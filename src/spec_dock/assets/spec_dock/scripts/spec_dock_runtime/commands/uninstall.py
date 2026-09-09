@@ -2,10 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-import subprocess
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import (
+    CommandArgs,
+    CommandOutcome,
+    CommandSpec,
+    InstallerExecRequest,
+)
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
@@ -83,6 +87,15 @@ def _uninstall_args(ns: argparse.Namespace) -> CommandArgs:
 def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     typed = _expect_uninstall_args(args)
+    if typed.remove_specs:
+        return CommandOutcome(
+            exit_code=1,
+            text=CliText(
+                stdout_lines=[],
+                stderr_lines=["error: spec history purge has been removed; uninstall is tooling-only."],
+                warnings=[],
+            ),
+        )
     target = Path(typed.target).expanduser().resolve()
     command = [
         "uvx",
@@ -102,23 +115,13 @@ def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     if typed.json:
         command.append("--json")
 
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return CommandOutcome(
-            exit_code=127,
-            text=CliText(
-                stdout_lines=[],
-                stderr_lines=["error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry."],
-                warnings=[],
-            ),
-        )
     return CommandOutcome(
-        exit_code=int(result.returncode),
-        text=CliText(
-            stdout_lines=result.stdout.splitlines(),
-            stderr_lines=result.stderr.splitlines(),
-            warnings=[],
+        exit_code=0,
+        text=CliText(stdout_lines=[], stderr_lines=[], warnings=[]),
+        terminal=InstallerExecRequest(
+            kind="installer-exec",
+            argv=tuple(command),
+            environment_policy="inherit-without-lock-bypass",
         ),
     )
 

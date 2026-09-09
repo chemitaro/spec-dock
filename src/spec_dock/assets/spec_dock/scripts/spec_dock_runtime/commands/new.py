@@ -4,13 +4,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.application.contracts import (
+    CURRENT_CREATABLE_ARTIFACT_TYPES,
     CreateArtifactDocRequest,
     CreateNodeRequest,
     CreateNodeResult,
     UseCases,
 )
 from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
-from spec_dock_runtime.domain.artifacts import CURRENT_CREATABLE_ARTIFACT_TYPES
 from spec_dock_runtime.presentation.cli_text import render_new_artifact_text, render_new_node_text
 from spec_dock_runtime.presentation.contracts import CliText
 

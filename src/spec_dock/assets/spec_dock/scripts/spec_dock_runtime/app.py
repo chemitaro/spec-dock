@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import contextlib
 from dataclasses import dataclass
+import io
 import os
 from pathlib import Path
 import re
@@ -35,6 +36,7 @@ from spec_dock_runtime.cli.bootstrap import build_runtime as _cli_build_runtime
 from spec_dock_runtime.cli.dispatch import dispatch as _cli_dispatch
 from spec_dock_runtime.cli.parser import build_parser as _cli_build_parser
 from spec_dock_runtime.cli.registry import build_registry as _cli_build_registry
+from spec_dock_runtime.commands.contracts import CommandOutcome, RuntimeProgramOutcome
 from spec_dock_runtime.domain.models import SpecGraph, SpecNodeSeed
 from spec_dock_runtime.domain.tree import build_graph as _domain_build_graph
 from spec_dock_runtime.domain.validation import (
@@ -53,6 +55,7 @@ from spec_dock_runtime.ids import (
 from spec_dock_runtime.infra.git_cli import origin_github_repo_slug as _origin_github_repo_slug
 from spec_dock_runtime.io_json import _load_json, _now_iso, _try_make_readonly, _warn, _write_json
 from spec_dock_runtime.presentation.cli_text import render_deps_check_text as _render_deps_check_text
+from spec_dock_runtime.presentation.contracts import CliText
 from spec_dock_runtime.presentation.json_state import render_deps_check_json as _render_deps_check_json
 from spec_dock_runtime.render_puml import (
     _deps_disabled_error_text,
@@ -2352,30 +2355,87 @@ def _parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv)
 
 
-def main(argv: list[str] | None = None) -> int:
-    """Entry point. Returns a process exit code (0=success)."""
+def run(
+    argv: list[str] | None = None,
+    bootstrap_context: Any | None = None,
+) -> RuntimeProgramOutcome:
+    """Parse and execute one runtime request without performing terminal I/O."""
     parsed_argv = sys.argv[1:] if argv is None else argv
-    try:
-        registry = _cli_build_registry()
-        parser = _cli_build_parser(registry)
+    registry = _cli_build_registry()
+    parser = _cli_build_parser(registry)
+    stdout = io.StringIO()
+    stderr = io.StringIO()
+    with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
         try:
             ns = parser.parse_args(parsed_argv)
         except SystemExit as error:
             code = getattr(error, "code", 1)
-            return int(code) if isinstance(code, int) else 1
-        try:
-            specdock_dir = _find_specdock_dir()
-            repo_root = specdock_dir.parent
-        except RuntimeError:
-            if getattr(ns, "command", None) != "doctor":
-                raise
-            repo_root = _find_repo_root_for_legacy_doctor()
-            specdock_dir = repo_root / _SPEC_DOCK_DIRNAME
-        runtime = _cli_build_runtime(specdock_dir, repo_root=repo_root)
-        return _cli_dispatch(ns, registry, runtime.use_cases)
-    except Exception as e:
-        print(f"error: {e}", file=sys.stderr)
+            exit_code = int(code) if isinstance(code, int) else 1
+            return CommandOutcome(
+                exit_code=exit_code,
+                text=CliText(
+                    stdout_lines=stdout.getvalue().splitlines(),
+                    stderr_lines=stderr.getvalue().splitlines(),
+                    warnings=[],
+                ),
+            )
+
+    try:
+        if bootstrap_context is None:
+            try:
+                specdock_dir = _find_specdock_dir()
+                repo_root = specdock_dir.parent
+            except RuntimeError:
+                if getattr(ns, "command", None) != "doctor":
+                    raise
+                repo_root = _find_repo_root_for_legacy_doctor()
+                specdock_dir = repo_root / _SPEC_DOCK_DIRNAME
+            bootstrap_context = _cli_build_runtime(specdock_dir, repo_root=repo_root)
+        outcome = _cli_dispatch(ns, registry, bootstrap_context.use_cases)
+        return CommandOutcome(
+            exit_code=int(outcome.exit_code),
+            text=CliText(
+                stdout_lines=[*stdout.getvalue().splitlines(), *outcome.text.stdout_lines],
+                stderr_lines=[*stderr.getvalue().splitlines(), *outcome.text.stderr_lines],
+                warnings=list(outcome.text.warnings),
+            ),
+            terminal=outcome.terminal,
+        )
+    except Exception as error:
+        return CommandOutcome(
+            exit_code=1,
+            text=CliText(
+                stdout_lines=stdout.getvalue().splitlines(),
+                stderr_lines=[*stderr.getvalue().splitlines(), f"error: {error}"],
+                warnings=[],
+            ),
+        )
+
+
+def _emit(text: CliText) -> None:
+    for warning in text.warnings:
+        print(f"spec-dock: (warn) {warning}", file=sys.stderr)
+    for line in text.stderr_lines:
+        print(line, file=sys.stderr)
+    for line in text.stdout_lines:
+        print(line)
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Compatibility entry point for direct module callers."""
+
+    outcome = run(argv)
+    if outcome.terminal is not None:
+        _emit(
+            CliText(
+                stdout_lines=[],
+                stderr_lines=["error: terminal runtime outcome requires the frozen bootstrap"],
+                warnings=[],
+            )
+        )
         return 1
+    _emit(outcome.text)
+    return int(outcome.exit_code)
 
 
 if __name__ == "__main__":

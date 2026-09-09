@@ -133,16 +133,13 @@ class TestRuntimeShellS11:
             }
         )
         ns = argparse.Namespace(command_key="dummy")
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, None)  # type: ignore[arg-type]
-        assert exit_code == 3
-        assert stdout.getvalue() == ""
-        assert stderr.getvalue().splitlines() == [
-            "spec-dock: (warn) deps_topology_external_ref:iss-local-99999",
+        outcome = cli_dispatch.dispatch(ns, registry, None)  # type: ignore[arg-type]
+        assert outcome.exit_code == 3
+        assert outcome.text.stdout_lines == []
+        assert outcome.text.stderr_lines == [
             "spec-dock: blocked (deps check) target=iss-local-00001 ready=false blockers=1",
         ]
+        assert outcome.text.warnings == ["deps_topology_external_ref:iss-local-99999"]
 
     def test_representative_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -187,18 +184,17 @@ class TestRuntimeShellS11:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["active", "set", "123"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 0
+        assert outcome.exit_code == 0
         request = captured.get("request")
         assert request is not None
         assert request.target.kind == "github_issue"
         assert request.target.github_issue_number == 123
-        assert "spec-dock: ok (active set) target=github#123" in stdout.getvalue()
-        assert stderr.getvalue() == ""
+        assert outcome.text.stdout_lines == [
+            "spec-dock: ok (active set) target=github#123 initiative=init-00123 epic=(none) issue=(none)"
+        ]
+        assert outcome.text.stderr_lines == []
 
     def test_close_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -247,18 +243,17 @@ class TestRuntimeShellS11:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["close", "--github-issue", "123"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 0
+        assert outcome.exit_code == 0
         request = captured.get("request")
         assert request is not None
         assert request.target.kind == "github_issue"
         assert request.target.github_issue_number == 123
-        assert "spec-dock: ok (close) target=github#123" in stdout.getvalue()
-        assert stderr.getvalue() == ""
+        assert outcome.text.stdout_lines == [
+            "spec-dock: ok (close) target=github#123 node=iss-local-00001 kind=issue github=#123 state=CLOSED already_closed=false"
+        ]
+        assert outcome.text.stderr_lines == []
 
     def test_delete_command_wrapper_smoke(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, _domain_models) = (
@@ -308,18 +303,15 @@ class TestRuntimeShellS11:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["delete", "iss-local-00001", "--yes"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 0
+        assert outcome.exit_code == 0
         request = captured.get("request")
         assert request is not None
         assert request.positional_target == "iss-local-00001"
         assert request.confirmed
-        assert "spec-dock: ok (delete) target=iss-local-00001" in stdout.getvalue()
-        assert stderr.getvalue() == ""
+        assert outcome.text.stdout_lines == ["spec-dock: ok (delete) target=iss-local-00001"]
+        assert outcome.text.stderr_lines == []
 
     def test_deps_json_stdout_only_and_text_warning_regression(self) -> None:
         (_runtime_app, app_contracts, cli_dispatch, cli_parser, cli_registry, _cmd_contracts, domain_models) = (
@@ -365,26 +357,20 @@ class TestRuntimeShellS11:
         parser = cli_parser.build_parser(registry)
 
         ns_json = parser.parse_args(["deps", "check", "iss-local-00001", "--json"])
-        stdout_json = io.StringIO()
-        stderr_json = io.StringIO()
-        with contextlib.redirect_stdout(stdout_json), contextlib.redirect_stderr(stderr_json):
-            exit_code_json = cli_dispatch.dispatch(ns_json, registry, use_cases)
-        assert exit_code_json == 0
-        assert stderr_json.getvalue() == ""
-        payload = json.loads(stdout_json.getvalue())
+        outcome_json = cli_dispatch.dispatch(ns_json, registry, use_cases)
+        assert outcome_json.exit_code == 0
+        assert outcome_json.text.stderr_lines == []
+        payload = json.loads("\n".join(outcome_json.text.stdout_lines))
         assert payload["warnings"] == ["gh_fetch_failed"]
 
         ns_text = parser.parse_args(["deps", "check", "iss-local-00001"])
-        stdout_text = io.StringIO()
-        stderr_text = io.StringIO()
-        with contextlib.redirect_stdout(stdout_text), contextlib.redirect_stderr(stderr_text):
-            exit_code_text = cli_dispatch.dispatch(ns_text, registry, use_cases)
-        assert exit_code_text == 0
-        assert "spec-dock: ok (deps check)" in stdout_text.getvalue()
-        assert "spec-dock: (warn) gh_fetch_failed" in stderr_text.getvalue()
+        outcome_text = cli_dispatch.dispatch(ns_text, registry, use_cases)
+        assert outcome_text.exit_code == 0
+        assert any("spec-dock: ok (deps check)" in line for line in outcome_text.text.stdout_lines)
+        assert outcome_text.text.warnings == ["gh_fetch_failed"]
 
     def test_staged_delegation_path_regression(self) -> None:
-        (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
+        (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, cmd_contracts, _domain_models) = (
             _runtime_modules()
         )
 
@@ -406,11 +392,14 @@ class TestRuntimeShellS11:
         runtime_app._cli_build_parser = lambda registry: _ParserStub()
         runtime_app._cli_build_runtime = lambda _specdock_dir, **_kwargs: SimpleNamespace(use_cases="use_cases")
         runtime_app._cli_dispatch = lambda ns, registry, use_cases: (
-            calls.append(("dispatch", ns.command_key, registry, use_cases)) or 17
+            calls.append(("dispatch", ns.command_key, registry, use_cases))
+            or cmd_contracts.CommandOutcome(
+                exit_code=17, text=SimpleNamespace(stdout_lines=[], stderr_lines=[], warnings=[])
+            )
         )
 
         try:
-            exit_code = runtime_app.main(["validate"])
+            outcome = runtime_app.run(["validate"])
         finally:
             runtime_app._find_specdock_dir = original_find_specdock_dir
             runtime_app._cli_build_registry = original_build_registry
@@ -418,7 +407,7 @@ class TestRuntimeShellS11:
             runtime_app._cli_build_runtime = original_build_runtime
             runtime_app._cli_dispatch = original_dispatch
 
-        assert exit_code == 17
+        assert outcome.exit_code == 17
         assert calls == [
             ("parse_args", ["validate"]),
             ("dispatch", "validate", "registry", "use_cases"),
@@ -466,11 +455,9 @@ class TestRuntimeShellS11:
             validate_tree=lambda req: None,  # type: ignore[return-value]
         )
 
-        stdout = io.StringIO()
-        with contextlib.redirect_stdout(stdout):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
-        assert exit_code == 9
-        assert stdout.getvalue().strip() == "spec-dock: ok (swapped wrapper)"
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
+        assert outcome.exit_code == 9
+        assert outcome.text.stdout_lines == ["spec-dock: ok (swapped wrapper)"]
 
     def test_final_api_call_site_and_structural_regression(self) -> None:
         (runtime_app, _app_contracts, _cli_dispatch, _cli_parser, _cli_registry, _cmd_contracts, _domain_models) = (
@@ -481,10 +468,10 @@ class TestRuntimeShellS11:
         app_source = app_source_path.read_text(encoding="utf-8")
         app_tree = ast.parse(app_source)
         main_node = next(
-            (node for node in app_tree.body if isinstance(node, ast.FunctionDef) and node.name == "main"),
+            (node for node in app_tree.body if isinstance(node, ast.FunctionDef) and node.name == "run"),
             None,
         )
-        assert main_node is not None, "main() not found in app.py"
+        assert main_node is not None, "run() not found in app.py"
 
         call_names: set[str] = set()
         for node in ast.walk(main_node):

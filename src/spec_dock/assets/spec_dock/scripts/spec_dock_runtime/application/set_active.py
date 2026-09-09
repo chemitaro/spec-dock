@@ -27,6 +27,16 @@ from spec_dock_runtime.domain.models import (
 from spec_dock_runtime.domain.tree import build_graph, select_active_chain
 from spec_dock_runtime.infra.contracts import ActiveManifest, ActiveManifestEntry, StoredMetaRecord
 
+_PROVIDER_CLOSURE_PATHS = (
+    "spec-dock/docs",
+    "spec-dock/templates",
+    "spec-dock/system",
+    "spec-dock/scripts",
+    ".agents/skills/spec-dock",
+    ".agents/skills/spec-dock-grill-with-docs",
+)
+_LAST_PINNED_CHECKOUT = None
+
 if TYPE_CHECKING:
     from spec_dock_runtime.application.ports import Ports
 
@@ -299,6 +309,8 @@ def checkout_active_target(
     ports: Ports,
     warnings: list[str],
 ) -> BranchDecision:
+    global _LAST_PINNED_CHECKOUT
+    _LAST_PINNED_CHECKOUT = None
     if ports.git_gateway is None:
         raise RuntimeError("git_gateway is required when checkout is enabled")
     repo_root = _resolve_repo_root(ports)
@@ -312,6 +324,32 @@ def checkout_active_target(
 
     ports.git_gateway.require_clean_working_tree(repo_root)
     current_branch = ports.git_gateway.current_branch_or_none(repo_root)
+
+    pinned_checkout = getattr(ports.git_gateway, "pinned_checkout", None)
+    resolve_commit = getattr(ports.git_gateway, "resolve_commit", None)
+    current_head = getattr(ports.git_gateway, "current_head_or_none", None)
+    if callable(pinned_checkout) and callable(resolve_commit) and callable(current_head):
+        checkout_kind = "existing" if ports.git_gateway.local_branch_exists(repo_root, decision.desired) else "new"
+        pinned_commit = (
+            resolve_commit(repo_root, f"refs/heads/{decision.desired}")
+            if checkout_kind == "existing"
+            else current_head(repo_root)
+        )
+        if not pinned_commit:
+            raise RuntimeError("cannot pin checkout: current HEAD is unavailable")
+        checkout = pinned_checkout(
+            repo_root,
+            branch=decision.desired,
+            pinned_commit=pinned_commit,
+            checkout_kind=checkout_kind,
+            closure_paths=_PROVIDER_CLOSURE_PATHS,
+        )
+        _LAST_PINNED_CHECKOUT = checkout
+        verify = getattr(ports.git_gateway, "verify_pinned_checkout", None)
+        if callable(verify):
+            verify(repo_root, checkout=checkout, closure_paths=_PROVIDER_CLOSURE_PATHS)
+        return decision
+
     if current_branch != decision.desired:
         if ports.git_gateway.local_branch_exists(repo_root, decision.desired):
             _append_unique(warnings, "branch already exists; reusing existing branch; content is not verified")
@@ -319,6 +357,12 @@ def checkout_active_target(
         else:
             ports.git_gateway.create_and_checkout_branch(repo_root, decision.desired)
     return decision
+
+
+def last_pinned_checkout():
+    """Return the checkout witness for the current issue-start transaction."""
+
+    return _LAST_PINNED_CHECKOUT
 
 
 def set_active(req: SetActiveRequest, ports: Ports) -> ActiveSetResult:

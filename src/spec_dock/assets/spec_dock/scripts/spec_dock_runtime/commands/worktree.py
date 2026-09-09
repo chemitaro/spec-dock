@@ -11,7 +11,12 @@ from spec_dock_runtime.application.contracts import (
     WorktreeRemoveRequest,
     WorktreeShowRequest,
 )
-from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import (
+    CommandArgs,
+    CommandOutcome,
+    CommandSpec,
+    ConsumerHookRequest,
+)
 from spec_dock_runtime.presentation.cli_text import (
     render_worktree_create_text,
     render_worktree_error_json,
@@ -31,6 +36,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class WorktreeCreateArgs(CommandArgs):
     label: str | None
+    json: bool
 
 
 @dataclass(frozen=True)
@@ -82,10 +88,11 @@ def _add_worktree_create_arguments(parser: argparse.ArgumentParser) -> None:
         nargs="?",
         help="Optional lowercase label for the worktree id (letters, digits, hyphens).",
     )
+    parser.add_argument("--json", action="store_true", help="Emit agent-oriented JSON output.")
 
 
 def _worktree_create_args(ns: argparse.Namespace) -> CommandArgs:
-    return WorktreeCreateArgs(label=getattr(ns, "label", None))
+    return WorktreeCreateArgs(label=getattr(ns, "label", None), json=bool(getattr(ns, "json", False)))
 
 
 def _add_worktree_json_arguments(parser: argparse.ArgumentParser) -> None:
@@ -126,6 +133,34 @@ def _worktree_remove_args(ns: argparse.Namespace) -> CommandArgs:
 def _run_worktree_create(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_worktree_create_args(args)
     result = use_cases.worktree_create(WorktreeCreateRequest(label=typed.label))
+    if result.bound_cwd_fd is not None:
+        if result.bound_device is None or result.bound_inode is None:
+            raise RuntimeError("worktree hook binding is incomplete")
+        payload = {
+            "id": result.id,
+            "main_worktree_path": str(result.main_worktree_path),
+            "container_path": str(result.container_path),
+            "worktree_path": str(result.worktree_path),
+            "branch_name": result.branch_name,
+            "bootstrap_status": result.bootstrap_status,
+            "bootstrap_command": result.bootstrap_command,
+            "bootstrap_exit_code": result.bootstrap_exit_code,
+            "warnings": list(result.warnings),
+        }
+        return CommandOutcome(
+            exit_code=0,
+            text=render_worktree_create_text(result),
+            terminal=ConsumerHookRequest(
+                kind="consumer-hook",
+                bound_cwd_fd=result.bound_cwd_fd,
+                bound_device=result.bound_device,
+                bound_inode=result.bound_inode,
+                detection_argv=("make", "-n", "init"),
+                execution_argv=("make", "init"),
+                result_format="worktree-create-json-v1" if typed.json else "worktree-create-text-v1",
+                result_payload=payload,
+            ),
+        )
     return CommandOutcome(exit_code=0, text=render_worktree_create_text(result))
 
 

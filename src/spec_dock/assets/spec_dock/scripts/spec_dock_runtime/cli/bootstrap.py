@@ -53,7 +53,6 @@ from spec_dock_runtime.infra import (
     github_capability_cli as infra_github_capability_cli,
     github_cli as infra_github_cli,
     json_store as infra_json_store,
-    make_cli as infra_make_cli,
     template_scaffolder as infra_template_scaffolder,
 )
 from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
@@ -235,6 +234,9 @@ class _GitGateway:
     def current_branch_or_none(self, repo_root: Path):
         return infra_git_cli.current_branch_or_none(repo_root)
 
+    def current_head_or_none(self, repo_root: Path):
+        return infra_git_cli.current_head_or_none(repo_root)
+
     def local_branch_exists(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.local_branch_exists(repo_root, branch)
 
@@ -256,20 +258,91 @@ class _GitGateway:
     def add_worktree_with_new_branch(self, repo_root: Path, *, path: Path, branch: str) -> None:
         infra_git_cli.add_worktree_with_new_branch(repo_root, path=path, branch=branch)
 
-    def remove_worktree(self, repo_root: Path, *, path: Path, force: bool) -> None:
-        infra_git_cli.remove_worktree(repo_root, path=path, force=force)
+    def remove_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        force: bool,
+        source_fd: int | None = None,
+        target_fd: int | None = None,
+    ) -> None:
+        infra_git_cli.remove_worktree(
+            repo_root,
+            path=path,
+            force=force,
+            source_fd=source_fd,
+            target_fd=target_fd,
+        )
+
+    def resolve_commit(self, repo_root: Path, ref: str) -> str:
+        return infra_git_cli.resolve_commit(repo_root, ref)
+
+    def provider_closure(self, repo_root: Path, pinned_commit: str):
+        return infra_git_cli.provider_closure(repo_root, pinned_commit)
+
+    def assess_capabilities(
+        self,
+        repo_root: Path,
+        *,
+        pinned_commit: str,
+        closure_paths: tuple[str, ...],
+        check_other_worktree: bool = True,
+    ):
+        return infra_git_cli.assess_capabilities(
+            repo_root,
+            pinned_commit=pinned_commit,
+            closure_paths=closure_paths,
+            check_other_worktree=check_other_worktree,
+        )
+
+    def pinned_checkout(
+        self,
+        repo_root: Path,
+        *,
+        branch: str,
+        pinned_commit: str,
+        checkout_kind: str,
+        closure_paths: tuple[str, ...],
+    ):
+        return infra_git_cli.pinned_checkout(
+            repo_root,
+            branch=branch,
+            pinned_commit=pinned_commit,
+            checkout_kind=checkout_kind,
+            closure_paths=closure_paths,
+        )
+
+    def verify_pinned_checkout(self, repo_root: Path, *, checkout, closure_paths: tuple[str, ...]) -> None:
+        infra_git_cli.verify_pinned_checkout(repo_root, checkout=checkout, closure_paths=closure_paths)
+
+    def add_worktree_pinned(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        branch: str,
+        pinned_commit: str,
+        source_fd: int | None = None,
+        target_fd: int | None = None,
+    ) -> None:
+        infra_git_cli.add_worktree_pinned(
+            repo_root,
+            path=path,
+            branch=branch,
+            pinned_commit=pinned_commit,
+            source_fd=source_fd,
+            target_fd=target_fd,
+        )
+
+    def materialize_worktree(self, repo_root: Path, *, path: Path, pinned_commit: str) -> None:
+        infra_git_cli.materialize_worktree(repo_root, path=path, pinned_commit=pinned_commit)
 
 
 @dataclass(frozen=True)
 class _GitHubCapabilityGateway:
     def probe(self, request):
         return infra_github_capability_cli.GitHubCapabilityCliGateway().probe(request)
-
-
-@dataclass(frozen=True)
-class _BootstrapGateway:
-    def run_make_init_if_available(self, worktree_path: Path):
-        return infra_make_cli.run_make_init_if_available(worktree_path)
 
 
 @dataclass(frozen=True)
@@ -341,7 +414,6 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         deps_topology_reader=_DepsTopologyReader(),
         git_gateway=_GitGateway(),
         github_capability_gateway=_GitHubCapabilityGateway(),
-        bootstrap_gateway=_BootstrapGateway(),
         environment_gateway=_EnvironmentGateway(),
         filesystem_gateway=_FilesystemGateway(),
         json_store=_JsonStore(),

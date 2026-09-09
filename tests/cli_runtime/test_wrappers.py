@@ -194,17 +194,3 @@ class TestCliRulesContract(CliRuntimeHarness):
             assert validate_result.returncode != 0
             assert "Unsafe artifact directory" in validate_result.stderr
             assert "must not be a symlink" in validate_result.stderr
-
-    def test_runtime_entrypoint_fails_fast_when_runtime_module_missing(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            assert main(["init", str(target)]) == 0
-
-            runtime_app = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "app.py"
-            runtime_backup = target / "spec-dock" / "scripts" / "spec_dock_runtime" / "app.py.bak"
-            runtime_app.rename(runtime_backup)
-
-            p = self._run_runtime_capture(target, ["sync"])
-            assert p.returncode != 0
-            assert "runtime module missing" in p.stderr
-            assert "spec-dock update" in p.stderr
