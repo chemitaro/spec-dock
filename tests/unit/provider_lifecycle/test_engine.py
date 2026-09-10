@@ -5,6 +5,7 @@ from io import BytesIO
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import tarfile
 from types import SimpleNamespace
@@ -103,6 +104,162 @@ def _workspace_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
         else:
             snapshot[relative] = ("directory", value.st_mode & 0o777)
     return snapshot
+
+
+def _assert_first_red_partial_shape(
+    result,
+    *,
+    expected_phase: str,
+    expected_last_completed_phase: str,
+    expected_actions: list[LifecycleAction],
+) -> None:
+    assert result.status == "partial_failure"
+    assert result.phase == expected_phase
+    assert result.last_completed_phase == expected_last_completed_phase
+    assert result.actions == tuple(expected_actions)
+    assert result.failed_paths == tuple(item.path for item in expected_actions if item.status == "failed")
+    assert result.pending_paths == tuple(item.path for item in expected_actions if item.status == "pending")
+    assert dict(result.summary) == {
+        status: sum(item.status == status for item in expected_actions)
+        for status in ("planned", "completed", "preserved", "pending", "failed", "warnings")
+    }
+    serialize_public_result(result)
+
+
+def test_t01_partial_action_vectors_are_operation_and_seed_specific(tmp_path: Path) -> None:
+    cases: tuple[tuple[Operation, Operation, str, str], ...] = (
+        ("install", "install", "create-if-absent", "completed"),
+        ("update", "install", "preserve-only", "preserved"),
+    )
+    for index, (request_operation, expected_operation, seed_policy, seed_status) in enumerate(cases):
+        workspace = (tmp_path / f"partial-{index}").resolve()
+        workspace.mkdir()
+        result = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(
+            _request(workspace, request_operation), force=True
+        )
+        expected_actions = [
+            LifecycleAction("spec-dock", "container", "preserved", "shared-container-preserve"),
+            LifecycleAction("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+            LifecycleAction("spec-dock/docs", "root", "completed", "candidate-root-create"),
+            LifecycleAction("spec-dock/templates", "root", "completed", "candidate-root-create"),
+            LifecycleAction("spec-dock/system", "root", "failed", "candidate-root-create"),
+            LifecycleAction("spec-dock/scripts", "root", "pending", "candidate-root-create"),
+            LifecycleAction(".agents/skills/spec-dock", "slot", "pending", "candidate-slot-create"),
+            LifecycleAction(".agents/skills/spec-dock-grill-with-docs", "slot", "pending", "candidate-slot-create"),
+            LifecycleAction(
+                "spec-dock/.gitignore",
+                "seed",
+                seed_status,
+                "fresh-seed-create" if seed_status == "completed" else "preserve-only-seed",
+            ),
+            LifecycleAction(
+                ".github/workflows/ci.yml",
+                "seed",
+                seed_status,
+                "fresh-seed-create" if seed_status == "completed" else "preserve-only-seed",
+            ),
+            LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+        ]
+        _assert_first_red_partial_shape(
+            result,
+            expected_phase="publish-system",
+            expected_last_completed_phase="publish-templates",
+            expected_actions=expected_actions,
+        )
+        assert result.operation == expected_operation
+        assert result.seed_policy == seed_policy
+
+
+def test_t01_update_partial_action_vector_preserves_current_domains(tmp_path: Path) -> None:
+    workspace = (tmp_path / "update-partial").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    (workspace / "spec-dock/system/consumer-owned.txt").write_text("consumer-owned\n", encoding="utf-8")
+
+    result = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(
+        _request(workspace, "update"), force=True
+    )
+    expected_actions = [
+        LifecycleAction("spec-dock", "container", "preserved", "shared-container-preserve"),
+        LifecycleAction("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+        LifecycleAction("spec-dock/docs", "root", "preserved", "candidate-root-current"),
+        LifecycleAction("spec-dock/templates", "root", "preserved", "candidate-root-current"),
+        LifecycleAction("spec-dock/system", "root", "failed", "candidate-root-replace"),
+        LifecycleAction("spec-dock/scripts", "root", "preserved", "candidate-root-current"),
+        LifecycleAction(".agents/skills/spec-dock", "slot", "preserved", "candidate-slot-current"),
+        LifecycleAction(".agents/skills/spec-dock-grill-with-docs", "slot", "preserved", "candidate-slot-current"),
+        LifecycleAction("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ]
+    _assert_first_red_partial_shape(
+        result,
+        expected_phase="publish-system",
+        expected_last_completed_phase="publish-templates",
+        expected_actions=expected_actions,
+    )
+    assert result.operation == "update"
+    assert result.seed_policy == "preserve-only"
+
+
+@pytest.mark.parametrize(
+    ("fault_point", "expected_last_completed_phase", "failed_index"),
+    [
+        ("root-docs-publish-or-detach", "publish-incomplete-record", 0),
+        ("root-system-publish-or-detach", "detach-templates", 2),
+    ],
+)
+def test_t01_uninstall_partial_action_vectors_follow_uninstall_sequence(
+    tmp_path: Path, fault_point: str, expected_last_completed_phase: str, failed_index: int
+) -> None:
+    workspace = (tmp_path / fault_point).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    result = ProviderLifecycleEngine(fault_injector=fault_point).execute(_request(workspace, "uninstall"), force=True)
+    expected_actions = [
+        LifecycleAction("spec-dock", "container", "preserved", "shared-container-preserve"),
+        LifecycleAction("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+    ]
+    for index, (category, path, _source) in enumerate(FIXED_DOMAINS):
+        status = "failed" if index == failed_index else "completed" if index < failed_index else "pending"
+        expected_actions.append(LifecycleAction(path, category, status, f"owned-{category}-remove"))
+    expected_actions.extend([
+        LifecycleAction("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ])
+    expected_phase = "detach-docs" if failed_index == 0 else "detach-system"
+    _assert_first_red_partial_shape(
+        result,
+        expected_phase=expected_phase,
+        expected_last_completed_phase=expected_last_completed_phase,
+        expected_actions=expected_actions,
+    )
+    assert result.operation == "uninstall"
+    assert result.seed_policy == "preserve-only"
+
+
+@pytest.mark.parametrize("missing_count", range(7))
+def test_t01_incomplete_uninstall_plan_precedes_already_absent_code(tmp_path: Path, missing_count: int) -> None:
+    workspace = (tmp_path / f"incomplete-uninstall-{missing_count}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    interrupted = ProviderLifecycleEngine(fault_injector="root-docs-publish-or-detach").execute(
+        _request(workspace, "uninstall"), force=True
+    )
+    assert interrupted.status == "partial_failure"
+
+    for _category, path, _source in FIXED_DOMAINS[:missing_count]:
+        shutil.rmtree(workspace / path)
+
+    dry_run = ProviderLifecycleEngine().execute(_request(workspace, "uninstall", mode="dry-run"))
+    assert dry_run.status == "planned"
+    assert dry_run.code == "uninstall-planned"
+    serialize_public_result(dry_run)
 
 
 def test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations(tmp_path: Path) -> None:

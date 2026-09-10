@@ -321,9 +321,15 @@ def _relation_preparation(profile: str, operation: str, seed_policy: str) -> lis
 
 def _relation_partial(profile: str, operation: str, seed_policy: str) -> list[dict[str, str]]:
     _prefix, phase = profile.split(" at ", 1)
+    terminal_record_failure = phase == "publish-terminal-record"
     actions = [
         _relation_action("spec-dock", "container", "preserved", "shared-container-preserve"),
-        _relation_action("spec-dock/spec-dock.version", "record", "completed", "terminal-record-publish"),
+        _relation_action(
+            "spec-dock/spec-dock.version",
+            "record",
+            "failed" if terminal_record_failure else "completed",
+            "terminal-record-publish" if terminal_record_failure else "incomplete-record-publish",
+        ),
     ]
     current_target = {
         "publish-docs": 0,
@@ -365,9 +371,15 @@ def _relation_partial(profile: str, operation: str, seed_policy: str) -> list[di
 
 
 def _relation_exact_uninstall(profile: str, phase: str) -> list[dict[str, str]]:
+    terminal_record_failure = phase == "publish-terminal-record"
     actions = [
         _relation_action("spec-dock", "container", "preserved", "shared-container-preserve"),
-        _relation_action("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+        _relation_action(
+            "spec-dock/spec-dock.version",
+            "record",
+            "failed" if terminal_record_failure else "completed",
+            "terminal-record-publish" if terminal_record_failure else "incomplete-record-publish",
+        ),
     ]
     current = {
         "detach-docs": 0,
@@ -512,6 +524,180 @@ def _relation_witness(row: dict[str, object]) -> dict[str, object]:
         "warnings": warning,
         "errors": error,
     }
+
+
+def _first_red_install_preserve_partial_result() -> dict[str, object]:
+    actions = [
+        _relation_action("spec-dock", "container", "preserved", "shared-container-preserve"),
+        _relation_action("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+        _relation_action("spec-dock/docs", "root", "completed", "candidate-root-create"),
+        _relation_action("spec-dock/templates", "root", "completed", "candidate-root-create"),
+        _relation_action("spec-dock/system", "root", "failed", "candidate-root-create"),
+        _relation_action("spec-dock/scripts", "root", "pending", "candidate-root-create"),
+        _relation_action(".agents/skills/spec-dock", "slot", "pending", "candidate-slot-create"),
+        _relation_action(".agents/skills/spec-dock-grill-with-docs", "slot", "pending", "candidate-slot-create"),
+        _relation_action("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        _relation_action(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        _relation_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ]
+    return _first_red_partial_result(
+        operation="install",
+        seed_policy="preserve-only",
+        phase="publish-system",
+        last_completed_phase="publish-templates",
+        retry_command="spec-dock update -- " + _RELATION_TARGET,
+        actions=actions,
+    )
+
+
+def _first_red_uninstall_partial_result() -> dict[str, object]:
+    actions = [
+        _relation_action("spec-dock", "container", "preserved", "shared-container-preserve"),
+        _relation_action("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+        _relation_action("spec-dock/docs", "root", "completed", "owned-root-remove"),
+        _relation_action("spec-dock/templates", "root", "completed", "owned-root-remove"),
+        _relation_action("spec-dock/system", "root", "failed", "owned-root-remove"),
+        _relation_action("spec-dock/scripts", "root", "pending", "owned-root-remove"),
+        _relation_action(".agents/skills/spec-dock", "slot", "pending", "owned-slot-remove"),
+        _relation_action(".agents/skills/spec-dock-grill-with-docs", "slot", "pending", "owned-slot-remove"),
+        _relation_action("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        _relation_action(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        _relation_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ]
+    return _first_red_partial_result(
+        operation="uninstall",
+        seed_policy="preserve-only",
+        phase="detach-system",
+        last_completed_phase="detach-templates",
+        retry_command="spec-dock uninstall --apply --keep-specs -- " + _RELATION_TARGET,
+        actions=actions,
+    )
+
+
+def _first_red_install_create_seed_partial_result() -> dict[str, object]:
+    actions = [
+        _relation_action("spec-dock", "container", "preserved", "shared-container-preserve"),
+        _relation_action("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+        _relation_action("spec-dock/docs", "root", "completed", "candidate-root-create"),
+        _relation_action("spec-dock/templates", "root", "completed", "candidate-root-create"),
+        _relation_action("spec-dock/system", "root", "completed", "candidate-root-create"),
+        _relation_action("spec-dock/scripts", "root", "completed", "candidate-root-create"),
+        _relation_action(".agents/skills/spec-dock", "slot", "completed", "candidate-slot-create"),
+        _relation_action(".agents/skills/spec-dock-grill-with-docs", "slot", "completed", "candidate-slot-create"),
+        _relation_action("spec-dock/.gitignore", "seed", "failed", "fresh-seed-create"),
+        _relation_action(".github/workflows/ci.yml", "seed", "pending", "fresh-seed-create"),
+        _relation_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ]
+    return _first_red_partial_result(
+        operation="install",
+        seed_policy="create-if-absent",
+        phase="create-seed-spec-dock-gitignore",
+        last_completed_phase="publish-slot-spec-dock-grill-with-docs",
+        retry_command="spec-dock init --force -- " + _RELATION_TARGET,
+        actions=actions,
+    )
+
+
+def _first_red_partial_result(
+    *,
+    operation: str,
+    seed_policy: str,
+    phase: str,
+    last_completed_phase: str,
+    retry_command: str,
+    actions: list[dict[str, str]],
+) -> dict[str, object]:
+    result: dict[str, object] = {
+        "schema_version": 1,
+        "target": _RELATION_TARGET,
+        "mode": "apply",
+        "apply": True,
+        "specs_mode": None,
+        "status": "partial_failure",
+        "code": f"{operation}-partial-failure",
+        "operation": operation,
+        "candidate_digest": _RELATION_DIGEST,
+        "seed_policy": seed_policy,
+        "mutation_started": True,
+        "bootstrap_rolled_back": False,
+        "phase": phase,
+        "last_completed_phase": last_completed_phase,
+        "retry_command": retry_command,
+        "continuation": {
+            "next_action": "run-request",
+            "next_command": retry_command,
+            "after_cleanup_action": "none",
+            "after_cleanup_command": None,
+        },
+        "failed_paths": [],
+        "pending_paths": [],
+        "summary": {},
+        "actions": actions,
+        "guidance": [
+            "Run continuation.next_command to resume the exact lifecycle operation.",
+            "Do not switch operation, candidate package, or seed policy.",
+        ],
+        "warnings": [],
+        "errors": [_RELATION_ERROR_TEXT[f"{operation}-partial-failure"]],
+    }
+    _refresh_first_red_derived_fields(result)
+    return result
+
+
+def _refresh_first_red_derived_fields(result: dict[str, object]) -> None:
+    actions = cast("list[dict[str, str]]", result["actions"])
+    result["failed_paths"] = [action["path"] for action in actions if action["status"] == "failed"]
+    result["pending_paths"] = [action["path"] for action in actions if action["status"] == "pending"]
+    result["summary"] = {
+        status: sum(action["status"] == status for action in actions)
+        for status in ("planned", "completed", "preserved", "pending", "failed", "warnings")
+    }
+
+
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "record-reason",
+        "record-status",
+        "prior-pending",
+        "multiple-failed",
+        "current-completed",
+        "later-completed",
+        "stage-completed",
+        "seed-pending",
+    ],
+)
+def test_t01_partial_action_profile_rejects_every_unlisted_vector(mutation: str) -> None:
+    if mutation in {"record-status"}:
+        result = _first_red_uninstall_partial_result()
+    elif mutation == "seed-pending":
+        result = _first_red_install_create_seed_partial_result()
+    else:
+        result = _first_red_install_preserve_partial_result()
+    actions = cast("list[dict[str, str]]", result["actions"])
+
+    if mutation == "record-reason":
+        actions[1]["reason"] = "terminal-record-publish"
+    elif mutation == "record-status":
+        actions[1]["status"] = "pending"
+    elif mutation == "prior-pending":
+        actions[2]["status"] = "pending"
+    elif mutation == "multiple-failed":
+        actions[3]["status"] = "failed"
+    elif mutation == "current-completed":
+        actions[4]["status"] = "completed"
+    elif mutation == "later-completed":
+        actions[5]["status"] = "completed"
+    elif mutation == "stage-completed":
+        actions[-1]["status"] = "completed"
+    elif mutation == "seed-pending":
+        actions[8]["status"] = "pending"
+    else:
+        raise AssertionError(f"unhandled mutation: {mutation}")
+    _refresh_first_red_derived_fields(result)
+
+    with pytest.raises(WireValidationError):
+        validate_public_result(result)
 
 
 @pytest.mark.parametrize(

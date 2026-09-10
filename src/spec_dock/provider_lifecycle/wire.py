@@ -696,6 +696,158 @@ def _action(
     return {"path": path, "category": category, "status": status, "reason": reason}
 
 
+_PARTIAL_TARGET_PHASE_INDEX = {
+    "install": {
+        "publish-docs": 0,
+        "publish-templates": 1,
+        "publish-system": 2,
+        "publish-scripts": 3,
+        "publish-slot-spec-dock": 4,
+        "publish-slot-spec-dock-grill-with-docs": 5,
+    },
+    "update": {
+        "publish-docs": 0,
+        "publish-templates": 1,
+        "publish-system": 2,
+        "publish-scripts": 3,
+        "publish-slot-spec-dock": 4,
+        "publish-slot-spec-dock-grill-with-docs": 5,
+    },
+    "uninstall": {
+        "detach-docs": 0,
+        "detach-templates": 1,
+        "detach-system": 2,
+        "detach-scripts": 3,
+        "detach-slot-spec-dock": 4,
+        "detach-slot-spec-dock-grill-with-docs": 5,
+    },
+}
+_PARTIAL_SEED_PHASE_INDEX = {
+    "create-seed-spec-dock-gitignore": 0,
+    "create-seed-consumer-ci": 1,
+}
+
+
+def _partial_action_profile_matches(
+    actions: Sequence[Mapping[str, str]],
+    *,
+    operation: str,
+    seed_policy: str,
+    phase: str,
+) -> bool:
+    """Validate one exact partial lifecycle action vector."""
+
+    if operation not in _PARTIAL_TARGET_PHASE_INDEX:
+        return False
+    if operation == "uninstall" and seed_policy != "preserve-only":
+        return False
+    if operation == "update" and seed_policy != "preserve-only":
+        return False
+    if operation == "install" and seed_policy not in {"create-if-absent", "preserve-only"}:
+        return False
+    if len(actions) != len(_LIFECYCLE_ACTION_PATHS) or [item["path"] for item in actions] != list(
+        _LIFECYCLE_ACTION_PATHS
+    ):
+        return False
+    if actions[0] != _action("spec-dock", "container", "preserved", "shared-container-preserve"):
+        return False
+    if actions[-1] != _action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"):
+        return False
+
+    terminal_record_failure = phase == "publish-terminal-record"
+    expected_record = _action(
+        "spec-dock/spec-dock.version",
+        "record",
+        "failed" if terminal_record_failure else "completed",
+        "terminal-record-publish" if terminal_record_failure else "incomplete-record-publish",
+    )
+    if actions[1] != expected_record:
+        return False
+
+    target_phase_index = _PARTIAL_TARGET_PHASE_INDEX[operation].get(phase)
+    if operation == "uninstall":
+        for index, (action, path, category) in enumerate(
+            zip(actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True)
+        ):
+            if action["path"] != path or action["category"] != category:
+                return False
+            absent = action["reason"] == f"owned-{category}-absent"
+            present = action["reason"] == f"owned-{category}-remove"
+            if not absent and not present:
+                return False
+            if absent:
+                if action["status"] != "preserved":
+                    return False
+                continue
+            if phase == "verify-target":
+                if action["status"] not in {"completed", "failed"}:
+                    return False
+                continue
+            if target_phase_index is not None and index == target_phase_index:
+                expected_status = "failed"
+            elif target_phase_index is not None and index > target_phase_index:
+                expected_status = "pending"
+            else:
+                expected_status = "completed"
+            if action["status"] != expected_status:
+                return False
+        return all(
+            action == _action(path, "seed", "preserved", "preserve-only-seed")
+            for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
+        )
+
+    for index, (action, path, category) in enumerate(
+        zip(actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True)
+    ):
+        if action["path"] != path or action["category"] != category:
+            return False
+        current = action["reason"] == f"candidate-{category}-current"
+        if current:
+            if action["status"] != "preserved" or index == target_phase_index:
+                return False
+            continue
+        if action["reason"] not in {f"candidate-{category}-create", f"candidate-{category}-replace"}:
+            return False
+        if phase == "verify-target":
+            if action["status"] not in {"completed", "failed"}:
+                return False
+            continue
+        if target_phase_index is not None and index == target_phase_index:
+            expected_status = "failed"
+        elif target_phase_index is not None and index > target_phase_index:
+            expected_status = "pending"
+        else:
+            expected_status = "completed"
+        if action["status"] != expected_status:
+            return False
+
+    if operation == "update" or seed_policy == "preserve-only":
+        return all(
+            action == _action(path, "seed", "preserved", "preserve-only-seed")
+            for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
+        )
+
+    seed_phase_index = _PARTIAL_SEED_PHASE_INDEX.get(phase)
+    for index, (action, path) in enumerate(zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)):
+        if action["path"] != path or action["category"] != "seed":
+            return False
+        if action["reason"] == "consumer-seed-present":
+            if action["status"] != "preserved" or index == seed_phase_index:
+                return False
+            continue
+        if action["reason"] != "fresh-seed-create":
+            return False
+        if seed_phase_index is None or index < seed_phase_index:
+            expected_status = "completed"
+        elif index == seed_phase_index:
+            expected_status = "failed"
+        else:
+            expected_status = "pending"
+        if action["status"] != expected_status:
+            return False
+    return True
+
+
 def _action_profile_matches(
     actions: Sequence[Mapping[str, str]],
     profile: str,
@@ -904,66 +1056,13 @@ def _action_profile_matches(
         prefix, expected_phase = profile.split(" at ", 1)
         if phase != expected_phase or operation not in {"install", "update", "uninstall"}:
             return False
-        if len(actions) != len(_LIFECYCLE_ACTION_PATHS) or [item["path"] for item in actions] != list(
-            _LIFECYCLE_ACTION_PATHS
-        ):
+        if prefix != f"exact {operation} partial action set":
             return False
-        if actions[0] != _action("spec-dock", "container", "preserved", "shared-container-preserve"):
-            return False
-        if actions[-1] != _action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"):
-            return False
-        if prefix.startswith("exact uninstall"):
-            if seed_policy != "preserve-only":
-                return False
-            if actions[1]["category"] != "record" or actions[1]["reason"] != "incomplete-record-publish":
-                return False
-            for action, path, category in zip(
-                actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
-            ):
-                if action["path"] != path or action["category"] != category:
-                    return False
-                if action["reason"] not in {f"owned-{category}-remove", f"owned-{category}-absent"}:
-                    return False
-                if action["status"] not in {"preserved", "completed", "failed", "pending"}:
-                    return False
-            return all(
-                action == _action(path, "seed", "preserved", "preserve-only-seed")
-                for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
-            )
-        if not prefix.startswith(("exact install", "exact update")):
-            return False
-        if prefix.startswith("exact install") and seed_policy not in {"create-if-absent", "preserve-only"}:
-            return False
-        if prefix.startswith("exact update") and seed_policy != "preserve-only":
-            return False
-        if actions[1]["category"] != "record" or actions[1]["status"] != "completed":
-            return False
-        if actions[1]["reason"] not in {"terminal-record-publish", "incomplete-record-publish"}:
-            return False
-        for action, path, category in zip(
-            actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
-        ):
-            if action["path"] != path or action["category"] != category:
-                return False
-            if action["reason"] not in {
-                f"candidate-{category}-create",
-                f"candidate-{category}-replace",
-                f"candidate-{category}-current",
-            }:
-                return False
-            if action["status"] not in {"preserved", "completed", "failed", "pending"}:
-                return False
-        if prefix.startswith("exact update") or seed_policy == "preserve-only":
-            return all(
-                action == _action(path, "seed", "preserved", "preserve-only-seed")
-                for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
-            )
-        return all(
-            action["path"] == path
-            and action["category"] == "seed"
-            and action["reason"] in {"fresh-seed-create", "consumer-seed-present"}
-            and action["status"] in {"completed", "preserved", "failed", "pending"}
-            for action, path in zip(actions[8:10], _UNINSTALL_SEED_PATHS, strict=True)
+        return _partial_action_profile_matches(
+            actions,
+            operation=operation,
+            seed_policy=seed_policy or "",
+            phase=phase,
         )
     if profile in {
         "install-create terminal action set",

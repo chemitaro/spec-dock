@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -78,6 +79,7 @@ class UninstallArgs(CommandArgs):
     keep_specs: bool
     remove_specs: bool
     json: bool
+    invocation_cwd: Path | None = None
 
 
 def command_specs() -> dict[str, CommandSpec]:
@@ -132,6 +134,7 @@ def _uninstall_args(ns: argparse.Namespace) -> CommandArgs:
         keep_specs=bool(getattr(ns, "keep_specs", False)),
         remove_specs=bool(getattr(ns, "remove_specs", False)),
         json=bool(getattr(ns, "json", False)),
+        invocation_cwd=getattr(ns, "_invocation_cwd", None),
     )
 
 
@@ -140,7 +143,12 @@ def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_uninstall_args(args)
     if typed.remove_specs:
         return _removed_purge_outcome(typed)
-    target = Path(typed.target).expanduser().absolute()
+    target = Path(typed.target).expanduser()
+    if typed.invocation_cwd is not None and not target.is_absolute():
+        target = typed.invocation_cwd / target
+    elif not target.is_absolute():
+        target = Path.cwd() / target
+    target = Path(os.path.normpath(target))
     command = [
         "uvx",
         "--no-cache",
@@ -171,7 +179,12 @@ def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 def _removed_purge_outcome(args: UninstallArgs) -> CommandOutcome:
     """Return the request-validation result without observing the target."""
 
-    target = Path(args.target).expanduser().absolute()
+    target = Path(args.target).expanduser()
+    if args.invocation_cwd is not None and not target.is_absolute():
+        target = args.invocation_cwd / target
+    elif not target.is_absolute():
+        target = Path.cwd() / target
+    target = Path(os.path.normpath(target))
     mode = "apply" if args.apply else "dry-run"
     payload = {
         "schema_version": 1,

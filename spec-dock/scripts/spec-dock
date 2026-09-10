@@ -601,6 +601,7 @@ def main() -> int:
     specdock_fd: int | None = None
     try:
         try:
+            invocation_cwd = Path.cwd()
             script_path = Path(__file__).absolute()
             repo_root_path = script_path.parent.parent.parent
             repo_root = str(repo_root_path)
@@ -652,6 +653,7 @@ def main() -> int:
             repo_root=bound_repo_root,
             repo_root_fd=root_fd,
             repo_root_binding=(before.st_dev, before.st_ino),
+            invocation_cwd=invocation_cwd,
         )
         outcome = run(sys.argv[1:], context)
         terminal = outcome.terminal

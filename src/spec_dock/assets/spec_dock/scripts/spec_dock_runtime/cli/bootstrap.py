@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class BootstrapContext:
     use_cases: UseCases
+    invocation_cwd: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -451,6 +452,7 @@ def build_runtime(
     repo_root: Path | None = None,
     repo_root_fd: int | None = None,
     repo_root_binding: tuple[int, int] | None = None,
+    invocation_cwd: Path | None = None,
 ) -> BootstrapContext:
     resolved_repo_root = repo_root if repo_root is not None else specdock_dir.parent
     binary_artifact_publisher = FilesystemBinaryArtifactPublisher()
@@ -507,4 +509,4 @@ def build_runtime(
         worktree_remove=lambda req: application_worktree_remove(req, ports),
         workbench_copy=lambda req: application_workbench_copy(req, ports),
     )
-    return BootstrapContext(use_cases=use_cases)
+    return BootstrapContext(use_cases=use_cases, invocation_cwd=invocation_cwd)

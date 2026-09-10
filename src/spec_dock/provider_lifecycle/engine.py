@@ -2364,7 +2364,12 @@ class ProviderLifecycleEngine:
         record: InstallationRecord | None,
     ) -> LifecycleResult:
         actions = self._uninstall_actions(targets, container, record, planned=True, include_stage=False)
-        code = "uninstall-planned" if any(item.kind == "directory" for item in targets) else "uninstall-already-absent"
+        incomplete_uninstall = record is not None and record.state == "incomplete" and record.operation == "uninstall"
+        code = (
+            "uninstall-planned"
+            if incomplete_uninstall or any(item.kind == "directory" for item in targets)
+            else "uninstall-already-absent"
+        )
         return build_public_result(
             request,
             status="planned",
@@ -2423,6 +2428,8 @@ class ProviderLifecycleEngine:
         planned: bool,
         partial_index: int | None = None,
         include_stage: bool = False,
+        partial_phase: str | None = None,
+        original_targets: Sequence[Mapping[str, object]] | None = None,
         failure_point: str | None = None,
     ) -> tuple[LifecycleAction, ...]:
         container = self._observe_container(root_fd)
@@ -2430,34 +2437,68 @@ class ProviderLifecycleEngine:
         container_status = "preserved" if container.kind == "directory" else "planned" if planned else "completed"
         container_reason = "shared-container-preserve" if container.kind == "directory" else "fresh-container-create"
         result.append(_make_action("spec-dock", "container", container_status, container_reason))
-        record_status = "planned" if planned else "completed"
-        result.append(_make_action("spec-dock/spec-dock.version", "record", record_status, "terminal-record-publish"))
+        if planned:
+            record_status = "planned"
+            record_reason = "terminal-record-publish"
+        elif partial_phase == "publish-terminal-record":
+            record_status = "failed"
+            record_reason = "terminal-record-publish"
+        elif partial_phase is not None:
+            record_status = "completed"
+            record_reason = "incomplete-record-publish"
+        else:
+            record_status = "completed"
+            record_reason = "terminal-record-publish"
+        result.append(_make_action("spec-dock/spec-dock.version", "record", record_status, record_reason))
         for index, item in enumerate(targets):
             kind, path, _ = FIXED_DOMAINS[index]
-            current = False
-            with contextlib.suppress(IndexError):
-                current = item.tree is not None and item.tree.tree_digest == candidate.domains[index].tree_digest
+            current = self._target_matches_candidate(root_fd, item.path, index, candidate)
             category = kind
+            original_kind = item.kind
+            original_current = False
+            if original_targets is not None:
+                with contextlib.suppress(IndexError, KeyError):
+                    original = original_targets[index]
+                    original_kind = cast("str", original["original_kind"])
+                    original_current = (
+                        current
+                        and original_kind == "directory"
+                        and original.get("original_tree_digest") == candidate.domains[index].tree_digest
+                    )
+            preserved_current = current and original_current
             reason = (
                 f"candidate-{category}-current"
-                if current
-                else f"candidate-{category}-{'create' if item.kind == 'absent' else 'replace'}"
+                if preserved_current
+                else f"candidate-{category}-{'create' if original_kind == 'absent' else 'replace'}"
             )
-            status = "preserved" if current else "planned" if planned else "completed"
-            if partial_index is not None and not current:
-                if index < partial_index:
-                    status = "completed"
-                elif index == partial_index:
-                    status = "failed"
-                else:
-                    status = "pending"
+            if planned:
+                status = "preserved" if current else "planned"
+            elif partial_index is None:
+                status = "preserved" if preserved_current else "completed"
+            elif partial_phase == "verify-target":
+                status = "preserved" if preserved_current else "completed" if current else "failed"
+            elif preserved_current:
+                status = "preserved"
+            elif index < partial_index:
+                status = "completed"
+            elif index == partial_index:
+                status = "failed"
+            else:
+                status = "pending"
             result.append(_make_action(path, category, status, reason))
-        for seed_index, (path, seed_name) in enumerate((
+        for seed_index, (path, _seed_name) in enumerate((
             ("spec-dock/.gitignore", "spec-dock-gitignore"),
             (".github/workflows/ci.yml", "consumer-ci"),
         )):
             existing = self._observe_target(root_fd, path, expect_tree=False)
-            if existing.kind in {"directory", "other", "symlink", "regular"}:
+            failed_seed = (
+                seed_policy == "create-if-absent"
+                and partial_phase in {"create-seed-spec-dock-gitignore", "create-seed-consumer-ci"}
+                and seed_index == (0 if partial_phase == "create-seed-spec-dock-gitignore" else 1)
+            )
+            if failed_seed:
+                reason = "fresh-seed-create"
+            elif existing.kind in {"directory", "other", "symlink", "regular"}:
                 reason = (
                     "consumer-seed-present"
                     if operation == "install" and seed_policy == "create-if-absent"
@@ -2466,22 +2507,20 @@ class ProviderLifecycleEngine:
             else:
                 reason = "fresh-seed-create" if seed_policy == "create-if-absent" else "preserve-only-seed"
             status = "preserved" if reason != "fresh-seed-create" else "planned" if planned else "completed"
-            if (
-                failure_point is not None
-                and failure_point.startswith(f"seed-{seed_name}-")
-                and reason == "fresh-seed-create"
-            ):
+            if partial_phase == "create-seed-spec-dock-gitignore" and seed_index == 0:
+                if reason == "fresh-seed-create":
+                    status = "failed"
+            elif partial_phase == "create-seed-spec-dock-gitignore" and seed_index == 1:
+                if reason == "fresh-seed-create":
+                    status = "pending"
+            elif partial_phase == "create-seed-consumer-ci" and seed_index == 0:
+                if reason == "fresh-seed-create":
+                    status = "completed"
+            elif partial_phase == "create-seed-consumer-ci" and seed_index == 1 and reason == "fresh-seed-create":
                 status = "failed"
-            elif (
-                failure_point is not None
-                and failure_point.startswith("seed-")
-                and seed_index == 1
-                and reason == "fresh-seed-create"
-            ):
-                status = "pending"
             result.append(_make_action(path, "seed", status, reason))
         if include_stage:
-            stage_status = "pending" if failure_point is not None else "completed"
+            stage_status = "pending" if partial_phase is not None or failure_point is not None else "completed"
             result.append(_make_action("@provider-stage", "stage", stage_status, "candidate-stage-cleanup"))
         return tuple(result)
 
@@ -2494,32 +2533,57 @@ class ProviderLifecycleEngine:
         planned: bool,
         include_stage: bool,
         partial_index: int | None = None,
+        partial_phase: str | None = None,
+        original_targets: Sequence[Mapping[str, object]] | None = None,
     ) -> tuple[LifecycleAction, ...]:
         result = [_make_action("spec-dock", "container", "preserved", "shared-container-preserve")]
-        record_status = "planned" if planned else "completed"
-        result.append(_make_action("spec-dock/spec-dock.version", "record", record_status, "terminal-record-publish"))
+        if planned:
+            record_status = "planned"
+            record_reason = "terminal-record-publish"
+        elif partial_phase == "publish-terminal-record":
+            record_status = "failed"
+            record_reason = "terminal-record-publish"
+        elif partial_phase is not None:
+            record_status = "completed"
+            record_reason = "incomplete-record-publish"
+        else:
+            record_status = "completed"
+            record_reason = "terminal-record-publish"
+        result.append(_make_action("spec-dock/spec-dock.version", "record", record_status, record_reason))
         for index, item in enumerate(targets):
             category, path, _ = FIXED_DOMAINS[index]
-            reason = f"owned-{category}-remove" if item.kind == "directory" else f"owned-{category}-absent"
-            status = (
-                "planned"
-                if planned and item.kind == "directory"
-                else "preserved"
-                if item.kind != "directory"
-                else "completed"
-            )
-            if partial_index is not None and item.kind == "directory":
-                if index < partial_index:
-                    status = "completed"
-                elif index == partial_index:
-                    status = "failed"
-                else:
-                    status = "pending"
+            original_kind = item.kind
+            if original_targets is not None:
+                with contextlib.suppress(IndexError, KeyError):
+                    original_kind = cast("str", original_targets[index]["original_kind"])
+            originally_present = original_kind == "directory"
+            reason = f"owned-{category}-remove" if originally_present else f"owned-{category}-absent"
+            if planned:
+                status = "planned" if originally_present else "preserved"
+            elif partial_index is None:
+                status = "completed" if originally_present else "preserved"
+            elif partial_phase == "verify-target":
+                status = "failed" if item.kind == "directory" else "completed" if originally_present else "preserved"
+            elif not originally_present:
+                status = "preserved"
+            elif index < partial_index:
+                status = "completed"
+            elif index == partial_index:
+                status = "failed"
+            else:
+                status = "pending"
             result.append(_make_action(path, category, status, reason))
         for path in ("spec-dock/.gitignore", ".github/workflows/ci.yml"):
             result.append(_make_action(path, "seed", "preserved", "preserve-only-seed"))
         if include_stage:
-            result.append(_make_action("@provider-stage", "stage", "completed", "candidate-stage-cleanup"))
+            result.append(
+                _make_action(
+                    "@provider-stage",
+                    "stage",
+                    "pending" if partial_phase is not None else "completed",
+                    "candidate-stage-cleanup",
+                )
+            )
         return tuple(result)
 
     @staticmethod
@@ -3372,6 +3436,7 @@ class ProviderLifecycleEngine:
                 None,
                 planned=False,
                 include_stage=True,
+                original_targets=active.owned_target_witnesses,
             )
             code = "uninstall-completed"
         else:
@@ -3385,6 +3450,7 @@ class ProviderLifecycleEngine:
                 root_fd,
                 planned=False,
                 include_stage=True,
+                original_targets=active.owned_target_witnesses,
             )
             code = f"{active.result_family}-completed"
         return build_public_result(
@@ -3519,7 +3585,7 @@ class ProviderLifecycleEngine:
         retry = self._retry_for(request, active.operation, active.seed_policy)
         if retry is None:
             retry = active.cleanup_retry_invocation["rendered_command"]
-        index = self._fault_index(point)
+        index = self._partial_index_for_phase(phase)
         if active.operation == "uninstall":
             actions = list(
                 self._uninstall_actions(
@@ -3529,6 +3595,8 @@ class ProviderLifecycleEngine:
                     planned=False,
                     include_stage=True,
                     partial_index=index,
+                    partial_phase=phase,
+                    original_targets=active.owned_target_witnesses,
                 )
             )
             code = "uninstall-partial-failure"
@@ -3543,6 +3611,8 @@ class ProviderLifecycleEngine:
                     root_fd,
                     planned=False,
                     partial_index=index,
+                    partial_phase=phase,
+                    original_targets=active.owned_target_witnesses,
                     include_stage=True,
                     failure_point=point,
                 )
@@ -3572,7 +3642,45 @@ class ProviderLifecycleEngine:
 
     @staticmethod
     def _last_completed_phase(phase: str, operation: str) -> str:
-        order = [value for value in PHASES if operation == "uninstall" or not value.startswith("detach-")]
+        order: tuple[str, ...]
+        if operation == "uninstall":
+            order = (
+                "request-validation",
+                "preflight",
+                "candidate-staging",
+                "bootstrap-container",
+                "publish-incomplete-record",
+                "detach-docs",
+                "detach-templates",
+                "detach-system",
+                "detach-scripts",
+                "detach-slot-spec-dock",
+                "detach-slot-spec-dock-grill-with-docs",
+                "verify-target",
+                "publish-terminal-record",
+                "cleanup-stage",
+                "complete",
+            )
+        else:
+            order = (
+                "request-validation",
+                "preflight",
+                "candidate-staging",
+                "bootstrap-container",
+                "publish-incomplete-record",
+                "publish-docs",
+                "publish-templates",
+                "publish-system",
+                "publish-scripts",
+                "publish-slot-spec-dock",
+                "publish-slot-spec-dock-grill-with-docs",
+                "create-seed-spec-dock-gitignore",
+                "create-seed-consumer-ci",
+                "verify-target",
+                "publish-terminal-record",
+                "cleanup-stage",
+                "complete",
+            )
         try:
             index = order.index(phase)
         except ValueError:
@@ -3580,23 +3688,26 @@ class ProviderLifecycleEngine:
         return "request-validation" if index == 0 else order[index - 1]
 
     @staticmethod
-    def _fault_index(point: str) -> int | None:
-        for index, name in enumerate(STAGE_ENTRY_NAMES):
-            if name in point:
-                return index
-        names = ("docs", "templates", "system", "scripts", "spec-dock", "spec-dock-grill-with-docs")
-        for index, name in enumerate(names):
-            if name in point:
-                return index
-        if "verify" in point:
-            return 6
-        if "terminal-record" in point:
-            return 7
-        if "seed-spec-dock" in point:
-            return 6
-        if "seed-consumer" in point:
-            return 7
-        return None
+    def _partial_index_for_phase(phase: str) -> int | None:
+        target_indices = {
+            "publish-docs": 0,
+            "publish-templates": 1,
+            "publish-system": 2,
+            "publish-scripts": 3,
+            "publish-slot-spec-dock": 4,
+            "publish-slot-spec-dock-grill-with-docs": 5,
+            "detach-docs": 0,
+            "detach-templates": 1,
+            "detach-system": 2,
+            "detach-scripts": 3,
+            "detach-slot-spec-dock": 4,
+            "detach-slot-spec-dock-grill-with-docs": 5,
+            "create-seed-spec-dock-gitignore": 6,
+            "create-seed-consumer-ci": 7,
+            "verify-target": 6,
+            "publish-terminal-record": 7,
+        }
+        return target_indices.get(phase)
 
     @staticmethod
     def _phase_for_fault(point: str, operation: str) -> str:

@@ -390,6 +390,47 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
         assert uninstall.returncode == 7
         assert log.read_text(encoding="utf-8").splitlines()[-2] == str(link)
 
+    def test_t01_relative_lifecycle_targets_use_invoking_cwd_and_preserve_symlink_text(self, tmp_path: Path) -> None:
+        managed = tmp_path / "A" / "managed"
+        managed.mkdir(parents=True)
+        assert main(["init", str(managed)]) == 0
+        caller = tmp_path / "C"
+        caller.mkdir()
+        sibling = tmp_path / "B"
+        sibling.mkdir()
+        link = caller / "target-link"
+        link.symlink_to(sibling, target_is_directory=True)
+
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        log = tmp_path / "uvx-args"
+        _make_uvx(bin_dir, log)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
+        script = managed / "spec-dock/scripts/spec-dock"
+        cases = (
+            (".", caller.absolute()),
+            ("../B", sibling.absolute()),
+            (str(sibling.absolute()), sibling.absolute()),
+            (str(link), link),
+        )
+
+        for command in ("update", "uninstall"):
+            for raw_target, expected_target in cases:
+                argv = [sys.executable, str(script), command, raw_target]
+                if command == "uninstall":
+                    argv.append("--apply")
+                result = subprocess.run(
+                    argv,
+                    cwd=caller,
+                    env=env,
+                    capture_output=True,
+                    text=True,
+                )
+                assert result.returncode == 7
+                logged = log.read_text(encoding="utf-8").splitlines()
+                assert logged[-1 if command == "update" else -2] == str(expected_target)
+
     def test_t04_git_write_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"

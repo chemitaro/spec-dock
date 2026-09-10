@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -23,6 +24,7 @@ UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
 @dataclass(frozen=True)
 class UpdateArgs(CommandArgs):
     target: str
+    invocation_cwd: Path | None = None
 
 
 def command_specs() -> dict[str, CommandSpec]:
@@ -50,13 +52,21 @@ def _add_update_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _update_args(ns: argparse.Namespace) -> CommandArgs:
-    return UpdateArgs(target=str(getattr(ns, "path", ".")))
+    return UpdateArgs(
+        target=str(getattr(ns, "path", ".")),
+        invocation_cwd=getattr(ns, "_invocation_cwd", None),
+    )
 
 
 def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     typed = _expect_update_args(args)
-    target = Path(typed.target).expanduser().absolute()
+    target = Path(typed.target).expanduser()
+    if typed.invocation_cwd is not None and not target.is_absolute():
+        target = typed.invocation_cwd / target
+    elif not target.is_absolute():
+        target = Path.cwd() / target
+    target = Path(os.path.normpath(target))
     command = (
         "uvx",
         "--no-cache",

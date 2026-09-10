@@ -2391,6 +2391,9 @@ def run(
                 repo_root = _find_repo_root_for_legacy_doctor()
                 specdock_dir = repo_root / _SPEC_DOCK_DIRNAME
             bootstrap_context = _cli_build_runtime(specdock_dir, repo_root=repo_root)
+        invocation_cwd = getattr(bootstrap_context, "invocation_cwd", None)
+        if invocation_cwd is not None:
+            ns._invocation_cwd = invocation_cwd
         outcome = _cli_dispatch(ns, registry, bootstrap_context.use_cases)
         return CommandOutcome(
             exit_code=int(outcome.exit_code),
