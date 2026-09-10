@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "364b10968cc1e0f6339bf9f42d6819e5e6002527"
-  tree: "a05aef0e370dfabfe17316a3efa9a80bcdd529e4"
+  sha: "0d993252674be5ec8fc162df09ead62c81b1eb9a"
+  tree: "70a4782e2e3ebb23a0edabe33bcacac6c8717fee"
 implementation_evidence:
-  candidate_sha: "364b10968cc1e0f6339bf9f42d6819e5e6002527"
-  candidate_tree: "a05aef0e370dfabfe17316a3efa9a80bcdd529e4"
+  candidate_sha: "0d993252674be5ec8fc162df09ead62c81b1eb9a"
+  candidate_tree: "70a4782e2e3ebb23a0edabe33bcacac6c8717fee"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。実装時点の詳細な証拠は§9に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正とdogfood projectionを含む現行candidateは`0d993252674be5ec8fc162df09ead62c81b1eb9a`です。実装時点の詳細な証拠は§9に記録します。
 
 ## 2. Source verification facts
 
@@ -104,9 +104,9 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4の実装candidate commit `364b10968cc1e0f6339bf9f42d6819e5e6002527`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、provider-first dogfood projectionを含む実装candidate commit `0d993252674be5ec8fc162df09ead62c81b1eb9a`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
 
-1. report を現行candidateへ更新した最終SHAのclean pushとupstream SHA一致。
+1. Report を現行candidateへ更新した最終SHAのclean pushとupstream SHA一致。
 2. 現行candidateと更新後Reportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
@@ -115,21 +115,21 @@ CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provid
 
 ## 8. Residual blocker and uncertainty
 
-親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証とclean pushは完了しています。直近の独立 Code Review Strict は、#395 baselineを除き、private-state root binding、準備状態の不確定性、invalid request分類、deferred receipt保存、foreign stage cleanupの5件をP1として指摘しました。Blue Team分析でも5件すべてを有効なblocking指摘と判定し、`364b1096`へ修正済みです。Report更新後のclean pushed SHAに対する再レビュー、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
+親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証とclean pushは完了しています。実装後の独立 Code Review Strict（`699d54bf`固定、browser、GPT-5.6 Sol、Extra High、完全bundle）は、#395 baselineを除きP1×2、P2×3を指摘しました。Blue Team分析でP1×2を有効なblocking指摘として実装修正対象に確定し、`4a6aba91`で修正、`0d993252`でdogfood projectionを完了しました。P2×3は現在の親ポリシーによりreport-onlyとして保持しています。Report更新後のclean pushed SHAに対する再レビュー、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
 
 current full verifierの`ledger-mismatch` 10件は#395が所有するactive baselineのsignature/coverage mismatchであり、#392の責務へ取り込まず、skip/xfailやledger変更で隠していません。残るgateはReport更新後のclean pushed Strict review、Final Quality Gate Strict、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssueの最終certification、Product GREEN、merge完了を主張しません。
 
 ## 9. Implementation verification update
 
-2026-09-10時点の実装candidate commit `364b10968cc1e0f6339bf9f42d6819e5e6002527`（tree
-`a05aef0e370dfabfe17316a3efa9a80bcdd529e4`）に対して、次の証拠を採取しました。
+2026-09-10時点の実装candidate commit `0d993252674be5ec8fc162df09ead62c81b1eb9a`（tree
+`70a4782e2e3ebb23a0edabe33bcacac6c8717fee`）に対して、次の証拠を採取しました。
 
 - provider-firstでprivate namespaceのrepository parent、固定top、repository-key namespaceをdescriptor-relative/no-followで再認証し、dry-runと各private storeの実読取り経路へ同じfull-chain bindingを適用しました。topまたはnamespaceのowner、mode、device、type、inodeが変化した場合はforeign private authorityとしてfail-closedし、dry-runでは作成・修正を行いません。
 - worktree Bはtarget reservation後の`OSError`、`RuntimeError`、`CalledProcessError`を候補再試行せず停止し、reservation、Git worktree add、materialization、pre/post-publication verification、consumer-hook bindingのphaseと、path、branch、Git record、payload path、entrypointのartifact stateを開示します。Git metadata取得後やmaterialization途中で失敗してもrollback・remove・別candidate retryを行いません。
-- provider runtimeとchecked-in dogfood runtimeを同期し、二つのslot markerとdogfood `spec-dock.version`のcandidate digest `9ee8258cab96980a479eb79d82543cf4065baa575446d67daa280a113054f468`を一致させました。`seed_policy=preserve-only`のdogfood update semanticsはfresh installの`create-if-absent`と混同していません。provider/dogfoodの同期対象はbyte一致を確認しました。
+- provider runtimeとchecked-in dogfood runtimeを同期し、二つのslot markerとdogfood `spec-dock.version`のcandidate digest `a940a5f4d328e7010b500355ce79b8a0dd46cb2c4a3794cc50e712573c61f388`を一致させました。`seed_policy=preserve-only`のdogfood update semanticsはfresh installの`create-if-absent`と混同していません。provider/dogfoodの同期対象はbyte一致を確認し、canonical `spec-dock update . --json` は`update-completed`でstage cleanupまで完了しました。
 - 今回の回帰修正は、full private chainの再入場検証、ACTIVEとbootstrapのrepository identity binding、running中のtarget/STAGE混在からのforward recovery、exchange前のold root保持、expected incomplete recordのparent fsync/revalidation、prepared uninstall dry-runのread-only分類、ACTIVE/receipt実I/O fault seam、terminal target kind witness、狭いbootstrap admission catch、閉じたpackage facadeに加え、leased root FDへのprivate namespace結合、不確定な準備状態の安全側分類、invalid requestのwire準拠、receipt先行保存、foreign stage ownership/payload検証を実装しました。追加した回帰テストは全て実装契約に対応し、obsolete behaviorのassertionは残していません。
-- `make lint`はruff check、ruff format、mypyすべてpass、default fastは`903 passed, 845 skipped`でした。clean fixed pointのdistribution cutover/integrationは`21 passed`で、Issue #392の受入・provider lifecycle・dogfood・handoff各suiteもそれぞれ`3 passed`、`48 passed`、`58 passed`、`5 passed`でした。distribution cutover focused suiteは`10 passed`でした。
-- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1748 tests collected`、4 shard exit 1、status=`ledger-mismatch`でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、violationは10件（runtime import 8、runtime shell 1、workbench 1）で、親レジスタに登録済みの#395 active baselineと一致しました。今回追加したprovider lifecycle testsを含む#392の新規node failure、candidate receiptのdirty状態、ledger／timing／required-fastの変更はありません。レートリミットを理由にbundleや検証範囲を縮小していません。
-- 最新修正前のfresh Code Review Strict（browser、GPT-5.6 Sol、Extra High、完全bundle）は本文JSONで`review_status=fail`、P1×5を返しました。Blue Teamのfresh ChatGPT Use Strict分析でも5件すべてを有効なblocking指摘と判定し、`364b1096`へ実装修正と回帰テストを反映しました。Report更新後のclean pushed SHAに対するfresh Code Review Strict、Final Quality Gate Strict、PR merge後B1は未完了です。
+- `make lint`はruff check、ruff format、mypyすべてpass、default fastは`904 passed, 846 skipped`でした。clean fixed pointのdistribution cutover/integrationは`21 passed`で、Issue #392の受入・provider lifecycle・dogfood・handoff各suiteは最新SHAでそれぞれ`3 passed`、`49 passed`、`58 passed`、`6 passed`でした。distribution cutover focused suiteは`10 passed`、Epic distributionは`11 passed`、bootstrapは`3 passed`でした。
+- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`1750 tests collected`、4 shard exit 1、status=`ledger-mismatch`でした。ledgerはtotal15／active14／resolved1、timing 243 entriesを維持し、violationは10件（runtime import 8、runtime shell 1、workbench 1）で、親レジスタに登録済みの#395 active baselineと一致しました。今回追加したprovider lifecycle testsを含む#392の新規node failure、candidate receiptのdirty状態、ledger／timing／required-fastの変更はありません。レートリミットを理由にbundleや検証範囲を縮小していません。
+- 実装後のfresh Code Review Strict（browser-only、GPT-5.6 Sol、Extra High、32 filesの完全bundle、約302k tokens）は、本文JSONで`review_status=fail`、P1×2、P2×3を返しました。P1はterminal handoffでsymlink targetを`.resolve()`する問題と、`install/preserve-only`から異なるseed policyを受理する問題でした。Blue Teamのfresh ChatGPT Use Strict分析は両P1をvalid/blocking・implementation remediationと判定し、`4a6aba91`へ回帰テスト付き修正を反映しました。P2×3はreport-onlyです。更新後のclean pushed SHAに対する再Code Review Strict、Final Quality Gate Strict、PR merge後B1は未完了です。
 
-以上により、#392のCP1–CP4実装candidate、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は現行commitへ更新済みです。ただしcurrent full verifierの#395 baseline mismatchと、Report更新後の最終Strict review／Final Quality Gateが残るため、Issue完了・Product GREEN・merge完了はまだ主張しません。最終Strict reviewとFinal Quality Gateは、このReportを含む次のclean pushed SHAに対して実施します。
+以上により、#392のCP1–CP4実装candidate、P1 remediation、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は現行commitへ更新済みです。ただしcurrent full verifierの#395 baseline mismatchと、Report更新後の最終Strict review／Final Quality Gateが残るため、Issue完了・Product GREEN・merge完了はまだ主張しません。最終Strict reviewとFinal Quality Gateは、このReportを含む次のclean pushed SHAに対して実施します。
