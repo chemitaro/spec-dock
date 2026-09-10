@@ -98,7 +98,7 @@ Installation recordはWire v12のexact seven keys/order/type/nullabilityを満�
 
 ### I392-RQ-004 — Seed policy
 
-`seed_policy`はoperation admission時に一度だけ確定してrecord/ACTIVEへdurableに保持します。retry/re-entry時にseedの有無から再推論しません。`create-if-absent`でも既存seedはread-onlyで、`preserve-only`ではmissing seedを作成しません。
+`seed_policy`はoperation admission時に一度だけ確定してrecord/ACTIVEへdurableに保持します。retry/re-entry時にseedの有無から再推論しません。さらに、固定seed（`spec-dock/.gitignore`、`.github/workflows/ci.yml`）ごとのadmission時状態をprivate `ACTIVE.seed_admission`へ`absent|present`でdurableに保持し、retry/re-entryとaction provenanceはこの保存値だけを使います。`create-if-absent`でもadmission時に`present`だったseedはread-onlyで、`preserve-only`ではmissing seedを作成しません。
 
 ### I392-RQ-005 — Exact-clean 0.2.3 migration
 
