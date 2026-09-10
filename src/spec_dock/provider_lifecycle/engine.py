@@ -1027,7 +1027,7 @@ class ProviderLifecycleEngine:
 
             if active is not None:
                 try:
-                    active_valid = self._validate_active_authority(active, bound.fd)
+                    active_valid = self._validate_active_authority(active, bound.fd, request.target)
                 except PrivateStateForeignError:
                     return self._blocked(
                         request,
@@ -1234,7 +1234,7 @@ class ProviderLifecycleEngine:
         binding = lease.binding
         return receipt.repository_key == repository_key_for(binding.device, binding.inode, binding.euid)
 
-    def _validate_active_authority(self, active: ActiveState, root_fd: int) -> bool:
+    def _validate_active_authority(self, active: ActiveState, root_fd: int, target: str) -> bool:
         device, inode, euid = self._repository_identity(root_fd)
         expected_identity = {"device": device, "inode": inode, "euid": euid}
         if active.repository_key != repository_key_for(device, inode, euid):
@@ -1244,7 +1244,7 @@ class ProviderLifecycleEngine:
         if active.state in {"ready", "terminal-cleanup"}:
             return True
 
-        raw, witness, record, record_kind = self._observe_record("", root_fd)
+        raw, witness, record, record_kind = self._observe_record(target, root_fd)
         expected_record = self._record_matches_expected(active, raw, witness, record, record_kind)
         original_record = self._record_matches_original(active, raw, witness, record_kind)
         if active.state == "prepared":
@@ -1546,6 +1546,7 @@ class ProviderLifecycleEngine:
             stage_store,
             root_fd,
             receipt=receipt,
+            legacy=record_kind == "legacy-0.2.3",
         )
 
     def _admit_existing_seeds(self, root_fd: int, *, operation: str, seed_policy: str) -> None:
@@ -4162,6 +4163,15 @@ class ProviderLifecycleEngine:
             )
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
+        if active.operation != "uninstall":
+            try:
+                self._admit_existing_seeds(
+                    root_fd,
+                    operation=active.operation,
+                    seed_policy=active.seed_policy,
+                )
+            except _AdmissionFailure as failure:
+                return self._admission_result(request, failure)
         initial_absent_paths: frozenset[str] | None = None
         try:
             if active.operation == "uninstall":
