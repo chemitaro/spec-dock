@@ -614,6 +614,36 @@ def test_t04_receipt_owned_deferred_request_survives_active_reconciliation_failu
     assert active.deferred_invocation is None
 
 
+def test_t04_absent_update_preserve_only_rejects_init_force_seed_mismatch(tmp_path: Path) -> None:
+    workspace = (tmp_path / "absent-update-seed").resolve()
+    workspace.mkdir()
+    update_request = _request(workspace, "update")
+    first = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(update_request, force=True)
+    assert first.status == "blocked"
+    assert first.operation == "install"
+    assert first.seed_policy == "preserve-only"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    assert active is not None
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "resume-seed-policy-mismatch"
+    assert result.operation == active.operation
+    assert result.candidate_digest == active.candidate_digest
+    assert result.seed_policy == active.seed_policy
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active
+
+
 @pytest.mark.parametrize("foreign_part", ["owner", "entry"])
 def test_t04_cleanup_preserves_foreign_stage_authority_and_payload(tmp_path: Path, foreign_part: str) -> None:
     workspace = (tmp_path / f"foreign-stage-{foreign_part}").resolve()

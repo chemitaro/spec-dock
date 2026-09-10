@@ -56,7 +56,7 @@ def _update_args(ns: argparse.Namespace) -> CommandArgs:
 def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     typed = _expect_update_args(args)
-    target = Path(typed.target).expanduser().resolve()
+    target = Path(typed.target).expanduser().absolute()
     command = (
         "uvx",
         "--no-cache",

@@ -354,3 +354,38 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
             fcntl.flock(contender, fcntl.LOCK_EX | fcntl.LOCK_NB)
         finally:
             os.close(contender)
+
+    def test_t04_terminal_handoff_preserves_symlink_target_for_external_admission(self, tmp_path: Path) -> None:
+        target = (tmp_path / "target").resolve()
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+        link = tmp_path / "target-link"
+        link.symlink_to(target, target_is_directory=True)
+
+        bin_dir = tmp_path / "bin"
+        bin_dir.mkdir()
+        log = tmp_path / "uvx-args"
+        _make_uvx(bin_dir, log)
+        env = os.environ.copy()
+        env["PATH"] = f"{bin_dir}{os.pathsep}{env.get('PATH', '')}"
+        script = target / "spec-dock/scripts/spec-dock"
+
+        update = subprocess.run(
+            [sys.executable, str(script), "update", str(link)],
+            cwd=target,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert update.returncode == 7
+        assert log.read_text(encoding="utf-8").splitlines()[-1] == str(link)
+
+        uninstall = subprocess.run(
+            [sys.executable, str(script), "uninstall", str(link), "--apply"],
+            cwd=target,
+            env=env,
+            capture_output=True,
+            text=True,
+        )
+        assert uninstall.returncode == 7
+        assert log.read_text(encoding="utf-8").splitlines()[-2] == str(link)

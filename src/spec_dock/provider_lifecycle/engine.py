@@ -3864,9 +3864,14 @@ class ProviderLifecycleEngine:
         force: bool | None,
     ) -> LifecycleResult:
         if not self._request_admits_active(operation, seed_policy, active, force=force):
+            code = (
+                "resume-seed-policy-mismatch"
+                if active.operation == operation == "install"
+                else "resume-operation-mismatch"
+            )
             return self._blocked(
                 request,
-                "resume-operation-mismatch",
+                code,
                 operation=active.operation,
                 candidate_digest=active.candidate_digest,
                 seed_policy=active.seed_policy,
@@ -3991,9 +3996,7 @@ class ProviderLifecycleEngine:
         """Classify a retry against the durable operation tuple, not raw flags alone."""
 
         if active.operation == operation:
-            return seed_policy == active.seed_policy or (
-                active.result_family == "install" and active.seed_policy == "preserve-only" and operation == "install"
-            )
+            return seed_policy == active.seed_policy
         if (
             active.result_family == "install"
             and active.operation == "install"

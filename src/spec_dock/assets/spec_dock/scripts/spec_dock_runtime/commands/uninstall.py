@@ -140,7 +140,7 @@ def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     typed = _expect_uninstall_args(args)
     if typed.remove_specs:
         return _removed_purge_outcome(typed)
-    target = Path(typed.target).expanduser().resolve()
+    target = Path(typed.target).expanduser().absolute()
     command = [
         "uvx",
         "--no-cache",
