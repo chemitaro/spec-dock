@@ -377,7 +377,7 @@ def _owned_targets(value: object) -> list[dict[str, object]]:
         if path != STAGE_TARGET_PATHS[index]:
             _fail("owned target witness path order is not fixed")
         for key in ("original_kind", "terminal_kind"):
-            kind = _string(mapping[key], f"owned_target_witness.{key}", allow_null=True)
+            kind = _string(mapping[key], f"owned_target_witness.{key}")
             if kind not in {None, "absent", "directory"}:
                 _fail(f"owned_target_witness.{key} is invalid")
         for key in ("original_tree_digest", "terminal_tree_digest"):
@@ -387,10 +387,16 @@ def _owned_targets(value: object) -> list[dict[str, object]]:
         original_inode = _parse_inode(mapping["original_inode"], "owned_target_witness.original_inode", allow_null=True)
         if original_kind == "directory" and original_inode is None:
             _fail("directory original target needs an inode witness")
-        if original_kind != "directory" and original_inode is not None:
+        if original_kind == "directory" and mapping["original_tree_digest"] is None:
+            _fail("directory original target needs a tree digest")
+        if original_kind == "absent" and mapping["original_tree_digest"] is not None:
+            _fail("absent original target cannot have a tree digest")
+        if original_kind == "absent" and original_inode is not None:
             _fail("absent original target cannot have an inode witness")
         if terminal_kind == "directory" and mapping["terminal_tree_digest"] is None:
             _fail("directory terminal target needs a tree digest")
+        if terminal_kind == "absent" and mapping["terminal_tree_digest"] is not None:
+            _fail("absent terminal target cannot have a tree digest")
         result.append(dict(mapping))
     return result
 
@@ -880,6 +886,8 @@ class _PrivateStore:
         mode: int | None = None,
         maximum: int | None = None,
         expected_existing: InodeWitness | None = None,
+        fault: Callable[[str], None] | None = None,
+        fault_prefix: str | None = None,
     ) -> None:
         name = self.filename if filename is None else filename
         temporary = f"{name}.tmp" if temporary is None else temporary
@@ -891,31 +899,80 @@ class _PrivateStore:
         filesystem = NativeAtomicFilesystem()
         temporary_fd = -1
         try:
-            try:
+            if fault is not None and fault_prefix is not None:
+                fault(f"{fault_prefix}-temp-open")
+            existing_temporary = self._read_bound_witness(namespace_fd, temporary, mode, maximum=maximum)
+            if (
+                existing_temporary is not None
+                and self._read_bound_bytes(
+                    namespace_fd,
+                    temporary,
+                    mode,
+                    maximum=maximum,
+                    expected=existing_temporary,
+                )
+                != payload
+            ):
+                filesystem.unlink_bound(namespace_fd, temporary, existing_temporary)
+                filesystem.fsync_directory(namespace_fd)
+                existing_temporary = None
+            if existing_temporary is None:
+                try:
+                    temporary_fd = os.open(
+                        temporary,
+                        os.O_WRONLY
+                        | os.O_CREAT
+                        | os.O_EXCL
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0),
+                        mode,
+                        dir_fd=namespace_fd,
+                    )
+                except FileExistsError as exc:
+                    raise PrivateStateForeignError(f"private temporary object {temporary} changed during open") from exc
+                os.fchmod(temporary_fd, mode)
+                if fault is not None and fault_prefix is not None:
+                    fault(f"{fault_prefix}-temp-write")
+                cursor = 0
+                while cursor < len(payload):
+                    cursor += os.write(temporary_fd, payload[cursor:])
+            if fault is not None and fault_prefix is not None:
+                fault(f"{fault_prefix}-temp-fsync")
+            if temporary_fd < 0:
                 temporary_fd = os.open(
                     temporary,
-                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-                    mode,
+                    os.O_WRONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
                     dir_fd=namespace_fd,
                 )
-            except FileExistsError as exc:
-                raise PrivateStateForeignError(f"private temporary object {temporary} already exists") from exc
-            os.fchmod(temporary_fd, mode)
-            cursor = 0
-            while cursor < len(payload):
-                cursor += os.write(temporary_fd, payload[cursor:])
             os.fsync(temporary_fd)
             os.close(temporary_fd)
             temporary_fd = -1
+            temporary_witness = self._read_bound_witness(namespace_fd, temporary, mode, maximum=maximum)
+            if temporary_witness is None:
+                raise PrivateStateError(f"private temporary object {temporary} disappeared before publication")
             existing = self._read_bound_witness(namespace_fd, name, mode, maximum=maximum)
             if expected_existing is not None and existing is None:
                 raise PrivateStateForeignError(f"private object {name} disappeared during update")
+            if fault is not None and fault_prefix is not None:
+                fault(f"{fault_prefix}-temp-rename")
             if existing is None:
-                filesystem.rename_no_replace(namespace_fd, temporary, namespace_fd, name)
+                filesystem.rename_no_replace(
+                    namespace_fd,
+                    temporary,
+                    namespace_fd,
+                    name,
+                    expected_source=temporary_witness,
+                )
             else:
                 if expected_existing is None or existing != expected_existing:
                     raise PrivateStateForeignError(f"private object {name} belongs to another operation")
-                filesystem.exchange(namespace_fd, temporary, namespace_fd, name)
+                filesystem.exchange(
+                    namespace_fd,
+                    temporary,
+                    namespace_fd,
+                    name,
+                    expected_source=temporary_witness,
+                )
                 old = filesystem.capture_inode(namespace_fd, temporary, "regular")
                 if old is None or not NativeAtomicFilesystem._same_content_identity(old, expected_existing):
                     if old is not None:
@@ -926,6 +983,8 @@ class _PrivateStore:
                         filesystem.fsync_directory(namespace_fd)
                     raise PrivateStateForeignError(f"old private object {name} changed during exchange")
                 filesystem.unlink_bound(namespace_fd, temporary, old)
+            if fault is not None and fault_prefix is not None:
+                fault(f"{fault_prefix}-parent-fsync")
             filesystem.fsync_directory(namespace_fd)
         finally:
             if temporary_fd >= 0:
@@ -981,6 +1040,61 @@ class _PrivateStore:
             return self._read_bound_witness(namespace_fd, self.filename, self.mode, maximum=self.maximum)
         finally:
             os.close(namespace_fd)
+
+    @staticmethod
+    def _read_bound_bytes(
+        parent_fd: int,
+        name: str,
+        mode: int,
+        *,
+        maximum: int | None = None,
+        expected: InodeWitness | None = None,
+    ) -> bytes:
+        fd = os.open(name, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0), dir_fd=parent_fd)
+        try:
+            opened = os.fstat(fd)
+            if (
+                not stat.S_ISREG(opened.st_mode)
+                or opened.st_nlink != 1
+                or opened.st_uid != _effective_euid()
+                or stat.S_IMODE(opened.st_mode) != mode
+            ):
+                raise PrivateStateForeignError(f"private object {name} is unsafe")
+            if maximum is not None and opened.st_size > maximum:
+                raise PrivateStateForeignError(f"private object {name} is oversized")
+            if expected is not None and (
+                opened.st_dev != expected.device
+                or opened.st_ino != expected.inode
+                or opened.st_ctime_ns != expected.ctime_ns
+                or stat.S_IMODE(opened.st_mode) != expected.mode
+                or opened.st_nlink != expected.link_count
+                or opened.st_size != expected.size
+            ):
+                raise PrivateStateForeignError(f"private object {name} changed while opening")
+            digest = hashlib.sha256()
+            chunks: list[bytes] = []
+            total = 0
+            while True:
+                limit = min(1024 * 1024, maximum + 1 - total) if maximum is not None else 1024 * 1024
+                chunk = os.read(fd, limit)
+                if not chunk:
+                    break
+                chunks.append(chunk)
+                digest.update(chunk)
+                total += len(chunk)
+                if maximum is not None and total > maximum:
+                    raise PrivateStateForeignError(f"private object {name} is oversized")
+            after = os.fstat(fd)
+            if not NativeAtomicFilesystem._same_inode(opened, after):
+                raise PrivateStateForeignError(f"private object {name} changed while reading")
+            data = b"".join(chunks)
+            if expected is not None:
+                current = NativeAtomicFilesystem._witness(after, "regular", digest.hexdigest())
+                if not NativeAtomicFilesystem._same_content_identity(current, expected):
+                    raise PrivateStateForeignError(f"private object {name} changed while reading")
+            return data
+        finally:
+            os.close(fd)
 
 
 def _effective_euid() -> int:
@@ -1202,7 +1316,7 @@ class ActiveStateStore(_PrivateStore):
 
     read = load
 
-    def save(self, state: ActiveState) -> None:
+    def save(self, state: ActiveState, *, fault: Callable[[str], None] | None = None) -> None:
         value = _active_mapping(state)
         parsed = _parse_active(value)
         existing = self.load()
@@ -1229,7 +1343,12 @@ class ActiveStateStore(_PrivateStore):
             expected_existing = self._current_witness()
             if expected_existing is None:
                 raise PrivateStateForeignError("ACTIVE disappeared before update")
-        self._publish_bytes(_json_bytes(_active_mapping(parsed)), expected_existing=expected_existing)
+        self._publish_bytes(
+            _json_bytes(_active_mapping(parsed)),
+            expected_existing=expected_existing,
+            fault=fault,
+            fault_prefix="active",
+        )
 
     write = save
 
@@ -1313,7 +1432,7 @@ class CompletionReceiptStore(_PrivateStore):
 
     read = load
 
-    def save(self, receipt: CompletionReceipt) -> None:
+    def save(self, receipt: CompletionReceipt, *, fault: Callable[[str], None] | None = None) -> None:
         value = _receipt_mapping(receipt)
         parsed = _parse_receipt(value)
         existing = self.load()
@@ -1340,7 +1459,12 @@ class CompletionReceiptStore(_PrivateStore):
             expected_existing = self._current_witness()
             if expected_existing is None:
                 raise PrivateStateForeignError("completion receipt disappeared before update")
-        self._publish_bytes(_json_bytes(_receipt_mapping(parsed)), expected_existing=expected_existing)
+        self._publish_bytes(
+            _json_bytes(_receipt_mapping(parsed)),
+            expected_existing=expected_existing,
+            fault=fault,
+            fault_prefix="receipt",
+        )
 
     write = save
 
@@ -1559,6 +1683,25 @@ class StageStore:
             return False
         entries = self._validate_stage_entries()
         return entries == STAGE_ENTRY_NAMES
+
+    def inspect(self, owner: StageOwner) -> tuple[Literal["absent", "incomplete", "complete"], tuple[str, ...]]:
+        """Classify the fixed stage without creating or changing any entry."""
+
+        namespace_fd = self._namespace_fd()
+        try:
+            try:
+                value = os.stat(STAGE_NAME, dir_fd=namespace_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return "absent", ()
+            _check_private_directory(value, os.fstat(namespace_fd).st_dev, _effective_euid())
+        finally:
+            os.close(namespace_fd)
+
+        current = self.load_owner()
+        entries = self._validate_stage_entries()
+        if current is not None and current != owner:
+            raise PrivateStateForeignError("STAGE-OWNER.json belongs to another operation")
+        return ("complete" if current == owner and entries == STAGE_ENTRY_NAMES else "incomplete"), entries
 
     def require_valid(self, owner: StageOwner) -> None:
         """Validate prepared-stage authority without changing private state."""

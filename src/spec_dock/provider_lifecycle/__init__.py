@@ -1,7 +1,7 @@
-"""Provider-owned lifecycle engine and its closed public contracts."""
+"""Closed provider lifecycle entrypoints."""
 
 from __future__ import annotations
 
-from spec_dock.provider_lifecycle.engine import FaultInjector, ProviderLifecycleEngine
+from spec_dock.provider_lifecycle.api import RuntimeInstallationAdmission, execute_provider_lifecycle
 
-__all__ = ["FaultInjector", "ProviderLifecycleEngine"]
+__all__ = ["RuntimeInstallationAdmission", "execute_provider_lifecycle"]

@@ -587,26 +587,45 @@ def main() -> int:
     root_fd: int | None = None
     specdock_fd: int | None = None
     try:
-        script_path = Path(__file__).absolute()
-        repo_root_path = script_path.parent.parent.parent
-        repo_root = str(repo_root_path)
-        root_fd = _open_absolute_directory(repo_root)
         try:
-            before = os.fstat(root_fd)
-        except OSError as error:
-            raise _UnsafeBindingError("repository root binding changed") from error
-        _acquire_shared_lease(root_fd)
-        try:
-            after = os.fstat(root_fd)
-        except OSError as error:
-            raise _UnsafeBindingError("repository root binding changed") from error
-        if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
-            raise _UnsafeBindingError("repository root binding changed")
-        specdock_fd = _open_directory(root_fd, ("spec-dock",))
-        candidate_digest = _validate_ready_record(specdock_fd)
-        _close(specdock_fd)
-        specdock_fd = None
-        _validate_fixed_domains(root_fd, candidate_digest)
+            script_path = Path(__file__).absolute()
+            repo_root_path = script_path.parent.parent.parent
+            repo_root = str(repo_root_path)
+            root_fd = _open_absolute_directory(repo_root)
+            try:
+                before = os.fstat(root_fd)
+            except OSError as error:
+                raise _UnsafeBindingError("repository root binding changed") from error
+            _acquire_shared_lease(root_fd)
+            try:
+                after = os.fstat(root_fd)
+            except OSError as error:
+                raise _UnsafeBindingError("repository root binding changed") from error
+            if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
+                raise _UnsafeBindingError("repository root binding changed")
+            specdock_fd = _open_directory(root_fd, ("spec-dock",))
+            candidate_digest = _validate_ready_record(specdock_fd)
+            _close(specdock_fd)
+            specdock_fd = None
+            _validate_fixed_domains(root_fd, candidate_digest)
+        except _BusyError:
+            _emit_bootstrap_error("repository-operation-busy")
+            return 1
+        except _UnavailableError:
+            _emit_bootstrap_error("repository-coordination-unavailable")
+            return 1
+        except _UnsafeBindingError:
+            _emit_bootstrap_error("unsafe-repository-binding")
+            return 1
+        except _NotReadyError:
+            _emit_bootstrap_error("runtime-installation-not-ready")
+            return 1
+        except _BootstrapError:
+            _emit_bootstrap_error("runtime-installation-not-ready")
+            return 1
+        except OSError:
+            _emit_bootstrap_error("runtime-installation-not-ready")
+            return 1
 
         _bind_process_cwd(root_fd)
         scripts_dir = Path("spec-dock") / "scripts"
@@ -635,27 +654,6 @@ def main() -> int:
         _close(root_fd)
         root_fd = None
         return int(outcome.exit_code)
-    except _BusyError:
-        _emit_bootstrap_error("repository-operation-busy")
-        return 1
-    except _UnavailableError:
-        _emit_bootstrap_error("repository-coordination-unavailable")
-        return 1
-    except _UnsafeBindingError:
-        _emit_bootstrap_error("unsafe-repository-binding")
-        return 1
-    except _NotReadyError:
-        _emit_bootstrap_error("runtime-installation-not-ready")
-        return 1
-    except _BootstrapError:
-        _emit_bootstrap_error("runtime-installation-not-ready")
-        return 1
-    except OSError:
-        _emit_bootstrap_error("runtime-installation-not-ready")
-        return 1
-    except Exception:
-        _emit_bootstrap_error("runtime-installation-not-ready")
-        return 1
     finally:
         _close(specdock_fd)
         _close(root_fd)

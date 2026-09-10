@@ -939,6 +939,40 @@ class ProviderLifecycleEngine:
             except (PrivateStateError, OSError):
                 return self._blocked(request, "lifecycle-preparation-failed")
 
+            if active is not None:
+                try:
+                    active_valid = self._validate_active_authority(active, bound.fd)
+                except PrivateStateForeignError:
+                    return self._blocked(
+                        request,
+                        "stage-owner-mismatch",
+                        operation=active.operation,
+                        candidate_digest=active.candidate_digest,
+                        seed_policy=active.seed_policy,
+                        phase="candidate-staging",
+                        last_completed_phase="preflight",
+                    )
+                except (FilesystemSafetyError, PrivateStateError, OSError, ValueError, WireValidationError):
+                    return self._blocked(
+                        request,
+                        "lifecycle-preparation-failed",
+                        operation=active.operation,
+                        candidate_digest=active.candidate_digest,
+                        seed_policy=active.seed_policy,
+                        phase="candidate-staging",
+                        last_completed_phase="preflight",
+                    )
+                if not active_valid:
+                    return self._blocked(
+                        request,
+                        "stage-owner-mismatch",
+                        operation=active.operation,
+                        candidate_digest=active.candidate_digest,
+                        seed_policy=active.seed_policy,
+                        phase="candidate-staging",
+                        last_completed_phase="preflight",
+                    )
+
             if cleanup_token is not None:
                 return self._cleanup_retry_or_replay(
                     request,
@@ -1054,6 +1088,50 @@ class ProviderLifecycleEngine:
     def _receipt_matches_repository(self, receipt: CompletionReceipt, lease: RepositoryLease) -> bool:
         binding = lease.binding
         return receipt.repository_key == repository_key_for(binding.device, binding.inode, binding.euid)
+
+    def _validate_active_authority(self, active: ActiveState, root_fd: int) -> bool:
+        device, inode, euid = self._repository_identity(root_fd)
+        expected_identity = {"device": device, "inode": inode, "euid": euid}
+        if active.repository_key != repository_key_for(device, inode, euid):
+            return False
+        if dict(active.repository_identity) != expected_identity:
+            return False
+        if active.state in {"ready", "terminal-cleanup"}:
+            return True
+
+        raw, witness, record, record_kind = self._observe_record("", root_fd)
+        expected_record = self._record_matches_expected(active, raw, witness, record, record_kind)
+        original_record = self._record_matches_original(active, raw, witness, record_kind)
+        if active.state == "prepared":
+            if not (expected_record or original_record):
+                return False
+            if not self._bootstrap_matches(active, root_fd):
+                return False
+            targets = self._observe_domains(root_fd)
+            return all(
+                self._target_matches_original(target, stored)
+                for target, stored in zip(targets, active.owned_target_witnesses, strict=True)
+            )
+
+        if active.state != "running" or not expected_record or not self._bootstrap_matches(active, root_fd):
+            return False
+        targets = self._observe_domains(root_fd)
+        return all(
+            self._target_matches_original(target, stored)
+            or self._target_matches_terminal(root_fd, target, stored, active.candidate_digest)
+            for target, stored in zip(targets, active.owned_target_witnesses, strict=True)
+        )
+
+    def _bootstrap_matches(self, active: ActiveState, root_fd: int) -> bool:
+        container = self._observe_container(root_fd)
+        disposition = active.bootstrap_container["disposition"]
+        if disposition == "planned-create":
+            return container.kind == "absent"
+        if disposition in {"existing", "created"}:
+            return container.kind == "directory" and self._directory_binding_matches(
+                active.bootstrap_container["witness"], container.witness
+            )
+        return False
 
     def _admission_result(
         self,
@@ -1562,17 +1640,19 @@ class ProviderLifecycleEngine:
         )
         if candidate is None:
             candidate_digests = (None,) * 6
-        owned = tuple(
-            {
+        owned_targets: list[dict[str, object]] = []
+        for index, item in enumerate(target_observations):
+            if item.kind not in {"absent", "directory"}:
+                raise FilesystemSafetyError(f"unsafe fixed target type at {item.path}")
+            owned_targets.append({
                 "path": item.path,
-                "original_kind": "directory" if item.kind == "directory" else None,
+                "original_kind": item.kind,
                 "original_tree_digest": item.tree.tree_digest if item.tree is not None else None,
                 "original_inode": _witness_mapping(item.witness) if item.witness is not None else None,
-                "terminal_kind": None,
-                "terminal_tree_digest": None,
-            }
-            for item in target_observations
-        )
+                "terminal_kind": "absent" if operation == "uninstall" else "directory",
+                "terminal_tree_digest": (None if operation == "uninstall" else candidate_digests[index]),
+            })
+        owned = tuple(owned_targets)
         registered = tuple(
             {
                 "name": name,
@@ -1617,7 +1697,7 @@ class ProviderLifecycleEngine:
             None,
         )
         self._save_active(active_store, active)
-        self._prepare_stage(stage_store, active, candidate)
+        self._prepare_stage(stage_store, active, candidate, root_fd)
         return active
 
     @staticmethod
@@ -1628,24 +1708,20 @@ class ProviderLifecycleEngine:
         return value.st_dev, value.st_ino, os.geteuid() if hasattr(os, "geteuid") else os.getuid()
 
     def _save_active(self, store: ActiveStateStore, active: ActiveState) -> None:
-        for point in (
-            "active-temp-open",
-            "active-temp-write",
-            "active-temp-fsync",
-            "active-temp-rename",
-            "active-parent-fsync",
-        ):
-            self._check_fault(point)
-        store.save(active)
+        store.save(active, fault=self._check_fault)
 
     def _prepare_stage(
         self,
         stage_store: StageStore,
         active: ActiveState,
         candidate: CandidateIdentity | None,
+        root_fd: int,
     ) -> None:
+        if active.state != "prepared":
+            return
         owner = self._stage_owner(active)
-        if stage_store.reuse_if_valid(owner) and self._stage_payload_valid(stage_store, candidate):
+        stage_state, _entries = stage_store.inspect(owner)
+        if stage_state == "complete" and self._stage_payload_valid(stage_store, candidate, root_fd):
             return
         self._check_fault("stage-mkdir")
         stage_store.ensure_registered_entries()
@@ -1698,13 +1774,22 @@ class ProviderLifecycleEngine:
             tuple(cast("str | None", item["original_tree_digest"]) for item in active.registered_stage_entries),
         )
 
-    def _stage_payload_valid(self, stage_store: StageStore, candidate: CandidateIdentity | None) -> bool:
-        if candidate is None:
-            return True
+    def _stage_payload_valid(
+        self,
+        stage_store: StageStore,
+        candidate: CandidateIdentity | None,
+        _root_fd: int,
+    ) -> bool:
         stage_fd = stage_store._stage_fd()
         try:
             for index, stage_name in enumerate(STAGE_ENTRY_NAMES):
                 current = _capture_domain(stage_fd, stage_name, exclude_marker=index >= 4)
+                if candidate is None:
+                    if current.entry_count != 0:
+                        return False
+                    if index >= 4 and not self._stage_slot_marker_absent(stage_fd, stage_name):
+                        return False
+                    continue
                 expected = candidate.domains[index]
                 if current.tree_digest != expected.tree_digest or current.entry_count != expected.entry_count:
                     return False
@@ -1726,6 +1811,202 @@ class ProviderLifecycleEngine:
                         return False
             return True
         except (OSError, FilesystemSafetyError, CandidateError, ValueError):
+            return False
+        finally:
+            os.close(stage_fd)
+
+    @staticmethod
+    def _stage_slot_marker_absent(stage_fd: int, stage_name: str) -> bool:
+        entry_fd = os.open(
+            stage_name,
+            os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+            dir_fd=stage_fd,
+        )
+        try:
+            try:
+                os.stat(SLOT_MARKER_NAME, dir_fd=entry_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                return True
+            return False
+        finally:
+            os.close(entry_fd)
+
+    @staticmethod
+    def _witness_matches(stored: object, current: InodeWitness | None) -> bool:
+        return current is not None and stored == _witness_mapping(current)
+
+    @staticmethod
+    def _directory_binding_matches(stored: object, current: InodeWitness | None) -> bool:
+        return (
+            current is not None
+            and isinstance(stored, dict)
+            and stored.get("kind") == "directory"
+            and stored.get("device") == current.device
+            and stored.get("inode") == current.inode
+            and stored.get("mode") == current.mode
+        )
+
+    def _target_matches_original(self, item: _ObservedTarget, stored: Mapping[str, object]) -> bool:
+        original_kind = stored["original_kind"]
+        if original_kind == "absent":
+            return item.kind == "absent"
+        if original_kind != "directory":
+            return False
+        return (
+            item.kind == "directory"
+            and item.tree is not None
+            and item.tree.tree_digest == stored["original_tree_digest"]
+            and self._witness_matches(stored["original_inode"], item.witness)
+        )
+
+    def _target_matches_terminal(
+        self,
+        root_fd: int,
+        item: _ObservedTarget,
+        stored: Mapping[str, object],
+        candidate_digest: str,
+    ) -> bool:
+        terminal_kind = stored["terminal_kind"]
+        if terminal_kind == "absent":
+            return item.kind == "absent"
+        if terminal_kind != "directory":
+            return False
+        if item.kind != "directory" or item.tree is None:
+            return False
+        if item.tree.tree_digest != stored["terminal_tree_digest"]:
+            return False
+        if item.path in {FIXED_DOMAINS[4][1], FIXED_DOMAINS[5][1]}:
+            return self._slot_marker_matches(root_fd, item.path, None, expected_digest=candidate_digest)
+        return True
+
+    def _record_matches_original(
+        self,
+        active: ActiveState,
+        raw: bytes | None,
+        witness: InodeWitness | None,
+        record_kind: str,
+    ) -> bool:
+        original = active.original_record
+        kind = original["kind"]
+        if kind == "absent":
+            return raw is None and witness is None and record_kind == "absent"
+        if raw is None or witness is None or record_kind != kind:
+            return False
+        encoded = original["bytes_base64"]
+        digest = original["sha256"]
+        if not isinstance(encoded, str) or not isinstance(digest, str):
+            return False
+        return (
+            raw == base64.b64decode(encoded)
+            and hashlib.sha256(raw).hexdigest() == digest
+            and self._witness_matches(original["witness"], witness)
+        )
+
+    @staticmethod
+    def _record_matches_expected(
+        active: ActiveState,
+        raw: bytes | None,
+        witness: InodeWitness | None,
+        record: InstallationRecord | None,
+        record_kind: str,
+    ) -> bool:
+        expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+        if (
+            raw != expected
+            or record is None
+            or record_kind != "final"
+            or record.state != "incomplete"
+            or record.operation != active.operation
+            or record.candidate_digest != active.candidate_digest
+            or record.seed_policy != active.seed_policy
+        ):
+            return False
+        return not (
+            active.record_temp_witness is not None
+            and (
+                witness is None
+                or not NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
+            )
+        )
+
+    def _validate_running_stage(
+        self,
+        stage_store: StageStore,
+        active: ActiveState,
+        candidate: CandidateIdentity | None,
+        root_fd: int,
+    ) -> bool:
+        status, present = stage_store.inspect(self._stage_owner(active))
+        if status == "absent" or stage_store.load_owner() is None:
+            return False
+        targets = self._observe_domains(root_fd)
+        stage_fd = stage_store._stage_fd()
+        present_names = set(present)
+        try:
+            for index, stage_name in enumerate(STAGE_ENTRY_NAMES):
+                stored = active.owned_target_witnesses[index]
+                target = targets[index]
+                is_original = self._target_matches_original(target, stored)
+                is_terminal = self._target_matches_terminal(root_fd, target, stored, active.candidate_digest)
+                expected_digest: str | None = None
+                expected_empty = False
+                expected_absent = False
+                expected_candidate = False
+                if active.operation == "uninstall":
+                    if is_original:
+                        expected_empty = True
+                    elif is_terminal and stored["original_kind"] == "directory":
+                        expected_digest = cast("str", stored["original_tree_digest"])
+                    elif is_terminal and stored["original_kind"] == "absent":
+                        expected_empty = True
+                    else:
+                        return False
+                elif is_original:
+                    if candidate is None:
+                        return False
+                    expected = candidate.domains[index]
+                    expected_digest = expected.tree_digest
+                    expected_candidate = True
+                elif is_terminal and stored["original_kind"] == "directory":
+                    expected_digest = cast("str", stored["original_tree_digest"])
+                elif is_terminal and stored["original_kind"] == "absent":
+                    expected_absent = True
+                else:
+                    return False
+
+                if expected_absent:
+                    if stage_name in present_names:
+                        return False
+                    continue
+                if stage_name not in present_names:
+                    return False
+                current = _capture_domain(stage_fd, stage_name, exclude_marker=index >= 4)
+                if expected_empty:
+                    if current.entry_count != 0:
+                        return False
+                    if index >= 4 and not self._stage_slot_marker_absent(stage_fd, stage_name):
+                        return False
+                    continue
+                if expected_digest is None or current.tree_digest != expected_digest:
+                    return False
+                if expected_candidate and index >= 4:
+                    entry_fd = os.open(
+                        stage_name,
+                        os.O_RDONLY
+                        | getattr(os, "O_DIRECTORY", 0)
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=stage_fd,
+                    )
+                    try:
+                        marker_raw, _ = _read_regular(entry_fd, SLOT_MARKER_NAME)
+                    finally:
+                        os.close(entry_fd)
+                    marker = parse_slot_marker(marker_raw)
+                    if marker.slot != FIXED_DOMAINS[index][1] or marker.candidate_digest != active.candidate_digest:
+                        return False
+            return True
+        except (CandidateError, FilesystemSafetyError, OSError, ValueError, WireValidationError):
             return False
         finally:
             os.close(stage_fd)
@@ -2164,17 +2445,13 @@ class ProviderLifecycleEngine:
         root_fd: int,
     ) -> LifecycleResult:
         active = self._ensure_bootstrap(request, active, active_store, root_fd)
-        _raw_record, _record_witness, record, _record_kind = self._observe_record(request.target, root_fd)
-        expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-        if not (
-            record is not None
-            and record.state == "incomplete"
-            and record.operation == active.operation
-            and record.candidate_digest == active.candidate_digest
-            and record.seed_policy == active.seed_policy
-        ):
+        raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
+        if not self._record_matches_expected(active, raw_record, record_witness, record, record_kind):
+            expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
             self._write_public_record(request, active, expected_incomplete, active_store, root_fd)
             active = active_store.load() or active
+        elif active.state == "prepared":
+            self._ensure_expected_record_durable(active, root_fd)
         if active.state == "prepared":
             active = replace(active, state="running")
             self._save_active(active_store, active)
@@ -2221,16 +2498,13 @@ class ProviderLifecycleEngine:
         container = self._observe_container(root_fd)
         if container.kind != "directory":
             raise FilesystemSafetyError("tooling container disappeared during uninstall")
-        expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-        _raw, _witness, record, _kind = self._observe_record(request.target, root_fd)
-        if not (
-            record is not None
-            and record.state == "incomplete"
-            and record.operation == "uninstall"
-            and record.candidate_digest == active.candidate_digest
-        ):
+        raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
+        if not self._record_matches_expected(active, raw_record, record_witness, record, record_kind):
+            expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
             self._write_public_record(request, active, expected_incomplete, active_store, root_fd)
             active = active_store.load() or active
+        elif active.state == "prepared":
+            self._ensure_expected_record_durable(active, root_fd)
         if active.state == "prepared":
             active = replace(active, state="running")
             self._save_active(active_store, active)
@@ -2354,6 +2628,21 @@ class ProviderLifecycleEngine:
             os.close(namespace_fd)
         self._save_active(active_store, replace(active, record_temp_witness=None))
 
+    def _ensure_expected_record_durable(self, active: ActiveState, root_fd: int) -> None:
+        expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+        specdock_fd = _open_path(root_fd, ("spec-dock",))
+        try:
+            self._check_fault("record-parent-fsync")
+            self._filesystem().fsync_directory(specdock_fd)
+            current, witness = _read_regular(specdock_fd, "spec-dock.version")
+        finally:
+            os.close(specdock_fd)
+        if current != expected or (
+            active.record_temp_witness is not None
+            and not NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
+        ):
+            raise PrivateStateForeignError("expected incomplete record changed before re-entry")
+
     def _target_matches_candidate(
         self,
         root_fd: int,
@@ -2441,7 +2730,6 @@ class ProviderLifecycleEngine:
                 if target.kind == "absent":
                     filesystem.rename_no_replace(stage_fd, name, destination_parent, components[-1])
                 elif target.kind == "directory":
-                    old_tree = filesystem.capture_domain_tree(destination_parent, components[-1])
                     if target.witness is None:
                         raise FilesystemSafetyError(f"missing fixed target witness at {path}")
                     filesystem.exchange(
@@ -2451,8 +2739,6 @@ class ProviderLifecycleEngine:
                         components[-1],
                         expected_destination=target.witness,
                     )
-                    residue = filesystem.capture_domain_tree(stage_fd, name)
-                    filesystem.remove_tree_bound(stage_fd, name, residue if residue != old_tree else old_tree)
                 else:
                     raise FilesystemSafetyError(f"unsafe fixed target type at {path}")
             self._check_fault("source-parent-fsync")
@@ -2553,15 +2839,7 @@ class ProviderLifecycleEngine:
                     active.cleanup_retry_invocation,
                     active.deferred_invocation,
                 )
-                for point in (
-                    "receipt-temp-open",
-                    "receipt-temp-write",
-                    "receipt-temp-fsync",
-                    "receipt-temp-rename",
-                    "receipt-parent-fsync",
-                ):
-                    self._check_fault(point)
-                receipt_store.save(receipt)
+                receipt_store.save(receipt, fault=self._check_fault)
             self._check_fault("active-expected-unlink")
             namespace_fd = active_store._open_namespace()
             try:
@@ -3107,7 +3385,9 @@ class ProviderLifecycleEngine:
             if stage_store is None:
                 return self._blocked(request, "lifecycle-preparation-failed")
             try:
-                stage_store.require_valid(self._stage_owner(active))
+                stage_state, _stage_entries = stage_store.inspect(self._stage_owner(active))
+                if stage_state == "complete" and not self._stage_payload_valid(stage_store, None, root_fd):
+                    raise PrivateStateForeignError("prepared uninstall stage payload is unsafe")
             except PrivateStateForeignError:
                 return self._blocked(
                     request,
@@ -3130,17 +3410,19 @@ class ProviderLifecycleEngine:
                 )
             targets = self._observe_domains(root_fd)
             container = self._observe_container(root_fd)
-            raw_record, _record_witness, record, record_kind = self._observe_record(request.target, root_fd)
+            raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
             expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-            if raw_record is not None and (
-                raw_record != expected
-                or record is None
-                or record_kind != "final"
-                or record.state != "incomplete"
-                or record.operation != "uninstall"
-                or record.candidate_digest != active.candidate_digest
-                or record.seed_policy != "preserve-only"
-            ):
+            expected_record = (
+                raw_record == expected
+                and record is not None
+                and record_kind == "final"
+                and record.state == "incomplete"
+                and record.operation == "uninstall"
+                and record.candidate_digest == active.candidate_digest
+                and record.seed_policy == "preserve-only"
+            )
+            original_record = self._record_matches_original(active, raw_record, record_witness, record_kind)
+            if raw_record is not None and not (expected_record or original_record):
                 return self._blocked(
                     request,
                     "installation-record-state-inconsistent",
@@ -3162,7 +3444,18 @@ class ProviderLifecycleEngine:
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
         try:
-            self._prepare_stage(stage_store, active, candidate)
+            if active.state == "prepared":
+                self._prepare_stage(stage_store, active, candidate, root_fd)
+            elif not self._validate_running_stage(stage_store, active, candidate, root_fd):
+                return self._blocked(
+                    request,
+                    "stage-owner-mismatch",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    phase="candidate-staging",
+                    last_completed_phase="preflight",
+                )
         except PrivateStateForeignError:
             return self._blocked(
                 request,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from io import BytesIO
 import os
 from pathlib import Path
@@ -14,7 +15,13 @@ from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import ActiveState, LifecycleMode, LifecycleRequest, Operation
 from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
-from spec_dock.provider_lifecycle.private_state import PrivateStateError, PrivateStateForeignError, StageStore
+from spec_dock.provider_lifecycle.private_state import (
+    ActiveStateStore,
+    PrivateStateError,
+    PrivateStateForeignError,
+    StageStore,
+    resolve_private_namespace,
+)
 from spec_dock.provider_lifecycle.wire import parse_installation_record, serialize_public_result
 
 
@@ -116,6 +123,30 @@ def test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations(tmp_path:
         assert retry.code in {"install-completed", "update-completed", "terminal-cleanup-completed"}
 
 
+def test_t06_exchange_keeps_the_old_root_in_stage_until_cleanup(tmp_path: Path) -> None:
+    workspace = (tmp_path / "exchange-recovery").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    consumer_file = workspace / "spec-dock" / "docs" / "consumer-owned.txt"
+    consumer_file.write_text("consumer-owned\n", encoding="utf-8")
+
+    request = _request(workspace, "update")
+    interrupted = ProviderLifecycleEngine(fault_injector="source-parent-fsync").execute(request)
+    assert interrupted.status == "partial_failure"
+    assert interrupted.mutation_started is True
+
+    namespace = resolve_private_namespace(workspace)
+    staged_old_root = namespace / "STAGE" / "docs"
+    assert staged_old_root.is_dir()
+    assert (staged_old_root / "consumer-owned.txt").read_text(encoding="utf-8") == "consumer-owned\n"
+    assert not consumer_file.exists()
+
+    resumed = ProviderLifecycleEngine().execute(request)
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
 def test_t07_legacy_migration_uninstall_and_old_package_mutation_zero(tmp_path: Path) -> None:
     workspace = (tmp_path / "legacy").resolve()
     workspace.mkdir()
@@ -211,7 +242,7 @@ def test_t04_foreign_stage_owner_is_stage_owner_mismatch_in_candidate_staging(mo
     assert result.actions == ()
 
 
-def test_t04_prepared_uninstall_dry_run_validates_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
+def test_t04_prepared_uninstall_dry_run_preserves_foreign_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
     workspace = (tmp_path / "prepared-uninstall").resolve()
     workspace.mkdir()
     request = _request(workspace, "uninstall", mode="dry-run")
@@ -233,7 +264,7 @@ def test_t04_prepared_uninstall_dry_run_validates_stage_before_plan(monkeypatch,
         def __init__(self) -> None:
             self.calls = 0
 
-        def require_valid(self, owner) -> None:
+        def inspect(self, owner):
             self.calls += 1
             raise PrivateStateForeignError("foreign prepared stage")
 
@@ -266,3 +297,91 @@ def test_t04_prepared_uninstall_dry_run_validates_stage_before_plan(monkeypatch,
     assert result.seed_policy == "preserve-only"
     assert result.mutation_started is False
     assert foreign_stage.calls == 1
+
+
+@pytest.mark.parametrize("fault_point", ["stage-mkdir", "stage-owner-write"])
+def test_t04_prepared_uninstall_dry_run_plans_without_repairing_incomplete_stage(
+    tmp_path: Path, fault_point: str
+) -> None:
+    workspace = (tmp_path / fault_point).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status == "blocked"
+    assert first.code == "lifecycle-preparation-failed"
+
+    before = _workspace_snapshot(workspace)
+    dry_run = ProviderLifecycleEngine().execute(_request(workspace, "uninstall", mode="dry-run"))
+
+    serialize_public_result(dry_run)
+    assert dry_run.status == "planned"
+    assert dry_run.code == "uninstall-planned"
+    assert _workspace_snapshot(workspace) == before
+
+
+def test_t04_active_reentry_rejects_repository_identity_mismatch(tmp_path: Path) -> None:
+    workspace = (tmp_path / "active-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(request, force=True)
+    assert first.status == "blocked"
+
+    namespace = resolve_private_namespace(workspace)
+    store = ActiveStateStore(namespace, repository_root=workspace)
+    active = store.load()
+    assert active is not None
+    store.save(
+        replace(
+            active,
+            repository_identity={
+                "device": active.repository_identity["device"],
+                "inode": active.repository_identity["inode"] + 1,
+                "euid": active.repository_identity["euid"],
+            },
+        )
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+
+
+@pytest.mark.parametrize("operation", ["install", "uninstall"])
+def test_t04_active_records_explicit_original_and_terminal_kinds(tmp_path: Path, operation: Operation) -> None:
+    workspace = (tmp_path / operation).resolve()
+    workspace.mkdir()
+    if operation == "uninstall":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+
+    result = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(_request(workspace, operation), force=True)
+    assert result.status == "blocked"
+
+    namespace = resolve_private_namespace(workspace)
+    store = ActiveStateStore(namespace, repository_root=workspace)
+    active = store.load()
+    assert active is not None
+    expected_original = "directory" if operation == "uninstall" else "absent"
+    expected_terminal = "absent" if operation == "uninstall" else "directory"
+    assert {item["original_kind"] for item in active.owned_target_witnesses} == {expected_original}
+    assert {item["terminal_kind"] for item in active.owned_target_witnesses} == {expected_terminal}
+    if operation == "uninstall":
+        assert all(item["terminal_tree_digest"] is None for item in active.owned_target_witnesses)
+    else:
+        assert all(isinstance(item["terminal_tree_digest"], str) for item in active.owned_target_witnesses)
+
+    invalid = replace(
+        active,
+        owned_target_witnesses=tuple(
+            {**item, "terminal_kind": None, "terminal_tree_digest": None} for item in active.owned_target_witnesses
+        ),
+    )
+    with pytest.raises(PrivateStateError):
+        store.save(invalid)

@@ -299,12 +299,15 @@ class NativeAtomicFilesystem:
         dst_parent_fd: int,
         dst_name: str,
         *,
+        expected_source: InodeWitness | None = None,
         expected_destination: InodeWitness | None = None,
     ) -> None:
         source = self._capture_any(src_parent_fd, src_name)
         destination = self._capture_any(dst_parent_fd, dst_name)
         if source is None or destination is None:
             raise FilesystemSafetyError("native exchange requires two existing entries")
+        if expected_source is not None and not self._same_content_identity(source[1], expected_source):
+            raise FilesystemSafetyError("native exchange source identity changed before mutation")
         if expected_destination is not None and not self._same_content_identity(destination[1], expected_destination):
             raise FilesystemSafetyError("native exchange destination identity changed before mutation")
         self._ensure_directory_fd(src_parent_fd)

@@ -14,8 +14,9 @@ import sys
 from typing import NoReturn, cast
 
 from spec_dock import __version__
+from spec_dock.provider_lifecycle import execute_provider_lifecycle
+from spec_dock.provider_lifecycle.api import invalid_provider_lifecycle_request
 from spec_dock.provider_lifecycle.contracts import LifecycleMode, LifecycleRequest, Operation
-from spec_dock.provider_lifecycle.engine import ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.wire import serialize_public_result
 
 
@@ -236,7 +237,7 @@ def main(argv: list[str] | None = None) -> int:
         namespace = _parse_args(arguments)
     except _ArgumentError:
         request, command = _invalid_request(arguments)
-        result = ProviderLifecycleEngine.invalid_request(request)
+        result = invalid_provider_lifecycle_request(request)
         if "--json" in arguments:
             print(serialize_public_result(result).decode("utf-8"), end="")
         else:
@@ -246,7 +247,7 @@ def main(argv: list[str] | None = None) -> int:
     target = _target(namespace.path)
     request = _request(namespace, target)
     json_requested = bool(getattr(namespace, "json", False))
-    result = ProviderLifecycleEngine().execute(
+    result = execute_provider_lifecycle(
         request,
         force=True if namespace.command == "init" and namespace.force else None,
         cleanup_token=getattr(namespace, "provider_cleanup_token", None),

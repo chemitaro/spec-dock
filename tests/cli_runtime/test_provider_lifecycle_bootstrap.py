@@ -53,6 +53,23 @@ def _install_import_spy(directory: Path, marker: Path) -> None:
     )
 
 
+def _install_runtime_failure_hook(directory: Path) -> None:
+    directory.mkdir()
+    (directory / "sitecustomize.py").write_text(
+        "import builtins\n"
+        "_original_import = builtins.__import__\n"
+        "def _raise(*args, **kwargs):\n"
+        "    raise RuntimeError('post-admission failure')\n"
+        "def _import(name, *args, **kwargs):\n"
+        "    module = _original_import(name, *args, **kwargs)\n"
+        "    if name == 'spec_dock_runtime.app':\n"
+        "        module.run = _raise\n"
+        "    return module\n"
+        "builtins.__import__ = _import\n",
+        encoding="utf-8",
+    )
+
+
 class TestProviderLifecycleBootstrap(CliRuntimeHarness):
     def test_t08_pre_import_shared_lease_and_ready_admission_are_enforced(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
@@ -104,6 +121,28 @@ class TestProviderLifecycleBootstrap(CliRuntimeHarness):
             "to complete recovery before running repository commands.\n"
         )
         assert not imported.exists(), "runtime was imported before ready admission"
+
+    def test_t08_post_admission_runtime_defect_is_not_mapped_to_not_ready(self, tmp_path: Path) -> None:
+        target = tmp_path / "target"
+        target.mkdir()
+        assert main(["init", str(target)]) == 0
+
+        hook_dir = tmp_path / "runtime-failure-hook"
+        _install_runtime_failure_hook(hook_dir)
+        env = os.environ.copy()
+        env["PYTHONPATH"] = f"{hook_dir}{os.pathsep}{env.get('PYTHONPATH', '')}"
+        result = subprocess.run(
+            [sys.executable, str(target / "spec-dock" / "scripts" / "spec-dock"), "--help"],
+            cwd=target,
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=3,
+        )
+
+        assert result.returncode != 0
+        assert "RuntimeError: post-admission failure" in result.stderr
+        assert "error: runtime-installation-not-ready:" not in result.stderr
 
     def test_t08_strict_record_admission_rejects_unsafe_bindings_before_import(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
