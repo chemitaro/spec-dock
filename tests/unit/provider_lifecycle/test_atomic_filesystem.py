@@ -13,6 +13,7 @@ from spec_dock.provider_lifecycle.contracts import LifecycleRequest
 from spec_dock.provider_lifecycle.engine import ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.filesystem import (
     AtomicRenameUnavailable,
+    FilesystemSafetyError,
     LinuxRenameAt2Adapter,
     MacOSRenameAtXAdapter,
     NativeAtomicFilesystem,
@@ -102,6 +103,25 @@ def test_t05_descriptor_relative_tree_removal_does_not_follow_links(tmp_path: Pa
         assert any(entry.kind == "symlink" for entry in captured.entries)
         filesystem.remove_tree_bound(bound.fd, "tree", captured)
     assert outside.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_t05_regular_tree_capture_revalidates_open_fd_before_and_after_hash(monkeypatch, tmp_path: Path) -> None:
+    filesystem = NativeAtomicFilesystem()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    tree = parent / "tree"
+    tree.mkdir()
+    value = tree / "value"
+    value.write_text("before\n", encoding="utf-8")
+    original_hash = NativeAtomicFilesystem._sha256_fd
+
+    def mutate_during_hash(fd: int) -> str:
+        value.write_text("after!\n", encoding="utf-8")
+        return original_hash(fd)
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "_sha256_fd", staticmethod(mutate_during_hash))
+    with filesystem.open_directory_chain_no_follow(str(parent)) as bound, pytest.raises(FilesystemSafetyError):
+        filesystem.capture_domain_tree(bound.fd, "tree")
 
 
 def test_t08_unavailable_native_capability_is_closed_before_repository_observation(monkeypatch, tmp_path: Path) -> None:

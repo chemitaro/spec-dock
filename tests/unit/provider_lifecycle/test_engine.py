@@ -16,6 +16,7 @@ import pytest
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import (
     ActiveState,
+    CompletionReceipt,
     LifecycleAction,
     LifecycleMode,
     LifecycleRequest,
@@ -30,6 +31,7 @@ from spec_dock.provider_lifecycle.private_state import (
     PrivateStateError,
     PrivateStateForeignError,
     StageStore,
+    cleanup_token_for,
     repository_key_for,
     resolve_private_namespace,
 )
@@ -128,7 +130,7 @@ def _assert_first_red_partial_shape(
 
 def test_t01_partial_action_vectors_are_operation_and_seed_specific(tmp_path: Path) -> None:
     cases: tuple[tuple[Operation, Operation, str, str], ...] = (
-        ("install", "install", "create-if-absent", "completed"),
+        ("install", "install", "create-if-absent", "pending"),
         ("update", "install", "preserve-only", "preserved"),
     )
     for index, (request_operation, expected_operation, seed_policy, seed_status) in enumerate(cases):
@@ -150,13 +152,13 @@ def test_t01_partial_action_vectors_are_operation_and_seed_specific(tmp_path: Pa
                 "spec-dock/.gitignore",
                 "seed",
                 seed_status,
-                "fresh-seed-create" if seed_status == "completed" else "preserve-only-seed",
+                "fresh-seed-create" if seed_policy == "create-if-absent" else "preserve-only-seed",
             ),
             LifecycleAction(
                 ".github/workflows/ci.yml",
                 "seed",
                 seed_status,
-                "fresh-seed-create" if seed_status == "completed" else "preserve-only-seed",
+                "fresh-seed-create" if seed_policy == "create-if-absent" else "preserve-only-seed",
             ),
             LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
         ]
@@ -203,6 +205,25 @@ def test_t01_update_partial_action_vector_preserves_current_domains(tmp_path: Pa
     assert result.seed_policy == "preserve-only"
 
 
+def test_t01_preserve_only_verify_failure_excludes_seed_phases(tmp_path: Path) -> None:
+    workspace = (tmp_path / "preserve-only-verify-failure").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    result = ProviderLifecycleEngine(fault_injector="target-verify").execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.phase == "verify-target"
+    assert result.last_completed_phase == "publish-slot-spec-dock-grill-with-docs"
+    assert result.actions[-3:] == (
+        LifecycleAction("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    )
+
+
 @pytest.mark.parametrize(
     ("fault_point", "expected_last_completed_phase", "failed_index"),
     [
@@ -242,6 +263,31 @@ def test_t01_uninstall_partial_action_vectors_follow_uninstall_sequence(
     assert result.seed_policy == "preserve-only"
 
 
+def test_t01_uninstall_resume_actions_use_invocation_initial_absence(tmp_path: Path) -> None:
+    workspace = (tmp_path / "uninstall-resume-absence").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+
+    first = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(request, force=True)
+    assert first.status == "partial_failure"
+
+    resumed = ProviderLifecycleEngine(fault_injector="root-scripts-publish-or-detach").execute(request)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "partial_failure"
+    assert resumed.phase == "detach-scripts"
+    assert resumed.actions[2:8] == (
+        LifecycleAction("spec-dock/docs", "root", "preserved", "owned-root-absent"),
+        LifecycleAction("spec-dock/templates", "root", "preserved", "owned-root-absent"),
+        LifecycleAction("spec-dock/system", "root", "completed", "owned-root-remove"),
+        LifecycleAction("spec-dock/scripts", "root", "failed", "owned-root-remove"),
+        LifecycleAction(".agents/skills/spec-dock", "slot", "pending", "owned-slot-remove"),
+        LifecycleAction(".agents/skills/spec-dock-grill-with-docs", "slot", "pending", "owned-slot-remove"),
+    )
+
+
 @pytest.mark.parametrize("missing_count", range(7))
 def test_t01_incomplete_uninstall_plan_precedes_already_absent_code(tmp_path: Path, missing_count: int) -> None:
     workspace = (tmp_path / f"incomplete-uninstall-{missing_count}").resolve()
@@ -260,6 +306,104 @@ def test_t01_incomplete_uninstall_plan_precedes_already_absent_code(tmp_path: Pa
     assert dry_run.status == "planned"
     assert dry_run.code == "uninstall-planned"
     serialize_public_result(dry_run)
+
+
+def test_t01_orphan_incomplete_uninstall_record_is_closed_without_new_active(tmp_path: Path) -> None:
+    workspace = (tmp_path / "orphan-incomplete-uninstall").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+    interrupted = ProviderLifecycleEngine(fault_injector="root-docs-publish-or-detach").execute(request, force=True)
+    assert interrupted.status == "partial_failure"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    assert active_store.load() is not None
+    record_path = workspace / "spec-dock/spec-dock.version"
+    record_before = record_path.read_bytes()
+    (namespace / "ACTIVE.json").unlink()
+    assert active_store.load() is None
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "installation-record-state-inconsistent"
+    assert result.operation is None
+    assert result.candidate_digest == interrupted.candidate_digest
+    assert result.seed_policy == interrupted.seed_policy
+    assert result.mutation_started is False
+    assert record_path.read_bytes() == record_before
+    assert active_store.load() is None
+
+
+def test_t01_active_resume_rejects_mismatched_receipt_before_mutation(tmp_path: Path) -> None:
+    workspace = (tmp_path / "active-receipt-mismatch").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    interrupted = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(request, force=True)
+    assert interrupted.status == "partial_failure"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    assert active is not None
+    receipt_store.save(
+        CompletionReceipt(
+            1,
+            active.repository_key,
+            active.tuple_key,
+            "0" * 32,
+            active.operation,
+            active.candidate_digest,
+            active.seed_policy,
+            active.result_family,
+            active.terminal_record_digest,
+            cleanup_token_for(active.repository_key, active.tuple_key, active.result_family, "0" * 32),
+            active.cleanup_retry_invocation,
+            active.deferred_invocation,
+        )
+    )
+    before = _workspace_snapshot(workspace)
+    active_before = active_store.load()
+    receipt_before = receipt_store.load()
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "error"
+    assert result.code == "invalid-request"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+
+
+def test_t01_uninstall_verify_rejects_non_directory_target(tmp_path: Path) -> None:
+    workspace = (tmp_path / "uninstall-unsupported-target").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    outside = (tmp_path / "outside").resolve()
+    outside.write_text("consumer-owned\n", encoding="utf-8")
+
+    def introduce_unsupported_target(point: str) -> None:
+        if point == "target-verify":
+            (workspace / "spec-dock/docs").symlink_to(outside)
+
+    result = ProviderLifecycleEngine(fault_injector=introduce_unsupported_target).execute(
+        _request(workspace, "uninstall"), force=True
+    )
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.code == "uninstall-partial-failure"
+    assert result.phase == "verify-target"
+    assert result.failed_paths == ("spec-dock/docs",)
+    assert result.actions[2] == LifecycleAction("spec-dock/docs", "root", "failed", "owned-root-remove")
+    assert (workspace / "spec-dock/docs").is_symlink()
 
 
 def test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations(tmp_path: Path) -> None:

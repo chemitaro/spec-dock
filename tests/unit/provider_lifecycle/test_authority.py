@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import io
 import os
 from pathlib import Path
@@ -9,6 +10,7 @@ from typing import Any, cast
 
 import pytest
 
+from spec_dock.provider_lifecycle import coordination
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import RepositoryBinding
 from spec_dock.provider_lifecycle.coordination import (
@@ -179,3 +181,39 @@ def test_t06_repository_lease_is_nonblocking_and_identity_bound(tmp_path: Path) 
             assert second_shared.binding == shared.binding
         with pytest.raises(RepositoryBusy):
             acquire_exclusive_repository_lease(repository)
+
+
+def test_t06_lease_rebinds_visible_root_after_successful_flock(monkeypatch, tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    old_path = tmp_path / "repository-old"
+
+    def replace_visible_root(_fd: int, _operation: int) -> None:
+        repository.rename(old_path)
+        replacement.rename(repository)
+
+    monkeypatch.setattr(coordination.fcntl, "flock", replace_visible_root)
+
+    with pytest.raises(RepositoryCoordinationError):
+        acquire_exclusive_repository_lease(repository)
+
+
+def test_t06_busy_classification_rechecks_visible_root_binding(monkeypatch, tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    old_path = tmp_path / "repository-old"
+
+    def replace_then_report_busy(_fd: int, _operation: int) -> None:
+        repository.rename(old_path)
+        replacement.rename(repository)
+        raise OSError(errno.EAGAIN, "busy")
+
+    monkeypatch.setattr(coordination.fcntl, "flock", replace_then_report_busy)
+
+    with pytest.raises(RepositoryCoordinationError) as error:
+        acquire_exclusive_repository_lease(repository)
+    assert type(error.value) is RepositoryCoordinationError

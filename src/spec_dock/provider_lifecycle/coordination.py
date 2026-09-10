@@ -95,6 +95,24 @@ def _open_absolute_directory_no_follow(path: str | os.PathLike[str]) -> int:
         raise
 
 
+def _rebind_visible_root(repository_root: str | os.PathLike[str], expected: RepositoryBinding) -> None:
+    """Confirm that the visible root still names the leased directory inode."""
+
+    try:
+        visible_fd = _open_absolute_directory_no_follow(repository_root)
+    except OSError as exc:
+        raise RepositoryCoordinationError("repository root changed after lease acquisition") from exc
+    try:
+        try:
+            visible = _binding_from_fd(visible_fd)
+        except RepositoryCoordinationError as exc:
+            raise RepositoryCoordinationError("visible repository root is unsafe") from exc
+    finally:
+        os.close(visible_fd)
+    if visible != expected:
+        raise RepositoryCoordinationError("visible repository root binding changed")
+
+
 def _open_root(repository_root: str | os.PathLike[str]) -> tuple[int, RepositoryBinding, os.stat_result]:
     path = Path(repository_root)
     if not path.is_absolute() or "\x00" in os.fspath(path):
@@ -120,20 +138,35 @@ def _acquire(repository_root: str | os.PathLike[str], mode: str) -> RepositoryLe
     try:
         fcntl.flock(fd, operation | fcntl.LOCK_NB)
     except OSError as exc:
-        os.close(fd)
         if exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
+            try:
+                _rebind_visible_root(repository_root, binding)
+            except RepositoryCoordinationError:
+                os.close(fd)
+                raise
+            os.close(fd)
             raise RepositoryBusy("repository coordination is busy") from exc
+        os.close(fd)
         raise RepositoryCoordinationUnavailable("repository coordination is unavailable") from exc
     try:
         after = os.fstat(fd)
+        after_binding = _binding_from_fd(fd)
+    except RepositoryCoordinationError:
+        os.close(fd)
+        raise
     except OSError as exc:
         os.close(fd)
         raise RepositoryCoordinationUnavailable(
             "repository root descriptor disappeared after lease acquisition"
         ) from exc
-    if after.st_dev != before.st_dev or after.st_ino != before.st_ino or _binding_from_fd(fd) != binding:
+    if after.st_dev != before.st_dev or after.st_ino != before.st_ino or after_binding != binding:
         os.close(fd)
         raise RepositoryCoordinationError("repository root binding changed during lease acquisition")
+    try:
+        _rebind_visible_root(repository_root, binding)
+    except RepositoryCoordinationError:
+        os.close(fd)
+        raise
     return RepositoryLease(fd, binding, mode)
 
 

@@ -363,8 +363,11 @@ def _relation_partial(profile: str, operation: str, seed_policy: str) -> list[di
             _relation_action(".github/workflows/ci.yml", "seed", "failed", "fresh-seed-create"),
         ])
     else:
+        phase_rank = _wire_generated.PHASE_VALUES.index(phase)
+        first_seed_rank = _wire_generated.PHASE_VALUES.index("create-seed-spec-dock-gitignore")
+        seed_status = "pending" if phase_rank < first_seed_rank else "completed"
         actions.extend(
-            _relation_action(path, "seed", "completed", "fresh-seed-create") for path in _RELATION_PATHS[8:10]
+            _relation_action(path, "seed", seed_status, "fresh-seed-create") for path in _RELATION_PATHS[8:10]
         )
     actions.append(_relation_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"))
     return actions

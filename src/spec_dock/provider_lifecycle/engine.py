@@ -1084,6 +1084,8 @@ class ProviderLifecycleEngine:
                         force=force,
                         receipt=receipt,
                     )
+                if receipt is not None and not self._receipt_matches_active(receipt, active):
+                    return self.invalid_request(request)
                 try:
                     candidate = None if operation == "uninstall" else self._candidate()
                 except (CandidateError, OSError, ValueError):
@@ -1586,6 +1588,12 @@ class ProviderLifecycleEngine:
                 raise _AdmissionFailure(
                     "resume-operation-mismatch",
                     operation=record.operation,
+                    candidate_digest=record.candidate_digest,
+                    seed_policy=record.seed_policy,
+                )
+            if record.state == "incomplete" and (active_store is None or active_store.load() is None):
+                raise _AdmissionFailure(
+                    "installation-record-state-inconsistent",
                     candidate_digest=record.candidate_digest,
                     seed_policy=record.seed_policy,
                 )
@@ -2490,11 +2498,12 @@ class ProviderLifecycleEngine:
             ("spec-dock/.gitignore", "spec-dock-gitignore"),
             (".github/workflows/ci.yml", "consumer-ci"),
         )):
+            seed_phase = "create-seed-spec-dock-gitignore" if seed_index == 0 else "create-seed-consumer-ci"
             existing = self._observe_target(root_fd, path, expect_tree=False)
             failed_seed = (
                 seed_policy == "create-if-absent"
                 and partial_phase in {"create-seed-spec-dock-gitignore", "create-seed-consumer-ci"}
-                and seed_index == (0 if partial_phase == "create-seed-spec-dock-gitignore" else 1)
+                and seed_phase == partial_phase
             )
             if failed_seed:
                 reason = "fresh-seed-create"
@@ -2506,18 +2515,18 @@ class ProviderLifecycleEngine:
                 )
             else:
                 reason = "fresh-seed-create" if seed_policy == "create-if-absent" else "preserve-only-seed"
-            status = "preserved" if reason != "fresh-seed-create" else "planned" if planned else "completed"
-            if partial_phase == "create-seed-spec-dock-gitignore" and seed_index == 0:
-                if reason == "fresh-seed-create":
-                    status = "failed"
-            elif partial_phase == "create-seed-spec-dock-gitignore" and seed_index == 1:
-                if reason == "fresh-seed-create":
-                    status = "pending"
-            elif partial_phase == "create-seed-consumer-ci" and seed_index == 0:
-                if reason == "fresh-seed-create":
-                    status = "completed"
-            elif partial_phase == "create-seed-consumer-ci" and seed_index == 1 and reason == "fresh-seed-create":
+            if reason != "fresh-seed-create":
+                status = "preserved"
+            elif planned:
+                status = "planned"
+            elif partial_phase is None:
+                status = "completed"
+            elif failed_seed:
                 status = "failed"
+            else:
+                partial_rank = PHASES.index(partial_phase) if partial_phase in PHASES else len(PHASES)
+                seed_rank = PHASES.index(seed_phase)
+                status = "pending" if partial_rank < seed_rank else "completed"
             result.append(_make_action(path, "seed", status, reason))
         if include_stage:
             stage_status = "pending" if partial_phase is not None or failure_point is not None else "completed"
@@ -2535,6 +2544,7 @@ class ProviderLifecycleEngine:
         partial_index: int | None = None,
         partial_phase: str | None = None,
         original_targets: Sequence[Mapping[str, object]] | None = None,
+        initial_absent_paths: frozenset[str] | None = None,
     ) -> tuple[LifecycleAction, ...]:
         result = [_make_action("spec-dock", "container", "preserved", "shared-container-preserve")]
         if planned:
@@ -2550,6 +2560,7 @@ class ProviderLifecycleEngine:
             record_status = "completed"
             record_reason = "terminal-record-publish"
         result.append(_make_action("spec-dock/spec-dock.version", "record", record_status, record_reason))
+        initially_absent = initial_absent_paths or frozenset()
         for index, item in enumerate(targets):
             category, path, _ = FIXED_DOMAINS[index]
             original_kind = item.kind
@@ -2557,13 +2568,23 @@ class ProviderLifecycleEngine:
                 with contextlib.suppress(IndexError, KeyError):
                     original_kind = cast("str", original_targets[index]["original_kind"])
             originally_present = original_kind == "directory"
-            reason = f"owned-{category}-remove" if originally_present else f"owned-{category}-absent"
+            was_absent_at_start = path in initially_absent
+            reason = (
+                f"owned-{category}-remove"
+                if originally_present and not was_absent_at_start
+                else f"owned-{category}-absent"
+            )
             if planned:
                 status = "planned" if originally_present else "preserved"
+            elif partial_phase == "verify-target":
+                if item.kind != "absent":
+                    status = "failed"
+                else:
+                    status = "preserved" if was_absent_at_start or not originally_present else "completed"
+            elif was_absent_at_start:
+                status = "preserved"
             elif partial_index is None:
                 status = "completed" if originally_present else "preserved"
-            elif partial_phase == "verify-target":
-                status = "failed" if item.kind == "directory" else "completed" if originally_present else "preserved"
             elif not originally_present:
                 status = "preserved"
             elif index < partial_index:
@@ -2629,8 +2650,12 @@ class ProviderLifecycleEngine:
             )
         if active.state in {"ready", "terminal-cleanup"}:
             return self._complete_pending_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
+        initial_absent_paths: frozenset[str] | None = None
         try:
             if active.operation == "uninstall":
+                initial_absent_paths = frozenset(
+                    item.path for item in self._observe_domains(root_fd) if item.kind == "absent"
+                )
                 return self._run_uninstall_active(
                     request,
                     active,
@@ -2638,6 +2663,7 @@ class ProviderLifecycleEngine:
                     receipt_store,
                     stage_store,
                     root_fd,
+                    initial_absent_paths=initial_absent_paths,
                 )
             assert candidate is not None
             return self._run_install_active(
@@ -2651,7 +2677,9 @@ class ProviderLifecycleEngine:
             )
         except _InjectedFailure as failure:
             current = active_store.load() or active
-            return self._partial_failure_result(request, current, failure, root_fd)
+            return self._partial_failure_result(
+                request, current, failure, root_fd, initial_absent_paths=initial_absent_paths
+            )
         except (
             _LifecycleFailure,
             AtomicRenameUnavailable,
@@ -2660,7 +2688,9 @@ class ProviderLifecycleEngine:
             OSError,
         ) as failure:
             current = active_store.load() or active
-            return self._partial_failure_result(request, current, failure, root_fd)
+            return self._partial_failure_result(
+                request, current, failure, root_fd, initial_absent_paths=initial_absent_paths
+            )
 
     def _run_install_active(
         self,
@@ -2752,6 +2782,8 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore,
         stage_store: StageStore,
         root_fd: int,
+        *,
+        initial_absent_paths: frozenset[str],
     ) -> LifecycleResult:
         container = self._execute_phase("bootstrap-container", lambda: self._observe_container(root_fd))
         if container.kind != "directory":
@@ -2781,7 +2813,10 @@ class ProviderLifecycleEngine:
             phase = f"detach-{STAGE_ENTRY_NAMES[index]}"
 
             def observe_target(index: int = index) -> _ObservedTarget:
-                return self._observe_domains(root_fd)[index]
+                item = self._observe_domains(root_fd)[index]
+                if item.kind not in {"absent", "directory"}:
+                    raise FilesystemSafetyError(f"unsupported fixed target type at {item.path}")
+                return item
 
             item = self._execute_phase("verify-target", observe_target)
             if item.kind == "directory":
@@ -2796,7 +2831,7 @@ class ProviderLifecycleEngine:
 
         def verify_targets() -> None:
             self._check_fault("target-verify")
-            if any(item.kind == "directory" for item in self._observe_domains(root_fd)):
+            if any(item.kind != "absent" for item in self._observe_domains(root_fd)):
                 raise FilesystemSafetyError("tooling target remained after uninstall")
 
         self._execute_phase("verify-target", verify_targets)
@@ -2810,7 +2845,15 @@ class ProviderLifecycleEngine:
         active = self._execute_phase("publish-terminal-record", lambda: active_store.load() or active)
         active = replace(active, state="terminal-cleanup")
         self._execute_phase("cleanup-stage", lambda: self._save_active(active_store, active))
-        return self._finish_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
+        return self._finish_cleanup(
+            request,
+            active,
+            active_store,
+            receipt_store,
+            stage_store,
+            root_fd,
+            initial_absent_paths=initial_absent_paths,
+        )
 
     def _ensure_bootstrap(
         self,
@@ -3291,6 +3334,7 @@ class ProviderLifecycleEngine:
         *,
         receipt: CompletionReceipt | None = None,
         cleanup_only: bool = False,
+        initial_absent_paths: frozenset[str] | None = None,
     ) -> LifecycleResult:
         try:
             self._cleanup_stage(stage_store, active)
@@ -3338,12 +3382,12 @@ class ProviderLifecycleEngine:
             return (
                 self._cleanup_completed_result(request, active)
                 if cleanup_only
-                else self._completed_result(request, active, root_fd)
+                else self._completed_result(request, active, root_fd, initial_absent_paths=initial_absent_paths)
             )
         return (
             self._cleanup_completed_result(request, active)
             if cleanup_only
-            else self._completed_result(request, active, root_fd)
+            else self._completed_result(request, active, root_fd, initial_absent_paths=initial_absent_paths)
         )
 
     def _cleanup_stage(self, stage_store: StageStore, active: ActiveState) -> None:
@@ -3427,7 +3471,14 @@ class ProviderLifecycleEngine:
         finally:
             os.close(namespace_fd)
 
-    def _completed_result(self, request: LifecycleRequest, active: ActiveState, root_fd: int) -> LifecycleResult:
+    def _completed_result(
+        self,
+        request: LifecycleRequest,
+        active: ActiveState,
+        root_fd: int,
+        *,
+        initial_absent_paths: frozenset[str] | None = None,
+    ) -> LifecycleResult:
         if active.operation == "uninstall":
             targets = self._observe_domains(root_fd)
             actions = self._uninstall_actions(
@@ -3437,6 +3488,7 @@ class ProviderLifecycleEngine:
                 planned=False,
                 include_stage=True,
                 original_targets=active.owned_target_witnesses,
+                initial_absent_paths=initial_absent_paths,
             )
             code = "uninstall-completed"
         else:
@@ -3501,6 +3553,8 @@ class ProviderLifecycleEngine:
         active: ActiveState,
         failure: BaseException,
         root_fd: int,
+        *,
+        initial_absent_paths: frozenset[str] | None = None,
     ) -> LifecycleResult:
         if active.state in {"ready", "terminal-cleanup"}:
             return self._terminal_cleanup_failure(request, active, failure)
@@ -3597,6 +3651,7 @@ class ProviderLifecycleEngine:
                     partial_index=index,
                     partial_phase=phase,
                     original_targets=active.owned_target_witnesses,
+                    initial_absent_paths=initial_absent_paths,
                 )
             )
             code = "uninstall-partial-failure"
@@ -3620,7 +3675,7 @@ class ProviderLifecycleEngine:
             code = "install-partial-failure" if active.operation == "install" else "update-partial-failure"
         if actions and actions[-1].path == "@provider-stage":
             actions[-1] = LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup")
-        last_completed = self._last_completed_phase(phase, active.operation)
+        last_completed = self._last_completed_phase(phase, active.operation, active.seed_policy)
         failed_paths, pending_paths = _action_path_sets(actions)
         return build_public_result(
             request,
@@ -3641,7 +3696,7 @@ class ProviderLifecycleEngine:
         )
 
     @staticmethod
-    def _last_completed_phase(phase: str, operation: str) -> str:
+    def _last_completed_phase(phase: str, operation: str, seed_policy: str) -> str:
         order: tuple[str, ...]
         if operation == "uninstall":
             order = (
@@ -3674,13 +3729,18 @@ class ProviderLifecycleEngine:
                 "publish-scripts",
                 "publish-slot-spec-dock",
                 "publish-slot-spec-dock-grill-with-docs",
-                "create-seed-spec-dock-gitignore",
-                "create-seed-consumer-ci",
                 "verify-target",
                 "publish-terminal-record",
                 "cleanup-stage",
                 "complete",
             )
+            if operation == "install" and seed_policy == "create-if-absent":
+                order = (
+                    *order[:11],
+                    "create-seed-spec-dock-gitignore",
+                    "create-seed-consumer-ci",
+                    *order[11:],
+                )
         try:
             index = order.index(phase)
         except ValueError:
@@ -4065,7 +4125,12 @@ class ProviderLifecycleEngine:
             )
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
+        initial_absent_paths: frozenset[str] | None = None
         try:
+            if active.operation == "uninstall":
+                initial_absent_paths = frozenset(
+                    item.path for item in self._observe_domains(root_fd) if item.kind == "absent"
+                )
             if active.state == "prepared":
                 self._execute_phase(
                     "candidate-staging",
@@ -4101,7 +4166,9 @@ class ProviderLifecycleEngine:
             OSError,
             _InjectedFailure,
         ) as failure:
-            return self._partial_failure_result(request, active, failure, root_fd)
+            return self._partial_failure_result(
+                request, active, failure, root_fd, initial_absent_paths=initial_absent_paths
+            )
         return self._run_active(request, active, candidate, active_store, receipt_store, stage_store, root_fd)
 
     @staticmethod

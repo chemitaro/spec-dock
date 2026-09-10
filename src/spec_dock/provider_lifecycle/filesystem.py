@@ -468,10 +468,16 @@ class NativeAtomicFilesystem:
                     dir_fd=directory_fd,
                 )
                 try:
+                    opened = os.fstat(child_fd)
+                    if not self._same_inode(child_stat, opened):
+                        raise FilesystemSafetyError(f"{child_relative!r} changed while opening")
                     content = self._sha256_fd(child_fd)
+                    after_read = os.fstat(child_fd)
+                    if not self._same_inode(opened, after_read):
+                        raise FilesystemSafetyError(f"{child_relative!r} changed while reading")
                 finally:
                     os.close(child_fd)
-                yield TreeEntry("regular", child_relative, stat.S_IMODE(child_stat.st_mode), content)
+                yield TreeEntry("regular", child_relative, stat.S_IMODE(after_read.st_mode), content)
             elif kind == "symlink":
                 target = os.readlink(child_name, dir_fd=directory_fd)
                 yield TreeEntry("symlink", child_relative, target=target)

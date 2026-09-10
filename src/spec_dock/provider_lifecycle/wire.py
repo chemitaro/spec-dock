@@ -837,7 +837,13 @@ def _partial_action_profile_matches(
             continue
         if action["reason"] != "fresh-seed-create":
             return False
-        if seed_phase_index is None or index < seed_phase_index:
+        if seed_phase_index is None:
+            expected_status = (
+                "pending"
+                if wire.PHASE_VALUES.index(phase) < wire.PHASE_VALUES.index("create-seed-spec-dock-gitignore")
+                else "completed"
+            )
+        elif index < seed_phase_index:
             expected_status = "completed"
         elif index == seed_phase_index:
             expected_status = "failed"
