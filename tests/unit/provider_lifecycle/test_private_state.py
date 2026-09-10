@@ -3,13 +3,20 @@ from __future__ import annotations
 import base64
 from dataclasses import replace
 import hashlib
+import json
 import os
 import stat
 from typing import TYPE_CHECKING
 
 import pytest
 
-from spec_dock.provider_lifecycle.contracts import ActiveState, CompletionReceipt, InstallationRecord, StageOwner
+from spec_dock.provider_lifecycle.contracts import (
+    SEED_PATHS,
+    ActiveState,
+    CompletionReceipt,
+    InstallationRecord,
+    StageOwner,
+)
 import spec_dock.provider_lifecycle.private_state as private_state
 from spec_dock.provider_lifecycle.private_state import (
     ActiveStateStore,
@@ -76,7 +83,7 @@ def _state(root: Path) -> tuple[Path, ActiveState, StageOwner]:
         )
     ]
     active = ActiveState(
-        1,
+        2,
         "prepared",
         "b" * 64,
         {"device": value.st_dev, "inode": value.st_ino, "euid": os.geteuid()},
@@ -85,6 +92,7 @@ def _state(root: Path) -> tuple[Path, ActiveState, StageOwner]:
         "update",
         digest,
         "preserve-only",
+        dict.fromkeys(SEED_PATHS, "present"),
         "update",
         {"kind": "absent", "bytes_base64": None, "sha256": None, "witness": None},
         {
@@ -303,6 +311,21 @@ def test_t04_active_identity_replacement_is_preserved_and_blocked(tmp_path: Path
     with pytest.raises(PrivateStateForeignError):
         store.save(replacement)
     assert ((namespace / "ACTIVE.json").read_bytes(), os.lstat(namespace / "ACTIVE.json").st_ino) == before
+
+
+def test_t04_active_schema_v1_is_fail_closed(tmp_path: Path) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    namespace, active, _owner = _state(repository)
+    store = ActiveStateStore(namespace)
+    store.save(active)
+    active_path = namespace / "ACTIVE.json"
+    value = json.loads(active_path.read_text(encoding="utf-8"))
+    value["schema_version"] = 1
+    active_path.write_bytes(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode() + b"\n")
+
+    with pytest.raises(PrivateStateError, match="ACTIVE schema_version must be 2"):
+        store.load()
 
 
 def test_t04_private_intermediate_symlink_is_rejected(tmp_path: Path) -> None:

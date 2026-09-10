@@ -10,9 +10,11 @@ if TYPE_CHECKING:
 
 Operation = Literal["install", "update", "uninstall"]
 SeedPolicy = Literal["create-if-absent", "preserve-only"]
+SeedAdmissionState = Literal["absent", "present"]
 LifecycleMode = Literal["dry-run", "apply"]
 RecordState = Literal["incomplete", "ready", "tooling-absent-preserved-data"]
 ActiveLifecycleState = Literal["prepared", "running", "ready", "terminal-cleanup"]
+SEED_PATHS = ("spec-dock/.gitignore", ".github/workflows/ci.yml")
 
 
 @dataclass(frozen=True, slots=True)
@@ -128,6 +130,7 @@ class ActiveState:
     operation: Operation
     candidate_digest: str
     seed_policy: SeedPolicy
+    seed_admission: Mapping[str, SeedAdmissionState]
     result_family: Literal["install", "legacy-migration", "update", "uninstall"]
     original_record: Mapping[str, object]
     expected_incomplete_record: Mapping[str, str]
@@ -173,6 +176,7 @@ class StageOwner:
 
 
 __all__ = [
+    "SEED_PATHS",
     "ActiveState",
     "CandidateIdentity",
     "CompletionReceipt",
@@ -182,6 +186,7 @@ __all__ = [
     "LifecycleRequest",
     "LifecycleResult",
     "RepositoryBinding",
+    "SeedAdmissionState",
     "SkillSlotMarker",
     "StageOwner",
 ]

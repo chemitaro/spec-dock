@@ -32,6 +32,7 @@ from spec_dock.provider_lifecycle.candidate import (
     marker_bytes,
 )
 from spec_dock.provider_lifecycle.contracts import (
+    SEED_PATHS,
     ActiveState,
     CandidateIdentity,
     CompletionReceipt,
@@ -43,6 +44,7 @@ from spec_dock.provider_lifecycle.contracts import (
     Operation,
     RecordState,
     RepositoryBinding,
+    SeedAdmissionState,
     SeedPolicy,
     StageOwner,
 )
@@ -98,7 +100,6 @@ TARGET_PATHS = (
     ".agents/skills/spec-dock",
     ".agents/skills/spec-dock-grill-with-docs",
 )
-SEED_PATHS = ("spec-dock/.gitignore", ".github/workflows/ci.yml")
 LIFECYCLE_GUIDANCE = (
     "Run continuation.next_command to resume the exact lifecycle operation.",
     "Do not switch operation, candidate package, or seed policy.",
@@ -1356,29 +1357,28 @@ class ProviderLifecycleEngine:
             suffix = "replace" if original.get("original_kind") == "directory" else "create"
             actions.append(_make_action(path, category, "pending", f"candidate-{category}-{suffix}"))
 
-        seed_observations = {path: self._observe_target(root_fd, path, expect_tree=False) for path in SEED_PATHS}
         if active.seed_policy == "preserve-only":
             actions.extend(_make_action(path, "seed", "preserved", "preserve-only-seed") for path in SEED_PATHS)
         else:
-            first_seed = seed_observations["spec-dock/.gitignore"]
+            first_seed = active.seed_admission["spec-dock/.gitignore"]
             actions.append(
                 _make_action(
                     "spec-dock/.gitignore",
                     "seed",
-                    "pending" if first_seed.kind == "absent" else "preserved",
-                    "fresh-seed-create" if first_seed.kind == "absent" else "consumer-seed-present",
+                    "pending" if first_seed == "absent" else "preserved",
+                    "fresh-seed-create" if first_seed == "absent" else "consumer-seed-present",
                 )
             )
             for parent in (".github", ".github/workflows"):
                 if self._observe_target(root_fd, parent, expect_tree=False).kind == "absent":
                     actions.append(_make_action(parent, "container", "pending", "fresh-container-create"))
-            second_seed = seed_observations[".github/workflows/ci.yml"]
+            second_seed = active.seed_admission[".github/workflows/ci.yml"]
             actions.append(
                 _make_action(
                     ".github/workflows/ci.yml",
                     "seed",
-                    "pending" if second_seed.kind == "absent" else "preserved",
-                    "fresh-seed-create" if second_seed.kind == "absent" else "consumer-seed-present",
+                    "pending" if second_seed == "absent" else "preserved",
+                    "fresh-seed-create" if second_seed == "absent" else "consumer-seed-present",
                 )
             )
         actions.append(_make_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"))
@@ -1790,6 +1790,7 @@ class ProviderLifecycleEngine:
             generation,
         )
         target_observations = self._observe_domains(root_fd)
+        seed_admission = self._observe_seed_admission(root_fd)
         original_digests = tuple(
             item.tree.tree_digest if item.tree is not None else None for item in target_observations
         )
@@ -1826,7 +1827,7 @@ class ProviderLifecycleEngine:
             "witness": _witness_mapping(container.witness),
         }
         active = ActiveState(
-            1,
+            2,
             "prepared",
             binding_key,
             {"device": binding.device, "inode": binding.inode, "euid": binding.euid},
@@ -1835,6 +1836,7 @@ class ProviderLifecycleEngine:
             cast("Operation", operation),
             candidate_digest,
             cast("SeedPolicy", seed_policy),
+            seed_admission,
             family,
             _record_ref(
                 raw_record,
@@ -2193,6 +2195,14 @@ class ProviderLifecycleEngine:
     def _observe_domains(self, root_fd: int) -> tuple[_ObservedTarget, ...]:
         return tuple(self._observe_target(root_fd, path, expect_tree=True) for _, path, _ in FIXED_DOMAINS)
 
+    def _observe_seed_admission(self, root_fd: int) -> dict[str, SeedAdmissionState]:
+        result: dict[str, SeedAdmissionState] = {}
+        for path in SEED_PATHS:
+            result[path] = (
+                "absent" if self._observe_target(root_fd, path, expect_tree=False).kind == "absent" else "present"
+            )
+        return result
+
     def _observe_target(self, root_fd: int, path: str, *, expect_tree: bool) -> _ObservedTarget:
         components = _target_components(path)
         parent_components, name = components[:-1], components[-1]
@@ -2441,6 +2451,7 @@ class ProviderLifecycleEngine:
         partial_phase: str | None = None,
         original_targets: Sequence[Mapping[str, object]] | None = None,
         failure_point: str | None = None,
+        seed_admission: Mapping[str, SeedAdmissionState] | None = None,
     ) -> tuple[LifecycleAction, ...]:
         container = self._observe_container(root_fd)
         result: list[LifecycleAction] = []
@@ -2502,6 +2513,13 @@ class ProviderLifecycleEngine:
         )):
             seed_phase = "create-seed-spec-dock-gitignore" if seed_index == 0 else "create-seed-consumer-ci"
             existing = self._observe_target(root_fd, path, expect_tree=False)
+            admission_state = (
+                seed_admission[path]
+                if seed_admission is not None
+                else "absent"
+                if existing.kind == "absent"
+                else "present"
+            )
             failed_seed = (
                 seed_policy == "create-if-absent"
                 and partial_phase in {"create-seed-spec-dock-gitignore", "create-seed-consumer-ci"}
@@ -2509,7 +2527,7 @@ class ProviderLifecycleEngine:
             )
             if failed_seed:
                 reason = "fresh-seed-create"
-            elif existing.kind in {"directory", "other", "symlink", "regular"}:
+            elif admission_state == "present":
                 reason = (
                     "consumer-seed-present"
                     if operation == "install" and seed_policy == "create-if-absent"
@@ -3260,13 +3278,14 @@ class ProviderLifecycleEngine:
         seed_name: str,
         source_suffix: str,
     ) -> None:
+        admission_state = active.seed_admission[public_path]
         item = self._observe_target(root_fd, public_path, expect_tree=False)
         if item.kind == "symlink" or item.kind == "other" or item.kind == "directory":
             raise FilesystemSafetyError(f"unsafe seed type at {public_path}")
         if item.kind == "regular":
             self._ensure_seed_durable(root_fd, public_path)
             return
-        if item.kind == "absent" and active.seed_policy != "create-if-absent":
+        if admission_state == "present" or active.seed_policy != "create-if-absent":
             return
         if item.kind != "absent":
             return
@@ -3505,6 +3524,7 @@ class ProviderLifecycleEngine:
                 planned=False,
                 include_stage=True,
                 original_targets=active.owned_target_witnesses,
+                seed_admission=active.seed_admission,
             )
             code = f"{active.result_family}-completed"
         return build_public_result(
@@ -3672,6 +3692,7 @@ class ProviderLifecycleEngine:
                     original_targets=active.owned_target_witnesses,
                     include_stage=True,
                     failure_point=point,
+                    seed_admission=active.seed_admission,
                 )
             )
             code = "install-partial-failure" if active.operation == "install" else "update-partial-failure"

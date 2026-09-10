@@ -284,9 +284,9 @@ Authority fileはregular/link1、authority directoryはdirectoryです。Pathは
 
 ### 8.2 `ACTIVE.json`
 
-max32768、mode0600。Top-level exact key order:
+max32768、mode0600。`ACTIVE` schema versionは2です。schema version 1は旧private stateとして受理せず、fail-closedで停止します。Top-level exact key order:
 
-1. `schema_version` = 1
+1. `schema_version` = 2
 2. `state`: `prepared|running|ready|terminal-cleanup`
 3. `repository_key`
 4. `repository_identity`: exact keys `device,inode,euid`
@@ -295,21 +295,23 @@ max32768、mode0600。Top-level exact key order:
 7. `operation`: `install|update|uninstall`
 8. `candidate_digest`
 9. `seed_policy`
-10. `result_family`: `install|legacy-migration|update|uninstall`
-11. `original_record`
-12. `expected_incomplete_record`
-13. `bootstrap_container`
-14. `owned_target_witnesses`
-15. `registered_stage_entries`
-16. `record_temp_witness`
-17. `terminal_record_digest`
-18. `cleanup_token`
-19. `cleanup_retry_invocation`
-20. `deferred_invocation`
+10. `seed_admission`
+11. `result_family`: `install|legacy-migration|update|uninstall`
+12. `original_record`
+13. `expected_incomplete_record`
+14. `bootstrap_container`
+15. `owned_target_witnesses`
+16. `registered_stage_entries`
+17. `record_temp_witness`
+18. `terminal_record_digest`
+19. `cleanup_token`
+20. `cleanup_retry_invocation`
+21. `deferred_invocation`
 
 Nested exact schemas:
 
 - `original_record`: `kind,bytes_base64,sha256,witness`。`kind=absent|legacy-0.2.3|final`。Absentでは後三件null、他はnon-null。
+- `seed_admission`: exact keys `spec-dock/.gitignore,.github/workflows/ci.yml`をこの順で持つmapping。各値は`absent|present`。admission時のnonmutating observationを一度だけ保存し、providerがseedを作成したか、consumer seedをpreserveしたかのaction provenanceとretry/re-entryのseed作成判断に使います。seed bytes、inode、mtime、user dataは保存しません。
 - `expected_incomplete_record`: `bytes_base64,sha256`。
 - `bootstrap_container`: `disposition,witness`。`disposition=existing|planned-create|created`。planned-createだけwitness null。
 - `owned_target_witnesses`: fixed six objects、domain order。各object exact keys `path,original_kind,original_tree_digest,original_inode,terminal_kind,terminal_tree_digest`。Kindは`absent|directory`、対応しないdigest/inodeはnull。

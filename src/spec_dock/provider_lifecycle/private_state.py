@@ -16,10 +16,12 @@ from typing import TYPE_CHECKING, Literal, NoReturn, cast
 
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import (
+    SEED_PATHS,
     ActiveState,
     CompletionReceipt,
     InodeWitness,
     Operation,
+    SeedAdmissionState,
     SeedPolicy,
     StageOwner,
 )
@@ -355,6 +357,18 @@ def _bootstrap(value: object) -> dict[str, object]:
     return dict(mapping)
 
 
+def _seed_admission(value: object) -> dict[str, SeedAdmissionState]:
+    mapping = _mapping(value, "ACTIVE.seed_admission")
+    _exact(mapping, SEED_PATHS, "ACTIVE.seed_admission")
+    result: dict[str, SeedAdmissionState] = {}
+    for path in SEED_PATHS:
+        state = _string(mapping[path], f"ACTIVE.seed_admission.{path}")
+        if state not in {"absent", "present"}:
+            _fail(f"ACTIVE.seed_admission.{path} is invalid")
+        result[path] = cast("SeedAdmissionState", state)
+    return result
+
+
 def _owned_targets(value: object) -> list[dict[str, object]]:
     if not isinstance(value, list) or len(value) != 6:
         _fail("owned_target_witnesses must contain six entries")
@@ -491,6 +505,7 @@ def _active_mapping(state: ActiveState) -> dict[str, object]:
         "operation": state.operation,
         "candidate_digest": state.candidate_digest,
         "seed_policy": state.seed_policy,
+        "seed_admission": dict(state.seed_admission),
         "result_family": state.result_family,
         "original_record": dict(state.original_record),
         "expected_incomplete_record": dict(state.expected_incomplete_record),
@@ -516,6 +531,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
         "operation",
         "candidate_digest",
         "seed_policy",
+        "seed_admission",
         "result_family",
         "original_record",
         "expected_incomplete_record",
@@ -529,8 +545,8 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
         "deferred_invocation",
     )
     _exact(value, keys, "ACTIVE")
-    if value["schema_version"] != 1:
-        _fail("ACTIVE schema_version must be 1")
+    if value["schema_version"] != 2:
+        _fail("ACTIVE schema_version must be 2")
     state = _string(value["state"], "ACTIVE.state")
     if state not in {"prepared", "running", "ready", "terminal-cleanup"}:
         _fail("ACTIVE.state is invalid")
@@ -545,6 +561,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
     seed_policy = _string(value["seed_policy"], "ACTIVE.seed_policy")
     if seed_policy not in {"create-if-absent", "preserve-only"}:
         _fail("ACTIVE.seed_policy is invalid")
+    seed_admission = _seed_admission(value["seed_admission"])
     result_family = _string(value["result_family"], "ACTIVE.result_family")
     if result_family not in {"install", "legacy-migration", "update", "uninstall"}:
         _fail("ACTIVE.result_family is invalid")
@@ -599,7 +616,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
     if cleanup_token_for(repository_key, tuple_key, result_family, operation_generation) != cleanup_token:
         _fail("ACTIVE.cleanup_token does not match identity")
     return ActiveState(
-        1,
+        2,
         state,  # type: ignore[arg-type]
         repository_key,
         identity_value,
@@ -608,6 +625,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
         operation,  # type: ignore[arg-type]
         candidate_digest,
         seed_policy,  # type: ignore[arg-type]
+        seed_admission,  # type: ignore[arg-type]
         result_family,  # type: ignore[arg-type]
         original_record,
         expected_record,

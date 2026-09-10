@@ -15,6 +15,7 @@ import pytest
 
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import (
+    SEED_PATHS,
     ActiveState,
     CompletionReceipt,
     LifecycleAction,
@@ -751,6 +752,62 @@ def test_t04_stage_rebuild_revalidates_frozen_candidate_before_consumer_mutation
     assert active is not None
     assert active.state == "prepared"
     assert active.candidate_digest != engine._candidate().aggregate_digest
+
+
+def test_t04_seed_admission_freezes_provider_created_action_provenance(tmp_path: Path) -> None:
+    workspace = (tmp_path / "seed-provenance").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+
+    first = ProviderLifecycleEngine(fault_injector="target-verify").execute(request, force=True)
+
+    assert first.status == "partial_failure"
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.seed_admission == dict.fromkeys(SEED_PATHS, "absent")
+    first_seed_actions = {action.path: action for action in first.actions if action.category == "seed"}
+    assert first_seed_actions == {
+        path: LifecycleAction(path, "seed", "completed", "fresh-seed-create") for path in SEED_PATHS
+    }
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    assert resumed.status == "completed"
+    resumed_seed_actions = {action.path: action for action in resumed.actions if action.category == "seed"}
+    assert resumed_seed_actions == {
+        path: LifecycleAction(path, "seed", "completed", "fresh-seed-create") for path in SEED_PATHS
+    }
+
+
+def test_t04_seed_admission_preserves_present_seed_through_reentry(tmp_path: Path) -> None:
+    workspace = (tmp_path / "present-seed-provenance").resolve()
+    workspace.mkdir()
+    existing_gitignore = workspace / "spec-dock/.gitignore"
+    existing_ci = workspace / ".github/workflows/ci.yml"
+    existing_gitignore.parent.mkdir(parents=True)
+    existing_ci.parent.mkdir(parents=True)
+    existing_gitignore.write_bytes(b"consumer gitignore\n")
+    existing_ci.write_bytes(b"consumer ci\n")
+    request = _request(workspace, "install")
+
+    first = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(request, force=True)
+
+    assert first.status == "blocked"
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.seed_admission == dict.fromkeys(SEED_PATHS, "present")
+    existing_gitignore.unlink()
+    existing_ci.unlink()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    assert resumed.status == "completed"
+    assert not existing_gitignore.exists()
+    assert not existing_ci.exists()
+    resumed_seed_actions = {action.path: action for action in resumed.actions if action.category == "seed"}
+    assert resumed_seed_actions == {
+        path: LifecycleAction(path, "seed", "preserved", "consumer-seed-present") for path in SEED_PATHS
+    }
 
 
 def test_t04_prepared_uninstall_dry_run_preserves_foreign_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
