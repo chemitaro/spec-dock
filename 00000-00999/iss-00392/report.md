@@ -4,7 +4,7 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 関連GitHub: ["#392"]
 状態: "approved"
-最終更新: "2026-09-10"
+最終更新: "2026-09-11"
 依存:
   - "requirement.md"
   - "design.md"
@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "29a6196342327338c45e8f14455665fe41f931b4"
-  tree: "451623f3bff9d14c7f7883c622fd7fc5ffc07110"
+  sha: "ec626c030b564cd7d5ed92332b4db8c02cf120ec"
+  tree: "1af83ed8bc6dd79ee10e8e1826a2b2c1ae52dc25"
 implementation_evidence:
-  candidate_sha: "29a6196342327338c45e8f14455665fe41f931b4"
-  candidate_tree: "451623f3bff9d14c7f7883c622fd7fc5ffc07110"
+  candidate_sha: "ec626c030b564cd7d5ed92332b4db8c02cf120ec"
+  candidate_tree: "1af83ed8bc6dd79ee10e8e1826a2b2c1ae52dc25"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediationを含む現行candidateは`29a6196342327338c45e8f14455665fe41f931b4`です。実装時点の詳細な証拠は§9に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2の追加修正を含む現行candidateは`ec626c030b564cd7d5ed92332b4db8c02cf120ec`です。実装時点の詳細な証拠は§9に記録します。
 
 ## 2. Source verification facts
 
@@ -104,16 +104,18 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediationを含む実装candidate commit `29a6196342327338c45e8f14455665fe41f931b4`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2を含む実装candidate commit `ec626c030b564cd7d5ed92332b4db8c02cf120ec`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
 
-1. Report を現行candidateへ更新した最終SHAのclean pushとupstream SHA一致。
-2. 現行candidateと更新後Reportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
+1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
+2. 現行candidateとこのReportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
 
 CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし、merged tipでB1を再検証します。B1 GREEN後だけ#395を開始します。
 
 ## 8. Residual blocker and uncertainty
+
+前回の`29a61963`時点のレビュー記録に続き、stage再構築後の凍結候補digest再検証を`467fe0e`、承認済みACTIVE schema v2の`seed_admission`（固定seedの入場時`absent|present`を永続化し、再入場・action provenance・create判定で再観測しない）を`ec626c03`へ回帰テスト付きで反映しました。以下の過去レビュー記録は履歴として保持し、現行candidateの検証結果は§9末尾の追補を正とします。
 
 親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証とclean pushは完了しています。実装後の独立 Code Review Strict（`699d54bf`固定、browser、GPT-5.6 Sol、Extra High、完全bundle）は、#395 baselineを除きP1×2、P2×3を指摘しました。Blue Team分析でP1×2を有効なblocking指摘として実装修正対象に確定し、`4a6aba91`で修正、`0d993252`でdogfood projectionを完了しました。続くFirst Red分析でP1×5とcoverage gapを同一batchの修正対象に確定し、`c7d6dd62`へ回帰テスト付き修正を反映しました。さらにfresh Code Review Strict（`29a61963`固定）で検出されたP1×8をBlue Teamがすべてvalid/blockingと判定し、`29a61963`へ追加の回帰修正を反映しました。P2×3は現在の親ポリシーによりreport-onlyとして保持しています。Report更新後の最終SHAに対する再レビュー、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
 
@@ -133,3 +135,15 @@ current full verifierの`ledger-mismatch` 10件は#395が所有するactive base
 - `29a61963`を対象にした直近のfresh Code Review Strict（browser-only、GPT-5.6 Sol、Extra High、完全bundle、約351k tokens）は、本文JSONで`review_status=fail`、P1×8を返しました。P1はseed/action phase profile、preserve-onlyのlast-completed phase、再開uninstallの呼出開始時absence、ACTIVEなしincomplete uninstall、ACTIVE/receipt不一致、非directory target、regular-file FD witness、flock後のvisible root rebindでした。Blue Teamのfresh ChatGPT Use Strict分析（browser-only、GPT-5.6 Sol、Pro、完全packet）は8件すべてをvalid/blocking・同一batch修正と判定し、`29a61963`へ回帰テスト付き修正を反映しました。P2のunsafe repository root分類とGit closure属性はreport-onlyで保持しています。最終SHAを対象にした再Code Review Strict、Final Quality Gate Strict、PR merge後B1は未完了です。
 
 以上により、#392のCP1–CP4実装candidate、P1 remediation、provider-first packaging、dogfood parity、回帰テスト、current gate観測の証拠は`29a6196342327338c45e8f14455665fe41f931b4`へ更新済みです。ただしcurrent full verifierの#395 baseline mismatchと、Report更新後の最終Strict review／Final Quality Gateが残るため、Issue完了・Product GREEN・merge完了はまだ主張しません。最終Strict reviewとFinal Quality Gateは、このReportを含む次のclean pushed SHAに対して実施します。
+
+## 10. Current candidate addendum (2026-09-11)
+
+現行candidateは`ec626c030b564cd7d5ed92332b4db8c02cf120ec`（tree `1af83ed8bc6dd79ee10e8e1826a2b2c1ae52dc25`）です。`467fe0e`でstage再構築後に凍結候補digestを再検証し、`ec626c03`でRequirement/Design/Planに反映したACTIVE schema v2の`seed_admission`を実装しました。固定seedの入場時状態を`absent|present`として保存し、再入場時のaction provenanceとcreate判定は保存値を使用します。schema v1はfail-closedで、public Wire v12とpreserve-onlyの「削除機能を復活させない」契約は変更していません。
+
+- focused provider-lifecycle: `52 passed`
+- provider-lifecycle全体: `250 passed`
+- default fast: `1105 passed, 848 skipped`
+- `make lint`: ruff check、ruff format、mypy pass
+- full verifier: `1953 tests collected`、status=`ledger-mismatch`、既知の#395 baseline violation 10件、#392起因のunexpected failure 0件
+
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T164621.176495Z/result.json`にあり、candidate SHAは現行実装commitと一致します。レートリミットを理由にbundleや検証範囲は縮小していません。現行candidateを対象にした最終Strict Code Review、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
