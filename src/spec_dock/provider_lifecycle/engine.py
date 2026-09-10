@@ -1921,6 +1921,8 @@ class ProviderLifecycleEngine:
             os.fsync(stage_fd)
         finally:
             os.close(stage_fd)
+        if candidate is not None and not self._stage_payload_valid(stage_store, candidate, root_fd):
+            raise FilesystemSafetyError("staged candidate does not match frozen candidate")
 
     @staticmethod
     def _stage_owner(active: ActiveState) -> StageOwner:

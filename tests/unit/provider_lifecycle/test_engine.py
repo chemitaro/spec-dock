@@ -718,6 +718,41 @@ def test_t04_foreign_stage_owner_is_stage_owner_mismatch_in_candidate_staging(mo
     assert result.actions == ()
 
 
+def test_t04_stage_rebuild_revalidates_frozen_candidate_before_consumer_mutation(monkeypatch, tmp_path: Path) -> None:
+    repository = Path(__file__).parents[3]
+    assets_root = tmp_path / "assets"
+    shutil.copytree(repository / "src/spec_dock/assets", assets_root)
+    drifted_file = assets_root / "spec_dock/docs/reference_naming.md"
+    engine = ProviderLifecycleEngine(assets_root=assets_root)
+    original_candidate = engine._candidate
+    mutated = False
+
+    def capture_then_drift():
+        nonlocal mutated
+        candidate = original_candidate()
+        if not mutated:
+            drifted_file.write_bytes(drifted_file.read_bytes() + b"\nsource drift\n")
+            mutated = True
+        return candidate
+
+    monkeypatch.setattr(engine, "_candidate", capture_then_drift)
+    workspace = (tmp_path / "stage-rebuild-drift").resolve()
+    workspace.mkdir()
+
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert result.phase == "candidate-staging"
+    assert result.mutation_started is False
+    assert not (workspace / "spec-dock").exists()
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.state == "prepared"
+    assert active.candidate_digest != engine._candidate().aggregate_digest
+
+
 def test_t04_prepared_uninstall_dry_run_preserves_foreign_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
     workspace = (tmp_path / "prepared-uninstall").resolve()
     workspace.mkdir()
