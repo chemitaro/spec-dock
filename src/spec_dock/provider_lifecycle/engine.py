@@ -1615,6 +1615,11 @@ class ProviderLifecycleEngine:
             candidate_digest = record.candidate_digest
             seed_policy = record.seed_policy
             self._admit_existing_slots(root_fd, targets, candidate_digest)
+        self._admit_existing_seeds(
+            root_fd,
+            operation="uninstall",
+            seed_policy="preserve-only",
+        )
         if request.mode == "dry-run":
             return self._uninstall_plan_result(request, candidate_digest, targets, container, record)
         assert active_store is not None and receipt_store is not None and stage_store is not None
@@ -4128,6 +4133,14 @@ class ProviderLifecycleEngine:
                     phase="candidate-staging",
                     last_completed_phase="preflight",
                 )
+            try:
+                self._admit_existing_seeds(
+                    root_fd,
+                    operation=active.operation,
+                    seed_policy=active.seed_policy,
+                )
+            except _AdmissionFailure as failure:
+                return self._admission_result(request, failure)
             targets = self._observe_domains(root_fd)
             container = self._observe_container(root_fd)
             raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
@@ -4163,7 +4176,7 @@ class ProviderLifecycleEngine:
             )
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
-        if active.operation != "uninstall":
+        if active.operation != "uninstall" or request.mode != "dry-run":
             try:
                 self._admit_existing_seeds(
                     root_fd,

@@ -109,6 +109,21 @@ def _workspace_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
     return snapshot
 
 
+def _replace_seed_with_unsafe_type(seed: Path, unsafe_kind: str, target: Path) -> None:
+    if seed.is_dir() and not seed.is_symlink():
+        shutil.rmtree(seed)
+    else:
+        seed.unlink(missing_ok=True)
+    seed.parent.mkdir(parents=True, exist_ok=True)
+    if unsafe_kind == "symlink":
+        target.write_text("consumer target\n", encoding="utf-8")
+        seed.symlink_to(target)
+    elif unsafe_kind == "directory":
+        seed.mkdir()
+    else:
+        os.mkfifo(seed)
+
+
 def _assert_first_red_partial_shape(
     result,
     *,
@@ -945,6 +960,130 @@ def test_t04_reentry_unsafe_seed_type_blocks_before_admission_mutation(
     assert active_store.load() == active_before
     assert receipt_store.load() == receipt_before
     assert _workspace_snapshot(namespace) == stage_before
+
+
+@pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_initial_uninstall_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    mode: LifecycleMode,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"initial-uninstall-unsafe-seed-{workspace_kind}-{mode}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "ready-origin":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    else:
+        _materialize_legacy_workspace(workspace)
+
+    seed = workspace / seed_path
+    _replace_seed_with_unsafe_type(
+        seed,
+        unsafe_kind,
+        tmp_path / f"initial-uninstall-{unsafe_kind}-{seed_path.replace('/', '-')}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace) if namespace.exists() else None
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    namespace_after = _workspace_snapshot(namespace) if namespace.exists() else None
+    if namespace_before is not None:
+        assert namespace_after == namespace_before
+    elif namespace_after is not None:
+        assert "ACTIVE.json" not in namespace_after
+        assert "CLEANUP-COMPLETED.json" not in namespace_after
+        assert "STAGE" not in namespace_after
+
+
+@pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_uninstall_reentry_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    active_state: str,
+    mode: LifecycleMode,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path
+        / f"reentry-uninstall-unsafe-seed-{workspace_kind}-{active_state}-{mode}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "ready-origin":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    else:
+        _materialize_legacy_workspace(workspace)
+    request = _request(workspace, "uninstall")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "root-docs-publish-or-detach"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.operation == "uninstall"
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    namespace_before = _workspace_snapshot(namespace)
+
+    seed = workspace / seed_path
+    _replace_seed_with_unsafe_type(
+        seed,
+        unsafe_kind,
+        tmp_path / f"reentry-uninstall-{active_state}-{unsafe_kind}-{seed_path.replace('/', '-')}-target",
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == namespace_before
 
 
 def test_t04_prepared_uninstall_dry_run_preserves_foreign_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
