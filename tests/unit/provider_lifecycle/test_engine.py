@@ -13,9 +13,15 @@ from typing import cast
 import pytest
 
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
-from spec_dock.provider_lifecycle.contracts import ActiveState, LifecycleMode, LifecycleRequest, Operation
+from spec_dock.provider_lifecycle.contracts import (
+    ActiveState,
+    LifecycleAction,
+    LifecycleMode,
+    LifecycleRequest,
+    Operation,
+)
 from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
-from spec_dock.provider_lifecycle.filesystem import NativeAtomicFilesystem
+from spec_dock.provider_lifecycle.filesystem import DomainTreeIdentity, NativeAtomicFilesystem
 from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
 from spec_dock.provider_lifecycle.private_state import (
     ActiveStateStore,
@@ -178,6 +184,106 @@ def test_t06_bootstrap_active_publication_failure_restores_absent_pre_state(tmp_
     assert active.bootstrap_container == {"disposition": "planned-create", "witness": None}
     resumed = ProviderLifecycleEngine().execute(request, force=True)
     assert resumed.status == "completed"
+
+
+@pytest.mark.parametrize("seed_policy", ["create-if-absent", "preserve-only"])
+def test_t06_bootstrap_cleanup_failure_publishes_closed_install_actions(
+    monkeypatch, tmp_path: Path, seed_policy: str
+) -> None:
+    workspace = (tmp_path / f"bootstrap-cleanup-failure-{seed_policy}").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install" if seed_policy == "create-if-absent" else "update")
+    root_stat = workspace.stat()
+    original_remove_tree_bound = NativeAtomicFilesystem.remove_tree_bound
+
+    def fail_bootstrap_cleanup(
+        filesystem: NativeAtomicFilesystem, parent_fd: int, name: str, tree: DomainTreeIdentity
+    ) -> None:
+        current = os.fstat(parent_fd)
+        if name == "spec-dock" and (current.st_dev, current.st_ino) == (root_stat.st_dev, root_stat.st_ino):
+            raise OSError("bootstrap cleanup blocked")
+        original_remove_tree_bound(filesystem, parent_fd, name, tree)
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "remove_tree_bound", fail_bootstrap_cleanup)
+    result = ProviderLifecycleEngine(fault_injector="bootstrap-container-fsync").execute(request, force=True)
+
+    expected = [
+        {
+            "path": "spec-dock",
+            "category": "container",
+            "status": "failed",
+            "reason": "fresh-container-create",
+        },
+        {
+            "path": "spec-dock/spec-dock.version",
+            "category": "record",
+            "status": "pending",
+            "reason": "incomplete-record-publish",
+        },
+        *[
+            {
+                "path": path,
+                "category": category,
+                "status": "pending",
+                "reason": f"candidate-{category}-create",
+            }
+            for category, path, _source in FIXED_DOMAINS
+        ],
+    ]
+    if seed_policy == "preserve-only":
+        expected.extend([
+            {
+                "path": "spec-dock/.gitignore",
+                "category": "seed",
+                "status": "preserved",
+                "reason": "preserve-only-seed",
+            },
+            {
+                "path": ".github/workflows/ci.yml",
+                "category": "seed",
+                "status": "preserved",
+                "reason": "preserve-only-seed",
+            },
+        ])
+    else:
+        expected.extend([
+            {
+                "path": "spec-dock/.gitignore",
+                "category": "seed",
+                "status": "pending",
+                "reason": "fresh-seed-create",
+            },
+            {
+                "path": ".github",
+                "category": "container",
+                "status": "pending",
+                "reason": "fresh-container-create",
+            },
+            {
+                "path": ".github/workflows",
+                "category": "container",
+                "status": "pending",
+                "reason": "fresh-container-create",
+            },
+            {
+                "path": ".github/workflows/ci.yml",
+                "category": "seed",
+                "status": "pending",
+                "reason": "fresh-seed-create",
+            },
+        ])
+    expected.append({
+        "path": "@provider-stage",
+        "category": "stage",
+        "status": "pending",
+        "reason": "candidate-stage-cleanup",
+    })
+
+    assert result.status == "partial_failure"
+    assert result.code == "bootstrap-cleanup-failed"
+    assert result.actions == tuple(LifecycleAction(**item) for item in expected)
+    assert result.failed_paths == ("spec-dock",)
+    assert result.pending_paths == tuple(item["path"] for item in expected if item["status"] == "pending")
 
 
 def test_t06_record_temp_witness_failure_cleans_unbound_temp_before_retry(tmp_path: Path) -> None:

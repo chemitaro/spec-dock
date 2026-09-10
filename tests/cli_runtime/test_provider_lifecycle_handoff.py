@@ -389,3 +389,31 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
         )
         assert uninstall.returncode == 7
         assert log.read_text(encoding="utf-8").splitlines()[-2] == str(link)
+
+    def test_t04_git_write_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+
+            target = tmp_path / "target"
+            target.mkdir()
+            marker = tmp_path / "shadowed"
+            shadow_package = target / "spec_dock_runtime" / "infra"
+            shadow_package.mkdir(parents=True)
+            (target / "spec_dock_runtime" / "__init__.py").write_text("", encoding="utf-8")
+            (shadow_package / "__init__.py").write_text("", encoding="utf-8")
+            (shadow_package / "git_helper.py").write_text(
+                f"from pathlib import Path; Path({str(marker)!r}).write_text('shadowed', encoding='utf-8')\n"
+                "raise SystemExit(97)\n",
+                encoding="utf-8",
+            )
+
+            result = git_cli._run_git_write(target, [sys.executable, "-c", "print('provider-helper')"])
+        finally:
+            sys.path.pop(0)
+
+        assert result.stdout == "provider-helper\n"
+        assert not marker.exists()

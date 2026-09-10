@@ -1382,6 +1382,14 @@ class ProviderLifecycleEngine:
         actions.append(_make_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"))
         return tuple(actions)
 
+    def _bootstrap_cleanup_actions(self, active: ActiveState, root_fd: int) -> tuple[LifecycleAction, ...]:
+        """Describe the install work that remains after bootstrap cleanup failed."""
+
+        actions = list(self._preparation_partial_actions(active, root_fd))
+        actions[0] = _make_action("spec-dock", "container", "failed", "fresh-container-create")
+        actions[1] = _make_action("spec-dock/spec-dock.version", "record", "pending", "incomplete-record-publish")
+        return tuple(actions)
+
     def _preparation_mutation_started(self, active: ActiveState, root_fd: int) -> bool | None:
         if active.bootstrap_container.get("disposition") == "created":
             return True
@@ -3448,7 +3456,7 @@ class ProviderLifecycleEngine:
                 )
             if getattr(failure, "bootstrap_cleanup_failed", False):
                 retry = self._retry_for(request, active.operation, active.seed_policy)
-                bootstrap_actions = (LifecycleAction("spec-dock", "container", "failed", "fresh-container-create"),)
+                bootstrap_actions = self._bootstrap_cleanup_actions(active, root_fd)
                 failed_paths, pending_paths = _action_path_sets(bootstrap_actions)
                 return build_public_result(
                     request,

@@ -71,7 +71,7 @@ _CONTINUATION_AFTER_VALUES = ("none", "run-request")
 _ACTION_RULES = {
     ("container", "fresh-container-create"): (
         frozenset({"planned", "completed", "pending", "failed"}),
-        frozenset({("install", "create-if-absent")}),
+        frozenset({("install", "create-if-absent"), ("install", "preserve-only")}),
     ),
     ("container", "shared-container-preserve"): (
         frozenset({"preserved"}),
@@ -713,7 +713,55 @@ def _action_profile_matches(
     if profile == "terminal cleanup retry-failed action set":
         return list(actions) == [_action("@provider-stage", "stage", "failed", "candidate-stage-cleanup")]
     if profile == "bootstrap cleanup-failed action set":
-        return list(actions) == [_action("spec-dock", "container", "failed", "fresh-container-create")]
+        if operation != "install" or seed_policy not in {"create-if-absent", "preserve-only"}:
+            return False
+        if not 11 <= len(actions) <= 13:
+            return False
+        if actions[:2] != [
+            _action("spec-dock", "container", "failed", "fresh-container-create"),
+            _action("spec-dock/spec-dock.version", "record", "pending", "incomplete-record-publish"),
+        ]:
+            return False
+        for action, path, category in zip(
+            actions[2:8], _UNINSTALL_TARGET_PATHS, _INSTALL_TARGET_CATEGORIES, strict=True
+        ):
+            if action not in (
+                _action(path, category, "pending", f"candidate-{category}-create"),
+                _action(path, category, "pending", f"candidate-{category}-replace"),
+            ):
+                return False
+        position = 8
+        if seed_policy == "preserve-only":
+            for path in _UNINSTALL_SEED_PATHS:
+                if actions[position] != _action(path, "seed", "preserved", "preserve-only-seed"):
+                    return False
+                position += 1
+        else:
+            if actions[position] not in (
+                _action("spec-dock/.gitignore", "seed", "pending", "fresh-seed-create"),
+                _action("spec-dock/.gitignore", "seed", "preserved", "consumer-seed-present"),
+            ):
+                return False
+            position += 1
+            parent_paths = []
+            while position < len(actions) and actions[position]["path"] in {".github", ".github/workflows"}:
+                parent_paths.append(actions[position]["path"])
+                if actions[position] != _action(
+                    actions[position]["path"], "container", "pending", "fresh-container-create"
+                ):
+                    return False
+                position += 1
+            if parent_paths == [".github"]:
+                return False
+            if position >= len(actions) or actions[position] not in (
+                _action(".github/workflows/ci.yml", "seed", "pending", "fresh-seed-create"),
+                _action(".github/workflows/ci.yml", "seed", "preserved", "consumer-seed-present"),
+            ):
+                return False
+            position += 1
+        return position + 1 == len(actions) and actions[position] == _action(
+            "@provider-stage", "stage", "pending", "candidate-stage-cleanup"
+        )
     if profile == "AP-PREP-PARTIAL":
         if operation not in {"install", "update", "uninstall"} or not 11 <= len(actions) <= 13:
             return False
@@ -970,15 +1018,19 @@ def _action_profile_matches(
         "install-preserve terminal + one stage warning",
         "update terminal + one stage warning",
     }:
-        if not _action_profile_matches(
-            actions[:-1],
+        if not actions or actions[-1] != _action(
+            "@provider-stage", "stage", "warning", "candidate-stage-cleanup-warning"
+        ):
+            return False
+        completed_actions = list(actions)
+        completed_actions[-1] = _action("@provider-stage", "stage", "completed", "candidate-stage-cleanup")
+        return _action_profile_matches(
+            completed_actions,
             profile.removesuffix(" + one stage warning") + " action set",
             operation=operation,
             seed_policy=seed_policy,
             phase=phase,
-        ):
-            return False
-        return actions[-1] == _action("@provider-stage", "stage", "warning", "candidate-stage-cleanup-warning")
+        )
     return False
 
 

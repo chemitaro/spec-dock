@@ -381,10 +381,14 @@ def _open_repository_root(repo_root: Path) -> int:
         raise
 
 
+def _runtime_scripts_root() -> Path:
+    return Path(__file__).resolve().parents[2]
+
+
 def _helper_environment() -> dict[str, str]:
     environment = os.environ.copy()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
-    runtime_scripts = str(Path(__file__).resolve().parents[2])
+    runtime_scripts = str(_runtime_scripts_root())
     existing = environment.get("PYTHONPATH")
     environment["PYTHONPATH"] = runtime_scripts if not existing else os.pathsep.join((runtime_scripts, existing))
     return environment
@@ -436,7 +440,7 @@ def _run_git_write(
         helper.extend(["--cwd-fd", str(working_directory_fd), "--", *command])
         result = subprocess.run(
             helper,
-            cwd=str(repo_root),
+            cwd=str(_runtime_scripts_root()),
             env=_helper_environment(),
             pass_fds=all_fds,
             capture_output=True,
