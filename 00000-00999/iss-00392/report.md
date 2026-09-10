@@ -107,7 +107,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 `実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `86b219605d4c678c0f044acd16b81848995f9b41`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
-2. 現行candidateとこのReportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
+2. 実装candidate `41e0e3e3330c0b1bcec54a46310ead4c8d538bef`に対する独立Code Review StrictのP0/P1ゼロ・pass（v5-3で完了）。Report更新後の最終SHAについては本項1のclean pushと、次項3のFinal Quality Gate Strictで再確認します。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
 
@@ -117,9 +117,9 @@ CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provid
 
 前回の`29a61963`時点のレビュー記録に続き、stage再構築後の凍結候補digest再検証を`467fe0e`、承認済みACTIVE schema v2の`seed_admission`（固定seedの入場時`absent|present`を永続化し、再入場・action provenance・create判定で再観測しない）を`ec626c03`へ回帰テスト付きで反映しました。以下の過去レビュー記録は履歴として保持し、現行candidateの検証結果は§9末尾の追補を正とします。
 
-親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証とclean pushは完了しています。実装後の独立 Code Review Strict（`699d54bf`固定、browser、GPT-5.6 Sol、Extra High、完全bundle）は、#395 baselineを除きP1×2、P2×3を指摘しました。Blue Team分析でP1×2を有効なblocking指摘として実装修正対象に確定し、`4a6aba91`で修正、`0d993252`でdogfood projectionを完了しました。続くFirst Red分析でP1×5とcoverage gapを同一batchの修正対象に確定し、`c7d6dd62`へ回帰テスト付き修正を反映しました。さらにfresh Code Review Strict（`29a61963`固定）で検出されたP1×8をBlue Teamがすべてvalid/blockingと判定し、`29a61963`へ追加の回帰修正を反映しました。P2×3は現在の親ポリシーによりreport-onlyとして保持しています。`01f2631b`で検出された再入場のfixed seed型preflight迂回を修正し、同じreviewerによるfresh Strict re-review、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
+親public valueまたはIssue責務の追加は不要です。`RECORD-TEMP`のparent clarificationはpublic inventoryを変えません。実装candidateのfocused/package/default-fast検証とclean pushは完了しています。実装後の独立 Code Review Strict（`699d54bf`固定、browser、GPT-5.6 Sol、Extra High、完全bundle）は、#395 baselineを除きP1×2、P2×3を指摘しました。Blue Team分析でP1×2を有効なblocking指摘として実装修正対象に確定し、`4a6aba91`で修正、`0d993252`でdogfood projectionを完了しました。続くFirst Red分析でP1×5とcoverage gapを同一batchの修正対象に確定し、`c7d6dd62`へ回帰テスト付き修正を反映しました。さらにfresh Code Review Strict（`29a61963`固定）で検出されたP1×8をBlue Teamがすべてvalid/blockingと判定し、`29a61963`へ追加の回帰修正を反映しました。P2×3は現在の親ポリシーによりreport-onlyとして保持しています。`01f2631b`で検出された再入場のfixed seed型preflight迂回を修正し、同じreviewerによるfresh Strict re-review v5-3は`41e0e3e3330c0b1bcec54a46310ead4c8d538bef`に対して本文JSON `review_status=pass`（P0/P1=0）となりました。Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
 
-current full verifierの`ledger-mismatch` 10件は#395が所有するactive baselineのsignature/coverage mismatchであり、#392の責務へ取り込まず、skip/xfailやledger変更で隠していません。残るgateはReport更新後のclean pushed Strict review、Final Quality Gate Strict、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssueの最終certification、Product GREEN、merge完了を主張しません。
+current full verifierの`ledger-mismatch` 10件は#395が所有するactive baselineのsignature/coverage mismatchであり、#392の責務へ取り込まず、skip/xfailやledger変更で隠していません。残るgateはReport更新後のclean push、Final Quality Gate Strict、#395 baselineと#392 GREEN要求の権限判断、人間PR review/merge、merged-tip B1です。これらが未完了のため、本ReportはIssueの最終certification、Product GREEN、merge完了を主張しません。
 
 ## 9. Implementation verification update
 
@@ -197,4 +197,6 @@ Blue Teamのfresh Strict分析（session `required-strict-github-connector-verif
 - commit/push: `86b219605d4c678c0f044acd16b81848995f9b41`、branch upstreamと一致、worktree clean
 - full verifier: `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4` は `2057 tests collected`、4 shard exit 1、status=`ledger-mismatch`、`evaluation.verified=false`
 
-full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T231201.276215Z/result.json`です。`candidate_sha`は`86b219605d4c678c0f044acd16b81848995f9b41`と一致し、active verifiedは4件、resolved verifiedは1件、violationは10件です。内訳はruntime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件で、前回と同じ#395所有baseline集合です。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。full verifierはGREENまたはexit 0ではなく、同一reviewerによるfresh Strict re-review、`review_status=pass`（P0/P1=0）、Final Quality Gate Strict、#395 baselineと#392 GREEN要求の権限判断、人間PR merge、merged-tip B1が未完了です。
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T231201.276215Z/result.json`です。`candidate_sha`は`86b219605d4c678c0f044acd16b81848995f9b41`と一致し、active verifiedは4件、resolved verifiedは1件、violationは10件です。内訳はruntime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件で、前回と同じ#395所有baseline集合です。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。full verifierはGREENまたはexit 0ではなく、Final Quality Gate Strict、#395 baselineと#392 GREEN要求の権限判断、人間PR merge、merged-tip B1が未完了です。
+
+Final Quality Gate前の同一reviewer fresh Strict re-review v5-3は、`41e0e3e3330c0b1bcec54a46310ead4c8d538bef`を対象にbrowser-only、GPT-5.6 Sol、Extra High、完全37-file bundleで実施しました。本文JSONは`findings=[]`、`overall_correctness=patch is correct`、`review_status=pass`、P0/P1=0で、response SHA-256は`88051d6c27991fac5be69673c6cf31f62170ceae834b9de425e979cc8303f9e9`です。レビュー自身はテストを再実行しておらず、Report記録の証拠を参照しています。Report更新後の最終SHAを対象とするFinal Quality Gate Strictは未実施です。
