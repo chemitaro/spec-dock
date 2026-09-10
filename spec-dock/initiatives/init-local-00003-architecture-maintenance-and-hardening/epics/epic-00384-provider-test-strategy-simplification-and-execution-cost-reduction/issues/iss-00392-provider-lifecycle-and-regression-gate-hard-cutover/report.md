@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "01f2631b59ac4d1a27b095ab7508865db3afcf41"
-  tree: "afdee8be47321d78ffe96ef4bc2ba83e00aa7ad6"
+  sha: "ca55d72007cf0b558985aa828520f9b2738a9f91"
+  tree: "7deee611e66813c3470a075c633d350b1170fb67"
 implementation_evidence:
-  candidate_sha: "01f2631b59ac4d1a27b095ab7508865db3afcf41"
-  candidate_tree: "afdee8be47321d78ffe96ef4bc2ba83e00aa7ad6"
+  candidate_sha: "ca55d72007cf0b558985aa828520f9b2738a9f91"
+  candidate_tree: "7deee611e66813c3470a075c633d350b1170fb67"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidateは`01f2631b59ac4d1a27b095ab7508865db3afcf41`です。実装時点の詳細な証拠は§9〜§11に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidateとreport-only evidence freezeは`ca55d72007cf0b558985aa828520f9b2738a9f91`です。実装時点の詳細な証拠は§9〜§12に記録します。
 
 ## 2. Source verification facts
 
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `01f2631b59ac4d1a27b095ab7508865db3afcf41`を固定し、branch upstream と同一であることを確認しました。このReport更新を含む次のclean pushed SHAが最終Strict review対象です。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `ca55d72007cf0b558985aa828520f9b2738a9f91`を固定し、branch upstream と同一であることを確認しました。Report-only evidence freeze後に作成される次のclean pushed SHAが最終Strict review対象です。次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
 2. 現行candidateとこのReportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
@@ -152,9 +152,9 @@ full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T180530.5
 
 直近のfresh Code Review Strict（`required-strict-github-connector-verificati-804`、`94c6c30f`固定、browser-only、GPT-5.6 Sol、Extra High、完全bundle）は本文JSONで`review_status=fail`、P1×1でした。Blue Teamのfresh分析（`required-strict-github-connector-verificati-805`、browser-only、GPT-5.6 Sol、Extra High、完全packet）はこのP1をvalid/blocking、実装/common admission修正、既存Wire v12の再利用と判定しました。`3a4884e1`の修正後、同じreviewerによるfresh Strict re-review、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
 
-## 11. Final implementation candidate addendum (2026-09-11)
+## 11. Code implementation candidate addendum (2026-09-11, before report-only evidence freeze)
 
-現行の実装candidateは`01f2631b59ac4d1a27b095ab7508865db3afcf41`（tree `afdee8be47321d78ffe96ef4bc2ba83e00aa7ad6`）です。`3a4884e1`の共通admission修正に対する同一reviewerの再入場指摘を受け、`_resume_or_block`の非uninstall再入場でも、stage準備およびrunning-stage検証、receipt/ACTIVE/record/consumer mutationより前に既存の`_admit_existing_seeds`を呼び出すよう修正しました。`active.operation`と`active.seed_policy`を使用し、symlink・directory・FIFOなどのunsafe fixed seedは既存の`unsafe-target-type` blocked resultへ収束します。`legacy-0.2.3`のtarget/record authorityを保持し、updateの`operation=update`／`seed_policy=preserve-only`、legacy migrationの`operation=install`／`seed_policy=preserve-only`、Wire v12、ACTIVE schema v2の`seed_admission`、uninstall分岐を変更していません。
+コード実装candidateは`01f2631b59ac4d1a27b095ab7508865db3afcf41`（tree `afdee8be47321d78ffe96ef4bc2ba83e00aa7ad6`）で、後続の`ca55d720`はReport-only evidence freezeです。`3a4884e1`の共通admission修正に対する同一reviewerの再入場指摘を受け、`_resume_or_block`の非uninstall再入場でも、stage準備およびrunning-stage検証、receipt/ACTIVE/record/consumer mutationより前に既存の`_admit_existing_seeds`を呼び出すよう修正しました。`active.operation`と`active.seed_policy`を使用し、symlink・directory・FIFOなどのunsafe fixed seedは既存の`unsafe-target-type` blocked resultへ収束します。`legacy-0.2.3`のtarget/record authorityを保持し、updateの`operation=update`／`seed_policy=preserve-only`、legacy migrationの`operation=install`／`seed_policy=preserve-only`、Wire v12、ACTIVE schema v2の`seed_admission`、uninstall分岐を変更していません。
 
 - First Red: `update|legacy migration` × `prepared|running` × 2 fixed seed paths × `symlink|directory|FIFO`の24ケースが、修正前にunsafe type検出前のre-entry経路を通過することを確認
 - First Green: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py -k reentry_unsafe_seed_type_blocks_before_admission_mutation` は `24 passed, 51 deselected`
@@ -169,3 +169,13 @@ full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T191330.4
 直近のCode Review Strict v7（reviewed SHA `22441c3a37effcb5e64371706338d8f651b228c1`、browser-only、GPT-5.6 Sol、Extra High、完全bundle）は本文JSONでP1×1、`review_status=fail`を返しました。レビューartifactのSHA-256は`3e8cd7b47bc87fd016e3cc103510e96e0f538a49d301e092ae8d08784f5bfc76`です。Blue Teamの同一目的再分析 v8（session `required-strict-github-connector-verificati-807`、browser-only、GPT-5.6 Sol、Extra High、9ファイル完全証拠束）は、P1を実質修正済み・正式クローズは同一reviewerの再レビュー待ちと判定し、full verifierの10件と#395境界を実証しました。分析packetは`issue-392-review-v8-evidence-packet.md`、応答ログはOracle session `required-strict-github-connector-verificati-807`に保存されています。
 
 このaddendumは、機能削減後に不要となった旧機能を再導入せず、削除対象を確認するだけのobsolete testを追加・保持しない方針で記録しています。現候補では同一reviewerのfresh Strict re-review、`review_status=pass`（P0/P1=0）、Final Quality Gate Strict、人間PR merge、merged-tip B1が未完了です。人間の受入判断なしに#395のbaseline修正、ledger/evaluator変更、GREEN偽装、Issue finish、PR mergeは行いません。
+
+## 12. Report-bound candidate addendum (2026-09-11)
+
+Report-only evidence freeze後のbranch tipは`ca55d72007cf0b558985aa828520f9b2738a9f91`（tree `7deee611e66813c3470a075c633d350b1170fb67`）です。実装コードは`01f2631b`から変わらず、reportのcandidate/evidence bindingだけを更新しました。このSHAに対して、同じcanonical commandを再実行し、full verifierの`candidate_sha`が一致することを確認しました。
+
+- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`: `1985 tests collected`、4 shard exit 1、status=`ledger-mismatch`、`evaluation.verified=false`
+- violation: runtime import S10 signature mismatch 8件、runtime shell S11 coverage mismatch 1件、workbench signature mismatch 1件
+- active verified: 4件、resolved verified: 1件、#392起因の新規lifecycle/provider `unexpected_failure`: 0件
+
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T221056.722381Z/result.json`です。4 shardの実結果は全件をcollect・executeし、前回の`01f2631b`実行と同じ#395所有baseline violation集合を示しました。full verifierはGREENでもexit 0でもなく、#392ではledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleを変更していません。従って、このreport-bound candidateは実装と証跡の束ね直しを完了していますが、同一reviewerのfresh Strict re-review、Final Quality Gate Strict、#395所有baselineと#392 GREEN要求の権限判断、人間PR merge、merged-tip B1は未完了です。
