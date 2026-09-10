@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "ca55d72007cf0b558985aa828520f9b2738a9f91"
-  tree: "7deee611e66813c3470a075c633d350b1170fb67"
+  sha: "86b219605d4c678c0f044acd16b81848995f9b41"
+  tree: "7e3638b16881f9f206d4ed0a68144ea067bad0e8"
 implementation_evidence:
-  candidate_sha: "ca55d72007cf0b558985aa828520f9b2738a9f91"
-  candidate_tree: "7deee611e66813c3470a075c633d350b1170fb67"
+  candidate_sha: "86b219605d4c678c0f044acd16b81848995f9b41"
+  candidate_tree: "7e3638b16881f9f206d4ed0a68144ea067bad0e8"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidateとreport-only evidence freezeは`ca55d72007cf0b558985aa828520f9b2738a9f91`です。実装時点の詳細な証拠は§9〜§12に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む直近の実装candidateは`86b219605d4c678c0f044acd16b81848995f9b41`です。実装時点の詳細な証拠は§9〜§13に記録します。
 
 ## 2. Source verification facts
 
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `ca55d72007cf0b558985aa828520f9b2738a9f91`を固定し、branch upstream と同一であることを確認しました。Report-only evidence freeze後に作成される次のclean pushed SHAが最終Strict review対象です。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `86b219605d4c678c0f044acd16b81848995f9b41`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
 2. 現行candidateとこのReportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
@@ -179,3 +179,22 @@ Report-only evidence freeze後のbranch tipは`ca55d72007cf0b558985aa828520f9b27
 - active verified: 4件、resolved verified: 1件、#392起因の新規lifecycle/provider `unexpected_failure`: 0件
 
 full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T221056.722381Z/result.json`です。4 shardの実結果は全件をcollect・executeし、前回の`01f2631b`実行と同じ#395所有baseline violation集合を示しました。full verifierはGREENでもexit 0でもなく、#392ではledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleを変更していません。従って、このreport-bound candidateは実装と証跡の束ね直しを完了していますが、同一reviewerのfresh Strict re-review、Final Quality Gate Strict、#395所有baselineと#392 GREEN要求の権限判断、人間PR merge、merged-tip B1は未完了です。
+
+## 13. Uninstall unsafe-seed remediation addendum (2026-09-11)
+
+同一reviewerによるfresh Code Review Strict v4b（reviewed SHA `13a343e990227cf96be4f75fa1138510989fbc61`、browser-only、GPT-5.6 Sol、Extra High、完全37-file bundle）は、本文JSONでP1×1、`review_status=fail`を返しました。指摘は、valid ready/legacy workspaceの初回uninstallとprepared/running再入場uninstallが、fixed seedのsymlink・directory・FIFOを`present`として扱い、receipt/ACTIVE/stage/record/consumer mutationまたはplanへ進む共通admission迂回です。レビューartifactのSHA-256は`396fee8a419d374a2348eca5aa809ba4bc9382144ca129146f510d024865b423`です。
+
+Blue Teamのfresh Strict分析（session `required-strict-github-connector-verificati-808`、browser-only、GPT-5.6 Sol、Extra High、full verifier evidence packet）は、このP1をvalid/reachable/in-scope/merge-blockingと判定しました。修正は既存`_admit_existing_seeds`を再利用し、Wire v12の`operation=uninstall`、`candidate_digest=null`、`seed_policy=preserve-only`、preflight、last-completed=`request-validation`、`mutation_started=false`、empty actionsを保持する実装修正としました。#395のfull-verifier baseline mismatchは別責務として扱い、ledger、timing、evaluator、skip/xfail、bundleは変更していません。
+
+`86b219605d4c678c0f044acd16b81848995f9b41`では、初回uninstallのdry-run/applyとprepared/running再入場のdry-run/applyにseed admissionを接続しました。apply再入場はstage準備・running-stage検証前、dry-run再入場は既存のstage owner/payload検証後かつtarget plan前に分類します。新たなWire/schema/stateは追加せず、obsolete behaviorを確認するだけのtestも追加していません。
+
+- First Red: `ready-origin|exact-legacy-origin` × 初回`dry-run|apply` × 2 seed paths × `symlink|directory|FIFO`（24件）、および同origin × `prepared|running` × 再入場`dry-run|apply` × 2 seed paths × 3 unsafe types（48件）を、合計72件すべて修正前に失敗させ、`completed|planned`への迂回を確認
+- First Green: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py -k 'initial_uninstall_unsafe_seed_type or uninstall_reentry_unsafe_seed_type' -q --tb=short` は `72 passed, 75 deselected`
+- engine: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py` は `147 passed`
+- provider lifecycle: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle` は `354 passed`
+- default fast: `TMPDIR=/private/tmp uv run pytest` は `1209 passed, 848 skipped`
+- static: `make lint` は ruff check、ruff format、mypyすべてpass
+- commit/push: `86b219605d4c678c0f044acd16b81848995f9b41`、branch upstreamと一致、worktree clean
+- full verifier: `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4` は `2057 tests collected`、4 shard exit 1、status=`ledger-mismatch`、`evaluation.verified=false`
+
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T231201.276215Z/result.json`です。`candidate_sha`は`86b219605d4c678c0f044acd16b81848995f9b41`と一致し、active verifiedは4件、resolved verifiedは1件、violationは10件です。内訳はruntime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件で、前回と同じ#395所有baseline集合です。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。full verifierはGREENまたはexit 0ではなく、同一reviewerによるfresh Strict re-review、`review_status=pass`（P0/P1=0）、Final Quality Gate Strict、#395 baselineと#392 GREEN要求の権限判断、人間PR merge、merged-tip B1が未完了です。
