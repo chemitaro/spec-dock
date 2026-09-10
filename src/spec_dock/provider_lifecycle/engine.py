@@ -1506,6 +1506,7 @@ class ProviderLifecycleEngine:
             durable_operation = "update"
             seed_policy = "preserve-only"
             result_family = "update"
+        self._admit_existing_seeds(root_fd, operation=durable_operation, seed_policy=seed_policy)
         targets = self._observe_domains(root_fd)
         if any(item.kind not in {"absent", "directory"} for item in targets):
             raise _AdmissionFailure(
@@ -1546,6 +1547,19 @@ class ProviderLifecycleEngine:
             root_fd,
             receipt=receipt,
         )
+
+    def _admit_existing_seeds(self, root_fd: int, *, operation: str, seed_policy: str) -> None:
+        """Reject fixed seed collisions before any lifecycle state is mutated."""
+
+        for path in SEED_PATHS:
+            item = self._observe_target(root_fd, path, expect_tree=False)
+            if item.kind not in {"absent", "regular"}:
+                raise _AdmissionFailure(
+                    "unsafe-target-type",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                )
 
     def _dispatch_uninstall(
         self,

@@ -810,6 +810,75 @@ def test_t04_seed_admission_preserves_present_seed_through_reentry(tmp_path: Pat
     }
 
 
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_update_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (tmp_path / f"unsafe-seed-{unsafe_kind}-{seed_path.replace('/', '-')}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    seed = workspace / seed_path
+    seed.unlink()
+    if unsafe_kind == "symlink":
+        target = tmp_path / f"{seed_path.replace('/', '-')}-target"
+        target.write_text("consumer target\n", encoding="utf-8")
+        seed.symlink_to(target)
+    elif unsafe_kind == "directory":
+        seed.mkdir()
+    else:
+        os.mkfifo(seed)
+
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    receipt_before = receipt_store.load()
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "update"
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+
+
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+def test_t04_legacy_unsafe_seed_type_blocks_before_admission_mutation(tmp_path: Path, seed_path: str) -> None:
+    workspace = (tmp_path / f"legacy-unsafe-seed-{seed_path.replace('/', '-')}").resolve()
+    workspace.mkdir()
+    _materialize_legacy_workspace(workspace)
+
+    seed = workspace / seed_path
+    seed.parent.mkdir(parents=True, exist_ok=True)
+    seed.unlink(missing_ok=True)
+    os.mkfifo(seed)
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "install"
+    assert result.seed_policy == "preserve-only"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+
+
 def test_t04_prepared_uninstall_dry_run_preserves_foreign_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
     workspace = (tmp_path / "prepared-uninstall").resolve()
     workspace.mkdir()
