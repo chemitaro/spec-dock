@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "ec626c030b564cd7d5ed92332b4db8c02cf120ec"
-  tree: "1af83ed8bc6dd79ee10e8e1826a2b2c1ae52dc25"
+  sha: "3a4884e1e4dab3c9ddf46573ffb65f7b835f2115"
+  tree: "1b6b970adbac9274e9ab384872cd2d8ddebf1960"
 implementation_evidence:
-  candidate_sha: "ec626c030b564cd7d5ed92332b4db8c02cf120ec"
-  candidate_tree: "1af83ed8bc6dd79ee10e8e1826a2b2c1ae52dc25"
+  candidate_sha: "3a4884e1e4dab3c9ddf46573ffb65f7b835f2115"
+  candidate_tree: "1b6b970adbac9274e9ab384872cd2d8ddebf1960"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2の追加修正を含む現行candidateは`ec626c030b564cd7d5ed92332b4db8c02cf120ec`です。実装時点の詳細な証拠は§9に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む現行candidateは`3a4884e1e4dab3c9ddf46573ffb65f7b835f2115`です。実装時点の詳細な証拠は§9と§10に記録します。
 
 ## 2. Source verification facts
 
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2を含む実装candidate commit `ec626c030b564cd7d5ed92332b4db8c02cf120ec`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `3a4884e1e4dab3c9ddf46573ffb65f7b835f2115`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
 2. 現行candidateとこのReportを含む最終SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。
@@ -138,12 +138,16 @@ current full verifierの`ledger-mismatch` 10件は#395が所有するactive base
 
 ## 10. Current candidate addendum (2026-09-11)
 
-実装candidateは`ec626c030b564cd7d5ed92332b4db8c02cf120ec`（tree `1af83ed8bc6dd79ee10e8e1826a2b2c1ae52dc25`）です。`467fe0e`でstage再構築後に凍結候補digestを再検証し、`ec626c03`でRequirement/Design/Planに反映したACTIVE schema v2の`seed_admission`を実装しました。固定seedの入場時状態を`absent|present`として保存し、再入場時のaction provenanceとcreate判定は保存値を使用します。schema v1はfail-closedで、public Wire v12とpreserve-onlyの「削除機能を復活させない」契約は変更していません。直近のReport更新commit `7cc39afc59c882e756a8f4af53899f47d041665f`はこの実装コードを変更しないため、full verifierは同じコードを含むそのcommitで再実行しました。
+現行実装candidateは`3a4884e1e4dab3c9ddf46573ffb65f7b835f2115`（tree `1b6b970adbac9274e9ab384872cd2d8ddebf1960`）です。`467fe0e`でstage再構築後に凍結候補digestを再検証し、`ec626c03`でRequirement/Design/Planに反映したACTIVE schema v2の`seed_admission`を実装しました。今回`3a4884e1`で、`_dispatch_new`の共通admissionに`SEED_PATHS`の型検証を追加しました。各seedをno-followで観測し、`absent`と`regular`だけを許可し、symlink・directory・FIFOなどの既存非regular seedは、receipt無効化、ACTIVE作成、stage作成、record/consumer mutationより前に既存の`unsafe-target-type` blocked resultとして返します。updateでは`operation=update`／`seed_policy=preserve-only`、legacy migrationでは`operation=install`／`seed_policy=preserve-only`を保持します。public Wire v12、`seed_admission`の`absent|present`、preserve-onlyの「削除機能を復活させない」契約、#395 baselineは変更していません。
 
-- focused provider-lifecycle: `52 passed`
-- provider-lifecycle全体: `250 passed`
-- default fast: `1105 passed, 848 skipped`
+- First Red: 追加したupdate 6ケース（2 seed paths × symlink/directory/FIFO）とlegacy migration 2ケース（2 seed paths × FIFO）は、修正前にすべて失敗し、late seed phaseの`WireValidationError`とmutationを確認
+- First Green: `tests/unit/provider_lifecycle/test_engine.py -k 'unsafe_seed_type_blocks_before_admission_mutation or legacy_unsafe_seed_type_blocks_before_admission_mutation'` は `8 passed`
+- focused provider-lifecycle（engine/private state）: `60 passed`
+- provider-lifecycle全体: `258 passed`
+- default fast: `1113 passed, 848 skipped`
 - `make lint`: ruff check、ruff format、mypy pass
-- full verifier: `1953 tests collected`、status=`ledger-mismatch`、既知の#395 baseline violation 10件、#392起因のunexpected failure 0件
+- full verifier: `1961 tests collected`、4 shard exit 1、status=`ledger-mismatch`、既知の#395 baseline violation 10件、#392起因の`unexpected_failure` 0件
 
-full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T165917.810976Z/result.json`にあり、candidate SHAは`7cc39afc59c882e756a8f4af53899f47d041665f`と一致します。レートリミットを理由にbundleや検証範囲は縮小していません。現行candidateを対象にした最終Strict Code Review、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T180530.534640Z/result.json`にあり、`candidate_sha`は`3a4884e1e4dab3c9ddf46573ffb65f7b835f2115`と一致します。baseline violationはruntime import S10 signature mismatch 8件、runtime shell S11 coverage mismatch 1件、workbench signature mismatch 1件で、ledger・timing・required-fast・bundleを変更していません。レートリミットを理由にbundleや検証範囲は縮小していません。対象acceptance/dogfood/bootstrap/handoffは個別実行で`72 passed`でしたが、subset指定により全体ledger coverage mismatchの終了コード3となるため、full verifierの判定には使用していません。
+
+直近のfresh Code Review Strict（`required-strict-github-connector-verificati-804`、`94c6c30f`固定、browser-only、GPT-5.6 Sol、Extra High、完全bundle）は本文JSONで`review_status=fail`、P1×1でした。Blue Teamのfresh分析（`required-strict-github-connector-verificati-805`、browser-only、GPT-5.6 Sol、Extra High、完全packet）はこのP1をvalid/blocking、実装/common admission修正、既存Wire v12の再利用と判定しました。`3a4884e1`の修正後、同じreviewerによるfresh Strict re-review、Final Quality Gate Strict、人間PR merge、merged-tip B1は未完了です。
