@@ -78,9 +78,9 @@ from spec_dock.provider_lifecycle.private_state import (
     StageStore,
     cleanup_token_for,
     repository_key_for,
-    resolve_private_namespace,
+    resolve_private_namespace_at,
     tuple_key_for,
-    validate_private_namespace,
+    validate_private_namespace_at,
 )
 from spec_dock.provider_lifecycle.wire import (
     WireValidationError,
@@ -984,7 +984,12 @@ class ProviderLifecycleEngine:
                 return self._blocked(request, "unsafe-repository-binding")
             try:
                 namespace = self._namespace_for(request.target, lease)
-                active_store, receipt_store, stage_store = self._stores(namespace, request.apply, request.target)
+                active_store, receipt_store, stage_store = self._stores(
+                    namespace,
+                    request.apply,
+                    repository_root_fd=bound.fd,
+                    repository_binding=lease.binding,
+                )
             except AtomicRenameUnavailable:
                 return self._blocked(
                     request,
@@ -1104,7 +1109,7 @@ class ProviderLifecycleEngine:
                 )
 
             if receipt is not None and not self._receipt_matches_repository(receipt, lease):
-                return self._blocked(request, "invalid-request")
+                return self.invalid_request(request)
             try:
                 candidate = None if operation == "uninstall" else self._candidate()
             except (CandidateError, OSError, ValueError):
@@ -1160,20 +1165,67 @@ class ProviderLifecycleEngine:
         self,
         namespace: Path,
         apply: bool,
-        target: str,
+        *,
+        repository_root_fd: int,
+        repository_binding: RepositoryBinding,
     ) -> tuple[ActiveStateStore | None, CompletionReceiptStore | None, StageStore | None]:
+        root_binding = (repository_binding.device, repository_binding.inode)
         if apply:
             for point in ("private-top-mkdir", "private-top-fsync", "private-repo-mkdir", "private-repo-fsync"):
                 self._check_fault(point)
-            namespace = resolve_private_namespace(target)
-            active = ActiveStateStore(namespace, repository_root=target)
-            receipt = CompletionReceiptStore(namespace, repository_root=target)
-            return active, receipt, StageStore(namespace, active, repository_root=target)
-        if not validate_private_namespace(target, namespace):
+            namespace = resolve_private_namespace_at(
+                repository_root_fd,
+                namespace,
+                effective_euid=repository_binding.euid,
+                expected_binding=root_binding,
+            )
+            active = ActiveStateStore(
+                namespace,
+                repository_root_fd=repository_root_fd,
+                repository_root_binding=root_binding,
+            )
+            receipt = CompletionReceiptStore(
+                namespace,
+                repository_root_fd=repository_root_fd,
+                repository_root_binding=root_binding,
+            )
+            return (
+                active,
+                receipt,
+                StageStore(
+                    namespace,
+                    active,
+                    repository_root_fd=repository_root_fd,
+                    repository_root_binding=root_binding,
+                ),
+            )
+        if not validate_private_namespace_at(
+            repository_root_fd,
+            namespace,
+            effective_euid=repository_binding.euid,
+            expected_binding=root_binding,
+        ):
             return None, None, None
-        active = ActiveStateStore(namespace, repository_root=target)
-        receipt = CompletionReceiptStore(namespace, repository_root=target)
-        return active, receipt, StageStore(namespace, active, repository_root=target)
+        active = ActiveStateStore(
+            namespace,
+            repository_root_fd=repository_root_fd,
+            repository_root_binding=root_binding,
+        )
+        receipt = CompletionReceiptStore(
+            namespace,
+            repository_root_fd=repository_root_fd,
+            repository_root_binding=root_binding,
+        )
+        return (
+            active,
+            receipt,
+            StageStore(
+                namespace,
+                active,
+                repository_root_fd=repository_root_fd,
+                repository_root_binding=root_binding,
+            ),
+        )
 
     def _receipt_matches_repository(self, receipt: CompletionReceipt, lease: RepositoryLease) -> bool:
         binding = lease.binding
@@ -1330,13 +1382,13 @@ class ProviderLifecycleEngine:
         actions.append(_make_action("@provider-stage", "stage", "pending", "candidate-stage-cleanup"))
         return tuple(actions)
 
-    def _preparation_mutation_started(self, active: ActiveState, root_fd: int) -> bool:
+    def _preparation_mutation_started(self, active: ActiveState, root_fd: int) -> bool | None:
         if active.bootstrap_container.get("disposition") == "created":
             return True
         try:
             raw, _witness, record, record_kind = self._observe_record("", root_fd)
         except (FilesystemSafetyError, OSError, ValueError, WireValidationError):
-            return False
+            return None
         expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
         return (
             raw == expected
@@ -3169,7 +3221,7 @@ class ProviderLifecycleEngine:
         cleanup_only: bool = False,
     ) -> LifecycleResult:
         try:
-            self._cleanup_stage(stage_store)
+            self._cleanup_stage(stage_store, active)
             self._check_fault("stage-parent-fsync")
             if receipt is None:
                 receipt = CompletionReceipt(
@@ -3222,7 +3274,7 @@ class ProviderLifecycleEngine:
             else self._completed_result(request, active, root_fd)
         )
 
-    def _cleanup_stage(self, stage_store: StageStore) -> None:
+    def _cleanup_stage(self, stage_store: StageStore, active: ActiveState) -> None:
         try:
             stage_fd = stage_store._stage_fd()
         except PrivateStateError as exc:
@@ -3236,23 +3288,61 @@ class ProviderLifecycleEngine:
                 os.close(namespace_fd)
             raise exc
         try:
-            for name in STAGE_ENTRY_NAMES:
-                try:
-                    tree = self._filesystem().capture_domain_tree(stage_fd, name)
-                except FileNotFoundError:
-                    continue
-                self._check_fault(f"stage-entry-{name}-remove")
-                self._filesystem().remove_tree_bound(stage_fd, name, tree)
-            try:
-                value = os.stat(STAGE_OWNER_NAME, dir_fd=stage_fd, follow_symlinks=False)
-            except FileNotFoundError:
-                value = None
-            if value is not None:
-                if not stat.S_ISREG(value.st_mode) or stat.S_IMODE(value.st_mode) != 0o600 or value.st_nlink != 1:
-                    raise PrivateStateForeignError("STAGE-OWNER.json is unsafe")
+            names = tuple(sorted(os.listdir(stage_fd), key=lambda name: os.fsencode(name)))  # noqa: PTH208
+            allowed = {STAGE_OWNER_NAME, *STAGE_ENTRY_NAMES}
+            if any(name not in allowed for name in names):
+                raise PrivateStateForeignError("STAGE contains an unknown entry")
+            expected_owner = self._stage_owner(active)
+            owner_witness = None
+            current_owner = stage_store.load_owner()
+            if current_owner is None:
+                if names:
+                    raise PrivateStateForeignError("STAGE-OWNER.json is missing")
+            else:
+                if current_owner != expected_owner:
+                    raise PrivateStateForeignError("STAGE-OWNER.json belongs to another operation")
                 owner_witness = self._filesystem().capture_inode(stage_fd, STAGE_OWNER_NAME, "regular")
                 if owner_witness is None:
                     raise PrivateStateForeignError("STAGE-OWNER.json disappeared during cleanup")
+            registered = {str(item["name"]): item for item in active.registered_stage_entries}
+            staged_trees: dict[str, DomainTreeIdentity] = {}
+            for index, name in enumerate(STAGE_ENTRY_NAMES):
+                try:
+                    value = os.stat(name, dir_fd=stage_fd, follow_symlinks=False)
+                except FileNotFoundError:
+                    continue
+                if not stat.S_ISDIR(value.st_mode):
+                    raise PrivateStateForeignError(f"stage entry {name} is unsafe")
+                validation_tree = _capture_domain(stage_fd, name, exclude_marker=index >= 4)
+                tree = self._filesystem().capture_domain_tree(stage_fd, name)
+                stored = active.owned_target_witnesses[index]
+                registered_entry = registered.get(name)
+                if (
+                    registered_entry is None
+                    or registered_entry["original_tree_digest"] != stored["original_tree_digest"]
+                ):
+                    raise PrivateStateForeignError(f"stage entry {name} is not registered by ACTIVE")
+                original_kind = stored["original_kind"]
+                if original_kind == "directory":
+                    expected_digest = registered_entry["original_tree_digest"]
+                    if validation_tree.tree_digest != expected_digest:
+                        raise PrivateStateForeignError(f"stage entry {name} has foreign payload")
+                elif active.operation == "uninstall":
+                    if validation_tree.entry_count != 0 or (
+                        index >= 4 and not self._stage_slot_marker_absent(stage_fd, name)
+                    ):
+                        raise PrivateStateForeignError(f"stage entry {name} has foreign payload")
+                else:
+                    raise PrivateStateForeignError(f"unexpected stage entry {name} remains after publication")
+                staged_trees[name] = tree
+
+            for name in STAGE_ENTRY_NAMES:
+                staged_tree = staged_trees.get(name)
+                if staged_tree is None:
+                    continue
+                self._check_fault(f"stage-entry-{name}-remove")
+                self._filesystem().remove_tree_bound(stage_fd, name, staged_tree)
+            if owner_witness is not None:
                 self._filesystem().unlink_bound(stage_fd, STAGE_OWNER_NAME, owner_witness)
             os.fsync(stage_fd)
         finally:
@@ -3389,6 +3479,16 @@ class ProviderLifecycleEngine:
             mutation_started = phase == "publish-incomplete-record" and self._preparation_mutation_started(
                 active, root_fd
             )
+            if mutation_started is None:
+                return self._blocked(
+                    request,
+                    "stage-owner-mismatch",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    phase="candidate-staging",
+                    last_completed_phase="preflight",
+                )
             return self._preparation_failure(
                 request,
                 active.operation,
@@ -3544,7 +3644,7 @@ class ProviderLifecycleEngine:
                 token=token,
                 expected=active.cleanup_retry_invocation,
             ):
-                return self._blocked(request, "invalid-request")
+                return self.invalid_request(request)
             if active_store is None or receipt_store is None or stage_store is None:
                 return self._blocked(request, "lifecycle-preparation-failed")
             return self._complete_pending_cleanup(
@@ -3571,7 +3671,7 @@ class ProviderLifecycleEngine:
                 seed_policy=receipt.seed_policy,
                 terminal_record_digest=receipt.terminal_record_digest,
             ):
-                return self._blocked(request, "invalid-request")
+                return self.invalid_request(request)
             return build_public_result(
                 request,
                 status="completed",
@@ -3589,7 +3689,7 @@ class ProviderLifecycleEngine:
                     else CLEANUP_COMPLETED_GUIDANCE
                 ),
             )
-        return self._blocked(request, "invalid-request")
+        return self.invalid_request(request)
 
     def _terminal_record_matches(
         self,
@@ -3636,10 +3736,30 @@ class ProviderLifecycleEngine:
         if active_store is None or receipt_store is None or stage_store is None:
             return self._blocked(request, "lifecycle-preparation-failed")
         if receipt is not None and not self._receipt_matches_active(receipt, active):
-            return self._blocked(request, "invalid-request")
+            return self.invalid_request(request)
         if receipt is not None:
             if active.deferred_invocation is not None and active.deferred_invocation != receipt.deferred_invocation:
-                return self._blocked(request, "invalid-request")
+                return self.invalid_request(request)
+            if active.deferred_invocation is None and receipt.deferred_invocation is None and capture_desired:
+                receipt = replace(receipt, deferred_invocation=_desired_invocation(request, force=force))
+                try:
+                    receipt_store.save(receipt, fault=self._check_fault)
+                except (
+                    AtomicRenameUnavailable,
+                    FilesystemSafetyError,
+                    PrivateStateError,
+                    OSError,
+                    _InjectedFailure,
+                ) as failure:
+                    try:
+                        durable_receipt = receipt_store.load()
+                    except (PrivateStateError, OSError):
+                        durable_receipt = None
+                    if durable_receipt is not None and self._receipt_matches_active(durable_receipt, active):
+                        receipt = durable_receipt
+                        if durable_receipt.deferred_invocation is not None:
+                            active = replace(active, deferred_invocation=durable_receipt.deferred_invocation)
+                    return self._terminal_cleanup_failure(request, active, failure)
             if active.deferred_invocation != receipt.deferred_invocation:
                 active = replace(active, deferred_invocation=receipt.deferred_invocation)
                 try:
@@ -3689,7 +3809,7 @@ class ProviderLifecycleEngine:
                 seed_policy=receipt.seed_policy,
                 terminal_record_digest=receipt.terminal_record_digest,
             ):
-                return self._blocked(request, "invalid-request")
+                return self.invalid_request(request)
             if receipt is None and capture_desired and active.deferred_invocation is None:
                 active = replace(active, deferred_invocation=_desired_invocation(request, force=force))
                 self._save_active(active_store, active)

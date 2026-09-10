@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from io import BytesIO
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -14,12 +15,15 @@ import pytest
 from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
 from spec_dock.provider_lifecycle.contracts import ActiveState, LifecycleMode, LifecycleRequest, Operation
 from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
+from spec_dock.provider_lifecycle.filesystem import NativeAtomicFilesystem
 from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
 from spec_dock.provider_lifecycle.private_state import (
     ActiveStateStore,
+    CompletionReceiptStore,
     PrivateStateError,
     PrivateStateForeignError,
     StageStore,
+    repository_key_for,
     resolve_private_namespace,
 )
 from spec_dock.provider_lifecycle.wire import parse_installation_record, serialize_public_result
@@ -450,3 +454,207 @@ def test_t04_active_records_explicit_original_and_terminal_kinds(tmp_path: Path,
     )
     with pytest.raises(PrivateStateError):
         store.save(invalid)
+
+
+def test_t04_private_authority_stays_bound_to_leased_root_after_visible_path_swap(tmp_path: Path) -> None:
+    requested = (tmp_path / "repository").resolve()
+    replacement = (tmp_path / "replacement").resolve()
+    original_location = (tmp_path / "original-location").resolve()
+    requested.mkdir()
+    replacement.mkdir()
+    original_binding = os.lstat(requested)
+    replacement_binding = os.lstat(replacement)
+
+    class SwapVisibleRootFilesystem(NativeAtomicFilesystem):
+        swapped = False
+
+        def probe_native_capability(self, parent_fd: int) -> None:
+            if not self.swapped:
+                requested.rename(original_location)
+                replacement.rename(requested)
+                self.swapped = True
+            super().probe_native_capability(parent_fd)
+
+    result = ProviderLifecycleEngine(filesystem=SwapVisibleRootFilesystem()).execute(
+        _request(requested, "install"), force=True
+    )
+
+    serialize_public_result(result)
+    assert result.status == "completed"
+    private_root = requested.parent / f".spec-dock-provider-lifecycle-v1-euid-{os.geteuid()}"
+    original_namespace = private_root / repository_key_for(
+        original_binding.st_dev, original_binding.st_ino, os.geteuid()
+    )
+    replacement_namespace = private_root / repository_key_for(
+        replacement_binding.st_dev, replacement_binding.st_ino, os.geteuid()
+    )
+    assert original_namespace.is_dir()
+    assert not replacement_namespace.exists()
+
+
+def test_t04_indeterminate_preparation_observation_is_not_classified_as_p2a(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "indeterminate-preparation").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    engine = ProviderLifecycleEngine(fault_injector="stage-mkdir")
+    first = engine.execute(request, force=True)
+    assert first.status == "blocked"
+
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    monkeypatch.setattr(engine, "_observe_record", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("unknown")))
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        result = engine._partial_failure_result(request, active, OSError("record publication failed"), root_fd)
+    finally:
+        os.close(root_fd)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.operation == "install"
+    assert result.candidate_digest == active.candidate_digest
+    assert result.seed_policy == active.seed_policy
+    assert result.phase == "candidate-staging"
+    assert result.last_completed_phase == "preflight"
+    assert result.mutation_started is False
+    assert result.actions == ()
+
+
+def test_t04_cleanup_token_mismatch_is_the_closed_request_error(tmp_path: Path) -> None:
+    workspace = (tmp_path / "invalid-cleanup-token").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "update")
+    occurrences = 0
+
+    def fail_cleanup(point: str) -> None:
+        nonlocal occurrences
+        if point == "stage-entry-docs-remove":
+            occurrences += 1
+            if occurrences == 2:
+                raise OSError("stage cleanup failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_cleanup).execute(request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    result = ProviderLifecycleEngine().execute(request, force=True, cleanup_token="0" * 64)
+
+    serialize_public_result(result)
+    assert result.status == "error"
+    assert result.code == "invalid-request"
+    assert result.operation is None
+    assert result.candidate_digest is None
+    assert result.seed_policy is None
+    assert result.phase == "request-validation"
+    assert result.last_completed_phase == "not-started"
+    assert result.mutation_started is False
+
+
+def test_t04_first_desired_request_is_saved_by_receipt_before_active_reconciliation(tmp_path: Path) -> None:
+    workspace = (tmp_path / "receipt-first-request").resolve()
+    workspace.mkdir()
+    base_request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(base_request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    receipt = receipt_store.load()
+    assert active is not None and receipt is not None
+    assert active.deferred_invocation is None
+    assert receipt.deferred_invocation is None
+
+    desired = _request(workspace, "uninstall", specs_mode="keep")
+    result = ProviderLifecycleEngine().execute(desired)
+
+    serialize_public_result(result)
+    assert result.status == "completed"
+    assert result.code == "terminal-cleanup-completed"
+    assert result.continuation["next_action"] == "run-request"
+    assert result.continuation["next_command"] == "spec-dock uninstall --apply --keep-specs -- " + str(workspace)
+    stored_receipt = receipt_store.load()
+    assert stored_receipt is not None
+    assert stored_receipt.deferred_invocation == {
+        "invocation_id": "uninstall-apply-keep",
+        "rendered_command": "spec-dock uninstall --apply --keep-specs -- " + str(workspace),
+    }
+
+
+def test_t04_receipt_owned_deferred_request_survives_active_reconciliation_failure(tmp_path: Path) -> None:
+    workspace = (tmp_path / "receipt-active-reconciliation-failure").resolve()
+    workspace.mkdir()
+    base_request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(base_request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    desired = _request(workspace, "uninstall", specs_mode="keep")
+    failed = ProviderLifecycleEngine(fault_injector="active-temp-open").execute(desired)
+
+    serialize_public_result(failed)
+    assert failed.status == "partial_failure"
+    assert failed.code == "terminal-cleanup-failed"
+    assert failed.continuation["next_action"] == "retry-cleanup"
+    assert failed.continuation["after_cleanup_action"] == "run-request"
+    assert failed.continuation["after_cleanup_command"] == "spec-dock uninstall --apply --keep-specs -- " + str(
+        workspace
+    )
+    namespace = resolve_private_namespace(workspace)
+    receipt = CompletionReceiptStore(namespace, repository_root=workspace).load()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert receipt is not None and active is not None
+    assert receipt.deferred_invocation is not None
+    assert active.deferred_invocation is None
+
+
+@pytest.mark.parametrize("foreign_part", ["owner", "entry"])
+def test_t04_cleanup_preserves_foreign_stage_authority_and_payload(tmp_path: Path, foreign_part: str) -> None:
+    workspace = (tmp_path / f"foreign-stage-{foreign_part}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "update")
+    occurrences = 0
+
+    def fail_cleanup(point: str) -> None:
+        nonlocal occurrences
+        if point == "stage-entry-docs-remove":
+            occurrences += 1
+            if occurrences == 2:
+                raise OSError("stage cleanup failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_cleanup).execute(request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    namespace = resolve_private_namespace(workspace)
+    stage = namespace / "STAGE"
+    owner_path = stage / "STAGE-OWNER.json"
+    docs_path = stage / "docs"
+    if foreign_part == "owner":
+        owner = json.loads(owner_path.read_text(encoding="utf-8"))
+        owner["operation_generation"] = "1" * 32
+        owner_path.write_text(json.dumps(owner, separators=(",", ":")) + "\n", encoding="utf-8")
+        owner_path.chmod(0o600)
+        expected_owner = owner_path.read_bytes()
+        expected_entry = docs_path
+    else:
+        foreign_file = docs_path / "foreign.txt"
+        foreign_file.write_text("foreign\n", encoding="utf-8")
+        expected_owner = owner_path.read_bytes()
+        expected_entry = foreign_file
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert owner_path.read_bytes() == expected_owner
+    assert expected_entry.exists()
