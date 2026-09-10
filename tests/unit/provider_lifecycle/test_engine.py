@@ -147,6 +147,64 @@ def test_t06_exchange_keeps_the_old_root_in_stage_until_cleanup(tmp_path: Path) 
     assert resumed.status == "completed"
 
 
+def test_t06_bootstrap_active_publication_failure_restores_absent_pre_state(tmp_path: Path) -> None:
+    workspace = (tmp_path / "bootstrap-active-recovery").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    occurrences = 0
+
+    def fail_bootstrap_active_publication(point: str) -> None:
+        nonlocal occurrences
+        if point == "active-parent-fsync":
+            occurrences += 1
+            if occurrences == 2:
+                raise OSError("bootstrap ACTIVE publication failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_bootstrap_active_publication).execute(request, force=True)
+    assert first.status == "blocked"
+    assert first.code == "bootstrap-container-conflict"
+    assert first.bootstrap_rolled_back is True
+    assert first.mutation_started is False
+    assert not (workspace / "spec-dock").exists()
+
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.state == "prepared"
+    assert active.bootstrap_container == {"disposition": "planned-create", "witness": None}
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+    assert resumed.status == "completed"
+
+
+def test_t06_record_temp_witness_failure_cleans_unbound_temp_before_retry(tmp_path: Path) -> None:
+    workspace = (tmp_path / "record-temp-witness-recovery").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    occurrences = 0
+
+    def fail_record_temp_witness(point: str) -> None:
+        nonlocal occurrences
+        if point == "active-temp-open":
+            occurrences += 1
+            if occurrences == 3:
+                raise OSError("RECORD-TEMP witness publication failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_record_temp_witness).execute(request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "lifecycle-preparation-failed"
+    assert first.phase == "publish-incomplete-record"
+    assert first.mutation_started is True
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    assert active is not None
+    assert active.record_temp_witness is None
+    assert not (namespace / "RECORD-TEMP").exists()
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+    assert resumed.status == "completed"
+
+
 def test_t07_legacy_migration_uninstall_and_old_package_mutation_zero(tmp_path: Path) -> None:
     workspace = (tmp_path / "legacy").resolve()
     workspace.mkdir()

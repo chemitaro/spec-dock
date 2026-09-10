@@ -17,7 +17,7 @@ from pathlib import Path
 import secrets
 import shlex
 import stat
-from typing import TYPE_CHECKING, Literal, cast
+from typing import TYPE_CHECKING, Literal, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
@@ -234,10 +234,23 @@ class _AdmissionFailure(LifecycleEngineError):
 
 
 class _LifecycleFailure(LifecycleEngineError):
-    def __init__(self, point: str, *, cause: BaseException | None = None) -> None:
+    def __init__(
+        self,
+        point: str,
+        *,
+        cause: BaseException | None = None,
+        bootstrap_rolled_back: bool = False,
+        bootstrap_cleanup_failed: bool = False,
+    ) -> None:
         super().__init__(point)
         self.point = point
+        self.phase = point
         self.cause = cause
+        self.bootstrap_rolled_back = bootstrap_rolled_back
+        self.bootstrap_cleanup_failed = bootstrap_cleanup_failed
+
+
+_PhaseResult = TypeVar("_PhaseResult")
 
 
 @dataclass(frozen=True, slots=True)
@@ -685,7 +698,15 @@ def _copy_source_entry(source_fd: int, name: str, destination_fd: int) -> None:
     raise CandidateError(f"packaged domain contains unsupported entry: {name}")
 
 
-def _copy_tree(source: Path, destination_fd: int, *, slot: str | None, candidate: CandidateIdentity) -> None:
+def _copy_tree(
+    source: Path,
+    destination_fd: int,
+    *,
+    slot: str | None,
+    candidate: CandidateIdentity,
+    fault: Callable[[str], None] | None = None,
+    fault_prefix: str | None = None,
+) -> None:
     """Copy one trusted packaged domain into an already-owned empty stage entry."""
 
     source_fd = _source_directory(source)
@@ -713,6 +734,8 @@ def _copy_tree(source: Path, destination_fd: int, *, slot: str | None, candidate
                 os.fsync(marker_fd)
             finally:
                 os.close(marker_fd)
+        if fault is not None and fault_prefix is not None:
+            fault(f"{fault_prefix}-fsync")
         os.fsync(destination_fd)
     finally:
         os.close(source_fd)
@@ -793,6 +816,14 @@ class ProviderLifecycleEngine:
             injector.check(point)
         else:
             injector(point)
+
+    def _execute_phase(self, phase: str, callback: Callable[[], _PhaseResult]) -> _PhaseResult:
+        try:
+            return callback()
+        except (_InjectedFailure, _AdmissionFailure, PrivateStateForeignError, _LifecycleFailure):
+            raise
+        except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+            raise _LifecycleFailure(phase, cause=failure) from failure
 
     def _filesystem(self) -> NativeAtomicFilesystem:
         if self.filesystem is None:
@@ -907,7 +938,16 @@ class ProviderLifecycleEngine:
         cleanup_token: str | None,
         lease: RepositoryLease,
     ) -> LifecycleResult:
-        filesystem = self._filesystem()
+        try:
+            filesystem = self._filesystem()
+        except AtomicRenameUnavailable:
+            return self._blocked(
+                request,
+                "atomic-rename-unavailable",
+                operation=operation,
+                candidate_digest=None,
+                seed_policy=seed_policy,
+            )
         try:
             bound = filesystem.open_directory_chain_no_follow(request.target)
         except OSError:
@@ -934,6 +974,12 @@ class ProviderLifecycleEngine:
             try:
                 active = active_store.load() if active_store is not None else None
                 receipt = receipt_store.load() if receipt_store is not None else None
+                if active is not None and active_store is not None:
+                    active_store.ensure_durable()
+                    active = active_store.load()
+                if receipt is not None and receipt_store is not None:
+                    receipt_store.ensure_durable()
+                    receipt = receipt_store.load()
             except PrivateStateForeignError:
                 return self._blocked(request, "stage-owner-mismatch")
             except (PrivateStateError, OSError):
@@ -1551,7 +1597,13 @@ class ProviderLifecycleEngine:
                 phase="candidate-staging",
                 last_completed_phase="preflight",
             )
-        except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+        except (
+            _LifecycleFailure,
+            AtomicRenameUnavailable,
+            FilesystemSafetyError,
+            PrivateStateError,
+            OSError,
+        ) as failure:
             current = active_store.load()
             if current is None:
                 digest = (
@@ -1696,8 +1748,8 @@ class ProviderLifecycleEngine:
             _cleanup_invocation(request, operation, seed_policy, token),
             None,
         )
-        self._save_active(active_store, active)
-        self._prepare_stage(stage_store, active, candidate, root_fd)
+        self._execute_phase("candidate-staging", lambda: self._save_active(active_store, active))
+        self._execute_phase("candidate-staging", lambda: self._prepare_stage(stage_store, active, candidate, root_fd))
         return active
 
     @staticmethod
@@ -1722,12 +1774,10 @@ class ProviderLifecycleEngine:
         owner = self._stage_owner(active)
         stage_state, _entries = stage_store.inspect(owner)
         if stage_state == "complete" and self._stage_payload_valid(stage_store, candidate, root_fd):
+            stage_store.ensure_durable(owner)
             return
-        self._check_fault("stage-mkdir")
-        stage_store.ensure_registered_entries()
-        self._check_fault("stage-owner-write")
-        stage_store.save_owner(owner)
-        self._check_fault("stage-owner-fsync")
+        stage_store.ensure_registered_entries(fault=self._check_fault)
+        stage_store.save_owner(owner, fault=self._check_fault)
         stage_fd = stage_store._stage_fd()
         try:
             if candidate is None:
@@ -1736,9 +1786,9 @@ class ProviderLifecycleEngine:
             for index, ((_, _, source_suffix), stage_name) in enumerate(
                 zip(FIXED_DOMAINS, STAGE_ENTRY_NAMES, strict=True)
             ):
-                for operation in ("create", "write", "fsync"):
-                    self._check_fault(f"stage-entry-{stage_name}-{operation}")
+                self._check_fault(f"stage-entry-{stage_name}-remove")
                 self._remove_stage_entry(stage_fd, stage_name)
+                self._check_fault(f"stage-entry-{stage_name}-create")
                 os.mkdir(stage_name, 0o700, dir_fd=stage_fd)
                 entry_fd = os.open(
                     stage_name,
@@ -1750,7 +1800,15 @@ class ProviderLifecycleEngine:
                 )
                 try:
                     slot = FIXED_DOMAINS[index][1] if index >= 4 else None
-                    _copy_tree(assets / source_suffix, entry_fd, slot=slot, candidate=candidate)
+                    self._check_fault(f"stage-entry-{stage_name}-write")
+                    _copy_tree(
+                        assets / source_suffix,
+                        entry_fd,
+                        slot=slot,
+                        candidate=candidate,
+                        fault=self._check_fault,
+                        fault_prefix=f"stage-entry-{stage_name}",
+                    )
                 finally:
                     os.close(entry_fd)
             self._check_fault("stage-parent-fsync")
@@ -1921,13 +1979,12 @@ class ProviderLifecycleEngine:
             or record.seed_policy != active.seed_policy
         ):
             return False
-        return not (
-            active.record_temp_witness is not None
-            and (
-                witness is None
-                or not NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
-            )
-        )
+        if active.record_temp_witness is None:
+            return True
+        if witness is not None and NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness):
+            return True
+        original_witness = active.original_record.get("witness")
+        return original_witness == _witness_mapping(active.record_temp_witness)
 
     def _validate_running_stage(
         self,
@@ -1936,7 +1993,10 @@ class ProviderLifecycleEngine:
         candidate: CandidateIdentity | None,
         root_fd: int,
     ) -> bool:
-        status, present = stage_store.inspect(self._stage_owner(active))
+        owner = self._stage_owner(active)
+        status, present = stage_store.inspect(owner)
+        if status == "complete":
+            stage_store.ensure_durable(owner)
         if status == "absent" or stage_store.load_owner() is None:
             return False
         targets = self._observe_domains(root_fd)
@@ -2430,7 +2490,13 @@ class ProviderLifecycleEngine:
         except _InjectedFailure as failure:
             current = active_store.load() or active
             return self._partial_failure_result(request, current, failure, root_fd)
-        except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+        except (
+            _LifecycleFailure,
+            AtomicRenameUnavailable,
+            FilesystemSafetyError,
+            PrivateStateError,
+            OSError,
+        ) as failure:
             current = active_store.load() or active
             return self._partial_failure_result(request, current, failure, root_fd)
 
@@ -2444,46 +2510,76 @@ class ProviderLifecycleEngine:
         stage_store: StageStore,
         root_fd: int,
     ) -> LifecycleResult:
-        active = self._ensure_bootstrap(request, active, active_store, root_fd)
-        raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
+        active = self._execute_phase(
+            "bootstrap-container",
+            lambda: self._ensure_bootstrap(request, active, active_store, root_fd),
+        )
+        raw_record, record_witness, record, record_kind = self._execute_phase(
+            "publish-incomplete-record",
+            lambda: self._observe_record(request.target, root_fd),
+        )
         if not self._record_matches_expected(active, raw_record, record_witness, record, record_kind):
             expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-            self._write_public_record(request, active, expected_incomplete, active_store, root_fd)
-            active = active_store.load() or active
+            self._execute_phase(
+                "publish-incomplete-record",
+                lambda: self._write_public_record(request, active, expected_incomplete, active_store, root_fd),
+            )
+            active = self._execute_phase("publish-incomplete-record", lambda: active_store.load() or active)
         elif active.state == "prepared":
-            self._ensure_expected_record_durable(active, root_fd)
+            self._execute_phase(
+                "publish-incomplete-record", lambda: self._ensure_expected_record_durable(active, root_fd)
+            )
         if active.state == "prepared":
             active = replace(active, state="running")
-            self._save_active(active_store, active)
-        targets = self._observe_domains(root_fd)
+            self._execute_phase("publish-incomplete-record", lambda: self._save_active(active_store, active))
+        targets = self._execute_phase("verify-target", lambda: self._observe_domains(root_fd))
         for index, item in enumerate(targets):
-            if self._target_matches_candidate(root_fd, item.path, index, candidate):
-                continue
-            self._publish_domain(request, active, stage_store, index, candidate, root_fd, detach=False)
-        self._publish_seed(
-            request, active, root_fd, "spec-dock/.gitignore", "spec-dock-gitignore", "spec_dock/.gitignore"
+            phase = f"publish-{STAGE_ENTRY_NAMES[index]}"
+
+            def publish_domain(index: int = index, item: _ObservedTarget = item) -> None:
+                if self._target_matches_candidate(root_fd, item.path, index, candidate):
+                    self._ensure_domain_durable(root_fd, stage_store, item.path, index=index, candidate=candidate)
+                    return
+                self._publish_domain(request, active, stage_store, index, candidate, root_fd, detach=False)
+
+            self._execute_phase(phase, publish_domain)
+        self._execute_phase(
+            "create-seed-spec-dock-gitignore",
+            lambda: self._publish_seed(
+                request, active, root_fd, "spec-dock/.gitignore", "spec-dock-gitignore", "spec_dock/.gitignore"
+            ),
         )
-        self._publish_seed(
-            request,
-            active,
-            root_fd,
-            ".github/workflows/ci.yml",
-            "consumer-ci",
-            "install_root/.github/workflows/ci.yml",
+        self._execute_phase(
+            "create-seed-consumer-ci",
+            lambda: self._publish_seed(
+                request,
+                active,
+                root_fd,
+                ".github/workflows/ci.yml",
+                "consumer-ci",
+                "install_root/.github/workflows/ci.yml",
+            ),
         )
-        self._check_fault("target-verify")
-        if not all(
-            self._target_matches_candidate(root_fd, path, index, candidate)
-            for index, (_, path, _) in enumerate(FIXED_DOMAINS)
-        ):
-            raise FilesystemSafetyError("published candidate does not verify")
+
+        def verify_targets() -> None:
+            self._check_fault("target-verify")
+            if not all(
+                self._target_matches_candidate(root_fd, path, index, candidate)
+                for index, (_, path, _) in enumerate(FIXED_DOMAINS)
+            ):
+                raise FilesystemSafetyError("published candidate does not verify")
+
+        self._execute_phase("verify-target", verify_targets)
         active = replace(active, state="ready")
-        self._save_active(active_store, active)
+        self._execute_phase("publish-terminal-record", lambda: self._save_active(active_store, active))
         terminal = self._terminal_record_bytes(active)
-        self._write_public_record(request, active, terminal, active_store, root_fd)
-        active = active_store.load() or active
+        self._execute_phase(
+            "publish-terminal-record",
+            lambda: self._write_public_record(request, active, terminal, active_store, root_fd),
+        )
+        active = self._execute_phase("publish-terminal-record", lambda: active_store.load() or active)
         active = replace(active, state="terminal-cleanup")
-        self._save_active(active_store, active)
+        self._execute_phase("cleanup-stage", lambda: self._save_active(active_store, active))
         return self._finish_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
 
     def _run_uninstall_active(
@@ -2495,33 +2591,63 @@ class ProviderLifecycleEngine:
         stage_store: StageStore,
         root_fd: int,
     ) -> LifecycleResult:
-        container = self._observe_container(root_fd)
+        container = self._execute_phase("bootstrap-container", lambda: self._observe_container(root_fd))
         if container.kind != "directory":
-            raise FilesystemSafetyError("tooling container disappeared during uninstall")
-        raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
+            raise _LifecycleFailure(
+                "bootstrap-container",
+                cause=FilesystemSafetyError("tooling container disappeared during uninstall"),
+            )
+        raw_record, record_witness, record, record_kind = self._execute_phase(
+            "publish-incomplete-record",
+            lambda: self._observe_record(request.target, root_fd),
+        )
         if not self._record_matches_expected(active, raw_record, record_witness, record, record_kind):
             expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-            self._write_public_record(request, active, expected_incomplete, active_store, root_fd)
-            active = active_store.load() or active
+            self._execute_phase(
+                "publish-incomplete-record",
+                lambda: self._write_public_record(request, active, expected_incomplete, active_store, root_fd),
+            )
+            active = self._execute_phase("publish-incomplete-record", lambda: active_store.load() or active)
         elif active.state == "prepared":
-            self._ensure_expected_record_durable(active, root_fd)
+            self._execute_phase(
+                "publish-incomplete-record", lambda: self._ensure_expected_record_durable(active, root_fd)
+            )
         if active.state == "prepared":
             active = replace(active, state="running")
-            self._save_active(active_store, active)
+            self._execute_phase("publish-incomplete-record", lambda: self._save_active(active_store, active))
         for index, (_kind, _path, _source) in enumerate(FIXED_DOMAINS):
-            item = self._observe_domains(root_fd)[index]
+            phase = f"detach-{STAGE_ENTRY_NAMES[index]}"
+
+            def observe_target(index: int = index) -> _ObservedTarget:
+                return self._observe_domains(root_fd)[index]
+
+            item = self._execute_phase("verify-target", observe_target)
             if item.kind == "directory":
-                self._publish_domain(request, active, stage_store, index, None, root_fd, detach=True)
-        self._check_fault("target-verify")
-        if any(item.kind == "directory" for item in self._observe_domains(root_fd)):
-            raise FilesystemSafetyError("tooling target remained after uninstall")
+
+                def detach_domain(index: int = index) -> None:
+                    self._publish_domain(request, active, stage_store, index, None, root_fd, detach=True)
+
+                self._execute_phase(
+                    phase,
+                    detach_domain,
+                )
+
+        def verify_targets() -> None:
+            self._check_fault("target-verify")
+            if any(item.kind == "directory" for item in self._observe_domains(root_fd)):
+                raise FilesystemSafetyError("tooling target remained after uninstall")
+
+        self._execute_phase("verify-target", verify_targets)
         active = replace(active, state="ready")
-        self._save_active(active_store, active)
+        self._execute_phase("publish-terminal-record", lambda: self._save_active(active_store, active))
         terminal = self._terminal_record_bytes(active)
-        self._write_public_record(request, active, terminal, active_store, root_fd)
-        active = active_store.load() or active
+        self._execute_phase(
+            "publish-terminal-record",
+            lambda: self._write_public_record(request, active, terminal, active_store, root_fd),
+        )
+        active = self._execute_phase("publish-terminal-record", lambda: active_store.load() or active)
         active = replace(active, state="terminal-cleanup")
-        self._save_active(active_store, active)
+        self._execute_phase("cleanup-stage", lambda: self._save_active(active_store, active))
         return self._finish_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
 
     def _ensure_bootstrap(
@@ -2543,11 +2669,17 @@ class ProviderLifecycleEngine:
             )
         if container.kind == "absent":
             self._check_fault("bootstrap-container-mkdir")
-            self._check_fault("bootstrap-container-fsync")
             container_fd = _mkdir_child(root_fd, "spec-dock")
+            witness: InodeWitness | None = None
             try:
+                witness = self._filesystem().capture_inode(root_fd, "spec-dock", "directory")
+                if witness is None:
+                    raise FilesystemSafetyError("bootstrap container disappeared")
+                self._check_fault("bootstrap-container-fsync")
                 self._filesystem().fsync_directory(root_fd)
                 witness = self._filesystem().capture_inode(root_fd, "spec-dock", "directory")
+            except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+                raise self._bootstrap_rollback_failure(root_fd, witness, failure) from failure
             finally:
                 os.close(container_fd)
             if witness is None:
@@ -2555,8 +2687,107 @@ class ProviderLifecycleEngine:
             active = replace(
                 active, bootstrap_container={"disposition": "created", "witness": _witness_mapping(witness)}
             )
-            self._save_active(active_store, active)
+            try:
+                self._save_active(active_store, active)
+            except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+                raise self._bootstrap_rollback_failure(
+                    root_fd,
+                    witness,
+                    failure,
+                    active_store=active_store,
+                    original_active=replace(
+                        active, bootstrap_container={"disposition": "planned-create", "witness": None}
+                    ),
+                    created_active=active,
+                ) from failure
         return active
+
+    def _bootstrap_rollback_failure(
+        self,
+        root_fd: int,
+        expected: InodeWitness | None,
+        failure: BaseException,
+        *,
+        active_store: ActiveStateStore | None = None,
+        original_active: ActiveState | None = None,
+        created_active: ActiveState | None = None,
+    ) -> _LifecycleFailure:
+        if active_store is not None and original_active is not None and created_active is not None:
+            try:
+                self._restore_bootstrap_active(active_store, original_active, created_active, original_active)
+            except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as restore_failure:
+                try:
+                    self._restore_bootstrap_active(active_store, original_active, created_active, created_active)
+                except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as keep_failure:
+                    return _LifecycleFailure(
+                        "bootstrap-container",
+                        cause=keep_failure,
+                        bootstrap_cleanup_failed=True,
+                    )
+                return _LifecycleFailure(
+                    "bootstrap-container",
+                    cause=restore_failure,
+                    bootstrap_cleanup_failed=True,
+                )
+        try:
+            current = self._filesystem().capture_inode(root_fd, "spec-dock", "directory")
+            if current is not None:
+                if expected is None or not NativeAtomicFilesystem._same_content_identity(current, expected):
+                    raise FilesystemSafetyError("bootstrap container identity changed during rollback")
+                tree = self._filesystem().capture_domain_tree(root_fd, "spec-dock")
+                if tree.entry_count != 0:
+                    raise FilesystemSafetyError("bootstrap container is no longer empty during rollback")
+                self._filesystem().remove_tree_bound(root_fd, "spec-dock", tree)
+            self._filesystem().fsync_directory(root_fd)
+        except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as cleanup_failure:
+            if active_store is not None and original_active is not None and created_active is not None:
+                try:
+                    current = self._filesystem().capture_inode(root_fd, "spec-dock", "directory")
+                    if current is not None:
+                        if expected is None or not NativeAtomicFilesystem._same_content_identity(current, expected):
+                            raise FilesystemSafetyError("bootstrap container identity changed during recovery")
+                        self._restore_bootstrap_active(active_store, original_active, created_active, created_active)
+                except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError):
+                    pass
+            return _LifecycleFailure(
+                "bootstrap-container",
+                cause=cleanup_failure,
+                bootstrap_cleanup_failed=True,
+            )
+        return _LifecycleFailure("bootstrap-container", cause=failure, bootstrap_rolled_back=True)
+
+    @staticmethod
+    def _restore_bootstrap_active(
+        active_store: ActiveStateStore,
+        original_active: ActiveState,
+        created_active: ActiveState,
+        desired: ActiveState,
+    ) -> None:
+        current = active_store.load()
+        if current is None or current.state != "prepared":
+            raise PrivateStateForeignError("ACTIVE changed during bootstrap rollback")
+        if (
+            current.repository_key,
+            current.tuple_key,
+            current.operation_generation,
+            current.operation,
+            current.candidate_digest,
+            current.seed_policy,
+            current.result_family,
+        ) != (
+            original_active.repository_key,
+            original_active.tuple_key,
+            original_active.operation_generation,
+            original_active.operation,
+            original_active.candidate_digest,
+            original_active.seed_policy,
+            original_active.result_family,
+        ):
+            raise PrivateStateForeignError("ACTIVE changed during bootstrap rollback")
+        if current.bootstrap_container not in (original_active.bootstrap_container, created_active.bootstrap_container):
+            raise PrivateStateForeignError("ACTIVE changed during bootstrap rollback")
+        active_store.save(desired)
+        active_store.ensure_durable()
 
     def _terminal_record_bytes(self, active: ActiveState) -> bytes:
         state = "tooling-absent-preserved-data" if active.operation == "uninstall" else "ready"
@@ -2579,11 +2810,24 @@ class ProviderLifecycleEngine:
         active_store: ActiveStateStore,
         root_fd: int,
     ) -> None:
-        for point in ("record-temp-open", "record-temp-write", "record-temp-fsync"):
-            self._check_fault(point)
-        witness = active_store.write_record_temp(payload)
-        self._save_active(active_store, replace(active, record_temp_witness=witness))
-        self._check_fault("record-temp-parent-fsync")
+        witness = active_store.write_record_temp(payload, fault=self._check_fault)
+        try:
+            self._save_active(active_store, replace(active, record_temp_witness=witness))
+        except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+            namespace_fd = active_store._open_namespace()
+            try:
+                current = self._filesystem().capture_inode(namespace_fd, RECORD_TEMP_NAME, "regular")
+                if current is None or not NativeAtomicFilesystem._same_content_identity(current, witness):
+                    raise PrivateStateForeignError("RECORD-TEMP changed before witness rollback")
+                self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, witness)
+                self._filesystem().fsync_directory(namespace_fd)
+            except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as cleanup_failure:
+                raise PrivateStateError(
+                    "RECORD-TEMP cleanup failed after ACTIVE publication error"
+                ) from cleanup_failure
+            finally:
+                os.close(namespace_fd)
+            raise failure
         namespace_fd = active_store._open_namespace()
         specdock_fd = _open_path(root_fd, ("spec-dock",), create=True)
         filesystem = self._filesystem()
@@ -2608,19 +2852,26 @@ class ProviderLifecycleEngine:
                     RECORD_TEMP_NAME,
                     specdock_fd,
                     "spec-dock.version",
+                    expected_source=witness,
                     expected_destination=old_witness,
                 )
                 residue_raw, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
                 if not NativeAtomicFilesystem._same_content_identity(residue_witness, old_witness):
                     filesystem.exchange(namespace_fd, RECORD_TEMP_NAME, specdock_fd, "spec-dock.version")
                     raise PrivateStateForeignError("public record exchange residue is foreign")
+                active = replace(active, record_temp_witness=residue_witness)
+                self._save_active(active_store, active)
                 self._check_fault("record-exchange-residue-unlink")
                 filesystem.unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
                 del residue_raw
             self._check_fault("record-parent-fsync")
             filesystem.fsync_directory(specdock_fd)
             current_raw, current_witness = _read_regular(specdock_fd, "spec-dock.version")
-            if current_raw != payload or current_witness.mode != 0o644:
+            if (
+                current_raw != payload
+                or current_witness.mode != 0o644
+                or not NativeAtomicFilesystem._same_content_identity(current_witness, witness)
+            ):
                 raise FilesystemSafetyError("public record postcondition failed")
             del old_raw
         finally:
@@ -2637,9 +2888,11 @@ class ProviderLifecycleEngine:
             current, witness = _read_regular(specdock_fd, "spec-dock.version")
         finally:
             os.close(specdock_fd)
-        if current != expected or (
-            active.record_temp_witness is not None
-            and not NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
+        if current != expected:
+            raise PrivateStateForeignError("expected incomplete record changed before re-entry")
+        if active.record_temp_witness is not None and not (
+            NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
+            or active.original_record.get("witness") == _witness_mapping(active.record_temp_witness)
         ):
             raise PrivateStateForeignError("expected incomplete record changed before re-entry")
 
@@ -2699,6 +2952,7 @@ class ProviderLifecycleEngine:
         if detach:
             observed = self._observe_target(root_fd, path, expect_tree=True)
             if observed.kind != "directory":
+                self._ensure_domain_durable(root_fd, stage_store, path, expected_absent=True)
                 return
         destination_parent = _open_path(root_fd, components[:-1], create=not detach)
         stage_fd = stage_store._stage_fd()
@@ -2726,17 +2980,31 @@ class ProviderLifecycleEngine:
                 if candidate is None:
                     raise CandidateError("candidate is required for publication")
                 if self._target_matches_candidate(root_fd, path, index, candidate):
+                    self._ensure_domain_durable(root_fd, stage_store, path, index=index, candidate=candidate)
                     return
                 if target.kind == "absent":
-                    filesystem.rename_no_replace(stage_fd, name, destination_parent, components[-1])
+                    source_witness = filesystem.capture_inode(stage_fd, name, "directory")
+                    if source_witness is None:
+                        raise FilesystemSafetyError(f"missing stage source witness at {name}")
+                    filesystem.rename_no_replace(
+                        stage_fd,
+                        name,
+                        destination_parent,
+                        components[-1],
+                        expected_source=source_witness,
+                    )
                 elif target.kind == "directory":
                     if target.witness is None:
                         raise FilesystemSafetyError(f"missing fixed target witness at {path}")
+                    source_witness = filesystem.capture_inode(stage_fd, name, "directory")
+                    if source_witness is None:
+                        raise FilesystemSafetyError(f"missing stage source witness at {name}")
                     filesystem.exchange(
                         stage_fd,
                         name,
                         destination_parent,
                         components[-1],
+                        expected_source=source_witness,
                         expected_destination=target.witness,
                     )
                 else:
@@ -2748,6 +3016,35 @@ class ProviderLifecycleEngine:
         finally:
             os.close(stage_fd)
             os.close(destination_parent)
+
+    def _ensure_domain_durable(
+        self,
+        root_fd: int,
+        stage_store: StageStore,
+        path: str,
+        *,
+        index: int | None = None,
+        candidate: CandidateIdentity | None = None,
+        expected_absent: bool = False,
+    ) -> None:
+        """Re-fsync both sides of a visible domain transition before reuse."""
+
+        components = _target_components(path)
+        destination_parent = _open_path(root_fd, components[:-1])
+        stage_fd = stage_store._stage_fd()
+        try:
+            self._filesystem().fsync_directory(stage_fd)
+            self._filesystem().fsync_directory(destination_parent)
+        finally:
+            os.close(stage_fd)
+            os.close(destination_parent)
+        current = self._observe_target(root_fd, path, expect_tree=True)
+        if expected_absent:
+            if current.kind != "absent":
+                raise FilesystemSafetyError(f"domain {path} changed during durability repair")
+            return
+        if candidate is None or index is None or not self._target_matches_candidate(root_fd, path, index, candidate):
+            raise FilesystemSafetyError(f"domain {path} changed during durability repair")
 
     def _publish_seed(
         self,
@@ -2762,6 +3059,7 @@ class ProviderLifecycleEngine:
         if item.kind == "symlink" or item.kind == "other" or item.kind == "directory":
             raise FilesystemSafetyError(f"unsafe seed type at {public_path}")
         if item.kind == "regular":
+            self._ensure_seed_durable(root_fd, public_path)
             return
         if item.kind == "absent" and active.seed_policy != "create-if-absent":
             return
@@ -2803,11 +3101,24 @@ class ProviderLifecycleEngine:
                 pass
             self._check_fault(f"seed-{seed_name}-parent-fsync")
             self._filesystem().fsync_directory(parent_fd)
+            current = self._observe_target(root_fd, public_path, expect_tree=False)
+            if current.kind not in {"regular"}:
+                raise FilesystemSafetyError(f"seed {public_path} changed after publication")
         finally:
             if destination_fd >= 0:
                 os.close(destination_fd)
             os.close(source_fd)
             os.close(parent_fd)
+
+    def _ensure_seed_durable(self, root_fd: int, public_path: str) -> None:
+        components = _target_components(public_path)
+        parent_fd = _open_path(root_fd, components[:-1])
+        try:
+            self._filesystem().fsync_directory(parent_fd)
+        finally:
+            os.close(parent_fd)
+        if self._observe_target(root_fd, public_path, expect_tree=False).kind != "regular":
+            raise FilesystemSafetyError(f"seed {public_path} changed during durability repair")
 
     def _finish_cleanup(
         self,
@@ -2851,6 +3162,7 @@ class ProviderLifecycleEngine:
             finally:
                 os.close(namespace_fd)
         except (
+            _LifecycleFailure,
             AtomicRenameUnavailable,
             FilesystemSafetyError,
             PrivateStateError,
@@ -2997,6 +3309,37 @@ class ProviderLifecycleEngine:
         if active.state == "prepared" and phase == "cleanup-stage" and point.startswith("active-"):
             phase = "publish-incomplete-record"
         if phase == "bootstrap-container":
+            if getattr(failure, "bootstrap_rolled_back", False):
+                return self._blocked(
+                    request,
+                    "bootstrap-container-conflict",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    phase="bootstrap-container",
+                    last_completed_phase="candidate-staging",
+                    bootstrap_rolled_back=True,
+                )
+            if getattr(failure, "bootstrap_cleanup_failed", False):
+                retry = self._retry_for(request, active.operation, active.seed_policy)
+                bootstrap_actions = (LifecycleAction("spec-dock", "container", "failed", "fresh-container-create"),)
+                failed_paths, pending_paths = _action_path_sets(bootstrap_actions)
+                return build_public_result(
+                    request,
+                    status="partial_failure",
+                    code="bootstrap-cleanup-failed",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    mutation_started=True,
+                    phase="bootstrap-container",
+                    last_completed_phase="candidate-staging",
+                    retry_command=retry,
+                    continuation=_lifecycle_continuation(retry) if retry is not None else _empty_continuation(),
+                    failed_paths=failed_paths,
+                    pending_paths=pending_paths,
+                    actions=bootstrap_actions,
+                )
             return self._preparation_failure(
                 request,
                 active.operation,
@@ -3113,6 +3456,8 @@ class ProviderLifecycleEngine:
 
     @staticmethod
     def _phase_for_fault(point: str, operation: str) -> str:
+        if point in PHASES:
+            return point
         if not point:
             return "publish-incomplete-record"
         if point.startswith("bootstrap"):
@@ -3218,6 +3563,11 @@ class ProviderLifecycleEngine:
         terminal_record_digest: str,
     ) -> bool:
         try:
+            specdock_fd = _open_path(root_fd, ("spec-dock",))
+            try:
+                self._filesystem().fsync_directory(specdock_fd)
+            finally:
+                os.close(specdock_fd)
             raw, _witness, record, record_kind = self._observe_record("", root_fd)
         except (FilesystemSafetyError, OSError, ValueError, WireValidationError):
             return False
@@ -3264,19 +3614,6 @@ class ProviderLifecycleEngine:
                     _InjectedFailure,
                 ) as failure:
                     return self._terminal_cleanup_failure(request, active, failure)
-        elif capture_desired and active.deferred_invocation is None:
-            active = replace(active, deferred_invocation=_desired_invocation(request, force=force))
-            try:
-                self._save_active(active_store, active)
-            except (
-                AtomicRenameUnavailable,
-                FilesystemSafetyError,
-                PrivateStateError,
-                OSError,
-                _InjectedFailure,
-            ) as failure:
-                return self._terminal_cleanup_failure(request, active, failure)
-
         try:
             if not self._terminal_record_matches(
                 root_fd,
@@ -3315,6 +3652,9 @@ class ProviderLifecycleEngine:
                 terminal_record_digest=receipt.terminal_record_digest,
             ):
                 return self._blocked(request, "invalid-request")
+            if receipt is None and capture_desired and active.deferred_invocation is None:
+                active = replace(active, deferred_invocation=_desired_invocation(request, force=force))
+                self._save_active(active_store, active)
             if active.state == "ready":
                 active = replace(active, state="terminal-cleanup")
                 self._save_active(active_store, active)
@@ -3445,8 +3785,14 @@ class ProviderLifecycleEngine:
             return self._blocked(request, "lifecycle-preparation-failed")
         try:
             if active.state == "prepared":
-                self._prepare_stage(stage_store, active, candidate, root_fd)
-            elif not self._validate_running_stage(stage_store, active, candidate, root_fd):
+                self._execute_phase(
+                    "candidate-staging",
+                    lambda: self._prepare_stage(stage_store, active, candidate, root_fd),
+                )
+            elif not self._execute_phase(
+                "candidate-staging",
+                lambda: self._validate_running_stage(stage_store, active, candidate, root_fd),
+            ):
                 return self._blocked(
                     request,
                     "stage-owner-mismatch",

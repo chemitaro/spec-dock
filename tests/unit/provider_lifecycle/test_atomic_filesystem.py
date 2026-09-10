@@ -8,12 +8,15 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from spec_dock.provider_lifecycle.contracts import LifecycleRequest
+from spec_dock.provider_lifecycle.engine import ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.filesystem import (
     AtomicRenameUnavailable,
     LinuxRenameAt2Adapter,
     MacOSRenameAtXAdapter,
     NativeAtomicFilesystem,
 )
+from spec_dock.provider_lifecycle.wire import serialize_public_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -83,3 +86,31 @@ def test_t05_descriptor_relative_tree_removal_does_not_follow_links(tmp_path: Pa
         assert any(entry.kind == "symlink" for entry in captured.entries)
         filesystem.remove_tree_bound(bound.fd, "tree", captured)
     assert outside.read_text(encoding="utf-8") == "keep\n"
+
+
+def test_t08_unavailable_native_capability_is_closed_before_repository_observation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "unavailable-native").resolve()
+    workspace.mkdir()
+    monkeypatch.setattr(
+        NativeAtomicFilesystem,
+        "_current_adapter",
+        staticmethod(lambda: (_ for _ in ()).throw(AtomicRenameUnavailable("native primitive unavailable"))),
+    )
+    request = LifecycleRequest(
+        str(workspace),
+        "apply",
+        True,
+        operation="install",
+        seed_policy="create-if-absent",
+    )
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "atomic-rename-unavailable"
+    assert result.operation == "install"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "create-if-absent"
+    assert result.mutation_started is False
+    assert tuple(workspace.iterdir()) == ()

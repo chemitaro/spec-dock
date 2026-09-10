@@ -972,6 +972,7 @@ class _PrivateStore:
                     namespace_fd,
                     name,
                     expected_source=temporary_witness,
+                    expected_destination=expected_existing,
                 )
                 old = filesystem.capture_inode(namespace_fd, temporary, "regular")
                 if old is None or not NativeAtomicFilesystem._same_content_identity(old, expected_existing):
@@ -986,6 +987,9 @@ class _PrivateStore:
             if fault is not None and fault_prefix is not None:
                 fault(f"{fault_prefix}-parent-fsync")
             filesystem.fsync_directory(namespace_fd)
+            durable = self._read_bound_witness(namespace_fd, name, mode, maximum=maximum)
+            if durable is None or not NativeAtomicFilesystem._same_content_identity(durable, temporary_witness):
+                raise PrivateStateForeignError(f"private object {name} changed after publication")
         finally:
             if temporary_fd >= 0:
                 os.close(temporary_fd)
@@ -1038,6 +1042,24 @@ class _PrivateStore:
         namespace_fd = self._open_namespace()
         try:
             return self._read_bound_witness(namespace_fd, self.filename, self.mode, maximum=self.maximum)
+        finally:
+            os.close(namespace_fd)
+
+    def ensure_durable(self, expected: InodeWitness | None = None) -> InodeWitness | None:
+        """Re-establish namespace-entry durability before trusting visible state."""
+
+        namespace_fd = self._open_namespace()
+        try:
+            current = self._read_bound_witness(namespace_fd, self.filename, self.mode, maximum=self.maximum)
+            if expected is not None and current != expected:
+                raise PrivateStateForeignError(f"private object {self.filename} changed before durability repair")
+            os.fsync(namespace_fd)
+            durable = self._read_bound_witness(namespace_fd, self.filename, self.mode, maximum=self.maximum)
+            if expected is not None and durable != expected:
+                raise PrivateStateForeignError(f"private object {self.filename} changed during durability repair")
+            if current != durable:
+                raise PrivateStateForeignError(f"private object {self.filename} changed during durability repair")
+            return durable
         finally:
             os.close(namespace_fd)
 
@@ -1352,20 +1374,29 @@ class ActiveStateStore(_PrivateStore):
 
     write = save
 
-    def write_record_temp(self, payload: bytes) -> InodeWitness:
+    def write_record_temp(
+        self,
+        payload: bytes,
+        *,
+        fault: Callable[[str], None] | None = None,
+    ) -> InodeWitness:
         record = parse_installation_record(payload)
         canonical = serialize_installation_record(record)
         if payload != canonical:
             raise PrivateStateError("RECORD-TEMP must contain canonical public record bytes")
         namespace_fd = self._open_namespace()
+        created_temp = False
         try:
             try:
+                if fault is not None:
+                    fault("record-temp-open")
                 fd = os.open(
                     RECORD_TEMP_NAME,
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
                     RECORD_TEMP_MODE,
                     dir_fd=namespace_fd,
                 )
+                created_temp = True
             except FileExistsError:
                 existing = self._read_bound_witness(
                     namespace_fd,
@@ -1374,23 +1405,56 @@ class ActiveStateStore(_PrivateStore):
                     maximum=4096,
                 )
                 active = self.load()
-                if (
-                    existing is None
-                    or active is None
-                    or active.record_temp_witness is None
-                    or active.record_temp_witness != existing
-                    or self._read_bytes(RECORD_TEMP_NAME, 4096, RECORD_TEMP_MODE) != payload
+                existing_payload = (
+                    None
+                    if existing is None
+                    else self._read_bound_bytes(
+                        namespace_fd,
+                        RECORD_TEMP_NAME,
+                        RECORD_TEMP_MODE,
+                        maximum=4096,
+                        expected=existing,
+                    )
+                )
+                if existing is None or active is None:
+                    raise PrivateStateForeignError("existing RECORD-TEMP is not the expected public record") from None
+                if existing_payload == payload and active.record_temp_witness == existing:
+                    if fault is not None:
+                        fault("record-temp-parent-fsync")
+                    os.fsync(namespace_fd)
+                    return existing
+                original = active.original_record
+                original_payload = original.get("bytes_base64")
+                original_witness = original.get("witness")
+                if not (
+                    isinstance(original_payload, str)
+                    and original_witness == _inode_mapping(existing)
+                    and existing_payload == base64.b64decode(original_payload)
                 ):
                     raise PrivateStateForeignError("existing RECORD-TEMP is not the expected public record") from None
-                return existing
+                NativeAtomicFilesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, existing)
+                os.fsync(namespace_fd)
+                fd = os.open(
+                    RECORD_TEMP_NAME,
+                    os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
+                    RECORD_TEMP_MODE,
+                    dir_fd=namespace_fd,
+                )
+                created_temp = True
             try:
+                if fault is not None:
+                    fault("record-temp-write")
                 cursor = 0
                 while cursor < len(payload):
                     cursor += os.write(fd, payload[cursor:])
                 os.fchmod(fd, RECORD_TEMP_MODE)
+                if fault is not None:
+                    fault("record-temp-fsync")
                 os.fsync(fd)
             finally:
                 os.close(fd)
+            if fault is not None:
+                fault("record-temp-parent-fsync")
             os.fsync(namespace_fd)
             witness = self._read_bound_witness(
                 namespace_fd,
@@ -1401,6 +1465,21 @@ class ActiveStateStore(_PrivateStore):
             if witness is None:
                 raise PrivateStateError("RECORD-TEMP disappeared after publication")
             return witness
+        except BaseException as failure:
+            if created_temp:
+                try:
+                    residue = self._read_bound_witness(
+                        namespace_fd,
+                        RECORD_TEMP_NAME,
+                        RECORD_TEMP_MODE,
+                        maximum=4096,
+                    )
+                    if residue is not None:
+                        NativeAtomicFilesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue)
+                        os.fsync(namespace_fd)
+                except BaseException as cleanup_failure:
+                    raise PrivateStateError("RECORD-TEMP cleanup failed after publication error") from cleanup_failure
+            raise failure
         finally:
             os.close(namespace_fd)
 
@@ -1493,14 +1572,20 @@ class StageStore:
             repository_root=self.repository_root,
         )._open_namespace()
 
-    def _ensure_stage(self) -> None:
+    def _ensure_stage(self, fault: Callable[[str], None] | None = None) -> None:
         namespace_fd = self._namespace_fd()
         try:
             try:
-                os.mkdir(STAGE_NAME, PRIVATE_DIRECTORY_MODE, dir_fd=namespace_fd)
-                os.fsync(namespace_fd)
-            except FileExistsError:
-                pass
+                os.stat(STAGE_NAME, dir_fd=namespace_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                if fault is not None:
+                    fault("stage-mkdir")
+                try:
+                    os.mkdir(STAGE_NAME, PRIVATE_DIRECTORY_MODE, dir_fd=namespace_fd)
+                except FileExistsError:
+                    pass
+                else:
+                    os.fsync(namespace_fd)
             stage_fd = os.open(
                 STAGE_NAME,
                 os.O_RDONLY
@@ -1610,21 +1695,28 @@ class StageStore:
             raise PrivateStateError("durable ACTIVE must precede stage writes")
         return active
 
-    def save_owner(self, owner: StageOwner) -> None:
+    def save_owner(self, owner: StageOwner, *, fault: Callable[[str], None] | None = None) -> None:
         self._require_prepared_active()
-        self._ensure_stage()
+        self._ensure_stage(fault)
         value = _owner_mapping(owner)
         parsed = _parse_owner(value)
         existing_owner = self.load_owner()
         if existing_owner is not None:
             if existing_owner != parsed:
                 raise PrivateStateForeignError("STAGE-OWNER.json belongs to another operation")
+            stage_fd = self._stage_fd()
+            try:
+                os.fsync(stage_fd)
+            finally:
+                os.close(stage_fd)
             return
         payload = _json_bytes(_owner_mapping(parsed))
         if len(payload) > 8192:
             raise PrivateStateError("STAGE-OWNER is oversized")
         stage_fd = self._stage_fd()
         try:
+            if fault is not None:
+                fault("stage-owner-write")
             fd = os.open(
                 STAGE_OWNER_NAME,
                 os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
@@ -1635,6 +1727,8 @@ class StageStore:
                 cursor = 0
                 while cursor < len(payload):
                     cursor += os.write(fd, payload[cursor:])
+                if fault is not None:
+                    fault("stage-owner-fsync")
                 os.fsync(fd)
             finally:
                 os.close(fd)
@@ -1653,9 +1747,14 @@ class StageStore:
         except FileNotFoundError:
             return False
 
-    def ensure_registered_entries(self, names: Sequence[str] = STAGE_ENTRY_NAMES) -> None:
+    def ensure_registered_entries(
+        self,
+        names: Sequence[str] = STAGE_ENTRY_NAMES,
+        *,
+        fault: Callable[[str], None] | None = None,
+    ) -> None:
         self._require_prepared_active()
-        self._ensure_stage()
+        self._ensure_stage(fault)
         if any(name not in STAGE_ENTRY_NAMES for name in names):
             raise PrivateStateError("stage rebuild attempted an unregistered entry")
         stage_fd = self._stage_fd()
@@ -1676,6 +1775,17 @@ class StageStore:
             os.fsync(stage_fd)
         finally:
             os.close(stage_fd)
+
+    def ensure_durable(self, owner: StageOwner) -> None:
+        """Re-fsync a complete stage before reusing it after an interrupted I/O."""
+
+        self.require_valid(owner)
+        stage_fd = self._stage_fd()
+        try:
+            os.fsync(stage_fd)
+        finally:
+            os.close(stage_fd)
+        self.require_valid(owner)
 
     def reuse_if_valid(self, owner: StageOwner) -> bool:
         current = self.load_owner()
