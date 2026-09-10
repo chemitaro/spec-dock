@@ -201,6 +201,13 @@ def test_t06_record_temp_witness_failure_cleans_unbound_temp_before_retry(tmp_pa
     assert active is not None
     assert active.record_temp_witness is None
     assert not (namespace / "RECORD-TEMP").exists()
+    before_cleanup_attempt = _workspace_snapshot(workspace)
+    rejected_cleanup = ProviderLifecycleEngine().execute(request, force=True, cleanup_token=active.cleanup_token)
+    serialize_public_result(rejected_cleanup)
+    assert rejected_cleanup.status == "error"
+    assert rejected_cleanup.code == "invalid-request"
+    assert rejected_cleanup.mutation_started is False
+    assert _workspace_snapshot(workspace) == before_cleanup_attempt
     resumed = ProviderLifecycleEngine().execute(request, force=True)
     assert resumed.status == "completed"
 

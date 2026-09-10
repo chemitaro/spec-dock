@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spec_dock.provider_lifecycle.contracts import ActiveState, CompletionReceipt, InstallationRecord, StageOwner
+import spec_dock.provider_lifecycle.private_state as private_state
 from spec_dock.provider_lifecycle.private_state import (
     ActiveStateStore,
     CompletionReceiptStore,
@@ -181,6 +182,29 @@ def test_t04_private_namespace_reopens_only_with_a_validated_full_chain(tmp_path
     with pytest.raises(PrivateStateForeignError, match="private directory binding is unsafe"):
         active_store.load()
     assert ((namespace / "ACTIVE.json").read_bytes(), os.lstat(namespace / "ACTIVE.json").st_ino) == before
+
+
+def test_t04_private_namespace_reentry_reestablishes_parent_durability_after_fsync_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    failed = False
+    real_fsync = os.fsync
+
+    def fail_once(fd: int) -> None:
+        nonlocal failed
+        if not failed:
+            failed = True
+            raise OSError("private parent fsync failed")
+        real_fsync(fd)
+
+    monkeypatch.setattr(private_state.os, "fsync", fail_once)
+    with pytest.raises(PrivateStateError, match="cannot persist private directory"):
+        resolve_private_namespace(repository)
+
+    monkeypatch.setattr(private_state.os, "fsync", real_fsync)
+    assert resolve_private_namespace(repository).is_dir()
 
 
 def test_t04_private_modes_and_record_temp_exception_are_exact(tmp_path: Path) -> None:

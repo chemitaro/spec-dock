@@ -9,6 +9,7 @@ import hashlib
 import os
 from pathlib import Path
 import posixpath
+import secrets
 import stat
 from typing import TYPE_CHECKING, Protocol
 
@@ -339,6 +340,26 @@ class NativeAtomicFilesystem:
     def fsync_directory(self, fd: int) -> None:
         self._ensure_directory_fd(fd)
         os.fsync(fd)
+
+    def probe_native_capability(self, parent_fd: int) -> None:
+        """Verify both native atomic primitives without creating any entries."""
+
+        self._ensure_directory_fd(parent_fd)
+        token = secrets.token_hex(16)
+        for operation in ("rename_no_replace", "exchange"):
+            source = f".spec-dock-native-probe-{token}-{operation}-source"
+            destination = f".spec-dock-native-probe-{token}-{operation}-destination"
+            try:
+                if operation == "rename_no_replace":
+                    self.adapter.rename_no_replace(parent_fd, source, parent_fd, destination)
+                else:
+                    self.adapter.exchange(parent_fd, source, parent_fd, destination)
+            except AtomicRenameUnavailable:
+                raise
+            except OSError as error:
+                if error.errno == errno.ENOENT:
+                    continue
+                raise FilesystemSafetyError("native atomic capability probe failed") from error
 
     @staticmethod
     def _same_inode(left: os.stat_result, right: os.stat_result) -> bool:

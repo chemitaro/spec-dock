@@ -820,9 +820,15 @@ class ProviderLifecycleEngine:
     def _execute_phase(self, phase: str, callback: Callable[[], _PhaseResult]) -> _PhaseResult:
         try:
             return callback()
-        except (_InjectedFailure, _AdmissionFailure, PrivateStateForeignError, _LifecycleFailure):
+        except (
+            _InjectedFailure,
+            _AdmissionFailure,
+            PrivateStateForeignError,
+            _LifecycleFailure,
+            AtomicRenameUnavailable,
+        ):
             raise
-        except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+        except (FilesystemSafetyError, PrivateStateError, OSError) as failure:
             raise _LifecycleFailure(phase, cause=failure) from failure
 
     def _filesystem(self) -> NativeAtomicFilesystem:
@@ -965,8 +971,28 @@ class ProviderLifecycleEngine:
             ):
                 return self._blocked(request, "unsafe-repository-binding")
             try:
+                filesystem.probe_native_capability(bound.fd)
+            except AtomicRenameUnavailable:
+                return self._blocked(
+                    request,
+                    "atomic-rename-unavailable",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                )
+            except (FilesystemSafetyError, OSError):
+                return self._blocked(request, "unsafe-repository-binding")
+            try:
                 namespace = self._namespace_for(request.target, lease)
                 active_store, receipt_store, stage_store = self._stores(namespace, request.apply, request.target)
+            except AtomicRenameUnavailable:
+                return self._blocked(
+                    request,
+                    "atomic-rename-unavailable",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                )
             except PrivateStateForeignError:
                 return self._blocked(request, "stage-owner-mismatch")
             except (PrivateStateError, OSError, _InjectedFailure):
@@ -980,6 +1006,14 @@ class ProviderLifecycleEngine:
                 if receipt is not None and receipt_store is not None:
                     receipt_store.ensure_durable()
                     receipt = receipt_store.load()
+            except AtomicRenameUnavailable:
+                return self._blocked(
+                    request,
+                    "atomic-rename-unavailable",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                )
             except PrivateStateForeignError:
                 return self._blocked(request, "stage-owner-mismatch")
             except (PrivateStateError, OSError):
@@ -1020,6 +1054,8 @@ class ProviderLifecycleEngine:
                     )
 
             if cleanup_token is not None:
+                if active is not None and active.state not in {"ready", "terminal-cleanup"}:
+                    return self.invalid_request(request)
                 return self._cleanup_retry_or_replay(
                     request,
                     cleanup_token,
@@ -1096,7 +1132,15 @@ class ProviderLifecycleEngine:
                 )
             except _AdmissionFailure as failure:
                 return self._admission_result(request, failure)
-            except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
+            except AtomicRenameUnavailable:
+                return self._blocked(
+                    request,
+                    "atomic-rename-unavailable",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                )
+            except (FilesystemSafetyError, PrivateStateError, OSError) as failure:
                 return self._preparation_failure(
                     request,
                     operation,
@@ -1597,13 +1641,7 @@ class ProviderLifecycleEngine:
                 phase="candidate-staging",
                 last_completed_phase="preflight",
             )
-        except (
-            _LifecycleFailure,
-            AtomicRenameUnavailable,
-            FilesystemSafetyError,
-            PrivateStateError,
-            OSError,
-        ) as failure:
+        except (_LifecycleFailure, FilesystemSafetyError, PrivateStateError, OSError) as failure:
             current = active_store.load()
             if current is None:
                 digest = (
@@ -2855,15 +2893,13 @@ class ProviderLifecycleEngine:
                     expected_source=witness,
                     expected_destination=old_witness,
                 )
-                residue_raw, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
+                _, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
                 if not NativeAtomicFilesystem._same_content_identity(residue_witness, old_witness):
-                    filesystem.exchange(namespace_fd, RECORD_TEMP_NAME, specdock_fd, "spec-dock.version")
                     raise PrivateStateForeignError("public record exchange residue is foreign")
                 active = replace(active, record_temp_witness=residue_witness)
                 self._save_active(active_store, active)
                 self._check_fault("record-exchange-residue-unlink")
                 filesystem.unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
-                del residue_raw
             self._check_fault("record-parent-fsync")
             filesystem.fsync_directory(specdock_fd)
             current_raw, current_witness = _read_regular(specdock_fd, "spec-dock.version")
@@ -3500,6 +3536,8 @@ class ProviderLifecycleEngine:
         force: bool | None,
     ) -> LifecycleResult:
         if active is not None:
+            if active.state not in {"ready", "terminal-cleanup"}:
+                return self.invalid_request(request)
             if active.cleanup_token != token or not _cleanup_request_matches(
                 request,
                 force=force,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import errno
 import inspect
 import os
 import stat
@@ -17,6 +18,21 @@ from spec_dock.provider_lifecycle.filesystem import (
     NativeAtomicFilesystem,
 )
 from spec_dock.provider_lifecycle.wire import serialize_public_result
+
+
+class _UnavailableAfterProbe:
+    def __init__(self) -> None:
+        self.exchange_calls = 0
+
+    def rename_no_replace(self, *_args: object) -> None:
+        raise OSError(errno.ENOENT, "probe source is absent")
+
+    def exchange(self, *_args: object) -> None:
+        self.exchange_calls += 1
+        if self.exchange_calls == 1:
+            raise OSError(errno.ENOENT, "probe source is absent")
+        raise AtomicRenameUnavailable("native primitive became unavailable")
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -114,3 +130,38 @@ def test_t08_unavailable_native_capability_is_closed_before_repository_observati
     assert result.seed_policy == "create-if-absent"
     assert result.mutation_started is False
     assert tuple(workspace.iterdir()) == ()
+
+
+def test_t08_runtime_native_capability_failure_uses_preparation_wire_row(tmp_path: Path) -> None:
+    workspace = (tmp_path / "runtime-unavailable-native").resolve()
+    workspace.mkdir()
+    install = LifecycleRequest(
+        str(workspace),
+        "apply",
+        True,
+        operation="install",
+        seed_policy="create-if-absent",
+    )
+    assert ProviderLifecycleEngine().execute(install, force=True).status == "completed"
+
+    update = LifecycleRequest(
+        str(workspace),
+        "apply",
+        True,
+        operation="update",
+        seed_policy="preserve-only",
+    )
+    adapter = _UnavailableAfterProbe()
+    result = ProviderLifecycleEngine(filesystem=NativeAtomicFilesystem(adapter=adapter)).execute(update)
+
+    serialize_public_result(result)
+    assert adapter.exchange_calls == 2
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert result.operation == "update"
+    assert result.candidate_digest is not None
+    assert result.seed_policy == "preserve-only"
+    assert result.mutation_started is False
+    assert result.phase == "publish-incomplete-record"
+    assert result.last_completed_phase == "candidate-staging"
+    assert result.retry_command == f"spec-dock update -- {workspace}"

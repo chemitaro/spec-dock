@@ -40,6 +40,27 @@ def _wait_for(path: Path, process: subprocess.Popen[str], *, timeout: float = 5.
 
 
 class TestProviderLifecycleHandoff(CliRuntimeHarness):
+    def test_t11_frozen_bootstrap_rejects_visible_root_replacement(self, tmp_path: Path) -> None:
+        script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
+        loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap_visible_binding", str(script))
+        spec = importlib.util.spec_from_loader(loader.name, loader)
+        assert spec is not None
+        module = importlib.util.module_from_spec(spec)
+        loader.exec_module(module)
+
+        root = tmp_path / "root"
+        root.mkdir()
+        root_fd = os.open(root, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            expected = os.fstat(root_fd)
+            moved = tmp_path / "moved-root"
+            root.rename(moved)
+            root.mkdir()
+            with pytest.raises(module._UnsafeBindingError, match="repository root binding changed"):
+                module._validate_visible_root(str(root), expected)
+        finally:
+            os.close(root_fd)
+
     def test_t11_consumer_hook_parent_io_failure_is_detection_failure_with_exit_zero(
         self, monkeypatch, capsys, tmp_path: Path
     ) -> None:

@@ -146,6 +146,19 @@ def _open_absolute_directory(path: str) -> int:
         raise
 
 
+def _validate_visible_root(path: str, expected: os.stat_result) -> None:
+    try:
+        visible = os.stat(path, follow_symlinks=False)
+    except OSError as error:
+        raise _UnsafeBindingError("repository root binding changed") from error
+    if (
+        not stat.S_ISDIR(visible.st_mode)
+        or visible.st_dev != expected.st_dev
+        or visible.st_ino != expected.st_ino
+    ):
+        raise _UnsafeBindingError("repository root binding changed")
+
+
 def _open_directory(base_fd: int, components: tuple[str, ...]) -> int:
     try:
         current = os.dup(base_fd)
@@ -359,9 +372,9 @@ def _acquire_shared_lease(root_fd: int) -> None:
 def _bind_process_cwd(fd: int) -> Path:
     try:
         os.fchdir(fd)
+        return Path.cwd()
     except OSError as error:
         raise _UnsafeBindingError("repository descriptor path is unavailable") from error
-    return Path(".")
 
 
 def _emit(text: object) -> None:
@@ -603,6 +616,7 @@ def main() -> int:
                 raise _UnsafeBindingError("repository root binding changed") from error
             if (before.st_dev, before.st_ino) != (after.st_dev, after.st_ino):
                 raise _UnsafeBindingError("repository root binding changed")
+            _validate_visible_root(repo_root, before)
             specdock_fd = _open_directory(root_fd, ("spec-dock",))
             candidate_digest = _validate_ready_record(specdock_fd)
             _close(specdock_fd)
@@ -627,15 +641,15 @@ def main() -> int:
             _emit_bootstrap_error("runtime-installation-not-ready")
             return 1
 
-        _bind_process_cwd(root_fd)
-        scripts_dir = Path("spec-dock") / "scripts"
+        bound_repo_root = _bind_process_cwd(root_fd)
+        scripts_dir = bound_repo_root / "spec-dock" / "scripts"
         sys.path.insert(0, str(scripts_dir))
         from spec_dock_runtime.app import run
         from spec_dock_runtime.cli.bootstrap import build_runtime
 
         context = build_runtime(
-            repo_root_path / "spec-dock",
-            repo_root=repo_root_path,
+            bound_repo_root / "spec-dock",
+            repo_root=bound_repo_root,
             repo_root_fd=root_fd,
             repo_root_binding=(before.st_dev, before.st_ino),
         )

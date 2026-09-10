@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 from collections.abc import Mapping
+import contextlib
 import hashlib
 import json
 import os
@@ -976,12 +977,6 @@ class _PrivateStore:
                 )
                 old = filesystem.capture_inode(namespace_fd, temporary, "regular")
                 if old is None or not NativeAtomicFilesystem._same_content_identity(old, expected_existing):
-                    if old is not None:
-                        filesystem.exchange(namespace_fd, temporary, namespace_fd, name)
-                        replacement = filesystem.capture_inode(namespace_fd, temporary, "regular")
-                        if replacement is not None:
-                            filesystem.unlink_bound(namespace_fd, temporary, replacement)
-                        filesystem.fsync_directory(namespace_fd)
                     raise PrivateStateForeignError(f"old private object {name} changed during exchange")
                 filesystem.unlink_bound(namespace_fd, temporary, old)
             if fault is not None and fault_prefix is not None:
@@ -1298,11 +1293,14 @@ def _check_private_directory(value: os.stat_result, device: int, euid: int) -> N
 def _mkdir_private(parent_fd: int, name: str, device: int, euid: int) -> None:
     try:
         os.mkdir(name, PRIVATE_DIRECTORY_MODE, dir_fd=parent_fd)
-        os.fsync(parent_fd)
     except FileExistsError:
         pass
     except OSError as exc:
         raise PrivateStateError(f"cannot create private directory {name}") from exc
+    try:
+        os.fsync(parent_fd)
+    except OSError as exc:
+        raise PrivateStateError(f"cannot persist private directory {name}") from exc
     fd = os.open(
         name,
         os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
@@ -1580,12 +1578,9 @@ class StageStore:
             except FileNotFoundError:
                 if fault is not None:
                     fault("stage-mkdir")
-                try:
+                with contextlib.suppress(FileExistsError):
                     os.mkdir(STAGE_NAME, PRIVATE_DIRECTORY_MODE, dir_fd=namespace_fd)
-                except FileExistsError:
-                    pass
-                else:
-                    os.fsync(namespace_fd)
+            os.fsync(namespace_fd)
             stage_fd = os.open(
                 STAGE_NAME,
                 os.O_RDONLY
