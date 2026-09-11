@@ -138,6 +138,7 @@ class ActiveState:
     owned_target_witnesses: Sequence[Mapping[str, object]]
     registered_stage_entries: Sequence[Mapping[str, object]]
     record_temp_witness: InodeWitness | None
+    public_record_witness: InodeWitness | None
     terminal_record_digest: str
     cleanup_token: str
     cleanup_retry_invocation: Mapping[str, str]

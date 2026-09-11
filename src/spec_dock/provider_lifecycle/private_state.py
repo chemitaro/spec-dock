@@ -513,6 +513,9 @@ def _active_mapping(state: ActiveState) -> dict[str, object]:
         "owned_target_witnesses": [dict(item) for item in state.owned_target_witnesses],
         "registered_stage_entries": [dict(item) for item in state.registered_stage_entries],
         "record_temp_witness": None if state.record_temp_witness is None else _inode_mapping(state.record_temp_witness),
+        "public_record_witness": (
+            None if state.public_record_witness is None else _inode_mapping(state.public_record_witness)
+        ),
         "terminal_record_digest": state.terminal_record_digest,
         "cleanup_token": state.cleanup_token,
         "cleanup_retry_invocation": dict(state.cleanup_retry_invocation),
@@ -539,14 +542,15 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
         "owned_target_witnesses",
         "registered_stage_entries",
         "record_temp_witness",
+        "public_record_witness",
         "terminal_record_digest",
         "cleanup_token",
         "cleanup_retry_invocation",
         "deferred_invocation",
     )
     _exact(value, keys, "ACTIVE")
-    if value["schema_version"] != 2:
-        _fail("ACTIVE schema_version must be 2")
+    if value["schema_version"] != 3:
+        _fail("ACTIVE schema_version must be 3")
     state = _string(value["state"], "ACTIVE.state")
     if state not in {"prepared", "running", "ready", "terminal-cleanup"}:
         _fail("ACTIVE.state is invalid")
@@ -574,13 +578,31 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
     expected_record = _expected_record(value["expected_incomplete_record"])
     expected_record_model = parse_installation_record(base64.b64decode(expected_record["bytes_base64"]))
     bootstrap = _bootstrap(value["bootstrap_container"])
-    owned = _owned_targets(value["owned_target_witnesses"])
-    registered = _registered_entries(value["registered_stage_entries"])
+    owned = tuple(_owned_targets(value["owned_target_witnesses"]))
+    registered = tuple(_registered_entries(value["registered_stage_entries"]))
     record_temp = _parse_inode(value["record_temp_witness"], "ACTIVE.record_temp_witness", allow_null=True)
     if record_temp is not None and (
         record_temp.kind != "regular" or record_temp.mode != RECORD_TEMP_MODE or record_temp.link_count != 1
     ):
         _fail("ACTIVE.record_temp_witness must be mode0644 regular")
+    public_record = _parse_inode(value["public_record_witness"], "ACTIVE.public_record_witness", allow_null=True)
+    if public_record is not None and (
+        public_record.kind != "regular" or public_record.mode != RECORD_TEMP_MODE or public_record.link_count != 1
+    ):
+        _fail("ACTIVE.public_record_witness must be mode0644 regular")
+    if state == "prepared":
+        original_public = original_record["witness"] == (
+            None if public_record is None else _inode_mapping(public_record)
+        )
+        expected_public = (
+            public_record is not None
+            and public_record.size == len(base64.b64decode(expected_record["bytes_base64"]))
+            and public_record.sha256 == expected_record["sha256"]
+        )
+        if not original_public and not expected_public:
+            _fail("prepared ACTIVE public record witness must match the original record")
+    elif public_record is None:
+        _fail("non-prepared ACTIVE needs a public record witness")
     terminal_digest = _digest(value["terminal_record_digest"], "ACTIVE.terminal_record_digest")
     cleanup_token = _digest(value["cleanup_token"], "ACTIVE.cleanup_token")
     cleanup_invocation = _invocation(value["cleanup_retry_invocation"], "ACTIVE.cleanup_retry_invocation", cleanup=True)
@@ -616,7 +638,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
     if cleanup_token_for(repository_key, tuple_key, result_family, operation_generation) != cleanup_token:
         _fail("ACTIVE.cleanup_token does not match identity")
     return ActiveState(
-        2,
+        3,
         state,  # type: ignore[arg-type]
         repository_key,
         identity_value,
@@ -633,6 +655,7 @@ def _parse_active(value: Mapping[str, object]) -> ActiveState:
         owned,
         registered,
         record_temp,
+        public_record,
         terminal_digest,
         cleanup_token,
         cleanup_invocation,
@@ -869,6 +892,12 @@ class _PrivateStore:
     def _read_bytes(
         self, filename: str | None = None, maximum: int | None = None, mode: int | None = None
     ) -> bytes | None:
+        data, _witness = self._read_bytes_with_witness(filename, maximum, mode)
+        return data
+
+    def _read_bytes_with_witness(
+        self, filename: str | None = None, maximum: int | None = None, mode: int | None = None
+    ) -> tuple[bytes | None, InodeWitness | None]:
         name = self.filename if filename is None else filename
         maximum = self.maximum if maximum is None else maximum
         mode = self.mode if mode is None else mode
@@ -877,7 +906,7 @@ class _PrivateStore:
             try:
                 value = os.stat(name, dir_fd=fd, follow_symlinks=False)
             except FileNotFoundError:
-                return None
+                return None, None
             if (
                 not stat.S_ISREG(value.st_mode)
                 or value.st_nlink != 1
@@ -907,7 +936,11 @@ class _PrivateStore:
                     or len(data) > maximum
                 ):
                     raise PrivateStateForeignError(f"private object {name} changed while reading")
-                return data
+                return data, NativeAtomicFilesystem._witness(
+                    after,
+                    "regular",
+                    hashlib.sha256(data).hexdigest(),
+                )
             finally:
                 os.close(object_fd)
         finally:
@@ -924,7 +957,7 @@ class _PrivateStore:
         expected_existing: InodeWitness | None = None,
         fault: Callable[[str], None] | None = None,
         fault_prefix: str | None = None,
-    ) -> None:
+    ) -> InodeWitness:
         name = self.filename if filename is None else filename
         temporary = f"{name}.tmp" if temporary is None else temporary
         mode = self.mode if mode is None else mode
@@ -1020,6 +1053,7 @@ class _PrivateStore:
             durable = self._read_bound_witness(namespace_fd, name, mode, maximum=maximum)
             if durable is None or not NativeAtomicFilesystem._same_content_identity(durable, temporary_witness):
                 raise PrivateStateForeignError(f"private object {name} changed after publication")
+            return durable
         finally:
             if temporary_fd >= 0:
                 os.close(temporary_fd)
@@ -1067,13 +1101,6 @@ class _PrivateStore:
             return NativeAtomicFilesystem._witness(after, "regular", digest.hexdigest())
         finally:
             os.close(object_fd)
-
-    def _current_witness(self) -> InodeWitness | None:
-        namespace_fd = self._open_namespace()
-        try:
-            return self._read_bound_witness(namespace_fd, self.filename, self.mode, maximum=self.maximum)
-        finally:
-            os.close(namespace_fd)
 
     def ensure_durable(self, expected: InodeWitness | None = None) -> InodeWitness | None:
         """Re-establish namespace-entry durability before trusting visible state."""
@@ -1500,13 +1527,30 @@ class ActiveStateStore(_PrivateStore):
         raw = self._read_bytes()
         return None if raw is None else _parse_active(_read_json_bytes(raw, self.maximum, "ACTIVE"))
 
+    def load_with_witness(self) -> tuple[ActiveState | None, InodeWitness | None]:
+        raw, witness = self._read_bytes_with_witness()
+        return (None, None) if raw is None else (_parse_active(_read_json_bytes(raw, self.maximum, "ACTIVE")), witness)
+
     read = load
 
-    def save(self, state: ActiveState, *, fault: Callable[[str], None] | None = None) -> None:
+    def save(
+        self,
+        state: ActiveState,
+        *,
+        expected: InodeWitness | None = None,
+        expected_absent: bool = False,
+        fault: Callable[[str], None] | None = None,
+    ) -> InodeWitness:
         value = _active_mapping(state)
         parsed = _parse_active(value)
-        existing = self.load()
-        expected_existing = None
+        existing, observed_existing = self.load_with_witness()
+        if expected is not None and expected_absent:
+            raise ValueError("expected and expected_absent are mutually exclusive")
+        if expected is not None and observed_existing != expected:
+            raise PrivateStateForeignError("ACTIVE changed before update")
+        if expected_absent and observed_existing is not None:
+            raise PrivateStateForeignError("ACTIVE appeared before creation")
+        expected_existing = observed_existing
         if existing is not None:
             if (
                 existing.repository_key,
@@ -1526,10 +1570,9 @@ class ActiveStateStore(_PrivateStore):
                 parsed.result_family,
             ):
                 raise PrivateStateForeignError("ACTIVE belongs to another operation")
-            expected_existing = self._current_witness()
             if expected_existing is None:
                 raise PrivateStateForeignError("ACTIVE disappeared before update")
-        self._publish_bytes(
+        return self._publish_bytes(
             _json_bytes(_active_mapping(parsed)),
             expected_existing=expected_existing,
             fault=fault,
@@ -1677,13 +1720,34 @@ class CompletionReceiptStore(_PrivateStore):
         raw = self._read_bytes()
         return None if raw is None else _parse_receipt(_read_json_bytes(raw, self.maximum, "CLEANUP-COMPLETED"))
 
+    def load_with_witness(self) -> tuple[CompletionReceipt | None, InodeWitness | None]:
+        raw, witness = self._read_bytes_with_witness()
+        return (
+            (None, None)
+            if raw is None
+            else (_parse_receipt(_read_json_bytes(raw, self.maximum, "CLEANUP-COMPLETED")), witness)
+        )
+
     read = load
 
-    def save(self, receipt: CompletionReceipt, *, fault: Callable[[str], None] | None = None) -> None:
+    def save(
+        self,
+        receipt: CompletionReceipt,
+        *,
+        expected: InodeWitness | None = None,
+        expected_absent: bool = False,
+        fault: Callable[[str], None] | None = None,
+    ) -> InodeWitness:
         value = _receipt_mapping(receipt)
         parsed = _parse_receipt(value)
-        existing = self.load()
-        expected_existing = None
+        existing, observed_existing = self.load_with_witness()
+        if expected is not None and expected_absent:
+            raise ValueError("expected and expected_absent are mutually exclusive")
+        if expected is not None and observed_existing != expected:
+            raise PrivateStateForeignError("completion receipt changed before update")
+        if expected_absent and observed_existing is not None:
+            raise PrivateStateForeignError("completion receipt appeared before creation")
+        expected_existing = observed_existing
         if existing is not None:
             if (
                 existing.repository_key,
@@ -1703,10 +1767,9 @@ class CompletionReceiptStore(_PrivateStore):
                 parsed.result_family,
             ):
                 raise PrivateStateForeignError("completion receipt belongs to another operation")
-            expected_existing = self._current_witness()
             if expected_existing is None:
                 raise PrivateStateForeignError("completion receipt disappeared before update")
-        self._publish_bytes(
+        return self._publish_bytes(
             _json_bytes(_receipt_mapping(parsed)),
             expected_existing=expected_existing,
             fault=fault,

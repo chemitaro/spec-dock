@@ -126,7 +126,7 @@ Expected RED:
 6. `InodeWitness`とdescriptor-relative captureを実装します。
 7. Linux/macOS Adapterを実装し、native capability unavailableでfail closedにします。
 8. Private namespace、ACTIVE/STAGE/receipt parser/writer、mode0644 `RECORD-TEMP` witness、P0/P1/P2 classifierを実装します。
-9. `ACTIVE.seed_admission`（schema v2）を実装し、fixed two-seedのadmission stateを再入場・action provenance・create判断へ一貫して適用します。旧schema v1はfail-closedとします。
+9. `ACTIVE` private schema v3（`seed_admission`のv2 semanticsを含む）を実装し、public record predecessor witnessとfixed two-seedのadmission stateを再入場・action provenance・create判断へ一貫して適用します。旧schema v1/v2はfail-closedとします。
 10. Unknown/foreign/temp re-entry、record no-replace/exchange前後のmode/witness/residue、P1 rebuild、P2 no-rewrite、seed provenanceのfault testsをGREENにします。
 11. このcheckpointでは`src/spec_dock/cli.py`と旧writerのproduction routeを変更しません。
 

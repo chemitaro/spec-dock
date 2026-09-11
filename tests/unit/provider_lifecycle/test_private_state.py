@@ -6,7 +6,7 @@ import hashlib
 import json
 import os
 import stat
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -83,7 +83,7 @@ def _state(root: Path) -> tuple[Path, ActiveState, StageOwner]:
         )
     ]
     active = ActiveState(
-        2,
+        3,
         "prepared",
         "b" * 64,
         {"device": value.st_dev, "inode": value.st_ino, "euid": os.geteuid()},
@@ -102,6 +102,7 @@ def _state(root: Path) -> tuple[Path, ActiveState, StageOwner]:
         {"disposition": "planned-create", "witness": None},
         owned,
         registered,
+        None,
         None,
         "d" * 64,
         token,
@@ -313,6 +314,55 @@ def test_t04_active_identity_replacement_is_preserved_and_blocked(tmp_path: Path
     assert ((namespace / "ACTIVE.json").read_bytes(), os.lstat(namespace / "ACTIVE.json").st_ino) == before
 
 
+@pytest.mark.parametrize("store_kind", ["active", "receipt"])
+def test_t04_private_save_preserves_same_content_foreign_inode(monkeypatch, tmp_path: Path, store_kind: str) -> None:
+    repository = tmp_path / "repository"
+    repository.mkdir()
+    namespace, active, _owner = _state(repository)
+    active_store = ActiveStateStore(namespace)
+    active_store.save(active)
+    store: Any
+    value: Any
+    if store_kind == "active":
+        store = active_store
+        value = active
+        path = namespace / "ACTIVE.json"
+    else:
+        store = CompletionReceiptStore(namespace)
+        value = CompletionReceipt(
+            1,
+            active.repository_key,
+            active.tuple_key,
+            active.operation_generation,
+            active.operation,
+            active.candidate_digest,
+            active.seed_policy,
+            active.result_family,
+            active.terminal_record_digest,
+            active.cleanup_token,
+            active.cleanup_retry_invocation,
+            None,
+        )
+        store.save(value)
+        path = namespace / "CLEANUP-COMPLETED.json"
+    before = path.read_bytes()
+    before_inode = os.lstat(path).st_ino
+    original_publish = store._publish_bytes
+
+    def replace_before_publish(payload: bytes, **kwargs):
+        displaced = tmp_path / f"{store_kind}-displaced.json"
+        path.rename(displaced)
+        path.write_bytes(before)
+        path.chmod(0o600)
+        return original_publish(payload, **kwargs)
+
+    monkeypatch.setattr(store, "_publish_bytes", replace_before_publish)
+    with pytest.raises(PrivateStateForeignError):
+        store.save(value)
+    assert path.read_bytes() == before
+    assert os.lstat(path).st_ino != before_inode
+
+
 def test_t04_active_schema_v1_is_fail_closed(tmp_path: Path) -> None:
     repository = tmp_path / "repository"
     repository.mkdir()
@@ -324,7 +374,7 @@ def test_t04_active_schema_v1_is_fail_closed(tmp_path: Path) -> None:
     value["schema_version"] = 1
     active_path.write_bytes(json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode() + b"\n")
 
-    with pytest.raises(PrivateStateError, match="ACTIVE schema_version must be 2"):
+    with pytest.raises(PrivateStateError, match="ACTIVE schema_version must be 3"):
         store.load()
 
 

@@ -9,7 +9,7 @@ import shutil
 import subprocess
 import tarfile
 from types import SimpleNamespace
-from typing import cast
+from typing import Literal, cast
 
 import pytest
 
@@ -18,6 +18,7 @@ from spec_dock.provider_lifecycle.contracts import (
     SEED_PATHS,
     ActiveState,
     CompletionReceipt,
+    InodeWitness,
     LifecycleAction,
     LifecycleMode,
     LifecycleRequest,
@@ -108,6 +109,15 @@ def _workspace_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
         else:
             snapshot[relative] = ("directory", value.st_mode & 0o777)
     return snapshot
+
+
+def _replace_regular_file_with_same_payload(path: Path, displaced: Path, *, mode: int) -> int:
+    payload = path.read_bytes()
+    original_inode = path.stat().st_ino
+    path.rename(displaced)
+    path.write_bytes(payload)
+    path.chmod(mode)
+    return original_inode
 
 
 def _replace_seed_with_unsafe_type(seed: Path, unsafe_kind: str, target: Path) -> None:
@@ -807,8 +817,8 @@ def test_t04_initial_apply_persists_first_seed_admission_without_post_receipt_re
     engine = ProviderLifecycleEngine(fault_injector="stage-mkdir")
     original_invalidate_receipt = engine._invalidate_receipt
 
-    def invalidate_receipt_then_remove_seed(store: CompletionReceiptStore) -> None:
-        original_invalidate_receipt(store)
+    def invalidate_receipt_then_remove_seed(store: CompletionReceiptStore, receipt: CompletionReceipt, witness) -> None:
+        original_invalidate_receipt(store, receipt, witness)
         (workspace / SEED_PATHS[0]).unlink()
 
     monkeypatch.setattr(engine, "_invalidate_receipt", invalidate_receipt_then_remove_seed)
@@ -1017,6 +1027,202 @@ def test_t04_admission_target_observation_is_reused_before_publication(
     assert isinstance(original_inode, dict)
     assert original_inode["inode"] == displaced.stat().st_ino
     assert original_inode["inode"] != target.stat().st_ino
+
+
+def test_t04_initial_public_record_publication_rejects_same_content_foreign_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "initial-record-predecessor-binding").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    record_path = workspace / "spec-dock/spec-dock.version"
+    original_inode = record_path.stat().st_ino
+    displaced = tmp_path / "initial-record-displaced"
+    swapped = False
+    engine = ProviderLifecycleEngine()
+    original_write = engine._write_public_record
+
+    def replace_predecessor(
+        request,
+        active: ActiveState,
+        payload: bytes,
+        active_store: ActiveStateStore,
+        root_fd: int,
+        *,
+        expected_active_witness: InodeWitness,
+        expected_predecessor: tuple[bytes | None, InodeWitness | None],
+        predecessor_kind: Literal["original", "incomplete"],
+    ):
+        nonlocal swapped
+        if predecessor_kind == "original" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+        return original_write(
+            request,
+            active,
+            payload,
+            active_store,
+            root_fd,
+            expected_active_witness=expected_active_witness,
+            expected_predecessor=expected_predecessor,
+            predecessor_kind=predecessor_kind,
+        )
+
+    monkeypatch.setattr(engine, "_write_public_record", replace_predecessor)
+    result = engine.execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != original_inode
+
+
+def test_t04_terminal_public_record_publication_rejects_same_content_foreign_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "terminal-record-predecessor-binding").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / "terminal-record-displaced"
+    swapped = False
+    engine = ProviderLifecycleEngine()
+    original_write = engine._write_public_record
+
+    def replace_predecessor(
+        request,
+        active: ActiveState,
+        payload: bytes,
+        active_store: ActiveStateStore,
+        root_fd: int,
+        *,
+        expected_active_witness: InodeWitness,
+        expected_predecessor: tuple[bytes | None, InodeWitness | None],
+        predecessor_kind: Literal["original", "incomplete"],
+    ):
+        nonlocal swapped
+        if predecessor_kind == "incomplete" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+        return original_write(
+            request,
+            active,
+            payload,
+            active_store,
+            root_fd,
+            expected_active_witness=expected_active_witness,
+            expected_predecessor=expected_predecessor,
+            predecessor_kind=predecessor_kind,
+        )
+
+    monkeypatch.setattr(engine, "_write_public_record", replace_predecessor)
+    result = engine.execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t04_receipt_invalidation_rejects_same_content_foreign_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "receipt-invalidation-binding").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    namespace = resolve_private_namespace(workspace)
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    displaced = tmp_path / "receipt-displaced"
+    calls = 0
+    original_load = CompletionReceiptStore.load_with_witness
+
+    def replace_on_invalidation(store: CompletionReceiptStore):
+        nonlocal calls
+        result = original_load(store)
+        if store.filename == "CLEANUP-COMPLETED.json":
+            calls += 1
+            if calls == 2:
+                _replace_regular_file_with_same_payload(receipt_path, displaced, mode=0o600)
+        return result
+
+    monkeypatch.setattr(CompletionReceiptStore, "load_with_witness", replace_on_invalidation)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert calls == 2
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert receipt_path.read_bytes() == displaced.read_bytes()
+    assert receipt_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t04_finish_cleanup_rejects_same_content_foreign_active_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "finish-cleanup-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(request, force=True)
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    active_path = namespace / "ACTIVE.json"
+    displaced = tmp_path / "active-displaced"
+    engine = ProviderLifecycleEngine()
+    original_finish = engine._finish_cleanup
+
+    def replace_before_finish(
+        request,
+        active: ActiveState,
+        active_store: ActiveStateStore,
+        receipt_store: CompletionReceiptStore,
+        stage_store: StageStore,
+        root_fd: int,
+        *,
+        active_witness: InodeWitness,
+        **kwargs,
+    ):
+        _replace_regular_file_with_same_payload(active_path, displaced, mode=0o600)
+        return original_finish(
+            request,
+            active,
+            active_store,
+            receipt_store,
+            stage_store,
+            root_fd,
+            active_witness=active_witness,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(engine, "_finish_cleanup", replace_before_finish)
+    result = engine.execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert active_path.read_bytes() == displaced.read_bytes()
+    assert active_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t06_terminal_record_residue_is_cleaned_on_retry(tmp_path: Path) -> None:
+    workspace = (tmp_path / "terminal-record-residue-recovery").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+
+    first = ProviderLifecycleEngine(fault_injector="record-exchange-residue-unlink").execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+    assert (namespace / "RECORD-TEMP").is_file()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+    assert not (namespace / "RECORD-TEMP").exists()
 
 
 @pytest.mark.parametrize("operation", ["install", "update"])

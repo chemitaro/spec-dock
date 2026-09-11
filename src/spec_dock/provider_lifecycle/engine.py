@@ -947,14 +947,20 @@ class ProviderLifecycleEngine:
             except (PrivateStateError, OSError, _InjectedFailure):
                 return self._blocked(request, "lifecycle-preparation-failed")
             try:
-                active = active_store.load() if active_store is not None else None
-                receipt = receipt_store.load() if receipt_store is not None else None
+                active, active_witness = active_store.load_with_witness() if active_store is not None else (None, None)
+                receipt, receipt_witness = (
+                    receipt_store.load_with_witness() if receipt_store is not None else (None, None)
+                )
                 if active is not None and active_store is not None:
-                    active_store.ensure_durable()
-                    active = active_store.load()
+                    if active_witness is None:
+                        return self._blocked(request, "lifecycle-preparation-failed")
+                    active_witness = active_store.ensure_durable(expected=active_witness)
+                    if active_witness is None:
+                        return self._blocked(request, "lifecycle-preparation-failed")
                 if receipt is not None and receipt_store is not None:
-                    receipt_store.ensure_durable()
-                    receipt = receipt_store.load()
+                    if receipt_witness is None:
+                        return self._blocked(request, "lifecycle-preparation-failed")
+                    receipt_witness = receipt_store.ensure_durable(expected=receipt_witness)
             except AtomicRenameUnavailable:
                 return self._blocked(
                     request,
@@ -1016,9 +1022,13 @@ class ProviderLifecycleEngine:
                     receipt_store,
                     stage_store,
                     bound.fd,
+                    active_witness=active_witness,
+                    receipt_witness=receipt_witness,
                     force=force,
                 )
             if active is not None:
+                if active_witness is None:
+                    return self._blocked(request, "lifecycle-preparation-failed")
                 if active.state in {"ready", "terminal-cleanup"}:
                     return self._complete_pending_cleanup(
                         request,
@@ -1027,6 +1037,8 @@ class ProviderLifecycleEngine:
                         receipt_store,
                         stage_store,
                         bound.fd,
+                        active_witness=active_witness,
+                        receipt_witness=receipt_witness,
                         force=force,
                         receipt=receipt,
                     )
@@ -1055,6 +1067,7 @@ class ProviderLifecycleEngine:
                         stage_store,
                         bound.fd,
                         force=force,
+                        active_witness=active_witness,
                     )
                 except _AdmissionFailure as failure:
                     return self._admission_result(request, failure)
@@ -1085,6 +1098,7 @@ class ProviderLifecycleEngine:
                     bound.fd,
                     force=force,
                     receipt=receipt,
+                    receipt_witness=receipt_witness,
                 )
             except _AdmissionFailure as failure:
                 return self._admission_result(request, failure)
@@ -1190,7 +1204,24 @@ class ProviderLifecycleEngine:
         if dict(active.repository_identity) != expected_identity:
             return False
         if active.state in {"ready", "terminal-cleanup"}:
-            return True
+            if active.state == "ready":
+                raw, witness, record, record_kind = self._observe_record(target, root_fd)
+                return self._terminal_record_matches(
+                    root_fd,
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    terminal_record_digest=active.terminal_record_digest,
+                    expected_witness=active.public_record_witness,
+                ) or self._record_matches_expected(active, raw, witness, record, record_kind)
+            return self._terminal_record_matches(
+                root_fd,
+                operation=active.operation,
+                candidate_digest=active.candidate_digest,
+                seed_policy=active.seed_policy,
+                terminal_record_digest=active.terminal_record_digest,
+                expected_witness=active.public_record_witness,
+            )
 
         raw, witness, record, record_kind = self._observe_record(target, root_fd)
         expected_record = self._record_matches_expected(active, raw, witness, record, record_kind)
@@ -1409,6 +1440,7 @@ class ProviderLifecycleEngine:
         *,
         force: bool | None,
         receipt: CompletionReceipt | None,
+        receipt_witness: InodeWitness | None,
     ) -> LifecycleResult:
         if operation == "uninstall":
             return self._dispatch_uninstall(
@@ -1418,6 +1450,8 @@ class ProviderLifecycleEngine:
                 receipt_store,
                 stage_store,
                 root_fd,
+                receipt=receipt,
+                receipt_witness=receipt_witness,
             )
         assert candidate is not None
         raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
@@ -1515,6 +1549,7 @@ class ProviderLifecycleEngine:
             stage_store,
             root_fd,
             receipt=receipt,
+            receipt_witness=receipt_witness,
             seed_admission=seed_admission,
             target_observations=targets,
             legacy=record_kind == "legacy-0.2.3",
@@ -1560,6 +1595,9 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore | None,
         stage_store: StageStore | None,
         root_fd: int,
+        *,
+        receipt: CompletionReceipt | None,
+        receipt_witness: InodeWitness | None,
     ) -> LifecycleResult:
         raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
         targets = self._observe_domains_for_admission(
@@ -1635,7 +1673,8 @@ class ProviderLifecycleEngine:
             receipt_store,
             stage_store,
             root_fd,
-            receipt=receipt_store.load() if receipt_store is not None else None,
+            receipt=receipt,
+            receipt_witness=receipt_witness,
             seed_admission=seed_admission,
             target_observations=targets,
             legacy=record_kind == "legacy-0.2.3",
@@ -1659,6 +1698,7 @@ class ProviderLifecycleEngine:
         seed_admission: Mapping[str, SeedAdmissionState],
         target_observations: Sequence[_ObservedTarget],
         receipt: CompletionReceipt | None = None,
+        receipt_witness: InodeWitness | None = None,
         legacy: bool = False,
     ) -> LifecycleResult:
         if request.mode == "dry-run":
@@ -1677,8 +1717,10 @@ class ProviderLifecycleEngine:
             raise _AdmissionFailure("candidate-invalid", operation=operation, seed_policy=seed_policy)
         try:
             if receipt is not None:
-                self._invalidate_receipt(receipt_store)
-            active = self._prepare_active(
+                if receipt_witness is None:
+                    raise PrivateStateForeignError("completion receipt witness is missing")
+                self._invalidate_receipt(receipt_store, receipt, receipt_witness)
+            active, active_witness = self._prepare_active(
                 request,
                 operation,
                 seed_policy,
@@ -1702,6 +1744,7 @@ class ProviderLifecycleEngine:
                 receipt_store,
                 stage_store,
                 root_fd,
+                active_witness=active_witness,
             )
         except _AdmissionFailure:
             raise
@@ -1755,13 +1798,18 @@ class ProviderLifecycleEngine:
                 return self._preparation_failure(request, operation, digest, seed_policy, failure)
             return self._partial_failure_result(request, current, failure, root_fd)
 
-    def _invalidate_receipt(self, store: CompletionReceiptStore) -> None:
-        witness = store._current_witness()
-        if witness is None:
-            return
+    def _invalidate_receipt(
+        self,
+        store: CompletionReceiptStore,
+        receipt: CompletionReceipt,
+        expected_witness: InodeWitness,
+    ) -> None:
+        current, witness = store.load_with_witness()
+        if current is None or witness is None or current != receipt or witness != expected_witness:
+            raise PrivateStateForeignError("completion receipt changed before invalidation")
         namespace_fd = store._open_namespace()
         try:
-            self._filesystem().unlink_bound(namespace_fd, store.filename, witness)
+            self._filesystem().unlink_bound(namespace_fd, store.filename, expected_witness)
             self._filesystem().fsync_directory(namespace_fd)
         finally:
             os.close(namespace_fd)
@@ -1783,7 +1831,7 @@ class ProviderLifecycleEngine:
         legacy: bool,
         seed_admission: Mapping[str, SeedAdmissionState],
         target_observations: Sequence[_ObservedTarget],
-    ) -> ActiveState:
+    ) -> tuple[ActiveState, InodeWitness]:
         binding = RepositoryBinding(*self._repository_identity(root_fd))
         candidate_digest = (
             candidate.aggregate_digest
@@ -1860,7 +1908,7 @@ class ProviderLifecycleEngine:
             "witness": _witness_mapping(container.witness),
         }
         active = ActiveState(
-            2,
+            3,
             "prepared",
             binding_key,
             {"device": binding.device, "inode": binding.inode, "euid": binding.euid},
@@ -1884,14 +1932,17 @@ class ProviderLifecycleEngine:
             owned,
             registered,
             None,
+            record_witness,
             hashlib.sha256(terminal_bytes).hexdigest(),
             token,
             _cleanup_invocation(request, operation, seed_policy, token),
             None,
         )
-        self._execute_phase("candidate-staging", lambda: self._save_active(active_store, active))
+        active_witness = self._execute_phase(
+            "candidate-staging", lambda: self._save_active(active_store, active, expected_absent=True)
+        )
         self._execute_phase("candidate-staging", lambda: self._prepare_stage(stage_store, active, candidate, root_fd))
-        return active
+        return active, active_witness
 
     @staticmethod
     def _repository_identity(root_fd: int) -> tuple[int, int, int]:
@@ -1900,8 +1951,20 @@ class ProviderLifecycleEngine:
             raise FilesystemSafetyError("repository root descriptor is not a directory")
         return value.st_dev, value.st_ino, os.geteuid() if hasattr(os, "geteuid") else os.getuid()
 
-    def _save_active(self, store: ActiveStateStore, active: ActiveState) -> None:
-        store.save(active, fault=self._check_fault)
+    def _save_active(
+        self,
+        store: ActiveStateStore,
+        active: ActiveState,
+        *,
+        expected: InodeWitness | None = None,
+        expected_absent: bool = False,
+    ) -> InodeWitness:
+        return store.save(
+            active,
+            expected=expected,
+            expected_absent=expected_absent,
+            fault=self._check_fault,
+        )
 
     def _prepare_stage(
         self,
@@ -2180,12 +2243,110 @@ class ProviderLifecycleEngine:
             or record.seed_policy != active.seed_policy
         ):
             return False
-        if active.record_temp_witness is None:
+        if witness is not None and active.public_record_witness == witness:
             return True
-        if witness is not None and NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness):
-            return True
-        original_witness = active.original_record.get("witness")
-        return original_witness == _witness_mapping(active.record_temp_witness)
+        return (
+            witness is not None
+            and active.record_temp_witness is not None
+            and NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
+        )
+
+    def _expected_incomplete_record_predecessor(
+        self,
+        active: ActiveState,
+        root_fd: int,
+    ) -> tuple[bytes, InodeWitness]:
+        raw, witness, record, record_kind = self._observe_record("", root_fd)
+        if not self._record_matches_expected(active, raw, witness, record, record_kind):
+            raise PrivateStateForeignError("expected incomplete record changed before terminal publication")
+        if raw is None or witness is None:
+            raise PrivateStateForeignError("expected incomplete record is absent before terminal publication")
+        return raw, witness
+
+    def _recover_public_record_state(
+        self,
+        active: ActiveState,
+        current_witness: InodeWitness | None,
+        active_store: ActiveStateStore,
+        active_witness: InodeWitness,
+    ) -> tuple[ActiveState, InodeWitness]:
+        if current_witness is None:
+            raise PrivateStateForeignError("expected public record witness is missing")
+        if active.public_record_witness == current_witness:
+            return active, active_witness
+        if active.record_temp_witness is None or not NativeAtomicFilesystem._same_content_identity(
+            current_witness, active.record_temp_witness
+        ):
+            raise PrivateStateForeignError("public record publication source is foreign")
+
+        namespace_fd = active_store._open_namespace()
+        try:
+            try:
+                residue_raw, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
+            except FileNotFoundError:
+                residue_raw, residue_witness = None, None
+            if residue_witness is not None:
+                original_payload = active.original_record.get("bytes_base64")
+                original_witness = active.original_record.get("witness")
+                if (
+                    not isinstance(original_payload, str)
+                    or residue_raw != base64.b64decode(original_payload)
+                    or not self._content_identity_matches_mapping(original_witness, residue_witness)
+                ):
+                    raise PrivateStateForeignError("public record exchange residue is foreign during recovery")
+                self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
+                self._filesystem().fsync_directory(namespace_fd)
+        finally:
+            os.close(namespace_fd)
+        recovered = replace(active, record_temp_witness=None, public_record_witness=current_witness)
+        active_witness = self._save_active(active_store, recovered, expected=active_witness)
+        return recovered, active_witness
+
+    @staticmethod
+    def _content_identity_matches_mapping(stored: object, current: InodeWitness) -> bool:
+        return (
+            isinstance(stored, dict)
+            and stored.get("kind") == current.kind
+            and stored.get("device") == current.device
+            and stored.get("inode") == current.inode
+            and stored.get("mode") == current.mode
+            and stored.get("link_count") == current.link_count
+            and stored.get("size") == current.size
+            and stored.get("sha256") == current.sha256
+        )
+
+    def _cleanup_record_exchange_residue(
+        self,
+        active: ActiveState,
+        active_store: ActiveStateStore,
+        active_witness: InodeWitness,
+    ) -> tuple[ActiveState, InodeWitness]:
+        expected_residue = active.record_temp_witness
+        if expected_residue is None:
+            return active, active_witness
+
+        namespace_fd = active_store._open_namespace()
+        try:
+            try:
+                residue_raw, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
+            except FileNotFoundError:
+                residue_raw, residue_witness = None, None
+            if residue_witness is not None:
+                expected_payload = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+                if (
+                    not NativeAtomicFilesystem._same_content_identity(residue_witness, expected_residue)
+                    or residue_raw != expected_payload
+                ):
+                    raise PrivateStateForeignError("public record exchange residue is foreign during cleanup")
+                self._check_fault("record-exchange-residue-unlink")
+                self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
+                self._filesystem().fsync_directory(namespace_fd)
+        finally:
+            os.close(namespace_fd)
+
+        cleaned = replace(active, record_temp_witness=None)
+        active_witness = self._save_active(active_store, cleaned, expected=active_witness)
+        return cleaned, active_witness
 
     def _validate_running_stage(
         self,
@@ -2797,6 +2958,8 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore,
         stage_store: StageStore,
         root_fd: int,
+        *,
+        active_witness: InodeWitness,
     ) -> LifecycleResult:
         if candidate is not None and candidate.aggregate_digest != active.candidate_digest:
             return self._blocked(
@@ -2809,7 +2972,15 @@ class ProviderLifecycleEngine:
                 last_completed_phase="preflight",
             )
         if active.state in {"ready", "terminal-cleanup"}:
-            return self._complete_pending_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
+            return self._complete_pending_cleanup(
+                request,
+                active,
+                active_store,
+                receipt_store,
+                stage_store,
+                root_fd,
+                active_witness=active_witness,
+            )
         initial_absent_paths: frozenset[str] | None = None
         try:
             if active.operation == "uninstall":
@@ -2829,6 +3000,7 @@ class ProviderLifecycleEngine:
                     receipt_store,
                     stage_store,
                     root_fd,
+                    active_witness=active_witness,
                     initial_absent_paths=initial_absent_paths,
                 )
             assert candidate is not None
@@ -2840,6 +3012,7 @@ class ProviderLifecycleEngine:
                 receipt_store,
                 stage_store,
                 root_fd,
+                active_witness=active_witness,
             )
         except _InjectedFailure as failure:
             current = active_store.load() or active
@@ -2867,10 +3040,12 @@ class ProviderLifecycleEngine:
         receipt_store: CompletionReceiptStore,
         stage_store: StageStore,
         root_fd: int,
+        *,
+        active_witness: InodeWitness,
     ) -> LifecycleResult:
-        active = self._execute_phase(
+        active, active_witness = self._execute_phase(
             "bootstrap-container",
-            lambda: self._ensure_bootstrap(request, active, active_store, root_fd),
+            lambda: self._ensure_bootstrap(request, active, active_store, root_fd, active_witness),
         )
         raw_record, record_witness, record, record_kind = self._execute_phase(
             "publish-incomplete-record",
@@ -2878,18 +3053,36 @@ class ProviderLifecycleEngine:
         )
         if not self._record_matches_expected(active, raw_record, record_witness, record, record_kind):
             expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-            self._execute_phase(
+            active, active_witness = self._execute_phase(
                 "publish-incomplete-record",
-                lambda: self._write_public_record(request, active, expected_incomplete, active_store, root_fd),
+                lambda: self._write_public_record(
+                    request,
+                    active,
+                    expected_incomplete,
+                    active_store,
+                    root_fd,
+                    expected_active_witness=active_witness,
+                    expected_predecessor=(raw_record, record_witness),
+                    predecessor_kind="original",
+                ),
             )
-            active = self._execute_phase("publish-incomplete-record", lambda: active_store.load() or active)
-        elif active.state == "prepared":
+        else:
+            active, active_witness = self._recover_public_record_state(
+                active,
+                record_witness,
+                active_store,
+                active_witness,
+            )
+        if active.state == "prepared":
             self._execute_phase(
                 "publish-incomplete-record", lambda: self._ensure_expected_record_durable(active, root_fd)
             )
         if active.state == "prepared":
             active = replace(active, state="running")
-            self._execute_phase("publish-incomplete-record", lambda: self._save_active(active_store, active))
+            active_witness = self._execute_phase(
+                "publish-incomplete-record",
+                lambda: self._save_active(active_store, active, expected=active_witness),
+            )
         targets = self._execute_phase("verify-target", lambda: self._observe_domains(root_fd))
         self._execute_phase(
             "verify-target",
@@ -2933,16 +3126,42 @@ class ProviderLifecycleEngine:
 
         self._execute_phase("verify-target", verify_targets)
         active = replace(active, state="ready")
-        self._execute_phase("publish-terminal-record", lambda: self._save_active(active_store, active))
-        terminal = self._terminal_record_bytes(active)
-        self._execute_phase(
+        active_witness = self._execute_phase(
             "publish-terminal-record",
-            lambda: self._write_public_record(request, active, terminal, active_store, root_fd),
+            lambda: self._save_active(active_store, active, expected=active_witness),
         )
-        active = self._execute_phase("publish-terminal-record", lambda: active_store.load() or active)
+        terminal = self._terminal_record_bytes(active)
+        terminal_predecessor = self._execute_phase(
+            "publish-terminal-record",
+            lambda: self._expected_incomplete_record_predecessor(active, root_fd),
+        )
+        active, active_witness = self._execute_phase(
+            "publish-terminal-record",
+            lambda: self._write_public_record(
+                request,
+                active,
+                terminal,
+                active_store,
+                root_fd,
+                expected_active_witness=active_witness,
+                expected_predecessor=terminal_predecessor,
+                predecessor_kind="incomplete",
+            ),
+        )
         active = replace(active, state="terminal-cleanup")
-        self._execute_phase("cleanup-stage", lambda: self._save_active(active_store, active))
-        return self._finish_cleanup(request, active, active_store, receipt_store, stage_store, root_fd)
+        active_witness = self._execute_phase(
+            "cleanup-stage",
+            lambda: self._save_active(active_store, active, expected=active_witness),
+        )
+        return self._finish_cleanup(
+            request,
+            active,
+            active_store,
+            receipt_store,
+            stage_store,
+            root_fd,
+            active_witness=active_witness,
+        )
 
     def _run_uninstall_active(
         self,
@@ -2953,6 +3172,7 @@ class ProviderLifecycleEngine:
         stage_store: StageStore,
         root_fd: int,
         *,
+        active_witness: InodeWitness,
         initial_absent_paths: frozenset[str],
     ) -> LifecycleResult:
         container = self._execute_phase("bootstrap-container", lambda: self._observe_container(root_fd))
@@ -2967,18 +3187,36 @@ class ProviderLifecycleEngine:
         )
         if not self._record_matches_expected(active, raw_record, record_witness, record, record_kind):
             expected_incomplete = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-            self._execute_phase(
+            active, active_witness = self._execute_phase(
                 "publish-incomplete-record",
-                lambda: self._write_public_record(request, active, expected_incomplete, active_store, root_fd),
+                lambda: self._write_public_record(
+                    request,
+                    active,
+                    expected_incomplete,
+                    active_store,
+                    root_fd,
+                    expected_active_witness=active_witness,
+                    expected_predecessor=(raw_record, record_witness),
+                    predecessor_kind="original",
+                ),
             )
-            active = self._execute_phase("publish-incomplete-record", lambda: active_store.load() or active)
-        elif active.state == "prepared":
+        else:
+            active, active_witness = self._recover_public_record_state(
+                active,
+                record_witness,
+                active_store,
+                active_witness,
+            )
+        if active.state == "prepared":
             self._execute_phase(
                 "publish-incomplete-record", lambda: self._ensure_expected_record_durable(active, root_fd)
             )
         if active.state == "prepared":
             active = replace(active, state="running")
-            self._execute_phase("publish-incomplete-record", lambda: self._save_active(active_store, active))
+            active_witness = self._execute_phase(
+                "publish-incomplete-record",
+                lambda: self._save_active(active_store, active, expected=active_witness),
+            )
         for index, (_kind, _path, _source) in enumerate(FIXED_DOMAINS):
             phase = f"detach-{STAGE_ENTRY_NAMES[index]}"
 
@@ -3012,15 +3250,33 @@ class ProviderLifecycleEngine:
 
         self._execute_phase("verify-target", verify_targets)
         active = replace(active, state="ready")
-        self._execute_phase("publish-terminal-record", lambda: self._save_active(active_store, active))
-        terminal = self._terminal_record_bytes(active)
-        self._execute_phase(
+        active_witness = self._execute_phase(
             "publish-terminal-record",
-            lambda: self._write_public_record(request, active, terminal, active_store, root_fd),
+            lambda: self._save_active(active_store, active, expected=active_witness),
         )
-        active = self._execute_phase("publish-terminal-record", lambda: active_store.load() or active)
+        terminal = self._terminal_record_bytes(active)
+        terminal_predecessor = self._execute_phase(
+            "publish-terminal-record",
+            lambda: self._expected_incomplete_record_predecessor(active, root_fd),
+        )
+        active, active_witness = self._execute_phase(
+            "publish-terminal-record",
+            lambda: self._write_public_record(
+                request,
+                active,
+                terminal,
+                active_store,
+                root_fd,
+                expected_active_witness=active_witness,
+                expected_predecessor=terminal_predecessor,
+                predecessor_kind="incomplete",
+            ),
+        )
         active = replace(active, state="terminal-cleanup")
-        self._execute_phase("cleanup-stage", lambda: self._save_active(active_store, active))
+        active_witness = self._execute_phase(
+            "cleanup-stage",
+            lambda: self._save_active(active_store, active, expected=active_witness),
+        )
         return self._finish_cleanup(
             request,
             active,
@@ -3028,6 +3284,7 @@ class ProviderLifecycleEngine:
             receipt_store,
             stage_store,
             root_fd,
+            active_witness=active_witness,
             initial_absent_paths=initial_absent_paths,
         )
 
@@ -3037,7 +3294,8 @@ class ProviderLifecycleEngine:
         active: ActiveState,
         active_store: ActiveStateStore,
         root_fd: int,
-    ) -> ActiveState:
+        active_witness: InodeWitness,
+    ) -> tuple[ActiveState, InodeWitness]:
         container = self._observe_container(root_fd)
         if container.kind == "other" or container.kind == "symlink":
             raise _AdmissionFailure(
@@ -3069,7 +3327,7 @@ class ProviderLifecycleEngine:
                 active, bootstrap_container={"disposition": "created", "witness": _witness_mapping(witness)}
             )
             try:
-                self._save_active(active_store, active)
+                active_witness = self._save_active(active_store, active, expected=active_witness)
             except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
                 raise self._bootstrap_rollback_failure(
                     root_fd,
@@ -3081,7 +3339,7 @@ class ProviderLifecycleEngine:
                     ),
                     created_active=active,
                 ) from failure
-        return active
+        return active, active_witness
 
     def _bootstrap_rollback_failure(
         self,
@@ -3144,8 +3402,8 @@ class ProviderLifecycleEngine:
         created_active: ActiveState,
         desired: ActiveState,
     ) -> None:
-        current = active_store.load()
-        if current is None or current.state != "prepared":
+        current, current_witness = active_store.load_with_witness()
+        if current is None or current_witness is None or current.state != "prepared":
             raise PrivateStateForeignError("ACTIVE changed during bootstrap rollback")
         if (
             current.repository_key,
@@ -3167,8 +3425,8 @@ class ProviderLifecycleEngine:
             raise PrivateStateForeignError("ACTIVE changed during bootstrap rollback")
         if current.bootstrap_container not in (original_active.bootstrap_container, created_active.bootstrap_container):
             raise PrivateStateForeignError("ACTIVE changed during bootstrap rollback")
-        active_store.save(desired)
-        active_store.ensure_durable()
+        published = active_store.save(desired, expected=current_witness)
+        active_store.ensure_durable(expected=published)
 
     def _terminal_record_bytes(self, active: ActiveState) -> bytes:
         state = "tooling-absent-preserved-data" if active.operation == "uninstall" else "ready"
@@ -3183,6 +3441,34 @@ class ProviderLifecycleEngine:
         )
         return serialize_installation_record(record)
 
+    def _require_public_record_predecessor(
+        self,
+        active: ActiveState,
+        raw: bytes | None,
+        witness: InodeWitness | None,
+        *,
+        predecessor_kind: Literal["original", "incomplete"],
+    ) -> None:
+        if active.public_record_witness != witness:
+            raise PrivateStateForeignError("public record predecessor witness changed")
+        if predecessor_kind == "original":
+            original_payload = active.original_record.get("bytes_base64")
+            matches = (
+                raw is None
+                if active.original_record.get("kind") == "absent"
+                else isinstance(original_payload, str) and raw == base64.b64decode(original_payload)
+            )
+        else:
+            expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+            matches = raw == expected
+        if not matches:
+            raise PrivateStateForeignError("public record predecessor bytes changed")
+        if predecessor_kind == "original" and raw is not None:
+            if witness is None or not self._witness_matches(active.original_record.get("witness"), witness):
+                raise PrivateStateForeignError("original public record predecessor is foreign")
+        elif predecessor_kind == "incomplete" and witness is None:
+            raise PrivateStateForeignError("incomplete public record predecessor is absent")
+
     def _write_public_record(
         self,
         _request: LifecycleRequest,
@@ -3190,10 +3476,25 @@ class ProviderLifecycleEngine:
         payload: bytes,
         active_store: ActiveStateStore,
         root_fd: int,
-    ) -> None:
+        *,
+        expected_active_witness: InodeWitness,
+        expected_predecessor: tuple[bytes | None, InodeWitness | None],
+        predecessor_kind: Literal["original", "incomplete"],
+    ) -> tuple[ActiveState, InodeWitness]:
+        predecessor_raw, predecessor_witness = expected_predecessor
+        self._require_public_record_predecessor(
+            active,
+            predecessor_raw,
+            predecessor_witness,
+            predecessor_kind=predecessor_kind,
+        )
         witness = active_store.write_record_temp(payload, fault=self._check_fault)
         try:
-            self._save_active(active_store, replace(active, record_temp_witness=witness))
+            active_witness = self._save_active(
+                active_store,
+                replace(active, record_temp_witness=witness),
+                expected=expected_active_witness,
+            )
         except (AtomicRenameUnavailable, FilesystemSafetyError, PrivateStateError, OSError) as failure:
             namespace_fd = active_store._open_namespace()
             try:
@@ -3217,6 +3518,8 @@ class ProviderLifecycleEngine:
                 old_raw, old_witness = _read_regular(specdock_fd, "spec-dock.version")
             except FileNotFoundError:
                 old_raw, old_witness = None, None
+            if old_raw != predecessor_raw or old_witness != predecessor_witness:
+                raise PrivateStateForeignError("public record predecessor changed before publication")
             if old_witness is None:
                 self._check_fault("record-publish-no-replace")
                 filesystem.rename_no_replace(
@@ -3227,6 +3530,7 @@ class ProviderLifecycleEngine:
                     expected_source=witness,
                 )
             else:
+                assert predecessor_witness is not None
                 self._check_fault("record-publish-exchange")
                 filesystem.exchange(
                     namespace_fd,
@@ -3234,13 +3538,18 @@ class ProviderLifecycleEngine:
                     specdock_fd,
                     "spec-dock.version",
                     expected_source=witness,
-                    expected_destination=old_witness,
+                    expected_destination=predecessor_witness,
                 )
                 _, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
-                if not NativeAtomicFilesystem._same_content_identity(residue_witness, old_witness):
+                if not NativeAtomicFilesystem._same_content_identity(residue_witness, predecessor_witness):
                     raise PrivateStateForeignError("public record exchange residue is foreign")
-                active = replace(active, record_temp_witness=residue_witness)
-                self._save_active(active_store, active)
+                _, public_witness = _read_regular(specdock_fd, "spec-dock.version")
+                active = replace(
+                    active,
+                    record_temp_witness=residue_witness,
+                    public_record_witness=public_witness,
+                )
+                active_witness = self._save_active(active_store, active, expected=active_witness)
                 self._check_fault("record-exchange-residue-unlink")
                 filesystem.unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
             self._check_fault("record-parent-fsync")
@@ -3252,11 +3561,12 @@ class ProviderLifecycleEngine:
                 or not NativeAtomicFilesystem._same_content_identity(current_witness, witness)
             ):
                 raise FilesystemSafetyError("public record postcondition failed")
-            del old_raw
         finally:
             os.close(specdock_fd)
             os.close(namespace_fd)
-        self._save_active(active_store, replace(active, record_temp_witness=None))
+        final_active = replace(active, record_temp_witness=None, public_record_witness=current_witness)
+        final_witness = self._save_active(active_store, final_active, expected=active_witness)
+        return final_active, final_witness
 
     def _ensure_expected_record_durable(self, active: ActiveState, root_fd: int) -> None:
         expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
@@ -3269,9 +3579,10 @@ class ProviderLifecycleEngine:
             os.close(specdock_fd)
         if current != expected:
             raise PrivateStateForeignError("expected incomplete record changed before re-entry")
-        if active.record_temp_witness is not None and not (
-            NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
-            or active.original_record.get("witness") == _witness_mapping(active.record_temp_witness)
+        if active.public_record_witness == witness:
+            return
+        if active.record_temp_witness is None or not NativeAtomicFilesystem._same_content_identity(
+            witness, active.record_temp_witness
         ):
             raise PrivateStateForeignError("expected incomplete record changed before re-entry")
 
@@ -3499,6 +3810,7 @@ class ProviderLifecycleEngine:
         stage_store: StageStore,
         root_fd: int,
         *,
+        active_witness: InodeWitness,
         receipt: CompletionReceipt | None = None,
         cleanup_only: bool = False,
         initial_absent_paths: frozenset[str] | None = None,
@@ -3506,6 +3818,11 @@ class ProviderLifecycleEngine:
         try:
             self._cleanup_stage(stage_store, active)
             self._check_fault("stage-parent-fsync")
+            stored_active, stored_witness = active_store.load_with_witness()
+            if stored_active != active or stored_witness != active_witness:
+                raise PrivateStateForeignError("ACTIVE changed before receipt publication")
+            if stored_witness is None:
+                raise PrivateStateForeignError("ACTIVE witness is missing before receipt publication")
             if receipt is None:
                 receipt = CompletionReceipt(
                     1,
@@ -3521,15 +3838,18 @@ class ProviderLifecycleEngine:
                     active.cleanup_retry_invocation,
                     active.deferred_invocation,
                 )
-                receipt_store.save(receipt, fault=self._check_fault)
+                receipt_store.save(receipt, expected_absent=True, fault=self._check_fault)
             self._check_fault("active-expected-unlink")
+            stored_active, stored_witness = active_store.load_with_witness()
+            if stored_active != active or stored_witness != active_witness:
+                raise PrivateStateForeignError("ACTIVE changed before expected unlink")
+            if stored_witness is None:
+                raise PrivateStateForeignError("ACTIVE witness is missing before expected unlink")
             namespace_fd = active_store._open_namespace()
             try:
-                witness = active_store._current_witness()
-                if witness is not None:
-                    self._filesystem().unlink_bound(namespace_fd, ACTIVE_NAME, witness)
-                    self._check_fault("active-expected-parent-fsync")
-                    self._filesystem().fsync_directory(namespace_fd)
+                self._filesystem().unlink_bound(namespace_fd, ACTIVE_NAME, stored_witness)
+                self._check_fault("active-expected-parent-fsync")
+                self._filesystem().fsync_directory(namespace_fd)
             finally:
                 os.close(namespace_fd)
         except (
@@ -3983,6 +4303,8 @@ class ProviderLifecycleEngine:
         stage_store: StageStore | None,
         root_fd: int,
         *,
+        active_witness: InodeWitness | None,
+        receipt_witness: InodeWitness | None,
         force: bool | None,
     ) -> LifecycleResult:
         if active is not None:
@@ -3997,6 +4319,8 @@ class ProviderLifecycleEngine:
                 return self.invalid_request(request)
             if active_store is None or receipt_store is None or stage_store is None:
                 return self._blocked(request, "lifecycle-preparation-failed")
+            if active_witness is None:
+                return self._blocked(request, "lifecycle-preparation-failed")
             return self._complete_pending_cleanup(
                 request,
                 active,
@@ -4004,6 +4328,8 @@ class ProviderLifecycleEngine:
                 receipt_store,
                 stage_store,
                 root_fd,
+                active_witness=active_witness,
+                receipt_witness=receipt_witness,
                 force=force,
                 receipt=receipt,
                 capture_desired=False,
@@ -4049,6 +4375,7 @@ class ProviderLifecycleEngine:
         candidate_digest: str,
         seed_policy: str,
         terminal_record_digest: str,
+        expected_witness: InodeWitness | None = None,
     ) -> bool:
         try:
             specdock_fd = _open_path(root_fd, ("spec-dock",))
@@ -4056,10 +4383,12 @@ class ProviderLifecycleEngine:
                 self._filesystem().fsync_directory(specdock_fd)
             finally:
                 os.close(specdock_fd)
-            raw, _witness, record, record_kind = self._observe_record("", root_fd)
+            raw, witness, record, record_kind = self._observe_record("", root_fd)
         except (FilesystemSafetyError, OSError, ValueError, WireValidationError):
             return False
         if raw is None or record is None or record_kind != "final":
+            return False
+        if expected_witness is not None and witness != expected_witness:
             return False
         expected_state = "tooling-absent-preserved-data" if operation == "uninstall" else "ready"
         return (
@@ -4079,11 +4408,15 @@ class ProviderLifecycleEngine:
         stage_store: StageStore | None,
         root_fd: int,
         *,
+        active_witness: InodeWitness,
+        receipt_witness: InodeWitness | None = None,
         force: bool | None = None,
         receipt: CompletionReceipt | None = None,
         capture_desired: bool = True,
     ) -> LifecycleResult:
         if active_store is None or receipt_store is None or stage_store is None:
+            return self._blocked(request, "lifecycle-preparation-failed")
+        if receipt is not None and receipt_witness is None:
             return self._blocked(request, "lifecycle-preparation-failed")
         if receipt is not None and not self._receipt_matches_active(receipt, active):
             return self.invalid_request(request)
@@ -4093,7 +4426,11 @@ class ProviderLifecycleEngine:
             if active.deferred_invocation is None and receipt.deferred_invocation is None and capture_desired:
                 receipt = replace(receipt, deferred_invocation=_desired_invocation(request, force=force))
                 try:
-                    receipt_store.save(receipt, fault=self._check_fault)
+                    receipt_witness = receipt_store.save(
+                        receipt,
+                        expected=receipt_witness,
+                        fault=self._check_fault,
+                    )
                 except (
                     AtomicRenameUnavailable,
                     FilesystemSafetyError,
@@ -4102,18 +4439,18 @@ class ProviderLifecycleEngine:
                     _InjectedFailure,
                 ) as failure:
                     try:
-                        durable_receipt = receipt_store.load()
+                        durable_receipt, durable_witness = receipt_store.load_with_witness()
                     except (PrivateStateError, OSError):
-                        durable_receipt = None
-                    if durable_receipt is not None and self._receipt_matches_active(durable_receipt, active):
+                        durable_receipt, durable_witness = None, None
+                    if durable_receipt is not None and durable_witness is not None and durable_receipt == receipt:
                         receipt = durable_receipt
-                        if durable_receipt.deferred_invocation is not None:
-                            active = replace(active, deferred_invocation=durable_receipt.deferred_invocation)
+                        receipt_witness = durable_witness
+                        active = replace(active, deferred_invocation=durable_receipt.deferred_invocation)
                     return self._terminal_cleanup_failure(request, active, failure)
             if active.deferred_invocation != receipt.deferred_invocation:
                 active = replace(active, deferred_invocation=receipt.deferred_invocation)
                 try:
-                    self._save_active(active_store, active)
+                    active_witness = self._save_active(active_store, active, expected=active_witness)
                 except (
                     AtomicRenameUnavailable,
                     FilesystemSafetyError,
@@ -4129,29 +4466,37 @@ class ProviderLifecycleEngine:
                 candidate_digest=active.candidate_digest,
                 seed_policy=active.seed_policy,
                 terminal_record_digest=active.terminal_record_digest,
+                expected_witness=active.public_record_witness,
             ):
-                raw, _witness, record, record_kind = self._observe_record(request.target, root_fd)
-                expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
-                if (
-                    raw != expected
-                    or record is None
-                    or record_kind != "final"
-                    or record.state != "incomplete"
-                    or record.operation != active.operation
-                    or record.candidate_digest != active.candidate_digest
-                    or record.seed_policy != active.seed_policy
-                ):
+                raw, witness, record, record_kind = self._observe_record(request.target, root_fd)
+                if not self._record_matches_expected(active, raw, witness, record, record_kind):
                     return self._blocked(request, "installation-record-state-inconsistent")
-                self._write_public_record(request, active, self._terminal_record_bytes(active), active_store, root_fd)
-                active = active_store.load() or active
+                if raw is None or witness is None:
+                    return self._blocked(request, "installation-record-state-inconsistent")
+                active, active_witness = self._write_public_record(
+                    request,
+                    active,
+                    self._terminal_record_bytes(active),
+                    active_store,
+                    root_fd,
+                    expected_active_witness=active_witness,
+                    expected_predecessor=(raw, witness),
+                    predecessor_kind="incomplete",
+                )
                 if not self._terminal_record_matches(
                     root_fd,
                     operation=active.operation,
                     candidate_digest=active.candidate_digest,
                     seed_policy=active.seed_policy,
                     terminal_record_digest=active.terminal_record_digest,
+                    expected_witness=active.public_record_witness,
                 ):
                     return self._blocked(request, "installation-record-state-inconsistent")
+            active, active_witness = self._cleanup_record_exchange_residue(
+                active,
+                active_store,
+                active_witness,
+            )
             if receipt is not None and not self._terminal_record_matches(
                 root_fd,
                 operation=receipt.operation,
@@ -4162,10 +4507,10 @@ class ProviderLifecycleEngine:
                 return self.invalid_request(request)
             if receipt is None and capture_desired and active.deferred_invocation is None:
                 active = replace(active, deferred_invocation=_desired_invocation(request, force=force))
-                self._save_active(active_store, active)
+                active_witness = self._save_active(active_store, active, expected=active_witness)
             if active.state == "ready":
                 active = replace(active, state="terminal-cleanup")
-                self._save_active(active_store, active)
+                active_witness = self._save_active(active_store, active, expected=active_witness)
         except (
             AtomicRenameUnavailable,
             FilesystemSafetyError,
@@ -4181,6 +4526,7 @@ class ProviderLifecycleEngine:
             receipt_store,
             stage_store,
             root_fd,
+            active_witness=active_witness,
             receipt=receipt,
             cleanup_only=True,
         )
@@ -4211,7 +4557,8 @@ class ProviderLifecycleEngine:
         stage_store: StageStore | None,
         root_fd: int,
         *,
-        force: bool | None,
+        active_witness: InodeWitness | None = None,
+        force: bool | None = None,
     ) -> LifecycleResult:
         if not self._request_admits_active(operation, seed_policy, active, force=force):
             code = (
@@ -4367,7 +4714,18 @@ class ProviderLifecycleEngine:
             return self._partial_failure_result(
                 request, active, failure, root_fd, initial_absent_paths=initial_absent_paths
             )
-        return self._run_active(request, active, candidate, active_store, receipt_store, stage_store, root_fd)
+        if active_witness is None:
+            return self._blocked(request, "lifecycle-preparation-failed")
+        return self._run_active(
+            request,
+            active,
+            candidate,
+            active_store,
+            receipt_store,
+            stage_store,
+            root_fd,
+            active_witness=active_witness,
+        )
 
     @staticmethod
     def _request_admits_active(
