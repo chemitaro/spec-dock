@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "ed735b5b42563407a2d89f27cb47b2dcb3214ca2"
-  tree: "315543e67741f4fbda5634cee00862cbca9d8cee"
+  sha: "f56486967f059e05199aa24554ef3a87546fdcc6"
+  tree: "4a6f67136e7dce71ee6e68bd2f27b676774c1d98"
 implementation_evidence:
-  candidate_sha: "ed735b5b42563407a2d89f27cb47b2dcb3214ca2"
-  candidate_tree: "315543e67741f4fbda5634cee00862cbca9d8cee"
+  candidate_sha: "f56486967f059e05199aa24554ef3a87546fdcc6"
+  candidate_tree: "4a6f67136e7dce71ee6e68bd2f27b676774c1d98"
 ---
 
 # #392 仕様・実装レポート
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証、親ディレクトリ再拘束のhardeningとその後のP1 remediation、fsync failure windowの追加remediationを含む実装candidate commit `ed735b5b42563407a2d89f27cb47b2dcb3214ca2`を固定しました。Report更新後のreport-bound clean SHAとbranch upstreamの一致確認、および次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証、親ディレクトリ再拘束のhardeningとその後のP1 remediation、fsync failure windowの追加remediation、witness失敗時のchild FD解放を含む実装candidate commit `f56486967f059e05199aa24554ef3a87546fdcc6`を固定しました。Report更新後のreport-bound clean SHAとbranch upstreamの一致確認、および次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
 2. このReport更新を含む最終clean pushed report-bound SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。各実装修正後は旧candidateのレビュー結果を再利用せず、現SHAへfresh reviewを束縛します。
@@ -414,3 +414,20 @@ clean full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T21
 Blue Team Strict分析（analyst session `required-strict-github-connector-verificati-827`、同一目的のfollow-up、browser-only、GPT-5.6 Sol、Extra High、raw response `spec-dock/.workbench/chatgpt-code-review-strict/issue-392-final-20260912-v6/blue-analysis-response.raw.md`、SHA-256 `8b36b254de1d563ecaaad630516cd373b3281ce60ce85d102be8323e3a1738f0`）は、P1をvalid・reachable・in-scope・blocking、first incorrect layer=`implementation`、primary route=`implementation-remediation`と判定しました。fsync failure windowはmaterial coverage gapとして同じroot-cause groupへ統合し、別のseverityは付与していません。新しいRequirement／Design／Wire／schema／API／ledger／evaluator判断は不要で、witness取得直後のrollback ownership登録と直接的なFirst Red/Greenが必要だと整理しました。
 
 この追補後は、Reportを含むclean pushed report-bound SHAに対するfresh Code Review Strict（browser-only、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Extra High）と、同じ目的のFinal Quality Gate Strict follow-up（browser-only、top-level `https://chatgpt.com/`、Pro）が未完了です。Code ReviewはP0/P1=0かつ`review_status=pass`、Final Quality Gateは`status=pass`、`coverage_complete=true`、P0/P1=0、`unresolved_items=[]`を要求します。人間PR merge、merged-tip B1、Issue finish、Product GREENは別ゲートです。#395 baselineの修正、GREEN偽装、obsolete-only testの再導入は行いません。
+
+## 26. Witness-failure FD remediation and ownership-provenance design gate (2026-09-12)
+
+report-bound candidate `9b50fa7514397dd07d6f06c622b113d1f48e8cf0`に対するfresh Code Review Strict v7（browser-only、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Extra High）は、本文JSONで`review_status=fail`、P1×1、P2×1を返しました。P1は`_open_path_bound(create=True)`の`mkdir`後からfinal-name `open`までにforeign directoryへ置換されると、再取得したforeign witnessをprovider-created ownershipとしてrollbackへ登録し、後続失敗時にforeign directoryを削除し得る点です。P2は`_open_path_visible`および`_open_path_bound`のexisting-child witness取得失敗時にchild FDがcleanup scopeから漏れる点です。review artifactは`spec-dock/.workbench/chatgpt-code-review-strict/issue-392-final-20260912-v7/review-response.json`、SHA-256は`27678422389b932311290976b581658292614d290f20adbce279b15c40bfa983`です。
+
+同一目的のBlue Team Strict分析（session `required-strict-github-connector-verificati-828`、browser-only、GPT-5.6 Sol、Extra High）は、P1をvalid・reachable・in-scope・blocking、first incorrect layer=`canonical Design`、primary route=`design-decision-required`と判定しました。追加の独立ChatGPT Use Strict設計分析（session `required-strict-github-connector-verificati-829`、同じexact GitHub SHA、browser-only、GPT-5.6 Sol、Extra High）も、現行のdirect final-name `mkdir → reopen/rebind`を維持したimplementation-only修正ではRequirementのforeign preserve-and-blockを証明できず、provider-owned temporary sourceをnative `rename_no_replace`で公開するcreation protocolにはDesign/Planの明示変更が必要で、Requirement変更は原則不要と確認しました。両分析のraw responseは同じv7 workbench directoryへ保存しています。
+
+P2については、`_directory_witness_or_close`を追加し、witness成功前はchild FDのtemporary ownershipを保持して例外時にcloseし、成功後だけcallerへ移すよう修正しました。First Redは`test_t06_open_path_visible_closes_child_when_witness_fails`と`test_t06_open_path_bound_closes_existing_child_when_witness_fails`で、捕捉したFDの`fstat`が`EBADF`になることを直接検証し、旧実装で両件が失敗しました。修正後は2件ともGreenです。
+
+- P2 focused Red/Green: 2 tests passed after remediation
+- provider lifecycle engine: `env TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py` は `295 passed`
+- default fast: `env TMPDIR=/private/tmp uv run pytest` は `1366 passed, 848 skipped`（2214 collected）
+- static analysis: `make lint`（ruff check、ruff format、mypy）はpass
+- implementation commit: `f56486967f059e05199aa24554ef3a87546fdcc6`（parent `9b50fa7514397dd07d6f06c622b113d1f48e8cf0`）
+- branch upstream: `f56486967f059e05199aa24554ef3a87546fdcc6`と一致、worktree clean
+
+P2は既存Wire、ACTIVE schema、rollback意味論、#395/#396 ledger/evaluator/baseline/timing/bundle、test scopeを変更していません。P1は未解決のため、現時点でCode Review `pass`、Final Quality Gate、Product GREEN、Issue finishは主張しません。P1を解消するには、Design §7.1と対応するPlanのcreation protocolを「owned temp → durability → native no-replace final publication」へ更新するhuman承認が必要です。承認前に脅威モデル、foreign preservation、rollback保証を推測で変更しません。
