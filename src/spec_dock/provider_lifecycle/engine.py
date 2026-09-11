@@ -528,6 +528,15 @@ def _directory_witness(fd: int) -> InodeWitness:
     return NativeAtomicFilesystem._witness(value, "directory", None)
 
 
+def _directory_witness_or_close(fd: int) -> InodeWitness:
+    try:
+        return _directory_witness(fd)
+    except BaseException:
+        with contextlib.suppress(OSError):
+            os.close(fd)
+        raise
+
+
 def _same_directory_binding(left: InodeWitness, right: InodeWitness) -> bool:
     return (
         left.kind == right.kind == "directory"
@@ -567,7 +576,7 @@ def _open_path_visible(root_fd: int, components: Sequence[str]) -> tuple[int, tu
             next_fd = _open_existing_child(current, component)
             if next_fd is None:
                 raise FileNotFoundError(component)
-            witnesses.append(_directory_witness(next_fd))
+            witnesses.append(_directory_witness_or_close(next_fd))
             os.close(current)
             current = next_fd
         return current, tuple(witnesses)
@@ -640,7 +649,7 @@ def _open_path_bound(
                 except BaseException:
                     os.close(next_fd)
                     raise
-            witnesses.append(_directory_witness(next_fd))
+            witnesses.append(_directory_witness_or_close(next_fd))
             os.close(current)
             current = next_fd
         for parent_fd, _name, _expected in created:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 from dataclasses import replace
+import errno
 from io import BytesIO
 import json
 import os
@@ -453,6 +454,54 @@ def test_t01_uninstall_verify_rejects_non_directory_target(tmp_path: Path) -> No
     assert result.failed_paths == ("spec-dock/docs",)
     assert result.actions[2] == LifecycleAction("spec-dock/docs", "root", "failed", "owned-root-remove")
     assert (workspace / "spec-dock/docs").is_symlink()
+
+
+def test_t06_open_path_visible_closes_child_when_witness_fails(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "visible-witness-failure").resolve()
+    workspace.mkdir()
+    (workspace / "child").mkdir()
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    witnessed_fd: int | None = None
+
+    def fail_witness(fd: int) -> InodeWitness:
+        nonlocal witnessed_fd
+        witnessed_fd = fd
+        raise OSError(errno.EIO, "witness failed")
+
+    monkeypatch.setattr(engine_module, "_directory_witness", fail_witness)
+    try:
+        with pytest.raises(OSError, match="witness failed"):
+            engine_module._open_path_visible(root_fd, ("child",))
+        assert witnessed_fd is not None
+        with pytest.raises(OSError) as error:
+            os.fstat(witnessed_fd)
+        assert error.value.errno == errno.EBADF
+    finally:
+        os.close(root_fd)
+
+
+def test_t06_open_path_bound_closes_existing_child_when_witness_fails(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "bound-witness-failure").resolve()
+    workspace.mkdir()
+    (workspace / "child").mkdir()
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    witnessed_fd: int | None = None
+
+    def fail_witness(fd: int) -> InodeWitness:
+        nonlocal witnessed_fd
+        witnessed_fd = fd
+        raise OSError(errno.EIO, "witness failed")
+
+    monkeypatch.setattr(engine_module, "_directory_witness", fail_witness)
+    try:
+        with pytest.raises(OSError, match="witness failed"):
+            engine_module._open_path_bound(root_fd, ("child",))
+        assert witnessed_fd is not None
+        with pytest.raises(OSError) as error:
+            os.fstat(witnessed_fd)
+        assert error.value.errno == errno.EBADF
+    finally:
+        os.close(root_fd)
 
 
 def test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations(tmp_path: Path) -> None:
