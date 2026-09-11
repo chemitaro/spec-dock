@@ -562,6 +562,69 @@ def test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory(monk
     assert tuple((workspace / "spec-dock").iterdir()) == ()
 
 
+def test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = (tmp_path / "bootstrap-witness-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "bootstrap-witness-displaced"
+    engine = ProviderLifecycleEngine()
+    original_ensure_bootstrap = engine._ensure_bootstrap
+    injected = False
+
+    def replace_bootstrap_after_admission(*args, **kwargs):
+        nonlocal injected
+        result = original_ensure_bootstrap(*args, **kwargs)
+        (workspace / "spec-dock").rename(displaced)
+        (workspace / "spec-dock").mkdir()
+        injected = True
+        return result
+
+    monkeypatch.setattr(engine, "_ensure_bootstrap", replace_bootstrap_after_admission)
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "lifecycle-preparation-failed"
+    assert not (displaced / "spec-dock.version").exists()
+    assert not (workspace / "spec-dock/spec-dock.version").exists()
+
+
+def test_t06_record_post_binding_rebind_rolls_back_displaced_publication(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "record-post-binding-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "record-post-binding-rebind-displaced"
+    original_rename = NativeAtomicFilesystem.rename_no_replace
+    injected = False
+
+    def rebind_before_record_rename(
+        filesystem, source_parent_fd, source_name, destination_parent_fd, destination_name, *, expected_source=None
+    ):
+        nonlocal injected
+        if destination_name == "spec-dock.version" and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_rename(
+            filesystem,
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            expected_source=expected_source,
+        )
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "rename_no_replace", rebind_before_record_rename)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert not (displaced / "spec-dock.version").exists()
+    assert not (workspace / "spec-dock/spec-dock.version").exists()
+
+
 def test_t06_seed_parent_rebind_does_not_write_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
     workspace = (tmp_path / "seed-parent-rebind").resolve()
     workspace.mkdir()
@@ -588,6 +651,31 @@ def test_t06_seed_parent_rebind_does_not_write_to_displaced_directory(monkeypatc
     assert result.phase == "create-seed-consumer-ci"
     assert not (displaced / "workflows/ci.yml").exists()
     assert not (workspace / ".github/workflows/ci.yml").exists()
+
+
+def test_t06_seed_post_binding_rebind_rolls_back_displaced_creation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "seed-post-binding-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "seed-post-binding-rebind-displaced"
+    original_open = engine_module.os.open
+    injected = False
+
+    def rebind_before_seed_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal injected
+        if path == ".gitignore" and dir_fd is not None and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(engine_module.os, "open", rebind_before_seed_open)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert not (displaced / ".gitignore").exists()
+    assert not (workspace / "spec-dock/.gitignore").exists()
 
 
 def test_t06_existing_bootstrap_rebind_blocks_before_mutation(monkeypatch, tmp_path: Path) -> None:
@@ -631,6 +719,7 @@ def test_t06_gitignore_parent_rebind_does_not_write_to_displaced_directory(monke
         fd, binding = original_open_path(root_fd, components, create=create)
         if (
             tuple(components) == ("spec-dock",)
+            and create
             and not injected
             and (workspace / "spec-dock/scripts").is_dir()
             and not (workspace / ".github").exists()
@@ -663,9 +752,9 @@ def test_t06_domain_parent_rebind_does_not_publish_to_displaced_directory(monkey
     def rebind_domain_parent(root_fd: int, components, *, create: bool = False):
         nonlocal injected, specdock_parent_opens
         fd, binding = original_open_path(root_fd, components, create=create)
-        if tuple(components) == ("spec-dock",):
+        if tuple(components) == ("spec-dock",) and create:
             specdock_parent_opens += 1
-            if specdock_parent_opens == 3:
+            if specdock_parent_opens == 1:
                 (workspace / "spec-dock").rename(displaced)
                 (workspace / "spec-dock").mkdir()
                 injected = True
@@ -678,8 +767,87 @@ def test_t06_domain_parent_rebind_does_not_publish_to_displaced_directory(monkey
     assert injected
     assert result.status == "partial_failure"
     assert result.code == "install-partial-failure"
-    assert result.phase == "publish-docs"
     assert not (displaced / "docs").exists()
+    assert not (workspace / "spec-dock/docs").exists()
+
+
+def test_t06_domain_post_binding_rebind_rolls_back_displaced_mutation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "domain-post-binding-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "domain-post-binding-rebind-displaced"
+    original_rename = NativeAtomicFilesystem.rename_no_replace
+    injected = False
+
+    def rebind_before_native_rename(
+        filesystem, source_parent_fd, source_name, destination_parent_fd, destination_name, *, expected_source=None
+    ):
+        nonlocal injected
+        if destination_name == "docs" and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_rename(
+            filesystem,
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            expected_source=expected_source,
+        )
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "rename_no_replace", rebind_before_native_rename)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert not (displaced / "docs").exists()
+    assert not (workspace / "spec-dock/docs").exists()
+
+
+def test_t06_domain_exchange_post_binding_rebind_rolls_back_displaced_mutation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "domain-exchange-post-binding-rebind").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    (workspace / "spec-dock/docs/consumer-owned.txt").write_text("consumer-owned\n", encoding="utf-8")
+    displaced = tmp_path / "domain-exchange-post-binding-rebind-displaced"
+    original_exchange = NativeAtomicFilesystem.exchange
+    injected = False
+
+    def rebind_before_native_exchange(
+        filesystem,
+        source_parent_fd,
+        source_name,
+        destination_parent_fd,
+        destination_name,
+        *,
+        expected_source=None,
+        expected_destination=None,
+    ):
+        nonlocal injected
+        if destination_name == "docs" and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_exchange(
+            filesystem,
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            expected_source=expected_source,
+            expected_destination=expected_destination,
+        )
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "exchange", rebind_before_native_exchange)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"))
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert (displaced / "docs/consumer-owned.txt").read_text(encoding="utf-8") == "consumer-owned\n"
     assert not (workspace / "spec-dock/docs").exists()
 
 

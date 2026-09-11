@@ -537,6 +537,45 @@ def _same_directory_binding(left: InodeWitness, right: InodeWitness) -> bool:
     )
 
 
+def _rollback_created_path_components(created: list[tuple[int, str, InodeWitness]]) -> None:
+    failure: BaseException | None = None
+    for parent_fd, name, expected in reversed(created):
+        try:
+            try:
+                value = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                continue
+            current = NativeAtomicFilesystem._witness(value, "directory", None)
+            if not _same_directory_binding(current, expected):
+                raise FilesystemSafetyError(f"created path component {name!r} changed during rollback")
+            os.rmdir(name, dir_fd=parent_fd)
+            os.fsync(parent_fd)
+        except (FilesystemSafetyError, OSError) as error:
+            failure = failure or error
+        finally:
+            os.close(parent_fd)
+    if failure is not None:
+        raise FilesystemSafetyError("created path component cleanup failed") from failure
+
+
+def _open_path_visible(root_fd: int, components: Sequence[str]) -> tuple[int, tuple[InodeWitness, ...]]:
+    current = os.dup(root_fd)
+    witnesses: list[InodeWitness] = []
+    try:
+        for component in components:
+            _safe_component(component)
+            next_fd = _open_existing_child(current, component)
+            if next_fd is None:
+                raise FileNotFoundError(component)
+            witnesses.append(_directory_witness(next_fd))
+            os.close(current)
+            current = next_fd
+        return current, tuple(witnesses)
+    except BaseException:
+        os.close(current)
+        raise
+
+
 def _open_path_bound(
     root_fd: int,
     components: Sequence[str],
@@ -547,33 +586,68 @@ def _open_path_bound(
 
     current = os.dup(root_fd)
     witnesses: list[InodeWitness] = []
+    created: list[tuple[int, str, InodeWitness]] = []
     try:
-        for component in components:
+        for index, component in enumerate(components):
             _safe_component(component)
             next_fd = _open_existing_child(current, component)
             if next_fd is None:
                 if not create:
                     raise FileNotFoundError(component)
+                cleanup_parent_fd = os.dup(current)
                 try:
                     os.mkdir(component, 0o755, dir_fd=current)
                 except FileExistsError as failure:
+                    os.close(cleanup_parent_fd)
                     raise FilesystemSafetyError(
                         f"path component {component!r} appeared during exclusive creation"
                     ) from failure
-                next_fd = os.open(
-                    component,
-                    os.O_RDONLY
-                    | getattr(os, "O_DIRECTORY", 0)
-                    | getattr(os, "O_NOFOLLOW", 0)
-                    | getattr(os, "O_CLOEXEC", 0),
-                    dir_fd=current,
-                )
+                next_fd = -1
+                try:
+                    next_fd = os.open(
+                        component,
+                        os.O_RDONLY
+                        | getattr(os, "O_DIRECTORY", 0)
+                        | getattr(os, "O_NOFOLLOW", 0)
+                        | getattr(os, "O_CLOEXEC", 0),
+                        dir_fd=current,
+                    )
+                    created_witness = _directory_witness(next_fd)
+                except BaseException:
+                    if next_fd >= 0:
+                        os.close(next_fd)
+                    with contextlib.suppress(OSError):
+                        os.rmdir(component, dir_fd=current)
+                    os.close(cleanup_parent_fd)
+                    raise
                 os.fsync(current)
+                created.append((cleanup_parent_fd, component, created_witness))
+                if index >= 0:
+                    visible_fd, visible = _open_path_visible(root_fd, tuple(components[: index + 1]))
+                    try:
+                        if (
+                            len(visible) != index + 1
+                            or any(
+                                not _same_directory_binding(left, right)
+                                for left, right in zip(witnesses, visible[:-1], strict=True)
+                            )
+                            or not _same_directory_binding(created_witness, visible[-1])
+                        ):
+                            raise FilesystemSafetyError("created path component is no longer root-visible")
+                    finally:
+                        os.close(visible_fd)
             witnesses.append(_directory_witness(next_fd))
             os.close(current)
             current = next_fd
+        for parent_fd, _name, _expected in created:
+            os.close(parent_fd)
         return current, tuple(witnesses)
-    except BaseException:
+    except BaseException as failure:
+        try:
+            _rollback_created_path_components(created)
+        except FilesystemSafetyError as cleanup_failure:
+            os.close(current)
+            raise cleanup_failure from failure
         os.close(current)
         raise
 
@@ -2193,6 +2267,15 @@ class ProviderLifecycleEngine:
             and stored.get("mode") == current.mode
         )
 
+    def _require_bootstrap_binding(self, active: ActiveState, root_fd: int) -> None:
+        container = self._observe_container(root_fd)
+        if (
+            active.bootstrap_container.get("disposition") not in {"existing", "created"}
+            or container.kind != "directory"
+            or not self._directory_binding_matches(active.bootstrap_container.get("witness"), container.witness)
+        ):
+            raise PrivateStateForeignError("bootstrap container binding changed before consumer mutation")
+
     def _target_matches_original(self, item: _ObservedTarget, stored: Mapping[str, object]) -> bool:
         original_kind = stored["original_kind"]
         if original_kind == "absent":
@@ -3739,10 +3822,17 @@ class ProviderLifecycleEngine:
             raise failure
         namespace_fd = active_store._open_namespace()
         specdock_components = ("spec-dock",)
-        specdock_fd, specdock_binding = _open_path_bound(root_fd, specdock_components, create=True)
+        specdock_fd = -1
         filesystem = self._filesystem()
         exchanged = False
         try:
+            self._require_bootstrap_binding(active, root_fd)
+            specdock_fd, specdock_binding = _open_path_bound(root_fd, specdock_components)
+            self._require_bootstrap_binding(active, root_fd)
+            if not specdock_binding or not self._directory_binding_matches(
+                active.bootstrap_container.get("witness"), specdock_binding[-1]
+            ):
+                raise PrivateStateForeignError("bootstrap container binding changed before record publication")
             _require_path_binding(root_fd, specdock_components, specdock_binding, specdock_fd)
             try:
                 old_raw, old_witness = _read_regular(specdock_fd, "spec-dock.version")
@@ -3752,7 +3842,12 @@ class ProviderLifecycleEngine:
                 raise PrivateStateForeignError("public record predecessor changed before publication")
             if old_witness is None:
                 self._check_fault("record-publish-no-replace")
-                filesystem.rename_no_replace(
+                self._rename_no_replace_bound(
+                    filesystem,
+                    root_fd,
+                    specdock_components,
+                    specdock_binding,
+                    specdock_fd,
                     namespace_fd,
                     RECORD_TEMP_NAME,
                     specdock_fd,
@@ -3762,7 +3857,12 @@ class ProviderLifecycleEngine:
             else:
                 assert predecessor_witness is not None
                 self._check_fault("record-publish-exchange")
-                filesystem.exchange(
+                self._exchange_bound(
+                    filesystem,
+                    root_fd,
+                    specdock_components,
+                    specdock_binding,
+                    specdock_fd,
                     namespace_fd,
                     RECORD_TEMP_NAME,
                     specdock_fd,
@@ -3817,7 +3917,8 @@ class ProviderLifecycleEngine:
                 ):
                     raise FilesystemSafetyError("public record postcondition failed")
         finally:
-            os.close(specdock_fd)
+            if specdock_fd >= 0:
+                os.close(specdock_fd)
             os.close(namespace_fd)
         final_active = replace(active, record_temp_witness=None, public_record_witness=current_witness)
         final_witness = self._save_active(active_store, final_active, expected=active_witness)
@@ -3864,6 +3965,143 @@ class ProviderLifecycleEngine:
             expected_digest=candidate.aggregate_digest,
         )
 
+    @staticmethod
+    def _rollback_no_replace(
+        filesystem: NativeAtomicFilesystem,
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+        expected_source: InodeWitness,
+    ) -> None:
+        source = filesystem.capture_inode(source_parent_fd, source_name, expected_source.kind)
+        destination = filesystem.capture_inode(destination_parent_fd, destination_name, expected_source.kind)
+        if source is not None:
+            if destination is None or not NativeAtomicFilesystem._same_content_identity(destination, expected_source):
+                return
+            raise FilesystemSafetyError("native no-replace rollback found duplicate source identity")
+        if destination is None or not NativeAtomicFilesystem._same_content_identity(destination, expected_source):
+            raise FilesystemSafetyError("native no-replace rollback cannot identify moved source")
+        filesystem.rename_no_replace(
+            destination_parent_fd,
+            destination_name,
+            source_parent_fd,
+            source_name,
+            expected_source=expected_source,
+        )
+        filesystem.fsync_directory(destination_parent_fd)
+        filesystem.fsync_directory(source_parent_fd)
+
+    def _rename_no_replace_bound(
+        self,
+        filesystem: NativeAtomicFilesystem,
+        root_fd: int,
+        destination_components: Sequence[str],
+        expected_binding: Sequence[InodeWitness],
+        bound_parent_fd: int,
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+        expected_source: InodeWitness,
+    ) -> None:
+        _require_path_binding(root_fd, destination_components, expected_binding, bound_parent_fd)
+        try:
+            filesystem.rename_no_replace(
+                source_parent_fd,
+                source_name,
+                destination_parent_fd,
+                destination_name,
+                expected_source=expected_source,
+            )
+            _require_path_binding(root_fd, destination_components, expected_binding, bound_parent_fd)
+        except (AtomicRenameUnavailable, FilesystemSafetyError, OSError) as failure:
+            try:
+                self._rollback_no_replace(
+                    filesystem,
+                    source_parent_fd,
+                    source_name,
+                    destination_parent_fd,
+                    destination_name,
+                    expected_source,
+                )
+            except (AtomicRenameUnavailable, FilesystemSafetyError, OSError) as cleanup_failure:
+                raise FilesystemSafetyError("native no-replace rollback failed") from cleanup_failure
+            raise failure
+
+    @staticmethod
+    def _rollback_exchange(
+        filesystem: NativeAtomicFilesystem,
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+        expected_source: InodeWitness,
+        expected_destination: InodeWitness,
+    ) -> None:
+        source = filesystem.capture_inode(source_parent_fd, source_name, expected_destination.kind)
+        destination = filesystem.capture_inode(destination_parent_fd, destination_name, expected_source.kind)
+        if source is not None and destination is not None:
+            if NativeAtomicFilesystem._same_content_identity(
+                source, expected_source
+            ) and NativeAtomicFilesystem._same_content_identity(destination, expected_destination):
+                return
+            if NativeAtomicFilesystem._same_content_identity(
+                source, expected_destination
+            ) and NativeAtomicFilesystem._same_content_identity(destination, expected_source):
+                filesystem.exchange(
+                    source_parent_fd,
+                    source_name,
+                    destination_parent_fd,
+                    destination_name,
+                    expected_source=expected_destination,
+                    expected_destination=expected_source,
+                )
+                filesystem.fsync_directory(source_parent_fd)
+                filesystem.fsync_directory(destination_parent_fd)
+                return
+        raise FilesystemSafetyError("native exchange rollback cannot identify swapped identities")
+
+    def _exchange_bound(
+        self,
+        filesystem: NativeAtomicFilesystem,
+        root_fd: int,
+        destination_components: Sequence[str],
+        expected_binding: Sequence[InodeWitness],
+        bound_parent_fd: int,
+        source_parent_fd: int,
+        source_name: str,
+        destination_parent_fd: int,
+        destination_name: str,
+        expected_source: InodeWitness,
+        expected_destination: InodeWitness,
+    ) -> None:
+        _require_path_binding(root_fd, destination_components, expected_binding, bound_parent_fd)
+        try:
+            filesystem.exchange(
+                source_parent_fd,
+                source_name,
+                destination_parent_fd,
+                destination_name,
+                expected_source=expected_source,
+                expected_destination=expected_destination,
+            )
+            _require_path_binding(root_fd, destination_components, expected_binding, bound_parent_fd)
+        except (AtomicRenameUnavailable, FilesystemSafetyError, OSError) as failure:
+            try:
+                self._rollback_exchange(
+                    filesystem,
+                    source_parent_fd,
+                    source_name,
+                    destination_parent_fd,
+                    destination_name,
+                    expected_source,
+                    expected_destination,
+                )
+            except (AtomicRenameUnavailable, FilesystemSafetyError, OSError) as cleanup_failure:
+                raise FilesystemSafetyError("native exchange rollback failed") from cleanup_failure
+            raise failure
+
     def _publish_domain(
         self,
         _request: LifecycleRequest,
@@ -3907,8 +4145,12 @@ class ProviderLifecycleEngine:
                     filesystem.remove_tree_bound(stage_fd, name, stage_tree)
                 except FileNotFoundError:
                     pass
-                _require_path_binding(root_fd, destination_components, destination_binding, destination_parent)
-                filesystem.rename_no_replace(
+                self._rename_no_replace_bound(
+                    filesystem,
+                    root_fd,
+                    destination_components,
+                    destination_binding,
+                    destination_parent,
                     destination_parent,
                     components[-1],
                     stage_fd,
@@ -3925,8 +4167,12 @@ class ProviderLifecycleEngine:
                     source_witness = filesystem.capture_inode(stage_fd, name, "directory")
                     if source_witness is None:
                         raise FilesystemSafetyError(f"missing stage source witness at {name}")
-                    _require_path_binding(root_fd, destination_components, destination_binding, destination_parent)
-                    filesystem.rename_no_replace(
+                    self._rename_no_replace_bound(
+                        filesystem,
+                        root_fd,
+                        destination_components,
+                        destination_binding,
+                        destination_parent,
                         stage_fd,
                         name,
                         destination_parent,
@@ -3939,8 +4185,12 @@ class ProviderLifecycleEngine:
                     source_witness = filesystem.capture_inode(stage_fd, name, "directory")
                     if source_witness is None:
                         raise FilesystemSafetyError(f"missing stage source witness at {name}")
-                    _require_path_binding(root_fd, destination_components, destination_binding, destination_parent)
-                    filesystem.exchange(
+                    self._exchange_bound(
+                        filesystem,
+                        root_fd,
+                        destination_components,
+                        destination_binding,
+                        destination_parent,
                         stage_fd,
                         name,
                         destination_parent,
@@ -4012,6 +4262,8 @@ class ProviderLifecycleEngine:
         parent_components = components[:-1]
         parent_fd, parent_binding = _open_path_bound(root_fd, parent_components, create=True)
         destination_fd = -1
+        created_witness: InodeWitness | None = None
+        filesystem = self._filesystem()
         try:
             source = self._assets() / source_suffix
             source_fd = os.open(
@@ -4039,15 +4291,34 @@ class ProviderLifecycleEngine:
                         cursor += os.write(destination_fd, chunk[cursor:])
                 os.fchmod(destination_fd, 0o644)
                 os.fsync(destination_fd)
+                created_witness = filesystem.capture_inode(parent_fd, components[-1], "regular")
+                if created_witness is None:
+                    raise FilesystemSafetyError(f"seed {public_path} disappeared after publication")
+                _require_path_binding(root_fd, parent_components, parent_binding, parent_fd)
             except FileExistsError:
                 # The no-replace operation lost a race.  Reclassify the visible
                 # entry; never replace a consumer seed.
                 pass
             self._check_fault(f"seed-{seed_name}-parent-fsync")
-            self._filesystem().fsync_directory(parent_fd)
+            filesystem.fsync_directory(parent_fd)
+            _require_path_binding(root_fd, parent_components, parent_binding, parent_fd)
             current = self._observe_target(root_fd, public_path, expect_tree=False)
             if current.kind not in {"regular"}:
                 raise FilesystemSafetyError(f"seed {public_path} changed after publication")
+        except (AtomicRenameUnavailable, FilesystemSafetyError, OSError) as failure:
+            if created_witness is not None:
+                try:
+                    created_current = filesystem.capture_inode(parent_fd, components[-1], "regular")
+                    if created_current is not None and NativeAtomicFilesystem._same_content_identity(
+                        created_current, created_witness
+                    ):
+                        filesystem.unlink_bound(parent_fd, components[-1], created_witness)
+                        filesystem.fsync_directory(parent_fd)
+                    elif created_current is not None:
+                        raise FilesystemSafetyError(f"seed {public_path} changed during rollback")
+                except (AtomicRenameUnavailable, FilesystemSafetyError, OSError) as cleanup_failure:
+                    raise FilesystemSafetyError(f"seed {public_path} rollback failed") from cleanup_failure
+            raise failure
         finally:
             if destination_fd >= 0:
                 os.close(destination_fd)
