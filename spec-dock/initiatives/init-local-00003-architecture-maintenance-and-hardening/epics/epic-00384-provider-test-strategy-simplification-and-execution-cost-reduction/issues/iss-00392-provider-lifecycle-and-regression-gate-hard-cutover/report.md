@@ -265,3 +265,23 @@ full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T052030.5
 full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T081102.979354Z/result.json`です。`candidate_sha`は上記実装candidateと一致し、violationは10件（runtime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件）でした。これは#395が所有する既知baselineであり、#392起因の新規lifecycle/provider `unexpected_failure`は0件です。検証範囲、ledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleを変更していません。機能削減に伴うobsolete-only testは追加・保持していません。
 
 この追補時点では、上記commitを含むReport-bound SHAのpush後に行うfresh Code Review Strict（Extra High）とFinal Quality Gate Strict（Pro）、人間PR merge、merged-tip B1が未完了です。従って、Issue finish、Product GREEN、PR merge完了はまだ主張しません。
+
+## 18. Target binding and slot-marker race remediation addendum (2026-09-11)
+
+Code Review Strict v10およびBlue Teamのfresh Strict分析で特定されたP1「観測済み対象と公開直前のスロット／対象が別inodeへ置換されても、pathname再オープンの結果を採用し得る」を、`ed49ee25e41be899dc2f579bdbfbf9d5e3216b0e`（parent `0260ccf9204d2867bd79e8d0fd50c4b7ecbc9cd3`）で修正しました。入場時に得た固定対象の`_ObservedTarget`をACTIVE準備とdry-run計画まで渡し、receipt無効化後やACTIVE準備後に対象を再観測して元のownership証拠を上書きしないようにしました。公開・detach前には、ACTIVEの元対象または正当なterminal candidateだけを許可します。
+
+スロットマーカー判定は、入場時に観測した対象のinode witnessと、同じ対象をdescriptor-relativeに開いたdirectoryのidentity、およびvisible entryのidentityを比較してから、同じdirectory descriptor上でマーカーを読みます。読み取り後にもdescriptor／visible identityを再確認し、A/Bスロット置換、marker pathnameの別対象読み取り、candidate判定のpathname再オープンを拒否します。元状態が`absent`のfresh installと、マーカーを持たない`legacy-0.2.3`の旧対象は従来どおり扱い、Wire v12、ACTIVE schema、public JSON、record、receipt、ledger、evaluator、required-fast、skip/xfail、bundleは変更していません。
+
+追加テストは、削除した旧機能の存在だけを確認するobsolete-only testではなく、実際の公開境界を検証する回帰テストです。valid markerを持つA/Bスロットの差し替えをupdate admission中に発生させ、foreign slotとしてpreflightで停止するケースと、update/uninstallのadmission後・publication前に固定docs対象をforeign directoryへ差し替え、観測済みACTIVE bindingを再利用して`verify-target`で停止するケースを追加しました。A/B競合テストではmarker読み取りの同一descriptor要件も検証します。
+
+- focused race tests: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py -k 'slot_marker_admission_rejects_replaced_slot_root or admission_target_observation_is_reused_before_publication' -q --tb=short` は`3 passed`
+- engine: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py -q --tb=short` は`258 passed`
+- provider lifecycle: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle -q --tb=short` は`472 passed`
+- default fast: `TMPDIR=/private/tmp uv run pytest -q --tb=short` は`1327 passed, 848 skipped`
+- static and SpecDock validation: `make lint`（ruff check、ruff format、mypy）はpass、`./spec-dock/scripts/spec-dock validate`は`nodes=236`
+- implementation commit: `ed49ee25e41be899dc2f579bdbfbf9d5e3216b0e`、parentは`0260ccf9204d2867bd79e8d0fd50c4b7ecbc9cd3`、commit直後のworktreeはclean
+- full verifier at implementation SHA: `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4` は`2175 tests collected`、4 shard exit 1、status=`ledger-mismatch`、`evaluation.verified=false`
+
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T092128.196303Z/result.json`です。`candidate_sha`は実装commitと一致し、violationは10件（#395 active baselineのruntime import S10 signature mismatch 8件、runtime shell S11 coverage mismatch 1件、workbench signature mismatch 1件）でした。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。既知baselineのledger mismatchを#392の修正として隠さず、#395の台帳・timing・evaluator・required-fast・skip/xfail・baseline行・bundleを変更していません。レートリミットを理由としたbundleまたは検証範囲の縮小も行っていません。
+
+この追補後は、reportを含む最終clean push SHAに対する同一reviewerのfresh Code Review Strict（Extra High）と、同じFQG v2 campaignによるFinal Quality Gate Strict（Pro）が未完了です。Code Review v10のP2「nested driftのunsafe-parent-binding分類」はreport-onlyとして残しており、P1修正でWire分類を変更していません。human PR merge、merged-tip B1、Issue finish、Product GREENは別ゲートであり、ここでは完了を主張しません。
