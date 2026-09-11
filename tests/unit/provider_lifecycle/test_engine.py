@@ -536,6 +536,153 @@ def test_t06_bootstrap_active_publication_failure_restores_absent_pre_state(tmp_
     assert resumed.status == "completed"
 
 
+def test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "bootstrap-planned-create-race").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    original_mkdir = engine_module.os.mkdir
+    injected = False
+
+    def introduce_foreign_container(name: str, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        nonlocal injected
+        if name == "spec-dock" and dir_fd is not None and not injected:
+            original_mkdir(name, mode, dir_fd=dir_fd)
+            injected = True
+        original_mkdir(name, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(engine_module.os, "mkdir", introduce_foreign_container)
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "blocked"
+    assert result.code == "bootstrap-container-conflict"
+    assert result.mutation_started is False
+    assert (workspace / "spec-dock").is_dir()
+    assert tuple((workspace / "spec-dock").iterdir()) == ()
+
+
+def test_t06_seed_parent_rebind_does_not_write_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "seed-parent-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "github-displaced"
+    original_open_path = engine_module._open_path_bound
+    injected = False
+
+    def rebind_github_parent(root_fd: int, components, *, create: bool = False):
+        nonlocal injected
+        fd, binding = original_open_path(root_fd, components, create=create)
+        if tuple(components) == (".github", "workflows") and not injected:
+            (workspace / ".github").rename(displaced)
+            (workspace / ".github" / "workflows").mkdir(parents=True)
+            injected = True
+        return fd, binding
+
+    monkeypatch.setattr(engine_module, "_open_path_bound", rebind_github_parent)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "create-seed-consumer-ci"
+    assert not (displaced / "workflows/ci.yml").exists()
+    assert not (workspace / ".github/workflows/ci.yml").exists()
+
+
+def test_t06_existing_bootstrap_rebind_blocks_before_mutation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "existing-bootstrap-rebind").resolve()
+    workspace.mkdir()
+    (workspace / "spec-dock").mkdir()
+    displaced = tmp_path / "spec-dock-displaced"
+    engine = ProviderLifecycleEngine()
+    original_prepare_stage = engine._prepare_stage
+    swapped = False
+
+    def replace_bootstrap_after_admission(stage_store, active, candidate, root_fd):
+        nonlocal swapped
+        original_prepare_stage(stage_store, active, candidate, root_fd)
+        (workspace / "spec-dock").rename(displaced)
+        (workspace / "spec-dock").mkdir()
+        swapped = True
+
+    monkeypatch.setattr(engine, "_prepare_stage", replace_bootstrap_after_admission)
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "blocked"
+    assert result.code == "bootstrap-container-conflict"
+    assert result.mutation_started is False
+    assert displaced.is_dir()
+    assert (workspace / "spec-dock").is_dir()
+    assert tuple((workspace / "spec-dock").iterdir()) == ()
+
+
+def test_t06_gitignore_parent_rebind_does_not_write_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "gitignore-parent-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "spec-dock-gitignore-displaced"
+    original_open_path = engine_module._open_path_bound
+    injected = False
+
+    def rebind_specdock_parent(root_fd: int, components, *, create: bool = False):
+        nonlocal injected
+        fd, binding = original_open_path(root_fd, components, create=create)
+        if (
+            tuple(components) == ("spec-dock",)
+            and not injected
+            and (workspace / "spec-dock/scripts").is_dir()
+            and not (workspace / ".github").exists()
+        ):
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return fd, binding
+
+    monkeypatch.setattr(engine_module, "_open_path_bound", rebind_specdock_parent)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "create-seed-spec-dock-gitignore"
+    assert not (displaced / ".gitignore").exists()
+    assert not (workspace / "spec-dock/.gitignore").exists()
+
+
+def test_t06_domain_parent_rebind_does_not_publish_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "domain-parent-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "domain-parent-rebind-displaced"
+    original_open_path = engine_module._open_path_bound
+    specdock_parent_opens = 0
+    injected = False
+
+    def rebind_domain_parent(root_fd: int, components, *, create: bool = False):
+        nonlocal injected, specdock_parent_opens
+        fd, binding = original_open_path(root_fd, components, create=create)
+        if tuple(components) == ("spec-dock",):
+            specdock_parent_opens += 1
+            if specdock_parent_opens == 3:
+                (workspace / "spec-dock").rename(displaced)
+                (workspace / "spec-dock").mkdir()
+                injected = True
+        return fd, binding
+
+    monkeypatch.setattr(engine_module, "_open_path_bound", rebind_domain_parent)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "publish-docs"
+    assert not (displaced / "docs").exists()
+    assert not (workspace / "spec-dock/docs").exists()
+
+
 @pytest.mark.parametrize("seed_policy", ["create-if-absent", "preserve-only"])
 def test_t06_bootstrap_cleanup_failure_publishes_closed_install_actions(
     monkeypatch, tmp_path: Path, seed_policy: str

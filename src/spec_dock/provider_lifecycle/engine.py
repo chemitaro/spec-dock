@@ -491,24 +491,6 @@ def _safe_component(name: str) -> None:
         raise FilesystemSafetyError(f"unsafe relative component: {name!r}")
 
 
-def _mkdir_child(parent_fd: int, name: str, mode: int = 0o755) -> int:
-    """Create/open a directory below an already-bound descriptor."""
-
-    _safe_component(name)
-    with contextlib.suppress(FileExistsError):
-        os.mkdir(name, mode, dir_fd=parent_fd)
-    fd = os.open(
-        name,
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-        dir_fd=parent_fd,
-    )
-    value = os.fstat(fd)
-    if not stat.S_ISDIR(value.st_mode):
-        os.close(fd)
-        raise FilesystemSafetyError(f"{name!r} is not a directory")
-    return fd
-
-
 def _open_existing_child(parent_fd: int, name: str) -> int | None:
     _safe_component(name)
     try:
@@ -522,11 +504,13 @@ def _open_existing_child(parent_fd: int, name: str) -> int | None:
 
 
 def _open_path(root_fd: int, components: Sequence[str], *, create: bool = False) -> int:
+    if create:
+        return _open_path_bound(root_fd, components, create=True)[0]
     current = os.dup(root_fd)
     try:
         for component in components:
             _safe_component(component)
-            next_fd = _mkdir_child(current, component) if create else _open_existing_child(current, component)
+            next_fd = _open_existing_child(current, component)
             if next_fd is None:
                 raise FileNotFoundError(component)
             os.close(current)
@@ -535,6 +519,84 @@ def _open_path(root_fd: int, components: Sequence[str], *, create: bool = False)
     except BaseException:
         os.close(current)
         raise
+
+
+def _directory_witness(fd: int) -> InodeWitness:
+    value = os.fstat(fd)
+    if not stat.S_ISDIR(value.st_mode):
+        raise FilesystemSafetyError("path component is not a directory")
+    return NativeAtomicFilesystem._witness(value, "directory", None)
+
+
+def _same_directory_binding(left: InodeWitness, right: InodeWitness) -> bool:
+    return (
+        left.kind == right.kind == "directory"
+        and left.device == right.device
+        and left.inode == right.inode
+        and left.mode == right.mode
+    )
+
+
+def _open_path_bound(
+    root_fd: int,
+    components: Sequence[str],
+    *,
+    create: bool = False,
+) -> tuple[int, tuple[InodeWitness, ...]]:
+    """Open a root-relative directory chain and retain its transient witnesses."""
+
+    current = os.dup(root_fd)
+    witnesses: list[InodeWitness] = []
+    try:
+        for component in components:
+            _safe_component(component)
+            next_fd = _open_existing_child(current, component)
+            if next_fd is None:
+                if not create:
+                    raise FileNotFoundError(component)
+                try:
+                    os.mkdir(component, 0o755, dir_fd=current)
+                except FileExistsError as failure:
+                    raise FilesystemSafetyError(
+                        f"path component {component!r} appeared during exclusive creation"
+                    ) from failure
+                next_fd = os.open(
+                    component,
+                    os.O_RDONLY
+                    | getattr(os, "O_DIRECTORY", 0)
+                    | getattr(os, "O_NOFOLLOW", 0)
+                    | getattr(os, "O_CLOEXEC", 0),
+                    dir_fd=current,
+                )
+                os.fsync(current)
+            witnesses.append(_directory_witness(next_fd))
+            os.close(current)
+            current = next_fd
+        return current, tuple(witnesses)
+    except BaseException:
+        os.close(current)
+        raise
+
+
+def _require_path_binding(
+    root_fd: int,
+    components: Sequence[str],
+    expected: Sequence[InodeWitness],
+    bound_fd: int,
+) -> None:
+    """Reject a parent descriptor that no longer names the visible root-relative chain."""
+
+    bound = _directory_witness(bound_fd)
+    visible_fd, visible = _open_path_bound(root_fd, components)
+    try:
+        if (
+            len(expected) != len(visible)
+            or not _same_directory_binding(bound, expected[-1])
+            or any(not _same_directory_binding(left, right) for left, right in zip(expected, visible, strict=True))
+        ):
+            raise FilesystemSafetyError("parent path binding changed before mutation")
+    finally:
+        os.close(visible_fd)
 
 
 def _source_directory(path: Path) -> int:
@@ -3429,7 +3491,17 @@ class ProviderLifecycleEngine:
         active_witness: InodeWitness,
     ) -> tuple[ActiveState, InodeWitness]:
         container = self._observe_container(root_fd)
-        if container.kind == "other" or container.kind == "symlink":
+        disposition = active.bootstrap_container.get("disposition")
+        bootstrap_matches = (
+            disposition == "planned-create"
+            and active.bootstrap_container.get("witness") is None
+            and container.kind == "absent"
+        ) or (
+            disposition in {"existing", "created"}
+            and container.kind == "directory"
+            and self._directory_binding_matches(active.bootstrap_container.get("witness"), container.witness)
+        )
+        if not bootstrap_matches:
             raise _AdmissionFailure(
                 "bootstrap-container-conflict",
                 phase="bootstrap-container",
@@ -3440,7 +3512,25 @@ class ProviderLifecycleEngine:
             )
         if container.kind == "absent":
             self._check_fault("bootstrap-container-mkdir")
-            container_fd = _mkdir_child(root_fd, "spec-dock")
+            try:
+                os.mkdir("spec-dock", 0o755, dir_fd=root_fd)
+            except FileExistsError as failure:
+                raise _AdmissionFailure(
+                    "bootstrap-container-conflict",
+                    phase="bootstrap-container",
+                    last_completed_phase="candidate-staging",
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                ) from failure
+            container_fd = os.open(
+                "spec-dock",
+                os.O_RDONLY
+                | getattr(os, "O_DIRECTORY", 0)
+                | getattr(os, "O_NOFOLLOW", 0)
+                | getattr(os, "O_CLOEXEC", 0),
+                dir_fd=root_fd,
+            )
             witness: InodeWitness | None = None
             try:
                 witness = self._filesystem().capture_inode(root_fd, "spec-dock", "directory")
@@ -3648,10 +3738,12 @@ class ProviderLifecycleEngine:
                 os.close(namespace_fd)
             raise failure
         namespace_fd = active_store._open_namespace()
-        specdock_fd = _open_path(root_fd, ("spec-dock",), create=True)
+        specdock_components = ("spec-dock",)
+        specdock_fd, specdock_binding = _open_path_bound(root_fd, specdock_components, create=True)
         filesystem = self._filesystem()
         exchanged = False
         try:
+            _require_path_binding(root_fd, specdock_components, specdock_binding, specdock_fd)
             try:
                 old_raw, old_witness = _read_regular(specdock_fd, "spec-dock.version")
             except FileNotFoundError:
@@ -3793,7 +3885,8 @@ class ProviderLifecycleEngine:
             if observed.kind != "directory":
                 self._ensure_domain_durable(root_fd, stage_store, path, expected_absent=True)
                 return
-        destination_parent = _open_path(root_fd, components[:-1], create=not detach)
+        destination_components = components[:-1]
+        destination_parent, destination_binding = _open_path_bound(root_fd, destination_components, create=not detach)
         stage_fd = stage_store._stage_fd()
         filesystem = self._filesystem()
         try:
@@ -3814,6 +3907,7 @@ class ProviderLifecycleEngine:
                     filesystem.remove_tree_bound(stage_fd, name, stage_tree)
                 except FileNotFoundError:
                     pass
+                _require_path_binding(root_fd, destination_components, destination_binding, destination_parent)
                 filesystem.rename_no_replace(
                     destination_parent,
                     components[-1],
@@ -3831,6 +3925,7 @@ class ProviderLifecycleEngine:
                     source_witness = filesystem.capture_inode(stage_fd, name, "directory")
                     if source_witness is None:
                         raise FilesystemSafetyError(f"missing stage source witness at {name}")
+                    _require_path_binding(root_fd, destination_components, destination_binding, destination_parent)
                     filesystem.rename_no_replace(
                         stage_fd,
                         name,
@@ -3844,6 +3939,7 @@ class ProviderLifecycleEngine:
                     source_witness = filesystem.capture_inode(stage_fd, name, "directory")
                     if source_witness is None:
                         raise FilesystemSafetyError(f"missing stage source witness at {name}")
+                    _require_path_binding(root_fd, destination_components, destination_binding, destination_parent)
                     filesystem.exchange(
                         stage_fd,
                         name,
@@ -3913,7 +4009,8 @@ class ProviderLifecycleEngine:
             return
         self._check_fault(f"seed-{seed_name}-no-replace-create")
         components = _target_components(public_path)
-        parent_fd = _open_path(root_fd, components[:-1], create=True)
+        parent_components = components[:-1]
+        parent_fd, parent_binding = _open_path_bound(root_fd, parent_components, create=True)
         destination_fd = -1
         try:
             source = self._assets() / source_suffix
@@ -3926,6 +4023,7 @@ class ProviderLifecycleEngine:
             raise
         try:
             try:
+                _require_path_binding(root_fd, parent_components, parent_binding, parent_fd)
                 destination_fd = os.open(
                     components[-1],
                     os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
