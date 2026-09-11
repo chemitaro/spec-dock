@@ -284,9 +284,9 @@ Authority fileはregular/link1、authority directoryはdirectoryです。Pathは
 
 ### 8.2 `ACTIVE.json`
 
-max32768、mode0600。`ACTIVE` schema versionは2です。schema version 1は旧private stateとして受理せず、fail-closedで停止します。Top-level exact key order:
+max32768、mode0600。`ACTIVE` schema versionは3です。schema version 1/2は旧private stateとして受理せず、fail-closedで停止します。Top-level exact key order:
 
-1. `schema_version` = 2
+1. `schema_version` = 3
 2. `state`: `prepared|running|ready|terminal-cleanup`
 3. `repository_key`
 4. `repository_identity`: exact keys `device,inode,euid`
@@ -303,10 +303,11 @@ max32768、mode0600。`ACTIVE` schema versionは2です。schema version 1は旧
 15. `owned_target_witnesses`
 16. `registered_stage_entries`
 17. `record_temp_witness`
-18. `terminal_record_digest`
-19. `cleanup_token`
-20. `cleanup_retry_invocation`
-21. `deferred_invocation`
+18. `public_record_witness`
+19. `terminal_record_digest`
+20. `cleanup_token`
+21. `cleanup_retry_invocation`
+22. `deferred_invocation`
 
 Nested exact schemas:
 
@@ -316,7 +317,8 @@ Nested exact schemas:
 - `bootstrap_container`: `disposition,witness`。`disposition=existing|planned-create|created`。planned-createだけwitness null。
 - `owned_target_witnesses`: fixed six objects、domain order。各object exact keys `path,original_kind,original_tree_digest,original_inode,terminal_kind,terminal_tree_digest`。Kindは`absent|directory`、対応しないdigest/inodeはnull。
 - `registered_stage_entries`: fixed six objects、domain order。各object exact keys `name,target_path,candidate_tree_digest,original_tree_digest`。`name`は`docs|templates|system|scripts|slot-spec-dock|slot-spec-dock-grill-with-docs`。
-- `record_temp_witness`: nullまたは`InodeWitness`。Publish前はmode0644のexact expected record staging inodeを表します。Exchange後はmode0644で戻った旧public recordをACTIVEの`original_record` witnessと照合してexpected-bound unlink/fsyncするまで表します。No-replace後はabsentを確認します。Foreign/content-equal別inodeは採用せず、record parent fsyncとresidue cleanup後にnullへ戻します。
+- `record_temp_witness`: nullまたは`InodeWitness`。Publish前はmode0644のexact expected record staging inodeを表します。初回publishのexchange後は、mode0644で戻った旧public recordをACTIVEの`original_record` witnessと照合し、終端publishのexchange後は直前のexpected incomplete recordとして照合して、expected-bound unlink/fsyncするまで表します。No-replace後は、公開済みrecordの復旧に必要な場合を除きabsentを確認します。Foreign/content-equal別inodeは採用せず、record parent fsyncとresidue cleanup後にnullへ戻します。
+- `public_record_witness`: nullまたはmode0644/link1のpublic `spec-dock.version` witness。Preparedの初期値は`original_record.witness`、prepared中にincomplete recordを公開した後はその公開inode、running/ready/terminal-cleanupでは現在のoperation-owned public record inodeを表します。初回publishはoriginal、終端publishはexpected incomplete recordのこのwitnessへ束縛し、content-equalなforeign inodeの交換・削除を許可しません。
 - `terminal_record_digest`: operation admission時に決定したexact expected terminal record bytesのSHA-256。
 - `cleanup_retry_invocation`: exact keys `role,invocation_id,cleanup_token,rendered_command`。`role=cleanup-retry`。
 - `deferred_invocation`: nullまたはexact keys `invocation_id,rendered_command`。
@@ -325,7 +327,7 @@ State invariants:
 
 | State | Required invariant |
 |---|---|
-| prepared | Consumerはoriginal stateまたはown expected incomplete + unpublished roots。Stageはabsent/incomplete/completeのいずれか。root mutationは禁止。 |
+| prepared | Consumerはoriginal state、またはACTIVEが束縛したown expected incomplete record + unpublished roots。Stageはabsent/incomplete/completeのいずれか。root mutationは禁止。 |
 | running | Expected incomplete recordとparent fsyncが成立。Fixed sequenceのtarget/stage配置から次phaseを推定する。 |
 | ready | 全terminal target content検証済み。Terminal recordは未公開またはmatching。 |
 | terminal-cleanup | Matching terminal recordあり。Lifecycle dispatchは禁止し、cleanup/receiptだけを実行。 |
@@ -377,7 +379,7 @@ max16384、mode0600。Stage removal/fsync後にreceiptをatomic publish/fsyncし
 
 1. Absent toolingで必要なら`spec-dock` containerをbounded create/fsyncし、ACTIVEのbootstrap witnessを`created`へ更新する。
 2. `RECORD-TEMP`をmode0644で作成し、expected incomplete recordを書いてfsyncし、そのwitnessをACTIVEへdurableに記録する。
-3. Native no-replace/exchangeでrecordを公開し、mode0644とrecord parentをfsync・再検証する。No-replace後はtemp absent、exchange後はACTIVEのoriginal-record witnessへ一致する旧recordだけをexpected-bound unlink/fsyncし、foreign substitutionはpreserve-and-blockする。
+3. Native no-replace/exchangeでrecordを公開し、mode0644とrecord parentをfsync・再検証する。公開inodeを`ACTIVE.public_record_witness`へdurableに記録してから、No-replace後はtemp absent、初回publishのexchange後はACTIVEのoriginal-record witnessへ、終端publishのexchange後は直前のexpected incomplete recordへ一致する旧recordだけをexpected-bound unlink/fsyncし、foreign substitutionはpreserve-and-blockする。
 4. ACTIVEを`running`へatomic publish/fsyncする。
 5. `docs`をpublish/exchangeし、target/stage parentsをfsync・再検証する。
 6. `templates`、`system`、`scripts`の順に同じ処理をする。
