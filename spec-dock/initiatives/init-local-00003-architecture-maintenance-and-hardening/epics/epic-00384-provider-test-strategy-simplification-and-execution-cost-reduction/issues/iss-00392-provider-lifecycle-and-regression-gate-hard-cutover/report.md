@@ -246,3 +246,22 @@ Blue Teamのfresh ChatGPT Use Strict分析（session `required-strict-github-con
 full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T052030.524878Z/result.json`です。`candidate_sha`は`c6a9278bb752571a4cb3305aa41c8d2d47036522`と一致し、violationは10件（#395 active baselineのruntime import S10 signature mismatch 8件、runtime shell S11 coverage mismatch 1件、workbench signature mismatch 1件）でした。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。前回のdirty実行で出たcandidate wheelのunexpected failureは未commit変更による作業ツリー汚染だったため、clean実行の結果には含めていません。レートリミットを理由にbundleや検証範囲を縮小せず、#395の台帳・timing・evaluator・baseline行を変更していません。
 
 このReport追記後のreport-bound SHAに対する同一reviewerのfresh Code Review Strict、Final Quality Gate Strict（Pro）、および人間PR merge／merged-tip B1は未完了です。full verifierの#395 baseline mismatchを#392へ取り込まず、Issue finish、Product GREEN、PR merge完了も主張しません。
+
+## 17. Filesystem identity-boundary remediation addendum (2026-09-11)
+
+`1c26266a814ceac341b9b559cd5b0489267fa7db`（parent `9898bfcba47a923b4270841347bcfcaedb0171ae`）では、直前のFinal Quality Gate StrictおよびBlue Team分析で特定されたfilesystem identity-boundaryのP1を修正しました。engine内に残っていた重複domain scannerを削除し、provider filesystemの単一bound captureへ統合しました。captureはrootのpre/open/post/visible identity、nested directoryのpre/open/post/visible identity、regular fileのpre/open/post/hash/visible identity、symlinkのreadlink pre/post identityを確認し、regular hard linkを拒否します。engineのstage validation、running-stage validation、re-entry observation、stage cleanup、stage removal、target observationはこのbound captureを使用します。engine固有のregular modeおよび相対symlink target制約はengine側に保持し、generic filesystemの挙動を過剰に狭めていません。
+
+同時に、repository rootのno-follow openでは`ENOENT`、`ENOTDIR`、`ELOOP`だけを既存Wire v12の`unsafe-repository-binding`へ分類し、その他のOS errorは従来のunavailable扱いを保持しました。seed parent chainのadmissionでは`ELOOP`、`ENOTDIR`だけを既存の`unsafe-parent-binding`へ収束させ、missing `.agents`をfresh installで合法的に作成できる経路を壊さないよう、`.agents`および`.agents/skills`のmatrixも追加しました。Wire、ACTIVE schema、ledger、evaluator、required-fast、skip/xfail、bundle、rate-limitを理由とした検証範囲は変更していません。
+
+回帰証拠は次のとおりです。
+
+- `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_atomic_filesystem.py tests/unit/provider_lifecycle/test_authority.py -q`: `20 passed`
+- `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py -q`: `255 passed`
+- `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle -q`: `469 passed`
+- `TMPDIR=/private/tmp uv run pytest -q --tb=short`: `1324 passed, 848 skipped`
+- `make lint`: ruff check、ruff format、mypyすべてpass
+- `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`: `2172 tests collected`、4 shard exit 1、`status=ledger-mismatch`、`evaluation.verified=false`
+
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T081102.979354Z/result.json`です。`candidate_sha`は上記実装candidateと一致し、violationは10件（runtime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件）でした。これは#395が所有する既知baselineであり、#392起因の新規lifecycle/provider `unexpected_failure`は0件です。検証範囲、ledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleを変更していません。機能削減に伴うobsolete-only testは追加・保持していません。
+
+この追補時点では、上記commitを含むReport-bound SHAのpush後に行うfresh Code Review Strict（Extra High）とFinal Quality Gate Strict（Pro）、人間PR merge、merged-tip B1が未完了です。従って、Issue finish、Product GREEN、PR merge完了はまだ主張しません。
