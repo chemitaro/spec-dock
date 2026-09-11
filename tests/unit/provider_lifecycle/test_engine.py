@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from dataclasses import replace
 from io import BytesIO
 import json
@@ -1525,6 +1526,84 @@ def test_t06_public_record_recovery_rejects_foreign_public_before_residue_unlink
     active = ActiveStateStore(namespace, repository_root=workspace).load()
     assert active is not None
     assert active.record_temp_witness is not None
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_initial_public_record_recovery_rejects_foreign_public_before_original_residue_unlink(
+    monkeypatch, tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / f"initial-public-record-recovery-public-race-{operation}").resolve()
+    workspace.mkdir()
+    if operation == "install":
+        _materialize_legacy_workspace(workspace)
+    else:
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    first_engine = ProviderLifecycleEngine()
+    original_save = first_engine._save_active
+    first_failed = False
+
+    def fail_after_initial_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal first_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+        if (
+            not first_failed
+            and active.state == "prepared"
+            and active.record_temp_witness is not None
+            and active.public_record_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == expected
+        ):
+            first_failed = True
+            raise OSError("injected initial exchange ACTIVE save failure")
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(first_engine, "_save_active", fail_after_initial_exchange)
+    first = first_engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    record_path = workspace / "spec-dock/spec-dock.version"
+    residue_path = namespace / "RECORD-TEMP"
+    assert record_path.is_file()
+    assert residue_path.is_file()
+    displaced = tmp_path / f"initial-public-record-recovery-public-race-{operation}-displaced"
+    swapped = False
+
+    def swap_public_after_residue_fault(point: str) -> None:
+        nonlocal swapped
+        if point == "record-exchange-residue-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    retry_request = _request(workspace, "update") if operation == "install" else request
+    second = ProviderLifecycleEngine(fault_injector=swap_public_after_residue_fault).execute(retry_request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "lifecycle-preparation-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert residue_path.is_file()
+    assert (namespace / "ACTIVE.json").is_file()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+
+    record_path.unlink()
+    displaced.rename(record_path)
+    resumed = ProviderLifecycleEngine().execute(retry_request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+    assert not residue_path.exists()
 
 
 @pytest.mark.parametrize("operation", ["install", "update", "uninstall"])

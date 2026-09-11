@@ -2260,7 +2260,11 @@ class ProviderLifecycleEngine:
             or record.seed_policy != active.seed_policy
         ):
             return False
-        if witness is not None and active.public_record_witness == witness:
+        if (
+            witness is not None
+            and active.public_record_witness is not None
+            and NativeAtomicFilesystem._same_content_identity(witness, active.public_record_witness)
+        ):
             return True
         return (
             witness is not None
@@ -2292,19 +2296,24 @@ class ProviderLifecycleEngine:
     ) -> tuple[ActiveState, InodeWitness]:
         if current_witness is None:
             raise PrivateStateForeignError("expected public record witness is missing")
-        if active.public_record_witness == current_witness:
-            return active, active_witness
-        if active.record_temp_witness is None or not NativeAtomicFilesystem._same_content_identity(
-            current_witness, active.record_temp_witness
-        ):
-            raise PrivateStateForeignError("public record publication source is foreign")
+        public_witness_matches = (
+            active.public_record_witness is not None
+            and NativeAtomicFilesystem._same_content_identity(current_witness, active.public_record_witness)
+        )
 
         namespace_fd = active_store._open_namespace()
         try:
             try:
                 residue_raw, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
             except FileNotFoundError:
+                if public_witness_matches:
+                    return active, active_witness
                 residue_raw, residue_witness = None, None
+            if not public_witness_matches and (
+                active.record_temp_witness is None
+                or not NativeAtomicFilesystem._same_content_identity(current_witness, active.record_temp_witness)
+            ):
+                raise PrivateStateForeignError("public record publication source is foreign")
             if residue_witness is not None:
                 if residue_kind == "original":
                     original_payload = active.original_record.get("bytes_base64")
@@ -2330,14 +2339,33 @@ class ProviderLifecycleEngine:
                 )
                 active_witness = self._save_active(active_store, recovered, expected=active_witness)
                 self._check_fault("record-exchange-residue-unlink")
-                if residue_kind == "incomplete" and not self._terminal_record_matches(
-                    root_fd,
-                    operation=recovered.operation,
-                    candidate_digest=recovered.candidate_digest,
-                    seed_policy=recovered.seed_policy,
-                    terminal_record_digest=recovered.terminal_record_digest,
-                    expected_witness=recovered.public_record_witness,
-                ):
+                if residue_kind == "incomplete":
+                    public_matches = self._terminal_record_matches(
+                        root_fd,
+                        operation=recovered.operation,
+                        candidate_digest=recovered.candidate_digest,
+                        seed_policy=recovered.seed_policy,
+                        terminal_record_digest=recovered.terminal_record_digest,
+                        expected_witness=recovered.public_record_witness,
+                    )
+                else:
+                    public_raw, public_witness, public_record, public_kind = self._observe_record("", root_fd)
+                    expected_payload = base64.b64decode(recovered.expected_incomplete_record["bytes_base64"])
+                    public_matches = (
+                        public_raw == expected_payload
+                        and public_witness is not None
+                        and recovered.public_record_witness is not None
+                        and NativeAtomicFilesystem._same_content_identity(
+                            public_witness, recovered.public_record_witness
+                        )
+                        and public_record is not None
+                        and public_kind == "final"
+                        and public_record.state == "incomplete"
+                        and public_record.operation == recovered.operation
+                        and public_record.candidate_digest == recovered.candidate_digest
+                        and public_record.seed_policy == recovered.seed_policy
+                    )
+                if not public_matches:
                     raise PrivateStateForeignError("public record changed before exchange residue cleanup")
                 self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
                 self._filesystem().fsync_directory(namespace_fd)
@@ -3553,7 +3581,12 @@ class ProviderLifecycleEngine:
         *,
         predecessor_kind: Literal["original", "incomplete"],
     ) -> None:
-        if active.public_record_witness != witness:
+        if active.public_record_witness is None:
+            if witness is not None:
+                raise PrivateStateForeignError("public record predecessor witness changed")
+        elif witness is None or not NativeAtomicFilesystem._same_content_identity(
+            witness, active.public_record_witness
+        ):
             raise PrivateStateForeignError("public record predecessor witness changed")
         if predecessor_kind == "original":
             original_payload = active.original_record.get("bytes_base64")
@@ -3709,7 +3742,9 @@ class ProviderLifecycleEngine:
             os.close(specdock_fd)
         if current != expected:
             raise PrivateStateForeignError("expected incomplete record changed before re-entry")
-        if active.public_record_witness == witness:
+        if active.public_record_witness is not None and NativeAtomicFilesystem._same_content_identity(
+            witness, active.public_record_witness
+        ):
             return
         if active.record_temp_witness is None or not NativeAtomicFilesystem._same_content_identity(
             witness, active.record_temp_witness
