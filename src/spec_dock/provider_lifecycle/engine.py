@@ -620,22 +620,26 @@ def _open_path_bound(
                         os.rmdir(component, dir_fd=current)
                     os.close(cleanup_parent_fd)
                     raise
-                os.fsync(current)
                 created.append((cleanup_parent_fd, component, created_witness))
-                if index >= 0:
-                    visible_fd, visible = _open_path_visible(root_fd, tuple(components[: index + 1]))
-                    try:
-                        if (
-                            len(visible) != index + 1
-                            or any(
-                                not _same_directory_binding(left, right)
-                                for left, right in zip(witnesses, visible[:-1], strict=True)
-                            )
-                            or not _same_directory_binding(created_witness, visible[-1])
-                        ):
-                            raise FilesystemSafetyError("created path component is no longer root-visible")
-                    finally:
-                        os.close(visible_fd)
+                try:
+                    os.fsync(current)
+                    if index >= 0:
+                        visible_fd, visible = _open_path_visible(root_fd, tuple(components[: index + 1]))
+                        try:
+                            if (
+                                len(visible) != index + 1
+                                or any(
+                                    not _same_directory_binding(left, right)
+                                    for left, right in zip(witnesses, visible[:-1], strict=True)
+                                )
+                                or not _same_directory_binding(created_witness, visible[-1])
+                            ):
+                                raise FilesystemSafetyError("created path component is no longer root-visible")
+                        finally:
+                            os.close(visible_fd)
+                except BaseException:
+                    os.close(next_fd)
+                    raise
             witnesses.append(_directory_witness(next_fd))
             os.close(current)
             current = next_fd

@@ -851,6 +851,39 @@ def test_t06_domain_exchange_post_binding_rebind_rolls_back_displaced_mutation(m
     assert not (workspace / "spec-dock/docs").exists()
 
 
+def test_t06_created_parent_fsync_failure_rolls_back_created_component(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "created-parent-fsync-failure").resolve()
+    workspace.mkdir()
+    original_mkdir = engine_module.os.mkdir
+    original_fsync = engine_module.os.fsync
+    target_parent_fd: int | None = None
+    injected = False
+
+    def record_target_parent(name: str, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        nonlocal target_parent_fd
+        if name == ".github" and dir_fd is not None:
+            target_parent_fd = dir_fd
+        original_mkdir(name, mode, dir_fd=dir_fd)
+
+    def fail_after_created_parent_witness(fd: int) -> None:
+        nonlocal injected
+        if target_parent_fd == fd and not injected:
+            injected = True
+            raise OSError("created parent fsync failed")
+        original_fsync(fd)
+
+    monkeypatch.setattr(engine_module.os, "mkdir", record_target_parent)
+    monkeypatch.setattr(engine_module.os, "fsync", fail_after_created_parent_witness)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "create-seed-consumer-ci"
+    assert not (workspace / ".github").exists()
+
+
 @pytest.mark.parametrize("seed_policy", ["create-if-absent", "preserve-only"])
 def test_t06_bootstrap_cleanup_failure_publishes_closed_install_actions(
     monkeypatch, tmp_path: Path, seed_policy: str
