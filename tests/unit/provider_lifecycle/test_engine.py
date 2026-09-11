@@ -1202,6 +1202,150 @@ def test_t04_finish_cleanup_rejects_same_content_foreign_active_inode(monkeypatc
     assert active_path.stat().st_ino != displaced.stat().st_ino
 
 
+def test_t04_terminal_record_exchange_rejects_foreign_public_inode_before_residue_cleanup(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = (tmp_path / "terminal-record-public-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / "terminal-record-public-displaced"
+    engine = ProviderLifecycleEngine()
+    original_save = engine._save_active
+    swapped = False
+
+    def replace_before_active_public_witness_save(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal swapped
+        if (
+            not swapped
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and record_path.is_file()
+            and record_path.read_bytes() == engine._terminal_record_bytes(active)
+        ):
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(engine, "_save_active", replace_before_active_public_witness_save)
+    result = engine.execute(request, force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+    assert (namespace / "RECORD-TEMP").is_file()
+
+
+def test_t06_public_record_recovery_preserves_residue_until_active_clear_is_durable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = (tmp_path / "public-record-recovery-order").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first_engine = ProviderLifecycleEngine()
+    original_first_save = first_engine._save_active
+    first_failed = False
+
+    def fail_after_terminal_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal first_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        if (
+            not first_failed
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == first_engine._terminal_record_bytes(active)
+        ):
+            first_failed = True
+            raise OSError("injected post-exchange ACTIVE save failure")
+        return original_first_save(store, active, **kwargs)
+
+    monkeypatch.setattr(first_engine, "_save_active", fail_after_terminal_exchange)
+    first = first_engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    assert (namespace / "RECORD-TEMP").is_file()
+
+    retry_engine = ProviderLifecycleEngine()
+    original_retry_save = retry_engine._save_active
+    clear_failed = False
+
+    def fail_before_active_clear(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal clear_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        if (
+            not clear_failed
+            and active.state == "ready"
+            and active.record_temp_witness is None
+            and record_path.is_file()
+            and record_path.read_bytes() == retry_engine._terminal_record_bytes(active)
+        ):
+            clear_failed = True
+            raise OSError("injected post-residue ACTIVE clear failure")
+        return original_retry_save(store, active, **kwargs)
+
+    monkeypatch.setattr(retry_engine, "_save_active", fail_before_active_clear)
+    second = retry_engine.execute(request, force=True)
+
+    serialize_public_result(second)
+    assert clear_failed
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    active_after_failure = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active_after_failure is not None
+    assert active_after_failure.record_temp_witness is not None
+    assert not (namespace / "RECORD-TEMP").exists()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
+def test_t04_finish_cleanup_rejects_foreign_receipt_inode_before_active_unlink(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "finish-cleanup-receipt-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(request, force=True)
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    displaced = tmp_path / "finish-cleanup-receipt-displaced"
+    calls = 0
+    original_load = ActiveStateStore.load_with_witness
+
+    def replace_before_active_unlink(store: ActiveStateStore):
+        nonlocal calls
+        result = original_load(store)
+        calls += 1
+        if calls == 3:
+            _replace_regular_file_with_same_payload(receipt_path, displaced, mode=0o600)
+        return result
+
+    monkeypatch.setattr(ActiveStateStore, "load_with_witness", replace_before_active_unlink)
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert calls == 4
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert (namespace / "ACTIVE.json").is_file()
+    assert receipt_path.read_bytes() == displaced.read_bytes()
+    assert receipt_path.stat().st_ino != displaced.stat().st_ino
+
+
 def test_t06_terminal_record_residue_is_cleaned_on_retry(tmp_path: Path) -> None:
     workspace = (tmp_path / "terminal-record-residue-recovery").resolve()
     workspace.mkdir()

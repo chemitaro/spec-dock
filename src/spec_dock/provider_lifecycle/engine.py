@@ -2322,6 +2322,13 @@ class ProviderLifecycleEngine:
                     )
                 if not residue_matches:
                     raise PrivateStateForeignError("public record exchange residue is foreign during recovery")
+                recovered = replace(
+                    active,
+                    record_temp_witness=residue_witness,
+                    public_record_witness=current_witness,
+                )
+                active_witness = self._save_active(active_store, recovered, expected=active_witness)
+                self._check_fault("record-exchange-residue-unlink")
                 self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
                 self._filesystem().fsync_directory(namespace_fd)
             elif residue_kind == "incomplete":
@@ -3587,6 +3594,7 @@ class ProviderLifecycleEngine:
         namespace_fd = active_store._open_namespace()
         specdock_fd = _open_path(root_fd, ("spec-dock",), create=True)
         filesystem = self._filesystem()
+        exchanged = False
         try:
             try:
                 old_raw, old_witness = _read_regular(specdock_fd, "spec-dock.version")
@@ -3617,24 +3625,49 @@ class ProviderLifecycleEngine:
                 _, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
                 if not NativeAtomicFilesystem._same_content_identity(residue_witness, predecessor_witness):
                     raise PrivateStateForeignError("public record exchange residue is foreign")
-                _, public_witness = _read_regular(specdock_fd, "spec-dock.version")
+                public_raw, public_witness = _read_regular(specdock_fd, "spec-dock.version")
+                if (
+                    public_raw != payload
+                    or public_witness.mode != 0o644
+                    or not NativeAtomicFilesystem._same_content_identity(public_witness, witness)
+                ):
+                    raise FilesystemSafetyError("public record exchange source is foreign")
+                self._check_fault("record-parent-fsync")
+                filesystem.fsync_directory(specdock_fd)
+                current_raw, current_witness = _read_regular(specdock_fd, "spec-dock.version")
+                if (
+                    current_raw != payload
+                    or current_witness.mode != 0o644
+                    or not NativeAtomicFilesystem._same_content_identity(current_witness, witness)
+                ):
+                    raise FilesystemSafetyError("public record changed before ACTIVE publication")
                 active = replace(
                     active,
                     record_temp_witness=residue_witness,
-                    public_record_witness=public_witness,
+                    public_record_witness=current_witness,
                 )
                 active_witness = self._save_active(active_store, active, expected=active_witness)
                 self._check_fault("record-exchange-residue-unlink")
+                current_raw, current_witness = _read_regular(specdock_fd, "spec-dock.version")
+                if (
+                    current_raw != payload
+                    or current_witness.mode != 0o644
+                    or not NativeAtomicFilesystem._same_content_identity(current_witness, witness)
+                ):
+                    raise FilesystemSafetyError("public record changed before exchange residue cleanup")
                 filesystem.unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
-            self._check_fault("record-parent-fsync")
-            filesystem.fsync_directory(specdock_fd)
-            current_raw, current_witness = _read_regular(specdock_fd, "spec-dock.version")
-            if (
-                current_raw != payload
-                or current_witness.mode != 0o644
-                or not NativeAtomicFilesystem._same_content_identity(current_witness, witness)
-            ):
-                raise FilesystemSafetyError("public record postcondition failed")
+                filesystem.fsync_directory(namespace_fd)
+                exchanged = True
+            if not exchanged:
+                self._check_fault("record-parent-fsync")
+                filesystem.fsync_directory(specdock_fd)
+                current_raw, current_witness = _read_regular(specdock_fd, "spec-dock.version")
+                if (
+                    current_raw != payload
+                    or current_witness.mode != 0o644
+                    or not NativeAtomicFilesystem._same_content_identity(current_witness, witness)
+                ):
+                    raise FilesystemSafetyError("public record postcondition failed")
         finally:
             os.close(specdock_fd)
             os.close(namespace_fd)
@@ -3886,6 +3919,7 @@ class ProviderLifecycleEngine:
         *,
         active_witness: InodeWitness,
         receipt: CompletionReceipt | None = None,
+        receipt_witness: InodeWitness | None = None,
         cleanup_only: bool = False,
         initial_absent_paths: frozenset[str] | None = None,
     ) -> LifecycleResult:
@@ -3912,7 +3946,7 @@ class ProviderLifecycleEngine:
                     active.cleanup_retry_invocation,
                     active.deferred_invocation,
                 )
-                receipt_store.save(receipt, expected_absent=True, fault=self._check_fault)
+                receipt_witness = receipt_store.save(receipt, expected_absent=True, fault=self._check_fault)
             self._check_fault("active-expected-unlink")
             stored_active, stored_witness = active_store.load_with_witness()
             if stored_active != active or stored_witness != active_witness:
@@ -3921,6 +3955,11 @@ class ProviderLifecycleEngine:
                 raise PrivateStateForeignError("ACTIVE witness is missing before expected unlink")
             namespace_fd = active_store._open_namespace()
             try:
+                if receipt_witness is None:
+                    raise PrivateStateForeignError("completion receipt witness is missing before expected unlink")
+                stored_receipt, stored_receipt_witness = receipt_store.load_with_witness()
+                if stored_receipt != receipt or stored_receipt_witness != receipt_witness:
+                    raise PrivateStateForeignError("completion receipt changed before expected unlink")
                 self._filesystem().unlink_bound(namespace_fd, ACTIVE_NAME, stored_witness)
                 self._check_fault("active-expected-parent-fsync")
                 self._filesystem().fsync_directory(namespace_fd)
@@ -4613,6 +4652,7 @@ class ProviderLifecycleEngine:
             root_fd,
             active_witness=active_witness,
             receipt=receipt,
+            receipt_witness=receipt_witness,
             cleanup_only=True,
         )
 
