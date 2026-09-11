@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Protocol
 from spec_dock.provider_lifecycle.contracts import InodeWitness
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Collection, Iterable
 
 
 class FilesystemSafetyError(RuntimeError):
@@ -215,25 +215,39 @@ class NativeAtomicFilesystem:
         kind = _object_kind(before.st_mode)
         if kind != expected_kind:
             raise FilesystemSafetyError(f"{name!r} is {kind}, expected {expected_kind}")
-        digest = None
-        if kind == "regular":
-            fd = os.open(
-                name, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0), dir_fd=parent_fd
-            )
-            try:
-                after_open = os.fstat(fd)
-                if not self._same_inode(before, after_open):
-                    raise FilesystemSafetyError(f"{name!r} changed while opening")
+        if kind == "regular" and before.st_nlink != 1:
+            raise FilesystemSafetyError(f"{name!r} is hard-linked")
+        fd = os.open(
+            name,
+            (_fd_flags() | getattr(os, "O_NOFOLLOW", 0))
+            if kind == "directory"
+            else os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
+            dir_fd=parent_fd,
+        )
+        try:
+            after_open = os.fstat(fd)
+            if not self._same_inode(before, after_open):
+                raise FilesystemSafetyError(f"{name!r} changed while opening")
+            digest = None
+            if kind == "regular":
                 digest = self._sha256_fd(fd)
-                after_read = os.fstat(fd)
-                if not self._same_inode(after_open, after_read):
-                    raise FilesystemSafetyError(f"{name!r} changed while reading")
-                before = after_read
-            finally:
-                os.close(fd)
-        return self._witness(before, kind, digest)
+            after_read = os.fstat(fd)
+            if not self._same_inode(after_open, after_read):
+                raise FilesystemSafetyError(f"{name!r} changed while reading")
+            visible = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if not self._same_inode(after_read, visible):
+                raise FilesystemSafetyError(f"{name!r} changed after reading")
+        finally:
+            os.close(fd)
+        return self._witness(after_read, kind, digest)
 
     def capture_domain_tree(self, parent_fd: int, name: str) -> DomainTreeIdentity:
+        _witness, tree = self.capture_bound_domain_tree(parent_fd, name)
+        return tree
+
+    def capture_bound_domain_tree(self, parent_fd: int, name: str) -> tuple[InodeWitness, DomainTreeIdentity]:
+        """Capture a directory tree and its root witness from one bound observation."""
+
         root_stat = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
         if not stat.S_ISDIR(root_stat.st_mode):
             raise FilesystemSafetyError(f"{name!r} is not a directory")
@@ -248,24 +262,12 @@ class NativeAtomicFilesystem:
             after_scan = os.fstat(root_fd)
             if not self._same_inode(opened, after_scan):
                 raise FilesystemSafetyError(f"{name!r} changed while reading")
+            visible = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
+            if not self._same_inode(after_scan, visible):
+                raise FilesystemSafetyError(f"{name!r} changed after reading")
         finally:
             os.close(root_fd)
-        stream = bytearray()
-        for entry in entries:
-            relative = entry.path.encode("utf-8")
-            if entry.kind == "directory":
-                stream.extend(b"D\0" + relative + b"\0")
-            elif entry.kind == "regular":
-                assert entry.mode is not None and entry.sha256 is not None
-                stream.extend(
-                    b"F\0" + relative + b"\0" + f"{entry.mode:04o}".encode() + b"\0" + entry.sha256.encode() + b"\0"
-                )
-            elif entry.kind == "symlink":
-                assert entry.target is not None
-                stream.extend(b"L\0" + relative + b"\0" + entry.target.encode("utf-8") + b"\0")
-            else:
-                raise FilesystemSafetyError("unsupported tree entry")
-        return DomainTreeIdentity(hashlib.sha256(stream).hexdigest(), len(entries), entries)
+        return self._witness(after_scan, "directory", None), _tree_identity(entries)
 
     def rename_no_replace(
         self,
@@ -331,8 +333,7 @@ class NativeAtomicFilesystem:
         os.unlink(name, dir_fd=parent_fd)
 
     def remove_tree_bound(self, parent_fd: int, name: str, expected_tree: DomainTreeIdentity) -> None:
-        root_witness = self.capture_inode(parent_fd, name, "directory")
-        current = self.capture_domain_tree(parent_fd, name)
+        root_witness, current = self.capture_bound_domain_tree(parent_fd, name)
         if root_witness is None or current != expected_tree:
             raise FilesystemSafetyError(f"bound tree witness mismatch for {name!r}")
         self._remove_tree(parent_fd, name, root_witness, expected_tree.entries)
@@ -459,9 +460,14 @@ class NativeAtomicFilesystem:
                     after_scan = os.fstat(child_fd)
                     if not self._same_inode(opened, after_scan):
                         raise FilesystemSafetyError(f"{child_relative!r} changed while reading")
+                    visible = os.stat(child_name, dir_fd=directory_fd, follow_symlinks=False)
+                    if not self._same_inode(after_scan, visible):
+                        raise FilesystemSafetyError(f"{child_relative!r} changed after reading")
                 finally:
                     os.close(child_fd)
             elif kind == "regular":
+                if child_stat.st_nlink != 1:
+                    raise FilesystemSafetyError(f"{child_relative!r} is hard-linked")
                 child_fd = os.open(
                     child_name,
                     os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0),
@@ -475,14 +481,22 @@ class NativeAtomicFilesystem:
                     after_read = os.fstat(child_fd)
                     if not self._same_inode(opened, after_read):
                         raise FilesystemSafetyError(f"{child_relative!r} changed while reading")
+                    visible = os.stat(child_name, dir_fd=directory_fd, follow_symlinks=False)
+                    if not self._same_inode(after_read, visible):
+                        raise FilesystemSafetyError(f"{child_relative!r} changed after reading")
                 finally:
                     os.close(child_fd)
                 yield TreeEntry("regular", child_relative, stat.S_IMODE(after_read.st_mode), content)
             elif kind == "symlink":
                 target = os.readlink(child_name, dir_fd=directory_fd)
+                after_link = os.stat(child_name, dir_fd=directory_fd, follow_symlinks=False)
+                if not self._same_inode(child_stat, after_link):
+                    raise FilesystemSafetyError(f"{child_relative!r} changed while reading")
                 yield TreeEntry("symlink", child_relative, target=target)
             else:
                 raise FilesystemSafetyError(f"unsupported tree entry at {child_relative!r}")
+        if sorted(os.listdir(directory_fd), key=lambda item: os.fsencode(item)) != names:
+            raise FilesystemSafetyError(f"{relative_prefix or 'tree'!r} changed while reading")
 
     def _remove_tree(
         self,
@@ -547,11 +561,40 @@ class NativeAtomicFilesystem:
                 os.unlink(name, dir_fd=directory_fd)
             elif entry.kind == "symlink":
                 value = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
-                if not stat.S_ISLNK(value.st_mode) or os.readlink(name, dir_fd=directory_fd) != entry.target:
+                target = os.readlink(name, dir_fd=directory_fd)
+                after_read = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+                if not stat.S_ISLNK(value.st_mode) or target != entry.target or not self._same_inode(value, after_read):
                     raise FilesystemSafetyError("symlink entry changed during bound removal")
                 os.unlink(name, dir_fd=directory_fd)
             else:
                 raise FilesystemSafetyError("unsupported entry during bound removal")
+
+
+def _tree_identity(entries: tuple[TreeEntry, ...]) -> DomainTreeIdentity:
+    stream = bytearray()
+    for entry in entries:
+        relative = entry.path.encode("utf-8")
+        if entry.kind == "directory":
+            stream.extend(b"D\0" + relative + b"\0")
+        elif entry.kind == "regular":
+            assert entry.mode is not None and entry.sha256 is not None
+            stream.extend(
+                b"F\0" + relative + b"\0" + f"{entry.mode:04o}".encode() + b"\0" + entry.sha256.encode() + b"\0"
+            )
+        elif entry.kind == "symlink":
+            assert entry.target is not None
+            stream.extend(b"L\0" + relative + b"\0" + entry.target.encode("utf-8") + b"\0")
+        else:
+            raise FilesystemSafetyError("unsupported tree entry")
+    return DomainTreeIdentity(hashlib.sha256(stream).hexdigest(), len(entries), entries)
+
+
+def project_domain_tree(tree: DomainTreeIdentity, *, exclude_root_names: Collection[str] = ()) -> DomainTreeIdentity:
+    """Return the canonical identity after excluding selected root entries."""
+
+    excluded = frozenset(exclude_root_names)
+    entries = tuple(entry for entry in tree.entries if entry.path not in excluded)
+    return _tree_identity(entries)
 
 
 __all__ = [
@@ -563,4 +606,5 @@ __all__ = [
     "MacOSRenameAtXAdapter",
     "NativeAtomicFilesystem",
     "TreeEntry",
+    "project_domain_tree",
 ]

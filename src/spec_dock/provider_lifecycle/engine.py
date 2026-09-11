@@ -61,7 +61,7 @@ from spec_dock.provider_lifecycle.filesystem import (
     DomainTreeIdentity,
     FilesystemSafetyError,
     NativeAtomicFilesystem,
-    TreeEntry,
+    project_domain_tree,
 )
 from spec_dock.provider_lifecycle.legacy_fixture import (
     classify_exact_legacy_workspace,
@@ -415,23 +415,6 @@ def _record_ref(raw: bytes | None, kind: str, witness: InodeWitness | None) -> d
     }
 
 
-def _domain_digest(entries: Sequence[TreeEntry]) -> str:
-    stream = bytearray()
-    for entry in entries:
-        path = entry.path.encode("utf-8")
-        if entry.kind == "directory":
-            stream.extend(b"D\0" + path + b"\0")
-        elif entry.kind == "regular":
-            assert entry.mode is not None and entry.sha256 is not None
-            stream.extend(b"F\0" + path + b"\0" + f"{entry.mode:04o}".encode() + b"\0" + entry.sha256.encode() + b"\0")
-        elif entry.kind == "symlink":
-            assert entry.target is not None
-            stream.extend(b"L\0" + path + b"\0" + entry.target.encode("utf-8") + b"\0")
-        else:
-            raise FilesystemSafetyError("unsupported domain entry")
-    return hashlib.sha256(bytes(stream)).hexdigest()
-
-
 def _read_regular(parent_fd: int, name: str, maximum: int = 4096) -> tuple[bytes, InodeWitness]:
     value = os.stat(name, dir_fd=parent_fd, follow_symlinks=False)
     if not stat.S_ISREG(value.st_mode) or value.st_nlink != 1 or stat.S_IMODE(value.st_mode) != 0o644:
@@ -494,66 +477,6 @@ def _open_child(parent_fd: int, components: Sequence[str], *, create: bool = Fal
     except BaseException:
         os.close(current)
         raise
-
-
-def _capture_entries(parent_fd: int, name: str, *, exclude_marker: bool = False) -> tuple[TreeEntry, ...]:
-    root_fd = os.open(
-        name,
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-        dir_fd=parent_fd,
-    )
-    entries: list[TreeEntry] = []
-
-    def visit(directory_fd: int, prefix: str) -> None:
-        names = sorted(os.listdir(directory_fd), key=os.fsencode)
-        for child in names:
-            if exclude_marker and not prefix and child == SLOT_MARKER_NAME:
-                continue
-            relative = f"{prefix}/{child}" if prefix else child
-            value = os.stat(child, dir_fd=directory_fd, follow_symlinks=False)
-            if stat.S_ISDIR(value.st_mode):
-                entries.append(TreeEntry("directory", relative))
-                child_fd = os.open(
-                    child,
-                    os.O_RDONLY
-                    | getattr(os, "O_DIRECTORY", 0)
-                    | getattr(os, "O_NOFOLLOW", 0)
-                    | getattr(os, "O_CLOEXEC", 0),
-                    dir_fd=directory_fd,
-                )
-                try:
-                    visit(child_fd, relative)
-                finally:
-                    os.close(child_fd)
-            elif stat.S_ISREG(value.st_mode):
-                if stat.S_IMODE(value.st_mode) not in {0o644, 0o755}:
-                    raise FilesystemSafetyError(f"unsupported regular mode at {relative}")
-                fd = os.open(
-                    child, os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0), dir_fd=directory_fd
-                )
-                try:
-                    content = NativeAtomicFilesystem._sha256_fd(fd)
-                finally:
-                    os.close(fd)
-                entries.append(TreeEntry("regular", relative, stat.S_IMODE(value.st_mode), content))
-            elif stat.S_ISLNK(value.st_mode):
-                target = os.readlink(child, dir_fd=directory_fd)
-                if target.startswith("/") or "\\" in target or "\x00" in target:
-                    raise FilesystemSafetyError(f"unsafe symlink at {relative}")
-                entries.append(TreeEntry("symlink", relative, target=target))
-            else:
-                raise FilesystemSafetyError(f"unsupported entry at {relative}")
-
-    try:
-        visit(root_fd, "")
-    finally:
-        os.close(root_fd)
-    return tuple(sorted(entries, key=lambda entry: entry.path.encode("utf-8")))
-
-
-def _capture_domain(parent_fd: int, name: str, *, exclude_marker: bool = False) -> DomainTreeIdentity:
-    entries = _capture_entries(parent_fd, name, exclude_marker=exclude_marker)
-    return DomainTreeIdentity(_domain_digest(entries), len(entries), entries)
 
 
 def _target_components(path: str) -> tuple[str, ...]:
@@ -838,6 +761,25 @@ class ProviderLifecycleEngine:
             self.filesystem = NativeAtomicFilesystem()
         return self.filesystem
 
+    def _capture_engine_domain(
+        self,
+        parent_fd: int,
+        name: str,
+        *,
+        exclude_marker: bool = False,
+    ) -> tuple[InodeWitness, DomainTreeIdentity]:
+        witness, tree = self._filesystem().capture_bound_domain_tree(parent_fd, name)
+        for entry in tree.entries:
+            if entry.kind == "regular" and entry.mode not in {0o644, 0o755}:
+                raise FilesystemSafetyError(f"unsupported regular mode at {entry.path}")
+            if entry.kind == "symlink" and (
+                entry.target is None or entry.target.startswith("/") or "\\" in entry.target or "\x00" in entry.target
+            ):
+                raise FilesystemSafetyError(f"unsafe symlink at {entry.path}")
+        if exclude_marker:
+            tree = project_domain_tree(tree, exclude_root_names={SLOT_MARKER_NAME})
+        return witness, tree
+
     def _assets(self) -> Path:
         value = Path(__file__).parent.parent / "assets" if self.assets_root is None else self.assets_root
         if (value / "spec_dock").is_dir() and (value / "install_root").is_dir():
@@ -1029,6 +971,8 @@ class ProviderLifecycleEngine:
             if active is not None:
                 try:
                     active_valid = self._validate_active_authority(active, bound.fd, request.target)
+                except _AdmissionFailure as failure:
+                    return self._admission_result(request, failure)
                 except PrivateStateForeignError:
                     return self._blocked(
                         request,
@@ -1099,18 +1043,21 @@ class ProviderLifecycleEngine:
                         seed_policy=seed_policy,
                         phase="candidate-staging",
                     )
-                return self._resume_or_block(
-                    request,
-                    operation,
-                    seed_policy,
-                    candidate,
-                    active,
-                    active_store,
-                    receipt_store,
-                    stage_store,
-                    bound.fd,
-                    force=force,
-                )
+                try:
+                    return self._resume_or_block(
+                        request,
+                        operation,
+                        seed_policy,
+                        candidate,
+                        active,
+                        active_store,
+                        receipt_store,
+                        stage_store,
+                        bound.fd,
+                        force=force,
+                    )
+                except _AdmissionFailure as failure:
+                    return self._admission_result(request, failure)
 
             if receipt is not None and not self._receipt_matches_repository(receipt, lease):
                 return self.invalid_request(request)
@@ -1253,7 +1200,11 @@ class ProviderLifecycleEngine:
                 return False
             if not self._bootstrap_matches(active, root_fd):
                 return False
-            targets = self._observe_domains(root_fd)
+            targets = self._observe_domains_for_admission(
+                root_fd,
+                operation=active.operation,
+                seed_policy=active.seed_policy,
+            )
             return all(
                 self._target_matches_original(target, stored)
                 for target, stored in zip(targets, active.owned_target_witnesses, strict=True)
@@ -1261,7 +1212,11 @@ class ProviderLifecycleEngine:
 
         if active.state != "running" or not expected_record or not self._bootstrap_matches(active, root_fd):
             return False
-        targets = self._observe_domains(root_fd)
+        targets = self._observe_domains_for_admission(
+            root_fd,
+            operation=active.operation,
+            seed_policy=active.seed_policy,
+        )
         return all(
             self._target_matches_original(target, stored)
             or self._target_matches_terminal(root_fd, target, stored, active.candidate_digest)
@@ -1512,7 +1467,11 @@ class ProviderLifecycleEngine:
             operation=durable_operation,
             seed_policy=seed_policy,
         )
-        targets = self._observe_domains(root_fd)
+        targets = self._observe_domains_for_admission(
+            root_fd,
+            operation=durable_operation,
+            seed_policy=seed_policy,
+        )
         if any(item.kind not in {"absent", "directory"} for item in targets):
             raise _AdmissionFailure(
                 "unsafe-target-type",
@@ -1597,7 +1556,11 @@ class ProviderLifecycleEngine:
         root_fd: int,
     ) -> LifecycleResult:
         raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
-        targets = self._observe_domains(root_fd)
+        targets = self._observe_domains_for_admission(
+            root_fd,
+            operation="uninstall",
+            seed_policy=seed_policy,
+        )
         container = self._observe_container(root_fd)
         if any(item.kind not in {"absent", "directory"} for item in targets) or container.kind not in {
             "absent",
@@ -1843,7 +1806,11 @@ class ProviderLifecycleEngine:
             family,
             generation,
         )
-        target_observations = self._observe_domains(root_fd)
+        target_observations = self._observe_domains_for_admission(
+            root_fd,
+            operation=operation,
+            seed_policy=seed_policy,
+        )
         original_digests = tuple(
             item.tree.tree_digest if item.tree is not None else None for item in target_observations
         )
@@ -2004,7 +1971,11 @@ class ProviderLifecycleEngine:
         stage_fd = stage_store._stage_fd()
         try:
             for index, stage_name in enumerate(STAGE_ENTRY_NAMES):
-                current = _capture_domain(stage_fd, stage_name, exclude_marker=index >= 4)
+                _witness, current = self._capture_engine_domain(
+                    stage_fd,
+                    stage_name,
+                    exclude_marker=index >= 4,
+                )
                 if candidate is None:
                     if current.entry_count != 0:
                         return False
@@ -2162,7 +2133,11 @@ class ProviderLifecycleEngine:
             stage_store.ensure_durable(owner)
         if status == "absent" or stage_store.load_owner() is None:
             return False
-        targets = self._observe_domains(root_fd)
+        targets = self._observe_domains_for_admission(
+            root_fd,
+            operation=active.operation,
+            seed_policy=active.seed_policy,
+        )
         stage_fd = stage_store._stage_fd()
         present_names = set(present)
         try:
@@ -2203,7 +2178,11 @@ class ProviderLifecycleEngine:
                     continue
                 if stage_name not in present_names:
                     return False
-                current = _capture_domain(stage_fd, stage_name, exclude_marker=index >= 4)
+                _witness, current = self._capture_engine_domain(
+                    stage_fd,
+                    stage_name,
+                    exclude_marker=index >= 4,
+                )
                 if expected_empty:
                     if current.entry_count != 0:
                         return False
@@ -2237,16 +2216,35 @@ class ProviderLifecycleEngine:
     def _remove_stage_entry(self, stage_fd: int, name: str) -> None:
         _safe_component(name)
         try:
-            current = _capture_domain(stage_fd, name)
+            _witness, current = self._capture_engine_domain(stage_fd, name)
         except FileNotFoundError:
             return
-        NativeAtomicFilesystem().remove_tree_bound(stage_fd, name, current)
+        self._filesystem().remove_tree_bound(stage_fd, name, current)
 
     def _observe_container(self, root_fd: int) -> _ObservedTarget:
         return self._observe_target(root_fd, "spec-dock", expect_tree=False)
 
     def _observe_domains(self, root_fd: int) -> tuple[_ObservedTarget, ...]:
         return tuple(self._observe_target(root_fd, path, expect_tree=True) for _, path, _ in FIXED_DOMAINS)
+
+    def _observe_domains_for_admission(
+        self,
+        root_fd: int,
+        *,
+        operation: str,
+        seed_policy: str,
+    ) -> tuple[_ObservedTarget, ...]:
+        try:
+            return self._observe_domains(root_fd)
+        except OSError as failure:
+            if failure.errno not in {errno.ELOOP, errno.ENOTDIR}:
+                raise
+            raise _AdmissionFailure(
+                "unsafe-parent-binding",
+                operation=operation,
+                candidate_digest=None,
+                seed_policy=seed_policy,
+            ) from failure
 
     def _observe_target(self, root_fd: int, path: str, *, expect_tree: bool) -> _ObservedTarget:
         components = _target_components(path)
@@ -2271,12 +2269,18 @@ class ProviderLifecycleEngine:
             )
             if kind != "directory":
                 return _ObservedTarget(path, kind, None, None)
-            witness = NativeAtomicFilesystem().capture_inode(parent_fd, name, "directory")
-            tree = (
-                _capture_domain(parent_fd, name, exclude_marker=path in {FIXED_DOMAINS[4][1], FIXED_DOMAINS[5][1]})
-                if expect_tree
-                else None
-            )
+            if expect_tree:
+                witness, tree = self._capture_engine_domain(
+                    parent_fd,
+                    name,
+                    exclude_marker=path in {FIXED_DOMAINS[4][1], FIXED_DOMAINS[5][1]},
+                )
+            else:
+                container_witness = self._filesystem().capture_inode(parent_fd, name, "directory")
+                if container_witness is None:
+                    raise FilesystemSafetyError(f"{name!r} disappeared while reading")
+                witness = container_witness
+                tree = None
             return _ObservedTarget(path, "directory", witness, tree)
         finally:
             os.close(parent_fd)
@@ -2719,7 +2723,13 @@ class ProviderLifecycleEngine:
         try:
             if active.operation == "uninstall":
                 initial_absent_paths = frozenset(
-                    item.path for item in self._observe_domains(root_fd) if item.kind == "absent"
+                    item.path
+                    for item in self._observe_domains_for_admission(
+                        root_fd,
+                        operation=active.operation,
+                        seed_policy=active.seed_policy,
+                    )
+                    if item.kind == "absent"
                 )
                 return self._run_uninstall_active(
                     request,
@@ -3495,8 +3505,10 @@ class ProviderLifecycleEngine:
                     continue
                 if not stat.S_ISDIR(value.st_mode):
                     raise PrivateStateForeignError(f"stage entry {name} is unsafe")
-                validation_tree = _capture_domain(stage_fd, name, exclude_marker=index >= 4)
-                tree = self._filesystem().capture_domain_tree(stage_fd, name)
+                _witness, tree = self._capture_engine_domain(stage_fd, name)
+                validation_tree = (
+                    project_domain_tree(tree, exclude_root_names={SLOT_MARKER_NAME}) if index >= 4 else tree
+                )
                 stored = active.owned_target_witnesses[index]
                 registered_entry = registered.get(name)
                 if (
@@ -4166,7 +4178,11 @@ class ProviderLifecycleEngine:
                 )
             except _AdmissionFailure as failure:
                 return self._admission_result(request, failure)
-            targets = self._observe_domains(root_fd)
+            targets = self._observe_domains_for_admission(
+                root_fd,
+                operation=active.operation,
+                seed_policy=active.seed_policy,
+            )
             container = self._observe_container(root_fd)
             raw_record, record_witness, record, record_kind = self._observe_record(request.target, root_fd)
             expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
@@ -4214,7 +4230,13 @@ class ProviderLifecycleEngine:
         try:
             if active.operation == "uninstall":
                 initial_absent_paths = frozenset(
-                    item.path for item in self._observe_domains(root_fd) if item.kind == "absent"
+                    item.path
+                    for item in self._observe_domains_for_admission(
+                        root_fd,
+                        operation=active.operation,
+                        seed_policy=active.seed_policy,
+                    )
+                    if item.kind == "absent"
                 )
             if active.state == "prepared":
                 self._execute_phase(

@@ -876,8 +876,25 @@ def test_t04_seed_admission_preserves_present_seed_through_reentry(tmp_path: Pat
     }
 
 
+@pytest.mark.parametrize("existing_parent", [None, ".agents"])
+def test_t04_fresh_install_creates_missing_slot_parent_chain(
+    tmp_path: Path,
+    existing_parent: str | None,
+) -> None:
+    workspace = (tmp_path / ("fresh-slots" if existing_parent is None else "fresh-slots-with-agents")).resolve()
+    workspace.mkdir()
+    if existing_parent is not None:
+        (workspace / existing_parent).mkdir()
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    assert result.status == "completed"
+    assert (workspace / ".agents/skills/spec-dock").is_dir()
+    assert (workspace / ".agents/skills/spec-dock-grill-with-docs").is_dir()
+
+
 @pytest.mark.parametrize("operation", ["install", "update"])
-@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
 def test_t04_initial_unsafe_seed_parent_binding_blocks_before_admission_mutation(
     tmp_path: Path,
@@ -887,8 +904,8 @@ def test_t04_initial_unsafe_seed_parent_binding_blocks_before_admission_mutation
 ) -> None:
     workspace = (tmp_path / f"initial-parent-{operation}-{parent_path.replace('/', '-')}-{unsafe_kind}").resolve()
     workspace.mkdir()
-    if parent_path == ".github/workflows":
-        (workspace / ".github").mkdir()
+    if "/" in parent_path:
+        (workspace / parent_path.split("/", 1)[0]).mkdir()
     _replace_seed_parent_with_unsafe_type(
         workspace,
         parent_path,
@@ -922,7 +939,7 @@ def test_t04_initial_unsafe_seed_parent_binding_blocks_before_admission_mutation
 
 
 @pytest.mark.parametrize("active_state", ["prepared", "running"])
-@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
 def test_t04_update_reentry_unsafe_seed_parent_binding_blocks_before_admission_mutation(
     tmp_path: Path,
@@ -978,7 +995,7 @@ def test_t04_update_reentry_unsafe_seed_parent_binding_blocks_before_admission_m
 
 
 @pytest.mark.parametrize("mode", ["apply", "dry-run"])
-@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
 def test_t04_initial_uninstall_unsafe_seed_parent_binding_blocks_before_admission_mutation(
     tmp_path: Path,
@@ -1021,7 +1038,7 @@ def test_t04_initial_uninstall_unsafe_seed_parent_binding_blocks_before_admissio
 
 @pytest.mark.parametrize("active_state", ["prepared", "running"])
 @pytest.mark.parametrize("mode", ["apply", "dry-run"])
-@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
 def test_t04_uninstall_reentry_unsafe_seed_parent_binding_blocks_before_admission_mutation(
     tmp_path: Path,

@@ -16,6 +16,7 @@ from spec_dock.provider_lifecycle.contracts import RepositoryBinding
 from spec_dock.provider_lifecycle.coordination import (
     RepositoryBusy,
     RepositoryCoordinationError,
+    RepositoryCoordinationUnavailable,
     acquire_exclusive_repository_lease,
     acquire_shared_repository_lease,
     validate_inherited_repository_lease,
@@ -198,6 +199,25 @@ def test_t06_lease_rebinds_visible_root_after_successful_flock(monkeypatch, tmp_
 
     with pytest.raises(RepositoryCoordinationError):
         acquire_exclusive_repository_lease(repository)
+
+
+@pytest.mark.parametrize("root_kind", ["missing", "symlink", "regular"])
+def test_t06_unsafe_visible_root_binding_is_not_reported_as_unavailable(
+    tmp_path: Path,
+    root_kind: str,
+) -> None:
+    repository = tmp_path / "repository"
+    if root_kind == "symlink":
+        target = tmp_path / "target"
+        target.mkdir()
+        repository.symlink_to(target, target_is_directory=True)
+    elif root_kind == "regular":
+        repository.write_text("not a directory\n", encoding="utf-8")
+
+    with pytest.raises(RepositoryCoordinationError) as error:
+        acquire_exclusive_repository_lease(repository)
+    assert type(error.value) is RepositoryCoordinationError
+    assert not isinstance(error.value, RepositoryCoordinationUnavailable)
 
 
 def test_t06_busy_classification_rechecks_visible_root_binding(monkeypatch, tmp_path: Path) -> None:

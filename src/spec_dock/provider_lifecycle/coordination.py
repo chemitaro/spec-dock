@@ -120,6 +120,8 @@ def _open_root(repository_root: str | os.PathLike[str]) -> tuple[int, Repository
     try:
         fd = _open_absolute_directory_no_follow(path)
     except OSError as exc:
+        if exc.errno in {errno.ENOENT, errno.ENOTDIR, errno.ELOOP}:
+            raise RepositoryCoordinationError("repository root binding is unsafe") from exc
         raise RepositoryCoordinationUnavailable("repository root cannot be opened") from exc
     before = os.fstat(fd)
     if not stat.S_ISDIR(before.st_mode):

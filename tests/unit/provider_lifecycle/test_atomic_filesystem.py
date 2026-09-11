@@ -5,7 +5,7 @@ import inspect
 import os
 import stat
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -122,6 +122,106 @@ def test_t05_regular_tree_capture_revalidates_open_fd_before_and_after_hash(monk
     monkeypatch.setattr(NativeAtomicFilesystem, "_sha256_fd", staticmethod(mutate_during_hash))
     with filesystem.open_directory_chain_no_follow(str(parent)) as bound, pytest.raises(FilesystemSafetyError):
         filesystem.capture_domain_tree(bound.fd, "tree")
+
+
+def test_t05_domain_tree_capture_revalidates_root_identity_before_open(monkeypatch, tmp_path: Path) -> None:
+    filesystem = NativeAtomicFilesystem()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    tree = parent / "tree"
+    tree.mkdir()
+    replacement = tmp_path / "replacement"
+    replacement.mkdir()
+    old = tmp_path / "tree-old"
+
+    with filesystem.open_directory_chain_no_follow(str(parent)) as bound:
+        original_open = os.open
+        replaced = False
+
+        def replace_root(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+            nonlocal replaced
+            if path == "tree" and kwargs.get("dir_fd") == bound.fd and not replaced:
+                tree.rename(old)
+                replacement.rename(tree)
+                replaced = True
+            return original_open(path, flags, *args, **kwargs)
+
+        monkeypatch.setattr(os, "open", replace_root)
+        with pytest.raises(FilesystemSafetyError):
+            filesystem.capture_domain_tree(bound.fd, "tree")
+    assert replaced
+
+
+def test_t05_domain_tree_capture_revalidates_nested_directory_identity_before_open(monkeypatch, tmp_path: Path) -> None:
+    filesystem = NativeAtomicFilesystem()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    tree = parent / "tree"
+    (tree / "nested").mkdir(parents=True)
+    replacement = tmp_path / "nested-replacement"
+    replacement.mkdir()
+    old = tmp_path / "nested-old"
+
+    with filesystem.open_directory_chain_no_follow(str(parent)) as bound:
+        original_open = os.open
+        replaced = False
+
+        def replace_nested(path: Any, flags: int, *args: Any, **kwargs: Any) -> int:
+            nonlocal replaced
+            if path == "nested" and not replaced:
+                (tree / "nested").rename(old)
+                replacement.rename(tree / "nested")
+                replaced = True
+            return original_open(path, flags, *args, **kwargs)
+
+        monkeypatch.setattr(os, "open", replace_nested)
+        with pytest.raises(FilesystemSafetyError):
+            filesystem.capture_domain_tree(bound.fd, "tree")
+    assert replaced
+
+
+def test_t05_domain_tree_capture_rejects_regular_hard_links(tmp_path: Path) -> None:
+    filesystem = NativeAtomicFilesystem()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    tree = parent / "tree"
+    tree.mkdir()
+    source = parent / "source"
+    source.write_text("shared\n", encoding="utf-8")
+    os.link(source, tree / "linked")
+
+    with filesystem.open_directory_chain_no_follow(str(parent)) as bound:
+        with pytest.raises(FilesystemSafetyError):
+            filesystem.capture_inode(bound.fd, "source", "regular")
+        with pytest.raises(FilesystemSafetyError):
+            filesystem.capture_domain_tree(bound.fd, "tree")
+
+
+def test_t05_domain_tree_capture_revalidates_symlink_identity_after_readlink(monkeypatch, tmp_path: Path) -> None:
+    filesystem = NativeAtomicFilesystem()
+    parent = tmp_path / "parent"
+    parent.mkdir()
+    tree = parent / "tree"
+    tree.mkdir()
+    link = tree / "link"
+    link.symlink_to("old-target")
+
+    original_readlink = cast("Any", os.readlink)
+    replaced = False
+
+    def replace_symlink(path: Any, *args: Any, **kwargs: Any) -> str:
+        nonlocal replaced
+        target = original_readlink(path, *args, **kwargs)
+        if path == "link" and not replaced:
+            link.unlink()
+            link.symlink_to("new-target")
+            replaced = True
+        return cast("str", target)
+
+    monkeypatch.setattr(os, "readlink", replace_symlink)
+    with filesystem.open_directory_chain_no_follow(str(parent)) as bound, pytest.raises(FilesystemSafetyError):
+        filesystem.capture_domain_tree(bound.fd, "tree")
+    assert replaced
 
 
 def test_t08_unavailable_native_capability_is_closed_before_repository_observation(monkeypatch, tmp_path: Path) -> None:
