@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "c6a9278bb752571a4cb3305aa41c8d2d47036522"
-  tree: "e6f41598cc1c2ca6af506e4032852dfcb88414d1"
+  sha: "ee356a3bbad2168e337d223f084270b02fd03f64"
+  tree: "b2ce649b566ae8405725da3d52485857a84a0e4a"
 implementation_evidence:
-  candidate_sha: "c6a9278bb752571a4cb3305aa41c8d2d47036522"
-  candidate_tree: "e6f41598cc1c2ca6af506e4032852dfcb88414d1"
+  candidate_sha: "ee356a3bbad2168e337d223f084270b02fd03f64"
+  candidate_tree: "b2ce649b566ae8405725da3d52485857a84a0e4a"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束を含む直近の実装candidateは`c6a9278bb752571a4cb3305aa41c8d2d47036522`です。実装時点の詳細な証拠は§9〜§16に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness bindingを含む直近の実装candidateは`ee356a3bbad2168e337d223f084270b02fd03f64`です。実装時点の詳細な証拠は§9〜§19に記録します。
 
 ## 2. Source verification facts
 
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束を含む実装candidate commit `c6a9278bb752571a4cb3305aa41c8d2d47036522`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness bindingを含む実装candidate commit `ee356a3bbad2168e337d223f084270b02fd03f64`を固定しました。report更新前のclean実装SHAとbranch upstreamの一致確認、および次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
 2. 実装candidate `c6a9278bb752571a4cb3305aa41c8d2d47036522`に対する独立Code Review StrictのP0/P1ゼロ・pass。直近のv8はP1×1を検出し、修正を反映済みです。
@@ -285,3 +285,20 @@ Code Review Strict v10およびBlue Teamのfresh Strict分析で特定されたP
 full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T092128.196303Z/result.json`です。`candidate_sha`は実装commitと一致し、violationは10件（#395 active baselineのruntime import S10 signature mismatch 8件、runtime shell S11 coverage mismatch 1件、workbench signature mismatch 1件）でした。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。既知baselineのledger mismatchを#392の修正として隠さず、#395の台帳・timing・evaluator・required-fast・skip/xfail・baseline行・bundleを変更していません。レートリミットを理由としたbundleまたは検証範囲の縮小も行っていません。
 
 この追補後は、reportを含む最終clean push SHAに対する同一reviewerのfresh Code Review Strict（Extra High）と、同じFQG v2 campaignによるFinal Quality Gate Strict（Pro）が未完了です。Code Review v10のP2「nested driftのunsafe-parent-binding分類」はreport-onlyとして残しており、P1修正でWire分類を変更していません。human PR merge、merged-tip B1、Issue finish、Product GREENは別ゲートであり、ここでは完了を主張しません。
+
+## 19. Public predecessor and private expected-witness remediation addendum (2026-09-11)
+
+実装candidate `ee356a3bbad2168e337d223f084270b02fd03f64`（parent `244a6badd0c5ac49bfa80b71e3d1bb9120550908`、tree `b2ce649b566ae8405725da3d52485857a84a0e4a`）へ、Final Quality Gate Strictで検出されたP1を修正しました。直前のFQG v2（browser-only、GPT-5.6 Sol、Pro、top-level `https://chatgpt.com/`から開始、reviewed SHA `244a6badd0c5ac49bfa80b71e3d1bb9120550908`、Oracle session `fqg-v2-e33906bb-0376134b`）は、`status=fail`、P1×3、P2×2を返しました。P2のGit attribute scopeとcoordination error分類はreport-onlyとして保持し、修正対象をP1に限定しました。
+
+P1修正では、ACTIVE private schemaをv3へ更新し、operation-owned public `spec-dock.version`の`public_record_witness`をdurableに保存します。初回公開はACTIVEのoriginal predecessor、終端公開はACTIVEのexpected incomplete predecessorへbytesとinode identityを束縛し、foreignまたはcontent-equalな別inodeを交換・削除せずpreserve-and-blockします。exchange residueは対応するexpected predecessorとして再検証し、再入場時にも安全にcleanupします。`ActiveStateStore`／`CompletionReceiptStore`にはreadと同時にwitnessを返す経路と、expected witnessまたはexpected absentを要求するatomic saveを導入し、receipt invalidation、ACTIVE更新、terminal cleanupのunlinkまで同じvalidated witnessを引き回します。Wire v12、public result、receipt schema、ledger、required-fast、skip/xfail、bundleは変更していません。
+
+追加した回帰テストは、削除した旧機能の存在だけを確認するobsolete-only testではなく、public record predecessor、private ACTIVE／receipt、terminal cleanupのforeign inode置換と、exchange residueの再入場cleanupを実際のmutation境界で検証します。レートリミットを理由にテストまたはbundleを縮小していません。
+
+- provider-lifecycle focused: `uv run pytest tests/unit/provider_lifecycle/test_private_state.py tests/unit/provider_lifecycle/test_engine.py -q` は `274 passed`
+- default fast: `TMPDIR=/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T uv run pytest -q` は `1334 passed, 848 skipped`
+- static and SpecDock validation: `make lint`（ruff check、ruff format、mypy）はpass、`./spec-dock/scripts/spec-dock validate`は`nodes=236`
+- clean full verifier: `TMPDIR=/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T uv run python -m scripts.quality.verify_full_regression --shards 4` はcandidate SHAが`ee356a3bbad2168e337d223f084270b02fd03f64`に一致し、`2182 tests collected`、4 shard exit 1、`status=ledger-mismatch`、`evaluation.verified=false`
+
+clean full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T124545.962807Z/result.json`です。violationは1件のみで、`tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression`の既知#395 active baseline `coverage_mismatch`です。#392起因の新規`unexpected_failure`は0件で、#395の台帳・timing・evaluator・required-fast・skip/xfail・baseline行は変更していません。clean実装commit後のworktreeはcleanでした。
+
+直前のCode Review Strict v11（browser-only、GPT-5.6 Sol、Extra High、reviewed SHA `244a6badd0c5ac49bfa80b71e3d1bb9120550908`）は本文JSON `findings=[]`、`review_status=pass`、P0/P1=0でしたが、public/private witness remediationを含む`ee356a3b`は未レビューです。このreport更新後に、更新済みreportを含むclean pushed SHAへfresh Code Review Strict（Extra High）とFinal Quality Gate Strict（Pro）を実施します。human PR merge、merged-tip B1、Issue finish、Product GREENは別ゲートとして未完了です。
