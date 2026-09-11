@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "86b219605d4c678c0f044acd16b81848995f9b41"
-  tree: "7e3638b16881f9f206d4ed0a68144ea067bad0e8"
+  sha: "5666bcc904ce6bbee3ddd1d5a97c928f35b2875f"
+  tree: "d7ffcf58545f69234cfb0dbd6624785ff258c05d"
 implementation_evidence:
-  candidate_sha: "86b219605d4c678c0f044acd16b81848995f9b41"
-  candidate_tree: "7e3638b16881f9f206d4ed0a68144ea067bad0e8"
+  candidate_sha: "5666bcc904ce6bbee3ddd1d5a97c928f35b2875f"
+  candidate_tree: "d7ffcf58545f69234cfb0dbd6624785ff258c05d"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む直近の実装candidateは`86b219605d4c678c0f044acd16b81848995f9b41`です。実装時点の詳細な証拠は§9〜§13に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持を含む直近の実装candidateは`5666bcc904ce6bbee3ddd1d5a97c928f35b2875f`です。実装時点の詳細な証拠は§9〜§14に記録します。
 
 ## 2. Source verification facts
 
@@ -104,10 +104,10 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正を含む実装candidate commit `86b219605d4c678c0f044acd16b81848995f9b41`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持を含む実装candidate commit `5666bcc904ce6bbee3ddd1d5a97c928f35b2875f`を固定し、branch upstream と同一であることを確認しました。次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
-2. 実装candidate `41e0e3e3330c0b1bcec54a46310ead4c8d538bef`に対する独立Code Review StrictのP0/P1ゼロ・pass（v5-3で完了）。Report更新後の最終SHAについては本項1のclean pushと、次項3のFinal Quality Gate Strictで再確認します。
+2. 実装candidate `5666bcc904ce6bbee3ddd1d5a97c928f35b2875f`に対する独立Code Review StrictのP0/P1ゼロ・pass。直前のv6はP1×1を検出し、修正を反映済みです。
 3. 最終Quality Gate Strictの実施条件成立。
 4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
 
@@ -200,3 +200,21 @@ Blue Teamのfresh Strict分析（session `required-strict-github-connector-verif
 full verifierの詳細は`spec-dock/.workbench/full-regression/20260910T231201.276215Z/result.json`です。`candidate_sha`は`86b219605d4c678c0f044acd16b81848995f9b41`と一致し、active verifiedは4件、resolved verifiedは1件、violationは10件です。内訳はruntime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件で、前回と同じ#395所有baseline集合です。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。full verifierはGREENまたはexit 0ではなく、Final Quality Gate Strict、#395 baselineと#392 GREEN要求の権限判断、人間PR merge、merged-tip B1が未完了です。
 
 Final Quality Gate前の同一reviewer fresh Strict re-review v5-3は、`41e0e3e3330c0b1bcec54a46310ead4c8d538bef`を対象にbrowser-only、GPT-5.6 Sol、Extra High、完全37-file bundleで実施しました。本文JSONは`findings=[]`、`overall_correctness=patch is correct`、`review_status=pass`、P0/P1=0で、response SHA-256は`88051d6c27991fac5be69673c6cf31f62170ceae834b9de425e979cc8303f9e9`です。レビュー自身はテストを再実行しておらず、Report記録の証拠を参照しています。Report更新後の最終SHAを対象とするFinal Quality Gate Strictは未実施です。
+
+## 14. Seed admission snapshot remediation addendum (2026-09-11)
+
+実装candidate `5666bcc904ce6bbee3ddd1d5a97c928f35b2875f`（parent `7b1178713108ed159aabb417d1a2cd18484eaaa6`、tree `d7ffcf58545f69234cfb0dbd6624785ff258c05d`）に対して、Code Review Strict v6のP1「receipt無効化後のseed admission再観測」を修正しました。レビューはbrowser-only、GPT-5.6 Sol、Extra High、完全bundleで、review sessionは`issue-392-code-review-v6`、review responseのSHA-256は`e98042e7e7d234b09ac41eabc976b8cb8b02764628dbd1b9576b2065c7cedf46`です。Blue Teamのfresh Strict分析（session `required-strict-github-connector-verificati-812`、browser-only、GPT-5.6 Sol、Extra High、transcript SHA-256 `0439eff1f1eac3b139238a1714ba849f7d8dc404b7eb064e53dacb1462c7e65a`）は、このP1をvalid、reachable、in-scope、implementation-remediationとして判定しました。
+
+修正は、初回の`_admit_existing_seeds`が同じ`_observe_target`結果から返す`absent|present` mappingを、updateおよび初回uninstallの`_start_or_run`から`_prepare_active`まで渡し、receipt無効化後に二度目の観測を行わないものです。re-entryの安全側admissionチェックは保持し、ACTIVEに保存済みのmappingを再入場で上書きしません。`_observe_seed_admission`は本番call-siteを確認した上で削除しました。Wire v12、ACTIVE schema v2、record、receipt、ledger、public API、#395 baseline、bundle、required-fast、skip/xfail方針は変更していません。
+
+- First Red: `test_t04_initial_apply_persists_first_seed_admission_without_post_receipt_reobservation`を`update|uninstall`で追加し、修正前は2件とも失敗（171件deselected）。既存completion receiptを作成した後、receipt無効化直後にseedを変更するfault seamで、初回admission snapshotが失われることを確認
+- First Green: 同focused testは`2 passed, 171 deselected`
+- engine: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle/test_engine.py` は`173 passed`
+- provider lifecycle: `TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle` は`380 passed`
+- default fast: `TMPDIR=/private/tmp uv run pytest` は`1235 passed, 848 skipped`
+- static and SpecDock validation: `make lint`（ruff check、ruff format、mypy）はpass、`./spec-dock/scripts/spec-dock validate`は`nodes=236`
+- full verifier: `TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4`は`2083 tests collected`、`507 passed, 6 skipped, 3 failed`、4 shard exit 1、status=`ledger-mismatch`、`evaluation.verified=false`
+
+full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T030914.314882Z/result.json`です。`candidate_sha`は`5666bcc904ce6bbee3ddd1d5a97c928f35b2875f`と一致します。violationは従来どおり10件（runtime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件）で、実際の3失敗も同じ#395所有baseline行に対応します。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。#392では検証範囲、bundle、ledger、timing、evaluator、required-fast、skip/xfail、baseline行を変更していません。レートリミットを理由にbundleや検証範囲を縮小していません。
+
+今回の回帰テストはreceipt境界の正しい実装契約を検証するものであり、削除した旧機能の存在だけを確認するobsolete testではありません。実装candidateのReport更新後、最終clean push SHAに対するCode Review Strict fresh re-reviewとFinal Quality Gate Strict（Pro）が残っています。#395 baselineの修正、GREEN偽装、Issue finish、PR mergeは行いません。
