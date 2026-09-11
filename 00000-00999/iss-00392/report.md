@@ -18,11 +18,11 @@ repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "55969f0c09220163f0a59a43b74e808c9dba8143"
-  tree: "01f052ab805066019e07597a21df9df6056d5c18"
+  sha: "072d9d15a2b6b3d5b90617a200de1ff3b360a0ec"
+  tree: "4dea4de8d36dd542b10dbcf2cea99873fbd3ddb4"
 implementation_evidence:
-  candidate_sha: "55969f0c09220163f0a59a43b74e808c9dba8143"
-  candidate_tree: "01f052ab805066019e07597a21df9df6056d5c18"
+  candidate_sha: "072d9d15a2b6b3d5b90617a200de1ff3b360a0ec"
+  candidate_tree: "4dea4de8d36dd542b10dbcf2cea99873fbd3ddb4"
 ---
 
 # #392 仕様・実装レポート
@@ -31,7 +31,7 @@ implementation_evidence:
 
 Issue #392の実装可能な仕様候補として、Requirement、Design、critical-level Plan、Luna Max checkpoint handoff、test ownership/migration Artifact、日本語HTMLガイドを一つのpackへ整列しました。
 
-初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証を含む直近の実装candidateは`55969f0c09220163f0a59a43b74e808c9dba8143`です。実装時点の詳細な証拠は§9〜§24に記録します。
+初回仕様作成時に行ったのは調査、仕様作成、静的自己検証です。その後、仕様を実装candidateへ反映し、CP1–CP4、focused test、package/dogfood parity、default fast、current full verifierを実行しました。P1修正、First Red再修正、dogfood projection、最終remediation、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証、親ディレクトリ再拘束のhardeningを含む直近の実装candidateは`072d9d15a2b6b3d5b90617a200de1ff3b360a0ec`です。実装時点の詳細な証拠は§9〜§25に記録します。
 
 ## 2. Source verification facts
 
@@ -104,7 +104,7 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証を含む実装candidate commit `55969f0c09220163f0a59a43b74e808c9dba8143`を固定しました。Report更新後のreport-bound clean SHAとbranch upstreamの一致確認、および次の最終ゲートが残っています。
+`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証、親ディレクトリ再拘束のhardeningを含む実装candidate commit `072d9d15a2b6b3d5b90617a200de1ff3b360a0ec`を固定しました。Report更新後のreport-bound clean SHAとbranch upstreamの一致確認、および次の最終ゲートが残っています。
 
 1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
 2. このReport更新を含む最終clean pushed report-bound SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。各実装修正後は旧candidateのレビュー結果を再利用せず、現SHAへfresh reviewを束縛します。
@@ -391,3 +391,21 @@ full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T170101.1
 clean full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T175230.576261Z/result.json`です。`candidate_sha`は`55969f0c09220163f0a59a43b74e808c9dba8143`と一致し、evaluator violationは既知Issue #395 active baselineのS11 `coverage_mismatch` 1件のみでした。shardで観測されたruntime import／CLI／workbenchの失敗も#395所有baselineで、#392起因の新規lifecycle/provider `unexpected_failure`は0件です。#392ではledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleを変更していません。full verifierをGREENまたはexit 0とは表現しません。
 
 この追補後は、Reportを含むclean pushed report-bound SHAに対するfresh Code Review Strict（browser-only、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Extra High）と、Final Quality Gate Strict（browser-only、top-level `https://chatgpt.com/`、Pro）が未完了です。両ゲートはこの追補後の最終SHAへ固定し、Code ReviewはP0/P1=0かつ`review_status=pass`、Final Quality Gateは`status=pass`、`coverage_complete=true`、P0/P1=0、`unresolved_items=[]`を確認します。人間PR merge、merged-tip B1、Issue finish、Product GREENは別ゲートです。#395 baselineの修正、GREEN偽装、機能削減後のobsolete-only test再導入は行いません。
+
+## 25. Parent-path rebinding hardening addendum (2026-09-12)
+
+前回のreport-bound candidate `616e97c1a86aa00770a130245603e4c6a59d8507`に対するFinal Quality Gate Strict（fresh browser conversation、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Pro）は、`FQG-PATH-PARENT-REBIND`をP1として検出し、`status=fail`、`coverage_complete=true`、`unresolved_items=[]`を返しました。指摘は、`_ensure_bootstrap`がprepared ACTIVEのplanned-create／既存bootstrap witnessをmutation直前に再照合せず、`_publish_seed`、`_write_public_record`、`_publish_domain`が親FD取得後のroot相対chain再拘束を行わないため、rename後の古いFDへconsumer-visibleな書き込みを行い得る点です。Blue TeamのStrict分析（session `issue-392-fqg-blue-analysis`、browser-only、GPT-5.6 Sol、Pro）は、valid・reachable・in-scope・certification-blocking、first incorrect layer=implementation、同じroot causeのcoverage gap=`AN-COV-392-OPEN-PARENT-RACE`と判定しました。#395 S11 ledger mismatchは別のout-of-scope groupとして扱い、#392へ取り込みません。
+
+実装commit `072d9d15a2b6b3d5b90617a200de1ff3b360a0ec`（parent `616e97c1a86aa00770a130245603e4c6a59d8507`、tree `4dea4de8d36dd542b10dbcf2cea99873fbd3ddb4`）では、永続schemaやWireを変更せず、親pathの各componentを一時的なdirectory witnessで束縛する`_open_path_bound`／`_require_path_binding`を追加しました。create時のEEXISTは既存directoryの採用へフォールバックせず停止し、bootstrapはACTIVEの`planned-create`／`existing`／`created` dispositionとwitnessを再照合します。record、domain、seedの各native mutation直前に、取得済みFDとroot相対のvisible chainが同じdevice／inode／modeであることを検証し、不一致時は既存のblocked／partial failure境界へ収束させます。ACTIVE schema、Wire、ledger、evaluator、bundle、rate-limit由来の検証範囲は変更していません。
+
+First Redでは、planned-create中の第三者`spec-dock`出現と、seed parent FD取得後の`.github`再配置を公開`ProviderLifecycleEngine.execute()`境界で再現し、修正前にforeign directoryの採用／displaced directoryへのseed書き込みが発生することを確認しました。Green後の追加回帰テストは、planned-create、existing bootstrap、`.gitignore` parent、CI parent、domain parentの5ケースで、foreign/displaced directoryを保持し、record/domain/seed mutationを行わないこと、late parent driftは既存partial-failureのmutation historyを保つことを検証します。削除した旧機能の存在だけを確認するobsolete-only testではありません。
+
+- parent-rebinding focused: `TMPDIR=/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T uv run pytest tests/unit/provider_lifecycle/test_engine.py -k 'bootstrap_planned_create_race or seed_parent_rebind or existing_bootstrap_rebind or gitignore_parent_rebind or domain_parent_rebind'` は `5 passed`
+- provider lifecycle engine: `TMPDIR=/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T uv run pytest tests/unit/provider_lifecycle/test_engine.py` は `287 passed`
+- default fast: `TMPDIR=/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T uv run pytest` は `1358 passed, 848 skipped`
+- static and SpecDock validation: `make lint`（ruff check、ruff format、mypy）はpass、`./spec-dock/scripts/spec-dock validate`は`nodes=236`
+- clean full verifier: `TMPDIR=/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T uv run python -m scripts.quality.verify_full_regression --shards 4` は`2206 tests collected`、4 shard exit 1、status=`ledger-mismatch`、`evaluation.verified=false`
+
+clean full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T192848.882858Z/result.json`です。`candidate_sha`は`072d9d15a2b6b3d5b90617a200de1ff3b360a0ec`と一致し、唯一のevaluator violationは既知Issue #395 active baselineのS11 `coverage_mismatch` 1件でした。shardで観測されたruntime import／CLI／workbenchの失敗も#395所有baselineで、#392起因の新規lifecycle/provider `unexpected_failure`は0件です。#392ではledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleを変更していません。レートリミットを理由にtest、bundle、検証範囲を縮小していません。full verifierをGREENまたはexit 0とは表現しません。
+
+この追補後は、Reportを含むclean pushed report-bound SHAに対するfresh Code Review Strict（browser-only、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Extra High）と、同じ目的のFinal Quality Gate Strict follow-up（browser-only、top-level `https://chatgpt.com/`、Pro）が未完了です。Code ReviewはP0/P1=0かつ`review_status=pass`、Final Quality Gateは`status=pass`、`coverage_complete=true`、P0/P1=0、`unresolved_items=[]`を要求します。人間PR merge、merged-tip B1、Issue finish、Product GREENは別ゲートです。#395 baselineの修正、GREEN偽装、obsolete-only testの再導入は行いません。
