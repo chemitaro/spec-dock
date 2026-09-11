@@ -13,7 +13,7 @@ from typing import cast
 
 import pytest
 
-from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS
+from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS, SLOT_MARKER_NAME
 from spec_dock.provider_lifecycle.contracts import (
     SEED_PATHS,
     ActiveState,
@@ -23,6 +23,7 @@ from spec_dock.provider_lifecycle.contracts import (
     LifecycleRequest,
     Operation,
 )
+import spec_dock.provider_lifecycle.engine as engine_module
 from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
 from spec_dock.provider_lifecycle.filesystem import DomainTreeIdentity, NativeAtomicFilesystem
 from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
@@ -891,6 +892,131 @@ def test_t04_fresh_install_creates_missing_slot_parent_chain(
     assert result.status == "completed"
     assert (workspace / ".agents/skills/spec-dock").is_dir()
     assert (workspace / ".agents/skills/spec-dock-grill-with-docs").is_dir()
+
+
+def test_t04_slot_marker_admission_rejects_replaced_slot_root(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    workspace = (tmp_path / "slot-marker-replacement").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    slot = workspace / FIXED_DOMAINS[4][1]
+    valid_replacement = tmp_path / "valid-slot-replacement"
+    shutil.copytree(slot, valid_replacement, symlinks=True)
+    (slot / SLOT_MARKER_NAME).write_bytes(b'{"invalid": true}\n')
+    displaced = tmp_path / "invalid-slot-displaced"
+    before = _workspace_snapshot(workspace)
+    swapped = False
+    restored = False
+
+    engine = ProviderLifecycleEngine()
+    original_capture = engine._capture_engine_domain
+
+    def capture(parent_fd: int, name: str, *, exclude_marker: bool = False):
+        nonlocal swapped
+        result = original_capture(parent_fd, name, exclude_marker=exclude_marker)
+        if name == "spec-dock" and not swapped:
+            slot.rename(displaced)
+            valid_replacement.rename(slot)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(engine, "_capture_engine_domain", capture)
+    original_read_regular = engine_module._read_regular
+
+    def read_regular(parent_fd: int, name: str, maximum: int = 4096):
+        nonlocal restored
+        result = original_read_regular(parent_fd, name, maximum)
+        if name == SLOT_MARKER_NAME and not restored:
+            slot.rename(valid_replacement)
+            displaced.rename(slot)
+            restored = True
+        return result
+
+    monkeypatch.setattr(engine_module, "_read_regular", read_regular)
+    try:
+        result = engine.execute(_request(workspace, "update"), force=True)
+    finally:
+        if swapped and not restored:
+            slot.rename(valid_replacement)
+            displaced.rename(slot)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "blocked"
+    assert result.code == "foreign-skill-slot"
+    assert result.operation == "update"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load() is None
+
+
+@pytest.mark.parametrize("operation", ["update", "uninstall"])
+def test_t04_admission_target_observation_is_reused_before_publication(
+    monkeypatch,
+    tmp_path: Path,
+    operation: Operation,
+) -> None:
+    workspace = (tmp_path / f"admission-target-observation-{operation}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    target = workspace / FIXED_DOMAINS[0][1]
+    displaced = tmp_path / f"original-{operation}-docs"
+    foreign = tmp_path / f"foreign-{operation}-docs"
+    foreign.mkdir()
+    (foreign / "consumer-owned.txt").write_text("consumer-owned\n", encoding="utf-8")
+    swapped = False
+    engine = ProviderLifecycleEngine()
+
+    def swap_target() -> None:
+        nonlocal swapped
+        if swapped:
+            return
+        target.rename(displaced)
+        foreign.rename(target)
+        swapped = True
+
+    if operation == "update":
+        original_admit_targets = engine._admit_existing_targets
+
+        def admit_targets(root_fd, targets, candidate, *, owner_digest):
+            original_admit_targets(root_fd, targets, candidate, owner_digest=owner_digest)
+            swap_target()
+
+        monkeypatch.setattr(engine, "_admit_existing_targets", admit_targets)
+    else:
+        original_admit_slots = engine._admit_existing_slots
+
+        def admit_slots(root_fd, targets, candidate_digest):
+            original_admit_slots(root_fd, targets, candidate_digest)
+            swap_target()
+
+        monkeypatch.setattr(engine, "_admit_existing_slots", admit_slots)
+
+    result = engine.execute(_request(workspace, operation), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "partial_failure"
+    assert result.phase == "verify-target"
+    assert result.code == f"{operation}-partial-failure"
+    assert (target / "consumer-owned.txt").read_text(encoding="utf-8") == "consumer-owned\n"
+    assert displaced.is_dir()
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    original_inode = active.owned_target_witnesses[0]["original_inode"]
+    assert isinstance(original_inode, dict)
+    assert original_inode["inode"] == displaced.stat().st_ino
+    assert original_inode["inode"] != target.stat().st_ino
 
 
 @pytest.mark.parametrize("operation", ["install", "update"])

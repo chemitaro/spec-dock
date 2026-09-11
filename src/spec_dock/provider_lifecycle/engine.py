@@ -1206,8 +1206,8 @@ class ProviderLifecycleEngine:
                 seed_policy=active.seed_policy,
             )
             return all(
-                self._target_matches_original(target, stored)
-                for target, stored in zip(targets, active.owned_target_witnesses, strict=True)
+                self._target_matches_active_original(root_fd, active, index, target)
+                for index, target in enumerate(targets)
             )
 
         if active.state != "running" or not expected_record or not self._bootstrap_matches(active, root_fd):
@@ -1218,9 +1218,14 @@ class ProviderLifecycleEngine:
             seed_policy=active.seed_policy,
         )
         return all(
-            self._target_matches_original(target, stored)
-            or self._target_matches_terminal(root_fd, target, stored, active.candidate_digest)
-            for target, stored in zip(targets, active.owned_target_witnesses, strict=True)
+            self._target_matches_active_original(root_fd, active, index, target)
+            or self._target_matches_terminal(
+                root_fd,
+                target,
+                active.owned_target_witnesses[index],
+                active.candidate_digest,
+            )
+            for index, target in enumerate(targets)
         )
 
     def _bootstrap_matches(self, active: ActiveState, root_fd: int) -> bool:
@@ -1511,6 +1516,7 @@ class ProviderLifecycleEngine:
             root_fd,
             receipt=receipt,
             seed_admission=seed_admission,
+            target_observations=targets,
             legacy=record_kind == "legacy-0.2.3",
         )
 
@@ -1631,6 +1637,7 @@ class ProviderLifecycleEngine:
             root_fd,
             receipt=receipt_store.load() if receipt_store is not None else None,
             seed_admission=seed_admission,
+            target_observations=targets,
             legacy=record_kind == "legacy-0.2.3",
         )
 
@@ -1650,12 +1657,21 @@ class ProviderLifecycleEngine:
         root_fd: int,
         *,
         seed_admission: Mapping[str, SeedAdmissionState],
+        target_observations: Sequence[_ObservedTarget],
         receipt: CompletionReceipt | None = None,
         legacy: bool = False,
     ) -> LifecycleResult:
         if request.mode == "dry-run":
             assert candidate is not None
-            return self._install_plan_result(request, operation, seed_policy, candidate, root_fd, record)
+            return self._install_plan_result(
+                request,
+                operation,
+                seed_policy,
+                candidate,
+                root_fd,
+                target_observations,
+                record,
+            )
         assert active_store is not None and receipt_store is not None and stage_store is not None
         if candidate is None and operation != "uninstall":
             raise _AdmissionFailure("candidate-invalid", operation=operation, seed_policy=seed_policy)
@@ -1676,6 +1692,7 @@ class ProviderLifecycleEngine:
                 root_fd,
                 legacy=legacy,
                 seed_admission=seed_admission,
+                target_observations=target_observations,
             )
             return self._run_active(
                 request,
@@ -1765,6 +1782,7 @@ class ProviderLifecycleEngine:
         *,
         legacy: bool,
         seed_admission: Mapping[str, SeedAdmissionState],
+        target_observations: Sequence[_ObservedTarget],
     ) -> ActiveState:
         binding = RepositoryBinding(*self._repository_identity(root_fd))
         candidate_digest = (
@@ -1805,11 +1823,6 @@ class ProviderLifecycleEngine:
             tuple_key,
             family,
             generation,
-        )
-        target_observations = self._observe_domains_for_admission(
-            root_fd,
-            operation=operation,
-            seed_policy=seed_policy,
         )
         original_digests = tuple(
             item.tree.tree_digest if item.tree is not None else None for item in target_observations
@@ -2051,6 +2064,60 @@ class ProviderLifecycleEngine:
             and self._witness_matches(stored["original_inode"], item.witness)
         )
 
+    def _target_matches_active_original(
+        self,
+        root_fd: int,
+        active: ActiveState,
+        index: int,
+        item: _ObservedTarget,
+    ) -> bool:
+        stored = active.owned_target_witnesses[index]
+        if not self._target_matches_original(item, stored):
+            return False
+        if (
+            stored["original_kind"] != "directory"
+            or index < 4
+            or active.original_record["kind"] == "legacy-0.2.3"
+            or active.result_family == "legacy-migration"
+        ):
+            return True
+        return self._slot_marker_matches(
+            root_fd,
+            item,
+            None,
+            expected_digest=self._original_slot_marker_digest(active),
+        )
+
+    @staticmethod
+    def _original_slot_marker_digest(active: ActiveState) -> str:
+        original_kind = active.original_record["kind"]
+        if original_kind == "absent":
+            return active.candidate_digest
+        if original_kind == "legacy-0.2.3":
+            return cast("str", load_legacy_fixture()["aggregate_digest"])
+        if original_kind != "final":
+            raise ValueError("ACTIVE original record kind cannot determine slot marker authority")
+        encoded = active.original_record["bytes_base64"]
+        if not isinstance(encoded, str):
+            raise ValueError("ACTIVE original record bytes are missing")
+        return parse_installation_record(base64.b64decode(encoded)).candidate_digest
+
+    def _require_active_target_bindings(
+        self,
+        root_fd: int,
+        active: ActiveState,
+        targets: Sequence[_ObservedTarget],
+    ) -> None:
+        if len(targets) != len(active.owned_target_witnesses):
+            raise FilesystemSafetyError("ACTIVE target binding count changed")
+        for index, item in enumerate(targets):
+            stored = active.owned_target_witnesses[index]
+            if not (
+                self._target_matches_active_original(root_fd, active, index, item)
+                or self._target_matches_terminal(root_fd, item, stored, active.candidate_digest)
+            ):
+                raise FilesystemSafetyError(f"fixed target binding changed before publication at {item.path}")
+
     def _target_matches_terminal(
         self,
         root_fd: int,
@@ -2068,7 +2135,7 @@ class ProviderLifecycleEngine:
         if item.tree.tree_digest != stored["terminal_tree_digest"]:
             return False
         if item.path in {FIXED_DOMAINS[4][1], FIXED_DOMAINS[5][1]}:
-            return self._slot_marker_matches(root_fd, item.path, None, expected_digest=candidate_digest)
+            return self._slot_marker_matches(root_fd, item, None, expected_digest=candidate_digest)
         return True
 
     def _record_matches_original(
@@ -2144,7 +2211,7 @@ class ProviderLifecycleEngine:
             for index, stage_name in enumerate(STAGE_ENTRY_NAMES):
                 stored = active.owned_target_witnesses[index]
                 target = targets[index]
-                is_original = self._target_matches_original(target, stored)
+                is_original = self._target_matches_active_original(root_fd, active, index, target)
                 is_terminal = self._target_matches_terminal(root_fd, target, stored, active.candidate_digest)
                 expected_digest: str | None = None
                 expected_empty = False
@@ -2329,7 +2396,7 @@ class ProviderLifecycleEngine:
             if index >= 4:
                 if not self._slot_marker_matches(
                     root_fd,
-                    item.path,
+                    item,
                     candidate,
                     expected_digest=owner_digest or candidate.aggregate_digest,
                 ):
@@ -2363,7 +2430,7 @@ class ProviderLifecycleEngine:
         for item in targets[4:]:
             if item.kind == "directory" and not self._slot_marker_matches(
                 root_fd,
-                item.path,
+                item,
                 None,
                 expected_digest=candidate_digest,
             ):
@@ -2377,21 +2444,42 @@ class ProviderLifecycleEngine:
     def _slot_marker_matches(
         self,
         root_fd: int,
-        path: str,
+        item: _ObservedTarget,
         candidate: CandidateIdentity | None,
         *,
         expected_digest: str,
     ) -> bool:
+        if item.kind != "directory" or item.witness is None:
+            return False
+        path = item.path
         components = _target_components(path)
+        slot_fd: int | None = None
+        parent_fd: int | None = None
         try:
             slot_fd = _open_path(root_fd, components)
+            opened = NativeAtomicFilesystem._witness(os.fstat(slot_fd), "directory", None)
+            if not NativeAtomicFilesystem._same_content_identity(opened, item.witness):
+                return False
+            parent_fd = _open_path(root_fd, components[:-1])
+            visible = os.stat(components[-1], dir_fd=parent_fd, follow_symlinks=False)
+            visible_witness = NativeAtomicFilesystem._witness(visible, "directory", None)
+            if not NativeAtomicFilesystem._same_content_identity(visible_witness, item.witness):
+                return False
         except (FileNotFoundError, OSError, FilesystemSafetyError):
             return False
+        assert slot_fd is not None and parent_fd is not None
         try:
             try:
                 raw, _witness = _read_regular(slot_fd, SLOT_MARKER_NAME, maximum=2048)
                 marker = parse_slot_marker(raw)
             except (FileNotFoundError, FilesystemSafetyError, CandidateError, ValueError, WireValidationError):
+                return False
+            after = NativeAtomicFilesystem._witness(os.fstat(slot_fd), "directory", None)
+            if not NativeAtomicFilesystem._same_content_identity(after, item.witness):
+                return False
+            visible = os.stat(components[-1], dir_fd=parent_fd, follow_symlinks=False)
+            visible_witness = NativeAtomicFilesystem._witness(visible, "directory", None)
+            if not NativeAtomicFilesystem._same_content_identity(visible_witness, item.witness):
                 return False
             return (
                 marker.slot == path
@@ -2399,7 +2487,10 @@ class ProviderLifecycleEngine:
                 and marker.candidate_digest == expected_digest
             )
         finally:
-            os.close(slot_fd)
+            if slot_fd is not None:
+                os.close(slot_fd)
+            if parent_fd is not None:
+                os.close(parent_fd)
 
     def _install_plan_result(
         self,
@@ -2408,9 +2499,9 @@ class ProviderLifecycleEngine:
         seed_policy: str,
         candidate: CandidateIdentity,
         root_fd: int,
+        targets: Sequence[_ObservedTarget],
         _record: InstallationRecord | None,
     ) -> LifecycleResult:
-        targets = self._observe_domains(root_fd)
         actions = self._install_actions(operation, seed_policy, candidate, targets, root_fd, planned=True)
         return build_public_result(
             request,
@@ -2522,7 +2613,7 @@ class ProviderLifecycleEngine:
         result.append(_make_action("spec-dock/spec-dock.version", "record", record_status, record_reason))
         for index, item in enumerate(targets):
             kind, path, _ = FIXED_DOMAINS[index]
-            current = self._target_matches_candidate(root_fd, item.path, index, candidate)
+            current = self._target_matches_candidate(root_fd, item, index, candidate)
             category = kind
             original_kind = item.kind
             original_current = False
@@ -2800,11 +2891,15 @@ class ProviderLifecycleEngine:
             active = replace(active, state="running")
             self._execute_phase("publish-incomplete-record", lambda: self._save_active(active_store, active))
         targets = self._execute_phase("verify-target", lambda: self._observe_domains(root_fd))
+        self._execute_phase(
+            "verify-target",
+            lambda: self._require_active_target_bindings(root_fd, active, targets),
+        )
         for index, item in enumerate(targets):
             phase = f"publish-{STAGE_ENTRY_NAMES[index]}"
 
             def publish_domain(index: int = index, item: _ObservedTarget = item) -> None:
-                if self._target_matches_candidate(root_fd, item.path, index, candidate):
+                if self._target_matches_candidate(root_fd, item, index, candidate):
                     self._ensure_domain_durable(root_fd, stage_store, item.path, index=index, candidate=candidate)
                     return
                 self._publish_domain(request, active, stage_store, index, candidate, root_fd, detach=False)
@@ -2830,9 +2925,9 @@ class ProviderLifecycleEngine:
 
         def verify_targets() -> None:
             self._check_fault("target-verify")
+            current = self._observe_domains(root_fd)
             if not all(
-                self._target_matches_candidate(root_fd, path, index, candidate)
-                for index, (_, path, _) in enumerate(FIXED_DOMAINS)
+                self._target_matches_candidate(root_fd, item, index, candidate) for index, item in enumerate(current)
             ):
                 raise FilesystemSafetyError("published candidate does not verify")
 
@@ -2891,6 +2986,12 @@ class ProviderLifecycleEngine:
                 item = self._observe_domains(root_fd)[index]
                 if item.kind not in {"absent", "directory"}:
                     raise FilesystemSafetyError(f"unsupported fixed target type at {item.path}")
+                stored = active.owned_target_witnesses[index]
+                if not (
+                    self._target_matches_active_original(root_fd, active, index, item)
+                    or self._target_matches_terminal(root_fd, item, stored, active.candidate_digest)
+                ):
+                    raise FilesystemSafetyError(f"fixed target binding changed before detach at {item.path}")
                 return item
 
             item = self._execute_phase("verify-target", observe_target)
@@ -3177,11 +3278,10 @@ class ProviderLifecycleEngine:
     def _target_matches_candidate(
         self,
         root_fd: int,
-        path: str,
+        item: _ObservedTarget,
         index: int,
         candidate: CandidateIdentity,
     ) -> bool:
-        item = self._observe_target(root_fd, path, expect_tree=True)
         if item.kind != "directory" or item.tree is None:
             return False
         expected = candidate.domains[index]
@@ -3189,32 +3289,17 @@ class ProviderLifecycleEngine:
             return False
         if index < 4:
             return True
-        components = _target_components(path)
-        parent_fd = _open_path(root_fd, components[:-1])
-        try:
-            try:
-                target_fd = _open_path(root_fd, components)
-            except FileNotFoundError:
-                return False
-            try:
-                marker_raw, _marker_witness = _read_regular(target_fd, SLOT_MARKER_NAME)
-            except (FileNotFoundError, FilesystemSafetyError):
-                return False
-            finally:
-                os.close(target_fd)
-            marker = parse_slot_marker(marker_raw)
-            return (
-                marker.slot == path
-                and marker.version == CANDIDATE_VERSION
-                and marker.candidate_digest == candidate.aggregate_digest
-            )
-        finally:
-            os.close(parent_fd)
+        return self._slot_marker_matches(
+            root_fd,
+            item,
+            candidate,
+            expected_digest=candidate.aggregate_digest,
+        )
 
     def _publish_domain(
         self,
         _request: LifecycleRequest,
-        _active: ActiveState,
+        active: ActiveState,
         stage_store: StageStore,
         index: int,
         candidate: CandidateIdentity | None,
@@ -3237,6 +3322,12 @@ class ProviderLifecycleEngine:
         filesystem = self._filesystem()
         try:
             target = self._observe_target(root_fd, path, expect_tree=True)
+            stored = active.owned_target_witnesses[index]
+            if not (
+                self._target_matches_active_original(root_fd, active, index, target)
+                or self._target_matches_terminal(root_fd, target, stored, active.candidate_digest)
+            ):
+                raise FilesystemSafetyError(f"fixed target binding changed during publication at {path}")
             if detach:
                 if target.kind != "directory":
                     return
@@ -3257,7 +3348,7 @@ class ProviderLifecycleEngine:
             else:
                 if candidate is None:
                     raise CandidateError("candidate is required for publication")
-                if self._target_matches_candidate(root_fd, path, index, candidate):
+                if self._target_matches_candidate(root_fd, target, index, candidate):
                     self._ensure_domain_durable(root_fd, stage_store, path, index=index, candidate=candidate)
                     return
                 if target.kind == "absent":
@@ -3321,7 +3412,7 @@ class ProviderLifecycleEngine:
             if current.kind != "absent":
                 raise FilesystemSafetyError(f"domain {path} changed during durability repair")
             return
-        if candidate is None or index is None or not self._target_matches_candidate(root_fd, path, index, candidate):
+        if candidate is None or index is None or not self._target_matches_candidate(root_fd, current, index, candidate):
             raise FilesystemSafetyError(f"domain {path} changed during durability repair")
 
     def _publish_seed(
