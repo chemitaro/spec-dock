@@ -1225,6 +1225,58 @@ def test_t06_terminal_record_residue_is_cleaned_on_retry(tmp_path: Path) -> None
     assert not (namespace / "RECORD-TEMP").exists()
 
 
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_terminal_record_exchange_recovers_when_active_witness_save_fails(
+    monkeypatch, tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / "terminal-record-active-save-recovery").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    engine = ProviderLifecycleEngine()
+    original_save = engine._save_active
+    failed = False
+
+    def fail_after_terminal_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        if (
+            not failed
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == engine._terminal_record_bytes(active)
+        ):
+            failed = True
+            raise OSError("injected post-exchange ACTIVE save failure")
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(engine, "_save_active", fail_after_terminal_exchange)
+    first = engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert failed
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.state == "ready"
+    assert active.record_temp_witness is not None
+    assert active.public_record_witness is not None
+    assert (namespace / "RECORD-TEMP").is_file()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+    assert not (namespace / "RECORD-TEMP").exists()
+
+
 @pytest.mark.parametrize("operation", ["install", "update"])
 @pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])

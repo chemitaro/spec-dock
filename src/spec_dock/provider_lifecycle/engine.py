@@ -975,8 +975,14 @@ class ProviderLifecycleEngine:
                 return self._blocked(request, "lifecycle-preparation-failed")
 
             if active is not None:
+                assert active_store is not None
                 try:
-                    active_valid = self._validate_active_authority(active, bound.fd, request.target)
+                    active_valid = self._validate_active_authority(
+                        active,
+                        bound.fd,
+                        request.target,
+                        active_store=active_store,
+                    )
                 except _AdmissionFailure as failure:
                     return self._admission_result(request, failure)
                 except PrivateStateForeignError:
@@ -1196,7 +1202,14 @@ class ProviderLifecycleEngine:
         binding = lease.binding
         return receipt.repository_key == repository_key_for(binding.device, binding.inode, binding.euid)
 
-    def _validate_active_authority(self, active: ActiveState, root_fd: int, target: str) -> bool:
+    def _validate_active_authority(
+        self,
+        active: ActiveState,
+        root_fd: int,
+        target: str,
+        *,
+        active_store: ActiveStateStore,
+    ) -> bool:
         device, inode, euid = self._repository_identity(root_fd)
         expected_identity = {"device": device, "inode": inode, "euid": euid}
         if active.repository_key != repository_key_for(device, inode, euid):
@@ -1206,14 +1219,18 @@ class ProviderLifecycleEngine:
         if active.state in {"ready", "terminal-cleanup"}:
             if active.state == "ready":
                 raw, witness, record, record_kind = self._observe_record(target, root_fd)
-                return self._terminal_record_matches(
-                    root_fd,
-                    operation=active.operation,
-                    candidate_digest=active.candidate_digest,
-                    seed_policy=active.seed_policy,
-                    terminal_record_digest=active.terminal_record_digest,
-                    expected_witness=active.public_record_witness,
-                ) or self._record_matches_expected(active, raw, witness, record, record_kind)
+                return (
+                    self._terminal_record_matches(
+                        root_fd,
+                        operation=active.operation,
+                        candidate_digest=active.candidate_digest,
+                        seed_policy=active.seed_policy,
+                        terminal_record_digest=active.terminal_record_digest,
+                        expected_witness=active.public_record_witness,
+                    )
+                    or self._record_matches_expected(active, raw, witness, record, record_kind)
+                    or self._post_exchange_terminal_record_matches(active, root_fd, active_store)
+                )
             return self._terminal_record_matches(
                 root_fd,
                 operation=active.operation,
@@ -2269,6 +2286,8 @@ class ProviderLifecycleEngine:
         current_witness: InodeWitness | None,
         active_store: ActiveStateStore,
         active_witness: InodeWitness,
+        *,
+        residue_kind: Literal["original", "incomplete"] = "original",
     ) -> tuple[ActiveState, InodeWitness]:
         if current_witness is None:
             raise PrivateStateForeignError("expected public record witness is missing")
@@ -2286,21 +2305,76 @@ class ProviderLifecycleEngine:
             except FileNotFoundError:
                 residue_raw, residue_witness = None, None
             if residue_witness is not None:
-                original_payload = active.original_record.get("bytes_base64")
-                original_witness = active.original_record.get("witness")
-                if (
-                    not isinstance(original_payload, str)
-                    or residue_raw != base64.b64decode(original_payload)
-                    or not self._content_identity_matches_mapping(original_witness, residue_witness)
-                ):
+                if residue_kind == "original":
+                    original_payload = active.original_record.get("bytes_base64")
+                    original_witness = active.original_record.get("witness")
+                    residue_matches = (
+                        isinstance(original_payload, str)
+                        and residue_raw == base64.b64decode(original_payload)
+                        and self._content_identity_matches_mapping(original_witness, residue_witness)
+                    )
+                else:
+                    expected_payload = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+                    residue_matches = (
+                        residue_raw == expected_payload
+                        and active.public_record_witness is not None
+                        and NativeAtomicFilesystem._same_content_identity(residue_witness, active.public_record_witness)
+                    )
+                if not residue_matches:
                     raise PrivateStateForeignError("public record exchange residue is foreign during recovery")
                 self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
                 self._filesystem().fsync_directory(namespace_fd)
+            elif residue_kind == "incomplete":
+                raise PrivateStateForeignError("expected incomplete record residue is missing during recovery")
         finally:
             os.close(namespace_fd)
         recovered = replace(active, record_temp_witness=None, public_record_witness=current_witness)
         active_witness = self._save_active(active_store, recovered, expected=active_witness)
         return recovered, active_witness
+
+    def _post_exchange_terminal_record_matches(
+        self,
+        active: ActiveState,
+        root_fd: int,
+        active_store: ActiveStateStore,
+    ) -> bool:
+        if active.record_temp_witness is None or active.public_record_witness is None:
+            return False
+        try:
+            specdock_fd = _open_path(root_fd, ("spec-dock",))
+            try:
+                self._filesystem().fsync_directory(specdock_fd)
+            finally:
+                os.close(specdock_fd)
+            raw, witness, record, record_kind = self._observe_record("", root_fd)
+        except (FilesystemSafetyError, OSError, ValueError, WireValidationError):
+            return False
+        expected_state = "tooling-absent-preserved-data" if active.operation == "uninstall" else "ready"
+        if (
+            raw is None
+            or witness is None
+            or record is None
+            or record_kind != "final"
+            or not NativeAtomicFilesystem._same_content_identity(witness, active.record_temp_witness)
+            or record.state != expected_state
+            or record.operation is not None
+            or record.candidate_digest != active.candidate_digest
+            or record.seed_policy != active.seed_policy
+            or hashlib.sha256(raw).hexdigest() != active.terminal_record_digest
+        ):
+            return False
+        try:
+            namespace_fd = active_store._open_namespace()
+            try:
+                residue_raw, residue_witness = _read_regular(namespace_fd, RECORD_TEMP_NAME)
+            finally:
+                os.close(namespace_fd)
+        except (FilesystemSafetyError, PrivateStateError, OSError, ValueError):
+            return False
+        expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+        return residue_raw == expected and NativeAtomicFilesystem._same_content_identity(
+            residue_witness, active.public_record_witness
+        )
 
     @staticmethod
     def _content_identity_matches_mapping(stored: object, current: InodeWitness) -> bool:
@@ -4469,20 +4543,31 @@ class ProviderLifecycleEngine:
                 expected_witness=active.public_record_witness,
             ):
                 raw, witness, record, record_kind = self._observe_record(request.target, root_fd)
-                if not self._record_matches_expected(active, raw, witness, record, record_kind):
+                if self._record_matches_expected(active, raw, witness, record, record_kind):
+                    if raw is None or witness is None:
+                        return self._blocked(request, "installation-record-state-inconsistent")
+                    active, active_witness = self._write_public_record(
+                        request,
+                        active,
+                        self._terminal_record_bytes(active),
+                        active_store,
+                        root_fd,
+                        expected_active_witness=active_witness,
+                        expected_predecessor=(raw, witness),
+                        predecessor_kind="incomplete",
+                    )
+                elif self._post_exchange_terminal_record_matches(active, root_fd, active_store):
+                    if witness is None:
+                        return self._blocked(request, "installation-record-state-inconsistent")
+                    active, active_witness = self._recover_public_record_state(
+                        active,
+                        witness,
+                        active_store,
+                        active_witness,
+                        residue_kind="incomplete",
+                    )
+                else:
                     return self._blocked(request, "installation-record-state-inconsistent")
-                if raw is None or witness is None:
-                    return self._blocked(request, "installation-record-state-inconsistent")
-                active, active_witness = self._write_public_record(
-                    request,
-                    active,
-                    self._terminal_record_bytes(active),
-                    active_store,
-                    root_fd,
-                    expected_active_witness=active_witness,
-                    expected_predecessor=(raw, witness),
-                    predecessor_kind="incomplete",
-                )
                 if not self._terminal_record_matches(
                     root_fd,
                     operation=active.operation,
