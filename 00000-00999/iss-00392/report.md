@@ -431,3 +431,11 @@ P2については、`_directory_witness_or_close`を追加し、witness成功前
 - branch upstream: `f56486967f059e05199aa24554ef3a87546fdcc6`と一致、worktree clean
 
 P2は既存Wire、ACTIVE schema、rollback意味論、#395/#396 ledger/evaluator/baseline/timing/bundle、test scopeを変更していません。P1は未解決のため、現時点でCode Review `pass`、Final Quality Gate、Product GREEN、Issue finishは主張しません。P1を解消するには、Design §7.1と対応するPlanのcreation protocolを「owned temp → durability → native no-replace final publication」へ更新するhuman承認が必要です。承認前に脅威モデル、foreign preservation、rollback保証を推測で変更しません。
+
+## 27. Implementation brief stop clarification (2026-09-12)
+
+Implementation Brief Strict（session `required-strict-github-connector-verificati-830`、current exact candidate `48de980ee12f2d815684b09a90ffd489fea09a54`、browser-only、GPT-5.6 Sol、Extra High）は、CP1 ownership-provenance repairを**BLOCKED / HUMAN DECISION REQUIRED**として返しました。briefのraw responseは`spec-dock/.workbench/chatgpt-code-review-strict/issue-392-final-20260912-v7/implementation-brief-response.raw.md`、SHA-256は`5f1d0e316d4e3dbe35fd621971f74f5b58262ea22ac5fe2fa0f589ab741510f1`です。
+
+この分析により、単純な「random temporary directory → fsync → native `rename_no_replace`」だけではP1を閉じられないことを明確化しました。temp basename自体も`mkdir(temp) → open(temp)`の間にforeign replacementを受け得るため、(a) temp sourceのownership provenanceを証明するnative protocol、または(b) same-euid substitutionを脅威モデルから外すRequirement/security decisionのいずれかを正本で決める必要があります。したがって、P1のhuman gateは「temp方式を採用するか」だけでなく、temp sourceを何でprovider-ownedと証明するか、CP1 filesystem/private-stateとCP2 engine call sitesの適用範囲、publication後failure時のrollback authorityを含みます。
+
+P2は`f56486967f059e05199aa24554ef3a87546fdcc6`でclosedです。このbriefではP2のtestを再追加・置換せず、P1のmkdir/open replacement raceを独立したFirst Redとして扱う方針を確認しました。人間承認済みのcanonical Design/Planを含む新しいexact SHAが提示されるまで、Product code・test・Requirement・Design・Planは追加変更しません。
