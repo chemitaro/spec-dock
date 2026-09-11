@@ -1598,6 +1598,11 @@ class ProviderLifecycleEngine:
                         candidate_digest=record.candidate_digest,
                         seed_policy=record.seed_policy,
                     )
+                self._admit_existing_seeds(
+                    root_fd,
+                    operation="uninstall",
+                    seed_policy="preserve-only",
+                )
                 return self._uninstall_already_absent_result(request, record)
             if record.state == "incomplete" and record.operation != "uninstall":
                 raise _AdmissionFailure(

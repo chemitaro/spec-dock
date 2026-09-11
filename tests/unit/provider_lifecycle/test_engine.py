@@ -1019,6 +1019,66 @@ def test_t04_initial_uninstall_unsafe_seed_type_blocks_before_admission_mutation
 
 
 @pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_terminal_uninstall_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    mode: LifecycleMode,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"terminal-uninstall-unsafe-seed-{workspace_kind}-{mode}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "ready-origin":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    else:
+        _materialize_legacy_workspace(workspace)
+        migrated = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert migrated.status == "completed"
+
+    terminal = ProviderLifecycleEngine().execute(_request(workspace, "uninstall"), force=True)
+    assert terminal.status == "completed"
+    assert terminal.code == "uninstall-completed"
+    assert parse_installation_record((workspace / "spec-dock/spec-dock.version").read_bytes()).state == (
+        "tooling-absent-preserved-data"
+    )
+
+    seed = workspace / seed_path
+    _replace_seed_with_unsafe_type(
+        seed,
+        unsafe_kind,
+        tmp_path / f"terminal-uninstall-{unsafe_kind}-{seed_path.replace('/', '-')}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace) if namespace.exists() else None
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    namespace_after = _workspace_snapshot(namespace) if namespace.exists() else None
+    assert namespace_after == namespace_before
+
+
+@pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
 @pytest.mark.parametrize("active_state", ["prepared", "running"])
 @pytest.mark.parametrize("mode", ["apply", "dry-run"])
 @pytest.mark.parametrize("seed_path", SEED_PATHS)
