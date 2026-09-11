@@ -217,4 +217,12 @@ Final Quality Gate前の同一reviewer fresh Strict re-review v5-3は、`41e0e3e
 
 full verifierの詳細は`spec-dock/.workbench/full-regression/20260911T030914.314882Z/result.json`です。`candidate_sha`は`5666bcc904ce6bbee3ddd1d5a97c928f35b2875f`と一致します。violationは従来どおり10件（runtime import S10のsignature mismatch 8件、runtime shell S11のcoverage mismatch 1件、workbenchのsignature mismatch 1件）で、実際の3失敗も同じ#395所有baseline行に対応します。#392起因の新規lifecycle/provider `unexpected_failure`は0件です。#392では検証範囲、bundle、ledger、timing、evaluator、required-fast、skip/xfail、baseline行を変更していません。レートリミットを理由にbundleや検証範囲を縮小していません。
 
-今回の回帰テストはreceipt境界の正しい実装契約を検証するものであり、削除した旧機能の存在だけを確認するobsolete testではありません。実装candidateのReport更新後、最終clean push SHAに対するCode Review Strict fresh re-reviewとFinal Quality Gate Strict（Pro）が残っています。#395 baselineの修正、GREEN偽装、Issue finish、PR mergeは行いません。
+今回の回帰テストはreceipt境界の正しい実装契約を検証するものであり、削除した旧機能の存在だけを確認するobsolete testではありません。このReport更新時点では、最終clean push SHAに対するCode Review Strict fresh re-reviewとFinal Quality Gate Strict（Pro）が残っています。#395 baselineの修正、GREEN偽装、Issue finish、PR mergeは行いません。
+
+## 15. Strict review and Final Quality Gate result addendum (2026-09-11)
+
+`ddd150b344ca8f3678ae49564f4b742def24fbf3`に対するCode Review Strict v7は、browser-only、GPT-5.6 Sol、Extra High verified、complete relevant bundleで実施し、本文JSON `findings=[]`、`overall_correctness=patch is correct`、`review_status=pass`、P0/P1=0を返しました。review sessionは`issue-392-review-v7`、response bodyのSHA-256は`90a7178a1798054f0d736ce0355ab93fcfb681073a9312ae2e951f1de30e58d3`です。レビューはテスト実行を主張せず、同一SHAのCodex test laneを別証拠として扱いました。
+
+同じFQG v2 campaign `issue-392-final-20260911`の既存レビュアー会話によるFinal Quality Gate Strict follow-upは、browser-only、GPT-5.6 Sol、Pro verifiedで`ddd150b344ca8f3678ae49564f4b742def24fbf3`をレビューし、`status=pass`、`coverage_complete=true`、P0/P1=0、`unresolved_items=[]`を返しました。Oracle sessionは`fqg-v2-ae0569fe-0da7c0f3`です。前回のP1 obligation `FQG-SEED-UNINSTALL-ALREADY-ABSENT`は`closed`です。P2は`FQG-UNSAFE-BINDING-WIRE-MAPPING`、`FQG-GIT-ATTRIBUTE-SCOPE`、`FQG-CANONICAL-GATE-STATE`の3件で、FQG規約どおり情報提供のみ・修正対象外です。
+
+FQGは#392のP0/P1とselected scopeをpassと判定しましたが、required test commandsを実行したとは主張していません。同一SHAでCodexが実行したdefault fast、lint、full verifierの結果は§14およびcampaign `test-results/manifest.json`に記録しています。full verifierの`ledger-mismatch`は10件の#395所有baseline mismatchであり、#392起因の新規lifecycle/provider `unexpected_failure`は0件です。Code Review StrictとFinal Quality Gate Strictは、human PR mergeおよびmerged-tip B1とは別ゲートです。ここでのFQG passはIssue finish、#395 baseline修正、PR merge、Product GREENを意味しません。
