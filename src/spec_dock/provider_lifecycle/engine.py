@@ -3954,6 +3954,15 @@ class ProviderLifecycleEngine:
                 raise PrivateStateForeignError("ACTIVE changed before receipt publication")
             if stored_witness is None:
                 raise PrivateStateForeignError("ACTIVE witness is missing before receipt publication")
+            if active.public_record_witness is None or not self._terminal_record_matches(
+                root_fd,
+                operation=active.operation,
+                candidate_digest=active.candidate_digest,
+                seed_policy=active.seed_policy,
+                terminal_record_digest=active.terminal_record_digest,
+                expected_witness=active.public_record_witness,
+            ):
+                raise PrivateStateForeignError("public record changed before receipt publication")
             if receipt is None:
                 receipt = CompletionReceipt(
                     1,
@@ -3983,6 +3992,15 @@ class ProviderLifecycleEngine:
                 stored_receipt, stored_receipt_witness = receipt_store.load_with_witness()
                 if stored_receipt != receipt or stored_receipt_witness != receipt_witness:
                     raise PrivateStateForeignError("completion receipt changed before expected unlink")
+                if stored_active.public_record_witness is None or not self._terminal_record_matches(
+                    root_fd,
+                    operation=stored_active.operation,
+                    candidate_digest=stored_active.candidate_digest,
+                    seed_policy=stored_active.seed_policy,
+                    terminal_record_digest=stored_active.terminal_record_digest,
+                    expected_witness=stored_active.public_record_witness,
+                ):
+                    raise PrivateStateForeignError("public record changed before expected unlink")
                 self._filesystem().unlink_bound(namespace_fd, ACTIVE_NAME, stored_witness)
                 self._check_fault("active-expected-parent-fsync")
                 self._filesystem().fsync_directory(namespace_fd)
@@ -4524,7 +4542,9 @@ class ProviderLifecycleEngine:
             return False
         if raw is None or record is None or record_kind != "final":
             return False
-        if expected_witness is not None and witness != expected_witness:
+        if expected_witness is not None and (
+            witness is None or not NativeAtomicFilesystem._same_content_identity(witness, expected_witness)
+        ):
             return False
         expected_state = "tooling-absent-preserved-data" if operation == "uninstall" else "ready"
         return (

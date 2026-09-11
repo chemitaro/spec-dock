@@ -1527,6 +1527,114 @@ def test_t06_public_record_recovery_rejects_foreign_public_before_residue_unlink
     assert active.record_temp_witness is not None
 
 
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_finish_cleanup_rejects_foreign_public_before_receipt_publication(
+    tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / f"finish-cleanup-public-before-receipt-{operation}").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    first_failed = False
+
+    def fail_before_receipt(point: str) -> None:
+        nonlocal first_failed
+        if point == "stage-parent-fsync" and not first_failed:
+            active = active_store.load()
+            if active is not None and active.state == "terminal-cleanup":
+                first_failed = True
+                raise OSError("injected pre-receipt cleanup failure")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_before_receipt).execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    record_path = workspace / "spec-dock/spec-dock.version"
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    assert record_path.is_file()
+    assert not receipt_path.exists()
+
+    displaced = tmp_path / f"finish-cleanup-public-before-receipt-{operation}-displaced"
+    swapped = False
+
+    def swap_public_before_receipt(point: str) -> None:
+        nonlocal swapped
+        if point == "stage-parent-fsync" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_before_receipt).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert not receipt_path.exists()
+    assert (namespace / "ACTIVE.json").is_file()
+
+    record_path.unlink()
+    displaced.rename(record_path)
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_finish_cleanup_rejects_foreign_public_before_active_unlink(tmp_path: Path, operation: Operation) -> None:
+    workspace = (tmp_path / f"finish-cleanup-public-before-active-unlink-{operation}").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    active_path = namespace / "ACTIVE.json"
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    assert active_path.is_file()
+    assert receipt_path.is_file()
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / f"finish-cleanup-public-before-active-unlink-{operation}-displaced"
+    swapped = False
+
+    def swap_public_before_active_unlink(point: str) -> None:
+        nonlocal swapped
+        if point == "active-expected-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_before_active_unlink).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert active_path.is_file()
+    assert receipt_path.is_file()
+
+    record_path.unlink()
+    displaced.rename(record_path)
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
 @pytest.mark.parametrize("operation", ["install", "update"])
 @pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
 @pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
