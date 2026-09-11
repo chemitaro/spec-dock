@@ -11,6 +11,7 @@ from __future__ import annotations
 import base64
 import contextlib
 from dataclasses import dataclass, replace
+import errno
 import hashlib
 import os
 from pathlib import Path
@@ -1565,7 +1566,17 @@ class ProviderLifecycleEngine:
 
         admission: dict[str, SeedAdmissionState] = {}
         for path in SEED_PATHS:
-            item = self._observe_target(root_fd, path, expect_tree=False)
+            try:
+                item = self._observe_target(root_fd, path, expect_tree=False)
+            except OSError as failure:
+                if failure.errno not in {errno.ELOOP, errno.ENOTDIR}:
+                    raise
+                raise _AdmissionFailure(
+                    "unsafe-parent-binding",
+                    operation=operation,
+                    candidate_digest=None,
+                    seed_policy=seed_policy,
+                ) from failure
             if item.kind not in {"absent", "regular"}:
                 raise _AdmissionFailure(
                     "unsafe-target-type",

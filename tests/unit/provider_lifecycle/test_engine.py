@@ -124,6 +124,27 @@ def _replace_seed_with_unsafe_type(seed: Path, unsafe_kind: str, target: Path) -
         os.mkfifo(seed)
 
 
+def _replace_seed_parent_with_unsafe_type(
+    root: Path,
+    parent_path: str,
+    unsafe_kind: str,
+    target: Path,
+) -> None:
+    parent = root / parent_path
+    if parent.is_symlink():
+        parent.unlink()
+    elif parent.is_dir():
+        shutil.rmtree(parent)
+    else:
+        parent.unlink(missing_ok=True)
+    parent.parent.mkdir(parents=True, exist_ok=True)
+    if unsafe_kind == "symlink":
+        target.write_text("consumer parent target\n", encoding="utf-8")
+        parent.symlink_to(target)
+    else:
+        parent.write_text("consumer parent\n", encoding="utf-8")
+
+
 def _assert_first_red_partial_shape(
     result,
     *,
@@ -853,6 +874,210 @@ def test_t04_seed_admission_preserves_present_seed_through_reentry(tmp_path: Pat
     assert resumed_seed_actions == {
         path: LifecycleAction(path, "seed", "preserved", "consumer-seed-present") for path in SEED_PATHS
     }
+
+
+@pytest.mark.parametrize("operation", ["install", "update"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_initial_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    operation: Operation,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (tmp_path / f"initial-parent-{operation}-{parent_path.replace('/', '-')}-{unsafe_kind}").resolve()
+    workspace.mkdir()
+    if parent_path == ".github/workflows":
+        (workspace / ".github").mkdir()
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"initial-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace) if namespace.exists() else None
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, operation), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "install"
+    assert result.candidate_digest is None
+    assert result.seed_policy == ("create-if-absent" if operation == "install" else "preserve-only")
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    namespace_after = _workspace_snapshot(namespace) if namespace.exists() else None
+    if namespace_before is not None:
+        assert namespace_after == namespace_before
+    elif namespace_after is not None:
+        assert "ACTIVE.json" not in namespace_after
+        assert "CLEANUP-COMPLETED.json" not in namespace_after
+        assert "STAGE" not in namespace_after
+
+
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_update_reentry_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    active_state: str,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"update-reentry-parent-{active_state}-{parent_path.replace('/', '-')}-{unsafe_kind}"
+    ).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "update")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "target-verify"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.operation == "update"
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    namespace_before = _workspace_snapshot(namespace)
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"update-reentry-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "update"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == namespace_before
+
+
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_initial_uninstall_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    mode: LifecycleMode,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (tmp_path / f"initial-uninstall-parent-{mode}-{parent_path.replace('/', '-')}-{unsafe_kind}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"initial-uninstall-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace)
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert _workspace_snapshot(namespace) == namespace_before
+
+
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_uninstall_reentry_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    active_state: str,
+    mode: LifecycleMode,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"uninstall-reentry-parent-{active_state}-{mode}-{parent_path.replace('/', '-')}-{unsafe_kind}"
+    ).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "root-docs-publish-or-detach"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.operation == "uninstall"
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    namespace_before = _workspace_snapshot(namespace)
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"uninstall-reentry-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == namespace_before
 
 
 @pytest.mark.parametrize("seed_path", SEED_PATHS)
