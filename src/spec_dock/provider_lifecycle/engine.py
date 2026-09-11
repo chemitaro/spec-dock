@@ -1506,7 +1506,11 @@ class ProviderLifecycleEngine:
             durable_operation = "update"
             seed_policy = "preserve-only"
             result_family = "update"
-        self._admit_existing_seeds(root_fd, operation=durable_operation, seed_policy=seed_policy)
+        seed_admission = self._admit_existing_seeds(
+            root_fd,
+            operation=durable_operation,
+            seed_policy=seed_policy,
+        )
         targets = self._observe_domains(root_fd)
         if any(item.kind not in {"absent", "directory"} for item in targets):
             raise _AdmissionFailure(
@@ -1546,12 +1550,20 @@ class ProviderLifecycleEngine:
             stage_store,
             root_fd,
             receipt=receipt,
+            seed_admission=seed_admission,
             legacy=record_kind == "legacy-0.2.3",
         )
 
-    def _admit_existing_seeds(self, root_fd: int, *, operation: str, seed_policy: str) -> None:
+    def _admit_existing_seeds(
+        self,
+        root_fd: int,
+        *,
+        operation: str,
+        seed_policy: str,
+    ) -> dict[str, SeedAdmissionState]:
         """Reject fixed seed collisions before any lifecycle state is mutated."""
 
+        admission: dict[str, SeedAdmissionState] = {}
         for path in SEED_PATHS:
             item = self._observe_target(root_fd, path, expect_tree=False)
             if item.kind not in {"absent", "regular"}:
@@ -1561,6 +1573,8 @@ class ProviderLifecycleEngine:
                     candidate_digest=None,
                     seed_policy=seed_policy,
                 )
+            admission[path] = "absent" if item.kind == "absent" else "present"
+        return admission
 
     def _dispatch_uninstall(
         self,
@@ -1620,7 +1634,7 @@ class ProviderLifecycleEngine:
             candidate_digest = record.candidate_digest
             seed_policy = record.seed_policy
             self._admit_existing_slots(root_fd, targets, candidate_digest)
-        self._admit_existing_seeds(
+        seed_admission = self._admit_existing_seeds(
             root_fd,
             operation="uninstall",
             seed_policy="preserve-only",
@@ -1642,6 +1656,7 @@ class ProviderLifecycleEngine:
             stage_store,
             root_fd,
             receipt=receipt_store.load() if receipt_store is not None else None,
+            seed_admission=seed_admission,
             legacy=record_kind == "legacy-0.2.3",
         )
 
@@ -1660,6 +1675,7 @@ class ProviderLifecycleEngine:
         stage_store: StageStore | None,
         root_fd: int,
         *,
+        seed_admission: Mapping[str, SeedAdmissionState],
         receipt: CompletionReceipt | None = None,
         legacy: bool = False,
     ) -> LifecycleResult:
@@ -1685,6 +1701,7 @@ class ProviderLifecycleEngine:
                 stage_store,
                 root_fd,
                 legacy=legacy,
+                seed_admission=seed_admission,
             )
             return self._run_active(
                 request,
@@ -1773,6 +1790,7 @@ class ProviderLifecycleEngine:
         root_fd: int,
         *,
         legacy: bool,
+        seed_admission: Mapping[str, SeedAdmissionState],
     ) -> ActiveState:
         binding = RepositoryBinding(*self._repository_identity(root_fd))
         candidate_digest = (
@@ -1815,7 +1833,6 @@ class ProviderLifecycleEngine:
             generation,
         )
         target_observations = self._observe_domains(root_fd)
-        seed_admission = self._observe_seed_admission(root_fd)
         original_digests = tuple(
             item.tree.tree_digest if item.tree is not None else None for item in target_observations
         )
@@ -2219,14 +2236,6 @@ class ProviderLifecycleEngine:
 
     def _observe_domains(self, root_fd: int) -> tuple[_ObservedTarget, ...]:
         return tuple(self._observe_target(root_fd, path, expect_tree=True) for _, path, _ in FIXED_DOMAINS)
-
-    def _observe_seed_admission(self, root_fd: int) -> dict[str, SeedAdmissionState]:
-        result: dict[str, SeedAdmissionState] = {}
-        for path in SEED_PATHS:
-            result[path] = (
-                "absent" if self._observe_target(root_fd, path, expect_tree=False).kind == "absent" else "present"
-            )
-        return result
 
     def _observe_target(self, root_fd: int, path: str, *, expect_tree: bool) -> _ObservedTarget:
         components = _target_components(path)

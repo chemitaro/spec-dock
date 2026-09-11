@@ -769,6 +769,36 @@ def test_t04_stage_rebuild_revalidates_frozen_candidate_before_consumer_mutation
     assert active.candidate_digest != engine._candidate().aggregate_digest
 
 
+@pytest.mark.parametrize("operation", ["update", "uninstall"])
+def test_t04_initial_apply_persists_first_seed_admission_without_post_receipt_reobservation(
+    monkeypatch,
+    tmp_path: Path,
+    operation: Operation,
+) -> None:
+    workspace = (tmp_path / f"initial-{operation}-seed-admission-snapshot").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    receipt_store = CompletionReceiptStore(resolve_private_namespace(workspace), repository_root=workspace)
+    assert receipt_store.load() is not None
+
+    engine = ProviderLifecycleEngine(fault_injector="stage-mkdir")
+    original_invalidate_receipt = engine._invalidate_receipt
+
+    def invalidate_receipt_then_remove_seed(store: CompletionReceiptStore) -> None:
+        original_invalidate_receipt(store)
+        (workspace / SEED_PATHS[0]).unlink()
+
+    monkeypatch.setattr(engine, "_invalidate_receipt", invalidate_receipt_then_remove_seed)
+    result = engine.execute(_request(workspace, operation), force=True)
+
+    serialize_public_result(result)
+    assert result.status in {"blocked", "partial_failure"}
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.seed_admission == dict.fromkeys(SEED_PATHS, "present")
+
+
 def test_t04_seed_admission_freezes_provider_created_action_provenance(tmp_path: Path) -> None:
     workspace = (tmp_path / "seed-provenance").resolve()
     workspace.mkdir()
