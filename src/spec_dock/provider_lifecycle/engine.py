@@ -2287,6 +2287,7 @@ class ProviderLifecycleEngine:
         active_store: ActiveStateStore,
         active_witness: InodeWitness,
         *,
+        root_fd: int,
         residue_kind: Literal["original", "incomplete"] = "original",
     ) -> tuple[ActiveState, InodeWitness]:
         if current_witness is None:
@@ -2329,6 +2330,15 @@ class ProviderLifecycleEngine:
                 )
                 active_witness = self._save_active(active_store, recovered, expected=active_witness)
                 self._check_fault("record-exchange-residue-unlink")
+                if residue_kind == "incomplete" and not self._terminal_record_matches(
+                    root_fd,
+                    operation=recovered.operation,
+                    candidate_digest=recovered.candidate_digest,
+                    seed_policy=recovered.seed_policy,
+                    terminal_record_digest=recovered.terminal_record_digest,
+                    expected_witness=recovered.public_record_witness,
+                ):
+                    raise PrivateStateForeignError("public record changed before exchange residue cleanup")
                 self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
                 self._filesystem().fsync_directory(namespace_fd)
             elif residue_kind == "incomplete":
@@ -2401,6 +2411,8 @@ class ProviderLifecycleEngine:
         active: ActiveState,
         active_store: ActiveStateStore,
         active_witness: InodeWitness,
+        *,
+        root_fd: int,
     ) -> tuple[ActiveState, InodeWitness]:
         expected_residue = active.record_temp_witness
         if expected_residue is None:
@@ -2420,6 +2432,15 @@ class ProviderLifecycleEngine:
                 ):
                     raise PrivateStateForeignError("public record exchange residue is foreign during cleanup")
                 self._check_fault("record-exchange-residue-unlink")
+                if not self._terminal_record_matches(
+                    root_fd,
+                    operation=active.operation,
+                    candidate_digest=active.candidate_digest,
+                    seed_policy=active.seed_policy,
+                    terminal_record_digest=active.terminal_record_digest,
+                    expected_witness=active.public_record_witness,
+                ):
+                    raise PrivateStateForeignError("public record changed before exchange residue cleanup")
                 self._filesystem().unlink_bound(namespace_fd, RECORD_TEMP_NAME, residue_witness)
                 self._filesystem().fsync_directory(namespace_fd)
         finally:
@@ -3153,6 +3174,7 @@ class ProviderLifecycleEngine:
                 record_witness,
                 active_store,
                 active_witness,
+                root_fd=root_fd,
             )
         if active.state == "prepared":
             self._execute_phase(
@@ -3287,6 +3309,7 @@ class ProviderLifecycleEngine:
                 record_witness,
                 active_store,
                 active_witness,
+                root_fd=root_fd,
             )
         if active.state == "prepared":
             self._execute_phase(
@@ -4603,6 +4626,7 @@ class ProviderLifecycleEngine:
                         witness,
                         active_store,
                         active_witness,
+                        root_fd=root_fd,
                         residue_kind="incomplete",
                     )
                 else:
@@ -4620,6 +4644,7 @@ class ProviderLifecycleEngine:
                 active,
                 active_store,
                 active_witness,
+                root_fd=root_fd,
             )
             if receipt is not None and not self._terminal_record_matches(
                 root_fd,

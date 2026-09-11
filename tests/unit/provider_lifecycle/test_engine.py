@@ -1369,6 +1369,46 @@ def test_t06_terminal_record_residue_is_cleaned_on_retry(tmp_path: Path) -> None
     assert not (namespace / "RECORD-TEMP").exists()
 
 
+def test_t06_terminal_record_residue_cleanup_rejects_foreign_public_before_unlink(
+    tmp_path: Path,
+) -> None:
+    workspace = (tmp_path / "terminal-record-residue-public-race-install").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="record-exchange-residue-unlink").execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    record_path = workspace / "spec-dock/spec-dock.version"
+    residue_path = namespace / "RECORD-TEMP"
+    assert residue_path.is_file()
+    displaced = tmp_path / "terminal-record-residue-public-race-install-displaced"
+    swapped = False
+
+    def swap_public_after_residue_fault(point: str) -> None:
+        nonlocal swapped
+        if point == "record-exchange-residue-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_after_residue_fault).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert residue_path.is_file()
+    assert (namespace / "ACTIVE.json").is_file()
+    assert not (namespace / "CLEANUP-COMPLETED.json").exists()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+
+
 @pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
 def test_t06_terminal_record_exchange_recovers_when_active_witness_save_fails(
     monkeypatch, tmp_path: Path, operation: Operation
@@ -1419,6 +1459,72 @@ def test_t06_terminal_record_exchange_recovers_when_active_witness_save_fails(
     serialize_public_result(resumed)
     assert resumed.status == "completed"
     assert not (namespace / "RECORD-TEMP").exists()
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_public_record_recovery_rejects_foreign_public_before_residue_unlink(
+    monkeypatch, tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / f"public-record-recovery-public-race-{operation}").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    first_engine = ProviderLifecycleEngine()
+    original_save = first_engine._save_active
+    first_failed = False
+
+    def fail_after_terminal_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal first_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        if (
+            not first_failed
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == first_engine._terminal_record_bytes(active)
+        ):
+            first_failed = True
+            raise OSError("injected post-exchange ACTIVE save failure")
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(first_engine, "_save_active", fail_after_terminal_exchange)
+    first = first_engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    residue_path = namespace / "RECORD-TEMP"
+    assert residue_path.is_file()
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / f"public-record-recovery-public-race-{operation}-displaced"
+    swapped = False
+
+    def swap_public_after_residue_fault(point: str) -> None:
+        nonlocal swapped
+        if point == "record-exchange-residue-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_after_residue_fault).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert residue_path.is_file()
+    assert (namespace / "ACTIVE.json").is_file()
+    assert not (namespace / "CLEANUP-COMPLETED.json").exists()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
 
 
 @pytest.mark.parametrize("operation", ["install", "update"])
