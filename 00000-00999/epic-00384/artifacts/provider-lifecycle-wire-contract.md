@@ -3,7 +3,7 @@
 ID: "provider-lifecycle-wire-contract-v12"
 タイトル: "Provider Lifecycle Wire Contract"
 状態: "parent-contract-candidate"
-最終更新: "2026-09-08"
+最終更新: "2026-09-12"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -14,6 +14,8 @@ repository_evidence:
 ---
 
 # Provider Lifecycle Wire Contract
+
+> **2026-09-12 threat-boundary clarification:** [same-EUID scope narrowing ADR](20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md) supersedes the earlier safe-stop decision only for threat scope and reopening. Same-EUID non-cooperating filesystem/process actors are outside the guarantee; WIR-COORD-003 covers only participating SpecDock invocations. This clarification does not add fields, codes, relations, phases, or goldens to v12 and does not claim general hostile-filesystem safety. The issue's implementation gate remains closed until revised docs pass independent review and freeze/projection.
 
 > **2026-09-08 v12 親契約改訂:** ユーザーがP392-001/002の親修正を承認した。準備・初期レコード公開の失敗をWIR-PREP-001で閉じる。旧35 public goldensと4 record goldensは保持し、closed codeを1個、relationを16行、public goldenを5個追加する。詳細は[準備失敗ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)。以下のv11採用経緯は履歴であり、v12のreview/freezeは別候補として証明する。
 
@@ -32,7 +34,7 @@ repository_evidence:
 | Issue #395 | Read-only consumer. Product defect repairs must preserve lifecycle semantics and serialized values. |
 | Issue #396 | Read-only consumer. Provider-gate and policy cutover may verify but not redefine this wire. |
 
-Any semantic change requires a superseding parent ADR, revalidation of affected Issue drafts, dependency-chain restart from the affected state and independent review under the Rolling-Wave Contract. When Issue boundaries or copied values change, regenerate those draft portions. Before any Issue implementation is accepted, the restart point is B0; unchanged reference-only Issue drafts need no invented implementation detail. Revision v10 was governed by [Preimplementation Clarifications ADR](20260907t223933z-adr-preimplementation-recovery-and-qualification-clarifications.md); v11 adds the parent-adopted coordination boundary under [Whole-plan Reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md). The user-authorized v12 revision is governed by [Preparation Failure ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md). It is authored while #392 is selected but before any Product implementation. Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
+Any semantic change requires a superseding parent ADR, revalidation of affected Issue drafts, dependency-chain restart from the affected state and independent review under the Rolling-Wave Contract. When Issue boundaries or copied values change, regenerate those draft portions. Before any Issue implementation is accepted, the restart point is B0; unchanged reference-only Issue drafts need no invented implementation detail. Revision v10 was governed by [Preimplementation Clarifications ADR](20260907t223933z-adr-preimplementation-recovery-and-qualification-clarifications.md); v11 adds the parent-adopted coordination boundary under [Whole-plan Reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md). The user-authorized v12 revision is governed by [Preparation Failure ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md). The superseding [same-EUID scope narrowing ADR](20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md) clarifies the actor boundary without changing the finite public wire inventory. It is authored while #392 is selected but before any new Product/test change. Rolling-wave elaboration may add implementation details and tests but cannot change this artifact.
 
 ## 2. Canonical scalar and serialization conventions
 
@@ -333,6 +335,8 @@ Parser errors and `uninstall --remove-specs` are request-validation outcomes and
 This section closes preparation failures only; it does not catch arbitrary lifecycle exceptions. The finite new code is `lifecycle-preparation-failed`. A caught expected filesystem resource/access/I/O failure is mapped only at the operations listed below. Root/parent rebinding, unsupported type, hard links, foreign owner, record/schema invalidity, digest mismatch and unavailable native/lock capabilities retain their existing specific diagnostics and precedence. Programming defects remain untyped process/test defects.
 
 **Owner-bound namespace and re-entry.** The private namespace remains outside Consumer data on the same filesystem. Its path is a deterministic function of the bound repository identity and effective user. Its fixed directory chain must be no-follow, owned by that user, mode0700, and on the bound filesystem; creation uses exclusive mkdir and fsync, then binding verification. An exactly bound empty reserved directory left by an interrupted mkdir is valid preparation, not foreign payload. Only the fixed entries are provider bookkeeping. Private metadata `ACTIVE.json`、`CLEANUP-COMPLETED.json`、`STAGE/STAGE-OWNER.json` and their metadata atomic-write temps are regular/link1/user-owned/mode0600. The sole mode exception is public-record staging `RECORD-TEMP`: regular/link1/user-owned/mode0644/max4096 and containing only exact expected seven-key public record bytes or, after exchange, the exact witnessed prior public record. Private directories remain mode0700. Incomplete mode0600 metadata temp bytes may be discarded and recreated after owner/binding validation. An unlisted entry, unsafe directory, foreign owner or unsafe metadata/temp type is preserve-and-block, never a reason to sweep the directory. The Issue fixes the physical path and finite private filenames before implementation. Do not create a stage payload before a valid prepared ACTIVE is durable. Thus an interruption before ACTIVE publication leaves at most this re-enterable bounded namespace/bookkeeping, not an unregistered payload tree. No directory scan discovers other repositories, historical generations or cleanup candidates.
+
+These owner/mode and binding checks rely on the stated OS trust boundary. They detect the defined unsafe observations and support ordinary failure recovery; they do not prove creator provenance or prevent deliberate changes by a non-cooperating same-EUID actor.
 
 **Prepared operation.** Complete nonmutating admission determines the operation/candidate/seed tuple, result family and exact original record-or-absence before recording a fresh generation. Invalidate an old valid completion receipt only at the existing WIR-CLEANUP-002 accepted new-operation boundary. Atomically publish/fsync `ACTIVE.state=prepared` before stage payload creation or any Consumer write. It binds the tuple/generation, registered fixed stage entries, original fixed-root identities, original record bytes/identity-or-absence, the expected incomplete record bytes, and any same-generation bootstrap-container identity. These are bounded operation witnesses, not per-file history, arbitrary action checkpoints or a rollback image.
 
@@ -1127,7 +1131,7 @@ Descriptor inheritance above is **only lifetime retention**, never installer aut
 3. The installer independently binds the requested target, obtains EX and repeats full preflight. No inherited descriptor, environment variable, argument token or “already locked” shortcut permits skipping admission.
 4. Once the installer starts, never resume the old installed Python modules to render a result, sync or write state. Propagate the external process streams/status directly. If uvx cannot be executed, only the immutable bootstrap may emit the existing exit-127 diagnostic: `error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry.\n`. Do not fall back to the old lifecycle implementation.
 
-Direct imports/internal module calls are test seams, not supported concurrent operational or recovery entrypoints. This cooperative protocol excludes lifecycle/runtime overlap; it does not claim exclusion against arbitrary manual Git/filesystem edits, arbitrary consumer hooks, external writers or nonparticipating legacy commands. Managed checkout and worktree creation/removal are **not** excluded: WIR-COORD-007 through 009 bind their generation, actual target and terminal handoff. E384-DEC-002 was explicitly adopted on 2026-09-08. An invoking-root lease alone never proves coordination of another root.
+Direct imports/internal module calls are test seams, not supported concurrent operational or recovery entrypoints. This cooperative protocol excludes lifecycle/runtime overlap; it does not claim exclusion against arbitrary manual Git/filesystem edits, arbitrary consumer hooks, external writers, nonparticipating legacy commands, or a non-cooperating process sharing the SpecDock process EUID. The latter actor is explicitly outside the Issue #392 threat model under E384-DEC-004 and receives no creator-provenance, non-interference, or arbitrary-time integrity guarantee. Managed checkout and worktree creation/removal are **not** excluded: WIR-COORD-007 through 009 bind their generation, actual target and terminal handoff for participating commands. E384-DEC-002 was explicitly adopted on 2026-09-08. An invoking-root lease alone never proves coordination of another root.
 
 ### WIR-COORD-004 — Closed pre-parser runtime diagnostics
 
@@ -1174,6 +1178,8 @@ There is no new maintenance-proof flag, automatic process kill, hidden pause of 
 - Missing/detection-failed/skipped/succeeded/failed bootstrap observations retain the existing worktree-create exit and warning semantics. A returned hook observation is not a claim that B remains ready after arbitrary consumer code.
 
 These tests are part of the lifecycle implementation unit, not a separate investigation or final-verification Issue.
+
+These acceptance cases verify cooperating SpecDock invocations, ordinary filesystem/I/O failures, and explicitly observed binding/type errors under the OS trust boundary. They do not establish resistance to a same-EUID non-cooperating actor or general hostile-filesystem safety. The excluded creator-replacement case is not an acceptance test; no stop-only replacement test is added.
 
 
 ### WIR-COORD-007 — Accepted same-generation managed checkout

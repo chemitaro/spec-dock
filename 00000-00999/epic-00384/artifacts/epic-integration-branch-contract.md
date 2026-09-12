@@ -3,7 +3,7 @@
 ID: "epic-00384-integration-branch-contract-v1"
 タイトル: "Epic Integration Branch Contract"
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-12"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -58,9 +58,9 @@ GREEN is not only a checkmark. It requires:
 
 ### B0 — Parent freeze
 
-Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent; E384-RQ-019 and `E384-DEC-001`/`E384-DEC-002` are fully resolved. The exact clean pushed tip has an independent review pass under Rolling-Wave Contract §5、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. #392 Product implementation is not started; formal Issue selection may already be complete。
+Three nodes、dependency metadata、parent R/D/P、ADRs、wire、baseline register、rolling-wave contract and `E384-QUAL-001` are coherent; E384-RQ-019 and `E384-DEC-001`/`E384-DEC-002`/`E384-DEC-004` are fully resolved. The exact clean pushed tip has an independent review pass under the current Rolling-Wave Contract §5、external parent-freeze receipt and successful readback of the post-pass GitHub #384/#392/#395/#396 body projections. The pre-safe-stop #392 CP1–CP4 candidate exists but remains unaccepted and unmerged; revised G0 governs its re-entry. Formal Issue selection is already complete。
 
-ユーザーが直列実装中の親修正を承認した場合、Product未着手の選択済みIssue branchでparent-only文書修正を行える。[準備失敗ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)の内容reviewと公開freezeを分離する手順に従い、Product実装前のfreeze/projectionを省略しない。Epic branchへのProduct統合は従来どおりIssue PRの人間mergeだけである。
+ユーザーが直列実装中の親修正を承認した場合、選択済みIssue branchでparent-only文書修正を行える。#392には安全停止前の未受入Product candidateがあるため、[準備失敗ADR](20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)と現行Option 1 ADRのreview・公開freeze・projectionを完了してからre-entryします。Epic branchへのProduct統合は従来どおりIssue PRの人間mergeだけである。
 
 ### B1 — After #392 merge
 
