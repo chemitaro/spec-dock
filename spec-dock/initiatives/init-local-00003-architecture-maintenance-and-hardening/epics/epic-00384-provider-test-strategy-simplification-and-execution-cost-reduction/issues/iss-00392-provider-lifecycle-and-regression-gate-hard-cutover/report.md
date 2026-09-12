@@ -439,3 +439,16 @@ Implementation Brief Strict（session `required-strict-github-connector-verifica
 この分析により、単純な「random temporary directory → fsync → native `rename_no_replace`」だけではP1を閉じられないことを明確化しました。temp basename自体も`mkdir(temp) → open(temp)`の間にforeign replacementを受け得るため、(a) temp sourceのownership provenanceを証明するnative protocol、または(b) same-euid substitutionを脅威モデルから外すRequirement/security decisionのいずれかを正本で決める必要があります。したがって、P1のhuman gateは「temp方式を採用するか」だけでなく、temp sourceを何でprovider-ownedと証明するか、CP1 filesystem/private-stateとCP2 engine call sitesの適用範囲、publication後failure時のrollback authorityを含みます。
 
 P2は`f56486967f059e05199aa24554ef3a87546fdcc6`でclosedです。このbriefではP2のtestを再追加・置換せず、P1のmkdir/open replacement raceを独立したFirst Redとして扱う方針を確認しました。人間承認済みのcanonical Design/Planを含む新しいexact SHAが提示されるまで、Product code・test・Requirement・Design・Planは追加変更しません。
+
+## 28. Same-EUID creation replacement first-RED (2026-09-12)
+
+ユーザー指示に従い、同一EUIDの非協調processを脅威モデルに残し、作成者provenanceのないreplacementへ書き込まないことを、既存public boundary `ProviderLifecycleEngine.execute()`で検証しました。Darwin上の一時再現では、`spec-dock`の`mkdir`成功直後かつ最初のpath open前に作成directory Xを退避して同一owner／modeのYへ置換すると、現行実装は`completed/install-completed`を返し、Yへ`.gitignore`、`docs`、`scripts`、`system`、`templates`、`spec-dock.version`を書き込みました。
+
+このwindowを固定する`test_t06_bootstrap_creation_replacement_is_not_populated`を追加しました。期待値はreplacement Yの保持・無変更、operationの`blocked`終端、displaced Xの保持です。First REDは新test単独で`1 failed`となり、replacement directoryに六entryが作られることを確認しました。従来の`test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory`は`1 passed`ですが、成功したmkdirと最初のopenの間の置換ではなく、二度目のmkdirによる`EEXIST`を扱う別scheduleです。この追加testはobsolete-only testではなく、現在のforeign-preservation要件の実故障を検証します。
+
+- 新しいreplacement regression: `uv run pytest -q tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_creation_replacement_is_not_populated` は期待どおりRED（`1 failed`、replacement Yが空でない）
+- 既存planned-create race: `uv run pytest -q tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory` は `1 passed`
+- engine回帰（今回のREDだけを除外）: `uv run pytest -q tests/unit/provider_lifecycle/test_engine.py -k 'not bootstrap_creation_replacement_is_not_populated'` は `295 passed, 1 deselected`
+- test file lint／format: `uv run ruff check tests/unit/provider_lifecycle/test_engine.py`、`uv run ruff format --check tests/unit/provider_lifecycle/test_engine.py` はpass。`git diff --check`もpass
+
+これはCP2のFirst RED evidenceであり、checkpoint GREENではありません。親Wire WIR-COORD-003は任意のfilesystem edit／external writer／nonparticipating commandを明示的に除外し、現行Issue Planは親Wireを編集しないと定めています。Strict分析とDarwin再現では、一時directory＋no-replaceだけで同じEUID replacementのcreator provenanceを証明できませんでした。したがってREDを隠すskip／xfailや、未証明の作成物を扱うproduction workaroundは追加せず、同一脅威モデルのままGREENにするには親Wire superseding ADRでcreation・population・publication・cleanup・recoveryを通じたtrusted mutation boundaryを決定する必要があります。今回の差分はregression testとこのReport追記だけで、Requirement／Design／Plan／Parent Wire、production code、旧機能testは変更していません。PR review、Final Quality Gate、Product GREENも未実施です。
