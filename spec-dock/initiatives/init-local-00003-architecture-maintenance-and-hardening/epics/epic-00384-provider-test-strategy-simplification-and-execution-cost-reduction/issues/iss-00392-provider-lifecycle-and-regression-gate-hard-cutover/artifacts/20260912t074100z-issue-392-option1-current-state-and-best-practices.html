@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Issue #392 現状整理と Option 1 再開ガイド</title>
+<style>
+:root{color-scheme:light dark;--bg:#f4f7fb;--surface:#fff;--surface2:#f8fafc;--text:#17202a;--muted:#5e6b78;--border:#d9e2ec;--blue:#175cd3;--bluebg:#eff6ff;--green:#067647;--greenbg:#ecfdf3;--amber:#b54708;--amberbg:#fffaeb;--red:#b42318;--redbg:#fef3f2;--purple:#6941c6;--purplebg:#f4f3ff;--shadow:0 8px 28px rgb(16 24 40 / 8%)}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1220;--surface:#111827;--surface2:#182132;--text:#f3f4f6;--muted:#b5c0ce;--border:#324054;--blue:#84adff;--bluebg:#16233e;--green:#75e0a7;--greenbg:#0f2e25;--amber:#fec84b;--amberbg:#34260e;--red:#fda29b;--redbg:#351716;--purple:#bdb4fe;--purplebg:#252044}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic UI","Yu Gothic",sans-serif;line-height:1.72}main{width:min(1120px,100% - 24px);margin:auto;padding:max(22px,env(safe-area-inset-top)) 0 max(48px,env(safe-area-inset-bottom))}header,section{background:var(--surface);border:1px solid var(--border);border-radius:18px;box-shadow:var(--shadow);padding:clamp(18px,3vw,30px);margin:0 0 18px}h1{font-size:clamp(1.65rem,5vw,2.6rem);line-height:1.28;margin:0 0 12px}h2{font-size:clamp(1.25rem,3.8vw,1.65rem);line-height:1.35;margin:0 0 12px}h3{font-size:1.06rem;margin:22px 0 8px}p{margin:.55em 0}.lead{font-size:1.08rem}.muted{color:var(--muted)}code{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.92em;background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:.08em .35em;overflow-wrap:anywhere}.meta{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}.badge{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:4px 10px;font-size:.82rem;font-weight:700}.blue{color:var(--blue);background:var(--bluebg)}.green{color:var(--green);background:var(--greenbg)}.amber{color:var(--amber);background:var(--amberbg)}.red{color:var(--red);background:var(--redbg)}.purple{color:var(--purple);background:var(--purplebg)}.callout{border-left:5px solid var(--blue);background:var(--bluebg);padding:14px 16px;border-radius:10px;margin:14px 0}.callout.warn{border-left-color:var(--amber);background:var(--amberbg)}.callout.stop{border-left-color:var(--red);background:var(--redbg)}.callout.good{border-left-color:var(--green);background:var(--greenbg)}.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.card{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:16px}.card h3{margin:0 0 6px}.num{font-size:1.35rem;font-weight:800;color:var(--blue)}table{width:100%;border-collapse:separate;border-spacing:0;margin:12px 0;font-size:.93rem;overflow:hidden;border:1px solid var(--border);border-radius:12px}th,td{text-align:left;vertical-align:top;padding:11px 12px;border-bottom:1px solid var(--border)}th{background:var(--surface2);font-weight:750}tr:last-child td{border-bottom:0}.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}.flow{display:flex;align-items:stretch;gap:8px;overflow-x:auto;padding:8px 0}.step{min-width:160px;flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px}.arrow{align-self:center;color:var(--muted);font-weight:800}.checklist{padding-left:1.25rem}.checklist li{margin:.45em 0}.yes{color:var(--green);font-weight:800}.no{color:var(--red);font-weight:800}.review{color:var(--amber);font-weight:800}.path{word-break:break-all}.small{font-size:.88rem}.source-list li{margin:.55em 0}.footer{color:var(--muted);font-size:.85rem;text-align:center;padding:8px 12px 24px}@media(max-width:760px){.grid{grid-template-columns:1fr}table{font-size:.86rem}th,td{padding:9px}.arrow{display:none}.flow{display:grid;grid-template-columns:1fr}.step{min-width:0}}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <div class="badge red">Issue #392 / HUMAN GUIDE / PRO REVIEW PENDING</div>
+  <h1>Provider Lifecycle Hard Cutover<br>現状整理と Option 1 再開ガイド</h1>
+  <p class="lead"><strong>結論:</strong> Product owner が選択した Option 1（同一EUIDの非協調processを脅威モデルから除外）は、same-EUID creator-provenance 問題による停止を解除するための設計判断として妥当です。ただし、<strong>正本の脅威境界変更・再承認・freezeが終わる前にProduct編集へ戻るべきではありません</strong>。</p>
+  <div class="meta"><span class="badge blue">Repository: chemitaro/spec-dock</span><span class="badge blue">Branch: iss-00392-provider-lifecycle-and-regression-gate-hard-cutover</span><span class="badge blue">Observed tip: 02840e4e46e0db4eef27dbde703ccad167035c91</span><span class="badge amber">2026-09-12 / evidence snapshot</span></div>
+</header>
+<section>
+<h2>最初に把握するべき4点</h2>
+<div class="grid">
+  <div class="card"><div class="num">1</div><h3>same-EUID問題は「実装バグ」だけではありません</h3><p>同じEUIDで非協調なprocessがpathを自由にrename/replaceできる前提では、通常ユーザー権限CLIだけで「自分が作成したinode」を継続的に証明するのは困難です。現在のFirst REDはその境界を実際に再現しています。</p></div>
+  <div class="card"><div class="num">2</div><h3>Option 1 は製品境界に合っています</h3><p>SpecDockを軽量な文書管理CLIとして維持するなら、privileged broker、daemon、OS policy subsystemを導入するより、協調SpecDock process間の整合性を保証し、同資格情報の非協調actorは境界外と明示する方が責務に整合します。</p></div>
+  <div class="card"><div class="num">3</div><h3>現在、証拠ソース同士に差があります</h3><p>接続GitHub先端にはFirst REDと設計判断要求が記録されています。一方、今回提供された添付snapshotにはaccepted safe-stop ADRと停止済みR/D/Pがありますが、そのADRは接続GitHub branchには存在しません。実装再開前にこの差を解消する必要があります。</p></div>
+  <div class="card"><div class="num">4</div><h3>full regression問題は別件です</h3><p>現行Reportは #395 所有baselineに関する <code>ledger-mismatch</code> 10件を記録し、#392起因の新規unexpected failureは0としています。しかしEpic要件はB1でfull-regression pathのGREENを要求しています。この整合問題はOption 1では解消しません。</p></div>
+</div>
+</section>
+<section>
+<h2>現在の状態を一枚で見る</h2>
+<div class="flow" aria-label="Issue 392 current state"><div class="step"><strong>実装candidate</strong><br>CP1–CP4相当の大部分は既に存在し、多数のremediation/test evidenceあり。</div><div class="arrow">→</div><div class="step"><strong>Strict review</strong><br>same-EUID creation replacementにより「設計判断が必要」と判定。</div><div class="arrow">→</div><div class="step"><strong>First RED</strong><br><code>mkdir</code>直後のsame-EUID置換でreplacementへ書込み。</div><div class="arrow">→</div><div class="step"><strong>Owner decision</strong><br>Option 1: same-EUID非協調actorを明示的にscope外へ。</div><div class="arrow">→</div><div class="step"><strong>次の正しい行動</strong><br>仕様境界更新 → 再review/freeze → Product再開。</div></div>
+<div class="callout warn"><strong>重要:</strong> 「Option 1を選んだ」ことと「Product編集を再開できる正本状態になった」ことは別です。現在の接続GitHubでは後者はまだ証明されていません。</div>
+</section>
+<section>
+<h2>なぜ停止したのか</h2>
+<p>観測されたraceは次の形です。</p>
+<div class="flow"><div class="step"><strong>A.</strong> SpecDockが <code>mkdir("spec-dock")</code> に成功</div><div class="arrow">→</div><div class="step"><strong>B.</strong> 同一EUIDの非協調actorが作成directory Xを退避</div><div class="arrow">→</div><div class="step"><strong>C.</strong> 同owner/modeの別directory Yを同pathへ配置</div><div class="arrow">→</div><div class="step"><strong>D.</strong> SpecDockがpathをopenし、Yを「作ったdirectory」と誤認</div><div class="arrow">→</div><div class="step"><strong>E.</strong> Yへprovider内容を書き込む</div></div>
+<p>既存のplanned-create EEXIST testは「exclusive create時点で既に競合物が存在する」scheduleを扱います。今回のREDは「create成功後、最初のopen前に置換される」別scheduleです。この差が、単なるEEXIST対応では閉じない理由です。</p>
+</section>
+<section>
+<h2>推奨する脅威境界</h2>
+<div class="callout good"><strong>推奨文言の要旨:</strong> SpecDockが保証するのは、WIR-COORDのlease/handoff/helper-lifetime規約に参加するsupported SpecDock CLI invocations間の協調、および通常のfilesystem/I/O failure・crash/recovery・観測可能なbinding driftに対する定義済み挙動です。同じEUIDでありながらこの協調規約に参加せず、operation中にpath/inode/bytesを任意変更できるactorは脅威モデル外とします。</div>
+<div class="scroll"><table><thead><tr><th>Actor / failure</th><th>Scope</th><th>保証</th></tr></thead><tbody>
+<tr><td>協調するSpecDock CLI / managed helper</td><td><span class="yes">IN</span></td><td>repository-root SH/EX coordination、helper lifetime、release→exec、busy時mutation-zero、generation整合を維持。</td></tr>
+<tr><td>通常のI/O failure、fsync/rename failure、process crash</td><td><span class="yes">IN</span></td><td>P0/P1/P2、ACTIVE/stage/receipt、forward recovery、protected data preservationを維持。</td></tr>
+<tr><td>観測可能なsymlink/type/owner/binding drift</td><td><span class="yes">IN</span></td><td>既存のfail-closed検査を維持。これはcorrectness/defense-in-depthでもある。</td></tr>
+<tr><td>同一EUID・非協調processによる任意rename/replace/write</td><td><span class="no">OUT</span></td><td>creator provenance、non-interference、hostile filesystem safetyを主張しない。</td></tr>
+<tr><td>異なるcredentialsのactor</td><td><span class="review">OS BOUNDARY</span></td><td>OS permission/ownership/ACLを信頼境界とし、SpecDockは観測可能な不整合をfail closedする。root/同等capabilityへの耐性は主張しない。</td></tr>
+</tbody></table></div>
+<p class="muted">この境界は「チェックを削除する」判断ではありません。既存no-follow、inode witness、owner/type確認、atomic rename、binding再検証は、通常障害・誤操作・協調競合に対する安全性として残します。</p>
+</section>
+<section>
+<h2>Option 1 が変えるもの / 変えないもの</h2>
+<div class="grid"><div class="card"><h3>変えるもの</h3><ul class="checklist"><li>same-EUID非協調actorをsecurity/threat requirementから明示的に除外。</li><li>creator provenanceを「same-EUID hostile actorにも成立する」と読めるRequirement/Design/Wire文言。</li><li>その攻撃scheduleのみを受入要件とするcreation-replacement test。</li><li>safe-stop ADRのcurrent authority status（履歴は残す）。</li></ul></div><div class="card"><h3>変えないもの</h3><ul class="checklist"><li>protected consumer data preservation。</li><li>native no-replace/exchange、no-follow、hard-link/special-type rejection。</li><li>crash recoveryとACTIVE/stage/receipt。</li><li>cooperating CLIのSH/EX coordinationとmanaged helper lifetime。</li><li>exact migration / tooling-only uninstall / closed public wire。</li><li>#392 → #395 → #396 の責務順序とhuman-only merge。</li></ul></div></div>
+</section>
+<section>
+<h2>最小の正本文書変更</h2>
+<p>新しいsecurity layerを追加せず、意味変更を必要最小限に閉じるのがベストです。</p>
+<div class="scroll"><table><thead><tr><th>文書</th><th>最小変更</th><th>注意</th></tr></thead><tbody>
+<tr><td>新しいsuperseding ADR</td><td>Option 1、明示的scope、受容リスク、broker/daemon等を追加しないこと、test dispositionを記録。</td><td>過去の安全停止を「誤りだった」と消さない。</td></tr>
+<tr><td>safe-stop ADR</td><td><code>superseded</code>として履歴保持し、新ADRへのlinkを付与。</td><td>Decision/Context/First RED evidenceを改竄しない。</td></tr>
+<tr><td>Epic Requirement</td><td><code>E384-RQ-006</code>のfilesystem safetyを協調/通常障害境界として限定。<code>E384-RQ-019</code>は協調保証を維持。current DECを更新。</td><td>general hostile-filesystem safetyを主張しない。</td></tr>
+<tr><td>Epic Design / Plan</td><td>safe-stop表示を解除し、B0再freeze後に#392再開できる状態へ。</td><td>review/freeze/projection gateを飛ばさない。</td></tr>
+<tr><td>Provider Lifecycle Wire</td><td>WIR-OWN/PREP/COORDのsecurity interpretationを明示。public wire inventoryは原則変更しない。</td><td>same-EUID除外を理由にI/O recoveryやbinding checksまで削らない。</td></tr>
+<tr><td>Issue #392 R/D/P</td><td>front matter・停止banner・I392-RQ-006/007/019/020・T06/CP再開条件を整合。</td><td>旧candidateの実装成果を全捨てしない。</td></tr>
+<tr><td>Issue Report</td><td>§28はhistorical First REDとして残し、後続節にowner decisionと「scope changeでtestをretireした」事実を追加。</td><td>実装でGREEN化したと表現しない。</td></tr>
+</tbody></table></div>
+</section>
+<section>
+<h2>テスト disposition</h2>
+<div class="scroll"><table><thead><tr><th>Test</th><th>判定</th><th>理由</th></tr></thead><tbody>
+<tr><td><code>test_t06_bootstrap_creation_replacement_is_not_populated</code></td><td><span class="no">REMOVE</span></td><td>same-EUID非協調actorがcreate成功後に置換するscheduleそのものが新threat modelから外れるため。skip/xfailや「scope外であることを確認するtest」へ置換しない。</td></tr>
+<tr><td><code>test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory</code></td><td><span class="yes">KEEP</span></td><td>exclusive creationのEEXIST/collisionは非敵対的な競合でも発生し得る。既存directoryを黙って採用しない保証は残す。</td></tr>
+<tr><td><code>test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory</code></td><td><span class="yes">KEEP</span></td><td>取得済みwitnessと後続mutation対象のidentity drift検出。hostile same-EUID proofではなく、観測可能なdriftへのfail-closedとして残す。</td></tr>
+<tr><td><code>test_t06_existing_bootstrap_rebind_blocks_before_mutation</code></td><td><span class="yes">KEEP</span></td><td>pre-existing containerを別inodeへrebindされたときに黙ってadoptしない所有境界。新規creator provenanceとは別問題。</td></tr>
+</tbody></table></div>
+<div class="callout"><strong>テストの原則:</strong> 「攻撃者を除外したからrace testを全部消す」ではありません。通常のcooperative concurrency、EEXIST、I/O error、observable rebind、protected data preservation、crash recoveryを守るtestは維持します。</div>
+</section>
+<section>
+<h2>CP1 → CP4 の最小再開順</h2>
+<ol class="checklist"><li><strong>Parent scope amendment:</strong> Option 1をsuperseding ADRとEpic/Wireへ反映。</li><li><strong>Issue contract reconciliation:</strong> #392 R/D/P、front matter、test trace、stop conditionを新境界へ整合。</li><li><strong>Independent review:</strong> 同一候補bytesを固定し、P0/P1=0・review pass。</li><li><strong>Freeze:</strong> clean push、remote full SHA、freeze receipt、GitHub Issue projection/readback。</li><li><strong>CP1:</strong> wire projection/private state/native filesystemを再確認。不要なsecurity protocolを追加しない。</li><li><strong>CP2:</strong> creation-replacement testをretireし、engine/CLI/recovery/migration/uninstallを新scopeで再検証。</li><li><strong>CP3:</strong> frozen bootstrap、SH/EX、helper lifetime、handoff、checkout、worktree coordinationを継続検証。</li><li><strong>CP4:</strong> package/dogfood parity、default fast、provider CI、full verifier、review/FQGをfinal SHAへ束縛。</li></ol>
+<p><strong>やらないこと:</strong> privileged broker、daemon、新scheduler、新security layer、same-EUID専用の擬似provenance workaround、scope外攻撃をassertするstop-only test。</p>
+</section>
+<section>
+<h2>別途解決が必要: B1 / full regression</h2>
+<div class="callout stop"><strong>Option 1で解消しません。</strong> Epic <code>E384-RQ-009</code> は #392 merge後も exact full-regression path のGREENを要求します。一方、Issue Reportは現在 <code>ledger-mismatch</code> 10件を #395 所有baselineのsignature/coverage mismatchとして記録しています。</div>
+<p>ここは脅威モデル変更と混ぜず、親レベルで別に adjudicate するのが安全です。最低限、次のどちらを契約として採るのかを決める必要があります。</p>
+<div class="grid"><div class="card"><h3>A. 現行契約を厳密維持</h3><p>#392はfull verifierが実際にGREENになるまでB1不可。14 active rowのsignature/lifecycle不変を守るため、#392側で既存signatureを壊さない実装へ修正する。</p><p class="muted">長所: 契約変更なし。短所: hard cutoverが正当な観測差を生む場合、技術的に不合理または高コストになり得る。</p></div><div class="card"><h3>B. Parent contractを明示改訂</h3><p>#392では「#395所有debtを増やさない／新unexpected failure 0／全baseline nodeを実行・追跡可能」をB1条件にし、signature/coverageの機械的rebindを厳格なmappingで扱う。</p><p class="muted">長所: 責務分離に合う。短所: E384-RQ-009、register/evaluator semanticsに触れるため、独立したparent decision/reviewが必要。</p></div></div>
+<p><strong>推奨:</strong> 10 mismatchを1件ずつ「accepted behaviorが変わったのか」「observer/signatureだけが変わったのか」に分類してからBを採否判断します。skip/xfail、approved failure追加、#395修正の先取りで隠すべきではありません。</p>
+</section>
+<section>
+<h2>オーナー向け判断表</h2>
+<div class="scroll"><table><thead><tr><th>質問</th><th>推奨判断</th></tr></thead><tbody><tr><td>same-EUID非協調actorまで守るべきか</td><td><strong>No。</strong> lightweight CLIの責務外として明示。OS同資格情報内をsecurity boundaryにしない。</td></tr><tr><td>既存のno-follow / witness / atomic renameは削るか</td><td><strong>No。</strong> 通常障害、誤操作、協調競合、観測可能driftへの安全策として保持。</td></tr><tr><td>privileged broker/daemonを追加するか</td><td><strong>No。</strong> Product purposeに対して過剰。</td></tr><tr><td>First REDは消すか</td><td><strong>Report evidenceは残す。</strong> Product testは新scopeに不要なのでretire。</td></tr><tr><td>Option 1採用後すぐProduct編集するか</td><td><strong>No。</strong> superseding ADR → canonical alignment → review/freeze後。</td></tr><tr><td>#395 baseline mismatchも同時に「解決済み」にするか</td><td><strong>No。</strong> B1 gateとして別 adjudication。</td></tr></tbody></table></div>
+</section>
+<section>
+<h2>証拠とauthorityの読み分け</h2>
+<ul class="source-list"><li><strong>Connected GitHub tip:</strong> <code>02840e4e46e0db4eef27dbde703ccad167035c91</code>。Report §28とcreation-replacement First RED testを含む。</li><li><strong>Connected GitHub canonical Issue R/D/P:</strong> 現時点では <code>approved / independent-review-passed / 実装開始許可:true</code> の旧状態。safe-stop ADRはbranchに存在しない。</li><li><strong>Provided attachment snapshot:</strong> 同じpathsの後続候補としてsafe-stop ADR、停止banner、<code>実装開始許可:false</code>等を含む。ただし接続GitHubには未反映なのでrepository authorityとしては未確定。</li><li><strong>Owner decision in current task:</strong> Option 1を明示選択。これが次のcanonical amendmentの入力。</li></ul>
+<div class="callout warn"><strong>再開条件:</strong> GitHub canonical docsとローカル/添付candidateを一本化し、Option 1を反映したexact candidateへ独立review/freezeを束縛するまで、どの文書をcurrent authorityとするかを推測で選ばない。</div>
+</section>
+<section>
+<h2>この資料の制作・検証ステータス</h2>
+<p>ユーザーは <strong>ChatGPT Use Strict + GPT-5.6 Pro</strong> による独立分析とHTML生成を指定しています。しかし、この実行環境では認証済みChatGPTブラウザ操作コネクタ／GPT-5.6 Pro外部セッションを起動する手段が利用できません。また、Tailscale CLI/Serve connectorも利用できません。</p>
+<p>そのため本資料は、<strong>接続GitHub・今回提供された添付snapshot・現在のowner decisionに基づき、GPT-5.6 Solが作成した暫定human guide</strong>です。GPT-5.6 Proが実施・承認したとは主張しません。</p>
+<div class="grid"><div class="card"><h3>完了</h3><ul class="checklist"><li>指定branchとAGENTS.md確認</li><li>Issue #392 canonical files / report evidence確認</li><li>Option 1のbest-practice分析</li><li>human-readable standalone HTML作成</li></ul></div><div class="card"><h3>未実施 / tooling blocker</h3><ul class="checklist"><li>GPT-5.6 Pro ChatGPT Use Strict external session</li><li>Pro側による独立HTML authoring/review</li><li>Tailscale Serve/Funnelでの配信</li></ul></div></div>
+</section>
+<section>
+<h2>検証可能な主要参照</h2>
+<ul class="source-list small"><li class="path"><code>AGENTS.md</code></li><li class="path"><code>.agents/skills/spec-dock/SKILL.md</code></li><li class="path"><code>spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/requirement.md</code> — E384-RQ-006 / 009 / 019</li><li class="path"><code>.../artifacts/provider-lifecycle-wire-contract.md</code> — WIR-PREP / WIR-COORD</li><li class="path"><code>.../issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/requirement.md</code> — I392-RQ-006 / 007 / 019 / 020</li><li class="path"><code>.../issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/design.md</code> — §7.1 / §9 / §11 / §20</li><li class="path"><code>.../issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/plan.md</code> — G0 / CP1–CP4 / B1</li><li class="path"><code>.../issues/iss-00392-provider-lifecycle-and-regression-gate-hard-cutover/report.md</code> — §8, §26–§28</li><li class="path"><code>tests/unit/provider_lifecycle/test_engine.py</code> — creation replacement / EEXIST / rebind tests</li></ul>
+</section>
+<div class="footer">Issue #392 evidence Artifact — generated 2026-09-12 16:41 JST / repository observation bound to tip 02840e4e46e0db4eef27dbde703ccad167035c91</div>
+</main>
+</body>
+</html>
