@@ -4,10 +4,12 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-12"
 依存:
   - "requirement.md"
   - "design.md"
+  - "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260902t070000z-adr-multi-issue-epic-integration-branch-and-rolling-wave-elaboration-policy.md"
   - "artifacts/epic-integration-branch-contract.md"
   - "artifacts/rolling-wave-issue-elaboration-contract.md"
@@ -23,9 +25,11 @@ repository_evidence:
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
+**現行状態（2026-09-12）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)はsame-EUID非協調actorを保証対象外とし、#392の安全停止を置き換えた。改訂R/D/Pの独立review・clean pushed freeze/projectionまではProduct変更を行わない。#395/#396はB1/B2受入まで開始しない。
+
 ## 1. 今回の位置づけ
 
-親計画のcommit/pushと最初のIssue #392の正式startは完了した。現在はユーザー承認のもと、同Issue branchでP392-001/002を親wire v12へ反映し、続けて#392の詳細R/D/Pを作成する。Product実装は今回行わず、Issue branchでの詳細化・独立review後に許可する。過去のGPT-5.6/外部Strict passも、直前の限定的GPT-6 review passも、新しい候補のacceptanceに流用しない。
+親計画のcommit/pushとIssue #392の正式startは完了した。安全停止前にCP1–CP4の実装candidateとその検証を行ったが、Issueとして未受入である。現在はOption 1反映後の親／Issue R/D/Pを独立reviewし、clean pushed freezeとGitHub projection/readbackを完了するG0段階にある。G0後はIssue Plan §2.1の限定re-entry（不要になった一件のtest削除と影響gateの再検証）から続け、CP1をやり直さない。過去のGPT-5.6／GPT-6 reviewはそれぞれの記録済みcandidateだけに有効で、現在候補のacceptanceへ流用しない。
 
 目的はprovider状態数・重複検証・実行コストの削減であり、文書数やIssue数を増やすことではない。実装・検証単位は#392 → #395 → #396の三件を維持する。各Issue PRをEpic branchへ人間が順次mergeし、最後にmainへ一度mergeする。
 
@@ -43,20 +47,20 @@ repository_evidence:
 
 | Gate | 必要な入力 | 受入条件 | 次の段階 |
 |---|---|---|---|
-| G0 Parent freeze | 現行親R/D/P、三Issue draft、契約、原因別register | 同一候補の独立GPT-6 Max review pass、P0/P1=0、親の未決判断0。clean pushed tipのfreeze receiptと4 Issue body projection readback | ユーザーの開始依頼後、#392の正式startと詳細化 |
-| G1 #392 | G0、#387完了、current transitional baseline | fixed lifecycle、migration/uninstall/recovery、runtime coordination、complete dogfood、旧writer撤去、current gates GREEN | 人間merge後のB1を確認 |
-| G2 #395 | B1、exact 15-row register | 原因に対応した12件のtest側修復と2件のProduct側修復、全accepted behavior正常pass、15 resolved、例外0、current gates GREEN | 人間merge後のB2を確認 |
-| G3 #396 | B2 clean baseline | build-once role graph、E384-QUAL-001、consumer-first旧policy撤去、context無空白切替、最終docs/dogfood | 人間merge後のB3を確認 |
-| G4 Epic main | B3と全受入証拠 | 最終human review、tree/context/evidence整合 | mainへ一度human merge、B4/closure確認 |
+| G0 Parent freeze | 現行親R/D/P、三Issue draft、契約、原因別register、E384-DEC-004 | 同一候補の独立review pass、P0/P1=0、親の未決判断0。clean pushed tipのfreeze receiptと4 Issue body projection readback | #392は正式start済み。改訂候補の受理後、Issue Plan §2.1から既存candidateを再開 |
+| G1 #392 | G0受入済み、#387完了、Option 1の脅威範囲と改訂Issue R/D/P | Issue Plan §2.1から既存candidateを再開し、不要になったtest一件だけを削除して影響gateを再検証する。#395所有baselineは変更せず、全gate結果と責務境界を正確に記録する。Code Review Strict／Final Quality Gate Strictのpass後にmerge-ready候補とする。 | 人間がEpic branchへmergeし、merge後tipでB1 GREENを確認してから#395。 |
+| G2 #395 | B1が未達 | 開始しない。baselineの修復・変更を行わない | 停止 |
+| G3 #396 | B2が未達 | 開始しない。regression gate/policyを変更しない | 停止 |
+| G4 Epic main | B3が未達 | Epic merge/closureを行わない | 停止 |
 
-`E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、親の未決判断は0件である。G0は改訂候補の独立review・clean pushed freeze receipt・projection readbackで受理する。採用だけでG0や実装開始を完了扱いにしない。
+`E384-DEC-001` / `E384-DEC-002` / `E384-DEC-004` はユーザー採用済みで、親の未決判断は0件である。G0は改訂候補の独立review・clean pushed freeze receipt・projection readbackで受理する。Option 1の採用だけでG0や実装開始を完了扱いにしない。
 
 ## 4. 各Issueで繰り返す進め方
 
 1. 受理済みEpic tip、前Issueのmerge/GREEN、dependency、main driftを確認する。
 2. ユーザーが開始を依頼したら、現行CLIの正式`issue start`で専用branch/activeを選択する。worktreeはユーザーの指定を守る。
 3. 選択したIssueの契約をcurrent treeへ具体化し、R/D/PとIssue専用handoffを作る。調査Issueは作らない。
-4. 初回fresh、修正後same-contextのGPT-6 Max reviewerで独立reviewする。Product実装はpassまで開始しない。
+4. Blue Teamの必要な分析とRed Teamの独立仕様reviewを分離する。Red Teamは`chatgpt-spec-review-strict`をclean pushed exact SHAに対して実行し、初回fresh、同一目的の修正reviewは同じreviewer sessionを使う。P0/P1=0かつ`review_status=pass`になるまでProduct実装を開始しない。
 5. 実装・そのIssue自身のテスト/保護/回復確認を行い、Epic baseのPRをmerge-readyにする。
 6. 人間merge後のexact integrated tipで、その段階のGREENを確認してからIssueを完了する。
 7. 次Issueは前の受入後にだけ詳細化する。
@@ -85,7 +89,7 @@ Replacement consumers/providersを先に成立させ、old consumer 0を確認�
 
 ## 8. レビューと証拠を増殖させない
 
-- 現在の独立review経路はRolling-Wave Contract §5。外部ChatGPT/Oracleの復旧待ちは開始条件にしない。
+- 現在の独立review経路はRolling-Wave Contract §5のChatGPT Strict browser flow。User-approved `chatgpt-use-strict`はBlue Team分析用、`chatgpt-code-review-strict`は実装後のRed Team review、`chatgpt-final-quality-gate-strict-v2`はProによる最終gateに使う。local subagentやnon-Strict fallbackへ切り替えない。
 - Authorとreviewerを分離する。同一周期は初回fresh・以後same reviewerを使う。
 - 変更対象と候補identityを固定し、指摘の原因を直す。未実装のIssue micro-step不足だけでEpicを再設計しない。
 - 親の横断契約を変えない実装詳細はIssue側に閉じ、影響のない受入済み親部分を最初から書き直さない。
@@ -100,7 +104,7 @@ Dependency/identity不一致、未決判断、非GREEN、保護データ変化�
 
 ### 9.1 直列実装中の親修正
 
-[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従い、Product未着手の#392 branchで親修正を行う。親とIssueの内容reviewはworking-tree manifestで固定できるが、公開freezeの完了は別証拠とする。後続Issueの責務は参照確認だけ行う。Review完了後も未公開候補をLuna Maxへ実装委譲しない。
+[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従い、選択済み#392 branchで親修正を行った。CP1–CP4のProduct candidateは存在するが未受入であり、安全停止後の新しいProduct変更は改訂仕様G0が閉じるまで行わない。親とIssueの内容reviewはworking-tree manifestで固定できるが、公開freezeの完了は別証拠とする。後続Issueの責務は参照確認だけ行い、#395/#396は開始しない。
 
 ## 10. 完了
 

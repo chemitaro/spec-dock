@@ -3,8 +3,8 @@
 ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 状態: "parent-planning"
-最終更新: "2026-09-08"
-依存: ["requirement.md", "design.md", "plan.md"]
+最終更新: "2026-09-12"
+依存: ["requirement.md", "design.md", "plan.md", "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md", "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"]
 親: ["init-local-00003"]
 ---
 
@@ -56,4 +56,16 @@ Raw evidenceはEpic配下のGit管理外 `.workbench/reviews/20260908-baseline-d
 3. 親G0、依存、B0を確認して同じworktreeで#392を正式startする。
 4. #392のR/D/PとLuna Max handoffを詳細化し、そのIssueの独立review合格後だけ実装へ進む。#395はB1、#396はB2待ち。
 
-[現行HTML](artifacts/epic-00384-current-plan-guide.html)は再評価の修正点、採用済み判断、正式startと実装許可の区別を説明する。旧10分割／単一Issue資料はhistorical evidenceであり、実装権限ではない。
+[2026-09-08 HTML guide](artifacts/epic-00384-current-plan-guide.html)は当時の再評価、正式start、実装許可の区別を説明するhistoryです。Option 1後の再開条件と現行Strict review routeは本文のEpic R/D/PおよびRolling-Wave Contract §5を正本とし、このguideはそれらを上書きしません。旧10分割／単一Issue資料もhistorical evidenceであり、実装権限ではありません。
+
+## 2026-09-12 later decision — Issue #392 safe stop (superseded)
+
+[Same-EUID safe-stop ADR](artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md)は当時の脅威モデルに基づく履歴として保持し、現在の再開判断は後続のE384-DEC-004に置き換わりました。
+
+## 2026-09-12 later decision — Issue #392 scope reopening
+
+ユーザーはOption 1を採用し、同一EUIDの非協調actorを保証対象外としました。[Superseding ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)とE384-DEC-004がcurrent authorityです。SpecDock協調lease、通常I/O failure、process interruption、Wire-defined recovery、protected-data preservation、baseline、required-fast、CI、human merge gateは変更しません。
+
+改訂親/Wire/Issue R/D/Pの独立review、clean pushed freeze、Issue projection/readbackが終わるまでProduct実装許可はfalseです。B1および#395/#396は未達のままです。Issue Report §28–29のfailure/safe-stop記述は当時の証拠として保持し、新しいtest dispositionは後続実装結果で追記します。
+
+ユーザーは2026-09-12にChatGPT Use系Strict skill/scriptの利用再開を指示しました。過去の一時的なGPT-6 subagent review routeは現在の運用authorityではなく、独立review routeは更新済み[Rolling-Wave Contract §5](artifacts/rolling-wave-issue-elaboration-contract.md)に従います。執筆/Blue Team分析とRed Team reviewは別sessionとし、exact clean pushed SHAをそれぞれStrictに確認します。

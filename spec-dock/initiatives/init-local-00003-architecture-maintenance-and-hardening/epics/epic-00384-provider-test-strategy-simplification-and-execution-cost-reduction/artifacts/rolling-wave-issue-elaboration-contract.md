@@ -3,7 +3,7 @@
 ID: "epic-00384-rolling-wave-issue-elaboration-contract-v1"
 タイトル: "Rolling-Wave Issue Elaboration Contract"
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-12"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -76,11 +76,14 @@ Before Product implementation, the elaboration pack must produce implementation-
 
 ## 5. Independent review — current authorized route
 
-2026-09-08のユーザー指示により、外部ChatGPT Useが機能しない状況での現在のreview経路は、独立したGPT-6（`gpt-6-astra`）・推論Maxのサブエージェントである。親／Issue draft中の「Strict review」「same-reviewer pass」は、現在の運用では本節の独立性・候補固定・再レビュー条件を満たすreviewを指す。外部ChatGPT Strictを実行したとは主張しない。過去の外部Strict passはその過去SHAだけの証拠として保持する。
+2026-09-12、ユーザーはChatGPT Use系のStrict skill／scriptを再び利用可能とし、authoring・analysisとindependent reviewを別セッションで進めるよう指示しました。この現在の運用は2026-09-08の一時的なGPT-6 subagent routeを置き換えます。過去のreview receiptは記録されたSHAにだけ有効で、現在候補へ流用しません。
 
-- 一つのreview周期の初回はfresh reviewerを使う。修正後は同じreviewerを再利用する。
+- Blue Teamは必要に応じて`chatgpt-use-strict`または`chatgpt-implementation-brief-strict`で候補を分析し、canonical local evidenceへ照合します。これらの出力は助言であり、仕様authorityを置き換えません。
+- Red Teamの仕様reviewは`chatgpt-spec-review-strict`、実装後のcode reviewは`chatgpt-code-review-strict`、実装完了後の最終gateは`chatgpt-final-quality-gate-strict-v2`を使います。Final Quality GateはProで実行します。
+- Authoring/analysisとindependent reviewは別のChatGPT browser sessionとし、初回reviewはfresh sessionを使う。修正後の同一目的reviewは、Strict skillが要求する同一reviewer sessionを再利用する。
+- Strict invocationごとに、clean worktree、configured GitHub upstreamとのexact full-SHA一致、およびGitHub connectorによる同じrepository/branch/SHAを確認します。条件を満たさない場合はreviewを開始せず、非Strict経路へfallbackしません。
+- ユーザーはsubagentを極力使わないよう指示しています。現行routeは独立ChatGPT sessionであり、local subagentへの代替は行いません。
 - 主担当がauthoringと指摘の採否を担当し、reviewerはread-onlyで独立に判断する。主担当自身のself-reviewだけでacceptしない。
-- Luna Maxは将来の実装担当である。このEpicのreviewerはGPT-6 Maxとする。
 - Reviewはexact base SHA/treeと候補のfile/diff identityへ束縛する。Working-tree review後にcommitする場合、review済み内容との一致を確認し、最終clean pushed tipのreceiptをtracked tree外へ記録する。後続の仕様変更を過去passで認証しない。
 - 要件・設計・責務境界・安全な中間状態・testability・互換性・recovery・evidence identity・human gateを確認する。`P0/P1=0` かつ `review_status=pass` がacceptance条件である。
 - Epicでは親契約とIssue draft境界をreviewする。まだ存在しないIssue詳細実装手順の欠如は、それ自体をEpicの欠陥としない。
@@ -109,6 +112,6 @@ The return payload identifies exact contract ID、expected/actual evidence、sco
 
 ## 8. Current status
 
-The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies the 2026-09-08 whole-plan changes. #392は正式start済みで、v12親修正と詳細化を進めている。#395/#396はcontract-level draftのまま。Issue内容のreadiness reviewと公開freezeを別々に確認する。 Both E384-DEC-001/002 were adopted by the user. G0 still requires the exact candidate review/publication receipts. The explicit request to start #392 has been executed in this same worktree; continue elaboration and independent implementation-readiness review without repeating scope selection.
+The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies later changes. #392は正式start済みで、v12親修正と詳細化を進めている。#395/#396はcontract-level draftのまま。Issue内容のreadiness reviewと公開freezeを別々に確認する。E384-DEC-001/002/004はユーザー採用済み。ユーザーは2026-09-12にChatGPT Strict運用を再開したため、現行review routeは§5に従う。G0はexact candidateのreview/publication receiptsを引き続き要求する。
 
 `owner_decisions_required=[]`. Both decisions are adopted; do not reopen them without new evidence. See [whole-plan reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md).

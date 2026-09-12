@@ -9,11 +9,13 @@ ID: "iss-00392"
   - "requirement.md"
   - "design.md"
   - "plan.md"
+  - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-luna-max-implementation-handoff.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
   - "artifacts/issue-392-human-guide.html"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: true
+実装開始許可: false
 repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
@@ -452,3 +454,19 @@ P2は`f56486967f059e05199aa24554ef3a87546fdcc6`でclosedです。このbriefで�
 - test file lint／format: `uv run ruff check tests/unit/provider_lifecycle/test_engine.py`、`uv run ruff format --check tests/unit/provider_lifecycle/test_engine.py` はpass。`git diff --check`もpass
 
 これはCP2のFirst RED evidenceであり、checkpoint GREENではありません。親Wire WIR-COORD-003は任意のfilesystem edit／external writer／nonparticipating commandを明示的に除外し、現行Issue Planは親Wireを編集しないと定めています。Strict分析とDarwin再現では、一時directory＋no-replaceだけで同じEUID replacementのcreator provenanceを証明できませんでした。したがってREDを隠すskip／xfailや、未証明の作成物を扱うproduction workaroundは追加せず、同一脅威モデルのままGREENにするには親Wire superseding ADRでcreation・population・publication・cleanup・recoveryを通じたtrusted mutation boundaryを決定する必要があります。今回の差分はregression testとこのReport追記だけで、Requirement／Design／Plan／Parent Wire、production code、旧機能testは変更していません。PR review、Final Quality Gate、Product GREENも未実施です。
+
+## 29. Same-EUID threat safe stop (2026-09-12, superseded)
+
+当時は同一EUIDの非協調filesystem actorを脅威モデルに残す判断を採用し、その前提では通常ユーザー権限CLIが作成者provenanceとtrusted mutation boundaryを証明できないため、#392のProduct実装を停止しました。この節とsafe-stop ADRは当時の履歴です。ユーザー採用済みOption 1と後続ADRにより、現在の脅威境界と再開条件は置き換えられています。
+
+§28のFirst RED `test_t06_bootstrap_creation_replacement_is_not_populated`と、別の`EEXIST` scheduleを扱う`test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory`は両方保持します。前者は脆弱な状態の証拠であり、機能削除確認テストではありません。新しいsafe-stop用Product testは追加しません。今回もProduct code/test、baseline、required-fast、CI、#395/#396文書や依存は変更していません。B1、Code Review Strict pass、Final Quality Gate、Product GREEN、Issue finishを主張しません。
+
+この節のtest dispositionは次の§30と現行Plan §3.1で supersede されます。§28のRED実測値は当時のsame-EUID actor modelにおける履歴として保持し、現行scopeの不具合や合格証拠として扱いません。
+
+## 30. Option 1採用と仕様再開（2026-09-12）
+
+ユーザーは、軽量な通常CLIを維持するOption 1を採用し、同一EUIDの非協調filesystem/Git/process actorを保証対象外としました。協調SpecDock commandのlease、通常I/O failure、process interruption、Wire-defined recovery、OS permission boundary、観測されたbinding drift、protected-data preservation、unsafe type拒否は維持します。creator provenance、non-interference、任意時点のintegrityは主張せず、broker/daemon/OS policy/独自security layerも追加しません。accepted authorityは[superseding ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)です。
+
+Requirement・Design・Planをこの境界へ揃え、Plan §3.1にテスト差分を限定しました。`test_t06_bootstrap_creation_replacement_is_not_populated`は対応要件がなくなるためG0後のCP2開始時に削除し、scope外をassertする後継testは作りません。EEXIST collision、観測済みwitness/binding drift、既存bootstrap rebindのtestは残る契約を検証するため維持します。Option 1を選択したこと自体はProduct実装許可ではありません。
+
+改訂文書の独立review、clean pushed freeze、Issue projection/readback、親gateの再確認は未完了です。従って現在の`実装開始許可=false`を保ち、この判断追記時点ではProduct code/testを変更していません。#395所有の10件のbaseline mismatchは#392で修正・抑止せず別責務として保持します。B1、Code Review Strict pass、Final Quality Gate、PR merge、Issue finishも未完了です。

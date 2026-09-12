@@ -4,17 +4,19 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "approved"
-詳細化状態: "independent-review-passed"
-最終更新: "2026-09-08"
+状態: "draft"
+詳細化状態: "draft"
+最終更新: "2026-09-12"
 依存:
   - "requirement.md"
   - "design.md"
+  - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-luna-max-implementation-handoff.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
 Planning Level: "critical"
-実装開始許可: true
+実装開始許可: false
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
@@ -24,6 +26,8 @@ repository_evidence:
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
+
+> **現行状態（2026-09-12）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に従い、同一EUIDの非協調actorを保証対象外とします。安全停止前にCP1–CP4 candidateは実装・検証済みですが未受入です。改訂Requirement／Design／Plan一式の独立review、clean pushed freeze、GitHub projection/readbackが完了するまでProduct変更は行いません。G0後はCP1からやり直さず、§2.1の再開位置から進めます。不要になったcreation-replacement testだけを削除し、out-of-scopeをassertする代替testは作りません。複雑な保護機構、skip/xfailによるRED隠し、#395/#396の先行開始は行いません。
 
 ## 1. 結論と実行単位
 
@@ -38,23 +42,49 @@ repository_evidence:
 
 ## 2. G0 — Product実装前gate
 
-現時点の値は`implementation_allowed=false`です。次の全条件が外部証拠として成立したときだけ、CodexがCP1 packetをLuna Maxへ渡します。
+現時点の値は`implementation_allowed=false`です。次の全条件が外部証拠として成立したときだけ、Codexが既存candidateの限定re-entryを始めます。
 
-- 本Requirement/Design/Plan/Handoff/Test Artifactを一つの候補として独立reviewし、P0=0、P1=0、`review_status=pass`。
+- accepted scope ADRと本Requirement/Design/Plan/Handoff/Test Artifactを一つの候補として独立reviewし、P0=0、P1=0、`review_status=pass`。
 - Review対象bytesのmanifest/hashが固定されている。
 - 同内容がIssue branchへcommit/pushされ、remote branch tipのfull SHAが取得済み。
 - GitHub #392 body/projectionがそのfreeze identityを参照し、readback確認済み。
 - Epic integration branch B0 GREEN、predecessor #387 completion、15 rows/14 active/1 resolved、243 timing entries、four required-fastが再確認済み。
-- User/Codexが「次の一checkpoint」であるCP1開始を許可している。
+- User/CodexがOption 1後の再開範囲（§2.1）を許可している。このIssueでは正式startは完了済みのため再実行しません。
 
 不足時は仕様packを改善するだけで、Product fileを変更しません。
 
+### 2.1 既存candidateからの再開位置
+
+安全停止前のCP1–CP4実装candidate、focused tests、package/dogfood parity、default fastおよびcurrent full verifierの記録は本Issue Report §§9–26にあり、停止前に追加されたsame-EUID creation-replacement testとsafe stopは§§28–29にあります。これらは実施履歴であり、現在の受入・GREEN証明ではありません。既存Product sourceと他のtestを作り直しません。
+
+G0通過後は次の順で続けます。
+
+1. §3.1の一件だけを削除し、out-of-scope確認testは追加しない。
+2. CP2のlifecycle engine、Wire、migration/uninstall、protected-data focused suiteを再実行し、T06の残すtestを含めてGREENを確認する。
+3. CP1/CP3の変更影響範囲、CP4のpackage/dogfood/default-fast/current-full gatesを再検証する。#395 baseline mismatchを修正・抑止せず、結果をそのまま記録する。
+4. candidateをclean pushし、Code Review StrictとFinal Quality Gate Strictを別々に実行する。人間merge/B1は別gateとして維持する。
+
+CP1–CP4の元packetは初回実装履歴として残し、現在の再開指示は本節と§3.1が優先します。
+
 ## 3. 共通実行規則
+
+### 3.1 Option 1によるtest disposition
+
+この表は、ユーザー採用済みADRによる脅威境界変更に伴う限定差分です。既存test ownership Artifactのその他のKEEP/REPLACE/RETIRE分類、baseline identity、required-fastは変更しません。
+
+| Action | Exact node | 理由 |
+|---|---|---|
+| REMOVE（CP2開始後、focused run前） | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_creation_replacement_is_not_populated` | 同一EUID非協調actorのcreator-provenance保証だけを要求するため、現行scopeに対応要件がない。skip/xfailや「保証対象外」を検査する後継testは作らない。 |
+| KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory` | ordinary `EEXIST` collisionと既存directoryの非採用・無変更を検証する。 |
+| KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory` | 実行中に観測されたbootstrap binding driftでrecordを書かない契約を検証する。 |
+| KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_existing_bootstrap_rebind_blocks_before_mutation` | 既存bootstrapの観測されたrebindをmutation前に拒否する契約を検証する。 |
+
+この一件の削除はscope narrowingにより要求自体がなくなるためのretirementであり、旧writerの削除とは別です。旧writer専用testのretirementには引き続きsuccessor GREENとproduction reference 0を要求します。
 
 - Repository root `AGENTS.md`を毎checkpoint開始時に再読します。
 - Baseはその時点のexact Issue branch tipです。別branch、default branch、mainへ黙って切り替えません。
 - Product sourceの正本は`src/spec_dock/`、dogfoodは最後のprojectionです。
-- Test削除はsuccessor GREEN後だけです。
+- Test削除はsuccessor GREEN後だけです。ただし§3.1のscope narrowingで対応要件自体がなくなった一件は、G0後の再開時に削除し、後継testを設けません。
 - Parent Wire、accepted ADR、register、#395/#396文書を編集しません。
 - Unexpected failure、wire drift、baseline driftをapproved/skip/xfailで隠しません。
 - 各packetの変更対象外fileに差分が出たら、そのcheckpointを停止します。
@@ -440,7 +470,7 @@ Expected REDはpackage inventory/dogfood/test disposition/provider-ci commandが
 3. 同じsource treeからwheel/sdistをbuildし、isolated environmentでinstalled packageだけをimportしてcandidate/fixture/bootstrap/docs/skillsを検証します。
 4. Artifact proofがGREENになった後だけ、provider sourceからdogfood scripts/docs/two skillsを一括byte projectionします。Partial projectionは禁止します。
 5. T13でsource/wheel/sdist/isolated install/fresh install/dogfood parityを検証します。
-6. Existing test filesをtest ArtifactどおりKEEP/REPLACE/RETIREします。Successor GREEN前削除はしません。
+6. Existing test filesをtest Artifactと§3.1どおりKEEP/REPLACE/RETIREします。§3.1のscope削除を除き、Successor GREEN前削除はしません。
 7. Resolved successor nodeidを維持します。
 8. Provider CIのold focused commandをnew lifecycle focused commandへ差し替え、PR-only/Linux-macOS/no-continue-on-error/current full pathsを維持します。
 9. T14とstatic acceptanceでold imports/path strings 0、Wire counts、required-fast、15/14/1、243、mirror parityを検証します。

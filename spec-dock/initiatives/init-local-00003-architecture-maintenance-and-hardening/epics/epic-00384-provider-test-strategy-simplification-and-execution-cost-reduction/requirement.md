@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-12"
 親: ["init-local-00003"]
 実装開始許可: false
 repository_evidence:
@@ -18,6 +18,8 @@ repository_evidence:
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
 
 本Epicの正本は、本書、[Design](design.md)、[Plan](plan.md)、accepted ADR、[Epic Integration Branch Contract](artifacts/epic-integration-branch-contract.md)、[Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md)、[Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md)、[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md)である。
+
+**現行実行状態（2026-09-12）:** [same-EUID脅威範囲の変更ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)により、同一EUIDの非協調actorを保証対象外とする。Issue #392の実装再開は、改訂R/D/Pの独立review・freeze/projection完了後とし、現時点の`実装開始許可`はfalseのまま保つ。B1は未達で、#395/#396は開始しない。
 
 ## 1. Outcome
 
@@ -51,7 +53,7 @@ CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持�
 - Root `full-regression-timing-weights.json`は243 node weightsを持つ。
 - Ledger top-levelの27件集計、古いhead SHA、conclusionはIssue #368時点のhistorical metadataであり、current row-count authorityではない。
 - Current Provider CI、policy skip、ledger evaluator、4-shard Full Regression、main-push workflowはまだtransitional stateとして存在する。
-- Issue #392は2026-09-08に正式start済み。Product implementationは未startである。現在は同Issue branchでユーザー承認済みの親v12修正とIssue詳細化を行う。正式start、内容review、公開freeze、実装許可を区別する。
+- Issue #392は2026-09-08に正式start済みで、CP1–CP4のProduct/test candidateは安全停止前に実装・検証済みである。2026-09-12のsame-EUID安全停止後は実装許可をfalseに戻し、Option 1採用後の改訂仕様を独立review・freezeするまで追加Product/test変更を止めている。G0後は既存candidateからPlanの限定再開範囲を続ける。過去candidateを受入済み・GREENとみなさず、Issue start、文書review、再開許可、Issue受入を区別する。
 
 ## 3. Requirements
 
@@ -78,6 +80,8 @@ Exact clean `0.2.3`だけを`0.2.4`へone-shot migrateする。Strict seven-key 
 ### E384-RQ-006 — Filesystem safety, recovery and protected data
 
 Candidate validation、descriptor binding、no-follow、hard-link/special-type rejection、same-filesystem persistent stage、native no-replace/exchange、terminal cleanup continuationを維持する。Wire v12のgeneration-bound completion receiptにより、cleanup完了応答前のクラッシュ後も、Consumerを変更せず完了と保存済みcontinuationを再提示できる。Receiptは既存private namespace内のbounded bookkeepingであり、新しいprovider-owned Consumer targetではない。Initiatives、Artifacts、repository workbench、consumer seeds、unknown path、unrelated skills、user dataをpreserveする。Lifecycle operationとevidence workspaceのcleanup authorityを混同しない。準備・初期incomplete recordの通常I/O失敗もWIR-PREP-001のclosed resultとexact recoveryへ含める。元Consumer状態と同世代record/container変更後を区別し、未公開operationをcleanup完了と誤認しない。
+
+本Requirementのowner/mode、descriptor、inode、no-followおよびrecovery検査は、OS上の信頼境界、通常のfilesystem/I/O failure、process interruption、観測可能なbinding driftと、WIR-COORDへ参加するSpecDock commandの安全性を扱う。同一EUIDを共有して協調規約へ参加しないactorに対するcreator provenance、non-interference、任意時点のintegrityは保証しない。一般的なhostile-filesystem耐性を主張しない。
 
 ### E384-RQ-007 — Post-#387 regression baseline authority
 
@@ -153,11 +157,19 @@ Rollback unitはIssue PR merge全体である。Dependent Issue start前は直�
 
 `E384-DEC-001` は2026-09-08のユーザー回答「推奨案を採用します」で確定した。初回0.2.3→0.2.4移行だけは、旧SpecDock command・書込みhelperを終了し、新規起動を止めたmaintenance windowで直接外部installerを実行する。移行中断時も停止を維持し、外部installerでreadyを確認してから解除する。旧runtimeの共通排他参加や、process一覧だけによる停止保証を主張しない。以後は[Wire §16](artifacts/provider-lifecycle-wire-contract.md)のrepository-root inodeの共有/排他leaseで保護する。自動process kill、旧runtimeの暗黙patch、新しい一般的schedulerは追加しない。
 
-同じwire節が、module import前のadmission、固定bootstrap、update/uninstall双方のrelease→exec handoff、書込みhelper終了までのlease寿命、busy/unsupported時のmutation-zero、incomplete後の外部復旧を定める。既存create lockは通常create同士の内側の直列化として残せるが、cross-generationのauthorityではない。親判断の解決はreview pass・公開freeze・Issue start・実装開始許可を代替しない。
+同じwire節が、module import前のadmission、固定bootstrap、update/uninstall双方のrelease→exec handoff、書込みhelper終了までのlease寿命、busy/unsupported時のmutation-zero、incomplete後の外部復旧を定める。既存create lockは通常create同士の内側の直列化として残せるが、cross-generationのauthorityではない。これらは規約に参加するSpecDock invocation間の協調保証であり、同一EUIDの非協調filesystem actorを排除するsecurity boundaryではない。親判断の解決はreview pass・公開freeze・Issue start・実装開始許可を代替しない。
 
 ### E384-DEC-002 — 既存branch checkoutの世代境界（採用済み）
 
 2026-09-08のユーザー回答「オッケーです。それではコミットプッシュした上で最初のイシューをスタートしてください」により採用した。管理下のcheckoutはadmission済みprovider closureを変えない場合だけ許可する。固定したtarget refの事前比較で不同一/判定不能ならcheckout前に、事後driftならactive/sync前に停止する。事後にbranchが変わっていればその事実を報告し、自動rollbackしない。現HEADから新branchを作る通常経路は維持する。Wire §16のclosed admissionと[全体再評価ADR §3 B2](artifacts/20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md)がこの判断を具体化する。
+
+### E384-DEC-003 — Issue #392 same-EUID 脅威下の安全停止（superseded）
+
+2026-09-12の[safe-stop ADR](artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md)を、当時のsame-EUID actor in-scope判断に対する履歴として保持する。脅威範囲と実装停止の決定は、後続のE384-DEC-004およびsuperseding ADRにより置き換えられた。
+
+### E384-DEC-004 — Issue #392 same-EUID threat boundary（採用済み）
+
+ユーザーが2026-09-12にOption 1を選択し、同一EUIDの非協調actorを保証対象外とした。参加するSpecDock command間のWIR-COORD lease、通常filesystem/I/O failure、process interruption、Wire-defined recovery、protected-data preservationは維持する。owner/mode/lock/rebindをsame-EUID attackerに対するcreator provenance証明と主張せず、特権broker、daemon、OS policy、独自security layerを追加しない。詳細な脅威境界と再開条件は[accepted ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に従う。
 
 ## 4. Parent acceptance coverage
 
@@ -180,4 +192,4 @@ Epic acceptance requires all three Issue merges on the integration branch, GREEN
 
 2026-09-08に[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)の親修正をユーザーが承認した。現在の内容reviewは当該修正を含む候補へ束縛し、Product実装前の公開freezeは別gateにする。
 
-Current parent decision: `owner_decisions_required=[]`。`E384-DEC-001` / `E384-DEC-002` はユーザー採用済み。今回の実測・採否は[全体再評価ADR](artifacts/20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md)を参照する。
+Current parent decision: `E384-DEC-001` / `E384-DEC-002` / `E384-DEC-004` は採用済み。Issue #392はOption 1の脅威範囲で再開可能だが、改訂R/D/Pのreview・freeze/projection前は実装許可falseのままである。B1未達のため#395/#396は未開始。今回の判断は[superseding ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に記録する。

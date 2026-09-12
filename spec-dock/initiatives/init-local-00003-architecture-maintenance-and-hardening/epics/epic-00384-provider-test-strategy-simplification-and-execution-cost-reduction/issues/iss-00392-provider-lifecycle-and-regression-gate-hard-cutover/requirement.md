@@ -4,11 +4,11 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "approved"
-詳細化状態: "independent-review-passed"
-最終更新: "2026-09-08"
+状態: "draft"
+詳細化状態: "draft"
+最終更新: "2026-09-12"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: true
+実装開始許可: false
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
@@ -19,23 +19,26 @@ repository_evidence:
 
 # #392 要件定義 — Provider lifecycleを固定所有境界へ切り替える
 
+> **現行状態（2026-09-12）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)がsame-EUIDの非協調actorを保証対象外とする。従来の[safe-stop ADR](../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md)はその範囲でsuperseded。既存CP1–CP4 candidateは未受入であり、以下は改訂候補。Product実装許可は独立review・clean pushed freeze/projection完了までfalseとする。B1未達のため#395/#396は開始しない。
+
 ## 1. 結論
 
 Issue #392は、現行のper-file managed-distribution engineを廃止し、四つのfixed tooling roots、二つのfixed skill slots、strict seven-key installation recordだけをdurable mutation authorityとする0.2.4 lifecycleへhard cutoverする、一つの実装・検証・PR受入単位です。
 
 このIssueのPRは`codex/epic-00384-provider-test-strategy-planning`だけをbaseとし、人間が同Epic integration branchへmergeします。#392のB1 GREENとmerge後tip再検証が完了するまで#395を開始せず、#395の後に#396を開始します。#392をmainへ直接mergeしません。
 
-親のpublic wire、三Issue責務、14 active baseline、`E384-QUAL-001`、`E384-DEC-001/002`は再設計しません。実装開始許可は、Issue仕様の独立内容reviewと、この内容を反映したclean pushed freeze/projectionが実際に完了するまで`false`です。
+親のpublic wire inventory、三Issue責務、14 active baseline、`E384-QUAL-001`、`E384-DEC-001/002`は再設計しません。E384-DEC-004が定めるthreat scopeだけを反映し、public code/relation/goldenは変更しません。実装開始許可は、Issue仕様の独立内容reviewと、この内容を反映したclean pushed freeze/projectionが実際に完了するまで`false`です。
 
 ## 2. 正本、優先順位、対象時点
 
-実装時の優先順位は次のとおりです。
+現行の文書優先順位は次のとおりです。
 
-1. Epic #384の`provider-lifecycle-wire-contract.md` v12。
-2. Epic #384のRequirement、Design、Plan、accepted ADR、`active-failure-disposition-register.md`、`epic-integration-branch-contract.md`、`rolling-wave-issue-elaboration-contract.md`。
-3. 本IssueのRequirement、Design、Plan。
-4. 本IssueのArtifact。Artifactは実装引継ぎまたは証拠であり、上位文書を上書きしません。
-5. verified commit `dc638e936e763cc7a6087f258201ed9ed654e7fb`のProduct sourceとtest。
+1. Epic #384のaccepted [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md) — 現行のthreat boundaryと再開条件。
+2. Epic #384の`provider-lifecycle-wire-contract.md` v12 — normative public wireとcooperative coordination契約。今回public inventoryは変更しない。
+3. Epic #384のRequirement、Design、Plan、他のaccepted ADR、`active-failure-disposition-register.md`、`epic-integration-branch-contract.md`、`rolling-wave-issue-elaboration-contract.md`。
+4. 本IssueのRequirement、Design、Plan — 独立review/freezeを待つ改訂候補。
+5. superseded [same-EUID safe-stop ADR](../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md) — 当時の脅威範囲と停止判断の履歴。
+6. 本IssueのArtifactとverified commit `dc638e936e763cc7a6087f258201ed9ed654e7fb`のProduct source/test — 仕様履歴と証拠。
 
 本仕様パックは上記verified commitを調査基準とします。親Wireのfinite inventoryは、6 status、41 code、23 phase、24 last-completed-phase、168 relation rows、40 public JSON goldens、4 durable record goldensです。実装でこの数を増減・再解釈してはなりません。
 
@@ -54,6 +57,10 @@ Issue #392は、現行のper-file managed-distribution engineを廃止し、四�
 11. required-fast、current provider CI、full-regression machinery、15-row register、14 active node、1 resolved successor、243 timing entriesを弱めず維持します。
 
 ## 4. Non-goal
+
+脅威境界: サポート対象の同時実行は、定義済みleaseを守るSpecDock commandに限ります。通常のfilesystem/I/O failure、process interruption、Wire-defined recovery、観測されたbinding drift、protected-data preservation、symlink/special-type拒否は引き続き保証対象です。一方、同一EUIDの非協調actorによる実行中のfilesystem/Git/process介入は対象外とし、creator provenance、non-interference、任意時点のintegrityを保証しません。異なるcredentialのactorについても、OSの書込み権限境界が有効な場合に限り、権限昇格や共有書込み権限を持つactorへの保証は追加しません。
+
+owner/mode、lock、inode witness、descriptor-relative operation、atomic renameは、この境界内の協調・通常障害処理のために維持します。これらを同一EUID actorに対するsecurity boundaryとして扱わず、特権broker、daemon、OS policy、独自security subsystemは追加しません。
 
 - #395が所有する14 active baseline failureの修正、skip、xfail、retirement、signature変更、lifecycle変更。
 - #396が所有するbuild-once final gate、current policy removal、ledger/timing/sharder削除、`E384-QUAL-001`実装または数値変更。
@@ -108,6 +115,8 @@ Designのclosed fixtureに一致する`0.2.3`だけをmigration対象としま�
 
 Private namespaceはConsumer外、repository parentと同一filesystem、effective user owner、mode0700、no-followです。Durable prepared ACTIVEより先にstage payloadまたはConsumer mutationを作成しません。
 
+これらのowner/mode/binding checksはOS credential boundaryと協調commandを前提にし、同一EUIDの非協調actorに対する作成者証明や非干渉性を意味しません。観測できたunsafe type、permission failure、binding driftは既定どおりpreserve-and-blockまたはWire-defined recoveryへ収束します。
+
 Private metadataとそのatomic tempはmode0600、private directoryはmode0700です。例外の`RECORD-TEMP`はexact expected public record、またはexchange後にACTIVEのoriginal-record witnessへ一致する旧public recordだけをmode0644で保持します。Foreign substitutionはcontent-equalでもpreserve-and-blockします。
 
 - P0: initial private authorityを信頼可能にできない。operation/digest/policy null、retryなし、Consumer mutation false。
@@ -119,7 +128,7 @@ Private metadataとそのatomic tempはmode0600、private directoryはmode0700�
 
 ### I392-RQ-007 — Native atomic filesystem safety
 
-Linuxは`renameat2`の`RENAME_NOREPLACE`/`RENAME_EXCHANGE`、macOSは`renameatx_np`の`RENAME_EXCL`/`RENAME_SWAP`をdescriptor-relativeに使用します。native primitiveが利用不能ならWireのclosed failureへ停止し、unlink-then-rename、copy fallback、path-only mutationを使用しません。全authority pathはno-follow、same-filesystem、identity再検証、hard-link/special-type拒否を満たします。
+Linuxは`renameat2`の`RENAME_NOREPLACE`/`RENAME_EXCHANGE`、macOSは`renameatx_np`の`RENAME_EXCL`/`RENAME_SWAP`をdescriptor-relativeに使用します。native primitiveが利用不能ならWireのclosed failureへ停止し、unlink-then-rename、copy fallback、path-only mutationを使用しません。全authority pathはno-follow、same-filesystem、identity再検証、hard-link/special-type拒否を満たします。これは通常障害と観測済みbinding driftへのfail-closed処理であり、一般のhostile-filesystem guaranteeではありません。
 
 ### I392-RQ-008 — Fixed publication and detach order
 
@@ -168,6 +177,8 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 ### I392-RQ-019 — Old writer/test retirement
 
 新保証のRED→GREEN証拠が揃う前に旧testを削除しません。揃った後、旧production writer、旧manifest、旧journal/retry interpretation、obsolete-only testを撤去します。runtime/docs/packaging、four required-fast nodes、resolved successor、14 active baseline nodes、current provider CI/full verifierは維持します。
+
+脅威範囲の変更により要件でなくなった`test_t06_bootstrap_creation_replacement_is_not_populated`はPlanの指定checkpointで削除し、out-of-scope状態だけを確認する後継testは作りません。EEXIST collision、観測されたwitness/binding drift、既存bootstrapの再bindを扱う別testは、それぞれの残る契約を検証するため保持します。
 
 ### I392-RQ-020 — B1 acceptanceと順序
 
@@ -229,4 +240,4 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 
 ## 10. 完了と人間gate
 
-仕様作成完了、実装開始許可、Product実装完了、PR merge、B1 GREEN、Issue closureは別の状態です。本仕様パック作成時点では、Issue仕様の独立review、clean pushed freeze/projection、Product変更、Product test、PR、merge、B1再検証はいずれも未完了です。したがって`実装開始許可: false`を維持します。
+仕様作成完了、再開許可、Product実装完了、PR merge、B1 GREEN、Issue closureは別の状態です。CP1–CP4 candidateとそのテスト・package/dogfood/current-gate検証はsafe stop前に実施済みですが、最終受入されていません。Option 1反映後の独立review、clean pushed freeze/projectionおよび親gateは未完了です。したがって現在は`実装開始許可: false`を維持し、G0後はPlanの限定re-entryを行います。

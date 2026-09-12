@@ -49,7 +49,7 @@ No research、decision、documentation、test-only、verification-only Issue is 
 
 ### ADR-MI-004 — Rolling-wave elaboration
 
-Current Issue R/D/P are contract-level drafts. Formal `issue start` selects the Issue branch/active scope only after parent G0、dependencies and explicit user authorization. File、symbol、test code、exact command and execution steps are then authored against that accepted integration tip and independently accepted before Product implementation. A new worktree or an existing worktree explicitly selected by the user may host the Issue branch. Independent review under Rolling-Wave Contract §5 is mandatory. The current user-authorized route uses a fresh GPT-6 Max subagent and reuses that reviewer for revisions; external ChatGPT Strict is not claimed. A stable-contract change returns to parent adjudication rather than being chosen by Luna Max。
+Current Issue R/D/P are contract-level drafts. Formal `issue start` selects the Issue branch/active scope only after parent G0、dependencies and explicit user authorization. File、symbol、test code、exact command and execution steps are then authored against that accepted integration tip and independently accepted before Product implementation. A new worktree or an existing worktree explicitly selected by the user may host the Issue branch. Independent review under Rolling-Wave Contract §5 is mandatory. The fresh GPT-6 Max subagent route recorded on 2026-09-08 was temporary while external ChatGPT Use was unavailable; the user's 2026-09-12 update restores ChatGPT Strict skills/scripts and the current route is now defined by Rolling-Wave Contract §5. A stable-contract change returns to parent adjudication rather than being chosen by Luna Max。
 
 ### ADR-MI-005 — Re-adopted lifecycle decisions
 

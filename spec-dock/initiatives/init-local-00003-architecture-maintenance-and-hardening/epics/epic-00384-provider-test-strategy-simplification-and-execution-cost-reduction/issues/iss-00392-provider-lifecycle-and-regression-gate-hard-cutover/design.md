@@ -4,14 +4,16 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "approved"
-詳細化状態: "independent-review-passed"
-最終更新: "2026-09-08"
+状態: "draft"
+詳細化状態: "draft"
+最終更新: "2026-09-12"
 依存:
   - "requirement.md"
+  - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: true
+実装開始許可: false
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
@@ -21,6 +23,8 @@ repository_evidence:
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
+
+> **現行状態（2026-09-12）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に従い、同一EUIDの非協調actorを保証対象外とします。既存CP1–CP4 candidateは未受入で、再開位置はPlan §2.1です。協調SpecDock commandのlease、通常I/O／crash recovery、観測されたbinding drift、protected-data preservationは維持し、creator provenanceや一般のhostile-filesystem耐性は主張しません。独立review・clean pushed freeze/projection完了まではProduct変更を行わず、特権broker/daemon等も追加しません。
 
 ## 1. 設計結論
 
@@ -248,6 +252,8 @@ Unknown entryはpreserve-and-blockです。Entry modeは次のclosed matrixで�
 | Private metadata atomic temp | `ACTIVE.json.tmp`、`CLEANUP-COMPLETED.json.tmp` | regular/link1/owner euid/mode0600 |
 | Public-record staging | `RECORD-TEMP` | regular/link1/owner euid/mode0644/max4096 |
 | Private directories | repository namespace、`STAGE` | directory/owner euid/mode0700 |
+
+このcreation/rebind protocolは、OS credential boundaryと協調commandを前提にした通常の安全確認です。同一EUIDの非協調actorがpathやinodeを実行中に差し替える状況に対するcreator-provenance／non-interference guaranteeではありません。観測済みのunsafe bindingは引き続きpreserve-and-blockし、特権serviceや独自security layerで範囲を広げません。
 
 `RECORD-TEMP`はexact expected seven-key public record、またはexchange後にACTIVEのoriginal-record bytes/hash/inode witnessへ一致する旧public recordだけを許可します。Content-equalなforeign inodeを採用せずpreserve-and-blockします。Unsafe objectを削除して進みません。
 
@@ -704,6 +710,7 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 
 ## 20. Security and privacy properties
 
+- Threat boundary: supported concurrent writers are SpecDock invocations that obey the defined leases. Same-EUID non-cooperating filesystem/Git/process actors are outside the guarantee; this design does not promise creator provenance, non-interference, or arbitrary-time integrity against them. Ordinary I/O/crash recovery, OS permission failures, observed binding drift, unsafe object rejection, and protected-data preservation remain in scope.
 - Private schemaはspec本文、Artifact content、credential、Git remote userinfo、任意のpath list、ambient cwd/home、environment dumpを保存しません。例外として、Wire v12が要求する`ACTIVE.cleanup_retry_invocation.rendered_command`、`ACTIVE.deferred_invocation.rendered_command`、および`CLEANUP-COMPLETED.json`内の同じ二fieldだけはWIR-TEXT-001のexact renderer出力をdurable保存し、normalized targetがabsoluteならabsolute pathを含み得ます。別のstandalone absolute-path fieldや任意commandは禁止し、operational metadataを不要なlog、telemetry、Reportへ転載しません。
 - Public diagnosticはWireのcontent-free exact textだけです。
 - Candidate/legacy fixtureはprovider-owned bytesのdigestと必要なlegacy record bytesだけを保持します。
