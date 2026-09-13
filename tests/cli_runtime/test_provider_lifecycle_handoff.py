@@ -189,7 +189,7 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
         source_contender: int | None = None
         target_contender: int | None = None
         try:
-            _wait_for(ready, process)
+            _wait_for(ready, process, timeout=15.0)
             assert worktree_path.is_dir()
 
             source_contender = os.open(target, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
