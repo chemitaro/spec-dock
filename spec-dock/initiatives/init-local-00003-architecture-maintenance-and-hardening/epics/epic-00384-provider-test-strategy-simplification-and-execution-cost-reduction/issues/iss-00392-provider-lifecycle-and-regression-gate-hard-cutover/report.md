@@ -479,3 +479,43 @@ Requirement・Design・Planをこの境界へ揃え、Plan §3.1にテスト差�
 Issue Requirement/Design/Plan、Epic R/D/P、integration/rolling-wave contract、register、#395 R/D/P、implementation handoffとtest ownership artifactをこの順序へ整合させています。#395から#392へのclose-based metadata edgeはSpecDock CLIで削除し、P392 SHA内容gateで実行順を保ちます。#392のCP4 acceptanceでは`.runtime/README.md`をprovider sourceとhidden package-data inventoryに明示し、T13 identity/candidate algorithmを変えません。
 
 テストは、現行public CLI・保護データ安全性・baseline/required-fast/policy contractの検証を保持し、削除済みimplementation/obsolete behaviorの不在だけをassertするtest、退役分類registry test、およびT14内のfile/test absence assertionsを恒久suiteから外します。T12/T14のテストコード自体はG0後に変更します。ここまでの変更は文書とSpecDock dependency metadataに限定し、Product source/testを変更していません。独立Strict spec review、projection/readback、Product再開ゲートは未完了です。
+
+## 32. Option 1 re-entry implementation and clean-candidate verification (2026-09-14)
+
+ユーザーの実装再開承認後、Option 1とPlan §2.1/§3.1に沿い、残存candidateを作り直さずに対象差分だけを実装・再検証しました。実装candidateは`832ee3b6a80edec0e69298c03acdc668397d7da0`、full regression再試行を安定させるT09 test-only変更は`16188fcde181aa8c508dbed39dcb071f3a867603`です。
+
+更新再開のFirst Redで、system rootのexchange後に旧公開rootが`STAGE` entryとして残る状態を再現すると、StageStoreがstage childにも`0700`を必須として`stage-owner-mismatch`で停止しました。Design §8.3ではexchange後のentryはoriginal rootであり、その通常modeを保持します。修正ではprivate `STAGE`親のowner/type/`0700`検証を維持しつつ、childにはdirectory typeとeffective-UID ownerを要求し、child modeだけを誤って固定する条件を除去しました。`ProviderLifecycleEngine.execute()`を使う`test_t01_update_resumes_after_exchange_preserves_original_root_mode`で、`publish-system`直後の中断・再入場完了を確認しました。
+
+受理済みsame-EUID scope narrowingに合わせ、`_open_path_bound`は既存祖先bindingの再検証を保持しながら、created childの追加visible-identity比較だけを外しました。既存のrollback記録、FD cleanup、観測された祖先binding driftの拒否は維持しています。テスト整理では、obsolete/out-of-scopeだけをassertする`test_t06_bootstrap_creation_replacement_is_not_populated`、retired docs/templates不在test、T14のretired-file/classification-registry assertionsを削除し、後継のabsence-only testは追加していません。現在のbehavior、baseline、required-fast、policy assertionsは保持しています。
+
+CP4ではprovider assetとdogfoodの`system/.runtime/README.md`を揃え、hidden package-data inventoryへ追加しました。`spec-dock update .`後のdogfood candidate digestは`1362bb0b9740d42da2e5bffb62d743ddcba49a90bd5428615c4324f5a9193fb4`で、T13 source/wheel/sdist/installed/dogfood parityはpassです。
+
+- lifecycle/private-state focused: `tests/unit/provider_lifecycle/test_engine.py`と`test_private_state.py`は `307 passed`
+- distribution cutover: `tests/cli_runtime/test_distribution_cutover.py`は `9 passed`
+- Issue acceptance: T12/T14は `2 passed`
+- T13 provider/dogfood parity: `1 passed`
+- default fast: `1367 passed, 846 skipped`
+- `make lint`: Ruff check、format、mypy 196 source filesすべてpass
+- `./spec-dock/scripts/spec-dock validate`: `nodes=236`
+
+最初のclean candidate `832ee3b6`でのfull verifierは、4 shard exit 1、`ledger-mismatch` 11件でした。既知#395-owned 10行に加え、T09のread-tree readiness待機が4-shard負荷下で5秒を超えました。単独再実行では同testが`1 passed`（3.65秒）でしたが、許容外failureを残さないため、このtestのreadiness timeoutだけを15秒へ延ばし、bounded timeoutとlease/SIGKILL assertionsは維持しました。更新後candidateの同testは`1 passed`（3.63秒）でした。
+
+candidate `16188fcde181aa8c508dbed39dcb071f3a867603`で再実行したfull verifierは`2213 tests collected`、4 shard exit 1、`status=ledger-mismatch`、`evaluation.verified=false`、violation 10件です。10件は全てregisterで#395が所有するactive baselineで、#392の`unexpected_failure`は0件でした。詳細は`spec-dock/.workbench/full-regression/20260913T174230.092658Z/result.json`です。
+
+```text
+S10 signature_mismatch (8):
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_regression
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_re_resolves_inside_lock_when_parent_drifts_regression
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_numeric_target_uses_resolved_current_repo_slug_for_github_read
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_issue_uses_target_repo_slug_for_same_repo_url_when_present
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_then_sync_artifact_path_name_content_regression
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_post_import_sync_negative_path_regression
+tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_execute_create_plan_reuse_seam
+S11 coverage_mismatch:
+tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression
+workbench signature_mismatch:
+tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands
+```
+
+このverifierはGREEN/exit 0ではありません。#395のledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleは変更しておらず、rate limitを理由とする検証縮小もありません。Report追記後のclean push、fresh Code Review Strict（Extra High）とBlue Team分析、同一最終SHAへのFinal Quality Gate Strict（Pro）は未実施です。human merge、merged-tip B1、Issue finish、Product GREENも主張しません。
