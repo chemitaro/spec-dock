@@ -4,9 +4,9 @@ ID: "iss-00395"
 タイトル: "Regression Baseline Terminalization and Product Defect Repair"
 関連GitHub: ["#395"]
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-14"
 依存:
-  - "iss-00392"
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../../requirement.md"
   - "../../design.md"
   - "../../plan.md"
@@ -53,12 +53,12 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 
 | Input | Required state |
 |---|---|
-| Dependency | #392 human-merged and B1 GREEN |
+| Dependency | #392 human-merged as P392; exact candidate/merge identity, all required checks and #392-owned acceptance checks GREEN, and measured full-verifier violations limited to #395-owned active rows |
 | Lifecycle | Final wire-conformant `0.2.4`, read-only |
 | Baseline | Exact 15 rows; 14 active and one resolved |
 | Timing | 243 current weights until #396 |
 | Current policy | Ledger evaluator, sharder, policy hook, PR/full workflow coherent |
-| Protected data | B1 witness and complete dogfood accepted |
+| Protected data | P392 witness, complete dogfood, and #392-owned checks accepted |
 
 ## 5. Stable output
 
@@ -67,9 +67,9 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 | Product behavior | All 14 accepted behaviors normal pass |
 | Register state | 15 total, active 0, resolved 15, fixed-in-place 14, superseded 1 |
 | Failure policy | Approved failure 0; no new skip/xfail/retirement |
-| Current gates | Ordinary and current full verifier independently GREEN |
+| Current gates | Ordinary and current full verifier independently GREEN on the post-#395 exact tip |
 | Lifecycle | #392 wire and semantics unchanged |
-| Integration | B2 GREEN, human-merged to Epic branch |
+| Integration | B1 and B2 verified on the same human-merged post-#395 exact tip |
 
 ## 6. Owned and shared Epic acceptance
 
@@ -81,7 +81,7 @@ Accepted #392 outputを含むEpic integration branch上で、post-#387 root ledg
 
 ### I395-RQ-001 — Exact baseline admission
 
-Issue starts only when the register matches exact 15/14/1 and #392 B1 is GREEN. Stale 27-row top-level metadata is not admission authority。
+Issue starts only from the exact human-merged P392 tip. The P392 witness must prove that every required check and every #392-owned acceptance check passed; P392 permits no failure outside the current full verifier's measured violations for #395-owned active rows. Re-run the current full verifier at the exact merged tip and confirm every measured violation maps to a #395-owned active register row, with no unexpected failure or baseline identity/signature drift. A #392 closure or B1 result is not the entry condition. Stale 27-row top-level metadata is not admission authority。
 
 ### I395-RQ-002 — Cause-appropriate contract repair
 
@@ -105,11 +105,11 @@ After repairs, active 0、approved 0、unexpected 0 and all 15 rows resolved. Hi
 
 ### I395-RQ-007 — Integration and protection
 
-Candidate-changing Product repairs update dogfood completely when necessary and preserve protected data. Exact merged B2 tip is GREEN before closure。
+Candidate-changing Product repairs update dogfood completely when necessary and preserve protected data. After human merge, verify B1 (current gates GREEN) and then B2 (15/0/15) on the same exact tip before closure。
 
 ### I395-RQ-008 — Issue-start gate
 
-Concrete owner surfaces、repair hypotheses、RED/GREEN tests、commands and ordering are generated only against B1 current tip and independently reviewed under Rolling-Wave Contract §5 before Product implementation. Elaboration does not implement or redefine `E384-QUAL-001`。
+Concrete owner surfaces、repair hypotheses、RED/GREEN tests、commands and ordering are generated only against the exact P392 merged tip and independently reviewed under Rolling-Wave Contract §5 before Product implementation. Elaboration does not implement or redefine `E384-QUAL-001`。
 
 ## 8. Verification evidence categories
 
@@ -117,10 +117,10 @@ Row-by-row RED/GREEN、current behavior and faithful test observers、current le
 
 ## 9. Rollback and recovery boundary
 
-Whole #395 merge is the rollback unit. Revert returns to accepted B1 with the known 14-active baseline and current policy still operational. #396 cannot start until B2 is reaccepted。
+Whole #395 merge is the rollback unit. Revert returns to accepted P392 with the known 14-active baseline and current policy still operational. #396 cannot start until B2 is reaccepted。
 
 ## 10. Stop and return
 
-Stop for unknown row/signature、already-changed active identity、required lifecycle redesign、need to remove current policy early、`E384-QUAL-001` implementation or reinterpretation、new Product scope、unresolvable behavior ambiguity、or non-GREEN B1。Return exact row and evidence to the parent; do not choose a new disposition。
+Stop if P392 SHA is not the accepted integration tip, its current full-verifier violations include anything outside #395-owned active rows, an active identity/signature has drifted, lifecycle redesign or early policy removal is required, `E384-QUAL-001` would be implemented/reinterpreted, Product scope expands, or behavior is ambiguous. Return the exact row and evidence to the parent; do not choose a new disposition。
 
-Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` とP392 sequence ADRはユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projection後、#392がhuman-merged P392になったexact SHAを入口として正式startする。#392のIssue closureを待たず、#395自身の詳細化・独立review後にだけProduct実装を許可する。

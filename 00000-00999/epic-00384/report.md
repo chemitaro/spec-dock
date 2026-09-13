@@ -3,8 +3,8 @@
 ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 状態: "parent-planning"
-最終更新: "2026-09-12"
-依存: ["requirement.md", "design.md", "plan.md", "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md", "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"]
+最終更新: "2026-09-14"
+依存: ["requirement.md", "design.md", "plan.md", "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md", "artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md", "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"]
 親: ["init-local-00003"]
 ---
 
@@ -69,3 +69,11 @@ Raw evidenceはEpic配下のGit管理外 `.workbench/reviews/20260908-baseline-d
 改訂親/Wire/Issue R/D/Pの独立review、clean pushed freeze、Issue projection/readbackが終わるまでProduct実装許可はfalseです。B1および#395/#396は未達のままです。Issue Report §28–29のfailure/safe-stop記述は当時の証拠として保持し、新しいtest dispositionは後続実装結果で追記します。
 
 ユーザーは2026-09-12にChatGPT Use系Strict skill/scriptの利用再開を指示しました。過去の一時的なGPT-6 subagent review routeは現在の運用authorityではなく、独立review routeは更新済み[Rolling-Wave Contract §5](artifacts/rolling-wave-issue-elaboration-contract.md)に従います。執筆/Blue Team分析とRed Team reviewは別sessionとし、exact clean pushed SHAをそれぞれStrictに確認します。
+
+## 2026-09-14 P392 sequence and dependency update
+
+ユーザー承認済み[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)をEpic acceptanceへ反映しました。#392 human merge後はP392として記録し、#395はそのexact merged tipから作業します。B1/B2は#395 merge後の同一tipで評価し、#392はB1、#395と#396はB2成立後の所定gateを満たすまでclosure/開始しません。P392のfull-verifier例外は、そのexact runの全violationが#395-owned active rowsに対応する場合だけ許可します。
+
+SpecDock CLIでiss-00395からiss-00392へのclose-based metadata dependencyを削除し、iss-00396からiss-00395へのdependencyは維持しました。したがってdeps check上の#395 ready=trueはP392証拠でもstart許可でもなく、#395の実行には人間がmergeしたP392 exact SHAと現在のfull-verifier row対応確認が別途必須です。#396は#395 dependencyにより引き続きblockedです。SpecDock validateはpassしました。
+
+#392 test migrationは現行public behavior・保護データ・baseline/policy検証を残し、obsolete-only/absence-onlyおよび分類専用testを恒久suiteから削るよう仕様化しました。Product source/testにはまだ変更を加えていません。改訂R/D/Pのindependent Strict review、clean pushed freeze、GitHub projection/readbackが済むまでProduct実装は再開しません。

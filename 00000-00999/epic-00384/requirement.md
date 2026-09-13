@@ -17,9 +17,9 @@ repository_evidence:
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
 
-本Epicの正本は、本書、[Design](design.md)、[Plan](plan.md)、accepted ADR、[Epic Integration Branch Contract](artifacts/epic-integration-branch-contract.md)、[Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md)、[Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md)、[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md)である。
+本Epicの正本は、本書、[Design](design.md)、[Plan](plan.md)、accepted ADR（[same-EUID scope](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)、[P392 sequence](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)）、[Epic Integration Branch Contract](artifacts/epic-integration-branch-contract.md)、[Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md)、[Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md)、[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md)である。
 
-**現行実行状態（2026-09-12）:** [same-EUID脅威範囲の変更ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)により、同一EUIDの非協調actorを保証対象外とする。Issue #392の実装再開は、改訂R/D/Pの独立review・freeze/projection完了後とし、現時点の`実装開始許可`はfalseのまま保つ。B1は未達で、#395/#396は開始しない。
+**現行実行状態（2026-09-13）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。#392は改訂R/D/Pの独立review・freeze/projection完了後に再開する。P392/B1/B2は未達で、#395/#396は未開始。
 
 ## 1. Outcome
 
@@ -31,7 +31,7 @@ Epic #384の目的は、利用者データを保護したままproviderの状態
 |---:|---|---:|---|
 | predecessor | `iss-00387` | #387 | CLOSED、mainへmerge済み。Current surface residue cleanup。 |
 | 1 | `iss-00392` | #392 | Fixed Ownership Provider Lifecycle Hard Cutover。既存nodeをscope縮小して再利用。 |
-| 2 | `iss-00395` | #395 | Regression Baseline Terminalization and Product Defect Repair。`iss-00392`へ依存。 |
+| 2 | `iss-00395` | #395 | Regression Baseline Terminalization and Product Defect Repair。human-merged P392 exact-tipをentry gateとし、#392 closureへのmetadata dependencyは置かない。 |
 | 3 | `iss-00396` | #396 | Build Once Provider Gate and Regression Policy Cutover。`iss-00395`へ依存。 |
 
 CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持し、再利用・reopen・dependency先への変更を行わない。
@@ -47,7 +47,7 @@ CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持�
 - `iss-00387` / GitHub #387はCLOSED/completedである。
 - PR #394はbase `main`、head `4f018da3790d7aeeb16410a386e6e586fb2e803d`、merge commit `db13d047e0a9fb2df31b1a5fc44da0673d8fb9cd`で、人間によりmainへmerge済みである。
 - Current branchはそのmergeを含むpost-#387 integration baselineである。
-- `iss-00395`と`iss-00396`は実在し、metadata dependencyはそれぞれ`iss-00392`、`iss-00395`である。
+- `iss-00395`と`iss-00396`は実在する。#395はP392 exact-tipの内容gateで進み、#396は`iss-00395`へmetadata dependencyを持つ。
 - Packageとchecked-in dogfoodはtransitional `0.2.3`である。
 - Root `full-regression-ledger.json`の`failure_paths`は15行で、14 `active`、1 `resolved/superseded`である。
 - Root `full-regression-timing-weights.json`は243 node weightsを持つ。
@@ -63,7 +63,7 @@ CLOSEDの`iss-00388`〜`iss-00390`はhistorical superseded nodeのまま保持�
 
 ### E384-RQ-002 — Ordered human merge and GREEN state
 
-Issue PRは`iss-00392`、`iss-00395`、`iss-00396`の順で、人間だけが一件ずつmergeする。各merge後にbranch-tip identityを固定し、required verificationを再実行し、GREENと内部整合を確認するまで次Issueをstartしない。
+Issue PRは`iss-00392`、`iss-00395`、`iss-00396`の順で、人間だけが一件ずつmergeする。唯一の中間状態P392では、#392所有required checksがGREENで、current full-verifier violationがexactに#395所有active rowsだけであることを確認して#395へ進む。P392をGREEN/B1やIssue受入と扱わない。#395 merge後の同一branch-tip SHAで、現行gates GREENのB1と15/0/15のB2を順に確認するまで#396をstartせず、P392以外の非GREENを許さない。
 
 ### E384-RQ-003 — Rolling-wave elaboration
 
@@ -93,7 +93,7 @@ Issue #392はfixed ownership lifecycle、closed wire、exact migration、tooling
 
 ### E384-RQ-009 — Issue #392 baseline and gate preservation
 
-Issue #392は14 active rowのnode identity、signature、lifecycleを追加・削除・変更しない。Current test-policy machineryを維持し、Issue merge後もknown baseline以外のunexpected failure 0、current PR gateとexact full-regression pathがGREENでなければならない。既にresolvedのrowは、old lifecycle test removalに必要なpre-decided behavior-preserving successor rebindingだけを許可する。
+Issue #392は14 active rowのnode identity、signature、lifecycleを追加・削除・変更しない。Current test-policy machineryを維持し、P392時点で#392所有のrequired/ordinary/PR checksはGREEN、unexpected failureは0でなければならない。exact full-regression pathは実行し、violationがある場合はその全てがregister §6.1で#395に割り当てられたactive rowsであることを証拠化する。その他のfailure、identity/signature drift、policy変更があればmergeを止める。B1ではcurrent PR/full gatesがGREENであることを要求する。既にresolvedのrowは、old lifecycle test removalに必要なpre-decided behavior-preserving successor rebindingだけを許可する。
 
 ### E384-RQ-010 — Issue #395 terminalization
 
@@ -145,7 +145,7 @@ Rollback unitはIssue PR merge全体である。Dependent Issue start前は直�
 
 ### E384-RQ-017 — Evidence, Issue closure and final main merge
 
-各Issue acceptanceは、Issue PRのhuman merge、integration branch GREEN、acceptance evidence readback後に成立する。三Issue完了後だけEpic PRをmainへ一度human mergeし、final branch treeとmerge treeのequality、final main verification、Issue/Epic closure evidenceを取得する。
+各Issue acceptanceはhuman merge後の適用可能なintegration evidenceで成立する。#392はP392 mergeでは完了せず、#395 merge後の同一exact tipがB1 GREENである時点で完了できる。#395はそのtipがB2（15/0/15）を満たした時点で完了できる。#396はB2を入力にし、merge後B3 GREENを要求する。三Issue完了後だけEpic PRをmainへ一度human mergeし、final branch treeとmerge treeのequality、final main verification、Issue/Epic closure evidenceを取得する。
 
 ### E384-RQ-018 — Historical non-authority and no extra Issue
 
@@ -188,8 +188,8 @@ Rollback unitはIssue PR merge全体である。Dependent Issue start前は直�
 
 ## 5. Final acceptance
 
-Epic acceptance requires all three Issue merges on the integration branch, GREEN evidence after each merge, `E384-QUAL-001` conformance, complete final provider gate, old regression-policy machinery absent, stable contracts unchanged, human review complete, and one final human merge to main. Parent freeze and #392 elaboration additionally require the independent review pass defined in the Rolling-Wave Contract and the post-pass GitHub Issue projection readback. Main must never observe Issue-level intermediate states.
+Epic acceptance requires all three Issue merges on the integration branch; the narrowly bounded P392 evidence after #392; B1 and B2 GREEN at the same post-#395 exact tip; B3 and `E384-QUAL-001` conformance; complete final provider gate; old regression-policy machinery absent; stable contracts unchanged; human review complete; and one final human merge to main. Parent freeze and #392 elaboration additionally require the independent review pass defined in the Rolling-Wave Contract and the post-pass GitHub Issue projection readback. Main must never observe Issue-level intermediate states.
 
 2026-09-08に[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)の親修正をユーザーが承認した。現在の内容reviewは当該修正を含む候補へ束縛し、Product実装前の公開freezeは別gateにする。
 
-Current parent decision: `E384-DEC-001` / `E384-DEC-002` / `E384-DEC-004` は採用済み。Issue #392はOption 1の脅威範囲で再開可能だが、改訂R/D/Pのreview・freeze/projection前は実装許可falseのままである。B1未達のため#395/#396は未開始。今回の判断は[superseding ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に記録する。
+Current parent decision: `E384-DEC-001` / `E384-DEC-002` / `E384-DEC-004` とP392 sequence ADRは採用済み。Issue #392は改訂R/D/Pのreview・freeze/projection前は実装許可falseのままである。P392未達のため#395/#396は未開始。P392/B1/B2の証拠と閉鎖条件は新ADRおよび本書に従う。

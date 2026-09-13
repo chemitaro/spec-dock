@@ -9,6 +9,7 @@ ID: "epic-00384"
   - "requirement.md"
   - "artifacts/20260902t070000z-adr-multi-issue-epic-integration-branch-and-rolling-wave-elaboration-policy.md"
   - "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/epic-integration-branch-contract.md"
   - "artifacts/rolling-wave-issue-elaboration-contract.md"
@@ -26,7 +27,7 @@ repository_evidence:
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
 
-**現行状態（2026-09-12）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)はsame-EUID非協調actorを保証対象外とする。#392の再開は改訂R/D/Pの独立review・freeze/projection後であり、現時点でB1達成や#395/#396開始を許可しない。
+**現行状態（2026-09-13）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。P392は#392の限定暫定merge、B1/B2は#395 merge後の同一tipで判定する。現在はいずれも未達で、#392再開前の独立review・freeze/projectionも未完了。
 
 ## 1. Delivery architecture
 
@@ -34,9 +35,10 @@ repository_evidence:
 post-#387 planning baseline
   -> parent contract freeze
   -> iss-00392 scope re-approved -> prior CP1–CP4 candidate re-entry (T06 removal + affected-gate rerun)
-     -> human merge + B1 verification
-  -> iss-00395 not started
-  -> iss-00396 not started
+     -> human merge -> P392 (only #395-owned measured baseline mismatches)
+  -> iss-00395 repairs from exact P392 tip -> human merge
+     -> B1 current gates GREEN -> B2 baseline 15/0/15 (same exact tip)
+  -> iss-00396 after B2
   -> final Epic PR          -> one human merge to main -> state B4
 ```
 
@@ -62,6 +64,8 @@ iss-00387 (completed predecessor)
 
 A later Issue may consume an earlier output but may not redefine it. An earlier Issue may not import a later Issue's implementation or verification tooling.
 
+The delivery order remains #392→#395→#396. Because #392 closure is deferred until B1, #395 entry is gated by the exact P392 merge tip rather than a close-based SpecDock dependency on #392; #396 continues to depend on #395.
+
 ### E384-C-003 — Lifecycle wire ownership
 
 [Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md) remains the normative lifecycle contract. Its threat boundary is clarified by [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md): supported coordination covers participating SpecDock commands, not same-EUID non-cooperating actors. #392 remains its sole production writer and #395/#396 remain read-only consumers.
@@ -78,7 +82,7 @@ The contract fixes the provider target set, consumer preservation and complete-c
 
 ### E384-C-006 — Transitional gate
 
-The current ledger/timing/sharder/policy system remains a live compatibility provider through #392 and #395. It must be GREEN after both merges. #396 is the sole final-policy writer and removes it only after replacement and consumer-zero proof.
+The current ledger/timing/sharder/policy system remains a live compatibility provider through #392 and #395. P392 is the only permitted non-GREEN intermediate state: the exact full-verifier violations must all be measured #395-owned active rows, and all #392-owned gates remain GREEN. The current system must be fully GREEN at B1 and B2 on the same post-#395 tip. #396 is the sole final-policy writer and removes it only after replacement and consumer-zero proof.
 
 ### E384-C-007 — Final provider gate
 
@@ -114,8 +118,9 @@ One final-gate attempt executes one role graph with one Linux canonical body. Th
 | State | Source | Required invariant |
 |---|---|---|
 | B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; the pre-safe-stop #392 CP1–CP4 candidate exists but is unaccepted and has no accepted merge; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; E384-RQ-019/wire and E384-DEC-001/002/004 resolved; revised #392 R/D/P independently reviewed, clean pushed freeze receipt and post-pass Issue-body projection readback complete before candidate re-entry. |
-| B1 | #392 merge | Complete final lifecycle, shared runtime coordination/handoff/crash proof and dogfood; old lifecycle writer absent; 14 active identities unchanged; transitional gates GREEN. |
-| B2 | #395 merge | 15 resolved, active/approved 0; Cause-appropriate Product/test repairs accepted; transitional gates independently GREEN. |
+| P392 | #392 human merge | #392-owned lifecycle, focused/platform/package/dogfood and required PR checks pass; 15/14/1, 243 timing and policy remain unchanged. The exact full verifier is run and any violations are exclusively the measured #395-owned active rows in register §6.1. This state is not GREEN, B1, #392 acceptance or permission for #396. |
+| B1 | #395 human merge, exact tip fixed | Complete #392 lifecycle and P392 invariants remain intact; current PR/full gates and provider parity are GREEN; no unexpected failure. |
+| B2 | Same exact tip as B1 | 15 rows total, active 0, resolved 15, approved 0, unexpected 0; cause-appropriate #395 repairs accepted. |
 | B3 | #396 merge | Final build-once gate and mechanical `E384-QUAL-001` evidence GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
 | B4 | Epic main merge | Main tree equals accepted B3 tree; final context and closure evidence read back. |
 
@@ -129,8 +134,8 @@ One final-gate attempt executes one role graph with one Linux canonical body. Th
 
 ## 5. Compatibility design
 
-- B1 is compatible with the current regression system even though Product lifecycle has changed.
-- B2 is a clean baseline under the current regression system.
+- P392 preserves the current regression system while isolating only the #395-owned known failures.
+- B1 is the fully GREEN current-system integration state; B2 proves its 15/0/15 terminal baseline on the same exact tip.
 - B3 replaces that system atomically and preserves Product behavior.
 - Compatibility is not a runtime feature toggle. It is an integration-state property.
 - No Issue merge is required to be independently deployable to main; it must only be internally coherent and GREEN on the Epic branch.

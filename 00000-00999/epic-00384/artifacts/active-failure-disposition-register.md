@@ -3,7 +3,7 @@
 ID: "epic-00384-post-387-regression-baseline-register-v2"
 タイトル: "Post-#387 Regression Baseline Register"
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-13"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -64,16 +64,16 @@ Root timing blobは`bdeeb6238609c38085aaed8023b78319a3dd0c6d`で、`node_seconds
 - New active/approved rowを追加しない。
 - Issue #392のlifecycle変更がこれらのfailure signatureを変える場合、Issue mergeをblockし、parentへexact diffを返す。
 - Row 2は既にresolved/supersededである。Old lifecycle test removalによりcurrent concrete successorを維持できない場合だけ、stable behavior key `provider-fixed-skill-slots-match-provider-and-dogfood`を観測する新concrete successorへreferentially rebindできる。これはactive debtの変更ではない。
-- Current ledger/timing/sharder/policy evaluator and workflows remain operational and GREEN。
+- Current ledger/timing/sharder/policy evaluator and workflows remain operational and unchanged。At P392, all #392-owned checks pass and any exact full-verifier violations are exclusively measured active rows owned by #395 under §6.1; this is recorded as provisional, not GREEN. B1 requires the current verifier fully GREEN after #395.
 
 ## 6. Issue #395 terminalization contract
 
-- Input is exact 15 rows after accepted #392 merge。
+- Input is exact 15 rows at the human-merged P392 tip. The exact full-verifier violations measured there must be within the #395-owned active rows described in §6.1; #392 does not repair or suppress them.
 - Active rows 1 and 3〜15 are all `fixed-in-place`。Parent-predecided successor is not used for these active rows。
 - Each row must become a normal pass through the parent-adjudicated repair surface below。Production repair is required where Product behavior violates the accepted contract; correcting an obsolete fixture/observer is required where the test violates the current contract。Expectation weakening、mock-only hiding、skip、xfail、approved failure、row deletion remain invalid。
 - Transition changes `lifecycle` to`resolved` and records `resolution_mode=fixed-in-place` while preserving historical node/signature fields。Current truth is measured from the new observation, not by rewriting historical failure snapshots。
 - Target is 15 total、0 active、15 resolved、14 fixed-in-place、1 superseded、0 approved failure、0 unexpected failure。
-- Current ordinary gate and current full verifier must independently prove the target before human merge。
+- Current ordinary gate and current full verifier must independently prove the 15/0/15 target before the #395 human merge. The resulting same exact merge tip is used to record B1 (all current gates GREEN) and B2 (baseline terminal state).
 
 ### 6.1 今回確定した原因と修復責務
 
@@ -98,9 +98,9 @@ The parent Artifact remains in Epic history after runtime policy deletion and re
 
 At every Issue start:
 
-- verify exact current integration tip and predecessor acceptance;
+- verify exact current integration tip and predecessor state: #395 starts only from P392; #396 only from B2;
 - read root ledger by content and require 15 exact rows/signatures in table order;
-- derive 14/1 or 0/15 lifecycle counts appropriate to the state;
+- derive 14/1 or 0/15 lifecycle counts appropriate to the state; P392 is explicitly not a GREEN state;
 - verify timing entry count 243 until Issue #396 deletion;
 - verify no #387-retired S05/S06 test or old authoring fixture is recreated;
 - verify no unaccounted active failure or successor drift;
