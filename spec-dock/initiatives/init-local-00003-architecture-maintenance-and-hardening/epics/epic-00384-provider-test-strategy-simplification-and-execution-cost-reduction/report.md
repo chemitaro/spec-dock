@@ -51,10 +51,10 @@ Raw evidenceはEpic配下のGit管理外 `.workbench/reviews/20260908-baseline-d
 
 ## Next authorized sequence
 
-1. 両DECと対象worktree修正を含む候補を同じreviewerで再確認し、P0/P1=0・review passを得る。
-2. 文書・HTML検証後、reviewed bytesをcommit/pushし、同一SHA・clean状態・外部freeze receiptと四つのGitHub projection/readbackを確認する。
-3. 親G0、依存、B0を確認して同じworktreeで#392を正式startする。
-4. #392のR/D/PとLuna Max handoffを詳細化し、そのIssueの独立review合格後だけ実装へ進む。#395はB1、#396はB2待ち。
+1. accepted ADR、Epic/Issue R/D/P、Handoff、Test Ownership Artifactを一つの候補として独立Strict reviewし、P0/P1=0・`review_status=pass`を得る。
+2. reviewed bytesをcommit/pushしてexact SHAを固定し、#384/#392/#395/#396のGitHub projection/readbackをそのfreezeへ収束させる。
+3. 親G0、依存、B0、#387、15/14/1、243 timing、required-fast fourを再確認する。#392のformal startは完了済みなので再実行しない。
+4. G0後はIssue #392 Plan §2.1から既存candidateの限定re-entryを行い、CP1を作り直さずCP2から進める。#392 mergeはP392、#395はそのexact tipから開始し、B1/B2は#395 merge後の同一tipで評価する。
 
 [2026-09-08 HTML guide](artifacts/epic-00384-current-plan-guide.html)は当時の再評価、正式start、実装許可の区別を説明するhistoryです。Option 1後の再開条件と現行Strict review routeは本文のEpic R/D/PおよびRolling-Wave Contract §5を正本とし、このguideはそれらを上書きしません。旧10分割／単一Issue資料もhistorical evidenceであり、実装権限ではありません。
 
@@ -77,3 +77,11 @@ Raw evidenceはEpic配下のGit管理外 `.workbench/reviews/20260908-baseline-d
 SpecDock CLIでiss-00395からiss-00392へのclose-based metadata dependencyを削除し、iss-00396からiss-00395へのdependencyは維持しました。したがってdeps check上の#395 ready=trueはP392証拠でもstart許可でもなく、#395の実行には人間がmergeしたP392 exact SHAと現在のfull-verifier row対応確認が別途必須です。#396は#395 dependencyにより引き続きblockedです。SpecDock validateはpassしました。
 
 #392 test migrationは現行public behavior・保護データ・baseline/policy検証を残し、obsolete-only/absence-onlyおよび分類専用testを恒久suiteから削るよう仕様化しました。Product source/testにはまだ変更を加えていません。改訂R/D/Pのindependent Strict review、clean pushed freeze、GitHub projection/readbackが済むまでProduct実装は再開しません。
+
+## 2026-09-14 Blue Strict analysis follow-up
+
+`chatgpt-use-strict` session `issue-392-p392-blue`（GPT-5.6 Sol、Extra High）は、verified branch SHA `13ed9de5fd6180b635f5c32d3a7ec3e6b53e7401`に対してBLOCKを返しました。これはP0/P1 classificationではなくG0未充足の判定です。live GitHub readbackで#384/#392/#395 bodiesに旧freeze/B1依存表現が残り、#396の#395 dependencyは現行契約どおり維持されていることを確認しました。現行sourceには`test_s40b_provider_scaffold_excludes_removed_docs_and_templates`というabsence-only testがあり、Test Ownership ArtifactのRule 5には未記載でした。また、同Artifactの`test_s40b_legacy_bootstrap_and_skill_apply_paths_are_retired` KEEP entryはcurrent sourceに存在しないstale classificationです。
+
+macOSでrequired-fastを既定`/var/folders`から実行すると、no-follow root bindingが`/var` symlinkを拒否して2件が失敗しました。同じ実体directoryを`/private/var/...`で指定すると通り、`TMPDIR=/private/tmp`でrequired-fast fourは`4 passed`でした。no-follow実装は変更せず、後続のローカルmacOS検証ではこの明示的temporary-rootを使います。
+
+この追補時点ではtest-disposition文書修正、independent Strict review、freeze後のGitHub projection/readbackは未完了です。従ってG0とProduct実装許可は未達のままです。

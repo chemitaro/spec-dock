@@ -71,11 +71,13 @@ CP1–CP4の元packetは初回実装履歴として残し、現在の再開指�
 
 ### 3.1 Option 1によるtest disposition
 
-この表は、ユーザー採用済みADRによる脅威境界変更に伴う限定差分です。既存test ownership Artifactのその他のKEEP/REPLACE/RETIRE分類、baseline identity、required-fastは変更しません。
+この表は、ユーザー採用済みscope narrowingと、削除済みimplementation/obsolete behaviorの不在だけを検証するtestを残さないという明示指示に伴う限定差分です。baseline identity、required-fast identities、現行behaviorを検証するその他のtestは変更しません。
 
 | Action | Exact node | 理由 |
 |---|---|---|
 | REMOVE（CP2開始後、focused run前） | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_creation_replacement_is_not_populated` | 同一EUID非協調actorのcreator-provenance保証だけを要求するため、現行scopeに対応要件がない。skip/xfailや「保証対象外」を検査する後継testは作らない。 |
+| REMOVE（G0後の再開直後、CP2 focused run前） | `tests/cli_runtime/test_distribution_cutover.py::test_s40b_provider_scaffold_excludes_removed_docs_and_templates` | 削除済みdocs/templatesと旧routeの不在だけを検証するため。後継testは作らない。 |
+| KEEPし負の補助assertionを削除 | `tests/cli_runtime/test_distribution_cutover.py::test_s40b_provider_install_root_is_current_catalog_only` | exact current install-root inventoryという正の契約は維持する。retired-prefix/nameだけの冗長なnegative assertionとその定数は削除し、別のabsence testへ置き換えない。 |
 | KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory` | ordinary `EEXIST` collisionと既存directoryの非採用・無変更を検証する。 |
 | KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory` | 実行中に観測されたbootstrap binding driftでrecordを書かない契約を検証する。 |
 | KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_existing_bootstrap_rebind_blocks_before_mutation` | 既存bootstrapの観測されたrebindをmutation前に拒否する契約を検証する。 |
