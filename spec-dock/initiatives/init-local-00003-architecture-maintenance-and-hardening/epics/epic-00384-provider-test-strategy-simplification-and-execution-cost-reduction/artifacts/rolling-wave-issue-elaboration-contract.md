@@ -17,13 +17,13 @@ repository_evidence:
 
 ## 1. Purpose
 
-Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Parent G0、dependency evidence and an explicit user start request permit formal `issue start` to select the Issue branch/active scope. Detailed R/D/P and handoff are then authored on that branch against the accepted integration tip; independent acceptance is required before Product implementation. Use a new worktree or an existing worktree explicitly selected by the user. The user requested parent commit/push followed by #392 formal start on 2026-09-08; this proceeds only after G0. Product implementation remains outside this task.
+Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Parent G0、dependency evidence and an explicit user start request permit formal `issue start` to select the Issue branch/active scope. Detailed R/D/P and handoff are then authored on that branch against the accepted integration tip; independent acceptance is required before Product implementation. Use a new worktree or an existing worktree explicitly selected by the user. The user requested parent commit/push followed by #392 formal start on 2026-09-08; this proceeds only after G0. Product implementation remains outside this task. The accepted [P392 ADR](20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md) governs the later #392→#395 transition.
 
 ## 2. Immutable parent inputs
 
 Elaboration may not change:
 
-- Issue count、IDs、GitHub numbers、dependency direction;
+- Issue count、IDs、GitHub numbers、delivery order #392→#395→#396;
 - integration branch and human merge topology;
 - stable cross-Issue contracts E384-C-001〜C-012 and parent `E384-QUAL-001`;
 - lifecycle wire values and #392 sole-writer/read-only rule;
@@ -31,6 +31,8 @@ Elaboration may not change:
 - current-policy-through-#395 and consumer-first-#396 rule;
 - protected data、compatibility、rollback、recovery and GREEN definitions;
 - no-extra-Issue and human-only settings/merge rule。
+
+The close-based SpecDock metadata edge from #395 to #392 is intentionally absent because #392 remains unaccepted at P392. The #392→#395 order is enforced by #395's exact P392 merged-tip entry gate; #396 retains its #395 dependency. This changes readiness representation, not delivery order or lifecycle ownership.
 
 A required change to any item is a parent stop, not an elaboration choice。
 
@@ -42,8 +44,8 @@ Before formal Issue start:
 
 1. Resolve exact current integration branch tip and tree。
 2. Require accepted parent G0 with `owner_decisions_required=[]`. For #392, require external `PARENT_FREEZE_SHA` receipt for that accepted parent tip and readback receipts for the post-pass GitHub #384/#392/#395/#396 body projections。
-3. Verify predecessor Issue merged and accepted, or #387 completed for #392。
-4. Verify current state B0/B1/B2 as applicable is GREEN。
+3. Verify predecessor evidence: #387 is complete for #392; #395 requires the exact human-merged P392 tip; #396 requires accepted B2。
+4. Verify the applicable state. P392 is the sole permitted non-GREEN pre-B1 state and is valid for #395 only when all full-verifier violations at that exact SHA are exclusively measured #395-owned active rows. B1 and B2 are GREEN checks on the same post-#395 tip。
 5. Verify Issue metadata ID、GitHub number and `depends_on` relation。
 6. Verify no other Issue writer is active。
 7. Compare main drift and classify overlap。
@@ -62,7 +64,7 @@ Before Product implementation, the elaboration pack must produce implementation-
 - component and symbol responsibilities;
 - stable input/output schemas and compatibility points;
 - for #392, resolved legacy admission, shared runtime/lifecycle coordination, wrapper handoff and interruption/concurrency evidence under E384-RQ-019;
-- for #395, the register §6.1 cause-specific repair map, including faithful harness repairs and guarded Product boundaries;
+- for #395, the exact P392 input SHA, measured row/signature set still failing there, and register §6.1 cause-specific repair map, including faithful harness repairs and guarded Product boundaries;
 - for #396, exact measurement/evidence implementation and boundary tests that mechanically realize `E384-QUAL-001` without duplicating its policy values, including one role graph per attempt, shared five-run/twenty-window observations and environment capability proof;
 - first RED and representative failure evidence;
 - complete test ownership and exact test cases;
@@ -99,7 +101,7 @@ The elaborator may choose exact implementation files、symbols、helper decompos
 Return to the parent owner without formal start if not yet active, or without Product implementation if already active, when:
 
 - dependency or branch-tip evidence differs;
-- current branch is not GREEN;
+- current branch fails its applicable state contract. For #395 only, P392's exact permitted #395-owned baseline mismatches are allowed; any additional failure blocks elaboration/implementation. B1/B2 must be GREEN before #396;
 - stable contract, including `E384-QUAL-001`, cannot be implemented without semantic change or duplicate policy authority;
 - required behavior crosses another Issue boundary;
 - an active baseline identity changed unexpectedly;
@@ -112,6 +114,6 @@ The return payload identifies exact contract ID、expected/actual evidence、sco
 
 ## 8. Current status
 
-The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies later changes. #392は正式start済みで、v12親修正と詳細化を進めている。#395/#396はcontract-level draftのまま。Issue内容のreadiness reviewと公開freezeを別々に確認する。E384-DEC-001/002/004はユーザー採用済み。ユーザーは2026-09-12にChatGPT Strict運用を再開したため、現行review routeは§5に従う。G0はexact candidateのreview/publication receiptsを引き続き要求する。
+The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies later changes. #392は正式start済み。P392 ADRは採用済みだが、P392自体は未達。#395/#396はcontract-level draftのままであり、#395はP392 exact-tip確認後に詳細化する。Issue内容のreadiness reviewと公開freezeを別々に確認する。E384-DEC-001/002/004はユーザー採用済み。現行review routeは§5に従い、G0はexact candidateのreview/publication receiptsを引き続き要求する。
 
 `owner_decisions_required=[]`. Both decisions are adopted; do not reopen them without new evidence. See [whole-plan reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md).

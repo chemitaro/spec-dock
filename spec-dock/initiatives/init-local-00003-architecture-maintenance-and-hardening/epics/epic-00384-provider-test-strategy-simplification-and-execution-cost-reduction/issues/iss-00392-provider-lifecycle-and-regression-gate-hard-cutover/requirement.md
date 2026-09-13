@@ -6,7 +6,9 @@ ID: "iss-00392"
 関連GitHub: ["#392"]
 状態: "draft"
 詳細化状態: "draft"
-最終更新: "2026-09-12"
+最終更新: "2026-09-14"
+依存:
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: false
 repository_evidence:
@@ -19,13 +21,13 @@ repository_evidence:
 
 # #392 要件定義 — Provider lifecycleを固定所有境界へ切り替える
 
-> **現行状態（2026-09-12）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)がsame-EUIDの非協調actorを保証対象外とする。従来の[safe-stop ADR](../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md)はその範囲でsuperseded。既存CP1–CP4 candidateは未受入であり、以下は改訂候補。Product実装許可は独立review・clean pushed freeze/projection完了までfalseとする。B1未達のため#395/#396は開始しない。
+> **現行状態（2026-09-14）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。既存CP1–CP4 candidateは未受入であり、Product実装許可は独立review・clean pushed freeze/projection完了までfalseとする。#392 merge後はP392であり、B1/B2は#395 merge後の同一tipで判定する。
 
 ## 1. 結論
 
 Issue #392は、現行のper-file managed-distribution engineを廃止し、四つのfixed tooling roots、二つのfixed skill slots、strict seven-key installation recordだけをdurable mutation authorityとする0.2.4 lifecycleへhard cutoverする、一つの実装・検証・PR受入単位です。
 
-このIssueのPRは`codex/epic-00384-provider-test-strategy-planning`だけをbaseとし、人間が同Epic integration branchへmergeします。#392のB1 GREENとmerge後tip再検証が完了するまで#395を開始せず、#395の後に#396を開始します。#392をmainへ直接mergeしません。
+このIssueのPRは`codex/epic-00384-provider-test-strategy-planning`だけをbaseとし、人間が同Epic integration branchへmergeします。#392 candidateはP392としてmergeし、#395はそのexact tipからだけ開始します。#395 merge後の同一tipでB1/B2を判定し、B1がGREENになるまで#392を完了扱いにしません。#392をmainへ直接mergeしません。
 
 親のpublic wire inventory、三Issue責務、14 active baseline、`E384-QUAL-001`、`E384-DEC-001/002`は再設計しません。E384-DEC-004が定めるthreat scopeだけを反映し、public code/relation/goldenは変更しません。実装開始許可は、Issue仕様の独立内容reviewと、この内容を反映したclean pushed freeze/projectionが実際に完了するまで`false`です。
 
@@ -33,7 +35,7 @@ Issue #392は、現行のper-file managed-distribution engineを廃止し、四�
 
 現行の文書優先順位は次のとおりです。
 
-1. Epic #384のaccepted [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md) — 現行のthreat boundaryと再開条件。
+1. Epic #384のaccepted [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md) — 現行のthreat boundaryと再開条件。accepted [P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md) — 暫定merge、#395 entry、B1/B2順序。
 2. Epic #384の`provider-lifecycle-wire-contract.md` v12 — normative public wireとcooperative coordination契約。今回public inventoryは変更しない。
 3. Epic #384のRequirement、Design、Plan、他のaccepted ADR、`active-failure-disposition-register.md`、`epic-integration-branch-contract.md`、`rolling-wave-issue-elaboration-contract.md`。
 4. 本IssueのRequirement、Design、Plan — 独立review/freezeを待つ改訂候補。
@@ -172,23 +174,23 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 
 ### I392-RQ-018 — Provider-first、packaging、dogfood
 
-まず`src/spec_dock/`とprovider assetsを完成させ、source testsをGREENにします。次にwheel/sdist/isolated installed resourcesで同じcandidate/fixture/bootstrap bytesを証明し、最後に`spec-dock/`と二skillのchecked-in dogfood mirrorをbyte-for-byte同期します。dogfoodを先行正本にしません。
+まず`src/spec_dock/`とprovider assetsを完成させ、source testsをGREENにします。`spec-dock/system/.runtime`をsource candidateにも含めるため、provider-owned `src/spec_dock/assets/spec_dock/system/.runtime/README.md`を追加し、wheel/sdistでは対応するhidden package-data pathを明示的に含めます。Candidate algorithmとT13 node identityは変更しません。次にwheel/sdist/isolated installed resourcesで同じcandidate/fixture/bootstrap bytesを証明し、最後に`spec-dock/`と二skillのchecked-in dogfood mirrorをbyte-for-byte同期します。dogfoodを先行正本にしません。
 
 ### I392-RQ-019 — Old writer/test retirement
 
-新保証のRED→GREEN証拠が揃う前に旧testを削除しません。揃った後、旧production writer、旧manifest、旧journal/retry interpretation、obsolete-only testを撤去します。runtime/docs/packaging、four required-fast nodes、resolved successor、14 active baseline nodes、current provider CI/full verifierは維持します。
+新保証のRED→GREEN証拠が揃う前に旧testを削除しません。揃った後、旧production writer、旧manifest、旧journal/retry interpretation、obsolete-only testを撤去します。削除済みimplementationやobsolete behaviorの不在だけを確認する永続testは残しません。T12はcurrent public CLIの結果・保護動作を検証し、実装削除は差分/code reviewで確認します。T14のretirement-classification-only testも残しません。実際のprotected-data保全やremoved purge requestのmutation-zeroは現行安全契約なので保持します。Four required-fast nodes、resolved successor、14 active baseline nodes、current provider CI/full verifierは維持します。
 
 脅威範囲の変更により要件でなくなった`test_t06_bootstrap_creation_replacement_is_not_populated`はPlanの指定checkpointで削除し、out-of-scope状態だけを確認する後継testは作りません。EEXIST collision、観測されたwitness/binding drift、既存bootstrapの再bindを扱う別testは、それぞれの残る契約を検証するため保持します。
 
-### I392-RQ-020 — B1 acceptanceと順序
+### I392-RQ-020 — P392、B1/B2 acceptanceと順序
 
-#392 candidateとhuman merge後Epic tipの双方で、focused Linux/macOS、default fast、current full verifier、packaging、dogfood、baseline integrityがGREENであること。Unexpected failureは0です。Human merge後tipを固定し、B1として再検証した後だけ#395を開始します。
+#392 candidateでは#392所有のfocused Linux/macOS、default fast、required PR checks、packaging、dogfood、baseline integrityをGREENにし、current full verifierも実行します。#395所有active rowsの測定済みviolationだけが残る場合に限りhuman merge後のtipをP392とし、exact SHAとviolation-row対応を記録します。それ以外のfailureはmerge blockerです。P392はB1/Issue受入ではありません。#395はそのexact tipから修復し、merge後同一tipでB1（current required/full gates GREEN）とB2（15/0/15）を確認します。#392はB1後、#395はB2後に受入・closure可能です。
 
 ## 7. Acceptance criteria
 
 | AC | 完了時に観測する事実 | 主なtest/evidence |
 |---|---|---|
-| AC-01 | Public init/update/uninstallが新engineだけへrouteし、旧writer/manifest参照が0。 | T01、T07、T12、T14 |
+| AC-01 | Public init/update/uninstallがcurrent lifecycle contractどおりに動作する。旧writer/manifest removalは候補差分とcode reviewで確認し、absence-only regression testは残さない。 | T07、T12、source diff review |
 | AC-02 | Candidate/record/marker/legacy fixtureがclosed formatとexact bytesを満たす。 | T01、T02 |
 | AC-03 | Protected sentinelのbytes/type/device/inodeが全normal/fault caseで不変。 | T03、T06、T07、T13 |
 | AC-04 | P0/P1/P2、全root/slot/record/receipt faultがWireのexact result/retryへ収束。 | T04、T05、T06 |
@@ -197,10 +199,10 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 | AC-07 | Wrapper A→B/B→A、全retained flag、stream/status/127、no old-module returnがGREEN。 | T09 |
 | AC-08 | Existing/new checkout、effective Git guard、pre/post driftがexact envelopeでGREEN。 | T10 |
 | AC-09 | Worktree B create/remove、entrypoint-last、C reuse、consumer hook handoffがGREEN。 | T11 |
-| AC-10 | Exact clean 0.2.3だけがmigrationし、old package mutation 0、purge trap exit 2。 | T02、T07、T12 |
+| AC-10 | Exact clean 0.2.3だけがmigrationし、保護データを維持し、purge requestはexit 2/mutation 0。 | T02、T07 |
 | AC-11 | Source/wheel/sdist/isolated install/fresh install/dogfoodが同candidate、fixture、bootstrap、skills、docsを持つ。 | T13 |
-| AC-12 | Four required-fast、15/14/1 register、resolved successor、243 timing entries、current gatesが不変。 | T14 |
-| AC-13 | PR base、human merge、B1 post-merge verificationがIntegration Contractどおり。 | human gate receipt |
+| AC-12 | Four required-fast、15/14/1 register、resolved successor、243 timing entries、policyが不変。full verifier実測はP392記録に分離する。 | T14、P392 receipt |
+| AC-13 | PR base、human merge、P392記録、B1/B2 same-tip verificationがIntegration Contractどおり。 | human gate receipt |
 | AC-14 | Product test/merge未実行の時点ではReportが成功を主張せず、実装開始許可はfalse。 | document review |
 
 ## 8. Requirement-to-test trace
@@ -218,9 +220,9 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 | T09 | Installer EX、managed helper lifetime、wrapper release-to-exec、stream/status/127。 |
 | T10 | Pinned existing/new checkout、effective Git capability guard、post-drift behavior。 |
 | T11 | Worktree B create/remove、entrypoint-last、path C、consumer hook terminal handoff。 |
-| T12 | Public installer CLI sole route、old writer/manifest/journal production reference 0、public compatibility、旧owner削除のacceptance。 |
+| T12 | Public init/uninstall CLI outcomes、current wire compatibility、protected-data preservation。 |
 | T13 | Source/wheel/sdist/isolated installed package/fresh install/dogfoodのcandidate、fixture、bootstrap、docs、skills parityとprotected data。 |
-| T14 | Required-fast、15/14/1、243 entries、current gate continuity、#395/#396境界。 |
+| T14 | Required-fast、15/14/1、243 entries、current policy continuity、#395/#396 boundary。Retirement-only classification assertionは含めない。 |
 
 詳細なKEEP/REPLACE/RETIRE分類は[ライフサイクルのテスト所有と移行対応](artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md)、checkpointの実行順は[実装計画](plan.md)、一回に一checkpointだけ渡すpacketは[Luna Max実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)を参照します。
 

@@ -4,11 +4,12 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 関連GitHub: ["#392"]
 状態: "approved"
-最終更新: "2026-09-12"
+最終更新: "2026-09-14"
 依存:
   - "requirement.md"
   - "design.md"
   - "plan.md"
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
   - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-luna-max-implementation-handoff.md"
@@ -470,3 +471,11 @@ P2は`f56486967f059e05199aa24554ef3a87546fdcc6`でclosedです。このbriefで�
 Requirement・Design・Planをこの境界へ揃え、Plan §3.1にテスト差分を限定しました。`test_t06_bootstrap_creation_replacement_is_not_populated`は対応要件がなくなるためG0後のCP2開始時に削除し、scope外をassertする後継testは作りません。EEXIST collision、観測済みwitness/binding drift、既存bootstrap rebindのtestは残る契約を検証するため維持します。Option 1を選択したこと自体はProduct実装許可ではありません。
 
 改訂文書の独立review、clean pushed freeze、Issue projection/readback、親gateの再確認は未完了です。従って現在の`実装開始許可=false`を保ち、この判断追記時点ではProduct code/testを変更していません。#395所有の10件のbaseline mismatchは#392で修正・抑止せず別責務として保持します。B1、Code Review Strict pass、Final Quality Gate、PR merge、Issue finishも未完了です。
+
+## 31. P392 acceptance sequence and test cleanup update (2026-09-14)
+
+ユーザー承認済み[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)に従い、#392のhuman mergeは限定的なP392、#395の開始点はそのexact merged tipとします。P392直前にcurrent full verifierを再実行し、violationがあればexact SHA・全violation・#395 register row対応を記録します。以前のcandidateで観測した10件を固定的な期待値として流用せず、#395-owned active rows以外のfailureがあれば停止します。B1/B2は#395 merge後の同一exact tipで検証します。
+
+Issue Requirement/Design/Plan、Epic R/D/P、integration/rolling-wave contract、register、#395 R/D/P、implementation handoffとtest ownership artifactをこの順序へ整合させています。#395から#392へのclose-based metadata edgeはSpecDock CLIで削除し、P392 SHA内容gateで実行順を保ちます。#392のCP4 acceptanceでは`.runtime/README.md`をprovider sourceとhidden package-data inventoryに明示し、T13 identity/candidate algorithmを変えません。
+
+テストは、現行public CLI・保護データ安全性・baseline/required-fast/policy contractの検証を保持し、削除済みimplementation/obsolete behaviorの不在だけをassertするtest、退役分類registry test、およびT14内のfile/test absence assertionsを恒久suiteから外します。T12/T14のテストコード自体はG0後に変更します。ここまでの変更は文書とSpecDock dependency metadataに限定し、Product source/testを変更していません。独立Strict spec review、projection/readback、Product再開ゲートは未完了です。

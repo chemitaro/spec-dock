@@ -6,10 +6,11 @@ ID: "iss-00392"
 関連GitHub: ["#392"]
 状態: "draft"
 詳細化状態: "draft"
-最終更新: "2026-09-12"
+最終更新: "2026-09-14"
 依存:
   - "requirement.md"
   - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
@@ -24,7 +25,7 @@ repository_evidence:
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
 
-> **現行状態（2026-09-12）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に従い、同一EUIDの非協調actorを保証対象外とします。既存CP1–CP4 candidateは未受入で、再開位置はPlan §2.1です。協調SpecDock commandのlease、通常I/O／crash recovery、観測されたbinding drift、protected-data preservationは維持し、creator provenanceや一般のhostile-filesystem耐性は主張しません。独立review・clean pushed freeze/projection完了まではProduct変更を行わず、特権broker/daemon等も追加しません。
+> **現行状態（2026-09-14）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)に従います。同一EUIDの非協調actorは保証対象外で、#392 human mergeはB1ではなくP392です。既存CP1–CP4 candidateは未受入で、再開位置はPlan §2.1です。協調SpecDock commandのlease、通常I/O／crash recovery、観測されたbinding drift、protected-data preservationは維持し、creator provenanceや一般のhostile-filesystem耐性は主張しません。改訂仕様の独立review・clean pushed freeze/projection完了まではProduct変更を行わず、特権broker/daemon等も追加しません。
 
 ## 1. 設計結論
 
@@ -691,7 +692,7 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 - `full-regression-timing-weights.json`の243 entries。
 - `scripts/quality/full_regression_baseline.py`、`scripts/quality/verify_full_regression.py`のpolicy semantics。
 - `tests/conftest.py`のfour required-fast identities、full-regression permission/shard behavior。
-- #395/#396 canonical R/D/PとProduct code。
+- #395/#396 Product codeとbaseline責務。Canonical R/D/PはP392 sequence ADRで承認されたentry gate・readiness dependencyの変更だけ反映し、修復scopeやrow dispositionは変えません。
 - Parent Wire v12、`E384-QUAL-001`、accepted ADR。
 - Consumer initiatives/Artifacts/active/`.agent`/diagrams/`.workbench` content。
 
@@ -701,7 +702,8 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 
 - CP2で`pyproject.toml` versionを0.2.4へ固定し、CP4ではread-only確認します。
 - Provider runtime、provider-shipped docs、two provider skills、fixture、package inventoryをcomplete candidateとして先に完成させ、source testsをGREENにしてcandidate digestを固定します。
-- Existing `assets/**/*` package dataへnew fixtureが入ることをwheel/sdist inventoryで検証します。
+- Provider-owned `src/spec_dock/assets/spec_dock/system/.runtime/README.md`を追加し、`pyproject.toml`の`[tool.setuptools.package-data]`へ`assets/spec_dock/system/.runtime/README.md`のexact entryを含めます。既存globへの暗黙依存にしません。
+- 同READMEをwheel/sdist inventoryとT13 parityで検証し、checked-in dogfood mirrorへ完全投影します。Candidate algorithmとT13 node identityは変更しません。
 - `setup.py`のstale build pruningがnew fixture、provider_lifecycle package、bootstrapを削除しないことを確認し、必要な場合だけexact allowlistを更新します。
 - 固定した同一source treeからwheel/sdistをbuildし、isolated installed packageのcandidate digest、fixture bytes、bootstrap SHA、docs、two skill tree digestsを比較します。Build後にprovider candidate bytesを変更した場合、artifact proofをやり直します。
 - Artifact proofがGREENになった後だけ、`spec-dock/scripts/**`、`spec-dock/docs/**`、`.agents/skills/spec-dock/**`、`.agents/skills/spec-dock-grill-with-docs/**`へcomplete candidateを一括同期します。Partial dogfood projectionは禁止します。

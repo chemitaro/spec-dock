@@ -6,11 +6,12 @@ ID: "iss-00392"
 関連GitHub: ["#392"]
 状態: "draft"
 詳細化状態: "draft"
-最終更新: "2026-09-12"
+最終更新: "2026-09-14"
 依存:
   - "requirement.md"
   - "design.md"
   - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-luna-max-implementation-handoff.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
@@ -27,16 +28,16 @@ repository_evidence:
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
 
-> **現行状態（2026-09-12）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)に従い、同一EUIDの非協調actorを保証対象外とします。安全停止前にCP1–CP4 candidateは実装・検証済みですが未受入です。改訂Requirement／Design／Plan一式の独立review、clean pushed freeze、GitHub projection/readbackが完了するまでProduct変更は行いません。G0後はCP1からやり直さず、§2.1の再開位置から進めます。不要になったcreation-replacement testだけを削除し、out-of-scopeをassertする代替testは作りません。複雑な保護機構、skip/xfailによるRED隠し、#395/#396の先行開始は行いません。
+> **現行状態（2026-09-13）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。安全停止前のCP1–CP4 candidateは未受入です。改訂Requirement／Design／Plan一式の独立review、clean pushed freeze、GitHub projection/readbackが完了するまでProduct変更は行いません。G0後はCP1からやり直さず、§2.1から限定再開します。obsolete behavior/削除済みimplementationの不在だけを確認する永続testは残しません。skip/xfailによるRED隠し、#395のP392前開始、#396のB2前開始は行いません。
 
 ## 1. 結論と実行単位
 
-#392は四つのcausal checkpointを順に実装し、最後に一つのPRとして人間がEpic integration branchへmergeします。Checkpointはレビューしやすい内部状態であり、単独merge、単独Issue closure、main向けPR、#395開始条件にはなりません。
+#392は四つのcausal checkpointを順に実装し、最後に一つのPRとして人間がEpic integration branchへmergeします。Checkpointはレビューしやすい内部状態であり、単独merge、単独Issue closure、main向けPR、#395開始条件にはなりません。#392 mergeはP392（B1未達）で、#395はそのexact tipから作業し、B1/B2は#395 merge後の同一tipで評価します。
 
 1. CP1: closed model、wire projection、candidate/legacy identity、private state、native filesystem。
 2. CP2: installer engine/public CLI hard cutover、recovery、migration/uninstall、旧writer撤去。
 3. CP3: frozen runtime bootstrap、lease/helper/handoff、pinned checkout、worktree B/hook。
-4. CP4: provider-first packaging、complete dogfood、test migration、current gate、B1受入。
+4. CP4: provider-first packaging、complete dogfood、test migration、current gate、P392候補の受入準備。
 
 各checkpointは最初にRED testを追加し、そのREDが意図した欠落だけを示すことを確認してからProductを変更します。次checkpointへ進む条件は、当該checkpointのcompletion stateとnarrow verificationが揃い、stop conditionが0件であることです。
 
@@ -61,8 +62,8 @@ G0通過後は次の順で続けます。
 
 1. §3.1の一件だけを削除し、out-of-scope確認testは追加しない。
 2. CP2のlifecycle engine、Wire、migration/uninstall、protected-data focused suiteを再実行し、T06の残すtestを含めてGREENを確認する。
-3. CP1/CP3の変更影響範囲、CP4のpackage/dogfood/default-fast/current-full gatesを再検証する。#395 baseline mismatchを修正・抑止せず、結果をそのまま記録する。
-4. candidateをclean pushし、Code Review StrictとFinal Quality Gate Strictを別々に実行する。人間merge/B1は別gateとして維持する。
+3. CP1/CP3の変更影響範囲、CP4のpackage/dogfood/default-fast/current-full gatesを再検証する。full verifierをexact candidateで実行し、許容できるのはregister §6.1の#395-owned active rowsだけであることを記録する。#395 baseline mismatchを修正・抑止しない。
+4. candidateをclean pushし、Code Review StrictとFinal Quality Gate Strictを別々に実行する。全required checksと#392所有gateがGREENであり、full-verifier mismatchが許容集合内である場合だけhuman merge-readyとする。人間merge後もP392であり、B1/B2は別gateとして維持する。
 
 CP1–CP4の元packetは初回実装履歴として残し、現在の再開指示は本節と§3.1が優先します。
 
@@ -79,13 +80,13 @@ CP1–CP4の元packetは初回実装履歴として残し、現在の再開指�
 | KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory` | 実行中に観測されたbootstrap binding driftでrecordを書かない契約を検証する。 |
 | KEEP | `tests/unit/provider_lifecycle/test_engine.py::test_t06_existing_bootstrap_rebind_blocks_before_mutation` | 既存bootstrapの観測されたrebindをmutation前に拒否する契約を検証する。 |
 
-この一件の削除はscope narrowingにより要求自体がなくなるためのretirementであり、旧writerの削除とは別です。旧writer専用testのretirementには引き続きsuccessor GREENとproduction reference 0を要求します。
+この一件の削除はscope narrowingにより要求自体がなくなるためのretirementであり、旧writerの削除とは別です。旧writer専用testは現行behavior successorのGREEN後にsource diff/code reviewで整理し、旧writer不在だけを確認するtestは作りません。
 
 - Repository root `AGENTS.md`を毎checkpoint開始時に再読します。
 - Baseはその時点のexact Issue branch tipです。別branch、default branch、mainへ黙って切り替えません。
 - Product sourceの正本は`src/spec_dock/`、dogfoodは最後のprojectionです。
 - Test削除はsuccessor GREEN後だけです。ただし§3.1のscope narrowingで対応要件自体がなくなった一件は、G0後の再開時に削除し、後継testを設けません。
-- Parent Wire、accepted ADR、register、#395/#396文書を編集しません。
+- Parent Wire、baseline ledger/timing、required-fast、policyは変更しません。P392 ADRと親/Rolling-Wave/#395 contractの承認済み反映箇所だけ更新可能です。
 - Unexpected failure、wire drift、baseline driftをapproved/skip/xfailで隠しません。
 - 各packetの変更対象外fileに差分が出たら、そのcheckpointを停止します。
 - Product code、tests、docs、packagingの変更は#392 branch内に保持し、人間merge前にIssueを完了扱いにしません。
@@ -214,7 +215,7 @@ CP1 summaryにchanged files、generated hashes、RED/GREEN commands、remaining 
 
 - `tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations`
 - `tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero`
-- `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent`
+- `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_preserves_current_lifecycle_contract`
 
 Expected REDはengine/route未実装または旧purge routeが呼ばれることです。旧test failureをassertion削除で解消しません。
 
@@ -252,15 +253,15 @@ Expected REDはengine/route未実装または旧purge routeが呼ばれること
 8. `--remove-specs`をtarget/private observation前のrequest errorへ切り替えます。
 9. Existing CLI compatibility/golden testsをnew resultへ置換します。
 10. Exact legacy/ready/incomplete/tooling-absent normal and fault integrationをGREENにします。
-11. New routeとabsence guardsがGREENになってから旧module、旧manifest、旧journal/retry testsを削除します。
-12. `grep`/AST testで旧writer import/call/path string 0を証明します。
+11. Current CLI behaviorと必要なsuccessor testsがGREENになってから旧module、旧manifest、旧journal/retry testsを削除します。
+12. 旧writer/manifestの削除は候補差分とcode reviewで確認します。削除されたimplementationの不在だけをassertする永続testは作りません。
 
 ### 5.5 Narrow verification
 
 ```bash
 uv run pytest -q \
   tests/unit/provider_lifecycle/test_engine.py \
-  tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent \
+  tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_preserves_current_lifecycle_contract \
   tests/integration/test_epic_00343_distribution.py
 uv run pytest -q tests/cli_runtime/test_distribution_cutover.py \
   -k 'retained_skill_identity_matches_current_provider_and_dogfood or provider_lifecycle'
@@ -276,7 +277,7 @@ Expected result:
 - Exact 0.2.3だけmigration。
 - Tooling uninstall後はrecord残存、roots/slots absent。
 - `--remove-specs` exit 2/mutation 0。
-- `src/spec_dock/managed_distribution.py`とold manifest absent、production references 0。
+- Old implementation/test cleanupはcandidate diff/code reviewで確認する。absence-only testは追加しない。
 - Resolved successor nodeは同nodeidでpass。
 
 ### 5.6 Completion state
@@ -296,7 +297,7 @@ Expected result:
 
 ### 5.8 Next-step handoff
 
-CP2 summaryでold writer absenceとpublic wire conformanceを示し、CP3 packetだけを渡します。外部installerが完成していても、runtime coordination前にmergeしません。
+CP2 summaryでcurrent public behavior、public wire conformance、削除したowner surfacesの候補diff reviewを示し、CP3 packetだけを渡します。外部installerが完成していても、runtime coordination前にmergeしません。
 
 ## 6. CP3 — Runtime/Git/worktree coordination
 
@@ -414,7 +415,7 @@ Expected result:
 
 CP3 summaryにreal concurrency process evidence、bootstrap SHA、Git/worktree behaviorを記録し、CP4 packetだけを渡します。まだmergeしません。
 
-## 7. CP4 — Packaging, dogfood, test migration and B1 acceptance
+## 7. CP4 — Packaging, dogfood, test migration and provisional integration
 
 ### 7.1 Entry state
 
@@ -435,7 +436,7 @@ Expected REDはpackage inventory/dogfood/test disposition/provider-ci commandが
 
 **READ-ONLY**
 
-- `pyproject.toml`の`[project].version=0.2.4`。実buildで追加設定が必要と判明した場合は、exact keyを指定したpacket訂正へ戻る。
+- `pyproject.toml`の`[project].version=0.2.4`。
 
 **MODIFY**
 - 必要な場合だけ`setup.py`のpackage/stale-prune allowlist
@@ -447,6 +448,8 @@ Expected REDはpackage inventory/dogfood/test disposition/provider-ci commandが
 - matching dogfood docs under `spec-dock/docs/`
 - `.agents/skills/spec-dock/**` provider/dogfood pair
 - `.agents/skills/spec-dock-grill-with-docs/**` provider/dogfood pair
+- `pyproject.toml`の`[tool.setuptools.package-data]`へ`assets/spec_dock/system/.runtime/README.md`を含めるexact entry
+- `src/spec_dock/assets/spec_dock/system/.runtime/README.md`とchecked-in dogfood mirror
 - Test files classified REPLACE/RETIRE in the test Artifact
 
 **NEW**
@@ -468,12 +471,12 @@ Expected REDはpackage inventory/dogfood/test disposition/provider-ci commandが
 1. CP2で固定済みのversion 0.2.4をread-only確認し、provider package data、fixture、docs、two skills、new package inventoryをcomplete candidateへ整列します。
 2. Provider source testsをGREENにし、complete provider candidate digestを固定します。
 3. 同じsource treeからwheel/sdistをbuildし、isolated environmentでinstalled packageだけをimportしてcandidate/fixture/bootstrap/docs/skillsを検証します。
-4. Artifact proofがGREENになった後だけ、provider sourceからdogfood scripts/docs/two skillsを一括byte projectionします。Partial projectionは禁止します。
+4. Artifact proofがGREENになった後だけ、provider sourceからdogfood scripts/docs/two skillsと`.runtime/README.md`を一括byte projectionします。Partial projectionは禁止します。
 5. T13でsource/wheel/sdist/isolated install/fresh install/dogfood parityを検証します。
 6. Existing test filesをtest Artifactと§3.1どおりKEEP/REPLACE/RETIREします。§3.1のscope削除を除き、Successor GREEN前削除はしません。
 7. Resolved successor nodeidを維持します。
 8. Provider CIのold focused commandをnew lifecycle focused commandへ差し替え、PR-only/Linux-macOS/no-continue-on-error/current full pathsを維持します。
-9. T14とstatic acceptanceでold imports/path strings 0、Wire counts、required-fast、15/14/1、243、mirror parityを検証します。
+9. T14でWire counts、required-fast、15/14/1、243、policyとIssue boundaryを検証します。旧writer削除は候補差分/code reviewで確認し、その不在だけをassertするtestは残しません。
 10. Default fast、current explicit full verifier、platform parityを実行します。
 11. Review findingsを修正し、全変更を一つの#392 PRへまとめます。
 
@@ -508,25 +511,26 @@ uv run pytest --run-full-regression --full-regression-shard tests/integration/te
 
 Expected result:
 
-- All commands exit 0、unexpected failure 0。
+- #392-owned commands/current PR checks exit 0、unexpected failure 0。Current full verifierも実行し、violationがある場合はregister §6.1の#395-owned active rowsだけであることを記録する。
 - Required-fast four nodeids collected/executed as current policy requires。
 - Register 15 rows/14 active/1 resolved、active signatures/lifecycle unchanged。
 - Timing entries exactly243。
 - Source/wheel/sdist/installed/dogfood candidate/fixture/bootstrap parity。
 - Linux/macOS provider parity GREEN。
-- Old writer/manifest/journal authority references 0。
+- Old writer/manifest/journalの削除はsource diff/code reviewで確認する。absence-only regression testは存在しない。
 - No `continue-on-error`、skip/xfail/approved failure追加。
 
 ### 7.6 Completion state
 
-- #392 Product、tests、docs、packaging、dogfoodが一つのcandidateとしてGREEN。
-- PR baseはEpic integration branch、mergeは未実施。
+- #392 Product、必要なbehavior tests、docs、packaging、dogfoodが一つのcandidateとして整合し、#392-owned checksがGREEN。
+- Current full verifierは正確な結果を保持し、#395-owned baseline violationだけが残る場合も#392がこれを修正・抑止しない。
+- PR baseはEpic integration branch。Human merge後はP392であり、B1/Issue closureではない。
 - Reportへ実行したexact commands/results/hashを記録。
 - Human merge gateへ渡せる。
 
 ### 7.7 Stop condition
 
-- Full/current gateを通すため#395 active failureを修正する必要がある。
+- Current full-verifier failureに#395 register外のviolationまたは#392-owned failureが含まれる。
 - #396 toolingを先取りする必要がある。
 - Built artifactとsource/dogfoodが一致しない。
 - Provider CIを弱める、skip/xfail/continue-on-errorが必要になる。
@@ -536,18 +540,18 @@ Expected result:
 
 Luna Maxの実装作業は終了し、Codexがwhole diff、review、PR準備を行います。人間だけがPRをEpic integration branchへmergeします。
 
-## 8. Human merge and B1 post-merge gate
+## 8. Human merge and P392/B1/B2 gates
 
 1. PR baseが`codex/epic-00384-provider-test-strategy-planning`であることを確認する。
 2. Candidate head SHA、review pass、all required checks、baseline integrityを確認する。
 3. 人間がmergeする。Agentはmergeしない。
-4. Merged Epic branch tipのfull SHAを固定する。
+4. #392 merge後のEpic branch tip SHAを固定する。
 5. CP4 current required gatesとprovider parityをmerged tipで再実行する。
-6. Source/dogfood/ledger/timing/required-fastを再検証する。
-7. 全てGREENならB1を記録し、#392をclose可能とする。
-8. B1 GREEN後だけ#395をstartする。
+6. Current full verifierを実行し、違反があればexact violationとregister §6.1の#395 row対応を確認する。
+7. 全required PR checks/#392-owned gatesがGREENで、full-verifier violationが#395-owned active rowsだけの場合にP392を記録する。P392では#392をcloseせず、B1を主張しない。
+8. #395をP392 exact tipからだけstart/detail化し、#392 issue closureを開始条件にしない。#395 merge後のsame exact tipでB1（current PR/full gates GREEN）とB2（15/0/15）を順に確認する。B1後に#392、B2後に#395をclose可能とする。
 
-Merge後failureでは#395を開始せず、#392 mergeをhuman revertしてB0へ戻すか、#392 PR相当のrepairを人間判断します。Partial cherry-pickで状態を混ぜません。
+P392の許容集合外failureでは進まず、humanが#392 whole-merge revertまたは#392-owned repairを判断します。#395後にB1/B2が失敗した場合は#396を止め、humanが#395 whole-merge revert to P392またはowned forward-fixを判断します。Partial cherry-pickで状態を混ぜません。
 
 ## 9. Operational risk plan
 
@@ -560,7 +564,7 @@ Merge後failureでは#395を開始せず、#392 mergeをhuman revertしてB0へ�
 | Kill switch | Runtime toggleはN/Aかつ禁止。Human PR merge停止またはwhole merge revertがkill switch。 |
 | Backup/restore | User-data backupをlifecycleが作るのはN/A。Provider rootsのold generationはoperation中stageにのみ存在し、完了後は破棄。Git branch/repository backupはhuman運用。 |
 | Forward recovery | Applicable。ACTIVE/stage/receiptとexact tuple/tokenだけ。Manual private deletion、operation switch、old writer fallback禁止。 |
-| Rollback | Unmergedはbranch discard、merged B1 failureはhuman whole-merge revert。Partial old writer restore禁止。 |
+| Rollback | Unmergedはbranch discard、P392外failureはhuman whole-merge回復判断、B1/B2 failureはhuman whole-#395 merge revertまたはowned forward-fix。Partial old writer restore禁止。 |
 | Incident response | New invocation停止、exact root/ACTIVE/receipt/record bytesとpublic result保存、protected dataへ触れずparentへ報告。Cleanup tokenを公開ログへ不要に転載しない。 |
 | Ownership | #392 owns lifecycle。#395/#396 read-only。Post-merge保守はrepository maintainer。 |
 | Human gate | Spec review、clean pushed freeze/projection、PR review/merge、B1 revalidation、legacy maintenance windowはhuman/Codex gate。 |
@@ -574,8 +578,8 @@ Merge後failureでは#395を開始せず、#392 mergeをhuman revertしてB0へ�
 5. ACTIVE/receipt/recordのhash、repository `(dev,ino)`、OS、native capability、operation generationを記録する。秘密tokenは必要な担当者以外へ出さない。
 6. Wireのexact continuationがある場合だけそのcommandを実行する。別operationへ切り替えない。
 7. Wireにない状態、identity drift、foreign objectなら停止し、parentへcontract gapとして返す。
-8. B1 merge後のincidentでは#395を開始せず、human revert判断を行う。
+8. P392以外のunexpected failureでは次Issueを開始せずhuman revert/forward-fix判断を行う。B1/B2 failure後は#396を開始しない。
 
 ## 11. Plan completion and current gate
 
-本Planはcritical-level唯一の実装計画候補です。Checkpoint packetは[実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)に定義します。独立内容reviewとclean pushed freeze/projectionが未完了であるため、現時点でProduct実装を開始しません。
+本Planはcritical-level唯一の実装計画候補です。Checkpoint packetは[実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)に定義します。独立内容reviewとclean pushed freeze/projectionが未完了であるため、現時点でProduct実装を開始しません。P392は限定的な#392 merge stateで、B1/B2成立前にIssue acceptanceまたは#396開始を主張しません。

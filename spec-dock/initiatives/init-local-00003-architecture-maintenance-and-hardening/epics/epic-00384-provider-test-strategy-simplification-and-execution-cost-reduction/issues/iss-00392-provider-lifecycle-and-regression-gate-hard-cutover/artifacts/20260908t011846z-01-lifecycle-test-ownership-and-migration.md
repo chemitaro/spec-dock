@@ -4,13 +4,14 @@ ID: "20260908t011846z-01"
 タイトル: "ライフサイクルのテスト所有と移行対応"
 状態: "approved"
 作成者: "blue-team specification author"
-最終更新: "2026-09-08"
+最終更新: "2026-09-14"
 親: ["iss-00392"]
 template: "blank"
 authority: "evidence"
 derived_from:
   - "../../../artifacts/provider-lifecycle-wire-contract.md"
   - "../../../artifacts/active-failure-disposition-register.md"
+  - "../../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../requirement.md"
   - "../design.md"
   - "../plan.md"
@@ -26,13 +27,13 @@ repository_evidence:
 
 ## 1. 結論
 
-#392のテスト移行は、旧テストを一括削除して新テストへ置き換える作業ではありません。現行nodeを次の三分類へ閉じ、新保証のRED→GREENが成立した後にだけ旧実装専用nodeを撤去します。
+#392のテスト移行は、旧テストを一括削除して新テストへ置き換える作業ではありません。現行nodeを次の三分類へ閉じ、新保証のRED→GREENが成立した後にだけ旧実装専用nodeを撤去します。撤去済み実装・旧挙動の不在だけをassertする恒久testは追加しません。削除対象の棚卸しと撤去はcandidate diff/code reviewで確認します。
 
 - **KEEP**: 受入動作、公開互換、保護データ、packaging、dogfood、required-fast、14 active baseline、resolved successorをそのnode identityまたは同一behavior keyで維持します。
 - **REPLACE**: 受入意図は維持するが、旧per-file writer、旧journal、旧manifest、旧wrapper-return seamへのassertionを新lifecycleの観測へ置き換えます。置換先T-IDがGREENになるまで元nodeを削除しません。
-- **RETIRE**: 旧ownerそのものの存在だけを要求するnodeです。置換先T-IDがGREEN、production参照0、whole-file classificationが完了した後にだけ削除します。
+- **RETIRE**: 旧ownerそのものの存在だけを要求するnodeです。置換先T-IDがGREENになり、candidate diff/code reviewでそのnode群だけのfileであることを一回限りで確認した後に削除します。
 
-分類対象はverified commit `dc638e936e763cc7a6087f258201ed9ed654e7fb`に存在するtestsです。Ordered ruleを上から適用し、最初にmatchした規則を採用します。明示例外以外はKEEPです。CP4に追加するclassification registry testは、全collected nodeがexactly one ruleへ属し、0件のunclassified/overlapであることを要求します。
+分類対象はverified commit `dc638e936e763cc7a6087f258201ed9ed654e7fb`に存在するtestsです。Ordered ruleを上から適用し、最初にmatchした規則を採用します。明示例外以外はKEEPです。この分類は一回限りの移行棚卸しであり、全collected nodeの分類・退役状態だけを検査する恒久testにはしません。
 
 ## 2. 不変の回帰gate
 
@@ -88,7 +89,7 @@ Root ledgerのauthorityは`failure_paths`の15 exact rowsです。#392は14 acti
 
 置換先はT01–T07、T12、T14です。Current public catalog、unknown preservation、no-follow、native atomic、fresh/recovery/uninstall、CLI sole-ownerという**behavior**は残しますが、`DistributionPlan`、`OperationJournalStore`、`DistributionStageOwnership`、`.distribution-journal.json`、schema-2 forward guard、per-file checkpointを直接要求するassertionは残しません。
 
-全nodeのsuccessorがGREENで、production import/callとdocs参照が0になった後、file全体にKEEP対象が残っていないことをclassification testで確認してRETIREします。一部nodeだけ先に削除しません。
+全nodeのsuccessorがGREENで、candidate diff/code reviewで旧ownerへの参照とfile内のKEEP対象が残っていないことを一回限りで確認した後にRETIREします。この確認専用のclassification/absence testは残しません。一部nodeだけ先に削除しません。
 
 ### Rule 4 — `tests/unit/infra/test_init_update.py`
 
@@ -136,7 +137,7 @@ REPLACE:
 RETIRE:
 
 - Resolved historical node `test_s40b_retained_skill_identity_matches_issue359_final_source`はledger上resolvedのまま実行対象に戻しません。
-- 旧writer/journal class名だけを禁止/許可するnodeはT12のproduction-reference-zero testへ統合後に削除します。
+- 旧writer/journal class名だけを禁止/許可するnodeは、現行動作を検証するsuccessorがGREENになった後、source diff/code reviewで削除を確認して撤去します。参照不在だけをassertするtestには置き換えません。
 
 ### Rule 6 — Runtime update/uninstall tests
 
@@ -204,7 +205,7 @@ RETIRE:
 | T09 | CP3 | `tests/cli_runtime/test_provider_lifecycle_handoff.py::test_t09_update_uninstall_exec_and_helper_lease_lifetime_are_terminal` | Release-to-exec、streams/status/127、pass_fds、parent-only SIGKILL。 |
 | T10 | CP3 | `tests/cli_runtime/test_generation_checkout.py::test_t10_existing_and_new_checkout_are_pinned_and_generation_safe` | Existing/new branch pin、三種のwriting hookを含むcapability guard、pre/post drift、normal Git guard維持。 |
 | T11 | CP3 | `tests/cli_runtime/test_worktree_lifecycle_coordination.py::test_t11_worktree_b_create_remove_and_make_handoff_are_inode_bound` | B EX、entrypoint-last、path C preservation、nonlocking B fd、make compatibility。 |
-| T12 | CP2 | `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent` | Sole route、old module/manifest/journal references 0、public compatibility。 |
+| T12 | CP2 | `tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_preserves_current_lifecycle_contract` | Public init/uninstall outcomes、current wire compatibility、protected-data preservation。 |
 | T13 | CP4 | `tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical` | Provider-first、package inventory、bootstrap/fixture/docs/skills/fresh install/dogfood parity。 |
 | T14 | CP4 | `tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged` | Required-fast、15/14/1、243、provider CI、#395/#396 no-touch。 |
 
@@ -259,15 +260,15 @@ CP3のT08–T11はprovider asset treeまたはそこから作ったtemporary ins
 5. Checked-in dogfood `spec-dock/`と`.agents/skills/{spec-dock,spec-dock-grill-with-docs}`。
 6. Fresh install output。
 
-Wheel/sdistはlegacy fixture、new package、runtime bootstrapを欠いてはなりません。Build stagingのstale旧writer/manifestがartifactへ混入しないnegative proofを含めます。
+Wheel/sdistはlegacy fixture、new package、runtime bootstrapを含む同一candidate inventoryを保ちます。T13はsourceとbuilt artifactのcandidate parityを検証します。
 
 ## 8. Migration order and deletion rule
 
 1. T01–T05をREDにする。
 2. Foundation実装でGREENにする。
 3. T06/T07をRED→GREENにし、新installer public routeを通す。
-4. CP2で`tests/integration/test_issue_392_acceptance.py`を作成し、T12のold production reference scanをGREENにする。
-5. その後にだけ`managed_distribution.py`、`managed_distribution.json`、旧writer専用testsを削除する。
+4. CP2で`tests/integration/test_issue_392_acceptance.py`を作成し、T12でcurrent public CLI outcomesと保護動作をGREENにする。
+5. SuccessorのGREEN後、candidate diff/code reviewで旧writer/manifestと旧writer専用testsを整理し、専用absence testを残さない。
 6. T08–T11をRED→GREENにする。
 7. CP4で同じacceptance fileへT14だけを追加し、artifact proof後にcomplete dogfoodを一括projectしてT13/T14をGREENにし、既存KEEP nodeを実行する。
 8. Default fast、current full verifier、Linux/macOS provider parityがGREENになって初めてPR受入候補とする。
@@ -290,18 +291,17 @@ T08–T11のreal concurrency/platform nodesが別fileにある場合、同jobへ
 
 #392のテスト移行完了は次を一つのReport evidence blockで示します。
 
-- Classification registry: unclassified=0、overlap=0、prematurely_retired=0。
 - T01–T14: all pass。
 - Required-fast: exact four present and pass。
 - Ledger: total15/active14/resolved1、active nodeid/signature/lifecycle unchanged、resolved successor present/pass。
 - Timing: 243 entries unchanged。
 - Default fast/current full/focused Linux/macOS/package/dogfood: exit0。
 - Unexpected failure/error/skip/xfail/approved failure additions: 0。
-- Old production writer/manifest/current-authority references: 0。
+- Removed production code and obsolete-only tests are reviewed in the candidate diff; no persistent absence-only test is retained.
 
 仕様pack作成時点ではこれらProduct testsを実行していません。本Artifactは移行契約であり、実装時点のGREEN証拠は次節に追記します。
 
-## 11. Implementation verification update
+## 11. Historical implementation verification update (2026-09-09)
 
 2026-09-09時点の実装candidate `e75bc8887e022f9b4a2ebf4716cb443d3542b70c`（tree
 `d925a51f86347b6cdf127ad617bfce9bd609703b`）に対して、次の証拠を採取しました。
@@ -317,3 +317,15 @@ T08–T11のreal concurrency/platform nodesが別fileにある場合、同jobへ
 - current full verifierは`1709 tests collected`、status=`ledger-mismatch`、violation=`10`でした。10件は#395が所有するactive baselineの既知signature/coverage mismatchだけで、今回のIssue由来のunexpected failure/error/skip/xfail追加はありません。#392はこのbaselineを変更していません。
 
 したがって、旧managed distribution testのRETIRE条件（whole-file classification、successor GREEN、production reference 0）はcandidate上で確認済みです。ただしcurrent full verifierの#395 baselineと、人間merge後のB1再検証は未完了です。本証拠は#392実装candidateの受入証跡であり、#395の修正やIssue全体の最終完了を意味しません。
+
+## 12. 2026-09-14 active test contract amendment
+
+後続のユーザー指示により、削除済みimplementation/obsolete behaviorの不在だけを検査するtest、およびretirement分類だけを目的とするtestは恒久suiteに残しません。§11は当時のcandidateで実行されたhistorical evidenceとして保持しますが、そこに記録されたclassification registryやold-reference scanを現在のtest要件とはしません。
+
+- T12は`test_t12_public_cli_preserves_current_lifecycle_contract`へ改名し、public CLI outcomes、current wire compatibility、protected-data preservationを検証します。Production source/file/referenceの不在assertionは含めません。
+- T14は`test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`のまま、required-fast identities、15/14/1 rows、243 timing entries、current policy/CI contract、Issue boundaryを検証します。Removed fileやobsolete-only testの不在assertion、およびclassification-only testは含めません。
+- `test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`から分類専用helper/testを削除し、unused importsも整理します。必要な現行動作・baseline/safety testsは残します。
+- T14のIssue境界スナップショットは維持し、#395 Requirement／Design／PlanがこのP392 gate文面で確定した時点で、その3文書の期待hashだけを更新します。Issue境界の対象・検出強度は弱めず、#396の期待hashは変更しません。
+- Old implementation/test cleanupはsuccessor GREEN後のcandidate diff/code reviewで確認し、absence-only regression testは追加しません。
+
+受入順は[P392 sequence ADR](../../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)に従います。#392のhuman mergeはP392であり、#395はそのexact tipから開始します。B1/B2は#395 merge後の同じexact tipで判定し、§11のhistorical candidate結果を現在のGREEN証拠として再利用しません。
