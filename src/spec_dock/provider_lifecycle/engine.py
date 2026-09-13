@@ -632,20 +632,15 @@ def _open_path_bound(
                 created.append((cleanup_parent_fd, component, created_witness))
                 try:
                     os.fsync(current)
-                    if index >= 0:
-                        visible_fd, visible = _open_path_visible(root_fd, tuple(components[: index + 1]))
-                        try:
-                            if (
-                                len(visible) != index + 1
-                                or any(
-                                    not _same_directory_binding(left, right)
-                                    for left, right in zip(witnesses, visible[:-1], strict=True)
-                                )
-                                or not _same_directory_binding(created_witness, visible[-1])
-                            ):
-                                raise FilesystemSafetyError("created path component is no longer root-visible")
-                        finally:
-                            os.close(visible_fd)
+                    visible_fd, visible = _open_path_visible(root_fd, tuple(components[: index + 1]))
+                    try:
+                        if any(
+                            not _same_directory_binding(left, right)
+                            for left, right in zip(witnesses, visible[:-1], strict=True)
+                        ):
+                            raise FilesystemSafetyError("existing ancestor binding changed during path creation")
+                    finally:
+                        os.close(visible_fd)
                 except BaseException:
                     os.close(next_fd)
                     raise

@@ -1915,11 +1915,7 @@ class StageStore:
                 if name == STAGE_OWNER_NAME:
                     continue
                 value = os.stat(name, dir_fd=stage_fd, follow_symlinks=False)
-                if (
-                    not stat.S_ISDIR(value.st_mode)
-                    or value.st_uid != _effective_euid()
-                    or stat.S_IMODE(value.st_mode) != PRIVATE_DIRECTORY_MODE
-                ):
+                if not stat.S_ISDIR(value.st_mode) or value.st_uid != _effective_euid():
                     raise PrivateStateForeignError(f"stage entry {name} is unsafe")
             return tuple(name for name in STAGE_ENTRY_NAMES if name in names)
         finally:

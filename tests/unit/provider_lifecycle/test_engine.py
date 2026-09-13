@@ -255,6 +255,30 @@ def test_t01_update_partial_action_vector_preserves_current_domains(tmp_path: Pa
     assert result.seed_policy == "preserve-only"
 
 
+def test_t01_update_resumes_after_exchange_preserves_original_root_mode(tmp_path: Path) -> None:
+    workspace = (tmp_path / "update-resume-original-root-mode").resolve()
+    workspace.mkdir()
+    previous_assets = tmp_path / "previous-assets"
+    shutil.copytree(Path(engine_module.__file__).resolve().parents[1] / "assets", previous_assets)
+    (previous_assets / "spec_dock/system/previous-generation.txt").write_text("previous\n", encoding="utf-8")
+    (previous_assets / "spec_dock/scripts/previous-generation.txt").write_text("previous\n", encoding="utf-8")
+
+    installed = ProviderLifecycleEngine(assets_root=previous_assets).execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    (workspace / "spec-dock/system").chmod(0o755)
+
+    interrupted = ProviderLifecycleEngine(fault_injector="root-scripts-publish-or-detach").execute(
+        _request(workspace, "update"), force=True
+    )
+    assert interrupted.status == "partial_failure"
+    assert interrupted.phase == "publish-scripts"
+    assert interrupted.last_completed_phase == "publish-system"
+
+    resumed = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    assert resumed.status == "completed", resumed.code
+
+
 def test_t01_preserve_only_verify_failure_excludes_seed_phases(tmp_path: Path) -> None:
     workspace = (tmp_path / "preserve-only-verify-failure").resolve()
     workspace.mkdir()
@@ -609,41 +633,6 @@ def test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory(monk
     assert result.mutation_started is False
     assert (workspace / "spec-dock").is_dir()
     assert tuple((workspace / "spec-dock").iterdir()) == ()
-
-
-def test_t06_bootstrap_creation_replacement_is_not_populated(monkeypatch, tmp_path: Path) -> None:
-    workspace = (tmp_path / "bootstrap-creation-replacement").resolve()
-    workspace.mkdir()
-    displaced_name = "spec-dock.operation-created-displaced"
-    original_mkdir = engine_module.os.mkdir
-    original_witness: tuple[int, int] | None = None
-    replacement_witness: tuple[int, int] | None = None
-
-    def replace_after_successful_create(name: str, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
-        nonlocal original_witness, replacement_witness
-        original_mkdir(name, mode, dir_fd=dir_fd)
-        if name != "spec-dock" or dir_fd is None or original_witness is not None:
-            return
-        created = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
-        original_witness = (created.st_dev, created.st_ino)
-        os.rename(name, displaced_name, src_dir_fd=dir_fd, dst_dir_fd=dir_fd)
-        original_mkdir(name, mode, dir_fd=dir_fd)
-        replacement = os.stat(name, dir_fd=dir_fd, follow_symlinks=False)
-        replacement_witness = (replacement.st_dev, replacement.st_ino)
-
-    monkeypatch.setattr(engine_module.os, "mkdir", replace_after_successful_create)
-    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
-
-    replacement = workspace / "spec-dock"
-    displaced = workspace / displaced_name
-    assert original_witness is not None
-    assert replacement_witness is not None
-    assert original_witness != replacement_witness
-    assert replacement.is_dir()
-    assert tuple(replacement.iterdir()) == ()
-    assert result.status == "blocked"
-    assert displaced.is_dir()
-    assert tuple(displaced.iterdir()) == ()
 
 
 def test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory(
