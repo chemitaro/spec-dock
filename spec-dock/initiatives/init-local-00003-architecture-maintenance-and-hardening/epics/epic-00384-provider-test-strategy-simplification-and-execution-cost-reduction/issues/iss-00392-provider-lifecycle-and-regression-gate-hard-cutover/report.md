@@ -16,16 +16,16 @@ ID: "iss-00392"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
   - "artifacts/issue-392-human-guide.html"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: false
+実装開始許可: true
 repository_evidence:
   role: "implementation-candidate-source"
   repository: "chemitaro/spec-dock"
   branch: "iss-00392-provider-lifecycle-and-regression-gate-hard-cutover"
-  sha: "f56486967f059e05199aa24554ef3a87546fdcc6"
-  tree: "4a6f67136e7dce71ee6e68bd2f27b676774c1d98"
+  sha: "d1db2696a87f6ec2e2d60ec24cf05679ac54c1e9"
+  tree: "97213d6819257de1306b2d9915ad368c72f86a14"
 implementation_evidence:
-  candidate_sha: "f56486967f059e05199aa24554ef3a87546fdcc6"
-  candidate_tree: "4a6f67136e7dce71ee6e68bd2f27b676774c1d98"
+  candidate_sha: "d1db2696a87f6ec2e2d60ec24cf05679ac54c1e9"
+  candidate_tree: "97213d6819257de1306b2d9915ad368c72f86a14"
 ---
 
 # #392 仕様・実装レポート
@@ -81,7 +81,7 @@ Issue #392の実装可能な仕様候補として、Requirement、Design、criti
 成果物作成directoryに対して次を機械検査し、すべてpassしました。
 
 - 必須成果物6 files（Report/manifest作成前段階）の存在・non-empty。
-- Canonical Markdownと二ArtifactのYAML front matter、ID、parent、`関連GitHub`、`実装開始許可=false`。
+- 当初の成果物作成時点におけるCanonical Markdownと二ArtifactのYAML front matter、ID、parent、`関連GitHub`、`実装開始許可=false`。
 - Markdown relative links 4件がpackage内に閉じ、全targetが存在。
 - 未解決作業マーカーとplaceholder-only行なし。
 - Wire v12 actual extraction: status 6、code 41、phase 23、last-completed-phase 24、relation 168、public JSON goldens 40、record goldens 4。全JSON block parse成功。
@@ -107,14 +107,11 @@ P1は、CP2のT12/version ownership、directory mode identity、`RECORD-TEMP` mo
 
 ## 7. Implementation and merge gate
 
-`実装開始許可=true`です。CP1–CP4、独立レビューのP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証、親ディレクトリ再拘束のhardeningとその後のP1 remediation、fsync failure windowの追加remediation、witness失敗時のchild FD解放を含む実装candidate commit `f56486967f059e05199aa24554ef3a87546fdcc6`を固定しました。Report更新後のreport-bound clean SHAとbranch upstreamの一致確認、および次の最終ゲートが残っています。
+G0の独立仕様reviewとfreeze/projectionは`bc896cf8d11362fb338768c2295e7430e5538200`で完了し、ユーザー承認後の実装開始許可はtrueです。CP1–CP4、独立レビューで得たP1修正、First Red再修正、provider-first dogfood projection、最終remediation、stageの凍結候補再検証、承認済み`seed_admission` v2、固定seedの危険型をmutation前に拒否する追加修正、初回適用時のadmission snapshot保持、unsafe parent bindingのWire収束、public record/private stateのexpected witness binding、終端レコード交換後のACTIVE保存失敗復旧、交換元と完了証跡の再検証、残骸unlink直前のpublic witness再検証、完了処理直前のpublic witness再検証、初回exchange recovery時のoriginal residue再検証、親ディレクトリ再拘束のhardening、fsync failure windowのremediation、witness失敗時のchild FD解放を含むProduct実装candidateは`d1db2696a87f6ec2e2d60ec24cf05679ac54c1e9`です。
 
-1. このReport更新を含む最終SHAのclean pushとupstream SHA一致。
-2. このReport更新を含む最終clean pushed report-bound SHAに対する独立Code Review StrictのP0/P1ゼロ・pass。各実装修正後は旧candidateのレビュー結果を再利用せず、現SHAへfresh reviewを束縛します。
-3. 最終Quality Gate Strictの実施条件成立。
-4. 人間による#392 PRのEpic integration branchへのmergeと、merged tip B1再検証。
+このcandidateでは`make lint`、default pytest、provider lifecycle、distribution cutover、package parity、Issue acceptance/dogfood designated shard、SpecDock validateがpassしました。full verifierはGREENではなく、`evaluation.verified=false`、violation 10件、`unexpected_failure=0`です。全件が#395-owned active rowsのためP392候補の限定記録対象ですが、#395のledger/timing/required-fast/policy/baseline/bundleを変更せず、GREENとは表現しません。
 
-CP4後もagentはmergeしません。人間が#392 PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし、merged tipでB1を再検証します。B1 GREEN後だけ#395を開始します。
+このReportの現在状態は、次のゲートを分離して扱います。candidateはexact clean SHAを対象にCode Review StrictとFinal Quality Gate Strictを通過してから人間mergeへ進みます。agentはmergeせず、Issueを完了扱いにしません。人間が#392 PRを`codex/epic-00384-provider-test-strategy-planning`へmergeした後にだけP392のexact tipとfull verifier結果を記録し、#395はそのtipから開始します。B1/B2は#395 merge後の同一tipで判定し、B1前の#392 acceptanceおよびB2前の#395 acceptance/#396開始を主張しません。
 
 ## 8. Residual blocker and uncertainty
 

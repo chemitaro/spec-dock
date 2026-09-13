@@ -17,7 +17,7 @@ ID: "iss-00392"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
 Planning Level: "critical"
-実装開始許可: false
+実装開始許可: true
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
@@ -28,7 +28,7 @@ repository_evidence:
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 実装計画
 
-> **現行状態（2026-09-13）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。安全停止前のCP1–CP4 candidateは未受入です。改訂Requirement／Design／Plan一式の独立review、clean pushed freeze、GitHub projection/readbackが完了するまでProduct変更は行いません。G0後はCP1からやり直さず、§2.1から限定再開します。obsolete behavior/削除済みimplementationの不在だけを確認する永続testは残しません。skip/xfailによるRED隠し、#395のP392前開始、#396のB2前開始は行いません。
+> **現行状態（2026-09-14）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済みです。仕様freeze `bc896cf8d11362fb338768c2295e7430e5538200`の独立review、clean pushed freeze、GitHub projection/readbackと親gateの確認でG0が成立し、ユーザー承認により`実装開始許可=true`です。Plan §2.1からの限定re-entry、CP1–CP4実装とobsolete-only test cleanupは完了し、結果はReport §32にあります。full verifierは#395-owned mismatchを含む非GREEN結果のまま記録し、#395 baselineを修正・抑止していません。Strict review、human merge/P392、B1/B2は別gateです。obsolete behavior/削除済みimplementationの不在だけを確認する永続testは残しません。skip/xfailによるRED隠し、#395のP392前開始、#396のB2前開始は行いません。
 
 ## 1. 結論と実行単位
 
@@ -43,7 +43,7 @@ repository_evidence:
 
 ## 2. G0 — Product実装前gate
 
-現時点の値は`implementation_allowed=false`です。次の全条件が外部証拠として成立したときだけ、Codexが既存candidateの限定re-entryを始めます。
+G0は仕様freeze `bc896cf8d11362fb338768c2295e7430e5538200`で成立済みで、現在の値は`implementation_allowed=true`です。次の項目は再開前の入場条件として確認済みであり、Product受入やmergeの証明ではありません。
 
 - accepted scope ADRと本Requirement/Design/Plan/Handoff/Test Artifactを一つの候補として独立reviewし、P0=0、P1=0、`review_status=pass`。
 - Review対象bytesのmanifest/hashが固定されている。
@@ -52,7 +52,7 @@ repository_evidence:
 - Epic integration branch B0 GREEN、predecessor #387 completion、15 rows/14 active/1 resolved、243 timing entries、four required-fastが再確認済み。
 - User/CodexがOption 1後の再開範囲（§2.1）を許可している。このIssueでは正式startは完了済みのため再実行しません。
 
-不足時は仕様packを改善するだけで、Product fileを変更しません。
+G0成立とOption 1再開承認により、Plan §2.1の限定re-entryは実施済みです。Product受入・mergeは後続の独立gateです。
 
 ### 2.1 既存candidateからの再開位置
 
@@ -65,7 +65,7 @@ G0通過後は次の順で続けます。
 3. CP1/CP3の変更影響範囲、CP4のpackage/dogfood/default-fast/current-full gatesを再検証する。full verifierをexact candidateで実行し、許容できるのはregister §6.1の#395-owned active rowsだけであることを記録する。#395 baseline mismatchを修正・抑止しない。
 4. candidateをclean pushし、Code Review StrictとFinal Quality Gate Strictを別々に実行する。全required checksと#392所有gateがGREENであり、full-verifier mismatchが許容集合内である場合だけhuman merge-readyとする。人間merge後もP392であり、B1/B2は別gateとして維持する。
 
-CP1–CP4の元packetは初回実装履歴として残し、現在の再開指示は本節と§3.1が優先します。
+CP1–CP4の元packetは初回実装履歴として残します。この§2.1で定めた限定re-entryとtest dispositionは実施済みで、結果はReport §32を参照します。
 
 ## 3. 共通実行規則
 
@@ -584,4 +584,4 @@ P392の許容集合外failureでは進まず、humanが#392 whole-merge revert�
 
 ## 11. Plan completion and current gate
 
-本Planはcritical-level唯一の実装計画候補です。Checkpoint packetは[実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)に定義します。独立内容reviewとclean pushed freeze/projectionが未完了であるため、現時点でProduct実装を開始しません。P392は限定的な#392 merge stateで、B1/B2成立前にIssue acceptanceまたは#396開始を主張しません。
+本Planはcritical-level唯一の実装計画です。Checkpoint packetは[実装引継ぎ](artifacts/20260908t011846z-luna-max-implementation-handoff.md)に定義します。G0と再開承認は完了し、CP1–CP4の実装・test cleanup・指定検証を実施済みです。current full verifierは#395-owned rowsのmismatchによりGREENではなく、#392所有のunexpected failureは0件です。Report §32にexact candidateと検証結果を記録しています。人間merge後だけをP392とし、B1/B2成立前にIssue acceptanceまたは#396開始を主張しません。

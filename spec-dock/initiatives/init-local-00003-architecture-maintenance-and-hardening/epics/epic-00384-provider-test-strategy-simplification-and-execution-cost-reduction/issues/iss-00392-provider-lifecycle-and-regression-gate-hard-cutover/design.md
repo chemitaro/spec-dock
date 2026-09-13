@@ -14,7 +14,7 @@ ID: "iss-00392"
   - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: false
+実装開始許可: true
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
@@ -25,7 +25,7 @@ repository_evidence:
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
 
-> **現行状態（2026-09-14）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)に従います。同一EUIDの非協調actorは保証対象外で、#392 human mergeはB1ではなくP392です。既存CP1–CP4 candidateは未受入で、再開位置はPlan §2.1です。協調SpecDock commandのlease、通常I/O／crash recovery、観測されたbinding drift、protected-data preservationは維持し、creator provenanceや一般のhostile-filesystem耐性は主張しません。改訂仕様の独立review・clean pushed freeze/projection完了まではProduct変更を行わず、特権broker/daemon等も追加しません。
+> **現行状態（2026-09-14）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)に従います。同一EUIDの非協調actorは保証対象外で、#392 human mergeはB1ではなくP392です。仕様freeze `bc896cf8d11362fb338768c2295e7430e5538200`の独立reviewとIssue projection/readbackでG0成立を確認し、ユーザー承認により`実装開始許可=true`です。CP1–CP4は実装済みですが、Issue受入、human merge、B1/B2は未完了の別gateです。協調SpecDock commandのlease、通常I/O／crash recovery、観測されたbinding drift、protected-data preservationは維持し、creator provenanceや一般のhostile-filesystem耐性は主張しません。特権broker/daemon等は追加しません。
 
 ## 1. 設計結論
 

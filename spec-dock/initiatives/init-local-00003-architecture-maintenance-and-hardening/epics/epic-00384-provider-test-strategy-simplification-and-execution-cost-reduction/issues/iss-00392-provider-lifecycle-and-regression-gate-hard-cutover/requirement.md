@@ -10,7 +10,7 @@ ID: "iss-00392"
 依存:
   - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: false
+実装開始許可: true
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
@@ -21,7 +21,7 @@ repository_evidence:
 
 # #392 要件定義 — Provider lifecycleを固定所有境界へ切り替える
 
-> **現行状態（2026-09-14）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。既存CP1–CP4 candidateは未受入であり、Product実装許可は独立review・clean pushed freeze/projection完了までfalseとする。#392 merge後はP392であり、B1/B2は#395 merge後の同一tipで判定する。
+> **現行状態（2026-09-14）:** [same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。仕様freeze `bc896cf8d11362fb338768c2295e7430e5538200`に対する独立reviewはP0/P1=0・passで、Issue projection/readbackを含むG0成立後にユーザーがOption 1再開を承認しました。したがって`実装開始許可=true`です。CP1–CP4 candidateは実装済みですが、#392 human merge、P392、B1/B2、Issue acceptance/closureとは別状態です。#392 merge後はP392とし、B1/B2は#395 merge後の同一tipで判定します。
 
 ## 1. 結論
 
@@ -29,7 +29,7 @@ Issue #392は、現行のper-file managed-distribution engineを廃止し、四�
 
 このIssueのPRは`codex/epic-00384-provider-test-strategy-planning`だけをbaseとし、人間が同Epic integration branchへmergeします。#392 candidateはP392としてmergeし、#395はそのexact tipからだけ開始します。#395 merge後の同一tipでB1/B2を判定し、B1がGREENになるまで#392を完了扱いにしません。#392をmainへ直接mergeしません。
 
-親のpublic wire inventory、三Issue責務、14 active baseline、`E384-QUAL-001`、`E384-DEC-001/002`は再設計しません。E384-DEC-004が定めるthreat scopeだけを反映し、public code/relation/goldenは変更しません。実装開始許可は、Issue仕様の独立内容reviewと、この内容を反映したclean pushed freeze/projectionが実際に完了するまで`false`です。
+親のpublic wire inventory、三Issue責務、14 active baseline、`E384-QUAL-001`、`E384-DEC-001/002`は再設計しません。E384-DEC-004が定めるthreat scopeだけを反映し、public code/relation/goldenは変更しません。G0の独立内容reviewとclean pushed freeze/projectionは上記freezeで完了しており、現在の実装開始許可は`true`です。
 
 ## 2. 正本、優先順位、対象時点
 
@@ -203,7 +203,7 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 | AC-11 | Source/wheel/sdist/isolated install/fresh install/dogfoodが同candidate、fixture、bootstrap、skills、docsを持つ。 | T13 |
 | AC-12 | Four required-fast、15/14/1 register、resolved successor、243 timing entries、policyが不変。full verifier実測はP392記録に分離する。 | T14、P392 receipt |
 | AC-13 | PR base、human merge、P392記録、B1/B2 same-tip verificationがIntegration Contractどおり。 | human gate receipt |
-| AC-14 | Product test/merge未実行の時点ではReportが成功を主張せず、実装開始許可はfalse。 | document review |
+| AC-14 | Product acceptance/merge未完了の時点でReportが最終成功を主張しない。実装開始許可はG0成立で独立判定する。 | document review |
 
 ## 8. Requirement-to-test trace
 
@@ -242,4 +242,4 @@ Createはsource commit/closureをpinし、empty Bをexclusive createしてB EX�
 
 ## 10. 完了と人間gate
 
-仕様作成完了、再開許可、Product実装完了、PR merge、B1 GREEN、Issue closureは別の状態です。CP1–CP4 candidateとそのテスト・package/dogfood/current-gate検証はsafe stop前に実施済みですが、最終受入されていません。Option 1反映後の独立review、clean pushed freeze/projectionおよび親gateは未完了です。したがって現在は`実装開始許可: false`を維持し、G0後はPlanの限定re-entryを行います。
+仕様作成完了、再開許可、Product実装完了、PR merge、B1 GREEN、Issue closureは別の状態です。G0は仕様freeze `bc896cf8d11362fb338768c2295e7430e5538200`で成立し、Option 1反映後の限定re-entryとCP1–CP4実装を許可済みです。現在は`実装開始許可: true`ですが、ProductのIssue受入・PR merge・B1 GREEN・Issue closureは未完了であり、相互に同一視しません。
