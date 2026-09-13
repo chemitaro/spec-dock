@@ -121,9 +121,8 @@ RETIRE:
 
 KEEP:
 
-- `test_s40b_provider_install_root_is_current_catalog_only`
+- `test_s40b_provider_install_root_is_current_catalog_only`（exact current install-root inventoryを検証。retired-prefix/nameだけの冗長なnegative assertionは削除する。）
 - `test_s40b_retained_skill_identity_matches_current_provider_and_dogfood`
-- `test_s40b_legacy_bootstrap_and_skill_apply_paths_are_retired`
 - Provider sourceとdogfood、installed runtime、current docs/skillsのbyte parityを守るnode。
 - Unknown/unrelated path、initiatives、Workbenchの不変を観測するnode。ただし旧action vocabularyではなくbytes/type/inode witnessで観測します。
 
@@ -136,7 +135,9 @@ REPLACE:
 
 RETIRE:
 
+- `test_s40b_provider_scaffold_excludes_removed_docs_and_templates`は削除済みpath/templateと旧routeの不在だけを検査するため撤去し、後継testを作りません。
 - Resolved historical node `test_s40b_retained_skill_identity_matches_issue359_final_source`はledger上resolvedのまま実行対象に戻しません。
+- `test_s40b_legacy_bootstrap_and_skill_apply_paths_are_retired` KEEP entryはcurrent sourceに存在しないstale classificationです。testを新設・復活させず、このclassificationから除外します。
 - 旧writer/journal class名だけを禁止/許可するnodeは、現行動作を検証するsuccessorがGREENになった後、source diff/code reviewで削除を確認して撤去します。参照不在だけをassertするtestには置き換えません。
 
 ### Rule 6 — Runtime update/uninstall tests
@@ -325,6 +326,7 @@ T08–T11のreal concurrency/platform nodesが別fileにある場合、同jobへ
 - T12は`test_t12_public_cli_preserves_current_lifecycle_contract`へ改名し、public CLI outcomes、current wire compatibility、protected-data preservationを検証します。Production source/file/referenceの不在assertionは含めません。
 - T14は`test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`のまま、required-fast identities、15/14/1 rows、243 timing entries、current policy/CI contract、Issue boundaryを検証します。Removed fileやobsolete-only testの不在assertion、およびclassification-only testは含めません。
 - `test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`から分類専用helper/testを削除し、unused importsも整理します。必要な現行動作・baseline/safety testsは残します。
+- Rule 5の`test_s40b_provider_scaffold_excludes_removed_docs_and_templates`を削除し、`test_s40b_provider_install_root_is_current_catalog_only`はexact current inventory assertionだけを残します。削除済みpath/nameを列挙する定数・negative assertionは残しません。
 - T14のIssue境界スナップショットは維持し、#395 Requirement／Design／PlanがこのP392 gate文面で確定した時点で、その3文書の期待hashだけを更新します。Issue境界の対象・検出強度は弱めず、#396の期待hashは変更しません。
 - Old implementation/test cleanupはsuccessor GREEN後のcandidate diff/code reviewで確認し、absence-only regression testは追加しません。
 
