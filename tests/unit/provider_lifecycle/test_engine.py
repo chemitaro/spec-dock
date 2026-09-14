@@ -1188,6 +1188,30 @@ def test_t04_foreign_stage_owner_is_stage_owner_mismatch_in_candidate_staging(mo
     assert result.actions == ()
 
 
+def test_t04_hard_linked_candidate_is_rejected_before_workspace_mutation(tmp_path: Path) -> None:
+    repository = Path(__file__).parents[3]
+    assets_root = tmp_path / "assets"
+    shutil.copytree(repository / "src/spec_dock/assets", assets_root)
+    os.link(assets_root / "spec_dock/docs/reference_naming.md", tmp_path / "hard-linked-copy")
+
+    workspace = (tmp_path / "hard-link-workspace").resolve()
+    workspace.mkdir()
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine(assets_root=assets_root).execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "candidate-invalid"
+    assert result.operation == "install"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "create-if-absent"
+    assert result.phase == "candidate-staging"
+    assert result.last_completed_phase == "preflight"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+
+
 def test_t04_stage_rebuild_revalidates_frozen_candidate_before_consumer_mutation(monkeypatch, tmp_path: Path) -> None:
     repository = Path(__file__).parents[3]
     assets_root = tmp_path / "assets"
