@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-12"
+最終更新: "2026-09-14"
 依存:
   - "requirement.md"
   - "design.md"
@@ -19,18 +19,18 @@ ID: "epic-00384"
 repository_evidence:
   role: "authoring-source-provenance"
   repository: "chemitaro/spec-dock"
-  branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
-  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
+  branch: "codex/epic-00384-p392-handoff-plan"
+  sha: "2d4bc1e50129ae1397324f1e777018d8e3966965"
+  tree: "42d46aa44c51ff2bc1cda62635f75dd08d701933"
 ---
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
-**現行状態（2026-09-13）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。改訂R/D/Pの独立review・clean pushed freeze/projectionまではProduct変更を行わない。G0後は#392 candidateを限定再開し、human merge後P392から#395へ進む。B1/B2は#395 merge後の同じtipで確認する。
+**現行状態（2026-09-14、GitHub readback）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。PR #397は人間によりEpic branchへmergeされ、PR head `e2dcf6aa01e0e5b6ac338ddbcd84aae3d3fc3a2a`とmerge commit `2d4bc1e50129ae1397324f1e777018d8e3966965`は同じtree `42d46aa44c51ff2bc1cda62635f75dd08d701933`である。このmergeはP392であり、B1や#392の完了・closureではない。GitHub #392は2026-09-14T01:39:58ZにCLOSED、#395はOPEN・未start。#392 Report §32までにはmerge SHAに対するP392 receiptがないため、#395着手前に#392の状態をOPENへ戻し、§3.1のmerged-tip証拠を揃える。`repository_evidence`はauthoring-source provenanceであり、P392 receiptではない。この計画更新自体はIssue状態変更や#395 startを行わない。
 
 ## 1. 今回の位置づけ
 
-親計画のcommit/pushとIssue #392の正式startは完了した。安全停止前にCP1–CP4 candidateは実装・検証済みだが未受入である。現在はOption 1とP392 sequenceを反映した親／Issue R/D/Pを独立reviewし、clean pushed freezeとGitHub projection/readbackを完了するG0段階にある。G0後はIssue Plan §2.1の限定re-entry（不要になったtestだけを削除し、影響gateを再検証）から続け、CP1をやり直さない。過去のreviewは記録済みcandidateだけに有効である。
+親計画のfreezeとIssue #392の正式startは完了し、PR #397もP392として人間merge済みである。現在はmerge SHA上のP392 receiptを確定し、#395へ引き継ぐ段階にある。安全停止前のCP1–CP4 candidateと過去Reportのfull-verifier結果は履歴であり、現在のmerged-tip証拠には流用しない。#392はP392で完了扱いにせず、freshなP392 evidenceが揃うまで#395をstartしない。具体的な状態補正・SHA gate・formal startは§3.1に従う。
 
 目的はprovider状態数・重複検証・実行コストの削減であり、文書数やIssue数を増やすことではない。実装・検証単位は#392 → #395 → #396の三件を維持する。各Issue PRをEpic branchへ人間が順次mergeし、最後にmainへ一度mergeする。
 
@@ -49,22 +49,33 @@ repository_evidence:
 | Gate | 必要な入力 | 受入条件 | 次の段階 |
 |---|---|---|---|
 | G0 Parent freeze | 現行親R/D/P、三Issue draft、契約、原因別register、E384-DEC-004 | 同一候補の独立review pass、P0/P1=0、親の未決判断0。clean pushed tipのfreeze receiptと4 Issue body projection readback | #392は正式start済み。改訂候補の受理後、Issue Plan §2.1から既存candidateを再開 |
-| G1 #392 | G0受入済み、#387完了、Option 1とP392 ADR、改訂Issue R/D/P | Issue Plan §2.1から既存candidateを再開し、不要なtestだけを削除して影響gateを再検証する。#395所有baselineは変更・抑止しない。全gateを実行し、current full verifierのviolationが#395 register rowsだけであることを証明する。Strict code review／Final Quality Gate後に人間がmergeし、P392として記録する。P392はB1ではない。 | #395はP392 exact tipから詳細化・独立review・実装。 |
-| G2 #395 | human-merged P392、同一exact tip、15/14/1と243の継続、#392所有gate pass | 14 active rowsをcause-appropriate repairでterminalizeする。skip/xfailやpolicy変更は禁止。人間merge後の同一exact tipでB1（全current gates GREEN）、続けてB2（15/0/15）を検証する。 | B1/B2成立後に#392/#395を受入し、#396へ進む。 |
+| G1 #392 | G0受入済み、#387完了、Option 1とP392 ADR、改訂Issue R/D/P | Issue Plan §2.1から限定再開し、不要なtestだけを削除して影響gateを再検証する。#395所有baselineは変更・抑止しない。merge前の#392所有gate／required checksとStrict review／Final Quality Gateを満たして人間mergeした後、§3.1に従ってmerge SHA上のfresh P392 receiptを記録する。P392はB1・#392 closureではない。 | P392 receipt後に、#392をOPENのまま#395をexact tipから詳細化・正式startする。 |
+| G2 #395 | §3.1のexact P392 witness、15/14/1・243・policy不変、#392所有gate pass、明示的なユーザーstart依頼 | 14 active rowsをcause-appropriate repairでterminalizeする。skip/xfailやpolicy変更は禁止。人間merge後に一つのexact SHAを固定し、同じSHAでB1（全current gates GREEN）、続けてB2（15/0/15）を検証する。closureと#396へのhandoffは§3.1に従う。`ready=true`だけでは開始しない。 | B1/B2の同一tip証拠後に#392/#395をclosureし、#396へ進む。 |
 | G3 #396 | B2が未達 | 開始しない。regression gate/policyを変更しない | 停止 |
 | G4 Epic main | B3が未達 | Epic merge/closureを行わない | 停止 |
 
 `E384-DEC-001` / `E384-DEC-002` / `E384-DEC-004` はユーザー採用済みで、親の未決判断は0件である。G0は改訂候補の独立review・clean pushed freeze receipt・projection readbackで受理する。Option 1の採用だけでG0や実装開始を完了扱いにしない。
 
+### 3.1 P392から#395へのhandoff
+
+この節は受理済み[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を運用手順にするもので、新しいnon-GREEN例外や#395の依存edgeは追加しない。2026-09-14のreadbackではPR #397がmerge SHA `2d4bc1e50129ae1397324f1e777018d8e3966965`でEpic branchへ統合済みだが、#392はCLOSED、#395はOPEN・未startである。#392 Report §§1–32とPR checksは、それ自体ではこのmerge SHAのP392 receiptにならない。
+
+1. **#392のtracker状態を整合させる。** P392で#392を完了・closeしない。現在CLOSEDのため、GitHubで#392をreopenし、readbackでOPENを確認する。これは受理済みclosure順を保つ状態補正であり、#395のcontent gateやP392 evidenceの代替ではない。P392中に`issue finish`を使わない。
+2. **merged-tip P392 witnessを確定する。** `codex/epic-00384-provider-test-strategy-planning`のHEADとupstreamがともに`2d4bc1e50129ae1397324f1e777018d8e3966965`であることを確認し、そのSHAでP392 ADRの条件をfreshに検証する。current full verifierを同じSHAで実行し、全violationをregister §6.1の#395-owned active rowsへ対応付け、#392-owned failureとunexpected failureが0であることを記録する。併せて#392-owned/required checks、15/14/1、timing 243、required-fast 4、policy不変、lifecycle/protected-data/dogfood evidenceを確認する。Code Review Strict／Final Quality Gate receiptはmerge tree `42d46aa44c51ff2bc1cda62635f75dd08d701933`に適用できるものを確認し、異なるtreeにしか束縛されていなければそのtreeでfreshに取得する。過去candidateの10件などを固定期待値として流用しない。
+3. **P392のbaseを保つ。** #395用branchはこのexact P392 SHAから作る。Epic Planだけの状態更新PRをEpic integration branchへmergeする前に#395 branchを作成し、`issue start`の開始点を移動させない。既存のローカル#395 branchがある場合、SpecDockがそれを再利用する前にP392 baseと既存変更を確認する。不一致・来歴不明なら停止し、reset/deleteで直さない。
+4. **明示依頼の後に#395を正式startする。** `active show`でIssue selectionを確認する。active Issueが#392なら`./spec-dock/scripts/spec-dock issue start iss-00395 -f`を使う。`-f`が迂回するのはunfinished-active-Issue guardだけで、dependency readiness・checkout・active writeの検査は維持される。active Issueがない場合は`./spec-dock/scripts/spec-dock issue start iss-00395`を使い、#392以外のIssueがactiveなら停止して解消する。`active set`はformal startではなく、`ready=true`もP392 witnessやユーザーの開始依頼を代替しない。start直後にbranch、HEAD/base SHA、active Issue #395、Issue状態、未変更Product treeをreadbackする。
+5. **実装開始を別gateに保つ。** #395のformal start後も、implementation-ready R/D/Pとhandoffを具体化し、clean pushed exact SHAへの独立Strict reviewがpassするまでProduct実装を開始しない。formal start、implementation readiness、Product実装許可は別々に判定する。
+6. **B1/B2とIssue closureを同一tipで行う。** #395を人間mergeした後にexact SHAを固定し、B1を確認してから同じSHAでB2を確認する。両方の証拠を揃えた後、非activeの#392は`./spec-dock/scripts/spec-dock close iss-00392`でcloseし、active #395は`./spec-dock/scripts/spec-dock issue finish`でcloseする。両GitHub IssueがCLOSEDでactive pointerが解除されたことを確認し、その後にだけ#396をstartする。#392はB1後、#395はB2後が最早のclosure時点であり、この順序はADRを遅らせるだけで変更しない。
+
 ## 4. 各Issueで繰り返す進め方
 
-1. 受理済みEpic tip、前Issueのmerge/state（#395はP392、#396はB2）、dependency、main driftを確認する。
-2. ユーザーが開始を依頼したら、現行CLIの正式`issue start`で専用branch/activeを選択する。worktreeはユーザーの指定を守る。
+1. 受理済みEpic tip、前Issueのmerge/state（#395は§3.1のP392 witness、#396はB2）、dependency、main driftを確認する。
+2. ユーザーが開始を依頼したら、現行CLIの正式`issue start`で専用branch/activeを選択する。#395のactive guardとexact baseは§3.1を守り、worktreeはユーザーの指定を守る。
 3. 選択したIssueの契約をcurrent treeへ具体化し、R/D/PとIssue専用handoffを作る。調査Issueは作らない。
 4. Blue Teamの必要な分析とRed Teamの独立仕様reviewを分離する。Red Teamは`chatgpt-spec-review-strict`をclean pushed exact SHAに対して実行し、初回fresh、同一目的の修正reviewは同じreviewer sessionを使う。P0/P1=0かつ`review_status=pass`になるまでProduct実装を開始しない。
 5. 実装・そのIssue自身のテスト/保護/回復確認を行い、Epic baseのPRをmerge-readyにする。
-6. 人間merge後のexact integrated tipで、その段階の受入を確認する。P392ではIssueを完了扱いにせず、#392/#395はB1/B2が同じtipで成立後に完了する。
-7. 次Issueは前の受入後にだけ詳細化する。
+6. 人間merge後のexact integrated tipで、その段階の受入を確認する。P392では#392を完了扱いにせず、#392/#395はB1/B2が同じtipで成立した後、§3.1の順でclosureする。
+7. 次Issueは前段階の受入後に詳細化する。#395に限り、受理済みP392 witnessは#392の最終acceptanceではなく、#395の限定handoff入力である。
 
 詳細なfile/symbol/test実装/command sequenceはIssue着手時の計画に置く。親で将来の全micro-stepを固定しない。
 
@@ -78,7 +89,7 @@ repository_evidence:
 
 register §6.1が原因と修復責務の正本である。「全部Product bug」「全部testを直せばよい」のどちらにも決め打ちしない。廃止CLIを復活させず、現行portへtest doubleを追随させ、Product責務混線は本番側で修正する。
 
-P392でhuman-mergedされた#392 exact tipをread-only lifecycle inputにする。14件のnode/signature履歴とaccepted behaviorを保持し、元の振る舞いがnormal passになった証拠でresolvedへ移す。Skip/xfail/approved failure/assertion弱化を認めない。修復途中の部分集合でmerge/完了しない。B1とB2は#395 merge後の同一tipで確認する。
+P392でhuman-mergedされた#392 exact tipをread-only lifecycle inputにする。14件のnode/signature履歴とaccepted behaviorを保持し、元の振る舞いがnormal passになった証拠でresolvedへ移す。Skip/xfail/approved failure/assertion弱化を認めない。修復途中の部分集合でmerge/完了しない。B1/B2およびclosure手順は§3.1に従う。
 
 ## 7. #396 — 最終検証基盤への切替
 
@@ -105,7 +116,7 @@ Dependency/identity不一致、未決判断、P392許容集合外のfailure、B1
 
 ### 9.1 直列実装中の親修正
 
-[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従い、選択済み#392 branchで親修正を行った。CP1–CP4 candidateは存在するが未受入であり、改訂仕様G0が閉じるまで新しいProduct変更は行わない。G0後は#392をP392まで進め、そのexact merged tipで#395を開始する。#395はB1/B2が同一tipで成立するまで受入扱いにしない。
+[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従った親修正と#392のP392 human mergeは完了した。現行のP392 receiptは未確定で、#392のGitHub状態は受理済みclosure順と不整合、#395は未startである。次の作業は§3.1のtracker correctionとexact-tip証拠であり、P392 witnessと明示的なユーザーstart依頼より前に#395 Product変更を行わない。
 
 ## 10. 完了
 
