@@ -81,6 +81,8 @@ def _safe_relative_symlink(target: str) -> None:
 
 
 def _regular_digest(path: str | os.PathLike[str], expected: os.stat_result) -> str:
+    if expected.st_nlink != 1:
+        raise CandidateError("candidate regular file must have exactly one link")
     fd = os.open(path, os.O_RDONLY | getattr(os, "O_CLOEXEC", 0) | getattr(os, "O_NOFOLLOW", 0))
     try:
         opened = os.fstat(fd)
@@ -104,6 +106,7 @@ def _regular_digest(path: str | os.PathLike[str], expected: os.stat_result) -> s
             or closed.st_ino != opened.st_ino
             or closed.st_ctime_ns != opened.st_ctime_ns
             or closed.st_size != opened.st_size
+            or closed.st_nlink != opened.st_nlink
         ):
             raise CandidateError("candidate file changed while reading")
         return digest.hexdigest()
