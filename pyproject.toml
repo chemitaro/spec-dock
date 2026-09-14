@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "spec-dock"
-version = "0.2.3"
+version = "0.2.4"
 description = "Scaffold a spec-driven planning workspace (spec-dock) for coding agents"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -173,6 +173,7 @@ spec_dock = [
   # Hidden subtrees under install_root must be included explicitly.
   "assets/install_root/.agents/**",
   "assets/install_root/.github/**",
+  "assets/spec_dock/system/.runtime/README.md",
   "assets/spec_dock/templates/root/.workbench/README.md",
   "assets/spec_dock/templates/initiative/.workbench/README.md",
   "assets/spec_dock/templates/epic/.workbench/README.md",

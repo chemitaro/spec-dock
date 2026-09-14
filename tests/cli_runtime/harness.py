@@ -328,9 +328,17 @@ class CliRuntimeHarness:
         return (resolved / rel_file).read_text(encoding="utf-8")
 
     def _run_git(self, target: Path, args: list[str], *, check: bool = True) -> subprocess.CompletedProcess[str]:
+        git_env = os.environ.copy()
+        git_env.update({
+            "GIT_AUTHOR_NAME": "test",
+            "GIT_AUTHOR_EMAIL": "test@example.com",
+            "GIT_COMMITTER_NAME": "test",
+            "GIT_COMMITTER_EMAIL": "test@example.com",
+        })
         p = subprocess.run(
             ["git", *args],
             cwd=str(target),
+            env=git_env,
             capture_output=True,
             text=True,
         )

@@ -291,8 +291,8 @@
     <header>
       <h1>Issue #392 固定所有ライフサイクル実装ガイド</h1>
       <p>SpecDock Epic #384の最初の実装単位である「Fixed Ownership Provider Lifecycle Hard Cutover」を、初参加者が実装順・所有境界・復旧・テストgateまで単独で追えるように整理した資料です。</p>
-      <p class="muted small">調査基準: <code>chemitaro/spec-dock</code> / <code>iss-00392-provider-lifecycle-and-regression-gate-hard-cutover</code> / <code>dc638e936e763cc7a6087f258201ed9ed654e7fb</code></p>
-      <div class="callout warning"><strong>実装開始許可はfalseです。</strong> 独立内容reviewと、同内容を含むclean pushed freeze/projectionが完了するまでProduct変更を開始しません。</div>
+      <p class="muted small">確認時点: 2026-09-12 / <code>chemitaro/spec-dock</code> / <code>iss-00392-provider-lifecycle-and-regression-gate-hard-cutover</code> / 文書更新前のHEAD <code>02840e4e46e0db4eef27dbde703ccad167035c91</code></p>
+      <div class="callout warning"><strong>現在位置:</strong> Option 1を採用済みです。CP1〜CP4を含む実装candidateはすでにありますが、Issueとしては未受入です。独立仕様reviewとclean pushed freeze/projectionを含むG0は未完了なので、Productとtestの変更はまだ行いません。G0後はIssue Plan §2.1から再開し、CP1へ戻りません。</div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
     </header>
 
@@ -310,8 +310,9 @@
     <section id="background">
       <h2>背景</h2>
       <p>現行0.2.3は、個々のmanaged file、historical manifest、複数のjournal/retry stateを使ってinstall/update/uninstallを進めています。#392はこれを部分改修せず、管理単位を四つのroot、二つのskill slot、一つのinstallation recordへ縮めます。</p>
-      <p>目的は「更新を常に成功させる」ことではありません。所有権が証明できない物、世代が混じる状態、Gitやfilesystemの実効動作を証明できない状態を、利用者データへ触れる前に停止することです。</p>
+      <p>目的は「更新を常に成功させる」ことではありません。SpecDockの協調command間では固定所有とleaseを守り、通常のI/O failureや中断からWire-defined recoveryを行い、利用者データをopaqueに保護します。</p>
       <div class="callout"><strong>中心原則:</strong> Provider toolingはreplaceable、利用者のspec・Artifact・Workbenchはopaqueに保護、復旧はexact tupleに束縛したforward recoveryです。</div>
+      <div class="callout warning"><strong>保証境界:</strong> 同一EUIDの非協調processによる意図的なfilesystem/Git変更や実行中processへの介入は保証対象外です。owner/mode、lock、inode witness、atomic renameなどは通常の安全確認であり、そのactorに対するcreator-provenanceやnon-interferenceの証明ではありません。特権broker、常駐daemon、独自security layerは追加しません。</div>
     </section>
 
     <section id="terms">
@@ -319,7 +320,7 @@
       <div class="grid">
         <div class="card"><strong>Candidate</strong><p>0.2.4で公開する四rootと二slotのexact content/type/mode集合です。SHA-256 digestで一つの世代を識別します。</p></div>
         <div class="card"><strong>Installation record</strong><p><code>spec-dock/spec-dock.version</code>に置く7-key compact JSONです。ready/incomplete/tooling-absentを公開します。</p></div>
-        <div class="card"><strong>ACTIVE / STAGE / receipt</strong><p>Consumer外のprivate stateです。中断位置とcleanup完了を、repository inodeとeuidへ束縛します。</p></div>
+        <div class="card"><strong>ACTIVE / STAGE / receipt</strong><p>Consumer外のprivate stateです。repository identity（device/inode/EUID）に対応付けます。これは同一EUIDの非協調actorに対する作成者証明ではありません。</p></div>
         <div class="card"><strong>SH / EX lease</strong><p>同じrepository-root inodeに対する共有・排他flockです。通常runtimeはSH、installerと変更先worktreeはEXです。</p></div>
         <div class="card"><strong>Provider closure</strong><p>四root、二slot、record/markerが同じcandidate generationであることを示す集合です。</p></div>
         <div class="card"><strong>B1</strong><p>#392をEpic integration branchへ人間がmergeした後、そのmerged tipで再度GREENを確認した状態です。</p></div>
@@ -389,7 +390,8 @@ installerは再構築・削除・正規化しない
 bytes・type・inodeを保つ
 end note
 note bottom of Private
-repository inode と euid に束縛
+repository identity (device/inode/euid) に対応付け
+同一EUID actorへのprovenance保証ではない
 同じfilesystem・mode 0700
 end note
 @enduml
@@ -537,13 +539,13 @@ end note
       </script>
       <div id="diagram-checkpoints" class="plantuml-diagram">実装checkpoint図を描画しています。</div>
       <details><summary>PlantUMLソースを確認する</summary><pre data-source-copy="source-checkpoints"></pre></details>
-      <table><thead><tr><th>Checkpoint</th><th>最初のRED</th><th>Completion state</th></tr></thead><tbody>
-        <tr><td>CP1</td><td>Wire/candidate/private/native Adapterが未実装</td><td>Pure foundationとgenerated checksがGREEN。Public routeは旧ownerのまま。</td></tr>
-        <tr><td>CP2</td><td>Engine/fault/migration/uninstallが未実装</td><td>新installerがsole owner。Successor GREEN後に旧writer撤去。</td></tr>
-        <tr><td>CP3</td><td>pre-import lease、exec、pinned Git、B coordinationが未実装</td><td>Real process concurrencyとhook handoffがGREEN。</td></tr>
-        <tr><td>CP4</td><td>Package/dogfood/gate inventoryが未整列</td><td>Source・artifacts・dogfood・current gatesが一つのPR candidateとしてGREEN。</td></tr>
+      <table><thead><tr><th>Checkpoint</th><th>主な実装範囲</th><th>現候補の状態</th></tr></thead><tbody>
+        <tr><td>CP1</td><td>Wire/candidate/private/native Adapter</td><td>実装candidateに反映済み。Issue全体は未受入。</td></tr>
+        <tr><td>CP2</td><td>Engine/fault/migration/uninstall</td><td>実装candidateに反映済み。Issue全体は未受入。</td></tr>
+        <tr><td>CP3</td><td>pre-import lease、exec、pinned Git、B coordination</td><td>実装candidateに反映済み。Issue全体は未受入。</td></tr>
+        <tr><td>CP4</td><td>Package/dogfood/gate inventory</td><td>実装candidateに反映済み。Issue全体は未受入。</td></tr>
       </tbody></table>
-      <p>各checkpointは自分のtestを伴いますが、単独mergeableなIssueではありません。Luna Maxには常に次の一packetだけを渡します。</p>
+      <p>これはcandidateが存在することを示すもので、全gateがGREENという意味ではありません。確認と再開位置はIssue Plan §2.1に従います。各checkpointは単独mergeableなIssueではありません。</p>
     </section>
 
     <section id="gates">

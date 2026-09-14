@@ -90,6 +90,39 @@ class TestCliWorktree(CliRuntimeHarness):
         assert item["classification_reason"] == reason, case_label
         assert item["origin"] == "classification_unavailable", case_label
 
+    def test_nonlocking_hook_fd_rejects_replacement_of_locked_worktree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
+            sys_path_inserted = False
+
+            if str(runtime_scripts_dir) not in sys.path:
+                sys.path.insert(0, str(runtime_scripts_dir))
+                sys_path_inserted = True
+            try:
+                from spec_dock_runtime.application import worktree as app_worktree
+            finally:
+                if sys_path_inserted:
+                    sys.path.pop(0)
+
+            worktree_path = Path(tmp) / "worktree"
+            replacement_path = Path(tmp) / "replacement"
+            worktree_path.mkdir()
+            replacement_path.mkdir()
+            target_fd = app_worktree._open_exclusive_worktree(worktree_path)
+            try:
+                worktree_path.rename(Path(tmp) / "worktree.original")
+                replacement_path.rename(worktree_path)
+
+                with pytest.raises(RuntimeError, match="consumer hook binding"):
+                    app_worktree._open_nonlocking_worktree_bound_to_exclusive(
+                        worktree_path,
+                        exclusive_fd=target_fd,
+                    )
+            finally:
+                app_worktree._close_fd(target_fd)
+
     def test_worktree_record_payload_includes_classification_diagnostics(self) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -231,6 +264,235 @@ class TestCliWorktree(CliRuntimeHarness):
             worktree_list = self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert str(expected_path.resolve()) in worktree_list
             assert f"branch refs/heads/{current_branch}-wt1" in worktree_list
+
+    @pytest.mark.parametrize(
+        "failure",
+        [
+            BlockingIOError(11, "worktree target is busy"),
+            RuntimeError("worktree target binding changed"),
+        ],
+        ids=["os-error", "runtime-error"],
+    )
+    def test_worktree_create_reports_post_mkdir_reservation_failure_without_retry(
+        self, monkeypatch, tmp_path: Path, failure: Exception
+    ) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                ports as app_ports,
+                worktree as app_worktree,
+            )
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        central_root = tmp_path / "worktrees"
+        repo_root.mkdir()
+        central_root.mkdir()
+        attempts: list[Path] = []
+
+        class FakeGitGateway:
+            def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                return None
+
+            def current_branch_or_none(self, repo_root_arg):
+                return "main"
+
+            def worktree_list(self, repo_root_arg):
+                return [app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")]
+
+            def local_branch_exists(self, repo_root_arg, branch):
+                return False
+
+            def check_ref_format_branch(self, repo_root_arg, branch):
+                return True
+
+        class FakeEnvironmentGateway:
+            def getenv(self, name):
+                return str(central_root)
+
+        def fail_after_mkdir(path: Path, *, allow_symlink_at=None) -> int:
+            attempts.append(path)
+            path.mkdir()
+            raise failure
+
+        monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
+        monkeypatch.setattr(app_worktree, "_open_created_exclusive_worktree", fail_after_mkdir)
+        ports = app_ports.Ports(
+            node_reader=object(),
+            repo_root=repo_root,
+            git_gateway=FakeGitGateway(),
+            environment_gateway=FakeEnvironmentGateway(),
+        )
+
+        with pytest.raises(RuntimeError, match="reservation failed after candidate creation") as raised:
+            app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(label="demo"), ports)
+
+        assert len(attempts) == 1
+        assert attempts[0].is_dir()
+        assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in str(raised.value)
+
+    def test_worktree_create_reports_materialization_failure_and_partial_payload_without_retry(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                ports as app_ports,
+                worktree as app_worktree,
+            )
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        central_root = tmp_path / "worktrees"
+        repo_root.mkdir()
+        central_root.mkdir()
+        attempts: list[Path] = []
+
+        class FakeGitGateway:
+            def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                return None
+
+            def current_branch_or_none(self, repo_root_arg):
+                return "main"
+
+            def current_head_or_none(self, repo_root_arg):
+                return "abc"
+
+            def worktree_list(self, repo_root_arg):
+                return [app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")]
+
+            def local_branch_exists(self, repo_root_arg, branch):
+                return False
+
+            def check_ref_format_branch(self, repo_root_arg, branch):
+                return True
+
+            def add_worktree_pinned(self, repo_root_arg, *, path, **kwargs):
+                attempts.append(path)
+
+            def materialize_worktree(self, repo_root_arg, *, path, **kwargs):
+                raise RuntimeError("materializer stopped after Git metadata creation")
+
+        class FakeEnvironmentGateway:
+            def getenv(self, name):
+                return str(central_root)
+
+        monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
+        ports = app_ports.Ports(
+            node_reader=object(),
+            repo_root=repo_root,
+            git_gateway=FakeGitGateway(),
+            environment_gateway=FakeEnvironmentGateway(),
+        )
+
+        with pytest.raises(RuntimeError, match="phase=materialization") as raised:
+            app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(label="demo"), ports)
+
+        assert len(attempts) == 1
+        assert attempts[0].is_dir()
+        message = str(raised.value)
+        assert "worktree create failed after target reservation" in message
+        assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in message
+        assert "payload_paths:0/7,entrypoint_exists:False" in message
+
+    def test_worktree_create_reports_git_failure_after_reservation_without_retry(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.application import (
+                contracts as app_contracts,
+                ports as app_ports,
+                worktree as app_worktree,
+            )
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        central_root = tmp_path / "worktrees"
+        repo_root.mkdir()
+        central_root.mkdir()
+        attempts: list[Path] = []
+
+        class FakeGitGateway:
+            def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                return None
+
+            def current_branch_or_none(self, repo_root_arg):
+                return "main"
+
+            def worktree_list(self, repo_root_arg):
+                return [app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")]
+
+            def local_branch_exists(self, repo_root_arg, branch):
+                return False
+
+            def check_ref_format_branch(self, repo_root_arg, branch):
+                return True
+
+            def add_worktree_pinned(self, repo_root_arg, *, path, **kwargs):
+                attempts.append(path)
+                raise subprocess.CalledProcessError(
+                    128,
+                    ["git", "worktree", "add"],
+                    stderr="fatal: a branch named 'main-wt1' already exists",
+                )
+
+        class FakeEnvironmentGateway:
+            def getenv(self, name):
+                return str(central_root)
+
+        monkeypatch.setattr(app_worktree, "_pin_worktree_source", lambda repo_root_arg, ports: "abc")
+        ports = app_ports.Ports(
+            node_reader=object(),
+            repo_root=repo_root,
+            git_gateway=FakeGitGateway(),
+            environment_gateway=FakeEnvironmentGateway(),
+        )
+
+        with pytest.raises(RuntimeError, match="git worktree add failed after target reservation") as raised:
+            app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(label="demo"), ports)
+
+        assert len(attempts) == 1
+        assert attempts[0].is_dir()
+        assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in str(raised.value)
+
+    def test_materializer_rejects_foreign_existing_descendant_directory(self, tmp_path: Path) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+        finally:
+            sys.path.pop(0)
+
+        worktree_path = tmp_path / "worktree"
+        (worktree_path / "spec-dock").mkdir(parents=True)
+        root_fd = os.open(worktree_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            with pytest.raises(RuntimeError, match="foreign directory: spec-dock"):
+                git_cli._open_relative_parent(
+                    root_fd,
+                    ("spec-dock", "docs", "README.md"),
+                    created_directory_witnesses={},
+                )
+            assert not (worktree_path / "spec-dock" / "docs").exists()
+        finally:
+            os.close(root_fd)
 
     def test_worktree_create_retries_collisions_and_accepts_label(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -393,7 +655,7 @@ class TestCliWorktree(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["worktree", "create", "--help"])
 
             assert p.returncode == 0, p.stderr
-            assert "worktree create [-h] [label]" in p.stdout
+            assert "worktree create [-h] [--json] [label]" in p.stdout
             assert "Optional lowercase label" in p.stdout
 
     def test_worktree_remove_help_uses_all_worktree_wording(self) -> None:
@@ -429,66 +691,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert p.returncode == 0, p.stderr
             assert "id=slice branch=feature/base-slice" in p.stdout
 
-    def test_worktree_create_runs_make_init_when_available(self) -> None:
-        if shutil.which("make") is None:
-            pytest.skip("make not available")
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            (target / "Makefile").write_text("init:\n\t@echo initialized > .init-ran\n", encoding="utf-8")
-            self._prepare_git_repo(target)
-
-            p = self._run_runtime_capture(target, ["worktree", "create", "setup"], env=self._worktree_env(central_root))
-
-            worktree_path = central_root / "sample-repo" / "sample-repo-setup"
-            assert p.returncode == 0, p.stderr
-            assert "bootstrap status=succeeded" in p.stdout
-            assert (worktree_path / ".init-ran").read_text(encoding="utf-8").strip() == "initialized"
-
-    def test_worktree_create_keeps_worktree_when_make_init_fails(self) -> None:
-        if shutil.which("make") is None:
-            pytest.skip("make not available")
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            (target / "Makefile").write_text("init:\n\t@exit 7\n", encoding="utf-8")
-            self._prepare_git_repo(target)
-
-            p = self._run_runtime_capture(target, ["worktree", "create", "setup"], env=self._worktree_env(central_root))
-
-            worktree_path = central_root / "sample-repo" / "sample-repo-setup"
-            assert p.returncode == 0, p.stderr
-            assert "bootstrap status=failed" in p.stdout
-            assert "spec-dock: (warn) make init failed:" in p.stderr
-            assert worktree_path.is_dir()
-            current_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
-            assert (
-                f"branch refs/heads/{current_branch}-setup"
-                in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            )
-
-    def test_worktree_create_keeps_worktree_when_make_init_detection_fails(self) -> None:
-        if shutil.which("make") is None:
-            pytest.skip("make not available")
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            (target / "Makefile").write_text("include missing.mk\ninit:\n\t@true\n", encoding="utf-8")
-            self._prepare_git_repo(target)
-
-            p = self._run_runtime_capture(
-                target, ["worktree", "create", "detect"], env=self._worktree_env(central_root)
-            )
-
-            worktree_path = central_root / "sample-repo" / "sample-repo-detect"
-            assert p.returncode == 0, p.stderr
-            assert "bootstrap status=detection_failed" in p.stdout
-            assert "spec-dock: (warn) make init detection failed:" in p.stderr
-            assert worktree_path.is_dir()
-
     def test_worktree_create_fails_from_detached_head(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
@@ -514,7 +716,51 @@ class TestCliWorktree(CliRuntimeHarness):
             p = self._run_runtime_capture(target, ["worktree", "create"], env=self._worktree_env(central_root))
 
             assert p.returncode != 0
-            assert "git failed: git rev-parse --abbrev-ref HEAD" in p.stderr
+            assert "git failed: git status --porcelain" in p.stderr
+
+    def test_materialize_worktree_passes_source_lease_to_read_tree_helper(self, monkeypatch, tmp_path: Path) -> None:
+        runtime_scripts_dir = (
+            Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+        )
+        sys.path.insert(0, str(runtime_scripts_dir))
+        try:
+            from spec_dock_runtime.infra import git_cli
+        finally:
+            sys.path.pop(0)
+
+        repo_root = tmp_path / "repo"
+        worktree_path = tmp_path / "worktree"
+        repo_root.mkdir()
+        worktree_path.mkdir()
+        calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+
+        def run_git_write(*args, **kwargs):
+            calls.append((args, kwargs))
+
+        monkeypatch.setattr(git_cli, "_run_git_write", run_git_write)
+        monkeypatch.setattr(
+            git_cli,
+            "_ls_tree_all",
+            lambda repo_root_arg, pinned_commit: b"100755 blob entrypoint\tspec-dock/scripts/spec-dock\0",
+        )
+
+        target_fd = os.open(worktree_path, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+        try:
+            git_cli.materialize_worktree(
+                repo_root,
+                path=worktree_path,
+                pinned_commit="abc123",
+                source_fd=11,
+                target_fd=target_fd,
+            )
+        finally:
+            os.close(target_fd)
+
+        assert len(calls) == 1
+        _, kwargs = calls[0]
+        assert kwargs["bound_fds"] == (11,)
+        assert kwargs["lease_fd"] == target_fd
+        assert kwargs["cwd_fd"] == target_fd
 
     def test_worktree_create_fails_when_namespace_path_is_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -532,154 +778,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert "SPEC_DOCK_WORKTREE_ROOT" in p.stderr
             assert "artifact_state=path_exists:False,branch_exists:False,record_exists:False" in p.stderr
             assert not (central_root / "sample-repo" / "sample-repo-wt1").exists()
-
-    def test_worktree_create_treats_non_collision_git_add_failure_as_fatal(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.list_calls = 0
-
-                def current_branch_or_none(self, repo_root):
-                    return "main"
-
-                def worktree_list(self, repo_root):
-                    self.list_calls += 1
-                    if self.list_calls == 1:
-                        return [app_contracts.GitWorktreeRecord(path=Path(tmp) / "repo", head="abc", branch="main")]
-                    return [
-                        app_contracts.GitWorktreeRecord(path=Path(tmp) / "repo", head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(
-                            path=Path(tmp) / "central-worktrees" / "repo" / "repo-wt1",
-                            head="abc",
-                            branch="main-wt1",
-                        ),
-                    ]
-
-                def local_branch_exists(self, repo_root, branch):
-                    return False
-
-                def check_ref_format_branch(self, repo_root, branch):
-                    return True
-
-                def add_worktree_with_new_branch(self, repo_root, *, path, branch):
-                    raise RuntimeError(
-                        "git failed: git worktree add\nfatal: cannot lock ref 'refs/heads/main-wt1': Permission denied"
-                    )
-
-            class FakeBootstrapGateway:
-                def run_make_init_if_available(self, worktree_path):
-                    raise AssertionError("bootstrap must not run after git add failure")
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(Path(tmp) / "central-worktrees")
-
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=Path(tmp) / "repo",
-                git_gateway=FakeGitGateway(),
-                bootstrap_gateway=FakeBootstrapGateway(),
-                environment_gateway=FakeEnvironmentGateway(),
-            )
-
-            with pytest.raises(RuntimeError) as raised:
-                app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(), ports)
-
-            message = str(raised.value)
-            assert "non-retryable" in message
-            assert "cannot lock ref" in message
-            assert "artifact_state=path_exists:False,branch_exists:False,record_exists:True" in message
-            assert "exhausted candidate attempts" not in message
-
-    def test_worktree_create_retries_git_add_collision(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.add_calls: list[tuple[Path, str]] = []
-
-                def current_branch_or_none(self, repo_root):
-                    return "main"
-
-                def worktree_list(self, repo_root):
-                    return [app_contracts.GitWorktreeRecord(path=Path(tmp) / "repo", head="abc", branch="main")]
-
-                def local_branch_exists(self, repo_root, branch):
-                    return False
-
-                def check_ref_format_branch(self, repo_root, branch):
-                    return True
-
-                def add_worktree_with_new_branch(self, repo_root, *, path, branch):
-                    self.add_calls.append((path, branch))
-                    if len(self.add_calls) == 1:
-                        raise RuntimeError("git failed: fatal: a branch named 'main-wt1' already exists")
-
-            class FakeBootstrapGateway:
-                def run_make_init_if_available(self, worktree_path):
-                    return app_contracts.BootstrapResult(
-                        status="skipped",
-                        command="make init",
-                        exit_code=None,
-                        warnings=[],
-                    )
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(Path(tmp) / "central-worktrees")
-
-            git_gateway = FakeGitGateway()
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=Path(tmp) / "repo",
-                git_gateway=git_gateway,
-                bootstrap_gateway=FakeBootstrapGateway(),
-                environment_gateway=FakeEnvironmentGateway(),
-            )
-
-            result = app_worktree.worktree_create(app_contracts.WorktreeCreateRequest(), ports)
-
-            assert result.id == "wt2"
-            assert [branch for _, branch in git_gateway.add_calls] == ["main-wt1", "main-wt2"]
-            assert [path for path, _ in git_gateway.add_calls] == [
-                Path(tmp) / "central-worktrees" / "repo" / "repo-wt1",
-                Path(tmp) / "central-worktrees" / "repo" / "repo-wt2",
-            ]
 
     def test_worktree_create_normalizes_container_from_linked_worktree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -951,37 +1049,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert "classification_reason=root_valid" in text_removed.stdout
             assert "remove_blockers=-" in text_removed.stdout
 
-    def test_worktree_remove_untracked_default_removes_directory_and_keeps_branch(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            self._prepare_git_repo(target)
-
-            created = self._run_runtime_capture(
-                target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root)
-            )
-            assert created.returncode == 0, created.stderr
-            worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
-            branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
-            assert branch
-            (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
-
-            removed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "dirty", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            assert removed.returncode == 0, removed.stderr or removed.stdout
-            payload = json.loads(removed.stdout)
-            assert payload["status"] == "ok"
-            assert payload["removed_record"]
-            assert payload["removed_directory"]
-            assert not payload["branch_deleted"]
-            assert not worktree_path.exists()
-            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
-
     def test_worktree_remove_deletes_nonempty_workbench_without_special_blocker(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "sample-repo"
@@ -1017,77 +1084,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert not payload["branch_deleted"]
             assert not worktree_path.exists()
             assert not workbench_file.exists()
-            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
-
-    def test_worktree_remove_tracked_modification_default_removes_directory_and_keeps_branch(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            self._prepare_git_repo(target)
-
-            created = self._run_runtime_capture(
-                target, ["worktree", "create", "modified"], env=self._worktree_env(central_root)
-            )
-            assert created.returncode == 0, created.stderr
-            worktree_path = central_root / "sample-repo" / "sample-repo-modified"
-            branch = self._run_git(
-                target, ["branch", "--list", "*-modified", "--format=%(refname:short)"]
-            ).stdout.strip()
-            assert branch
-            tracked_file = worktree_path / "tracked.txt"
-            tracked_file.write_text("tracked\n", encoding="utf-8")
-            self._run_git(worktree_path, ["add", "tracked.txt"])
-            self._run_git(
-                worktree_path,
-                ["-c", "user.email=test@example.com", "-c", "user.name=test", "commit", "-m", "add tracked"],
-            )
-            tracked_file.write_text("tracked modified\n", encoding="utf-8")
-
-            removed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "modified", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            assert removed.returncode == 0, removed.stderr or removed.stdout
-            payload = json.loads(removed.stdout)
-            assert payload["status"] == "ok"
-            assert payload["removed_record"]
-            assert payload["removed_directory"]
-            assert not payload["branch_deleted"]
-            assert not worktree_path.exists()
-            assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
-            assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
-
-    def test_worktree_remove_force_compatibility_removes_dirty_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp) / "sample-repo"
-            central_root = Path(tmp) / "central-worktrees"
-            target.mkdir()
-            self._prepare_git_repo(target)
-
-            created = self._run_runtime_capture(
-                target, ["worktree", "create", "dirty"], env=self._worktree_env(central_root)
-            )
-            assert created.returncode == 0, created.stderr
-            worktree_path = central_root / "sample-repo" / "sample-repo-dirty"
-            branch = self._run_git(target, ["branch", "--list", "*-dirty", "--format=%(refname:short)"]).stdout.strip()
-            assert branch
-            (worktree_path / "cache.tmp").write_text("dirty\n", encoding="utf-8")
-
-            removed = self._run_runtime_capture(
-                target,
-                ["worktree", "remove", "dirty", "--force", "--json"],
-                env=self._worktree_env(central_root),
-            )
-            assert removed.returncode == 0, removed.stderr or removed.stdout
-            payload = json.loads(removed.stdout)
-            assert payload["status"] == "ok"
-            assert payload["removed_record"]
-            assert payload["removed_directory"]
-            assert not payload["branch_deleted"]
-            assert not worktree_path.exists()
             assert str(worktree_path) not in self._run_git(target, ["worktree", "list", "--porcelain"]).stdout
             assert branch in self._run_git(target, ["branch", "--list", branch]).stdout
 
@@ -1279,276 +1275,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert stable_payload["resolved_target"]["id"] == "dupe"
             assert duplicate.exists()
 
-    def test_worktree_remove_external_paths_are_not_blocked_by_managed_namespace_containment(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            namespace = central_root / "repo"
-            escaped = Path(tmp) / "escaped"
-            repo_root.mkdir()
-            namespace.mkdir(parents=True)
-            escaped.mkdir()
-            if not self._can_create_symlink(Path(tmp)):
-                pytest.skip("symlink unavailable")
-            symlink_path = namespace / "repo-escape"
-            Path(symlink_path).symlink_to(escaped)
-            central_sentinel = central_root / "sentinel"
-            namespace_sentinel = namespace / "sentinel"
-            central_sentinel.write_text("keep\n", encoding="utf-8")
-            namespace_sentinel.write_text("keep\n", encoding="utf-8")
-
-            class FakeGitGateway:
-                def __init__(self, records):
-                    self.records = records
-                    self.remove_calls: list[tuple[Path, bool]] = []
-
-                def worktree_list(self, repo_root_arg):
-                    return self.records
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append((path, force))
-
-            class FakeEnvironmentGateway:
-                def __init__(self, root):
-                    self.root = root
-
-                def getenv(self, name):
-                    return str(self.root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return Path(path).exists() or os.path.lexists(path)
-
-                def remove_target(self, path):
-                    if Path(path) == symlink_path and Path(path).is_symlink():
-                        Path(path).unlink()
-                        return
-                    raise AssertionError(f"remove_target must only be called for the external symlink target: {path}")
-
-            git_gateway = FakeGitGateway([
-                app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                app_contracts.GitWorktreeRecord(path=symlink_path, head="def", branch="main-escape"),
-            ])
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(central_root),
-                filesystem_gateway=FakeFilesystemGateway(),
-            )
-
-            result = app_worktree.worktree_remove(
-                app_contracts.WorktreeRemoveRequest(target=str(symlink_path), force=True),
-                ports,
-            )
-
-            assert result.removed_record
-            assert git_gateway.remove_calls == [(symlink_path, True)]
-            assert not os.path.lexists(symlink_path)
-            assert escaped.exists()
-            assert central_sentinel.exists()
-            assert namespace_sentinel.exists()
-
-            for target, record_path, force in (
-                (str(central_root), central_root, False),
-                (str(central_root), central_root, True),
-                (str(namespace), namespace, False),
-                (str(namespace), namespace, True),
-            ):
-                case_label = f"target={target}, force={force}"
-                git_gateway = FakeGitGateway([
-                    app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                    app_contracts.GitWorktreeRecord(path=record_path, head="def", branch=f"main-{target}"),
-                ])
-                ports = app_ports.Ports(
-                    node_reader=object(),
-                    repo_root=repo_root,
-                    git_gateway=git_gateway,
-                    environment_gateway=FakeEnvironmentGateway(central_root),
-                    filesystem_gateway=FakeFilesystemGateway(),
-                )
-
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target=target, force=force), ports)
-
-                assert raised.value.code == "remove_blocked", case_label
-                assert "protected_cleanup_path" in raised.value.remove_blockers, case_label
-                assert git_gateway.remove_calls == [], case_label
-                assert record_path.exists(), case_label
-                assert central_sentinel.exists(), case_label
-                assert namespace_sentinel.exists(), case_label
-
-            ancestor_worktree = Path(tmp) / "ancestor-worktree"
-            nested_central_root = ancestor_worktree / "worktrees"
-            nested_namespace = nested_central_root / "repo"
-            ancestor_worktree.mkdir()
-            nested_namespace.mkdir(parents=True)
-            nested_sentinel = nested_namespace / "sentinel"
-            nested_sentinel.write_text("keep\n", encoding="utf-8")
-            git_gateway = FakeGitGateway([
-                app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                app_contracts.GitWorktreeRecord(path=ancestor_worktree, head="def", branch="main-ancestor"),
-            ])
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(nested_central_root),
-                filesystem_gateway=FakeFilesystemGateway(),
-            )
-
-            for force in (False, True):
-                case_label = f"ancestor_force={force}"
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(
-                        app_contracts.WorktreeRemoveRequest(target=str(ancestor_worktree), force=force),
-                        ports,
-                    )
-
-                assert raised.value.code == "remove_blocked", case_label
-                assert "protected_cleanup_path" in raised.value.remove_blockers, case_label
-                assert git_gateway.remove_calls == [], case_label
-                assert nested_sentinel.exists(), case_label
-
-            symlink_root = Path(tmp) / "central-with-symlink-namespace"
-            symlink_root.mkdir()
-            namespace_symlink = symlink_root / "repo"
-            Path(namespace_symlink).symlink_to(escaped)
-            namespace_symlink_record = namespace_symlink / "repo-linked"
-            namespace_symlink_record.touch()
-            git_gateway = FakeGitGateway([
-                app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                app_contracts.GitWorktreeRecord(path=namespace_symlink_record, head="def", branch="main-linked"),
-            ])
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(symlink_root),
-                filesystem_gateway=FakeFilesystemGateway(),
-            )
-
-            for force in (False, True):
-                case_label = f"namespace_symlink_force={force}"
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(
-                        app_contracts.WorktreeRemoveRequest(target=str(namespace_symlink_record), force=force),
-                        ports,
-                    )
-
-                assert raised.value.code == "remove_blocked", case_label
-                assert "protected_cleanup_path" in raised.value.remove_blockers, case_label
-                assert git_gateway.remove_calls == [], case_label
-                assert namespace_symlink_record.exists(), case_label
-
-    def test_worktree_remove_cleans_leftover_directory_and_reports_cleanup_failure(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            worktree_path = central_root / "repo" / "repo-leftover"
-            repo_root.mkdir()
-            worktree_path.mkdir(parents=True)
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[tuple[Path, bool]] = []
-
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append((path, force))
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FakeFilesystemGateway:
-                def __init__(self, *, fail: bool = False) -> None:
-                    self.fail = fail
-                    self.remove_calls: list[Path] = []
-
-                def path_exists(self, path):
-                    return True
-
-                def remove_target(self, path):
-                    self.remove_calls.append(path)
-                    if self.fail:
-                        raise RuntimeError("cleanup denied")
-
-            filesystem_gateway = FakeFilesystemGateway()
-            git_gateway = FakeGitGateway()
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=filesystem_gateway,
-            )
-
-            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
-
-            assert result.removed_record
-            assert result.removed_directory
-            assert git_gateway.remove_calls == [(worktree_path, True)]
-            assert filesystem_gateway.remove_calls == [worktree_path]
-
-            failing_fs = FakeFilesystemGateway(fail=True)
-            failing_ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=FakeGitGateway(),
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=failing_fs,
-            )
-
-            with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), failing_ports)
-
-            assert raised.value.code == "post_remove_cleanup_failed"
-            assert raised.value.removed_record
-            assert not raised.value.removed_directory
-            assert failing_fs.remove_calls == [worktree_path]
-
     def test_worktree_remove_git_failure_does_not_cleanup_target(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime_scripts_dir = (
@@ -1585,7 +1311,10 @@ class TestCliWorktree(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
                     ]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append((path, force))
                     raise RuntimeError("git refused")
 
@@ -1593,27 +1322,19 @@ class TestCliWorktree(CliRuntimeHarness):
                 def getenv(self, name):
                     return str(central_root)
 
-            class CleanupMustNotRun:
-                def path_exists(self, path):
-                    raise AssertionError("cleanup existence check must not be called")
-
-                def remove_target(self, path):
-                    raise AssertionError("cleanup must not be called")
-
             git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
                 node_reader=object(),
                 repo_root=repo_root,
                 git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=CleanupMustNotRun(),
             )
 
             with pytest.raises(app_contracts.WorktreeCommandError) as raised:
                 app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
 
             assert raised.value.code == "git_worktree_remove_failed"
-            assert git_gateway.remove_calls == [(worktree_path, True)]
+            assert git_gateway.remove_calls == [(worktree_path, False)]
 
     def test_worktree_remove_locked_default_uses_force_equivalent_git_call(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1653,19 +1374,16 @@ class TestCliWorktree(CliRuntimeHarness):
                         ),
                     ]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append((path, force))
+                    worktree_path.rmdir()
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return False
-
-                def remove_target(self, path):
-                    raise AssertionError("cleanup should not run when path is already gone")
 
             git_gateway = FakeGitGateway()
             ports = app_ports.Ports(
@@ -1673,7 +1391,6 @@ class TestCliWorktree(CliRuntimeHarness):
                 repo_root=repo_root,
                 git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=FakeFilesystemGateway(),
             )
 
             result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="locked"), ports)
@@ -1682,255 +1399,6 @@ class TestCliWorktree(CliRuntimeHarness):
             assert result.resolved_target.removable
             assert result.resolved_target.remove_blockers == []
             assert git_gateway.remove_calls == [(worktree_path, True)]
-
-    def test_worktree_remove_uses_target_only_cleanup_for_remaining_directory(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            namespace = central_root / "repo"
-            worktree_path = namespace / "repo-leftover"
-            repo_root.mkdir()
-            worktree_path.mkdir(parents=True)
-            parent_sentinel = worktree_path.parent / "parent-sentinel"
-            root_sentinel = central_root / "root-sentinel"
-            namespace_sentinel = namespace / "namespace-sentinel"
-            for sentinel in (parent_sentinel, root_sentinel, namespace_sentinel):
-                sentinel.write_text("keep\n", encoding="utf-8")
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[tuple[Path, bool]] = []
-
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append((path, force))
-                    return None
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FakeFilesystemGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[Path] = []
-
-                def path_exists(self, path):
-                    return True
-
-                def remove_target(self, path):
-                    self.remove_calls.append(path)
-                    shutil.rmtree(path)
-
-            filesystem_gateway = FakeFilesystemGateway()
-            git_gateway = FakeGitGateway()
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=filesystem_gateway,
-            )
-
-            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
-
-            assert result.removed_record
-            assert result.removed_directory
-            assert git_gateway.remove_calls == [(worktree_path, True)]
-            assert filesystem_gateway.remove_calls == [worktree_path]
-            assert not worktree_path.exists()
-            for sentinel in (parent_sentinel, root_sentinel, namespace_sentinel):
-                assert sentinel.exists(), f"sentinel={sentinel.name}"
-
-    def test_worktree_remove_reports_target_cleanup_failures(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            worktree_path = central_root / "repo" / "repo-leftover"
-            repo_root.mkdir()
-            worktree_path.mkdir(parents=True)
-
-            class FakeGitGateway:
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="main-leftover"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    return None
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FailingFilesystemGateway:
-                def __init__(self, mode):
-                    self.mode = mode
-
-                def path_exists(self, path):
-                    if self.mode == "lstat":
-                        raise RuntimeError("failed to inspect target path")
-                    return True
-
-                def remove_target(self, path):
-                    messages = {
-                        "unsupported": "unsupported target path type",
-                        "unlink": "failed to remove target path",
-                        "rmtree": "failed to remove directory tree",
-                        "race": "failed to inspect target path",
-                    }
-                    raise RuntimeError(messages[self.mode])
-
-            for mode in ("unsupported", "lstat", "unlink", "rmtree", "race"):
-                case_label = f"cleanup_mode={mode}"
-                ports = app_ports.Ports(
-                    node_reader=object(),
-                    repo_root=repo_root,
-                    git_gateway=FakeGitGateway(),
-                    environment_gateway=FakeEnvironmentGateway(),
-                    filesystem_gateway=FailingFilesystemGateway(mode),
-                )
-
-                with pytest.raises(app_contracts.WorktreeCommandError) as raised:
-                    app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="leftover"), ports)
-
-                assert raised.value.code == "post_remove_cleanup_failed", case_label
-                assert raised.value.removed_record, case_label
-                assert not raised.value.removed_directory, case_label
-
-    def test_fs_remove_target_unlinks_symlink_broken_symlink_and_regular_file(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            if not self._can_create_symlink(Path(tmp)):
-                pytest.skip("symlink unavailable")
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.infra import fs_cli
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            base = Path(tmp)
-            target_dir = base / "target-dir"
-            target_dir.mkdir()
-            target_sentinel = target_dir / "sentinel"
-            target_sentinel.write_text("keep\n", encoding="utf-8")
-            symlink_path = base / "target-link"
-            Path(symlink_path).symlink_to(target_dir)
-            broken_symlink = base / "broken-link"
-            Path(broken_symlink).symlink_to(base / "missing-target")
-            regular_file = base / "target-file"
-            regular_file.write_text("remove\n", encoding="utf-8")
-
-            assert fs_cli.path_exists(symlink_path)
-            assert fs_cli.path_exists(broken_symlink)
-            assert fs_cli.path_exists(regular_file)
-
-            fs_cli.remove_target(symlink_path)
-            fs_cli.remove_target(broken_symlink)
-            fs_cli.remove_target(regular_file)
-
-            assert not os.path.lexists(symlink_path)
-            assert not os.path.lexists(broken_symlink)
-            assert not regular_file.exists()
-            assert target_sentinel.exists()
-
-    def test_fs_remove_target_reports_lstat_unlink_rmtree_and_unsupported_failures(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.infra import fs_cli
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            base = Path(tmp)
-            with pytest.raises(RuntimeError) as missing:
-                fs_cli.remove_target(base / "missing")
-            assert "failed to inspect target path" in str(missing.value)
-
-            regular_file = base / "target-file"
-            regular_file.write_text("remove\n", encoding="utf-8")
-            with (
-                _patch_object(Path, "unlink", side_effect=OSError("denied")),
-                pytest.raises(RuntimeError) as unlink_failed,
-            ):
-                fs_cli.remove_target(regular_file)
-            assert "failed to remove target path" in str(unlink_failed.value)
-
-            target_dir = base / "target-dir"
-            target_dir.mkdir()
-            with (
-                _patch_object(fs_cli.shutil, "rmtree", side_effect=OSError("denied")),
-                pytest.raises(RuntimeError) as rmtree_failed,
-            ):
-                fs_cli.remove_target(target_dir)
-            assert "failed to remove directory tree" in str(rmtree_failed.value)
-
-            if not hasattr(os, "mkfifo"):
-                pytest.skip("mkfifo unavailable")
-            fifo_path = base / "target-fifo"
-            os.mkfifo(fifo_path)
-            try:
-                with pytest.raises(RuntimeError) as unsupported:
-                    fs_cli.remove_target(fifo_path)
-            finally:
-                fifo_path.unlink(missing_ok=True)
-            assert "unsupported target path type" in str(unsupported.value)
 
     def test_worktree_remove_ambiguous_basename_stops_before_git_remove(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1961,19 +1429,16 @@ class TestCliWorktree(CliRuntimeHarness):
                 def __init__(self) -> None:
                     self.remove_calls: list[Path] = []
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(Path(tmp) / "central")
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return True
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             inventory = [
                 app_contracts.WorktreeRecordView(
@@ -2011,7 +1476,6 @@ class TestCliWorktree(CliRuntimeHarness):
                 repo_root=repo_root,
                 git_gateway=git_gateway,
                 environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=FakeFilesystemGateway(),
             )
 
             with (
@@ -2153,19 +1617,16 @@ class TestCliWorktree(CliRuntimeHarness):
                     ]
                     return initial_records if self.calls == 1 else self.refreshed_records
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return Path(path).exists()
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
             cases = (
@@ -2197,7 +1658,6 @@ class TestCliWorktree(CliRuntimeHarness):
                     repo_root=repo_root,
                     git_gateway=git_gateway,
                     environment_gateway=FakeEnvironmentGateway(),
-                    filesystem_gateway=FakeFilesystemGateway(),
                 )
 
                 with pytest.raises(app_contracts.WorktreeCommandError) as raised:
@@ -2210,6 +1670,150 @@ class TestCliWorktree(CliRuntimeHarness):
                 if expected_blocker is not None:
                     assert expected_blocker in raised.value.remove_blockers, case_label
                 assert git_gateway.remove_calls == [], case_label
+
+    def test_worktree_remove_revalidates_record_after_exclusive_open(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
+            sys.path.insert(0, str(runtime_scripts_dir))
+            try:
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
+            finally:
+                sys.path.pop(0)
+
+            root = Path(tmp)
+            repo_root = root / "repo"
+            central_root = root / "central"
+            worktree_path = central_root / "repo" / "repo-managed"
+            replacement = root / "manual" / "repo-managed"
+            repo_root.mkdir()
+            worktree_path.mkdir(parents=True)
+            replacement.parent.mkdir()
+            replacement.mkdir()
+
+            main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
+            stable_record = app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="managed")
+            replacement_record = app_contracts.GitWorktreeRecord(
+                path=replacement,
+                head="def",
+                branch="managed",
+            )
+
+            class FakeGitGateway:
+                def __init__(self) -> None:
+                    self.calls = 0
+                    self.remove_calls: list[Path] = []
+
+                def worktree_list(self, repo_root_arg):
+                    self.calls += 1
+                    record = stable_record if self.calls < 3 else replacement_record
+                    return [main_record, record]
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                    self.remove_calls.append(path)
+
+            class FakeEnvironmentGateway:
+                def getenv(self, name):
+                    return str(central_root)
+
+            git_gateway = FakeGitGateway()
+            ports = app_ports.Ports(
+                node_reader=object(),
+                repo_root=repo_root,
+                git_gateway=git_gateway,
+                environment_gateway=FakeEnvironmentGateway(),
+            )
+
+            with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                app_worktree.worktree_remove(
+                    app_contracts.WorktreeRemoveRequest(target="repo-managed", force=True),
+                    ports,
+                )
+
+            assert raised.value.code == "remove_blocked"
+            assert raised.value.remove_blockers == ["record_missing"]
+            assert git_gateway.calls == 3
+            assert git_gateway.remove_calls == []
+            assert worktree_path.is_dir()
+
+    def test_worktree_remove_rejects_same_path_inode_change_after_exclusive_open(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime_scripts_dir = (
+                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
+            )
+            sys.path.insert(0, str(runtime_scripts_dir))
+            try:
+                from spec_dock_runtime.application import (
+                    contracts as app_contracts,
+                    ports as app_ports,
+                    worktree as app_worktree,
+                )
+            finally:
+                sys.path.pop(0)
+
+            root = Path(tmp)
+            repo_root = root / "repo"
+            central_root = root / "central"
+            worktree_path = central_root / "repo" / "repo-managed"
+            original = central_root / "repo" / "repo-managed-original"
+            repo_root.mkdir()
+            worktree_path.mkdir(parents=True)
+
+            main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
+            managed_record = app_contracts.GitWorktreeRecord(path=worktree_path, head="def", branch="managed")
+
+            class FakeGitGateway:
+                def __init__(self) -> None:
+                    self.calls = 0
+                    self.remove_calls: list[Path] = []
+
+                def worktree_list(self, repo_root_arg):
+                    self.calls += 1
+                    if self.calls == 3:
+                        worktree_path.rename(original)
+                        worktree_path.mkdir()
+                    return [main_record, managed_record]
+
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                    self.remove_calls.append(path)
+
+            class FakeEnvironmentGateway:
+                def getenv(self, name):
+                    return str(central_root)
+
+            git_gateway = FakeGitGateway()
+            ports = app_ports.Ports(
+                node_reader=object(),
+                repo_root=repo_root,
+                git_gateway=git_gateway,
+                environment_gateway=FakeEnvironmentGateway(),
+            )
+
+            with pytest.raises(app_contracts.WorktreeCommandError) as raised:
+                app_worktree.worktree_remove(
+                    app_contracts.WorktreeRemoveRequest(target="repo-managed", force=True),
+                    ports,
+                )
+
+            error = raised.value
+            assert error.code == "post_remove_cleanup_failed"
+            assert error.removed_record is False
+            assert error.removed_directory is False
+            assert git_gateway.calls == 3
+            assert git_gateway.remove_calls == []
+            assert worktree_path.is_dir()
+            assert original.is_dir()
 
     def test_worktree_remove_hard_blockers_stop_before_git_remove_even_with_force(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2253,19 +1857,16 @@ class TestCliWorktree(CliRuntimeHarness):
                     self.calls += 1
                     return self.records_by_call[index]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def getenv(self, name):
                     return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return Path(path).exists()
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             main_record = app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main")
             cases = (
@@ -2308,7 +1909,6 @@ class TestCliWorktree(CliRuntimeHarness):
                         repo_root=repo_for_case,
                         git_gateway=git_gateway,
                         environment_gateway=FakeEnvironmentGateway(),
-                        filesystem_gateway=FakeFilesystemGateway(),
                     )
 
                     with pytest.raises(app_contracts.WorktreeCommandError) as raised:
@@ -2320,77 +1920,6 @@ class TestCliWorktree(CliRuntimeHarness):
                     assert raised.value.code == "remove_blocked", case_label
                     assert expected_blocker in raised.value.remove_blockers, case_label
                     assert git_gateway.remove_calls == [], case_label
-
-    def test_worktree_remove_treats_broken_symlink_target_as_existing(self) -> None:
-        with tempfile.TemporaryDirectory() as tmp:
-            if not self._can_create_symlink(Path(tmp)):
-                pytest.skip("symlink unavailable")
-            runtime_scripts_dir = (
-                Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-            )
-            sys_path_inserted = False
-
-            if str(runtime_scripts_dir) not in sys.path:
-                sys.path.insert(0, str(runtime_scripts_dir))
-                sys_path_inserted = True
-            try:
-                from spec_dock_runtime.application import (
-                    contracts as app_contracts,
-                    ports as app_ports,
-                    worktree as app_worktree,
-                )
-            finally:
-                if sys_path_inserted:
-                    sys.path.pop(0)
-
-            repo_root = Path(tmp) / "repo"
-            central_root = Path(tmp) / "central"
-            namespace = central_root / "repo"
-            repo_root.mkdir()
-            namespace.mkdir(parents=True)
-            broken = namespace / "repo-broken"
-            Path(broken).symlink_to(Path(tmp) / "missing-target")
-
-            class FakeGitGateway:
-                def __init__(self) -> None:
-                    self.remove_calls: list[Path] = []
-
-                def worktree_list(self, repo_root_arg):
-                    return [
-                        app_contracts.GitWorktreeRecord(path=repo_root, head="abc", branch="main"),
-                        app_contracts.GitWorktreeRecord(path=broken, head="def", branch="main-broken"),
-                    ]
-
-                def remove_worktree(self, repo_root_arg, *, path, force):
-                    self.remove_calls.append(path)
-
-            class FakeEnvironmentGateway:
-                def getenv(self, name):
-                    return str(central_root)
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return os.path.lexists(path)
-
-                def remove_target(self, path):
-                    Path(path).unlink()
-
-            git_gateway = FakeGitGateway()
-            ports = app_ports.Ports(
-                node_reader=object(),
-                repo_root=repo_root,
-                git_gateway=git_gateway,
-                environment_gateway=FakeEnvironmentGateway(),
-                filesystem_gateway=FakeFilesystemGateway(),
-            )
-
-            result = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target=str(broken)), ports)
-
-            assert result.removed_record
-            assert result.resolved_target.path_exists
-            assert result.resolved_target.remove_blockers == []
-            assert git_gateway.remove_calls == [broken]
-            assert not os.path.lexists(broken)
 
     def test_worktree_invalid_root_reads_git_records_before_classification(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -2431,8 +1960,12 @@ class TestCliWorktree(CliRuntimeHarness):
                         app_contracts.GitWorktreeRecord(path=manual, head="def", branch="manual"),
                     ]
 
-                def remove_worktree(self, repo_root_arg, *, path, force):
+                def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
+                    return None
+
+                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
                     self.remove_calls.append(path)
+                    shutil.rmtree(path)
 
             class FakeEnvironmentGateway:
                 def __init__(self, value) -> None:
@@ -2440,13 +1973,6 @@ class TestCliWorktree(CliRuntimeHarness):
 
                 def getenv(self, name):
                     return self.value
-
-            class FakeFilesystemGateway:
-                def path_exists(self, path):
-                    return False
-
-                def remove_target(self, path):
-                    raise AssertionError("remove_target must not be called")
 
             cases = (
                 (None, "root_missing"),
@@ -2456,20 +1982,20 @@ class TestCliWorktree(CliRuntimeHarness):
             )
             for value, expected_reason in cases:
                 case_label = f"root_value={value!r}"
+                manual.mkdir(exist_ok=True)
                 git_gateway = FakeGitGateway()
                 ports = app_ports.Ports(
                     node_reader=object(),
                     repo_root=repo_root,
                     git_gateway=git_gateway,
                     environment_gateway=FakeEnvironmentGateway(value),
-                    filesystem_gateway=FakeFilesystemGateway(),
                 )
 
                 listed = app_worktree.worktree_list(app_contracts.WorktreeListRequest(), ports)
                 shown = app_worktree.worktree_show(app_contracts.WorktreeShowRequest(target="manual"), ports)
                 removed = app_worktree.worktree_remove(app_contracts.WorktreeRemoveRequest(target="manual"), ports)
 
-                assert git_gateway.calls == 4, case_label
+                assert git_gateway.calls == 5, case_label
                 assert git_gateway.remove_calls == [manual], case_label
                 for worktree in listed.worktrees:
                     assert not worktree.managed, case_label

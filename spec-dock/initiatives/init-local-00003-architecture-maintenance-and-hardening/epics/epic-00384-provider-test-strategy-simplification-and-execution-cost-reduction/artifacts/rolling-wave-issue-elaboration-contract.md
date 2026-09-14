@@ -3,7 +3,7 @@
 ID: "epic-00384-rolling-wave-issue-elaboration-contract-v1"
 タイトル: "Rolling-Wave Issue Elaboration Contract"
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-12"
 対象: ["epic-00384", "iss-00392", "iss-00395", "iss-00396"]
 repository_evidence:
   role: "authoring-source-provenance"
@@ -17,13 +17,13 @@ repository_evidence:
 
 ## 1. Purpose
 
-Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Parent G0、dependency evidence and an explicit user start request permit formal `issue start` to select the Issue branch/active scope. Detailed R/D/P and handoff are then authored on that branch against the accepted integration tip; independent acceptance is required before Product implementation. Use a new worktree or an existing worktree explicitly selected by the user. The user requested parent commit/push followed by #392 formal start on 2026-09-08; this proceeds only after G0. Product implementation remains outside this task.
+Current Issue R/D/P define stable acceptance contracts only. They intentionally omit implementation file lists、symbols、test code、exact commands and ordered implementation steps. Parent G0、dependency evidence and an explicit user start request permit formal `issue start` to select the Issue branch/active scope. Detailed R/D/P and handoff are then authored on that branch against the accepted integration tip; independent acceptance is required before Product implementation. Use a new worktree or an existing worktree explicitly selected by the user. The user requested parent commit/push followed by #392 formal start on 2026-09-08; this proceeds only after G0. Product implementation remains outside this task. The accepted [P392 ADR](20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md) governs the later #392→#395 transition.
 
 ## 2. Immutable parent inputs
 
 Elaboration may not change:
 
-- Issue count、IDs、GitHub numbers、dependency direction;
+- Issue count、IDs、GitHub numbers、delivery order #392→#395→#396;
 - integration branch and human merge topology;
 - stable cross-Issue contracts E384-C-001〜C-012 and parent `E384-QUAL-001`;
 - lifecycle wire values and #392 sole-writer/read-only rule;
@@ -31,6 +31,8 @@ Elaboration may not change:
 - current-policy-through-#395 and consumer-first-#396 rule;
 - protected data、compatibility、rollback、recovery and GREEN definitions;
 - no-extra-Issue and human-only settings/merge rule。
+
+The close-based SpecDock metadata edge from #395 to #392 is intentionally absent because #392 remains unaccepted at P392. The #392→#395 order is enforced by #395's exact P392 merged-tip entry gate; #396 retains its #395 dependency. This changes readiness representation, not delivery order or lifecycle ownership.
 
 A required change to any item is a parent stop, not an elaboration choice。
 
@@ -42,8 +44,8 @@ Before formal Issue start:
 
 1. Resolve exact current integration branch tip and tree。
 2. Require accepted parent G0 with `owner_decisions_required=[]`. For #392, require external `PARENT_FREEZE_SHA` receipt for that accepted parent tip and readback receipts for the post-pass GitHub #384/#392/#395/#396 body projections。
-3. Verify predecessor Issue merged and accepted, or #387 completed for #392。
-4. Verify current state B0/B1/B2 as applicable is GREEN。
+3. Verify predecessor evidence: #387 is complete for #392; #395 requires the exact human-merged P392 tip; #396 requires accepted B2。
+4. Verify the applicable state. P392 is the sole permitted non-GREEN pre-B1 state and is valid for #395 only when all full-verifier violations at that exact SHA are exclusively measured #395-owned active rows. B1 and B2 are GREEN checks on the same post-#395 tip。
 5. Verify Issue metadata ID、GitHub number and `depends_on` relation。
 6. Verify no other Issue writer is active。
 7. Compare main drift and classify overlap。
@@ -62,7 +64,7 @@ Before Product implementation, the elaboration pack must produce implementation-
 - component and symbol responsibilities;
 - stable input/output schemas and compatibility points;
 - for #392, resolved legacy admission, shared runtime/lifecycle coordination, wrapper handoff and interruption/concurrency evidence under E384-RQ-019;
-- for #395, the register §6.1 cause-specific repair map, including faithful harness repairs and guarded Product boundaries;
+- for #395, the exact P392 input SHA, measured row/signature set still failing there, and register §6.1 cause-specific repair map, including faithful harness repairs and guarded Product boundaries;
 - for #396, exact measurement/evidence implementation and boundary tests that mechanically realize `E384-QUAL-001` without duplicating its policy values, including one role graph per attempt, shared five-run/twenty-window observations and environment capability proof;
 - first RED and representative failure evidence;
 - complete test ownership and exact test cases;
@@ -76,11 +78,14 @@ Before Product implementation, the elaboration pack must produce implementation-
 
 ## 5. Independent review — current authorized route
 
-2026-09-08のユーザー指示により、外部ChatGPT Useが機能しない状況での現在のreview経路は、独立したGPT-6（`gpt-6-astra`）・推論Maxのサブエージェントである。親／Issue draft中の「Strict review」「same-reviewer pass」は、現在の運用では本節の独立性・候補固定・再レビュー条件を満たすreviewを指す。外部ChatGPT Strictを実行したとは主張しない。過去の外部Strict passはその過去SHAだけの証拠として保持する。
+2026-09-12、ユーザーはChatGPT Use系のStrict skill／scriptを再び利用可能とし、authoring・analysisとindependent reviewを別セッションで進めるよう指示しました。この現在の運用は2026-09-08の一時的なGPT-6 subagent routeを置き換えます。過去のreview receiptは記録されたSHAにだけ有効で、現在候補へ流用しません。
 
-- 一つのreview周期の初回はfresh reviewerを使う。修正後は同じreviewerを再利用する。
+- Blue Teamは必要に応じて`chatgpt-use-strict`または`chatgpt-implementation-brief-strict`で候補を分析し、canonical local evidenceへ照合します。これらの出力は助言であり、仕様authorityを置き換えません。
+- Red Teamの仕様reviewは`chatgpt-spec-review-strict`、実装後のcode reviewは`chatgpt-code-review-strict`、実装完了後の最終gateは`chatgpt-final-quality-gate-strict-v2`を使います。Final Quality GateはProで実行します。
+- Authoring/analysisとindependent reviewは別のChatGPT browser sessionとし、初回reviewはfresh sessionを使う。修正後の同一目的reviewは、Strict skillが要求する同一reviewer sessionを再利用する。
+- Strict invocationごとに、clean worktree、configured GitHub upstreamとのexact full-SHA一致、およびGitHub connectorによる同じrepository/branch/SHAを確認します。条件を満たさない場合はreviewを開始せず、非Strict経路へfallbackしません。
+- ユーザーはsubagentを極力使わないよう指示しています。現行routeは独立ChatGPT sessionであり、local subagentへの代替は行いません。
 - 主担当がauthoringと指摘の採否を担当し、reviewerはread-onlyで独立に判断する。主担当自身のself-reviewだけでacceptしない。
-- Luna Maxは将来の実装担当である。このEpicのreviewerはGPT-6 Maxとする。
 - Reviewはexact base SHA/treeと候補のfile/diff identityへ束縛する。Working-tree review後にcommitする場合、review済み内容との一致を確認し、最終clean pushed tipのreceiptをtracked tree外へ記録する。後続の仕様変更を過去passで認証しない。
 - 要件・設計・責務境界・安全な中間状態・testability・互換性・recovery・evidence identity・human gateを確認する。`P0/P1=0` かつ `review_status=pass` がacceptance条件である。
 - Epicでは親契約とIssue draft境界をreviewする。まだ存在しないIssue詳細実装手順の欠如は、それ自体をEpicの欠陥としない。
@@ -96,7 +101,7 @@ The elaborator may choose exact implementation files、symbols、helper decompos
 Return to the parent owner without formal start if not yet active, or without Product implementation if already active, when:
 
 - dependency or branch-tip evidence differs;
-- current branch is not GREEN;
+- current branch fails its applicable state contract. For #395 only, P392's exact permitted #395-owned baseline mismatches are allowed; any additional failure blocks elaboration/implementation. B1/B2 must be GREEN before #396;
 - stable contract, including `E384-QUAL-001`, cannot be implemented without semantic change or duplicate policy authority;
 - required behavior crosses another Issue boundary;
 - an active baseline identity changed unexpectedly;
@@ -109,6 +114,6 @@ The return payload identifies exact contract ID、expected/actual evidence、sco
 
 ## 8. Current status
 
-The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies the 2026-09-08 whole-plan changes. #392は正式start済みで、v12親修正と詳細化を進めている。#395/#396はcontract-level draftのまま。Issue内容のreadiness reviewと公開freezeを別々に確認する。 Both E384-DEC-001/002 were adopted by the user. G0 still requires the exact candidate review/publication receipts. The explicit request to start #392 has been executed in this same worktree; continue elaboration and independent implementation-readiness review without repeating scope selection.
+The 2026-09-02 parent candidate `1429c2f899c6d2086d5bd03c0dcea01f5b168435` passed external review; the later narrow GPT-6 review also applies only to its recorded candidate. Neither certifies later changes. #392は正式start済み。P392 ADRは採用済みだが、P392自体は未達。#395/#396はcontract-level draftのままであり、#395はP392 exact-tip確認後に詳細化する。Issue内容のreadiness reviewと公開freezeを別々に確認する。E384-DEC-001/002/004はユーザー採用済み。現行review routeは§5に従い、G0はexact candidateのreview/publication receiptsを引き続き要求する。
 
 `owner_decisions_required=[]`. Both decisions are adopted; do not reopen them without new evidence. See [whole-plan reassessment ADR](20260907t234210z-adr-whole-plan-reassessment-and-executable-gates.md).

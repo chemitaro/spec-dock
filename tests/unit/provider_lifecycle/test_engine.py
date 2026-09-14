@@ -1,0 +1,3039 @@
+from __future__ import annotations
+
+import base64
+from dataclasses import replace
+import errno
+from io import BytesIO
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tarfile
+from types import SimpleNamespace
+from typing import Literal, cast
+
+import pytest
+
+from spec_dock.provider_lifecycle.candidate import FIXED_DOMAINS, SLOT_MARKER_NAME
+from spec_dock.provider_lifecycle.contracts import (
+    SEED_PATHS,
+    ActiveState,
+    CompletionReceipt,
+    InodeWitness,
+    LifecycleAction,
+    LifecycleMode,
+    LifecycleRequest,
+    Operation,
+)
+import spec_dock.provider_lifecycle.engine as engine_module
+from spec_dock.provider_lifecycle.engine import FAULT_POINTS, ProviderLifecycleEngine
+from spec_dock.provider_lifecycle.filesystem import DomainTreeIdentity, NativeAtomicFilesystem
+from spec_dock.provider_lifecycle.legacy_fixture import LEGACY_SOURCE_COMMIT
+from spec_dock.provider_lifecycle.private_state import (
+    ActiveStateStore,
+    CompletionReceiptStore,
+    PrivateStateError,
+    PrivateStateForeignError,
+    StageStore,
+    cleanup_token_for,
+    repository_key_for,
+    resolve_private_namespace,
+)
+from spec_dock.provider_lifecycle.wire import parse_installation_record, serialize_public_result
+
+
+def _materialize_legacy_workspace(root: Path) -> None:
+    repository = Path(__file__).parents[3]
+    sources = [f"src/spec_dock/assets/{suffix}" for _kind, _public, suffix in FIXED_DOMAINS]
+    archive = subprocess.run(
+        ["git", "archive", "--format=tar", LEGACY_SOURCE_COMMIT, "--", *sources, "spec-dock/spec-dock.version"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+    ).stdout
+    with tarfile.open(fileobj=BytesIO(archive), mode="r:") as stream:
+        for member in stream:
+            if member.name == "spec-dock/spec-dock.version":
+                destination = root / member.name
+            else:
+                domain = next(
+                    (
+                        item
+                        for item in FIXED_DOMAINS
+                        if member.name == f"src/spec_dock/assets/{item[2]}"
+                        or member.name.startswith(f"src/spec_dock/assets/{item[2]}/")
+                    ),
+                    None,
+                )
+                if domain is None:
+                    continue
+                destination = root / domain[1] / member.name[len(f"src/spec_dock/assets/{domain[2]}") :].lstrip("/")
+            if member.isdir():
+                destination.mkdir(parents=True, exist_ok=True)
+            elif member.issym():
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.symlink_to(member.linkname)
+            else:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                source = stream.extractfile(member)
+                assert source is not None
+                destination.write_bytes(source.read())
+                destination.chmod(0o755 if member.mode & 0o111 else 0o644)
+
+
+def _request(
+    root: Path,
+    operation: Operation,
+    *,
+    mode: LifecycleMode = "apply",
+    specs_mode: str | None = None,
+) -> LifecycleRequest:
+    return LifecycleRequest(
+        str(root.resolve()),
+        mode,
+        mode == "apply",
+        specs_mode=specs_mode,
+        operation=operation,
+        seed_policy="create-if-absent" if operation == "install" else "preserve-only",
+    )
+
+
+def _workspace_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+    snapshot: dict[str, tuple[object, ...]] = {}
+    for path in (root, *root.rglob("*")):
+        relative = "." if path == root else path.relative_to(root).as_posix()
+        value = path.lstat()
+        if path.is_symlink():
+            snapshot[relative] = ("symlink", path.readlink().as_posix())
+        elif path.is_file():
+            snapshot[relative] = ("file", value.st_mode & 0o777, path.read_bytes())
+        else:
+            snapshot[relative] = ("directory", value.st_mode & 0o777)
+    return snapshot
+
+
+def _replace_regular_file_with_same_payload(path: Path, displaced: Path, *, mode: int) -> int:
+    payload = path.read_bytes()
+    original_inode = path.stat().st_ino
+    path.rename(displaced)
+    path.write_bytes(payload)
+    path.chmod(mode)
+    return original_inode
+
+
+def _replace_seed_with_unsafe_type(seed: Path, unsafe_kind: str, target: Path) -> None:
+    if seed.is_dir() and not seed.is_symlink():
+        shutil.rmtree(seed)
+    else:
+        seed.unlink(missing_ok=True)
+    seed.parent.mkdir(parents=True, exist_ok=True)
+    if unsafe_kind == "symlink":
+        target.write_text("consumer target\n", encoding="utf-8")
+        seed.symlink_to(target)
+    elif unsafe_kind == "directory":
+        seed.mkdir()
+    else:
+        os.mkfifo(seed)
+
+
+def _replace_seed_parent_with_unsafe_type(
+    root: Path,
+    parent_path: str,
+    unsafe_kind: str,
+    target: Path,
+) -> None:
+    parent = root / parent_path
+    if parent.is_symlink():
+        parent.unlink()
+    elif parent.is_dir():
+        shutil.rmtree(parent)
+    else:
+        parent.unlink(missing_ok=True)
+    parent.parent.mkdir(parents=True, exist_ok=True)
+    if unsafe_kind == "symlink":
+        target.write_text("consumer parent target\n", encoding="utf-8")
+        parent.symlink_to(target)
+    else:
+        parent.write_text("consumer parent\n", encoding="utf-8")
+
+
+def _assert_first_red_partial_shape(
+    result,
+    *,
+    expected_phase: str,
+    expected_last_completed_phase: str,
+    expected_actions: list[LifecycleAction],
+) -> None:
+    assert result.status == "partial_failure"
+    assert result.phase == expected_phase
+    assert result.last_completed_phase == expected_last_completed_phase
+    assert result.actions == tuple(expected_actions)
+    assert result.failed_paths == tuple(item.path for item in expected_actions if item.status == "failed")
+    assert result.pending_paths == tuple(item.path for item in expected_actions if item.status == "pending")
+    assert dict(result.summary) == {
+        status: sum(item.status == status for item in expected_actions)
+        for status in ("planned", "completed", "preserved", "pending", "failed", "warnings")
+    }
+    serialize_public_result(result)
+
+
+def test_t01_partial_action_vectors_are_operation_and_seed_specific(tmp_path: Path) -> None:
+    cases: tuple[tuple[Operation, Operation, str, str], ...] = (
+        ("install", "install", "create-if-absent", "pending"),
+        ("update", "install", "preserve-only", "preserved"),
+    )
+    for index, (request_operation, expected_operation, seed_policy, seed_status) in enumerate(cases):
+        workspace = (tmp_path / f"partial-{index}").resolve()
+        workspace.mkdir()
+        result = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(
+            _request(workspace, request_operation), force=True
+        )
+        expected_actions = [
+            LifecycleAction("spec-dock", "container", "preserved", "shared-container-preserve"),
+            LifecycleAction("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+            LifecycleAction("spec-dock/docs", "root", "completed", "candidate-root-create"),
+            LifecycleAction("spec-dock/templates", "root", "completed", "candidate-root-create"),
+            LifecycleAction("spec-dock/system", "root", "failed", "candidate-root-create"),
+            LifecycleAction("spec-dock/scripts", "root", "pending", "candidate-root-create"),
+            LifecycleAction(".agents/skills/spec-dock", "slot", "pending", "candidate-slot-create"),
+            LifecycleAction(".agents/skills/spec-dock-grill-with-docs", "slot", "pending", "candidate-slot-create"),
+            LifecycleAction(
+                "spec-dock/.gitignore",
+                "seed",
+                seed_status,
+                "fresh-seed-create" if seed_policy == "create-if-absent" else "preserve-only-seed",
+            ),
+            LifecycleAction(
+                ".github/workflows/ci.yml",
+                "seed",
+                seed_status,
+                "fresh-seed-create" if seed_policy == "create-if-absent" else "preserve-only-seed",
+            ),
+            LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+        ]
+        _assert_first_red_partial_shape(
+            result,
+            expected_phase="publish-system",
+            expected_last_completed_phase="publish-templates",
+            expected_actions=expected_actions,
+        )
+        assert result.operation == expected_operation
+        assert result.seed_policy == seed_policy
+
+
+def test_t01_update_partial_action_vector_preserves_current_domains(tmp_path: Path) -> None:
+    workspace = (tmp_path / "update-partial").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    (workspace / "spec-dock/system/consumer-owned.txt").write_text("consumer-owned\n", encoding="utf-8")
+
+    result = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(
+        _request(workspace, "update"), force=True
+    )
+    expected_actions = [
+        LifecycleAction("spec-dock", "container", "preserved", "shared-container-preserve"),
+        LifecycleAction("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+        LifecycleAction("spec-dock/docs", "root", "preserved", "candidate-root-current"),
+        LifecycleAction("spec-dock/templates", "root", "preserved", "candidate-root-current"),
+        LifecycleAction("spec-dock/system", "root", "failed", "candidate-root-replace"),
+        LifecycleAction("spec-dock/scripts", "root", "preserved", "candidate-root-current"),
+        LifecycleAction(".agents/skills/spec-dock", "slot", "preserved", "candidate-slot-current"),
+        LifecycleAction(".agents/skills/spec-dock-grill-with-docs", "slot", "preserved", "candidate-slot-current"),
+        LifecycleAction("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ]
+    _assert_first_red_partial_shape(
+        result,
+        expected_phase="publish-system",
+        expected_last_completed_phase="publish-templates",
+        expected_actions=expected_actions,
+    )
+    assert result.operation == "update"
+    assert result.seed_policy == "preserve-only"
+
+
+def test_t01_update_resumes_after_exchange_preserves_original_root_mode(tmp_path: Path) -> None:
+    workspace = (tmp_path / "update-resume-original-root-mode").resolve()
+    workspace.mkdir()
+    previous_assets = tmp_path / "previous-assets"
+    shutil.copytree(Path(engine_module.__file__).resolve().parents[1] / "assets", previous_assets)
+    (previous_assets / "spec_dock/system/previous-generation.txt").write_text("previous\n", encoding="utf-8")
+    (previous_assets / "spec_dock/scripts/previous-generation.txt").write_text("previous\n", encoding="utf-8")
+
+    installed = ProviderLifecycleEngine(assets_root=previous_assets).execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    (workspace / "spec-dock/system").chmod(0o755)
+
+    interrupted = ProviderLifecycleEngine(fault_injector="root-scripts-publish-or-detach").execute(
+        _request(workspace, "update"), force=True
+    )
+    assert interrupted.status == "partial_failure"
+    assert interrupted.phase == "publish-scripts"
+    assert interrupted.last_completed_phase == "publish-system"
+
+    resumed = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    assert resumed.status == "completed", resumed.code
+
+
+def test_t01_preserve_only_verify_failure_excludes_seed_phases(tmp_path: Path) -> None:
+    workspace = (tmp_path / "preserve-only-verify-failure").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    result = ProviderLifecycleEngine(fault_injector="target-verify").execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.phase == "verify-target"
+    assert result.last_completed_phase == "publish-slot-spec-dock-grill-with-docs"
+    assert result.actions[-3:] == (
+        LifecycleAction("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    )
+
+
+@pytest.mark.parametrize(
+    ("fault_point", "expected_last_completed_phase", "failed_index"),
+    [
+        ("root-docs-publish-or-detach", "publish-incomplete-record", 0),
+        ("root-system-publish-or-detach", "detach-templates", 2),
+    ],
+)
+def test_t01_uninstall_partial_action_vectors_follow_uninstall_sequence(
+    tmp_path: Path, fault_point: str, expected_last_completed_phase: str, failed_index: int
+) -> None:
+    workspace = (tmp_path / fault_point).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    result = ProviderLifecycleEngine(fault_injector=fault_point).execute(_request(workspace, "uninstall"), force=True)
+    expected_actions = [
+        LifecycleAction("spec-dock", "container", "preserved", "shared-container-preserve"),
+        LifecycleAction("spec-dock/spec-dock.version", "record", "completed", "incomplete-record-publish"),
+    ]
+    for index, (category, path, _source) in enumerate(FIXED_DOMAINS):
+        status = "failed" if index == failed_index else "completed" if index < failed_index else "pending"
+        expected_actions.append(LifecycleAction(path, category, status, f"owned-{category}-remove"))
+    expected_actions.extend([
+        LifecycleAction("spec-dock/.gitignore", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction(".github/workflows/ci.yml", "seed", "preserved", "preserve-only-seed"),
+        LifecycleAction("@provider-stage", "stage", "pending", "candidate-stage-cleanup"),
+    ])
+    expected_phase = "detach-docs" if failed_index == 0 else "detach-system"
+    _assert_first_red_partial_shape(
+        result,
+        expected_phase=expected_phase,
+        expected_last_completed_phase=expected_last_completed_phase,
+        expected_actions=expected_actions,
+    )
+    assert result.operation == "uninstall"
+    assert result.seed_policy == "preserve-only"
+
+
+def test_t01_uninstall_resume_actions_use_invocation_initial_absence(tmp_path: Path) -> None:
+    workspace = (tmp_path / "uninstall-resume-absence").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+
+    first = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(request, force=True)
+    assert first.status == "partial_failure"
+
+    resumed = ProviderLifecycleEngine(fault_injector="root-scripts-publish-or-detach").execute(request)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "partial_failure"
+    assert resumed.phase == "detach-scripts"
+    assert resumed.actions[2:8] == (
+        LifecycleAction("spec-dock/docs", "root", "preserved", "owned-root-absent"),
+        LifecycleAction("spec-dock/templates", "root", "preserved", "owned-root-absent"),
+        LifecycleAction("spec-dock/system", "root", "completed", "owned-root-remove"),
+        LifecycleAction("spec-dock/scripts", "root", "failed", "owned-root-remove"),
+        LifecycleAction(".agents/skills/spec-dock", "slot", "pending", "owned-slot-remove"),
+        LifecycleAction(".agents/skills/spec-dock-grill-with-docs", "slot", "pending", "owned-slot-remove"),
+    )
+
+
+@pytest.mark.parametrize("missing_count", range(7))
+def test_t01_incomplete_uninstall_plan_precedes_already_absent_code(tmp_path: Path, missing_count: int) -> None:
+    workspace = (tmp_path / f"incomplete-uninstall-{missing_count}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    interrupted = ProviderLifecycleEngine(fault_injector="root-docs-publish-or-detach").execute(
+        _request(workspace, "uninstall"), force=True
+    )
+    assert interrupted.status == "partial_failure"
+
+    for _category, path, _source in FIXED_DOMAINS[:missing_count]:
+        shutil.rmtree(workspace / path)
+
+    dry_run = ProviderLifecycleEngine().execute(_request(workspace, "uninstall", mode="dry-run"))
+    assert dry_run.status == "planned"
+    assert dry_run.code == "uninstall-planned"
+    serialize_public_result(dry_run)
+
+
+def test_t01_orphan_incomplete_uninstall_record_is_closed_without_new_active(tmp_path: Path) -> None:
+    workspace = (tmp_path / "orphan-incomplete-uninstall").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+    interrupted = ProviderLifecycleEngine(fault_injector="root-docs-publish-or-detach").execute(request, force=True)
+    assert interrupted.status == "partial_failure"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    assert active_store.load() is not None
+    record_path = workspace / "spec-dock/spec-dock.version"
+    record_before = record_path.read_bytes()
+    (namespace / "ACTIVE.json").unlink()
+    assert active_store.load() is None
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "installation-record-state-inconsistent"
+    assert result.operation is None
+    assert result.candidate_digest == interrupted.candidate_digest
+    assert result.seed_policy == interrupted.seed_policy
+    assert result.mutation_started is False
+    assert record_path.read_bytes() == record_before
+    assert active_store.load() is None
+
+
+def test_t01_active_resume_rejects_mismatched_receipt_before_mutation(tmp_path: Path) -> None:
+    workspace = (tmp_path / "active-receipt-mismatch").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    interrupted = ProviderLifecycleEngine(fault_injector="root-system-publish-or-detach").execute(request, force=True)
+    assert interrupted.status == "partial_failure"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    assert active is not None
+    receipt_store.save(
+        CompletionReceipt(
+            1,
+            active.repository_key,
+            active.tuple_key,
+            "0" * 32,
+            active.operation,
+            active.candidate_digest,
+            active.seed_policy,
+            active.result_family,
+            active.terminal_record_digest,
+            cleanup_token_for(active.repository_key, active.tuple_key, active.result_family, "0" * 32),
+            active.cleanup_retry_invocation,
+            active.deferred_invocation,
+        )
+    )
+    before = _workspace_snapshot(workspace)
+    active_before = active_store.load()
+    receipt_before = receipt_store.load()
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "error"
+    assert result.code == "invalid-request"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+
+
+def test_t01_uninstall_verify_rejects_non_directory_target(tmp_path: Path) -> None:
+    workspace = (tmp_path / "uninstall-unsupported-target").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    outside = (tmp_path / "outside").resolve()
+    outside.write_text("consumer-owned\n", encoding="utf-8")
+
+    def introduce_unsupported_target(point: str) -> None:
+        if point == "target-verify":
+            (workspace / "spec-dock/docs").symlink_to(outside)
+
+    result = ProviderLifecycleEngine(fault_injector=introduce_unsupported_target).execute(
+        _request(workspace, "uninstall"), force=True
+    )
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.code == "uninstall-partial-failure"
+    assert result.phase == "verify-target"
+    assert result.failed_paths == ("spec-dock/docs",)
+    assert result.actions[2] == LifecycleAction("spec-dock/docs", "root", "failed", "owned-root-remove")
+    assert (workspace / "spec-dock/docs").is_symlink()
+
+
+def test_t06_open_path_visible_closes_child_when_witness_fails(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "visible-witness-failure").resolve()
+    workspace.mkdir()
+    (workspace / "child").mkdir()
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    witnessed_fd: int | None = None
+
+    def fail_witness(fd: int) -> InodeWitness:
+        nonlocal witnessed_fd
+        witnessed_fd = fd
+        raise OSError(errno.EIO, "witness failed")
+
+    monkeypatch.setattr(engine_module, "_directory_witness", fail_witness)
+    try:
+        with pytest.raises(OSError, match="witness failed"):
+            engine_module._open_path_visible(root_fd, ("child",))
+        assert witnessed_fd is not None
+        with pytest.raises(OSError) as error:
+            os.fstat(witnessed_fd)
+        assert error.value.errno == errno.EBADF
+    finally:
+        os.close(root_fd)
+
+
+def test_t06_open_path_bound_closes_existing_child_when_witness_fails(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "bound-witness-failure").resolve()
+    workspace.mkdir()
+    (workspace / "child").mkdir()
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    witnessed_fd: int | None = None
+
+    def fail_witness(fd: int) -> InodeWitness:
+        nonlocal witnessed_fd
+        witnessed_fd = fd
+        raise OSError(errno.EIO, "witness failed")
+
+    monkeypatch.setattr(engine_module, "_directory_witness", fail_witness)
+    try:
+        with pytest.raises(OSError, match="witness failed"):
+            engine_module._open_path_bound(root_fd, ("child",))
+        assert witnessed_fd is not None
+        with pytest.raises(OSError) as error:
+            os.fstat(witnessed_fd)
+        assert error.value.errno == errno.EBADF
+    finally:
+        os.close(root_fd)
+
+
+def test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations(tmp_path: Path) -> None:
+    for index, point in enumerate(sorted(FAULT_POINTS)):
+        workspace = (tmp_path / f"fault-{index}-{point}").resolve()
+        workspace.mkdir()
+        request = _request(workspace, "install")
+
+        first = ProviderLifecycleEngine(fault_injector=point).execute(request, force=True)
+        serialize_public_result(first)
+        assert first.status in {"blocked", "partial_failure", "completed", "completed_with_warnings"}
+
+        retry = first
+        for _attempt in range(4):
+            if retry.status == "completed":
+                break
+            if retry.continuation["next_action"] == "retry-cleanup":
+                command = retry.continuation["next_command"]
+                assert isinstance(command, str)
+                token = command.split("--provider-cleanup-token ", 1)[1].split(" -- ", 1)[0]
+                retry = ProviderLifecycleEngine().execute(request, force=True, cleanup_token=token)
+            else:
+                if retry.continuation["next_action"] != "none":
+                    assert retry.continuation["next_action"] == "run-request"
+                retry = ProviderLifecycleEngine().execute(request, force=True)
+            serialize_public_result(retry)
+        assert retry.status == "completed"
+        assert retry.code in {"install-completed", "update-completed", "terminal-cleanup-completed"}
+
+
+def test_t06_exchange_keeps_the_old_root_in_stage_until_cleanup(tmp_path: Path) -> None:
+    workspace = (tmp_path / "exchange-recovery").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    consumer_file = workspace / "spec-dock" / "docs" / "consumer-owned.txt"
+    consumer_file.write_text("consumer-owned\n", encoding="utf-8")
+
+    request = _request(workspace, "update")
+    interrupted = ProviderLifecycleEngine(fault_injector="source-parent-fsync").execute(request)
+    assert interrupted.status == "partial_failure"
+    assert interrupted.mutation_started is True
+
+    namespace = resolve_private_namespace(workspace)
+    staged_old_root = namespace / "STAGE" / "docs"
+    assert staged_old_root.is_dir()
+    assert (staged_old_root / "consumer-owned.txt").read_text(encoding="utf-8") == "consumer-owned\n"
+    assert not consumer_file.exists()
+
+    resumed = ProviderLifecycleEngine().execute(request)
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
+def test_t06_bootstrap_active_publication_failure_restores_absent_pre_state(tmp_path: Path) -> None:
+    workspace = (tmp_path / "bootstrap-active-recovery").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    occurrences = 0
+
+    def fail_bootstrap_active_publication(point: str) -> None:
+        nonlocal occurrences
+        if point == "active-parent-fsync":
+            occurrences += 1
+            if occurrences == 2:
+                raise OSError("bootstrap ACTIVE publication failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_bootstrap_active_publication).execute(request, force=True)
+    assert first.status == "blocked"
+    assert first.code == "bootstrap-container-conflict"
+    assert first.bootstrap_rolled_back is True
+    assert first.mutation_started is False
+    assert not (workspace / "spec-dock").exists()
+
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.state == "prepared"
+    assert active.bootstrap_container == {"disposition": "planned-create", "witness": None}
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+    assert resumed.status == "completed"
+
+
+def test_t06_bootstrap_planned_create_race_does_not_adopt_foreign_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "bootstrap-planned-create-race").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    original_mkdir = engine_module.os.mkdir
+    injected = False
+
+    def introduce_foreign_container(name: str, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        nonlocal injected
+        if name == "spec-dock" and dir_fd is not None and not injected:
+            original_mkdir(name, mode, dir_fd=dir_fd)
+            injected = True
+        original_mkdir(name, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(engine_module.os, "mkdir", introduce_foreign_container)
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "blocked"
+    assert result.code == "bootstrap-container-conflict"
+    assert result.mutation_started is False
+    assert (workspace / "spec-dock").is_dir()
+    assert tuple((workspace / "spec-dock").iterdir()) == ()
+
+
+def test_t06_bootstrap_witness_rebind_before_record_does_not_adopt_foreign_directory(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = (tmp_path / "bootstrap-witness-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "bootstrap-witness-displaced"
+    engine = ProviderLifecycleEngine()
+    original_ensure_bootstrap = engine._ensure_bootstrap
+    injected = False
+
+    def replace_bootstrap_after_admission(*args, **kwargs):
+        nonlocal injected
+        result = original_ensure_bootstrap(*args, **kwargs)
+        (workspace / "spec-dock").rename(displaced)
+        (workspace / "spec-dock").mkdir()
+        injected = True
+        return result
+
+    monkeypatch.setattr(engine, "_ensure_bootstrap", replace_bootstrap_after_admission)
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "lifecycle-preparation-failed"
+    assert not (displaced / "spec-dock.version").exists()
+    assert not (workspace / "spec-dock/spec-dock.version").exists()
+
+
+def test_t06_record_post_binding_rebind_rolls_back_displaced_publication(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "record-post-binding-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "record-post-binding-rebind-displaced"
+    original_rename = NativeAtomicFilesystem.rename_no_replace
+    injected = False
+
+    def rebind_before_record_rename(
+        filesystem, source_parent_fd, source_name, destination_parent_fd, destination_name, *, expected_source=None
+    ):
+        nonlocal injected
+        if destination_name == "spec-dock.version" and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_rename(
+            filesystem,
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            expected_source=expected_source,
+        )
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "rename_no_replace", rebind_before_record_rename)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert not (displaced / "spec-dock.version").exists()
+    assert not (workspace / "spec-dock/spec-dock.version").exists()
+
+
+def test_t06_seed_parent_rebind_does_not_write_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "seed-parent-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "github-displaced"
+    original_open_path = engine_module._open_path_bound
+    injected = False
+
+    def rebind_github_parent(root_fd: int, components, *, create: bool = False):
+        nonlocal injected
+        fd, binding = original_open_path(root_fd, components, create=create)
+        if tuple(components) == (".github", "workflows") and not injected:
+            (workspace / ".github").rename(displaced)
+            (workspace / ".github" / "workflows").mkdir(parents=True)
+            injected = True
+        return fd, binding
+
+    monkeypatch.setattr(engine_module, "_open_path_bound", rebind_github_parent)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "create-seed-consumer-ci"
+    assert not (displaced / "workflows/ci.yml").exists()
+    assert not (workspace / ".github/workflows/ci.yml").exists()
+
+
+def test_t06_seed_post_binding_rebind_rolls_back_displaced_creation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "seed-post-binding-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "seed-post-binding-rebind-displaced"
+    original_open = engine_module.os.open
+    injected = False
+
+    def rebind_before_seed_open(path, flags, mode=0o777, *, dir_fd=None):
+        nonlocal injected
+        if path == ".gitignore" and dir_fd is not None and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    monkeypatch.setattr(engine_module.os, "open", rebind_before_seed_open)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert not (displaced / ".gitignore").exists()
+    assert not (workspace / "spec-dock/.gitignore").exists()
+
+
+def test_t06_existing_bootstrap_rebind_blocks_before_mutation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "existing-bootstrap-rebind").resolve()
+    workspace.mkdir()
+    (workspace / "spec-dock").mkdir()
+    displaced = tmp_path / "spec-dock-displaced"
+    engine = ProviderLifecycleEngine()
+    original_prepare_stage = engine._prepare_stage
+    swapped = False
+
+    def replace_bootstrap_after_admission(stage_store, active, candidate, root_fd):
+        nonlocal swapped
+        original_prepare_stage(stage_store, active, candidate, root_fd)
+        (workspace / "spec-dock").rename(displaced)
+        (workspace / "spec-dock").mkdir()
+        swapped = True
+
+    monkeypatch.setattr(engine, "_prepare_stage", replace_bootstrap_after_admission)
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "blocked"
+    assert result.code == "bootstrap-container-conflict"
+    assert result.mutation_started is False
+    assert displaced.is_dir()
+    assert (workspace / "spec-dock").is_dir()
+    assert tuple((workspace / "spec-dock").iterdir()) == ()
+
+
+def test_t06_gitignore_parent_rebind_does_not_write_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "gitignore-parent-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "spec-dock-gitignore-displaced"
+    original_open_path = engine_module._open_path_bound
+    injected = False
+
+    def rebind_specdock_parent(root_fd: int, components, *, create: bool = False):
+        nonlocal injected
+        fd, binding = original_open_path(root_fd, components, create=create)
+        if (
+            tuple(components) == ("spec-dock",)
+            and create
+            and not injected
+            and (workspace / "spec-dock/scripts").is_dir()
+            and not (workspace / ".github").exists()
+        ):
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return fd, binding
+
+    monkeypatch.setattr(engine_module, "_open_path_bound", rebind_specdock_parent)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "create-seed-spec-dock-gitignore"
+    assert not (displaced / ".gitignore").exists()
+    assert not (workspace / "spec-dock/.gitignore").exists()
+
+
+def test_t06_domain_parent_rebind_does_not_publish_to_displaced_directory(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "domain-parent-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "domain-parent-rebind-displaced"
+    original_open_path = engine_module._open_path_bound
+    specdock_parent_opens = 0
+    injected = False
+
+    def rebind_domain_parent(root_fd: int, components, *, create: bool = False):
+        nonlocal injected, specdock_parent_opens
+        fd, binding = original_open_path(root_fd, components, create=create)
+        if tuple(components) == ("spec-dock",) and create:
+            specdock_parent_opens += 1
+            if specdock_parent_opens == 1:
+                (workspace / "spec-dock").rename(displaced)
+                (workspace / "spec-dock").mkdir()
+                injected = True
+        return fd, binding
+
+    monkeypatch.setattr(engine_module, "_open_path_bound", rebind_domain_parent)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert not (displaced / "docs").exists()
+    assert not (workspace / "spec-dock/docs").exists()
+
+
+def test_t06_domain_post_binding_rebind_rolls_back_displaced_mutation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "domain-post-binding-rebind").resolve()
+    workspace.mkdir()
+    displaced = tmp_path / "domain-post-binding-rebind-displaced"
+    original_rename = NativeAtomicFilesystem.rename_no_replace
+    injected = False
+
+    def rebind_before_native_rename(
+        filesystem, source_parent_fd, source_name, destination_parent_fd, destination_name, *, expected_source=None
+    ):
+        nonlocal injected
+        if destination_name == "docs" and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_rename(
+            filesystem,
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            expected_source=expected_source,
+        )
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "rename_no_replace", rebind_before_native_rename)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert not (displaced / "docs").exists()
+    assert not (workspace / "spec-dock/docs").exists()
+
+
+def test_t06_domain_exchange_post_binding_rebind_rolls_back_displaced_mutation(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "domain-exchange-post-binding-rebind").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    (workspace / "spec-dock/docs/consumer-owned.txt").write_text("consumer-owned\n", encoding="utf-8")
+    displaced = tmp_path / "domain-exchange-post-binding-rebind-displaced"
+    original_exchange = NativeAtomicFilesystem.exchange
+    injected = False
+
+    def rebind_before_native_exchange(
+        filesystem,
+        source_parent_fd,
+        source_name,
+        destination_parent_fd,
+        destination_name,
+        *,
+        expected_source=None,
+        expected_destination=None,
+    ):
+        nonlocal injected
+        if destination_name == "docs" and not injected:
+            (workspace / "spec-dock").rename(displaced)
+            (workspace / "spec-dock").mkdir()
+            injected = True
+        return original_exchange(
+            filesystem,
+            source_parent_fd,
+            source_name,
+            destination_parent_fd,
+            destination_name,
+            expected_source=expected_source,
+            expected_destination=expected_destination,
+        )
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "exchange", rebind_before_native_exchange)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"))
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert (displaced / "docs/consumer-owned.txt").read_text(encoding="utf-8") == "consumer-owned\n"
+    assert not (workspace / "spec-dock/docs").exists()
+
+
+def test_t06_created_parent_fsync_failure_rolls_back_created_component(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "created-parent-fsync-failure").resolve()
+    workspace.mkdir()
+    original_mkdir = engine_module.os.mkdir
+    original_fsync = engine_module.os.fsync
+    target_parent_fd: int | None = None
+    injected = False
+
+    def record_target_parent(name: str, mode: int = 0o777, *, dir_fd: int | None = None) -> None:
+        nonlocal target_parent_fd
+        if name == ".github" and dir_fd is not None:
+            target_parent_fd = dir_fd
+        original_mkdir(name, mode, dir_fd=dir_fd)
+
+    def fail_after_created_parent_witness(fd: int) -> None:
+        nonlocal injected
+        if target_parent_fd == fd and not injected:
+            injected = True
+            raise OSError("created parent fsync failed")
+        original_fsync(fd)
+
+    monkeypatch.setattr(engine_module.os, "mkdir", record_target_parent)
+    monkeypatch.setattr(engine_module.os, "fsync", fail_after_created_parent_witness)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert injected
+    assert result.status == "partial_failure"
+    assert result.code == "install-partial-failure"
+    assert result.phase == "create-seed-consumer-ci"
+    assert not (workspace / ".github").exists()
+
+
+@pytest.mark.parametrize("seed_policy", ["create-if-absent", "preserve-only"])
+def test_t06_bootstrap_cleanup_failure_publishes_closed_install_actions(
+    monkeypatch, tmp_path: Path, seed_policy: str
+) -> None:
+    workspace = (tmp_path / f"bootstrap-cleanup-failure-{seed_policy}").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install" if seed_policy == "create-if-absent" else "update")
+    root_stat = workspace.stat()
+    original_remove_tree_bound = NativeAtomicFilesystem.remove_tree_bound
+
+    def fail_bootstrap_cleanup(
+        filesystem: NativeAtomicFilesystem, parent_fd: int, name: str, tree: DomainTreeIdentity
+    ) -> None:
+        current = os.fstat(parent_fd)
+        if name == "spec-dock" and (current.st_dev, current.st_ino) == (root_stat.st_dev, root_stat.st_ino):
+            raise OSError("bootstrap cleanup blocked")
+        original_remove_tree_bound(filesystem, parent_fd, name, tree)
+
+    monkeypatch.setattr(NativeAtomicFilesystem, "remove_tree_bound", fail_bootstrap_cleanup)
+    result = ProviderLifecycleEngine(fault_injector="bootstrap-container-fsync").execute(request, force=True)
+
+    expected = [
+        {
+            "path": "spec-dock",
+            "category": "container",
+            "status": "failed",
+            "reason": "fresh-container-create",
+        },
+        {
+            "path": "spec-dock/spec-dock.version",
+            "category": "record",
+            "status": "pending",
+            "reason": "incomplete-record-publish",
+        },
+        *[
+            {
+                "path": path,
+                "category": category,
+                "status": "pending",
+                "reason": f"candidate-{category}-create",
+            }
+            for category, path, _source in FIXED_DOMAINS
+        ],
+    ]
+    if seed_policy == "preserve-only":
+        expected.extend([
+            {
+                "path": "spec-dock/.gitignore",
+                "category": "seed",
+                "status": "preserved",
+                "reason": "preserve-only-seed",
+            },
+            {
+                "path": ".github/workflows/ci.yml",
+                "category": "seed",
+                "status": "preserved",
+                "reason": "preserve-only-seed",
+            },
+        ])
+    else:
+        expected.extend([
+            {
+                "path": "spec-dock/.gitignore",
+                "category": "seed",
+                "status": "pending",
+                "reason": "fresh-seed-create",
+            },
+            {
+                "path": ".github",
+                "category": "container",
+                "status": "pending",
+                "reason": "fresh-container-create",
+            },
+            {
+                "path": ".github/workflows",
+                "category": "container",
+                "status": "pending",
+                "reason": "fresh-container-create",
+            },
+            {
+                "path": ".github/workflows/ci.yml",
+                "category": "seed",
+                "status": "pending",
+                "reason": "fresh-seed-create",
+            },
+        ])
+    expected.append({
+        "path": "@provider-stage",
+        "category": "stage",
+        "status": "pending",
+        "reason": "candidate-stage-cleanup",
+    })
+
+    assert result.status == "partial_failure"
+    assert result.code == "bootstrap-cleanup-failed"
+    assert result.actions == tuple(LifecycleAction(**item) for item in expected)
+    assert result.failed_paths == ("spec-dock",)
+    assert result.pending_paths == tuple(item["path"] for item in expected if item["status"] == "pending")
+
+
+def test_t06_record_temp_witness_failure_cleans_unbound_temp_before_retry(tmp_path: Path) -> None:
+    workspace = (tmp_path / "record-temp-witness-recovery").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    occurrences = 0
+
+    def fail_record_temp_witness(point: str) -> None:
+        nonlocal occurrences
+        if point == "active-temp-open":
+            occurrences += 1
+            if occurrences == 3:
+                raise OSError("RECORD-TEMP witness publication failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_record_temp_witness).execute(request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "lifecycle-preparation-failed"
+    assert first.phase == "publish-incomplete-record"
+    assert first.mutation_started is True
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    assert active is not None
+    assert active.record_temp_witness is None
+    assert not (namespace / "RECORD-TEMP").exists()
+    before_cleanup_attempt = _workspace_snapshot(workspace)
+    rejected_cleanup = ProviderLifecycleEngine().execute(request, force=True, cleanup_token=active.cleanup_token)
+    serialize_public_result(rejected_cleanup)
+    assert rejected_cleanup.status == "error"
+    assert rejected_cleanup.code == "invalid-request"
+    assert rejected_cleanup.mutation_started is False
+    assert _workspace_snapshot(workspace) == before_cleanup_attempt
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+    assert resumed.status == "completed"
+
+
+def test_t07_legacy_migration_uninstall_and_old_package_mutation_zero(tmp_path: Path) -> None:
+    workspace = (tmp_path / "legacy").resolve()
+    workspace.mkdir()
+    _materialize_legacy_workspace(workspace)
+    protected = workspace / "spec-dock" / "initiatives" / "protected.txt"
+    protected.parent.mkdir(parents=True)
+    protected.write_bytes(b"consumer-owned\n")
+    before_protected = (protected.read_bytes(), protected.lstat().st_ino)
+
+    migrated = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert migrated.status == "completed"
+    assert migrated.code == "legacy-migration-completed"
+    assert (protected.read_bytes(), protected.lstat().st_ino) == before_protected
+    record = parse_installation_record((workspace / "spec-dock/spec-dock.version").read_bytes())
+    assert record.state == "ready"
+    assert record.version == "0.2.4"
+
+    uninstalled = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", specs_mode="keep"),
+    )
+    assert uninstalled.status == "completed"
+    assert uninstalled.code == "uninstall-completed"
+    assert parse_installation_record((workspace / "spec-dock/spec-dock.version").read_bytes()).state == (
+        "tooling-absent-preserved-data"
+    )
+    assert not (workspace / "spec-dock/docs").exists()
+    assert not (workspace / ".agents/skills/spec-dock").exists()
+    assert (protected.read_bytes(), protected.lstat().st_ino) == before_protected
+
+    before_rejected_purge = _workspace_snapshot(workspace)
+    rejected = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", specs_mode="remove"),
+    )
+    assert rejected.status == "error"
+    assert rejected.code == "spec-history-purge-removed"
+    assert _workspace_snapshot(workspace) == before_rejected_purge
+
+
+@pytest.mark.parametrize(
+    ("failure", "expected_code"),
+    [
+        (PrivateStateForeignError("foreign private authority"), "stage-owner-mismatch"),
+        (PrivateStateError("private authority I/O"), "lifecycle-preparation-failed"),
+    ],
+)
+def test_t04_initial_private_authority_preserves_foreign_vs_io_wire_codes(
+    monkeypatch, tmp_path: Path, failure: PrivateStateError, expected_code: str
+) -> None:
+    modes: tuple[LifecycleMode, ...] = ("apply", "dry-run")
+    for index, mode in enumerate(modes):
+        workspace = (tmp_path / f"authority-{expected_code}-{index}").resolve()
+        workspace.mkdir()
+        engine = ProviderLifecycleEngine()
+
+        def fail_stores(*_args, **_kwargs):
+            raise failure
+
+        monkeypatch.setattr(engine, "_stores", fail_stores)
+        before = _workspace_snapshot(workspace)
+        result = engine.execute(_request(workspace, "install", mode=mode), force=True)
+
+        serialize_public_result(result)
+        assert result.status == "blocked"
+        assert result.code == expected_code
+        assert result.operation is None
+        assert result.candidate_digest is None
+        assert result.seed_policy is None
+        assert result.mutation_started is False
+        assert result.continuation["next_action"] == "none"
+        assert _workspace_snapshot(workspace) == before
+
+
+def test_t04_foreign_stage_owner_is_stage_owner_mismatch_in_candidate_staging(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "stage-owner").resolve()
+    workspace.mkdir()
+    engine = ProviderLifecycleEngine()
+
+    def fail_prepare_stage(*_args, **_kwargs):
+        raise PrivateStateForeignError("foreign stage owner")
+
+    monkeypatch.setattr(engine, "_prepare_stage", fail_prepare_stage)
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.operation == "install"
+    assert result.candidate_digest is not None
+    assert result.seed_policy == "create-if-absent"
+    assert result.phase == "candidate-staging"
+    assert result.last_completed_phase == "preflight"
+    assert result.mutation_started is False
+    assert result.actions == ()
+
+
+def test_t04_stage_rebuild_revalidates_frozen_candidate_before_consumer_mutation(monkeypatch, tmp_path: Path) -> None:
+    repository = Path(__file__).parents[3]
+    assets_root = tmp_path / "assets"
+    shutil.copytree(repository / "src/spec_dock/assets", assets_root)
+    drifted_file = assets_root / "spec_dock/docs/reference_naming.md"
+    engine = ProviderLifecycleEngine(assets_root=assets_root)
+    original_candidate = engine._candidate
+    mutated = False
+
+    def capture_then_drift():
+        nonlocal mutated
+        candidate = original_candidate()
+        if not mutated:
+            drifted_file.write_bytes(drifted_file.read_bytes() + b"\nsource drift\n")
+            mutated = True
+        return candidate
+
+    monkeypatch.setattr(engine, "_candidate", capture_then_drift)
+    workspace = (tmp_path / "stage-rebuild-drift").resolve()
+    workspace.mkdir()
+
+    result = engine.execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert result.phase == "candidate-staging"
+    assert result.mutation_started is False
+    assert not (workspace / "spec-dock").exists()
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.state == "prepared"
+    assert active.candidate_digest != engine._candidate().aggregate_digest
+
+
+@pytest.mark.parametrize("operation", ["update", "uninstall"])
+def test_t04_initial_apply_persists_first_seed_admission_without_post_receipt_reobservation(
+    monkeypatch,
+    tmp_path: Path,
+    operation: Operation,
+) -> None:
+    workspace = (tmp_path / f"initial-{operation}-seed-admission-snapshot").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    receipt_store = CompletionReceiptStore(resolve_private_namespace(workspace), repository_root=workspace)
+    assert receipt_store.load() is not None
+
+    engine = ProviderLifecycleEngine(fault_injector="stage-mkdir")
+    original_invalidate_receipt = engine._invalidate_receipt
+
+    def invalidate_receipt_then_remove_seed(store: CompletionReceiptStore, receipt: CompletionReceipt, witness) -> None:
+        original_invalidate_receipt(store, receipt, witness)
+        (workspace / SEED_PATHS[0]).unlink()
+
+    monkeypatch.setattr(engine, "_invalidate_receipt", invalidate_receipt_then_remove_seed)
+    result = engine.execute(_request(workspace, operation), force=True)
+
+    serialize_public_result(result)
+    assert result.status in {"blocked", "partial_failure"}
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.seed_admission == dict.fromkeys(SEED_PATHS, "present")
+
+
+def test_t04_seed_admission_freezes_provider_created_action_provenance(tmp_path: Path) -> None:
+    workspace = (tmp_path / "seed-provenance").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+
+    first = ProviderLifecycleEngine(fault_injector="target-verify").execute(request, force=True)
+
+    assert first.status == "partial_failure"
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.seed_admission == dict.fromkeys(SEED_PATHS, "absent")
+    first_seed_actions = {action.path: action for action in first.actions if action.category == "seed"}
+    assert first_seed_actions == {
+        path: LifecycleAction(path, "seed", "completed", "fresh-seed-create") for path in SEED_PATHS
+    }
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    assert resumed.status == "completed"
+    resumed_seed_actions = {action.path: action for action in resumed.actions if action.category == "seed"}
+    assert resumed_seed_actions == {
+        path: LifecycleAction(path, "seed", "completed", "fresh-seed-create") for path in SEED_PATHS
+    }
+
+
+def test_t04_seed_admission_preserves_present_seed_through_reentry(tmp_path: Path) -> None:
+    workspace = (tmp_path / "present-seed-provenance").resolve()
+    workspace.mkdir()
+    existing_gitignore = workspace / "spec-dock/.gitignore"
+    existing_ci = workspace / ".github/workflows/ci.yml"
+    existing_gitignore.parent.mkdir(parents=True)
+    existing_ci.parent.mkdir(parents=True)
+    existing_gitignore.write_bytes(b"consumer gitignore\n")
+    existing_ci.write_bytes(b"consumer ci\n")
+    request = _request(workspace, "install")
+
+    first = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(request, force=True)
+
+    assert first.status == "blocked"
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    assert active.seed_admission == dict.fromkeys(SEED_PATHS, "present")
+    existing_gitignore.unlink()
+    existing_ci.unlink()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    assert resumed.status == "completed"
+    assert not existing_gitignore.exists()
+    assert not existing_ci.exists()
+    resumed_seed_actions = {action.path: action for action in resumed.actions if action.category == "seed"}
+    assert resumed_seed_actions == {
+        path: LifecycleAction(path, "seed", "preserved", "consumer-seed-present") for path in SEED_PATHS
+    }
+
+
+@pytest.mark.parametrize("existing_parent", [None, ".agents"])
+def test_t04_fresh_install_creates_missing_slot_parent_chain(
+    tmp_path: Path,
+    existing_parent: str | None,
+) -> None:
+    workspace = (tmp_path / ("fresh-slots" if existing_parent is None else "fresh-slots-with-agents")).resolve()
+    workspace.mkdir()
+    if existing_parent is not None:
+        (workspace / existing_parent).mkdir()
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    assert result.status == "completed"
+    assert (workspace / ".agents/skills/spec-dock").is_dir()
+    assert (workspace / ".agents/skills/spec-dock-grill-with-docs").is_dir()
+
+
+def test_t04_slot_marker_admission_rejects_replaced_slot_root(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    workspace = (tmp_path / "slot-marker-replacement").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    slot = workspace / FIXED_DOMAINS[4][1]
+    valid_replacement = tmp_path / "valid-slot-replacement"
+    shutil.copytree(slot, valid_replacement, symlinks=True)
+    (slot / SLOT_MARKER_NAME).write_bytes(b'{"invalid": true}\n')
+    displaced = tmp_path / "invalid-slot-displaced"
+    before = _workspace_snapshot(workspace)
+    swapped = False
+    restored = False
+
+    engine = ProviderLifecycleEngine()
+    original_capture = engine._capture_engine_domain
+
+    def capture(parent_fd: int, name: str, *, exclude_marker: bool = False):
+        nonlocal swapped
+        result = original_capture(parent_fd, name, exclude_marker=exclude_marker)
+        if name == "spec-dock" and not swapped:
+            slot.rename(displaced)
+            valid_replacement.rename(slot)
+            swapped = True
+        return result
+
+    monkeypatch.setattr(engine, "_capture_engine_domain", capture)
+    original_read_regular = engine_module._read_regular
+
+    def read_regular(parent_fd: int, name: str, maximum: int = 4096):
+        nonlocal restored
+        result = original_read_regular(parent_fd, name, maximum)
+        if name == SLOT_MARKER_NAME and not restored:
+            slot.rename(valid_replacement)
+            displaced.rename(slot)
+            restored = True
+        return result
+
+    monkeypatch.setattr(engine_module, "_read_regular", read_regular)
+    try:
+        result = engine.execute(_request(workspace, "update"), force=True)
+    finally:
+        if swapped and not restored:
+            slot.rename(valid_replacement)
+            displaced.rename(slot)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "blocked"
+    assert result.code == "foreign-skill-slot"
+    assert result.operation == "update"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load() is None
+
+
+@pytest.mark.parametrize("operation", ["update", "uninstall"])
+def test_t04_admission_target_observation_is_reused_before_publication(
+    monkeypatch,
+    tmp_path: Path,
+    operation: Operation,
+) -> None:
+    workspace = (tmp_path / f"admission-target-observation-{operation}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    target = workspace / FIXED_DOMAINS[0][1]
+    displaced = tmp_path / f"original-{operation}-docs"
+    foreign = tmp_path / f"foreign-{operation}-docs"
+    foreign.mkdir()
+    (foreign / "consumer-owned.txt").write_text("consumer-owned\n", encoding="utf-8")
+    swapped = False
+    engine = ProviderLifecycleEngine()
+
+    def swap_target() -> None:
+        nonlocal swapped
+        if swapped:
+            return
+        target.rename(displaced)
+        foreign.rename(target)
+        swapped = True
+
+    if operation == "update":
+        original_admit_targets = engine._admit_existing_targets
+
+        def admit_targets(root_fd, targets, candidate, *, owner_digest):
+            original_admit_targets(root_fd, targets, candidate, owner_digest=owner_digest)
+            swap_target()
+
+        monkeypatch.setattr(engine, "_admit_existing_targets", admit_targets)
+    else:
+        original_admit_slots = engine._admit_existing_slots
+
+        def admit_slots(root_fd, targets, candidate_digest):
+            original_admit_slots(root_fd, targets, candidate_digest)
+            swap_target()
+
+        monkeypatch.setattr(engine, "_admit_existing_slots", admit_slots)
+
+    result = engine.execute(_request(workspace, operation), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "partial_failure"
+    assert result.phase == "verify-target"
+    assert result.code == f"{operation}-partial-failure"
+    assert (target / "consumer-owned.txt").read_text(encoding="utf-8") == "consumer-owned\n"
+    assert displaced.is_dir()
+    active = ActiveStateStore(resolve_private_namespace(workspace), repository_root=workspace).load()
+    assert active is not None
+    original_inode = active.owned_target_witnesses[0]["original_inode"]
+    assert isinstance(original_inode, dict)
+    assert original_inode["inode"] == displaced.stat().st_ino
+    assert original_inode["inode"] != target.stat().st_ino
+
+
+def test_t04_initial_public_record_publication_rejects_same_content_foreign_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "initial-record-predecessor-binding").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    record_path = workspace / "spec-dock/spec-dock.version"
+    original_inode = record_path.stat().st_ino
+    displaced = tmp_path / "initial-record-displaced"
+    swapped = False
+    engine = ProviderLifecycleEngine()
+    original_write = engine._write_public_record
+
+    def replace_predecessor(
+        request,
+        active: ActiveState,
+        payload: bytes,
+        active_store: ActiveStateStore,
+        root_fd: int,
+        *,
+        expected_active_witness: InodeWitness,
+        expected_predecessor: tuple[bytes | None, InodeWitness | None],
+        predecessor_kind: Literal["original", "incomplete"],
+    ):
+        nonlocal swapped
+        if predecessor_kind == "original" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+        return original_write(
+            request,
+            active,
+            payload,
+            active_store,
+            root_fd,
+            expected_active_witness=expected_active_witness,
+            expected_predecessor=expected_predecessor,
+            predecessor_kind=predecessor_kind,
+        )
+
+    monkeypatch.setattr(engine, "_write_public_record", replace_predecessor)
+    result = engine.execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != original_inode
+
+
+def test_t04_terminal_public_record_publication_rejects_same_content_foreign_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "terminal-record-predecessor-binding").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / "terminal-record-displaced"
+    swapped = False
+    engine = ProviderLifecycleEngine()
+    original_write = engine._write_public_record
+
+    def replace_predecessor(
+        request,
+        active: ActiveState,
+        payload: bytes,
+        active_store: ActiveStateStore,
+        root_fd: int,
+        *,
+        expected_active_witness: InodeWitness,
+        expected_predecessor: tuple[bytes | None, InodeWitness | None],
+        predecessor_kind: Literal["original", "incomplete"],
+    ):
+        nonlocal swapped
+        if predecessor_kind == "incomplete" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+        return original_write(
+            request,
+            active,
+            payload,
+            active_store,
+            root_fd,
+            expected_active_witness=expected_active_witness,
+            expected_predecessor=expected_predecessor,
+            predecessor_kind=predecessor_kind,
+        )
+
+    monkeypatch.setattr(engine, "_write_public_record", replace_predecessor)
+    result = engine.execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t04_receipt_invalidation_rejects_same_content_foreign_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "receipt-invalidation-binding").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    namespace = resolve_private_namespace(workspace)
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    displaced = tmp_path / "receipt-displaced"
+    calls = 0
+    original_load = CompletionReceiptStore.load_with_witness
+
+    def replace_on_invalidation(store: CompletionReceiptStore):
+        nonlocal calls
+        result = original_load(store)
+        if store.filename == "CLEANUP-COMPLETED.json":
+            calls += 1
+            if calls == 2:
+                _replace_regular_file_with_same_payload(receipt_path, displaced, mode=0o600)
+        return result
+
+    monkeypatch.setattr(CompletionReceiptStore, "load_with_witness", replace_on_invalidation)
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert calls == 2
+    assert result.status == "blocked"
+    assert result.code == "lifecycle-preparation-failed"
+    assert receipt_path.read_bytes() == displaced.read_bytes()
+    assert receipt_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t04_finish_cleanup_rejects_same_content_foreign_active_inode(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "finish-cleanup-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(request, force=True)
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    active_path = namespace / "ACTIVE.json"
+    displaced = tmp_path / "active-displaced"
+    engine = ProviderLifecycleEngine()
+    original_finish = engine._finish_cleanup
+
+    def replace_before_finish(
+        request,
+        active: ActiveState,
+        active_store: ActiveStateStore,
+        receipt_store: CompletionReceiptStore,
+        stage_store: StageStore,
+        root_fd: int,
+        *,
+        active_witness: InodeWitness,
+        **kwargs,
+    ):
+        _replace_regular_file_with_same_payload(active_path, displaced, mode=0o600)
+        return original_finish(
+            request,
+            active,
+            active_store,
+            receipt_store,
+            stage_store,
+            root_fd,
+            active_witness=active_witness,
+            **kwargs,
+        )
+
+    monkeypatch.setattr(engine, "_finish_cleanup", replace_before_finish)
+    result = engine.execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert active_path.read_bytes() == displaced.read_bytes()
+    assert active_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t04_terminal_record_exchange_rejects_foreign_public_inode_before_residue_cleanup(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = (tmp_path / "terminal-record-public-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / "terminal-record-public-displaced"
+    engine = ProviderLifecycleEngine()
+    original_save = engine._save_active
+    swapped = False
+
+    def replace_before_active_public_witness_save(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal swapped
+        if (
+            not swapped
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and record_path.is_file()
+            and record_path.read_bytes() == engine._terminal_record_bytes(active)
+        ):
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(engine, "_save_active", replace_before_active_public_witness_save)
+    result = engine.execute(request, force=True)
+
+    serialize_public_result(result)
+    assert swapped
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+    assert (namespace / "RECORD-TEMP").is_file()
+
+
+def test_t06_public_record_recovery_preserves_residue_until_active_clear_is_durable(
+    monkeypatch, tmp_path: Path
+) -> None:
+    workspace = (tmp_path / "public-record-recovery-order").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first_engine = ProviderLifecycleEngine()
+    original_first_save = first_engine._save_active
+    first_failed = False
+
+    def fail_after_terminal_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal first_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        if (
+            not first_failed
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == first_engine._terminal_record_bytes(active)
+        ):
+            first_failed = True
+            raise OSError("injected post-exchange ACTIVE save failure")
+        return original_first_save(store, active, **kwargs)
+
+    monkeypatch.setattr(first_engine, "_save_active", fail_after_terminal_exchange)
+    first = first_engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    assert (namespace / "RECORD-TEMP").is_file()
+
+    retry_engine = ProviderLifecycleEngine()
+    original_retry_save = retry_engine._save_active
+    clear_failed = False
+
+    def fail_before_active_clear(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal clear_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        if (
+            not clear_failed
+            and active.state == "ready"
+            and active.record_temp_witness is None
+            and record_path.is_file()
+            and record_path.read_bytes() == retry_engine._terminal_record_bytes(active)
+        ):
+            clear_failed = True
+            raise OSError("injected post-residue ACTIVE clear failure")
+        return original_retry_save(store, active, **kwargs)
+
+    monkeypatch.setattr(retry_engine, "_save_active", fail_before_active_clear)
+    second = retry_engine.execute(request, force=True)
+
+    serialize_public_result(second)
+    assert clear_failed
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    active_after_failure = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active_after_failure is not None
+    assert active_after_failure.record_temp_witness is not None
+    assert not (namespace / "RECORD-TEMP").exists()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
+def test_t04_finish_cleanup_rejects_foreign_receipt_inode_before_active_unlink(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "finish-cleanup-receipt-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(request, force=True)
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    displaced = tmp_path / "finish-cleanup-receipt-displaced"
+    calls = 0
+    original_load = ActiveStateStore.load_with_witness
+
+    def replace_before_active_unlink(store: ActiveStateStore):
+        nonlocal calls
+        result = original_load(store)
+        calls += 1
+        if calls == 3:
+            _replace_regular_file_with_same_payload(receipt_path, displaced, mode=0o600)
+        return result
+
+    monkeypatch.setattr(ActiveStateStore, "load_with_witness", replace_before_active_unlink)
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert calls == 4
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert (namespace / "ACTIVE.json").is_file()
+    assert receipt_path.read_bytes() == displaced.read_bytes()
+    assert receipt_path.stat().st_ino != displaced.stat().st_ino
+
+
+def test_t06_terminal_record_residue_is_cleaned_on_retry(tmp_path: Path) -> None:
+    workspace = (tmp_path / "terminal-record-residue-recovery").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+
+    first = ProviderLifecycleEngine(fault_injector="record-exchange-residue-unlink").execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+    assert (namespace / "RECORD-TEMP").is_file()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+    assert not (namespace / "RECORD-TEMP").exists()
+
+
+def test_t06_terminal_record_residue_cleanup_rejects_foreign_public_before_unlink(
+    tmp_path: Path,
+) -> None:
+    workspace = (tmp_path / "terminal-record-residue-public-race-install").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="record-exchange-residue-unlink").execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    record_path = workspace / "spec-dock/spec-dock.version"
+    residue_path = namespace / "RECORD-TEMP"
+    assert residue_path.is_file()
+    displaced = tmp_path / "terminal-record-residue-public-race-install-displaced"
+    swapped = False
+
+    def swap_public_after_residue_fault(point: str) -> None:
+        nonlocal swapped
+        if point == "record-exchange-residue-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_after_residue_fault).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert residue_path.is_file()
+    assert (namespace / "ACTIVE.json").is_file()
+    assert not (namespace / "CLEANUP-COMPLETED.json").exists()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_terminal_record_exchange_recovers_when_active_witness_save_fails(
+    monkeypatch, tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / "terminal-record-active-save-recovery").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    engine = ProviderLifecycleEngine()
+    original_save = engine._save_active
+    failed = False
+
+    def fail_after_terminal_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        if (
+            not failed
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == engine._terminal_record_bytes(active)
+        ):
+            failed = True
+            raise OSError("injected post-exchange ACTIVE save failure")
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(engine, "_save_active", fail_after_terminal_exchange)
+    first = engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert failed
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.state == "ready"
+    assert active.record_temp_witness is not None
+    assert active.public_record_witness is not None
+    assert (namespace / "RECORD-TEMP").is_file()
+
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+    assert not (namespace / "RECORD-TEMP").exists()
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_public_record_recovery_rejects_foreign_public_before_residue_unlink(
+    monkeypatch, tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / f"public-record-recovery-public-race-{operation}").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    first_engine = ProviderLifecycleEngine()
+    original_save = first_engine._save_active
+    first_failed = False
+
+    def fail_after_terminal_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal first_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        if (
+            not first_failed
+            and active.state == "ready"
+            and active.record_temp_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == first_engine._terminal_record_bytes(active)
+        ):
+            first_failed = True
+            raise OSError("injected post-exchange ACTIVE save failure")
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(first_engine, "_save_active", fail_after_terminal_exchange)
+    first = first_engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    residue_path = namespace / "RECORD-TEMP"
+    assert residue_path.is_file()
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / f"public-record-recovery-public-race-{operation}-displaced"
+    swapped = False
+
+    def swap_public_after_residue_fault(point: str) -> None:
+        nonlocal swapped
+        if point == "record-exchange-residue-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_after_residue_fault).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert residue_path.is_file()
+    assert (namespace / "ACTIVE.json").is_file()
+    assert not (namespace / "CLEANUP-COMPLETED.json").exists()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_initial_public_record_recovery_rejects_foreign_public_before_original_residue_unlink(
+    monkeypatch, tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / f"initial-public-record-recovery-public-race-{operation}").resolve()
+    workspace.mkdir()
+    if operation == "install":
+        _materialize_legacy_workspace(workspace)
+    else:
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    first_engine = ProviderLifecycleEngine()
+    original_save = first_engine._save_active
+    first_failed = False
+
+    def fail_after_initial_exchange(store, active: ActiveState, **kwargs) -> InodeWitness:
+        nonlocal first_failed
+        record_path = workspace / "spec-dock/spec-dock.version"
+        residue_path = store.namespace / "RECORD-TEMP"
+        expected = base64.b64decode(active.expected_incomplete_record["bytes_base64"])
+        if (
+            not first_failed
+            and active.state == "prepared"
+            and active.record_temp_witness is not None
+            and active.public_record_witness is not None
+            and residue_path.is_file()
+            and record_path.is_file()
+            and record_path.read_bytes() == expected
+        ):
+            first_failed = True
+            raise OSError("injected initial exchange ACTIVE save failure")
+        return original_save(store, active, **kwargs)
+
+    monkeypatch.setattr(first_engine, "_save_active", fail_after_initial_exchange)
+    first = first_engine.execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    namespace = resolve_private_namespace(workspace)
+    record_path = workspace / "spec-dock/spec-dock.version"
+    residue_path = namespace / "RECORD-TEMP"
+    assert record_path.is_file()
+    assert residue_path.is_file()
+    displaced = tmp_path / f"initial-public-record-recovery-public-race-{operation}-displaced"
+    swapped = False
+
+    def swap_public_after_residue_fault(point: str) -> None:
+        nonlocal swapped
+        if point == "record-exchange-residue-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    retry_request = _request(workspace, "update") if operation == "install" else request
+    second = ProviderLifecycleEngine(fault_injector=swap_public_after_residue_fault).execute(retry_request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "lifecycle-preparation-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert residue_path.is_file()
+    assert (namespace / "ACTIVE.json").is_file()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    assert active.record_temp_witness is not None
+
+    record_path.unlink()
+    displaced.rename(record_path)
+    resumed = ProviderLifecycleEngine().execute(retry_request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+    assert not residue_path.exists()
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_finish_cleanup_rejects_foreign_public_before_receipt_publication(
+    tmp_path: Path, operation: Operation
+) -> None:
+    workspace = (tmp_path / f"finish-cleanup-public-before-receipt-{operation}").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    first_failed = False
+
+    def fail_before_receipt(point: str) -> None:
+        nonlocal first_failed
+        if point == "stage-parent-fsync" and not first_failed:
+            active = active_store.load()
+            if active is not None and active.state == "terminal-cleanup":
+                first_failed = True
+                raise OSError("injected pre-receipt cleanup failure")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_before_receipt).execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first_failed
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    record_path = workspace / "spec-dock/spec-dock.version"
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    assert record_path.is_file()
+    assert not receipt_path.exists()
+
+    displaced = tmp_path / f"finish-cleanup-public-before-receipt-{operation}-displaced"
+    swapped = False
+
+    def swap_public_before_receipt(point: str) -> None:
+        nonlocal swapped
+        if point == "stage-parent-fsync" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_before_receipt).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert not receipt_path.exists()
+    assert (namespace / "ACTIVE.json").is_file()
+
+    record_path.unlink()
+    displaced.rename(record_path)
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
+@pytest.mark.parametrize("operation", ["install", "update", "uninstall"])
+def test_t06_finish_cleanup_rejects_foreign_public_before_active_unlink(tmp_path: Path, operation: Operation) -> None:
+    workspace = (tmp_path / f"finish-cleanup-public-before-active-unlink-{operation}").resolve()
+    workspace.mkdir()
+    if operation != "install":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    request = _request(workspace, operation, specs_mode="keep" if operation == "uninstall" else None)
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(request, force=True)
+
+    serialize_public_result(first)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+    namespace = resolve_private_namespace(workspace)
+    active_path = namespace / "ACTIVE.json"
+    receipt_path = namespace / "CLEANUP-COMPLETED.json"
+    assert active_path.is_file()
+    assert receipt_path.is_file()
+    record_path = workspace / "spec-dock/spec-dock.version"
+    displaced = tmp_path / f"finish-cleanup-public-before-active-unlink-{operation}-displaced"
+    swapped = False
+
+    def swap_public_before_active_unlink(point: str) -> None:
+        nonlocal swapped
+        if point == "active-expected-unlink" and not swapped:
+            _replace_regular_file_with_same_payload(record_path, displaced, mode=0o644)
+            swapped = True
+
+    second = ProviderLifecycleEngine(fault_injector=swap_public_before_active_unlink).execute(request, force=True)
+
+    serialize_public_result(second)
+    assert swapped
+    assert second.status == "partial_failure"
+    assert second.code == "terminal-cleanup-failed"
+    assert record_path.read_bytes() == displaced.read_bytes()
+    assert record_path.stat().st_ino != displaced.stat().st_ino
+    assert active_path.is_file()
+    assert receipt_path.is_file()
+
+    record_path.unlink()
+    displaced.rename(record_path)
+    resumed = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(resumed)
+    assert resumed.status == "completed"
+
+
+@pytest.mark.parametrize("operation", ["install", "update"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_initial_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    operation: Operation,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (tmp_path / f"initial-parent-{operation}-{parent_path.replace('/', '-')}-{unsafe_kind}").resolve()
+    workspace.mkdir()
+    if "/" in parent_path:
+        (workspace / parent_path.split("/", 1)[0]).mkdir()
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"initial-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace) if namespace.exists() else None
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, operation), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "install"
+    assert result.candidate_digest is None
+    assert result.seed_policy == ("create-if-absent" if operation == "install" else "preserve-only")
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    namespace_after = _workspace_snapshot(namespace) if namespace.exists() else None
+    if namespace_before is not None:
+        assert namespace_after == namespace_before
+    elif namespace_after is not None:
+        assert "ACTIVE.json" not in namespace_after
+        assert "CLEANUP-COMPLETED.json" not in namespace_after
+        assert "STAGE" not in namespace_after
+
+
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_update_reentry_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    active_state: str,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"update-reentry-parent-{active_state}-{parent_path.replace('/', '-')}-{unsafe_kind}"
+    ).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "update")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "target-verify"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.operation == "update"
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    namespace_before = _workspace_snapshot(namespace)
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"update-reentry-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "update"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == namespace_before
+
+
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_initial_uninstall_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    mode: LifecycleMode,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (tmp_path / f"initial-uninstall-parent-{mode}-{parent_path.replace('/', '-')}-{unsafe_kind}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"initial-uninstall-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace)
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert _workspace_snapshot(namespace) == namespace_before
+
+
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("parent_path", [".github", ".github/workflows", ".agents", ".agents/skills"])
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "regular"])
+def test_t04_uninstall_reentry_unsafe_seed_parent_binding_blocks_before_admission_mutation(
+    tmp_path: Path,
+    active_state: str,
+    mode: LifecycleMode,
+    parent_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"uninstall-reentry-parent-{active_state}-{mode}-{parent_path.replace('/', '-')}-{unsafe_kind}"
+    ).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "root-docs-publish-or-detach"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.operation == "uninstall"
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    namespace_before = _workspace_snapshot(namespace)
+    _replace_seed_parent_with_unsafe_type(
+        workspace,
+        parent_path,
+        unsafe_kind,
+        tmp_path / f"uninstall-reentry-parent-{parent_path.replace('/', '-')}-{unsafe_kind}-target",
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-parent-binding"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == namespace_before
+
+
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_update_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (tmp_path / f"unsafe-seed-{unsafe_kind}-{seed_path.replace('/', '-')}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+
+    seed = workspace / seed_path
+    seed.unlink()
+    if unsafe_kind == "symlink":
+        target = tmp_path / f"{seed_path.replace('/', '-')}-target"
+        target.write_text("consumer target\n", encoding="utf-8")
+        seed.symlink_to(target)
+    elif unsafe_kind == "directory":
+        seed.mkdir()
+    else:
+        os.mkfifo(seed)
+
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    receipt_before = receipt_store.load()
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "update"
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+
+
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+def test_t04_legacy_unsafe_seed_type_blocks_before_admission_mutation(tmp_path: Path, seed_path: str) -> None:
+    workspace = (tmp_path / f"legacy-unsafe-seed-{seed_path.replace('/', '-')}").resolve()
+    workspace.mkdir()
+    _materialize_legacy_workspace(workspace)
+
+    seed = workspace / seed_path
+    seed.parent.mkdir(parents=True, exist_ok=True)
+    seed.unlink(missing_ok=True)
+    os.mkfifo(seed)
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "update"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "install"
+    assert result.seed_policy == "preserve-only"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+
+
+@pytest.mark.parametrize("workspace_kind", ["update", "legacy-migration"])
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_reentry_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    active_state: str,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"reentry-unsafe-seed-{workspace_kind}-{active_state}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "update":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+        request = _request(workspace, "update")
+    else:
+        _materialize_legacy_workspace(workspace)
+        request = _request(workspace, "update")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "target-verify"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    stage_before = _workspace_snapshot(namespace)
+
+    seed = workspace / seed_path
+    if seed.is_symlink() or seed.exists():
+        seed.unlink()
+    seed.parent.mkdir(parents=True, exist_ok=True)
+    if unsafe_kind == "symlink":
+        target = tmp_path / f"{seed_path.replace('/', '-')}-target"
+        target.write_text("consumer target\n", encoding="utf-8")
+        seed.symlink_to(target)
+    elif unsafe_kind == "directory":
+        seed.mkdir()
+    else:
+        os.mkfifo(seed)
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == active_before.operation
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == stage_before
+
+
+@pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_initial_uninstall_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    mode: LifecycleMode,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"initial-uninstall-unsafe-seed-{workspace_kind}-{mode}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "ready-origin":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    else:
+        _materialize_legacy_workspace(workspace)
+
+    seed = workspace / seed_path
+    _replace_seed_with_unsafe_type(
+        seed,
+        unsafe_kind,
+        tmp_path / f"initial-uninstall-{unsafe_kind}-{seed_path.replace('/', '-')}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace) if namespace.exists() else None
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    namespace_after = _workspace_snapshot(namespace) if namespace.exists() else None
+    if namespace_before is not None:
+        assert namespace_after == namespace_before
+    elif namespace_after is not None:
+        assert "ACTIVE.json" not in namespace_after
+        assert "CLEANUP-COMPLETED.json" not in namespace_after
+        assert "STAGE" not in namespace_after
+
+
+@pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_terminal_uninstall_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    mode: LifecycleMode,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path / f"terminal-uninstall-unsafe-seed-{workspace_kind}-{mode}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "ready-origin":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    else:
+        _materialize_legacy_workspace(workspace)
+        migrated = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert migrated.status == "completed"
+
+    terminal = ProviderLifecycleEngine().execute(_request(workspace, "uninstall"), force=True)
+    assert terminal.status == "completed"
+    assert terminal.code == "uninstall-completed"
+    assert parse_installation_record((workspace / "spec-dock/spec-dock.version").read_bytes()).state == (
+        "tooling-absent-preserved-data"
+    )
+
+    seed = workspace / seed_path
+    _replace_seed_with_unsafe_type(
+        seed,
+        unsafe_kind,
+        tmp_path / f"terminal-uninstall-{unsafe_kind}-{seed_path.replace('/', '-')}-target",
+    )
+    before = _workspace_snapshot(workspace)
+    namespace = resolve_private_namespace(workspace)
+    namespace_before = _workspace_snapshot(namespace) if namespace.exists() else None
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    namespace_after = _workspace_snapshot(namespace) if namespace.exists() else None
+    assert namespace_after == namespace_before
+
+
+@pytest.mark.parametrize("workspace_kind", ["ready-origin", "exact-legacy-origin"])
+@pytest.mark.parametrize("active_state", ["prepared", "running"])
+@pytest.mark.parametrize("mode", ["apply", "dry-run"])
+@pytest.mark.parametrize("seed_path", SEED_PATHS)
+@pytest.mark.parametrize("unsafe_kind", ["symlink", "directory", "fifo"])
+def test_t04_uninstall_reentry_unsafe_seed_type_blocks_before_admission_mutation(
+    tmp_path: Path,
+    workspace_kind: str,
+    active_state: str,
+    mode: LifecycleMode,
+    seed_path: str,
+    unsafe_kind: str,
+) -> None:
+    workspace = (
+        tmp_path
+        / f"reentry-uninstall-unsafe-seed-{workspace_kind}-{active_state}-{mode}-{unsafe_kind}-{seed_path.replace('/', '-')}"
+    ).resolve()
+    workspace.mkdir()
+    if workspace_kind == "ready-origin":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+    else:
+        _materialize_legacy_workspace(workspace)
+    request = _request(workspace, "uninstall")
+
+    fault_point = "stage-mkdir" if active_state == "prepared" else "root-docs-publish-or-detach"
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status in {"blocked", "partial_failure"}
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active_before = active_store.load()
+    assert active_before is not None
+    assert active_before.operation == "uninstall"
+    assert active_before.state == active_state
+    receipt_before = receipt_store.load()
+    namespace_before = _workspace_snapshot(namespace)
+
+    seed = workspace / seed_path
+    _replace_seed_with_unsafe_type(
+        seed,
+        unsafe_kind,
+        tmp_path / f"reentry-uninstall-{active_state}-{unsafe_kind}-{seed_path.replace('/', '-')}-target",
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(
+        _request(workspace, "uninstall", mode=mode),
+        force=True,
+    )
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "unsafe-target-type"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest is None
+    assert result.seed_policy == "preserve-only"
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert result.actions == ()
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active_before
+    assert receipt_store.load() == receipt_before
+    assert _workspace_snapshot(namespace) == namespace_before
+
+
+def test_t04_prepared_uninstall_dry_run_preserves_foreign_stage_before_plan(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "prepared-uninstall").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "uninstall", mode="dry-run")
+    active = cast(
+        "ActiveState",
+        SimpleNamespace(
+            operation="uninstall",
+            seed_policy="preserve-only",
+            result_family="uninstall",
+            repository_key="a" * 64,
+            tuple_key="b" * 64,
+            operation_generation="0" * 32,
+            candidate_digest="c" * 64,
+            registered_stage_entries=({"candidate_tree_digest": None, "original_tree_digest": None},) * 6,
+        ),
+    )
+
+    class ForeignStage:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def inspect(self, owner):
+            self.calls += 1
+            raise PrivateStateForeignError("foreign prepared stage")
+
+    foreign_stage = ForeignStage()
+    stage = cast("StageStore", foreign_stage)
+    engine = ProviderLifecycleEngine()
+    monkeypatch.setattr(engine, "_observe_domains", lambda _root_fd: pytest.fail("target was observed"))
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        result = engine._resume_or_block(
+            request,
+            "uninstall",
+            "preserve-only",
+            None,
+            active,
+            None,
+            None,
+            stage,
+            root_fd,
+            force=None,
+        )
+    finally:
+        os.close(root_fd)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.operation == "uninstall"
+    assert result.candidate_digest == "c" * 64
+    assert result.seed_policy == "preserve-only"
+    assert result.mutation_started is False
+    assert foreign_stage.calls == 1
+
+
+@pytest.mark.parametrize("fault_point", ["stage-mkdir", "stage-owner-write"])
+def test_t04_prepared_uninstall_dry_run_plans_without_repairing_incomplete_stage(
+    tmp_path: Path, fault_point: str
+) -> None:
+    workspace = (tmp_path / fault_point).resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "uninstall")
+    first = ProviderLifecycleEngine(fault_injector=fault_point).execute(request, force=True)
+    assert first.status == "blocked"
+    assert first.code == "lifecycle-preparation-failed"
+
+    before = _workspace_snapshot(workspace)
+    dry_run = ProviderLifecycleEngine().execute(_request(workspace, "uninstall", mode="dry-run"))
+
+    serialize_public_result(dry_run)
+    assert dry_run.status == "planned"
+    assert dry_run.code == "uninstall-planned"
+    assert _workspace_snapshot(workspace) == before
+
+
+def test_t04_active_reentry_rejects_repository_identity_mismatch(tmp_path: Path) -> None:
+    workspace = (tmp_path / "active-binding").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(request, force=True)
+    assert first.status == "blocked"
+
+    namespace = resolve_private_namespace(workspace)
+    store = ActiveStateStore(namespace, repository_root=workspace)
+    active = store.load()
+    assert active is not None
+    store.save(
+        replace(
+            active,
+            repository_identity={
+                "device": active.repository_identity["device"],
+                "inode": active.repository_identity["inode"] + 1,
+                "euid": active.repository_identity["euid"],
+            },
+        )
+    )
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+
+
+@pytest.mark.parametrize("operation", ["install", "uninstall"])
+def test_t04_active_records_explicit_original_and_terminal_kinds(tmp_path: Path, operation: Operation) -> None:
+    workspace = (tmp_path / operation).resolve()
+    workspace.mkdir()
+    if operation == "uninstall":
+        installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+        assert installed.status == "completed"
+
+    result = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(_request(workspace, operation), force=True)
+    assert result.status == "blocked"
+
+    namespace = resolve_private_namespace(workspace)
+    store = ActiveStateStore(namespace, repository_root=workspace)
+    active = store.load()
+    assert active is not None
+    expected_original = "directory" if operation == "uninstall" else "absent"
+    expected_terminal = "absent" if operation == "uninstall" else "directory"
+    assert {item["original_kind"] for item in active.owned_target_witnesses} == {expected_original}
+    assert {item["terminal_kind"] for item in active.owned_target_witnesses} == {expected_terminal}
+    if operation == "uninstall":
+        assert all(item["terminal_tree_digest"] is None for item in active.owned_target_witnesses)
+    else:
+        assert all(isinstance(item["terminal_tree_digest"], str) for item in active.owned_target_witnesses)
+
+    invalid = replace(
+        active,
+        owned_target_witnesses=tuple(
+            {**item, "terminal_kind": None, "terminal_tree_digest": None} for item in active.owned_target_witnesses
+        ),
+    )
+    with pytest.raises(PrivateStateError):
+        store.save(invalid)
+
+
+def test_t04_private_authority_stays_bound_to_leased_root_after_visible_path_swap(tmp_path: Path) -> None:
+    requested = (tmp_path / "repository").resolve()
+    replacement = (tmp_path / "replacement").resolve()
+    original_location = (tmp_path / "original-location").resolve()
+    requested.mkdir()
+    replacement.mkdir()
+    original_binding = os.lstat(requested)
+    replacement_binding = os.lstat(replacement)
+
+    class SwapVisibleRootFilesystem(NativeAtomicFilesystem):
+        swapped = False
+
+        def probe_native_capability(self, parent_fd: int) -> None:
+            if not self.swapped:
+                requested.rename(original_location)
+                replacement.rename(requested)
+                self.swapped = True
+            super().probe_native_capability(parent_fd)
+
+    result = ProviderLifecycleEngine(filesystem=SwapVisibleRootFilesystem()).execute(
+        _request(requested, "install"), force=True
+    )
+
+    serialize_public_result(result)
+    assert result.status == "completed"
+    private_root = requested.parent / f".spec-dock-provider-lifecycle-v1-euid-{os.geteuid()}"
+    original_namespace = private_root / repository_key_for(
+        original_binding.st_dev, original_binding.st_ino, os.geteuid()
+    )
+    replacement_namespace = private_root / repository_key_for(
+        replacement_binding.st_dev, replacement_binding.st_ino, os.geteuid()
+    )
+    assert original_namespace.is_dir()
+    assert not replacement_namespace.exists()
+
+
+def test_t04_indeterminate_preparation_observation_is_not_classified_as_p2a(monkeypatch, tmp_path: Path) -> None:
+    workspace = (tmp_path / "indeterminate-preparation").resolve()
+    workspace.mkdir()
+    request = _request(workspace, "install")
+    engine = ProviderLifecycleEngine(fault_injector="stage-mkdir")
+    first = engine.execute(request, force=True)
+    assert first.status == "blocked"
+
+    namespace = resolve_private_namespace(workspace)
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert active is not None
+    monkeypatch.setattr(engine, "_observe_record", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("unknown")))
+    root_fd = os.open(workspace, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        result = engine._partial_failure_result(request, active, OSError("record publication failed"), root_fd)
+    finally:
+        os.close(root_fd)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "stage-owner-mismatch"
+    assert result.operation == "install"
+    assert result.candidate_digest == active.candidate_digest
+    assert result.seed_policy == active.seed_policy
+    assert result.phase == "candidate-staging"
+    assert result.last_completed_phase == "preflight"
+    assert result.mutation_started is False
+    assert result.actions == ()
+
+
+def test_t04_cleanup_token_mismatch_is_the_closed_request_error(tmp_path: Path) -> None:
+    workspace = (tmp_path / "invalid-cleanup-token").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "update")
+    occurrences = 0
+
+    def fail_cleanup(point: str) -> None:
+        nonlocal occurrences
+        if point == "stage-entry-docs-remove":
+            occurrences += 1
+            if occurrences == 2:
+                raise OSError("stage cleanup failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_cleanup).execute(request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    result = ProviderLifecycleEngine().execute(request, force=True, cleanup_token="0" * 64)
+
+    serialize_public_result(result)
+    assert result.status == "error"
+    assert result.code == "invalid-request"
+    assert result.operation is None
+    assert result.candidate_digest is None
+    assert result.seed_policy is None
+    assert result.phase == "request-validation"
+    assert result.last_completed_phase == "not-started"
+    assert result.mutation_started is False
+
+
+def test_t04_first_desired_request_is_saved_by_receipt_before_active_reconciliation(tmp_path: Path) -> None:
+    workspace = (tmp_path / "receipt-first-request").resolve()
+    workspace.mkdir()
+    base_request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(base_request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    receipt_store = CompletionReceiptStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    receipt = receipt_store.load()
+    assert active is not None and receipt is not None
+    assert active.deferred_invocation is None
+    assert receipt.deferred_invocation is None
+
+    desired = _request(workspace, "uninstall", specs_mode="keep")
+    result = ProviderLifecycleEngine().execute(desired)
+
+    serialize_public_result(result)
+    assert result.status == "completed"
+    assert result.code == "terminal-cleanup-completed"
+    assert result.continuation["next_action"] == "run-request"
+    assert result.continuation["next_command"] == "spec-dock uninstall --apply --keep-specs -- " + str(workspace)
+    stored_receipt = receipt_store.load()
+    assert stored_receipt is not None
+    assert stored_receipt.deferred_invocation == {
+        "invocation_id": "uninstall-apply-keep",
+        "rendered_command": "spec-dock uninstall --apply --keep-specs -- " + str(workspace),
+    }
+
+
+def test_t04_receipt_owned_deferred_request_survives_active_reconciliation_failure(tmp_path: Path) -> None:
+    workspace = (tmp_path / "receipt-active-reconciliation-failure").resolve()
+    workspace.mkdir()
+    base_request = _request(workspace, "install")
+    first = ProviderLifecycleEngine(fault_injector="active-expected-unlink").execute(base_request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    desired = _request(workspace, "uninstall", specs_mode="keep")
+    failed = ProviderLifecycleEngine(fault_injector="active-temp-open").execute(desired)
+
+    serialize_public_result(failed)
+    assert failed.status == "partial_failure"
+    assert failed.code == "terminal-cleanup-failed"
+    assert failed.continuation["next_action"] == "retry-cleanup"
+    assert failed.continuation["after_cleanup_action"] == "run-request"
+    assert failed.continuation["after_cleanup_command"] == "spec-dock uninstall --apply --keep-specs -- " + str(
+        workspace
+    )
+    namespace = resolve_private_namespace(workspace)
+    receipt = CompletionReceiptStore(namespace, repository_root=workspace).load()
+    active = ActiveStateStore(namespace, repository_root=workspace).load()
+    assert receipt is not None and active is not None
+    assert receipt.deferred_invocation is not None
+    assert active.deferred_invocation is None
+
+
+def test_t04_absent_update_preserve_only_rejects_init_force_seed_mismatch(tmp_path: Path) -> None:
+    workspace = (tmp_path / "absent-update-seed").resolve()
+    workspace.mkdir()
+    update_request = _request(workspace, "update")
+    first = ProviderLifecycleEngine(fault_injector="stage-mkdir").execute(update_request, force=True)
+    assert first.status == "blocked"
+    assert first.operation == "install"
+    assert first.seed_policy == "preserve-only"
+
+    namespace = resolve_private_namespace(workspace)
+    active_store = ActiveStateStore(namespace, repository_root=workspace)
+    active = active_store.load()
+    assert active is not None
+    before = _workspace_snapshot(workspace)
+
+    result = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+
+    serialize_public_result(result)
+    assert result.status == "blocked"
+    assert result.code == "resume-seed-policy-mismatch"
+    assert result.operation == active.operation
+    assert result.candidate_digest == active.candidate_digest
+    assert result.seed_policy == active.seed_policy
+    assert result.phase == "preflight"
+    assert result.last_completed_phase == "request-validation"
+    assert result.mutation_started is False
+    assert _workspace_snapshot(workspace) == before
+    assert active_store.load() == active
+
+
+@pytest.mark.parametrize("foreign_part", ["owner", "entry"])
+def test_t04_cleanup_preserves_foreign_stage_authority_and_payload(tmp_path: Path, foreign_part: str) -> None:
+    workspace = (tmp_path / f"foreign-stage-{foreign_part}").resolve()
+    workspace.mkdir()
+    installed = ProviderLifecycleEngine().execute(_request(workspace, "install"), force=True)
+    assert installed.status == "completed"
+    request = _request(workspace, "update")
+    occurrences = 0
+
+    def fail_cleanup(point: str) -> None:
+        nonlocal occurrences
+        if point == "stage-entry-docs-remove":
+            occurrences += 1
+            if occurrences == 2:
+                raise OSError("stage cleanup failed")
+
+    first = ProviderLifecycleEngine(fault_injector=fail_cleanup).execute(request, force=True)
+    assert first.status == "partial_failure"
+    assert first.code == "terminal-cleanup-failed"
+
+    namespace = resolve_private_namespace(workspace)
+    stage = namespace / "STAGE"
+    owner_path = stage / "STAGE-OWNER.json"
+    docs_path = stage / "docs"
+    if foreign_part == "owner":
+        owner = json.loads(owner_path.read_text(encoding="utf-8"))
+        owner["operation_generation"] = "1" * 32
+        owner_path.write_text(json.dumps(owner, separators=(",", ":")) + "\n", encoding="utf-8")
+        owner_path.chmod(0o600)
+        expected_owner = owner_path.read_bytes()
+        expected_entry = docs_path
+    else:
+        foreign_file = docs_path / "foreign.txt"
+        foreign_file.write_text("foreign\n", encoding="utf-8")
+        expected_owner = owner_path.read_bytes()
+        expected_entry = foreign_file
+
+    result = ProviderLifecycleEngine().execute(request, force=True)
+
+    serialize_public_result(result)
+    assert result.status == "partial_failure"
+    assert result.code == "terminal-cleanup-failed"
+    assert owner_path.read_bytes() == expected_owner
+    assert expected_entry.exists()

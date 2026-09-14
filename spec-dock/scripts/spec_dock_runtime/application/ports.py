@@ -8,14 +8,16 @@ if TYPE_CHECKING:
 
     from spec_dock_runtime.application.contracts import (
         ArtifactWriteResult,
-        BootstrapResult,
         ExplicitFileArtifactPublishRequest,
         ExplicitFileArtifactPublishResult,
         ExplicitFileSourcePreflightRequest,
+        GitCapabilityAssessment,
         GitHubCapabilityDiagnostic,
         GitHubCapabilityProbeRequest,
         GitWorktreeRecord,
         GuardedExplicitFileSource,
+        PinnedCheckout,
+        PinnedProviderClosure,
         SyncCommandResult,
         SyncRequest,
     )
@@ -150,9 +152,11 @@ class DepsTopologyReader(Protocol):
 
 
 class GitGateway(Protocol):
-    def require_clean_working_tree(self, repo_root: Path) -> None: ...
+    def require_clean_working_tree(self, repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None: ...
 
     def current_branch_or_none(self, repo_root: Path) -> str | None: ...
+
+    def current_head_or_none(self, repo_root: Path) -> str | None: ...
 
     def local_branch_exists(self, repo_root: Path, branch: str) -> bool: ...
 
@@ -166,23 +170,85 @@ class GitGateway(Protocol):
 
     def worktree_list(self, repo_root: Path) -> list[GitWorktreeRecord]: ...
 
-    def add_worktree_with_new_branch(self, repo_root: Path, *, path: Path, branch: str) -> None: ...
+    def remove_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        force: bool,
+        source_fd: int | None = None,
+        target_fd: int | None = None,
+    ) -> None: ...
 
-    def remove_worktree(self, repo_root: Path, *, path: Path, force: bool) -> None: ...
+    def resolve_commit(self, repo_root: Path, ref: str) -> str: ...
+
+    def provider_closure(self, repo_root: Path, pinned_commit: str) -> PinnedProviderClosure: ...
+
+    def assess_capabilities(
+        self,
+        repo_root: Path,
+        *,
+        pinned_commit: str,
+        closure_paths: tuple[str, ...],
+        branch: str | None = None,
+        check_other_worktree: bool = True,
+    ) -> GitCapabilityAssessment: ...
+
+    def pinned_checkout(
+        self,
+        repo_root: Path,
+        *,
+        branch: str,
+        pinned_commit: str,
+        checkout_kind: str,
+        closure_paths: tuple[str, ...],
+    ) -> PinnedCheckout: ...
+
+    def verify_pinned_checkout(
+        self,
+        repo_root: Path,
+        *,
+        checkout: PinnedCheckout,
+        closure_paths: tuple[str, ...],
+    ) -> None: ...
+
+    def add_worktree_pinned(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        branch: str,
+        pinned_commit: str,
+        source_fd: int | None = None,
+        target_fd: int | None = None,
+    ) -> None: ...
+
+    def materialize_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        pinned_commit: str,
+        source_fd: int,
+        target_fd: int,
+    ) -> tuple[tuple[str, tuple[int, int]], ...]: ...
+
+    def publish_worktree_entrypoint(
+        self,
+        repo_root: Path,
+        *,
+        target_fd: int,
+        pinned_commit: str,
+        directory_witnesses: tuple[tuple[str, tuple[int, int]], ...],
+    ) -> None: ...
 
 
 class GitHubCapabilityGateway(Protocol):
     def probe(self, request: GitHubCapabilityProbeRequest) -> list[GitHubCapabilityDiagnostic]: ...
 
 
-class BootstrapGateway(Protocol):
-    def run_make_init_if_available(self, worktree_path: Path) -> BootstrapResult: ...
-
-
 class FilesystemGateway(Protocol):
     def path_exists(self, path: Path) -> bool: ...
-
-    def remove_target(self, path: Path) -> None: ...
 
     def path_kind(self, path: Path) -> str: ...
 
@@ -253,8 +319,9 @@ class Ports:
     clock: Clock | None = None
     artifact_writer: ArtifactWriter | None = None
     sync_legacy_runner: SyncLegacyRunner | None = None
-    bootstrap_gateway: BootstrapGateway | None = None
     environment_gateway: EnvironmentGateway | None = None
     filesystem_gateway: FilesystemGateway | None = None
     explicit_file_source_guard: ExplicitFileSourceGuard | None = None
     explicit_file_artifact_publisher: ExplicitFileArtifactPublisher | None = None
+    repo_root_fd: int | None = None
+    repo_root_binding: tuple[int, int] | None = None

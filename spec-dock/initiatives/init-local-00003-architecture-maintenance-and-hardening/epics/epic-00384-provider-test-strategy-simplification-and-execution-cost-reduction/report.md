@@ -3,8 +3,8 @@
 ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 状態: "parent-planning"
-最終更新: "2026-09-08"
-依存: ["requirement.md", "design.md", "plan.md"]
+最終更新: "2026-09-14"
+依存: ["requirement.md", "design.md", "plan.md", "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md", "artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md", "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"]
 親: ["init-local-00003"]
 ---
 
@@ -51,9 +51,37 @@ Raw evidenceはEpic配下のGit管理外 `.workbench/reviews/20260908-baseline-d
 
 ## Next authorized sequence
 
-1. 両DECと対象worktree修正を含む候補を同じreviewerで再確認し、P0/P1=0・review passを得る。
-2. 文書・HTML検証後、reviewed bytesをcommit/pushし、同一SHA・clean状態・外部freeze receiptと四つのGitHub projection/readbackを確認する。
-3. 親G0、依存、B0を確認して同じworktreeで#392を正式startする。
-4. #392のR/D/PとLuna Max handoffを詳細化し、そのIssueの独立review合格後だけ実装へ進む。#395はB1、#396はB2待ち。
+1. accepted ADR、Epic/Issue R/D/P、Handoff、Test Ownership Artifactを一つの候補として独立Strict reviewし、P0/P1=0・`review_status=pass`を得る。
+2. reviewed bytesをcommit/pushしてexact SHAを固定し、#384/#392/#395/#396のGitHub projection/readbackをそのfreezeへ収束させる。
+3. 親G0、依存、B0、#387、15/14/1、243 timing、required-fast fourを再確認する。#392のformal startは完了済みなので再実行しない。
+4. G0後はIssue #392 Plan §2.1から既存candidateの限定re-entryを行い、CP1を作り直さずCP2から進める。#392 mergeはP392、#395はそのexact tipから開始し、B1/B2は#395 merge後の同一tipで評価する。
 
-[現行HTML](artifacts/epic-00384-current-plan-guide.html)は再評価の修正点、採用済み判断、正式startと実装許可の区別を説明する。旧10分割／単一Issue資料はhistorical evidenceであり、実装権限ではない。
+[2026-09-08 HTML guide](artifacts/epic-00384-current-plan-guide.html)は当時の再評価、正式start、実装許可の区別を説明するhistoryです。Option 1後の再開条件と現行Strict review routeは本文のEpic R/D/PおよびRolling-Wave Contract §5を正本とし、このguideはそれらを上書きしません。旧10分割／単一Issue資料もhistorical evidenceであり、実装権限ではありません。
+
+## 2026-09-12 later decision — Issue #392 safe stop (superseded)
+
+[Same-EUID safe-stop ADR](artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md)は当時の脅威モデルに基づく履歴として保持し、現在の再開判断は後続のE384-DEC-004に置き換わりました。
+
+## 2026-09-12 later decision — Issue #392 scope reopening
+
+ユーザーはOption 1を採用し、同一EUIDの非協調actorを保証対象外としました。[Superseding ADR](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)とE384-DEC-004がcurrent authorityです。SpecDock協調lease、通常I/O failure、process interruption、Wire-defined recovery、protected-data preservation、baseline、required-fast、CI、human merge gateは変更しません。
+
+改訂親/Wire/Issue R/D/Pの独立review、clean pushed freeze、Issue projection/readbackが終わるまでProduct実装許可はfalseです。B1および#395/#396は未達のままです。Issue Report §28–29のfailure/safe-stop記述は当時の証拠として保持し、新しいtest dispositionは後続実装結果で追記します。
+
+ユーザーは2026-09-12にChatGPT Use系Strict skill/scriptの利用再開を指示しました。過去の一時的なGPT-6 subagent review routeは現在の運用authorityではなく、独立review routeは更新済み[Rolling-Wave Contract §5](artifacts/rolling-wave-issue-elaboration-contract.md)に従います。執筆/Blue Team分析とRed Team reviewは別sessionとし、exact clean pushed SHAをそれぞれStrictに確認します。
+
+## 2026-09-14 P392 sequence and dependency update
+
+ユーザー承認済み[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)をEpic acceptanceへ反映しました。#392 human merge後はP392として記録し、#395はそのexact merged tipから作業します。B1/B2は#395 merge後の同一tipで評価し、#392はB1、#395と#396はB2成立後の所定gateを満たすまでclosure/開始しません。P392のfull-verifier例外は、そのexact runの全violationが#395-owned active rowsに対応する場合だけ許可します。
+
+SpecDock CLIでiss-00395からiss-00392へのclose-based metadata dependencyを削除し、iss-00396からiss-00395へのdependencyは維持しました。したがってdeps check上の#395 ready=trueはP392証拠でもstart許可でもなく、#395の実行には人間がmergeしたP392 exact SHAと現在のfull-verifier row対応確認が別途必須です。#396は#395 dependencyにより引き続きblockedです。SpecDock validateはpassしました。
+
+#392 test migrationは現行public behavior・保護データ・baseline/policy検証を残し、obsolete-only/absence-onlyおよび分類専用testを恒久suiteから削るよう仕様化しました。Product source/testにはまだ変更を加えていません。改訂R/D/Pのindependent Strict review、clean pushed freeze、GitHub projection/readbackが済むまでProduct実装は再開しません。
+
+## 2026-09-14 Blue Strict analysis follow-up
+
+`chatgpt-use-strict` session `issue-392-p392-blue`（GPT-5.6 Sol、Extra High）は、verified branch SHA `13ed9de5fd6180b635f5c32d3a7ec3e6b53e7401`に対してBLOCKを返しました。これはP0/P1 classificationではなくG0未充足の判定です。live GitHub readbackで#384/#392/#395 bodiesに旧freeze/B1依存表現が残り、#396の#395 dependencyは現行契約どおり維持されていることを確認しました。現行sourceには`test_s40b_provider_scaffold_excludes_removed_docs_and_templates`というabsence-only testがあり、Test Ownership ArtifactのRule 5には未記載でした。また、同Artifactの`test_s40b_legacy_bootstrap_and_skill_apply_paths_are_retired` KEEP entryはcurrent sourceに存在しないstale classificationです。
+
+macOSでrequired-fastを既定`/var/folders`から実行すると、no-follow root bindingが`/var` symlinkを拒否して2件が失敗しました。同じ実体directoryを`/private/var/...`で指定すると通り、`TMPDIR=/private/tmp`でrequired-fast fourは`4 passed`でした。no-follow実装は変更せず、後続のローカルmacOS検証ではこの明示的temporary-rootを使います。
+
+この追補時点ではtest-disposition文書修正、independent Strict review、freeze後のGitHub projection/readbackは未完了です。従ってG0とProduct実装許可は未達のままです。

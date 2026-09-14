@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
-import subprocess
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import (
+    CommandArgs,
+    CommandOutcome,
+    CommandSpec,
+    InstallerExecRequest,
+)
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
@@ -19,6 +24,7 @@ UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
 @dataclass(frozen=True)
 class UpdateArgs(CommandArgs):
     target: str
+    invocation_cwd: Path | None = None
 
 
 def command_specs() -> dict[str, CommandSpec]:
@@ -46,14 +52,22 @@ def _add_update_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _update_args(ns: argparse.Namespace) -> CommandArgs:
-    return UpdateArgs(target=str(getattr(ns, "path", ".")))
+    return UpdateArgs(
+        target=str(getattr(ns, "path", ".")),
+        invocation_cwd=getattr(ns, "_invocation_cwd", None),
+    )
 
 
 def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     typed = _expect_update_args(args)
-    target = Path(typed.target).expanduser().resolve()
-    command = [
+    target = Path(typed.target).expanduser()
+    if typed.invocation_cwd is not None and not target.is_absolute():
+        target = typed.invocation_cwd / target
+    elif not target.is_absolute():
+        target = Path.cwd() / target
+    target = Path(os.path.normpath(target))
+    command = (
         "uvx",
         "--no-cache",
         "--from",
@@ -61,24 +75,14 @@ def _run_update(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         "spec-dock",
         "update",
         str(target),
-    ]
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return CommandOutcome(
-            exit_code=127,
-            text=CliText(
-                stdout_lines=[],
-                stderr_lines=["error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry."],
-                warnings=[],
-            ),
-        )
+    )
     return CommandOutcome(
-        exit_code=int(result.returncode),
-        text=CliText(
-            stdout_lines=result.stdout.splitlines(),
-            stderr_lines=result.stderr.splitlines(),
-            warnings=[],
+        exit_code=0,
+        text=CliText(stdout_lines=[], stderr_lines=[], warnings=[]),
+        terminal=InstallerExecRequest(
+            kind="installer-exec",
+            argv=command,
+            environment_policy="inherit-without-lock-bypass",
         ),
     )
 

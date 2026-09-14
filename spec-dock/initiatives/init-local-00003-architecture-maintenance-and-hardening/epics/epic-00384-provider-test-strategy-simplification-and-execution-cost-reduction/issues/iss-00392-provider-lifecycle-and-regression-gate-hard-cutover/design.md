@@ -4,11 +4,14 @@ ID: "iss-00392"
 タイトル: "Provider Lifecycle And Regression Gate Hard Cutover"
 契約名: "Fixed Ownership Provider Lifecycle Hard Cutover"
 関連GitHub: ["#392"]
-状態: "approved"
-詳細化状態: "independent-review-passed"
-最終更新: "2026-09-08"
+状態: "draft"
+詳細化状態: "draft"
+最終更新: "2026-09-14"
 依存:
   - "requirement.md"
+  - "../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
+  - "../../artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
   - "artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md"
 親: ["epic-00384", "init-local-00003"]
 実装開始許可: true
@@ -21,6 +24,8 @@ repository_evidence:
 ---
 
 # iss-00392 Provider Lifecycle And Regression Gate Hard Cutover — 設計
+
+> **現行状態（2026-09-14）:** ユーザー採用済みの[same-EUID scope narrowing ADR](../../artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)に従います。同一EUIDの非協調actorは保証対象外で、#392 human mergeはB1ではなくP392です。仕様freeze `bc896cf8d11362fb338768c2295e7430e5538200`の独立reviewとIssue projection/readbackでG0成立を確認し、ユーザー承認により`実装開始許可=true`です。CP1–CP4は実装済みですが、Issue受入、human merge、B1/B2は未完了の別gateです。協調SpecDock commandのlease、通常I/O／crash recovery、観測されたbinding drift、protected-data preservationは維持し、creator provenanceや一般のhostile-filesystem耐性は主張しません。特権broker/daemon等は追加しません。
 
 ## 1. 設計結論
 
@@ -249,6 +254,8 @@ Unknown entryはpreserve-and-blockです。Entry modeは次のclosed matrixで�
 | Public-record staging | `RECORD-TEMP` | regular/link1/owner euid/mode0644/max4096 |
 | Private directories | repository namespace、`STAGE` | directory/owner euid/mode0700 |
 
+このcreation/rebind protocolは、OS credential boundaryと協調commandを前提にした通常の安全確認です。同一EUIDの非協調actorがpathやinodeを実行中に差し替える状況に対するcreator-provenance／non-interference guaranteeではありません。観測済みのunsafe bindingは引き続きpreserve-and-blockし、特権serviceや独自security layerで範囲を広げません。
+
 `RECORD-TEMP`はexact expected seven-key public record、またはexchange後にACTIVEのoriginal-record bytes/hash/inode witnessへ一致する旧public recordだけを許可します。Content-equalなforeign inodeを採用せずpreserve-and-blockします。Unsafe objectを削除して進みません。
 
 ### 7.2 Repository and tuple identities
@@ -284,9 +291,9 @@ Authority fileはregular/link1、authority directoryはdirectoryです。Pathは
 
 ### 8.2 `ACTIVE.json`
 
-max32768、mode0600。Top-level exact key order:
+max32768、mode0600。`ACTIVE` schema versionは3です。schema version 1/2は旧private stateとして受理せず、fail-closedで停止します。Top-level exact key order:
 
-1. `schema_version` = 1
+1. `schema_version` = 3
 2. `state`: `prepared|running|ready|terminal-cleanup`
 3. `repository_key`
 4. `repository_identity`: exact keys `device,inode,euid`
@@ -295,26 +302,30 @@ max32768、mode0600。Top-level exact key order:
 7. `operation`: `install|update|uninstall`
 8. `candidate_digest`
 9. `seed_policy`
-10. `result_family`: `install|legacy-migration|update|uninstall`
-11. `original_record`
-12. `expected_incomplete_record`
-13. `bootstrap_container`
-14. `owned_target_witnesses`
-15. `registered_stage_entries`
-16. `record_temp_witness`
-17. `terminal_record_digest`
-18. `cleanup_token`
-19. `cleanup_retry_invocation`
-20. `deferred_invocation`
+10. `seed_admission`
+11. `result_family`: `install|legacy-migration|update|uninstall`
+12. `original_record`
+13. `expected_incomplete_record`
+14. `bootstrap_container`
+15. `owned_target_witnesses`
+16. `registered_stage_entries`
+17. `record_temp_witness`
+18. `public_record_witness`
+19. `terminal_record_digest`
+20. `cleanup_token`
+21. `cleanup_retry_invocation`
+22. `deferred_invocation`
 
 Nested exact schemas:
 
 - `original_record`: `kind,bytes_base64,sha256,witness`。`kind=absent|legacy-0.2.3|final`。Absentでは後三件null、他はnon-null。
+- `seed_admission`: exact keys `spec-dock/.gitignore,.github/workflows/ci.yml`をこの順で持つmapping。各値は`absent|present`。admission時のnonmutating observationを一度だけ保存し、providerがseedを作成したか、consumer seedをpreserveしたかのaction provenanceとretry/re-entryのseed作成判断に使います。seed bytes、inode、mtime、user dataは保存しません。
 - `expected_incomplete_record`: `bytes_base64,sha256`。
 - `bootstrap_container`: `disposition,witness`。`disposition=existing|planned-create|created`。planned-createだけwitness null。
 - `owned_target_witnesses`: fixed six objects、domain order。各object exact keys `path,original_kind,original_tree_digest,original_inode,terminal_kind,terminal_tree_digest`。Kindは`absent|directory`、対応しないdigest/inodeはnull。
 - `registered_stage_entries`: fixed six objects、domain order。各object exact keys `name,target_path,candidate_tree_digest,original_tree_digest`。`name`は`docs|templates|system|scripts|slot-spec-dock|slot-spec-dock-grill-with-docs`。
-- `record_temp_witness`: nullまたは`InodeWitness`。Publish前はmode0644のexact expected record staging inodeを表します。Exchange後はmode0644で戻った旧public recordをACTIVEの`original_record` witnessと照合してexpected-bound unlink/fsyncするまで表します。No-replace後はabsentを確認します。Foreign/content-equal別inodeは採用せず、record parent fsyncとresidue cleanup後にnullへ戻します。
+- `record_temp_witness`: nullまたは`InodeWitness`。Publish前はmode0644のexact expected record staging inodeを表します。初回publishのexchange後は、mode0644で戻った旧public recordをACTIVEの`original_record` witnessと照合し、終端publishのexchange後は直前のexpected incomplete recordとして照合して、expected-bound unlink/fsyncするまで表します。No-replace後は、公開済みrecordの復旧に必要な場合を除きabsentを確認します。Foreign/content-equal別inodeは採用せず、record parent fsyncとresidue cleanup後にnullへ戻します。
+- `public_record_witness`: nullまたはmode0644/link1のpublic `spec-dock.version` witness。Preparedの初期値は`original_record.witness`、prepared中にincomplete recordを公開した後はその公開inode、running/ready/terminal-cleanupでは現在のoperation-owned public record inodeを表します。初回publishはoriginal、終端publishはexpected incomplete recordのこのwitnessへ束縛し、content-equalなforeign inodeの交換・削除を許可しません。
 - `terminal_record_digest`: operation admission時に決定したexact expected terminal record bytesのSHA-256。
 - `cleanup_retry_invocation`: exact keys `role,invocation_id,cleanup_token,rendered_command`。`role=cleanup-retry`。
 - `deferred_invocation`: nullまたはexact keys `invocation_id,rendered_command`。
@@ -323,7 +334,7 @@ State invariants:
 
 | State | Required invariant |
 |---|---|
-| prepared | Consumerはoriginal stateまたはown expected incomplete + unpublished roots。Stageはabsent/incomplete/completeのいずれか。root mutationは禁止。 |
+| prepared | Consumerはoriginal state、またはACTIVEが束縛したown expected incomplete record + unpublished roots。Stageはabsent/incomplete/completeのいずれか。root mutationは禁止。 |
 | running | Expected incomplete recordとparent fsyncが成立。Fixed sequenceのtarget/stage配置から次phaseを推定する。 |
 | ready | 全terminal target content検証済み。Terminal recordは未公開またはmatching。 |
 | terminal-cleanup | Matching terminal recordあり。Lifecycle dispatchは禁止し、cleanup/receiptだけを実行。 |
@@ -375,7 +386,7 @@ max16384、mode0600。Stage removal/fsync後にreceiptをatomic publish/fsyncし
 
 1. Absent toolingで必要なら`spec-dock` containerをbounded create/fsyncし、ACTIVEのbootstrap witnessを`created`へ更新する。
 2. `RECORD-TEMP`をmode0644で作成し、expected incomplete recordを書いてfsyncし、そのwitnessをACTIVEへdurableに記録する。
-3. Native no-replace/exchangeでrecordを公開し、mode0644とrecord parentをfsync・再検証する。No-replace後はtemp absent、exchange後はACTIVEのoriginal-record witnessへ一致する旧recordだけをexpected-bound unlink/fsyncし、foreign substitutionはpreserve-and-blockする。
+3. Native no-replace/exchangeでrecordを公開し、mode0644とrecord parentをfsync・再検証する。公開inodeを`ACTIVE.public_record_witness`へdurableに記録してから、No-replace後はtemp absent、初回publishのexchange後はACTIVEのoriginal-record witnessへ、終端publishのexchange後は直前のexpected incomplete recordへ一致する旧recordだけをexpected-bound unlink/fsyncし、foreign substitutionはpreserve-and-blockする。
 4. ACTIVEを`running`へatomic publish/fsyncする。
 5. `docs`をpublish/exchangeし、target/stage parentsをfsync・再検証する。
 6. `templates`、`system`、`scripts`の順に同じ処理をする。
@@ -681,7 +692,7 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 - `full-regression-timing-weights.json`の243 entries。
 - `scripts/quality/full_regression_baseline.py`、`scripts/quality/verify_full_regression.py`のpolicy semantics。
 - `tests/conftest.py`のfour required-fast identities、full-regression permission/shard behavior。
-- #395/#396 canonical R/D/PとProduct code。
+- #395/#396 Product codeとbaseline責務。Canonical R/D/PはP392 sequence ADRで承認されたentry gate・readiness dependencyの変更だけ反映し、修復scopeやrow dispositionは変えません。
 - Parent Wire v12、`E384-QUAL-001`、accepted ADR。
 - Consumer initiatives/Artifacts/active/`.agent`/diagrams/`.workbench` content。
 
@@ -691,7 +702,8 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 
 - CP2で`pyproject.toml` versionを0.2.4へ固定し、CP4ではread-only確認します。
 - Provider runtime、provider-shipped docs、two provider skills、fixture、package inventoryをcomplete candidateとして先に完成させ、source testsをGREENにしてcandidate digestを固定します。
-- Existing `assets/**/*` package dataへnew fixtureが入ることをwheel/sdist inventoryで検証します。
+- Provider-owned `src/spec_dock/assets/spec_dock/system/.runtime/README.md`を追加し、`pyproject.toml`の`[tool.setuptools.package-data]`へ`assets/spec_dock/system/.runtime/README.md`のexact entryを含めます。既存globへの暗黙依存にしません。
+- 同READMEをwheel/sdist inventoryとT13 parityで検証し、checked-in dogfood mirrorへ完全投影します。Candidate algorithmとT13 node identityは変更しません。
 - `setup.py`のstale build pruningがnew fixture、provider_lifecycle package、bootstrapを削除しないことを確認し、必要な場合だけexact allowlistを更新します。
 - 固定した同一source treeからwheel/sdistをbuildし、isolated installed packageのcandidate digest、fixture bytes、bootstrap SHA、docs、two skill tree digestsを比較します。Build後にprovider candidate bytesを変更した場合、artifact proofをやり直します。
 - Artifact proofがGREENになった後だけ、`spec-dock/scripts/**`、`spec-dock/docs/**`、`.agents/skills/spec-dock/**`、`.agents/skills/spec-dock-grill-with-docs/**`へcomplete candidateを一括同期します。Partial dogfood projectionは禁止します。
@@ -700,6 +712,7 @@ Generatorは親Wire pathをexplicit引数で受け、次を機械検査します
 
 ## 20. Security and privacy properties
 
+- Threat boundary: supported concurrent writers are SpecDock invocations that obey the defined leases. Same-EUID non-cooperating filesystem/Git/process actors are outside the guarantee; this design does not promise creator provenance, non-interference, or arbitrary-time integrity against them. Ordinary I/O/crash recovery, OS permission failures, observed binding drift, unsafe object rejection, and protected-data preservation remain in scope.
 - Private schemaはspec本文、Artifact content、credential、Git remote userinfo、任意のpath list、ambient cwd/home、environment dumpを保存しません。例外として、Wire v12が要求する`ACTIVE.cleanup_retry_invocation.rendered_command`、`ACTIVE.deferred_invocation.rendered_command`、および`CLEANUP-COMPLETED.json`内の同じ二fieldだけはWIR-TEXT-001のexact renderer出力をdurable保存し、normalized targetがabsoluteならabsolute pathを含み得ます。別のstandalone absolute-path fieldや任意commandは禁止し、operational metadataを不要なlog、telemetry、Reportへ転載しません。
 - Public diagnosticはWireのcontent-free exact textだけです。
 - Candidate/legacy fixtureはprovider-owned bytesのdigestと必要なlegacy record bytesだけを保持します。

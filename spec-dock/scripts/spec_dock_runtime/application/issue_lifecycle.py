@@ -22,6 +22,7 @@ from spec_dock_runtime.application.repo_context import resolve_current_repo_slug
 from spec_dock_runtime.application.set_active import (
     checkout_active_target,
     clear_active,
+    last_pinned_checkout,
     resolve_target_node_id,
     set_active,
 )
@@ -283,6 +284,20 @@ def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
             ports=ports,
             warnings=warnings,
         )
+        pinned_checkout = last_pinned_checkout()
+        if pinned_checkout is not None:
+            ports.git_gateway.verify_pinned_checkout(
+                _resolve_repo_root(ports),
+                checkout=pinned_checkout,
+                closure_paths=(
+                    "spec-dock/docs",
+                    "spec-dock/templates",
+                    "spec-dock/system",
+                    "spec-dock/scripts",
+                    ".agents/skills/spec-dock",
+                    ".agents/skills/spec-dock-grill-with-docs",
+                ),
+            )
     except Exception as error:
         raise _checkout_issue_start_failure(requested_issue_id=requested.id, error=error) from error
 

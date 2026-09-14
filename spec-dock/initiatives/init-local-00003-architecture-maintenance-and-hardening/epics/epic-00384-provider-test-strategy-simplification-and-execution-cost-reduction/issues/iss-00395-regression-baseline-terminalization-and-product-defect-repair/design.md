@@ -4,10 +4,10 @@ ID: "iss-00395"
 タイトル: "Regression Baseline Terminalization and Product Defect Repair"
 関連GitHub: ["#395"]
 状態: "draft"
-最終更新: "2026-09-08"
+最終更新: "2026-09-14"
 依存:
   - "requirement.md"
-  - "iss-00392"
+  - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../../design.md"
   - "../../artifacts/active-failure-disposition-register.md"
   - "../../artifacts/provider-lifecycle-wire-contract.md"
@@ -29,7 +29,7 @@ Regression debtを原因に対応して修復する。現行contractに追随し
 
 ## 2. Current / target
 
-| Concern | B1 input | B2 target |
+| Concern | P392 input | Post-#395 same-tip target |
 |---|---|---|
 | Rows | 15 total, 14 active, 1 resolved | 15 total, 0 active, 15 resolved |
 | Product | Accepted failure signatures remain | All accepted behaviors normal pass |
@@ -43,7 +43,7 @@ The register provides identity、signature、behavior and terminalization mode. 
 
 ## 4. Stable input/output interface
 
-Input is accepted B1 tree plus exact register. Output is a clean current-policy baseline consumed by #396. Parent `E384-QUAL-001` remains a read-only future-gate contract and is not implemented or reinterpreted here. A row is resolved only when the canonical observation is normal pass and current evaluator agrees. Ledger text alone cannot create resolution truth。
+Input is the exact human-merged P392 tree plus the exact register and a fresh full-verifier result whose violations are confined to #395-owned active rows. The P392 witness must also show every required check and #392-owned acceptance check GREEN; this narrow full-verifier exception does not waive any other failed check. Output is a clean current-policy baseline consumed by #396. Parent `E384-QUAL-001` remains a read-only future-gate contract and is not implemented or reinterpreted here. A row is resolved only when the canonical observation is normal pass and current evaluator agrees. Ledger text alone cannot create resolution truth。
 
 ### 今確定したProduct境界
 
@@ -67,7 +67,7 @@ Rolling-wave elaboration groups rows only when one diagnosed cause and one obser
 - Signature or identity mismatch before repair blocks the Issue。
 - A fix causing another registered behavior regression is not accepted。
 - A row passing only through skip/xfail/policy exception remains unresolved。
-- Branch rollback reverts complete #395 merge to B1。
+- Branch rollback reverts the complete #395 merge to P392。
 - Cross-Issue contract change returns to parent。
 
 ## 8. Testability
@@ -84,6 +84,6 @@ Implementation-ready elaboration defines exact production observers、representa
 | Broad refactor | Row ownership and non-goals constrain scope. |
 | Hidden lifecycle drift | Wire/read-only conformance is rechecked. |
 
-Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` はユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projectionと当該Issueの依存条件を満たして正式startし、詳細化・独立review後にだけProduct実装を許可する。#392の開始依頼は2026-09-08に受領済みである。
+Issue固有の追加判断はない。親の `E384-DEC-001` / `E384-DEC-002` とP392 sequence ADRはユーザー採用済みで、`owner_decisions_required=[]` である。親G0の独立review・公開freeze/projection後、human-merged P392のexact tipを入口として正式startする。#392 Issue closureを依存条件にせず、#395自身の詳細化・独立review後にだけProduct実装を許可する。
 
 Wire §16のbootstrap bytes、runtime/lifecycle admissionとlease/handoff契約はread-onlyである。Candidate変更時も#392受入時のbootstrap identityを保持し、別の互換機構や運用例外を発明しない。

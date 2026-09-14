@@ -4,11 +4,11 @@ ID: "20260908t011846z"
 タイトル: "Luna Max 実装引継ぎ"
 状態: "approved"
 作成者: "blue-team specification author"
-最終更新: "2026-09-08"
+最終更新: "2026-09-14"
 親: ["iss-00392"]
 template: "blank"
 authority: "evidence"
-derived_from: ["../requirement.md", "../design.md", "../plan.md", "20260908t011846z-01-lifecycle-test-ownership-and-migration.md"]
+derived_from: ["../requirement.md", "../design.md", "../plan.md", "../artifacts/20260908t011846z-01-lifecycle-test-ownership-and-migration.md", "../../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"]
 reflected_to: ["../plan.md"]
 implementation_allowed: true
 repository_evidence:
@@ -167,13 +167,13 @@ Foundationへ`ProviderLifecycleEngine`を追加し、init/update/uninstall publi
 - DELETE after proof `src/spec_dock/managed_distribution.py`
 - DELETE after proof `src/spec_dock/assets/managed_distribution.json`
 - NEW `tests/unit/provider_lifecycle/test_engine.py`
-- NEW `tests/integration/test_issue_392_acceptance.py`へT12だけを追加。
+- NEW `tests/integration/test_issue_392_acceptance.py`へT12のcurrent public lifecycle behavior testだけを追加。
 - MODIFY/RETIRE exact test families in test ownership Artifact。
 
 ### First RED
 
 ```bash
-uv run pytest -q   tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations   tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero   tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent
+uv run pytest -q   tests/unit/provider_lifecycle/test_engine.py::test_t06_all_fixed_fault_boundaries_converge_to_wire_continuations   tests/unit/provider_lifecycle/test_engine.py::test_t07_legacy_migration_uninstall_and_old_package_mutation_zero   tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_preserves_current_lifecycle_contract
 ```
 
 Expected: engine/public route不在またはold ownerへ到達してfail。Protected sentinels test自体は実行可能です。
@@ -188,18 +188,18 @@ Expected: engine/public route不在またはold ownerへ到達してfail。Prote
 6. Tooling-only uninstall/absent recordと`--remove-specs` exit2/mutation0を実装します。
 7. CLIをvalidated `LifecycleResult` emit-only adapterへ切替します。
 8. T06/T07とexact T12 successorをGREENにします。
-9. Production reference scanが0になった後だけold module/manifest/helper/testを削除します。
+9. Current-behavior successorsがGREENになった後、candidate diff/code reviewと一回限りのsource inventoryでold module/manifest/helper/testを整理します。absence-only regression testは作りません。
 
 ### Verification
 
 ```bash
-uv run pytest -q tests/unit/provider_lifecycle   tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_uses_only_new_lifecycle_and_old_writer_is_absent
+uv run pytest -q tests/unit/provider_lifecycle   tests/integration/test_issue_392_acceptance.py::test_t12_public_cli_preserves_current_lifecycle_contract
 uv run pytest --run-full-regression --full-regression-shard tests/cli_runtime/test_distribution_cutover.py
 uv run pytest --run-full-regression --full-regression-shard tests/integration/test_epic_00343_distribution.py
 make lint
 ```
 
-Expected: exit0、all fault subcases exact Wire relation、protected data unchanged、old writer/manifest production reference 0。
+Expected: exit0、all fault subcases exact Wire relation、protected data unchanged。T12 verifies current public behavior; deleted implementation/file/reference checks are performed only by candidate diff/code review, not a persistent test。
 
 ### Stop
 
@@ -280,11 +280,12 @@ CP2で固定済みのversion 0.2.4を確認し、complete provider candidate→s
 - Focused Product/runtime tests GREEN。
 - Old production writer absent。
 - Package versionは0.2.4固定済みで、dogfoodは旧projectionのまま。
-- Human merge、B1、#395開始は未実施。
+- Human merge、P392、#395開始は未実施。
 
 ### Owned files/symbols
 
 - READ-ONLY verify `pyproject.toml`の`[project].version=0.2.4`。Package設定不足が判明した場合はexact keyを指定したpacket訂正へ戻る。
+- NEW `src/spec_dock/assets/spec_dock/system/.runtime/README.md`をprovider sourceとし、`pyproject.toml`の`[tool.setuptools.package-data]`に`assets/spec_dock/system/.runtime/README.md`のexact entryを追加する。checked-in dogfood mirrorも同じbytesへ投影する。Candidate algorithmとT13 node identityは変更しない。
 - MODIFY 必要時のみ`setup.py` package/stale-prune inventory。
 - MODIFY `.github/workflows/provider-ci.yml` without trigger/job/protection weakening。
 - MODIFY provider README/migration/reference_worktree and exact dogfood mirrors。
@@ -323,7 +324,7 @@ uv run pytest
 uv run python -m scripts.quality.verify_full_regression --shards 4
 ```
 
-Provider CI exact focused commandsはPlan §7.5を使用します。Expected: all exit0、unexpected failure0、classification gaps0、15/14/1 and 243 unchanged、artifact parity、old references0。
+Provider CI exact focused commandsはPlan §7.5を使用します。Expected: applicable focused commands exit0、unexpected failure0、15/14/1 and 243 unchanged、artifact parity。Old implementation cleanupとtest ownership分類はcandidate diff/code reviewで確認し、absence-only/classification-only testsは残しません。Current full verifierのviolationはP392でexact SHAとともに記録し、#395-owned active rows以外が混在すればstopです。
 
 ### Stop
 
@@ -331,7 +332,7 @@ Provider CI exact focused commandsはPlan §7.5を使用します。Expected: al
 
 ### Receipt and terminal handoff
 
-Candidate SHA、all command results、artifact hashes、classification result、baseline/gate inventory、review findingsをCodexへ返します。Luna MaxはPR mergeを行わず、#395を開始しません。Codexがwhole diff reviewとPR準備を行い、人間がEpic integration branchへmergeします。Merged tip B1再検証がGREENになった後だけ#395開始可能です。
+Candidate SHA、all command results、artifact hashes、one-time test ownership inventory、baseline/gate inventory、review findingsをCodexへ返します。Luna MaxはPR mergeを行わず、#395を開始しません。Codexがwhole diff reviewとPR準備を行い、人間がEpic integration branchへmergeします。Merge直前にexact candidateのfull verifier結果を確認し、#395-owned active rowsだけが残る場合に限りP392としてmergeします。#395はそのexact merged tipから開始し、B1/B2は#395 merge後の同じexact tipで検証します。
 
 ## 7. Handoff rejection conditions
 

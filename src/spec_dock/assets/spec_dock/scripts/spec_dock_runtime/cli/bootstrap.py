@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+import stat
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
@@ -53,7 +54,6 @@ from spec_dock_runtime.infra import (
     github_capability_cli as infra_github_capability_cli,
     github_cli as infra_github_cli,
     json_store as infra_json_store,
-    make_cli as infra_make_cli,
     template_scaffolder as infra_template_scaffolder,
 )
 from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
@@ -65,6 +65,7 @@ if TYPE_CHECKING:
 @dataclass(frozen=True)
 class BootstrapContext:
     use_cases: UseCases
+    invocation_cwd: Path | None = None
 
 
 @dataclass(frozen=True)
@@ -229,20 +230,36 @@ class _DepsTopologyReader:
 
 @dataclass(frozen=True)
 class _GitGateway:
-    def require_clean_working_tree(self, repo_root: Path) -> None:
-        infra_git_cli.require_clean_working_tree(repo_root)
+    repository_root_fd: int | None = None
+    repository_root_binding: tuple[int, int] | None = None
+
+    def _validated_repository_root_fd(self) -> int | None:
+        if self.repository_root_fd is None:
+            return None
+        if self.repository_root_binding is None:
+            raise RuntimeError("admitted repository binding is incomplete")
+        value = os.fstat(self.repository_root_fd)
+        if not stat.S_ISDIR(value.st_mode) or (value.st_dev, value.st_ino) != self.repository_root_binding:
+            raise RuntimeError("admitted repository binding changed")
+        return self.repository_root_fd
+
+    def require_clean_working_tree(self, repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None:
+        infra_git_cli.require_clean_working_tree(repo_root, allowed_missing_paths=allowed_missing_paths)
 
     def current_branch_or_none(self, repo_root: Path):
         return infra_git_cli.current_branch_or_none(repo_root)
+
+    def current_head_or_none(self, repo_root: Path):
+        return infra_git_cli.current_head_or_none(repo_root)
 
     def local_branch_exists(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.local_branch_exists(repo_root, branch)
 
     def checkout_branch(self, repo_root: Path, branch: str) -> None:
-        infra_git_cli.checkout_branch(repo_root, branch)
+        infra_git_cli.checkout_branch(repo_root, branch, lease_fd=self._validated_repository_root_fd())
 
     def create_and_checkout_branch(self, repo_root: Path, branch: str) -> None:
-        infra_git_cli.create_and_checkout_branch(repo_root, branch)
+        infra_git_cli.create_and_checkout_branch(repo_root, branch, lease_fd=self._validated_repository_root_fd())
 
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.check_ref_format_branch(repo_root, branch)
@@ -253,11 +270,123 @@ class _GitGateway:
     def worktree_list(self, repo_root: Path):
         return infra_git_cli.worktree_list(repo_root)
 
-    def add_worktree_with_new_branch(self, repo_root: Path, *, path: Path, branch: str) -> None:
-        infra_git_cli.add_worktree_with_new_branch(repo_root, path=path, branch=branch)
+    def remove_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        force: bool,
+        source_fd: int | None = None,
+        target_fd: int | None = None,
+    ) -> None:
+        infra_git_cli.remove_worktree(
+            repo_root,
+            path=path,
+            force=force,
+            source_fd=source_fd,
+            target_fd=target_fd,
+            lease_fd=self._validated_repository_root_fd(),
+        )
 
-    def remove_worktree(self, repo_root: Path, *, path: Path, force: bool) -> None:
-        infra_git_cli.remove_worktree(repo_root, path=path, force=force)
+    def resolve_commit(self, repo_root: Path, ref: str) -> str:
+        return infra_git_cli.resolve_commit(repo_root, ref)
+
+    def provider_closure(self, repo_root: Path, pinned_commit: str):
+        return infra_git_cli.provider_closure(repo_root, pinned_commit)
+
+    def assess_capabilities(
+        self,
+        repo_root: Path,
+        *,
+        pinned_commit: str,
+        closure_paths: tuple[str, ...],
+        branch: str | None = None,
+        check_other_worktree: bool = True,
+    ):
+        return infra_git_cli.assess_capabilities(
+            repo_root,
+            pinned_commit=pinned_commit,
+            closure_paths=closure_paths,
+            branch=branch,
+            check_other_worktree=check_other_worktree,
+        )
+
+    def pinned_checkout(
+        self,
+        repo_root: Path,
+        *,
+        branch: str,
+        pinned_commit: str,
+        checkout_kind: str,
+        closure_paths: tuple[str, ...],
+    ):
+        return infra_git_cli.pinned_checkout(
+            repo_root,
+            branch=branch,
+            pinned_commit=pinned_commit,
+            checkout_kind=checkout_kind,
+            closure_paths=closure_paths,
+            lease_fd=self._validated_repository_root_fd(),
+        )
+
+    def verify_pinned_checkout(self, repo_root: Path, *, checkout, closure_paths: tuple[str, ...]) -> None:
+        infra_git_cli.verify_pinned_checkout(
+            repo_root,
+            checkout=checkout,
+            closure_paths=closure_paths,
+        )
+
+    def add_worktree_pinned(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        branch: str,
+        pinned_commit: str,
+        source_fd: int | None = None,
+        target_fd: int | None = None,
+    ) -> None:
+        infra_git_cli.add_worktree_pinned(
+            repo_root,
+            path=path,
+            branch=branch,
+            pinned_commit=pinned_commit,
+            source_fd=source_fd,
+            target_fd=target_fd,
+            lease_fd=self._validated_repository_root_fd(),
+        )
+
+    def materialize_worktree(
+        self,
+        repo_root: Path,
+        *,
+        path: Path,
+        pinned_commit: str,
+        source_fd: int,
+        target_fd: int,
+    ) -> tuple[tuple[str, tuple[int, int]], ...]:
+        return infra_git_cli.materialize_worktree(
+            repo_root,
+            path=path,
+            pinned_commit=pinned_commit,
+            source_fd=source_fd,
+            target_fd=target_fd,
+        )
+
+    def publish_worktree_entrypoint(
+        self,
+        repo_root: Path,
+        *,
+        target_fd: int,
+        pinned_commit: str,
+        directory_witnesses: tuple[tuple[str, tuple[int, int]], ...],
+    ) -> None:
+        infra_git_cli.publish_worktree_entrypoint(
+            repo_root,
+            target_fd=target_fd,
+            pinned_commit=pinned_commit,
+            directory_witnesses=directory_witnesses,
+        )
 
 
 @dataclass(frozen=True)
@@ -267,21 +396,12 @@ class _GitHubCapabilityGateway:
 
 
 @dataclass(frozen=True)
-class _BootstrapGateway:
-    def run_make_init_if_available(self, worktree_path: Path):
-        return infra_make_cli.run_make_init_if_available(worktree_path)
-
-
-@dataclass(frozen=True)
 class _FilesystemGateway:
     def path_exists(self, path: Path) -> bool:
         return infra_fs_cli.path_exists(path)
 
     def remove_tree(self, path: Path) -> None:
         infra_fs_cli.remove_tree(path)
-
-    def remove_target(self, path: Path) -> None:
-        infra_fs_cli.remove_target(path)
 
     def path_kind(self, path: Path) -> str:
         return infra_fs_cli.path_kind(path)
@@ -326,7 +446,14 @@ class _ArtifactWriter:
         return infra_artifact_writer.write(specdock_dir, bundle)
 
 
-def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> BootstrapContext:
+def build_runtime(
+    specdock_dir: Path,
+    *,
+    repo_root: Path | None = None,
+    repo_root_fd: int | None = None,
+    repo_root_binding: tuple[int, int] | None = None,
+    invocation_cwd: Path | None = None,
+) -> BootstrapContext:
     resolved_repo_root = repo_root if repo_root is not None else specdock_dir.parent
     binary_artifact_publisher = FilesystemBinaryArtifactPublisher()
     ports = Ports(
@@ -339,9 +466,11 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         issue_gateway=_IssueGateway(),
         active_state_store=_ActiveStateStore(),
         deps_topology_reader=_DepsTopologyReader(),
-        git_gateway=_GitGateway(),
+        git_gateway=_GitGateway(
+            repository_root_fd=repo_root_fd,
+            repository_root_binding=repo_root_binding,
+        ),
         github_capability_gateway=_GitHubCapabilityGateway(),
-        bootstrap_gateway=_BootstrapGateway(),
         environment_gateway=_EnvironmentGateway(),
         filesystem_gateway=_FilesystemGateway(),
         json_store=_JsonStore(),
@@ -349,6 +478,8 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         artifact_writer=_ArtifactWriter(),
         explicit_file_source_guard=binary_artifact_publisher,
         explicit_file_artifact_publisher=binary_artifact_publisher,
+        repo_root_fd=repo_root_fd,
+        repo_root_binding=repo_root_binding,
     )
 
     use_cases = UseCases(
@@ -378,4 +509,4 @@ def build_runtime(specdock_dir: Path, *, repo_root: Path | None = None) -> Boots
         worktree_remove=lambda req: application_worktree_remove(req, ports),
         workbench_copy=lambda req: application_workbench_copy(req, ports),
     )
-    return BootstrapContext(use_cases=use_cases)
+    return BootstrapContext(use_cases=use_cases, invocation_cwd=invocation_cwd)
