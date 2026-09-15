@@ -124,6 +124,10 @@ concurrent_writer:
     - src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
     - spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
     - spec-dock/spec-dock.version
+    - spec-dock/docs
+    - spec-dock/templates
+    - spec-dock/system
+    - spec-dock/scripts
     - .agents/skills/spec-dock/.spec-dock-provider-slot.json
     - .agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
     - tests/cli_runtime/test_delete.py
@@ -1353,6 +1357,10 @@ expected_scope = {
     "spec-dock/scripts/spec_dock_runtime/"
     "infra/git_cli.py",
     "spec-dock/spec-dock.version",
+    "spec-dock/docs",
+    "spec-dock/templates",
+    "spec-dock/system",
+    "spec-dock/scripts",
     ".agents/skills/spec-dock/"
     ".spec-dock-provider-slot.json",
     ".agents/skills/"
