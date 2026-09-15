@@ -10,7 +10,7 @@ elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
-implementation_allowed: false
+implementation_allowed: true
 owner_decisions_required: []
 human_merge_only: true
 authority: "advisory-corrected-design"
@@ -20,9 +20,9 @@ authority: "advisory-corrected-design"
 
 ## 1. Status and authority
 
-This document is a corrected implementation design for Issue #395. It does not grant permission to modify Product source, tests, ledger, dogfood, policy, workflows, Git history, pull requests, or Issue state.
+This document is a corrected implementation design for Issue #395. It does not grant permission to modify policy, workflows, Git history, pull requests, or Issue state. Following the completed specification review, the user has explicitly authorized Issue #395 implementation, so the current `implementation_allowed` value is `true`.
 
-Implementation remains blocked until all of the following exist for one clean pushed specification tip:
+Before the first mutation, the executor must still verify all of the following for one clean pushed specification tip:
 
 1. the canonical Issue Requirement, Design, Plan, LunaMax handoff, human guide, and manifest;
 2. exact local `HEAD`, configured upstream, and remote Issue-branch equality;
@@ -44,7 +44,7 @@ The corrected design preserves these parent and Issue boundaries without reinter
 | Ledger target  | 15 total, 0 active, 15 resolved, 14 `fixed-in-place`, 1 `superseded`, approved 0, unexpected 0                                  |
 | Lifecycle      | Issue #392 lifecycle, wire, schema, migration, uninstall, recovery, coordination, and protected-data semantics remain read-only |
 | Merge          | Human only; no direct push to the integration branch; no agent merge or revert                                                  |
-| Permission     | `implementation_allowed=false` until a separate reviewed dispatch exists                                                        |
+| Permission     | `implementation_allowed=true` after the reviewed user dispatch; exact identity and writer checks remain mandatory              |
 
 The integration branch remains `codex/epic-00384-provider-test-strategy-planning`. The Issue branch remains `iss-00395-regression-baseline-terminalization-and-product-defect-repair`.
 
@@ -346,7 +346,7 @@ A verifier pass is necessary but not sufficient. The before/after ledger invaria
 
 ### 10.1 Read-only preflight
 
-Read-only preflight may run while `implementation_allowed=false`. It may fetch refs, read repository state, parse files, collect tests, and execute known entry observations that do not change tracked Product/test/ledger/dogfood state.
+Read-only preflight may run before or after implementation authorization. It may fetch refs, read repository state, parse files, collect tests, and execute known entry observations that do not change tracked Product/test/ledger/dogfood state.
 
 It must not run lifecycle update, edit files, stage, commit, push, create/update a PR, or merge.
 
@@ -502,4 +502,4 @@ Before human merge, abandon or repair the complete Issue candidate. After human 
 
 ## 16. Decision state
 
-No new Product, security, lifecycle, policy, or parent decision is required. `owner_decisions_required=[]` is retained. Implementation permission remains false. Adoption, clean push, independent specification review, and explicit dispatch remain mandatory separate gates.
+No new Product, security, lifecycle, policy, or parent decision is required. `owner_decisions_required=[]` is retained. Following the completed specification review and explicit user dispatch, implementation permission is true. Exact identity, concurrent-writer absence, clean push, and the remaining implementation and delivery gates remain mandatory separate gates.
