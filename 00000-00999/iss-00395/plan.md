@@ -12,6 +12,8 @@ elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
+support_history_sha: "c0736434503117d5d468d1438fb18da16d382a56"
+support_history_tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
 planning_level: "implementation-ready-after-adoption-review-and-dispatch"
 implementation_allowed: true
 owner_decisions_required: []
@@ -63,6 +65,10 @@ export P392_TREE="190bc566a18cd84813c4b7c043f8724e275cb55d"
 
 export ELABORATION_INPUT_SHA="fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 export ELABORATION_INPUT_TREE="4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
+
+export SUPPORT_HISTORY_SHA="c0736434503117d5d468d1438fb18da16d382a56"
+export SUPPORT_HISTORY_TREE="cec02ce70fbcbbbac811a04106dcc15540ad4d09"
+export PREVIOUS_SPEC_CANDIDATE_SHA="78d6406ba7df8bd4953f2c3f6db5610d635ff48c"
 
 ROW_1='tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active'
 ROW_2_HISTORICAL='tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source'
@@ -126,7 +132,7 @@ SPEC_PACK_PATHS=(
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-chatgpt-spec-pack-manifest.md
 )
 
-SPEC_SUPPORT_PATHS=(
+PRESERVED_SUPPORT_HISTORY_PATHS=(
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/design-luna-max-ready.md
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-design-tdd-ready.md
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-lunamax-handoff-tdd-ready.md
@@ -357,17 +363,22 @@ PY
 
 Product、test、ledger、timing、policy、workflowがこの差分へ含まれていた場合は停止する。
 
-### B5. Elaboration inputからspec freezeまでのspec pack
+### B5. Elaboration inputからspec freezeまでのspecification admission history
 
 ```bash
-python - "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA" \
-  "${SPEC_PACK_PATHS[@]}" \
-  "${SPEC_SUPPORT_PATHS[@]}" <<'PY'
+python - "$ELABORATION_INPUT_SHA" "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" \
+  "$SUPPORT_HISTORY_TREE" "$PREVIOUS_SPEC_CANDIDATE_SHA" \
+  "${SPEC_PACK_PATHS[@]}" -- \
+  "${PRESERVED_SUPPORT_HISTORY_PATHS[@]}" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
-base, head, *allowed_paths = sys.argv[1:]
+elaboration_input, support_history, spec_freeze, support_tree, previous_candidate, *paths = sys.argv[1:]
+separator = paths.index("--")
+primary_paths = set(paths[:separator])
+support_paths = set(paths[separator + 1:])
+all_paths = primary_paths | support_paths
 
 issue = Path(
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
@@ -375,38 +386,89 @@ issue = Path(
     "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 )
 
-expected = set(allowed_paths)
+def changed_paths(base, head):
+    return set(
+        subprocess.check_output(
+            ["git", "diff", "--name-only", "--no-renames", base, head, "--"],
+            text=True,
+        ).splitlines()
+    )
 
-actual = set(
-    subprocess.check_output(
-        ["git", "diff", "--name-only", base, head, "--"],
+def tree_entry(revision, path):
+    lines = subprocess.check_output(
+        ["git", "ls-tree", "--full-tree", revision, "--", path],
         text=True,
     ).splitlines()
+    assert len(lines) == 1, (revision, path, lines)
+    return lines[0]
+
+subprocess.run(
+    ["git", "merge-base", "--is-ancestor", elaboration_input, support_history],
+    check=True,
+)
+subprocess.run(
+    ["git", "merge-base", "--is-ancestor", support_history, spec_freeze],
+    check=True,
 )
 
-assert actual == expected, {
-    "stage": "elaboration-to-spec-freeze",
-    "expected": sorted(expected),
-    "actual": sorted(actual),
+assert subprocess.check_output(
+    ["git", "rev-parse", f"{support_history}^{{tree}}"],
+    text=True,
+).strip() == support_tree
+
+preparation_paths = changed_paths(elaboration_input, support_history)
+assert preparation_paths == all_paths, {
+    "stage": "elaboration-to-support-history-checkpoint",
+    "expected": sorted(all_paths),
+    "actual": sorted(preparation_paths),
 }
 
-for path in sorted(expected):
+current_spec_paths = changed_paths(support_history, spec_freeze)
+assert current_spec_paths == primary_paths, {
+    "stage": "support-history-checkpoint-to-spec-freeze",
+    "expected": sorted(primary_paths),
+    "actual": sorted(current_spec_paths),
+}
+
+previous_candidate_paths = changed_paths(
+    previous_candidate,
+    spec_freeze,
+)
+assert previous_candidate_paths == primary_paths, {
+    "stage": "previous-spec-candidate-to-spec-freeze",
+    "expected": sorted(primary_paths),
+    "actual": sorted(previous_candidate_paths),
+}
+
+full_paths = changed_paths(elaboration_input, spec_freeze)
+assert full_paths == all_paths, {
+    "stage": "elaboration-to-spec-freeze",
+    "expected": sorted(all_paths),
+    "actual": sorted(full_paths),
+}
+
+for path in sorted(all_paths):
     candidate = Path(path)
     assert candidate.is_file(), path
     assert candidate.stat().st_size > 0, path
 
-assert str(issue / "requirement.md") in expected
-assert str(issue / "design.md") in expected
-assert str(issue / "plan.md") in expected
-assert str(issue / "artifacts/iss-00395-luna-max-implementation-handoff.md") in expected
-assert str(issue / "artifacts/iss-00395-human-guide.html") in expected
-assert str(issue / "artifacts/iss-00395-chatgpt-spec-pack-manifest.md") in expected
+assert primary_paths == {
+    str(issue / "requirement.md"),
+    str(issue / "design.md"),
+    str(issue / "plan.md"),
+    str(issue / "artifacts/iss-00395-luna-max-implementation-handoff.md"),
+    str(issue / "artifacts/iss-00395-human-guide.html"),
+    str(issue / "artifacts/iss-00395-chatgpt-spec-pack-manifest.md"),
+}
 
-print("spec-freeze-pack-and-support-only-ok")
+for path in sorted(support_paths):
+    assert tree_entry(support_history, path) == tree_entry(spec_freeze, path), path
+
+print("specification-admission-history-and-support-entry-equality-ok")
 PY
 ```
 
-`SPEC_PACK_PATHS`はhuman guideを含む6件の主仕様packである。`SPEC_SUPPORT_PATHS`は、elaboration input後の同一仕様準備で既に作成された補助artifactを厳密に列挙する。これら以外の差分は許可しない。各pathの実体が必要であり、Manifestの自己申告または過去のhashだけでは代替できない。
+`SPEC_PACK_PATHS`はhuman guideを含む6件のcurrent canonical specification packである。`PRESERVED_SUPPORT_HISTORY_PATHS`はelaboration input後の同一仕様準備で既に作成されたexact 16件のgrandfathered support historyであり、current specification packではない。B5は、P392からelaboration inputまでのdoc-only確認（B4）、elaboration inputからsupport-history checkpointまでのexact 22-path確認、checkpointからspec freezeまでのexact 6-path確認、および16件のpath/mode/object type/Git object ID equalityを別々に検証する。22件を単一のcurrent-spec allowlistとして扱わず、directory prefix、glob、Manifestの自己申告、working-tree上の存在、過去のZIP hashだけで代替しない。support historyのedit、delete、rename、copy substitution、regenerate、recompress、新規追加、またはProduct/test/ledger/timing/policy/workflow差分が一件でもあれば停止する。
 
 ### B6. Active state、managed metadata、SpecDock validation
 

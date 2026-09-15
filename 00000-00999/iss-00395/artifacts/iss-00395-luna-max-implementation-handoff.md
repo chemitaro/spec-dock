@@ -12,7 +12,9 @@ elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
-implementation_allowed: false
+support_history_sha: "c0736434503117d5d468d1438fb18da16d382a56"
+support_history_tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
+implementation_allowed: true
 owner_decisions_required: []
 human_merge_only: true
 authority: "advisory-execution-handoff"
@@ -33,12 +35,12 @@ derived_from:
 現在の実装許可は次のとおりである。
 
 ```text
-implementation_allowed = false
+implementation_allowed = true
 owner_decisions_required = []
 human_merge_only = true
 ```
 
-本書、Design、Plan、formal Issue start、active pointer、dependency state、`owner_decisions_required=[]`のいずれも、単独ではProduct、test、ledger、dogfood projectionの変更を許可しない。
+`implementation_allowed=true`はユーザーの明示dispatchを記録する。しかし、本書、Design、Plan、formal Issue start、active pointer、dependency state、`owner_decisions_required=[]`のいずれも単独ではProduct、test、ledger、dogfood projectionの変更を許可しない。fresh Strict specification reviewのpass、P0/P1=0、Phase E execution packet、concurrent-writer absenceが揃うまで、実効的なmutation gateは閉じている。
 
 LunaMaxは、次の状態を分離して扱う。
 
@@ -201,6 +203,9 @@ export P392_TREE="190bc566a18cd84813c4b7c043f8724e275cb55d"
 export ELABORATION_INPUT_SHA="fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 export ELABORATION_INPUT_TREE="4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 
+export SUPPORT_HISTORY_SHA="c0736434503117d5d468d1438fb18da16d382a56"
+export SUPPORT_HISTORY_TREE="cec02ce70fbcbbbac811a04106dcc15540ad4d09"
+
 ROW_1='tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active'
 ROW_2_HISTORICAL='tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source'
 ROW_2_SUCCESSOR='tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood'
@@ -331,7 +336,7 @@ PY
 
 ## 6. Read-only preflight
 
-Read-only preflightは`implementation_allowed=false`のまま実行できる。
+Read-only preflightは`implementation_allowed=true`の記録後も実行できる。これはeffective mutation gateが開いたことを意味しない。
 
 ### 6.1 Spec freeze identity
 
@@ -503,15 +508,15 @@ print("p392-to-elaboration-doc-only-ok")
 PY
 ```
 
-### 6.5 Spec freeze pack差分
+### 6.5 Specification admission history
 
 ```bash
-python - "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA" <<'PY'
+python - "$ELABORATION_INPUT_SHA" "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" "$SUPPORT_HISTORY_TREE" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
-base, head = sys.argv[1:]
+elaboration_input, support_history, spec_freeze, support_tree = sys.argv[1:]
 
 issue = Path(
     "spec-dock/initiatives/"
@@ -524,7 +529,7 @@ issue = Path(
     "and-product-defect-repair"
 )
 
-expected = {
+primary = {
     str(issue / "requirement.md"),
     str(issue / "design.md"),
     str(issue / "plan.md"),
@@ -545,29 +550,70 @@ expected = {
     ),
 }
 
-actual = set(
-    subprocess.check_output(
-        ["git", "diff", "--name-only", base, head, "--"],
-        text=True,
-    ).splitlines()
-)
-
-assert actual == expected, {
-    "stage": "elaboration-to-spec-freeze",
-    "expected": sorted(expected),
-    "actual": sorted(actual),
+support = {
+    str(issue / "artifacts/design-luna-max-ready.md"),
+    str(issue / "artifacts/iss-00395-design-tdd-ready.md"),
+    str(issue / "artifacts/iss-00395-lunamax-handoff-tdd-ready.md"),
+    str(issue / "artifacts/iss-00395-plan-review-analysis.md"),
+    str(issue / "artifacts/iss-00395-plan-tdd-ready.md"),
+    str(issue / "artifacts/iss-00395-requirement-tdd-ready.md"),
+    str(issue / "artifacts/iss-00395-spec-pack.zip"),
+    str(issue / "artifacts/iss-00395-tdd-ready-manifest.md"),
+    str(issue / "artifacts/iss-00395-tdd-ready-pack.receipt.md"),
+    str(issue / "artifacts/iss-00395-tdd-ready-pack.zip"),
+    str(issue / "artifacts/luna-max-implementation-handoff-ready.md"),
+    str(issue / "artifacts/luna-max-readiness-analysis.md"),
+    str(issue / "artifacts/luna-max-readiness-manifest.md"),
+    str(issue / "artifacts/luna-max-readiness-pack.receipt.md"),
+    str(issue / "artifacts/luna-max-readiness-pack.zip"),
+    str(issue / "artifacts/plan-lunamax-ready.md"),
 }
 
-for path in sorted(expected):
+def changed_paths(base, head):
+    return set(
+        subprocess.check_output(
+            ["git", "diff", "--name-only", "--no-renames", base, head, "--"],
+            text=True,
+        ).splitlines()
+    )
+
+def tree_entry(revision, path):
+    lines = subprocess.check_output(
+        ["git", "ls-tree", "--full-tree", revision, "--", path],
+        text=True,
+    ).splitlines()
+    assert len(lines) == 1, (revision, path, lines)
+    return lines[0]
+
+all_paths = primary | support
+assert subprocess.check_output(
+    ["git", "rev-parse", f"{support_history}^{{tree}}"],
+    text=True,
+).strip() == support_tree
+subprocess.run(
+    ["git", "merge-base", "--is-ancestor", elaboration_input, support_history],
+    check=True,
+)
+subprocess.run(
+    ["git", "merge-base", "--is-ancestor", support_history, spec_freeze],
+    check=True,
+)
+assert changed_paths(elaboration_input, support_history) == all_paths
+assert changed_paths(support_history, spec_freeze) == primary
+assert changed_paths(elaboration_input, spec_freeze) == all_paths
+
+for path in sorted(all_paths):
     candidate = Path(path)
     assert candidate.is_file(), path
     assert candidate.stat().st_size > 0, path
+for path in sorted(support):
+    assert tree_entry(support_history, path) == tree_entry(spec_freeze, path), path
 
-print("spec-freeze-pack-only-ok")
+print("specification-admission-history-and-support-entry-equality-ok")
 PY
 ```
 
-Human guideを含むsix-file packの実体が必要である。Manifestの自己申告だけでは代替できない。
+The six primary paths are the only current specification surface. The sixteen support paths are immutable history and must remain equal at the checkpoint's Git tree entries. The execution handoff must not use a 22-path current-spec allowlist, a directory-prefix or glob allowlist, a Manifest self-declaration, or working-tree existence as a substitute for path/mode/object-type/object-ID checks. Support-history edits, deletion, rename, regeneration, recompression, reclassification, and new support artifacts are forbidden.
 
 ### 6.6 Active state、metadata、validation
 
@@ -885,6 +931,8 @@ tests/cli_runtime/test_runtime_shell_s11.py
 * Active pointer
 * Dependency storage
 * Generated index/tree/diagram
+
+The exact sixteen support-history artifacts recorded at `SUPPORT_HISTORY_SHA` are also no-touch paths. They are preserved evidence, not current authority or implementation input; do not edit, delete, rename, regenerate, recompress, or reclassify them.
 
 ## 11. 13個の修正対象
 
@@ -2806,12 +2854,12 @@ LunaMaxは、人間merge、Issue closure、#396 start、policy retirement、requ
 
 ## 38. Completion state
 
-本handoffの作成・採用は、実装許可を変更しない。
+本handoffの作成・採用自体は、実装許可を変更しない。現在の `implementation_allowed=true` は、ユーザーの明示dispatchをcanonical R/D/Pと整合させて記録した値である。
 
 ```text
-implementation_allowed = false
+implementation_allowed = true
 owner_decisions_required = []
 human_merge_only = true
 ```
 
-実装開始は、exact clean spec freeze、independent spec review pass、P0/P1=0、explicit implementation authorization、scoped concurrent-writer absenceがすべて成立した後だけである。
+実効的な実装開始は、修正後のexact clean spec freeze、independent fresh spec review pass、P0/P1=0、explicit implementation authorization、scoped concurrent-writer absenceがすべて成立した後だけである。support-history 16件はimmutable、non-authoritativeであり、current specification packはexact 6 pathsのまま維持する。
