@@ -516,3 +516,56 @@ tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_rea
 ```
 
 このverifierはGREEN/exit 0ではありません。#395のledger、timing、evaluator、required-fast、skip/xfail、baseline行、bundleは変更しておらず、rate limitを理由とする検証縮小もありません。Report追記後のclean push、fresh Code Review Strict（Extra High）とBlue Team分析、同一最終SHAへのFinal Quality Gate Strict（Pro）は未実施です。human merge、merged-tip B1、Issue finish、Product GREENも主張しません。
+
+## 33. P392 merged-tip verification receipt (2026-09-15)
+
+PR #399は人間によりEpic branchへmerge済みである。PR head `75f0ec5a23eee40c528f049029b8561dcb7880dd`とmerge SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`は同じtree `190bc566a18cd84813c4b7c043f8724e275cb55d`であり、以後のP392受入証拠はこのmerge SHAに固定する。親commitはEpic branch側 `e6703000f1a0b22ad1f5bee05ecdd933cacee8db`とPR head側 `75f0ec5a23eee40c528f049029b8561dcb7880dd`である。
+
+GitHub readbackではIssue #392と#395がともにOPEN、#392のSpecDock `active`は未設定である。PR #399の観測済み7 checks（validate 2件、Commit identity 2件、Provider CI、Provider distribution parity Ubuntu、Provider distribution parity macOS）はすべてSUCCESSだった。P392は#392の完了・closure、B1、Product GREENを意味しない。
+
+### 33.1 Exact merged-tip checks
+
+同一SHAのclean verification cloneで、次の通常検証を実行し、結果を固定した。
+
+- `env TMPDIR=/private/tmp uv run pytest`: `1367 passed, 847 skipped`
+- `env TMPDIR=/private/tmp make lint`: Ruff check／format、mypyがすべてpass
+- `env TMPDIR=/private/tmp uv run pytest tests/unit/provider_lifecycle`: `513 passed`
+- `./spec-dock/scripts/spec-dock validate`: `spec-dock: ok (validate) nodes=236`
+
+Baseline registerは15 total／14 active／1 resolved、timingは243 entries、required-fastは4件のままであり、register、evaluator、timing、required-fast、skip/xfail、baseline、bundle、検証policyは変更していない。
+
+current full verifierも同じ`921bf7512c72bfa2887673cb7ec9bc512cec6ff3`で実行した。`2214 tests collected`、4 shardはすべてexit 1、`status=ledger-mismatch`、`evaluation.verified=false`である。10件のviolationはregister §6.1の#395-owned active rows 4–12、15に一対一で対応し、#392-owned lifecycle/providerの`unexpected_failure`、および許容集合外のviolationは0件だった。
+
+| register row | verifier code | nodeid |
+|---:|---|---|
+| 4 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_regression` |
+| 5 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression` |
+| 6 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_re_resolves_inside_lock_when_parent_drifts_regression` |
+| 7 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_numeric_target_uses_resolved_current_repo_slug_for_github_read` |
+| 8 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_issue_uses_target_repo_slug_for_same_repo_url_when_present` |
+| 9 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_import_then_sync_artifact_path_name_content_regression` |
+| 10 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_post_import_sync_negative_path_regression` |
+| 11 | `signature_mismatch` | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_execute_create_plan_reuse_seam` |
+| 12 | `coverage_mismatch` | `tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_final_api_call_site_and_structural_regression` |
+| 15 | `signature_mismatch` | `tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands` |
+
+active rows 1、3、13、14は`active_verified`、resolved row 2は`resolved_verified`だった。したがって、full verifierはGREENまたはexit 0ではなく、P392 ADRが許容する「#395-owned active rowsだけが残り、#392-owned unexpected failureが0件」の限定handoff evidenceとして扱う。#395のbaselineを#392で修正・抑止したり、skip/xfailやledger変更で隠したりしていない。
+
+### 33.2 Independent review receipts
+
+同じmerged treeを対象に、Code Review Strict（browser-only、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Extra High）を実施した。reviewed rangeはEpic base `e6703000f1a0b22ad1f5bee05ecdd933cacee8db`からmerge SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`までで、本文JSONは`review_status=pass`、findingsなし、P0/P1=0だった。
+
+続けてFinal Quality Gate Strict v2（browser-only、top-level `https://chatgpt.com/`、GPT-5.6 Sol、Pro）を同じmerge SHAに固定して実施した。結果は`status=pass`、`coverage_complete=true`、全12 active perspectives complete、`findings=[]`、`unreviewed_areas=[]`、`unresolved_items=[]`、P0/P1=0だった。FQG campaignは検証用clean cloneの`spec-dock/.workbench/chatgpt-final-quality-gate-strict-v2/issue-392-p392-merged-921bf751-20260915/`に保存している。FQG passはこのP392の証拠束に対する判定であり、full verifierのGREEN、B1、Issue closure、#395完了を意味しない。
+
+### 33.3 #395 handoff readback
+
+#395用worktreeは、doc-onlyのEpic計画補正より前に、exact P392 SHAから作成済みである。
+
+- branch: `codex/epic-00384-provider-test-strategy-planning-iss-00395-p392-921bf751`
+- HEAD: `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`
+- path: `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/spec-dock-managed-395/issue-395-p392-source-921bf751/issue-395-p392-source-921bf751-iss-00395-p392-921bf751`
+- working tree: clean、P392 SHAとの差分なし
+- Issue #395: OPEN、dependency `ready=true`、`active`未設定、SpecDock validate `nodes=236`
+- #395のRequirement／Design／Plan: P392 SHAから差分なし
+
+正式な`issue start`、#395のactive設定、Product実装、#395の仕様具体化・独立reviewはまだ行っていない。このreceiptとEpic計画の更新は文書・handoff状態だけを記録するものであり、#395の実装許可や#392のclosureではない。

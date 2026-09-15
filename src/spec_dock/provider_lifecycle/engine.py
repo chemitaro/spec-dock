@@ -1204,6 +1204,7 @@ class ProviderLifecycleEngine:
                         candidate_digest=None,
                         seed_policy=seed_policy,
                         phase="candidate-staging",
+                        last_completed_phase="preflight",
                     )
                 try:
                     return self._resume_or_block(
@@ -1234,6 +1235,7 @@ class ProviderLifecycleEngine:
                     candidate_digest=None,
                     seed_policy=seed_policy,
                     phase="candidate-staging",
+                    last_completed_phase="preflight",
                 )
             candidate_digest = candidate.aggregate_digest if candidate is not None else None
             try:
