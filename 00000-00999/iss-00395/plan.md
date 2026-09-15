@@ -13,7 +13,7 @@ elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
 planning_level: "implementation-ready-after-adoption-review-and-dispatch"
-implementation_allowed: false
+implementation_allowed: true
 owner_decisions_required: []
 human_merge_only: true
 authority: "advisory-corrected-plan"
@@ -23,9 +23,9 @@ authority: "advisory-corrected-plan"
 
 ## 1. 実行原則
 
-本書はIssue #395の完全な実装順序、検証ゲート、証拠形式および停止条件を固定する。ただし、本書自体はProduct、test、ledger、dogfood projectionの変更を許可しない。
+本書はIssue #395の完全な実装順序、検証ゲート、証拠形式および停止条件を固定する。ユーザーの明示承認により、canonical statusの`implementation_allowed`はtrueである。ただし、実行者は最初のmutation前にPhase Eのexecution packet検証、exact identity、独立レビュー証跡、同時書き込みなしの確認を満たさなければならない。
 
-GPT-5.6 LunaMaxは、実装許可がfalseの状態でも**Phase A〜Dのread-only preflight**を実行できる。次の操作は、Phase Eのmutation authorizationがすべて成立するまで禁止する。
+GPT-5.6 LunaMaxは**Phase A〜Dのread-only preflight**を実行できる。次の操作は、Phase Eのexecution packet検証と同時書き込みなしの確認が成立するまで禁止する。
 
 * Product sourceの編集
 * regression testの編集
@@ -3934,10 +3934,10 @@ B1またはB2が失敗した場合、humanが次のいずれかを選ぶ。
 
 ## 26. Completion state
 
-本Planの作成・保存はrepository state、implementation permission、commit permission、PR permissionまたはmerge permissionを変更しない。
+本Planの作成・保存自体はrepository state、commit permission、PR permissionまたはmerge permissionを変更しない。今回はユーザーの明示承認により、canonical implementation permissionをtrueとした。
 
 ```text
-implementation_allowed = false
+implementation_allowed = true
 owner_decisions_required = []
 human_merge_only = true
 ```

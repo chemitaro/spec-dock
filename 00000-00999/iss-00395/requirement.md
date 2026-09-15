@@ -15,7 +15,7 @@ ID: "iss-00395"
   - "../../artifacts/epic-integration-branch-contract.md"
   - "../../artifacts/rolling-wave-issue-elaboration-contract.md"
 親: ["epic-00384", "init-local-00003"]
-実装開始許可: false
+実装開始許可: true
 owner_decisions_required: []
 repository_evidence:
   role: "elaboration-input-provenance"
@@ -34,7 +34,7 @@ p392_entry_evidence:
 
 Issue #395は、human-merged P392が残したpost-#387回帰baselineの14 active rowsを、親registerで確定済みの原因分類に従ってnormal passへterminalizeする。修復面はtest harness / observer 12件とProduct境界2件である。ただし、P392 exact treeではProduct row 12のthin-shell境界は既にapplication contract経由へ回復済みであり、現行Full Regressionは同rowを`coverage_mismatch`として観測している。したがってrow 12は、現行Product構造を保持し、normal pass観測とledgerの`fixed-in-place`解決で閉じる。現行構造を再編集すること自体を成果条件にしない。
 
-本Issueのformal `issue start`は、指定Issue branchと添付generated contextで`iss-00395`がactiveである状態として扱う。formal startはbranch/active scopeの選択であり、Product実装許可ではない。本書、Design、Plan、LunaMax handoff、human guide、manifestをlocal canonical treeへ反映し、SpecDock validation、clean push、exact-tipの独立`chatgpt-spec-review-strict`で`review_status=pass`かつP0/P1=0を得て、さらに実装dispatchで許可証跡が渡されるまで、`実装開始許可: false`を維持する。
+本Issueのformal `issue start`は、指定Issue branchと添付generated contextで`iss-00395`がactiveである状態として扱う。formal startはbranch/active scopeの選択であり、Product実装許可ではない。本書、Design、Plan、LunaMax handoff、human guide、manifestをlocal canonical treeへ反映し、SpecDock validation、clean push、exact-tipの独立`chatgpt-spec-review-strict`で`review_status=pass`かつP0/P1=0を得たうえで、ユーザーが本メッセージで仕様の実装を明示的に許可したため、現在の`実装開始許可: true`を記録する。この許可は、実装前のexact identity／同時書き込みなしの確認、Product/test GREEN、code review、human merge、B1/B2、#392/#395 closureを完了扱いにしない。
 
 ## 2. Identity contract
 
@@ -265,7 +265,7 @@ HumanがIssue PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし
 8. same-tip B1/B2
 9. #392/#395 closure
 
-本packの作成完了は2までであり、3と4を満たすまで実装許可をtrueにしない。`owner_decisions_required=[]`は設計判断が未決でないことだけを示し、実装許可やmerge許可を意味しない。
+本packの作成完了は2までである。独立spec review passを前提に、ユーザーが本メッセージで明示的なimplementation dispatchを行ったため、現在の実装許可はtrueである。`owner_decisions_required=[]`は設計判断が未決でないことだけを示し、実装完了やmerge許可を意味しない。
 
 ### I395-RQ-014 — Evidence and traceability
 
@@ -316,4 +316,4 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 
 ## 10. Decision state
 
-Issue固有の追加owner decisionはない。`owner_decisions_required=[]`を維持する。親のE384-DEC-001、E384-DEC-002、E384-DEC-004、accepted P392 sequence ADRを再審議しない。Implementation permissionは引き続きfalseである。
+Issue固有の追加owner decisionはない。`owner_decisions_required=[]`を維持する。親のE384-DEC-001、E384-DEC-002、E384-DEC-004、accepted P392 sequence ADRを再審議しない。ユーザーによる本明示承認により、Implementation permissionはtrueである。これはProduct実装完了、code review、human merge、B1/B2、Issue closureを意味しない。
