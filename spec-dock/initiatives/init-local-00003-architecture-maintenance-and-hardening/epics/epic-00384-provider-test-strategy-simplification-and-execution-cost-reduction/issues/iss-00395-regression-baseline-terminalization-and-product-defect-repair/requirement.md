@@ -26,6 +26,9 @@ repository_evidence:
 p392_entry_evidence:
   sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
   tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
+support_history_evidence:
+  sha: "c0736434503117d5d468d1438fb18da16d382a56"
+  tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
 ---
 
 # iss-00395 Regression Baseline Terminalization and Product Defect Repair — 要件定義
@@ -71,6 +74,52 @@ P392 receiptは次を固定する。
 
 このwitnessは#395 entryを許す限定証拠であり、full verifier GREEN、B1、#392 closure、#395実装許可を意味しない。
 
+### 2.3 Canonical specification packとpreserved support history
+
+本Issueのcurrent canonical specification packは、次のexact 6 pathsである。
+
+1. `requirement.md`
+2. `design.md`
+3. `plan.md`
+4. `artifacts/iss-00395-luna-max-implementation-handoff.md`
+5. `artifacts/iss-00395-human-guide.html`
+6. `artifacts/iss-00395-chatgpt-spec-pack-manifest.md`
+
+Elaboration input後に既に作成されていた次のexact 16 artifactsは、
+`c0736434503117d5d468d1438fb18da16d382a56` / `cec02ce70fbcbbbac811a04106dcc15540ad4d09`を
+support-history checkpointとして、grandfathered support historyに分類する。
+
+| Support history path |
+|---|
+| `artifacts/design-luna-max-ready.md` |
+| `artifacts/iss-00395-design-tdd-ready.md` |
+| `artifacts/iss-00395-lunamax-handoff-tdd-ready.md` |
+| `artifacts/iss-00395-plan-review-analysis.md` |
+| `artifacts/iss-00395-plan-tdd-ready.md` |
+| `artifacts/iss-00395-requirement-tdd-ready.md` |
+| `artifacts/iss-00395-spec-pack.zip` |
+| `artifacts/iss-00395-tdd-ready-manifest.md` |
+| `artifacts/iss-00395-tdd-ready-pack.receipt.md` |
+| `artifacts/iss-00395-tdd-ready-pack.zip` |
+| `artifacts/luna-max-implementation-handoff-ready.md` |
+| `artifacts/luna-max-readiness-analysis.md` |
+| `artifacts/luna-max-readiness-manifest.md` |
+| `artifacts/luna-max-readiness-pack.receipt.md` |
+| `artifacts/luna-max-readiness-pack.zip` |
+| `artifacts/plan-lunamax-ready.md` |
+
+Support historyは、現在のcanonical R/D/P、実装入力、owned write surface、
+implementation permission、owner decisionを上書きしない。内容に古いSHA、tree、
+permission値またはidentityが残っていても、履歴snapshotとして扱う。編集、削除、
+rename、copy substitution、再生成、再圧縮、内容の最新化、新規support artifact追加を
+行わない。current canonical packと内容が矛盾する場合は、current canonical R/D/Pを
+authorityとし、support historyを修正して整合させない。
+
+このadmission/history分類の追加は、Product、Row 3のsecurity/no-secret、lifecycle、
+policy、protected-data、workflowの意味を変更しない。Row 3のcredential-bearing origin
+処理、same-repository validation、publication strictness、secret non-exposureは、従来どおり
+実装とsecurity matrixで検証する。
+
 ## 3. Observable outcome
 
 Issue #395のhuman merge後、同一exact integration tipで次を順に成立させる。
@@ -87,7 +136,11 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 1. Repositoryは`chemitaro/spec-dock`、branchは`iss-00395-regression-baseline-terminalization-and-product-defect-repair`である。
 2. Reviewed spec freeze SHA、local `HEAD`、configured upstream、remote branch tipがbyte-for-byte一致し、worktreeがcleanである。
 3. `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`がspec freeze tipのancestorである。
-4. P392からspec freezeまでの差分は、本Issueの`requirement.md`、`design.md`、`plan.md`、本Issue直下の三Artifacts、およびP392 receiptを保持する親文書だけで、Product source、tests、ledger、timing、policy、workflowに差分がない。
+4. Specification admission historyは、次の三つのsegmentを独立に検証する。22 pathsを単一のcurrent-spec allowlistとして扱わない。
+   - **P392からelaboration inputまで:** Epic PlanとIssue #392 Reportのexact 2 pathsだけが変化し、Product source、tests、ledger、timing、policy、workflowは変化しない。
+   - **Elaboration inputからsupport-history checkpointまで:** current canonical specification packの6 pathsと、§2.3のgrandfathered support history 16 pathsのexact 22 pathsだけが存在し、それ以外の差分がない。
+   - **Support-history checkpointからreviewed spec freezeまで:** current canonical specification packのexact 6 pathsだけが変更され、support history 16 pathsのpath、mode、object type、Git object IDがcheckpointと完全一致する。
+   P392 receiptを保持する親文書は、上記のP392からelaboration inputまでのdoc-only契約に含めて確認する。
 5. `./spec-dock/scripts/spec-dock active show`がIssue `iss-00395`を示す。generated active stateをtracked `.meta.json`やGitHub Issue bodyから推測しない。
 6. `.meta.json`のID/GitHub linkageは`iss-00395` / `#395`、`depends_on=[]`である。`.meta.json`は手編集しない。
 7. root ledgerはtable orderを含むexact 15 rowsで、row 1とrows 3–15がactive、row 2がresolved/supersededである。全nodeid/signatureが§6と一致する。
@@ -111,7 +164,9 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 | Structural observer row 12 | `tests/cli_runtime/test_runtime_shell_s11.py` | Existing assertionsとnode identityを保持する。assertion削除・弱化は禁止。 |
 | Transitional state | `full-regression-ledger.json` | 14 active rowsを`resolved` / `fixed-in-place`へ移す。historical fieldsとrow 2を保持する。 |
 | Canonical Issue docs | 本IssueのR/D/P | Stable parent contractを意味変更せず具体化する。 |
-| Issue Artifacts | 本Issueのhandoff、human guide、manifest | Evidence/advisory。canonical R/D/Pを置換しない。 |
+| Primary Issue Artifacts | 本Issueのhandoff、human guide、manifest | Current advisory artifacts。permission、identity、admission semanticsをcanonical R/D/Pと整合させる。canonical R/D/Pを置換しない。 |
+
+Support history 16件はcurrent Issue Artifactsではなく、§2.3で定義したpreserved support historyである。これらはread-only evidenceとして扱い、今回のowned write surfaceに含めない。
 
 ### 5.2 Shared/read-only surfaces
 
@@ -129,6 +184,8 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 - `.github/workflows/provider-ci.yml`
 - `.github/workflows/provider-full-regression.yml`
 - #392 lifecycle source、wire record、migration、uninstall、recovery、bootstrap、coordination、package version
+
+`§2.3`で列挙したexact 16 support-history artifactsもshared/read-only surfaceである。固定checkpointとのtree-entry equalityを保持し、edit、delete、rename、regenerate、recompress、reclassifyを行わない。これらをcurrent authorityまたはimplementation inputとして使用しない。
 
 これらは本Issueのaccepted behaviorを観測するために読む。修復に意味変更が必要なら親へ戻す。
 
@@ -167,9 +224,11 @@ Row 2は本Issueのactive scopeではない。既存`resolved/superseded`、hist
 
 ## 7. Detailed requirements
 
-### I395-RQ-001 — Exact baseline admission
+### I395-RQ-001 — Exact baseline and specification-history admission
 
-§4をすべて満たす。P392 exact SHAとcurrent spec freeze SHAを別のidentityとして記録し、current tipがP392 Product/test/ledgerを保持することをpath-level diffで証明する。GitHub IssueのOPEN/CLOSED、SpecDock `ready=true`、過去candidateのtest結果だけでentryを代替しない。
+§4をすべて満たす。P392 entry、elaboration input、support-history checkpoint、current spec freezeを別のidentityとして記録し、current tipがP392 Product/test/ledgerを保持することをpath-level diffで証明する。GitHub IssueのOPEN/CLOSED、SpecDock `ready=true`、過去candidateのtest結果だけでentryを代替しない。
+
+Canonical primary packはexact 6 pathsである。Exact 16 support artifactsはpreserved support historyとしてのみadmitし、current canonical packまたはowned write surfaceへadmitしない。Plan B5は三つのhistory segmentのpath-set検証と、16 support pathsのtree-entry equalityを実行する。Manifestの自己申告、working-tree上の存在、directory prefix allowlist、過去のZIP hashだけではこの検証を代替できない。
 
 ### I395-RQ-002 — Cause-appropriate repair
 
@@ -265,7 +324,9 @@ HumanがIssue PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし
 8. same-tip B1/B2
 9. #392/#395 closure
 
-本packの作成完了は2までである。独立spec review passを前提に、ユーザーが本メッセージで明示的なimplementation dispatchを行ったため、現在の実装許可はtrueである。`owner_decisions_required=[]`は設計判断が未決でないことだけを示し、実装完了やmerge許可を意味しない。
+本packの作成完了は2までである。独立spec review passを実効ゲートとして残したうえで、ユーザーが本メッセージで明示的なimplementation dispatchを行ったため、現在の実装許可はtrueである。`owner_decisions_required=[]`は設計判断が未決でないことだけを示し、実装完了やmerge許可を意味しない。
+
+今回の仕様修正で、current canonical packをexact 6 paths、existing 16 artifactsをimmutable support historyとして分類する判断をRequirement、Design、Planへ明示した。`implementation_allowed=true`はこのowner dispatchを保持するが、spec review failまたはpendingの間は実効的なProduct/test/ledger/dogfood mutationを許可しない。修正後のexact SHA/treeでfresh Strict specification reviewが`review_status=pass`、P0=0、P1=0となり、Phase E execution packetとconcurrent-writer absenceが成立した後にだけmutationを開始できる。
 
 ### I395-RQ-014 — Evidence and traceability
 
@@ -316,4 +377,6 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 
 ## 10. Decision state
 
-Issue固有の追加owner decisionはない。`owner_decisions_required=[]`を維持する。親のE384-DEC-001、E384-DEC-002、E384-DEC-004、accepted P392 sequence ADRを再審議しない。ユーザーによる本明示承認により、Implementation permissionはtrueである。これはProduct実装完了、code review、human merge、B1/B2、Issue closureを意味しない。
+今回の仕様修正で、Issue固有のadmission/history decisionを次のとおり確定した。current canonical specification packはexact 6 pathsを維持し、existing exact 16 support artifactsはimmutable、non-authoritative、grandfathered support historyとして保存する。新しいsupport artifactを追加せず、support historyの内容をcurrent authorityへ昇格させない。この決定はProduct、security、lifecycle、policy、parent contractを変更しない。
+
+従って、親のE384-DEC-001、E384-DEC-002、E384-DEC-004、accepted P392 sequence ADRを再審議せず、`owner_decisions_required=[]`を維持する。ユーザーによる本明示承認により、`implementation_allowed=true`も維持する。ただし、これはProduct実装完了、code review、human merge、B1/B2、Issue closureを意味しない。修正後のfresh Strict specification reviewがpassするまで、実効的なmutation gateは閉じる。

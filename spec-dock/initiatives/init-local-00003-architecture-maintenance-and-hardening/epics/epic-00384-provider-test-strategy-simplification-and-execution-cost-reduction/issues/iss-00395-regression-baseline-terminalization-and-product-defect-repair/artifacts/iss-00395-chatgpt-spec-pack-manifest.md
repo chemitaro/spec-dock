@@ -16,7 +16,7 @@ github_issue: "#395"
 template: "blank"
 authority: "advisory-evidence"
 canonical_authority_replacement: false
-implementation_allowed: false
+implementation_allowed: true
 owner_decisions_required: []
 derived_from:
 
@@ -46,6 +46,10 @@ derived_from:
   role: "product-test-ledger-entry-baseline"
   sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
   tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
+support_history_evidence:
+  role: "grandfathered-immutable-support-history"
+  sha: "c0736434503117d5d468d1438fb18da16d382a56"
+  tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
   strict_authoring_evidence:
   requested_model: "GPT-5.6 Pro（GPT-5.6 Sol + Pro 推論）"
   runtime_model_identity: "GPT-5.6 Sol Pro"
@@ -67,14 +71,16 @@ derived_from:
 * `full-regression-ledger.json`の遷移
 * dogfood candidateの更新
 * SpecDock managed metadataの手編集
-* implementation permissionの付与
+* Pack生成時点でのimplementation permissionの付与
 * commitまたはpush
 * Pull Requestの作成またはmerge
 * Issue #392またはIssue #395のclosure
 * Issue #396の開始
 * mainへのmerge
 
-`implementation_allowed: false`を維持する。Packの生成、ローカル配置、静的検査、SpecDock validate、commitまたはpushのいずれも、独立Strict specification reviewと明示的なimplementation dispatchを代替しない。
+Pack生成時点ではimplementation permissionを付与していなかった。現在のcanonical R/D/Pおよび本manifestのimplementation_allowed: trueは、ユーザーの明示dispatchを反映する。ただし、packの生成、ローカル配置、静的検査、SpecDock validate、commitまたはpushのいずれも、独立Strict specification reviewと明示的なimplementation dispatchを代替しない。修正後のfresh Strict specification reviewがpassするまで、実効的なProduct/test/ledger/dogfood mutationはblockedである。
+
+Current canonical specification packはexact 6 pathsである。Elaboration input後に既に存在したexact 16 support artifactsは、c0736434503117d5d468d1438fb18da16d382a56 / cec02ce70fbcbbbac811a04106dcc15540ad4d09をcheckpointとするimmutable、non-authoritative、grandfathered support historyである。Support historyはcurrent authority、implementation input、permission evidenceではなく、編集、削除、rename、再生成、再圧縮、再分類、新規追加を行わない。
 
 ## 2. 対象コンテキスト
 
@@ -92,8 +98,10 @@ derived_from:
 | Integration branch                | `codex/epic-00384-provider-test-strategy-planning`                        |
 | Issue branch                      | `iss-00395-regression-baseline-terminalization-and-product-defect-repair` |
 | Delivery order                    | `#392 -> #395 -> #396 -> Epic human merge to main`                        |
-| Current implementation permission | `false`                                                                   |
+| Current implementation permission | `true`                                                                    |
 | Current owner decisions           | `[]`                                                                      |
+
+implementation_allowed=trueはユーザーの明示dispatchを記録する。これはfresh Strict review pass前の実効的なmutation許可ではない。
 
 現在のgenerated contextはInitiative `init-local-00003`、Epic `epic-00384`、Issue `iss-00395`をactive contextとして示す。Generated active stateは作業案内であり、canonical Issue R/D/P、accepted ADR、normative artifactsおよびexact repository stateを置換しない。
 
@@ -460,6 +468,10 @@ Canonical Issue R/D/Pは、ローカル反映、reviewおよび採用後にIssue
 16. Issue #396の`E384-QUAL-001` implementation、policy retirement、required-context transition、main mergeはIssue #395の対象外である。
 17. Pack完成だけではProduct implementation permissionを付与しない。
 18. `owner_decisions_required=[]`を維持する。
+19. Current canonical specification packはexact 6 pathsである。
+20. Existing exact 16 support artifactsは、support-history checkpoint c0736434503117d5d468d1438fb18da16d382a56 / cec02ce70fbcbbbac811a04106dcc15540ad4d09に束縛されたimmutable、non-authoritative、grandfathered support historyである。
+21. Support historyはcurrent authority、implementation input、permission evidenceではなく、path、mode、object type、Git object IDをspec freezeでcheckpointと一致させる。
+22. 22 pathsを単一のcurrent-spec allowlistとして扱わず、support historyのedit、delete、rename、regenerate、recompress、reclassify、新規追加を行わない。
 
 ## 11. Row-specific contractの固定内容
 
@@ -668,21 +680,21 @@ SpecDock managed stateを変更する必要がある場合は、current SpecDock
 * Requirement、Design、Planのfront matterに次がある。
 
   * `ID: "iss-00395"`
-  * `実装開始許可: false`
+  * `実装開始許可: true`
   * `owner_decisions_required: []`
 * LunaMax handoffに次がある。
 
-  * `implementation_allowed: false`
+  * `implementation_allowed: true`
   * `owner_decisions_required: []`
 * Manifestに次がある。
 
   * `authority: "advisory-evidence"`
   * `canonical_authority_replacement: false`
-  * `implementation_allowed: false`
+  * `implementation_allowed: true`
 
 ### 15.2 SHA-256検証
 
-初回sandbox bytesをそのまま配置した五つのnon-manifest filesは、次と一致しなければならない。
+次のhashは修正前packの履歴identityであり、今回の仕様修正後のcurrent bytesとの一致を要求しない。修正後は、六つのprimary filesを保存した最終candidateでSHA-256を再計算し、Git SHA/treeとexternal receiptへ束縛する。
 
 ```text
 1c6465d01c80849fe8ef3d0fca03ae162c4f00bce948504d25cc46ceb03e460d  requirement.md
@@ -711,9 +723,9 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 
 Extra Product、test、ledger、timing、policyまたはworkflow pathがある場合は停止する。
 
-### 15.4 Spec pack diff境界
+### 15.4 Specification admission history boundary
 
-Packを反映したcandidateについて、`fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9`からのchanged pathsを確認する。
+Support-history checkpointからreviewed specification freezeまでのcurrent diffについて、exact six primary pathsだけが変更されていることを確認する。Elaboration inputからsupport-history checkpointまでのexact 22 pathsは、別の履歴segmentとして既に検証済みである。
 
 Expected set:
 
@@ -725,6 +737,8 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-human-guide.html
 spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-chatgpt-spec-pack-manifest.md
 ```
+
+Support-history checkpointは c0736434503117d5d468d1438fb18da16d382a56、treeは cec02ce70fbcbbbac811a04106dcc15540ad4d09 である。exact 16 support pathsについて、checkpointとreviewed specification freezeのGit tree entry（path、mode、object type、object ID）が一致することを確認する。22 pathsをcurrent-spec allowlistとして扱わず、directory prefix、glob、Manifestの自己申告、working-tree存在、過去のZIP hashで代替しない。Support historyのedit、delete、rename、copy substitution、regenerate、recompress、reclassify、新規追加は停止条件である。
 
 SpecDock commandが正当に再生成するdocumentation projectionがある場合は、そのcommand、before/after identityおよび理由を別receiptへ記録する。Product source、tests、ledger、timing、policy、workflowまたはdogfood runtimeが含まれる場合はcommit/push前に停止する。
 
@@ -805,7 +819,7 @@ spec-dock: ok (validate) nodes=236
 11. 過去review receiptをnew SHAへ流用しない。
 12. Review receiptをtracked Product tree外のapproved evidence locationへ保存する。
 
-Independent review pass後も、`implementation_allowed`を自動的にtrueへ変更しない。Implementation dispatchは別の明示操作である。
+Independent review pass後も、implementation_allowedを自動的に変更しない。現在のtrueはユーザーの明示dispatchを記録した値であり、fresh review pass前のeffective mutation permissionではない。Implementation dispatch、spec review pass、execution packet、concurrent-writer absenceは別のゲートとして扱う。
 
 ## 17. LunaMax implementation dispatch gate
 
@@ -966,8 +980,8 @@ Rollback unitはwhole Issue #395 mergeである。
 | Initial attachment bundle SHA-256             | 未確認         | Original bytesを再取得できた場合に計算                          |
 | Local repositoryへの六ファイル反映                     | 完了         | Codexによる配置と`git diff`確認                             |
 | SpecDock validate after reflection            | pass         | `./spec-dock/scripts/spec-dock validate` (`nodes=236`)            |
-| Independent specification review              | 未実施         | Clean pushed exact SHAで`chatgpt-spec-review-strict` |
-| Implementation permission                     | 未付与         | Review pass後のexplicit dispatch                      |
+| Independent specification review              | 修正後candidateで実施前。receiptは外部evidence locationへ保存 | Clean pushed exact SHAで`chatgpt-spec-review-strict` |
+| Implementation permission                     | ユーザーの明示dispatch済み（`true`）。実効mutationは別ゲート | Fresh review pass、execution packet、concurrent-writer absence |
 | Product implementation                        | 未実施         | LunaMax execution packet                            |
 | Test修正                                        | 未実施         | LunaMax execution packet                            |
 | Ledger transition                             | 未実施         | 14 rows normal pass後                                |
@@ -998,7 +1012,7 @@ Rollback unitはwhole Issue #395 mergeである。
 * P392 SHA: `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`
 * P392 tree: `190bc566a18cd84813c4b7c043f8724e275cb55d`
 * P392後のProduct/test/policy drift: なし。Epic PlanとIssue #392 Reportのdoc-only差分
-* Implementation permission: `false`
+* Implementation permission: `true` records the user's explicit dispatch. Effective Product/test/ledger/dogfood mutation remains blocked until the repaired specification receives a fresh Strict review pass with P0=0 and P1=0 and the execution packet is complete.
 * Product implementation: 未実施
 * Independent spec review: 未実施
 * Human merge: 未実施

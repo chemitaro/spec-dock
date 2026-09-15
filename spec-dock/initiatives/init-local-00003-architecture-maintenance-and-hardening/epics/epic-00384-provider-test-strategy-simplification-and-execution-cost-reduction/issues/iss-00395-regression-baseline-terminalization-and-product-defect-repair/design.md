@@ -10,6 +10,8 @@ elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
+support_history_sha: "c0736434503117d5d468d1438fb18da16d382a56"
+support_history_tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
 implementation_allowed: true
 owner_decisions_required: []
 human_merge_only: true
@@ -20,7 +22,7 @@ authority: "advisory-corrected-design"
 
 ## 1. Status and authority
 
-This document is a corrected implementation design for Issue #395. It does not grant permission to modify policy, workflows, Git history, pull requests, or Issue state. Following the completed specification review, the user has explicitly authorized Issue #395 implementation, so the current `implementation_allowed` value is `true`.
+This document is a corrected implementation design for Issue #395. It does not grant permission to modify policy, workflows, Git history, pull requests, or Issue state. Following the prior specification-review cycle and the user's explicit dispatch, the current `implementation_allowed` value is `true`.
 
 Before the first mutation, the executor must still verify all of the following for one clean pushed specification tip:
 
@@ -56,6 +58,7 @@ The integration branch remains `codex/epic-00384-provider-test-strategy-planning
 | ------------------------ | ------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------- |
 | P392 Product entry       | `921bf7512c72bfa2887673cb7ec9bc512cec6ff3` | `190bc566a18cd84813c4b7c043f8724e275cb55d` | Human-merged #392 Product/test/ledger baseline                              |
 | Elaboration input        | `fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9` | `4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599` | Exact Issue-branch tip reviewed in this readiness analysis                  |
+| Support-history checkpoint | `c0736434503117d5d468d1438fb18da16d382a56` | `cec02ce70fbcbbbac811a04106dcc15540ad4d09` | Exact 16 existing support artifacts; immutable, non-authoritative history |
 | Specification freeze     | Runtime value                              | Runtime value                              | Future clean pushed canonical six-file specification pack                   |
 | Implementation candidate | Runtime value                              | Runtime value                              | Future clean pushed Product/test/ledger candidate, if separately authorized |
 | Post-merge B1/B2 tip     | Runtime value                              | Runtime value                              | Future human-merged integration tip                                         |
@@ -88,6 +91,29 @@ entry baseline observation
   -> human PR merge
   -> same-tip B1, then B2
 ```
+
+### 3.3 Specification admission/history design
+
+The specification freeze is modeled as three separate history segments rather than one combined allowlist:
+
+```text
+P392
+  └─ exact two receipt documents
+      ↓
+Elaboration input
+  └─ six primary specification paths + sixteen existing support-history paths
+      ↓
+Support-history checkpoint c0736434503117d5d468d1438fb18da16d382a56
+  ├─ sixteen support tree entries are immutable and non-authoritative
+  └─ six primary paths remain the only current specification surface
+      ↓
+Reviewed specification freeze
+  └─ only the six primary paths may change
+```
+
+The six primary paths are the Issue Requirement, Design, Plan, LunaMax handoff, human guide, and ChatGPT spec-pack manifest. The sixteen support-history paths are the exact paths listed by the Requirement. They are preserved as history only: they cannot provide current permission, owner decisions, implementation input, or a replacement authority for the canonical R/D/P.
+
+The B5 design must prove, for every support-history path, equality of path, mode, object type, and Git object ID between the checkpoint and the reviewed specification freeze. A same-content copy, rename, recompressed ZIP, directory-prefix match, or manifest-only declaration is not equivalent. This governance correction does not alter Product behavior, Row 3's credential/no-secret/publication guarantees, lifecycle, policy, protected-data, timing, workflow, or the Row 12 no-edit boundary.
 
 Changing the ledger before the normal-pass proof is forbidden. Treating working-tree verifier output as exact candidate identity is forbidden.
 
@@ -373,6 +399,8 @@ Concurrent-writer absence means no other process, worktree, agent, or Issue task
 * lifecycle-owned generated roots during the projection;
 * the Issue branch ref.
 
+The sixteen preserved support-history paths are explicitly excluded from the writer scope. No process, worktree, agent, or Issue task may edit, delete, rename, regenerate, recompress, or reclassify them. Their unchanged tree entries are an entry-gate assertion, not an implementation write permission.
+
 A boolean without an assertion identity and scope is insufficient.
 
 ## 11. Evidence design
@@ -502,4 +530,6 @@ Before human merge, abandon or repair the complete Issue candidate. After human 
 
 ## 16. Decision state
 
-No new Product, security, lifecycle, policy, or parent decision is required. `owner_decisions_required=[]` is retained. Following the completed specification review and explicit user dispatch, implementation permission is true. Exact identity, concurrent-writer absence, clean push, and the remaining implementation and delivery gates remain mandatory separate gates.
+The Issue-specific admission/history decision is now explicit: the current canonical specification pack remains exactly six paths, and the existing exact sixteen support artifacts remain immutable, non-authoritative, grandfathered support history at the recorded checkpoint. No new support artifact is admitted and no support-history content is updated to match current R/D/P. This decision changes no Product, security, lifecycle, policy, protected-data, workflow, or parent contract.
+
+`owner_decisions_required=[]` is therefore consistent with the current design. Following the explicit user dispatch, `implementation_allowed=true` remains the recorded owner permission. Effective mutation is still gated separately: the repaired exact SHA/tree must first pass a fresh Strict specification review with `review_status=pass`, P0=0, P1=0, and a valid execution packet with concurrent-writer absence. Exact identity, clean push, human merge, and all implementation/delivery gates remain separate requirements.
