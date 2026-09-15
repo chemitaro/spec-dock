@@ -125,6 +125,25 @@ SPEC_PACK_PATHS=(
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-human-guide.html
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-chatgpt-spec-pack-manifest.md
 )
+
+SPEC_SUPPORT_PATHS=(
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/design-luna-max-ready.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-design-tdd-ready.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-lunamax-handoff-tdd-ready.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-plan-review-analysis.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-plan-tdd-ready.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-requirement-tdd-ready.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-spec-pack.zip
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-tdd-ready-manifest.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-tdd-ready-pack.receipt.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-tdd-ready-pack.zip
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-implementation-handoff-ready.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-analysis.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-manifest.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-pack.receipt.md
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-pack.zip
+  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/plan-lunamax-ready.md
+)
 ```
 
 ## 3. Test lane契約
@@ -338,15 +357,17 @@ PY
 
 Product、test、ledger、timing、policy、workflowがこの差分へ含まれていた場合は停止する。
 
-### B5. Elaboration inputからspec freezeまでのsix-file pack
+### B5. Elaboration inputからspec freezeまでのspec pack
 
 ```bash
-python - "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA" <<'PY'
+python - "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA" \
+  "${SPEC_PACK_PATHS[@]}" \
+  "${SPEC_SUPPORT_PATHS[@]}" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
-base, head = sys.argv[1:]
+base, head, *allowed_paths = sys.argv[1:]
 
 issue = Path(
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
@@ -354,14 +375,7 @@ issue = Path(
     "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 )
 
-expected = {
-    str(issue / "requirement.md"),
-    str(issue / "design.md"),
-    str(issue / "plan.md"),
-    str(issue / "artifacts/iss-00395-luna-max-implementation-handoff.md"),
-    str(issue / "artifacts/iss-00395-human-guide.html"),
-    str(issue / "artifacts/iss-00395-chatgpt-spec-pack-manifest.md"),
-}
+expected = set(allowed_paths)
 
 actual = set(
     subprocess.check_output(
@@ -381,11 +395,18 @@ for path in sorted(expected):
     assert candidate.is_file(), path
     assert candidate.stat().st_size > 0, path
 
-print("spec-freeze-pack-only-ok")
+assert str(issue / "requirement.md") in expected
+assert str(issue / "design.md") in expected
+assert str(issue / "plan.md") in expected
+assert str(issue / "artifacts/iss-00395-luna-max-implementation-handoff.md") in expected
+assert str(issue / "artifacts/iss-00395-human-guide.html") in expected
+assert str(issue / "artifacts/iss-00395-chatgpt-spec-pack-manifest.md") in expected
+
+print("spec-freeze-pack-and-support-only-ok")
 PY
 ```
 
-Human guideを含むsix filesの実体が必要である。Manifestの自己申告または過去のhashだけでは代替できない。
+`SPEC_PACK_PATHS`はhuman guideを含む6件の主仕様packである。`SPEC_SUPPORT_PATHS`は、elaboration input後の同一仕様準備で既に作成された補助artifactを厳密に列挙する。これら以外の差分は許可しない。各pathの実体が必要であり、Manifestの自己申告または過去のhashだけでは代替できない。
 
 ### B6. Active state、managed metadata、SpecDock validation
 
