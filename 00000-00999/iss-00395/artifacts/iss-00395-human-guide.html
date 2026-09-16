@@ -195,18 +195,12 @@
     <li><strong>補助履歴:</strong> 16件のsupport historyは現在の仕様ではなく、no-diffだけで保全する情報資料です。mode、object type、Git object IDの一致を、実装開始の二重ゲートにしません。</li>
     <li><strong>Issue間のSHA結合:</strong> Issue #392のProduct gateへ、Issue #395/#396の文書SHAを同期しません。#392のbaseline assertionはP392のimmutable ledger blobで独立して検証します。</li>
     <li><strong>Parser:</strong> preflightに別の<code>urlsplit</code>やregex parserを持たず、production resolverを一つの正本として利用します。</li>
-    <li><strong>重複実行:</strong> clean candidateのfull verifierが収集したfull-regression結果を正本とし、同じnodeやsuiteをN3で再実行しません。N3では、別policyのordinary laneを一度だけ実行し、lint、SpecDock validation、手動境界証明を追加します。</li>
+    <li><strong>重複実行:</strong> clean candidateとpost-merge B1ではfull verifierをfull-regressionの正本とし、同じSHAのtargeted suiteを再実行しません。ordinary laneはdefault policyを確認する別契約として一度だけ実行し、lint、SpecDock validation、手動境界証明を別に残します。</li>
   </ol>
   <div class="callout ok"><strong>修正後の作成経路:</strong> create/link_existing → 既存publication endpointを一度だけ実行 → accepted slugをsame-repository validationへ渡す → create時は<code>IssueGateway</code>へslugを渡す → <code>gh issue create --repo &lt;slug&gt;</code>。importは従来どおりfetch-onlyです。retry、cache、feature flag、二重parserは追加しません。</div>
-  <h3>ユーザーに求める判断</h3>
-  <p>新しいProduct方針や追加のsecurity選択を求めているわけではありません。判断してほしいのは、次の最小方針で仕様レビューを再実施してよいかです。</p>
-  <ol class="compact">
-    <li>既存publication endpointを一度だけcreate境界へ接続する。</li>
-    <li>Issue作成先を解決済みslugで明示する。</li>
-    <li>importのfetch-only挙動、既存のsame-repository検証、credential non-exposureを維持する。</li>
-    <li>Strictスペックレビューが<code>review_status=pass</code>、P0=0、P1=0になるまでProduct/test変更を開始しない。</li>
-  </ol>
-  <p class="small muted">現在はこの再レビューが必要な段階です。仕様レビューがpassした後に実装を開始し、実装後には作成前失敗と明示的な<code>--repo</code>をfocused create-boundary testで、4ケースのpublication policy matrixを専用diagnosticで確認します。</p>
+  <h3>現在のユーザー判断</h3>
+  <p>Epic #384の簡素化方針に沿った仕様修正と、GPT-5.6 ProによるStrictスペックレビューはすでに承認されています。今回の文書補正自体について、追加のProduct方針やsecurity選択は求めていません。</p>
+  <p class="small muted">実装はStrictレビューが<code>review_status=pass</code>、P0=0、P1=0になった後に限って開始します。post-U05の既存RED証拠が欠落・不一致なら編集前に停止し、必要な証拠の場所・SHA・不足項目を提示します。最終PR mergeは引き続き人間だけが判断します。</p>
 </section>
 
 <section id="admission-change">
@@ -436,6 +430,7 @@ end note
 
 <section id="normal-flow">
   <h2>正常flow</h2>
+  <div class="callout ok"><strong>post-U05でのRED証拠:</strong> 初回の13-row REDは、packetが指定するrepository外evidenceからidentity・summary・raw log/observationのhashを検証して再利用します。証拠が見つからない・一致しない場合は編集前に停止し、修復済みnodeをREDに戻すためだけの再実行はしません。</div>
   <script type="text/plain" class="plantuml-source" id="source-normal-flow" data-target="diagram-normal-flow">
 
 @startuml

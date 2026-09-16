@@ -362,6 +362,15 @@ The four-case diagnostic is a focused security regression check. It is run once 
 
 This matrix covers the existing publication endpoint policy only. The create-boundary test separately proves application preflight before any write and explicit `--repo` binding; the matrix does not claim that call-graph coverage.
 
+Create-boundary call-graph coverage uses only these existing nodes; no test node or ledger row is added:
+
+* tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write
+* tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_with_canonical_origin_scope_still_succeeds
+* tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_link_existing_same_repo_scope_succeeds_and_persists_canonical_scope
+* tests/cli_runtime/test_new.py::TestCliNew::test_new_issue_can_create_github_issue_and_use_its_number
+
+Together they prove one resolver call before any IssueGateway/local write, normalized slug delivery as repo_slug, no writes after create or link_existing preflight rejection, explicit gh issue create --repo binding, and create-error redaction. The H5 four-case matrix remains limited to the existing endpoint policy and does not duplicate this call-graph proof.
+
 ## 8. Dogfood and protected-data design
 
 ### 8.1 Pre-projection snapshot
@@ -504,11 +513,14 @@ Neither review authorizes merge. The PR base remains the Epic integration branch
 
 After human merge, use a separate clean verification checkout of the integration branch and fix the exact merge SHA and tree.
 
+At B1, run the ordinary lane once for its default-policy contract and the current full verifier once. The full verifier collects and executes all pytest nodes, so its receipt is the source for provider lifecycle, distribution cutover, platform/coordination, packaged distribution, and dogfood coverage; do not rerun those subsets on the same merged tree.
+
 B1 requires:
 
 * the accepted PR head tree equals the post-merge integration tree;
 * Provider CI receipts for both Linux and macOS matrix roles are successful on that PR head tree;
-* ordinary lane, provider lifecycle unit suite, distribution cutover, lifecycle platform/coordination suite, packaged distribution parity, dogfood parity, lint, SpecDock validate, row 3 publication diagnostic, row 12 guard, protected-data proof, and current full verifier are all GREEN or unchanged as applicable;
+* ordinary lane and current full verifier are GREEN; the full verifier covers provider lifecycle, distribution cutover, lifecycle platform/coordination, packaged distribution, and dogfood pytest nodes;
+* lint, SpecDock validate, row 3 publication diagnostic, row 12 guard, and protected-data proof are GREEN or unchanged as applicable;
 * unexpected failures are zero;
 * the exact integration SHA remains unchanged throughout local verification.
 
