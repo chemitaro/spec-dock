@@ -195,7 +195,7 @@
     <li><strong>補助履歴:</strong> 16件のsupport historyは現在の仕様ではなく、no-diffだけで保全する情報資料です。mode、object type、Git object IDの一致を、実装開始の二重ゲートにしません。</li>
     <li><strong>Issue間のSHA結合:</strong> Issue #392のProduct gateへ、Issue #395/#396の文書SHAを同期しません。#392のbaseline assertionはP392のimmutable ledger blobで独立して検証します。</li>
     <li><strong>Parser:</strong> preflightに別の<code>urlsplit</code>やregex parserを持たず、production resolverを一つの正本として利用します。</li>
-    <li><strong>重複実行:</strong> clean candidateのfull verifierが収集したfull-regression結果を正本とし、同じnodeやsuiteをN3で再実行しません。N3はlint、SpecDock validation、手動境界証明だけに絞ります。</li>
+    <li><strong>重複実行:</strong> clean candidateのfull verifierが収集したfull-regression結果を正本とし、同じnodeやsuiteをN3で再実行しません。N3では、別policyのordinary laneを一度だけ実行し、lint、SpecDock validation、手動境界証明を追加します。</li>
   </ol>
   <div class="callout ok"><strong>修正後の作成経路:</strong> create/link_existing → 既存publication endpointを一度だけ実行 → accepted slugをsame-repository validationへ渡す → create時は<code>IssueGateway</code>へslugを渡す → <code>gh issue create --repo &lt;slug&gt;</code>。importは従来どおりfetch-onlyです。retry、cache、feature flag、二重parserは追加しません。</div>
   <h3>ユーザーに求める判断</h3>
@@ -290,7 +290,7 @@ end note
 <section id="identity">
   <h2>P392と現行tipの区別</h2>
   <p>P392からelaboration inputまでに変わったのはEpic Planと#392 Reportだけです。Product source、tests、ledger、timing、verifier、workflowsは同一です。仕様packのcommitはさらにdoc差分を足しますが、P392 Product entryを置換しません。</p>
-  <p>current tipとして採用するのは、常にfresh Strict仕様レビューの対象になったclean pushedな<code>SPEC_FREEZE_SHA/TREE</code>です。U05後の再開で使う<code>RESUME_CHECKPOINT_SHA/TREE</code>は、既存の実装candidateが由来する祖先の基点です。resume checkpointをcurrent tipとして扱わず、そこから仕様レビュー対象までの差分が主仕様の文書だけであることを確認します。</p>
+  <p>current tipに束縛するのは、常にfresh Strict仕様レビューの対象になったclean pushedな<code>SPEC_FREEZE_SHA/TREE</code>です。U05後の再開で使う<code>RESUME_CHECKPOINT_SHA/TREE</code>は、既存の実装candidateが由来する祖先の基点です。resume checkpointをcurrent tipとして扱わず、そこから仕様レビュー対象までの差分が主仕様の文書だけであることを確認します。</p>
   <script type="text/plain" class="plantuml-source" id="source-identity" data-target="diagram-identity">
 
 @startuml
@@ -444,24 +444,31 @@ start
 :Specification admission\n主仕様6件・履歴16件;
 :Fresh Strict spec review\nP0/P1=0;
 :Identity/active/15-row/243 preflight;
-:Entry full verifier\nexact 10 violations + known boundary witness;
-:Resume checkpointは必要時だけ祖先として確認;
-:Issue #392 boundary witnessの不要な文書SHA比較を実装時に除去;
-:P392のbaseline bindingとboundary assertionを保持;
-:Row 12 current passを確認;
-:Rows 4-11 scaffolder double RED;
-:Rows 1,13,14,15 retired args RED;
-:Row 3 identity coupling RED;
-:Test harness/observerを修正;
-:Row 3 Product boundaryを修正;
-:14 rows + row2 successor = 15 pass;
-:Provider source GREEN;
-:SpecDock updateでdogfoodへ投影;
-:Ledger 14 rowsを一括 resolved/fixed-in-place (U05済みなら再実行しない);
-:Post-U05 terminal stateを確認;
-:CandidateをSPEC_FREEZEのclean tipとしてcommit/pushまたはadopt;
+if (Resume mode?) then (initial)
+  :Entry full verifier\nexact 10 violations + known boundary witness;
+  :Issue #392 boundary witnessの不要な文書SHA比較を実装時に除去;
+  :P392のbaseline bindingとboundary assertionを保持;
+  :Row 12 current passを確認;
+  :Rows 4-11 scaffolder double RED;
+  :Rows 1,13,14,15 retired args RED;
+  :Row 3 identity coupling RED;
+  :Test harness/observerを修正;
+  :Row 3 Product boundaryを修正;
+  :14 rows + row2 successor = 15 pass;
+  :Provider source GREEN;
+  :SpecDock updateでdogfoodへ投影;
+  :Ledger 14 rowsを一括 resolved/fixed-in-place;
+else (post-U05)
+  :Resume checkpointを祖先として確認;
+  :Existing terminal ledger 15/0/15を確認;
+  :P392 boundary witness整理とfocused Product/testを修正;
+  :Provider source GREEN;
+  :SpecDock updateでdogfoodへ投影;
+  :Ledger transitionは再実行しない;
+endif
+:CandidateをSPEC_FREEZEのclean tipとしてcommit/push;
 :Clean candidate full verifier verified;
-:N2 full verifier verified; N3 lint/validate/manual proof GREEN;
+:N2 full verifier verified; N3 ordinary lane + lint/validate/manual proof GREEN;
 :Strict code review + Pro FQG pass;
 :Human PR merge;
 :B1 current gates GREEN;
@@ -556,8 +563,9 @@ env TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression 
   <p>このfinal verifierは、commit済みでcleanなcandidate SHA/TREEを固定した後にだけ実行します。Working treeのdiagnostic結果をfinal receiptへ転用しません。Exit 0、<code>status=verified</code>、active 0、resolved 15、violations 0を要求します。</p>
 
   <h3>Clean candidateの非重複gate</h3>
-  <p>full-regressionのnode、distribution、lifecycle、package、dogfoodは上のfull verifierが一度だけ収集・実行します。同じcandidateで個別suiteを再実行しません。ここではN2が収集しない静的gateだけを確認します。</p>
-  <pre><code>env TMPDIR=/private/tmp make lint
+  <p>full-regressionのnode、distribution、lifecycle、package、dogfoodは上のfull verifierが一度だけ収集・実行します。同じcandidateでそれらのsuiteを再実行しません。N3では、N2とは異なるordinary policy laneを一度だけ実行し、lint、SpecDock validation、publication security matrix、row 12 guard、protected-dataおよびno-touchのmanual proofを確認します。</p>
+  <pre><code>env TMPDIR=/private/tmp uv run pytest -q
+env TMPDIR=/private/tmp make lint
 ./spec-dock/scripts/spec-dock validate</code></pre>
 
   <h3>No-touch</h3>
