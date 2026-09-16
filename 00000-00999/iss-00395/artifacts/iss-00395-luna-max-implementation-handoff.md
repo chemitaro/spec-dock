@@ -3,7 +3,7 @@
 kind: "implementation-handoff"
 issue: "iss-00395"
 title: "Issue #395 LunaMax Implementation Handoff — Ready Contract"
-artifact_path: "artifacts/luna-max-implementation-handoff-ready.md"
+artifact_path: "artifacts/iss-00395-luna-max-implementation-handoff.md"
 generated_at: "2026-09-16"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
@@ -21,8 +21,8 @@ authority: "advisory-execution-handoff"
 derived_from:
 
   - "requirement.md"
-  - "design-luna-max-ready.md"
-  - "plan-lunamax-ready.md"
+  - "design.md"
+  - "plan.md"
 
 ---
 
@@ -182,7 +182,7 @@ human_merge_only: true
   * `merge_ready=false`とする。
 * `COMMIT_PUSH_AUTHORIZED=true`:
 
-  * 全gateがGREENの場合だけ、exact 13 pathsをIssue branchへcommit/pushできる。
+  * 全gateがGREENの場合だけ、`initial-spec-freeze`ではexact 13 paths、`post-u05-checkpoint`では事前検証済みnon-empty incremental subsetをIssue branchへcommit/pushできる。累積implementation surfaceのexact 13 pathsは別のpath gateで維持する。
 * `PR_PREPARE_AUTHORIZED=false`:
 
   * PRを作成・更新しない。

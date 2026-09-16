@@ -457,7 +457,7 @@ Raw local evidence containing absolute paths is not copied into a distributed ar
 
 ## 12. Exact clean candidate and review boundary
 
-Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 13 paths are staged. Untracked files, caches, logs, and evidence are not staged.
+Commit and push are allowed only when the execution packet separately authorizes them. In `initial-spec-freeze`, the exact 13 implementation paths are staged. In `post-u05-checkpoint`, the cumulative implementation surface remains exactly 13 paths, but only the pre-verified non-empty incremental subset is staged; for the E3R route this is the single T14 boundary-test path. Untracked files, caches, logs, and evidence are not staged.
 
 The boundary-test path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to binding the baseline payload read to the immutable P392 entry blob, while preserving every Issue #392 assertion, and synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The separate migration observer path is `tests/unit/test_provider_test_lanes.py`; it compares the P392 before payload with the current root after payload and does not alter evaluator/verifier behavior. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
 
