@@ -67,7 +67,7 @@ No future SHA or tree is predeclared in tracked content. Every future identity i
 
 ### 3.2 Baseline semantics
 
-The root ledger contains 15 rows. Row 2 is already `resolved/superseded`; rows 1 and 3–15 are active. The root timing file contains 243 node weights. The current full-regression evaluator has these relevant rules:
+The P392 historical ledger contains 15 rows. Row 2 is `resolved/superseded`; rows 1 and 3–15 are active. The current root ledger retains the same rows and, after the approved U05 transition, is terminalized as 15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`. The root timing file contains 243 node weights. The current full-regression evaluator has these relevant rules:
 
 * active row: the historical node executes exactly once and fails normally with the historical signature;
 * resolved/fixed-in-place row: the historical node executes exactly once and passes normally;
@@ -222,7 +222,7 @@ The runtime mirror must be byte-equal to provider source. The ready record and b
 
 ### 5.7 Ledger write surface
 
-Only `full-regression-ledger.json` changes. For rows 1 and 3–15, the only semantic changes are:
+Only `full-regression-ledger.json` changes. The immutable before payload is read from `921bf7512c72bfa2887673cb7ec9bc512cec6ff3:full-regression-ledger.json`; the after payload is the current root ledger. For rows 1 and 3–15, the only semantic changes are:
 
 ```json
 {
@@ -239,11 +239,11 @@ to:
 }
 ```
 
-Every other field in those rows, the complete row 2 object, row order, and all top-level historical fields must be identical to the pre-transition payload.
+Every other field in those rows, the complete row 2 object, row order, and all top-level historical fields must be identical to the P392 before payload. A current root ledger that is already terminalized is never used as a substitute for the immutable historical before payload.
 
 ### 5.8 Expected implementation file set
 
-The exact expected tracked implementation diff contains 12 files:
+The exact expected tracked implementation diff contains 13 files:
 
 ```text
 full-regression-ledger.json
@@ -257,6 +257,7 @@ tests/cli_runtime/test_import.py
 tests/cli_runtime/test_runtime_import_s10.py
 tests/cli_runtime/test_sync.py
 tests/cli_runtime/test_workbench.py
+tests/unit/test_provider_test_lanes.py
 tests/integration/test_issue_392_acceptance.py
 ```
 
@@ -398,7 +399,7 @@ Missing, inconsistent, or unparsable values stop with zero mutations.
 
 Concurrent-writer absence means no other process, worktree, agent, or Issue task is authorized to write any of:
 
-* the exact 12 expected implementation paths;
+* the exact 13 expected implementation paths;
 * lifecycle-owned generated roots during the projection;
 * the Issue branch ref.
 
@@ -429,7 +430,7 @@ Row 12 records the entry evaluator `coverage_mismatch` as RED and the independen
 
 ### 11.3 Candidate evidence
 
-Working-tree evidence records both Git `HEAD` and a SHA-256 of the complete binary diff and is explicitly provisional. Merge-ready evidence is rerun on one clean pushed implementation SHA and tree and contains:
+Working-tree evidence records both Git `HEAD` and a SHA-256 of the complete binary diff and is explicitly provisional. Candidate-wheel and merge-ready full-verifier evidence is never produced from that dirty state; it is rerun on one clean pushed implementation SHA and tree and contains:
 
 * exact changed-file set;
 * all per-row evidence;
@@ -446,9 +447,9 @@ Raw local evidence containing absolute paths is not copied into a distributed ar
 
 ## 12. Exact clean candidate and review boundary
 
-Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 12 paths are staged. Untracked files, caches, logs, and evidence are not staged.
+Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 13 paths are staged. Untracked files, caches, logs, and evidence are not staged.
 
-The twelfth path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to binding the baseline payload read to the immutable P392 entry blob, while preserving every Issue #392 assertion, and synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
+The boundary-test path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to binding the baseline payload read to the immutable P392 entry blob, while preserving every Issue #392 assertion, and synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The separate migration observer path is `tests/unit/test_provider_test_lanes.py`; it compares the P392 before payload with the current root after payload and does not alter evaluator/verifier behavior. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
 
 After commit and push, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
 

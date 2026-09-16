@@ -128,6 +128,7 @@ IMPLEMENTATION_PATHS=(
   tests/cli_runtime/test_runtime_import_s10.py
   tests/cli_runtime/test_sync.py
   tests/cli_runtime/test_workbench.py
+  tests/unit/test_provider_test_lanes.py
   tests/integration/test_issue_392_acceptance.py
 )
 
@@ -607,9 +608,12 @@ Blob driftがある場合は、仕様入力と実装対象が一致していな�
 
 ### C2. Immutable pre-transition ledger evidence
 
+`ledger-before.json`は作業ツリーの現行rootをコピーして作らない。P392 entryのimmutable Git blobをhistorical beforeとして再構築し、U05遷移前のcurrent rootまたはU05後のcurrent rootを、実行フェーズに応じたafterとして別に検証する。U05後のcheckpointから再開する場合、ledger transition writeを再実行せず、P392 beforeとcurrent root afterの保存証明だけを実施する。
+
 ```bash
-cp full-regression-ledger.json \
-  "$EVIDENCE_DIR/ledger-before.json"
+git show \
+  "$P392_SHA:full-regression-ledger.json" \
+  > "$EVIDENCE_DIR/ledger-before.json"
 
 python - "$EVIDENCE_DIR/ledger-before.json" <<'PY'
 from pathlib import Path
@@ -1306,6 +1310,7 @@ assert set(writer["scope_paths"]) == {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
     "tests/integration/test_issue_392_acceptance.py",
     "refs/heads/"
     "iss-00395-regression-baseline-terminalization-and-product-defect-repair",
@@ -2631,84 +2636,11 @@ print("post-ledger-normal-pass=15/15")
 PY
 ```
 
-### M2. Provisional working-tree full verifier
+### M2. Clean candidate full verifier
 
-Working-tree diffをSHA-256へ束縛する。
+候補wheelを含むfull verifierは、意図的なtracked変更が残るworking treeでは実行しない。working-tree上の確認はfocused testとmanual invariantに限り、candidate verifierはcommit済みでcleanなcheckout/worktreeから実行する。stash、reset、force checkout、alternate indexなどでdirty stateを隠してはならない。
 
-```bash
-python - "$EVIDENCE_DIR/worktree-diff.sha256" <<'PY'
-from pathlib import Path
-import hashlib
-import subprocess
-import sys
-
-raw = subprocess.check_output(
-    ["git", "diff", "--binary"]
-)
-
-assert raw
-
-Path(sys.argv[1]).write_text(
-    hashlib.sha256(raw).hexdigest() + "\n",
-    encoding="utf-8",
-)
-PY
-```
-
-Verifierにはprivate artifact rootを渡す。
-
-```bash
-WORKTREE_ARTIFACT_ROOT="$EVIDENCE_DIR/full-worktree"
-mkdir -p "$WORKTREE_ARTIFACT_ROOT"
-test -z "$(find "$WORKTREE_ARTIFACT_ROOT" -mindepth 1 -print -quit)"
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run python -m scripts.quality.verify_full_regression \
-    --shards 4 \
-    --artifact-dir "$WORKTREE_ARTIFACT_ROOT"
-
-test "$(
-  find "$WORKTREE_ARTIFACT_ROOT" \
-    -type f \
-    -name result.json \
-    | wc -l \
-    | tr -d ' '
-)" -eq 1
-
-WORKTREE_RESULT="$(
-  find "$WORKTREE_ARTIFACT_ROOT" \
-    -type f \
-    -name result.json \
-    -print
-)"
-
-python - "$WORKTREE_RESULT" "$SPEC_FREEZE_SHA" <<'PY'
-from pathlib import Path
-import json
-import sys
-
-result = json.loads(
-    Path(sys.argv[1]).read_text(encoding="utf-8")
-)
-
-assert result["candidate_sha"] == sys.argv[2]
-assert result["status"] == "verified"
-assert result["evaluation"]["verified"] is True
-assert result["evaluation"]["active_verified"] == []
-assert len(
-    result["evaluation"]["resolved_verified"]
-) == 15
-assert result["evaluation"]["retired_verified"] == []
-assert result["evaluation"]["violations"] == []
-
-print(
-    "working-tree-full-verifier="
-    "verified-provisional"
-)
-PY
-```
-
-このrunはfunctional evidenceであり、merge-ready evidenceではない。`candidate_sha`は未commit bytesではなくspec freeze HEADを示す。
+M2のfull verifier実行は、Phase N1で候補をcommit・pushした後のN2へ委譲する。N2ではclean状態を先に確認し、private artifact rootへ結果を書き込み、`candidate_sha`を実際のimplementation SHAへ束縛する。これにより候補wheel receiptとfull verifierが同じclean candidateを検査する。
 
 ### M3. Ordinary laneとProvider CI相当gate
 
@@ -2836,6 +2768,7 @@ expected = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
     "tests/integration/test_issue_392_acceptance.py",
 }
 
@@ -2857,7 +2790,7 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print("implementation-file-set=12/12")
+print("implementation-file-set=13/13")
 PY
 
 git diff --check
@@ -2875,7 +2808,7 @@ Commit gateへ進む前に次を再実行する。
 3. Phase K4 protected-data equality
 4. Phase L2 ledger historical preservation
 5. Required-fast 4 / timing 243
-6. Exact 12-file set
+6. Exact 13-file set
 7. no-touch checks
 
 一つでも失敗した場合はcommit許可を使用しない。
@@ -2932,6 +2865,7 @@ expected = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
     "tests/integration/test_issue_392_acceptance.py",
 }
 
@@ -2953,7 +2887,7 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print("staged-file-set=12/12")
+print("staged-file-set=13/13")
 PY
 
 test "$(git config user.name)" = "chemitaro"
@@ -3150,7 +3084,7 @@ Input:
 * ledger preservation
 * exact full-verifier summary/hash
 * no-touch proof
-* exact 12-file set
+* exact 13-file set
 
 Acceptance:
 
@@ -3711,7 +3645,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
     * row 3 publication-security matrix
     * row 12 blob/AST guard
     * policy/workflow no-touch
-    * exact 12-file set
+    * exact 13-file set
     * timing 243
     * required-fast 4
 
@@ -3926,7 +3860,8 @@ Payloadへ次を含めない。
 ### Baseline / source drift
 
 * 15 rowsでない
-* 14 active / 1 resolvedでない
+* P392 historical beforeが14 active / 1 resolvedでない
+* U05後のcurrent root afterが15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`でない
 * row order drift
 * nodeid drift
 * historical signature drift
