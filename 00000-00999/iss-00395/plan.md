@@ -56,6 +56,17 @@ GPT-5.6 LunaMaxは**Phase A〜D1のread-only preflight**を実行できる。承
 
 このpathで許可される変更は、Issue #392の既存baseline assertionを保持するためのbaseline payload readをP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛することと、`_ISSUE_BOUNDARY_SHA256`にあるIssue #395の3値を最終spec freezeの実体へ置き換えることだけである。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更せず、assertionの削除、弱化、skip、xfail化も行わない。同期後のEntry verifierは、計画内の10件だけをREDとして観測し、#392-owned failureとunexpected failureを0件にする。
 
+### 1.2 仕様訂正トラックとcheckpoint再開モード
+
+最新のStrict仕様レビューがP0/P1を返した場合、まず`documentation-correction`として本Plan、Design、および実装handoffの契約だけを訂正する。このトラックではProduct、test、ledger、dogfood、evaluator、verifierを変更せず、実装許可済みの実装トラックへ進まない。訂正後のclean pushed SHAを同じ仕様レビューへ再投入し、`review_status=pass`、P0=0、P1=0になった後にだけ、以下の実装トラックを再開する。
+
+実装トラックには二つのidentity modeがある。
+
+* **`initial-spec-freeze`:** `SPEC_FREEZE_SHA/TREE`がcurrent local `HEAD`、configured upstream、Issue branchのremote tipであり、cleanであることを確認してから最初のmutationを行う。
+* **`post-u05-checkpoint`:** `SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthorityとancestor確認にだけ使う。実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をcurrent local `HEAD`、configured upstream、remote tipの一致対象とする。U05が既に完了していること、current root ledgerがterminalizedであること、L1を再実行しないことを確認する。既に必要な実装差分がcommit済みなら、空のcommitを作らず、そのclean checkpointを`IMPLEMENTATION_SHA/TREE`としてadoptしてN2へ進む。新しい差分がある場合だけ、allowed implementation pathsの範囲でforward commitを作る。
+
+`SPEC_FREEZE_SHA`をoriginal specification、resume checkpoint、pre-push current candidateの三つの意味で再利用してはならない。reset、rebase、stash、alternate index、force push、U05 transitionの再実行で古いidentityを作り直すことは禁止する。
+
 ## 2. 固定定数とnode集合
 
 ```bash
@@ -75,6 +86,16 @@ export ELABORATION_INPUT_TREE="4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 export SUPPORT_HISTORY_SHA="c0736434503117d5d468d1438fb18da16d382a56"
 export SUPPORT_HISTORY_TREE="cec02ce70fbcbbbac811a04106dcc15540ad4d09"
 export PREVIOUS_SPEC_CANDIDATE_SHA="78d6406ba7df8bd4953f2c3f6db5610d635ff48c"
+
+export RESUME_MODE="${RESUME_MODE:-initial-spec-freeze}"
+case "$RESUME_MODE" in
+  initial-spec-freeze) ;;
+  post-u05-checkpoint)
+    : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
+    : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+    ;;
+  *) exit 1 ;;
+esac
 
 ROW_1='tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active'
 ROW_2_HISTORICAL='tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source'
@@ -196,7 +217,7 @@ PRESERVED_SUPPORT_HISTORY_PATHS=(
    * failure signatureなし
    * skip、xfail、xpass、errorなし
 
-4. Current full verifierは、private artifact rootを明示して実行する。共有された`spec-dock/.workbench/full-regression`から「最新run」を推測してはならない。
+4. Current full verifierをmerge-blocking evidenceとして扱う場合は、clean committed candidateからprivate artifact rootを明示して実行する。共有された`spec-dock/.workbench/full-regression`から「最新run」を推測してはならず、working treeではfocused/manual diagnosticに限定する。
 
 ## 4. Phase A — private evidence workspace
 
@@ -238,9 +259,9 @@ Raw log、absolute private path、credential-bearing outputは配布用evidence�
 
 ## 5. Phase B — read-only repository / specification preflight
 
-### B1. Adopted specification identity
+### B1. Specification and resume identity
 
-Read-only preflightであっても、dispatchはadopt済みclean pushed canonical specificationのSHA/treeを渡さなければならない。
+Read-only preflightであっても、dispatchはadopt済みclean pushed identityを明示しなければならない。`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthorityであり、current tip equalityの対象はmodeによって決まる。
 
 ```bash
 : "${SPEC_FREEZE_SHA:?SPEC_FREEZE_SHA is required}"
@@ -248,6 +269,22 @@ Read-only preflightであっても、dispatchはadopt済みclean pushed canonica
 
 test "${#SPEC_FREEZE_SHA}" -eq 40
 test "${#SPEC_FREEZE_TREE}" -eq 40
+
+case "$RESUME_MODE" in
+  initial-spec-freeze)
+    EXPECTED_CURRENT_SHA="$SPEC_FREEZE_SHA"
+    EXPECTED_CURRENT_TREE="$SPEC_FREEZE_TREE"
+    ;;
+  post-u05-checkpoint)
+    : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
+    : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+    test "${#RESUME_CHECKPOINT_SHA}" -eq 40
+    test "${#RESUME_CHECKPOINT_TREE}" -eq 40
+    EXPECTED_CURRENT_SHA="$RESUME_CHECKPOINT_SHA"
+    EXPECTED_CURRENT_TREE="$RESUME_CHECKPOINT_TREE"
+    ;;
+  *) exit 1 ;;
+esac
 ```
 
 ### B2. Repository、branch、upstream、remote、ancestry、clean status
@@ -257,24 +294,27 @@ git fetch --prune origin
 
 test "$(git rev-parse --show-toplevel)" = "$PWD"
 test "$(git rev-parse --abbrev-ref HEAD)" = "$ISSUE_BRANCH"
-test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
+test "$(git rev-parse HEAD)" = "$EXPECTED_CURRENT_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
 
-test "$(git rev-parse '@{upstream}')" = "$SPEC_FREEZE_SHA"
+test "$(git rev-parse '@{upstream}')" = "$EXPECTED_CURRENT_SHA"
 test "$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}')" = "origin/$ISSUE_BRANCH"
 
 REMOTE_LINE="$(git ls-remote --heads origin "refs/heads/$ISSUE_BRANCH")"
 test "$(printf '%s\n' "$REMOTE_LINE" | awk 'NF {count++} END {print count+0}')" -eq 1
-test "$(printf '%s\n' "$REMOTE_LINE" | awk 'NF {print $1}')" = "$SPEC_FREEZE_SHA"
+test "$(printf '%s\n' "$REMOTE_LINE" | awk 'NF {print $1}')" = "$EXPECTED_CURRENT_SHA"
 
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
 git merge-base --is-ancestor "$P392_SHA" "$ELABORATION_INPUT_SHA"
 git merge-base --is-ancestor "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA"
+git merge-base --is-ancestor "$SPEC_FREEZE_SHA" "$EXPECTED_CURRENT_SHA"
 
 test "$(git rev-parse "$P392_SHA^{tree}")" = "$P392_TREE"
 test "$(git rev-parse "$ELABORATION_INPUT_SHA^{tree}")" = "$ELABORATION_INPUT_TREE"
 ```
+
+`post-u05-checkpoint`では、U05の承認済み遷移が`EXPECTED_CURRENT_SHA`の履歴に既に存在することを別途確認し、L1を再実行しない。`initial-spec-freeze`では、従来どおりspec freezeから実装を開始する。
 
 一つでも失敗した場合、Product/test/ledger/dogfood変更0で停止する。
 
@@ -1324,8 +1364,8 @@ print(
 PY
 
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
-test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
+test "$(git rev-parse HEAD)" = "$EXPECTED_CURRENT_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
 ```
 
 次の場合は変更0で停止する。
@@ -1341,13 +1381,14 @@ test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
 * writer scopeが不足
 * `IMPLEMENTATION_AUTHORIZED`がtrueでない
 * worktreeがdirty
-* HEADがspec freezeから動いた
+* `initial-spec-freeze`でHEADがspec freezeから動いた
+* `post-u05-checkpoint`でHEADがadopted resume checkpointから動いた
 
 Writer assertionは最初のedit直前に再検証する。期限切れのassertionを再利用しない。
 
-### E3. First authorized mutation — Issue #392 boundary test synchronization
+### E3. First authorized mutation — Issue #392 boundary test synchronization (`initial-spec-freeze` only)
 
-E1/E2がpassし、worktreeがcleanであり、`SPEC_FREEZE_SHA`／`SPEC_FREEZE_TREE`がfresh Strict specification reviewの対象と一致した後にだけ、最初のtracked mutationとして実行する。
+`RESUME_MODE=initial-spec-freeze`で、E1/E2がpassし、worktreeがcleanであり、`SPEC_FREEZE_SHA`／`SPEC_FREEZE_TREE`がfresh Strict specification reviewの対象と一致した後にだけ、最初のtracked mutationとして実行する。`RESUME_MODE=post-u05-checkpoint`では、U05のledger transitionとこのIssue #392 boundary synchronizationが既に完了しているため、E3を再実行せず、terminalized current rootと既存のmigration-test checkpointを検証して次のclean-candidate gateへ進む。
 
 1. `spec-dock/active/issue/requirement.md`、`spec-dock/active/issue/design.md`、`spec-dock/active/issue/plan.md`のSHA-256を計算する。
 2. `tests/integration/test_issue_392_acceptance.py`へ、P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`の`full-regression-ledger.json` blobを読むread-only source bindingを追加し、`_ISSUE_BOUNDARY_SHA256`のIssue #395の3値だけを1の結果へ置換する。Issue #392のbaseline/timing/required-fast/policy/workflow/assertion本文は変更しない。
@@ -2359,7 +2400,9 @@ print(f"dogfood-candidate={new_digest}")
 PY
 ```
 
-### K5. Dogfood parity node
+### K5. Dogfood parity node — clean candidateでのみ実行
+
+K5はcandidate-wheel、source、sdist、installed、dogfoodの最終parity receiptを生成するため、Phase Kのworking treeでは実行しない。Phase KではK4までのprojection/protected-data proofと、必要なfocused/manual確認だけを行う。K5の次のcommandはPhase N1/N2でclean pushed candidateを確定した後、Phase N3として実行する。Phase Kのdirty状態から得た結果をfinal receiptへ転用してはならない。
 
 ```bash
 DOGFOOD_PARITY_OBS="$EVIDENCE_DIR/dogfood-parity-observation.json"
@@ -2642,7 +2685,9 @@ PY
 
 M2のfull verifier実行は、Phase N1で候補をcommit・pushした後のN2へ委譲する。N2ではclean状態を先に確認し、private artifact rootへ結果を書き込み、`candidate_sha`を実際のimplementation SHAへ束縛する。これにより候補wheel receiptとfull verifierが同じclean candidateを検査する。
 
-### M3. Ordinary laneとProvider CI相当gate
+### M3. Pre-candidate ordinary laneとsource checks
+
+Phase Mのworking treeでは、candidate-wheel、distribution、installed、dogfood、またはfull-verifierのfinal receiptを生成しない。ここで実行できるのは、ordinary lane、Provider lifecycle unit、lint、SpecDock validation、およびfocused/manual invariantだけである。
 
 ```bash
 # Ordinary lane。Current policy skipは意図した現行動作。
@@ -2658,45 +2703,6 @@ env TMPDIR="$TEST_TMPDIR" \
     --tb=short \
     tests/unit/provider_lifecycle
 
-# Distribution cutover。
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/cli_runtime/test_distribution_cutover.py
-
-# Provider lifecycle platform / coordination。
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
-    tests/cli_runtime/test_provider_lifecycle_handoff.py \
-    tests/cli_runtime/test_generation_checkout.py \
-    tests/cli_runtime/test_worktree_lifecycle_coordination.py
-
-# Packaged distribution parity。
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/integration/test_epic_00343_distribution.py
-
-# Full dogfood heavy suite。
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/integration/test_provider_lifecycle_dogfood.py
-
 env TMPDIR="$TEST_TMPDIR" \
   make lint
 
@@ -2708,7 +2714,7 @@ grep -F \
   "$EVIDENCE_DIR/post-change-validate.txt"
 ```
 
-すべてexit 0でなければならない。Heavy pathはskipされず実行されなければならない。
+このpre-candidate subsetはexit 0でなければならない。Distribution、packaged parity、dogfood、およびfull verifierはN2/N3のclean candidate gateでのみ実行する。
 
 ### M4. No-touch surfaces
 
@@ -2747,7 +2753,10 @@ git diff --exit-code "$SPEC_FREEZE_SHA" -- \
 
 ### M5. Exact implementation file set
 
+初回実装ではreviewed specification freezeからのworking-tree diffをexact 13-path setと比較する。U05後のresumeで既存candidateをadoptする場合は、未commit差分がないこと、`RESUME_CHECKPOINT_SHA/TREE`がcurrent identityであること、および累積scopeが上記13-path declarationと一致する既存のunit receiptsで確認済みであることを検査する。resumeで空のcommitを作ってpath countを満たしてはならない。
+
 ```bash
+if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
 python - "$SPEC_FREEZE_SHA" <<'PY'
 import subprocess
 import sys
@@ -2792,6 +2801,12 @@ assert actual == expected, {
 
 print("implementation-file-set=13/13")
 PY
+else
+  test -z "$(git status --porcelain=v1 --untracked-files=all)"
+  test "$(git rev-parse HEAD)" = "$RESUME_CHECKPOINT_SHA"
+  test "$(git rev-parse 'HEAD^{tree}')" = "$RESUME_CHECKPOINT_TREE"
+  echo "implementation-file-set=13/13 (cumulative scope adopted)"
+fi
 
 git diff --check
 test -z "$(git ls-files --others --exclude-standard)"
@@ -2828,8 +2843,17 @@ implementation_tree = null
 
 `COMMIT_PUSH_AUTHORIZED=true`の場合だけ以下を実行する。
 
+`RESUME_MODE=post-u05-checkpoint`で既存candidateがcleanである場合、commit/pushを再実行せず、`RESUME_CHECKPOINT_SHA/TREE`を検証してそのHEADを`IMPLEMENTATION_SHA/TREE`としてadoptする。resume状態に未commit差分がある場合は、旧candidateへ戻す操作をせず、対象pathと単位を再評価して停止する。以下のstage・commit・pushブロックは`initial-spec-freeze`で新しいcandidateを作る場合だけ実行する。
+
 ```bash
 test "$COMMIT_PUSH_AUTHORIZED" = "true"
+
+EXPECTED_REMOTE_SHA="$SPEC_FREEZE_SHA"
+if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
+  : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
+  : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+  EXPECTED_REMOTE_SHA="$RESUME_CHECKPOINT_SHA"
+fi
 
 test "$(
   git ls-remote \
@@ -2837,7 +2861,13 @@ test "$(
     origin \
     "refs/heads/$ISSUE_BRANCH" \
     | awk 'NF {print $1}'
-)" = "$SPEC_FREEZE_SHA"
+  )" = "$EXPECTED_REMOTE_SHA"
+
+if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
+  test -z "$(git status --porcelain=v1 --untracked-files=all)"
+  export IMPLEMENTATION_SHA="$(git rev-parse HEAD)"
+  export IMPLEMENTATION_TREE="$(git rev-parse 'HEAD^{tree}')"
+else
 
 git add -- "${IMPLEMENTATION_PATHS[@]}"
 
@@ -2917,6 +2947,7 @@ test "$(
 )" = "$IMPLEMENTATION_SHA"
 
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
+fi
 ```
 
 禁止事項:
@@ -2980,15 +3011,67 @@ PY
 
 ### N3. Exact clean gate rerun
 
-同じclean `IMPLEMENTATION_SHA`で次を再実行する。
+同じclean `IMPLEMENTATION_SHA`で次を再実行する。ここがK5およびM3のclean-only commandを実行する唯一の段階であり、Phase K/Mのworking treeから先に実行してはならない。
 
 * Phase H5
 * Phase I
 * Phase M1
+* Phase K5（Phase Kで保留したdogfood parity command）
 * Phase M3
 * Phase M4
 * Phase M5
 * Phase M6
+
+```bash
+# Distribution cutover
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/cli_runtime/test_distribution_cutover.py
+
+# Provider lifecycle platform / coordination
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
+    tests/cli_runtime/test_provider_lifecycle_handoff.py \
+    tests/cli_runtime/test_generation_checkout.py \
+    tests/cli_runtime/test_worktree_lifecycle_coordination.py
+
+# Packaged distribution parity
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/integration/test_epic_00343_distribution.py
+
+# Complete dogfood heavy suite
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/integration/test_provider_lifecycle_dogfood.py
+
+env TMPDIR="$TEST_TMPDIR" \
+  make lint
+
+./spec-dock/scripts/spec-dock validate \
+  | tee "$EVIDENCE_DIR/exact-candidate-validate.txt"
+
+grep -F \
+  'spec-dock: ok (validate) nodes=236' \
+  "$EVIDENCE_DIR/exact-candidate-validate.txt"
+```
 
 その後、identityを確認する。
 
@@ -3620,7 +3703,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 7. Working-tree provisional evidence
 
    * binary diff SHA-256
-   * provisional full-verifier hash
+   * focused/manual diagnostic results only; no full-verifier, wheel, distribution, or dogfood final receipt
    * `merge_ready=false`
 
 8. Exact clean evidence
