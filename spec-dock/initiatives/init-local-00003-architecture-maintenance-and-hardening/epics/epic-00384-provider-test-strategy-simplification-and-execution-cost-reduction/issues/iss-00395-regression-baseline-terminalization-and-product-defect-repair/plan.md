@@ -3,7 +3,7 @@
 kind: "corrected-plan"
 issue: "iss-00395"
 title: "Issue #395 LunaMax-ready Execution Plan"
-artifact_path: "artifacts/plan-lunamax-ready.md"
+artifact_path: "plan.md"
 generated_at: "2026-09-16"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
@@ -27,7 +27,7 @@ authority: "advisory-corrected-plan"
 
 本書はIssue #395の完全な実装順序、検証ゲート、証拠形式および停止条件を固定する。ユーザーの明示承認により、canonical statusの`implementation_allowed`はtrueである。ただし、実行者は最初のmutation前にPhase Eのexecution packet検証、exact identity、独立レビュー証跡、同時書き込みなしの確認を満たさなければならない。
 
-GPT-5.6 LunaMaxは**Phase A〜D1のread-only preflight**を実行できる。承認済みT14同期はread-onlyではなく、Phase Eのexecution packet検証と同時書き込みなしの確認後にだけE3として実行する。次の操作は、Phase Eのexecution packet検証と同時書き込みなしの確認が成立するまで禁止する。
+GPT-5.6 LunaMaxは、両modeでPhase A〜Cのread-only preflightを実行できる。`initial-spec-freeze`ではD1の初回entry observationまで、`post-u05-checkpoint`ではD1Rのterminal-state entry proofまでがread-only preflightである。承認済みT14同期はread-onlyではなく、Phase Eのexecution packet検証と同時書き込みなしの確認後にだけE3またはE3Rとして実行する。次の操作は、Phase Eのexecution packet検証と同時書き込みなしの確認が成立するまで禁止する。
 
 * Product sourceの編集
 * regression testの編集
@@ -949,7 +949,9 @@ PY
 
 ## 7. Phase D — entry verifierと最初のRED
 
-### D1. Current full verifier entry observation
+### D1. Current full verifier entry observation (`initial-spec-freeze` only)
+
+このD1は、修復前の15 total / 14 active / 1 resolved状態を観測する初回route専用である。`post-u05-checkpoint`ではこのfull verifierを実行せず、初回の11 violations、`active_verified=4`、row 2だけの`resolved_verified`を要求してはならない。post-U05のentryは、次のD1Rでcurrent rootのterminal stateを確認した後、Phase Eへ進む。
 
 Verifier artifact rootは、このrun専用の空directoryとする。
 
@@ -1088,9 +1090,73 @@ print("entry-full-verifier-exact-allowance-ok")
 PY
 ```
 
-初回の受入条件は、計画済みexact 10 violationsに加えて、承認済みT14同期対象である`unexpected_failure` 1件だけを許容することである。これはまだGREENではない。E1/E2のmutation authorization後にE3でT14を同期し、再実行したEntry verifierの受入条件はexact 10 violations、Extra violation 0、missing violation 0、#392-owned failure 0、unexpected failure 0である。
+`RESUME_MODE=initial-spec-freeze`の受入条件は、計画済みexact 10 violationsに加えて、承認済みT14同期対象である`unexpected_failure` 1件だけを許容することである。これはまだGREENではない。E1/E2のmutation authorization後にE3でT14を同期し、再実行したEntry verifierの受入条件はexact 10 violations、Extra violation 0、missing violation 0、#392-owned failure 0、unexpected failure 0である。`post-u05-checkpoint`では、このD1の受入条件を適用しない。
 
-### D1.1 — 承認済みIssue #392境界テスト同期の実行位置
+### D1R. Post-U05 terminalized entry observation (`post-u05-checkpoint` only)
+
+`RESUME_MODE=post-u05-checkpoint`では、U05後のcurrent rootが既にterminalizedであるため、D1の初回full verifierを実行しない。Phase Eへ進む前に、current ledgerの15/0/15 invariantとmigration observerをread-onlyで確認し、U05 transitionを再実行しない。
+
+```bash
+POST_U05_ENTRY_OBS="$EVIDENCE_DIR/post-u05-terminal-entry-observation.json"
+
+python - "$POST_U05_ENTRY_OBS" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+ledger = json.loads(
+    Path("full-regression-ledger.json").read_text(encoding="utf-8")
+)
+rows = ledger["failure_paths"]
+
+assert len(rows) == 15
+assert all(row["lifecycle"] == "resolved" for row in rows)
+assert sum(
+    row.get("resolution_mode") == "fixed-in-place"
+    for row in rows
+) == 14
+assert sum(
+    row.get("resolution_mode") == "superseded"
+    for row in rows
+) == 1
+assert not any(row.get("lifecycle") == "active" for row in rows)
+
+Path(sys.argv[1]).write_text(
+    json.dumps(
+        {
+            "schema_version": 1,
+            "entry_mode": "post-u05-checkpoint",
+            "total": len(rows),
+            "active": sum(row["lifecycle"] == "active" for row in rows),
+            "resolved": sum(row["lifecycle"] == "resolved" for row in rows),
+            "fixed_in_place": sum(
+                row.get("resolution_mode") == "fixed-in-place"
+                for row in rows
+            ),
+            "superseded": sum(
+                row.get("resolution_mode") == "superseded"
+                for row in rows
+            ),
+        },
+        indent=2,
+        ensure_ascii=False,
+    )
+    + "\n",
+    encoding="utf-8",
+)
+print("post-u05-terminal-entry=15/0/15 fixed=14 superseded=1")
+PY
+
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    -q \
+    --tb=short \
+    tests/unit/test_provider_test_lanes.py::test_full_regression_ledger_migration_preserves_schema1_history
+```
+
+このD1Rは、初回D1の11 violationsやfull-verifier `ledger-mismatch` receiptの代替ではない。D1Rとmigration observerがGREENでなければ、E1/E2、E3R、N1へ進まず、Product/test/ledger/dogfoodを変更しない。
+
+### D1.1 — 承認済みIssue #392境界テスト同期の実行位置 (`initial-spec-freeze` only)
 
 前回のspec freeze候補で観測した`ISSUE_392_BOUNDARY_TEST`のSHA不一致は、今回の仕様修正を反映する前の履歴証拠として保持する。この節は実行位置と変更境界だけを定義し、ここではtracked fileを編集しない。ユーザー承認後の最初のmutationは、Phase EのE1/E2を通過した後のE3に限定する。
 
@@ -1102,7 +1168,7 @@ PY
 
 この同期はassertionの削除・弱化・skip・xfail化ではなく、baseline source bindingと仕様修正に伴う3つの固定値更新である。3つのSHA値またはbaseline source binding以外に差分が出た場合、またはE3後のD1がexact 10 violationsにならない場合は停止する。
 
-### D2. Rows 1、3–11、13–15の個別RED
+### D2. Rows 1、3–11、13–15の個別RED (`initial-spec-freeze` only)
 
 この節とD3のnode実行は、Phase EのE3同期およびE4のpost-sync Entry再検証が完了した後に行う。初回D1の後に直ちに実行してはならない。
 
@@ -1268,9 +1334,9 @@ PY
 * 対象外nodeが実行される
 * credential-bearing URLがlogへ露出する
 
-### D3. Row 12のfirst REDとcurrent node GREEN
+### D3. Row 12のfirst REDとcurrent node GREEN (`initial-spec-freeze` only)
 
-Row 12のfirst REDはD1の`coverage_mismatch`である。Product-boundary node自身は既にnormal passしなければならない。
+Row 12のfirst REDは初回D1の`coverage_mismatch`である。Product-boundary node自身は既にnormal passしなければならない。`post-u05-checkpoint`ではD1およびこのinitial RED acquisitionを実行せず、D1Rのterminal-state proofを使用する。
 
 ```bash
 ROW12_ENTRY_OBS="$EVIDENCE_DIR/row-12-entry-observation.json"
@@ -1308,7 +1374,7 @@ Nodeが失敗する場合はsource driftとして停止する。Row 12を推測�
 
 ## 8. Phase E — mutation authorization gate
 
-このPhaseは、初回D1のread-only観測後、D2/D3のRED確認と最初のfile editに先立って実行する。E1/E2の完了前にE3または他のtracked file editを行ってはならない。
+`initial-spec-freeze`では、このPhaseを初回D1のread-only観測後、D2/D3のRED確認と最初のfile editに先立って実行する。`post-u05-checkpoint`では、D1Rのterminal-state entry proof後にこのPhaseへ入り、D1、D1.1、D2、D3、E3、E4のinitial routeを実行しない。いずれのmodeでもE1/E2の完了前にE3、E3R、または他のtracked file editを行ってはならない。
 
 ### E1. 必須environment values
 
