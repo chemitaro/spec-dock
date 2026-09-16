@@ -62,13 +62,13 @@ The integration branch remains `codex/epic-00384-provider-test-strategy-planning
 | Elaboration input        | `fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9` | `4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599` | Exact Issue-branch tip reviewed in this readiness analysis                  |
 | Support-history checkpoint | `c0736434503117d5d468d1438fb18da16d382a56` | `cec02ce70fbcbbbac811a04106dcc15540ad4d09` | Exact 16 existing support artifacts; immutable, non-authoritative history |
 | Specification freeze     | Runtime value                              | Runtime value                              | Future clean pushed canonical six-file specification pack                   |
-| Adopted resume checkpoint | Runtime value                              | Runtime value                              | Existing clean pushed checkpoint used when resuming after an approved U05 transition |
+| Resume checkpoint | Runtime value                              | Runtime value                              | Existing clean pushed checkpoint used to verify an approved U05 transition |
 | Implementation candidate | Runtime value                              | Runtime value                              | Future clean pushed Product/test/ledger candidate, if separately authorized |
 | Post-merge B1/B2 tip     | Runtime value                              | Runtime value                              | Future human-merged integration tip                                         |
 
 No future SHA or tree is predeclared in tracked content. Every future identity is supplied and then verified at the corresponding gate.
 
-Both identity modes bind the current local `HEAD`, configured upstream, and Issue branch remote tip to `Specification freeze`. In `post-u05-checkpoint`, `Adopted resume checkpoint` is a prior clean implementation base and must be an ancestor of that current specification-review target; it is not a replacement current-tip identity. The resume-to-specification diff is therefore required to be canonical-document-only before the implementation track is resumed.
+Both identity modes bind the current local `HEAD`, configured upstream, and Issue branch remote tip to `Specification freeze`. In `post-u05-checkpoint`, `Resume checkpoint` is a prior clean implementation base and must be an ancestor of that current specification-review target; it is not a replacement current-tip identity. The resume-to-specification diff is therefore required to be canonical-document-only before the implementation track is resumed.
 
 ### 3.2 Baseline semantics
 
@@ -93,7 +93,7 @@ entry baseline observation
   -> complete dogfood projection and protection proof
   -> atomic ledger transition (initial route only)
   -> post-U05 resume: verify terminalized ledger and do not rerun the transition
-  -> exact clean candidate freeze or adoption
+  -> exact clean candidate freeze
   -> current full verifier and all candidate gates on that clean candidate
   -> independent implementation review
   -> human PR merge
@@ -288,7 +288,7 @@ tests/unit/test_provider_test_lanes.py
 tests/integration/test_issue_392_acceptance.py
 ```
 
-A missing expected path means the cumulative Issue candidate is incomplete or the handoff is out of sync. An extra path means scope drift. On a fresh run, the working-tree diff from the reviewed specification freeze must equal this set. On a post-U05 resume, an already committed candidate may be adopted without an empty commit; only a new incremental diff within this set may be staged. Either condition stops the execution. The set does not authorize changes to the row 12 structural observer or to any unrelated runtime surface.
+A missing expected path means the cumulative Issue candidate is incomplete or the handoff is out of sync. An extra path means scope drift. On a fresh run, the working-tree diff from the reviewed specification freeze must equal this set. On a post-U05 resume, only a new non-empty incremental diff within this set may be staged; an empty implementation commit is not valid. Either condition stops the execution. The set does not authorize changes to the row 12 structural observer or to any unrelated runtime surface.
 
 ## 6. Exact row acceptance design
 
@@ -482,7 +482,7 @@ Commit and push are allowed only when the execution packet separately authorizes
 
 The boundary-witness path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to keeping the P392 baseline source binding and removing the cross-Issue #395/#396 document-hash coupling; every Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertion remains intact. The separate migration observer path is `tests/unit/test_provider_test_lanes.py`; it compares the P392 before payload with the current root after payload and does not alter evaluator/verifier behavior.
 
-After commit and push, or after an explicit clean-candidate adoption from an existing checkpoint, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
+After commit and push, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
 
 Independent implementation review consists of:
 

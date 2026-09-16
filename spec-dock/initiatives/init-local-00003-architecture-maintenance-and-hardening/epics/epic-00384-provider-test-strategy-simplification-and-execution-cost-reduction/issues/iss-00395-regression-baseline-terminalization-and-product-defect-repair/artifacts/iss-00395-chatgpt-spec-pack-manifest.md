@@ -916,7 +916,7 @@ LunaMaxへ渡すexecution packetには少なくとも次をactual valuesで含�
 
 Working-tree verifierの`candidate_sha`はuncommitted bytesを識別しないため、merge-ready evidenceに使用しない。
 
-実行コストを増やさないため、current full verifierをfull-regression、distribution、lifecycle、package、dogfoodおよびM1 rowsの唯一のsuite ownerとする。N3は`make lint`、SpecDock validateおよび必要なno-touch確認だけを行い、N2が既に実行したsuiteをN3のために再実行しない。
+実行コストを増やさないため、current full verifierをfull-regression、distribution、lifecycle、package、dogfoodおよびM1 rowsの唯一のsuite ownerとする。N3はN2が収集しないordinary pytest policy laneを一度だけ実行し、`make lint`、SpecDock validate、publication security matrix、row 12 guard、protected-dataおよびno-touch確認を行う。N2が既に実行したfull-regression suiteをN3のために再実行しない。
 
 ## 19. Human merge、B1/B2およびrollback
 

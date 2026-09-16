@@ -208,7 +208,7 @@ human_merge_only: true
 
 ### 3.4 Identity modes
 
-`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityであり、両modeでcurrent local `HEAD`、configured upstream、remote branch tipの一致対象である。U05後のresumeでは、実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をU05後の既存clean実装candidateを表す祖先のresume基点として別に検査し、current equalityの対象にはしない。U05のledger transitionが既に完了している場合は、current rootのterminal stateを確認してL1を再実行せず、仕様レビュー対象をclean candidateとしてadoptできる。resume中の未commit差分は、旧identityへ戻す操作や空commitで隠さず、allowed pathとして束縛してcommitする。
+`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityであり、両modeでcurrent local `HEAD`、configured upstream、remote branch tipの一致対象である。U05後のresumeでは、実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をU05後の既存clean実装candidateを表す祖先のresume基点として別に検査し、current equalityの対象にはしない。U05のledger transitionが既に完了している場合は、current rootのterminal stateを確認してL1を再実行せず、仕様レビュー対象を実装開始点とする。resume中の未commit差分は、旧identityへ戻す操作や空commitで隠さず、allowed pathとして束縛してcommitする。
 
 ## 4. 共通shell constants
 
@@ -1103,7 +1103,7 @@ Row 12に対して次を行ってはならない。
 
 ## 14. Entry verifierとindividual RED
 
-### 14.1 Entry full verifier
+### 14.1 Entry full verifier (`initial-spec-freeze` only)
 
 ```bash
 ENTRY_ARTIFACT_ROOT="$EVIDENCE_DIR/full-entry"
@@ -1153,7 +1153,11 @@ Expected evaluation:
 
 Extra violation、missing violation、別row failureがあれば停止する。
 
-### 14.2 13修正対象のindividual RED
+### 14.1R Post-U05 terminalized entry (`post-u05-checkpoint` only)
+
+post-U05では、U05後に既に確定したcurrent ledgerの15 total / 0 active / 15 resolved / 14 `fixed-in-place` / 1 `superseded`をread-onlyで確認する。D1相当の`ledger-mismatch`、exact 10 active-row violationsまたはU05のledger transitionを再実行しない。migration observerがP392 beforeとcurrent root afterの契約を確認し、Issue #392 boundary witnessと今回のfocused Product/test変更はE4R相当のfocused recheckで検証する。
+
+### 14.2 13修正対象のindividual RED (`initial-spec-freeze` only)
 
 Grouped commandだけでREDを証明してはならない。13 rowsを一件ずつ実行する。
 
@@ -1532,7 +1536,7 @@ Rows 4–11 test double
   -> atomic ledger transition (initial route only)
   -> focused GREEN
   -> post-U05 resume verification without transition rerun
-  -> exact clean candidate freeze or adoption
+  -> exact clean candidate freeze
   -> full verifier and complete gates on the clean candidate
   -> independent reviews
   -> optional PR preparation
@@ -1540,6 +1544,8 @@ Rows 4–11 test double
   -> same-tip B1
   -> same-tip B2
 ```
+
+初回modeではentry verifier、individual RED、15-node pre-ledger GREENおよびatomic ledger transitionを実行する。post-U05 modeではterminalized entryとmigration observerを確認した後、focused Product/test recheckとdogfood projectionへ進み、entry verifier、individual REDおよびledger transitionを再実行しない。
 
 ## 17. Rows 4–11 test double
 
@@ -1813,7 +1819,7 @@ Require:
 
 ### 22.4 Dogfood parity lane（clean candidate only）
 
-このfull-regression parity nodeは、projection直後やledger transition前のworking treeでは実行・受入しない。生成identity、protected-data、pre-ledger 15-node GREENの確認後も、ここではfocused/manual diagnosticだけを記録する。次のcommandはN1で一つのclean pushed `IMPLEMENTATION_SHA/TREE`を作成またはadoptし、ledger transitionを含むcandidateを確定した後の§28でのみ実行する。
+このfull-regression parity nodeは、projection直後やledger transition前のworking treeでは実行・受入しない。生成identity、protected-data、pre-ledger 15-node GREENの確認後も、ここではfocused/manual diagnosticだけを記録する。次のcommandはN1で一つのclean pushed `IMPLEMENTATION_SHA/TREE`を作成し、ledger transitionを含むcandidateを確定した後の§28でのみ実行する。
 
 ```bash
 DOGFOOD_PARITY_OBS="$EVIDENCE_DIR/dogfood-parity-observation.json"
@@ -1922,7 +1928,7 @@ full_verifier_receipt = absent
 candidate_wheel_receipt = absent
 ```
 
-Full verifierとcandidate-wheelを含む完全なgateは、N1でclean candidateをcommit/pushまたはadoptした後、N2で一度だけ実行する。Working-treeのdiagnostic結果をclean candidate receiptへ転用してはならない。
+Full verifierとcandidate-wheelを含む完全なgateは、N1でclean candidateをcommit/pushした後、N2で一度だけ実行する。Working-treeのdiagnostic結果をclean candidate receiptへ転用してはならない。
 
 ### 24.3 Working-tree ordinary/source checks
 
@@ -1957,14 +1963,14 @@ Distribution cutover、platform/coordination、packaged parity、complete dogfoo
 
 ## 25. Exact changed-file gate
 
-初回実装のworking-tree diffはreviewed specification freezeからのfocused 26 pathsでなければならない。U05後のresumeでは、support-history checkpointからcurrent reviewed specification targetまでのscopeをcanonical 6 pathsとfocused implementation 26 pathsとして実測し、resume checkpointからtargetまでの仕様訂正差分がcanonical 6 pathsだけであることを確認する。current working-tree差分はimplementation paths内に限定し、既存clean candidateに対して空commitを作らない。
+初回実装のworking-tree diffはreviewed specification freezeからのfocused 26 pathsでなければならない。U05後のresumeでは、resume checkpointからcurrent `HEAD`までの累積差分がcanonical 6 pathsまたはfocused implementation pathsに限定され、reviewed specification freeze以後の実装差分がfocused implementation pathsに限定されることを確認する。current working-tree差分もimplementation paths内に限定し、non-emptyの実装差分がない場合は空commitを作らない。
 
 ```bash
-python - "$RESUME_MODE" "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" <<'PY'
+python - "$RESUME_MODE" "${RESUME_CHECKPOINT_SHA:-}" "$SPEC_FREEZE_SHA" <<'PY'
 import subprocess
 import sys
 
-mode, support_history, spec_freeze = sys.argv[1:]
+mode, resume_checkpoint, spec_freeze = sys.argv[1:]
 
 primary = {
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
@@ -2051,21 +2057,32 @@ if mode == "initial-spec-freeze":
     }
     print(f"implementation-file-set={len(actual)}/{len(implementation)}")
 elif mode == "post-u05-checkpoint":
-    committed = changed(support_history, spec_freeze)
-    assert committed == primary | implementation, {
-        "stage": "post-u05-cumulative-scope",
-        "expected": sorted(primary | implementation),
-        "actual": sorted(committed),
+    assert resume_checkpoint
+    resume_to_head = changed(resume_checkpoint, "HEAD")
+    assert resume_to_head <= primary | implementation, {
+        "stage": "post-u05-resume-to-head-scope",
+        "allowed": sorted(primary | implementation),
+        "actual": sorted(resume_to_head),
     }
-    working = changed(spec_freeze)
+    spec_to_head = changed(spec_freeze, "HEAD")
+    assert spec_to_head <= implementation, {
+        "stage": "post-u05-spec-freeze-to-head-scope",
+        "allowed": sorted(implementation),
+        "actual": sorted(spec_to_head),
+    }
+    working = changed("HEAD")
     assert working <= implementation, {
         "stage": "post-u05-working-tree-scope",
         "allowed": sorted(implementation),
         "actual": sorted(working),
     }
+    implementation_delta = spec_to_head | working
+    assert implementation_delta, {
+        "stage": "post-u05-non-empty-implementation-delta",
+    }
     print(
-        f"implementation-file-set={len(implementation)}/{len(implementation)} "
-        f"cumulative-committed={len(committed)} working-tree={len(working)}"
+        f"implementation-file-set={len(implementation_delta)}/{len(implementation)} "
+        f"resume-to-head={len(resume_to_head)} working-tree={len(working)}"
     )
 else:
     raise AssertionError(f"unsupported resume mode: {mode}")
@@ -2075,7 +2092,7 @@ git diff --check
 test -z "$(git ls-files --others --exclude-standard)"
 ```
 
-Missing expected pathとextra pathの両方がblockingである。
+初回modeでは26件のexpected pathとextra pathの両方がblockingである。post-U05 modeでは実測したnon-empty implementation deltaのsubsetとextra pathを確認し、既存candidateを空差分として再生成しない。
 
 ## 26. No-touch gate
 
@@ -2117,7 +2134,7 @@ Working-tree diff、evidence、stop/return receiptを返して停止する。
 
 ### 27.2 Commit/push許可あり
 
-`RESUME_MODE=post-u05-checkpoint`で、current reviewed specification targetがcleanで必要な実装差分をすでに含む場合は、commit/pushを再実行せず、`SPEC_FREEZE_SHA/TREE`を検証してそのcurrent HEADを`IMPLEMENTATION_SHA/TREE`としてadoptする。`RESUME_CHECKPOINT_SHA/TREE`は、その実装が由来する祖先基点の証明にだけ使う。仕様レビュー後にboundary witnessの不要な文書SHA比較除去などのallowed implementation差分が残る場合は、旧candidateへ戻す操作や空commitで隠さず、以下のfocused path stage・commit・pushブロックで一つのforward commitへ束縛する。
+`RESUME_MODE=post-u05-checkpoint`では、`RESUME_CHECKPOINT_SHA/TREE`を既存実装candidateの祖先基点として確認し、current reviewed specification target以後の実装差分が残っている場合だけ、そのnon-empty差分をstage・commit・pushする。current HEADがspec freezeと同じで差分がない場合は、空commitを作らず、実装candidate未作成として停止する。`SPEC_FREEZE_SHA/TREE`からcurrent HEADまでの実装差分がfocused pathsに限定されていることを確認してから`IMPLEMENTATION_SHA/TREE`へ束縛する。
 
 初回のforward commitでは、実装candidateのstaged path set全体をfocused 26件と照合する。`post-u05-checkpoint`では、累積scopeと今回のcommitでstageするincremental setを混同しない。resumeで残るapproved pending setは、stage前に`SPEC_FREEZE_SHA`から実測し、non-emptyで`IMPLEMENTATION_PATHS`のsubsetであることを確認したうえで、そのpending setだけをstageする。既にcommit済みのpathを空の差分として再出現させたり、空commitでpath数を満たしたりしてはならない。
 
@@ -2138,14 +2155,8 @@ test "$(
     | awk 'NF {print $1}'
   )" = "$EXPECTED_REMOTE_SHA"
 
-if [ "$RESUME_MODE" = "post-u05-checkpoint" ] && \
-   [ -z "$(git status --porcelain=v1 --untracked-files=all)" ]; then
-  test -z "$(git status --porcelain=v1 --untracked-files=all)"
-  test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
-  test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
-  export IMPLEMENTATION_SHA="$(git rev-parse HEAD)"
-  export IMPLEMENTATION_TREE="$(git rev-parse 'HEAD^{tree}')"
-else
+test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
 
 if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
 git add -- "${IMPLEMENTATION_PATHS[@]}"
@@ -2178,19 +2189,12 @@ assert actual == expected, {
 print(f"staged-file-set={len(actual)}/{len(expected)}")
 PY
 else
-POST_U05_INCREMENTAL_PATHS=(
-  tests/integration/test_issue_392_acceptance.py
-)
-
-python - "$SPEC_FREEZE_SHA" "${IMPLEMENTATION_PATHS[@]}" -- \
-  "${POST_U05_INCREMENTAL_PATHS[@]}" <<'PY'
+python - "$SPEC_FREEZE_SHA" "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 import subprocess
 import sys
 
-base, *paths = sys.argv[1:]
-separator = paths.index("--")
-allowed = set(paths[:separator])
-expected = set(paths[separator + 1:])
+base = sys.argv[1]
+allowed = set(sys.argv[2:])
 actual = set(
     subprocess.check_output(
         [
@@ -2206,27 +2210,22 @@ actual = set(
 )
 
 assert actual, "post-U05 incremental diff must be non-empty"
-assert actual == expected, {
-    "stage": "post-u05-incremental-before-stage",
-    "expected": sorted(expected),
-    "actual": sorted(actual),
-}
 assert actual <= allowed, {
-    "stage": "post-u05-incremental-allowlist",
+    "stage": "post-u05-incremental-before-stage",
     "allowed": sorted(allowed),
     "actual": sorted(actual),
 }
 
-print("post-u05-incremental-file-set=1/1")
+print(f"post-u05-incremental-file-set={len(actual)}/{len(allowed)}")
 PY
 
-git add -- "${POST_U05_INCREMENTAL_PATHS[@]}"
+git add -- "${IMPLEMENTATION_PATHS[@]}"
 
-python - "${POST_U05_INCREMENTAL_PATHS[@]}" <<'PY'
+python - "${IMPLEMENTATION_PATHS[@]}" <<'PY
 import subprocess
 import sys
 
-expected = set(sys.argv[1:])
+allowed = set(sys.argv[1:])
 actual = set(
     subprocess.check_output(
         [
@@ -2241,13 +2240,14 @@ actual = set(
     ).splitlines()
 )
 
-assert actual == expected, {
+assert actual, "post-U05 incremental stage is empty"
+assert actual <= allowed, {
     "stage": "post-u05-incremental-cached",
-    "expected": sorted(expected),
+    "allowed": sorted(allowed),
     "actual": sorted(actual),
 }
 
-print("staged-incremental-file-set=1/1")
+print(f"staged-incremental-file-set={len(actual)}/{len(allowed)}")
 PY
 fi
 
@@ -2287,7 +2287,6 @@ test "$(
 test -z "$(
   git status --porcelain=v1 --untracked-files=all
 )"
-fi
 ```
 
 禁止事項:
@@ -2301,11 +2300,12 @@ fi
 
 ## 28. Exact clean rerun
 
-Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束縛する。ここがcandidate-wheel、distribution、installed、dogfood parity、およびfull verifierの唯一の受入段階である。N1のcommit/pushまたはclean adoption前に、これらのfinal receiptを生成・受入してはならない。
+Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束縛する。ここがcandidate-wheel、distribution、installed、dogfood parity、およびfull verifierの唯一の受入段階である。N1のcommit/push前に、これらのfinal receiptを生成・受入してはならない。
 
 必須rerun:
 
 * Exact clean full verifier（full-regressionの全node、15-node observation、distribution、lifecycle、platform/coordination、packaged parity、dogfood、candidate-wheelを一度に収集・実行）
+* Ordinary pytest lane（full-regression opt-inを付けない現行policy lane）
 * `make lint`
 * SpecDock validate
 * Row 3 security matrix
@@ -2318,7 +2318,7 @@ Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束
 * Exact focused 26-path set
 * Clean local/upstream/remote equality
 
-N2のfull verifierで収集済みのnodeやsuiteをN3相当の別commandで再実行しない。Working-tree proofをexact clean proofとして流用しない。
+N2のfull verifierで収集済みのnodeやsuiteをN3相当の別commandで再実行しない。Ordinary laneはN2の`--run-full-regression`とは異なるpolicy laneなので、clean candidate上で一度だけ実行する。Row 3 security matrix、row 12 guard、protected-dataおよびno-touchはN2が収集しないmanual proofとしてN3相当で一度だけ実行する。Working-tree proofをexact clean proofとして流用しない。
 
 ## 29. Independent implementation reviews
 
