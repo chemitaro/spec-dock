@@ -145,7 +145,7 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 6. `.meta.json`のID/GitHub linkageは`iss-00395` / `#395`、`depends_on=[]`である。`.meta.json`は手編集しない。
 7. root ledgerはtable orderを含むexact 15 rowsで、row 1とrows 3–15がactive、row 2がresolved/supersededである。全nodeid/signatureが§6と一致する。
 8. timingの`node_seconds`は243 entriesである。
-9. fresh current full verifierの全violationはrows 4–12、15だけに限定され、#392-owned/unexpected failureは0である。rows 1、3、13、14はactive failure signatureが一致し、row 2のsuccessorはnormal passする。
+9. 初回Entry verifierは、rows 4–12、15の計画済み10件と、承認済みT14同期対象の`tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`だけを観測する。T14同期後の再検証ではrows 4–12、15だけに限定され、#392-owned/unexpected failureは0である。rows 1、3、13、14はactive failure signatureが一致し、row 2のsuccessorはnormal passする。
 10. `owner_decisions_required=[]`であり、同時に別Issue writerがいない。
 11. implementation-ready packの独立Strict reviewがpassし、実装dispatchにexact spec freeze SHAと許可証跡が含まれる。
 
@@ -161,6 +161,7 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 | Generated dogfood candidate | `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`、`spec-dock/spec-dock.version`、`.agents/skills/spec-dock/.spec-dock-provider-slot.json`、`.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json` | Provider source GREEN後にSpecDock updateで一つのcandidateとして投影する。四fileとも手編集しない。Runtime mirror bytesを更新し、recordと二slot markerの`candidate_digest`を同じ新digestへ束縛する。 |
 | Product row 12 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`、`application/contracts.py`、`domain/artifacts.py` | 現行構造は既にaccepted correctionを満たすため、preflight一致時は変更しない。drift時だけstop-and-returnし、推測修正しない。 |
 | Test rows 1、3–11、13–15 | `tests/cli_runtime/test_delete.py`、`test_import.py`、`test_runtime_import_s10.py`、`test_sync.py`、`test_workbench.py` | Node identityを保持し、observer/test doubleだけを現行contractへ追随させる。 |
+| Issue #392 boundary observer | `tests/integration/test_issue_392_acceptance.py` | T14の既存baseline assertionを保持し、baseline payloadだけをP392 entryのimmutable Git blobから読む。Issue #395 Requirement／Design／Planの期待SHA-256 3値だけを現行spec freezeへ同期する。 |
 | Structural observer row 12 | `tests/cli_runtime/test_runtime_shell_s11.py` | Existing assertionsとnode identityを保持する。assertion削除・弱化は禁止。 |
 | Transitional state | `full-regression-ledger.json` | 14 active rowsを`resolved` / `fixed-in-place`へ移す。historical fieldsとrow 2を保持する。 |
 | Canonical Issue docs | 本IssueのR/D/P | Stable parent contractを意味変更せず具体化する。 |
@@ -343,7 +344,7 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 - Repository、branch、P392 SHA、spec freeze SHA、upstream/remoteの不一致
 - P392からcurrent spec freezeまでに許可外Product/test/policy差分がある
 - 15 rows、14/1 count、nodeid、signature、row order、row 2 successor、timing 243のdrift
-- Entry verifierにrows 4–12、15以外のviolation、#392-owned failure、unexpected failureがある
+- 初回Entry verifierで計画済み10件と承認済みT14同期対象以外のviolation、または同期後にrows 4–12、15以外のviolation、#392-owned failure、unexpected failureがある
 - Current path/symbolが存在しない、またはrow 12のcompliant boundaryが失われている
 - Accepted behaviorを満たすためにlifecycle wire、`E384-QUAL-001`、policy retirement、workflow redesign、main merge、new Issueが必要
 - Publication strictness、secret non-exposure、same-repo validationを両立できない
@@ -352,9 +353,9 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 
 ### I395-RQ-017 — Issue #392 boundary assertion synchronization
 
-今回ユーザーが明示承認したスコープ拡張として、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。このpathで許可される変更は、`_ISSUE_BOUNDARY_SHA256`に記録されたIssue #395 Requirement／Design／Planの3つの期待SHA-256を、今回の最終spec freezeの実体へ同期することだけである。
+今回ユーザーが明示承認したスコープ拡張として、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。このpathで許可される変更は、Issue #392の既存baseline assertionを変更せずに維持するため、baseline payloadの読み取り元をP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛すること、および`_ISSUE_BOUNDARY_SHA256`に記録されたIssue #395 Requirement／Design／Planの3つの期待SHA-256を今回の最終spec freezeの実体へ同期することだけである。
 
-Issue #392のbaseline、ledger、timing、required-fast、policy、workflow、その他のboundary assertionは変更しない。assertionの削除・弱化・skip・xfail化は行わず、同期後に同じテストをfull-regression laneでnormal passさせる。この同期は仕様修正との整合を回復するentry前提であり、Productの挙動やIssue #392の契約を変更するものではない。
+Issue #392のbaseline row、ledger、timing、required-fast、policy、workflow、その他のboundary assertionの値と意味は変更しない。assertionの削除・弱化・skip・xfail化は行わず、root ledgerがIssue #395で15/0/15へ遷移した後も、T14はP392 entryの14/1 baselineを検証する。同期後に同じテストをfull-regression laneでnormal passさせ、current root ledgerの15/0/15はfull verifierとB2で検証する。この同期は仕様修正との整合を回復するentry前提であり、Productの挙動やIssue #392の契約を変更するものではない。
 
 ## 8. Non-goals
 
