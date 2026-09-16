@@ -2892,13 +2892,14 @@ test -z "$(git ls-files --others --exclude-standard)"
 
 Commit gateへ進む前に次を再実行する。
 
-1. Phase H5 publication security matrix
-2. Phase I row 12 blob/AST guard
-3. Phase K4 protected-data equality
-4. Phase L2 ledger historical preservation
-5. Required-fast 4 / timing 243
-6. Exact focused 26-file set
-7. no-touch checks
+1. Phase I row 12 blob/AST guard
+2. Phase K4 protected-data equality
+3. Phase L2 ledger historical preservation
+4. Required-fast 4 / timing 243
+5. Exact focused 26-file set
+6. no-touch checks
+
+Phase H5はH3の最終provider source編集後、dogfood projection前に一度実行し、その後provider sourceを変更しない。同じworking-treeに対するM6での再実行は省く。exact clean implementation SHAとpost-merge B1 SHAに対するH5は、それぞれ指定された時点で実行する。
 
 一つでも失敗した場合はcommit許可を使用しない。
 
