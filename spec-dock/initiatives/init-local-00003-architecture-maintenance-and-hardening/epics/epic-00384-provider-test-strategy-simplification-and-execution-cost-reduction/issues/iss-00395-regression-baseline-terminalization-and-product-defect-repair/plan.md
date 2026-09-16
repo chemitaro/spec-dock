@@ -1805,6 +1805,8 @@ PY
 
 ### H5. Publication security matrix
 
+このpolicy-only diagnosticは、create経路を直接呼ばず、既存publication endpointの受入・拒否とcredential non-exposureだけを確認する。create前のapplication preflightと`gh issue create --repo`へのbindingは、Row 3のfocused create-boundary testで確認する。H5のreceiptへcreate call graphの証明を帰属させない。
+
 このdiagnosticは次の三時点で実行する。
 
 1. dogfood projection前
@@ -3148,7 +3150,7 @@ grep -F \
 
 上記に加え、同じclean candidateを対象に次のnon-overlapping proofを実行する。N2はこれらを実行しないため、N3での一回の実行は重複ではない。
 
-1. Phase H5の4ケースpublication security matrix（create前preflight、userinfo拒否、fetch/push mismatch拒否、matching publicationの`--repo` binding）
+1. Phase H5の4ケースpublication policy matrix（userinfo拒否、fetch/push mismatch拒否、matching publicationのnormalized slug、credential non-exposure）。create前preflightと`--repo` bindingはRow 3のfocused create-boundary testで確認する。
 2. Phase Iのrow 12 blob/AST no-edit guard
 3. Phase K4のprotected-data snapshot equalityと6-file provider/dogfood parity
 4. Phase M4のtiming、policy、workflow、P392/#396およびその他no-touch surfaces

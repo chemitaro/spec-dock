@@ -163,7 +163,7 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 | Category | Path / surface | Write rule |
 |---|---|---|
 | Product row 3 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`、`application/repo_context.py`、`application/ports.py`、`application/create_node.py`、`cli/bootstrap.py`、`infra/github_cli.py` | 既存のpublication endpoint policyをcreate境界へ一度だけ接続し、作成前にcanonical repositoryを確定する。read-only importはfetch-only identityを維持し、GitHub作成先には明示的な`--repo`を渡す。新しいpolicy層、retry、cache、feature flagは追加しない。 |
-| Generated dogfood candidate | `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`、`spec-dock/spec-dock.version`、`.agents/skills/spec-dock/.spec-dock-provider-slot.json`、`.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json` | Provider source GREEN後にSpecDock updateで一つのcandidateとして投影する。四fileとも手編集しない。Runtime mirror bytesを更新し、recordと二slot markerの`candidate_digest`を同じ新digestへ束縛する。 |
+| Generated dogfood candidate | `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`、`application/repo_context.py`、`application/ports.py`、`application/create_node.py`、`cli/bootstrap.py`、`infra/github_cli.py`、`spec-dock/spec-dock.version`、`.agents/skills/spec-dock/.spec-dock-provider-slot.json`、`.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json` | Provider source GREEN後にSpecDock updateで一つのcandidateとして投影する。9件とも手編集しない。6つのruntime mirror bytesをprovider sourceと一致させ、recordと二slot markerの`candidate_digest`を同じ新digestへ束縛する。 |
 | Product row 12 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`、`application/contracts.py`、`domain/artifacts.py` | 現行構造は既にaccepted correctionを満たすため、preflight一致時は変更しない。drift時だけstop-and-returnし、推測修正しない。 |
 | Test rows 1、3–11、13–15 | `tests/cli_runtime/test_delete.py`、`test_import.py`、`test_runtime_import_s10.py`、`test_sync.py`、`test_workbench.py` | Node identityを保持し、observer/test doubleだけを現行contractへ追随させる。 |
 | Ledger migration observer | `tests/unit/test_provider_test_lanes.py` | P392 entryのimmutable `full-regression-ledger.json` Git blobをbefore、current root ledgerをafterとして読み、許可された14行の`lifecycle` / `resolution_mode`変更だけでafterが構成されることをexact payload equalityで検証する。evaluator/verifierの仕様は変更しない。 |
@@ -296,7 +296,7 @@ Skip、xfail、approved failure、marker変更、policy skip reason変更、asse
 
 ### I395-RQ-010 — Lifecycle, protected data and dogfood
 
-#392 lifecycle/wire/record/migration/uninstall/recovery/coordinationはread-onlyである。Row 3のprovider source変更はcandidate-changing shipped runtime変更なので、provider sourceを先にGREENにし、既存lifecycle commandでchecked-in dogfoodへcomplete projectionする。generated mirror、`spec-dock.version`、二つの`.spec-dock-provider-slot.json`を手編集しない。Projection後はruntime mirrorのbytesと、record／二slot markerの新`candidate_digest`が一致し、version 0.2.4、record state `ready`、operation `null`、`seed_policy=preserve-only`、skill slot names、two skill `SKILL.md` bytes、four roots、consumer data、Workbench、initiatives、Artifactsを保持する。
+#392 lifecycle/wire/record/migration/uninstall/recovery/coordinationはread-onlyである。Row 3のprovider source変更はcandidate-changing shipped runtime変更なので、provider sourceを先にGREENにし、既存lifecycle commandでchecked-in dogfoodへcomplete projectionする。6つのgenerated runtime mirror、`spec-dock.version`、二つの`.spec-dock-provider-slot.json`を手編集しない。Projection後は6つのruntime mirrorのbytesと、record／二slot markerの新`candidate_digest`が一致し、version 0.2.4、record state `ready`、operation `null`、`seed_policy=preserve-only`、skill slot names、two skill `SKILL.md` bytes、four roots、consumer data、Workbench、initiatives、Artifactsを保持する。
 
 ### I395-RQ-011 — Non-regression gates
 
