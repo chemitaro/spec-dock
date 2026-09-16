@@ -24,12 +24,14 @@ authority: "advisory-corrected-design"
 
 This document is a corrected implementation design for Issue #395. It does not grant permission to modify policy, workflows, Git history, pull requests, or Issue state. Following the prior specification-review cycle and the user's explicit dispatch, the current `implementation_allowed` value is `true`.
 
-Before the first mutation, the executor must still verify all of the following for one clean pushed specification tip:
+Before the first implementation mutation, the executor must still verify one of two explicitly selected identity modes:
 
 1. the canonical Issue Requirement, Design, Plan, LunaMax handoff, human guide, and manifest;
-2. exact local `HEAD`, configured upstream, and remote Issue-branch equality;
-3. an independent specification review bound to that exact SHA and tree with `review_status=pass`, P0=0, P1=0;
+2. for an initial run, exact local `HEAD`, configured upstream, and remote Issue-branch equality with the reviewed specification freeze; for a post-U05 resume, exact equality with the packet's adopted resume checkpoint while the reviewed specification freeze remains an authority/ancestor check;
+3. an independent specification review bound to the reviewed specification identity with `review_status=pass`, P0=0, P1=0;
 4. an explicit execution packet with `implementation_authorized=true` and an identified concurrent-writer absence assertion.
+
+The current Issue procedure may also be in a specification-correction track after a blocking specification review. That track is limited to the canonical documents and advisory handoff, produces a new clean pushed specification candidate, and must pass a fresh specification review before any Product/test/ledger/dogfood implementation mutation. It does not reuse a failed review as implementation permission.
 
 `owner_decisions_required=[]` means the Product design has no unresolved owner choice. It does not mean implementation, commit, push, PR preparation, or merge is authorized.
 
@@ -60,6 +62,7 @@ The integration branch remains `codex/epic-00384-provider-test-strategy-planning
 | Elaboration input        | `fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9` | `4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599` | Exact Issue-branch tip reviewed in this readiness analysis                  |
 | Support-history checkpoint | `c0736434503117d5d468d1438fb18da16d382a56` | `cec02ce70fbcbbbac811a04106dcc15540ad4d09` | Exact 16 existing support artifacts; immutable, non-authoritative history |
 | Specification freeze     | Runtime value                              | Runtime value                              | Future clean pushed canonical six-file specification pack                   |
+| Adopted resume checkpoint | Runtime value                              | Runtime value                              | Existing clean pushed checkpoint used when resuming after an approved U05 transition |
 | Implementation candidate | Runtime value                              | Runtime value                              | Future clean pushed Product/test/ledger candidate, if separately authorized |
 | Post-merge B1/B2 tip     | Runtime value                              | Runtime value                              | Future human-merged integration tip                                         |
 
@@ -86,9 +89,10 @@ entry baseline observation
   -> row 12 no-edit guard
   -> all 14 historical nodes + row 2 successor normal-pass proof
   -> complete dogfood projection and protection proof
-  -> atomic ledger transition
-  -> current full verifier GREEN
-  -> exact clean candidate freeze and full rerun
+  -> atomic ledger transition (initial route only)
+  -> post-U05 resume: verify terminalized ledger and do not rerun the transition
+  -> exact clean candidate freeze or adoption
+  -> current full verifier and all candidate gates on that clean candidate
   -> independent implementation review
   -> human PR merge
   -> same-tip B1, then B2
@@ -243,7 +247,7 @@ Every other field in those rows, the complete row 2 object, row order, and all t
 
 ### 5.8 Expected implementation file set
 
-The exact expected tracked implementation diff contains 13 files:
+The cumulative Issue implementation surface contains exactly 13 tracked paths:
 
 ```text
 full-regression-ledger.json
@@ -261,7 +265,7 @@ tests/unit/test_provider_test_lanes.py
 tests/integration/test_issue_392_acceptance.py
 ```
 
-A missing expected file means the candidate was not completely projected or corrected. An extra file means scope drift. Either condition stops the execution.
+A missing expected path means the cumulative Issue candidate is incomplete or the handoff is out of sync. An extra path means scope drift. On a fresh run, the working-tree diff from the reviewed specification freeze must equal this set. On a post-U05 resume, an already committed candidate may be adopted without an empty commit; only a new incremental diff within this set may be staged. Either condition stops the execution.
 
 ## 6. Exact row acceptance design
 
@@ -368,7 +372,7 @@ The transition program must:
 5. compare the resulting payload against an expected payload constructed from the saved input;
 6. write one normalized JSON file with a terminal newline;
 7. rerun evaluator tests and all 15 selected nodes;
-8. run the current full verifier in a private artifact root.
+8. record focused post-transition evidence only. The current full verifier, candidate-wheel, distribution, installed, and dogfood parity receipts are deferred until the clean candidate gate in §11.3 and are never accepted from this dirty transition state.
 
 A verifier pass is necessary but not sufficient. The before/after ledger invariant is a separate merge-blocking proof.
 
@@ -451,7 +455,7 @@ Commit and push are allowed only when the execution packet separately authorizes
 
 The boundary-test path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to binding the baseline payload read to the immutable P392 entry blob, while preserving every Issue #392 assertion, and synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The separate migration observer path is `tests/unit/test_provider_test_lanes.py`; it compares the P392 before payload with the current root after payload and does not alter evaluator/verifier behavior. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
 
-After commit and push, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
+After commit and push, or after an explicit clean-candidate adoption from an existing checkpoint, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
 
 Independent implementation review consists of:
 

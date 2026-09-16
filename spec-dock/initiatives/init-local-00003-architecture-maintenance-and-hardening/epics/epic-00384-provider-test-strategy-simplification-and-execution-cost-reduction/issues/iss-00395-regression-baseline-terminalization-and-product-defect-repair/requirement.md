@@ -136,7 +136,7 @@ B1とB2は同じfull SHAを証拠にする。#392 lifecycle output、current led
 Product/test/ledger変更へ進む前に、すべての条件を満たす。
 
 1. Repositoryは`chemitaro/spec-dock`、branchは`iss-00395-regression-baseline-terminalization-and-product-defect-repair`である。
-2. Reviewed spec freeze SHA、local `HEAD`、configured upstream、remote branch tipがbyte-for-byte一致し、worktreeがcleanである。
+2. **初回実行**では、reviewed spec freeze SHA、local `HEAD`、configured upstream、remote branch tipがbyte-for-byte一致し、worktreeがcleanである。**U05後の再開**では、reviewed spec freeze SHA/treeはauthorityとancestorの確認に用い、local `HEAD`、configured upstream、remote branch tipの一致は、実行packetが明示するadopted resume checkpointまたは最終candidate SHA/treeに対して検査する。既に完了したU05遷移を再実行してこのidentityを作り直してはならない。
 3. `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`がspec freeze tipのancestorである。
 4. Specification admission historyは、次の三つのsegmentを独立に検証する。22 pathsを単一のcurrent-spec allowlistとして扱わない。
    - **P392からelaboration inputまで:** Epic PlanとIssue #392 Reportのexact 2 pathsだけが変化し、Product source、tests、ledger、timing、policy、workflowは変化しない。

@@ -137,6 +137,7 @@ concurrent_writer:
     - tests/cli_runtime/test_runtime_import_s10.py
     - tests/cli_runtime/test_sync.py
     - tests/cli_runtime/test_workbench.py
+    - tests/unit/test_provider_test_lanes.py
     - tests/integration/test_issue_392_acceptance.py
     - refs/heads/iss-00395-regression-baseline-terminalization-and-product-defect-repair
 
@@ -175,7 +176,7 @@ human_merge_only: true
   * `merge_ready=false`とする。
 * `COMMIT_PUSH_AUTHORIZED=true`:
 
-  * 全gateがGREENの場合だけ、exact 12 pathsをIssue branchへcommit/pushできる。
+  * 全gateがGREENの場合だけ、exact 13 pathsをIssue branchへcommit/pushできる。
 * `PR_PREPARE_AUTHORIZED=false`:
 
   * PRを作成・更新しない。
@@ -185,6 +186,14 @@ human_merge_only: true
 * `HUMAN_MERGE_ONLY=true`:
 
   * LunaMaxはPRをmergeしない。
+
+### 3.3 Specification-review remediation track
+
+最新のStrict仕様レビューがP0/P1を返した場合は、実装trackを開始せず、`documentation-correction`としてcanonical Requirement/Design/Planとこのadvisory handoffの契約だけを修正する。このtrackではProduct、test、ledger、dogfood、evaluator、verifierを変更せず、clean pushed specification candidateを作成して同じ仕様レビューをfresh rerunする。`review_status=pass`、P0=0、P1=0になった後にだけ、以下の実装mutation gateと13-path candidate gateを適用する。
+
+### 3.4 Identity modes
+
+`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityである。初回実装ではcurrent local `HEAD`、configured upstream、remote branch tipもこの値に一致する。U05後のresumeでは、実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をcurrent equalityの対象とし、`SPEC_FREEZE_SHA/TREE`はancestor/authorityとして検査する。U05のledger transitionが既に完了している場合は、current rootのterminal stateを確認してL1を再実行せず、clean checkpointを`IMPLEMENTATION_SHA/TREE`としてadoptできる。resume中の未commit差分は、旧identityへ戻す操作や空commitで隠さず停止する。
 
 ## 4. 共通shell constants
 
@@ -206,6 +215,16 @@ export ELABORATION_INPUT_TREE="4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 
 export SUPPORT_HISTORY_SHA="c0736434503117d5d468d1438fb18da16d382a56"
 export SUPPORT_HISTORY_TREE="cec02ce70fbcbbbac811a04106dcc15540ad4d09"
+
+export RESUME_MODE="${RESUME_MODE:-initial-spec-freeze}"
+case "$RESUME_MODE" in
+  initial-spec-freeze) ;;
+  post-u05-checkpoint)
+    : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
+    : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+    ;;
+  *) exit 1 ;;
+esac
 
 ROW_1='tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active'
 ROW_2_HISTORICAL='tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source'
@@ -292,6 +311,7 @@ IMPLEMENTATION_PATHS=(
   tests/cli_runtime/test_runtime_import_s10.py
   tests/cli_runtime/test_sync.py
   tests/cli_runtime/test_workbench.py
+  tests/unit/test_provider_test_lanes.py
   tests/integration/test_issue_392_acceptance.py
 )
 ```
@@ -340,7 +360,9 @@ PY
 
 Read-only preflightは`implementation_allowed=true`の記録後も実行できる。これはeffective mutation gateが開いたことを意味しない。
 
-### 6.1 Spec freeze identity
+### 6.1 Specification and resume identity
+
+`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityである。初回実装ではcurrent tip equalityにも使用する。U05後のresumeでは、execution packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をcurrent tip equalityに使用し、spec freezeはancestor/authorityとして残す。
 
 ```bash
 : "${SPEC_FREEZE_SHA:?SPEC_FREEZE_SHA is required}"
@@ -348,6 +370,22 @@ Read-only preflightは`implementation_allowed=true`の記録後も実行でき�
 
 test "${#SPEC_FREEZE_SHA}" -eq 40
 test "${#SPEC_FREEZE_TREE}" -eq 40
+
+case "$RESUME_MODE" in
+  initial-spec-freeze)
+    EXPECTED_CURRENT_SHA="$SPEC_FREEZE_SHA"
+    EXPECTED_CURRENT_TREE="$SPEC_FREEZE_TREE"
+    ;;
+  post-u05-checkpoint)
+    : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
+    : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+    test "${#RESUME_CHECKPOINT_SHA}" -eq 40
+    test "${#RESUME_CHECKPOINT_TREE}" -eq 40
+    EXPECTED_CURRENT_SHA="$RESUME_CHECKPOINT_SHA"
+    EXPECTED_CURRENT_TREE="$RESUME_CHECKPOINT_TREE"
+    ;;
+  *) exit 1 ;;
+esac
 ```
 
 ### 6.2 Repository、branch、upstream、remote、clean status
@@ -358,10 +396,10 @@ git fetch --prune origin
 test "$(git rev-parse --show-toplevel)" = "$PWD"
 test "$(git rev-parse --abbrev-ref HEAD)" = "$ISSUE_BRANCH"
 
-test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
+test "$(git rev-parse HEAD)" = "$EXPECTED_CURRENT_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
 
-test "$(git rev-parse '@{upstream}')" = "$SPEC_FREEZE_SHA"
+test "$(git rev-parse '@{upstream}')" = "$EXPECTED_CURRENT_SHA"
 test "$(
   git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}'
 )" = "origin/$ISSUE_BRANCH"
@@ -378,7 +416,7 @@ test "$(
 test "$(
   printf '%s\n' "$REMOTE_LINE" \
     | awk 'NF {print $1}'
-)" = "$SPEC_FREEZE_SHA"
+)" = "$EXPECTED_CURRENT_SHA"
 
 test -z "$(
   git status --porcelain=v1 --untracked-files=all
@@ -392,11 +430,17 @@ git merge-base --is-ancestor \
   "$ELABORATION_INPUT_SHA" \
   "$SPEC_FREEZE_SHA"
 
+git merge-base --is-ancestor \
+  "$SPEC_FREEZE_SHA" \
+  "$EXPECTED_CURRENT_SHA"
+
 test "$(git rev-parse "$P392_SHA^{tree}")" = "$P392_TREE"
 test "$(
   git rev-parse "$ELABORATION_INPUT_SHA^{tree}"
 )" = "$ELABORATION_INPUT_TREE"
 ```
+
+`post-u05-checkpoint`では、U05の承認済み遷移が履歴に存在することとcurrent rootがterminalizedであることを確認し、L1を再実行しない。
 
 一つでも失敗した場合、変更0でstop-and-returnする。Reset、force checkout、別branch、default branchへのfallbackで修復しない。
 
@@ -762,12 +806,12 @@ Blob driftがある場合、変更0でstop-and-returnする。
 
 ### 7.2 Entry ledger evidence
 
-Mutation前にledgerをprivate evidenceへ保存する。
+初回のtransitionでは、P392 entryのimmutable Git blobをhistorical beforeとしてprivate evidenceへ保存する。作業ツリーのcurrent rootをbeforeとしてコピーしてはならない。U05後のresumeではこのbeforeを再構築し、current rootのterminalized afterを検証するだけで、ledger transition writeを再実行しない。
 
 ```bash
-cp \
-  full-regression-ledger.json \
-  "$EVIDENCE_DIR/ledger-before.json"
+git show \
+  "$P392_SHA:full-regression-ledger.json" \
+  > "$EVIDENCE_DIR/ledger-before.json"
 ```
 
 Entry stateは次でなければならない。
@@ -780,6 +824,8 @@ Entry stateは次でなければならない。
 * Row 2 successor unchanged
 * Timing 243
 * Required-fast 4
+
+`post-u05-checkpoint`では、上記はP392 historical beforeの期待値であり、current rootの検査値ではない。current afterは15 rows、0 active、15 resolved、14 `fixed-in-place`、1 `superseded`であることを別のafter assertionで確認する。
 
 ## 8. Test lane contract
 
@@ -1424,6 +1470,7 @@ expected_scope = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
     "refs/heads/"
     "iss-00395-regression-baseline-terminalization-"
     "and-product-defect-repair",
@@ -1442,8 +1489,8 @@ test -z "$(
   git status --porcelain=v1 --untracked-files=all
 )"
 
-test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
+test "$(git rev-parse HEAD)" = "$EXPECTED_CURRENT_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
 ```
 
 Writer assertionが期限切れになった場合は再取得する。期限切れ、scope不足、SHA/tree mismatchを無視して継続しない。
@@ -1460,11 +1507,11 @@ Rows 4–11 test double
   -> Row 12 guard
   -> 15-node pre-ledger GREEN
   -> dogfood projection and protection proof
-  -> atomic ledger transition
+  -> atomic ledger transition (initial route only)
   -> focused GREEN
-  -> working-tree provisional full verifier
-  -> complete gates
-  -> exact clean candidate
+  -> post-U05 resume verification without transition rerun
+  -> exact clean candidate freeze or adoption
+  -> full verifier and complete gates on the clean candidate
   -> independent reviews
   -> optional PR preparation
   -> human merge
@@ -1863,36 +1910,20 @@ env TMPDIR="$TEST_TMPDIR" \
     "${ALL_OBSERVED_ROWS[@]}"
 ```
 
-### 24.2 Working-tree full verifier
+### 24.2 Working-tree provisional boundary
 
-```bash
-WORKTREE_ARTIFACT_ROOT="$EVIDENCE_DIR/full-worktree"
-mkdir -p "$WORKTREE_ARTIFACT_ROOT"
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run python \
-    -m scripts.quality.verify_full_regression \
-    --shards 4 \
-    --artifact-dir "$WORKTREE_ARTIFACT_ROOT"
-```
-
-Expected:
-
-* `status=verified`
-* `evaluation.verified=true`
-* `active_verified=[]`
-* `resolved_verified` count 15
-* `retired_verified=[]`
-* `violations=[]`
-
-Working-tree verifierの`candidate_sha`はuncommitted bytesを表さない。Binary diff SHA-256と組み合わせたprovisional evidenceとして扱う。
+Working treeではfocused test、manual invariant、no-touch、protected-data、および必要な診断だけを実行する。candidate-wheel、distribution、installed、dogfood parity、full verifierのfinal receiptはここで生成しない。
 
 ```text
 candidate_state = working-tree-provisional
 merge_ready = false
+full_verifier_receipt = absent
+candidate_wheel_receipt = absent
 ```
 
-### 24.3 Complete gate set
+Full verifierとcandidate-wheelを含む完全なgateは、N1でclean candidateをcommit/pushまたはadoptした後、N2/N3から実行する。Working-treeのdiagnostic結果をclean candidate receiptへ転用してはならない。
+
+### 24.3 Working-tree ordinary/source checks
 
 ```bash
 # Ordinary lane
@@ -1908,45 +1939,6 @@ env TMPDIR="$TEST_TMPDIR" \
     --tb=short \
     tests/unit/provider_lifecycle
 
-# Distribution cutover
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/cli_runtime/test_distribution_cutover.py
-
-# Platform / coordination
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
-    tests/cli_runtime/test_provider_lifecycle_handoff.py \
-    tests/cli_runtime/test_generation_checkout.py \
-    tests/cli_runtime/test_worktree_lifecycle_coordination.py
-
-# Packaged distribution parity
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/integration/test_epic_00343_distribution.py
-
-# Complete dogfood heavy suite
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/integration/test_provider_lifecycle_dogfood.py
-
 # Static analysis
 env TMPDIR="$TEST_TMPDIR" \
   make lint
@@ -1960,9 +1952,11 @@ grep -F \
   "$EVIDENCE_DIR/post-change-validate.txt"
 ```
 
+Distribution cutover、platform/coordination、packaged parity、complete dogfood suite、およびcandidate-wheelを含むfull verifierは、N1/N2後のclean candidate gateである28章だけで実行する。Working-treeで実行したfocused/ordinary結果はprovisionalで、final receiptへ転用しない。
+
 ## 25. Exact changed-file gate
 
-Working-tree diffはexact 12 pathsでなければならない。
+初回実装のworking-tree diffはreviewed specification freezeからのexact 13 pathsでなければならない。U05後に既存candidateをadoptするresumeでは、累積13-path scopeを既存unit receiptsで確認し、未commit差分がないことを確認して空commitを作らない。
 
 ```bash
 python - "$SPEC_FREEZE_SHA" <<'PY'
@@ -1986,6 +1980,7 @@ expected = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
     "tests/integration/test_issue_392_acceptance.py",
 }
 
@@ -2007,7 +2002,7 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print("implementation-file-set=12/12")
+print("implementation-file-set=13/13")
 PY
 
 git diff --check
@@ -2060,8 +2055,17 @@ Working-tree diff、evidence、stop/return receiptを返して停止する。
 
 ### 27.2 Commit/push許可あり
 
+`RESUME_MODE=post-u05-checkpoint`で既存candidateがcleanである場合は、commit/pushを再実行せず、`RESUME_CHECKPOINT_SHA/TREE`を検証してそのHEADを`IMPLEMENTATION_SHA/TREE`としてadoptする。resume状態に未commit差分がある場合は、旧identityへ戻す操作や空commitで隠さず停止する。以下のstage・commit・pushブロックは`initial-spec-freeze`で新しいcandidateを作る場合だけ実行する。
+
 ```bash
 test "$COMMIT_PUSH_AUTHORIZED" = "true"
+
+EXPECTED_REMOTE_SHA="$SPEC_FREEZE_SHA"
+if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
+  : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
+  : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+  EXPECTED_REMOTE_SHA="$RESUME_CHECKPOINT_SHA"
+fi
 
 test "$(
   git ls-remote \
@@ -2069,7 +2073,13 @@ test "$(
     origin \
     "refs/heads/$ISSUE_BRANCH" \
     | awk 'NF {print $1}'
-)" = "$SPEC_FREEZE_SHA"
+  )" = "$EXPECTED_REMOTE_SHA"
+
+if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
+  test -z "$(git status --porcelain=v1 --untracked-files=all)"
+  export IMPLEMENTATION_SHA="$(git rev-parse HEAD)"
+  export IMPLEMENTATION_TREE="$(git rev-parse 'HEAD^{tree}')"
+else
 
 git add -- "${IMPLEMENTATION_PATHS[@]}"
 
@@ -2109,6 +2119,7 @@ test "$(
 test -z "$(
   git status --porcelain=v1 --untracked-files=all
 )"
+fi
 ```
 
 禁止事項:
@@ -2122,7 +2133,7 @@ test -z "$(
 
 ## 28. Exact clean rerun
 
-Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束縛する。
+Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束縛する。ここがcandidate-wheel、distribution、installed、dogfood parity、およびfull verifierの唯一の受入段階である。N1のcommit/pushまたはclean adoption前に、これらのfinal receiptを生成・受入してはならない。
 
 必須rerun:
 
@@ -2143,7 +2154,7 @@ Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束
 * Timing 243
 * Required-fast 4
 * Policy/workflow no-touch
-* Exact 12-file set
+* Exact 13-path set
 * Clean local/upstream/remote equality
 
 Working-tree proofをexact clean proofとして流用しない。
