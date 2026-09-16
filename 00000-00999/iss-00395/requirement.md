@@ -72,6 +72,8 @@ P392 receiptは次を固定する。
 - #392-owned unexpected failureは0
 - Code Review StrictとFinal Quality Gate StrictはP392 merged treeに対してpass
 
+ここでいう15 total / 14 active / 1 resolvedは、P392 entryのimmutable historical ledgerの状態である。Issue #395のcurrent root ledgerは同じ15行を保持したまま、U05の承認済み遷移後に15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`となる。P392の履歴証拠をcurrent rootの「after」として再利用してはならず、移行検査はP392 Git blobをbefore、作業ツリーのcurrent root ledgerをafterとして比較する。
+
 このwitnessは#395 entryを許す限定証拠であり、full verifier GREEN、B1、#392 closure、#395実装許可を意味しない。
 
 ### 2.3 Canonical specification packとpreserved support history
@@ -143,7 +145,7 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
    P392 receiptを保持する親文書は、上記のP392からelaboration inputまでのdoc-only契約に含めて確認する。
 5. `./spec-dock/scripts/spec-dock active show`がIssue `iss-00395`を示す。generated active stateをtracked `.meta.json`やGitHub Issue bodyから推測しない。
 6. `.meta.json`のID/GitHub linkageは`iss-00395` / `#395`、`depends_on=[]`である。`.meta.json`は手編集しない。
-7. root ledgerはtable orderを含むexact 15 rowsで、row 1とrows 3–15がactive、row 2がresolved/supersededである。全nodeid/signatureが§6と一致する。
+7. P392 historical ledgerはtable orderを含むexact 15 rowsで、row 1とrows 3–15がactive、row 2がresolved/supersededである。current root ledgerも同じnodeid、signature、row order、row 2 objectを保持し、U05遷移後はexact 15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`である。どの状態を検査しているかを、P392 historical beforeとcurrent root afterで明示する。
 8. timingの`node_seconds`は243 entriesである。
 9. 初回Entry verifierは、rows 4–12、15の計画済み10件と、承認済みT14同期対象の`tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`だけを観測する。T14同期後の再検証ではrows 4–12、15だけに限定され、#392-owned/unexpected failureは0である。rows 1、3、13、14はactive failure signatureが一致し、row 2のsuccessorはnormal passする。
 10. `owner_decisions_required=[]`であり、同時に別Issue writerがいない。
@@ -161,6 +163,7 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 | Generated dogfood candidate | `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`、`spec-dock/spec-dock.version`、`.agents/skills/spec-dock/.spec-dock-provider-slot.json`、`.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json` | Provider source GREEN後にSpecDock updateで一つのcandidateとして投影する。四fileとも手編集しない。Runtime mirror bytesを更新し、recordと二slot markerの`candidate_digest`を同じ新digestへ束縛する。 |
 | Product row 12 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`、`application/contracts.py`、`domain/artifacts.py` | 現行構造は既にaccepted correctionを満たすため、preflight一致時は変更しない。drift時だけstop-and-returnし、推測修正しない。 |
 | Test rows 1、3–11、13–15 | `tests/cli_runtime/test_delete.py`、`test_import.py`、`test_runtime_import_s10.py`、`test_sync.py`、`test_workbench.py` | Node identityを保持し、observer/test doubleだけを現行contractへ追随させる。 |
+| Ledger migration observer | `tests/unit/test_provider_test_lanes.py` | P392 entryのimmutable `full-regression-ledger.json` Git blobをbefore、current root ledgerをafterとして読み、許可された14行の`lifecycle` / `resolution_mode`変更だけでafterが構成されることをexact payload equalityで検証する。evaluator/verifierの仕様は変更しない。 |
 | Issue #392 boundary observer | `tests/integration/test_issue_392_acceptance.py` | T14の既存baseline assertionを保持し、baseline payloadだけをP392 entryのimmutable Git blobから読む。Issue #395 Requirement／Design／Planの期待SHA-256 3値だけを現行spec freezeへ同期する。 |
 | Structural observer row 12 | `tests/cli_runtime/test_runtime_shell_s11.py` | Existing assertionsとnode identityを保持する。assertion削除・弱化は禁止。 |
 | Transitional state | `full-regression-ledger.json` | 14 active rowsを`resolved` / `fixed-in-place`へ移す。historical fieldsとrow 2を保持する。 |
@@ -274,6 +277,8 @@ Current blobsがP392と一致する限り、row 12のProduct sourceは変更し�
 - `nodeid`、`fixed_point_signature_sha256`、`current_signature_sha256`、historical status、disposition、historical top-level fieldsを変更しない。
 - Row 2の`resolved`、`superseded`、successorを変更しない。
 - Row追加、削除、rename、successor substitution、retired化を行わない。
+- 移行前のhistorical payloadはP392 entryの`full-regression-ledger.json` Git blobから読み、current root ledgerを移行後payloadとして扱う。current rootが既にU05後のterminal stateである場合も、P392 blobをcurrent rootのbeforeとして読み替えない。
+- 移行後payloadは、P392 payloadからrows 1、3–15の`lifecycle`と`resolution_mode`だけを許可どおり投影した結果と完全一致しなければならない。
 - Current truthは修正後observationと`evaluate_baseline`のnormal-pass判定で証明する。JSON textだけで解決を宣言しない。
 
 Targetはexact 15 total / 0 active / 15 resolved / 14 fixed-in-place / 1 superseded / approved 0 / unexpected 0である。
@@ -297,6 +302,7 @@ Skip、xfail、approved failure、marker変更、policy skip reason変更、asse
 - 14 row focused RED/GREEN evidence
 - Row 2 successor
 - `tests/unit/test_full_regression_baseline.py`
+- `tests/unit/test_provider_test_lanes.py::test_full_regression_ledger_migration_preserves_schema1_history`
 - ordinary `uv run pytest`
 - current full verifier 4 shards
 - provider lifecycle focused suite
@@ -331,7 +337,7 @@ HumanがIssue PRを`codex/epic-00384-provider-test-strategy-planning`へmergeし
 
 ### I395-RQ-014 — Evidence and traceability
 
-各rowについて、entry observation、changed path/symbol、RED reason、GREEN assertion、focused command、ledger state、full-verifier resultを一対一で記録する。未commit working-tree verifierはdiff SHA-256付きのprovisional evidenceに限り、merge-readyへ使わない。Final evidenceはclean pushed implementation SHA/treeでfull verifierと全merge-blocking gatesを再実行して束縛し、secretを含めない。Handoff evidence schemaに欠落があればmerge-readyとしない。
+各rowについて、entry observation、changed path/symbol、RED reason、GREEN assertion、focused command、ledger state、full-verifier resultを一対一で記録する。未commit working-tree verifierはdiff SHA-256付きのprovisional evidenceに限り、merge-readyへ使わない。候補wheelを含むfull verifierのmerge-blocking evidenceは、cleanなcommit済みcheckout/worktreeで実行する。Final evidenceはclean pushed implementation SHA/treeでfull verifierと全merge-blocking gatesを再実行して束縛し、secretを含めない。Handoff evidence schemaに欠落があればmerge-readyとしない。
 
 ### I395-RQ-015 — Rollback
 
