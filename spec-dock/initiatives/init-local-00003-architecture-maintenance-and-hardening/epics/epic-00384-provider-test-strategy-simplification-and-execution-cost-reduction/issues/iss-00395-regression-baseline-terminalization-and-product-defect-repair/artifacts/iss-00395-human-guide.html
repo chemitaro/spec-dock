@@ -146,8 +146,8 @@
     <header>
       <h1>Issue #395 回帰基線終端化・Product欠陥修復ガイド</h1>
       <p>Epic #384のP392から、14件の既知回帰契約を原因別に修復し、current verifierを15/0/15のclean baselineへ戻すIssue #395の仕様と検証境界を、新規参加者が単独で追えるように整理した資料です。</p>
-      <p class="muted small">Repository <code>chemitaro/spec-dock</code> / Issue branch <code>iss-00395-regression-baseline-terminalization-and-product-defect-repair</code> / current specification candidate <code>78d6406ba7df8bd4953f2c3f6db5610d635ff48c</code></p>
-      <div class="callout warning"><strong>現在の状態:</strong> <code>implementation_allowed=true</code> はユーザーの明示dispatchを記録しています。しかし、現行候補は仕様AdmissionのStrictレビューがP1でfailしているため、実効的なProduct、test、ledger、dogfood変更はまだblockedです。修正後にfresh Strictスペックレビューがpassし、P0/P1=0になった後で実装へ進みます。</div>
+      <p class="muted small">Repository <code>chemitaro/spec-dock</code> / Issue branch <code>iss-00395-regression-baseline-terminalization-and-product-defect-repair</code> / current specification identity <code>SPEC_FREEZE_SHA/TREE</code>（実行時にfresh Strict review receiptで確認）</p>
+      <div class="callout warning"><strong>現在の状態:</strong> <code>implementation_allowed=true</code> はユーザーの明示dispatchを記録しています。ただし、実効的なProduct、test、ledger、dogfood変更を開始するには、正しいcanonical scopeを指定したfresh Strictスペックレビューがpassし、P0/P1=0になる必要があります。P2の資料上の不整合は報告対象ですが、実装開始の合否条件にはしません。</div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
     </header>
 
@@ -199,6 +199,12 @@
   </ol>
   <div class="callout ok"><strong>修正後の意味:</strong> current tipは常にclean pushedな<code>SPEC_FREEZE_SHA/TREE</code>です。<code>RESUME_CHECKPOINT_SHA/TREE</code>はその祖先の実装基点です。T14の3値同期はfresh Strict仕様レビューがpassした後だけ行い、full verifier、wheel、distribution、dogfoodの最終証拠はcommit済みclean candidateでだけ受け入れます。</div>
   <p class="small muted">なお、Row 3のcredential-bearing origin、publication strictness、userinfo拒否などのセキュリティ要件は別の検証行列です。今回の仕様修正でそれらを緩和したり、未実行の検証をGREENと宣言したりはしていません。</p>
+  <h3>今回の再レビューで追加された確認点</h3>
+  <ul class="compact">
+    <li><strong>manifestの指定:</strong> 正規の6件目は<code>artifacts/iss-00395-chatgpt-spec-pack-manifest.md</code>です。レビュー呼出しで一度指定された<code>manifest.json</code>はリポジトリにないため、ファイルを新設せず、呼出し側の指定だけを直します。</li>
+    <li><strong>U05後のcommit:</strong> 累積の実装13件はそのまま検証しますが、実際のforward commitでstageするのはその時点のnon-emptyな差分だけです。今回のE3RではT14の1件だけをstageし、既にcommit済みの12件を空の差分として要求しません。</li>
+    <li><strong>ガイドのSHA表示:</strong> HTML自身に「current commitのSHA」を固定すると、そのHTMLを更新したcommit直後に古くなります。そのため、ガイドは<code>SPEC_FREEZE_SHA/TREE</code>を実行時のreview receiptで確認する方式にします。これはP2の資料整合性改善で、P1の合否条件ではありません。</li>
+  </ul>
 </section>
 
 <section id="admission-change">
@@ -217,6 +223,7 @@
       <tr><td>T14同期の時点</td><td>仕様レビュー前にも3つの期待ハッシュを更新できるように読める</td><td>fresh Strict仕様レビューpass後のE3Rに限定し、3値以外は変更しない</td></tr>
       <tr><td>最終検証の状態</td><td>dirty treeのverifier/dogfood結果が最終証拠に混ざる余地があった</td><td>最終証拠はclean pushed implementation candidateでのみ取得</td></tr>
       <tr><td>実装パスの数え方</td><td>handoffの一部が12件で、migration observerが漏れていた</td><td>実装13件を列挙し、U05後は累積19件をGit差分として実測</td></tr>
+      <tr><td>U05後のstage単位</td><td>累積13件と今回のforward commitの差分を同じ集合として要求</td><td>累積13件を別途証明し、E3Rでは実測したT14のnon-empty 1件だけをstage</td></tr>
     </tbody>
   </table></div>
 
