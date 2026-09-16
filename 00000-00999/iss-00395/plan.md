@@ -3016,6 +3016,8 @@ implementation_tree = null
 
 `RESUME_MODE=post-u05-checkpoint`で、current reviewed specification targetがcleanで必要な実装差分をすでに含む場合は、commit/pushを再実行せず、`SPEC_FREEZE_SHA/TREE`を検証してそのcurrent HEADを`IMPLEMENTATION_SHA/TREE`としてadoptする。`RESUME_CHECKPOINT_SHA/TREE`は、その実装が由来する祖先基点の証明にだけ使う。仕様レビュー後にT14同期などのallowed implementation差分が残る場合は、旧candidateへ戻す操作をせず、以下のexact path stage・commit・pushブロックで一つのforward commitへ束縛する。
 
+初回のforward commitでは、実装candidateのstaged path set全体を13件と照合する。`post-u05-checkpoint`では、累積13-path proofと今回のcommitでstageするincremental setを混同しない。E3Rで残る現在のapproved pending setは、stage前に`SPEC_FREEZE_SHA`から実測し、non-emptyで`IMPLEMENTATION_PATHS`のsubset、かつT14の1件と完全一致することを確認したうえで、そのpending setだけをstageする。既にcommit済みの12件を空の差分として再出現させたり、空commitでpath数を満たしたりしてはならない。
+
 ```bash
 test "$COMMIT_PUSH_AUTHORIZED" = "true"
 
@@ -3042,36 +3044,14 @@ if [ "$RESUME_MODE" = "post-u05-checkpoint" ] && \
   export IMPLEMENTATION_TREE="$(git rev-parse 'HEAD^{tree}')"
 else
 
+if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
 git add -- "${IMPLEMENTATION_PATHS[@]}"
 
-test -z "$(git diff --name-only)"
-test -z "$(git ls-files --others --exclude-standard)"
-
-git diff --cached --check
-
-python - <<'PY'
+python - "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 import subprocess
+import sys
 
-expected = {
-    "full-regression-ledger.json",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/infra/git_cli.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "infra/git_cli.py",
-    "spec-dock/spec-dock.version",
-    ".agents/skills/spec-dock/"
-    ".spec-dock-provider-slot.json",
-    ".agents/skills/spec-dock-grill-with-docs/"
-    ".spec-dock-provider-slot.json",
-    "tests/cli_runtime/test_delete.py",
-    "tests/cli_runtime/test_import.py",
-    "tests/cli_runtime/test_runtime_import_s10.py",
-    "tests/cli_runtime/test_sync.py",
-    "tests/cli_runtime/test_workbench.py",
-    "tests/unit/test_provider_test_lanes.py",
-    "tests/integration/test_issue_392_acceptance.py",
-}
-
+expected = set(sys.argv[1:])
 actual = set(
     subprocess.check_output(
         [
@@ -3079,6 +3059,7 @@ actual = set(
             "diff",
             "--cached",
             "--name-only",
+            "--no-renames",
             "--",
         ],
         text=True,
@@ -3086,12 +3067,91 @@ actual = set(
 )
 
 assert actual == expected, {
+    "stage": "initial-exact-13",
     "expected": sorted(expected),
     "actual": sorted(actual),
 }
 
 print("staged-file-set=13/13")
 PY
+else
+POST_U05_INCREMENTAL_PATHS=(
+  tests/integration/test_issue_392_acceptance.py
+)
+
+python - "$SPEC_FREEZE_SHA" "${IMPLEMENTATION_PATHS[@]}" -- \
+  "${POST_U05_INCREMENTAL_PATHS[@]}" <<'PY'
+import subprocess
+import sys
+
+base, *paths = sys.argv[1:]
+separator = paths.index("--")
+allowed = set(paths[:separator])
+expected = set(paths[separator + 1:])
+actual = set(
+    subprocess.check_output(
+        [
+            "git",
+            "diff",
+            "--name-only",
+            "--no-renames",
+            base,
+            "--",
+        ],
+        text=True,
+    ).splitlines()
+)
+
+assert actual, "post-U05 incremental diff must be non-empty"
+assert actual == expected, {
+    "stage": "post-u05-incremental-before-stage",
+    "expected": sorted(expected),
+    "actual": sorted(actual),
+}
+assert actual <= allowed, {
+    "stage": "post-u05-incremental-allowlist",
+    "allowed": sorted(allowed),
+    "actual": sorted(actual),
+}
+
+print("post-u05-incremental-file-set=1/1")
+PY
+
+git add -- "${POST_U05_INCREMENTAL_PATHS[@]}"
+
+python - "${POST_U05_INCREMENTAL_PATHS[@]}" <<'PY'
+import subprocess
+import sys
+
+expected = set(sys.argv[1:])
+actual = set(
+    subprocess.check_output(
+        [
+            "git",
+            "diff",
+            "--cached",
+            "--name-only",
+            "--no-renames",
+            "--",
+        ],
+        text=True,
+    ).splitlines()
+)
+
+assert actual == expected, {
+    "stage": "post-u05-incremental-cached",
+    "expected": sorted(expected),
+    "actual": sorted(actual),
+}
+
+print("staged-incremental-file-set=1/1")
+PY
+fi
+
+test -z "$(git diff --name-only)"
+test -z "$(git ls-files --others --exclude-standard)"
+
+git diff --cached --check
 
 test "$(git config user.name)" = "chemitaro"
 test "$(git config user.email)" = \
