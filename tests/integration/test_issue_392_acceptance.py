@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import subprocess
 from pathlib import Path
+import subprocess
 
 from spec_dock import cli
 from tests.conftest import REQUIRED_FAST_NODE_IDS
@@ -170,7 +170,10 @@ def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> N
     repository = Path(__file__).parents[2]
 
     baseline_ledger = _git_blob(repository, _P392_ENTRY_SHA, "full-regression-ledger.json")
-    assert hashlib.sha256(baseline_ledger).hexdigest() == "838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d"
+    assert (
+        hashlib.sha256(baseline_ledger).hexdigest()
+        == "838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d"
+    )
     ledger = json.loads(baseline_ledger)
     rows = ledger["failure_paths"]
     observed_rows = tuple(
