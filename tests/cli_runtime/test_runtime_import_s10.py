@@ -121,6 +121,36 @@ class _StubNodeRepo:
         (dest_dir / ".meta.json").write_text(json.dumps(data), encoding="utf-8")
         self.store.append(record)
 
+    def write_meta_at(self, dest_dir_fd: int, record) -> None:
+        self.events.append("write_meta")
+        data = {
+            "schema_version": 1,
+            "type": record.kind,
+            "id": record.id,
+            "title": record.title,
+            "slug": record.slug,
+            "parent_id": record.parent_id,
+            "initiative_id": record.initiative_id,
+            "epic_id": record.epic_id,
+        }
+        if record.github_issue_number is not None:
+            github_data = {"issue_number": int(record.github_issue_number)}
+            if record.github_repo_owner is not None and record.github_repo_name is not None:
+                github_data["repo_owner"] = record.github_repo_owner
+                github_data["repo_name"] = record.github_repo_name
+            data["github"] = github_data
+        meta_fd = os.open(
+            ".meta.json",
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+            0o666,
+            dir_fd=dest_dir_fd,
+        )
+        try:
+            os.write(meta_fd, json.dumps(data).encode("utf-8"))
+        finally:
+            os.close(meta_fd)
+        self.store.append(record)
+
 
 class _StubTemplateScaffolder:
     def __init__(self, events=None):
@@ -150,6 +180,23 @@ class _StubTemplateScaffolder:
             dest_path.write_text(self.render_text(text, replacements), encoding="utf-8")
             created.append(dest_path)
         return created
+
+    def copy_scaffolded_tree_at(
+        self,
+        src_dir: Path,
+        dest_dir: Path,
+        dest_dir_fd: int,
+        replacements: dict[str, str],
+    ) -> list[Path]:
+        self.events.append("copy_scaffolded_tree_at")
+        from spec_dock_runtime.infra import template_scaffolder
+
+        return template_scaffolder.copy_scaffolded_tree_at(
+            src_dir,
+            dest_dir,
+            dest_dir_fd,
+            replacements,
+        )
 
     def write_text(self, dest_path, text):
         dest_path.parent.mkdir(parents=True, exist_ok=True)
