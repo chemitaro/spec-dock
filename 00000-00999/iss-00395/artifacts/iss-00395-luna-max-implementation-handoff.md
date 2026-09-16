@@ -2044,7 +2044,7 @@ PY
 
 git add -- "${IMPLEMENTATION_PATHS[@]}"
 
-python - "${IMPLEMENTATION_PATHS[@]}" <<'PY
+python - "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 import subprocess
 import sys
 
