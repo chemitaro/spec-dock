@@ -1074,7 +1074,7 @@ env TMPDIR="$TEST_TMPDIR" \
 
 ### D2. Rows 1、3–11、13–15の個別RED (`initial-spec-freeze` only)
 
-この節とD3のnode実行は、Phase Eのmutation authorization後にboundary witness整理を含む実装変更を行い、focused testとEntry verifierの再検証が完了した後に行う。初回D1の後に直ちに実行してはならない。
+この節とD3の初回RED証拠は、Phase Eのmutation authorization通過後、最初のtracked file editより前に取得する。boundary witness整理を含むtest変更やProduct変更の後にREDを取り直してはならない。実行順序はD1、E1/E2、D2/D3、最初のfile editである。
 
 13 rowsを一件ずつ実行し、各rowの最初の失敗層を独立に確認する。
 
@@ -1410,7 +1410,11 @@ assert issued.tzinfo is not None
 assert expires.tzinfo is not None
 assert issued <= now <= expires
 
-assert set(writer["scope_paths"]) == implementation_paths
+expected_writer_scope = implementation_paths | {
+    f"refs/heads/{branch}",
+}
+
+assert set(writer["scope_paths"]) == expected_writer_scope
 
 print(
     "mutation-authorized "
@@ -1807,11 +1811,10 @@ PY
 
 このpolicy-only diagnosticは、create経路を直接呼ばず、既存publication endpointの受入・拒否とcredential non-exposureだけを確認する。create前のapplication preflightと`gh issue create --repo`へのbindingは、Row 3のfocused create-boundary testで確認する。H5のreceiptへcreate call graphの証明を帰属させない。
 
-このdiagnosticは次の三時点で実行する。
+このdiagnosticは次の二時点で一度ずつ実行する。
 
-1. dogfood projection前
-2. exact clean implementation SHA
-3. post-merge B1 SHA
+1. N3のexact clean implementation SHA
+2. post-merge B1 SHA
 
 ```bash
 env TMPDIR="$TEST_TMPDIR" \
@@ -2899,8 +2902,6 @@ Commit gateへ進む前に次を再実行する。
 5. Exact focused 26-file set
 6. no-touch checks
 
-Phase H5はH3の最終provider source編集後、dogfood projection前に一度実行し、その後provider sourceを変更しない。同じworking-treeに対するM6での再実行は省く。exact clean implementation SHAとpost-merge B1 SHAに対するH5は、それぞれ指定された時点で実行する。
-
 一つでも失敗した場合はcommit許可を使用しない。
 
 ## 17. Phase N — optional exact candidate freeze
@@ -3181,7 +3182,7 @@ test "$(
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
 ```
 
-Working-tree evidenceを再利用しない。N2のfull-verifier receiptとN3の非重複gateを、exact clean SHA/treeへ束縛する。Phase H5、I、M1、K5、distribution、lifecycle、package parity、dogfoodのfull-regression結果はN2から再実行せずに参照する。
+Working-tree evidenceをexact clean proofとして再利用しない。N2のfull-verifier receiptは、同verifierが収集したfull-regression、M1、K5、distribution、lifecycle、package parity、dogfoodの結果の正本とする。N3ではN2が実行しないH5 publication matrix、I row 12 blob/AST guard、および他のmanual proofを各一度だけ実行し、N2/N3の結果を同じclean SHA/treeへ束縛する。
 
 ### N4. Sanitized full-verifier summary
 
