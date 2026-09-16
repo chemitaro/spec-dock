@@ -100,6 +100,9 @@ elaboration_input_tree: 4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599
 
 spec_freeze_sha: "<actual clean pushed 40-hex SHA>"
 spec_freeze_tree: "<actual clean pushed 40-hex tree>"
+resume_mode: "initial-spec-freeze | post-u05-checkpoint"
+resume_checkpoint_sha: "<required only for post-u05-checkpoint>"
+resume_checkpoint_tree: "<required only for post-u05-checkpoint>"
 
 spec_review:
   reviewer: chatgpt-spec-review-strict
@@ -152,6 +155,9 @@ human_merge_only: true
 | ------------------------------------ | ------------------------------------ |
 | `spec_freeze_sha`                    | `SPEC_FREEZE_SHA`                    |
 | `spec_freeze_tree`                   | `SPEC_FREEZE_TREE`                   |
+| `resume_mode`                        | `RESUME_MODE`                        |
+| `resume_checkpoint_sha`              | `RESUME_CHECKPOINT_SHA`              |
+| `resume_checkpoint_tree`             | `RESUME_CHECKPOINT_TREE`             |
 | `spec_review.receipt_path`           | `SPEC_REVIEW_RECEIPT_PATH`           |
 | `spec_review.receipt_sha256`         | `SPEC_REVIEW_RECEIPT_SHA256`         |
 | `implementation_authorized`          | `IMPLEMENTATION_AUTHORIZED`          |
@@ -193,7 +199,7 @@ human_merge_only: true
 
 ### 3.4 Identity modes
 
-`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityである。初回実装ではcurrent local `HEAD`、configured upstream、remote branch tipもこの値に一致する。U05後のresumeでは、実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をcurrent equalityの対象とし、`SPEC_FREEZE_SHA/TREE`はancestor/authorityとして検査する。U05のledger transitionが既に完了している場合は、current rootのterminal stateを確認してL1を再実行せず、clean checkpointを`IMPLEMENTATION_SHA/TREE`としてadoptできる。resume中の未commit差分は、旧identityへ戻す操作や空commitで隠さず停止する。
+`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityであり、両modeでcurrent local `HEAD`、configured upstream、remote branch tipの一致対象である。U05後のresumeでは、実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をU05後の既存clean実装candidateを表す祖先のresume基点として別に検査し、current equalityの対象にはしない。U05のledger transitionが既に完了している場合は、current rootのterminal stateを確認してL1を再実行せず、仕様レビュー対象をclean candidateとしてadoptできる。resume中の未commit差分は、旧identityへ戻す操作や空commitで隠さず、allowed pathとして束縛してcommitする。
 
 ## 4. 共通shell constants
 
@@ -362,7 +368,7 @@ Read-only preflightは`implementation_allowed=true`の記録後も実行でき�
 
 ### 6.1 Specification and resume identity
 
-`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityである。初回実装ではcurrent tip equalityにも使用する。U05後のresumeでは、execution packetが渡す`RESUME_CHECKPOINT_SHA/TREE`をcurrent tip equalityに使用し、spec freezeはancestor/authorityとして残す。
+`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthority identityであり、両modeでcurrent tip equalityに使用する。U05後のresumeでは、execution packetが渡す`RESUME_CHECKPOINT_SHA/TREE`を既存実装の祖先基点として別に検証し、current tip equalityには使用しない。
 
 ```bash
 : "${SPEC_FREEZE_SHA:?SPEC_FREEZE_SHA is required}"
@@ -381,8 +387,8 @@ case "$RESUME_MODE" in
     : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
     test "${#RESUME_CHECKPOINT_SHA}" -eq 40
     test "${#RESUME_CHECKPOINT_TREE}" -eq 40
-    EXPECTED_CURRENT_SHA="$RESUME_CHECKPOINT_SHA"
-    EXPECTED_CURRENT_TREE="$RESUME_CHECKPOINT_TREE"
+    EXPECTED_CURRENT_SHA="$SPEC_FREEZE_SHA"
+    EXPECTED_CURRENT_TREE="$SPEC_FREEZE_TREE"
     ;;
   *) exit 1 ;;
 esac
@@ -434,13 +440,21 @@ git merge-base --is-ancestor \
   "$SPEC_FREEZE_SHA" \
   "$EXPECTED_CURRENT_SHA"
 
+if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
+  git merge-base --is-ancestor \
+    "$RESUME_CHECKPOINT_SHA" \
+    "$SPEC_FREEZE_SHA"
+  test "$(git rev-parse "$RESUME_CHECKPOINT_SHA^{tree}")" = \
+    "$RESUME_CHECKPOINT_TREE"
+fi
+
 test "$(git rev-parse "$P392_SHA^{tree}")" = "$P392_TREE"
 test "$(
   git rev-parse "$ELABORATION_INPUT_SHA^{tree}"
 )" = "$ELABORATION_INPUT_TREE"
 ```
 
-`post-u05-checkpoint`では、U05の承認済み遷移が履歴に存在することとcurrent rootがterminalizedであることを確認し、L1を再実行しない。
+`post-u05-checkpoint`では、U05の承認済み遷移が`RESUME_CHECKPOINT_SHA`の履歴に存在することとcurrent rootがterminalizedであることを確認し、L1を再実行しない。current tipは`SPEC_FREEZE_SHA`に一致し、resume checkpointからcurrent reviewed specification targetまでの差分はcanonical-document-onlyとして後続のadmission gateで検査する。
 
 一つでも失敗した場合、変更0でstop-and-returnする。Reset、force checkout、別branch、default branchへのfallbackで修復しない。
 
@@ -557,12 +571,22 @@ PY
 ### 6.5 Specification admission history
 
 ```bash
-python - "$ELABORATION_INPUT_SHA" "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" "$SUPPORT_HISTORY_TREE" <<'PY'
+python - "$RESUME_MODE" "${RESUME_CHECKPOINT_SHA:-}" \
+  "${RESUME_CHECKPOINT_TREE:-}" "$ELABORATION_INPUT_SHA" \
+  "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" "$SUPPORT_HISTORY_TREE" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
-elaboration_input, support_history, spec_freeze, support_tree = sys.argv[1:]
+(
+    mode,
+    resume_checkpoint,
+    resume_tree,
+    elaboration_input,
+    support_history,
+    spec_freeze,
+    support_tree,
+) = sys.argv[1:]
 
 issue = Path(
     "spec-dock/initiatives/"
@@ -615,6 +639,22 @@ support = {
     str(issue / "artifacts/plan-lunamax-ready.md"),
 }
 
+implementation = {
+    "full-regression-ledger.json",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/spec-dock.version",
+    ".agents/skills/spec-dock/.spec-dock-provider-slot.json",
+    ".agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json",
+    "tests/cli_runtime/test_delete.py",
+    "tests/cli_runtime/test_import.py",
+    "tests/cli_runtime/test_runtime_import_s10.py",
+    "tests/cli_runtime/test_sync.py",
+    "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
+    "tests/integration/test_issue_392_acceptance.py",
+}
+
 def changed_paths(base, head):
     return set(
         subprocess.check_output(
@@ -645,8 +685,38 @@ subprocess.run(
     check=True,
 )
 assert changed_paths(elaboration_input, support_history) == all_paths
-assert changed_paths(support_history, spec_freeze) == primary
-assert changed_paths(elaboration_input, spec_freeze) == all_paths
+
+if mode == "initial-spec-freeze":
+    assert changed_paths(support_history, spec_freeze) == primary
+    assert changed_paths(elaboration_input, spec_freeze) == all_paths
+elif mode == "post-u05-checkpoint":
+    assert resume_checkpoint
+    assert len(resume_checkpoint) == 40
+    assert len(resume_tree) == 40
+    subprocess.run(
+        ["git", "merge-base", "--is-ancestor", resume_checkpoint, spec_freeze],
+        check=True,
+    )
+    assert subprocess.check_output(
+        ["git", "rev-parse", f"{resume_checkpoint}^{{tree}}"],
+        text=True,
+    ).strip() == resume_tree
+
+    resume_to_spec_paths = changed_paths(resume_checkpoint, spec_freeze)
+    assert resume_to_spec_paths <= primary, {
+        "stage": "resume-checkpoint-to-reviewed-specification",
+        "allowed": sorted(primary),
+        "actual": sorted(resume_to_spec_paths),
+    }
+    assert changed_paths(support_history, spec_freeze) == primary | implementation
+
+    for path in sorted(implementation):
+        assert tree_entry(resume_checkpoint, path) == tree_entry(
+            spec_freeze,
+            path,
+        ), path
+else:
+    raise AssertionError(f"unsupported resume mode: {mode}")
 
 for path in sorted(all_paths):
     candidate = Path(path)
@@ -655,11 +725,11 @@ for path in sorted(all_paths):
 for path in sorted(support):
     assert tree_entry(support_history, path) == tree_entry(spec_freeze, path), path
 
-print("specification-admission-history-and-support-entry-equality-ok")
+print(f"specification-admission-history-and-support-entry-equality-ok mode={mode}")
 PY
 ```
 
-The six primary paths are the only current specification surface. The sixteen support paths are immutable history and must remain equal at the checkpoint's Git tree entries. The execution handoff must not use a 22-path current-spec allowlist, a directory-prefix or glob allowlist, a Manifest self-declaration, or working-tree existence as a substitute for path/mode/object-type/object-ID checks. Support-history edits, deletion, rename, regeneration, recompression, reclassification, and new support artifacts are forbidden.
+The six primary paths are the only current specification surface. The sixteen support paths are immutable history and must remain equal at the checkpoint's Git tree entries. In `post-u05-checkpoint`, the handoff additionally measures the cumulative support-history-to-reviewed-target scope as the six primary plus 13 implementation paths, while requiring the resume-to-target correction diff to stay within the six primary paths. The execution handoff must not use a 22-path current-spec allowlist, a directory-prefix or glob allowlist, a Manifest self-declaration, or working-tree existence as a substitute for path/mode/object-type/object-ID checks. Support-history edits, deletion, rename, regeneration, recompression, reclassification, and new support artifacts are forbidden.
 
 ### 6.6 Active state、metadata、validation
 
@@ -720,9 +790,10 @@ Preflightを通すために次を行ってはならない。
 
 ### 7.1 Verified source blobs
 
-`SPEC_FREEZE_SHA`では、少なくとも次のblobsがelaboration inputと一致しなければならない。
+`initial-spec-freeze`では、`SPEC_FREEZE_SHA`のblobsがelaboration inputと一致しなければならない。`post-u05-checkpoint`では、P392前のledger blobをcurrent specへ再適用せず、次のno-touch面が`RESUME_CHECKPOINT_SHA`と`SPEC_FREEZE_SHA`の間で一致することを検証する。
 
 ```bash
+if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
 python - "$SPEC_FREEZE_SHA" <<'PY'
 import subprocess
 import sys
@@ -800,6 +871,51 @@ mismatch = {
 assert not mismatch, mismatch
 print("source-blob-guard-ok")
 PY
+else
+python - "$RESUME_CHECKPOINT_SHA" "$SPEC_FREEZE_SHA" <<'PY'
+import subprocess
+import sys
+
+base, head = sys.argv[1:]
+paths = {
+    "full-regression-ledger.json",
+    "full-regression-timing-weights.json",
+    "tests/conftest.py",
+    "scripts/quality/full_regression_baseline.py",
+    "scripts/quality/verify_full_regression.py",
+    "tests/unit/test_full_regression_baseline.py",
+    ".github/workflows/provider-ci.yml",
+    ".github/workflows/provider-full-regression.yml",
+    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/spec-dock.version",
+    ".agents/skills/spec-dock/.spec-dock-provider-slot.json",
+    ".agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json",
+    "tests/cli_runtime/test_delete.py",
+    "tests/cli_runtime/test_import.py",
+    "tests/cli_runtime/test_runtime_import_s10.py",
+    "tests/cli_runtime/test_sync.py",
+    "tests/cli_runtime/test_workbench.py",
+    "tests/unit/test_provider_test_lanes.py",
+    "tests/integration/test_issue_392_acceptance.py",
+}
+
+def blob(revision, path):
+    return subprocess.check_output(
+        ["git", "rev-parse", f"{revision}:{path}"],
+        text=True,
+    ).strip()
+
+mismatch = {
+    path: {"resume": blob(base, path), "spec": blob(head, path)}
+    for path in sorted(paths)
+    if blob(base, path) != blob(head, path)
+}
+
+assert not mismatch, mismatch
+print("post-u05-source-and-implementation-no-touch-ok")
+PY
+fi
 ```
 
 Blob driftがある場合、変更0でstop-and-returnする。
@@ -869,9 +985,9 @@ Heavy nodeの受入条件:
 * error 0
 * failure signatureなし
 
-### 8.3 Full verifier
+### 8.3 Full verifier（clean candidate only）
 
-各runへprivateな空directoryを渡す。
+各runへprivateな空directoryを渡す。このコマンドは説明用の形だけを示し、merge-blockingのfull verifier receiptとして受け入れるのは、N1後のclean pushed `IMPLEMENTATION_SHA/TREE`に対する§28の実行だけである。意図的なtracked変更が残るworking treeでは、focused/manual diagnosticを超えて実行・受入してはならない。
 
 ```bash
 ARTIFACT_ROOT="$EVIDENCE_DIR/full-example"
@@ -890,9 +1006,9 @@ env TMPDIR="$TEST_TMPDIR" \
 
 `result.json`は、そのprivate root内でexactly oneでなければならない。
 
-## 9. 変更許可ファイル12件
+## 9. 変更許可ファイル13件
 
-Mutation authorization後に変更できるtracked pathsは、次の12件だけである。
+Mutation authorization後に変更できるtracked pathsは、次の13件だけである。
 
 ```text
 full-regression-ledger.json
@@ -906,10 +1022,11 @@ tests/cli_runtime/test_import.py
 tests/cli_runtime/test_runtime_import_s10.py
 tests/cli_runtime/test_sync.py
 tests/cli_runtime/test_workbench.py
+tests/unit/test_provider_test_lanes.py
 tests/integration/test_issue_392_acceptance.py
 ```
 
-12件目の`tests/integration/test_issue_392_acceptance.py`は、今回ユーザーが承認したtest-only同期pathである。Issue #392の既存baseline assertionを変更せずに保持するため、baseline payload readをP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛し、`_ISSUE_BOUNDARY_SHA256`のIssue #395 Requirement／Design／Planの3値だけを最終spec freezeへ同期する。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更しない。assertionの削除・弱化・skip・xfail化は許可しない。
+12件目の`tests/unit/test_provider_test_lanes.py`は、P392 entryのimmutable `full-regression-ledger.json` blobをbefore、current root ledgerをafterとして比較するmigration observerである。13件目の`tests/integration/test_issue_392_acceptance.py`は、今回ユーザーが承認したtest-only同期pathである。Issue #392の既存baseline assertionを変更せずに保持するため、baseline payload readをP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛し、`_ISSUE_BOUNDARY_SHA256`のIssue #395 Requirement／Design／Planの3値だけを最終spec freezeへ同期する。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更しない。assertionの削除・弱化・skip・xfail化は許可しない。
 
 ### 9.1 Hand-edit可能なpaths
 
@@ -1812,7 +1929,9 @@ Require:
 * Both `SKILL.md` unchanged
 * Protected snapshot unchanged
 
-### 22.4 Dogfood parity lane
+### 22.4 Dogfood parity lane（clean candidate only）
+
+このfull-regression parity nodeは、projection直後やledger transition前のworking treeでは実行・受入しない。生成identity、protected-data、pre-ledger 15-node GREENの確認後も、ここではfocused/manual diagnosticだけを記録する。次のcommandはN1で一つのclean pushed `IMPLEMENTATION_SHA/TREE`を作成またはadoptし、ledger transitionを含むcandidateを確定した後の§28でのみ実行する。
 
 ```bash
 DOGFOOD_PARITY_OBS="$EVIDENCE_DIR/dogfood-parity-observation.json"
@@ -1827,7 +1946,7 @@ env TMPDIR="$TEST_TMPDIR" \
     tests/integration/test_provider_lifecycle_dogfood.py::test_t13_source_wheel_sdist_installed_and_dogfood_candidate_are_identical
 ```
 
-Heavy flagなしのexit 0は受け入れない。
+§28での受入条件は、対象nodeが`--run-full-regression --full-regression-shard`で一回だけ収集・実行され、normal passすることである。Heavy flagなしのexit 0は受け入れない。working-tree実行結果はfinal dogfood receiptへ転用しない。
 
 ## 23. Atomic ledger transition
 
@@ -1956,14 +2075,40 @@ Distribution cutover、platform/coordination、packaged parity、complete dogfoo
 
 ## 25. Exact changed-file gate
 
-初回実装のworking-tree diffはreviewed specification freezeからのexact 13 pathsでなければならない。U05後に既存candidateをadoptするresumeでは、累積13-path scopeを既存unit receiptsで確認し、未commit差分がないことを確認して空commitを作らない。
+初回実装のworking-tree diffはreviewed specification freezeからのexact 13 pathsでなければならない。U05後のresumeでは、support-history checkpointからcurrent reviewed specification targetまでの累積scopeをcanonical 6 pathsとimplementation 13 pathsの合計19 pathsとして実測し、resume checkpointからtargetまでの仕様訂正差分がcanonical 6 pathsだけであることを確認する。current working-tree差分はimplementation paths内に限定し、既存clean candidateに対して空commitを作らない。
 
 ```bash
-python - "$SPEC_FREEZE_SHA" <<'PY'
+python - "$RESUME_MODE" "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" <<'PY'
 import subprocess
 import sys
 
-expected = {
+mode, support_history, spec_freeze = sys.argv[1:]
+
+primary = {
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
+    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
+    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
+    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
+    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
+    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
+    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/plan.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
+    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
+    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
+    "iss-00395-luna-max-implementation-handoff.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
+    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
+    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
+    "iss-00395-human-guide.html",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
+    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
+    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
+    "iss-00395-chatgpt-spec-pack-manifest.md",
+}
+
+implementation = {
     "full-regression-ledger.json",
     "src/spec_dock/assets/spec_dock/scripts/"
     "spec_dock_runtime/infra/git_cli.py",
@@ -1984,25 +2129,41 @@ expected = {
     "tests/integration/test_issue_392_acceptance.py",
 }
 
-actual = set(
-    subprocess.check_output(
-        [
-            "git",
-            "diff",
-            "--name-only",
-            sys.argv[1],
-            "--",
-        ],
-        text=True,
-    ).splitlines()
-)
+def changed(base, head=None):
+    command = ["git", "diff", "--name-only", "--no-renames"]
+    if head is None:
+        command.append(base)
+    else:
+        command.extend((base, head))
+    command.append("--")
+    return set(subprocess.check_output(command, text=True).splitlines())
 
-assert actual == expected, {
-    "expected": sorted(expected),
-    "actual": sorted(actual),
-}
-
-print("implementation-file-set=13/13")
+if mode == "initial-spec-freeze":
+    actual = changed(spec_freeze)
+    assert actual == implementation, {
+        "expected": sorted(implementation),
+        "actual": sorted(actual),
+    }
+    print("implementation-file-set=13/13")
+elif mode == "post-u05-checkpoint":
+    committed = changed(support_history, spec_freeze)
+    assert committed == primary | implementation, {
+        "stage": "post-u05-cumulative-scope",
+        "expected": sorted(primary | implementation),
+        "actual": sorted(committed),
+    }
+    working = changed(spec_freeze)
+    assert working <= implementation, {
+        "stage": "post-u05-working-tree-scope",
+        "allowed": sorted(implementation),
+        "actual": sorted(working),
+    }
+    print(
+        "implementation-file-set=13/13 "
+        f"cumulative-committed={len(committed)} working-tree={len(working)}"
+    )
+else:
+    raise AssertionError(f"unsupported resume mode: {mode}")
 PY
 
 git diff --check
@@ -2055,7 +2216,7 @@ Working-tree diff、evidence、stop/return receiptを返して停止する。
 
 ### 27.2 Commit/push許可あり
 
-`RESUME_MODE=post-u05-checkpoint`で既存candidateがcleanである場合は、commit/pushを再実行せず、`RESUME_CHECKPOINT_SHA/TREE`を検証してそのHEADを`IMPLEMENTATION_SHA/TREE`としてadoptする。resume状態に未commit差分がある場合は、旧identityへ戻す操作や空commitで隠さず停止する。以下のstage・commit・pushブロックは`initial-spec-freeze`で新しいcandidateを作る場合だけ実行する。
+`RESUME_MODE=post-u05-checkpoint`で、current reviewed specification targetがcleanで必要な実装差分をすでに含む場合は、commit/pushを再実行せず、`SPEC_FREEZE_SHA/TREE`を検証してそのcurrent HEADを`IMPLEMENTATION_SHA/TREE`としてadoptする。`RESUME_CHECKPOINT_SHA/TREE`は、その実装が由来する祖先基点の証明にだけ使う。仕様レビュー後にT14同期などのallowed implementation差分が残る場合は、旧candidateへ戻す操作や空commitで隠さず、以下のexact path stage・commit・pushブロックで一つのforward commitへ束縛する。
 
 ```bash
 test "$COMMIT_PUSH_AUTHORIZED" = "true"
@@ -2064,7 +2225,6 @@ EXPECTED_REMOTE_SHA="$SPEC_FREEZE_SHA"
 if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
   : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
   : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
-  EXPECTED_REMOTE_SHA="$RESUME_CHECKPOINT_SHA"
 fi
 
 test "$(
@@ -2075,8 +2235,11 @@ test "$(
     | awk 'NF {print $1}'
   )" = "$EXPECTED_REMOTE_SHA"
 
-if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
+if [ "$RESUME_MODE" = "post-u05-checkpoint" ] && \
+   [ -z "$(git status --porcelain=v1 --untracked-files=all)" ]; then
   test -z "$(git status --porcelain=v1 --untracked-files=all)"
+  test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
+  test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
   export IMPLEMENTATION_SHA="$(git rev-parse HEAD)"
   export IMPLEMENTATION_TREE="$(git rev-parse 'HEAD^{tree}')"
 else
@@ -2329,7 +2492,7 @@ top_level_historical_fields_preserved = true
 各runへ専用rootを使う。
 
 * Entry verifier result
-* Working-tree provisional verifier result
+* Working-tree focused/manual diagnostic summary (never a final verifier receipt)
 * Exact clean verifier result
 * Post-merge verifier result
 
@@ -2841,7 +3004,7 @@ LunaMaxはCodexへ次を返す。
 4. Spec freeze SHA/tree
 5. Working-tree diff SHA-256
 6. Commit/push許可時のimplementation SHA/tree
-7. Exact changed files 12件
+7. Exact changed files 13件（post-U05では累積19-path scopeを実測）
 8. Exact changed symbols
 9. 13 rowsのindividual RED
 10. 13 rowsのGREEN

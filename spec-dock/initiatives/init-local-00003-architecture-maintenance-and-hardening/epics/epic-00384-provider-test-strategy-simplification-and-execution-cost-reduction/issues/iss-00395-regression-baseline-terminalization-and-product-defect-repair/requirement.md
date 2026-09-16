@@ -55,6 +55,8 @@ Issue #395は、human-merged P392が残したpost-#387回帰baselineの14 active
 
 従って、`fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9`のProduct source、tests、root ledger、timing、verifier、policy、workflowはP392と同一である。後続の本仕様pack commitは新しいspec freeze候補を作るが、P392のProduct entry identityを置換しない。実装開始時は、P392からspec freeze tipまでの差分が本Issueのcanonical docsとArtifactsに限定されることを再確認する。
 
+実装のadmissionには二つのmodeがある。`initial-spec-freeze`では、`SPEC_FREEZE_SHA/TREE`が仕様レビュー対象であり、local `HEAD`、configured upstream、Issue branchのremote tipが同じ値であることを確認してから最初のmutationを行う。`post-u05-checkpoint`では、同じく`SPEC_FREEZE_SHA/TREE`を現在の仕様レビュー対象およびcurrent tipとして扱う一方、`RESUME_CHECKPOINT_SHA/TREE`はU05後の既存clean実装candidateを表す祖先のresume基点として別に検証する。resume checkpointをcurrent tipとの一致対象にしてはならず、仕様訂正差分はresume checkpointから仕様レビュー対象までのcanonical docsだけに限定する。
+
 ### 2.2 P392 witness
 
 P392 receiptは次を固定する。
@@ -136,12 +138,13 @@ B1とB2は同じfull SHAを証拠にする。#392 lifecycle output、current led
 Product/test/ledger変更へ進む前に、すべての条件を満たす。
 
 1. Repositoryは`chemitaro/spec-dock`、branchは`iss-00395-regression-baseline-terminalization-and-product-defect-repair`である。
-2. **初回実行**では、reviewed spec freeze SHA、local `HEAD`、configured upstream、remote branch tipがbyte-for-byte一致し、worktreeがcleanである。**U05後の再開**では、reviewed spec freeze SHA/treeはauthorityとancestorの確認に用い、local `HEAD`、configured upstream、remote branch tipの一致は、実行packetが明示するadopted resume checkpointまたは最終candidate SHA/treeに対して検査する。既に完了したU05遷移を再実行してこのidentityを作り直してはならない。
+2. **初回実行**でも**U05後の再開**でも、reviewed spec freeze SHA/tree、local `HEAD`、configured upstream、remote branch tipが一致し、worktreeがcleanである。U05後の再開でpacketが渡す`RESUME_CHECKPOINT_SHA/TREE`は、既存実装の祖先であるresume基点として別に検証し、current tipの一致対象にはしない。既に完了したU05遷移を再実行してこのidentityを作り直してはならない。
 3. `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`がspec freeze tipのancestorである。
 4. Specification admission historyは、次の三つのsegmentを独立に検証する。22 pathsを単一のcurrent-spec allowlistとして扱わない。
    - **P392からelaboration inputまで:** Epic PlanとIssue #392 Reportのexact 2 pathsだけが変化し、Product source、tests、ledger、timing、policy、workflowは変化しない。
    - **Elaboration inputからsupport-history checkpointまで:** current canonical specification packの6 pathsと、§2.3のgrandfathered support history 16 pathsのexact 22 pathsだけが存在し、それ以外の差分がない。
-   - **Support-history checkpointからreviewed spec freezeまで:** current canonical specification packのexact 6 pathsだけが変更され、support history 16 pathsのpath、mode、object type、Git object IDがcheckpointと完全一致する。
+   - **Support-history checkpointからreviewed spec freezeまで（initial mode）:** current canonical specification packのexact 6 pathsだけが変更され、support history 16 pathsのpath、mode、object type、Git object IDがcheckpointと完全一致する。
+   - **Resume checkpointからreviewed spec freezeまで（post-U05 mode）:** 仕様訂正差分はcurrent canonical specification packの6 paths内だけであり、support-history checkpointからreviewed spec freezeまでの累積差分はcanonical 6 pathsとimplementation 13 pathsのexact 19 pathsである。support history 16 pathsのpath、mode、object type、Git object IDはcheckpointと完全一致する。
    P392 receiptを保持する親文書は、上記のP392からelaboration inputまでのdoc-only契約に含めて確認する。
 5. `./spec-dock/scripts/spec-dock active show`がIssue `iss-00395`を示す。generated active stateをtracked `.meta.json`やGitHub Issue bodyから推測しない。
 6. `.meta.json`のID/GitHub linkageは`iss-00395` / `#395`、`depends_on=[]`である。`.meta.json`は手編集しない。
@@ -362,6 +365,8 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 今回ユーザーが明示承認したスコープ拡張として、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。このpathで許可される変更は、Issue #392の既存baseline assertionを変更せずに維持するため、baseline payloadの読み取り元をP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛すること、および`_ISSUE_BOUNDARY_SHA256`に記録されたIssue #395 Requirement／Design／Planの3つの期待SHA-256を今回の最終spec freezeの実体へ同期することだけである。
 
 Issue #392のbaseline row、ledger、timing、required-fast、policy、workflow、その他のboundary assertionの値と意味は変更しない。assertionの削除・弱化・skip・xfail化は行わず、root ledgerがIssue #395で15/0/15へ遷移した後も、T14はP392 entryの14/1 baselineを検証する。同期後に同じテストをfull-regression laneでnormal passさせ、current root ledgerの15/0/15はfull verifierとB2で検証する。この同期は仕様修正との整合を回復するentry前提であり、Productの挙動やIssue #392の契約を変更するものではない。
+
+`post-u05-checkpoint`では、既存のterminalized ledgerとmigration observerのcheckpointをread-onlyで確認し、U05 transitionを再実行しない。fresh Strict仕様レビューがpassした後に限り、E3RとしてこのテストのIssue #395 canonical-document SHA-256 3値だけを現行spec freezeへ同期し、T14を一回だけnormal passさせる。仕様レビューがpassする前にこの同期を行ってはならない。
 
 ## 8. Non-goals
 

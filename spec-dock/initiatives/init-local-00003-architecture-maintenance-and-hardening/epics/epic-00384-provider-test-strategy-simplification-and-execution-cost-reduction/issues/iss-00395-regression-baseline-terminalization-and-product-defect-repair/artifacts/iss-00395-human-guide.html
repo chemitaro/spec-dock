@@ -190,6 +190,14 @@
     <div class="card"><strong>セキュリティ実装の問題ではない</strong><p>このP1の差分区間にはProduct source、test、ledger、timing、policy、workflowの変更はありません。</p></div>
     <div class="card"><strong>それでも安全性に関係する理由</strong><p>対象範囲が曖昧なまま実装を許すと、レビューされていないファイルを仕様として取り込む可能性があります。そのためセキュリティと同じく、実装前の停止条件にしています。</p></div>
   </div>
+  <h3>今回の再レビューで確認された4つの不整合</h3>
+  <ol class="compact">
+    <li><strong>Identityの混同:</strong> 仕様レビュー対象の<code>SPEC_FREEZE_SHA/TREE</code>と、U05後に再開する既存実装の<code>RESUME_CHECKPOINT_SHA/TREE</code>を、同じcurrent tipとして扱っていました。</li>
+    <li><strong>T14の同期時点:</strong> U05後の再開でも、仕様レビューを通過する前にIssue #395の3つの文書ハッシュを同期できるように読めました。</li>
+    <li><strong>検証の順序:</strong> dirtyなworking treeでdogfood parityやfull verifierの最終証拠を作れるように見えました。</li>
+    <li><strong>変更数の測定:</strong> 実装対象13パスを明示している一方、handoffの一部が12パスのままで、U05後の累積差分を実測していませんでした。</li>
+  </ol>
+  <div class="callout ok"><strong>修正後の意味:</strong> current tipは常にclean pushedな<code>SPEC_FREEZE_SHA/TREE</code>です。<code>RESUME_CHECKPOINT_SHA/TREE</code>はその祖先の実装基点です。T14の3値同期はfresh Strict仕様レビューがpassした後だけ行い、full verifier、wheel、distribution、dogfoodの最終証拠はcommit済みclean candidateでだけ受け入れます。</div>
   <p class="small muted">なお、Row 3のcredential-bearing origin、publication strictness、userinfo拒否などのセキュリティ要件は別の検証行列です。今回の仕様修正でそれらを緩和したり、未実行の検証をGREENと宣言したりはしていません。</p>
 </section>
 
@@ -205,6 +213,10 @@
       <tr><td>履歴の同一性</td><td>パス数中心で、履歴Artifactの内容固定が不明確</td><td>16件についてpath、mode、object type、Git object IDの一致を確認する</td></tr>
       <tr><td>実装許可の表示</td><td>明示dispatch後もfalseという説明が残る</td><td><code>implementation_allowed=true</code>はdispatchの事実を示す。ただしfresh Strict passまで実効的なProduct変更はblocked</td></tr>
       <tr><td>セキュリティ境界</td><td>仕様Admissionの曖昧さとsecurity行列の関係が説明不足</td><td>security要件は維持し、未実行のsecurity行列を合格扱いしないことを明記</td></tr>
+      <tr><td>U05後のidentity</td><td>resume checkpointをcurrent tipとして扱う余地があった</td><td><code>SPEC_FREEZE</code>をcurrent tip、<code>RESUME_CHECKPOINT</code>を祖先の実装基点として別々に検証</td></tr>
+      <tr><td>T14同期の時点</td><td>仕様レビュー前にも3つの期待ハッシュを更新できるように読める</td><td>fresh Strict仕様レビューpass後のE3Rに限定し、3値以外は変更しない</td></tr>
+      <tr><td>最終検証の状態</td><td>dirty treeのverifier/dogfood結果が最終証拠に混ざる余地があった</td><td>最終証拠はclean pushed implementation candidateでのみ取得</td></tr>
+      <tr><td>実装パスの数え方</td><td>handoffの一部が12件で、migration observerが漏れていた</td><td>実装13件を列挙し、U05後は累積19件をGit差分として実測</td></tr>
     </tbody>
   </table></div>
 
@@ -216,10 +228,15 @@ left to right direction
 rectangle "P392\nProduct・test・ledgerの入口" as P392
 rectangle "Elaboration input\n仕様作成の開始点" as ELAB
 rectangle "Support-history checkpoint\n6件の主仕様 + 16件の履歴" as SUPPORT
-rectangle "Reviewed specification freeze\n6件の主仕様だけが変更対象" as FREEZE
+rectangle "初回実装\n主仕様6件だけを修正" as INITIAL
+rectangle "U05後の再開\n既存実装13件を保持" as RESUME
+rectangle "仕様レビュー対象\ncurrent tip・clean pushed" as FREEZE
 P392 --> ELAB : receipt文書2件
 ELAB --> SUPPORT : 22件を履歴として確定
-SUPPORT --> FREEZE : 主仕様6件だけを修正
+SUPPORT --> INITIAL : 初回実装
+INITIAL --> FREEZE : 主仕様6件だけを修正
+SUPPORT --> RESUME : U05後の既存candidate
+RESUME --> FREEZE : docs-only訂正
 note bottom of SUPPORT
 16件はGit tree entryを固定
 current authorityではない
@@ -264,6 +281,7 @@ end note
 <section id="identity">
   <h2>P392と現行tipの区別</h2>
   <p>P392からelaboration inputまでに変わったのはEpic Planと#392 Reportだけです。Product source、tests、ledger、timing、verifier、workflowsは同一です。仕様packのcommitはさらにdoc差分を足しますが、P392 Product entryを置換しません。</p>
+  <p>current tipとして採用するのは、常にfresh Strict仕様レビューの対象になったclean pushedな<code>SPEC_FREEZE_SHA/TREE</code>です。U05後の再開で使う<code>RESUME_CHECKPOINT_SHA/TREE</code>は、既存の実装candidateが由来する祖先の基点です。resume checkpointをcurrent tipとして扱わず、そこから仕様レビュー対象までの差分が主仕様の文書だけであることを確認します。</p>
   <script type="text/plain" class="plantuml-source" id="source-identity" data-target="diagram-identity">
 
 @startuml
@@ -384,6 +402,18 @@ end note
   <p class="small muted">Row 2は既にresolved/supersededで、本Issueではread-onlyです。</p>
 </section>
 
+<section id="decision">
+  <h2>いまユーザーに求められていること</h2>
+  <div class="callout ok"><strong>現時点で追加の製品判断はありません。</strong> ユーザーはすでに「仕様の実装を明示的に許可」しているため、<code>implementation_allowed=true</code>です。現在は、仕様訂正をclean pushedし、fresh Strict仕様レビューをpassさせることが先行条件です。</div>
+  <div class="grid">
+    <div class="card"><strong>今すぐの確認</strong><p>新しいowner decisionやsecurity仕様の変更を求めているわけではありません。current authority 6件、support history 16件、実装13件の区別を確認します。</p></div>
+    <div class="card"><strong>実装再開後の確認</strong><p>U05後の再開では、既存terminal ledgerを再利用し、U05をやり直しません。仕様レビューpass後にT14の3つの文書ハッシュだけを同期します。</p></div>
+    <div class="card"><strong>人間に残る判断</strong><p>実装・レビューが完了しても、PRのmerge、Issue closure、#396 start、mainへのmergeは人間だけが判断します。</p></div>
+  </div>
+  <h3>停止した場合に見てほしい情報</h3>
+  <p>停止時は、推測で許可を追加せず、<code>expected/actual SHA</code>、tree、branch、変更パス、row、failure signature、security exposureの有無を確認してください。原因が仕様の出典・対象範囲なら文書訂正へ戻り、実装を先に進めないことが判断になります。</p>
+</section>
+
 <section id="normal-flow">
   <h2>正常flow</h2>
   <script type="text/plain" class="plantuml-source" id="source-normal-flow" data-target="diagram-normal-flow">
@@ -395,6 +425,12 @@ start
 :Fresh Strict spec review\nP0/P1=0;
 :Identity/active/15-row/243 preflight;
 :Entry full verifier\nexact 10 P392 violations;
+if (U05が完了済み?) then (完了)
+:Resume checkpointを祖先として確認;
+:T14の3文書SHAだけを同期;
+else (初回)
+:T14のbaseline bindingと3文書SHAを同期;
+endif
 :Row 12 current passを確認;
 :Rows 4-11 scaffolder double RED;
 :Rows 1,13,14,15 retired args RED;
@@ -406,7 +442,7 @@ start
 :SpecDock updateでdogfoodへ投影;
 :Ledger 14 rowsを一括 resolved/fixed-in-place (U05済みなら再実行しない);
 :Post-U05 terminal stateを確認;
-:Candidateをclean commit/pushまたは既存clean checkpointからadopt;
+:CandidateをSPEC_FREEZEのclean tipとしてcommit/pushまたはadopt;
 :Clean candidate full verifier verified;
 :Ordinary/lifecycle/platform/package/lint/validate GREEN;
 :Strict code review + Pro FQG pass;
