@@ -4,7 +4,7 @@ kind: "corrected-plan"
 issue: "iss-00395"
 title: "Issue #395 LunaMax-ready Execution Plan"
 artifact_path: "artifacts/plan-lunamax-ready.md"
-generated_at: "2026-09-15"
+generated_at: "2026-09-16"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 integration_branch: "codex/epic-00384-provider-test-strategy-planning"
@@ -50,6 +50,12 @@ GPT-5.6 LunaMaxは**Phase A〜Dのread-only preflight**を実行できる。次�
 * obsolete APIまたはretired CLI flagの復活
 * 推測による別設計の採用
 
+### 1.1 承認済みの境界テスト同期スコープ
+
+ユーザーの明示承認により、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。これは、今回更新したIssue #395のcanonical Requirement／Design／Planと、Issue #392の「境界が不変であること」を検査する既存テストの期待SHA-256を同期するためのtest-only pathである。
+
+このpathで許可される変更は、`_ISSUE_BOUNDARY_SHA256`にあるIssue #395の3値を最終spec freezeの実体へ置き換えることだけである。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更せず、assertionの削除、弱化、skip、xfail化も行わない。同期後のEntry verifierは、計画内の10件だけをREDとして観測し、#392-owned failureとunexpected failureを0件にする。
+
 ## 2. 固定定数とnode集合
 
 ```bash
@@ -86,6 +92,7 @@ ROW_12='tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_f
 ROW_13='tests/cli_runtime/test_sync.py::TestCliSync::test_new_and_active_and_sync'
 ROW_14='tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root'
 ROW_15='tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands'
+ISSUE_392_BOUNDARY_TEST='tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged'
 
 ACTIVE_ROWS=(
   "$ROW_1"
@@ -121,6 +128,7 @@ IMPLEMENTATION_PATHS=(
   tests/cli_runtime/test_runtime_import_s10.py
   tests/cli_runtime/test_sync.py
   tests/cli_runtime/test_workbench.py
+  tests/integration/test_issue_392_acceptance.py
 )
 
 SPEC_PACK_PATHS=(
@@ -924,6 +932,17 @@ PY
 
 受入条件はexact 10 violationsである。Extra violation、missing violation、#392-owned failure、unexpected failureが一件でもあれば停止する。
 
+### D1.1 — 承認済みIssue #392境界テストの同期
+
+前回のspec freeze候補で観測した`ISSUE_392_BOUNDARY_TEST`のSHA不一致は、今回の仕様修正を反映する前の履歴証拠として保持する。ユーザー承認後の最初のmutationは、次のtest-only同期に限定する。
+
+1. `tests/integration/test_issue_392_acceptance.py`の`_ISSUE_BOUNDARY_SHA256`にあるIssue #395 Requirement／Design／Planの3値を、今回のfresh spec reviewが対象とするspec freezeの実体から計算したSHA-256へ更新する。
+2. ledger、timing、required-fast、policy、workflow、P392/#392のその他のassertionを変更しない。
+3. 境界テストを`--run-full-regression --full-regression-shard`付きで実行し、normal passを記録する。
+4. 新しいspec freezeと同期後testのcandidateでD1を再実行し、計画内のexact 10 violations、`#392-owned failure=0`、`unexpected failure=0`を確認する。
+
+この同期はassertionの削除・弱化・skip・xfail化ではなく、仕様修正に伴う固定値の更新である。3値以外に差分が出た場合、またはD1がexact 10 violationsにならない場合は停止する。
+
 ### D2. Rows 1、3–11、13–15の個別RED
 
 13 rowsを一件ずつ実行し、各rowの最初の失敗層を独立に確認する。
@@ -1277,6 +1296,7 @@ assert set(writer["scope_paths"]) == {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/integration/test_issue_392_acceptance.py",
     "refs/heads/"
     "iss-00395-regression-baseline-terminalization-and-product-defect-repair",
 }
@@ -2781,6 +2801,7 @@ expected = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/integration/test_issue_392_acceptance.py",
 }
 
 actual = set(
@@ -2801,7 +2822,7 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print("implementation-file-set=11/11")
+print("implementation-file-set=12/12")
 PY
 
 git diff --check
@@ -2819,7 +2840,7 @@ Commit gateへ進む前に次を再実行する。
 3. Phase K4 protected-data equality
 4. Phase L2 ledger historical preservation
 5. Required-fast 4 / timing 243
-6. Exact 11-file set
+6. Exact 12-file set
 7. no-touch checks
 
 一つでも失敗した場合はcommit許可を使用しない。
@@ -2876,6 +2897,7 @@ expected = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/integration/test_issue_392_acceptance.py",
 }
 
 actual = set(
@@ -2896,7 +2918,7 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print("staged-file-set=11/11")
+print("staged-file-set=12/12")
 PY
 
 test "$(git config user.name)" = "chemitaro"
@@ -3093,7 +3115,7 @@ Input:
 * ledger preservation
 * exact full-verifier summary/hash
 * no-touch proof
-* exact 11-file set
+* exact 12-file set
 
 Acceptance:
 
@@ -3654,7 +3676,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
     * row 3 publication-security matrix
     * row 12 blob/AST guard
     * policy/workflow no-touch
-    * exact 11-file set
+    * exact 12-file set
     * timing 243
     * required-fast 4
 
@@ -3970,7 +3992,7 @@ Candidateは、一つのclean pushed implementation SHA/treeに対し次がす�
 * timing 243 unchanged
 * required-fast 4 unchanged
 * policy/workflow unchanged
-* exact changed-file set 11
+* exact changed-file set 12
 * no extra tracked/untracked implementation file
 * Code Review Strict pass、P0/P1=0
 * Final Quality Gate pass、coverage complete、P0/P1=0
