@@ -1836,12 +1836,14 @@ New test nodeやnew ledger rowを追加しない。
 * Link-existing success nodeは、同じresolverを1回だけ通り、same-repository validation後にcanonical scopeを保存することを確認する。
 * CLI create nodeは、`gh issue create`のargvに`--repo example/repo`が含まれ、create failureのraw outputやcredential sentinelがdiagnosticへ漏れないことを確認する。
 
-4 nodeはtest-firstとGREENで同じまま使い、H5の4-case endpoint policy matrixはcall graphを重ねて検査しない。
+この4 nodeのassertionをProduct sourceより先に既存test bodyへ追加・強化し、H2でRED、Product修復後に同じnodeでGREENを確認する。H5の4-case endpoint policy matrixはcall graphを重ねて検査しない。
 
-### H2. Product edit前のRED再確認
+### H2. Product edit前のcreate-boundary RED再確認
+
+H2は既存のcreate-boundary 4 nodeだけを対象とし、`ROW_3`は再実行しない。`ROW_3`の初回REDは`initial-spec-freeze`ではD2、`post-u05-checkpoint`ではD1Rの再利用証拠で扱う。
 
 ```bash
-ROW3_TESTFIRST_OBS="$EVIDENCE_DIR/row-03-test-first-red-observation.json"
+CREATE_BOUNDARY_TESTFIRST_OBS="$EVIDENCE_DIR/create-boundary-test-first-observation.json"
 
 set +e
 
@@ -1849,33 +1851,28 @@ env TMPDIR="$TEST_TMPDIR" \
   uv run pytest \
     --run-full-regression \
     --full-regression-shard \
-    --full-regression-observation "$ROW3_TESTFIRST_OBS" \
+    --full-regression-observation "$CREATE_BOUNDARY_TESTFIRST_OBS" \
     -q \
     --tb=short \
-    "$ROW_3" \
     "${ROW3_CREATE_BOUNDARY_NODES[@]}" \
-    >"$EVIDENCE_DIR/row-03-test-first-red.log" \
+    >"$EVIDENCE_DIR/create-boundary-test-first-red.log" \
     2>&1
 
-ROW3_TESTFIRST_RC=$?
+CREATE_BOUNDARY_TESTFIRST_RC=$?
 
 set -e
 
-test "$ROW3_TESTFIRST_RC" -eq 1
-
-grep -F \
-  'Current GitHub repo scope could not be resolved from origin' \
-  "$EVIDENCE_DIR/row-03-test-first-red.log"
+test "$CREATE_BOUNDARY_TESTFIRST_RC" -eq 1
 
 ! grep -F \
   'token@' \
-  "$EVIDENCE_DIR/row-03-test-first-red.log"
+  "$EVIDENCE_DIR/create-boundary-test-first-red.log"
 
 ! grep -F \
   'https://token@github.com' \
-  "$EVIDENCE_DIR/row-03-test-first-red.log"
+  "$EVIDENCE_DIR/create-boundary-test-first-red.log"
 
-python - "$ROW3_TESTFIRST_OBS" "$ROW_3" \
+python - "$CREATE_BOUNDARY_TESTFIRST_OBS" \
   "${ROW3_CREATE_BOUNDARY_NODES[@]}" <<'PY'
 from pathlib import Path
 import json
@@ -1891,7 +1888,7 @@ assert observation["outcomes"] == {
     nodeid: "failed" for nodeid in expected
 }
 assert set(observation["failure_signatures"]) == set(expected)
-print(f"row-3-create-boundary-red={len(expected)}/{len(expected)}")
+print(f"create-boundary-red={len(expected)}/{len(expected)}")
 PY
 ```
 
@@ -3168,7 +3165,7 @@ PY
 
 git add -- "${IMPLEMENTATION_PATHS[@]}"
 
-python - "${IMPLEMENTATION_PATHS[@]}" <<'PY
+python - "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 import subprocess
 import sys
 
