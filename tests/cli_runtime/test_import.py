@@ -648,6 +648,9 @@ class TestCliImport(CliRuntimeHarness):
             )
             assert p.returncode == 0, p.stdout + p.stderr
             assert "spec-dock: ok (import issue)" in p.stdout
+            combined = p.stdout + p.stderr
+            assert "token" not in combined
+            assert "https://token@github.com/example/repo.git" not in combined
 
     def test_import_issue_uses_active_epic_when_parent_not_specified(self) -> None:
         if os.name == "nt":

@@ -193,8 +193,6 @@ def _remote_get_url(repo_root: Path, *, push: bool) -> str:
 
 
 def _parse_github_repo_slug(remote_url: str) -> str | None:
-    if _remote_has_userinfo(remote_url):
-        return None
     match = _HTTPS_GH_REMOTE_RE.fullmatch(remote_url) or _SSH_GH_REMOTE_RE.fullmatch(remote_url)
     if match is None:
         return None
@@ -226,6 +224,11 @@ def _directory_flags() -> int:
 def origin_github_publication_endpoint(repo_root: Path) -> tuple[str, str]:
     fetch_url = _remote_get_url(repo_root, push=False)
     push_url = _remote_get_url(repo_root, push=True)
+    if _remote_has_userinfo(fetch_url) or _remote_has_userinfo(push_url):
+        raise RuntimeError(
+            "origin remote contains credentials; cannot resolve canonical repo scope: "
+            f"fetch={_redact_remote_url(fetch_url)} push={_redact_remote_url(push_url)}"
+        )
     fetch_slug = _parse_github_repo_slug(fetch_url)
     push_slug = _parse_github_repo_slug(push_url)
     if fetch_slug is None or push_slug is None:
@@ -242,8 +245,7 @@ def origin_github_publication_endpoint(repo_root: Path) -> tuple[str, str]:
 
 
 def origin_github_repo_slug(repo_root: Path) -> str | None:
-    slug, _push_url = origin_github_publication_endpoint(repo_root)
-    return slug
+    return _parse_github_repo_slug(_remote_get_url(repo_root, push=False))
 
 
 def worktree_list(repo_root: Path) -> list[GitWorktreeRecord]:
