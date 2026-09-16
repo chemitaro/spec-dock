@@ -92,6 +92,9 @@ case "$RESUME_MODE" in
   post-u05-checkpoint)
     : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
     : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+    : "${INITIAL_RED_EVIDENCE_ROOT:?INITIAL_RED_EVIDENCE_ROOT is required}"
+    : "${INITIAL_RED_IDENTITY_SHA256:?INITIAL_RED_IDENTITY_SHA256 is required}"
+    : "${INITIAL_RED_SUMMARY_SHA256:?INITIAL_RED_SUMMARY_SHA256 is required}"
     ;;
   *) exit 1 ;;
 esac
@@ -113,6 +116,13 @@ ROW_13='tests/cli_runtime/test_sync.py::TestCliSync::test_new_and_active_and_syn
 ROW_14='tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root'
 ROW_15='tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands'
 ISSUE_392_BOUNDARY_TEST='tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged'
+
+ROW3_CREATE_BOUNDARY_NODES=(
+  'tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write'
+  'tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_with_canonical_origin_scope_still_succeeds'
+  'tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_link_existing_same_repo_scope_succeeds_and_persists_canonical_scope'
+  'tests/cli_runtime/test_new.py::TestCliNew::test_new_issue_can_create_github_issue_and_use_its_number'
+)
 
 ACTIVE_ROWS=(
   "$ROW_1"
@@ -1006,6 +1016,8 @@ PY
 
 `RESUME_MODE=post-u05-checkpoint`では、U05後のcurrent rootが既にterminalizedであるため、D1の初回full verifierを実行しない。Phase Eへ進む前に、current ledgerの15/0/15 invariantとmigration observerをread-onlyで確認し、U05 transitionを再実行しない。
 
+初回D2の13 row RED証拠は、packetで指定されたrepository外の既存evidence rootから再利用する。`identity.json`、`individual-red-summary.json`、13件すべてのraw logとobservationのSHA-256、repository/branch/P392 identity、RED node集合を確認し、初回spec SHAがresume checkpointの祖先であることを検証する。証拠が欠落・不一致ならE1/E2より前に停止する。修復済みnodeをRED取得のために再実行せず、証拠を新しいrootへコピーしない。
+
 ```bash
 POST_U05_ENTRY_OBS="$EVIDENCE_DIR/post-u05-terminal-entry-observation.json"
 
@@ -1055,6 +1067,111 @@ Path(sys.argv[1]).write_text(
     encoding="utf-8",
 )
 print("post-u05-terminal-entry=15/0/15 fixed=14 superseded=1")
+PY
+
+python - "$INITIAL_RED_EVIDENCE_ROOT" \
+  "$INITIAL_RED_IDENTITY_SHA256" \
+  "$INITIAL_RED_SUMMARY_SHA256" \
+  "$RESUME_CHECKPOINT_SHA" \
+  "$EXPECTED_REPOSITORY" \
+  "$ISSUE_BRANCH" \
+  "$INTEGRATION_BRANCH" \
+  "$P392_SHA" \
+  "$P392_TREE" \
+  "$ROW_12" \
+  "${ACTIVE_ROWS[@]}" <<'PY'
+from pathlib import Path
+import hashlib
+import json
+import subprocess
+import sys
+
+root = Path(sys.argv[1]).resolve(strict=True)
+identity_hash, summary_hash = sys.argv[2:4]
+(
+    resume_checkpoint,
+    repository,
+    issue_branch,
+    integration_branch,
+    p392_sha,
+    p392_tree,
+    row_12,
+    *active_rows,
+) = sys.argv[4:]
+repo_root = Path.cwd().resolve()
+
+assert (
+    root != repo_root
+    and repo_root not in root.parents
+    and root not in repo_root.parents
+), {
+    "stage": "post-u05-prior-red-evidence-location",
+}
+
+identity_path = root / "identity.json"
+summary_path = root / "individual-red-summary.json"
+
+def sha256(path):
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+assert sha256(identity_path) == identity_hash
+assert sha256(summary_path) == summary_hash
+
+identity = json.loads(identity_path.read_text(encoding="utf-8"))
+assert identity["repository"] == repository
+assert identity["branch"] == issue_branch
+assert identity["integration_branch"] == integration_branch
+assert identity["p392_sha"] == p392_sha
+assert identity["p392_tree"] == p392_tree
+
+initial_sha = identity["spec_freeze_sha"]
+initial_tree = identity["spec_freeze_tree"]
+resolved_sha = subprocess.check_output(
+    ["git", "rev-parse", "--verify", f"{initial_sha}^{{commit}}"],
+    text=True,
+).strip()
+resolved_tree = subprocess.check_output(
+    ["git", "rev-parse", f"{initial_sha}^{{tree}}"],
+    text=True,
+).strip()
+assert resolved_sha == initial_sha
+assert resolved_tree == initial_tree
+subprocess.run(
+    ["git", "merge-base", "--is-ancestor", initial_sha, resume_checkpoint],
+    check=True,
+)
+
+expected_nodes = [node for node in active_rows if node != row_12]
+expected_ordinals = [
+    ordinal for ordinal in range(1, 16) if ordinal not in {2, 12}
+]
+summary = json.loads(summary_path.read_text(encoding="utf-8"))
+assert [item["ordinal"] for item in summary] == expected_ordinals
+assert [item["nodeid"] for item in summary] == expected_nodes
+
+for item in summary:
+    ordinal = item["ordinal"]
+    nodeid = item["nodeid"]
+    log_path = root / f"row-{ordinal:02d}-red.log"
+    observation_path = root / f"row-{ordinal:02d}-red-observation.json"
+    assert item["returncode"] == 1
+    assert sha256(log_path) == item["raw_log_sha256"]
+    assert sha256(observation_path) == item["observation_sha256"]
+
+    observation = json.loads(
+        observation_path.read_text(encoding="utf-8")
+    )
+    assert observation["collected"] == [nodeid]
+    assert observation["executed"] == [nodeid]
+    assert observation["outcomes"] == {nodeid: "failed"}
+    assert observation["failure_signatures"][nodeid] == item["failure_signature"]
+
+    if ordinal == 3:
+        log = log_path.read_text(encoding="utf-8")
+        assert "token@" not in log
+        assert "https://token@github.com" not in log
+
+print("prior-initial-red=13/13 reused")
 PY
 
 env TMPDIR="$TEST_TMPDIR" \
@@ -1712,6 +1829,15 @@ assert "https://token@github.com/example/repo.git" not in combined
 
 New test nodeやnew ledger rowを追加しない。
 
+作成境界の証明には、§2の既存4 nodeだけを使う。
+
+* Precheck failure nodeは`create`と`link_existing`の両方で、不正なpublication scope時にresolverが1回だけ呼ばれ、IssueGateway/local writerより前に失敗し、IssueGateway call・event・local directoryが0であることを確認する。
+* Create success nodeは、resolverのaccepted normalized slug `example/repo`が`IssueGateway.issue_create(repo_slug=...)`へ渡ることを確認する。
+* Link-existing success nodeは、同じresolverを1回だけ通り、same-repository validation後にcanonical scopeを保存することを確認する。
+* CLI create nodeは、`gh issue create`のargvに`--repo example/repo`が含まれ、create failureのraw outputやcredential sentinelがdiagnosticへ漏れないことを確認する。
+
+4 nodeはtest-firstとGREENで同じまま使い、H5の4-case endpoint policy matrixはcall graphを重ねて検査しない。
+
 ### H2. Product edit前のRED再確認
 
 ```bash
@@ -1727,6 +1853,7 @@ env TMPDIR="$TEST_TMPDIR" \
     -q \
     --tb=short \
     "$ROW_3" \
+    "${ROW3_CREATE_BOUNDARY_NODES[@]}" \
     >"$EVIDENCE_DIR/row-03-test-first-red.log" \
     2>&1
 
@@ -1747,6 +1874,25 @@ grep -F \
 ! grep -F \
   'https://token@github.com' \
   "$EVIDENCE_DIR/row-03-test-first-red.log"
+
+python - "$ROW3_TESTFIRST_OBS" "$ROW_3" \
+  "${ROW3_CREATE_BOUNDARY_NODES[@]}" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+observation = json.loads(
+    Path(sys.argv[1]).read_text(encoding="utf-8")
+)
+expected = sys.argv[2:]
+assert observation["collected"] == expected
+assert observation["executed"] == expected
+assert observation["outcomes"] == {
+    nodeid: "failed" for nodeid in expected
+}
+assert set(observation["failure_signatures"]) == set(expected)
+print(f"row-3-create-boundary-red={len(expected)}/{len(expected)}")
+PY
 ```
 
 ### H3. Product source edit
@@ -1783,9 +1929,11 @@ env TMPDIR="$TEST_TMPDIR" \
     --full-regression-observation "$ROW3_GREEN_OBS" \
     -q \
     --tb=short \
-    "$ROW_3"
+    "$ROW_3" \
+    "${ROW3_CREATE_BOUNDARY_NODES[@]}"
 
-python - "$ROW3_GREEN_OBS" "$ROW_3" <<'PY'
+python - "$ROW3_GREEN_OBS" "$ROW_3" \
+  "${ROW3_CREATE_BOUNDARY_NODES[@]}" <<'PY'
 from pathlib import Path
 import json
 import sys
@@ -1794,16 +1942,16 @@ value = json.loads(
     Path(sys.argv[1]).read_text(encoding="utf-8")
 )
 
-nodeid = sys.argv[2]
+nodeids = sys.argv[2:]
 
-assert value["collected"] == [nodeid]
-assert value["executed"] == [nodeid]
+assert value["collected"] == nodeids
+assert value["executed"] == nodeids
 assert value["outcomes"] == {
-    nodeid: "passed",
+    nodeid: "passed" for nodeid in nodeids
 }
 assert value["failure_signatures"] == {}
 
-print("row-3-green")
+print(f"row-3-green={len(nodeids)}/{len(nodeids)}")
 PY
 ```
 
@@ -2796,7 +2944,7 @@ git diff --exit-code "$SPEC_FREEZE_SHA" -- \
 
 ### M5. Exact implementation file set
 
-初回実装ではreviewed specification freezeからのworking-tree diffを、`IMPLEMENTATION_PATHS`で定義したfocused 26-path setと比較する。U05後のresumeでは、resume checkpointからcurrent `HEAD`までの累積差分が、canonical 6 pathsまたはfocused implementation pathsに限定されることを確認する。そのうえで、reviewed specification freezeからcurrent `HEAD`およびworking treeに存在する実装差分がfocused implementation paths内に限定され、少なくとも一つの実装差分が存在することを確認する。`RESUME_CHECKPOINT_SHA/TREE`はcurrent identityではなく、既存実装の祖先基点として検証する。support historyのmode、object type、Git object ID一致を追加のblocking gateにせず、resumeで空のcommitを作ってpath countを満たしてはならない。
+初回実装ではreviewed specification freezeからのworking-tree diffを、`IMPLEMENTATION_PATHS`で定義したfocused 26-path setと比較する。U05後のresumeでは、resume checkpointからcurrent `HEAD`までの累積差分がcanonical 6 pathsまたはfocused implementation pathsに限定されること、さらに`P392_SHA`からcurrent `HEAD`とworking treeまでの累積implementation path setがfocused 26 pathsと完全一致することを確認する。これが累積path completenessの唯一のgateであり、N1は今回stageするnon-empty差分だけを確認する。`RESUME_CHECKPOINT_SHA/TREE`はcurrent identityではなく、既存実装の祖先基点として検証する。support historyのmode、object type、Git object ID一致を追加のblocking gateにせず、空差分やno-op editでpath countを満たしてはならない。
 
 ```bash
 if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
@@ -2827,13 +2975,13 @@ assert actual == expected, {
 print(f"implementation-file-set={len(actual)}/{len(expected)}")
 PY
 else
-python - "$RESUME_CHECKPOINT_SHA" "$SPEC_FREEZE_SHA" \
+  python - "$RESUME_CHECKPOINT_SHA" "$SPEC_FREEZE_SHA" "$P392_SHA" \
   "${SPEC_PACK_PATHS[@]}" -- \
   "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 import subprocess
 import sys
 
-resume_checkpoint, spec_freeze, *paths = sys.argv[1:]
+resume_checkpoint, spec_freeze, p392_sha, *paths = sys.argv[1:]
 separator = paths.index("--")
 primary_paths = set(paths[:separator])
 implementation_paths = set(paths[separator + 1:])
@@ -2872,13 +3020,27 @@ assert working_tree_paths <= implementation_paths, {
     "actual": sorted(working_tree_paths),
 }
 
+cumulative_candidate_paths = (
+    changed_paths(p392_sha, "HEAD") | working_tree_paths
+)
+actual_cumulative_implementation = (
+    cumulative_candidate_paths & implementation_paths
+)
+assert actual_cumulative_implementation == implementation_paths, {
+    "stage": "post-u05-cumulative-implementation-set",
+    "expected": sorted(implementation_paths),
+    "actual": sorted(actual_cumulative_implementation),
+}
+
 implementation_delta = spec_freeze_to_head_paths | working_tree_paths
 assert implementation_delta, {
     "stage": "post-u05-non-empty-implementation-delta",
 }
 
 print(
-    f"implementation-file-set={len(implementation_delta)}/{len(implementation_paths)} "
+    f"cumulative-implementation-file-set="
+    f"{len(actual_cumulative_implementation)}/{len(implementation_paths)} "
+    f"incremental-delta={len(implementation_delta)} "
     f"resume-to-head={len(resume_to_head_paths)} "
     f"working-tree={len(working_tree_paths)}"
 )
@@ -2889,7 +3051,7 @@ git diff --check
 test -z "$(git ls-files --others --exclude-standard)"
 ```
 
-初回modeでは26件のexpected pathとextra pathのどちらもblockingである。post-U05 modeでは既存candidateに含まれるpathを空差分として再生成せず、実測したnon-empty implementation deltaのsubsetとextra pathだけを検査する。
+初回modeでは26件のexpected pathとextra pathのどちらもblockingである。post-U05 modeではP392からcurrent candidateまでの累積implementation setを26件と照合し、N1では既存candidateを再生成せず今回のnon-empty incremental setだけをstageする。
 
 ### M6. Working-tree manual invariants再実行
 
@@ -2919,7 +3081,7 @@ implementation_tree = null
 
 `COMMIT_PUSH_AUTHORIZED=true`の場合だけ以下を実行する。
 
-`RESUME_MODE=post-u05-checkpoint`では、`RESUME_CHECKPOINT_SHA/TREE`を既存実装candidateの祖先基点として確認し、current reviewed specification targetからのnon-empty実装差分だけをstage・commit・pushする。current HEADがspec freezeと同じで実装差分がない場合は、空commitを作らず、実装candidate未作成として停止する。resume checkpointをcurrent candidateとして採用せず、`SPEC_FREEZE_SHA/TREE`を実装開始点として扱う。
+`RESUME_MODE=post-u05-checkpoint`では、M5で累積implementation path setがfocused 26件と完全一致したことを確認した後、`RESUME_CHECKPOINT_SHA/TREE`を既存実装candidateの祖先基点として検証し、current reviewed specification targetからのnon-empty incremental差分だけをstage・commit・pushする。current HEADがspec freezeと同じで実装差分がない場合は、空commitを作らず、実装candidate未作成として停止する。resume checkpointをcurrent candidateとして採用せず、`SPEC_FREEZE_SHA/TREE`を実装開始点として扱う。
 
 初回のforward commitでは、実装candidateのstaged path set全体を`IMPLEMENTATION_PATHS`のfocused 26件と照合する。`post-u05-checkpoint`では、累積scopeと今回のcommitでstageするincremental setを混同しない。resumeで残るapproved pending setは、stage前に`SPEC_FREEZE_SHA`から実測し、non-emptyで`IMPLEMENTATION_PATHS`のsubsetであることを確認したうえで、そのpending setだけをstageする。既にcommit済みのpathを空の差分として再出現させたり、空commitでpath数を満たしたりしてはならない。
 
@@ -3479,47 +3641,6 @@ env TMPDIR="$TEST_TMPDIR" \
     --tb=short
 
 env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    -q \
-    --tb=short \
-    tests/unit/provider_lifecycle
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/cli_runtime/test_distribution_cutover.py
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
-    tests/cli_runtime/test_provider_lifecycle_handoff.py \
-    tests/cli_runtime/test_generation_checkout.py \
-    tests/cli_runtime/test_worktree_lifecycle_coordination.py
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/integration/test_epic_00343_distribution.py
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    --run-full-regression \
-    --full-regression-shard \
-    -q \
-    --tb=short \
-    tests/integration/test_provider_lifecycle_dogfood.py
-
-env TMPDIR="$TEST_TMPDIR" \
   make lint
 
 ./spec-dock/scripts/spec-dock validate
@@ -3595,16 +3716,11 @@ B1受入条件:
 * PR required Provider CI roles SUCCESS
 * PR head tree = merged tree
 * ordinary suite GREEN
-* provider lifecycle unit GREEN
-* distribution cutover GREEN
-* platform/coordination GREEN
-* packaged distribution parity GREEN
-* dogfood parity GREEN
+* current full verifier GREEN（provider lifecycle、distribution、platform/coordination、packaged parity、dogfoodのpytest nodeを含む）
 * row 3 security matrix GREEN
 * row 12 no-edit guard GREEN
 * lint GREEN
 * SpecDock validate GREEN
-* current full verifier GREEN
 * unexpected failure 0
 * lifecycle/protected-data invariants unchanged
 * same exact merged SHA/tree維持
@@ -3746,6 +3862,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 
    * repository
    * Issue branch
+   * integration branch
    * P392 SHA/tree
    * elaboration input SHA/tree
    * specification SHA/tree
@@ -3753,10 +3870,8 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 
 2. `individual-red-summary.json`
 
-   * 13 individually failing rows
-   * expected failure layer
-   * raw log SHA-256
-   * observation SHA-256
+   * initial modeで13件を生成
+   * post-U05 modeではpacket指定rootの既存summary・identity・全raw log/observation hashを検証して再利用し、再実行・コピーしない
 
 3. Row GREEN observations
 
@@ -3801,11 +3916,8 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 9. Command receipts
 
    * ordinary
-   * lifecycle
-   * distribution cutover
-   * platform/coordination
-   * packaged distribution
-   * dogfood
+   * pre-candidate provider lifecycle unit lane
+   * clean-candidate / post-merge full verifier（残るfull-regression suiteの正式結果を含む）
    * lint
    * SpecDock validate
 

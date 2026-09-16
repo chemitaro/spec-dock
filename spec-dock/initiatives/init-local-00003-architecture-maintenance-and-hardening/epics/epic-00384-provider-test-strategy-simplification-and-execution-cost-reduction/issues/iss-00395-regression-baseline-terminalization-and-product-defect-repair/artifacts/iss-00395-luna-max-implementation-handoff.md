@@ -81,12 +81,12 @@ P392はIssue #395のProduct/test/ledger entry pointである。P392はB1、Issue
 
 Elaboration inputはP392後のreceipt文書を含む仕様作成sourceである。P392からelaboration inputまでの変更は、Epic PlanとIssue #392 Reportの二文書に限定される。Product source、tests、ledger、timing、policy、workflowはP392と同一である。
 
-## 3. Execution packet v2
+## 3. Execution packet v3
 
 Codexは、少なくとも次のpacketをactual valuesで発行する。
 
 ```yaml
-packet_schema: 2
+packet_schema: 3
 issue: iss-00395
 repository: chemitaro/spec-dock
 branch: iss-00395-regression-baseline-terminalization-and-product-defect-repair
@@ -103,6 +103,10 @@ spec_freeze_tree: "<actual clean pushed 40-hex tree>"
 resume_mode: "initial-spec-freeze | post-u05-checkpoint"
 resume_checkpoint_sha: "<required only for post-u05-checkpoint>"
 resume_checkpoint_tree: "<required only for post-u05-checkpoint>"
+initial_red_evidence:
+  root: "<repository-external immutable directory; required only for post-u05-checkpoint>"
+  identity_sha256: "<64 lowercase hex; required only for post-u05-checkpoint>"
+  summary_sha256: "<64 lowercase hex; required only for post-u05-checkpoint>"
 
 spec_review:
   reviewer: chatgpt-spec-review-strict
@@ -158,6 +162,8 @@ pr_prepare_authorized: false
 human_merge_only: true
 ```
 
+`initial-spec-freeze`では`initial_red_evidence`を省略する。`post-u05-checkpoint`ではその3 fieldを必須とし、既存の初回RED証拠をSHA-256でpacketへ束縛する。
+
 ### 3.1 Environment mapping
 
 | Packet field                         | Environment variable                 |
@@ -167,6 +173,9 @@ human_merge_only: true
 | `resume_mode`                        | `RESUME_MODE`                        |
 | `resume_checkpoint_sha`              | `RESUME_CHECKPOINT_SHA`              |
 | `resume_checkpoint_tree`             | `RESUME_CHECKPOINT_TREE`             |
+| `initial_red_evidence.root`          | `INITIAL_RED_EVIDENCE_ROOT`          |
+| `initial_red_evidence.identity_sha256` | `INITIAL_RED_IDENTITY_SHA256`       |
+| `initial_red_evidence.summary_sha256`  | `INITIAL_RED_SUMMARY_SHA256`        |
 | `spec_review.receipt_path`           | `SPEC_REVIEW_RECEIPT_PATH`           |
 | `spec_review.receipt_sha256`         | `SPEC_REVIEW_RECEIPT_SHA256`         |
 | `implementation_authorized`          | `IMPLEMENTATION_AUTHORIZED`          |
@@ -236,6 +245,9 @@ case "$RESUME_MODE" in
   post-u05-checkpoint)
     : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
     : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
+    : "${INITIAL_RED_EVIDENCE_ROOT:?INITIAL_RED_EVIDENCE_ROOT is required}"
+    : "${INITIAL_RED_IDENTITY_SHA256:?INITIAL_RED_IDENTITY_SHA256 is required}"
+    : "${INITIAL_RED_SUMMARY_SHA256:?INITIAL_RED_SUMMARY_SHA256 is required}"
     ;;
   *) exit 1 ;;
 esac
@@ -1110,6 +1122,8 @@ Extra violation、missing violation、別row failureがあれば停止する。
 
 ### 14.1R Post-U05 terminalized entry (`post-u05-checkpoint` only)
 
+13-row initial RED evidenceはPlan §7 D1Rに従い、packet指定rootのidentity・summary・各raw log/observation hash、repository/branch/P392 identity、node集合、初回spec SHAの祖先関係を検証して再利用する。欠落・不一致時はE1/E2前に停止し、修復済みnodeを再実行しない。
+
 post-U05では、U05後に既に確定したcurrent ledgerの15 total / 0 active / 15 resolved / 14 `fixed-in-place` / 1 `superseded`をread-onlyで確認する。D1相当の`ledger-mismatch`、exact 10 active-row violationsまたはU05のledger transitionを再実行しない。migration observerがP392 beforeとcurrent root afterの契約を確認し、Issue #392 boundary witnessと今回のfocused Product/test変更はE4R相当のfocused recheckで検証する。
 
 ### 14.2 13修正対象のindividual RED (`initial-spec-freeze` only)
@@ -1589,6 +1603,8 @@ Product edit前の再実行では、current repo scope unresolvedでREDのまま
 
 ### 19.2 Product write surface
 
+Test-firstとGREENはPlan §2のROW3_CREATE_BOUNDARY_NODESに列挙された既存4 nodeを同じ順序で実行する。必須assertionはPlan §H1を正とし、重複説明や追加node/ledger rowを作らない。H5は既存publication endpointの4-case policy matrixに限定する。
+
 変更対象は次の6つのprovider fileである。generated mirrorは§9.2のとおり更新コマンドで投影し、手編集しない。
 
 ```text
@@ -1899,94 +1915,7 @@ Distribution cutover、platform/coordination、packaged parity、complete dogfoo
 
 ## 25. Exact changed-file gate
 
-初回実装のworking-tree diffはreviewed specification freezeからのfocused 26 pathsでなければならない。U05後のresumeでは、resume checkpointからcurrent `HEAD`までの累積差分がcanonical 6 pathsまたはfocused implementation pathsに限定され、reviewed specification freeze以後の実装差分がfocused implementation pathsに限定されることを確認する。current working-tree差分もimplementation paths内に限定し、non-emptyの実装差分がない場合は空commitを作らない。
-
-```bash
-python - "$RESUME_MODE" "${RESUME_CHECKPOINT_SHA:-}" "$SPEC_FREEZE_SHA" \
-  "${IMPLEMENTATION_PATHS[@]}" <<'PY'
-import subprocess
-import sys
-
-mode, resume_checkpoint, spec_freeze, *implementation_values = sys.argv[1:]
-implementation = set(implementation_values)
-
-primary = {
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
-    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
-    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/requirement.md",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
-    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
-    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/design.md",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
-    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
-    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/plan.md",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
-    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
-    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
-    "iss-00395-luna-max-implementation-handoff.md",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
-    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
-    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
-    "iss-00395-human-guide.html",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
-    "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
-    "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
-    "iss-00395-chatgpt-spec-pack-manifest.md",
-}
-
-def changed(base, head=None):
-    command = ["git", "diff", "--name-only", "--no-renames"]
-    if head is None:
-        command.append(base)
-    else:
-        command.extend((base, head))
-    command.append("--")
-    return set(subprocess.check_output(command, text=True).splitlines())
-
-if mode == "initial-spec-freeze":
-    actual = changed(spec_freeze)
-    assert actual == implementation, {
-        "expected": sorted(implementation),
-        "actual": sorted(actual),
-    }
-    print(f"implementation-file-set={len(actual)}/{len(implementation)}")
-elif mode == "post-u05-checkpoint":
-    assert resume_checkpoint
-    resume_to_head = changed(resume_checkpoint, "HEAD")
-    assert resume_to_head <= primary | implementation, {
-        "stage": "post-u05-resume-to-head-scope",
-        "allowed": sorted(primary | implementation),
-        "actual": sorted(resume_to_head),
-    }
-    spec_to_head = changed(spec_freeze, "HEAD")
-    assert spec_to_head <= implementation, {
-        "stage": "post-u05-spec-freeze-to-head-scope",
-        "allowed": sorted(implementation),
-        "actual": sorted(spec_to_head),
-    }
-    working = changed("HEAD")
-    assert working <= implementation, {
-        "stage": "post-u05-working-tree-scope",
-        "allowed": sorted(implementation),
-        "actual": sorted(working),
-    }
-    implementation_delta = spec_to_head | working
-    assert implementation_delta, {
-        "stage": "post-u05-non-empty-implementation-delta",
-    }
-    print(
-        f"implementation-file-set={len(implementation_delta)}/{len(implementation)} "
-        f"resume-to-head={len(resume_to_head)} working-tree={len(working)}"
-    )
-else:
-    raise AssertionError(f"unsupported resume mode: {mode}")
-PY
-
-git diff --check
-test -z "$(git ls-files --others --exclude-standard)"
-```
-
-初回modeでは26件のexpected pathとextra pathの両方がblockingである。post-U05 modeでは実測したnon-empty implementation deltaのsubsetとextra pathを確認し、既存candidateを空差分として再生成しない。
+このgateの唯一の実行定義はcanonical Plan §M5である。実装候補のpath completenessを確認するときは同gateを一度だけ実行する。post-U05ではP392からcandidateまでの累積implementation setが、Planに既存定義された26-path setと完全一致しなければならない。N1では通過後のnon-empty incremental差分だけをstageし、累積gateを重複実行しない。
 
 ## 26. No-touch gate
 
@@ -2322,6 +2251,8 @@ implementation_tree
 
 ### 31.2 RED evidence
 
+Initial-spec-freeze mode creates the RED files below. Post-U05 mode references the prior immutable evidence root and hashes supplied in packet v3; D1R verifies them and does not copy the files or rerun repaired nodes.
+
 * `individual-red-summary.json`
 * `row-01-red-observation.json`
 * `row-03-red-observation.json`
@@ -2418,11 +2349,8 @@ artifact_sha256
 
 * Ordinary
 * Evaluator unit
-* Provider lifecycle unit
-* Distribution cutover
-* Platform/coordination
-* Packaged distribution
-* Dogfood
+* Pre-candidate provider lifecycle unit
+* Clean-candidate / post-merge full verifier (single authoritative receipt for the remaining full-regression suites)
 * Lint
 * SpecDock validate
 * Row 3 security matrix
@@ -2790,29 +2718,25 @@ PR head treeとpost-merge integration treeが一致しなければ、PR-head CI�
 
 同じexact merged SHA/tree上で次を実行する。
 
-* Ordinary lane
-* Provider lifecycle unit
-* Distribution cutover
-* Platform/coordination
-* Packaged distribution parity
-* Complete dogfood heavy suite
+* Ordinary lane (default policy behavior)
+* Current full verifier (includes provider lifecycle, distribution, platform/coordination, packaged distribution, and dogfood pytest nodes)
 * Row 3 security matrix
 * Row 12 guard
+* Protected-data proof
 * Lint
 * SpecDock validate
-* Current full verifier
 
 B1 acceptance:
 
 ```text
 required PR gates = success
 ordinary = green
-provider lifecycle = green
-distribution cutover = green
-platform/coordination = green
-packaged distribution = green
-dogfood parity = green
 full verifier = verified
+full-regression categories = covered by the full verifier receipt
+row 3 security matrix = green
+row 12 guard = green
+protected data = unchanged
+lint and SpecDock validate = green
 unexpected failure = 0
 same merged SHA/tree = unchanged
 ```
