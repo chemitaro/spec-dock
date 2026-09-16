@@ -27,7 +27,7 @@ authority: "advisory-corrected-plan"
 
 本書はIssue #395の完全な実装順序、検証ゲート、証拠形式および停止条件を固定する。ユーザーの明示承認により、canonical statusの`implementation_allowed`はtrueである。ただし、実行者は最初のmutation前にPhase Eのexecution packet検証、exact identity、独立レビュー証跡、同時書き込みなしの確認を満たさなければならない。
 
-GPT-5.6 LunaMaxは**Phase A〜Dのread-only preflight**を実行できる。次の操作は、Phase Eのexecution packet検証と同時書き込みなしの確認が成立するまで禁止する。
+GPT-5.6 LunaMaxは**Phase A〜D1のread-only preflight**を実行できる。承認済みT14同期はread-onlyではなく、Phase Eのexecution packet検証と同時書き込みなしの確認後にだけE3として実行する。次の操作は、Phase Eのexecution packet検証と同時書き込みなしの確認が成立するまで禁止する。
 
 * Product sourceの編集
 * regression testの編集
@@ -54,7 +54,7 @@ GPT-5.6 LunaMaxは**Phase A〜Dのread-only preflight**を実行できる。次�
 
 ユーザーの明示承認により、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。これは、今回更新したIssue #395のcanonical Requirement／Design／Planと、Issue #392の「境界が不変であること」を検査する既存テストの期待SHA-256を同期するためのtest-only pathである。
 
-このpathで許可される変更は、`_ISSUE_BOUNDARY_SHA256`にあるIssue #395の3値を最終spec freezeの実体へ置き換えることだけである。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更せず、assertionの削除、弱化、skip、xfail化も行わない。同期後のEntry verifierは、計画内の10件だけをREDとして観測し、#392-owned failureとunexpected failureを0件にする。
+このpathで許可される変更は、Issue #392の既存baseline assertionを保持するためのbaseline payload readをP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛することと、`_ISSUE_BOUNDARY_SHA256`にあるIssue #395の3値を最終spec freezeの実体へ置き換えることだけである。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更せず、assertionの削除、弱化、skip、xfail化も行わない。同期後のEntry verifierは、計画内の10件だけをREDとして観測し、#392-owned failureとunexpected failureを0件にする。
 
 ## 2. 固定定数とnode集合
 
@@ -904,9 +904,16 @@ expected = {
         "tests/cli_runtime/test_workbench.py::TestCliWorkbench::"
         "test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands",
     ),
+    (
+        "unexpected_failure",
+        "tests/integration/test_issue_392_acceptance.py::"
+        "test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged",
+    ),
 }
 
 assert violations == expected
+assert len(violations) == 11
+assert sum(code == "unexpected_failure" for code, _ in violations) == 1
 
 assert set(result["evaluation"]["active_verified"]) == {
     "tests/cli_runtime/test_delete.py::TestCliDelete::"
@@ -930,20 +937,23 @@ print("entry-full-verifier-exact-allowance-ok")
 PY
 ```
 
-受入条件はexact 10 violationsである。Extra violation、missing violation、#392-owned failure、unexpected failureが一件でもあれば停止する。
+初回の受入条件は、計画済みexact 10 violationsに加えて、承認済みT14同期対象である`unexpected_failure` 1件だけを許容することである。これはまだGREENではない。E1/E2のmutation authorization後にE3でT14を同期し、再実行したEntry verifierの受入条件はexact 10 violations、Extra violation 0、missing violation 0、#392-owned failure 0、unexpected failure 0である。
 
-### D1.1 — 承認済みIssue #392境界テストの同期
+### D1.1 — 承認済みIssue #392境界テスト同期の実行位置
 
-前回のspec freeze候補で観測した`ISSUE_392_BOUNDARY_TEST`のSHA不一致は、今回の仕様修正を反映する前の履歴証拠として保持する。ユーザー承認後の最初のmutationは、次のtest-only同期に限定する。
+前回のspec freeze候補で観測した`ISSUE_392_BOUNDARY_TEST`のSHA不一致は、今回の仕様修正を反映する前の履歴証拠として保持する。この節は実行位置と変更境界だけを定義し、ここではtracked fileを編集しない。ユーザー承認後の最初のmutationは、Phase EのE1/E2を通過した後のE3に限定する。
 
-1. `tests/integration/test_issue_392_acceptance.py`の`_ISSUE_BOUNDARY_SHA256`にあるIssue #395 Requirement／Design／Planの3値を、今回のfresh spec reviewが対象とするspec freezeの実体から計算したSHA-256へ更新する。
-2. ledger、timing、required-fast、policy、workflow、P392/#392のその他のassertionを変更しない。
-3. 境界テストを`--run-full-regression --full-regression-shard`付きで実行し、normal passを記録する。
-4. 新しいspec freezeと同期後testのcandidateでD1を再実行し、計画内のexact 10 violations、`#392-owned failure=0`、`unexpected failure=0`を確認する。
+1. E3では、T14のbaseline payload readをP392 entry SHAのimmutable Git blobへ束縛し、既存baseline assertionを保持する。
+2. `tests/integration/test_issue_392_acceptance.py`の`_ISSUE_BOUNDARY_SHA256`にあるIssue #395 Requirement／Design／Planの3値を、fresh spec reviewが対象とするspec freezeの実体から計算したSHA-256へ更新する。
+3. ledger、timing、required-fast、policy、workflow、P392/#392のその他のassertionを変更しない。
+4. 境界テストを`--run-full-regression --full-regression-shard`付きで実行し、normal passを記録する。
+5. E3後のD1再実行で、計画内のexact 10 violations、`#392-owned failure=0`、`unexpected failure=0`を確認する。
 
-この同期はassertionの削除・弱化・skip・xfail化ではなく、仕様修正に伴う固定値の更新である。3値以外に差分が出た場合、またはD1がexact 10 violationsにならない場合は停止する。
+この同期はassertionの削除・弱化・skip・xfail化ではなく、baseline source bindingと仕様修正に伴う3つの固定値更新である。3つのSHA値またはbaseline source binding以外に差分が出た場合、またはE3後のD1がexact 10 violationsにならない場合は停止する。
 
 ### D2. Rows 1、3–11、13–15の個別RED
+
+この節とD3のnode実行は、Phase EのE3同期およびE4のpost-sync Entry再検証が完了した後に行う。初回D1の後に直ちに実行してはならない。
 
 13 rowsを一件ずつ実行し、各rowの最初の失敗層を独立に確認する。
 
@@ -1147,7 +1157,7 @@ Nodeが失敗する場合はsource driftとして停止する。Row 12を推測�
 
 ## 8. Phase E — mutation authorization gate
 
-このPhaseは、最初のfile editの直前に実行する。
+このPhaseは、初回D1のread-only観測後、D2/D3のRED確認と最初のfile editに先立って実行する。E1/E2の完了前にE3または他のtracked file editを行ってはならない。
 
 ### E1. 必須environment values
 
@@ -1329,6 +1339,31 @@ test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
 * HEADがspec freezeから動いた
 
 Writer assertionは最初のedit直前に再検証する。期限切れのassertionを再利用しない。
+
+### E3. First authorized mutation — Issue #392 boundary test synchronization
+
+E1/E2がpassし、worktreeがcleanであり、`SPEC_FREEZE_SHA`／`SPEC_FREEZE_TREE`がfresh Strict specification reviewの対象と一致した後にだけ、最初のtracked mutationとして実行する。
+
+1. `spec-dock/active/issue/requirement.md`、`spec-dock/active/issue/design.md`、`spec-dock/active/issue/plan.md`のSHA-256を計算する。
+2. `tests/integration/test_issue_392_acceptance.py`へ、P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`の`full-regression-ledger.json` blobを読むread-only source bindingを追加し、`_ISSUE_BOUNDARY_SHA256`のIssue #395の3値だけを1の結果へ置換する。Issue #392のbaseline/timing/required-fast/policy/workflow/assertion本文は変更しない。
+3. T14を次で実行し、observationで対象nodeが一回だけnormal passすることを確認する。
+
+   ```bash
+   env TMPDIR="$TEST_TMPDIR" \
+     uv run pytest \
+       --run-full-regression \
+       --full-regression-shard \
+       --full-regression-observation "$EVIDENCE_DIR/issue-392-boundary-sync-observation.json" \
+       -q \
+       --tb=short \
+       "$ISSUE_392_BOUNDARY_TEST"
+   ```
+
+4. `git diff --unified=0 "$SPEC_FREEZE_SHA" -- tests/integration/test_issue_392_acceptance.py`を確認し、差分がbaseline source bindingと3つのIssue #395 SHA値だけであることを証明する。その他のbaseline assertion、ledger、timing、required-fast、policy、workflowの差分があれば停止する。
+
+### E4. Post-sync Entry recheck
+
+E3のfocused testがpassした後、D1のcurrent full verifier commandを新しいprivate artifact rootで再実行する。`candidate_sha`は`SPEC_FREEZE_SHA`、statusは`ledger-mismatch`、violation setはD1で定義した計画済み10件からT14同期対象を除いたexact 10件でなければならない。`active_verified` 4件、row 2の`resolved_verified` 1件、`retired_verified=[]`、`unexpected_failure` 0件も確認する。ここを通過して初めてD2/D3の個別REDへ進む。
 
 ## 9. Phase F — Rows 4–11 test fixture修正
 

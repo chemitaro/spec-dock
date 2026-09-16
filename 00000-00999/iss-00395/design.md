@@ -74,6 +74,8 @@ The root ledger contains 15 rows. Row 2 is already `resolved/superseded`; rows 1
 * resolved/superseded row: the successor executes exactly once and passes normally;
 * any other failure or error: unexpected violation.
 
+`tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged` is a historical boundary witness for the P392 entry, not a current-root-ledger assertion. Its existing baseline assertions continue to read the immutable `full-regression-ledger.json` blob at P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`. This preserves the 15-row/14-active/1-resolved baseline while the current root ledger is later terminalized by Issue #395. The test keeps its baseline, timing, required-fast, policy, workflow, and boundary assertions unchanged; only the three Issue #395 canonical-document SHA expectations are synchronized.
+
 Therefore the safe transition order is fixed:
 
 ```text
@@ -241,7 +243,7 @@ Every other field in those rows, the complete row 2 object, row order, and all t
 
 ### 5.8 Expected implementation file set
 
-The exact expected tracked implementation diff contains 11 files:
+The exact expected tracked implementation diff contains 12 files:
 
 ```text
 full-regression-ledger.json
@@ -255,6 +257,7 @@ tests/cli_runtime/test_import.py
 tests/cli_runtime/test_runtime_import_s10.py
 tests/cli_runtime/test_sync.py
 tests/cli_runtime/test_workbench.py
+tests/integration/test_issue_392_acceptance.py
 ```
 
 A missing expected file means the candidate was not completely projected or corrected. An extra file means scope drift. Either condition stops the execution.
@@ -445,7 +448,7 @@ Raw local evidence containing absolute paths is not copied into a distributed ar
 
 Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 12 paths are staged. Untracked files, caches, logs, and evidence are not staged.
 
-The twelfth path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
+The twelfth path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to binding the baseline payload read to the immutable P392 entry blob, while preserving every Issue #392 assertion, and synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
 
 After commit and push, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
 

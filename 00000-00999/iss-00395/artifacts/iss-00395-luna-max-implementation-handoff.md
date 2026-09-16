@@ -137,6 +137,7 @@ concurrent_writer:
     - tests/cli_runtime/test_runtime_import_s10.py
     - tests/cli_runtime/test_sync.py
     - tests/cli_runtime/test_workbench.py
+    - tests/integration/test_issue_392_acceptance.py
     - refs/heads/iss-00395-regression-baseline-terminalization-and-product-defect-repair
 
 commit_push_authorized: false
@@ -291,6 +292,7 @@ IMPLEMENTATION_PATHS=(
   tests/cli_runtime/test_runtime_import_s10.py
   tests/cli_runtime/test_sync.py
   tests/cli_runtime/test_workbench.py
+  tests/integration/test_issue_392_acceptance.py
 )
 ```
 
@@ -861,7 +863,7 @@ tests/cli_runtime/test_workbench.py
 tests/integration/test_issue_392_acceptance.py
 ```
 
-12件目の`tests/integration/test_issue_392_acceptance.py`は、今回ユーザーが承認したtest-only同期pathである。`_ISSUE_BOUNDARY_SHA256`のIssue #395 Requirement／Design／Planの3値だけを最終spec freezeへ同期し、Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更しない。assertionの削除・弱化・skip・xfail化は許可しない。
+12件目の`tests/integration/test_issue_392_acceptance.py`は、今回ユーザーが承認したtest-only同期pathである。Issue #392の既存baseline assertionを変更せずに保持するため、baseline payload readをP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛し、`_ISSUE_BOUNDARY_SHA256`のIssue #395 Requirement／Design／Planの3値だけを最終spec freezeへ同期する。Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更しない。assertionの削除・弱化・skip・xfail化は許可しない。
 
 ### 9.1 Hand-edit可能なpaths
 
