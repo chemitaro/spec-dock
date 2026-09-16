@@ -58,7 +58,7 @@ class TestCliSync(CliRuntimeHarness):
             assert "iss-00003" in requirement
 
             # Active pointers are set by a single target argument (node id or GitHub issue number).
-            self._run_runtime(target, ["active", "set", "iss-00003", "--force"])
+            self._run_runtime(target, ["active", "set", "iss-00003"])
             assert (target / "spec-dock" / ".agent" / "active.json").is_file()
             assert (target / "spec-dock" / "active" / "issue").exists() or (
                 target / "spec-dock" / "active" / "issue.path"
@@ -1245,7 +1245,7 @@ class TestCliSync(CliRuntimeHarness):
             self._set_meta_depends_on(issues_root / "iss-00302-blocked-issue", [303])
             self._set_meta_depends_on(issues_root / "iss-00304-ready-second", [301])
 
-            p_active = self._run_runtime_capture(target, ["active", "set", "305", "--force", "--no-checkout"])
+            p_active = self._run_runtime_capture(target, ["active", "set", "305"])
             assert p_active.returncode == 0, p_active.stdout + p_active.stderr
 
             bin_dir = target / ".bin"
