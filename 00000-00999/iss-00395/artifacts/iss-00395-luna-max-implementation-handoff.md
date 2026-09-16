@@ -4,7 +4,7 @@ kind: "implementation-handoff"
 issue: "iss-00395"
 title: "Issue #395 LunaMax Implementation Handoff — Ready Contract"
 artifact_path: "artifacts/luna-max-implementation-handoff-ready.md"
-generated_at: "2026-09-15"
+generated_at: "2026-09-16"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 integration_branch: "codex/epic-00384-provider-test-strategy-planning"
@@ -174,7 +174,7 @@ human_merge_only: true
   * `merge_ready=false`とする。
 * `COMMIT_PUSH_AUTHORIZED=true`:
 
-  * 全gateがGREENの場合だけ、exact 11 pathsをIssue branchへcommit/pushできる。
+  * 全gateがGREENの場合だけ、exact 12 pathsをIssue branchへcommit/pushできる。
 * `PR_PREPARE_AUTHORIZED=false`:
 
   * PRを作成・更新しない。
@@ -842,9 +842,9 @@ env TMPDIR="$TEST_TMPDIR" \
 
 `result.json`は、そのprivate root内でexactly oneでなければならない。
 
-## 9. 変更許可ファイル11件
+## 9. 変更許可ファイル12件
 
-Mutation authorization後に変更できるtracked pathsは、次の11件だけである。
+Mutation authorization後に変更できるtracked pathsは、次の12件だけである。
 
 ```text
 full-regression-ledger.json
@@ -858,7 +858,10 @@ tests/cli_runtime/test_import.py
 tests/cli_runtime/test_runtime_import_s10.py
 tests/cli_runtime/test_sync.py
 tests/cli_runtime/test_workbench.py
+tests/integration/test_issue_392_acceptance.py
 ```
+
+12件目の`tests/integration/test_issue_392_acceptance.py`は、今回ユーザーが承認したtest-only同期pathである。`_ISSUE_BOUNDARY_SHA256`のIssue #395 Requirement／Design／Planの3値だけを最終spec freezeへ同期し、Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更しない。assertionの削除・弱化・skip・xfail化は許可しない。
 
 ### 9.1 Hand-edit可能なpaths
 
@@ -1957,7 +1960,7 @@ grep -F \
 
 ## 25. Exact changed-file gate
 
-Working-tree diffはexact 11 pathsでなければならない。
+Working-tree diffはexact 12 pathsでなければならない。
 
 ```bash
 python - "$SPEC_FREEZE_SHA" <<'PY'
@@ -1981,6 +1984,7 @@ expected = {
     "tests/cli_runtime/test_runtime_import_s10.py",
     "tests/cli_runtime/test_sync.py",
     "tests/cli_runtime/test_workbench.py",
+    "tests/integration/test_issue_392_acceptance.py",
 }
 
 actual = set(
@@ -2001,7 +2005,7 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print("implementation-file-set=11/11")
+print("implementation-file-set=12/12")
 PY
 
 git diff --check
@@ -2137,7 +2141,7 @@ Clean pushed `IMPLEMENTATION_SHA`へ、すべてのmerge-blocking proofを再束
 * Timing 243
 * Required-fast 4
 * Policy/workflow no-touch
-* Exact 11-file set
+* Exact 12-file set
 * Clean local/upstream/remote equality
 
 Working-tree proofをexact clean proofとして流用しない。
@@ -2824,7 +2828,7 @@ LunaMaxはCodexへ次を返す。
 4. Spec freeze SHA/tree
 5. Working-tree diff SHA-256
 6. Commit/push許可時のimplementation SHA/tree
-7. Exact changed files 11件
+7. Exact changed files 12件
 8. Exact changed symbols
 9. 13 rowsのindividual RED
 10. 13 rowsのGREEN

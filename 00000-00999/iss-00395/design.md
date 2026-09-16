@@ -3,7 +3,7 @@
 kind: "corrected-design"
 issue: "iss-00395"
 title: "Issue #395 LunaMax-ready Design"
-generated_at: "2026-09-15"
+generated_at: "2026-09-16"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
@@ -395,7 +395,7 @@ Missing, inconsistent, or unparsable values stop with zero mutations.
 
 Concurrent-writer absence means no other process, worktree, agent, or Issue task is authorized to write any of:
 
-* the exact 11 expected implementation paths;
+* the exact 12 expected implementation paths;
 * lifecycle-owned generated roots during the projection;
 * the Issue branch ref.
 
@@ -443,7 +443,9 @@ Raw local evidence containing absolute paths is not copied into a distributed ar
 
 ## 12. Exact clean candidate and review boundary
 
-Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 11 paths are staged. Untracked files, caches, logs, and evidence are not staged.
+Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 12 paths are staged. Untracked files, caches, logs, and evidence are not staged.
+
+The twelfth path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to synchronizing the three Issue #395 canonical-document SHA-256 expectations with the final reviewed specification freeze. The existing Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertions remain intact; the synchronization must not weaken, remove, skip, or xfail any assertion.
 
 After commit and push, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
 
@@ -527,6 +529,7 @@ Before human merge, abandon or repair the complete Issue candidate. After human 
 | I395-RQ-014 | §11              |
 | I395-RQ-015 | §14              |
 | I395-RQ-016 | §14              |
+| I395-RQ-017 | §12              |
 
 ## 16. Decision state
 

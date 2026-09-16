@@ -4,7 +4,7 @@ ID: "iss-00395"
 タイトル: "Regression Baseline Terminalization and Product Defect Repair"
 関連GitHub: ["#395"]
 状態: "draft"
-最終更新: "2026-09-15"
+最終更新: "2026-09-16"
 依存:
   - "../../artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
   - "../../requirement.md"
@@ -349,6 +349,12 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 - Publication strictness、secret non-exposure、same-repo validationを両立できない
 - Dogfood projectionがversion/lifecycle/protected dataを変更する
 - New owner decisionが必要、または`owner_decisions_required`がnon-empty
+
+### I395-RQ-017 — Issue #392 boundary assertion synchronization
+
+今回ユーザーが明示承認したスコープ拡張として、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。このpathで許可される変更は、`_ISSUE_BOUNDARY_SHA256`に記録されたIssue #395 Requirement／Design／Planの3つの期待SHA-256を、今回の最終spec freezeの実体へ同期することだけである。
+
+Issue #392のbaseline、ledger、timing、required-fast、policy、workflow、その他のboundary assertionは変更しない。assertionの削除・弱化・skip・xfail化は行わず、同期後に同じテストをfull-regression laneでnormal passさせる。この同期は仕様修正との整合を回復するentry前提であり、Productの挙動やIssue #392の契約を変更するものではない。
 
 ## 8. Non-goals
 
