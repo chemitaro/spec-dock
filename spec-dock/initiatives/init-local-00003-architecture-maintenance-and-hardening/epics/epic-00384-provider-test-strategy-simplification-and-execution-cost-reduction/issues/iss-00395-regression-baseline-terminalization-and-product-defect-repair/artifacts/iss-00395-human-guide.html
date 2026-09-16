@@ -175,7 +175,7 @@
   <p>Issue #395は、その既知failureをskipやapproved failureで隠すのではなく、元のaccepted behaviorをnormal passへ戻します。親registerは15 rowsを持ち、row 2だけが既にresolved/superseded、row 1とrows 3–15がactiveです。</p>
   <div class="grid">
     <div class="card"><strong>入力</strong><p>15 total / 14 active / 1 resolved、timing 243、current policyあり。</p></div>
-    <div class="card"><strong>修復面</strong><p>Test harness/observer 12件、Product boundary 2件。</p></div>
+    <div class="card"><strong>修復面</strong><p>Test harness/observer 12件、既存publication policyを接続する単一のProduct boundary（provider側6ファイル）。Row 12はno-edit guardです。</p></div>
     <div class="card"><strong>出力</strong><p>15 total / 0 active / 15 resolved、approved 0、unexpected 0。</p></div>
     <div class="card"><strong>次工程</strong><p>同一tip B1/B2後だけIssue #396へ進めます。</p></div>
   </div>
@@ -183,47 +183,49 @@
 
 <section id="review-finding">
   <h2>今回のP1は何が問題だったのか</h2>
-  <div class="callout warning"><strong>結論:</strong> 今回のP1は、Productの認証・公開・ledger処理そのものに脆弱性が見つかったという意味ではありません。仕様書が「現在の主仕様」と「仕様を作る途中で保存された補助履歴」を同じ許可リストとして扱っており、どのファイルを実装対象として受け入れるのかを、Gitの履歴から再現できない状態になっていたことが問題でした。</div>
-  <p>前回のStrictレビューでは、Requirementが現在のIssue Artifactを6件の主仕様パスに限定していた一方、PlanのB5が仕様packの履歴確認で6件に16件の補助Artifactを加え、合計22件を一つの許可リストとして扱っていました。実際のelaboration inputから仕様候補までのGit差分にも、その22パスが現れます。このため、レビュー時点では「22件すべてが現在の実装仕様なのか」「16件は保存された履歴なのか」を機械的に証明できませんでした。</p>
+  <div class="callout error"><strong>結論:</strong> 今回のP1は、認証情報が漏れたことを観測したという意味ではありません。Issue作成処理の「作成前に公開先Repositoryを確定し、確定した先へだけ書き込む」という契約が、現在の実装許可範囲と受入条件に明示されておらず、実装しても証明できない状態だったことが問題です。</div>
+  <p>現在の作成経路は、originのfetch URLからread-onlyのRepository identityを確認した後、GitHubのIssue作成へ進みます。しかし、作成前にfetch/pushの公開先整合性を検証する既存のpublication endpointを呼ぶ契約と、<code>gh issue create --repo &lt;owner/repo&gt;</code>で作成先を明示的に束縛する契約が、applicationのcall graphに接続されていませんでした。そのため、認証済み環境で作成を実行した場合に、意図しないRepositoryへの副作用を作成前に止められると、仕様上もテスト上も証明できません。</p>
   <div class="grid">
-    <div class="card"><strong>仕様ゲートの問題</strong><p>許可範囲、履歴、current authorityの境界が一致していませんでした。これは実装前に停止すべきP1です。</p></div>
-    <div class="card"><strong>セキュリティ実装の問題ではない</strong><p>このP1の差分区間にはProduct source、test、ledger、timing、policy、workflowの変更はありません。</p></div>
-    <div class="card"><strong>それでも安全性に関係する理由</strong><p>対象範囲が曖昧なまま実装を許すと、レビューされていないファイルを仕様として取り込む可能性があります。そのためセキュリティと同じく、実装前の停止条件にしています。</p></div>
+    <div class="card"><strong>観測した事実</strong><p>fetch-only identity resolverは存在します。publication endpointもfetch/push、userinfo、Repository不一致を検証します。ただし、Issue作成経路からpublication endpointへ接続されていません。</p></div>
+    <div class="card"><strong>まだ確認していないこと</strong><p>本レビューは実運用での認証情報漏えいや誤Repository作成を報告するものではありません。作成境界の契約欠落を、実装前にP1として扱っています。</p></div>
+    <div class="card"><strong>なぜ安全性に関係するか</strong><p>書き込み前のRepository確定がなければ、成功したように見えるIssue作成が別の公開先へ向かう可能性を排除できません。副作用前に失敗させることが必要です。</p></div>
   </div>
-  <h3>今回の再レビューで確認された4つの不整合</h3>
+  <h3>同時に見直した、Epic #384の簡素化ポイント</h3>
   <ol class="compact">
-    <li><strong>Identityの混同:</strong> 仕様レビュー対象の<code>SPEC_FREEZE_SHA/TREE</code>と、U05後に再開する既存実装の<code>RESUME_CHECKPOINT_SHA/TREE</code>を、同じcurrent tipとして扱っていました。</li>
-    <li><strong>T14の同期時点:</strong> U05後の再開でも、仕様レビューを通過する前にIssue #395の3つの文書ハッシュを同期できるように読めました。</li>
-    <li><strong>検証の順序:</strong> dirtyなworking treeでdogfood parityやfull verifierの最終証拠を作れるように見えました。</li>
-    <li><strong>変更数の測定:</strong> 実装対象13パスを明示している一方、handoffの一部が12パスのままで、U05後の累積差分を実測していませんでした。</li>
+    <li><strong>補助履歴:</strong> 16件のsupport historyは現在の仕様ではなく、no-diffだけで保全する情報資料です。mode、object type、Git object IDの一致を、実装開始の二重ゲートにしません。</li>
+    <li><strong>Issue間のSHA結合:</strong> Issue #392のProduct gateへ、Issue #395/#396の文書SHAを同期しません。#392のbaseline assertionはP392のimmutable ledger blobで独立して検証します。</li>
+    <li><strong>Parser:</strong> preflightに別の<code>urlsplit</code>やregex parserを持たず、production resolverを一つの正本として利用します。</li>
+    <li><strong>重複実行:</strong> clean candidateのfull verifierが収集したfull-regression結果を正本とし、同じnodeやsuiteをN3で再実行しません。N3はlint、SpecDock validation、手動境界証明だけに絞ります。</li>
   </ol>
-  <div class="callout ok"><strong>修正後の意味:</strong> current tipは常にclean pushedな<code>SPEC_FREEZE_SHA/TREE</code>です。<code>RESUME_CHECKPOINT_SHA/TREE</code>はその祖先の実装基点です。T14の3値同期はfresh Strict仕様レビューがpassした後だけ行い、full verifier、wheel、distribution、dogfoodの最終証拠はcommit済みclean candidateでだけ受け入れます。</div>
-  <p class="small muted">なお、Row 3のcredential-bearing origin、publication strictness、userinfo拒否などのセキュリティ要件は別の検証行列です。今回の仕様修正でそれらを緩和したり、未実行の検証をGREENと宣言したりはしていません。</p>
-  <h3>今回の再レビューで追加された確認点</h3>
-  <ul class="compact">
-    <li><strong>manifestの指定:</strong> 正規の6件目は<code>artifacts/iss-00395-chatgpt-spec-pack-manifest.md</code>です。レビュー呼出しで一度指定された<code>manifest.json</code>はリポジトリにないため、ファイルを新設せず、呼出し側の指定だけを直します。</li>
-    <li><strong>U05後のcommit:</strong> 累積の実装13件はそのまま検証しますが、実際のforward commitでstageするのはその時点のnon-emptyな差分だけです。今回のE3RではT14の1件だけをstageし、既にcommit済みの12件を空の差分として要求しません。</li>
-    <li><strong>ガイドのSHA表示:</strong> HTML自身に「current commitのSHA」を固定すると、そのHTMLを更新したcommit直後に古くなります。そのため、ガイドは<code>SPEC_FREEZE_SHA/TREE</code>を実行時のreview receiptで確認する方式にします。これはP2の資料整合性改善で、P1の合否条件ではありません。</li>
-  </ul>
+  <div class="callout ok"><strong>修正後の作成経路:</strong> create/link_existing → 既存publication endpointを一度だけ実行 → accepted slugをsame-repository validationへ渡す → create時は<code>IssueGateway</code>へslugを渡す → <code>gh issue create --repo &lt;slug&gt;</code>。importは従来どおりfetch-onlyです。retry、cache、feature flag、二重parserは追加しません。</div>
+  <h3>ユーザーに求める判断</h3>
+  <p>新しいProduct方針や追加のsecurity選択を求めているわけではありません。判断してほしいのは、次の最小方針で仕様レビューを再実施してよいかです。</p>
+  <ol class="compact">
+    <li>既存publication endpointを一度だけcreate境界へ接続する。</li>
+    <li>Issue作成先を解決済みslugで明示する。</li>
+    <li>importのfetch-only挙動、既存のsame-repository検証、credential non-exposureを維持する。</li>
+    <li>Strictスペックレビューが<code>review_status=pass</code>、P0=0、P1=0になるまでProduct/test変更を開始しない。</li>
+  </ol>
+  <p class="small muted">現在はこの再レビューが必要な段階です。仕様レビューがpassした後に実装を開始し、実装後には作成前失敗、明示的な<code>--repo</code>、4ケースのpublication security matrixをテストで確認します。</p>
 </section>
 
 <section id="admission-change">
   <h2>仕様の変更前後</h2>
-  <p>ブルーチームの提案に従い、製品仕様を広げるのではなく、仕様の受け入れ方を明確化しました。現在の実装対象は従来どおり6件です。追加の16件は削除・改名・再圧縮せず、過去の仕様作成過程を検証するための不変な補助履歴として固定します。</p>
+  <p>ブルーチームの提案に従い、製品仕様を広げるのではなく、仕様の受け入れ方と作成境界を明確化しました。current specification surfaceは従来どおり6件です。実装candidateは必要なprovider、generated、test、ledgerのfocused 26 pathsに限定します。追加の16件は削除・改名・再圧縮せず、過去の仕様作成過程を参照する補助履歴として保全します。</p>
   <div class="table-scroll"><table>
     <thead><tr><th>観点</th><th>修正前</th><th>修正後</th></tr></thead>
     <tbody>
       <tr><td>現在の主仕様</td><td>Requirementの6パスと、B5の22パスの意味が競合</td><td>Requirement / Design / Plan / handoff / guide / manifestの6パスだけをcurrent authorityとする</td></tr>
       <tr><td>補助Artifact 16件</td><td>主仕様と同じallowlistに混在</td><td><code>c0736434503117d5d468d1438fb18da16d382a56</code>時点のimmutable support historyとして保存</td></tr>
       <tr><td>Git履歴の検証</td><td>22パスを一つの集合として確認</td><td>P392→elaboration、elaboration→履歴checkpoint、checkpoint→修正後freezeの3区間に分ける</td></tr>
-      <tr><td>履歴の同一性</td><td>パス数中心で、履歴Artifactの内容固定が不明確</td><td>16件についてpath、mode、object type、Git object IDの一致を確認する</td></tr>
+      <tr><td>履歴の同一性</td><td>非正本の履歴が実装開始のblocking gateになっていた</td><td>16件はno-diffだけで保全し、mode、object type、Git object IDの一致を二重の実装gateにしない</td></tr>
       <tr><td>実装許可の表示</td><td>明示dispatch後もfalseという説明が残る</td><td><code>implementation_allowed=true</code>はdispatchの事実を示す。ただしfresh Strict passまで実効的なProduct変更はblocked</td></tr>
-      <tr><td>セキュリティ境界</td><td>仕様Admissionの曖昧さとsecurity行列の関係が説明不足</td><td>security要件は維持し、未実行のsecurity行列を合格扱いしないことを明記</td></tr>
+      <tr><td>セキュリティ境界</td><td>Issue作成前のpublication検証と作成先のbindingがcall graph上で証明できない</td><td>既存publication endpointを一度だけcreate境界へ接続し、accepted slugを<code>--repo</code>へ渡す。preflight失敗時は副作用0</td></tr>
       <tr><td>U05後のidentity</td><td>resume checkpointをcurrent tipとして扱う余地があった</td><td><code>SPEC_FREEZE</code>をcurrent tip、<code>RESUME_CHECKPOINT</code>を祖先の実装基点として別々に検証</td></tr>
-      <tr><td>T14同期の時点</td><td>仕様レビュー前にも3つの期待ハッシュを更新できるように読める</td><td>fresh Strict仕様レビューpass後のE3Rに限定し、3値以外は変更しない</td></tr>
+      <tr><td>Issue #392境界witness</td><td>Issue #395/#396の文書SHAが#392 Product gateへ結合</td><td>P392のimmutable baseline assertionを維持し、不要な文書SHA比較だけを実装時に除去する</td></tr>
       <tr><td>最終検証の状態</td><td>dirty treeのverifier/dogfood結果が最終証拠に混ざる余地があった</td><td>最終証拠はclean pushed implementation candidateでのみ取得</td></tr>
-      <tr><td>実装パスの数え方</td><td>handoffの一部が12件で、migration observerが漏れていた</td><td>実装13件を列挙し、U05後は累積19件をGit差分として実測</td></tr>
-      <tr><td>U05後のstage単位</td><td>累積13件と今回のforward commitの差分を同じ集合として要求</td><td>累積13件を別途証明し、E3Rでは実測したT14のnon-empty 1件だけをstage</td></tr>
+      <tr><td>実装パスの数え方</td><td>Productの作成境界ファイルが許可範囲から漏れていた</td><td>provider、generated、test、ledgerを含むfocused 26 pathsを一つの実装scopeとして列挙する</td></tr>
+      <tr><td>U05後のstage単位</td><td>累積scopeとforward commitの差分を同じ集合として扱う余地があった</td><td>累積scopeとnon-empty incremental subsetを分け、空commitを作らない</td></tr>
     </tbody>
   </table></div>
 
@@ -236,22 +238,22 @@ rectangle "P392\nProduct・test・ledgerの入口" as P392
 rectangle "Elaboration input\n仕様作成の開始点" as ELAB
 rectangle "Support-history checkpoint\n6件の主仕様 + 16件の履歴" as SUPPORT
 rectangle "初回実装\n主仕様6件だけを修正" as INITIAL
-rectangle "U05後の再開\n既存実装13件を保持" as RESUME
+rectangle "U05後の再開\n既存実装26件を保持" as RESUME
 rectangle "仕様レビュー対象\ncurrent tip・clean pushed" as FREEZE
 P392 --> ELAB : receipt文書2件
-ELAB --> SUPPORT : 22件を履歴として確定
+ELAB --> SUPPORT : provenanceとして記録
 SUPPORT --> INITIAL : 初回実装
 INITIAL --> FREEZE : 主仕様6件だけを修正
 SUPPORT --> RESUME : U05後の既存candidate
 RESUME --> FREEZE : docs-only訂正
 note bottom of SUPPORT
-16件はGit tree entryを固定
+16件はcheckpoint以降no-diffで保全
 current authorityではない
 end note
 @enduml </script> <div id="diagram-admission-history" class="plantuml-diagram">仕様Admission図を描画しています。</div> <details><summary>編集可能なPlantUMLソース</summary><pre data-source-copy="source-admission-history"></pre></details>
 
   <h3>保全する16件の補助履歴</h3>
-  <p>次のパスは、現在の実装仕様ではありません。checkpointのGit tree entryと一致することだけを要求し、実装者の書き換え対象から外します。</p>
+  <p>次のパスは、現在の実装仕様ではありません。support-history checkpoint以降に差分がないことだけを確認し、実装者の書き換え対象から外します。mode、object type、Git object IDは履歴情報であり、実装開始の追加ゲートにはしません。</p>
   <ol class="compact">
     <li><code>artifacts/design-luna-max-ready.md</code></li>
     <li><code>artifacts/iss-00395-design-tdd-ready.md</code></li>
@@ -320,7 +322,7 @@ end note
 <section id="architecture">
   <h2>修復アーキテクチャ</h2>
   <h3>Product row 3: identityとpublicationの分離</h3>
-  <p>現在の<code>origin_github_repo_slug</code>は<code>origin_github_publication_endpoint</code>を呼ぶため、credential-bearing HTTPS originをread-only identityとして解釈できません。修復後はfetch originからslugだけを読み、publication時だけuserinfo拒否とfetch/push一致を要求します。</p>
+  <p>現在の<code>origin_github_repo_slug</code>はfetch-onlyのread-only identity resolverです。別に存在する<code>origin_github_publication_endpoint</code>はfetch/push、userinfo、Repository不一致を検証しますが、Issue作成経路から接続されていません。修復後はimportのfetch-only挙動を維持し、create/link_existingの作成前にpublication endpointを一度だけ実行して、accepted slugを<code>gh issue create --repo &lt;slug&gt;</code>へ渡します。</p>
   <script type="text/plain" class="plantuml-source" id="source-product-boundary" data-target="diagram-product-boundary">
 
 @startuml
@@ -328,23 +330,34 @@ title Read-only identity と publication policy
 left to right direction
 actor "Import user" as User
 component "application.import_node" as Import
+actor "Create user" as Creator
+component "application.create_node" as Create
 component "GitGateway\norigin_github_repo_slug" as Port
+component "GitGateway\npublication_repo_slug" as PubPort
 component "infra.git_cli\n_parse_github_repo_slug" as Parser
 component "origin_github_publication_endpoint" as Publish
+component "IssueGateway" as IssueGateway
 rectangle "fetch origin\nhttps://token@github.com/example/repo.git" as Fetch
 rectangle "push origin" as Push
+rectangle "gh issue create\n--repo <slug>" as GhCreate
 User --> Import : canonical same-repo URL
 Import --> Port : read-only identity
 Port --> Fetch : git remote get-url origin
 Fetch --> Parser : owner/repoだけ抽出
 Parser --> Import : example/repo
 Import --> Import : target URLとsame-repo照合
+Creator --> Create : new node / link_existing
+Create --> PubPort : publication preflight
+PubPort --> Publish : fetch + push validation
+Publish --> Create : accepted slug
+Create --> IssueGateway : create with repo_slug
+IssueGateway --> GhCreate : explicit target binding
 Publish --> Fetch : publication fetch validation
 Publish --> Push : publication push validation
 Publish --> Publish : userinfo拒否\nfetch/push slug一致\nsecret redaction
 note bottom of Parser
 URLやcredentialを返さない
-new public APIを作らない
+別のpolicy層やCLI optionを作らない
 end note
 @enduml </script> <div id="diagram-product-boundary" class="plantuml-diagram">Product境界図を描画しています。</div> <details><summary>編集可能なPlantUMLソース</summary><pre data-source-copy="source-product-boundary"></pre></details>
 
@@ -367,7 +380,7 @@ rectangle "Rows 4-11\nscaffolder double" as R4
 rectangle "Rows 13-14\nsync observer" as R13
 rectangle "Row 15\nWorkbench observer" as R15
 }
-package "Product boundary: 2" {
+package "Product boundary: 1 / no-edit guard" {
 rectangle "Row 3\nrepo identity vs publication" as R3
 rectangle "Row 12\nthin shell\ncurrent source already compliant" as R12
 }
@@ -413,8 +426,8 @@ end note
   <h2>いまユーザーに求められていること</h2>
   <div class="callout ok"><strong>現時点で追加の製品判断はありません。</strong> ユーザーはすでに「仕様の実装を明示的に許可」しているため、<code>implementation_allowed=true</code>です。現在は、仕様訂正をclean pushedし、fresh Strict仕様レビューをpassさせることが先行条件です。</div>
   <div class="grid">
-    <div class="card"><strong>今すぐの確認</strong><p>新しいowner decisionやsecurity仕様の変更を求めているわけではありません。current authority 6件、support history 16件、実装13件の区別を確認します。</p></div>
-    <div class="card"><strong>実装再開後の確認</strong><p>U05後の再開では、既存terminal ledgerを再利用し、U05をやり直しません。仕様レビューpass後にT14の3つの文書ハッシュだけを同期します。</p></div>
+    <div class="card"><strong>今すぐの確認</strong><p>新しいowner decisionやsecurity仕様の変更を求めているわけではありません。current authority 6件、support history 16件、focused implementation 26 pathsの区別を確認します。</p></div>
+    <div class="card"><strong>実装再開後の確認</strong><p>U05後の再開では、既存terminal ledgerを再利用し、U05をやり直しません。Issue #392のboundary witnessから不要な文書SHA比較だけを除去し、P392のbaseline assertionは維持します。</p></div>
     <div class="card"><strong>人間に残る判断</strong><p>実装・レビューが完了しても、PRのmerge、Issue closure、#396 start、mainへのmergeは人間だけが判断します。</p></div>
   </div>
   <h3>停止した場合に見てほしい情報</h3>
@@ -431,13 +444,10 @@ start
 :Specification admission\n主仕様6件・履歴16件;
 :Fresh Strict spec review\nP0/P1=0;
 :Identity/active/15-row/243 preflight;
-:Entry full verifier\nexact 10 P392 violations;
-if (U05が完了済み?) then (完了)
-:Resume checkpointを祖先として確認;
-:T14の3文書SHAだけを同期;
-else (初回)
-:T14のbaseline bindingと3文書SHAを同期;
-endif
+:Entry full verifier\nexact 10 violations + known boundary witness;
+:Resume checkpointは必要時だけ祖先として確認;
+:Issue #392 boundary witnessの不要な文書SHA比較を実装時に除去;
+:P392のbaseline bindingとboundary assertionを保持;
 :Row 12 current passを確認;
 :Rows 4-11 scaffolder double RED;
 :Rows 1,13,14,15 retired args RED;
@@ -451,7 +461,7 @@ endif
 :Post-U05 terminal stateを確認;
 :CandidateをSPEC_FREEZEのclean tipとしてcommit/pushまたはadopt;
 :Clean candidate full verifier verified;
-:Ordinary/lifecycle/platform/package/lint/validate GREEN;
+:N2 full verifier verified; N3 lint/validate/manual proof GREEN;
 :Strict code review + Pro FQG pass;
 :Human PR merge;
 :B1 current gates GREEN;
@@ -462,7 +472,7 @@ stop
 <section id="failure-flow">
   <h2>失敗・停止flow</h2>
   <ul class="compact">
-    <li>Specification admissionが6件/16件の区別、三つのGit差分区間、16件のtree entry一致を証明できなければ、Product変更前に停止します。</li>
+    <li>Specification admissionで6件のcurrent pack、16件のsupport history、support historyのno-diffを証明できなければ、Product変更前に停止します。</li>
     <li>許容外violation、row/signature/count/timing driftはProduct変更前に停止します。</li>
     <li>Publication strictnessとread-only identityを両立できなければ、credential許可で迂回しません。</li>
     <li>S10 testを通すためにproductionを旧copy APIへ戻しません。</li>
@@ -545,12 +555,9 @@ mkdir -p "$evidence_dir/verifier"
 env TMPDIR=/private/tmp uv run python -m scripts.quality.verify_full_regression --shards 4 --artifact-dir "$evidence_dir/verifier"</code></pre>
   <p>このfinal verifierは、commit済みでcleanなcandidate SHA/TREEを固定した後にだけ実行します。Working treeのdiagnostic結果をfinal receiptへ転用しません。Exit 0、<code>status=verified</code>、active 0、resolved 15、violations 0を要求します。</p>
 
-  <h3>Ordinary / lifecycle / package / static（clean candidate後）</h3>
-  <pre><code>env TMPDIR=/private/tmp uv run pytest -q --tb=short
-
-env TMPDIR=/private/tmp uv run pytest -q --tb=short tests/unit/provider_lifecycle
-env TMPDIR=/private/tmp uv run pytest --run-full-regression --full-regression-shard -q --tb=short tests/integration/test_provider_lifecycle_dogfood.py
-env TMPDIR=/private/tmp make lint
+  <h3>Clean candidateの非重複gate</h3>
+  <p>full-regressionのnode、distribution、lifecycle、package、dogfoodは上のfull verifierが一度だけ収集・実行します。同じcandidateで個別suiteを再実行しません。ここではN2が収集しない静的gateだけを確認します。</p>
+  <pre><code>env TMPDIR=/private/tmp make lint
 ./spec-dock/scripts/spec-dock validate</code></pre>
 
   <h3>No-touch</h3>
@@ -560,14 +567,14 @@ env TMPDIR=/private/tmp make lint
 
 <section id="security">
   <h2>セキュリティ上の意味</h2>
-  <p>今回のP1を「セキュリティ確認の失敗」と短く言うと誤解が生じます。正確には、security要件を含む実装へ進む前に、仕様の出典と対象範囲を固定できていないという、仕様ガバナンス上の安全性問題でした。</p>
+  <p>今回のP1を「認証情報が漏れた」と短く言うと誤解が生じます。正確には、Issue作成前にpublication先を確定して副作用を防ぐ実装契約がcall graph上で証明できず、同時にその修復範囲へ不要な履歴・重複ゲートが混ざっていたことです。仕様は、最小のcreate-boundary修正と独立したsecurity証拠に分けます。</p>
   <div class="table-scroll"><table>
     <thead><tr><th>確認対象</th><th>今回の修正でどう扱うか</th><th>合格の証拠</th></tr></thead>
     <tbody>
-      <tr><td>仕様の対象範囲</td><td>current authorityは6件、補助履歴は16件。履歴16件はno-touch。</td><td>B5の3区間比較とsupport tree entry一致</td></tr>
+      <tr><td>仕様の対象範囲</td><td>current authorityは6件、補助履歴は16件。履歴16件が実装gateへ混在。</td><td>6件のcurrent packとsupport historyのno-diff。mode/object/Git IDは追加gateにしない</td></tr>
       <tr><td>秘密情報・認証情報</td><td>新しい資格情報を追加せず、例外的な公開許可で補助履歴を正当化しない。</td><td>既存のsecurity要件・No-touch確認、secret混入なし</td></tr>
-      <tr><td>Repository identity</td><td>credential-bearing HTTPS originをread-only identityとして扱う既存のRow 3要件を維持する。</td><td>Row 3のfocused testとsecurity行列</td></tr>
-      <tr><td>Publication</td><td>userinfo拒否、fetch/push一致、publication strictnessを緩和しない。</td><td>publication boundaryのテストとStrict review</td></tr>
+      <tr><td>Repository identity</td><td>credential-bearing HTTPS originをread-only identityとして扱う既存のRow 3要件を維持する。</td><td>fetch-only resolverとRow 3のfocused test</td></tr>
+      <tr><td>Publication</td><td>userinfo拒否、fetch/push一致、publication strictnessを維持し、作成先を暗黙のremoteに任せない。</td><td>create前のpublication preflight、明示的な<code>--repo</code>、4ケースのsecurity matrix</td></tr>
       <tr><td>未実行の検証</td><td>仕様修正だけではGREENと宣言しない。Product実装後に別ゲートで確認する。</td><td>15 focused nodes、full verifier、Strict code review、Pro FQG</td></tr>
     </tbody>
   </table></div>

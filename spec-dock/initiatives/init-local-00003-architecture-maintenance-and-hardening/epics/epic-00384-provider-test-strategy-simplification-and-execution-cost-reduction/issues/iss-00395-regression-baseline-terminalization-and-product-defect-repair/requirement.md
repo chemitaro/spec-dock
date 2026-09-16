@@ -35,7 +35,7 @@ support_history_evidence:
 
 ## 1. 結論と現在位置
 
-Issue #395は、human-merged P392が残したpost-#387回帰baselineの14 active rowsを、親registerで確定済みの原因分類に従ってnormal passへterminalizeする。修復面はtest harness / observer 12件とProduct境界2件である。ただし、P392 exact treeではProduct row 12のthin-shell境界は既にapplication contract経由へ回復済みであり、現行Full Regressionは同rowを`coverage_mismatch`として観測している。したがってrow 12は、現行Product構造を保持し、normal pass観測とledgerの`fixed-in-place`解決で閉じる。現行構造を再編集すること自体を成果条件にしない。
+Issue #395は、human-merged P392が残したpost-#387回帰baselineの14 active rowsを、親registerで確定済みの原因分類に従ってnormal passへterminalizeする。修復面はtest harness / observer 12件と、既存publication policyをcreate境界へ接続する単一のProduct境界である。ただし、P392 exact treeではProduct row 12のthin-shell境界は既にapplication contract経由へ回復済みであり、現行Full Regressionは同rowを`coverage_mismatch`として観測している。したがってrow 12は、現行Product構造を保持し、normal pass観測とledgerの`fixed-in-place`解決で閉じる。現行構造を再編集すること自体を成果条件にしない。
 
 本Issueのformal `issue start`は、指定Issue branchと添付generated contextで`iss-00395`がactiveである状態として扱う。formal startはbranch/active scopeの選択であり、Product実装許可ではない。本書、Design、Plan、LunaMax handoff、human guide、manifestをlocal canonical treeへ反映し、SpecDock validation、clean push、exact-tipの独立`chatgpt-spec-review-strict`で`review_status=pass`かつP0/P1=0を得たうえで、ユーザーが本メッセージで仕様の実装を明示的に許可したため、現在の`実装開始許可: true`を記録する。この許可は、実装前のexact identity／同時書き込みなしの確認、Product/test GREEN、code review、human merge、B1/B2、#392/#395 closureを完了扱いにしない。
 
@@ -140,17 +140,17 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 1. Repositoryは`chemitaro/spec-dock`、branchは`iss-00395-regression-baseline-terminalization-and-product-defect-repair`である。
 2. **初回実行**でも**U05後の再開**でも、reviewed spec freeze SHA/tree、local `HEAD`、configured upstream、remote branch tipが一致し、worktreeがcleanである。U05後の再開でpacketが渡す`RESUME_CHECKPOINT_SHA/TREE`は、既存実装の祖先であるresume基点として別に検証し、current tipの一致対象にはしない。既に完了したU05遷移を再実行してこのidentityを作り直してはならない。
 3. `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`がspec freeze tipのancestorである。
-4. Specification admission historyは、次の三つのsegmentを独立に検証する。22 pathsを単一のcurrent-spec allowlistとして扱わない。
+4. Specification admission historyは、次の三つの基幹segmentを独立に検証する。post-U05のresumeは第三segmentの別modeであり、22 pathsを単一のcurrent-spec allowlistとして扱わない。
    - **P392からelaboration inputまで:** Epic PlanとIssue #392 Reportのexact 2 pathsだけが変化し、Product source、tests、ledger、timing、policy、workflowは変化しない。
-   - **Elaboration inputからsupport-history checkpointまで:** current canonical specification packの6 pathsと、§2.3のgrandfathered support history 16 pathsのexact 22 pathsだけが存在し、それ以外の差分がない。
-   - **Support-history checkpointからreviewed spec freezeまで（initial mode）:** current canonical specification packのexact 6 pathsだけが変更され、support history 16 pathsのpath、mode、object type、Git object IDがcheckpointと完全一致する。
-   - **Resume checkpointからreviewed spec freezeまで（post-U05 mode）:** 仕様訂正差分はcurrent canonical specification packの6 paths内だけであり、support-history checkpointからreviewed spec freezeまでの累積差分はcanonical 6 pathsとimplementation 13 pathsのexact 19 pathsである。support history 16 pathsのpath、mode、object type、Git object IDはcheckpointと完全一致する。
+   - **Elaboration inputからsupport-history checkpointまで:** current canonical specification packの6 pathsと、§2.3のgrandfathered support history 16 pathsが作成された履歴を確認する。support historyはcurrent authorityではなく、実装許可や実装対象のallowlistに含めない。
+   - **Support-history checkpointからreviewed spec freezeまで（initial mode）:** current canonical specification packのexact 6 pathsだけを仕様訂正の対象とし、support historyに変更がないことだけを確認する。support historyのmode、object type、Git object IDを実装開始のblocking条件にしない。
+   - **Resume checkpointからreviewed spec freezeまで（post-U05 mode）:** 仕様訂正差分はcurrent canonical specification packの6 paths内に限定し、support historyは変更しない。累積差分の実装対象は、後述する必要最小限のimplementation pathsで明示する。
    P392 receiptを保持する親文書は、上記のP392からelaboration inputまでのdoc-only契約に含めて確認する。
 5. `./spec-dock/scripts/spec-dock active show`がIssue `iss-00395`を示す。generated active stateをtracked `.meta.json`やGitHub Issue bodyから推測しない。
 6. `.meta.json`のID/GitHub linkageは`iss-00395` / `#395`、`depends_on=[]`である。`.meta.json`は手編集しない。
 7. P392 historical ledgerはtable orderを含むexact 15 rowsで、row 1とrows 3–15がactive、row 2がresolved/supersededである。current root ledgerも同じnodeid、signature、row order、row 2 objectを保持し、U05遷移後はexact 15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`である。どの状態を検査しているかを、P392 historical beforeとcurrent root afterで明示する。
 8. timingの`node_seconds`は243 entriesである。
-9. 初回Entry verifierは、rows 4–12、15の計画済み10件と、承認済みT14同期対象の`tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`だけを観測する。T14同期後の再検証ではrows 4–12、15だけに限定され、#392-owned/unexpected failureは0である。rows 1、3、13、14はactive failure signatureが一致し、row 2のsuccessorはnormal passする。
+9. 初回Entry verifierは、現行baselineの診断としてrows 4–12、15の計画済み10件と、`tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged`の既知の独立した境界witness不整合を記録する。この境界witness不整合はIssue #395/396文書SHAのProduct gate結合を除去する実装対象であり、仕様レビュー前に期待値を同期して解消してはならない。実装後の再検証ではrows 4–12、15だけに限定され、#392-owned/unexpected failureは0である。rows 1、3、13、14はactive failure signatureが一致し、row 2のsuccessorはnormal passする。
 10. `owner_decisions_required=[]`であり、同時に別Issue writerがいない。
 11. implementation-ready packの独立Strict reviewがpassし、実装dispatchにexact spec freeze SHAと許可証跡が含まれる。
 
@@ -162,12 +162,12 @@ Product/test/ledger変更へ進む前に、すべての条件を満たす。
 
 | Category | Path / surface | Write rule |
 |---|---|---|
-| Product row 3 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py` | Existing symbolsだけを用いてread-only repository identityとpublication endpoint policyを分離する。 |
+| Product row 3 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py`、`application/repo_context.py`、`application/ports.py`、`application/create_node.py`、`cli/bootstrap.py`、`infra/github_cli.py` | 既存のpublication endpoint policyをcreate境界へ一度だけ接続し、作成前にcanonical repositoryを確定する。read-only importはfetch-only identityを維持し、GitHub作成先には明示的な`--repo`を渡す。新しいpolicy層、retry、cache、feature flagは追加しない。 |
 | Generated dogfood candidate | `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`、`spec-dock/spec-dock.version`、`.agents/skills/spec-dock/.spec-dock-provider-slot.json`、`.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json` | Provider source GREEN後にSpecDock updateで一つのcandidateとして投影する。四fileとも手編集しない。Runtime mirror bytesを更新し、recordと二slot markerの`candidate_digest`を同じ新digestへ束縛する。 |
 | Product row 12 | `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py`、`application/contracts.py`、`domain/artifacts.py` | 現行構造は既にaccepted correctionを満たすため、preflight一致時は変更しない。drift時だけstop-and-returnし、推測修正しない。 |
 | Test rows 1、3–11、13–15 | `tests/cli_runtime/test_delete.py`、`test_import.py`、`test_runtime_import_s10.py`、`test_sync.py`、`test_workbench.py` | Node identityを保持し、observer/test doubleだけを現行contractへ追随させる。 |
 | Ledger migration observer | `tests/unit/test_provider_test_lanes.py` | P392 entryのimmutable `full-regression-ledger.json` Git blobをbefore、current root ledgerをafterとして読み、許可された14行の`lifecycle` / `resolution_mode`変更だけでafterが構成されることをexact payload equalityで検証する。evaluator/verifierの仕様は変更しない。 |
-| Issue #392 boundary observer | `tests/integration/test_issue_392_acceptance.py` | T14の既存baseline assertionを保持し、baseline payloadだけをP392 entryのimmutable Git blobから読む。Issue #395 Requirement／Design／Planの期待SHA-256 3値だけを現行spec freezeへ同期する。 |
+| Issue #392 boundary observer | `tests/integration/test_issue_392_acceptance.py` | T14の既存baseline assertionを保持し、baseline payloadだけをP392 entryのimmutable Git blobから読む。Issue #395/396文書のSHA-256をProduct regression gateへ同期しない。 |
 | Structural observer row 12 | `tests/cli_runtime/test_runtime_shell_s11.py` | Existing assertionsとnode identityを保持する。assertion削除・弱化は禁止。 |
 | Transitional state | `full-regression-ledger.json` | 14 active rowsを`resolved` / `fixed-in-place`へ移す。historical fieldsとrow 2を保持する。 |
 | Canonical Issue docs | 本IssueのR/D/P | Stable parent contractを意味変更せず具体化する。 |
@@ -178,10 +178,6 @@ Support history 16件はcurrent Issue Artifactsではなく、§2.3で定義し�
 ### 5.2 Shared/read-only surfaces
 
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py`
 - `scripts/quality/full_regression_baseline.py`
 - `scripts/quality/verify_full_regression.py`
@@ -192,7 +188,7 @@ Support history 16件はcurrent Issue Artifactsではなく、§2.3で定義し�
 - `.github/workflows/provider-full-regression.yml`
 - #392 lifecycle source、wire record、migration、uninstall、recovery、bootstrap、coordination、package version
 
-`§2.3`で列挙したexact 16 support-history artifactsもshared/read-only surfaceである。固定checkpointとのtree-entry equalityを保持し、edit、delete、rename、regenerate、recompress、reclassifyを行わない。これらをcurrent authorityまたはimplementation inputとして使用しない。
+`§2.3`で列挙したexact 16 support-history artifactsもshared/read-only surfaceである。今回のcandidateからの変更がないことだけを確認し、edit、delete、rename、regenerate、recompress、reclassifyを行わない。固定checkpointとのmode、object type、Git object ID一致は履歴receiptの情報であり、current implementation gateにしない。これらをcurrent authorityまたはimplementation inputとして使用しない。
 
 これらは本Issueのaccepted behaviorを観測するために読む。修復に意味変更が必要なら親へ戻す。
 
@@ -213,7 +209,7 @@ Support history 16件はcurrent Issue Artifactsではなく、§2.3で定義し�
 | Row | Exact nodeid | Historical signature SHA-256 | Accepted behavior | 確定原因 | 修復面とacceptance |
 |---:|---|---|---|---|---|
 | 1 | `tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active` | `0d6c418e8c531ed77662b5bb0f166c6370f1b4d995a1ec6ac23452382c34869f` | 削除済みnode metadataはvalidate、sync、active-state observation後も再観測されない。 | 廃止済み`active set --force`を使用。 | Test observer。`active set --id iss-00058`でselection-only操作を成功させ、delete後の非再観測assertionsを保持する。 |
-| 3 | `tests/cli_runtime/test_import.py::TestCliImport::test_import_accepts_canonical_url_when_origin_is_credentialed_https_remote` | `f149be56ae07e7b774137b1f8f5912076a82838250be9750c886aca7a8392a5f` | Credential-bearing HTTPS originからcanonical same-repository URLをimportでき、credentialを露出しない。 | Read-only identity解析がpublication endpoint policyへ結合。 | Product。fetch originからread-only slugを解決し、target URLとのsame-repo照合を維持する。stdout/stderrへ`token`またはcredential-bearing URLを出さない。publication endpointはuserinfo拒否とfetch/push整合を維持する。 |
+| 3 | `tests/cli_runtime/test_import.py::TestCliImport::test_import_accepts_canonical_url_when_origin_is_credentialed_https_remote` | `f149be56ae07e7b774137b1f8f5912076a82838250be9750c886aca7a8392a5f` | Credential-bearing HTTPS originからcanonical same-repository URLをimportでき、credentialを露出しない。 | Read-only identity解析がpublication endpoint policyへ結合。 | Product。importはfetch originからread-only slugを解決し、target URLとのsame-repo照合を維持する。create/link_existingは既存publication endpointを作成前に一度だけ検証し、accepted slugを`IssueGateway`へ渡して`gh issue create --repo <slug>`へ束縛する。stdout/stderrへ`token`またはcredential-bearing URLを出さず、publication endpointのuserinfo拒否とfetch/push整合を維持する。preflight失敗時はGitHub/local writeを行わない。 |
 | 4 | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_regression` | `3f7d32388f2d60f77ec1740aac53fd6d6481f7cb04ef3f3ae7ef09463a29a980` | Import parent fallbackがaccepted existing parentを解決する。 | `_StubTemplateScaffolder`が`copy_scaffolded_tree_at`を未実装。 | Test double。descriptor-bound portへ追随し、parent、GitHub read、active manifest assertionsを保持する。 |
 | 5 | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_load_active_manifest_chain_regression` | `55f2d59d2e1ce7b337462feefbde5c5a84423d07f039ff5fb5dd7bc8b10762ce` | Retired workflow authorityなしにcurrent active manifest chainを読む。 | 同上。 | Test double。cheap precheckとlock-side再解決の2 read、active IDs、artifact failure handlingを保持する。 |
 | 6 | `tests/cli_runtime/test_runtime_import_s10.py::TestRuntimeImportS10::test_parent_fallback_re_resolves_inside_lock_when_parent_drifts_regression` | `ab1f703094ed3335d43ff943cb9194266ee2c162758b3c732b47c1c1cee9256a` | 観測parentが変化した場合、existing lock内でfallbackを再解決する。 | 同上。 | Test double。2回のparent resolution、second parentへの作成、GitHub read assertionsを保持する。 |
@@ -235,13 +231,13 @@ Row 2は本Issueのactive scopeではない。既存`resolved/superseded`、hist
 
 §4をすべて満たす。P392 entry、elaboration input、support-history checkpoint、current spec freezeを別のidentityとして記録し、current tipがP392 Product/test/ledgerを保持することをpath-level diffで証明する。GitHub IssueのOPEN/CLOSED、SpecDock `ready=true`、過去candidateのtest結果だけでentryを代替しない。
 
-Canonical primary packはexact 6 pathsである。Exact 16 support artifactsはpreserved support historyとしてのみadmitし、current canonical packまたはowned write surfaceへadmitしない。Plan B5は三つのhistory segmentのpath-set検証と、16 support pathsのtree-entry equalityを実行する。Manifestの自己申告、working-tree上の存在、directory prefix allowlist、過去のZIP hashだけではこの検証を代替できない。
+Canonical primary packはexact 6 pathsである。Exact 16 support artifactsはpreserved support historyとしてのみadmitし、current canonical packまたはowned write surfaceへadmitしない。Plan B5はcurrent canonical packのpath-setとsupport historyのno-diffだけを検証する。Manifestの自己申告、working-tree上の存在、directory prefix allowlist、過去のZIP hashだけではcurrent canonical packの検証を代替できない。
 
 ### I395-RQ-002 — Cause-appropriate repair
 
 Rows 1、4–11、13–15はtest harness/observerを修正し、Productを廃止済みCLI/APIへ退行させない。Row 3はProduct identity boundaryを修正する。Row 12はcurrent compliant boundaryを保護し、不要なsource変更を行わない。修正後に同じaccepted behaviorがnormal passすることをrowごとに観測する。
 
-### I395-RQ-003 — Read-only identity / publication separation
+### I395-RQ-003 — Read-only identity / publication separation and create binding
 
 `infra/git_cli.py`のexisting symbolsで次を成立させる。
 
@@ -249,8 +245,12 @@ Rows 1、4–11、13–15はtest harness/observerを修正し、Productを廃止
 - `origin_github_repo_slug`はfetch originだけを読み、read-only identityを返す。push URLやpublication可否を要求しない。
 - `origin_github_publication_endpoint`はfetch/push両方を読み、どちらかにuserinfoがあれば拒否し、両slug不一致を拒否する。
 - `_remote_has_userinfo`と`_redact_remote_url`を維持し、credential-bearing URL、username、password、tokenをexception、stdout、stderrへ展開しない。
-- `application.ports.GitGateway.origin_github_repo_slug`、`cli.bootstrap._GitGateway.origin_github_repo_slug`、`application.repo_context.require_current_repo_slug`のpublic/internal signatureを変更しない。
+- 新しい`GitGateway.origin_github_publication_repo_slug(repo_root)`は、既存の`origin_github_publication_endpoint`を一度だけ呼び、accepted slugだけをapplicationへ返す薄いadapterとする。publication policyを別実装しない。
+- `application.create_node`の`create` / `link_existing`は、GitHub gatewayまたはlocal writeより前にpublication用slugをrequireし、requested repositoryとの一致を既存のsame-repository validationへ渡す。
+- `IssueGateway.issue_create`はnormalized `repo_slug`を必須引数として受け取り、GitHub adapterは`gh issue create --repo <repo_slug>`を実行する。作成先を`gh`の暗黙のremote解決に任せない。
+- `application.ports.GitGateway.origin_github_repo_slug`、`cli.bootstrap._GitGateway.origin_github_repo_slug`、`application.repo_context.require_current_repo_slug`はread-only import互換のため変更しない。
 - `application.import_node`のsame-repository validation、numeric target current-scope requirement、foreign URL rejectionを弱めない。
+- create経路では、publication preflightの失敗時にIssueGatewayとlocal writeを呼ばない。`github_cli`はpolicyを再実装せず、target bindingとcredentialを含まない診断だけを担当する。
 
 ### I395-RQ-004 — Descriptor-bound harness repair
 
@@ -353,20 +353,20 @@ Rollback unitはwhole Issue #395 mergeである。#396開始前にB1またはB2�
 - Repository、branch、P392 SHA、spec freeze SHA、upstream/remoteの不一致
 - P392からcurrent spec freezeまでに許可外Product/test/policy差分がある
 - 15 rows、14/1 count、nodeid、signature、row order、row 2 successor、timing 243のdrift
-- 初回Entry verifierで計画済み10件と承認済みT14同期対象以外のviolation、または同期後にrows 4–12、15以外のviolation、#392-owned failure、unexpected failureがある
+- 初回Entry verifierで計画済み10件と既知の独立したT14 boundary witness以外のviolation、または実装後にrows 4–12、15以外のviolation、#392-owned failure、unexpected failureがある
 - Current path/symbolが存在しない、またはrow 12のcompliant boundaryが失われている
 - Accepted behaviorを満たすためにlifecycle wire、`E384-QUAL-001`、policy retirement、workflow redesign、main merge、new Issueが必要
 - Publication strictness、secret non-exposure、same-repo validationを両立できない
 - Dogfood projectionがversion/lifecycle/protected dataを変更する
 - New owner decisionが必要、または`owner_decisions_required`がnon-empty
 
-### I395-RQ-017 — Issue #392 boundary assertion synchronization
+### I395-RQ-017 — Issue #392 boundary witness independence
 
-今回ユーザーが明示承認したスコープ拡張として、`tests/integration/test_issue_392_acceptance.py`をIssue #395のtracked implementation pathへ追加する。このpathで許可される変更は、Issue #392の既存baseline assertionを変更せずに維持するため、baseline payloadの読み取り元をP392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blobへ束縛すること、および`_ISSUE_BOUNDARY_SHA256`に記録されたIssue #395 Requirement／Design／Planの3つの期待SHA-256を今回の最終spec freezeの実体へ同期することだけである。
+`tests/integration/test_issue_392_acceptance.py`はIssue #392の既存baseline witnessとして扱い、P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable Git blob、ledger、timing、required-fast、policy、workflowのassertionを保持する。Issue #395/396のcanonical document SHAをこのテストへ同期せず、仕様書変更をProduct regression failureへ変換しない。
 
-Issue #392のbaseline row、ledger、timing、required-fast、policy、workflow、その他のboundary assertionの値と意味は変更しない。assertionの削除・弱化・skip・xfail化は行わず、root ledgerがIssue #395で15/0/15へ遷移した後も、T14はP392 entryの14/1 baselineを検証する。同期後に同じテストをfull-regression laneでnormal passさせ、current root ledgerの15/0/15はfull verifierとB2で検証する。この同期は仕様修正との整合を回復するentry前提であり、Productの挙動やIssue #392の契約を変更するものではない。
+Issue #392のbaseline row、ledger、timing、required-fast、policy、workflow、その他のboundary assertionの値と意味は変更しない。assertionの削除・弱化・skip・xfail化は行わず、root ledgerがIssue #395で15/0/15へ遷移した後も、T14はP392 entryの14/1 baselineを検証する。current root ledgerの15/0/15はIssue #395のledger observerとfull verifierで検証する。
 
-`post-u05-checkpoint`では、既存のterminalized ledgerとmigration observerのcheckpointをread-onlyで確認し、U05 transitionを再実行しない。fresh Strict仕様レビューがpassした後に限り、E3RとしてこのテストのIssue #395 canonical-document SHA-256 3値だけを現行spec freezeへ同期し、T14を一回だけnormal passさせる。仕様レビューがpassする前にこの同期を行ってはならない。
+必要なtest-surface整理として、`_ISSUE_BOUNDARY_SHA256`からIssue #395/396文書の固定値照合を取り除くことは許可する。この変更は#392のbaseline assertionを削除・弱化・skip・xfail化せず、T14をIssue #395のimplementation gateから独立させるためだけに行う。U05後は既存のterminalized ledgerとmigration observerをread-onlyで確認し、U05 transitionを再実行しない。
 
 ## 8. Non-goals
 
@@ -377,6 +377,7 @@ Issue #392のbaseline row、ledger、timing、required-fast、policy、workflow�
 - Mainへの直接merge、agent merge、automatic rollback、Issue close
 - Historical top-level 27-countのcurrent authority化
 - Deleted active flags、old scaffolder API、direct domain importの復活
+- 新しいpublication policy層、retry、cache、feature flag、不要な二重parser、文書SHAを使った追加のProduct gate
 
 ## 9. Traceability
 

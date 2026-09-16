@@ -5,7 +5,7 @@ ID: "iss-00395-chatgpt-spec-pack-manifest"
 タイトル: "Issue #395 ChatGPT Spec Pack Manifest"
 状態: "draft"
 作成者: "ChatGPT specification author"
-最終更新: "2026-09-15"
+最終更新: "2026-09-17"
 親: ["iss-00395"]
 対象:
 initiative: "init-local-00003"
@@ -107,9 +107,9 @@ implementation_allowed=trueはユーザーの明示dispatchを記録する。こ
 
 ## 3. Strict GitHub connector verification
 
-### 3.1 最新検証結果
+### 3.1 仕様作成入力時のStrict GitHub connector verification
 
-この最終manifest本文の作成前に、connected GitHub repositoryに対して次を実行した。
+初回仕様作成時の入力identityを固定するため、connected GitHub repositoryに対して次を実行した。この表はその時点の履歴evidenceであり、今回の仕様訂正candidateのreview identityではない。訂正後candidateは、§16の手順でclean pushed SHAへ再束縛して検証する。
 
 | Operation                            | Requested target                                                          | Observed result                                           |
 | ------------------------------------ | ------------------------------------------------------------------------- | --------------------------------------------------------- |
@@ -378,9 +378,14 @@ Raw server timing logまたは署名付きthinking-time artifactは取得して�
   * `_require_numeric_import_repo_scope`
   * `_resolve_import_issue_view_repo_slug`
 * `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py`
+
+  * `require_current_repo_slug`
+  * create boundaryへ接続するpublication repo slug resolver（今回のcandidate）
 * `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py`
 
   * `GitGateway.origin_github_repo_slug`
+  * publication repo slug gateway contract（今回のcandidate）
+  * `IssueGateway.issue_create`のexplicit `repo_slug` contract（今回のcandidate）
   * `TemplateScaffolder.copy_scaffolded_tree_at`
 * `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py`
 
@@ -389,6 +394,10 @@ Raw server timing logまたは署名付きthinking-time artifactは取得して�
 * `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py`
 
   * `execute_create_plan`
+  * create/link_existingのpublication preflight（今回のcandidate）
+* `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py`
+
+  * `issue_create_raw`の`gh issue create --repo <slug>` binding（今回のcandidate）
 * `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py`
 
   * `copy_scaffolded_tree_at`
@@ -462,7 +471,7 @@ Canonical Issue R/D/Pは、ローカル反映、reviewおよび採用後にIssue
 10. Required-fastはexact four nodeidsのまま保持する。
 11. Current ledger evaluator、sharder、policy hook、Provider CI、main-push Full RegressionはIssue #395完了まで保持する。
 12. 14 active rowsのnodeidとhistorical signatureを変更しない。
-13. 修復面はtest harness/observer 12件、Product boundary 2件である。
+13. 修復面はtest harness/observer 12件と、既存publication policyをcreate境界へ一度だけ接続する単一のProduct boundary（provider側6ファイル）である。
 14. Skip、xfail、approved failure追加、row削除、signature書換え、assertion弱化、silent retirement、unrelated successor substitutionを禁止する。
 15. Issue #392 lifecycle、wire、record、migration、uninstall、recovery、runtime coordinationおよびprotected-data contractはread-onlyである。
 16. Issue #396の`E384-QUAL-001` implementation、policy retirement、required-context transition、main mergeはIssue #395の対象外である。
@@ -470,7 +479,7 @@ Canonical Issue R/D/Pは、ローカル反映、reviewおよび採用後にIssue
 18. `owner_decisions_required=[]`を維持する。
 19. Current canonical specification packはexact 6 pathsである。
 20. Existing exact 16 support artifactsは、support-history checkpoint c0736434503117d5d468d1438fb18da16d382a56 / cec02ce70fbcbbbac811a04106dcc15540ad4d09に束縛されたimmutable、non-authoritative、grandfathered support historyである。
-21. Support historyはcurrent authority、implementation input、permission evidenceではなく、path、mode、object type、Git object IDをspec freezeでcheckpointと一致させる。
+21. Support historyはcurrent authority、implementation input、permission evidenceではない。spec freezeではsupport historyとのdiffが空であることだけを確認し、path、mode、object type、Git object IDの一致を実装blocking条件にしない。
 22. 22 pathsを単一のcurrent-spec allowlistとして扱わず、support historyのedit、delete、rename、regenerate、recompress、reclassify、新規追加を行わない。
 
 ## 11. Row-specific contractの固定内容
@@ -501,6 +510,9 @@ Canonical Issue R/D/Pは、ローカル反映、reviewおよび採用後にIssue
 * Same-repository import validationを維持する。
 * Credential、username、password、tokenまたはcredential-bearing URLをstdout、stderr、exceptionまたはevidenceへ露出しない。
 * Existing `GitGateway.origin_github_repo_slug` signatureを変更しない。
+* Create/link_existingでは既存`origin_github_publication_endpoint`を一度だけ呼び、受理済みslugをapplicationへ渡す。
+* `IssueGateway.issue_create`は受理済み`repo_slug`を必須とし、CLI adapterは`gh issue create --repo <slug>`へ束縛する。
+* Importのfetch-only resolverは変更せず、new policy layer、retry、cache、feature flagまたは重複parserを追加しない。
 
 ### 11.4 Row 12
 
@@ -723,9 +735,11 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 
 Extra Product、test、ledger、timing、policyまたはworkflow pathがある場合は停止する。
 
+Issue #392のboundary testはP392のimmutable blob、baseline、timing、required-fast、policyおよびworkflow assertionsを保持する独立witnessである。Issue #395/#396のcanonical document SHA比較はProduct gateに含めず、実装時にその比較だけを削除してもP392 assertionsは削除または弱化しない。
+
 ### 15.4 Specification admission history boundary
 
-Support-history checkpointからreviewed specification freezeまでのcurrent diffについて、exact six primary pathsだけが変更されていることを確認する。Elaboration inputからsupport-history checkpointまでのexact 22 pathsは、別の履歴segmentとして既に検証済みである。
+Support-history checkpointからreviewed specification freezeまでのcurrent diffについて、exact six primary pathsだけが変更されていることを確認する。Elaboration inputからsupport-history checkpointまでのsupport historyは、過去のprovenance segmentとして扱い、そこで記録されたpath数をcurrent-spec allowlistや実装blocking条件へ昇格させない。
 
 Expected set:
 
@@ -738,7 +752,7 @@ spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/ep
 spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-chatgpt-spec-pack-manifest.md
 ```
 
-Support-history checkpointは c0736434503117d5d468d1438fb18da16d382a56、treeは cec02ce70fbcbbbac811a04106dcc15540ad4d09 である。exact 16 support pathsについて、checkpointとreviewed specification freezeのGit tree entry（path、mode、object type、object ID）が一致することを確認する。22 pathsをcurrent-spec allowlistとして扱わず、directory prefix、glob、Manifestの自己申告、working-tree存在、過去のZIP hashで代替しない。Support historyのedit、delete、rename、copy substitution、regenerate、recompress、reclassify、新規追加は停止条件である。
+Support-history checkpointは c0736434503117d5d468d1438fb18da16d382a56、treeは cec02ce70fbcbbbac811a04106dcc15540ad4d09 である。既知のsupport historyとのdiffが空であることを確認するが、path、mode、object type、object IDのtree-entry一致やexact 16/22のpath数をcurrent implementation gateにはしない。Support history自体のedit、delete、rename、copy substitution、regenerate、recompress、reclassify、新規追加は行わない。directory prefix、glob、Manifestの自己申告、working-tree存在または過去のZIP hashをcurrent canonical authorityの代用にもしない。
 
 SpecDock commandが正当に再生成するdocumentation projectionがある場合は、そのcommand、before/after identityおよび理由を別receiptへ記録する。Product source、tests、ledger、timing、policy、workflowまたはdogfood runtimeが含まれる場合はcommit/push前に停止する。
 
@@ -902,6 +916,8 @@ LunaMaxへ渡すexecution packetには少なくとも次をactual valuesで含�
 
 Working-tree verifierの`candidate_sha`はuncommitted bytesを識別しないため、merge-ready evidenceに使用しない。
 
+実行コストを増やさないため、current full verifierをfull-regression、distribution、lifecycle、package、dogfoodおよびM1 rowsの唯一のsuite ownerとする。N3は`make lint`、SpecDock validateおよび必要なno-touch確認だけを行い、N2が既に実行したsuiteをN3のために再実行しない。
+
 ## 19. Human merge、B1/B2およびrollback
 
 ### 19.1 Human merge boundary
@@ -1001,10 +1017,10 @@ Rollback unitはwhole Issue #395 mergeである。
 * Manifest final body: 配置済み
 * Initial sandbox ZIP integrity: pass
 * Initial sandbox member hashes: 記録済み
-* Final local member hashes: 記録済み
+* Initial local member hashes: 記録済み。今回の仕様訂正candidateのhashはfresh clean SHAで再計算する
 * Final manifest hash: 外部receiptで記録
 * Final ZIP hash: 外部receiptで記録
-* Strict GitHub verification: pass
+* Initial authoring-input Strict GitHub verification: pass
 * Repository: `chemitaro/spec-dock`
 * Branch: `iss-00395-regression-baseline-terminalization-and-product-defect-repair`
 * Verified HEAD: `fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9`
@@ -1014,7 +1030,8 @@ Rollback unitはwhole Issue #395 mergeである。
 * P392後のProduct/test/policy drift: なし。Epic PlanとIssue #392 Reportのdoc-only差分
 * Implementation permission: `true` records the user's explicit dispatch. Effective Product/test/ledger/dogfood mutation remains blocked until the repaired specification receives a fresh Strict review pass with P0=0 and P1=0 and the execution packet is complete.
 * Product implementation: 未実施
-* Independent spec review: 未実施
+* Initial independent specification review: `fail`（P1=1、P2=4）。本manifestを含む訂正candidateをclean pushed SHAへ再束縛して再レビューする
+* Corrected-candidate independent specification review: 未実施
 * Human merge: 未実施
 * `owner_decisions_required=[]`
 * Canonical authority replacement: しない
