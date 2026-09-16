@@ -27,7 +27,7 @@ This document is a corrected implementation design for Issue #395. It does not g
 Before the first implementation mutation, the executor must still verify one of two explicitly selected identity modes:
 
 1. the canonical Issue Requirement, Design, Plan, LunaMax handoff, human guide, and manifest;
-2. for an initial run, exact local `HEAD`, configured upstream, and remote Issue-branch equality with the reviewed specification freeze; for a post-U05 resume, exact equality with the packet's adopted resume checkpoint while the reviewed specification freeze remains an authority/ancestor check;
+2. for either mode, exact local `HEAD`, configured upstream, and remote Issue-branch equality with the reviewed specification freeze; for a post-U05 resume, the packet's resume checkpoint is checked separately as the ancestor/base of the existing implementation candidate and is never substituted for the current-tip identity;
 3. an independent specification review bound to the reviewed specification identity with `review_status=pass`, P0=0, P1=0;
 4. an explicit execution packet with `implementation_authorized=true` and an identified concurrent-writer absence assertion.
 
@@ -67,6 +67,8 @@ The integration branch remains `codex/epic-00384-provider-test-strategy-planning
 | Post-merge B1/B2 tip     | Runtime value                              | Runtime value                              | Future human-merged integration tip                                         |
 
 No future SHA or tree is predeclared in tracked content. Every future identity is supplied and then verified at the corresponding gate.
+
+Both identity modes bind the current local `HEAD`, configured upstream, and Issue branch remote tip to `Specification freeze`. In `post-u05-checkpoint`, `Adopted resume checkpoint` is a prior clean implementation base and must be an ancestor of that current specification-review target; it is not a replacement current-tip identity. The resume-to-specification diff is therefore required to be canonical-document-only before the implementation track is resumed.
 
 ### 3.2 Baseline semantics
 
@@ -111,15 +113,19 @@ Elaboration input
       ↓
 Support-history checkpoint c0736434503117d5d468d1438fb18da16d382a56
   ├─ sixteen support tree entries are immutable and non-authoritative
-  └─ six primary paths remain the only current specification surface
-      ↓
-Reviewed specification freeze
-  └─ only the six primary paths may change
+  ├─ initial route: six primary paths remain the only current specification surface
+  │     ↓
+  │   Reviewed specification freeze
+  │     └─ only the six primary paths may change
+  └─ post-U05 route: an existing 13-path implementation candidate is resumed
+        ↓
+      Resume checkpoint
+        └─ only canonical-document corrections may reach the reviewed specification freeze
 ```
 
-The six primary paths are the Issue Requirement, Design, Plan, LunaMax handoff, human guide, and ChatGPT spec-pack manifest. The sixteen support-history paths are the exact paths listed by the Requirement. They are preserved as history only: they cannot provide current permission, owner decisions, implementation input, or a replacement authority for the canonical R/D/P.
+The six primary paths are the Issue Requirement, Design, Plan, LunaMax handoff, human guide, and ChatGPT spec-pack manifest. The sixteen support-history paths are the exact paths listed by the Requirement. They are preserved as history only: they cannot provide current permission, owner decisions, implementation input, or a replacement authority for the canonical R/D/P. In the post-U05 route, the 13 implementation paths already present at the resume checkpoint remain implementation history; only the six primary paths may change in the documentation-correction segment.
 
-The B5 design must prove, for every support-history path, equality of path, mode, object type, and Git object ID between the checkpoint and the reviewed specification freeze. A same-content copy, rename, recompressed ZIP, directory-prefix match, or manifest-only declaration is not equivalent. This governance correction does not alter Product behavior, Row 3's credential/no-secret/publication guarantees, lifecycle, policy, protected-data, timing, workflow, or the Row 12 no-edit boundary.
+The B5 design must prove, for every support-history path, equality of path, mode, object type, and Git object ID between the checkpoint and the reviewed specification freeze. On the post-U05 route it must additionally prove that the resume checkpoint is an ancestor of the reviewed specification target, that the resume-to-target diff is a subset of the six primary paths, and that the cumulative support-history-to-target scope is exactly the six primary paths plus the 13 declared implementation paths. A same-content copy, rename, recompressed ZIP, directory-prefix match, or manifest-only declaration is not equivalent. This governance correction does not alter Product behavior, Row 3's credential/no-secret/publication guarantees, lifecycle, policy, protected-data, timing, workflow, or the Row 12 no-edit boundary.
 
 Changing the ledger before the normal-pass proof is forbidden. Treating working-tree verifier output as exact candidate identity is forbidden.
 
@@ -355,7 +361,7 @@ Require:
 * record and marker closed fields are unchanged;
 * the protected-data snapshot is exactly equal;
 * fixed-slot `SKILL.md` bytes are exactly equal;
-* package/source/wheel/sdist/installed/dogfood parity node executes and passes in the full-regression shard lane.
+  * package/source/wheel/sdist/installed/dogfood parity is deferred to the clean-candidate gate in §11.3 and is never accepted from this dirty projection state.
 
 Any version, lifecycle, wire, schema, protected-data, policy, workflow, or unrelated root drift stops the execution and discards the projection candidate.
 
