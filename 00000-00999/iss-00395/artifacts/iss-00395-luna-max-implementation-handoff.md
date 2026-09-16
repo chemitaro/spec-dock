@@ -316,7 +316,17 @@ SELECTION_ROWS=(
 IMPLEMENTATION_PATHS=(
   full-regression-ledger.json
   src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py
   spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
+  spec-dock/scripts/spec_dock_runtime/application/repo_context.py
+  spec-dock/scripts/spec_dock_runtime/application/ports.py
+  spec-dock/scripts/spec_dock_runtime/application/create_node.py
+  spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
+  spec-dock/scripts/spec_dock_runtime/infra/github_cli.py
   spec-dock/spec-dock.version
   .agents/skills/spec-dock/.spec-dock-provider-slot.json
   .agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
@@ -325,6 +335,9 @@ IMPLEMENTATION_PATHS=(
   tests/cli_runtime/test_runtime_import_s10.py
   tests/cli_runtime/test_sync.py
   tests/cli_runtime/test_workbench.py
+  tests/cli_runtime/test_new.py
+  tests/unit/commands/test_runtime_new_s08.py
+  tests/unit/infra/test_init_update.py
   tests/unit/test_provider_test_lanes.py
   tests/integration/test_issue_392_acceptance.py
 )
@@ -896,80 +909,17 @@ env TMPDIR="$TEST_TMPDIR" \
 
 ## 9. 変更許可ファイル（focused 26 paths）
 
-Mutation authorization後に変更できるtracked pathsは、次のfocused 26件だけである。
-
-```text
-full-regression-ledger.json
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py
-spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
-spec-dock/scripts/spec_dock_runtime/application/repo_context.py
-spec-dock/scripts/spec_dock_runtime/application/ports.py
-spec-dock/scripts/spec_dock_runtime/application/create_node.py
-spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
-spec-dock/scripts/spec_dock_runtime/infra/github_cli.py
-spec-dock/spec-dock.version
-.agents/skills/spec-dock/.spec-dock-provider-slot.json
-.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
-tests/cli_runtime/test_delete.py
-tests/cli_runtime/test_import.py
-tests/cli_runtime/test_runtime_import_s10.py
-tests/cli_runtime/test_sync.py
-tests/cli_runtime/test_workbench.py
-tests/cli_runtime/test_new.py
-tests/unit/commands/test_runtime_new_s08.py
-tests/unit/infra/test_init_update.py
-tests/unit/test_provider_test_lanes.py
-tests/integration/test_issue_392_acceptance.py
-```
+Mutation authorization後に変更できるtracked pathsは、§4の`IMPLEMENTATION_PATHS`にある26件だけである。以降のgateは同じ配列を再利用し、別のallowlistを定義しない。
 
 `tests/unit/test_provider_test_lanes.py`は、P392 entryのimmutable `full-regression-ledger.json` blobをbefore、current root ledgerをafterとして比較するmigration observerである。`tests/integration/test_issue_392_acceptance.py`は、Issue #392の独立したboundary witnessとして、不要なIssue #395/#396文書SHA比較だけを除去する。P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable baseline source binding、Issue #392のledger、timing、required-fast、policy、workflow、その他のassertionは変更しない。assertionの削除・弱化・skip・xfail化、仕様書SHAの同期gate追加は許可しない。
 
 ### 9.1 Hand-edit可能なpaths
 
-次は直接編集できる。
-
-```text
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py
-tests/cli_runtime/test_delete.py
-tests/cli_runtime/test_import.py
-tests/cli_runtime/test_runtime_import_s10.py
-tests/cli_runtime/test_sync.py
-tests/cli_runtime/test_workbench.py
-tests/cli_runtime/test_new.py
-tests/unit/commands/test_runtime_new_s08.py
-tests/unit/infra/test_init_update.py
-full-regression-ledger.json
-```
-
-ただしledgerは全14 active nodesのnormal pass proof後だけ編集する。
+§4の`IMPLEMENTATION_PATHS`にあるprovider source、test、ledgerだけを直接編集する。`full-regression-ledger.json`は全14 active nodesのnormal-pass proof後に限り編集する。
 
 ### 9.2 Generated paths
 
-次の9件は手編集しない。
-
-```text
-spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
-spec-dock/scripts/spec_dock_runtime/application/repo_context.py
-spec-dock/scripts/spec_dock_runtime/application/ports.py
-spec-dock/scripts/spec_dock_runtime/application/create_node.py
-spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
-spec-dock/scripts/spec_dock_runtime/infra/github_cli.py
-spec-dock/spec-dock.version
-.agents/skills/spec-dock/.spec-dock-provider-slot.json
-.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
-```
-
-Provider source GREEN後に、current lifecycle commandで一つのcandidateとして生成する。
+`IMPLEMENTATION_PATHS`内の六つのruntime mirror、`spec-dock.version`、二つのslot marker（計9件）は手編集しない。Provider source GREEN後にcurrent lifecycle commandで一つのcandidateとして生成する。
 
 ## 10. Read-only / no-touch surfaces
 
@@ -1399,7 +1349,8 @@ python - \
   "$EXPECTED_REPOSITORY" \
   "$ISSUE_BRANCH" \
   "$SPEC_FREEZE_SHA" \
-  "$SPEC_FREEZE_TREE" <<'PY'
+  "$SPEC_FREEZE_TREE" \
+  "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 from pathlib import Path
 from datetime import datetime, timezone
 import hashlib
@@ -1415,6 +1366,7 @@ repository = sys.argv[5]
 branch = sys.argv[6]
 sha = sys.argv[7]
 tree = sys.argv[8]
+implementation_paths = set(sys.argv[9:])
 
 def load(
     path: Path,
@@ -1480,31 +1432,8 @@ assert issued.tzinfo is not None
 assert expires.tzinfo is not None
 assert issued <= now <= expires
 
-expected_scope = {
-    "full-regression-ledger.json",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/infra/git_cli.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "infra/git_cli.py",
-    "spec-dock/spec-dock.version",
-    "spec-dock/docs",
-    "spec-dock/templates",
-    "spec-dock/system",
-    "spec-dock/scripts",
-    ".agents/skills/spec-dock/"
-    ".spec-dock-provider-slot.json",
-    ".agents/skills/"
-    "spec-dock-grill-with-docs/"
-    ".spec-dock-provider-slot.json",
-    "tests/cli_runtime/test_delete.py",
-    "tests/cli_runtime/test_import.py",
-    "tests/cli_runtime/test_runtime_import_s10.py",
-    "tests/cli_runtime/test_sync.py",
-    "tests/cli_runtime/test_workbench.py",
-    "tests/unit/test_provider_test_lanes.py",
-    "refs/heads/"
-    "iss-00395-regression-baseline-terminalization-"
-    "and-product-defect-repair",
+expected_scope = implementation_paths | {
+    f"refs/heads/{branch}",
 }
 
 assert set(writer["scope_paths"]) == expected_scope
@@ -1973,11 +1902,13 @@ Distribution cutover、platform/coordination、packaged parity、complete dogfoo
 初回実装のworking-tree diffはreviewed specification freezeからのfocused 26 pathsでなければならない。U05後のresumeでは、resume checkpointからcurrent `HEAD`までの累積差分がcanonical 6 pathsまたはfocused implementation pathsに限定され、reviewed specification freeze以後の実装差分がfocused implementation pathsに限定されることを確認する。current working-tree差分もimplementation paths内に限定し、non-emptyの実装差分がない場合は空commitを作らない。
 
 ```bash
-python - "$RESUME_MODE" "${RESUME_CHECKPOINT_SHA:-}" "$SPEC_FREEZE_SHA" <<'PY'
+python - "$RESUME_MODE" "${RESUME_CHECKPOINT_SHA:-}" "$SPEC_FREEZE_SHA" \
+  "${IMPLEMENTATION_PATHS[@]}" <<'PY'
 import subprocess
 import sys
 
-mode, resume_checkpoint, spec_freeze = sys.argv[1:]
+mode, resume_checkpoint, spec_freeze, *implementation_values = sys.argv[1:]
+implementation = set(implementation_values)
 
 primary = {
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
@@ -2001,50 +1932,6 @@ primary = {
     "epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/"
     "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/"
     "iss-00395-chatgpt-spec-pack-manifest.md",
-}
-
-implementation = {
-    "full-regression-ledger.json",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/infra/git_cli.py",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/application/repo_context.py",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/application/ports.py",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/application/create_node.py",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/cli/bootstrap.py",
-    "src/spec_dock/assets/spec_dock/scripts/"
-    "spec_dock_runtime/infra/github_cli.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "infra/git_cli.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "application/repo_context.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "application/ports.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "application/create_node.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "cli/bootstrap.py",
-    "spec-dock/scripts/spec_dock_runtime/"
-    "infra/github_cli.py",
-    "spec-dock/spec-dock.version",
-    ".agents/skills/spec-dock/"
-    ".spec-dock-provider-slot.json",
-    ".agents/skills/"
-    "spec-dock-grill-with-docs/"
-    ".spec-dock-provider-slot.json",
-    "tests/cli_runtime/test_delete.py",
-    "tests/cli_runtime/test_import.py",
-    "tests/cli_runtime/test_runtime_import_s10.py",
-    "tests/cli_runtime/test_sync.py",
-    "tests/cli_runtime/test_workbench.py",
-    "tests/cli_runtime/test_new.py",
-    "tests/unit/commands/test_runtime_new_s08.py",
-    "tests/unit/infra/test_init_update.py",
-    "tests/unit/test_provider_test_lanes.py",
-    "tests/integration/test_issue_392_acceptance.py",
 }
 
 def changed(base, head=None):
