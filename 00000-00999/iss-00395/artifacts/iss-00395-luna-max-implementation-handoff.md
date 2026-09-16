@@ -955,10 +955,15 @@ full-regression-ledger.json
 
 ### 9.2 Generated paths
 
-次の4件は手編集しない。
+次の9件は手編集しない。
 
 ```text
 spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
+spec-dock/scripts/spec_dock_runtime/application/repo_context.py
+spec-dock/scripts/spec_dock_runtime/application/ports.py
+spec-dock/scripts/spec_dock_runtime/application/create_node.py
+spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
+spec-dock/scripts/spec_dock_runtime/infra/github_cli.py
 spec-dock/spec-dock.version
 .agents/skills/spec-dock/.spec-dock-provider-slot.json
 .agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
@@ -1709,6 +1714,8 @@ Required correction:
    * Publication succeeds
 
 Working-treeではfocused確認をprovisionalに記録できるが、同じmatrixを文書・gateごとに重複実行しない。merge-blockingの正式なsecurity receiptはclean implementation SHAで一度、post-merge B1 SHAで一度だけ取得し、同じraw observationを該当receiptへ再利用する。
+
+このmatrixは既存publication endpointのpolicyだけを検証する。create前のapplication preflightと`gh issue create --repo`へのbindingは、Row 3のfocused create-boundary testで別に検証する。
 
 ## 20. Row 12 guard
 

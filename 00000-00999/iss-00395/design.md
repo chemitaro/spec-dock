@@ -225,14 +225,19 @@ The provider source blobs and AST import edges are guarded before edits and agai
 
 ### 5.6 Generated dogfood projection
 
-After provider source GREEN, the current lifecycle command projects one complete candidate. These files are generated, never hand-edited:
+After provider source GREEN, the current lifecycle command projects one complete candidate. These nine paths are generated, never hand-edited:
 
 * `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`
+* `spec-dock/scripts/spec_dock_runtime/application/repo_context.py`
+* `spec-dock/scripts/spec_dock_runtime/application/ports.py`
+* `spec-dock/scripts/spec_dock_runtime/application/create_node.py`
+* `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py`
+* `spec-dock/scripts/spec_dock_runtime/infra/github_cli.py`
 * `spec-dock/spec-dock.version`
 * `.agents/skills/spec-dock/.spec-dock-provider-slot.json`
 * `.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json`
 
-The runtime mirror must be byte-equal to provider source. The ready record and both slot markers must share one lowercase 64-hex candidate digest that differs from the pre-projection digest. Version remains `0.2.4`, record state remains `ready`, operation remains `null`, seed policy remains `preserve-only`, and fixed slot names remain unchanged.
+Each runtime mirror must be byte-equal to its provider source. The ready record and both slot markers must share one lowercase 64-hex candidate digest that differs from the pre-projection digest. Version remains `0.2.4`, record state remains `ready`, operation remains `null`, seed policy remains `preserve-only`, and fixed slot names remain unchanged.
 
 ### 5.7 Ledger write surface
 
@@ -355,6 +360,8 @@ The verification matrix contains four mandatory cases:
 
 The four-case diagnostic is a focused security regression check. It is run once for the implementation candidate and once after human merge when B1 is collected; the same raw observation is reused for the applicable receipts rather than rerunning the Product test for each document or gate.
 
+This matrix covers the existing publication endpoint policy only. The create-boundary test separately proves application preflight before any write and explicit `--repo` binding; the matrix does not claim that call-graph coverage.
+
 ## 8. Dogfood and protected-data design
 
 ### 8.1 Pre-projection snapshot
@@ -370,7 +377,7 @@ The snapshot excludes transient evidence and secret-bearing output.
 
 ### 8.2 Projection
 
-Run the current external provider CLI as one complete update. Validate its JSON result before reading generated files. The projection may change only the four generated identities listed in §5.6 in addition to the provider source already edited.
+Run the current external provider CLI as one complete update. Validate its JSON result before reading generated files. The projection may change only the nine generated identities listed in §5.6 in addition to the provider source already edited.
 
 ### 8.3 Post-projection proof
 

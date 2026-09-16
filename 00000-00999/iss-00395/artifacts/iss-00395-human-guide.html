@@ -206,7 +206,7 @@
     <li>importのfetch-only挙動、既存のsame-repository検証、credential non-exposureを維持する。</li>
     <li>Strictスペックレビューが<code>review_status=pass</code>、P0=0、P1=0になるまでProduct/test変更を開始しない。</li>
   </ol>
-  <p class="small muted">現在はこの再レビューが必要な段階です。仕様レビューがpassした後に実装を開始し、実装後には作成前失敗、明示的な<code>--repo</code>、4ケースのpublication security matrixをテストで確認します。</p>
+  <p class="small muted">現在はこの再レビューが必要な段階です。仕様レビューがpassした後に実装を開始し、実装後には作成前失敗と明示的な<code>--repo</code>をfocused create-boundary testで、4ケースのpublication policy matrixを専用diagnosticで確認します。</p>
 </section>
 
 <section id="admission-change">
@@ -570,7 +570,7 @@ env TMPDIR=/private/tmp make lint
 
   <h3>No-touch</h3>
   <p>Timing 243、required-fast 4、<code>tests/conftest.py</code>、evaluator、verifier、Provider CI、main-push Full Regression、parent contracts、Wire、#392 lifecycle、#396 scopeにdiffがないことを確認します。</p>
-  <div class="callout warning"><strong>Dogfood:</strong> <code>infra/git_cli.py</code>はshipped runtimeです。Provider sourceを先にGREENにし、<code>uv run spec-dock update . --json</code>でcomplete projectionします。Generated runtime mirror、<code>spec-dock/spec-dock.version</code>、二つの<code>.spec-dock-provider-slot.json</code>は手編集せず、recordと両markerの新<code>candidate_digest</code>が一致することを検証します。</div>
+  <div class="callout warning"><strong>Dogfood:</strong> <code>infra/git_cli.py</code>はshipped runtimeです。Provider sourceを先にGREENにし、<code>uv run spec-dock update . --json</code>でcomplete projectionします。6つのgenerated runtime mirror、<code>spec-dock/spec-dock.version</code>、二つの<code>.spec-dock-provider-slot.json</code>は手編集せず、recordと両markerの新<code>candidate_digest</code>が一致することを検証します。</div>
 </section>
 
 <section id="security">
@@ -582,7 +582,7 @@ env TMPDIR=/private/tmp make lint
       <tr><td>仕様の対象範囲</td><td>current authorityは6件、補助履歴は16件。履歴16件が実装gateへ混在。</td><td>6件のcurrent packとsupport historyのno-diff。mode/object/Git IDは追加gateにしない</td></tr>
       <tr><td>秘密情報・認証情報</td><td>新しい資格情報を追加せず、例外的な公開許可で補助履歴を正当化しない。</td><td>既存のsecurity要件・No-touch確認、secret混入なし</td></tr>
       <tr><td>Repository identity</td><td>credential-bearing HTTPS originをread-only identityとして扱う既存のRow 3要件を維持する。</td><td>fetch-only resolverとRow 3のfocused test</td></tr>
-      <tr><td>Publication</td><td>userinfo拒否、fetch/push一致、publication strictnessを維持し、作成先を暗黙のremoteに任せない。</td><td>create前のpublication preflight、明示的な<code>--repo</code>、4ケースのsecurity matrix</td></tr>
+      <tr><td>Publication</td><td>userinfo拒否、fetch/push一致、publication strictnessを維持し、作成先を暗黙のremoteに任せない。</td><td>create-boundary testで作成前失敗と<code>--repo</code>を確認し、policy matrixでuserinfo・一致・非露出を確認</td></tr>
       <tr><td>未実行の検証</td><td>仕様修正だけではGREENと宣言しない。Product実装後に別ゲートで確認する。</td><td>15 focused nodes、full verifier、Strict code review、Pro FQG</td></tr>
     </tbody>
   </table></div>
