@@ -164,24 +164,21 @@ def test_full_regression_ledger_migration_preserves_schema1_history() -> None:
         ["git", "show", f"{P392_ENTRY_SHA}:{FULL_REGRESSION_ROOT_LEDGER}"],
         cwd=repository,
     )
-    assert hashlib.sha1(
-        f"blob {len(historical_raw)}\0".encode("ascii") + historical_raw
-    ).hexdigest() == P392_ROOT_LEDGER_GIT_BLOB_SHA1
+    assert (
+        hashlib.sha1(f"blob {len(historical_raw)}\0".encode("ascii") + historical_raw).hexdigest()
+        == P392_ROOT_LEDGER_GIT_BLOB_SHA1
+    )
     historical_payload = json.loads(historical_raw)
     historical_rows = historical_payload["failure_paths"]
 
     assert [row["nodeid"] for row in historical_rows] == [row["nodeid"] for row in rows]
-    assert [
-        row["nodeid"]
-        for row in historical_rows
-        if row.get("lifecycle") == "resolved"
-    ] == [RETAINED_SKILL_HISTORICAL_NODE]
+    assert [row["nodeid"] for row in historical_rows if row.get("lifecycle") == "resolved"] == [
+        RETAINED_SKILL_HISTORICAL_NODE
+    ]
     assert historical_rows[1]["resolution_mode"] == "superseded"
     assert historical_rows[1]["successor_nodeid"] == RETAINED_SKILL_SUCCESSOR_NODE
     assert all(
-        row.get("lifecycle") == "active"
-        for row in historical_rows
-        if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE
+        row.get("lifecycle") == "active" for row in historical_rows if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE
     )
 
     expected_current = copy.deepcopy(historical_payload)
