@@ -1,0 +1,822 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Issue #396 実装準備ガイド</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #175cd3;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 960px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2 { line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+
+    .status-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+    .status-pill { padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--background); font-size: 0.88rem; font-weight: 700; }
+    .status-pill.good { color: var(--success); }
+    .status-pill.pending { color: #9a6700; }
+    .callout { margin: 14px 0; padding: 14px 16px; border-left: 4px solid var(--accent); border-radius: 8px; background: var(--background); }
+    .callout strong { display: block; margin-bottom: 4px; }
+    table { width: 100%; margin: 12px 0; border-collapse: collapse; font-size: 0.94rem; }
+    th, td { padding: 9px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { background: var(--background); }
+    .flow-list { padding-left: 1.25rem; }
+    .flow-list li { margin: 7px 0; }
+    .artifact-links { display: flex; flex-wrap: wrap; gap: 10px 18px; padding-left: 1.2rem; }
+    .small { font-size: 0.9rem; }
+    .mono { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diagram-zoom-controls button {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 3.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    #diagram-zoom-reset {
+      width: auto;
+      min-width: 58px;
+      padding-inline: 8px;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Issue #396 実装準備ガイド</h1>
+      <p>Epic #384の受入ゲート、#395から引き継いだB1/B2の証拠、#396で実装する最終Provider Gateを、初めて参加する人にも分かるようにまとめます。</p>
+      <div class="status-strip" aria-label="現在の状態">
+        <span class="status-pill good">#396 active</span>
+        <span class="status-pill good">B1/B2 entry evidence recorded</span>
+        <span class="status-pill pending">Strict review gates implementation</span>
+        <span class="status-pill">Product implementation not authorized</span>
+        <span class="status-pill">B3 not started</span>
+      </div>
+      <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
+        図を読み込んでいます。
+      </div>
+    </header>
+
+    <section id="purpose">
+      <h2>1. 目的とEpic全体の位置づけ</h2>
+      <p>Epic #384は、provider testの重複と実行コストを減らしながら、テスト失敗を弱めずに最終qualificationを証明します。実施順はIssue #392、#395、#396です。#396は、candidateを一度だけbuildし、同じwheelとsdistを各roleで再利用する最終Provider Gateへの切替を担当します。</p>
+      <p>前任者からの報告時点では、#395を閉じただけでB1/B2が未実施だったため、依存グラフ上のreadyとEpic計画上の開始条件がずれていました。その後、Epic Planとentry receiptで確認したところ、B1/B2は#395のpost-merge exact SHA <code>fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d</code>、tree <code>37eabc1aa250838dcd9f61d627309b0ff27e0db7</code>で別途実行され、#396のentry evidenceとして記録されています。したがって、#396の入口条件は満たされています。</p>
+      <aside class="callout">
+        <strong>B1/B2の完了は、#396やEpic全体の完了ではありません。</strong>
+        B1/B2は#395の受入証拠です。#396のreplacement gate、required-context切替、post-merge B3、Epic main受入はこれからの別ゲートです。B2の古いshard/skip結果をB3の証拠に流用しません。
+      </aside>
+      <table>
+        <thead><tr><th>段階</th><th>何を証明するか</th><th>現在の位置</th></tr></thead>
+        <tbody>
+          <tr><td>#392</td><td>Provider lifecycle hard cutoverとP392 handoff</td><td>Epic Plan上で完了</td></tr>
+          <tr><td>#395 B1</td><td>current gatesがGREENであること</td><td>ordinary pytest 1,367 passed / 847 skipped、lint・validate・security guards GREEN</td></tr>
+          <tr><td>#395 B2</td><td>15件のbaseline rowが15/0/15で検証されること</td><td>2,188 passed / 26 skipped、15 total / 0 active / 15 resolved、violation 0</td></tr>
+          <tr><td>#396</td><td>build-once replacement gateとold-policy cutoverを実装すること</td><td>仕様レビューとIssue projection readbackを進める段階</td></tr>
+          <tr><td>#396 B3</td><td>Epicの最終qualification条件をmerged sourceで満たすこと</td><td>未開始</td></tr>
+        </tbody>
+      </table>
+      <p>Epic Requirementの<code>E384-QUAL-001</code>がqualificationの数値、母集団、集計方法の唯一のauthorityです。Issue #396の仕様は、それを生成projectionとevaluatorへ反映し、別のpolicyとして再定義しません。Initiative-levelの優先順位資料は別のgovernance範囲です。このガイドは明示選択された#396とEpic #384の契約に絞っています。</p>
+    </section>
+
+    <section id="terms">
+      <h2>2. 最初に知る用語</h2>
+      <table>
+        <thead><tr><th>用語</th><th>意味</th></tr></thead>
+        <tbody>
+          <tr><td>B1 / B2</td><td>#395 post-merge exact sourceで行ったentry gates。B1はcurrent gatesのGREEN、B2は15件のbaseline評価です。</td></tr>
+          <tr><td>B3</td><td>#396が人間によりEpic branchへmergeされた後、その正確なmerged SHAで実施する最終qualification。</td></tr>
+          <tr><td>SourceIdentityV1</td><td>一つのGitHub Actions runを識別する値。event、run ID、attempt、source repository、source SHA/treeを持ちます。同じattemptの各roleが同じbytesを使います。</td></tr>
+          <tr><td>CandidateIdentityV1</td><td>build済みcandidateの識別子。source SHA/tree、provider digest、manifest、wheel/sdistの実bytes hash、producer来歴を束縛します。</td></tr>
+          <tr><td>Role</td><td>一つのattempt内でcandidateを検証する仕事のまとまり。Linux canonical、sdist smoke、macOS delta、static analysisを指します。</td></tr>
+          <tr><td><code>U + new</code></td><td>既存required contextsのうち残す無関係なもの（U）とreplacement context（new）の集合。old contextを外した後の最終readback値です。</td></tr>
+          <tr><td>consumer-zero</td><td>runtime、workflow、testから旧policyの利用箇所がなくなったことをscannerで証明した状態です。削除対象の旧provider自体は、削除直前まで残せます。</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="architecture">
+      <h2>3. 候補の識別と一回のrole graph</h2>
+      <p>event resolverはGitHub eventごとにsourceを一意に決めます。pull requestではPR head SHAとsource repository、workflow dispatchでは必須の<code>inputs.source_sha</code>、merge queueではmerge-group SHAを使います。PRのraw <code>GITHUB_SHA</code>はmerge commitを表すため、PR head candidateの代わりに使いません。</p>
+      <p>各workflow attemptは自分の<code>SourceIdentityV1</code>を作成します。同じattemptの全roleはproducer jobが保存した同じidentity bytesを使います。後続attemptではrun IDとattemptが変わりますが、source SHA/treeは元candidate manifestに一致させます。後続attemptで同じcandidateを再buildすることはありません。</p>
+
+      <script type="text/plain"
+              class="plantuml-source"
+              id="source-candidate-flow"
+              data-target="diagram-candidate-flow">
+@startuml
+title Candidate identityと同一attemptのrole graph
+top to bottom direction
+
+rectangle "GitHub event\nPR head / dispatch input / merge_group" as Event
+rectangle "resolve_source_identity\nrun単位のSourceIdentityV1" as Source
+rectangle "初回producer\nwheelとsdistを一度だけbuild" as Producer
+rectangle "CandidateManifestV1 / CandidateIdentityV1\nsourceとartifactのdigestを固定" as Candidate
+database "保存されたcandidate bundle\nwheel + sdistの実bytes" as Bundle
+rectangle "各attemptのrole graph" as Graph
+rectangle "Linux canonical\n1 pytest root / worker 1" as Linux
+rectangle "sdist smoke\nbuild backendを再起動しない" as Sdist
+rectangle "macOS delta\n明示所有nodeだけ" as Mac
+rectangle "static analysis\nmake lint" as Static
+rectangle "per-attempt evaluator\n全roleをAND判定" as Attempt
+rectangle "history evaluator\nparent-defined campaign / fault / window" as History
+
+Event --> Source : event別SHA/treeを解決
+Source --> Producer : 初回runだけ
+Producer --> Candidate : producer来歴を記録
+Candidate --> Bundle : actual bytesを保存
+Source --> Graph : 同じattemptのidentity bytes
+Bundle --> Graph : 同一candidate bytes
+Graph --> Linux
+Graph --> Sdist
+Graph --> Mac
+Graph --> Static
+Linux --> Attempt
+Sdist --> Attempt
+Mac --> Attempt
+Static --> Attempt
+Attempt --> History
+@enduml
+      </script>
+
+      <div id="diagram-candidate-flow" class="plantuml-diagram">
+        Candidateとrole graphを描画しています。
+      </div>
+
+      <details>
+        <summary>Candidate graphのPlantUMLソース</summary>
+        <pre data-source-copy="source-candidate-flow"></pre>
+      </details>
+
+      <h3>Hashの依存関係</h3>
+      <ol class="flow-list">
+        <li><code>manifest_core_sha256</code>はCandidate manifestのfields 1–12をcanonical JSON化して計算します。</li>
+        <li><code>bundle_sha256</code>はraw core digestと、filenameのUTF-8 byte順に並べたwheel/sdistのmetadataおよび実bytesを長さ付きで計算します。</li>
+        <li>完成manifest全体の<code>candidate_manifest_sha256</code>は、完成ファイルの外にあるEvidenceIndex、producer receipt、CandidateIdentityに保存します。manifest自身へ書き戻さないので自己参照はありません。</li>
+        <li>受け取り側はclaimed digestだけを信頼せず、wheel/sdist実bytesとGitHub artifact metadataを再計算して照合します。</li>
+      </ol>
+      <p class="small">Wire field、type、nullability、enum、key順、JSON bytesはIssue artifact <code>provider-gate-contracts-v1.schema.json</code>が唯一のclosed schemaです。runtime copyは同一bytesでなければ失敗します。</p>
+    </section>
+
+    <section id="roles">
+      <h2>4. 実装前に固定したtest ownership</h2>
+      <p>現行treeのLinuxとmacOS collect-only outputは各2,214 unique node IDsで、正規化集合の差は0です。この集合を実装者がtest body実行後に組み替えるのではなく、Issue artifact <code>role-ownership-v1.json</code>に一意ownerとして固定しています。</p>
+      <table>
+        <thead><tr><th>Owner</th><th>Node数</th><th>担当内容</th></tr></thead>
+        <tbody>
+          <tr><td><code>linux-canonical</code></td><td>2,191</td><td>Linux上の正規regression graph。worker 1、shardなし、descendantを含む計測。</td></tr>
+          <tr><td><code>sdist-smoke</code></td><td>1</td><td><code>tests/integration/test_epic_00343_distribution.py::test_tc_360_s80_wheel_and_sdist_catalog_bytes_and_modes_match_provider</code>。保存済みsdistを検証し、build backendを再実行しません。</td></tr>
+          <tr><td><code>macos-delta</code></td><td>22</td><td>四つのparity fileにある21 nodeと、macOS固有のatomic publish capability test 1 node。</td></tr>
+          <tr><td><code>static-analysis</code></td><td>pytest node外</td><td><code>make lint</code>を一つのrole結果として記録します。</td></tr>
+        </tbody>
+      </table>
+      <p>LinuxとmacOSのraw collect-only outputは同じartifactに保存され、hashとsource SHA/treeが契約へ記録されています。新しいnodeを追加、削除、renameするときは、collection-only差分からownerを明示して登録してから、そのnodeのtest bodyを実行します。old <code>fast</code>/<code>full_regression</code> markerからownerを推測しません。</p>
+    </section>
+
+    <section id="sequence">
+      <h2>5. 実装順とゲート</h2>
+      <p>PlanはcheckpointごとにRED、最小実装、GREEN、evidence保存を行います。以下の順番を入れ替えません。</p>
+      <ol class="flow-list">
+        <li><strong>P00–P03:</strong> R/D/P、handoff、schema、ownership、snapshot helper、entry evidenceを検証し、依存・外部state・protected baselineをread-onlyで記録します。</li>
+        <li><strong>P04–P08:</strong> parent policy projection、closed schema、candidate identity/build reuse、environment/process collector、ownership/plugin、history/evaluator/fault catalogueをテスト先行で実装します。</li>
+        <li><strong>P09–P10:</strong> 旧consumer scannerを作り、distribution testを保存済みartifactに対応させ、旧lane test内の一つの非policy regressionを移設します。</li>
+        <li><strong>P11–P12:</strong> 旧workflowと新workflowをshadowで共存させ、実際のrunner/provider/limits/imageを観測してenvironment contractをfreezeします。</li>
+        <li><strong>P13:</strong> Humanがnew required contextを追加し、intentional REDがmergeをblockすることを確認してからGREENへ戻します。old contextはこの段階では残します。</li>
+        <li><strong>P14:</strong> 全consumerをreplacementへ移し、scannerがruntime/workflow/test consumer 0を証明します。old check emitterを残したままHumanがold required contextを外し、最終required set <code>U + new</code>とmerge_group coverageをreadbackします。</li>
+        <li><strong>P15–P18:</strong> readback成功後にold emitter/provider/dataを削除し、final sourceのlocal/Actions確認と独立code review / Final Quality Gateを行います。</li>
+        <li><strong>P19:</strong> PRをEpic integration branch向けにmerge-readyで準備します。mergeはHumanだけが行います。</li>
+        <li><strong>P20–P22:</strong> merged SHA/treeとcontext stateをread-onlyで再確認し、merged SHAへ一度だけbuild、そのcandidateでB3 campaignを実行してreceiptを作ります。</li>
+      </ol>
+
+      <script type="text/plain"
+              class="plantuml-source"
+              id="source-context-cutover"
+              data-target="diagram-context-cutover">
+@startuml
+title old required contextを安全に切り替える順番
+start
+:old contextを維持したままnew contextを追加;
+:new contextをintentional REDにする;
+if (REDがPRとactive merge_groupをblockするか) then (はい)
+  :新しいsource SHAでGREENへ復旧;
+else (いいえ)
+  :切替を停止し、old contextを維持;
+  stop
+endif
+:consumerをreplacementへ移行;
+:runtime / workflow / test consumer 0を確認;
+:Humanがold required contextだけを除去;
+note right
+old check emitterはまだ存在する
+end note
+if (readbackがU + newか) then (はい)
+  :readback証拠を保存;
+  :P15でold emitterとold providerを削除;
+  :final sourceでreplacement checkを検証;
+else (いいえ)
+  :削除せずstop-and-return;
+endif
+stop
+@enduml
+      </script>
+      <div id="diagram-context-cutover" class="plantuml-diagram">
+        required-context切替の順番を描画しています。
+      </div>
+      <details>
+        <summary>required-context図のPlantUMLソース</summary>
+        <pre data-source-copy="source-context-cutover"></pre>
+      </details>
+      <p>Settings変更とPR mergeはHumanの担当です。P20は<code>U + new</code>のreadback確認だけを行い、old contextを後から外すcheckpointではありません。readbackが取れない、または期待値と異なる場合はold emitter/providerを残した状態で停止します。</p>
+    </section>
+
+    <section id="safe-seam">
+      <h2>6. 旧pytest hookからの一時移行点</h2>
+      <p>現在の<code>tests/conftest.py</code>はlegacy marker、policy skip、ledger判定を行います。replacement GREENを作るテストまでlegacy hookが一律skipすると、旧hookを削除する前にconsumer-zeroへ到達できません。そこで移行期間だけ、role mode専用の狭い経路を設けます。</p>
+      <ol class="flow-list">
+        <li>Role CLIは<code>-p scripts.quality.provider_gate.pytest_plugin</code>と<code>--provider-gate-role</code>を指定します。</li>
+        <li>root conftestはrole指定を検出すると、pluginのexact module登録を要求します。</li>
+        <li><code>prepare_role_collection(config, items)</code>だけがclosed contract、全node割当、owner一意性を検証して非所有nodeをdeselectします。二重filterは登録しません。</li>
+        <li>検証成功後はold skip/ledger hookを通らず、検証失敗、plugin欠落、unknown node、legacy flag併用ならtest body開始前に失敗します。</li>
+        <li>通常pytestと既存legacy runはconsumer-zeroまで従来どおりです。P15でtransition seamとold hookをまとめて削除します。</li>
+      </ol>
+      <aside class="callout">
+        <strong>Skipで代用しません。</strong>
+        Role外nodeはdeselectします。role-owned testへ<code>POLICY_SKIP_REASON</code>が付く状態、未知owner、重複実行はreplacement attemptの拒否条件です。
+      </aside>
+    </section>
+
+    <section id="fail-closed">
+      <h2>7. 失敗時の動作</h2>
+      <table>
+        <thead><tr><th>検出した状態</th><th>動作</th><th>続行してはいけない理由</th></tr></thead>
+        <tbody>
+          <tr><td>repository / source SHA / tree / run attemptが一致しない</td><td>candidateまたはattemptをreject</td><td>異なるsourceの結果を同一候補へ混ぜないためです。</td></tr>
+          <tr><td>artifact欠落、重複producer、hash/実bytes不一致</td><td>build fallbackせずreject</td><td>同じsourceの再buildは「一度だけ」の証明を壊すためです。</td></tr>
+          <tr><td>owner欠落、重複、未知node、policy skip</td><td>collection/attemptをreject</td><td>検証母集団とowner集合が確定しないためです。</td></tr>
+          <tr><td>runner環境や有効quotaを証明できない</td><td>admissionをreject</td><td>別環境の結果を性能qualificationに使えないためです。</td></tr>
+          <tr><td>pytest root終了後にdescendantが残る</td><td>全processのreapまで計測し、未回収ならreject</td><td>wall/CPU値の測定窓が閉じていないためです。</td></tr>
+          <tr><td>started runの結果/evidenceが欠落・cancel・interruption</td><td>history memberとして残し、成功で置換しない</td><td>欠測を成功扱いにできないためです。</td></tr>
+          <tr><td>new required contextのREDがmergeをblockしない</td><td>settings before-stateへ戻して停止</td><td>no-gap切替の安全性が証明できないためです。</td></tr>
+          <tr><td>old context removal後のreadbackが<code>U + new</code>でない</td><td>old emitter/providerを削除せず停止</td><td>必須checkの欠落や範囲変更を隠さないためです。</td></tr>
+        </tbody>
+      </table>
+      <p>すべてのstopは<code>StopReturnV1</code>だけで記録します。PlanやHandoffに別の停止JSON形式はありません。Packetも<code>ExecutionPacketV1</code>だけを使い、一回に一checkpointだけを認可します。</p>
+    </section>
+
+    <section id="verification">
+      <h2>8. 実装者がたどる場所と確認方法</h2>
+      <p>Issueの正本はこのrepository内のRequirement、Design、Planです。人間向けHTMLは説明用で、closed schemaや親qualification契約を置き換えません。実装開始前に最新のStrict reviewがpassであること、Issue body projectionのreadback、ユーザーの明示dispatch、同時writerがいないことを確認します。</p>
+      <table>
+        <thead><tr><th>読む場所</th><th>用途</th></tr></thead>
+        <tbody>
+          <tr><td><a href="../requirement.md">requirement.md</a></td><td>目的、境界、親とのauthority、受入条件。</td></tr>
+          <tr><td><a href="../design.md">design.md</a></td><td>各moduleの責務、identity/hash graph、role ownership、transition seam。</td></tr>
+          <tr><td><a href="../plan.md">plan.md</a></td><td>P00–P22の順序、具体的なtest commands、evidence、stop条件。</td></tr>
+          <tr><td><a href="20260917t124918z--luna-max-implementation-handoff.md">Luna Max handoff</a></td><td>実装担当のpacket、path envelope、CLI契約、戻り値。</td></tr>
+          <tr><td><a href="provider-gate-contracts-v1.schema.json">closed schema</a></td><td>すべてのruntime/evidence/packet wire shape。</td></tr>
+          <tr><td><a href="role-ownership-v1.json">role ownership</a></td><td>2,214 nodeの実装前owner baseline。</td></tr>
+          <tr><td><a href="20260917t124918z-01--b1-b2-gate-receipt.md">B1/B2 entry receipt</a></td><td>#395から引き継いだentry evidenceとその非主張。</td></tr>
+          <tr><td><a href="20260917t162312z-strict-review-remediation-analysis.md">Strict review remediation analysis</a></td><td>初回P1指摘の証拠照合と修正理由。</td></tr>
+        </tbody>
+      </table>
+      <p>中心となる実装先は<code>scripts/quality/provider_gate/</code>、生成policyは<code>scripts/maintenance/generate_provider_qualification_policy.py</code>、新規unit testsは<code>tests/unit/provider_gate/</code>です。Provider-side scaffold、lifecycle Product source、installed consumer workflowはprotected/no-touch scopeです。</p>
+      <p>Planの最終確認には、schema validation、provider-gate unit/integration tests、provider lifecycle / distribution non-regression、<code>make lint</code>、ordinary pytest、SpecDock validate、consumer-zero scan、retained workflow byte comparisonを含みます。各checkpointの実行結果を別々のEvidenceIndexへ保存します。</p>
+      <p>GitHubのeventでsource SHAが変わる点は<a href="https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows" target="_blank" rel="noreferrer">GitHub Actions公式event仕様</a>に従います。PR eventの<code>GITHUB_SHA</code>はmerge branch commit、<code>merge_group</code>はmerge-group SHA、dispatchではrequired <code>source_sha</code> inputを使います。</p>
+    </section>
+
+    <section id="status">
+      <h2>9. この準備タスクの完了条件</h2>
+      <p>このタスクは仕様をLuna Maxが迷わず実装できる状態にし、独立Strict spec reviewを通すところまでです。Product source、tests、workflow、policy、required-context settingsの変更は行いません。</p>
+      <ul class="flow-list">
+        <li>Requirement、Design、Plan、handoffとsupport schema/ownership/evidenceをIssue canonical artifactsへ揃える。</li>
+        <li>同じ内容を含むZIPと、テンプレート規約に沿ってbrowserで描画確認したこのHTMLを配布可能にする。</li>
+        <li>修正候補をcommit/pushしてclean exact SHAを確立し、同じRed reviewer sessionで全scopeを再レビューする。</li>
+        <li>最新reviewが<code>review_status=pass</code>、P0=0、P1=0となったら、GitHub Issue body projectionをreadbackする。</li>
+        <li>それでもProduct implementation permissionはfalseのまま。ユーザーのexplicit dispatchと有効な一checkpoint ExecutionPacketが別途必要です。</li>
+      </ul>
+      <p class="muted">Human merge、required-context変更、B3、Epic main mergeは、この準備タスクの完了とは別のゲートです。</p>
+    </section>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title">
+      <h2 id="diagram-zoom-title" class="visually-hidden">図を拡大表示</h2>
+      <header class="diagram-zoom-header">
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する" title="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-reset" aria-label="100%に戻す" title="100%に戻す">
+            <span id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</span>
+          </button>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する" title="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-close" aria-label="拡大表示を閉じる" title="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </header>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomResetButton.setAttribute("aria-label", `100%に戻す（現在${zoomLevelOutput.value}）`);
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>

@@ -5,7 +5,7 @@ ID: "iss-00396"
 関連GitHub: ["#396"]
 状態: "draft"
 詳細化状態: "implementation-ready-candidate"
-最終更新: "2026-09-17"
+最終更新: "2026-09-18"
 依存:
   - "requirement.md"
   - "design.md"
@@ -32,9 +32,9 @@ qualification_authority: "E384-QUAL-001"
 
 本Planはimplementation-ready specification candidateであり、Product/test/workflow/policy実装をまだ許可しない。実行開始には次を全て要求する。
 
-1. 本R/D/Pと`luna-max-implementation-handoff.md`がIssue canonical copyへbyte-identicalに反映される。
+1. 本R/D/P、`artifacts/20260917t124918z--luna-max-implementation-handoff.md`、closed contract schema、role-ownership baseline、snapshot helper、B1/B2 receiptとraw evidence、人間向けHTMLが同一ZIP artifactへ収録され、R/D/PとhandoffがIssue canonical copyへbyte-identicalに反映される。
 2. clean pushed exact SHA/treeがGitHub connectorで一致する。
-3. independent `chatgpt-spec-review-strict`がfresh sessionで`review_status=pass`、P0=0、P1=0。
+3. 初回は`iss396-spec-review-red`で独立`chatgpt-spec-review-strict`を実行し、修正候補は同じsession IDへ`--followup`して、最新結果が`review_status=pass`、P0=0、P1=0となる。
 4. 主担当がGitHub Issue #396 bodyをcanonical projectionへ更新し、readbackする。
 5. ユーザーがexplicit implementation dispatchを出す。
 6. concurrent writerがいない。
@@ -63,6 +63,10 @@ chmod 700 "$EVIDENCE_ROOT"
 
 `SPEC_FREEZE_SHA` / `SPEC_FREEZE_TREE`は独立review対象のclean pushed tipから実行時に設定する。B2 SHAはentry provenanceであり、spec-only commits後のcurrent tipと混同しない。
 
+Implementation admissionで再検証するB2 exact entry identityは`fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`である。B2のraw resultとbefore-ledgerはそれぞれIssue artifact `20260917t124918z-02--iss-00395-b2-full-regression-result.json`（SHA-256 `bd4630014ee046967713c89c7b8112a2ebe7f10aa85100256aca8a677d817786`）と`20260917t124919z--iss-00395-b2-ledger-before.json`（SHA-256 `838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d`）である。これは#395のpost-merge B1/B2 entry proofだけで、#396のB3・replacement gate・Product実装を証明しない。
+
+`artifacts/provider-gate-contracts-v1.schema.json`がruntime/evidence/execution wireの唯一のclosed schema sourceである。`artifacts/role-ownership-v1.json`とそこから参照される2つのraw collect-only outputsはreviewed 2,214-node baselineである。Implementation時のruntime copiesはcanonical artifactsとbyte-identicalに保ち、schema/ownership hashをpacketのEvidenceIndexへ含める。
+
 ## 3. Planned change inventory
 
 ### 3.1 NEW
@@ -85,6 +89,7 @@ scripts/quality/provider_gate/evidence.py
 scripts/quality/provider_gate/cli.py
 scripts/quality/provider_gate/_qualification_policy_generated.py
 scripts/quality/provider_gate/contracts/specdock-linux-qualification-v1.json
+scripts/quality/provider_gate/contracts/provider-gate-contracts-v1.schema.json
 scripts/quality/provider_gate/contracts/role-ownership-v1.json
 scripts/quality/provider_gate/contracts/seeded-fault-catalogue-v1.json
 scripts/quality/provider_gate/contracts/old-policy-retirement-v1.json
@@ -96,6 +101,7 @@ tests/unit/provider_gate/test_artifacts.py
 tests/unit/provider_gate/test_environment.py
 tests/unit/provider_gate/test_process_tree.py
 tests/unit/provider_gate/test_role_ownership.py
+tests/unit/provider_gate/test_role_transition_seam.py
 tests/unit/provider_gate/test_history.py
 tests/unit/provider_gate/test_fault_catalogue.py
 tests/unit/provider_gate/test_evaluator.py
@@ -150,13 +156,14 @@ spec-dock/.workbench/**   # dedicated new evidence path以外
 
 Owner: 主担当 / independent reviewer。Product mutation禁止。
 
-1. ZIPのR/D/PをIssue canonical pathsへbyte-identicalに配置する。
-2. handoff/receiptをIssue direct-child `artifacts/`へ適切なnameで配置する。
-3. `./spec-dock/scripts/spec-dock validate`、必要なら`sync`を実行する。
-4. spec-only diffを確認し、commit/pushする。
-5. GitHub connectorでrepository/branch/full SHAをverifyする。
-6. `chatgpt-spec-review-strict`をfresh sessionで実行する。
-7. pass後、GitHub Issue #396 body projectionを主担当が更新しreadbackする。
+1. `artifacts/issue-396-specification-pack.zip`のrootに`README.md`を置き、repository-relative path hierarchyを保ってcanonical Issue R/D/P、handoff、regular Issue artifacts（対象ZIP自身を除く）、親Epic R/D/Pと明示dependency artifactsを収録する。ZIP内Issue docsとartifactsはcanonical direct-child filesにbyte-identicalとする。
+2. ZIP内`manifest.sha256`はREADMEを含む全payload entryをpath順にhashし、manifest自身とZIP file自身は自己参照させない。個別entry hash検証後、ZIPのSHA-256と`git hash-object`出力を`EVIDENCE_ROOT/p00-zip-identity.txt`へ記録する。commit後は`git rev-parse HEAD:$ISSUE_DIR/artifacts/issue-396-specification-pack.zip`が記録済みblob IDと一致することを確認する。
+3. schema、role ownership、raw collection output、snapshot helper、remediation analysis、B1/B2 receipt/raw JSON、説明HTMLをIssue direct-child `artifacts/`へ配置し、ZIP内とbyte-identicalであることを確認する。
+4. `./spec-dock/scripts/spec-dock validate`を実行する。
+5. spec-only diffを確認し、commit/pushする。
+6. GitHub connectorでrepository/branch/full SHAをverifyする。
+7. 初回は新しい独立Red session `iss396-spec-review-red`で`chatgpt-spec-review-strict`を実行する。P0/P1指摘の修正後は同じsessionへ`--followup iss396-spec-review-red`を渡し、目的・範囲を変えず、候補SHAごとにStrict gatesを再実行する。P2/P3は記録だけで、修正・task化・合否条件化しない。
+8. latest reviewがpass、P0=0、P1=0の後、GitHub Issue #396 body projectionを主担当が更新し、readbackする。
 
 Exact local verification:
 
@@ -165,14 +172,19 @@ Exact local verification:
 git diff --check
 git status --short
 git diff --name-only "$B2_SHA"...HEAD | tee "$EVIDENCE_ROOT/p00-spec-diff.txt"
+git hash-object "$ISSUE_DIR/artifacts/issue-396-specification-pack.zip" \
+  | tee "$EVIDENCE_ROOT/p00-zip-identity.txt"
+shasum -a 256 "$ISSUE_DIR/artifacts/issue-396-specification-pack.zip" \
+  | tee -a "$EVIDENCE_ROOT/p00-zip-identity.txt"
 ```
 
 Expected output class:
 
 - validate exit 0、`nodes=236`またはspec publicationに伴う正当なnode count不変。
+- ZIP member hashesとIssue canonical copyのhashが一致し、HTML browser validationが成功。ZIP SHA-256とpre-commit Git blob IDはEvidenceRootに記録し、commit後のpath blob IDと一致。
 - diffは#396 canonical R/D/P/Artifactsと、projectionに必要なgenerated docsだけ。
 - Product、tests、workflow、policy data差分0。
-- Strict review `pass`, P0=0, P1=0。
+- 同一Red sessionの最新Strict reviewが`pass`, P0=0, P1=0。
 
 Failure: Product file差分、review fail、SHA mismatchでは停止。過去reviewへfallbackしない。
 
@@ -279,16 +291,16 @@ P02のcaptureが揃うまでworkflow codeを書かない。
 
 ### 7.1 Protected snapshot
 
-New helperをまだ作らず、read-only shell/Python one-shotでsnapshotする。専用evidence pathをtracked tree外へ置く。
+`artifacts/capture_protected_snapshot.py`が唯一のreview済みcapture実装である。P03/P16の双方で同一script SHA-256を確認し、専用evidence pathをtracked tree外へ置く。
 
 ```bash
-python - <<'PY' > "$EVIDENCE_ROOT/p03-protected-before.json"
-# Implementation packet supplies the reviewed snapshot script.
-# It records repository-relative path, type, mode, size, SHA-256 for protected roots.
-PY
+test "$(sha256sum "$ISSUE_DIR/artifacts/capture_protected_snapshot.py" | awk '{print $1}')" = "$SNAPSHOT_HELPER_SHA256"
+python "$ISSUE_DIR/artifacts/capture_protected_snapshot.py" \
+  --repository . \
+  --output "$EVIDENCE_ROOT/p03-protected-before.json"
 ```
 
-Snapshot rootsはRequirement §4.3 / Design §13.3。Symlinkをfollowしない。
+`SNAPSHOT_HELPER_SHA256`はIssue artifact SHA manifestおよびExecutionPacket EvidenceIndexから得る。Snapshot roots/exclusionはRequirement §4.3 / Design §13.3とschema `ProtectedTreeSnapshotV1`が同一値で定義する。Symlinkをfollowしない。Outputはfresh pathへexclusive作成する。
 
 ### 7.2 Current old consumer inventory
 
@@ -391,12 +403,22 @@ Implement `identity.py`, `artifacts.py`, required contracts and CLI commands.
 Candidate build command invoked by producer path:
 
 ```bash
+uv run python -m scripts.quality.provider_gate.cli resolve-source-identity \
+  --repository "$REPOSITORY" \
+  --event-payload "$GITHUB_EVENT_PATH" \
+  --workflow-run-id "$GITHUB_RUN_ID" \
+  --run-attempt "$GITHUB_RUN_ATTEMPT" \
+  --output "$RUNNER_TEMP/source_identity.json"
+
 uv run python -m scripts.quality.provider_gate.cli build-candidate \
   --repository . \
-  --source-sha "$GITHUB_SHA" \
-  --source-tree "$(git rev-parse "$GITHUB_SHA^{tree}")" \
+  --source-identity "$RUNNER_TEMP/source_identity.json" \
+  --workflow-run-id "$GITHUB_RUN_ID" \
+  --run-attempt "$GITHUB_RUN_ATTEMPT" \
   --output "$CANDIDATE_DIR"
 ```
+
+`resolve-source-identity`はDesign §12.2と`SourceIdentityV1`に従ってevent別にSHAを解決する。`pull_request`はpayloadのhead SHA/repository、`workflow_dispatch`はrequired `inputs.source_sha`、`merge_group`はmerge-group SHAを使う。全consumerはproducerが保存した同じ`source_identity.json` bytesを検証する。PRのraw `GITHUB_SHA`をcandidate SHAへ使わない。
 
 Inside CLI, top-level packaging process is exactly:
 
@@ -472,9 +494,11 @@ Expected: unit GREEN。Actual runner admission remains pending until shadow work
 
 ## 11. Checkpoint P07 — Role ownership and pytest plugin RED→GREEN
 
-### 11.1 Capture collection without changing current policy
+### 11.1 Freeze ownership before executing role nodes
 
-Before old hook removal, use current full collection result from B2 (2214) as historical reference only. Build `role-ownership-v1.json` from current files and explicit role objectives, then test against actual collection in a temporary branch state where plugin is loaded. Do not derive final owner by old fast/full marker.
+Review済みbaselineは`artifacts/role-ownership-v1.json`であり、source `3ded647d247b9399a4b79ad6f854d6a87fbf4313` / tree `614778cc7e6e64609a7de80bf2428b3e7f5ec4b7`におけるLinux/macOS各2,214 unique node IDsである。normalized set hashは`b6e742ecba64ec02512892cf99d0c0c7273c175f56e0bc5a5666127f885f03da`、owner countはLinux canonical 2,191、sdist smoke 1、macOS delta 22。raw output filesは同じartifact directory内にあり、contractのEvidenceRef/hashとbyte一致する。
+
+P07の最初のcollection-only testは、実装branch SHAで収集したnode集合とreview済みbaselineの差分を表示する。差分が0ならownership contractをそのまま使用する。追加・削除・rename nodeがある場合は、test bodyや旧fast/full markerを実行・owner決定へ使う前にcollection-only差分を確認し、明示的な役割根拠と一意ownerをcontractへ登録し直し、そのhashと差分をreviewする。Baselineと新candidateの母集団を暗黙に混ぜない。
 
 ### 11.2 Tests
 
@@ -486,10 +510,13 @@ Before old hook removal, use current full collection result from B2 (2214) as hi
 - execution observation detects duplicate node、policy skip、approved failure。
 - macOS selectors include actual platform-specific nodes; Linux does not execute them。
 - sdist role owns package artifact tests; no duplicate execution in Linux canonical。
+- `tests/conftest.py` role transition seamがCLIの`-p scripts.quality.provider_gate.pytest_plugin`登録をrequireする。plugin自身はcollection filter hookを登録せず、root conftestから`prepare_role_collection(config, items)`を一度だけ呼ぶ。plugin未登録・role option欠落・schema不正・unknown node・old flag併用をcollection開始前にrejectし、role modeではlegacy `POLICY_SKIP_REASON` hookを通さない。
 
 ```bash
+uv run pytest -q tests/unit/provider_gate/test_role_transition_seam.py --tb=short \
+  | tee "$EVIDENCE_ROOT/p07-transition-seam.txt"
 uv run pytest -q tests/unit/provider_gate/test_role_ownership.py --tb=short \
-  | tee "$EVIDENCE_ROOT/p07-red.txt"
+  | tee "$EVIDENCE_ROOT/p07-role-ownership.txt"
 ```
 
 Implement `pytest_plugin.py` and role contract. GREEN expected all pass。
@@ -701,6 +728,7 @@ U + old + new
 ```
 
 No unrelated context/review/merge-queue drift。
+この段階ではold contextを削除しない。変更前後のactual context names、branch/ruleset scope、merge queue scopeをreadback evidenceへ記録する。
 
 ### 17.2 Intentional RED
 
@@ -714,19 +742,19 @@ Required observation:
 - attempt appears in rolling history as failed/nonaccepted。
 - no rerun of that run。
 
-After proof, fix the canary by a new commit/source SHA and obtain new context GREEN。This recovery candidate is not automatically final B3 candidate; final source after retirement will create its own identity。
+After proof, fix the canary by a new commit/source SHA and obtain new context GREEN。This recovery candidate is not automatically final B3 candidate; final source after retirement will create its own identity。Replacement GREENだけではold contextを外さず、P14 consumer-zero後にhuman removal/readbackを行う。
 
 If RED does not block, restore settings before-state and stop。Do not remove old context。
 
 ## 18. Checkpoint P14 — Migrate all consumers to replacement
 
-Remove old policy use from current consumers while keeping old providers/data present:
+Remove old policy use from current consumers while keeping old providers/data and old check emitter present:
 
 1. `.github/workflows/provider-ci.yml` new jobs become authoritative per-attempt path; old jobs still present temporarily。
 2. Refactored package tests consume stored artifacts in final gate。
 3. docs/operator commands point to provider-gate CLI, not old verifier。
 4. no code imports old evaluator/sharder except historical/retirement contract。
-5. `tests/conftest.py` old dynamic marker/skip/evaluator is no longer required by replacement runs but remains until zero/deletion checkpoint if scanner classifies it as provider, not consumer。
+5. `tests/conftest.py` keeps a temporary, role-only transition seam: for `--provider-gate-role`, require the registered provider-gate plugin, validate the closed role contract and all collected node assignments, then hand the collection to the new plugin before legacy classification/skip/ledger logic. Without that option, existing ordinary and legacy behavior remains unchanged. Reject missing plugin, invalid contract, unknown node, or mixed legacy flags before test bodies run. Add focused tests for all branches. This seam and legacy hooks are deleted together only after consumer-zero.
 
 Run scanner:
 
@@ -739,9 +767,11 @@ uv run python -m scripts.quality.provider_gate.cli scan-old-consumers \
 
 Exit criteria: `runtime_consumers=0`, `workflow_consumers=0`, `test_consumers=0` excluding listed providers scheduled for deletion and historical allowlist。If any consumer remains, do not delete provider/data。
 
+After replacement roles are GREEN and consumer-zero is proven, keep the old workflow/check emitter intact while the human removes only the old required context. Read back the final effective context set as `U + new`, including active merge-queue `merge_group` coverage. Save before/change/readback/rollback evidence. If settings are unreadable, scope changes, or readback is not exactly `U + new`, stop and retain both old provider and emitter.
+
 ## 19. Checkpoint P15 — Delete old provider/data/workflow in one cutover
 
-Only after P14 consumer-zero:
+Only after P14 consumer-zero and successful human old-context removal/readback while the old check emitter still exists:
 
 1. delete root ledger/timing。
 2. delete old quality modules。
@@ -765,6 +795,8 @@ uv run python -m scripts.quality.provider_gate.cli scan-old-consumers \
 ```
 
 Expected: zero old runtime/workflow/test consumers; deleted providers absent; historical references allowed; retained workflows present and byte-equal。
+
+The old check emitter is removed in this same cutover only after the `U + new` readback exists. P20 is read-only confirmation and never performs a late old-context removal.
 
 No compatibility shim、empty ledger、stub verifier、deprecated flag aliasを残さない。
 
@@ -845,7 +877,10 @@ Required final-source PR attempt:
 - fault campaign 100%（candidate-bound、run once per candidate campaign）。
 - consumer-zero、retained workflow、protected evidence pass。
 - new required context GREEN。
-- old required context still present until human removal plan is ready。
+- P14 human readback is exactly `U + new`; old context has already been removed while its emitter still existed.
+- final candidate no longer emits the old context; no required context is missing.
+
+For `pull_request`, resolve and test the PR head SHA/tree from event payload. If merge queue is active, separately resolve the `merge_group` SHA/tree and verify that the replacement required check is emitted there. Neither event may silently substitute the other event's source SHA.
 
 Do not start first-five final campaign on PR head if human merge creates a different source SHA. PR evidence proves implementation and per-attempt behavior, not post-merge B3 candidate qualification。
 
@@ -888,16 +923,17 @@ PR evidence:
 
 Human alone merges。Agent stops merge-ready。
 
-## 24. Checkpoint P20 — Post-merge exact identity and old-context removal
+## 24. Checkpoint P20 — Post-merge exact identity and context readback
 
 After human merge to Epic integration branch:
 
 1. resolve exact merge SHA/tree。
 2. require merged tree equals accepted PR head tree; SHA may differ。
 3. this merge SHA is a **new candidate identity**。
-4. human verifies new context on integration branch and removes old required context only after no-gap conditions are met。
-5. readback final effective set `U + new`。
-6. no main merge yet。
+4. Read back the effective required-context set `U + new` and merge-queue `merge_group` coverage after the earlier P14 removal.
+5. Confirm the old emitter is absent from the accepted merge tree and no old context is required.
+6. Do not mutate settings in this checkpoint; if readback is unavailable or differs, stop before B3.
+7. no main merge yet。
 
 ```bash
 MERGED_SHA='<read from GitHub>'
@@ -911,13 +947,13 @@ If tree differs, stop and do not start B3 campaign。
 
 ### 25.1 First attempt is sole producer
 
-Dispatch one fresh workflow run for exact `MERGED_SHA`; do not rerun it。It builds wheel/sdist exactly once and freezes candidate manifest/environment/campaign IDs。
+Dispatch one fresh `workflow_dispatch` run with required input `source_sha=MERGED_SHA`; the resolver must produce `source_identity.json` with `source_reference=workflow_dispatch_source_sha` and exact merged SHA/tree. Do not substitute `GITHUB_SHA` or branch tip, and do not rerun the run. It builds wheel/sdist exactly once and freezes candidate manifest/environment/campaign IDs.
 
 If build/role fails, candidate is rejected; create a forward-fix source SHA and repeat human review/merge as applicable。Do not rebuild same SHA。
 
 ### 25.2 First five
 
-Dispatch four additional independent workflow runs, each new run ID, all consuming producer bytes。The chronological first five started attempts are immutable population。No retries/reruns/replacement。
+Dispatch four additional independent workflow runs, each with the same required `source_sha=MERGED_SHA` but a new run ID, all consuming the producer artifact and exact producer `source_identity.json` bytes. The chronological first five started attempts are immutable population. No retries/reruns/replacement.
 
 Evaluate:
 
@@ -1009,26 +1045,7 @@ Exact pass counts are observations, not specification constants。Any expected o
 
 ## 28. Stop-and-return payload
 
-Implementation agent returns a JSON document with exact schema:
-
-```json
-{
-  "schema_version": 1,
-  "issue_id": "iss-00396",
-  "checkpoint": "Pxx",
-  "status": "stopped",
-  "contract_id": "I396-RQ-xxx or E384-QUAL-001 clause",
-  "expected": "exact expected fact",
-  "actual": "sanitized observed fact",
-  "evidence": ["repository-relative path, run ID, or redacted API receipt"],
-  "scope_impact": ["affected component"],
-  "owner": "parent-owner|human-settings-owner|issue-396-implementer",
-  "next_required_check": "one exact isolating check",
-  "mutation_performed": false
-}
-```
-
-Do not include credentials、tokens、private absolute paths。`cause`が確定しない場合は`原因未特定`とする。
+唯一のstop-and-return wire schemaは`artifacts/provider-gate-contracts-v1.schema.json#/$defs/StopReturnV1`である。Plan/Handoffに別JSON shapeを定義しない。Evidenceはrepository-relative path / run ID / redacted API receiptとし、credentials、tokens、private absolute pathsを含めない。原因を特定できない場合は`cause="原因未特定"`とする。
 
 ## 29. Stop conditions
 

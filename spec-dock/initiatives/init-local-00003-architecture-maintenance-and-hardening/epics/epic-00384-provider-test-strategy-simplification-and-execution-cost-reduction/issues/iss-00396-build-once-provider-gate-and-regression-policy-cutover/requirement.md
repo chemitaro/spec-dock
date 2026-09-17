@@ -5,7 +5,7 @@ ID: "iss-00396"
 関連GitHub: ["#396"]
 状態: "draft"
 詳細化状態: "implementation-ready-candidate"
-最終更新: "2026-09-17"
+最終更新: "2026-09-18"
 依存:
   - "iss-00395"
   - "../../requirement.md"
@@ -75,11 +75,11 @@ GitHub connectorで次を直接確認済みである。
 | GitHub #396 | OPEN |
 | SpecDock dependency | `.meta.json`の`depends_on=["iss-00395"]`を維持 |
 
-GitHub #396 bodyは「#395待ち、未開始、blocked」という過去projectionを含む。現在のentry事実を表さないため、canonical sourceとして複写しない。body更新は本成果物の範囲外であり、独立Strict review後に主担当が行う。
+GitHub #396 bodyは「#395待ち、未開始、blocked」という過去projectionを含む。現在のentry事実を表さないため、canonical sourceとして複写しない。仕様review pass後、P00に従って主担当が最新freeze SHAへのbody projectionを更新し、GitHubからreadbackする。
 
 ### 2.3 B1/B2 receiptの意味
 
-B1/B2は同じsource/treeで成立した。詳細は`b1-b2-gate-receipt.md`とZIP内raw JSONを参照する。
+B1/B2は同じsource/treeで成立した。詳細は`artifacts/20260917t124918z-01--b1-b2-gate-receipt.md`と同階層のraw B2 JSONを参照する。
 
 - B1: ordinary pytest `1367 passed, 847 skipped`、lint GREEN、SpecDock validate `nodes=236`、#395のpublication security matrixとrow 12 guard GREEN。
 - B2: 2214 collected、4 shard合計`2188 passed, 26 skipped`、`evaluation.verified=true`、15 total / 0 active / 15 resolved、14 fixed-in-place / 1 superseded、approved/unexpected 0。
@@ -158,13 +158,15 @@ B3時点で、次の全てが同じfinal source上で成立する。
 
 ### I396-RQ-003 — Candidate identity and one build invocation
 
-Candidate manifestは次を閉じる。
+`artifacts/provider-gate-contracts-v1.schema.json#/$defs/CandidateManifestV1`がcandidate manifestの唯一のclosed shape authorityである。Manifestは次を閉じる。
 
 - repository、source SHA、source tree。
 - `capture_packaged_candidate()`から得るprovider candidate digest。
 - build invocation IDとexact top-level command。
 - wheel filename/size/SHA-256、sdist filename/size/SHA-256。
 - manifest core digest、final manifest digest、bundle digest。
+
+Hashは非循環でなければならない。`manifest_core_sha256`はcanonical manifest fields 1–12から計算し、`bundle_sha256`はcore digestとfilename-byte-orderで並べたwheel/sdist metadata・actual bytesをlength-frameして計算する。完成したmanifest bytesの`candidate_manifest_sha256`はmanifest外のEvidenceIndex／producer receipt／CandidateIdentityに保存し、manifestまたはbundleの入力に戻さない。`CandidateIdentityV1`はsource SHA/tree、provider digest、core hash、final manifest hash、bundle hash、wheel/sdist hashesを全て束縛する。
 
 一つのsource SHAに対しbuild producerは一つだけである。`uv build --sdist --wheel ...`のtop-level process invocationをcount 1とし、downstream role、rerun、別OSで再buildしない。missing artifact、複数producer、wrong source/tree、manifest mismatch、actual-byte mismatchはfail closedである。
 
@@ -187,7 +189,9 @@ Role IDはevidence schemaでclosed enumとする。role欠落、重複、同一n
 
 ### I396-RQ-006 — Role ownership without policy skip
 
-Source-controlled `role-ownership-v1.json`がtest path/node familyのownerを一意に定める。pytest pluginはrole外nodeをskip/xfailにせずdeselectし、role-owned nodeのcollection/executionをraw evidenceへ記録する。union coverage、intersection empty、unknown owner 0をmechanically検証する。旧`fast` / `full_regression` marker、`POLICY_SKIP_REASON`、`--run-full-regression`、`--full-regression-shard`をfinal sourceに残さない。
+`artifacts/role-ownership-v1.json`をsource-controlled contractの初期内容とする。添付collection outputsはIssue branchのsource `3ded647d247b9399a4b79ad6f854d6a87fbf4313` / tree `614778cc7e6e64609a7de80bf2428b3e7f5ec4b7`で採取したLinux/macOS各2,214 node IDsであり、unique countも2,214、集合差0である。全nodeのownerは一意で、初期owner数は`linux-canonical=2191`、`sdist-smoke=1`、`macos-delta=22`。Raw outputとnormalized sorted-node-ID hashを契約内で参照する。
+
+このbaseline SHAはcollection evidenceの来歴であり、後続candidate identityではない。実装でtest nodeを追加・削除・renameするときは、collection-onlyで差分を特定し、contract assignmentを明示更新してからtest bodyを実行する。集合外node、owner欠落、重複ownerはcollection段階でrejectする。Role外nodeはskip/xfailではなくdeselectし、role-owned nodeのcollection/executionをraw evidenceへ記録する。旧`fast` / `full_regression` marker、`POLICY_SKIP_REASON`、`--run-full-regression`、`--full-regression-shard`をfinal sourceに残さない。
 
 ### I396-RQ-007 — Linux canonical topology and process lifecycle
 
@@ -195,7 +199,7 @@ Linux canonicalはone pytest root、worker 1、xdistなし、shardなしで実�
 
 ### I396-RQ-008 — Environment contract and fingerprint
 
-`specdock-linux-qualification-v1.json`は、初回measurement前に次を固定する。
+`specdock-linux-qualification-v1.json`は`artifacts/provider-gate-contracts-v1.schema.json#/$defs/EnvironmentFingerprintV1`の`linux-canonical` instanceとして、初回measurement前に次を固定する。
 
 - runner provider/class、architecture。
 - CPU model family、effective quota/limit。
@@ -234,6 +238,8 @@ New required contextのintentional REDはfive-run campaign freeze前に行い、
 
 ### I396-RQ-014 — Actual-byte and API evidence
 
+`artifacts/provider-gate-contracts-v1.schema.json#/$defs/EvidenceIndexV1`と各参照先schemaがEvidenceIndexとevidenceの唯一のclosed shape authorityである。Canonical JSONはschemaの`x-key-order`順、UTF-8、BOMなし、空白なし、`ensure_ascii=false`相当、NaN/Infinityなし、末尾LF一つとする。Unknown/missing/duplicate key、重複path、絶対path、dot/dot-dot、backslash、NUL、symlink traversalはrejectする。EvidenceIndexはrepository-relative path、schema kind/version、size、実バイトSHA-256を持つ。
+
 Evidence indexはtracked future factを書かず、実行時に次をraw保存する。
 
 - source SHA/tree、manifestとwheel/sdist actual bytes hash。
@@ -247,7 +253,7 @@ File nameやclaimed digestだけでactual bytesを省略しない。auth token�
 
 ### I396-RQ-015 — Consumer-first old policy retirement
 
-Replacement code、tests、workflow role、evidence evaluatorを先にGREENにする。その後、AST/YAML/JSON/text-aware scannerでold consumer inventoryを0と証明してから、次を同一Issue PRで削除する。
+Replacement code、tests、workflow role、evidence evaluatorを先にGREENにする。移行中にpytestをrole modeで実行するときだけ、root `tests/conftest.py`は`--provider-gate-role`が指定され、`scripts.quality.provider_gate.pytest_plugin`が登録済みで、pluginの契約検証と全node assignmentが成功した場合に限り、legacy marker classification/policy skip/ledger hookを通らずpluginへcollectionを渡す。plugin不在、role未指定、契約不正、legacy flag併用では通さず、通常・従来のpytest実行は現行legacy behaviorを保つ。これはconsumer-zeroまでの一時的なtransition seamで、final sourceではlegacy hook自体を削除する。その後、AST/YAML/JSON/text-aware scannerでold consumer inventoryを0と証明してから、次を同一Issue PRで削除する。
 
 - `full-regression-ledger.json`
 - `full-regression-timing-weights.json`
@@ -273,11 +279,12 @@ Implementation前にcurrent effective required contexts、ruleset scope、merge 
 1. old requiredを維持したままnew contextを追加。
 2. unrelated context集合とreview gateが不変であることをreadback。
 3. new checkだけをintentional REDにし、merge blockを証明。
-4. GREEN復旧。
-5. old contextを除去。
-6. final effective setとmerge queue scopeをreadback。
+4. new checkをGREENへ復旧し、replacement consumerの移行とconsumer-zeroを証明。
+5. old check emitterがbranch上にまだ存在する間に、Humanがold required contextだけを除去。
+6. `U + new`、merge-queue scope、required check readbackを確認する。active merge queueではPR headと`merge_group`をそれぞれ確認する。
+7. readbackが`U + new`である場合に限り、Issue branchからold check emitterを含むold workflow/jobを削除する。
 
-Agentはsettingsを書かず、captureされたbefore-stateとrollback instructionsを提供する。
+Agentはsettingsを書かず、captureされたbefore-stateとrollback instructionsを提供する。必要設定が読めない場合はhuman readbackを待ち、403や空配列を「required contextなし」と解釈しない。
 
 ### I396-RQ-018 — Docs, dogfood and protected data
 
@@ -295,9 +302,9 @@ Rollback unitはwhole #396 mergeである。Human merge前はIssue branchを修�
 
 | AC | Observable fact | Primary evidence |
 |---|---|---|
-| AC-01 | Entry repo/branch/SHA/treeとB2がexact | `b1-b2-gate-receipt.md`, GitHub readback |
+| AC-01 | Entry repo/branch/SHA/treeとB2がexact | `artifacts/20260917t124918z-01--b1-b2-gate-receipt.md`, GitHub readback |
 | AC-02 | Parent policy projectionがgenerated、diff 0 | generator `--check`, unit test |
-| AC-03 | Candidate build invocation count 1、wheel/sdist actual bytes固定 | candidate manifest, producer API, hashes |
+| AC-03 | Candidate build invocation count 1、非循環manifest/bundle hashes、final manifest digest外部保存、wheel/sdist actual bytes固定 | CandidateManifestV1, CandidateIdentityV1, producer API, hashes |
 | AC-04 | 全roleが同じbytes/source/treeをconsume | role results, artifact verification |
 | AC-05 | Linux canonicalが1 root/1 worker/no shard、descendant-inclusive | process metrics, process-tree tests |
 | AC-06 | Environment capability/fingerprint固定、drift fail | environment receipt, boundary tests |
@@ -307,10 +314,11 @@ Rollback unitはwhole #396 mergeである。Human merge前はIssue branchを修�
 | AC-10 | unexpected/approved/policy-skip/duplicate 0 | per-attempt result |
 | AC-11 | old consumer 0の後にold provider/data/workflow absent | scanner result, final tree |
 | AC-12 | retained install-root workflow present/byte-identical | focused guard |
-| AC-13 | new context RED blocks、GREEN復旧、old removal、final readback | human settings receipt |
+| AC-13 | new context RED blocks、GREEN復旧後にold contextをemitter削除前に外し、`U + new` readback | human settings receipt |
 | AC-14 | protected data不変、docs/final source整合 | snapshots, docs test |
 | AC-15 | human merge後exact integration SHAでB3 GREEN | qualification result, B3 receipt |
 | AC-16 | mainへのIssue direct merge、extra Issue、agent mergeなし | PR/readback evidence |
+| AC-17 | Linux/macOS 2,214 node setが一致し、全nodeが実装前に一意ownerへ固定 | `role-ownership-v1.json`, raw collection artifacts, role schema tests |
 
 ## 7. Requirement-to-component/test/evidence traceability
 
@@ -318,8 +326,8 @@ Rollback unitはwhole #396 mergeである。Human merge前はIssue branchを修�
 |---|---|---|---|---|
 | I396-RQ-001 | identity admission | `scripts/quality/provider_gate/identity.py::resolve_repository_identity`, `register_attempt` | `tests/unit/provider_gate/test_identity.py` | identity receipt |
 | I396-RQ-002 | policy projection | `scripts/maintenance/generate_provider_qualification_policy.py`, `_qualification_policy_generated.py` | `test_policy_projection.py` | generator diff 0 |
-| I396-RQ-003–004 | build/provenance/reuse | `artifacts.py::{build_candidate_manifest,verify_candidate_bundle,resolve_producer_artifact}` | `test_artifacts.py`, role graph integration | candidate manifest/API readback |
-| I396-RQ-005–006 | role ownership | `contracts/role-ownership-v1.json`, `pytest_plugin.py` | `test_role_ownership.py`, `test_provider_gate_role_graph.py` | role inventory/union/intersection |
+| I396-RQ-003–004 | build/provenance/reuse | `CandidateManifestV1`, `CandidateIdentityV1`, `artifacts.py::{build_candidate_manifest,verify_candidate_bundle,resolve_producer_artifact}` | `test_artifacts.py`, hash goldens, role graph integration | candidate manifest/API readback |
+| I396-RQ-005–006 | role ownership | `artifacts/role-ownership-v1.json` baseline copied to `contracts/role-ownership-v1.json`, `pytest_plugin.py`, transition seam in `tests/conftest.py` | `test_role_ownership.py`, collection-diff and transition tests | baseline hash/counts, role inventory/union/intersection, skip count 0 |
 | I396-RQ-007 | process lifecycle | `process_tree.py::{LinuxCgroupV2Collector,ProcessMeasurement}` | `test_process_tree.py`, fault integration | process metrics/reap proof |
 | I396-RQ-008 | environment | `environment.py`, `specdock-linux-qualification-v1.json` | `test_environment.py` | environment fingerprint receipt |
 | I396-RQ-009–010 | attempt/five-run | `history.py::{AttemptRegistry,select_first_five}` | `test_history.py` | campaign result |
