@@ -3333,6 +3333,9 @@ class _StubGitGateway:
     def origin_github_repo_slug(self, repo_root):
         del repo_root
         return "current/repo"
+    def origin_github_publication_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
 
 class _FailingTemplateScaffolder(_StubTemplateScaffolder):
     def copy_scaffolded_tree(self, src_dir, dest_dir, replacements):
@@ -3351,7 +3354,8 @@ class _BlockingIssueGateway:
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         return []
-    def issue_create(self, repo_root, title, body):
+    def issue_create(self, repo_root, title, body, *, repo_slug):
+        assert repo_slug == "current/repo"
         self.calls.append((str(repo_root), title, body))
         self.started_event.set()
         if not self.release_event.wait(timeout=5.0):
@@ -4209,7 +4213,8 @@ class _StubIssueGateway:
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         return []
-    def issue_create(self, repo_root, title, body):
+    def issue_create(self, repo_root, title, body, *, repo_slug):
+        assert repo_slug == "current/repo"
         self.calls.append((str(repo_root), title, body))
         if not self._numbers:
             raise RuntimeError("no issue numbers configured")
@@ -4227,6 +4232,9 @@ class _StubGitGateway:
 
 class _StubGitGateway:
     def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+    def origin_github_publication_repo_slug(self, repo_root):
         del repo_root
         return "current/repo"
 
@@ -4454,7 +4462,8 @@ class _StubIssueGateway:
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         return []
-    def issue_create(self, repo_root, title, body):
+    def issue_create(self, repo_root, title, body, *, repo_slug):
+        assert repo_slug == "current/repo"
         self.calls.append((str(repo_root), title, body))
         if not self._numbers:
             raise RuntimeError("no issue numbers configured")
@@ -4462,6 +4471,9 @@ class _StubIssueGateway:
 
 class _StubGitGateway:
     def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+    def origin_github_publication_repo_slug(self, repo_root):
         del repo_root
         return "current/repo"
 
@@ -4639,7 +4651,8 @@ class _StubIssueGateway:
     def issue_index(self, repo_root, *, limit):
         del repo_root, limit
         return []
-    def issue_create(self, repo_root, title, body):
+    def issue_create(self, repo_root, title, body, *, repo_slug):
+        assert repo_slug == "current/repo"
         self.calls.append((str(repo_root), title, body))
         if not self._numbers:
             raise RuntimeError("no issue numbers configured")
@@ -4647,6 +4660,9 @@ class _StubIssueGateway:
 
 class _StubGitGateway:
     def origin_github_repo_slug(self, repo_root):
+        del repo_root
+        return "current/repo"
+    def origin_github_publication_repo_slug(self, repo_root):
         del repo_root
         return "current/repo"
 
