@@ -84,4 +84,10 @@ SpecDock CLIでiss-00395からiss-00392へのclose-based metadata dependencyを�
 
 macOSでrequired-fastを既定`/var/folders`から実行すると、no-follow root bindingが`/var` symlinkを拒否して2件が失敗しました。同じ実体directoryを`/private/var/...`で指定すると通り、`TMPDIR=/private/tmp`でrequired-fast fourは`4 passed`でした。no-follow実装は変更せず、後続のローカルmacOS検証ではこの明示的temporary-rootを使います。
 
+## 2026-09-17 Issue #395 B1/B2 and Issue #396 entry
+
+Issue #395の人間merge後のexact SHA `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`でB1/B2を同一tipに対して実施しました。B1はordinary pytest `1367 passed, 847 skipped`、`make lint`、SpecDock validate `nodes=236`、H5 publication security matrix、row-12 blob/AST guardを通過しました。B2は2214 collected、4 shard合計`2188 passed, 26 skipped`、`evaluation.verified=true`、15/0/15、approved/unexpected failures 0、violations 0でした。
+
+Raw B2 resultとbefore-ledgerのSHA-256付きreceiptは[Issue #396 B1/B2 entry receipt](issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/20260917t124918z-01--b1-b2-gate-receipt.md)と隣接JSON evidence artifactsに保存しました。GitHub #392/#395はCLOSED、#396はOPENでformal start済み・activeです。Issue #396は仕様候補の独立Strict review段階であり、Product実装許可はfalse、B3は未開始です。Initiative-level portfolio prioritiesやEpic間順序はこの更新では変更していません。
+
 この追補時点ではtest-disposition文書修正、independent Strict review、freeze後のGitHub projection/readbackは未完了です。従ってG0とProduct実装許可は未達のままです。
