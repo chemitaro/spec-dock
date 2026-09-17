@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:spec-dock:provider-gate-contracts:v1",
-  "title": "Issue #396 provider-gate closed contract family, version 1",
-  "$comment": "Validate a payload against the named $defs entry. Every payload object is closed. x-key-order and x-array-order are normative extensions consumed by the canonical codec; JSON Schema properties order alone is not normative.",
+  "title": "Issue #396 provider-gate closed contract family, final authoring candidate v1",
+  "$comment": "P1-remediated closed contract family. E384-QUAL-001 remains the sole quantitative and aggregation authority. P2 findings are record-only.",
   "$defs": {
     "Sha1": {
       "type": "string",
@@ -35,57 +35,136 @@
     "EvidenceRefV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "sha256"],
+      "required": [
+        "path",
+        "sha256"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/EvidencePath" },
-        "sha256": { "$ref": "#/$defs/Sha256" }
+        "path": {
+          "$ref": "#/$defs/EvidencePath"
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
       },
-      "x-key-order": ["path", "sha256"]
+      "x-key-order": [
+        "path",
+        "sha256"
+      ]
     },
     "CandidateArtifactV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["filename", "size", "sha256"],
+      "required": [
+        "filename",
+        "size",
+        "sha256"
+      ],
       "properties": {
         "filename": {
           "type": "string",
           "minLength": 1,
           "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]*$"
         },
-        "size": { "type": "integer", "minimum": 0 },
-        "sha256": { "$ref": "#/$defs/Sha256" }
+        "size": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
       },
-      "x-key-order": ["filename", "size", "sha256"]
+      "x-key-order": [
+        "filename",
+        "size",
+        "sha256"
+      ]
     },
     "CandidateManifestV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "gate_contract_version", "repository", "source_sha", "source_tree",
-        "provider_candidate_digest", "build_invocation_id", "build_command", "builder_run_id",
-        "builder_run_attempt", "wheel", "sdist", "manifest_core_sha256", "bundle_sha256", "created_at"
+        "schema_version",
+        "gate_contract_version",
+        "repository",
+        "source_sha",
+        "source_tree",
+        "provider_candidate_digest",
+        "build_invocation_id",
+        "build_command",
+        "builder_run_id",
+        "builder_run_attempt",
+        "wheel",
+        "sdist",
+        "manifest_core_sha256",
+        "bundle_sha256",
+        "created_at"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "gate_contract_version": { "const": "specdock-provider-gate-v1" },
-        "repository": { "$ref": "#/$defs/Repository" },
-        "source_sha": { "$ref": "#/$defs/Sha1" },
-        "source_tree": { "$ref": "#/$defs/Sha1" },
-        "provider_candidate_digest": { "$ref": "#/$defs/Sha256" },
-        "build_invocation_id": { "$ref": "#/$defs/NonEmptyText" },
-        "build_command": { "type": "string", "minLength": 1 },
-        "builder_run_id": { "type": "integer", "minimum": 1 },
-        "builder_run_attempt": { "const": 1 },
-        "wheel": { "$ref": "#/$defs/CandidateArtifactV1" },
-        "sdist": { "$ref": "#/$defs/CandidateArtifactV1" },
-        "manifest_core_sha256": { "$ref": "#/$defs/Sha256" },
-        "bundle_sha256": { "$ref": "#/$defs/Sha256" },
-        "created_at": { "$ref": "#/$defs/Timestamp" }
+        "schema_version": {
+          "const": 1
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "repository": {
+          "$ref": "#/$defs/Repository"
+        },
+        "source_sha": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "source_tree": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "provider_candidate_digest": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "build_invocation_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "build_command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "builder_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "builder_run_attempt": {
+          "const": 1
+        },
+        "wheel": {
+          "$ref": "#/$defs/CandidateArtifactV1"
+        },
+        "sdist": {
+          "$ref": "#/$defs/CandidateArtifactV1"
+        },
+        "manifest_core_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "bundle_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        }
       },
       "x-key-order": [
-        "schema_version", "gate_contract_version", "repository", "source_sha", "source_tree",
-        "provider_candidate_digest", "build_invocation_id", "build_command", "builder_run_id",
-        "builder_run_attempt", "wheel", "sdist", "manifest_core_sha256", "bundle_sha256", "created_at"
+        "schema_version",
+        "gate_contract_version",
+        "repository",
+        "source_sha",
+        "source_tree",
+        "provider_candidate_digest",
+        "build_invocation_id",
+        "build_command",
+        "builder_run_id",
+        "builder_run_attempt",
+        "wheel",
+        "sdist",
+        "manifest_core_sha256",
+        "bundle_sha256",
+        "created_at"
       ],
       "x-hash-contract": {
         "manifest_core_sha256": "SHA-256(ASCII(spec-dock.provider-gate.manifest-core.v1) || 0x00 || uint64_be(length(core_json)) || core_json), where core_json is canonical UTF-8 JSON plus exactly one terminal LF for fields 1 through 12",
@@ -97,62 +176,204 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "repository", "source_sha", "source_tree", "provider_candidate_digest", "manifest_core_sha256",
-        "candidate_manifest_sha256", "candidate_bundle_sha256", "wheel_sha256", "sdist_sha256"
+        "repository",
+        "source_sha",
+        "source_tree",
+        "provider_candidate_digest",
+        "manifest_core_sha256",
+        "candidate_manifest_sha256",
+        "candidate_bundle_sha256",
+        "wheel_sha256",
+        "sdist_sha256"
       ],
       "properties": {
-        "repository": { "$ref": "#/$defs/Repository" },
-        "source_sha": { "$ref": "#/$defs/Sha1" },
-        "source_tree": { "$ref": "#/$defs/Sha1" },
-        "provider_candidate_digest": { "$ref": "#/$defs/Sha256" },
-        "manifest_core_sha256": { "$ref": "#/$defs/Sha256" },
-        "candidate_manifest_sha256": { "$ref": "#/$defs/Sha256" },
-        "candidate_bundle_sha256": { "$ref": "#/$defs/Sha256" },
-        "wheel_sha256": { "$ref": "#/$defs/Sha256" },
-        "sdist_sha256": { "$ref": "#/$defs/Sha256" }
+        "repository": {
+          "$ref": "#/$defs/Repository"
+        },
+        "source_sha": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "source_tree": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "provider_candidate_digest": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "manifest_core_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_manifest_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_bundle_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "wheel_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "sdist_sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
       },
       "x-key-order": [
-        "repository", "source_sha", "source_tree", "provider_candidate_digest", "manifest_core_sha256",
-        "candidate_manifest_sha256", "candidate_bundle_sha256", "wheel_sha256", "sdist_sha256"
+        "repository",
+        "source_sha",
+        "source_tree",
+        "provider_candidate_digest",
+        "manifest_core_sha256",
+        "candidate_manifest_sha256",
+        "candidate_bundle_sha256",
+        "wheel_sha256",
+        "sdist_sha256"
       ]
     },
     "SourceIdentityV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "repository", "source_repository", "workflow_id", "workflow_run_id", "run_attempt",
-        "event_name", "source_reference", "pull_request_number", "source_sha", "source_tree"
+        "schema_version",
+        "repository",
+        "source_repository",
+        "workflow_id",
+        "workflow_run_id",
+        "run_attempt",
+        "event_name",
+        "source_reference",
+        "pull_request_number",
+        "source_sha",
+        "source_tree"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "repository": { "$ref": "#/$defs/Repository" },
-        "source_repository": { "$ref": "#/$defs/Repository" },
-        "workflow_id": { "type": "integer", "minimum": 1 },
-        "workflow_run_id": { "type": "integer", "minimum": 1 },
-        "run_attempt": { "type": "integer", "minimum": 1 },
-        "event_name": { "enum": ["pull_request", "workflow_dispatch", "merge_group"] },
-        "source_reference": { "enum": ["pull_request_head_sha", "workflow_dispatch_source_sha", "merge_group_sha"] },
-        "pull_request_number": { "type": ["integer", "null"], "minimum": 1 },
-        "source_sha": { "$ref": "#/$defs/Sha1" },
-        "source_tree": { "$ref": "#/$defs/Sha1" }
+        "schema_version": {
+          "const": 1
+        },
+        "repository": {
+          "$ref": "#/$defs/Repository"
+        },
+        "source_repository": {
+          "$ref": "#/$defs/Repository"
+        },
+        "workflow_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_name": {
+          "enum": [
+            "pull_request",
+            "workflow_dispatch",
+            "merge_group"
+          ]
+        },
+        "source_reference": {
+          "enum": [
+            "pull_request_head_sha",
+            "workflow_dispatch_source_sha",
+            "merge_group_sha"
+          ]
+        },
+        "pull_request_number": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "source_sha": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "source_tree": {
+          "$ref": "#/$defs/Sha1"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "event_name": { "const": "pull_request" } }, "required": ["event_name"] },
-          "then": { "properties": { "source_reference": { "const": "pull_request_head_sha" }, "pull_request_number": { "type": "integer", "minimum": 1 } } }
+          "if": {
+            "properties": {
+              "event_name": {
+                "const": "pull_request"
+              }
+            },
+            "required": [
+              "event_name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_reference": {
+                "const": "pull_request_head_sha"
+              },
+              "pull_request_number": {
+                "type": "integer",
+                "minimum": 1
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "event_name": { "const": "workflow_dispatch" } }, "required": ["event_name"] },
-          "then": { "properties": { "source_reference": { "const": "workflow_dispatch_source_sha" }, "pull_request_number": { "type": "null" } } }
+          "if": {
+            "properties": {
+              "event_name": {
+                "const": "workflow_dispatch"
+              }
+            },
+            "required": [
+              "event_name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_reference": {
+                "const": "workflow_dispatch_source_sha"
+              },
+              "pull_request_number": {
+                "type": "null"
+              }
+            }
+          }
         },
         {
-          "if": { "properties": { "event_name": { "const": "merge_group" } }, "required": ["event_name"] },
-          "then": { "properties": { "source_reference": { "const": "merge_group_sha" }, "pull_request_number": { "type": "null" } } }
+          "if": {
+            "properties": {
+              "event_name": {
+                "const": "merge_group"
+              }
+            },
+            "required": [
+              "event_name"
+            ]
+          },
+          "then": {
+            "properties": {
+              "source_reference": {
+                "const": "merge_group_sha"
+              },
+              "pull_request_number": {
+                "type": "null"
+              }
+            }
+          }
         }
       ],
       "x-key-order": [
-        "schema_version", "repository", "source_repository", "workflow_id", "workflow_run_id", "run_attempt",
-        "event_name", "source_reference", "pull_request_number", "source_sha", "source_tree"
+        "schema_version",
+        "repository",
+        "source_repository",
+        "workflow_id",
+        "workflow_run_id",
+        "run_attempt",
+        "event_name",
+        "source_reference",
+        "pull_request_number",
+        "source_sha",
+        "source_tree"
       ],
       "x-source-resolution": {
         "pull_request": "source_sha is github.event.pull_request.head.sha and source_repository is github.event.pull_request.head.repo.full_name; raw GITHUB_SHA is the merge-branch SHA and is never candidate identity",
@@ -165,56 +386,222 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "role_id", "runner_provider", "runner_class", "operating_system", "architecture",
-        "cpu_model_family", "cpu_quota_cores", "memory_limit_bytes", "os_release", "image_digest",
-        "python_version", "dependency_lock_sha256", "uv_version", "pytest_version", "filesystem_type",
-        "filesystem_mount_options", "cgroup_version", "collector_version", "fingerprint_sha256"
+        "schema_version",
+        "role_id",
+        "runner_provider",
+        "runner_class",
+        "operating_system",
+        "architecture",
+        "cpu_model_family",
+        "cpu_quota_cores",
+        "memory_limit_bytes",
+        "os_release",
+        "image_digest",
+        "python_version",
+        "dependency_lock_sha256",
+        "uv_version",
+        "pytest_version",
+        "filesystem_type",
+        "filesystem_mount_options",
+        "cgroup_version",
+        "collector_version",
+        "fingerprint_sha256"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "role_id": { "enum": ["static-analysis", "linux-canonical", "sdist-smoke", "macos-delta"] },
-        "runner_provider": { "$ref": "#/$defs/NonEmptyText" },
-        "runner_class": { "$ref": "#/$defs/NonEmptyText" },
-        "operating_system": { "enum": ["linux", "macos"] },
-        "architecture": { "enum": ["x86_64", "aarch64", "arm64"] },
-        "cpu_model_family": { "type": ["string", "null"], "minLength": 1 },
-        "cpu_quota_cores": { "type": ["string", "null"], "pattern": "^(?:0\\.(?:[0-9]*[1-9])|[1-9][0-9]*(?:\\.[0-9]*[1-9])?)$" },
-        "memory_limit_bytes": { "type": ["integer", "null"], "minimum": 1 },
-        "os_release": { "$ref": "#/$defs/NonEmptyText" },
-        "image_digest": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "python_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-        "dependency_lock_sha256": { "$ref": "#/$defs/Sha256" },
-        "uv_version": { "$ref": "#/$defs/NonEmptyText" },
-        "pytest_version": { "$ref": "#/$defs/NonEmptyText" },
-        "filesystem_type": { "$ref": "#/$defs/NonEmptyText" },
-        "filesystem_mount_options": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "cgroup_version": { "type": ["integer", "null"], "minimum": 1 },
-        "collector_version": { "type": ["string", "null"], "minLength": 1 },
-        "fingerprint_sha256": { "$ref": "#/$defs/Sha256" }
+        "schema_version": {
+          "const": 1
+        },
+        "role_id": {
+          "enum": [
+            "static-analysis",
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "runner_provider": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "runner_class": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "operating_system": {
+          "enum": [
+            "linux",
+            "macos"
+          ]
+        },
+        "architecture": {
+          "enum": [
+            "x86_64",
+            "aarch64",
+            "arm64"
+          ]
+        },
+        "cpu_model_family": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "cpu_quota_cores": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(?:0\\.(?:[0-9]*[1-9])|[1-9][0-9]*(?:\\.[0-9]*[1-9])?)$"
+        },
+        "memory_limit_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "os_release": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "image_digest": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "python_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "dependency_lock_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "uv_version": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "pytest_version": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "filesystem_type": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "filesystem_mount_options": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "cgroup_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "collector_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "role_id": { "const": "linux-canonical" } }, "required": ["role_id"] },
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "linux-canonical"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
           "then": {
             "properties": {
-              "operating_system": { "const": "linux" }, "cpu_model_family": { "type": "string", "minLength": 1 },
-              "cpu_quota_cores": { "type": "string", "pattern": "^(?:0\\.(?:[0-9]*[1-9])|[1-9][0-9]*(?:\\.[0-9]*[1-9])?)$" },
-              "memory_limit_bytes": { "type": "integer", "minimum": 1 },
-              "image_digest": { "$ref": "#/$defs/Sha256" }, "cgroup_version": { "const": 2 },
-              "collector_version": { "type": "string", "minLength": 1 }
+              "operating_system": {
+                "const": "linux"
+              },
+              "cpu_model_family": {
+                "type": "string",
+                "minLength": 1
+              },
+              "cpu_quota_cores": {
+                "type": "string",
+                "pattern": "^(?:0\\.(?:[0-9]*[1-9])|[1-9][0-9]*(?:\\.[0-9]*[1-9])?)$"
+              },
+              "memory_limit_bytes": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "image_digest": {
+                "$ref": "#/$defs/Sha256"
+              },
+              "cgroup_version": {
+                "const": 2
+              },
+              "collector_version": {
+                "type": "string",
+                "minLength": 1
+              }
             }
           }
         },
         {
-          "if": { "properties": { "role_id": { "const": "macos-delta" } }, "required": ["role_id"] },
-          "then": { "properties": { "operating_system": { "const": "macos" }, "cgroup_version": { "type": "null" }, "collector_version": { "type": "null" } } }
+          "if": {
+            "properties": {
+              "role_id": {
+                "const": "macos-delta"
+              }
+            },
+            "required": [
+              "role_id"
+            ]
+          },
+          "then": {
+            "properties": {
+              "operating_system": {
+                "const": "macos"
+              },
+              "cgroup_version": {
+                "type": "null"
+              },
+              "collector_version": {
+                "type": "null"
+              }
+            }
+          }
         }
       ],
       "x-key-order": [
-        "schema_version", "role_id", "runner_provider", "runner_class", "operating_system", "architecture",
-        "cpu_model_family", "cpu_quota_cores", "memory_limit_bytes", "os_release", "image_digest",
-        "python_version", "dependency_lock_sha256", "uv_version", "pytest_version", "filesystem_type",
-        "filesystem_mount_options", "cgroup_version", "collector_version", "fingerprint_sha256"
+        "schema_version",
+        "role_id",
+        "runner_provider",
+        "runner_class",
+        "operating_system",
+        "architecture",
+        "cpu_model_family",
+        "cpu_quota_cores",
+        "memory_limit_bytes",
+        "os_release",
+        "image_digest",
+        "python_version",
+        "dependency_lock_sha256",
+        "uv_version",
+        "pytest_version",
+        "filesystem_type",
+        "filesystem_mount_options",
+        "cgroup_version",
+        "collector_version",
+        "fingerprint_sha256"
       ],
       "x-fingerprint-contract": "fingerprint_sha256 is SHA-256 of canonical fields 1 through 19; null means not applicable or not collected, never an omitted field or a string placeholder. linux-canonical admission rejects null capability fields."
     },
@@ -222,627 +609,3670 @@
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "attempt_id", "repository_id", "workflow_id", "workflow_run_id", "run_attempt",
-        "created_at", "event_name", "source_sha", "source_tree", "candidate_manifest_sha256",
-        "environment_fingerprint_sha256", "gate_contract_version", "campaign_id", "window_contract_id", "registration_status"
+        "schema_version",
+        "attempt_id",
+        "repository_id",
+        "workflow_id",
+        "workflow_run_id",
+        "run_attempt",
+        "created_at",
+        "event_name",
+        "source_sha",
+        "source_tree",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "purpose",
+        "campaign_id",
+        "window_contract_id",
+        "registration_status"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "attempt_id": { "$ref": "#/$defs/Sha256" },
-        "repository_id": { "type": "integer", "minimum": 1 },
-        "workflow_id": { "type": "integer", "minimum": 1 },
-        "workflow_run_id": { "type": "integer", "minimum": 1 },
-        "run_attempt": { "type": "integer", "minimum": 1 },
-        "created_at": { "$ref": "#/$defs/Timestamp" },
-        "event_name": { "enum": ["pull_request", "workflow_dispatch", "merge_group"] },
-        "source_sha": { "$ref": "#/$defs/Sha1" },
-        "source_tree": { "$ref": "#/$defs/Sha1" },
-        "candidate_manifest_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "environment_fingerprint_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "gate_contract_version": { "const": "specdock-provider-gate-v1" },
-        "campaign_id": { "$ref": "#/$defs/Sha256" },
-        "window_contract_id": { "$ref": "#/$defs/Sha256" },
-        "registration_status": { "enum": ["registered", "rejected-rerun", "rejected-identity"] }
+        "schema_version": {
+          "const": 1
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "repository_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "workflow_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "event_name": {
+          "enum": [
+            "pull_request",
+            "workflow_dispatch",
+            "merge_group"
+          ]
+        },
+        "source_sha": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "source_tree": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "purpose": {
+          "enum": [
+            "context-canary",
+            "qualification"
+          ]
+        },
+        "campaign_id": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "window_contract_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "registration_status": {
+          "enum": [
+            "registered",
+            "rejected-rerun",
+            "rejected-identity"
+          ]
+        }
       },
-      "x-key-order": [
-        "schema_version", "attempt_id", "repository_id", "workflow_id", "workflow_run_id", "run_attempt",
-        "created_at", "event_name", "source_sha", "source_tree", "candidate_manifest_sha256",
-        "environment_fingerprint_sha256", "gate_contract_version", "campaign_id", "window_contract_id", "registration_status"
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "purpose": {
+                "const": "qualification"
+              }
+            },
+            "required": [
+              "purpose"
+            ]
+          },
+          "then": {
+            "properties": {
+              "campaign_id": {
+                "$ref": "#/$defs/Sha256"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "purpose": {
+                "const": "context-canary"
+              }
+            },
+            "required": [
+              "purpose"
+            ]
+          },
+          "then": {
+            "properties": {
+              "campaign_id": {
+                "type": "null"
+              }
+            }
+          }
+        }
       ],
-      "x-attempt-id-contract": "attempt_id = SHA-256(domain-separated canonical tuple repository_id, workflow_id, workflow_run_id, run_attempt). run_attempt greater than one remains a rejected history member."
+      "x-attempt-id-contract": "attempt_id binds repository_id, workflow_id, workflow_run_id and the first started run identity; run_attempt>1 is retained and rejected as rerun. P2 wording divergence remains record-only until separately adjudicated."
     },
     "ErrorV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "message", "evidence_paths"],
+      "required": [
+        "code",
+        "message",
+        "evidence_paths"
+      ],
       "properties": {
-        "code": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_-]{0,63}$" },
-        "message": { "type": "string", "minLength": 1 },
-        "evidence_paths": { "type": "array", "items": { "$ref": "#/$defs/EvidencePath" }, "uniqueItems": true }
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z0-9][A-Z0-9_-]{0,63}$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "evidence_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidencePath"
+          },
+          "uniqueItems": true
+        }
       },
-      "x-key-order": ["code", "message", "evidence_paths"],
-      "x-array-order": { "evidence_paths": "UTF-8 byte order; no duplicates" }
+      "x-key-order": [
+        "code",
+        "message",
+        "evidence_paths"
+      ],
+      "x-array-order": {
+        "evidence_paths": "UTF-8 byte order; no duplicates"
+      }
     },
     "ViolationV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["code", "subject_id", "evidence_paths"],
+      "required": [
+        "code",
+        "subject_id",
+        "evidence_paths"
+      ],
       "properties": {
-        "code": { "type": "string", "pattern": "^[A-Z0-9][A-Z0-9_-]{0,63}$" },
-        "subject_id": { "type": ["string", "null"], "minLength": 1 },
-        "evidence_paths": { "type": "array", "items": { "$ref": "#/$defs/EvidencePath" }, "uniqueItems": true }
+        "code": {
+          "$ref": "#/$defs/ViolationCodeV1"
+        },
+        "subject_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "minLength": 1
+        },
+        "evidence_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidencePath"
+          },
+          "uniqueItems": true
+        }
       },
-      "x-key-order": ["code", "subject_id", "evidence_paths"],
-      "x-array-order": { "evidence_paths": "UTF-8 byte order; no duplicates" }
+      "x-key-order": [
+        "code",
+        "subject_id",
+        "evidence_paths"
+      ],
+      "x-array-order": {
+        "evidence_paths": "UTF-8 byte order; no duplicates"
+      }
     },
     "PredicateResultV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["predicate_id", "observed", "expected", "passed", "evidence_paths"],
+      "required": [
+        "predicate_id",
+        "observed",
+        "expected",
+        "passed",
+        "evidence_paths"
+      ],
       "properties": {
-        "predicate_id": { "type": "string", "pattern": "^E384-QUAL-001-[A-Z0-9.-]+$" },
-        "observed": { "type": ["string", "null"] },
-        "expected": { "type": ["string", "null"] },
-        "passed": { "type": "boolean" },
-        "evidence_paths": { "type": "array", "items": { "$ref": "#/$defs/EvidencePath" }, "uniqueItems": true }
+        "predicate_id": {
+          "type": "string",
+          "pattern": "^E384-QUAL-001-[A-Z0-9.-]+$"
+        },
+        "observed": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "expected": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "passed": {
+          "type": "boolean"
+        },
+        "evidence_paths": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidencePath"
+          },
+          "uniqueItems": true
+        }
       },
-      "x-key-order": ["predicate_id", "observed", "expected", "passed", "evidence_paths"],
-      "x-array-order": { "evidence_paths": "UTF-8 byte order; no duplicates" }
+      "x-key-order": [
+        "predicate_id",
+        "observed",
+        "expected",
+        "passed",
+        "evidence_paths"
+      ],
+      "x-array-order": {
+        "evidence_paths": "UTF-8 byte order; no duplicates"
+      }
     },
     "RoleResultRefV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["role_id", "status", "sha256"],
+      "required": [
+        "role_id",
+        "status",
+        "sha256"
+      ],
       "properties": {
-        "role_id": { "enum": ["candidate-producer", "static-analysis", "linux-canonical", "sdist-smoke", "macos-delta"] },
-        "status": { "enum": ["successful", "failed", "cancelled", "interrupted", "missing-evidence", "rejected"] },
-        "sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] }
+        "role_id": {
+          "enum": [
+            "static-analysis",
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "status": {
+          "enum": [
+            "successful",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "missing-evidence",
+            "rejected"
+          ]
+        },
+        "sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       },
-      "x-key-order": ["role_id", "status", "sha256"]
+      "x-key-order": [
+        "role_id",
+        "status",
+        "sha256"
+      ]
     },
     "RoleResultV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "attempt_id", "role_id", "candidate_manifest_sha256", "candidate_bundle_sha256",
-        "environment_fingerprint_sha256", "started_at", "completed_at", "status", "command", "exit_code",
-        "node_observation_sha256", "process_measurement_sha256", "unexpected_failures", "approved_failures",
-        "policy_skips", "duplicate_executions", "errors"
+        "schema_version",
+        "attempt_id",
+        "role_id",
+        "candidate_manifest_sha256",
+        "candidate_bundle_sha256",
+        "environment_fingerprint_sha256",
+        "started_at",
+        "completed_at",
+        "status",
+        "command",
+        "exit_code",
+        "node_observation_sha256",
+        "process_measurement_sha256",
+        "unexpected_failures",
+        "approved_failures",
+        "policy_skips",
+        "duplicate_executions",
+        "errors"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "attempt_id": { "$ref": "#/$defs/Sha256" },
-        "role_id": { "enum": ["candidate-producer", "static-analysis", "linux-canonical", "sdist-smoke", "macos-delta"] },
-        "candidate_manifest_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "candidate_bundle_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "environment_fingerprint_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "started_at": { "oneOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] },
-        "completed_at": { "oneOf": [{ "$ref": "#/$defs/Timestamp" }, { "type": "null" }] },
-        "status": { "enum": ["successful", "failed", "cancelled", "interrupted", "missing-evidence", "rejected"] },
-        "command": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 },
-        "exit_code": { "type": ["integer", "null"] },
-        "node_observation_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "process_measurement_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "unexpected_failures": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "approved_failures": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "policy_skips": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "duplicate_executions": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/ErrorV1" } }
+        "schema_version": {
+          "const": 1
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "role_id": {
+          "enum": [
+            "static-analysis",
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "candidate_manifest_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_bundle_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "started_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completed_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "successful",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "missing-evidence",
+            "rejected"
+          ]
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "node_observation_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "process_measurement_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "unexpected_failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "approved_failures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "policy_skips": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "duplicate_executions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
       },
       "x-key-order": [
-        "schema_version", "attempt_id", "role_id", "candidate_manifest_sha256", "candidate_bundle_sha256",
-        "environment_fingerprint_sha256", "started_at", "completed_at", "status", "command", "exit_code",
-        "node_observation_sha256", "process_measurement_sha256", "unexpected_failures", "approved_failures",
-        "policy_skips", "duplicate_executions", "errors"
+        "schema_version",
+        "attempt_id",
+        "role_id",
+        "candidate_manifest_sha256",
+        "candidate_bundle_sha256",
+        "environment_fingerprint_sha256",
+        "started_at",
+        "completed_at",
+        "status",
+        "command",
+        "exit_code",
+        "node_observation_sha256",
+        "process_measurement_sha256",
+        "unexpected_failures",
+        "approved_failures",
+        "policy_skips",
+        "duplicate_executions",
+        "errors"
       ],
       "x-array-order": {
-        "unexpected_failures": "UTF-8 byte order", "approved_failures": "UTF-8 byte order",
-        "policy_skips": "UTF-8 byte order", "duplicate_executions": "UTF-8 byte order", "errors": "code then evidence path"
-      }
+        "unexpected_failures": "UTF-8 byte order",
+        "approved_failures": "UTF-8 byte order",
+        "policy_skips": "UTF-8 byte order",
+        "duplicate_executions": "UTF-8 byte order",
+        "errors": "code then evidence path"
+      },
+      "x-semantic-invariants": [
+        "cannot serve as build/materialization evidence",
+        "all role identities are complete before role start"
+      ]
     },
     "ProcessMetricsV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "attempt_id", "role_id", "collector_version", "root_pid", "pytest_root_count",
-        "descendant_pids", "started_monotonic_ns", "reaped_monotonic_ns", "elapsed_wall_ns", "cpu_user_usec",
-        "cpu_system_usec", "cpu_total_usec", "cpu_wall_ratio_decimal", "effective_cpu_quota",
-        "effective_memory_limit_bytes", "all_descendants_reaped", "cgroup_populated_zero", "root_exit_code", "termination_reason"
+        "schema_version",
+        "attempt_id",
+        "role_id",
+        "collector_version",
+        "root_pid",
+        "pytest_root_count",
+        "descendant_pids",
+        "started_monotonic_ns",
+        "reaped_monotonic_ns",
+        "elapsed_wall_ns",
+        "cpu_user_usec",
+        "cpu_system_usec",
+        "cpu_total_usec",
+        "cpu_wall_ratio_decimal",
+        "effective_cpu_quota",
+        "effective_memory_limit_bytes",
+        "all_descendants_reaped",
+        "cgroup_populated_zero",
+        "root_exit_code",
+        "termination_reason"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "attempt_id": { "$ref": "#/$defs/Sha256" },
-        "role_id": { "const": "linux-canonical" },
-        "collector_version": { "$ref": "#/$defs/NonEmptyText" },
-        "root_pid": { "type": ["integer", "null"], "minimum": 1 },
-        "pytest_root_count": { "type": "integer", "minimum": 0 },
-        "descendant_pids": { "type": "array", "items": { "type": "integer", "minimum": 1 }, "uniqueItems": true },
-        "started_monotonic_ns": { "type": ["integer", "null"], "minimum": 0 },
-        "reaped_monotonic_ns": { "type": ["integer", "null"], "minimum": 0 },
-        "elapsed_wall_ns": { "type": ["integer", "null"], "minimum": 0 },
-        "cpu_user_usec": { "type": ["integer", "null"], "minimum": 0 },
-        "cpu_system_usec": { "type": ["integer", "null"], "minimum": 0 },
-        "cpu_total_usec": { "type": ["integer", "null"], "minimum": 0 },
-        "cpu_wall_ratio_decimal": { "type": ["string", "null"], "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$" },
-        "effective_cpu_quota": { "type": ["number", "null"], "exclusiveMinimum": 0 },
-        "effective_memory_limit_bytes": { "type": ["integer", "null"], "minimum": 1 },
-        "all_descendants_reaped": { "type": ["boolean", "null"] },
-        "cgroup_populated_zero": { "type": ["boolean", "null"] },
-        "root_exit_code": { "type": ["integer", "null"] },
-        "termination_reason": { "enum": ["completed", "deadline", "cancelled", "signal", "collector-error", "not-started"] }
+        "schema_version": {
+          "const": 1
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "role_id": {
+          "const": "linux-canonical"
+        },
+        "collector_version": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "root_pid": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "pytest_root_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "descendant_pids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "uniqueItems": true
+        },
+        "started_monotonic_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "reaped_monotonic_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "elapsed_wall_ns": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_user_usec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_system_usec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_total_usec": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "cpu_wall_ratio_decimal": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        },
+        "effective_cpu_quota": {
+          "type": [
+            "number",
+            "null"
+          ],
+          "exclusiveMinimum": 0
+        },
+        "effective_memory_limit_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "all_descendants_reaped": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "cgroup_populated_zero": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "root_exit_code": {
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "termination_reason": {
+          "enum": [
+            "completed",
+            "deadline",
+            "cancelled",
+            "signal",
+            "collector-error",
+            "not-started"
+          ]
+        }
       },
       "x-key-order": [
-        "schema_version", "attempt_id", "role_id", "collector_version", "root_pid", "pytest_root_count",
-        "descendant_pids", "started_monotonic_ns", "reaped_monotonic_ns", "elapsed_wall_ns", "cpu_user_usec",
-        "cpu_system_usec", "cpu_total_usec", "cpu_wall_ratio_decimal", "effective_cpu_quota",
-        "effective_memory_limit_bytes", "all_descendants_reaped", "cgroup_populated_zero", "root_exit_code", "termination_reason"
+        "schema_version",
+        "attempt_id",
+        "role_id",
+        "collector_version",
+        "root_pid",
+        "pytest_root_count",
+        "descendant_pids",
+        "started_monotonic_ns",
+        "reaped_monotonic_ns",
+        "elapsed_wall_ns",
+        "cpu_user_usec",
+        "cpu_system_usec",
+        "cpu_total_usec",
+        "cpu_wall_ratio_decimal",
+        "effective_cpu_quota",
+        "effective_memory_limit_bytes",
+        "all_descendants_reaped",
+        "cgroup_populated_zero",
+        "root_exit_code",
+        "termination_reason"
       ],
-      "x-array-order": { "descendant_pids": "ascending numeric PID" },
+      "x-array-order": {
+        "descendant_pids": "ascending numeric PID"
+      },
       "x-acceptance-rule": "Parent thresholds are evaluated from raw integer time and CPU fields using exact arithmetic. cpu_wall_ratio_decimal is display-only and never determines acceptance."
     },
     "AttemptResultV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "attempt_id", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "role_results", "identity_complete", "raw_evidence_complete", "linux_predicates", "correctness_predicates",
-        "rerun_detected", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "attempt_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "role_results",
+        "identity_complete",
+        "raw_evidence_complete",
+        "linux_predicates",
+        "correctness_predicates",
+        "rerun_detected",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "attempt_id": { "$ref": "#/$defs/Sha256" },
-        "candidate_identity": { "$ref": "#/$defs/CandidateIdentityV1" },
-        "environment_fingerprint_sha256": { "$ref": "#/$defs/Sha256" },
-        "gate_contract_version": { "const": "specdock-provider-gate-v1" },
-        "role_results": { "type": "array", "items": { "$ref": "#/$defs/RoleResultRefV1" } },
-        "identity_complete": { "type": "boolean" },
-        "raw_evidence_complete": { "type": "boolean" },
-        "linux_predicates": { "type": "array", "items": { "$ref": "#/$defs/PredicateResultV1" } },
-        "correctness_predicates": { "type": "array", "items": { "$ref": "#/$defs/PredicateResultV1" } },
-        "rerun_detected": { "type": "boolean" },
-        "status": { "enum": ["accepted", "rejected", "incomplete"] },
-        "accepted": { "type": "boolean" },
-        "violations": { "type": "array", "items": { "$ref": "#/$defs/ViolationV1" } },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/ErrorV1" } }
+        "schema_version": {
+          "const": 1
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "role_results": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RoleResultRefV1"
+          }
+        },
+        "identity_complete": {
+          "type": "boolean"
+        },
+        "raw_evidence_complete": {
+          "type": "boolean"
+        },
+        "linux_predicates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PredicateResultV1"
+          }
+        },
+        "correctness_predicates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PredicateResultV1"
+          }
+        },
+        "rerun_detected": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "incomplete"
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ViolationV1"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
       },
       "x-key-order": [
-        "schema_version", "attempt_id", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "role_results", "identity_complete", "raw_evidence_complete", "linux_predicates", "correctness_predicates",
-        "rerun_detected", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "attempt_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "role_results",
+        "identity_complete",
+        "raw_evidence_complete",
+        "linux_predicates",
+        "correctness_predicates",
+        "rerun_detected",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
       "x-array-order": {
         "role_results": "role order candidate-producer, static-analysis, linux-canonical, sdist-smoke, macos-delta",
-        "linux_predicates": "parent predicate ID order", "correctness_predicates": "parent predicate ID order",
-        "violations": "code then subject_id", "errors": "code then evidence path"
+        "linux_predicates": "parent predicate ID order",
+        "correctness_predicates": "parent predicate ID order",
+        "violations": "code then subject_id",
+        "errors": "code then evidence path"
       },
-      "x-semantic-invariants": ["status=accepted iff accepted=true", "accepted requires complete identity and raw evidence", "accepted requires every required role and parent predicate to pass", "missing evidence is incomplete and never success"]
+      "x-semantic-invariants": [
+        "status=accepted iff accepted=true",
+        "accepted requires complete identity and raw evidence",
+        "accepted requires every required role and parent predicate to pass",
+        "missing evidence is incomplete and never success"
+      ]
     },
     "CampaignMemberV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attempt_id", "workflow_run_id", "run_attempt", "created_at", "registration_status", "result_sha256", "accepted"],
+      "required": [
+        "attempt_id",
+        "workflow_run_id",
+        "run_attempt",
+        "created_at",
+        "registration_status",
+        "result_sha256",
+        "accepted"
+      ],
       "properties": {
-        "attempt_id": { "$ref": "#/$defs/Sha256" },
-        "workflow_run_id": { "type": "integer", "minimum": 1 },
-        "run_attempt": { "type": "integer", "minimum": 1 },
-        "created_at": { "$ref": "#/$defs/Timestamp" },
-        "registration_status": { "enum": ["registered", "rejected-rerun", "rejected-identity"] },
-        "result_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "accepted": { "type": "boolean" }
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "workflow_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "registration_status": {
+          "enum": [
+            "registered",
+            "rejected-rerun",
+            "rejected-identity"
+          ]
+        },
+        "result_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        }
       },
-      "x-key-order": ["attempt_id", "workflow_run_id", "run_attempt", "created_at", "registration_status", "result_sha256", "accepted"]
+      "x-key-order": [
+        "attempt_id",
+        "workflow_run_id",
+        "run_attempt",
+        "created_at",
+        "registration_status",
+        "result_sha256",
+        "accepted"
+      ]
     },
     "CampaignResultV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "campaign_id", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "members", "population_complete", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "campaign_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "members",
+        "population_complete",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "campaign_id": { "$ref": "#/$defs/Sha256" },
-        "candidate_identity": { "$ref": "#/$defs/CandidateIdentityV1" },
-        "environment_fingerprint_sha256": { "$ref": "#/$defs/Sha256" },
-        "gate_contract_version": { "const": "specdock-provider-gate-v1" },
-        "members": { "type": "array", "items": { "$ref": "#/$defs/CampaignMemberV1" } },
-        "population_complete": { "type": "boolean" },
-        "status": { "enum": ["accepted", "rejected", "incomplete"] },
-        "accepted": { "type": "boolean" },
-        "violations": { "type": "array", "items": { "$ref": "#/$defs/ViolationV1" } },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/ErrorV1" } }
+        "schema_version": {
+          "const": 1
+        },
+        "campaign_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/CampaignMemberV1"
+          }
+        },
+        "population_complete": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "incomplete"
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ViolationV1"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
       },
       "x-key-order": [
-        "schema_version", "campaign_id", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "members", "population_complete", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "campaign_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "members",
+        "population_complete",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
-      "x-array-order": { "members": "chronological created_at ascending, then numeric workflow_run_id ascending", "violations": "code then subject_id", "errors": "code then evidence path" },
-      "x-semantic-invariants": ["member population is selected by generated E384-QUAL-001 policy", "started failures, cancellation, interruption, and missing evidence remain members", "status=accepted iff accepted=true"]
+      "x-array-order": {
+        "members": "chronological created_at ascending, then numeric workflow_run_id ascending",
+        "violations": "code then subject_id",
+        "errors": "code then evidence path"
+      },
+      "x-semantic-invariants": [
+        "member population is selected by generated E384-QUAL-001 policy",
+        "started failures, cancellation, interruption, and missing evidence remain members",
+        "status=accepted iff accepted=true"
+      ]
     },
     "FaultCampaignResultV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "campaign_id", "candidate_identity", "fault_catalogue_sha256", "expected_fault_ids",
-        "executed_fault_ids", "detected_fault_ids", "missed_fault_ids", "population_complete", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "campaign_id",
+        "candidate_identity",
+        "fault_catalogue_sha256",
+        "expected_fault_ids",
+        "executed_fault_ids",
+        "detected_fault_ids",
+        "missed_fault_ids",
+        "population_complete",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "campaign_id": { "$ref": "#/$defs/Sha256" },
-        "candidate_identity": { "$ref": "#/$defs/CandidateIdentityV1" },
-        "fault_catalogue_sha256": { "$ref": "#/$defs/Sha256" },
-        "expected_fault_ids": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "executed_fault_ids": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "detected_fault_ids": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "missed_fault_ids": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "uniqueItems": true },
-        "population_complete": { "type": "boolean" },
-        "status": { "enum": ["accepted", "rejected", "incomplete"] },
-        "accepted": { "type": "boolean" },
-        "violations": { "type": "array", "items": { "$ref": "#/$defs/ViolationV1" } },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/ErrorV1" } }
+        "schema_version": {
+          "const": 1
+        },
+        "campaign_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "fault_catalogue_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "expected_fault_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "executed_fault_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "detected_fault_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "missed_fault_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "population_complete": {
+          "type": "boolean"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "incomplete"
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ViolationV1"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
       },
       "x-key-order": [
-        "schema_version", "campaign_id", "candidate_identity", "fault_catalogue_sha256", "expected_fault_ids",
-        "executed_fault_ids", "detected_fault_ids", "missed_fault_ids", "population_complete", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "campaign_id",
+        "candidate_identity",
+        "fault_catalogue_sha256",
+        "expected_fault_ids",
+        "executed_fault_ids",
+        "detected_fault_ids",
+        "missed_fault_ids",
+        "population_complete",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
-      "x-array-order": { "expected_fault_ids": "UTF-8 byte order", "executed_fault_ids": "UTF-8 byte order", "detected_fault_ids": "UTF-8 byte order", "missed_fault_ids": "UTF-8 byte order", "violations": "code then subject_id", "errors": "code then evidence path" },
-      "x-semantic-invariants": ["expected_fault_ids is frozen before execution", "executed_fault_ids equals expected_fault_ids for a complete result", "detected_fault_ids union missed_fault_ids equals expected_fault_ids", "accepted requires zero misses"]
+      "x-array-order": {
+        "expected_fault_ids": "UTF-8 byte order",
+        "executed_fault_ids": "UTF-8 byte order",
+        "detected_fault_ids": "UTF-8 byte order",
+        "missed_fault_ids": "UTF-8 byte order",
+        "violations": "code then subject_id",
+        "errors": "code then evidence path"
+      },
+      "x-semantic-invariants": [
+        "expected_fault_ids is frozen before execution",
+        "executed_fault_ids equals expected_fault_ids for a complete result",
+        "detected_fault_ids union missed_fault_ids equals expected_fault_ids",
+        "accepted requires zero misses"
+      ]
     },
     "WindowMemberV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["attempt_id", "workflow_run_id", "run_attempt", "created_at", "registration_status", "result_sha256", "accepted"],
+      "required": [
+        "attempt_id",
+        "workflow_run_id",
+        "run_attempt",
+        "created_at",
+        "registration_status",
+        "result_sha256",
+        "accepted"
+      ],
       "properties": {
-        "attempt_id": { "$ref": "#/$defs/Sha256" },
-        "workflow_run_id": { "type": "integer", "minimum": 1 },
-        "run_attempt": { "type": "integer", "minimum": 1 },
-        "created_at": { "$ref": "#/$defs/Timestamp" },
-        "registration_status": { "enum": ["registered", "rejected-rerun", "rejected-identity"] },
-        "result_sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] },
-        "accepted": { "type": "boolean" }
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "workflow_run_id": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "run_attempt": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "registration_status": {
+          "enum": [
+            "registered",
+            "rejected-rerun",
+            "rejected-identity"
+          ]
+        },
+        "result_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        }
       },
-      "x-key-order": ["attempt_id", "workflow_run_id", "run_attempt", "created_at", "registration_status", "result_sha256", "accepted"]
+      "x-key-order": [
+        "attempt_id",
+        "workflow_run_id",
+        "run_attempt",
+        "created_at",
+        "registration_status",
+        "result_sha256",
+        "accepted"
+      ]
     },
     "StabilityWindowResultV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "window_contract_id", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "members", "window_complete", "retry_or_rerun_count", "nonaccepted_attempt_ids", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "window_contract_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "members",
+        "window_complete",
+        "retry_or_rerun_count",
+        "nonaccepted_attempt_ids",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "window_contract_id": { "$ref": "#/$defs/Sha256" },
-        "candidate_identity": { "$ref": "#/$defs/CandidateIdentityV1" },
-        "environment_fingerprint_sha256": { "$ref": "#/$defs/Sha256" },
-        "gate_contract_version": { "const": "specdock-provider-gate-v1" },
-        "members": { "type": "array", "items": { "$ref": "#/$defs/WindowMemberV1" } },
-        "window_complete": { "type": "boolean" },
-        "retry_or_rerun_count": { "type": "integer", "minimum": 0 },
-        "nonaccepted_attempt_ids": { "type": "array", "items": { "$ref": "#/$defs/Sha256" }, "uniqueItems": true },
-        "status": { "enum": ["accepted", "rejected", "incomplete"] },
-        "accepted": { "type": "boolean" },
-        "violations": { "type": "array", "items": { "$ref": "#/$defs/ViolationV1" } },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/ErrorV1" } }
+        "schema_version": {
+          "const": 1
+        },
+        "window_contract_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/WindowMemberV1"
+          }
+        },
+        "window_complete": {
+          "type": "boolean"
+        },
+        "retry_or_rerun_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "nonaccepted_attempt_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Sha256"
+          },
+          "uniqueItems": true
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "incomplete"
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ViolationV1"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
       },
       "x-key-order": [
-        "schema_version", "window_contract_id", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "members", "window_complete", "retry_or_rerun_count", "nonaccepted_attempt_ids", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "window_contract_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "members",
+        "window_complete",
+        "retry_or_rerun_count",
+        "nonaccepted_attempt_ids",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
-      "x-array-order": { "members": "chronological created_at ascending, then numeric workflow_run_id ascending", "nonaccepted_attempt_ids": "member chronology", "violations": "code then subject_id", "errors": "code then evidence path" },
-      "x-semantic-invariants": ["membership uses the generated E384-QUAL-001 window policy", "failure/cancel/interruption/missing evidence remain members", "status=accepted iff accepted=true"]
+      "x-array-order": {
+        "members": "chronological created_at ascending, then numeric workflow_run_id ascending",
+        "nonaccepted_attempt_ids": "member chronology",
+        "violations": "code then subject_id",
+        "errors": "code then evidence path"
+      },
+      "x-semantic-invariants": [
+        "membership uses the generated E384-QUAL-001 window policy",
+        "failure/cancel/interruption/missing evidence remain members",
+        "status=accepted iff accepted=true"
+      ]
     },
     "QualificationResultV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "campaign_result_sha256", "fault_campaign_result_sha256", "stability_window_result_sha256",
-        "context_readback", "consumer_zero_evidence", "protected_before", "protected_after", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "campaign_result_sha256",
+        "fault_campaign_result_sha256",
+        "stability_window_result_sha256",
+        "context_readback",
+        "consumer_zero_evidence",
+        "protected_before",
+        "protected_after",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "candidate_identity": { "$ref": "#/$defs/CandidateIdentityV1" },
-        "environment_fingerprint_sha256": { "$ref": "#/$defs/Sha256" },
-        "gate_contract_version": { "const": "specdock-provider-gate-v1" },
-        "campaign_result_sha256": { "$ref": "#/$defs/Sha256" },
-        "fault_campaign_result_sha256": { "$ref": "#/$defs/Sha256" },
-        "stability_window_result_sha256": { "$ref": "#/$defs/Sha256" },
-        "context_readback": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] },
-        "consumer_zero_evidence": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] },
-        "protected_before": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] },
-        "protected_after": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] },
-        "status": { "enum": ["accepted", "rejected", "incomplete"] },
-        "accepted": { "type": "boolean" },
-        "violations": { "type": "array", "items": { "$ref": "#/$defs/ViolationV1" } },
-        "errors": { "type": "array", "items": { "$ref": "#/$defs/ErrorV1" } }
+        "schema_version": {
+          "const": 1
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "campaign_result_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "fault_campaign_result_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "stability_window_result_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "context_readback": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EvidenceRefV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "consumer_zero_evidence": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EvidenceRefV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protected_before": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EvidenceRefV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "protected_after": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EvidenceRefV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "rejected",
+            "incomplete"
+          ]
+        },
+        "accepted": {
+          "type": "boolean"
+        },
+        "violations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ViolationV1"
+          }
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
       },
       "x-key-order": [
-        "schema_version", "candidate_identity", "environment_fingerprint_sha256", "gate_contract_version",
-        "campaign_result_sha256", "fault_campaign_result_sha256", "stability_window_result_sha256",
-        "context_readback", "consumer_zero_evidence", "protected_before", "protected_after", "status", "accepted", "violations", "errors"
+        "schema_version",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "campaign_result_sha256",
+        "fault_campaign_result_sha256",
+        "stability_window_result_sha256",
+        "context_readback",
+        "consumer_zero_evidence",
+        "protected_before",
+        "protected_after",
+        "status",
+        "accepted",
+        "violations",
+        "errors"
       ],
-      "x-semantic-invariants": ["status=accepted iff accepted=true", "accepted requires all four evidence references and all referenced aggregate results accepted", "missing reference is incomplete and never success"]
+      "x-semantic-invariants": [
+        "status=accepted iff accepted=true",
+        "accepted requires all four evidence references and all referenced aggregate results accepted",
+        "missing reference is incomplete and never success"
+      ]
     },
     "EvidenceEntryV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "kind", "schema_version", "size_bytes", "sha256"],
+      "required": [
+        "path",
+        "kind",
+        "schema_version",
+        "size_bytes",
+        "sha256"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/EvidencePath" },
+        "path": {
+          "$ref": "#/$defs/EvidencePath"
+        },
         "kind": {
           "enum": [
-            "candidate-manifest", "wheel", "sdist", "source-identity", "environment", "role-result", "process-metrics",
-            "node-observation", "api-run", "api-artifact", "attempt-result", "campaign-result", "fault-campaign-result",
-            "stability-window-result", "qualification-result", "workflow-log", "test-collection", "snapshot",
-            "context-readback", "consumer-scan", "review", "other-raw"
+            "candidate-manifest",
+            "wheel",
+            "sdist",
+            "source-identity",
+            "environment",
+            "role-result",
+            "process-metrics",
+            "node-observation",
+            "api-run",
+            "api-artifact",
+            "attempt-result",
+            "campaign-result",
+            "fault-campaign-result",
+            "stability-window-result",
+            "qualification-result",
+            "workflow-log",
+            "test-collection",
+            "snapshot",
+            "context-readback",
+            "consumer-scan",
+            "review",
+            "other-raw"
           ]
         },
-        "schema_version": { "type": ["integer", "null"], "minimum": 1 },
-        "size_bytes": { "type": "integer", "minimum": 0 },
-        "sha256": { "$ref": "#/$defs/Sha256" }
+        "schema_version": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
       },
-      "x-key-order": ["path", "kind", "schema_version", "size_bytes", "sha256"]
+      "x-key-order": [
+        "path",
+        "kind",
+        "schema_version",
+        "size_bytes",
+        "sha256"
+      ]
     },
     "EvidenceIndexV1": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["schema_version", "scope", "scope_id", "candidate_identity", "entries"],
-      "properties": {
-        "schema_version": { "const": 1 },
-        "scope": { "enum": ["attempt", "campaign", "fault-campaign", "stability-window", "qualification", "cutover"] },
-        "scope_id": { "$ref": "#/$defs/NonEmptyText" },
-        "candidate_identity": { "$ref": "#/$defs/CandidateIdentityV1" },
-        "entries": { "type": "array", "items": { "$ref": "#/$defs/EvidenceEntryV1" }, "minItems": 1 }
-      },
-      "x-key-order": ["schema_version", "scope", "scope_id", "candidate_identity", "entries"],
-      "x-array-order": { "entries": "path UTF-8 byte order" },
-      "x-unique-by": { "entries": "path" },
-      "x-semantic-invariants": ["paths are repository-relative POSIX paths", "reject absolute paths, dot/dot-dot segments, backslash, NUL, symlink traversal, duplicate path, and conflicting digest", "every referenced file is hashed from actual bytes", "JSON entries have a non-null schema_version; raw entries have null"]
+      "oneOf": [
+        {
+          "$ref": "#/$defs/PreflightEvidenceIndexV1"
+        },
+        {
+          "$ref": "#/$defs/CandidateEvidenceIndexV1"
+        }
+      ],
+      "x-discriminator": "stage"
     },
     "ProtectedTreeEntryV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["path", "kind", "mode", "size_bytes", "sha256"],
+      "required": [
+        "path",
+        "kind",
+        "mode",
+        "size_bytes",
+        "sha256"
+      ],
       "properties": {
-        "path": { "$ref": "#/$defs/EvidencePath" },
-        "kind": { "enum": ["directory", "regular-file", "symlink"] },
-        "mode": { "type": "integer", "minimum": 0 },
-        "size_bytes": { "type": ["integer", "null"], "minimum": 0 },
-        "sha256": { "oneOf": [{ "$ref": "#/$defs/Sha256" }, { "type": "null" }] }
+        "path": {
+          "$ref": "#/$defs/EvidencePath"
+        },
+        "kind": {
+          "enum": [
+            "directory",
+            "regular-file",
+            "symlink"
+          ]
+        },
+        "mode": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "size_bytes": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 0
+        },
+        "sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
       },
-      "x-key-order": ["path", "kind", "mode", "size_bytes", "sha256"],
-      "x-semantic-invariants": ["directory size and digest are null", "regular-file digest hashes actual bytes", "symlink digest hashes link-target bytes and traversal never follows a symlink"]
+      "x-key-order": [
+        "path",
+        "kind",
+        "mode",
+        "size_bytes",
+        "sha256"
+      ],
+      "x-semantic-invariants": [
+        "directory size and digest are null",
+        "regular-file digest hashes actual bytes",
+        "symlink digest hashes link-target bytes and traversal never follows a symlink"
+      ]
     },
     "ProtectedTreeSnapshotV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "roots", "excluded_paths", "entries"],
+      "required": [
+        "schema_version",
+        "roots",
+        "excluded_paths",
+        "entries"
+      ],
       "properties": {
-        "schema_version": { "const": 1 },
+        "schema_version": {
+          "const": 1
+        },
         "roots": {
           "type": "array",
-          "const": ["spec-dock", ".agents/skills", ".gitignore", ".github/workflows/ci.yml", "src/spec_dock/assets"]
+          "const": [
+            "spec-dock",
+            ".agents/skills",
+            ".gitignore",
+            ".github/workflows/ci.yml",
+            "src/spec_dock/assets"
+          ]
         },
         "excluded_paths": {
           "type": "array",
-          "const": ["spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/.workbench/evidence"]
+          "const": [
+            "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/.workbench/evidence"
+          ]
         },
-        "entries": { "type": "array", "items": { "$ref": "#/$defs/ProtectedTreeEntryV1" }, "minItems": 1 }
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ProtectedTreeEntryV1"
+          },
+          "minItems": 1
+        }
       },
-      "x-key-order": ["schema_version", "roots", "excluded_paths", "entries"],
-      "x-array-order": { "entries": "path UTF-8 byte order" },
-      "x-unique-by": { "entries": "path" },
-      "x-semantic-invariants": ["every listed root must exist", "no absolute path is emitted", "capture aborts on unsupported file type, mutation during read, missing root, or output inside a protected root", "output has no timestamp so byte equality is a valid before/after comparison"]
+      "x-key-order": [
+        "schema_version",
+        "roots",
+        "excluded_paths",
+        "entries"
+      ],
+      "x-array-order": {
+        "entries": "path UTF-8 byte order"
+      },
+      "x-unique-by": {
+        "entries": "path"
+      },
+      "x-semantic-invariants": [
+        "every listed root must exist",
+        "no absolute path is emitted",
+        "capture aborts on unsupported file type, mutation during read, missing root, or output inside a protected root",
+        "output has no timestamp so byte equality is a valid before/after comparison"
+      ]
     },
     "StopReturnV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "issue_id", "checkpoint", "status", "contract_id", "expected", "actual",
-        "verified_facts", "hypotheses", "unverified", "operations_attempted", "operations_not_attempted",
-        "evidence", "cause", "next_required_check", "mutation_performed"
+        "schema_version",
+        "stop_id",
+        "checkpoint_id",
+        "reason_code",
+        "violations",
+        "evidence_index",
+        "scope_impact",
+        "required_owners",
+        "required_actions",
+        "mutation_performed",
+        "changed_surfaces",
+        "external_changes",
+        "rollback",
+        "recovery",
+        "automatic_rollback_performed"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "issue_id": { "const": "iss-00396" },
-        "checkpoint": { "enum": ["P00", "P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09", "P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "P20", "P21", "P22"] },
-        "status": { "const": "stopped" },
-        "contract_id": { "$ref": "#/$defs/NonEmptyText" },
-        "expected": { "type": "string" },
-        "actual": { "type": "string" },
-        "verified_facts": { "type": "array", "items": { "type": "string" } },
-        "hypotheses": { "type": "array", "items": { "type": "string" } },
-        "unverified": { "type": "array", "items": { "type": "string" } },
-        "operations_attempted": { "type": "array", "items": { "type": "string" } },
-        "operations_not_attempted": { "type": "array", "items": { "type": "string" } },
-        "evidence": { "type": "array", "items": { "$ref": "#/$defs/EvidenceRefV1" } },
-        "cause": { "type": "string" },
-        "next_required_check": { "type": "string", "minLength": 1 },
-        "mutation_performed": { "const": false }
+        "schema_version": {
+          "const": 1
+        },
+        "stop_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "checkpoint_id": {
+          "pattern": "^P(?:0[0-9]|1[0-9]|2[0-2])$"
+        },
+        "reason_code": {
+          "$ref": "#/$defs/ViolationCodeV1"
+        },
+        "violations": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/ViolationV1"
+          }
+        },
+        "evidence_index": {
+          "$ref": "#/$defs/EvidenceIndexV1"
+        },
+        "scope_impact": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "specification",
+              "product-source",
+              "tests",
+              "workflow",
+              "policy-data",
+              "evidence-workspace",
+              "github-required-contexts",
+              "github-rulesets",
+              "merge-queue",
+              "integration-branch",
+              "candidate-campaign",
+              "protected-data",
+              "retained-workflow"
+            ]
+          }
+        },
+        "required_owners": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "implementation-agent",
+              "primary-author",
+              "independent-reviewer",
+              "repository-maintainer",
+              "github-settings-owner",
+              "human-merge-owner",
+              "parent-epic-owner"
+            ]
+          }
+        },
+        "required_actions": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "repair-specification",
+              "capture-read-only-evidence",
+              "forward-fix-new-source",
+              "restore-settings-before-state",
+              "whole-merge-revert",
+              "revalidate-b2",
+              "return-to-parent",
+              "await-human-decision",
+              "rerun-same-red-review"
+            ]
+          }
+        },
+        "mutation_performed": {
+          "type": "boolean"
+        },
+        "changed_surfaces": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChangedSurfaceV1"
+          }
+        },
+        "external_changes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChangedSurfaceV1"
+          }
+        },
+        "rollback": {
+          "$ref": "#/$defs/RecoveryDispositionV1"
+        },
+        "recovery": {
+          "$ref": "#/$defs/RecoveryDispositionV1"
+        },
+        "automatic_rollback_performed": {
+          "const": false
+        }
       },
-      "x-key-order": [
-        "schema_version", "issue_id", "checkpoint", "status", "contract_id", "expected", "actual",
-        "verified_facts", "hypotheses", "unverified", "operations_attempted", "operations_not_attempted",
-        "evidence", "cause", "next_required_check", "mutation_performed"
-      ],
-      "x-array-order": { "evidence": "path UTF-8 byte order" }
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mutation_performed": {
+                "const": false
+              }
+            },
+            "required": [
+              "mutation_performed"
+            ]
+          },
+          "then": {
+            "properties": {
+              "changed_surfaces": {
+                "maxItems": 0
+              },
+              "external_changes": {
+                "maxItems": 0
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mutation_performed": {
+                "const": true
+              }
+            },
+            "required": [
+              "mutation_performed"
+            ]
+          },
+          "then": {
+            "anyOf": [
+              {
+                "properties": {
+                  "changed_surfaces": {
+                    "minItems": 1
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "external_changes": {
+                    "minItems": 1
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
     },
     "CheckpointInputV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["checkpoint_id", "plan_section_sha256", "evidence_index", "write_boundary", "write_paths"],
+      "required": [
+        "schema_version",
+        "checkpoint_id",
+        "section_sha256",
+        "evidence_index"
+      ],
       "properties": {
-        "checkpoint_id": { "enum": ["P00", "P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09", "P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "P20", "P21", "P22"] },
-        "plan_section_sha256": { "$ref": "#/$defs/Sha256" },
-        "evidence_index": { "$ref": "#/$defs/EvidenceRefV1" },
-        "write_boundary": { "enum": ["read-only", "specification-only", "product-code", "human-settings", "human-merge"] },
-        "write_paths": { "type": "array", "items": { "$ref": "#/$defs/EvidencePath" }, "uniqueItems": true }
+        "schema_version": {
+          "const": 1
+        },
+        "checkpoint_id": {
+          "pattern": "^P(?:0[0-9]|1[0-9]|2[0-2])$"
+        },
+        "section_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "evidence_index": {
+          "$ref": "#/$defs/EvidenceIndexV1"
+        }
       },
-      "x-key-order": ["checkpoint_id", "plan_section_sha256", "evidence_index", "write_boundary", "write_paths"],
-      "x-array-order": { "write_paths": "path UTF-8 byte order" },
-      "x-semantic-invariants": ["one checkpoint only", "checkpoint_id equals ExecutionPacketV1.authorized_checkpoint", "plan_section_sha256 hashes that exact Plan section", "evidence_index covers every checkpoint input and actual bytes", "write_paths are a subset of the Plan section and empty for read-only checkpoints"]
+      "x-stage-contract": "P00-P04 preflight; P05 emits candidate-bound; P06-P22 candidate-bound except poisoned-stop returns."
     },
     "ExecutionPacketV1": {
       "type": "object",
       "additionalProperties": false,
       "required": [
-        "schema_version", "issue_id", "repository", "issue_branch", "spec_freeze_sha", "spec_freeze_tree",
-        "b2_entry_sha", "b2_entry_tree", "b2_result_artifact", "b2_ledger_before_artifact", "spec_review",
-        "issue_projection_readback", "implementation_authorized", "implementation_dispatch_receipt",
-        "concurrent_writer_absent", "authorized_checkpoint", "checkpoint_inputs", "commit_push_authorized",
-        "pr_authorized", "external_settings_owner", "human_merge_only"
+        "schema_version",
+        "issue_id",
+        "repository",
+        "issue_branch",
+        "spec_freeze_sha",
+        "spec_freeze_tree",
+        "b1_b2_status",
+        "spec_review",
+        "issue_projection_readback",
+        "implementation_authorized",
+        "implementation_dispatch_receipt",
+        "concurrent_writer_absent",
+        "authorized_checkpoint",
+        "checkpoint_inputs",
+        "commit_push_authorized",
+        "pr_authorized",
+        "external_settings_owner",
+        "human_merge_only"
       ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "issue_id": { "const": "iss-00396" },
-        "repository": { "const": "chemitaro/spec-dock" },
-        "issue_branch": { "const": "iss-00396-build-once-provider-gate-and-regression-policy-cutover" },
-        "spec_freeze_sha": { "$ref": "#/$defs/Sha1" },
-        "spec_freeze_tree": { "$ref": "#/$defs/Sha1" },
-        "b2_entry_sha": { "const": "fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d" },
-        "b2_entry_tree": { "const": "37eabc1aa250838dcd9f61d627309b0ff27e0db7" },
-        "b2_result_artifact": {
-          "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
-          "properties": {
-            "path": { "const": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/20260917t124918z-02--iss-00395-b2-full-regression-result.json" },
-            "sha256": { "const": "bd4630014ee046967713c89c7b8112a2ebe7f10aa85100256aca8a677d817786" }
-          },
-          "x-key-order": ["path", "sha256"]
+        "schema_version": {
+          "const": 1
         },
-        "b2_ledger_before_artifact": {
-          "type": "object", "additionalProperties": false, "required": ["path", "sha256"],
-          "properties": {
-            "path": { "const": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/20260917t124919z--iss-00395-b2-ledger-before.json" },
-            "sha256": { "const": "838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d" }
-          },
-          "x-key-order": ["path", "sha256"]
+        "issue_id": {
+          "const": "iss-00396"
+        },
+        "repository": {
+          "const": "chemitaro/spec-dock"
+        },
+        "issue_branch": {
+          "const": "iss-00396-build-once-provider-gate-and-regression-policy-cutover"
+        },
+        "spec_freeze_sha": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "spec_freeze_tree": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "b1_b2_status": {
+          "$ref": "#/$defs/B1B2AdmissionStatusV2"
         },
         "spec_review": {
-          "type": "object", "additionalProperties": false,
-          "required": ["status", "p0_count", "p1_count", "review_session_id", "review_json"],
-          "properties": {
-            "status": { "enum": ["not-run", "fail", "pass"] },
-            "p0_count": { "type": "integer", "minimum": 0 },
-            "p1_count": { "type": "integer", "minimum": 0 },
-            "review_session_id": { "type": ["string", "null"], "minLength": 1 },
-            "review_json": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] }
-          },
-          "allOf": [
+          "type": "object"
+        },
+        "issue_projection_readback": {
+          "oneOf": [
             {
-              "if": { "properties": { "status": { "const": "pass" } }, "required": ["status"] },
-              "then": { "properties": { "p0_count": { "const": 0 }, "p1_count": { "const": 0 }, "review_session_id": { "type": "string" }, "review_json": { "$ref": "#/$defs/EvidenceRefV1" } } }
+              "$ref": "#/$defs/EvidenceBlobRefV1"
+            },
+            {
+              "type": "null"
             }
-          ],
-          "x-key-order": ["status", "p0_count", "p1_count", "review_session_id", "review_json"]
+          ]
         },
-        "issue_projection_readback": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] },
-        "implementation_authorized": { "type": "boolean" },
-        "implementation_dispatch_receipt": { "oneOf": [{ "$ref": "#/$defs/EvidenceRefV1" }, { "type": "null" }] },
-        "concurrent_writer_absent": { "type": "boolean" },
-        "authorized_checkpoint": { "enum": ["P00", "P01", "P02", "P03", "P04", "P05", "P06", "P07", "P08", "P09", "P10", "P11", "P12", "P13", "P14", "P15", "P16", "P17", "P18", "P19", "P20", "P21", "P22"] },
-        "checkpoint_inputs": { "$ref": "#/$defs/CheckpointInputV1" },
-        "commit_push_authorized": { "type": "boolean" },
-        "pr_authorized": { "type": "boolean" },
-        "external_settings_owner": { "const": "human" },
-        "human_merge_only": { "const": true }
-      },
-      "allOf": [
-        {
-          "if": { "properties": { "implementation_authorized": { "const": true } }, "required": ["implementation_authorized"] },
-          "then": {
-            "properties": {
-              "spec_review": { "properties": { "status": { "const": "pass" }, "p0_count": { "const": 0 }, "p1_count": { "const": 0 } } },
-              "issue_projection_readback": { "$ref": "#/$defs/EvidenceRefV1" },
-              "implementation_dispatch_receipt": { "$ref": "#/$defs/EvidenceRefV1" },
-              "concurrent_writer_absent": { "const": true }
+        "implementation_authorized": {
+          "type": "boolean"
+        },
+        "implementation_dispatch_receipt": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EvidenceBlobRefV1"
+            },
+            {
+              "type": "null"
             }
-          }
+          ]
         },
-        {
-          "if": { "properties": { "implementation_authorized": { "const": false } }, "required": ["implementation_authorized"] },
-          "then": { "properties": { "implementation_dispatch_receipt": { "type": "null" } } }
+        "concurrent_writer_absent": {
+          "type": "boolean"
+        },
+        "authorized_checkpoint": {
+          "pattern": "^P(?:0[0-9]|1[0-9]|2[0-2])$"
+        },
+        "checkpoint_inputs": {
+          "$ref": "#/$defs/CheckpointInputV1"
+        },
+        "commit_push_authorized": {
+          "type": "boolean"
+        },
+        "pr_authorized": {
+          "type": "boolean"
+        },
+        "external_settings_owner": {
+          "const": "human"
+        },
+        "human_merge_only": {
+          "const": true
         }
-      ],
-      "x-key-order": [
-        "schema_version", "issue_id", "repository", "issue_branch", "spec_freeze_sha", "spec_freeze_tree",
-        "b2_entry_sha", "b2_entry_tree", "b2_result_artifact", "b2_ledger_before_artifact", "spec_review",
-        "issue_projection_readback", "implementation_authorized", "implementation_dispatch_receipt",
-        "concurrent_writer_absent", "authorized_checkpoint", "checkpoint_inputs", "commit_push_authorized",
-        "pr_authorized", "external_settings_owner", "human_merge_only"
-      ],
-      "x-semantic-invariants": ["authorized_checkpoint contains exactly one checkpoint ID", "checkpoint_inputs.checkpoint_id equals authorized_checkpoint", "only the checkpoint section hash and evidence index for that single step are accepted", "implementation authorization is separate from commit/push and PR authorization", "this packet does not authorize settings changes or human merge"]
+      },
+      "x-semantic-invariants": [
+        "implementation_authorized requires B1 and B2 accepted on same exact tip, same-Red pass P0/P1=0, projection readback, explicit dispatch, concurrent writer absent"
+      ]
     },
     "RoleOwnershipEntryV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["nodeid", "owner", "reason"],
+      "required": [
+        "nodeid",
+        "owner",
+        "reason"
+      ],
       "properties": {
-        "nodeid": { "$ref": "#/$defs/NonEmptyText" },
-        "owner": { "enum": ["linux-canonical", "sdist-smoke", "macos-delta"] },
-        "reason": { "enum": ["linux-canonical-default", "existing-sdist-parity-test", "existing-macos-parity-matrix", "macos-native-publication-test"] }
+        "nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "owner": {
+          "enum": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "linux-canonical-default",
+            "existing-sdist-parity-test",
+            "existing-macos-parity-matrix",
+            "macos-native-publication-test"
+          ]
+        }
       },
-      "x-key-order": ["nodeid", "owner", "reason"]
+      "x-key-order": [
+        "nodeid",
+        "owner",
+        "reason"
+      ]
     },
     "PlatformCollectionV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["platform_id", "platform", "python_version", "uv_version", "pytest_version", "preparation_commands", "command", "node_count", "unique_node_count", "normalized_node_ids_sha256", "raw_output_artifact"],
+      "required": [
+        "platform_id",
+        "platform",
+        "python_version",
+        "uv_version",
+        "pytest_version",
+        "preparation_commands",
+        "command",
+        "node_count",
+        "unique_node_count",
+        "normalized_node_ids_sha256",
+        "raw_output_artifact"
+      ],
       "properties": {
-        "platform_id": { "enum": ["linux-x86_64", "macos-arm64"] },
-        "platform": { "$ref": "#/$defs/NonEmptyText" },
-        "python_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$" },
-        "uv_version": { "$ref": "#/$defs/NonEmptyText" },
-        "pytest_version": { "$ref": "#/$defs/NonEmptyText" },
-        "preparation_commands": { "type": "array", "items": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "minItems": 1 } },
-        "command": { "type": "array", "items": { "$ref": "#/$defs/NonEmptyText" }, "minItems": 1 },
-        "node_count": { "type": "integer", "minimum": 0 },
-        "unique_node_count": { "type": "integer", "minimum": 0 },
-        "normalized_node_ids_sha256": { "$ref": "#/$defs/Sha256" },
-        "raw_output_artifact": { "$ref": "#/$defs/EvidenceRefV1" }
+        "platform_id": {
+          "enum": [
+            "linux-x86_64",
+            "macos-arm64"
+          ]
+        },
+        "platform": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "python_version": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+        },
+        "uv_version": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "pytest_version": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "preparation_commands": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/NonEmptyText"
+            },
+            "minItems": 1
+          }
+        },
+        "command": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "minItems": 1
+        },
+        "node_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "unique_node_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "normalized_node_ids_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "raw_output_artifact": {
+          "$ref": "#/$defs/EvidenceRefV1"
+        }
       },
-      "x-key-order": ["platform_id", "platform", "python_version", "uv_version", "pytest_version", "preparation_commands", "command", "node_count", "unique_node_count", "normalized_node_ids_sha256", "raw_output_artifact"]
+      "x-key-order": [
+        "platform_id",
+        "platform",
+        "python_version",
+        "uv_version",
+        "pytest_version",
+        "preparation_commands",
+        "command",
+        "node_count",
+        "unique_node_count",
+        "normalized_node_ids_sha256",
+        "raw_output_artifact"
+      ]
     },
     "RoleOwnershipV1": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["schema_version", "contract_id", "source_identity", "platform_collections", "platform_node_sets_equal", "linux_only_node_count", "macos_only_node_count", "assignments", "owner_counts", "duplicate_nodeid_count", "unknown_owner_count"],
+      "required": [
+        "schema_version",
+        "contract_id",
+        "source_identity",
+        "platform_collections",
+        "platform_node_sets_equal",
+        "linux_only_node_count",
+        "macos_only_node_count",
+        "assignments",
+        "owner_counts",
+        "duplicate_nodeid_count",
+        "unknown_owner_count"
+      ],
       "properties": {
-        "schema_version": { "const": 1 },
-        "contract_id": { "const": "iss-00396-role-ownership-v1" },
+        "schema_version": {
+          "const": 1
+        },
+        "contract_id": {
+          "const": "iss-00396-role-ownership-v1"
+        },
         "source_identity": {
-          "type": "object", "additionalProperties": false,
-          "required": ["repository", "branch", "source_sha", "source_tree"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "branch",
+            "source_sha",
+            "source_tree"
+          ],
           "properties": {
-            "repository": { "$ref": "#/$defs/Repository" },
-            "branch": { "$ref": "#/$defs/NonEmptyText" },
-            "source_sha": { "$ref": "#/$defs/Sha1" },
-            "source_tree": { "$ref": "#/$defs/Sha1" }
+            "repository": {
+              "$ref": "#/$defs/Repository"
+            },
+            "branch": {
+              "$ref": "#/$defs/NonEmptyText"
+            },
+            "source_sha": {
+              "$ref": "#/$defs/Sha1"
+            },
+            "source_tree": {
+              "$ref": "#/$defs/Sha1"
+            }
           },
-          "x-key-order": ["repository", "branch", "source_sha", "source_tree"]
+          "x-key-order": [
+            "repository",
+            "branch",
+            "source_sha",
+            "source_tree"
+          ]
         },
-        "platform_collections": { "type": "array", "items": { "$ref": "#/$defs/PlatformCollectionV1" }, "minItems": 2, "maxItems": 2 },
-        "platform_node_sets_equal": { "const": true },
-        "linux_only_node_count": { "const": 0 },
-        "macos_only_node_count": { "const": 0 },
-        "assignments": { "type": "array", "items": { "$ref": "#/$defs/RoleOwnershipEntryV1" }, "minItems": 1 },
+        "platform_collections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PlatformCollectionV1"
+          },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "platform_node_sets_equal": {
+          "const": true
+        },
+        "linux_only_node_count": {
+          "const": 0
+        },
+        "macos_only_node_count": {
+          "const": 0
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/RoleOwnershipEntryV1"
+          },
+          "minItems": 1
+        },
         "owner_counts": {
-          "type": "object", "additionalProperties": false,
-          "required": ["linux-canonical", "sdist-smoke", "macos-delta"],
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ],
           "properties": {
-            "linux-canonical": { "type": "integer", "minimum": 0 },
-            "sdist-smoke": { "type": "integer", "minimum": 0 },
-            "macos-delta": { "type": "integer", "minimum": 0 }
+            "linux-canonical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "sdist-smoke": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "macos-delta": {
+              "type": "integer",
+              "minimum": 0
+            }
           },
-          "x-key-order": ["linux-canonical", "sdist-smoke", "macos-delta"]
+          "x-key-order": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
         },
-        "duplicate_nodeid_count": { "const": 0 },
-        "unknown_owner_count": { "const": 0 }
+        "duplicate_nodeid_count": {
+          "const": 0
+        },
+        "unknown_owner_count": {
+          "const": 0
+        }
       },
-      "x-key-order": ["schema_version", "contract_id", "source_identity", "platform_collections", "platform_node_sets_equal", "linux_only_node_count", "macos_only_node_count", "assignments", "owner_counts", "duplicate_nodeid_count", "unknown_owner_count"],
-      "x-array-order": { "platform_collections": "platform_id linux-x86_64 then macos-arm64", "assignments": "nodeid UTF-8 byte order" },
-      "x-unique-by": { "platform_collections": "platform_id", "assignments": "nodeid" },
-      "x-semantic-invariants": ["assignment nodeid set equals both collected sets", "each node has exactly one owner", "owner_counts equal assignment counts", "no owner is derived from fast/full_regression markers", "runtime collection with an unlisted node is rejected before test execution"]
+      "x-key-order": [
+        "schema_version",
+        "contract_id",
+        "source_identity",
+        "platform_collections",
+        "platform_node_sets_equal",
+        "linux_only_node_count",
+        "macos_only_node_count",
+        "assignments",
+        "owner_counts",
+        "duplicate_nodeid_count",
+        "unknown_owner_count"
+      ],
+      "x-array-order": {
+        "platform_collections": "platform_id linux-x86_64 then macos-arm64",
+        "assignments": "nodeid UTF-8 byte order"
+      },
+      "x-unique-by": {
+        "platform_collections": "platform_id",
+        "assignments": "nodeid"
+      },
+      "x-semantic-invariants": [
+        "assignment nodeid set equals both collected sets",
+        "each node has exactly one owner",
+        "owner_counts equal assignment counts",
+        "no owner is derived from fast/full_regression markers",
+        "runtime collection with an unlisted node is rejected before test execution"
+      ]
+    },
+    "ResolvedRoleOwnershipEntryV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeid",
+        "owner",
+        "reason"
+      ],
+      "properties": {
+        "nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "owner": {
+          "enum": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "reason": {
+          "enum": [
+            "existing-macos-parity-matrix",
+            "existing-sdist-parity-test",
+            "issue396-provider-gate-integration",
+            "issue396-provider-gate-unit",
+            "linux-canonical-default",
+            "macos-native-publication-test",
+            "moved-nonpolicy-regression",
+            "old-policy-retirement"
+          ]
+        }
+      },
+      "x-key-order": [
+        "nodeid",
+        "owner",
+        "reason"
+      ]
+    },
+    "ViolationCodeV1": {
+      "type": "string",
+      "enum": [
+        "MANIFEST_MISSING",
+        "MANIFEST_MALFORMED",
+        "MANIFEST_DUPLICATE_KEY",
+        "SOURCE_SHA_MISMATCH",
+        "SOURCE_TREE_MISMATCH",
+        "WHEEL_BYTES_MISMATCH",
+        "WHEEL_SIZE_MISMATCH",
+        "SDIST_BYTES_MISMATCH",
+        "SDIST_SIZE_MISMATCH",
+        "PRODUCER_AMBIGUOUS",
+        "PRODUCER_MISSING",
+        "PRODUCER_CANCELLED",
+        "PRODUCER_ARTIFACT_EXPIRED",
+        "ENVIRONMENT_FINGERPRINT_DRIFT",
+        "CPU_LIMIT_UNPROVABLE",
+        "CPU_LIMIT_OUT_OF_BOUNDS",
+        "MEMORY_LIMIT_UNPROVABLE",
+        "MEMORY_LIMIT_OUT_OF_BOUNDS",
+        "GPU_PRESENT",
+        "RUNNER_TIER_FORBIDDEN",
+        "CPU_BURST_DRIFT",
+        "PYTEST_ROOT_COUNT_INVALID",
+        "PYTEST_WORKER_COUNT_INVALID",
+        "PYTEST_SHARD_FORBIDDEN",
+        "DESCENDANT_PROCESS_LEAK",
+        "DESCENDANT_REAP_INCOMPLETE",
+        "WALL_PREDICATE_FAILED",
+        "CPU_RATIO_PREDICATE_FAILED",
+        "POLICY_SKIP_DETECTED",
+        "APPROVED_FAILURE_DETECTED",
+        "DUPLICATE_NODE_EXECUTION",
+        "ROLE_RESULT_MISSING",
+        "RAW_EVIDENCE_MISSING",
+        "RUN_ATTEMPT_RERUN_DETECTED",
+        "ATTEMPT_ID_DUPLICATE",
+        "STARTED_ATTEMPT_CANCELLED",
+        "STARTED_ATTEMPT_FAILED",
+        "FIRST_FIVE_REPLACEMENT_ATTEMPTED",
+        "WINDOW_SUCCESS_FILTER_ATTEMPTED",
+        "WINDOW_MEMBER_REPLACEMENT_ATTEMPTED",
+        "FAULT_DENOMINATOR_CHANGED",
+        "FAULT_ENTRY_UNEXECUTED",
+        "OLD_POLICY_CONSUMER_REMAINS",
+        "RETAINED_WORKFLOW_MISSING",
+        "RETAINED_WORKFLOW_BYTES_MISMATCH",
+        "CANDIDATE_IDENTITY_INCOMPLETE",
+        "ENVIRONMENT_IDENTITY_INCOMPLETE",
+        "CAMPAIGN_FREEZE_INCOMPLETE",
+        "ATTEMPT_REGISTRATION_MISSING",
+        "ROLE_OWNERSHIP_UNKNOWN_NODE",
+        "ROLE_OWNERSHIP_DUPLICATE_OWNER",
+        "ROLE_OWNERSHIP_COLLECTION_MISMATCH",
+        "ROLE_RESULT_DUPLICATE",
+        "CONTEXT_READBACK_INCOMPLETE",
+        "CONTEXT_EFFECTIVE_SET_MISMATCH",
+        "MERGE_GROUP_COVERAGE_MISSING",
+        "CONSUMER_SCAN_INCOMPLETE",
+        "PROTECTED_DATA_DRIFT",
+        "EVIDENCE_INDEX_INCOMPLETE",
+        "EVIDENCE_HASH_MISMATCH",
+        "EVIDENCE_STAGE_MISMATCH",
+        "MATERIALIZATION_POISONED",
+        "SAME_SHA_REBUILD_ATTEMPTED",
+        "CAMPAIGN_POPULATION_INCOMPLETE",
+        "STABILITY_WINDOW_INCOMPLETE",
+        "FAULT_CAMPAIGN_INCOMPLETE",
+        "QUALIFICATION_COMPONENT_REJECTED",
+        "RETENTION_INSUFFICIENT"
+      ]
+    },
+    "EvidenceWorkspaceV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "evidence_root_id",
+        "workspace_kind",
+        "created_at",
+        "retention_class"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "evidence_root_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "workspace_kind": {
+          "enum": [
+            "preflight",
+            "candidate-bound"
+          ]
+        },
+        "created_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "retention_class": {
+          "enum": [
+            "spec-authoring",
+            "implementation-checkpoint",
+            "qualification-campaign",
+            "human-readback"
+          ]
+        }
+      },
+      "x-semantic-invariants": [
+        "physical absolute root is runtime-only and never serialized"
+      ]
+    },
+    "EvidenceBlobRefV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "evidence_root_id",
+        "logical_path",
+        "size_bytes",
+        "sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "evidence_root_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "logical_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
+      }
+    },
+    "RepositoryArtifactRefV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "source_sha",
+        "repository_relative_path",
+        "size_bytes",
+        "sha256"
+      ],
+      "properties": {
+        "repository": {
+          "$ref": "#/$defs/Repository"
+        },
+        "source_sha": {
+          "$ref": "#/$defs/Sha1"
+        },
+        "repository_relative_path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+        },
+        "size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
+      }
+    },
+    "EvidenceEntryV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "blob"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "identity",
+            "contract",
+            "command-log",
+            "raw-json",
+            "workflow-api",
+            "artifact-bytes",
+            "test-collection",
+            "node-observation",
+            "process-metrics",
+            "snapshot",
+            "consumer-scan",
+            "context-readback",
+            "review",
+            "stop-return",
+            "other-raw"
+          ]
+        },
+        "blob": {
+          "$ref": "#/$defs/EvidenceBlobRefV1"
+        }
+      }
+    },
+    "PreflightEvidenceIndexV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stage",
+        "scope_id",
+        "evidence_workspace",
+        "specification_identity",
+        "entries"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "stage": {
+          "const": "preflight"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "evidence_workspace": {
+          "$ref": "#/$defs/EvidenceWorkspaceV1"
+        },
+        "specification_identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "repository",
+            "branch",
+            "source_sha",
+            "source_tree"
+          ],
+          "properties": {
+            "repository": {
+              "$ref": "#/$defs/Repository"
+            },
+            "branch": {
+              "$ref": "#/$defs/NonEmptyText"
+            },
+            "source_sha": {
+              "$ref": "#/$defs/Sha1"
+            },
+            "source_tree": {
+              "$ref": "#/$defs/Sha1"
+            }
+          }
+        },
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EvidenceEntryV2"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "evidence_workspace": {
+              "properties": {
+                "workspace_kind": {
+                  "const": "preflight"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CandidateEvidenceIndexV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stage",
+        "scope_id",
+        "evidence_workspace",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "entries"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "stage": {
+          "const": "candidate-bound"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "evidence_workspace": {
+          "$ref": "#/$defs/EvidenceWorkspaceV1"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/EvidenceEntryV2"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "evidence_workspace": {
+              "properties": {
+                "workspace_kind": {
+                  "const": "candidate-bound"
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "CandidateMaterializationV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "materialization_id",
+        "source_identity",
+        "state",
+        "started_at",
+        "completed_at",
+        "build_invocation_count",
+        "candidate_identity",
+        "environment_fingerprint",
+        "evidence_index",
+        "poison_reason"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "materialization_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "source_identity": {
+          "$ref": "#/$defs/SourceIdentityV1"
+        },
+        "state": {
+          "enum": [
+            "unmaterialized",
+            "materializing",
+            "materialized",
+            "poisoned"
+          ]
+        },
+        "started_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completed_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "build_invocation_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "candidate_identity": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CandidateIdentityV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment_fingerprint": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EnvironmentFingerprintV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "evidence_index": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/CandidateEvidenceIndexV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "poison_reason": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ViolationCodeV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "materialized"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "build_invocation_count": {
+                "const": 1
+              },
+              "candidate_identity": {
+                "$ref": "#/$defs/CandidateIdentityV1"
+              },
+              "environment_fingerprint": {
+                "$ref": "#/$defs/EnvironmentFingerprintV1"
+              },
+              "evidence_index": {
+                "$ref": "#/$defs/CandidateEvidenceIndexV1"
+              },
+              "poison_reason": {
+                "type": "null"
+              },
+              "completed_at": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "poisoned"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "poison_reason": {
+                "$ref": "#/$defs/ViolationCodeV1"
+              },
+              "completed_at": {
+                "$ref": "#/$defs/Timestamp"
+              }
+            }
+          }
+        }
+      ],
+      "x-semantic-invariants": [
+        "not a final-gate attempt",
+        "no attempt_id or history membership",
+        "poisoned source SHA/tree cannot materialize again"
+      ]
+    },
+    "CampaignFreezeV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "campaign_id",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "gate_contract_version",
+        "fault_catalogue_definition_sha256",
+        "window_contract_id",
+        "frozen_at",
+        "evidence_index"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "campaign_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "fault_catalogue_definition_sha256": {
+          "const": "7a73bcc44bcca28e734b704e2980d439e4edd161c996515ea45004d038f4bb8f"
+        },
+        "window_contract_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "frozen_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "evidence_index": {
+          "$ref": "#/$defs/CandidateEvidenceIndexV1"
+        }
+      },
+      "x-semantic-invariants": [
+        "created only after materialization is complete",
+        "immutable before first campaign attempt registration"
+      ]
+    },
+    "NodeExecutionV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "nodeid",
+        "owner",
+        "execution_ordinal",
+        "outcome",
+        "duration_ns"
+      ],
+      "properties": {
+        "nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "owner": {
+          "enum": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "execution_ordinal": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "outcome": {
+          "enum": [
+            "passed",
+            "failed",
+            "error",
+            "skipped",
+            "xfailed",
+            "xpassed",
+            "not-executed"
+          ]
+        },
+        "duration_ns": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "NodeObservationV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "attempt_id",
+        "role_id",
+        "collected_nodeids",
+        "executions",
+        "unknown_nodeids",
+        "missing_nodeids",
+        "duplicate_nodeids",
+        "collection_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "role_id": {
+          "enum": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "collected_nodeids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "executions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NodeExecutionV1"
+          }
+        },
+        "unknown_nodeids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "missing_nodeids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "duplicate_nodeids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "collection_sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
+      }
+    },
+    "RoleOwnershipDeltaOperationV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "operation",
+        "activation_checkpoint",
+        "owner",
+        "reason",
+        "semantic_key"
+      ],
+      "properties": {
+        "operation": {
+          "enum": [
+            "add",
+            "move",
+            "delete"
+          ]
+        },
+        "activation_checkpoint": {
+          "pattern": "^P(?:0[0-9]|1[0-9]|2[0-2])$"
+        },
+        "nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "from_nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "to_nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "owner": {
+          "enum": [
+            "linux-canonical",
+            "sdist-smoke",
+            "macos-delta"
+          ]
+        },
+        "reason": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "semantic_key": {
+          "$ref": "#/$defs/NonEmptyText"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "enum": [
+                  "add",
+                  "delete"
+                ]
+              }
+            },
+            "required": [
+              "operation"
+            ]
+          },
+          "then": {
+            "required": [
+              "nodeid"
+            ],
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "from_nodeid"
+                  ]
+                },
+                {
+                  "required": [
+                    "to_nodeid"
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "operation": {
+                "const": "move"
+              }
+            },
+            "required": [
+              "operation"
+            ]
+          },
+          "then": {
+            "required": [
+              "from_nodeid",
+              "to_nodeid"
+            ],
+            "not": {
+              "required": [
+                "nodeid"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "RoleOwnershipDeltaV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_id",
+        "repository",
+        "issue_branch",
+        "verified_authoring_source_sha",
+        "verified_authoring_source_tree",
+        "baseline",
+        "rules",
+        "operations",
+        "expected_final"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "contract_id": {
+          "const": "iss-00396-role-ownership-delta-v1"
+        },
+        "repository": {
+          "const": "chemitaro/spec-dock"
+        },
+        "issue_branch": {
+          "const": "iss-00396-build-once-provider-gate-and-regression-policy-cutover"
+        },
+        "verified_authoring_source_sha": {
+          "const": "4d68bce3f3ee977548a3c467476da39c15f43594"
+        },
+        "verified_authoring_source_tree": {
+          "const": "80ade10f57cd5f4140daa03ca8a40b844f1fcc53"
+        },
+        "baseline": {
+          "type": "object"
+        },
+        "rules": {
+          "type": "object"
+        },
+        "operations": {
+          "type": "array",
+          "minItems": 113,
+          "maxItems": 113,
+          "items": {
+            "$ref": "#/$defs/RoleOwnershipDeltaOperationV1"
+          }
+        },
+        "expected_final": {
+          "type": "object"
+        }
+      }
+    },
+    "ResolvedRoleOwnershipV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "checkpoint_id",
+        "baseline_sha256",
+        "delta_sha256",
+        "assignment_count",
+        "owner_counts",
+        "collection_sha256",
+        "assignments"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "contract_id": {
+          "const": "iss-00396-role-ownership-resolved-final-v1"
+        },
+        "checkpoint_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "baseline_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "delta_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "assignment_count": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "owner_counts": {
+          "type": "object"
+        },
+        "collection_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "assignments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ResolvedRoleOwnershipEntryV1"
+          }
+        }
+      }
+    },
+    "FaultCatalogueEntryV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fault_id",
+        "category_id",
+        "category",
+        "fixture_id",
+        "injector_id",
+        "expected_violation_code",
+        "expected_detection_stage",
+        "first_red_case_id",
+        "first_red_test_nodeid",
+        "candidate_bound"
+      ],
+      "properties": {
+        "fault_id": {
+          "pattern": "^F(?:00[1-9]|0[1-3][0-9]|04[0-5])$"
+        },
+        "category_id": {
+          "pattern": "^C(?:0[1-9]|1[0-9]|20)$"
+        },
+        "category": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "fixture_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "injector_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "expected_violation_code": {
+          "$ref": "#/$defs/ViolationCodeV1"
+        },
+        "expected_detection_stage": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "first_red_case_id": {
+          "pattern": "^RED-F(?:00[1-9]|0[1-3][0-9]|04[0-5])$"
+        },
+        "first_red_test_nodeid": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "candidate_bound": {
+          "const": true
+        }
+      }
+    },
+    "FaultCatalogueDefinitionV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_id",
+        "gate_contract_version",
+        "definition_entry_count",
+        "definition_entries_sha256",
+        "candidate_binding",
+        "entries"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "contract_id": {
+          "const": "iss-00396-seeded-fault-catalogue-v1"
+        },
+        "gate_contract_version": {
+          "const": "specdock-provider-gate-v1"
+        },
+        "definition_entry_count": {
+          "const": 45
+        },
+        "definition_entries_sha256": {
+          "const": "7a73bcc44bcca28e734b704e2980d439e4edd161c996515ea45004d038f4bb8f"
+        },
+        "candidate_binding": {
+          "type": "object"
+        },
+        "entries": {
+          "type": "array",
+          "minItems": 45,
+          "maxItems": 45,
+          "items": {
+            "$ref": "#/$defs/FaultCatalogueEntryV1"
+          }
+        }
+      }
+    },
+    "CandidateBoundFaultCatalogueV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "candidate_identity",
+        "environment_fingerprint_sha256",
+        "definition_entries_sha256",
+        "entry_count",
+        "frozen_at",
+        "entries_sha256"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "definition_entries_sha256": {
+          "const": "7a73bcc44bcca28e734b704e2980d439e4edd161c996515ea45004d038f4bb8f"
+        },
+        "entry_count": {
+          "const": 45
+        },
+        "frozen_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "entries_sha256": {
+          "$ref": "#/$defs/Sha256"
+        }
+      }
+    },
+    "FaultExecutionResultV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "fault_id",
+        "candidate_identity_sha256",
+        "executed_at",
+        "detected",
+        "observed_violation_code",
+        "detection_stage",
+        "evidence"
+      ],
+      "properties": {
+        "fault_id": {
+          "pattern": "^F[0-9]{3}$"
+        },
+        "candidate_identity_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "executed_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "detected": {
+          "type": "boolean"
+        },
+        "observed_violation_code": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/ViolationCodeV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "detection_stage": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "evidence": {
+          "$ref": "#/$defs/CandidateEvidenceIndexV1"
+        }
+      }
+    },
+    "OldPolicySignatureV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signature_id",
+        "kind",
+        "path",
+        "symbol_or_token",
+        "classification",
+        "disposition"
+      ],
+      "properties": {
+        "signature_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "kind": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+        },
+        "symbol_or_token": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "classification": {
+          "enum": [
+            "production-consumer",
+            "workflow-consumer",
+            "test-consumer",
+            "historical-allowlist",
+            "retained-protected"
+          ]
+        },
+        "disposition": {
+          "$ref": "#/$defs/NonEmptyText"
+        }
+      }
+    },
+    "OldPolicyRetirementContractV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_id",
+        "scan_contract_version",
+        "source_verified_at",
+        "signatures",
+        "delete_paths",
+        "conditional_delete_paths",
+        "retained_paths",
+        "historical_allowlist_prefixes",
+        "deletion_gate"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "contract_id": {
+          "const": "iss-00396-old-policy-retirement-v1"
+        },
+        "scan_contract_version": {
+          "const": "specdock-old-policy-retirement-v1"
+        },
+        "source_verified_at": {
+          "type": "object"
+        },
+        "signatures": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/OldPolicySignatureV1"
+          }
+        },
+        "delete_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "uniqueItems": true
+        },
+        "conditional_delete_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "uniqueItems": true
+        },
+        "retained_paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "uniqueItems": true
+        },
+        "historical_allowlist_prefixes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+          },
+          "uniqueItems": true
+        },
+        "deletion_gate": {
+          "type": "object"
+        }
+      }
+    },
+    "ConsumerScanMatchV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "signature_id",
+        "path",
+        "line_or_json_pointer",
+        "content_sha256",
+        "classification"
+      ],
+      "properties": {
+        "signature_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?!/)(?![A-Za-z]:)(?!\\.\\.?$)(?!.*(?:^|/)\\.\\.(?:/|$))(?!.*(?:^|/)\\.(?:/|$))(?!.*\\\\)[^\\u0000]+$"
+        },
+        "line_or_json_pointer": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "content_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "classification": {
+          "enum": [
+            "production-consumer",
+            "workflow-consumer",
+            "test-consumer",
+            "historical-allowlist",
+            "retained-protected"
+          ]
+        }
+      }
+    },
+    "ConsumerScanResultV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "source_identity",
+        "contract_sha256",
+        "scan_complete",
+        "matches",
+        "old_consumer_count",
+        "retained_workflow_result",
+        "evidence"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "source_identity": {
+          "$ref": "#/$defs/SourceIdentityV1"
+        },
+        "contract_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "scan_complete": {
+          "type": "boolean"
+        },
+        "matches": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ConsumerScanMatchV1"
+          }
+        },
+        "old_consumer_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "retained_workflow_result": {
+          "enum": [
+            "present-byte-equal",
+            "missing",
+            "bytes-mismatch",
+            "not-checked"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/CandidateEvidenceIndexV1"
+        }
+      }
+    },
+    "RequiredContextSnapshotV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stage",
+        "repository",
+        "target_branch",
+        "observed_at",
+        "source_kind",
+        "effective_required_contexts",
+        "unrelated_contexts",
+        "old_contexts",
+        "new_context",
+        "merge_queue_active",
+        "merge_group_contexts",
+        "read_status",
+        "evidence"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "stage": {
+          "enum": [
+            "before",
+            "old-plus-new",
+            "intentional-red",
+            "recovered-green",
+            "new-only",
+            "final-readback"
+          ]
+        },
+        "repository": {
+          "$ref": "#/$defs/Repository"
+        },
+        "target_branch": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "observed_at": {
+          "$ref": "#/$defs/Timestamp"
+        },
+        "source_kind": {
+          "enum": [
+            "github-api",
+            "human-ui-export",
+            "gh-api-read-only"
+          ]
+        },
+        "effective_required_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "unrelated_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "old_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "new_context": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/NonEmptyText"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "merge_queue_active": {
+          "type": "boolean"
+        },
+        "merge_group_contexts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          },
+          "uniqueItems": true
+        },
+        "read_status": {
+          "enum": [
+            "complete",
+            "permission-limited",
+            "unavailable"
+          ]
+        },
+        "evidence": {
+          "$ref": "#/$defs/EvidenceIndexV1"
+        }
+      }
+    },
+    "ContextTransitionReceiptV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "before_snapshot",
+        "additive_snapshot",
+        "red_snapshot",
+        "green_snapshot",
+        "new_only_snapshot",
+        "final_snapshot",
+        "canary_attempt_ids",
+        "human_operator_receipt"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "before_snapshot": {
+          "$ref": "#/$defs/RequiredContextSnapshotV1"
+        },
+        "additive_snapshot": {
+          "$ref": "#/$defs/RequiredContextSnapshotV1"
+        },
+        "red_snapshot": {
+          "$ref": "#/$defs/RequiredContextSnapshotV1"
+        },
+        "green_snapshot": {
+          "$ref": "#/$defs/RequiredContextSnapshotV1"
+        },
+        "new_only_snapshot": {
+          "$ref": "#/$defs/RequiredContextSnapshotV1"
+        },
+        "final_snapshot": {
+          "$ref": "#/$defs/RequiredContextSnapshotV1"
+        },
+        "canary_attempt_ids": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/Sha256"
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        },
+        "human_operator_receipt": {
+          "$ref": "#/$defs/EvidenceBlobRefV1"
+        }
+      }
+    },
+    "ChangedSurfaceV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "path_or_external_id",
+        "before_sha256",
+        "after_sha256",
+        "change_kind"
+      ],
+      "properties": {
+        "scope": {
+          "enum": [
+            "specification",
+            "product-source",
+            "tests",
+            "workflow",
+            "policy-data",
+            "evidence-workspace",
+            "github-required-contexts",
+            "github-rulesets",
+            "merge-queue",
+            "integration-branch",
+            "candidate-campaign",
+            "protected-data",
+            "retained-workflow"
+          ]
+        },
+        "path_or_external_id": {
+          "$ref": "#/$defs/NonEmptyText"
+        },
+        "before_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "after_sha256": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "change_kind": {
+          "enum": [
+            "created",
+            "modified",
+            "deleted",
+            "external-state-changed",
+            "attempt-started",
+            "none"
+          ]
+        }
+      }
+    },
+    "RecoveryDispositionV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "owner",
+        "action",
+        "evidence"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "not-required",
+            "required-not-started",
+            "available-not-started",
+            "in-progress",
+            "completed",
+            "blocked"
+          ]
+        },
+        "owner": {
+          "enum": [
+            "implementation-agent",
+            "primary-author",
+            "independent-reviewer",
+            "repository-maintainer",
+            "github-settings-owner",
+            "human-merge-owner",
+            "parent-epic-owner"
+          ]
+        },
+        "action": {
+          "enum": [
+            "none",
+            "repair-specification",
+            "capture-read-only-evidence",
+            "forward-fix-new-source",
+            "restore-settings-before-state",
+            "whole-merge-revert",
+            "revalidate-b2",
+            "return-to-parent",
+            "await-human-decision",
+            "rerun-same-red-review"
+          ]
+        },
+        "evidence": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/EvidenceIndexV1"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "B1B2AdmissionStatusV2": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "contract_id",
+        "repository",
+        "issue_id",
+        "operational_fact_source",
+        "formal_issue_start",
+        "predecessor_human_merge",
+        "b1",
+        "b2",
+        "historical_claim_artifacts",
+        "authority_conflicts",
+        "required_order",
+        "stop_rule"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 2
+        },
+        "contract_id": {
+          "const": "iss-00396-b1-b2-admission-status-v2"
+        },
+        "repository": {
+          "const": "chemitaro/spec-dock"
+        },
+        "issue_id": {
+          "const": "iss-00396"
+        },
+        "operational_fact_source": {
+          "const": "explicit-owner-correction-2026-09-18"
+        },
+        "formal_issue_start": {
+          "type": "object"
+        },
+        "predecessor_human_merge": {
+          "type": "object"
+        },
+        "b1": {
+          "type": "object"
+        },
+        "b2": {
+          "type": "object"
+        },
+        "historical_claim_artifacts": {
+          "type": "array",
+          "minItems": 3,
+          "items": {
+            "type": "object"
+          }
+        },
+        "authority_conflicts": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object"
+          }
+        },
+        "required_order": {
+          "type": "array",
+          "minItems": 7,
+          "items": {
+            "$ref": "#/$defs/NonEmptyText"
+          }
+        },
+        "stop_rule": {
+          "$ref": "#/$defs/NonEmptyText"
+        }
+      }
     }
   }
 }

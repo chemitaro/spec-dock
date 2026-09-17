@@ -4,7 +4,7 @@ ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
 状態: "draft"
-詳細化状態: "implementation-ready-candidate"
+詳細化状態: "implementation-ready-specification; product-implementation-gated"
 最終更新: "2026-09-18"
 依存:
   - "requirement.md"
@@ -16,13 +16,15 @@ ID: "iss-00396"
 Planning Level: "implementation-ready"
 実装開始許可: false
 owner_decisions_required: []
+external_prerequisites:
+  - "#395 owner must correct and accept the owner-reported implementation defect, then provide the exact merged SHA/tree before B1/B2 admission."
 human_merge_only: true
 repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "iss-00396-build-once-provider-gate-and-regression-policy-cutover"
-  sha: "fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d"
-  tree: "37eabc1aa250838dcd9f61d627309b0ff27e0db7"
+  sha: "4d68bce3f3ee977548a3c467476da39c15f43594"
+  tree: "80ade10f57cd5f4140daa03ca8a40b844f1fcc53"
 qualification_authority: "E384-QUAL-001"
 ---
 
@@ -30,100 +32,96 @@ qualification_authority: "E384-QUAL-001"
 
 ## 1. Execution boundary
 
-本Planはimplementation-ready specification candidateであり、Product/test/workflow/policy実装をまだ許可しない。実行開始には次を全て要求する。
+本Planは完成authoring candidateであり、Product/test/workflow/policy実装を許可しない。Formal Issue start/active branchは維持するが、次のgateを厳密に分離する。
 
-1. 本R/D/P、`artifacts/20260917t124918z--luna-max-implementation-handoff.md`、closed contract schema、role-ownership baseline、snapshot helper、B1/B2 receiptとraw evidence、人間向けHTMLが同一ZIP artifactへ収録され、R/D/PとhandoffがIssue canonical copyへbyte-identicalに反映される。
-2. clean pushed exact SHA/treeがGitHub connectorで一致する。
-3. 初回は`iss396-spec-review-red`で独立`chatgpt-spec-review-strict`を実行し、修正候補は同じsession IDへ`--followup`して、最新結果が`review_status=pass`、P0=0、P1=0となる。
-4. 主担当がGitHub Issue #396 bodyをcanonical projectionへ更新し、readbackする。
-5. ユーザーがexplicit implementation dispatchを出す。
-6. concurrent writerがいない。
+| Gate | Candidate-time state | Exit |
+|---|---|---|
+| A0 Authoring | 本packを生成 | ZIP/HTML/schema/manifest内部整合 |
+| A1 Specification acceptance | **PENDING** | clean pushed exact candidateをsame Red sessionでpass、P0/P1=0。P2/P3はreview contractに従う |
+| A2 Projection readback | **PENDING** | Pass後にIssue body projectionを更新しGitHubからreadback |
+| A3 Predecessor admission | **BLOCKED** | #395 owner-reported defect resolved; corrected merged SHA/tree read back; fresh B1 then same-tip B2 accepted |
+| A4 Explicit dispatch | **PENDING** | 別途dispatch + clean freeze identity + concurrent writerなし |
+| I0–I22 Implementation/B3 | **NOT STARTED** | A0–A4成立後、P02以後のordered checkpoints |
 
-Formal `issue start`済みという事実、#392/#395 CLOSED、B1/B2 GREEN、`owner_decisions_required=[]`だけでは実装を開始しない。
+上表と`authoring-gate-status-v1.json`は本仕様candidate作成時点のsnapshotである。後続のStrict review、Issue projection readback、B1/B2 acceptanceはexact SHAに結び付く別の実行証跡で判定する。
 
-実装者はcheckpointを順に一つずつ完了し、各checkpointのexit evidenceを保存する。後段の証拠を前段へ流用しない。中間stateはIssue branch内の作業状態であり、mergeable/acceptedではない。
+User correctionにより、#395 implementation自体はincorrectと報告されている。具体的defectと修正後tipは未確認なので、original #395 SHA/treeとhistorical B1/B2 receipt/raw bytesはidentity/historyに限定し、current acceptanceに使わない。#395 ownerの修正・受入と修正後merge identityのGitHub readbackが済むまでA3はBLOCKEDであり、Issue #396は#395を修正しない。Parent Epic Plan §3.2との矛盾を理由にgateを免除しない。B1/B2を本authoring task中に実行したと主張しない。
 
-## 2. Fixed identities and shell constants
+実装者はA1–A4が全部成立した後だけP02以後へ進める。一checkpointずつ実行し、stage-correct EvidenceIndexとexit evidenceを作る。後段証拠の流用、same-SHA retry、old/new partial stateのmergeを禁止する。
+
+## 2. Fixed identities, evidence roots and shell constants
 
 ```bash
 set -euo pipefail
-
+umask 077
 REPOSITORY='chemitaro/spec-dock'
 ISSUE_ID='iss-00396'
 ISSUE_BRANCH='iss-00396-build-once-provider-gate-and-regression-policy-cutover'
 INTEGRATION_BRANCH='codex/epic-00384-provider-test-strategy-planning'
-B2_SHA='fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d'
-B2_TREE='37eabc1aa250838dcd9f61d627309b0ff27e0db7'
+VERIFIED_AUTHORING_SOURCE_SHA='4d68bce3f3ee977548a3c467476da39c15f43594'
+VERIFIED_AUTHORING_SOURCE_TREE='80ade10f57cd5f4140daa03ca8a40b844f1fcc53'
+ORIGINAL_PREDECESSOR_MERGE_SHA='fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d'
+ORIGINAL_PREDECESSOR_MERGE_TREE='37eabc1aa250838dcd9f61d627309b0ff27e0db7'
+# Resolve only from GitHub readback after the #395 owner closes the reported defect.
+B12_TARGET_SHA=''
+B12_TARGET_TREE=''
 QUAL_AUTHORITY='E384-QUAL-001'
 ISSUE_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover'
-PARENT_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction'
-EVIDENCE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iss-00396-evidence.XXXXXXXX")"
-chmod 700 "$EVIDENCE_ROOT"
+PREFLIGHT_PHYSICAL_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iss396-preflight.XXXXXXXX")"
+chmod 700 "$PREFLIGHT_PHYSICAL_ROOT"
 ```
 
-`SPEC_FREEZE_SHA` / `SPEC_FREEZE_TREE`は独立review対象のclean pushed tipから実行時に設定する。B2 SHAはentry provenanceであり、spec-only commits後のcurrent tipと混同しない。
+Physical evidence rootはruntime-onlyで、wireへserializeしない。`evidence_root_id`はrandom/operation-bound 256-bit value、entry pathはroot-relative POSIX、size/hashはactual bytesから計算する。
 
-Implementation admissionで再検証するB2 exact entry identityは`fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`である。B2のraw resultとbefore-ledgerはそれぞれIssue artifact `20260917t124918z-02--iss-00395-b2-full-regression-result.json`（SHA-256 `bd4630014ee046967713c89c7b8112a2ebe7f10aa85100256aca8a677d817786`）と`20260917t124919z--iss-00395-b2-ledger-before.json`（SHA-256 `838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d`）である。これは#395のpost-merge B1/B2 entry proofだけで、#396のB3・replacement gate・Product実装を証明しない。
+`SPEC_FREEZE_SHA/TREE`はsame-Red review対象の将来clean pushed tipから設定する。`VERIFIED_AUTHORING_SOURCE_*`は本authoring input provenance、`ORIGINAL_PREDECESSOR_MERGE_*`はincorrectと報告された旧#395 mergeのhistory、`B12_TARGET_*`は#395 ownerがdefect correctionを受入した後にGitHub readbackする実行対象であり、相互に代用しない。`B12_TARGET_*`が空または未承認ならP01で直ちに停止する。
 
-`artifacts/provider-gate-contracts-v1.schema.json`がruntime/evidence/execution wireの唯一のclosed schema sourceである。`artifacts/role-ownership-v1.json`とそこから参照される2つのraw collect-only outputsはreviewed 2,214-node baselineである。Implementation時のruntime copiesはcanonical artifactsとbyte-identicalに保ち、schema/ownership hashをpacketのEvidenceIndexへ含める。
+`role-ownership-delta-v1.json`の`verified_authoring_source_sha/tree`は、collection deltaを作成したauthoring input `4d68bce3f3ee977548a3c467476da39c15f43594` / `80ade10f57cd5f4140daa03ca8a40b844f1fcc53`へのprovenanceであり、後続の仕様freeze SHA/TREEではない。これをcurrent specification identityとして読み替えない。
+
+Canonical machine inputs:
+
+```text
+artifacts/b1-b2-admission-status-v2.json
+artifacts/b1-b2-verification-contract-v1.json
+artifacts/provider-gate-contracts-v1.schema.json
+artifacts/role-ownership-v1.json
+artifacts/role-ownership-delta-v1.json
+artifacts/role-ownership-checkpoints-v1.json
+artifacts/role-ownership-resolved-final-v1.json
+artifacts/seeded-fault-catalogue-v1.json
+artifacts/closed-violation-codes-v1.json
+artifacts/old-policy-retirement-v1.json
+artifacts/authoring-gate-status-v1.json
+artifacts/strict-review-p2-record-v1.json
+```
 
 ## 3. Planned change inventory
 
-### 3.1 NEW
+### 3.1 NEW implementation paths after dispatch
 
 ```text
 scripts/maintenance/generate_provider_qualification_policy.py
-scripts/quality/provider_gate/__init__.py
-scripts/quality/provider_gate/contracts.py
-scripts/quality/provider_gate/codec.py
-scripts/quality/provider_gate/identity.py
-scripts/quality/provider_gate/artifacts.py
-scripts/quality/provider_gate/environment.py
-scripts/quality/provider_gate/process_tree.py
-scripts/quality/provider_gate/pytest_plugin.py
-scripts/quality/provider_gate/history.py
-scripts/quality/provider_gate/faults.py
-scripts/quality/provider_gate/consumer_scan.py
-scripts/quality/provider_gate/evaluator.py
-scripts/quality/provider_gate/evidence.py
-scripts/quality/provider_gate/cli.py
+scripts/quality/provider_gate/{__init__,contracts,codec,identity,materialization,artifacts,environment,process_tree,pytest_plugin,history,faults,consumer_scan,context,evaluator,evidence,cli}.py
 scripts/quality/provider_gate/_qualification_policy_generated.py
-scripts/quality/provider_gate/contracts/specdock-linux-qualification-v1.json
-scripts/quality/provider_gate/contracts/provider-gate-contracts-v1.schema.json
-scripts/quality/provider_gate/contracts/role-ownership-v1.json
-scripts/quality/provider_gate/contracts/seeded-fault-catalogue-v1.json
-scripts/quality/provider_gate/contracts/old-policy-retirement-v1.json
-tests/unit/provider_gate/__init__.py
-tests/unit/provider_gate/test_policy_projection.py
-tests/unit/provider_gate/test_contracts.py
-tests/unit/provider_gate/test_identity.py
-tests/unit/provider_gate/test_artifacts.py
-tests/unit/provider_gate/test_environment.py
-tests/unit/provider_gate/test_process_tree.py
-tests/unit/provider_gate/test_role_ownership.py
-tests/unit/provider_gate/test_role_transition_seam.py
-tests/unit/provider_gate/test_history.py
-tests/unit/provider_gate/test_fault_catalogue.py
-tests/unit/provider_gate/test_evaluator.py
-tests/unit/provider_gate/test_consumer_inventory.py
-tests/integration/test_provider_gate_role_graph.py
-tests/integration/test_provider_gate_faults.py
+scripts/quality/provider_gate/contracts/{specdock-linux-qualification-v1.json,provider-gate-contracts-v1.schema.json,role-ownership-v1.json,role-ownership-delta-v1.json,seeded-fault-catalogue-v1.json,old-policy-retirement-v1.json}
+tests/unit/provider_gate/{__init__,test_policy_projection,test_contracts,test_identity,test_materialization,test_artifacts,test_environment,test_process_tree,test_role_ownership,test_role_transition_seam,test_history,test_fault_catalogue,test_evaluator,test_consumer_inventory,test_context}.py
+tests/integration/{test_provider_gate_role_graph,test_provider_gate_faults}.py
 docs/provider-gate.md
 ```
 
-### 3.2 MODIFY
+Exact 43 added test node IDs、one moved node、69 deleted nodesは`role-ownership-delta-v1.json`だけがauthorityである。Path listやwildcardからnodeを推測しない。
+
+### 3.2 MODIFY after dispatch
 
 ```text
 .github/workflows/provider-ci.yml
 AGENTS.md
 pyproject.toml
+tests/conftest.py                    # temporary compatibility seam only; later retire old hook
 tests/integration/test_epic_00343_distribution.py
 tests/cli_runtime/test_distribution_cutover.py
 ```
 
-`src/spec_dock/assets/**`、`spec-dock/**`、provider lifecycle production sourceはdefault planで変更しない。
-
-### 3.3 DELETE after replacement and consumer-zero
+### 3.3 DELETE only after replacement GREEN + consumer zero + context readback
 
 ```text
 .github/workflows/provider-full-regression.yml
@@ -131,126 +129,137 @@ full-regression-ledger.json
 full-regression-timing-weights.json
 scripts/quality/full_regression_baseline.py
 scripts/quality/verify_full_regression.py
-tests/conftest.py
 tests/unit/test_full_regression_baseline.py
 tests/unit/test_provider_test_lanes.py
+tests/conftest.py  # only when remaining content is legacy-only; otherwise delete legacy symbols
 ```
 
-`tests/conftest.py`はcurrent contentがold lane/policy hookだけであることをimplementation tipで再確認してからfile deleteする。共通fixtureが追加されていた場合はold symbolsだけを削除し、他内容をpreserveする。
-
-### 3.4 NO-TOUCH / protected
+### 3.4 NO-TOUCH / read-only
 
 ```text
 .github/workflows/ci.yml
 src/spec_dock/assets/install_root/.github/workflows/ci.yml
 src/spec_dock/provider_lifecycle/**
 tests/unit/provider_lifecycle/**
-spec-dock/initiatives/**  # canonical #396 docs publicationを除き、Product実装中はread-only
-spec-dock/active/**
-spec-dock/.agent/**
-spec-dock/diagrams/**
-spec-dock/.workbench/**   # dedicated new evidence path以外
+parent Epic R/D/P, accepted ADR, wire, baseline register
+Issue #392/#395 canonical docs/Product behavior
+spec-dock/active/** and metadata generated projections
+GitHub required-context/ruleset/merge settings (human-only)
+Initiative portfolio priority
 ```
 
-## 4. Checkpoint P00 — Specification publication and independent review
+Parent docs/historical artifacts included in the pack remain byte-preserved. This authoring task changes only Issue #396 specifications/artifacts and external download copies。
 
-Owner: 主担当 / independent reviewer。Product mutation禁止。
+## 4. Checkpoint P00 — Complete specification artifact and same-Red re-review
 
-1. `artifacts/issue-396-specification-pack.zip`のrootに`README.md`を置き、repository-relative path hierarchyを保ってcanonical Issue R/D/P、handoff、regular Issue artifacts（対象ZIP自身を除く）、親Epic R/D/Pと明示dependency artifactsを収録する。ZIP内Issue docsとartifactsはcanonical direct-child filesにbyte-identicalとする。
-2. ZIP内`manifest.sha256`はREADMEを含む全payload entryをpath順にhashし、manifest自身とZIP file自身は自己参照させない。個別entry hash検証後、ZIPのSHA-256と`git hash-object`出力を`EVIDENCE_ROOT/p00-zip-identity.txt`へ記録する。commit後は`git rev-parse HEAD:$ISSUE_DIR/artifacts/issue-396-specification-pack.zip`が記録済みblob IDと一致することを確認する。
-3. schema、role ownership、raw collection output、snapshot helper、remediation analysis、B1/B2 receipt/raw JSON、説明HTMLをIssue direct-child `artifacts/`へ配置し、ZIP内とbyte-identicalであることを確認する。
-4. `./spec-dock/scripts/spec-dock validate`を実行する。
-5. spec-only diffを確認し、commit/pushする。
-6. GitHub connectorでrepository/branch/full SHAをverifyする。
-7. 初回は新しい独立Red session `iss396-spec-review-red`で`chatgpt-spec-review-strict`を実行する。P0/P1指摘の修正後は同じsessionへ`--followup iss396-spec-review-red`を渡し、目的・範囲を変えず、候補SHAごとにStrict gatesを再実行する。P2/P3は記録だけで、修正・task化・合否条件化しない。
-8. latest reviewがpass、P0=0、P1=0の後、GitHub Issue #396 body projectionを主担当が更新し、readbackする。
+Owner: primary author / independent reviewer。Product/tests/workflow/policy/settings mutation禁止。
+
+1. Canonical Issue R/D/P、handoff、closed schema、machine artifacts、HTML、README、payload manifestをrepository-relative hierarchyでZIPへ収録する。
+2. `payload-manifest-v1.json`で`modified/new/preserved`を区別し、size/SHA-256を記録する。`manifest.sha256`は全payloadをpath順・分類group付きで列挙する。
+3. Historical B1/B2 receipt/raw bytes、2,214-node baseline、Linux/macOS raw collections、parent docs/contractsはbyte-preserveする。
+4. Schema self-validation、concrete artifact validation、delta derivation、45 fault denominator、ZIP CRC、manifest、HTML internal/external byte equalityを検査する。
+5. Repositoryへ適用する場合、spec-only diffをcommit/pushし、GitHub connectorでexact branch/full SHAをverifyする。
+6. 同じsession `iss396-spec-review-red`へfollow-up reviewし、`review_status=pass`、P0=0、P1=0をrequireする。P2六件は`strict-review-p2-record-v1.json`へrecord-onlyで保持し、task/acceptance conditionにしない。
+7. Pass後にだけprimary authorがIssue body projectionを更新し、GitHubからreadbackする。
+
+`authoring-gate-status-v1.json`はcandidate組み立て時点でのgate snapshotである。後続のcommit/push、Strict review、Issue projection readbackは同ファイルを書き換えず、対象SHAを付けた外部実行証跡として記録する。
 
 Exact local verification:
 
 ```bash
-./spec-dock/scripts/spec-dock validate | tee "$EVIDENCE_ROOT/p00-validate.txt"
-git diff --check
-git status --short
-git diff --name-only "$B2_SHA"...HEAD | tee "$EVIDENCE_ROOT/p00-spec-diff.txt"
-git hash-object "$ISSUE_DIR/artifacts/issue-396-specification-pack.zip" \
-  | tee "$EVIDENCE_ROOT/p00-zip-identity.txt"
-shasum -a 256 "$ISSUE_DIR/artifacts/issue-396-specification-pack.zip" \
-  | tee -a "$EVIDENCE_ROOT/p00-zip-identity.txt"
+python -m zipfile -t "$ISSUE_DIR/artifacts/issue-396-specification-pack.zip"
+PACK_VERIFY_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iss396-pack.XXXXXXXX")"
+python -m zipfile -e "$ISSUE_DIR/artifacts/issue-396-specification-pack.zip" "$PACK_VERIFY_ROOT"
+python - "$PACK_VERIFY_ROOT" <<'PY'
+import hashlib
+import sys
+from pathlib import Path
+
+root = Path(sys.argv[1])
+for line in (root / "manifest.sha256").read_text(encoding="ascii").splitlines():
+    expected, relative = line.split("  ", 1)
+    actual = hashlib.sha256((root / relative).read_bytes()).hexdigest()
+    if actual != expected:
+        raise SystemExit(f"manifest hash mismatch: {relative}")
+print("PASS manifest.sha256")
+PY
+python -m json.tool "$PACK_VERIFY_ROOT/$ISSUE_DIR/artifacts/provider-gate-contracts-v1.schema.json" >/dev/null
+cmp "$ISSUE_DIR/artifacts/issue-396-implementation-readiness.html" \
+  "$PACK_VERIFY_ROOT/$ISSUE_DIR/artifacts/issue-396-implementation-readiness.html"
+/Users/iwasawayuuta/.agents/skills/japanese-explanatory-html/scripts/validate-plantuml-html.mjs \
+  "$ISSUE_DIR/artifacts/issue-396-implementation-readiness.html"
 ```
 
-Expected output class:
+Expected: ZIP CRC pass、all payload hashes OK、schema JSON valid、HTML bytes equal。このlocal artifact verification単独ではStrict review passやProduct GREENを意味しない。
 
-- validate exit 0、`nodes=236`またはspec publicationに伴う正当なnode count不変。
-- ZIP member hashesとIssue canonical copyのhashが一致し、HTML browser validationが成功。ZIP SHA-256とpre-commit Git blob IDはEvidenceRootに記録し、commit後のpath blob IDと一致。
-- diffは#396 canonical R/D/P/Artifactsと、projectionに必要なgenerated docsだけ。
-- Product、tests、workflow、policy data差分0。
-- 同一Red sessionの最新Strict reviewが`pass`, P0=0, P1=0。
+## 5. Checkpoint P01 — #395 defect resolution, B1/B2 admission and implementation dispatch
 
-Failure: Product file差分、review fail、SHA mismatchでは停止。過去reviewへfallbackしない。
+Owner: #395 owner + implementation agent + parent owner。**現状BLOCKED**。#395 defect correctionはそのIssue scopeで完了させる。P01の操作はread-only/test executionで、Issue #396 Product fileを編集しない。
 
-## 5. Checkpoint P01 — Read-only implementation admission
+### 5.1 Resolve the reported predecessor defect and target identity
 
-Owner: implementation agent。Mutation前。
+Before any B1/B2 command, the #395 owner must correct and accept the reported implementation defect under Issue #395 and provide the resulting merged commit/tree. Capture the defect disposition and exact GitHub readback in preflight evidence. The currently recorded PR #401 merge SHA/tree is historical identity only; it is not a fallback target. If the correction is not merged or the exact readback is unavailable, return a StopReturn to the #395/parent owner and stop P01.
 
-### 5.1 Repository identity
+After that owner readback, set `B12_TARGET_SHA` and `B12_TARGET_TREE` from the exact corrected merge identity. Never fill them from the Issue #396 branch, a historical receipt, or a test result from a different SHA.
+
+### 5.2 Exact corrected predecessor identity
 
 ```bash
-CURRENT_HEAD="$(git rev-parse HEAD^{commit})"
-CURRENT_TREE="$(git rev-parse HEAD^{tree})"
-UPSTREAM="$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}')"
-UPSTREAM_HEAD="$(git rev-parse '@{upstream}^{commit}')"
-REMOTE_HEAD="$(git ls-remote --heads origin "$ISSUE_BRANCH" | awk '{print $1}')"
+B12_WORKTREE='<clean worktree at exact merge SHA>'
+cd "$B12_WORKTREE"
+test -n "$B12_TARGET_SHA"
+test -n "$B12_TARGET_TREE"
+test "$(git rev-parse HEAD^{commit})" = "$B12_TARGET_SHA"
+test "$(git rev-parse HEAD^{tree})" = "$B12_TARGET_TREE"
+test -z "$(git status --porcelain=v1)"
+export B12_PRIVATE_TMP="$(mktemp -d "${TMPDIR:-/tmp}/iss396-b12.XXXXXXXX")"
+chmod 700 "$B12_PRIVATE_TMP"
+export B12_TMPDIR="$B12_PRIVATE_TMP/tmp"
+mkdir -m 700 "$B12_TMPDIR"
+export B12_EVIDENCE_ROOT="$B12_PRIVATE_TMP/evidence"
+mkdir -m 700 "$B12_EVIDENCE_ROOT"
+```
 
-printf '%s\n' "$CURRENT_HEAD" "$CURRENT_TREE" "$UPSTREAM" "$UPSTREAM_HEAD" "$REMOTE_HEAD" \
-  > "$EVIDENCE_ROOT/p01-identity.txt"
+Mismatch/dirty/missing commit/treeではStopReturn。Reset、fallback branch、別SHA evidence禁止。
 
-test "$CURRENT_HEAD" = "$SPEC_FREEZE_SHA"
-test "$CURRENT_TREE" = "$SPEC_FREEZE_TREE"
-test "$UPSTREAM_HEAD" = "$SPEC_FREEZE_SHA"
-test "$REMOTE_HEAD" = "$SPEC_FREEZE_SHA"
+### 5.3 Fresh B1
+
+`b1-b2-verification-contract-v1.json`の順で実行し、stdout/stderr/exit/identity/actual-byte hashesをPreflightEvidenceIndexV1へ保存する。
+
+```bash
+env TMPDIR="$B12_TMPDIR" uv run pytest -q --tb=short   >"$B12_EVIDENCE_ROOT/b1-ordinary.stdout"   2>"$B12_EVIDENCE_ROOT/b1-ordinary.stderr"
+make lint >"$B12_EVIDENCE_ROOT/b1-lint.stdout" 2>"$B12_EVIDENCE_ROOT/b1-lint.stderr"
+./spec-dock/scripts/spec-dock validate   >"$B12_EVIDENCE_ROOT/b1-validate.stdout"   2>"$B12_EVIDENCE_ROOT/b1-validate.stderr"
+uv run pytest -q tests/unit/provider_lifecycle   tests/cli_runtime/test_distribution_cutover.py   tests/integration/test_issue_392_acceptance.py --tb=short   >"$B12_EVIDENCE_ROOT/b1-parity.stdout"   2>"$B12_EVIDENCE_ROOT/b1-parity.stderr"
+```
+
+Pass countsは事前constantにせずactual observationとして記録する。全command exit 0、unexpected Product/lifecycle/protected failure 0をparent ownerがacceptedとしたreceiptが必要である。
+
+### 5.4 Same-tip fresh B2
+
+B1 accepted後、same shell/worktreeでidentityを再確認し実行する。
+
+```bash
+test "$(git rev-parse HEAD^{commit})" = "$B12_TARGET_SHA"
+test "$(git rev-parse HEAD^{tree})" = "$B12_TARGET_TREE"
+uv run python -m scripts.quality.verify_full_regression --shards 4   >"$B12_EVIDENCE_ROOT/b2-verifier.stdout"   2>"$B12_EVIDENCE_ROOT/b2-verifier.stderr"
+sha256sum "$B12_EVIDENCE_ROOT"/* >"$B12_EVIDENCE_ROOT/sha256sum.txt"
+```
+
+Expected class: exit 0、raw result actual bytes、15 total/0 active/15 resolved/approved 0/unexpected 0/violations empty。Historical raw resultをcurrent outputとしてcopyしない。
+
+### 5.5 Current Issue specification admission and dispatch
+
+B1/B2 accepted receipts後、Issue worktreeへ戻り、P00のStrict review passとIssue projection readbackを含む先行gateが同じ仕様candidateについて成立していることを次で再確認する。
+
+```bash
+test "$(git rev-parse HEAD^{commit})" = "$SPEC_FREEZE_SHA"
+test "$(git rev-parse HEAD^{tree})" = "$SPEC_FREEZE_TREE"
+test "$(git rev-parse '@{upstream}^{commit}')" = "$SPEC_FREEZE_SHA"
 test -z "$(git status --porcelain=v1)"
 ```
 
-Expected: all exact equality、clean worktree。
-
-### 5.2 Entry provenance and dependency
-
-```bash
-git merge-base --is-ancestor "$B2_SHA" HEAD
-git show -s --format='%H %T' "$B2_SHA" | tee "$EVIDENCE_ROOT/p01-b2-identity.txt"
-./spec-dock/scripts/spec-dock deps check "$ISSUE_ID" | tee "$EVIDENCE_ROOT/p01-deps.txt"
-./spec-dock/scripts/spec-dock active show | tee "$EVIDENCE_ROOT/p01-active.txt"
-./spec-dock/scripts/spec-dock validate | tee "$EVIDENCE_ROOT/p01-validate.txt"
-```
-
-Expected:
-
-- `B2_SHA B2_TREE` exact。
-- dependency #395 ready/closed。
-- active Issue exact `iss-00396`。
-- nodes=236、validation pass。
-
-### 5.3 B1/B2 raw evidence
-
-Receiptに記載した二つのraw JSONをprivate evidence workspaceへcopyしhashを再検証する。Tracked implementation treeへraw local absolute pathsをcommitしない。
-
-```bash
-sha256sum "$B2_RESULT_JSON"
-sha256sum "$B2_BEFORE_LEDGER_JSON"
-```
-
-Expected:
-
-```text
-bd4630014ee046967713c89c7b8112a2ebe7f10aa85100256aca8a677d817786  <result>
-838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d  <before-ledger>
-```
-
-Failure: hash不一致、B2 evaluation mismatchでは停止。添付本文からJSONを再構成しない。
-
-### 5.4 Concurrent writer
-
-`git status`、current worktree list、open PR/branch activityをread-only確認し、same Issue branchへ別writerがいないことをexecution packetに記録する。自動lock/daemonを追加しない。
+Require reported #395 defect correction/owner acceptance、corrected-tip B1/B2 acceptance、same-Red pass P0/P1=0、Issue projection readback、explicit implementation dispatch、concurrent writer absent。これらが全て揃って初めてP02へ進む。Formal active state、graph ready、#395 CLOSED、original merge SHA、historical B1/B2 raw artifactsだけでは進まない。
 
 ## 6. Checkpoint P02 — Current external state capture
 
@@ -326,120 +335,57 @@ sha256sum \
 
 Expected: byte-identical。
 
-## 8. Checkpoint P04 — First RED: policy projection and closed schemas
+## 8. Checkpoint P04 — Review-frozen contracts and exact First RED
 
-最初にtestsだけを追加する。
+P04でschema、fault denominator、ownership delta、retirement signaturesを設計しない。Canonical artifactsをruntime contract areaへbyte-identical copyし、hashをPreflightEvidenceIndexV1へ記録する。
 
-Add:
+Pre-body ownership manifestはP04 resolved manifest（baseline + seven P04 adds）である。Unknown/duplicate/collection mismatchならbody 0件でrejectする。
 
-- `tests/unit/provider_gate/test_policy_projection.py`
-- `tests/unit/provider_gate/test_contracts.py`
-- initial contract goldens/fixtures
-
-Run:
+Add only the exact P04 test nodes listed in `role-ownership-delta-v1.json`, then run through the permanent plugin path:
 
 ```bash
-uv run pytest -q \
-  tests/unit/provider_gate/test_policy_projection.py \
-  tests/unit/provider_gate/test_contracts.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p04-red.txt"
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P04"   -q tests/unit/provider_gate/test_policy_projection.py      tests/unit/provider_gate/test_contracts.py      tests/unit/provider_gate/test_fault_catalogue.py   --tb=short
 ```
 
-Expected RED class:
+First RED must enumerate `RED-F001`–`RED-F045` and fail for missing detection implementation, not collection skip or undefined catalogue. Then implement generator/contracts/codec skeleton sufficient to make schema/projection/definition validation GREEN. Fault detection implementation remains P08。
 
-- missing `scripts.quality.provider_gate` / generator / generated projection。
-- no unrelated existing test failure。
-- RED reasonがassertion/missing implementationであり、test collection policy skipではない。
+Exit: generated parent projection diff 0、schema Draft 2020-12 valid、closed code count 68、fault entry count 45、P04 ownership exact、skip/xfail 0。
 
-Then implement:
+## 9. Checkpoint P05 — Materialization and two-stage evidence RED→GREEN
 
-- `contracts.py`
-- `codec.py`
-- generator
-- generated projection
+Implement `identity.py`, `materialization.py`, `artifacts.py`, `evidence.py` with synthetic/temp bytes only。Real candidate build is not run in this checkpoint。
 
-GREEN:
+Exact RED cases are the P05 additions in role delta and include:
+
+- state transition and build count one。
+- materialization not attempt/member。
+- complete candidate+environment before `materialized`。
+- poisoned same-SHA rebuild rejection。
+- preflight/candidate evidence discriminator。
+- logical path absolute/dotdot/backslash/NUL/symlink/hash mismatch rejection。
+- wheel/sdist actual-byte size/hash/source/tree mismatch。
 
 ```bash
-uv run python scripts/maintenance/generate_provider_qualification_policy.py --check
-uv run pytest -q \
-  tests/unit/provider_gate/test_policy_projection.py \
-  tests/unit/provider_gate/test_contracts.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p04-green.txt"
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P05"   -q tests/unit/provider_gate/test_identity.py      tests/unit/provider_gate/test_materialization.py      tests/unit/provider_gate/test_artifacts.py      tests/unit/provider_gate/test_contracts.py --tb=short
 ```
 
-Expected: exit 0、skip/xfail 0。Generated diff 0。
+Target CLI separation:
 
-Stop if parent section parse is ambiguous or semantic tokens cannot be extracted without manual duplicated constants。
-
-## 9. Checkpoint P05 — Candidate identity and artifact build/reuse RED→GREEN
-
-### 9.1 RED tests
-
-Add artifact/identity tests covering:
-
-- exact source SHA/tree。
-- manifest canonical bytes/hash。
-- one producer resolution。
-- actual wheel/sdist bytes mismatch。
-- missing/multiple/expired producer artifact。
-- source/tree mismatch。
-- rerun producer rejection。
-- no downstream build command。
-
-```bash
-uv run pytest -q \
-  tests/unit/provider_gate/test_identity.py \
-  tests/unit/provider_gate/test_artifacts.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p05-red.txt"
+```text
+provider_gate.cli materialize-candidate  # no attempt registration
+provider_gate.cli resolve-candidate      # no build
+provider_gate.cli freeze-campaign        # complete materialization only
+provider_gate.cli register-attempt       # build forbidden
+provider_gate.cli run-role               # build forbidden
 ```
 
-Expected RED: missing implementation only。
-
-### 9.2 Implement
-
-Implement `identity.py`, `artifacts.py`, required contracts and CLI commands.
-
-Candidate build command invoked by producer path:
-
-```bash
-uv run python -m scripts.quality.provider_gate.cli resolve-source-identity \
-  --repository "$REPOSITORY" \
-  --event-payload "$GITHUB_EVENT_PATH" \
-  --workflow-run-id "$GITHUB_RUN_ID" \
-  --run-attempt "$GITHUB_RUN_ATTEMPT" \
-  --output "$RUNNER_TEMP/source_identity.json"
-
-uv run python -m scripts.quality.provider_gate.cli build-candidate \
-  --repository . \
-  --source-identity "$RUNNER_TEMP/source_identity.json" \
-  --workflow-run-id "$GITHUB_RUN_ID" \
-  --run-attempt "$GITHUB_RUN_ATTEMPT" \
-  --output "$CANDIDATE_DIR"
-```
-
-`resolve-source-identity`はDesign §12.2と`SourceIdentityV1`に従ってevent別にSHAを解決する。`pull_request`はpayloadのhead SHA/repository、`workflow_dispatch`はrequired `inputs.source_sha`、`merge_group`はmerge-group SHAを使う。全consumerはproducerが保存した同じ`source_identity.json` bytesを検証する。PRのraw `GITHUB_SHA`をcandidate SHAへ使わない。
-
-Inside CLI, top-level packaging process is exactly:
+Real build top-level command remains exactly one invocation selected by implementation:
 
 ```bash
 uv build --sdist --wheel --out-dir "$CANDIDATE_DIR/dist" --clear .
 ```
 
-The CLI refuses preexisting dist output, additional wheel/sdist, `run_attempt != 1`, source mismatch, second producer observation。
-
-### 9.3 GREEN
-
-```bash
-uv run pytest -q \
-  tests/unit/provider_gate/test_identity.py \
-  tests/unit/provider_gate/test_artifacts.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p05-green.txt"
-```
-
-Expected: all pass、skip/xfail 0。
-
-Do not run a real qualification build yet; synthetic/temp artifact tests only。A real source SHA packaging build must be performed by the selected workflow producer to preserve count semantics。
+Exit: synthetic GREEN、skip/xfail 0、P05 CandidateEvidenceIndex generated only after complete identities。No qualification claim。
 
 ## 10. Checkpoint P06 — Environment and process collector RED→GREEN
 
@@ -492,82 +438,35 @@ uv run pytest -q \
 
 Expected: unit GREEN。Actual runner admission remains pending until shadow workflow。
 
-## 11. Checkpoint P07 — Role ownership and pytest plugin RED→GREEN
+## 11. Checkpoint P07 — Permanent plugin and deterministic role ownership
 
-### 11.1 Freeze ownership before executing role nodes
-
-Review済みbaselineは`artifacts/role-ownership-v1.json`であり、source `3ded647d247b9399a4b79ad6f854d6a87fbf4313` / tree `614778cc7e6e64609a7de80bf2428b3e7f5ec4b7`におけるLinux/macOS各2,214 unique node IDsである。normalized set hashは`b6e742ecba64ec02512892cf99d0c0c7273c175f56e0bc5a5666127f885f03da`、owner countはLinux canonical 2,191、sdist smoke 1、macOS delta 22。raw output filesは同じartifact directory内にあり、contractのEvidenceRef/hashとbyte一致する。
-
-P07の最初のcollection-only testは、実装branch SHAで収集したnode集合とreview済みbaselineの差分を表示する。差分が0ならownership contractをそのまま使用する。追加・削除・rename nodeがある場合は、test bodyや旧fast/full markerを実行・owner決定へ使う前にcollection-only差分を確認し、明示的な役割根拠と一意ownerをcontractへ登録し直し、そのhashと差分をreviewする。Baselineと新candidateの母集団を暗黙に混ぜない。
-
-### 11.2 Tests
-
-- every collected node gets exactly one role owner。
-- role intersections empty。
-- union complete。
-- Linux role uses one pytest process and no worker/shard option。
-- role-out nodes are deselected, not skipped/xfail。
-- execution observation detects duplicate node、policy skip、approved failure。
-- macOS selectors include actual platform-specific nodes; Linux does not execute them。
-- sdist role owns package artifact tests; no duplicate execution in Linux canonical。
-- `tests/conftest.py` role transition seamがCLIの`-p scripts.quality.provider_gate.pytest_plugin`登録をrequireする。plugin自身はcollection filter hookを登録せず、root conftestから`prepare_role_collection(config, items)`を一度だけ呼ぶ。plugin未登録・role option欠落・schema不正・unknown node・old flag併用をcollection開始前にrejectし、role modeではlegacy `POLICY_SKIP_REASON` hookを通さない。
+1. Copy baseline/delta/checkpoint manifests into runtime contracts byte-identically。
+2. Add only P07 nodes in reviewed delta before body execution。
+3. Implement plugin-owned `pytest_addoption`, `pytest_collection_modifyitems`, node observation hooks。
+4. Modify root `tests/conftest.py` only as temporary exact bypass seam。Plugin—not root conftest—calls the role filter。
+5. Verify ordinary pytest keeps legacy behavior until P15。
+6. Verify role invocation deselects nonowned nodes and never policy-skips them。
+7. Verify P15 simulation without root conftest still filters via plugin。
 
 ```bash
-uv run pytest -q tests/unit/provider_gate/test_role_transition_seam.py --tb=short \
-  | tee "$EVIDENCE_ROOT/p07-transition-seam.txt"
-uv run pytest -q tests/unit/provider_gate/test_role_ownership.py --tb=short \
-  | tee "$EVIDENCE_ROOT/p07-role-ownership.txt"
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P07"   -q tests/unit/provider_gate/test_role_transition_seam.py      tests/unit/provider_gate/test_role_ownership.py --tb=short
 ```
 
-Implement `pytest_plugin.py` and role contract. GREEN expected all pass。
+Negative cases: plugin missing、role missing、legacy flags combined、unknown node、duplicate owner、wrong manifest/hash、unplanned node、P15 caller loss。All reject before body。Exit: resolved count/hash exact、role intersection empty、union complete、skip/xfail 0。
 
-### 11.3 Integration dry graph
+## 12. Checkpoint P08 — History/evaluator/exact 45-fault implementation
+
+Use P08 resolved ownership. Do not change catalogue/code inventory。
+
+History tests cover registration before start、started failure/cancel/interruption/missing retention、run_attempt rerun、same ID、first-member replacement、success filtering、window replacement、campaign reset。Materialization must be absent from attempt history。
+
+Fault test iterates exact 45 source-controlled entries and requires each fixture/injector to emit exact expected code at exact stage. Wrong/missing/unexecuted/denominator drift are explicit failures。
 
 ```bash
-uv run pytest -q tests/integration/test_provider_gate_role_graph.py --tb=short \
-  | tee "$EVIDENCE_ROOT/p07-role-graph.txt"
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P08"   -q tests/unit/provider_gate/test_history.py      tests/unit/provider_gate/test_evaluator.py      tests/unit/provider_gate/test_fault_catalogue.py --tb=short
 ```
 
-This test uses synthetic/small candidate bytes and must not claim qualification。Expected: role count exact、same manifest all roles、duplicate 0。
-
-## 12. Checkpoint P08 — Attempt/history/evaluator/fault catalogue RED→GREEN
-
-### 12.1 History tests
-
-Add exact cases:
-
-- chronological first five from `created_at` + run ID。
-- first 1–5にfailure/cancel/missingを残す。
-- sixth successで置換しない。
-- same candidateでcampaign ID変更をreject。
-- latest twenty includes failed/cancel/missing。
-- 19 member => incomplete not per-attempt failure。
-- 21件目以降はchronological latest-twenty境界により最古memberだけが自然にwindow外となる。
-- same run ID `run_attempt=2` rejected/rerun count。
-- duplicate attempt ID/artifact replacement reject。
-
-### 12.2 Evaluator tests
-
-- per-attempt result independent from campaign/window completeness。
-- all roles conjunction。
-- identity/raw missing reject。
-- parent-generated wall/CPU/correctness predicates applied independently。
-- aggregate cannot mean/median/round/offset failures。
-- macOS role does not receive Linux performance predicate。
-
-### 12.3 Fault catalogue tests
-
-Freeze catalogue denominator before execution and inject all entries. Test denominator reduction、missing execution、wrong expected violation、miss。
-
-```bash
-uv run pytest -q \
-  tests/unit/provider_gate/test_history.py \
-  tests/unit/provider_gate/test_evaluator.py \
-  tests/unit/provider_gate/test_fault_catalogue.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p08-red.txt"
-```
-
-Implement `history.py`, `evaluator.py`, `faults.py`, `evidence.py` and contracts。Then GREEN expected all pass、skip/xfail 0。
+Per-attempt result remains independent of aggregate completeness。Linux predicates come only from generated parent projection。macOS delta receives no Linux performance predicate。Exit: all exact cases GREEN、45/45 detected in synthetic campaign、skip/xfail 0。
 
 ## 13. Checkpoint P09 — Consumer scanner and retained workflow guard
 
@@ -608,40 +507,25 @@ uv run pytest -q \
 
 Expected GREEN throughout all checkpoints。
 
-## 14. Checkpoint P10 — Packaging consumer refactor and nonpolicy test move
+## 14. Checkpoint P10 — Packaging consumer refactor and exact one-node move
 
-### 14.1 `candidate_wheel` dual mode
+Refactor `candidate_wheel` into qualification artifact mode and explicitly noneligible local-build mode。Final workflow must set materialized manifest/bundle and may not invoke local build fallback。
 
-Refactor `tests/integration/test_epic_00343_distribution.py::candidate_wheel`:
+Move exactly:
 
-- `SPECDOCK_CANDIDATE_MANIFEST` + bundle paths present => qualification artifact mode、hash/source verify、build helper not called。
-- absent => local-test-build mode、existing helper may build for local test only、result explicitly`qualification_eligible=false`。
-- CI final gate must always set artifact mode。
-- unit/workflow static test proves final gate cannot enter local fallback。
-
-Preserve existing CandidateWheel assertions and Product behavior。
-
-### 14.2 Move nonpolicy regression
-
-Move `test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup` into `tests/cli_runtime/test_distribution_cutover.py` with imports/helpers adjusted。Run before deleting old file:
-
-```bash
-uv run pytest -q \
-  tests/cli_runtime/test_distribution_cutover.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p10-distribution-cutover.txt"
+```text
+from tests/unit/test_provider_test_lanes.py::test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup
+to   tests/cli_runtime/test_distribution_cutover.py::test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup
 ```
 
-Expected: behavior pass。No old lane flags。
-
-### 14.3 Focused package tests
+Semantic key/owner remain as delta contract specifies。Run with P10 resolved ownership/plugin:
 
 ```bash
-uv run pytest -q \
-  tests/integration/test_epic_00343_distribution.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p10-local-package.txt"
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10"   -q tests/cli_runtime/test_distribution_cutover.py --tb=short
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role sdist-smoke   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10"   -q tests/integration/test_epic_00343_distribution.py --tb=short
 ```
 
-This local run is not qualification evidence. Record its build count separately and never mix with Actions candidate manifest。
+Local build-mode result is marked `qualification_eligible=false` and never enters candidate/campaign evidence。
 
 ## 15. Checkpoint P11 — Shadow replacement workflow
 
@@ -715,36 +599,20 @@ make lint
 
 Expected: no placeholder/unknown fields; generated policy diff 0; accepted environment fingerprint stable across new roles。
 
-## 17. Checkpoint P13 — Required-context additive transition and intentional RED
+## 17. Checkpoint P13 — One-time PR materialization and required-context canary
 
-Human-only settings phase。Repository agent prepares receipt templates and evidence; human performs settings mutation。
+Human/settings owner boundary applies。
 
-### 17.1 Additive new context
+1. Resolve exact PR source SHA/tree and create SourceIdentityV1。
+2. Run one-time materialization outside any final-gate attempt。Failure poisons source; no rerun。
+3. Observe actual new check/context name from successful shadow output。
+4. Human adds new required context while old remains; readback `U + old + new`。
+5. Register intentional RED as a normal role-graph attempt with `purpose=context-canary`, campaign ID null, window contract ID non-null。Materialization is not a member。
+6. Inject the predeclared canary condition so only new context RED; old/U remain GREEN。Human verifies merge block (and merge_group if active)。
+7. Forward-fix new source if needed; no rerun of failed run/source。Materialize new source once。
+8. Run fresh GREEN canary; readback recovered GREEN。
 
-Human adds actual `NEW_CONTEXT_NAME` while old context(s) remain。Readback must show:
-
-```text
-U + old + new
-```
-
-No unrelated context/review/merge-queue drift。
-この段階ではold contextを削除しない。変更前後のactual context names、branch/ruleset scope、merge queue scopeをreadback evidenceへ記録する。
-
-### 17.2 Intentional RED
-
-Before final candidate five-run freeze, create one controlled source candidate whose new per-attempt gate fails for a source-controlled canary without making old compatibility gate fail. The canary is test-only/workflow input and must not weaken Product tests or inject secrets。
-
-Required observation:
-
-- old and unrelated contexts GREEN。
-- new context RED。
-- PR merge blocked, including merge_group if active。
-- attempt appears in rolling history as failed/nonaccepted。
-- no rerun of that run。
-
-After proof, fix the canary by a new commit/source SHA and obtain new context GREEN。This recovery candidate is not automatically final B3 candidate; final source after retirement will create its own identity。Replacement GREENだけではold contextを外さず、P14 consumer-zero後にhuman removal/readbackを行う。
-
-If RED does not block, restore settings before-state and stop。Do not remove old context。
+Every snapshot conforms to RequiredContextSnapshotV1 and forms ContextTransitionReceiptV1。Settings write/restore are human-only。RED remains in rolling history; no campaign freeze yet。
 
 ## 18. Checkpoint P14 — Migrate all consumers to replacement
 
@@ -769,36 +637,20 @@ Exit criteria: `runtime_consumers=0`, `workflow_consumers=0`, `test_consumers=0`
 
 After replacement roles are GREEN and consumer-zero is proven, keep the old workflow/check emitter intact while the human removes only the old required context. Read back the final effective context set as `U + new`, including active merge-queue `merge_group` coverage. Save before/change/readback/rollback evidence. If settings are unreadable, scope changes, or readback is not exactly `U + new`, stop and retain both old provider and emitter.
 
-## 19. Checkpoint P15 — Delete old provider/data/workflow in one cutover
+## 19. Checkpoint P15 — Consumer-zero retirement; permanent plugin survives
 
-Only after P14 consumer-zero and successful human old-context removal/readback while the old check emitter still exists:
+Preconditions:
 
-1. delete root ledger/timing。
-2. delete old quality modules。
-3. delete old evaluator/sharder/skip tests/hooks。
-4. remove old marker declarations。
-5. remove old jobs/commands from provider-ci, retaining final provider gate。
-6. delete provider-full-regression workflow。
-7. preserve retained installed-consumer workflow。
-8. update AGENTS/docs final guidance。
+- replacement workflow and role graph GREEN。
+- all consumers migrated。
+- ConsumerScanResultV1 complete and old consumer count 0。
+- retained workflow present/byte-equal。
+- human removed old required context while emitter still existed, and new-only/final readback is complete。
+- P15 resolved ownership manifest contains exact 69 deletions and final 2,188 assignments。
 
-Before deleting `tests/unit/test_provider_test_lanes.py`, verify moved nonpolicy test exists and passes。Before deleting `tests/conftest.py`, AST-check current file contains no unrelated fixture/hook。
+Then delete only paths/signatures in `old-policy-retirement-v1.json`。Remove root legacy hook/temporary seam, but retain `scripts/quality/provider_gate/pytest_plugin.py` as sole permanent filter owner。If `tests/conftest.py` contains nonlegacy fixtures, preserve file and remove only old symbols。
 
-Final consumer scan:
-
-```bash
-uv run python -m scripts.quality.provider_gate.cli scan-old-consumers \
-  --repository . \
-  --contract scripts/quality/provider_gate/contracts/old-policy-retirement-v1.json \
-  --require-zero \
-  --output "$EVIDENCE_ROOT/p15-consumer-zero.json"
-```
-
-Expected: zero old runtime/workflow/test consumers; deleted providers absent; historical references allowed; retained workflows present and byte-equal。
-
-The old check emitter is removed in this same cutover only after the `U + new` readback exists. P20 is read-only confirmation and never performs a late old-context removal.
-
-No compatibility shim、empty ledger、stub verifier、deprecated flag aliasを残さない。
+Run final scanner and P15 plugin ownership before any broad suite. Unknown final node/diff rejects before body。No old compatibility shim/fallback remains。
 
 ## 20. Checkpoint P16 — Final-source local verification
 
@@ -923,85 +775,48 @@ PR evidence:
 
 Human alone merges。Agent stops merge-ready。
 
-## 24. Checkpoint P20 — Post-merge exact identity and context readback
+## 24. Checkpoint P20 — Post-merge identity and final external readback
 
 After human merge to Epic integration branch:
 
-1. resolve exact merge SHA/tree。
-2. require merged tree equals accepted PR head tree; SHA may differ。
-3. this merge SHA is a **new candidate identity**。
-4. Read back the effective required-context set `U + new` and merge-queue `merge_group` coverage after the earlier P14 removal.
-5. Confirm the old emitter is absent from the accepted merge tree and no old context is required.
-6. Do not mutate settings in this checkpoint; if readback is unavailable or differs, stop before B3.
-7. no main merge yet。
+1. GitHub readback exact merge SHA/tree and accepted PR head tree。
+2. Require merge tree equality; SHA may differ。
+3. Treat merge SHA/tree as a new candidate identity。
+4. Read back effective `U + new`, ruleset scope, review requirements and merge_group coverage。
+5. Confirm old emitter absent in merge tree and old context not required。
+6. Do not mutate settings in this checkpoint。
+
+Mismatch/unavailable readback produces post-mutation StopReturn and blocks B3/materialization。No main merge。
+
+## 25. Checkpoint P21 — Post-merge materialization, freeze and B3 campaign
+
+### 25.1 One-time materialization (not an attempt)
+
+Dispatch materialization for exact merged SHA/tree。Register state before build; execute packaging once; complete manifest/wheel/sdist/environment/candidate evidence。Build/cancel/missing/mismatch poisons source. Do not rerun same SHA。
 
 ```bash
-MERGED_SHA='<read from GitHub>'
-MERGED_TREE='<read from GitHub>'
-git show -s --format='%H %T' "$MERGED_SHA"
+uv run python -m scripts.quality.provider_gate.cli materialize-candidate   --repository "$REPOSITORY" --source-sha "$MERGED_SHA"   --output-root "$MATERIALIZATION_PHYSICAL_ROOT"
 ```
 
-If tree differs, stop and do not start B3 campaign。
+### 25.2 Campaign freeze
 
-## 25. Checkpoint P21 — Post-merge candidate build once and B3 campaign
-
-### 25.1 First attempt is sole producer
-
-Dispatch one fresh `workflow_dispatch` run with required input `source_sha=MERGED_SHA`; the resolver must produce `source_identity.json` with `source_reference=workflow_dispatch_source_sha` and exact merged SHA/tree. Do not substitute `GITHUB_SHA` or branch tip, and do not rerun the run. It builds wheel/sdist exactly once and freezes candidate manifest/environment/campaign IDs.
-
-If build/role fails, candidate is rejected; create a forward-fix source SHA and repeat human review/merge as applicable。Do not rebuild same SHA。
-
-### 25.2 First five
-
-Dispatch four additional independent workflow runs, each with the same required `source_sha=MERGED_SHA` but a new run ID, all consuming the producer artifact and exact producer `source_identity.json` bytes. The chronological first five started attempts are immutable population. No retries/reruns/replacement.
-
-Evaluate:
+After `materialized`, bind candidate identity、environment hash、gate version、45-entry definition hash、window contract ID into immutable CampaignFreezeV1。No campaign attempt can be registered earlier。
 
 ```bash
-uv run python -m scripts.quality.provider_gate.cli evaluate-qualification \
-  --repository "$REPOSITORY" \
-  --source-sha "$MERGED_SHA" \
-  --mode campaign \
-  --output "$EVIDENCE_ROOT/p21-campaign-result.json"
+uv run python -m scripts.quality.provider_gate.cli freeze-campaign   --materialization "$MATERIALIZATION_INDEX"   --fault-definition "$ISSUE_DIR/artifacts/seeded-fault-catalogue-v1.json"   --output "$CAMPAIGN_FREEZE_JSON"
 ```
 
-Expected: five complete accepted members、parent predicates all true。
+### 25.3 Independent attempts and aggregates
 
-### 25.3 Latest twenty
+Register each final-gate attempt before role start, consume exact stored bytes, execute one role graph, and retain all started outcomes。Parent-generated projection determines first population/window/acceptance; this Plan does not choose replacements or success filtering。Materialization is never a member。No run rerun、same attempt ID、artifact replacement、campaign reset。
 
-Because intentional RED remains in history, dispatch additional independent successful attempts until the latest twenty chronological attempts under the same gate/environment contract are all accepted。This normally requires twenty new successes after RED; first five are included in those twenty where chronology permits。Do not create 5×20 nested execution。
+### 25.4 Candidate-bound fault campaign
 
-Each attempt runs one role graph and consumes stored bytes。Use no reruns。
-
-### 25.4 Fault campaign
-
-Run source-controlled catalogue once for the merge candidate and require all entries executed/detected。Fault fixtures do not mutate candidate bytes or Product source。
+Bind exact 45 definitions to candidate/environment and execute all entries through test-only seams。Require exact code/stage for each and no denominator change。
 
 ### 25.5 Final evaluation
 
-```bash
-uv run python -m scripts.quality.provider_gate.cli evaluate-qualification \
-  --repository "$REPOSITORY" \
-  --source-sha "$MERGED_SHA" \
-  --mode final \
-  --required-context-readback "$FINAL_CONTEXT_READBACK" \
-  --consumer-zero "$CONSUMER_ZERO_JSON" \
-  --protected-before "$PROTECTED_BEFORE_JSON" \
-  --protected-after "$PROTECTED_AFTER_JSON" \
-  --output "$EVIDENCE_ROOT/p21-qualification-result.json"
-```
-
-Expected:
-
-- candidate/source/tree/manifest/artifact identity complete。
-- first five accepted independently。
-- fault catalogue 100%。
-- latest twenty complete/all accepted、flakes/retry/rerun 0。
-- context final set correct。
-- consumer-zero、protected-data GREEN。
-- B3 `accepted=true`。
-
-B3 is not claimed until this exact output and API/raw readback are independently inspected。
+Evaluate per-attempt separately from campaign/fault/window; then evaluate B3 with context final readback、consumer-zero、protected snapshot、review receipts。B3 is not claimed until actual output says accepted and raw/API evidence has been independently inspected。
 
 ## 26. Checkpoint P22 — B3 receipt and handoff to Epic main merge
 
@@ -1045,80 +860,90 @@ Exact pass counts are observations, not specification constants。Any expected o
 
 ## 28. Stop-and-return payload
 
-唯一のstop-and-return wire schemaは`artifacts/provider-gate-contracts-v1.schema.json#/$defs/StopReturnV1`である。Plan/Handoffに別JSON shapeを定義しない。Evidenceはrepository-relative path / run ID / redacted API receiptとし、credentials、tokens、private absolute pathsを含めない。原因を特定できない場合は`cause="原因未特定"`とする。
+Use only `provider-gate-contracts-v1.schema.json#/$defs/StopReturnV1`。It records finite reason code、stage-correct evidence、scope impact、owners/actions、mutation flag、changed/external surfaces、rollback/recovery status。Private absolute paths、credentials/tokensをwireへ入れない。`automatic_rollback_performed=false`。
+
+Pre-mutation example: B1/B2 missing、same-Red fail。Post-mutation examples: P11 workflow pushed、P13/P14 settings changed、P15 files deleted、P21 attempt started。Post-mutation changesをfalse/emptyへ偽装しない。
 
 ## 29. Stop conditions
 
-### Identity / admission
+### Admission
 
-- repository/branch/full SHA/tree/upstream/remote mismatch。
-- B2 raw hash/evaluation mismatch。
-- dependency/active/concurrent writer ambiguity。
-- spec review pass/P0/P1条件未達。
+- #395 merge identity不一致、fresh B1未受入、same-tip B2未受入。
+- Historical claim/別SHA/Issue readyを代替にしようとした場合。
+- same-Red pass P0/P1=0、projection readback、explicit dispatch未達。
 
-### Parent authority
+### Parent/no-touch
 
-- `E384-QUAL-001`を一意にprojectできない。
-- value/population/window/aggregation/platform/rejection/escapeの変更が必要。
-- hidden workflow thresholdが必要。
+- Parent values/population/window/aggregation/scope/rejection/escape変更が必要。
+- #392/#395 Product/lifecycle、retained workflow、protected data変更が必要。
 
-### Candidate/environment
+### Materialization/evidence
 
-- producer一意性、actual bytes、source/tree binding、retention不十分。
-- effective limit/image/class/fingerprint不明またはdrift。
-- same SHA rebuild/retry/rerunが必要。
+- producer不一意、one build/actual bytes/environment/retention不成立。
+- poisoned same SHAのrebuildが必要。
+- evidence stage/path/hash不成立。
 
-### Role/process
+### Ownership/plugin/process
 
-- role ownership欠落/重複。
-- skip/approved failure/shard/worker追加が必要。
-- descendant-inclusive CPU/reapを証明不能。
+- baseline/delta未計画node、duplicate/missing owner、collection mismatch。
+- plugin sole filterがP15後に残らない。
+- root/worker/shard/descendant measurement/reapを閉じられない。
 
-### History/evidence
+### Fault/history/aggregate
 
-- first five/latest twenty/API chronology/raw evidence不完全。
-- failure/cancel/missingを残せない。
-- fault detection 100%未達。
+- 45 entryの一つでも未実行/未検出/wrong code/stage/denominator drift。
+- started failure/cancel/missing/rerunを除外・置換しなければpassできない。
 
-### Cutover/context/protection
+### Cutover/external
 
-- old consumer remaining。
-- retained installed-consumer workflowに削除/変更が及ぶ。
-- ruleset/context/merge queue state未確認、REDがblockしない、no-gap不可。
-- Product/lifecycle/15-row/protected data変更が必要。
-- dogfood partial projection。
-
-### Governance
-
-- extra Issue、direct-main、agent merge、human merge removal、portfolio reprioritizationが必要。
+- consumer scan不完全またはcount>0。
+- context/ruleset/merge queue readback不能、REDがblockしない、U drift、rollback不明。
+- partial old-policy deletionやold writer fallbackが必要。
 
 ## 30. Rollback and recovery matrix
 
 | State | Valid recovery |
 |---|---|
-| Spec candidate unaccepted | docsだけ修正しfresh Strict review |
-| Implementation uncommitted | Issue branchで修正/abandon、B2 untouched |
-| Shadow workflow failed | new source commit、same run rerun禁止 |
-| Context additive migration failed | human restores captured `U + old`; merge blocked |
-| Final source PR unmerged | repair with new source SHA、full revalidation |
-| #396 merged, B3 not accepted | stop Epic main; human whole-merge revert + settings restore to complete B2, or owned forward-fix/new candidate |
-| B3 accepted, Epic main unmerged | repair on integration branch; B3 evidence invalidated by source change |
-| Epic main merged | parent-controlled suffix recovery/forward-fix; automatic rollback禁止 |
+| B1/B2 unresolved | No implementation mutation; return exact missing evidence to parent owner |
+| Spec candidate not passed | Repair specs only; same-Red re-review |
+| Implementation uncommitted | Repair/abandon Issue branch; predecessor tip unchanged |
+| Materialization poisoned | Forward-fix new source SHA/tree; never rebuild same SHA |
+| Shadow workflow failed | New source commit and materialization; no workflow rerun |
+| Context additive transition failed | Human restore captured before-state; merge blocked |
+| P15 deletion failed | Preserve actual branch; forward-fix or abandon unmerged PR; no partial accepted state |
+| #396 merged, B3 not accepted | Stop Epic main; human settings restore + whole-merge revert or owned forward-fix/new candidate |
+| B3 accepted, main unmerged | Any source change invalidates B3; materialize/evaluate new candidate |
+| Epic main merged | Parent-controlled suffix recovery/forward-fix; automatic rollback forbidden |
 
 ## 31. Completion criteria
 
-本Issueは次が全て成立するまで完了しない。
+Authoring completion and Issue/Product completion are distinct。
 
-1. implementation-ready spec independently accepted。
-2. replacement final gate implemented/tested。
-3. old consumer 0 then old policy removed on final source。
-4. final-source per-attempt gate GREEN、review GREEN、PR human merged to Epic branch。
-5. merged SHA candidate built once。
-6. current candidate first five accepted。
-7. candidate-bound seeded faults 100%。
-8. latest twenty complete/all accepted、retry/rerun/flake 0。
-9. context final set/readback GREEN。
-10. docs/protected/retained workflow/consumer-zero GREEN。
-11. B3 receipt complete。
+### 31.1 This specification pack is authoring-complete when
 
-この時点でもEpic main mergeは別human gateである。
+- R/D/P/handoff/schema/machine artifacts/HTML are synchronized。
+- Historical/baseline/raw bytes are preserved。
+- ZIP CRC、manifest、schema、delta/fault/HTML validations pass。
+- No Product/test/workflow/policy/settings mutation occurred。
+
+This does not mean independent review pass or implementation authorization。
+
+### 31.2 Product implementation may start only when
+
+1. Clean pushed spec candidate exists。
+2. Same-Red `review_status=pass`, P0/P1=0; P2/P3 follow the review contract。
+3. Issue projection update/readback complete。
+4. #395 owner correction/acceptance and corrected merged SHA/tree are read back。
+5. Fresh B1 is accepted at that corrected exact SHA/tree。
+6. Fresh B2 is accepted at the same exact tip after B1。
+7. Current specification freeze is clean and exact; no concurrent writer exists。
+8. Explicit implementation dispatch is received。
+
+### 31.3 Issue #396 completes only when
+
+- replacement implemented/tested and human merged to Epic branch。
+- consumer-zero then old policy retired on final source。
+- permanent plugin ownership、retained workflow、protected data、context final readback GREEN。
+- merged candidate materialized once, campaign/fault/window evaluated by parent projection, B3 receipt complete。
+
+Epic main merge remains a separate human gate。

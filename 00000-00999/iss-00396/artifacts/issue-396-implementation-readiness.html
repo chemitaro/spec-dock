@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Issue #396 実装準備ガイド</title>
+  <title>Issue #396 完成版実装準備ガイド</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -118,21 +118,6 @@
     }
 
     .muted { color: var(--muted); }
-
-    .status-strip { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
-    .status-pill { padding: 5px 10px; border: 1px solid var(--border); border-radius: 999px; background: var(--background); font-size: 0.88rem; font-weight: 700; }
-    .status-pill.good { color: var(--success); }
-    .status-pill.pending { color: #9a6700; }
-    .callout { margin: 14px 0; padding: 14px 16px; border-left: 4px solid var(--accent); border-radius: 8px; background: var(--background); }
-    .callout strong { display: block; margin-bottom: 4px; }
-    table { width: 100%; margin: 12px 0; border-collapse: collapse; font-size: 0.94rem; }
-    th, td { padding: 9px 10px; border: 1px solid var(--border); text-align: left; vertical-align: top; }
-    th { background: var(--background); }
-    .flow-list { padding-left: 1.25rem; }
-    .flow-list li { margin: 7px 0; }
-    .artifact-links { display: flex; flex-wrap: wrap; gap: 10px 18px; padding-left: 1.2rem; }
-    .small { font-size: 0.9rem; }
-    .mono { overflow-wrap: anywhere; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88rem; }
 
     .visually-hidden {
       position: absolute;
@@ -281,263 +266,250 @@
         --error-bg: #55160c;
       }
     }
-  </style>
+
+    nav { position: sticky; top: 8px; z-index: 10; overflow-x: auto; white-space: nowrap; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    nav a { margin-right: 16px; color: var(--accent); text-decoration: none; }
+    .status { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; margin-top: 18px; }
+    .status > div, .card { padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+    .status strong { display: block; color: var(--muted); font-size: .84rem; }
+    .badge { display: inline-block; padding: 2px 8px; border: 1px solid currentColor; border-radius: 999px; font-size: .8rem; }
+    .badge.red { color: var(--error); }
+    .badge.blue { color: var(--accent); }
+    .badge.green { color: var(--success); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+    .card h3 { margin-top: 0; }
+    .callout { margin: 14px 0; padding: 14px 16px; border-left: 5px solid var(--accent); border-radius: 7px; background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+    .callout.danger { border-color: var(--error); background: var(--error-bg); }
+    .callout.warn { border-color: #8a5a00; background: #fff8e8; }
+    .callout.ok { border-color: var(--success); background: var(--success-bg); }
+    .scroll { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+    th, td { padding: 8px 10px; border: 1px solid var(--border); vertical-align: top; text-align: left; }
+    th { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+    .timeline { counter-reset: step; }
+    .timeline article { position: relative; margin: 0 0 12px 32px; padding: 12px 14px; border-left: 3px solid var(--border); border-radius: 0 8px 8px 0; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); }
+    .timeline article::before { counter-increment: step; content: counter(step); position: absolute; left: -31px; top: 10px; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 700; }
+    @media print { nav, .plantuml-status { display: none !important; } }
+      </style>
 </head>
 <body>
   <main>
     <header>
-      <h1>Issue #396 実装準備ガイド</h1>
-      <p>Epic #384の受入ゲート、#395から引き継いだB1/B2の証拠、#396で実装する最終Provider Gateを、初めて参加する人にも分かるようにまとめます。</p>
-      <div class="status-strip" aria-label="現在の状態">
-        <span class="status-pill good">#396 active</span>
-        <span class="status-pill good">B1/B2 entry evidence recorded</span>
-        <span class="status-pill pending">Strict review gates implementation</span>
-        <span class="status-pill">Product implementation not authorized</span>
-        <span class="status-pill">B3 not started</span>
+      <h1>Issue #396 完成版実装準備ガイド</h1>
+      <p>Build Once Provider Gate and Regression Policy Cutover</p>
+      <p>Epic #384のqualification authorityを保ったまま、#395後続ゲートと#396実装開始条件を分けて理解するための説明資料です。</p>
+      <div class="status">
+        <div><strong>Issue #396</strong>active issue / issue branchを維持</div>
+        <div><strong>Product実装許可</strong><span class="badge red">false</span></div>
+        <div><strong>#395 implementation</strong><span class="badge red">owner-reported incorrect; disposition pending</span></div>
+        <div><strong>B1 / B2</strong><span class="badge red">未実施・未受入</span></div>
+        <div><strong>前回Strict review</strong>P1=6。6件の修正を本candidateへ反映</div>
+        <div><strong>このcandidateの再review</strong>判定は外部のsame-Red receiptで確認</div>
+        <div><strong>B3</strong><span class="badge red">not started</span></div>
       </div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
         図を読み込んでいます。
       </div>
     </header>
+<nav><a href="#overview">概要</a><a href="#authority">Authority</a><a href="#admission">前提ゲート</a><a href="#architecture">構成</a><a href="#state">状態遷移</a><a href="#ownership">Test ownership</a><a href="#faults">Fault</a><a href="#checkpoints">Checkpoint</a><a href="#verify">検証</a><a href="#stop">停止・回復</a><a href="#done">完了条件</a></nav>
 
-    <section id="purpose">
-      <h2>1. 目的とEpic全体の位置づけ</h2>
-      <p>Epic #384は、provider testの重複と実行コストを減らしながら、テスト失敗を弱めずに最終qualificationを証明します。実施順はIssue #392、#395、#396です。#396は、candidateを一度だけbuildし、同じwheelとsdistを各roleで再利用する最終Provider Gateへの切替を担当します。</p>
-      <p>前任者からの報告時点では、#395を閉じただけでB1/B2が未実施だったため、依存グラフ上のreadyとEpic計画上の開始条件がずれていました。その後、Epic Planとentry receiptで確認したところ、B1/B2は#395のpost-merge exact SHA <code>fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d</code>、tree <code>37eabc1aa250838dcd9f61d627309b0ff27e0db7</code>で別途実行され、#396のentry evidenceとして記録されています。したがって、#396の入口条件は満たされています。</p>
-      <aside class="callout">
-        <strong>B1/B2の完了は、#396やEpic全体の完了ではありません。</strong>
-        B1/B2は#395の受入証拠です。#396のreplacement gate、required-context切替、post-merge B3、Epic main受入はこれからの別ゲートです。B2の古いshard/skip結果をB3の証拠に流用しません。
-      </aside>
-      <table>
-        <thead><tr><th>段階</th><th>何を証明するか</th><th>現在の位置</th></tr></thead>
-        <tbody>
-          <tr><td>#392</td><td>Provider lifecycle hard cutoverとP392 handoff</td><td>Epic Plan上で完了</td></tr>
-          <tr><td>#395 B1</td><td>current gatesがGREENであること</td><td>ordinary pytest 1,367 passed / 847 skipped、lint・validate・security guards GREEN</td></tr>
-          <tr><td>#395 B2</td><td>15件のbaseline rowが15/0/15で検証されること</td><td>2,188 passed / 26 skipped、15 total / 0 active / 15 resolved、violation 0</td></tr>
-          <tr><td>#396</td><td>build-once replacement gateとold-policy cutoverを実装すること</td><td>仕様レビューとIssue projection readbackを進める段階</td></tr>
-          <tr><td>#396 B3</td><td>Epicの最終qualification条件をmerged sourceで満たすこと</td><td>未開始</td></tr>
-        </tbody>
-      </table>
-      <p>Epic Requirementの<code>E384-QUAL-001</code>がqualificationの数値、母集団、集計方法の唯一のauthorityです。Issue #396の仕様は、それを生成projectionとevaluatorへ反映し、別のpolicyとして再定義しません。Initiative-levelの優先順位資料は別のgovernance範囲です。このガイドは明示選択された#396とEpic #384の契約に絞っています。</p>
-    </section>
+<section id="overview"><h2>1. Issueの目的とEpic内の位置</h2>
+<p>Epic #384は、Issue #392のprovider lifecycleとIssue #395の先行変更を経て、Issue #396でfinal provider gateへ切り替える計画です。#396はbuild-once packaging、same-candidate downstream roles、Linux canonical、sdist smoke、macOS delta、actual-byte evidence、qualification evidence、required-context cutover、旧policy retirementを一つのIssue acceptance単位として所有します。</p>
+<div class="callout danger"><strong>現在の最重要停止条件:</strong> ownerは#395の実装自体が誤りと報告しています。具体的defectと修正後のtipは未確認です。#395 ownerが#395のscope内で修正・受入し、GitHub readbackでcorrected SHA/treeを確定するまでB1/B2対象は未確定で、Issue #396のProduct実装は開始できません。</div>
+<p>仕様作成、formal start、implementation dispatch、Product実装、human merge、post-merge B3、Epic main mergeは別々の状態です。</p>
+</section>
 
-    <section id="terms">
-      <h2>2. 最初に知る用語</h2>
-      <table>
-        <thead><tr><th>用語</th><th>意味</th></tr></thead>
-        <tbody>
-          <tr><td>B1 / B2</td><td>#395 post-merge exact sourceで行ったentry gates。B1はcurrent gatesのGREEN、B2は15件のbaseline評価です。</td></tr>
-          <tr><td>B3</td><td>#396が人間によりEpic branchへmergeされた後、その正確なmerged SHAで実施する最終qualification。</td></tr>
-          <tr><td>SourceIdentityV1</td><td>一つのGitHub Actions runを識別する値。event、run ID、attempt、source repository、source SHA/treeを持ちます。同じattemptの各roleが同じbytesを使います。</td></tr>
-          <tr><td>CandidateIdentityV1</td><td>build済みcandidateの識別子。source SHA/tree、provider digest、manifest、wheel/sdistの実bytes hash、producer来歴を束縛します。</td></tr>
-          <tr><td>Role</td><td>一つのattempt内でcandidateを検証する仕事のまとまり。Linux canonical、sdist smoke、macOS delta、static analysisを指します。</td></tr>
-          <tr><td><code>U + new</code></td><td>既存required contextsのうち残す無関係なもの（U）とreplacement context（new）の集合。old contextを外した後の最終readback値です。</td></tr>
-          <tr><td>consumer-zero</td><td>runtime、workflow、testから旧policyの利用箇所がなくなったことをscannerで証明した状態です。削除対象の旧provider自体は、削除直前まで残せます。</td></tr>
-        </tbody>
-      </table>
-    </section>
+<section id="authority"><h2>2. Authorityと責務境界</h2>
+<div class="grid">
+<div class="card"><h3>親だけが所有</h3><p><code>E384-QUAL-001</code>のvalue、population、window、aggregation、platform scope、rejection、forbidden escape。Issue文書は実装投影だけです。</p></div>
+<div class="card"><h3>#392 / #395 read-only</h3><p>Lifecycle wire、bootstrap、migration/uninstall、既存Product挙動、15-row register/historyは本Issueで変更しません。#395の旧receiptは現行受入の根拠にせず、B1/B2は指定SHA/treeでfreshに実行します。</p></div>
+<div class="card"><h3>#396が所有</h3><p>Provider-gate modules、measurement/evidence、role ownership、consumer-first cutover、final guidance。</p></div>
+<div class="card"><h3>Human only</h3><p>Required contexts、rulesets、merge queue settings、merge/revert。Agentはcapture、request、readback、検証だけです。</p></div>
+</div>
+<h3>Repository sourceの区別</h3><p><code>src/spec_dock/</code>はprovider実装source、<code>spec-dock/</code>はdogfood/generated workspaceです。Retained installed-consumer workflow <code>src/spec_dock/assets/install_root/.github/workflows/ci.yml</code>をprovider main-push Full Regressionと取り違えてはいけません。</p>
+</section>
 
-    <section id="architecture">
-      <h2>3. 候補の識別と一回のrole graph</h2>
-      <p>event resolverはGitHub eventごとにsourceを一意に決めます。pull requestではPR head SHAとsource repository、workflow dispatchでは必須の<code>inputs.source_sha</code>、merge queueではmerge-group SHAを使います。PRのraw <code>GITHUB_SHA</code>はmerge commitを表すため、PR head candidateの代わりに使いません。</p>
-      <p>各workflow attemptは自分の<code>SourceIdentityV1</code>を作成します。同じattemptの全roleはproducer jobが保存した同じidentity bytesを使います。後続attemptではrun IDとattemptが変わりますが、source SHA/treeは元candidate manifestに一致させます。後続attemptで同じcandidateを再buildすることはありません。</p>
+<section id="admission"><h2>3. 実装前の前提ゲート</h2>
+<div class="timeline">
+<article><strong>仕様candidateを固定</strong><br>R/D/P・schema・machine artifacts・HTML・ZIPを検証し、cleanなIssue branchへcommit/pushしてexact SHA/treeを固定します。</article>
+<article><strong>Same-Red specification review</strong><br>同じ<code>iss396-spec-review-red</code>でStrict re-reviewし、<code>review_status=pass</code>、P0=0、P1=0を要求します。P2/P3はreview contractに従います。</article>
+<article><strong>Issue projection readback</strong><br>Pass後にIssue #396 bodyを更新し、GitHubからcanonical projectionを読み戻します。</article>
+<article><strong>#395 defect resolution and identity readback</strong><br>#395 ownerによる修正・受入後のmerged SHA/treeをGitHub readbackします。元のPR #401 SHA/treeはhistorical identityのみで、B1/B2 targetには使いません。</article>
+<article><strong>Fresh B1 acceptance</strong><br>ordinary pytest、lint、SpecDock validate、provider/lifecycle/protected parityを実行し、actual logs/hashを保存します。</article>
+<article><strong>Fresh same-tip B2 acceptance</strong><br>B1と同じSHA/treeでfull verifierを実行し、fresh raw resultと15/0/15 relationを受入します。</article>
+<article><strong>Explicit implementation dispatch</strong><br>clean specification freeze、同時writer不在、別途の明示dispatchがそろって初めてProduct変更へ進みます。</article>
+</div>
+<div class="callout warn">Parent Plan §3.2と旧receiptの完了主張、およびownerによる#395 implementation error reportは未解決です。本Issueでは親文書や#395を変更せず、#395 ownerの修正・受入までadmission holdとして記録します。</div>
+</section>
 
-      <script type="text/plain"
-              class="plantuml-source"
-              id="source-candidate-flow"
-              data-target="diagram-candidate-flow">
+<section id="architecture"><h2>4. 構成と責務</h2>
+<table><thead><tr><th>Layer</th><th>責務</th><th>主なmodule / artifact</th></tr></thead><tbody>
+<tr><td>Admission</td><td>B1/B2、review、projection、dispatch</td><td><code>b1-b2-*.json</code>, <code>authoring-gate-status-v1.json</code></td></tr>
+<tr><td>Policy projection</td><td>親authorityをmechanical projection</td><td><code>generate_provider_qualification_policy.py</code></td></tr>
+<tr><td>Materialization</td><td>sourceごとone build、actual bytes/env完成、poison</td><td><code>materialization.py</code>, <code>CandidateMaterializationV1</code></td></tr>
+<tr><td>Evidence</td><td>preflight/candidate-bound index、logical paths</td><td><code>evidence.py</code>, two EvidenceIndex schemas</td></tr>
+<tr><td>Role execution</td><td>permanent plugin、exact owner、one graph</td><td><code>pytest_plugin.py</code>, ownership manifests</td></tr>
+<tr><td>History/evaluation</td><td>started outcomes保持、aggregate separation</td><td><code>history.py</code>, <code>evaluator.py</code></td></tr>
+<tr><td>Cutover</td><td>consumer-zero、context、old retirement</td><td><code>consumer_scan.py</code>, retirement/context artifacts</td></tr>
+</tbody></table>
+<h3>Candidate build graph</h3>
+<p>Materializationはfinal-gate attemptではありません。Candidate/environment完成後にcampaignをfreezeし、その後のattemptはstored wheel/sdist bytesをconsumeします。同じsource SHA/treeのmaterializationが失敗した場合はpoisonし、rebuildせずforward-fixします。</p>
+</section>
+
+<section id="state"><h2>5. 状態遷移</h2>
+<script type="text/plain" class="plantuml-source" id="source-issue-admission" data-target="diagram-issue-admission">
 @startuml
-title Candidate identityと同一attemptのrole graph
-top to bottom direction
-
-rectangle "GitHub event\nPR head / dispatch input / merge_group" as Event
-rectangle "resolve_source_identity\nrun単位のSourceIdentityV1" as Source
-rectangle "初回producer\nwheelとsdistを一度だけbuild" as Producer
-rectangle "CandidateManifestV1 / CandidateIdentityV1\nsourceとartifactのdigestを固定" as Candidate
-database "保存されたcandidate bundle\nwheel + sdistの実bytes" as Bundle
-rectangle "各attemptのrole graph" as Graph
-rectangle "Linux canonical\n1 pytest root / worker 1" as Linux
-rectangle "sdist smoke\nbuild backendを再起動しない" as Sdist
-rectangle "macOS delta\n明示所有nodeだけ" as Mac
-rectangle "static analysis\nmake lint" as Static
-rectangle "per-attempt evaluator\n全roleをAND判定" as Attempt
-rectangle "history evaluator\nparent-defined campaign / fault / window" as History
-
-Event --> Source : event別SHA/treeを解決
-Source --> Producer : 初回runだけ
-Producer --> Candidate : producer来歴を記録
-Candidate --> Bundle : actual bytesを保存
-Source --> Graph : 同じattemptのidentity bytes
-Bundle --> Graph : 同一candidate bytes
-Graph --> Linux
-Graph --> Sdist
-Graph --> Mac
-Graph --> Static
-Linux --> Attempt
-Sdist --> Attempt
-Mac --> Attempt
-Static --> Attempt
-Attempt --> History
-@enduml
-      </script>
-
-      <div id="diagram-candidate-flow" class="plantuml-diagram">
-        Candidateとrole graphを描画しています。
-      </div>
-
-      <details>
-        <summary>Candidate graphのPlantUMLソース</summary>
-        <pre data-source-copy="source-candidate-flow"></pre>
-      </details>
-
-      <h3>Hashの依存関係</h3>
-      <ol class="flow-list">
-        <li><code>manifest_core_sha256</code>はCandidate manifestのfields 1–12をcanonical JSON化して計算します。</li>
-        <li><code>bundle_sha256</code>はraw core digestと、filenameのUTF-8 byte順に並べたwheel/sdistのmetadataおよび実bytesを長さ付きで計算します。</li>
-        <li>完成manifest全体の<code>candidate_manifest_sha256</code>は、完成ファイルの外にあるEvidenceIndex、producer receipt、CandidateIdentityに保存します。manifest自身へ書き戻さないので自己参照はありません。</li>
-        <li>受け取り側はclaimed digestだけを信頼せず、wheel/sdist実bytesとGitHub artifact metadataを再計算して照合します。</li>
-      </ol>
-      <p class="small">Wire field、type、nullability、enum、key順、JSON bytesはIssue artifact <code>provider-gate-contracts-v1.schema.json</code>が唯一のclosed schemaです。runtime copyは同一bytesでなければ失敗します。</p>
-    </section>
-
-    <section id="roles">
-      <h2>4. 実装前に固定したtest ownership</h2>
-      <p>現行treeのLinuxとmacOS collect-only outputは各2,214 unique node IDsで、正規化集合の差は0です。この集合を実装者がtest body実行後に組み替えるのではなく、Issue artifact <code>role-ownership-v1.json</code>に一意ownerとして固定しています。</p>
-      <table>
-        <thead><tr><th>Owner</th><th>Node数</th><th>担当内容</th></tr></thead>
-        <tbody>
-          <tr><td><code>linux-canonical</code></td><td>2,191</td><td>Linux上の正規regression graph。worker 1、shardなし、descendantを含む計測。</td></tr>
-          <tr><td><code>sdist-smoke</code></td><td>1</td><td><code>tests/integration/test_epic_00343_distribution.py::test_tc_360_s80_wheel_and_sdist_catalog_bytes_and_modes_match_provider</code>。保存済みsdistを検証し、build backendを再実行しません。</td></tr>
-          <tr><td><code>macos-delta</code></td><td>22</td><td>四つのparity fileにある21 nodeと、macOS固有のatomic publish capability test 1 node。</td></tr>
-          <tr><td><code>static-analysis</code></td><td>pytest node外</td><td><code>make lint</code>を一つのrole結果として記録します。</td></tr>
-        </tbody>
-      </table>
-      <p>LinuxとmacOSのraw collect-only outputは同じartifactに保存され、hashとsource SHA/treeが契約へ記録されています。新しいnodeを追加、削除、renameするときは、collection-only差分からownerを明示して登録してから、そのnodeのtest bodyを実行します。old <code>fast</code>/<code>full_regression</code> markerからownerを推測しません。</p>
-    </section>
-
-    <section id="sequence">
-      <h2>5. 実装順とゲート</h2>
-      <p>PlanはcheckpointごとにRED、最小実装、GREEN、evidence保存を行います。以下の順番を入れ替えません。</p>
-      <ol class="flow-list">
-        <li><strong>P00–P03:</strong> R/D/P、handoff、schema、ownership、snapshot helper、entry evidenceを検証し、依存・外部state・protected baselineをread-onlyで記録します。</li>
-        <li><strong>P04–P08:</strong> parent policy projection、closed schema、candidate identity/build reuse、environment/process collector、ownership/plugin、history/evaluator/fault catalogueをテスト先行で実装します。</li>
-        <li><strong>P09–P10:</strong> 旧consumer scannerを作り、distribution testを保存済みartifactに対応させ、旧lane test内の一つの非policy regressionを移設します。</li>
-        <li><strong>P11–P12:</strong> 旧workflowと新workflowをshadowで共存させ、実際のrunner/provider/limits/imageを観測してenvironment contractをfreezeします。</li>
-        <li><strong>P13:</strong> Humanがnew required contextを追加し、intentional REDがmergeをblockすることを確認してからGREENへ戻します。old contextはこの段階では残します。</li>
-        <li><strong>P14:</strong> 全consumerをreplacementへ移し、scannerがruntime/workflow/test consumer 0を証明します。old check emitterを残したままHumanがold required contextを外し、最終required set <code>U + new</code>とmerge_group coverageをreadbackします。</li>
-        <li><strong>P15–P18:</strong> readback成功後にold emitter/provider/dataを削除し、final sourceのlocal/Actions確認と独立code review / Final Quality Gateを行います。</li>
-        <li><strong>P19:</strong> PRをEpic integration branch向けにmerge-readyで準備します。mergeはHumanだけが行います。</li>
-        <li><strong>P20–P22:</strong> merged SHA/treeとcontext stateをread-onlyで再確認し、merged SHAへ一度だけbuild、そのcandidateでB3 campaignを実行してreceiptを作ります。</li>
-      </ol>
-
-      <script type="text/plain"
-              class="plantuml-source"
-              id="source-context-cutover"
-              data-target="diagram-context-cutover">
-@startuml
-title old required contextを安全に切り替える順番
+title Issue #396の実装開始ゲート
 start
-:old contextを維持したままnew contextを追加;
-:new contextをintentional REDにする;
-if (REDがPRとactive merge_groupをblockするか) then (はい)
-  :新しいsource SHAでGREENへ復旧;
+:要件・設計・実装計画・機械契約を完成;
+:ZIP、schema、manifest、HTMLを検証;
+:cleanなIssue branchへcommit・push;
+if (同一Red sessionのStrict reviewがpass?) then (はい)
+  :Issue #396のbodyを更新しGitHubからreadback;
 else (いいえ)
-  :切替を停止し、old contextを維持;
+  :仕様だけを修正し同一Red sessionで再review;
   stop
 endif
-:consumerをreplacementへ移行;
-:runtime / workflow / test consumer 0を確認;
-:Humanがold required contextだけを除去;
-note right
-old check emitterはまだ存在する
-end note
-if (readbackがU + newか) then (はい)
-  :readback証拠を保存;
-  :P15でold emitterとold providerを削除;
-  :final sourceでreplacement checkを検証;
+:#395のhuman merge SHA/treeをreadbackし固定;
+:指定SHA/treeでfresh B1を実行・受入;
+if (B1がaccepted?) then (はい)
+  :同じclean worktreeとSHA/treeでfresh B2を実行・受入;
+  if (B2がaccepted?) then (はい)
+    :cleanな仕様freezeと同時writer不在を再確認;
+    if (明示implementation dispatchを受領?) then (はい)
+      :Product実装を開始;
+      stop
+    else (いいえ)
+      :Product変更を開始せず停止;
+      stop
+    endif
+  else (いいえ)
+    :親Epic ownerへ不足するB2証跡を返す;
+    stop
+  endif
 else (いいえ)
-  :削除せずstop-and-return;
+  :親Epic ownerへ不足するB1証跡を返す;
+  stop
 endif
-stop
 @enduml
-      </script>
-      <div id="diagram-context-cutover" class="plantuml-diagram">
-        required-context切替の順番を描画しています。
-      </div>
-      <details>
-        <summary>required-context図のPlantUMLソース</summary>
-        <pre data-source-copy="source-context-cutover"></pre>
-      </details>
-      <p>Settings変更とPR mergeはHumanの担当です。P20は<code>U + new</code>のreadback確認だけを行い、old contextを後から外すcheckpointではありません。readbackが取れない、または期待値と異なる場合はold emitter/providerを残した状態で停止します。</p>
-    </section>
+</script>
+<div id="diagram-issue-admission" class="plantuml-diagram">実装開始までのゲート図を描画しています。</div>
+<details><summary>図のPlantUMLソースを確認する</summary>
+<pre data-source-copy="source-issue-admission"></pre></details>
+</section>
 
-    <section id="safe-seam">
-      <h2>6. 旧pytest hookからの一時移行点</h2>
-      <p>現在の<code>tests/conftest.py</code>はlegacy marker、policy skip、ledger判定を行います。replacement GREENを作るテストまでlegacy hookが一律skipすると、旧hookを削除する前にconsumer-zeroへ到達できません。そこで移行期間だけ、role mode専用の狭い経路を設けます。</p>
-      <ol class="flow-list">
-        <li>Role CLIは<code>-p scripts.quality.provider_gate.pytest_plugin</code>と<code>--provider-gate-role</code>を指定します。</li>
-        <li>root conftestはrole指定を検出すると、pluginのexact module登録を要求します。</li>
-        <li><code>prepare_role_collection(config, items)</code>だけがclosed contract、全node割当、owner一意性を検証して非所有nodeをdeselectします。二重filterは登録しません。</li>
-        <li>検証成功後はold skip/ledger hookを通らず、検証失敗、plugin欠落、unknown node、legacy flag併用ならtest body開始前に失敗します。</li>
-        <li>通常pytestと既存legacy runはconsumer-zeroまで従来どおりです。P15でtransition seamとold hookをまとめて削除します。</li>
-      </ol>
-      <aside class="callout">
-        <strong>Skipで代用しません。</strong>
-        Role外nodeはdeselectします。role-owned testへ<code>POLICY_SKIP_REASON</code>が付く状態、未知owner、重複実行はreplacement attemptの拒否条件です。
-      </aside>
-    </section>
+<section id="ownership"><h2>6. Test ownershipとpytest移行</h2>
+<p>2,214-node baselineを変更せず、reviewed exact deltaをcheckpoint順に適用します。Unknown、duplicate、unplanned nodeはtest body前に拒否します。</p>
+<div class="scroll"><table><thead><tr><th>Checkpoint</th><th>Total</th><th>Linux</th><th>sdist</th><th>macOS</th><th>Manifest hash</th></tr></thead><tbody><tr><td><code>P03</code></td><td>2,214</td><td>2,191</td><td>1</td><td>22</td><td><code>b6e742ecba64…</code></td></tr><tr><td><code>P04</code></td><td>2,221</td><td>2,198</td><td>1</td><td>22</td><td><code>338f75a6a37f…</code></td></tr><tr><td><code>P05</code></td><td>2,229</td><td>2,206</td><td>1</td><td>22</td><td><code>82c203d08fc6…</code></td></tr><tr><td><code>P06</code></td><td>2,235</td><td>2,212</td><td>1</td><td>22</td><td><code>0872eadbb9c6…</code></td></tr><tr><td><code>P07</code></td><td>2,243</td><td>2,220</td><td>1</td><td>22</td><td><code>01bf56864ea9…</code></td></tr><tr><td><code>P08</code></td><td>2,254</td><td>2,231</td><td>1</td><td>22</td><td><code>5e1ed22c71c4…</code></td></tr><tr><td><code>P09</code></td><td>2,257</td><td>2,234</td><td>1</td><td>22</td><td><code>efcd833c741d…</code></td></tr><tr><td><code>P10</code></td><td>2,257</td><td>2,234</td><td>1</td><td>22</td><td><code>4683b571d455…</code></td></tr><tr><td><code>P15</code></td><td>2,188</td><td>2,165</td><td>1</td><td>22</td><td><code>0ede9a66aa3c…</code></td></tr></tbody></table></div>
+<div class="callout"><strong>Filter owner:</strong> <code>pytest_plugin.py</code>が移行中もfinal sourceも恒久ownerです。Root <code>tests/conftest.py</code>はtemporary compatibility seamに限定し、P15でold hookを退役してもpluginは残ります。</div>
+<script type="text/plain" class="plantuml-source" id="source-role-ownership" data-target="diagram-role-ownership">
+@startuml
+title pytestの役割filter移行
+actor "実装担当" as Agent
+participant "pytest runner" as Runner
+participant "tests/conftest.py\n旧hook・一時seam" as Legacy
+participant "pytest_plugin.py\n恒久filter owner" as Plugin
+participant "baseline + exact delta\ncheckpoint assignments" as Ownership
+participant "owned test bodies" as Bodies
 
-    <section id="fail-closed">
-      <h2>7. 失敗時の動作</h2>
-      <table>
-        <thead><tr><th>検出した状態</th><th>動作</th><th>続行してはいけない理由</th></tr></thead>
-        <tbody>
-          <tr><td>repository / source SHA / tree / run attemptが一致しない</td><td>candidateまたはattemptをreject</td><td>異なるsourceの結果を同一候補へ混ぜないためです。</td></tr>
-          <tr><td>artifact欠落、重複producer、hash/実bytes不一致</td><td>build fallbackせずreject</td><td>同じsourceの再buildは「一度だけ」の証明を壊すためです。</td></tr>
-          <tr><td>owner欠落、重複、未知node、policy skip</td><td>collection/attemptをreject</td><td>検証母集団とowner集合が確定しないためです。</td></tr>
-          <tr><td>runner環境や有効quotaを証明できない</td><td>admissionをreject</td><td>別環境の結果を性能qualificationに使えないためです。</td></tr>
-          <tr><td>pytest root終了後にdescendantが残る</td><td>全processのreapまで計測し、未回収ならreject</td><td>wall/CPU値の測定窓が閉じていないためです。</td></tr>
-          <tr><td>started runの結果/evidenceが欠落・cancel・interruption</td><td>history memberとして残し、成功で置換しない</td><td>欠測を成功扱いにできないためです。</td></tr>
-          <tr><td>new required contextのREDがmergeをblockしない</td><td>settings before-stateへ戻して停止</td><td>no-gap切替の安全性が証明できないためです。</td></tr>
-          <tr><td>old context removal後のreadbackが<code>U + new</code>でない</td><td>old emitter/providerを削除せず停止</td><td>必須checkの欠落や範囲変更を隠さないためです。</td></tr>
-        </tbody>
-      </table>
-      <p>すべてのstopは<code>StopReturnV1</code>だけで記録します。PlanやHandoffに別の停止JSON形式はありません。Packetも<code>ExecutionPacketV1</code>だけを使い、一回に一checkpointだけを認可します。</p>
-    </section>
+Agent -> Runner : exact roleとmanifestを指定
+Runner -> Legacy : P07–P15は旧hookのbypass条件を評価
+Runner -> Plugin : pytest_collection_modifyitems
+Plugin -> Ownership : node集合・owner・canonical hashを照合
+Ownership --> Plugin : 一意なcheckpoint assignments
+Plugin -> Runner : owner外nodeをdeselect
+Runner -> Bodies : ownerが一意なnodeだけ実行
+note over Legacy,Plugin : 通常pytestはP15まで旧動作を保ち、role invocationだけ旧hookを正確に迂回
+note over Plugin : P15で旧hook/seamを退役しても恒久filter ownerとして残る
+@enduml
+</script>
+<div id="diagram-role-ownership" class="plantuml-diagram">pytest role ownershipの移行図を描画しています。</div>
+<details><summary>図のPlantUMLソースを確認する</summary>
+<pre data-source-copy="source-role-ownership"></pre></details>
+</section>
 
-    <section id="verification">
-      <h2>8. 実装者がたどる場所と確認方法</h2>
-      <p>Issueの正本はこのrepository内のRequirement、Design、Planです。人間向けHTMLは説明用で、closed schemaや親qualification契約を置き換えません。実装開始前に最新のStrict reviewがpassであること、Issue body projectionのreadback、ユーザーの明示dispatch、同時writerがいないことを確認します。</p>
-      <table>
-        <thead><tr><th>読む場所</th><th>用途</th></tr></thead>
-        <tbody>
-          <tr><td><a href="../requirement.md">requirement.md</a></td><td>目的、境界、親とのauthority、受入条件。</td></tr>
-          <tr><td><a href="../design.md">design.md</a></td><td>各moduleの責務、identity/hash graph、role ownership、transition seam。</td></tr>
-          <tr><td><a href="../plan.md">plan.md</a></td><td>P00–P22の順序、具体的なtest commands、evidence、stop条件。</td></tr>
-          <tr><td><a href="20260917t124918z--luna-max-implementation-handoff.md">Luna Max handoff</a></td><td>実装担当のpacket、path envelope、CLI契約、戻り値。</td></tr>
-          <tr><td><a href="provider-gate-contracts-v1.schema.json">closed schema</a></td><td>すべてのruntime/evidence/packet wire shape。</td></tr>
-          <tr><td><a href="role-ownership-v1.json">role ownership</a></td><td>2,214 nodeの実装前owner baseline。</td></tr>
-          <tr><td><a href="20260917t124918z-01--b1-b2-gate-receipt.md">B1/B2 entry receipt</a></td><td>#395から引き継いだentry evidenceとその非主張。</td></tr>
-          <tr><td><a href="20260917t162312z-strict-review-remediation-analysis.md">Strict review remediation analysis</a></td><td>初回P1指摘の証拠照合と修正理由。</td></tr>
-        </tbody>
-      </table>
-      <p>中心となる実装先は<code>scripts/quality/provider_gate/</code>、生成policyは<code>scripts/maintenance/generate_provider_qualification_policy.py</code>、新規unit testsは<code>tests/unit/provider_gate/</code>です。Provider-side scaffold、lifecycle Product source、installed consumer workflowはprotected/no-touch scopeです。</p>
-      <p>Planの最終確認には、schema validation、provider-gate unit/integration tests、provider lifecycle / distribution non-regression、<code>make lint</code>、ordinary pytest、SpecDock validate、consumer-zero scan、retained workflow byte comparisonを含みます。各checkpointの実行結果を別々のEvidenceIndexへ保存します。</p>
-      <p>GitHubのeventでsource SHAが変わる点は<a href="https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows" target="_blank" rel="noreferrer">GitHub Actions公式event仕様</a>に従います。PR eventの<code>GITHUB_SHA</code>はmerge branch commit、<code>merge_group</code>はmerge-group SHA、dispatchではrequired <code>source_sha</code> inputを使います。</p>
-    </section>
+<section id="faults"><h2>7. Closed fault denominatorとschema</h2>
+<p><code>seeded-fault-catalogue-v1.json</code>は20 categories / exact 45 atomic entriesです。各entryはfixture、injector、expected finite code、detection stage、First Red caseを閉じています。Definition hash: <code>7a73bcc44bcca28e734b704e2980d439e4edd161c996515ea45004d038f4bb8f</code>。</p>
+<div class="scroll"><table><thead><tr><th>ID</th><th>Category</th><th>Entries</th><th>Fault range</th></tr></thead><tbody><tr><td><code>C01</code></td><td>manifest admission</td><td>3</td><td><code>F001–F003</code></td></tr><tr><td><code>C02</code></td><td>source identity</td><td>2</td><td><code>F004–F005</code></td></tr><tr><td><code>C03</code></td><td>actual artifact bytes</td><td>4</td><td><code>F006–F009</code></td></tr><tr><td><code>C04</code></td><td>producer cardinality</td><td>1</td><td><code>F010–F010</code></td></tr><tr><td><code>C05</code></td><td>producer terminal state</td><td>3</td><td><code>F011–F013</code></td></tr><tr><td><code>C06</code></td><td>environment identity</td><td>1</td><td><code>F014–F014</code></td></tr><tr><td><code>C07</code></td><td>effective resource admission</td><td>4</td><td><code>F015–F018</code></td></tr><tr><td><code>C08</code></td><td>forbidden environment escape</td><td>3</td><td><code>F019–F021</code></td></tr><tr><td><code>C09</code></td><td>canonical process topology</td><td>3</td><td><code>F022–F024</code></td></tr><tr><td><code>C10</code></td><td>descendant lifecycle</td><td>2</td><td><code>F025–F026</code></td></tr><tr><td><code>C11</code></td><td>performance predicates</td><td>2</td><td><code>F027–F028</code></td></tr><tr><td><code>C12</code></td><td>correctness predicates</td><td>3</td><td><code>F029–F031</code></td></tr><tr><td><code>C13</code></td><td>role/raw completeness</td><td>2</td><td><code>F032–F033</code></td></tr><tr><td><code>C14</code></td><td>rerun identity</td><td>2</td><td><code>F034–F035</code></td></tr><tr><td><code>C15</code></td><td>started nonaccepted member</td><td>2</td><td><code>F036–F037</code></td></tr><tr><td><code>C16</code></td><td>first-five chronology</td><td>1</td><td><code>F038–F038</code></td></tr><tr><td><code>C17</code></td><td>latest-twenty chronology</td><td>2</td><td><code>F039–F040</code></td></tr><tr><td><code>C18</code></td><td>fault denominator</td><td>2</td><td><code>F041–F042</code></td></tr><tr><td><code>C19</code></td><td>consumer retirement</td><td>1</td><td><code>F043–F043</code></td></tr><tr><td><code>C20</code></td><td>retained workflow protection</td><td>2</td><td><code>F044–F045</code></td></tr></tbody></table></div>
+<p>Violation inventoryはfault 45 + operational 23 = 68 codesです。Open regex/free-form codeは禁止です。NodeObservation、consumer scan、retirement、required-context snapshots、StopReturnもclosed schemaです。</p>
+</section>
 
-    <section id="status">
-      <h2>9. この準備タスクの完了条件</h2>
-      <p>このタスクは仕様をLuna Maxが迷わず実装できる状態にし、独立Strict spec reviewを通すところまでです。Product source、tests、workflow、policy、required-context settingsの変更は行いません。</p>
-      <ul class="flow-list">
-        <li>Requirement、Design、Plan、handoffとsupport schema/ownership/evidenceをIssue canonical artifactsへ揃える。</li>
-        <li>同じ内容を含むZIPと、テンプレート規約に沿ってbrowserで描画確認したこのHTMLを配布可能にする。</li>
-        <li>修正候補をcommit/pushしてclean exact SHAを確立し、同じRed reviewer sessionで全scopeを再レビューする。</li>
-        <li>最新reviewが<code>review_status=pass</code>、P0=0、P1=0となったら、GitHub Issue body projectionをreadbackする。</li>
-        <li>それでもProduct implementation permissionはfalseのまま。ユーザーのexplicit dispatchと有効な一checkpoint ExecutionPacketが別途必要です。</li>
-      </ul>
-      <p class="muted">Human merge、required-context変更、B3、Epic main mergeは、この準備タスクの完了とは別のゲートです。</p>
-    </section>
+<section id="checkpoints"><h2>8. 実装checkpoint</h2>
+<div class="scroll"><table><thead><tr><th>Phase</th><th>目的</th><th>Exit</th></tr></thead><tbody>
+<tr><td>P00</td><td>仕様pack/manifest/schema検証、same-Red再review</td><td>pass後もB1/B2 gate必要</td></tr>
+<tr><td>P01</td><td>fresh B1 → same-tip B2 → specification freeze再確認 → explicit dispatch</td><td>初めて実装可能</td></tr>
+<tr><td>P02–P03</td><td>external/protected/current consumer read-only capture</td><td>Preflight evidence complete</td></tr>
+<tr><td>P04</td><td>review済みschema/delta/faultでexact First RED</td><td>design choice追加なし</td></tr>
+<tr><td>P05–P06</td><td>materialization/evidence/env/process</td><td>synthetic GREEN</td></tr>
+<tr><td>P07–P10</td><td>permanent plugin、ownership、history、fault、scanner、package move</td><td>checkpoint manifests一致</td></tr>
+<tr><td>P11–P14</td><td>shadow workflow、one-time PR materialization、human context canary、consumer migration</td><td>replacement GREEN + consumer zero</td></tr>
+<tr><td>P15–P17</td><td>old retirement、final-source local/workflow</td><td>plugin survives、old absent</td></tr>
+<tr><td>P18–P20</td><td>independent reviews、merge-ready/human merge/readback</td><td>post-merge identity fixed</td></tr>
+<tr><td>P21–P22</td><td>post-merge materialization、freeze、attempt/fault/window、B3 receipt</td><td>B3 actual accepted evidence</td></tr>
+</tbody></table></div>
+</section>
+
+<section id="verify"><h2>9. Verification commandsと期待結果</h2>
+<h3>Specification artifact</h3><pre>python -m zipfile -t iss-00396-complete-specification-pack.zip
+python -m zipfile -e iss-00396-complete-specification-pack.zip /tmp/iss396-pack
+(cd /tmp/iss396-pack && sha256sum -c manifest.sha256)
+python -m json.tool /tmp/iss396-pack/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/provider-gate-contracts-v1.schema.json &gt;/dev/null
+cmp /tmp/iss396-pack/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/issue-396-implementation-readiness.html iss-00396-complete-human-guide.html</pre>
+<h3>B1/B2 admission</h3><pre>test -n "$B12_TARGET_SHA" &amp;&amp; test -n "$B12_TARGET_TREE"
+test "$(git rev-parse HEAD^{commit})" = "$B12_TARGET_SHA"
+test "$(git rev-parse HEAD^{tree})" = "$B12_TARGET_TREE"
+B12_TMPDIR="$B12_PRIVATE_TMP/tmp"
+mkdir -m 700 "$B12_TMPDIR"
+env TMPDIR="$B12_TMPDIR" uv run pytest -q --tb=short
+make lint
+./spec-dock/scripts/spec-dock validate
+uv run pytest -q tests/unit/provider_lifecycle tests/cli_runtime/test_distribution_cutover.py tests/integration/test_issue_392_acceptance.py --tb=short
+uv run python -m scripts.quality.verify_full_regression --shards 4</pre>
+<p>期待結果はexit classとcontract relationです。Pass countをhistorical claimへ合わせずactual outputを保存します。</p>
+<h3>Implementation final source</h3><pre>uv run python scripts/maintenance/generate_provider_qualification_policy.py --check
+uv run python -m scripts.quality.provider_gate.cli validate-contracts
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin --provider-gate-role linux-canonical ...
+make lint
+uv run pytest -q --tb=short
+uv run python -m scripts.quality.provider_gate.cli scan-old-consumers --require-zero
+cmp .github/workflows/ci.yml src/spec_dock/assets/install_root/.github/workflows/ci.yml</pre>
+</section>
+
+<section id="stop"><h2>10. 停止・回復・rollback</h2>
+<p><code>StopReturnV1</code>はpre/post mutationを区別し、finite reason、scope、owner/action、actual changes、external changes、rollback/recoveryを記録します。Automatic rollbackは常にfalseです。</p>
+<table><thead><tr><th>状態</th><th>停止</th><th>回復</th></tr></thead><tbody>
+<tr><td>#395 reported defect unresolved</td><td>Issue #396 admission / Product実装前</td><td>#395 ownerが修正・受入し、corrected SHA/treeをreadback</td></tr>
+<tr><td>B1/B2未受入</td><td>実装前</td><td>exact missing evidenceをparent ownerへ返す</td></tr>
+<tr><td>Spec review fail</td><td>仕様のみ</td><td>same Red sessionへ修正再review</td></tr>
+<tr><td>Materialization failure</td><td>source poisoned</td><td>new source SHA/treeへforward-fix</td></tr>
+<tr><td>Context canary失敗</td><td>merge/old deletion停止</td><td>humanがcaptured before-stateへrestore</td></tr>
+<tr><td>P15 deletion後failure</td><td>partial acceptedにしない</td><td>unmergedならforward-fix/abandon、mergedならhuman whole-merge revertまたはnew source</td></tr>
+<tr><td>B3 rejection</td><td>Epic main停止</td><td>member replacement/rerunせず、owned forward-fix/new candidate</td></tr>
+</tbody></table>
+</section>
+
+<section id="done"><h2>11. 完了条件の分離</h2>
+<div class="grid">
+<div class="card"><h3>Authoring complete</h3><p>R/D/P/handoff/schema/machine artifacts/HTML/manifestが整合し、CRC/hash/schema検査が通る。現在ここまでです。</p></div>
+<div class="card"><h3>Implementation allowed</h3><p>Clean pushed spec、same-Red pass、Issue projection readback、fresh B1、同一tipのfresh B2、clean freeze、explicit dispatch、no writer。</p></div>
+<div class="card"><h3>Issue complete</h3><p>Human merge後のexact candidateでmaterialization、campaign/fault/window、context/consumer/protectionがB3 accepted。</p></div>
+<div class="card"><h3>Epic complete</h3><p>B3後の別human main mergeと最終readback。Issue #396成果だけでは完了しません。</p></div>
+</div>
+<div class="callout ok"><strong>このHTMLの立場:</strong> 人向け説明projectionです。Canonical authorityは同梱R/D/P、schema、machine artifacts、親contractです。</div>
+</section>
+
+<section><h2>12. 同梱machine artifacts</h2>
+<ul>
+<li><code>b1-b2-admission-status-v2.json</code> — current owner correctionとblocker。</li>
+<li><code>b1-b2-verification-contract-v1.json</code> — fresh same-tip execution。</li>
+<li><code>provider-gate-contracts-v1.schema.json</code> — closed contract family。</li>
+<li><code>role-ownership-v1.json</code> + delta/checkpoints/final — exact ownership。</li>
+<li><code>seeded-fault-catalogue-v1.json</code> + closed codes — fault denominator。</li>
+<li><code>old-policy-retirement-v1.json</code> — consumer-first signatures。</li>
+<li><code>authoring-gate-status-v1.json</code> — candidate組み立て時点のgate snapshot。後続証跡はexact SHAへ結び付けます。</li>
+<li><code>strict-review-p2-record-v1.json</code> — P2 record-only。</li>
+<li><code>payload-manifest-v1.json</code> / <code>manifest.sha256</code> — modified/new/preserved classificationとhash。</li>
+</ul></section>
   </main>
 
   <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
