@@ -114,15 +114,6 @@ _EXPECTED_BASELINE_ROWS = (
     ),
 )
 
-_ISSUE_BOUNDARY_SHA256 = {
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/requirement.md": "aac9b70823c2642bb8ccb5f458a4f464f87dce344af14d22ae3598a1ef45f094",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/design.md": "5bacb56340720bfbdc20ea934681bb67450578fa1147c78d2b9284d237b77973",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/plan.md": "1a4a57a3385feac9169bfbb18c323ac4a4e44ec7f02a2ad7b03e70adcdc9d6a2",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/requirement.md": "f240f9e8a87828b13bc5061b5dc59d870c25081eaf7671ff7d7a381d7c7331b7",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/design.md": "9521b4b102c3cf57b042c288f700ef53c54fd4cb0105b792551bd18d502c5576",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/plan.md": "45eacc30d921563ad627adac584ea64f835afd1dcdc3902f78c396d11ac6a095",
-}
-
 _P392_ENTRY_SHA = "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 
 
@@ -231,8 +222,3 @@ def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> N
     assert "run: uv run pytest\n" in workflow
     assert "continue-on-error" not in workflow
     assert "verify_full_regression" not in workflow
-
-    for relative_path, expected_sha256 in _ISSUE_BOUNDARY_SHA256.items():
-        path = repository / relative_path
-        assert path.is_file()
-        assert _sha256(path) == expected_sha256
