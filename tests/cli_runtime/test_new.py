@@ -1948,6 +1948,14 @@ class TestCliNew(CliRuntimeHarness):
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
                 'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  if [[ "$*" != *"--repo example/repo"* ]]; then\n'
+                '    echo "gh issue create missing explicit repo binding" >&2\n'
+                "    exit 23\n"
+                "  fi\n"
+                '  if [[ "${GH_CREATE_FAILURE:-0}" == "1" ]]; then\n'
+                '    echo "GH_ERROR_SENTINEL token=private-token-sentinel origin=https://user:password-sentinel@github.com/example/repo.git" >&2\n'
+                "    exit 24\n"
+                "  fi\n"
                 '  echo "https://github.com/example/repo/issues/123"\n'
                 "  exit 0\n"
                 "fi\n"
@@ -1964,7 +1972,7 @@ class TestCliNew(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
             self._run_runtime(
                 target,
-                ["new", "issue", "--epic", "2", "--title", "Add refresh token"],
+                ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--create-github-issue"],
                 env=test_env,
             )
 
@@ -1984,6 +1992,35 @@ class TestCliNew(CliRuntimeHarness):
             assert meta["github"]["issue_number"] == 123
             self._assert_spec_dock_meta_marker(meta)
             self._assert_readonly_on_posix(issue_dir / ".meta.json")
+
+            issue_names_before_failure = sorted(path.name for path in issue_dir.parent.glob("iss-*"))
+            failure_env = {**test_env, "GH_CREATE_FAILURE": "1"}
+            failed = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "2",
+                    "--title",
+                    "Failure sentinel",
+                    "--create-github-issue",
+                ],
+                env=failure_env,
+            )
+            assert failed.returncode != 0
+            diagnostic = failed.stdout + failed.stderr
+            if any(
+                marker in diagnostic
+                for marker in (
+                    "GH_ERROR_SENTINEL",
+                    "private-token-sentinel",
+                    "password-sentinel",
+                    "https://user:password-sentinel@github.com/example/repo.git",
+                )
+            ):
+                pytest.fail("GitHub create failure diagnostic exposed raw output or credential material")
+            assert sorted(path.name for path in issue_dir.parent.glob("iss-*")) == issue_names_before_failure
 
     def test_new_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

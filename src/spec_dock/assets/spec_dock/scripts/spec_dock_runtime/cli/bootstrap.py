@@ -149,8 +149,8 @@ class _IssueGateway:
     def issue_index(self, repo_root: Path, *, limit: int):
         return infra_github_cli.issue_index(repo_root, limit=limit)
 
-    def issue_create(self, repo_root: Path, title: str, body: str) -> int:
-        return infra_github_cli.issue_create(repo_root, title=title, body=body)
+    def issue_create(self, repo_root: Path, title: str, body: str, *, repo_slug: str) -> int:
+        return infra_github_cli.issue_create(repo_root, title=title, body=body, repo_slug=repo_slug)
 
     def issue_view_minimal(self, repo_root: Path, issue_number: int, *, repo_slug: str | None = None):
         return infra_github_cli.issue_view_minimal(
@@ -266,6 +266,9 @@ class _GitGateway:
 
     def origin_github_repo_slug(self, repo_root: Path) -> str | None:
         return infra_git_cli.origin_github_repo_slug(repo_root)
+
+    def origin_github_publication_repo_slug(self, repo_root: Path) -> str:
+        return infra_git_cli.origin_github_publication_repo_slug(repo_root)
 
     def worktree_list(self, repo_root: Path):
         return infra_git_cli.worktree_list(repo_root)

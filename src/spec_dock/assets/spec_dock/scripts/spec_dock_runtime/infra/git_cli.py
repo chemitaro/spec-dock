@@ -244,6 +244,11 @@ def origin_github_publication_endpoint(repo_root: Path) -> tuple[str, str]:
     return fetch_slug, push_url
 
 
+def origin_github_publication_repo_slug(repo_root: Path) -> str:
+    repo_slug, _push_url = origin_github_publication_endpoint(repo_root)
+    return repo_slug
+
+
 def origin_github_repo_slug(repo_root: Path) -> str | None:
     return _parse_github_repo_slug(_remote_get_url(repo_root, push=False))
 
