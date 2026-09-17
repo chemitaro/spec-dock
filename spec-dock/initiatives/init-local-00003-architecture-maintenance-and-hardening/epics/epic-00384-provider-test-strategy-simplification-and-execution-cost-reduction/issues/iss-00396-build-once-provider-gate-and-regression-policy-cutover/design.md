@@ -4,7 +4,7 @@ ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
 状態: "draft"
-詳細化状態: "implementation-ready-candidate"
+詳細化状態: "implementation-ready-awaiting-strict-rereview-and-b1-b2"
 最終更新: "2026-09-18"
 依存:
   - "requirement.md"
@@ -22,8 +22,8 @@ repository_evidence:
   role: "issue-elaboration-source-provenance"
   repository: "chemitaro/spec-dock"
   branch: "iss-00396-build-once-provider-gate-and-regression-policy-cutover"
-  sha: "fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d"
-  tree: "37eabc1aa250838dcd9f61d627309b0ff27e0db7"
+  sha: "4d68bce3f3ee977548a3c467476da39c15f43594"
+  tree: "80ade10f57cd5f4140daa03ca8a40b844f1fcc53"
 qualification_authority: "E384-QUAL-001"
 ---
 
@@ -31,15 +31,19 @@ qualification_authority: "E384-QUAL-001"
 
 ## 1. Design conclusion
 
-Targetは、workflow YAMLへ閾値やhistory logicを埋め込む構成ではなく、次の五層へ分けたprovider-gateである。
+Target architectureは、次の七層を順序付きで分離する。Workflow YAMLやtracked docsへ親qualification valueを独立管理しない。
 
-1. **Parent policy projection** — Epic Requirementの`E384-QUAL-001`からmechanical constants/predicate IDsだけを生成する。
-2. **Candidate and environment identity** — source SHA/tree、provider candidate digest、wheel/sdist actual bytes、environment fingerprintをfreezeする。
-3. **One-attempt role graph** — build producerまたはstored artifact resolver、static analysis、Linux canonical、sdist smoke、macOS delta、attempt evaluatorを一回ずつ実行する。
-4. **History and qualification evaluator** — GitHub workflow run chronologyからfirst five、seeded-fault、latest twentyを選択なしで評価する。
-5. **Consumer-first cutover** — replacementがGREEN、old consumerが0になった後に旧policy provider/data/workflowを削除し、final sourceで再実行する。
+1. **Predecessor admission layer** — #395実装はowner-reported incorrectで、具体defectと修正結果は未確認、B1/B2も未実施・未受入である。#395 ownerがdefectを#395 scopeで修正・受入し、corrected merge SHA/treeをGitHub readbackした後だけ、そのsame exact tipでfresh B1、続いてB2を受入する。Original #395 merge identity `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / `37eabc1aa250838dcd9f61d627309b0ff27e0db7`はhistorical identity onlyで、実行targetやacceptanceには使わない。
+2. **Parent policy projection layer** — Epic Requirementの`E384-QUAL-001`からmechanical constants/predicate IDsだけを生成する。
+3. **One-time materialization layer** — final-gate attemptとは別にsource SHA/treeを一度だけbuildし、wheel/sdist actual bytesとenvironment identityを完成させる。Failureはsame-SHA poisonである。
+4. **Immutable freeze layer** — complete candidate/environment/fault definition/window contractをcampaign開始前にfreezeする。
+5. **One-attempt role graph** — permanent pytest pluginがresolved ownershipに従ってstatic analysis、Linux canonical、sdist smoke、macOS deltaを同じstored bytes上で一回ずつ実行し、per-attempt resultを作る。
+6. **History/qualification layer** — GitHub chronologyからparent contractが要求するpopulation/window/fault aggregateをselectionなしで評価する。
+7. **Consumer-first cutover layer** — replacement GREEN、old consumer 0、context new-only readback後に旧provider/data/workflowを削除し、final sourceで再検証する。
 
-Workflowはorchestratorでありpolicy authorityではない。Python modulesはparent-generated projectionをconsumeし、raw evidenceからpure resultを作る。External ruleset/required-context mutationはhuman-onlyで、repository codeはread-only captureとreceipt generationだけを行う。
+Evidenceはcandidate前の`PreflightEvidenceIndexV1`とcandidate後の`CandidateEvidenceIndexV1`へ分離する。Wireへprivate absolute pathを保存せず、`evidence_root_id`とlogical root-relative POSIX path、actual byte size/hashだけを持つ。External settings mutationとmergeはhuman-onlyで、agentはread-only capture、request、receipt、verificationだけを行う。
+
+Formal start/active stateは保存するが、B1/B2 acceptance、same-Red pass、Issue projection readback、explicit implementation dispatchが完了するまでProduct/test/workflow/policy mutationを行わない。
 
 ## 2. Verified current repository surface
 
@@ -78,12 +82,16 @@ Workflowはorchestratorでありpolicy authorityではない。Python modulesは
 | `test_tc_360_s80_wheel_and_sdist_catalog_bytes_and_modes_match_provider` | source/wheel/sdist asset parity。sdist roleへ所有。 |
 | `pyproject.toml [tool.setuptools.package-data]` | package-data authority。変更が必要な場合のみ最小修正。 |
 
-### 2.3 B2 proof surfaces
+### 2.3 Predecessor admission and historical claim surfaces
 
-- Root ledgerはschema 2、15 rows全てresolved、active/retired 0である。
-- Timing blobは243 entriesを持つ。
-- Current full verifierは2214 collectedを4 shardへ分割し、B2 resultは15/0/15、violations 0である。
-- これらはold policy retirementのbefore-stateであり、target runtime policyへ移植しない。
+GitHub readbackで#395 PR #401のoriginal human merge SHA/treeは`fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / `37eabc1aa250838dcd9f61d627309b0ff27e0db7`と確認した。ただし2026-09-18のowner correctionは#395 implementation自体をincorrectと報告しており、具体的defectと修正後のtipは未確認である。このoriginal SHA/treeはhistorical identityに限定し、B1/B2対象やaccepted Product baselineとして扱わない。
+
+- `b1-b2-admission-status-v2.json`がcurrent Issue-local statusを閉じる。
+- `b1-b2-verification-contract-v1.json`が#395 ownerによるdefect correction後にGitHub readbackしたexact merge SHA/treeをexecution targetとして解決する規則、fresh execution order、evidenceを閉じる。
+- Defect disposition、修正後merge identity、親owner acceptanceのいずれかが欠ける場合、B1/B2を開始・受入せず、Issue #396のProduct実装を停止する。Issue #396は#395 defectを修正しない。
+- Historical receipt/raw bytesは改変しない。
+- Parent Epic Plan §3.2との矛盾はIssue側で親文書を書換えず、admission holdとして明示する。
+- Corrected #395 tip上でfresh B1/B2 acceptanceが得られない限り、以下のtarget topologyはimplementation designに留まり、dispatch不可である。
 
 ## 3. Target module topology
 
@@ -91,48 +99,47 @@ Workflowはorchestratorでありpolicy authorityではない。Python modulesは
 
 | Status | Exact path | Planned symbols / responsibility |
 |---|---|---|
-| NEW | `scripts/quality/provider_gate/__init__.py` | public versionとclosed exportsのみ。 |
-| NEW | `scripts/quality/provider_gate/contracts.py` | frozen dataclasses/enums for every `$defs` artifact in `provider-gate-contracts-v1.schema.json`; JSON Schema shape validation and semantic invariant validation。 |
-| NEW | `scripts/quality/provider_gate/codec.py` | schema-bound parse/serialize、unknown/missing/duplicate field拒否、schema key orderのcanonical UTF-8 one-LF。 |
-| NEW | `scripts/quality/provider_gate/identity.py` | `RepositoryIdentity`, event-aware `resolve_source_identity`, `build_attempt_id`, `build_campaign_id`, `build_window_contract_id`, SHA/tree/API binding。 |
-| NEW | `scripts/quality/provider_gate/artifacts.py` | `build_candidate_manifest`, `verify_candidate_bundle`, `resolve_producer_artifact`, `hash_file`, safe archive inventory。 |
-| NEW | `scripts/quality/provider_gate/environment.py` | `capture_environment`, `validate_environment_contract`, `fingerprint_environment`, effective CPU/memory/filesystem/image proof。 |
-| NEW | `scripts/quality/provider_gate/process_tree.py` | `LinuxCgroupV2Collector`, `ProcessMeasurement`, subreaper/cgroup lifecycle、root/descendant CPU/wall/reap。 |
-| NEW | `scripts/quality/provider_gate/pytest_plugin.py` | `--provider-gate-role`、role-owned deselection、node execution/skip/duplicate observation。normal pytestではinactive。 |
-| NEW | `scripts/quality/provider_gate/history.py` | `AttemptRegistry`, immutable API observations、`select_first_five`, `select_latest_twenty`、rerun/duplicate/cancel/missing handling。 |
-| NEW | `scripts/quality/provider_gate/faults.py` | source-controlled catalogue loader、synthetic injector、expected violation matching。 |
-| NEW | `scripts/quality/provider_gate/consumer_scan.py` | `scan_old_policy_consumers`、AST/YAML/JSON/text-aware old policy consumer scanner、retained workflow guard。 |
-| NEW | `scripts/quality/provider_gate/evaluator.py` | pure per-role/per-attempt/campaign/window/fault/final evaluation。generated parent predicatesだけを使用。 |
-| NEW | `scripts/quality/provider_gate/evidence.py` | evidence workspace、index、API/raw hashes、redaction/relative path normalization。 |
-| NEW | `scripts/quality/provider_gate/cli.py` | thin argparse dispatch: `validate-contracts`, `build-candidate`, `verify-candidate`, `capture-environment`, `register-attempt`, `run-role`, `evaluate-attempt`, `evaluate-faults`, `evaluate-qualification`, `scan-old-consumers`。 |
-| NEW | `scripts/quality/provider_gate/_qualification_policy_generated.py` | parent Requirementから生成。手編集禁止。 |
+| NEW | `scripts/quality/provider_gate/__init__.py` | versionとclosed public exportsのみ。 |
+| NEW | `scripts/quality/provider_gate/contracts.py` | schema-bound frozen dataclasses/enums、semantic invariant validation。 |
+| NEW | `scripts/quality/provider_gate/codec.py` | duplicate/unknown/missing拒否、canonical UTF-8 JSON one LF。 |
+| NEW | `scripts/quality/provider_gate/identity.py` | source/materialization/attempt/campaign/window identities。 |
+| NEW | `scripts/quality/provider_gate/materialization.py` | `start_materialization`, `complete_materialization`, `poison_materialization`, same-SHA registry。 |
+| NEW | `scripts/quality/provider_gate/artifacts.py` | `build_candidate_manifest`, actual-byte verification、stored artifact resolver。 |
+| NEW | `scripts/quality/provider_gate/environment.py` | environment admission/fingerprint。 |
+| NEW | `scripts/quality/provider_gate/process_tree.py` | Linux root+descendant measurement/reap。 |
+| NEW | `scripts/quality/provider_gate/pytest_plugin.py` | permanent `pytest_addoption`/`pytest_collection_modifyitems`/observation owner。 |
+| NEW | `scripts/quality/provider_gate/history.py` | immutable attempt registry、chronological selectors。 |
+| NEW | `scripts/quality/provider_gate/faults.py` | exact 45-entry catalogue loader/test injector/evaluator。 |
+| NEW | `scripts/quality/provider_gate/consumer_scan.py` | finite retirement signature scanner、retained workflow guard。 |
+| NEW | `scripts/quality/provider_gate/context.py` | read-only snapshot relation evaluator。GitHub settings writerを持たない。 |
+| NEW | `scripts/quality/provider_gate/evaluator.py` | pure role/attempt/campaign/window/fault/final evaluation。 |
+| NEW | `scripts/quality/provider_gate/evidence.py` | preflight/candidate evidence workspaces、logical path/byte hash。 |
+| NEW | `scripts/quality/provider_gate/cli.py` | thin dispatch。Business ruleを持たない。 |
+| NEW | `scripts/quality/provider_gate/_qualification_policy_generated.py` | parent Requirement projection。手編集禁止。 |
 
-`cli.py`へbusiness ruleを集約しない。Identity、history、artifact、environment、process、evaluationを独立pure/adapter層へ分け、testがworkflowなしで境界を検証できるようにする。
+Materialization CLIとrole CLIを分ける。`materialize-candidate`はattemptを登録せず、`run-role`はbuildを実行できない。`freeze-campaign`はcomplete materialization recordだけを入力にする。
 
 ### 3.2 Source-controlled contracts
 
-| Status | Exact path | Role |
+| Status | Exact path | Authority/role |
 |---|---|---|
-| SPEC ARTIFACT | `artifacts/provider-gate-contracts-v1.schema.json` | all runtime, evidence, ownership, snapshot, execution-packet and stop-return wire shapes; implementation copy must be byte-identical and checked against this artifact。 |
-| SPEC ARTIFACT | `artifacts/role-ownership-v1.json` | exact 2,214-node Linux/macOS baseline assignment and collection provenance for P07。 |
-| SPEC ARTIFACT | `artifacts/20260917t164244z--linux-collect-only-nodeids.txt` | raw Linux collection output referenced by the ownership contract。 |
-| SPEC ARTIFACT | `artifacts/20260917t164244z-01--macos-collect-only-nodeids.txt` | raw macOS collection output referenced by the ownership contract。The suffix disambiguates the SpecDock artifact timestamp slot; raw bytes and SHA-256 are unchanged。 |
-| SPEC ARTIFACT | `artifacts/capture_protected_snapshot.py` | reviewed P03/P16 helper; Plan binds its exact SHA-256。 |
-| SPEC ARTIFACT | `artifacts/20260917t124918z-01--b1-b2-gate-receipt.md` | #395 post-merge B1/B2 entry receipt; proves entry qualification only。 |
-| SPEC ARTIFACT | `artifacts/20260917t124918z-02--iss-00395-b2-full-regression-result.json` | immutable raw B2 verifier result; Plan binds exact SHA-256。 |
-| SPEC ARTIFACT | `artifacts/20260917t124919z--iss-00395-b2-ledger-before.json` | immutable pre-B2 ledger snapshot; Plan binds exact SHA-256。 |
-| SPEC ARTIFACT | `artifacts/20260917t124918z--luna-max-implementation-handoff.md` | implementation handoff subordinate to canonical Requirement/Design/Plan and shared wire schema。 |
-| SPEC ARTIFACT | `artifacts/20260917t162312z-strict-review-remediation-analysis.md` | Blue analysis of initial Red P1 findings and verified corrections; advisory to the canonical specs。 |
-| SPEC ARTIFACT | `artifacts/issue-396-implementation-readiness.html` | self-contained Japanese human guide; explanatory only and subordinate to canonical specs/schema。 |
-| SPEC ARTIFACT | `artifacts/issue-396-specification-pack.zip` | downloadable archive of canonical specs and supporting artifacts; `manifest.sha256` binds archive members。 |
-| NEW | `scripts/quality/provider_gate/contracts/specdock-linux-qualification-v1.json` | accepted environment instance。初回measurement前に実値freeze。 |
-| NEW | `scripts/quality/provider_gate/contracts/provider-gate-contracts-v1.schema.json` | Issue schema artifactのbyte-identical runtime copy。 |
-| NEW | `scripts/quality/provider_gate/contracts/role-ownership-v1.json` | Linux canonical / sdist smoke / macOS deltaのpytest node exclusive selector。Static analysisはpytest node ownership外。 |
-| NEW | `scripts/quality/provider_gate/contracts/seeded-fault-catalogue-v1.json` | candidate-bound fault denominator。 |
-| NEW | `scripts/quality/provider_gate/contracts/old-policy-retirement-v1.json` | current old consumer signatures、deletion paths、historical allowlist、retained workflow paths。 |
-| NEW | `scripts/maintenance/generate_provider_qualification_policy.py` | parent Markdownのstable anchorsをparseし、generated projectionをdeterministic生成。 |
+| PRESERVE | `artifacts/role-ownership-v1.json` | immutable current 2,214-node baseline。 |
+| NEW | `artifacts/role-ownership-delta-v1.json` | reviewed exact 43 add / 1 move / 69 delete。 |
+| NEW | `artifacts/role-ownership-checkpoints-v1.json` | checkpointごとのfull resolved assignments/hash。 |
+| NEW | `artifacts/role-ownership-resolved-final-v1.json` | final 2,188 exact assignments。 |
+| NEW | `artifacts/seeded-fault-catalogue-v1.json` | exact 20 categories / 45 entries。 |
+| NEW | `artifacts/closed-violation-codes-v1.json` | finite 68-code inventory。 |
+| NEW | `artifacts/old-policy-retirement-v1.json` | finite signatures/delete/retain/deletion gate。 |
+| NEW | `artifacts/b1-b2-admission-status-v2.json` | current owner-correction-based admission state; reported #395 defect remains unresolved。 |
+| NEW | `artifacts/b1-b2-verification-contract-v1.json` | fresh same-tip B1/B2 commands/evidence relation。 |
+| NEW | `artifacts/authoring-gate-status-v1.json` | review/projection/dispatch/B1/B2 current status。 |
+| NEW | `artifacts/strict-review-p2-record-v1.json` | six P2 record-only entries。 |
+| MODIFY | `artifacts/provider-gate-contracts-v1.schema.json` | closed Draft 2020-12 contract family。 |
+| MODIFY | `artifacts/issue-396-implementation-readiness.html` | standalone human guide synchronized to these contracts。 |
+| PRESERVE | Linux/macOS raw collection files | immutable baseline evidence。 |
+| PRESERVE | historical B1/B2 receipt/raw JSON | historical claims only。 |
 
-Environment JSONのrunner provider/class/image/limitsは本仕様で値を創作しない。implementation preflightで実environmentをread-only観測し、parent capability boundaryを満たす一つのcontract candidateをfreezeする。解決不能ならstopである。
+Runtime copies under `scripts/quality/provider_gate/contracts/` are generated/copied from these canonical Issue artifacts after dispatch and are byte-identical. Canonical artifacts are authoring inputs, not Product runtime writes during implementation。
 
 ### 3.3 Tests
 
@@ -196,74 +203,52 @@ Design/Planはpolicy値を独立定義しない。Generated output内の数値�
 
 Parent semantic changeが必要なら本Issueを停止し、親ADR/reviewへ戻す。
 
-## 5. Candidate build, provenance and reuse graph
+## 5. Candidate materialization, provenance and reuse graph
 
-### 5.1 Build count unit
+### 5.1 State machine
 
-Count unitはcandidate source SHAに対する**top-level packaging process invocation**である。Exact command candidateは次で固定する。
-
-```bash
-uv build --sdist --wheel --out-dir "$CANDIDATE_DIR/dist" --clear .
+```text
+unmaterialized
+  -> materializing
+       -> materialized
+       -> poisoned
 ```
 
-この一つのprocessがwheelとsdistを生成する。後続roleは`uv build`、`python -m build`、pipのsdist-to-wheel buildを行わない。sdist smokeはactual sdistをsafe extractし、metadata/assets/source import surfaceを検証する。wheel roleはactual wheelをfresh environmentへinstallする。
+`CandidateMaterializationV1`はsource SHA/treeごとに一つだけ作る。Materialization IDはsource identityとgate contract versionにdomain-separated hashを適用して作り、attempt IDとは別namespaceにする。
 
-### 5.2 Producer selection
+- `materializing`: build invocation durable registration後、completion前。
+- `materialized`: build invocation count 1、complete manifest/wheel/sdist bytes、candidate identity、environment fingerprint、candidate evidence indexが存在。
+- `poisoned`: build failure/cancel/missing/mismatch/duplicate producer。Same source SHA/treeで再入場不可。
 
-Candidate source SHAごとにGitHub Actions workflow run chronologyを読み、次でproducerを一意に決める。
+Materializationはfinal-gate role graph、first population、rolling windowのmemberではない。Materialization outputをattempt resultへ偽装しない。
 
-1. target workflow、exact source SHA、`run_attempt=1`のstarted runを列挙。
-2. `created_at`, run IDで最初のrunをproducer candidateとする。
-3. そのrunがbuild開始前なら、そのrunだけbuildを許可する。
-4. producer runがstarted後に失敗/cancel/missing artifactとなった場合、そのsource SHAはbuild-once evidenceとしてrejectedである。後続runは再buildしない。
-5. producer artifactがexactly oneで、manifest/bundle hashがAPI metadataと一致する場合だけ後続runがconsumeする。
+### 5.2 Exact producer/materializer selection
 
-Workflow rerunによる`run_attempt>1`はproducerにもconsumerにもならず、attempt resultをrejectedとしてhistoryへ残す。
+1. SourceIdentityV1をevent別にresolveし、checkout SHA/treeと一致させる。
+2. Same source SHA/treeのmaterialization registryをread-only確認する。
+3. Existing `materialized`ならstored bytesだけをresolveし、buildしない。
+4. Existing `materializing`または`poisoned`ならfail closed。
+5. Absentなら`materializing`をdurable登録し、top-level build commandをexactly one invocation実行する。
+6. Manifest/core/bundle/final bytes hash、wheel/sdist actual bytes、provider candidate digestを完成させる。
+7. Environment admission/fingerprintを完成させる。
+8. CandidateEvidenceIndexV1を完成させて`materialized`へterminalizeする。
+9. 途中failureは`poisoned`へterminalizeする。
 
-### 5.3 Candidate manifest schema
+Workflow rerun、run_attempt増分、別job build、role内build、local fallbackをqualification producerにしない。
 
-`artifacts/provider-gate-contracts-v1.schema.json#/$defs/CandidateManifestV1`が唯一のshape authorityである。Runtime copy `scripts/quality/provider_gate/contracts/provider-gate-contracts-v1.schema.json`はIssue Artifactとbyte-identicalで、schema equality testで検査する。`candidate-manifest.json`のexact fields/order:
+### 5.3 Non-circular manifest and actual-byte binding
 
-1. `schema_version`
-2. `gate_contract_version`
-3. `repository`
-4. `source_sha`
-5. `source_tree`
-6. `provider_candidate_digest`
-7. `build_invocation_id`
-8. `build_command`
-9. `builder_run_id`
-10. `builder_run_attempt`
-11. `wheel`
-12. `sdist`
-13. `manifest_core_sha256`
-14. `bundle_sha256`
-15. `created_at`
+Candidate manifestはsource repository/SHA/tree、provider candidate digest、build invocation identity/command、wheel/sdist filename/size/SHA-256、manifest core digest、bundle digestをclosed orderで持つ。Core hashはself fieldsを除くcanonical bytes、bundle hashはcore digestとactual artifact records/bytesをlength-frameして計算する。Final manifest bytes hashはmanifest外のCandidateIdentityV1/EvidenceIndexに保存する。
 
-`wheel` / `sdist` exact fields: `filename,size,sha256`。`build_command`は監査用であり、count authorityはbuild invocation ID + process receipt + workflow chronologyである。
+Every consumer verifies API artifact identity、downloaded manifest bytes、wheel/sdist size/hash、source/tree/provider candidate digest。Filenameやclaimed hashだけでは受理しない。
 
-Hash graphはmanifestへの自己参照を含めず、次のbyte algorithmで固定する。Canonical JSONはUTF-8、BOMなし、schema `x-key-order`順、空白なし、non-ASCIIを直接UTF-8化、NaN/Infinityなし、末尾LF一つとする。
+### 5.4 Campaign freeze ordering
 
-1. `core_json`はfield 1–12のみを`CandidateManifestV1`のkey orderでserializeしたcanonical JSON bytes。
-2. `manifest_core_sha256 = SHA256(ASCII("spec-dock.provider-gate.manifest-core.v1") || 0x00 || uint64_be(len(core_json)) || core_json)`。
-3. wheelとsdistをfilename UTF-8 bytesの昇順に並べる。各artifact metadataは`filename,size,sha256`のcanonical JSON bytesとし、recordを`uint64_be(name_len) || name_utf8 || uint64_be(metadata_len) || metadata_json || uint64_be(actual_len) || actual_bytes`として順に連結する。
-4. `bundle_sha256 = SHA256(ASCII("spec-dock.provider-gate.bundle.v1") || 0x00 || raw32(manifest_core_sha256) || records)`。実際のwheel/sdist bytesを必ず含める。
-5. field 1–15全体をcanonical JSON plus one LFとして出力した後、その完成ファイルの`candidate_manifest_sha256`を計算し、EvidenceIndex／producer receipt／CandidateIdentityにだけ保存する。これはManifest内にもhash inputにも含めない。
+`CampaignFreezeV1`はmaterializationが`materialized`になった後だけ作成できる。Candidate identity、environment fingerprint、gate contract version、fault definition hash、window contract ID、frozen-at、candidate evidence indexをimmutableに閉じる。
 
-Runtimeはunknown/missing/duplicate key、順序・canonical-byte不一致、filename重複、manifest/actual bytes/API metadata不一致を拒否する。`CandidateIdentityV1`にはsource SHA/tree、provider digest、core hash、完成manifest hash、bundle hash、wheel/sdist hashesを束縛する。Algorithmはschema artifactと`codec.py`でversionedにし、unit goldenで全中間/最終digestを固定する。
-
-### 5.4 Artifact consumer verification
-
-各roleは実行前に次を行う。
-
-- checkout HEAD/source treeをmanifestへ照合。
-- downloaded wheel/sdistのactual bytesをrehash。
-- archive filename、size、single member expectationを照合。
-- provider candidate digestをsource、wheel install、sdist extractionの各surfaceで再計算。
-- producer run/artifact IDをrole resultへ記録。
-- mismatch時はtest bodyを開始せずrole rejected。
-
-Artifact retentionが短くB3前に失われる可能性がある設定はadmission failureである。retention値はhuman/context captureで確認後に選択する。
+- Required-context intentional REDはmaterialized PR candidate上の通常attemptとして実行できるが、campaign freeze前なら`purpose=context-canary`、campaign ID null、window contract ID non-nullでhistoryへ残す。
+- Human merge SHA/treeがPR sourceと異なる場合、merge sourceは別candidateなので新しいone-time materializationを行う。
+- Final B3 campaignの最初のattempt registrationはpost-merge materializationとCampaignFreezeV1の完成後である。
 
 ## 6. Environment contract and collector seam
 
@@ -312,18 +297,23 @@ Process topologyは次で閉じる。
 
 ## 7. Role graph and test ownership
 
-### 7.1 Role graph
+### 7.1 Role graph and deterministic ownership
+
+One final-gate attemptはcomplete candidate/environmentとresolved ownership manifestを入力に、次のexecution rolesを一回ずつ実行する。
 
 ```text
-candidate-resolve/build
-  -> static-analysis
-  -> linux-canonical
-  -> sdist-smoke
-  -> macos-delta
-  -> attempt-evaluate
+static-analysis
+linux-canonical
+sdist-smoke
+macos-delta
+attempt-evaluate  # execution result aggregator; pytest roleではない
 ```
 
-Build producer runだけが`build-candidate`を行い、その他は`resolve-producer-artifact`を行う。Role jobsは同じmanifest/bundle digestをneed/outputで渡す。`attempt-evaluate`は全role resultとAPI observationをdownloadし、per-attempt resultを一回だけ構築する。
+Build producer/materializationはrole graph外である。`role-ownership-v1.json` baselineへ`role-ownership-delta-v1.json`をactivation checkpoint順に適用し、checkpoint manifestを決定的に導出する。P03=2,214、P04以後のadds、P10 move、P15 deletions後final=2,188 assignmentsである。
+
+`collection_sha256`はowner/reasonを含まないnormalized node-ID set digestである。重複IDまたはCR/LFを含むIDを先にrejectし、node IDをUTF-8 byte順にsortし、各IDのUTF-8 bytesにLFを一つずつ付けたstream（末尾LFを含む）のSHA-256を取る。これはbaseline `normalized_node_ids_sha256`と同じcanonicalizationである。Checkpoint `collection_sha256`、final projectionのdigest、実collectionの`NodeObservationV1.collection_sha256`は同じ入力表現を使う。
+
+Pluginはbody開始前にactual collection setとresolved assignment setを照合する。Unknown、missing、duplicate owner、unplanned add/move/delete、collection hash mismatchを検出したらbodyを0件実行してrejectする。
 
 ### 7.2 Linux canonical
 
@@ -375,218 +365,155 @@ Qualification workflow以外の`uv run pytest`はdeveloper convenienceであり�
 
 Consumer scannerとworkflow testsはfinal gateがlocal fallbackを参照しないことをmechanically証明する。
 
-### 7.7 Transition seam for the existing pytest policy hook
+### 7.7 Permanent plugin ownership and temporary root compatibility seam
 
-P07では`tests/conftest.py::pytest_collection_modifyitems`の最初に次のexclusive branchを置く。`--provider-gate-role`がない通常・従来実行は現行classification/skip/ledger behaviorを通る。role optionがある場合はCLIが`-p scripts.quality.provider_gate.pytest_plugin`でpluginを先に登録し、root conftestがplugin managerからこのexact moduleをrequireする。Root conftestは`prepare_role_collection(config, items)`を一度だけ呼び、role contract schema、contractと全collected nodeの集合一致、owner一意性、role/environment適合を検証してowned subsetを確定する。collection filterはこのhelperだけが行い、plugin自身は二重filter hookを登録しない。正常終了後は旧hookをbypassし、エラー時はpytest collectionを失敗させtest bodyを開始しない。Role modeと`--run-full-regression`、`--full-regression-shard`、`--full-regression-observation`の併用はUsageErrorでrejectする。
+`pytest_plugin.py`は移行中・final sourceの両方で`pytest_collection_modifyitems`を実装する恒久的filter ownerである。Root `tests/conftest.py`はP07–P15だけのtemporary seamとして、次を満たすexact invocationでlegacy marker/skip/ledger hookをbypassする。
 
-このentryはroot conftestのlegacy skip marker付与より先にrole selectionを完了する。これによりlegacy `POLICY_SKIP_REASON`が新role-owned nodeへ残らない。Plugin不在・option不在・contract不正の経路にbypass fallbackを設けない。P14 consumer-zero後、P15で旧classification/hookとtransition seamを一括削除する。通常`pytest`と旧laneの互換性はP07 focused testsで、role modeのskip 0・deselect・unknown-node failはplugin testsで検証する。
+- `-p scripts.quality.provider_gate.pytest_plugin`でplugin登録済み。
+- `--provider-gate-role=<exact role>`が指定済み。
+- resolved ownership manifest path/hashが指定済み。
+- legacy full-regression flagsとの併用なし。
+- plugin contract/schema/version検証済み。
 
-## 8. Evidence schemas and separation of results
+Plugin未登録、role欠落、unknown node、schema/hash不一致、legacy flag併用はcollection前rejectで、legacy skipへfallbackしない。Ordinary pytestはP15までlegacy behaviorを保つ。
 
-`artifacts/provider-gate-contracts-v1.schema.json`はIssue #396が生成する全wire artifactの唯一のclosed shape authorityである。Implementationはそのbyte-identical copyを`scripts/quality/provider_gate/contracts/provider-gate-contracts-v1.schema.json`へ置き、equality testを通す。対象は`CandidateManifestV1`、`CandidateIdentityV1`、`SourceIdentityV1`、`EnvironmentFingerprintV1`、`AttemptRegistrationV1`、`RoleResultV1`、`ProcessMetricsV1`、`AttemptResultV1`、`CampaignResultV1`、`FaultCampaignResultV1`、`StabilityWindowResultV1`、`QualificationResultV1`、`EvidenceIndexV1`、`ProtectedTreeSnapshotV1`、`ExecutionPacketV1`、`StopReturnV1`、`RoleOwnershipV1`とそのnested typesである。
+P15ではconsumer-zero後にlegacy hook/temporary seamを削除する。`tests/conftest.py`がold hookだけならfile削除、他fixtureがあればold symbolsだけ削除する。Pluginのfilter hookは残るため、final `run-role`にowner callerが消失しない。P15後のnegative testはroot conftest不存在/legacy symbols不存在とplugin filteringの同時成立を確認する。
 
-まず Draft 2020-12 validatorでshapeを検証し、`contracts.py`でschemaの`x-key-order`、`x-array-order`、`x-unique-by`、`x-semantic-invariants`、artifact間のidentity/evidence参照を検証する。全objectはclosed、全propertyはrequiredとし、値が該当しないfieldはschemaが許す明示nullを使う。未知field、欠落field、重複keyをdrop・補完しない。
+## 8. Closed evidence and execution schema families
 
-Canonical JSON bytesはUTF-8（BOMなし）、schema記載のfield order、array order、空白なし、non-ASCIIを直接UTF-8化、NaN/Infinityなし、末尾LF一つとする。整数は非負のbase-10、浮動小数型はwire valueに使わず、CPU quotaなどのdecimalはschema指定のcanonical decimal stringとする。Object key orderやarray orderが契約にない場合はserializerが勝手にsortせず、schema contractへ戻して止める。
+`provider-gate-contracts-v1.schema.json`はDraft 2020-12で、all objectsを`additionalProperties=false`へ閉じる。Semantic codecはduplicate keys、key order、array order、cross-field relationsを追加検証する。
 
-### 8.1 Attempt registration
+### 8.1 Preflight vs candidate-bound evidence
 
-`AttemptRegistrationV1`はGitHub repository/workflow/run ID、`run_attempt`、API `created_at`、event-resolved source SHA/tree、manifest digest、environment fingerprint、campaign/window IDs、registration statusを閉じる。Started runはAPI historyに現れた時点で一度登録し、結果・artifact欠落でも消さない。`run_attempt != 1`は`rejected-rerun`として保存し、同じattempt IDを再登録しない。
+- `EvidenceWorkspaceV1`: root ID、kind、created-at、retention。Physical absolute pathはruntime-only。
+- `EvidenceBlobRefV1`: root ID、logical POSIX path、size、actual-byte SHA-256。
+- `PreflightEvidenceIndexV1`: specification identityとP00–P04/B1/B2/review/capture evidence。Candidate identity禁止。
+- `CandidateEvidenceIndexV1`: complete candidate identityとenvironment hashを必須とするP05以後。
+- `RepositoryArtifactRefV1`: source-controlled canonical artifactだけを参照。
 
-### 8.2 Role result
+Logical pathはabsolute、drive letter、dot/dot-dot、backslash、NUL、symlink traversalを拒否する。
 
-`RoleResultV1`はroleごとに一つだけ出す。CandidateIdentity、role環境fingerprint、start/completion時刻、status、argv、exit code、node observation、process metrics、unexpected/approved/policy-skip/duplicate counts、errorsを型付きで記録する。Artifact pathだけでactual-byte proofに代えず、EvidenceIndexのactual bytes hashを参照する。Missing role resultは成功扱いにしない。
+### 8.2 Materialization and campaign
 
-### 8.3 Process measurement
+`CandidateMaterializationV1`、`CampaignFreezeV1`、`SourceIdentityV1`、`CandidateIdentityV1`、`EnvironmentFingerprintV1`を分離する。Materializationにはattempt IDがなく、CampaignFreezeはcomplete materializationだけを受ける。
 
-`ProcessMetricsV1`はroot PID/count、descendant PID list、monotonic start/reap時刻、wall/CPU値、effective quota/memory、root exit、全descendant reap、cgroup empty、termination reasonを閉じる。CPU/wall ratioはraw integer inputsからDecimalで算出したcanonical decimal stringを使う。表示上の丸め値はpredicateへ渡さない。
+### 8.3 Ownership and node observation
 
-### 8.4 Per-attempt result
+`RoleOwnershipDeltaOperationV1`、`RoleOwnershipDeltaV1`、`ResolvedRoleOwnershipV1`、`NodeExecutionV1`、`NodeObservationV1`を閉じる。NodeObservationはcollected/executed/unknown/missing/duplicate setと§7.1のcanonical collection hashを持つ。Baseline P03、各checkpoint、実collectionは同じnode-ID normalizationを使い、owner assignmentが変わらない限り同一node setは同一digestになる。
 
-`AttemptResultV1`は、candidate/environment identity、全role result、identity/raw evidence completeness、Linux/correctness predicates、rerun detection、status/accepted、violationsをまとめる。一回のattemptの全role conjunctionだけを判定し、first five、fault campaign、latest twentyの不足をattempt statusへ循環させない。
+### 8.4 Attempt and results
 
-### 8.5 Aggregate results
+Every started attemptはcomplete candidate/environment identityを持つ`AttemptRegistrationV1`へ事前登録される。RoleResultはbuild evidenceを持たず、static/Linux/sdist/macOSだけを表す。AttemptResultはrole/raw evidenceのconjunction、aggregate resultsはparent-generated predicatesを参照する。
 
-`CampaignResultV1`はcandidate/campaign identityとAPI chronology上の先頭5 attemptを、`FaultCampaignResultV1`は固定catalogue denominatorとexecuted/detected/missed IDsを、`StabilityWindowResultV1`はchronological latest 20 memberをそれぞれ型付きで保持する。`QualificationResultV1`はattempt/campaign/fault/window/context/consumer-zero/protection evidenceの最終conjunctionだけを記録する。全artifactのexact required field、enum、nullability、array orderはschema `$defs`で確定し、ここに第2のfield listを作らない。
+### 8.5 Fault, retirement and external context
 
-### 8.6 Evidence index and protected snapshot
+- `FaultCatalogueDefinitionV1`: exact 45 entries。
+- `CandidateBoundFaultCatalogueV1` / `FaultExecutionResultV1`。
+- `OldPolicyRetirementContractV1` / `ConsumerScanResultV1`。
+- `RequiredContextSnapshotV1` / `ContextTransitionReceiptV1`。
 
-`EvidenceIndexV1`の各entryはrepository-relative POSIX path、kind/schema version、actual size、actual SHA-256を持つ。Duplicate path、conflicting digest、絶対path、`.`/`..`、backslash、NUL、symlink traversal、credential/private pathは拒否する。Raw workflow/API outputはredaction後の保存bytesも再hashし、未加工credentialを残さない。
+External names/IDsはread-only captureからのみ入り、specで創作しない。
 
-`ProtectedTreeSnapshotV1`は同schema artifactのexact roots/exclusionと、path/type/mode/size/hashを保存する。Directoryはsize/hash null、regular fileはactual bytes digest、symlinkはlink target bytes digestのみでtargetをfollowしない。詳細は§13.3のreviewed helperが唯一のcapture implementationである。
+### 8.6 Finite violations
 
-### 8.7 Execution packet and stop return
+`ViolationCodeV1`は`closed-violation-codes-v1.json`の68 valuesだけを許可する。Unknown/free-form/catch-all codeは禁止する。
 
-`ExecutionPacketV1`だけがcheckpoint input/authorization packetであり、`authorized_checkpoint`と`checkpoint_inputs.checkpoint_id`は一致する一つのP00–P22値である。Packetは該当Plan section hash、EvidenceIndex参照、write boundary/path allowlistを束縛し、read-only checkpointのwrite pathは空にする。`implementation_authorized=true`にはschema上review pass/P0=0/P1=0、Issue projection readback、explicit dispatch receipt、concurrent-writer absenceが必要である。現行spec artifactは`implementation_authorized=false`のままで、review passだけではProduct mutationを解禁しない。`StopReturnV1`だけがstop payloadである。PlanとHandoffは同じschema definitionへの参照であり、別のexact JSON field listを作らない。
+### 8.7 Truthful stop
+
+`StopReturnV1`はpre/post mutation双方を表し、scope impact、required owners/actions、changed/external surfaces、rollback/recovery state、stage-correct evidenceを持つ。`automatic_rollback_performed=false`は不変である。Pre-mutationはchange arrays空、post-mutationは実施済みchangeを少なくとも一件記録する。
 
 ## 9. Chronology, cancellation and missing evidence
 
-### 9.1 Source of chronology
+### 9.1 Three distinct chronologies
 
-GitHub Actions workflow run APIをauthoritative chronological indexとして用いる。Artifact directoryのmtime、job completion time、result filename順は使わない。Order keyは`created_at`、同値時はnumeric run IDである。
+1. Materialization registry chronology — source SHA/treeごとのone-time build terminal state。Attemptではない。
+2. Attempt chronology — GitHub run created/start identityとrun attemptをimmutable保存。Context canaryを含む。
+3. Aggregate selection — parent-generated rulesでfirst population/windowをchronologyから導出。Result filter禁止。
 
-### 9.2 Started but incomplete runs
+### 9.2 Started incomplete attempts
 
-APIにrunが現れた後の次をmemberとして残す。
+Registration後のfailure、cancel、interruption、missing role/raw evidenceはhistory memberとして残り、nonaccepted resultになる。Workflow API状態、job conclusion、artifact listing/downloadのactual-byte evidenceを保存する。Run deletion/expiryでevidenceが欠けた場合もsuccessへ補正しない。
 
-- `failure`
-- `cancelled`
-- `timed_out`
-- `action_required`
-- `stale`
-- `startup_failure`
-- completedだがartifact missing
-- role result missing
-- identity/raw mismatch
+### 9.3 Retry/rerun and identity
 
-Aggregatorはmissing resultをsynthetic successfulへ変換せず、`missing-evidence` non-accepted memberを作る。
+Same attempt ID、run_attempt増分、artifact replacement、campaign reset、member replacement、success-only filterをfinite violation codeでrejectする。Old attempt rowを上書きしない。P2のattempt tuple表現差はrecord-onlyで、本P1 authoring passの合否条件へ昇格しない。
 
-### 9.3 Same-ID and rerun
+### 9.4 Campaign ordering
 
-- workflow run IDが同じで`run_attempt>1`ならrerun。
-- duplicate `attempt_id` artifactが二つならidentity violation。
-- API runが一つでartifact replacement/updateが観測されたらmutable evidence violation。
-- `workflow_dispatch`による新run IDは独立attemptとして許可されるが、first-five/window membershipはchronologyが決める。
-
-Campaign IDを変えて不都合なfirst fiveを捨てることは、deterministic identity conflictとしてrejectする。
+Required-context REDはmaterialization後のnormal role graphでありrolling historyへ残る。Final campaignはpost-merge materializationとfreeze後に開始する。Materializationをfirst/window memberへ数えない。Aggregate completenessをper-attempt statusへ逆流させない。
 
 ## 10. Seeded-fault catalogue
 
-Catalogue entry exact fields:
+Normative denominatorは`seeded-fault-catalogue-v1.json`で、20 categories / exact 45 atomic entriesを持つ。Definition hashは`7a73bcc44bcca28e734b704e2980d439e4edd161c996515ea45004d038f4bb8f`である。各entryは次を閉じる。
 
-1. `fault_id`
-2. `category`
-3. `fixture`
-4. `injector`
-5. `expected_violation_code`
-6. `expected_detection_stage`
-7. `candidate_bound`
+- `F001`–`F045` fault ID。
+- category ID/name。
+- exact fixture ID、test-only injector ID。
+- finite expected violation code。
+- detection stage。
+- `RED-F001`–`RED-F045` First Red case。
+- exact test node `tests/unit/provider_gate/test_fault_catalogue.py::test_fault_catalogue_first_red_cases`。
+- `candidate_bound=true`。
 
-Initial catalogueには少なくとも次を含める。
+Categoriesはmanifest、source identity、artifact bytes/size、producer、environment、topology、process lifecycle、performance/correctness、missing role/raw evidence、rerun/duplicate attempt、started incomplete attempts、first population/window replacement/filter、fault denominator/execution、old consumer、retained workflowを覆う。
 
-| Fault category | Required detection |
-|---|---|
-| manifest missing / malformed / duplicate key | artifact admission reject |
-| source SHA/tree mismatch | identity reject |
-| wheel/sdist bytes or size mismatch | actual-byte reject |
-| multiple producer artifacts | producer ambiguity reject |
-| producer missing/cancelled/expired | candidate rejected, no rebuild |
-| environment fingerprint drift | environment reject |
-| effective CPU/memory limit unprovable or out-of-bound | environment admission reject |
-| GPU/high-tier/burst drift signal | environment reject |
-| extra pytest root / worker / shard option | topology reject |
-| descendant leak or incomplete reap | process evidence reject |
-| synthetic wall or CPU predicate breach | per-attempt reject |
-| policy skip / approved failure / duplicate node | correctness reject |
-| missing role or raw evidence | attempt reject |
-| same run rerun / same attempt ID | history reject |
-| cancelled/failed started attempt | member retained and nonaccepted |
-| first-five replacement attempt | campaign reject |
-| latest-twenty success filter/replacement | window reject |
-| catalogue denominator reduction/unexecuted entry | fault campaign reject |
-| old consumer remaining | retirement block |
-| retained install-root workflow deletion/mismatch | protected workflow reject |
-
-Fault injectionはproduction workflowへfree-form debug flagを残さず、test fixture/object adapter境界に限定する。
+First Redは45件を全件enumerateし、各entryのexpected code/stageがまだ検出されないことをrecordする。Implementation後GREENは全件exact matchを要求する。Post-observation denominator reduction、entry omission、wrong code、wrong stage、unexecuted entryをfail closedにする。Injectorはtest fixture/object adapter seamだけに存在し、production workflowへfree-form fault optionを残さない。
 
 ## 11. Consumer-first cutover design
 
-### 11.1 Old consumer inventory
+### 11.1 Finite retirement contract
 
-`old-policy-retirement-v1.json`は以下を分類する。
+`old-policy-retirement-v1.json`はproduction/workflow/test consumers、delete candidates、retained-protected paths、historical allowlistをfinite signaturesで列挙する。ScannerはPython AST、YAML jobs/run/needs、JSON paths、operational docsを解釈し、plain `rg`だけをproofにしない。
 
-- production/runtime consumer
-- workflow consumer
-- test consumer
-- data provider
-- historical reference allowlist
-- retained installed-consumer workflow
+### 11.2 Ordered sequence
 
-ScannerはPython AST import/name/call/constants、workflow YAML `run`/job/path、JSON path references、current operational docsを読む。`rg` outputだけをproofにしない。Historical parent contractsやreceiptはold namesを説明できるが、runtime consumer countには含めない。
+1. Closed schemas/delta/fault/retirement artifactsをreview済み入力としてfreeze。
+2. Permanent pluginとreplacement modules/testsをRED→GREEN。
+3. Shadow workflowをadditiveに実装。
+4. Candidateをone-time materializeし、new checkをobserved nameでcapture。
+5. Human required-context additive migration + intentional RED + GREEN recovery。
+6. 全old consumerをreplacementへ移行。
+7. `ConsumerScanResultV1.scan_complete=true`、old consumer 0、retained workflow equal。
+8. Humanがold emitter存在中にold required contextだけを外し、`U + new`/merge-group scopeをreadback。
+9. Old provider/data/workflow/tests/temp seamを同一Issue PR内で削除。Permanent pluginは残す。
+10. Final sourceでscanner/ownership/role graph/ordinary suite/lint/protectionを再実行。
 
-### 11.2 Sequence
+Consumer-zero前のdeletion、old required context gap、partial accepted state、compat writer/fallbackは禁止する。
 
-1. replacement contracts/tests/moduleをRED→GREEN。
-2. replacement workflowをold workflow/jobsとshadow coexistence。
-3. new attempt result/evidenceを取得。
-4. required-context new RED/GREENをhuman canary。
-5. 全old consumerをreplacementへ移す。
-6. scannerでconsumer count 0。
-7. replacement GREENとconsumer-zero後、old check emitterがbranchに残っている状態でhumanがold required contextを除去し、`U + new`とmerge-queue scopeをreadbackする。
-8. `U + new`確認後に限りold data/provider/workflow/tests/markersを削除。
-9. final sourceでscanner、unit、integration、role graph、lint、protected workflow guardを再実行する。Post-merge gateはcontextをread-onlyで再確認し、設定変更を繰り返さない。
+### 11.3 Exact move/delete ownership
 
-同一PR内のcheckpointは許すが、consumer-zero前のdeletion commitやold/new partial stateをmergeable/acceptedとしない。
+Nonpolicy node `test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup`をP10でexact destinationへmoveし、semantic key/ownerを維持する。P15の69 deleteはreviewed deltaどおりで、implementation-time判断を許さない。
 
-### 11.3 Nonpolicy test preservation
+## 12. Workflow, materialization and human external boundary
 
-`test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup`はold policy test file削除前に`tests/cli_runtime/test_distribution_cutover.py`へ移し、node behaviorを維持する。Old evaluator/sharder/skip internalsだけを検証するtestsはreplacement tests成立後に削除する。
+### 12.1 Permissions and source identity
 
-## 12. Workflow design and external permissions
+Repository workflowはread-only permissionsを最小化し、actual API callsで必要性を確認する。PRはpayload head SHA、workflow_dispatchはrequired source SHA input、merge_groupはmerge group SHAへbindする。Raw PR `GITHUB_SHA`やbranch tipで代用しない。
 
-### 12.1 Repository workflow permissions
+### 12.2 Jobs and non-circular ordering
 
-Target workflowは原則次のread permissionsだけを持つ。
-
-```yaml
-permissions:
-  contents: read
-  actions: read
-  checks: read
-  pull-requests: read
-```
-
-Repository/org policyが`checks: read`等を許さない、または不要な場合は実際のAPI callに基づき最小化する。`contents: write`、`actions: write`、`administration: write`を要求しない。Artifact upload自体に追加write scopeを仮定しない。
-
-### 12.2 Trigger and attempts
-
-- `pull_request`: per-attempt checkのsourceはevent payloadのPR head SHA/tree。
-- `merge_group`: merge queueがactiveな場合、merge group SHA/treeを別source identityとしてper-attempt checkする。
-- `workflow_dispatch`: required input `source_sha`で指定したexact commit/treeを独立attemptとして実行する。B3 dispatchはmerged integration SHAを明示する。
-- Candidate producer: exact SHAのfirst started accepted run。
-- main push automatic Full Regressionは削除し、B3 campaignはhuman-controlled independent dispatchesで実行する。
-
-`SourceIdentityV1`を作る`resolve_source_identity`は次のevent rulesでsourceを一意にする。
-
-| Event | source SHA/reference | Required validation |
-|---|---|---|
-| `pull_request` | `github.event.pull_request.head.sha` / `pull_request_head_sha` | head repo full nameが存在し、source repo+SHAから解決したtreeとcheckout treeが一致する。raw `GITHUB_SHA`は使わない。 |
-| `workflow_dispatch` | required input `inputs.source_sha` / `workflow_dispatch_source_sha` | inputが40 lowercase hex、target repository内で解決可能、API/checkout treeが一致する。branch tipやevent `GITHUB_SHA`で代用しない。 |
-| `merge_group` | event `GITHUB_SHA` / `merge_group_sha` | GitHubがmerge group SHAと定義する値を使い、checkout treeを確認する。PR head SHAへ置き換えない。 |
-
-Resolverは各workflow attemptについて`source_identity.json`へrepository/source repository/workflow/run/run_attempt/event/reference/PR number/source SHA/treeを閉じて記録する。同じattempt内の全roleはproducer jobが保存した同じidentity bytesをconsumeし、repository/workflow/run/attempt/SHA/treeとcheckout HEAD/treeを再確認する。後続の独立attemptは自分のrun ID/attemptを持つ別のSourceIdentityV1を作るが、source SHA/treeはCandidateManifestV1と一致させる。CandidateIdentityV1はcandidate source SHA/treeと元producer provenanceを束縛し、後続attemptのrun IDをproducer IDと同一視しない。Build CLIはSourceIdentityV1内のrun ID/attemptを実行環境値と照合し、raw PR `GITHUB_SHA`を直接CandidateIdentityに使わない。
-
-GitHubは`pull_request` eventの`GITHUB_SHA`をPR merge branchのmerge commitと定義し、head commitには`github.event.pull_request.head.sha`を指定するよう案内している。また`merge_group`ではmerge group SHAを提供し、`workflow_dispatch`には必須inputを定義できる。([GitHub Actions: Events that trigger workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows))
-
-Workflow cancellation policyはstarted attemptを置換しない。`cancel-in-progress: true`をqualification attemptsへ使わない。Concurrencyは同じcandidateのsimultaneous producer raceを防ぐためserializeできるが、wait/cancelしたrunのchronology/evidenceを隠さない。
-
-### 12.3 External context capture
-
-Implementation前に次をread-only captureする。
-
-- current branch/ruleset effective required contexts。
-- check suite/job names on a representative PR。
-- merge queue / merge_group usage。
-- unrelated required contexts `U`。
-- review requirements、dismissal/approval settingsの範囲。
-
-GitHub App connectorがadministration permission不足でrulesetを読めない場合、それをpermission failureと断定せず「connectorで未確認」と記録し、humanによるUI/`gh api` read-only exportをrequireする。Exact external context nameはこのcaptureから選び、本仕様では創作しない。
-
-### 12.4 No-gap migration
+Shadow/final workflowは概念上次を持つ。
 
 ```text
-U + old
-  -> U + old + new
-  -> intentional new RED: U + old GREEN / new RED / merge blocked
-  -> new GREEN
-  -> replacement consumers GREEN and old consumer inventory = 0
-  -> human removes old required context while old emitter still exists
-  -> readback U + new and merge-queue scope
-  -> delete old emitter/provider only after readback
-  -> final read-only readback U + new
+materialize-candidate   # attempt外、一回限り
+static-analysis         # final-gate attempt role
+linux-canonical         # final-gate attempt role
+sdist-smoke             # final-gate attempt role
+macos-delta             # final-gate attempt role
+attempt-evaluate        # result aggregate
 ```
 
-Merge queueがactiveならPR headとmerge_groupを別々にcanaryする。Settings rollbackはcaptureされた`U + old`を復元する。Agentはsettings mutationを行わない。Required-context removal後のreadbackが不一致・取得不能ならold emitterを削除せず停止する。
+Materialization job成功後だけrole graphを開始できる。Subsequent independent attemptsはmaterialize jobをbuildせず、stored candidateをresolve/verifyする。Post-merge final candidateはmerge SHA/treeで別materializationを一度だけ行い、その後CampaignFreezeV1を作る。Build failureはsame-SHA poisonである。
+
+Qualification attemptsへ`cancel-in-progress: true`を使わない。Started cancel/failure/missingをhistoryに残す。
+
+### 12.3 Read-only external capture
+
+`RequiredContextSnapshotV1`のstagesは`before -> old-plus-new -> intentional-red -> recovered-green -> new-only -> final-readback`である。Exact context/ruleset/merge-queue namesはP02 read-only captureからのみ得る。Permission-limited/empty responseを「contextなし」と解釈しない。
+
+### 12.4 Human-only transition
+
+Humanだけがsettings add/remove/restoreとmergeを行う。Agentはrequested change set、canary attempt、readback、rollback instructionsを作る。Unrelated effective set`U`、review gate、merge queue/merge_group coverageを各snapshotで比較する。REDがblockしない、GREENが戻らない、readback不能、U driftならold emitterを削除せずStopReturnを作る。
 
 ## 13. Documentation, dogfood and protection
 
@@ -625,17 +552,18 @@ Partial provider/dogfood projectionをmergeしない。
 
 ## 14. Failure, recovery and rollback
 
-### 14.1 Candidate poisoning
+### 14.1 Materialization/candidate poisoning
 
-次のいずれかでsame source SHA candidateはqualification不可になる。
+次のいずれかでsource SHA/tree materializationを`poisoned`へterminalizeする。
 
-- first build producer失敗/cancel/artifact missing。
-- first five member不合格。
-- candidate/environment identity mismatch。
-- rerun/retry。
-- fault catalogue miss。
+- build producer failure/cancel/missing/expired artifact。
+- manifest/source/tree/wheel/sdist/environment mismatch。
+- build invocation countを1へ閉じられない。
+- Materialization evidence indexが不完全。
 
-同じSHAでcampaign IDを変える、artifactを再buildする、runをrerunすることは禁止。Fix commitでnew source SHA/treeを作り、新candidateとして最初から進む。
+Poisoned sourceは同じSHA/treeでbuildを再実行できない。`MATERIALIZATION_POISONED`と`SAME_SHA_REBUILD_ATTEMPTED`を区別し、fix commitによるnew sourceだけを許す。
+
+Materialization後のattempt/campaign rejectionも同じsourceでmember replacement、campaign reset、rerunを許さない。Contract上source changeが必要な場合、new candidateとしてmaterializationから開始する。
 
 ### 14.2 External settings failure
 
@@ -653,18 +581,20 @@ Partial ledger-only、workflow-only、context-only rollbackはaccepted stateに�
 
 | Requirement | Design section |
 |---|---|
-| I396-RQ-001 | §2, §8.1, §12.3 |
+| I396-RQ-001 | §2.3 and predecessor admission artifacts |
 | I396-RQ-002 | §4 |
-| I396-RQ-003–004 | §5 |
-| I396-RQ-005–006 | §7 |
-| I396-RQ-007 | §6.2–6.3 |
-| I396-RQ-008 | §6.1 |
-| I396-RQ-009–013 | §8–10 |
-| I396-RQ-014 | §8, §12 |
+| I396-RQ-003 | §5 materialization/freeze |
+| I396-RQ-004 | §8.1 evidence stages |
+| I396-RQ-005 | §7.1, §12.2 |
+| I396-RQ-006 | §3.2, §7.1, §7.7 |
+| I396-RQ-007–008 | §6 |
+| I396-RQ-009–013 | §9 and parent projection |
+| I396-RQ-011 | §10 exact catalogue |
+| I396-RQ-014 | §8 closed families/codes |
 | I396-RQ-015–016 | §11 |
-| I396-RQ-017 | §12 |
+| I396-RQ-017 | §12.3–12.4 |
 | I396-RQ-018 | §13 |
-| I396-RQ-019–020 | §14 and Plan review/merge phases |
+| I396-RQ-019–020 | §14, StopReturnV1, Plan review gates |
 
 ## 16. Unresolved operational captures, not owner decisions
 
