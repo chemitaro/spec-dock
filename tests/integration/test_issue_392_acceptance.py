@@ -114,6 +114,15 @@ _EXPECTED_BASELINE_ROWS = (
     ),
 )
 
+_ISSUE_BOUNDARY_DOCUMENTS = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/plan.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/plan.md",
+)
+
 _P392_ENTRY_SHA = "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 
 
@@ -222,3 +231,6 @@ def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> N
     assert "run: uv run pytest\n" in workflow
     assert "continue-on-error" not in workflow
     assert "verify_full_regression" not in workflow
+
+    for relative_path in _ISSUE_BOUNDARY_DOCUMENTS:
+        assert (repository / relative_path).is_file()
