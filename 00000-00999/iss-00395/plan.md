@@ -92,9 +92,6 @@ case "$RESUME_MODE" in
   post-u05-checkpoint)
     : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
     : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
-    : "${INITIAL_RED_EVIDENCE_ROOT:?INITIAL_RED_EVIDENCE_ROOT is required}"
-    : "${INITIAL_RED_IDENTITY_SHA256:?INITIAL_RED_IDENTITY_SHA256 is required}"
-    : "${INITIAL_RED_SUMMARY_SHA256:?INITIAL_RED_SUMMARY_SHA256 is required}"
     ;;
   *) exit 1 ;;
 esac
@@ -1016,7 +1013,7 @@ PY
 
 `RESUME_MODE=post-u05-checkpoint`では、U05後のcurrent rootが既にterminalizedであるため、D1の初回full verifierを実行しない。Phase Eへ進む前に、current ledgerの15/0/15 invariantとmigration observerをread-onlyで確認し、U05 transitionを再実行しない。
 
-初回D2の13 row RED証拠は、packetで指定されたrepository外の既存evidence rootから再利用する。`identity.json`、`individual-red-summary.json`、13件すべてのraw logとobservationのSHA-256、repository/branch/P392 identity、RED node集合を確認し、初回spec SHAがresume checkpointの祖先であることを検証する。証拠が欠落・不一致ならE1/E2より前に停止する。修復済みnodeをRED取得のために再実行せず、証拠を新しいrootへコピーしない。
+2026-09-17、ユーザーは初回13 row RED記録を包むrepository外rootとidentity manifestは運用管理用であり、本質的な作業再開条件ではないと判断した。post-U05では、既存のIssue Workbench内のsummary・raw log・observationをそのまま行単位の履歴記録として使う。外部root、`identity.json`、外部packetでのarchive hash束縛はPhase Eへの条件にしない。外部rootが見つからなくても停止せず、既存ログのコピーやidentityの後付け作成、修復済みnodeのRED再取得は行わない。製品の正しさはcurrent ledger、migration observer、focused GREEN、およびclean candidateのfull verifierで確認する。
 
 ```bash
 POST_U05_ENTRY_OBS="$EVIDENCE_DIR/post-u05-terminal-entry-observation.json"
@@ -1067,111 +1064,6 @@ Path(sys.argv[1]).write_text(
     encoding="utf-8",
 )
 print("post-u05-terminal-entry=15/0/15 fixed=14 superseded=1")
-PY
-
-python - "$INITIAL_RED_EVIDENCE_ROOT" \
-  "$INITIAL_RED_IDENTITY_SHA256" \
-  "$INITIAL_RED_SUMMARY_SHA256" \
-  "$RESUME_CHECKPOINT_SHA" \
-  "$EXPECTED_REPOSITORY" \
-  "$ISSUE_BRANCH" \
-  "$INTEGRATION_BRANCH" \
-  "$P392_SHA" \
-  "$P392_TREE" \
-  "$ROW_12" \
-  "${ACTIVE_ROWS[@]}" <<'PY'
-from pathlib import Path
-import hashlib
-import json
-import subprocess
-import sys
-
-root = Path(sys.argv[1]).resolve(strict=True)
-identity_hash, summary_hash = sys.argv[2:4]
-(
-    resume_checkpoint,
-    repository,
-    issue_branch,
-    integration_branch,
-    p392_sha,
-    p392_tree,
-    row_12,
-    *active_rows,
-) = sys.argv[4:]
-repo_root = Path.cwd().resolve()
-
-assert (
-    root != repo_root
-    and repo_root not in root.parents
-    and root not in repo_root.parents
-), {
-    "stage": "post-u05-prior-red-evidence-location",
-}
-
-identity_path = root / "identity.json"
-summary_path = root / "individual-red-summary.json"
-
-def sha256(path):
-    return hashlib.sha256(path.read_bytes()).hexdigest()
-
-assert sha256(identity_path) == identity_hash
-assert sha256(summary_path) == summary_hash
-
-identity = json.loads(identity_path.read_text(encoding="utf-8"))
-assert identity["repository"] == repository
-assert identity["branch"] == issue_branch
-assert identity["integration_branch"] == integration_branch
-assert identity["p392_sha"] == p392_sha
-assert identity["p392_tree"] == p392_tree
-
-initial_sha = identity["spec_freeze_sha"]
-initial_tree = identity["spec_freeze_tree"]
-resolved_sha = subprocess.check_output(
-    ["git", "rev-parse", "--verify", f"{initial_sha}^{{commit}}"],
-    text=True,
-).strip()
-resolved_tree = subprocess.check_output(
-    ["git", "rev-parse", f"{initial_sha}^{{tree}}"],
-    text=True,
-).strip()
-assert resolved_sha == initial_sha
-assert resolved_tree == initial_tree
-subprocess.run(
-    ["git", "merge-base", "--is-ancestor", initial_sha, resume_checkpoint],
-    check=True,
-)
-
-expected_nodes = [node for node in active_rows if node != row_12]
-expected_ordinals = [
-    ordinal for ordinal in range(1, 16) if ordinal not in {2, 12}
-]
-summary = json.loads(summary_path.read_text(encoding="utf-8"))
-assert [item["ordinal"] for item in summary] == expected_ordinals
-assert [item["nodeid"] for item in summary] == expected_nodes
-
-for item in summary:
-    ordinal = item["ordinal"]
-    nodeid = item["nodeid"]
-    log_path = root / f"row-{ordinal:02d}-red.log"
-    observation_path = root / f"row-{ordinal:02d}-red-observation.json"
-    assert item["returncode"] == 1
-    assert sha256(log_path) == item["raw_log_sha256"]
-    assert sha256(observation_path) == item["observation_sha256"]
-
-    observation = json.loads(
-        observation_path.read_text(encoding="utf-8")
-    )
-    assert observation["collected"] == [nodeid]
-    assert observation["executed"] == [nodeid]
-    assert observation["outcomes"] == {nodeid: "failed"}
-    assert observation["failure_signatures"][nodeid] == item["failure_signature"]
-
-    if ordinal == 3:
-        log = log_path.read_text(encoding="utf-8")
-        assert "token@" not in log
-        assert "https://token@github.com" not in log
-
-print("prior-initial-red=13/13 reused")
 PY
 
 env TMPDIR="$TEST_TMPDIR" \
@@ -3868,7 +3760,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 2. `individual-red-summary.json`
 
    * initial modeで13件を生成
-   * post-U05 modeではpacket指定rootの既存summary・identity・全raw log/observation hashを検証して再利用し、再実行・コピーしない
+   * post-U05 modeでは既存Workbench記録を使い、外部root、identity manifest、外部packetでの過去hash照合は要求しない。外部rootの欠落はblockerにしない。既存REDを作り直すための再実行やコピーはしない
 
 3. Row GREEN observations
 

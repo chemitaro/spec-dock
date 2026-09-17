@@ -103,10 +103,6 @@ spec_freeze_tree: "<actual clean pushed 40-hex tree>"
 resume_mode: "initial-spec-freeze | post-u05-checkpoint"
 resume_checkpoint_sha: "<required only for post-u05-checkpoint>"
 resume_checkpoint_tree: "<required only for post-u05-checkpoint>"
-initial_red_evidence:
-  root: "<repository-external immutable directory; required only for post-u05-checkpoint>"
-  identity_sha256: "<64 lowercase hex; required only for post-u05-checkpoint>"
-  summary_sha256: "<64 lowercase hex; required only for post-u05-checkpoint>"
 
 spec_review:
   reviewer: chatgpt-spec-review-strict
@@ -162,7 +158,7 @@ pr_prepare_authorized: false
 human_merge_only: true
 ```
 
-`initial-spec-freeze`では`initial_red_evidence`を省略する。`post-u05-checkpoint`ではその3 fieldを必須とし、既存の初回RED証拠をSHA-256でpacketへ束縛する。
+`post-u05-checkpoint`では外部RED evidence rootと過去identityのpacket fieldsを要求しない。既存Workbenchのsummary・raw log・observationを行単位の履歴記録として使う。外部rootの欠落では実装ゲートを止めず、修復済みnodeを過去のRED再取得のために実行しない。
 
 ### 3.1 Environment mapping
 
@@ -173,9 +169,6 @@ human_merge_only: true
 | `resume_mode`                        | `RESUME_MODE`                        |
 | `resume_checkpoint_sha`              | `RESUME_CHECKPOINT_SHA`              |
 | `resume_checkpoint_tree`             | `RESUME_CHECKPOINT_TREE`             |
-| `initial_red_evidence.root`          | `INITIAL_RED_EVIDENCE_ROOT`          |
-| `initial_red_evidence.identity_sha256` | `INITIAL_RED_IDENTITY_SHA256`       |
-| `initial_red_evidence.summary_sha256`  | `INITIAL_RED_SUMMARY_SHA256`        |
 | `spec_review.receipt_path`           | `SPEC_REVIEW_RECEIPT_PATH`           |
 | `spec_review.receipt_sha256`         | `SPEC_REVIEW_RECEIPT_SHA256`         |
 | `implementation_authorized`          | `IMPLEMENTATION_AUTHORIZED`          |
@@ -245,9 +238,6 @@ case "$RESUME_MODE" in
   post-u05-checkpoint)
     : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
     : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
-    : "${INITIAL_RED_EVIDENCE_ROOT:?INITIAL_RED_EVIDENCE_ROOT is required}"
-    : "${INITIAL_RED_IDENTITY_SHA256:?INITIAL_RED_IDENTITY_SHA256 is required}"
-    : "${INITIAL_RED_SUMMARY_SHA256:?INITIAL_RED_SUMMARY_SHA256 is required}"
     ;;
   *) exit 1 ;;
 esac
@@ -1122,7 +1112,7 @@ Extra violation、missing violation、別row failureがあれば停止する。
 
 ### 14.1R Post-U05 terminalized entry (`post-u05-checkpoint` only)
 
-13-row initial RED evidenceはPlan §7 D1Rに従い、packet指定rootのidentity・summary・各raw log/observation hash、repository/branch/P392 identity、node集合、初回spec SHAの祖先関係を検証して再利用する。欠落・不一致時はE1/E2前に停止し、修復済みnodeを再実行しない。
+13-row initial REDの外部rootとidentityは、ユーザー判断により運用管理上の任意記録へ変更した。既存の`.workbench/luna-max-implement/evidence/`内のsummary・ログ・observationを行単位の履歴記録として使い、外部rootがないことだけではE1/E2前に停止しない。コピーや後付けidentity作成、修復済みnodeの再実行はしない。
 
 post-U05では、U05後に既に確定したcurrent ledgerの15 total / 0 active / 15 resolved / 14 `fixed-in-place` / 1 `superseded`をread-onlyで確認する。D1相当の`ledger-mismatch`、exact 10 active-row violationsまたはU05のledger transitionを再実行しない。migration observerがP392 beforeとcurrent root afterの契約を確認し、Issue #392 boundary witnessと今回のfocused Product/test変更はE4R相当のfocused recheckで検証する。
 
@@ -2251,7 +2241,7 @@ implementation_tree
 
 ### 31.2 RED evidence
 
-Initial-spec-freeze mode creates the RED files below. Post-U05 mode references the prior immutable evidence root and hashes supplied in packet v3; D1R verifies them and does not copy the files or rerun repaired nodes.
+Initial-spec-freeze mode creates the RED files below. Post-U05 mode uses existing local Workbench records; an external root and its identity/hash packet are not required. Do not copy records or rerun repaired nodes to recreate historical RED.
 
 * `individual-red-summary.json`
 * `row-01-red-observation.json`

@@ -200,7 +200,7 @@
   <div class="callout ok"><strong>修正後の作成経路:</strong> create/link_existing → 既存publication endpointを一度だけ実行 → accepted slugをsame-repository validationへ渡す → create時は<code>IssueGateway</code>へslugを渡す → <code>gh issue create --repo &lt;slug&gt;</code>。importは従来どおりfetch-onlyです。retry、cache、feature flag、二重parserは追加しません。</div>
   <h3>現在のユーザー判断</h3>
   <p>Epic #384の簡素化方針に沿った仕様修正と、GPT-5.6 ProによるStrictスペックレビューはすでに承認されています。今回の文書補正自体について、追加のProduct方針やsecurity選択は求めていません。</p>
-  <p class="small muted">実装はStrictレビューが<code>review_status=pass</code>、P0=0、P1=0になった後に限って開始します。post-U05の既存RED証拠が欠落・不一致なら編集前に停止し、必要な証拠の場所・SHA・不足項目を提示します。最終PR mergeは引き続き人間だけが判断します。</p>
+  <p class="small muted">実装はStrictレビューが<code>review_status=pass</code>、P0=0、P1=0になった後に開始します。ユーザー判断により、post-U05の過去RED記録を包む外部保存場所やidentityは管理用であり、必須ではありません。Issue Workbenchにある既存ログを使い、現在のテストとclean candidateの検証も行います。最終PR mergeは人間だけが判断します。</p>
 </section>
 
 <section id="admission-change">
@@ -430,7 +430,7 @@ end note
 
 <section id="normal-flow">
   <h2>正常flow</h2>
-  <div class="callout ok"><strong>post-U05でのRED証拠:</strong> 初回の13-row REDは、packetが指定するrepository外evidenceからidentity・summary・raw log/observationのhashを検証して再利用します。証拠が見つからない・一致しない場合は編集前に停止し、修復済みnodeをREDに戻すためだけの再実行はしません。</div>
+  <div class="callout ok"><strong>post-U05の過去RED記録:</strong> Issue Workbenchにある初回13-rowのsummary・ログ・observationをそのまま使います。別の外部保存先やidentityの後付けは不要です。修復済みnodeを過去の失敗記録を作るために再実行することもしません。正しさは現在のGREENテスト、終端化済み台帳、clean candidateのfull verifierで確認します。</div>
   <script type="text/plain" class="plantuml-source" id="source-normal-flow" data-target="diagram-normal-flow">
 
 @startuml
@@ -456,6 +456,7 @@ if (Resume mode?) then (initial)
 else (post-U05)
   :Resume checkpointを祖先として確認;
   :Existing terminal ledger 15/0/15を確認;
+  :既存RED記録を行履歴として使用;
   :P392 boundary witness整理とfocused Product/testを修正;
   :Provider source GREEN;
   :SpecDock updateでdogfoodへ投影;
