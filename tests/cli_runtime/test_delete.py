@@ -529,7 +529,7 @@ class TestCliDelete(CliRuntimeHarness):
             if isinstance(edge, dict)
         )
 
-        activated = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00058", "--force"], env=env)
+        activated = self._run_runtime_capture(target, ["active", "set", "--id", "iss-00058"], env=env)
         assert activated.returncode == 0, activated.stdout + activated.stderr
         assert "spec-dock: ok (active set)" in activated.stdout
         assert "iss-00056" not in activated.stdout + activated.stderr

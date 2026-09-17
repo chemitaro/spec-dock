@@ -3,8 +3,8 @@
 kind: "corrected-plan"
 issue: "iss-00395"
 title: "Issue #395 LunaMax-ready Execution Plan"
-artifact_path: "plan.md"
-generated_at: "2026-09-16"
+artifact_path: "artifacts/plan-lunamax-ready.md"
+generated_at: "2026-09-15"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 integration_branch: "codex/epic-00384-provider-test-strategy-planning"
@@ -12,10 +12,8 @@ elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
-support_history_sha: "c0736434503117d5d468d1438fb18da16d382a56"
-support_history_tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
-planning_level: "implementation-ready-after-strict-review-and-dispatch"
-implementation_allowed: true
+planning_level: "implementation-ready-after-adoption-review-and-dispatch"
+implementation_allowed: false
 owner_decisions_required: []
 human_merge_only: true
 authority: "advisory-corrected-plan"
@@ -25,9 +23,9 @@ authority: "advisory-corrected-plan"
 
 ## 1. 実行原則
 
-本書はIssue #395の完全な実装順序、検証ゲート、証拠形式および停止条件を固定する。ユーザーの明示承認により、canonical statusの`implementation_allowed`はtrueである。ただし、実行者は最初のmutation前にPhase Eのexecution packet検証、exact identity、独立レビュー証跡、同時書き込みなしの確認を満たさなければならない。
+本書はIssue #395の完全な実装順序、検証ゲート、証拠形式および停止条件を固定する。ただし、本書自体はProduct、test、ledger、dogfood projectionの変更を許可しない。
 
-GPT-5.6 LunaMaxは、両modeでPhase A〜Cのread-only preflightを実行できる。`initial-spec-freeze`ではD1の初回entry observationまで、`post-u05-checkpoint`ではD1Rのterminal-state entry proofまでがread-only preflightである。Issue #392 boundary witnessの文書SHA結合を除去する変更は、仕様レビュー前の同期ではなく、Strict仕様レビューpass後の通常の実装トラックで行う。次の操作は、Phase Eのexecution packet検証と同時書き込みなしの確認が成立するまで禁止する。
+GPT-5.6 LunaMaxは、実装許可がfalseの状態でも**Phase A〜Dのread-only preflight**を実行できる。次の操作は、Phase Eのmutation authorizationがすべて成立するまで禁止する。
 
 * Product sourceの編集
 * regression testの編集
@@ -50,23 +48,6 @@ GPT-5.6 LunaMaxは、両modeでPhase A〜Cのread-only preflightを実行でき�
 * obsolete APIまたはretired CLI flagの復活
 * 推測による別設計の採用
 
-### 1.1 Issue #392境界テストの独立性
-
-`tests/integration/test_issue_392_acceptance.py`は、P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`のimmutable `full-regression-ledger.json` blobと、Issue #392のbaseline、timing、required-fast、policy、workflow、boundary assertionを検証する独立したwitnessである。Issue #395/396のcanonical document SHAをProduct regression gateへ同期しない。
-
-必要なtest-surface整理として、`_ISSUE_BOUNDARY_SHA256`からIssue #395/396文書の固定値照合を取り除くことは許可する。これは#392のassertionを削除・弱化・skip・xfail化せず、文書更新をIssue #392のProduct gateへ結合しないための最小変更である。Issue #395の15/0/15は、Issue #395のledger observerとfull verifierで検証する。
-
-### 1.2 仕様訂正トラックとcheckpoint再開モード
-
-最新のStrict仕様レビューがP0/P1を返した場合、まず`documentation-correction`として本Plan、Design、Requirement、および実装handoff/guide/manifestの契約だけを訂正する。このトラックではProduct、test、ledger、dogfood、evaluator、verifierを変更せず、実装許可済みの実装トラックへ進まない。訂正後のclean pushed SHAを同じ仕様レビューへ再投入し、`review_status=pass`、P0=0、P1=0になった後にだけ、以下の実装トラックを再開する。
-
-実装トラックには二つのidentity modeがある。
-
-* **`initial-spec-freeze`:** `SPEC_FREEZE_SHA/TREE`がcurrent local `HEAD`、configured upstream、Issue branchのremote tipであり、cleanであることを確認してから最初のmutationを行う。
-* **`post-u05-checkpoint`:** `SPEC_FREEZE_SHA/TREE`をreviewed specificationのauthorityおよびcurrent local `HEAD`、configured upstream、Issue branchのremote tipの一致対象とする。実行packetが渡す`RESUME_CHECKPOINT_SHA/TREE`はU05後の既存clean実装candidateを表す祖先のresume基点として別に検証し、current tipの一致対象にはしない。U05が既に完了していること、current root ledgerがterminalizedであること、L1を再実行しないことを確認する。実装はreviewed specification freezeから始め、必要なnon-empty差分だけをfocused implementation pathsへstageする。resume checkpointをcurrent tipとして採用したり、空のcommitを作ったりしない。
-
-`SPEC_FREEZE_SHA`をoriginal specification、resume checkpoint、pre-push current candidateの三つの意味で再利用してはならない。reset、rebase、stash、alternate index、force push、U05 transitionの再実行で古いidentityを作り直すことは禁止する。
-
 ## 2. 固定定数とnode集合
 
 ```bash
@@ -82,19 +63,6 @@ export P392_TREE="190bc566a18cd84813c4b7c043f8724e275cb55d"
 
 export ELABORATION_INPUT_SHA="fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 export ELABORATION_INPUT_TREE="4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
-
-export SUPPORT_HISTORY_SHA="c0736434503117d5d468d1438fb18da16d382a56"
-export PREVIOUS_SPEC_CANDIDATE_SHA="78d6406ba7df8bd4953f2c3f6db5610d635ff48c"
-
-export RESUME_MODE="${RESUME_MODE:-initial-spec-freeze}"
-case "$RESUME_MODE" in
-  initial-spec-freeze) ;;
-  post-u05-checkpoint)
-    : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
-    : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
-    ;;
-  *) exit 1 ;;
-esac
 
 ROW_1='tests/cli_runtime/test_delete.py::TestCliDelete::test_delete_scrubbed_meta_is_not_reobserved_by_validate_sync_active'
 ROW_2_HISTORICAL='tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_issue359_final_source'
@@ -112,14 +80,6 @@ ROW_12='tests/cli_runtime/test_runtime_shell_s11.py::TestRuntimeShellS11::test_f
 ROW_13='tests/cli_runtime/test_sync.py::TestCliSync::test_new_and_active_and_sync'
 ROW_14='tests/cli_runtime/test_sync.py::TestCliSync::test_sync_emits_tree_puml_ready_board_at_spec_dock_root'
 ROW_15='tests/cli_runtime/test_workbench.py::TestCliWorkbench::test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands'
-ISSUE_392_BOUNDARY_TEST='tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged'
-
-ROW3_CREATE_BOUNDARY_NODES=(
-  'tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write'
-  'tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_with_canonical_origin_scope_still_succeeds'
-  'tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_link_existing_same_repo_scope_succeeds_and_persists_canonical_scope'
-  'tests/cli_runtime/test_new.py::TestCliNew::test_new_issue_can_create_github_issue_and_use_its_number'
-)
 
 ACTIVE_ROWS=(
   "$ROW_1"
@@ -146,17 +106,7 @@ ALL_OBSERVED_ROWS=(
 IMPLEMENTATION_PATHS=(
   full-regression-ledger.json
   src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
-  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py
-  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py
-  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
-  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py
-  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py
   spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
-  spec-dock/scripts/spec_dock_runtime/application/repo_context.py
-  spec-dock/scripts/spec_dock_runtime/application/ports.py
-  spec-dock/scripts/spec_dock_runtime/application/create_node.py
-  spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
-  spec-dock/scripts/spec_dock_runtime/infra/github_cli.py
   spec-dock/spec-dock.version
   .agents/skills/spec-dock/.spec-dock-provider-slot.json
   .agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
@@ -165,11 +115,6 @@ IMPLEMENTATION_PATHS=(
   tests/cli_runtime/test_runtime_import_s10.py
   tests/cli_runtime/test_sync.py
   tests/cli_runtime/test_workbench.py
-  tests/cli_runtime/test_new.py
-  tests/unit/commands/test_runtime_new_s08.py
-  tests/unit/infra/test_init_update.py
-  tests/unit/test_provider_test_lanes.py
-  tests/integration/test_issue_392_acceptance.py
 )
 
 SPEC_PACK_PATHS=(
@@ -179,25 +124,6 @@ SPEC_PACK_PATHS=(
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-luna-max-implementation-handoff.md
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-human-guide.html
   spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-chatgpt-spec-pack-manifest.md
-)
-
-PRESERVED_SUPPORT_HISTORY_PATHS=(
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/design-luna-max-ready.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-design-tdd-ready.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-lunamax-handoff-tdd-ready.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-plan-review-analysis.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-plan-tdd-ready.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-requirement-tdd-ready.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-spec-pack.zip
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-tdd-ready-manifest.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-tdd-ready-pack.receipt.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/iss-00395-tdd-ready-pack.zip
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-implementation-handoff-ready.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-analysis.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-manifest.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-pack.receipt.md
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/luna-max-readiness-pack.zip
-  spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/artifacts/plan-lunamax-ready.md
 )
 ```
 
@@ -236,7 +162,7 @@ PRESERVED_SUPPORT_HISTORY_PATHS=(
    * failure signatureなし
    * skip、xfail、xpass、errorなし
 
-4. Current full verifierをmerge-blocking evidenceとして扱う場合は、clean committed candidateからprivate artifact rootを明示して実行する。共有された`spec-dock/.workbench/full-regression`から「最新run」を推測してはならず、working treeではfocused/manual diagnosticに限定する。
+4. Current full verifierは、private artifact rootを明示して実行する。共有された`spec-dock/.workbench/full-regression`から「最新run」を推測してはならない。
 
 ## 4. Phase A — private evidence workspace
 
@@ -278,9 +204,9 @@ Raw log、absolute private path、credential-bearing outputは配布用evidence�
 
 ## 5. Phase B — read-only repository / specification preflight
 
-### B1. Specification and resume identity
+### B1. Adopted specification identity
 
-Read-only preflightであっても、dispatchはreviewed specification freezeのclean pushed identityを明示しなければならない。`SPEC_FREEZE_SHA/TREE`はreviewed specificationのauthorityであり、両modeでcurrent tip equalityの対象である。`post-u05-checkpoint`の`RESUME_CHECKPOINT_SHA/TREE`は、そのcurrent tipへ至る既存実装の祖先基点であり、別のidentityとして検証する。
+Read-only preflightであっても、dispatchはadopt済みclean pushed canonical specificationのSHA/treeを渡さなければならない。
 
 ```bash
 : "${SPEC_FREEZE_SHA:?SPEC_FREEZE_SHA is required}"
@@ -288,22 +214,6 @@ Read-only preflightであっても、dispatchはreviewed specification freezeの
 
 test "${#SPEC_FREEZE_SHA}" -eq 40
 test "${#SPEC_FREEZE_TREE}" -eq 40
-
-case "$RESUME_MODE" in
-  initial-spec-freeze)
-    EXPECTED_CURRENT_SHA="$SPEC_FREEZE_SHA"
-    EXPECTED_CURRENT_TREE="$SPEC_FREEZE_TREE"
-    ;;
-  post-u05-checkpoint)
-    : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
-    : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
-    test "${#RESUME_CHECKPOINT_SHA}" -eq 40
-    test "${#RESUME_CHECKPOINT_TREE}" -eq 40
-    EXPECTED_CURRENT_SHA="$SPEC_FREEZE_SHA"
-    EXPECTED_CURRENT_TREE="$SPEC_FREEZE_TREE"
-    ;;
-  *) exit 1 ;;
-esac
 ```
 
 ### B2. Repository、branch、upstream、remote、ancestry、clean status
@@ -313,51 +223,71 @@ git fetch --prune origin
 
 test "$(git rev-parse --show-toplevel)" = "$PWD"
 test "$(git rev-parse --abbrev-ref HEAD)" = "$ISSUE_BRANCH"
-test "$(git rev-parse HEAD)" = "$EXPECTED_CURRENT_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
+test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
 
-test "$(git rev-parse '@{upstream}')" = "$EXPECTED_CURRENT_SHA"
+test "$(git rev-parse '@{upstream}')" = "$SPEC_FREEZE_SHA"
 test "$(git rev-parse --abbrev-ref --symbolic-full-name '@{upstream}')" = "origin/$ISSUE_BRANCH"
 
 REMOTE_LINE="$(git ls-remote --heads origin "refs/heads/$ISSUE_BRANCH")"
 test "$(printf '%s\n' "$REMOTE_LINE" | awk 'NF {count++} END {print count+0}')" -eq 1
-test "$(printf '%s\n' "$REMOTE_LINE" | awk 'NF {print $1}')" = "$EXPECTED_CURRENT_SHA"
+test "$(printf '%s\n' "$REMOTE_LINE" | awk 'NF {print $1}')" = "$SPEC_FREEZE_SHA"
 
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
 
 git merge-base --is-ancestor "$P392_SHA" "$ELABORATION_INPUT_SHA"
 git merge-base --is-ancestor "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA"
-git merge-base --is-ancestor "$SPEC_FREEZE_SHA" "$EXPECTED_CURRENT_SHA"
-
-if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
-  git merge-base --is-ancestor "$RESUME_CHECKPOINT_SHA" "$SPEC_FREEZE_SHA"
-  test "$(git rev-parse "$RESUME_CHECKPOINT_SHA^{tree}")" = \
-    "$RESUME_CHECKPOINT_TREE"
-fi
 
 test "$(git rev-parse "$P392_SHA^{tree}")" = "$P392_TREE"
 test "$(git rev-parse "$ELABORATION_INPUT_SHA^{tree}")" = "$ELABORATION_INPUT_TREE"
 ```
 
-`post-u05-checkpoint`では、U05の承認済み遷移が`RESUME_CHECKPOINT_SHA`の履歴に既に存在することを別途確認し、L1を再実行しない。current `HEAD`は`SPEC_FREEZE_SHA`に一致し、resume checkpointからcurrent spec-review targetまでの差分はB5でcanonical-document-onlyと検証する。`initial-spec-freeze`では、従来どおりspec freezeから実装を開始する。
-
 一つでも失敗した場合、Product/test/ledger/dogfood変更0で停止する。
 
 ### B3. Origin repository identity
 
-Production code is the single source of truth for repository parsing. The preflight calls the shipped fetch-only resolver and compares its normalized slug with `EXPECTED_REPOSITORY`; it does not contain a second `urlsplit`/regex parser. Publication strictness is exercised only by the existing publication endpoint and the create-boundary tests.
+Raw remote URLを出力せず、current originが`chemitaro/spec-dock`であることを検査する。
 
 ```bash
-env PYTHONPATH=src/spec_dock/assets/spec_dock/scripts \
-  uv run python - "$EXPECTED_REPOSITORY" <<'PY'
-from pathlib import Path
+python - "$EXPECTED_REPOSITORY" <<'PY'
+import re
+import subprocess
 import sys
+from urllib.parse import urlsplit
 
-from spec_dock_runtime.infra.git_cli import origin_github_repo_slug
-
-repository = Path.cwd()
 expected = sys.argv[1].lower()
-actual = origin_github_repo_slug(repository)
+raw = subprocess.check_output(
+    ["git", "remote", "get-url", "origin"],
+    text=True,
+).strip()
+
+def parse_slug(value: str) -> str | None:
+    if re.match(r"^(?:ssh://)?git@github\.com[:/]", value, re.IGNORECASE):
+        path = re.sub(
+            r"^(?:ssh://)?git@github\.com[:/]",
+            "",
+            value,
+            flags=re.IGNORECASE,
+        )
+    else:
+        try:
+            parsed = urlsplit(value)
+        except ValueError:
+            return None
+        if parsed.hostname is None or parsed.hostname.lower() != "github.com":
+            return None
+        path = parsed.path.lstrip("/")
+
+    if path.endswith(".git"):
+        path = path[:-4]
+
+    parts = path.rstrip("/").split("/")
+    if len(parts) != 2 or not all(parts):
+        return None
+
+    return f"{parts[0].lower()}/{parts[1].lower()}"
+
+actual = parse_slug(raw)
 assert actual == expected, {
     "expected": expected,
     "actual": actual or "unresolved",
@@ -408,21 +338,15 @@ PY
 
 Product、test、ledger、timing、policy、workflowがこの差分へ含まれていた場合は停止する。
 
-### B5. Elaboration inputからspec freezeまでのspecification admission history
+### B5. Elaboration inputからspec freezeまでのsix-file pack
 
 ```bash
-python - "$RESUME_MODE" "${RESUME_CHECKPOINT_SHA:-}" \
-  "${RESUME_CHECKPOINT_TREE:-}" "$SUPPORT_HISTORY_SHA" "$SPEC_FREEZE_SHA" \
-  "$PREVIOUS_SPEC_CANDIDATE_SHA" "${SPEC_PACK_PATHS[@]}" -- \
-  "${PRESERVED_SUPPORT_HISTORY_PATHS[@]}" <<'PY'
+python - "$ELABORATION_INPUT_SHA" "$SPEC_FREEZE_SHA" <<'PY'
 from pathlib import Path
 import subprocess
 import sys
 
-mode, resume_checkpoint, resume_tree, support_history, spec_freeze, previous_candidate, *paths = sys.argv[1:]
-separator = paths.index("--")
-primary_paths = set(paths[:separator])
-support_paths = set(paths[separator + 1:])
+base, head = sys.argv[1:]
 
 issue = Path(
     "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/"
@@ -430,21 +354,7 @@ issue = Path(
     "issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 )
 
-def changed_paths(base, head):
-    return set(
-        subprocess.check_output(
-            ["git", "diff", "--name-only", "--no-renames", base, head, "--"],
-            text=True,
-        ).splitlines()
-    )
-
-assert subprocess.check_output(
-    ["git", "merge-base", "--is-ancestor", support_history, spec_freeze],
-    text=True,
-    stderr=subprocess.DEVNULL,
-) == ""
-
-assert primary_paths == {
+expected = {
     str(issue / "requirement.md"),
     str(issue / "design.md"),
     str(issue / "plan.md"),
@@ -453,48 +363,29 @@ assert primary_paths == {
     str(issue / "artifacts/iss-00395-chatgpt-spec-pack-manifest.md"),
 }
 
-if mode == "initial-spec-freeze":
-    assert changed_paths(support_history, spec_freeze) == primary_paths, {
-        "stage": "support-history-checkpoint-to-spec-freeze",
-        "expected": sorted(primary_paths),
-        "actual": sorted(changed_paths(support_history, spec_freeze)),
-    }
-    assert changed_paths(previous_candidate, spec_freeze) == primary_paths
-elif mode == "post-u05-checkpoint":
-    assert resume_checkpoint and len(resume_checkpoint) == 40
-    assert len(resume_tree) == 40
-    subprocess.run(
-        ["git", "merge-base", "--is-ancestor", resume_checkpoint, spec_freeze],
-        check=True,
-    )
-    assert subprocess.check_output(
-        ["git", "rev-parse", f"{resume_checkpoint}^{{tree}}"],
+actual = set(
+    subprocess.check_output(
+        ["git", "diff", "--name-only", base, head, "--"],
         text=True,
-    ).strip() == resume_tree
-    assert changed_paths(resume_checkpoint, spec_freeze) <= primary_paths, {
-        "stage": "resume-checkpoint-to-reviewed-specification",
-        "allowed": sorted(primary_paths),
-        "actual": sorted(changed_paths(resume_checkpoint, spec_freeze)),
-    }
-else:
-    raise AssertionError(f"unsupported resume mode: {mode}")
+    ).splitlines()
+)
 
-support_changes = changed_paths(support_history, spec_freeze) & support_paths
-assert not support_changes, {
-    "stage": "support-history-no-diff",
-    "changed": sorted(support_changes),
+assert actual == expected, {
+    "stage": "elaboration-to-spec-freeze",
+    "expected": sorted(expected),
+    "actual": sorted(actual),
 }
 
-for path in sorted(primary_paths):
+for path in sorted(expected):
     candidate = Path(path)
     assert candidate.is_file(), path
     assert candidate.stat().st_size > 0, path
 
-print(f"canonical-spec-admission-ok mode={mode}; support-history-nonblocking=true")
+print("spec-freeze-pack-only-ok")
 PY
 ```
 
-`SPEC_PACK_PATHS`はhuman guideを含む6件のcurrent canonical specification packである。`IMPLEMENTATION_PATHS`は実装candidateのfocused path setであり、`PRESERVED_SUPPORT_HISTORY_PATHS`は履歴として参照できるがcurrent authorityではない。B5はcurrent canonical packの差分とsupport historyのno-diffだけを確認し、support historyのmode、object type、Git object ID一致や、22/19-path累積allowlistを実装開始の条件にしない。support historyのedit、delete、rename、copy substitution、regenerate、recompress、新規追加がcurrent candidateに含まれる場合だけ、no-diff違反として停止する。
+Human guideを含むsix filesの実体が必要である。Manifestの自己申告または過去のhashだけでは代替できない。
 
 ### B6. Active state、managed metadata、SpecDock validation
 
@@ -547,10 +438,9 @@ Preflightを通すために次を行ってはならない。
 
 ### C1. Exact source blob guard
 
-`initial-spec-freeze`では、`SPEC_FREEZE_SHA`において、次のProduct/test/ledger/policy/workflow blobsがelaboration inputと一致しなければならない。`post-u05-checkpoint`では、同じno-touch面が`RESUME_CHECKPOINT_SHA`と`SPEC_FREEZE_SHA`の間で一致し、仕様訂正が実装candidateを変更していないことを検証する。post-U05でP392前のledger blobをcurrent spec freezeへ再適用してはならない。
+`SPEC_FREEZE_SHA`において、次のProduct/test/ledger/policy/workflow blobsがelaboration inputと一致しなければならない。
 
 ```bash
-if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
 python - "$SPEC_FREEZE_SHA" <<'PY'
 import subprocess
 import sys
@@ -620,64 +510,15 @@ mismatch = {
 assert not mismatch, mismatch
 print("source-blob-guard-ok")
 PY
-else
-python - "$RESUME_CHECKPOINT_SHA" "$SPEC_FREEZE_SHA" <<'PY'
-import subprocess
-import sys
-
-base, head = sys.argv[1:]
-
-paths = {
-    "full-regression-ledger.json",
-    "full-regression-timing-weights.json",
-    "tests/conftest.py",
-    "scripts/quality/full_regression_baseline.py",
-    "scripts/quality/verify_full_regression.py",
-    "tests/unit/test_full_regression_baseline.py",
-    ".github/workflows/provider-ci.yml",
-    ".github/workflows/provider-full-regression.yml",
-    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py",
-    "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py",
-    "spec-dock/spec-dock.version",
-    ".agents/skills/spec-dock/.spec-dock-provider-slot.json",
-    ".agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json",
-    "tests/cli_runtime/test_delete.py",
-    "tests/cli_runtime/test_import.py",
-    "tests/cli_runtime/test_runtime_import_s10.py",
-    "tests/cli_runtime/test_sync.py",
-    "tests/cli_runtime/test_workbench.py",
-    "tests/unit/test_provider_test_lanes.py",
-    "tests/integration/test_issue_392_acceptance.py",
-}
-
-def blob(revision, path):
-    return subprocess.check_output(
-        ["git", "rev-parse", f"{revision}:{path}"],
-        text=True,
-    ).strip()
-
-mismatch = {
-    path: {"resume": blob(base, path), "spec": blob(head, path)}
-    for path in sorted(paths)
-    if blob(base, path) != blob(head, path)
-}
-
-assert not mismatch, mismatch
-print("post-u05-source-and-implementation-no-touch-ok")
-PY
-fi
 ```
 
 Blob driftがある場合は、仕様入力と実装対象が一致していないため変更0で停止する。
 
 ### C2. Immutable pre-transition ledger evidence
 
-`ledger-before.json`は作業ツリーの現行rootをコピーして作らない。P392 entryのimmutable Git blobをhistorical beforeとして再構築し、U05遷移前のcurrent rootまたはU05後のcurrent rootを、実行フェーズに応じたafterとして別に検証する。U05後のcheckpointから再開する場合、ledger transition writeを再実行せず、P392 beforeとcurrent root afterの保存証明だけを実施する。
-
 ```bash
-git show \
-  "$P392_SHA:full-regression-ledger.json" \
-  > "$EVIDENCE_DIR/ledger-before.json"
+cp full-regression-ledger.json \
+  "$EVIDENCE_DIR/ledger-before.json"
 
 python - "$EVIDENCE_DIR/ledger-before.json" <<'PY'
 from pathlib import Path
@@ -866,9 +707,7 @@ PY
 
 ## 7. Phase D — entry verifierと最初のRED
 
-### D1. Current full verifier entry observation (`initial-spec-freeze` only)
-
-このD1は、修復前の15 total / 14 active / 1 resolved状態を観測する初回route専用である。`post-u05-checkpoint`ではこのfull verifierを実行せず、初回の11 violations、`active_verified=4`、row 2だけの`resolved_verified`を要求してはならない。post-U05のentryは、次のD1Rでcurrent rootのterminal stateを確認した後、Phase Eへ進む。
+### D1. Current full verifier entry observation
 
 Verifier artifact rootは、このrun専用の空directoryとする。
 
@@ -974,16 +813,9 @@ expected = {
         "tests/cli_runtime/test_workbench.py::TestCliWorkbench::"
         "test_copied_workbench_readme_and_payloads_remain_opaque_to_runtime_commands",
     ),
-    (
-        "unexpected_failure",
-        "tests/integration/test_issue_392_acceptance.py::"
-        "test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged",
-    ),
 }
 
 assert violations == expected
-assert len(violations) == 11
-assert sum(code == "unexpected_failure" for code, _ in violations) == 1
 
 assert set(result["evaluation"]["active_verified"]) == {
     "tests/cli_runtime/test_delete.py::TestCliDelete::"
@@ -1007,83 +839,9 @@ print("entry-full-verifier-exact-allowance-ok")
 PY
 ```
 
-`RESUME_MODE=initial-spec-freeze`の受入条件は、現行baselineの診断として計画済みexact 10 violationsと、文書SHA結合を持つIssue #392 boundary witnessの既知の`unexpected_failure` 1件を記録することである。これはまだGREENではなく、boundary witnessの期待値を仕様レビュー前に同期してはならない。Strict仕様レビューpass後の実装トラックで不要な文書SHA結合を除去し、修復後に再実行するEntry verifierの受入条件はexact 10 violations、Extra violation 0、missing violation 0、#392-owned failure 0、unexpected failure 0である。`post-u05-checkpoint`では、このD1の受入条件を適用しない。
+受入条件はexact 10 violationsである。Extra violation、missing violation、#392-owned failure、unexpected failureが一件でもあれば停止する。
 
-### D1R. Post-U05 terminalized entry observation (`post-u05-checkpoint` only)
-
-`RESUME_MODE=post-u05-checkpoint`では、U05後のcurrent rootが既にterminalizedであるため、D1の初回full verifierを実行しない。Phase Eへ進む前に、current ledgerの15/0/15 invariantとmigration observerをread-onlyで確認し、U05 transitionを再実行しない。
-
-2026-09-17、ユーザーは初回13 row RED記録を包むrepository外rootとidentity manifestは運用管理用であり、本質的な作業再開条件ではないと判断した。post-U05では、既存のIssue Workbench内のsummary・raw log・observationをそのまま行単位の履歴記録として使う。外部root、`identity.json`、外部packetでのarchive hash束縛はPhase Eへの条件にしない。外部rootが見つからなくても停止せず、既存ログのコピーやidentityの後付け作成、修復済みnodeのRED再取得は行わない。製品の正しさはcurrent ledger、migration observer、focused GREEN、およびclean candidateのfull verifierで確認する。
-
-```bash
-POST_U05_ENTRY_OBS="$EVIDENCE_DIR/post-u05-terminal-entry-observation.json"
-
-python - "$POST_U05_ENTRY_OBS" <<'PY'
-from pathlib import Path
-import json
-import sys
-
-ledger = json.loads(
-    Path("full-regression-ledger.json").read_text(encoding="utf-8")
-)
-rows = ledger["failure_paths"]
-
-assert len(rows) == 15
-assert all(row["lifecycle"] == "resolved" for row in rows)
-assert sum(
-    row.get("resolution_mode") == "fixed-in-place"
-    for row in rows
-) == 14
-assert sum(
-    row.get("resolution_mode") == "superseded"
-    for row in rows
-) == 1
-assert not any(row.get("lifecycle") == "active" for row in rows)
-
-Path(sys.argv[1]).write_text(
-    json.dumps(
-        {
-            "schema_version": 1,
-            "entry_mode": "post-u05-checkpoint",
-            "total": len(rows),
-            "active": sum(row["lifecycle"] == "active" for row in rows),
-            "resolved": sum(row["lifecycle"] == "resolved" for row in rows),
-            "fixed_in_place": sum(
-                row.get("resolution_mode") == "fixed-in-place"
-                for row in rows
-            ),
-            "superseded": sum(
-                row.get("resolution_mode") == "superseded"
-                for row in rows
-            ),
-        },
-        indent=2,
-        ensure_ascii=False,
-    )
-    + "\n",
-    encoding="utf-8",
-)
-print("post-u05-terminal-entry=15/0/15 fixed=14 superseded=1")
-PY
-
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    -q \
-    --tb=short \
-    tests/unit/test_provider_test_lanes.py::test_full_regression_ledger_migration_preserves_schema1_history
-```
-
-このD1Rは、初回D1の11 violationsやfull-verifier `ledger-mismatch` receiptの代替ではない。D1Rとmigration observerがGREENでなければ、E1/E2およびmode-specificな実装再開へ進まず、Product/test/ledger/dogfoodを変更しない。post-U05ではD1、D1.1、D2、D3およびledger transitionを再実行せず、E4Rでterminalized stateを前提に再検証する。
-
-### D1.1 — Issue #392境界witnessの独立性 (`initial-spec-freeze` only)
-
-前回のspec freeze候補で観測した`ISSUE_392_BOUNDARY_TEST`のSHA不一致は、今回の仕様修正を反映する前の診断証拠として保持する。この節ではtracked fileを編集しない。Strict仕様レビューpass後の実装トラックで、`tests/integration/test_issue_392_acceptance.py`からIssue #395/#396文書の固定SHA照合だけを除去し、P392のimmutable ledger blob、baseline、timing、required-fast、policy、workflow、boundary assertionsは保持する。
-
-この整理は仕様書SHAを更新する同期処理ではなく、Issue #392のProduct gateとIssue #395のcanonical documentを分離するための最小test-surface変更である。変更後は境界テストを`--run-full-regression --full-regression-shard`付きで一度実行し、normal passを記録する。固定SHAの追加更新、baseline assertionの削除・弱化・skip・xfail化、別のProduct gateの追加は行わない。
-
-### D2. Rows 1、3–11、13–15の個別RED (`initial-spec-freeze` only)
-
-この節とD3の初回RED証拠は、Phase Eのmutation authorization通過後、最初のtracked file editより前に取得する。boundary witness整理を含むtest変更やProduct変更の後にREDを取り直してはならない。実行順序はD1、E1/E2、D2/D3、最初のfile editである。
+### D2. Rows 1、3–11、13–15の個別RED
 
 13 rowsを一件ずつ実行し、各rowの最初の失敗層を独立に確認する。
 
@@ -1247,9 +1005,9 @@ PY
 * 対象外nodeが実行される
 * credential-bearing URLがlogへ露出する
 
-### D3. Row 12のfirst REDとcurrent node GREEN (`initial-spec-freeze` only)
+### D3. Row 12のfirst REDとcurrent node GREEN
 
-Row 12のfirst REDは初回D1の`coverage_mismatch`である。Product-boundary node自身は既にnormal passしなければならない。`post-u05-checkpoint`ではD1およびこのinitial RED acquisitionを実行せず、D1Rのterminal-state proofを使用する。
+Row 12のfirst REDはD1の`coverage_mismatch`である。Product-boundary node自身は既にnormal passしなければならない。
 
 ```bash
 ROW12_ENTRY_OBS="$EVIDENCE_DIR/row-12-entry-observation.json"
@@ -1287,7 +1045,7 @@ Nodeが失敗する場合はsource driftとして停止する。Row 12を推測�
 
 ## 8. Phase E — mutation authorization gate
 
-`initial-spec-freeze`では、このPhaseを初回D1のread-only観測後、D2/D3のRED確認と最初のfile editに先立って実行する。`post-u05-checkpoint`では、D1Rのterminal-state entry proof後にこのPhaseへ入り、D1、D1.1、D2、D3のinitial routeを実行しない。いずれのmodeでもE1/E2の完了前にtracked file editを行ってはならない。
+このPhaseは、最初のfile editの直前に実行する。
 
 ### E1. 必須environment values
 
@@ -1330,8 +1088,7 @@ python - \
   "$EXPECTED_REPOSITORY" \
   "$ISSUE_BRANCH" \
   "$SPEC_FREEZE_SHA" \
-  "$SPEC_FREEZE_TREE" \
-  "${IMPLEMENTATION_PATHS[@]}" <<'PY'
+  "$SPEC_FREEZE_TREE" <<'PY'
 from pathlib import Path
 from datetime import datetime, timezone
 import hashlib
@@ -1347,7 +1104,6 @@ repository = sys.argv[5]
 branch = sys.argv[6]
 sha = sys.argv[7]
 tree = sys.argv[8]
-implementation_paths = set(sys.argv[9:])
 
 def load(path: Path, expected_hash: str) -> dict[str, object]:
     raw = path.read_bytes()
@@ -1419,11 +1175,24 @@ assert issued.tzinfo is not None
 assert expires.tzinfo is not None
 assert issued <= now <= expires
 
-expected_writer_scope = implementation_paths | {
-    f"refs/heads/{branch}",
+assert set(writer["scope_paths"]) == {
+    "full-regression-ledger.json",
+    "src/spec_dock/assets/spec_dock/scripts/"
+    "spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/spec-dock.version",
+    ".agents/skills/spec-dock/"
+    ".spec-dock-provider-slot.json",
+    ".agents/skills/spec-dock-grill-with-docs/"
+    ".spec-dock-provider-slot.json",
+    "tests/cli_runtime/test_delete.py",
+    "tests/cli_runtime/test_import.py",
+    "tests/cli_runtime/test_runtime_import_s10.py",
+    "tests/cli_runtime/test_sync.py",
+    "tests/cli_runtime/test_workbench.py",
+    "refs/heads/"
+    "iss-00395-regression-baseline-terminalization-and-product-defect-repair",
 }
-
-assert set(writer["scope_paths"]) == expected_writer_scope
 
 print(
     "mutation-authorized "
@@ -1433,8 +1202,8 @@ print(
 PY
 
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
-test "$(git rev-parse HEAD)" = "$EXPECTED_CURRENT_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
+test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
+test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
 ```
 
 次の場合は変更0で停止する。
@@ -1450,32 +1219,9 @@ test "$(git rev-parse 'HEAD^{tree}')" = "$EXPECTED_CURRENT_TREE"
 * writer scopeが不足
 * `IMPLEMENTATION_AUTHORIZED`がtrueでない
 * worktreeがdirty
-* `initial-spec-freeze`でHEADがspec freezeから動いた
-* `post-u05-checkpoint`でHEADがreviewed specification freezeから動いた
+* HEADがspec freezeから動いた
 
 Writer assertionは最初のedit直前に再検証する。期限切れのassertionを再利用しない。
-
-### E3. Issue #392境界witness整理の実装境界
-
-Strict仕様レビューpass後、E1/E2がpassし、worktreeがcleanであり、`SPEC_FREEZE_SHA`／`SPEC_FREEZE_TREE`がレビュー対象と一致した後に、通常の実装トラックを開始する。`tests/integration/test_issue_392_acceptance.py`の変更は、Issue #395/#396 canonical documentの固定SHA比較を除去することだけに限定する。P392 entryのimmutable `full-regression-ledger.json` blob、Issue #392のbaseline、timing、required-fast、policy、workflow、boundary assertionsはそのまま保持する。
-
-この整理は仕様書SHAを計算して同期するゲートではない。`initial-spec-freeze`でも`post-u05-checkpoint`でも、同じtest pathを実装candidateのfocused testとして一度だけ実行し、normal passを記録する。仕様レビュー後の作業は、Product修正、必要なtest修正、ledger transition、dogfood projectionを一つの実装計画に従って進める。U05後に既存のledger transitionを再実行しない。
-
-### E4. Post-implementation Entry recheck (`initial-spec-freeze` only)
-
-`initial-spec-freeze`でIssue #392境界witness整理とProduct/testのfocused修正を行った後、D1のcurrent full verifier commandを新しいprivate artifact rootで再実行する。`candidate_sha`は実装candidate、statusは`ledger-mismatch`、violation setは計画済みexact 10件でなければならない。`active_verified` 4件、row 2の`resolved_verified` 1件、`retired_verified=[]`、`#392-owned failure=0`、`unexpected_failure=0`も確認する。ここを通過して初めて全14 rowsのGREEN観測とledger transitionへ進む。
-
-### E4R. Post-U05 implementation recheck (`post-u05-checkpoint` only)
-
-`post-u05-checkpoint`では、D1Rで確認したcurrent ledgerの15/0/15 terminal stateを維持したまま、Product create-boundary、必要なtest fixtureおよびIssue #392 boundary witnessのfocused変更だけを検証する。D1の`ledger-mismatch`、exact 10 active-row violations、`active_verified` 4件またはinitial ledger transitionを期待しない。
-
-次を一度だけ実行する。
-
-1. 変更対象のfocused Product/test nodesと独立したIssue #392 boundary witnessのnormal pass
-2. current root ledgerの15 total / 0 active / 15 resolved / 14 `fixed-in-place` / 1 `superseded`確認
-3. `RESUME_CHECKPOINT_SHA`からのledger、timing、policy、workflow差分がないことの確認
-
-E4RがGREENなら、U05 transitionを再実行せず、Phase JおよびPhase LをskipしてPhase K、M、Nへ進む。post-U05 routeでfull-regressionの最終証拠を作るのはN2のclean candidate full verifierだけであり、ここでinitial entry verifierを再現しない。
 
 ## 9. Phase F — Rows 4–11 test fixture修正
 
@@ -1721,21 +1467,10 @@ assert "https://token@github.com/example/repo.git" not in combined
 
 New test nodeやnew ledger rowを追加しない。
 
-作成境界の証明には、§2の既存4 nodeだけを使う。
-
-* Precheck failure nodeは`create`と`link_existing`の両方で、不正なpublication scope時にresolverが1回だけ呼ばれ、IssueGateway/local writerより前に失敗し、IssueGateway call・event・local directoryが0であることを確認する。
-* Create success nodeは、resolverのaccepted normalized slug `example/repo`が`IssueGateway.issue_create(repo_slug=...)`へ渡ることを確認する。
-* Link-existing success nodeは、同じresolverを1回だけ通り、same-repository validation後にcanonical scopeを保存することを確認する。
-* CLI create nodeは、`gh issue create`のargvに`--repo example/repo`が含まれ、create failureのraw outputやcredential sentinelがdiagnosticへ漏れないことを確認する。
-
-この4 nodeのassertionをProduct sourceより先に既存test bodyへ追加・強化し、H2でRED、Product修復後に同じnodeでGREENを確認する。H5の4-case endpoint policy matrixはcall graphを重ねて検査しない。
-
-### H2. Product edit前のcreate-boundary RED再確認
-
-H2は既存のcreate-boundary 4 nodeだけを対象とし、`ROW_3`は再実行しない。`ROW_3`の初回REDは`initial-spec-freeze`ではD2、`post-u05-checkpoint`ではD1Rの再利用証拠で扱う。
+### H2. Product edit前のRED再確認
 
 ```bash
-CREATE_BOUNDARY_TESTFIRST_OBS="$EVIDENCE_DIR/create-boundary-test-first-observation.json"
+ROW3_TESTFIRST_OBS="$EVIDENCE_DIR/row-03-test-first-red-observation.json"
 
 set +e
 
@@ -1743,68 +1478,76 @@ env TMPDIR="$TEST_TMPDIR" \
   uv run pytest \
     --run-full-regression \
     --full-regression-shard \
-    --full-regression-observation "$CREATE_BOUNDARY_TESTFIRST_OBS" \
+    --full-regression-observation "$ROW3_TESTFIRST_OBS" \
     -q \
     --tb=short \
-    "${ROW3_CREATE_BOUNDARY_NODES[@]}" \
-    >"$EVIDENCE_DIR/create-boundary-test-first-red.log" \
+    "$ROW_3" \
+    >"$EVIDENCE_DIR/row-03-test-first-red.log" \
     2>&1
 
-CREATE_BOUNDARY_TESTFIRST_RC=$?
+ROW3_TESTFIRST_RC=$?
 
 set -e
 
-test "$CREATE_BOUNDARY_TESTFIRST_RC" -eq 1
+test "$ROW3_TESTFIRST_RC" -eq 1
+
+grep -F \
+  'Current GitHub repo scope could not be resolved from origin' \
+  "$EVIDENCE_DIR/row-03-test-first-red.log"
 
 ! grep -F \
   'token@' \
-  "$EVIDENCE_DIR/create-boundary-test-first-red.log"
+  "$EVIDENCE_DIR/row-03-test-first-red.log"
 
 ! grep -F \
   'https://token@github.com' \
-  "$EVIDENCE_DIR/create-boundary-test-first-red.log"
-
-python - "$CREATE_BOUNDARY_TESTFIRST_OBS" \
-  "${ROW3_CREATE_BOUNDARY_NODES[@]}" <<'PY'
-from pathlib import Path
-import json
-import sys
-
-observation = json.loads(
-    Path(sys.argv[1]).read_text(encoding="utf-8")
-)
-expected = sys.argv[2:]
-assert observation["collected"] == expected
-assert observation["executed"] == expected
-assert observation["outcomes"] == {
-    nodeid: "failed" for nodeid in expected
-}
-assert set(observation["failure_signatures"]) == set(expected)
-print(f"create-boundary-red={len(expected)}/{len(expected)}")
-PY
+  "$EVIDENCE_DIR/row-03-test-first-red.log"
 ```
 
 ### H3. Product source edit
 
-変更対象は、既存のpublication policyをcreate境界へ一度だけ接続する次のfocused six filesである。
+変更対象はprovider-side sourceの次のexisting symbolsだけである。
 
-| Path / surface | Required change |
-| --- | --- |
-| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py` | `origin_github_publication_endpoint`を唯一のpolicy実装として維持し、accepted slugだけを返す薄い`origin_github_publication_repo_slug` adapterを追加する。fetch-only `origin_github_repo_slug`は変更しない。 |
-| `.../application/repo_context.py` | create/link_existing用にpublication slugをrequireする薄いapplication helperを追加する。importのfetch-only resolverは維持する。 |
-| `.../application/ports.py` | publication resolver gatewayを追加し、`IssueGateway.issue_create`へnormalized `repo_slug`を必須で渡す契約にする。 |
-| `.../application/create_node.py` | IssueGatewayまたはlocal writeより前にpublication preflightを実行し、accepted slugを既存same-repository validationとIssueGatewayへ渡す。 |
-| `.../cli/bootstrap.py` | 新しいgateway/application contractを既存adapterへ接続する。command-layer policyは追加しない。 |
-| `.../infra/github_cli.py` | `gh issue create --repo <slug>`へ明示的に束縛し、raw command outputやcredentialをdiagnosticへ含めない。 |
+```text
+src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
+```
 
-次を変更・追加しない。
+1. `_parse_github_repo_slug`
 
-* `_remote_get_url`、`_remote_has_userinfo`、`_redact_remote_url`の既存contract
-* fetch-only identity、same-repository validation、numeric target scope、foreign repository rejection
-* 新しいpolicy層、retry、cache、feature flag、background verifier、new CLI flagまたは重複parser
-* unrelated Git coordination code
+   * `_remote_has_userinfo`によるpublication-policy rejectionをidentity parserから除去する。
+   * GitHub host/path parsingを維持する。
+   * owner/repositoryのnon-empty条件を維持する。
+   * lowercase normalized slugだけを返す。
+   * raw URLまたはcredentialを返さない。
 
-このsix-file sliceは、IssueGateway/local writeの前に失敗できることと、accepted repositoryへ作成先を固定できることを実装・testで証明するための最小境界である。
+2. `origin_github_repo_slug`
+
+   * `origin_github_publication_endpoint`を呼ばない。
+   * `_remote_get_url(repo_root, push=False)`だけを読む。
+   * `_parse_github_repo_slug`の結果をread-only identityとして返す。
+
+3. `origin_github_publication_endpoint`
+
+   * fetch URLとpush URLを読む。
+   * parseより前に、fetchまたはpushのuserinfoを明示的に拒否する。
+   * diagnosticには必ず`_redact_remote_url`を使用する。
+   * fetch/pushの両方がGitHub repository identityへparseできることを要求する。
+   * normalized fetch slugとpush slugのexact equalityを要求する。
+   * accepted時だけslugとpush URLを返す。
+
+4. 次を変更しない。
+
+   * `_remote_get_url` signature
+   * `_remote_has_userinfo` signature
+   * `_redact_remote_url` signature
+   * `GitGateway.origin_github_repo_slug` signature
+   * bootstrap adapter signature
+   * application same-repository validation
+   * numeric target current-scope requirement
+   * foreign repository rejection
+   * unrelated Git coordination code
+
+New public function、new port、new request/result type、new CLI flagを追加しない。
 
 ### H4. Row 3 GREEN
 
@@ -1818,11 +1561,9 @@ env TMPDIR="$TEST_TMPDIR" \
     --full-regression-observation "$ROW3_GREEN_OBS" \
     -q \
     --tb=short \
-    "$ROW_3" \
-    "${ROW3_CREATE_BOUNDARY_NODES[@]}"
+    "$ROW_3"
 
-python - "$ROW3_GREEN_OBS" "$ROW_3" \
-  "${ROW3_CREATE_BOUNDARY_NODES[@]}" <<'PY'
+python - "$ROW3_GREEN_OBS" "$ROW_3" <<'PY'
 from pathlib import Path
 import json
 import sys
@@ -1831,27 +1572,26 @@ value = json.loads(
     Path(sys.argv[1]).read_text(encoding="utf-8")
 )
 
-nodeids = sys.argv[2:]
+nodeid = sys.argv[2]
 
-assert value["collected"] == nodeids
-assert value["executed"] == nodeids
+assert value["collected"] == [nodeid]
+assert value["executed"] == [nodeid]
 assert value["outcomes"] == {
-    nodeid: "passed" for nodeid in nodeids
+    nodeid: "passed",
 }
 assert value["failure_signatures"] == {}
 
-print(f"row-3-green={len(nodeids)}/{len(nodeids)}")
+print("row-3-green")
 PY
 ```
 
 ### H5. Publication security matrix
 
-このpolicy-only diagnosticは、create経路を直接呼ばず、既存publication endpointの受入・拒否とcredential non-exposureだけを確認する。create前のapplication preflightと`gh issue create --repo`へのbindingは、Row 3のfocused create-boundary testで確認する。H5のreceiptへcreate call graphの証明を帰属させない。
+このdiagnosticは次の三時点で実行する。
 
-このdiagnosticは次の二時点で一度ずつ実行する。
-
-1. N3のexact clean implementation SHA
-2. post-merge B1 SHA
+1. dogfood projection前
+2. exact clean implementation SHA
+3. post-merge B1 SHA
 
 ```bash
 env TMPDIR="$TEST_TMPDIR" \
@@ -2195,7 +1935,6 @@ env TMPDIR="$TEST_TMPDIR" \
     --tb=short \
     tests/cli_runtime/test_import.py \
     tests/cli_runtime/test_runtime_import_s10.py \
-    tests/cli_runtime/test_new.py \
     tests/cli_runtime/test_runtime_shell_s11.py
 
 python - "$SOURCE_FOCUSED_OBS" <<'PY'
@@ -2381,20 +2120,9 @@ cmp -s \
   "$EVIDENCE_DIR/protected-before.json" \
   "$EVIDENCE_DIR/protected-after.json"
 
-for relative in \
-  infra/git_cli.py \
-  application/repo_context.py \
-  application/ports.py \
-  application/create_node.py \
-  cli/bootstrap.py \
-  infra/github_cli.py
-do
-  cmp -s \
-    "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/$relative" \
-    "spec-dock/scripts/spec_dock_runtime/$relative"
-done
-
-printf '%s\n' 'dogfood-provider-runtime-parity=6/6'
+cmp -s \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py \
+  spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
 
 python - \
   "$EVIDENCE_DIR/record-before.json" \
@@ -2484,9 +2212,7 @@ print(f"dogfood-candidate={new_digest}")
 PY
 ```
 
-### K5. Dogfood parity node — clean candidateでのみ実行
-
-K5はcandidate-wheel、source、sdist、installed、dogfoodの最終parity receiptを生成するため、Phase Kのworking treeでは実行しない。Phase KではK4までのprojection/protected-data proofと、必要なfocused/manual確認だけを行う。K5の次のcommandはPhase N1でclean pushed candidateを確定した後、N2のcurrent full verifierへ一度だけ含める。Phase Kのdirty状態から得た結果をfinal receiptへ転用してはならない。
+### K5. Dogfood parity node
 
 ```bash
 DOGFOOD_PARITY_OBS="$EVIDENCE_DIR/dogfood-parity-observation.json"
@@ -2763,15 +2489,86 @@ print("post-ledger-normal-pass=15/15")
 PY
 ```
 
-### M2. Clean candidate full verifier
+### M2. Provisional working-tree full verifier
 
-候補wheelを含むfull verifierは、意図的なtracked変更が残るworking treeでは実行しない。working-tree上の確認はfocused testとmanual invariantに限り、candidate verifierはcommit済みでcleanなcheckout/worktreeから実行する。stash、reset、force checkout、alternate indexなどでdirty stateを隠してはならない。
+Working-tree diffをSHA-256へ束縛する。
 
-M2のfull verifier実行は、Phase N1で候補をcommit・pushした後のN2へ委譲する。N2ではclean状態を先に確認し、private artifact rootへ結果を書き込み、`candidate_sha`を実際のimplementation SHAへ束縛する。これにより候補wheel receiptとfull verifierが同じclean candidateを検査する。
+```bash
+python - "$EVIDENCE_DIR/worktree-diff.sha256" <<'PY'
+from pathlib import Path
+import hashlib
+import subprocess
+import sys
 
-### M3. Pre-candidate ordinary laneとsource checks
+raw = subprocess.check_output(
+    ["git", "diff", "--binary"]
+)
 
-Phase Mのworking treeでは、candidate-wheel、distribution、installed、dogfood、またはfull-verifierのfinal receiptを生成しない。ここで実行できるのは、ordinary lane、Provider lifecycle unit、lint、SpecDock validation、およびfocused/manual invariantだけである。
+assert raw
+
+Path(sys.argv[1]).write_text(
+    hashlib.sha256(raw).hexdigest() + "\n",
+    encoding="utf-8",
+)
+PY
+```
+
+Verifierにはprivate artifact rootを渡す。
+
+```bash
+WORKTREE_ARTIFACT_ROOT="$EVIDENCE_DIR/full-worktree"
+mkdir -p "$WORKTREE_ARTIFACT_ROOT"
+test -z "$(find "$WORKTREE_ARTIFACT_ROOT" -mindepth 1 -print -quit)"
+
+env TMPDIR="$TEST_TMPDIR" \
+  uv run python -m scripts.quality.verify_full_regression \
+    --shards 4 \
+    --artifact-dir "$WORKTREE_ARTIFACT_ROOT"
+
+test "$(
+  find "$WORKTREE_ARTIFACT_ROOT" \
+    -type f \
+    -name result.json \
+    | wc -l \
+    | tr -d ' '
+)" -eq 1
+
+WORKTREE_RESULT="$(
+  find "$WORKTREE_ARTIFACT_ROOT" \
+    -type f \
+    -name result.json \
+    -print
+)"
+
+python - "$WORKTREE_RESULT" "$SPEC_FREEZE_SHA" <<'PY'
+from pathlib import Path
+import json
+import sys
+
+result = json.loads(
+    Path(sys.argv[1]).read_text(encoding="utf-8")
+)
+
+assert result["candidate_sha"] == sys.argv[2]
+assert result["status"] == "verified"
+assert result["evaluation"]["verified"] is True
+assert result["evaluation"]["active_verified"] == []
+assert len(
+    result["evaluation"]["resolved_verified"]
+) == 15
+assert result["evaluation"]["retired_verified"] == []
+assert result["evaluation"]["violations"] == []
+
+print(
+    "working-tree-full-verifier="
+    "verified-provisional"
+)
+PY
+```
+
+このrunはfunctional evidenceであり、merge-ready evidenceではない。`candidate_sha`は未commit bytesではなくspec freeze HEADを示す。
+
+### M3. Ordinary laneとProvider CI相当gate
 
 ```bash
 # Ordinary lane。Current policy skipは意図した現行動作。
@@ -2787,6 +2584,45 @@ env TMPDIR="$TEST_TMPDIR" \
     --tb=short \
     tests/unit/provider_lifecycle
 
+# Distribution cutover。
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/cli_runtime/test_distribution_cutover.py
+
+# Provider lifecycle platform / coordination。
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
+    tests/cli_runtime/test_provider_lifecycle_handoff.py \
+    tests/cli_runtime/test_generation_checkout.py \
+    tests/cli_runtime/test_worktree_lifecycle_coordination.py
+
+# Packaged distribution parity。
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/integration/test_epic_00343_distribution.py
+
+# Full dogfood heavy suite。
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/integration/test_provider_lifecycle_dogfood.py
+
 env TMPDIR="$TEST_TMPDIR" \
   make lint
 
@@ -2798,7 +2634,7 @@ grep -F \
   "$EVIDENCE_DIR/post-change-validate.txt"
 ```
 
-このpre-candidate subsetはexit 0でなければならない。Distribution、packaged parity、dogfood、およびfull verifierはN2のclean candidate gateで一度だけ実行し、N3では再実行しない。
+すべてexit 0でなければならない。Heavy pathはskipされず実行されなければならない。
 
 ### M4. No-touch surfaces
 
@@ -2812,6 +2648,10 @@ git diff --exit-code "$SPEC_FREEZE_SHA" -- \
   .github/workflows/provider-ci.yml \
   .github/workflows/provider-full-regression.yml \
   src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py \
+  src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py \
   src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py \
   src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/new.py \
   src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py \
@@ -2833,15 +2673,28 @@ git diff --exit-code "$SPEC_FREEZE_SHA" -- \
 
 ### M5. Exact implementation file set
 
-初回実装ではreviewed specification freezeからのworking-tree diffを、`IMPLEMENTATION_PATHS`で定義したfocused 26-path setと比較する。U05後のresumeでは、resume checkpointからcurrent `HEAD`までの累積差分がcanonical 6 pathsまたはfocused implementation pathsに限定されること、さらに`P392_SHA`からcurrent `HEAD`とworking treeまでの累積implementation path setがfocused 26 pathsと完全一致することを確認する。これが累積path completenessの唯一のgateであり、N1は今回stageするnon-empty差分だけを確認する。`RESUME_CHECKPOINT_SHA/TREE`はcurrent identityではなく、既存実装の祖先基点として検証する。support historyのmode、object type、Git object ID一致を追加のblocking gateにせず、空差分やno-op editでpath countを満たしてはならない。
-
 ```bash
-if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
-python - "$SPEC_FREEZE_SHA" "${IMPLEMENTATION_PATHS[@]}" <<'PY'
+python - "$SPEC_FREEZE_SHA" <<'PY'
 import subprocess
 import sys
 
-expected = set(sys.argv[2:])
+expected = {
+    "full-regression-ledger.json",
+    "src/spec_dock/assets/spec_dock/scripts/"
+    "spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/scripts/spec_dock_runtime/"
+    "infra/git_cli.py",
+    "spec-dock/spec-dock.version",
+    ".agents/skills/spec-dock/"
+    ".spec-dock-provider-slot.json",
+    ".agents/skills/spec-dock-grill-with-docs/"
+    ".spec-dock-provider-slot.json",
+    "tests/cli_runtime/test_delete.py",
+    "tests/cli_runtime/test_import.py",
+    "tests/cli_runtime/test_runtime_import_s10.py",
+    "tests/cli_runtime/test_sync.py",
+    "tests/cli_runtime/test_workbench.py",
+}
 
 actual = set(
     subprocess.check_output(
@@ -2861,97 +2714,26 @@ assert actual == expected, {
     "actual": sorted(actual),
 }
 
-print(f"implementation-file-set={len(actual)}/{len(expected)}")
+print("implementation-file-set=11/11")
 PY
-else
-  python - "$RESUME_CHECKPOINT_SHA" "$SPEC_FREEZE_SHA" "$P392_SHA" \
-  "${SPEC_PACK_PATHS[@]}" -- \
-  "${IMPLEMENTATION_PATHS[@]}" <<'PY'
-import subprocess
-import sys
-
-resume_checkpoint, spec_freeze, p392_sha, *paths = sys.argv[1:]
-separator = paths.index("--")
-primary_paths = set(paths[:separator])
-implementation_paths = set(paths[separator + 1:])
-
-def changed_paths(base, head):
-    return set(
-        subprocess.check_output(
-            ["git", "diff", "--name-only", "--no-renames", base, head, "--"],
-            text=True,
-        ).splitlines()
-    )
-
-resume_to_head_paths = changed_paths(resume_checkpoint, "HEAD")
-assert resume_to_head_paths <= primary_paths | implementation_paths, {
-    "stage": "post-u05-resume-to-head-scope",
-    "allowed": sorted(primary_paths | implementation_paths),
-    "actual": sorted(resume_to_head_paths),
-}
-
-spec_freeze_to_head_paths = changed_paths(spec_freeze, "HEAD")
-assert spec_freeze_to_head_paths <= implementation_paths, {
-    "stage": "post-u05-spec-freeze-to-head-scope",
-    "allowed": sorted(implementation_paths),
-    "actual": sorted(spec_freeze_to_head_paths),
-}
-
-working_tree_paths = set(
-    subprocess.check_output(
-        ["git", "diff", "--name-only", "--no-renames", "HEAD", "--"],
-        text=True,
-    ).splitlines()
-)
-assert working_tree_paths <= implementation_paths, {
-    "stage": "post-u05-working-tree-scope",
-    "allowed": sorted(implementation_paths),
-    "actual": sorted(working_tree_paths),
-}
-
-cumulative_candidate_paths = (
-    changed_paths(p392_sha, "HEAD") | working_tree_paths
-)
-actual_cumulative_implementation = (
-    cumulative_candidate_paths & implementation_paths
-)
-assert actual_cumulative_implementation == implementation_paths, {
-    "stage": "post-u05-cumulative-implementation-set",
-    "expected": sorted(implementation_paths),
-    "actual": sorted(actual_cumulative_implementation),
-}
-
-implementation_delta = spec_freeze_to_head_paths | working_tree_paths
-assert implementation_delta, {
-    "stage": "post-u05-non-empty-implementation-delta",
-}
-
-print(
-    f"cumulative-implementation-file-set="
-    f"{len(actual_cumulative_implementation)}/{len(implementation_paths)} "
-    f"incremental-delta={len(implementation_delta)} "
-    f"resume-to-head={len(resume_to_head_paths)} "
-    f"working-tree={len(working_tree_paths)}"
-)
-PY
-fi
 
 git diff --check
 test -z "$(git ls-files --others --exclude-standard)"
 ```
 
-初回modeでは26件のexpected pathとextra pathのどちらもblockingである。post-U05 modeではP392からcurrent candidateまでの累積implementation setを26件と照合し、N1では既存candidateを再生成せず今回のnon-empty incremental setだけをstageする。
+Missing expected pathとextra pathのどちらもblockingである。
 
 ### M6. Working-tree manual invariants再実行
 
 Commit gateへ進む前に次を再実行する。
 
-1. Phase I row 12 blob/AST guard
-2. Phase K4 protected-data equality
-3. Phase L2 ledger historical preservation
-4. Required-fast 4 / timing 243
-5. Exact focused 26-file set
-6. no-touch checks
+1. Phase H5 publication security matrix
+2. Phase I row 12 blob/AST guard
+3. Phase K4 protected-data equality
+4. Phase L2 ledger historical preservation
+5. Required-fast 4 / timing 243
+6. Exact 11-file set
+7. no-touch checks
 
 一つでも失敗した場合はcommit許可を使用しない。
 
@@ -2970,18 +2752,8 @@ implementation_tree = null
 
 `COMMIT_PUSH_AUTHORIZED=true`の場合だけ以下を実行する。
 
-`RESUME_MODE=post-u05-checkpoint`では、M5で累積implementation path setがfocused 26件と完全一致したことを確認した後、`RESUME_CHECKPOINT_SHA/TREE`を既存実装candidateの祖先基点として検証し、current reviewed specification targetからのnon-empty incremental差分だけをstage・commit・pushする。current HEADがspec freezeと同じで実装差分がない場合は、空commitを作らず、実装candidate未作成として停止する。resume checkpointをcurrent candidateとして採用せず、`SPEC_FREEZE_SHA/TREE`を実装開始点として扱う。
-
-初回のforward commitでは、実装candidateのstaged path set全体を`IMPLEMENTATION_PATHS`のfocused 26件と照合する。`post-u05-checkpoint`では、累積scopeと今回のcommitでstageするincremental setを混同しない。resumeで残るapproved pending setは、stage前に`SPEC_FREEZE_SHA`から実測し、non-emptyで`IMPLEMENTATION_PATHS`のsubsetであることを確認したうえで、そのpending setだけをstageする。既にcommit済みのpathを空の差分として再出現させたり、空commitでpath数を満たしたりしてはならない。
-
 ```bash
 test "$COMMIT_PUSH_AUTHORIZED" = "true"
-
-EXPECTED_REMOTE_SHA="$SPEC_FREEZE_SHA"
-if [ "$RESUME_MODE" = "post-u05-checkpoint" ]; then
-  : "${RESUME_CHECKPOINT_SHA:?RESUME_CHECKPOINT_SHA is required}"
-  : "${RESUME_CHECKPOINT_TREE:?RESUME_CHECKPOINT_TREE is required}"
-fi
 
 test "$(
   git ls-remote \
@@ -2989,19 +2761,36 @@ test "$(
     origin \
     "refs/heads/$ISSUE_BRANCH" \
     | awk 'NF {print $1}'
-  )" = "$EXPECTED_REMOTE_SHA"
+)" = "$SPEC_FREEZE_SHA"
 
-test "$(git rev-parse HEAD)" = "$SPEC_FREEZE_SHA"
-test "$(git rev-parse 'HEAD^{tree}')" = "$SPEC_FREEZE_TREE"
-
-if [ "$RESUME_MODE" = "initial-spec-freeze" ]; then
 git add -- "${IMPLEMENTATION_PATHS[@]}"
 
-python - "${IMPLEMENTATION_PATHS[@]}" <<'PY'
-import subprocess
-import sys
+test -z "$(git diff --name-only)"
+test -z "$(git ls-files --others --exclude-standard)"
 
-expected = set(sys.argv[1:])
+git diff --cached --check
+
+python - <<'PY'
+import subprocess
+
+expected = {
+    "full-regression-ledger.json",
+    "src/spec_dock/assets/spec_dock/scripts/"
+    "spec_dock_runtime/infra/git_cli.py",
+    "spec-dock/scripts/spec_dock_runtime/"
+    "infra/git_cli.py",
+    "spec-dock/spec-dock.version",
+    ".agents/skills/spec-dock/"
+    ".spec-dock-provider-slot.json",
+    ".agents/skills/spec-dock-grill-with-docs/"
+    ".spec-dock-provider-slot.json",
+    "tests/cli_runtime/test_delete.py",
+    "tests/cli_runtime/test_import.py",
+    "tests/cli_runtime/test_runtime_import_s10.py",
+    "tests/cli_runtime/test_sync.py",
+    "tests/cli_runtime/test_workbench.py",
+}
+
 actual = set(
     subprocess.check_output(
         [
@@ -3009,7 +2798,6 @@ actual = set(
             "diff",
             "--cached",
             "--name-only",
-            "--no-renames",
             "--",
         ],
         text=True,
@@ -3017,80 +2805,12 @@ actual = set(
 )
 
 assert actual == expected, {
-    "stage": "initial-focused-26",
     "expected": sorted(expected),
     "actual": sorted(actual),
 }
 
-print(f"staged-file-set={len(actual)}/{len(expected)}")
+print("staged-file-set=11/11")
 PY
-else
-python - "$SPEC_FREEZE_SHA" "${IMPLEMENTATION_PATHS[@]}" <<'PY'
-import subprocess
-import sys
-
-base = sys.argv[1]
-allowed = set(sys.argv[2:])
-actual = set(
-    subprocess.check_output(
-        [
-            "git",
-            "diff",
-            "--name-only",
-            "--no-renames",
-            base,
-            "--",
-        ],
-        text=True,
-    ).splitlines()
-)
-
-assert actual, "post-U05 incremental diff must be non-empty"
-assert actual <= allowed, {
-    "stage": "post-u05-incremental-before-stage",
-    "allowed": sorted(allowed),
-    "actual": sorted(actual),
-}
-
-print(f"post-u05-incremental-file-set={len(actual)}/{len(allowed)}")
-PY
-
-git add -- "${IMPLEMENTATION_PATHS[@]}"
-
-python - "${IMPLEMENTATION_PATHS[@]}" <<'PY'
-import subprocess
-import sys
-
-allowed = set(sys.argv[1:])
-actual = set(
-    subprocess.check_output(
-        [
-            "git",
-            "diff",
-            "--cached",
-            "--name-only",
-            "--no-renames",
-            "--",
-        ],
-        text=True,
-    ).splitlines()
-)
-
-assert actual, "post-U05 incremental stage is empty"
-assert actual <= allowed, {
-    "stage": "post-u05-incremental-cached",
-    "allowed": sorted(allowed),
-    "actual": sorted(actual),
-}
-
-print(f"staged-incremental-file-set={len(actual)}/{len(allowed)}")
-PY
-fi
-
-test -z "$(git diff --name-only)"
-test -z "$(git ls-files --others --exclude-standard)"
-
-git diff --cached --check
 
 test "$(git config user.name)" = "chemitaro"
 test "$(git config user.email)" = \
@@ -3180,35 +2900,17 @@ print("exact-candidate-full-verifier=verified")
 PY
 ```
 
-### N3. Exact clean non-overlapping gate
+### N3. Exact clean gate rerun
 
-N2のcurrent full verifierが収集・実行したfull-regression nodeと、その結果に含まれるdistribution、lifecycle、packaged parity、dogfood、M1相当の全nodeを再実行しない。N2の一つのresult receiptを、それらのテスト証拠の正本として再利用する。一方、ordinary pytest laneはfull-regression opt-inとは異なるpolicy laneなので、clean candidate上で一度だけ実行する。N3は同じclean `IMPLEMENTATION_SHA/TREE`に対する、N2が収集しないordinary lane、lint、SpecDock validation、manual security/no-touch/protected-data証明だけを確認する。これにより同一suiteの重複を避けながら、requiredなclean evidenceを落とさない。
+同じclean `IMPLEMENTATION_SHA`で次を再実行する。
 
-```bash
-env TMPDIR="$TEST_TMPDIR" \
-  uv run pytest \
-    -q \
-    --tb=short
-
-env TMPDIR="$TEST_TMPDIR" \
-  make lint
-
-./spec-dock/scripts/spec-dock validate \
-  | tee "$EVIDENCE_DIR/exact-candidate-validate.txt"
-
-grep -F \
-  'spec-dock: ok (validate) nodes=236' \
-  "$EVIDENCE_DIR/exact-candidate-validate.txt"
-```
-
-上記に加え、同じclean candidateを対象に次のnon-overlapping proofを実行する。N2はこれらを実行しないため、N3での一回の実行は重複ではない。
-
-1. Phase H5の4ケースpublication policy matrix（userinfo拒否、fetch/push mismatch拒否、matching publicationのnormalized slug、credential non-exposure）。create前preflightと`--repo` bindingはRow 3のfocused create-boundary testで確認する。
-2. Phase Iのrow 12 blob/AST no-edit guard
-3. Phase K4のprotected-data snapshot equalityと6-file provider/dogfood parity
-4. Phase M4のtiming、policy、workflow、P392/#396およびその他no-touch surfaces
-
-各proofはN3用のprivate evidence pathへ出力し、working-treeのprovisional resultを再利用しない。N2のfull-regression receiptとN3の上記結果を同じ`IMPLEMENTATION_SHA/TREE`へ束縛する。
+* Phase H5
+* Phase I
+* Phase M1
+* Phase M3
+* Phase M4
+* Phase M5
+* Phase M6
 
 その後、identityを確認する。
 
@@ -3233,7 +2935,7 @@ test "$(
 test -z "$(git status --porcelain=v1 --untracked-files=all)"
 ```
 
-Working-tree evidenceをexact clean proofとして再利用しない。N2のfull-verifier receiptは、同verifierが収集したfull-regression、M1、K5、distribution、lifecycle、package parity、dogfoodの結果の正本とする。N3ではN2が実行しないH5 publication matrix、I row 12 blob/AST guard、および他のmanual proofを各一度だけ実行し、N2/N3の結果を同じclean SHA/treeへ束縛する。
+Working-tree evidenceを再利用しない。すべてのmerge-blocking evidenceをexact clean SHA/treeへ束縛する。
 
 ### N4. Sanitized full-verifier summary
 
@@ -3294,7 +2996,7 @@ Input:
 * repository
 * branch
 * exact implementation SHA/tree
-* reviewed Requirement/Design/Plan/handoff
+* adopted Requirement/Design/Plan/handoff
 * exact diff
 * 14 rowsのRED/GREEN
 * row 2 successor
@@ -3304,7 +3006,7 @@ Input:
 * ledger preservation
 * exact full-verifier summary/hash
 * no-touch proof
-* exact focused 26-file set
+* exact 11-file set
 
 Acceptance:
 
@@ -3530,6 +3232,47 @@ env TMPDIR="$TEST_TMPDIR" \
     --tb=short
 
 env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    -q \
+    --tb=short \
+    tests/unit/provider_lifecycle
+
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/cli_runtime/test_distribution_cutover.py
+
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/cli_runtime/test_provider_lifecycle_bootstrap.py \
+    tests/cli_runtime/test_provider_lifecycle_handoff.py \
+    tests/cli_runtime/test_generation_checkout.py \
+    tests/cli_runtime/test_worktree_lifecycle_coordination.py
+
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/integration/test_epic_00343_distribution.py
+
+env TMPDIR="$TEST_TMPDIR" \
+  uv run pytest \
+    --run-full-regression \
+    --full-regression-shard \
+    -q \
+    --tb=short \
+    tests/integration/test_provider_lifecycle_dogfood.py
+
+env TMPDIR="$TEST_TMPDIR" \
   make lint
 
 ./spec-dock/scripts/spec-dock validate
@@ -3605,11 +3348,16 @@ B1受入条件:
 * PR required Provider CI roles SUCCESS
 * PR head tree = merged tree
 * ordinary suite GREEN
-* current full verifier GREEN（provider lifecycle、distribution、platform/coordination、packaged parity、dogfoodのpytest nodeを含む）
+* provider lifecycle unit GREEN
+* distribution cutover GREEN
+* platform/coordination GREEN
+* packaged distribution parity GREEN
+* dogfood parity GREEN
 * row 3 security matrix GREEN
 * row 12 no-edit guard GREEN
 * lint GREEN
 * SpecDock validate GREEN
+* current full verifier GREEN
 * unexpected failure 0
 * lifecycle/protected-data invariants unchanged
 * same exact merged SHA/tree維持
@@ -3751,7 +3499,6 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 
    * repository
    * Issue branch
-   * integration branch
    * P392 SHA/tree
    * elaboration input SHA/tree
    * specification SHA/tree
@@ -3759,8 +3506,10 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 
 2. `individual-red-summary.json`
 
-   * initial modeで13件を生成
-   * post-U05 modeでは既存Workbench記録を使い、外部root、identity manifest、外部packetでの過去hash照合は要求しない。外部rootの欠落はblockerにしない。既存REDを作り直すための再実行やコピーはしない
+   * 13 individually failing rows
+   * expected failure layer
+   * raw log SHA-256
+   * observation SHA-256
 
 3. Row GREEN observations
 
@@ -3793,7 +3542,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 7. Working-tree provisional evidence
 
    * binary diff SHA-256
-   * focused/manual diagnostic results only; no full-verifier, wheel, distribution, or dogfood final receipt
+   * provisional full-verifier hash
    * `merge_ready=false`
 
 8. Exact clean evidence
@@ -3805,8 +3554,11 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
 9. Command receipts
 
    * ordinary
-   * pre-candidate provider lifecycle unit lane
-   * clean-candidate / post-merge full verifier（残るfull-regression suiteの正式結果を含む）
+   * lifecycle
+   * distribution cutover
+   * platform/coordination
+   * packaged distribution
+   * dogfood
    * lint
    * SpecDock validate
 
@@ -3815,7 +3567,7 @@ Executorは、tracked Product filesではなく、private evidence rootまたは
     * row 3 publication-security matrix
     * row 12 blob/AST guard
     * policy/workflow no-touch
-    * exact focused 26-file set
+    * exact 11-file set
     * timing 243
     * required-fast 4
 
@@ -4030,8 +3782,7 @@ Payloadへ次を含めない。
 ### Baseline / source drift
 
 * 15 rowsでない
-* P392 historical beforeが14 active / 1 resolvedでない
-* U05後のcurrent root afterが15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`でない
+* 14 active / 1 resolvedでない
 * row order drift
 * nodeid drift
 * historical signature drift
@@ -4132,7 +3883,7 @@ Candidateは、一つのclean pushed implementation SHA/treeに対し次がす�
 * timing 243 unchanged
 * required-fast 4 unchanged
 * policy/workflow unchanged
-* exact changed-file set 26（post-U05はcanonical 6 pathsとfocused implementation 26 pathsのscopeを実測）
+* exact changed-file set 11
 * no extra tracked/untracked implementation file
 * Code Review Strict pass、P0/P1=0
 * Final Quality Gate pass、coverage complete、P0/P1=0
@@ -4183,10 +3934,10 @@ B1またはB2が失敗した場合、humanが次のいずれかを選ぶ。
 
 ## 26. Completion state
 
-本Planの作成・保存自体はrepository state、commit permission、PR permissionまたはmerge permissionを変更しない。今回はユーザーの明示承認により、canonical implementation permissionをtrueとした。
+本Planの作成・保存はrepository state、implementation permission、commit permission、PR permissionまたはmerge permissionを変更しない。
 
 ```text
-implementation_allowed = true
+implementation_allowed = false
 owner_decisions_required = []
 human_merge_only = true
 ```
@@ -4194,7 +3945,7 @@ human_merge_only = true
 Product completionは次の順序でのみ成立する。
 
 ```text
-reviewed clean specification
+adopted clean specification
   -> independent spec review pass
   -> explicit implementation dispatch
   -> Product/test GREEN

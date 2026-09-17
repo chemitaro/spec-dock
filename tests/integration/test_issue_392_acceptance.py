@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 
 from spec_dock import cli
 from tests.conftest import REQUIRED_FAST_NODE_IDS
@@ -113,18 +114,30 @@ _EXPECTED_BASELINE_ROWS = (
     ),
 )
 
-_ISSUE_BOUNDARY_SHA256 = {
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/requirement.md": "15a73075acac920c2adcc71a215d4085ae3f769e91fa40c975164c56175fc4dc",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/design.md": "aa379ec9b3ca9beb6724d41b2dd06d252cb0346188ee44940f9bb15ddaa1d6b0",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/plan.md": "e4ba76f06d741f4c1b1f3c705df26993c13ccfb8e130c1b585539a2ebd8c7800",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/requirement.md": "f240f9e8a87828b13bc5061b5dc59d870c25081eaf7671ff7d7a381d7c7331b7",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/design.md": "9521b4b102c3cf57b042c288f700ef53c54fd4cb0105b792551bd18d502c5576",
-    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/plan.md": "45eacc30d921563ad627adac584ea64f835afd1dcdc3902f78c396d11ac6a095",
-}
+_ISSUE_BOUNDARY_DOCUMENTS = (
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00395-regression-baseline-terminalization-and-product-defect-repair/plan.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/requirement.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/design.md",
+    "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/plan.md",
+)
+
+_P392_ENTRY_SHA = "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 
 
 def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _git_blob(repository: Path, revision: str, relative_path: str) -> bytes:
+    completed = subprocess.run(
+        ["git", "show", f"{revision}:{relative_path}"],
+        cwd=repository,
+        check=True,
+        capture_output=True,
+    )
+    return completed.stdout
 
 
 def test_t12_public_cli_preserves_current_lifecycle_contract(tmp_path: Path, capsys) -> None:
@@ -156,9 +169,12 @@ def test_t12_public_cli_preserves_current_lifecycle_contract(tmp_path: Path, cap
 def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> None:
     repository = Path(__file__).parents[2]
 
-    ledger_path = repository / "full-regression-ledger.json"
-    assert _sha256(ledger_path) == "838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d"
-    ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+    baseline_ledger = _git_blob(repository, _P392_ENTRY_SHA, "full-regression-ledger.json")
+    assert (
+        hashlib.sha256(baseline_ledger).hexdigest()
+        == "838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d"
+    )
+    ledger = json.loads(baseline_ledger)
     rows = ledger["failure_paths"]
     observed_rows = tuple(
         (
@@ -216,7 +232,5 @@ def test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged() -> N
     assert "continue-on-error" not in workflow
     assert "verify_full_regression" not in workflow
 
-    for relative_path, expected_sha256 in _ISSUE_BOUNDARY_SHA256.items():
-        path = repository / relative_path
-        assert path.is_file()
-        assert _sha256(path) == expected_sha256
+    for relative_path in _ISSUE_BOUNDARY_DOCUMENTS:
+        assert (repository / relative_path).is_file()

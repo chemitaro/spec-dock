@@ -60,18 +60,20 @@ def issue_index_raw(repo_root: Path, *, limit: int) -> dict[int, dict[str, Any]]
     return index
 
 
-def issue_create_raw(repo_root: Path, *, title: str, body: str) -> int:
+def issue_create_raw(repo_root: Path, *, title: str, body: str, repo_slug: str | None = None) -> int:
     ensure_gh_available()
     cmd = ["gh", "issue", "create", "--title", title, "--body", body]
+    if repo_slug:
+        cmd.extend(["--repo", repo_slug])
     try:
         p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"gh failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
+    except subprocess.CalledProcessError:
+        raise RuntimeError("gh issue create failed for the validated repository.") from None
 
     out = f"{(p.stdout or '').strip()}\n{(p.stderr or '').strip()}".strip()
     m = _GH_ISSUE_URL_RE.search(out)
     if not m:
-        raise RuntimeError(f"Failed to parse issue number from gh output:\n{out}")
+        raise RuntimeError("gh issue create did not return a parseable issue URL.")
     return int(m.group("num"))
 
 
@@ -205,8 +207,8 @@ def issue_index(repo_root: Path, *, limit: int) -> list[IssueSnapshot]:
     return snapshots
 
 
-def issue_create(repo_root: Path, title: str, body: str) -> int:
-    return issue_create_raw(repo_root, title=title, body=body)
+def issue_create(repo_root: Path, title: str, body: str, *, repo_slug: str) -> int:
+    return issue_create_raw(repo_root, title=title, body=body, repo_slug=repo_slug)
 
 
 def issue_view_minimal(repo_root: Path, issue_number: int, *, repo_slug: str | None = None) -> IssueSnapshot:

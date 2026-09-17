@@ -315,7 +315,8 @@ class TestCliWorkbench(CliRuntimeHarness):
                 validate_result = self._run_runtime_capture(target, ["validate"])
                 sync_result = self._run_runtime_capture(target, ["sync"])
                 deps_result = self._run_runtime_capture(target, ["deps", "check", "--id", scope_id, "--no-github"])
-                active_result = self._run_runtime_capture(target, ["active", "set", "--id", scope_id, "--force"])
+                active_result = self._run_runtime_capture(target, ["active", "set", "--id", scope_id])
+                assert active_result.returncode == 0, active_result.stdout + active_result.stderr
                 active = json.loads((target / "spec-dock" / ".agent" / "active.json").read_text(encoding="utf-8"))
                 active_fields = tuple(
                     (key, active[key][field]) for key in ("initiative", "epic", "issue") for field in ("id", "path")

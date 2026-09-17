@@ -3,16 +3,14 @@
 kind: "corrected-design"
 issue: "iss-00395"
 title: "Issue #395 LunaMax-ready Design"
-generated_at: "2026-09-16"
+generated_at: "2026-09-15"
 repository: "chemitaro/spec-dock"
 branch: "iss-00395-regression-baseline-terminalization-and-product-defect-repair"
 elaboration_input_sha: "fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9"
 elaboration_input_tree: "4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599"
 p392_entry_sha: "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
 p392_entry_tree: "190bc566a18cd84813c4b7c043f8724e275cb55d"
-support_history_sha: "c0736434503117d5d468d1438fb18da16d382a56"
-support_history_tree: "cec02ce70fbcbbbac811a04106dcc15540ad4d09"
-implementation_allowed: true
+implementation_allowed: false
 owner_decisions_required: []
 human_merge_only: true
 authority: "advisory-corrected-design"
@@ -22,16 +20,14 @@ authority: "advisory-corrected-design"
 
 ## 1. Status and authority
 
-This document is a corrected implementation design for Issue #395. It does not grant permission to modify policy, workflows, Git history, pull requests, or Issue state. Following the prior specification-review cycle and the user's explicit dispatch, the current `implementation_allowed` value is `true`.
+This document is a corrected implementation design for Issue #395. It does not grant permission to modify Product source, tests, ledger, dogfood, policy, workflows, Git history, pull requests, or Issue state.
 
-Before the first implementation mutation, the executor must still verify one of two explicitly selected identity modes:
+Implementation remains blocked until all of the following exist for one clean pushed specification tip:
 
 1. the canonical Issue Requirement, Design, Plan, LunaMax handoff, human guide, and manifest;
-2. for either mode, exact local `HEAD`, configured upstream, and remote Issue-branch equality with the reviewed specification freeze; for a post-U05 resume, the packet's resume checkpoint is checked separately as the ancestor/base of the existing implementation candidate and is never substituted for the current-tip identity;
-3. an independent specification review bound to the reviewed specification identity with `review_status=pass`, P0=0, P1=0;
+2. exact local `HEAD`, configured upstream, and remote Issue-branch equality;
+3. an independent specification review bound to that exact SHA and tree with `review_status=pass`, P0=0, P1=0;
 4. an explicit execution packet with `implementation_authorized=true` and an identified concurrent-writer absence assertion.
-
-The current Issue procedure may also be in a specification-correction track after a blocking specification review. That track is limited to the canonical documents and advisory handoff, produces a new clean pushed specification candidate, and must pass a fresh specification review before any Product/test/ledger/dogfood implementation mutation. It does not reuse a failed review as implementation permission.
 
 `owner_decisions_required=[]` means the Product design has no unresolved owner choice. It does not mean implementation, commit, push, PR preparation, or merge is authorized.
 
@@ -48,7 +44,7 @@ The corrected design preserves these parent and Issue boundaries without reinter
 | Ledger target  | 15 total, 0 active, 15 resolved, 14 `fixed-in-place`, 1 `superseded`, approved 0, unexpected 0                                  |
 | Lifecycle      | Issue #392 lifecycle, wire, schema, migration, uninstall, recovery, coordination, and protected-data semantics remain read-only |
 | Merge          | Human only; no direct push to the integration branch; no agent merge or revert                                                  |
-| Permission     | `implementation_allowed=true` after the reviewed user dispatch; exact identity and writer checks remain mandatory              |
+| Permission     | `implementation_allowed=false` until a separate reviewed dispatch exists                                                        |
 
 The integration branch remains `codex/epic-00384-provider-test-strategy-planning`. The Issue branch remains `iss-00395-regression-baseline-terminalization-and-product-defect-repair`.
 
@@ -60,26 +56,20 @@ The integration branch remains `codex/epic-00384-provider-test-strategy-planning
 | ------------------------ | ------------------------------------------ | ------------------------------------------ | --------------------------------------------------------------------------- |
 | P392 Product entry       | `921bf7512c72bfa2887673cb7ec9bc512cec6ff3` | `190bc566a18cd84813c4b7c043f8724e275cb55d` | Human-merged #392 Product/test/ledger baseline                              |
 | Elaboration input        | `fe9ac410a23ca4ccce2de440ef0ddb6c76c48af9` | `4ee7cf0911ed6e4e51f8d50a09e2b34c71eae599` | Exact Issue-branch tip reviewed in this readiness analysis                  |
-| Support-history checkpoint | `c0736434503117d5d468d1438fb18da16d382a56` | `cec02ce70fbcbbbac811a04106dcc15540ad4d09` | Exact 16 existing support artifacts; immutable, non-authoritative history |
 | Specification freeze     | Runtime value                              | Runtime value                              | Future clean pushed canonical six-file specification pack                   |
-| Resume checkpoint | Runtime value                              | Runtime value                              | Existing clean pushed checkpoint used to verify an approved U05 transition |
 | Implementation candidate | Runtime value                              | Runtime value                              | Future clean pushed Product/test/ledger candidate, if separately authorized |
 | Post-merge B1/B2 tip     | Runtime value                              | Runtime value                              | Future human-merged integration tip                                         |
 
 No future SHA or tree is predeclared in tracked content. Every future identity is supplied and then verified at the corresponding gate.
 
-Both identity modes bind the current local `HEAD`, configured upstream, and Issue branch remote tip to `Specification freeze`. In `post-u05-checkpoint`, `Resume checkpoint` is a prior clean implementation base and must be an ancestor of that current specification-review target; it is not a replacement current-tip identity. The resume-to-specification diff is therefore required to be canonical-document-only before the implementation track is resumed.
-
 ### 3.2 Baseline semantics
 
-The P392 historical ledger contains 15 rows. Row 2 is `resolved/superseded`; rows 1 and 3–15 are active. The current root ledger retains the same rows and, after the approved U05 transition, is terminalized as 15 resolved / 0 active / 14 `fixed-in-place` / 1 `superseded`. The root timing file contains 243 node weights. The current full-regression evaluator has these relevant rules:
+The root ledger contains 15 rows. Row 2 is already `resolved/superseded`; rows 1 and 3–15 are active. The root timing file contains 243 node weights. The current full-regression evaluator has these relevant rules:
 
 * active row: the historical node executes exactly once and fails normally with the historical signature;
 * resolved/fixed-in-place row: the historical node executes exactly once and passes normally;
 * resolved/superseded row: the successor executes exactly once and passes normally;
 * any other failure or error: unexpected violation.
-
-`tests/integration/test_issue_392_acceptance.py::test_t14_transitional_gates_baseline_and_issue_boundary_are_unchanged` is a historical boundary witness for the P392 entry, not a current-root-ledger assertion. Its existing baseline assertions continue to read the immutable `full-regression-ledger.json` blob at P392 entry SHA `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`. This preserves the 15-row/14-active/1-resolved baseline while the current root ledger is later terminalized by Issue #395. The test keeps its baseline, timing, required-fast, policy, workflow, and boundary assertions unchanged; it is not coupled to the SHA-256 of Issue #395/396 canonical documents.
 
 Therefore the safe transition order is fixed:
 
@@ -91,41 +81,13 @@ entry baseline observation
   -> row 12 no-edit guard
   -> all 14 historical nodes + row 2 successor normal-pass proof
   -> complete dogfood projection and protection proof
-  -> atomic ledger transition (initial route only)
-  -> post-U05 resume: verify terminalized ledger and do not rerun the transition
-  -> exact clean candidate freeze
-  -> current full verifier and all candidate gates on that clean candidate
+  -> atomic ledger transition
+  -> current full verifier GREEN
+  -> exact clean candidate freeze and full rerun
   -> independent implementation review
   -> human PR merge
   -> same-tip B1, then B2
 ```
-
-### 3.3 Specification admission/history design
-
-The specification freeze is modeled as three separate base history segments rather than one combined allowlist; the post-U05 resume is an alternate mode of the third segment:
-
-```text
-P392
-  └─ exact two receipt documents
-      ↓
-Elaboration input
-  └─ six primary specification paths + sixteen existing support-history paths
-      ↓
-Support-history checkpoint c0736434503117d5d468d1438fb18da16d382a56
-  ├─ sixteen support tree entries are immutable and non-authoritative
-  ├─ initial route: six primary paths remain the only current specification surface
-  │     ↓
-  │   Reviewed specification freeze
-  │     └─ only the six primary paths may change
-  └─ post-U05 route: an existing focused 26-path implementation candidate is resumed
-        ↓
-      Resume checkpoint
-        └─ only canonical-document corrections may reach the reviewed specification freeze
-```
-
-The six primary paths are the Issue Requirement, Design, Plan, LunaMax handoff, human guide, and ChatGPT spec-pack manifest. The sixteen support-history paths are the exact paths listed by the Requirement. They are preserved as history only: they cannot provide current permission, owner decisions, implementation input, or a replacement authority for the canonical R/D/P. In the post-U05 route, the focused 26 implementation paths already present at the resume checkpoint remain implementation history; only the six primary paths may change in the documentation-correction segment.
-
-The B5 design proves the six primary paths and confirms that no support-history path is part of the current candidate diff. The historical mode/object-type/object-ID record remains informational provenance, not a second implementation authority or a blocking runtime gate. On the post-U05 route it additionally proves that the resume checkpoint is an ancestor of the reviewed specification target and that the resume-to-target correction diff is limited to the six primary paths. This governance correction does not alter Product behavior, Row 3's credential/no-secret/publication guarantees, lifecycle, policy, protected-data, timing, workflow, or the Row 12 no-edit boundary.
 
 Changing the ledger before the normal-pass proof is forbidden. Treating working-tree verifier output as exact candidate identity is forbidden.
 
@@ -153,22 +115,18 @@ This contract applies to first RED, focused GREEN, dogfood parity, exact clean r
 
 ### 5.1 Product row 3
 
-The correction uses the existing publication policy once at the application create boundary. The provider-side write surface is limited to the following six files:
+Only these existing symbols in the provider source may be edited:
 
-| Path / surface | Responsibility |
-| --- | --- |
-| `infra/git_cli.py` | Keep the fetch-only identity parser and publication endpoint policy; add only a thin adapter that returns the accepted publication slug. |
-| `application/repo_context.py` | Require the publication slug for a node-creation operation while keeping the fetch-only resolver for import. |
-| `application/ports.py` | Expose the one publication resolver and make `IssueGateway.issue_create` accept the already-resolved slug. |
-| `application/create_node.py` | Run the publication preflight before `IssueGateway` or local writes and pass the normalized slug through the existing same-repository checks. |
-| `cli/bootstrap.py` | Bind the two application methods to the provider adapters without adding command-layer policy. |
-| `infra/github_cli.py` | Execute `gh issue create --repo <slug>` and emit diagnostics that do not include raw command output or credentials. |
+| Path                                                                        | Symbol                               | Target responsibility                                                                                                                                                           |
+| --------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py` | `_parse_github_repo_slug`            | Parse read-only GitHub repository identity, including credential-bearing HTTPS fetch URLs, without returning or logging credentials                                             |
+| same                                                                        | `origin_github_repo_slug`            | Read only the fetch origin and return normalized owner/repo identity                                                                                                            |
+| same                                                                        | `origin_github_publication_endpoint` | Enforce publication policy: reject userinfo in fetch or push URL, require both URLs to be GitHub repository URLs, require exact slug equality, and return the accepted push URL |
 
-`origin_github_publication_endpoint` remains the single policy implementation. The new adapter may discard its push URL after validation, but must not parse remotes or reimplement userinfo/mismatch checks. No retry, cache, feature flag, background verifier, or new CLI option is added.
+The signatures and behavior of `_remote_get_url`, `_remote_has_userinfo`, `_redact_remote_url`, `GitGateway.origin_github_repo_slug`, bootstrap adapter bindings, and application consumers remain unchanged.
 
 The Product edit must not weaken:
 
-* read-only import's fetch-only identity behavior;
 * same-repository canonical URL validation;
 * numeric-target current-repository scope requirements;
 * foreign repository rejection;
@@ -192,7 +150,7 @@ def copy_scaffolded_tree_at(
 ) -> list[Path]:
 ```
 
-It records the event exactly once and delegates all four arguments to `spec_dock_runtime.infra.template_scaffolder.copy_scaffolded_tree_at`. It does not implement a second pathname writer. The existing legacy method remains only for unrelated test compatibility. Apart from the separate create-boundary changes in §5.1, production `application.create_node.execute_create_plan`, the `TemplateScaffolder` portion of `application.ports`, and `infra.template_scaffolder` are read-only.
+It records the event exactly once and delegates all four arguments to `spec_dock_runtime.infra.template_scaffolder.copy_scaffolded_tree_at`. It does not implement a second pathname writer. The existing legacy method remains only for unrelated test compatibility. Production `application.create_node.execute_create_plan`, `application.ports.TemplateScaffolder`, and `infra.template_scaffolder` are read-only.
 
 ### 5.3 Rows 1, 13, 14, and 15 observers
 
@@ -225,23 +183,18 @@ The provider source blobs and AST import edges are guarded before edits and agai
 
 ### 5.6 Generated dogfood projection
 
-After provider source GREEN, the current lifecycle command projects one complete candidate. These nine paths are generated, never hand-edited:
+After provider source GREEN, the current lifecycle command projects one complete candidate. These files are generated, never hand-edited:
 
 * `spec-dock/scripts/spec_dock_runtime/infra/git_cli.py`
-* `spec-dock/scripts/spec_dock_runtime/application/repo_context.py`
-* `spec-dock/scripts/spec_dock_runtime/application/ports.py`
-* `spec-dock/scripts/spec_dock_runtime/application/create_node.py`
-* `spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py`
-* `spec-dock/scripts/spec_dock_runtime/infra/github_cli.py`
 * `spec-dock/spec-dock.version`
 * `.agents/skills/spec-dock/.spec-dock-provider-slot.json`
 * `.agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json`
 
-Each runtime mirror must be byte-equal to its provider source. The ready record and both slot markers must share one lowercase 64-hex candidate digest that differs from the pre-projection digest. Version remains `0.2.4`, record state remains `ready`, operation remains `null`, seed policy remains `preserve-only`, and fixed slot names remain unchanged.
+The runtime mirror must be byte-equal to provider source. The ready record and both slot markers must share one lowercase 64-hex candidate digest that differs from the pre-projection digest. Version remains `0.2.4`, record state remains `ready`, operation remains `null`, seed policy remains `preserve-only`, and fixed slot names remain unchanged.
 
 ### 5.7 Ledger write surface
 
-Only `full-regression-ledger.json` changes. The immutable before payload is read from `921bf7512c72bfa2887673cb7ec9bc512cec6ff3:full-regression-ledger.json`; the after payload is the current root ledger. For rows 1 and 3–15, the only semantic changes are:
+Only `full-regression-ledger.json` changes. For rows 1 and 3–15, the only semantic changes are:
 
 ```json
 {
@@ -258,26 +211,16 @@ to:
 }
 ```
 
-Every other field in those rows, the complete row 2 object, row order, and all top-level historical fields must be identical to the P392 before payload. A current root ledger that is already terminalized is never used as a substitute for the immutable historical before payload.
+Every other field in those rows, the complete row 2 object, row order, and all top-level historical fields must be identical to the pre-transition payload.
 
 ### 5.8 Expected implementation file set
 
-The cumulative Issue implementation surface is the following focused set. It contains the existing baseline repairs, the six-file create-boundary slice, its generated mirror, and only the tests needed to prove those contracts:
+The exact expected tracked implementation diff contains 11 files:
 
 ```text
 full-regression-ledger.json
 src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/bootstrap.py
-src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py
 spec-dock/scripts/spec_dock_runtime/infra/git_cli.py
-spec-dock/scripts/spec_dock_runtime/application/repo_context.py
-spec-dock/scripts/spec_dock_runtime/application/ports.py
-spec-dock/scripts/spec_dock_runtime/application/create_node.py
-spec-dock/scripts/spec_dock_runtime/cli/bootstrap.py
-spec-dock/scripts/spec_dock_runtime/infra/github_cli.py
 spec-dock/spec-dock.version
 .agents/skills/spec-dock/.spec-dock-provider-slot.json
 .agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json
@@ -286,14 +229,9 @@ tests/cli_runtime/test_import.py
 tests/cli_runtime/test_runtime_import_s10.py
 tests/cli_runtime/test_sync.py
 tests/cli_runtime/test_workbench.py
-tests/cli_runtime/test_new.py
-tests/unit/commands/test_runtime_new_s08.py
-tests/unit/infra/test_init_update.py
-tests/unit/test_provider_test_lanes.py
-tests/integration/test_issue_392_acceptance.py
 ```
 
-A missing expected path means the cumulative Issue candidate is incomplete or the handoff is out of sync. An extra path means scope drift. On a fresh run, the working-tree diff from the reviewed specification freeze must equal this set. On a post-U05 resume, only a new non-empty incremental diff within this set may be staged; an empty implementation commit is not valid. Either condition stops the execution. The set does not authorize changes to the row 12 structural observer or to any unrelated runtime surface.
+A missing expected file means the candidate was not completely projected or corrected. An extra file means scope drift. Either condition stops the execution.
 
 ## 6. Exact row acceptance design
 
@@ -338,18 +276,14 @@ application import request
 ### 7.2 Publication path
 
 ```text
-new node create / link_existing
-  -> GitGateway.origin_github_publication_repo_slug
-  -> origin_github_publication_endpoint
-       read fetch and push URL
-       reject userinfo, non-GitHub URL, or slug mismatch
-       return one normalized slug
-  -> existing same-repository validation
-  -> IssueGateway.issue_create(repo_slug=slug) when mode=create
-  -> gh issue create --repo slug
+publication request
+  -> read fetch URL
+  -> read push URL
+  -> reject userinfo in either URL using redacted diagnostics
+  -> parse both GitHub repository identities
+  -> require exact normalized slug equality
+  -> return accepted slug and push URL
 ```
-
-This preflight is one call to the existing publication policy. The application owns the fail-fast boundary, while the terminal GitHub adapter only binds the already-validated slug to `gh`. It does not perform a second remote policy check or silently fall back to the current working directory.
 
 The verification matrix contains four mandatory cases:
 
@@ -358,18 +292,7 @@ The verification matrix contains four mandatory cases:
 3. clean fetch and clean push with different repositories: publication rejects mismatch;
 4. clean matching fetch and push: publication succeeds and returns the expected normalized slug.
 
-The four-case diagnostic is a focused security regression check. It is run once for the implementation candidate and once after human merge when B1 is collected; the same raw observation is reused for the applicable receipts rather than rerunning the Product test for each document or gate.
-
-This matrix covers the existing publication endpoint policy only. The create-boundary test separately proves application preflight before any write and explicit `--repo` binding; the matrix does not claim that call-graph coverage.
-
-Create-boundary call-graph coverage uses only these existing nodes; no test node or ledger row is added:
-
-* tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_repo_scope_precheck_failures_happen_before_github_create_or_local_write
-* tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_create_with_canonical_origin_scope_still_succeeds
-* tests/unit/commands/test_runtime_new_s08.py::TestRuntimeNewS08::test_issue_link_existing_same_repo_scope_succeeds_and_persists_canonical_scope
-* tests/cli_runtime/test_new.py::TestCliNew::test_new_issue_can_create_github_issue_and_use_its_number
-
-Together they prove one resolver call before any IssueGateway/local write, normalized slug delivery as repo_slug, no writes after create or link_existing preflight rejection, explicit gh issue create --repo binding, and create-error redaction. The H5 four-case matrix remains limited to the existing endpoint policy and does not duplicate this call-graph proof.
+This diagnostic is run before commit, on the exact clean implementation commit, and on the post-merge B1 tip.
 
 ## 8. Dogfood and protected-data design
 
@@ -386,7 +309,7 @@ The snapshot excludes transient evidence and secret-bearing output.
 
 ### 8.2 Projection
 
-Run the current external provider CLI as one complete update. Validate its JSON result before reading generated files. The projection may change only the nine generated identities listed in §5.6 in addition to the provider source already edited.
+Run the current external provider CLI as one complete update. Validate its JSON result before reading generated files. The projection may change only the four generated identities listed in §5.6 in addition to the provider source already edited.
 
 ### 8.3 Post-projection proof
 
@@ -398,7 +321,7 @@ Require:
 * record and marker closed fields are unchanged;
 * the protected-data snapshot is exactly equal;
 * fixed-slot `SKILL.md` bytes are exactly equal;
-  * package/source/wheel/sdist/installed/dogfood parity is deferred to the clean-candidate gate in §11.3 and is never accepted from this dirty projection state.
+* package/source/wheel/sdist/installed/dogfood parity node executes and passes in the full-regression shard lane.
 
 Any version, lifecycle, wire, schema, protected-data, policy, workflow, or unrelated root drift stops the execution and discards the projection candidate.
 
@@ -415,7 +338,7 @@ The transition program must:
 5. compare the resulting payload against an expected payload constructed from the saved input;
 6. write one normalized JSON file with a terminal newline;
 7. rerun evaluator tests and all 15 selected nodes;
-8. record focused post-transition evidence only. The current full verifier, candidate-wheel, distribution, installed, and dogfood parity receipts are deferred until the clean candidate gate in §11.3 and are never accepted from this dirty transition state.
+8. run the current full verifier in a private artifact root.
 
 A verifier pass is necessary but not sufficient. The before/after ledger invariant is a separate merge-blocking proof.
 
@@ -423,7 +346,7 @@ A verifier pass is necessary but not sufficient. The before/after ledger invaria
 
 ### 10.1 Read-only preflight
 
-Read-only preflight may run before or after implementation authorization. It may fetch refs, read repository state, parse files, collect tests, and execute known entry observations that do not change tracked Product/test/ledger/dogfood state.
+Read-only preflight may run while `implementation_allowed=false`. It may fetch refs, read repository state, parse files, collect tests, and execute known entry observations that do not change tracked Product/test/ledger/dogfood state.
 
 It must not run lifecycle update, edit files, stage, commit, push, create/update a PR, or merge.
 
@@ -444,13 +367,11 @@ Missing, inconsistent, or unparsable values stop with zero mutations.
 
 ### 10.3 Writer scope
 
-Concurrent-writer absence means no other process, worktree, agent, or Issue task is authorized to write any of the focused implementation paths listed in §5.8:
+Concurrent-writer absence means no other process, worktree, agent, or Issue task is authorized to write any of:
 
-* the focused provider, generated, test, and ledger paths;
+* the exact 11 expected implementation paths;
 * lifecycle-owned generated roots during the projection;
 * the Issue branch ref.
-
-The sixteen preserved support-history paths are explicitly excluded from the writer scope. No process, worktree, agent, or Issue task may edit, delete, rename, regenerate, recompress, or reclassify them. A simple no-diff check protects them; their historical tree entries are not a second implementation gate.
 
 A boolean without an assertion identity and scope is insufficient.
 
@@ -477,7 +398,7 @@ Row 12 records the entry evaluator `coverage_mismatch` as RED and the independen
 
 ### 11.3 Candidate evidence
 
-Working-tree evidence records both Git `HEAD` and a SHA-256 of the complete binary diff and is explicitly provisional. Candidate-wheel and merge-ready full-verifier evidence is never produced from that dirty state; it is rerun on one clean pushed implementation SHA and tree and contains:
+Working-tree evidence records both Git `HEAD` and a SHA-256 of the complete binary diff and is explicitly provisional. Merge-ready evidence is rerun on one clean pushed implementation SHA and tree and contains:
 
 * exact changed-file set;
 * all per-row evidence;
@@ -494,9 +415,7 @@ Raw local evidence containing absolute paths is not copied into a distributed ar
 
 ## 12. Exact clean candidate and review boundary
 
-Commit and push are allowed only when the execution packet separately authorizes them. In `initial-spec-freeze`, the focused implementation paths listed in §5.8 are staged. In `post-u05-checkpoint`, only the pre-verified non-empty incremental subset is staged. Untracked files, caches, logs, and evidence are not staged.
-
-The boundary-witness path is `tests/integration/test_issue_392_acceptance.py`. Its permitted change is limited to keeping the P392 baseline source binding and removing the cross-Issue #395/#396 document-hash coupling; every Issue #392 ledger, timing, required-fast, policy, workflow, and boundary assertion remains intact. The separate migration observer path is `tests/unit/test_provider_test_lanes.py`; it compares the P392 before payload with the current root after payload and does not alter evaluator/verifier behavior.
+Commit and push are allowed only when the execution packet separately authorizes them. Only the exact 11 paths are staged. Untracked files, caches, logs, and evidence are not staged.
 
 After commit and push, all merge-blocking invariants are rerun on the clean candidate, including manual diagnostics and no-touch proofs—not only tests. Any remediation creates a new SHA and invalidates prior exact-SHA evidence.
 
@@ -513,14 +432,11 @@ Neither review authorizes merge. The PR base remains the Epic integration branch
 
 After human merge, use a separate clean verification checkout of the integration branch and fix the exact merge SHA and tree.
 
-At B1, run the ordinary lane once for its default-policy contract and the current full verifier once. The full verifier collects and executes all pytest nodes, so its receipt is the source for provider lifecycle, distribution cutover, platform/coordination, packaged distribution, and dogfood coverage; do not rerun those subsets on the same merged tree.
-
 B1 requires:
 
 * the accepted PR head tree equals the post-merge integration tree;
 * Provider CI receipts for both Linux and macOS matrix roles are successful on that PR head tree;
-* ordinary lane and current full verifier are GREEN; the full verifier covers provider lifecycle, distribution cutover, lifecycle platform/coordination, packaged distribution, and dogfood pytest nodes;
-* lint, SpecDock validate, row 3 publication diagnostic, row 12 guard, and protected-data proof are GREEN or unchanged as applicable;
+* ordinary lane, provider lifecycle unit suite, distribution cutover, lifecycle platform/coordination suite, packaged distribution parity, dogfood parity, lint, SpecDock validate, row 3 publication diagnostic, row 12 guard, protected-data proof, and current full verifier are all GREEN or unchanged as applicable;
 * unexpected failures are zero;
 * the exact integration SHA remains unchanged throughout local verification.
 
@@ -583,10 +499,7 @@ Before human merge, abandon or repair the complete Issue candidate. After human 
 | I395-RQ-014 | §11              |
 | I395-RQ-015 | §14              |
 | I395-RQ-016 | §14              |
-| I395-RQ-017 | §12              |
 
 ## 16. Decision state
 
-The Issue-specific admission/history decision is now explicit: the current canonical specification pack remains exactly six paths, and the existing exact sixteen support artifacts remain non-authoritative, grandfathered support history at the recorded checkpoint. No new support artifact is admitted and no support-history content is updated to match current R/D/P. The history record is informational; current implementation authority comes from the reviewed canonical pack and the focused implementation path set. This decision changes no Product, security, lifecycle, policy, protected-data, workflow, or parent contract.
-
-`owner_decisions_required=[]` is therefore consistent with the current design. Following the explicit user dispatch, `implementation_allowed=true` remains the recorded owner permission. Effective mutation is still gated separately: the repaired exact SHA/tree must first pass a fresh Strict specification review with `review_status=pass`, P0=0, P1=0, and a valid execution packet with concurrent-writer absence. Exact identity, clean push, human merge, and all implementation/delivery gates remain separate requirements.
+No new Product, security, lifecycle, policy, or parent decision is required. `owner_decisions_required=[]` is retained. Implementation permission remains false. Adoption, clean push, independent specification review, and explicit dispatch remain mandatory separate gates.

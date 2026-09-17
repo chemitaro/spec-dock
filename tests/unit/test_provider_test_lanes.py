@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+import copy
 import hashlib
 import importlib.util
 import json
@@ -52,6 +53,8 @@ FULL_REGRESSION_HISTORICAL_TIMING_WEIGHTS = (
 FULL_REGRESSION_ROOT_LEDGER = "full-regression-ledger.json"
 FULL_REGRESSION_ROOT_TIMING_WEIGHTS = "full-regression-timing-weights.json"
 FULL_REGRESSION_LEDGER = FULL_REGRESSION_ROOT_LEDGER
+P392_ENTRY_SHA = "921bf7512c72bfa2887673cb7ec9bc512cec6ff3"
+P392_ROOT_LEDGER_GIT_BLOB_SHA1 = "f181fd3098ef0cba8d0d17e47d00ea12fbbeb8b5"
 ISSUE368_HISTORICAL_LEDGER_SHA256 = "3fb3192110ad9981a6826dae8a5eea30f12bc9f5b65106173dc5777749a8ea3b"
 ISSUE368_HISTORICAL_TIMING_WEIGHTS_SHA256 = "b647b3a0ee3f24202c954e0dd367809dc8981ba686bf6a67f349868ab01da5fc"
 PRE_MIGRATION_LEDGER_CURRENT_HEAD = "fc02e1215d2b9e056a2c18bd1411fe489efdf2f2"
@@ -132,7 +135,9 @@ def test_full_regression_signature_normalization_is_platform_independent() -> No
 
 
 def test_full_regression_ledger_migration_preserves_schema1_history() -> None:
-    payload = json.loads((_repo_root() / FULL_REGRESSION_LEDGER).read_text(encoding="utf-8"))
+    repository = _repo_root()
+    current_raw = (repository / FULL_REGRESSION_LEDGER).read_bytes()
+    payload = json.loads(current_raw)
     rows = payload["failure_paths"]
     assert isinstance(rows, list)
 
@@ -155,11 +160,41 @@ def test_full_regression_ledger_migration_preserves_schema1_history() -> None:
     assert payload["current_head_sha"] == PRE_MIGRATION_LEDGER_CURRENT_HEAD
     assert hashlib.sha256(projection_bytes).hexdigest() == PRE_MIGRATION_SCHEMA1_PROJECTION_SHA256
 
-    resolved_rows = [row for row in rows if row.get("lifecycle") == "resolved"]
-    assert [row["nodeid"] for row in resolved_rows] == [RETAINED_SKILL_HISTORICAL_NODE]
-    assert resolved_rows[0]["resolution_mode"] == "superseded"
-    assert resolved_rows[0]["successor_nodeid"] == RETAINED_SKILL_SUCCESSOR_NODE
-    assert all(row.get("lifecycle") == "active" for row in rows if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE)
+    historical_raw = subprocess.check_output(
+        ["git", "show", f"{P392_ENTRY_SHA}:{FULL_REGRESSION_ROOT_LEDGER}"],
+        cwd=repository,
+    )
+    assert (
+        hashlib.sha1(f"blob {len(historical_raw)}\0".encode("ascii") + historical_raw).hexdigest()
+        == P392_ROOT_LEDGER_GIT_BLOB_SHA1
+    )
+    historical_payload = json.loads(historical_raw)
+    historical_rows = historical_payload["failure_paths"]
+
+    assert [row["nodeid"] for row in historical_rows] == [row["nodeid"] for row in rows]
+    assert [row["nodeid"] for row in historical_rows if row.get("lifecycle") == "resolved"] == [
+        RETAINED_SKILL_HISTORICAL_NODE
+    ]
+    assert historical_rows[1]["resolution_mode"] == "superseded"
+    assert historical_rows[1]["successor_nodeid"] == RETAINED_SKILL_SUCCESSOR_NODE
+    assert all(
+        row.get("lifecycle") == "active" for row in historical_rows if row["nodeid"] != RETAINED_SKILL_HISTORICAL_NODE
+    )
+
+    expected_current = copy.deepcopy(historical_payload)
+    for row in expected_current["failure_paths"]:
+        if row["nodeid"] == RETAINED_SKILL_HISTORICAL_NODE:
+            continue
+
+        assert row["lifecycle"] == "active"
+        assert "resolution_mode" not in row
+        row["lifecycle"] = "resolved"
+        row["resolution_mode"] = "fixed-in-place"
+
+    assert payload == expected_current
+    assert sum(row["lifecycle"] == "resolved" for row in rows) == 15
+    assert sum(row.get("resolution_mode") == "fixed-in-place" for row in rows) == 14
+    assert sum(row.get("resolution_mode") == "superseded" for row in rows) == 1
     assert not any(row.get("lifecycle") == "retired" for row in rows)
 
 
