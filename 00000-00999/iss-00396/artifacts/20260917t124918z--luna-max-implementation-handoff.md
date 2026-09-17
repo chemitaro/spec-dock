@@ -4,6 +4,7 @@ issue: "iss-00396"
 title: "Issue #396 GPT-5.6 Luna Max Implementation Handoff"
 artifact_path: "luna-max-implementation-handoff.md"
 generated_at: "2026-09-17"
+updated_at: "2026-09-18"
 repository: "chemitaro/spec-dock"
 branch: "iss-00396-build-once-provider-gate-and-regression-policy-cutover"
 integration_branch: "codex/epic-00384-provider-test-strategy-planning"
@@ -18,7 +19,7 @@ derived_from:
   - "requirement.md"
   - "design.md"
   - "plan.md"
-  - "b1-b2-gate-receipt.md"
+  - "artifacts/20260917t124918z-01--b1-b2-gate-receipt.md"
 ---
 
 # Issue #396 GPT-5.6 Luna Max Implementation Handoff
@@ -35,6 +36,8 @@ human_merge_only = true
 
 R/D/P作成、formal `issue start`、#392/#395 CLOSED、B1/B2 GREEN、dependency ready、`owner_decisions_required=[]`は、いずれも単独ではProduct/test/workflow/policy mutationを許可しない。実効的なmutation gateは、clean pushed exact specification candidateに対するindependent `chatgpt-spec-review-strict` pass（P0/P1=0）、GitHub #396 projection readback、ユーザーのexplicit implementation dispatch、concurrent-writer absenceが揃うまで閉じる。
 
+初回reviewは`iss396-spec-review-red`の独立sessionで行う。同一Issue・同一目的の修正再レビューはそのexact session IDを`--followup`へ渡し、候補SHAごとにStrict preflightとGitHub connector SHA verificationを再実行する。P2/P3はreview methodどおり情報記録のみで、修正・task化・再レビューgateにしない。
+
 このhandoffはB3実装完了、qualification pass、required-context変更、PR mergeを主張しない。実装者は一checkpointだけを処理し、そのcheckpointのevidenceとstop conditionを返す。
 
 ## 2. Fixed identity and immutable inputs
@@ -46,6 +49,8 @@ R/D/P作成、formal `issue start`、#392/#395 CLOSED、B1/B2 GREEN、dependency
 | Integration branch | `codex/epic-00384-provider-test-strategy-planning` |
 | B2 entry SHA | `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` |
 | B2 entry tree | `37eabc1aa250838dcd9f61d627309b0ff27e0db7` |
+| B2 raw result | `artifacts/20260917t124918z-02--iss-00395-b2-full-regression-result.json`, SHA-256 `bd4630014ee046967713c89c7b8112a2ebe7f10aa85100256aca8a677d817786` |
+| B2 before-ledger | `artifacts/20260917t124919z--iss-00395-b2-ledger-before.json`, SHA-256 `838f1415f2a4399a3f18cf7914dc0b2f3648cb06a5d623de4ca7a22648a87a0d` |
 | Entry register | 15 total / 0 active / 15 resolved |
 | Resolution modes | 14 fixed-in-place / 1 superseded |
 | Approved / unexpected | 0 / 0 |
@@ -55,35 +60,13 @@ R/D/P作成、formal `issue start`、#392/#395 CLOSED、B1/B2 GREEN、dependency
 
 B2 SHA/treeはentry provenanceである。Canonical R/D/P publication後のreviewed `SPEC_FREEZE_SHA/TREE`は別identityとしてexecution packetに入れる。B2へresetして実装しない。
 
+The single source for runtime/evidence/packet wire shapes is `artifacts/provider-gate-contracts-v1.schema.json`. Its copy under `scripts/quality/provider_gate/contracts/` must be byte-identical. `artifacts/role-ownership-v1.json` freezes the 2,214-node baseline from source SHA `3ded647d247b9399a4b79ad6f854d6a87fbf4313` / tree `614778cc7e6e64609a7de80bf2428b3e7f5ec4b7`; the two raw collect-only files it references remain immutable evidence. Initial owners are Linux 2,191, sdist 1, macOS 22, with equal Linux/macOS node sets. `artifacts/capture_protected_snapshot.py` is the only P03/P16 snapshot implementation; its exact SHA-256 is carried in the checkpoint EvidenceIndex.
+
 ## 3. Required execution packet
 
-Mutationを受け付けるpacketは次のexact fieldsを持つ。
+唯一のpacket schemaは`artifacts/provider-gate-contracts-v1.schema.json#/$defs/ExecutionPacketV1`とその`CheckpointInputV1`である。本handoffに第2のfield listや例示JSONは作らない。Packetは一回に一つのcheckpointだけを認可し、`authorized_checkpoint`と`checkpoint_inputs.checkpoint_id`は完全一致させる。`checkpoint_inputs`にはそのPlan sectionのSHA-256、canonical `EvidenceIndexV1`へのEvidenceRef、境界区分、明示的なwrite allowlistを含める。Range（例`P01-P22`）、unknown/missing/duplicate key、bool-as-integer、path traversalは拒否する。
 
-```json
-{
-  "schema_version": 1,
-  "issue_id": "iss-00396",
-  "repository": "chemitaro/spec-dock",
-  "issue_branch": "iss-00396-build-once-provider-gate-and-regression-policy-cutover",
-  "spec_freeze_sha": "40 lowercase hex",
-  "spec_freeze_tree": "40 lowercase hex",
-  "b2_entry_sha": "fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d",
-  "b2_entry_tree": "37eabc1aa250838dcd9f61d627309b0ff27e0db7",
-  "spec_review_status": "pass",
-  "spec_review_p0": 0,
-  "spec_review_p1": 0,
-  "github_projection_readback": true,
-  "implementation_authorized": true,
-  "concurrent_writer_absent": true,
-  "authorized_checkpoint": "P01-P22",
-  "commit_push_authorized": false,
-  "pr_authorized": false,
-  "external_settings_owner": "human",
-  "human_merge_only": true
-}
-```
-
-Unknown/missing key、identity mismatch、authorized checkpoint外ではmutation 0で停止する。`commit_push_authorized`と`pr_authorized`はProduct mutation許可と別である。
+Product/test/workflow/policy mutationには、schemaで有効なpacketに加えて、`spec_review.status=pass`・P0/P1=0・review JSON EvidenceRef・Issue body projection readback・`implementation_authorized=true`・explicit dispatch receipt・`concurrent_writer_absent=true`を必須とする。`implementation_allowed=false`の本handoff自体は実行packetではなく、現時点で製品変更を許可しない。`commit_push_authorized`、`pr_authorized`はProduct mutation許可と別の明示値であり、PR/merge/settingsのauthorityを昇格させない。`external_settings_owner=human`、`human_merge_only=true`を常に保持する。
 
 ## 4. Before every checkpoint
 
@@ -94,6 +77,9 @@ REPOSITORY='chemitaro/spec-dock'
 ISSUE_BRANCH='iss-00396-build-once-provider-gate-and-regression-policy-cutover'
 B2_SHA='fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d'
 B2_TREE='37eabc1aa250838dcd9f61d627309b0ff27e0db7'
+ISSUE_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover'
+B2_RESULT_JSON="$ISSUE_DIR/artifacts/20260917t124918z-02--iss-00395-b2-full-regression-result.json"
+B2_BEFORE_LEDGER_JSON="$ISSUE_DIR/artifacts/20260917t124919z--iss-00395-b2-ledger-before.json"
 
 HEAD_SHA="$(git rev-parse HEAD^{commit})"
 HEAD_TREE="$(git rev-parse HEAD^{tree})"
@@ -107,6 +93,8 @@ test "$REMOTE_SHA" = "$SPEC_FREEZE_SHA"
 test -z "$(git status --porcelain=v1)"
 git merge-base --is-ancestor "$B2_SHA" HEAD
 ```
+
+Before a checkpoint, validate the packet against the canonical `ExecutionPacketV1` schema and its semantic invariants. Exactly one `authorized_checkpoint` is admitted and it must equal `checkpoint_inputs.checkpoint_id`; the section hash, EvidenceIndex reference, write boundary, and explicit write-path allowlist must match the Plan section. P01 rehashes `B2_RESULT_JSON` and `B2_BEFORE_LEDGER_JSON` using the fixed values above. P03 and P16 verify the `capture_protected_snapshot.py` SHA-256 from that checkpoint's EvidenceIndex and invoke the same helper; no heredoc, packet-supplied unreviewed script, or manually reconstructed snapshot is allowed.
 
 After a checkpoint changes files, the next packet must identify the new exact clean pushed candidate if the task proceeds to a remote/review/workflow gate. Do not silently continue under the old identity。
 
@@ -209,8 +197,8 @@ Any other Product/source/workflow/spec-dock metadata path。If a needed change f
 11. Freeze actual environment on a new source SHA and rerun shadow。
 12. Human additive required-context change and intentional RED/GREEN canary。
 13. Move all consumers to replacement。
-14. Prove old consumer 0。
-15. Delete old provider/data/workflow/tests/markers in same Issue PR。
+14. Prove old consumer 0。Replacement GREENのままold emitterを保持し、Humanがold required contextだけを外して`U + new`とactive merge-group scopeをreadbackする。
+15. Successful readbackの後、old provider/data/workflow/tests/markers and old check emitterを同じIssue PRで削除する。
 16. Final-source full local/workflow verification。
 17. Independent code review and Final Quality Gate。
 18. Prepare PR; human merges to Epic branch。
@@ -288,9 +276,9 @@ Do not add a hidden grace acceptance threshold。Infrastructure cancellation mea
 
 ### 8.6 `pytest_plugin.py`
 
-The plugin is inactive unless `--provider-gate-role` is supplied。When active:
+The role CLI registers the plugin with `-p scripts.quality.provider_gate.pytest_plugin` and supplies `--provider-gate-role`。The root conftest's existing collection hook requires that exact plugin and delegates selection once to its `prepare_role_collection(config, items)` helper. The helper validates the role contract and owns the one deselection operation. The plugin must not install a second collection filter; it records execution outcomes through the remaining pytest hooks. Without the role option, existing ordinary/legacy runs retain their current behavior until P15.
 
-- load exact role contract。
+- load the byte-identical reviewed role contract。
 - deselect nonowned nodes; do not skip them。
 - record collected/executed/outcome/skip reason/node duplicates。
 - classify policy skip separately。
@@ -336,14 +324,22 @@ Per-attempt status must not depend on future five/twenty completeness。Use raw 
 ### 9.1 Producer
 
 ```bash
+uv run python -m scripts.quality.provider_gate.cli resolve-source-identity \
+  --repository "$GITHUB_REPOSITORY" \
+  --event-payload "$GITHUB_EVENT_PATH" \
+  --workflow-run-id "$GITHUB_RUN_ID" \
+  --run-attempt "$GITHUB_RUN_ATTEMPT" \
+  --output "$RUNNER_TEMP/source_identity.json"
+
 uv run python -m scripts.quality.provider_gate.cli build-candidate \
   --repository . \
-  --source-sha "$GITHUB_SHA" \
-  --source-tree "$(git rev-parse "$GITHUB_SHA^{tree}")" \
+  --source-identity "$RUNNER_TEMP/source_identity.json" \
   --workflow-run-id "$GITHUB_RUN_ID" \
   --run-attempt "$GITHUB_RUN_ATTEMPT" \
   --output "$RUNNER_TEMP/specdock-candidate"
 ```
+
+`resolve-source-identity` must follow Design §12.2 and `SourceIdentityV1`: PR uses the head SHA/repository from the event payload; dispatch requires `inputs.source_sha`; merge queue uses the merge-group SHA. Never use raw PR `GITHUB_SHA` or branch tip as a substitute. Within one attempt, every role job consumes the same `source_identity.json` bytes and verifies checkout HEAD/tree. A later independent attempt creates its own run identity and must match the producer CandidateManifest's source SHA/tree; its run ID/attempt are not expected to equal the original producer's.
 
 Expected files:
 
@@ -362,8 +358,7 @@ The artifact upload must include actual bytes and manifest。Never reconstruct f
 uv run python -m scripts.quality.provider_gate.cli verify-candidate \
   --manifest "$CANDIDATE/candidate-manifest.json" \
   --bundle "$CANDIDATE/candidate-bundle" \
-  --expected-source-sha "$GITHUB_SHA" \
-  --expected-source-tree "$(git rev-parse "$GITHUB_SHA^{tree}")"
+  --source-identity "$RUNNER_TEMP/source_identity.json"
 ```
 
 ### 9.3 Environment capture
@@ -430,6 +425,7 @@ Minimum negative tests:
 - root exits before child、child leak、incomplete reap。
 - policy skip、approved failure、duplicate node。
 - role missing/duplicated/wrong owner。
+- transition seam: normal invocation preserves legacy behavior; role invocation requires plugin; missing plugin, invalid schema, unknown/unassigned node, and mixed legacy flags fail before test bodies; role-owned nodes never receive the legacy policy skip.
 - started failure/cancel/interruption/missing evidence。
 - same attempt ID、run attempt increment、artifact replacement。
 - first-five replacement/campaign reset。
@@ -482,13 +478,13 @@ The final context name is the actual emitted check-run name captured from shadow
 
 The implementation agent produces exact before/add/RED/GREEN/remove/readback evidence template。Human performs settings changes。Do not call admin APIs to mutate contexts/rulesets。
 
-Intentional RED must precede final candidate five-run freeze and remain in rolling history。Do not rerun RED run。After RED, produce a fix commit/new source SHA and GREEN。
+Intentional RED must precede final candidate five-run freeze and remain in rolling history。Do not rerun RED run。After RED, produce a fix commit/new source SHA and GREEN。After all replacement consumers are GREEN and consumer-zero is proven, the human removes the old required context while the old emitter still exists, then reads back exactly `U + new` and merge-queue coverage. If readback fails, stop and keep the old emitter/provider. Delete the emitter only after successful readback. The post-merge checkpoint verifies this state read-only.
 
 ## 13. Final source and post-merge qualification
 
 ### 13.1 PR head is not B3 source when merge SHA differs
 
-PR head per-attempt evidence proves code/gate behavior。Human merge to Epic branch may create a new commit SHA even when tree equality holds。Because candidate identity includes exact source SHA/tree, post-merge SHA is a new candidate and must build once independently。
+PR head per-attempt evidence proves code/gate behavior。For the PR check, `SourceIdentityV1` resolves the head SHA and source repository; raw event `GITHUB_SHA` is the merge-branch value and is not candidate identity. Human merge to Epic branch may create a new commit SHA even when tree equality holds。Because candidate identity includes exact source SHA/tree, post-merge SHA is a new candidate and must build once independently. The dispatch input `source_sha` carries that exact merge SHA; each new attempt resolves its own run metadata and verifies that the source SHA/tree equals the candidate manifest.
 
 ### 13.2 Post-merge attempts
 
@@ -594,26 +590,7 @@ Every summary points to raw evidence hash。Do not replace raw JSON with prose-o
 
 ## 17. Stop return schema
 
-```json
-{
-  "schema_version": 1,
-  "issue_id": "iss-00396",
-  "checkpoint": "Pxx",
-  "status": "stopped",
-  "contract_id": "exact requirement or parent clause",
-  "expected": "exact expected fact",
-  "actual": "sanitized observed fact",
-  "verified_facts": ["facts actually observed"],
-  "hypotheses": ["clearly marked hypotheses"],
-  "unverified": ["未確認 points"],
-  "operations_attempted": ["actual commands/API reads"],
-  "operations_not_attempted": ["未実行"],
-  "evidence": ["relative paths or IDs"],
-  "cause": "原因未特定 or exact cause",
-  "next_required_check": "one exact check",
-  "mutation_performed": false
-}
-```
+The only stop payload is `artifacts/provider-gate-contracts-v1.schema.json#/$defs/StopReturnV1`. Plan §28 and this section use that exact schema; no competing inline shape is valid. `checkpoint` is one exact P00–P22 value. Keep evidence to repository-relative paths, run IDs, or redacted API receipts; never include credentials or private absolute paths. Use `cause="原因未特定"` when the cause is not verified.
 
 ## 18. Commit, PR and merge boundary
 
