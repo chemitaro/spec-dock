@@ -1728,7 +1728,7 @@ New test nodeやnew ledger rowを追加しない。
 * Link-existing success nodeは、同じresolverを1回だけ通り、same-repository validation後にcanonical scopeを保存することを確認する。
 * CLI create nodeは、`gh issue create`のargvに`--repo example/repo`が含まれ、create failureのraw outputやcredential sentinelがdiagnosticへ漏れないことを確認する。
 
-この4 nodeのassertionをProduct sourceより先に既存test bodyへ追加・強化し、H2でRED、Product修復後に同じnodeでGREENを確認する。H5の4-case endpoint policy matrixはcall graphを重ねて検査しない。
+この4 nodeのassertionをProduct sourceより先に既存test bodyへ追加・強化し、H2でRED、Product修復後に同じnodeでGREENを確認する。H5の6-case endpoint policy matrixはcall graphを重ねて検査しない。
 
 ### H2. Product edit前のcreate-boundary RED再確認
 
@@ -1958,6 +1958,48 @@ with tempfile.TemporaryDirectory() as temporary:
     assert "<credential-bearing remote>" in text
 
     # Case 3:
+    # Unsupported SSH push URLs with passwords are rejected without exposure.
+    run_git(
+        repository,
+        "remote",
+        "set-url",
+        "--push",
+        "origin",
+        "ssh://synthetic-user:ssh-password-sentinel@git.example.invalid/Example/Repo.git",
+    )
+
+    text = reject_without_secret(
+        repository,
+        (
+            "ssh-password-sentinel",
+            "ssh://synthetic-user:ssh-password-sentinel@git.example.invalid",
+        ),
+    )
+
+    assert "<credential-bearing remote>" in text
+
+    # Case 4:
+    # Unsupported FTP push URLs with passwords are rejected without exposure.
+    run_git(
+        repository,
+        "remote",
+        "set-url",
+        "--push",
+        "origin",
+        "ftp://synthetic-user:ftp-password-sentinel@git.example.invalid/Example/Repo.git",
+    )
+
+    text = reject_without_secret(
+        repository,
+        (
+            "ftp-password-sentinel",
+            "ftp://synthetic-user:ftp-password-sentinel@git.example.invalid",
+        ),
+    )
+
+    assert "<credential-bearing remote>" in text
+
+    # Case 5:
     # Clean fetch/push with different repository identities is rejected.
     run_git(
         repository,
@@ -1977,7 +2019,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert "example/repo" in text
     assert "other/repo" in text
 
-    # Case 4:
+    # Case 6:
     # Clean matching fetch/push succeeds.
     run_git(
         repository,
@@ -3203,7 +3245,7 @@ grep -F \
 
 上記に加え、同じclean candidateを対象に次のnon-overlapping proofを実行する。N2はこれらを実行しないため、N3での一回の実行は重複ではない。
 
-1. Phase H5の4ケースpublication policy matrix（userinfo拒否、fetch/push mismatch拒否、matching publicationのnormalized slug、credential non-exposure）。create前preflightと`--repo` bindingはRow 3のfocused create-boundary testで確認する。
+1. Phase H5の6ケースpublication policy matrix（userinfo拒否、fetch/push mismatch拒否、matching publicationのnormalized slug、credential non-exposure）。create前preflightと`--repo` bindingはRow 3のfocused create-boundary testで確認する。
 2. Phase Iのrow 12 blob/AST no-edit guard
 3. Phase K4のprotected-data snapshot equalityと6-file provider/dogfood parity
 4. Phase M4のtiming、policy、workflow、P392/#396およびその他no-touch surfaces
