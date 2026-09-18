@@ -317,6 +317,13 @@ Build producer/materializationはrole graph外である。`role-ownership-v1.jso
 
 Pluginはbody開始前にactual collection setとresolved assignment setを照合する。Unknown、missing、duplicate owner、unplanned add/move/delete、collection hash mismatchを検出したらbodyを0件実行してrejectする。
 
+Checkpoint manifestは全assignmentを保持し、invocation selectorに合わせて縮小しない。
+
+- **Full qualification role invocation:** pytestのpositional node selector、`-k`、`-m`、shard/ignore selectorを付けず、repository全体をcollectする。Pluginはactual collection set/hashをfull resolved manifestと照合してから、指定roleのowner nodeだけを実行する。この経路だけがaccepted `RoleResultV1` / attempt qualification evidenceになれる。
+- **Focused checkpoint invocation:** `path/to/test.py::...`形式の完全なpytest node IDを一つ以上指定する。Pluginはactual collection setが指定ID集合と完全一致すること、各IDがfull manifestに一度だけ存在し、selected roleのownerであることをbody前に検証する。未指定のmanifest nodeはmissing扱いしない。File/directory selector、marker、glob、`-k`、`-m`、shard/ignore selectorは拒否する。Focused resultはengineering verificationであり、accepted `RoleResultV1`、AttemptResultまたはB3 qualification evidenceには使わない。
+
+両modeでbaseline + ordered deltaから導出したfull manifestのcount/hash/owner partitionは検証する。Unknown ID、requested IDのmissing/duplicate、duplicate owner、unplanned add/move/delete、該当modeのcollection hash mismatchはbodyを0件実行してrejectする。
+
 ### 7.2 Linux canonical
 
 Candidate environment setup:
@@ -368,6 +375,8 @@ Qualification workflow以外の`uv run pytest`はdeveloper convenienceであり�
 Consumer scannerとworkflow testsはfinal gateがlocal fallbackを参照しないことをmechanically証明する。
 
 P04/P05の割当済みunit test nodesは通常の`uv run pytest`で直接実行する。Permanent pluginとrole ownership filteringはP07から導入するため、それ以前のunit実行へplugin/role flagsを付けない。この実行は開発用検証であり、qualificationまたはrole ownershipの証拠にはしない。
+
+Plan P07/P08/P10/P11にあるplugin付きpytest commandのうちnode IDを列挙するものはfocused checkpoint invocationである。これらはfull role runを代替せず、qualification resultとして登録・集約しない。実attemptのroleはhandoff §9.3の`run-role`からpytest selectorなしで実行し、full qualification collectionを照合する。
 
 ### 7.7 Permanent plugin ownership and temporary root compatibility seam
 

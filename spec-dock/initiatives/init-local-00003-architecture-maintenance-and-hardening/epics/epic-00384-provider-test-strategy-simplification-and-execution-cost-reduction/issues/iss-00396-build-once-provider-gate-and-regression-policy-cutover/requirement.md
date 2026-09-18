@@ -233,6 +233,7 @@ Role IDはevidence schemaでclosed enumとする。role欠落、重複、同一n
 - Wildcard、marker、directory prefix、runtime discoveryによるowner choiceは禁止する。
 - New/moved/deleted nodeはtest body実行前にreviewed deltaへ存在しなければならない。
 - Unknown node、duplicate owner、collection/hash mismatchはbody前にrejectする。
+- Qualification role invocationはtest population全体をcollectし、full resolved checkpoint manifestと一致させてからrole filterを適用する。Focused checkpoint verificationは完全なnode IDだけを受け付け、実collectionと指定ID集合の完全一致、および各IDのownerをfull manifestで検証する。未指定のmanifest nodeはmissing扱いしない。File/directory/marker/glob/`-k`/`-m`/shard selectorは禁止し、focused結果はqualification evidenceに使わない。
 - `pytest_plugin.py`が移行中・最終状態の恒久collection filter ownerである。
 - Root `tests/conftest.py`はtemporary compatibility seamだけを所有し、exact plugin+role invocationでlegacy hookをbypassする。P15でlegacy hook/fileを削除した後もpluginの`pytest_collection_modifyitems`がsole filter ownerとして残る。
 - Role外nodeはdeselectし、skip/xfailへ変換しない。Policy skip、approved failure、duplicate executionは0でなければならない。
@@ -348,7 +349,7 @@ B1/B2未受入、same-Red fail、projection unread、explicit dispatchなしで�
 | AC-06 | Same-SHA materialization failureはpoison、rebuild拒否 | violation evidence `MATERIALIZATION_POISONED` / `SAME_SHA_REBUILD_ATTEMPTED` |
 | AC-07 | Preflight/Candidate evidenceがstage-correct、logical path/size/hashだけ | schema validation, actual-byte index |
 | AC-08 | 2,214 baseline + exact 43 add/1 move/69 deleteを決定的に導出 | baseline, delta, checkpoint manifests, final 2,188 manifest |
-| AC-09 | Pluginが移行中/最終のsole permanent filter owner | transition/final collection tests |
+| AC-09 | Pluginが移行中/最終のsole permanent filter ownerであり、full qualificationとexact-node focused collectionを正しく区別 | transition/final ownershipとqualification/focused-selector tests |
 | AC-10 | Closed 45-entry fault catalogueを全件実行・検出 | definition/binding/execution results |
 | AC-11 | Violation、node、scan、retirement、context、stop schemasがclosed | Draft 2020-12 schema + finite code inventory |
 | AC-12 | Parent-generated predicatesをper-attempt/campaign/windowへ適用 | generator `--check`, evaluator tests |

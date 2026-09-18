@@ -303,8 +303,10 @@
         <div><strong>Product実装許可</strong><span class="badge red">false</span></div>
         <div><strong>#395 implementation</strong><span class="badge red">owner-reported incorrect; disposition pending</span></div>
         <div><strong>B1 / B2</strong><span class="badge red">未実施・未受入</span></div>
-        <div><strong>直近のStrict review</strong>d9 candidate: P0=0 / P1=4 / P2=3、fail</div>
-        <div><strong>このcandidate</strong>4件のP1修正を反映。same-Red結果はexact SHAのreceiptで確認</div>
+        <div><strong>修正前のStrict review</strong>SHA cc8b6800…：P0=0 / P1=2 / P2=3</div>
+        <div><strong>今回の仕様補正</strong>有効なP1のselector矛盾を修正し、既存write scopeの参照を明記。schema、component、ownership、checkpointは不変</div>
+        <div><strong>P2</strong>3件はreview contractに従いreport-only</div>
+        <div><strong>再review結果</strong>同一Red sessionのexact-SHA receiptを参照</div>
         <div><strong>B3</strong><span class="badge red">not started</span></div>
       </div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
@@ -410,6 +412,7 @@ endif
 <p>2,214-node baselineを変更せず、reviewed exact deltaをcheckpoint順に適用します。Unknown、duplicate、unplanned nodeはtest body前に拒否します。</p>
 <div class="scroll"><table><thead><tr><th>Checkpoint</th><th>Total</th><th>Linux</th><th>sdist</th><th>macOS</th><th>Manifest hash</th></tr></thead><tbody><tr><td><code>P03</code></td><td>2,214</td><td>2,191</td><td>1</td><td>22</td><td><code>b6e742ecba64…</code></td></tr><tr><td><code>P04</code></td><td>2,221</td><td>2,198</td><td>1</td><td>22</td><td><code>338f75a6a37f…</code></td></tr><tr><td><code>P05</code></td><td>2,229</td><td>2,206</td><td>1</td><td>22</td><td><code>82c203d08fc6…</code></td></tr><tr><td><code>P06</code></td><td>2,235</td><td>2,212</td><td>1</td><td>22</td><td><code>0872eadbb9c6…</code></td></tr><tr><td><code>P07</code></td><td>2,243</td><td>2,220</td><td>1</td><td>22</td><td><code>01bf56864ea9…</code></td></tr><tr><td><code>P08</code></td><td>2,254</td><td>2,231</td><td>1</td><td>22</td><td><code>5e1ed22c71c4…</code></td></tr><tr><td><code>P09</code></td><td>2,257</td><td>2,234</td><td>1</td><td>22</td><td><code>efcd833c741d…</code></td></tr><tr><td><code>P10</code></td><td>2,257</td><td>2,234</td><td>1</td><td>22</td><td><code>4683b571d455…</code></td></tr><tr><td><code>P15</code></td><td>2,188</td><td>2,165</td><td>1</td><td>22</td><td><code>0ede9a66aa3c…</code></td></tr></tbody></table></div>
 <div class="callout"><strong>Filter owner:</strong> <code>pytest_plugin.py</code>が移行中もfinal sourceも恒久ownerです。Root <code>tests/conftest.py</code>はtemporary compatibility seamに限定し、P15でold hookを退役してもpluginは残ります。</div>
+<div class="callout"><strong>Collection照合:</strong> どちらの実行でもownership manifestはfull setのまま保持します。<br><strong>Full qualification:</strong> pytest selectorを付けず、全node集合をfull manifestと照合してからrole ownerだけを実行します。accepted role/attempt qualification evidenceになるのはこの実行です。<br><strong>Focused checkpoint:</strong> manifestに登録済みの完全なnode IDだけを指定し、実collectionが指定集合と一致し各ownerがroleと一致することを確認します。未指定nodeはmissing扱いしません。file/directory、marker、glob、<code>-k</code>、<code>-m</code>、shard selectorは禁止です。focused結果は開発用確認で、qualification evidenceには使いません。</div>
 <script type="text/plain" class="plantuml-source" id="source-role-ownership" data-target="diagram-role-ownership">
 @startuml
 title pytestの役割filter移行
@@ -456,7 +459,7 @@ note over Plugin : P15で旧hook/seamを退役しても恒久filter ownerとし�
 <tr><td>P21–P22</td><td>post-merge materialization、freeze、attempt/fault/window、B3 receipt</td><td>B3 actual accepted evidence</td></tr>
 </tbody></table></div>
 <div class="callout ok"><strong>設計規模:</strong> 今回の修正は既存gate、コマンド、schemaを明確にする範囲です。Product component、state machine、ownership node、checkpoint、Epic policyは増やしません。</div>
-<div class="callout"><strong>Test invocation:</strong> P04/P05は既存の割当済みunit nodeを通常pytestで直接実行し、role/qualification evidenceとは扱いません。Permanent pluginはP07から使います。P11 integration runは既存P10 ownership manifestのexact P07/P08 nodesを指定し、新しいP11 checkpointは作りません。</div>
+<div class="callout"><strong>Test invocation:</strong> P04/P05は割当済みunit nodeを通常pytestで実行する開発用確認です。P07/P08/P10/P11のplugin付きcheckpoint commandは完全なnode IDを列挙するfocused runであり、full qualificationの代わりにはなりません。P11 integration runはfull P10 manifestからLinux ownerのexact node IDを指定し、新しいP11 checkpointは作りません。</div>
 </section>
 
 <section id="verify"><h2>9. Verification commandsと期待結果</h2>
