@@ -3,8 +3,8 @@
 ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
-状態: "draft"
-詳細化状態: "implementation-ready-awaiting-strict-rereview-and-b1-b2"
+状態: "approved"
+詳細化状態: "implementation-ready-specification; product-implementation-gated"
 最終更新: "2026-09-18"
 依存:
   - "requirement.md"
@@ -30,6 +30,8 @@ qualification_authority: "E384-QUAL-001"
 # iss-00396 Build Once Provider Gate and Regression Policy Cutover — 設計
 
 ## 1. Design conclusion
+
+本Designは2026-09-18付でApprovedである。承認根拠は同一Red sessionのStrict review pass（SHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0）。今回の承認更新は状態と進捗表示だけで、ユーザー指示により再reviewしない。新しいSHAをreview済みとは扱わず、§8の実装許可条件およびfalseの実装許可は変更しない。
 
 Target architectureは、次の七層を順序付きで分離する。Workflow YAMLやtracked docsへ親qualification valueを独立管理しない。
 

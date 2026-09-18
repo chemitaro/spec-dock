@@ -3,8 +3,8 @@
 ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
-状態: "draft"
-詳細化状態: "implementation-ready-awaiting-strict-rereview-and-b1-b2"
+状態: "approved"
+詳細化状態: "implementation-ready-specification; product-implementation-gated"
 最終更新: "2026-09-18"
 依存:
   - "iss-00395"
@@ -38,9 +38,11 @@ Issue #396は、親`E384-QUAL-001`を変更せず、Provider CIをbuild-once・s
 
 GitHub readbackで確認した#395 PR #401の人間merge identityは、source `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d`、tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`であり、履歴上のidentityに限る。ユーザーは#395実装を誤りと報告しており、具体的defectと修正結果は未確認である。#395 ownerがIssue #395のscopeでdefectを修正・受入し、修正後のexact merged SHA/treeをGitHub readbackするまで、B1/B2 execution targetは存在しない。元merge SHA/tree、historical receipt、別SHAの結果をB1/B2 targetやacceptanceへ使ってはならない。Corrected targetでB1をfreshに受入した後、同じSHA/treeでB2をfreshに受入し、actual-byte evidenceとaccepted-state receiptを得る。Identity、log、raw evidenceまたはaccepted stateの一つでも検証できない場合は`StopReturnV1`で親ownerへ戻す。
 
+要件定義書・設計書・実装計画書は2026-09-18付で`approved`にした。根拠となる同一Red sessionのStrict reviewはSHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`に対して`review_status=pass`、P0=0、P1=0、findings=0である。今回の状態更新は仕様内容を変えず、状態・準備状況の表示だけを更新する。ユーザーの指示により、この状態更新後のSHAについてStrict reviewは繰り返さない。新しいSHAが独立にreview済みであるとは表現しない。**承認はProduct実装許可ではなく、`実装開始許可`はfalseのまま維持する。**
+
 Formal `issue start`、active branch、Issue OPEN/CLOSED、dependency readyはProduct実装許可と別状態である。Formal stateは巻き戻さず、仕様authoringだけを完了する。次の全gateが順に成立するまで、Product source、tests、workflow、policy data、GitHub settingsを変更しない。
 
-1. 本完成仕様をcleanにIssue branchへpushし、same-Red reviewで`review_status=pass`、P0=0、P1=0を得る。P2/P3はreview contractに従う。
+1. 本仕様内容のsame-Red reviewは上記SHA/treeで`review_status=pass`、P0=0、P1=0を取得済みである。今回の承認状態更新はstatus-onlyであり、ユーザー指示により再reviewしない。仕様内容を変える場合、または後続の実装freezeを別SHA/treeへ進める場合は、実装許可に使うfreeze SHA/treeとreview receiptを一致させる。
 2. GitHub Issue #396 canonical projectionを更新し、readbackで一致を確認する。
 3. #395 ownerがreported defectをIssue #395のscopeで修正・受入し、corrected exact merged SHA/treeをGitHub readbackする。
 4. Corrected exact SHA/treeでfresh B1を受入する。
@@ -169,7 +171,7 @@ Product実装前に、次の順で全条件を要求する。
 
 1. `artifacts/b1-b2-admission-status-v2.json`を読み、#395 implementationがowner-reported incorrect、B1/B2が未実施・未受入である現状を確認する。旧receiptとraw JSONはhistorical claimとして保存し、current acceptanceへ転用しない。
 2. Issue #396の完成仕様をcleanなIssue branchへcommit/pushし、local HEADとconfigured upstreamのfull SHA一致を確認する。
-3. `iss396-spec-review-red`で同じ目的のStrict re-reviewを行い、`review_status=pass`、P0=0、P1=0を得る。P2/P3はreview contractに従う。
+3. `iss396-spec-review-red`のpass receiptを確認する。今回の承認の根拠はSHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0である。状態更新後のSHAはreview済みと扱わず、ユーザー指示により今回のstatus-only更新では再reviewしない。将来の実装freezeで仕様内容またはfreeze identityが変わる場合は、Design §8のreview SHA/tree一致条件を満たす。
 4. Pass後にIssue #396 bodyへcanonical projectionを適用し、GitHubから読み戻して一致を確認する。
 5. #395 ownerがreported implementation defectを#395のscope内で修正・受入し、修正後のmerged SHA/treeをGitHub readbackした記録を取得する。Issue #396はこの修正を代行しない。
 6. `b1-b2-verification-contract-v1.json`のtarget resolution ruleに従って、修正後のexact SHA/treeをP01 preflight evidenceへ固定する。元の#395 SHA/treeを代用しない。
@@ -411,4 +413,4 @@ B1/B2未受入、same-Red fail、projection unread、explicit dispatchなしで�
 
 StopReturnはpre/post mutationの事実を区別し、scope impact、owner、required action、changed surfaces、external changes、rollback/recovery statusを記録する。Cause未特定は推測で埋めず、evidence不足としてparent ownerへ返す。Automatic rollbackは禁止する。
 
-`owner_decisions_required=[]`は、現在のP1六件に追加のProduct/Policy/Security decisionが不要であることだけを意味する。B1/B2、review、external readback等の未完了gateを省略する意味ではない。
+`owner_decisions_required=[]`は、本仕様のProduct/Policy/Securityに関するowner decision listが空であることだけを意味する。過去reviewでのP1件数を現在のfinding数として示すものでも、B1/B2、current projection readback、explicit dispatch等のgateを省略するものでもない。
