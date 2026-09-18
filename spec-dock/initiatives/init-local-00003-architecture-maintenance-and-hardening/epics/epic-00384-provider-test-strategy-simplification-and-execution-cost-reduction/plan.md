@@ -4,7 +4,7 @@ ID: "epic-00384"
 タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
 関連GitHub: ["#384"]
 状態: "draft"
-最終更新: "2026-09-15"
+最終更新: "2026-09-17"
 依存:
   - "requirement.md"
   - "design.md"
@@ -26,11 +26,13 @@ repository_evidence:
 
 # epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — Epic計画
 
-**現行状態（2026-09-15、GitHub readback）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。PR #399は人間によりEpic branchへmergeされ、PR head `75f0ec5a23eee40c528f049029b8561dcb7880dd`とmerge commit `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`は同じtree `190bc566a18cd84813c4b7c043f8724e275cb55d`である。このmergeはP392であり、B1や#392の完了・closureではない。GitHub #392と#395はOPEN、#392の`active`は未設定である。#392 Report §33にこのmerged-tipのP392 receipt、通常検証、full verifierの#395-owned限定結果、Code Review Strict／Final Quality Gate Strictの結果を記録した。#395はexact P392 SHAから専用worktreeを準備済みだが、formal `issue start`とProduct実装は未実施である。`repository_evidence`はauthoring-source provenanceであり、P392 receiptではない。この計画更新自体はIssue状態変更や#395 startを行わない。
+**現行状態（2026-09-17、GitHub readback）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)は引き続き有効である。PR #399は人間によりEpic branchへmergeされ、PR head `75f0ec5a23eee40c528f049029b8561dcb7880dd`とmerge commit `921bf7512c72bfa2887673cb7ec9bc512cec6ff3`は同じtree `190bc566a18cd84813c4b7c043f8724e275cb55d`である。このmergeはP392であり、B1や#392の完了・closureではなかった。#395の人間merge後のexact SHA `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`に対しB1/B2を同一tipで実施し、B1 current gatesはGREEN、B2は`2188 passed, 26 skipped`、15/0/15、violations 0で成立した。証拠は#396の[B1/B2 entry receipt](issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/20260917t124918z-01--b1-b2-gate-receipt.md)に保存した。GitHub #392/#395はCLOSED、#396はOPENでformal start済みかつactiveである。現在は#396のR/D/Pを独立Strict reviewへ通す段階で、Product実装許可はfalse、B3は未開始である。
+
+**2026-09-15時点の履歴:** 当時のreadbackでは#392/#395がOPENで、#392の`active`は未設定、#396は未開始だった。下記の過去手順・receiptはその時点の状態を記録する。
 
 ## 1. 今回の位置づけ
 
-親計画のfreezeとIssue #392の正式startは完了し、PR #399もP392として人間merge済みである。現在はmerge SHA上のP392 receiptを記録済みとし、#395へ引き継ぐ段階にある。安全停止前のCP1–CP4 candidateと過去Reportのfull-verifier結果は履歴であり、現在のmerged-tip証拠には流用しない。#392はP392で完了扱いにせず、#395はexact P392 SHAからworktreeだけを準備済みで、formal `issue start`とProduct実装はまだ行わない。具体的な状態・SHA gate・formal startは§3.1に従う。
+親計画のfreezeとIssue #392の正式startは完了し、PR #399もP392として人間merge済みである。#395のB1/B2をexact post-merge SHA/treeで実施し、#392/#395は所定順でCLOSEDとなった。2026-09-17現在、Issue #396がformal start済み・activeであり、このR/D/P候補の独立Strict reviewを準備している。Product実装許可はfalseで、B3は未開始である。安全停止前のCP1–CP4 candidateと過去Reportのfull-verifier結果は履歴であり、現在のmerged-tip証拠には流用しない。具体的な状態・SHA gate・formal startは§3.1に従う。
 
 目的はprovider状態数・重複検証・実行コストの削減であり、文書数やIssue数を増やすことではない。実装・検証単位は#392 → #395 → #396の三件を維持する。各Issue PRをEpic branchへ人間が順次mergeし、最後にmainへ一度mergeする。
 
@@ -42,7 +44,7 @@ repository_evidence:
 - SpecDock `issue start` はbranch/activeの正式選択であり、Product実装開始許可ではない。
 - Issue詳細R/D/P、Luna Max handoff、独立reviewが揃うまでProduct実装を行わない。formal startだけ、Epic passだけ、dependency readyだけを実装許可にしない。
 
-以前のstart/checkout保留は、2026-09-08の明示的な開始依頼で解除された。#392の正式startを繰り返さない。改訂候補の内容review後、Product実装の開始前にその候補のcommit/push・freeze/projectionを確認する。#395/#396を先にstartしない。
+以前のstart/checkout保留は2026-09-08の明示的な開始依頼で解除され、#392はformal start済み、#395と#396も後続の明示依頼と依存gateを経てformal startされた。2026-09-17現在#392/#395はCLOSED、#396がactiveである。formal startは選択状態でありProduct実装許可ではない。#396のR/D/Pをclean pushed exact SHAで独立Strict reviewし、GitHub Issue projectionをreadbackし、ユーザーが実装をdispatchするまでProduct変更を開始しない。
 
 ## 3. 依存順と受入条件
 
@@ -51,7 +53,7 @@ repository_evidence:
 | G0 Parent freeze | 現行親R/D/P、三Issue draft、契約、原因別register、E384-DEC-004 | 同一候補の独立review pass、P0/P1=0、親の未決判断0。clean pushed tipのfreeze receiptと4 Issue body projection readback | #392は正式start済み。改訂候補の受理後、Issue Plan §2.1から既存candidateを再開 |
 | G1 #392 | G0受入済み、#387完了、Option 1とP392 ADR、改訂Issue R/D/P | Issue Plan §2.1から限定再開し、不要なtestだけを削除して影響gateを再検証する。#395所有baselineは変更・抑止しない。merge前の#392所有gate／required checksとStrict review／Final Quality Gateを満たして人間mergeした後、§3.1に従ってmerge SHA上のfresh P392 receiptを記録する。P392はB1・#392 closureではない。 | P392 receipt後に、#392をOPENのまま#395をexact tipから詳細化・正式startする。 |
 | G2 #395 | §3.1のexact P392 witness、15/14/1・243・policy不変、#392所有gate pass、明示的なユーザーstart依頼 | 14 active rowsをcause-appropriate repairでterminalizeする。skip/xfailやpolicy変更は禁止。人間merge後に一つのexact SHAを固定し、同じSHAでB1（全current gates GREEN）、続けてB2（15/0/15）を検証する。closureと#396へのhandoffは§3.1に従う。`ready=true`だけでは開始しない。 | B1/B2の同一tip証拠後に#392/#395をclosureし、#396へ進む。 |
-| G3 #396 | B2が未達 | 開始しない。regression gate/policyを変更しない | 停止 |
+| G3 #396 | #395 post-merge exact tipでB1/B2成立、#392/#395 CLOSED、#396 formal start済み | R/D/PとLuna Max handoffを独立Strict reviewでpassにし、GitHub Issue projectionをreadbackする。明示的な実装dispatchまではProduct実装を行わない | 実装許可後に#396のreplacement gateとB3計画を実行 |
 | G4 Epic main | B3が未達 | Epic merge/closureを行わない | 停止 |
 
 `E384-DEC-001` / `E384-DEC-002` / `E384-DEC-004` はユーザー採用済みで、親の未決判断は0件である。G0は改訂候補の独立review・clean pushed freeze receipt・projection readbackで受理する。Option 1の採用だけでG0や実装開始を完了扱いにしない。
@@ -66,6 +68,10 @@ repository_evidence:
 4. **明示依頼の後に#395を正式startする。** `active show`でIssue selectionを確認する。active Issueが#392なら`./spec-dock/scripts/spec-dock issue start iss-00395 -f`を使う。`-f`が迂回するのはunfinished-active-Issue guardだけで、dependency readiness・checkout・active writeの検査は維持される。active Issueがない場合は`./spec-dock/scripts/spec-dock issue start iss-00395`を使い、#392以外のIssueがactiveなら停止して解消する。`active set`はformal startではなく、`ready=true`もP392 witnessやユーザーの開始依頼を代替しない。start直後にbranch、HEAD/base SHA、active Issue #395、Issue状態、未変更Product treeをreadbackする。
 5. **実装開始を別gateに保つ。** #395のformal start後も、implementation-ready R/D/Pとhandoffを具体化し、clean pushed exact SHAへの独立Strict reviewがpassするまでProduct実装を開始しない。formal start、implementation readiness、Product実装許可は別々に判定する。
 6. **B1/B2とIssue closureを同一tipで行う。** #395を人間mergeした後にexact SHAを固定し、B1を確認してから同じSHAでB2を確認する。両方の証拠を揃えた後、非activeの#392は`./spec-dock/scripts/spec-dock close iss-00392`でcloseし、active #395は`./spec-dock/scripts/spec-dock issue finish`でcloseする。両GitHub IssueがCLOSEDでactive pointerが解除されたことを確認し、その後にだけ#396をstartする。#392はB1後、#395はB2後が最早のclosure時点であり、この順序はADRを遅らせるだけで変更しない。
+
+### 3.2 2026-09-17 B1/B2 and Issue #396 handoff
+
+上記gateを実行した結果、#395 exact post-merge tip `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`でB1とB2は成立し、#392/#395はCLOSED、#396はOPEN・activeとなった。実測とraw evidence hashは[#396 B1/B2 receipt](issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover/artifacts/20260917t124918z-01--b1-b2-gate-receipt.md)および同IssueのJSON evidence artifactsを参照する。これは#396 entry gateだけを満たし、Issue #396の独立仕様review、Product実装、required-context cutover、B3を完了扱いにしない。
 
 ## 4. 各Issueで繰り返す進め方
 
@@ -116,7 +122,7 @@ Dependency/identity不一致、未決判断、P392許容集合外のfailure、B1
 
 ### 9.1 直列実装中の親修正
 
-[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従った親修正、#392のreopen、P392 human merge、merged-tip receiptの記録は完了した。#392と#395はGitHubでOPEN、#395はexact P392 SHAから専用worktreeを準備済みだがformal `issue start`前である。次の作業は、ユーザーの明示的な開始依頼後に#395のR/D/Pを確認し、必要な独立reviewを経てformal startすることであり、その前に#395 Product変更を行わない。
+[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)に従った親修正、#392のreopen、P392 human merge、merged-tip receiptの記録は完了した。後続の#395 B1/B2とIssue closureを経て、#396は2026-09-17にformal startされactiveとなった。次の作業は#396 R/D/Pの独立Strict reviewとIssue projection readbackであり、明示的な実装dispatchの前にProduct変更を行わない。Initiative-level portfolio priorityは別のgovernance follow-upで扱い、このEpic/Issue更新では変更しない。
 
 ## 10. 完了
 
