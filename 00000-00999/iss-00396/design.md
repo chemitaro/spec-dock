@@ -39,7 +39,7 @@ Target architectureは、次の七層を順序付きで分離する。Workflow Y
 2. **Parent policy projection layer** — Epic Requirementの`E384-QUAL-001`からmechanical constants/predicate IDsだけを生成する。
 3. **One-time materialization layer** — final-gate attemptとは別にsource SHA/treeを一度だけbuildし、wheel/sdist actual bytesとenvironment identityを完成させる。Failureはsame-SHA poisonである。
 4. **Immutable freeze layer** — complete candidate/environment/fault definition/window contractをcampaign開始前にfreezeする。
-5. **One-attempt role graph** — permanent pytest pluginがresolved ownershipに従ってstatic analysis、Linux canonical、sdist smoke、macOS deltaを同じstored bytes上で一回ずつ実行し、per-attempt resultを作る。
+5. **One-attempt stage graph** — `candidate-resolve`が登録済みcandidateと保存済みactual bytesをbuildなしで照合し、その後permanent pytest pluginがresolved ownershipに従ってstatic analysis、Linux canonical、sdist smoke、macOS deltaを同じresolved bytes上で一回ずつ実行する。Terminal `attempt-evaluate`はresolve証拠と4 execution-role resultを集約してper-attempt resultを一つ作る。
 6. **History/qualification layer** — GitHub chronologyからparent contractが要求するpopulation/window/fault aggregateをselectionなしで評価する。
 7. **Consumer-first cutover layer** — replacement GREEN、old consumer 0、context new-only readback後に旧provider/data/workflowを削除し、final sourceで再検証する。
 
@@ -305,17 +305,22 @@ Process topologyは次で閉じる。
 
 ### 7.1 Role graph and deterministic ownership
 
-One final-gate attemptはcomplete candidate/environmentとresolved ownership manifestを入力に、次のexecution rolesを一回ずつ実行する。
+One final-gate attemptは登録済みcomplete candidate/environmentとresolved ownership manifestを入力に、次のordered stage graphを一回ずつ実行する。
 
 ```text
+candidate-resolve       # read-only stored-byte resolution; no build
 static-analysis
 linux-canonical
 sdist-smoke
 macos-delta
-attempt-evaluate  # execution result aggregator; pytest roleではない
+attempt-evaluate        # terminal result aggregator; pytest roleではない
 ```
 
-Build producer/materializationはrole graph外である。`role-ownership-v1.json` baselineへ`role-ownership-delta-v1.json`をactivation checkpoint順に適用し、checkpoint manifestを決定的に導出する。P03=2,214、P04以後のadds、P10 move、P15 deletions後final=2,188 assignmentsである。
+Build producer/materializationはattempt/stage graph外であり、`candidate-resolve`は新しいbuildやartifact置換を行わない。各attemptで`candidate-resolve`は`AttemptRegistrationV1`のsource/candidate/environment identityを、同一source SHA/treeに対するcompleted `CandidateMaterializationV1`、`CandidateEvidenceIndexV1`、manifest/wheel/sdistのactual bytesと照合する。Resolverはactual manifest bytesとartifact sizes/digests、bundle digest、candidate identity、environment fingerprintを検証し、`CandidateResolutionV1`へstage status、attempt/candidate/materialization/evidence identities、開始/完了、build invocation count 0、errorsを記録する。登録またはstored bytesが欠落・不一致ならfail closedし、後段roleを開始しない。これはattempt evidenceでありmaterialization registryを変更しない。
+
+Resolved candidateの後、4つのexecution rolesだけが`RoleResultV1`を出力する。Terminal `attempt-evaluate`は同一attemptの`CandidateResolutionV1`とrole result refsを読み、`AttemptResultV1`を一度だけ出力する。正常系ではsuccessful resolutionと4つのrole resultsを集約する。Resolutionが失敗または欠落した場合はexecutionを開始せず、4 role slotsを`rejected`または`missing-evidence`、hashなしで記録し、AttemptResultをnon-acceptedにする。`AttemptResultV1.stage_id=attempt-evaluate`が終端stage artifactであり、self-referenceを作らない。Attempt resultは`candidate_resolution_sha256`と4要素のordered `role_results`を持つ。candidate resolve不成立・欠落は`identity_complete=false`または`raw_evidence_complete=false`にし、attemptはacceptedにならない。`AttemptStageIdV1`は6 stageのclosed enum、`ExecutionRoleIdV1`と`RoleResultV1.role_id`は4 execution roleだけのclosed enumとする。Stage/roleの一回性、参照先attempt/candidate/environment identityの一致はsemantic codec invariantとして検証する。
+
+`role-ownership-v1.json` baselineへ`role-ownership-delta-v1.json`をactivation checkpoint順に適用し、checkpoint manifestを決定的に導出する。P03=2,214、P04以後のadds、P10 move、P15 deletions後final=2,188 assignmentsである。
 
 `collection_sha256`はowner/reasonを含まないnormalized node-ID set digestである。重複IDまたはCR/LFを含むIDを先にrejectし、node IDをUTF-8 byte順にsortし、各IDのUTF-8 bytesにLFを一つずつ付けたstream（末尾LFを含む）のSHA-256を取る。これはbaseline `normalized_node_ids_sha256`と同じcanonicalizationである。Checkpoint `collection_sha256`、final projectionのdigest、実collectionの`NodeObservationV1.collection_sha256`は同じ入力表現を使う。
 
@@ -518,7 +523,11 @@ Repository workflowはread-only permissionsを最小化し、actual API callsで
 Shadow/final workflowは概念上次を持つ。
 
 ```text
-materialize-candidate   # attempt外、一回限り
+materialize-candidate   # attempt/stage graph外、一回限り
+freeze-campaign         # complete materialization後、attempt graph外
+register-attempt        # durable registration前提、stage graph外
+--- one registered attempt ---
+candidate-resolve       # attempt内、stored bytesのread-only照合
 static-analysis         # final-gate attempt role
 linux-canonical         # final-gate attempt role
 sdist-smoke             # final-gate attempt role
@@ -526,7 +535,7 @@ macos-delta             # final-gate attempt role
 attempt-evaluate        # result aggregate
 ```
 
-Materialization job成功後だけrole graphを開始できる。Subsequent independent attemptsはmaterialize jobをbuildせず、stored candidateをresolve/verifyする。Post-merge final candidateはmerge SHA/treeで別materializationを一度だけ行い、その後CampaignFreezeV1を作る。Build failureはsame-SHA poisonである。
+Materialization job成功後だけattempt stage graphを開始できる。各attemptの最初の`candidate-resolve`はmaterialize jobをbuildせず、stored candidateをresolve/verifyする。成功後に限り4 execution rolesを開始し、terminal `attempt-evaluate`がresultを作る。Post-merge final candidateはmerge SHA/treeで別materializationを一度だけ行い、その後CampaignFreezeV1を作る。Build failureはsame-SHA poisonである。
 
 Qualification attemptsへ`cancel-in-progress: true`を使わない。Started cancel/failure/missingをhistoryに残す。
 

@@ -366,7 +366,7 @@ uv run pytest -q \
   --tb=short
 ```
 
-P04 First RED covers parent projection and schema/contract rejection, including a valid blocked execution packet and a fully gated positive authorization fixture. Negative packet cases reject empty/unknown nested fields, a true authorization with a missing gate, B1/B2 SHA/tree mismatch, review SHA/tree mismatch, and missing or negative ancestry evidence. The semantic packet validator checks these relations; it must fail on a violated invariant, not collection skip or missing plugin. The 45 fault injection/detection cases belong to P08 and must not be reported as P04 work. Then implement generator/contracts/codec skeleton sufficient to make schema/projection/definition validation GREEN.
+P04 First RED covers parent projection and schema/contract rejection, including a valid blocked execution packet and a fully gated positive authorization fixture. `test_schema_inventory_is_closed_and_canonical` verifies the exact six-stage graph, its four execution-role subset, `CandidateResolutionV1` actual-byte/build-zero relations, and terminal `AttemptResultV1` role cardinality using the closed schema. Negative packet cases reject empty/unknown nested fields, a true authorization with a missing gate, B1/B2 SHA/tree mismatch, review SHA/tree mismatch, and missing or negative ancestry evidence. The semantic packet validator checks these relations; it must fail on a violated invariant, not collection skip or missing plugin. The 45 fault injection/detection cases belong to P08 and must not be reported as P04 work. Then implement generator/contracts/codec skeleton sufficient to make schema/projection/definition validation GREEN.
 
 Exit: generated parent projection diff 0、schema Draft 2020-12 valid、closed code count 68、fault entry count 45、P04 ownership exact、skip/xfail 0。
 
@@ -403,10 +403,11 @@ Target CLI separation:
 
 ```text
 provider_gate.cli materialize-candidate  # no attempt registration
-provider_gate.cli resolve-candidate      # no build
 provider_gate.cli freeze-campaign        # complete materialization only
 provider_gate.cli register-attempt       # build forbidden
+provider_gate.cli resolve-candidate     # per-attempt; build forbidden
 provider_gate.cli run-role               # build forbidden
+provider_gate.cli evaluate-attempt       # terminal AttemptResultV1; no pytest/build
 ```
 
 Real build top-level command remains exactly one invocation selected by implementation:
@@ -618,6 +619,7 @@ Modify `.github/workflows/provider-ci.yml` additively while retaining old jobs. 
 provider-tests                 # old, temporary
 provider-distribution-parity   # old, temporary
 provider-candidate             # new
+provider-candidate-resolve     # new per-attempt read-only stage; no build
 provider-static-analysis       # new
 provider-linux-canonical       # new
 provider-sdist-smoke           # new
@@ -633,7 +635,8 @@ Workflow design gates:
 - `run_attempt == 1` check。
 - permissions minimized from P02 evidence。
 - no `cancel-in-progress: true` for qualification attempts。
-- candidate producer/resolver uses Actions API chronology。
+- candidate producer uses Actions API chronology; each attempt has one candidate resolver stage bound to its registration and completed materialization。
+- Four execution-role jobs start only after the unique `CandidateResolutionV1` is `resolved`; if resolution fails, terminal evaluation records all four role slots as rejected/missing with null result hashes. The terminal evaluator always emits exactly one attempt result with exactly one ref per execution role。
 - all roles consume exact artifact IDs/hashes。
 - evidence uploaded `if: always()` but missing evidence remains reject。
 - no old flags/sharder inside new jobs。
@@ -900,7 +903,7 @@ uv run python -m scripts.quality.provider_gate.cli freeze-campaign   --materiali
 
 ### 25.3 Independent attempts and aggregates
 
-Register each final-gate attempt before role start, consume exact stored bytes, execute one role graph, and retain all started outcomes。Parent-generated projection determines first population/window/acceptance; this Plan does not choose replacements or success filtering。Materialization is never a member。No run rerun、same attempt ID、artifact replacement、campaign reset。
+Register each final-gate attempt before role start, run candidate resolution once before the four execution roles, consume only the exact stored bytes, run terminal attempt evaluation once, and retain all started outcomes。Parent-generated projection determines first population/window/acceptance; this Plan does not choose replacements or success filtering。Materialization is never a member。No run rerun、same attempt ID、artifact replacement、campaign reset。
 
 ### 25.4 Candidate-bound fault campaign
 

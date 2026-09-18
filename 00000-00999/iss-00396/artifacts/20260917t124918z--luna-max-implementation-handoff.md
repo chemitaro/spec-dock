@@ -307,18 +307,19 @@ uv run python -m scripts.quality.provider_gate.cli freeze-campaign   --materiali
 
 Only complete materialization accepted。
 
-### 9.3 Register/run role
+### 9.3 Resolve candidate, run roles, and evaluate attempt
 
 ```bash
 uv run python -m scripts.quality.provider_gate.cli register-attempt   --candidate-index "$CANDIDATE_INDEX" --purpose qualification   --campaign-freeze "$CAMPAIGN_FREEZE_JSON" --output "$REGISTRATION_JSON"
-uv run python -m scripts.quality.provider_gate.cli run-role   --registration "$REGISTRATION_JSON" --role linux-canonical   --ownership "$RESOLVED_OWNERSHIP" --output "$ROLE_OUTPUT"
 ```
 
-`run-role` invokes pytest once through permanent plugin and never builds。Other role IDs: `static-analysis`, `sdist-smoke`, `macos-delta`。Attempt evaluator is not a pytest role。
+After registration, execute `candidate-resolve` exactly once. It is read-only, verifies the registered candidate against the completed materialization, candidate evidence index, manifest and actual wheel/sdist bytes, and emits `CandidateResolutionV1` with build invocation count zero. No role job starts unless its status is `resolved`; on failure, terminal evaluation records all four role slots as rejected or missing evidence without result hashes.
+
+Execute each of `static-analysis`, `linux-canonical`, `sdist-smoke`, and `macos-delta` exactly once through the registered role contract. `run-role` invokes the selected pytest role through the permanent plugin when applicable and never builds. Then execute terminal `attempt-evaluate` exactly once; it consumes the candidate-resolution evidence and one result reference for each execution role and emits `AttemptResultV1`. Materialization is not an attempt stage or role result. `AttemptStageIdV1` has the six closed graph IDs; `ExecutionRoleIdV1` and `RoleResultV1.role_id` have only the four execution roles.
 
 ### 9.4 Context canary
 
-Before campaign freeze, register `purpose=context-canary`, campaign ID null, window contract present。It still runs the normal role graph and remains rolling history member。Materialization is never a member。
+Before campaign freeze, register `purpose=context-canary`, campaign ID null, window contract present。It still runs the normal six-stage attempt graph and remains a rolling history member。Materialization is never a member。
 
 ## 10. Exact test-first ownership packet
 
@@ -366,7 +367,7 @@ Workflow final gate tests assert artifact mode exactly。Do not use pytest skip 
 
 ### 12.1 Shadow phase
 
-Retain old jobs temporarily and add `materialize-candidate` plus new role graph。Materialization is outside attempt history; roles consume stored actual bytes。No role job builds。Permissions read-only/minimum; evidence upload `if: always()` does not convert missing evidence to success。No cancellation that erases started attempts。
+Retain old jobs temporarily and add `materialize-candidate` plus the six-stage attempt graph. Each attempt's `candidate-resolve` stage reads stored evidence without building; only a resolved candidate may enter the four execution-role jobs, followed by terminal evaluation. Materialization is outside attempt history; every role consumes the same stored actual bytes。No attempt stage builds。Permissions read-only/minimum; evidence upload `if: always()` does not convert missing evidence to success。No cancellation that erases started attempts。
 
 ### 12.2 Human context canary
 
@@ -387,7 +388,7 @@ PR evidence is not post-merge B3 when merge SHA differs。After human merge, rea
 1. One-time materialization for merge SHA/tree, outside attempts。
 2. Environment admission and CandidateEvidenceIndex complete。
 3. CampaignFreezeV1 complete before first qualification attempt registration。
-4. Independent final-gate attempts each consume same stored bytes and one role graph。
+4. Independent final-gate attempts each resolve the same stored bytes and execute one six-stage role graph。
 5. Exact 45-entry candidate-bound fault campaign。
 6. Parent-generated aggregate evaluation including history/window/context/consumer/protection。
 

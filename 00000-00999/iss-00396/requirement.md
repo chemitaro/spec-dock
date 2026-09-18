@@ -217,7 +217,7 @@ Evidenceをcandidate生成前後で分離する。
 
 ### I396-RQ-005 — One attempt / one role graph
 
-各attemptはfresh owner-bound workspaceで、次のrole graphをexactly once実行する。
+各attemptはfresh owner-bound workspaceで、次のstage graphを順序どおりexactly once実行する。`candidate-resolve`と`attempt-evaluate`はpytest execution roleではなく、各々`CandidateResolutionV1`とterminal `AttemptResultV1`を生成する制御stageである。`static-analysis`、`linux-canonical`、`sdist-smoke`、`macos-delta`だけが`RoleResultV1`を生成するexecution roleである。Candidate materialization/buildはattempt外の一回限りのproducerであり、このstage graphに含めない。
 
 1. `candidate-resolve`
 2. `static-analysis`
@@ -226,7 +226,7 @@ Evidenceをcandidate生成前後で分離する。
 5. `macos-delta`
 6. `attempt-evaluate`
 
-Role IDはevidence schemaでclosed enumとする。role欠落、重複、同一nodeのduplicate execution、別candidate bytes、別environment fingerprintを含むattemptはnon-acceptedである。five-runやrolling twentyを一つのattempt内で反復しない。
+Stage IDはevidence schemaの`AttemptStageIdV1` closed enum、execution role IDは`ExecutionRoleIdV1` closed enumとする。`candidate-resolve`は事前登録済みattempt identityに対応するcompleted materialization、candidate evidence index、manifestおよび実artifact bytesをread-onlyで照合し、candidate identityとenvironment fingerprintの一致を`CandidateResolutionV1`へ記録する。resolveはbuildせず、materialization producerの再実行やartifact置換を行わない。`attempt-evaluate`はresolve結果と4つのexecution-role resultを集約し、唯一のterminal `AttemptResultV1`を出力する。Resolve失敗時は後続executionを開始せず、evaluatorが全4 role slotを`rejected`または`missing-evidence`としてhashなしで記録し、AttemptResultをnon-acceptedにする。Candidate resolution不成立・欠落、stage/roleの欠落・重複、同一nodeのduplicate execution、別candidate bytes、別environment fingerprintを含むattemptはnon-acceptedである。five-runやrolling twentyを一つのattempt内で反復しない。
 
 ### I396-RQ-006 — Immutable role baseline plus reviewed delta
 
@@ -369,7 +369,7 @@ B1/B2未受入、same-Red fail、projection unread、explicit dispatchなしで�
 | RQ-002 | parent projection | generator, `_qualification_policy_generated.py` | hidden literal/parent drift | generator diff 0 |
 | RQ-003 | materialization/freeze | `CandidateMaterializationV1`, `CampaignFreezeV1`, `artifacts.py` | producer failure, same-SHA rebuild, incomplete env | materialization + freeze records |
 | RQ-004 | evidence stages | `EvidenceWorkspaceV1`, `PreflightEvidenceIndexV1`, `CandidateEvidenceIndexV1` | absolute/dotdot/symlink/hash mismatch | actual-byte indexes |
-| RQ-005 | one role graph | workflow, `RoleResultV1`, evaluator | missing/duplicate role | per-attempt result |
+| RQ-005 | six-stage attempt graph | workflow, `AttemptStageIdV1`, `CandidateResolutionV1`, four `RoleResultV1`s, terminal `AttemptResultV1` | missing/duplicate stage or execution role, identity mismatch | per-attempt result |
 | RQ-006 | ownership/plugin | baseline, delta, checkpoints, `pytest_plugin.py`, temporary `tests/conftest.py` seam | unknown/duplicate/unplanned/P15-owner-survival | resolved ownership/hash |
 | RQ-007–008 | topology/env | `process_tree.py`, `environment.py` | leak/reap/root/worker/shard/drift/limit | process and environment evidence |
 | RQ-009–013 | attempt/history/aggregates | `history.py`, `evaluator.py`, parent projection | rerun/cancel/missing/replacement/filter | attempt/campaign/window results |

@@ -351,12 +351,14 @@
 <tr><td>Policy projection</td><td>親authorityをmechanical projection</td><td><code>generate_provider_qualification_policy.py</code></td></tr>
 <tr><td>Materialization</td><td>sourceごとone build、actual bytes/env完成、poison</td><td><code>materialization.py</code>, <code>CandidateMaterializationV1</code></td></tr>
 <tr><td>Evidence</td><td>preflight/candidate-bound index、logical paths</td><td><code>evidence.py</code>, two EvidenceIndex schemas</td></tr>
-<tr><td>Role execution</td><td>permanent plugin、exact owner、one graph</td><td><code>pytest_plugin.py</code>, ownership manifests</td></tr>
+<tr><td>Attempt stage graph</td><td>stored candidate resolve、4つのexecution role、terminal evaluation</td><td><code>CandidateResolutionV1</code>, <code>RoleResultV1</code>, <code>AttemptResultV1</code></td></tr>
 <tr><td>History/evaluation</td><td>started outcomes保持、aggregate separation</td><td><code>history.py</code>, <code>evaluator.py</code></td></tr>
 <tr><td>Cutover</td><td>consumer-zero、context、old retirement</td><td><code>consumer_scan.py</code>, retirement/context artifacts</td></tr>
 </tbody></table>
 <h3>Candidate build graph</h3>
 <p>Materializationはfinal-gate attemptではありません。Candidate/environment完成後にcampaignをfreezeし、その後のattemptはstored wheel/sdist bytesをconsumeします。同じsource SHA/treeのmaterializationが失敗した場合はpoisonし、rebuildせずforward-fixします。</p>
+<h3>One-attempt stage graph</h3>
+<p><code>candidate-resolve</code>、<code>static-analysis</code>、<code>linux-canonical</code>、<code>sdist-smoke</code>、<code>macos-delta</code>、<code>attempt-evaluate</code>をこの順で一度ずつ処理します。Candidate resolutionはattempt登録、completed materialization、candidate evidence index、manifestとwheel/sdistのactual bytes、environment identityをread-only照合し、buildしません。4つのtest execution roleだけが<code>RoleResultV1</code>を生成し、terminal evaluatorはresolutionと4結果から<code>AttemptResultV1</code>を一つ生成します。Stage IDとexecution-role IDはそれぞれclosed enumです。</p>
 </section>
 
 <section id="state"><h2>5. 状態遷移</h2>
