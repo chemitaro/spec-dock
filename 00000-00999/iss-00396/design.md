@@ -31,11 +31,11 @@ qualification_authority: "E384-QUAL-001"
 
 ## 1. Design conclusion
 
-本Designは2026-09-18付でApprovedである。承認根拠は同一Red sessionのStrict review pass（SHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0）。今回の承認更新は状態と進捗表示だけで、ユーザー指示により再reviewしない。新しいSHAをreview済みとは扱わず、§8の実装許可条件およびfalseの実装許可は変更しない。
+本Designの実質仕様は2026-09-18に同一Red sessionのStrict reviewをpass（SHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0）。その後の#395 corrected mergeを#396 branchへ許可された方法で統合し、新しいexact freeze candidateを作るため、当該旧receiptを新candidateのreviewとして扱わず、同一Red sessionで新freeze SHA/treeの再reviewを行う。新reviewとIssue projection readbackが揃うまで、実装許可はfalseのままとする。
 
 Target architectureは、次の七層を順序付きで分離する。Workflow YAMLやtracked docsへ親qualification valueを独立管理しない。
 
-1. **Predecessor admission layer** — #395実装はowner-reported incorrectで、具体defectと修正結果は未確認、B1/B2も未実施・未受入である。#395 ownerがdefectを#395 scopeで修正・受入し、corrected merge SHA/treeをGitHub readbackした後だけ、そのsame exact tipでfresh B1、続いてB2を受入する。Original #395 merge identity `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / `37eabc1aa250838dcd9f61d627309b0ff27e0db7`はhistorical identity onlyで、実行targetやacceptanceには使わない。
+1. **Predecessor admission layer** — #395 A395-SEC-001 correctionはPR #403としてmerge済み（SHA `3c69af78843b04a13bde2f93eb3b1eb4081cdb33`, tree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`）。同一tipでB1/B2をfresh実行して親ownerが受入済み。元PR #401 merge identity `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / `37eabc1aa250838dcd9f61d627309b0ff27e0db7`はhistorical only。別途報告された症状とA395-SEC-001の同一性は推定しない。
 2. **Parent policy projection layer** — Epic Requirementの`E384-QUAL-001`からmechanical constants/predicate IDsだけを生成する。
 3. **One-time materialization layer** — final-gate attemptとは別にsource SHA/treeを一度だけbuildし、wheel/sdist actual bytesとenvironment identityを完成させる。Failureはsame-SHA poisonである。
 4. **Immutable freeze layer** — complete candidate/environment/fault definition/window contractをcampaign開始前にfreezeする。
@@ -86,16 +86,18 @@ Formal start/active stateは保存するが、B1/B2 acceptance、same-Red pass�
 
 ### 2.3 Predecessor admission and historical claim surfaces
 
-GitHub readbackで#395 PR #401のoriginal human merge SHA/treeは`fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / `37eabc1aa250838dcd9f61d627309b0ff27e0db7`と確認した。ただし2026-09-18のowner correctionは#395 implementation自体をincorrectと報告しており、具体的defectと修正後のtipは未確認である。このoriginal SHA/treeはhistorical identityに限定し、B1/B2対象やaccepted Product baselineとして扱わない。
+#395 original PR #401 merge `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d` / `37eabc1aa250838dcd9f61d627309b0ff27e0db7`はhistorical identity onlyである。A395-SEC-001 correction PR #403はmerge済み（`3c69af78843b04a13bde2f93eb3b1eb4081cdb33` / `38e2f9a50f7cae14ef24fa1187a559c592729e3b`）。別途報告された症状との同一性を仮定せず、Issue #395はOPENのまま保持する。
+
+Fresh B1とsame-tip B2はいずれも親owner受入済みでactual-byte evidenceを保持している。B2の最初のdefault-temp runは`unsafe-repository-binding`で失敗したため失敗証拠を残し、private TMPDIRを使った再実行のみpassとして集計する。許可済みrealignment後、corrected mergeが#396 branch祖先になった。新freezeのsame-Red reviewおよびIssue projection readbackはまだ別gateである。
 
 - `b1-b2-admission-status-v2.json`がcurrent Issue-local statusを閉じる。
 - `b1-b2-verification-contract-v1.json`が#395 ownerによるdefect correction後にGitHub readbackしたexact merge SHA/treeをexecution targetとして解決する規則、fresh execution order、evidenceを閉じる。
 - Corrected #395 merge SHAはIssue #396のfinal `SPEC_FREEZE_SHA`のancestorでなければならない。`git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"`でread-only確認し、falseならIssue branchの統合方法をEpic integration/parent ownerへ戻す。明示許可なしにbranchをmerge/rebase/cherry-pick/recreate/force-pushしない。
 - 許可されたbranch realignment後はsource SHA/treeに依存するcapture/artifactを再生成し、新しいspec candidateを同じRed reviewへ再提出してIssue projectionを読み戻す。#395 SHA/treeが同一ならaccepted B1/B2 bytesは再利用できるが、異なる場合は再実行する。
-- Defect disposition、修正後merge identity、親owner acceptanceのいずれかが欠ける場合、B1/B2を開始・受入せず、Issue #396のProduct実装を停止する。Issue #396は#395 defectを修正しない。
+- #395 correction PR #403のmerge identityとsame-tip fresh B1/B2 receiptを確認済み。B1/B2 parent-owner acceptanceとactual-byte indexesはIssue Workbenchに保存する。
 - Historical receipt/raw bytesは改変しない。
-- Parent Epic Plan §3.2との矛盾はIssue側で親文書を書換えず、admission holdとして明示する。
-- Corrected #395 tip上でfresh B1/B2 acceptanceが得られない限り、以下のtarget topologyはimplementation designに留まり、dispatch不可である。
+- 正しいtarget SHA/tree上でB1/B2をpassしても、別途報告された未特定症状との同一性は含意しない。
+- Ancestryはauthorized realignment後にpassした。最終freeze、same-Red review、Issue body readback、clean exact identity/no concurrent writerが揃うまではtarget topologyはimplementation designのままで、dispatch不可である。
 
 ## 3. Target module topology
 
@@ -134,7 +136,7 @@ Materialization CLIとrole CLIを分ける。`materialize-candidate`はattempt�
 | NEW | `artifacts/seeded-fault-catalogue-v1.json` | exact 20 categories / 45 entries。 |
 | NEW | `artifacts/closed-violation-codes-v1.json` | finite 68-code inventory。 |
 | NEW | `artifacts/old-policy-retirement-v1.json` | finite signatures/delete/retain/deletion gate。 |
-| NEW | `artifacts/b1-b2-admission-status-v2.json` | current owner-correction-based admission state; reported #395 defect remains unresolved。 |
+| NEW | `artifacts/b1-b2-admission-status-v2.json` | current corrected-merge/B1/B2 admission status with accepted same-tip evidence; separate unspecified symptom identity is not inferred。 |
 | NEW | `artifacts/b1-b2-verification-contract-v1.json` | fresh same-tip B1/B2 commands/evidence relation。 |
 | NEW | `artifacts/authoring-gate-status-v1.json` | review/projection/dispatch/B1/B2 current status。 |
 | NEW | `artifacts/strict-review-p2-record-v1.json` | six P2 record-only entries。 |
