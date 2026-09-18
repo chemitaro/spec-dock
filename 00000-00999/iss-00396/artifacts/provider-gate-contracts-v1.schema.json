@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:spec-dock:provider-gate-contracts:v1",
-  "title": "Issue #396 provider-gate closed contract family, final authoring candidate v1",
-  "$comment": "P1-remediated closed contract family. E384-QUAL-001 remains the sole quantitative and aggregation authority. P2 findings are record-only.",
+  "title": "Issue #396 provider-gate contract candidate v1",
+  "$comment": "ExecutionPacketV1 and B1B2AdmissionStatusV2 fixed-shape objects are closed. A same-Red review pass remains a separate gate. E384-QUAL-001 is the sole quantitative and aggregation authority; P2 findings are record-only.",
   "$defs": {
     "Sha1": {
       "type": "string",
@@ -2365,7 +2365,188 @@
           "$ref": "#/$defs/B1B2AdmissionStatusV2"
         },
         "spec_review": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "reviewer_session_id",
+            "review_status",
+            "reviewed_sha",
+            "reviewed_tree",
+            "p0_count",
+            "p1_count",
+            "p2_count",
+            "p3_count",
+            "review_evidence"
+          ],
+          "properties": {
+            "reviewer_session_id": {
+              "const": "iss396-spec-review-red"
+            },
+            "review_status": {
+              "enum": [
+                "not-run",
+                "pass",
+                "fail"
+              ]
+            },
+            "reviewed_sha": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Sha1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "reviewed_tree": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Sha1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "p0_count": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "p1_count": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "p2_count": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "p3_count": {
+              "oneOf": [
+                {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "review_evidence": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/EvidenceBlobRefV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "review_status": {
+                    "const": "not-run"
+                  }
+                },
+                "required": [
+                  "review_status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "reviewed_sha": {
+                    "type": "null"
+                  },
+                  "reviewed_tree": {
+                    "type": "null"
+                  },
+                  "p0_count": {
+                    "type": "null"
+                  },
+                  "p1_count": {
+                    "type": "null"
+                  },
+                  "p2_count": {
+                    "type": "null"
+                  },
+                  "p3_count": {
+                    "type": "null"
+                  },
+                  "review_evidence": {
+                    "type": "null"
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "review_status": {
+                    "enum": [
+                      "pass",
+                      "fail"
+                    ]
+                  }
+                },
+                "required": [
+                  "review_status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "reviewed_sha": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "reviewed_tree": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "p0_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "p1_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "p2_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "p3_count": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "review_evidence": {
+                    "$ref": "#/$defs/EvidenceBlobRefV1"
+                  }
+                }
+              }
+            }
+          ]
         },
         "issue_projection_readback": {
           "oneOf": [
@@ -2413,7 +2594,119 @@
         }
       },
       "x-semantic-invariants": [
-        "implementation_authorized requires B1 and B2 accepted on same exact tip, same-Red pass P0/P1=0, projection readback, explicit dispatch, concurrent writer absent"
+        "implementation_authorized=true requires B1 and B2 performed and accepted at the same exact corrected predecessor SHA/tree; both accepted identities equal predecessor_human_merge.merge_sha/merge_tree",
+        "implementation_authorized=true requires predecessor_human_merge.issue_branch_ancestry_status=verified; the recorded ancestry evidence must prove merge-base --is-ancestor of that corrected merge SHA and spec_freeze_sha",
+        "implementation_authorized=true requires same-Red review_status=pass, p0_count=0, p1_count=0; reviewed_sha/tree equal spec_freeze_sha/tree; review evidence, Issue projection readback, dispatch receipt are non-null; concurrent_writer_absent=true"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "implementation_authorized": {
+                "const": true
+              }
+            },
+            "required": [
+              "implementation_authorized"
+            ]
+          },
+          "then": {
+            "properties": {
+              "spec_review": {
+                "properties": {
+                  "review_status": {
+                    "const": "pass"
+                  },
+                  "p0_count": {
+                    "const": 0
+                  },
+                  "p1_count": {
+                    "const": 0
+                  },
+                  "reviewed_sha": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "reviewed_tree": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "review_evidence": {
+                    "$ref": "#/$defs/EvidenceBlobRefV1"
+                  }
+                }
+              },
+              "issue_projection_readback": {
+                "$ref": "#/$defs/EvidenceBlobRefV1"
+              },
+              "implementation_dispatch_receipt": {
+                "$ref": "#/$defs/EvidenceBlobRefV1"
+              },
+              "concurrent_writer_absent": {
+                "const": true
+              },
+              "b1_b2_status": {
+                "properties": {
+                  "predecessor_human_merge": {
+                    "properties": {
+                      "identity_classification": {
+                        "const": "corrected-owner-accepted-merge"
+                      },
+                      "implementation_disposition": {
+                        "const": "owner-corrected-and-accepted"
+                      },
+                      "b1_b2_execution_target_status": {
+                        "const": "resolved-corrected-merge-owner-accepted-and-read-back"
+                      },
+                      "issue_branch_ancestry_status": {
+                        "const": "verified"
+                      },
+                      "issue_branch_ancestry_evidence": {
+                        "$ref": "#/$defs/EvidenceBlobRefV1"
+                      }
+                    }
+                  },
+                  "b1": {
+                    "properties": {
+                      "execution_status": {
+                        "const": "performed"
+                      },
+                      "acceptance_status": {
+                        "const": "accepted"
+                      },
+                      "accepted_sha": {
+                        "$ref": "#/$defs/Sha1"
+                      },
+                      "accepted_tree": {
+                        "$ref": "#/$defs/Sha1"
+                      },
+                      "fresh_evidence_index": {
+                        "$ref": "#/$defs/PreflightEvidenceIndexV1"
+                      }
+                    }
+                  },
+                  "b2": {
+                    "properties": {
+                      "execution_status": {
+                        "const": "performed"
+                      },
+                      "acceptance_status": {
+                        "const": "accepted"
+                      },
+                      "accepted_sha": {
+                        "$ref": "#/$defs/Sha1"
+                      },
+                      "accepted_tree": {
+                        "$ref": "#/$defs/Sha1"
+                      },
+                      "fresh_evidence_index": {
+                        "$ref": "#/$defs/PreflightEvidenceIndexV1"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
       ]
     },
     "RoleOwnershipEntryV1": {
@@ -4237,34 +4530,322 @@
           "const": "explicit-owner-correction-2026-09-18"
         },
         "formal_issue_start": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state",
+            "product_implementation_authorized",
+            "rollback_or_repeat_start_forbidden"
+          ],
+          "properties": {
+            "state": {
+              "const": "preserved-active-branch-selection"
+            },
+            "product_implementation_authorized": {
+              "const": false
+            },
+            "rollback_or_repeat_start_forbidden": {
+              "const": true
+            }
+          }
         },
         "predecessor_human_merge": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "pull_request_number",
+            "merge_sha",
+            "merge_tree",
+            "github_readback_status",
+            "identity_classification",
+            "implementation_disposition",
+            "b1_b2_execution_target_status",
+            "issue_branch_ancestry_status",
+            "issue_branch_ancestry_evidence"
+          ],
+          "properties": {
+            "pull_request_number": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "merge_sha": {
+              "$ref": "#/$defs/Sha1"
+            },
+            "merge_tree": {
+              "$ref": "#/$defs/Sha1"
+            },
+            "github_readback_status": {
+              "enum": [
+                "pending",
+                "verified"
+              ]
+            },
+            "identity_classification": {
+              "enum": [
+                "original-merge-historical-identity-only",
+                "corrected-owner-accepted-merge"
+              ]
+            },
+            "implementation_disposition": {
+              "enum": [
+                "owner-reported-incorrect",
+                "owner-corrected-and-accepted"
+              ]
+            },
+            "b1_b2_execution_target_status": {
+              "enum": [
+                "blocked-until-corrected-merge-is-owner-accepted-and-read-back",
+                "resolved-corrected-merge-owner-accepted-and-read-back"
+              ]
+            },
+            "issue_branch_ancestry_status": {
+              "enum": [
+                "blocked-awaiting-corrected-merge",
+                "blocked-not-ancestor",
+                "verified"
+              ]
+            },
+            "issue_branch_ancestry_evidence": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/EvidenceBlobRefV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          }
         },
         "b1": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "execution_status",
+            "acceptance_status",
+            "accepted_sha",
+            "accepted_tree",
+            "fresh_evidence_index"
+          ],
+          "properties": {
+            "execution_status": {
+              "enum": [
+                "not-performed",
+                "performed"
+              ]
+            },
+            "acceptance_status": {
+              "enum": [
+                "not-accepted",
+                "accepted"
+              ]
+            },
+            "accepted_sha": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Sha1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "accepted_tree": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Sha1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fresh_evidence_index": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/PreflightEvidenceIndexV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "acceptance_status": {
+                    "const": "accepted"
+                  }
+                },
+                "required": [
+                  "acceptance_status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "execution_status": {
+                    "const": "performed"
+                  },
+                  "accepted_sha": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "accepted_tree": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "fresh_evidence_index": {
+                    "$ref": "#/$defs/PreflightEvidenceIndexV1"
+                  }
+                }
+              }
+            }
+          ]
         },
         "b2": {
-          "type": "object"
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "execution_status",
+            "acceptance_status",
+            "accepted_sha",
+            "accepted_tree",
+            "fresh_evidence_index"
+          ],
+          "properties": {
+            "execution_status": {
+              "enum": [
+                "not-performed",
+                "performed"
+              ]
+            },
+            "acceptance_status": {
+              "enum": [
+                "not-accepted",
+                "accepted"
+              ]
+            },
+            "accepted_sha": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Sha1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "accepted_tree": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/Sha1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "fresh_evidence_index": {
+              "oneOf": [
+                {
+                  "$ref": "#/$defs/PreflightEvidenceIndexV1"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "acceptance_status": {
+                    "const": "accepted"
+                  }
+                },
+                "required": [
+                  "acceptance_status"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "execution_status": {
+                    "const": "performed"
+                  },
+                  "accepted_sha": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "accepted_tree": {
+                    "$ref": "#/$defs/Sha1"
+                  },
+                  "fresh_evidence_index": {
+                    "$ref": "#/$defs/PreflightEvidenceIndexV1"
+                  }
+                }
+              }
+            }
+          ]
         },
         "historical_claim_artifacts": {
           "type": "array",
           "minItems": 3,
           "items": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "path",
+              "sha256",
+              "classification"
+            ],
+            "properties": {
+              "path": {
+                "$ref": "#/$defs/NonEmptyText"
+              },
+              "sha256": {
+                "$ref": "#/$defs/Sha256"
+              },
+              "classification": {
+                "enum": [
+                  "preserved-historical-claim-not-current-acceptance",
+                  "preserved-historical-raw-claim-not-current-acceptance",
+                  "preserved-historical-before-state"
+                ]
+              }
+            }
           }
         },
         "authority_conflicts": {
           "type": "array",
           "minItems": 1,
           "items": {
-            "type": "object"
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "source",
+              "claim",
+              "current_operational_fact",
+              "resolution"
+            ],
+            "properties": {
+              "source": {
+                "$ref": "#/$defs/NonEmptyText"
+              },
+              "claim": {
+                "$ref": "#/$defs/NonEmptyText"
+              },
+              "current_operational_fact": {
+                "$ref": "#/$defs/NonEmptyText"
+              },
+              "resolution": {
+                "$ref": "#/$defs/NonEmptyText"
+              }
+            }
           }
         },
         "required_order": {
           "type": "array",
-          "minItems": 7,
+          "minItems": 11,
           "items": {
             "$ref": "#/$defs/NonEmptyText"
           }
@@ -4272,7 +4853,132 @@
         "stop_rule": {
           "$ref": "#/$defs/NonEmptyText"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "predecessor_human_merge": {
+                "properties": {
+                  "issue_branch_ancestry_status": {
+                    "enum": [
+                      "verified",
+                      "blocked-not-ancestor"
+                    ]
+                  }
+                }
+              }
+            },
+            "required": [
+              "predecessor_human_merge"
+            ]
+          },
+          "then": {
+            "properties": {
+              "predecessor_human_merge": {
+                "properties": {
+                  "issue_branch_ancestry_evidence": {
+                    "$ref": "#/$defs/EvidenceBlobRefV1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "predecessor_human_merge": {
+                "properties": {
+                  "issue_branch_ancestry_status": {
+                    "const": "blocked-awaiting-corrected-merge"
+                  }
+                }
+              }
+            },
+            "required": [
+              "predecessor_human_merge"
+            ]
+          },
+          "then": {
+            "properties": {
+              "predecessor_human_merge": {
+                "properties": {
+                  "issue_branch_ancestry_evidence": {
+                    "type": "null"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "b1": {
+                "properties": {
+                  "acceptance_status": {
+                    "const": "accepted"
+                  }
+                }
+              }
+            },
+            "required": [
+              "b1"
+            ]
+          },
+          "then": {
+            "properties": {
+              "predecessor_human_merge": {
+                "properties": {
+                  "identity_classification": {
+                    "const": "corrected-owner-accepted-merge"
+                  },
+                  "implementation_disposition": {
+                    "const": "owner-corrected-and-accepted"
+                  },
+                  "b1_b2_execution_target_status": {
+                    "const": "resolved-corrected-merge-owner-accepted-and-read-back"
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "b2": {
+                "properties": {
+                  "acceptance_status": {
+                    "const": "accepted"
+                  }
+                }
+              }
+            },
+            "required": [
+              "b2"
+            ]
+          },
+          "then": {
+            "properties": {
+              "b1": {
+                "properties": {
+                  "acceptance_status": {
+                    "const": "accepted"
+                  }
+                }
+              }
+            }
+          }
+        }
+      ],
+      "x-semantic-invariants": [
+        "B2 cannot be accepted unless B1 is accepted first; acceptance order is recorded in required_order",
+        "accepted B1 and B2 each have performed execution, exact SHA/tree, and a stage-correct PreflightEvidenceIndexV1",
+        "accepted B1 and B2 identities are equal to each other and the corrected owner-accepted predecessor merge identity",
+        "issue_branch_ancestry_status=verified means the corrected predecessor merge SHA is an ancestor of the exact Issue specification freeze SHA; the evidence ref contains the actual read-only command result"
+      ]
     }
   }
 }

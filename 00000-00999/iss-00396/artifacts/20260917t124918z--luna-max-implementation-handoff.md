@@ -44,7 +44,7 @@ These values are the candidate-assembly snapshot; later same-Red review, Issue p
 
 ユーザーの最新運用事実により、#395 implementation自体がincorrectと報告され、B1/B2も未実施・未受入である。具体的defectと修正後tipは未確認である。元の#395 merge SHA/treeはhistorical identityのみで、correct Product baselineやB1/B2 targetではない。#395 ownerはdefectを#395 scopeで修正・受入し、修正後のmerged SHA/treeをGitHub readbackする必要がある。これがない場合はP01で停止し、Issue #396のProduct変更を開始しない。Issue #396は#395の実装修正を代行しない。
 
-その後も、clean pushed spec candidate、same-Red `review_status=pass`かつP0/P1=0、Issue projection readback、explicit implementation dispatch、concurrent writer absenceが必要である。P2六件はrecord-onlyで、修正・task化・acceptance gateにしない。
+その後も、corrected #395 merge SHAがIssue specification freezeのancestorであること、clean pushed spec candidate、same-Red `review_status=pass`かつP0/P1=0、Issue projection readback、explicit implementation dispatch、concurrent writer absenceが必要である。P2/P3はreview contractに従いrecord-onlyとし、修正・task化・acceptance gateにしない。
 
 本handoffはProduct code、test、workflow、policy、GitHub settings、merge、B3を変更・完了したことを示さない。一packetで一checkpointだけを実行し、exit evidenceまたはtruthful StopReturnを返す。
 
@@ -89,6 +89,7 @@ Validate against `provider-gate-contracts-v1.schema.json#/$defs/ExecutionPacketV
 Before `implementation_authorized=true`, packet must include:
 
 - #395 owner correction/acceptance evidence and GitHub readback of the corrected merged SHA/tree。
+- Read-only proof that the corrected #395 merge SHA is an ancestor of `spec_freeze_sha` (`git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"`). If false or unavailable, return to the Epic integration/parent owner. Do not merge, rebase, cherry-pick, recreate the branch, or force-push; after an owner-authorized realignment, regenerate affected source-bound artifacts, then repeat same-Red review and Issue projection readback at the new freeze SHA/tree.
 - accepted `B1B2AdmissionStatusV2` with B1/B2 on that same corrected exact tip。
 - clean pushed `spec_freeze_sha/tree` matching local/upstream/remote。
 - same-Red review pass/P0=0/P1=0 and review evidence。
@@ -131,6 +132,7 @@ Before the first mutation additionally verify:
 ```text
 B1 accepted at owner-approved corrected #395 SHA/tree
 B2 accepted after B1 at the same SHA/tree
+corrected #395 merge SHA is an ancestor of SPEC_FREEZE_SHA
 same-Red review pass P0/P1=0
 Issue projection readback complete
 explicit implementation dispatch present

@@ -303,8 +303,8 @@
         <div><strong>Product実装許可</strong><span class="badge red">false</span></div>
         <div><strong>#395 implementation</strong><span class="badge red">owner-reported incorrect; disposition pending</span></div>
         <div><strong>B1 / B2</strong><span class="badge red">未実施・未受入</span></div>
-        <div><strong>前回Strict review</strong>P1=6。6件の修正を本candidateへ反映</div>
-        <div><strong>このcandidateの再review</strong>判定は外部のsame-Red receiptで確認</div>
+        <div><strong>直近のStrict review</strong>d9 candidate: P0=0 / P1=4 / P2=3、fail</div>
+        <div><strong>このcandidate</strong>4件のP1修正を反映。same-Red結果はexact SHAのreceiptで確認</div>
         <div><strong>B3</strong><span class="badge red">not started</span></div>
       </div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
@@ -337,9 +337,11 @@
 <article><strong>#395 defect resolution and identity readback</strong><br>#395 ownerによる修正・受入後のmerged SHA/treeをGitHub readbackします。元のPR #401 SHA/treeはhistorical identityのみで、B1/B2 targetには使いません。</article>
 <article><strong>Fresh B1 acceptance</strong><br>ordinary pytest、lint、SpecDock validate、provider/lifecycle/protected parityを実行し、actual logs/hashを保存します。</article>
 <article><strong>Fresh same-tip B2 acceptance</strong><br>B1と同じSHA/treeでfull verifierを実行し、fresh raw resultと15/0/15 relationを受入します。</article>
+<article><strong>Issue branch ancestry</strong><br>Corrected #395 merge SHAがIssue #396のSPEC_FREEZE_SHAのancestorかを確認します。falseならbranchを変更せず、Epic integration/parent ownerへ戻します。</article>
 <article><strong>Explicit implementation dispatch</strong><br>clean specification freeze、同時writer不在、別途の明示dispatchがそろって初めてProduct変更へ進みます。</article>
 </div>
 <div class="callout warn">Parent Plan §3.2と旧receiptの完了主張、およびownerによる#395 implementation error reportは未解決です。本Issueでは親文書や#395を変更せず、#395 ownerの修正・受入までadmission holdとして記録します。</div>
+<div class="callout">Branch ancestryがfalseの場合、Epic ownerが許可したrealignment後にsource-bound evidence、ZIP、same-Red review、Issue projectionを新しいfreeze SHA/treeで更新します。Agentによるmerge/rebase/cherry-pick/branch recreation/force-pushは禁止です。</div>
 </section>
 
 <section id="architecture"><h2>4. 構成と責務</h2>
@@ -375,12 +377,18 @@ endif
 if (B1がaccepted?) then (はい)
   :同じclean worktreeとSHA/treeでfresh B2を実行・受入;
   if (B2がaccepted?) then (はい)
-    :cleanな仕様freezeと同時writer不在を再確認;
-    if (明示implementation dispatchを受領?) then (はい)
-      :Product実装を開始;
-      stop
+    if (corrected #395 SHAはSPEC_FREEZE_SHAのancestor?) then (はい)
+      :cleanな仕様freezeと同時writer不在を再確認;
+      if (明示implementation dispatchを受領?) then (はい)
+        :Product実装を開始;
+        stop
+      else (いいえ)
+        :Product変更を開始せず停止;
+        stop
+      endif
     else (いいえ)
-      :Product変更を開始せず停止;
+      :StopReturnでEpic integration/parent ownerへ戻す;
+      :許可後のrealignmentでartifact、ZIP、review、projectionを更新;
       stop
     endif
   else (いいえ)
@@ -447,6 +455,8 @@ note over Plugin : P15で旧hook/seamを退役しても恒久filter ownerとし�
 <tr><td>P18–P20</td><td>independent reviews、merge-ready/human merge/readback</td><td>post-merge identity fixed</td></tr>
 <tr><td>P21–P22</td><td>post-merge materialization、freeze、attempt/fault/window、B3 receipt</td><td>B3 actual accepted evidence</td></tr>
 </tbody></table></div>
+<div class="callout ok"><strong>設計規模:</strong> 今回の修正は既存gate、コマンド、schemaを明確にする範囲です。Product component、state machine、ownership node、checkpoint、Epic policyは増やしません。</div>
+<div class="callout"><strong>Test invocation:</strong> P04/P05は既存の割当済みunit nodeを通常pytestで直接実行し、role/qualification evidenceとは扱いません。Permanent pluginはP07から使います。P11 integration runは既存P10 ownership manifestのexact P07/P08 nodesを指定し、新しいP11 checkpointは作りません。</div>
 </section>
 
 <section id="verify"><h2>9. Verification commandsと期待結果</h2>
@@ -463,9 +473,10 @@ mkdir -m 700 "$B12_TMPDIR"
 env TMPDIR="$B12_TMPDIR" uv run pytest -q --tb=short
 make lint
 ./spec-dock/scripts/spec-dock validate
-uv run pytest -q tests/unit/provider_lifecycle tests/cli_runtime/test_distribution_cutover.py tests/integration/test_issue_392_acceptance.py --tb=short
+env TMPDIR="$B12_TMPDIR" uv run pytest -q --run-full-regression --full-regression-shard tests/unit/provider_lifecycle tests/cli_runtime/test_distribution_cutover.py tests/integration/test_issue_392_acceptance.py --tb=short
 uv run python -m scripts.quality.verify_full_regression --shards 4</pre>
-<p>期待結果はexit classとcontract relationです。Pass countをhistorical claimへ合わせずactual outputを保存します。</p>
+<p>Parity commandには既存policy skipを避けるため両方のfull-regression flagsを指定します。選択したtest bodyが全て実行され、skip/xfail/xpassがないことを確認します。他のB1 ordinary suiteのskip数は観測値として保存します。Pass countをhistorical claimへ合わせません。</p>
+<pre>git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"</pre>
 <h3>Implementation final source</h3><pre>uv run python scripts/maintenance/generate_provider_qualification_policy.py --check
 uv run python -m scripts.quality.provider_gate.cli validate-contracts
 uv run pytest -p scripts.quality.provider_gate.pytest_plugin --provider-gate-role linux-canonical ...

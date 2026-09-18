@@ -175,9 +175,12 @@ Product実装前に、次の順で全条件を要求する。
 6. `b1-b2-verification-contract-v1.json`のtarget resolution ruleに従って、修正後のexact SHA/treeをP01 preflight evidenceへ固定する。元の#395 SHA/treeを代用しない。
 7. 修正後の指定SHA/treeでB1をfresh実行・受入する。
 8. 同じclean worktree、同じSHA/treeでB2をfresh実行・受入する。
-9. B1/B2のactual-byte evidence index、accepted receipts、same-tip proofを生成し、親Epic ownerがreported defectの解消とgate結果の受入を記録する。
-10. Current specification freezeのlocal HEAD、configured upstream、remote branch full SHAが一致し、worktree clean、同時writerなしであることを再確認する。
-11. 別途のexplicit implementation dispatchを受け取る。
+9. Corrected #395 merge SHAがIssue #396の`SPEC_FREEZE_SHA`のancestorであることを`git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"`で確認する。ancestorでなければStopReturnでEpic integration/parent ownerへ戻し、Agentはmerge、rebase、cherry-pick、branch recreation、force pushを行わない。
+10. B1/B2のactual-byte evidence index、accepted receipts、same-tip proofを生成し、親Epic ownerがreported defectの解消とgate結果の受入を記録する。
+11. Current specification freezeのlocal HEAD、configured upstream、remote branch full SHAが一致し、worktree clean、同時writerなしであることを再確認する。
+12. 別途のexplicit implementation dispatchを受け取る。
+
+Ancestry checkがfalseの場合、Issue branchの統合方法はEpic integration contractに従う人間/parent ownerの判断へ戻す。明示的に許可されたbranch realignment後は、影響を受けたP02/P03などsource SHA/tree由来のcaptureとartifactを再生成し、ZIPを更新してcleanな新candidateを固定する。同じRed reviewとIssue projection readbackを新しいexact candidateでやり直す。B1/B2 receiptを再利用できるのはcorrected #395 SHA/treeが同一でevidenceが引き続き有効な場合だけである。
 
 一つでも欠ける場合、formal start/active stateを変更せず実装を停止する。#395のreported defectが未解決、#395 CLOSED、Issue graph ready、historical raw bytes、別SHAのGREEN、過去reviewは代替にならない。B1/B2 failureまたは修正後#395 identityの欠落は#395 ownerへ戻し、Issue #396のProduct変更を開始しない。
 
@@ -336,7 +339,7 @@ B1/B2未受入、same-Red fail、projection unread、explicit dispatchなしで�
 
 | AC | Observable fact | Primary evidence |
 |---|---|---|
-| AC-00 | #395 reported implementation defectが#395 ownerにより修正・受入され、corrected merge SHA/treeがGitHub readbackどおり | #395 correction/acceptance receipt + corrected commit/tree readback in `PreflightEvidenceIndexV1` |
+| AC-00 | #395 reported implementation defectが#395 ownerにより修正・受入され、corrected merge SHA/treeがGitHub readbackどおりで、corrected merge SHAがIssue #396の`SPEC_FREEZE_SHA`のancestor | #395 correction/acceptance receipt + corrected commit/tree readback + `git merge-base --is-ancestor` result in `PreflightEvidenceIndexV1` |
 | AC-01 | B1がfresh executionでaccepted | `b1-b2-verification-contract-v1.json`, PreflightEvidenceIndexV1, accepted receipt |
 | AC-02 | B2がaccepted B1とsame exact tipでfresh accepted | raw verifier bytes, 15/0/15 relation, accepted receipt |
 | AC-03 | same-Red review pass、P0/P1=0。P2はrecord-only | review JSON/session receipt |
@@ -359,7 +362,7 @@ B1/B2未受入、same-Red fail、projection unread、explicit dispatchなしで�
 
 | Requirement | Component/data | Exact files/symbols | First/negative tests | Exit evidence |
 |---|---|---|---|---|
-| RQ-001 | predecessor correction/admission | `b1-b2-admission-status-v2.json`, `b1-b2-verification-contract-v1.json` | unresolved defect/original-SHA fallback/wrong tree/different B2 SHA/missing raw log | #395 owner correction receipt, exact corrected-tip readback, accepted B1/B2 preflight indexes |
+| RQ-001 | predecessor correction/admission | `b1-b2-admission-status-v2.json`, `b1-b2-verification-contract-v1.json` | unresolved defect/original-SHA fallback/wrong tree/different B2 SHA/missing raw log/corrected merge not ancestor of spec freeze | #395 owner correction receipt, exact corrected-tip readback, ancestry proof, accepted B1/B2 preflight indexes |
 | RQ-002 | parent projection | generator, `_qualification_policy_generated.py` | hidden literal/parent drift | generator diff 0 |
 | RQ-003 | materialization/freeze | `CandidateMaterializationV1`, `CampaignFreezeV1`, `artifacts.py` | producer failure, same-SHA rebuild, incomplete env | materialization + freeze records |
 | RQ-004 | evidence stages | `EvidenceWorkspaceV1`, `PreflightEvidenceIndexV1`, `CandidateEvidenceIndexV1` | absolute/dotdot/symlink/hash mismatch | actual-byte indexes |
@@ -391,6 +394,7 @@ B1/B2未受入、same-Red fail、projection unread、explicit dispatchなしで�
 次を観測したら、fallbackやgate免除を行わず`StopReturnV1`で停止する。
 
 - #395 merge SHA/tree、B1/B2 same-tip execution、raw evidence、accepted stateの欠落・不一致。
+- corrected #395 merge SHAがIssue #396 specification freezeのancestorでない、またはbranch history realignmentに人間/parent ownerの明示的 dispositionがない場合。
 - historical receipt、Issue graph ready、#395 CLOSED、別SHA結果でB1/B2を代替しようとした場合。
 - same-Red reviewがpass/P0=0/P1=0でない、projection readbackまたはexplicit dispatchがない場合。
 - parent `E384-QUAL-001`をsemantic変更、duplicate authority、hidden thresholdなしにprojectできない場合。
