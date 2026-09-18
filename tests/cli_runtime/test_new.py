@@ -514,6 +514,66 @@ class TestCliNew(CliRuntimeHarness):
             assert issue_meta["github"]["repo_owner"] == "current"
             assert issue_meta["github"]["repo_name"] == "repo"
 
+    @pytest.mark.parametrize("scheme", ["ssh", "ftp"])
+    def test_new_issue_rejects_credentialed_unsupported_push_remote_without_disclosure(self, scheme: str) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a POSIX shell stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+
+            secret = "synthetic-password-sentinel"
+            remote = f"{scheme}://synthetic-user:{secret}@git.example.invalid/example/repo.git"
+            self._run_git(target, ["remote", "set-url", "--push", "origin", remote])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            gh_call_log = target / "gh-calls.txt"
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/bin/sh\nprintf '%s\n' called >> \"$GH_CALL_LOG\"\nexit 91\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+            test_env = {
+                "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_CALL_LOG": str(gh_call_log),
+            }
+
+            issues_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+            )
+            issue_names_before = sorted(path.name for path in issues_dir.glob("iss-*"))
+            failed = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "2",
+                    "--title",
+                    "Reject credentialed unsupported remote",
+                    "--create-github-issue",
+                ],
+                env=test_env,
+            )
+
+            assert failed.returncode != 0, failed.stdout + failed.stderr
+            diagnostic = failed.stdout + failed.stderr
+            assert "origin remote contains credentials" in diagnostic
+            assert secret not in diagnostic
+            assert remote not in diagnostic
+            assert not gh_call_log.exists()
+            assert sorted(path.name for path in issues_dir.glob("iss-*")) == issue_names_before
+
     def test_new_rejects_unsafe_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)

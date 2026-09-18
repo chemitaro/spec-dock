@@ -204,8 +204,6 @@ def _parse_github_repo_slug(remote_url: str) -> str | None:
 
 
 def _remote_has_userinfo(remote_url: str) -> bool:
-    if not remote_url.lower().startswith(("http://", "https://")):
-        return False
     try:
         parsed = urlsplit(remote_url)
     except ValueError:
