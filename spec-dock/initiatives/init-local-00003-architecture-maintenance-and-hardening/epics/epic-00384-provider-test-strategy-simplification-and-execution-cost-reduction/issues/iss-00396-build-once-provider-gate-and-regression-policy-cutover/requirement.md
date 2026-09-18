@@ -232,6 +232,8 @@ Stage IDはevidence schemaの`AttemptStageIdV1` closed enum、execution role ID�
 
 `artifacts/role-ownership-v1.json`の2,214-node assignmentはimmutable baselineである。実装でbaselineを上書きしない。`artifacts/role-ownership-delta-v1.json`のexact 43 add、1 move、69 deleteをactivation checkpoint順に適用し、各checkpointの`ResolvedRoleOwnershipV1`を`role-ownership-checkpoints-v1.json`から検証する。Final populationは2,188 assignmentsであるが、これはparent qualification populationではなくtest ownership inventoryである。
 
+各resolved checkpoint/finalの`baseline_sha256`と`delta_sha256`は、canonical baseline/delta JSON artifactの正確なfile bytes（末尾LFを含む）のSHA-256である。bytesを直接hashし、JSONのparse/re-serialize、key sort、改行変換その他の正規化をしてはならない。これはDesign §7.1のnode-ID集合digest `collection_sha256`とは別のartifact identityである。
+
 - Wildcard、marker、directory prefix、runtime discoveryによるowner choiceは禁止する。
 - New/moved/deleted nodeはtest body実行前にreviewed deltaへ存在しなければならない。
 - Unknown node、duplicate owner、collection/hash mismatchはbody前にrejectする。

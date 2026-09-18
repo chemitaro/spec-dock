@@ -160,7 +160,7 @@ Owner: primary author / independent reviewer。Product/tests/workflow/policy/set
 1. Canonical Issue R/D/P、handoff、closed schema、machine artifacts、HTML、README、payload manifestをrepository-relative hierarchyでZIPへ収録する。
 2. `payload-manifest-v1.json`で`modified/new/preserved`を区別し、size/SHA-256を記録する。`manifest.sha256`は全payloadをpath順・分類group付きで列挙する。
 3. Historical B1/B2 receipt/raw bytes、2,214-node baseline、Linux/macOS raw collections、parent docs/contractsはbyte-preserveする。
-4. Schema self-validation、concrete artifact validation、delta derivation、45 fault denominator、ZIP CRC、manifest、HTML internal/external byte equalityを検査する。
+4. Schema self-validation、concrete artifact validation、baseline/deltaのexact raw-byte SHA-256と全checkpoint/finalへの伝播、delta derivation、45 fault denominator、ZIP CRC、manifest、HTML internal/external byte equalityを検査する。
 5. Repositoryへ適用する場合、spec-only diffをcommit/pushし、GitHub connectorでexact branch/full SHAをverifyする。
 6. 同じsession `iss396-spec-review-red`の既存receiptを確認する。SHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`で`review_status=pass`、P0=0、P1=0、findings=0である。ユーザー指示により、今回のstatus-only承認更新では再reviewしない。実装freeze identityまたは実質仕様を変更するときは、Design §8に従いfreeze SHA/treeとreview SHA/treeを一致させる。
 7. Approved状態を反映したIssue body projectionを更新し、GitHubからreadbackする。現行Issue bodyは旧レビューSHAを参照しているため、本revisionのprojection readbackは未完了である。
@@ -478,6 +478,8 @@ Expected: unit GREEN。Actual runner admission remains pending until shadow work
 5. Verify ordinary pytest keeps legacy behavior until P15。
 6. Exercise selector-free full qualification and focused exact-node collection within the existing six P07 plugin/ownership tests. The command below runs those tests by exact node ID; do not add ownership nodes for this distinction.
 7. Verify P15 simulation without root conftest still filters via plugin。
+
+`test_reviewed_baseline_and_delta_derive_checkpoint_manifest`は、baseline/delta digestがcanonical artifactのexact bytes（末尾LFを含む）に対するSHA-256であること、および各resolved checkpointが両digestを保持することも検証する。
 
 ```bash
 uv run pytest \
