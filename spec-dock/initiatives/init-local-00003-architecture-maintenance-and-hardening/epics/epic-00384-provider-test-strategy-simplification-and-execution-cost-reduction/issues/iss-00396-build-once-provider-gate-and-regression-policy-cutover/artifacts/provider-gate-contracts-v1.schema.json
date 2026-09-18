@@ -863,6 +863,148 @@
         "evidence_paths": "UTF-8 byte order; no duplicates"
       }
     },
+    "AttemptStageIdV1": {
+      "type": "string",
+      "enum": [
+        "candidate-resolve",
+        "static-analysis",
+        "linux-canonical",
+        "sdist-smoke",
+        "macos-delta",
+        "attempt-evaluate"
+      ]
+    },
+    "ExecutionRoleIdV1": {
+      "type": "string",
+      "enum": [
+        "static-analysis",
+        "linux-canonical",
+        "sdist-smoke",
+        "macos-delta"
+      ]
+    },
+    "CandidateResolutionV1": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "stage_id",
+        "attempt_id",
+        "materialization_id",
+        "candidate_identity",
+        "candidate_evidence_index_sha256",
+        "environment_fingerprint_sha256",
+        "started_at",
+        "completed_at",
+        "build_invocation_count",
+        "status",
+        "errors"
+      ],
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "stage_id": {
+          "$ref": "#/$defs/AttemptStageIdV1"
+        },
+        "attempt_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "materialization_id": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "candidate_identity": {
+          "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "candidate_evidence_index_sha256": {
+          "description": "SHA-256 of the canonical UTF-8 JSON bytes for the CandidateEvidenceIndexV1 used by this resolution; null when the index is unavailable.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "environment_fingerprint_sha256": {
+          "$ref": "#/$defs/Sha256"
+        },
+        "started_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "completed_at": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Timestamp"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "build_invocation_count": {
+          "const": 0
+        },
+        "status": {
+          "enum": [
+            "resolved",
+            "failed",
+            "cancelled",
+            "interrupted",
+            "missing-evidence",
+            "rejected"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ErrorV1"
+          }
+        }
+      },
+      "allOf": [
+        {
+          "properties": {
+            "stage_id": {
+              "const": "candidate-resolve"
+            }
+          }
+        }
+      ],
+      "x-key-order": [
+        "schema_version",
+        "stage_id",
+        "attempt_id",
+        "materialization_id",
+        "candidate_identity",
+        "candidate_evidence_index_sha256",
+        "environment_fingerprint_sha256",
+        "started_at",
+        "completed_at",
+        "build_invocation_count",
+        "status",
+        "errors"
+      ],
+      "x-array-order": {
+        "errors": "code then evidence path"
+      },
+      "x-semantic-invariants": [
+        "exactly one resolution is bound to each registered attempt",
+        "attempt, materialization, candidate, evidence-index, and environment identities equal the registered and completed materialization identities",
+        "status=resolved requires actual manifest, wheel, and sdist bytes to match candidate identity and bundle digest",
+        "status=resolved requires candidate_evidence_index_sha256 to reference the complete candidate evidence index",
+        "resolution is read-only and build_invocation_count is zero",
+        "a missing or unsuccessful resolution prevents all execution roles and cannot produce an accepted attempt"
+      ]
+    },
     "RoleResultRefV1": {
       "type": "object",
       "additionalProperties": false,
@@ -873,12 +1015,7 @@
       ],
       "properties": {
         "role_id": {
-          "enum": [
-            "static-analysis",
-            "linux-canonical",
-            "sdist-smoke",
-            "macos-delta"
-          ]
+          "$ref": "#/$defs/ExecutionRoleIdV1"
         },
         "status": {
           "enum": [
@@ -938,12 +1075,7 @@
           "$ref": "#/$defs/Sha256"
         },
         "role_id": {
-          "enum": [
-            "static-analysis",
-            "linux-canonical",
-            "sdist-smoke",
-            "macos-delta"
-          ]
+          "$ref": "#/$defs/ExecutionRoleIdV1"
         },
         "candidate_manifest_sha256": {
           "$ref": "#/$defs/Sha256"
@@ -1266,8 +1398,10 @@
       "additionalProperties": false,
       "required": [
         "schema_version",
+        "stage_id",
         "attempt_id",
         "candidate_identity",
+        "candidate_resolution_sha256",
         "environment_fingerprint_sha256",
         "gate_contract_version",
         "role_results",
@@ -1285,11 +1419,25 @@
         "schema_version": {
           "const": 1
         },
+        "stage_id": {
+          "$ref": "#/$defs/AttemptStageIdV1"
+        },
         "attempt_id": {
           "$ref": "#/$defs/Sha256"
         },
         "candidate_identity": {
           "$ref": "#/$defs/CandidateIdentityV1"
+        },
+        "candidate_resolution_sha256": {
+          "description": "SHA-256 of this attempt's unique CandidateResolutionV1 canonical UTF-8 JSON bytes; null means resolution evidence is absent.",
+          "oneOf": [
+            {
+              "$ref": "#/$defs/Sha256"
+            },
+            {
+              "type": "null"
+            }
+          ]
         },
         "environment_fingerprint_sha256": {
           "$ref": "#/$defs/Sha256"
@@ -1299,6 +1447,8 @@
         },
         "role_results": {
           "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
           "items": {
             "$ref": "#/$defs/RoleResultRefV1"
           }
@@ -1347,10 +1497,21 @@
           }
         }
       },
+      "allOf": [
+        {
+          "properties": {
+            "stage_id": {
+              "const": "attempt-evaluate"
+            }
+          }
+        }
+      ],
       "x-key-order": [
         "schema_version",
+        "stage_id",
         "attempt_id",
         "candidate_identity",
+        "candidate_resolution_sha256",
         "environment_fingerprint_sha256",
         "gate_contract_version",
         "role_results",
@@ -1365,15 +1526,19 @@
         "errors"
       ],
       "x-array-order": {
-        "role_results": "role order candidate-producer, static-analysis, linux-canonical, sdist-smoke, macos-delta",
+        "role_results": "execution role order static-analysis, linux-canonical, sdist-smoke, macos-delta; exactly one per role",
         "linux_predicates": "parent predicate ID order",
         "correctness_predicates": "parent predicate ID order",
         "violations": "code then subject_id",
         "errors": "code then evidence path"
       },
       "x-semantic-invariants": [
+        "stage_id is exactly attempt-evaluate",
+        "candidate_resolution_sha256 references the unique CandidateResolutionV1 for this attempt; null means resolution evidence is absent and result is never accepted",
+        "role_results contains exactly one ref for each ExecutionRoleIdV1 and no other role",
+        "when candidate resolution is not resolved, every execution-role ref is rejected or missing-evidence with sha256=null and the attempt is not accepted",
         "status=accepted iff accepted=true",
-        "accepted requires complete identity and raw evidence",
+        "accepted requires complete identity, successful candidate resolution, and complete raw evidence",
         "accepted requires every required role and parent predicate to pass",
         "missing evidence is incomplete and never success"
       ]
