@@ -322,6 +322,8 @@ Resolved candidateの後、4つのexecution rolesだけが`RoleResultV1`を出�
 
 `role-ownership-v1.json` baselineへ`role-ownership-delta-v1.json`をactivation checkpoint順に適用し、checkpoint manifestを決定的に導出する。P03=2,214、P04以後のadds、P10 move、P15 deletions後final=2,188 assignmentsである。
 
+各`baseline_sha256`と`delta_sha256`は、canonical baseline/delta JSON artifact fileの正確なbytes（末尾LFを含む）のSHA-256とする。file bytesを直接hashし、JSON parse/re-serialize、key/array order変更、newline変換その他の正規化をしない。全checkpointとfinal projectionで同じsource artifact digestを保持する。これらのartifact identity digestは、次に定義するnode-ID collection digestとは別である。
+
 `collection_sha256`はowner/reasonを含まないnormalized node-ID set digestである。重複IDまたはCR/LFを含むIDを先にrejectし、node IDをUTF-8 byte順にsortし、各IDのUTF-8 bytesにLFを一つずつ付けたstream（末尾LFを含む）のSHA-256を取る。これはbaseline `normalized_node_ids_sha256`と同じcanonicalizationである。Checkpoint `collection_sha256`、final projectionのdigest、実collectionの`NodeObservationV1.collection_sha256`は同じ入力表現を使う。
 
 Pluginはbody開始前にactual collection setとresolved assignment setを照合する。Unknown、missing、duplicate owner、unplanned add/move/delete、collection hash mismatchを検出したらbodyを0件実行してrejectする。
@@ -427,7 +429,7 @@ Logical pathはabsolute、drive letter、dot/dot-dot、backslash、NUL、symlink
 
 ### 8.3 Ownership and node observation
 
-`RoleOwnershipDeltaOperationV1`、`RoleOwnershipDeltaV1`、`ResolvedRoleOwnershipV1`、`NodeExecutionV1`、`NodeObservationV1`を閉じる。NodeObservationはcollected/executed/unknown/missing/duplicate setと§7.1のcanonical collection hashを持つ。Baseline P03、各checkpoint、実collectionは同じnode-ID normalizationを使い、owner assignmentが変わらない限り同一node setは同一digestになる。
+`RoleOwnershipDeltaOperationV1`、`RoleOwnershipDeltaV1`、`ResolvedRoleOwnershipV1`、`NodeExecutionV1`、`NodeObservationV1`を閉じる。Resolved ownershipの`baseline_sha256`/`delta_sha256`は§7.1のexact source-file bytes digestを持つ。NodeObservationはcollected/executed/unknown/missing/duplicate setと§7.1のcanonical collection hashを持つ。Baseline P03、各checkpoint、実collectionは同じnode-ID normalizationを使い、owner assignmentが変わらない限り同一node setは同一digestになる。
 
 ### 8.4 Attempt and results
 

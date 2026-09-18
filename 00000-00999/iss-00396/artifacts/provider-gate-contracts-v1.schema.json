@@ -3998,10 +3998,12 @@
           "$ref": "#/$defs/NonEmptyText"
         },
         "baseline_sha256": {
-          "$ref": "#/$defs/Sha256"
+          "$ref": "#/$defs/Sha256",
+          "description": "SHA-256 of the exact canonical baseline artifact file bytes, including its final LF; hash bytes directly without JSON reserialization or normalization."
         },
         "delta_sha256": {
-          "$ref": "#/$defs/Sha256"
+          "$ref": "#/$defs/Sha256",
+          "description": "SHA-256 of the exact canonical delta artifact file bytes, including its final LF; hash bytes directly without JSON reserialization or normalization."
         },
         "assignment_count": {
           "type": "integer",
