@@ -103,7 +103,7 @@ scripts/maintenance/generate_provider_qualification_policy.py
 scripts/quality/provider_gate/{__init__,contracts,codec,identity,materialization,artifacts,environment,process_tree,pytest_plugin,history,faults,consumer_scan,context,evaluator,evidence,cli}.py
 scripts/quality/provider_gate/_qualification_policy_generated.py
 scripts/quality/provider_gate/contracts/{specdock-linux-qualification-v1.json,provider-gate-contracts-v1.schema.json,role-ownership-v1.json,role-ownership-delta-v1.json,seeded-fault-catalogue-v1.json,old-policy-retirement-v1.json}
-tests/unit/provider_gate/{__init__,test_policy_projection,test_contracts,test_identity,test_materialization,test_artifacts,test_environment,test_process_tree,test_role_ownership,test_role_transition_seam,test_history,test_fault_catalogue,test_evaluator,test_consumer_inventory,test_context}.py
+tests/unit/provider_gate/{__init__,test_policy_projection,test_contracts,test_identity,test_artifacts,test_environment,test_process_tree,test_role_ownership,test_role_transition_seam,test_history,test_fault_catalogue,test_evaluator,test_consumer_inventory,test_context}.py
 tests/integration/{test_provider_gate_role_graph,test_provider_gate_faults}.py
 docs/provider-gate.md
 ```
@@ -159,7 +159,7 @@ Owner: primary author / independent reviewer。Product/tests/workflow/policy/set
 3. Historical B1/B2 receipt/raw bytes、2,214-node baseline、Linux/macOS raw collections、parent docs/contractsはbyte-preserveする。
 4. Schema self-validation、concrete artifact validation、delta derivation、45 fault denominator、ZIP CRC、manifest、HTML internal/external byte equalityを検査する。
 5. Repositoryへ適用する場合、spec-only diffをcommit/pushし、GitHub connectorでexact branch/full SHAをverifyする。
-6. 同じsession `iss396-spec-review-red`へfollow-up reviewし、`review_status=pass`、P0=0、P1=0をrequireする。P2六件は`strict-review-p2-record-v1.json`へrecord-onlyで保持し、task/acceptance conditionにしない。
+6. 同じsession `iss396-spec-review-red`へfollow-up reviewし、`review_status=pass`、P0=0、P1=0をrequireする。P2/P3はreview contractに従いrecord-onlyとし、task/acceptance conditionにしない。直近pre-remediation reviewのP2=3も記録のみである。
 7. Pass後にだけprimary authorがIssue body projectionを更新し、GitHubからreadbackする。
 
 `authoring-gate-status-v1.json`はcandidate組み立て時点でのgate snapshotである。後続のcommit/push、Strict review、Issue projection readbackは同ファイルを書き換えず、対象SHAを付けた外部実行証跡として記録する。
@@ -230,10 +230,10 @@ Mismatch/dirty/missing commit/treeではStopReturn。Reset、fallback branch、�
 env TMPDIR="$B12_TMPDIR" uv run pytest -q --tb=short   >"$B12_EVIDENCE_ROOT/b1-ordinary.stdout"   2>"$B12_EVIDENCE_ROOT/b1-ordinary.stderr"
 make lint >"$B12_EVIDENCE_ROOT/b1-lint.stdout" 2>"$B12_EVIDENCE_ROOT/b1-lint.stderr"
 ./spec-dock/scripts/spec-dock validate   >"$B12_EVIDENCE_ROOT/b1-validate.stdout"   2>"$B12_EVIDENCE_ROOT/b1-validate.stderr"
-uv run pytest -q tests/unit/provider_lifecycle   tests/cli_runtime/test_distribution_cutover.py   tests/integration/test_issue_392_acceptance.py --tb=short   >"$B12_EVIDENCE_ROOT/b1-parity.stdout"   2>"$B12_EVIDENCE_ROOT/b1-parity.stderr"
+env TMPDIR="$B12_TMPDIR" uv run pytest -q --run-full-regression --full-regression-shard   tests/unit/provider_lifecycle   tests/cli_runtime/test_distribution_cutover.py   tests/integration/test_issue_392_acceptance.py --tb=short   >"$B12_EVIDENCE_ROOT/b1-parity.stdout"   2>"$B12_EVIDENCE_ROOT/b1-parity.stderr"
 ```
 
-Pass countsは事前constantにせずactual observationとして記録する。全command exit 0、unexpected Product/lifecycle/protected failure 0をparent ownerがacceptedとしたreceiptが必要である。
+Pass countsは事前constantにせずactual observationとして記録する。B1 parity invocationでは全selected test bodyが実行され、policy skip、skip/xfail/xpass、collection-only omissionが0であることを確認する。全command exit 0、unexpected Product/lifecycle/protected failure 0をparent ownerがacceptedとしたreceiptが必要である。
 
 ### 5.4 Same-tip fresh B2
 
@@ -250,7 +250,15 @@ Expected class: exit 0、raw result actual bytes、15 total/0 active/15 resolved
 
 ### 5.5 Current Issue specification admission and dispatch
 
-B1/B2 accepted receipts後、Issue worktreeへ戻り、P00のStrict review passとIssue projection readbackを含む先行gateが同じ仕様candidateについて成立していることを次で再確認する。
+B1/B2 accepted receipts後、corrected #395 merge SHAがIssue branch freezeのancestorであることをread-only確認する。
+
+```bash
+git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"
+```
+
+コマンド、`B12_TARGET_SHA`、`SPEC_FREEZE_SHA`、exit statusをPreflightEvidenceIndexV1へ保存する。Falseまたは判定不能ならStopReturnでEpic integration/parent ownerへ戻す。Agentはbranch historyを変更しない。明示許可されたbranch realignment後は、影響するsource-bound capture/artifactを再生成し、ZIP・spec freeze・same-Red review・projection readbackを新しいexact candidateに対してやり直す。B1/B2 receiptの再利用はcorrected #395 SHA/treeが変わらず、証拠が引き続き有効な場合に限る。
+
+Ancestry pass後、Issue worktreeへ戻り、P00のStrict review passとIssue projection readbackを含む先行gateが同じ仕様candidateについて成立していることを次で再確認する。
 
 ```bash
 test "$(git rev-parse HEAD^{commit})" = "$SPEC_FREEZE_SHA"
@@ -259,7 +267,7 @@ test "$(git rev-parse '@{upstream}^{commit}')" = "$SPEC_FREEZE_SHA"
 test -z "$(git status --porcelain=v1)"
 ```
 
-Require reported #395 defect correction/owner acceptance、corrected-tip B1/B2 acceptance、same-Red pass P0/P1=0、Issue projection readback、explicit implementation dispatch、concurrent writer absent。これらが全て揃って初めてP02へ進む。Formal active state、graph ready、#395 CLOSED、original merge SHA、historical B1/B2 raw artifactsだけでは進まない。
+Require reported #395 defect correction/owner acceptance、corrected merge ancestor proof、corrected-tip B1/B2 acceptance、same-Red pass P0/P1=0、Issue projection readback、explicit implementation dispatch、concurrent writer absent。これらが全て揃って初めてP02へ進む。Formal active state、graph ready、#395 CLOSED、original merge SHA、historical B1/B2 raw artifactsだけでは進まない。
 
 ## 6. Checkpoint P02 — Current external state capture
 
@@ -339,15 +347,23 @@ Expected: byte-identical。
 
 P04でschema、fault denominator、ownership delta、retirement signaturesを設計しない。Canonical artifactsをruntime contract areaへbyte-identical copyし、hashをPreflightEvidenceIndexV1へ記録する。
 
-Pre-body ownership manifestはP04 resolved manifest（baseline + seven P04 adds）である。Unknown/duplicate/collection mismatchならbody 0件でrejectする。
+P04で先にexact seven P04 test nodesのtest bodiesを追加し、その後に割当済みnode IDだけを直接実行する。P07で初めてpermanent pluginを導入するため、P04/P05は通常のunit-test invocationを使い、role ownership/qualification evidenceとは扱わない。
 
-Add only the exact P04 test nodes listed in `role-ownership-delta-v1.json`, then run through the permanent plugin path:
+Run only the exact P04 nodes listed in `role-ownership-delta-v1.json`:
 
 ```bash
-uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P04"   -q tests/unit/provider_gate/test_policy_projection.py      tests/unit/provider_gate/test_contracts.py      tests/unit/provider_gate/test_fault_catalogue.py   --tb=short
+uv run pytest -q \
+  tests/unit/provider_gate/test_policy_projection.py::test_generated_policy_projection_matches_parent_authority \
+  tests/unit/provider_gate/test_policy_projection.py::test_generated_policy_projection_rejects_hidden_literals \
+  tests/unit/provider_gate/test_contracts.py::test_schema_inventory_is_closed_and_canonical \
+  tests/unit/provider_gate/test_contracts.py::test_preflight_and_candidate_evidence_indexes_are_disjoint \
+  tests/unit/provider_gate/test_contracts.py::test_logical_evidence_paths_reject_absolute_or_parent_escape \
+  tests/unit/provider_gate/test_contracts.py::test_stop_return_relations_cover_pre_and_post_mutation \
+  tests/unit/provider_gate/test_contracts.py::test_violation_code_inventory_is_closed \
+  --tb=short
 ```
 
-First RED must enumerate `RED-F001`–`RED-F045` and fail for missing detection implementation, not collection skip or undefined catalogue. Then implement generator/contracts/codec skeleton sufficient to make schema/projection/definition validation GREEN. Fault detection implementation remains P08。
+P04 First RED covers parent projection and schema/contract rejection, including a valid blocked execution packet and a fully gated positive authorization fixture. Negative packet cases reject empty/unknown nested fields, a true authorization with a missing gate, B1/B2 SHA/tree mismatch, review SHA/tree mismatch, and missing or negative ancestry evidence. The semantic packet validator checks these relations; it must fail on a violated invariant, not collection skip or missing plugin. The 45 fault injection/detection cases belong to P08 and must not be reported as P04 work. Then implement generator/contracts/codec skeleton sufficient to make schema/projection/definition validation GREEN.
 
 Exit: generated parent projection diff 0、schema Draft 2020-12 valid、closed code count 68、fault entry count 45、P04 ownership exact、skip/xfail 0。
 
@@ -365,8 +381,19 @@ Exact RED cases are the P05 additions in role delta and include:
 - logical path absolute/dotdot/backslash/NUL/symlink/hash mismatch rejection。
 - wheel/sdist actual-byte size/hash/source/tree mismatch。
 
+Run only the exact P05 nodes in `role-ownership-delta-v1.json`; materialization cases are owned by the existing `test_identity.py` and `test_artifacts.py` nodes, so do not add a test file or unassigned test path:
+
 ```bash
-uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P05"   -q tests/unit/provider_gate/test_identity.py      tests/unit/provider_gate/test_materialization.py      tests/unit/provider_gate/test_artifacts.py      tests/unit/provider_gate/test_contracts.py --tb=short
+uv run pytest -q \
+  tests/unit/provider_gate/test_identity.py::test_source_identity_resolution_is_event_specific \
+  tests/unit/provider_gate/test_identity.py::test_materialization_identity_is_deterministic \
+  tests/unit/provider_gate/test_identity.py::test_campaign_freeze_requires_materialized_candidate_and_environment \
+  tests/unit/provider_gate/test_identity.py::test_attempt_campaign_and_window_ids_are_deterministic \
+  tests/unit/provider_gate/test_artifacts.py::test_materialization_build_invocation_is_exactly_one \
+  tests/unit/provider_gate/test_artifacts.py::test_candidate_manifest_and_bundle_bind_actual_wheel_and_sdist_bytes \
+  tests/unit/provider_gate/test_artifacts.py::test_downstream_consumer_rejects_missing_mismatched_multiple_or_expired_artifact \
+  tests/unit/provider_gate/test_artifacts.py::test_materialization_failure_poisons_same_source_candidate \
+  --tb=short
 ```
 
 Target CLI separation:
@@ -556,14 +583,21 @@ Workflow design gates:
 - no old flags/sharder inside new jobs。
 - no packaging build in role jobs。
 
-Static tests parse workflow and assert job needs/commands/permissions。Run:
+Static tests parse workflow and assert job needs/commands/permissions。Unit tests are a focused non-qualification development run. The role-graph and fault integration nodes use the latest existing resolved ownership checkpoint; the ownership artifact has no P11 checkpoint, so do not create one or claim new ownership assignments:
 
 ```bash
-uv run pytest -q \
-  tests/unit/provider_gate \
-  tests/integration/test_provider_gate_role_graph.py \
-  tests/integration/test_provider_gate_faults.py \
-  --tb=short | tee "$EVIDENCE_ROOT/p11-focused.txt"
+uv run pytest -q tests/unit/provider_gate --tb=short \
+  | tee "$EVIDENCE_ROOT/p11-unit-focused.txt"
+
+uv run pytest -p scripts.quality.provider_gate.pytest_plugin \
+  --provider-gate-role linux-canonical \
+  --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10" \
+  -q \
+  tests/integration/test_provider_gate_role_graph.py::test_materialization_is_not_a_final_gate_attempt \
+  tests/integration/test_provider_gate_role_graph.py::test_role_graph_consumes_one_candidate_and_executes_each_owned_node_once \
+  tests/integration/test_provider_gate_faults.py::test_seeded_fault_catalogue_detects_every_entry \
+  tests/integration/test_provider_gate_faults.py::test_post_mutation_stop_return_preserves_recovery_evidence \
+  --tb=short | tee "$EVIDENCE_ROOT/p11-role-integration.txt"
 
 make lint | tee "$EVIDENCE_ROOT/p11-lint.txt"
 ```

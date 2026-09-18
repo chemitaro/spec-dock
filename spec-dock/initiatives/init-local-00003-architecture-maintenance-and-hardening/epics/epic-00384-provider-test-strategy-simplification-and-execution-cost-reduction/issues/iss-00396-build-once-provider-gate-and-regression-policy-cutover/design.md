@@ -88,6 +88,8 @@ GitHub readbackで#395 PR #401のoriginal human merge SHA/treeは`fd5df1d64b5d7e
 
 - `b1-b2-admission-status-v2.json`がcurrent Issue-local statusを閉じる。
 - `b1-b2-verification-contract-v1.json`が#395 ownerによるdefect correction後にGitHub readbackしたexact merge SHA/treeをexecution targetとして解決する規則、fresh execution order、evidenceを閉じる。
+- Corrected #395 merge SHAはIssue #396のfinal `SPEC_FREEZE_SHA`のancestorでなければならない。`git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"`でread-only確認し、falseならIssue branchの統合方法をEpic integration/parent ownerへ戻す。明示許可なしにbranchをmerge/rebase/cherry-pick/recreate/force-pushしない。
+- 許可されたbranch realignment後はsource SHA/treeに依存するcapture/artifactを再生成し、新しいspec candidateを同じRed reviewへ再提出してIssue projectionを読み戻す。#395 SHA/treeが同一ならaccepted B1/B2 bytesは再利用できるが、異なる場合は再実行する。
 - Defect disposition、修正後merge identity、親owner acceptanceのいずれかが欠ける場合、B1/B2を開始・受入せず、Issue #396のProduct実装を停止する。Issue #396は#395 defectを修正しない。
 - Historical receipt/raw bytesは改変しない。
 - Parent Epic Plan §3.2との矛盾はIssue側で親文書を書換えず、admission holdとして明示する。
@@ -365,6 +367,8 @@ Qualification workflow以外の`uv run pytest`はdeveloper convenienceであり�
 
 Consumer scannerとworkflow testsはfinal gateがlocal fallbackを参照しないことをmechanically証明する。
 
+P04/P05の割当済みunit test nodesは通常の`uv run pytest`で直接実行する。Permanent pluginとrole ownership filteringはP07から導入するため、それ以前のunit実行へplugin/role flagsを付けない。この実行は開発用検証であり、qualificationまたはrole ownershipの証拠にはしない。
+
 ### 7.7 Permanent plugin ownership and temporary root compatibility seam
 
 `pytest_plugin.py`は移行中・final sourceの両方で`pytest_collection_modifyitems`を実装する恒久的filter ownerである。Root `tests/conftest.py`はP07–P15だけのtemporary seamとして、次を満たすexact invocationでlegacy marker/skip/ledger hookをbypassする。
@@ -381,7 +385,13 @@ P15ではconsumer-zero後にlegacy hook/temporary seamを削除する。`tests/c
 
 ## 8. Closed evidence and execution schema families
 
-`provider-gate-contracts-v1.schema.json`はDraft 2020-12で、all objectsを`additionalProperties=false`へ閉じる。Semantic codecはduplicate keys、key order、array order、cross-field relationsを追加検証する。
+`provider-gate-contracts-v1.schema.json`はDraft 2020-12である。今回対象の`ExecutionPacketV1`と`B1B2AdmissionStatusV2`は、nested recordを含め`additionalProperties=false`へ閉じる。Semantic codecはduplicate keys、key order、array order、cross-field relationsを追加検証する。これ以外のschema familyはこの修正で形を変えない。
+
+`ExecutionPacketV1.spec_review`はclosed objectで、`reviewer_session_id`、`review_status`、`reviewed_sha`、`reviewed_tree`、`p0_count`、`p1_count`、`p2_count`、`p3_count`、`review_evidence`だけを持つ。Sessionは`iss396-spec-review-red`に固定する。未実施ならreviewed identity/counts/evidenceをnull、`pass`/`fail`なら全てを埋める。`B1B2AdmissionStatusV2`の全nested objectもclosed fieldsにし、`formal_issue_start`、`predecessor_human_merge`、B1/B2 acceptance、historical claims、authority conflictsは各現行fieldをrequiredにしてunknown propertyを拒否する。
+
+`implementation_authorized`は既存のbooleanのままfalseを有効なblocked状態として保持する。`formal_issue_start.product_implementation_authorized=false`はformal start時点の履歴を表し、後続の許可判定は`ExecutionPacketV1.implementation_authorized`だけで行う。trueの場合は、corrected predecessor mergeのowner acceptanceとIssue freeze ancestor proof、B1/B2のperformed+accepted status・non-null evidence・同一corrected SHA/tree、review passかつP0/P1=0でreviewed SHA/treeがspec freezeと一致、Issue projection readback、explicit dispatch、`concurrent_writer_absent=true`を要求する。JSON Schemaで表すfield/enum/non-null条件に加え、SHA/tree等の相互一致はsemantic codec invariantとして検証する。新しいauthorization state modelやcheckpointは追加しない。
+
+Semantic validatorは、(1) B1 SHA/tree = B2 SHA/tree = corrected predecessor merge SHA/tree、(2) review SHA/tree = spec freeze SHA/tree、(3) ancestry commandの入力が同じcorrected SHAとspec freeze SHAでexit 0、(4) B2 acceptedなら先行B1もacceptedを検証する。P04の既存`test_schema_inventory_is_closed_and_canonical` nodeはblocked packetのpositive caseと、空/unknown nested fields、不足gate、SHA/tree不一致、ancestor proof欠落/negative、review identity不一致のnegative casesを含む。これらは現行packet validator内で検証し、別state machineやtest nodeは追加しない。
 
 ### 8.1 Preflight vs candidate-bound evidence
 
