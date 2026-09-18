@@ -300,13 +300,13 @@
       <p>Epic #384のqualification authorityを保ったまま、#395後続ゲートと#396実装開始条件を分けて理解するための説明資料です。</p>
       <div class="status">
         <div><strong>Issue #396</strong>active issue / issue branchを維持</div>
+        <div><strong>Requirement / Design / Plan</strong><span class="badge green">Approved · 2026-09-18</span></div>
         <div><strong>Product実装許可</strong><span class="badge red">false</span></div>
         <div><strong>#395 implementation</strong><span class="badge red">owner-reported incorrect; disposition pending</span></div>
         <div><strong>B1 / B2</strong><span class="badge red">未実施・未受入</span></div>
-        <div><strong>修正前のStrict review</strong>SHA cc8b6800…：P0=0 / P1=2 / P2=3</div>
-        <div><strong>今回の仕様補正</strong>有効なP1のselector矛盾を修正し、既存write scopeの参照を明記。schema、component、ownership、checkpointは不変</div>
-        <div><strong>P2</strong>3件はreview contractに従いreport-only</div>
-        <div><strong>再review結果</strong>同一Red sessionのexact-SHA receiptを参照</div>
+        <div><strong>Strict review</strong>SHA 0c7cdd48…でPASS · P0=0 / P1=0 / findings=0</div>
+        <div><strong>承認後の状態更新</strong>status-onlyのためユーザー指示により再reviewなし。新SHAをreview済みとは扱わない</div>
+        <div><strong>Approved状態のIssue projection</strong><span class="badge red">更新・readback待ち</span></div>
         <div><strong>B3</strong><span class="badge red">not started</span></div>
       </div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
@@ -333,9 +333,8 @@
 
 <section id="admission"><h2>3. 実装前の前提ゲート</h2>
 <div class="timeline">
-<article><strong>仕様candidateを固定</strong><br>R/D/P・schema・machine artifacts・HTML・ZIPを検証し、cleanなIssue branchへcommit/pushしてexact SHA/treeを固定します。</article>
-<article><strong>Same-Red specification review</strong><br>同じ<code>iss396-spec-review-red</code>でStrict re-reviewし、<code>review_status=pass</code>、P0=0、P1=0を要求します。P2/P3はreview contractに従います。</article>
-<article><strong>Issue projection readback</strong><br>Pass後にIssue #396 bodyを更新し、GitHubからcanonical projectionを読み戻します。</article>
+<article><strong>承認済み仕様とreview receipt</strong><br>要件・設計・計画の実質仕様はSHA <code>0c7cdd484c82142333f035df9488cf60586c2aea</code> / tree <code>4ba6fc830e7d2d5d9767ba36c00459371e360aa2</code>でStrict review pass、P0/P1=0です。今回の状態表示のみの更新はユーザー指示により再reviewしません。</article>
+<article><strong>Approved状態のIssue projection readback</strong><br>現行bodyは旧revisionを参照しています。Approved状態と更新後の参照先を反映し、GitHubから読み戻す工程は未完了です。</article>
 <article><strong>#395 defect resolution and identity readback</strong><br>#395 ownerによる修正・受入後のmerged SHA/treeをGitHub readbackします。元のPR #401 SHA/treeはhistorical identityのみで、B1/B2 targetには使いません。</article>
 <article><strong>Fresh B1 acceptance</strong><br>ordinary pytest、lint、SpecDock validate、provider/lifecycle/protected parityを実行し、actual logs/hashを保存します。</article>
 <article><strong>Fresh same-tip B2 acceptance</strong><br>B1と同じSHA/treeでfull verifierを実行し、fresh raw resultと15/0/15 relationを受入します。</article>
@@ -447,7 +446,7 @@ note over Plugin : P15で旧hook/seamを退役しても恒久filter ownerとし�
 
 <section id="checkpoints"><h2>8. 実装checkpoint</h2>
 <div class="scroll"><table><thead><tr><th>Phase</th><th>目的</th><th>Exit</th></tr></thead><tbody>
-<tr><td>P00</td><td>仕様pack/manifest/schema検証、same-Red再review</td><td>pass後もB1/B2 gate必要</td></tr>
+<tr><td>P00</td><td>仕様pack/manifest/schema検証、既存review receipt確認、Approved projection</td><td>A1 review pass済み。status-only更新は再reviewなし。B1/B2 gateは継続</td></tr>
 <tr><td>P01</td><td>fresh B1 → same-tip B2 → specification freeze再確認 → explicit dispatch</td><td>初めて実装可能</td></tr>
 <tr><td>P02–P03</td><td>external/protected/current consumer read-only capture</td><td>Preflight evidence complete</td></tr>
 <tr><td>P04</td><td>review済みschema/delta/faultでexact First RED</td><td>design choice追加なし</td></tr>

@@ -3,7 +3,7 @@
 ID: "iss-00396"
 タイトル: "Build Once Provider Gate and Regression Policy Cutover"
 関連GitHub: ["#396"]
-状態: "draft"
+状態: "approved"
 詳細化状態: "implementation-ready-specification; product-implementation-gated"
 最終更新: "2026-09-18"
 依存:
@@ -30,20 +30,22 @@ qualification_authority: "E384-QUAL-001"
 
 # iss-00396 Build Once Provider Gate and Regression Policy Cutover — 実装計画
 
+本Planは2026-09-18付でApprovedである。承認根拠は同一Red sessionのStrict review pass（SHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0）。今回の状態・進捗表示の更新についてユーザーは再review不要と指定したため、新SHAの再reviewは行わない。実装開始許可は別ゲートであり、falseのまま維持する。
+
 ## 1. Execution boundary
 
 本Planは完成authoring candidateであり、Product/test/workflow/policy実装を許可しない。Formal Issue start/active branchは維持するが、次のgateを厳密に分離する。
 
-| Gate | Candidate-time state | Exit |
+| Gate | Current state | Exit |
 |---|---|---|
-| A0 Authoring | 本packを生成 | ZIP/HTML/schema/manifest内部整合 |
-| A1 Specification acceptance | **PENDING** | clean pushed exact candidateをsame Red sessionでpass、P0/P1=0。P2/P3はreview contractに従う |
-| A2 Projection readback | **PENDING** | Pass後にIssue body projectionを更新しGitHubからreadback |
+| A0 Authoring | **PASS** | ZIP CRC、payload manifest、manifest.sha256、canonical copiesを検証。HTML図2件とzoom操作を検証 |
+| A1 Specification acceptance | **PASS** | SHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`でpass、P0/P1=0、findings=0。今回のstatus-only承認更新は再review対象外 |
+| A2 Projection readback | **PENDING** | Approved状態とこのrevisionの参照先をIssue bodyへ反映し、GitHubからreadback |
 | A3 Predecessor admission | **BLOCKED** | #395 owner-reported defect resolved; corrected merged SHA/tree read back; fresh B1 then same-tip B2 accepted |
 | A4 Explicit dispatch | **PENDING** | 別途dispatch + clean freeze identity + concurrent writerなし |
 | I0–I22 Implementation/B3 | **NOT STARTED** | A0–A4成立後、P02以後のordered checkpoints |
 
-上表と`authoring-gate-status-v1.json`は本仕様candidate作成時点のsnapshotである。後続のStrict review、Issue projection readback、B1/B2 acceptanceはexact SHAに結び付く別の実行証跡で判定する。
+上表は2026-09-18の承認revision時点の状態である。`authoring-gate-status-v1.json`はcandidate組み立て時点のsnapshotとして保存し、現在のgate statusへ読み替えない。A1のreview receiptは上記exact SHA/treeに結び付く。承認後のstatus-only更新では新SHAをreview済みと主張せず、ユーザー指示により再reviewしていない。実装freeze identityが変わる場合はDesign §8のexact review/freeze一致条件を引き続き満たす。A2のGitHub projection readbackはこのApproved状態について未完了である。
 
 User correctionにより、#395 implementation自体はincorrectと報告されている。具体的defectと修正後tipは未確認なので、original #395 SHA/treeとhistorical B1/B2 receipt/raw bytesはidentity/historyに限定し、current acceptanceに使わない。#395 ownerの修正・受入と修正後merge identityのGitHub readbackが済むまでA3はBLOCKEDであり、Issue #396は#395を修正しない。Parent Epic Plan §3.2との矛盾を理由にgateを免除しない。B1/B2を本authoring task中に実行したと主張しない。
 
@@ -150,7 +152,7 @@ Initiative portfolio priority
 
 Parent docs/historical artifacts included in the pack remain byte-preserved. This authoring task changes only Issue #396 specifications/artifacts and external download copies。
 
-## 4. Checkpoint P00 — Complete specification artifact and same-Red re-review
+## 4. Checkpoint P00 — Complete specification artifact, review receipt and approved-state projection
 
 Owner: primary author / independent reviewer。Product/tests/workflow/policy/settings mutation禁止。
 
@@ -159,8 +161,8 @@ Owner: primary author / independent reviewer。Product/tests/workflow/policy/set
 3. Historical B1/B2 receipt/raw bytes、2,214-node baseline、Linux/macOS raw collections、parent docs/contractsはbyte-preserveする。
 4. Schema self-validation、concrete artifact validation、delta derivation、45 fault denominator、ZIP CRC、manifest、HTML internal/external byte equalityを検査する。
 5. Repositoryへ適用する場合、spec-only diffをcommit/pushし、GitHub connectorでexact branch/full SHAをverifyする。
-6. 同じsession `iss396-spec-review-red`へfollow-up reviewし、`review_status=pass`、P0=0、P1=0をrequireする。P2/P3はreview contractに従いrecord-onlyとし、task/acceptance conditionにしない。直近pre-remediation reviewのP2=3も記録のみである。
-7. Pass後にだけprimary authorがIssue body projectionを更新し、GitHubからreadbackする。
+6. 同じsession `iss396-spec-review-red`の既存receiptを確認する。SHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`で`review_status=pass`、P0=0、P1=0、findings=0である。ユーザー指示により、今回のstatus-only承認更新では再reviewしない。実装freeze identityまたは実質仕様を変更するときは、Design §8に従いfreeze SHA/treeとreview SHA/treeを一致させる。
+7. Approved状態を反映したIssue body projectionを更新し、GitHubからreadbackする。現行Issue bodyは旧レビューSHAを参照しているため、本revisionのprojection readbackは未完了である。
 
 `authoring-gate-status-v1.json`はcandidate組み立て時点でのgate snapshotである。後続のcommit/push、Strict review、Issue projection readbackは同ファイルを書き換えず、対象SHAを付けた外部実行証跡として記録する。
 
