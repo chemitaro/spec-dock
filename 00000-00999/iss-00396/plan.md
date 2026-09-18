@@ -472,14 +472,27 @@ Expected: unit GREEN。Actual runner admission remains pending until shadow work
 3. Implement plugin-owned `pytest_addoption`, `pytest_collection_modifyitems`, node observation hooks。
 4. Modify root `tests/conftest.py` only as temporary exact bypass seam。Plugin—not root conftest—calls the role filter。
 5. Verify ordinary pytest keeps legacy behavior until P15。
-6. Verify role invocation deselects nonowned nodes and never policy-skips them。
+6. Exercise selector-free full qualification and focused exact-node collection within the existing six P07 plugin/ownership tests. The command below runs those tests by exact node ID; do not add ownership nodes for this distinction.
 7. Verify P15 simulation without root conftest still filters via plugin。
 
 ```bash
-uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P07"   -q tests/unit/provider_gate/test_role_transition_seam.py      tests/unit/provider_gate/test_role_ownership.py --tb=short
+uv run pytest \
+  -p scripts.quality.provider_gate.pytest_plugin \
+  --provider-gate-role linux-canonical \
+  --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P07" \
+  -q \
+  tests/unit/provider_gate/test_role_transition_seam.py::test_ordinary_pytest_preserves_legacy_behavior_during_transition \
+  tests/unit/provider_gate/test_role_transition_seam.py::test_provider_gate_plugin_owns_collection_filtering_during_transition \
+  tests/unit/provider_gate/test_role_transition_seam.py::test_provider_gate_plugin_remains_owner_after_legacy_hook_retirement \
+  tests/unit/provider_gate/test_role_ownership.py::test_each_collected_node_has_exactly_one_owner \
+  tests/unit/provider_gate/test_role_ownership.py::test_reviewed_baseline_and_delta_derive_checkpoint_manifest \
+  tests/unit/provider_gate/test_role_ownership.py::test_unknown_duplicate_or_unplanned_node_is_rejected_before_body \
+  --tb=short
 ```
 
-Negative cases: plugin missing、role missing、legacy flags combined、unknown node、duplicate owner、wrong manifest/hash、unplanned node、P15 caller loss。All reject before body。Exit: resolved count/hash exact、role intersection empty、union complete、skip/xfail 0。
+This is a focused checkpoint invocation. Resolve and verify the full P07 manifest (count/hash, role partition, disjointness and complete union) independently; this command collects exactly the six listed P07 Linux-owned nodes. The other manifest assignments are not expected in this focused collection and are not missing.
+
+Negative cases: plugin missing、role missing、legacy flags combined、unknown node、duplicate owner、wrong manifest/hash、unplanned node、P15 caller loss。All reject before body。Exit: full manifest count/hash/owner partition exact; actual selected collection equals the six requested IDs; skip/xfail 0. This run is not qualification evidence.
 
 ## 12. Checkpoint P08 — History/evaluator/exact 45-fault implementation
 
@@ -490,8 +503,24 @@ History tests cover registration before start、started failure/cancel/interrupt
 Fault test iterates exact 45 source-controlled entries and requires each fixture/injector to emit exact expected code at exact stage. Wrong/missing/unexecuted/denominator drift are explicit failures。
 
 ```bash
-uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P08"   -q tests/unit/provider_gate/test_history.py      tests/unit/provider_gate/test_evaluator.py      tests/unit/provider_gate/test_fault_catalogue.py --tb=short
+uv run pytest \
+  -p scripts.quality.provider_gate.pytest_plugin \
+  --provider-gate-role linux-canonical \
+  --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P08" \
+  -q \
+  tests/unit/provider_gate/test_history.py::test_first_five_preserves_chronology_and_nonaccepted_members \
+  tests/unit/provider_gate/test_history.py::test_latest_twenty_preserves_chronology_and_missing_members \
+  tests/unit/provider_gate/test_history.py::test_rerun_duplicate_campaign_reset_and_replacement_are_rejected \
+  tests/unit/provider_gate/test_evaluator.py::test_attempt_result_is_independent_of_aggregate_completeness \
+  tests/unit/provider_gate/test_evaluator.py::test_final_qualification_requires_all_closed_evidence_families \
+  tests/unit/provider_gate/test_evaluator.py::test_parent_predicates_are_independent_conjunction \
+  tests/unit/provider_gate/test_fault_catalogue.py::test_candidate_bound_catalogue_rejects_denominator_change_unexecuted_or_missed_entry \
+  tests/unit/provider_gate/test_fault_catalogue.py::test_catalogue_definition_has_exact_atomic_denominator \
+  tests/unit/provider_gate/test_fault_catalogue.py::test_fault_catalogue_first_red_cases \
+  --tb=short
 ```
+
+The P08 manifest remains full. This focused command requests exactly the nine listed Linux-owned node IDs; it checks their collection and ownership without treating unselected P08 assignments as missing, and it is not qualification evidence.
 
 Per-attempt result remains independent of aggregate completeness。Linux predicates come only from generated parent projection。macOS delta receives no Linux performance predicate。Exit: all exact cases GREEN、45/45 detected in synthetic campaign、skip/xfail 0。
 
@@ -547,12 +576,36 @@ to   tests/cli_runtime/test_distribution_cutover.py::test_distribution_cutover_r
 
 Semantic key/owner remain as delta contract specifies。Run with P10 resolved ownership/plugin:
 
+Both invocations below are focused engineering checks against the full P10 manifest. They name only exact node IDs whose P10 owner matches the selected role; other manifest assignments are not missing and these runs are not final qualification evidence.
+
 ```bash
-uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role linux-canonical   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10"   -q tests/cli_runtime/test_distribution_cutover.py --tb=short
-uv run pytest -p scripts.quality.provider_gate.pytest_plugin   --provider-gate-role sdist-smoke   --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10"   -q tests/integration/test_epic_00343_distribution.py --tb=short
+uv run pytest \
+  -p scripts.quality.provider_gate.pytest_plugin \
+  --provider-gate-role linux-canonical \
+  --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10" \
+  -q \
+  tests/cli_runtime/test_distribution_cutover.py::test_distribution_cutover_reuses_plain_init_only_as_update_or_uninstall_setup \
+  tests/cli_runtime/test_distribution_cutover.py::test_s40b_fresh_init_materializes_current_external_catalog_and_slot_markers \
+  tests/cli_runtime/test_distribution_cutover.py::test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces \
+  tests/cli_runtime/test_distribution_cutover.py::test_s40b_provider_install_root_is_current_catalog_only \
+  tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_ci_and_gitignore_are_deterministic_assets \
+  tests/cli_runtime/test_distribution_cutover.py::test_s40b_retained_skill_identity_matches_current_provider_and_dogfood \
+  tests/cli_runtime/test_distribution_cutover.py::test_s45_existing_consumer_seed_is_preserved \
+  tests/cli_runtime/test_distribution_cutover.py::test_s45_foreign_fixed_root_is_preserved_and_blocks_fresh_install \
+  tests/cli_runtime/test_distribution_cutover.py::test_s45_foreign_skill_slot_is_preserved_and_blocks_fresh_install \
+  tests/cli_runtime/test_distribution_cutover.py::test_s45_fresh_preserves_unrelated_and_obsolete_looking_external_paths \
+  --tb=short
+
+uv run pytest \
+  -p scripts.quality.provider_gate.pytest_plugin \
+  --provider-gate-role sdist-smoke \
+  --provider-gate-ownership "$ISSUE_DIR/artifacts/role-ownership-checkpoints-v1.json#P10" \
+  -q \
+  tests/integration/test_epic_00343_distribution.py::test_tc_360_s80_wheel_and_sdist_catalog_bytes_and_modes_match_provider \
+  --tb=short
 ```
 
-Local build-mode result is marked `qualification_eligible=false` and never enters candidate/campaign evidence。
+Focused test output and local build-mode results never enter candidate/campaign evidence. Local build-mode result is marked `qualification_eligible=false`。
 
 ## 15. Checkpoint P11 — Shadow replacement workflow
 
@@ -584,6 +637,8 @@ Workflow design gates:
 - no packaging build in role jobs。
 
 Static tests parse workflow and assert job needs/commands/permissions。Unit tests are a focused non-qualification development run. The role-graph and fault integration nodes use the latest existing resolved ownership checkpoint; the ownership artifact has no P11 checkpoint, so do not create one or claim new ownership assignments:
+
+The four node IDs below are a focused invocation against the full P10 manifest. Their exact requested collection and Linux ownership must match; this does not qualify the full Linux role or create B3 evidence.
 
 ```bash
 uv run pytest -q tests/unit/provider_gate --tb=short \

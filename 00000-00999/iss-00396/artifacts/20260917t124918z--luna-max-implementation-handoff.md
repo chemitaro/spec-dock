@@ -101,6 +101,8 @@ Before `implementation_authorized=true`, packet must include:
 
 The packet does not grant GitHub settings writes or merge。`commit_push_authorized` and `pr_authorized` remain separate explicit booleans。Unknown/missing/duplicate fields、range checkpoint、absolute evidence path、candidate identity before materialization are invalid。
 
+`CheckpointInputV1` does not duplicate a write-path ACL. For a Product checkpoint, effective write scope is the intersection of the Requirement/Design/Plan pinned by `spec_freeze_sha/tree`, that exact checkpoint step and the Plan §3 path inventory, and this handoff §6 allowed-path envelope. These references can narrow scope but cannot override the no-touch/forbidden boundary. Commit/push and PR permissions remain separate packet booleans.
+
 ## 4. Before every checkpoint
 
 ```bash
@@ -332,7 +334,9 @@ Required first RED groups:
 - P09: current inventory exact + final zero RED + retained workflow guard。
 - P10: exact one-node move/package artifact mode。
 
-Every focused run uses permanent plugin, exact role and exact resolved ownership manifest。Missing plugin/schema/manifest or mixed legacy flags must reject before body。Skip/xfail does not count as GREEN。
+Every plugin-based role/checkpoint run loads the full resolved ownership manifest; selectors never trim or rewrite it. A qualification role invocation has no pytest node selectors: the plugin checks the complete collected set/hash against that full manifest, then filters to the selected role. A focused checkpoint invocation may name exact fully qualified pytest node IDs only; the actual collection must equal that requested set, and every ID must have the selected role owner in the full manifest. Unselected manifest rows are not missing. File/directory, marker, glob, `-k`, `-m`, shard and ignore selectors are rejected in focused mode.
+
+Focused runs are engineering/test-first verification only. They do not create accepted `RoleResultV1`/AttemptResult or B3 qualification evidence. Missing plugin/schema/manifest, unknown or duplicate IDs/owners, a mismatched collection, or mixed legacy flags must reject before body. Skip/xfail does not count as GREEN.
 
 Negative inventory is closed by finite codes and includes manifest/source/artifact/producer/environment/topology/process/performance/correctness/raw/attempt/fault/consumer/retained-workflow cases。Do not add free-form fault injection or unreviewed node IDs。
 
