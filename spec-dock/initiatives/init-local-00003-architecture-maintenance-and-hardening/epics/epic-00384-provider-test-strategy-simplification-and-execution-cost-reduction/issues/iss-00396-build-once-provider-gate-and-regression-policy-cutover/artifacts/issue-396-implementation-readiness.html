@@ -302,11 +302,11 @@
         <div><strong>Issue #396</strong>active issue / issue branchを維持</div>
         <div><strong>Requirement / Design / Plan</strong><span class="badge green">Approved · 2026-09-18</span></div>
         <div><strong>Product実装許可</strong><span class="badge red">false</span></div>
-        <div><strong>#395 implementation</strong><span class="badge red">owner-reported incorrect; disposition pending</span></div>
-        <div><strong>B1 / B2</strong><span class="badge red">未実施・未受入</span></div>
-        <div><strong>Strict review</strong>SHA 0c7cdd48…でPASS · P0=0 / P1=0 / findings=0</div>
-        <div><strong>承認後の状態更新</strong>status-onlyのためユーザー指示により再reviewなし。新SHAをreview済みとは扱わない</div>
-        <div><strong>Approved状態のIssue projection</strong><span class="badge red">更新・readback待ち</span></div>
+        <div><strong>#395 A395-SEC-001</strong><span class="badge green">PR #403 merged; separate symptom identity not inferred</span></div>
+        <div><strong>B1 / B2</strong><span class="badge green">same corrected SHA/tree; both parent-accepted</span></div>
+        <div><strong>Previous Strict review</strong>SHA 0c7cdd48…でPASS · new freeze review required after branch realignment</div>
+        <div><strong>仕様freeze</strong><span class="badge red">更新仕様packと同一SHA/treeのreviewを準備中</span></div>
+        <div><strong>Issue projection</strong><span class="badge red">new freeze review後に更新・readback</span></div>
         <div><strong>B3</strong><span class="badge red">not started</span></div>
       </div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">
@@ -317,7 +317,7 @@
 
 <section id="overview"><h2>1. Issueの目的とEpic内の位置</h2>
 <p>Epic #384は、Issue #392のprovider lifecycleとIssue #395の先行変更を経て、Issue #396でfinal provider gateへ切り替える計画です。#396はbuild-once packaging、same-candidate downstream roles、Linux canonical、sdist smoke、macOS delta、actual-byte evidence、qualification evidence、required-context cutover、旧policy retirementを一つのIssue acceptance単位として所有します。</p>
-<div class="callout danger"><strong>現在の最重要停止条件:</strong> ownerは#395の実装自体が誤りと報告しています。具体的defectと修正後のtipは未確認です。#395 ownerが#395のscope内で修正・受入し、GitHub readbackでcorrected SHA/treeを確定するまでB1/B2対象は未確定で、Issue #396のProduct実装は開始できません。</div>
+<div class="callout danger"><strong>現在の最重要停止条件:</strong> #395 A395-SEC-001はPR #403で修正・merge済み。corrected merge `3c69af78843b04a13bde2f93eb3b1eb4081cdb33` / tree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`でB1/B2をfresh実行し親owner受入済みです。別途報告された詳細不明の症状が同じ欠陥だとは推定しません。許可されたbranch realignment後、新freeze reviewとIssue projection readbackを終えるまで#396 Product実装は開始しません。</div>
 <p>仕様作成、formal start、implementation dispatch、Product実装、human merge、post-merge B3、Epic main mergeは別々の状態です。</p>
 </section>
 
@@ -333,15 +333,15 @@
 
 <section id="admission"><h2>3. 実装前の前提ゲート</h2>
 <div class="timeline">
-<article><strong>承認済み仕様とreview receipt</strong><br>要件・設計・計画の実質仕様はSHA <code>0c7cdd484c82142333f035df9488cf60586c2aea</code> / tree <code>4ba6fc830e7d2d5d9767ba36c00459371e360aa2</code>でStrict review pass、P0/P1=0です。今回の状態表示のみの更新はユーザー指示により再reviewしません。</article>
-<article><strong>Approved状態のIssue projection readback</strong><br>現行bodyは旧revisionを参照しています。Approved状態と更新後の参照先を反映し、GitHubから読み戻す工程は未完了です。</article>
-<article><strong>#395 defect resolution and identity readback</strong><br>#395 ownerによる修正・受入後のmerged SHA/treeをGitHub readbackします。元のPR #401 SHA/treeはhistorical identityのみで、B1/B2 targetには使いません。</article>
-<article><strong>Fresh B1 acceptance</strong><br>ordinary pytest、lint、SpecDock validate、provider/lifecycle/protected parityを実行し、actual logs/hashを保存します。</article>
-<article><strong>Fresh same-tip B2 acceptance</strong><br>B1と同じSHA/treeでfull verifierを実行し、fresh raw resultと15/0/15 relationを受入します。</article>
-<article><strong>Issue branch ancestry</strong><br>Corrected #395 merge SHAがIssue #396のSPEC_FREEZE_SHAのancestorかを確認します。falseならbranchを変更せず、Epic integration/parent ownerへ戻します。</article>
-<article><strong>Explicit implementation dispatch</strong><br>clean specification freeze、同時writer不在、別途の明示dispatchがそろって初めてProduct変更へ進みます。</article>
+<article><strong>新freezeの仕様review</strong><br>以前の仕様candidateはSHA <code>0c7cdd484c82142333f035df9488cf60586c2aea</code> / tree <code>4ba6fc830e7d2d5d9767ba36c00459371e360aa2</code>でpassでした。branch realignment後にcanonical statusとpackを更新するため、新しいexact freeze SHA/treeにsame-Red Strict reviewを再実施します。</article>
+<article><strong>Issue projection readback</strong><br>new freezeのStrict review pass後、exact SHA/treeと仕様pack参照を反映し、GitHub Issue #396 bodyをreadbackします。</article>
+<article><strong>#395 corrected merge and fresh B1/B2</strong><br>PR #403 merge SHA <code>3c69af78843b04a13bde2f93eb3b1eb4081cdb33</code> / tree <code>38e2f9a50f7cae14ef24fa1187a559c592729e3b</code>をreadback済み。B1とsame-tip B2は親ownerが受入済み。default-temp B2 attempt 1 failureも保持し、private-TMPDIR attempt 2 passと区別しました。</article>
+<article><strong>Fresh B1 acceptance</strong><br>Ordinary pytest 1,368 passed / 848 skipped、lintとSpecDock validate pass、parity shard 524 passed。actual logs/hashを保存し親owner受入済みです。</article>
+<article><strong>Fresh same-tip B2 acceptance</strong><br>B1と同じSHA/treeでfull verifier pass、2,216 collected (2,191 passed / 25 skipped)、15 resolved、0 violations。親owner受入済みです。</article>
+<article><strong>Issue branch ancestry</strong><br>Owner-authorized integrationによりcorrected #395 SHAはIssue branch ancestorです。新しい最終freeze SHA/treeでproofを再確認して保存します。</article>
+<article><strong>Explicit implementation dispatch</strong><br>User dispatchは受領済みです。Clean exact final freeze、same-Red pass、projection readback、同時writer不在を確認してからProduct変更へ進みます。</article>
 </div>
-<div class="callout warn">Parent Plan §3.2と旧receiptの完了主張、およびownerによる#395 implementation error reportは未解決です。本Issueでは親文書や#395を変更せず、#395 ownerの修正・受入までadmission holdとして記録します。</div>
+<div class="callout warn">Issue #395はOPENのままです。PR #403で修正したA395-SEC-001と、詳細が提示されていない別症状との同一性は主張しません。Parentやhistorical documentsは書き換えず、旧#395 raw receiptsはhistorical evidenceとして保持します。</div>
 <div class="callout">Branch ancestryがfalseの場合、Epic ownerが許可したrealignment後にsource-bound evidence、ZIP、same-Red review、Issue projectionを新しいfreeze SHA/treeで更新します。Agentによるmerge/rebase/cherry-pick/branch recreation/force-pushは禁止です。</div>
 </section>
 

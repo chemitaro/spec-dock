@@ -30,7 +30,7 @@ qualification_authority: "E384-QUAL-001"
 
 # iss-00396 Build Once Provider Gate and Regression Policy Cutover — 実装計画
 
-本Planは2026-09-18付でApprovedである。承認根拠は同一Red sessionのStrict review pass（SHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0）。今回の状態・進捗表示の更新についてユーザーは再review不要と指定したため、新SHAの再reviewは行わない。実装開始許可は別ゲートであり、falseのまま維持する。
+本Planの実質仕様は2026-09-18に同一Red sessionでStrict review pass（SHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0）。#395 corrected mergeのowner-authorized realignment後は新しいspecification freeze identityとなるため、この新candidateを同一Red sessionで再reviewする。旧receiptを新SHAのレビューとして扱わない。Issue projection readbackと他のadmission gateが完了するまで実装開始許可はfalseである。
 
 ## 1. Execution boundary
 
@@ -38,16 +38,16 @@ qualification_authority: "E384-QUAL-001"
 
 | Gate | Current state | Exit |
 |---|---|---|
-| A0 Authoring | **PASS** | ZIP CRC、payload manifest、manifest.sha256、canonical copiesを検証。HTML図2件とzoom操作を検証 |
-| A1 Specification acceptance | **PASS** | SHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`でpass、P0/P1=0、findings=0。今回のstatus-only承認更新は再review対象外 |
-| A2 Projection readback | **PENDING** | Approved状態とこのrevisionの参照先をIssue bodyへ反映し、GitHubからreadback |
-| A3 Predecessor admission | **BLOCKED** | #395 owner-reported defect resolved; corrected merged SHA/tree read back; fresh B1 then same-tip B2 accepted |
-| A4 Explicit dispatch | **PENDING** | 別途dispatch + clean freeze identity + concurrent writerなし |
-| I0–I22 Implementation/B3 | **NOT STARTED** | A0–A4成立後、P02以後のordered checkpoints |
+| A0 Authoring | **REVALIDATE** | Realignment後の更新仕様ZIP、payload manifest、manifest.sha256、canonical copies、HTMLを再検証 |
+| A1 Specification acceptance | **PENDING NEW FREEZE REVIEW** | Realignment後の最終clean freeze SHA/treeでsame-Red Strict pass、P0/P1=0を取得 |
+| A2 Projection readback | **PENDING** | 新freeze review後のIssue body projectionをGitHubからreadback |
+| A3 Predecessor admission | **PASS, FINAL FREEZE RECHECK** | PR #403 corrected merge exact SHA/tree; same-tip B1/B2 parent-accepted; ancestry passes after authorized integration |
+| A4 Explicit dispatch | **DISPATCH RECEIVED; IDENTITY CHECK PENDING** | User directed implementation; clean exact final freeze and no concurrent writer still required |
+| I0–I22 Implementation/B3 | **NOT STARTED** | A0–A4の残りgateが揃ってからP02以後を順に開始 |
 
-上表は2026-09-18の承認revision時点の状態である。`authoring-gate-status-v1.json`はcandidate組み立て時点のsnapshotとして保存し、現在のgate statusへ読み替えない。A1のreview receiptは上記exact SHA/treeに結び付く。承認後のstatus-only更新では新SHAをreview済みと主張せず、ユーザー指示により再reviewしていない。実装freeze identityが変わる場合はDesign §8のexact review/freeze一致条件を引き続き満たす。A2のGitHub projection readbackはこのApproved状態について未完了である。
+上表は#395 PR #403 merge後の現在のadmission状態である。`authoring-gate-status-v1.json`はcandidate組み立て時点のsnapshotとして保存し、current gate statusへ読み替えない。旧A1 receiptは旧SHA/treeに結び付き、new freeze reviewを代替しない。RealignmentでIssue branchへmerge commit `a7f66ca5f8ca2e0571505ac8bf2466144186f769`を作成した。そのtree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`はrealignment前のtree `dfcc40204df51930d446aa65d343a5549857e381`と異なり、PR #403の7 changed pathsを取り込んだ。R/D/P・admission status・specification packを整えた後の新candidateに対してA0/A1を再実行し、そのexact freezeをA2 projectionへ反映する。
 
-User correctionにより、#395 implementation自体はincorrectと報告されている。具体的defectと修正後tipは未確認なので、original #395 SHA/treeとhistorical B1/B2 receipt/raw bytesはidentity/historyに限定し、current acceptanceに使わない。#395 ownerの修正・受入と修正後merge identityのGitHub readbackが済むまでA3はBLOCKEDであり、Issue #396は#395を修正しない。Parent Epic Plan §3.2との矛盾を理由にgateを免除しない。B1/B2を本authoring task中に実行したと主張しない。
+Issue #395 A395-SEC-001は修正PR #403が人間mergeされ、exact merge `3c69af78843b04a13bde2f93eb3b1eb4081cdb33` / `38e2f9a50f7cae14ef24fa1187a559c592729e3b`をreadbackした。Fresh B1とsame-tip B2は実行し親ownerが受入済みである。B2のdefault-temp attempt 1失敗も保存し、private TMPDIR attempt 2 passと区別する。別途報告された詳細不明の症状とA395-SEC-001の同一性は主張しない。Original #395 PR #401 SHA/treeおよびhistorical receiptsは歴史として保つ。Issue #396は#395実装を修正しない。
 
 実装者はA1–A4が全部成立した後だけP02以後へ進める。一checkpointずつ実行し、stage-correct EvidenceIndexとexit evidenceを作る。後段証拠の流用、same-SHA retry、old/new partial stateのmergeを禁止する。
 
@@ -64,9 +64,10 @@ VERIFIED_AUTHORING_SOURCE_SHA='4d68bce3f3ee977548a3c467476da39c15f43594'
 VERIFIED_AUTHORING_SOURCE_TREE='80ade10f57cd5f4140daa03ca8a40b844f1fcc53'
 ORIGINAL_PREDECESSOR_MERGE_SHA='fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d'
 ORIGINAL_PREDECESSOR_MERGE_TREE='37eabc1aa250838dcd9f61d627309b0ff27e0db7'
-# Resolve only from GitHub readback after the #395 owner closes the reported defect.
-B12_TARGET_SHA=''
-B12_TARGET_TREE=''
+CORRECTED_PREDECESSOR_PR=403
+B12_TARGET_SHA='3c69af78843b04a13bde2f93eb3b1eb4081cdb33'
+B12_TARGET_TREE='38e2f9a50f7cae14ef24fa1187a559c592729e3b'
+# Resolve SPEC_FREEZE_SHA/TREE only after the updated pack and docs are committed.
 QUAL_AUTHORITY='E384-QUAL-001'
 ISSUE_DIR='spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00396-build-once-provider-gate-and-regression-policy-cutover'
 PREFLIGHT_PHYSICAL_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/iss396-preflight.XXXXXXXX")"
@@ -75,7 +76,7 @@ chmod 700 "$PREFLIGHT_PHYSICAL_ROOT"
 
 Physical evidence rootはruntime-onlyで、wireへserializeしない。`evidence_root_id`はrandom/operation-bound 256-bit value、entry pathはroot-relative POSIX、size/hashはactual bytesから計算する。
 
-`SPEC_FREEZE_SHA/TREE`はsame-Red review対象の将来clean pushed tipから設定する。`VERIFIED_AUTHORING_SOURCE_*`は本authoring input provenance、`ORIGINAL_PREDECESSOR_MERGE_*`はincorrectと報告された旧#395 mergeのhistory、`B12_TARGET_*`は#395 ownerがdefect correctionを受入した後にGitHub readbackする実行対象であり、相互に代用しない。`B12_TARGET_*`が空または未承認ならP01で直ちに停止する。
+`SPEC_FREEZE_SHA/TREE`はsame-Red review対象の将来clean pushed tipから設定する。`VERIFIED_AUTHORING_SOURCE_*`は本authoring input provenance、`ORIGINAL_PREDECESSOR_MERGE_*`はincorrectと報告された旧#395 mergeのhistory、`B12_TARGET_*`はPR #403 corrected mergeとしてGitHub readbackし、fresh B1/B2を実行・親owner受入済みのidentityである。realignment後の最終spec freeze identityは別途解決し、同じ値と取り違えない。
 
 `role-ownership-delta-v1.json`の`verified_authoring_source_sha/tree`は、collection deltaを作成したauthoring input `4d68bce3f3ee977548a3c467476da39c15f43594` / `80ade10f57cd5f4140daa03ca8a40b844f1fcc53`へのprovenanceであり、後続の仕様freeze SHA/TREEではない。これをcurrent specification identityとして読み替えない。
 
@@ -196,7 +197,7 @@ Expected: ZIP CRC pass、all payload hashes OK、schema JSON valid、HTML bytes 
 
 ## 5. Checkpoint P01 — #395 defect resolution, B1/B2 admission and implementation dispatch
 
-Owner: #395 owner + implementation agent + parent owner。**現状BLOCKED**。#395 defect correctionはそのIssue scopeで完了させる。P01の操作はread-only/test executionで、Issue #396 Product fileを編集しない。
+Owner: #395 owner + implementation agent + parent owner。#395 corrected merge、B1/B2およびparent acceptanceは取得済み。許可済みbranch realignmentも行った。A0/A1/A2の新freeze gatesが残るためProduct実装は引き続き禁止。P01はread-only/test execution/evidence更新で、Issue #396 Product fileを編集しない。
 
 ### 5.1 Resolve the reported predecessor defect and target identity
 
@@ -244,11 +245,11 @@ B1 accepted後、same shell/worktreeでidentityを再確認し実行する。
 ```bash
 test "$(git rev-parse HEAD^{commit})" = "$B12_TARGET_SHA"
 test "$(git rev-parse HEAD^{tree})" = "$B12_TARGET_TREE"
-uv run python -m scripts.quality.verify_full_regression --shards 4   >"$B12_EVIDENCE_ROOT/b2-verifier.stdout"   2>"$B12_EVIDENCE_ROOT/b2-verifier.stderr"
+env TMPDIR="$B12_TMPDIR" uv run python -m scripts.quality.verify_full_regression --shards 4   >"$B12_EVIDENCE_ROOT/b2-verifier.stdout"   2>"$B12_EVIDENCE_ROOT/b2-verifier.stderr"
 sha256sum "$B12_EVIDENCE_ROOT"/* >"$B12_EVIDENCE_ROOT/sha256sum.txt"
 ```
 
-Expected class: exit 0、raw result actual bytes、15 total/0 active/15 resolved/approved 0/unexpected 0/violations empty。Historical raw resultをcurrent outputとしてcopyしない。
+Expected class: exit 0、raw result actual bytes、15 total/0 active/15 resolved/approved 0/unexpected 0/violations empty。`TMPDIR`はB1と同じprivate temp directoryを明示する。Attempt 1はdefault macOS symlinked temp rootにより`unsafe-repository-binding`で失敗したためraw failureを保存し、同じSHA/tree/verifier/shards/acceptanceでprivate TMPDIR指定のattempt 2を行った。成功attemptのみcurrent B2 resultであり、初回失敗もactual evidenceへ保持する。Historical raw resultをcurrent outputとしてcopyしない。
 
 ### 5.5 Current Issue specification admission and dispatch
 
@@ -258,7 +259,7 @@ B1/B2 accepted receipts後、corrected #395 merge SHAがIssue branch freezeのan
 git merge-base --is-ancestor "$B12_TARGET_SHA" "$SPEC_FREEZE_SHA"
 ```
 
-コマンド、`B12_TARGET_SHA`、`SPEC_FREEZE_SHA`、exit statusをPreflightEvidenceIndexV1へ保存する。Falseまたは判定不能ならStopReturnでEpic integration/parent ownerへ戻す。Agentはbranch historyを変更しない。明示許可されたbranch realignment後は、影響するsource-bound capture/artifactを再生成し、ZIP・spec freeze・same-Red review・projection readbackを新しいexact candidateに対してやり直す。B1/B2 receiptの再利用はcorrected #395 SHA/treeが変わらず、証拠が引き続き有効な場合に限る。
+コマンド、`B12_TARGET_SHA`、`SPEC_FREEZE_SHA`、exit statusをPreflightEvidenceIndexV1へ保存する。Falseまたは判定不能ならStopReturnでEpic integration/parent ownerへ戻す。Agentは明示的parent-owner authorizationなしにbranch historyを変更しない。このrunではuserが#395 merge `3c69af...`を既存Issue branchへ統合する方針を承認した。Merge commit `a7f66ca5f8ca2e0571505ac8bf2466144186f769`がPR #403の7 changed pathsをIssue branchへ取り込み、result treeは`38e2f9a50f7cae14ef24fa1187a559c592729e3b`になった。B1/B2 target SHA/tree自体は変わらず、同じcorrected contentに対する受入receiptを再利用する。影響するcurrent-status captureとZIP/hashは更新し、same-Red reviewとprojection readbackは新freeze candidateで再実行する。
 
 Ancestry pass後、Issue worktreeへ戻り、P00のStrict review passとIssue projection readbackを含む先行gateが同じ仕様candidateについて成立していることを次で再確認する。
 

@@ -34,22 +34,22 @@ qualification_authority: "E384-QUAL-001"
 
 Issue #396は、親`E384-QUAL-001`を変更せず、Provider CIをbuild-once・same-candidate・one-role-graph-per-attemptのfinal gateへ切り替え、replacement consumerが成立してold consumerが機械的に0になった後にだけ旧ledger、timing、sharder、policy skip、policy hook、quality provider、provider main-push Full Regressionを同一Issue PRで撤去する実装単位である。
 
-ただし、**現在のProduct実装許可はfalseである。** ユーザーが2026-09-18に示した最新の運用事実は「Issue #395の完了処理は行われたが、Epicが#396の前提とするB1/B2は実施されておらず、受入もされていない」である。従来のreceipt/raw JSONと親Plan §3.2の記述は歴史的主張としてbytesを保持するが、current admission authorityにはしない。
+ただし、**現在のProduct実装許可はfalseである。** #395のA395-SEC-001資格情報漏えい修正PR #403は2026-09-18にEpic integration branchへ人間mergeされ、corrected merge SHA `3c69af78843b04a13bde2f93eb3b1eb4081cdb33` / tree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`としてGitHubからreadbackした。これは未対応schemeのpush URL拒否診断に資格情報が漏れる具体的なIssue #395内のdefectを修正する。別途報告された具体性のない症状とA395-SEC-001が同一であるとは推定しない。
 
-GitHub readbackで確認した#395 PR #401の人間merge identityは、source `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d`、tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7`であり、履歴上のidentityに限る。ユーザーは#395実装を誤りと報告しており、具体的defectと修正結果は未確認である。#395 ownerがIssue #395のscopeでdefectを修正・受入し、修正後のexact merged SHA/treeをGitHub readbackするまで、B1/B2 execution targetは存在しない。元merge SHA/tree、historical receipt、別SHAの結果をB1/B2 targetやacceptanceへ使ってはならない。Corrected targetでB1をfreshに受入した後、同じSHA/treeでB2をfreshに受入し、actual-byte evidenceとaccepted-state receiptを得る。Identity、log、raw evidenceまたはaccepted stateの一つでも検証できない場合は`StopReturnV1`で親ownerへ戻す。
+Corrected targetでfresh B1を実行し親ownerが受入済みである。続けて同じSHA/tree・同じpersistent shellでfresh B2を実行し、private TMPDIRを指定した2回目の実行を親ownerが受入済みである。B2の初回実行はmacOS既定のsymlinked temporary rootで`unsafe-repository-binding`となったため、失敗証拠を保持し、実行target・verifier・shard count・acceptance criteriaを変えずにprivate TMPDIRで再実行した。成功結果は2,216件中2,191 passed / 25 skipped、15 resolved、0 violationsである。両receipt、親owner acceptance、actual-byte evidenceはIssue-local Workbenchに保存した。
 
-要件定義書・設計書・実装計画書は2026-09-18付で`approved`にした。根拠となる同一Red sessionのStrict reviewはSHA `0c7cdd484c82142333f035df9488cf60586c2aea`、tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`に対して`review_status=pass`、P0=0、P1=0、findings=0である。今回の状態更新は仕様内容を変えず、状態・準備状況の表示だけを更新する。ユーザーの指示により、この状態更新後のSHAについてStrict reviewは繰り返さない。新しいSHAが独立にreview済みであるとは表現しない。**承認はProduct実装許可ではなく、`実装開始許可`はfalseのまま維持する。**
+許可されたbranch realignmentでcorrected merge SHAを#396 branchへ統合した。統合merge commit `a7f66ca5f8ca2e0571505ac8bf2466144186f769` / tree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`はpre-realignment Issue commit `59da598a6352c447711399d3a1adab871e6b4a8a` / tree `dfcc40204df51930d446aa65d343a5549857e381`と異なり、PR #403が変更した7 pathを含む。変更は二つのinstalled-skill provider-slot metadata、Issue #395 plan、provider sourceとdogfood mirror、`spec-dock.version`、および`tests/cli_runtime/test_new.py`で、すべてA395-SEC-001 correctionに属する。Issue #396のP02/I0–I22実装は未開始である。実装用specification freezeのSHA/treeは更新後の仕様パックを確定してから別途固定する。新freezeはそのexact SHA/treeでsame-Red Strict reviewを再実施し、GitHub Issue projectionをreadbackする必要がある。過去review SHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`のpassを新freezeのreview passとして扱わない。**現時点の`実装開始許可`はfalseのまま維持する。**
 
 Formal `issue start`、active branch、Issue OPEN/CLOSED、dependency readyはProduct実装許可と別状態である。Formal stateは巻き戻さず、仕様authoringだけを完了する。次の全gateが順に成立するまで、Product source、tests、workflow、policy data、GitHub settingsを変更しない。
 
-1. 本仕様内容のsame-Red reviewは上記SHA/treeで`review_status=pass`、P0=0、P1=0を取得済みである。今回の承認状態更新はstatus-onlyであり、ユーザー指示により再reviewしない。仕様内容を変える場合、または後続の実装freezeを別SHA/treeへ進める場合は、実装許可に使うfreeze SHA/treeとreview receiptを一致させる。
-2. GitHub Issue #396 canonical projectionを更新し、readbackで一致を確認する。
-3. #395 ownerがreported defectをIssue #395のscopeで修正・受入し、corrected exact merged SHA/treeをGitHub readbackする。
-4. Corrected exact SHA/treeでfresh B1を受入する。
-5. B1と同じSHA/treeでfresh B2を受入する。
-6. Actual-byte evidenceと親ownerによるdefect disposition/B1/B2 acceptanceを記録する。
-7. 仕様freeze SHA/treeがclean・pushed・exactで、同時writerがいないことを再確認する。
-8. 別途のexplicit implementation dispatchを受領する。
+1. 現在のcorrected #395 merge PR #403 SHA/treeをGitHub readback済み。A395-SEC-001を修正・mergeした。別途報告された未特定症状との同一性は主張しない。
+2. 同一corrected SHA/treeでfresh B1、その後same-tip B2を実行し、両方とも親owner受入済み。raw bytes、失敗した初回B2、成功再実行、受入記録をactual-byte indexに保存する。
+3. Corrected #395 merge SHAがIssue branchの祖先であることをbranch realignment後に確認済み。最終仕様freeze SHAに対しても再確認する。
+4. R/D/Pと仕様ZIPを更新し、cleanな新freeze SHA/treeを固定する。
+5. 新freeze SHA/treeでsame-Red Strict reviewを再実施し、P0/P1=0のpass receiptを得る。
+6. review pass後、GitHub Issue #396 canonical projectionを新freezeへ更新し、bodyをreadbackして一致を確認する。
+7. 新freeze SHA/tree、configured upstream、GitHub branch tipの完全一致、clean worktree、同時writer不在を確認する。
+8. Userから受領済みの明示的実装dispatchを確認し、以上の全gateが揃うまでProduct source、tests、workflow、policy data、GitHub settingsは変更しない。
 
 Corrected SHA/tree、B1、B2のいずれにもoriginal #395 merge SHA/treeを代用しない。
 
@@ -77,19 +77,19 @@ Corrected SHA/tree、B1、B2のいずれにもoriginal #395 merge SHA/treeを代
 | Repository | `chemitaro/spec-dock` |
 | Issue branch | `iss-00396-build-once-provider-gate-and-regression-policy-cutover` |
 | Verified Blue authoring-input identity | SHA `4d68bce3f3ee977548a3c467476da39c15f43594`, tree `80ade10f57cd5f4140daa03ca8a40b844f1fcc53` |
-| #395 human merge PR | `#401` |
-| #395 original human merge identity (historical) | SHA `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d`, tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7` |
-| #395 implementation disposition | User-reported incorrect; defect details and corrective outcome are not independently verified |
-| B1/B2 execution target | Blocked until the #395 owner corrects and accepts the implementation, then provides the exact merged SHA/tree |
-| Issue #396 Product implementation | prohibited / not started |
-| B1 acceptance | unresolved / not accepted |
-| B2 acceptance | unresolved / not accepted |
+| #395 original human merge PR (historical) | `#401`; SHA `fd5df1d64b5d7ebf7bd4b41bb35fd8760d17e65d`, tree `37eabc1aa250838dcd9f61d627309b0ff27e0db7` |
+| #395 corrected human merge | PR `#403`; SHA `3c69af78843b04a13bde2f93eb3b1eb4081cdb33`, tree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`; A395-SEC-001 corrected and merged |
+| Separate reported symptom | Its relationship to A395-SEC-001 is unverified; no identity claim is made |
+| B1 acceptance | accepted by parent owner on corrected SHA/tree; 1,368 passed / 848 skipped ordinary suite, lint and SpecDock validation passed, parity 524 passed |
+| B2 acceptance | accepted by parent owner on same SHA/tree; attempt 2 verified 2,216 tests (2,191 passed / 25 skipped), 15 resolved, 0 violations; default-temp attempt 1 retained as environment failure |
+| Corrected merge ancestry | verified after authorized realignment; final specification freeze proof remains part of new freeze capture |
+| Issue #396 Product implementation | prohibited / not started pending new freeze review and projection readback |
 
 Current branch tipはspec/evidence authoring candidateであり、predecessor merge tipやB1/B2 acceptance identityではない。`artifacts/b1-b2-admission-status-v2.json`がcurrent Issue-local admission statusを閉じる。GitHub #396 bodyの古いprojection、SpecDock dependency ready、#395 CLOSED、formal active selectionはB1/B2の代替にならない。
 
-Owner correctionは「#395の実装が誤り」であることも示すが、具体的な不具合と修正結果はこのIssueのauthoring evidenceから確認できていない。#395の元merge SHAは履歴上のidentityだけで、正しいProduct baselineやB1/B2 execution targetとして扱わない。#395 ownerが不具合を#395のscope内で修正し、修正後のexact merged SHA/treeと受入根拠をGitHub readbackで提示するまでB1/B2 execution targetは未確定である。Issue #396は#395 Product codeや親文書を修正せず、欠けた情報を推測で補わない。
+A395-SEC-001は#395のaccepted scope内で再現・修正され、PR #403のmergeによりEpic integration branchへ入った。Issue #395はユーザーの指示どおりOPENのままであり、これをclosedとは扱わない。Issue #395のgeneric body/commentには別途報告された症状の詳細がないため、A395-SEC-001との同一性は未確認として残す。元PR #401 merge SHA/treeは歴史上のidentityだけであり、B1/B2 targetには使用しない。
 
-Parent Epic Plan §3.2とhistorical entry receiptの「B1/B2完了」記述は、今回のowner correctionと矛盾する。このIssue authoring taskでは親Plan/#395 docsを変更せず、矛盾をadmission hold理由として記録する。修正後の#395 tipでfresh B1/B2を実行し、親ownerが受入を記録するまで、Issue側は`not-accepted`を維持する。
+Corrected PR #403 merge `3c69af78843b04a13bde2f93eb3b1eb4081cdb33` / tree `38e2f9a50f7cae14ef24fa1187a559c592729e3b`でfresh B1とB2を順に実行し、親owner受入を取得した。B2のsymlinked-default-TMPDIR失敗は保持し、private TMPDIRでの同一target retryを成功証拠として区別した。B1/B2 raw bytes、実行結果、acceptance、ancestry記録はIssue #396のignored Workbench evidenceに保存する。親文書のhistorical記述や旧raw artifactsは書き換えない。
 
 ### 2.3 B1/B2 historical artifactsとfresh acceptance
 
@@ -169,7 +169,7 @@ B3時点で、次の全てが同じfinal source上で成立する。
 
 Product実装前に、次の順で全条件を要求する。
 
-1. `artifacts/b1-b2-admission-status-v2.json`を読み、#395 implementationがowner-reported incorrect、B1/B2が未実施・未受入である現状を確認する。旧receiptとraw JSONはhistorical claimとして保存し、current acceptanceへ転用しない。
+1. `artifacts/b1-b2-admission-status-v2.json`とfresh evidence indexを読み、PR #403 corrected merge identity、A395-SEC-001 correction、親owner accepted B1/B2、actual-byte receiptsを確認する。PR #401の旧receipt/raw JSONはhistorical claimとして保持しcurrent acceptanceへ転用しない。
 2. Issue #396の完成仕様をcleanなIssue branchへcommit/pushし、local HEADとconfigured upstreamのfull SHA一致を確認する。
 3. `iss396-spec-review-red`のpass receiptを確認する。今回の承認の根拠はSHA `0c7cdd484c82142333f035df9488cf60586c2aea` / tree `4ba6fc830e7d2d5d9767ba36c00459371e360aa2`、P0=0、P1=0、findings=0である。状態更新後のSHAはreview済みと扱わず、ユーザー指示により今回のstatus-only更新では再reviewしない。将来の実装freezeで仕様内容またはfreeze identityが変わる場合は、Design §8のreview SHA/tree一致条件を満たす。
 4. Pass後にIssue #396 bodyへcanonical projectionを適用し、GitHubから読み戻して一致を確認する。
