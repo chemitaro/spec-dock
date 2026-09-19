@@ -30,3 +30,5 @@ ID: "iss-00396"
 #395は修正済みの履歴として参照する。OPEN維持による開始ブロックを撤去するため、#396から#395へのmetadata依存をCLIで除去した。IssueのOPEN/CLOSED状態は変更していない。
 
 重点検証: installer/package 10 passed、runtime/Git/handoff 66 passed、配布文書・cutover 204 passed。make lint（ruff/mypy）とvalidate（236 nodes）は成功。U1/U2は起動経路と旧認証撤去が不可分のため同じcheckpointにまとめる。
+
+再レビューで初回init失敗とupdate再試行の範囲が曖昧と判定された。ユーザーの「個別ファイル管理を不要にし、要件設計自体を削ぎ落とす」という本タスクの変更権限に基づき、R8を6ディレクトリのupdateに限定した。初回失敗は不完全ディレクトリを利用者が保全してfresh initをやり直す。状態判定・seed修復の実装は追加しない。これは外部分析の推奨Aを、元の明示指示に照合して主担当が採用した判断であり、別途のユーザー承認を得たという記録ではない。

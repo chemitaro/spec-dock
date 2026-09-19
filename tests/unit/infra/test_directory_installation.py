@@ -173,3 +173,26 @@ def test_fresh_install_rejects_copy_into_its_scaffold_source(tmp_path: Path, mon
     assert sentinel.read_bytes() == b"original distribution"
     assert not (target / "spec-dock").exists()
     assert not (target / ".agents").exists()
+
+
+def test_failed_fresh_init_is_retried_after_preserving_partial_scaffold(tmp_path: Path, monkeypatch) -> None:
+    from spec_dock import installer
+
+    def partial_copy(source, destination):
+        destination.mkdir()
+        (destination / "local.txt").write_bytes(b"preserve me")
+        raise OSError("injected initial copy failure")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(installer, "_copy", partial_copy)
+        assert main(["init", str(tmp_path)]) != 0
+    scaffold = tmp_path / "spec-dock"
+    assert not (scaffold / ".gitignore").exists()
+    assert main(["update", str(tmp_path)]) == 0
+    assert not (scaffold / ".gitignore").exists()
+    assert (scaffold / "local.txt").read_bytes() == b"preserve me"
+    preserved = tmp_path / "preserved-scaffold"
+    scaffold.rename(preserved)
+    assert main(["init", str(tmp_path)]) == 0
+    assert (scaffold / ".gitignore").is_file()
+    assert (preserved / "local.txt").read_bytes() == b"preserve me"

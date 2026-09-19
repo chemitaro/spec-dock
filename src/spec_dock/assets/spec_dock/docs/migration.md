@@ -14,6 +14,8 @@ spec-dock init /path/to/project
 
 未導入のspec-dockスキャフォールドを配置します。既存のspec-dockがある場合はupdateを使います。`init --force` はupdateと同じディレクトリ交換です。初回に配置した `.gitignore` は以後上書きしません。
 
+初回initが途中失敗した場合は、原因を解消し、不完全な `spec-dock/` ディレクトリを別名または別の場所へ移して内容を保全してから、initを再実行してください。updateや `init --force` はツールだけを交換するため、欠けた初期設定（`.gitignore` など）の修復にはなりません。仕様や設定を作成済みでも、そのデータを自動削除する復旧処理はありません。
+
 ## 更新
 
 更新中は、そのリポジトリのSpecDockコマンドを停止してください。
