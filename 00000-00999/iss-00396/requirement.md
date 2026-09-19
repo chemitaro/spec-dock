@@ -171,7 +171,7 @@ Product実装前に、次の順で全条件を要求する。
 
 1. `artifacts/b1-b2-admission-status-v2.json`とfresh evidence indexを読み、PR #403 corrected merge identity、A395-SEC-001 correction、親owner accepted B1/B2、actual-byte receiptsを確認する。PR #401の旧receipt/raw JSONはhistorical claimとして保持しcurrent acceptanceへ転用しない。
 2. Issue #396の完成仕様をcleanなIssue branchへcommit/pushし、local HEADとconfigured upstreamのfull SHA一致を確認する。
-3. 簡素化後のR/D/Pを対象にsame-Red Strict reviewを行い、P0=0、P1=0、findings=0を確認する。旧review receiptは歴史として保持し、新freezeのreview passへ流用しない。
+3. 簡素化後のR/D/Pを対象にsame-Red Strict reviewを行い、review_status=pass、P0=0、P1=0を確認する。P2/P3はreview methodに従い情報として保持し、旧review receiptは歴史として保持して新freezeのreview passへ流用しない。
 4. Pass後にIssue #396 bodyへcanonical projectionを適用し、GitHubから読み戻して一致を確認する。
 5. #395 ownerがreported implementation defectを#395のscope内で修正・受入し、修正後のmerged SHA/treeをGitHub readbackした記録を取得する。Issue #396はこの修正を代行しない。
 6. `b1-b2-verification-contract-v1.json`のtarget resolution ruleに従って、修正後のexact SHA/treeをEvidenceIndexへ固定する。元の#395 SHA/treeを代用しない。
