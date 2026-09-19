@@ -41,3 +41,7 @@ EpicとIssueの要件・設計・計画を再構成し、固定6ディレクト�
 - 管理ディレクトリ内のローカル変更は全て置換する。個別ファイル保持、自動rollback、世代証明は提供しない。
 - レビューのP2は配布README内の旧recovery説明の残存。レビュー方針に従い情報として記録し、この修正では変更していない。
 - 人間によるPR merge前の段階であり、このレポートはFinal Quality Gate合格やIssue完了を宣言しない。
+
+## 第2回レビューと契約の整理
+
+`dabdf0a2`: 全pytestは1547 passed / 25 skipped、lint/validate成功。PR #404の全CIも成功（Linux provider-tests 1542 passed / 30 skipped、macOS/Ubuntuの基本試験各11 passed）。第2回Strictレビューでは初回失敗後の初期設定修復についてP1が残った。ユーザーが要求した個別管理の撤去を優先し、要件と設計でupdate再配置と初回initやり直しを明確に区別した。新しい状態管理やファイル別seed処理は追加していない。修正後のレビュー結果は別途取得する。
