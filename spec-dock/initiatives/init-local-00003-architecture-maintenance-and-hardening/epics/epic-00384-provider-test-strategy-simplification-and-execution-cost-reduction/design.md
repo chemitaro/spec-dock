@@ -1,171 +1,38 @@
 ---
 種別: 設計書（Epic）
 ID: "epic-00384"
-タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
-関連GitHub: ["#384"]
-状態: "draft"
-最終更新: "2026-09-12"
-依存:
-  - "requirement.md"
-  - "artifacts/20260902t070000z-adr-multi-issue-epic-integration-branch-and-rolling-wave-elaboration-policy.md"
-  - "artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md"
-  - "artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md"
-  - "artifacts/20260912t053507z-adr-issue-392-same-uid-threat-safe-stop.md"
-  - "artifacts/epic-integration-branch-contract.md"
-  - "artifacts/rolling-wave-issue-elaboration-contract.md"
-  - "artifacts/provider-lifecycle-wire-contract.md"
-  - "artifacts/active-failure-disposition-register.md"
-親: ["init-local-00003"]
-実装開始許可: false
-repository_evidence:
-  role: "authoring-source-provenance"
-  repository: "chemitaro/spec-dock"
-  branch: "codex/epic-00384-provider-test-strategy-planning"
-  sha: "240e561e94b50250a4a6309452a7fd0fb511458a"
-  tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
+タイトル: "固定ディレクトリ再配置と検証の簡素化"
+状態: "approved"
+最終更新: "2026-09-19"
 ---
 
-# epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 設計
+# Epic #384 — 設計
 
-**現行状態（2026-09-13）:** [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md)と[P392 sequence ADR](artifacts/20260913t144152z-adr-issue-392-provisional-merge-and-deferred-b1.md)を採用済み。P392は#392の限定暫定merge、B1/B2は#395 merge後の同一tipで判定する。現在はいずれも未達で、#392再開前の独立review・freeze/projectionも未完了。
+## 構成
 
-## 1. Delivery architecture
+installerを `cli.py`（引数・出力）と小さい配置処理へ分ける。配置処理はパッケージ内assetsを読み、固定の6パスに `shutil.rmtree` と `shutil.copytree` を適用する。ファイル別のmanifest/marker/保持リストを作らない。配布元はビルド成果物のディレクトリ構造を保つ。
 
-```text
-post-#387 planning baseline
-  -> parent contract freeze
-  -> iss-00392 scope re-approved -> prior CP1–CP4 candidate re-entry (T06 removal + affected-gate rerun)
-     -> human merge -> P392 (only #395-owned measured baseline mismatches)
-  -> iss-00395 repairs from exact P392 tip -> human merge
-     -> B1 current gates GREEN -> B2 baseline 15/0/15 (same exact tip)
-  -> iss-00396 after B2
-  -> final Epic PR          -> one human merge to main -> state B4
-```
+## 更新の手順
 
-Issue branches are short-lived writers. A new worktree or an explicitly user-selected existing worktree may host that branch; directory reuse does not change the integration topology. The user requested parent commit/push followed by #392 formal start on 2026-09-08, and that formal start was completed. The pre-safe-stop CP1–CP4 candidate exists but is not accepted; after the revised-scope G0 it resumes from the exact delta in the Issue Plan rather than restarting CP1. The Epic branch is the only integration target. Main is not an Issue-level integration target.
+1. ターゲットを絶対パスとして解決し、管理対象の親と6ディレクトリがsymlinkや不適切な種類でないことを確認する。
+2. 配布元6ディレクトリが存在することを、削除を始める前に確認する。配布元を含む場所への自己上書きも拒否する。
+3. 各対象が存在すれば丸ごと削除し、配布元から丸ごとコピーする。対象内部の古いファイルも残さない。
+4. すべて成功した後、単純なバージョン記録を書く。
 
-## 2. Stable cross-Issue contracts
+初回initのみ未導入のspec-dockスキャフォールド全体をコピーする。既存ターゲットのforce-initは通常updateと同じ処理にする。updateはデータ/設定seedを作成しない。配置元のPythonキャッシュはビルド成果物へ含めず、ローカルソース実行時にも配布対象から除く。
 
-### E384-C-001 — Branch topology
+## 失敗と運用
 
-The exact integration branch name is `codex/epic-00384-provider-test-strategy-planning`. Each Issue branch starts from its current tip, targets it by PR, and is merged sequentially by a human. The branch contract is detailed in [Epic Integration Branch Contract](artifacts/epic-integration-branch-contract.md).
+途中失敗では混在状態が残り得る。利用者データは触らない。エラーを返し、外部installerのupdateをもう一度行う。途中状態の記録、旧版バックアップ、cleanup token、候補認証、自動復旧は作らない。通常のコマンドと更新の同時実行は運用上禁止する。
 
-### E384-C-002 — Dependency direction
+## runtimeとの境界
 
-Dependency direction is one-way:
+起動スクリプトはruntimeをimportしてdispatchする。更新/uninstallは外部installerに引き渡す。provider状態認証と共有leaseを削除する。Git操作に付加されたprovider世代の認証も外すが、Git操作自身の既存clean check、固定ref、安全なworktree対象判定は維持する。機能的に無関係なデータ操作ロックを撤去しない。
 
-```text
-iss-00387 (completed predecessor)
-  -> iss-00392
-  -> iss-00395
-  -> iss-00396
-  -> Epic main merge
-```
+## テストとCI
 
-A later Issue may consume an earlier output but may not redefine it. An earlier Issue may not import a later Issue's implementation or verification tooling.
+置き換え契約は少数の一時ディレクトリ試験で確認する。旧provider_lifecycle専用suiteと生成器、専用regression ledger/sharderを撤去する。通常のruntime機能テストは保持する。CIの既存required job名を可能な範囲で維持し、`uv run pytest` と `make lint` を直接実行する。macOSはinstaller/runtime起動などの差分確認へ絞る。独自の履歴DB・qualification serviceは作らない。CI所要時間は通常ログで観察する。
 
-The delivery order remains #392→#395→#396. Because #392 closure is deferred until B1, #395 entry is gated by the exact P392 merge tip rather than a close-based SpecDock dependency on #392; #396 continues to depend on #395.
+## 文書の整合
 
-### E384-C-003 — Lifecycle wire ownership
-
-[Provider Lifecycle Wire Contract](artifacts/provider-lifecycle-wire-contract.md) remains the normative lifecycle contract. Its threat boundary is clarified by [E384-DEC-004](artifacts/20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md): supported coordination covers participating SpecDock commands, not same-EUID non-cooperating actors. #392 remains its sole production writer and #395/#396 remain read-only consumers.
-
-WIR-PREP-001は準備/record初回公開の失敗、bounded prepared authority、再入場、ready先行公開を定める。[準備失敗ADR](artifacts/20260908t011139z-adr-lifecycle-preparation-and-initial-record-failure-contract.md)は引き続き有効である。WIR-COORD-003のleaseは協調command間の境界であり、同一EUID actorのcreator provenanceを証明しない。
-
-### E384-C-004 — Protected data and dogfood
-
-The contract fixes the provider target set, consumer preservation and complete-candidate dogfood rule. Owner/mode and private workspace checks rely on the OS trust boundary and are not guarantees against same-EUID non-cooperating actors. Consumer preservation, complete-candidate dogfood and the accepted scope decision remain; candidate-changing Issues may proceed only after the revised-scope review and freeze gate.
-
-### E384-C-005 — Regression baseline
-
-[Post-#387 Regression Baseline Register](artifacts/active-failure-disposition-register.md) freezes the current 15 rows. Its `failure_paths` identities are current authority; stale 27-row top-level metadata remains historical context only. #392 preserves the 14 active identities, #395 restores the represented contracts using the parent-adjudicated repair surfaces (12 test-harness/observer, 2 Product boundaries), and #396 consumes only the clean result.
-
-### E384-C-006 — Transitional gate
-
-The current ledger/timing/sharder/policy system remains a live compatibility provider through #392 and #395. P392 is the only permitted non-GREEN intermediate state: the exact full-verifier violations must all be measured #395-owned active rows, and all #392-owned gates remain GREEN. The current system must be fully GREEN at B1 and B2 on the same post-#395 tip. #396 is the sole final-policy writer and removes it only after replacement and consumer-zero proof.
-
-### E384-C-007 — Final provider gate
-
-The final gate is a build-once, same-candidate role graph implemented by Issue #396. Linux canonical, sdist, macOS delta, qualification and evidence are separate observable responsibilities but one Issue acceptance unit. Every quantitative qualification predicate is consumed from `E384-QUAL-001`; this Design does not define a second value, population or aggregation rule.
-
-### E384-C-008 — Compatibility and evidence
-
-Required-context transition has no gap. External dynamic identities are measured after source freeze; tracked documents contain schemas and methods, not future run/head/merge facts. Human is the only writer of branch settings and merge state.
-
-### E384-C-009 — Rollback and recovery
-
-Issue merge is the smallest integration rollback unit. Runtime lifecycle recovery uses the wire contract. Branch rollback uses whole-merge revert or reverse-order suffix revert. CI/settings recovery restores a captured human-readable before-state. No automatic old behavior fallback exists.
-
-### E384-C-010 — Rolling-wave detail
-
-The current Issue designs specify responsibility, inputs, outputs and acceptance boundaries. Implementation structures are intentionally absent. [Rolling-Wave Issue Elaboration Contract](artifacts/rolling-wave-issue-elaboration-contract.md) controls when those details may be introduced.
-
-### E384-C-011 — Parent-owned qualification policy
-
-`E384-QUAL-001` in Epic Requirement is the sole current quantitative qualification authority. Issue #396 owns measurement, evaluation, evidence schemas and workflow realization, but does not own the policy values or aggregation semantics. #392 and #395 may verify non-interference only. A required semantic change returns to parent adjudication before Issue start.
-
-### E384-C-012 — Replaceable payload versus runtime coordination
-
-E384-RQ-019 is owned by #392. [Wire §16](artifacts/provider-lifecycle-wire-contract.md) fixes the repository-root inode as the common coordination identity, outside all replaced roots. Normal runtime admission holds a nonblocking shared lease before replaceable module imports; every parser-valid lifecycle path holds a nonblocking exclusive lease before target/stage observation. The fixed bootstrap, ready admission, helper lifetime and release→exec handoff for both `update` and `uninstall` are mandatory. A writing helper retains the shared lease if its parent dies; inherited descriptors are not installer authorization or a lock-acquisition bypass. The existing create lock may serialize creates inside the outer lease but is not cross-generation authority. E384-DEC-001 was accepted by the user on 2026-09-08: only the first 0.2.3 migration uses a maintenance window; 0.2.4 onward uses coordination. This excludes lifecycle/runtime overlap, not all possible Git changes. E384-DEC-002 is user-adopted: managed checkout preserves the admitted provider closure and rejects different/uncertain generations before active/sync. Worktree creation/removal binds the actual affected root, not only the invoking root; Wire §16 owns the target birth, helper lifetime and terminal external-hook handoff. No new Issue is introduced.
-E384-RQ-019 is owned by #392. [Wire §16](artifacts/provider-lifecycle-wire-contract.md) fixes the repository-root inode as the common coordination identity, outside all replaced roots. Normal runtime admission holds a nonblocking shared lease before replaceable module imports; every parser-valid lifecycle path holds a nonblocking exclusive lease before target/stage observation. The fixed bootstrap, ready admission, helper lifetime and release→exec handoff for both `update` and `uninstall` are mandatory. A writing helper retains the shared lease if its parent dies; inherited descriptors are not installer authorization or a lock-acquisition bypass. The existing create lock may serialize creates inside the outer lease but is not cross-generation authority. E384-DEC-001 was accepted by the user on 2026-09-08: only the first 0.2.3 migration uses a maintenance window; 0.2.4 onward uses coordination. This excludes lifecycle/runtime overlap and arbitrary nonparticipating writers. E384-DEC-002 is user-adopted: managed checkout preserves the admitted provider closure and rejects different/uncertain generations before active/sync. Worktree creation/removal binds the actual affected root, not only the invoking root; Wire §16 owns the target birth, helper lifetime and terminal external-hook handoff. E384-DEC-004 excludes same-EUID actors that do not participate in this coordination; it does not weaken the supported-command lease contract. No new Issue is introduced.
-
-### Final-gate execution model
-
-One final-gate attempt executes one role graph with one Linux canonical body. The first five registered attempts of the fixed candidate/campaign supply the performance samples; their same observations may also belong to the latest-twenty stability window. Five-run, seeded-fault and twenty-member qualification aggregation belongs to B3/Epic acceptance, not to every PR's per-attempt status. Started failures/cancellations/missing evidence remain members, and the campaign cannot be reset to select better samples. Parent `E384-QUAL-001` alone defines values and environment capability limits.
-
-## 3. Integration states
-
-| State | Source | Required invariant |
-|---|---|---|
-| B0 | Parent contract freeze on current branch | Three nodes and dependencies exist; the pre-safe-stop #392 CP1–CP4 candidate exists but is unaccepted and has no accepted merge; baseline 15/14/1 and timing 243 fixed; `E384-QUAL-001` complete; E384-RQ-019/wire and E384-DEC-001/002/004 resolved; revised #392 R/D/P independently reviewed, clean pushed freeze receipt and post-pass Issue-body projection readback complete before candidate re-entry. |
-| P392 | #392 human merge | #392-owned lifecycle, focused/platform/package/dogfood and required PR checks pass; 15/14/1, 243 timing and policy remain unchanged. The exact full verifier is run and any violations are exclusively the measured #395-owned active rows in register §6.1. This state is not GREEN, B1, #392 acceptance or permission for #396. |
-| B1 | #395 human merge, exact tip fixed | Complete #392 lifecycle and P392 invariants remain intact; current PR/full gates and provider parity are GREEN; no unexpected failure. |
-| B2 | Same exact tip as B1 | 15 rows total, active 0, resolved 15, approved 0, unexpected 0; cause-appropriate #395 repairs accepted. |
-| B3 | #396 merge | Final build-once gate and mechanical `E384-QUAL-001` evidence GREEN; old ledger/timing/sharder/policy machinery absent; final docs/dogfood coherent. |
-| B4 | Epic main merge | Main tree equals accepted B3 tree; final context and closure evidence read back. |
-
-## 4. Issue responsibility boundaries
-
-| Issue | Sole write authority | Explicit read-only input | Forbidden ownership |
-|---|---|---|---|
-| #392 | Provider lifecycle semantics, wire conformance, migration/uninstall/recovery, lifecycle docs and candidate | Post-#387 active identities and transitional gate | Product defect terminalization; final gate/policy removal |
-| #395 | Product behavior or test harness/observer represented by the 14 active rows, as adjudicated in register §6.1, and their terminal state | #392 lifecycle output, wire, current policy | Lifecycle redesign; final gate/policy removal |
-| #396 | Provider test ownership, build-once CI, `E384-QUAL-001` implementation/evidence, policy cutover and final guidance | Clean #395 baseline, #392 lifecycle and parent qualification policy | New Product behavior, lifecycle semantic change or qualification policy change |
-
-## 5. Compatibility design
-
-- P392 preserves the current regression system while isolating only the #395-owned known failures.
-- B1 is the fully GREEN current-system integration state; B2 proves its 15/0/15 terminal baseline on the same exact tip.
-- B3 replaces that system atomically and preserves Product behavior.
-- Compatibility is not a runtime feature toggle. It is an integration-state property.
-- No Issue merge is required to be independently deployable to main; it must only be internally coherent and GREEN on the Epic branch.
-
-## 6. Main drift design
-
-Main is inspected only between Issues. Non-overlapping drift may be human-integrated into the Epic branch followed by complete GREEN revalidation. Drift touching a stable contract, owned boundary or acceptance identity blocks the next Issue and returns to parent adjudication. Issue implementers do not silently absorb it.
-
-## 7. Evidence design
-
-Each Issue records four evidence classes without deferring all proof to the final Issue:
-
-1. contract conformance;
-2. observable Product or CI outcome;
-3. integration-branch GREEN state at exact tip;
-4. rollback/recovery readiness.
-
-Final Epic evidence additionally binds the B3 tree, human main merge tree equality, final required-context readback and the mechanical `E384-QUAL-001` result with its complete raw inputs.
-
-## 8. Historical material
-
-Historical research, discussions, HTML guides and CLOSED #388–#390 remain in the repository. They may explain prior reasoning but cannot override current parent R/D/P, accepted multi-Issue ADR or normative contracts. The accepted disposable-root/fixed-slot ADR remains supporting technical authority where it does not conflict with the new ADR.
-
-## 9. Traceability
-
-| Requirement | Design contract |
-|---|---|
-| E384-RQ-001–003 | C-001, C-002, C-010 |
-| E384-RQ-004–006 | C-003, C-004, C-009 |
-| E384-RQ-007–011 | C-005, C-006 and B0–B2 |
-| E384-RQ-012–014 and E384-QUAL-001 | C-007, C-008, C-011 and B3 |
-| E384-RQ-015–018 | C-004, C-008, C-009 and B4 |
-| E384-RQ-019 | C-012 and #392 admission/concurrency proof |
+旧Wire/qualification artifactは履歴として残し、現行R/D/Pから権威を外す。古いIssue #392/#395の受入を再演しない。provider側docsを更新後、同じinstallerを使ってdogfoodのツールだけを同期する。データ領域の内容比較を行う。
