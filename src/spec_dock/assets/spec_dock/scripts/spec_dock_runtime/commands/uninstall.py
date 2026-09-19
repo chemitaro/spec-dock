@@ -1,11 +1,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import os
 from pathlib import Path
-import subprocess
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.commands.contracts import CommandArgs, CommandOutcome, CommandSpec
+from spec_dock_runtime.commands.contracts import (
+    CommandArgs,
+    CommandOutcome,
+    CommandSpec,
+    InstallerExecRequest,
+)
 from spec_dock_runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
@@ -14,6 +20,7 @@ if TYPE_CHECKING:
     from spec_dock_runtime.application.contracts import UseCases
 
 UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
+_PURGE_REMOVED_ERROR = "Spec history purge has been removed; uninstall is tooling-only."
 
 
 @dataclass(frozen=True)
@@ -23,6 +30,7 @@ class UninstallArgs(CommandArgs):
     keep_specs: bool
     remove_specs: bool
     json: bool
+    invocation_cwd: Path | None = None
 
 
 def command_specs() -> dict[str, CommandSpec]:
@@ -61,7 +69,7 @@ def _add_uninstall_arguments(parser: argparse.ArgumentParser) -> None:
     specs_mode.add_argument(
         "--remove-specs",
         action="store_true",
-        help="Remove spec history while uninstalling managed tooling",
+        help="Unsupported: consumer data is never removed",
     )
     parser.add_argument(
         "--json",
@@ -77,13 +85,21 @@ def _uninstall_args(ns: argparse.Namespace) -> CommandArgs:
         keep_specs=bool(getattr(ns, "keep_specs", False)),
         remove_specs=bool(getattr(ns, "remove_specs", False)),
         json=bool(getattr(ns, "json", False)),
+        invocation_cwd=getattr(ns, "_invocation_cwd", None),
     )
 
 
 def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
     del use_cases
     typed = _expect_uninstall_args(args)
-    target = Path(typed.target).expanduser().resolve()
+    if typed.remove_specs:
+        return _removed_purge_outcome(typed)
+    target = Path(typed.target).expanduser()
+    if typed.invocation_cwd is not None and not target.is_absolute():
+        target = typed.invocation_cwd / target
+    elif not target.is_absolute():
+        target = Path.cwd() / target
+    target = Path(os.path.normpath(target))
     command = [
         "uvx",
         "--no-cache",
@@ -97,30 +113,30 @@ def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
         command.append("--apply")
     if typed.keep_specs:
         command.append("--keep-specs")
-    if typed.remove_specs:
-        command.append("--remove-specs")
     if typed.json:
         command.append("--json")
 
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-    except FileNotFoundError:
-        return CommandOutcome(
-            exit_code=127,
-            text=CliText(
-                stdout_lines=[],
-                stderr_lines=["error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry."],
-                warnings=[],
-            ),
-        )
     return CommandOutcome(
-        exit_code=int(result.returncode),
-        text=CliText(
-            stdout_lines=result.stdout.splitlines(),
-            stderr_lines=result.stderr.splitlines(),
-            warnings=[],
+        exit_code=0,
+        text=CliText(stdout_lines=[], stderr_lines=[], warnings=[]),
+        terminal=InstallerExecRequest(
+            kind="installer-exec",
+            argv=tuple(command),
+            environment_policy="inherit-without-lock-bypass",
         ),
     )
+
+
+def _removed_purge_outcome(args: UninstallArgs) -> CommandOutcome:
+    """Return the request-validation result without observing the target."""
+
+    message = _PURGE_REMOVED_ERROR
+    text = CliText(
+        stdout_lines=[json.dumps({"status": "error", "command": "uninstall", "error": message})] if args.json else [],
+        stderr_lines=[] if args.json else [f"error: {message}"],
+        warnings=[],
+    )
+    return CommandOutcome(exit_code=2, text=text)
 
 
 def _expect_uninstall_args(args: CommandArgs) -> UninstallArgs:

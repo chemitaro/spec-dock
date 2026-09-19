@@ -514,6 +514,66 @@ class TestCliNew(CliRuntimeHarness):
             assert issue_meta["github"]["repo_owner"] == "current"
             assert issue_meta["github"]["repo_name"] == "repo"
 
+    @pytest.mark.parametrize("scheme", ["ssh", "ftp"])
+    def test_new_issue_rejects_credentialed_unsupported_push_remote_without_disclosure(self, scheme: str) -> None:
+        if os.name == "nt":
+            pytest.skip("This test uses a POSIX shell stub for gh; skip on Windows.")
+
+        with tempfile.TemporaryDirectory() as tmp:
+            target = Path(tmp)
+            assert main(["init", str(target)]) == 0
+            self._create_same_repo_linked_hierarchy(target)
+
+            secret = "synthetic-password-sentinel"
+            remote = f"{scheme}://synthetic-user:{secret}@git.example.invalid/example/repo.git"
+            self._run_git(target, ["remote", "set-url", "--push", "origin", remote])
+
+            bin_dir = target / ".bin"
+            bin_dir.mkdir(parents=True, exist_ok=True)
+            gh_call_log = target / "gh-calls.txt"
+            gh_path = bin_dir / "gh"
+            gh_path.write_text(
+                "#!/bin/sh\nprintf '%s\n' called >> \"$GH_CALL_LOG\"\nexit 91\n",
+                encoding="utf-8",
+            )
+            gh_path.chmod(0o755)
+            test_env = {
+                "PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}",
+                "GH_CALL_LOG": str(gh_call_log),
+            }
+
+            issues_dir = (
+                target
+                / "spec-dock"
+                / "initiatives"
+                / "init-00001-auth-platform"
+                / "epics"
+                / "epic-00002-jwt-auth"
+                / "issues"
+            )
+            issue_names_before = sorted(path.name for path in issues_dir.glob("iss-*"))
+            failed = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "2",
+                    "--title",
+                    "Reject credentialed unsupported remote",
+                    "--create-github-issue",
+                ],
+                env=test_env,
+            )
+
+            assert failed.returncode != 0, failed.stdout + failed.stderr
+            diagnostic = failed.stdout + failed.stderr
+            assert "origin remote contains credentials" in diagnostic
+            assert secret not in diagnostic
+            assert remote not in diagnostic
+            assert not gh_call_log.exists()
+            assert sorted(path.name for path in issues_dir.glob("iss-*")) == issue_names_before
+
     def test_new_rejects_unsafe_slug(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp)
@@ -1485,6 +1545,11 @@ class TestCliNew(CliRuntimeHarness):
             assert main(["init", str(target)]) == 0
             self._create_same_repo_linked_hierarchy(target)
 
+            root_template = target / "spec-dock" / "templates" / "root" / ".workbench" / "README.md"
+            root_workbench = target / "spec-dock" / ".workbench"
+            root_workbench.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(root_template, root_workbench / "README.md")
+
             init_dir = target / "spec-dock" / "initiatives" / "init-00001-auth-platform"
             epic_dir = init_dir / "epics" / "epic-00002-jwt-auth"
             issue_dir = epic_dir / "issues" / "iss-00003-add-refresh-token"
@@ -1943,6 +2008,14 @@ class TestCliNew(CliRuntimeHarness):
                 "#!/usr/bin/env bash\n"
                 "set -euo pipefail\n"
                 'if [[ "$1" == "issue" && "$2" == "create" ]]; then\n'
+                '  if [[ "$*" != *"--repo example/repo"* ]]; then\n'
+                '    echo "gh issue create missing explicit repo binding" >&2\n'
+                "    exit 23\n"
+                "  fi\n"
+                '  if [[ "${GH_CREATE_FAILURE:-0}" == "1" ]]; then\n'
+                '    echo "GH_ERROR_SENTINEL token=private-token-sentinel origin=https://user:password-sentinel@github.com/example/repo.git" >&2\n'
+                "    exit 24\n"
+                "  fi\n"
                 '  echo "https://github.com/example/repo/issues/123"\n'
                 "  exit 0\n"
                 "fi\n"
@@ -1959,7 +2032,7 @@ class TestCliNew(CliRuntimeHarness):
             test_env = {"PATH": f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"}
             self._run_runtime(
                 target,
-                ["new", "issue", "--epic", "2", "--title", "Add refresh token"],
+                ["new", "issue", "--epic", "2", "--title", "Add refresh token", "--create-github-issue"],
                 env=test_env,
             )
 
@@ -1979,6 +2052,35 @@ class TestCliNew(CliRuntimeHarness):
             assert meta["github"]["issue_number"] == 123
             self._assert_spec_dock_meta_marker(meta)
             self._assert_readonly_on_posix(issue_dir / ".meta.json")
+
+            issue_names_before_failure = sorted(path.name for path in issue_dir.parent.glob("iss-*"))
+            failure_env = {**test_env, "GH_CREATE_FAILURE": "1"}
+            failed = self._run_runtime_capture(
+                target,
+                [
+                    "new",
+                    "issue",
+                    "--epic",
+                    "2",
+                    "--title",
+                    "Failure sentinel",
+                    "--create-github-issue",
+                ],
+                env=failure_env,
+            )
+            assert failed.returncode != 0
+            diagnostic = failed.stdout + failed.stderr
+            if any(
+                marker in diagnostic
+                for marker in (
+                    "GH_ERROR_SENTINEL",
+                    "private-token-sentinel",
+                    "password-sentinel",
+                    "https://user:password-sentinel@github.com/example/repo.git",
+                )
+            ):
+                pytest.fail("GitHub create failure diagnostic exposed raw output or credential material")
+            assert sorted(path.name for path in issue_dir.parent.glob("iss-*")) == issue_names_before_failure
 
     def test_new_fails_preflight_on_legacy_meta_without_creating_nodes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

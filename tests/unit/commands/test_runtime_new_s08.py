@@ -245,8 +245,8 @@ class _StubIssueGateway:
         del repo_root, limit
         return []
 
-    def issue_create(self, repo_root, title, body):
-        self.calls.append((str(repo_root), title, body))
+    def issue_create(self, repo_root, title, body, *, repo_slug):
+        self.calls.append((str(repo_root), title, body, repo_slug))
         if not self.created_numbers:
             raise RuntimeError("no issue numbers configured")
         return self.created_numbers.pop(0)
@@ -257,9 +257,21 @@ class _StubGitGateway:
         self.origin_repo_slug = origin_repo_slug
         self.error = error
         self.calls = []
+        self.fetch_calls = []
+        self.publication_calls = []
 
     def origin_github_repo_slug(self, repo_root):
-        self.calls.append(str(repo_root))
+        repo_root_text = str(repo_root)
+        self.calls.append(repo_root_text)
+        self.fetch_calls.append(repo_root_text)
+        if self.error is not None:
+            raise RuntimeError(self.error)
+        return self.origin_repo_slug
+
+    def origin_github_publication_repo_slug(self, repo_root):
+        repo_root_text = str(repo_root)
+        self.calls.append(repo_root_text)
+        self.publication_calls.append(repo_root_text)
         if self.error is not None:
             raise RuntimeError(self.error)
         return self.origin_repo_slug
@@ -271,8 +283,8 @@ class _BlockingIssueGateway(_StubIssueGateway):
         self._started_event = started_event
         self._release_event = release_event
 
-    def issue_create(self, repo_root, title, body):
-        self.calls.append((str(repo_root), title, body))
+    def issue_create(self, repo_root, title, body, *, repo_slug):
+        self.calls.append((str(repo_root), title, body, repo_slug))
         self._started_event.set()
         if not self._release_event.wait(timeout=5.0):
             raise RuntimeError("timed out waiting for release_event")
@@ -3320,34 +3332,37 @@ class TestRuntimeNewS08:
                     "origin remote fetch/push mismatch; cannot resolve canonical repo scope:",
                 ),
             ]
-            for case_name, git_error in cases:
-                with _case_label(case=case_name):
-                    events: list[str] = []
-                    issue_gateway = _StubIssueGateway([799])
-                    git_gateway = _StubGitGateway(error=git_error)
-                    ports = self._ports(
-                        app_ports,
-                        specdock_dir=specdock_dir,
-                        records=records,
-                        events=events,
-                        issue_gateway=issue_gateway,
-                        git_gateway=git_gateway,
-                    )
-                    with pytest.raises(RuntimeError, match=git_error):
-                        app_create_node.create_issue(
-                            app_contracts.CreateNodeRequest(
-                                title="Refresh token",
-                                slug=None,
-                                parent_id="epic-local-00001",
-                                github_mode="create",
-                                github_issue_number=None,
-                            ),
-                            ports,
+            for github_mode in ("create", "link_existing"):
+                for case_name, git_error in cases:
+                    with _case_label(case=f"{github_mode}:{case_name}"):
+                        events: list[str] = []
+                        issue_gateway = _StubIssueGateway([799])
+                        git_gateway = _StubGitGateway(error=git_error)
+                        ports = self._ports(
+                            app_ports,
+                            specdock_dir=specdock_dir,
+                            records=records,
+                            events=events,
+                            issue_gateway=issue_gateway,
+                            git_gateway=git_gateway,
                         )
-                    assert issue_gateway.calls == []
-                    assert events == []
-                    assert not (epic_dir / "issues").exists()
-                    assert git_gateway.calls == [str(repo_root)]
+                        with pytest.raises(RuntimeError, match=git_error):
+                            app_create_node.create_issue(
+                                app_contracts.CreateNodeRequest(
+                                    title="Refresh token",
+                                    slug=None,
+                                    parent_id="epic-local-00001",
+                                    github_mode=github_mode,
+                                    github_issue_number=799 if github_mode == "link_existing" else None,
+                                ),
+                                ports,
+                            )
+                        assert issue_gateway.calls == []
+                        assert events == []
+                        assert not (epic_dir / "issues").exists()
+                        assert git_gateway.publication_calls == [str(repo_root)]
+                        assert git_gateway.fetch_calls == []
+                        assert git_gateway.calls == [str(repo_root)]
 
     def test_issue_create_with_canonical_origin_scope_still_succeeds(self) -> None:
         (
@@ -3420,6 +3435,9 @@ class TestRuntimeNewS08:
             assert issue_gateway.calls[0][0] == str(repo_root)
             assert issue_gateway.calls[0][1] == "Refresh token"
             assert "Type: issue" in issue_gateway.calls[0][2]
+            assert issue_gateway.calls[0][3] == "example/repo"
+            assert git_gateway.publication_calls == [str(repo_root)]
+            assert git_gateway.fetch_calls == []
             assert git_gateway.calls[0] == str(repo_root)
             created_record = node_repo._records[-1]
             assert created_record.github_repo_owner == "example"
@@ -3536,6 +3554,8 @@ class TestRuntimeNewS08:
             created_record = node_repo._records[-1]
             assert created_record.github_repo_owner == "example"
             assert created_record.github_repo_name == "repo"
+            assert git_gateway.publication_calls == [str(repo_root)]
+            assert git_gateway.fetch_calls == []
             assert git_gateway.calls == [str(repo_root)]
 
     def test_issue_link_existing_rejects_explicit_cross_repo_target(self) -> None:
@@ -3702,8 +3722,8 @@ class TestRuntimeNewS08:
             ]
 
             class _IssueCreateFailureGateway(_StubIssueGateway):
-                def issue_create(self, repo_root, title, body):
-                    self.calls.append((str(repo_root), title, body))
+                def issue_create(self, repo_root, title, body, *, repo_slug):
+                    self.calls.append((str(repo_root), title, body, repo_slug))
                     raise RuntimeError("simulated issue_create failure")
 
             issue_gateway = _IssueCreateFailureGateway([799])

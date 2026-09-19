@@ -5,7 +5,7 @@
   "title": "Provider Test Strategy Simplification and Execution Cost Reduction",
   "slug": "provider-test-strategy-simplification-and-execution-cost-reduction",
   "created_at": "2026-08-31T08:34:11+09:00",
-  "updated_at": "2026-08-31T08:34:11+09:00",
+  "updated_at": "2026-09-01T11:59:31+09:00",
   "parent_id": "init-local-00003",
   "initiative_id": "init-local-00003",
   "epic_id": null,
@@ -18,5 +18,8 @@
     "issue_number": 384,
     "repo_owner": "chemitaro",
     "repo_name": "spec-dock"
-  }
+  },
+  "depends_on": [
+    "iss-00387"
+  ]
 }

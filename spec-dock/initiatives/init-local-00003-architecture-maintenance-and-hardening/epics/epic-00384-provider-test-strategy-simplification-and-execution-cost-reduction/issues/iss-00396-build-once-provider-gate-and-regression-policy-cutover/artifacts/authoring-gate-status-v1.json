@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "contract_id": "iss-00396-authoring-gate-status-v1",
+  "record_scope": "candidate-assembly snapshot; #395 implementation owner-reported incorrect and corrective disposition unresolved; later review and admission receipts bind to exact SHA and are recorded separately",
+  "verified_source": {
+    "repository": "chemitaro/spec-dock",
+    "branch": "iss-00396-build-once-provider-gate-and-regression-policy-cutover",
+    "sha": "4d68bce3f3ee977548a3c467476da39c15f43594",
+    "tree": "80ade10f57cd5f4140daa03ca8a40b844f1fcc53"
+  },
+  "last_completed_same_red_review_before_this_candidate": {
+    "status": "fail",
+    "p0": 0,
+    "p1": 6,
+    "p2": 6,
+    "p3": 0,
+    "session_id": "iss396-spec-review-red"
+  },
+  "p1_remediation_authored": true,
+  "same_red_rereview_performed_at_candidate_assembly": false,
+  "issue_projection_readback_performed_at_candidate_assembly": false,
+  "b1_accepted_at_candidate_assembly": false,
+  "b2_accepted_at_candidate_assembly": false,
+  "explicit_implementation_dispatch_received_at_candidate_assembly": false,
+  "implementation_authorized_at_candidate_assembly": false,
+  "product_or_test_or_workflow_or_policy_changed_by_this_pack": false,
+  "b3_status_at_candidate_assembly": "not-started",
+  "remaining_gates_in_order": [
+    "clean pushed specification candidate",
+    "same-Red review_status=pass with P0/P1=0",
+    "Issue projection update and GitHub readback",
+    "#395 owner correction and acceptance of the reported implementation defect under Issue #395",
+    "GitHub readback of the exact corrected #395 merge SHA/tree",
+    "fresh B1 acceptance at the corrected owner-approved SHA/tree",
+    "fresh B2 acceptance at the same SHA/tree",
+    "actual-byte evidence and parent-owner acceptance",
+    "clean exact specification freeze and no concurrent writer",
+    "explicit implementation dispatch"
+  ]
+}

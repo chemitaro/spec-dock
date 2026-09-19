@@ -1,22 +1,267 @@
 #!/usr/bin/env python3
-"""Thin runtime entrypoint for spec-dock."""
+"""Start the installed runtime without provider lifecycle admission."""
 from __future__ import annotations
 
-import sys
+import contextlib
+import json
+import os
 from pathlib import Path
+import stat
+import subprocess
+import sys
 
-# Importing the installed runtime must not dirty the managed consumer repository.
-sys.dont_write_bytecode = True
+_MISSING_INIT_FRAGMENTS = (
+    "no rule to make target 'init'",
+    "no rule to make target `init'",
+    "no rule to make target init",
+    "no targets specified and no makefile found",
+    "no makefile found",
+)
 
-_SCRIPT_DIR = Path(__file__).resolve().parent
-_RUNTIME_DIR = _SCRIPT_DIR / "spec_dock_runtime"
-_APP_PATH = _RUNTIME_DIR / "app.py"
-if not _APP_PATH.is_file():
-    raise SystemExit("error: spec-dock runtime module missing; run 'spec-dock update'")
 
-sys.path.insert(0, str(_SCRIPT_DIR))
+def _close(fd: int | None) -> None:
+    if fd is None:
+        return
+    with contextlib.suppress(OSError):
+        os.close(fd)
 
-from spec_dock_runtime.app import main
+
+def _emit(text: object) -> None:
+    for warning in getattr(text, "warnings", ()):
+        print(f"spec-dock: (warn) {warning}", file=sys.stderr)
+    for line in getattr(text, "stderr_lines", ()):
+        print(line, file=sys.stderr)
+    for line in getattr(text, "stdout_lines", ()):
+        print(line)
+
+
+def _installer_exec(request: object, root_fd: int) -> int:
+    argv = tuple(getattr(request, "argv", ()))
+    if not argv or getattr(request, "environment_policy", None) != "inherit-without-lock-bypass":
+        raise RuntimeError("invalid installer terminal request")
+    _close(root_fd)
+    try:
+        os.execvpe(argv[0], list(argv), os.environ.copy())
+    except FileNotFoundError:
+        print("error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry.", file=sys.stderr)
+        return 127
+    except OSError as error:
+        print(f"error: {error.strerror or 'installer could not be executed'}", file=sys.stderr)
+        return 1
+    raise AssertionError("execvpe returned unexpectedly")
+
+
+def _is_missing_init(stderr: str) -> bool:
+    lowered = stderr.lower()
+    return any(fragment in lowered for fragment in _MISSING_INIT_FRAGMENTS)
+
+
+def _hook_child(
+    bound_fd: int,
+    write_fd: int,
+    detection_argv: tuple[str, ...],
+    execution_argv: tuple[str, ...],
+) -> None:
+    try:
+        os.fchdir(bound_fd)
+        try:
+            detection = subprocess.run(
+                list(detection_argv),
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        except FileNotFoundError:
+            result = {
+                "status": "detection_failed",
+                "command": " ".join(detection_argv),
+                "exit_code": None,
+                "warning": "make command not found",
+            }
+        else:
+            stderr = (detection.stderr or "").strip()
+            if detection.returncode != 0:
+                if _is_missing_init(stderr):
+                    result = {"status": "skipped", "command": None, "exit_code": None, "warning": None}
+                else:
+                    result = {
+                        "status": "detection_failed",
+                        "command": " ".join(detection_argv),
+                        "exit_code": detection.returncode,
+                        "warning": stderr or "unknown error",
+                    }
+            else:
+                run = subprocess.run(list(execution_argv), check=False)
+                result = {
+                    "status": "succeeded" if run.returncode == 0 else "failed",
+                    "command": " ".join(execution_argv),
+                    "exit_code": run.returncode,
+                    "warning": None
+                    if run.returncode == 0
+                    else f"{' '.join(execution_argv)} failed: exit={run.returncode}",
+                }
+        os.write(write_fd, json.dumps(result, separators=(",", ":")).encode("utf-8"))
+        os._exit(0)
+    except BaseException as error:
+        try:
+            os.write(
+                write_fd,
+                json.dumps(
+                    {
+                        "status": "detection_failed",
+                        "command": " ".join(detection_argv),
+                        "exit_code": None,
+                        "warning": str(error),
+                    },
+                    separators=(",", ":"),
+                ).encode("utf-8"),
+            )
+        finally:
+            os._exit(0)
+
+
+def _render_consumer_hook_result(request: object, result: dict[str, object]) -> int:
+    payload = dict(getattr(request, "result_payload", {}))
+    payload["bootstrap_status"] = result.get("status")
+    payload["bootstrap_command"] = result.get("command")
+    payload["bootstrap_exit_code"] = result.get("exit_code")
+    warnings = list(payload.get("warnings", ()))
+    if result.get("warning"):
+        warnings.append(str(result["warning"]))
+    payload["warnings"] = warnings
+    if getattr(request, "result_format", None) == "worktree-create-json-v1":
+        print(json.dumps({"status": "ok", "command": "worktree create", **payload}, ensure_ascii=False, indent=2))
+    else:
+        print(
+            f"spec-dock: ok (worktree create) id={payload.get('id')} "
+            f"branch={payload.get('branch_name')} path={payload.get('worktree_path')}"
+        )
+        print(
+            "spec-dock: worktree bootstrap "
+            f"status={payload.get('bootstrap_status')} command={payload.get('bootstrap_command') or '-'}"
+        )
+        for warning in warnings:
+            print(f"spec-dock: (warn) {warning}", file=sys.stderr)
+    return 0
+
+
+def _consumer_hook(request: object, root_fd: int) -> int:
+    bound_fd = int(request.bound_cwd_fd)
+    expected_device = int(request.bound_device)
+    expected_inode = int(request.bound_inode)
+    detection_argv = tuple(getattr(request, "detection_argv", ()))
+    execution_argv = tuple(getattr(request, "execution_argv", ()))
+    if detection_argv != ("make", "-n", "init") or execution_argv != ("make", "init"):
+        _close(root_fd)
+        _close(bound_fd)
+        print("error: invalid consumer hook request", file=sys.stderr)
+        return 1
+    try:
+        bound_stat = os.fstat(bound_fd)
+    except OSError as error:
+        _close(bound_fd)
+        _close(root_fd)
+        return _render_consumer_hook_result(
+            request,
+            {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": f"worktree hook binding unavailable: {error}",
+            },
+        )
+    if (
+        not stat.S_ISDIR(bound_stat.st_mode)
+        or bound_stat.st_dev != expected_device
+        or bound_stat.st_ino != expected_inode
+    ):
+        _close(bound_fd)
+        _close(root_fd)
+        return _render_consumer_hook_result(
+            request,
+            {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": "unsafe worktree binding",
+            },
+        )
+    _close(root_fd)
+    root_fd = -1
+    read_fd: int | None = None
+    write_fd: int | None = None
+    child_pid: int | None = None
+    try:
+        read_fd, write_fd = os.pipe()
+        assert read_fd is not None and write_fd is not None
+        child_pid = os.fork()
+        if child_pid == 0:
+            _close(read_fd)
+            _close(root_fd)
+            _hook_child(bound_fd, write_fd, detection_argv, execution_argv)
+            raise AssertionError("hook child returned unexpectedly")
+        _close(write_fd)
+        write_fd = None
+        _close(bound_fd)
+        bound_fd = -1
+        _close(root_fd)
+        chunks: list[bytes] = []
+        assert read_fd is not None and child_pid is not None
+        while True:
+            chunk = os.read(read_fd, 4096)
+            if not chunk:
+                break
+            chunks.append(chunk)
+        _close(read_fd)
+        read_fd = None
+        _pid, status = os.waitpid(child_pid, 0)
+        del status
+        try:
+            result = json.loads(b"".join(chunks).decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            result = {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": "hook result unavailable",
+            }
+        return _render_consumer_hook_result(request, result)
+    except OSError as error:
+        _close(read_fd)
+        _close(write_fd)
+        _close(bound_fd)
+        if child_pid is not None:
+            with contextlib.suppress(OSError):
+                os.waitpid(child_pid, 0)
+        return _render_consumer_hook_result(
+            request,
+            {
+                "status": "detection_failed",
+                "command": "make -n init",
+                "exit_code": None,
+                "warning": f"consumer hook failed: {error}",
+            },
+        )
+
+
+def main() -> int:
+    sys.dont_write_bytecode = True
+    invocation_cwd = Path.cwd()
+    root = Path(__file__).resolve().parents[2]
+    sys.path.insert(0, str(root / "spec-dock/scripts"))
+    from spec_dock_runtime.app import run
+    from spec_dock_runtime.cli.bootstrap import build_runtime
+
+    context = build_runtime(root / "spec-dock", repo_root=root, invocation_cwd=invocation_cwd)
+    outcome = run(sys.argv[1:], context)
+    if outcome.terminal is not None:
+        if outcome.terminal.kind == "installer-exec":
+            return _installer_exec(outcome.terminal, -1)
+        if outcome.terminal.kind == "consumer-hook":
+            return _consumer_hook(outcome.terminal, -1)
+        raise RuntimeError("Unknown terminal request")
+    _emit(outcome.text)
+    return int(outcome.exit_code)
 
 
 if __name__ == "__main__":

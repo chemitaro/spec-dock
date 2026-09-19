@@ -1,163 +1,50 @@
 ---
 種別: 要件定義書（Epic）
 ID: "epic-00384"
-タイトル: "Provider Test Strategy Simplification and Execution Cost Reduction"
-関連GitHub: ["#384"]
-状態: "draft"
-最終更新: "2026-08-31"
-親: ["init-local-00003"]
+タイトル: "固定ディレクトリ再配置と検証の簡素化"
+状態: "approved"
+最終更新: "2026-09-19"
 ---
 
-# epic-00384 Provider Test Strategy Simplification and Execution Cost Reduction — 要件定義
+# Epic #384 — 固定ディレクトリ再配置による簡素化
 
-詳細: [Requirement Guide](../../../../docs/authoring/requirement.md)
+## 決定と正本
+
+2026-09-19のユーザー指示により、Epic自体を再構成する。正本は本Requirement、Design、Plan、および[再構成20260919t021920z-adr-directory-replacement-reconstruction.md](artifacts/20260919t021920z-adr-directory-replacement-reconstruction.md)である。旧E384-QUAL-001、Wire v12、P02、rolling-wave追加契約、旧failure register、#392/#395の実装保証は履歴であり、今回の実装を拘束しない。旧レビュー合格を新仕様の合格証拠へ流用しない。
 
 ## 目的
 
-SpecDock provider のテストを、並列実行で待ち時間だけを隠す仕組みから、必要な契約を最小の実行量で証明する仕組みへ置き換える。開発者が通常使う回帰確認は、shard や `pytest-xdist` を使わない単一の `pytest` process で10分以内に完了し、同じ candidate・OS で同じ契約を重複実行しない状態を成果とする。
+データ領域には触れず、固定されたツールディレクトリを削除し、配布パッケージのディレクトリをそのままコピーする。個別ファイルの保持・差分マージ・所有権台帳を廃止する。実装、旧テスト、CIをこの小さい契約へ切り替える。
 
-テストだけを削るのではなく、テスト件数を生んでいる install / update / uninstall / spec-history purge の product contract も見直す。安全上必要な不変条件は残し、利用者価値を持たない自動復旧、歴史的互換性、状態の組合せは product contract から縮小してからテストを廃止する。
+## 範囲と動作
 
-## 背景
+- R1: 管理対象は `spec-dock/{docs,templates,system,scripts}` と `.agents/skills/{spec-dock,spec-dock-grill-with-docs}` の6ディレクトリ。内部のローカル変更・未知ファイルも交換時に削除する。
+- R2: 上記以外の利用者データ・仕様・成果物・設定・無関係なスキルには書き込まない。ディレクトリ内部で「このファイルだけ残す」という判断を持たない。
+- R3: 初回initは未導入の `spec-dock/` に初期スキャフォールド全体をコピーする。既存領域へinitする場合は明示した `--force` が必要で、その場合はupdateと同じ6ディレクトリ交換になる。
+- R4: updateは6ディレクトリを順番に削除・コピーする。旧バージョン記録やmarkerの検査による移行ゲートは設けない。欠損した管理対象も同じ処理で再配置できる。
+- R5: バージョン表示用の `spec-dock/spec-dock.version` は単純な版文字列と改行にする。全配置成功後にだけ書く。runtime起動を認証する状態機械に使わない。
+- R6: uninstallは既定dry-run、`--apply` で6ディレクトリとバージョン記録だけを削除する。データの削除機能は持たない。`--remove-specs` は引き続き拒否する。
+- R7: 配布元の必要ディレクトリ不足、配置先の危険なsymlink/非ディレクトリ、I/O失敗は非ゼロ終了で通知する。固定対象とその親を事前確認し、データへの誤書込みを防ぐ。敵対的な同一ユーザーの競合、対象内部の個別inode追跡は保証しない。
+- R8: 更新中は関連コマンドを停止して利用する。複数ディレクトリの原子的交換、クラッシュ後の自動再開、ロールバック、並行更新は保証しない。update失敗時は外部installerで同じ更新を最初からやり直す。この再配置保証は6管理ディレクトリに限り、初回initでコピーする設定は補修しない。初回init自体が失敗した場合は、利用者が不完全な `spec-dock/` を別の場所へ移して保全し、空いた配置先へinitを再実行する。ツールが利用者データを自動削除する復旧は行わない。途中失敗を成功と報告しない。
+- R9: 通常のruntime起動は配置されたPythonプログラムを起動するだけとし、provider digest/slot marker/共有leaseの確認を廃止する。データ操作自身の既存ロック・整合性検査は別責務として保持する。
+- R10: GitHub workflowの自動配置・個別ファイルseed管理を廃止する。既存の利用者workflowは変更しない。初回の `.gitignore` はスキャフォールド全体のコピーに含め、updateでは触らない。
 
-Issue #372 は distribution hard cutover と parity を対象とし、Full Regression を4 shardで実行する仕組みを導入している。この仕組みは証拠を分割して壁時計を短縮するが、テスト実行量そのものは減らさない。最新 branch の実測では、2,708 tests の GitHub Full Regression が約99分の壁時計と約5.51 shard-process-hoursを使った。別のローカル実測でも約27分の壁時計に対して約87.65 shard-process-minutesを使っている。利用者からは、別時点の逐次実行が約4時間、並列実行中は約10分にわたりCPUがほぼ100%になるとの観測がある。
+## 撤去する保証・機構
 
-通常の PR gate も `1567 passed, 1141 skipped in 650.55s` であり、すでに目標の10分を超える。Full Regression はこの1,567 fast testsを再度実行する。distribution parity は Ubuntu 上で通常 gate と同じ575件の `test_managed_distribution.py` を再実行し、さらに Linux / macOS で cutover と package parity を繰り返す。
+永続lifecycle state、cleanup token、completion receipt、candidate digest、exact-legacy fixture、native rename exchange、provider専用descriptor/lease/checkout認証、およびそれらだけを検証するテストを撤去する。CPU比率、実効quota認証、first-five/latest-twenty、専用campaign/history/fault catalogue/evidence schema、保持期間H、same-SHA再実行禁止を撤去する。
 
-テスト量は production design と分離できない。`src/spec_dock/managed_distribution.py` は22,332行、41 classes、454 functions / methodsを持ち、provider Python sourceのおよそ44%を占める。対応する4つの主要 test filesだけで約35,000行ある。単純なローカルツールという product goal に対し、per-path identity、journal、retry marker、crash checkpoint、historical compatibility、deprovision、spec-history purge の組合せが永続的な契約になっていることが、テスト肥大化の主因候補である。
+旧台帳・timing weights・sharder・既定policy skipを廃止する。新しい所有権pluginや独自評価CLIで置換しない。通常のpytest、lint、パッケージの基本動作で検証する。
 
-本 Epic は親 Initiative の architecture hardening 方針を維持しつつ、「安全であること」と「すべての歴史的・異常状態を自動回復すること」を分離する。Issue #372 の candidate を直接変更せず、独立した product / test architecture outcome として扱う。
+## 受入条件
 
-## 観測可能な要件
+1. init/update後の6ディレクトリが配布元と一致し、削除された配布ファイルや導入先だけのファイルが残らない。
+2. 更新・削除前後で非対象データの内容が変わらない。
+3. 不完全な配布元と危険な配置先は変更前に拒否する。updateの途中コピー失敗は非ゼロになり、同じupdateの再実行で6管理ディレクトリの正常配置へ戻る。初回initの失敗は非ゼロで報告し、R8の別途保全・fresh init手順でやり直す。
+4. 外部installerと導入されたruntimeが動作し、wheel/sdistに必要なファイルが含まれる。
+5. 旧専用機構とそのconsumerが現行コード/CIに残らず、残す一般機能のテストとlintが通る。
+6. Linux/macOSの基本ファイル操作を検証する。性能専用の合格条件は設けない。
+7. 指定の独立コードレビューと最終品質確認を通したPRを提出する。マージは人間が行う。
 
-### R1. 一つの実行時間予算
+## 履歴と非ゴール
 
-- 開発者向け canonical regression command は、単一の `pytest` processで全ての merge-required contractを実行する。
-- 同一条件で連続5回計測した各回が、dependency installとlintを除く test bodyで600秒以内となる。
-- CIのreference measurementはdependency install完了後、fresh workspace、network accessなし、Linux 2 vCPU hard quota、8 GiB memoryを基本とする。GitHub-hosted runnerがhard quotaを保証できない場合は2 vCPU containerまたはdedicated runnerでreferenceを取得する。
-- canonical commandは内部でshard、`pytest-xdist`、並列test workerを起動しない。テストが起動するCLI subprocessも、1 test内で明示的に必要なものを除き直列とする。
-- 計測はwall secondsだけでなく、user + system CPU seconds、subprocess数、temp workspace作成数、同一nodeの重複実行数を残す。
-- child processを含む `user + system CPU seconds / wall seconds` を平均論理core使用数として扱い、canonical local regressionの5回すべてで1.1以下とする。これにより、短い起動overlapを許しつつ、複数coreを長時間使い切る設計を禁止する。
-
-### R2. 重複実行ゼロ
-
-- 同じcandidate・OS・契約について、merge判定までに同じtest nodeを複数laneで実行しない。
-- platform固有の差分を確認するtestだけを各OSで実行し、OS非依存のdomain / service contractをLinuxとmacOSの双方で繰り返さない。
-- wheelとsdistはcandidateごとに一度だけbuild・hash固定し、その同じartifactを必要なsmokeで再利用する。
-
-### R3. 契約追跡可能性
-
-- 残すすべてのtest familyは、現在のpublic behaviorまたはsecurity invariant、責務を持つlayer、実行lane、代表する失敗を一つ以上持つ。
-- historical Issue / Step 名だけを根拠とするtestは、durable invariantへ改名・統合するか、対応契約とともに削除する。
-- test削除は、同じ invariant をより低い層で証明するtest、または product contract の廃止記録に結び付ける。
-
-### R4. layerごとの証明責務
-
-- domain testは純粋な状態遷移・validation・propertyを網羅し、filesystem、Git、package build、CLI processを起動しない。
-- filesystem / application contract testは、最小synthetic workspaceと注入可能なfaultを使い、OS境界の代表ケースだけを扱う。
-- CLI testはargument / exit code / JSON・text mappingと、代表的なhappy path・fail-closed pathに限定する。
-- package / platform testはbuilt artifactのprovenanceと、init・update・uninstallの最小end-to-end smokeだけを扱う。
-
-### R5. distribution product contractの簡素化
-
-- `spec-dock/initiatives/**` とnested Artifactsをdurable user dataとし、init / update / tooling uninstall / retry / cleanupの変更対象にしない。
-- `spec-dock/active/**`、`spec-dock/.agent/**`、dashboard、tree / deps図、ADR mirrorなどの再生成可能なprojectionをprovider file inventoryやhistorical identityの管理対象にしない。
-- provider-owned repo-local contentは `spec-dock/{docs,templates,system,scripts}` の4 fixed rootsとし、updateではcandidateを全てstage・validateした後、root内部を保存せずroot単位で全量置換する。`scripts` は最後に置換する。
-- disposable root内部のuser editは保存しないことをpublic contractにする。inner fileごとのmodified / unknown / historical identityを判定しない。
-- root allowlistはcodeに固定し、root / parent binding、symlink、unexpected typeをdestructive step直前に検証する。shared parentやallowlist外pathへ削除authorityを広げない。
-- 4 root全体のatomic transaction、自動rollback、per-file checkpoint resume、cross-intent recoveryをpublic contractにしない。partial failure後は外部installerから同じdesired versionを再実行して収束させる。
-- small installation record / ready markerは1つだけとし、schema、version、candidate digest、fixed skill slot versionを持つ。per-file stateや任意pathを持たない。
-- 通常uninstallはprovider toolingだけを削除し、user-owned spec historyを常に保持する。spec history purgeは通常uninstallから分離する。
-
-### R5A. managed skill contract
-
-- `.agents/skills` 親全体を置換・探索・削除しない。
-- managed skillを `.agents/skills/spec-dock` と `.agents/skills/spec-dock-grill-with-docs` の2 fixed slotsに限定する。
-- 各slot rootへowner / slot / schema versionの小さなmarkerを置き、valid markerがあるexact slotだけをroot単位でupdate / uninstallする。
-- marker欠落・不正・別ownerのslotは上書きも削除もせず、書込み前にblockする。unrelated skillsは常に保持する。
-- retired skillはcodeに固定された有限のexact-slot allowlistとvalid old markerでだけ削除し、prefix match、arbitrary manifest path、per-file historical digestを削除authorityに使わない。
-- marker導入前のcurrent 2 skill rootsは期限付きone-shot migrationでのみ認識し、移行終了後は旧identityとtestsを削除する。
-
-### R5B. Product decision status
-
-accepted ADR `20260831t005139z-adr` により、次を確定した。
-
-1. user historyは常にuser-ownedであり、tooling lifecycleからpurge authorityを除外する。
-2. repo-local runtime layoutは4 disposable rootsを維持し、immutable version payload / activation pointerではなくroot replacementを使う。
-3. automatic rollback / arbitrary checkpoint resumeを廃止し、external rerun convergenceをfailure contractにする。
-4. `.agents/skills` はfixed slot marker方式で管理する。
-
-次は影響する実装Issueを作成・開始する前に個別確定する。未回答を実装者が推測しない。
-
-1. `.github/workflows/ci.yml` のownershipと更新方法。
-2. legacy direct updateのversion / date window。
-3. `--remove-specs` の完全廃止または独立purge commandへの移行方法。
-4. `.gitignore` init seedのcollision / customization policy。
-5. wheel / sdist / macOS smokeのtriggerとpublic deprecation window。
-
-### R6. failureを成功扱いしない
-
-- canonical required testはzero unexpected failuresかつzero approved active failuresでGREENになる。
-- 26件のactive failure signatureを成功として受理するledgerは、各nodeを「修正」「現行契約外として削除」「有効なsuccessorへ置換」のいずれかで処理した後に撤去する。
-- quarantineが一時的に必要な場合はowner、reason、expiry、successorを必須とし、merge-required GREENの定義には含めない。
-- cutover後のrolling 20 canonical runsでflake retryなし・unexpected failureなしを確認する。
-
-### R7. 実行量の可視化
-
-- CI summaryはlaneごとのwall time、CPU time、node count、artifact build count、workspace copy bytes、duplicate node countをcandidate SHAに束縛して表示する。
-- budget超過はtest failureとして扱い、timing weight更新やworker追加だけで回避できない。
-
-## スコープ
-
-対象:
-
-- provider test portfolio全体のinventory、重複・cost・contract ownershipの確定
-- `managed_distribution.py` が公開しているper-file reconciliation / journal / recovery契約を4 root replacementへ縮小
-- fixed skill slot marker、tooling-only uninstall、有限one-shot migration
-- unit、service contract、CLI smoke、package / platform smokeへの再配置
-- Full Regression ledger、timing weights、4-shard runnerの段階的撤去
-- Provider CI / Provider Full Regressionの実行graph、artifact reuse、budget gate
-- obsolete test、duplicate test、historical-step testの安全な削除
-
-対象外:
-
-- Issue #372 candidateへの横入り修正
-- test時間短縮だけを目的としたworker数の増加、CI machineの大型化、恒久的なtiming-weight tuning
-- Product判断なしでfail-closed path protectionを弱めること
-- user-owned spec historyの自動削除範囲を黙って拡大すること
-- このEpicの調査段階で全実装Issueを開始すること
-
-## 失敗・境界条件
-
-- production contractを残したままtestだけを削ると、path substitution、partial update、drift、destructive deleteの退行を見逃す。契約縮小とtest削除は同じIssueまたは明示的な依存で結ぶ。
-- 逆に、すべてのcurrent testを安全要件とみなすと、歴史的実装詳細が永久にproduct contractとなる。public behavior / invariantへ追跡できないtestは保持理由を満たさない。
-- filesystem挙動にはLinux / macOS差がある。pure/domainを両OSで繰り返すのではなく、差が生じるsyscall境界を選んでplatform smokeを残す。
-- cold dependency install、GitHub runnerのnoisy-neighbor、network downloadをtest bodyと混同しない。artifact buildとtest実行を別計測する。
-- wall timeだけを満たしてprocess-hoursが増える変更は失敗とする。
-- R5Bの未決事項はProduct判断であり、影響する下位Issueが推測で決めない。
-
-## 受け入れ条件
-
-- [x] 4 disposable roots、fixed skill slots、user history保護、external rerun convergenceをaccepted ADR `20260831t005139z-adr` に記録している。
-- [ ] R5Bの残るProduct判断を、影響する実装Issueの開始前にaccepted decisionとして記録している。
-- [ ] 全test familyのcontract / layer / lane / cost / keep-move-consolidate-delete判定が追跡できる。
-- [ ] canonical local regressionを単一pytest processで連続5回実行し、各回600秒以内、zero failures、zero policy skipsである。
-- [ ] 上記5回のchild-inclusive平均論理core使用数が各1.1以下であり、同時pytest worker数が1である。
-- [ ] canonical PR test bodyのcritical pathが同一runner classの連続5 successful runsで各600秒以内である。
-- [ ] 同一candidate・OSにおけるduplicate test node数が0で、wheel / sdistの各artifact build回数が1である。
-- [ ] default pathでshard runnerを使用せず、test worker concurrencyが1である。
-- [ ] fixed 2-vCPU Linux referenceで同じbudgetを満たし、seeded fault pack（user data誤書込み、allowlist外削除、symlink follow、root間failure、skill marker mismatch、artifact欠落）を100%検出する。
-- [ ] cutover後のrolling 20 canonical runsでflake 0、retry 0である。
-- [ ] platform固有smokeがLinuxとmacOSでGREENになり、各OSのtest bodyが600秒以内である。
-- [ ] active approved failureが0になり、`full-regression-ledger.json`、timing weights、baseline evaluator、4-shard verifierを削除またはmerge判定外の一時migration toolingへ退役させている。
-- [ ] obsolete / duplicate testsの削除前後で、残すdurable invariantsのtraceabilityとnegative-path proofが維持されている。
-- [ ] budget summaryがcandidate SHA、wall / CPU time、node / subprocess / workspace / duplicate countsを報告する。
-
-## 制約・前提
-
-- 現時点の計測はlatest concurrent branch `iss-00372-distribution-hard-cutover-and-parity` の `7af12c54...`、実装candidate `bc156009...`、GitHub candidate `53f309a4...` を区別して記録する。
-- user-reported「約4時間」「CPUほぼ100%」は重要な問題入力だが、同一SHA・同一machineで今回再測定した数値ではない。
-- 10分budgetはtest bodyの目標であり、初回dependency downloadなど外部network時間は別表示する。ただしartifactをlaneごとに再buildする時間は重複costとして対象に含める。
-- destructive operationは既定でfail closedとし、path ownershipを証明できない対象を削除しない。
-- 既存のhuman PR merge gateを維持する。
-- accepted ADR `20260831t005139z-adr` の範囲は確定済みとし、R5Bの未決事項だけを実装上の既成事実にしない。
+#392/#395とPR #403の修正は既存履歴。#395のURL認証情報をエラーへ漏らさない性質など、残る機能の回帰は守る。Issue状態を勝手に変更しない。実装は既存#396で完結させる。通常の仕様管理・GitHub操作・worktree機能の廃止や、利用者データの移行・削除は今回の目的に含めない。

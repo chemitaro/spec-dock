@@ -20,7 +20,7 @@ from spec_dock_runtime.application.contracts import (
     CreatePlan,
 )
 from spec_dock_runtime.application.repo_context import (
-    require_current_repo_slug,
+    require_publication_repo_slug,
     resolve_current_repo_slug,
     split_repo_slug,
 )
@@ -1432,7 +1432,7 @@ def create_node_core(
         _validate_pre_github_create_inputs(req, kind=kind, mode=mode)
         specdock_dir = _resolve_specdock_dir(ports)
         if mode in ("create", "link_existing"):
-            current_repo_slug = require_current_repo_slug(ports)
+            current_repo_slug = require_publication_repo_slug(ports)
             _resolve_requested_repo_slug(req, current_repo_slug=current_repo_slug)
 
         if mode == "link_existing" and github_issue_number is None:
@@ -1445,10 +1445,12 @@ def create_node_core(
             _precheck_pre_github_create_rules_sources(kind=kind, specdock_dir=specdock_dir)
             _precheck_pre_github_create_symlink_capability(kind=kind, specdock_dir=specdock_dir, parent=parent)
             repo_root = _resolve_repo_root(ports)
+            assert current_repo_slug is not None
             github_issue_number = ports.issue_gateway.issue_create(
                 repo_root,
                 title=title,
                 body=_github_issue_body(kind=kind),
+                repo_slug=current_repo_slug,
             )
             created_github_issue_number = int(github_issue_number)
     except Exception as exc:

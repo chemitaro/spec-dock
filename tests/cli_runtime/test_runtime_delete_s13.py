@@ -1,5 +1,3 @@
-import contextlib
-import io
 import json
 from pathlib import Path
 import shutil
@@ -3359,13 +3357,10 @@ class TestRuntimeDeleteS13:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes", "--json"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 1
-        payload = json.loads(stdout.getvalue())
+        assert outcome.exit_code == 1
+        payload = json.loads("\n".join(outcome.text.stdout_lines))
         assert payload["status"] == "local_delete_partial_failure"
         assert payload["target_id"] == "iss-local-00056"
         assert payload["deleted_node_ids"] == []
@@ -3374,7 +3369,7 @@ class TestRuntimeDeleteS13:
         assert payload["active_restore_result"] == "not_needed"
         assert payload["dependency_scrub_failures"] == []
         assert "recovery_guidance" in payload
-        assert stderr.getvalue() == ""
+        assert outcome.text.stderr_lines == []
 
     def test_forced_issue_delete_clears_active_when_target_is_active(self) -> None:
         (
@@ -3614,19 +3609,16 @@ class TestRuntimeDeleteS13:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["delete", "iss-local-00056", "--yes", "--json"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 1
+        assert outcome.exit_code == 1
         request = captured["request"]
         assert request.positional_target == "iss-local-00056"
         assert request.confirmed
-        payload = json.loads(stdout.getvalue())
+        payload = json.loads("\n".join(outcome.text.stdout_lines))
         assert payload["status"] == "dependency_conflict"
         assert set(payload.keys()) == {"status", "target_id", "offending_node_ids", "validation_reasons"}
-        assert stderr.getvalue() == ""
+        assert outcome.text.stderr_lines == []
 
     def test_delete_json_field_matrix_for_blocker_statuses(self) -> None:
         (
@@ -3703,16 +3695,13 @@ class TestRuntimeDeleteS13:
             )
 
             ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes", "--json"])
-            stdout = io.StringIO()
-            stderr = io.StringIO()
-            with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-                exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+            outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-            assert exit_code == 1, status
-            payload = json.loads(stdout.getvalue())
+            assert outcome.exit_code == 1, status
+            payload = json.loads("\n".join(outcome.text.stdout_lines))
             assert payload["status"] == status
             assert set(payload.keys()) == {"status", "target_id", "offending_node_ids", "validation_reasons"}
-            assert stderr.getvalue() == ""
+            assert outcome.text.stderr_lines == []
 
     def test_delete_json_field_matrix_for_ok_status_with_ordering(self) -> None:
         (
@@ -3765,13 +3754,10 @@ class TestRuntimeDeleteS13:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes", "--json"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 0
-        payload = json.loads(stdout.getvalue())
+        assert outcome.exit_code == 0
+        payload = json.loads("\n".join(outcome.text.stdout_lines))
         assert list(payload.keys()) == [
             "status",
             "target_id",
@@ -3785,7 +3771,7 @@ class TestRuntimeDeleteS13:
         assert payload["remaining_node_ids"] == []
         assert payload["remote_close"]["closed"] == ["example/repo#56"]
         assert payload["active_restore_result"] == "not_needed"
-        assert stderr.getvalue() == ""
+        assert outcome.text.stderr_lines == []
 
     def test_delete_json_field_matrix_for_metadata_validation_failed_and_remote_close_failed(self) -> None:
         (
@@ -3845,13 +3831,10 @@ class TestRuntimeDeleteS13:
         )
 
         ns_metadata = parser.parse_args(["delete", "--id", "epic-local-00001", "--yes", "--json"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns_metadata, registry, use_cases_metadata_failed)
+        outcome_metadata = cli_dispatch.dispatch(ns_metadata, registry, use_cases_metadata_failed)
 
-        assert exit_code == 1
-        payload = json.loads(stdout.getvalue())
+        assert outcome_metadata.exit_code == 1
+        payload = json.loads("\n".join(outcome_metadata.text.stdout_lines))
         assert set(payload.keys()) == {
             "status",
             "target_id",
@@ -3860,7 +3843,7 @@ class TestRuntimeDeleteS13:
             "remote_close",
         }
         assert payload["status"] == "metadata_validation_failed"
-        assert stderr.getvalue() == ""
+        assert outcome_metadata.text.stderr_lines == []
 
         def _remote_close_failed(_req):
             return app_contracts.DeleteNodeResult(
@@ -3900,16 +3883,13 @@ class TestRuntimeDeleteS13:
         )
 
         ns_remote = parser.parse_args(["delete", "--id", "epic-local-00001", "--yes", "--json"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns_remote, registry, use_cases_remote_failed)
+        outcome_remote = cli_dispatch.dispatch(ns_remote, registry, use_cases_remote_failed)
 
-        assert exit_code == 1
-        payload = json.loads(stdout.getvalue())
+        assert outcome_remote.exit_code == 1
+        payload = json.loads("\n".join(outcome_remote.text.stdout_lines))
         assert set(payload.keys()) == {"status", "target_id", "remote_close", "deleted_node_ids"}
         assert payload["status"] == "remote_close_failed"
-        assert stderr.getvalue() == ""
+        assert outcome_remote.text.stderr_lines == []
 
     def test_delete_json_field_matrix_for_local_delete_partial_failure(self) -> None:
         (
@@ -3963,13 +3943,10 @@ class TestRuntimeDeleteS13:
         )
 
         ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes", "--json"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
 
-        assert exit_code == 1
-        payload = json.loads(stdout.getvalue())
+        assert outcome.exit_code == 1
+        payload = json.loads("\n".join(outcome.text.stdout_lines))
         assert set(payload.keys()) == {
             "status",
             "target_id",
@@ -3983,7 +3960,7 @@ class TestRuntimeDeleteS13:
         assert payload["status"] == "local_delete_partial_failure"
         assert payload["deleted_node_ids"] == ["iss-local-00056"]
         assert payload["active_restore_result"] == "restored"
-        assert stderr.getvalue() == ""
+        assert outcome.text.stderr_lines == []
 
     def test_issue_delete_success_path_returns_ok_and_cli_success_text(self) -> None:
         (
@@ -4025,10 +4002,7 @@ class TestRuntimeDeleteS13:
         registry = cli_registry.build_registry()
         parser = cli_parser.build_parser(registry)
         ns = parser.parse_args(["delete", "--id", "iss-local-00056", "--yes"])
-        stdout = io.StringIO()
-        stderr = io.StringIO()
-        with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(stderr):
-            exit_code = cli_dispatch.dispatch(ns, registry, use_cases)
-        assert exit_code == 0
-        assert "ok (delete) target=iss-local-00056" in stdout.getvalue()
-        assert stderr.getvalue() == ""
+        outcome = cli_dispatch.dispatch(ns, registry, use_cases)
+        assert outcome.exit_code == 0
+        assert "ok (delete) target=iss-local-00056" in "\n".join(outcome.text.stdout_lines)
+        assert outcome.text.stderr_lines == []
