@@ -148,3 +148,28 @@ def test_version_hard_link_does_not_modify_external_data(tmp_path: Path) -> None
     assert main(["update", str(tmp_path)]) == 0
     assert external.read_text() == "user data"
     assert version.read_text() == "0.2.4\n"
+
+
+def test_fresh_install_rejects_copy_into_its_scaffold_source(tmp_path: Path, monkeypatch) -> None:
+    import pytest
+
+    from spec_dock import installer
+
+    assets = tmp_path / "assets"
+    for name in installer.ROOTS:
+        (assets / "spec_dock" / name).mkdir(parents=True)
+    for name in installer.SKILLS:
+        (assets / "install_root/.agents/skills" / name).mkdir(parents=True)
+    target = assets / "spec_dock"
+    sentinel = target / "source.txt"
+    sentinel.write_bytes(b"original distribution")
+
+    def unexpected_copy(*args, **kwargs):
+        pytest.fail("overlapping source reached copy")
+
+    monkeypatch.setattr(installer, "_copy", unexpected_copy)
+    with pytest.raises(ValueError, match="overlaps the distribution source"):
+        installer.install(target, version="new", fresh=True, assets=assets)
+    assert sentinel.read_bytes() == b"original distribution"
+    assert not (target / "spec-dock").exists()
+    assert not (target / ".agents").exists()

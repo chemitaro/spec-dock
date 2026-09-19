@@ -51,6 +51,11 @@ def install(target: Path, *, version: str, fresh: bool, assets: Path = ASSETS) -
             destination = (target / relative).resolve()
             if source.resolve().is_relative_to(destination) or destination.is_relative_to(source.resolve()):
                 raise ValueError("Installation target overlaps the distribution source")
+    if fresh:
+        source = (assets / "spec_dock").resolve()
+        destination = (target / "spec-dock").resolve()
+        if source.is_relative_to(destination) or destination.is_relative_to(source):
+            raise ValueError("Installation target overlaps the distribution source")
     target.mkdir(parents=True, exist_ok=True)
     if fresh:
         _copy(assets / "spec_dock", target / "spec-dock")
