@@ -178,16 +178,6 @@ def test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only() -> N
     assert "## Agent-first operations" in provider_docs
 
 
-_ISS_00031_STALE_WHEEL_PATHS = (
-    "spec_dock/assets/spec_dock/templates/adr.md",
-    "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
-    "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
-    "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
-    "spec_dock/assets/spec_dock/templates/initiative/discussions/rules.md",
-    "spec_dock/assets/spec_dock/templates/epic/discussions/rules.md",
-    "spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
-)
-
 _ISS_00031_EXCLUDE_PATTERNS = (
     "assets/spec_dock/templates/adr.md",
     "assets/spec_dock/templates/**/discussions/rules.md",
@@ -461,7 +451,6 @@ class TestInitUpdate(CliRuntimeHarness):
         ".agents/skills/spec-dock-grill-with-docs/SKILL.md": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
         ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
         ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-        ".github/workflows/ci.yml": "src/spec_dock/assets/install_root/.github/workflows/ci.yml",
     }
     _DOGFOODING_ACTIVE_NONE_REPORT_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/system/active-none/initiative/report.md": (
@@ -506,27 +495,6 @@ class TestInitUpdate(CliRuntimeHarness):
         "epic/.workbench/README.md",
         "issue/.workbench/README.md",
     )
-    _ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS = (
-        "spec_dock/assets/install_root/.agents/skills/spec-dock-hub/SKILL.md",
-        "spec_dock/assets/spec_dock/docs/authoring/chatgpt-pack.md",
-        "spec_dock/assets/spec_dock/scripts/authoring-pack/README.md",
-        "spec_dock/assets/spec_dock/scripts/spec-dock-close-smoke.sh",
-        "spec_dock/assets/github/workflows/spec-dock-close.yml",
-        "spec_dock/assets/spec_dock/templates/initiative/current/stale.md",
-        "spec_dock/assets/spec_dock/templates/initiative/completed/stale.md",
-        "spec_dock/assets/spec_dock/templates/adr.md",
-        "spec_dock/assets/spec_dock/templates/issue/discussions/rules.md",
-        "spec_dock/assets/spec_dock/templates/issue/discussions/_template.md",
-        "spec_dock/assets/spec_dock/templates/initiative/epics/new-epic",
-        "spec_dock/assets/spec_dock/templates/epic/issues/new-issue",
-        "spec_dock/assets/spec_dock/templates/issue/legacy/README.md",
-        "spec_dock/assets/spec_dock/templates/design.md",
-        "spec_dock/assets/spec_dock/templates/plan.md",
-        "spec_dock/assets/spec_dock/templates/report.md",
-        "spec_dock/assets/spec_dock/templates/requirement.md",
-    )
-    _ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV = "SPEC_DOCK_BUILD_PY_SEED_STALE_FIXTURES"
-    _ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV = "SPEC_DOCK_BUILD_PY_PRE_PRUNE_SNAPSHOT"
 
     def _assert_canonical_rules_files_match_provider_assets(
         self,
@@ -1372,15 +1340,6 @@ class TestInitUpdate(CliRuntimeHarness):
             assert rules_link.resolve() == installed_rules.resolve()
             assert rules_link.read_bytes() == provider_rules.read_bytes()
 
-    def test_pyproject_excludes_deleted_wrapper_era_assets_from_package_data(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-        pyproject_text = (repo_root / "pyproject.toml").read_text(encoding="utf-8")
-
-        for package_data_pattern in _ISS_00031_EXCLUDE_PATTERNS:
-            assert f'"{package_data_pattern}"' in pyproject_text, (
-                f"missing exclude-package-data guard for stale build artifact: {package_data_pattern}"
-            )
-
     def test_issue_69_native_build_venv_installs_backend_requirements_in_place(
         self, monkeypatch, tmp_path: Path
     ) -> None:
@@ -1487,7 +1446,7 @@ class TestInitUpdate(CliRuntimeHarness):
             ]
         ]
 
-    def test_built_wheel_excludes_deleted_wrapper_era_assets_from_stale_build_outputs(self) -> None:
+    def test_built_wheel_replaces_stale_python_and_asset_output(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1507,7 +1466,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
             wheel_dir.mkdir()
 
-            for stale_rel_path in _ISS_00031_STALE_WHEEL_PATHS:
+            for stale_rel_path in ("spec_dock/provider_lifecycle/retired.py", "spec_dock/assets/retired.txt"):
                 stale_path = build_context / "build" / "lib" / stale_rel_path
                 stale_path.parent.mkdir(parents=True, exist_ok=True)
                 stale_path.write_text("stale wrapper-era artifact\n", encoding="utf-8")
@@ -1525,7 +1484,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "spec_dock/assets/spec_dock/templates/README.md" in wheel_entries, (
                 "sanity check failed: built wheel did not include expected live template asset"
             )
-            for stale_rel_path in _ISS_00031_STALE_WHEEL_PATHS:
+            for stale_rel_path in ("spec_dock/provider_lifecycle/retired.py", "spec_dock/assets/retired.txt"):
                 assert stale_rel_path not in wheel_entries, (
                     f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}"
                 )
@@ -1543,82 +1502,6 @@ class TestInitUpdate(CliRuntimeHarness):
                 f"issue-69 full install_root inventory parity failed for {surface_name}; "
                 f"missing={missing[:10]} unexpected={unexpected[:10]}"
             )
-
-    def test_distribution_wheel_build_prunes_seeded_stale_wrapper_era_outputs(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-
-        with tempfile.TemporaryDirectory() as tmp:
-            temp_root = Path(tmp)
-            build_context = temp_root / "build-context"
-            wheel_dir = temp_root / "wheelhouse"
-            sdist_dir = temp_root / "sdist"
-            pre_prune_snapshot = temp_root / "wheel-pre-prune-snapshot.json"
-
-            self._issue_69_prepare_build_context(repo_root, build_context)
-            build_env = os.environ.copy()
-            build_env[self._ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV] = "1"
-            build_env[self._ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV] = str(pre_prune_snapshot)
-
-            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
-                repo_root=repo_root,
-                build_context=build_context,
-                wheel_dir=wheel_dir,
-                sdist_dir=sdist_dir,
-                build_env=build_env,
-            )
-
-            assert pre_prune_snapshot.is_file(), f"issue-69 expected pre-prune snapshot to exist: {pre_prune_snapshot}"
-            snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
-            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
-            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == expected_seeded_fixtures, (
-                "issue-69 setup.py snapshot did not report the approved seeded fixture set"
-            )
-            assert set(snapshot_payload.get("present_before_prune", [])) == expected_seeded_fixtures, (
-                "issue-69 seeded stale fixture set must exist in wheel build staging before prune"
-            )
-
-            wheel_inventory = self._issue_69_collect_wheel_file_inventory(wheel_path)
-            for stale_artifact_path in self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS:
-                assert stale_artifact_path not in wheel_inventory, (
-                    f"issue-69 wheel build unexpectedly shipped seeded stale wrapper-era output: {stale_artifact_path}"
-                )
-
-    def test_workbench_readme_build_prune_preserves_allowlist_and_removes_stale_nested_readme(self) -> None:
-        repo_root = Path(__file__).resolve().parents[3]
-
-        with tempfile.TemporaryDirectory() as tmp:
-            temp_root = Path(tmp)
-            build_context = temp_root / "build-context"
-            wheel_dir = temp_root / "wheelhouse"
-            sdist_dir = temp_root / "sdist"
-            pre_prune_snapshot = temp_root / "wheel-pre-prune-snapshot.json"
-
-            self._issue_69_prepare_build_context(repo_root, build_context)
-            build_env = os.environ.copy()
-            build_env[self._ISSUE_69_SETUP_SEED_STALE_FIXTURES_ENV] = "1"
-            build_env[self._ISSUE_69_SETUP_PRE_PRUNE_SNAPSHOT_ENV] = str(pre_prune_snapshot)
-
-            wheel_path, _, _ = self._issue_69_build_artifacts_with_local_wheelhouse(
-                repo_root=repo_root,
-                build_context=build_context,
-                wheel_dir=wheel_dir,
-                sdist_dir=sdist_dir,
-                build_env=build_env,
-            )
-
-            snapshot_payload = json.loads(pre_prune_snapshot.read_text(encoding="utf-8"))
-            expected_seeded_fixtures = set(self._ISSUE_69_SEEDED_STALE_FIXTURE_ARTIFACT_RELATIVE_PATHS)
-            expected_readmes_before_prune = {
-                *self._WORKBENCH_TEMPLATE_README_PATHS,
-                "issue/legacy/README.md",
-            }
-            assert set(snapshot_payload.get("expected_seeded_stale_fixture_paths", [])) == expected_seeded_fixtures
-            assert set(snapshot_payload.get("present_before_prune", [])) == expected_seeded_fixtures
-            assert set(snapshot_payload.get("template_readmes_before_prune", [])) == expected_readmes_before_prune
-
-            wheel_payloads = self._collect_wheel_template_readme_payloads(wheel_path)
-            assert set(wheel_payloads) == set(self._WORKBENCH_TEMPLATE_README_PATHS)
-            assert "issue/legacy/README.md" not in wheel_payloads
 
     def test_workbench_readme_distribution_inventory_and_bytes_match_all_surfaces(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
@@ -5386,189 +5269,16 @@ assert observed == {{"branch": "123-fix-login", "current_repo_slug": "current/re
                 cli.__file__ = old_file
 
     def test_no_skill_option_is_rejected(self, capsys: pytest.CaptureFixture[str]) -> None:
-        import spec_dock.cli as cli
+        assert main(["init", "--no-skill", ".", "--json"]) == 2
+        assert "unrecognized arguments" in capsys.readouterr().err
 
-        assert cli.main(["init", "--no-skill", ".", "--json"]) == 2
-        captured = capsys.readouterr()
-        assert captured.err == ""
-        payload = json.loads(captured.out)
-        assert payload["status"] == "error"
-        assert payload["code"] == "invalid-request"
-        assert payload["operation"] is None
-        assert payload["candidate_digest"] is None
-        assert payload["seed_policy"] is None
-        assert payload["mutation_started"] is False
-
-    def test_issue_68_workflow_seed_matches_repo_root_ci_workflow(self) -> None:
-        install_root_workflow = self._ISSUE_68_INSTALL_ROOT / ".github/workflows/ci.yml"
-        repo_root_workflow = Path(".github/workflows/ci.yml")
-
-        assert repo_root_workflow.is_file(), f"missing repo-root workflow seed source: {repo_root_workflow}"
-        assert install_root_workflow.is_file(), f"missing issue-68 install_root workflow seed: {install_root_workflow}"
-        assert install_root_workflow.read_bytes() == repo_root_workflow.read_bytes(), (
-            "install_root workflow seed must be byte-equivalent to repo-root .github/workflows/ci.yml"
-        )
-        workflow_text = install_root_workflow.read_text(encoding="utf-8")
-        assert "test -f ./spec-dock/scripts/spec-dock" in workflow_text
-        assert "test -x ./spec-dock/scripts/spec-dock" not in workflow_text
-        assert "python3 ./spec-dock/scripts/spec-dock sync" in workflow_text
-        assert "python3 ./spec-dock/scripts/spec-dock validate" in workflow_text
-
-    def test_issue_68_provider_only_workflow_is_not_shipped_via_install_root(self) -> None:
+    def test_provider_ci_runs_normal_suite_without_a_policy_evaluator(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
-        provider_workflow_paths = {
-            "fast": repo_root / ".github/workflows/provider-ci.yml",
-            "full": repo_root / ".github/workflows/provider-full-regression.yml",
-        }
-        install_root_workflow_paths = {
-            name: repo_root / "src/spec_dock/assets/install_root" / path.relative_to(repo_root)
-            for name, path in provider_workflow_paths.items()
-        }
-
-        for name, workflow_path in provider_workflow_paths.items():
-            assert workflow_path.is_file(), (
-                f"missing repo-root provider-only workflow: name={name}, path={workflow_path}"
-            )
-            assert not install_root_workflow_paths[name].exists(), (
-                "provider-only workflow must not be shipped in install_root managed assets: "
-                f"{install_root_workflow_paths[name]}"
-            )
-
-        workflow_texts = {name: path.read_text(encoding="utf-8") for name, path in provider_workflow_paths.items()}
-        workflow_lines = {name: text.splitlines() for name, text in workflow_texts.items()}
-
-        def section_keys(lines: list[str], header: str) -> set[str]:
-            section_index = lines.index(header)
-            keys: set[str] = set()
-            for line in lines[section_index + 1 :]:
-                if line and not line.startswith(" "):
-                    break
-                match = re.fullmatch(r"  ([A-Za-z0-9_-]+):.*", line)
-                if match is not None:
-                    keys.add(match.group(1))
-            return keys
-
-        fast_triggers = section_keys(workflow_lines["fast"], "on:")
-        full_triggers = section_keys(workflow_lines["full"], "on:")
-        assert fast_triggers == {"pull_request"}
-        assert full_triggers == {"push", "workflow_dispatch"}
-
-        full_push_index = workflow_lines["full"].index("  push:")
-        full_push_block: list[str] = []
-        for line in workflow_lines["full"][full_push_index + 1 :]:
-            if re.fullmatch(r"  [A-Za-z0-9_-]+:.*", line):
-                break
-            full_push_block.append(line)
-        full_push_is_main_only = "    branches: [main]" in full_push_block
-        assert full_push_is_main_only
-
-        observed_event_matrix = {
-            "pull_request": (
-                "pull_request" in fast_triggers,
-                "pull_request" in full_triggers,
-            ),
-            "non-main push": (
-                "push" in fast_triggers,
-                "push" in full_triggers and not full_push_is_main_only,
-            ),
-            "main push": (
-                "push" in fast_triggers,
-                "push" in full_triggers and full_push_is_main_only,
-            ),
-            "workflow_dispatch": (
-                "workflow_dispatch" in fast_triggers,
-                "workflow_dispatch" in full_triggers,
-            ),
-            "schedule": (
-                "schedule" in fast_triggers,
-                "schedule" in full_triggers,
-            ),
-        }
-        assert observed_event_matrix == {
-            "pull_request": (True, False),
-            "non-main push": (False, False),
-            "main push": (False, True),
-            "workflow_dispatch": (False, True),
-            "schedule": (False, False),
-        }
-
-        assert "name: Provider CI" in workflow_lines["fast"]
-        assert section_keys(workflow_lines["fast"], "jobs:") == {
-            "provider-tests",
-            "provider-distribution-parity",
-        }
-        assert section_keys(workflow_lines["full"], "jobs:") == {"provider-full-regression"}
-        assert "python -m pip install uv" in workflow_texts["fast"]
-        provider_test_lines = _workflow_job_lines(workflow_texts["fast"], "provider-tests")
-        assert "        run: make lint" in provider_test_lines
-        assert provider_test_lines.count("        run: uv run pytest") == 1
-        assert "--run-full-regression" not in "\n".join(provider_test_lines)
-        provider_parity_lines = _workflow_job_lines(workflow_texts["fast"], "provider-distribution-parity")
-        provider_parity_text = "\n".join(provider_parity_lines)
-        assert "    runs-on: ${{ matrix.os }}" in provider_parity_lines
-        assert "        os: [ubuntu-latest, macos-latest]" in provider_parity_lines
-        assert "          ref: ${{ github.event.pull_request.head.sha }}" in provider_parity_lines
-        assert "          CANDIDATE_SHA: ${{ github.event.pull_request.head.sha }}" in provider_parity_lines
-        assert provider_parity_text.count("${{ github.event.pull_request.head.sha }}") == 2
-        assert '        run: test "$(git rev-parse HEAD)" = "$CANDIDATE_SHA"' in provider_parity_lines
-        assert "continue-on-error:" not in provider_parity_text
-        expected_provider_parity_commands = (
-            "        run: uv run pytest tests/unit/provider_lifecycle",
-            (
-                "        run: uv run pytest --run-full-regression --full-regression-shard "
-                "tests/cli_runtime/test_distribution_cutover.py"
-            ),
-            (
-                "        run: uv run pytest --run-full-regression --full-regression-shard "
-                "tests/integration/test_epic_00343_distribution.py"
-            ),
-        )
-        for command in expected_provider_parity_commands:
-            assert command in provider_parity_lines
-        full_workflow_flattened = " ".join(workflow_texts["full"].split())
-        assert "uv run python -m scripts.quality.verify_full_regression --shards 4" in full_workflow_flattened
-        assert "verify-full-regression.py" not in workflow_texts["full"]
-        assert "timeout-minutes" not in workflow_texts["full"]
-        assert "--timeout-seconds" not in workflow_texts["full"]
-        assert "--max-total-seconds" not in workflow_texts["full"]
-        assert "--shards 4" in workflow_texts["full"]
-        assert "run: uv run pytest --run-full-regression" not in workflow_texts["full"]
-        assert "continue-on-error:" not in workflow_texts["full"]
-
-        for name, workflow_text in workflow_texts.items():
-            assert re.search(r"(?m)^\s*permissions:", workflow_text) is None, name
-            assert re.search(r"(?m)^\s*secrets:", workflow_text) is None, name
-            assert "secrets." not in workflow_text, name
-
-        concurrency_index = workflow_lines["full"].index("concurrency:")
-        concurrency_lines: list[str] = []
-        for line in workflow_lines["full"][concurrency_index + 1 :]:
-            if line and not line.startswith(" "):
-                break
-            concurrency_lines.append(line)
-        group_line = next(line for line in concurrency_lines if line.startswith("  group: "))
-        cancel_line = next(line for line in concurrency_lines if line.startswith("  cancel-in-progress: "))
-        assert "github.event_name == 'push'" in group_line
-        assert "github.ref" in group_line
-        assert "github.run_id" in group_line
-        assert "github.event_name == 'push'" in cancel_line
-
-        with tempfile.TemporaryDirectory() as tmp:
-            target = Path(tmp)
-            generated_workflow_paths = {
-                name: target / path.relative_to(repo_root) for name, path in provider_workflow_paths.items()
-            }
-
-            assert main(["init", str(target)]) == 0
-            for path in generated_workflow_paths.values():
-                assert not path.exists(), f"provider-only workflow must not be generated by init: {path}"
-
-            assert main(["update", str(target)]) == 0
-            for path in generated_workflow_paths.values():
-                assert not path.exists(), f"provider-only workflow must not be generated by update: {path}"
-
-        legacy_runner = "python -m " + "unit" + "test discover"
-        assert legacy_runner not in workflow_texts["fast"]
+        workflow = (repo_root / ".github/workflows/provider-ci.yml").read_text()
+        assert "run: uv run pytest\n" in workflow
+        assert "run: make lint" in workflow
+        assert "--full-regression" not in workflow
+        assert not (repo_root / "full-regression-ledger.json").exists()
 
     def test_issue_360_readme_catalog_excludes_historical_artifact_routes(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]

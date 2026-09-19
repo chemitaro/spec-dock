@@ -9,7 +9,7 @@
 
 - Codex agents are the default operators of `./spec-dock/scripts/spec-dock ...`. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results; do not stop at command suggestions or ask the user to type ordinary commands.
 - Treat the request or approved plan as authorization for the command's ordinary documented local, Git, and GitHub side effects. Inspect current root and leaf help, resolve exact targets, and preserve the CLI's fail-closed boundaries.
-- Require an exact target and explicit destructive outcome in the request or approved plan before running `delete`, `uninstall --apply`, `uninstall --remove-specs`, `worktree remove`, or a guard-bypassing `--force`. Once authorized, execute and verify them rather than handing them back for manual entry.
+- Require an exact target and explicit destructive outcome in the request or approved plan before running `delete`, `uninstall --apply`, `worktree remove`, or a guard-bypassing `--force`. Once authorized, execute and verify them rather than handing them back for manual entry.
 - Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
 - Keep the repository's human PR merge gate. That gate does not make node creation, Artifact creation, `issue start`, `issue finish`, `close`, `sync`, `update`, or other ordinary SpecDock operations human-only.
 
@@ -43,10 +43,9 @@ Read these first before changing code or tests:
 - `src/spec_dock/`: installer package for the top-level `spec-dock` CLI.
 - `src/spec_dock/cli.py`: installer entrypoint for `init` / `update`.
 - `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
-- `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/` and the retained `.github/workflows/ci.yml`.
+- `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/`.
   - `.agents/skills/spec-dock/SKILL.md`
   - `.agents/skills/spec-dock-grill-with-docs/SKILL.md`
-  - `.github/workflows/ci.yml`
 - Legacy `src/spec_dock/assets/codex_skills/` tree was retired and removed from the current repo; use historical issue records under `spec-dock/initiatives/**` when legacy context is needed.
 - `src/spec_dock/assets/spec_dock/`: provider-side scaffold source of truth for files that are generated into managed repos.
 - `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`: provider-side runtime CLI shipped into managed repos.
@@ -60,8 +59,7 @@ src/spec_dock/
 |-- cli.py
 |-- assets/
 |   |-- install_root/
-|   |   |-- .agents/
-|   |   `-- .github/
+|   |   `-- .agents/
 |   `-- spec_dock/
 |       |-- docs/
 |       |-- templates/
@@ -88,8 +86,8 @@ tests/
 Read it like this:
 
 - Change installer behavior: start at `src/spec_dock/cli.py`.
-- Change the two installed skills or retained CI workflow: start at `src/spec_dock/assets/install_root/`.
-- Treat `src/spec_dock/assets/install_root/` as the only current authority for the installed skills and retained CI workflow.
+- Change the two installed skills: start at `src/spec_dock/assets/install_root/`.
+- Treat `src/spec_dock/assets/install_root/` as the only current authority for the installed skills.
 - Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
 - Change runtime command entrypoints: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{cli,commands}/`.
 - Change orchestration or use cases: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`.
@@ -125,7 +123,7 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 1. Read the relevant docs under `spec-dock/active/`, or `spec-dock/system/active-none/` if no active context is set.
 2. Identify the layer or surface you are changing:
    - installer: `src/spec_dock/cli.py`, asset sync/update behavior
-   - installed skills / retained CI workflow: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for retired-artifact context
+   - installed skills: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for retired-artifact context
    - runtime command surface: `.../spec_dock_runtime/cli/` and `.../commands/`
    - orchestration or business logic: `.../application/` and `.../domain/`
    - external adapters or persistence: `.../infra/`
@@ -137,22 +135,10 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 ## Build, Test, and Development Commands
 
 ```bash
-# Ordinary test commands run the fast lane. They retain the usual pytest
-# interface and policy-skip selected full-regression tests.
+# Run all selected tests directly; no policy skip or regression ledger.
 uv run pytest
 uv run pytest tests/unit
-
-# Focused pytest commands follow the same default policy.
-uv run pytest tests/unit/path_to_test.py
-
-# Marker selection alone is diagnostic; it does not permit full-regression bodies.
-uv run pytest -m full_regression
-
-# Explicit full-regression permission.
-uv run pytest --run-full-regression
-
-# Explicit heavy-only execution.
-uv run pytest --run-full-regression -m full_regression
+uv run pytest tests/unit/infra/test_directory_installation.py
 
 # Run installer locally from the current checkout
 uvx --from . spec-dock init /tmp/target-repo
@@ -166,27 +152,10 @@ spec-dock update .
 python -m spec_dock.cli init /tmp/target-repo
 ```
 
-`full_regression test is disabled by default; use --run-full-regression to run
-it` is the stable policy skip reason. Do not use `-m full_regression` alone as
-an execution permission.
-
-For pull requests, `Provider CI` / `provider-tests` is the merge-blocking fast
-gate and runs `make lint` plus ordinary `uv run pytest`. `Provider Full
-Regression` is an independent post-merge validation that runs on `main` push
-or `workflow_dispatch`; it is not a PR merge blocker, and this repository has
-no scheduled or cron full-regression trigger.
-
-On a post-merge full-regression failure, the repository maintainer checks the
-SHA, failed tests, logs, duration, and summary, then normally forward-fixes or
-reruns the workflow. Reproduce the same SHA locally with `uv run pytest
---run-full-regression` when necessary. Do not add automatic rollback or
-automatic Issue creation. If a selector omission, missing required check, or
-unacceptable escape is found, stop the next merge decision, restore the PR
-workflow command to `uv run pytest --run-full-regression`, and disable the
-default conditional policy skip if it is unsafe. Preserve markers, the manual
-full command, the post-merge workflow, and measurement evidence; only
-reintroduce the fast gate after fresh review. Agents must stop at a
-merge-ready PR: a human performs the merge.
+`Provider CI` runs `make lint` and ordinary `uv run pytest` on pull requests.
+There is no separate full-regression policy, ledger, sharder, or post-merge evaluator.
+Keep tests hermetic and verify installer basics on supported platforms. Agents stop at a
+merge-ready PR; a human performs the merge.
 
 ## Testing Guidelines
 

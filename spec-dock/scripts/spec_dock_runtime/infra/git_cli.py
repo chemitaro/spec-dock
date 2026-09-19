@@ -4,7 +4,6 @@ import contextlib
 import ctypes
 import errno
 import fcntl
-import hashlib
 import os
 from pathlib import Path
 import re
@@ -20,18 +19,8 @@ from spec_dock_runtime.application.contracts import (
     GitCapabilityAssessment,
     GitWorktreeRecord,
     PinnedCheckout,
-    PinnedProviderClosure,
 )
 
-_PROVIDER_CLOSURE_PATHS = (
-    "spec-dock/docs",
-    "spec-dock/templates",
-    "spec-dock/system",
-    "spec-dock/scripts",
-    "spec-dock/spec-dock.version",
-    ".agents/skills/spec-dock",
-    ".agents/skills/spec-dock-grill-with-docs",
-)
 _WRITING_GIT_COMMANDS = frozenset({"checkout", "switch", "update-ref", "worktree"})
 DirectoryWitness = tuple[int, int]
 DirectoryWitnesses = tuple[tuple[str, DirectoryWitness], ...]
@@ -526,24 +515,6 @@ def _git_object_bytes(repo_root: Path, *, object_type: str, object_id: str) -> b
     return result.stdout or b""
 
 
-def provider_closure(repo_root: Path, pinned_commit: str) -> PinnedProviderClosure:
-    raw = _ls_tree(repo_root, pinned_commit, _PROVIDER_CLOSURE_PATHS)
-    entries = _tree_entries(raw)
-    digest = hashlib.sha256()
-    for mode, object_type, object_id, path in sorted(entries, key=lambda item: os.fsencode(item[3])):
-        digest.update(mode.encode("ascii"))
-        digest.update(b"\0")
-        digest.update(object_type.encode("ascii"))
-        digest.update(b"\0")
-        payload = _git_object_bytes(repo_root, object_type=object_type, object_id=object_id)
-        digest.update(len(payload).to_bytes(8, "big"))
-        digest.update(payload)
-        digest.update(b"\0")
-        digest.update(path.encode("utf-8"))
-        digest.update(b"\0")
-    return PinnedProviderClosure(pinned_commit=pinned_commit, paths=_PROVIDER_CLOSURE_PATHS, digest=digest.hexdigest())
-
-
 def _config(repo_root: Path, key: str) -> str | None:
     result = subprocess.run(
         ["git", "config", "--get", key],
@@ -576,7 +547,6 @@ def assess_capabilities(
     repo_root: Path,
     *,
     pinned_commit: str,
-    closure_paths: tuple[str, ...] = _PROVIDER_CLOSURE_PATHS,
     branch: str | None = None,
     check_other_worktree: bool = True,
 ) -> GitCapabilityAssessment:
@@ -645,18 +615,12 @@ def assess_capabilities(
         reasons.append("core-eol-set")
 
     try:
-        closure = provider_closure(repo_root, pinned_commit)
-    except RuntimeError:
-        closure = None
-        reasons.append("provider-closure-unprovable")
-
-    try:
         target_entries = _tree_entries(_ls_tree_all(repo_root, pinned_commit))
     except RuntimeError:
         target_entries = []
         reasons.append("target-tree-unprovable")
 
-    attr_paths = [entry[3] for entry in target_entries] or list(closure_paths)
+    attr_paths = [entry[3] for entry in target_entries]
     attr_command = [
         "git",
         "--literal-pathspecs",
@@ -726,8 +690,6 @@ def assess_capabilities(
         allowed=not reasons,
         reasons=tuple(dict.fromkeys(reasons)),
         pinned_commit=pinned_commit,
-        closure_paths=closure_paths,
-        provider_closure_digest=closure.digest if closure is not None else None,
     )
 
 
@@ -737,27 +699,17 @@ def pinned_checkout(
     branch: str,
     pinned_commit: str,
     checkout_kind: str,
-    closure_paths: tuple[str, ...] = _PROVIDER_CLOSURE_PATHS,
     lease_fd: int | None = None,
 ) -> PinnedCheckout:
     before_branch = current_branch_or_none(repo_root)
     before_head = current_head_or_none(repo_root)
-    target_closure = provider_closure(repo_root, pinned_commit)
-    if before_head is not None:
-        admitted_closure = provider_closure(repo_root, before_head)
-        if admitted_closure.digest != target_closure.digest:
-            raise RuntimeError("runtime-generation-change-blocked: target closure differs from admitted generation")
     assessment = assess_capabilities(
         repo_root,
         pinned_commit=pinned_commit,
-        closure_paths=closure_paths,
         branch=branch,
     )
     if not assessment.allowed:
         raise RuntimeError("Git capability guard failed: " + ", ".join(assessment.reasons))
-    closure_digest = assessment.provider_closure_digest
-    if closure_digest is None:
-        raise RuntimeError("Git capability guard failed: provider closure is unprovable")
     if checkout_kind == "existing":
         _run_git_write(
             repo_root,
@@ -775,10 +727,9 @@ def pinned_checkout(
         pinned_commit=pinned_commit,
         before_branch=before_branch,
         before_head=before_head,
-        provider_closure_digest=target_closure.digest,
         checkout_kind=checkout_kind,  # type: ignore[arg-type]
     )
-    verify_pinned_checkout(repo_root, checkout=checkout, closure_paths=closure_paths)
+    verify_pinned_checkout(repo_root, checkout=checkout)
     return checkout
 
 
@@ -786,7 +737,6 @@ def verify_pinned_checkout(
     repo_root: Path,
     *,
     checkout: PinnedCheckout,
-    closure_paths: tuple[str, ...] = _PROVIDER_CLOSURE_PATHS,
 ) -> None:
     branch = current_branch_or_none(repo_root)
     head = current_head_or_none(repo_root)
@@ -796,13 +746,9 @@ def verify_pinned_checkout(
             f"before={checkout.before_branch or '(detached)'}:{checkout.before_head or '(none)'} "
             f"after={branch or '(detached)'}:{head or '(none)'}"
         )
-    closure = provider_closure(repo_root, checkout.pinned_commit)
-    if closure.digest != checkout.provider_closure_digest:
-        raise RuntimeError("runtime-generation-drift: provider closure changed")
     assessment = assess_capabilities(
         repo_root,
         pinned_commit=checkout.pinned_commit,
-        closure_paths=closure_paths,
         branch=checkout.target_branch,
     )
     if not assessment.allowed:
