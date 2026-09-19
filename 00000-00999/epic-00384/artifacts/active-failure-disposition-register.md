@@ -13,6 +13,8 @@ repository_evidence:
   tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
+> 履歴資料（2026-09-19）: 固定ディレクトリ再配置への再構成により、現行の要件・開始条件・品質ゲートの正本ではありません。[現在のEpic要件](../requirement.md)を参照してください。
+
 # Post-#387 Regression Baseline Register
 
 ## 1. Authority

@@ -13,6 +13,8 @@ repository_evidence:
   tree: "181f7eb28da0edff3ca1352edf4cb2ae1f21d433"
 ---
 
+> 履歴資料（2026-09-19）: 固定ディレクトリ再配置への再構成により、現行の要件・開始条件・品質ゲートの正本ではありません。[現在のEpic要件](../requirement.md)を参照してください。
+
 # Provider Lifecycle Wire Contract
 
 > **2026-09-12 threat-boundary clarification:** [same-EUID scope narrowing ADR](20260912t073840z-adr-issue-392-same-euid-scope-narrowing.md) supersedes the earlier safe-stop decision only for threat scope and reopening. Same-EUID non-cooperating filesystem/process actors are outside the guarantee; WIR-COORD-003 covers only participating SpecDock invocations. This clarification does not add fields, codes, relations, phases, or goldens to v12 and does not claim general hostile-filesystem safety. The issue's implementation gate remains closed until revised docs pass independent review and freeze/projection.
