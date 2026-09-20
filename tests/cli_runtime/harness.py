@@ -34,31 +34,6 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock",
     "spec-dock-grill-with-docs",
 )
-_DELETED_ROLE_SKILL_NAMES = (
-    "spec-dock-system-architect",
-    "spec-dock-implementation-planner",
-    "spec-dock-hub",
-    "spec-dock-initiative-planning",
-    "spec-dock-epic-planning",
-    "spec-dock-epic-execution",
-    "spec-dock-issue-planning",
-    "spec-dock-issue-execution",
-    "spec-dock-chatgpt-authoring",
-    "spec-dock-initiative-planning-manual",
-    "spec-dock-epic-planning-manual",
-    "spec-dock-issue-planning-manual",
-    "spec-dock-clarification",
-    "spec-dock-adr-facilitation",
-    "spec-dock-codex-adapter",
-    "spec-dock-copilot-adapter",
-    "git-commit-conventional-ja",
-    "github-pr-observation",
-    "github-pr-creator",
-    "github-pr-merge-preparer",
-    "spec-driven-tdd-workflow",
-)
-
-
 def _assert_is_file(path: Path, message: str | None = None) -> None:
     if not path.is_file():
         raise AssertionError(message or f"expected file to exist: {path}")
@@ -558,23 +533,11 @@ class CliRuntimeHarness:
         return sorted(p.relative_to(skills_root).as_posix() for p in skills_root.glob("*/SKILL.md"))
 
     def _assert_managed_skills_installed(self, target: Path) -> None:
-        managed_names = set(_EXPECTED_MANAGED_SKILL_NAMES)
-        installed_managed = sorted(
-            skill_file
-            for skill_file in self._installed_skill_files(target)
-            if skill_file.split("/", 1)[0] in managed_names
-        )
         _assert_equal(
-            installed_managed,
+            self._installed_skill_files(target),
             sorted(f"{name}/SKILL.md" for name in _EXPECTED_MANAGED_SKILL_NAMES),
+            "installed skill catalog must exactly match the current provider",
         )
-        installed_skill_names = {skill_file.split("/", 1)[0] for skill_file in self._installed_skill_files(target)}
-        for deleted_skill_name in _DELETED_ROLE_SKILL_NAMES:
-            _assert_equal(
-                deleted_skill_name not in installed_skill_names,
-                True,
-                f"deleted role skill must not be installed: {deleted_skill_name}",
-            )
 
     def _read_text_map(self, base: Path, rel_paths: list[str]) -> dict[str, str]:
         out: dict[str, str] = {}

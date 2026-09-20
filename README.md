@@ -18,7 +18,7 @@ uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/pr
 # Overwrite managed files if 'spec-dock' already exists
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
 
-# Installer-level refresh of managed files (docs/templates/scripts/skills only)
+# Replace the six fixed tooling directories
 uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
 ```
 
@@ -45,9 +45,19 @@ uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
 uvx --from ~/src/spec-dock spec-dock update
 ```
 
-`spec-dock update` deletes and replaces the six fixed tooling directories from the package.
-User data outside those directories is untouched. Stop repository commands during updates;
-if a copy fails, fix the cause and rerun the external installer.
+`spec-dock update` replaces these six fixed directories from the package, in order:
+
+1. `spec-dock/docs`
+2. `spec-dock/templates`
+3. `spec-dock/system`
+4. `spec-dock/scripts`
+5. `.agents/skills/spec-dock`
+6. `.agents/skills/spec-dock-grill-with-docs`
+
+The `spec-dock/spec-dock.version` record is refreshed after all six copies succeed. Updates are
+nontransactional: stop repository commands during the update, and if a copy fails, fix the cause and
+rerun the external installer from the start. There is no automatic rollback or resume. Paths outside
+the six directories and the version record, including `spec-dock/initiatives`, are untouched.
 
 既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
 
@@ -156,10 +166,10 @@ so.
 ```
 
 Notes:
-- Updates replace the four tooling directories and two SpecDock skill directories wholesale.
-  Local edits inside those directories are discarded. Consumer specifications and other data are untouched.
-- Stop repository commands during updates. After an interrupted copy, rerun the external installer;
-  there is no transaction journal, generation authentication, automatic rollback, or resume token.
+- The six directories listed above are replaced wholesale, so local edits inside them are discarded.
+  Consumer specifications and other data are outside that replacement boundary.
+- Stop repository commands during updates. After an interrupted copy, fix the cause and rerun the
+  external installer from the start; there is no transaction journal, automatic rollback, or resume.
 - Uninstall defaults to dry-run; `--apply` removes only tooling and its version record.
   `--remove-specs` is rejected. Consumer workflows are never installed or updated automatically.
 - `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
@@ -203,6 +213,7 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
   - `spec-dock.version` (installed spec-dock version)
   - `docs/` (guide)
   - `templates/` (initiative/epic/issue/adr templates)
+  - `system/` (managed runtime system files)
   - `scripts/` (runtime scripts; local operations)
   - `initiatives/` (spec tree root; always-on)
     - generated nodes include `artifacts/rules.md` for new working artifacts and do not include scope-local node creation wrappers

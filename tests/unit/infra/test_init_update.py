@@ -57,7 +57,6 @@ def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
             path.is_file()
             and "__pycache__" not in path.parts
             and path.suffix not in {".pyc", ".pyo"}
-            and path.name != ".spec-dock-provider-slot.json"
         )
     }
 
@@ -94,7 +93,6 @@ def test_issue_334_update_preserves_unmanaged_content(tmp_path: Path) -> None:
 
     assert initiative_sentinel.read_bytes() == b"persistent\n"
     assert unmanaged_sentinel.read_bytes() == b"unmanaged\n"
-    assert not (target / ".agents/skills/spec-dock-issue-planning").exists()
 
 
 def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
@@ -415,9 +413,9 @@ class TestInitUpdate(CliRuntimeHarness):
             if path.is_file() and not self._is_generated_python_cache_path(path.relative_to(root))
         }
 
-    # S40B replaces the historical mirror inventory with the physical current
-    # catalog. Keep this assertion focused on retained provider-owned files;
-    # stale consumer-only files are handled by the later classifier steps.
+    # The current install-root inventory is owned by the physical catalog.
+    # Keep this assertion focused on retained provider-owned files; stale
+    # consumer-only files are handled by the later classifier steps.
     _DOGFOODING_MIRROR_PROVIDER_ASSET_MAP: ClassVar[dict[str, object]] = {
         "spec-dock/.gitignore": "src/spec_dock/assets/spec_dock/.gitignore",
         "spec-dock/templates/README.md": "src/spec_dock/assets/spec_dock/templates/README.md",
@@ -1466,7 +1464,7 @@ class TestInitUpdate(CliRuntimeHarness):
             )
             wheel_dir.mkdir()
 
-            for stale_rel_path in ("spec_dock/provider_lifecycle/retired.py", "spec_dock/assets/retired.txt"):
+            for stale_rel_path in ("spec_dock/stale_build_output.py", "spec_dock/assets/retired.txt"):
                 stale_path = build_context / "build" / "lib" / stale_rel_path
                 stale_path.parent.mkdir(parents=True, exist_ok=True)
                 stale_path.write_text("stale wrapper-era artifact\n", encoding="utf-8")
@@ -1484,7 +1482,7 @@ class TestInitUpdate(CliRuntimeHarness):
             assert "spec_dock/assets/spec_dock/templates/README.md" in wheel_entries, (
                 "sanity check failed: built wheel did not include expected live template asset"
             )
-            for stale_rel_path in ("spec_dock/provider_lifecycle/retired.py", "spec_dock/assets/retired.txt"):
+            for stale_rel_path in ("spec_dock/stale_build_output.py", "spec_dock/assets/retired.txt"):
                 assert stale_rel_path not in wheel_entries, (
                     f"built wheel unexpectedly shipped stale build artifact: {stale_rel_path}"
                 )
@@ -1914,7 +1912,7 @@ with tempfile.TemporaryDirectory() as td:
         )
         assert result.returncode == 0, f"stdout:\n{result.stdout}\nstderr:\n{result.stderr}"
 
-    def test_checked_in_dogfooding_runtime_import_release_lock_backward_compat_parity(self) -> None:
+    def test_checked_in_dogfooding_runtime_import_create_lock_ownership_and_release_parity(self) -> None:
         repo_root = Path(__file__).resolve().parents[3]
         runtime_scripts_dir = repo_root / "spec-dock" / "scripts"
         check_code = f"""

@@ -169,22 +169,6 @@ class GitWorktreeRecord:
 
 
 @dataclass(frozen=True)
-class GitCapabilityAssessment:
-    allowed: bool
-    reasons: tuple[str, ...]
-    pinned_commit: str
-
-
-@dataclass(frozen=True)
-class PinnedCheckout:
-    target_branch: str
-    pinned_commit: str
-    before_branch: str | None
-    before_head: str | None
-    checkout_kind: Literal["existing", "new"]
-
-
-@dataclass(frozen=True)
 class BootstrapResult:
     status: BootstrapStatus
     command: str | None

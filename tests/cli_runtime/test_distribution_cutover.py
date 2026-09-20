@@ -52,13 +52,13 @@ def _filesystem_snapshot(root: Path) -> dict[str, tuple[object, ...]]:
     return snapshot
 
 
-def test_s40b_provider_install_root_is_current_catalog_only() -> None:
+def test_provider_install_root_is_current_catalog_only() -> None:
     actual = _relative_files(INSTALL_ROOT)
 
     assert actual == CURRENT_INSTALL_ROOT_FILES
 
 
-def test_s40b_retained_skill_identity_matches_current_provider_and_dogfood() -> None:
+def test_retained_skill_identity_matches_current_provider_and_dogfood() -> None:
     for relative_path in CURRENT_RETAINED_SKILL_FILES:
         provider = INSTALL_ROOT / relative_path
         dogfood = REPO_ROOT / relative_path
@@ -68,7 +68,7 @@ def test_s40b_retained_skill_identity_matches_current_provider_and_dogfood() -> 
         assert provider.stat().st_mode & 0o777 == dogfood.stat().st_mode & 0o777
 
 
-def test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces(tmp_path: Path) -> None:
+def test_only_runtime_wrapper_is_executable_across_current_surfaces(tmp_path: Path) -> None:
     assert _executable_relative_files(PROVIDER_ROOT) == frozenset({"spec_dock/scripts/spec-dock"})
     dogfood_paths = {
         *(REPO_ROOT / path for path in CURRENT_INSTALL_ROOT_FILES),
@@ -90,7 +90,7 @@ def test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces(tmp_pat
     assert _executable_relative_files(tmp_path) == frozenset({"spec-dock/scripts/spec-dock"})
 
 
-def test_fresh_init_copies_skill_directories_without_markers(tmp_path: Path) -> None:
+def test_fresh_init_copies_exact_current_external_catalog(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
 
     installed_external = frozenset(
@@ -100,7 +100,7 @@ def test_fresh_init_copies_skill_directories_without_markers(tmp_path: Path) -> 
     assert (tmp_path / "spec-dock/.gitignore").read_bytes() == (SCAFFOLD_ROOT / ".gitignore").read_bytes()
 
 
-def test_s45_fresh_preserves_unrelated_and_obsolete_looking_external_paths(tmp_path: Path) -> None:
+def test_fresh_init_preserves_unrelated_and_obsolete_looking_external_paths(tmp_path: Path) -> None:
     unrelated = tmp_path / "README.user.md"
     unrelated.write_bytes(b"user content\n")
     obsolete_skill = tmp_path / ".agents/skills/spec-dock-issue-planning/SKILL.md"
@@ -124,7 +124,7 @@ def test_s45_fresh_preserves_unrelated_and_obsolete_looking_external_paths(tmp_p
     assert (tmp_path / "spec-dock/.gitignore").is_file()
 
 
-def test_s45_existing_consumer_seed_is_preserved(tmp_path: Path) -> None:
+def test_existing_consumer_workflow_is_preserved(tmp_path: Path) -> None:
     seed = tmp_path / ".github/workflows/ci.yml"
     seed.parent.mkdir(parents=True)
     seed.write_bytes(b"consumer workflow\n")
@@ -135,7 +135,7 @@ def test_s45_existing_consumer_seed_is_preserved(tmp_path: Path) -> None:
     assert (seed.read_bytes(), os.lstat(seed).st_ino) == before
 
 
-def test_s45_foreign_fixed_root_is_preserved_and_blocks_fresh_install(tmp_path: Path) -> None:
+def test_foreign_fixed_root_is_preserved_and_blocks_fresh_install(tmp_path: Path) -> None:
     root = tmp_path / "spec-dock/docs"
     root.mkdir(parents=True)
     sentinel = root / "consumer.md"

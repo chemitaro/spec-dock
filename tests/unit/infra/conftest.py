@@ -11,9 +11,6 @@ import pytest
 
 _SETUP_ONLY_PREFIXES = (
     "test_checked_in_dogfooding_",
-    "test_recognized_reconciliation_",
-    "test_uninstall_",
-    "test_update_",
 )
 
 

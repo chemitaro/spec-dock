@@ -18,7 +18,7 @@ def test_update_replaces_whole_directories_and_preserves_data(tmp_path: Path) ->
     assert (tmp_path / "spec-dock/spec-dock.version").read_text().strip() == "0.2.4"
 
 
-def test_installed_runtime_starts_without_provider_markers(tmp_path: Path) -> None:
+def test_installed_runtime_starts_from_current_catalog(tmp_path: Path) -> None:
     import subprocess
     import sys
 
@@ -31,28 +31,88 @@ def test_installed_runtime_starts_without_provider_markers(tmp_path: Path) -> No
     )
     assert result.returncode == 0, result.stderr
     assert "validate" in result.stdout
-    assert not (tmp_path / ".agents/skills/spec-dock/.spec-dock-provider-slot.json").exists()
 
 
-def test_failed_copy_can_be_retried_without_touching_data(tmp_path: Path, monkeypatch) -> None:
-    import shutil
+def test_update_mid_copy_failure_is_nontransactional_and_rerunnable_without_touching_data(
+    tmp_path: Path, monkeypatch
+) -> None:
+    import stat
+
+    from spec_dock import __version__, installer
 
     assert main(["init", str(tmp_path)]) == 0
-    data = tmp_path / "spec-dock/user-data.txt"
-    data.write_bytes(b"keep")
-    original = shutil.copytree
+    data = tmp_path / "spec-dock/initiatives/preservation/sentinel.txt"
+    data.parent.mkdir(parents=True)
+    data.write_bytes(b"user data\n")
+    version = tmp_path / installer.VERSION_FILE
+    version.write_bytes(b"old-version\n")
+    sources = installer._sources(installer.ASSETS)
+    stale_paths: list[Path] = []
+    for relative in installer.TOOL_DIRECTORIES:
+        stale = tmp_path / relative / "pre-update-stale.txt"
+        stale.write_text("remove on retry", encoding="utf-8")
+        stale_paths.append(stale)
 
-    def broken_copy(*args, **kwargs):
-        raise OSError("injected disk error")
+    def snapshot(root: Path) -> dict[str, tuple[object, ...]]:
+        entries: dict[str, tuple[object, ...]] = {}
+        for path in sorted((root, *root.rglob("*"))):
+            if "__pycache__" in path.parts or path.suffix in {".pyc", ".pyo"}:
+                continue
+            relative = "." if path == root else path.relative_to(root).as_posix()
+            mode = stat.S_IMODE(path.stat(follow_symlinks=False).st_mode)
+            if path.is_symlink():
+                entries[relative] = ("symlink", path.readlink().as_posix(), mode)
+            elif path.is_dir():
+                entries[relative] = ("directory", mode)
+            elif path.is_file():
+                entries[relative] = ("file", path.read_bytes(), mode)
+            else:
+                entries[relative] = ("other", mode)
+        return entries
+
+    original_copy = installer._copy
+    copy_count = 0
+
+    def fail_during_fourth_copy(source: Path, destination: Path) -> None:
+        nonlocal copy_count
+        copy_count += 1
+        if copy_count < 4:
+            original_copy(source, destination)
+            return
+        if copy_count == 4:
+            destination.mkdir()
+            (destination / "partial.txt").write_bytes(b"partial copy\n")
+            raise OSError("injected fourth-copy failure")
+        raise AssertionError("installer continued copying after the injected fourth-copy failure")
 
     with monkeypatch.context() as patch:
-        patch.setattr(shutil, "copytree", broken_copy)
+        patch.setattr(installer, "_copy", fail_during_fourth_copy)
         assert main(["update", str(tmp_path)]) != 0
-    assert data.read_bytes() == b"keep"
-    assert shutil.copytree is original
+
+    assert copy_count == 4
+    for index, (relative, source) in enumerate(zip(installer.TOOL_DIRECTORIES, sources, strict=True)):
+        destination = tmp_path / relative
+        if index < 3:
+            assert snapshot(destination) == snapshot(source)
+            assert not stale_paths[index].exists()
+        elif index == 3:
+            assert (destination / "partial.txt").read_bytes() == b"partial copy\n"
+            assert snapshot(destination) != snapshot(source)
+            assert not stale_paths[index].exists()
+        else:
+            assert stale_paths[index].read_text(encoding="utf-8") == "remove on retry"
+
+    assert version.read_bytes() == b"old-version\n"
+    assert data.read_bytes() == b"user data\n"
+
     assert main(["update", str(tmp_path)]) == 0
-    assert (tmp_path / "spec-dock/docs/README.md").is_file()
-    assert data.read_bytes() == b"keep"
+    for relative, source, stale in zip(installer.TOOL_DIRECTORIES, sources, stale_paths, strict=True):
+        destination = tmp_path / relative
+        assert snapshot(destination) == snapshot(source)
+        assert not stale.exists()
+    assert not any((tmp_path / relative / "partial.txt").exists() for relative in installer.TOOL_DIRECTORIES)
+    assert version.read_text(encoding="utf-8") == f"{__version__}\n"
+    assert data.read_bytes() == b"user data\n"
 
 
 def test_uninstall_dry_run_then_removes_only_tool_directories(tmp_path: Path) -> None:

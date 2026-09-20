@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.application.check_deps import check_deps as application_check_deps
 from spec_dock_runtime.application.close_node import close_node as application_close_node
@@ -241,12 +241,6 @@ class _GitGateway:
     def local_branch_exists(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.local_branch_exists(repo_root, branch)
 
-    def checkout_branch(self, repo_root: Path, branch: str) -> None:
-        infra_git_cli.checkout_branch(repo_root, branch)
-
-    def create_and_checkout_branch(self, repo_root: Path, branch: str) -> None:
-        infra_git_cli.create_and_checkout_branch(repo_root, branch)
-
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool:
         return infra_git_cli.check_ref_format_branch(repo_root, branch)
 
@@ -265,72 +259,47 @@ class _GitGateway:
         *,
         path: Path,
         force: bool,
-        source_fd: int | None = None,
-        target_fd: int | None = None,
+        target_fd: int,
     ) -> None:
         infra_git_cli.remove_worktree(
             repo_root,
             path=path,
             force=force,
-            source_fd=source_fd,
             target_fd=target_fd,
         )
 
     def resolve_commit(self, repo_root: Path, ref: str) -> str:
         return infra_git_cli.resolve_commit(repo_root, ref)
 
-    def assess_capabilities(
-        self,
-        repo_root: Path,
-        *,
-        pinned_commit: str,
-        branch: str | None = None,
-        check_other_worktree: bool = True,
-    ):
-        return infra_git_cli.assess_capabilities(
-            repo_root,
-            pinned_commit=pinned_commit,
-            branch=branch,
-            check_other_worktree=check_other_worktree,
-        )
-
-    def pinned_checkout(
+    def checkout_fixed_ref(
         self,
         repo_root: Path,
         *,
         branch: str,
-        pinned_commit: str,
-        checkout_kind: str,
-    ):
-        return infra_git_cli.pinned_checkout(
+        target_commit: str,
+        checkout_kind: Literal["existing", "new"],
+    ) -> None:
+        infra_git_cli.checkout_fixed_ref(
             repo_root,
             branch=branch,
-            pinned_commit=pinned_commit,
+            target_commit=target_commit,
             checkout_kind=checkout_kind,
         )
 
-    def verify_pinned_checkout(self, repo_root: Path, *, checkout) -> None:
-        infra_git_cli.verify_pinned_checkout(
-            repo_root,
-            checkout=checkout,
-        )
-
-    def add_worktree_pinned(
+    def add_worktree_at_commit(
         self,
         repo_root: Path,
         *,
         path: Path,
         branch: str,
-        pinned_commit: str,
-        source_fd: int | None = None,
-        target_fd: int | None = None,
+        target_commit: str,
+        target_fd: int,
     ) -> None:
-        infra_git_cli.add_worktree_pinned(
+        infra_git_cli.add_worktree_at_commit(
             repo_root,
             path=path,
             branch=branch,
-            pinned_commit=pinned_commit,
-            source_fd=source_fd,
+            target_commit=target_commit,
             target_fd=target_fd,
         )
 
@@ -339,15 +308,13 @@ class _GitGateway:
         repo_root: Path,
         *,
         path: Path,
-        pinned_commit: str,
-        source_fd: int,
+        target_commit: str,
         target_fd: int,
     ) -> tuple[tuple[str, tuple[int, int]], ...]:
         return infra_git_cli.materialize_worktree(
             repo_root,
             path=path,
-            pinned_commit=pinned_commit,
-            source_fd=source_fd,
+            target_commit=target_commit,
             target_fd=target_fd,
         )
 
@@ -356,13 +323,13 @@ class _GitGateway:
         repo_root: Path,
         *,
         target_fd: int,
-        pinned_commit: str,
+        target_commit: str,
         directory_witnesses: tuple[tuple[str, tuple[int, int]], ...],
     ) -> None:
         infra_git_cli.publish_worktree_entrypoint(
             repo_root,
             target_fd=target_fd,
-            pinned_commit=pinned_commit,
+            target_commit=target_commit,
             directory_witnesses=directory_witnesses,
         )
 

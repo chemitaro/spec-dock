@@ -18,9 +18,8 @@ import pytest
 
 from tests.cli_runtime import harness
 
-# Keep tests that deliberately monkeypatch or assert the distribution cutover
-# on the real init path.  The listed modules exercise runtime commands against
-# an already-provisioned workspace and do not assert the init implementation.
+# The listed modules exercise runtime commands against an already-provisioned
+# workspace and do not assert the init implementation.
 _TEMPLATE_MODULES = frozenset({
     "tests.cli_runtime.test_active",
     "tests.cli_runtime.test_artifact_import_file",
@@ -41,22 +40,10 @@ _TEMPLATE_MODULES = frozenset({
     "tests.cli_runtime.test_worktree",
     "tests.cli_runtime.test_wrappers",
 })
-_DISTRIBUTION_CUTOVER_MODULE = "tests.cli_runtime.test_distribution_cutover"
-_DISTRIBUTION_SETUP_OPERATIONS = ("update", "uninstall", "recognized")
-
-
-def _can_reuse_fresh_init_result(module_name: str, test_name: str) -> bool:
+def _can_reuse_fresh_init_result(module_name: str) -> bool:
     """Return whether plain init is only a precondition for this test."""
 
-    if module_name in _TEMPLATE_MODULES:
-        return True
-    if module_name != _DISTRIBUTION_CUTOVER_MODULE:
-        return False
-    return (
-        any(operation in test_name for operation in _DISTRIBUTION_SETUP_OPERATIONS)
-        and "fresh" not in test_name
-        and "reinit" not in test_name
-    )
+    return module_name in _TEMPLATE_MODULES
 
 
 def _clone_tree_contents(source: Path, target: Path) -> None:
@@ -100,7 +87,7 @@ def _reuse_fresh_init_result(
     """
 
     module_name = request.node.nodeid.split("::", 1)[0][:-3].replace("/", ".")
-    if not _can_reuse_fresh_init_result(module_name, request.node.originalname):
+    if not _can_reuse_fresh_init_result(module_name):
         return
 
     real_main = request.module.main

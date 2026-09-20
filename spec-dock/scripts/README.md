@@ -61,4 +61,7 @@ artifact 補足:
 
 注:
 - `spec-dock/.agent/` と `spec-dock/active/` は生成物です（git 管理しません）。
-- 導入/更新（`spec-dock/{docs,templates,scripts}` の配置）は `uvx spec-dock init/update` を使います。
+- 導入/更新は外部installerの `uvx spec-dock init/update` を使います。updateは次の固定6ディレクトリを順に丸ごと置換し、copy成功後に `spec-dock/spec-dock.version` を更新します:
+  `spec-dock/docs`, `spec-dock/templates`, `spec-dock/system`, `spec-dock/scripts`,
+  `.agents/skills/spec-dock`, `.agents/skills/spec-dock-grill-with-docs`。
+  updateはnontransactionalです。関連repository commandを停止し、copy failure後は原因を修正して外部installerを最初から実行してください。rollback/journal/resumeはありません。6ディレクトリとversion record以外の利用者dataは変更されません。
