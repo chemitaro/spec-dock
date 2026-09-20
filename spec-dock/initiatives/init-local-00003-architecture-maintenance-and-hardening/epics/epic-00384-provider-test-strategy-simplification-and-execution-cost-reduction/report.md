@@ -18,7 +18,7 @@ Current installer contractは固定6ディレクトリのnontransactional replac
 
 ## Issue #405 — current delivery evidence (S7 candidate)
 
-実装branchは `iss-00405-directory-replacement-final-cleanup`、PRは[#406](https://github.com/chemitaro/spec-dock/pull/406)です。現在の公開済みcandidateは`11825a335b628b195cb61ddd47abe8aaab9cfd88`です。S6 local integrated qualificationは直前の実装candidate `0d9114b038ddb78dab32bc6039b51c4d02943846`で完了し、S7のPR checksとfresh integrated reviewは`11825...`でpassしました。final Report SHAに対する必須test sequenceとFinal Quality Gate Strict v2は未完了であり、Issue #405はまだmerge-readyではありません。
+実装branchは `iss-00405-directory-replacement-final-cleanup`、PRは[#406](https://github.com/chemitaro/spec-dock/pull/406)です。S6 local integrated qualificationは実装candidate `0d9114b038ddb78dab32bc6039b51c4d02943846`で完了し、S7のPR checksとfresh integrated reviewはcandidate`11825a335b628b195cb61ddd47abe8aaab9cfd88`でpassしました。その後のcommit `2849bf596efc5d98c061299035fcdf05e049727e`はIssue/Epic Reportだけを更新し、公開tipに対するCI、final-SHA test sequenceおよびFinal Quality Gate Strict v2は未完了です。Issue #405はまだmerge-readyではありません。
 
 | 検証 | 実測 |
 |---|---|
@@ -50,10 +50,11 @@ S6の最初のattempt (`0ab3ab...4125`)はfocused/full suite後に`make lint`で
 
 | Delivery gate | 状態・実測 |
 |---|---|
-| PR #406 / required CI | pass。PR OPEN/non-draft、head exact。Provider `provider-tests`: `1546 passed, 30 skipped in 1018.01s`; embedded `make lint` pass。CI validate、Commit identity check pass。 |
-| Provider distribution parity (Ubuntu) | pass、`12 passed in 2.77s` |
-| Provider distribution parity (macOS) | pass、`12 passed in 3.71s` |
+| Prior PR candidate `11825...` | All pull-request checks passed on that exact head and its PR merge tree matched. Provider `provider-tests`: `1546 passed, 30 skipped in 1018.01s`; embedded `make lint` pass. CI validate and Commit identity check passed. |
+| Prior Provider distribution parity (Ubuntu) | pass、`12 passed in 2.77s` |
+| Prior Provider distribution parity (macOS) | pass、`12 passed in 3.71s` |
 | fresh integrated code/spec/QA Strict review | GPT-5.6 Sol Extra High、`a865277de85740acee536613bde6c7de50092e71..11825a335b628b195cb61ddd47abe8aaab9cfd88`、session `required-strict-github-connector-verificati-1050`、`review_status=pass`、findings 0、confidence 0.97 |
+| Current Report-only PR tip | `2849bf596efc5d98c061299035fcdf05e049727e`。New-tip checks pending/requiring confirmation; no success is inferred from prior-candidate results. |
 | Final Quality Gate Strict v2 | pending。Report証拠を含む最終pushed SHAで必須test sequenceを再実行してからGPT-5.6 Sol Proで審査する |
 | Issue #405 merge-ready / human merge | 未達 / 未実施 |
 
