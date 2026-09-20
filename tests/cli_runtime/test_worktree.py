@@ -377,7 +377,7 @@ class TestCliWorktree(CliRuntimeHarness):
             def check_ref_format_branch(self, repo_root_arg, branch):
                 return True
 
-            def add_worktree_pinned(self, repo_root_arg, *, path, **kwargs):
+            def add_worktree_at_commit(self, repo_root_arg, *, path, **kwargs):
                 attempts.append(path)
 
             def materialize_worktree(self, repo_root_arg, *, path, **kwargs):
@@ -443,7 +443,7 @@ class TestCliWorktree(CliRuntimeHarness):
             def check_ref_format_branch(self, repo_root_arg, branch):
                 return True
 
-            def add_worktree_pinned(self, repo_root_arg, *, path, **kwargs):
+            def add_worktree_at_commit(self, repo_root_arg, *, path, **kwargs):
                 attempts.append(path)
                 raise subprocess.CalledProcessError(
                     128,
@@ -718,7 +718,43 @@ class TestCliWorktree(CliRuntimeHarness):
             assert p.returncode != 0
             assert "git failed: git status --porcelain" in p.stderr
 
-    def test_materialize_worktree_passes_source_lease_to_read_tree_helper(self, monkeypatch, tmp_path: Path) -> None:
+    def test_worktree_materializer_rejects_submodule_before_entrypoint_publication(self, tmp_path: Path) -> None:
+        target = tmp_path / "sample-repo"
+        target.mkdir()
+        self._prepare_git_repo(target)
+        pinned_commit = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
+        (target / ".gitmodules").write_text(
+            '[submodule "external/submodule"]\n'
+            "\tpath = external/submodule\n"
+            "\turl = https://example.invalid/submodule.git\n",
+            encoding="utf-8",
+        )
+        self._run_git(target, ["add", ".gitmodules"])
+        self._run_git(
+            target,
+            ["update-index", "--add", "--cacheinfo", f"160000,{pinned_commit},external/submodule"],
+        )
+        self._run_git(target, ["commit", "-m", "record external submodule"])
+        self._run_git(target, ["config", "submodule.external/submodule.ignore", "all"])
+        assert self._run_git(target, ["status", "--porcelain"]).stdout == ""
+
+        central_root = tmp_path / "central-worktrees"
+        worktree_path = central_root / "sample-repo" / "sample-repo-submodule"
+        result = self._run_runtime_capture(
+            target,
+            ["worktree", "create", "submodule"],
+            env=self._worktree_env(central_root),
+        )
+
+        assert result.returncode != 0
+        assert "submodule is not supported in a materialized worktree: external/submodule" in result.stderr
+        assert "Git capability guard failed" not in result.stderr
+        assert worktree_path.is_dir()
+        assert not (worktree_path / "spec-dock" / "scripts" / "spec-dock").exists()
+
+    def test_materialize_worktree_runs_read_tree_in_target_bound_cwd_without_source_lease(
+        self, monkeypatch, tmp_path: Path
+    ) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
@@ -732,12 +768,12 @@ class TestCliWorktree(CliRuntimeHarness):
         worktree_path = tmp_path / "worktree"
         repo_root.mkdir()
         worktree_path.mkdir()
-        calls: list[tuple[tuple[object, ...], dict[str, object]]] = []
+        calls: list[tuple[list[str], int]] = []
 
-        def run_git_write(*args, **kwargs):
-            calls.append((args, kwargs))
+        def run_git_in_bound_cwd(command: list[str], *, cwd_fd: int) -> None:
+            calls.append((command, cwd_fd))
 
-        monkeypatch.setattr(git_cli, "_run_git_write", run_git_write)
+        monkeypatch.setattr(git_cli, "_run_git_in_bound_cwd", run_git_in_bound_cwd)
         monkeypatch.setattr(
             git_cli,
             "_ls_tree_all",
@@ -749,18 +785,13 @@ class TestCliWorktree(CliRuntimeHarness):
             git_cli.materialize_worktree(
                 repo_root,
                 path=worktree_path,
-                pinned_commit="abc123",
-                source_fd=11,
+                target_commit="abc123",
                 target_fd=target_fd,
             )
         finally:
             os.close(target_fd)
 
-        assert len(calls) == 1
-        _, kwargs = calls[0]
-        assert kwargs["bound_fds"] == (11,)
-        assert kwargs["lease_fd"] == target_fd
-        assert kwargs["cwd_fd"] == target_fd
+        assert calls == [(["git", "read-tree", "--reset", "abc123"], target_fd)]
 
     def test_worktree_create_fails_when_namespace_path_is_file(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1314,7 +1345,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append((path, force))
                     raise RuntimeError("git refused")
 
@@ -1377,7 +1408,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append((path, force))
                     worktree_path.rmdir()
 
@@ -1432,7 +1463,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
                     shutil.rmtree(path)
 
@@ -1620,7 +1651,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
                     shutil.rmtree(path)
 
@@ -1717,7 +1748,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
 
             class FakeEnvironmentGateway:
@@ -1785,7 +1816,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
 
             class FakeEnvironmentGateway:
@@ -1860,7 +1891,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
                     shutil.rmtree(path)
 
@@ -1963,7 +1994,7 @@ class TestCliWorktree(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
                     shutil.rmtree(path)
 

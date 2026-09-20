@@ -131,7 +131,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     # Simulate Git removing only its record while leaving the
                     # original empty directory for descriptor-bound cleanup.
                     return None
@@ -192,7 +192,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
 
             class FakeEnvironmentGateway:

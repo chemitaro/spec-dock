@@ -190,7 +190,9 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
                 logged = log.read_text(encoding="utf-8").splitlines()
                 assert logged[-1 if command == "update" else -2] == str(expected_target)
 
-    def test_t04_git_write_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
+
+class TestRuntimeHandoff(CliRuntimeHarness):
+    def test_bound_cwd_git_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
@@ -211,9 +213,16 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
                 encoding="utf-8",
             )
 
-            result = git_cli._run_git_write(target, [sys.executable, "-c", "print('provider-helper')"])
+            target_fd = os.open(target, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                result = git_cli._run_git_in_bound_cwd(
+                    [sys.executable, "-c", "import os; print(os.getcwd())"],
+                    cwd_fd=target_fd,
+                )
+            finally:
+                os.close(target_fd)
         finally:
             sys.path.pop(0)
 
-        assert result.stdout == "provider-helper\n"
+        assert result.stdout == f"{target}\n"
         assert not marker.exists()
