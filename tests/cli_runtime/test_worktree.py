@@ -403,7 +403,7 @@ class TestCliWorktree(CliRuntimeHarness):
         message = str(raised.value)
         assert "worktree create failed after target reservation" in message
         assert "artifact_state=path_exists:True,branch_exists:False,record_exists:False" in message
-        assert "payload_paths:0/7,entrypoint_exists:False" in message
+        assert "entrypoint_exists:False" in message
 
     def test_worktree_create_reports_git_failure_after_reservation_without_retry(
         self, monkeypatch, tmp_path: Path

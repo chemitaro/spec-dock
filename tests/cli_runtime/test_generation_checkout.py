@@ -51,7 +51,7 @@ class TestGenerationCheckout(CliRuntimeHarness):
             finally:
                 hook.unlink()
 
-    def test_t10_existing_branch_rejects_provider_generation_drift_before_mutation(self, tmp_path: Path) -> None:
+    def test_existing_branch_can_use_different_tooling_version(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         assert main(["init", str(target)]) == 0
@@ -75,15 +75,9 @@ class TestGenerationCheckout(CliRuntimeHarness):
         provider_doc.write_text(provider_doc.read_text(encoding="utf-8") + "\nnew generation\n", encoding="utf-8")
         self._run_git(target, ["add", str(provider_doc.relative_to(target))])
         self._run_git(target, ["commit", "-m", "change provider generation"])
-        before_branch = self._run_git(target, ["branch", "--show-current"]).stdout.strip()
-        before_head = self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip()
-
-        blocked = self._run_runtime_capture(target, ["issue", "start", "3"])
-
-        assert blocked.returncode != 0
-        assert "runtime-generation-change-blocked" in blocked.stderr
-        assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
-        assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head
+        result = self._run_runtime_capture(target, ["issue", "start", "3"])
+        assert result.returncode == 0, result.stderr
+        assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == "iss-00003-refresh-token"
 
     @pytest.mark.parametrize("attribute", ("diff=custom", "merge=custom"))
     def test_t10_effective_diff_and_merge_attributes_are_rejected_before_mutation(
@@ -115,7 +109,6 @@ class TestGenerationCheckout(CliRuntimeHarness):
             assessment = git_cli.assess_capabilities(
                 target,
                 pinned_commit=pinned_commit,
-                closure_paths=git_cli._PROVIDER_CLOSURE_PATHS,
                 branch="main",
                 check_other_worktree=False,
             )
@@ -127,7 +120,7 @@ class TestGenerationCheckout(CliRuntimeHarness):
         assert self._run_git(target, ["branch", "--show-current"]).stdout.strip() == before_branch
         assert self._run_git(target, ["rev-parse", "HEAD"]).stdout.strip() == before_head
 
-    def test_t10_capability_guard_covers_materialized_tree_outside_provider_closure(self, tmp_path: Path) -> None:
+    def test_capability_guard_covers_the_materialized_tree(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         assert main(["init", str(target)]) == 0
@@ -153,7 +146,6 @@ class TestGenerationCheckout(CliRuntimeHarness):
             assessment = git_cli.assess_capabilities(
                 target,
                 pinned_commit=before_head,
-                closure_paths=git_cli._PROVIDER_CLOSURE_PATHS,
                 branch=before_branch,
                 check_other_worktree=False,
             )
@@ -189,7 +181,6 @@ class TestGenerationCheckout(CliRuntimeHarness):
             assessment = git_cli.assess_capabilities(
                 target,
                 pinned_commit=before_head,
-                closure_paths=git_cli._PROVIDER_CLOSURE_PATHS,
                 branch=before_branch,
                 check_other_worktree=False,
             )

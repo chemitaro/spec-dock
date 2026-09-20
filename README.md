@@ -45,10 +45,9 @@ uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
 uvx --from ~/src/spec-dock spec-dock update
 ```
 
-`spec-dock update` refreshes the recognized managed distribution through one plan/apply path. It
-preserves user-owned and unknown paths, blocks before writing when ownership or workspace identity is
-ambiguous, and records a root/intent/authority/contract/plan/protocol-bound operation journal when an apply starts. It is distinct from
-`init --force`; older or incompatible workspaces may still require manual normalization or rebuild.
+`spec-dock update` deletes and replaces the six fixed tooling directories from the package.
+User data outside those directories is untouched. Stop repository commands during updates;
+if a copy fails, fix the cause and rerun the external installer.
 
 既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
 
@@ -91,7 +90,7 @@ execution back to the user. Removing bundled orchestration does not make the CLI
 
 Ordinary in-scope creation, import, Artifact, active, dependency, sync, issue lifecycle, worktree
 creation, Workbench copy, close, and managed update operations do not require command-by-command
-confirmation. Destructive operations (`delete`, `uninstall --apply`, `uninstall --remove-specs`,
+confirmation. Destructive operations (`delete`, `uninstall --apply`,
 `worktree remove`, and guard-bypassing `--force`) require an exact target and destructive outcome in
 the user request or approved plan. PR merge remains human-operated where repository instructions say
 so.
@@ -157,48 +156,12 @@ so.
 ```
 
 Notes:
-- `update` and `init --force` use the same recognized distribution classifier and fail closed on
-  unknown, modified, symlinked, hard-linked, or root-rebound targets. No pathname-based recursive
-  cleanup is used for unknown paths.
-- An interrupted recognized update or `init --force` may leave
-  `spec-dock/.distribution-journal.json`. Rerun the same operation against the same repository root
-  with the same package or a compatible newer package to resume from exact action pre/postconditions.
-  Root, intent, authority, contract, plan, protocol, or exact target-state mismatches, downgrades, and
-  incompatible packages stop before further mutation; inspect the reported repository-relative reason
-  instead of rolling back to older installer code. Recovery is forward recovery; forward recovery is not code rollback.
-- Recovery metadata role is schema/purpose-based, not pathname-based: the same pathname
-  `spec-dock/.distribution-retry.json` carries schema 1 as a legacy migration input and schema 2 as the current forward guard. A schema-1 payload is converted one way only when it is the exact same-root,
-  same-operation pre-write state and the executing package is the same or a compatible newer version.
-  An exact legacy staging lease is accepted only when its action, private stage-name family, parent chain,
-  device, inode, ctime, type, and link count all match the reconstructed plan; otherwise the payload and
-  stage are preserved for manual diagnosis. The current `.distribution-journal.json` records the
-  root-bound forward operation. A `.uninstall-retry.json` file is legacy reader-only/manual evidence and
-  is never auto-converted, auto-deleted, or promoted to current recovery authority. Malformed,
-  later-phase, cross-root, different-operation, downgrade, incompatible-package, unknown-stage, or dual
-  recovery state is rejected without rewriting recovery authority.
-- Managed distribution deprovision is the default/`--keep-specs` uninstall owner. Dry-run performs a
-  complete read-only assessment; apply uses a schema-2 forward guard in
-  `spec-dock/.distribution-retry.json` and a protocol-2 journal in
-  `spec-dock/.distribution-journal.json`. Recovery is forward-only and resumes only the same root,
-  intent, authority, contract, plan, and protocol with the same or a semantically compatible newer
-  package.
-- Generated `spec-dock/active` and `spec-dock/.agent` entries are removable only when the single
-  runtime-derived producer proves their current identity. Unknown, modified, legacy, conflicting,
-  hard-linked, or special entries block every mutation and remain preserved. Proven-owned absent
-  subtrees collapse to one surviving-ancestor witness; a completely absent managed subtree completes
-  without writing protocol metadata.
-- Directory publication is bottom-up and depends on exact immediate-child absence. The journal moves
-  through prepared, executing, verifying, and an atomic verified/completed terminal publication.
-  Public fields come only from the typed `DistributionProcessResult`; the CLI does not interpret
-  journal files. Those fields include phase, checkpoint, failed/pending paths, and action/top-level
-  errors.
-- A legacy `.uninstall-retry.json` is never converted automatically because it proves no root, specs
-  mode, plan, or checkpoint. It is preserved as legacy reader-only/manual evidence for manual recovery.
-  `--keep-specs` preserves initiatives, Workbench data, and unknown content. `--remove-specs` is the
-  current explicit spec-history purge authority for shared,
-  journaled spec-history purge: dry-run is write-free, and apply uses the same root-bound forward journal.
-  A matching partial purge is retried only with `spec-dock uninstall --apply --remove-specs <target>`;
-  legacy or conflicting recovery state remains manual and is never converted automatically.
+- Updates replace the four tooling directories and two SpecDock skill directories wholesale.
+  Local edits inside those directories are discarded. Consumer specifications and other data are untouched.
+- Stop repository commands during updates. After an interrupted copy, rerun the external installer;
+  there is no transaction journal, generation authentication, automatic rollback, or resume token.
+- Uninstall defaults to dry-run; `--apply` removes only tooling and its version record.
+  `--remove-specs` is rejected. Consumer workflows are never installed or updated automatically.
 - `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
   installer update command by running
   `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.
@@ -206,9 +169,9 @@ Notes:
   passed to the installer.
 - Runtime update always uses the fixed upstream `git+https://github.com/chemitaro/spec-dock` source
   with `uvx --no-cache`; it does not expose arbitrary package source, cache, or `--force` options.
-- Runtime update refreshes recognized managed files through installer update. It is not `init --force`.
-  Legacy or incompatible workspaces are preserved or blocked when identity cannot be proven; they are
-  not silently rewritten.
+- Runtime update replaces the fixed directories through the external installer. Missing tooling
+  directories are recreated without examining an old version protocol.
+
 - Workbench is an experimental, Git-ignored, non-canonical, disposable work area. The root
   `spec-dock/.workbench/` uses date buckets and manual file selection only; there is no root bulk-copy
   command. Initiative/Epic/Issue Workbenches can be copied explicitly to the same scope in one linked
@@ -255,52 +218,14 @@ See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + 
 ## Testing
 
 ```bash
-# Ordinary local test commands: run the fast lane. Selected full-regression
-# tests are skipped with a stable policy reason.
 uv run pytest
-uv run pytest tests/unit
-
-# Focused pytest commands use the same default policy.
-uv run pytest tests/unit/path_to_test.py
-
-# Inspect the full-regression selection only. This does not grant permission
-# to run its test bodies.
-uv run pytest -m full_regression
-
-# Intentional full regression: the only local command that permits all test bodies.
-uv run pytest --run-full-regression
-
-# Local static-analysis gate: Ruff check, Ruff format check, and mypy
+uv run pytest tests/unit/infra/test_directory_installation.py
 make lint
 ```
 
-The policy skip reason is `full_regression test is disabled by default; use
---run-full-regression to run it`. Add `--run-full-regression` to a marker
-selection when deliberately running only the heavy lane, for example
-`uv run pytest --run-full-regression -m full_regression`.
-
-### Provider test workflows and post-merge operation
-
-`Provider CI` / `provider-tests` runs on pull requests and remains the merge
-blocker. It runs `make lint` and the ordinary `uv run pytest` command only; it
-does not run the full regression. `Provider Full Regression` is an independent
-workflow that runs `uv run pytest --run-full-regression` after a push to `main`
-or when started with `workflow_dispatch`. It is post-merge validation, not a
-retroactive merge blocker. No scheduled or cron execution is configured.
-
-If `Provider Full Regression` fails, the repository maintainer checks the
-run's SHA, failed tests, logs, duration, and summary. Reproduce the same SHA
-locally with `uv run pytest --run-full-regression` when needed, then normally
-apply a forward fix or rerun the GitHub Actions workflow. The workflow does
-not automatically roll back a merge or create an Issue.
-
-If a selector omission, missing required check, or unacceptable escape is
-found, stop the next merge decision and return the PR test command in
-`.github/workflows/provider-ci.yml` to `uv run pytest --run-full-regression`.
-If the default policy skip itself is unsafe, disable that conditional skip.
-Keep the markers, explicit full command, full workflow, and measurement
-evidence; reintroduce the fast gate only after a fresh review. A merge-ready
-PR still requires a human to perform the merge.
+Ordinary pytest runs all selected tests without a policy skip, ledger, or sharding wrapper.
+Provider CI runs lint and the suite on pull requests. Platform jobs check basic installation
+and runtime startup on Linux and macOS. Human review and merge remain required.
 
 ---
 

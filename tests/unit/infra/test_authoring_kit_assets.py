@@ -712,7 +712,6 @@ def test_s90_retained_repository_guidelines_match_current_distribution_surface()
     assert "src/spec_dock/assets/install_root/" in content
     assert ".agents/skills/spec-dock/SKILL.md" in content
     assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in content
-    assert ".github/workflows/ci.yml" in content
 
 
 @pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))

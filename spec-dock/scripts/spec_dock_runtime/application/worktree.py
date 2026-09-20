@@ -34,15 +34,6 @@ _LABEL_RE = re.compile(r"^[a-z0-9-]+$")
 _MAX_ATTEMPTS = 10000
 _WORKTREE_ROOT_ENV = "SPEC_DOCK_WORKTREE_ROOT"
 _WORKTREE_ROOT_EXAMPLE = 'export SPEC_DOCK_WORKTREE_ROOT="$HOME/workspace/worktrees"'
-_PROVIDER_CLOSURE_PATHS = (
-    "spec-dock/docs",
-    "spec-dock/templates",
-    "spec-dock/system",
-    "spec-dock/scripts",
-    "spec-dock/spec-dock.version",
-    ".agents/skills/spec-dock",
-    ".agents/skills/spec-dock-grill-with-docs",
-)
 _ENTRYPOINT_PATH = "spec-dock/scripts/spec-dock"
 
 
@@ -59,18 +50,14 @@ def _pin_worktree_source(repo_root: Path, ports: Ports) -> str:
     pinned_commit = ports.git_gateway.current_head_or_none(repo_root)
     if not pinned_commit:
         raise RuntimeError("worktree create cannot pin an unavailable HEAD")
-    provider_closure = ports.git_gateway.provider_closure(repo_root, pinned_commit)
     assessment = ports.git_gateway.assess_capabilities(
         repo_root,
         pinned_commit=pinned_commit,
-        closure_paths=tuple(provider_closure.paths),
         branch=ports.git_gateway.current_branch_or_none(repo_root),
         check_other_worktree=False,
     )
     if not assessment.allowed:
         raise RuntimeError("Git capability guard failed: " + ", ".join(assessment.reasons))
-    if assessment.provider_closure_digest != provider_closure.digest:
-        raise RuntimeError("provider closure changed during worktree preparation")
     return pinned_commit
 
 
@@ -1129,10 +1116,9 @@ def _artifact_state(
         branch_exists = "unknown"
     path_exists = worktree_path.exists()
     record_exists = _canonical_path(worktree_path) in record_paths
-    payload_paths = sum((worktree_path / relative).exists() for relative in _PROVIDER_CLOSURE_PATHS)
     entrypoint = worktree_path / _ENTRYPOINT_PATH
     entrypoint_exists = entrypoint.is_file() and not entrypoint.is_symlink()
     return (
         f"artifact_state=path_exists:{path_exists},branch_exists:{branch_exists},record_exists:{record_exists},"
-        f"payload_paths:{payload_paths}/{len(_PROVIDER_CLOSURE_PATHS)},entrypoint_exists:{entrypoint_exists}"
+        f"entrypoint_exists:{entrypoint_exists}"
     )

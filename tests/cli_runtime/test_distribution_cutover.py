@@ -15,11 +15,6 @@ CURRENT_INSTALL_ROOT_FILES = frozenset({
     ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
     ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
     ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-    ".github/workflows/ci.yml",
-})
-CURRENT_SLOT_MARKERS = frozenset({
-    ".agents/skills/spec-dock/.spec-dock-provider-slot.json",
-    ".agents/skills/spec-dock-grill-with-docs/.spec-dock-provider-slot.json",
 })
 CURRENT_RETAINED_SKILL_FILES = (
     ".agents/skills/spec-dock/SKILL.md",
@@ -73,14 +68,6 @@ def test_s40b_retained_skill_identity_matches_current_provider_and_dogfood() -> 
         assert provider.stat().st_mode & 0o777 == dogfood.stat().st_mode & 0o777
 
 
-def test_s40b_retained_ci_and_gitignore_are_deterministic_assets() -> None:
-    ci = (INSTALL_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
-    assert "python3 ./spec-dock/scripts/spec-dock sync" in ci
-    assert "python3 ./spec-dock/scripts/spec-dock validate" in ci
-    assert "spec-dock-chatgpt" not in ci
-    assert (SCAFFOLD_ROOT / ".gitignore").is_file()
-
-
 def test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces(tmp_path: Path) -> None:
     assert _executable_relative_files(PROVIDER_ROOT) == frozenset({"spec_dock/scripts/spec-dock"})
     dogfood_paths = {
@@ -103,13 +90,13 @@ def test_s40b_only_runtime_wrapper_is_executable_across_current_surfaces(tmp_pat
     assert _executable_relative_files(tmp_path) == frozenset({"spec-dock/scripts/spec-dock"})
 
 
-def test_s40b_fresh_init_materializes_current_external_catalog_and_slot_markers(tmp_path: Path) -> None:
+def test_fresh_init_copies_skill_directories_without_markers(tmp_path: Path) -> None:
     assert main(["init", str(tmp_path)]) == 0
 
     installed_external = frozenset(
         path for path in _relative_files(tmp_path) if path.startswith(".agents/") or path.startswith(".github/")
     )
-    assert installed_external == CURRENT_INSTALL_ROOT_FILES | CURRENT_SLOT_MARKERS
+    assert installed_external == CURRENT_INSTALL_ROOT_FILES
     assert (tmp_path / "spec-dock/.gitignore").read_bytes() == (SCAFFOLD_ROOT / ".gitignore").read_bytes()
 
 
@@ -160,13 +147,11 @@ def test_s45_foreign_fixed_root_is_preserved_and_blocks_fresh_install(tmp_path: 
     assert _filesystem_snapshot(tmp_path) == before
 
 
-def test_s45_foreign_skill_slot_is_preserved_and_blocks_fresh_install(tmp_path: Path) -> None:
+def test_init_replaces_the_fixed_skill_directory(tmp_path: Path) -> None:
     slot = tmp_path / ".agents/skills/spec-dock"
     slot.mkdir(parents=True)
-    sentinel = slot / "consumer.md"
-    sentinel.write_bytes(b"consumer-owned\n")
-    before = _filesystem_snapshot(tmp_path)
-
-    assert main(["init", str(tmp_path)]) == 1
-
-    assert _filesystem_snapshot(tmp_path) == before
+    sentinel = slot / "local.md"
+    sentinel.write_text("discard")
+    assert main(["init", str(tmp_path)]) == 0
+    assert not sentinel.exists()
+    assert (slot / "SKILL.md").is_file()

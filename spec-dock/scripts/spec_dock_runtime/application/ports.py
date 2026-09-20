@@ -17,7 +17,6 @@ if TYPE_CHECKING:
         GitWorktreeRecord,
         GuardedExplicitFileSource,
         PinnedCheckout,
-        PinnedProviderClosure,
         SyncCommandResult,
         SyncRequest,
     )
@@ -184,14 +183,11 @@ class GitGateway(Protocol):
 
     def resolve_commit(self, repo_root: Path, ref: str) -> str: ...
 
-    def provider_closure(self, repo_root: Path, pinned_commit: str) -> PinnedProviderClosure: ...
-
     def assess_capabilities(
         self,
         repo_root: Path,
         *,
         pinned_commit: str,
-        closure_paths: tuple[str, ...],
         branch: str | None = None,
         check_other_worktree: bool = True,
     ) -> GitCapabilityAssessment: ...
@@ -203,7 +199,6 @@ class GitGateway(Protocol):
         branch: str,
         pinned_commit: str,
         checkout_kind: str,
-        closure_paths: tuple[str, ...],
     ) -> PinnedCheckout: ...
 
     def verify_pinned_checkout(
@@ -211,7 +206,6 @@ class GitGateway(Protocol):
         repo_root: Path,
         *,
         checkout: PinnedCheckout,
-        closure_paths: tuple[str, ...],
     ) -> None: ...
 
     def add_worktree_pinned(
@@ -325,5 +319,3 @@ class Ports:
     filesystem_gateway: FilesystemGateway | None = None
     explicit_file_source_guard: ExplicitFileSourceGuard | None = None
     explicit_file_artifact_publisher: ExplicitFileArtifactPublisher | None = None
-    repo_root_fd: int | None = None
-    repo_root_binding: tuple[int, int] | None = None

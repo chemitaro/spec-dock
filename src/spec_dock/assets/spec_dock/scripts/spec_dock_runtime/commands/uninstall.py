@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import json
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 from spec_dock_runtime.commands.contracts import (
     CommandArgs,
@@ -20,56 +20,7 @@ if TYPE_CHECKING:
     from spec_dock_runtime.application.contracts import UseCases
 
 UPSTREAM_SOURCE = "git+https://github.com/chemitaro/spec-dock"
-_PURGE_REMOVED_CODE = "spec-history-purge-removed"
 _PURGE_REMOVED_ERROR = "Spec history purge has been removed; uninstall is tooling-only."
-_PURGE_REMOVED_GUIDANCE = (
-    "Use tooling-only uninstall without --remove-specs.",
-    "Spec history and Workbench data remain consumer-owned.",
-)
-
-
-def _none(value: object) -> str:
-    return "none" if value is None else str(value)
-
-
-def _bool_text(value: bool) -> str:
-    return "true" if value else "false"
-
-
-def _render_uninstall_text(payload: dict[str, object]) -> list[str]:
-    continuation = cast("dict[str, object]", payload["continuation"])
-    summary = cast("dict[str, int]", payload["summary"])
-    actions = cast("list[dict[str, str]]", payload["actions"])
-    guidance = cast("list[str]", payload["guidance"])
-    warnings = cast("list[str]", payload["warnings"])
-    errors = cast("list[str]", payload["errors"])
-    lines = [
-        f"spec-dock uninstall {payload['mode']} for {payload['target']}",
-        f"status: {payload['status']}",
-        f"code: {payload['code']}",
-        f"phase: {payload['phase']}",
-        f"last-completed-phase: {payload['last_completed_phase']}",
-        f"operation: {_none(payload['operation'])}",
-        f"candidate-digest: {_none(payload['candidate_digest'])}",
-        f"seed-policy: {_none(payload['seed_policy'])}",
-        f"mutation-started: {_bool_text(bool(payload['mutation_started']))}",
-        f"bootstrap-rolled-back: {_bool_text(bool(payload['bootstrap_rolled_back']))}",
-        f"next-action: {continuation['next_action']}",
-        f"next-command: {_none(continuation['next_command'])}",
-        f"after-cleanup-action: {continuation['after_cleanup_action']}",
-        f"after-cleanup-command: {_none(continuation['after_cleanup_command'])}",
-        "summary: "
-        f"planned={summary['planned']} completed={summary['completed']} preserved={summary['preserved']} "
-        f"pending={summary['pending']} failed={summary['failed']} warnings={summary['warnings']}",
-    ]
-    lines.extend(
-        f"action: {action['path']} category={action['category']} status={action['status']} reason={action['reason']}"
-        for action in actions
-    )
-    lines.extend(f"guidance: {item}" for item in guidance)
-    lines.extend(f"warning: {warning}" for warning in warnings)
-    lines.extend(f"error: {error}" for error in errors)
-    return lines
 
 
 @dataclass(frozen=True)
@@ -118,7 +69,7 @@ def _add_uninstall_arguments(parser: argparse.ArgumentParser) -> None:
     specs_mode.add_argument(
         "--remove-specs",
         action="store_true",
-        help="Remove spec history while uninstalling managed tooling",
+        help="Unsupported: consumer data is never removed",
     )
     parser.add_argument(
         "--json",
@@ -179,58 +130,13 @@ def _run_uninstall(args: CommandArgs, use_cases: UseCases) -> CommandOutcome:
 def _removed_purge_outcome(args: UninstallArgs) -> CommandOutcome:
     """Return the request-validation result without observing the target."""
 
-    target = Path(args.target).expanduser()
-    if args.invocation_cwd is not None and not target.is_absolute():
-        target = args.invocation_cwd / target
-    elif not target.is_absolute():
-        target = Path.cwd() / target
-    target = Path(os.path.normpath(target))
-    mode = "apply" if args.apply else "dry-run"
-    payload = {
-        "schema_version": 1,
-        "target": str(target),
-        "mode": mode,
-        "apply": args.apply,
-        "specs_mode": "remove",
-        "status": "error",
-        "code": _PURGE_REMOVED_CODE,
-        "operation": None,
-        "candidate_digest": None,
-        "seed_policy": None,
-        "mutation_started": False,
-        "bootstrap_rolled_back": False,
-        "phase": "request-validation",
-        "last_completed_phase": "not-started",
-        "retry_command": None,
-        "continuation": {
-            "next_action": "none",
-            "next_command": None,
-            "after_cleanup_action": "none",
-            "after_cleanup_command": None,
-        },
-        "failed_paths": [],
-        "pending_paths": [],
-        "summary": {
-            "planned": 0,
-            "completed": 0,
-            "preserved": 0,
-            "pending": 0,
-            "failed": 0,
-            "warnings": 0,
-        },
-        "actions": [],
-        "guidance": list(_PURGE_REMOVED_GUIDANCE),
-        "warnings": [],
-        "errors": [_PURGE_REMOVED_ERROR],
-    }
-    if args.json:
-        stdout_lines = [json.dumps(payload, ensure_ascii=False, separators=(",", ":"))]
-    else:
-        stdout_lines = _render_uninstall_text(payload)
-    return CommandOutcome(
-        exit_code=2,
-        text=CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=[]),
+    message = _PURGE_REMOVED_ERROR
+    text = CliText(
+        stdout_lines=[json.dumps({"status": "error", "command": "uninstall", "error": message})] if args.json else [],
+        stderr_lines=[] if args.json else [f"error: {message}"],
+        warnings=[],
     )
+    return CommandOutcome(exit_code=2, text=text)
 
 
 def _expect_uninstall_args(args: CommandArgs) -> UninstallArgs:

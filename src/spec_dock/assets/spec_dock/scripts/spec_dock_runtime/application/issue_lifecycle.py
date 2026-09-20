@@ -289,14 +289,6 @@ def issue_start(req: IssueStartRequest, ports: Ports) -> IssueStartResult:
             ports.git_gateway.verify_pinned_checkout(
                 _resolve_repo_root(ports),
                 checkout=pinned_checkout,
-                closure_paths=(
-                    "spec-dock/docs",
-                    "spec-dock/templates",
-                    "spec-dock/system",
-                    "spec-dock/scripts",
-                    ".agents/skills/spec-dock",
-                    ".agents/skills/spec-dock-grill-with-docs",
-                ),
             )
     except Exception as error:
         raise _checkout_issue_start_failure(requested_issue_id=requested.id, error=error) from error

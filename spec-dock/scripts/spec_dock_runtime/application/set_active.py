@@ -27,15 +27,6 @@ from spec_dock_runtime.domain.models import (
 from spec_dock_runtime.domain.tree import build_graph, select_active_chain
 from spec_dock_runtime.infra.contracts import ActiveManifest, ActiveManifestEntry, StoredMetaRecord
 
-_PROVIDER_CLOSURE_PATHS = (
-    "spec-dock/docs",
-    "spec-dock/templates",
-    "spec-dock/system",
-    "spec-dock/scripts",
-    "spec-dock/spec-dock.version",
-    ".agents/skills/spec-dock",
-    ".agents/skills/spec-dock-grill-with-docs",
-)
 _LAST_PINNED_CHECKOUT = None
 
 if TYPE_CHECKING:
@@ -337,10 +328,9 @@ def checkout_active_target(
         branch=decision.desired,
         pinned_commit=pinned_commit,
         checkout_kind=checkout_kind,
-        closure_paths=_PROVIDER_CLOSURE_PATHS,
     )
     _LAST_PINNED_CHECKOUT = checkout
-    ports.git_gateway.verify_pinned_checkout(repo_root, checkout=checkout, closure_paths=_PROVIDER_CLOSURE_PATHS)
+    ports.git_gateway.verify_pinned_checkout(repo_root, checkout=checkout)
     return decision
 
 

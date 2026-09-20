@@ -1,66 +1,45 @@
-# 移行ガイド
+# インストール・更新・削除
 
-このページは、既に `spec-dock` を導入しているリポジトリを現行の Storage Core 配布面へ更新するための手順です。新規導入は [全体ガイド](guide.md) を参照してください。
+## 管理対象
 
-## 1. 更新前の確認
+SpecDockは `spec-dock/docs`、`templates`、`system`、`scripts` と、`.agents/skills/spec-dock`、`.agents/skills/spec-dock-grill-with-docs` を管理します。更新は各ディレクトリを削除し、配布元の同じ構造をそのままコピーします。内部の個別ファイルの保持や差分マージは行いません。ここに加えたローカル変更も消えます。
 
-作業対象リポジトリで、未コミットの変更と利用者が管理する仕様データを確認します。`spec-dock update` は仕様履歴、Artifact、Discussion、ADR、Workbench の利用者データを自動変換しません。
+仕様書・成果物・Workbench・利用者設定は管理対象外です。既存のGitHub workflowも変更しません。新規workflowの自動配置は行いません。
 
-```bash
-git status --short
-./spec-dock/scripts/spec-dock validate
-```
+## 初回配置
 
-## 2. 現行配布面へ更新する
-
-通常は repo-local wrapper を使います。
-
-```bash
-./spec-dock/scripts/spec-dock update
-```
-
-別の管理対象を更新する場合はパスを明示できます。
-
-```bash
-./spec-dock/scripts/spec-dock update /path/to/project
-```
-
-更新は固定 upstream の recognized distribution を一つの計画として検証します。所有権を証明できない変更、symlink、hard-link、root の差し替え、未知の衝突は保持して書き込みを停止します。途中で停止した場合は、同じ root・operation に対して同じ package または compatible newer package で同じ command を再実行してください。`spec-dock/.distribution-journal.json` は root・intent・authority・contract・plan・protocol と action ごとの exact pre/postcondition に束縛され、不一致、downgrade、incompatible package なら追加 mutation 前に停止します。Recovery metadata role is schema/purpose-based, not pathname-based: the same pathname `spec-dock/.distribution-retry.json` carries schema 1 as a legacy migration input and schema 2 as the current forward guard. 旧 schema 1 payload は accepted exact condition の場合だけ一方向に schema 2 guard へ移行されます。schema 2 guard と journal は current forward recovery evidence です。unknown・replaced・malformed・mismatched lease、その他の legacy marker、dual recovery state は書き換えず、診断された repository-relative reason を確認してください。new journal 作成後は古い installer へ戻さず forward recovery を行います。forward recovery is not code rollback。
-
-## 3. 旧レイアウトや衝突がある場合
-
-自動的な rename、仕様書の再構成、利用者ファイルの強制削除は行いません。まず dry-run で対象と preserve set を確認し、managed surface だけを除去する必要がある場合に限り、仕様履歴を残すモードで uninstall を実行します。
-
-```bash
-spec-dock uninstall /path/to/project
-spec-dock uninstall /path/to/project --apply --keep-specs
+```sh
 spec-dock init /path/to/project
 ```
 
-default / `--keep-specs` uninstall は managed distribution deprovision として完全な read-only assessment を先に行います。apply は `.distribution-retry.json` schema 2 forward guard と `.distribution-journal.json` protocol 2 journal を使い、同じ root・intent・authority・contract・plan・protocol と semantic sourceが一致する同一または compatible newer packageだけがsame-plan forward recoveryできます。journalは `prepared → executing → verifying → completed` の順に進み、directoryはexact immediate-child evidenceがpublishedかつexpected-absentになってからだけ削除します。
+未導入のspec-dockスキャフォールドを配置します。既存のspec-dockがある場合はupdateを使います。`init --force` はupdateと同じディレクトリ交換です。初回に配置した `.gitignore` は以後上書きしません。
 
-`--remove-specs` は仕様履歴を削除する `current explicit spec-history purge authority` です。実行前に `--keep-specs` で残すspec history、Workbench、unknown / modified contentを確認してください。legacy `.uninstall-retry.json` は root、keep/remove mode、plan、checkpoint を証明しない `legacy reader-only/manual evidence` であり、自動変換・自動削除・current authorityへの昇格をしません。legacy markerとnew guard/journalが併存する場合もどちらかへ推測統合せず、manual recovery診断で停止します。
+初回initが途中失敗した場合は、原因を解消し、不完全な `spec-dock/` ディレクトリを別名または別の場所へ移して内容を保全してから、initを再実行してください。updateや `init --force` はツールだけを交換するため、欠けた初期設定（`.gitignore` など）の修復にはなりません。仕様や設定を作成済みでも、そのデータを自動削除する復旧処理はありません。
 
-成功した `--remove-specs` uninstall は、再初期化の境界として空の `spec-dock/` ディレクトリを残すことがあります。空境界には利用者データがないため、同じ対象で `spec-dock init /path/to/project` を実行して現行配布面を再作成できます。通常のkeep recoveryでJSON / text診断に表示されるretry commandは、元の対象を失わないよう現在の作業ディレクトリからの相対パスを使います。同じ作業ディレクトリで表示されたsame-keep commandを再実行してください。legacy markerはunsafeなretry commandを返さず、delete / rename / convertを自動案内しません。
+## 更新
 
-## 4. Artifact の取り込み
+更新中は、そのリポジトリのSpecDockコマンドを停止してください。
 
-現行の generic import は `artifact import file` です。一件の明示 regular file を opaque Artifact として保存し、source は変更・削除しません。
-
-```bash
-./spec-dock/scripts/spec-dock artifact import file \
-  --issue iss-00123 \
-  --file path/to/evidence.md
+```sh
+spec-dock update /path/to/project
 ```
 
-既存の evidence は自動的に canonical document へ書き換えられません。採用する主張は、レビュー後に Requirement、Design、Plan、Report へ手動で反映します。
+導入先コマンドからも `./spec-dock/scripts/spec-dock update /path/to/project` で固定upstreamの外部installerを呼べます。途中失敗では新旧のコードが混在し得ます。エラー原因を解消して外部installerのupdateを最初から再実行してください。自動ロールバック、cleanup token、版ごとの移行認証はありません。旧状態記録は更新の判断に使いません。
 
-## 5. 更新後の確認
+## ツールだけの削除
 
-```bash
-./spec-dock/scripts/spec-dock validate
-./spec-dock/scripts/spec-dock sync --no-github
+```sh
+spec-dock uninstall /path/to/project
+spec-dock uninstall /path/to/project --apply
+```
+
+既定は変更しないdry-runです。applyは6ディレクトリとバージョン記録を削除します。仕様・成果物などは残ります。`--remove-specs` は拒否します。再導入は残ったspec-dockに対してupdateを実行できます。
+
+## 確認
+
+```sh
 ./spec-dock/scripts/spec-dock --help
+./spec-dock/scripts/spec-dock validate
 ```
 
-Current の入口は [docs README](README.md)、[全体ガイド](guide.md)、[Authoring Kit 概要](authoring/overview.md) です。更新後も利用者所有の仕様履歴と Workbench を保持し、Current の runtime command と二つの repo-local skill だけを使用してください。
+配置先のsymlinkや非ディレクトリは誤書込みを避けるため拒否します。利用者データを管理対象ディレクトリ内へ置かないでください。

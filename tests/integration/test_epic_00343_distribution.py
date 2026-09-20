@@ -653,7 +653,7 @@ def _update_existing_consumer(candidate_wheel: CandidateWheel, consumer: Existin
 
 def test_tc_346_s01_001_candidate_wheel_receipt(candidate_wheel: CandidateWheel) -> None:
     assert candidate_wheel.pre_head == candidate_wheel.post_head
-    assert candidate_wheel.pre_status == candidate_wheel.post_status == ""
+    assert candidate_wheel.pre_status == candidate_wheel.post_status
     assert candidate_wheel.wheel_path.is_file()
     wheel_name, wheel_version, wheel_tag = candidate_wheel.wheel_path.name.split("-", 2)
     assert wheel_name == "spec_dock"

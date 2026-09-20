@@ -173,15 +173,6 @@ class GitCapabilityAssessment:
     allowed: bool
     reasons: tuple[str, ...]
     pinned_commit: str
-    closure_paths: tuple[str, ...]
-    provider_closure_digest: str | None = None
-
-
-@dataclass(frozen=True)
-class PinnedProviderClosure:
-    pinned_commit: str
-    paths: tuple[str, ...]
-    digest: str
 
 
 @dataclass(frozen=True)
@@ -190,7 +181,6 @@ class PinnedCheckout:
     pinned_commit: str
     before_branch: str | None
     before_head: str | None
-    provider_closure_digest: str
     checkout_kind: Literal["existing", "new"]
 
 
