@@ -10,11 +10,11 @@ ID: "iss-00405"
 
 # Result Summary
 
-## Current outcome — local implementation qualification complete
+## Current outcome — S7 delivery checks and integrated review complete
 
 GitHub Issue #405 はEpic #384配下に作成され、`issue start --id iss-00405`で正式開始されています。実装branchは`iss-00405-directory-replacement-final-cleanup`、active Issueは`iss-00405`です。
 
-承認済みRequirement / Design / Planとtest dispositionに従い、S0〜S6の実装・ローカル統合検証を完了しました。現在の公開済みcandidateは`0d9114b038ddb78dab32bc6039b51c4d02943846`です。Issue #405はまだmerge-readyではありません。PR、PR起動CI、S7 integrated review、Final Quality Gate Strict v2が未完了で、人間によるmergeは実行していません。
+承認済みRequirement / Design / Planとtest dispositionに従い、S0〜S6の実装・ローカル統合検証を完了し、PR #406を作成しました。現行の公開済みPR candidateは`11825a335b628b195cb61ddd47abe8aaab9cfd88`です。PR起動checksとfresh integrated reviewはこのcandidateで合格しています。tracked差分はS6候補`0d9114b038ddb78dab32bc6039b51c4d02943846`からIssue/Epic Reportの証拠更新だけです。Final Quality Gate Strict v2と、そのゲートが要求するfinal-SHA全テストはこれから実施するため、Issue #405はまだmerge-readyではありません。人間によるmergeは実行していません。
 
 ### Unit status
 
@@ -24,7 +24,7 @@ GitHub Issue #405 はEpic #384配下に作成され、`issue start --id iss-0040
 | S1–S3 | 完了 | provider generation/shared-lease gateの撤去と必要なcheckout/worktree/data safetyの維持。candidate `f77f6f7163430d6e5f1142eec7b8f07440e259f6`のfresh GPT-5.6 Sol Extra High reviewは`pass`、findings 0、confidence 0.94。 |
 | S4–S5 | 完了 | test/harness cleanup、installer failure successorの現行挙動照合、provider-first docs/dogfood sync。candidate `0ab3ab341cf734a032042c9beebb0fb2dba94125`のfresh GPT-5.6 Sol Extra High reviewは`pass`、findings 0、confidence 0.97。 |
 | S6 | 完了（local） | restart candidate `0d9114b038ddb78dab32bc6039b51c4d02943846`でfocused/full suite、lint、package、distribution integration、parity、SpecDock validateが完了。raw logsは後掲のS6 run directoryに保存。 |
-| S7 | 進行中 | PR作成、Ubuntu/macOSとその他PR checks、fresh integrated review、最終Report証拠更新、Final Quality Gate Strict v2待ち。human merge未実施。 |
+| S7 | 進行中 | PR #406、全PR checks、fresh integrated reviewはcandidate `11825a3`で合格。Report証拠を更新済み。Final Quality Gate Strict v2と同じfinal SHAの必須テストは未完了。human merge未実施。 |
 
 ### S6 candidate restartの履歴
 
@@ -65,10 +65,27 @@ skip全項目とraw summaryは`20260920T102326Z/08-full-pytest-skip-reasons.log`
 | Gate | 状態 | 結果の扱い |
 |---|---|---|
 | S6 local qualification | pass | 上記の公開済みcandidate `0d9114...`で実測済み |
-| PR / Ubuntu・macOS CI / 最新PR checks | pending | PR作成・実行後にexact head SHAと全job結果を記録する |
-| fresh integrated code/spec/QA review | pending | S7でGPT-5.6 Sol Extra Highを使用し、review candidate SHAを固定する |
-| Final Quality Gate Strict v2 | pending | 全ての最新必須checksとreviewが揃ったfinal pushed SHAをGPT-5.6 Sol Proで検証する |
+| PR #406 / Ubuntu・macOS CI / 最新PR checks | pass | exact PR head `11825a335b628b195cb61ddd47abe8aaab9cfd88`で全必須PR checks成功。Provider CIの実測と同じGit treeであることを確認 |
+| fresh integrated code/spec/QA review | pass | GPT-5.6 Sol Extra High、range `a865277de85740acee536613bde6c7de50092e71..11825a335b628b195cb61ddd47abe8aaab9cfd88`、`review_status=pass`、findings 0、confidence 0.97 |
+| Final Quality Gate Strict v2 | pending | Report更新後に確定するfinal pushed SHAの全必須テストと最新PR checksを確認後、GPT-5.6 Sol Proで実施する |
 | human merge | 未実施 | agentはmergeせず、merge-ready handoffで停止する |
+
+### S7 delivery evidence — exact PR candidate `11825a335b628b195cb61ddd47abe8aaab9cfd88`
+
+PR #406: [refactor: provider generation gateと旧テスト残滓を撤去 (#405)](https://github.com/chemitaro/spec-dock/pull/406)。2026-09-20時点でPRはOPEN、non-draft、`MERGEABLE` / `CLEAN`です。これはmerge実施の記録ではありません。
+
+| Check | 実測結果 |
+|---|---|
+| Provider CI / `provider-tests` | success、`1546 passed, 30 skipped in 1018.01s`。job内`make lint`も成功。 [run/job](https://github.com/chemitaro/spec-dock/actions/runs/35507399426/job/106069427747) |
+| Provider distribution parity (`ubuntu-latest`) | success、`12 passed in 2.77s`。 [job](https://github.com/chemitaro/spec-dock/actions/runs/35507399426/job/106069427826) |
+| Provider distribution parity (`macos-latest`) | success、`12 passed in 3.71s`。 [job](https://github.com/chemitaro/spec-dock/actions/runs/35507399426/job/106069427917) |
+| CI `validate` | success。 [job](https://github.com/chemitaro/spec-dock/actions/runs/35507399439/job/106069427736) |
+| Commit identity `check` | success。 [job](https://github.com/chemitaro/spec-dock/actions/runs/35507399443/job/106069427820) |
+| PR/push-triggered check inventory | `gh pr checks 406` readbackでは、上記PR jobsおよび同candidateのpush-triggered `validate` / `check`を含め、返された全checksがsuccess。 |
+
+Provider CIはpull-request merge commit `cae669050cb5209cfcf3c958e70fdf7b307da1a2`上で実行されました。そのtree SHA `bb2fd5c1c2a39d05c584f82bc55d2ada435d0a2d`はPR head `11825...`のtree SHAと一致しています。Provider CIの30 skipsはCIログに個別理由が出ていないため、このレポートでは理由を推定しません。Darwin arm64上のローカルS6 `1551 passed, 25 skipped`と、Linux runner上のCI `1546 passed, 30 skipped`は環境・候補の異なる結果として分けて扱います。
+
+fresh integrated Strict reviewはsession `required-strict-github-connector-verificati-1050`、GPT-5.6 Sol / Extra Highでrange `a865277de85740acee536613bde6c7de50092e71..11825a335b628b195cb61ddd47abe8aaab9cfd88`を対象に実施し、`review_status=pass`、findings 0、confidence 0.97でした。raw structured resultはGit管理外Workbenchの`reviews/s7-integrated-review.json`に保存し、SHA-256は`2cef8ca7501d9b0a8d006bde4a03dca09fb4435e84ddfdb389651b1a43f05f6d`です。このreviewはFinal Quality Gate Strict v2の代替ではありません。
 
 ## Deliverables
 
@@ -88,13 +105,14 @@ skip全項目とraw summaryは`20260920T102326Z/08-full-pytest-skip-reasons.log`
 - `f77f6f7163430d6e5f1142eec7b8f07440e259f6`: S1–S3実装・ローカル検証・Strict review pass。
 - `0ab3ab341cf734a032042c9beebb0fb2dba94125`: S4–S5 cleanup/sync・Strict review pass。
 - `0d9114b038ddb78dab32bc6039b51c4d02943846`: S6 restart candidate。Ruff formatのみの修正後、S6全sequenceを再実行。
+- `11825a335b628b195cb61ddd47abe8aaab9cfd88`: S7 Report証拠更新、PR #406、PR checks、fresh integrated review pass。final-SHA tests/FQG v2は次のゲート。
 
 ## Residual risks / non-goals
 
 - installerは仕様どおりnontransactionalであり、自動rollbackしない。途中失敗時は外部installerを再実行して置換を完了する。
 - native Git hook/config failureは起こり得る。
 - same-EUID非協調actorへの追加保証、cross-filesystem worktree対応、atomic installer/journal/rollbackは追加していない。
-- S7のPR CI、integrated reviewおよびFinal Quality Gateが未完了のため、merge-readyではない。
+- S7のPR CIとintegrated reviewはpass。final evidence SHAの全必須テストとFinal Quality Gate Strict v2が未完了のため、merge-readyではない。
 
 ## Historical appendix — specification authoring and adoption
 
