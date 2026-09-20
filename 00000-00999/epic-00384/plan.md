@@ -20,12 +20,12 @@ ID: "epic-00384"
 
 | #405単位 | 状態 | 実測・残作業 |
 |---|---|---|
-| S0〜S3 runtime boundary | 完了 | runtime `686 passed, 24 skipped`、application/artifact `283 passed, 6 skipped`、`make lint`成功。S1〜S3候補 `f77f6f7163430d6e5f1142eec7b8f07440e259f6` はGPT-5.6 Sol Extra High Strict code review `pass`、P0/P1なし。 |
-| S4〜S5 installer/test cleanup・docs/dogfood・本Plan/Report | local verification完了 | directory installation `11 passed`、distribution cutover `8 passed`、runtime handoff/worktree safety `9 passed`、同期後 `test_init_update.py` `58 passed`。mid-copy failure successorは現行ProductでGreen (`covered-existing`) のためinstaller sourceは変更なし。保護pathのsync前後差分は0、current-doc obsolete guarantee scanは0件。作業候補のcommitとS4〜S5 Strict reviewは未完了。 |
-| S6 integrated local qualification | 未実施（pending） | full `uv run pytest`、最新候補の`make lint`、package/build、integration、parity、`spec-dock validate`を実測する。 |
-| S7 delivery gate | 未実施（pending） | Issue Report、PR、Ubuntu/macOS CI、独立最終レビューと最新checksを確認し、merge-ready handoffへ進む。人間mergeは未実施。 |
+| S0〜S3 runtime boundary | 完了 | runtime `686 passed, 24 skipped`、application/artifact `283 passed, 6 skipped`、`make lint`成功。S1〜S3候補 `f77f6f7163430d6e5f1142eec7b8f07440e259f6` はGPT-5.6 Sol Extra High Strict code review `pass`、findings 0、confidence 0.94。 |
+| S4〜S5 installer/test cleanup・docs/dogfood・本Plan/Report | local verification・Strict review完了 | directory installation `11 passed`、distribution cutover `8 passed`、runtime handoff/worktree safety `9 passed`、同期後 `test_init_update.py` `58 passed`。mid-copy failure successorは現行ProductでGreen (`covered-existing`) のためinstaller sourceは変更なし。保護pathのsync前後差分は0、current-doc obsolete guarantee scanは0件。candidate `0ab3ab341cf734a032042c9beebb0fb2dba94125`のGPT-5.6 Sol Extra High Strict reviewは`pass`、findings 0、confidence 0.97。 |
+| S6 integrated local qualification | 完了（local） | candidate `0d9114b038ddb78dab32bc6039b51c4d02943846`でfocused `141 passed`、full `1551 passed, 25 skipped`、`make lint`、sdist/wheel build、distribution integration `11 passed`、parity `10 passed`、SpecDock validate `nodes=237`を実測。skip理由とraw logsはIssue Reportに記録。 |
+| S7 delivery gate | 進行中 | S6証拠を記録し、PRを作成してUbuntu/macOS CI、fresh integrated review、Final Quality Gate Strict v2を確認する。これらはpending。人間mergeは未実施。 |
 
-S4〜S5はIssue Planどおり一つのcheckpointです。親文書のこの更新自体も同checkpointの測定済み証拠に限り、未実行のS6/S7を完了扱いしません。Issue #405のRequirement、Design、accepted ADR、historical artifactsは変更対象ではありません。
+S4〜S5はIssue Planどおり一つのcheckpointで完了し、candidate `0ab3ab...4125`を対象にStrict reviewを通過しました。S6の実測はcandidate `0d9114...3846`に結び付きます。初回S6試行でRuff format/checkが失敗したため、test/fixture 5ファイルだけにformat-only修正を行い、新candidateで正規sequence全体を再実行しました。S7 PR/CI/review/Final Quality Gateは未完了であり、merge-ready扱いしません。現在状態と測定詳細はIssue #405 Reportを参照してください。Issue #405のRequirement、Design、accepted ADR、historical artifactsは変更対象ではありません。
 
 ## 実施規律
 
