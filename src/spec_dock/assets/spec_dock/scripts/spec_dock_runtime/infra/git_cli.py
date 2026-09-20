@@ -3,7 +3,6 @@ from __future__ import annotations
 import contextlib
 import ctypes
 import errno
-import fcntl
 import os
 from pathlib import Path
 import re
@@ -12,16 +11,11 @@ import shutil
 import stat
 import subprocess
 import sys
-import unicodedata
+from typing import Literal
 from urllib.parse import urlsplit
 
-from spec_dock_runtime.application.contracts import (
-    GitCapabilityAssessment,
-    GitWorktreeRecord,
-    PinnedCheckout,
-)
+from spec_dock_runtime.application.contracts import GitWorktreeRecord
 
-_WRITING_GIT_COMMANDS = frozenset({"checkout", "switch", "update-ref", "worktree"})
 DirectoryWitness = tuple[int, int]
 DirectoryWitnesses = tuple[tuple[str, DirectoryWitness], ...]
 
@@ -117,24 +111,6 @@ def local_branch_exists(repo_root: Path, branch: str) -> bool:
     return p.returncode == 0
 
 
-def checkout_branch(repo_root: Path, branch: str, *, lease_fd: int | None = None) -> None:
-    _ensure_git_available()
-    cmd = ["git", "checkout", branch]
-    try:
-        _run_git_write(repo_root, cmd, lease_fd=lease_fd)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
-
-
-def create_and_checkout_branch(repo_root: Path, branch: str, *, lease_fd: int | None = None) -> None:
-    _ensure_git_available()
-    cmd = ["git", "checkout", "-b", branch]
-    try:
-        _run_git_write(repo_root, cmd, lease_fd=lease_fd)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
-
-
 def check_ref_format_branch(repo_root: Path, branch: str) -> bool:
     _ensure_git_available()
     p = subprocess.run(
@@ -204,10 +180,6 @@ def _redact_remote_url(remote_url: str) -> str:
     return "<credential-bearing remote>" if _remote_has_userinfo(remote_url) else remote_url
 
 
-def _directory_flags() -> int:
-    return os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0)
-
-
 def origin_github_publication_endpoint(repo_root: Path) -> tuple[str, str]:
     fetch_url = _remote_get_url(repo_root, push=False)
     push_url = _remote_get_url(repo_root, push=True)
@@ -255,22 +227,16 @@ def remove_worktree(
     *,
     path: Path,
     force: bool,
-    source_fd: int | None = None,
-    target_fd: int | None = None,
-    lease_fd: int | None = None,
+    target_fd: int,
 ) -> None:
     _ensure_git_available()
     cmd = ["git", "worktree", "remove"]
     if force:
         cmd.append("--force")
     cmd.append(str(path))
+    _verify_worktree_target_binding(path, target_fd, phase="before Git mutation")
     try:
-        _run_git_write(
-            repo_root,
-            cmd,
-            bound_fds=tuple(fd for fd in (source_fd, target_fd) if fd is not None),
-            lease_fd=lease_fd,
-        )
+        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         stderr = (e.stderr or "").strip()
         stdout = (e.stdout or "").strip()
@@ -324,57 +290,6 @@ def _parse_worktree_porcelain(text: str) -> list[GitWorktreeRecord]:
     return records
 
 
-def _open_repository_root(repo_root: Path) -> int:
-    raw = os.fspath(repo_root)
-    if not Path(raw).is_absolute() or "\x00" in raw:
-        raise RuntimeError("repository root must be absolute and NUL-free")
-    if Path(raw).is_symlink():
-        raise RuntimeError("repository root must not be a symlink")
-    absolute = Path(raw)
-    current = os.open(
-        os.sep,
-        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0) | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_CLOEXEC", 0),
-    )
-    try:
-        for index, component in enumerate(absolute.parts[1:]):
-            if component in {"", ".", ".."}:
-                raise RuntimeError("repository root contains an unsafe component")
-            try:
-                binding = os.stat(component, dir_fd=current, follow_symlinks=False)
-            except FileNotFoundError:
-                binding = None
-            if binding is not None and stat.S_ISLNK(binding.st_mode):
-                allowed_var_alias = (
-                    sys.platform == "darwin"
-                    and index == 0
-                    and component == "var"
-                    and os.readlink(component, dir_fd=current) in {"/private/var", "private/var"}
-                )
-                if not allowed_var_alias:
-                    raise RuntimeError("repository root contains an unsafe symlink component")
-                private_fd = os.open("private", _directory_flags(), dir_fd=current)
-                os.close(current)
-                current = private_fd
-                var_fd = os.open("var", _directory_flags(), dir_fd=current)
-                os.close(current)
-                current = var_fd
-                continue
-            next_fd = os.open(
-                component,
-                os.O_RDONLY
-                | getattr(os, "O_DIRECTORY", 0)
-                | getattr(os, "O_NOFOLLOW", 0)
-                | getattr(os, "O_CLOEXEC", 0),
-                dir_fd=current,
-            )
-            os.close(current)
-            current = next_fd
-        return current
-    except BaseException:
-        os.close(current)
-        raise
-
-
 def _runtime_scripts_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
@@ -388,70 +303,61 @@ def _helper_environment() -> dict[str, str]:
     return environment
 
 
-def _run_git_write(
-    repo_root: Path,
+def _verify_worktree_target_binding(path: Path, target_fd: int, *, phase: str) -> None:
+    try:
+        opened = os.fstat(target_fd)
+        observed = path.stat(follow_symlinks=False)
+    except OSError as error:
+        raise RuntimeError(f"worktree target binding unavailable {phase}") from error
+    if (
+        not stat.S_ISDIR(opened.st_mode)
+        or not stat.S_ISDIR(observed.st_mode)
+        or (opened.st_dev, opened.st_ino) != (observed.st_dev, observed.st_ino)
+    ):
+        raise RuntimeError(f"worktree target binding changed {phase}")
+
+
+def _run_git_in_bound_cwd(
     command: list[str],
     *,
-    bound_fds: tuple[int, ...] = (),
-    lease_fd: int | None = None,
-    cwd_fd: int | None = None,
+    cwd_fd: int,
 ) -> subprocess.CompletedProcess[str]:
-    """Run a writing Git command through the lease-retaining helper."""
-
-    owns_lease = lease_fd is None
-    root_fd = _open_repository_root(repo_root) if lease_fd is None else lease_fd
     try:
-        try:
-            value = os.fstat(root_fd)
-        except OSError as error:
-            raise RuntimeError("repository coordination is unavailable") from error
-        if not stat.S_ISDIR(value.st_mode):
-            raise RuntimeError("repository coordination is unavailable")
-        if owns_lease:
-            try:
-                fcntl.flock(root_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
-            except OSError as error:
-                if error.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
-                    raise RuntimeError("repository coordination is busy") from error
-                raise RuntimeError("repository coordination is unavailable") from error
-        working_directory_fd = root_fd if cwd_fd is None else cwd_fd
-        all_fds = tuple(dict.fromkeys((root_fd, *bound_fds, working_directory_fd)))
-        helper = [
-            sys.executable,
-            "-m",
-            "spec_dock_runtime.infra.git_helper",
-        ]
-        for bound_fd in all_fds:
-            value = os.fstat(bound_fd)
-            helper.extend([
-                "--lease-fd",
-                str(bound_fd),
-                "--expected-device",
-                str(value.st_dev),
-                "--expected-inode",
-                str(value.st_ino),
-            ])
-        helper.extend(["--cwd-fd", str(working_directory_fd), "--", *command])
-        result = subprocess.run(
-            helper,
-            cwd=str(_runtime_scripts_root()),
-            env=_helper_environment(),
-            pass_fds=all_fds,
-            capture_output=True,
-            text=True,
-            check=False,
+        value = os.fstat(cwd_fd)
+    except OSError as error:
+        raise RuntimeError("worktree cwd binding is unavailable") from error
+    if not stat.S_ISDIR(value.st_mode):
+        raise RuntimeError("worktree cwd binding is not a directory")
+    helper = [
+        sys.executable,
+        "-m",
+        "spec_dock_runtime.infra.git_helper",
+        "--cwd-fd",
+        str(cwd_fd),
+        "--expected-device",
+        str(value.st_dev),
+        "--expected-inode",
+        str(value.st_ino),
+        "--",
+        *command,
+    ]
+    result = subprocess.run(
+        helper,
+        cwd=str(_runtime_scripts_root()),
+        env=_helper_environment(),
+        pass_fds=(cwd_fd,),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode,
+            command,
+            output=result.stdout,
+            stderr=result.stderr,
         )
-        if result.returncode != 0:
-            raise subprocess.CalledProcessError(
-                result.returncode,
-                command,
-                output=result.stdout,
-                stderr=result.stderr,
-            )
-        return result
-    finally:
-        if owns_lease:
-            os.close(root_fd)
+    return result
 
 
 def resolve_commit(repo_root: Path, ref: str) -> str:
@@ -464,18 +370,8 @@ def resolve_commit(repo_root: Path, ref: str) -> str:
     return (result.stdout or "").strip()
 
 
-def _ls_tree(repo_root: Path, pinned_commit: str, paths: tuple[str, ...]) -> bytes:
-    command = ["git", "ls-tree", "-rz", "-r", "--full-tree", pinned_commit, "--", *paths]
-    result = subprocess.run(command, cwd=str(repo_root), capture_output=True, check=False)
-    if result.returncode != 0:
-        raise RuntimeError(
-            f"git failed: {' '.join(command)}\n{(result.stderr or b'').decode(errors='replace').strip()}"
-        )
-    return result.stdout or b""
-
-
-def _ls_tree_all(repo_root: Path, pinned_commit: str) -> bytes:
-    command = ["git", "ls-tree", "-rz", "-r", "--full-tree", pinned_commit]
+def _ls_tree_all(repo_root: Path, target_commit: str) -> bytes:
+    command = ["git", "ls-tree", "-rz", "-r", "--full-tree", target_commit]
     result = subprocess.run(command, cwd=str(repo_root), capture_output=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(
@@ -515,263 +411,55 @@ def _git_object_bytes(repo_root: Path, *, object_type: str, object_id: str) -> b
     return result.stdout or b""
 
 
-def _config(repo_root: Path, key: str) -> str | None:
-    result = subprocess.run(
-        ["git", "config", "--get", key],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return None
-    value = (result.stdout or "").strip()
-    return value or None
-
-
-def _git_path(repo_root: Path, name: str) -> Path:
-    result = subprocess.run(
-        ["git", "rev-parse", "--git-path", name],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if result.returncode != 0:
-        return repo_root / name
-    candidate = Path((result.stdout or "").strip())
-    return candidate if candidate.is_absolute() else repo_root / candidate
-
-
-def assess_capabilities(
-    repo_root: Path,
-    *,
-    pinned_commit: str,
-    branch: str | None = None,
-    check_other_worktree: bool = True,
-) -> GitCapabilityAssessment:
-    reasons: list[str] = []
-
-    status = subprocess.run(
-        ["git", "status", "--porcelain=v1"],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if status.returncode != 0:
-        reasons.append("status-unavailable")
-    elif status.stdout:
-        reasons.append("working-tree-not-clean")
-
-    if subprocess.run(
-        ["git", "diff", "--name-only", "--diff-filter=U"],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    ).stdout:
-        reasons.append("unmerged-index")
-
-    for state_name in ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "BISECT_LOG"):
-        if _git_path(repo_root, state_name).exists():
-            reasons.append(f"operation-state:{state_name.lower()}")
-    if any(_git_path(repo_root, state).exists() for state in ("rebase-apply", "rebase-merge")):
-        reasons.append("operation-state:rebase")
-
-    hooks_value = _config(repo_root, "core.hooksPath")
-    hooks_root = Path(hooks_value).expanduser() if hooks_value else _git_path(repo_root, "hooks")
-    if not hooks_root.is_absolute():
-        hooks_root = repo_root / hooks_root
-    for hook_name in ("post-checkout", "reference-transaction", "post-index-change"):
-        hook = hooks_root / hook_name
-        try:
-            if hook.is_file() and os.access(hook, os.X_OK):
-                reasons.append(f"writing-hook:{hook_name}")
-        except OSError:
-            reasons.append(f"writing-hook-unavailable:{hook_name}")
-
-    fsmonitor = _config(repo_root, "core.fsmonitor")
-    if fsmonitor is not None and fsmonitor.lower() not in {"false", "0", "off", "no", "none"}:
-        reasons.append("fsmonitor-enabled")
-    sparse_checkout = _config(repo_root, "core.sparseCheckout")
-    if sparse_checkout is not None and sparse_checkout.lower() in {"true", "1", "yes", "on"}:
-        reasons.append("sparse-checkout-enabled")
-    sparse_bits = subprocess.run(
-        ["git", "ls-files", "-v"],
-        cwd=str(repo_root),
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    if sparse_bits.returncode != 0:
-        reasons.append("skip-worktree-probe-unavailable")
-    elif any(line.startswith("S ") for line in (sparse_bits.stdout or "").splitlines()):
-        reasons.append("skip-worktree-bit-set")
-
-    if (_config(repo_root, "core.autocrlf") or "false").lower() not in {"false", "0", "off"}:
-        reasons.append("autocrlf-enabled")
-    if _config(repo_root, "core.eol") is not None:
-        reasons.append("core-eol-set")
-
-    try:
-        target_entries = _tree_entries(_ls_tree_all(repo_root, pinned_commit))
-    except RuntimeError:
-        target_entries = []
-        reasons.append("target-tree-unprovable")
-
-    attr_paths = [entry[3] for entry in target_entries]
-    attr_command = [
-        "git",
-        "--literal-pathspecs",
-        "check-attr",
-        f"--source={pinned_commit}",
-        "-z",
-        "--all",
-        "--",
-        *attr_paths,
-    ]
-    attrs = subprocess.run(attr_command, cwd=str(repo_root), capture_output=True, check=False)
-    if attrs.returncode != 0:
-        reasons.append("attributes-unprovable")
-    else:
-        fields = attrs.stdout.split(b"\0")
-        for index in range(0, len(fields) - 2, 3):
-            attribute = fields[index + 1].decode("utf-8", errors="replace")
-            value = fields[index + 2].decode("utf-8", errors="replace")
-            if attribute in {
-                "eol",
-                "text",
-                "working-tree-encoding",
-                "ident",
-                "filter",
-                "diff",
-                "merge",
-            } and value not in {
-                "unspecified",
-                "",
-                "-",
-            }:
-                reasons.append(f"attribute-enabled:{attribute}={value}")
-                break
-
-    normalized: dict[str, str] = {}
-    for mode, object_type, object_id, path in target_entries:
-        normalized_path = unicodedata.normalize("NFC", path).casefold()
-        previous = normalized.get(normalized_path)
-        if previous is not None and previous != path:
-            reasons.append(f"path-collision:{previous}:{path}")
-        normalized[normalized_path] = path
-        if mode == "160000" or object_type == "commit":
-            reasons.append(f"submodule:{path}")
-        if mode == "120000":
-            try:
-                link = _git_object_bytes(repo_root, object_type=object_type, object_id=object_id)
-                _validate_link_target(link, path)
-            except RuntimeError:
-                reasons.append(f"unsafe-symlink:{path}")
-
-    if check_other_worktree:
-        other_worktree = subprocess.run(
-            ["git", "worktree", "list", "--porcelain"],
-            cwd=str(repo_root),
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        for record in _parse_worktree_porcelain(other_worktree.stdout or ""):
-            same_path = record.path.resolve(strict=False) == repo_root.resolve(strict=False)
-            conflicting_branch = branch is not None and record.branch == branch
-            conflicting_head = branch is None and record.head == pinned_commit
-            if not same_path and (conflicting_branch or conflicting_head):
-                reasons.append("commit-checked-out-in-other-worktree")
-
-    return GitCapabilityAssessment(
-        allowed=not reasons,
-        reasons=tuple(dict.fromkeys(reasons)),
-        pinned_commit=pinned_commit,
-    )
-
-
-def pinned_checkout(
+def checkout_fixed_ref(
     repo_root: Path,
     *,
     branch: str,
-    pinned_commit: str,
-    checkout_kind: str,
-    lease_fd: int | None = None,
-) -> PinnedCheckout:
-    before_branch = current_branch_or_none(repo_root)
-    before_head = current_head_or_none(repo_root)
-    assessment = assess_capabilities(
-        repo_root,
-        pinned_commit=pinned_commit,
-        branch=branch,
-    )
-    if not assessment.allowed:
-        raise RuntimeError("Git capability guard failed: " + ", ".join(assessment.reasons))
+    target_commit: str,
+    checkout_kind: Literal["existing", "new"],
+) -> None:
+    _ensure_git_available()
     if checkout_kind == "existing":
-        _run_git_write(
-            repo_root,
-            ["git", "update-ref", f"refs/heads/{branch}", pinned_commit, pinned_commit],
-            lease_fd=lease_fd,
-        )
-        if before_branch != branch:
-            _run_git_write(repo_root, ["git", "switch", branch], lease_fd=lease_fd)
+        commands = [["git", "update-ref", f"refs/heads/{branch}", target_commit, target_commit]]
+        if current_branch_or_none(repo_root) != branch:
+            commands.append(["git", "switch", branch])
     elif checkout_kind == "new":
-        _run_git_write(repo_root, ["git", "switch", "-c", branch, pinned_commit], lease_fd=lease_fd)
+        commands = [["git", "switch", "-c", branch, target_commit]]
     else:
         raise RuntimeError(f"unsupported checkout kind: {checkout_kind}")
-    checkout = PinnedCheckout(
-        target_branch=branch,
-        pinned_commit=pinned_commit,
-        before_branch=before_branch,
-        before_head=before_head,
-        checkout_kind=checkout_kind,  # type: ignore[arg-type]
-    )
-    verify_pinned_checkout(repo_root, checkout=checkout)
-    return checkout
 
+    for command in commands:
+        try:
+            subprocess.run(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError(f"git failed: {' '.join(command)}\n{(error.stderr or '').strip()}") from error
 
-def verify_pinned_checkout(
-    repo_root: Path,
-    *,
-    checkout: PinnedCheckout,
-) -> None:
-    branch = current_branch_or_none(repo_root)
-    head = current_head_or_none(repo_root)
-    if branch != checkout.target_branch or head != checkout.pinned_commit:
+    observed_branch = current_branch_or_none(repo_root)
+    observed_head = current_head_or_none(repo_root)
+    if observed_branch != branch or observed_head != target_commit:
         raise RuntimeError(
-            "runtime-generation-drift: "
-            f"before={checkout.before_branch or '(detached)'}:{checkout.before_head or '(none)'} "
-            f"after={branch or '(detached)'}:{head or '(none)'}"
+            "Git checkout did not reach the fixed target: "
+            f"expected={branch}:{target_commit} observed={observed_branch or '(detached)'}:{observed_head or '(none)'}"
         )
-    assessment = assess_capabilities(
-        repo_root,
-        pinned_commit=checkout.pinned_commit,
-        branch=checkout.target_branch,
-    )
-    if not assessment.allowed:
-        raise RuntimeError("runtime-generation-drift: " + ", ".join(assessment.reasons))
 
 
-def add_worktree_pinned(
+def add_worktree_at_commit(
     repo_root: Path,
     *,
     path: Path,
     branch: str,
-    pinned_commit: str,
-    source_fd: int | None = None,
-    target_fd: int | None = None,
-    lease_fd: int | None = None,
+    target_commit: str,
+    target_fd: int,
 ) -> None:
-    bound_fds = tuple(fd for fd in (source_fd, target_fd) if fd is not None)
-    _run_git_write(
-        repo_root,
-        ["git", "worktree", "add", "--no-checkout", "-b", branch, str(path), pinned_commit],
-        bound_fds=bound_fds,
-        lease_fd=lease_fd,
-    )
+    _ensure_git_available()
+    command = ["git", "worktree", "add", "--no-checkout", "-b", branch, str(path), target_commit]
+    _verify_worktree_target_binding(path, target_fd, phase="before Git mutation")
+    try:
+        subprocess.run(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
+    except subprocess.CalledProcessError as error:
+        details = "\n".join(part for part in ((error.stderr or "").strip(), (error.stdout or "").strip()) if part)
+        raise RuntimeError(f"git failed: {' '.join(command)}\n{details}") from error
+    _verify_worktree_target_binding(path, target_fd, phase="after Git mutation")
 
 
 def _relative_components(path: str) -> tuple[str, ...]:
@@ -951,6 +639,8 @@ def _materialize_tree_entry(
         created_directory_witnesses=created_directory_witnesses,
     )
     try:
+        if mode == "160000" or object_type == "commit":
+            raise RuntimeError(f"submodule is not supported in a materialized worktree: {relative_path}")
         payload = _git_object_bytes(repo_root, object_type=object_type, object_id=object_id)
         if mode == "100644":
             _materialize_regular(parent_fd, components[-1], payload, 0o644)
@@ -958,8 +648,6 @@ def _materialize_tree_entry(
             _materialize_regular(parent_fd, components[-1], payload, 0o755)
         elif mode == "120000":
             _materialize_symlink(parent_fd, components[-1], payload, relative_path)
-        elif mode == "160000" or object_type == "commit":
-            raise RuntimeError(f"submodule is not supported in a materialized worktree: {relative_path}")
         else:
             raise RuntimeError(f"unsupported Git tree mode: {mode} ({relative_path})")
         os.fsync(parent_fd)
@@ -1064,20 +752,13 @@ def materialize_worktree(
     repo_root: Path,
     *,
     path: Path,
-    pinned_commit: str,
-    source_fd: int,
+    target_commit: str,
     target_fd: int,
 ) -> DirectoryWitnesses:
-    command = ["git", "read-tree", "--reset", pinned_commit]
+    command = ["git", "read-tree", "--reset", target_commit]
     try:
-        _run_git_write(
-            path,
-            command,
-            bound_fds=(source_fd,),
-            lease_fd=target_fd,
-            cwd_fd=target_fd,
-        )
-        entries = _tree_entries(_ls_tree_all(path, pinned_commit))
+        _run_git_in_bound_cwd(command, cwd_fd=target_fd)
+        entries = _tree_entries(_ls_tree_all(path, target_commit))
         entrypoint = "spec-dock/scripts/spec-dock"
         pending_entrypoint: tuple[str, str, str, str] | None = None
         created_directory_witnesses: dict[str, DirectoryWitness] = {}
@@ -1111,10 +792,10 @@ def publish_worktree_entrypoint(
     repo_root: Path,
     *,
     target_fd: int,
-    pinned_commit: str,
+    target_commit: str,
     directory_witnesses: DirectoryWitnesses,
 ) -> None:
-    entries = _tree_entries(_ls_tree_all(repo_root, pinned_commit))
+    entries = _tree_entries(_ls_tree_all(repo_root, target_commit))
     pending_entrypoint = next((entry for entry in entries if entry[3] == "spec-dock/scripts/spec-dock"), None)
     if pending_entrypoint is None:
         raise RuntimeError("worktree entrypoint is missing from the pinned tree")

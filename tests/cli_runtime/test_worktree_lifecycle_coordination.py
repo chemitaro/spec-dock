@@ -14,8 +14,8 @@ import pytest
 from tests.cli_runtime.harness import CliRuntimeHarness, main
 
 
-class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
-    def test_t11_worktree_b_create_remove_and_make_handoff_are_inode_bound(self, tmp_path: Path) -> None:
+class TestWorktreeSafetyCoordination(CliRuntimeHarness):
+    def test_worktree_create_remove_and_consumer_handoff_are_inode_bound(self, tmp_path: Path) -> None:
         target = tmp_path / "target"
         target.mkdir()
         assert main(["init", str(target)]) == 0
@@ -81,7 +81,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
         assert replacement.is_symlink()
         assert outside.is_dir()
 
-    def test_t11_cross_filesystem_worktree_admission_is_rejected_before_git_mutation(self, monkeypatch) -> None:
+    def test_cross_filesystem_worktree_admission_is_rejected_before_git_mutation(self, monkeypatch) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
@@ -99,7 +99,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
         finally:
             sys.path.pop(0)
 
-    def test_t11_original_worktree_inode_is_preserved_when_git_leaves_it(self) -> None:
+    def test_original_worktree_inode_is_preserved_when_git_leaves_it(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime_scripts_dir = (
                 Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -131,7 +131,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     # Simulate Git removing only its record while leaving the
                     # original empty directory for descriptor-bound cleanup.
                     return None
@@ -157,7 +157,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
             assert worktree_path.is_dir()
             assert worktree_path.is_symlink() is False
 
-    def test_t11_worktree_remove_reports_busy_target_before_git_mutation(self) -> None:
+    def test_worktree_remove_reports_busy_target_before_git_mutation(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime_scripts_dir = (
                 Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
@@ -192,7 +192,7 @@ class TestWorktreeLifecycleCoordination(CliRuntimeHarness):
                 def require_clean_working_tree(self, repo_root_arg, *, allowed_missing_paths=()):
                     return None
 
-                def remove_worktree(self, repo_root_arg, *, path, force, source_fd=None, target_fd=None):
+                def remove_worktree(self, repo_root_arg, *, path, force, target_fd):
                     self.remove_calls.append(path)
 
             class FakeEnvironmentGateway:

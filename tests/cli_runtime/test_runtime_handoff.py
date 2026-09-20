@@ -33,8 +33,8 @@ def _wait_for(path: Path, process: subprocess.Popen[str], *, timeout: float = 5.
     raise AssertionError(f"timed out waiting for {path}")
 
 
-class TestProviderLifecycleHandoff(CliRuntimeHarness):
-    def test_t11_consumer_hook_parent_io_failure_is_detection_failure_with_exit_zero(
+class TestRuntimeHandoff(CliRuntimeHarness):
+    def test_consumer_hook_parent_io_failure_is_detection_failure_with_exit_zero(
         self, monkeypatch, capsys, tmp_path: Path
     ) -> None:
         script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
@@ -77,9 +77,7 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
         assert payload["warnings"][-1] == "consumer hook failed: [Errno 5] pipe failed"
         assert captured.err == ""
 
-    def test_t11_consumer_hook_binding_mismatch_is_detection_failure_with_exit_zero(
-        self, capsys, tmp_path: Path
-    ) -> None:
+    def test_consumer_hook_binding_mismatch_is_detection_failure_with_exit_zero(self, capsys, tmp_path: Path) -> None:
         script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
         loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap_binding", str(script))
         spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -114,7 +112,7 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
         assert payload["warnings"][-1] == "unsafe worktree binding"
         assert captured.err == ""
 
-    def test_t04_terminal_handoff_preserves_symlink_target_for_external_admission(self, tmp_path: Path) -> None:
+    def test_external_installer_handoff_preserves_symlink_target(self, tmp_path: Path) -> None:
         target = (tmp_path / "target").resolve()
         target.mkdir()
         assert main(["init", str(target)]) == 0
@@ -149,7 +147,9 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
         assert uninstall.returncode == 7
         assert log.read_text(encoding="utf-8").splitlines()[-2] == str(link)
 
-    def test_t01_relative_lifecycle_targets_use_invoking_cwd_and_preserve_symlink_text(self, tmp_path: Path) -> None:
+    def test_relative_update_and_uninstall_targets_use_invoking_cwd_and_preserve_symlink_text(
+        self, tmp_path: Path
+    ) -> None:
         managed = tmp_path / "A" / "managed"
         managed.mkdir(parents=True)
         assert main(["init", str(managed)]) == 0
@@ -190,7 +190,7 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
                 logged = log.read_text(encoding="utf-8").splitlines()
                 assert logged[-1 if command == "update" else -2] == str(expected_target)
 
-    def test_t04_git_write_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
+    def test_bound_cwd_git_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
         runtime_scripts_dir = (
             Path(__file__).resolve().parents[2] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
         )
@@ -211,9 +211,16 @@ class TestProviderLifecycleHandoff(CliRuntimeHarness):
                 encoding="utf-8",
             )
 
-            result = git_cli._run_git_write(target, [sys.executable, "-c", "print('provider-helper')"])
+            target_fd = os.open(target, os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+            try:
+                result = git_cli._run_git_in_bound_cwd(
+                    [sys.executable, "-c", "import os; print(os.getcwd())"],
+                    cwd_fd=target_fd,
+                )
+            finally:
+                os.close(target_fd)
         finally:
             sys.path.pop(0)
 
-        assert result.stdout == "provider-helper\n"
+        assert result.stdout == f"{target}\n"
         assert not marker.exists()

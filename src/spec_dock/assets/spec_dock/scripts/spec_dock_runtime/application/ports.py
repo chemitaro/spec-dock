@@ -11,12 +11,10 @@ if TYPE_CHECKING:
         ExplicitFileArtifactPublishRequest,
         ExplicitFileArtifactPublishResult,
         ExplicitFileSourcePreflightRequest,
-        GitCapabilityAssessment,
         GitHubCapabilityDiagnostic,
         GitHubCapabilityProbeRequest,
         GitWorktreeRecord,
         GuardedExplicitFileSource,
-        PinnedCheckout,
         SyncCommandResult,
         SyncRequest,
     )
@@ -159,10 +157,6 @@ class GitGateway(Protocol):
 
     def local_branch_exists(self, repo_root: Path, branch: str) -> bool: ...
 
-    def checkout_branch(self, repo_root: Path, branch: str) -> None: ...
-
-    def create_and_checkout_branch(self, repo_root: Path, branch: str) -> None: ...
-
     def check_ref_format_branch(self, repo_root: Path, branch: str) -> bool: ...
 
     def origin_github_repo_slug(self, repo_root: Path) -> str | None: ...
@@ -177,46 +171,28 @@ class GitGateway(Protocol):
         *,
         path: Path,
         force: bool,
-        source_fd: int | None = None,
-        target_fd: int | None = None,
+        target_fd: int,
     ) -> None: ...
 
     def resolve_commit(self, repo_root: Path, ref: str) -> str: ...
 
-    def assess_capabilities(
-        self,
-        repo_root: Path,
-        *,
-        pinned_commit: str,
-        branch: str | None = None,
-        check_other_worktree: bool = True,
-    ) -> GitCapabilityAssessment: ...
-
-    def pinned_checkout(
+    def checkout_fixed_ref(
         self,
         repo_root: Path,
         *,
         branch: str,
-        pinned_commit: str,
-        checkout_kind: str,
-    ) -> PinnedCheckout: ...
-
-    def verify_pinned_checkout(
-        self,
-        repo_root: Path,
-        *,
-        checkout: PinnedCheckout,
+        target_commit: str,
+        checkout_kind: Literal["existing", "new"],
     ) -> None: ...
 
-    def add_worktree_pinned(
+    def add_worktree_at_commit(
         self,
         repo_root: Path,
         *,
         path: Path,
         branch: str,
-        pinned_commit: str,
-        source_fd: int | None = None,
-        target_fd: int | None = None,
+        target_commit: str,
+        target_fd: int,
     ) -> None: ...
 
     def materialize_worktree(
@@ -224,8 +200,7 @@ class GitGateway(Protocol):
         repo_root: Path,
         *,
         path: Path,
-        pinned_commit: str,
-        source_fd: int,
+        target_commit: str,
         target_fd: int,
     ) -> tuple[tuple[str, tuple[int, int]], ...]: ...
 
@@ -234,7 +209,7 @@ class GitGateway(Protocol):
         repo_root: Path,
         *,
         target_fd: int,
-        pinned_commit: str,
+        target_commit: str,
         directory_witnesses: tuple[tuple[str, tuple[int, int]], ...],
     ) -> None: ...
 

@@ -47,28 +47,14 @@ class _WorktreeClassificationContext:
 
 def _pin_worktree_source(repo_root: Path, ports: Ports) -> str:
     assert ports.git_gateway is not None
-    pinned_commit = ports.git_gateway.current_head_or_none(repo_root)
-    if not pinned_commit:
-        raise RuntimeError("worktree create cannot pin an unavailable HEAD")
-    assessment = ports.git_gateway.assess_capabilities(
-        repo_root,
-        pinned_commit=pinned_commit,
-        branch=ports.git_gateway.current_branch_or_none(repo_root),
-        check_other_worktree=False,
-    )
-    if not assessment.allowed:
-        raise RuntimeError("Git capability guard failed: " + ", ".join(assessment.reasons))
-    return pinned_commit
+    target_commit = ports.git_gateway.current_head_or_none(repo_root)
+    if not target_commit:
+        raise RuntimeError("worktree create cannot resolve an available HEAD commit")
+    return target_commit
 
 
-def _open_source_shared(repo_root: Path) -> int:
-    fd = _open_directory_no_follow(repo_root)
-    try:
-        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
-    except OSError:
-        _close_fd(fd)
-        raise
-    return fd
+def _open_source_directory_for_filesystem_probe(repo_root: Path) -> int:
+    return _open_directory_no_follow(repo_root)
 
 
 def _open_directory_no_follow(path: Path, *, allow_symlink_at: Path | None = None) -> int:
@@ -237,8 +223,8 @@ def _open_nonlocking_worktree_bound_to_exclusive(
         raise
 
 
-def _require_same_filesystem(source_fd: int, target_fd: int) -> None:
-    source_stat = os.fstat(source_fd)
+def _require_same_filesystem(source_probe_fd: int, target_fd: int) -> None:
+    source_stat = os.fstat(source_probe_fd)
     target_stat = os.fstat(target_fd)
     if source_stat.st_dev != target_stat.st_dev:
         raise RuntimeError("worktree source and target must share a filesystem")
@@ -255,8 +241,7 @@ def _materialize_and_verify_worktree(
     ports: Ports,
     *,
     worktree_path: Path,
-    pinned_commit: str,
-    source_fd: int,
+    target_commit: str,
     target_fd: int,
     phase: list[str] | None = None,
 ) -> None:
@@ -267,15 +252,14 @@ def _materialize_and_verify_worktree(
     directory_witnesses = ports.git_gateway.materialize_worktree(
         ports.repo_root,
         path=worktree_path,
-        pinned_commit=pinned_commit,
-        source_fd=source_fd,
+        target_commit=target_commit,
         target_fd=target_fd,
     )
     if phase is not None:
         phase[0] = "pre-publication-verification"
     head = ports.git_gateway.current_head_or_none(worktree_path)
-    if head != pinned_commit:
-        raise RuntimeError(f"worktree generation drift: expected {pinned_commit}, observed {head}")
+    if head != target_commit:
+        raise RuntimeError(f"worktree commit mismatch: expected {target_commit}, observed {head}")
     ports.git_gateway.require_clean_working_tree(
         worktree_path,
         allowed_missing_paths=(_ENTRYPOINT_PATH,),
@@ -285,14 +269,14 @@ def _materialize_and_verify_worktree(
     ports.git_gateway.publish_worktree_entrypoint(
         ports.repo_root,
         target_fd=target_fd,
-        pinned_commit=pinned_commit,
+        target_commit=target_commit,
         directory_witnesses=directory_witnesses,
     )
     if phase is not None:
         phase[0] = "post-publication-verification"
     head = ports.git_gateway.current_head_or_none(worktree_path)
-    if head != pinned_commit:
-        raise RuntimeError(f"worktree generation drift: expected {pinned_commit}, observed {head}")
+    if head != target_commit:
+        raise RuntimeError(f"worktree commit mismatch: expected {target_commit}, observed {head}")
     ports.git_gateway.require_clean_working_tree(worktree_path)
     entrypoint = worktree_path / _ENTRYPOINT_PATH
     if not entrypoint.is_file() or entrypoint.is_symlink():
@@ -330,7 +314,7 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
     if not records:
         raise RuntimeError("git worktree list returned no worktrees")
     main_worktree = records[0].path
-    pinned_commit = _pin_worktree_source(repo_root, ports)
+    target_commit = _pin_worktree_source(repo_root, ports)
     repo_basename = main_worktree.name
     container = central_root / repo_basename
     known_paths = {_canonical_path(record.path) for record in records}
@@ -388,21 +372,21 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 f"{_format_worktree_error(exc)}"
             ) from exc
 
-        source_fd: int | None = None
         try:
-            source_fd = _open_source_shared(repo_root)
-            _require_same_filesystem(source_fd, target_fd)
+            source_probe_fd = _open_source_directory_for_filesystem_probe(repo_root)
+            try:
+                _require_same_filesystem(source_probe_fd, target_fd)
+            finally:
+                _close_fd(source_probe_fd)
             _verify_worktree_path_binding(worktree_path, target_fd)
-            ports.git_gateway.add_worktree_pinned(
+            ports.git_gateway.add_worktree_at_commit(
                 repo_root,
                 path=worktree_path,
                 branch=branch_name,
-                pinned_commit=pinned_commit,
-                source_fd=source_fd,
+                target_commit=target_commit,
                 target_fd=target_fd,
             )
         except (OSError, RuntimeError, subprocess.CalledProcessError) as exc:
-            _close_fd(source_fd)
             _close_fd(target_fd)
             state = _artifact_state(
                 repo_root=repo_root,
@@ -418,19 +402,16 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
                 f"{_format_worktree_error(exc)}"
             ) from exc
         except BaseException:
-            _close_fd(source_fd)
             _close_fd(target_fd)
             raise
 
         bound_fd: int | None = None
         phase = ["materialization"]
         try:
-            assert source_fd is not None
             _materialize_and_verify_worktree(
                 ports,
                 worktree_path=worktree_path,
-                pinned_commit=pinned_commit,
-                source_fd=source_fd,
+                target_commit=target_commit,
                 target_fd=target_fd,
                 phase=phase,
             )
@@ -456,7 +437,6 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             )
         except Exception as exc:
             _close_fd(bound_fd)
-            _close_fd(source_fd)
             _close_fd(target_fd)
             state = _artifact_state(
                 repo_root=repo_root,
@@ -475,7 +455,6 @@ def worktree_create(req: WorktreeCreateRequest, ports: Ports) -> WorktreeCreateR
             _close_fd(bound_fd)
             raise
         finally:
-            _close_fd(source_fd)
             _close_fd(target_fd)
 
     mode = "label" if label is not None else "auto"
@@ -557,7 +536,6 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
     _guard_remove_containment(refreshed_worktree, refreshed_inventory, ports, command="remove", target=req.target)
 
     target_fd: int | None = None
-    source_fd: int | None = None
     try:
         central_root: Path | None = None
         with contextlib.suppress(RuntimeError):
@@ -566,7 +544,6 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
             refreshed_worktree.path,
             allow_symlink_at=central_root,
         )
-        source_fd = _open_source_shared(ports.repo_root)
         bound_inventory = _build_inventory(ports, command="remove", target=req.target)
         try:
             bound_worktree = resolve_worktree_target(req.target, bound_inventory, command="remove")
@@ -607,11 +584,9 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         target_stat = os.fstat(target_fd)
     except WorktreeCommandError:
         _close_fd(target_fd)
-        _close_fd(source_fd)
         raise
     except OSError as exc:
         _close_fd(target_fd)
-        _close_fd(source_fd)
         coordination = _coordination_failure_kind(exc)
         if coordination == "busy":
             raise WorktreeCommandError(
@@ -645,7 +620,6 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
         ) from exc
     except RuntimeError as exc:
         _close_fd(target_fd)
-        _close_fd(source_fd)
         raise WorktreeCommandError(
             code="post_remove_cleanup_failed",
             message="worktree target could not be safely bound",
@@ -675,16 +649,13 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
             ports.repo_root,
             path=refreshed_worktree.path,
             force=refreshed_worktree.locked,
-            source_fd=source_fd,
             target_fd=target_fd,
         )
     except WorktreeCommandError:
         _close_fd(target_fd)
-        _close_fd(source_fd)
         raise
     except RuntimeError as exc:
         _close_fd(target_fd)
-        _close_fd(source_fd)
         raise WorktreeCommandError(
             code="git_worktree_remove_failed",
             message="git worktree remove failed",
@@ -693,8 +664,6 @@ def worktree_remove(req: WorktreeRemoveRequest, ports: Ports) -> WorktreeRemoveR
             worktree=refreshed_worktree,
             git_error=str(exc),
         ) from exc
-    _close_fd(source_fd)
-    source_fd = None
     removed_directory = False
     try:
         _guard_remove_containment(refreshed_worktree, refreshed_inventory, ports, command="remove", target=req.target)
