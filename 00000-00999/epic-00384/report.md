@@ -16,9 +16,9 @@ ID: "epic-00384"
 
 Current installer contractは固定6ディレクトリのnontransactional replacementです。利用者dataはその対象外として保持します。provider generation authenticationやrepository-wide shared leaseはcurrent contractではありません。Issue #405は不要な残滓を撤去しながら、dirty checkout、worktree target inode、data-operation lock、submodule rejection、entrypoint-last、package/dogfood parityなど残す契約を維持します。
 
-## Issue #405 — current measured state (S6 candidate)
+## Issue #405 — current delivery evidence (S7 candidate)
 
-実装branchは `iss-00405-directory-replacement-final-cleanup` です。現在の公開済みlocal/remote candidateは`0d9114b038ddb78dab32bc6039b51c4d02943846`で、S6 local integrated qualificationを完了しました。Issue #405はまだmerge-readyではありません。
+実装branchは `iss-00405-directory-replacement-final-cleanup`、PRは[#406](https://github.com/chemitaro/spec-dock/pull/406)です。現在の公開済みcandidateは`11825a335b628b195cb61ddd47abe8aaab9cfd88`です。S6 local integrated qualificationは直前の実装candidate `0d9114b038ddb78dab32bc6039b51c4d02943846`で完了し、S7のPR checksとfresh integrated reviewは`11825...`でpassしました。final Report SHAに対する必須test sequenceとFinal Quality Gate Strict v2は未完了であり、Issue #405はまだmerge-readyではありません。
 
 | 検証 | 実測 |
 |---|---|
@@ -46,14 +46,20 @@ S6の最初のattempt (`0ab3ab...4125`)はfocused/full suite後に`make lint`で
 
 正規raw evidenceはIssue #405配下の`.workbench/s6-local-qualification/0d9114b038ddb78dab32bc6039b51c4d02943846/20260920T102326Z/`です。補助的`uv run pytest -rs` runも同candidateでskip理由を取得しました（`1551 passed, 25 skipped in 707.12s`）。skip内訳はS04 successor coverage 16件、S06 successor coverage 7件、Darwin arm64固有のraw non-UTF-8 filename (`EPERM`) とLinux `O_TMPFILE` capabilityの制約が各1件です。個別理由はIssue Reportと`08-full-pytest-skip-reasons.log`に記録しています。
 
-| Delivery gate | 状態 |
+### S7 delivery gate — exact candidate `11825a335b628b195cb61ddd47abe8aaab9cfd88`
+
+| Delivery gate | 状態・実測 |
 |---|---|
-| PR作成、Ubuntu/macOS platform jobs、その他最新PR checks | pending |
-| fresh integrated code/spec/QA Strict review | pending |
-| Final Quality Gate Strict v2 | pending |
+| PR #406 / required CI | pass。PR OPEN/non-draft、head exact。Provider `provider-tests`: `1546 passed, 30 skipped in 1018.01s`; embedded `make lint` pass。CI validate、Commit identity check pass。 |
+| Provider distribution parity (Ubuntu) | pass、`12 passed in 2.77s` |
+| Provider distribution parity (macOS) | pass、`12 passed in 3.71s` |
+| fresh integrated code/spec/QA Strict review | GPT-5.6 Sol Extra High、`a865277de85740acee536613bde6c7de50092e71..11825a335b628b195cb61ddd47abe8aaab9cfd88`、session `required-strict-github-connector-verificati-1050`、`review_status=pass`、findings 0、confidence 0.97 |
+| Final Quality Gate Strict v2 | pending。Report証拠を含む最終pushed SHAで必須test sequenceを再実行してからGPT-5.6 Sol Proで審査する |
 | Issue #405 merge-ready / human merge | 未達 / 未実施 |
 
-従って、このcandidateのlocal S6成功だけで最終合格またはmerge-readyとは宣言しません。人間merge前で停止し、S7のPR/CI/review/Final Quality Gate証拠を集めます。
+Provider CIはmerge commit `cae669050cb5209cfcf3c958e70fdf7b307da1a2`で実行され、そのtree SHA `bb2fd5c1c2a39d05c584f82bc55d2ada435d0a2d`はPR head `11825...`のtreeと一致しました。CI環境でskip理由は個別出力されていません。macOSローカルS6とLinux CIのskip件数の差は理由を推定せず、別環境の結果として扱います。Integrated reviewのstructured resultはIssue Workbenchの`reviews/s7-integrated-review.json`、SHA-256 `2cef8ca7501d9b0a8d006bde4a03dca09fb4435e84ddfdb389651b1a43f05f6d`です。
+
+最終候補の必須test sequenceとFinal Quality Gate Strict v2が完了するまで、最終合格またはmerge-readyとは宣言しません。人間merge前で停止します。
 
 ## Historical appendix
 
