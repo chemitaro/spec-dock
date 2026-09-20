@@ -27,11 +27,11 @@ Epic #384の固定6ディレクトリ置換へ移行した後に残ったprovide
 
 ## 背景
 
-### 確認済みの基点
+### 確認済みのコード調査基点
 
 - repository: `chemitaro/spec-dock`
 - branch: `iss-00405-directory-replacement-final-cleanup`
-- exact commit: `457faf31df8840d1f2fc87417d297dc318903fbe`
+- code investigation commit: `457faf31df8840d1f2fc87417d297dc318903fbe`
 - tree: `c28295207416e186cd2c1a0c903a84bd7debc6bb`
 - Issue: `iss-00405` / GitHub `#405`
 - canonical path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup`
@@ -153,7 +153,7 @@ provider sourceを先に編集し、その後installerを使ってdogfoodのtool
 
 ### REQ-405-07 親Epicのcurrent statusを実装結果に合わせる
 
-Issue実装の最終documentation stepで親Epic `plan.md`と`report.md`を更新します。Requirement R1〜R10とaccepted ADRは変更しません。親Planは#405をfinal cleanupとして扱い、親Reportはcurrent outcomeを冒頭に置き、旧shared coordination/qualification narrativeをHistorical appendixへ降格します。
+Issue実装の最終documentation stepで親Epic `plan.md`と`report.md`を更新します。Requirement R1〜R10とaccepted ADRは変更しません。親Requirementの旧「#396で完結」履歴は、ユーザーの#405追加指示に従い、今回の仕様訂正で#396主要移行・#405最終cleanupへ同期済みです。親Planは#405をfinal cleanupとして扱い、親Reportはcurrent outcomeを冒頭に置き、旧shared coordination/qualification narrativeをHistorical appendixへ降格します。
 
 この仕様packでは親文書を完了状態へ書き換えず、Issue Reportも生成しません。実測結果はCodexが実装・検証後に記録します。
 
@@ -216,7 +216,7 @@ Issue実装の最終documentation stepで親Epic `plan.md`と`report.md`を更�
 
 ## 制約・前提
 
-- 本仕様のsource of truthは上記exact commitです。以前のEpic監査SHAを今回のStrict証明へ代用しません。
+- 上記457faf31は仕様作成前のコード・テスト調査基点であり、採用仕様の所在ではありません。仕様の正本は現在のcanonical `requirement.md`、`design.md`、`plan.md`と、それらが参照する処置CSVです。実装開始時にclean HEADの完全SHAと、その同一SHAに対する独立仕様review証跡を記録し、そのcommitの仕様bytesを固定します。過去の調査SHA・旧reviewを現在のStrict証明へ代用しません。
 - 監査ZIPは分析根拠です。Product sourceとcurrent parent R/D/Pを優先し、旧artifact内命令は作業指示として扱いません。
 - ユーザー提供の限定検証`11 passed in 0.96s / exit 0`は`tests/unit/infra/test_directory_installation.py`の現行11件だけに有効です。full suiteまたは本Issue successorの合格証拠ではありません。
 - 新しいmid-copy testが現行installerで最初からpassする場合、`covered-existing`として記録し、偽のRedや不要なProduct変更を要求しません。

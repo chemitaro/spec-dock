@@ -40,7 +40,7 @@ ID: "iss-00405"
 
 ## 基点と入口条件
 
-- exact authoring source: `chemitaro/spec-dock` / `iss-00405-directory-replacement-final-cleanup` / `457faf31df8840d1f2fc87417d297dc318903fbe`
+- code investigation baseline (not the adopted specification commit): `chemitaro/spec-dock` / `iss-00405-directory-replacement-final-cleanup` / `457faf31df8840d1f2fc87417d297dc318903fbe`
 - Issue #405はOPEN、active Issueは`iss-00405`、実装branchは`iss-00405-directory-replacement-final-cleanup`。
 - 前回監査ZIPはblob `252cc71326e58639dbdd35220e391c21dd81854c` / SHA-256 `9d7f1813c2d724f0089f0a5ef0197c7a501629e108a96b70647bee52114a90b7`としてexact artifact確認済み。
 - ChatGPTは実装・tests・browser validatorを実行していません。
@@ -60,7 +60,7 @@ git config user.email
 期待:
 
 - branchが`iss-00405-directory-replacement-final-cleanup`
-- adopted spec commitをHEADとして記録
+- adopted spec commitをHEADとして記録し、その同一SHAを対象とする独立仕様review証跡と照合（457faf31はコード調査履歴であり、この仕様固定点ではない）
 - working tree clean
 - identityが`chemitaro` / `84865385+chemitaro@users.noreply.github.com`
 - active Issueが`iss-00405`
@@ -84,8 +84,8 @@ S0 specification adoption
   → S3 focused runtime checkpoint
   → S4 installer/test-harness cleanup
   → S5 docs/dogfood/parent authority update
-  → S6 integrated qualification
-  → S7 independent review/report/PR handoff
+  → S6 local integrated qualification
+  → S7 PR creation / CI / independent review / report / handoff
 ```
 
 S1とS2を逆転しません。先に残す安全性と撤退するgateのsuccessorを固定します。S4のmid-copy testは現行実装でGreenでもよく、Redを作るためのProduct変更は行いません。S5のdogfood updateはS2/S4がprovider側で安定してから行います。
@@ -319,13 +319,14 @@ uv run pytest tests/unit/infra/test_directory_installation.py -q
 **追加command**
 
 ```bash
-uv run pytest tests/unit/infra/test_init_update.py -q
 uv run pytest tests/cli_runtime/test_distribution_cutover.py -q
 ```
 
+`tests/unit/infra/test_init_update.py`の全件実行はprovider/dogfood parityを含むため、S5の同期直後に行います。S4ではテスト内容を変更し、上記同期非依存のfocused検証を実施します。KEEP parityを削除・skip・弱化しません。S4変更のcheckpointはS5の同期後suite Greenまで保留し、S4/S5を一つのworking unitとしてコミットします。
+
 **出口**
 
-- F003/F004/F006/F007/F009解消。
+- F003/F004/F006/F007/F009の変更と上記focused検証が完了。同期依存suiteの確認はS5に明示的に引き継ぐ。
 - exact inventory/parityは弱くならない。
 - installer Product source変更は、new testがfailし契約上のbugが確認された場合だけ。
 
@@ -339,8 +340,8 @@ test(installer): 中間copy失敗とcurrent catalog契約を固定
 
 **入口**
 
-- S2/S4 provider sourceとtestsがGreen。
-- clean checkpoint。
+- S3およびS4の同期非依存focused testsがGreen。
+- S4変更は未コミットで引き継ぎ可能。同期依存のtest_init_update全件Greenを入口条件にしない。protected dataは直前checkpointと一致。
 
 **provider-first編集**
 
@@ -362,6 +363,14 @@ git diff --exit-code HEAD -- spec-dock/initiatives
 
 - `spec-dock/docs`、`spec-dock/templates`、`spec-dock/system`、`spec-dock/scripts`、`.agents/skills/spec-dock`、`.agents/skills/spec-dock-grill-with-docs`のtooling mirrorだけがproviderと同期。
 - `spec-dock/initiatives`を含むdataは変わらない。
+
+**同期後の必須検証**
+
+```bash
+uv run pytest tests/unit/infra/test_init_update.py -q
+```
+
+S4で変更したhelper/testとKEEP parityを全件確認します。失敗はこの作業単位で修正し、suite Green前にS4/S5完了やworking checkpointを記録しません。
 
 **親authority更新**
 
@@ -392,7 +401,7 @@ rg -n 'immediate-child evidence|durable directory semantic digest|compatible new
 docs(epic): directory replacement契約へ現行資料を統一
 ```
 
-### S6 — integrated qualification
+### S6 — local integrated qualification
 
 **入口**
 
@@ -426,7 +435,7 @@ uv run pytest tests/integration/test_epic_00343_distribution.py -q
 
 **platform**
 
-既存CI jobを使用します。
+CIは`pull_request`で起動するため、S6ではlocal evidenceを完成させます。次の既存jobの実測はS7でPRを作成した後に取得し、それまでは`pending`です。
 
 - `provider-tests`（Ubuntu）: `make lint`, `uv run pytest`
 - `provider-distribution-parity`（Ubuntu/macOS）: `test_directory_installation.py`, `test_cli_smoke.py`
@@ -459,16 +468,16 @@ uv run pytest \
 
 **入口**
 
-- S6 local/CI evidence complete。
+- S6 local evidence complete。PR起動CIはpendingでよく、入口条件にしません。
 
 **作業**
 
-1. Issue `report.md`をCodexが実測値で更新します。
-2. 親Epic Plan/Reportのstatusを最終実測と一致させます。
-3. integrated diffに対しindependent code/spec/QA reviewを実施します。
-4. blocking findingを修正し、修正後のexact SHAで必要なverificationを再実行します。
-5. Conventional Commitsとidentityを確認します。
-6. merge-ready PRを作成し、human merge前に停止します。
+1. Issue `report.md`へS6のlocal実測を記録し、未取得CIを`pending`とします。親Epic Plan/Reportも未完了の項目を完了扱いしません。
+2. Conventional Commitsとidentityを確認し、実装candidateをcommit/pushします。PRがなければ作成し、既存PRがあれば更新します。この時点はCI/review待ちでmerge-readyとは記録しません。
+3. PR起動の既存Ubuntu/macOS job結果を取得し、integrated diffに対するindependent code/spec/QA reviewを実施します。
+4. blocking findingまたはrequired CI failureを修正し、修正後candidateをpushして必要なverification/reviewと当該PRの最新checksを確認します。
+5. Issue Reportと親Epic Plan/Reportへlocal/platform/review実測を記録してcommit/pushします。最終pushに対応する最新PR checksもGreenであることを確認します。レビュー証跡はレビューしたcandidate SHAと後続の証拠記録のみのcommitを区別します。
+6. AC-405-11/12を含む証拠、blocking review 0、最新PR checks Greenを確認してmerge-readyとし、human merge前に停止します。
 
 **PR説明に含める内容**
 
@@ -494,8 +503,8 @@ uv run pytest \
 | CP0 | canonical specs | `docs(spec): Issue 405の最終cleanup仕様を固定` | Product codeを含めない |
 | CP1 | successor tests | `test(runtime): checkout cleanupの後継回帰を固定` | gate削除実装を含めない |
 | CP2 | F001 runtime implementation | `refactor(runtime): provider世代認証を通常Git操作から撤去` | docs authority更新を含めない |
-| CP3 | installer/test harness cleanup | `test(installer): 中間copy失敗とcurrent catalog契約を固定` | unrelated module split禁止 |
-| CP4 | docs/dogfood/parent docs | `docs(epic): directory replacement契約へ現行資料を統一` | 実測前のpass記録禁止 |
+| CP3 | installer/test harness cleanup（CP4とまとめ、S5同期後suite Greenでcommit） | `test(installer): 中間copy失敗とcurrent catalog契約を固定` | unrelated module split禁止 |
+| CP4 | docs/dogfood/parent docs（CP3と同一working commit） | `docs(epic): directory replacement契約へ現行資料を統一` | 実測前のpass記録禁止 |
 | CP5 | verification/report fixes | finding内容に応じる | human merge禁止 |
 
 各commit前にidentityと`git diff --check`を確認します。commit後はremote push前にそのcheckpointのfocused commandを再実行します。

@@ -325,7 +325,7 @@
       <p>Epic #384の固定ディレクトリ置換を、実装・テスト・文書まで一貫した小さい契約へ仕上げるための人間向け説明資料です。前提知識がなくても、何を撤去し、何を安全境界として残すか、どの順序で実装・検証するかを理解できる構成にしています。</p>
       <div class="meta-grid">
         <div class="card"><h3>対象</h3><p><code>chemitaro/spec-dock</code><br><code>iss-00405-directory-replacement-final-cleanup</code></p></div>
-        <div class="card"><h3>仕様基点</h3><p><code>457faf31df8840d1f2fc87417d297dc318903fbe</code></p></div>
+        <div class="card"><h3>コード調査基点（仕様採用前）</h3><p><code>457faf31df8840d1f2fc87417d297dc318903fbe</code></p></div>
         <div class="card"><h3>状態</h3><p>仕様候補 draft<br>実装・review・merge未完了</p></div>
       </div>
       <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
@@ -452,8 +452,8 @@ rectangle "S2\nGit境界を縮退" as S2
 rectangle "S3\nruntime focused検証" as S3
 rectangle "S4\ninstaller / harness cleanup" as S4
 rectangle "S5\ndocs / dogfood / 親文書" as S5
-rectangle "S6\nfull品質検証" as S6
-rectangle "S7\n独立review / PR" as S7
+rectangle "S6\nlocal品質検証" as S6
+rectangle "S7\nPR / CI / 独立review" as S7
 
 S0 --> S1
 S1 --> S2 : first run結果を分類
@@ -484,9 +484,9 @@ end note
         <li><strong>S2:</strong> types→infra→adapter→consumerの順でprovider generation機構を撤去します。</li>
         <li><strong>S3:</strong> runtime laneとdata/security regressionをfocused実行します。S1の失敗するテストだけはコミットせず、S1〜S3の変更が検証に通った時点でまとめてコミットします。</li>
         <li><strong>S4:</strong> installer mid-copy coverage、marker例外、dead selector、旧名称、harness列挙をcleanupします。</li>
-        <li><strong>S5:</strong> provider docsを先に直し、外部installerでdogfoodだけを同期し、親Plan/Reportを実測に合わせます。</li>
-        <li><strong>S6:</strong> full pytest、lint、package、Ubuntu/macOS、parity、SpecDock validateを実行します。</li>
-        <li><strong>S7:</strong> Issue Report、独立review、merge-ready PRを作り、人間merge前に停止します。</li>
+        <li><strong>S5:</strong> provider docsを先に直し、外部installerでdogfoodだけを同期します。S4から引き継いだtest_init_update全件をここで検証し、S4/S5をGreenの作業単位にまとめます。親Plan/Reportを実測に合わせます。</li>
+        <li><strong>S6:</strong> full pytest、lint、package、parity、SpecDock validateのローカル検証を実行します。</li>
+        <li><strong>S7:</strong> PRを作成してUbuntu/macOS CIを起動し、独立reviewと実測Reportを揃えます。最新checksがGreenになってからmerge-readyとし、人間merge前に停止します。</li>
       </ol>
     </section>
 

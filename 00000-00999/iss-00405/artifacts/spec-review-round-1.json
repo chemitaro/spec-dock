@@ -1,0 +1,68 @@
+{
+"findings": [
+{
+"title": "[P1] 仕様正本SHAが未記入templateを指している",
+"body": "検証済みbranch tipは`0db10f2766fc2a7b48c75774c5d8dc86ce2d3a6e`だが、`requirement.md`は`457faf31df8840d1f2fc87417d297dc318903fbe`を「本仕様のsource of truth」とし、`plan.md`、Luna Max handoff、source-symbol-map、CSVも同SHAを実装根拠として反復している。GitHub connectorで`457faf31df8840d1f2fc87417d297dc318903fbe`の同じ`requirement.md`を取得すると、内容は章見出しだけの未記入templateで現在レビューした契約を含まない。宣言済み正本へ従うと仕様が失われ、verified HEADへ従うとRequirementの制約に反するため、実装対象bytesを一意に確定できない。",
+"confidence_score": 0.99,
+"priority": 1,
+"artifact_location": {
+"repository_relative_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup/requirement.md",
+"section_or_line": "「背景 > 確認済みの基点」および「制約・前提」のsource of truth記述"
+}
+},
+{
+"title": "[P1] S4のparity testがS5同期前には成立しない",
+"body": "S2はprovider側の`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/**`を変更する一方、S4は`uv run pytest tests/unit/infra/test_init_update.py -q`の全件実行を要求する。検証済みsuiteには`test_issue_334_checked_in_dogfood_projection_matches_provider`と`test_checked_in_dogfooding_runtime_mirror_match_provider_assets`があり、provider scriptsとdogfoodの`spec-dock/scripts`を直接比較する。dogfood同期はS5まで禁止され、S5入口はS4のtests Greenを要求するため、S2後からS5へ到達するには同期順序を破るかKEEP parity testを弱めるしかなく、計画どおりの実装順序が循環している。",
+"confidence_score": 0.99,
+"priority": 1,
+"artifact_location": {
+"repository_relative_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup/plan.md",
+"section_or_line": "「S4 — F003/F004/F006/F007/F009 test・harness cleanup」の追加commandと「S5 — F002/F005/F008 docs、dogfood、親authority」の入口・dogfood同期"
+}
+},
+{
+"title": "[P1] pull_request CIをPR作成前のS6完了条件にしている",
+"body": "S6はUbuntu/macOSの既存CI jobを実測し、S7入口を「S6 local/CI evidence complete」とする。しかし検証済み`.github/workflows/provider-ci.yml`のtriggerは`pull_request`だけで、対象branchには現時点でPRがなく、PR作成はS7作業6に初めて置かれている。したがってS7へ入る前に必要なCIを起動できず、S7作業1のIssue ReportにもAC-405-11のplatform実測を記録できないため、受入手順が循環している。",
+"confidence_score": 0.99,
+"priority": 1,
+"artifact_location": {
+"repository_relative_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup/plan.md",
+"section_or_line": "「S6 — integrated qualification > platform」と「S7 — independent review、Report、PR handoff」の入口・作業1・作業6"
+}
+},
+{
+"title": "[P1] 親Requirementの#396完結宣言と#405実装範囲が矛盾する",
+"body": "approvedな親Epic Requirementは「実装は既存#396で完結させる」と現在形で拘束しているが、子Issue #405はF001〜F009の必須実装と受入条件を新たに正本化している。REQ-405-07、Designの変更対象、Plan S5、Luna Max handoffはいずれも親`plan.md`と`report.md`だけを更新対象とし、親`requirement.md`を変更しないため、#405完了後も上位正本が#405の実装を否定したまま残る。親子scopeと受入authorityを同時に満たせない。",
+"confidence_score": 0.98,
+"priority": 1,
+"artifact_location": {
+"repository_relative_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/requirement.md",
+"section_or_line": "「履歴と非ゴール」末尾の「実装は既存#396で完結させる」"
+}
+},
+{
+"title": "[P2] S1の単独commit禁止とCP1/CP2分離が両立しない",
+"body": "S1のcheckpoint境界は、S1のtest変更を単独commitせず、S2のproduction変更とS3のGreen確認までを一つのcommitへまとめると明記する。一方、同じ`plan.md`のcommit境界表はCP1を「successor testsのみ・gate削除実装を含めない」、CP2を「F001 runtime implementation」と別commitにしている。どちらを採用しても他方を破るため、要求される履歴・review単位が一意でないが、Productの実装結果自体には安全な経路が残る。",
+"confidence_score": 0.99,
+"priority": 2,
+"artifact_location": {
+"repository_relative_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup/plan.md",
+"section_or_line": "「S1 — F001 successor testsとtest処置を先に固定 > checkpoint境界」と「チェックポイントcommit境界」CP1/CP2"
+}
+},
+{
+"title": "[P2] 全skillを2件に限定する指示が非管理skill保持と衝突する",
+"body": "Plan S4作業7は全installed `*/SKILL.md`をexact 2件にするよう指示するが、処置正本CSVのTI-0108〜TI-0110はcurrent managed skill名に絞ったpositive equalityを保持する契約であり、親R2とKEEP対象`test_fresh_init_preserves_unrelated_and_obsolete_looking_external_paths`は無関係な`.agents/skills/spec-dock-issue-planning/SKILL.md`の存続を要求する。非管理skillが存在する正当なconsumer状態ではPlanのliteral assertionだけが失敗し、canonical test dispositionと食い違うが、managed-only解釈では実装を継続できる。",
+"confidence_score": 0.97,
+"priority": 2,
+"artifact_location": {
+"repository_relative_path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup/plan.md",
+"section_or_line": "「S4 — F003/F004/F006/F007/F009 test・harness cleanup」作業7"
+}
+}
+],
+"review_scope_summary": "GitHub connectorで`chemitaro/spec-dock` / `iss-00405-directory-replacement-final-cleanup` / `0db10f2766fc2a7b48c75774c5d8dc86ce2d3a6e`の完全一致を確認し、指定6成果物を全体確認した。解釈・反証に必要な最小文脈として親Epic Requirement/Design/Plan/Reportとaccepted ADR、exact-SHAのruntime・installer・worktree・test・harness、CI workflow、Issue/PR metadataを照合した。テスト実行は行っていない。レビュー基準と出力schemaは添付契約を適用した。",
+"review_status": "fail",
+"review_status_reason": "P1が4件あり、仕様正本の特定、親子authority、provider/dogfood parityの実行順序、PR起動CIの実行順序が現状のままでは一貫した実装・受入検証を成立させないためfailとした。P2はcommit境界とskill assertionの2件で、単独ではProduct実装を阻害しない。指定成果物と判断に必要なrepository文脈にはアクセスでき、未実行なのはProduct test・lint・build・CIであり、本draft仕様の静的レビュー判定を妨げない。",
+"overall_confidence_score": 0.98
+}

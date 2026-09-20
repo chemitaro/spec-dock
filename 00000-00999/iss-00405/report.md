@@ -16,7 +16,7 @@ ID: "iss-00405"
 
 監査を担当した同じChatGPT会話をStrict/GPT-5.6 Sol・Proで継続し、Luna Maxが後続実装するためのrequirement/design/planを生成してcanonicalへ配置した。F001〜F009の処置、target-bound helperを保持する具体設計、test successor、checkpoint、通常品質経路を文書化した。
 
-このReportは仕様作成・配置の結果であり、cleanup実装完了ではない。Product source/testおよび親Epic R/D/P/Reportは変更していない。
+このReportは仕様作成・配置の結果であり、cleanup実装完了ではない。Product source/testは変更していない。仕様review対応で親Epic Requirementの実装担当履歴一文だけを最新ユーザー指示へ同期した。R1〜R10/ADRと親Design/Plan/Reportは未変更。
 
 ## Deliverables
 
@@ -34,7 +34,7 @@ ID: "iss-00405"
 - SpecDock validate PASS（237 nodes）、Markdown local links正常、Git diff whitespace check正常。
 - 既存test 100 caseのpath/symbol/line照合に不一致なし。
 - HTML 2図描画・拡大操作・keyboard/focus検証PASS。
-- Product実装、full pytest/lint/package/platform CI、独立仕様reviewは今回未実施。
+- Product実装、full pytest/lint/package/platform CIは今回未実施。独立仕様review初回はfail（P1 4件、P2 2件）。P1の記録・計画順序訂正後に同一reviewerへ再reviewする。
 
 ## Checkpoints
 
@@ -45,4 +45,6 @@ ID: "iss-00405"
 ## Residual Risks / Follow-ups
 
 仕様はdraftであり、独立仕様reviewとその修正を終えてからPlan S1以降へ進む。実装は後続Luna Max担当。human PR merge境界を維持する。
-追加のTailscale公開は自動承認レビューで拒否されたため、明示承認が得られるまではローカルHTMLとZIPを納品する。
+Tailscale公開は追加の明示承認を受けて成功。URL: http://100.85.74.8:8765/iss-00405-cleanup-guide.html 。canonical HTMLへのlive symlinkであり、同tailnet向け。
+
+Reviewer lineageと全指摘分析: [分析記録](artifacts/20260920t064301z-specification-review-findings-analysis.md)。旧ZIPは採用時点の履歴であり、現在の修正仕様の代わりには使用しない。

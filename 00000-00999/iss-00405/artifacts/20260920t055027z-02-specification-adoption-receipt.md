@@ -47,6 +47,6 @@ Issue直下のrequirement.md/design.md/plan.mdを完全置換し、HTML・実装
 ## 状態
 
 仕様候補draftを配置済み。Issue startは完了、実装未着手。canonical Plan S0の独立仕様reviewは残る。著者による自己点検やCodexの採用確認を独立review passとは扱わない。
-HTMLのローカル納品は完了。追加のTailscale公開は自動承認レビューで拒否され、公開の明示承認待ち（ファイル納品の阻害条件ではない）。
+HTMLのローカル納品は完了。追加Tailscale公開は当初拒否されたが、後続の明示承認により配信成功: http://100.85.74.8:8765/iss-00405-cleanup-guide.html 。本記録と採用ZIPは初回採用時点の来歴であり、レビュー訂正後のcanonical仕様を優先する。
 
 - 最終整形: CSVのCRLFをLFへ正規化（行・値は不変）。採用済みZIPも配置内容から再生成し一致を確認。
