@@ -16,11 +16,13 @@ reflected_to: []
 
 - repository: `chemitaro/spec-dock`
 - branch: `iss-00405-directory-replacement-final-cleanup`
-- exact SHA: `457faf31df8840d1f2fc87417d297dc318903fbe`
+- code investigation baseline SHA (not adopted specification SHA): `457faf31df8840d1f2fc87417d297dc318903fbe`
 - tree: `c28295207416e186cd2c1a0c903a84bd7debc6bb`
 - status: implementation未実行
 
-## Exact current blobs
+The table describes the pre-implementation code baseline. Adopted specifications are the canonical R/D/P and disposition CSV at the implementation-start clean HEAD, matched to its independent review evidence.
+
+## Exact baseline blobs
 
 | repository path | blob SHA | current role |
 |---|---|---|

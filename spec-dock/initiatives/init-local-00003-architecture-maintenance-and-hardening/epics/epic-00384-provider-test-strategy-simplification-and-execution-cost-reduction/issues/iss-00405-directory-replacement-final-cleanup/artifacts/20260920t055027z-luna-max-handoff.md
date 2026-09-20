@@ -19,10 +19,12 @@ reflected_to: []
 - task: Issue #405 Directory Replacement Final Cleanup implementation
 - repository: `chemitaro/spec-dock`
 - authoring branch: `iss-00405-directory-replacement-final-cleanup`
-- specification source SHA: `457faf31df8840d1f2fc87417d297dc318903fbe`
+- pre-specification code investigation SHA: `457faf31df8840d1f2fc87417d297dc318903fbe`
 - canonical Issue path: `spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00384-provider-test-strategy-simplification-and-execution-cost-reduction/issues/iss-00405-directory-replacement-final-cleanup`
 - state: specification draft; implementation/review/qualification未実行
 - parent merge history is context only; Issue #405 remains OPEN
+
+The baseline above identifies code investigated before specification adoption, not the adopted specification bytes. At implementation start, record the clean HEAD and matching independent specification review SHA; use the canonical R/D/P and disposition CSV at that commit.
 
 Start only after Codex has placed and reviewed the canonical `requirement.md`, `design.md`, and `plan.md`. Re-read the actual repository HEAD and `AGENTS.md`; do not assume this handoff SHA is still HEAD after specification adoption commits.
 
@@ -196,7 +198,7 @@ Follow S4 exactly. The 4th-copy injection is a test seam, not a new Product cons
 
 ### Integrated
 
-Follow canonical Plan S6. Do not replace ordinary pytest with any legacy evaluator.
+Follow canonical Plan S6 for local checks, then S7 for PR creation and PR-triggered platform CI before merge-ready handoff. Do not replace ordinary pytest with any legacy evaluator.
 
 ## 4. Provider-first and dogfood
 
@@ -211,6 +213,8 @@ git diff --exit-code HEAD -- spec-dock/initiatives
 Then verify runtime/docs/skills parity. If protected data changes, stop and preserve evidence; do not clean it automatically.
 
 ## 5. Parent docs and Report
+
+The parent Requirement history has already been aligned with the user-authorized #405 cleanup; R1–R10 and the accepted ADR remain unchanged.
 
 At S5/S7:
 
