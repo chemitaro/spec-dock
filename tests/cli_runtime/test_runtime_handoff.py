@@ -77,9 +77,7 @@ class TestRuntimeHandoff(CliRuntimeHarness):
         assert payload["warnings"][-1] == "consumer hook failed: [Errno 5] pipe failed"
         assert captured.err == ""
 
-    def test_consumer_hook_binding_mismatch_is_detection_failure_with_exit_zero(
-        self, capsys, tmp_path: Path
-    ) -> None:
+    def test_consumer_hook_binding_mismatch_is_detection_failure_with_exit_zero(self, capsys, tmp_path: Path) -> None:
         script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
         loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap_binding", str(script))
         spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -191,7 +189,6 @@ class TestRuntimeHandoff(CliRuntimeHarness):
                 assert result.returncode == 7
                 logged = log.read_text(encoding="utf-8").splitlines()
                 assert logged[-1 if command == "update" else -2] == str(expected_target)
-
 
     def test_bound_cwd_git_helper_cannot_be_shadowed_by_consumer_module(self, tmp_path: Path) -> None:
         runtime_scripts_dir = (

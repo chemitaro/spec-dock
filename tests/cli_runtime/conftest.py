@@ -40,6 +40,8 @@ _TEMPLATE_MODULES = frozenset({
     "tests.cli_runtime.test_worktree",
     "tests.cli_runtime.test_wrappers",
 })
+
+
 def _can_reuse_fresh_init_result(module_name: str) -> bool:
     """Return whether plain init is only a precondition for this test."""
 

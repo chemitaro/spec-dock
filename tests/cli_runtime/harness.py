@@ -34,6 +34,8 @@ _EXPECTED_MANAGED_SKILL_NAMES = (
     "spec-dock",
     "spec-dock-grill-with-docs",
 )
+
+
 def _assert_is_file(path: Path, message: str | None = None) -> None:
     if not path.is_file():
         raise AssertionError(message or f"expected file to exist: {path}")

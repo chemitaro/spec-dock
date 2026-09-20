@@ -9,9 +9,7 @@ import sys
 
 import pytest
 
-_SETUP_ONLY_PREFIXES = (
-    "test_checked_in_dogfooding_",
-)
+_SETUP_ONLY_PREFIXES = ("test_checked_in_dogfooding_",)
 
 
 def _clone_tree_contents(source: Path, target: Path) -> None:

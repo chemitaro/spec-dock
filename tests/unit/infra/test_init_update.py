@@ -53,11 +53,7 @@ def _managed_tree_bytes(root: Path) -> dict[str, bytes]:
     return {
         path.relative_to(root).as_posix(): path.read_bytes()
         for path in sorted(root.rglob("*"))
-        if (
-            path.is_file()
-            and "__pycache__" not in path.parts
-            and path.suffix not in {".pyc", ".pyo"}
-        )
+        if (path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"})
     }
 
 
