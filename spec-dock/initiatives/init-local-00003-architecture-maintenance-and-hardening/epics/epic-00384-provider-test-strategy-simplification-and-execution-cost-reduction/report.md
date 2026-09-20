@@ -16,16 +16,16 @@ ID: "epic-00384"
 
 Current installer contractは固定6ディレクトリのnontransactional replacementです。利用者dataはその対象外として保持します。provider generation authenticationやrepository-wide shared leaseはcurrent contractではありません。Issue #405は不要な残滓を撤去しながら、dirty checkout、worktree target inode、data-operation lock、submodule rejection、entrypoint-last、package/dogfood parityなど残す契約を維持します。
 
-## Issue #405 — S5時点の測定済み状態
+## Issue #405 — current measured state (S6 candidate)
 
-実装branchは `iss-00405-directory-replacement-final-cleanup`、S4–S5 working unitのbaseは `f77f6f7163430d6e5f1142eec7b8f07440e259f6` です。
+実装branchは `iss-00405-directory-replacement-final-cleanup` です。現在の公開済みlocal/remote candidateは`0d9114b038ddb78dab32bc6039b51c4d02943846`で、S6 local integrated qualificationを完了しました。Issue #405はまだmerge-readyではありません。
 
 | 検証 | 実測 |
 |---|---|
 | S1–S3 runtime lane | `uv run pytest tests/cli_runtime -q`: `686 passed, 24 skipped` |
 | S1–S3 application/artifact lane | 指定companion tests: `283 passed, 6 skipped` |
 | S1–S3 lint | `make lint`: Ruff、format、mypyすべて成功 |
-| S1–S3 Strict code review | GPT-5.6 Sol Extra High、exact range `a865277de85740acee536613bde6c7de50092e71..f77f6f7163430d6e5f1142eec7b8f07440e259f6`、`review_status=pass`、findingなし |
+| S1–S3 Strict code review | GPT-5.6 Sol Extra High、exact range `a865277de85740acee536613bde6c7de50092e71..f77f6f7163430d6e5f1142eec7b8f07440e259f6`、`review_status=pass`、findings 0、confidence 0.94 |
 | S4 directory installation | `11 passed`; mid-copy 4th-copy injectionは`covered-existing`。`src/spec_dock/installer.py`変更なし |
 | S4 distribution cutover | `8 passed` |
 | S4 runtime handoff/worktree safety | `9 passed` |
@@ -33,8 +33,27 @@ Current installer contractは固定6ディレクトリのnontransactional replac
 | S5 managed dogfood diff | provider-first sourceから期待されるREADME 2件とS1–S3 runtime 8ファイルの計10 path |
 | S5 installer/dogfood suite | sync後の`uv run pytest tests/unit/infra/test_init_update.py -q`: `58 passed` |
 | S5 current-doc obsolete guarantee scan | 0 matches |
+| S4–S5 Strict code review | GPT-5.6 Sol Extra High、exact range `f77f6f7163430d6e5f1142eec7b8f07440e259f6..0ab3ab341cf734a032042c9beebb0fb2dba94125`、`review_status=pass`、findings 0、confidence 0.97 |
+| S6 focused seven-file suite | candidate `0d9114...3846`: `141 passed in 92.22s` |
+| S6 canonical full suite | `uv run pytest`: `1551 passed, 25 skipped in 688.52s` |
+| S6 lint | `make lint`: Ruff check/format (248 files) and mypy (174 source files) all pass |
+| S6 package | `uv build`: sdist and wheel build success |
+| S6 distribution integration | `11 passed in 13.05s` |
+| S6 SpecDock validation | `spec-dock: ok (validate) nodes=237` |
+| S6 provider/dogfood parity | `10 passed in 0.28s` |
 
-S1–S3のテスト・lintはそのunit候補で実測済みです。S4–S5変更を含む最新candidateのintegrated lint/full suite/build/package/integration/SpecDock validationはまだ実行していません。S4–S5 Strict unit review、S6 local integrated qualification、S7 PR/Ubuntu・macOS CIとFinal Quality Gateも`pending`です。Issue #405はmerge-readyとせず、人間mergeも未実施です。
+S6の最初のattempt (`0ab3ab...4125`)はfocused/full suite後に`make lint`でRuff違反を検出し、その時点で停止しました。S4–S5で触れたtest/fixture 5ファイルをformat-onlyで修正し、`0d9114...3846`にてS6正規sequenceを最初から全て再実行しています。最初のcandidateの部分結果は新candidateの合格扱いにしていません。
+
+正規raw evidenceはIssue #405配下の`.workbench/s6-local-qualification/0d9114b038ddb78dab32bc6039b51c4d02943846/20260920T102326Z/`です。補助的`uv run pytest -rs` runも同candidateでskip理由を取得しました（`1551 passed, 25 skipped in 707.12s`）。skip内訳はS04 successor coverage 16件、S06 successor coverage 7件、Darwin arm64固有のraw non-UTF-8 filename (`EPERM`) とLinux `O_TMPFILE` capabilityの制約が各1件です。個別理由はIssue Reportと`08-full-pytest-skip-reasons.log`に記録しています。
+
+| Delivery gate | 状態 |
+|---|---|
+| PR作成、Ubuntu/macOS platform jobs、その他最新PR checks | pending |
+| fresh integrated code/spec/QA Strict review | pending |
+| Final Quality Gate Strict v2 | pending |
+| Issue #405 merge-ready / human merge | 未達 / 未実施 |
+
+従って、このcandidateのlocal S6成功だけで最終合格またはmerge-readyとは宣言しません。人間merge前で停止し、S7のPR/CI/review/Final Quality Gate証拠を集めます。
 
 ## Historical appendix
 
