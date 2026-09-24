@@ -14,7 +14,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.cli.catalog import LEAF_PATHS  # noqa: E402
 from spec_dock_runtime.cli.legacy import LegacyCommandError  # noqa: E402
-from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
+from spec_dock_runtime.cli.options import parse_vnext, parse_vnext_output  # noqa: E402
 from spec_dock_runtime.cli.parser import build_parser  # noqa: E402
 from spec_dock_runtime.cli.registry import build_registry  # noqa: E402
 
@@ -205,3 +205,33 @@ def test_same_name_legacy_arguments_and_abbreviations_are_rejected() -> None:
         with pytest.raises(SystemExit) as invalid:
             parse_vnext(arguments)
         assert invalid.value.code == 2
+
+
+def test_json_usage_failure_is_one_envelope_on_stdout() -> None:
+    output = parse_vnext_output(["--json", "scope", "show"])
+    assert output.namespace is None
+    assert output.exit_code == 2
+    assert output.stderr == ""
+    payload = json.loads(output.stdout)
+    assert payload["schema_version"] == "specdock.cli/v1"
+    assert payload["status"] == "failed"
+    assert payload["error"]["code"] == "USAGE_ERROR"
+
+
+def test_json_help_is_an_envelope() -> None:
+    output = parse_vnext_output(["scope", "close", "--help", "--json"])
+    assert output.namespace is None
+    assert output.exit_code == 0
+    assert output.stderr == ""
+    payload = json.loads(output.stdout)
+    assert payload["status"] == "succeeded"
+    assert "--reason" in payload["data"]["help"]
+
+
+def test_root_version_is_distinct_from_installation_update_version() -> None:
+    root = parse_vnext_output(["--json", "--version"], engine_version="0.2.4")
+    assert root.exit_code == 0
+    assert json.loads(root.stdout)["data"]["version"] == "0.2.4"
+    update = parse_vnext(["installation", "update", "--version", "0.2.4"])
+    assert update.command_path == "installation update"
+    assert update.version == "0.2.4"

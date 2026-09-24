@@ -3,13 +3,27 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
+from io import StringIO
 from typing import TYPE_CHECKING, Any
 
 from spec_dock_runtime.cli.catalog import LEAF_ARGUMENTS, LEAF_PATHS, MUTATING_LEAF_PATHS
-from spec_dock_runtime.cli.legacy import reject_legacy_root
+from spec_dock_runtime.cli.legacy import LegacyCommandError, reject_legacy_root
+from spec_dock_runtime.presentation.envelope import Diagnostic, OperationResult, render_json
+from spec_dock_runtime.presentation.errors import CliMessageData, VersionData
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+
+@dataclass(frozen=True)
+class ParseOutcome:
+    namespace: argparse.Namespace | None
+    exit_code: int | None
+    stdout: str
+    stderr: str
+
 
 _COMMON_SWITCHES = {
     "--json": "json",
@@ -120,3 +134,66 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
         setattr(parsed, key, common.get(key, False if key in _COMMON_SWITCHES.values() else None))
     return parsed
+
+
+def parse_vnext_output(
+    argv: Sequence[str], *, engine_version: str | None = None, engine_digest: str | None = None
+) -> ParseOutcome:
+    json_mode = _json_requested(argv)
+    if [token for token in argv if token != "--json"] in (["--version"], ["-V"]):
+        if engine_version is None:
+            return _parse_failure("ENGINE_VERSION_UNAVAILABLE", "engine version is unavailable", json_mode)
+        if json_mode:
+            result = OperationResult(
+                command="version",
+                status="succeeded",
+                data=VersionData(engine_version, engine_digest),
+                exit_code=0,
+            )
+            return ParseOutcome(None, 0, render_json(result), "")
+        return ParseOutcome(None, 0, f"spec-dock {engine_version}\n", "")
+    captured_stdout = StringIO()
+    captured_stderr = StringIO()
+    try:
+        with redirect_stdout(captured_stdout), redirect_stderr(captured_stderr):
+            namespace = parse_vnext(argv)
+    except LegacyCommandError as error:
+        return _parse_failure(error.error_code, str(error), json_mode)
+    except SystemExit as error:
+        code = int(error.code or 0)
+        if code == 0:
+            help_text = captured_stdout.getvalue()
+            if json_mode:
+                result = OperationResult(
+                    command="help",
+                    status="succeeded",
+                    data=CliMessageData(help_text),
+                    exit_code=0,
+                )
+                return ParseOutcome(None, 0, render_json(result), "")
+            return ParseOutcome(None, 0, help_text, "")
+        message = captured_stderr.getvalue().strip().splitlines()[-1]
+        return _parse_failure("USAGE_ERROR", message, json_mode)
+    return ParseOutcome(namespace, None, "", "")
+
+
+def _json_requested(argv: Sequence[str]) -> bool:
+    for token in argv:
+        if token == "--":
+            return False
+        if token == "--json":
+            return True
+    return False
+
+
+def _parse_failure(code: str, message: str, json_mode: bool) -> ParseOutcome:
+    if json_mode:
+        result = OperationResult(
+            command="cli.parse",
+            status="failed",
+            data=CliMessageData(None),
+            exit_code=2,
+            error=Diagnostic(code, message, {}),
+        )
+        return ParseOutcome(None, 2, render_json(result), "")
+    return ParseOutcome(None, 2, "", f"error [{code}] {message}\n")
