@@ -20,7 +20,7 @@
   - `draft-requirement`: scope kind に応じた canonical requirement template を直接 source として render する discussion-local draft。
   - `draft-design`: scope kind に応じた canonical design template を直接 source として render する discussion-local draft。
   - `draft-plan`: scope kind に応じた canonical plan template を直接 source として render する discussion-local draft。
-- `note` は retired。既存 artifact は grandfathered です。future raw / untyped capture は `new artifact blank` を使います。
+- `note` は retired。既存 artifact は grandfathered です。future raw / untyped capture は `artifact create --scope TARGET --type blank --title TITLE` を使います。
 - `disc` が大きくなりすぎたら、質問回答は `interview`、事実調査は `research`、生ログは `scratch`、長期判断は `adr` へ分割してください。`report.md` へ synthesis 本文を抱え込ませず、採用済み evidence と canonical 反映結果だけを残します。
-- Do not create new files in this directory for routine work. New working artifacts use `./spec-dock/scripts/spec-dock new artifact <type> --initiative <id> --title "<title>"` and target `artifacts/`.
+- Do not create new files in this directory for routine work. New working artifacts use `spec-dock artifact create --scope TARGET --type TYPE --title TITLE` and target `artifacts/`.
 - Historical creation command examples are intentionally omitted so this preservation surface is not advertised as a runnable path.

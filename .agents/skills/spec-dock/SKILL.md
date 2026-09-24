@@ -19,10 +19,12 @@ Use this skill as the agent-first operating guide for the current SpecDock Stora
 1. Read root help and the relevant leaf help immediately before using a command. Current help owns syntax and available operations.
 2. Inspect only the canonical docs, references, metadata, Artifact rules, dependency state, and worktree facts needed to validate the operation.
 3. Execute every in-scope SpecDock command needed for the requested outcome. A user request or approved plan authorizes its ordinary documented local, Git, and GitHub side effects; do not ask for command-by-command confirmation.
-4. Verify command output and post-state. Run `validate`, `sync`, `active show`, `deps check`, or worktree inspection when the changed surface requires them.
+4. Verify command output and post-state. Run `workspace validate`, `workspace sync`, `active show`, `dependency check`, or worktree inspection when the changed surface requires them.
 5. Continue through the requested SpecDock outcome. Keep lifecycle admission, implementation evidence, PR delivery, merge, and lifecycle closure distinct rather than treating one command as proof of all of them.
 
-Ordinary agent execution includes read-only commands and the current create, import, Artifact, active, dependency, sync, issue lifecycle, worktree creation, Workbench copy, doctor, close, and managed update routes when the requested outcome needs them. This includes the documented GitHub issue create/read/close and Git checkout effects of those routes. `uninstall` without `--apply` is an ordinary dry-run.
+Ordinary agent execution includes `scope create/import/show`, `active`, `work`, `branch`, `dependency`, `artifact`, `worktree`, `workbench`, `workspace`, and `installation` routes when the requested outcome needs them. This includes their documented GitHub issue and Git checkout effects. Use the fixed external distribution or its pinned repository shim; never fall back to checkout code after engine verification fails.
+
+`work start TARGET` and `work finish TARGET` accept Initiative, Epic, and Issue. Start checks readiness, creates or checks out the corresponding branch, and selects the target. Finish completes the target and clears its selected subtree. For selection alone use `active set` or `active clear`; for state alone use `scope close` or `scope reopen`; for branch alone use `branch create` or `branch switch`. Finish is not proof of commit, push, PR, merge, test, or review completion.
 
 For a future or unfamiliar command, inspect its leaf help and Current reference docs. Execute it when its semantics are non-destructive and in scope. Stop and explain the unresolved effect when the documentation is insufficient to classify it safely.
 
@@ -30,10 +32,10 @@ For a future or unfamiliar command, inspect its leaf help and Current reference 
 
 Require the user's request or an approved plan to name the exact target and destructive outcome before executing:
 
-- `delete`, including recursive deletion
-- `uninstall --apply`, especially `--remove-specs`
+- `scope delete`, including recursive deletion
+- `installation uninstall`
 - `worktree remove`
-- a `--force` option that bypasses a guard or validation failure
+- `worktree bootstrap` when its project-owned `make init` effects are not yet understood
 
 Once that exact authorization exists, execute and verify the command rather than returning it for manual entry. Reconfirm only when the resolved target, deletion set, or effect is materially broader than authorized.
 
@@ -51,7 +53,7 @@ Read one resolved scope in this order when the task needs its contents:
 
 Edit canonical Requirement, Design, Plan, Report, or ADR files when the user requests authoring or an approved plan assigns that work. Preserve their distinct roles and do not treat an Artifact, generated projection, external response, or Report as durable authority automatically.
 
-Use `new artifact` for supported Markdown Artifact types and populate the returned path. For another requested evidence format, such as HTML, create it in the resolved scope's direct-child `artifacts/` directory and apply the format-specific validation skill. Artifact creation and content authoring are one outcome; do not leave an empty scaffold for the operator to finish.
+Use `artifact create --scope TARGET --type TYPE --title TITLE` for supported Markdown Artifact types and populate the returned path. Use `artifact import file PATH --scope TARGET` for one explicit opaque evidence file. For another requested evidence format, such as HTML, create it in the resolved scope's direct-child `artifacts/` directory and apply the format-specific validation skill. Artifact creation and content authoring are one outcome; do not leave an empty scaffold for the operator to finish.
 
 ## Guardrails
 

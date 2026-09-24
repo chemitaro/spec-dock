@@ -1,257 +1,40 @@
 # spec-dock
 
-`spec-dock` scaffolds a lightweight spec-driven documentation workspace into an existing repository.
+SpecDockは既存GitリポジトリにInitiative・Epic・Issueの仕様ツリーとCLIを導入する個人用ツールです。業務CLIは `scope`（仕様ノード）、`active`（現在の選択）、`work`（開始・完了）を分け、branch、dependency、artifact、worktree、workspace、installationを独立した操作群として提供します。
 
-It is designed to be executed via `uvx` (ephemeral install). After scaffolding, your project uses the
-generated files (Markdown templates, scripts, agent skills); the `spec-dock` package itself is not
-required at runtime.
+## 入口
 
-## Usage (uvx)
+- [現行CLIの全44コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
+- [日本語の対話的な説明資料](src/spec_dock/assets/spec_dock/docs/cli-redesign-guide.html)
+- [導入・一括移行・復旧](src/spec_dock/assets/spec_dock/docs/migration.md)
+- [文書作成ガイド](src/spec_dock/assets/spec_dock/docs/authoring/overview.md)
 
-```bash
-# Install into the current directory
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init
+導入済みリポジトリでは、外部の固定distributionにある `spec-dock` コマンド、または `./spec-dock/scripts/spec-dock` shimを使います。どちらも同じengine pinを検証します。`spec-dock help` と各leafの `--help` が引数のauthorityです。CLIはagent-firstで運用し、依頼または承認済み計画の範囲にある操作をagentが実行して結果を検証します。
 
-# Install into a target path
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init /path/to/project
-
-# Overwrite managed files if 'spec-dock' already exists
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock init --force
-
-# Replace the six fixed tooling directories
-uvx --from git+https://github.com/chemitaro/spec-dock spec-dock update
+```sh
+spec-dock scope create initiative --backend github --title "Platform"
+spec-dock scope create epic --backend github --parent init-00123 --title "Authentication"
+spec-dock scope create issue --backend github --parent epic-00124 --title "Refresh tokens"
+spec-dock work start epic-00124 --base main
+spec-dock active show
+spec-dock work finish epic-00124 --yes
 ```
 
-## Usage (uvx from a local clone)
+`work start` と `work finish` はIssue、Epic、Initiativeに使えます。開始は依存確認、branch作成またはcheckout、選択を実行します。完了はScopeをcompletedにし、選択中ならその対象以下を解除します。commit、push、PR、merge、test、reviewは別途確認してください。選択だけを変える場合は `active set TARGET`、状態だけを変える場合は `scope close TARGET` を使います。
 
-If you want to try `spec-dock` without fetching from GitHub each time, clone this repository and
-point `uvx --from` to the local directory.
+## 導入と更新
 
-Note: `--from` must point to the repository root that contains `pyproject.toml`
-(do not point it at `src/spec_dock/`).
+新しい配布物はworktree外の固定distributionから実行します。初回導入は `spec-dock installation init PATH --yes`、固定commitへの更新は `spec-dock installation update --target PATH --commit SHA --maintenance --yes` を使います。既存導入先は停止・backup・inventoryを揃え、全登録worktreeを同じwriter protocolへ移行する必要があります。schema変換は `workspace migrate --to-schema 3 --yes` で別に実行します。途中失敗時はjournalのoperation IDを確認し、対象leafの `--resume` または `--rollback` に従います。詳細な手順とガードは[移行ガイド](src/spec_dock/assets/spec_dock/docs/migration.md)にあります。
 
-```bash
-# Clone spec-dock somewhere on your machine
-git clone https://github.com/chemitaro/spec-dock ~/src/spec-dock
+`SPEC_DOCK_WORKTREE_ROOT` は管理対象linked worktreeの配置先です。使う場合は環境で絶対pathを指定してください。worktree作成には `--base REF` が必要です。
 
-# Install into your target project (current directory)
-cd /path/to/your/project
-uvx --from ~/src/spec-dock spec-dock init
+## 開発
 
-# Or: specify the target path explicitly
-uvx --from ~/src/spec-dock spec-dock init /path/to/your/project
+provider側の正本は `src/spec_dock/` です。`src/spec_dock/assets/spec_dock/` の文書・テンプレート・runtimeが導入先に配布され、このリポジトリの `spec-dock/` はdogfooding用のconsumer workspaceです。仕様の変更はactive IssueのRequirement、Design、Planで追跡します。
 
-# Update managed files later
-uvx --from ~/src/spec-dock spec-dock update
-```
-
-`spec-dock update` replaces these six fixed directories from the package, in order:
-
-1. `spec-dock/docs`
-2. `spec-dock/templates`
-3. `spec-dock/system`
-4. `spec-dock/scripts`
-5. `.agents/skills/spec-dock`
-6. `.agents/skills/spec-dock-grill-with-docs`
-
-The `spec-dock/spec-dock.version` record is refreshed after all six copies succeed. Updates are
-nontransactional: stop repository commands during the update, and if a copy fails, fix the cause and
-rerun the external installer from the start. There is no automatic rollback or resume. Paths outside
-the six directories and the version record, including `spec-dock/initiatives`, are untouched.
-
-既存環境の更新手順と、旧配布面からの移行・復旧方針は [移行ガイド](spec-dock/docs/migration.md) を参照してください。
-
-## Worktree Root Setup
-
-`./spec-dock/scripts/spec-dock worktree create` requires `SPEC_DOCK_WORKTREE_ROOT`.
-Set it once in the shell startup file used by your local environment, such as `~/.zshenv` for zsh
-or `~/.bashrc` / `~/.bash_profile` for bash.
-
-```bash
-export SPEC_DOCK_WORKTREE_ROOT="${SPEC_DOCK_WORKTREE_ROOT:-$HOME/workspace/worktrees}"
-```
-
-SpecDock uses this directory as the central root for managed linked worktrees. Runtime reference
-docs describe the command contract and placement rules, but shell setup belongs here as onboarding.
-
-Troubleshooting:
-- If `.spec-dock/current` or `spec-dock-close*.sh` are generated, you're running the legacy (v1) scaffold.
-  v2 generates `spec-dock/initiatives/`, `spec-dock/active/`, and `spec-dock/.agent/`.
-- If you already have a legacy `.spec-dock/` directory from older v2 versions, rename it:
-  - `mv .spec-dock spec-dock`
-- If your local clone contains the v2 files but `uvx` still behaves like v1, try one of:
-  - Avoid the shared cache for a single run: `uvx --no-cache --from ~/src/spec-dock spec-dock init`
-  - Use a dedicated cache directory: `uvx --cache-dir /tmp/uv-cache-spec-dock --from ~/src/spec-dock spec-dock init`
-  - Remove stale build outputs in the tool repo (this often causes mixed v1/v2 assets): `rm -rf ~/src/spec-dock/build`
-  - (If possible) clear the cache: `uv cache clean`
-
-## Usage (local scripts)
-
-After `init`, Core operations use `./spec-dock/scripts/spec-dock`. The installed skill surface is
-limited to the Storage Core guide and the optional operator-owned documentation grill; planning,
-review, and execution orchestration are not shipped as repository-local workflow engines.
-
-### Agent-first operation
-
-SpecDock is intended to be operated by a Codex agent. When a user requests a SpecDock outcome or
-approves a plan that requires one, the agent runs the applicable repository-local commands and
-verifies their results. The examples below are command references, not instructions to hand routine
-execution back to the user. Removing bundled orchestration does not make the CLI human-operated.
-
-Ordinary in-scope creation, import, Artifact, active, dependency, sync, issue lifecycle, worktree
-creation, Workbench copy, close, and managed update operations do not require command-by-command
-confirmation. Destructive operations (`delete`, `uninstall --apply`,
-`worktree remove`, and guard-bypassing `--force`) require an exact target and destructive outcome in
-the user request or approved plan. PR merge remains human-operated where repository instructions say
-so.
-
-```bash
-# Create nodes:
-# - initiative/epic/issue default: create and link a GitHub issue.
-#   Requires: GitHub CLI `gh` and a GitHub repository.
-./spec-dock/scripts/spec-dock new initiative --title "Auth platform"                # creates GH issue, id=init-00123
-./spec-dock/scripts/spec-dock new epic --initiative init-00123 --title "JWT auth"  # creates GH issue, id=epic-00124
-
-# - issue default: create and link a GitHub issue; ids follow GitHub issue numbers.
-./spec-dock/scripts/spec-dock new issue --epic epic-00124 --title "Add refresh token"  # creates GH issue, id=iss-00123
-
-# `--create-github-issue` is an explicit alias for the default create path.
-./spec-dock/scripts/spec-dock new initiative --create-github-issue --title "Auth platform"                # id=init-00123
-./spec-dock/scripts/spec-dock new epic --create-github-issue --initiative init-00123 --title "JWT auth"  # id=epic-00124
-
-# Or: link to an existing GitHub issue number (without creating a new one)
-./spec-dock/scripts/spec-dock new issue --epic epic-00124 --title "Add refresh token" --github-issue 123  # id=iss-00123
-
-# Node creation does not accept `--no-github`; use `--github-issue <n>` to link an existing issue.
-
-# Working artifacts such as ADR originals are created via runtime command.
-./spec-dock/scripts/spec-dock new artifact adr --issue iss-00123 --title "Token rotation strategy"
-
-# Copy one Initiative/Epic/Issue Workbench to an existing linked worktree (experimental, one-shot).
-./spec-dock/scripts/spec-dock workbench copy --scope iss-00123 --to /path/to/linked-worktree
-
-# Preserve one explicit evidence file as opaque, evidence-only Artifact content.
-./spec-dock/scripts/spec-dock artifact import file \
-  --issue iss-00123 --file spec-dock/initiatives/.../.workbench/report.md
-
-# Import an existing GitHub issue into the spec tree (does not create/update the issue on GitHub)
-./spec-dock/scripts/spec-dock import initiative 10 --title "Auth platform"                 # id=init-00010
-./spec-dock/scripts/spec-dock import epic 11 --title "JWT auth" --initiative init-00010    # id=epic-00011
-./spec-dock/scripts/spec-dock import issue 123 --title "Add refresh token" --epic epic-00011  # id=iss-00123
-#
-# Note: canonical GitHub issue URLs are checked against the current repo; owner/repo mismatch is rejected.
-# Note: numeric initiative/epic/issue imports read from the resolved current repo (or explicit owner/repo when provided); if neither explicit repo scope nor a resolvable current repo scope from `origin` is available, import fails before local writes.
-
-# Normal issue execution lifecycle (primary path: branch checkout/create, guard, dependency readiness)
-./spec-dock/scripts/spec-dock issue start 123             # active + branch checkout/create
-./spec-dock/scripts/spec-dock issue start iss-local-00001 # local node id
-./spec-dock/scripts/spec-dock issue finish                # lifecycle closure: GitHub close + active clear
-
-# Active node selection (selection-only)
-./spec-dock/scripts/spec-dock active set 123             # default: active only (no checkout)
-./spec-dock/scripts/spec-dock active set iss-local-00001 # local node id (no checkout)
-
-# Generate index.json/tree.json (local scan; optionally enrich from GitHub via gh)
-./spec-dock/scripts/spec-dock sync
-./spec-dock/scripts/spec-dock sync --github
-
-# Validate the spec tree structure
-./spec-dock/scripts/spec-dock validate
-
-# Refresh this managed repo from the fixed upstream package (target defaults to the current directory)
-./spec-dock/scripts/spec-dock update
-
-# Or refresh an explicit managed repo path
-./spec-dock/scripts/spec-dock update /path/to/project
-```
-
-Notes:
-- The six directories listed above are replaced wholesale, so local edits inside them are discarded.
-  Consumer specifications and other data are outside that replacement boundary.
-- Stop repository commands during updates. After an interrupted copy, fix the cause and rerun the
-  external installer from the start; there is no transaction journal, automatic rollback, or resume.
-- Uninstall defaults to dry-run; `--apply` removes only tooling and its version record.
-  `--remove-specs` is rejected. Consumer workflows are never installed or updated automatically.
-- `./spec-dock/scripts/spec-dock update [path]` is the repo-local self-update path. It wraps the
-  installer update command by running
-  `uvx --no-cache --from git+https://github.com/chemitaro/spec-dock spec-dock update <target>`.
-  The target defaults to the current working directory, and an explicit path is resolved before it is
-  passed to the installer.
-- Runtime update always uses the fixed upstream `git+https://github.com/chemitaro/spec-dock` source
-  with `uvx --no-cache`; it does not expose arbitrary package source, cache, or `--force` options.
-- Runtime update replaces the fixed directories through the external installer. Missing tooling
-  directories are recreated without examining an old version protocol.
-
-- Workbench is an experimental, Git-ignored, non-canonical, disposable work area. The root
-  `spec-dock/.workbench/` uses date buckets and manual file selection only; there is no root bulk-copy
-  command. Initiative/Epic/Issue Workbenches can be copied explicitly to the same scope in one linked
-  worktree. This is a source-wins, one-shot copy, not automatic synchronization or copy-back.
-- Workbench copy applies to the complete directory without language, extension, MIME, or content
-  classification. Keep material that must survive outside Workbench in an Artifact or canonical doc.
-- `artifact import file` accepts one explicit regular file, preserves the source and its bytes, and
-  stores it as an opaque generic Artifact. Imported content remains evidence-only until it is reviewed and
-  accepted claims are explicitly rewritten into Requirement, Design, Plan, or an accepted ADR. See
-  [移行ガイド](spec-dock/docs/migration.md) for the replacement route and recovery notes.
-- `update` preserves existing Workbench directories as unmanaged local content. It does not migrate,
-  normalize, delete, or promote them.
-- For `new/import {initiative,epic,issue}`, `--title` is restricted to ASCII (alphanumerics + single spaces) and `--slug` is kebab-case.
-- Legacy sequential discussion docs are grandfathered only. New docs do not reuse legacy sequence names, and spec-dock does not auto-rename or auto-repair them to preserve forced backward compatibility.
-- Normal issue execution should use `issue start <target>` / `issue finish` as the primary path. Use `issue start <target> -f` / `--force` only to bypass the unfinished active issue guard; dependency readiness still applies.
-- `issue finish` is lifecycle closure only: it closes or confirms the linked GitHub issue and clears active state, but it does not guarantee commit, push, PR, merge, validate, test, or review completion. Record delivery completion evidence before running it.
-- Treat `active set` as selection-only: it resolves a local node and updates active pointers without branch checkout, GitHub access, dependency readiness, or the unfinished active Issue guard. `issue start <target>` owns branch checkout, that guard, and dependency readiness.
-- `github.issue_number` links (initiative/epic/issue) must be globally unique; duplicates are rejected/detected. See `src/spec_dock/assets/spec_dock/docs/reference_github.md` for details.
-- Generated initiative/epic/issue nodes include `artifacts/rules.md` as the default working-artifact surface.
-- New working artifacts are created under the target scope `artifacts/` direct child with `./spec-dock/scripts/spec-dock new artifact <type> --{initiative|epic|issue} <id> --title "..."`.
-- Existing `discussions/` docs are legacy/preservation evidence; do not use them as the recommended destination for new working artifacts.
-- Generated nodes do not include template-derived `README.md`.
-
-See `docs/sync-aggregation.md` for how `sync` generates index/tree from local + GitHub state.
-
-## What it creates
-
-- `spec-dock/`
-  - `spec-dock.version` (installed spec-dock version)
-  - `docs/` (guide)
-  - `templates/` (initiative/epic/issue/adr templates)
-  - `system/` (managed runtime system files)
-  - `scripts/` (runtime scripts; local operations)
-  - `initiatives/` (spec tree root; always-on)
-    - generated nodes include `artifacts/rules.md` for new working artifacts and do not include scope-local node creation wrappers
-    - legacy `discussions/` content is preserved when present, but is not the default destination for new working artifacts
-  - `active/` (generated pointers; gitignored)
-  - `.agent/` (generated agent state; gitignored)
-  - `.workbench/` (optional experimental root Workbench; date buckets/manual selection; gitignored)
-  - `.gitignore` (ignores `active/`, `.agent/`, `.workbench/` (and legacy `.work/`))
-- `.agents/skills/` (Codex-compatible installed surface)
-  - `spec-dock/` (Storage Core and Authoring Kit guidance)
-  - `spec-dock-grill-with-docs/` (optional operator-owned documentation Artifact helper)
-
-## Testing
-
-```bash
-uv run pytest
-uv run pytest tests/unit/infra/test_directory_installation.py
+```sh
 make lint
+uv run pytest
 ```
 
-Ordinary pytest runs all selected tests without a policy skip, ledger, or sharding wrapper.
-Provider CI runs lint and the suite on pull requests. Platform jobs check basic installation
-and runtime startup on Linux and macOS. Human review and merge remain required.
-
----
-
-## 日本語（概要）
-
-`spec-dock` は、既存リポジトリに `spec-dock/`（仕様書駆動開発のためのドキュメント一式）と
-Codex 互換の二つの補助Skillを生成するためのスキャフォルディングツールです。
-
-実行は `uvx` を想定しており、導入後は生成されたファイル（Markdown/スクリプト/Skill）を使って運用します。
-
-SpecDockの通常操作はCodex agentが実行するagent-first運用を想定しています。利用者の依頼または承認済み計画に必要なコマンドはagentが実行・検証し、コマンド例の提示だけで利用者へ返しません。破壊的操作は対象と結果が依頼または承認済み計画に明記されている場合に限り、PRのmergeはrepositoryのhuman gateに従います。
-
-v2 では `spec-dock/initiatives/` に Initiative → Epic → Issue の仕様ツリーを **常置**し、
-`spec-dock/active/` を “現在取り組んでいる対象” の固定入口（symlink）として使います。
-状態の集計は `spec-dock/.agent/index.json` と `spec-dock/.agent/tree.json` を `./spec-dock/scripts/spec-dock sync` で自動生成します（Git 管理しません）。
-
-補足: 通常の issue 実行開始/終了は `issue start <target>` / `issue finish` を primary path とし、unfinished active issue guard だけを bypass する場合は `issue start <target> -f` / `--force` を使います。`active set` は local node の selection-only であり、branch checkout、unfinished active Issue guard、dependency readiness は `issue start` が所有します。Artifact の採用内容は Requirement、Design、Plan または accepted ADR へ明示的に再記述します。`new/import {initiative,epic,issue}` の `--title`/`--slug` には入力制約（ASCII / kebab-case）があります。
-また、`github.issue_number` は initiative/epic/issue をまたいで一意です（重複は検知されます）。詳細は導入先の `spec-dock/docs/reference_github.md`（このリポジトリでは `src/spec_dock/assets/spec_dock/docs/reference_github.md`）を参照してください。
+Provider CIもlintと通常のpytestを実行します。PRのmergeは人間が行います。

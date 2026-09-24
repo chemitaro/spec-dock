@@ -3,7 +3,7 @@
 このディレクトリは `spec-dock` が **ツール都合で常設するファイル**を置く領域です。
 
 - ここにあるファイルは **ユーザーの仕様書（Initiative/Epic/Issue）ではありません**
-- `spec-dock update` により **上書きされる可能性**があります
+- `spec-dock installation update` により **上書きされる可能性**があります
 
 ## active-none（placeholder）
 

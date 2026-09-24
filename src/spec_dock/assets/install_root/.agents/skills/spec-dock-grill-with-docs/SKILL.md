@@ -33,7 +33,7 @@ Complete this preflight twice: before external capability use and immediately be
 4. Require the target directory and its `artifacts/` child to exist as ordinary directories, not symlinks.
 5. Require `artifacts/rules.md` to be a symlink that resolves to the matching Initiative, Epic, or Issue Artifact rules file inside `spec-dock/docs/rules/`.
 6. Require `spec-dock/templates/artifacts/<route>.md` to exist as a non-empty ordinary file whose resolved path remains inside the repository template tree.
-7. Read root and `new artifact --help` output and confirm the selector, route, title, and optional slug are accepted by the Current CLI.
+7. Read root and `artifact create --help` output and confirm the selector, route, title, and optional slug are accepted by the Current CLI.
 8. Require this skill's `agents/openai.yaml` and `scripts/finalize-artifact.py` to exist as non-empty ordinary files inside this skill directory.
 9. Confirm both external capabilities are available and can obey this skill's read-only boundary.
 
@@ -79,8 +79,8 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 4. Invoke the Current CLI exactly once, passing arguments without shell interpolation:
 
    ```text
-   ./spec-dock/scripts/spec-dock new artifact <route> \
-     --<initiative|epic|issue> <scope-id> \
+   ./spec-dock/scripts/spec-dock artifact create \
+     --scope <scope-id> --type <route> \
      --title <title> \
      [--slug <slug>]
    ```

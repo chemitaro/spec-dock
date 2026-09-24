@@ -6,9 +6,9 @@
 
 アクティブ対象を設定する例:
 
-```bash
-./spec-dock/scripts/spec-dock active set 123            # GitHub issue number
-./spec-dock/scripts/spec-dock active set --github-issue 123
-./spec-dock/scripts/spec-dock active set epic-00123     # node id（epic）
-./spec-dock/scripts/spec-dock active set --id epic-00123
+```sh
+spec-dock active set epic-00123
+spec-dock active show
 ```
+
+作業branchへ移る場合は `spec-dock work start epic-00123 --base main` を使います。
