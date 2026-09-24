@@ -8,6 +8,7 @@ import subprocess
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.cli.options import parse_vnext_output
+from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
@@ -90,13 +91,18 @@ def run_vnext(
     ns = parsed.namespace
     json_mode = bool(ns.json)
     try:
-        if ns.command_path not in {"work start", "work finish"}:
+        if ns.command_path not in {"work start", "work finish", "active show", "active set", "active clear"}:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
-        gateway = GithubIssueGateway(timeout=ns.timeout)
-        if ns.command_path == "work start":
+        if ns.command_path == "active show":
+            result = run_active_show(context)
+        elif ns.command_path in {"active set", "active clear"}:
+            result = run_active_change(ns, context)
+        elif ns.command_path == "work start":
+            gateway = GithubIssueGateway(timeout=ns.timeout)
             result = run_work_start(ns, context, gateway=gateway)
         else:
+            gateway = GithubIssueGateway(timeout=ns.timeout)
             result = run_work_finish(ns, context, gateway=gateway)
     except RemoteIssueError as error:
         return _failure(ns.command_path, error.code, str(error), error.exit_code, json_mode=json_mode)

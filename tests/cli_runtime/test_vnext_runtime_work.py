@@ -52,3 +52,20 @@ def test_vnext_cli_rejects_engine_mismatch_before_work_mutation(tmp_path: Path) 
     assert result.exit_code == 3
     assert json.loads(result.stdout)["error"]["code"] == "PRECONDITION_FAILED"
     assert (issue.path / ".meta.json").read_bytes() == before
+
+
+def test_vnext_active_show_set_clear_and_dry_run(tmp_path: Path) -> None:
+    specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
+    arguments = {"invocation_cwd": specdock_dir.parent, "engine_digest": "engine-a", "engine_version": "test"}
+    preview = run_vnext(["active", "set", issue.id, "--dry-run", "--json"], **arguments)
+    assert preview.exit_code == 0
+    assert json.loads(preview.stdout)["status"] == "planned"
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
+    selected = run_vnext(["active", "set", issue.id, "--json"], **arguments)
+    assert json.loads(selected.stdout)["data"]["focus_id"] == issue.id
+    shown = run_vnext(["active", "show", "--json"], **arguments)
+    assert json.loads(shown.stdout)["data"]["focus_id"] == issue.id
+    cleared_epic = run_vnext(["active", "clear", "--from", epic.id, "--json"], **arguments)
+    assert json.loads(cleared_epic.stdout)["data"]["focus_id"] == initiative.id
+    cleared_all = run_vnext(["active", "clear", "--all", "--json"], **arguments)
+    assert json.loads(cleared_all.stdout)["data"]["focus_id"] is None

@@ -24,6 +24,11 @@ class ActiveChangeResult:
     changed: bool
 
 
+def show_active_selection(*, repo_root: Path, worktree_id: str) -> SelectionState:
+    """Observe the current worktree selection without repairing or writing it."""
+    return load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)[0]
+
+
 def _parent(views: tuple[ScopeView, ...], child: ScopeView, expected_kind: str) -> ScopeView:
     if child.parent_id is None:
         raise ValueError("Scope ancestry is incomplete")
@@ -79,6 +84,57 @@ def clear_selection(
     return SelectionState(current.worktree_id, current.revision + 1, *ids, focus)
 
 
+def _decide_selection(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    views: tuple[ScopeView, ...],
+    current: SelectionState,
+    target: str | None,
+    from_branch: bool,
+    clear_from: str | None,
+    clear_all: bool,
+) -> SelectionState:
+    if sum((target is not None, from_branch, clear_from is not None, clear_all)) != 1:
+        raise ValueError("select exactly one active mutation")
+    if from_branch:
+        from spec_dock_runtime.application.branch_vnext import scope_from_current_branch
+
+        target = scope_from_current_branch(repo_root, common_dir)
+    if target is not None:
+        return select_scope(views, target, current=current)
+    return clear_selection(views, current=current, from_target=clear_from, all_scopes=clear_all)
+
+
+def preview_active_change(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    target: str | None = None,
+    from_branch: bool = False,
+    clear_from: str | None = None,
+    clear_all: bool = False,
+) -> ActiveChangeResult:
+    """Preview one selection change without taking a writer lock or publishing state."""
+    from spec_dock_runtime.application.scope_query import load_scope_views
+
+    specdock_dir = repo_root / "spec-dock"
+    views = load_scope_views(specdock_dir)
+    current, _identity = load_selection_v3(specdock_dir, worktree_id=worktree_id)
+    next_selection = _decide_selection(
+        repo_root=repo_root,
+        common_dir=common_dir,
+        views=views,
+        current=current,
+        target=target,
+        from_branch=from_branch,
+        clear_from=clear_from,
+        clear_all=clear_all,
+    )
+    return ActiveChangeResult(next_selection, next_selection != current)
+
+
 def change_active_selection(
     *,
     repo_root: Path,
@@ -95,8 +151,6 @@ def change_active_selection(
     """Admit and commit one worktree-local selection change without network or Git effects."""
     from spec_dock_runtime.application.scope_query import load_scope_views
 
-    if sum((target is not None, from_branch, clear_from is not None, clear_all)) != 1:
-        raise ValueError("select exactly one active mutation")
     specdock_dir = repo_root / "spec-dock"
     with WriterLock(common_dir, timeout=lock_timeout):
         admit_writer(
@@ -108,14 +162,16 @@ def change_active_selection(
         )
         views = load_scope_views(specdock_dir)
         current, identity = load_selection_v3(specdock_dir, worktree_id=worktree_id)
-        if from_branch:
-            from spec_dock_runtime.application.branch_vnext import scope_from_current_branch
-
-            target = scope_from_current_branch(repo_root, common_dir)
-        if target is not None:
-            next_selection = select_scope(views, target, current=current)
-        else:
-            next_selection = clear_selection(views, current=current, from_target=clear_from, all_scopes=clear_all)
+        next_selection = _decide_selection(
+            repo_root=repo_root,
+            common_dir=common_dir,
+            views=views,
+            current=current,
+            target=target,
+            from_branch=from_branch,
+            clear_from=clear_from,
+            clear_all=clear_all,
+        )
         if next_selection == current:
             return ActiveChangeResult(current, False)
         save_selection_v3(specdock_dir, next_selection, views=views, expected_identity=identity)
