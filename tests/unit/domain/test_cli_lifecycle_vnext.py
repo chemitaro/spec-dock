@@ -130,6 +130,20 @@ def test_metadata_codec_rejects_kind_and_id_mismatch() -> None:
         decode_scope_metadata(payload)
 
 
+def test_schema_three_codec_rejects_noncanonical_saved_id() -> None:
+    payload: dict[str, object] = {
+        "schema_version": 3,
+        "type": "issue",
+        "id": "iss-1",
+        "revision": 0,
+        "backend": "local",
+        "github": None,
+        "lifecycle": {"state": "open", "revision": 0, "updated_at": "now"},
+    }
+    with pytest.raises(ValueError, match="canonical"):
+        decode_scope_metadata(payload)
+
+
 def test_codec_updates_typed_lifecycle_without_losing_unknown_fields() -> None:
     payload: dict[str, object] = {
         "schema_version": 3,

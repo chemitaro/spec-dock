@@ -37,6 +37,7 @@ def _decode(payload: object) -> OperationRecord:
         raise ValueError("journal must be a JSON object")
     operation_id = payload.get("operation_id")
     command = payload.get("command")
+    effect_plan = payload.get("effect_plan")
     fingerprint = payload.get("request_fingerprint")
     phase = payload.get("phase")
     digest = payload.get("engine_digest")
@@ -49,6 +50,8 @@ def _decode(payload: object) -> OperationRecord:
         not isinstance(operation_id, str)
         or not _OPERATION_ID.fullmatch(operation_id)
         or not isinstance(command, str)
+        or not isinstance(effect_plan, list)
+        or not all(isinstance(item, str) for item in effect_plan)
         or not isinstance(fingerprint, str)
         or not isinstance(phase, str)
         or not isinstance(digest, str)
@@ -65,19 +68,23 @@ def _decode(payload: object) -> OperationRecord:
         if not isinstance(item, dict):
             raise ValueError("invalid journal effect")
         effect_id, kind, target, status = (item.get(key) for key in ("id", "kind", "target", "status"))
+        retry_of = item.get("retry_of")
         if (
             not isinstance(effect_id, str)
             or kind not in ("local", "git", "remote")
             or not isinstance(target, str)
-            or status not in ("intent", "succeeded", "failed", "unknown")
+            or status not in ("intent", "succeeded", "failed", "unknown", "not-applied")
+            or (retry_of is not None and not isinstance(retry_of, str))
         ):
             raise ValueError("invalid journal effect")
-        effects.append(OperationEffect(effect_id, kind, target, status))
+        after_revisions = _pairs(item.get("after_revisions", []), values=int)
+        effects.append(OperationEffect(effect_id, kind, target, status, retry_of, after_revisions))
     fixed_targets = _pairs(payload.get("fixed_targets"), values=str)
     before_revisions = _pairs(payload.get("before_revisions"), values=int)
     return OperationRecord(
         operation_id=operation_id,
         command=command,
+        effect_plan=tuple(effect_plan),
         fixed_targets=cast("tuple[tuple[str, str], ...]", fixed_targets),
         request_fingerprint=fingerprint,
         before_revisions=cast("tuple[tuple[str, int], ...]", before_revisions),
@@ -137,6 +144,7 @@ class JournalStore:
             for field in (
                 "operation_id",
                 "command",
+                "effect_plan",
                 "fixed_targets",
                 "request_fingerprint",
                 "before_revisions",
@@ -145,6 +153,7 @@ class JournalStore:
             )
         ):
             raise ValueError("journal fixed operation identity changed")
+        _assert_journal_transition(current, record)
         metadata = path.lstat()
         atomic_write_json(path, asdict(record), expected_identity=(metadata.st_dev, metadata.st_ino))
 
@@ -161,3 +170,56 @@ class JournalStore:
             if record.terminal_status in ("pending", "unknown"):
                 pending.append(record)
         return tuple(pending)
+
+
+def _assert_journal_transition(before: OperationRecord, after: OperationRecord) -> None:
+    if before.terminal_status not in ("pending", "unknown"):
+        raise ValueError("terminal journal cannot change")
+    if after.terminal_status == "rolled-back":
+        raise ValueError("rollback requires a verified recovery executor")
+    if len(after.effects) < len(before.effects) or len(after.effects) > len(before.effects) + 1:
+        raise ValueError("journal effect history cannot be removed or skipped")
+    if len(after.effects) == len(before.effects) + 1:
+        if after.effects[:-1] != before.effects or after.effects[-1].status != "intent":
+            raise ValueError("journal effect addition must preserve history and start with intent")
+        appended = after.effects[-1]
+        if appended.retry_of is not None:
+            prior = [
+                effect
+                for effect in before.effects
+                if effect.id == appended.retry_of or effect.retry_of == appended.retry_of
+            ]
+            if (
+                not prior
+                or prior[-1].status != "not-applied"
+                or (prior[-1].kind, prior[-1].target) != (appended.kind, appended.target)
+            ):
+                raise ValueError("journal effect retry requires observed non-application")
+        elif any(effect.id == appended.id for effect in before.effects):
+            raise ValueError("journal effect ID is duplicated")
+        if before.effects and before.effects[-1].status not in ("succeeded", "not-applied"):
+            raise ValueError("journal has an unresolved effect")
+    else:
+        changed = [
+            index for index, (old, new) in enumerate(zip(before.effects, after.effects, strict=True)) if old != new
+        ]
+        if len(changed) > 1 or (changed and changed[0] != len(before.effects) - 1):
+            raise ValueError("journal effect history cannot be reordered or rewritten")
+        if changed:
+            old, new = before.effects[-1], after.effects[-1]
+            if (old.id, old.kind, old.target, old.retry_of) != (new.id, new.kind, new.target, new.retry_of):
+                raise ValueError("journal effect identity cannot change")
+            allowed = {
+                "intent": {"succeeded", "failed", "unknown"},
+                "unknown": {"succeeded", "not-applied", "unknown"},
+            }
+            if new.status not in allowed.get(old.status, set()):
+                raise ValueError("journal effect status transition is invalid")
+    if after.backup_refs[: len(before.backup_refs)] != before.backup_refs:
+        raise ValueError("journal backup references are append-only")
+    if after.terminal_status == "succeeded" and any(effect.status != "succeeded" for effect in after.effects):
+        raise ValueError("journal terminal success has incomplete effects")
+    if after.terminal_status in ("failed", "rolled-back") and any(
+        effect.status in ("intent", "unknown") for effect in after.effects
+    ):
+        raise ValueError("journal terminal state has unresolved effects")

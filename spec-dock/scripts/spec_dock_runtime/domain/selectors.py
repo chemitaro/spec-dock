@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import PurePosixPath
 import re
 from typing import Literal, cast
 
@@ -127,17 +126,16 @@ def parse_artifact_selector(value: str) -> ArtifactSelector:
 
 
 def parse_worktree_selector(value: str) -> WorktreeSelector:
-    raw = value.strip()
+    raw = value
     if raw.startswith("wt:"):
         worktree_id = raw[3:]
         if not _WORKTREE_NAME.fullmatch(worktree_id):
             raise ValueError("invalid stable worktree ID")
         return WorktreeIdSelector(worktree_id)
     if raw.startswith("/"):
-        path = PurePosixPath(raw)
         if ".." in raw.split("/") or "\x00" in raw:
             raise ValueError("worktree path must be absolute without traversal")
-        return WorktreePathSelector(str(path))
+        return WorktreePathSelector(raw)
     if _WORKTREE_NAME.fullmatch(raw):
         return WorktreeAliasSelector(raw)
     raise ValueError("worktree selector requires wt:ID, registered alias, or absolute path")

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 import re
 from typing import Literal, cast
 
+from spec_dock_runtime.domain.ids import format_id
+
 LifecycleState = Literal["open", "completed", "not-planned"]
 ObservedState = Literal["open", "completed", "not-planned", "unknown"]
 
@@ -88,6 +90,8 @@ def decode_scope_metadata(payload: dict[str, object]) -> ScopeMetadata:
     match = re.fullmatch(rf"{prefix}(?:-local)?-([0-9]+)", scope_id)
     if match is None or int(match.group(1)) <= 0:
         raise ValueError("Scope ID does not match kind")
+    if scope_id != format_id(prefix, int(match.group(1)), local="-local-" in scope_id):
+        raise ValueError("Scope ID must use canonical spelling and width")
     revision = payload.get("revision")
     if not isinstance(revision, int) or isinstance(revision, bool) or revision < 0:
         raise ValueError("Scope metadata requires a nonnegative revision")

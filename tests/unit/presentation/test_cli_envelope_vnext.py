@@ -90,6 +90,27 @@ def test_result_rejects_success_exit_with_partial_effect() -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("status", "exit_code", "effects"),
+    [
+        ("succeeded", 0, (Effect("github.close", "unknown", "iss-00409"),)),
+        ("unchanged", 0, (Effect("active.clear", "succeeded", "iss-00409"),)),
+        ("planned", 0, (Effect("active.clear", "succeeded", "iss-00409"),)),
+        ("failed", 5, (Effect("github.close", "unknown", "iss-00409"),)),
+    ],
+)
+def test_top_level_result_cannot_hide_effect_state(status: str, exit_code: int, effects: tuple[Effect, ...]) -> None:
+    with pytest.raises(ValueError, match="effect"):
+        OperationResult(
+            command="work.finish",
+            status=status,
+            data=ActiveShowData(None, None, None, None, 0),
+            exit_code=exit_code,
+            effects=effects,
+            error=Diagnostic("FAILURE", "failure", {}) if status == "failed" else None,
+        )
+
+
 def test_text_renderer_reports_same_effect_and_error_codes() -> None:
     result = OperationResult(
         command="work.finish",

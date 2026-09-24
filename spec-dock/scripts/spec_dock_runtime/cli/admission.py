@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from spec_dock_runtime.domain.operation import BLOCKING_COMMANDS
 from spec_dock_runtime.infra.control_store import WORKSPACE_SCHEMA, WRITER_PROTOCOL, ControlState
+from spec_dock_runtime.infra.operation_journal import JournalStore
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 _MAINTENANCE_COMMANDS = frozenset({
     "workspace.migrate",
@@ -21,21 +24,13 @@ class AdmissionError(RuntimeError):
         self.code = code
 
 
-@dataclass(frozen=True)
-class PendingOperation:
-    operation_id: str
-    command: str
-    terminal_status: str
-    blocking: bool
-
-
 def admit_writer(
     control: ControlState | None,
     *,
+    common_dir: Path,
     worktree_id: str,
     engine_digest: str,
     expected_epoch: int,
-    operations: tuple[PendingOperation, ...] = (),
     maintenance_command: str | None = None,
     recovery_operation_id: str | None = None,
 ) -> None:
@@ -51,11 +46,8 @@ def admit_writer(
     registered = {item.id: item for item in control.worktrees}
     if worktree_id not in registered or not registered[worktree_id].active:
         raise AdmissionError("WORKTREE_UNREGISTERED", "current worktree is not active in the control inventory")
-    blocking = tuple(
-        item
-        for item in operations
-        if item.blocking and item.command in BLOCKING_COMMANDS and item.terminal_status in {"pending", "unknown"}
-    )
+    operations = JournalStore(common_dir).pending()
+    blocking = tuple(item for item in operations if item.terminal_status in {"pending", "unknown"})
     if recovery_operation_id is not None:
         if len(blocking) != 1 or blocking[0].operation_id != recovery_operation_id:
             raise AdmissionError(

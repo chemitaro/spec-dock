@@ -87,6 +87,13 @@ def test_empty_active_role_and_missing_id_are_not_found() -> None:
         resolve_scope_targets(snapshot, {"target": parse_scope_selector("iss-99999")})
 
 
+def test_snapshot_rejects_noncanonical_scope_id_before_target_resolution() -> None:
+    snapshot = _snapshot()
+    nodes = {**snapshot.nodes, "iss-3": _node("issue", "iss-3", "epic-00002")}
+    with pytest.raises(ValueError, match="canonical"):
+        ScopeSnapshot(nodes, snapshot.selection, snapshot.repository)
+
+
 def test_github_ref_requires_current_repo_and_unique_imported_node() -> None:
     snapshot = _snapshot()
     found = resolve_scope_targets(snapshot, {"target": parse_scope_selector("gh:Chemitaro/Spec-Dock#3")})

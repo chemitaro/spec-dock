@@ -12,7 +12,7 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.cli.catalog import LEAF_PATHS  # noqa: E402
+from spec_dock_runtime.cli.catalog import LEAF_PATHS, RECOVERY_LEAF_COMMANDS  # noqa: E402
 from spec_dock_runtime.cli.legacy import LegacyCommandError  # noqa: E402
 from spec_dock_runtime.cli.options import parse_vnext, parse_vnext_output  # noqa: E402
 from spec_dock_runtime.cli.parser import build_parser  # noqa: E402
@@ -187,6 +187,61 @@ def test_common_numeric_timeout_rejects_negative_values() -> None:
     with pytest.raises(SystemExit) as invalid:
         parse_vnext(["work", "start", "iss-00409", "--lock-timeout", "-1"])
     assert invalid.value.code == 2
+
+
+def test_common_timeouts_are_typed_finite_and_explicit() -> None:
+    default = parse_vnext(["work", "start", "iss-00409", "--json"])
+    assert default.lock_timeout == pytest.approx(0.0)
+    assert default.timeout == pytest.approx(30.0)
+    assert default.non_interactive is True
+    assert parse_vnext(["worktree", "bootstrap", "wt:one"]).timeout == pytest.approx(300.0)
+    assert parse_vnext(["work", "start", "iss-00409", "--lock-timeout", "1"]).lock_timeout == pytest.approx(1.0)
+    for value in ("nan", "inf", "-inf"):
+        with pytest.raises(SystemExit):
+            parse_vnext(["work", "start", "iss-00409", "--lock-timeout", value])
+
+
+@pytest.mark.parametrize("path", sorted(RECOVERY_LEAF_COMMANDS))
+def test_only_recoverable_leaves_accept_resume(path: str) -> None:
+    args = {
+        "scope create initiative": ["--backend", "local", "--title", "Plan"],
+        "scope create epic": ["--backend", "local", "--parent", "init-00001", "--title", "Plan"],
+        "scope create issue": ["--backend", "local", "--parent", "epic-00001", "--title", "Plan"],
+        "scope import github initiative": ["gh:a/b#1", "--title", "Plan"],
+        "scope import github epic": ["gh:a/b#1", "--parent", "init-00001", "--title", "Plan"],
+        "scope import github issue": ["gh:a/b#1", "--parent", "epic-00001", "--title", "Plan"],
+        "scope close": ["iss-00001"],
+        "scope reopen": ["iss-00001"],
+        "scope delete": ["iss-00001"],
+        "work start": ["iss-00001"],
+        "work finish": ["iss-00001"],
+        "branch create": ["iss-00001", "--base", "main"],
+        "workspace migrate": ["--to-schema", "3"],
+        "installation init": ["/tmp/install"],
+        "installation update": ["--version", "0.2.4"],
+        "installation uninstall": [],
+    }[path]
+    operation_id = "0123456789abcdef0123456789abcdef"
+    parsed = parse_vnext([*path.split(), *args, "--resume", operation_id])
+    assert parsed.resume == operation_id
+    with pytest.raises(SystemExit):
+        parse_vnext([*path.split(), *args, "--resume", "bad"])
+    if RECOVERY_LEAF_COMMANDS[path] in {
+        "scope.delete",
+        "workspace.migrate",
+        "installation.init",
+        "installation.update",
+        "installation.uninstall",
+    }:
+        rolled = parse_vnext([*path.split(), *args, "--rollback", operation_id])
+        assert rolled.rollback == operation_id
+        with pytest.raises(SystemExit):
+            parse_vnext([*path.split(), *args, "--resume", operation_id, "--rollback", operation_id])
+
+
+def test_nonrecoverable_leaf_rejects_recovery_option() -> None:
+    with pytest.raises(SystemExit):
+        parse_vnext(["scope", "edit", "iss-00409", "--title", "New", "--resume", "0123456789abcdef0123456789abcdef"])
 
 
 def test_help_option_before_leaf_opens_that_leaf(capsys: pytest.CaptureFixture[str]) -> None:

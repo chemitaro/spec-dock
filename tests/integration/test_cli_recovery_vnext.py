@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from multiprocessing import Process, Queue
+import os
 from pathlib import Path
 import sys
 import time
@@ -18,6 +19,7 @@ from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     can_send_effect,
     prepare_operation,
     record_effect_intent,
+    record_effect_observation,
     record_effect_result,
 )
 from spec_dock_runtime.infra.json_store import atomic_write_json  # noqa: E402
@@ -33,6 +35,7 @@ def _prepare_and_hold(common_dir: str, command: str, ready: Queue[str]) -> None:
         before_revisions={"selection": 2},
         engine_digest="engine-a",
         writer_epoch=7,
+        effect_plan=("effect",),
     )
     store.create(prepared)
     ready.put(prepared.operation_id)
@@ -81,6 +84,7 @@ def test_non_recoverable_command_cannot_create_blocking_journal() -> None:
             before_revisions={},
             engine_digest="engine-a",
             writer_epoch=7,
+            effect_plan=("effect",),
         )
 
 
@@ -93,6 +97,7 @@ def test_resume_uses_original_fixed_target_and_rejects_changed_request(tmp_path:
         before_revisions={"selection": 2},
         engine_digest="engine-a",
         writer_epoch=7,
+        effect_plan=("active-clear",),
     )
     store.create(prepared)
     assert_resume_request(
@@ -116,6 +121,32 @@ def test_resume_uses_original_fixed_target_and_rejects_changed_request(tmp_path:
         )
 
 
+def test_resume_accepts_recorded_partial_revision_and_rejects_other_changes() -> None:
+    prepared = prepare_operation(
+        command="work.finish",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:finish",
+        before_revisions={"selection": 2, "metadata": 4},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("active-clear", "projection"),
+    )
+    intent = record_effect_intent(prepared, effect_id="active-clear", kind="local", target="iss-00409")
+    partial = record_effect_result(
+        intent, effect_id="active-clear", status="succeeded", after_revisions={"selection": 3}
+    )
+    kwargs = {
+        "command": "work.finish",
+        "fixed_targets": {"target": "iss-00409"},
+        "request_fingerprint": "sha256:finish",
+        "engine_digest": "engine-a",
+        "writer_epoch": 7,
+    }
+    assert_resume_request(partial, current_revisions={"selection": 3, "metadata": 4}, **kwargs)
+    with pytest.raises(ValueError, match="revision"):
+        assert_resume_request(partial, current_revisions={"selection": 4, "metadata": 4}, **kwargs)
+
+
 def test_journal_update_cannot_retarget_an_existing_operation(tmp_path: Path) -> None:
     store = JournalStore(tmp_path)
     prepared = prepare_operation(
@@ -125,6 +156,7 @@ def test_journal_update_cannot_retarget_an_existing_operation(tmp_path: Path) ->
         before_revisions={},
         engine_digest="engine-a",
         writer_epoch=7,
+        effect_plan=("branch-create",),
     )
     store.create(prepared)
     altered = replace(prepared, fixed_targets=(("target", "iss-99999"),), sequence=1)
@@ -141,6 +173,7 @@ def test_unknown_remote_effect_requires_observation_before_retry(tmp_path: Path)
         before_revisions={"selection": 2},
         engine_digest="engine-a",
         writer_epoch=7,
+        effect_plan=("github-close", "active-clear"),
     )
     store.create(prepared)
     intent = record_effect_intent(
@@ -151,6 +184,90 @@ def test_unknown_remote_effect_requires_observation_before_retry(tmp_path: Path)
     store.update(unknown, expected_sequence=1)
     assert not can_send_effect(store.load(prepared.operation_id), "github-close")
     assert store.load(prepared.operation_id).terminal_status == "pending"
+    with pytest.raises(ValueError, match="unresolved"):
+        record_effect_intent(unknown, effect_id="active-clear", kind="local", target="iss-00409")
+    observed = record_effect_observation(unknown, effect_id="github-close", outcome="observed_applied")
+    store.update(observed, expected_sequence=2)
+    assert not can_send_effect(observed, "github-close")
+    record_effect_intent(observed, effect_id="active-clear", kind="local", target="iss-00409")
+
+
+def test_observed_not_applied_allows_recorded_retry_only() -> None:
+    prepared = prepare_operation(
+        command="scope.close",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:close",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-close",),
+    )
+    intent = record_effect_intent(
+        prepared, effect_id="github-close", kind="remote", target="gh:chemitaro/spec-dock#409"
+    )
+    unknown = record_effect_result(intent, effect_id="github-close", status="unknown")
+    observed = record_effect_observation(unknown, effect_id="github-close", outcome="observed_not_applied")
+    assert can_send_effect(observed, "github-close")
+    retry = record_effect_intent(observed, effect_id="github-close", kind="remote", target="gh:chemitaro/spec-dock#409")
+    assert len(retry.effects) == 2
+    assert retry.effects[0].status == "not-applied"
+    assert retry.effects[1].status == "intent"
+
+
+def test_journal_cannot_erase_effect_or_mark_unknown_as_success(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.close",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:close",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-close",),
+    )
+    store.create(prepared)
+    intent = record_effect_intent(
+        prepared, effect_id="github-close", kind="remote", target="gh:chemitaro/spec-dock#409"
+    )
+    store.update(intent, expected_sequence=0)
+    unknown = record_effect_result(intent, effect_id="github-close", status="unknown")
+    store.update(unknown, expected_sequence=1)
+    with pytest.raises(ValueError, match="effect"):
+        store.update(replace(unknown, effects=(), sequence=3), expected_sequence=2)
+    with pytest.raises(ValueError, match="terminal"):
+        store.update(replace(unknown, terminal_status="succeeded", sequence=3), expected_sequence=2)
+
+
+def test_unimplemented_rollback_cannot_clear_a_pending_journal(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.delete",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:delete",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("local-delete",),
+    )
+    store.create(prepared)
+    with pytest.raises(ValueError, match="rollback"):
+        store.update(replace(prepared, terminal_status="rolled-back", sequence=1), expected_sequence=0)
+
+
+def test_planned_effects_cannot_be_skipped_or_reordered_to_clear_blocker() -> None:
+    prepared = prepare_operation(
+        command="work.finish",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:finish",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-close", "active-clear"),
+    )
+    with pytest.raises(ValueError, match="effect plan"):
+        replace(prepared, terminal_status="succeeded", sequence=1)
+    with pytest.raises(ValueError, match="effect plan"):
+        record_effect_intent(prepared, effect_id="active-clear", kind="local", target="iss-00409")
 
 
 def test_atomic_json_rename_failure_keeps_previous_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -158,12 +275,13 @@ def test_atomic_json_rename_failure_keeps_previous_bytes(tmp_path: Path, monkeyp
     path.write_bytes(b'{"original":true}\n')
     original = path.read_bytes()
 
-    def fail_replace(self: Path, target: Path) -> None:
+    def fail_replace(*args: object, **kwargs: object) -> None:
         raise OSError("injected rename failure")
 
-    monkeypatch.setattr(Path, "replace", fail_replace)
+    monkeypatch.setattr(os, "replace", fail_replace)
     with pytest.raises(OSError, match="rename failure"):
-        atomic_write_json(path, {"new": True})
+        identity = path.stat()
+        atomic_write_json(path, {"new": True}, expected_identity=(identity.st_dev, identity.st_ino))
     assert path.read_bytes() == original
     assert sorted(item.name for item in tmp_path.iterdir()) == ["state.json"]
 
@@ -189,6 +307,21 @@ def test_atomic_json_refuses_symlink_ancestor(tmp_path: Path) -> None:
     assert not (nested / "data.json").exists()
 
 
+def test_atomic_json_rejects_hardlinked_target_and_accidental_replace(tmp_path: Path) -> None:
+    path = tmp_path / "state.json"
+    alias = tmp_path / "alias.json"
+    path.write_text("{}\n", encoding="utf-8")
+    os.link(path, alias)
+    identity = path.stat()
+    with pytest.raises(ValueError, match="hardlink"):
+        atomic_write_json(path, {"changed": True}, expected_identity=(identity.st_dev, identity.st_ino))
+    normal = tmp_path / "normal.json"
+    normal.write_text("{}\n", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        atomic_write_json(normal, {"changed": True})
+    assert path.read_text(encoding="utf-8") == alias.read_text(encoding="utf-8") == "{}\n"
+
+
 def test_corrupt_journal_is_not_treated_as_completed(tmp_path: Path) -> None:
     store = JournalStore(tmp_path)
     prepared = prepare_operation(
@@ -198,6 +331,7 @@ def test_corrupt_journal_is_not_treated_as_completed(tmp_path: Path) -> None:
         before_revisions={},
         engine_digest="engine-a",
         writer_epoch=7,
+        effect_plan=("branch-create",),
     )
     store.create(prepared)
     journal_path = store.root / prepared.operation_id / "journal.json"

@@ -13,7 +13,8 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.cli.admission import AdmissionError, PendingOperation, admit_writer  # noqa: E402
+from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
+from spec_dock_runtime.cli.admission import AdmissionError, admit_writer  # noqa: E402
 from spec_dock_runtime.infra.control_store import (  # noqa: E402
     ControlState,
     WorktreeRegistration,
@@ -21,6 +22,7 @@ from spec_dock_runtime.infra.control_store import (  # noqa: E402
     store_control,
 )
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
+from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from spec_dock_runtime.infra.writer_lock import (  # noqa: E402
     WorktreeLease,
     WriterLock,
@@ -43,8 +45,8 @@ def _control(*, mode: str = "ready", schema: int = 3, digest: str = "engine-a") 
     )
 
 
-def test_all_registered_worktrees_must_use_same_writer_protocol() -> None:
-    admit_writer(_control(), worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+def test_all_registered_worktrees_must_use_same_writer_protocol(tmp_path: Path) -> None:
+    admit_writer(_control(), common_dir=tmp_path, worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
     bad = _control()
     incompatible = WorktreeRegistration("wt-two", "/project/two", 2, "specdock.writer/v0", "engine-a", True)
     bad = ControlState(
@@ -56,7 +58,7 @@ def test_all_registered_worktrees_must_use_same_writer_protocol() -> None:
         (bad.worktrees[0], incompatible),
     )
     with pytest.raises(AdmissionError, match="protocol"):
-        admit_writer(bad, worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+        admit_writer(bad, common_dir=tmp_path, worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
 
 
 @pytest.mark.parametrize(
@@ -67,36 +69,60 @@ def test_all_registered_worktrees_must_use_same_writer_protocol() -> None:
         {"expected_epoch": 11},
     ],
 )
-def test_unregistered_or_stale_writer_is_rejected(kwargs: dict[str, object]) -> None:
-    valid: dict[str, object] = {"worktree_id": "wt-one", "engine_digest": "engine-a", "expected_epoch": 12}
+def test_unregistered_or_stale_writer_is_rejected(tmp_path: Path, kwargs: dict[str, object]) -> None:
+    valid: dict[str, object] = {
+        "common_dir": tmp_path,
+        "worktree_id": "wt-one",
+        "engine_digest": "engine-a",
+        "expected_epoch": 12,
+    }
     valid.update(kwargs)
     with pytest.raises(AdmissionError):
         admit_writer(_control(), **valid)
 
 
-def test_only_explicit_blocking_recovery_operations_stop_unrelated_writes() -> None:
-    partial = PendingOperation("op-partial", "artifact.create", "partial", False)
-    admit_writer(_control(), worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12, operations=(partial,))
-    blocking = PendingOperation("op-start", "work.start", "pending", True)
+def test_only_explicit_blocking_recovery_operations_stop_unrelated_writes(tmp_path: Path) -> None:
+    admit_writer(_control(), common_dir=tmp_path, worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+    blocking = prepare_operation(
+        command="work.start",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:start",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=12,
+        effect_plan=("branch-create",),
+    )
+    JournalStore(tmp_path).create(blocking)
     with pytest.raises(AdmissionError, match="recovery"):
         admit_writer(
-            _control(), worktree_id="wt-two", engine_digest="engine-a", expected_epoch=12, operations=(blocking,)
+            _control(),
+            common_dir=tmp_path,
+            worktree_id="wt-two",
+            engine_digest="engine-a",
+            expected_epoch=12,
         )
     admit_writer(
         _control(),
+        common_dir=tmp_path,
         worktree_id="wt-one",
         engine_digest="engine-a",
         expected_epoch=12,
-        operations=(blocking,),
-        recovery_operation_id="op-start",
+        recovery_operation_id=blocking.operation_id,
     )
 
 
-def test_maintenance_blocks_normal_writer_but_allows_migration() -> None:
+def test_maintenance_blocks_normal_writer_but_allows_migration(tmp_path: Path) -> None:
     with pytest.raises(AdmissionError, match="maintenance"):
-        admit_writer(_control(mode="maintenance"), worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+        admit_writer(
+            _control(mode="maintenance"),
+            common_dir=tmp_path,
+            worktree_id="wt-one",
+            engine_digest="engine-a",
+            expected_epoch=12,
+        )
     admit_writer(
         _control(mode="maintenance"),
+        common_dir=tmp_path,
         worktree_id="wt-one",
         engine_digest="engine-a",
         expected_epoch=12,
@@ -104,7 +130,7 @@ def test_maintenance_blocks_normal_writer_but_allows_migration() -> None:
     )
 
 
-def test_maintenance_can_repair_mixed_registered_worktrees() -> None:
+def test_maintenance_can_repair_mixed_registered_worktrees(tmp_path: Path) -> None:
     ready = _control()
     outdated = WorktreeRegistration("wt-two", "/project/two", 2, "specdock.writer/v0", "engine-old", True)
     mixed = ControlState(
@@ -117,6 +143,7 @@ def test_maintenance_can_repair_mixed_registered_worktrees() -> None:
     )
     admit_writer(
         mixed,
+        common_dir=tmp_path,
         worktree_id="wt-one",
         engine_digest="engine-a",
         expected_epoch=12,

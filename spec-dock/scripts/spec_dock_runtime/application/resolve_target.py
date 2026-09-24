@@ -32,6 +32,15 @@ class ScopeSnapshot:
     repository: tuple[str, str] | None
 
     def __post_init__(self) -> None:
+        for node_id, node in self.nodes.items():
+            try:
+                selector = parse_scope_selector(node_id)
+            except ValueError as exc:
+                raise ValueError("snapshot contains an invalid Scope ID") from exc
+            if not isinstance(selector, ScopeIdSelector) or selector.id != node_id or node.id != node_id:
+                raise ValueError("snapshot contains a noncanonical Scope ID")
+            if selector.kind != node.kind:
+                raise ValueError("snapshot Scope ID kind disagrees with node kind")
         object.__setattr__(self, "nodes", MappingProxyType(dict(self.nodes)))
         if self.repository is not None:
             object.__setattr__(self, "repository", tuple(part.lower() for part in self.repository))

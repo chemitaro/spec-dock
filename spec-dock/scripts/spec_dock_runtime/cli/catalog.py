@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from spec_dock_runtime.domain.operation import BLOCKING_COMMANDS, ROLLBACK_COMMANDS
+
 
 @dataclass(frozen=True)
 class ArgumentSpec:
@@ -171,6 +173,27 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "help": (_arg("command_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
+
+RECOVERY_LEAF_COMMANDS: dict[str, str] = {
+    **{f"scope create {kind}": "scope.create" for kind in KINDS},
+    **{f"scope import github {kind}": "scope.import" for kind in KINDS},
+    "scope close": "scope.close",
+    "scope reopen": "scope.reopen",
+    "scope delete": "scope.delete",
+    "work start": "work.start",
+    "work finish": "work.finish",
+    "branch create": "branch.create",
+    "workspace migrate": "workspace.migrate",
+    "installation init": "installation.init",
+    "installation update": "installation.update",
+    "installation uninstall": "installation.uninstall",
+}
+if set(RECOVERY_LEAF_COMMANDS.values()) != BLOCKING_COMMANDS:
+    raise RuntimeError("recovery CLI leaves do not match the D-16 command allowlist")
+for _leaf, _command in RECOVERY_LEAF_COMMANDS.items():
+    LEAF_ARGUMENTS[_leaf] += (_arg("--resume"),)
+    if _command in ROLLBACK_COMMANDS:
+        LEAF_ARGUMENTS[_leaf] += (_arg("--rollback"),)
 
 
 MUTATING_LEAF_PATHS = frozenset({

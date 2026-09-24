@@ -6,6 +6,8 @@ import argparse
 from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from io import StringIO
+import math
+import re
 from typing import TYPE_CHECKING, Any
 
 from spec_dock_runtime.cli.catalog import LEAF_ARGUMENTS, LEAF_PATHS, MUTATING_LEAF_PATHS
@@ -101,20 +103,22 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
             if not value:
                 error_parser.error(f"{name} requires a nonempty value")
             key = _COMMON_VALUES[name]
-            if key in common and common[key] != value:
-                error_parser.error(f"conflicting duplicate {name}")
+            normalized_value: str | float = value
             if key in ("lock_timeout", "timeout"):
                 try:
                     duration = float(value)
                 except ValueError:
                     error_parser.error(f"{name} requires a number")
-                if duration < 0 or (key == "timeout" and duration == 0):
+                if not math.isfinite(duration) or duration < 0 or (key == "timeout" and duration == 0):
                     error_parser.error(f"{name} requires a positive value")
+                normalized_value = duration
+            if key in common and common[key] != normalized_value:
+                error_parser.error(f"conflicting duplicate {name}")
             if key == "expect_backend" and value not in ("github", "local"):
                 error_parser.error("--expect-backend must be github or local")
             if key == "color" and value not in ("auto", "always", "never"):
                 error_parser.error("--color must be auto, always, or never")
-            common[key] = value
+            common[key] = normalized_value
         else:
             remaining.append(arg)
         index += 1
@@ -129,10 +133,21 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("active set requires exactly one of TARGET or --from-branch")
     if parsed.command_path == "installation update" and bool(parsed.version) == bool(parsed.commit):
         parser.error("installation update requires exactly one of --version or --commit")
+    resume = getattr(parsed, "resume", None)
+    rollback = getattr(parsed, "rollback", None)
+    if resume and rollback:
+        parser.error("--resume and --rollback are mutually exclusive")
+    if any(value is not None and re.fullmatch(r"[0-9a-f]{32}", value) is None for value in (resume, rollback)):
+        parser.error("recovery requires a 32-character lowercase operation ID")
     if parsed.command_path not in MUTATING_LEAF_PATHS and (common.get("yes") or common.get("dry_run")):
         parser.error("--yes and --dry-run apply only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
         setattr(parsed, key, common.get(key, False if key in _COMMON_SWITCHES.values() else None))
+    parsed.non_interactive = bool(parsed.non_interactive or parsed.json)
+    parsed.lock_timeout = 0.0 if parsed.lock_timeout is None else parsed.lock_timeout
+    parsed.timeout = (
+        (300.0 if parsed.command_path == "worktree bootstrap" else 30.0) if parsed.timeout is None else parsed.timeout
+    )
     return parsed
 
 

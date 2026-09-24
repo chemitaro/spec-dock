@@ -69,6 +69,17 @@ class OperationResult(Generic[T]):
                 raise ValueError("successful result requires exit 0 and no error")
         else:
             raise ValueError("invalid operation status")
+        effect_states = {effect.status for effect in self.effects}
+        if self.status == "succeeded" and not effect_states <= {"succeeded", "unchanged"}:
+            raise ValueError("succeeded result cannot contain incomplete effects")
+        if self.status == "unchanged" and not effect_states <= {"unchanged"}:
+            raise ValueError("unchanged result cannot contain mutation effects")
+        if self.status == "planned" and not effect_states <= {"planned"}:
+            raise ValueError("planned result cannot contain executed effects")
+        if self.status == "failed" and effect_states & {"succeeded", "unknown"}:
+            raise ValueError("failed result cannot hide applied or unknown effects")
+        if self.status == "partial" and not ("unknown" in effect_states or "succeeded" in effect_states):
+            raise ValueError("partial result requires an applied or unknown effect")
 
 
 def render_json(result: OperationResult[object]) -> str:

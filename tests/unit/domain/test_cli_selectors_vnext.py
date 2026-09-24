@@ -74,3 +74,11 @@ def test_worktree_selector_requires_registered_shape() -> None:
     for bad in ("../planning", "/tmp/../private", "wt:../../x", "", "file:///tmp/planning"):
         with pytest.raises(ValueError):
             parse_worktree_selector(bad)
+
+
+def test_absolute_worktree_path_preserves_significant_whitespace() -> None:
+    assert parse_worktree_selector("/tmp/planning ") == WorktreePathSelector("/tmp/planning ")
+    with pytest.raises(ValueError):
+        parse_worktree_selector(" wt:planning-1")
+    with pytest.raises(ValueError):
+        parse_worktree_selector("planning-1 ")
