@@ -15,6 +15,7 @@ from spec_dock_runtime.commands.dependency_vnext import run_dependency_change, r
 from spec_dock_runtime.commands.scope_create_vnext import run_scope_create
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
+from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace_diagnostics
 from spec_dock_runtime.commands.worktree_vnext import run_worktree_query
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
@@ -120,6 +121,8 @@ def run_vnext(
             "artifact show",
             "worktree list",
             "worktree show",
+            "workspace validate",
+            "workspace doctor",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
@@ -137,6 +140,8 @@ def run_vnext(
             result = run_artifact_query(ns, context)
         elif ns.command_path in {"worktree list", "worktree show"}:
             result = run_worktree_query(ns, context)
+        elif ns.command_path in {"workspace validate", "workspace doctor"}:
+            result = run_workspace_diagnostics(ns, context)
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)
         elif ns.command_path == "active show":
@@ -166,6 +171,6 @@ def run_vnext(
     except OSError:
         return _failure(ns.command_path, "LOCAL_IO_FAILED", "local I/O operation failed", 5, json_mode=json_mode)
     if json_mode:
-        return RuntimeOutput(0, render_json(result), "")
+        return RuntimeOutput(result.exit_code, render_json(result), "")
     stdout, stderr = render_text(result)
-    return RuntimeOutput(0, stdout, stderr)
+    return RuntimeOutput(result.exit_code, stdout, stderr)
