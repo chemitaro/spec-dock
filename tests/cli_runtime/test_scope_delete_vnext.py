@@ -3,20 +3,25 @@
 from __future__ import annotations
 
 from pathlib import Path
+import subprocess
 import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock_runtime.application import scope_delete_vnext  # noqa: E402
 from spec_dock_runtime.application.active_selection import select_scope  # noqa: E402
+from spec_dock_runtime.application.branch_vnext import create_scope_branch  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
 from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
 from spec_dock_runtime.application.scope_delete_vnext import (  # noqa: E402
     delete_scope,
     plan_scope_delete,
     resume_scope_delete,
+    rollback_scope_delete,
 )
 from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
@@ -28,6 +33,9 @@ from spec_dock_runtime.infra.writer_lock import WriterLock  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
 from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
 
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.operation import OperationRecord
+
 
 def test_delete_requires_explicit_recursive_active_and_dependency_choices(tmp_path: Path) -> None:
     _root, views, initiative, epic, issue = _three_scopes(tmp_path)
@@ -38,8 +46,12 @@ def test_delete_requires_explicit_recursive_active_and_dependency_choices(tmp_pa
     with pytest.raises(ValueError, match="CLEAR_ACTIVE_REQUIRED"):
         plan_scope_delete(views, target=epic.id, selection=active, dependencies=edges, recursive=True)
     ready = plan_scope_delete(
-        views, target=epic.id, selection=active, dependencies=edges,
-        recursive=True, clear_active=True,
+        views,
+        target=epic.id,
+        selection=active,
+        dependencies=edges,
+        recursive=True,
+        clear_active=True,
     )
     assert set(ready.deleted_ids) == {epic.id, issue.id}
     assert ready.selection_after == SelectionState("main", 2, initiative.id, None, None, initiative.id)
@@ -48,11 +60,15 @@ def test_delete_requires_explicit_recursive_active_and_dependency_choices(tmp_pa
 def test_delete_boundary_dependency_requires_explicit_detach(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
     sibling = create_local_scope(
-        kind="issue", title="Sibling",
+        kind="issue",
+        title="Sibling",
         parent=AncestorState(epic.id, "epic", "local", "open", False, initiative.id),
         ancestors=(AncestorState(initiative.id, "initiative", "local", "open", False),),
-        repo_root=specdock_dir.parent, common_dir=specdock_dir.parent / ".git",
-        worktree_id="main", engine_digest="engine-a", expected_epoch=1,
+        repo_root=specdock_dir.parent,
+        common_dir=specdock_dir.parent / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
         updated_at="2026-09-25T00:00:00Z",
     )
     views = load_scope_views(specdock_dir)
@@ -60,9 +76,7 @@ def test_delete_boundary_dependency_requires_explicit_detach(tmp_path: Path) -> 
     edges = {initiative.id: (), epic.id: (), issue.id: (), sibling.id: (issue.id,)}
     with pytest.raises(ValueError, match="DETACH_DEPENDENCIES_REQUIRED"):
         plan_scope_delete(views, target=issue.id, selection=active, dependencies=edges)
-    plan = plan_scope_delete(
-        views, target=issue.id, selection=active, dependencies=edges, detach_dependencies=True
-    )
+    plan = plan_scope_delete(views, target=issue.id, selection=active, dependencies=edges, detach_dependencies=True)
     assert plan.boundary_edges == ((sibling.id, issue.id),)
     assert plan.survivor_dependencies == {sibling.id: ()}
     assert plan.selection_after == active
@@ -89,8 +103,14 @@ def test_import_does_not_reuse_deleted_github_scope_id(tmp_path: Path) -> None:
     gateway = FakeGateway(_issue())
     with pytest.raises(ValueError, match="deleted Scope ID"):
         import_github_scope(
-            kind="initiative", github_ref="gh:example/repo#47", repo_hint=None,
-            title="Imported", parent_id=None, slug=None, gateway=gateway, **common,
+            kind="initiative",
+            github_ref="gh:example/repo#47",
+            repo_hint=None,
+            title="Imported",
+            parent_id=None,
+            slug=None,
+            gateway=gateway,
+            **common,
         )
     assert JournalStore(common_dir).pending() == ()
 
@@ -98,10 +118,31 @@ def test_import_does_not_reuse_deleted_github_scope_id(tmp_path: Path) -> None:
 def test_delete_quarantines_only_target_tree_and_keeps_branch_binding(tmp_path: Path) -> None:
     specdock_dir, _views, _initiative, epic, issue = _three_scopes(tmp_path)
     repo_root = specdock_dir.parent
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    binding = create_scope_branch(
+        repo_root=repo_root,
+        common_dir=repo_root / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        scope_id=issue.id,
+        base="HEAD",
+        name=None,
+    )
     before_parent = (epic.path / ".meta.json").read_bytes()
     result = delete_scope(
-        repo_root=repo_root, common_dir=repo_root / ".git", worktree_id="main",
-        engine_digest="engine-a", expected_epoch=1, target=issue.id,
+        repo_root=repo_root,
+        common_dir=repo_root / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=issue.id,
     )
     assert result.deleted_ids == (issue.id,)
     assert not issue.path.exists()
@@ -109,17 +150,30 @@ def test_delete_quarantines_only_target_tree_and_keeps_branch_binding(tmp_path: 
     assert (result.quarantine_path / ".meta.json").is_file()
     assert (epic.path / ".meta.json").read_bytes() == before_parent
     assert RegistryStore(repo_root / ".git").load()[0].deleted_ids == frozenset((issue.id,))
+    assert RegistryStore(repo_root / ".git").load()[0].branches == (binding,)
+    assert (
+        subprocess.run(
+            ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{binding.name}"],
+            cwd=repo_root,
+            capture_output=True,
+        ).returncode
+        == 0
+    )
     assert JournalStore(repo_root / ".git").pending() == ()
 
 
 def test_delete_detaches_survivor_dependency_and_clears_selected_issue(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
     sibling = create_local_scope(
-        kind="issue", title="Sibling",
+        kind="issue",
+        title="Sibling",
         parent=AncestorState(epic.id, "epic", "local", "open", False, initiative.id),
         ancestors=(AncestorState(initiative.id, "initiative", "local", "open", False),),
-        repo_root=specdock_dir.parent, common_dir=specdock_dir.parent / ".git",
-        worktree_id="main", engine_digest="engine-a", expected_epoch=1,
+        repo_root=specdock_dir.parent,
+        common_dir=specdock_dir.parent / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
         updated_at="2026-09-25T00:00:00Z",
     )
     loaded = read_guarded_json(sibling.path / ".meta.json")
@@ -132,9 +186,14 @@ def test_delete_detaches_survivor_dependency_and_clears_selected_issue(tmp_path:
     selection = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selection, views=views, expected_identity=None)
     result = delete_scope(
-        repo_root=specdock_dir.parent, common_dir=specdock_dir.parent / ".git", worktree_id="main",
-        engine_digest="engine-a", expected_epoch=1, target=issue.id,
-        clear_active=True, detach_dependencies=True,
+        repo_root=specdock_dir.parent,
+        common_dir=specdock_dir.parent / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=issue.id,
+        clear_active=True,
+        detach_dependencies=True,
     )
     assert result.deleted_ids == (issue.id,)
     remaining = read_guarded_json(sibling.path / ".meta.json")
@@ -149,12 +208,15 @@ def test_delete_resumes_after_tree_move_before_journal_receipt(tmp_path: Path, m
     specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
     repo_root = specdock_dir.parent
     arguments = {
-        "repo_root": repo_root, "common_dir": repo_root / ".git", "worktree_id": "main",
-        "engine_digest": "engine-a", "expected_epoch": 1,
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
     }
     original = JournalStore.update
 
-    def fail_after_move(store: JournalStore, record: object, *, expected_sequence: int) -> None:
+    def fail_after_move(store: JournalStore, record: OperationRecord, *, expected_sequence: int) -> None:
         if record.command == "scope.delete" and any(
             effect.id == "quarantine-move" and effect.status == "succeeded" for effect in record.effects
         ):
@@ -179,14 +241,22 @@ def test_recursive_delete_moves_subtree_and_retains_all_ids(tmp_path: Path) -> N
     repo_root = specdock_dir.parent
     with pytest.raises(ValueError, match="RECURSIVE_REQUIRED"):
         delete_scope(
-            repo_root=repo_root, common_dir=repo_root / ".git", worktree_id="main",
-            engine_digest="engine-a", expected_epoch=1, target=initiative.id,
+            repo_root=repo_root,
+            common_dir=repo_root / ".git",
+            worktree_id="main",
+            engine_digest="engine-a",
+            expected_epoch=1,
+            target=initiative.id,
         )
     assert initiative.path.exists()
     assert JournalStore(repo_root / ".git").pending() == ()
     result = delete_scope(
-        repo_root=repo_root, common_dir=repo_root / ".git", worktree_id="main",
-        engine_digest="engine-a", expected_epoch=1, target=initiative.id,
+        repo_root=repo_root,
+        common_dir=repo_root / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=initiative.id,
         recursive=True,
     )
     assert set(result.deleted_ids) == {initiative.id, epic.id, issue.id}
@@ -195,16 +265,21 @@ def test_recursive_delete_moves_subtree_and_retains_all_ids(tmp_path: Path) -> N
     assert RegistryStore(repo_root / ".git").load()[0].deleted_ids == frozenset(result.deleted_ids)
 
 
-def test_delete_recovery_rejects_quarantine_identity_replacement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_delete_recovery_rejects_quarantine_identity_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
     repo_root = specdock_dir.parent
     arguments = {
-        "repo_root": repo_root, "common_dir": repo_root / ".git", "worktree_id": "main",
-        "engine_digest": "engine-a", "expected_epoch": 1,
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
     }
     original = JournalStore.update
 
-    def fail_after_move(store: JournalStore, record: object, *, expected_sequence: int) -> None:
+    def fail_after_move(store: JournalStore, record: OperationRecord, *, expected_sequence: int) -> None:
         if record.command == "scope.delete" and any(
             effect.id == "quarantine-move" and effect.status == "succeeded" for effect in record.effects
         ):
@@ -223,4 +298,125 @@ def test_delete_recovery_rejects_quarantine_identity_replacement(tmp_path: Path,
     with pytest.raises(ValueError, match="quarantine differs"):
         resume_scope_delete(operation_id=pending[0].operation_id, **arguments)
     assert quarantine.is_dir()
+    assert JournalStore(repo_root / ".git").pending() == pending
+
+
+def test_delete_rollback_restores_quarantined_tree_after_verified_partial_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    repo_root = specdock_dir.parent
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    original = JournalStore.update
+
+    def fail_after_tombstone(store: JournalStore, record: OperationRecord, *, expected_sequence: int) -> None:
+        if record.command == "scope.delete" and any(
+            effect.id == "registry-tombstone" and effect.status == "succeeded" for effect in record.effects
+        ):
+            monkeypatch.setattr(JournalStore, "update", original)
+            raise OSError("injected journal failure after tombstone")
+        original(store, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_after_tombstone)
+    with pytest.raises(OSError, match="after tombstone"):
+        delete_scope(target=issue.id, **arguments)
+    pending = JournalStore(repo_root / ".git").pending()
+    assert len(pending) == 1 and not issue.path.exists()
+    assert issue.id in RegistryStore(repo_root / ".git").load()[0].deleted_ids
+    restored = rollback_scope_delete(operation_id=pending[0].operation_id, **arguments)
+    assert restored.target_id == issue.id and issue.path.is_dir()
+    assert not restored.quarantine_path.exists()
+    assert issue.id not in RegistryStore(repo_root / ".git").load()[0].deleted_ids
+    assert JournalStore(repo_root / ".git").pending() == ()
+
+
+def test_delete_rollback_restores_dependency_and_active_before_images(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
+    sibling = create_local_scope(
+        kind="issue",
+        title="Sibling",
+        parent=AncestorState(epic.id, "epic", "local", "open", False, initiative.id),
+        ancestors=(AncestorState(initiative.id, "initiative", "local", "open", False),),
+        repo_root=specdock_dir.parent,
+        common_dir=specdock_dir.parent / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        updated_at="2026-09-25T00:00:00Z",
+    )
+    loaded = read_guarded_json(sibling.path / ".meta.json")
+    assert loaded is not None and isinstance(loaded[0], dict)
+    before = dict(loaded[0])
+    before["depends_on"] = [issue.id]
+    before["revision"] = before["revision"] + 1
+    atomic_write_json(sibling.path / ".meta.json", before, expected_identity=loaded[1])
+    views = load_scope_views(specdock_dir)
+    selection = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
+    save_selection_v3(specdock_dir, selection, views=views, expected_identity=None)
+    arguments = {
+        "repo_root": specdock_dir.parent,
+        "common_dir": specdock_dir.parent / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+
+    def fail_tombstone(*args: object, **kwargs: object) -> None:
+        raise OSError("injected tombstone publication failure")
+
+    monkeypatch.setattr(scope_delete_vnext, "_apply_tombstones", fail_tombstone)
+    with pytest.raises(OSError, match="tombstone publication"):
+        delete_scope(target=issue.id, clear_active=True, detach_dependencies=True, **arguments)
+    pending = JournalStore(specdock_dir.parent / ".git").pending()
+    assert len(pending) == 1
+    rollback_scope_delete(operation_id=pending[0].operation_id, **arguments)
+    assert issue.path.is_dir()
+    assert read_guarded_json(sibling.path / ".meta.json")[0] == before
+    restored = load_selection_v3(specdock_dir, worktree_id="main")[0]
+    assert restored.focus_id == issue.id and restored.revision == 3
+    assert JournalStore(specdock_dir.parent / ".git").pending() == ()
+
+
+def test_delete_rollback_rejects_modified_quarantine_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    repo_root = specdock_dir.parent
+    original = scope_delete_vnext._apply_tombstones
+
+    def fail_tombstone(*args: object, **kwargs: object) -> None:
+        raise OSError("injected tombstone failure")
+
+    monkeypatch.setattr(scope_delete_vnext, "_apply_tombstones", fail_tombstone)
+    with pytest.raises(OSError, match="injected tombstone failure"):
+        delete_scope(
+            repo_root=repo_root,
+            common_dir=repo_root / ".git",
+            worktree_id="main",
+            engine_digest="engine-a",
+            expected_epoch=1,
+            target=issue.id,
+        )
+    monkeypatch.setattr(scope_delete_vnext, "_apply_tombstones", original)
+    pending = JournalStore(repo_root / ".git").pending()
+    quarantine = repo_root / dict(pending[0].fixed_targets)["quarantine_path"]
+    metadata = quarantine / ".meta.json"
+    metadata.chmod(0o600)
+    metadata.write_bytes(metadata.read_bytes() + b" ")
+    with pytest.raises(ValueError, match="ROLLBACK_CONFLICT: delete tree content changed"):
+        rollback_scope_delete(
+            repo_root=repo_root,
+            common_dir=repo_root / ".git",
+            worktree_id="main",
+            engine_digest="engine-a",
+            expected_epoch=1,
+            operation_id=pending[0].operation_id,
+        )
+    assert metadata.read_bytes().endswith(b" ")
     assert JournalStore(repo_root / ".git").pending() == pending

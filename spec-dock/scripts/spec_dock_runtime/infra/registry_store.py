@@ -173,8 +173,22 @@ class RegistryStore:
         if requested.issubset(state.deleted_ids):
             return state
         next_state = replace(
-            state, revision=state.revision + 1,
+            state,
+            revision=state.revision + 1,
             deleted_ids=state.deleted_ids | requested,
         )
         atomic_write_json(self.path, _encode_registry(next_state), expected_identity=identity)
         return next_state
+
+    def restore_deleted_locked(
+        self, *, before_ids: frozenset[str], after_ids: frozenset[str], before_revision: int
+    ) -> LocalIdRegistry:
+        """Undo only a recorded tombstone addition after exact revision and content checks."""
+        state, identity = self.load()
+        if state.deleted_ids == before_ids and state.revision in (before_revision, before_revision + 2):
+            return state
+        if state.deleted_ids != after_ids or state.revision != before_revision + 1:
+            raise ValueError("ROLLBACK_CONFLICT: deleted Scope registry changed")
+        restored = replace(state, revision=state.revision + 1, deleted_ids=before_ids)
+        atomic_write_json(self.path, _encode_registry(restored), expected_identity=identity)
+        return restored

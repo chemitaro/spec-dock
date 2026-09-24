@@ -92,8 +92,14 @@ def test_start_checks_out_registered_issue_branch_and_selects_issue(tmp_path: Pa
     subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
     subprocess.run(
         [
-            "git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid",
-            "commit", "-qm", "fixture",
+            "git",
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
         ],
         cwd=repo_root,
         check=True,
@@ -111,25 +117,35 @@ def test_start_checks_out_registered_issue_branch_and_selects_issue(tmp_path: Pa
         start_work(target=issue.id, base="HEAD", **arguments)
     result = start_work(target=issue.id, **arguments)
     assert result.target_id == issue.id and result.branch == binding.name
-    assert subprocess.run(
-        ["git", "branch", "--show-current"], cwd=repo_root, check=True, capture_output=True, text=True
-    ).stdout.strip() == binding.name
+    assert (
+        subprocess.run(
+            ["git", "branch", "--show-current"], cwd=repo_root, check=True, capture_output=True, text=True
+        ).stdout.strip()
+        == binding.name
+    )
     assert load_selection_v3(specdock_dir, worktree_id="main")[0] == SelectionState(
         "main", 1, initiative.id, epic.id, issue.id, issue.id
     )
 
 
-def test_start_resumes_after_checkout_when_selection_publication_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_start_resumes_after_checkout_when_selection_publication_fails(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
     repo_root = specdock_dir.parent
     subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
     subprocess.run(
         ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
-        cwd=repo_root, check=True, capture_output=True,
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
     )
     arguments = {
-        "repo_root": repo_root, "common_dir": repo_root / ".git", "worktree_id": "main",
-        "engine_digest": "engine-a", "expected_epoch": 1,
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
     }
     saved = work_lifecycle.save_selection_v3
 
@@ -161,11 +177,17 @@ def test_start_creates_canonical_branch_for_each_local_scope(tmp_path: Path, kin
     subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
     subprocess.run(
         ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
-        cwd=repo_root, check=True, capture_output=True,
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
     )
     result = start_work(
-        repo_root=repo_root, common_dir=repo_root / ".git", worktree_id="main",
-        engine_digest="engine-a", expected_epoch=1, target=selected.id,
+        repo_root=repo_root,
+        common_dir=repo_root / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=selected.id,
     )
     assert result.target_id == selected.id
     assert result.branch.startswith(selected.id + "-")
@@ -179,8 +201,12 @@ def test_dirty_start_has_no_branch_or_journal_effect(tmp_path: Path) -> None:
     (repo_root / "untracked.txt").write_text("keep", encoding="utf-8")
     with pytest.raises(ValueError, match="clean working tree"):
         start_work(
-            repo_root=repo_root, common_dir=repo_root / ".git", worktree_id="main",
-            engine_digest="engine-a", expected_epoch=1, target=issue.id,
+            repo_root=repo_root,
+            common_dir=repo_root / ".git",
+            worktree_id="main",
+            engine_digest="engine-a",
+            expected_epoch=1,
+            target=issue.id,
         )
     assert JournalStore(repo_root / ".git").pending() == ()
 
@@ -191,12 +217,18 @@ def test_detached_start_requires_explicit_base(tmp_path: Path) -> None:
     subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
     subprocess.run(
         ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
-        cwd=repo_root, check=True, capture_output=True,
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
     )
     subprocess.run(["git", "switch", "--detach", "HEAD"], cwd=repo_root, check=True, capture_output=True)
     arguments = {
-        "repo_root": repo_root, "common_dir": repo_root / ".git", "worktree_id": "main",
-        "engine_digest": "engine-a", "expected_epoch": 1, "target": issue.id,
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+        "target": issue.id,
     }
     with pytest.raises(ValueError, match="detached HEAD requires --base"):
         start_work(**arguments)

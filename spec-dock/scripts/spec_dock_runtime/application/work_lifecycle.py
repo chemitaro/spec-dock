@@ -111,9 +111,7 @@ def plan_start_work(
         if current_state not in ("open", "completed", "not-planned", "unknown"):
             raise ValueError("CURRENT_STATUS_UNOBSERVED")
         related = (
-            focus_id == scope.id
-            or focus_id in _ancestry(views, scope.id)
-            or scope.id in _ancestry(views, focus_id)
+            focus_id == scope.id or focus_id in _ancestry(views, scope.id) or scope.id in _ancestry(views, focus_id)
         )
         if not related and current_state in ("open", "unknown") and not switch_active:
             raise ValueError("SWITCH_ACTIVE_REQUIRED")
@@ -152,36 +150,68 @@ def _current_start_state(
 
 
 def _start_plan(
-    *, repo_root: Path, worktree_id: str, target: str, source: str, allow_stale: bool,
-    offline: bool, gateway: GithubIssueGateway | None, switch_active: bool,
+    *,
+    repo_root: Path,
+    worktree_id: str,
+    target: str,
+    source: str,
+    allow_stale: bool,
+    offline: bool,
+    gateway: GithubIssueGateway | None,
+    switch_active: bool,
 ) -> tuple[tuple[ScopeView, ...], SelectionState, WorkStartPlan]:
     specdock_dir = repo_root / "spec-dock"
     views = load_scope_views(specdock_dir)
     selection, _ = load_selection_v3(specdock_dir, worktree_id=worktree_id)
     readiness = check_scope_readiness(
-        specdock_dir, target, source=source, for_start=True, allow_stale=allow_stale,
-        offline=offline, gateway=gateway, worktree_id=worktree_id,
+        specdock_dir,
+        target,
+        source=source,
+        for_start=True,
+        allow_stale=allow_stale,
+        offline=offline,
+        gateway=gateway,
+        worktree_id=worktree_id,
     )
     plan = plan_start_work(
-        views, target=target, selection=selection,
+        views,
+        target=target,
+        selection=selection,
         current_state=_current_start_state(repo_root, views, selection, gateway),
-        readiness=readiness, switch_active=switch_active,
+        readiness=readiness,
+        switch_active=switch_active,
     )
     return views, selection, plan
 
 
 def start_work(
-    *, repo_root: Path, common_dir: Path, worktree_id: str, engine_digest: str,
-    expected_epoch: int, target: str, base: str | None = None, branch_name: str | None = None,
-    switch_active: bool = False, source: str = "github", allow_stale: bool = False,
-    offline: bool = False, gateway: GithubIssueGateway | None = None,
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    target: str,
+    base: str | None = None,
+    branch_name: str | None = None,
+    switch_active: bool = False,
+    source: str = "github",
+    allow_stale: bool = False,
+    offline: bool = False,
+    gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkStartResult:
     """Start one ready Scope with fixed checkout and selection effects."""
     _require_clean_start(repo_root)
     _views, selection, plan = _start_plan(
-        repo_root=repo_root, worktree_id=worktree_id, target=target, source=source,
-        allow_stale=allow_stale, offline=offline, gateway=gateway, switch_active=switch_active,
+        repo_root=repo_root,
+        worktree_id=worktree_id,
+        target=target,
+        source=source,
+        allow_stale=allow_stale,
+        offline=offline,
+        gateway=gateway,
+        switch_active=switch_active,
     )
     try:
         binding = show_scope_branch(repo_root, common_dir, plan.target_id)
@@ -193,21 +223,35 @@ def start_work(
         if base is None and not _head_state(repo_root)[0]:
             raise ValueError("new work start from detached HEAD requires --base") from None
         binding = create_scope_branch(
-            repo_root=repo_root, common_dir=common_dir, worktree_id=worktree_id,
-            engine_digest=engine_digest, expected_epoch=expected_epoch,
-            scope_id=plan.target_id, base=base or "HEAD", name=branch_name, lock_timeout=lock_timeout,
+            repo_root=repo_root,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+            scope_id=plan.target_id,
+            base=base or "HEAD",
+            name=branch_name,
+            lock_timeout=lock_timeout,
         )
     with WriterLock(common_dir, timeout=lock_timeout):
         control = load_control(common_dir)
         admit_writer(
-            control, common_dir=common_dir, worktree_id=worktree_id,
-            engine_digest=engine_digest, expected_epoch=expected_epoch,
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
         )
         _require_clean_start(repo_root)
         current_views, current_selection, current_plan = _start_plan(
-            repo_root=repo_root, worktree_id=worktree_id, target=plan.target_id,
-            source=source, allow_stale=allow_stale, offline=offline,
-            gateway=gateway, switch_active=switch_active,
+            repo_root=repo_root,
+            worktree_id=worktree_id,
+            target=plan.target_id,
+            source=source,
+            allow_stale=allow_stale,
+            offline=offline,
+            gateway=gateway,
+            switch_active=switch_active,
         )
         if current_selection != selection or current_plan.target_id != plan.target_id:
             raise ValueError("work start inputs changed before checkout")
@@ -220,20 +264,29 @@ def start_work(
         _verify_scope_at_commit(repo_root, current_views, plan.target_id, branch_tip)
         source_branch, source_sha = _head_state(repo_root)
         fixed = {
-            "scope": plan.target_id, "worktree": worktree_id, "branch": binding.name,
-            "branch_sha": branch_tip, "source_branch": source_branch,
-            "source_sha": source_sha, "selection_before": _selection_chain(selection),
+            "scope": plan.target_id,
+            "worktree": worktree_id,
+            "branch": binding.name,
+            "branch_sha": branch_tip,
+            "source_branch": source_branch,
+            "source_sha": source_sha,
+            "selection_before": _selection_chain(selection),
             "selection_after": _selection_chain(current_plan.selection_after),
-            "readiness_source": source, "allow_stale": str(allow_stale).lower(),
-            "offline": str(offline).lower(), "switch_active": str(switch_active).lower(),
+            "readiness_source": source,
+            "allow_stale": str(allow_stale).lower(),
+            "offline": str(offline).lower(),
+            "switch_active": str(switch_active).lower(),
         }
         assert control is not None
         journal = JournalStore(common_dir)
         operation = prepare_operation(
-            command="work.start", fixed_targets=fixed,
-            effect_plan=("checkout", "selection-set"), request_fingerprint=_fingerprint(fixed),
+            command="work.start",
+            fixed_targets=fixed,
+            effect_plan=("checkout", "selection-set"),
+            request_fingerprint=_fingerprint(fixed),
             before_revisions={"selection": selection.revision},
-            engine_digest=engine_digest, writer_epoch=control.epoch,
+            engine_digest=engine_digest,
+            writer_epoch=control.epoch,
         )
         journal.create(operation)
         checkout_intent = record_effect_intent(operation, effect_id="checkout", kind="git", target=binding.name)
@@ -246,8 +299,13 @@ def start_work(
         checkout_done = record_effect_result(checkout_intent, effect_id="checkout", status="succeeded")
         journal.update(checkout_done, expected_sequence=checkout_intent.sequence)
         _require_start_readiness(
-            repo_root, plan.target_id, source=source, allow_stale=allow_stale,
-            offline=offline, gateway=gateway, worktree_id=worktree_id,
+            repo_root,
+            plan.target_id,
+            source=source,
+            allow_stale=allow_stale,
+            offline=offline,
+            gateway=gateway,
+            worktree_id=worktree_id,
         )
         selection_intent = record_effect_intent(
             checkout_done, effect_id="selection-set", kind="local", target=worktree_id
@@ -259,13 +317,19 @@ def start_work(
             raise ValueError("work start selection changed after checkout")
         _, selection_identity = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
         if after_selection != selection:
-            save_selection_v3(repo_root / "spec-dock", after_selection, views=after_views, expected_identity=selection_identity)
+            save_selection_v3(
+                repo_root / "spec-dock", after_selection, views=after_views, expected_identity=selection_identity
+            )
         selection_done = record_effect_result(
-            selection_intent, effect_id="selection-set", status="succeeded",
+            selection_intent,
+            effect_id="selection-set",
+            status="succeeded",
             after_revisions={"selection": after_selection.revision},
         )
         journal.update(selection_done, expected_sequence=selection_intent.sequence)
-        terminal = replace(selection_done, phase="complete", terminal_status="succeeded", sequence=selection_done.sequence + 1)
+        terminal = replace(
+            selection_done, phase="complete", terminal_status="succeeded", sequence=selection_done.sequence + 1
+        )
         journal.update(terminal, expected_sequence=selection_done.sequence)
         return WorkStartResult(plan.target_id, binding.name, after_selection != selection, operation.operation_id)
 
@@ -280,20 +344,38 @@ def _verify_start_checkout(repo_root: Path, fixed: Mapping[str, str]) -> None:
 
 
 def _require_start_readiness(
-    repo_root: Path, target: str, *, source: str, allow_stale: bool, offline: bool,
-    gateway: GithubIssueGateway | None, worktree_id: str,
+    repo_root: Path,
+    target: str,
+    *,
+    source: str,
+    allow_stale: bool,
+    offline: bool,
+    gateway: GithubIssueGateway | None,
+    worktree_id: str,
 ) -> None:
     result = check_scope_readiness(
-        repo_root / "spec-dock", target, source=source, for_start=True,
-        allow_stale=allow_stale, offline=offline, gateway=gateway, worktree_id=worktree_id,
+        repo_root / "spec-dock",
+        target,
+        source=source,
+        for_start=True,
+        allow_stale=allow_stale,
+        offline=offline,
+        gateway=gateway,
+        worktree_id=worktree_id,
     )
     if not result.ready:
         raise ValueError("START_NOT_READY after checkout")
 
 
 def resume_start_work(
-    *, repo_root: Path, common_dir: Path, worktree_id: str, engine_digest: str,
-    expected_epoch: int, operation_id: str, gateway: GithubIssueGateway | None = None,
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    operation_id: str,
+    gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkStartResult:
     """Reconcile an exact pending checkout and selection without a blind branch reset."""
@@ -306,9 +388,20 @@ def resume_start_work(
         if (
             operation.command != "work.start"
             or operation.effect_plan != ("checkout", "selection-set")
-            or set(fixed) != {
-                "scope", "worktree", "branch", "branch_sha", "source_branch", "source_sha",
-                "selection_before", "selection_after", "readiness_source", "allow_stale", "offline", "switch_active",
+            or set(fixed)
+            != {
+                "scope",
+                "worktree",
+                "branch",
+                "branch_sha",
+                "source_branch",
+                "source_sha",
+                "selection_before",
+                "selection_after",
+                "readiness_source",
+                "allow_stale",
+                "offline",
+                "switch_active",
             }
             or fixed["worktree"] != worktree_id
             or fixed["readiness_source"] not in ("github", "cache")
@@ -323,7 +416,8 @@ def resume_start_work(
             fixed["selection_before"], worktree_id=worktree_id, revision=revisions["selection"]
         )
         after = _decode_selection_chain(
-            fixed["selection_after"], worktree_id=worktree_id,
+            fixed["selection_after"],
+            worktree_id=worktree_id,
             revision=before.revision + (fixed["selection_before"] != fixed["selection_after"]),
         )
         if operation.terminal_status == "succeeded":
@@ -331,12 +425,18 @@ def resume_start_work(
         if operation.terminal_status != "pending":
             raise ValueError("work start recovery requires a pending operation")
         admit_writer(
-            load_control(common_dir), common_dir=common_dir, worktree_id=worktree_id,
-            engine_digest=engine_digest, expected_epoch=expected_epoch,
+            load_control(common_dir),
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
             recovery_operation_id=operation_id,
         )
         binding = show_scope_branch(repo_root, common_dir, fixed["scope"])
-        if binding.name != fixed["branch"] or _resolve_commit(repo_root, f"refs/heads/{binding.name}") != fixed["branch_sha"]:
+        if (
+            binding.name != fixed["branch"]
+            or _resolve_commit(repo_root, f"refs/heads/{binding.name}") != fixed["branch_sha"]
+        ):
             raise ValueError("work start canonical branch changed")
         selection, selection_identity = load_selection_v3(specdock_dir, worktree_id=worktree_id)
         if selection not in (before, after):
@@ -358,7 +458,9 @@ def resume_start_work(
         if operation.effects[0].status == "intent":
             if current == old and current != desired:
                 for worktree in worktree_list(repo_root):
-                    if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
+                    if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(
+                        strict=True
+                    ):
                         raise ValueError("canonical branch is checked out in another worktree")
                 switched = _git(repo_root, "switch", "--no-guess", binding.name, timeout=60.0)
                 if switched.returncode != 0:
@@ -372,9 +474,13 @@ def resume_start_work(
         _verify_start_checkout(repo_root, fixed)
         if selection == before:
             _require_start_readiness(
-                repo_root, fixed["scope"], source=fixed["readiness_source"],
-                allow_stale=fixed["allow_stale"] == "true", offline=fixed["offline"] == "true",
-                gateway=gateway, worktree_id=worktree_id,
+                repo_root,
+                fixed["scope"],
+                source=fixed["readiness_source"],
+                allow_stale=fixed["allow_stale"] == "true",
+                offline=fixed["offline"] == "true",
+                gateway=gateway,
+                worktree_id=worktree_id,
             )
         views = load_scope_views(specdock_dir)
         if select_scope(views, fixed["scope"], current=before) != after:
@@ -382,9 +488,7 @@ def resume_start_work(
         if len(operation.effects) == 1:
             if selection != before:
                 raise ValueError("work start selection changed before effect intent")
-            advanced = record_effect_intent(
-                operation, effect_id="selection-set", kind="local", target=worktree_id
-            )
+            advanced = record_effect_intent(operation, effect_id="selection-set", kind="local", target=worktree_id)
             journal.update(advanced, expected_sequence=operation.sequence)
             operation = advanced
         if len(operation.effects) != 2 or operation.effects[1].id != "selection-set":
@@ -393,7 +497,9 @@ def resume_start_work(
             if selection == before and after != before:
                 save_selection_v3(specdock_dir, after, views=views, expected_identity=selection_identity)
             advanced = record_effect_result(
-                operation, effect_id="selection-set", status="succeeded",
+                operation,
+                effect_id="selection-set",
+                status="succeeded",
                 after_revisions={"selection": after.revision},
             )
             journal.update(advanced, expected_sequence=operation.sequence)

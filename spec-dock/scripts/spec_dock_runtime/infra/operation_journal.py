@@ -7,7 +7,7 @@ import os
 import re
 from typing import TYPE_CHECKING, cast
 
-from spec_dock_runtime.domain.operation import OperationEffect, OperationRecord, TerminalStatus
+from spec_dock_runtime.domain.operation import ROLLBACK_COMMANDS, OperationEffect, OperationRecord, TerminalStatus
 from spec_dock_runtime.infra.control_store import control_directory
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 
@@ -198,7 +198,9 @@ def _ensure_durable_directory(path: Path) -> None:
 def _assert_journal_transition(before: OperationRecord, after: OperationRecord) -> None:
     if before.terminal_status not in ("pending", "unknown"):
         raise ValueError("terminal journal cannot change")
-    if after.terminal_status == "rolled-back":
+    if after.terminal_status == "rolled-back" and (
+        after.command not in ROLLBACK_COMMANDS or after.phase != "rollback-verified"
+    ):
         raise ValueError("rollback requires a verified recovery executor")
     if len(after.effects) < len(before.effects) or len(after.effects) > len(before.effects) + 1:
         raise ValueError("journal effect history cannot be removed or skipped")
