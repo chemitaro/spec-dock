@@ -7,6 +7,8 @@ from pathlib import Path
 import subprocess
 import sys
 
+import pytest
+
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
@@ -16,7 +18,7 @@ from spec_dock_runtime.infra.control_store import (  # noqa: E402
     store_control,
 )
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.migration_store import inspect_migration_inventory  # noqa: E402
+from spec_dock_runtime.infra.migration_store import MigrationMap, inspect_migration_inventory  # noqa: E402
 
 
 def _legacy_repo(tmp_path: Path) -> Path:
@@ -186,3 +188,46 @@ def test_migration_inventory_digest_includes_workspace_and_control_bytes(tmp_pat
     third = inspect_migration_inventory(repo)
     assert third.control_digest is not None
     assert third.digest != second.digest
+
+
+def test_migration_plan_preserves_unknown_fields_and_active_focus(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(
+        inventory.repository_uid, inventory.digest, (), (), (), ({"root": str(repo), "registration_id": "main"},)
+    )
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    changes = migration_module.plan_migration_changes(inventory, mapping, updated_at="2026-01-01T00:00:00Z")
+    by_path = {change.path: json.loads(change.after_bytes) for change in changes}
+    initiative_path = str(repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json")
+    initiative = by_path[initiative_path]
+    assert initiative["schema_version"] == 3
+    assert initiative["backend"] == "github"
+    assert initiative["unknown_field"] == {"keep": True}
+    epic_path = str(repo / "spec-dock/initiatives/init-local-00001-plan/epics/epic-local-00001-work/.meta.json")
+    assert by_path[epic_path]["lifecycle"]["state"] == "open"
+    active = by_path[str(repo / "spec-dock/.agent/active.json")]
+    assert active["schema_version"] == 3
+    assert active["focus_id"] == "init-local-00001"
+    assert active["worktree_id"] is not None
+    assert json.loads((repo / "spec-dock/.agent/active.json").read_text())["schema_version"] == 2
+
+
+def test_migration_plan_rejects_missing_registration_and_changed_metadata(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    inventory = inspect_migration_inventory(repo)
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    empty_mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    with pytest.raises(ValueError, match="registration"):
+        migration_module.plan_migration_changes(inventory, empty_mapping, updated_at="2026-01-01T00:00:00Z")
+    mapping = MigrationMap(
+        inventory.repository_uid, inventory.digest, (), (), (), ({"root": str(repo), "registration_id": "main"},)
+    )
+    meta_path = repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json"
+    payload = json.loads(meta_path.read_text(encoding="utf-8"))
+    payload["title"] = "Changed"
+    meta_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="changed"):
+        migration_module.plan_migration_changes(inventory, mapping, updated_at="2026-01-01T00:00:00Z")
