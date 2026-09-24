@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
+import stat
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.application.artifact_query import ArtifactCatalogEntry, show_artifact
@@ -21,6 +23,14 @@ if TYPE_CHECKING:
 ArtifactCreationType = Literal["blank", "research", "interview", "disc", "decision-candidate", "adr"]
 
 
+@dataclass(frozen=True)
+class ArtifactMutationPreview:
+    scope_id: str
+    scope_kind: str
+    operation: Literal["create", "import"]
+    artifact_type: str | None
+
+
 def _selected_scope(
     *, repo_root: Path, worktree_id: str, scope: str, selection: SelectionState | None
 ) -> tuple[str, str]:
@@ -28,6 +38,32 @@ def _selected_scope(
         selection, _ = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
     target = show_scope(load_scope_views(repo_root / "spec-dock"), scope, selection=selection)
     return target.id, target.kind
+
+
+def preview_scope_artifact(
+    *, repo_root: Path, worktree_id: str, scope: str, artifact_type: ArtifactCreationType, title: str
+) -> ArtifactMutationPreview:
+    if isinstance(parse_artifact_selector(scope), ArtifactRootSelector):
+        raise ValueError("Artifact creation requires a Scope; @root accepts file import only")
+    if not title.strip():
+        raise ValueError("Artifact title is required")
+    scope_id, kind = _selected_scope(repo_root=repo_root, worktree_id=worktree_id, scope=scope, selection=None)
+    return ArtifactMutationPreview(scope_id, kind, "create", artifact_type)
+
+
+def preview_import_scope_file(
+    *, repo_root: Path, worktree_id: str, scope: str, source_path: Path
+) -> ArtifactMutationPreview:
+    try:
+        source_stat = source_path.lstat()
+    except OSError as error:
+        raise ValueError("Artifact source is unavailable") from error
+    if not stat.S_ISREG(source_stat.st_mode) or source_stat.st_nlink != 1:
+        raise ValueError("Artifact source must be one regular file")
+    if isinstance(parse_artifact_selector(scope), ArtifactRootSelector):
+        return ArtifactMutationPreview("root", "root", "import", None)
+    scope_id, kind = _selected_scope(repo_root=repo_root, worktree_id=worktree_id, scope=scope, selection=None)
+    return ArtifactMutationPreview(scope_id, kind, "import", None)
 
 
 def create_scope_artifact(
