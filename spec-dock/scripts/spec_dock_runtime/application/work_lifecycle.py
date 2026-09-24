@@ -11,12 +11,14 @@ from spec_dock_runtime.application.active_selection import clear_selection
 from spec_dock_runtime.application.operation_executor import (
     prepare_operation,
     record_effect_intent,
+    record_effect_observation,
     record_effect_result,
 )
 from spec_dock_runtime.application.scope_completion import _descendants, plan_close
 from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.domain.lifecycle import (
+    GithubBackend,
     LocalBackend,
     LocalLifecycle,
     SelectionState,
@@ -25,6 +27,7 @@ from spec_dock_runtime.domain.lifecycle import (
 )
 from spec_dock_runtime.infra.active_store import load_selection_v3, save_selection_v3
 from spec_dock_runtime.infra.control_store import load_control
+from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
 from spec_dock_runtime.infra.writer_lock import WriterLock
@@ -83,6 +86,25 @@ def _selection_chain(selection: SelectionState) -> str:
     )
 
 
+def _live_statuses(
+    *, repo_root: Path, views: tuple[ScopeView, ...], scope: ScopeView, gateway: GithubIssueGateway | None
+) -> dict[str, ObservedState]:
+    statuses: dict[str, ObservedState] = {}
+    for view in (scope, *_descendants(views, scope)):
+        if isinstance(view.backend, LocalBackend):
+            statuses[view.id] = view.status.state
+        else:
+            if gateway is None:
+                raise ValueError("GitHub Scope requires a live gateway for work finish")
+            remote = gateway.get(
+                repo_root,
+                f"{view.backend.repo_owner}/{view.backend.repo_name}",
+                view.backend.issue_number,
+            )
+            statuses[view.id] = remote.state
+    return statuses
+
+
 def finish_work(
     *,
     repo_root: Path,
@@ -92,9 +114,10 @@ def finish_work(
     expected_epoch: int,
     target: str,
     updated_at: str,
+    gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkFinishResult:
-    """Record local completion and selection clearing as separate resumable effects."""
+    """Record completion and selection clearing as separate resumable effects."""
     if not updated_at:
         raise ValueError("work finish timestamp is required")
     specdock_dir = repo_root / "spec-dock"
@@ -110,12 +133,7 @@ def finish_work(
         views = load_scope_views(specdock_dir)
         selection, selection_identity = load_selection_v3(specdock_dir, worktree_id=worktree_id)
         scope = show_scope(views, target, selection=selection)
-        if not isinstance(scope.backend, LocalBackend):
-            raise ValueError("GitHub-backed work finish requires a live effect adapter")
-        descendants = _descendants(views, scope)
-        if any(not isinstance(view.backend, LocalBackend) for view in descendants):
-            raise ValueError("GitHub descendants require live observation before work finish")
-        statuses = {view.id: view.status.state for view in (scope, *descendants)}
+        statuses = _live_statuses(repo_root=repo_root, views=views, scope=scope, gateway=gateway)
         plan = plan_finish_work(views, target=scope.id, statuses=statuses, selection=selection)
         selection_changed = plan.selection_after != selection
         if not plan.completion.changed and not selection_changed:
@@ -124,11 +142,11 @@ def finish_work(
         if loaded is None or not isinstance(loaded[0], dict):
             raise ValueError("Scope metadata is missing")
         metadata = decode_scope_metadata(loaded[0])
-        if not isinstance(metadata.backend, LocalBackend) or metadata.revision != scope.revision:
+        if type(metadata.backend) is not type(scope.backend) or metadata.revision != scope.revision:
             raise ValueError("Scope metadata changed before work finish")
         next_metadata_payload = loaded[0]
         after_revision = metadata.revision
-        if plan.completion.changed:
+        if plan.completion.changed and isinstance(metadata.backend, LocalBackend):
             lifecycle = metadata.backend.lifecycle
             next_metadata = replace(
                 metadata,
@@ -141,6 +159,8 @@ def finish_work(
         fixed = {
             "scope": scope.id,
             "worktree": worktree_id,
+            "backend": "local" if isinstance(metadata.backend, LocalBackend) else "github",
+            "github_ref": scope.github_ref or "",
             "updated_at": updated_at,
             "before_state": plan.completion.before,
             "metadata_before_digest": _metadata_digest(loaded[0]),
@@ -160,15 +180,48 @@ def finish_work(
             writer_epoch=control.epoch,
         )
         journal.create(operation)
-        lifecycle_intent = record_effect_intent(operation, effect_id="lifecycle-update", kind="local", target=scope.id)
+        lifecycle_intent = record_effect_intent(
+            operation,
+            effect_id="lifecycle-update",
+            kind="local" if isinstance(metadata.backend, LocalBackend) else "remote",
+            target=scope.id,
+        )
         journal.update(lifecycle_intent, expected_sequence=operation.sequence)
-        if plan.completion.changed:
+        if plan.completion.changed and isinstance(metadata.backend, LocalBackend):
             atomic_write_json(scope.path / ".meta.json", next_metadata_payload, expected_identity=loaded[1])
+        if plan.completion.changed and isinstance(metadata.backend, GithubBackend):
+            if gateway is None:
+                raise AssertionError("GitHub gateway was checked before the journal")
+            backend = metadata.backend
+            try:
+                remote = gateway.set_state(
+                    repo_root,
+                    f"{backend.repo_owner}/{backend.repo_name}",
+                    backend.issue_number,
+                    state="closed",
+                    reason="completed",
+                )
+                if remote.state != "completed":
+                    raise RemoteIssueError("GITHUB_EFFECT_UNKNOWN", uncertain=True)
+            except RemoteIssueError as error:
+                observed = record_effect_result(
+                    lifecycle_intent,
+                    effect_id="lifecycle-update",
+                    status="unknown" if error.uncertain else "failed",
+                )
+                journal.update(observed, expected_sequence=lifecycle_intent.sequence)
+                if not error.uncertain:
+                    terminal_failure = replace(
+                        observed, phase="complete", terminal_status="failed", sequence=observed.sequence + 1
+                    )
+                    journal.update(terminal_failure, expected_sequence=observed.sequence)
+                raise
         lifecycle_done = record_effect_result(
             lifecycle_intent,
             effect_id="lifecycle-update",
             status="succeeded",
             after_revisions={"metadata": after_revision},
+            remote_ref=scope.github_ref if isinstance(metadata.backend, GithubBackend) else None,
         )
         journal.update(lifecycle_done, expected_sequence=lifecycle_intent.sequence)
         selection_intent = record_effect_intent(
@@ -213,9 +266,10 @@ def resume_finish_work(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkFinishResult:
-    """Reconcile one local finish from its recorded target and before/after states."""
+    """Reconcile a fixed finish; never blindly resend an uncertain remote effect."""
     specdock_dir = repo_root / "spec-dock"
     with WriterLock(common_dir, timeout=lock_timeout):
         journal = JournalStore(common_dir)
@@ -229,6 +283,8 @@ def resume_finish_work(
             != {
                 "scope",
                 "worktree",
+                "backend",
+                "github_ref",
                 "updated_at",
                 "before_state",
                 "metadata_before_digest",
@@ -238,6 +294,8 @@ def resume_finish_work(
                 "lifecycle_changed",
             }
             or fixed["worktree"] != worktree_id
+            or fixed["backend"] not in ("local", "github")
+            or (fixed["backend"] == "local" and fixed["github_ref"] != "")
             or fixed["before_state"] not in ("open", "completed")
             or fixed["lifecycle_changed"] not in ("true", "false")
             or set(revisions) != {"metadata", "selection"}
@@ -272,12 +330,10 @@ def resume_finish_work(
         )
         views = load_scope_views(specdock_dir)
         scope = show_scope(views, fixed["scope"])
-        if not isinstance(scope.backend, LocalBackend):
+        backend_name = "local" if isinstance(scope.backend, LocalBackend) else "github"
+        if backend_name != fixed["backend"] or (scope.github_ref or "") != fixed["github_ref"]:
             raise ValueError("recorded work finish backend changed")
-        descendants = _descendants(views, scope)
-        if any(not isinstance(view.backend, LocalBackend) for view in descendants):
-            raise ValueError("GitHub descendants require live observation before work finish recovery")
-        statuses = {view.id: view.status.state for view in (scope, *descendants)}
+        statuses = _live_statuses(repo_root=repo_root, views=views, scope=scope, gateway=gateway)
         plan_close(views, scope.id, statuses)
         if clear_selection(views, current=before_selection, from_target=scope.id) != after_selection:
             raise ValueError("recorded work finish selection does not match the fixed Scope")
@@ -286,17 +342,26 @@ def resume_finish_work(
         if loaded is None or not isinstance(loaded[0], dict):
             raise ValueError("Scope metadata is missing during work finish recovery")
         metadata = decode_scope_metadata(loaded[0])
-        if not isinstance(metadata.backend, LocalBackend) or metadata.raw.get("id") != scope.id:
+        if type(metadata.backend) is not type(scope.backend) or metadata.raw.get("id") != scope.id:
             raise ValueError("recorded work finish Scope identity changed")
-        expected_metadata_revision = revisions["metadata"] + lifecycle_changed
-        lifecycle = metadata.backend.lifecycle
-        applied = (
-            lifecycle_changed
-            and metadata.revision == expected_metadata_revision
-            and lifecycle.state == "completed"
-            and lifecycle.updated_at == fixed["updated_at"]
-        )
-        unapplied = metadata.revision == revisions["metadata"] and lifecycle.state == fixed["before_state"]
+        local = isinstance(metadata.backend, LocalBackend)
+        expected_metadata_revision = revisions["metadata"] + (lifecycle_changed and local)
+        if local:
+            lifecycle = metadata.backend.lifecycle
+            applied = (
+                lifecycle_changed
+                and metadata.revision == expected_metadata_revision
+                and lifecycle.state == "completed"
+                and lifecycle.updated_at == fixed["updated_at"]
+            )
+            unapplied = metadata.revision == revisions["metadata"] and lifecycle.state == fixed["before_state"]
+        else:
+            applied = (
+                lifecycle_changed
+                and metadata.revision == expected_metadata_revision
+                and statuses[scope.id] == "completed"
+            )
+            unapplied = metadata.revision == revisions["metadata"] and statuses[scope.id] == fixed["before_state"]
         if not applied and not unapplied:
             raise ValueError("work finish metadata differs from recorded before/after state")
         expected_digest = fixed["metadata_after_digest"] if applied else fixed["metadata_before_digest"]
@@ -304,29 +369,51 @@ def resume_finish_work(
             raise ValueError("work finish metadata differs from recorded before/after content")
         if operation.effects:
             effect = operation.effects[0]
-            if effect.id != "lifecycle-update" or effect.target != scope.id or effect.kind != "local":
+            if (
+                effect.id != "lifecycle-update"
+                or effect.target != scope.id
+                or effect.kind != ("local" if local else "remote")
+            ):
                 raise ValueError("recorded work finish lifecycle effect is invalid")
         else:
             if applied:
                 raise ValueError("work finish lifecycle changed before effect intent")
-            next_record = record_effect_intent(operation, effect_id="lifecycle-update", kind="local", target=scope.id)
+            next_record = record_effect_intent(
+                operation, effect_id="lifecycle-update", kind="local" if local else "remote", target=scope.id
+            )
             journal.update(next_record, expected_sequence=operation.sequence)
             operation = next_record
         if operation.effects[0].status == "intent":
-            if unapplied and lifecycle_changed:
+            if local and unapplied and lifecycle_changed:
                 if statuses[scope.id] != "open":
                     raise ValueError("work finish lifecycle precondition changed during recovery")
+                lifecycle = metadata.backend.lifecycle
                 next_metadata = replace(
                     metadata,
                     backend=LocalBackend(LocalLifecycle("completed", lifecycle.revision + 1, fixed["updated_at"])),
                     revision=metadata.revision + 1,
                 )
                 atomic_write_json(metadata_path, encode_scope_metadata(next_metadata), expected_identity=loaded[1])
+            if not local and lifecycle_changed and not applied:
+                raise ValueError("remote work finish is not confirmed; refusing a blind retry")
             succeeded = record_effect_result(
                 operation,
                 effect_id="lifecycle-update",
                 status="succeeded",
                 after_revisions={"metadata": expected_metadata_revision},
+                remote_ref=scope.github_ref if not local else None,
+            )
+            journal.update(succeeded, expected_sequence=operation.sequence)
+            operation = succeeded
+        elif operation.effects[0].status == "unknown" and not local:
+            if not applied:
+                raise ValueError("remote work finish remains uncertain; refusing a blind retry")
+            succeeded = record_effect_observation(
+                operation,
+                effect_id="lifecycle-update",
+                outcome="observed_applied",
+                after_revisions={"metadata": expected_metadata_revision},
+                remote_ref=scope.github_ref,
             )
             journal.update(succeeded, expected_sequence=operation.sequence)
             operation = succeeded

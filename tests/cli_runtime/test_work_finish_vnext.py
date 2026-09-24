@@ -18,9 +18,11 @@ from spec_dock_runtime.application.scope_completion import change_scope_lifecycl
 from spec_dock_runtime.application.work_lifecycle import finish_work, plan_finish_work, resume_finish_work  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import LocalBackend, SelectionState, decode_scope_metadata  # noqa: E402
 from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.json_store import read_guarded_json  # noqa: E402
+from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError  # noqa: E402
+from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
+from tests.cli_runtime.test_scope_close_vnext import _Gateway  # noqa: E402
 
 if TYPE_CHECKING:
     from spec_dock_runtime.domain.operation import OperationRecord
@@ -262,3 +264,192 @@ def test_finish_resume_rejects_same_revision_metadata_tamper(tmp_path: Path, mon
     with pytest.raises(ValueError, match="metadata differs"):
         resume_finish_work(operation_id=pending.operation_id, **arguments)
     assert JournalStore(arguments["common_dir"]).load(pending.operation_id).terminal_status == "pending"
+
+
+def test_github_issue_finish_updates_remote_then_clears_only_issue(tmp_path: Path) -> None:
+    specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
+    from spec_dock_runtime.infra.active_store import save_selection_v3
+
+    path = issue.path / ".meta.json"
+    loaded = read_guarded_json(path)
+    assert loaded is not None
+    metadata = loaded[0]
+    metadata.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(path, metadata, expected_identity=loaded[1])
+    before = path.read_bytes()
+    selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
+    save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
+    gateway = _Gateway()
+    result = finish_work(
+        repo_root=specdock_dir.parent,
+        common_dir=specdock_dir.parent / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=issue.id,
+        updated_at="2026-09-25T00:00:00Z",
+        gateway=gateway,
+    )
+    assert result.target_id == issue.id and result.completion_changed and result.selection_changed
+    assert gateway.state == "completed" and gateway.set_calls == 1
+    assert path.read_bytes() == before
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == SelectionState(
+        "main", 2, initiative.id, epic.id, None, epic.id
+    )
+
+
+def test_github_finish_resume_after_remote_success_does_not_resend(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
+    from spec_dock_runtime.infra.active_store import save_selection_v3
+
+    path = issue.path / ".meta.json"
+    loaded = read_guarded_json(path)
+    assert loaded is not None
+    metadata = loaded[0]
+    metadata.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(path, metadata, expected_identity=loaded[1])
+    selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
+    save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
+    original_save = work_lifecycle.save_selection_v3
+
+    def fail_selection(*args: object, **kwargs: object) -> None:
+        raise OSError("injected selection failure")
+
+    monkeypatch.setattr(work_lifecycle, "save_selection_v3", fail_selection)
+    arguments = {
+        "repo_root": specdock_dir.parent,
+        "common_dir": specdock_dir.parent / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    gateway = _Gateway()
+    with pytest.raises(OSError, match="injected selection failure"):
+        finish_work(target=issue.id, updated_at="2026-09-25T00:00:00Z", gateway=gateway, **arguments)
+    pending = JournalStore(arguments["common_dir"]).pending()[0]
+    assert pending.effects[0].kind == "remote" and pending.effects[0].status == "succeeded"
+    monkeypatch.setattr(work_lifecycle, "save_selection_v3", original_save)
+    recovered = resume_finish_work(operation_id=pending.operation_id, gateway=gateway, **arguments)
+    assert recovered.target_id == issue.id
+    assert gateway.set_calls == 1
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == SelectionState(
+        "main", 2, initiative.id, epic.id, None, epic.id
+    )
+
+
+def test_uncertain_github_finish_waits_for_live_completed_observation_before_selection_clear(tmp_path: Path) -> None:
+    specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
+    from spec_dock_runtime.infra.active_store import save_selection_v3
+
+    path = issue.path / ".meta.json"
+    loaded = read_guarded_json(path)
+    assert loaded is not None
+    metadata = loaded[0]
+    metadata.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(path, metadata, expected_identity=loaded[1])
+    selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
+    save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
+
+    class UncertainGateway(_Gateway):
+        def set_state(self, *_args: object, **_kwargs: object):
+            self.set_calls += 1
+            raise RemoteIssueError("GITHUB_TIMEOUT", uncertain=True)
+
+    gateway = UncertainGateway()
+    arguments = {
+        "repo_root": specdock_dir.parent,
+        "common_dir": specdock_dir.parent / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    with pytest.raises(RemoteIssueError, match="GITHUB_TIMEOUT"):
+        finish_work(target=issue.id, updated_at="2026-09-25T00:00:00Z", gateway=gateway, **arguments)
+    pending = JournalStore(arguments["common_dir"]).pending()[0]
+    assert pending.effects[0].status == "unknown"
+    with pytest.raises(ValueError, match="refusing a blind retry"):
+        resume_finish_work(operation_id=pending.operation_id, gateway=gateway, **arguments)
+    assert gateway.set_calls == 1
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == selected
+    gateway.state = "completed"
+    recovered = resume_finish_work(operation_id=pending.operation_id, gateway=gateway, **arguments)
+    assert recovered.target_id == issue.id and gateway.set_calls == 1
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == SelectionState(
+        "main", 2, initiative.id, epic.id, None, epic.id
+    )
+
+
+def test_already_completed_github_issue_clears_selection_without_remote_write(tmp_path: Path) -> None:
+    specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
+    from spec_dock_runtime.infra.active_store import save_selection_v3
+
+    path = issue.path / ".meta.json"
+    loaded = read_guarded_json(path)
+    assert loaded is not None
+    metadata = loaded[0]
+    metadata.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(path, metadata, expected_identity=loaded[1])
+    selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
+    save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
+    gateway = _Gateway()
+    gateway.state = "completed"
+    result = finish_work(
+        repo_root=specdock_dir.parent,
+        common_dir=specdock_dir.parent / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=issue.id,
+        updated_at="2026-09-25T00:00:00Z",
+        gateway=gateway,
+    )
+    assert not result.completion_changed and result.selection_changed
+    assert gateway.set_calls == 0
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == SelectionState(
+        "main", 2, initiative.id, epic.id, None, epic.id
+    )
+
+
+def test_local_epic_finish_uses_live_github_descendant_state(tmp_path: Path) -> None:
+    specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
+    from spec_dock_runtime.infra.active_store import save_selection_v3
+
+    path = issue.path / ".meta.json"
+    loaded = read_guarded_json(path)
+    assert loaded is not None
+    metadata = loaded[0]
+    metadata.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(path, metadata, expected_identity=loaded[1])
+    selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
+    save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
+    gateway = _Gateway()
+    arguments = {
+        "repo_root": specdock_dir.parent,
+        "common_dir": specdock_dir.parent / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+        "gateway": gateway,
+    }
+    with pytest.raises(ValueError, match="DESCENDANT_NOT_COMPLETED"):
+        finish_work(target=epic.id, updated_at="2026-09-25T00:00:00Z", **arguments)
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == selected
+    gateway.state = "completed"
+    finished = finish_work(target=epic.id, updated_at="2026-09-25T01:00:00Z", **arguments)
+    assert finished.completion_changed and finished.selection_changed
+    assert gateway.set_calls == 0
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0] == SelectionState(
+        "main", 2, initiative.id, None, None, initiative.id
+    )
