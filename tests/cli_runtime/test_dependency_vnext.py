@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import stat
 import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -15,12 +16,19 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
 from spec_dock_runtime.application.dependency_vnext import (  # noqa: E402
+    check_scope_readiness,
     list_scope_dependencies,
     mutate_scope_dependency,
 )
+from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
 from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
+from spec_dock_runtime.domain.dependency_vnext import evaluate_start_readiness  # noqa: E402
+from spec_dock_runtime.domain.lifecycle import GithubBackend, StatusObservation  # noqa: E402
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.infra.contracts import GithubIssueRecord
 
 
 def _two_trees(tmp_path: Path):
@@ -90,6 +98,15 @@ def test_dependency_rejects_self_ancestor_and_effective_cycle(tmp_path: Path) ->
     assert len(views) == 6
 
 
+def test_dependency_rejects_cycle_through_parent_completion_wait(tmp_path: Path) -> None:
+    common, left, right = _two_trees(tmp_path)
+    mutate_scope_dependency(from_target=left[2].id, to_target=right[1].id, action="add", **_mutation_context(common))
+    with pytest.raises(ValueError, match="cycle"):
+        mutate_scope_dependency(
+            from_target=right[1].id, to_target=left[0].id, action="add", **_mutation_context(common)
+        )
+
+
 @pytest.mark.parametrize("source_index", [0, 1, 2])
 @pytest.mark.parametrize("target_index", [0, 1, 2])
 def test_dependency_all_kind_pairs_preserve_unknown_fields_and_mode(
@@ -116,3 +133,89 @@ def test_dependency_all_kind_pairs_preserve_unknown_fields_and_mode(
     assert after["depends_on"] == [destination.id]
     assert after["custom_note"] == {"retain": True}
     assert stat.S_IMODE(meta_path.stat().st_mode) == before_mode
+
+
+def test_readiness_checks_target_and_ancestors_without_waiting_for_children(tmp_path: Path) -> None:
+    common, left, right = _two_trees(tmp_path)
+    mutate_scope_dependency(from_target=left[2].id, to_target=right[0].id, action="add", **_mutation_context(common))
+    specdock_dir = cast("Path", common["repo_root"]) / "spec-dock"
+    views = load_scope_views(specdock_dir)
+    raw: dict[str, tuple[str, ...]] = {view.id: () for view in views}
+    raw[left[2].id] = (right[0].id,)
+    assert evaluate_start_readiness(views, raw, left[0].id).ready
+    child = evaluate_start_readiness(views, raw, left[2].id)
+    assert not child.ready
+    assert [(blocker.scope_id, blocker.required_state) for blocker in child.blockers] == [(right[0].id, "completed")]
+    # Completed children do not substitute for their still-open parent.
+    completed = StatusObservation("completed", "local", "local", "2026-09-25T00:00:00Z", None, False)
+    with_completed_children = tuple(
+        replace(view, status=completed) if view.id in (right[1].id, right[2].id) else view for view in views
+    )
+    parent_dependency = evaluate_start_readiness(with_completed_children, raw, left[2].id)
+    assert not parent_dependency.ready
+
+
+def test_readiness_rejects_unknown_and_requires_explicit_stale_opt_in(tmp_path: Path) -> None:
+    common, left, right = _two_trees(tmp_path)
+    views = load_scope_views(cast("Path", common["repo_root"]) / "spec-dock")
+    raw: dict[str, tuple[str, ...]] = {view.id: () for view in views}
+    raw[left[1].id] = (right[0].id,)
+    cache = StatusObservation("completed", "github", "cache", "2026-09-25T00:00:00Z", None, True)
+    unknown = StatusObservation("unknown", "github", "cache", None, None, True)
+    github_views = tuple(
+        replace(view, backend=GithubBackend(47, "example", "repo"), status=cache) if view.id == right[0].id else view
+        for view in views
+    )
+    assert not evaluate_start_readiness(github_views, raw, left[1].id, source="cache", mode="start").ready
+    assert evaluate_start_readiness(github_views, raw, left[1].id, source="cache", mode="start", allow_stale=True).ready
+    unknown_views = tuple(replace(view, status=unknown) if view.id == right[0].id else view for view in github_views)
+    assert not evaluate_start_readiness(
+        unknown_views, raw, left[1].id, source="cache", mode="start", allow_stale=True
+    ).ready
+    live = StatusObservation("completed", "github", "github", "2026-09-25T00:00:00Z", None, False)
+    assert evaluate_start_readiness(
+        unknown_views, raw, left[1].id, source="github", mode="start", observations={right[0].id: live}
+    ).ready
+    assert not evaluate_start_readiness(unknown_views, raw, left[1].id, source="github", mode="start").ready
+    with pytest.raises(ValueError, match="offline"):
+        evaluate_start_readiness(unknown_views, raw, left[1].id, source="github", offline=True)
+
+
+def test_readiness_live_observes_only_relevant_github_scope_without_mutation(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    local = create_local_scope(kind="initiative", title="Local", parent=None, ancestors=(), **common)
+    imported = import_github_scope(
+        kind="initiative",
+        github_ref="gh:example/repo#47",
+        repo_hint=None,
+        title="Remote",
+        parent_id=None,
+        slug=None,
+        gateway=FakeGateway(_issue()),
+        **common,
+    )
+    specdock_dir = cast("Path", common["repo_root"]) / "spec-dock"
+    before = (local.path / ".meta.json").read_bytes()
+    assert check_scope_readiness(specdock_dir, local.id, source="github").ready
+    mutate_scope_dependency(
+        from_target=local.id,
+        to_target=imported.id,
+        action="add",
+        **_mutation_context(common),
+    )
+    after_mutation = (local.path / ".meta.json").read_bytes()
+
+    class CompletedGateway:
+        calls = 0
+
+        def get(self, repo_root: Path, repository: str, number: int) -> GithubIssueRecord:
+            self.calls += 1
+            assert repository == "example/repo" and number == 47
+            return replace(_issue(), state="completed", raw_state="closed", state_reason="completed")
+
+    gateway = CompletedGateway()
+    assert not check_scope_readiness(specdock_dir, local.id, source="cache").ready
+    assert check_scope_readiness(specdock_dir, local.id, source="github", gateway=gateway, for_start=True).ready
+    assert gateway.calls == 1
+    assert (local.path / ".meta.json").read_bytes() == after_mutation
+    assert before != after_mutation

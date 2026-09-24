@@ -3,19 +3,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from spec_dock_runtime.application.scope_query import ScopeView, load_scope_views, show_scope
 from spec_dock_runtime.cli.admission import admit_writer
-from spec_dock_runtime.domain.dependency_vnext import DependencyListing, dependency_listing, validate_dependency_graph
-from spec_dock_runtime.domain.lifecycle import SelectionState, decode_scope_metadata
+from spec_dock_runtime.domain.dependency_vnext import (
+    DependencyListing,
+    ReadinessResult,
+    dependency_listing,
+    evaluate_start_readiness,
+    validate_dependency_graph,
+)
+from spec_dock_runtime.domain.lifecycle import GithubBackend, SelectionState, StatusObservation, decode_scope_metadata
 from spec_dock_runtime.infra.active_store import load_selection_v3
 from spec_dock_runtime.infra.control_store import load_control
+from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from spec_dock_runtime.infra.contracts import GithubIssueRecord
+
+
+class GithubStateGateway(Protocol):
+    def get(self, repo_root: Path, repository: str, number: int) -> GithubIssueRecord: ...
 
 
 @dataclass(frozen=True)
@@ -72,6 +85,64 @@ def list_scope_dependencies(
     source = show_scope(views, target, selection=selection)
     raw, _metadata = _read_raw_edges(views)
     return dependency_listing(views, raw, source.id)
+
+
+def check_scope_readiness(
+    specdock_dir: Path,
+    target: str,
+    *,
+    source: Literal["github", "cache"] = "cache",
+    for_start: bool = False,
+    allow_stale: bool = False,
+    offline: bool = False,
+    gateway: GithubStateGateway | None = None,
+    worktree_id: str | None = None,
+) -> ReadinessResult:
+    """Observe only the target chain and effective prerequisites, without writes."""
+    if target.startswith("@") and worktree_id is None:
+        raise ValueError("active dependency target requires worktree identity")
+    views = load_scope_views(specdock_dir)
+    selection = _selection_for_targets(specdock_dir, worktree_id or "", target) if target.startswith("@") else None
+    selected = show_scope(views, target, selection=selection)
+    raw, _metadata = _read_raw_edges(views)
+    by_id = {view.id: view for view in views}
+    needed = [selected.id]
+    parent_id = selected.parent_id
+    while parent_id is not None:
+        needed.append(parent_id)
+        parent_id = by_id[parent_id].parent_id
+    needed.extend(edge.target_id for edge in dependency_listing(views, raw, selected.id).effective)
+    github_needed = tuple(
+        by_id[scope_id] for scope_id in dict.fromkeys(needed) if isinstance(by_id[scope_id].backend, GithubBackend)
+    )
+    if offline and source == "github" and github_needed:
+        raise ValueError("offline mode cannot fetch required GitHub state")
+    observations: dict[str, StatusObservation] = {}
+    if source == "github" and github_needed:
+        if gateway is None:
+            raise ValueError("live GitHub readiness requires a gateway")
+        for view in github_needed:
+            assert isinstance(view.backend, GithubBackend)
+            repository = f"{view.backend.repo_owner}/{view.backend.repo_name}"
+            try:
+                observed = gateway.get(specdock_dir.parent, repository, view.backend.issue_number)
+                if observed.repository.lower() != repository.lower() or observed.number != view.backend.issue_number:
+                    raise RemoteIssueError("GITHUB_ISSUE_ID_MISMATCH")
+                observations[view.id] = StatusObservation(
+                    observed.state, "github", "github", observed.updated_at, observed.updated_at, False
+                )
+            except RemoteIssueError:
+                observations[view.id] = StatusObservation("unknown", "github", "unknown", None, None, True)
+    return evaluate_start_readiness(
+        views,
+        raw,
+        selected.id,
+        source=source,
+        mode="start" if for_start else "check",
+        allow_stale=allow_stale,
+        offline=offline,
+        observations=observations,
+    )
 
 
 def mutate_scope_dependency(
