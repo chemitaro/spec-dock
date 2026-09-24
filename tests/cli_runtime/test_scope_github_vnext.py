@@ -15,11 +15,15 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.application.create_github_scope import create_github_scope  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
+from spec_dock_runtime.application.create_node import CreatePlanExecutionError  # noqa: E402
 from spec_dock_runtime.application.github_create_effect import (  # noqa: E402
     create_github_issue_effect,
     operation_marker,
 )
-from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
+from spec_dock_runtime.application.import_github_scope import (  # noqa: E402
+    import_github_scope,
+    resume_github_scope_import,
+)
 from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
 from spec_dock_runtime.application.resume_github_scope import resume_github_scope_create  # noqa: E402
 from spec_dock_runtime.infra.contracts import GithubIssueRecord  # noqa: E402
@@ -453,6 +457,54 @@ def test_import_existing_issue_uses_explicit_title_and_never_posts(tmp_path: Pat
     assert metadata["title"] == "Local title"
     assert metadata["github"]["issue_number"] == 47
     assert JournalStore(common["common_dir"]).load(imported.operation_id).terminal_status == "succeeded"
+
+
+def test_import_collision_resumes_only_after_destination_is_absent(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    destination = cast("Path", common["repo_root"]) / "spec-dock/initiatives/init-00047-plan"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text("occupied\n", encoding="utf-8")
+    gateway = FakeGateway(_issue())
+    with pytest.raises(CreatePlanExecutionError, match="Destination already exists"):
+        import_github_scope(
+            kind="initiative",
+            github_ref="gh:example/repo#47",
+            repo_hint=None,
+            title="Plan",
+            parent_id=None,
+            slug=None,
+            gateway=gateway,
+            **common,
+        )
+    store = JournalStore(cast("Path", common["common_dir"]))
+    operation = store.pending()[0]
+    with pytest.raises(RuntimeError, match="unverified content"):
+        resume_github_scope_import(
+            kind="initiative",
+            github_ref="gh:example/repo#47",
+            repo_hint=None,
+            title="Plan",
+            parent_id=None,
+            slug=None,
+            gateway=gateway,
+            operation_id=operation.operation_id,
+            **{key: value for key, value in common.items() if key != "updated_at"},
+        )
+    destination.unlink()
+    resumed = resume_github_scope_import(
+        kind="initiative",
+        github_ref="gh:example/repo#47",
+        repo_hint=None,
+        title="Plan",
+        parent_id=None,
+        slug=None,
+        gateway=gateway,
+        operation_id=operation.operation_id,
+        **{key: value for key, value in common.items() if key != "updated_at"},
+    )
+    assert resumed.id == "init-00047"
+    assert gateway.calls == 0
+    assert store.load(operation.operation_id).terminal_status == "succeeded"
 
 
 def test_import_operation_identity_fixes_slug_and_normalizes_github_ref(tmp_path: Path) -> None:

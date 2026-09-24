@@ -37,6 +37,7 @@ from spec_dock_runtime.infra.operation_journal import JournalStore
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
+    from spec_dock_runtime.application.contracts import CreatePlan
     from spec_dock_runtime.domain.operation import OperationRecord
     from spec_dock_runtime.infra.contracts import GithubIssueRecord
 
@@ -117,6 +118,73 @@ def _assert_no_unfinished_transaction(destination: Path) -> None:
         raise RuntimeError("unfinished Scope scaffold transaction requires inspection")
 
 
+def resume_local_scaffold(
+    operation: OperationRecord,
+    *,
+    journal: JournalStore,
+    plan: CreatePlan,
+    metadata: dict[str, object],
+    repo_root: Path,
+    specdock_dir: Path,
+    parent_fd: int | None,
+) -> OperationRecord:
+    """Reconcile one scaffold effect and retry only verified absent publication."""
+    local = (
+        operation.effects[-1]
+        if operation.effects and (operation.effects[-1].retry_of or operation.effects[-1].id) == "scaffold"
+        else None
+    )
+    if local is not None and local.status == "intent":
+        unknown = record_effect_result(operation, effect_id="scaffold", status="unknown")
+        journal.update(unknown, expected_sequence=operation.sequence)
+        operation, local = unknown, unknown.effects[-1]
+    if local is not None and local.status == "succeeded":
+        if not _published_scope_matches(plan.dest_dir, metadata, plan.planned_paths):
+            raise RuntimeError("recorded Scope scaffold no longer matches its fixed operation")
+    elif local is not None and local.status in ("failed", "unknown"):
+        if local.status == "unknown" and _published_scope_matches(plan.dest_dir, metadata, plan.planned_paths):
+            observed = record_effect_observation(operation, effect_id="scaffold", outcome="observed_applied")
+        else:
+            if os.path.lexists(plan.dest_dir):
+                raise RuntimeError("Scope destination is occupied by unverified content")
+            _assert_no_unfinished_transaction(plan.dest_dir)
+            observed = record_effect_observation(operation, effect_id="scaffold", outcome="observed_not_applied")
+        journal.update(observed, expected_sequence=operation.sequence)
+        operation, local = observed, observed.effects[-1]
+    if local is None or local.status == "not-applied":
+        if os.path.lexists(plan.dest_dir):
+            raise RuntimeError("Scope destination appeared before retry")
+        _assert_no_unfinished_transaction(plan.dest_dir)
+        intent = record_effect_intent(operation, effect_id="scaffold", kind="local", target=plan.meta.id)
+        journal.update(intent, expected_sequence=operation.sequence)
+        ports = Ports(
+            node_reader=fs_repo,
+            repo_root=repo_root,
+            specdock_dir=specdock_dir,
+            node_repo=fs_repo,
+            template_scaffolder=template_scaffolder,
+        )
+        try:
+            execute_create_plan(
+                plan,
+                ports,
+                metadata_writer=lambda directory_fd: fs_repo.write_meta_payload_at(directory_fd, metadata),
+                parent_anchor_fd=parent_fd,
+            )
+        except CreatePlanExecutionError as error:
+            failed = record_effect_result(
+                intent, effect_id="scaffold", status="failed" if error.phase == "none" else "unknown"
+            )
+            journal.update(failed, expected_sequence=intent.sequence)
+            raise
+        succeeded = record_effect_result(intent, effect_id="scaffold", status="succeeded")
+        journal.update(succeeded, expected_sequence=intent.sequence)
+        operation = succeeded
+    if operation.effects[-1].status != "succeeded":
+        raise RuntimeError("Scope scaffold recovery remains incomplete")
+    return operation
+
+
 def resume_github_scope_create(
     *,
     repo_root: Path,
@@ -153,6 +221,11 @@ def resume_github_scope_create(
         fixed = dict(operation.fixed_targets)
         if operation.effect_plan != ("github-create", "scaffold") or not fixed.get("updated_at"):
             raise ValueError("journal is not a recoverable GitHub Scope create")
+        if operation.effects and (
+            operation.effects[0].id != "github-create"
+            or any((effect.retry_of or effect.id) != "scaffold" for effect in operation.effects[1:])
+        ):
+            raise ValueError("GitHub Scope create journal has unexpected effects")
         assert_resume_request(
             operation,
             command="scope.create",
@@ -212,59 +285,15 @@ def resume_github_scope_create(
                 for record in records.values()
             ):
                 raise ValueError("GitHub Issue is linked to another local Scope")
-            local = operation.effects[-1] if len(operation.effects) > 1 else None
-            if local is not None and (local.retry_of or local.id) != "scaffold":
-                raise ValueError("unexpected effect in GitHub create journal")
-            if local is not None and local.status == "intent":
-                unknown = record_effect_result(operation, effect_id="scaffold", status="unknown")
-                journal.update(unknown, expected_sequence=operation.sequence)
-                operation, local = unknown, unknown.effects[-1]
-            if local is not None and local.status == "succeeded":
-                if not _published_scope_matches(plan.dest_dir, metadata, plan.planned_paths):
-                    raise RuntimeError("recorded Scope scaffold no longer matches its fixed operation")
-            elif local is not None and local.status in ("failed", "unknown"):
-                if local.status == "unknown" and _published_scope_matches(plan.dest_dir, metadata, plan.planned_paths):
-                    observed = record_effect_observation(operation, effect_id="scaffold", outcome="observed_applied")
-                else:
-                    if os.path.lexists(plan.dest_dir):
-                        raise RuntimeError("Scope destination is occupied by unverified content")
-                    _assert_no_unfinished_transaction(plan.dest_dir)
-                    observed = record_effect_observation(
-                        operation, effect_id="scaffold", outcome="observed_not_applied"
-                    )
-                journal.update(observed, expected_sequence=operation.sequence)
-                operation, local = observed, observed.effects[-1]
-            if local is None or local.status == "not-applied":
-                if os.path.lexists(plan.dest_dir):
-                    raise RuntimeError("Scope destination appeared before retry")
-                _assert_no_unfinished_transaction(plan.dest_dir)
-                intent = record_effect_intent(operation, effect_id="scaffold", kind="local", target=plan.meta.id)
-                journal.update(intent, expected_sequence=operation.sequence)
-                ports = Ports(
-                    node_reader=fs_repo,
-                    repo_root=repo_root,
-                    specdock_dir=specdock_dir,
-                    node_repo=fs_repo,
-                    template_scaffolder=template_scaffolder,
-                )
-                try:
-                    execute_create_plan(
-                        plan,
-                        ports,
-                        metadata_writer=lambda directory_fd: fs_repo.write_meta_payload_at(directory_fd, metadata),
-                        parent_anchor_fd=parent_fd,
-                    )
-                except CreatePlanExecutionError as error:
-                    failed = record_effect_result(
-                        intent, effect_id="scaffold", status="failed" if error.phase == "none" else "unknown"
-                    )
-                    journal.update(failed, expected_sequence=intent.sequence)
-                    raise
-                succeeded = record_effect_result(intent, effect_id="scaffold", status="succeeded")
-                journal.update(succeeded, expected_sequence=intent.sequence)
-                operation = succeeded
-            if operation.effects[-1].status != "succeeded":
-                raise RuntimeError("GitHub Scope create recovery remains incomplete")
+            operation = resume_local_scaffold(
+                operation,
+                journal=journal,
+                plan=plan,
+                metadata=metadata,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                parent_fd=parent_fd,
+            )
             complete = replace(
                 operation, phase="complete", terminal_status="succeeded", sequence=operation.sequence + 1
             )

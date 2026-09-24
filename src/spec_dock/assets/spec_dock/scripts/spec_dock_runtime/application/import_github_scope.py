@@ -23,11 +23,13 @@ from spec_dock_runtime.application.create_node import (
 )
 from spec_dock_runtime.application.github_scope_scaffold import build_github_scope_scaffold
 from spec_dock_runtime.application.operation_executor import (
+    assert_resume_request,
     prepare_operation,
     record_effect_intent,
     record_effect_result,
 )
 from spec_dock_runtime.application.ports import Ports
+from spec_dock_runtime.application.resume_github_scope import resume_local_scaffold
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.domain.ids import resolve_input_title_and_slug
 from spec_dock_runtime.domain.selectors import ScopeKind, parse_github_ref
@@ -45,6 +47,62 @@ class GithubScopeImported:
     path: Path
     github_ref: str
     operation_id: str
+
+
+@dataclass(frozen=True)
+class GithubScopeImportPreview:
+    kind: ScopeKind
+    title: str
+    slug: str
+    parent_id: str | None
+    github_ref: str
+
+
+def _import_fingerprint(*, kind: ScopeKind, github_ref: str, title: str, slug: str, parent_id: str | None) -> str:
+    digest = hashlib.sha256(
+        json.dumps(
+            {"kind": kind, "github_ref": github_ref, "title": title, "slug": slug, "parent": parent_id},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode()
+    ).hexdigest()
+    return f"sha256:{digest}"
+
+
+def preview_import_github_scope(
+    *,
+    repo_root: Path,
+    kind: ScopeKind,
+    github_ref: str,
+    repo_hint: str | None,
+    title: str,
+    parent_id: str | None,
+    slug: str | None,
+    gateway: GithubScopeGateway,
+) -> GithubScopeImportPreview:
+    normalized_title, normalized_slug = resolve_input_title_and_slug(title, slug)
+    target = parse_github_ref(github_ref, repo_hint=repo_hint)
+    repository = git_cli.origin_github_publication_repo_slug(repo_root)
+    if f"{target.owner}/{target.repo}" != repository:
+        raise ValueError("foreign GitHub Issue import is rejected")
+    specdock_dir = repo_root / "spec-dock"
+    if specdock_dir.is_symlink() or not specdock_dir.is_dir():
+        raise ValueError("SpecDock workspace root is missing or redirected")
+    records = {record.id: record for record in fs_repo.load_node_records(specdock_dir)}
+    ancestors = _parent_records(kind=kind, parent_id=parent_id, records=records)
+    _require_open_ancestors(ancestors=ancestors, repo_root=repo_root, repository=repository, gateway=gateway)
+    if any(
+        record.github_issue_number == target.issue_number
+        and f"{record.github_repo_owner}/{record.github_repo_name}".lower() == repository
+        for record in records.values()
+    ):
+        raise ValueError("GitHub Issue is already linked to a local Scope")
+    remote = gateway.get(repo_root, repository, target.issue_number)
+    if remote.repository.lower() != repository or remote.number != target.issue_number:
+        raise ValueError("GitHub Issue identity changed during import")
+    return GithubScopeImportPreview(
+        kind, normalized_title, normalized_slug, parent_id, f"gh:{repository}#{target.issue_number}"
+    )
 
 
 def import_github_scope(
@@ -124,30 +182,24 @@ def import_github_scope(
         )
         if create_plan.meta.id in RegistryStore(common_dir).load()[0].deleted_ids:
             raise ValueError("deleted Scope ID cannot be imported again")
-        fingerprint = hashlib.sha256(
-            json.dumps(
-                {
-                    "kind": kind,
-                    "github_ref": f"gh:{repository}#{target.issue_number}",
-                    "title": normalized_title,
-                    "slug": normalized_slug,
-                    "parent": parent_id,
-                },
-                sort_keys=True,
-                separators=(",", ":"),
-            ).encode()
-        ).hexdigest()
+        canonical_ref = f"gh:{repository}#{target.issue_number}"
         assert control is not None
         operation = prepare_operation(
             command="scope.import",
             effect_plan=("scaffold",),
             fixed_targets={
                 "target": create_plan.meta.id,
-                "github_ref": f"gh:{repository}#{target.issue_number}",
+                "github_ref": canonical_ref,
+                "repository": repository,
+                "kind": kind,
+                "title": normalized_title,
                 "parent": parent_id or "",
                 "slug": normalized_slug,
+                "updated_at": updated_at,
             },
-            request_fingerprint=f"sha256:{fingerprint}",
+            request_fingerprint=_import_fingerprint(
+                kind=kind, github_ref=canonical_ref, title=normalized_title, slug=normalized_slug, parent_id=parent_id
+            ),
             before_revisions={},
             engine_digest=engine_digest,
             writer_epoch=control.epoch,
@@ -183,9 +235,6 @@ def import_github_scope(
                     intent, effect_id="scaffold", status="failed" if error.phase == "none" else "unknown"
                 )
                 journal.update(failed, expected_sequence=intent.sequence)
-                if error.phase == "none":
-                    terminal = replace(failed, phase="complete", terminal_status="failed", sequence=failed.sequence + 1)
-                    journal.update(terminal, expected_sequence=failed.sequence)
                 raise
             succeeded = record_effect_result(intent, effect_id="scaffold", status="succeeded")
             journal.update(succeeded, expected_sequence=intent.sequence)
@@ -199,3 +248,122 @@ def import_github_scope(
                 f"gh:{repository}#{target.issue_number}",
                 operation.operation_id,
             )
+
+
+def resume_github_scope_import(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    kind: ScopeKind,
+    github_ref: str,
+    repo_hint: str | None,
+    title: str,
+    parent_id: str | None,
+    slug: str | None,
+    operation_id: str,
+    gateway: GithubScopeGateway,
+    lock_timeout: float = 0.0,
+) -> GithubScopeImported:
+    normalized_title, normalized_slug = resolve_input_title_and_slug(title, slug)
+    target = parse_github_ref(github_ref, repo_hint=repo_hint)
+    specdock_dir = repo_root / "spec-dock"
+    if specdock_dir.is_symlink() or not specdock_dir.is_dir():
+        raise ValueError("SpecDock workspace root is missing or redirected")
+    with WriterLock(common_dir, timeout=lock_timeout):
+        control = load_control(common_dir)
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+            recovery_operation_id=operation_id,
+        )
+        repository = git_cli.origin_github_publication_repo_slug(repo_root)
+        if f"{target.owner}/{target.repo}" != repository:
+            raise ValueError("foreign GitHub Issue import is rejected")
+        canonical_ref = f"gh:{repository}#{target.issue_number}"
+        journal = JournalStore(common_dir)
+        operation = journal.load(operation_id)
+        fixed = dict(operation.fixed_targets)
+        if operation.effect_plan != ("scaffold",) or not fixed.get("updated_at"):
+            raise ValueError("journal is not a recoverable GitHub Scope import")
+        if any((effect.retry_of or effect.id) != "scaffold" for effect in operation.effects):
+            raise ValueError("GitHub Scope import journal has unexpected effects")
+        assert_resume_request(
+            operation,
+            command="scope.import",
+            fixed_targets={
+                "target": fixed.get("target", ""),
+                "github_ref": canonical_ref,
+                "repository": repository,
+                "kind": kind,
+                "title": normalized_title,
+                "parent": parent_id or "",
+                "slug": normalized_slug,
+                "updated_at": fixed["updated_at"],
+            },
+            request_fingerprint=_import_fingerprint(
+                kind=kind, github_ref=canonical_ref, title=normalized_title, slug=normalized_slug, parent_id=parent_id
+            ),
+            current_revisions={},
+            engine_digest=engine_digest,
+            writer_epoch=expected_epoch,
+        )
+        records = {record.id: record for record in fs_repo.load_node_records(specdock_dir)}
+        ancestors = _parent_records(kind=kind, parent_id=parent_id, records=records)
+        parent_identity = _require_open_ancestors(
+            ancestors=ancestors, repo_root=repo_root, repository=repository, gateway=gateway
+        )
+        parent = ancestors[0] if ancestors else None
+        remote = gateway.get(repo_root, repository, target.issue_number)
+        if remote.repository.lower() != repository or remote.number != target.issue_number:
+            raise ValueError("GitHub Issue identity changed during import recovery")
+        plan, metadata = build_github_scope_scaffold(
+            specdock_dir=specdock_dir,
+            kind=kind,
+            title=normalized_title,
+            slug=normalized_slug,
+            parent_id=parent_id,
+            parent_record=parent,
+            repository=repository,
+            issue_number=target.issue_number,
+            today=fixed["updated_at"][:10],
+        )
+        if plan.meta.id != fixed["target"]:
+            raise ValueError("GitHub Scope import target changed")
+        if any(
+            record.github_issue_number == target.issue_number
+            and f"{record.github_repo_owner}/{record.github_repo_name}".lower() == repository
+            and record.id != plan.meta.id
+            for record in records.values()
+        ):
+            raise ValueError("GitHub Issue is linked to another local Scope")
+        with ExitStack() as anchors:
+            parent_fd: int | None = None
+            if parent is not None:
+                parent_path = Path(parent.path).resolve(strict=True)
+                if not parent_path.is_relative_to(specdock_dir.resolve(strict=True)):
+                    raise ValueError("Scope parent is outside this workspace")
+                parent_fd = open_guarded_directory(parent_path)
+                anchors.callback(os.close, parent_fd)
+                bound = read_guarded_json_at(parent_fd, ".meta.json")
+                if bound is None or bound[1] != parent_identity:
+                    raise ValueError("Scope parent identity changed during import recovery")
+            operation = resume_local_scaffold(
+                operation,
+                journal=journal,
+                plan=plan,
+                metadata=metadata,
+                repo_root=repo_root,
+                specdock_dir=specdock_dir,
+                parent_fd=parent_fd,
+            )
+            terminal = replace(
+                operation, phase="complete", terminal_status="succeeded", sequence=operation.sequence + 1
+            )
+            journal.update(terminal, expected_sequence=operation.sequence)
+            return GithubScopeImported(plan.meta.id, plan.dest_dir, canonical_ref, operation_id)
