@@ -2563,8 +2563,12 @@ class TestRuntimeNewS08:
                 "_resolve_node_tree_no_replace_rename",
                 _unsupported_no_replace,
             )
-            with pytest.raises(NotImplementedError, match="atomic no-replace rename is unavailable"):
+            with pytest.raises(
+                app_create_node.CreatePlanExecutionError,
+                match="atomic no-replace rename is unavailable",
+            ) as failure:
                 app_create_node.execute_create_plan(plan, ports)
+            assert failure.value.phase == "none"
 
             assert not plan.dest_dir.parent.exists()
             assert events == []
