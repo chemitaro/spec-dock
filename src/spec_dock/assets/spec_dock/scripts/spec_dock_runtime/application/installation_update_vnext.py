@@ -107,7 +107,7 @@ def _quarantine_unjournaled_stage(target: InstallationTarget, journal_root: Path
 
 
 def _stage_missing(
-    common_dir: Path, record: InstallationGroupRecord, bundle: VerifiedBundle, *, recover_stage: bool = False
+    common_dir: Path, record: InstallationGroupRecord, bundle: VerifiedBundle | None, *, recover_stage: bool = False
 ) -> InstallationGroupRecord:
     for target in record.targets:
         assert target.child_operation_id is not None
@@ -123,13 +123,13 @@ def _stage_missing(
             child = prepare_installation(
                 Path(target.root),
                 journal_root,
-                action="update",
+                action=record.action,
                 bundle=bundle,
                 operation_id=target.child_operation_id,
             )
         if (
             child.target != target.root
-            or child.action != "update"
+            or child.action != record.action
             or child.source_commit != record.source_commit
             or child.source_digest != record.source_digest
         ):
@@ -148,7 +148,7 @@ def _apply_children(common_dir: Path, record: InstallationGroupRecord) -> Instal
         child = read_record(journal_root, target.child_operation_id)
         if (
             child.target != target.root
-            or child.action != "update"
+            or child.action != record.action
             or child.source_commit != record.source_commit
             or child.source_digest != record.source_digest
         ):
@@ -247,6 +247,59 @@ def update_installation_group(
             raise
 
 
+def uninstall_installation_group(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    lock_timeout: float = 0.0,
+) -> InstallationGroupRecord:
+    """Remove only managed tooling across the fixed registered worktree group."""
+    before = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    if any(item.version is None for item in before.worktrees):
+        raise ValueError("installation group contains an unversioned target")
+    with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in before.worktrees), timeout=lock_timeout):
+        if inspect_installation_group(repo_root=repo_root, common_dir=common_dir) != before:
+            raise ValueError("installation group changed before the uninstall lock")
+        control = load_control(common_dir)
+        assert control is not None
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+            maintenance_command="installation.uninstall",
+        )
+        group_id = uuid4().hex
+        record = InstallationGroupRecord(
+            group_id,
+            "uninstall",
+            str(common_dir),
+            control.epoch,
+            engine_digest,
+            None,
+            None,
+            True,
+            _fixed_targets(before, group_id),
+            "preparing",
+        )
+        write_group_record(common_dir, record, create=True)
+        try:
+            store_control(
+                common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
+            )
+            record = _stage_missing(common_dir, record, None)
+            record = _apply_children(common_dir, record)
+            return _commit_group(common_dir, record)
+        except Exception as error:
+            failed = replace(read_group_record(common_dir, group_id), phase="recovery-required", error=str(error))
+            write_group_record(common_dir, failed)
+            raise
+
+
 def resume_installation_group(
     *,
     repo_root: Path,
@@ -299,7 +352,7 @@ def resume_installation_group(
             raise
 
 
-def rollback_installation_group(
+def resume_uninstall_installation_group(
     *,
     repo_root: Path,
     common_dir: Path,
@@ -308,9 +361,65 @@ def rollback_installation_group(
     operation_id: str,
     lock_timeout: float = 0.0,
 ) -> InstallationGroupRecord:
-    """Restore a pending update or an untouched committed maintenance update."""
+    """Resume fixed uninstall targets from local journal bytes without a source bundle."""
     record = read_group_record(common_dir, operation_id)
-    if record.action != "update" or (record.phase == "committed" and not record.keep_maintenance):
+    if record.action != "uninstall" or record.phase in {"committed", "rolled-back"}:
+        raise ValueError("installation uninstall group is not resumable")
+    group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    if tuple((item.id, item.root) for item in group.worktrees) != tuple(
+        (item.worktree_id, item.root) for item in record.targets
+    ):
+        raise ValueError("installation recovery target inventory changed")
+    with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in group.worktrees), timeout=lock_timeout):
+        record = read_group_record(common_dir, operation_id)
+        if record.action != "uninstall" or record.phase in {"committed", "rolled-back"}:
+            raise ValueError("installation uninstall group is not resumable")
+        if inspect_installation_group(repo_root=repo_root, common_dir=common_dir) != group:
+            raise ValueError("installation recovery inventory changed before the lock")
+        control = load_control(common_dir)
+        if control is None:
+            raise ValueError("installation control is missing")
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=control.epoch,
+            recovery_operation_id=operation_id,
+        )
+        if control.epoch == record.control_epoch and control.mode in {"ready", "maintenance"}:
+            store_control(
+                common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
+            )
+        elif control.mode != "maintenance" or control.epoch < record.control_epoch + 1:
+            raise ValueError("installation control is not at a recoverable epoch")
+        try:
+            record = _stage_missing(common_dir, record, None, recover_stage=True)
+            record = _apply_children(common_dir, record)
+            return _commit_group(common_dir, record)
+        except Exception as error:
+            failed = replace(read_group_record(common_dir, operation_id), phase="recovery-required", error=str(error))
+            write_group_record(common_dir, failed)
+            raise
+
+
+def rollback_installation_group(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    operation_id: str,
+    expected_action: str = "update",
+    lock_timeout: float = 0.0,
+) -> InstallationGroupRecord:
+    """Restore a pending or untouched committed update/uninstall group."""
+    record = read_group_record(common_dir, operation_id)
+    if (
+        record.action != expected_action
+        or expected_action not in {"update", "uninstall"}
+        or (record.phase == "committed" and not record.keep_maintenance)
+    ):
         raise ValueError("installation group is not rollback eligible")
     if record.phase == "rolled-back":
         return record
@@ -321,7 +430,11 @@ def rollback_installation_group(
         raise ValueError("installation rollback target inventory changed")
     with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in group.worktrees), timeout=lock_timeout):
         record = read_group_record(common_dir, operation_id)
-        if record.action != "update" or (record.phase == "committed" and not record.keep_maintenance):
+        if (
+            record.action != expected_action
+            or expected_action not in {"update", "uninstall"}
+            or (record.phase == "committed" and not record.keep_maintenance)
+        ):
             raise ValueError("installation group is not rollback eligible")
         if inspect_installation_group(repo_root=repo_root, common_dir=common_dir) != group:
             raise ValueError("installation rollback inventory changed before the lock")
@@ -337,7 +450,7 @@ def rollback_installation_group(
                 worktree_id=worktree_id,
                 engine_digest=engine_digest,
                 expected_epoch=control.epoch,
-                maintenance_command="installation.update",
+                maintenance_command=f"installation.{record.action}",
             )
         else:
             admit_writer(
@@ -369,7 +482,7 @@ def rollback_installation_group(
                 child = preflight_rollback_installation(journal_root, target.child_operation_id, allow_committed=True)
                 if (
                     child.target != target.root
-                    or child.action != "update"
+                    or child.action != record.action
                     or child.source_commit != record.source_commit
                     or child.source_digest != record.source_digest
                 ):

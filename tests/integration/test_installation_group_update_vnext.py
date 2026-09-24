@@ -300,6 +300,116 @@ def test_installation_update_dry_run_preserves_targets(tmp_path: Path, monkeypat
     assert not (second / "spec-dock/docs/source.txt").exists()
 
 
+def test_group_uninstall_preserves_spec_data_and_can_restore_tooling(tmp_path: Path) -> None:
+    repo, second, common_dir, epoch, digest, _bundle_value = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    data = repo / "spec-dock/initiatives/kept.md"
+    data.parent.mkdir(parents=True, exist_ok=True)
+    data.write_text("consumer data\n", encoding="utf-8")
+    before_version = (repo / "spec-dock/spec-dock.version").read_bytes()
+    completed = update_module.uninstall_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        expected_epoch=epoch,
+    )
+    assert completed.action == "uninstall" and completed.phase == "committed"
+    assert load_control(common_dir).mode == "maintenance"
+    for root in (repo, second):
+        assert not (root / "spec-dock/docs").exists()
+        assert not (root / "spec-dock/spec-dock.version").exists()
+    assert data.read_text(encoding="utf-8") == "consumer data\n"
+    restored = update_module.rollback_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=completed.operation_id,
+        expected_action="uninstall",
+    )
+    assert restored.phase == "rolled-back"
+    assert (repo / "spec-dock/spec-dock.version").read_bytes() == before_version
+    assert (second / "spec-dock/docs").is_dir()
+    assert data.read_text(encoding="utf-8") == "consumer data\n"
+
+
+def test_group_uninstall_resumes_offline_after_one_worktree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, _bundle_value = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_apply = update_module.apply_installation
+    attempts = 0
+
+    def fail_second(*args: object, **kwargs: object):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RuntimeError("injected uninstall stop")
+        return real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(update_module, "apply_installation", fail_second)
+    with pytest.raises(RuntimeError, match="uninstall stop"):
+        update_module.uninstall_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    monkeypatch.setattr(update_module, "apply_installation", real_apply)
+    completed = update_module.resume_uninstall_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=group_id,
+    )
+    assert completed.phase == "committed"
+    assert pending_installation_groups(common_dir) == ()
+    assert not (second / "spec-dock/docs").exists()
+
+
+def test_installation_uninstall_cli_requires_yes_and_rolls_back_offline(tmp_path: Path) -> None:
+    repo, second, common_dir, _epoch, digest, _bundle_value = _group_fixture(tmp_path)
+    unconfirmed = run_vnext(
+        ["installation", "uninstall", "--target", str(repo), "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert unconfirmed.exit_code == 3
+    completed = run_vnext(
+        ["installation", "uninstall", "--target", str(repo), "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert completed.exit_code == 0
+    operation_id = json.loads(completed.stdout)["operation_id"]
+    assert not (second / "spec-dock/docs").exists()
+    wrong_recovery = run_vnext(
+        ["installation", "update", "--rollback", operation_id, "--offline", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert wrong_recovery.exit_code == 3
+    assert not (second / "spec-dock/docs").exists()
+    restored = run_vnext(
+        ["installation", "uninstall", "--rollback", operation_id, "--offline", "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert restored.exit_code == 0
+    assert json.loads(restored.stdout)["data"]["phase"] == "rolled-back"
+    assert (repo / "spec-dock/docs").is_dir()
+    assert pending_installation_groups(common_dir) == ()
+
+
 def test_committed_maintenance_update_can_be_rolled_back_before_resume(tmp_path: Path) -> None:
     repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
     completed = update_installation_group(

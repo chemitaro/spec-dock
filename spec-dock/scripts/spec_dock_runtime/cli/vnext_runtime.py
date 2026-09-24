@@ -12,7 +12,11 @@ from spec_dock_runtime.commands.active_vnext import run_active_change, run_activ
 from spec_dock_runtime.commands.artifact_vnext import run_artifact_change, run_artifact_query
 from spec_dock_runtime.commands.branch_vnext import run_branch_command
 from spec_dock_runtime.commands.dependency_vnext import run_dependency_change, run_dependency_query
-from spec_dock_runtime.commands.installation_vnext import run_installation_show, run_installation_update
+from spec_dock_runtime.commands.installation_vnext import (
+    run_installation_show,
+    run_installation_uninstall,
+    run_installation_update,
+)
 from spec_dock_runtime.commands.scope_create_vnext import run_scope_create
 from spec_dock_runtime.commands.scope_delete_vnext import run_scope_delete
 from spec_dock_runtime.commands.scope_import_vnext import run_scope_import
@@ -153,6 +157,7 @@ def run_vnext(
             "workspace migrate",
             "installation show",
             "installation update",
+            "installation uninstall",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
@@ -196,6 +201,8 @@ def run_vnext(
             result = run_installation_show(ns, context, engine_version=engine_version, invocation_cwd=invocation_cwd)
         elif ns.command_path == "installation update":
             result = run_installation_update(ns, context, invocation_cwd=invocation_cwd)
+        elif ns.command_path == "installation uninstall":
+            result = run_installation_uninstall(ns, context, invocation_cwd=invocation_cwd)
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)
         elif ns.command_path == "active show":

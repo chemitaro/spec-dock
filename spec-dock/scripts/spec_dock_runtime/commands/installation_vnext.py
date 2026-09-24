@@ -16,7 +16,9 @@ from spec_dock.installation.source import (
 )
 from spec_dock_runtime.application.installation_update_vnext import (
     resume_installation_group,
+    resume_uninstall_installation_group,
     rollback_installation_group,
+    uninstall_installation_group,
     update_installation_group,
 )
 from spec_dock_runtime.application.installation_vnext import (
@@ -39,6 +41,12 @@ class InstallationUpdatePlan:
     source_digest: str
     targets: tuple[str, ...]
     keep_maintenance: bool
+
+
+@dataclass(frozen=True)
+class InstallationUninstallPlan:
+    targets: tuple[str, ...]
+    preserve_consumer_data: bool
 
 
 def run_installation_show(
@@ -137,4 +145,55 @@ def run_installation_update(
         record,
         0,
         effects=(Effect("installation", "succeeded", record.operation_id),),
+    )
+
+
+def run_installation_uninstall(
+    ns: argparse.Namespace, context: WorkContext, *, invocation_cwd: Path
+) -> OperationResult[InstallationGroupRecord | InstallationUninstallPlan]:
+    target = Path(ns.target).expanduser() if ns.target else context.repo_root
+    if not target.is_absolute():
+        target = invocation_cwd / target
+    show_installation(
+        repo_root=context.repo_root,
+        common_dir=context.common_dir,
+        engine_version="bound",
+        engine_digest=context.engine_digest,
+        target=target,
+    )
+    if ns.dry_run:
+        if ns.resume or ns.rollback:
+            raise ValueError("installation uninstall recovery cannot be previewed")
+        group = inspect_installation_group(repo_root=context.repo_root, common_dir=context.common_dir)
+        return OperationResult(
+            ns.command_path,
+            "planned",
+            InstallationUninstallPlan(tuple(item.root for item in group.worktrees), True),
+            0,
+            effects=(Effect("installation-uninstall", "planned", None),),
+        )
+    if not ns.yes:
+        raise ValueError("installation uninstall requires --yes")
+    common = {
+        "repo_root": context.repo_root,
+        "common_dir": context.common_dir,
+        "worktree_id": context.worktree_id,
+        "engine_digest": context.engine_digest,
+        "lock_timeout": ns.lock_timeout,
+    }
+    if ns.rollback:
+        record = rollback_installation_group(operation_id=ns.rollback, expected_action="uninstall", **common)
+    elif ns.resume:
+        record = resume_uninstall_installation_group(operation_id=ns.resume, **common)
+    else:
+        record = uninstall_installation_group(expected_epoch=context.expected_epoch, **common)
+    if record.action != "uninstall":
+        raise ValueError("installation recovery operation is not an uninstall")
+    return OperationResult(
+        ns.command_path,
+        "succeeded",
+        record,
+        0,
+        operation_id=record.operation_id,
+        effects=(Effect("installation-uninstall", "succeeded", record.operation_id),),
     )
