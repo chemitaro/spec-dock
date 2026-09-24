@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from spec_dock_runtime.infra.control_store import load_control
+from spec_dock_runtime.infra.git_cli import worktree_list
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,14 @@ class InstallationView:
     source_repository: str
     control_mode: str
     control_epoch: int
+    worktrees: tuple[InstalledWorktree, ...]
+
+
+@dataclass(frozen=True)
+class InstallationGroup:
+    common_dir: str
+    control_epoch: int
+    mode: str
     worktrees: tuple[InstalledWorktree, ...]
 
 
@@ -80,4 +89,47 @@ def show_installation(
         control.mode,
         control.epoch,
         tuple(worktrees),
+    )
+
+
+def inspect_installation_group(*, repo_root: Path, common_dir: Path) -> InstallationGroup:
+    """Fix a complete, registered Git worktree inventory before a shared update."""
+    control = load_control(common_dir)
+    if control is None or control.mode not in {"ready", "maintenance"}:
+        raise ValueError("installation group requires ready or maintenance control")
+    registered: dict[Path, InstalledWorktree] = {}
+    for item in control.worktrees:
+        if not item.active:
+            continue
+        root = Path(item.root)
+        if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+            raise ValueError("registered installation worktree is unavailable")
+        canonical = root.resolve(strict=True)
+        if canonical != root or canonical in registered:
+            raise ValueError("registered installation worktree identity changed")
+        registered[canonical] = InstalledWorktree(
+            item.id,
+            item.root,
+            _installed_version(root),
+            item.schema_version,
+            item.writer_protocol,
+            item.engine_digest,
+            True,
+        )
+    records = worktree_list(repo_root)
+    observed: set[Path] = set()
+    for record in records:
+        if record.bare or record.path.is_symlink() or not record.path.is_dir():
+            raise ValueError("Git worktree inventory contains an unavailable worktree")
+        canonical = record.path.resolve(strict=True)
+        if canonical not in registered or canonical in observed:
+            raise ValueError("Git worktree inventory differs from registered installation targets")
+        observed.add(canonical)
+    if observed != set(registered) or repo_root.resolve(strict=True) not in observed:
+        raise ValueError("installation group is incomplete")
+    return InstallationGroup(
+        str(common_dir),
+        control.epoch,
+        control.mode,
+        tuple(sorted(registered.values(), key=lambda item: item.id)),
     )
