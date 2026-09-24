@@ -23,6 +23,15 @@ if TYPE_CHECKING:
 class GithubCreateGateway(Protocol):
     def create(self, repo_root: Path, repository: str, *, title: str, body: str) -> GithubIssueRecord: ...
 
+    def find_by_marker(self, repo_root: Path, repository: str, marker: str) -> tuple[GithubIssueRecord, ...]: ...
+
+
+def operation_marker(operation_id: str) -> str:
+    """Stable, non-secret correlation marker for uncertain GitHub POST results."""
+    if len(operation_id) != 32 or any(character not in "0123456789abcdef" for character in operation_id):
+        raise ValueError("invalid operation ID for GitHub correlation")
+    return f"<!-- spec-dock-operation:{operation_id} -->"
+
 
 def create_github_issue_effect(
     *,
@@ -46,21 +55,33 @@ def create_github_issue_effect(
         raise ValueError("GitHub create request is incomplete")
     if not can_send_effect(operation, "github-create"):
         raise ValueError("GitHub create effect was already sent")
+    marker = operation_marker(operation.operation_id)
+    if marker in body:
+        raise ValueError("GitHub create body already contains its operation marker")
     intent = record_effect_intent(operation, effect_id="github-create", kind="remote", target=repository)
     journal.update(intent, expected_sequence=operation.sequence)
     try:
-        created = gateway.create(repo_root, repository, title=title, body=body)
+        created = gateway.create(repo_root, repository, title=title, body=f"{body.rstrip()}\n\n{marker}\n")
         if created.repository.lower() != repository.lower() or created.state != "open" or created.number <= 0:
             raise RemoteIssueError("GITHUB_CREATE_IDENTITY_UNKNOWN", uncertain=True)
     except RemoteIssueError as error:
-        failed = record_effect_result(
-            intent, effect_id="github-create", status="unknown" if error.uncertain else "failed"
-        )
-        journal.update(failed, expected_sequence=intent.sequence)
-        if not error.uncertain:
+        if error.uncertain:
+            try:
+                matches = gateway.find_by_marker(repo_root, repository, marker)
+            except RemoteIssueError:
+                matches = ()
+            if len(matches) == 1 and matches[0].repository.lower() == repository.lower() and matches[0].state == "open":
+                created = matches[0]
+            else:
+                unknown = record_effect_result(intent, effect_id="github-create", status="unknown")
+                journal.update(unknown, expected_sequence=intent.sequence)
+                raise RemoteIssueError("GITHUB_EFFECT_UNKNOWN", uncertain=True) from error
+        else:
+            failed = record_effect_result(intent, effect_id="github-create", status="failed")
+            journal.update(failed, expected_sequence=intent.sequence)
             terminal = replace(failed, phase="complete", terminal_status="failed", sequence=failed.sequence + 1)
             journal.update(terminal, expected_sequence=failed.sequence)
-        raise
+            raise
     except Exception as error:
         unknown = record_effect_result(intent, effect_id="github-create", status="unknown")
         journal.update(unknown, expected_sequence=intent.sequence)

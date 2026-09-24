@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from contextlib import suppress
 import ctypes
 import errno
 import json
@@ -83,8 +82,12 @@ def atomic_write_json(path: Path, data: Any, *, expected_identity: tuple[int, in
     directory_fd = _open_directory_without_links(directory)
     transaction_name = ".specdock-json-transactions"
     try:
-        with suppress(FileExistsError):
+        try:
             os.mkdir(transaction_name, mode=0o700, dir_fd=directory_fd)
+        except FileExistsError:
+            pass
+        else:
+            os.fsync(directory_fd)
         transaction_fd = os.open(transaction_name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)
     except BaseException:
         os.close(directory_fd)
@@ -140,6 +143,8 @@ def atomic_write_json(path: Path, data: Any, *, expected_identity: tuple[int, in
                 raise ValueError("JSON destination identity changed")
             if _target_identity(directory_fd, path.name) != expected_identity:
                 raise ValueError("JSON destination identity changed")
+            os.fchmod(stage_fd, stat.S_IMODE(expected_stat.st_mode))
+            os.fsync(stage_fd)
             _write_transaction_record(
                 transaction_fd,
                 intent_name,

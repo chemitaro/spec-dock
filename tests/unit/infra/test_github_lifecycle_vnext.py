@@ -15,7 +15,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError  # noqa: E402
 
 
-def _reply(status: int, payload: dict[str, object]) -> subprocess.CompletedProcess[str]:
+def _reply(status: int, payload: object) -> subprocess.CompletedProcess[str]:
     return subprocess.CompletedProcess(
         ["gh"],
         0 if status < 400 else 1,
@@ -186,6 +186,26 @@ def test_create_success_response_without_identity_is_unknown_effect(tmp_path: Pa
             tmp_path, "example/product", title="Plan", body="body"
         )
     assert caught.value.exit_code == 6
+
+
+def test_marker_scan_reads_all_pages_and_excludes_pull_requests(tmp_path: Path) -> None:
+    marker = "<!-- spec-dock-operation:0123456789abcdef0123456789abcdef -->"
+    first_page = [_issue(number=number) for number in range(1, 101)]
+    first_page[13]["body"] = marker
+    first_page[14]["body"] = marker
+    first_page[14]["pull_request"] = {"url": "https://api.github.com/repos/example/product/pulls/15"}
+    runner = FakeRun(_reply(200, first_page), _reply(200, [{**_issue(number=101), "body": "unrelated"}]))
+    matches = GithubIssueGateway(runner=runner).find_by_marker(tmp_path, "example/product", marker)
+    assert [record.number for record in matches] == [14]
+    assert "page=1" in runner.calls[0][0][-1]
+    assert "page=2" in runner.calls[1][0][-1]
+
+
+def test_marker_scan_rejects_incomplete_page(tmp_path: Path) -> None:
+    marker = "<!-- spec-dock-operation:0123456789abcdef0123456789abcdef -->"
+    runner = FakeRun(_reply(200, {"unexpected": "object"}))
+    with pytest.raises(RemoteIssueError, match="GITHUB_RESPONSE_INVALID"):
+        GithubIssueGateway(runner=runner).find_by_marker(tmp_path, "example/product", marker)
 
 
 @pytest.mark.parametrize("status", [400, 410, 422])

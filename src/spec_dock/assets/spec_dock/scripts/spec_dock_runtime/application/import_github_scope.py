@@ -123,7 +123,13 @@ def import_github_scope(
         )
         fingerprint = hashlib.sha256(
             json.dumps(
-                {"kind": kind, "github_ref": github_ref, "title": normalized_title, "parent": parent_id},
+                {
+                    "kind": kind,
+                    "github_ref": f"gh:{repository}#{target.issue_number}",
+                    "title": normalized_title,
+                    "slug": normalized_slug,
+                    "parent": parent_id,
+                },
                 sort_keys=True,
                 separators=(",", ":"),
             ).encode()
@@ -136,6 +142,7 @@ def import_github_scope(
                 "target": create_plan.meta.id,
                 "github_ref": f"gh:{repository}#{target.issue_number}",
                 "parent": parent_id or "",
+                "slug": normalized_slug,
             },
             request_fingerprint=f"sha256:{fingerprint}",
             before_revisions={},

@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from contextlib import suppress
 from dataclasses import asdict
-import json
+import os
 import re
 from typing import TYPE_CHECKING, cast
 
 from spec_dock_runtime.domain.operation import OperationEffect, OperationRecord, TerminalStatus
 from spec_dock_runtime.infra.control_store import control_directory
-from spec_dock_runtime.infra.json_store import atomic_write_json
+from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -114,33 +113,33 @@ class JournalStore:
         if record.sequence != 0 or record.terminal_status != "pending":
             raise ValueError("new journal must start pending at sequence zero")
         path = self._path(record.operation_id)
-        self.root.mkdir(parents=True, exist_ok=True)
-        if self.root.is_symlink():
-            raise ValueError("operations directory must not be a symlink")
+        _ensure_durable_directory(self.root)
         path.parent.mkdir(mode=0o700, exist_ok=False)
-        try:
-            atomic_write_json(path, asdict(record))
-        except BaseException:
-            with suppress(OSError):
-                path.parent.rmdir()
-            raise
+        _fsync_directory(self.root)
+        atomic_write_json(path, asdict(record))
 
     def load(self, operation_id: str) -> OperationRecord:
+        return self.load_with_identity(operation_id)[0]
+
+    def load_with_identity(self, operation_id: str) -> tuple[OperationRecord, tuple[int, int]]:
         path = self._path(operation_id)
         if path.parent.is_symlink() or path.is_symlink():
             raise ValueError("journal path must not be a symlink")
         try:
-            payload = json.loads(path.read_text(encoding="utf-8"))
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            loaded = read_guarded_json(path)
+        except (ValueError, UnicodeDecodeError) as exc:
             raise ValueError("invalid journal JSON") from exc
+        if loaded is None:
+            raise FileNotFoundError(path)
+        payload, identity = loaded
         record = _decode(payload)
         if record.operation_id != operation_id:
             raise ValueError("journal ID and directory disagree")
-        return record
+        return record, identity
 
     def update(self, record: OperationRecord, *, expected_sequence: int) -> None:
         path = self._path(record.operation_id)
-        current = self.load(record.operation_id)
+        current, identity = self.load_with_identity(record.operation_id)
         if current.sequence != expected_sequence or record.sequence != expected_sequence + 1:
             raise ValueError("journal sequence changed")
         if any(
@@ -158,8 +157,7 @@ class JournalStore:
         ):
             raise ValueError("journal fixed operation identity changed")
         _assert_journal_transition(current, record)
-        metadata = path.lstat()
-        atomic_write_json(path, asdict(record), expected_identity=(metadata.st_dev, metadata.st_ino))
+        atomic_write_json(path, asdict(record), expected_identity=identity)
 
     def pending(self) -> tuple[OperationRecord, ...]:
         if not self.root.exists():
@@ -174,6 +172,27 @@ class JournalStore:
             if record.terminal_status in ("pending", "unknown"):
                 pending.append(record)
         return tuple(pending)
+
+
+def _fsync_directory(path: Path) -> None:
+    fd = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def _ensure_durable_directory(path: Path) -> None:
+    missing: list[Path] = []
+    cursor = path
+    while not cursor.exists():
+        missing.append(cursor)
+        cursor = cursor.parent
+    if any(parent.is_symlink() for parent in (cursor, *cursor.parents)) or not cursor.is_dir():
+        raise ValueError("journal directory must not be redirected")
+    for directory in reversed(missing):
+        directory.mkdir(mode=0o700)
+        _fsync_directory(directory.parent)
 
 
 def _assert_journal_transition(before: OperationRecord, after: OperationRecord) -> None:

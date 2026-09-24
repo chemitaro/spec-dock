@@ -6,7 +6,7 @@ from collections.abc import Callable
 import json
 import re
 import subprocess
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Literal, cast
 
 from spec_dock_runtime.domain.lifecycle import ObservedState, observe_github_state
 from spec_dock_runtime.infra.contracts import GithubIssueRecord
@@ -35,7 +35,9 @@ def _repository_slug(value: str) -> str:
     return value
 
 
-def _decode_response(response: subprocess.CompletedProcess[str], *, mutation: bool) -> dict[str, object]:
+def _decode_response(
+    response: subprocess.CompletedProcess[str], *, mutation: bool, expect_array: bool = False
+) -> dict[str, object] | list[object]:
     raw = response.stdout or ""
     header, marker, body = raw.replace("\r\n", "\n").partition("\n\n")
     matched = _STATUS.match(header.splitlines()[0] if header else "")
@@ -52,7 +54,7 @@ def _decode_response(response: subprocess.CompletedProcess[str], *, mutation: bo
         payload = json.loads(body)
     except json.JSONDecodeError as error:
         raise RemoteIssueError("GITHUB_RESPONSE_INVALID", uncertain=mutation) from error
-    if not isinstance(payload, dict):
+    if not isinstance(payload, list if expect_array else dict):
         raise RemoteIssueError("GITHUB_RESPONSE_INVALID", uncertain=mutation)
     return payload
 
@@ -111,7 +113,8 @@ class GithubIssueGateway:
         method: Literal["GET", "POST", "PATCH"],
         endpoint: str,
         payload: dict[str, str] | None = None,
-    ) -> dict[str, object]:
+        expect_array: bool = False,
+    ) -> dict[str, object] | list[object]:
         argv = ["gh", "api", "--hostname", "github.com", "--include", "--method", method, endpoint]
         if payload is not None:
             argv.extend(["--input", "-"])
@@ -131,29 +134,67 @@ class GithubIssueGateway:
             raise RemoteIssueError("GITHUB_PROCESS_NOT_STARTED") from error
         except OSError as error:
             raise RemoteIssueError("GITHUB_PROCESS_ERROR", uncertain=method != "GET") from error
-        return _decode_response(response, mutation=method != "GET")
+        return _decode_response(response, mutation=method != "GET", expect_array=expect_array)
 
     def get(self, repo_root: Path, repository: str, number: int) -> GithubIssueRecord:
         repository = _repository_slug(repository)
         if number <= 0:
             raise ValueError("GitHub Issue number must be positive")
-        payload = self._api(repo_root, method="GET", endpoint=f"repos/{repository}/issues/{number}")
+        payload = cast(
+            "dict[str, object]", self._api(repo_root, method="GET", endpoint=f"repos/{repository}/issues/{number}")
+        )
         return _record(payload, repository=repository, number=number)
 
     def create(self, repo_root: Path, repository: str, *, title: str, body: str) -> GithubIssueRecord:
         repository = _repository_slug(repository)
         if not title.strip():
             raise ValueError("GitHub Issue title must be nonempty")
-        payload = self._api(
-            repo_root,
-            method="POST",
-            endpoint=f"repos/{repository}/issues",
-            payload={"title": title, "body": body},
+        payload = cast(
+            "dict[str, object]",
+            self._api(
+                repo_root,
+                method="POST",
+                endpoint=f"repos/{repository}/issues",
+                payload={"title": title, "body": body},
+            ),
         )
         try:
             return _record(payload, repository=repository, number=None)
         except RemoteIssueError as error:
             raise RemoteIssueError("GITHUB_CREATE_IDENTITY_UNKNOWN", uncertain=True) from error
+
+    def find_by_marker(self, repo_root: Path, repository: str, marker: str) -> tuple[GithubIssueRecord, ...]:
+        """Scan every Issue page; zero matches is diagnostic, never proof to retry a POST."""
+        repository = _repository_slug(repository)
+        if not marker.startswith("<!-- spec-dock-operation:") or not marker.endswith(" -->"):
+            raise ValueError("invalid GitHub operation marker")
+        matches: list[GithubIssueRecord] = []
+        page = 1
+        while True:
+            payload = cast(
+                "list[object]",
+                self._api(
+                    repo_root,
+                    method="GET",
+                    endpoint=f"repos/{repository}/issues?state=all&per_page=100&page={page}",
+                    expect_array=True,
+                ),
+            )
+            for item in payload:
+                if not isinstance(item, dict):
+                    raise RemoteIssueError("GITHUB_RESPONSE_INVALID")
+                if "pull_request" in item:
+                    continue
+                body = item.get("body")
+                if body is None:
+                    continue
+                if not isinstance(body, str):
+                    raise RemoteIssueError("GITHUB_RESPONSE_INVALID")
+                if marker in body:
+                    matches.append(_record(item, repository=repository, number=None))
+            if len(payload) < 100:
+                return tuple(matches)
+            page += 1
 
     def set_state(
         self,

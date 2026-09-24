@@ -15,7 +15,10 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.application.create_github_scope import create_github_scope  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.github_create_effect import create_github_issue_effect  # noqa: E402
+from spec_dock_runtime.application.github_create_effect import (  # noqa: E402
+    create_github_issue_effect,
+    operation_marker,
+)
 from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
 from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
 from spec_dock_runtime.infra.contracts import GithubIssueRecord  # noqa: E402
@@ -27,13 +30,22 @@ from tests.cli_runtime import harness  # noqa: E402
 
 
 class FakeGateway:
-    def __init__(self, result: GithubIssueRecord | Exception, *, expected_title: str = "Plan") -> None:
+    def __init__(
+        self,
+        result: GithubIssueRecord | Exception,
+        *,
+        expected_title: str = "Plan",
+        observed: tuple[GithubIssueRecord, ...] = (),
+    ) -> None:
         self.result = result
         self.expected_title = expected_title
+        self.observed = observed
         self.calls = 0
+        self.sent_body: str | None = None
 
     def create(self, repo_root: Path, repository: str, *, title: str, body: str) -> GithubIssueRecord:
         self.calls += 1
+        self.sent_body = body
         if isinstance(self.result, Exception):
             raise self.result
         assert repository == "example/repo"
@@ -45,6 +57,11 @@ class FakeGateway:
         assert repository == "example/repo"
         assert number == 47
         return _issue()
+
+    def find_by_marker(self, repo_root: Path, repository: str, marker: str) -> tuple[GithubIssueRecord, ...]:
+        assert repository == "example/repo"
+        assert marker.startswith("<!-- spec-dock-operation:")
+        return self.observed
 
 
 def _prepared(store: JournalStore):
@@ -88,6 +105,7 @@ def test_remote_receipt_is_durable_before_local_scaffold_and_cannot_be_replayed(
         body="Created by SpecDock.",
     )
     assert created.number == 47
+    assert gateway.sent_body is not None and operation_marker(operation.operation_id) in gateway.sent_body
     assert advanced.effects[0].remote_ref == "gh:example/repo#47"
     assert store.load(operation.operation_id) == advanced
     assert advanced.terminal_status == "pending"
@@ -109,7 +127,7 @@ def test_remote_failure_records_confirmed_or_unknown_outcome(tmp_path: Path, unc
     store = JournalStore(tmp_path)
     operation = _prepared(store)
     gateway = FakeGateway(RemoteIssueError("INJECTED", uncertain=uncertain))
-    with pytest.raises(RemoteIssueError, match="INJECTED"):
+    with pytest.raises(RemoteIssueError, match="GITHUB_EFFECT_UNKNOWN" if uncertain else "INJECTED"):
         create_github_issue_effect(
             operation=operation,
             journal=store,
@@ -122,6 +140,42 @@ def test_remote_failure_records_confirmed_or_unknown_outcome(tmp_path: Path, unc
     saved = store.load(operation.operation_id)
     assert saved.effects[0].status == ("unknown" if uncertain else "failed")
     assert saved.terminal_status == ("pending" if uncertain else "failed")
+    assert gateway.calls == 1
+
+
+def test_remote_timeout_observation_recovers_exact_match_without_repost(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    operation = _prepared(store)
+    gateway = FakeGateway(RemoteIssueError("GITHUB_TIMEOUT", uncertain=True), observed=(_issue(),))
+    advanced, created = create_github_issue_effect(
+        operation=operation,
+        journal=store,
+        gateway=gateway,
+        repo_root=tmp_path,
+        repository="example/repo",
+        title="Plan",
+        body="Created by SpecDock.",
+    )
+    assert created.number == 47
+    assert gateway.calls == 1
+    assert advanced.effects[0].remote_ref == "gh:example/repo#47"
+
+
+def test_remote_timeout_with_duplicate_markers_stays_unknown(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    operation = _prepared(store)
+    gateway = FakeGateway(RemoteIssueError("GITHUB_TIMEOUT", uncertain=True), observed=(_issue(), _issue()))
+    with pytest.raises(RemoteIssueError, match="GITHUB_EFFECT_UNKNOWN"):
+        create_github_issue_effect(
+            operation=operation,
+            journal=store,
+            gateway=gateway,
+            repo_root=tmp_path,
+            repository="example/repo",
+            title="Plan",
+            body="Created by SpecDock.",
+        )
+    assert store.load(operation.operation_id).effects[0].status == "unknown"
     assert gateway.calls == 1
 
 
@@ -280,6 +334,33 @@ def test_import_existing_issue_uses_explicit_title_and_never_posts(tmp_path: Pat
     assert metadata["title"] == "Local title"
     assert metadata["github"]["issue_number"] == 47
     assert JournalStore(common["common_dir"]).load(imported.operation_id).terminal_status == "succeeded"
+
+
+def test_import_operation_identity_fixes_slug_and_normalizes_github_ref(tmp_path: Path) -> None:
+    signatures: list[tuple[tuple[tuple[str, str], ...], str]] = []
+    for label, github_ref, slug in (
+        ("one", "gh:example/repo#47", "alpha"),
+        ("two", "https://github.com/example/repo/issues/47", "alpha"),
+        ("three", "gh:example/repo#47", "beta"),
+    ):
+        root = tmp_path / label
+        root.mkdir()
+        common = _ready_repo(root)
+        imported = import_github_scope(
+            kind="initiative",
+            github_ref=github_ref,
+            repo_hint=None,
+            title="Plan",
+            parent_id=None,
+            slug=slug,
+            gateway=FakeGateway(_issue()),
+            **common,
+        )
+        operation = JournalStore(common["common_dir"]).load(imported.operation_id)
+        signatures.append((operation.fixed_targets, operation.request_fingerprint))
+    assert signatures[0] == signatures[1]
+    assert signatures[0] != signatures[2]
+    assert dict(signatures[0][0])["slug"] == "alpha"
 
 
 def test_import_rejects_foreign_duplicate_and_missing_title_without_post(tmp_path: Path) -> None:

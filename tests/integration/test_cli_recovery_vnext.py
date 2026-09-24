@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import asdict, replace
+import json
 from multiprocessing import Process, Queue
 import os
 from pathlib import Path
@@ -22,6 +23,7 @@ from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     record_effect_observation,
     record_effect_result,
 )
+from spec_dock_runtime.infra import operation_journal  # noqa: E402
 from spec_dock_runtime.infra.json_store import atomic_write_json, reconcile_atomic_json  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 
@@ -162,6 +164,66 @@ def test_journal_update_cannot_retarget_an_existing_operation(tmp_path: Path) ->
     altered = replace(prepared, fixed_targets=(("target", "iss-99999"),), sequence=1)
     with pytest.raises(ValueError, match="fixed"):
         store.update(altered, expected_sequence=0)
+
+
+def test_journal_update_uses_identity_of_the_verified_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.create",
+        fixed_targets={"repository": "example/repo"},
+        request_fingerprint="sha256:request",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-create",),
+    )
+    store.create(prepared)
+    first = record_effect_intent(prepared, effect_id="github-create", kind="remote", target="example/repo")
+    concurrent = record_effect_result(
+        first, effect_id="github-create", status="succeeded", remote_ref="gh:example/repo#47"
+    )
+    original_write = operation_journal.atomic_write_json
+
+    def replace_after_read(path: Path, data: object, *, expected_identity: tuple[int, int] | None = None) -> None:
+        replacement = path.with_name("concurrent.json")
+        replacement.write_text(json.dumps(asdict(concurrent)), encoding="utf-8")
+        replacement.replace(path)
+        original_write(path, data, expected_identity=expected_identity)
+
+    monkeypatch.setattr(operation_journal, "atomic_write_json", replace_after_read)
+    with pytest.raises(ValueError, match="identity changed"):
+        store.update(first, expected_sequence=0)
+    assert store.load(prepared.operation_id) == concurrent
+
+
+def test_journal_creation_syncs_parent_before_publishing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.create",
+        fixed_targets={"repository": "example/repo"},
+        request_fingerprint="sha256:request",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-create",),
+    )
+    events: list[str] = []
+    original_sync = operation_journal._fsync_directory
+    original_write = operation_journal.atomic_write_json
+
+    def sync(path: Path) -> None:
+        if path == store.root:
+            events.append("operation-parent-synced")
+        original_sync(path)
+
+    def write(path: Path, data: object, *, expected_identity: tuple[int, int] | None = None) -> None:
+        events.append("journal-published")
+        original_write(path, data, expected_identity=expected_identity)
+
+    monkeypatch.setattr(operation_journal, "_fsync_directory", sync)
+    monkeypatch.setattr(operation_journal, "atomic_write_json", write)
+    store.create(prepared)
+    assert events == ["operation-parent-synced", "journal-published"]
 
 
 def test_unknown_remote_effect_requires_observation_before_retry(tmp_path: Path) -> None:
