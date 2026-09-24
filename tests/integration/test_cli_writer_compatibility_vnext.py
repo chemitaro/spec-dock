@@ -1,0 +1,198 @@
+"""Shared writer admission and lock compatibility across linked worktrees."""
+
+from __future__ import annotations
+
+from multiprocessing import Process, Queue
+import os
+from pathlib import Path
+import subprocess
+import sys
+
+import pytest
+
+RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+sys.path.insert(0, str(RUNTIME_SCRIPTS))
+
+from spec_dock_runtime.cli.admission import AdmissionError, PendingOperation, admit_writer  # noqa: E402
+from spec_dock_runtime.infra.control_store import (  # noqa: E402
+    ControlState,
+    WorktreeRegistration,
+    load_control,
+    store_control,
+)
+from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
+from spec_dock_runtime.infra.writer_lock import (  # noqa: E402
+    WorktreeLease,
+    WriterLock,
+    WriterLockBusy,
+    writer_transaction,
+)
+
+
+def _control(*, mode: str = "ready", schema: int = 3, digest: str = "engine-a") -> ControlState:
+    return ControlState(
+        schema_version=schema,
+        writer_protocol="specdock.writer/v1",
+        epoch=12,
+        engine_digest=digest,
+        mode=mode,
+        worktrees=(
+            WorktreeRegistration("wt-one", "/project/one", 3, "specdock.writer/v1", "engine-a", True),
+            WorktreeRegistration("wt-two", "/project/two", 3, "specdock.writer/v1", "engine-a", True),
+        ),
+    )
+
+
+def test_all_registered_worktrees_must_use_same_writer_protocol() -> None:
+    admit_writer(_control(), worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+    bad = _control()
+    incompatible = WorktreeRegistration("wt-two", "/project/two", 2, "specdock.writer/v0", "engine-a", True)
+    bad = ControlState(
+        bad.schema_version,
+        bad.writer_protocol,
+        bad.epoch,
+        bad.engine_digest,
+        bad.mode,
+        (bad.worktrees[0], incompatible),
+    )
+    with pytest.raises(AdmissionError, match="protocol"):
+        admit_writer(bad, worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"worktree_id": "unregistered"},
+        {"engine_digest": "engine-old"},
+        {"expected_epoch": 11},
+    ],
+)
+def test_unregistered_or_stale_writer_is_rejected(kwargs: dict[str, object]) -> None:
+    valid: dict[str, object] = {"worktree_id": "wt-one", "engine_digest": "engine-a", "expected_epoch": 12}
+    valid.update(kwargs)
+    with pytest.raises(AdmissionError):
+        admit_writer(_control(), **valid)
+
+
+def test_only_explicit_blocking_recovery_operations_stop_unrelated_writes() -> None:
+    partial = PendingOperation("op-partial", "artifact.create", "partial", False)
+    admit_writer(_control(), worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12, operations=(partial,))
+    blocking = PendingOperation("op-start", "work.start", "pending", True)
+    with pytest.raises(AdmissionError, match="recovery"):
+        admit_writer(
+            _control(), worktree_id="wt-two", engine_digest="engine-a", expected_epoch=12, operations=(blocking,)
+        )
+    admit_writer(
+        _control(),
+        worktree_id="wt-one",
+        engine_digest="engine-a",
+        expected_epoch=12,
+        operations=(blocking,),
+        recovery_operation_id="op-start",
+    )
+
+
+def test_maintenance_blocks_normal_writer_but_allows_migration() -> None:
+    with pytest.raises(AdmissionError, match="maintenance"):
+        admit_writer(_control(mode="maintenance"), worktree_id="wt-one", engine_digest="engine-a", expected_epoch=12)
+    admit_writer(
+        _control(mode="maintenance"),
+        worktree_id="wt-one",
+        engine_digest="engine-a",
+        expected_epoch=12,
+        maintenance_command="workspace.migrate",
+    )
+
+
+def test_maintenance_can_repair_mixed_registered_worktrees() -> None:
+    ready = _control()
+    outdated = WorktreeRegistration("wt-two", "/project/two", 2, "specdock.writer/v0", "engine-old", True)
+    mixed = ControlState(
+        ready.schema_version,
+        ready.writer_protocol,
+        ready.epoch,
+        ready.engine_digest,
+        "maintenance",
+        (ready.worktrees[0], outdated),
+    )
+    admit_writer(
+        mixed,
+        worktree_id="wt-one",
+        engine_digest="engine-a",
+        expected_epoch=12,
+        maintenance_command="workspace.migrate",
+    )
+
+
+def test_control_store_preserves_epoch_and_detects_stale_update(tmp_path: Path) -> None:
+    assert load_control(tmp_path) is None
+    store_control(tmp_path, _control(), expected_epoch=None)
+    assert load_control(tmp_path) == _control()
+    next_state = ControlState(3, "specdock.writer/v1", 13, "engine-a", "maintenance", _control().worktrees)
+    with pytest.raises(ValueError, match="epoch"):
+        store_control(tmp_path, next_state, expected_epoch=11)
+    store_control(tmp_path, next_state, expected_epoch=12)
+    assert load_control(tmp_path) == next_state
+
+
+def test_git_common_directory_is_shared_by_linked_worktrees(tmp_path: Path) -> None:
+    repo = tmp_path / "repo"
+    linked = tmp_path / "linked"
+    subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
+    (repo / "readme.txt").write_text("fixture\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "--", "readme.txt"], check=True, capture_output=True)
+    identity = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "test",
+        "GIT_AUTHOR_EMAIL": "test@example.invalid",
+        "GIT_COMMITTER_NAME": "test",
+        "GIT_COMMITTER_EMAIL": "test@example.invalid",
+    }
+    subprocess.run(["git", "-C", str(repo), "commit", "-qm", "fixture"], check=True, env=identity, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "--detach", str(linked)], check=True, capture_output=True
+    )
+    assert git_common_directory(repo) == git_common_directory(linked)
+
+
+def _hold_lock(common_dir: str, ready: Queue[bool]) -> None:
+    with WriterLock(Path(common_dir), timeout=0):
+        ready.put(True)
+        import time
+
+        time.sleep(30)
+
+
+def test_second_process_times_out_and_killed_owner_releases_lock(tmp_path: Path) -> None:
+    ready: Queue[bool] = Queue()
+    child = Process(target=_hold_lock, args=(str(tmp_path), ready))
+    child.start()
+    try:
+        assert ready.get(timeout=5) is True
+        with pytest.raises(WriterLockBusy), WriterLock(tmp_path, timeout=0):
+            pass
+    finally:
+        child.kill()
+        child.join(timeout=5)
+    with WriterLock(tmp_path, timeout=0):
+        pass
+
+
+def test_worktree_lease_rejects_recursive_exclusive_use(tmp_path: Path) -> None:
+    with (
+        WorktreeLease(tmp_path, "wt-one", exclusive=False, timeout=0),
+        pytest.raises(WriterLockBusy),
+        WorktreeLease(tmp_path, "wt-one", exclusive=True, timeout=0),
+    ):
+        pass
+
+
+def test_writer_transaction_takes_sorted_worktree_leases(tmp_path: Path) -> None:
+    with (
+        writer_transaction(tmp_path, worktree_ids=("wt-two", "wt-one"), timeout=0),
+        pytest.raises(WriterLockBusy),
+        WorktreeLease(tmp_path, "wt-one", exclusive=True, timeout=0),
+    ):
+        pass
+    with WorktreeLease(tmp_path, "wt-one", exclusive=True, timeout=0):
+        pass

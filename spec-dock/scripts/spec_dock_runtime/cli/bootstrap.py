@@ -229,6 +229,9 @@ class _DepsTopologyReader:
 
 @dataclass(frozen=True)
 class _GitGateway:
+    def git_common_directory(self, repo_root: Path) -> Path:
+        return infra_git_cli.git_common_directory(repo_root)
+
     def require_clean_working_tree(self, repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None:
         infra_git_cli.require_clean_working_tree(repo_root, allowed_missing_paths=allowed_missing_paths)
 

@@ -25,6 +25,23 @@ def _ensure_git_available() -> None:
         raise RuntimeError("'git' CLI not found. Install Git, or disable git-dependent operations.")
 
 
+def git_common_directory(repo_root: Path) -> Path:
+    """Ask Git for the shared metadata root rather than assuming .git is a directory."""
+    _ensure_git_available()
+    result = subprocess.run(
+        ["git", "rev-parse", "--git-common-dir"],
+        cwd=str(repo_root),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0 or not result.stdout.strip():
+        raise RuntimeError("Git common directory could not be resolved")
+    reported = Path(result.stdout.strip())
+    candidate = reported if reported.is_absolute() else repo_root / reported
+    return candidate.resolve(strict=True)
+
+
 def require_clean_working_tree(repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None:
     _ensure_git_available()
     try:
