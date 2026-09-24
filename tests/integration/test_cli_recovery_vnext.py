@@ -22,7 +22,7 @@ from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     record_effect_observation,
     record_effect_result,
 )
-from spec_dock_runtime.infra.json_store import atomic_write_json  # noqa: E402
+from spec_dock_runtime.infra.json_store import atomic_write_json, reconcile_atomic_json  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 
 
@@ -300,20 +300,113 @@ def test_planned_effects_cannot_be_skipped_or_reordered_to_clear_blocker() -> No
         record_effect_intent(prepared, effect_id="active-clear", kind="local", target="iss-00409")
 
 
-def test_atomic_json_rename_failure_keeps_previous_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_atomic_json_exchange_failure_keeps_previous_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     path = tmp_path / "state.json"
     path.write_bytes(b'{"original":true}\n')
     original = path.read_bytes()
 
-    def fail_replace(*args: object, **kwargs: object) -> None:
-        raise OSError("injected rename failure")
+    def fail_exchange(*args: object, **kwargs: object) -> None:
+        raise OSError("injected exchange failure")
 
-    monkeypatch.setattr(os, "replace", fail_replace)
-    with pytest.raises(OSError, match="rename failure"):
+    monkeypatch.setattr("spec_dock_runtime.infra.json_store._rename_exchange_at", fail_exchange)
+    with pytest.raises(OSError, match="exchange failure"):
         identity = path.stat()
         atomic_write_json(path, {"new": True}, expected_identity=(identity.st_dev, identity.st_ino))
     assert path.read_bytes() == original
-    assert sorted(item.name for item in tmp_path.iterdir()) == ["state.json"]
+
+
+def test_atomic_json_exchange_preserves_racing_destination(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    path = tmp_path / "state.json"
+    path.write_bytes(b'{"original":true}\n')
+    expected = path.stat()
+    competitor = tmp_path / "competitor.json"
+    competitor.write_bytes(b'{"competitor":true}\n')
+
+    from spec_dock_runtime.infra import json_store
+
+    real_exchange = json_store._rename_exchange_at
+    raced = False
+
+    def race_then_exchange(source_fd: int, source_name: str, target_fd: int, target_name: str) -> None:
+        nonlocal raced
+        if not raced:
+            competitor.replace(path)
+            raced = True
+        real_exchange(source_fd, source_name, target_fd, target_name)
+
+    monkeypatch.setattr(json_store, "_rename_exchange_at", race_then_exchange)
+    with pytest.raises(ValueError, match="identity changed"):
+        atomic_write_json(path, {"new": True}, expected_identity=(expected.st_dev, expected.st_ino))
+    candidates = [item.read_bytes() for item in tmp_path.rglob("*") if item.is_file()]
+    assert b'{"competitor":true}\n' in candidates
+    assert path.read_bytes() == b'{"competitor":true}\n'
+
+
+def test_atomic_json_exchange_error_after_effect_blocks_blind_retry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    path = tmp_path / "state.json"
+    path.write_bytes(b'{"original":true}\n')
+    identity = path.stat()
+    from spec_dock_runtime.infra import json_store
+
+    real_exchange = json_store._rename_exchange_at
+
+    def effect_then_error(source_fd: int, source_name: str, target_fd: int, target_name: str) -> None:
+        real_exchange(source_fd, source_name, target_fd, target_name)
+        raise OSError("injected post-effect error")
+
+    monkeypatch.setattr(json_store, "_rename_exchange_at", effect_then_error)
+    with pytest.raises(OSError, match="post-effect"):
+        atomic_write_json(path, {"new": True}, expected_identity=(identity.st_dev, identity.st_ino))
+    assert path.read_bytes() == b'{"new":true}\n'
+    with pytest.raises(RuntimeError, match="recovery is required"):
+        atomic_write_json(path, {"newer": True}, expected_identity=(path.stat().st_dev, path.stat().st_ino))
+
+
+def test_atomic_json_create_only_has_no_second_hardlink(tmp_path: Path) -> None:
+    path = tmp_path / "state.json"
+    atomic_write_json(path, {"created": True})
+    assert path.stat().st_nlink == 1
+    assert path.read_bytes() == b'{"created":true}\n'
+
+
+def _exchange_then_hold(path_value: str, ready: Queue[str]) -> None:
+    from spec_dock_runtime.infra import json_store
+
+    path = Path(path_value)
+    identity = path.stat()
+    real_exchange = json_store._rename_exchange_at
+
+    def exchange_then_pause(source_fd: int, source_name: str, target_fd: int, target_name: str) -> None:
+        real_exchange(source_fd, source_name, target_fd, target_name)
+        ready.put("exchanged")
+        time.sleep(30)
+
+    json_store._rename_exchange_at = exchange_then_pause
+    json_store.atomic_write_json(path, {"new": True}, expected_identity=(identity.st_dev, identity.st_ino))
+
+
+def test_atomic_json_killed_after_exchange_retains_old_and_blocks_retry(tmp_path: Path) -> None:
+    path = tmp_path / "state.json"
+    path.write_bytes(b'{"original":true}\n')
+    ready: Queue[str] = Queue()
+    child = Process(target=_exchange_then_hold, args=(str(path), ready))
+    child.start()
+    try:
+        assert ready.get(timeout=5) == "exchanged"
+    finally:
+        child.kill()
+        child.join(timeout=5)
+    assert path.read_bytes() == b'{"new":true}\n'
+    candidates = [item.read_bytes() for item in tmp_path.rglob("*") if item.is_file()]
+    assert b'{"original":true}\n' in candidates
+    with pytest.raises(RuntimeError, match="recovery is required"):
+        atomic_write_json(path, {"newer": True}, expected_identity=(path.stat().st_dev, path.stat().st_ino))
+    assert reconcile_atomic_json(path) == ("published",)
+    identity = path.stat()
+    atomic_write_json(path, {"newer": True}, expected_identity=(identity.st_dev, identity.st_ino))
+    assert path.read_bytes() == b'{"newer":true}\n'
 
 
 def test_atomic_json_refuses_symlink_destination(tmp_path: Path) -> None:
