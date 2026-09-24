@@ -35,6 +35,7 @@ from spec_dock_runtime.infra import fs_repo, git_cli, template_scaffolder
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.json_store import open_guarded_directory, read_guarded_json_at
 from spec_dock_runtime.infra.operation_journal import JournalStore
+from spec_dock_runtime.infra.registry_store import RegistryStore
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 
@@ -121,6 +122,8 @@ def import_github_scope(
             issue_number=target.issue_number,
             today=updated_at[:10],
         )
+        if create_plan.meta.id in RegistryStore(common_dir).load()[0].deleted_ids:
+            raise ValueError("deleted Scope ID cannot be imported again")
         fingerprint = hashlib.sha256(
             json.dumps(
                 {
