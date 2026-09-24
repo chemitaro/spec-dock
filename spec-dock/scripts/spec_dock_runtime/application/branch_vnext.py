@@ -17,6 +17,7 @@ from spec_dock_runtime.application.scope_query import load_scope_views, show_sco
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.domain.branch_binding import BranchBinding
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
+from spec_dock_runtime.infra.active_store import load_selection_v3
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import worktree_list
 from spec_dock_runtime.infra.json_store import read_guarded_json
@@ -106,6 +107,45 @@ def show_scope_branch(repo_root: Path, common_dir: Path, scope_id: str) -> Branc
     binding = _binding_for_scope(RegistryStore(common_dir), scope_id)
     if not _branch_exists(repo_root, binding.name):
         raise ValueError("CANONICAL_BRANCH_MISSING")
+    return binding
+
+
+def resolve_branch_scope(repo_root: Path, worktree_id: str, target: str) -> str:
+    """Resolve an ID, GitHub reference, or active selector from one workspace snapshot."""
+    specdock_dir = repo_root / "spec-dock"
+    views = load_scope_views(specdock_dir)
+    selection, _ = load_selection_v3(specdock_dir, worktree_id=worktree_id)
+    return show_scope(views, target, selection=selection).id
+
+
+def preview_scope_branch_switch(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    scope_id: str,
+) -> BranchBinding:
+    """Check the exact checkout candidate without taking a writer lock or invoking Git switch."""
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    binding = show_scope_branch(repo_root, common_dir, scope_id)
+    status = _git(repo_root, "status", "--porcelain", "--untracked-files=all")
+    if status.returncode != 0 or status.stdout.strip():
+        raise ValueError("branch switch requires a clean working tree")
+    for worktree in worktree_list(repo_root):
+        if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
+            raise ValueError("canonical branch is checked out in another worktree")
+    tip = _resolve_commit(repo_root, f"refs/heads/{binding.name}")
+    views = load_scope_views(repo_root / "spec-dock")
+    show_scope(views, scope_id)
+    _verify_scope_at_commit(repo_root, views, scope_id, tip)
     return binding
 
 

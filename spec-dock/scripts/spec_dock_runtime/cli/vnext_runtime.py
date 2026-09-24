@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.cli.options import parse_vnext_output
 from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
+from spec_dock_runtime.commands.branch_vnext import run_branch_command
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.infra.control_store import load_control
@@ -101,11 +102,15 @@ def run_vnext(
             "scope list",
             "scope show",
             "scope edit",
+            "branch show",
+            "branch switch",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
         if ns.command_path in {"scope list", "scope show"}:
             result = run_scope_query(ns, context)
+        elif ns.command_path in {"branch show", "branch switch"}:
+            result = run_branch_command(ns, context)
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)
         elif ns.command_path == "active show":
