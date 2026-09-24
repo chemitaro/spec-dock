@@ -149,6 +149,63 @@ def test_resume_accepts_recorded_partial_revision_and_rejects_other_changes() ->
         assert_resume_request(partial, current_revisions={"selection": 4, "metadata": 4}, **kwargs)
 
 
+def test_verified_local_non_application_can_retry_after_remote_create(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.create",
+        fixed_targets={"target": "iss-00409"},
+        request_fingerprint="sha256:request",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-create", "scaffold"),
+    )
+    store.create(prepared)
+    remote_intent = record_effect_intent(prepared, effect_id="github-create", kind="remote", target="example/repo")
+    store.update(remote_intent, expected_sequence=prepared.sequence)
+    remote_done = record_effect_result(
+        remote_intent, effect_id="github-create", status="succeeded", remote_ref="gh:example/repo#409"
+    )
+    store.update(remote_done, expected_sequence=remote_intent.sequence)
+    local_intent = record_effect_intent(remote_done, effect_id="scaffold", kind="local", target="iss-00409")
+    store.update(local_intent, expected_sequence=remote_done.sequence)
+    local_failed = record_effect_result(local_intent, effect_id="scaffold", status="failed")
+    store.update(local_failed, expected_sequence=local_intent.sequence)
+    verified_absent = record_effect_observation(local_failed, effect_id="scaffold", outcome="observed_not_applied")
+    store.update(verified_absent, expected_sequence=local_failed.sequence)
+    retry = record_effect_intent(verified_absent, effect_id="scaffold", kind="local", target="iss-00409")
+    store.update(retry, expected_sequence=verified_absent.sequence)
+    assert retry.effects[-1].retry_of == "scaffold"
+    assert len(retry.effects) == 3
+
+
+def test_failed_remote_effect_cannot_be_reclassified_as_not_applied(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.create",
+        fixed_targets={"repository": "example/repo"},
+        request_fingerprint="sha256:request",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-create",),
+    )
+    store.create(prepared)
+    intent = record_effect_intent(prepared, effect_id="github-create", kind="remote", target="example/repo")
+    store.update(intent, expected_sequence=prepared.sequence)
+    failed = record_effect_result(intent, effect_id="github-create", status="failed")
+    store.update(failed, expected_sequence=intent.sequence)
+    with pytest.raises(ValueError, match="unresolved remote or local"):
+        record_effect_observation(failed, effect_id="github-create", outcome="observed_not_applied")
+    forged = replace(
+        failed,
+        effects=(*failed.effects[:-1], replace(failed.effects[-1], status="not-applied")),
+        sequence=failed.sequence + 1,
+    )
+    with pytest.raises(ValueError, match="status transition"):
+        store.update(forged, expected_sequence=failed.sequence)
+
+
 def test_journal_update_cannot_retarget_an_existing_operation(tmp_path: Path) -> None:
     store = JournalStore(tmp_path)
     prepared = prepare_operation(

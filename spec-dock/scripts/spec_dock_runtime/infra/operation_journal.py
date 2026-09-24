@@ -237,6 +237,7 @@ def _assert_journal_transition(before: OperationRecord, after: OperationRecord) 
             allowed = {
                 "intent": {"succeeded", "failed", "unknown"},
                 "unknown": {"succeeded", "not-applied", "unknown"},
+                "failed": {"not-applied"} if old.kind == "local" else set(),
             }
             if new.status not in allowed.get(old.status, set()):
                 raise ValueError("journal effect status transition is invalid")

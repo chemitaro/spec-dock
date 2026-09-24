@@ -134,11 +134,19 @@ def record_effect_observation(
     after_revisions: Mapping[str, int] | None = None,
     remote_ref: str | None = None,
 ) -> OperationRecord:
+    """Record an observation only after the caller verifies the effect's outcome."""
     if record.terminal_status != "pending" or not record.effects:
         raise ValueError("observation requires a pending operation")
     effect = record.effects[-1]
-    if _logical_id(effect) != effect_id or effect.kind != "remote" or effect.status != "unknown":
-        raise ValueError("observation requires the last unknown remote effect")
+    if _logical_id(effect) != effect_id or not (
+        (effect.kind == "remote" and effect.status == "unknown")
+        or (effect.kind == "local" and effect.status in ("failed", "unknown"))
+    ):
+        raise ValueError("observation requires the last unresolved remote or local effect")
+    if effect.kind == "local" and remote_ref is not None:
+        raise ValueError("local effect observation cannot record a remote reference")
+    if effect.status == "failed" and outcome != "observed_not_applied":
+        raise ValueError("failed local effect requires verified non-application")
     if outcome == "observed_applied":
         updated = replace(
             effect,
