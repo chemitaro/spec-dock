@@ -263,6 +263,22 @@ def _digest_paths(root: Path, paths: Iterable[str]) -> str:
     return digest.hexdigest()
 
 
+def verify_bundle_integrity(bundle: VerifiedBundle) -> None:
+    """Recheck the immutable input just before installer staging."""
+    fixed_archive_url(bundle.source)
+    root = bundle.root
+    if not root.is_dir() or root.is_symlink():
+        raise ValueError("verified bundle root is unavailable")
+    paths: list[str] = []
+    for path in root.rglob("*"):
+        if path.is_symlink() or (not path.is_file() and not path.is_dir()):
+            raise ValueError("verified bundle contains an unsafe entry")
+        if path.is_file():
+            paths.append(path.relative_to(root).as_posix())
+    if _digest_paths(root, sorted(paths)) != bundle.digest or _tooling_inventory(root) != bundle.tooling_paths:
+        raise ValueError("verified bundle content changed after archive validation")
+
+
 def verify_pinned_archive(source: PinnedSource, archive: bytes, destination: Path) -> VerifiedBundle:
     """Extract inert regular files only into a new directory, then hash all inputs."""
     fixed_archive_url(source)
