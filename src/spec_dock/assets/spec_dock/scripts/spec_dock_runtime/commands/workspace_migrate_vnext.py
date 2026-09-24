@@ -9,10 +9,15 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.migrate_workspace_vnext import (
     apply_workspace_migration,
+    plan_migration_changes,
     resume_workspace_migration,
     rollback_workspace_migration,
 )
-from spec_dock_runtime.infra.migration_store import MigrationInventory, inspect_migration_inventory, read_migration_map
+from spec_dock_runtime.infra.migration_store import (
+    MigrationWorktree,
+    inspect_migration_inventory,
+    read_migration_map,
+)
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -30,9 +35,27 @@ class MigrationOutcome:
     worktrees: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class MigrationPreviewFile:
+    path: str
+    before_digest: str | None
+    action: str
+
+
+@dataclass(frozen=True)
+class MigrationPreview:
+    common_dir: str
+    repository_uid: str
+    control_digest: str | None
+    digest: str
+    worktrees: tuple[MigrationWorktree, ...]
+    blockers: tuple[str, ...]
+    changes: tuple[MigrationPreviewFile, ...]
+
+
 def run_workspace_migrate(
     ns: argparse.Namespace, context: WorkContext, *, invocation_cwd: Path
-) -> OperationResult[MigrationInventory | MigrationOutcome]:
+) -> OperationResult[MigrationPreview | MigrationOutcome]:
     if ns.to_schema != "3":
         raise ValueError("workspace migrate supports only --to-schema 3")
     if (ns.resume or ns.rollback) and (ns.dry_run or ns.mapping_file):
@@ -75,10 +98,31 @@ def run_workspace_migrate(
             mapping_path = invocation_cwd / mapping_path
         mapping = read_migration_map(mapping_path, inventory)
     if ns.dry_run:
+        changes = (
+            plan_migration_changes(inventory, mapping, updated_at=datetime.now(timezone.utc).isoformat())
+            if mapping
+            else ()
+        )
+        preview = MigrationPreview(
+            inventory.common_dir,
+            inventory.repository_uid,
+            inventory.control_digest,
+            inventory.digest,
+            inventory.worktrees,
+            inventory.blockers,
+            tuple(
+                MigrationPreviewFile(
+                    item.path,
+                    item.before_digest,
+                    "create" if item.before_digest is None else "replace",
+                )
+                for item in changes
+            ),
+        )
         return OperationResult(
             ns.command_path,
             "planned",
-            inventory,
+            preview,
             0,
             effects=(Effect("workspace-migration", "planned", inventory.repository_uid),),
         )

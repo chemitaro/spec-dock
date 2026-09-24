@@ -57,6 +57,8 @@ def test_workspace_migrate_dry_run_requires_exact_mapping_inventory(tmp_path: Pa
         engine_version="0.2.4",
     )
     assert result.exit_code == 0
+    preview = json.loads(result.stdout)["data"]
+    assert "changes" in preview
     payload["source_inventory_digest"] = "sha256:" + "0" * 64
     mapping.write_text(json.dumps(payload), encoding="utf-8")
     rejected = run_vnext(
@@ -98,6 +100,17 @@ def test_workspace_migrate_apply_and_rollback_use_fixed_operation_id(tmp_path: P
         }),
         encoding="utf-8",
     )
+    preview = run_vnext(
+        ["workspace", "migrate", "--to-schema", "3", "--mapping-file", str(mapping), "--dry-run", "--json"],
+        invocation_cwd=root,
+        engine_digest=engine,
+        engine_version="0.2.4",
+    )
+    assert preview.exit_code == 0
+    changes = json.loads(preview.stdout)["data"]["changes"]
+    assert changes
+    assert all(item["path"].startswith(str(root)) for item in changes)
+    assert all(item["action"] in {"create", "replace"} for item in changes)
     missing_confirmation = run_vnext(
         ["workspace", "migrate", "--to-schema", "3", "--mapping-file", str(mapping), "--json"],
         invocation_cwd=root,
