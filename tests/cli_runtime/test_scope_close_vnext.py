@@ -11,11 +11,18 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.application.scope_completion import change_scope_lifecycle, plan_close, plan_reopen  # noqa: E402
+from spec_dock_runtime.application.scope_completion import (  # noqa: E402
+    change_scope_lifecycle,
+    plan_close,
+    plan_reopen,
+    resume_scope_lifecycle,
+)
 from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import LocalBackend, ObservedState, decode_scope_metadata  # noqa: E402
 from spec_dock_runtime.infra.contracts import GithubIssueRecord  # noqa: E402
+from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError  # noqa: E402
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
+from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
 from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
 
@@ -181,3 +188,118 @@ def test_github_close_uses_live_status_and_leaves_metadata_unchanged(tmp_path: P
         **common,
     )
     assert closed_epic.changed and gateway.set_calls == 1
+
+
+def test_local_close_resume_reconciles_saved_state_after_journal_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    from spec_dock_runtime.application.create_local_scope import create_local_scope
+
+    initiative = create_local_scope(kind="initiative", title="Init", parent=None, ancestors=(), **common)
+    arguments = {k: v for k, v in common.items() if k != "updated_at"}
+    original_update = JournalStore.update
+
+    def fail_after_save(store: JournalStore, record, *, expected_sequence: int):
+        if record.command == "scope.close" and record.effects and record.effects[-1].status == "succeeded":
+            raise OSError("injected journal failure")
+        return original_update(store, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_after_save)
+    with pytest.raises(OSError, match="injected"):
+        change_scope_lifecycle(target_id=initiative.id, action="close", updated_at="2026-09-25T00:00:00Z", **arguments)
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    common_dir = cast("Path", common["common_dir"])
+    pending = JournalStore(common_dir).pending()
+    assert len(pending) == 1 and pending[0].effects[-1].status == "intent"
+    resumed = resume_scope_lifecycle(operation_id=pending[0].operation_id, **arguments)
+    assert resumed.decision.after == "completed"
+    assert JournalStore(common_dir).pending() == ()
+    assert resume_scope_lifecycle(operation_id=pending[0].operation_id, **arguments) == resumed
+
+
+def test_github_close_resume_observes_remote_before_finishing_journal(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    metadata_path = issue.path / ".meta.json"
+    loaded = read_guarded_json(metadata_path)
+    assert loaded is not None
+    data = loaded[0]
+    data.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(metadata_path, data, expected_identity=loaded[1])
+    arguments = {
+        "repo_root": specdock_dir.parent,
+        "common_dir": (specdock_dir.parent / ".git").resolve(),
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    gateway = _Gateway()
+    original_update = JournalStore.update
+
+    def fail_after_remote(store: JournalStore, record, *, expected_sequence: int):
+        if record.command == "scope.close" and record.effects and record.effects[-1].status == "succeeded":
+            raise OSError("injected journal failure")
+        return original_update(store, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_after_remote)
+    with pytest.raises(OSError, match="injected"):
+        change_scope_lifecycle(
+            target_id=issue.id,
+            action="close",
+            updated_at="2026-09-25T00:00:00Z",
+            gateway=gateway,
+            **arguments,
+        )
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    common_dir = cast("Path", arguments["common_dir"])
+    pending = JournalStore(common_dir).pending()
+    assert len(pending) == 1 and pending[0].effects[-1].status == "intent"
+    resumed = resume_scope_lifecycle(operation_id=pending[0].operation_id, gateway=gateway, **arguments)
+    assert resumed.decision.after == "completed" and gateway.set_calls == 1
+    assert JournalStore(common_dir).pending() == ()
+
+
+def test_github_unknown_effect_is_not_resent_on_resume(tmp_path: Path) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    metadata_path = issue.path / ".meta.json"
+    loaded = read_guarded_json(metadata_path)
+    assert loaded is not None
+    data = loaded[0]
+    data.update(
+        backend="github", github={"issue_number": 47, "repo_owner": "example", "repo_name": "repo"}, lifecycle=None
+    )
+    atomic_write_json(metadata_path, data, expected_identity=loaded[1])
+    arguments = {
+        "repo_root": specdock_dir.parent,
+        "common_dir": (specdock_dir.parent / ".git").resolve(),
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+
+    class UncertainGateway(_Gateway):
+        def set_state(
+            self, _repo: Path, repository: str, number: int, *, state: str, reason: str | None
+        ) -> GithubIssueRecord:
+            self.set_calls += 1
+            raise RemoteIssueError("GITHUB_TIMEOUT", uncertain=True)
+
+    gateway = UncertainGateway()
+    with pytest.raises(RemoteIssueError, match="GITHUB_TIMEOUT"):
+        change_scope_lifecycle(
+            target_id=issue.id,
+            action="close",
+            updated_at="2026-09-25T00:00:00Z",
+            gateway=gateway,
+            **arguments,
+        )
+    common_dir = cast("Path", arguments["common_dir"])
+    pending = JournalStore(common_dir).pending()
+    assert len(pending) == 1 and pending[0].effects[-1].status == "unknown"
+    with pytest.raises(ValueError, match="no blind resend"):
+        resume_scope_lifecycle(operation_id=pending[0].operation_id, gateway=gateway, **arguments)
+    assert gateway.set_calls == 1
