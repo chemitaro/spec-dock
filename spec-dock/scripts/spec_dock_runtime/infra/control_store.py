@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass
 import json
 import os
 from pathlib import Path
+import re
 from typing import Literal
 import uuid
 
@@ -22,6 +23,7 @@ class WorktreeRegistration:
     writer_protocol: str
     engine_digest: str
     active: bool
+    alias: str | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,7 @@ def decode_control(payload: object) -> ControlState:
     worktrees: list[WorktreeRegistration] = []
     seen_ids: set[str] = set()
     seen_roots: set[str] = set()
+    seen_aliases: set[str] = set()
     for item in items:
         if not isinstance(item, dict):
             raise ValueError("invalid worktree registration")
@@ -73,6 +76,7 @@ def decode_control(payload: object) -> ControlState:
         item_protocol = item.get("writer_protocol")
         item_digest = item.get("engine_digest")
         active = item.get("active")
+        alias = item.get("alias")
         if (
             not isinstance(worktree_id, str)
             or not worktree_id
@@ -85,13 +89,20 @@ def decode_control(payload: object) -> ControlState:
             or not isinstance(item_digest, str)
             or not item_digest
             or not isinstance(active, bool)
+            or (alias is not None and (not isinstance(alias, str) or re.fullmatch(r"[a-z0-9-]+", alias) is None))
         ):
             raise ValueError("invalid worktree registration")
-        if worktree_id in seen_ids or root in seen_roots:
+        if worktree_id in seen_ids or root in seen_roots or (alias is not None and alias in seen_aliases):
             raise ValueError("duplicate worktree registration")
         seen_ids.add(worktree_id)
         seen_roots.add(root)
-        worktrees.append(WorktreeRegistration(worktree_id, root, item_schema, item_protocol, item_digest, active))
+        if alias is not None:
+            seen_aliases.add(alias)
+        worktrees.append(
+            WorktreeRegistration(worktree_id, root, item_schema, item_protocol, item_digest, active, alias)
+        )
+    if seen_aliases.intersection(seen_ids):
+        raise ValueError("worktree alias conflicts with a stable ID")
     return ControlState(schema, protocol, epoch, digest, mode, tuple(worktrees))
 
 
