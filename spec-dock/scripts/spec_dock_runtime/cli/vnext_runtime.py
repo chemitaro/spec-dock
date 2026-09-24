@@ -15,6 +15,7 @@ from spec_dock_runtime.commands.dependency_vnext import run_dependency_change, r
 from spec_dock_runtime.commands.scope_create_vnext import run_scope_create
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
+from spec_dock_runtime.commands.worktree_vnext import run_worktree_query
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
@@ -117,6 +118,8 @@ def run_vnext(
             "dependency remove",
             "artifact list",
             "artifact show",
+            "worktree list",
+            "worktree show",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
@@ -132,6 +135,8 @@ def run_vnext(
             result = run_dependency_change(ns, context)
         elif ns.command_path in {"artifact list", "artifact show"}:
             result = run_artifact_query(ns, context)
+        elif ns.command_path in {"worktree list", "worktree show"}:
+            result = run_worktree_query(ns, context)
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)
         elif ns.command_path == "active show":
