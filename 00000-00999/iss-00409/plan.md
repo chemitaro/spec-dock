@@ -265,9 +265,9 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T10,T12,T15,T07 |
 | 対象file群 | 既存 RT application/close_node.py、domain/status.py。新設/拡張domain/lifecycle.py、commands/scope.py。 |
-| 実施内容 | local/GHのclose/reopen、終端理由、親のcompleted guard、祖先terminal guardを実装します。child集計で親自身の完了を代用しません。 |
+| 実施内容 | local/GHのclose/reopen、終端理由、親のcompleted guard、祖先terminal guardを実装します。reason省略はcompleted、not-plannedは明示指定に限定します。completed親への同一理由closeも子孫guardを先に再評価します。child集計で親自身の完了を代用しません。 |
 | 完了条件 | selection/branchは無変更で、理由変更を暗黙適用せず、mixed-backend subtreeを観測できます。 |
-| 必要なテスト | 新設 tests/cli_runtime/test_scope_close_vnext.py。empty parent、未完了child Epic、unknown、not-planned、local reopen/GH祖先。 |
+| 必要なテスト | 新設 tests/cli_runtime/test_scope_close_vnext.py。reason省略→completedと明示completedの同値性、明示not-plannedのみの取り止め、help/JSONの既定値表示、empty parent、local reopen/GH祖先を確認します。既にcompletedの親に対する同一理由closeは、子孫が全completedならremote書込みなしのno-op、open/not-planned/unknownの各子孫があれば拒否し、active/Gitを変えないことを確認します。 |
 | 対応AC | AC-11, AC-12, AC-28 |
 
 ### T19 三階層work finish
