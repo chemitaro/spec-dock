@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import hashlib
+import json
 import os
+from pathlib import Path
 import re
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from pathlib import Path
+import subprocess
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -64,10 +63,70 @@ def verify_engine_pin(pin: EnginePin, *, checkout_root: Path) -> VerifiedEngine:
     checkout = checkout_root.resolve(strict=True)
     distribution = pin.distribution_root.resolve(strict=True)
     executable = pin.executable.resolve(strict=True)
-    if distribution.is_relative_to(checkout) or executable.is_relative_to(checkout):
+    if (
+        distribution.is_relative_to(checkout)
+        or checkout.is_relative_to(distribution)
+        or executable.is_relative_to(checkout)
+    ):
         raise ValueError("engine must be outside the checkout")
     if not executable.is_relative_to(distribution) or not executable.is_file() or not os.access(executable, os.X_OK):
         raise ValueError("engine executable must be an executable file within the fixed distribution")
     if digest_distribution(distribution) != pin.distribution_digest:
         raise ValueError("engine distribution digest mismatch")
     return VerifiedEngine(executable, distribution, pin.distribution_digest)
+
+
+def git_common_directory(project_root: Path) -> Path:
+    """Resolve the shared control directory without importing checkout code."""
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(project_root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError("Git common directory could not be resolved") from error
+    if completed.returncode != 0 or not completed.stdout.strip():
+        raise ValueError("Git common directory could not be resolved")
+    common = Path(completed.stdout.strip())
+    if not common.is_absolute() or not common.is_dir():
+        raise ValueError("Git common directory is invalid")
+    return common.resolve(strict=True)
+
+
+def read_engine_pin(common_dir: Path, *, checkout_root: Path) -> VerifiedEngine:
+    """Decode and verify the absolute package location recorded in common control."""
+    if not common_dir.is_absolute() or not checkout_root.is_absolute():
+        raise ValueError("engine lookup requires absolute paths")
+    locator = common_dir / "spec-dock/control/engine.json"
+    control = common_dir / "spec-dock/control/control.json"
+    if locator.is_symlink() or control.is_symlink():
+        raise ValueError("engine control contains a symlink")
+    try:
+        payload = json.loads(locator.read_text(encoding="utf-8"))
+        control_payload = json.loads(control.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError("fixed engine control is missing or invalid") from error
+    if not isinstance(payload, dict) or set(payload) != {
+        "schema_version",
+        "executable",
+        "distribution_root",
+        "distribution_digest",
+    }:
+        raise ValueError("fixed engine locator has an invalid shape")
+    if (
+        payload["schema_version"] != 1
+        or not isinstance(payload["executable"], str)
+        or not isinstance(payload["distribution_root"], str)
+        or not isinstance(payload["distribution_digest"], str)
+        or not isinstance(control_payload, dict)
+        or control_payload.get("engine_digest") != payload["distribution_digest"]
+    ):
+        raise ValueError("fixed engine and repository control disagree")
+    pin = EnginePin(Path(payload["executable"]), Path(payload["distribution_root"]), payload["distribution_digest"])
+    return verify_engine_pin(pin, checkout_root=checkout_root)

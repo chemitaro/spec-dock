@@ -1,10 +1,11 @@
 """The future supported entrypoint pins an external engine distribution."""
 
+import json
 from pathlib import Path
 
 import pytest
 
-from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin
+from spec_dock.runtime_loader import EnginePin, digest_distribution, read_engine_pin, verify_engine_pin
 
 
 def _fixture_engine(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -55,3 +56,25 @@ def test_executable_tamper_and_relative_pin_are_rejected(tmp_path: Path) -> None
         verify_engine_pin(pin, checkout_root=checkout)
     with pytest.raises(ValueError, match="absolute"):
         verify_engine_pin(EnginePin(Path("spec-dock"), distribution, pin.distribution_digest), checkout_root=checkout)
+
+
+def test_engine_locator_matches_control_and_verifies_full_distribution(tmp_path: Path) -> None:
+    checkout, distribution, executable = _fixture_engine(tmp_path)
+    digest = digest_distribution(distribution)
+    common = tmp_path / "common"
+    control = common / "spec-dock/control"
+    control.mkdir(parents=True)
+    (control / "engine.json").write_text(
+        json.dumps({
+            "schema_version": 1,
+            "executable": str(executable),
+            "distribution_root": str(distribution),
+            "distribution_digest": digest,
+        }),
+        encoding="utf-8",
+    )
+    (control / "control.json").write_text(json.dumps({"engine_digest": digest}), encoding="utf-8")
+    assert read_engine_pin(common, checkout_root=checkout).distribution_digest == digest
+    (control / "control.json").write_text(json.dumps({"engine_digest": "a" * 64}), encoding="utf-8")
+    with pytest.raises(ValueError, match="disagree"):
+        read_engine_pin(common, checkout_root=checkout)
