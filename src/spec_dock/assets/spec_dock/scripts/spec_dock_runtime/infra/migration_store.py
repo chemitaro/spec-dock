@@ -10,7 +10,7 @@ from pathlib import Path
 
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
-from spec_dock_runtime.infra.control_store import load_control
+from spec_dock_runtime.infra.control_store import control_directory, load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory, origin_github_repo_slug, worktree_list
 
 
@@ -33,6 +33,7 @@ class MigrationWorktree:
     branch: str | None
     head: str | None
     workspace_schema: int | None
+    workspace_digest: str | None
     active_digest: str | None
     active_focus: str | None
     scopes: tuple[MigrationScope, ...]
@@ -43,6 +44,7 @@ class MigrationWorktree:
 class MigrationInventory:
     common_dir: str
     repository_uid: str
+    control_digest: str | None
     digest: str
     worktrees: tuple[MigrationWorktree, ...]
     blockers: tuple[str, ...]
@@ -184,10 +186,11 @@ def _inspect_worktree(
     specdock_dir = root / "spec-dock"
     workspace = specdock_dir / "workspace.json"
     workspace_schema: int | None = None
+    workspace_digest: str | None = None
     blockers: list[str] = []
     if workspace.exists() or workspace.is_symlink():
         try:
-            payload, _ = _read_json(workspace)
+            payload, workspace_digest = _read_json(workspace)
             schema = payload.get("schema_version") if isinstance(payload, dict) else None
             if type(schema) is int:
                 workspace_schema = schema
@@ -215,6 +218,7 @@ def _inspect_worktree(
         branch,
         head,
         workspace_schema,
+        workspace_digest,
         active_digest,
         focus,
         scopes,
@@ -235,6 +239,16 @@ def inspect_migration_inventory(repo_root: Path) -> MigrationInventory:
         raise ValueError("Git worktree inventory is empty")
     blockers: list[str] = []
     worktrees: list[MigrationWorktree] = []
+    control_path = control_directory(common_dir) / "control.json"
+    control_digest: str | None = None
+    if control_path.exists() or control_path.is_symlink():
+        if control_path.is_symlink() or control_path.parent.is_symlink():
+            blockers.append("CONTROL_UNREADABLE")
+        else:
+            try:
+                control_digest = _digest(control_path.read_bytes())
+            except OSError:
+                blockers.append("CONTROL_UNREADABLE")
     try:
         control = load_control(common_dir)
     except ValueError:
@@ -263,9 +277,15 @@ def inspect_migration_inventory(repo_root: Path) -> MigrationInventory:
         blockers.append("CONTROL_WORKTREE_MISSING")
     uid = _digest(str(common_dir).encode())
     encoded = json.dumps(
-        {"repository_uid": uid, "worktrees": [asdict(worktree) for worktree in worktrees]},
+        {
+            "repository_uid": uid,
+            "control_digest": control_digest,
+            "worktrees": [asdict(worktree) for worktree in worktrees],
+        },
         ensure_ascii=False,
         sort_keys=True,
         separators=(",", ":"),
     ).encode()
-    return MigrationInventory(str(common_dir), uid, _digest(encoded), tuple(worktrees), tuple(sorted(set(blockers))))
+    return MigrationInventory(
+        str(common_dir), uid, control_digest, _digest(encoded), tuple(worktrees), tuple(sorted(set(blockers)))
+    )

@@ -165,3 +165,24 @@ def test_migration_inventory_detects_unregistered_git_worktree(tmp_path: Path) -
     inventory = inspect_migration_inventory(repo)
     assert "WORKTREE_UNREGISTERED" in inventory.blockers
     assert {worktree.registration_id for worktree in inventory.worktrees} == {"main", None}
+
+
+def test_migration_inventory_digest_includes_workspace_and_control_bytes(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    workspace = repo / "spec-dock/workspace.json"
+    workspace.write_text(json.dumps({"schema_version": 1, "unknown": "a"}), encoding="utf-8")
+    first = inspect_migration_inventory(repo)
+    workspace.write_text(json.dumps({"schema_version": 1, "unknown": "b"}), encoding="utf-8")
+    second = inspect_migration_inventory(repo)
+    assert first.worktrees[0].workspace_schema == second.worktrees[0].workspace_schema == 1
+    assert first.digest != second.digest
+    common = git_common_directory(repo)
+    registration = WorktreeRegistration("main", str(repo), 3, "specdock.writer/v1", "engine-a", True)
+    store_control(
+        common,
+        ControlState(3, "specdock.writer/v1", 1, "engine-a", "maintenance", (registration,)),
+        expected_epoch=None,
+    )
+    third = inspect_migration_inventory(repo)
+    assert third.control_digest is not None
+    assert third.digest != second.digest
