@@ -10,6 +10,7 @@ from pathlib import Path
 
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
+from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory, origin_github_repo_slug, worktree_list
 
 
@@ -28,6 +29,7 @@ class MigrationScope:
 @dataclass(frozen=True)
 class MigrationWorktree:
     root: str
+    registration_id: str | None
     branch: str | None
     head: str | None
     workspace_schema: int | None
@@ -176,7 +178,9 @@ def _active_focus(root: Path, scopes: tuple[MigrationScope, ...]) -> tuple[str |
     return focus, digest, ()
 
 
-def _inspect_worktree(root: Path, branch: str | None, head: str | None, repository: str | None) -> MigrationWorktree:
+def _inspect_worktree(
+    root: Path, registration_id: str | None, branch: str | None, head: str | None, repository: str | None
+) -> MigrationWorktree:
     specdock_dir = root / "spec-dock"
     workspace = specdock_dir / "workspace.json"
     workspace_schema: int | None = None
@@ -206,7 +210,15 @@ def _inspect_worktree(root: Path, branch: str | None, head: str | None, reposito
     focus, active_digest, active_blockers = _active_focus(root, scopes)
     blockers.extend(active_blockers)
     return MigrationWorktree(
-        str(root), branch, head, workspace_schema, active_digest, focus, scopes, tuple(sorted(set(blockers)))
+        str(root),
+        registration_id,
+        branch,
+        head,
+        workspace_schema,
+        active_digest,
+        focus,
+        scopes,
+        tuple(sorted(set(blockers))),
     )
 
 
@@ -223,14 +235,32 @@ def inspect_migration_inventory(repo_root: Path) -> MigrationInventory:
         raise ValueError("Git worktree inventory is empty")
     blockers: list[str] = []
     worktrees: list[MigrationWorktree] = []
+    try:
+        control = load_control(common_dir)
+    except ValueError:
+        control = None
+        blockers.append("CONTROL_UNREADABLE")
+    registrations = (
+        {str(Path(item.root).resolve(strict=False)): item.id for item in control.worktrees if item.active}
+        if control is not None
+        else {}
+    )
+    observed_roots: set[str] = set()
     for record in sorted(records, key=lambda item: str(item.path)):
         candidate = record.path
         if record.bare or not candidate.is_dir() or candidate.is_symlink():
             blockers.append("WORKTREE_UNAVAILABLE")
             continue
-        worktree = _inspect_worktree(candidate.resolve(strict=True), record.branch, record.head, repository)
+        canonical = candidate.resolve(strict=True)
+        observed_roots.add(str(canonical))
+        registration_id = registrations.get(str(canonical))
+        if control is not None and registration_id is None:
+            blockers.append("WORKTREE_UNREGISTERED")
+        worktree = _inspect_worktree(canonical, registration_id, record.branch, record.head, repository)
         worktrees.append(worktree)
         blockers.extend(worktree.blockers)
+    if control is not None and set(registrations) - observed_roots:
+        blockers.append("CONTROL_WORKTREE_MISSING")
     uid = _digest(str(common_dir).encode())
     encoded = json.dumps(
         {"repository_uid": uid, "worktrees": [asdict(worktree) for worktree in worktrees]},

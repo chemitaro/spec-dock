@@ -10,6 +10,12 @@ import sys
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock_runtime.infra.control_store import (  # noqa: E402
+    ControlState,
+    WorktreeRegistration,
+    store_control,
+)
+from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
 from spec_dock_runtime.infra.migration_store import inspect_migration_inventory  # noqa: E402
 
 
@@ -143,3 +149,19 @@ def test_migration_inventory_detects_duplicate_id_and_unknown_field_change(tmp_p
     duplicate.mkdir()
     (duplicate / ".meta.json").write_text(json.dumps(payload), encoding="utf-8")
     assert "DUPLICATE_SCOPE_ID" in inspect_migration_inventory(repo).blockers
+
+
+def test_migration_inventory_detects_unregistered_git_worktree(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    second = tmp_path / "second"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "second", str(second)], check=True)
+    common = git_common_directory(repo)
+    registration = WorktreeRegistration("main", str(repo), 3, "specdock.writer/v1", "engine-a", True)
+    store_control(
+        common,
+        ControlState(3, "specdock.writer/v1", 1, "engine-a", "maintenance", (registration,)),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    assert "WORKTREE_UNREGISTERED" in inventory.blockers
+    assert {worktree.registration_id for worktree in inventory.worktrees} == {"main", None}
