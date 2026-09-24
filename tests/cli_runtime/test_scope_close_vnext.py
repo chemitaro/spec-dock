@@ -127,7 +127,7 @@ class _Gateway:
 
 
 def test_github_close_uses_live_status_and_leaves_metadata_unchanged(tmp_path: Path) -> None:
-    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    specdock_dir, _views, _initiative, epic, issue = _three_scopes(tmp_path)
     metadata_path = issue.path / ".meta.json"
     loaded = read_guarded_json(metadata_path)
     assert loaded is not None
@@ -145,6 +145,17 @@ def test_github_close_uses_live_status_and_leaves_metadata_unchanged(tmp_path: P
         "expected_epoch": 1,
     }
     gateway = _Gateway()
+    gateway.state = "unknown"
+    with pytest.raises(ValueError, match="DESCENDANT_NOT_COMPLETED"):
+        change_scope_lifecycle(
+            target_id=epic.id,
+            action="close",
+            updated_at="2026-09-25T00:00:00Z",
+            gateway=gateway,
+            **common,
+        )
+    assert gateway.set_calls == 0
+    gateway.state = "open"
     result = change_scope_lifecycle(
         target_id=issue.id,
         action="close",
@@ -152,7 +163,7 @@ def test_github_close_uses_live_status_and_leaves_metadata_unchanged(tmp_path: P
         gateway=gateway,
         **common,
     )
-    assert result.changed and gateway.get_calls == 1 and gateway.set_calls == 1
+    assert result.changed and gateway.get_calls == 2 and gateway.set_calls == 1
     assert metadata_path.read_bytes() == before
     repeated = change_scope_lifecycle(
         target_id=issue.id,
@@ -162,3 +173,11 @@ def test_github_close_uses_live_status_and_leaves_metadata_unchanged(tmp_path: P
         **common,
     )
     assert not repeated.changed and gateway.set_calls == 1
+    closed_epic = change_scope_lifecycle(
+        target_id=epic.id,
+        action="close",
+        updated_at="2026-09-25T02:00:00Z",
+        gateway=gateway,
+        **common,
+    )
+    assert closed_epic.changed and gateway.set_calls == 1
