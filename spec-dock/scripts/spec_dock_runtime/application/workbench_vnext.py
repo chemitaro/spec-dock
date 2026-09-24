@@ -28,6 +28,50 @@ class WorkbenchCopied:
     target_path: Path
 
 
+def preview_workbench_copy(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    scope: str,
+    to_worktree: str,
+    on_conflict: Literal["error", "overwrite"] = "error",
+) -> WorkbenchCopied:
+    """Resolve and inspect a copy without changing either worktree."""
+    if on_conflict not in ("error", "overwrite"):
+        raise ValueError("Workbench conflict policy is invalid")
+    inventory = list_worktrees(repo_root=repo_root, common_dir=common_dir)
+    source = next((item for item in inventory if item.id == worktree_id and item.registered), None)
+    if source is None or source.path.resolve(strict=True) != repo_root.resolve(strict=True):
+        raise WorkbenchCopyError(code="source_unavailable", message="current worktree is not registered")
+    target = show_worktree(repo_root=repo_root, common_dir=common_dir, reference=to_worktree)
+    if target.id is None or not target.registered or target.id == worktree_id or target.bare:
+        raise WorkbenchCopyError(code="target_ineligible", message="destination worktree is not eligible")
+    source_selection, _ = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
+    source_scope = show_scope(load_scope_views(repo_root / "spec-dock"), scope, selection=source_selection)
+    target_scope = show_scope(load_scope_views(target.path / "spec-dock"), source_scope.id)
+    if target_scope.id != source_scope.id or target_scope.kind != source_scope.kind:
+        raise WorkbenchCopyError(code="scope_mismatch", message="Scope differs between worktrees")
+    source_workbench = _guard_workbench_path(repo_root, source_scope.path, allow_missing_workbench=False)
+    target_workbench = _guard_workbench_path(target.path, target_scope.path, allow_missing_workbench=True)
+    if fs_cli.path_kind(source_workbench) != "directory":
+        raise WorkbenchCopyError(code="no_source", message="source Workbench is not a directory")
+    if fs_cli.path_kind(target_workbench) not in {"missing", "directory"}:
+        raise WorkbenchCopyError(code="target_ineligible", message="destination Workbench root is invalid")
+    try:
+        fs_cli.preflight_workbench_copy(
+            source_workbench,
+            target_workbench,
+            on_conflict=on_conflict,
+            relative_symlinks_only=True,
+        )
+    except WorkbenchFilesystemError as error:
+        raise WorkbenchCopyError(
+            code="copy_failed", message="Workbench copy stopped at a conflict or unsafe path"
+        ) from error
+    return WorkbenchCopied(source_scope.id, worktree_id, target.id, target_workbench)
+
+
 def _guard_workbench_path(root: Path, scope_path: Path, *, allow_missing_workbench: bool) -> Path:
     specdock_dir = root / "spec-dock"
     fs_cli.guard_workbench_ancestry(root, specdock_dir)

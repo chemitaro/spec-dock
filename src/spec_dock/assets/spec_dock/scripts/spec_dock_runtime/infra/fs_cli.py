@@ -408,6 +408,42 @@ def copy_workbench(
         raise WorkbenchFilesystemError(mutation_started=mutation_started[0]) from exc
 
 
+def preflight_workbench_copy(
+    source: Path,
+    destination: Path,
+    *,
+    on_conflict: str,
+    relative_symlinks_only: bool = True,
+) -> None:
+    """Check the same entry and symlink conflicts as copy without creating files."""
+    if on_conflict not in {"error", "overwrite"}:
+        raise ValueError("unsupported Workbench conflict policy")
+    try:
+        _require_workbench_descriptor_support()
+        source_identity = _capture_directory_identity(source)
+        source_fd = _open_verified_directory(source, source_identity)
+        destination_fd: int | None = None
+        try:
+            destination_kind, destination_identity = _inspect_path(destination)
+            if destination_kind not in {"missing", "directory"}:
+                raise RuntimeError("workbench copy destination is not a directory")
+            if destination_kind == "directory":
+                assert destination_identity is not None
+                destination_fd = _open_verified_directory(destination, destination_identity)
+            _preflight_workbench_directory(
+                source_fd,
+                destination_fd,
+                on_conflict=on_conflict,
+                relative_symlinks_only=relative_symlinks_only,
+            )
+        finally:
+            if destination_fd is not None:
+                os.close(destination_fd)
+            os.close(source_fd)
+    except (OSError, RuntimeError) as exc:
+        raise WorkbenchFilesystemError(mutation_started=False) from exc
+
+
 def _preflight_workbench_directory(
     source_fd: int,
     destination_fd: int | None,
