@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.work_lifecycle import (
     finish_work,
+    preview_finish_work,
+    preview_start_work,
     resume_finish_work,
     resume_start_work,
     start_work,
@@ -49,7 +51,34 @@ def run_work_start(
 ) -> OperationResult[WorkStartData]:
     """Run or resume the recorded branch checkout and active selection."""
     if ns.dry_run:
-        raise ValueError("work start dry-run planning is unavailable")
+        if ns.resume is not None:
+            raise ValueError("work start recovery cannot be previewed as a new request")
+        preview = preview_start_work(
+            repo_root=context.repo_root,
+            common_dir=context.common_dir,
+            worktree_id=context.worktree_id,
+            engine_digest=context.engine_digest,
+            expected_epoch=context.expected_epoch,
+            target=ns.target,
+            base=ns.base,
+            branch_name=ns.branch,
+            switch_active=ns.switch_active,
+            source=ns.source,
+            allow_stale=ns.allow_stale,
+            offline=ns.offline,
+            gateway=gateway,
+        )
+        return OperationResult(
+            command="work start",
+            status="planned",
+            data=WorkStartData(preview.target_id, preview.branch, preview.selection_changed),
+            exit_code=0,
+            effects=(
+                Effect("branch", "planned", preview.branch),
+                Effect("checkout", "planned", preview.branch),
+                Effect("selection", "planned", preview.target_id),
+            ),
+        )
     common = {
         "repo_root": context.repo_root,
         "common_dir": context.common_dir,
@@ -92,7 +121,28 @@ def run_work_finish(
 ) -> OperationResult[WorkFinishData]:
     """Finish a selected Issue, Epic, or Initiative and clear its selection chain."""
     if ns.dry_run:
-        raise ValueError("work finish dry-run planning is unavailable")
+        if ns.resume is not None:
+            raise ValueError("work finish recovery cannot be previewed as a new request")
+        preview = preview_finish_work(
+            repo_root=context.repo_root,
+            common_dir=context.common_dir,
+            worktree_id=context.worktree_id,
+            engine_digest=context.engine_digest,
+            expected_epoch=context.expected_epoch,
+            target=ns.target,
+            gateway=gateway,
+        )
+        selection_changed = preview.selection_changed
+        return OperationResult(
+            command="work finish",
+            status="planned",
+            data=WorkFinishData(preview.target_id, preview.completion.changed, selection_changed),
+            exit_code=0,
+            effects=(
+                Effect("lifecycle", "planned", preview.target_id),
+                Effect("selection", "planned", preview.target_id),
+            ),
+        )
     if not ns.yes:
         raise ValueError("work finish requires --yes after reviewing the target and effects")
     common = {

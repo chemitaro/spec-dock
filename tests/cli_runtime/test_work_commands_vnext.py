@@ -42,14 +42,33 @@ def test_work_commands_start_and_finish_all_three_kinds(tmp_path: Path) -> None:
     assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
 
 
-def test_work_adapter_rejects_unimplemented_dry_run_and_unconfirmed_finish(tmp_path: Path) -> None:
+def test_work_adapter_plans_start_and_finish_without_writes(tmp_path: Path) -> None:
     specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
     repo_root = specdock_dir.parent
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
     context = WorkContext(repo_root, repo_root / ".git", "main", "engine-a", 1)
     gateway = GithubIssueGateway()
     before = (issue.path / ".meta.json").read_bytes()
-    with pytest.raises(ValueError, match="dry-run"):
-        run_work_start(parse_vnext(["work", "start", issue.id, "--dry-run"]), context, gateway=gateway)
+    start = run_work_start(parse_vnext(["work", "start", issue.id, "--dry-run"]), context, gateway=gateway)
+    assert start.status == "planned"
+    assert start.data.scope_id == issue.id
+    assert start.data.branch.startswith(issue.id)
+    assert start.operation_id is None
+    assert not (repo_root / ".git" / "spec-dock" / "journal").exists()
+    finish = run_work_finish(parse_vnext(["work", "finish", issue.id, "--dry-run"]), context, gateway=gateway)
+    assert finish.status == "planned"
+    assert finish.data.scope_id == issue.id
+    assert finish.data.lifecycle_changed
+    assert finish.operation_id is None
+    assert (
+        subprocess.run(["git", "status", "--porcelain"], cwd=repo_root, check=True, capture_output=True).stdout == b""
+    )
     with pytest.raises(ValueError, match="requires --yes"):
         run_work_finish(parse_vnext(["work", "finish", issue.id]), context, gateway=gateway)
     assert (issue.path / ".meta.json").read_bytes() == before

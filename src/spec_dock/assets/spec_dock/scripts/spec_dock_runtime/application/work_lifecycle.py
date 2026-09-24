@@ -9,8 +9,10 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.active_selection import clear_selection, select_scope
 from spec_dock_runtime.application.branch_vnext import (
+    _branch_exists,
     _git,
     _resolve_commit,
+    _validate_name,
     _verify_scope_at_commit,
     create_scope_branch,
     show_scope_branch,
@@ -39,6 +41,7 @@ from spec_dock_runtime.infra.git_cli import worktree_list
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
+from spec_dock_runtime.infra.registry_store import RegistryStore
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
@@ -56,6 +59,7 @@ class WorkFinishPlan:
     target_id: str
     completion: CompletionDecision
     selection_after: SelectionState
+    selection_changed: bool
 
 
 @dataclass(frozen=True)
@@ -79,6 +83,14 @@ class WorkStartResult:
     branch: str
     selection_changed: bool
     operation_id: str
+
+
+@dataclass(frozen=True)
+class WorkStartPreview:
+    target_id: str
+    branch: str
+    branch_creation: bool
+    selection_changed: bool
 
 
 def _ancestry(views: tuple[ScopeView, ...], scope_id: str) -> tuple[str, ...]:
@@ -182,6 +194,76 @@ def _start_plan(
         switch_active=switch_active,
     )
     return views, selection, plan
+
+
+def preview_start_work(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    target: str,
+    base: str | None = None,
+    branch_name: str | None = None,
+    switch_active: bool = False,
+    source: str = "github",
+    allow_stale: bool = False,
+    offline: bool = False,
+    gateway: GithubIssueGateway | None = None,
+) -> WorkStartPreview:
+    """Validate start effects without a lock, journal, Git write, or selection write."""
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    _require_clean_start(repo_root)
+    views, selection, plan = _start_plan(
+        repo_root=repo_root,
+        worktree_id=worktree_id,
+        target=target,
+        source=source,
+        allow_stale=allow_stale,
+        offline=offline,
+        gateway=gateway,
+        switch_active=switch_active,
+    )
+    try:
+        binding = show_scope_branch(repo_root, common_dir, plan.target_id)
+    except LookupError:
+        binding = None
+    if binding is None:
+        if base is None and not _head_state(repo_root)[0]:
+            raise ValueError("new work start from detached HEAD requires --base") from None
+        scope = show_scope(views, plan.target_id)
+        loaded = read_guarded_json(scope.path / ".meta.json")
+        if loaded is None or not isinstance(loaded[0], dict):
+            raise ValueError("Scope metadata is missing")
+        metadata = decode_scope_metadata(loaded[0])
+        slug = metadata.raw.get("slug")
+        if not isinstance(slug, str) or not slug or metadata.revision != scope.revision:
+            raise ValueError("Scope metadata changed before branch creation")
+        planned_name = branch_name if branch_name is not None else f"{scope.id}-{slug}"
+        _validate_name(repo_root, planned_name)
+        if any(item.name == planned_name for item in RegistryStore(common_dir).load()[0].branches):
+            raise ValueError("Scope or branch is already bound")
+        if _branch_exists(repo_root, planned_name):
+            raise ValueError("BRANCH_ADOPTION_REQUIRED")
+        sha = _resolve_commit(repo_root, base or "HEAD")
+        _verify_scope_at_commit(repo_root, views, scope.id, sha)
+        return WorkStartPreview(scope.id, planned_name, True, plan.selection_after != selection)
+    if base is not None:
+        raise ValueError("--base is valid only when creating a new canonical branch")
+    if branch_name is not None and branch_name != binding.name:
+        raise ValueError("requested branch differs from the canonical binding")
+    for worktree in worktree_list(repo_root):
+        if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
+            raise ValueError("canonical branch is checked out in another worktree")
+    _verify_scope_at_commit(repo_root, views, scope.id, _resolve_commit(repo_root, f"refs/heads/{binding.name}"))
+    return WorkStartPreview(scope.id, binding.name, False, plan.selection_after != selection)
 
 
 def start_work(
@@ -525,7 +607,7 @@ def plan_finish_work(
     scope = show_scope(views, target, selection=selection)
     completion = plan_close(views, scope.id, statuses)
     selection_after = clear_selection(views, current=selection, from_target=scope.id)
-    return WorkFinishPlan(scope.id, completion, selection_after)
+    return WorkFinishPlan(scope.id, completion, selection_after, selection_after != selection)
 
 
 def _fingerprint(fixed: dict[str, str]) -> str:
@@ -561,6 +643,32 @@ def _live_statuses(
             )
             statuses[view.id] = remote.state
     return statuses
+
+
+def preview_finish_work(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    target: str,
+    gateway: GithubIssueGateway | None = None,
+) -> WorkFinishPlan:
+    """Read the live completion guard and selection effect without writing."""
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    specdock_dir = repo_root / "spec-dock"
+    views = load_scope_views(specdock_dir)
+    selection, _ = load_selection_v3(specdock_dir, worktree_id=worktree_id)
+    scope = show_scope(views, target, selection=selection)
+    statuses = _live_statuses(repo_root=repo_root, views=views, scope=scope, gateway=gateway)
+    return plan_finish_work(views, target=scope.id, statuses=statuses, selection=selection)
 
 
 def finish_work(
