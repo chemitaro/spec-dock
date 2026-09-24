@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from uuid import uuid4
 
 from spec_dock_runtime.cli.admission import admit_writer
+from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock_runtime.infra.control_store import WRITER_PROTOCOL, load_control, store_control
 from spec_dock_runtime.infra.git_cli import worktree_list
@@ -25,7 +26,8 @@ from spec_dock_runtime.infra.migration_journal import (
     read_migration_record,
     write_migration_record,
 )
-from spec_dock_runtime.infra.migration_store import inspect_migration_inventory
+from spec_dock_runtime.infra.migration_store import branch_tip, inspect_migration_inventory
+from spec_dock_runtime.infra.registry_store import RegistryStore, _encode_registry
 from spec_dock_runtime.infra.writer_lock import writer_transaction
 
 if TYPE_CHECKING:
@@ -142,6 +144,33 @@ def plan_migration_changes(
         converted_workspace.update(schema_version=3, writer_protocol="specdock.writer/v1")
         if converted_workspace != workspace:
             changes.append(MigrationChange(str(workspace_path), workspace_digest, _encode(converted_workspace)))
+    if mapping.branch_bindings:
+        registry = RegistryStore(Path(inventory.common_dir))
+        state, _identity = registry.load()
+        known = {(worktree.registration_id, scope.id) for worktree in inventory.worktrees for scope in worktree.scopes}
+        for row in mapping.branch_bindings:
+            worktree_id = row["worktree_id"]
+            scope_id = row["scope_id"]
+            name = row["branch"]
+            tip = row["tip_sha"]
+            if (
+                not isinstance(worktree_id, str)
+                or not isinstance(scope_id, str)
+                or not isinstance(name, str)
+                or not isinstance(tip, str)
+                or (worktree_id, scope_id) not in known
+                or branch_tip(Path(inventory.worktrees[0].root), name) != tip
+            ):
+                raise ValueError("migration branch binding no longer matches its inventory or ref")
+            state = bind_branch(state, BranchBinding(scope_id, name, tip))
+        current = registry.path.read_bytes() if registry.path.exists() and not registry.path.is_symlink() else None
+        if registry.path.is_symlink():
+            raise ValueError("migration branch registry is redirected")
+        encoded = _encode(_encode_registry(state))
+        if current != encoded:
+            changes.append(
+                MigrationChange(str(registry.path), _file_digest(current) if current is not None else None, encoded)
+            )
     return tuple(changes)
 
 
@@ -208,6 +237,8 @@ def apply_workspace_migration(
     with writer_transaction(common_dir, worktree_ids=tuple(item[0] for item in roots), timeout=lock_timeout):
         if inspect_migration_inventory(repo_root) != inventory:
             raise ValueError("migration inventory changed before the writer lock")
+        if plan_migration_changes(inventory, mapping, updated_at=updated_at) != changes:
+            raise ValueError("migration plan changed before the writer lock")
         control = load_control(common_dir)
         if control is None or control.mode != "maintenance":
             raise ValueError("migration requires maintenance control")

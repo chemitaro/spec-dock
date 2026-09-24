@@ -59,9 +59,11 @@ def _directory(common_dir: Path, operation_id: str) -> Path:
     return directory
 
 
-def _managed_file(path: Path, roots: set[str]) -> bool:
+def _managed_file(path: Path, roots: set[str], common_dir: str) -> bool:
     if not path.is_absolute() or ".." in path.parts:
         return False
+    if path == Path(common_dir) / "spec-dock" / "control" / "registry.json":
+        return True
     for root in roots:
         if not path.is_relative_to(root):
             continue
@@ -123,7 +125,7 @@ def _validate(record: MigrationRecord) -> None:
         if (
             not isinstance(item, MigrationFile)
             or not isinstance(item.path, str)
-            or not _managed_file(Path(item.path), roots)
+            or not _managed_file(Path(item.path), roots, record.common_dir)
             or item.path in paths
             or not isinstance(item.after_bytes, bytes)
             or len(item.after_bytes) > _MAX_FILE

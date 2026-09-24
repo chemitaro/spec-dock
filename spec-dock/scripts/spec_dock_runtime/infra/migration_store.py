@@ -62,7 +62,7 @@ class MigrationMap:
     worktrees: tuple[dict[str, object], ...]
 
 
-def _branch_tip(repo_root: Path, branch: str) -> str:
+def branch_tip(repo_root: Path, branch: str) -> str:
     try:
         checked = subprocess.run(
             ["git", "-C", str(repo_root), "check-ref-format", "--branch", branch],
@@ -171,7 +171,7 @@ def read_migration_map(path: Path, inventory: MigrationInventory) -> MigrationMa
             raise ValueError("migration branch mapping is invalid")
         if (worktree_id, scope_id) in branch_keys or row["branch"] in branch_names:
             raise ValueError("migration branch mapping is duplicated")
-        if not inventory.worktrees or _branch_tip(Path(inventory.worktrees[0].root), row["branch"]) != row["tip_sha"]:
+        if not inventory.worktrees or branch_tip(Path(inventory.worktrees[0].root), row["branch"]) != row["tip_sha"]:
             raise ValueError("migration branch mapping tip changed")
         branch_keys.add((worktree_id, scope_id))
         branch_names.add(row["branch"])

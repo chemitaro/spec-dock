@@ -19,7 +19,12 @@ from spec_dock_runtime.infra.control_store import (  # noqa: E402
     store_control,
 )
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.migration_store import MigrationMap, inspect_migration_inventory  # noqa: E402
+from spec_dock_runtime.infra.migration_store import (  # noqa: E402
+    MigrationMap,
+    inspect_migration_inventory,
+    read_migration_map,
+)
+from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
 
 
 def _legacy_repo(tmp_path: Path) -> Path:
@@ -481,3 +486,131 @@ def test_migration_rollback_resumes_after_interruption(tmp_path: Path, monkeypat
     )
     assert rolled_back.phase == "rolled-back"
     assert journal.pending_migrations(common) == ()
+
+
+def test_migration_adopts_explicit_existing_branch_and_rolls_binding_back(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    subprocess.run(["git", "-C", str(repo), "branch", "iss-local-00001-task"], check=True)
+    tip = subprocess.run(
+        ["git", "-C", str(repo), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        json.dumps({
+            "schema_version": "specdock.migration-map/v1",
+            "repository_uid": inventory.repository_uid,
+            "source_inventory_digest": inventory.digest,
+            "scope_backend_overrides": [],
+            "branch_bindings": [
+                {
+                    "worktree_id": "main",
+                    "scope_id": "iss-local-00001",
+                    "branch": "iss-local-00001-task",
+                    "tip_sha": tip,
+                    "reason": "adopt the existing issue work branch",
+                }
+            ],
+            "active_repairs": [],
+            "worktrees": [],
+        }),
+        encoding="utf-8",
+    )
+    mapping = read_migration_map(mapping_path, inventory)
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    registry_path = RegistryStore(common).path
+    registry, _identity = RegistryStore(common).load()
+    assert [(item.scope_id, item.name, item.initial_sha) for item in registry.branches] == [
+        ("iss-local-00001", "iss-local-00001-task", tip)
+    ]
+    migration_module.rollback_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=completed.operation_id,
+    )
+    assert not registry_path.exists()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(repo), "rev-parse", "iss-local-00001-task"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+        == tip
+    )
+
+
+def test_migration_applies_and_restores_all_registered_worktrees(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    second = tmp_path / "second"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "second", str(second)], check=True)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (
+                WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),
+                WorktreeRegistration("second", str(second), 1, "specdock.writer/v0", engine, True),
+            ),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    assert completed.phase == "committed"
+    assert len(completed.worktrees) == 2
+    for root in (repo, second):
+        assert json.loads((root / "spec-dock/workspace.json").read_text())["schema_version"] == 3
+    assert all(item.schema_version == 3 for item in load_control(common).worktrees)
+    migration_module.rollback_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=completed.operation_id,
+    )
+    for root in (repo, second):
+        assert not (root / "spec-dock/workspace.json").exists()
+        assert json.loads((root / "spec-dock/.agent/active.json").read_text())["schema_version"] == 2

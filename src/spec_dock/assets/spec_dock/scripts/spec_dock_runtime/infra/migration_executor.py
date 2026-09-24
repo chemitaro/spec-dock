@@ -18,7 +18,12 @@ def _digest(data: bytes) -> str:
 
 
 def _guard_path(record: MigrationRecord, path: Path) -> None:
-    roots = [Path(root) for _id, root in record.worktrees if path.is_relative_to(root)]
+    registry = Path(record.common_dir) / "spec-dock" / "control" / "registry.json"
+    roots = (
+        [Path(record.common_dir)]
+        if path == registry
+        else [Path(root) for _id, root in record.worktrees if path.is_relative_to(root)]
+    )
     if len(roots) != 1 or ".." in path.parts:
         raise ValueError("migration path is outside its fixed worktree")
     root = roots[0]
