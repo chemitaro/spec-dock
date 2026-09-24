@@ -9,14 +9,11 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.migrate_workspace_vnext import (
     apply_workspace_migration,
+    inspect_workspace_migration,
+    load_workspace_migration_map,
     plan_migration_changes,
     resume_workspace_migration,
     rollback_workspace_migration,
-)
-from spec_dock_runtime.infra.migration_store import (
-    MigrationWorktree,
-    inspect_migration_inventory,
-    read_migration_map,
 )
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
 
@@ -48,7 +45,7 @@ class MigrationPreview:
     repository_uid: str
     control_digest: str | None
     digest: str
-    worktrees: tuple[MigrationWorktree, ...]
+    worktrees: tuple[object, ...]
     blockers: tuple[str, ...]
     changes: tuple[MigrationPreviewFile, ...]
 
@@ -90,13 +87,13 @@ def run_workspace_migrate(
             operation_id=record.operation_id,
             effects=(Effect("workspace-migration", "succeeded", record.operation_id),),
         )
-    inventory = inspect_migration_inventory(context.repo_root)
+    inventory = inspect_workspace_migration(context.repo_root)
     mapping = None
     if ns.mapping_file:
         mapping_path = Path(ns.mapping_file).expanduser()
         if not mapping_path.is_absolute():
             mapping_path = invocation_cwd / mapping_path
-        mapping = read_migration_map(mapping_path, inventory)
+        mapping = load_workspace_migration_map(mapping_path, inventory)
     if ns.dry_run:
         changes = (
             plan_migration_changes(inventory, mapping, updated_at=datetime.now(timezone.utc).isoformat())

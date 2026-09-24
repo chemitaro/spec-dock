@@ -33,12 +33,24 @@ from spec_dock_runtime.infra.migration_journal import (
     read_migration_record,
     write_migration_record,
 )
-from spec_dock_runtime.infra.migration_store import branch_tip, inspect_migration_inventory
+from spec_dock_runtime.infra.migration_store import (
+    branch_tip,
+    inspect_migration_inventory,
+    read_migration_map,
+)
 from spec_dock_runtime.infra.registry_store import RegistryStore, _encode_registry, historical_local_ids
 from spec_dock_runtime.infra.writer_lock import writer_transaction
 
 if TYPE_CHECKING:
     from spec_dock_runtime.infra.migration_store import MigrationInventory, MigrationMap
+
+
+def inspect_workspace_migration(repo_root: Path) -> MigrationInventory:
+    return inspect_migration_inventory(repo_root)
+
+
+def load_workspace_migration_map(path: Path, inventory: MigrationInventory) -> MigrationMap:
+    return read_migration_map(path, inventory)
 
 
 @dataclass(frozen=True)
