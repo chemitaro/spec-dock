@@ -5,20 +5,34 @@ ID: "epic-00356"
 関連GitHub: ["#356"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-09-24"
 依存: ["requirement.md", "design.md"]
 親: ["init-local-00003"]
 ---
 
 # epic-00356 SpecDock Core Simplification and External Intelligence Boundary — Vertical Slice計画
 
-## 1. 計画方針
+## 0. 後続Issue #409の現行実装計画（2026-09-24）
+
+Product OwnerがCLI再設計案を全面採用し、一括実装を選んだため、Issue [#409](issues/iss-00409-scope-active-work-cli-redesign/plan.md) のT01〜T33を現行のCLI/Runtime/installer/schema migration、help、tests、consumer cutoverの実装計画とする。#409のR/D/PとACが、旧`issue start/finish`、optional positional Artifact type、357/360への旧実装担当割当に優先する。以下のT0〜T4、IC-1〜IC-4、357〜360の所有表・テスト表・E-RQ/E-AC対応・rollout/rollbackは初回Core簡素化の履歴であり、#409の受入や担当を二重に定めない。
+
+#409は新 `scope` / `active` / `work` / `artifact` 文法と三階層のstart/finish、明示type、旧入口拒否を一つのcutoverとして扱う。親EpicのStorage Core / Authoring Kit / External Intelligence境界とデータ保全契約は維持する。#409実装開始条件は、その正本三文書のStrict review passと、当該時点のsource/AC再照合である。
+
+| 現行の対象契約 | 担当 | 現行検証先 |
+|---|---|---|
+| 三階層の選択・開始・完了と親子guard（E-RQ-003/004、E-AC-002） | #409 | #409 R-03/04、AC-07〜12、T15〜T19 |
+| 明示typeのArtifact作成とgeneric import（E-RQ-005、E-AC-003） | #409 | #409 AC-15、T21 |
+| 旧入口拒否、help、Runtime/installer/schemaの一括cutover | #409 | #409 AC-01〜06、AC-30、T03/T28〜T33 |
+
+上表の実装担当は旧357/360の初回Core計画と別の後続作業であり、以下の履歴表の所有欄では上書きしない。
+
+## 1. 初回計画方針（履歴）
 
 Existing Issue ID、GitHub linkage、history、dependency edgeを維持しつつ、各Issueをend-to-end vertical sliceとして再定義する。Issue draftはplanning evidenceであり、各Issueの正本化と実装開始判断は後続のIssue planningで行う。
 
 Runtimeの`ready`はdependency-onlyのまま維持する。本計画のplanning handoffは文書上の契約であり、Runtime state、gate、metadataではない。
 
-## 2. Tranche
+## 2. 初回Core簡素化のTranche（履歴）
 
 | Tranche | Work item | Goal | Parallelism | Exit evidence |
 |---|---|---|---|---|
@@ -33,7 +47,7 @@ Runtimeの`ready`はdependency-onlyのまま維持する。本計画のplanning 
 
 T4は人間がIssue node作成を承認した場合にだけ実施する。
 
-## 3. Dependency graph
+## 3. 初回Core簡素化のDependency graph（履歴）
 
 Existing direct edgeを維持する。
 
@@ -45,7 +59,7 @@ Existing direct edgeを維持する。
 | `iss-00360` | `iss-00357`, `iss-00358`, `iss-00359` | Runtime、asset、skillの完成inventoryをpackage cutoverする |
 | 最終Issue候補 | `iss-00357`, `iss-00358`, `iss-00359`, `iss-00360` | 全implementation sliceの統合結果を独立に検証する |
 
-`iss-00357`と`iss-00358`は並行workstreamとする。dependency edgeがないことをshared-file conflictがないことと混同せず、IC-1で共有契約を統合する。
+初回計画では`iss-00357`と`iss-00358`を並行workstreamとした。#409のCLI再設計にはこの分割を適用しない。dependency edgeがないことをshared-file conflictがないことと混同せず、IC-1で共有契約を統合する。
 
 ```plantuml
 @startuml
@@ -84,7 +98,7 @@ I360 --> Final : direct dependency
 - **Excluded details:** branch名、commit ID、Issue内の細かなtask順序。
 - **Update trigger:** dependency、tranche、checkpoint、最終Issue採否が変わるとき。
 
-## 4. Sliceごとのend-to-end demonstration
+## 4. 初回Sliceごとのend-to-end demonstration（履歴）
 
 ### 4.1 `iss-00357` — Storage Core user flow
 
@@ -96,7 +110,7 @@ I360 --> Final : direct dependency
 6. Historical `.assurance.json`、draft / repair Artifact、heavy Reportがあっても旧workflow gateを再開しないことを示す。
 7. Removed commandがhelp / parser / registryに存在しないことを示す。
 
-主所有はRuntime mechanism、CLI、test、historical compatibilityである。Template proseは358へ渡す。
+初回主所有はRuntime mechanism、CLI、test、historical compatibilityだった。#409の現行CLI再設計は#409自身が所有する。Template proseの初回担当は358だった。
 
 ### 4.2 `iss-00358` — Authoring Kit user flow
 
@@ -108,7 +122,7 @@ I360 --> Final : direct dependency
 6. Provider / dogfood parity、link、catalog、Current禁止語彙testを通す。
 7. Existing node-local documentのbytesが変更されないことを確認する。
 
-主所有はtemplate / guide content、navigation、Artifact wording、existing-doc preservationである。parser / registryは編集しない。
+初回主所有はtemplate / guide content、navigation、Artifact wording、existing-doc preservationだった。#409では新CLIに関わるhelp/docs・parser/registryを#409が一体で扱う。
 
 ### 4.3 `iss-00359` — Repo-local skill user flow
 
@@ -141,7 +155,7 @@ I360 --> Final : direct dependency
 
 この候補は自らIssue作成、提出、merge、Issue close、Epic完了を決定しない。
 
-## 5. Issue planning handoff契約
+## 5. 初回Issue planning handoff契約（履歴）
 
 各Issueのimplementation handoff候補に必要な文書上の条件を次とする。Runtime `ready`とは無関係である。
 
@@ -171,7 +185,7 @@ I360 --> Final : direct dependency
 
 各pathは該当Issue directoryを基準とする。最終Issue候補はnodeが存在せず、人間承認前なのでIssue-local Artifactを作成しない。候補R/D/PはEpic-local validated pack内に保持する。
 
-## 6. Integration checkpoint
+## 6. 初回Integration checkpoint（履歴）
 
 ### IC-0 — Candidate review
 
@@ -188,7 +202,7 @@ ID / linkage保持、採用済み判断の後退がないこと、authority自�
 
 ### IC-1 — Core / Kit contract
 
-次の共有契約だけを固定する。
+初回CoreとKitについて次の共有契約だけを固定した。#409の現行CLIではoptional positional Artifact typeを採用しない。
 
 - Fresh node fileは一つのR/D/P + thin Report
 - Report path / minimal heading / empty-valid semantics
@@ -234,7 +248,7 @@ ID / linkage保持、採用済み判断の後退がないこと、authority自�
 
 ### 6.1 Checkpoint実行契約
 
-ICはIssue nodeでもRuntime gateでもない。Epic orchestratorが文書上のhandoffを管理するための統合確認であり、dependency `ready`や`issue start`の意味を変更しない。
+初回のICはIssue nodeでもRuntime gateでもない。Epic orchestratorが文書上のhandoffを管理するための統合確認であり、dependency `ready`や`issue start`の意味を変更しない。
 
 | IC | Owner | Entry | Verification | Evidence destination | Pass transition | Fail transition |
 |---|---|---|---|---|---|---|
@@ -246,7 +260,7 @@ ICはIssue nodeでもRuntime gateでもない。Epic orchestratorが文書上の
 
 IC failureはRuntime metadataを変更せず、Evidence destinationへblocking理由、owner、再開条件を記録する。
 
-## 7. Test strategy
+## 7. 初回Test strategy（履歴）
 
 | Test family | 357 | 358 | 359 | 360 | Final候補 |
 |---|---:|---:|---:|---:|---:|
@@ -263,7 +277,9 @@ IC failureはRuntime metadataを変更せず、Evidence destinationへblocking�
 
 各Issueは狭いtestから始める。通常laneは`uv run pytest`、full regressionは明示的に`uv run pytest --run-full-regression`を使う。`-m full_regression`だけを実行許可として使用しない。
 
-## 8. 要件・受け入れ条件のクロージャ対応
+## 8. 初回要件・受け入れ条件のクロージャ対応（履歴）
+
+本節の旧コマンドと担当は初回Coreの検証記録である。#409の該当現行受入には#409のR/D/P、AC-01〜AC-30、T01〜T33を適用し、357/360へCLI再設計の現行責務を戻さない。
 
 ### 8.1 E-RQ対応
 
@@ -294,9 +310,9 @@ IC failureはRuntime metadataを変更せず、Evidence destinationへblocking�
 | E-AC-009 Vertical slice completion | 357〜360 | 各Issueのcode / test / docs / compatibility handoffとIC契約 | 各Issue report / artifacts、IC-1〜IC-3 |
 | E-AC-010 Final integration | 人間承認後の最終Issue | 4 direct dependency、full regression、cross-slice smoke、defect-only repair、diff / handoff | Final Issue report / artifacts、IC-4、Epic report |
 
-Epic closure時、上表の各行を`report.md`のE-AC達成状況へ反映する。T4が不採用の場合、E-AC-010を満たさないままEpic完了とせず、Product OwnerがRequirementを変更する必要がある。
+初回Epic closure時に上表の各行を`report.md`のE-AC達成状況へ反映する計画だった。#409の該当範囲は#409の現行ACとT計画で検証する。T4が不採用の場合、E-AC-010を満たさないままEpic完了とせず、Product OwnerがRequirementを変更する必要がある。
 
-## 9. Rolloutとdocs impact
+## 9. 初回Rolloutとdocs impact（履歴）
 
 ### 9.1 Rollout順序
 
@@ -331,7 +347,7 @@ Historical docsはexisting repositoryにevidenceとして残せるが、Current 
 - update / uninstall ownership boundary
 - External Intelligenceがoperator-ownedで交換可能であること
 
-## 10. Rollback / recovery
+## 10. 初回Rollback / recovery（履歴）
 
 | Stage | Rollback / recovery |
 |---|---|
@@ -343,7 +359,7 @@ Historical docsはexisting repositoryにevidenceとして残せるが、Current 
 
 各stageは対応testを実行せずにrollback安全性を主張しない。rollbackできない場合はforward recoveryだけであることを明記する。
 
-## 11. Final exit契約
+## 11. 初回Final exit契約（履歴）
 
 次は最終Issue候補に必要なevidenceであり、現時点で達成済みではない。
 
@@ -361,7 +377,7 @@ Historical docsはexisting repositoryにevidenceとして残せるが、Current 
 - Change-setのscopeとcommit historyが一貫し、independent review evidenceがある。
 - 正本昇格、提出、merge、Issue close、Epic完了のauthorityは人間に残る。
 
-## 12. 人間アクション
+## 12. 初回人間アクション（履歴）
 
 - 本計画のvertical-slice remapを確認する。
 - 品質・統合・handoff用の最終Issueを作成するか判断する。

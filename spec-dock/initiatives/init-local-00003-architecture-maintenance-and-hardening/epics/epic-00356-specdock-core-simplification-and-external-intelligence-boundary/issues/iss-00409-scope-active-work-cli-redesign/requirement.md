@@ -60,7 +60,7 @@ Scopeの一覧・指定表示・title編集を提供します。title編集でID
 
 `work finish`は対象をcompletedにします。対象がactiveチェーンにあるときだけ、その対象以下を解除し、祖先を残します。無関係な選択を消しません。未完了・取り止め・状態不明の子孫が残る親を正常完了にしません。空の親は、他の前提を満たせば完了可能です。子の完了集計だけで親自身を完了済みにしません。
 
-Closeは対象の終端状態だけを変更し、activeを変更しません。Reopenは対象だけをopenへ戻します。正常完了と取り止めを区別し、取り止めを依存の完了条件とみなしません。
+Closeは対象の終端状態だけを変更し、activeを変更しません。`scope close TARGET`で`--reason`を省略すると`completed`と等価です。取り止めの`not-planned`は`--reason not-planned`を明示した場合だけ選択します。Reopenは対象だけをopenへ戻します。正常完了と取り止めを区別し、取り止めを依存の完了条件とみなしません。
 
 Deleteはローカルの対象と、その操作で明示された所有物の削除です。GitHub Issueを閉じず、Git branchを削除しません。子孫、active、境界を跨ぐ依存の扱いは個別の明示許可を要求します。
 
@@ -124,8 +124,8 @@ Updateは固定供給元から明示versionまたはcommitを解決し、journal
 | AC-08 | 三階層すべてでstartが対象確認→対応branch確保/checkout→active設定を満たします。親の子孫が未完了でも、その親自身の前提が満たされれば開始できます。closed対象は暗黙reopenしません。 |
 | AC-09 | 新branchのbase省略・既存branchへのbase指定・canonical対応の二重登録・他Scopeとのbranch共有・dirty/他worktree衝突を拒否します。branch createはcheckout/active変更なし、branch switchはactive変更なしです。 |
 | AC-10 | Issue finishはIssueのみ完了しEpic/Initiative選択を残します。Epic finishはEpic以下を解除しInitiativeを残します。Initiative finishは全解除します。無関係な選択は残り、Git branch/HEADは変わりません。 |
-| AC-11 | open、not-planned、unknownの子孫を持つ親finishとcompleted closeを拒否し、子孫を自動closeしません。空の親は完了できます。親自身がopenなら子全完了だけでは親doneと表示しません。 |
-| AC-12 | close/reopenは対象backendの状態だけを変え、activeとGitを変更しません。local完了は保存されます。not-plannedはcompletedとは別で、依存を充足しません。異なる終端理由を黙って上書きしません。 |
+| AC-11 | open、not-planned、unknownの子孫を持つ親finishとcompleted closeを拒否し、子孫を自動closeしません。既にcompletedの親への同じ理由のcloseも現在の子孫状態を再評価してからno-opにします。空の親は完了できます。親自身がopenなら子全完了だけでは親doneと表示しません。 |
+| AC-12 | `scope close TARGET`の理由省略はcompleted、not-plannedは明示指定のみです。close/reopenは対象backendの状態だけを変え、activeとGitを変更しません。local完了は保存されます。not-plannedはcompletedとは別で、依存を充足しません。異なる終端理由を黙って上書きしません。 |
 | AC-13 | 新deleteでGitHub読書き・branch削除がありません。親のrecursive、選択解除、境界依存の除去が個別に許可されます。未承認時は無変更です。削除失敗時に残存/削除済み/回復先が判別できます。 |
 | AC-14 | 全kind間の依存を宣言・表示・検査・除去できます。自己依存/循環を拒否し、重複addはno-op、不存在removeは--missing-okがない限り失敗します。暗黙のGitHub post-syncはありません。 |
 | AC-15 | 六種の文書生成、三階層/rootへのgeneric file import、list/showが動作します。source bytesは保存され、sourceを変更しません。保存済みunknown typeの有効Artifactを拒否せず、自動採用しません。機密出力契約を守ります。 |

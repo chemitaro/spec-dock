@@ -123,7 +123,7 @@ CommandSpecとRequestは任意dictionaryではなく、command別に型付けし
 | C07 | `scope list` | `[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]` | 現在のworktreeに存在するScopeを安定したID順で表示します。 | 読取りのみ |
 | C08 | `scope show` | `TARGET` | 指定Scopeのmetadata、状態の出典、親子、branch対応を表示します。 | 読取りのみ |
 | C09 | `scope edit` | `TARGET --title TITLE` | ローカルmetadataのtitleだけを変更します。 | 一次仕様 |
-| C10 | `scope close` | `TARGET [--reason {completed,not-planned}]` | backendに従って終端状態を設定します。選択は変更しません。 | local状態またはGitHub |
+| C10 | `scope close` | `TARGET [--reason {completed,not-planned}]` | reason省略はcompleted、not-plannedは明示指定のみです。backendに従って終端状態を設定し、選択は変更しません。 | local状態またはGitHub |
 | C11 | `scope reopen` | `TARGET` | 対象だけをopenへ戻します。選択もbranchも変更しません。 | local状態またはGitHub |
 | C12 | `scope delete` | `TARGET [--recursive] [--clear-active] [--detach-dependencies]` | 指定したローカルScopeの所有物を削除します。GitHubは閉じません。 | 一次仕様、明示許可時の選択・依存 |
 | C13 | `active show` | `` | worktree-localな選択チェーンと中心対象を表示します。 | 読取りのみ |
@@ -223,7 +223,7 @@ rootのversion表示flagを除き、共通optionはleaf前後で認め、矛盾�
 
 `source`既定は `work start=github`、`dependency check=cache`、`workspace sync=cache` です。ここでgithubは必要なGitHub-backed対象のみをlive観測する方針であり、完全local graphに対して無意味なnetwork callをしません。`--offline`と `--source github` は、GitHub-backed対象が一件でも必要ならエラーです。startをcacheで許可するには `--allow-stale` も必要です。unknownはallow-staleでも開始不可です。finish/close/reopenはGitHub backendならlive確認必須で、cache指定を公開しません。
 
-確認が必要なのは、GitHub新規作成、close/reopen/finish、delete、worktree remove/bootstrap、Workbench overwrite、installation init/update/uninstall、schema migrateです。単純local create/edit/selection/dependency/branch/startは明示入力自体を操作意思と扱います。startの別作業切替は `--switch-active` を別途要求します。TTY確認では解決済みID・repository・write一覧を表示します。許可されていない操作への包括的なagent同意は作りません。
+確認が必要なのは、GitHub新規作成、close/reopen/finish、delete、worktree remove/bootstrap、Workbench overwrite、installation init/update/uninstall、schema migrateです。`--yes`は確認だけを省略し、`scope close`のreason省略がcompletedになる規則を変更しません。単純local create/edit/selection/dependency/branch/startは明示入力自体を操作意思と扱います。startの別作業切替は `--switch-active` を別途要求します。TTY確認では解決済みID・repository・write一覧を表示します。許可されていない操作への包括的なagent同意は作りません。
 
 全current参照は一回のsnapshotで解決し、確認後に再解決しません。実行前にfocus/revision/各target revisionを再照合し、変化はcode 3 `STATE_CONFLICT`です。非対話の `--expect-current` は誤対象防止、内部revision checkは並行変更防止であり、別の役割です。
 
@@ -304,7 +304,7 @@ branch registryは「このrepositoryで一つ」の対応です。独立clone�
 | INV-02 | activeは一つの有効な祖先チェーンであり、focusは最下位非null欄と一致します。 |
 | INV-03 | selectionを変える単機能操作はlifecycle/Gitを変えず、lifecycle単機能操作はselection/Gitを変えません。 |
 | INV-04 | local/remoteのauthorityは排他的です。GitHub観測をlocal completionとして永続化しません。 |
-| INV-05 | completedを新しく設定する親は、観測対象の全子孫自身がcompletedです。unknown/not-plannedは通りません。 |
+| INV-05 | 親へのcompleted finish/closeを受理する時点では、既にcompletedへの同一理由closeであっても、現在観測した全子孫自身がcompletedです。open/unknown/not-plannedは通りません。 |
 | INV-06 | 一Scopeに0または1 canonical branch、同branchに0または1 Scopeです。branch欠損は第二branchの作成理由になりません。 |
 | INV-07 | new branchのbaseは固定commit、existing branchはresetしません。other worktree ownershipを奪いません。 |
 | INV-08 | `--yes`や限定的な例外flagは、path safety/identity/child completion/循環検査を迂回しません。 |
@@ -341,7 +341,7 @@ localまたはGitHub authority
 | finish対象がopen、全子孫completed | 対象をcompletedにし、選択チェーン内なら対象以下を解除します。 |
 | finish対象が既にcompleted | 子孫条件を再確認し、remote書込みはno-op、未解除activeだけ処理できます。 |
 | finish対象がnot-planned | reasonを黙ってcompletedに変えず拒否します。reopen後に明示finishします。 |
-| close completed対象が同じcompleted | no-opです。選択は残します。 |
+| close completed対象が同じcompleted | 現在の子孫状態にAC-11のcompleted guardを先に適用します。open、not-planned、unknownの子孫があれば拒否します。満たす場合だけremote lifecycle writeのないno-opとし、選択・Gitは変えません。 |
 | closeで別の終端理由を指定 | `TERMINAL_REASON_CONFLICT`。reopenを挟みます。 |
 | close not-plannedにopenの子がある | 親だけnot-plannedにできます。子は変更せず残ることを確認画面/JSONに表示します。親の正常finishは別で、子の正常完了を必要とします。 |
 | 祖先がcompleted/not-plannedの子をstart/create/reopen | `ANCESTOR_TERMINAL`。祖先を必要な順でreopenします。 |
@@ -520,7 +520,7 @@ journal/backupはoperator-only permissionとし、token・credential環境変数
 | `active show` | `active show` | 読取り効果を維持 | 出力は共通envelopeへ移し、旧出力をparseするscriptは切替時に更新します。 |
 | `active clear` | `active clear --all` | 名前維持・引数なしは拒否 | --from TARGETで対象以下、--allで全解除を明示します。 |
 | `delete` | `scope delete TARGET` | 削除済み入口として拒否 | GitHub closeを行わない新操作へ黙ってaliasしません。 |
-| `close` | `scope close TARGET` | 削除済み入口として拒否 | reasonと親完了ガードを含む新契約を確認して移します。 |
+| `close` | `scope close TARGET` | 削除済み入口として拒否 | reason省略はcompleted、取り止めは--reason not-plannedを明示します。親完了ガードを確認して移します。 |
 | `update` | `installation update --commit SHA` | 削除済み入口として拒否 | 未固定upstream取得は廃止します。新distribution外部入口を使います。 |
 | `uninstall` | `installation uninstall --dry-run` | 削除済み入口として拒否 | 旧既定dry-runを新適用操作へ黙ってaliasしません。 |
 | `issue start` | `work start TARGET` | 削除済み入口として拒否 | 三階層共通化、新branchには--base、forceは--switch-activeです。 |

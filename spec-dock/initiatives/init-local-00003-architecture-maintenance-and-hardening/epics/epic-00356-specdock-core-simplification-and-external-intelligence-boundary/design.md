@@ -5,12 +5,16 @@ ID: "epic-00356"
 関連GitHub: ["#356"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-09-24"
 依存: ["requirement.md"]
 親: ["init-local-00003"]
 ---
 
 # epic-00356 SpecDock Core Simplification and External Intelligence Boundary — 設計
+
+## 0. 後続決定と設計適用境界（2026-09-24）
+
+Issue [#409](issues/iss-00409-scope-active-work-cli-redesign/design.md) が、三階層の `scope` / `active` / `work`、`artifact create --type`、CLI・Runtime・installer/schema migrationの現行詳細設計を所有する。本書の初回Core簡素化に関する旧 `issue start/finish`、optional positional Artifact type、357/360担当割当は履歴であり、#409と競合する現行設計ではない。Storage Core、Authoring Kit、External Intelligence境界およびデータ保全は引き続き本Epicの設計原則とする。
 
 ## 1. 設計概要
 
@@ -66,9 +70,9 @@ Kit --> Graph : fresh scaffold内容を定義
 @enduml
 ```
 
-## 3. Vertical sliceとhandoff
+## 3. 初回Vertical sliceとhandoff（履歴）
 
-Existing Issue IDと既存依存を維持し、各Issueをend-to-end flowとして再定義する。
+以下はIssue 357〜360の初回Core簡素化時のhandoff図である。#409の現行CLI再設計の所有図ではない。既存Issue IDと依存の記録は保持する。
 
 - **Title:** Existing Issue IDを保つvertical-slice dependency
 - **Question answered:** どのIssueがどのend-to-end valueを所有し、何を次へ渡すか。
@@ -110,73 +114,15 @@ I360 --> Final : direct dependency
 
 品質・統合・handoff用の最終Issueは設計上の候補であり、人間承認まではnodeを作成しない。
 
-## 4. Thin lifecycleとevidence boundary
+## 4. 三階層Work lifecycleとevidence boundary
 
-Runtimeが判定する範囲と、文書／人間へ残す判断を分離する。
+初回Coreの `issue start/finish`、`--force`、close→全active clear→post-syncは履歴である。#409の [D-04〜D-11](issues/iss-00409-scope-active-work-cli-redesign/design.md) を現行の文法・状態遷移・失敗回復契約とする。
 
-- **Title:** Active selection、Issue start / finish、Evidenceの非ゲート化
-- **Question answered:** Runtimeが何を判定し、何を判定しないか。
-- **Scope:** selection、dependency check、GitHub close、active clear、post-sync、evidence placement。
-- **Excluded details:** GitHub API adapter実装、filesystem transaction primitive、retry backoff。
-- **Update trigger:** lifecycle ordering、failure recovery、dependency semantics、Report / Artifact authorityが変わるとき。
-
-```plantuml
-@startuml
-title Epic 00356 - Thin Lifecycle and Evidence Boundary
-skinparam shadowing false
-
-actor Operator
-participant "active set" as Select
-participant "issue start" as Start
-participant "Dependency DAG" as Deps
-participant "Git / Branch" as Git
-participant "Active Store" as Active
-participant "issue finish" as Finish
-participant "GitHub Issue" as GH
-participant "post-sync" as Sync
-database "R/D/P or accepted ADR" as Canonical
-database "Artifact / thin Report" as Evidence
-
-Operator -> Select : valid scopeを選択
-Select -> Active : ID + pathだけを保存
-Operator -> Start : Issue executionを依頼
-Start -> Active : unfinished active Issue guard
-Start -> Deps : dependency-only readiness
-Start -> Git : target branchへcheckout
-Start -> Active : checkout後にactive Issue設定
-Operator -> Evidence : research / interview / result summary
-Evidence --> Canonical : 人間がレビューして反映
-Operator -> Finish : close便利操作を依頼
-Finish -> GH : linked Issueをclose
-GH --> Finish : close result
-Finish -> Active : close成功後だけclear
-Finish -> Sync : clear後にprojection再生成
-note right of Finish
-Quality、Review、Plan、Test、
-EAL、authority、Reportを判定しない
-end note
-@enduml
-```
-
-### 4.1 `active set`
-
-- valid scopeのIDとpathを選択状態として保存する。
-- dependency blockedかどうか、planningが完了したか、Issueが実装可能かは判定しない。
-- planning / researchのためblocked Issueも選択できる。
-
-### 4.2 `issue start`
-
-- unfinished active Issue guardとdependency readinessを確認する。
-- `--force`はunfinished guardだけを迂回し、dependency blockは迂回しない。
-- checkout成功後にactive Issueを設定する。
-
-### 4.3 `issue finish`
-
-1. linked GitHub Issueをcloseする。already closedは成功として扱う。
-2. close成功後だけactiveをclearする。
-3. clear後にpost-syncを行う。
-
-GitHub close失敗時はactiveを保持する。close後のclear失敗と、clear後のsync失敗は別のpartial failureとして診断する。
+- `active set TARGET`は選択だけを変更し、blocked Scopeも選択できる。
+- `work start TARGET`はInitiative / Epic / Issue共通で、開始条件と依存を確認し、canonical branchを確保・checkoutしてからactiveを設定する。別作業への切替は`--switch-active`を明示する。
+- `work finish TARGET`は対象をcompletedにし、選択中なら対象以下だけを解除する。親をcompletedにする場合、現在の全子孫がcompletedであることを要する。Git branch/HEADは変えず、Review / Plan / Test / Reportをgateにしない。
+- `scope close TARGET`はactive/Gitを変更しない。`--reason`省略はcompleted、取り止めは明示`--reason not-planned`のみ。completed親への同一理由の再closeでも現在の子孫完了guardを先に再評価し、成立時だけno-opにする。
+- GitHub失敗時に選択を保持し、remote成功後のactive解除失敗は別のpartial failureとして記録する。旧暗黙post-syncは契約に含めない。
 
 ## 5. 責務モデル
 
@@ -187,7 +133,7 @@ GitHub close失敗時はactiveを保持する。close後のclear失敗と、clea
 - Node identity、parent chain、directory placement、GitHub linkage
 - `.meta.json.depends_on`とDAG invariant
 - active ID / pathとgenerated context pointer
-- `active set`、`issue start`、薄い`issue finish`
+- `active set`、三階層の`work start` / `work finish`、`scope close`（#409の現行契約）
 - Artifact filename / collision / lock / symlink / path safety
 - Current作成可能型とHistorical認識型の機械契約
 - generic one-file import
@@ -251,7 +197,7 @@ Installer / updaterはmanaged asset inventoryとprune boundaryを所有する。
 | Artifact | research / question / synthesis / candidate evidence | none |
 | thin `report.md` | optional-content result summary | none |
 | `.meta.json.depends_on` | dependency graph source | dependency-only readiness |
-| active manifest | selected ID + path | unfinished guard only in `issue start` |
+| active manifest | selected ID + path | #409のWork開始・終了時の選択整合guard |
 
 ### 6.2 Artifact set
 
@@ -266,19 +212,9 @@ HISTORICAL_RECOGNIZABLE = {
 }
 ```
 
-Exact historical inventoryはIssue 357の実装前inventoryで固定する。「新規作成できない」と「既存を認識できない」を同一にしない。
+初回Coreのhistorical inventoryはIssue 357の実装前inventoryで固定した。「新規作成できない」と「既存を認識できない」を同一にしない。
 
-Target CLI:
-
-```text
-spec-dock new artifact [type] --<scope> <id> --title <title> [--slug <slug>]
-```
-
-- `[type]` omittedは`blank`
-- explicit `blank`も受理する
-- duplicateな`--type`構文は追加しない
-- blank filenameに`blank` tokenを含めない
-- importは`artifact import file`だけとする
+現行CLIは#409の `artifact create --scope TARGET --type TYPE --title TITLE [--slug SLUG]` と `artifact import file PATH --scope ARTIFACT_SCOPE` である。`--type`は必須で、旧optional positional typeは初回Coreの履歴である。Current 6種を作成でき、Historical typeは認識して保持するが新規作成しない。generic importは単一fileをopaqueに保存する。
 
 ### 6.3 Report
 
@@ -306,7 +242,11 @@ templates/issue/plan.md
 
 Level選択、理由、risk factor、再評価条件は通常の`plan.md`本文に書く。Runtime、`.meta.json`、active manifest、dependency projectionへ複製しない。履歴はGit diffで確認する。
 
-## 7. Slice ownershipとshared-file protocol
+## 7. 初回Sliceの履歴と現行所有権
+
+以下の357〜360表とshared-file protocolは初回Core簡素化の履歴である。#409のCLI/Runtime/installer/schema migration、help、tests、consumer cutoverは#409が一体で所有し、旧357/360へ再割当しない。Authoring Kitとskillの非競合責務は維持する。
+
+### 7.1 初回所有表
 
 | Surface | 357 | 358 | 359 | 360 | Final候補 |
 |---|---|---|---|---|---|
@@ -357,10 +297,10 @@ Shared-file protocol:
 | Failure | Required behavior |
 |---|---|
 | GitHub close fails | activeを保持し、再実行方法を返す |
-| close succeeds but active clear fails | close済み可能性、active recovery、再実行をpartial successとして示す |
-| post-sync fails after clear | lifecycle close / clearとprojection staleを区別する |
-| dependency blocked | `issue start --force`でも開始しない |
-| blocked Issue selection | `active set`は選択を許可する |
+| work finishのclose succeeds but active clear fails | close済み可能性、active recovery、再実行をpartial successとして示す |
+| projection failure | #409の明示syncとlifecycle結果を区別する。旧暗黙post-syncを再導入しない |
+| dependency blocked | #409の`work start`は開始せず、`--switch-active`でも依存を迂回しない |
+| blocked Scope selection | `active set`は選択を許可する |
 | historical Artifact present | validateを壊さず、新規作成だけ拒否する |
 | removed command invoked | unknown commandまたは明示的なmigration guidance。旧backendへfallbackしない |
 | external grilling unavailable | 正本を書かず、misleading successを返さず、operator actionを示す |
@@ -371,11 +311,11 @@ Shared-file protocol:
 
 - **Unit:** artifact parser / sets、active data、dependency check、lifecycle ordering、installer inventory function
 - **Application integration:** start / finish failure matrix、generic import、Assuranceなしscaffold、authority非依存
-- **CLI:** help inventory、removed command negative test、optional positional type、privacy-safe output
+- **CLI:** #409のhelp inventory、旧入口negative test、明示Artifact `--type`、三階層Work、privacy-safe output
 - **Asset:** template exact catalog、Level Guide link、Current禁止語彙、provider / dogfood parity
 - **Consumer:** fresh init、existing update、uninstall、partial failure、historical fixture preservation
 - **Skill:** 2 skillだけ、provider-owned AI callなし、evidence Artifact 1件、正本自動変更なし
 - **Cross-slice:** Core + Kit + Skills + Distributionのend-to-end smoke
 - **Delivery:** package build、full suite、diff audit、independent review evidence、coherent change-set assembly
 
-Exact removed module / test / asset listは、各implementation branchの開始時に再計算する。これはProduct decisionではなく、Issue 357 / 360のmechanical inventory taskである。
+Exact removed module / test / asset listは、各implementation branchの開始時に再計算する。これはProduct decisionではなく、初回357/360の履歴inventoryである。#409 cutoverのexact inventoryと検証は#409計画で所有する。
