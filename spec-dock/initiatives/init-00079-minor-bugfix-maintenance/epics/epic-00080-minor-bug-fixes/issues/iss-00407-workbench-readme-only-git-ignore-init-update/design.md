@@ -18,15 +18,15 @@ provider 正本から `spec-dock/.gitignore` と root Workbench README を正し
 
 ## Current / Target
 - Current: `src/spec_dock/assets/spec_dock/.gitignore` と dogfooding 側は同じ README-only 規則を持つ。fresh init は provider tree 全体を copy するが、root README は `templates/root/` に留まる。既存 update は `spec-dock/{docs,templates,system,scripts}` と2 skill だけを置換し、`.gitignore` を触らない。
-- Target: fresh init は canonical ignore file と root README を配置する。既存 update / force-init は既知状態の ignore file を安全に更新し、未知の独自編集では無断上書きをしない。
+- Target: fresh init は canonical ignore file と root README を配置する。既存 update / force-init は欠落または確認済みの旧版だけを更新し、独自編集は保持する。
 
 ## 責務・Interface
 - provider 正本: `src/spec_dock/assets/spec_dock/.gitignore` と `templates/root/.workbench/README.md`。`spec-dock/` は consumer/dogfooding の投影先とする。
-- installer: 固定ディレクトリとは別の singleton `spec-dock/.gitignore` を判定し、fresh 時に root README を exact byte copy する候補設計。既存 Workbench と node は操作しない。
+- installer: 固定ディレクトリとは別に `spec-dock/.gitignore` を判定し、fresh 時に root README を byte copy する。既存 Workbench と node は操作しない。
 - Git ignore は未追跡 path の候補選別を担う。既追跡 payload の index 解除は installer の責務に含めない。
 
 ## data / failure
-- 推奨案: 書込み前に `.gitignore` の欠落・現行版・既知の旧版・未知の独自編集を区別する。既知版は更新し、未知版は変更せず対象と理由を示して停止する。既知版の集合と停止範囲は実装前に承認する。
+- 採用案: 配布済みの `.workbench/` 一括 ignore 版とバイト単位で一致するファイルだけを旧版として更新する。欠落時は作成し、それ以外の既存ファイルは保持する。
 - 部分的な fresh init の後でも、既存 update が欠落した ignore file を回復できるようにする。
 - 既存 Workbench payload は opaque とし、検査で内容を読まない。
 
@@ -36,7 +36,7 @@ provider 正本から `spec-dock/.gitignore` と root Workbench README を正し
 
 ## 移行・互換性・rollback
 - 既存 project に provider が index migration を実施しない。利用者は各 project の既追跡 payload を個別に確認し、手動で追跡解除する。
-- 未知の独自 `.gitignore` は保護する。失敗時は利用先の内容を保持し、明示的な判断後に再実行できる状態にする。
+- 独自編集された `.gitignore` は保持する。更新が必要なら利用先で内容を確認して手動で扱う。
 - 変更の戻し方は provider asset と installer の修正を revert し、更新済み consumer の ignore file は内容・由来を確認して別途扱う。
 
 ## testability
@@ -45,5 +45,5 @@ provider 正本から `spec-dock/.gitignore` と root Workbench README を正し
 - provider と dogfooding の静的 byte 比較に加え、正規 update の結果として `.gitignore` が投影されることを検査する。
 
 ## risk
-- 未決: `spec-dock/.gitignore` の所有権、既知の旧版 hash、未知の独自編集で update 全体を停止するか。当面の推奨は provider 管理・既知版のみ更新・未知版は書込み前に停止。現行 installer test の「利用先設定を保持する」契約と衝突するため、実装前に明示的に adjudicate する。
+- 配布元は provider asset とする。利用先が独自編集した `.gitignore` は更新しないため、その内容による ignore の実効性は利用先が確認する。
 - `.gitignore` だけでは既追跡 payload や `git add -f` を禁止できない。完全な index invariant gate は本 Issue の外として、必要なら別判断にする。

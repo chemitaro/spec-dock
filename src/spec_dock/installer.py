@@ -10,20 +10,37 @@ ROOTS = ("docs", "templates", "system", "scripts")
 SKILLS = ("spec-dock", "spec-dock-grill-with-docs")
 TOOL_DIRECTORIES = tuple(f"spec-dock/{name}" for name in ROOTS) + tuple(f".agents/skills/{name}" for name in SKILLS)
 VERSION_FILE = "spec-dock/spec-dock.version"
+IGNORE_FILE = "spec-dock/.gitignore"
+LEGACY_WORKBENCH_IGNORE = (
+    b"# spec-dock runtime (generated)\n"
+    b"# v2 generated state for agents (SSOT + derived views)\n"
+    b".agent/\n"
+    b"# legacy v2 name (kept ignored for safe upgrades)\n"
+    b".work/\n"
+    b"# local disposable work areas (reserved exact directory name at any scope)\n"
+    b".workbench/\n"
+    b"active/\n"
+    b"/adrs/\n"
+    b"tree-all.puml\n"
+    b"tree.puml\n"
+    b"deps-issues.puml\n"
+    b"deps-raw.puml\n"
+    b"dashboard.md\n"
+)
 
 
 def _check_target(target: Path) -> None:
     """Reject redirecting parents before deleting any managed directory."""
-    for relative in (*TOOL_DIRECTORIES, VERSION_FILE):
+    for relative in (*TOOL_DIRECTORIES, VERSION_FILE, IGNORE_FILE):
         path = target
         for part in Path(relative).parts:
             path = path / part
             if path.is_symlink():
                 raise ValueError(f"Refusing symbolic link in installation target: {path}")
-            if path.exists() and not path.is_dir() and path != target / VERSION_FILE:
+            if path.exists() and not path.is_dir() and path not in (target / VERSION_FILE, target / IGNORE_FILE):
                 raise ValueError(f"Expected installation directory: {path}")
-        if relative == VERSION_FILE and path.exists() and not path.is_file():
-            raise ValueError(f"Expected version file: {path}")
+        if relative in (VERSION_FILE, IGNORE_FILE) and path.exists() and not path.is_file():
+            raise ValueError(f"Expected installation file: {path}")
 
 
 def _sources(assets: Path) -> tuple[Path, ...]:
@@ -56,9 +73,17 @@ def install(target: Path, *, version: str, fresh: bool, assets: Path = ASSETS) -
         destination = (target / "spec-dock").resolve()
         if source.is_relative_to(destination) or destination.is_relative_to(source):
             raise ValueError("Installation target overlaps the distribution source")
+    if not (assets / "spec_dock/.gitignore").is_file():
+        raise ValueError("Missing packaged file: spec-dock/.gitignore")
     target.mkdir(parents=True, exist_ok=True)
     if fresh:
         _copy(assets / "spec_dock", target / "spec-dock")
+        root_workbench = target / "spec-dock/.workbench"
+        root_workbench.mkdir()
+        shutil.copyfile(
+            assets / "spec_dock/templates/root/.workbench/README.md",
+            root_workbench / "README.md",
+        )
     for relative, source in zip(TOOL_DIRECTORIES, sources, strict=True):
         if fresh and relative.startswith("spec-dock/"):
             continue
@@ -67,6 +92,11 @@ def install(target: Path, *, version: str, fresh: bool, assets: Path = ASSETS) -
             shutil.rmtree(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
         _copy(source, destination)
+    ignore_path = target / IGNORE_FILE
+    if ignore_path.exists() and ignore_path.read_bytes() == LEGACY_WORKBENCH_IGNORE:
+        ignore_path.unlink()
+    if not ignore_path.exists():
+        shutil.copyfile(assets / "spec_dock/.gitignore", ignore_path)
     version_path = target / VERSION_FILE
     version_path.unlink(missing_ok=True)
     version_path.write_text(version + "\n", encoding="utf-8")

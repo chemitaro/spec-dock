@@ -24,7 +24,7 @@ SpecDock が新規・既存 workspace に README-only の Workbench Git ignore �
 ## 観測可能な要件
 - RQ-407-01: 新規 workspace の `spec-dock/.gitignore` は、root / Initiative / Epic / Issue の各 `.workbench/` において、直下の正確な `README.md` のみを通常の Git 追跡候補とし、それ以外の entry を ignore する。
 - RQ-407-02: fresh init は root の `spec-dock/.workbench/README.md` を生成する。新規 node にも同じ README を生成し、既存 root / node には通常 update で backfill しない。
-- RQ-407-03: 既存 workspace の update と `init --force` は、欠落または既知の旧版の `spec-dock/.gitignore` を現行契約へ到達させる。未知の利用先編集を黙って破壊せず、解決できないときは明確に診断する。
+- RQ-407-03: 既存 workspace の update と `init --force` は、欠落または確認済みの旧版の `spec-dock/.gitignore` を現行契約へ到達させる。独自編集されたファイルは変更しない。
 - RQ-407-04: ignore 規則の実効結果を実 Git repository で検証できる。Workbench payload の内容は診断のために読み取らない。
 
 ## スコープ
@@ -33,7 +33,7 @@ SpecDock が新規・既存 workspace に README-only の Workbench Git ignore �
 - 対象外: 各利用先 project の既追跡 payload の `git rm --cached`、履歴改変、既存 Workbench payload の削除・移動、`workbench copy` の source-wins 仕様変更、強制的な `git add -f` の全面禁止。
 
 ## 失敗・境界条件
-- `.gitignore` が欠落、既知の旧版、利用先で独自編集された状態を区別する。独自編集は無断で上書きしない。
+- `.gitignore` が欠落、確認済みの旧版、利用先で独自編集された状態を区別する。独自編集は無断で上書きせず、通常 update による修復対象外とする。
 - 親階層の ignore 規則も効くため、配布 asset の byte 一致だけで実効結果を保証したと扱わない。
 - `.gitignore` は既に index に入った payload と明示的な強制 add を追跡対象から外せない。この限界を docs と検証結果で明示する。
 
@@ -45,4 +45,4 @@ SpecDock が新規・既存 workspace に README-only の Workbench Git ignore �
 
 ## 制約・前提
 - 既存利用先の追跡済み payload への Git 操作は利用者が手動で行い、provider は自動移行しない。
-- `spec-dock/.gitignore` の未知の独自編集を update 時にどう診断・停止するかは、実装前に Design の判断点を確定する。
+- `spec-dock/.gitignore` の独自編集を更新せず保持する。利用先の既追跡 payload は利用者が手動で確認する。
