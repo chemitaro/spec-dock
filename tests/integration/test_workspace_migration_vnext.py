@@ -15,6 +15,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 from spec_dock_runtime.infra.control_store import (  # noqa: E402
     ControlState,
     WorktreeRegistration,
+    load_control,
     store_control,
 )
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
@@ -231,3 +232,252 @@ def test_migration_plan_rejects_missing_registration_and_changed_metadata(tmp_pa
     meta_path.write_text(json.dumps(payload), encoding="utf-8")
     with pytest.raises(ValueError, match="changed"):
         migration_module.plan_migration_changes(inventory, mapping, updated_at="2026-01-01T00:00:00Z")
+
+
+def test_migration_applies_registered_worktree_and_keeps_maintenance(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    control = ControlState(
+        3,
+        "specdock.writer/v1",
+        1,
+        engine,
+        "maintenance",
+        (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+    )
+    store_control(common, control, expected_epoch=None)
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    result = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    assert result.phase == "committed"
+    meta = repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json"
+    assert json.loads(meta.read_text(encoding="utf-8"))["schema_version"] == 3
+    active = repo / "spec-dock/.agent/active.json"
+    assert json.loads(active.read_text(encoding="utf-8"))["focus_id"] == "init-local-00001"
+    workspace = repo / "spec-dock/workspace.json"
+    assert json.loads(workspace.read_text(encoding="utf-8"))["schema_version"] == 3
+    updated_control = load_control(common)
+    assert updated_control is not None and updated_control.mode == "maintenance"
+    assert updated_control.worktrees[0].schema_version == 3
+
+
+def test_migration_resumes_after_one_file_was_published(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _legacy_repo(tmp_path)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock_runtime.infra.migration_journal as journal
+
+    real_apply = migration_module.apply_migration_file
+    attempts = 0
+
+    def stop_second(*args: object, **kwargs: object) -> None:
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RuntimeError("injected migration stop")
+        real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(migration_module, "apply_migration_file", stop_second)
+    with pytest.raises(RuntimeError, match="migration stop"):
+        migration_module.apply_workspace_migration(
+            repo_root=repo,
+            common_dir=common,
+            worktree_id="main",
+            engine_digest=engine,
+            expected_epoch=1,
+            inventory=inventory,
+            mapping=mapping,
+            updated_at="2026-01-01T00:00:00Z",
+        )
+    (operation_id,) = journal.pending_migrations(common)
+    monkeypatch.setattr(migration_module, "apply_migration_file", real_apply)
+    resumed = migration_module.resume_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=operation_id,
+    )
+    assert resumed.phase == "committed"
+    assert journal.pending_migrations(common) == ()
+    assert all(json.loads(Path(item.path).read_text())["schema_version"] == 3 for item in resumed.files)
+
+
+def test_committed_migration_rollback_restores_before_bytes_in_maintenance(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    control = ControlState(
+        3,
+        "specdock.writer/v1",
+        1,
+        engine,
+        "maintenance",
+        (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+    )
+    store_control(common, control, expected_epoch=None)
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    active = repo / "spec-dock/.agent/active.json"
+    before = active.read_bytes()
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    rolled_back = migration_module.rollback_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=completed.operation_id,
+    )
+    assert rolled_back.phase == "rolled-back"
+    assert active.read_bytes() == before
+    assert not (repo / "spec-dock/workspace.json").exists()
+    restored_control = load_control(common)
+    assert restored_control is not None and restored_control.mode == "maintenance"
+    assert restored_control.worktrees[0].schema_version == 1
+
+
+def test_migration_rollback_refuses_later_user_edit_without_partial_restore(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    active = repo / "spec-dock/.agent/active.json"
+    active.write_bytes(active.read_bytes() + b" ")
+    first_meta = Path(completed.files[0].path)
+    first_after = first_meta.read_bytes()
+    with pytest.raises(ValueError, match="later changes"):
+        migration_module.rollback_workspace_migration(
+            repo_root=repo,
+            common_dir=common,
+            worktree_id="main",
+            engine_digest=engine,
+            operation_id=completed.operation_id,
+        )
+    assert first_meta.read_bytes() == first_after
+    assert active.read_bytes().endswith(b" ")
+
+
+def test_migration_rollback_resumes_after_interruption(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo = _legacy_repo(tmp_path)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock_runtime.infra.migration_journal as journal
+
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    real_rollback = migration_module.rollback_migration_file
+    calls = 0
+
+    def stop_second(*args: object, **kwargs: object) -> None:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise RuntimeError("injected rollback stop")
+        real_rollback(*args, **kwargs)
+
+    monkeypatch.setattr(migration_module, "rollback_migration_file", stop_second)
+    with pytest.raises(RuntimeError, match="rollback stop"):
+        migration_module.rollback_workspace_migration(
+            repo_root=repo,
+            common_dir=common,
+            worktree_id="main",
+            engine_digest=engine,
+            operation_id=completed.operation_id,
+        )
+    assert journal.pending_migrations(common) == (completed.operation_id,)
+    monkeypatch.setattr(migration_module, "rollback_migration_file", real_rollback)
+    rolled_back = migration_module.rollback_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=completed.operation_id,
+    )
+    assert rolled_back.phase == "rolled-back"
+    assert journal.pending_migrations(common) == ()

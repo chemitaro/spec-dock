@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import base64
 import binascii
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import hashlib
 import json
 import os
@@ -12,10 +12,12 @@ from pathlib import Path
 import re
 from uuid import uuid4
 
+from spec_dock_runtime.infra.control_store import ControlState, decode_control
+
 _ID = re.compile(r"[0-9a-f]{32}\Z")
 _DIGEST = re.compile(r"sha256:[0-9a-f]{64}\Z")
 _ENGINE = re.compile(r"[0-9a-f]{64}\Z")
-_PHASES = {"prepared", "applying", "recovery-required", "committed", "rolled-back"}
+_PHASES = {"prepared", "applying", "recovery-required", "committed", "rollback-required", "rolled-back"}
 _MAX_FILE = 50 * 1024 * 1024
 
 
@@ -41,6 +43,7 @@ class MigrationRecord:
     completed_paths: tuple[str, ...]
     phase: str
     error: str | None = None
+    control_before: ControlState | None = None
 
 
 def _digest(data: bytes) -> str:
@@ -90,6 +93,14 @@ def _validate(record: MigrationRecord) -> None:
         or not isinstance(record.files, tuple)
         or not isinstance(record.completed_paths, tuple)
         or (record.error is not None and not isinstance(record.error, str))
+        or (
+            record.control_before is not None
+            and (
+                not isinstance(record.control_before, ControlState)
+                or record.control_before.epoch != record.control_epoch
+                or record.control_before.engine_digest != record.engine_digest
+            )
+        )
     ):
         raise ValueError("invalid migration journal record")
     worktree_ids: set[str] = set()
@@ -158,6 +169,7 @@ def _encode(record: MigrationRecord) -> bytes:
         "completed_paths": record.completed_paths,
         "phase": record.phase,
         "error": record.error,
+        "control_before": None if record.control_before is None else asdict(record.control_before),
     }
     return (json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
@@ -188,6 +200,7 @@ def _decode(payload: object) -> MigrationRecord:
             tuple(payload["completed_paths"]),
             payload["phase"],
             payload.get("error"),
+            None if payload.get("control_before") is None else decode_control(payload["control_before"]),
         )
     except (TypeError, KeyError, ValueError, binascii.Error) as error:
         raise ValueError("migration journal shape is invalid") from error
