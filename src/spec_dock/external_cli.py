@@ -1,0 +1,113 @@
+"""Run the verified external package engine against a repository worktree."""
+
+from __future__ import annotations
+
+import os
+from pathlib import Path
+import subprocess
+import sys
+from typing import TYPE_CHECKING
+
+from spec_dock import __version__
+from spec_dock.installer import ASSETS
+from spec_dock.runtime_loader import EnginePin, VerifiedEngine, digest_distribution, read_engine_pin, verify_engine_pin
+
+if TYPE_CHECKING:
+    import argparse
+    from collections.abc import Sequence
+
+
+def _git_root(candidate: Path) -> Path | None:
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    try:
+        completed = subprocess.run(
+            ["git", "-C", str(candidate), "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+            env=environment,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0 or not completed.stdout.strip():
+        return None
+    return Path(completed.stdout.strip()).resolve(strict=True)
+
+
+def _project_candidate(namespace: argparse.Namespace, invocation_cwd: Path) -> Path:
+    if getattr(namespace, "command_path", None) == "installation init":
+        raw = namespace.path
+    else:
+        raw = getattr(namespace, "project", None)
+    if raw is None:
+        return invocation_cwd
+    candidate = Path(raw).expanduser()
+    if not candidate.is_absolute():
+        candidate = invocation_cwd / candidate
+    return candidate.resolve(strict=True)
+
+
+def _executing_engine(*, executable: Path, checkout_root: Path) -> VerifiedEngine:
+    if not executable.is_absolute() or executable.is_symlink() or executable.parent.name != "bin":
+        raise ValueError("external engine must run from an absolute distribution bin path")
+    distribution = executable.parent.parent
+    package_file = Path(__file__).resolve(strict=True)
+    assets = ASSETS.resolve(strict=True)
+    if not package_file.is_relative_to(distribution) or not assets.is_relative_to(distribution):
+        raise ValueError("external engine imported code outside its distribution")
+    digest = digest_distribution(distribution)
+    return verify_engine_pin(EnginePin(executable, distribution, digest), checkout_root=checkout_root)
+
+
+def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path) -> int:
+    """Verify self and repository pin before loading any checkout runtime."""
+    sys.dont_write_bytecode = True
+    engine = _executing_engine(executable=executable, checkout_root=invocation_cwd)
+    sys.path.insert(0, str(ASSETS / "spec_dock/scripts"))
+    from spec_dock_runtime.cli.options import parse_vnext_output
+    from spec_dock_runtime.cli.vnext_runtime import run_vnext
+
+    parsed = parse_vnext_output(argv, engine_version=__version__)
+    namespace = parsed.namespace
+    candidate = invocation_cwd if namespace is None else _project_candidate(namespace, invocation_cwd)
+    project_root = _git_root(candidate)
+    if project_root is not None:
+        from spec_dock.runtime_loader import git_common_directory
+
+        verify_engine_pin(
+            EnginePin(engine.executable, engine.distribution_root, engine.distribution_digest),
+            checkout_root=project_root,
+        )
+        common = git_common_directory(project_root)
+        control_path = common / "spec-dock/control/control.json"
+        if control_path.exists() and namespace is not None:
+            pinned = read_engine_pin(common, checkout_root=project_root)
+            if pinned != engine:
+                raise ValueError("executing engine differs from repository pin")
+    output = run_vnext(
+        argv,
+        invocation_cwd=invocation_cwd,
+        engine_digest=engine.distribution_digest,
+        engine_version=__version__,
+        engine_pin=engine,
+    )
+    if output.stdout:
+        sys.stdout.write(output.stdout)
+    if output.stderr:
+        sys.stderr.write(output.stderr)
+    return output.exit_code
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    sys.dont_write_bytecode = True
+    try:
+        return run_external(
+            sys.argv[1:] if argv is None else argv,
+            executable=Path(sys.argv[0]).absolute(),
+            invocation_cwd=Path.cwd(),
+        )
+    except (OSError, ValueError) as error:
+        print(f"spec-dock: {error}", file=sys.stderr)
+        return 3
