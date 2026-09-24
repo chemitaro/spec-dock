@@ -188,6 +188,19 @@ def test_installation_refuses_journal_inside_replaced_skill(tmp_path: Path) -> N
     assert not journal_root.exists()
 
 
+def test_installation_can_fix_child_operation_id_before_staging(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    child_id = "f" * 32
+    bundle = _bundle(tmp_path)
+    record = prepare_installation(target, journal_root, action="init", bundle=bundle, operation_id=child_id)
+    assert record.operation_id == child_id
+    assert read_record(journal_root, child_id) == record
+    with pytest.raises(ValueError, match="operation ID"):
+        prepare_installation(target, journal_root, action="init", bundle=bundle, operation_id="bad")
+
+
 def test_uninstall_retains_consumer_data_and_ignore_file(tmp_path: Path) -> None:
     target = tmp_path / "consumer"
     target.mkdir()

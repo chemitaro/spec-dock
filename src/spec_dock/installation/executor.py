@@ -6,6 +6,7 @@ from dataclasses import replace
 import hashlib
 import os
 from pathlib import Path
+import re
 import shutil
 import stat
 from typing import TYPE_CHECKING
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 _MANAGED = (*TOOL_DIRECTORIES, VERSION_FILE, IGNORE_FILE)
+_OPERATION_ID = re.compile(r"[0-9a-f]{32}\Z")
 
 
 def _digest_path(path: Path) -> str | None:
@@ -109,6 +111,7 @@ def prepare_installation(
     action: str,
     bundle: VerifiedBundle | None,
     installed_version: str | None = None,
+    operation_id: str | None = None,
 ) -> InstallationRecord:
     """Stage and verify every replacement before publishing a recoverable journal."""
     if action not in ("init", "update", "uninstall") or (action == "uninstall") != (bundle is None):
@@ -129,7 +132,9 @@ def prepare_installation(
         for relative in TOOL_DIRECTORIES
     ):
         raise ValueError("journal must be outside replaced tooling")
-    operation_id = uuid.uuid4().hex
+    operation_id = uuid.uuid4().hex if operation_id is None else operation_id
+    if not isinstance(operation_id, str) or _OPERATION_ID.fullmatch(operation_id) is None:
+        raise ValueError("installation operation ID is invalid")
     area = _operation_area(target, operation_id)
     area.mkdir(mode=0o700, parents=True, exist_ok=False)
     before: dict[str, str | None] = {}
