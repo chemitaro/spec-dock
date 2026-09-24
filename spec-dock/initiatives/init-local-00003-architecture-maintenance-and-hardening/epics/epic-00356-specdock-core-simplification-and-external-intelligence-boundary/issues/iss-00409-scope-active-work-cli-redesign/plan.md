@@ -133,9 +133,9 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T02,T05 |
 | 対象file群 | 新設 RT infra/{control_store,writer_lock}.py、cli/admission.py。既存 bootstrap/ports。 |
-| 実施内容 | common directoryのcontrol、epoch、inventory、admission状態、lock順とworktree leaseを実装します。書込み前にschemaとengineを検証します。 |
-| 完了条件 | mixed protocol/未登録作業場/maintenance/pending時に通常mutatorが開始できず、read-only診断は可能です。 |
-| 必要なテスト | 新設 tests/integration/test_cli_writer_compatibility_vnext.py。二process、二worktree、lock timeout、kill後解放、再入/lease競合。 |
+| 実施内容 | common directoryのcontrol、epoch、inventory、admission状態、lock順とworktree leaseを実装します。D-16の明示resume対象だけが未完了blocking journalでglobal recovery-requiredへ移り、その他の操作は対象固有の競合診断に留めます。書込み前にschemaとengineを検証します。 |
+| 完了条件 | mixed protocol/未登録作業場/maintenance/D-16対象のpending blocking journal時だけ通常mutatorが開始できず、read-only診断は可能です。復旧対象外の部分失敗は無関係なwriteをglobalに止めません。 |
+| 必要なテスト | 新設 tests/integration/test_cli_writer_compatibility_vnext.py。二process、二worktree、lock timeout、kill後解放、再入/lease競合。D-16対象のpendingだけがglobal writeを止め、対象外partialでは同対象の競合を拒否しつつ無関係なwriteが続くことを検証します。 |
 | 対応AC | AC-25, AC-28, AC-30 |
 
 ### T07 Journalと安全な永続化原語
@@ -144,9 +144,9 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T06 |
 | 対象file群 | 既存 RT infra/{json_store,fs_repo,active_store}.py。新設 infra/operation_journal.py、domain/operation.py、application/operation_executor.py。 |
-| 実施内容 | 同filesystem stage・fsync・atomic publish・identity再照合、effect前後記録、resume/rollback照合を小さい共通原語として実装します。汎用workflow engineにしません。 |
-| 完了条件 | phaseごとのkillからsucceeded/failed/unknownを区別でき、他人のfileをcleanupしません。 |
-| 必要なテスト | 新設 tests/integration/test_cli_recovery_vnext.py。disk full、rename失敗、hardlink/symlink、inode差替え、journal欠損/改変。 |
+| 実施内容 | 同filesystem stage・fsync・atomic publish・identity再照合を共通原語にします。D-16の列挙対象だけにblocking journalとeffect前後記録、固定対象/fingerprint/revision照合によるresume、許可されたrollbackを適用します。対象外はatomic/CASまたは操作別partial/unknown診断とし、global recovery-requiredを生成しません。汎用workflow engineにしません。 |
+| 完了条件 | D-16の全blocking journal対象がkill後に固定操作のresume経路を持ち、unknownのremote効果を盲目的に再送しません。対象外のkillはglobal未解消journalを残さず、状態再観測前に作成や外部効果を自動重複させません。他人のfileをcleanupしません。 |
+| 必要なテスト | 新設 tests/integration/test_cli_recovery_vnext.py。D-16列挙対象を各一件以上killし、全pendingにresumeが存在すること、非対応leafはpending blocking journalを作らないこと、通常同一コマンド再実行がblocking journalを迂回しないことを検証します。disk full、rename失敗、hardlink/symlink、inode差替え、journal欠損/改変も含めます。 |
 | 対応AC | AC-13, AC-23, AC-28, AC-29 |
 
 ### T08 外部固定engineとrepo shimの統一
@@ -300,7 +300,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 | 対象file群 | 既存 RT application/{create_artifact_doc,import_file_artifact}.py、domain/artifacts.py、binary_artifact_publisher、commands/artifact_import.py。 |
 | 実施内容 | create/import/list/showを共通scope selectorへ移し、publisherの安全境界・保存済みopen-world判定・privacy-safe出力を保持します。 |
 | 完了条件 | 六creation種とgeneric/historical evidenceを区別し、rootの利用可能操作を制限できます。 |
-| 必要なテスト | 新設 tests/cli_runtime/test_artifact_vnext.py。binary/HTML/unknown label、衝突slot、source保持、外部pathとhash非露出、staged publication failure。 |
+| 必要なテスト | 新設 tests/cli_runtime/test_artifact_vnext.py。binary/HTML/unknown label、衝突slot、source保持、外部pathとhash非露出、staged publication failure。公開直後killでは既存Artifactを観測する前のblind retryを行わず、global recovery-requiredを作らないことも確認します。 |
 | 対応AC | AC-15, AC-29 |
 
 ### T22 Worktree inventoryとcreate
@@ -333,7 +333,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 | 対象file群 | 既存 repo-local scriptのconsumer hook処理を分離、RT commands/worktree.py、application/worktree.py。 |
 | 実施内容 | bootstrap leafを追加し、dry-run/ offline時にmakeを起動しない規則を入れます。shared lease、timeout、capture、partialを実装します。 |
 | 完了条件 | hook失敗はsuccessにならず、JSON stdoutを汚さず、子processからの危険な再入を拒否します。 |
-| 必要なテスト | 新設 tests/cli_runtime/test_worktree_bootstrap_vnext.py。make -n評価trap、missing target、stdout flood、timeout/kill、offline、child SpecDock metadata操作。 |
+| 必要なテスト | 新設 tests/cli_runtime/test_worktree_bootstrap_vnext.py。make -n評価trap、missing target、stdout flood、timeout/kill、offline、child SpecDock metadata操作。途中停止・任意効果unknownでは自動再実行/rollbackがなく、対象の診断は残しつつ無関係なwriteをglobal停止しないことも確認します。 |
 | 対応AC | AC-18, AC-22, AC-29 |
 
 ### T25 Workbench copyの衝突契約
@@ -344,7 +344,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 | 対象file群 | 既存 RT application/workbench.py、infra/fs_cli.py、commands/workbench.py。 |
 | 実施内容 | 新--to-worktreeとcurrent/local scopeを受理し、default conflict errorの全件preflightと明示overwriteを実装します。rootなし・内容非解釈を維持します。 |
 | 完了条件 | dest-onlyを残し、型衝突/unsafe ancestryを拒否し、途中競合はpartialです。 |
-| 必要なテスト | 新設 tests/cli_runtime/test_workbench_vnext.py。local Scope、dest-only、source変更、symlink、conflict before-write、overwrite途中失敗。 |
+| 必要なテスト | 新設 tests/cli_runtime/test_workbench_vnext.py。local Scope、dest-only、source変更、symlink、conflict before-write、overwrite途中失敗。partial後は実施済み範囲を検査するまでblind overwriteをせず、global recovery-requiredは作らないことを確認します。 |
 | 対応AC | AC-19, AC-29 |
 
 ### T26 生成世代とSyncの分離
@@ -355,7 +355,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 | 対象file群 | 既存 RT application/sync_state.py、infra/artifact_writer.py/derived_state_reader.py、presentation/json_state.py。新設 infra/generation_store.py、commands/workspace.py。 |
 | 実施内容 | active自動推定と通常mutation後の全件GitHub取得を除きます。cache既定、generation stage/pointer、projection stale、validityを実装します。 |
 | 完了条件 | syncの全sourceで一次仕様/active/Git不変、live部分失敗をfreshと偽りません。 |
-| 必要なテスト | 新設 tests/cli_runtime/test_workspace_sync_vnext.py。finish後syncで非再選択、zero nodes、live failure、pointer前後kill、allow-invalid、安全性拒否。 |
+| 必要なテスト | 新設 tests/cli_runtime/test_workspace_sync_vnext.py。finish後syncで非再選択、zero nodes、live failure、pointer前後kill、allow-invalid、安全性拒否。kill後のgeneration pointer再観測と同source再実行が安全で、global recovery-requiredを作らないことを確認します。 |
 | 対応AC | AC-20, AC-22 |
 
 ### T27 Validate/Doctorの診断統合
@@ -511,7 +511,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 | CLI | 全44leaf、全旧28leaf、option前後、--、日本語title、parse error、JSON/noninteractive/confirm |
 | filesystem | symlink/hardlink、ancestor redirect、rename前後inode変更、disk full、readonly、partially published |
 | rollout | 2つ以上のworktree、2つ以上のconsumer、dogfood、旧engine/新schema、未知schema、履歴branch |
-| recovery | network送信前後、各journal phase、active保存前後、generation pointer前後、各managed root間のkill |
+| recovery | D-16対象のnetwork送信前後・各blocking journal phase・active保存前後・各managed root間kill。対象外のatomic/partial（Artifact、worktree、copy/bootstrap、generation pointer）ではglobal blockなし、対象固有のblind retry拒否 |
 | privacy | secretを含むstderr/URL、Artifact source外部path/hash/byte count、Workbench payload、terminal control文字 |
 
 例示fixtureのIDはtestが生成する値を使います。実repositoryのIssue番号をhard-codeしてテスト対象にしません。fixture専用IDを本番Issue IDと混同する文書も作りません。

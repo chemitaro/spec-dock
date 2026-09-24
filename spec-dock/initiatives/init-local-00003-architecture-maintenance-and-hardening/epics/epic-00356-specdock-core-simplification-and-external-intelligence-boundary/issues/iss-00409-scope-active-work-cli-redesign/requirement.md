@@ -78,6 +78,8 @@ Syncは生成状態の再構築です。active推定を行わず、既定はcach
 
 部分成功と成否不明を、変更前の失敗から区別します。remote操作済みなのに未実施と報告せず、解決済みの明示IDを使って回復を案内します。終了直後に `@current` が祖先へ移ることを考慮し、同じ動的selectorで再試行させません。
 
+未完了journalによる全変更の停止は、固定対象を使う明示的な復旧手順を持つ操作に限定します。その他の変更操作はatomic/CAS/identity検証と操作別の部分失敗診断で扱い、成否が不明な作成・外部効果を自動で再実行して二重適用しません。`workbench copy`と`worktree bootstrap`の任意・部分的な効果は自動rollbackや盲目的な再実行をせず、実施済み範囲を確認してから明示的に再実行します。これらの操作だけを理由に、無関係な変更を復旧不能なjournalで全体停止しません。
+
 ### R-07 一括切替とデータ保全
 
 変更された旧コマンドを新しい副作用へ黙ってaliasしません。副作用を維持できる入口以外は無変更で停止し、新しい入力方法を提示します。全旧28leafの対応を文書と回帰テストで追跡します。
@@ -141,7 +143,7 @@ Updateは固定供給元から明示versionまたはcommitを解決し、journal
 | AC-25 | 移行前の全対象がinventoryに載り、全writer停止・backup/restore検証後に一回のcoordinated cutoverを実施できます。全worktreeのwriter protocol/必要schemaが揃うまで通常変更を再開できません。 |
 | AC-26 | 三文書・Artifact・Workbench・Git ref・index・未追跡/ignored payloadの保全を検証できます。移行対象外のbytesは同一で、変更するmetadataは差分一覧に限られます。移行だけでGitHub状態は変わりません。 |
 | AC-27 | 全旧28leafについて、効果維持または無変更の説明付き拒否が確認できます。旧delete/finish/sync/uninstall/createの意味を黙って新効果へ置き換えません。全実行入口・skills・automationの呼出しが更新されます。 |
-| AC-28 | 並行writer、current変更競合、checkout後active失敗、remote close後解除失敗、成否不明timeoutで対象と実施済みeffectが保持されます。回復は固定IDを使い、別対象を処理しません。 |
+| AC-28 | 並行writer、current変更競合、checkout後active失敗、remote close後解除失敗、成否不明timeoutで対象と実施済みeffectが保持されます。明示resumeを備えた操作の未完了blocking journalだけが全変更を止め、固定IDと元operationで回復します。その他の部分失敗は同対象の衝突と二重適用を防ぎ、無関係な変更を全体停止しません。 |
 | AC-29 | symlink/hardlink、path traversal、異なるinodeへの差替え、credential付きURL、供給元偽装を無変更または明示partialとして扱います。secret、source本文/hash/byte count、リポジトリ外Artifact source絶対pathを出力しません。 |
 | AC-30 | provider sourceを先に完成させ、dogfoodingと全consumerを同じfixed bundleへ切り替えられます。consumer固有データをproviderの内容で上書きせず、履歴branchから旧writerが戻る経路を棚卸し・停止できます。 |
 | AC-31 | 人間向けHTMLが単独file・offline・スマートフォンで読めます。旧新対照、用語、状態/副作用、正常/失敗、移行手順があり、外部script/image/CDNに依存しません。 |

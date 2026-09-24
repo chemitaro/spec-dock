@@ -309,7 +309,7 @@ branch registryは「このrepositoryで一つ」の対応です。独立clone�
 | INV-07 | new branchのbaseは固定commit、existing branchはresetしません。other worktree ownershipを奪いません。 |
 | INV-08 | `--yes`や限定的な例外flagは、path safety/identity/child completion/循環検査を迂回しません。 |
 | INV-09 | 同じcommon directoryのmutatorは同一writer protocolとcontrol epochを要求し、schema不一致で書込みません。 |
-| INV-10 | pending/unknown journalは通常writeをブロックし、明示resume/rollbackまたはdiagnosticだけを許可します。 |
+| INV-10 | D-16の復旧対象操作が残したpending/unknown blocking journalだけが通常writeをブロックし、固定操作の明示resume/rollbackまたはdiagnosticだけを許可します。復旧対象外のpartial/unknownは対象固有の安全確認・競合guardを維持しますが、common control全体をrecovery-requiredにしません。 |
 | INV-11 | retryのtargetはoperation開始時の解決済みIDで固定し、@currentを再解決しません。 |
 | INV-12 | read-only/help/parse failureは一次状態を変更せず、dry-runはmanaged writeとproject hookを実行しません。 |
 | INV-13 | deleteはremote closeしない、syncはactive推定しない、worktree createはbootstrapしないという禁止effectを守ります。 |
@@ -360,11 +360,11 @@ GitHub adapterはIssue取得と更新のREST契約を使用し、PRを示すpull
 
 ### D-13 OperationPlan・lock・admission
 
-各変更は「resolve/read → pure plan → human confirmation → admission/lock再確認 → journal準備 → effect実行 → durable結果」の順です。確認中にwriter lockを占有せず、実行直前にsnapshot/revisionを再検証します。
+各変更は「resolve/read → pure plan → human confirmation → admission/lock再確認 → effect実行 → durable結果」の順です。D-16の復旧対象操作だけはeffect前にblocking journalを準備します。復旧対象外ではatomic/CAS/identity-safe persistenceまたは操作固有のpartial/unknown診断を使い、全体停止するpending journalを作りません。確認中にwriter lockを占有せず、実行直前にsnapshot/revisionを再検証します。
 
-controlの状態は `uninitialized / maintenance / ready / recovery-required` です。readyではschema3・writer/v1・承認済みengine digest・全登録active worktreeの互換性を要求します。maintenance中はinstallation/migrate/recoveryだけ、recovery-required中はdiagnosticと対象operationの回復だけを許可します。環境変数一個によるlock bypassは設けません。
+controlの状態は `uninitialized / maintenance / ready / recovery-required` です。readyではschema3・writer/v1・承認済みengine digest・全登録active worktreeの互換性を要求します。maintenance中はinstallation/migrate/recoveryだけ、recovery-required中はD-16のblocking journal対象operationのdiagnosticと固定操作の回復だけを許可します。復旧対象外の失敗は対象・entry固有の競合を診断し、無関係な通常writeをglobalに止めません。環境変数一個によるlock bypassは設けません。
 
-同一common directoryの通常mutatorは一つの共有advisory write lockで直列化します。単純さを優先し、短いmetadata操作の並列性を最適化しません。GitHubcallにはtimeoutを設定し、停止したprocessのlock解放後も未完了journalで継続writeを防ぎます。pid文字列や経過時間だけでlockを削除しません。
+同一common directoryの通常mutatorは一つの共有advisory write lockで直列化します。単純さを優先し、短いmetadata操作の並列性を最適化しません。GitHubcallにはtimeoutを設定し、D-16の復旧対象操作では停止したprocessのlock解放後も未完了blocking journalで継続writeを防ぎます。その他の操作は原子的な公開、状態再観測、対象固有の衝突拒否で二重適用を避けます。pid文字列や経過時間だけでlockを削除しません。
 
 複数作業場を触るcopy/update/migrateはcommon lockの後、stable worktree ID順にleaseを取得します。bootstrapは対象のshared lifetime leaseを維持し、common write lockを子process実行中ずっと保持しません。子process内の通常metadata操作は可能ですが、対象作業場のcheckout/remove/updateのexclusive leaseは失敗します。bootstrapから同じbootstrapを再帰実行する場合もbusyとして拒否します。
 
@@ -413,7 +413,7 @@ subprocessはargv配列で実行し、shell=True、eval、command substitution�
 | migrate/installation | inventory、schema/protocol/engine digest、phase、計画対象、適用結果、backup/journal識別 |
 | help/completion/version | `help`構造または`script`文字列、shell、version/digest。補完fileを直接書きません。 |
 
-errorは `{code,message,details}`、warningsは同じcode付き配列、recoveryは `{operation_id,can_resume,can_rollback,commands,blocked_reason}` とします。回復commandはshell文字列だけでなくargv配列を保持して安全に引用します。変化し得る日本語messageをscriptの分岐に使いません。
+errorは `{code,message,details}`、warningsは同じcode付き配列、recoveryは `{operation_id,can_resume,can_rollback,commands,blocked_reason}` とします。回復commandはshell文字列だけでなくargv配列を保持して安全に引用します。変化し得る日本語messageをscriptの分岐に使いません。 D-16対象外のpartial/unknownでは`can_resume=false`、`can_rollback=false`とし、実在しない復旧commandを出しません。対象固有のread-only確認先と、盲目的な再実行を拒否する理由を`details`/`recovery.blocked_reason`に示します。
 
 | exit | 用途 |
 |---:|---|
@@ -439,6 +439,8 @@ JSON指定時は最初のusage errorを含めstdout一文書です。stderrにpr
 | finish: GitHub close成否不明 | remote ref、request開始、reason、観測失敗をunknownで残します。activeは解除しません。 | live再照会して一致確認後に解除、未知のまま再closeを繰り返しません。 |
 | finish: close成功・active解除失敗 | remote completed、対象固定、selection before。 | 固定IDでresume。現在選択が別に進んでいればCAS失敗として停止します。 |
 | local close: metadata保存成功・projection失敗 | authoritative local stateは維持、derived dirty。 | sync cacheで再生成。状態保存を二回適用しません。 |
+| Artifact create/import: 公開後に結果不明 | 対象ScopeのArtifact catalogと新規fileのidentityを再観測します。 | 既存成果の確認前に別slotへblind create/importを繰り返しません。対象外のwriteをglobalに止めません。 |
+| branch switch / worktree create/remove: Git効果後に結果不明 | HEAD・ref・worktree登録・対象pathをread-onlyで再観測し、同対象の不整合を報告します。 | ref/dirを無条件に再作成・再削除せず、競合した対象だけ停止します。 |
 | delete: detach/active/削除の途中 | 許可された操作計画、退避した対象tree、before metadata、applied effects。 | D-16のresumeまたは安全条件付きrollback。GitHub操作は一切ありません。 |
 | sync: generation公開前失敗 | 以前のgeneration pointerを維持します。 | same sourceで再実行。失敗したstageを無条件deleteせず所有確認します。 |
 | sync: pointer公開後旧projection失敗 | 新generationを一次の派生読取り先として維持、旧固定名のstaleを表示。 | syncでprojectionを修復。active authorityは変更しません。 |
@@ -449,9 +451,9 @@ Deleteは実削除前に対象treeを同filesystem内の操作専用quarantine�
 
 ### D-16 Journalと具体的な復旧interface
 
-journalは業務イベントソーシングではなく、クラッシュ時の限定的な操作記録です。最低限 `operation_id / command / fixed_targets / request_fingerprint / before_revisions / phase / effects / backup_refs / engine_digest / writer_epoch / terminal_status` を保存します。network送信前にrequest開始を記録し、成功応答後に確定を書きます。request timeoutを失敗確定とみなしません。
+blocking journalは業務イベントソーシングではなく、D-16で明示resumeを持つ操作のクラッシュ時に限る操作記録です。対象は `scope create/import/close/reopen/delete`、`work start/finish`、`branch create`、`workspace migrate`、`installation init/update/uninstall` です。これ以外の変更leafはblocking journalとglobal `recovery-required`を生成しません。blocking journalには最低限 `operation_id / command / fixed_targets / request_fingerprint / before_revisions / phase / effects / backup_refs / engine_digest / writer_epoch / terminal_status` を保存します。network送信前にrequest開始を記録し、成功応答後に確定を書きます。request timeoutを失敗確定とみなしません。
 
-標準の再試行は固定IDによる同じ操作です。曖昧なpending operationがある場合は自動でどれかを再開しません。以下の補助optionを既存leafにだけ追加します。新しいnamespaceやコマンド名は増やしません。
+blocking journalを解消する標準の再試行は、D-16の`--resume`を使う固定ID・固定対象の同じ操作です。元operation、request fingerprint、revision、実施済み効果を照合し、remote効果がunknownならlive再照会で確認するまで重ねて送信しません。曖昧なpending operationを通常の同一コマンド再実行や別leafで自動再開せず、解消できない間は`recovery-required`を維持します。以下の補助optionを既存leafにだけ追加します。新しいnamespaceやコマンド名は増やしません。
 
 ```text
 --resume OPERATION_ID
@@ -463,6 +465,8 @@ journalは業務イベントソーシングではなく、クラッシュ時の�
   scope delete、workspace migrate、installation init/update/uninstallだけで対応します。
   --resumeとは排他です。通常targetやpin指定は元計画と一致する必要があります。
 ```
+
+D-16の一覧にない変更leaf、すなわち`scope edit`、`active set/clear`、`branch switch`、`dependency add/remove`、`artifact create/import`、`worktree create/remove/bootstrap`、`workbench copy`、`workspace sync`では`--resume/--rollback`を受理しません。中断後は対象と実施済み効果を再観測し、同一entryやtargetの衝突が未解消ならその操作だけを拒否します。Artifact作成/importやworktree作成の成否が不明な場合は、既存成果を確認する前に新規作成を繰り返しません。copy/bootstrapの任意効果は自動再実行せず、実施済み範囲の確認後だけ明示再実行します。syncは公開済みgeneration pointerを読んでから同じsourceで再実行します。いずれも無関係な通常writeはglobalに止めません。
 
 rollbackはremote close/reopen/createの逆操作を自動実行しません。Git refの復元も勝手に行わず、before/afterが記録値と一致し、利用者の後続変更がない場合だけローカルbackupを復元します。未確認changeがあれば `ROLLBACK_CONFLICT` で停止し、forward recoveryに切り替えます。operationが既に終了していればresumeは元の結果を返すno-opです。
 
