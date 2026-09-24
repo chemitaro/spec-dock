@@ -39,6 +39,18 @@ class InstallationGroup:
     worktrees: tuple[InstalledWorktree, ...]
 
 
+def installation_targets(repo_root: Path) -> tuple[Path, ...]:
+    """Read the available Git worktree roots for a new installation."""
+    targets: list[Path] = []
+    for item in worktree_list(repo_root):
+        if item.bare or item.path.is_symlink() or not item.path.is_dir():
+            raise ValueError("installation requires available Git worktrees")
+        targets.append(item.path.resolve(strict=True))
+    if repo_root not in targets or len(set(targets)) != len(targets):
+        raise ValueError("installation Git worktree inventory is incomplete")
+    return tuple(targets)
+
+
 def _installed_version(root: Path) -> str | None:
     version_path = root / "spec-dock/spec-dock.version"
     if any(path.is_symlink() for path in (root, root / "spec-dock", version_path)):

@@ -86,6 +86,9 @@ def _bundle(tmp_path: Path) -> VerifiedBundle:
     ignore = assets / "spec_dock/.gitignore"
     ignore.write_text(".agent/\n", encoding="utf-8")
     (assets / "spec_dock/workspace.json").write_text("{}\n", encoding="utf-8")
+    readme = assets / "spec_dock/templates/root/.workbench/README.md"
+    readme.parent.mkdir(parents=True)
+    readme.write_text("workbench\n", encoding="utf-8")
     (root / "pyproject.toml").write_text('[project]\nname = "spec-dock"\nversion = "0.2.4"\n', encoding="utf-8")
     paths = sorted(path.relative_to(root).as_posix() for path in root.rglob("*") if path.is_file())
     return VerifiedBundle(
@@ -94,6 +97,26 @@ def _bundle(tmp_path: Path) -> VerifiedBundle:
         _digest_paths(root, paths),
         _tooling_inventory(root),
     )
+
+
+def test_fresh_init_journals_scaffold_and_restores_absence(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    bundle = _bundle(tmp_path)
+    journal_root = tmp_path / "common"
+    record = prepare_installation(target, journal_root, action="init", bundle=bundle)
+    assert "spec-dock/workspace.json" in record.after_hashes
+    assert "spec-dock/.workbench/README.md" in record.after_hashes
+    completed = apply_installation(journal_root, record.operation_id, enter_maintenance=lambda _: None)
+    assert completed.phase == "committed"
+    assert (target / "spec-dock/workspace.json").read_text(encoding="utf-8") == "{}\n"
+    assert (target / "spec-dock/.workbench/README.md").read_text(encoding="utf-8") == "workbench\n"
+    restored = rollback_installation(
+        journal_root, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True
+    )
+    assert restored.phase == "rolled-back"
+    assert not (target / "spec-dock/workspace.json").exists()
+    assert not (target / "spec-dock/.workbench/README.md").exists()
 
 
 def test_installation_resumes_after_first_root_and_preserves_custom_ignore(tmp_path: Path) -> None:

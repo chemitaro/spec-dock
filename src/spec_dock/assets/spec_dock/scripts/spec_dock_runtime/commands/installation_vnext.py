@@ -10,13 +10,20 @@ from typing import TYPE_CHECKING
 from spec_dock.installation.source import (
     assert_disjoint_source_target,
     download_pinned_archive,
+    packaged_bundle,
     resolve_fixed_source,
     verify_bundle_integrity,
     verify_pinned_archive,
 )
+from spec_dock.installer import ASSETS
 from spec_dock_runtime.application.installation_update_vnext import (
+    bind_installation_engine,
+    init_installation_group,
+    plan_init_installation_group,
+    resume_init_installation_group,
     resume_installation_group,
     resume_uninstall_installation_group,
+    rollback_init_installation_group,
     rollback_installation_group,
     uninstall_installation_group,
     update_installation_group,
@@ -24,6 +31,7 @@ from spec_dock_runtime.application.installation_update_vnext import (
 from spec_dock_runtime.application.installation_vnext import (
     InstallationView,
     inspect_installation_group,
+    installation_targets,
     show_installation,
 )
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
@@ -32,6 +40,7 @@ if TYPE_CHECKING:
     import argparse
 
     from spec_dock.installation.group_journal import InstallationGroupRecord
+    from spec_dock.runtime_loader import VerifiedEngine
     from spec_dock_runtime.commands.work_vnext import WorkContext
 
 
@@ -47,6 +56,79 @@ class InstallationUpdatePlan:
 class InstallationUninstallPlan:
     targets: tuple[str, ...]
     preserve_consumer_data: bool
+
+
+@dataclass(frozen=True)
+class InstallationInitPlan:
+    targets: tuple[str, ...]
+    engine_digest: str
+
+
+def run_installation_init(
+    ns: argparse.Namespace,
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    engine_digest: str,
+    engine_version: str,
+    engine_pin: VerifiedEngine | None,
+) -> OperationResult[InstallationGroupRecord | InstallationInitPlan]:
+    """Install the executing fixed package into a fresh Git worktree group."""
+    targets = installation_targets(repo_root)
+    for target in targets:
+        assert_disjoint_source_target(ASSETS, target)
+    if ns.dry_run:
+        if ns.resume or ns.rollback:
+            raise ValueError("installation init recovery cannot be previewed")
+        plan_init_installation_group(repo_root=repo_root, common_dir=common_dir, engine_digest=engine_digest)
+        return OperationResult(
+            ns.command_path,
+            "planned",
+            InstallationInitPlan(tuple(str(item) for item in targets), engine_digest),
+            0,
+            effects=(Effect("installation-init", "planned", None),),
+        )
+    if not ns.yes:
+        raise ValueError("installation init requires --yes")
+    if engine_pin is None or engine_pin.distribution_digest != engine_digest:
+        raise ValueError("installation init requires a verified external engine")
+    if ns.rollback:
+        record = rollback_init_installation_group(
+            repo_root=repo_root,
+            common_dir=common_dir,
+            engine_digest=engine_digest,
+            operation_id=ns.rollback,
+            lock_timeout=ns.lock_timeout,
+        )
+    else:
+        with TemporaryDirectory(prefix="specdock-package-") as directory:
+            bundle = packaged_bundle(assets_root=ASSETS, destination=Path(directory) / "bundle", version=engine_version)
+            bind_installation_engine(repo_root=repo_root, common_dir=common_dir, engine=engine_pin)
+            if ns.resume:
+                record = resume_init_installation_group(
+                    repo_root=repo_root,
+                    common_dir=common_dir,
+                    engine_digest=engine_digest,
+                    operation_id=ns.resume,
+                    bundle=bundle,
+                    lock_timeout=ns.lock_timeout,
+                )
+            else:
+                record = init_installation_group(
+                    repo_root=repo_root,
+                    common_dir=common_dir,
+                    engine_digest=engine_digest,
+                    bundle=bundle,
+                    lock_timeout=ns.lock_timeout,
+                )
+    return OperationResult(
+        ns.command_path,
+        "succeeded",
+        record,
+        0,
+        operation_id=record.operation_id,
+        effects=(Effect("installation-init", "succeeded", record.operation_id),),
+    )
 
 
 def run_installation_show(

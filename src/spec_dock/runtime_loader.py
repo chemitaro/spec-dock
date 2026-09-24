@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import uuid
 
 _SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -130,3 +131,46 @@ def read_engine_pin(common_dir: Path, *, checkout_root: Path) -> VerifiedEngine:
         raise ValueError("fixed engine and repository control disagree")
     pin = EnginePin(Path(payload["executable"]), Path(payload["distribution_root"]), payload["distribution_digest"])
     return verify_engine_pin(pin, checkout_root=checkout_root)
+
+
+def write_engine_pin(common_dir: Path, engine: VerifiedEngine) -> None:
+    """Publish one verified locator without replacing another engine identity."""
+    if not common_dir.is_absolute() or not _SHA256.fullmatch(engine.distribution_digest):
+        raise ValueError("engine locator identity is invalid")
+    directory = common_dir / "spec-dock/control"
+    for parent in (common_dir / "spec-dock", directory):
+        parent.mkdir(mode=0o700, exist_ok=True)
+        if parent.is_symlink():
+            raise ValueError("engine locator directory is redirected")
+    path = directory / "engine.json"
+    if path.is_symlink():
+        raise ValueError("engine locator is redirected")
+    payload = {
+        "schema_version": 1,
+        "executable": str(engine.executable),
+        "distribution_root": str(engine.distribution_root),
+        "distribution_digest": engine.distribution_digest,
+    }
+    if path.exists():
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as error:
+            raise ValueError("existing engine locator is invalid") from error
+        if existing != payload:
+            raise ValueError("engine locator already pins another distribution")
+        return
+    temporary = directory / f".engine-{uuid.uuid4().hex}.tmp"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write((json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode())
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+        parent_descriptor = os.open(directory, os.O_RDONLY)
+        try:
+            os.fsync(parent_descriptor)
+        finally:
+            os.close(parent_descriptor)
+    finally:
+        temporary.unlink(missing_ok=True)

@@ -81,7 +81,8 @@ def _validate(record: InstallationGroupRecord) -> None:
             and (not isinstance(record.source_digest, str) or _DIGEST.fullmatch(record.source_digest) is None)
         )
         or (record.action == "uninstall" and (record.source_commit is not None or record.source_digest is not None))
-        or (record.action != "uninstall" and (record.source_commit is None or record.source_digest is None))
+        or (record.action == "update" and (record.source_commit is None or record.source_digest is None))
+        or (record.action == "init" and record.source_digest is None)
         or type(record.keep_maintenance) is not bool
         or not isinstance(record.targets, tuple)
         or not record.targets

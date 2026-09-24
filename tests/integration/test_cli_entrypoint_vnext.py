@@ -5,7 +5,13 @@ from pathlib import Path
 
 import pytest
 
-from spec_dock.runtime_loader import EnginePin, digest_distribution, read_engine_pin, verify_engine_pin
+from spec_dock.runtime_loader import (
+    EnginePin,
+    digest_distribution,
+    read_engine_pin,
+    verify_engine_pin,
+    write_engine_pin,
+)
 
 
 def _fixture_engine(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -78,3 +84,19 @@ def test_engine_locator_matches_control_and_verifies_full_distribution(tmp_path:
     (control / "control.json").write_text(json.dumps({"engine_digest": "a" * 64}), encoding="utf-8")
     with pytest.raises(ValueError, match="disagree"):
         read_engine_pin(common, checkout_root=checkout)
+
+
+def test_engine_locator_does_not_replace_an_existing_pin(tmp_path: Path) -> None:
+    checkout, distribution, executable = _fixture_engine(tmp_path)
+    digest = digest_distribution(distribution)
+    common = tmp_path / "common"
+    common.mkdir()
+    verified = verify_engine_pin(EnginePin(executable, distribution, digest), checkout_root=checkout)
+    write_engine_pin(common, verified)
+    path = common / "spec-dock/control/engine.json"
+    before = path.read_bytes()
+    write_engine_pin(common, verified)
+    assert path.read_bytes() == before
+    with pytest.raises(ValueError, match="another distribution"):
+        write_engine_pin(common, type(verified)(executable, distribution, "a" * 64))
+    assert path.read_bytes() == before

@@ -20,7 +20,12 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
 _MANAGED = (*TOOL_DIRECTORIES, VERSION_FILE, IGNORE_FILE)
+_INIT_SCAFFOLD = ("spec-dock/workspace.json", "spec-dock/.workbench/README.md")
 _OPERATION_ID = re.compile(r"[0-9a-f]{32}\Z")
+
+
+def _record_paths(action: str) -> tuple[str, ...]:
+    return (*_MANAGED, *_INIT_SCAFFOLD) if action == "init" else _MANAGED
 
 
 def _digest_path(path: Path) -> str | None:
@@ -52,7 +57,7 @@ def _digest_path(path: Path) -> str | None:
 def _guard_target(target: Path) -> None:
     if not target.is_absolute() or not target.is_dir() or any(path.is_symlink() for path in (target, *target.parents)):
         raise ValueError("installation target must be an existing absolute directory")
-    for relative in _MANAGED:
+    for relative in (*_MANAGED, *_INIT_SCAFFOLD):
         candidate = target
         for part in Path(relative).parts:
             candidate = candidate / part
@@ -68,6 +73,8 @@ def _operation_area(target: Path, operation_id: str) -> Path:
 
 
 def _asset_path(bundle: VerifiedBundle, relative: str) -> Path:
+    if relative == "spec-dock/.workbench/README.md":
+        return bundle.root / "src/spec_dock/assets/spec_dock/templates/root/.workbench/README.md"
     if relative.startswith("spec-dock/"):
         return bundle.root / "src/spec_dock/assets/spec_dock" / relative.removeprefix("spec-dock/")
     return bundle.root / "src/spec_dock/assets/install_root" / relative
@@ -120,7 +127,7 @@ def prepare_installation(
     installed = (target / VERSION_FILE).exists()
     if action == "init" and installed:
         raise ValueError("SpecDock is already installed")
-    if action == "init" and any((target / relative).exists() for relative in TOOL_DIRECTORIES):
+    if action == "init" and any((target / relative).exists() for relative in (*TOOL_DIRECTORIES, *_INIT_SCAFFOLD)):
         raise ValueError("installation init refuses existing tooling directories")
     if action == "update" and not installed:
         raise ValueError("SpecDock is not installed")
@@ -140,7 +147,7 @@ def prepare_installation(
     before: dict[str, str | None] = {}
     after: dict[str, str | None] = {}
     try:
-        for relative in _MANAGED:
+        for relative in _record_paths(action):
             destination = target / relative
             before[relative] = _digest_path(destination)
             staged = area / "stage" / relative
@@ -149,10 +156,11 @@ def prepare_installation(
                 after[relative] = before[relative] if relative == IGNORE_FILE else None
             elif relative == VERSION_FILE:
                 assert bundle is not None
+                version = installed_version or bundle.source.version or bundle.source.commit
+                if version is None:
+                    raise ValueError("installation source has no version identity")
                 staged.parent.mkdir(parents=True, exist_ok=True)
-                staged.write_text(
-                    (installed_version or bundle.source.version or bundle.source.commit) + "\n", encoding="utf-8"
-                )
+                staged.write_text(version + "\n", encoding="utf-8")
                 after[relative] = _digest_path(staged)
             elif relative == IGNORE_FILE:
                 if before[relative] is not None and destination.read_bytes() != LEGACY_WORKBENCH_IGNORE:
@@ -185,10 +193,11 @@ def prepare_installation(
 
 
 def _verify_record_paths(record: InstallationRecord) -> None:
-    if set(record.before_hashes) != set(_MANAGED) or set(record.after_hashes) != set(_MANAGED):
+    paths = _record_paths(record.action)
+    if set(record.before_hashes) != set(paths) or set(record.after_hashes) != set(paths):
         raise ValueError("installation journal path inventory differs from this engine")
     if len(set(record.completed_roots)) != len(record.completed_roots) or any(
-        root not in _MANAGED for root in record.completed_roots
+        root not in paths for root in record.completed_roots
     ):
         raise ValueError("installation journal completed-root inventory is invalid")
 
@@ -246,7 +255,7 @@ def apply_installation(
     try:
         record = replace(record, phase="replacing", error=None)
         write_record(journal_root, record)
-        for relative in _MANAGED:
+        for relative in _record_paths(record.action):
             if relative in record.completed_roots:
                 if _digest_path(target / relative) != record.after_hashes[relative]:
                     raise ValueError(f"completed installation path changed: {relative}")
@@ -257,7 +266,7 @@ def apply_installation(
             write_record(journal_root, record)
             if after_root is not None:
                 after_root(relative)
-        for relative in _MANAGED:
+        for relative in _record_paths(record.action):
             if _digest_path(target / relative) != record.after_hashes[relative]:
                 raise ValueError(f"installed content verification failed: {relative}")
         record = replace(record, phase="committed")
@@ -283,7 +292,7 @@ def rollback_installation(
     target = Path(record.target)
     enter_maintenance(record)
     area = _operation_area(target, operation_id)
-    for relative in reversed(_MANAGED):
+    for relative in reversed(_record_paths(record.action)):
         destination = target / relative
         backup = area / "backup" / relative
         current = _digest_path(destination)
@@ -321,7 +330,7 @@ def preflight_rollback_installation(
     target = Path(record.target)
     _guard_target(target)
     area = _operation_area(target, operation_id)
-    for relative in _MANAGED:
+    for relative in _record_paths(record.action):
         current = _digest_path(target / relative)
         expected = record.after_hashes[relative]
         previous = record.before_hashes[relative]

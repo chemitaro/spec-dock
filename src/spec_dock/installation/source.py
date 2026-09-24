@@ -8,6 +8,7 @@ from io import BytesIO
 import os
 from pathlib import Path, PurePosixPath
 import re
+import shutil
 import subprocess
 import tarfile
 import tempfile
@@ -53,8 +54,15 @@ class PinnedSource:
 
 
 @dataclass(frozen=True)
+class PackagedSource:
+    repository: str
+    commit: None
+    version: str
+
+
+@dataclass(frozen=True)
 class VerifiedBundle:
-    source: PinnedSource
+    source: PinnedSource | PackagedSource
     root: Path
     digest: str
     tooling_paths: tuple[str, ...]
@@ -265,7 +273,10 @@ def _digest_paths(root: Path, paths: Iterable[str]) -> str:
 
 def verify_bundle_integrity(bundle: VerifiedBundle) -> None:
     """Recheck the immutable input just before installer staging."""
-    fixed_archive_url(bundle.source)
+    if isinstance(bundle.source, PinnedSource):
+        fixed_archive_url(bundle.source)
+    elif bundle.source.repository != SOURCE_REPOSITORY or _VERSION.fullmatch(bundle.source.version) is None:
+        raise ValueError("packaged bundle source identity is invalid")
     root = bundle.root
     if not root.is_dir() or root.is_symlink():
         raise ValueError("verified bundle root is unavailable")
@@ -277,6 +288,37 @@ def verify_bundle_integrity(bundle: VerifiedBundle) -> None:
             paths.append(path.relative_to(root).as_posix())
     if _digest_paths(root, sorted(paths)) != bundle.digest or _tooling_inventory(root) != bundle.tooling_paths:
         raise ValueError("verified bundle content changed after archive validation")
+
+
+def packaged_bundle(*, assets_root: Path, destination: Path, version: str) -> VerifiedBundle:
+    """Normalize the executing package's assets into a verified inert bundle."""
+    if _VERSION.fullmatch(version) is None or not assets_root.is_absolute() or not assets_root.is_dir():
+        raise ValueError("installed package source is invalid")
+    if not destination.is_absolute() or destination.exists() or destination.is_symlink():
+        raise ValueError("package bundle destination must be a new absolute directory")
+    for path in assets_root.rglob("*"):
+        if path.is_symlink() or (not path.is_file() and not path.is_dir()):
+            raise ValueError("installed package has an unsafe asset")
+    normalized = destination / "src/spec_dock/assets"
+    normalized.parent.mkdir(parents=True)
+    shutil.copytree(
+        assets_root,
+        normalized,
+        symlinks=False,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
+    )
+    (destination / "pyproject.toml").write_text(
+        f'[project]\nname = "spec-dock"\nversion = "{version.removeprefix("v")}"\n', encoding="utf-8"
+    )
+    paths = tuple(sorted(path.relative_to(destination).as_posix() for path in destination.rglob("*") if path.is_file()))
+    bundle = VerifiedBundle(
+        PackagedSource(SOURCE_REPOSITORY, None, version),
+        destination,
+        _digest_paths(destination, paths),
+        _tooling_inventory(destination),
+    )
+    verify_bundle_integrity(bundle)
+    return bundle
 
 
 def verify_pinned_archive(source: PinnedSource, archive: bytes, destination: Path) -> VerifiedBundle:

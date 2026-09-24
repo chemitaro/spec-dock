@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -23,15 +24,23 @@ from spec_dock.installation.group_journal import (
 )
 from spec_dock.installation.journal import InstallationRecord, read_record
 from spec_dock.installation.source import assert_disjoint_source_target, verify_bundle_integrity
-from spec_dock_runtime.application.installation_vnext import InstallationGroup, inspect_installation_group
+from spec_dock.runtime_loader import EnginePin, VerifiedEngine, verify_engine_pin, write_engine_pin
+from spec_dock_runtime.application.installation_vnext import (
+    InstallationGroup,
+    InstalledWorktree,
+    inspect_installation_group,
+)
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.infra.control_store import (
     WORKSPACE_SCHEMA,
     WRITER_PROTOCOL,
     ControlState,
+    WorktreeRegistration,
     load_control,
     store_control,
 )
+from spec_dock_runtime.infra.git_cli import worktree_list
+from spec_dock_runtime.infra.installation_group_store import pending_installation_groups
 from spec_dock_runtime.infra.writer_lock import writer_transaction
 
 if TYPE_CHECKING:
@@ -186,6 +195,268 @@ def _commit_group(common_dir: Path, record: InstallationGroupRecord) -> Installa
     completed = replace(record, phase="committed", error=None)
     write_group_record(common_dir, completed)
     return completed
+
+
+def _fresh_group(repo_root: Path, common_dir: Path, engine_digest: str) -> InstallationGroup:
+    """Fix the real Git worktree inventory before publishing initial control."""
+    control = load_control(common_dir)
+    if control is not None and (control.mode != "uninitialized" or control.engine_digest != engine_digest):
+        raise ValueError("repository already has installation control")
+    records = worktree_list(repo_root)
+    roots: set[Path] = set()
+    targets: list[InstalledWorktree] = []
+    for record in records:
+        root = record.path
+        if record.bare or not root.is_absolute() or root.is_symlink() or not root.is_dir():
+            raise ValueError("Git worktree inventory contains an unavailable worktree")
+        if root.resolve(strict=True) != root or root in roots:
+            raise ValueError("Git worktree inventory has an unstable path")
+        roots.add(root)
+        worktree_id = (
+            "main" if (root / ".git").is_dir() else f"wt-{hashlib.sha256(str(root).encode()).hexdigest()[:16]}"
+        )
+        if (root / "spec-dock/spec-dock.version").exists():
+            raise ValueError("installation init requires every worktree to be uninstalled")
+        targets.append(
+            InstalledWorktree(worktree_id, str(root), None, WORKSPACE_SCHEMA, WRITER_PROTOCOL, engine_digest, True)
+        )
+    if repo_root not in roots or not targets:
+        raise ValueError("installation init target is not a Git worktree root")
+    if len({item.id for item in targets}) != len(targets):
+        raise ValueError("installation worktree identity collision")
+    targets.sort(key=lambda item: item.id)
+    if control is not None and tuple((item.id, item.root) for item in targets) != tuple(
+        (item.id, item.root) for item in control.worktrees
+    ):
+        raise ValueError("uninitialized installation worktree inventory changed")
+    return InstallationGroup(str(common_dir), 0 if control is None else control.epoch, "uninitialized", tuple(targets))
+
+
+def _check_init_inventory(repo_root: Path, record: InstallationGroupRecord) -> None:
+    observed: set[tuple[str, str]] = set()
+    for item in worktree_list(repo_root):
+        root = item.path
+        if item.bare or root.is_symlink() or not root.is_dir() or root.resolve(strict=True) != root:
+            raise ValueError("installation init worktree inventory is unavailable")
+        worktree_id = (
+            "main" if (root / ".git").is_dir() else f"wt-{hashlib.sha256(str(root).encode()).hexdigest()[:16]}"
+        )
+        observed.add((worktree_id, str(root)))
+    fixed = {(target.worktree_id, target.root) for target in record.targets}
+    if observed != fixed or len(observed) != len(record.targets):
+        raise ValueError("installation init worktree inventory changed")
+
+
+def _initial_control(record: InstallationGroupRecord) -> ControlState:
+    registrations = tuple(
+        WorktreeRegistration(
+            target.worktree_id, target.root, WORKSPACE_SCHEMA, WRITER_PROTOCOL, record.engine_digest, True
+        )
+        for target in record.targets
+    )
+    return ControlState(
+        WORKSPACE_SCHEMA,
+        WRITER_PROTOCOL,
+        record.control_epoch + 1,
+        record.engine_digest,
+        "maintenance",
+        registrations,
+    )
+
+
+def plan_init_installation_group(*, repo_root: Path, common_dir: Path, engine_digest: str) -> InstallationGroup:
+    """Inspect a fresh group without creating control or journals."""
+    group = _fresh_group(repo_root, common_dir, engine_digest)
+    if pending_installation_groups(common_dir):
+        raise ValueError("installation init has a pending operation; resume or rollback it")
+    return group
+
+
+def bind_installation_engine(*, repo_root: Path, common_dir: Path, engine: VerifiedEngine) -> None:
+    """Recheck the external distribution before the first control transition."""
+    checked = verify_engine_pin(
+        EnginePin(engine.executable, engine.distribution_root, engine.distribution_digest),
+        checkout_root=repo_root,
+    )
+    if checked != engine:
+        raise ValueError("executing engine identity changed")
+    write_engine_pin(common_dir, checked)
+
+
+def init_installation_group(
+    *, repo_root: Path, common_dir: Path, engine_digest: str, bundle: VerifiedBundle, lock_timeout: float = 0.0
+) -> InstallationGroupRecord:
+    """Journal a fixed fresh distribution across every Git worktree."""
+    before = plan_init_installation_group(repo_root=repo_root, common_dir=common_dir, engine_digest=engine_digest)
+    _check_bundle(before, bundle)
+    with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in before.worktrees), timeout=lock_timeout):
+        if _fresh_group(repo_root, common_dir, engine_digest) != before or pending_installation_groups(common_dir):
+            raise ValueError("installation inventory changed before the init lock")
+        group_id = uuid4().hex
+        record = InstallationGroupRecord(
+            group_id,
+            "init",
+            str(common_dir),
+            before.control_epoch,
+            engine_digest,
+            bundle.source.commit,
+            bundle.digest,
+            False,
+            _fixed_targets(before, group_id),
+            "preparing",
+        )
+        write_group_record(common_dir, record, create=True)
+        try:
+            previous = load_control(common_dir)
+            store_control(
+                common_dir,
+                _initial_control(record),
+                expected_epoch=None if previous is None else previous.epoch,
+            )
+            record = _stage_missing(common_dir, record, bundle)
+            record = _apply_children(common_dir, record)
+            return _commit_group(common_dir, record)
+        except Exception as error:
+            failed = replace(read_group_record(common_dir, group_id), phase="recovery-required", error=str(error))
+            write_group_record(common_dir, failed)
+            raise
+
+
+def resume_init_installation_group(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    engine_digest: str,
+    operation_id: str,
+    bundle: VerifiedBundle,
+    lock_timeout: float = 0.0,
+) -> InstallationGroupRecord:
+    """Complete a fixed fresh install after a stopped staging or replacement phase."""
+    record = read_group_record(common_dir, operation_id)
+    if record.action != "init" or record.phase in {"committed", "rolled-back"} or record.engine_digest != engine_digest:
+        raise ValueError("installation init group is not resumable")
+    _check_init_inventory(repo_root, record)
+    group = InstallationGroup(
+        str(common_dir),
+        record.control_epoch,
+        "uninitialized",
+        tuple(
+            InstalledWorktree(item.worktree_id, item.root, None, WORKSPACE_SCHEMA, WRITER_PROTOCOL, engine_digest, True)
+            for item in record.targets
+        ),
+    )
+    _check_bundle(group, bundle, source_commit=record.source_commit, source_digest=record.source_digest)
+    with writer_transaction(
+        common_dir, worktree_ids=tuple(item.worktree_id for item in record.targets), timeout=lock_timeout
+    ):
+        record = read_group_record(common_dir, operation_id)
+        if record.action != "init" or record.phase in {"committed", "rolled-back"}:
+            raise ValueError("installation init group is not resumable")
+        _check_init_inventory(repo_root, record)
+        control = load_control(common_dir)
+        expected = _initial_control(record)
+        if control is None:
+            if record.control_epoch != 0:
+                raise ValueError("installation init lost its previous control")
+            store_control(common_dir, expected, expected_epoch=None)
+        elif control.mode == "uninitialized" and control.epoch == record.control_epoch:
+            store_control(common_dir, expected, expected_epoch=control.epoch)
+        elif control != expected:
+            if not (
+                control.mode == "ready"
+                and control.epoch == record.control_epoch + 2
+                and replace(control, mode="maintenance", epoch=record.control_epoch + 1) == expected
+                and all(item.completed for item in record.targets)
+            ):
+                raise ValueError("installation init control changed during recovery")
+        try:
+            record = _stage_missing(common_dir, record, bundle, recover_stage=True)
+            record = _apply_children(common_dir, record)
+            return _commit_group(common_dir, record)
+        except Exception as error:
+            failed = replace(read_group_record(common_dir, operation_id), phase="recovery-required", error=str(error))
+            write_group_record(common_dir, failed)
+            raise
+
+
+def rollback_init_installation_group(
+    *, repo_root: Path, common_dir: Path, engine_digest: str, operation_id: str, lock_timeout: float = 0.0
+) -> InstallationGroupRecord:
+    """Restore untouched pre-init paths in every worktree and disable the new writer."""
+    record = read_group_record(common_dir, operation_id)
+    if record.action != "init" or record.engine_digest != engine_digest:
+        raise ValueError("installation rollback target is not an init operation")
+    if record.phase == "rolled-back":
+        return record
+    _check_init_inventory(repo_root, record)
+    with writer_transaction(
+        common_dir, worktree_ids=tuple(item.worktree_id for item in record.targets), timeout=lock_timeout
+    ):
+        record = read_group_record(common_dir, operation_id)
+        if record.action != "init" or record.phase == "rolled-back":
+            raise ValueError("installation init rollback state changed")
+        _check_init_inventory(repo_root, record)
+        control = load_control(common_dir)
+        if control is not None:
+            allowed = {
+                ("maintenance", record.control_epoch + 1),
+                ("ready", record.control_epoch + 2),
+                ("maintenance", record.control_epoch + 3),
+                ("uninitialized", record.control_epoch + 2),
+                ("uninitialized", record.control_epoch + 4),
+            }
+            if control.engine_digest != engine_digest or (control.mode, control.epoch) not in allowed:
+                raise ValueError("installation init control changed before rollback")
+        children: list[InstallationRecord | None] = []
+        for target in record.targets:
+            assert target.child_operation_id is not None
+            journal_root = _child_root(common_dir, record.operation_id, target.worktree_id)
+            child_path = journal_root / "installations" / target.child_operation_id / "record.json"
+            if not os.path.lexists(child_path):
+                if target.completed:
+                    raise ValueError("completed installation child has no journal")
+                children.append(None)
+                continue
+            child = preflight_rollback_installation(journal_root, target.child_operation_id, allow_committed=True)
+            if (
+                child.action != "init"
+                or child.target != target.root
+                or child.source_commit != record.source_commit
+                or child.source_digest != record.source_digest
+            ):
+                raise ValueError("installation init child identity changed")
+            children.append(child)
+        if control is not None and control.mode == "ready":
+            store_control(
+                common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
+            )
+        try:
+            for target, rollback_child in reversed(tuple(zip(record.targets, children, strict=True))):
+                if rollback_child is None or rollback_child.phase == "rolled-back":
+                    continue
+                assert target.child_operation_id is not None
+                rollback_installation(
+                    _child_root(common_dir, record.operation_id, target.worktree_id),
+                    target.child_operation_id,
+                    enter_maintenance=lambda _child: None,
+                    allow_committed=True,
+                )
+            current = load_control(common_dir)
+            if current is not None and current.mode != "uninitialized":
+                if current.mode != "maintenance" or current.engine_digest != engine_digest:
+                    raise ValueError("installation init maintenance control changed")
+                store_control(
+                    common_dir,
+                    replace(current, mode="uninitialized", epoch=current.epoch + 1),
+                    expected_epoch=current.epoch,
+                )
+            rolled_back = replace(record, phase="rolled-back", error=None)
+            write_group_record(common_dir, rolled_back)
+            return rolled_back
+        except Exception as error:
+            failed = replace(read_group_record(common_dir, operation_id), phase="recovery-required", error=str(error))
+            write_group_record(common_dir, failed)
+            raise
 
 
 def update_installation_group(

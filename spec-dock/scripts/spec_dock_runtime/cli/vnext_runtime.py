@@ -13,6 +13,7 @@ from spec_dock_runtime.commands.artifact_vnext import run_artifact_change, run_a
 from spec_dock_runtime.commands.branch_vnext import run_branch_command
 from spec_dock_runtime.commands.dependency_vnext import run_dependency_change, run_dependency_query
 from spec_dock_runtime.commands.installation_vnext import (
+    run_installation_init,
     run_installation_show,
     run_installation_uninstall,
     run_installation_update,
@@ -36,6 +37,8 @@ from spec_dock_runtime.presentation.errors import CliMessageData, CompletionData
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from spec_dock.runtime_loader import VerifiedEngine
 
 
 @dataclass(frozen=True)
@@ -100,6 +103,7 @@ def run_vnext(
     invocation_cwd: Path,
     engine_digest: str,
     engine_version: str,
+    engine_pin: VerifiedEngine | None = None,
 ) -> RuntimeOutput:
     """Parse once, bind to a registered worktree, then dispatch supported leaves."""
     parsed = parse_vnext_output(argv, engine_version=engine_version, engine_digest=engine_digest)
@@ -156,10 +160,33 @@ def run_vnext(
             "workspace sync",
             "workspace migrate",
             "installation show",
+            "installation init",
             "installation update",
             "installation uninstall",
         }:
             raise ValueError("vNext command execution is not yet connected")
+        if ns.command_path == "installation init":
+            requested = Path(ns.path).expanduser()
+            if not requested.is_absolute():
+                requested = invocation_cwd / requested
+            requested = requested.resolve(strict=True)
+            root = _repository_root(requested)
+            if root != requested:
+                raise ValueError("installation init PATH must name a Git worktree root")
+            if ns.project and Path(ns.project).expanduser().resolve(strict=True) != requested:
+                raise ValueError("--project and installation init PATH must name the same worktree")
+            result = run_installation_init(
+                ns,
+                repo_root=root,
+                common_dir=git_common_directory(root),
+                engine_digest=engine_digest,
+                engine_version=engine_version,
+                engine_pin=engine_pin,
+            )
+            if json_mode:
+                return RuntimeOutput(result.exit_code, render_json(result), "")
+            stdout, stderr = render_text(result)
+            return RuntimeOutput(result.exit_code, stdout, stderr)
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
         if ns.command_path in {"scope list", "scope show"}:
             result = run_scope_query(ns, context)
