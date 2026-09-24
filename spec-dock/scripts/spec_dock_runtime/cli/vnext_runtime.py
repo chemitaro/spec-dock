@@ -21,6 +21,7 @@ from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_sco
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.commands.workbench_vnext import run_workbench_copy
 from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace_diagnostics
+from spec_dock_runtime.commands.workspace_migrate_vnext import run_workspace_migrate
 from spec_dock_runtime.commands.workspace_sync_vnext import run_workspace_sync
 from spec_dock_runtime.commands.worktree_vnext import run_worktree_change, run_worktree_query
 from spec_dock_runtime.infra.control_store import load_control
@@ -149,6 +150,7 @@ def run_vnext(
             "workspace validate",
             "workspace doctor",
             "workspace sync",
+            "workspace migrate",
             "installation show",
             "installation update",
         }:
@@ -188,6 +190,8 @@ def run_vnext(
             result = run_workspace_diagnostics(ns, context)
         elif ns.command_path == "workspace sync":
             result = run_workspace_sync(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+        elif ns.command_path == "workspace migrate":
+            result = run_workspace_migrate(ns, context, invocation_cwd=invocation_cwd)
         elif ns.command_path == "installation show":
             result = run_installation_show(ns, context, engine_version=engine_version, invocation_cwd=invocation_cwd)
         elif ns.command_path == "installation update":

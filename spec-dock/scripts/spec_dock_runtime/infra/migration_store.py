@@ -7,6 +7,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
+import subprocess
 
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
@@ -48,6 +50,174 @@ class MigrationInventory:
     digest: str
     worktrees: tuple[MigrationWorktree, ...]
     blockers: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class MigrationMap:
+    repository_uid: str
+    source_inventory_digest: str
+    scope_backend_overrides: tuple[dict[str, object], ...]
+    branch_bindings: tuple[dict[str, object], ...]
+    active_repairs: tuple[dict[str, object], ...]
+    worktrees: tuple[dict[str, object], ...]
+
+
+def _branch_tip(repo_root: Path, branch: str) -> str:
+    try:
+        checked = subprocess.run(
+            ["git", "-C", str(repo_root), "check-ref-format", "--branch", branch],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError("migration branch mapping could not be inspected") from error
+    if checked.returncode != 0:
+        raise ValueError("migration branch mapping name is invalid")
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "show-ref", "--verify", "--hash", f"refs/heads/{branch}"],
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=10,
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise ValueError("migration branch mapping could not be inspected") from error
+    if result.returncode != 0 or re.fullmatch(r"[0-9a-f]{40}", result.stdout.strip()) is None:
+        raise ValueError("migration branch mapping ref is missing")
+    return result.stdout.strip()
+
+
+def read_migration_map(path: Path, inventory: MigrationInventory) -> MigrationMap:
+    """Accept only decisions tied to exact, observed inventory entries."""
+    if not path.is_file() or path.is_symlink():
+        raise ValueError("migration mapping must be a regular file")
+    payload, _digest_value = _read_json(path)
+    fields = {
+        "schema_version",
+        "repository_uid",
+        "source_inventory_digest",
+        "scope_backend_overrides",
+        "branch_bindings",
+        "active_repairs",
+        "worktrees",
+    }
+    if not isinstance(payload, dict) or set(payload) != fields:
+        raise ValueError("migration mapping shape is invalid")
+    if (
+        payload["schema_version"] != "specdock.migration-map/v1"
+        or payload["repository_uid"] != inventory.repository_uid
+        or payload["source_inventory_digest"] != inventory.digest
+    ):
+        raise ValueError("migration mapping does not match the current inventory")
+    rows: dict[str, tuple[dict[str, object], ...]] = {}
+    for name in ("scope_backend_overrides", "branch_bindings", "active_repairs", "worktrees"):
+        items = payload[name]
+        if not isinstance(items, list) or any(not isinstance(item, dict) for item in items):
+            raise ValueError(f"migration mapping {name} must be an array of objects")
+        rows[name] = tuple(items)
+    by_worktree = {item.registration_id: item for item in inventory.worktrees if item.registration_id is not None}
+    known_scopes = {(item.registration_id, scope.id): scope for item in inventory.worktrees for scope in item.scopes}
+    backend_keys: set[tuple[str, str]] = set()
+    for row in rows["scope_backend_overrides"]:
+        if set(row) - {"worktree_id", "scope_id", "metadata_digest", "backend", "github"}:
+            raise ValueError("migration backend mapping contains unknown fields")
+        worktree_id = row.get("worktree_id")
+        scope_id = row.get("scope_id")
+        backend = row.get("backend")
+        if not isinstance(worktree_id, str) or not isinstance(scope_id, str) or not isinstance(backend, str):
+            raise ValueError("migration backend mapping identity is invalid")
+        scope = known_scopes.get((worktree_id, scope_id))
+        if scope is None or row.get("metadata_digest") != scope.digest or backend not in {"local", "github"}:
+            raise ValueError("migration backend mapping does not match a Scope snapshot")
+        if (worktree_id, scope_id) in backend_keys:
+            raise ValueError("migration backend mapping is duplicated")
+        backend_keys.add((worktree_id, scope_id))
+        if row["backend"] == "github":
+            github = row.get("github")
+            if not isinstance(github, dict) or set(github) != {"issue_number", "repo_owner", "repo_name"}:
+                raise ValueError("migration GitHub backend mapping is incomplete")
+            if (
+                type(github["issue_number"]) is not int
+                or github["issue_number"] <= 0
+                or not all(isinstance(github[key], str) and github[key] for key in ("repo_owner", "repo_name"))
+            ):
+                raise ValueError("migration GitHub backend mapping is invalid")
+        elif "github" in row:
+            raise ValueError("migration local backend mapping cannot contain GitHub link")
+    branch_keys: set[tuple[str, str]] = set()
+    branch_names: set[str] = set()
+    for row in rows["branch_bindings"]:
+        if set(row) != {"worktree_id", "scope_id", "branch", "tip_sha", "reason"}:
+            raise ValueError("migration branch mapping shape is invalid")
+        worktree_id = row.get("worktree_id")
+        scope_id = row.get("scope_id")
+        if (
+            not isinstance(worktree_id, str)
+            or not isinstance(scope_id, str)
+            or (worktree_id, scope_id) not in known_scopes
+        ):
+            raise ValueError("migration branch mapping targets an unknown Scope")
+        if (
+            not isinstance(row["branch"], str)
+            or not row["branch"]
+            or not isinstance(row["tip_sha"], str)
+            or re.fullmatch(r"[0-9a-f]{40}", row["tip_sha"]) is None
+            or not isinstance(row["reason"], str)
+            or not row["reason"].strip()
+        ):
+            raise ValueError("migration branch mapping is invalid")
+        if (worktree_id, scope_id) in branch_keys or row["branch"] in branch_names:
+            raise ValueError("migration branch mapping is duplicated")
+        if not inventory.worktrees or _branch_tip(Path(inventory.worktrees[0].root), row["branch"]) != row["tip_sha"]:
+            raise ValueError("migration branch mapping tip changed")
+        branch_keys.add((worktree_id, scope_id))
+        branch_names.add(row["branch"])
+    repair_ids: set[str] = set()
+    for row in rows["active_repairs"]:
+        if set(row) != {"worktree_id", "action"} or row.get("action") != "clear":
+            raise ValueError("migration active repair shape is invalid")
+        worktree_id = row.get("worktree_id")
+        if not isinstance(worktree_id, str):
+            raise ValueError("migration active repair worktree identity is invalid")
+        worktree = by_worktree.get(worktree_id)
+        if worktree is None or "ACTIVE_REPAIR_REQUIRED" not in worktree.blockers:
+            raise ValueError("migration active repair does not match a broken selection")
+        if worktree_id in repair_ids:
+            raise ValueError("migration active repair is duplicated")
+        repair_ids.add(worktree_id)
+    roots = {item.root: item for item in inventory.worktrees}
+    mapped_roots: set[str] = set()
+    mapped_ids: set[str] = set(by_worktree)
+    for row in rows["worktrees"]:
+        if set(row) != {"root", "registration_id"}:
+            raise ValueError("migration worktree mapping shape is invalid")
+        root = row.get("root")
+        if not isinstance(root, str):
+            raise ValueError("migration worktree mapping root is invalid")
+        worktree = roots.get(root)
+        registration = row.get("registration_id")
+        if (
+            worktree is None
+            or worktree.registration_id is not None
+            or not isinstance(registration, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", registration)
+        ):
+            raise ValueError("migration worktree mapping is not an unregistered observed worktree")
+        if root in mapped_roots or registration in mapped_ids:
+            raise ValueError("migration worktree mapping is duplicated")
+        mapped_roots.add(root)
+        mapped_ids.add(registration)
+    return MigrationMap(
+        inventory.repository_uid,
+        inventory.digest,
+        rows["scope_backend_overrides"],
+        rows["branch_bindings"],
+        rows["active_repairs"],
+        rows["worktrees"],
+    )
 
 
 def _digest(data: bytes) -> str:
