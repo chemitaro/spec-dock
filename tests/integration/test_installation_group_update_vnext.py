@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from pathlib import Path
 import sys
 from typing import cast
@@ -18,6 +19,7 @@ from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E
     update_installation_group,
 )
 from spec_dock_runtime.application.worktree_vnext import create_worktree  # noqa: E402
+from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
 from spec_dock_runtime.infra.control_store import load_control, store_control  # noqa: E402
 from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
 from tests.cli_runtime.test_worktree_create_vnext import _committed_repo  # noqa: E402
@@ -220,3 +222,79 @@ def test_group_rollback_checks_all_children_before_restoring(tmp_path: Path, mon
         )
     assert pending_installation_groups(common_dir) == (group_id,)
     assert (repo / "spec-dock/docs/source.txt").is_file()
+
+
+def test_installation_update_cli_updates_registered_group(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, _, _, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source, raising=False)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive", raising=False)
+    monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle, raising=False)
+    result = run_vnext(
+        ["installation", "update", "--target", str(repo), "--commit", bundle.source.commit, "--maintenance", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["data"]["phase"] == "committed"
+    assert {target["root"] for target in payload["data"]["targets"]} == {str(repo), str(second)}
+
+
+def test_installation_update_cli_rolls_back_without_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, _, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_apply = update_module.apply_installation
+    attempts = 0
+
+    def fail_second(*args: object, **kwargs: object):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RuntimeError("injected group stop")
+        return real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(update_module, "apply_installation", fail_second)
+    with pytest.raises(RuntimeError, match="group stop"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+            bundle=bundle,
+            keep_maintenance=True,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    output = run_vnext(
+        ["installation", "update", "--rollback", group_id, "--offline", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert output.exit_code == 0
+    assert json.loads(output.stdout)["data"]["phase"] == "rolled-back"
+
+
+def test_installation_update_dry_run_preserves_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle)
+    output = run_vnext(
+        ["installation", "update", "--commit", bundle.source.commit, "--dry-run", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert output.exit_code == 0
+    assert json.loads(output.stdout)["status"] == "planned"
+    assert load_control(common_dir).epoch == epoch
+    assert pending_installation_groups(common_dir) == ()
+    assert not (repo / "spec-dock/docs/source.txt").exists()
+    assert not (second / "spec-dock/docs/source.txt").exists()

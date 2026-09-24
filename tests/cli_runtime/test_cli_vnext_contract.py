@@ -233,10 +233,11 @@ def test_only_recoverable_leaves_accept_resume(path: str) -> None:
         "installation.update",
         "installation.uninstall",
     }:
-        rolled = parse_vnext([*path.split(), *args, "--rollback", operation_id])
+        rollback_args = [] if path == "installation update" else args
+        rolled = parse_vnext([*path.split(), *rollback_args, "--rollback", operation_id])
         assert rolled.rollback == operation_id
         with pytest.raises(SystemExit):
-            parse_vnext([*path.split(), *args, "--resume", operation_id, "--rollback", operation_id])
+            parse_vnext([*path.split(), *rollback_args, "--resume", operation_id, "--rollback", operation_id])
 
 
 def test_nonrecoverable_leaf_rejects_recovery_option() -> None:
