@@ -103,6 +103,7 @@ def record_effect_result(
     effect_id: str,
     status: Literal["succeeded", "failed", "unknown"],
     after_revisions: Mapping[str, int] | None = None,
+    remote_ref: str | None = None,
 ) -> OperationRecord:
     if status not in ("succeeded", "failed", "unknown"):
         raise ValueError("invalid effect result")
@@ -115,7 +116,12 @@ def record_effect_result(
         raise ValueError("effect result requires a recorded intent")
     if status != "succeeded" and after_revisions:
         raise ValueError("only succeeded effects may record after revisions")
-    updated = replace(record.effects[-1], status=status, after_revisions=tuple(sorted((after_revisions or {}).items())))
+    updated = replace(
+        record.effects[-1],
+        status=status,
+        after_revisions=tuple(sorted((after_revisions or {}).items())),
+        remote_ref=remote_ref,
+    )
     effects = (*record.effects[:-1], updated)
     return replace(record, phase="effect-result", effects=effects, sequence=record.sequence + 1)
 
@@ -126,6 +132,7 @@ def record_effect_observation(
     effect_id: str,
     outcome: Literal["observed_applied", "observed_not_applied", "still_unknown"],
     after_revisions: Mapping[str, int] | None = None,
+    remote_ref: str | None = None,
 ) -> OperationRecord:
     if record.terminal_status != "pending" or not record.effects:
         raise ValueError("observation requires a pending operation")
@@ -133,13 +140,18 @@ def record_effect_observation(
     if _logical_id(effect) != effect_id or effect.kind != "remote" or effect.status != "unknown":
         raise ValueError("observation requires the last unknown remote effect")
     if outcome == "observed_applied":
-        updated = replace(effect, status="succeeded", after_revisions=tuple(sorted((after_revisions or {}).items())))
+        updated = replace(
+            effect,
+            status="succeeded",
+            after_revisions=tuple(sorted((after_revisions or {}).items())),
+            remote_ref=remote_ref,
+        )
     elif outcome == "observed_not_applied":
-        if after_revisions:
+        if after_revisions or remote_ref:
             raise ValueError("not-applied observation cannot advance revisions")
         updated = replace(effect, status="not-applied")
     elif outcome == "still_unknown":
-        if after_revisions:
+        if after_revisions or remote_ref:
             raise ValueError("unknown observation cannot advance revisions")
         updated = effect
     else:

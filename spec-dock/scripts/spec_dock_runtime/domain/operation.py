@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import re
 from typing import Literal
 
 BLOCKING_COMMANDS = frozenset({
@@ -28,6 +29,7 @@ ROLLBACK_COMMANDS = frozenset({
 })
 EffectStatus = Literal["intent", "succeeded", "failed", "unknown", "not-applied"]
 TerminalStatus = Literal["pending", "succeeded", "failed", "unknown", "rolled-back"]
+_REMOTE_REF = re.compile(r"^gh:[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+#[1-9][0-9]*$")
 
 
 @dataclass(frozen=True)
@@ -38,6 +40,7 @@ class OperationEffect:
     status: EffectStatus
     retry_of: str | None = None
     after_revisions: tuple[tuple[str, int], ...] = ()
+    remote_ref: str | None = None
 
     def __post_init__(self) -> None:
         if not self.id or not self.target:
@@ -46,6 +49,10 @@ class OperationEffect:
             raise ValueError("only succeeded effects may hold after revisions")
         if self.after_revisions != tuple(sorted(self.after_revisions)):
             raise ValueError("effect after revisions must be sorted")
+        if self.remote_ref is not None and (
+            self.kind != "remote" or self.status != "succeeded" or _REMOTE_REF.fullmatch(self.remote_ref) is None
+        ):
+            raise ValueError("remote receipt requires a successful remote Issue effect")
 
 
 @dataclass(frozen=True)

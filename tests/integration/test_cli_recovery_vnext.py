@@ -192,6 +192,36 @@ def test_unknown_remote_effect_requires_observation_before_retry(tmp_path: Path)
     record_effect_intent(observed, effect_id="active-clear", kind="local", target="iss-00409")
 
 
+def test_remote_create_receipt_survives_restart_and_cannot_be_rewritten(tmp_path: Path) -> None:
+    store = JournalStore(tmp_path)
+    prepared = prepare_operation(
+        command="scope.create",
+        fixed_targets={"repository": "example/product", "title": "Plan"},
+        request_fingerprint="sha256:create",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("github-create", "scaffold"),
+    )
+    store.create(prepared)
+    intent = record_effect_intent(
+        prepared, effect_id="github-create", kind="remote", target="gh:example/product:create"
+    )
+    store.update(intent, expected_sequence=0)
+    completed = record_effect_result(
+        intent, effect_id="github-create", status="succeeded", remote_ref="gh:example/product#21"
+    )
+    store.update(completed, expected_sequence=1)
+    assert store.load(prepared.operation_id).effects[0].remote_ref == "gh:example/product#21"
+    changed = replace(
+        completed,
+        effects=(replace(completed.effects[0], remote_ref="gh:other/product#21"),),
+        sequence=3,
+    )
+    with pytest.raises(ValueError, match="effect"):
+        store.update(changed, expected_sequence=2)
+
+
 def test_observed_not_applied_allows_recorded_retry_only() -> None:
     prepared = prepare_operation(
         command="scope.close",

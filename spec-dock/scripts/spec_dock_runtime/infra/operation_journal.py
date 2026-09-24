@@ -69,16 +69,18 @@ def _decode(payload: object) -> OperationRecord:
             raise ValueError("invalid journal effect")
         effect_id, kind, target, status = (item.get(key) for key in ("id", "kind", "target", "status"))
         retry_of = item.get("retry_of")
+        remote_ref = item.get("remote_ref")
         if (
             not isinstance(effect_id, str)
             or kind not in ("local", "git", "remote")
             or not isinstance(target, str)
             or status not in ("intent", "succeeded", "failed", "unknown", "not-applied")
             or (retry_of is not None and not isinstance(retry_of, str))
+            or (remote_ref is not None and not isinstance(remote_ref, str))
         ):
             raise ValueError("invalid journal effect")
         after_revisions = _pairs(item.get("after_revisions", []), values=int)
-        effects.append(OperationEffect(effect_id, kind, target, status, retry_of, after_revisions))
+        effects.append(OperationEffect(effect_id, kind, target, status, retry_of, after_revisions, remote_ref))
     fixed_targets = _pairs(payload.get("fixed_targets"), values=str)
     before_revisions = _pairs(payload.get("before_revisions"), values=int)
     return OperationRecord(
