@@ -27,6 +27,32 @@ def write_json(path: Path, data: Any) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
+def read_guarded_json(path: Path) -> tuple[Any, tuple[int, int]] | None:
+    """Read a single-link regular JSON file through a verified parent descriptor."""
+    if not path.is_absolute():
+        raise ValueError("JSON source must be absolute")
+    if not path.parent.exists():
+        return None
+    directory_fd = _open_directory_without_links(path.parent)
+    try:
+        try:
+            fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+        except FileNotFoundError:
+            return None
+        except OSError as exc:
+            if exc.errno == errno.ELOOP:
+                raise ValueError("JSON source must not be a symlink") from exc
+            raise
+        with os.fdopen(fd, "rb") as stream:
+            metadata = os.fstat(stream.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                raise ValueError("JSON source must be a single-link regular file")
+            payload = json.load(stream)
+            return payload, (metadata.st_dev, metadata.st_ino)
+    finally:
+        os.close(directory_fd)
+
+
 def atomic_write_json(path: Path, data: Any, *, expected_identity: tuple[int, int] | None = None) -> None:
     """Create or CAS-replace JSON in a descriptor-verified directory."""
     directory = path.parent

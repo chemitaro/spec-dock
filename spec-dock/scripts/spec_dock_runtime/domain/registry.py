@@ -1,0 +1,78 @@
+"""Pure, monotone local Scope ID reservations."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass, replace
+import re
+from typing import TYPE_CHECKING
+
+from spec_dock_runtime.domain.ids import format_id
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
+    from spec_dock_runtime.domain.selectors import ScopeKind
+
+_KIND_INDEX = {"initiative": 0, "epic": 1, "issue": 2}
+_KIND_PREFIX = {"initiative": "init", "epic": "epic", "issue": "iss"}
+_PREFIX_INDEX = {"init": 0, "epic": 1, "iss": 2}
+_OBSERVED_ID = re.compile(r"^(?P<prefix>init|epic|iss)(?P<local>-local)?-(?P<number>[0-9]+)$")
+
+
+@dataclass(frozen=True)
+class LocalIdRegistry:
+    revision: int
+    high_water: tuple[int, int, int]
+    reserved: frozenset[str]
+
+    def __post_init__(self) -> None:
+        if type(self.revision) is not int or self.revision < 0:
+            raise ValueError("registry revision is invalid")
+        if len(self.high_water) != 3 or any(type(value) is not int or value < 0 for value in self.high_water):
+            raise ValueError("registry high-water marks are invalid")
+        for scope_id in self.reserved:
+            match = _OBSERVED_ID.fullmatch(scope_id)
+            if match is None or match.group("local") is None or int(match.group("number")) <= 0:
+                raise ValueError("registry reservation is invalid")
+            prefix = match.group("prefix")
+            number = int(match.group("number"))
+            if scope_id != format_id(prefix, number, local=True):
+                raise ValueError("registry reservation is not canonical")
+            if number > self.high_water[_PREFIX_INDEX[prefix]]:
+                raise ValueError("registry reservation exceeds its high-water mark")
+
+    @classmethod
+    def empty(cls) -> LocalIdRegistry:
+        return cls(0, (0, 0, 0), frozenset())
+
+
+def reserve_local_id(
+    state: LocalIdRegistry,
+    *,
+    kind: ScopeKind,
+    observed_ids: Iterable[str],
+) -> tuple[LocalIdRegistry, str]:
+    """Burn a fresh ID under the shared writer lock, even if later create fails."""
+    index = _KIND_INDEX[kind]
+    prefix = _KIND_PREFIX[kind]
+    highest = state.high_water[index]
+    for node_id in (*state.reserved, *observed_ids):
+        match = _OBSERVED_ID.fullmatch(node_id)
+        if match is None or int(match.group("number")) <= 0:
+            raise ValueError("invalid observed Scope ID in local allocator")
+        if node_id != format_id(
+            match.group("prefix"), int(match.group("number")), local=match.group("local") is not None
+        ):
+            raise ValueError("noncanonical observed Scope ID in local allocator")
+        if match.group("prefix") == prefix and match.group("local") is not None:
+            highest = max(highest, int(match.group("number")))
+    number = highest + 1
+    allocated = format_id(prefix, number, local=True)
+    if allocated in state.reserved:
+        raise ValueError("local Scope ID reservation collision")
+    updated = list(state.high_water)
+    updated[index] = number
+    next_high_water = (updated[0], updated[1], updated[2])
+    return replace(
+        state, revision=state.revision + 1, high_water=next_high_water, reserved=state.reserved | {allocated}
+    ), allocated

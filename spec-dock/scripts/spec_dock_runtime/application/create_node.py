@@ -1090,7 +1090,12 @@ def _close_node_tree_parent_fd(descriptor: int) -> None:
     os.close(descriptor)
 
 
-def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
+def execute_create_plan(
+    plan: CreatePlan,
+    ports: Ports,
+    *,
+    metadata_writer: Callable[[int], None] | None = None,
+) -> list[Path]:
     node_repo = _resolve_node_repo(ports)
     template_scaffolder = _resolve_template_scaffolder(ports)
     specdock_dir = _resolve_specdock_dir(ports)
@@ -1162,7 +1167,10 @@ def execute_create_plan(plan: CreatePlan, ports: Ports) -> list[Path]:
                 target_path=target_path,
             )
             created_rule_links.append(link_path)
-        node_repo.write_meta_at(payload_fd, plan.meta)
+        if metadata_writer is None:
+            node_repo.write_meta_at(payload_fd, plan.meta)
+        else:
+            metadata_writer(payload_fd)
         if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
             raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
         _verified_directory_identity_at(
