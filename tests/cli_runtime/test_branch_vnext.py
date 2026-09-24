@@ -15,6 +15,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 from spec_dock_runtime.application.active_selection import change_active_selection  # noqa: E402
 from spec_dock_runtime.application.branch_vnext import (  # noqa: E402
     create_scope_branch,
+    resume_scope_branch_create,
     scope_from_current_branch,
     show_scope_branch,
     switch_scope_branch,
@@ -22,6 +23,7 @@ from spec_dock_runtime.application.branch_vnext import (  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
 from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch  # noqa: E402
 from spec_dock_runtime.domain.registry import LocalIdRegistry  # noqa: E402
+from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
 from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
 
@@ -215,3 +217,76 @@ def test_branch_switch_reports_post_checkout_hook_mutation(tmp_path: Path) -> No
     hook.chmod(0o755)
     with pytest.raises(RuntimeError, match="checkout changed"):
         switch_scope_branch(scope_id=initiative.id, **arguments)
+
+
+def test_branch_create_resume_binds_fixed_ref_after_registry_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common, initiative = _committed_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    arguments = {k: v for k, v in common.items() if k != "updated_at"}
+    original_bind = RegistryStore.bind_locked
+
+    def fail_bind(_store: RegistryStore, _binding: BranchBinding):
+        raise OSError("injected registry failure")
+
+    monkeypatch.setattr(RegistryStore, "bind_locked", fail_bind)
+    with pytest.raises(OSError, match="injected"):
+        create_scope_branch(scope_id=initiative.id, base="HEAD", name=None, **arguments)
+    monkeypatch.setattr(RegistryStore, "bind_locked", original_bind)
+    common_dir = cast("Path", common["common_dir"])
+    pending = JournalStore(common_dir).pending()
+    assert len(pending) == 1 and pending[0].command == "branch.create"
+    assert RegistryStore(common_dir).load()[0].branches == ()
+    resumed = resume_scope_branch_create(operation_id=pending[0].operation_id, **arguments)
+    assert resumed.name == f"{initiative.id}-alpha"
+    assert show_scope_branch(repo, common_dir, initiative.id) == resumed
+    assert JournalStore(common_dir).pending() == ()
+    assert resume_scope_branch_create(operation_id=pending[0].operation_id, **arguments) == resumed
+
+
+def test_branch_create_resume_reconciles_binding_after_journal_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common, initiative = _committed_repo(tmp_path)
+    arguments = {k: v for k, v in common.items() if k != "updated_at"}
+    original_update = JournalStore.update
+
+    def fail_after_bind(store: JournalStore, record, *, expected_sequence: int):
+        if record.effects and record.effects[-1].id == "registry-bind" and record.effects[-1].status == "succeeded":
+            raise OSError("injected journal failure")
+        return original_update(store, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_after_bind)
+    with pytest.raises(OSError, match="injected"):
+        create_scope_branch(scope_id=initiative.id, base="HEAD", name=None, **arguments)
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    common_dir = cast("Path", common["common_dir"])
+    pending = JournalStore(common_dir).pending()
+    assert len(pending) == 1
+    assert RegistryStore(common_dir).load()[0].branches[0].scope_id == initiative.id
+    resumed = resume_scope_branch_create(operation_id=pending[0].operation_id, **arguments)
+    assert resumed.scope_id == initiative.id
+    assert JournalStore(common_dir).pending() == ()
+
+
+def test_branch_create_resume_can_apply_prepared_fixed_operation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common, initiative = _committed_repo(tmp_path)
+    arguments = {k: v for k, v in common.items() if k != "updated_at"}
+    original_update = JournalStore.update
+
+    def fail_before_git(_store: JournalStore, _record, *, expected_sequence: int):
+        raise OSError("injected intent failure")
+
+    monkeypatch.setattr(JournalStore, "update", fail_before_git)
+    with pytest.raises(OSError, match="injected"):
+        create_scope_branch(scope_id=initiative.id, base="HEAD", name=None, **arguments)
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    common_dir = cast("Path", common["common_dir"])
+    pending = JournalStore(common_dir).pending()
+    assert len(pending) == 1 and pending[0].effects == ()
+    resumed = resume_scope_branch_create(operation_id=pending[0].operation_id, **arguments)
+    assert resumed.scope_id == initiative.id
+    assert JournalStore(common_dir).pending() == ()

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import hashlib
 import json
 import subprocess
 from typing import TYPE_CHECKING
@@ -96,6 +97,11 @@ def _binding_for_scope(store: RegistryStore, scope_id: str) -> BranchBinding:
     return matches[0]
 
 
+def _branch_fingerprint(scope_id: str, name: str, sha: str) -> str:
+    payload = json.dumps((scope_id, name, sha), separators=(",", ":"))
+    return "sha256:" + hashlib.sha256(payload.encode()).hexdigest()
+
+
 def show_scope_branch(repo_root: Path, common_dir: Path, scope_id: str) -> BranchBinding:
     binding = _binding_for_scope(RegistryStore(common_dir), scope_id)
     if not _branch_exists(repo_root, binding.name):
@@ -180,7 +186,7 @@ def create_scope_branch(
             command="branch.create",
             effect_plan=("git-branch", "registry-bind"),
             fixed_targets={"scope": scope.id, "branch": branch_name, "base_sha": sha},
-            request_fingerprint=f"sha256:{sha}:{scope.id}:{branch_name}",
+            request_fingerprint=_branch_fingerprint(scope.id, branch_name, sha),
             before_revisions={"registry": state.revision, "metadata": scope.revision},
             engine_digest=engine_digest,
             writer_epoch=control.epoch,
@@ -200,6 +206,115 @@ def create_scope_branch(
         journal.update(bound, expected_sequence=registry_intent.sequence)
         terminal = replace(bound, phase="complete", terminal_status="succeeded", sequence=bound.sequence + 1)
         journal.update(terminal, expected_sequence=bound.sequence)
+        return binding
+
+
+def resume_scope_branch_create(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    operation_id: str,
+    lock_timeout: float = 0.0,
+) -> BranchBinding:
+    """Complete the recorded binding only after observing its exact fixed Git ref."""
+    with WriterLock(common_dir, timeout=lock_timeout):
+        journal = JournalStore(common_dir)
+        operation = journal.load(operation_id)
+        if operation.terminal_status == "succeeded":
+            targets = dict(operation.fixed_targets)
+            if (
+                operation.command != "branch.create"
+                or set(targets) != {"scope", "branch", "base_sha"}
+                or operation.request_fingerprint
+                != _branch_fingerprint(targets["scope"], targets["branch"], targets["base_sha"])
+                or operation.engine_digest != engine_digest
+                or operation.writer_epoch != expected_epoch
+            ):
+                raise ValueError("completed branch operation differs from the recorded request")
+            binding = BranchBinding(targets["scope"], targets["branch"], targets["base_sha"])
+            if show_scope_branch(repo_root, common_dir, binding.scope_id) != binding:
+                raise ValueError("completed branch binding changed")
+            return binding
+        admit_writer(
+            load_control(common_dir),
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+            recovery_operation_id=operation_id,
+        )
+        targets = dict(operation.fixed_targets)
+        if (
+            operation.command != "branch.create"
+            or operation.effect_plan != ("git-branch", "registry-bind")
+            or set(targets) != {"scope", "branch", "base_sha"}
+            or operation.engine_digest != engine_digest
+            or operation.writer_epoch != expected_epoch
+            or operation.terminal_status != "pending"
+        ):
+            raise ValueError("branch create recovery operation differs from the recorded request")
+        scope_id, name, sha = targets["scope"], targets["branch"], targets["base_sha"]
+        if operation.request_fingerprint != _branch_fingerprint(scope_id, name, sha):
+            raise ValueError("branch create recovery fingerprint differs from fixed targets")
+        binding = BranchBinding(scope_id, name, sha)
+        _validate_name(repo_root, name)
+        views = load_scope_views(repo_root / "spec-dock")
+        show_scope(views, scope_id)
+        _verify_scope_at_commit(repo_root, views, scope_id, sha)
+        effects = operation.effects
+        if effects and (effects[0].id != "git-branch" or effects[0].target != name):
+            raise ValueError("recorded Git effect is invalid")
+        exists = _branch_exists(repo_root, name)
+        if exists and _resolve_commit(repo_root, f"refs/heads/{name}") != sha:
+            raise ValueError("recorded branch ref changed; recovery needs inspection")
+        if not effects:
+            if exists:
+                raise ValueError("unrecorded branch ref cannot be adopted during recovery")
+            next_record = record_effect_intent(operation, effect_id="git-branch", kind="git", target=name)
+            journal.update(next_record, expected_sequence=operation.sequence)
+            operation = next_record
+        if not exists:
+            if operation.effects[0].status != "intent":
+                raise ValueError("recorded branch ref disappeared; recovery needs inspection")
+            created = _git(repo_root, "branch", name, sha)
+            if created.returncode != 0:
+                _finish_failed_git_effect(journal, operation, name=name, repo_root=repo_root)
+            if not _branch_exists(repo_root, name) or _resolve_commit(repo_root, f"refs/heads/{name}") != sha:
+                raise RuntimeError("branch creation result is inconsistent; inspect the pending operation")
+        if operation.effects[0].status == "intent":
+            operation = record_effect_result(operation, effect_id="git-branch", status="succeeded")
+            journal.update(operation, expected_sequence=operation.sequence - 1)
+        elif operation.effects[0].status != "succeeded":
+            raise ValueError("recorded Git effect cannot be resumed")
+        if len(operation.effects) == 1:
+            next_record = record_effect_intent(operation, effect_id="registry-bind", kind="local", target=scope_id)
+            journal.update(next_record, expected_sequence=operation.sequence)
+            operation = next_record
+        if len(operation.effects) != 2 or operation.effects[1].id != "registry-bind":
+            raise ValueError("recorded registry effect is invalid")
+        state, _identity = RegistryStore(common_dir).load()
+        before_revision = dict(operation.before_revisions).get("registry")
+        if before_revision is None:
+            raise ValueError("recorded registry revision is missing")
+        matches = [item for item in state.branches if item.scope_id == scope_id or item.name == name]
+        if matches:
+            if matches != [binding] or state.revision != before_revision + 1:
+                raise ValueError("recorded binding conflicts with the current registry")
+        elif state.revision == before_revision:
+            RegistryStore(common_dir).bind_locked(binding)
+        else:
+            raise ValueError("registry revision changed during branch recovery")
+        if operation.effects[1].status == "intent":
+            next_record = record_effect_result(operation, effect_id="registry-bind", status="succeeded")
+            journal.update(next_record, expected_sequence=operation.sequence)
+            operation = next_record
+        elif operation.effects[1].status != "succeeded":
+            raise ValueError("recorded registry effect cannot be resumed")
+        terminal = replace(operation, phase="complete", terminal_status="succeeded", sequence=operation.sequence + 1)
+        journal.update(terminal, expected_sequence=operation.sequence)
         return binding
 
 
