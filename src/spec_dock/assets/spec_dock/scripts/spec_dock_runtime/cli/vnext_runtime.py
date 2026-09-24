@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.cli.options import parse_vnext_output
 from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
+from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
@@ -91,10 +92,23 @@ def run_vnext(
     ns = parsed.namespace
     json_mode = bool(ns.json)
     try:
-        if ns.command_path not in {"work start", "work finish", "active show", "active set", "active clear"}:
+        if ns.command_path not in {
+            "work start",
+            "work finish",
+            "active show",
+            "active set",
+            "active clear",
+            "scope list",
+            "scope show",
+            "scope edit",
+        }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
-        if ns.command_path == "active show":
+        if ns.command_path in {"scope list", "scope show"}:
+            result = run_scope_query(ns, context)
+        elif ns.command_path == "scope edit":
+            result = run_scope_edit(ns, context)
+        elif ns.command_path == "active show":
             result = run_active_show(context)
         elif ns.command_path in {"active set", "active clear"}:
             result = run_active_change(ns, context)
