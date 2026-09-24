@@ -124,7 +124,10 @@ def prepare_installation(
     if bundle is not None:
         assert_disjoint_source_target(bundle.root, target)
         verify_bundle_integrity(bundle)
-    if not journal_root.is_absolute() or journal_root.is_relative_to(target / "spec-dock"):
+    if not journal_root.is_absolute() or any(
+        journal_root.resolve(strict=False).is_relative_to((target / relative).resolve(strict=False))
+        for relative in TOOL_DIRECTORIES
+    ):
         raise ValueError("journal must be outside replaced tooling")
     operation_id = uuid.uuid4().hex
     area = _operation_area(target, operation_id)

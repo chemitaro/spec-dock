@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import json
 from typing import TYPE_CHECKING
 
 import pytest
@@ -25,8 +26,8 @@ def _record(target: Path) -> InstallationRecord:
         "c" * 64,
         "planned",
         (),
-        {"spec-dock/docs": "before"},
-        {"spec-dock/docs": "after"},
+        {"spec-dock/docs": "d" * 64},
+        {"spec-dock/docs": "e" * 64},
     )
 
 
@@ -50,6 +51,23 @@ def test_installation_record_rejects_symlink_and_corruption(tmp_path: Path) -> N
         read_record(root, original.operation_id)
     path.unlink()
     path.symlink_to(tmp_path / "elsewhere")
+    with pytest.raises(ValueError, match="symlink"):
+        read_record(root, original.operation_id)
+
+
+def test_installation_record_rejects_invalid_digest_and_symlinked_directory(tmp_path: Path) -> None:
+    root = tmp_path / "common"
+    original = _record(tmp_path / "target")
+    write_record(root, original, create=True)
+    record_file = root / "installations" / original.operation_id / "record.json"
+    payload = json.loads(record_file.read_text(encoding="utf-8"))
+    payload["before_hashes"]["spec-dock/docs"] = "bad"
+    record_file.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(ValueError, match="hash"):
+        read_record(root, original.operation_id)
+    operation_dir = record_file.parent
+    operation_dir.rename(root / "real-operation")
+    operation_dir.symlink_to(root / "real-operation")
     with pytest.raises(ValueError, match="symlink"):
         read_record(root, original.operation_id)
 
@@ -158,6 +176,16 @@ def test_init_refuses_existing_unversioned_tooling(tmp_path: Path) -> None:
     (target / TOOL_DIRECTORIES[0]).mkdir(parents=True)
     with pytest.raises(ValueError, match="existing tooling"):
         prepare_installation(target, tmp_path / "common", action="init", bundle=_bundle(tmp_path))
+
+
+def test_installation_refuses_journal_inside_replaced_skill(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = target / ".agents/skills/spec-dock/control"
+    with pytest.raises(ValueError, match="outside replaced tooling"):
+        prepare_installation(target, journal_root, action="init", bundle=_bundle(tmp_path))
+    assert not (target / ".spec-dock-installations").exists()
+    assert not journal_root.exists()
 
 
 def test_uninstall_retains_consumer_data_and_ignore_file(tmp_path: Path) -> None:

@@ -10,6 +10,8 @@ import re
 import uuid
 
 _ID = re.compile(r"[0-9a-f]{32}\Z")
+_SHA = re.compile(r"[0-9a-f]{40}\Z")
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _PHASES = frozenset({
     "planned",
     "staged",
@@ -39,7 +41,10 @@ class InstallationRecord:
 def operation_directory(journal_root: Path, operation_id: str) -> Path:
     if _ID.fullmatch(operation_id) is None or not journal_root.is_absolute():
         raise ValueError("invalid installation journal location")
-    return journal_root / "installations" / operation_id
+    directory = journal_root / "installations" / operation_id
+    if any(path.is_symlink() for path in (directory, *directory.parents)):
+        raise ValueError("installation journal location contains a symlink")
+    return directory
 
 
 def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
@@ -66,8 +71,24 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         or not all(isinstance(root, str) for root in record.completed_roots)
         or not isinstance(record.before_hashes, dict)
         or not isinstance(record.after_hashes, dict)
+        or (
+            record.source_commit is not None
+            and (not isinstance(record.source_commit, str) or _SHA.fullmatch(record.source_commit) is None)
+        )
+        or (
+            record.source_digest is not None
+            and (not isinstance(record.source_digest, str) or _DIGEST.fullmatch(record.source_digest) is None)
+        )
+        or (record.error is not None and not isinstance(record.error, str))
     ):
         raise ValueError("installation journal content is invalid")
+    for hashes in (record.before_hashes, record.after_hashes):
+        if any(
+            not isinstance(key, str)
+            or (value is not None and (not isinstance(value, str) or _DIGEST.fullmatch(value) is None))
+            for key, value in hashes.items()
+        ):
+            raise ValueError("installation journal hash inventory is invalid")
     return InstallationRecord(
         operation_id,
         record.action,
