@@ -51,6 +51,47 @@ class GithubScopeCreated:
     operation_id: str
 
 
+@dataclass(frozen=True)
+class GithubScopeCreatePreview:
+    kind: ScopeKind
+    title: str
+    slug: str
+    parent_id: str | None
+    repository: str
+    effects: tuple[str, str]
+
+
+def preview_github_scope_create(
+    *,
+    repo_root: Path,
+    kind: ScopeKind,
+    title: str,
+    parent_id: str | None,
+    slug: str | None,
+    gateway: GithubScopeGateway,
+) -> GithubScopeCreatePreview:
+    normalized_title, normalized_slug = resolve_input_title_and_slug(title, slug)
+    specdock_dir = repo_root / "spec-dock"
+    if specdock_dir.is_symlink() or not specdock_dir.is_dir():
+        raise ValueError("SpecDock workspace root is missing or redirected")
+    repository = git_cli.origin_github_publication_repo_slug(repo_root)
+    records = {record.id: record for record in fs_repo.load_node_records(specdock_dir)}
+    ancestors = _parent_records(kind=kind, parent_id=parent_id, records=records)
+    _require_open_ancestors(ancestors=ancestors, repo_root=repo_root, repository=repository, gateway=gateway)
+    parent = ancestors[0] if ancestors else None
+    if parent is not None and not Path(parent.path).resolve(strict=True).is_relative_to(
+        specdock_dir.resolve(strict=True)
+    ):
+        raise ValueError("Scope parent is outside this workspace")
+    _precheck_pre_github_create_rules_sources(kind=kind, specdock_dir=specdock_dir)
+    _precheck_pre_github_create_symlink_capability(
+        kind=kind, specdock_dir=specdock_dir, parent=_to_spec_node(parent) if parent else None
+    )
+    return GithubScopeCreatePreview(
+        kind, normalized_title, normalized_slug, parent_id, repository, ("github-create", "scaffold")
+    )
+
+
 def _parent_records(
     *, kind: ScopeKind, parent_id: str | None, records: dict[str, StoredMetaRecord]
 ) -> tuple[StoredMetaRecord, ...]:

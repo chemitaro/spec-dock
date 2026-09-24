@@ -134,7 +134,7 @@ def run_vnext(
         if ns.command_path in {"scope list", "scope show"}:
             result = run_scope_query(ns, context)
         elif ns.command_path in {"scope create initiative", "scope create epic", "scope create issue"}:
-            result = run_scope_create(ns, context)
+            result = run_scope_create(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
         elif ns.command_path == "scope delete":
             result = run_scope_delete(ns, context)
         elif ns.command_path in {"scope close", "scope reopen"}:
