@@ -243,8 +243,10 @@ def _assert_journal_transition(before: OperationRecord, after: OperationRecord) 
                 raise ValueError("journal effect status transition is invalid")
     if after.backup_refs[: len(before.backup_refs)] != before.backup_refs:
         raise ValueError("journal backup references are append-only")
-    if after.terminal_status == "succeeded" and any(effect.status != "succeeded" for effect in after.effects):
-        raise ValueError("journal terminal success has incomplete effects")
+    if after.terminal_status == "succeeded":
+        latest_effects = {effect.retry_of or effect.id: effect for effect in after.effects}
+        if any(effect.status != "succeeded" for effect in latest_effects.values()):
+            raise ValueError("journal terminal success has incomplete effects")
     if after.terminal_status in ("failed", "rolled-back") and any(
         effect.status in ("intent", "unknown") for effect in after.effects
     ):

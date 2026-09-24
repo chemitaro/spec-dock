@@ -174,6 +174,8 @@ def create_github_scope(
                 "repository": repository,
                 "title": normalized_title,
                 "parent": parent_id or "",
+                "slug": normalized_slug,
+                "updated_at": updated_at,
             },
             request_fingerprint=f"sha256:{fingerprint}",
             before_revisions={},

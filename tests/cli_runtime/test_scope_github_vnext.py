@@ -21,6 +21,7 @@ from spec_dock_runtime.application.github_create_effect import (  # noqa: E402
 )
 from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
 from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
+from spec_dock_runtime.application.resume_github_scope import resume_github_scope_create  # noqa: E402
 from spec_dock_runtime.infra.contracts import GithubIssueRecord  # noqa: E402
 from spec_dock_runtime.infra.control_store import ControlState, WorktreeRegistration, store_control  # noqa: E402
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
@@ -294,6 +295,124 @@ def test_remote_only_success_keeps_receipt_when_local_destination_collides(tmp_p
     assert len(pending) == 1
     assert [effect.status for effect in pending[0].effects] == ["succeeded", "failed"]
     assert pending[0].effects[0].remote_ref == "gh:example/repo#47"
+
+
+def test_remote_only_create_resumes_local_scaffold_without_second_post(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    destination = cast("Path", common["repo_root"]) / "spec-dock/initiatives/init-00047-plan"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text("other owner\n", encoding="utf-8")
+    gateway = FakeGateway(_issue())
+    with pytest.raises(RuntimeError, match="Destination already exists"):
+        create_github_scope(kind="initiative", title="Plan", parent_id=None, slug=None, gateway=gateway, **common)
+    operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
+    with pytest.raises(RuntimeError, match="unverified content"):
+        resume_github_scope_create(
+            kind="initiative",
+            title="Plan",
+            parent_id=None,
+            slug=None,
+            operation_id=operation.operation_id,
+            gateway=gateway,
+            **{key: value for key, value in common.items() if key != "updated_at"},
+        )
+    destination.unlink()
+    resumed = resume_github_scope_create(
+        kind="initiative",
+        title="Plan",
+        parent_id=None,
+        slug=None,
+        operation_id=operation.operation_id,
+        gateway=gateway,
+        **{key: value for key, value in common.items() if key != "updated_at"},
+    )
+    assert resumed.id == "init-00047"
+    assert gateway.calls == 1
+    assert JournalStore(cast("Path", common["common_dir"])).load(operation.operation_id).terminal_status == "succeeded"
+
+
+def test_unknown_remote_create_requires_marker_and_never_reposts(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    gateway = FakeGateway(RemoteIssueError("GITHUB_TIMEOUT", uncertain=True))
+    with pytest.raises(RemoteIssueError, match="GITHUB_EFFECT_UNKNOWN"):
+        create_github_scope(kind="initiative", title="Plan", parent_id=None, slug=None, gateway=gateway, **common)
+    store = JournalStore(cast("Path", common["common_dir"]))
+    operation = store.pending()[0]
+    kwargs = {key: value for key, value in common.items() if key != "updated_at"}
+    with pytest.raises(RemoteIssueError, match="GITHUB_EFFECT_UNKNOWN"):
+        resume_github_scope_create(
+            kind="initiative",
+            title="Plan",
+            parent_id=None,
+            slug=None,
+            operation_id=operation.operation_id,
+            gateway=gateway,
+            **kwargs,
+        )
+    assert gateway.calls == 1
+    gateway.observed = (_issue(),)
+    with pytest.raises(ValueError, match="fixed target"):
+        resume_github_scope_create(
+            kind="initiative",
+            title="Other",
+            parent_id=None,
+            slug=None,
+            operation_id=operation.operation_id,
+            gateway=gateway,
+            **kwargs,
+        )
+    resumed = resume_github_scope_create(
+        kind="initiative",
+        title="Plan",
+        parent_id=None,
+        slug=None,
+        operation_id=operation.operation_id,
+        gateway=gateway,
+        **kwargs,
+    )
+    assert resumed.id == "init-00047"
+    assert gateway.calls == 1
+
+
+def test_published_scaffold_is_reconciled_after_journal_write_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    gateway = FakeGateway(_issue())
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_once(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if (
+            not injected
+            and record.effects
+            and record.effects[-1].id == "scaffold"
+            and record.effects[-1].status == "succeeded"
+        ):
+            injected = True
+            raise OSError("injected journal write failure")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_once)
+    with pytest.raises(OSError, match="injected"):
+        create_github_scope(kind="initiative", title="Plan", parent_id=None, slug=None, gateway=gateway, **common)
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    store = JournalStore(cast("Path", common["common_dir"]))
+    operation = store.pending()[0]
+    assert operation.effects[-1].status == "intent"
+    resumed = resume_github_scope_create(
+        kind="initiative",
+        title="Plan",
+        parent_id=None,
+        slug=None,
+        operation_id=operation.operation_id,
+        gateway=gateway,
+        **{key: value for key, value in common.items() if key != "updated_at"},
+    )
+    assert resumed.path.is_dir()
+    assert gateway.calls == 1
+    assert store.load(operation.operation_id).terminal_status == "succeeded"
 
 
 def test_github_create_refuses_duplicate_local_issue_link(tmp_path: Path) -> None:
