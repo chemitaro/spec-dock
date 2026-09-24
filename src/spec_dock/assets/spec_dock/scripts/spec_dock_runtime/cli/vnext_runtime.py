@@ -14,6 +14,7 @@ from spec_dock_runtime.commands.branch_vnext import run_branch_command
 from spec_dock_runtime.commands.dependency_vnext import run_dependency_change, run_dependency_query
 from spec_dock_runtime.commands.scope_create_vnext import run_scope_create
 from spec_dock_runtime.commands.scope_delete_vnext import run_scope_delete
+from spec_dock_runtime.commands.scope_lifecycle_vnext import run_scope_lifecycle
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace_diagnostics
@@ -112,6 +113,8 @@ def run_vnext(
             "scope create epic",
             "scope create issue",
             "scope delete",
+            "scope close",
+            "scope reopen",
             "branch show",
             "branch create",
             "branch switch",
@@ -134,6 +137,8 @@ def run_vnext(
             result = run_scope_create(ns, context)
         elif ns.command_path == "scope delete":
             result = run_scope_delete(ns, context)
+        elif ns.command_path in {"scope close", "scope reopen"}:
+            result = run_scope_lifecycle(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
         elif ns.command_path in {"branch show", "branch create", "branch switch"}:
             result = run_branch_command(ns, context)
         elif ns.command_path in {"dependency list", "dependency check"}:

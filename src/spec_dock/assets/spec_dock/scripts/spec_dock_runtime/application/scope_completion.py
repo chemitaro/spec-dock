@@ -134,6 +134,65 @@ def plan_reopen(
     return CompletionDecision(target.id, before, "open", before != "open", ())
 
 
+def _decide_lifecycle(
+    *,
+    views: tuple[ScopeView, ...],
+    target_id: str,
+    action: Literal["close", "reopen"],
+    reason: CompletionReason,
+    repo_root: Path,
+    gateway: GithubIssueGateway | None,
+) -> CompletionDecision:
+    target = show_scope(views, target_id)
+    relevant = (target, *_descendants(views, target)) if action == "close" else (target, *_ancestors(views, target))
+    statuses: dict[str, ObservedState] = {}
+    for view in relevant:
+        if isinstance(view.backend, LocalBackend):
+            statuses[view.id] = view.status.state
+        else:
+            if gateway is None:
+                raise ValueError("GitHub lifecycle requires a live gateway")
+            remote = gateway.get(
+                repo_root,
+                f"{view.backend.repo_owner}/{view.backend.repo_name}",
+                view.backend.issue_number,
+            )
+            statuses[view.id] = remote.state
+    return (
+        plan_close(views, target.id, statuses, reason=reason)
+        if action == "close"
+        else plan_reopen(views, target.id, statuses)
+    )
+
+
+def preview_scope_lifecycle(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    target_id: str,
+    action: Literal["close", "reopen"],
+    reason: CompletionReason = "completed",
+    gateway: GithubIssueGateway | None = None,
+) -> CompletionDecision:
+    """Observe the lifecycle boundary without creating a journal or changing state."""
+    if action not in ("close", "reopen") or (action == "reopen" and reason != "completed"):
+        raise ValueError("invalid lifecycle action or reason")
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    views = load_scope_views(repo_root / "spec-dock")
+    return _decide_lifecycle(
+        views=views, target_id=target_id, action=action, reason=reason, repo_root=repo_root, gateway=gateway
+    )
+
+
 def change_scope_lifecycle(
     *,
     repo_root: Path,
@@ -164,24 +223,8 @@ def change_scope_lifecycle(
         )
         views = load_scope_views(repo_root / "spec-dock")
         target = show_scope(views, target_id)
-        relevant = (target, *_descendants(views, target)) if action == "close" else (target, *_ancestors(views, target))
-        statuses: dict[str, ObservedState] = {}
-        for view in relevant:
-            if isinstance(view.backend, LocalBackend):
-                statuses[view.id] = view.status.state
-            else:
-                if gateway is None:
-                    raise ValueError("GitHub lifecycle requires a live gateway")
-                remote = gateway.get(
-                    repo_root,
-                    f"{view.backend.repo_owner}/{view.backend.repo_name}",
-                    view.backend.issue_number,
-                )
-                statuses[view.id] = remote.state
-        decision = (
-            plan_close(views, target.id, statuses, reason=reason)
-            if action == "close"
-            else plan_reopen(views, target.id, statuses)
+        decision = _decide_lifecycle(
+            views=views, target_id=target.id, action=action, reason=reason, repo_root=repo_root, gateway=gateway
         )
         if not decision.changed:
             return CompletionResult(decision, False, None)
@@ -280,6 +323,9 @@ def resume_scope_lifecycle(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    expected_scope_id: str | None = None,
+    expected_action: Literal["close", "reopen"] | None = None,
+    expected_reason: CompletionReason | None = None,
     gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> CompletionResult:
@@ -299,6 +345,9 @@ def resume_scope_lifecycle(
             or operation.request_fingerprint != _completion_fingerprint(fixed)
             or operation.engine_digest != engine_digest
             or operation.writer_epoch != expected_epoch
+            or (expected_scope_id is not None and fixed["scope"] != expected_scope_id)
+            or (expected_action is not None and fixed["action"] != expected_action)
+            or (expected_reason is not None and fixed["reason"] != expected_reason)
         ):
             raise ValueError("lifecycle recovery operation differs from fixed request")
         action = fixed["action"]
