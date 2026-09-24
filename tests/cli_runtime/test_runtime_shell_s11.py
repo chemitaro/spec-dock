@@ -541,6 +541,7 @@ class TestRuntimeShellS11:
             "import_github_scope.py",
             "scope_completion.py",
             "scope_query.py",
+            "work_lifecycle.py",
         }
         application_dir = app_source_path.parent / "application"
         for module_path in sorted(application_dir.glob("*.py")):
