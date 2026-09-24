@@ -16,6 +16,7 @@ from spec_dock_runtime.application.create_local_scope import create_local_scope 
 from spec_dock_runtime.application.scope_query import ScopeView  # noqa: E402
 from spec_dock_runtime.application.workspace_diagnostics_vnext import doctor_workspace  # noqa: E402
 from spec_dock_runtime.application.workspace_sync_vnext import sync_workspace  # noqa: E402
+from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import (  # noqa: E402
     GithubBackend,
     LocalBackend,
@@ -30,6 +31,31 @@ from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
 
 def _sync_args(common: dict[str, object]) -> dict[str, object]:
     return {key: common[key] for key in ("repo_root", "common_dir", "worktree_id", "engine_digest", "expected_epoch")}
+
+
+def test_workspace_sync_cli_preview_and_publish_preserve_selection(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    before = load_selection_v3(repo / "spec-dock", worktree_id="main")[0]
+
+    def run(*options: str):
+        return run_vnext(
+            ["workspace", "sync", *options, "--json"],
+            invocation_cwd=repo,
+            engine_digest="engine-a",
+            engine_version="0.2.4",
+        )
+
+    preview = run("--dry-run")
+    assert preview.exit_code == 0
+    assert json.loads(preview.stdout)["status"] == "planned"
+    assert load_generation(repo / "spec-dock") is None
+    published = run()
+    assert published.exit_code == 0
+    data = json.loads(published.stdout)["data"]
+    assert data["node_count"] == 0 and data["source"] == "cache"
+    assert data["generation_id"] == load_generation(repo / "spec-dock").id
+    assert load_selection_v3(repo / "spec-dock", worktree_id="main")[0] == before
 
 
 def test_empty_and_local_workspace_sync_leave_selection_unchanged(tmp_path: Path) -> None:

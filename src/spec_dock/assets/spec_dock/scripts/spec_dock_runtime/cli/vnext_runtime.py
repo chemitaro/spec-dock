@@ -20,6 +20,7 @@ from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_sco
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.commands.workbench_vnext import run_workbench_copy
 from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace_diagnostics
+from spec_dock_runtime.commands.workspace_sync_vnext import run_workspace_sync
 from spec_dock_runtime.commands.worktree_vnext import run_worktree_change, run_worktree_query
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
@@ -139,6 +140,7 @@ def run_vnext(
             "workbench copy",
             "workspace validate",
             "workspace doctor",
+            "workspace sync",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
@@ -174,6 +176,8 @@ def run_vnext(
             result = run_workbench_copy(ns, context)
         elif ns.command_path in {"workspace validate", "workspace doctor"}:
             result = run_workspace_diagnostics(ns, context)
+        elif ns.command_path == "workspace sync":
+            result = run_workspace_sync(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)
         elif ns.command_path == "active show":

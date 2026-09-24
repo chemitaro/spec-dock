@@ -31,6 +31,31 @@ class WorkspaceSyncResult:
     findings: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class WorkspaceSyncPreview:
+    node_count: int
+    source: Literal["cache", "github"]
+    valid: bool
+    remote_count: int
+    findings: tuple[str, ...]
+
+
+def preview_sync_workspace(
+    *, repo_root: Path, source: Literal["cache", "github"] = "cache", allow_invalid: bool = False, offline: bool = False
+) -> WorkspaceSyncPreview:
+    """Inspect planned inputs without publishing or contacting GitHub."""
+    if source not in ("cache", "github"):
+        raise ValueError("workspace sync source must be cache or github")
+    views = load_scope_views(repo_root / "spec-dock")
+    findings = _structural_findings(views)
+    if findings and not allow_invalid:
+        raise ValueError("workspace structure is invalid")
+    remote_count = sum(isinstance(item.backend, GithubBackend) for item in views)
+    if source == "github" and offline and remote_count:
+        raise ValueError("offline mode cannot refresh GitHub-backed Scopes")
+    return WorkspaceSyncPreview(len(views), source, not findings, remote_count, findings)
+
+
 def _structural_findings(views: Sequence[ScopeView]) -> tuple[str, ...]:
     by_id = {item.id: item for item in views}
     findings: list[str] = []
