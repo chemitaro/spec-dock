@@ -235,6 +235,9 @@ def import_github_scope(
                     intent, effect_id="scaffold", status="failed" if error.phase == "none" else "unknown"
                 )
                 journal.update(failed, expected_sequence=intent.sequence)
+                if error.phase == "none":
+                    terminal = replace(failed, phase="complete", terminal_status="failed", sequence=failed.sequence + 1)
+                    journal.update(terminal, expected_sequence=failed.sequence)
                 raise
             succeeded = record_effect_result(intent, effect_id="scaffold", status="succeeded")
             journal.update(succeeded, expected_sequence=intent.sequence)

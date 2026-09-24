@@ -40,19 +40,29 @@ def test_scope_import_cli_previews_and_creates_without_post(tmp_path: Path, monk
     assert gateway.calls == 0
 
 
-def test_scope_import_cli_resumes_after_local_collision(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_scope_import_cli_resumes_after_uncertain_local_publication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     common = _ready_repo(tmp_path)
     repo = cast("Path", common["repo_root"])
-    destination = repo / "spec-dock/initiatives/init-00047-plan"
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    destination.write_text("occupied\n", encoding="utf-8")
     gateway = FakeGateway(_issue())
     monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_once(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if not injected and record.effects and record.effects[-1].status == "succeeded":
+            injected = True
+            raise OSError("injected journal failure")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_once)
     prefix = ("scope", "import", "github", "initiative", "gh:example/repo#47", "--title", "Plan")
     first = _run(repo, *prefix)
-    assert first.exit_code == 6
+    assert first.exit_code == 5
+    monkeypatch.setattr(JournalStore, "update", original_update)
     operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
-    destination.unlink()
     resumed = _run(repo, *prefix, "--resume", operation.operation_id)
     assert resumed.exit_code == 0
     assert json.loads(resumed.stdout)["operation_id"] == operation.operation_id

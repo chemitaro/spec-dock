@@ -459,7 +459,7 @@ def test_import_existing_issue_uses_explicit_title_and_never_posts(tmp_path: Pat
     assert JournalStore(common["common_dir"]).load(imported.operation_id).terminal_status == "succeeded"
 
 
-def test_import_collision_resumes_only_after_destination_is_absent(tmp_path: Path) -> None:
+def test_import_confirmed_collision_ends_without_blocking_retry(tmp_path: Path) -> None:
     common = _ready_repo(tmp_path)
     destination = cast("Path", common["repo_root"]) / "spec-dock/initiatives/init-00047-plan"
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -477,9 +477,40 @@ def test_import_collision_resumes_only_after_destination_is_absent(tmp_path: Pat
             **common,
         )
     store = JournalStore(cast("Path", common["common_dir"]))
-    operation = store.pending()[0]
-    with pytest.raises(RuntimeError, match="unverified content"):
-        resume_github_scope_import(
+    assert store.pending() == ()
+    destination.unlink()
+    retried = import_github_scope(
+        kind="initiative",
+        github_ref="gh:example/repo#47",
+        repo_hint=None,
+        title="Plan",
+        parent_id=None,
+        slug=None,
+        gateway=gateway,
+        **common,
+    )
+    assert retried.id == "init-00047"
+    assert gateway.calls == 0
+
+
+def test_import_published_scaffold_resumes_after_journal_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    gateway = FakeGateway(_issue())
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_once(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if not injected and record.effects and record.effects[-1].status == "succeeded":
+            injected = True
+            raise OSError("injected journal failure")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_once)
+    with pytest.raises(OSError, match="injected"):
+        import_github_scope(
             kind="initiative",
             github_ref="gh:example/repo#47",
             repo_hint=None,
@@ -487,10 +518,11 @@ def test_import_collision_resumes_only_after_destination_is_absent(tmp_path: Pat
             parent_id=None,
             slug=None,
             gateway=gateway,
-            operation_id=operation.operation_id,
-            **{key: value for key, value in common.items() if key != "updated_at"},
+            **common,
         )
-    destination.unlink()
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    store = JournalStore(cast("Path", common["common_dir"]))
+    operation = store.pending()[0]
     resumed = resume_github_scope_import(
         kind="initiative",
         github_ref="gh:example/repo#47",

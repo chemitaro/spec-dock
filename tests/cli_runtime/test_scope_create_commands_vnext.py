@@ -70,8 +70,35 @@ def test_local_scope_create_cli_does_not_retry_a_recovery_request_as_new(tmp_pat
         "--resume",
         "a" * 32,
     )
-    assert result.exit_code == 3
+    assert result.exit_code == 4
     assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
+
+
+def test_local_scope_create_cli_resumes_original_reserved_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_once(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if not injected and record.effects and record.effects[-1].status == "succeeded":
+            injected = True
+            raise OSError("injected journal failure")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_once)
+    prefix = ("scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    first = _run(repo, *prefix)
+    assert first.exit_code == 5
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
+    assert operation.effects[-1].status == "intent"
+    resumed = _run(repo, *prefix, "--resume", operation.operation_id)
+    assert resumed.exit_code == 0
+    payload = json.loads(resumed.stdout)
+    assert payload["data"]["scope_id"] == "init-local-00001"
+    assert payload["operation_id"] == operation.operation_id
 
 
 def test_github_scope_create_cli_previews_and_requires_confirmation(

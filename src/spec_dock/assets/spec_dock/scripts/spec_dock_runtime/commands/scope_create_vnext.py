@@ -84,8 +84,6 @@ def run_scope_create(
                 Effect("scaffold", "succeeded", created.id),
             ),
         )
-    if ns.resume is not None:
-        raise ValueError("local Scope create recovery is not yet connected")
     result = create_local_scope_command(
         repo_root=context.repo_root,
         common_dir=context.common_dir,
@@ -98,6 +96,7 @@ def run_scope_create(
         slug=ns.slug,
         updated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         dry_run=ns.dry_run,
+        resume_id=ns.resume,
         lock_timeout=ns.lock_timeout,
     )
     return OperationResult(

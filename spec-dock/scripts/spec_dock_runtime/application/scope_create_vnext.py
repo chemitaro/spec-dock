@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.active_selection import show_active_selection
-from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope, plan_local_scope_create
+from spec_dock_runtime.application.create_local_scope import (
+    AncestorState,
+    create_local_scope,
+    plan_local_scope_create,
+    resume_local_scope,
+)
 from spec_dock_runtime.application.scope_query import ScopeView, load_scope_views, show_scope
 
 if TYPE_CHECKING:
@@ -50,6 +55,7 @@ def create_local_scope_command(
     slug: str | None,
     updated_at: str,
     dry_run: bool,
+    resume_id: str | None,
     lock_timeout: float,
 ) -> LocalCreateOutcome:
     views = load_scope_views(repo_root / "spec-dock")
@@ -66,20 +72,26 @@ def create_local_scope_command(
             ancestors = (_ancestor_state(initiative),)
     plan = plan_local_scope_create(kind=kind, title=title, parent=parent, ancestors=ancestors, slug=slug)
     if dry_run:
+        if resume_id is not None:
+            raise ValueError("local Scope create recovery cannot be previewed")
         return LocalCreateOutcome(None, kind, plan.title, plan.parent_id, None, None, plan.warnings)
-    created = create_local_scope(
-        repo_root=repo_root,
-        common_dir=common_dir,
-        worktree_id=worktree_id,
-        engine_digest=engine_digest,
-        expected_epoch=expected_epoch,
-        kind=kind,
-        title=plan.title,
-        parent=parent,
-        ancestors=ancestors,
-        updated_at=updated_at,
-        slug=plan.slug,
-        lock_timeout=lock_timeout,
+    common = {
+        "repo_root": repo_root,
+        "common_dir": common_dir,
+        "worktree_id": worktree_id,
+        "engine_digest": engine_digest,
+        "expected_epoch": expected_epoch,
+        "kind": kind,
+        "title": plan.title,
+        "parent": parent,
+        "ancestors": ancestors,
+        "slug": plan.slug,
+        "lock_timeout": lock_timeout,
+    }
+    created = (
+        resume_local_scope(**common, operation_id=resume_id)
+        if resume_id is not None
+        else create_local_scope(**common, updated_at=updated_at)
     )
     path = created.path.relative_to(repo_root).as_posix()
     return LocalCreateOutcome(
