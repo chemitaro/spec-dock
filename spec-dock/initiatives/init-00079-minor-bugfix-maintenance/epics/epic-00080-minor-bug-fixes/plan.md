@@ -62,6 +62,21 @@ ID: "epic-00080"
     - E-AC-001
   - depends on:
     - なし
+- iss-00407-workbench-readme-only-git-ignore-init-update:
+  - 目的:
+    - README-only の Workbench Git ignore 契約が fresh / existing workspace へ安全に配布されるよう、repo-local な installer 契約不一致を修正する
+  - deliverable:
+    - issue requirement / design / plan / report
+    - provider-first の配布・更新と実 Git 回帰テスト
+  - tranche:
+    - future-minor-fix
+  - closes:
+    - E-RQ-001
+    - E-RQ-002
+    - E-RQ-003
+    - E-RQ-004
+  - depends on:
+    - なし
 
 ## 統合チェックポイント
 - G1 decomposition review:

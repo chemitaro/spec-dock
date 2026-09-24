@@ -1,8 +1,37 @@
 """Observable contracts for directory replacement, independent of the old wire."""
 
 from pathlib import Path
+import subprocess
 
 from spec_dock.cli import main
+
+
+def test_fresh_init_tracks_only_root_workbench_readme(tmp_path: Path) -> None:
+    from spec_dock.installer import ASSETS
+
+    assert main(["init", str(tmp_path)]) == 0
+    workbench = tmp_path / "spec-dock/.workbench"
+    readme = workbench / "README.md"
+    assert readme.read_bytes() == (ASSETS / "spec_dock/templates/root/.workbench/README.md").read_bytes()
+    (workbench / "scratch.txt").write_text("temporary\n", encoding="utf-8")
+
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
+    readme_result = subprocess.run(
+        ["git", "check-ignore", "--no-index", "spec-dock/.workbench/README.md"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    scratch_result = subprocess.run(
+        ["git", "check-ignore", "--no-index", "spec-dock/.workbench/scratch.txt"],
+        cwd=tmp_path,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert readme_result.returncode == 1, readme_result.stderr
+    assert scratch_result.returncode == 0, scratch_result.stderr
 
 
 def test_update_replaces_whole_directories_and_preserves_data(tmp_path: Path) -> None:
@@ -155,6 +184,33 @@ def test_force_init_replaces_tools_without_reseeding_settings(tmp_path: Path) ->
     assert not (tmp_path / ".github").exists()
 
 
+def test_update_replaces_known_legacy_workbench_ignore_only(tmp_path: Path) -> None:
+    from spec_dock.installer import ASSETS
+
+    assert main(["init", str(tmp_path)]) == 0
+    ignore = tmp_path / "spec-dock/.gitignore"
+    ignore.write_text(
+        "# spec-dock runtime (generated)\n"
+        "# v2 generated state for agents (SSOT + derived views)\n"
+        ".agent/\n"
+        "# legacy v2 name (kept ignored for safe upgrades)\n"
+        ".work/\n"
+        "# local disposable work areas (reserved exact directory name at any scope)\n"
+        ".workbench/\n"
+        "active/\n"
+        "/adrs/\n"
+        "tree-all.puml\n"
+        "tree.puml\n"
+        "deps-issues.puml\n"
+        "deps-raw.puml\n"
+        "dashboard.md\n",
+        encoding="utf-8",
+    )
+
+    assert main(["update", str(tmp_path)]) == 0
+    assert ignore.read_bytes() == (ASSETS / "spec_dock/.gitignore").read_bytes()
+
+
 def test_all_six_directories_match_package_and_discard_old_files(tmp_path: Path) -> None:
     from spec_dock.installer import ASSETS
 
@@ -249,7 +305,7 @@ def test_failed_fresh_init_is_retried_after_preserving_partial_scaffold(tmp_path
     scaffold = tmp_path / "spec-dock"
     assert not (scaffold / ".gitignore").exists()
     assert main(["update", str(tmp_path)]) == 0
-    assert not (scaffold / ".gitignore").exists()
+    assert (scaffold / ".gitignore").read_bytes() == (installer.ASSETS / "spec_dock/.gitignore").read_bytes()
     assert (scaffold / "local.txt").read_bytes() == b"preserve me"
     preserved = tmp_path / "preserved-scaffold"
     scaffold.rename(preserved)
