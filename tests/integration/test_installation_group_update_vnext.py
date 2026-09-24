@@ -14,16 +14,188 @@ RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/sp
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock.installation.group_journal import read_group_record  # noqa: E402
+from spec_dock.installer import TOOL_DIRECTORIES  # noqa: E402
+from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin  # noqa: E402
 from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
     resume_installation_group,
+    rollback_installation_group,
     update_installation_group,
 )
+from spec_dock_runtime.application.migrate_workspace_vnext import inspect_workspace_migration  # noqa: E402
 from spec_dock_runtime.application.worktree_vnext import create_worktree  # noqa: E402
 from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
 from spec_dock_runtime.infra.control_store import load_control, store_control  # noqa: E402
 from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
 from tests.cli_runtime.test_worktree_create_vnext import _committed_repo  # noqa: E402
+from tests.integration.test_installation_group_init_vnext import _fresh_repo  # noqa: E402
 from tests.integration.test_installation_journal_vnext import _bundle  # noqa: E402
+
+
+def _legacy_fixture(tmp_path: Path):
+    repo, second = _fresh_repo(tmp_path)
+    for root in (repo, second):
+        for relative in TOOL_DIRECTORIES:
+            directory = root / relative
+            directory.mkdir(parents=True)
+            (directory / "old.txt").write_text("old", encoding="utf-8")
+        (root / "spec-dock/spec-dock.version").write_text("legacy\n", encoding="utf-8")
+        (root / "spec-dock/workspace.json").write_text('{"schema_version":1}\n', encoding="utf-8")
+    distribution = tmp_path / "external"
+    executable = distribution / "bin/spec-dock"
+    executable.parent.mkdir(parents=True)
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    pin = verify_engine_pin(EnginePin(executable, distribution, digest_distribution(distribution)), checkout_root=repo)
+    return repo, second, pin, _bundle(tmp_path)
+
+
+def test_legacy_update_bootstraps_maintenance_control_without_migrating_data(tmp_path: Path) -> None:
+    repo, second, pin, bundle = _legacy_fixture(tmp_path)
+    result = update_installation_group(
+        repo_root=repo,
+        common_dir=repo / ".git",
+        worktree_id="main",
+        engine_digest=pin.distribution_digest,
+        expected_epoch=0,
+        bundle=bundle,
+        keep_maintenance=True,
+        engine_pin=pin,
+    )
+    assert result.phase == "committed" and result.bootstrap
+    assert load_control(repo / ".git").mode == "maintenance"
+    assert all(item.schema_version == 1 for item in load_control(repo / ".git").worktrees)
+    inventory = inspect_workspace_migration(repo)
+    assert {item.registration_id for item in inventory.worktrees} == {
+        item.id for item in load_control(repo / ".git").worktrees
+    }
+    for root in (repo, second):
+        assert (root / "spec-dock/docs/source.txt").is_file()
+        assert (root / "spec-dock/workspace.json").read_text(encoding="utf-8") == '{"schema_version":1}\n'
+
+
+def test_legacy_update_cli_dry_run_then_bootstraps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, pin, bundle = _legacy_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle)
+    command = ["installation", "update", "--commit", bundle.source.commit, "--maintenance", "--json"]
+    preview = run_vnext(
+        [*command, "--dry-run"],
+        invocation_cwd=repo,
+        engine_digest=pin.distribution_digest,
+        engine_version="0.2.4",
+        engine_pin=pin,
+    )
+    assert preview.exit_code == 0 and load_control(repo / ".git") is None
+    result = run_vnext(
+        [*command, "--yes"],
+        invocation_cwd=repo,
+        engine_digest=pin.distribution_digest,
+        engine_version="0.2.4",
+        engine_pin=pin,
+    )
+    assert result.exit_code == 0
+    assert {item["root"] for item in json.loads(result.stdout)["data"]["targets"]} == {str(repo), str(second)}
+    assert load_control(repo / ".git").mode == "maintenance"
+
+
+def test_legacy_update_resumes_if_control_publish_stops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, pin, bundle = _legacy_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as module
+
+    real_store = module.store_control
+
+    def stop_before_control(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("control publish stopped")
+
+    monkeypatch.setattr(module, "store_control", stop_before_control)
+    with pytest.raises(RuntimeError, match="control publish stopped"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=repo / ".git",
+            worktree_id="main",
+            engine_digest=pin.distribution_digest,
+            expected_epoch=0,
+            bundle=bundle,
+            keep_maintenance=True,
+            engine_pin=pin,
+        )
+    (operation_id,) = pending_installation_groups(repo / ".git")
+    assert load_control(repo / ".git") is None
+    monkeypatch.setattr(module, "store_control", real_store)
+    completed = resume_installation_group(
+        repo_root=repo,
+        common_dir=repo / ".git",
+        worktree_id="main",
+        engine_digest=pin.distribution_digest,
+        operation_id=operation_id,
+        bundle=bundle,
+        engine_pin=pin,
+    )
+    assert completed.phase == "committed" and completed.bootstrap
+    assert load_control(repo / ".git").mode == "maintenance"
+    assert (second / "spec-dock/docs/source.txt").is_file()
+
+
+def test_legacy_update_can_rollback_before_control_is_published(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, second, pin, bundle = _legacy_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as module
+
+    def stop_before_control(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("control publish stopped")
+
+    monkeypatch.setattr(module, "store_control", stop_before_control)
+    with pytest.raises(RuntimeError, match="control publish stopped"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=repo / ".git",
+            worktree_id="main",
+            engine_digest=pin.distribution_digest,
+            expected_epoch=0,
+            bundle=bundle,
+            keep_maintenance=True,
+            engine_pin=pin,
+        )
+    (operation_id,) = pending_installation_groups(repo / ".git")
+    restored = rollback_installation_group(
+        repo_root=repo,
+        common_dir=repo / ".git",
+        worktree_id="main",
+        engine_digest=pin.distribution_digest,
+        operation_id=operation_id,
+    )
+    assert restored.phase == "rolled-back" and load_control(repo / ".git") is None
+    for root in (repo, second):
+        assert (root / "spec-dock/docs/old.txt").read_text(encoding="utf-8") == "old"
+
+
+def test_legacy_update_rollback_restores_tooling_and_disables_writer(tmp_path: Path) -> None:
+    repo, second, pin, bundle = _legacy_fixture(tmp_path)
+    committed = update_installation_group(
+        repo_root=repo,
+        common_dir=repo / ".git",
+        worktree_id="main",
+        engine_digest=pin.distribution_digest,
+        expected_epoch=0,
+        bundle=bundle,
+        keep_maintenance=True,
+        engine_pin=pin,
+    )
+    restored = rollback_installation_group(
+        repo_root=repo,
+        common_dir=repo / ".git",
+        worktree_id="main",
+        engine_digest=pin.distribution_digest,
+        operation_id=committed.operation_id,
+    )
+    assert restored.phase == "rolled-back"
+    assert load_control(repo / ".git").mode == "uninitialized"
+    for root in (repo, second):
+        assert (root / "spec-dock/docs/old.txt").read_text(encoding="utf-8") == "old"
 
 
 def _group_fixture(tmp_path: Path):

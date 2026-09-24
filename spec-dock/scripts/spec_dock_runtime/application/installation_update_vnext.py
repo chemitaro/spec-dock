@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import hashlib
+import json
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -29,6 +30,7 @@ from spec_dock_runtime.application.installation_vnext import (
     InstallationGroup,
     InstalledWorktree,
     inspect_installation_group,
+    installation_targets,
 )
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.infra.control_store import (
@@ -212,9 +214,7 @@ def _fresh_group(repo_root: Path, common_dir: Path, engine_digest: str) -> Insta
         if root.resolve(strict=True) != root or root in roots:
             raise ValueError("Git worktree inventory has an unstable path")
         roots.add(root)
-        worktree_id = (
-            "main" if (root / ".git").is_dir() else f"wt-{hashlib.sha256(str(root).encode()).hexdigest()[:16]}"
-        )
+        worktree_id = initial_worktree_id(root)
         if (root / "spec-dock/spec-dock.version").exists():
             raise ValueError("installation init requires every worktree to be uninstalled")
         targets.append(
@@ -238,13 +238,57 @@ def _check_init_inventory(repo_root: Path, record: InstallationGroupRecord) -> N
         root = item.path
         if item.bare or root.is_symlink() or not root.is_dir() or root.resolve(strict=True) != root:
             raise ValueError("installation init worktree inventory is unavailable")
-        worktree_id = (
-            "main" if (root / ".git").is_dir() else f"wt-{hashlib.sha256(str(root).encode()).hexdigest()[:16]}"
-        )
+        worktree_id = initial_worktree_id(root)
         observed.add((worktree_id, str(root)))
     fixed = {(target.worktree_id, target.root) for target in record.targets}
     if observed != fixed or len(observed) != len(record.targets):
         raise ValueError("installation init worktree inventory changed")
+
+
+def initial_worktree_id(root: Path) -> str:
+    return "main" if (root / ".git").is_dir() else f"wt-{hashlib.sha256(str(root).encode()).hexdigest()[:16]}"
+
+
+def _legacy_group(repo_root: Path, common_dir: Path, engine_digest: str) -> InstallationGroup:
+    """Inventory installed legacy worktrees without trusting their runtime code."""
+    targets: list[InstalledWorktree] = []
+    for root in installation_targets(repo_root):
+        version_path = root / "spec-dock/spec-dock.version"
+        workspace_path = root / "spec-dock/workspace.json"
+        if version_path.is_symlink() or workspace_path.is_symlink():
+            raise ValueError("legacy installation metadata is redirected")
+        try:
+            version = version_path.read_text(encoding="utf-8").strip()
+        except (OSError, UnicodeError) as error:
+            raise ValueError("legacy installation version is unavailable") from error
+        if not version or "\n" in version or "\r" in version:
+            raise ValueError("legacy installation version is invalid")
+        try:
+            workspace = json.loads(workspace_path.read_text(encoding="utf-8")) if workspace_path.exists() else {}
+        except (OSError, UnicodeError, json.JSONDecodeError) as error:
+            raise ValueError("legacy workspace marker is invalid") from error
+        if not isinstance(workspace, dict) or workspace.get("schema_version", 1) not in (1, 3):
+            raise ValueError("legacy workspace schema requires explicit migration inspection")
+        schema = workspace.get("schema_version", 1)
+        protocol = workspace.get("writer_protocol", "legacy")
+        if not isinstance(protocol, str) or not protocol:
+            raise ValueError("legacy writer protocol is invalid")
+        targets.append(
+            InstalledWorktree(initial_worktree_id(root), str(root), version, schema, protocol, engine_digest, True)
+        )
+    targets.sort(key=lambda item: item.id)
+    if len({item.id for item in targets}) != len(targets):
+        raise ValueError("legacy worktree identities collide")
+    return InstallationGroup(str(common_dir), 0, "uninitialized", tuple(targets))
+
+
+def inspect_legacy_installation(repo_root: Path, common_dir: Path, engine_digest: str) -> InstallationGroup:
+    """Read legacy installation targets without publishing writer control."""
+    control = load_control(common_dir)
+    if control is not None and control.mode != "uninitialized":
+        raise ValueError("installation is already controlled")
+    group = _legacy_group(repo_root, common_dir, engine_digest)
+    return replace(group, control_epoch=0 if control is None else control.epoch)
 
 
 def _initial_control(record: InstallationGroupRecord) -> ControlState:
@@ -468,47 +512,101 @@ def update_installation_group(
     expected_epoch: int,
     bundle: VerifiedBundle,
     keep_maintenance: bool,
+    engine_pin: VerifiedEngine | None = None,
     lock_timeout: float = 0.0,
 ) -> InstallationGroupRecord:
     """Stage every target before replacing one, and preserve recovery on failure."""
-    before = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    original_control = load_control(common_dir)
+    bootstrap = original_control is None or original_control.mode == "uninitialized"
+    if bootstrap:
+        if not keep_maintenance or engine_pin is None or engine_pin.distribution_digest != engine_digest:
+            raise ValueError("legacy installation update requires --maintenance and a verified external engine")
+        before = _legacy_group(repo_root, common_dir, engine_digest)
+        if original_control is not None:
+            if original_control.engine_digest != engine_digest or tuple(
+                (item.id, item.root) for item in original_control.worktrees
+            ) != tuple((item.id, item.root) for item in before.worktrees):
+                raise ValueError("uninitialized installation inventory changed")
+            before = replace(before, control_epoch=original_control.epoch)
+        if pending_installation_groups(common_dir):
+            raise ValueError("legacy installation has an unfinished group operation")
+    else:
+        before = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
     if any(item.version is None for item in before.worktrees):
         raise ValueError("installation group contains an unversioned target")
+    if bundle.source.commit is None:
+        raise ValueError("installation update requires a pinned source commit")
     _check_bundle(before, bundle)
     with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in before.worktrees), timeout=lock_timeout):
-        current = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+        current = (
+            replace(_legacy_group(repo_root, common_dir, engine_digest), control_epoch=before.control_epoch)
+            if bootstrap
+            else inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+        )
         if current != before:
             raise ValueError("installation group changed before the update lock")
         control = load_control(common_dir)
-        assert control is not None
-        admit_writer(
-            control,
-            common_dir=common_dir,
-            worktree_id=worktree_id,
-            engine_digest=engine_digest,
-            expected_epoch=expected_epoch,
-            maintenance_command="installation.update",
-        )
-        if not keep_maintenance and not _can_restore_ready(control):
-            raise ValueError("mixed writer versions require --maintenance")
+        if bootstrap:
+            if control != original_control or expected_epoch != before.control_epoch:
+                raise ValueError("legacy installation control changed before update")
+            if worktree_id not in {item.id for item in current.worktrees}:
+                raise ValueError("legacy installation caller is not a registered worktree")
+        else:
+            assert control is not None
+            admit_writer(
+                control,
+                common_dir=common_dir,
+                worktree_id=worktree_id,
+                engine_digest=engine_digest,
+                expected_epoch=expected_epoch,
+                maintenance_command="installation.update",
+            )
+            if not keep_maintenance and not _can_restore_ready(control):
+                raise ValueError("mixed writer versions require --maintenance")
         group_id = uuid4().hex
         record = InstallationGroupRecord(
             group_id,
             "update",
             str(common_dir),
-            control.epoch,
+            before.control_epoch,
             engine_digest,
             bundle.source.commit,
             bundle.digest,
             keep_maintenance,
             _fixed_targets(current, group_id),
             "preparing",
+            bootstrap=bootstrap,
         )
         write_group_record(common_dir, record, create=True)
         try:
-            store_control(
-                common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
-            )
+            if bootstrap:
+                assert engine_pin is not None
+                bind_installation_engine(repo_root=repo_root, common_dir=common_dir, engine=engine_pin)
+                registrations = tuple(
+                    WorktreeRegistration(
+                        item.id, item.root, item.schema_version, item.writer_protocol, engine_digest, True
+                    )
+                    for item in current.worktrees
+                )
+                store_control(
+                    common_dir,
+                    ControlState(
+                        WORKSPACE_SCHEMA,
+                        WRITER_PROTOCOL,
+                        before.control_epoch + 1,
+                        engine_digest,
+                        "maintenance",
+                        registrations,
+                    ),
+                    expected_epoch=None if control is None else control.epoch,
+                )
+            else:
+                assert control is not None
+                store_control(
+                    common_dir,
+                    replace(control, mode="maintenance", epoch=control.epoch + 1),
+                    expected_epoch=control.epoch,
+                )
             record = _stage_missing(common_dir, record, bundle)
             record = _apply_children(common_dir, record)
             return _commit_group(common_dir, record)
@@ -579,13 +677,20 @@ def resume_installation_group(
     engine_digest: str,
     operation_id: str,
     bundle: VerifiedBundle,
+    engine_pin: VerifiedEngine | None = None,
     lock_timeout: float = 0.0,
 ) -> InstallationGroupRecord:
     """Resume only the fixed targets and source captured by the group journal."""
     record = read_group_record(common_dir, operation_id)
     if record.action != "update" or record.phase in {"committed", "rolled-back"}:
         raise ValueError("installation group is not resumable")
-    group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    control_before = load_control(common_dir)
+    legacy_before = record.bootstrap and (control_before is None or control_before.mode == "uninitialized")
+    group = (
+        _legacy_group(repo_root, common_dir, engine_digest)
+        if legacy_before
+        else inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    )
     if tuple((item.id, item.root) for item in group.worktrees) != tuple(
         (item.worktree_id, item.root) for item in record.targets
     ):
@@ -593,26 +698,59 @@ def resume_installation_group(
     _check_bundle(group, bundle, source_commit=record.source_commit, source_digest=record.source_digest)
     with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in group.worktrees), timeout=lock_timeout):
         record = read_group_record(common_dir, operation_id)
-        current = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+        current = (
+            _legacy_group(repo_root, common_dir, engine_digest)
+            if legacy_before
+            else inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+        )
         if current != group:
             raise ValueError("installation recovery inventory changed before the lock")
         control = load_control(common_dir)
-        if control is None:
-            raise ValueError("installation control is missing")
-        admit_writer(
-            control,
-            common_dir=common_dir,
-            worktree_id=worktree_id,
-            engine_digest=engine_digest,
-            expected_epoch=control.epoch,
-            recovery_operation_id=operation_id,
-        )
-        if control.epoch == record.control_epoch and control.mode in {"ready", "maintenance"}:
-            store_control(
-                common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
+        if legacy_before:
+            if (
+                control != control_before
+                or engine_pin is None
+                or engine_pin.distribution_digest != engine_digest
+                or record.engine_digest != engine_digest
+                or worktree_id not in {item.id for item in current.worktrees}
+            ):
+                raise ValueError("legacy installation recovery identity changed")
+            bind_installation_engine(repo_root=repo_root, common_dir=common_dir, engine=engine_pin)
+            registrations = tuple(
+                WorktreeRegistration(item.id, item.root, item.schema_version, item.writer_protocol, engine_digest, True)
+                for item in current.worktrees
             )
-        elif control.mode not in {"maintenance", "ready"} or control.epoch < record.control_epoch + 1:
-            raise ValueError("installation control is not at a recoverable epoch")
+            store_control(
+                common_dir,
+                ControlState(
+                    WORKSPACE_SCHEMA,
+                    WRITER_PROTOCOL,
+                    record.control_epoch + 1,
+                    engine_digest,
+                    "maintenance",
+                    registrations,
+                ),
+                expected_epoch=None if control is None else control.epoch,
+            )
+        else:
+            if control is None:
+                raise ValueError("installation control is missing")
+            admit_writer(
+                control,
+                common_dir=common_dir,
+                worktree_id=worktree_id,
+                engine_digest=engine_digest,
+                expected_epoch=control.epoch,
+                recovery_operation_id=operation_id,
+            )
+            if control.epoch == record.control_epoch and control.mode in {"ready", "maintenance"}:
+                store_control(
+                    common_dir,
+                    replace(control, mode="maintenance", epoch=control.epoch + 1),
+                    expected_epoch=control.epoch,
+                )
+            elif control.mode not in {"maintenance", "ready"} or control.epoch < record.control_epoch + 1:
+                raise ValueError("installation control is not at a recoverable epoch")
         try:
             record = _stage_missing(common_dir, record, bundle, recover_stage=True)
             record = _apply_children(common_dir, record)
@@ -694,7 +832,13 @@ def rollback_installation_group(
         raise ValueError("installation group is not rollback eligible")
     if record.phase == "rolled-back":
         return record
-    group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    control_before = load_control(common_dir)
+    legacy_before = record.bootstrap and (control_before is None or control_before.mode == "uninitialized")
+    group = (
+        _legacy_group(repo_root, common_dir, engine_digest)
+        if legacy_before
+        else inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    )
     if tuple((item.id, item.root) for item in group.worktrees) != tuple(
         (item.worktree_id, item.root) for item in record.targets
     ):
@@ -707,12 +851,20 @@ def rollback_installation_group(
             or (record.phase == "committed" and not record.keep_maintenance)
         ):
             raise ValueError("installation group is not rollback eligible")
-        if inspect_installation_group(repo_root=repo_root, common_dir=common_dir) != group:
+        current_group = (
+            _legacy_group(repo_root, common_dir, engine_digest)
+            if legacy_before
+            else inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+        )
+        if current_group != group:
             raise ValueError("installation rollback inventory changed before the lock")
         control = load_control(common_dir)
-        if control is None:
+        if legacy_before:
+            if control != control_before or record.engine_digest != engine_digest:
+                raise ValueError("legacy installation rollback control changed")
+        elif control is None:
             raise ValueError("installation control is missing")
-        if record.phase == "committed":
+        elif record.phase == "committed":
             if control.mode != "maintenance" or control.epoch != record.control_epoch + 1:
                 raise ValueError("installation maintenance state changed after completion")
             admit_writer(
@@ -724,6 +876,7 @@ def rollback_installation_group(
                 maintenance_command=f"installation.{record.action}",
             )
         else:
+            assert control is not None
             admit_writer(
                 control,
                 common_dir=common_dir,
@@ -732,7 +885,9 @@ def rollback_installation_group(
                 expected_epoch=control.epoch,
                 recovery_operation_id=operation_id,
             )
-        if control.epoch == record.control_epoch and control.mode in {"ready", "maintenance"}:
+        if legacy_before:
+            pass
+        elif control is not None and control.epoch == record.control_epoch and control.mode in {"ready", "maintenance"}:
             store_control(
                 common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
             )
@@ -766,11 +921,25 @@ def rollback_installation_group(
                 rollback_installation(
                     _child_root(common_dir, record.operation_id, target.worktree_id),
                     target.child_operation_id,
-                    enter_maintenance=lambda _child: _require_maintenance(
-                        common_dir, minimum_epoch=record.control_epoch + 1, engine_digest=engine_digest
+                    enter_maintenance=(
+                        (lambda _child: None)
+                        if legacy_before
+                        else lambda _child: _require_maintenance(
+                            common_dir, minimum_epoch=record.control_epoch + 1, engine_digest=engine_digest
+                        )
                     ),
                     allow_committed=True,
                 )
+            if record.bootstrap:
+                current_control = load_control(common_dir)
+                if current_control is not None and current_control.mode == "maintenance":
+                    store_control(
+                        common_dir,
+                        replace(current_control, mode="uninitialized", epoch=current_control.epoch + 1),
+                        expected_epoch=current_control.epoch,
+                    )
+                elif current_control is not None and current_control.mode != "uninitialized":
+                    raise ValueError("bootstrap rollback lost maintenance control")
             rolled_back = replace(record, phase="rolled-back", error=None)
             write_group_record(common_dir, rolled_back)
             return rolled_back

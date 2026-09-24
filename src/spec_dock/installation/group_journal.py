@@ -37,6 +37,7 @@ class InstallationGroupRecord:
     targets: tuple[InstallationTarget, ...]
     phase: str
     error: str | None = None
+    bootstrap: bool = False
 
 
 def child_operation_id(group_id: str, worktree_id: str) -> str:
@@ -87,6 +88,7 @@ def _validate(record: InstallationGroupRecord) -> None:
         or not isinstance(record.targets, tuple)
         or not record.targets
         or (record.error is not None and not isinstance(record.error, str))
+        or type(record.bootstrap) is not bool
     ):
         raise ValueError("invalid installation group record")
     identifiers: set[str] = set()

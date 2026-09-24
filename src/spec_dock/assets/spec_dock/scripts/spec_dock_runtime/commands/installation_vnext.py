@@ -19,6 +19,7 @@ from spec_dock.installer import ASSETS
 from spec_dock_runtime.application.installation_update_vnext import (
     bind_installation_engine,
     init_installation_group,
+    inspect_legacy_installation,
     plan_init_installation_group,
     resume_init_installation_group,
     resume_installation_group,
@@ -31,6 +32,7 @@ from spec_dock_runtime.application.installation_update_vnext import (
 from spec_dock_runtime.application.installation_vnext import (
     InstallationView,
     inspect_installation_group,
+    installation_control_mode,
     installation_targets,
     show_installation,
 )
@@ -148,18 +150,24 @@ def run_installation_show(
 
 
 def run_installation_update(
-    ns: argparse.Namespace, context: WorkContext, *, invocation_cwd: Path
+    ns: argparse.Namespace, context: WorkContext, *, invocation_cwd: Path, engine_pin: VerifiedEngine | None = None
 ) -> OperationResult[InstallationGroupRecord | InstallationUpdatePlan]:
     target = Path(ns.target).expanduser() if ns.target else context.repo_root
     if not target.is_absolute():
         target = invocation_cwd / target
-    show_installation(
-        repo_root=context.repo_root,
-        common_dir=context.common_dir,
-        engine_version="bound",
-        engine_digest=context.engine_digest,
-        target=target,
-    )
+    legacy = installation_control_mode(context.common_dir) in (None, "uninitialized")
+    if legacy:
+        group = inspect_legacy_installation(context.repo_root, context.common_dir, context.engine_digest)
+        if str(target.resolve(strict=True)) not in {item.root for item in group.worktrees}:
+            raise ValueError("installation target is not in this Git worktree group")
+    else:
+        show_installation(
+            repo_root=context.repo_root,
+            common_dir=context.common_dir,
+            engine_version="bound",
+            engine_digest=context.engine_digest,
+            target=target,
+        )
     if ns.rollback:
         if ns.dry_run or ns.version or ns.commit or ns.maintenance:
             raise ValueError("installation rollback accepts no source, maintenance, or dry-run option")
@@ -187,7 +195,11 @@ def run_installation_update(
         if ns.dry_run:
             if ns.resume:
                 raise ValueError("installation resume cannot be a dry run")
-            group = inspect_installation_group(repo_root=context.repo_root, common_dir=context.common_dir)
+            group = (
+                inspect_legacy_installation(context.repo_root, context.common_dir, context.engine_digest)
+                if legacy
+                else inspect_installation_group(repo_root=context.repo_root, common_dir=context.common_dir)
+            )
             verify_bundle_integrity(bundle)
             for item in group.worktrees:
                 assert_disjoint_source_target(bundle.root, Path(item.root))
@@ -208,6 +220,7 @@ def run_installation_update(
                 engine_digest=context.engine_digest,
                 operation_id=ns.resume,
                 bundle=bundle,
+                engine_pin=engine_pin,
                 lock_timeout=ns.lock_timeout,
             )
         else:
@@ -219,6 +232,7 @@ def run_installation_update(
                 expected_epoch=context.expected_epoch,
                 bundle=bundle,
                 keep_maintenance=bool(ns.maintenance),
+                engine_pin=engine_pin,
                 lock_timeout=ns.lock_timeout,
             )
     return OperationResult(

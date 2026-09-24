@@ -51,6 +51,12 @@ def installation_targets(repo_root: Path) -> tuple[Path, ...]:
     return tuple(targets)
 
 
+def installation_control_mode(common_dir: Path) -> str | None:
+    """Read whether an installation has entered the new writer protocol."""
+    control = load_control(common_dir)
+    return None if control is None else control.mode
+
+
 def _installed_version(root: Path) -> str | None:
     version_path = root / "spec-dock/spec-dock.version"
     if any(path.is_symlink() for path in (root, root / "spec-dock", version_path)):

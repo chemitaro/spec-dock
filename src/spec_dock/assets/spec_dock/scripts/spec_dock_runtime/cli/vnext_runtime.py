@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.application.installation_update_vnext import initial_worktree_id
 from spec_dock_runtime.cli.options import completion_script, explicit_help, parse_vnext_output
 from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
 from spec_dock_runtime.commands.artifact_vnext import run_artifact_change, run_artifact_query
@@ -74,6 +75,14 @@ def _context(ns: object, *, invocation_cwd: Path, engine_digest: str) -> WorkCon
         raise ValueError("--project must name the Git worktree root")
     common = git_common_directory(root)
     control = load_control(common)
+    if getattr(ns, "command_path", None) == "installation update" and (
+        control is None or control.mode == "uninitialized"
+    ):
+        if control is not None and control.engine_digest != engine_digest:
+            raise ValueError("external engine does not match uninitialized repository control")
+        return WorkContext(
+            root, common, initial_worktree_id(root), engine_digest, 0 if control is None else control.epoch
+        )
     if control is None or control.engine_digest != engine_digest:
         raise ValueError("external engine does not match repository control")
     matches = [entry for entry in control.worktrees if entry.active and Path(entry.root).resolve(strict=True) == root]
@@ -227,7 +236,7 @@ def run_vnext(
         elif ns.command_path == "installation show":
             result = run_installation_show(ns, context, engine_version=engine_version, invocation_cwd=invocation_cwd)
         elif ns.command_path == "installation update":
-            result = run_installation_update(ns, context, invocation_cwd=invocation_cwd)
+            result = run_installation_update(ns, context, invocation_cwd=invocation_cwd, engine_pin=engine_pin)
         elif ns.command_path == "installation uninstall":
             result = run_installation_uninstall(ns, context, invocation_cwd=invocation_cwd)
         elif ns.command_path == "scope edit":
