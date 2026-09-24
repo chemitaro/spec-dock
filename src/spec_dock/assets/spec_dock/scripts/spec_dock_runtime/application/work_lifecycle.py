@@ -375,6 +375,7 @@ def resume_start_work(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    expected_scope_id: str | None = None,
     gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkStartResult:
@@ -384,6 +385,8 @@ def resume_start_work(
         journal = JournalStore(common_dir)
         operation = journal.load(operation_id)
         fixed = dict(operation.fixed_targets)
+        if expected_scope_id is not None and fixed.get("scope") != expected_scope_id:
+            raise ValueError("work start recovery target differs from the recorded Scope ID")
         revisions = dict(operation.before_revisions)
         if (
             operation.command != "work.start"
@@ -721,6 +724,7 @@ def resume_finish_work(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    expected_scope_id: str | None = None,
     gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkFinishResult:
@@ -730,6 +734,8 @@ def resume_finish_work(
         journal = JournalStore(common_dir)
         operation = journal.load(operation_id)
         fixed = dict(operation.fixed_targets)
+        if expected_scope_id is not None and fixed.get("scope") != expected_scope_id:
+            raise ValueError("work finish recovery target differs from the recorded Scope ID")
         revisions = dict(operation.before_revisions)
         if (
             operation.command != "work.finish"
