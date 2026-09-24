@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 import hashlib
 import json
 import subprocess
@@ -177,6 +177,118 @@ def _finish_failed_git_effect(journal: JournalStore, intent: OperationRecord, *,
     raise RuntimeError("Git branch creation failed without creating a ref")
 
 
+def _plan_scope_branch_create(
+    repo_root: Path, common_dir: Path, scope_id: str, base: str, name: str | None
+) -> tuple[BranchBinding, int, int]:
+    views = load_scope_views(repo_root / "spec-dock")
+    scope = show_scope(views, scope_id)
+    loaded = read_guarded_json(scope.path / ".meta.json")
+    if loaded is None or not isinstance(loaded[0], dict):
+        raise ValueError("Scope metadata is missing")
+    metadata = decode_scope_metadata(loaded[0])
+    slug = metadata.raw.get("slug")
+    if not isinstance(slug, str) or not slug or metadata.revision != scope.revision:
+        raise ValueError("Scope metadata changed before branch creation")
+    branch_name = name if name is not None else f"{scope.id}-{slug}"
+    _validate_name(repo_root, branch_name)
+    state, _identity = RegistryStore(common_dir).load()
+    if any(binding.scope_id == scope.id or binding.name == branch_name for binding in state.branches):
+        raise ValueError("Scope or branch is already bound")
+    if _branch_exists(repo_root, branch_name):
+        raise ValueError("BRANCH_ADOPTION_REQUIRED")
+    sha = _resolve_commit(repo_root, base)
+    _verify_scope_at_commit(repo_root, views, scope.id, sha)
+    return BranchBinding(scope.id, branch_name, sha), scope.revision, state.revision
+
+
+def preview_scope_branch_create(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    scope_id: str,
+    base: str,
+    name: str | None,
+) -> BranchBinding:
+    """Preview a fixed branch create without reserving a ref or journal."""
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    binding, _scope_revision, _registry_revision = _plan_scope_branch_create(
+        repo_root, common_dir, scope_id, base, name
+    )
+    return binding
+
+
+@dataclass(frozen=True)
+class BranchCreateReceipt:
+    binding: BranchBinding
+    operation_id: str
+
+
+def create_scope_branch_with_receipt(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    scope_id: str,
+    base: str,
+    name: str | None,
+    lock_timeout: float = 0.0,
+) -> BranchCreateReceipt:
+    """Create a new branch at a fixed commit, then durably bind it without checkout."""
+    with WriterLock(common_dir, timeout=lock_timeout):
+        control = load_control(common_dir)
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+        )
+        registry = RegistryStore(common_dir)
+        binding, scope_revision, registry_revision = _plan_scope_branch_create(
+            repo_root, common_dir, scope_id, base, name
+        )
+        branch_name = binding.name
+        sha = binding.initial_sha
+        assert control is not None
+        journal = JournalStore(common_dir)
+        operation = prepare_operation(
+            command="branch.create",
+            effect_plan=("git-branch", "registry-bind"),
+            fixed_targets={"scope": scope_id, "branch": branch_name, "base_sha": sha},
+            request_fingerprint=_branch_fingerprint(scope_id, branch_name, sha),
+            before_revisions={"registry": registry_revision, "metadata": scope_revision},
+            engine_digest=engine_digest,
+            writer_epoch=control.epoch,
+        )
+        journal.create(operation)
+        intent = record_effect_intent(operation, effect_id="git-branch", kind="git", target=branch_name)
+        journal.update(intent, expected_sequence=operation.sequence)
+        created = _git(repo_root, "branch", branch_name, sha)
+        if created.returncode != 0:
+            _finish_failed_git_effect(journal, intent, name=branch_name, repo_root=repo_root)
+        advanced = record_effect_result(intent, effect_id="git-branch", status="succeeded")
+        journal.update(advanced, expected_sequence=intent.sequence)
+        registry_intent = record_effect_intent(advanced, effect_id="registry-bind", kind="local", target=scope_id)
+        journal.update(registry_intent, expected_sequence=advanced.sequence)
+        registry.bind_locked(binding)
+        bound = record_effect_result(registry_intent, effect_id="registry-bind", status="succeeded")
+        journal.update(bound, expected_sequence=registry_intent.sequence)
+        terminal = replace(bound, phase="complete", terminal_status="succeeded", sequence=bound.sequence + 1)
+        journal.update(terminal, expected_sequence=bound.sequence)
+        return BranchCreateReceipt(binding, operation.operation_id)
+
+
 def create_scope_branch(
     *,
     repo_root: Path,
@@ -189,64 +301,18 @@ def create_scope_branch(
     name: str | None,
     lock_timeout: float = 0.0,
 ) -> BranchBinding:
-    """Create a new branch at a fixed commit, then durably bind it without checkout."""
-    specdock_dir = repo_root / "spec-dock"
-    with WriterLock(common_dir, timeout=lock_timeout):
-        control = load_control(common_dir)
-        admit_writer(
-            control,
-            common_dir=common_dir,
-            worktree_id=worktree_id,
-            engine_digest=engine_digest,
-            expected_epoch=expected_epoch,
-        )
-        views = load_scope_views(specdock_dir)
-        scope = show_scope(views, scope_id)
-        loaded = read_guarded_json(scope.path / ".meta.json")
-        if loaded is None or not isinstance(loaded[0], dict):
-            raise ValueError("Scope metadata is missing")
-        metadata = decode_scope_metadata(loaded[0])
-        slug = metadata.raw.get("slug")
-        if not isinstance(slug, str) or not slug or metadata.revision != scope.revision:
-            raise ValueError("Scope metadata changed before branch creation")
-        branch_name = name if name is not None else f"{scope.id}-{slug}"
-        _validate_name(repo_root, branch_name)
-        registry = RegistryStore(common_dir)
-        state, _identity = registry.load()
-        if any(binding.scope_id == scope.id or binding.name == branch_name for binding in state.branches):
-            raise ValueError("Scope or branch is already bound")
-        if _branch_exists(repo_root, branch_name):
-            raise ValueError("BRANCH_ADOPTION_REQUIRED")
-        sha = _resolve_commit(repo_root, base)
-        _verify_scope_at_commit(repo_root, views, scope.id, sha)
-        binding = BranchBinding(scope.id, branch_name, sha)
-        assert control is not None
-        journal = JournalStore(common_dir)
-        operation = prepare_operation(
-            command="branch.create",
-            effect_plan=("git-branch", "registry-bind"),
-            fixed_targets={"scope": scope.id, "branch": branch_name, "base_sha": sha},
-            request_fingerprint=_branch_fingerprint(scope.id, branch_name, sha),
-            before_revisions={"registry": state.revision, "metadata": scope.revision},
-            engine_digest=engine_digest,
-            writer_epoch=control.epoch,
-        )
-        journal.create(operation)
-        intent = record_effect_intent(operation, effect_id="git-branch", kind="git", target=branch_name)
-        journal.update(intent, expected_sequence=operation.sequence)
-        created = _git(repo_root, "branch", branch_name, sha)
-        if created.returncode != 0:
-            _finish_failed_git_effect(journal, intent, name=branch_name, repo_root=repo_root)
-        advanced = record_effect_result(intent, effect_id="git-branch", status="succeeded")
-        journal.update(advanced, expected_sequence=intent.sequence)
-        registry_intent = record_effect_intent(advanced, effect_id="registry-bind", kind="local", target=scope.id)
-        journal.update(registry_intent, expected_sequence=advanced.sequence)
-        registry.bind_locked(binding)
-        bound = record_effect_result(registry_intent, effect_id="registry-bind", status="succeeded")
-        journal.update(bound, expected_sequence=registry_intent.sequence)
-        terminal = replace(bound, phase="complete", terminal_status="succeeded", sequence=bound.sequence + 1)
-        journal.update(terminal, expected_sequence=bound.sequence)
-        return binding
+    """Create and return the canonical binding for application callers."""
+    return create_scope_branch_with_receipt(
+        repo_root=repo_root,
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+        scope_id=scope_id,
+        base=base,
+        name=name,
+        lock_timeout=lock_timeout,
+    ).binding
 
 
 def resume_scope_branch_create(
@@ -257,6 +323,7 @@ def resume_scope_branch_create(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    expected_scope_id: str | None = None,
     lock_timeout: float = 0.0,
 ) -> BranchBinding:
     """Complete the recorded binding only after observing its exact fixed Git ref."""
@@ -268,6 +335,7 @@ def resume_scope_branch_create(
             if (
                 operation.command != "branch.create"
                 or set(targets) != {"scope", "branch", "base_sha"}
+                or (expected_scope_id is not None and targets["scope"] != expected_scope_id)
                 or operation.request_fingerprint
                 != _branch_fingerprint(targets["scope"], targets["branch"], targets["base_sha"])
                 or operation.engine_digest != engine_digest
@@ -291,6 +359,7 @@ def resume_scope_branch_create(
             operation.command != "branch.create"
             or operation.effect_plan != ("git-branch", "registry-bind")
             or set(targets) != {"scope", "branch", "base_sha"}
+            or (expected_scope_id is not None and targets["scope"] != expected_scope_id)
             or operation.engine_digest != engine_digest
             or operation.writer_epoch != expected_epoch
             or operation.terminal_status != "pending"

@@ -35,6 +35,8 @@ def test_work_commands_start_and_finish_all_three_kinds(tmp_path: Path) -> None:
         assert outcome.status == "succeeded"
         assert outcome.data.scope_id == scope.id
         assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == scope.id
+        preview = run_work_start(parse_vnext(["work", "start", scope.id, "--dry-run"]), context, gateway=gateway)
+        assert preview.status == "planned" and preview.data.branch == outcome.data.branch
     for scope in (issue, epic, initiative):
         outcome = run_work_finish(parse_vnext(["work", "finish", scope.id, "--yes"]), context, gateway=gateway)
         assert outcome.status == "succeeded"

@@ -128,7 +128,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     ),
     "work finish": (_arg("target"),),
     "branch show": (_arg("target"),),
-    "branch create": (_arg("target"), _arg("--name"), _required("--base")),
+    "branch create": (_arg("target"), _arg("--name"), _arg("--base")),
     "branch switch": (_arg("target"),),
     "dependency list": (_arg("target"), _arg("--view", choices=("declared", "effective"))),
     "dependency check": (_arg("target"), _arg("--source", choices=SOURCES, default="cache")),

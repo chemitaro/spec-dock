@@ -103,13 +103,14 @@ def run_vnext(
             "scope show",
             "scope edit",
             "branch show",
+            "branch create",
             "branch switch",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
         if ns.command_path in {"scope list", "scope show"}:
             result = run_scope_query(ns, context)
-        elif ns.command_path in {"branch show", "branch switch"}:
+        elif ns.command_path in {"branch show", "branch create", "branch switch"}:
             result = run_branch_command(ns, context)
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)

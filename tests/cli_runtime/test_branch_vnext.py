@@ -238,7 +238,16 @@ def test_branch_create_resume_binds_fixed_ref_after_registry_failure(
     pending = JournalStore(common_dir).pending()
     assert len(pending) == 1 and pending[0].command == "branch.create"
     assert RegistryStore(common_dir).load()[0].branches == ()
-    resumed = resume_scope_branch_create(operation_id=pending[0].operation_id, **arguments)
+    with pytest.raises(ValueError, match="recorded request"):
+        resume_scope_branch_create(
+            operation_id=pending[0].operation_id,
+            expected_scope_id="init-local-99999",
+            **arguments,
+        )
+    assert RegistryStore(common_dir).load()[0].branches == ()
+    resumed = resume_scope_branch_create(
+        operation_id=pending[0].operation_id, expected_scope_id=initiative.id, **arguments
+    )
     assert resumed.name == f"{initiative.id}-alpha"
     assert show_scope_branch(repo, common_dir, initiative.id) == resumed
     assert JournalStore(common_dir).pending() == ()

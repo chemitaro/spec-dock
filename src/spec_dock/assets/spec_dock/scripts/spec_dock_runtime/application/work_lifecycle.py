@@ -9,12 +9,11 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.active_selection import clear_selection, select_scope
 from spec_dock_runtime.application.branch_vnext import (
-    _branch_exists,
     _git,
     _resolve_commit,
-    _validate_name,
     _verify_scope_at_commit,
     create_scope_branch,
+    preview_scope_branch_create,
     show_scope_branch,
 )
 from spec_dock_runtime.application.dependency_vnext import check_scope_readiness
@@ -41,7 +40,6 @@ from spec_dock_runtime.infra.git_cli import worktree_list
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
-from spec_dock_runtime.infra.registry_store import RegistryStore
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
@@ -238,23 +236,17 @@ def preview_start_work(
     if binding is None:
         if base is None and not _head_state(repo_root)[0]:
             raise ValueError("new work start from detached HEAD requires --base") from None
-        scope = show_scope(views, plan.target_id)
-        loaded = read_guarded_json(scope.path / ".meta.json")
-        if loaded is None or not isinstance(loaded[0], dict):
-            raise ValueError("Scope metadata is missing")
-        metadata = decode_scope_metadata(loaded[0])
-        slug = metadata.raw.get("slug")
-        if not isinstance(slug, str) or not slug or metadata.revision != scope.revision:
-            raise ValueError("Scope metadata changed before branch creation")
-        planned_name = branch_name if branch_name is not None else f"{scope.id}-{slug}"
-        _validate_name(repo_root, planned_name)
-        if any(item.name == planned_name for item in RegistryStore(common_dir).load()[0].branches):
-            raise ValueError("Scope or branch is already bound")
-        if _branch_exists(repo_root, planned_name):
-            raise ValueError("BRANCH_ADOPTION_REQUIRED")
-        sha = _resolve_commit(repo_root, base or "HEAD")
-        _verify_scope_at_commit(repo_root, views, scope.id, sha)
-        return WorkStartPreview(scope.id, planned_name, True, plan.selection_after != selection)
+        planned = preview_scope_branch_create(
+            repo_root=repo_root,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+            scope_id=plan.target_id,
+            base=base or "HEAD",
+            name=branch_name,
+        )
+        return WorkStartPreview(planned.scope_id, planned.name, True, plan.selection_after != selection)
     if base is not None:
         raise ValueError("--base is valid only when creating a new canonical branch")
     if branch_name is not None and branch_name != binding.name:
@@ -262,8 +254,8 @@ def preview_start_work(
     for worktree in worktree_list(repo_root):
         if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
             raise ValueError("canonical branch is checked out in another worktree")
-    _verify_scope_at_commit(repo_root, views, scope.id, _resolve_commit(repo_root, f"refs/heads/{binding.name}"))
-    return WorkStartPreview(scope.id, binding.name, False, plan.selection_after != selection)
+    _verify_scope_at_commit(repo_root, views, plan.target_id, _resolve_commit(repo_root, f"refs/heads/{binding.name}"))
+    return WorkStartPreview(plan.target_id, binding.name, False, plan.selection_after != selection)
 
 
 def start_work(

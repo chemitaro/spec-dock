@@ -139,6 +139,8 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("--resume and --rollback are mutually exclusive")
     if any(value is not None and re.fullmatch(r"[0-9a-f]{32}", value) is None for value in (resume, rollback)):
         parser.error("recovery requires a 32-character lowercase operation ID")
+    if parsed.command_path == "branch create" and not resume and not parsed.base:
+        parser.error("branch create requires --base unless --resume is specified")
     if parsed.command_path not in MUTATING_LEAF_PATHS and (common.get("yes") or common.get("dry_run")):
         parser.error("--yes and --dry-run apply only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
