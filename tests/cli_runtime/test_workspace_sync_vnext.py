@@ -14,6 +14,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
 from spec_dock_runtime.application.scope_query import ScopeView  # noqa: E402
+from spec_dock_runtime.application.workspace_diagnostics_vnext import doctor_workspace  # noqa: E402
 from spec_dock_runtime.application.workspace_sync_vnext import sync_workspace  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import (  # noqa: E402
     GithubBackend,
@@ -117,3 +118,10 @@ def test_projection_failure_keeps_generation_readable(tmp_path: Path, monkeypatc
     result = sync_workspace(**_sync_args(common))
     assert result.projection_stale is True
     assert load_generation(repo / "spec-dock") == result.generation
+    diagnosed = doctor_workspace(
+        repo_root=repo,
+        common_dir=cast("Path", common["common_dir"]),
+        worktree_id="main",
+        engine_digest="engine-a",
+    )
+    assert "projection_stale" in {finding.code for finding in diagnosed.findings}

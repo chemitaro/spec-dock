@@ -532,6 +532,7 @@ class TestRuntimeShellS11:
         # to this set require an intentional architecture review.
         direct_infra_use_cases = {
             "active_selection.py",
+            "artifact_vnext.py",
             "branch_vnext.py",
             "create_github_scope.py",
             "create_local_scope.py",
@@ -543,6 +544,11 @@ class TestRuntimeShellS11:
             "scope_delete_vnext.py",
             "scope_query.py",
             "work_lifecycle.py",
+            "workbench_vnext.py",
+            "worktree_bootstrap_vnext.py",
+            "worktree_vnext.py",
+            "workspace_diagnostics_vnext.py",
+            "workspace_sync_vnext.py",
         }
         application_dir = app_source_path.parent / "application"
         for module_path in sorted(application_dir.glob("*.py")):

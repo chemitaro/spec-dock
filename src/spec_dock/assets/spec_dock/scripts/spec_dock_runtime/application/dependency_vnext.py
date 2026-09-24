@@ -66,6 +66,11 @@ def _read_raw_edges(
     return raw, loaded_by_id
 
 
+def validate_scope_dependency_snapshot(views: tuple[ScopeView, ...]) -> None:
+    """Read and validate all declared edges without writing derived state."""
+    _read_raw_edges(views)
+
+
 def _selection_for_targets(specdock_dir: Path, worktree_id: str, *targets: str) -> SelectionState | None:
     if any(target.startswith("@") for target in targets):
         return load_selection_v3(specdock_dir, worktree_id=worktree_id)[0]
