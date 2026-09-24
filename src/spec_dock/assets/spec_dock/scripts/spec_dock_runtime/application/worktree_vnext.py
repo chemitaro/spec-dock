@@ -13,6 +13,7 @@ from spec_dock_runtime.application.branch_vnext import _resolve_commit
 from spec_dock_runtime.application.worktree import (
     _close_fd,
     _open_created_exclusive_worktree,
+    _open_exclusive_existing_worktree,
     _open_source_directory_for_filesystem_probe,
     _require_same_filesystem,
     _validate_worktree_root,
@@ -60,6 +61,14 @@ class WorktreeView:
     locked: bool
     bare: bool
     detached: bool
+
+
+@dataclass(frozen=True)
+class WorktreeRemoved:
+    id: str
+    path: Path
+    branch_deleted: bool
+    control_epoch: int
 
 
 def list_worktrees(*, repo_root: Path, common_dir: Path) -> tuple[WorktreeView, ...]:
@@ -273,5 +282,116 @@ def create_worktree(
             raise RuntimeError(
                 f"worktree create stopped at {phase}; inspect Git worktree, branch, and path before retrying"
             ) from error
+        finally:
+            _close_fd(target_fd)
+
+
+def _target_payload_state(path: Path) -> tuple[bool, bool, bool]:
+    """Classify tracked changes, untracked entries, and ignored payload separately."""
+    observed = subprocess.run(
+        ["git", "status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=all"],
+        cwd=path,
+        capture_output=True,
+        check=False,
+        timeout=30,
+    )
+    if observed.returncode != 0:
+        raise RuntimeError("target worktree payload could not be classified")
+    tracked = False
+    untracked = False
+    ignored = False
+    for item in observed.stdout.split(b"\0"):
+        if not item:
+            continue
+        if len(item) < 4 or item[2:3] != b" ":
+            raise RuntimeError("target worktree status is malformed")
+        if item[:2] == b"!!":
+            ignored = True
+        elif item[:2] == b"??":
+            untracked = True
+        else:
+            tracked = True
+    return tracked, untracked, ignored
+
+
+def _discard_ignored_payload(path: Path) -> None:
+    cleaned = subprocess.run(["git", "clean", "-fdX", "--"], cwd=path, capture_output=True, check=False, timeout=60)
+    if cleaned.returncode != 0:
+        raise RuntimeError("ignored payload cleanup failed; inspect the target before retrying")
+
+
+def remove_worktree(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    reference: str,
+    unlock: bool = False,
+    discard_ignored: bool = False,
+    lock_timeout: float = 0.0,
+) -> WorktreeRemoved:
+    """Remove only a clean registered noncurrent worktree and retain its branch."""
+    with WriterLock(common_dir, timeout=lock_timeout):
+        control = load_control(common_dir)
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+        )
+        assert control is not None
+        target = show_worktree(repo_root=repo_root, common_dir=common_dir, reference=reference)
+        registration = next(item for item in control.worktrees if item.id == target.id)
+        git_records = git_cli.worktree_list(repo_root)
+        if not target.registered or not registration.active or target.head is None or target.branch is None:
+            raise ValueError("target worktree has no active registration and Git record")
+        if target.bare or target.detached:
+            raise ValueError("bare or detached worktree cannot be removed")
+        if target.path == git_records[0].path or target.path.resolve(strict=True) == repo_root.resolve(strict=True):
+            raise ValueError("main or current worktree cannot be removed")
+        if target.locked and not unlock:
+            raise ValueError("locked worktree requires --unlock")
+        path = target.path
+        target_fd = _open_exclusive_existing_worktree(path)
+        try:
+            _verify_worktree_path_binding(path, target_fd)
+            tracked, untracked, ignored = _target_payload_state(path)
+            if tracked:
+                raise ValueError("tracked worktree changes prevent removal")
+            if untracked:
+                raise ValueError("untracked worktree payload prevents removal")
+            if ignored and not discard_ignored:
+                raise ValueError("ignored worktree payload requires --discard-ignored")
+            if target.locked:
+                unlocked = subprocess.run(
+                    ["git", "worktree", "unlock", str(path)],
+                    cwd=repo_root,
+                    capture_output=True,
+                    check=False,
+                    timeout=30,
+                )
+                if unlocked.returncode != 0:
+                    raise RuntimeError("worktree unlock failed; inspect the target before retrying")
+            if ignored:
+                _discard_ignored_payload(path)
+            if any(_target_payload_state(path)):
+                raise ValueError("worktree payload changed before removal")
+            _verify_worktree_path_binding(path, target_fd)
+            git_cli.remove_worktree(repo_root, path=path, force=False, target_fd=target_fd)
+            if os.path.lexists(path):
+                raise RuntimeError("worktree path remains after Git removal; inspect before retrying")
+            if not _branch_exists(repo_root, target.branch):
+                raise RuntimeError("worktree branch disappeared unexpectedly")
+            retired = replace(registration, active=False)
+            next_control = replace(
+                control,
+                epoch=control.epoch + 1,
+                worktrees=tuple(retired if item.id == registration.id else item for item in control.worktrees),
+            )
+            store_control(common_dir, next_control, expected_epoch=control.epoch)
+            return WorktreeRemoved(registration.id, path, False, next_control.epoch)
         finally:
             _close_fd(target_fd)
