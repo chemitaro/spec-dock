@@ -205,7 +205,7 @@ def test_two_linked_worktrees_share_history_aware_monotone_reservations(tmp_path
     assert {"iss-local-00008", "iss-local-00009"} <= state.reserved
 
 
-def test_local_initiative_epic_and_issue_scaffold_without_network(tmp_path: Path) -> None:
+def _ready_repo(tmp_path: Path) -> tuple[dict[str, object], Path]:
     repo = tmp_path / "repo"
     assert harness.main(["init", str(repo)]) == 0
     subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
@@ -242,6 +242,11 @@ def test_local_initiative_epic_and_issue_scaffold_without_network(tmp_path: Path
         "expected_epoch": 1,
         "updated_at": "2026-09-24T00:00:00Z",
     }
+    return common, common_dir
+
+
+def test_local_initiative_epic_and_issue_scaffold_without_network(tmp_path: Path) -> None:
+    common, common_dir = _ready_repo(tmp_path)
     initiative = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
     initiative_state = AncestorState(initiative.id, "initiative", "local", "open", False)
     epic = create_local_scope(
@@ -258,3 +263,65 @@ def test_local_initiative_epic_and_issue_scaffold_without_network(tmp_path: Path
         assert (created.path / "requirement.md").exists()
         assert JournalStore(common_dir).load(created.operation_id).terminal_status == "succeeded"
     assert JournalStore(common_dir).pending() == ()
+
+
+def test_scaffold_collision_after_id_reservation_does_not_block_other_writers(tmp_path: Path) -> None:
+    common, common_dir = _ready_repo(tmp_path)
+    repo = common["repo_root"]
+    assert isinstance(repo, Path)
+    collision = repo / "spec-dock/initiatives/init-local-00001-plan"
+    collision.parent.mkdir(parents=True)
+    collision.write_text("occupied\n", encoding="utf-8")
+    with pytest.raises((RuntimeError, ValueError), match="Destination already exists"):
+        create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    assert JournalStore(common_dir).pending() == ()
+    second = create_local_scope(kind="initiative", title="Other", parent=None, ancestors=(), **common)
+    assert second.id == "init-local-00002"
+
+
+def test_parent_directory_swap_before_publication_cannot_redirect_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common, common_dir = _ready_repo(tmp_path)
+    initiative = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    parent = AncestorState(initiative.id, "initiative", "local", "open", False)
+    from spec_dock_runtime.application import create_node
+
+    real_execute = create_node.execute_create_plan
+
+    def swap_parent(plan: object, ports: object, **kwargs: object) -> object:
+        removed = initiative.path.with_name(f"{initiative.path.name}-removed")
+        initiative.path.rename(removed)
+        initiative.path.mkdir()
+        (initiative.path / "epics").mkdir()
+        return real_execute(plan, ports, **kwargs)
+
+    monkeypatch.setattr(create_node, "execute_create_plan", swap_parent)
+    with pytest.raises((RuntimeError, ValueError), match="parent identity changed"):
+        create_local_scope(kind="epic", title="Build", parent=parent, ancestors=(parent,), **common)
+    assert list((initiative.path / "epics").iterdir()) == []
+    assert JournalStore(common_dir).pending() == ()
+
+
+def test_parent_swap_at_atomic_publish_never_writes_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common, common_dir = _ready_repo(tmp_path)
+    initiative = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    parent = AncestorState(initiative.id, "initiative", "local", "open", False)
+    from spec_dock_runtime.application import create_node
+
+    real_rename = create_node._rename_node_tree_no_replace_between_at
+
+    def swap_at_rename(*args: object, **kwargs: object) -> object:
+        removed = initiative.path.with_name(f"{initiative.path.name}-removed")
+        initiative.path.rename(removed)
+        initiative.path.mkdir()
+        (initiative.path / "epics").mkdir()
+        return real_rename(*args, **kwargs)
+
+    monkeypatch.setattr(create_node, "_rename_node_tree_no_replace_between_at", swap_at_rename)
+    with pytest.raises((RuntimeError, ValueError), match="parent identity changed after publication"):
+        create_local_scope(kind="epic", title="Build", parent=parent, ancestors=(parent,), **common)
+    assert list((initiative.path / "epics").iterdir()) == []
+    assert len(JournalStore(common_dir).pending()) == 1

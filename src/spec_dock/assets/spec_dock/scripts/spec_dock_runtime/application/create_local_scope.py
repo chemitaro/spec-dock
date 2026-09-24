@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass, replace
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Literal
 
 from spec_dock_runtime.domain.ids import resolve_input_title_and_slug
 from spec_dock_runtime.domain.lifecycle import GithubBackend, LocalBackend, decode_scope_metadata
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, ScopeKind, parse_scope_selector
-from spec_dock_runtime.infra.json_store import read_guarded_json
+from spec_dock_runtime.infra.json_store import open_guarded_directory, read_guarded_json, read_guarded_json_at
 
 
 @dataclass(frozen=True)
@@ -109,6 +111,7 @@ def create_local_scope(
     """Create one local Scope with a burned ID and a durable scaffold journal."""
     from spec_dock_runtime.application.contracts import CreatePlan
     from spec_dock_runtime.application.create_node import (
+        CreatePlanExecutionError,
         _replacements,
         _rules_scaffold_specs,
         _scaffold_file_paths,
@@ -145,6 +148,7 @@ def create_local_scope(
         )
         plan = plan_local_scope_create(kind=kind, title=title, parent=parent, ancestors=ancestors, slug=slug)
         records = {record.id: record for record in fs_repo.load_node_records(specdock_dir)}
+        parent_meta_identity: tuple[int, int] | None = None
         for ancestor in (parent, *ancestors):
             if ancestor is None:
                 continue
@@ -154,6 +158,8 @@ def create_local_scope(
             loaded = read_guarded_json(Path(record.meta_path))
             if loaded is None or not isinstance(loaded[0], dict):
                 raise ValueError("parent or ancestor metadata is missing")
+            if parent is not None and ancestor.id == parent.id:
+                parent_meta_identity = loaded[1]
             metadata = decode_scope_metadata(loaded[0])
             if metadata.backend.kind != ancestor.backend:
                 raise ValueError("parent or ancestor backend changed")
@@ -235,27 +241,47 @@ def create_local_scope(
             node_repo=fs_repo,
             template_scaffolder=template_scaffolder,
         )
-        assert control is not None
-        journal = JournalStore(common_dir)
-        operation = prepare_operation(
-            command="scope.create",
-            effect_plan=("scaffold",),
-            fixed_targets={"target": scope_id, "parent": plan.parent_id or ""},
-            request_fingerprint=f"sha256:{fingerprint}",
-            before_revisions={},
-            engine_digest=engine_digest,
-            writer_epoch=control.epoch,
-        )
-        journal.create(operation)
-        intent = record_effect_intent(operation, effect_id="scaffold", kind="local", target=scope_id)
-        journal.update(intent, expected_sequence=operation.sequence)
-        execute_create_plan(
-            create_plan,
-            ports,
-            metadata_writer=lambda directory_fd: fs_repo.write_meta_payload_at(directory_fd, metadata_payload),
-        )
-        succeeded = record_effect_result(intent, effect_id="scaffold", status="succeeded")
-        journal.update(succeeded, expected_sequence=intent.sequence)
-        completed = replace(succeeded, phase="complete", terminal_status="succeeded", sequence=succeeded.sequence + 1)
-        journal.update(completed, expected_sequence=succeeded.sequence)
-        return LocalScopeCreated(scope_id, destination, operation.operation_id, plan.warnings)
+        with ExitStack() as anchors:
+            parent_anchor_fd: int | None = None
+            if parent is not None:
+                parent_anchor_fd = open_guarded_directory(parent_path)
+                anchors.callback(os.close, parent_anchor_fd)
+                bound = read_guarded_json_at(parent_anchor_fd, ".meta.json")
+                if bound is None or bound[1] != parent_meta_identity:
+                    raise ValueError("Scope parent identity changed before publication")
+            assert control is not None
+            journal = JournalStore(common_dir)
+            operation = prepare_operation(
+                command="scope.create",
+                effect_plan=("scaffold",),
+                fixed_targets={"target": scope_id, "parent": plan.parent_id or ""},
+                request_fingerprint=f"sha256:{fingerprint}",
+                before_revisions={},
+                engine_digest=engine_digest,
+                writer_epoch=control.epoch,
+            )
+            journal.create(operation)
+            intent = record_effect_intent(operation, effect_id="scaffold", kind="local", target=scope_id)
+            journal.update(intent, expected_sequence=operation.sequence)
+            try:
+                execute_create_plan(
+                    create_plan,
+                    ports,
+                    metadata_writer=lambda directory_fd: fs_repo.write_meta_payload_at(directory_fd, metadata_payload),
+                    parent_anchor_fd=parent_anchor_fd,
+                )
+            except CreatePlanExecutionError as exc:
+                failure_status = "failed" if exc.phase == "none" else "unknown"
+                failed = record_effect_result(intent, effect_id="scaffold", status=failure_status)
+                journal.update(failed, expected_sequence=intent.sequence)
+                if failure_status == "failed":
+                    terminal = replace(failed, phase="complete", terminal_status="failed", sequence=failed.sequence + 1)
+                    journal.update(terminal, expected_sequence=failed.sequence)
+                raise
+            succeeded = record_effect_result(intent, effect_id="scaffold", status="succeeded")
+            journal.update(succeeded, expected_sequence=intent.sequence)
+            completed = replace(
+                succeeded, phase="complete", terminal_status="succeeded", sequence=succeeded.sequence + 1
+            )
+            journal.update(completed, expected_sequence=succeeded.sequence)
+            return LocalScopeCreated(scope_id, destination, operation.operation_id, plan.warnings)

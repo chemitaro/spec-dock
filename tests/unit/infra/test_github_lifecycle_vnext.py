@@ -186,3 +186,18 @@ def test_create_success_response_without_identity_is_unknown_effect(tmp_path: Pa
             tmp_path, "example/product", title="Plan", body="body"
         )
     assert caught.value.exit_code == 6
+
+
+@pytest.mark.parametrize("status", [400, 410, 422])
+def test_create_client_rejection_is_confirmed_non_application(tmp_path: Path, status: int) -> None:
+    gateway = GithubIssueGateway(runner=FakeRun(_reply(status, {"message": "invalid request"})))
+    with pytest.raises(RemoteIssueError) as caught:
+        gateway.create(tmp_path, "example/product", title="Plan", body="")
+    assert caught.value.exit_code == 5
+
+
+def test_missing_gh_executable_is_confirmed_non_application(tmp_path: Path) -> None:
+    gateway = GithubIssueGateway(runner=FakeRun(FileNotFoundError("gh")))
+    with pytest.raises(RemoteIssueError) as caught:
+        gateway.create(tmp_path, "example/product", title="Plan", body="")
+    assert caught.value.exit_code == 5

@@ -44,6 +44,8 @@ def _decode_response(response: subprocess.CompletedProcess[str], *, mutation: bo
     status = int(matched.group(1))
     if status in (401, 403, 404):
         raise RemoteIssueError("GITHUB_ACCESS_DENIED")
+    if status in (400, 410, 422):
+        raise RemoteIssueError("GITHUB_REQUEST_REJECTED")
     if response.returncode != 0 or status >= 400:
         raise RemoteIssueError("GITHUB_REMOTE_UNAVAILABLE", uncertain=mutation)
     try:
@@ -125,6 +127,8 @@ class GithubIssueGateway:
             )
         except subprocess.TimeoutExpired as error:
             raise RemoteIssueError("GITHUB_TIMEOUT", uncertain=method != "GET") from error
+        except (FileNotFoundError, PermissionError, NotADirectoryError) as error:
+            raise RemoteIssueError("GITHUB_PROCESS_NOT_STARTED") from error
         except OSError as error:
             raise RemoteIssueError("GITHUB_PROCESS_ERROR", uncertain=method != "GET") from error
         return _decode_response(response, mutation=method != "GET")

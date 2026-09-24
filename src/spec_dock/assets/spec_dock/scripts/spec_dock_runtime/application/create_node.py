@@ -1095,27 +1095,31 @@ def execute_create_plan(
     ports: Ports,
     *,
     metadata_writer: Callable[[int], None] | None = None,
+    parent_anchor_fd: int | None = None,
 ) -> list[Path]:
     node_repo = _resolve_node_repo(ports)
     template_scaffolder = _resolve_template_scaffolder(ports)
     specdock_dir = _resolve_specdock_dir(ports)
 
-    collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
-    if collisions:
-        raise RuntimeError(f"Destination already exists: {collisions[0]}")
+    try:
+        collisions = [path for path in plan.planned_paths if os.path.lexists(path)]
+        if collisions:
+            raise RuntimeError(f"Destination already exists: {collisions[0]}")
 
-    template_dir = _resolve_template_dir(plan)
-    rules_scaffold_specs = _rules_scaffold_specs(
-        kind=plan.meta.kind,
-        dest_dir=plan.dest_dir,
-        specdock_dir=specdock_dir,
-    )
-    for link_path, target_path in rules_scaffold_specs:
-        _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
-    if os.path.lexists(plan.dest_dir):
-        raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
-    _require_node_tree_no_replace_rename_capability()
-    _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+        template_dir = _resolve_template_dir(plan)
+        rules_scaffold_specs = _rules_scaffold_specs(
+            kind=plan.meta.kind,
+            dest_dir=plan.dest_dir,
+            specdock_dir=specdock_dir,
+        )
+        for link_path, target_path in rules_scaffold_specs:
+            _validate_rules_symlink_preflight(link_path=link_path, target_path=target_path)
+        if os.path.lexists(plan.dest_dir):
+            raise RuntimeError(f"Destination already exists: {plan.dest_dir}")
+        _require_node_tree_no_replace_rename_capability()
+        _preflight_rules_symlink_creation_capability(rules_scaffold_specs)
+    except Exception as exc:
+        raise CreatePlanExecutionError(phase="none", message=str(exc)) from exc
 
     destination_parent_fd: int | None = None
     destination_parent_identity: tuple[int, int] | None = None
@@ -1128,11 +1132,25 @@ def execute_create_plan(
     payload_identity: tuple[int, int] | None = None
     committed = False
     try:
-        plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
-        destination_parent_fd = os.open(
-            plan.dest_dir.parent,
-            os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
-        )
+        if parent_anchor_fd is None:
+            plan.dest_dir.parent.mkdir(parents=True, exist_ok=True)
+            destination_parent_fd = os.open(
+                plan.dest_dir.parent,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+            )
+        else:
+            anchor_path = plan.dest_dir.parent.parent
+            anchor_stat = os.fstat(parent_anchor_fd)
+            anchor_identity = (anchor_stat.st_dev, anchor_stat.st_ino)
+            if _directory_path_identity(anchor_path) != anchor_identity:
+                raise RuntimeError(f"Scope parent identity changed before publication: {anchor_path}")
+            with contextlib.suppress(FileExistsError):
+                os.mkdir(plan.dest_dir.parent.name, dir_fd=parent_anchor_fd)
+            destination_parent_fd = os.open(
+                plan.dest_dir.parent.name,
+                os.O_RDONLY | os.O_DIRECTORY | getattr(os, "O_NOFOLLOW", 0),
+                dir_fd=parent_anchor_fd,
+            )
         parent_stat = os.fstat(destination_parent_fd)
         destination_parent_identity = (parent_stat.st_dev, parent_stat.st_ino)
         os.mkdir(outer_name, mode=0o700, dir_fd=destination_parent_fd)
@@ -1173,6 +1191,8 @@ def execute_create_plan(
             metadata_writer(payload_fd)
         if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
             raise RuntimeError(f"Destination parent identity changed before publication: {plan.dest_dir.parent}")
+        if parent_anchor_fd is not None and _directory_path_identity(plan.dest_dir.parent.parent) != anchor_identity:
+            raise RuntimeError(f"Scope parent identity changed before publication: {plan.dest_dir.parent.parent}")
         _verified_directory_identity_at(
             destination_parent_fd,
             outer_name,
@@ -1192,6 +1212,8 @@ def execute_create_plan(
             plan.dest_dir.name,
         )
         committed = True
+        if _directory_path_identity(plan.dest_dir.parent) != destination_parent_identity:
+            raise RuntimeError(f"Destination parent identity changed after publication: {plan.dest_dir.parent}")
         with contextlib.suppress(OSError, RuntimeError):
             _cleanup_committed_outer_transaction(
                 parent_fd=destination_parent_fd,
@@ -1199,6 +1221,8 @@ def execute_create_plan(
                 outer_identity=outer_identity,
             )
     except Exception as exc:
+        if committed:
+            raise CreatePlanExecutionError(phase="post_write_verified", message=str(exc)) from exc
         if not committed and destination_parent_fd is not None:
             try:
                 _cleanup_node_tree_transaction(

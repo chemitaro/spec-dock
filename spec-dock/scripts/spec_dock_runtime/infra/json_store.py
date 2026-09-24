@@ -35,22 +35,34 @@ def read_guarded_json(path: Path) -> tuple[Any, tuple[int, int]] | None:
         return None
     directory_fd = _open_directory_without_links(path.parent)
     try:
-        try:
-            fd = os.open(path.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
-        except FileNotFoundError:
-            return None
-        except OSError as exc:
-            if exc.errno == errno.ELOOP:
-                raise ValueError("JSON source must not be a symlink") from exc
-            raise
-        with os.fdopen(fd, "rb") as stream:
-            metadata = os.fstat(stream.fileno())
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
-                raise ValueError("JSON source must be a single-link regular file")
-            payload = json.load(stream)
-            return payload, (metadata.st_dev, metadata.st_ino)
+        return read_guarded_json_at(directory_fd, path.name)
     finally:
         os.close(directory_fd)
+
+
+def read_guarded_json_at(directory_fd: int, name: str) -> tuple[Any, tuple[int, int]] | None:
+    if not name or name in (".", "..") or "/" in name or "\\" in name:
+        raise ValueError("JSON name must be a single path component")
+    try:
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+    except FileNotFoundError:
+        return None
+    except OSError as exc:
+        if exc.errno == errno.ELOOP:
+            raise ValueError("JSON source must not be a symlink") from exc
+        raise
+    with os.fdopen(fd, "rb") as stream:
+        metadata = os.fstat(stream.fileno())
+        if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+            raise ValueError("JSON source must be a single-link regular file")
+        payload = json.load(stream)
+        return payload, (metadata.st_dev, metadata.st_ino)
+
+
+def open_guarded_directory(path: Path) -> int:
+    if not path.is_absolute():
+        raise ValueError("guarded directory must be absolute")
+    return _open_directory_without_links(path)
 
 
 def atomic_write_json(path: Path, data: Any, *, expected_identity: tuple[int, int] | None = None) -> None:
