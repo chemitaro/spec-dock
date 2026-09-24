@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 import re
 import subprocess
@@ -29,6 +29,7 @@ def _decode_registry(payload: object) -> LocalIdRegistry:
     high_water = payload.get("high_water")
     reserved_ids = payload.get("reserved_ids")
     branches = payload.get("branch_bindings", [])
+    deleted_ids = payload.get("deleted_ids", [])
     if (
         type(revision) is not int
         or not isinstance(high_water, dict)
@@ -38,6 +39,9 @@ def _decode_registry(payload: object) -> LocalIdRegistry:
         or not all(isinstance(item, str) for item in reserved_ids)
         or reserved_ids != sorted(set(reserved_ids))
         or not isinstance(branches, list)
+        or not isinstance(deleted_ids, list)
+        or not all(isinstance(item, str) for item in deleted_ids)
+        or deleted_ids != sorted(set(deleted_ids))
         or any(
             not isinstance(binding, dict)
             or set(binding) != {"scope_id", "name", "initial_sha"}
@@ -51,6 +55,7 @@ def _decode_registry(payload: object) -> LocalIdRegistry:
         tuple(high_water[kind] for kind in _KIND_ORDER),
         frozenset(reserved_ids),
         tuple(BranchBinding(item["scope_id"], item["name"], item["initial_sha"]) for item in branches),
+        frozenset(deleted_ids),
     )
 
 
@@ -60,6 +65,7 @@ def _encode_registry(state: LocalIdRegistry) -> dict[str, object]:
         "revision": state.revision,
         "high_water": dict(zip(_KIND_ORDER, state.high_water, strict=True)),
         "reserved_ids": sorted(state.reserved),
+        "deleted_ids": sorted(state.deleted_ids),
         "branch_bindings": [
             {"scope_id": item.scope_id, "name": item.name, "initial_sha": item.initial_sha} for item in state.branches
         ],
@@ -152,4 +158,23 @@ class RegistryStore:
         next_state = bind_branch(state, binding)
         if next_state != state:
             atomic_write_json(self.path, _encode_registry(next_state), expected_identity=identity)
+        return next_state
+
+    def mark_deleted_locked(self, scope_ids: tuple[str, ...]) -> LocalIdRegistry:
+        """Keep tombstones and existing branch bindings when a Scope tree is removed."""
+        state, identity = self.load()
+        requested = frozenset(scope_ids)
+        if not requested:
+            raise ValueError("deleted Scope IDs are required")
+        for scope_id in requested:
+            selector = parse_scope_selector(scope_id)
+            if not isinstance(selector, ScopeIdSelector) or selector.id != scope_id:
+                raise ValueError("deleted Scope ID is invalid")
+        if requested.issubset(state.deleted_ids):
+            return state
+        next_state = replace(
+            state, revision=state.revision + 1,
+            deleted_ids=state.deleted_ids | requested,
+        )
+        atomic_write_json(self.path, _encode_registry(next_state), expected_identity=identity)
         return next_state

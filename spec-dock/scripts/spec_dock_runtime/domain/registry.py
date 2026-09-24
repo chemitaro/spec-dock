@@ -7,6 +7,7 @@ import re
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.domain.ids import format_id
+from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -26,6 +27,7 @@ class LocalIdRegistry:
     high_water: tuple[int, int, int]
     reserved: frozenset[str]
     branches: tuple[BranchBinding, ...] = ()
+    deleted_ids: frozenset[str] = frozenset()
 
     def __post_init__(self) -> None:
         if type(self.revision) is not int or self.revision < 0:
@@ -46,6 +48,10 @@ class LocalIdRegistry:
             binding.name for binding in self.branches
         }) != len(self.branches):
             raise ValueError("canonical branch registry has duplicate bindings")
+        for scope_id in self.deleted_ids:
+            selector = parse_scope_selector(scope_id)
+            if not isinstance(selector, ScopeIdSelector) or selector.id != scope_id:
+                raise ValueError("deleted Scope ID reservation is invalid")
 
     @classmethod
     def empty(cls) -> LocalIdRegistry:

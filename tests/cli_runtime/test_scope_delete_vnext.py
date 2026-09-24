@@ -14,6 +14,8 @@ from spec_dock_runtime.application.create_local_scope import AncestorState, crea
 from spec_dock_runtime.application.scope_delete_vnext import plan_scope_delete  # noqa: E402
 from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
+from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
+from spec_dock_runtime.infra.writer_lock import WriterLock  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
 
 
@@ -54,3 +56,15 @@ def test_delete_boundary_dependency_requires_explicit_detach(tmp_path: Path) -> 
     assert plan.boundary_edges == ((sibling.id, issue.id),)
     assert plan.survivor_dependencies == {sibling.id: ()}
     assert plan.selection_after == active
+
+
+def test_deleted_scope_ids_remain_reserved_in_shared_registry(tmp_path: Path) -> None:
+    specdock_dir, _views, _initiative, epic, issue = _three_scopes(tmp_path)
+    common_dir = specdock_dir.parent / ".git"
+    registry = RegistryStore(common_dir)
+    with WriterLock(common_dir):
+        updated = registry.mark_deleted_locked((epic.id, issue.id))
+    assert updated.deleted_ids == frozenset((epic.id, issue.id))
+    assert registry.load()[0].deleted_ids == updated.deleted_ids
+    with WriterLock(common_dir):
+        assert registry.mark_deleted_locked((issue.id, epic.id)) == updated
