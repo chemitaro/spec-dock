@@ -39,6 +39,17 @@ class DependencyMutationResult:
     changed: bool
 
 
+@dataclass(frozen=True)
+class _DependencyMutationPlan:
+    from_id: str
+    to_id: str
+    revision: int
+    changed: bool
+    path: Path
+    payload: dict[str, object]
+    identity: tuple[int, int]
+
+
 def _read_raw_edges(
     views: tuple[ScopeView, ...],
 ) -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[dict[str, object], tuple[int, int]]]]:
@@ -164,9 +175,6 @@ def mutate_scope_dependency(
     lock_timeout: float = 0.0,
 ) -> DependencyMutationResult:
     """Apply one v3 metadata CAS under the common writer lock."""
-    if action != "remove" and missing_ok:
-        raise ValueError("missing_ok is valid only for dependency remove")
-    specdock_dir = repo_root / "spec-dock"
     with WriterLock(common_dir, timeout=lock_timeout):
         admit_writer(
             load_control(common_dir),
@@ -175,28 +183,78 @@ def mutate_scope_dependency(
             engine_digest=engine_digest,
             expected_epoch=expected_epoch,
         )
-        views = load_scope_views(specdock_dir)
-        selection = _selection_for_targets(specdock_dir, worktree_id, from_target, to_target)
-        source = show_scope(views, from_target, selection=selection)
-        destination = show_scope(views, to_target, selection=selection)
-        raw, metadata = _read_raw_edges(views)
-        existing = raw[source.id]
-        if action == "add":
-            if destination.id in existing:
-                return DependencyMutationResult(source.id, destination.id, source.revision, False)
-            candidate = (*existing, destination.id)
-        else:
-            if destination.id not in existing:
-                if missing_ok:
-                    return DependencyMutationResult(source.id, destination.id, source.revision, False)
-                raise LookupError("dependency edge was not found")
-            candidate = tuple(item for item in existing if item != destination.id)
+        plan = _plan_dependency_mutation(
+            repo_root / "spec-dock", worktree_id, from_target, to_target, action, missing_ok
+        )
+        if plan.changed:
+            atomic_write_json(plan.path, plan.payload, expected_identity=plan.identity)
+        return DependencyMutationResult(plan.from_id, plan.to_id, plan.revision, plan.changed)
+
+
+def preview_mutate_scope_dependency(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    from_target: str,
+    to_target: str,
+    action: Literal["add", "remove"],
+    missing_ok: bool = False,
+) -> DependencyMutationResult:
+    """Validate a metadata edge change without a writer lock or metadata write."""
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    plan = _plan_dependency_mutation(repo_root / "spec-dock", worktree_id, from_target, to_target, action, missing_ok)
+    return DependencyMutationResult(plan.from_id, plan.to_id, plan.revision, plan.changed)
+
+
+def _plan_dependency_mutation(
+    specdock_dir: Path,
+    worktree_id: str,
+    from_target: str,
+    to_target: str,
+    action: Literal["add", "remove"],
+    missing_ok: bool,
+) -> _DependencyMutationPlan:
+    if action != "remove" and missing_ok:
+        raise ValueError("missing_ok is valid only for dependency remove")
+    views = load_scope_views(specdock_dir)
+    selection = _selection_for_targets(specdock_dir, worktree_id, from_target, to_target)
+    source = show_scope(views, from_target, selection=selection)
+    destination = show_scope(views, to_target, selection=selection)
+    raw, metadata = _read_raw_edges(views)
+    existing = raw[source.id]
+    changed = True
+    if action == "add":
+        changed = destination.id not in existing
+        candidate = (*existing, destination.id) if changed else existing
+    else:
+        changed = destination.id in existing
+        if not changed and not missing_ok:
+            raise LookupError("dependency edge was not found")
+        candidate = tuple(item for item in existing if item != destination.id)
+    if changed:
         updated_raw = dict(raw)
         updated_raw[source.id] = candidate
         validate_dependency_graph(views, updated_raw)
-        payload, identity = metadata[source.id]
-        updated = dict(payload)
+    payload, identity = metadata[source.id]
+    updated = dict(payload)
+    if changed:
         updated["depends_on"] = list(candidate)
         updated["revision"] = source.revision + 1
-        atomic_write_json(source.path / ".meta.json", updated, expected_identity=identity)
-        return DependencyMutationResult(source.id, destination.id, source.revision + 1, True)
+    return _DependencyMutationPlan(
+        source.id,
+        destination.id,
+        source.revision + int(changed),
+        changed,
+        source.path / ".meta.json",
+        updated,
+        identity,
+    )

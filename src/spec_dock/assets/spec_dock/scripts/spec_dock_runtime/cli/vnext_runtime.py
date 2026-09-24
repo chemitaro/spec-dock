@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from spec_dock_runtime.cli.options import parse_vnext_output
 from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
 from spec_dock_runtime.commands.branch_vnext import run_branch_command
+from spec_dock_runtime.commands.dependency_vnext import run_dependency_change, run_dependency_query
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.infra.control_store import load_control
@@ -105,6 +106,10 @@ def run_vnext(
             "branch show",
             "branch create",
             "branch switch",
+            "dependency list",
+            "dependency check",
+            "dependency add",
+            "dependency remove",
         }:
             raise ValueError("vNext command execution is not yet connected")
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
@@ -112,6 +117,10 @@ def run_vnext(
             result = run_scope_query(ns, context)
         elif ns.command_path in {"branch show", "branch create", "branch switch"}:
             result = run_branch_command(ns, context)
+        elif ns.command_path in {"dependency list", "dependency check"}:
+            result = run_dependency_query(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+        elif ns.command_path in {"dependency add", "dependency remove"}:
+            result = run_dependency_change(ns, context)
         elif ns.command_path == "scope edit":
             result = run_scope_edit(ns, context)
         elif ns.command_path == "active show":
