@@ -71,6 +71,24 @@ class WorktreeRemoved:
     control_epoch: int
 
 
+@dataclass(frozen=True)
+class WorktreeCreatePreview:
+    id: str
+    alias: str | None
+    path: str
+    branch: str
+    commit: str
+
+
+@dataclass(frozen=True)
+class WorktreeRemovePreview:
+    id: str
+    path: str
+    branch: str
+    locked: bool
+    ignored_payload: bool
+
+
 def list_worktrees(*, repo_root: Path, common_dir: Path) -> tuple[WorktreeView, ...]:
     """Join Git's worktree inventory to the stable control registrations."""
     control = load_control(common_dir)
@@ -203,6 +221,35 @@ def _materialize(repo_root: Path, path: Path, commit: str, target_fd: int) -> No
     git_cli.require_clean_working_tree(path)
 
 
+def preview_create_worktree(
+    *, repo_root: Path, common_dir: Path, base: str, name: str | None = None, root: Path | None = None
+) -> WorktreeCreatePreview:
+    alias = _validated_name(name)
+    central_root = _worktree_root(root)
+    control = load_control(common_dir)
+    if control is None or control.mode != "ready":
+        raise ValueError("repository worktree control is not ready")
+    git_cli.require_clean_working_tree(repo_root)
+    commit = _resolve_commit(repo_root, base)
+    git_records = git_cli.worktree_list(repo_root)
+    if not git_records or repo_root.resolve(strict=True) not in {
+        item.path.resolve(strict=True) for item in git_records
+    }:
+        raise ValueError("source worktree is not registered by Git")
+    names = {item.id for item in control.worktrees} | {
+        item.alias for item in control.worktrees if item.alias is not None
+    }
+    if alias is not None and alias in names:
+        raise ValueError("worktree name is already registered")
+    container = central_root / git_records[0].path.name
+    stable_id = _next_id(repo_root, container, control)
+    if alias == stable_id:
+        raise ValueError("worktree name conflicts with its stable ID")
+    return WorktreeCreatePreview(
+        stable_id, alias, str(container / f"{container.name}-{stable_id}"), f"worktree/{stable_id}", commit
+    )
+
+
 def create_worktree(
     *,
     repo_root: Path,
@@ -318,6 +365,27 @@ def _discard_ignored_payload(path: Path) -> None:
     cleaned = subprocess.run(["git", "clean", "-fdX", "--"], cwd=path, capture_output=True, check=False, timeout=60)
     if cleaned.returncode != 0:
         raise RuntimeError("ignored payload cleanup failed; inspect the target before retrying")
+
+
+def preview_remove_worktree(
+    *, repo_root: Path, common_dir: Path, reference: str, unlock: bool, discard_ignored: bool
+) -> WorktreeRemovePreview:
+    target = show_worktree(repo_root=repo_root, common_dir=common_dir, reference=reference)
+    git_records = git_cli.worktree_list(repo_root)
+    if not target.registered or target.id is None or target.head is None or target.branch is None:
+        raise ValueError("target worktree has no active registration and Git record")
+    if target.bare or target.detached:
+        raise ValueError("bare or detached worktree cannot be removed")
+    if target.path == git_records[0].path or target.path.resolve(strict=True) == repo_root.resolve(strict=True):
+        raise ValueError("main or current worktree cannot be removed")
+    if target.locked and not unlock:
+        raise ValueError("locked worktree requires --unlock")
+    tracked, untracked, ignored = _target_payload_state(target.path)
+    if tracked or untracked:
+        raise ValueError("worktree payload prevents removal")
+    if ignored and not discard_ignored:
+        raise ValueError("ignored worktree payload requires --discard-ignored")
+    return WorktreeRemovePreview(target.id, str(target.path), target.branch, target.locked, ignored)
 
 
 def remove_worktree(

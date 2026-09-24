@@ -19,7 +19,7 @@ from spec_dock_runtime.commands.scope_lifecycle_vnext import run_scope_lifecycle
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace_diagnostics
-from spec_dock_runtime.commands.worktree_vnext import run_worktree_query
+from spec_dock_runtime.commands.worktree_vnext import run_worktree_change, run_worktree_query
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
@@ -132,6 +132,9 @@ def run_vnext(
             "artifact import file",
             "worktree list",
             "worktree show",
+            "worktree create",
+            "worktree remove",
+            "worktree bootstrap",
             "workspace validate",
             "workspace doctor",
         }:
@@ -163,6 +166,8 @@ def run_vnext(
             result = run_artifact_change(ns, context, invocation_cwd=invocation_cwd)
         elif ns.command_path in {"worktree list", "worktree show"}:
             result = run_worktree_query(ns, context)
+        elif ns.command_path in {"worktree create", "worktree remove", "worktree bootstrap"}:
+            result = run_worktree_change(ns, context)
         elif ns.command_path in {"workspace validate", "workspace doctor"}:
             result = run_workspace_diagnostics(ns, context)
         elif ns.command_path == "scope edit":
