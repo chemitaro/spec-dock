@@ -4,22 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from spec_dock_runtime.domain.operation import BLOCKING_COMMANDS
 from spec_dock_runtime.infra.control_store import WORKSPACE_SCHEMA, WRITER_PROTOCOL, ControlState
 
-_BLOCKING_COMMANDS = frozenset({
-    "scope.create",
-    "scope.import",
-    "scope.close",
-    "scope.reopen",
-    "scope.delete",
-    "work.start",
-    "work.finish",
-    "branch.create",
-    "workspace.migrate",
-    "installation.init",
-    "installation.update",
-    "installation.uninstall",
-})
 _MAINTENANCE_COMMANDS = frozenset({
     "workspace.migrate",
     "installation.init",
@@ -67,7 +54,7 @@ def admit_writer(
     blocking = tuple(
         item
         for item in operations
-        if item.blocking and item.command in _BLOCKING_COMMANDS and item.terminal_status in {"pending", "unknown"}
+        if item.blocking and item.command in BLOCKING_COMMANDS and item.terminal_status in {"pending", "unknown"}
     )
     if recovery_operation_id is not None:
         if len(blocking) != 1 or blocking[0].operation_id != recovery_operation_id:
