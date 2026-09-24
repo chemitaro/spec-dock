@@ -614,3 +614,59 @@ def test_migration_applies_and_restores_all_registered_worktrees(tmp_path: Path)
     for root in (repo, second):
         assert not (root / "spec-dock/workspace.json").exists()
         assert json.loads((root / "spec-dock/.agent/active.json").read_text())["schema_version"] == 2
+
+
+def test_migration_registers_explicitly_mapped_worktree_and_rollback_removes_registration(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    second = tmp_path / "second"
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", "second", str(second)], check=True)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping_path = tmp_path / "mapping.json"
+    mapping_path.write_text(
+        json.dumps({
+            "schema_version": "specdock.migration-map/v1",
+            "repository_uid": inventory.repository_uid,
+            "source_inventory_digest": inventory.digest,
+            "scope_backend_overrides": [],
+            "branch_bindings": [],
+            "active_repairs": [],
+            "worktrees": [{"root": str(second), "registration_id": "second"}],
+        }),
+        encoding="utf-8",
+    )
+    mapping = read_migration_map(mapping_path, inventory)
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    assert {(item.id, item.schema_version) for item in load_control(common).worktrees} == {("main", 3), ("second", 3)}
+    migration_module.rollback_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=completed.operation_id,
+    )
+    assert [(item.id, item.schema_version) for item in load_control(common).worktrees] == [("main", 1)]

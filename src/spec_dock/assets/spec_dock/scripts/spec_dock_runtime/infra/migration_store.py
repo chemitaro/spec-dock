@@ -119,7 +119,35 @@ def read_migration_map(path: Path, inventory: MigrationInventory) -> MigrationMa
             raise ValueError(f"migration mapping {name} must be an array of objects")
         rows[name] = tuple(items)
     by_worktree = {item.registration_id: item for item in inventory.worktrees if item.registration_id is not None}
-    known_scopes = {(item.registration_id, scope.id): scope for item in inventory.worktrees for scope in item.scopes}
+    roots = {item.root: item for item in inventory.worktrees}
+    mapped_roots: set[str] = set()
+    mapped_ids: set[str] = set(by_worktree)
+    for row in rows["worktrees"]:
+        if set(row) != {"root", "registration_id"}:
+            raise ValueError("migration worktree mapping shape is invalid")
+        root = row.get("root")
+        if not isinstance(root, str):
+            raise ValueError("migration worktree mapping root is invalid")
+        worktree = roots.get(root)
+        registration = row.get("registration_id")
+        if (
+            worktree is None
+            or worktree.registration_id is not None
+            or not isinstance(registration, str)
+            or not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", registration)
+        ):
+            raise ValueError("migration worktree mapping is not an unregistered observed worktree")
+        if root in mapped_roots or registration in mapped_ids:
+            raise ValueError("migration worktree mapping is duplicated")
+        mapped_roots.add(root)
+        mapped_ids.add(registration)
+        by_worktree[registration] = worktree
+    mapped_by_root = {row["root"]: row["registration_id"] for row in rows["worktrees"]}
+    known_scopes = {
+        (item.registration_id or mapped_by_root.get(item.root), scope.id): scope
+        for item in inventory.worktrees
+        for scope in item.scopes
+    }
     backend_keys: set[tuple[str, str]] = set()
     for row in rows["scope_backend_overrides"]:
         if set(row) - {"worktree_id", "scope_id", "metadata_digest", "backend", "github"}:
@@ -188,28 +216,6 @@ def read_migration_map(path: Path, inventory: MigrationInventory) -> MigrationMa
         if worktree_id in repair_ids:
             raise ValueError("migration active repair is duplicated")
         repair_ids.add(worktree_id)
-    roots = {item.root: item for item in inventory.worktrees}
-    mapped_roots: set[str] = set()
-    mapped_ids: set[str] = set(by_worktree)
-    for row in rows["worktrees"]:
-        if set(row) != {"root", "registration_id"}:
-            raise ValueError("migration worktree mapping shape is invalid")
-        root = row.get("root")
-        if not isinstance(root, str):
-            raise ValueError("migration worktree mapping root is invalid")
-        worktree = roots.get(root)
-        registration = row.get("registration_id")
-        if (
-            worktree is None
-            or worktree.registration_id is not None
-            or not isinstance(registration, str)
-            or not re.fullmatch(r"[a-z0-9][a-z0-9._-]*", registration)
-        ):
-            raise ValueError("migration worktree mapping is not an unregistered observed worktree")
-        if root in mapped_roots or registration in mapped_ids:
-            raise ValueError("migration worktree mapping is duplicated")
-        mapped_roots.add(root)
-        mapped_ids.add(registration)
     return MigrationMap(
         inventory.repository_uid,
         inventory.digest,

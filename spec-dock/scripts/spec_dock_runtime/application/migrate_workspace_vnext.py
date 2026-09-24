@@ -12,7 +12,13 @@ from uuid import uuid4
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
-from spec_dock_runtime.infra.control_store import WRITER_PROTOCOL, load_control, store_control
+from spec_dock_runtime.infra.control_store import (
+    WRITER_PROTOCOL,
+    ControlState,
+    WorktreeRegistration,
+    load_control,
+    store_control,
+)
 from spec_dock_runtime.infra.git_cli import worktree_list
 from spec_dock_runtime.infra.migration_executor import (
     apply_migration_file,
@@ -174,6 +180,22 @@ def plan_migration_changes(
     return tuple(changes)
 
 
+def _desired_worktrees(before: ControlState, record: MigrationRecord) -> tuple[WorktreeRegistration, ...]:
+    upgraded = tuple(
+        replace(item, schema_version=3, writer_protocol=WRITER_PROTOCOL, engine_digest=record.engine_digest)
+        if item.active
+        else item
+        for item in before.worktrees
+    )
+    known = {item.id for item in before.worktrees}
+    added = tuple(
+        WorktreeRegistration(worktree_id, root, 3, WRITER_PROTOCOL, record.engine_digest, True)
+        for worktree_id, root in record.worktrees
+        if worktree_id not in known
+    )
+    return (*upgraded, *added)
+
+
 def _finish_migration(common_dir: Path, record: MigrationRecord) -> MigrationRecord:
     control = load_control(common_dir)
     before = record.control_before
@@ -184,12 +206,7 @@ def _finish_migration(common_dir: Path, record: MigrationRecord) -> MigrationRec
         or control.engine_digest != record.engine_digest
     ):
         raise ValueError("migration lost maintenance control")
-    desired_worktrees = tuple(
-        replace(item, schema_version=3, writer_protocol=WRITER_PROTOCOL, engine_digest=record.engine_digest)
-        if item.active
-        else item
-        for item in before.worktrees
-    )
+    desired_worktrees = _desired_worktrees(before, record)
     desired = replace(before, epoch=record.control_epoch + 1, worktrees=desired_worktrees)
     if control == before:
         store_control(
@@ -231,9 +248,14 @@ def apply_workspace_migration(
 ) -> MigrationRecord:
     """Apply one fixed migration under the common writer lock and maintenance mode."""
     changes = plan_migration_changes(inventory, mapping, updated_at=updated_at)
-    roots = tuple((item.registration_id, item.root) for item in inventory.worktrees if item.registration_id is not None)
-    if len(roots) != len(inventory.worktrees):
-        raise ValueError("migration requires all worktrees to be registered before apply")
+    mapped = {row["root"]: row["registration_id"] for row in mapping.worktrees}
+    roots = tuple((item.registration_id or mapped.get(item.root), item.root) for item in inventory.worktrees)
+    if (
+        any(not isinstance(worktree_id, str) or not worktree_id for worktree_id, _root in roots)
+        or len({worktree_id for worktree_id, _root in roots}) != len(roots)
+        or set(mapped) != {item.root for item in inventory.worktrees if item.registration_id is None}
+    ):
+        raise ValueError("migration requires unique registrations for all worktrees")
     with writer_transaction(common_dir, worktree_ids=tuple(item[0] for item in roots), timeout=lock_timeout):
         if inspect_migration_inventory(repo_root) != inventory:
             raise ValueError("migration inventory changed before the writer lock")
@@ -382,12 +404,7 @@ def rollback_workspace_migration(
             expected_epoch=control.epoch,
             **({"maintenance_command": "workspace.migrate"} if committed else {"recovery_operation_id": operation_id}),
         )
-        desired_worktrees = tuple(
-            replace(item, schema_version=3, writer_protocol=WRITER_PROTOCOL, engine_digest=record.engine_digest)
-            if item.active
-            else item
-            for item in before.worktrees
-        )
+        desired_worktrees = _desired_worktrees(before, record)
         if control.worktrees not in (before.worktrees, desired_worktrees):
             raise ValueError("migration rollback control registration changed")
         for item in record.files:
