@@ -1,0 +1,249 @@
+"""Create, inspect, and switch exact canonical Scope branch bindings."""
+
+from __future__ import annotations
+
+from dataclasses import replace
+import json
+import subprocess
+from typing import TYPE_CHECKING
+
+from spec_dock_runtime.application.operation_executor import (
+    prepare_operation,
+    record_effect_intent,
+    record_effect_result,
+)
+from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
+from spec_dock_runtime.cli.admission import admit_writer
+from spec_dock_runtime.domain.branch_binding import BranchBinding
+from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
+from spec_dock_runtime.infra.control_store import load_control
+from spec_dock_runtime.infra.git_cli import worktree_list
+from spec_dock_runtime.infra.json_store import read_guarded_json
+from spec_dock_runtime.infra.operation_journal import JournalStore
+from spec_dock_runtime.infra.registry_store import RegistryStore
+from spec_dock_runtime.infra.writer_lock import WriterLock
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from spec_dock_runtime.application.scope_query import ScopeView
+    from spec_dock_runtime.domain.operation import OperationRecord
+
+
+def _git(repo_root: Path, *arguments: str, timeout: float = 30.0) -> subprocess.CompletedProcess[str]:
+    try:
+        return subprocess.run(
+            ["git", *arguments], cwd=repo_root, capture_output=True, text=True, check=False, timeout=timeout
+        )
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise RuntimeError("Git operation could not be observed") from error
+
+
+def _resolve_commit(repo_root: Path, reference: str) -> str:
+    if not reference or reference.startswith("-"):
+        raise ValueError("branch base must be an explicit Git reference")
+    result = _git(repo_root, "rev-parse", "--verify", "--end-of-options", f"{reference}^{{commit}}")
+    sha = result.stdout.strip()
+    if result.returncode != 0 or len(sha) not in (40, 64) or any(char not in "0123456789abcdef" for char in sha):
+        raise ValueError("branch base does not resolve to a commit")
+    return sha
+
+
+def _branch_exists(repo_root: Path, name: str) -> bool:
+    result = _git(repo_root, "show-ref", "--verify", "--quiet", f"refs/heads/{name}")
+    if result.returncode not in (0, 1):
+        raise RuntimeError("Git branch inventory could not be read")
+    return result.returncode == 0
+
+
+def _validate_name(repo_root: Path, name: str) -> None:
+    if not name or not name.isascii() or name.startswith("-"):
+        raise ValueError("canonical branch name is invalid")
+    if _git(repo_root, "check-ref-format", "--branch", name).returncode != 0:
+        raise ValueError("canonical branch name is invalid")
+
+
+def _verify_scope_at_commit(repo_root: Path, views: tuple[ScopeView, ...], scope_id: str, sha: str) -> None:
+    by_id = {view.id: view for view in views}
+    current = by_id[scope_id]
+    while True:
+        relative = current.path.relative_to(repo_root).as_posix()
+        result = _git(repo_root, "show", f"{sha}:{relative}/.meta.json")
+        if result.returncode != 0:
+            raise ValueError("base commit is missing Scope metadata")
+        try:
+            raw = json.loads(result.stdout)
+            if not isinstance(raw, dict):
+                raise ValueError("base metadata is not an object")
+            metadata = decode_scope_metadata(raw)
+        except (ValueError, json.JSONDecodeError) as error:
+            raise ValueError("base commit has invalid Scope metadata") from error
+        if (
+            metadata.raw.get("id") != current.id
+            or metadata.raw.get("type") != current.kind
+            or metadata.raw.get("parent_id") != current.parent_id
+        ):
+            raise ValueError("base commit Scope graph differs from the current snapshot")
+        if current.parent_id is None:
+            return
+        current = by_id[current.parent_id]
+
+
+def _binding_for_scope(store: RegistryStore, scope_id: str) -> BranchBinding:
+    matches = [binding for binding in store.load()[0].branches if binding.scope_id == scope_id]
+    if len(matches) != 1:
+        raise LookupError("canonical branch binding is missing")
+    return matches[0]
+
+
+def show_scope_branch(repo_root: Path, common_dir: Path, scope_id: str) -> BranchBinding:
+    binding = _binding_for_scope(RegistryStore(common_dir), scope_id)
+    if not _branch_exists(repo_root, binding.name):
+        raise ValueError("CANONICAL_BRANCH_MISSING")
+    return binding
+
+
+def scope_from_current_branch(repo_root: Path, common_dir: Path) -> str:
+    """Resolve an exact recorded branch name; never infer an ID from its text."""
+    current = _git(repo_root, "branch", "--show-current")
+    if current.returncode != 0:
+        raise RuntimeError("current Git branch could not be read")
+    name = current.stdout.strip()
+    if not name:
+        raise LookupError("canonical branch is unavailable on detached HEAD")
+    matches = [binding for binding in RegistryStore(common_dir).load()[0].branches if binding.name == name]
+    if len(matches) != 1:
+        raise LookupError("canonical branch binding is missing or ambiguous")
+    if not _branch_exists(repo_root, name):
+        raise ValueError("CANONICAL_BRANCH_MISSING")
+    return matches[0].scope_id
+
+
+def _finish_failed_git_effect(journal: JournalStore, intent: OperationRecord, *, name: str, repo_root: Path) -> None:
+    if _branch_exists(repo_root, name):
+        uncertain = record_effect_result(intent, effect_id="git-branch", status="unknown")
+        journal.update(uncertain, expected_sequence=intent.sequence)
+        raise RuntimeError("branch creation outcome is unknown; inspect the pending operation")
+    failed = record_effect_result(intent, effect_id="git-branch", status="failed")
+    journal.update(failed, expected_sequence=intent.sequence)
+    terminal = replace(failed, phase="complete", terminal_status="failed", sequence=failed.sequence + 1)
+    journal.update(terminal, expected_sequence=failed.sequence)
+    raise RuntimeError("Git branch creation failed without creating a ref")
+
+
+def create_scope_branch(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    scope_id: str,
+    base: str,
+    name: str | None,
+    lock_timeout: float = 0.0,
+) -> BranchBinding:
+    """Create a new branch at a fixed commit, then durably bind it without checkout."""
+    specdock_dir = repo_root / "spec-dock"
+    with WriterLock(common_dir, timeout=lock_timeout):
+        control = load_control(common_dir)
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+        )
+        views = load_scope_views(specdock_dir)
+        scope = show_scope(views, scope_id)
+        loaded = read_guarded_json(scope.path / ".meta.json")
+        if loaded is None or not isinstance(loaded[0], dict):
+            raise ValueError("Scope metadata is missing")
+        metadata = decode_scope_metadata(loaded[0])
+        slug = metadata.raw.get("slug")
+        if not isinstance(slug, str) or not slug or metadata.revision != scope.revision:
+            raise ValueError("Scope metadata changed before branch creation")
+        branch_name = name if name is not None else f"{scope.id}-{slug}"
+        _validate_name(repo_root, branch_name)
+        registry = RegistryStore(common_dir)
+        state, _identity = registry.load()
+        if any(binding.scope_id == scope.id or binding.name == branch_name for binding in state.branches):
+            raise ValueError("Scope or branch is already bound")
+        if _branch_exists(repo_root, branch_name):
+            raise ValueError("BRANCH_ADOPTION_REQUIRED")
+        sha = _resolve_commit(repo_root, base)
+        _verify_scope_at_commit(repo_root, views, scope.id, sha)
+        binding = BranchBinding(scope.id, branch_name, sha)
+        assert control is not None
+        journal = JournalStore(common_dir)
+        operation = prepare_operation(
+            command="branch.create",
+            effect_plan=("git-branch", "registry-bind"),
+            fixed_targets={"scope": scope.id, "branch": branch_name, "base_sha": sha},
+            request_fingerprint=f"sha256:{sha}:{scope.id}:{branch_name}",
+            before_revisions={"registry": state.revision, "metadata": scope.revision},
+            engine_digest=engine_digest,
+            writer_epoch=control.epoch,
+        )
+        journal.create(operation)
+        intent = record_effect_intent(operation, effect_id="git-branch", kind="git", target=branch_name)
+        journal.update(intent, expected_sequence=operation.sequence)
+        created = _git(repo_root, "branch", branch_name, sha)
+        if created.returncode != 0:
+            _finish_failed_git_effect(journal, intent, name=branch_name, repo_root=repo_root)
+        advanced = record_effect_result(intent, effect_id="git-branch", status="succeeded")
+        journal.update(advanced, expected_sequence=intent.sequence)
+        registry_intent = record_effect_intent(advanced, effect_id="registry-bind", kind="local", target=scope.id)
+        journal.update(registry_intent, expected_sequence=advanced.sequence)
+        registry.bind_locked(binding)
+        bound = record_effect_result(registry_intent, effect_id="registry-bind", status="succeeded")
+        journal.update(bound, expected_sequence=registry_intent.sequence)
+        terminal = replace(bound, phase="complete", terminal_status="succeeded", sequence=bound.sequence + 1)
+        journal.update(terminal, expected_sequence=bound.sequence)
+        return binding
+
+
+def switch_scope_branch(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    scope_id: str,
+    lock_timeout: float = 0.0,
+) -> BranchBinding:
+    """Switch only to the recorded branch after verifying the target snapshot and ownership."""
+    with WriterLock(common_dir, timeout=lock_timeout):
+        admit_writer(
+            load_control(common_dir),
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+        )
+        binding = show_scope_branch(repo_root, common_dir, scope_id)
+        status = _git(repo_root, "status", "--porcelain", "--untracked-files=all")
+        if status.returncode != 0 or status.stdout.strip():
+            raise ValueError("branch switch requires a clean working tree")
+        for worktree in worktree_list(repo_root):
+            if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
+                raise ValueError("canonical branch is checked out in another worktree")
+        tip = _resolve_commit(repo_root, f"refs/heads/{binding.name}")
+        views = load_scope_views(repo_root / "spec-dock")
+        show_scope(views, scope_id)
+        _verify_scope_at_commit(repo_root, views, scope_id, tip)
+        switched = _git(repo_root, "switch", "--no-guess", binding.name, timeout=60.0)
+        if switched.returncode != 0:
+            raise RuntimeError("Git branch switch failed; inspect current HEAD before retrying")
+        actual_branch = _git(repo_root, "branch", "--show-current")
+        actual_sha = _resolve_commit(repo_root, "HEAD")
+        if actual_branch.stdout.strip() != binding.name or actual_sha != tip:
+            raise RuntimeError("Git branch changed during switch; inspect current HEAD")
+        after_status = _git(repo_root, "status", "--porcelain", "--untracked-files=all")
+        if after_status.returncode != 0 or after_status.stdout.strip():
+            raise RuntimeError("checkout changed the working tree; inspect current HEAD and hook effects")
+        after_views = load_scope_views(repo_root / "spec-dock")
+        show_scope(after_views, scope_id)
+        _verify_scope_at_commit(repo_root, after_views, scope_id, actual_sha)
+        return binding

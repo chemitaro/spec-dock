@@ -87,6 +87,7 @@ def change_active_selection(
     engine_digest: str,
     expected_epoch: int,
     target: str | None = None,
+    from_branch: bool = False,
     clear_from: str | None = None,
     clear_all: bool = False,
     lock_timeout: float = 0.0,
@@ -94,7 +95,7 @@ def change_active_selection(
     """Admit and commit one worktree-local selection change without network or Git effects."""
     from spec_dock_runtime.application.scope_query import load_scope_views
 
-    if (target is not None) == (clear_from is not None or clear_all):
+    if sum((target is not None, from_branch, clear_from is not None, clear_all)) != 1:
         raise ValueError("select exactly one active mutation")
     specdock_dir = repo_root / "spec-dock"
     with WriterLock(common_dir, timeout=lock_timeout):
@@ -107,6 +108,10 @@ def change_active_selection(
         )
         views = load_scope_views(specdock_dir)
         current, identity = load_selection_v3(specdock_dir, worktree_id=worktree_id)
+        if from_branch:
+            from spec_dock_runtime.application.branch_vnext import scope_from_current_branch
+
+            target = scope_from_current_branch(repo_root, common_dir)
         if target is not None:
             next_selection = select_scope(views, target, current=current)
         else:

@@ -8,6 +8,7 @@ import re
 import subprocess
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch
 from spec_dock_runtime.domain.registry import LocalIdRegistry, reserve_local_id
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 from spec_dock_runtime.infra.control_store import control_directory, load_control
@@ -27,6 +28,7 @@ def _decode_registry(payload: object) -> LocalIdRegistry:
     revision = payload.get("revision")
     high_water = payload.get("high_water")
     reserved_ids = payload.get("reserved_ids")
+    branches = payload.get("branch_bindings", [])
     if (
         type(revision) is not int
         or not isinstance(high_water, dict)
@@ -35,12 +37,20 @@ def _decode_registry(payload: object) -> LocalIdRegistry:
         or not isinstance(reserved_ids, list)
         or not all(isinstance(item, str) for item in reserved_ids)
         or reserved_ids != sorted(set(reserved_ids))
+        or not isinstance(branches, list)
+        or any(
+            not isinstance(binding, dict)
+            or set(binding) != {"scope_id", "name", "initial_sha"}
+            or any(not isinstance(binding[key], str) for key in ("scope_id", "name", "initial_sha"))
+            for binding in branches
+        )
     ):
         raise ValueError("invalid registry state")
     return LocalIdRegistry(
         revision,
         tuple(high_water[kind] for kind in _KIND_ORDER),
         frozenset(reserved_ids),
+        tuple(BranchBinding(item["scope_id"], item["name"], item["initial_sha"]) for item in branches),
     )
 
 
@@ -50,6 +60,9 @@ def _encode_registry(state: LocalIdRegistry) -> dict[str, object]:
         "revision": state.revision,
         "high_water": dict(zip(_KIND_ORDER, state.high_water, strict=True)),
         "reserved_ids": sorted(state.reserved),
+        "branch_bindings": [
+            {"scope_id": item.scope_id, "name": item.name, "initial_sha": item.initial_sha} for item in state.branches
+        ],
     }
 
 
@@ -132,3 +145,11 @@ class RegistryStore:
         next_state, scope_id = reserve_local_id(state, kind=kind, observed_ids=observed)
         atomic_write_json(self.path, _encode_registry(next_state), expected_identity=identity)
         return scope_id
+
+    def bind_locked(self, binding: BranchBinding) -> LocalIdRegistry:
+        """Publish a new binding while the caller holds the common writer lock."""
+        state, identity = self.load()
+        next_state = bind_branch(state, binding)
+        if next_state != state:
+            atomic_write_json(self.path, _encode_registry(next_state), expected_identity=identity)
+        return next_state

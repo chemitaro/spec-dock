@@ -11,6 +11,7 @@ from spec_dock_runtime.domain.ids import format_id
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from spec_dock_runtime.domain.branch_binding import BranchBinding
     from spec_dock_runtime.domain.selectors import ScopeKind
 
 _KIND_INDEX = {"initiative": 0, "epic": 1, "issue": 2}
@@ -24,6 +25,7 @@ class LocalIdRegistry:
     revision: int
     high_water: tuple[int, int, int]
     reserved: frozenset[str]
+    branches: tuple[BranchBinding, ...] = ()
 
     def __post_init__(self) -> None:
         if type(self.revision) is not int or self.revision < 0:
@@ -40,6 +42,10 @@ class LocalIdRegistry:
                 raise ValueError("registry reservation is not canonical")
             if number > self.high_water[_PREFIX_INDEX[prefix]]:
                 raise ValueError("registry reservation exceeds its high-water mark")
+        if len({binding.scope_id for binding in self.branches}) != len(self.branches) or len({
+            binding.name for binding in self.branches
+        }) != len(self.branches):
+            raise ValueError("canonical branch registry has duplicate bindings")
 
     @classmethod
     def empty(cls) -> LocalIdRegistry:
