@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.infra.control_store import WORKSPACE_SCHEMA, WRITER_PROTOCOL, ControlState
 from spec_dock_runtime.infra.installation_group_store import pending_installation_groups
+from spec_dock_runtime.infra.migration_journal import pending_migrations
 from spec_dock_runtime.infra.operation_journal import JournalStore
 
 if TYPE_CHECKING:
@@ -50,9 +51,10 @@ def admit_writer(
     operations = JournalStore(common_dir).pending()
     blocking = tuple(item for item in operations if item.terminal_status in {"pending", "unknown"})
     pending_groups = pending_installation_groups(common_dir)
-    pending_ids = {item.operation_id for item in blocking} | set(pending_groups)
+    pending_schema = pending_migrations(common_dir)
+    pending_ids = {item.operation_id for item in blocking} | set(pending_groups) | set(pending_schema)
     if recovery_operation_id is not None:
-        if len(blocking) + len(pending_groups) != 1 or pending_ids != {recovery_operation_id}:
+        if len(blocking) + len(pending_groups) + len(pending_schema) != 1 or pending_ids != {recovery_operation_id}:
             raise AdmissionError(
                 "RECOVERY_TARGET_MISMATCH", "recovery operation does not match a pending blocking journal"
             )

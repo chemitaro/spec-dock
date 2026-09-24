@@ -29,6 +29,7 @@ from spec_dock_runtime.infra.control_store import (  # noqa: E402
 )
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
 from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
+from spec_dock_runtime.infra.migration_journal import MigrationRecord, write_migration_record  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from spec_dock_runtime.infra.writer_lock import (  # noqa: E402
     WorktreeLease,
@@ -133,6 +134,32 @@ def test_pending_installation_group_blocks_other_writers_and_admits_its_recovery
     )
     write_group_record(tmp_path, record, create=True)
     assert pending_installation_groups(tmp_path) == (record.operation_id,)
+    with pytest.raises(AdmissionError, match="recovery"):
+        admit_writer(_control(), common_dir=tmp_path, worktree_id="wt-two", engine_digest="engine-a", expected_epoch=12)
+    admit_writer(
+        _control(mode="maintenance"),
+        common_dir=tmp_path,
+        worktree_id="wt-one",
+        engine_digest="engine-a",
+        expected_epoch=12,
+        recovery_operation_id=record.operation_id,
+    )
+
+
+def test_pending_migration_blocks_other_writers_and_admits_its_recovery(tmp_path: Path) -> None:
+    record = MigrationRecord(
+        "a" * 32,
+        str(tmp_path),
+        "sha256:" + "b" * 64,
+        "sha256:" + "c" * 64,
+        "d" * 64,
+        12,
+        (("wt-one", "/project/one"),),
+        (),
+        (),
+        "prepared",
+    )
+    write_migration_record(tmp_path, record, create=True)
     with pytest.raises(AdmissionError, match="recovery"):
         admit_writer(_control(), common_dir=tmp_path, worktree_id="wt-two", engine_digest="engine-a", expected_epoch=12)
     admit_writer(
