@@ -298,3 +298,57 @@ def test_installation_update_dry_run_preserves_targets(tmp_path: Path, monkeypat
     assert pending_installation_groups(common_dir) == ()
     assert not (repo / "spec-dock/docs/source.txt").exists()
     assert not (second / "spec-dock/docs/source.txt").exists()
+
+
+def test_committed_maintenance_update_can_be_rolled_back_before_resume(tmp_path: Path) -> None:
+    repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    completed = update_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        expected_epoch=epoch,
+        bundle=bundle,
+        keep_maintenance=True,
+    )
+    assert (repo / "spec-dock/docs/source.txt").is_file()
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    rolled_back = update_module.rollback_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=completed.operation_id,
+    )
+    assert rolled_back.phase == "rolled-back"
+    assert load_control(common_dir).mode == "maintenance"
+    assert not (repo / "spec-dock/docs/source.txt").exists()
+    assert not (second / "spec-dock/docs/source.txt").exists()
+
+
+def test_committed_update_rollback_rejects_later_control_epoch(tmp_path: Path) -> None:
+    repo, _, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    completed = update_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        expected_epoch=epoch,
+        bundle=bundle,
+        keep_maintenance=True,
+    )
+    control = load_control(common_dir)
+    assert control is not None
+    store_control(common_dir, replace(control, epoch=control.epoch + 1), expected_epoch=control.epoch)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    with pytest.raises(ValueError, match="changed after completion"):
+        update_module.rollback_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            operation_id=completed.operation_id,
+        )
+    assert (repo / "spec-dock/docs/source.txt").is_file()

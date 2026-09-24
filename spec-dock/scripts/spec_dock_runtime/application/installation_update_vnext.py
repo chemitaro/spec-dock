@@ -308,9 +308,9 @@ def rollback_installation_group(
     operation_id: str,
     lock_timeout: float = 0.0,
 ) -> InstallationGroupRecord:
-    """Restore a pending update only when every child still matches its recorded state."""
+    """Restore a pending update or an untouched committed maintenance update."""
     record = read_group_record(common_dir, operation_id)
-    if record.action != "update" or record.phase == "committed":
+    if record.action != "update" or (record.phase == "committed" and not record.keep_maintenance):
         raise ValueError("installation group is not rollback eligible")
     if record.phase == "rolled-back":
         return record
@@ -321,19 +321,33 @@ def rollback_installation_group(
         raise ValueError("installation rollback target inventory changed")
     with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in group.worktrees), timeout=lock_timeout):
         record = read_group_record(common_dir, operation_id)
+        if record.action != "update" or (record.phase == "committed" and not record.keep_maintenance):
+            raise ValueError("installation group is not rollback eligible")
         if inspect_installation_group(repo_root=repo_root, common_dir=common_dir) != group:
             raise ValueError("installation rollback inventory changed before the lock")
         control = load_control(common_dir)
         if control is None:
             raise ValueError("installation control is missing")
-        admit_writer(
-            control,
-            common_dir=common_dir,
-            worktree_id=worktree_id,
-            engine_digest=engine_digest,
-            expected_epoch=control.epoch,
-            recovery_operation_id=operation_id,
-        )
+        if record.phase == "committed":
+            if control.mode != "maintenance" or control.epoch != record.control_epoch + 1:
+                raise ValueError("installation maintenance state changed after completion")
+            admit_writer(
+                control,
+                common_dir=common_dir,
+                worktree_id=worktree_id,
+                engine_digest=engine_digest,
+                expected_epoch=control.epoch,
+                maintenance_command="installation.update",
+            )
+        else:
+            admit_writer(
+                control,
+                common_dir=common_dir,
+                worktree_id=worktree_id,
+                engine_digest=engine_digest,
+                expected_epoch=control.epoch,
+                recovery_operation_id=operation_id,
+            )
         if control.epoch == record.control_epoch and control.mode in {"ready", "maintenance"}:
             store_control(
                 common_dir, replace(control, mode="maintenance", epoch=control.epoch + 1), expected_epoch=control.epoch
