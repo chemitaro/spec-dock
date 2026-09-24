@@ -99,6 +99,41 @@ def plan_scope_delete(
     return ScopeDeletePlan(scope.id, deleted_ids, selection_after, boundary_edges, survivor_dependencies)
 
 
+def preview_scope_delete(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    target: str,
+    recursive: bool = False,
+    clear_active: bool = False,
+    detach_dependencies: bool = False,
+) -> ScopeDeletePlan:
+    """Check the deletion boundary without reserving a journal or changing files."""
+    admit_writer(
+        load_control(common_dir),
+        common_dir=common_dir,
+        worktree_id=worktree_id,
+        engine_digest=engine_digest,
+        expected_epoch=expected_epoch,
+    )
+    specdock_dir = repo_root / "spec-dock"
+    views = load_scope_views(specdock_dir)
+    selection, _ = load_selection_v3(specdock_dir, worktree_id=worktree_id)
+    dependencies, _ = _read_raw_edges(views)
+    return plan_scope_delete(
+        views,
+        target=target,
+        selection=selection,
+        dependencies=dependencies,
+        recursive=recursive,
+        clear_active=clear_active,
+        detach_dependencies=detach_dependencies,
+    )
+
+
 def _canonical(payload: object) -> str:
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
@@ -483,6 +518,7 @@ def resume_scope_delete(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    expected_scope_id: str | None = None,
     lock_timeout: float = 0.0,
 ) -> ScopeDeleteResult:
     """Resume only the recorded local images and fixed quarantine target."""
@@ -513,6 +549,7 @@ def resume_scope_delete(
                 "registry_before_deleted_ids",
             }
             or fixed["worktree"] != worktree_id
+            or (expected_scope_id is not None and fixed["scope"] != expected_scope_id)
             or operation.request_fingerprint != _fingerprint(fixed)
             or operation.engine_digest != engine_digest
             or operation.writer_epoch != expected_epoch
@@ -651,6 +688,7 @@ def rollback_scope_delete(
     engine_digest: str,
     expected_epoch: int,
     operation_id: str,
+    expected_scope_id: str | None = None,
     lock_timeout: float = 0.0,
 ) -> ScopeDeleteResult:
     """Restore only verified local before images from a pending delete operation."""
@@ -663,6 +701,7 @@ def rollback_scope_delete(
             operation.command != "scope.delete"
             or operation.terminal_status != "pending"
             or fixed.get("worktree") != worktree_id
+            or (expected_scope_id is not None and fixed.get("scope") != expected_scope_id)
             or operation.engine_digest != engine_digest
             or operation.writer_epoch != expected_epoch
             or operation.request_fingerprint != _fingerprint(fixed)
