@@ -107,6 +107,8 @@ def test_start_checks_out_registered_issue_branch_and_selects_issue(tmp_path: Pa
         "expected_epoch": 1,
     }
     binding = create_scope_branch(scope_id=issue.id, base="HEAD", name=None, **arguments)
+    with pytest.raises(ValueError, match="--base is valid only"):
+        start_work(target=issue.id, base="HEAD", **arguments)
     result = start_work(target=issue.id, **arguments)
     assert result.target_id == issue.id and result.branch == binding.name
     assert subprocess.run(
@@ -181,3 +183,23 @@ def test_dirty_start_has_no_branch_or_journal_effect(tmp_path: Path) -> None:
             engine_digest="engine-a", expected_epoch=1, target=issue.id,
         )
     assert JournalStore(repo_root / ".git").pending() == ()
+
+
+def test_detached_start_requires_explicit_base(tmp_path: Path) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    repo_root = specdock_dir.parent
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+        cwd=repo_root, check=True, capture_output=True,
+    )
+    subprocess.run(["git", "switch", "--detach", "HEAD"], cwd=repo_root, check=True, capture_output=True)
+    arguments = {
+        "repo_root": repo_root, "common_dir": repo_root / ".git", "worktree_id": "main",
+        "engine_digest": "engine-a", "expected_epoch": 1, "target": issue.id,
+    }
+    with pytest.raises(ValueError, match="detached HEAD requires --base"):
+        start_work(**arguments)
+    assert JournalStore(repo_root / ".git").pending() == ()
+    result = start_work(base="HEAD", **arguments)
+    assert result.target_id == issue.id

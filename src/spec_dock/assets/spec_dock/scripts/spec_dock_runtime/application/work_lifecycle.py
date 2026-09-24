@@ -172,7 +172,7 @@ def _start_plan(
 
 def start_work(
     *, repo_root: Path, common_dir: Path, worktree_id: str, engine_digest: str,
-    expected_epoch: int, target: str, base: str = "HEAD", branch_name: str | None = None,
+    expected_epoch: int, target: str, base: str | None = None, branch_name: str | None = None,
     switch_active: bool = False, source: str = "github", allow_stale: bool = False,
     offline: bool = False, gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
@@ -185,13 +185,17 @@ def start_work(
     )
     try:
         binding = show_scope_branch(repo_root, common_dir, plan.target_id)
+        if base is not None:
+            raise ValueError("--base is valid only when creating a new canonical branch")
         if branch_name is not None and branch_name != binding.name:
             raise ValueError("requested branch differs from the canonical binding")
     except LookupError:
+        if base is None and not _head_state(repo_root)[0]:
+            raise ValueError("new work start from detached HEAD requires --base") from None
         binding = create_scope_branch(
             repo_root=repo_root, common_dir=common_dir, worktree_id=worktree_id,
             engine_digest=engine_digest, expected_epoch=expected_epoch,
-            scope_id=plan.target_id, base=base, name=branch_name, lock_timeout=lock_timeout,
+            scope_id=plan.target_id, base=base or "HEAD", name=branch_name, lock_timeout=lock_timeout,
         )
     with WriterLock(common_dir, timeout=lock_timeout):
         control = load_control(common_dir)
