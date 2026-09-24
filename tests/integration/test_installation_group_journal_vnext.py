@@ -11,6 +11,7 @@ import pytest
 from spec_dock.installation.group_journal import (
     InstallationGroupRecord,
     InstallationTarget,
+    child_operation_id,
     read_group_record,
     write_group_record,
 )
@@ -82,3 +83,12 @@ def test_group_journal_rejects_corruption_and_symlink(tmp_path: Path) -> None:
     path.symlink_to(tmp_path / "external")
     with pytest.raises(ValueError, match="redirected"):
         read_group_record(common, first.operation_id)
+
+
+def test_child_operation_ids_are_stable_and_distinct() -> None:
+    first = child_operation_id("a" * 32, "main")
+    assert first == child_operation_id("a" * 32, "main")
+    assert first != child_operation_id("a" * 32, "wt1")
+    assert first != child_operation_id("b" * 32, "main")
+    with pytest.raises(ValueError, match="identity"):
+        child_operation_id("bad", "main")

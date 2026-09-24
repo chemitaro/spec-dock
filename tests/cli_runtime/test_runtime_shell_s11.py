@@ -541,6 +541,7 @@ class TestRuntimeShellS11:
             "github_create_effect.py",
             "import_github_scope.py",
             "installation_vnext.py",
+            "installation_update_vnext.py",
             "resume_github_scope.py",
             "scope_completion.py",
             "scope_delete_vnext.py",

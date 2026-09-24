@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -36,6 +37,18 @@ class InstallationGroupRecord:
     targets: tuple[InstallationTarget, ...]
     phase: str
     error: str | None = None
+
+
+def child_operation_id(group_id: str, worktree_id: str) -> str:
+    """Derive a stable child ID so recovery can locate a stage after a crash."""
+    if (
+        not isinstance(group_id, str)
+        or _ID.fullmatch(group_id) is None
+        or not isinstance(worktree_id, str)
+        or re.fullmatch(r"[a-z0-9][a-z0-9._-]*", worktree_id) is None
+    ):
+        raise ValueError("invalid installation child identity")
+    return hashlib.sha256(f"{group_id}:{worktree_id}".encode()).hexdigest()[:32]
 
 
 def _directory(common_dir: Path, operation_id: str) -> Path:
