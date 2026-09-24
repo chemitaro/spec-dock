@@ -274,31 +274,15 @@ def rollback_installation(
     operation_id: str,
     *,
     enter_maintenance: Callable[[InstallationRecord], None],
+    allow_committed: bool = False,
 ) -> InstallationRecord:
     """Restore only untouched after-state paths, retaining both backups and displaced bytes."""
-    record = read_record(journal_root, operation_id)
-    _verify_record_paths(record)
+    record = preflight_rollback_installation(journal_root, operation_id, allow_committed=allow_committed)
     if record.phase == "rolled-back":
         return record
-    if record.phase == "committed":
-        raise ValueError("committed installation requires a separate maintenance recovery plan")
     target = Path(record.target)
-    _guard_target(target)
     enter_maintenance(record)
     area = _operation_area(target, operation_id)
-    for relative in _MANAGED:
-        current = _digest_path(target / relative)
-        expected = record.after_hashes[relative]
-        previous = record.before_hashes[relative]
-        backup = area / "backup" / relative
-        if current not in (expected, previous, None):
-            raise ValueError(f"installation rollback refuses later changes: {relative}")
-        if relative in record.completed_roots and expected is not None and current is None:
-            raise ValueError(f"installation rollback refuses later deletion: {relative}")
-        if current is None and previous is not None and _digest_path(backup) != previous:
-            raise ValueError(f"installation rollback lacks before state: {relative}")
-        if current == expected and previous != expected and previous is not None and _digest_path(backup) != previous:
-            raise ValueError(f"installation rollback backup changed: {relative}")
     for relative in reversed(_MANAGED):
         destination = target / relative
         backup = area / "backup" / relative
@@ -321,4 +305,33 @@ def rollback_installation(
             _sync_directory(backup.parent)
     record = replace(record, phase="rolled-back", error=None)
     write_record(journal_root, record)
+    return record
+
+
+def preflight_rollback_installation(
+    journal_root: Path, operation_id: str, *, allow_committed: bool = False
+) -> InstallationRecord:
+    """Check a child restore without changing the target; group rollback checks every child first."""
+    record = read_record(journal_root, operation_id)
+    _verify_record_paths(record)
+    if record.phase == "rolled-back":
+        return record
+    if record.phase == "committed" and not allow_committed:
+        raise ValueError("committed installation requires a separate maintenance recovery plan")
+    target = Path(record.target)
+    _guard_target(target)
+    area = _operation_area(target, operation_id)
+    for relative in _MANAGED:
+        current = _digest_path(target / relative)
+        expected = record.after_hashes[relative]
+        previous = record.before_hashes[relative]
+        backup = area / "backup" / relative
+        if current not in (expected, previous, None):
+            raise ValueError(f"installation rollback refuses later changes: {relative}")
+        if relative in record.completed_roots and expected is not None and current is None:
+            raise ValueError(f"installation rollback refuses later deletion: {relative}")
+        if current is None and previous is not None and _digest_path(backup) != previous:
+            raise ValueError(f"installation rollback lacks before state: {relative}")
+        if current == expected and previous != expected and previous is not None and _digest_path(backup) != previous:
+            raise ValueError(f"installation rollback backup changed: {relative}")
     return record

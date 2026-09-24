@@ -101,3 +101,122 @@ def test_group_update_resumes_after_one_child_completed(tmp_path: Path, monkeypa
     )
     assert completed.phase == "committed" and pending_installation_groups(common_dir) == ()
     assert (second / "spec-dock/docs/source.txt").is_file()
+
+
+def test_group_update_resumes_after_unjournaled_stage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, _, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_prepare = update_module.prepare_installation
+
+    def stop_during_stage(target: Path, journal_root: Path, **kwargs: object):
+        operation_id = kwargs["operation_id"]
+        assert isinstance(operation_id, str)
+        area = target / ".spec-dock-installations" / operation_id
+        area.mkdir(mode=0o700, parents=True)
+        (area / "stage").mkdir()
+        raise RuntimeError("injected staging stop")
+
+    monkeypatch.setattr(update_module, "prepare_installation", stop_during_stage)
+    with pytest.raises(RuntimeError, match="staging stop"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+            bundle=bundle,
+            keep_maintenance=True,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    monkeypatch.setattr(update_module, "prepare_installation", real_prepare)
+    completed = resume_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=group_id,
+        bundle=bundle,
+    )
+    assert completed.phase == "committed"
+    assert pending_installation_groups(common_dir) == ()
+
+
+def test_group_update_rolls_back_a_completed_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_apply = update_module.apply_installation
+    attempts = 0
+
+    def fail_second(*args: object, **kwargs: object):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RuntimeError("injected group stop")
+        return real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(update_module, "apply_installation", fail_second)
+    with pytest.raises(RuntimeError, match="group stop"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+            bundle=bundle,
+            keep_maintenance=True,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    assert (repo / "spec-dock/docs/source.txt").is_file()
+    rolled_back = update_module.rollback_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=group_id,
+    )
+    assert rolled_back.phase == "rolled-back"
+    assert pending_installation_groups(common_dir) == ()
+    assert load_control(common_dir).mode == "maintenance"
+    assert not (repo / "spec-dock/docs/source.txt").exists()
+    assert not (second / "spec-dock/docs/source.txt").exists()
+
+
+def test_group_rollback_checks_all_children_before_restoring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_apply = update_module.apply_installation
+    attempts = 0
+
+    def fail_second(*args: object, **kwargs: object):
+        nonlocal attempts
+        attempts += 1
+        if attempts == 2:
+            raise RuntimeError("injected group stop")
+        return real_apply(*args, **kwargs)
+
+    monkeypatch.setattr(update_module, "apply_installation", fail_second)
+    with pytest.raises(RuntimeError, match="group stop"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+            bundle=bundle,
+            keep_maintenance=True,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    (second / "spec-dock/docs/later.txt").write_text("later\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="later changes"):
+        update_module.rollback_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            operation_id=group_id,
+        )
+    assert pending_installation_groups(common_dir) == (group_id,)
+    assert (repo / "spec-dock/docs/source.txt").is_file()
