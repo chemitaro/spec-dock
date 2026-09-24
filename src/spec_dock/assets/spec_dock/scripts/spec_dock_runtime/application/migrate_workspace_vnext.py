@@ -250,7 +250,7 @@ def apply_workspace_migration(
                 read_migration_record(common_dir, record.operation_id), phase="recovery-required", error=str(error)
             )
             write_migration_record(common_dir, record)
-            raise
+            raise RuntimeError("migration requires explicit recovery") from error
 
 
 def _file_digest(data: bytes) -> str:
@@ -301,7 +301,7 @@ def resume_workspace_migration(
                 read_migration_record(common_dir, operation_id), phase="recovery-required", error=str(error)
             )
             write_migration_record(common_dir, failed)
-            raise
+            raise RuntimeError("migration requires explicit recovery") from error
 
 
 def rollback_workspace_migration(
@@ -377,4 +377,4 @@ def rollback_workspace_migration(
                 read_migration_record(common_dir, operation_id), phase="rollback-required", error=str(error)
             )
             write_migration_record(common_dir, failed)
-            raise
+            raise RuntimeError("migration rollback requires explicit recovery") from error

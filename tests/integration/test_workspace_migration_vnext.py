@@ -305,7 +305,7 @@ def test_migration_resumes_after_one_file_was_published(tmp_path: Path, monkeypa
         real_apply(*args, **kwargs)
 
     monkeypatch.setattr(migration_module, "apply_migration_file", stop_second)
-    with pytest.raises(RuntimeError, match="migration stop"):
+    with pytest.raises(RuntimeError, match="requires explicit recovery"):
         migration_module.apply_workspace_migration(
             repo_root=repo,
             common_dir=common,
@@ -462,7 +462,7 @@ def test_migration_rollback_resumes_after_interruption(tmp_path: Path, monkeypat
         real_rollback(*args, **kwargs)
 
     monkeypatch.setattr(migration_module, "rollback_migration_file", stop_second)
-    with pytest.raises(RuntimeError, match="rollback stop"):
+    with pytest.raises(RuntimeError, match="requires explicit recovery"):
         migration_module.rollback_workspace_migration(
             repo_root=repo,
             common_dir=common,
