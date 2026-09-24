@@ -327,7 +327,12 @@ def _active_focus(root: Path, scopes: tuple[MigrationScope, ...]) -> tuple[str |
     try:
         payload, digest = _read_json(path)
     except (OSError, ValueError):
-        return None, "unreadable", ("ACTIVE_REPAIR_REQUIRED",)
+        if path.is_symlink() or not path.is_file():
+            return None, "unreadable", ("ACTIVE_REPAIR_REQUIRED",)
+        try:
+            return None, _digest(path.read_bytes()), ("ACTIVE_REPAIR_REQUIRED",)
+        except OSError:
+            return None, "unreadable", ("ACTIVE_REPAIR_REQUIRED",)
     if not isinstance(payload, dict) or payload.get("schema_version") not in (2, 3):
         return None, digest, ("ACTIVE_REPAIR_REQUIRED",)
     by_id = {scope.id: scope for scope in scopes if scope.id is not None}

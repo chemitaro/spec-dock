@@ -748,3 +748,53 @@ def test_migration_reserves_deleted_historical_local_id(tmp_path: Path) -> None:
     registry, _identity = RegistryStore(common).load()
     assert "init-local-00009" in registry.reserved
     assert registry.high_water[0] == 9
+
+
+def test_migration_repairs_malformed_active_only_with_explicit_clear_and_restores_bytes(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    active = repo / "spec-dock/.agent/active.json"
+    before = b"{malformed active\n"
+    active.write_bytes(before)
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    assert "ACTIVE_REPAIR_REQUIRED" in inventory.blockers
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    unapproved = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    with pytest.raises(ValueError, match="active repair"):
+        migration_module.plan_migration_changes(inventory, unapproved, updated_at="2026-01-01T00:00:00Z")
+    mapping = MigrationMap(
+        inventory.repository_uid, inventory.digest, (), (), ({"worktree_id": "main", "action": "clear"},), ()
+    )
+    completed = migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    assert json.loads(active.read_text())["focus_id"] is None
+    migration_module.rollback_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        operation_id=completed.operation_id,
+    )
+    assert active.read_bytes() == before

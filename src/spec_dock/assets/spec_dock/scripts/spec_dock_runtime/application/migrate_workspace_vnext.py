@@ -52,7 +52,9 @@ def _encode(payload: dict[str, object]) -> bytes:
     return (json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")) + "\n").encode()
 
 
-def _snapshot(path: Path, expected_digest: str | None) -> tuple[dict[str, object] | None, str | None]:
+def _snapshot(
+    path: Path, expected_digest: str | None, *, allow_invalid_json: bool = False
+) -> tuple[dict[str, object] | None, str | None]:
     if path.is_symlink():
         raise ValueError("migration input path is redirected")
     if not path.exists():
@@ -66,8 +68,12 @@ def _snapshot(path: Path, expected_digest: str | None) -> tuple[dict[str, object
     try:
         payload = json.loads(data)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        if allow_invalid_json:
+            return None, digest
         raise ValueError("migration input is invalid JSON") from error
     if not isinstance(payload, dict):
+        if allow_invalid_json:
+            return None, digest
         raise ValueError("migration input must be a JSON object")
     return payload, digest
 
@@ -122,17 +128,18 @@ def plan_migration_changes(
             changes.append(MigrationChange(str(path), digest, _encode(converted)))
         active_path = root / "spec-dock/.agent/active.json"
         if worktree.active_digest is not None:
-            active, active_digest = _snapshot(active_path, worktree.active_digest)
-            assert active is not None
-            if "ACTIVE_REPAIR_REQUIRED" in worktree.blockers:
-                if worktree_id not in repairs:
-                    raise ValueError("migration active repair requires explicit mapping")
+            repair_required = "ACTIVE_REPAIR_REQUIRED" in worktree.blockers
+            if repair_required and worktree_id not in repairs:
+                raise ValueError("migration active repair requires explicit mapping")
+            active, active_digest = _snapshot(active_path, worktree.active_digest, allow_invalid_json=repair_required)
+            if repair_required:
                 selected: dict[str, object] = dict.fromkeys(("initiative", "epic", "issue"))
                 focus = None
             else:
+                assert active is not None
                 selected = {role: active.get(role) for role in ("initiative", "epic", "issue")}
                 focus = worktree.active_focus
-            if active.get("schema_version") != 3 or "ACTIVE_REPAIR_REQUIRED" in worktree.blockers:
+            if active is None or active.get("schema_version") != 3 or repair_required:
                 converted_active: dict[str, object] = {
                     "schema_version": 3,
                     "worktree_id": worktree_id,
