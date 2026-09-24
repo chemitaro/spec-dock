@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import shutil
 import stat
-from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.contracts import WorkbenchFilesystemError
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
 
 DirectoryIdentity = tuple[int, int, int]
 PathIdentity = tuple[int, int, int]
@@ -308,8 +304,48 @@ def _read_verified_symlink_at(parent_fd: int, name: str, expected: PathIdentity)
     return target
 
 
-def copy_workbench(source: Path, destination: Path) -> None:
+def _existing_entry_matches(
+    source_parent_fd: int,
+    destination_parent_fd: int,
+    name: str,
+    *,
+    kind: str,
+    source_identity: PathIdentity,
+    destination_identity: PathIdentity,
+) -> bool:
+    destination_kind, _ = _inspect_entry_at(destination_parent_fd, name)
+    if destination_kind != kind:
+        return False
+    if kind == "symlink":
+        return _read_verified_symlink_at(source_parent_fd, name, source_identity) == _read_verified_symlink_at(
+            destination_parent_fd, name, destination_identity
+        )
+    if kind != "file":
+        return False
+    source_fd = _open_verified_regular_source_at(source_parent_fd, name, source_identity)
+    destination_fd = _open_verified_regular_source_at(destination_parent_fd, name, destination_identity)
+    try:
+        if os.fstat(source_fd).st_size != os.fstat(destination_fd).st_size:
+            return False
+        while source_chunk := os.read(source_fd, 1024 * 1024):
+            if source_chunk != os.read(destination_fd, len(source_chunk)):
+                return False
+        return os.read(destination_fd, 1) == b""
+    finally:
+        os.close(source_fd)
+        os.close(destination_fd)
+
+
+def copy_workbench(
+    source: Path,
+    destination: Path,
+    *,
+    on_conflict: str = "overwrite",
+    relative_symlinks_only: bool = False,
+) -> None:
     """Merge an opaque Workbench tree without following symlinks."""
+    if on_conflict not in {"error", "overwrite"}:
+        raise ValueError("unsupported Workbench conflict policy")
     mutation_started = [False]
     try:
         _require_workbench_descriptor_support()
@@ -318,6 +354,23 @@ def copy_workbench(source: Path, destination: Path) -> None:
         destination_fd: int | None = None
         try:
             destination_kind, destination_identity = _inspect_path(destination)
+            if on_conflict == "error" or relative_symlinks_only:
+                if destination_kind not in {"missing", "directory"}:
+                    raise RuntimeError("workbench copy destination is not a directory")
+                preflight_destination_fd: int | None = None
+                try:
+                    if destination_kind == "directory":
+                        assert destination_identity is not None
+                        preflight_destination_fd = _open_verified_directory(destination, destination_identity)
+                    _preflight_workbench_directory(
+                        source_fd,
+                        preflight_destination_fd,
+                        on_conflict=on_conflict,
+                        relative_symlinks_only=relative_symlinks_only,
+                    )
+                finally:
+                    if preflight_destination_fd is not None:
+                        os.close(preflight_destination_fd)
             if destination_kind == "missing":
                 destination_parent_identity = _capture_directory_identity(destination.parent)
                 destination_parent_fd = _open_verified_directory(
@@ -338,7 +391,13 @@ def copy_workbench(source: Path, destination: Path) -> None:
                 destination_fd = _open_verified_directory(destination, destination_identity)
             else:
                 raise RuntimeError("workbench copy destination is not a directory")
-            _merge_workbench_directory(source_fd, destination_fd, mutation_started)
+            _merge_workbench_directory(
+                source_fd,
+                destination_fd,
+                mutation_started,
+                on_conflict=on_conflict,
+                relative_symlinks_only=relative_symlinks_only,
+            )
         finally:
             if destination_fd is not None:
                 os.close(destination_fd)
@@ -349,15 +408,86 @@ def copy_workbench(source: Path, destination: Path) -> None:
         raise WorkbenchFilesystemError(mutation_started=mutation_started[0]) from exc
 
 
-def _merge_workbench_directory(
+def _preflight_workbench_directory(
     source_fd: int,
-    destination_fd: int,
-    mutation_started: list[bool],
+    destination_fd: int | None,
+    *,
+    on_conflict: str,
+    relative_symlinks_only: bool,
 ) -> None:
     with os.scandir(source_fd) as entries:
         source_names = sorted(entry.name for entry in entries)
     for name in source_names:
-        _merge_workbench_entry(source_fd, destination_fd, name, mutation_started)
+        source_kind, source_identity = _inspect_entry_at(source_fd, name)
+        destination_kind, destination_identity = (
+            _inspect_entry_at(destination_fd, name) if destination_fd is not None else ("missing", None)
+        )
+        if source_kind == "directory":
+            if source_identity is None or destination_kind not in {"missing", "directory"}:
+                raise RuntimeError("workbench copy entry type collision")
+            source_child = _open_verified_directory_at(source_fd, name, source_identity)
+            destination_child: int | None = None
+            try:
+                if destination_kind == "directory":
+                    assert destination_fd is not None and destination_identity is not None
+                    destination_child = _open_verified_directory_at(destination_fd, name, destination_identity)
+                _preflight_workbench_directory(
+                    source_child,
+                    destination_child,
+                    on_conflict=on_conflict,
+                    relative_symlinks_only=relative_symlinks_only,
+                )
+            finally:
+                if destination_child is not None:
+                    os.close(destination_child)
+                os.close(source_child)
+            continue
+        if source_kind not in {"file", "symlink"} or destination_kind in {"directory", "other"}:
+            raise RuntimeError("workbench copy entry type collision")
+        if source_identity is None:
+            raise RuntimeError("workbench copy source disappeared")
+        if (
+            destination_kind != "missing"
+            and on_conflict == "error"
+            and (
+                destination_fd is None
+                or destination_identity is None
+                or not _existing_entry_matches(
+                    source_fd,
+                    destination_fd,
+                    name,
+                    kind=source_kind,
+                    source_identity=source_identity,
+                    destination_identity=destination_identity,
+                )
+            )
+        ):
+            raise RuntimeError("workbench copy entry already exists")
+        if source_kind == "symlink" and relative_symlinks_only:
+            target = _read_verified_symlink_at(source_fd, name, source_identity)
+            if Path(target).is_absolute():
+                raise RuntimeError("workbench copy requires relative symlink targets")
+
+
+def _merge_workbench_directory(
+    source_fd: int,
+    destination_fd: int,
+    mutation_started: list[bool],
+    *,
+    on_conflict: str = "overwrite",
+    relative_symlinks_only: bool = False,
+) -> None:
+    with os.scandir(source_fd) as entries:
+        source_names = sorted(entry.name for entry in entries)
+    for name in source_names:
+        _merge_workbench_entry(
+            source_fd,
+            destination_fd,
+            name,
+            mutation_started,
+            on_conflict=on_conflict,
+            relative_symlinks_only=relative_symlinks_only,
+        )
 
 
 def _merge_workbench_entry(
@@ -365,6 +495,9 @@ def _merge_workbench_entry(
     destination_parent_fd: int,
     name: str,
     mutation_started: list[bool],
+    *,
+    on_conflict: str = "overwrite",
+    relative_symlinks_only: bool = False,
 ) -> None:
     source_kind, source_identity = _inspect_entry_at(source_parent_fd, name)
     destination_kind, destination_identity = _inspect_entry_at(destination_parent_fd, name)
@@ -391,7 +524,13 @@ def _merge_workbench_entry(
             else:
                 raise RuntimeError("workbench copy entry type collision")
             try:
-                _merge_workbench_directory(source_child_fd, destination_child_fd, mutation_started)
+                _merge_workbench_directory(
+                    source_child_fd,
+                    destination_child_fd,
+                    mutation_started,
+                    on_conflict=on_conflict,
+                    relative_symlinks_only=relative_symlinks_only,
+                )
             finally:
                 os.close(destination_child_fd)
         finally:
@@ -404,6 +543,17 @@ def _merge_workbench_entry(
         raise RuntimeError("workbench copy source identity is missing")
     if destination_kind == "directory" or destination_kind == "other":
         raise RuntimeError("workbench copy entry type collision")
+    if destination_kind != "missing" and on_conflict == "error":
+        if destination_identity is None or not _existing_entry_matches(
+            source_parent_fd,
+            destination_parent_fd,
+            name,
+            kind=source_kind,
+            source_identity=source_identity,
+            destination_identity=destination_identity,
+        ):
+            raise RuntimeError("workbench copy entry already exists")
+        return
     if source_kind == "file":
         _copy_regular_file(
             source_parent_fd,
@@ -415,6 +565,8 @@ def _merge_workbench_entry(
         )
         return
     link_target = _read_verified_symlink_at(source_parent_fd, name, source_identity)
+    if relative_symlinks_only and Path(link_target).is_absolute():
+        raise RuntimeError("workbench copy requires relative symlink targets")
     if destination_kind in {"file", "symlink"}:
         if destination_identity is None:
             raise RuntimeError("workbench copy destination identity is missing")
