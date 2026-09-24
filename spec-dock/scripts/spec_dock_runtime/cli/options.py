@@ -74,6 +74,67 @@ def build_vnext_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def explicit_help(command_path: Sequence[str]) -> str:
+    """Render a known command or group from the same parser as execution."""
+    current = build_vnext_parser()
+    for component in command_path:
+        action = next((item for item in current._actions if isinstance(item, argparse._SubParsersAction)), None)
+        if action is None or component not in action.choices:
+            raise ValueError("help target is not a known command path")
+        current = action.choices[component]
+    return current.format_help()
+
+
+def completion_script(shell: str) -> str:
+    """Generate command-name completion from the canonical leaf catalog."""
+    if shell not in {"bash", "zsh", "fish"}:
+        raise ValueError("completion shell is unsupported")
+    children: dict[str, set[str]] = {}
+    for leaf in LEAF_PATHS:
+        parts = leaf.split()
+        for index, word in enumerate(parts):
+            children.setdefault(" ".join(parts[:index]), set()).add(word)
+        children.setdefault(leaf, set()).update(
+            name for argument in LEAF_ARGUMENTS[leaf] for name in argument.names if name.startswith("-")
+        )
+        children[leaf].update((*_COMMON_SWITCHES, *_COMMON_VALUES, "--help"))
+    entries = [(key, " ".join(sorted(values))) for key, values in sorted(children.items())]
+    if shell == "fish":
+        lines = [
+            "function __spec_dock_path_is",
+            "  set -l seen (commandline -opc)",
+            "  test (string join ' ' $seen[2..]) = \"$argv[1]\"",
+            "end",
+            "complete -c spec-dock -f",
+        ]
+        for path, words in entries:
+            lines.append(f"complete -c spec-dock -n '__spec_dock_path_is \"{path}\"' -a '{words}'")
+        return "\n".join(lines) + "\n"
+    cases = "\n".join(f'    "{path}") choices="{words}" ;;' for path, words in entries)
+    if shell == "bash":
+        return (
+            "_spec_dock_complete() {\n"
+            '  local key="" choices="" word i\n'
+            "  for ((i=1; i<COMP_CWORD; i++)); do\n"
+            '    word="${COMP_WORDS[i]}"\n'
+            '    [[ "$word" == -* ]] || key="${key:+$key }$word"\n'
+            "  done\n"
+            f'  case "$key" in\n{cases}\n  esac\n'
+            '  COMPREPLY=( $(compgen -W "$choices" -- "${COMP_WORDS[COMP_CWORD]}") )\n'
+            "}\ncomplete -F _spec_dock_complete spec-dock\n"
+        )
+    return (
+        "#compdef spec-dock\n_spec_dock_complete() {\n"
+        '  local key="" choices="" word i\n'
+        "  for ((i=2; i<CURRENT; i++)); do\n"
+        '    word="${words[i]}"\n'
+        '    [[ "$word" == -* ]] || key="${key:+$key }$word"\n'
+        "  done\n"
+        f'  case "$key" in\n{cases}\n  esac\n'
+        "  compadd -- ${(z)choices}\n}\ncompdef _spec_dock_complete spec-dock\n"
+    )
+
+
 def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     error_parser = _StrictParser(prog="spec-dock")
     remaining: list[str] = []

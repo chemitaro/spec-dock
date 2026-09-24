@@ -170,7 +170,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "installation init": (_arg("path"),),
     "installation update": (_arg("--target"), _arg("--version"), _arg("--commit"), _flag("--maintenance")),
     "installation uninstall": (_arg("--target"),),
-    "help": (_arg("command_path", nargs="*"),),
+    "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
 

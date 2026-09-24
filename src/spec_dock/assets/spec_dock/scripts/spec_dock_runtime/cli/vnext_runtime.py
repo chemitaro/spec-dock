@@ -7,7 +7,7 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING
 
-from spec_dock_runtime.cli.options import parse_vnext_output
+from spec_dock_runtime.cli.options import completion_script, explicit_help, parse_vnext_output
 from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
 from spec_dock_runtime.commands.artifact_vnext import run_artifact_change, run_artifact_query
 from spec_dock_runtime.commands.branch_vnext import run_branch_command
@@ -27,7 +27,7 @@ from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock_runtime.presentation.envelope import Diagnostic, Effect, OperationResult, render_json, render_text
-from spec_dock_runtime.presentation.errors import CliMessageData
+from spec_dock_runtime.presentation.errors import CliMessageData, CompletionData
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -104,6 +104,13 @@ def run_vnext(
     ns = parsed.namespace
     json_mode = bool(ns.json)
     try:
+        if ns.command_path in {"help", "completion"}:
+            content = explicit_help(ns.help_path) if ns.command_path == "help" else completion_script(ns.shell)
+            if json_mode:
+                data = CliMessageData(content) if ns.command_path == "help" else CompletionData(ns.shell, content)
+                result = OperationResult(ns.command_path, "succeeded", data, 0)
+                return RuntimeOutput(0, render_json(result), "")
+            return RuntimeOutput(0, content, "")
         if ns.command_path not in {
             "work start",
             "work finish",

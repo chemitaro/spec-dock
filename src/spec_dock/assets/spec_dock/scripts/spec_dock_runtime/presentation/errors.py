@@ -14,3 +14,9 @@ class CliMessageData:
 class VersionData:
     version: str
     engine_digest: str | None
+
+
+@dataclass(frozen=True)
+class CompletionData:
+    shell: str
+    script: str
