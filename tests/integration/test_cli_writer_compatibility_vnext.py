@@ -10,6 +10,12 @@ import sys
 
 import pytest
 
+from spec_dock.installation.group_journal import (
+    InstallationGroupRecord,
+    InstallationTarget,
+    write_group_record,
+)
+
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
@@ -22,6 +28,7 @@ from spec_dock_runtime.infra.control_store import (  # noqa: E402
     store_control,
 )
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
+from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from spec_dock_runtime.infra.writer_lock import (  # noqa: E402
     WorktreeLease,
@@ -108,6 +115,33 @@ def test_only_explicit_blocking_recovery_operations_stop_unrelated_writes(tmp_pa
         engine_digest="engine-a",
         expected_epoch=12,
         recovery_operation_id=blocking.operation_id,
+    )
+
+
+def test_pending_installation_group_blocks_other_writers_and_admits_its_recovery(tmp_path: Path) -> None:
+    record = InstallationGroupRecord(
+        "a" * 32,
+        "update",
+        str(tmp_path),
+        12,
+        "b" * 64,
+        "c" * 40,
+        "d" * 64,
+        True,
+        (InstallationTarget("wt-one", "/project/one", None, False),),
+        "preparing",
+    )
+    write_group_record(tmp_path, record, create=True)
+    assert pending_installation_groups(tmp_path) == (record.operation_id,)
+    with pytest.raises(AdmissionError, match="recovery"):
+        admit_writer(_control(), common_dir=tmp_path, worktree_id="wt-two", engine_digest="engine-a", expected_epoch=12)
+    admit_writer(
+        _control(mode="maintenance"),
+        common_dir=tmp_path,
+        worktree_id="wt-one",
+        engine_digest="engine-a",
+        expected_epoch=12,
+        recovery_operation_id=record.operation_id,
     )
 
 

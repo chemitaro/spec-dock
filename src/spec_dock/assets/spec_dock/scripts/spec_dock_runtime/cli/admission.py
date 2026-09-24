@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.infra.control_store import WORKSPACE_SCHEMA, WRITER_PROTOCOL, ControlState
+from spec_dock_runtime.infra.installation_group_store import pending_installation_groups
 from spec_dock_runtime.infra.operation_journal import JournalStore
 
 if TYPE_CHECKING:
@@ -48,13 +49,15 @@ def admit_writer(
         raise AdmissionError("WORKTREE_UNREGISTERED", "current worktree is not active in the control inventory")
     operations = JournalStore(common_dir).pending()
     blocking = tuple(item for item in operations if item.terminal_status in {"pending", "unknown"})
+    pending_groups = pending_installation_groups(common_dir)
+    pending_ids = {item.operation_id for item in blocking} | set(pending_groups)
     if recovery_operation_id is not None:
-        if len(blocking) != 1 or blocking[0].operation_id != recovery_operation_id:
+        if len(blocking) + len(pending_groups) != 1 or pending_ids != {recovery_operation_id}:
             raise AdmissionError(
                 "RECOVERY_TARGET_MISMATCH", "recovery operation does not match a pending blocking journal"
             )
         return
-    if blocking or control.mode == "recovery-required":
+    if pending_ids or control.mode == "recovery-required":
         raise AdmissionError("RECOVERY_REQUIRED", "pending blocking journal requires explicit recovery")
     if control.mode == "maintenance" and maintenance_command not in _MAINTENANCE_COMMANDS:
         raise AdmissionError("MAINTENANCE_REQUIRED", "repository is in maintenance mode")
