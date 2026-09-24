@@ -371,6 +371,30 @@ def test_atomic_json_create_only_has_no_second_hardlink(tmp_path: Path) -> None:
     assert path.read_bytes() == b'{"created":true}\n'
 
 
+def test_journal_create_preserves_original_publish_error_with_retained_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    record = prepare_operation(
+        command="scope.create",
+        fixed_targets={"target": "init-local-00001"},
+        request_fingerprint="sha256:request",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=1,
+        effect_plan=("scaffold",),
+    )
+
+    def fail_publish(*args: object, **kwargs: object) -> None:
+        raise OSError("injected publish failure")
+
+    monkeypatch.setattr("spec_dock_runtime.infra.json_store._rename_no_replace_at", fail_publish)
+    with pytest.raises(OSError, match="injected publish failure"):
+        JournalStore(tmp_path).create(record)
+    operation_dir = JournalStore(tmp_path).root / record.operation_id
+    assert not (operation_dir / "journal.json").exists()
+    assert any((operation_dir / ".specdock-json-transactions").iterdir())
+
+
 def _exchange_then_hold(path_value: str, ready: Queue[str]) -> None:
     from spec_dock_runtime.infra import json_store
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import asdict
 import json
 import re
@@ -120,7 +121,8 @@ class JournalStore:
         try:
             atomic_write_json(path, asdict(record))
         except BaseException:
-            path.parent.rmdir()
+            with suppress(OSError):
+                path.parent.rmdir()
             raise
 
     def load(self, operation_id: str) -> OperationRecord:
