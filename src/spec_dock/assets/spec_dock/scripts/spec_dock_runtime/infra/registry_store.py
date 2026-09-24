@@ -96,7 +96,7 @@ def _working_tree_ids(roots: tuple[Path, ...]) -> set[str]:
     return observed
 
 
-def _historical_local_ids(repo_root: Path) -> set[str]:
+def historical_local_ids(repo_root: Path) -> set[str]:
     completed = subprocess.run(
         ["git", "-C", str(repo_root), "log", "--all", "--name-only", "--format=", "--", "spec-dock/initiatives"],
         check=False,
@@ -147,7 +147,7 @@ class RegistryStore:
         state, identity = self.load()
         observed = _working_tree_ids(roots)
         if identity is None:
-            observed.update(_historical_local_ids(repo_root))
+            observed.update(historical_local_ids(repo_root))
         next_state, scope_id = reserve_local_id(state, kind=kind, observed_ids=observed)
         atomic_write_json(self.path, _encode_registry(next_state), expected_identity=identity)
         return scope_id

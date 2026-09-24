@@ -88,3 +88,24 @@ def reserve_local_id(
     return replace(
         state, revision=state.revision + 1, high_water=next_high_water, reserved=state.reserved | {allocated}
     ), allocated
+
+
+def include_observed_local_ids(state: LocalIdRegistry, observed_ids: Iterable[str]) -> LocalIdRegistry:
+    """Reserve current and historical local IDs without consuming the next ID."""
+    observed = set(state.reserved)
+    high_water = list(state.high_water)
+    for scope_id in observed_ids:
+        match = _OBSERVED_ID.fullmatch(scope_id)
+        if match is None or int(match.group("number")) <= 0:
+            raise ValueError("migration observed Scope ID is invalid")
+        prefix = match.group("prefix")
+        number = int(match.group("number"))
+        if scope_id != format_id(prefix, number, local=match.group("local") is not None):
+            raise ValueError("migration observed Scope ID is not canonical")
+        if match.group("local") is not None:
+            observed.add(scope_id)
+            high_water[_PREFIX_INDEX[prefix]] = max(high_water[_PREFIX_INDEX[prefix]], number)
+    next_high_water = (high_water[0], high_water[1], high_water[2])
+    if frozenset(observed) == state.reserved and next_high_water == state.high_water:
+        return state
+    return replace(state, revision=state.revision + 1, high_water=next_high_water, reserved=frozenset(observed))

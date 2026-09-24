@@ -332,7 +332,11 @@ def test_migration_resumes_after_one_file_was_published(tmp_path: Path, monkeypa
     )
     assert resumed.phase == "committed"
     assert journal.pending_migrations(common) == ()
-    assert all(json.loads(Path(item.path).read_text())["schema_version"] == 3 for item in resumed.files)
+    assert all(
+        json.loads(Path(item.path).read_text())["schema_version"] == 3
+        for item in resumed.files
+        if Path(item.path).name != "registry.json"
+    )
 
 
 def test_committed_migration_rollback_restores_before_bytes_in_maintenance(tmp_path: Path) -> None:
@@ -548,6 +552,8 @@ def test_migration_adopts_explicit_existing_branch_and_rolls_binding_back(tmp_pa
     assert [(item.scope_id, item.name, item.initial_sha) for item in registry.branches] == [
         ("iss-local-00001", "iss-local-00001-task", tip)
     ]
+    assert registry.reserved == frozenset({"init-local-00001", "epic-local-00001", "iss-local-00001"})
+    assert registry.high_water == (1, 1, 1)
     migration_module.rollback_workspace_migration(
         repo_root=repo,
         common_dir=common,
@@ -670,3 +676,75 @@ def test_migration_registers_explicitly_mapped_worktree_and_rollback_removes_reg
         operation_id=completed.operation_id,
     )
     assert [(item.id, item.schema_version) for item in load_control(common).worktrees] == [("main", 1)]
+
+
+def test_migration_reserves_deleted_historical_local_id(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    historical = repo / "spec-dock/initiatives/init-local-00009-old"
+    historical.mkdir()
+    (historical / ".meta.json").write_text('{"id":"init-local-00009"}', encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "old",
+        ],
+        check=True,
+    )
+    (historical / ".meta.json").unlink()
+    historical.rmdir()
+    subprocess.run(["git", "-C", str(repo), "add", "-A"], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(repo),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "remove old",
+        ],
+        check=True,
+    )
+    common = git_common_directory(repo)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(repo), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(repo)
+    mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
+    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+
+    migration_module.apply_workspace_migration(
+        repo_root=repo,
+        common_dir=common,
+        worktree_id="main",
+        engine_digest=engine,
+        expected_epoch=1,
+        inventory=inventory,
+        mapping=mapping,
+        updated_at="2026-01-01T00:00:00Z",
+    )
+    registry, _identity = RegistryStore(common).load()
+    assert "init-local-00009" in registry.reserved
+    assert registry.high_water[0] == 9

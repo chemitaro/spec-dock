@@ -12,6 +12,7 @@ from uuid import uuid4
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
+from spec_dock_runtime.domain.registry import include_observed_local_ids
 from spec_dock_runtime.infra.control_store import (
     WRITER_PROTOCOL,
     ControlState,
@@ -33,7 +34,7 @@ from spec_dock_runtime.infra.migration_journal import (
     write_migration_record,
 )
 from spec_dock_runtime.infra.migration_store import branch_tip, inspect_migration_inventory
-from spec_dock_runtime.infra.registry_store import RegistryStore, _encode_registry
+from spec_dock_runtime.infra.registry_store import RegistryStore, _encode_registry, historical_local_ids
 from spec_dock_runtime.infra.writer_lock import writer_transaction
 
 if TYPE_CHECKING:
@@ -150,9 +151,13 @@ def plan_migration_changes(
         converted_workspace.update(schema_version=3, writer_protocol="specdock.writer/v1")
         if converted_workspace != workspace:
             changes.append(MigrationChange(str(workspace_path), workspace_digest, _encode(converted_workspace)))
+    registry = RegistryStore(Path(inventory.common_dir))
+    state, _identity = registry.load()
+    before_registry = state
+    observed_ids = {scope.id for worktree in inventory.worktrees for scope in worktree.scopes if scope.id is not None}
+    observed_ids.update(historical_local_ids(Path(inventory.worktrees[0].root)))
+    state = include_observed_local_ids(state, observed_ids)
     if mapping.branch_bindings:
-        registry = RegistryStore(Path(inventory.common_dir))
-        state, _identity = registry.load()
         known = {(worktree.registration_id, scope.id) for worktree in inventory.worktrees for scope in worktree.scopes}
         for row in mapping.branch_bindings:
             worktree_id = row["worktree_id"]
@@ -169,14 +174,17 @@ def plan_migration_changes(
             ):
                 raise ValueError("migration branch binding no longer matches its inventory or ref")
             state = bind_branch(state, BranchBinding(scope_id, name, tip))
-        current = registry.path.read_bytes() if registry.path.exists() and not registry.path.is_symlink() else None
-        if registry.path.is_symlink():
-            raise ValueError("migration branch registry is redirected")
-        encoded = _encode(_encode_registry(state))
-        if current != encoded:
-            changes.append(
-                MigrationChange(str(registry.path), _file_digest(current) if current is not None else None, encoded)
+    current = registry.path.read_bytes() if registry.path.exists() and not registry.path.is_symlink() else None
+    if registry.path.is_symlink():
+        raise ValueError("migration branch registry is redirected")
+    if state != before_registry:
+        changes.append(
+            MigrationChange(
+                str(registry.path),
+                _file_digest(current) if current is not None else None,
+                _encode(_encode_registry(state)),
             )
+        )
     return tuple(changes)
 
 
