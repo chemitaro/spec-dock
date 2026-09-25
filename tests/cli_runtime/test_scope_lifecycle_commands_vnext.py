@@ -29,19 +29,27 @@ def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: P
     assert planned.exit_code == 0
     assert json.loads(planned.stdout)["status"] == "planned"
     assert metadata.read_bytes() == before
-    closed = _run(repo, "scope", "close", created.id)
+    unconfirmed = _run(repo, "scope", "close", created.id)
+    assert unconfirmed.exit_code == 3
+    assert metadata.read_bytes() == before
+    closed = _run(repo, "scope", "close", created.id, "--yes")
     assert closed.exit_code == 0
     assert json.loads(metadata.read_text())["lifecycle"]["state"] == "completed"
     operation_id = json.loads(closed.stdout)["operation_id"]
-    wrong_action = _run(repo, "scope", "reopen", created.id, "--resume", operation_id)
+    wrong_action = _run(repo, "scope", "reopen", created.id, "--resume", operation_id, "--yes")
     assert wrong_action.exit_code == 3
-    resumed = _run(repo, "scope", "close", created.id, "--resume", operation_id)
+    resumed = _run(repo, "scope", "close", created.id, "--resume", operation_id, "--yes")
     assert resumed.exit_code == 0
-    reopened = _run(repo, "scope", "reopen", created.id)
+    unconfirmed_reopen = _run(repo, "scope", "reopen", created.id)
+    assert unconfirmed_reopen.exit_code == 3
+    assert json.loads(metadata.read_text())["lifecycle"]["state"] == "completed"
+    reopened = _run(repo, "scope", "reopen", created.id, "--yes")
     assert reopened.exit_code == 0
     assert json.loads(metadata.read_text())["lifecycle"]["state"] == "open"
-    abandoned = _run(repo, "scope", "close", created.id, "--reason", "not-planned")
+    abandoned = _run(repo, "scope", "close", created.id, "--reason", "not-planned", "--yes")
     assert abandoned.exit_code == 0
     abandoned_id = json.loads(abandoned.stdout)["operation_id"]
-    resumed_abandoned = _run(repo, "scope", "close", created.id, "--reason", "not-planned", "--resume", abandoned_id)
+    resumed_abandoned = _run(
+        repo, "scope", "close", created.id, "--reason", "not-planned", "--resume", abandoned_id, "--yes"
+    )
     assert resumed_abandoned.exit_code == 0

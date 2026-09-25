@@ -24,6 +24,8 @@ if TYPE_CHECKING:
 def run_scope_lifecycle(
     ns: argparse.Namespace, context: WorkContext, *, gateway: GithubIssueGateway
 ) -> OperationResult[object]:
+    if not ns.dry_run and not ns.yes:
+        raise ValueError("Scope close/reopen requires --yes after reviewing the target and effects")
     action = "close" if ns.command_path == "scope close" else "reopen"
     reason = ns.reason if action == "close" else "completed"
     if ns.resume is not None:
