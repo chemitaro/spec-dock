@@ -10,8 +10,15 @@ import math
 import re
 from typing import TYPE_CHECKING, Any
 
-from spec_dock_runtime.cli.catalog import LEAF_ARGUMENTS, LEAF_PATHS, MUTATING_LEAF_PATHS
+from spec_dock_runtime.cli.catalog import (
+    HELP_EFFECTS,
+    LEAF_ARGUMENTS,
+    LEAF_PATHS,
+    MUTATING_LEAF_PATHS,
+    RECOVERY_LEAF_COMMANDS,
+)
 from spec_dock_runtime.cli.legacy import LegacyCommandError, reject_legacy_root
+from spec_dock_runtime.domain.operation import ROLLBACK_COMMANDS
 from spec_dock_runtime.presentation.envelope import Diagnostic, OperationResult, render_json
 from spec_dock_runtime.presentation.errors import CliMessageData, VersionData
 
@@ -48,7 +55,26 @@ _COMMON_VALUES = {
 class _StrictParser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("allow_abbrev", False)
+        kwargs.setdefault("formatter_class", argparse.RawDescriptionHelpFormatter)
         super().__init__(*args, **kwargs)
+
+
+def _recovery_help(leaf: str) -> str:
+    command = RECOVERY_LEAF_COMMANDS.get(leaf)
+    if command is not None:
+        rollback = (
+            "; --rollback OPERATION_ID is available for verified local rollback" if command in ROLLBACK_COMMANDS else ""
+        )
+        return f"Inspect the operation record, then use --resume OPERATION_ID with the same target{rollback}."
+    if leaf == "worktree create":
+        return "Inspect the target path, Git ref, and registration before retrying; there is no --resume."
+    if leaf == "worktree bootstrap":
+        return "Inspect the recorded execution and project effects before an explicit retry; there is no --resume."
+    if leaf == "workspace sync":
+        return "Inspect the published generation pointer, then retry with the same source; there is no --resume."
+    if leaf in MUTATING_LEAF_PATHS:
+        return "Inspect the target and observed effects before retrying; there is no --resume."
+    return "No mutation to recover; correct the reported input or environment and rerun."
 
 
 def build_vnext_parser() -> argparse.ArgumentParser:
@@ -71,6 +97,7 @@ def build_vnext_parser() -> argparse.ArgumentParser:
         parents[parts].set_defaults(command_path=leaf)
         for argument in LEAF_ARGUMENTS[leaf]:
             parents[parts].add_argument(*argument.names, **argument.options)
+        parents[parts].epilog = f"Effects:\n  {HELP_EFFECTS[leaf]}\n\nRecovery:\n  {_recovery_help(leaf)}"
     return parser
 
 

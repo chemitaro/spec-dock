@@ -14,7 +14,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.cli.catalog import LEAF_PATHS, RECOVERY_LEAF_COMMANDS  # noqa: E402
 from spec_dock_runtime.cli.legacy import LegacyCommandError  # noqa: E402
-from spec_dock_runtime.cli.options import parse_vnext, parse_vnext_output  # noqa: E402
+from spec_dock_runtime.cli.options import explicit_help, parse_vnext, parse_vnext_output  # noqa: E402
 from spec_dock_runtime.cli.parser import build_parser  # noqa: E402
 from spec_dock_runtime.cli.registry import build_registry  # noqa: E402
 
@@ -102,6 +102,27 @@ def test_every_vnext_leaf_has_parseable_help() -> None:
             assert exc.code == 0, path
         else:
             raise AssertionError(f"help did not exit: {path}")
+
+
+def test_every_leaf_help_names_its_effects_and_recovery() -> None:
+    for path in LEAF_PATHS:
+        text = explicit_help(path.split())
+        assert "Effects:" in text, path
+        assert "Recovery:" in text, path
+        parsed = parse_vnext_output([*path.split(), "--help", "--json"])
+        assert parsed.exit_code == 0
+        assert "Effects:" in json.loads(parsed.stdout)["data"]["help"], path
+    work_start = explicit_help(("work", "start"))
+    assert "branch" in work_start and "checkout" in work_start
+    assert "--resume" in work_start
+
+
+def test_repository_operator_guidance_uses_current_cli() -> None:
+    guidance = (Path(__file__).resolve().parents[2] / "AGENTS.md").read_text(encoding="utf-8")
+    for command in ("work start/finish", "scope create/import", "installation update", "workspace validate"):
+        assert command in guidance
+    for retired in ("issue start", "issue finish", "uninstall --apply", "spec-dock update ."):
+        assert retired not in guidance
 
 
 def test_common_options_are_accepted_before_or_after_leaf() -> None:

@@ -7,11 +7,11 @@
 
 ## SpecDock Agent-First Operations
 
-- Codex agents are the default operators of `./spec-dock/scripts/spec-dock ...`. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results; do not stop at command suggestions or ask the user to type ordinary commands.
+- Codex agents operate SpecDock through the verified fixed external `spec-dock` engine or its pinned repository shim. During the coordinated cutover, use the fixed candidate engine and its current leaf help; do not run the retired repository-local implementation as a fallback. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results.
 - Treat the request or approved plan as authorization for the command's ordinary documented local, Git, and GitHub side effects. Inspect current root and leaf help, resolve exact targets, and preserve the CLI's fail-closed boundaries.
-- Require an exact target and explicit destructive outcome in the request or approved plan before running `delete`, `uninstall --apply`, `worktree remove`, or a guard-bypassing `--force`. Once authorized, execute and verify them rather than handing them back for manual entry.
+- Require an exact target and explicit destructive outcome in the request or approved plan before running `scope delete`, `installation uninstall`, or `worktree remove`. Once authorized, execute and verify them rather than handing them back for manual entry.
 - Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
-- Keep the repository's human PR merge gate. That gate does not make node creation, Artifact creation, `issue start`, `issue finish`, `close`, `sync`, `update`, or other ordinary SpecDock operations human-only.
+- Keep the repository's human PR merge gate. That gate does not make `scope create/import`, Artifact creation, `work start/finish`, `scope close/reopen`, `workspace sync`, `installation update`, or other ordinary SpecDock operations human-only.
 
 ## Dogfooding Warning
 
@@ -41,7 +41,8 @@ Read these first before changing code or tests:
 ## Project Structure & Module Organization
 
 - `src/spec_dock/`: installer package for the top-level `spec-dock` CLI.
-- `src/spec_dock/cli.py`: installer entrypoint for `init` / `update`.
+- `src/spec_dock/cli.py`: public fixed-engine entrypoint; its legacy installer is retained only for historical tests.
+- `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py`: fixed engine execution, bundle creation, and repository pin verification.
 - `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
 - `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/`.
   - `.agents/skills/spec-dock/SKILL.md`
@@ -85,7 +86,7 @@ tests/
 
 Read it like this:
 
-- Change installer behavior: start at `src/spec_dock/cli.py`.
+- Change fixed distribution behavior: start at `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py` and the runtime `application/installation_*` modules.
 - Change the two installed skills: start at `src/spec_dock/assets/install_root/`.
 - Treat `src/spec_dock/assets/install_root/` as the only current authority for the installed skills.
 - Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
@@ -122,7 +123,7 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 
 1. Read the relevant docs under `spec-dock/active/`, or `spec-dock/system/active-none/` if no active context is set.
 2. Identify the layer or surface you are changing:
-   - installer: `src/spec_dock/cli.py`, asset sync/update behavior
+   - fixed engine and installer: `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py`, runtime installation use cases, asset sync/update behavior
    - installed skills: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for retired-artifact context
    - runtime command surface: `.../spec_dock_runtime/cli/` and `.../commands/`
    - orchestration or business logic: `.../application/` and `.../domain/`
@@ -140,16 +141,12 @@ uv run pytest
 uv run pytest tests/unit
 uv run pytest tests/unit/infra/test_directory_installation.py
 
-# Run installer locally from the current checkout
-uvx --from . spec-dock init /tmp/target-repo
-uvx --from . spec-dock update /tmp/target-repo
+# Build a fixed candidate outside the checkout, then inspect its help.
+uv run python -m spec_dock.fixed_bundle /private/tmp/spec-dock-candidate
+/private/tmp/spec-dock-candidate/bin/spec-dock help
 
-# Dogfooding repo: installed local tool
-spec-dock --version
-spec-dock update .
-
-# Module entrypoint
-python -m spec_dock.cli init /tmp/target-repo
+# After installation and migration are ready, use the pinned engine or shim.
+spec-dock workspace validate
 ```
 
 `Provider CI` runs `make lint` and ordinary `uv run pytest` on pull requests.
