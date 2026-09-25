@@ -150,6 +150,19 @@ def test_migration_inventory_does_not_scan_workbench(tmp_path: Path) -> None:
     assert len(inventory.worktrees[0].scopes) == 3
 
 
+def test_migration_inventory_rejects_symlinked_scope_metadata(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    metadata = repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json"
+    backup = tmp_path / "initiative-metadata.json"
+    backup.write_bytes(metadata.read_bytes())
+    metadata.unlink()
+    metadata.symlink_to(backup)
+
+    inventory = inspect_migration_inventory(repo)
+
+    assert "SCOPE_TREE_UNREADABLE" in inventory.blockers
+
+
 def test_migration_inventory_marks_partial_link_and_broken_active(tmp_path: Path) -> None:
     repo = _legacy_repo(tmp_path)
     initiative = repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json"
