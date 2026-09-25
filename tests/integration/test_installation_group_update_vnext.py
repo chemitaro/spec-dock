@@ -6,6 +6,7 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import sys
+from tempfile import TemporaryDirectory
 from typing import cast
 
 import pytest
@@ -100,6 +101,40 @@ def test_legacy_update_cli_dry_run_then_bootstraps(tmp_path: Path, monkeypatch: 
     assert result.exit_code == 0
     assert {item["root"] for item in json.loads(result.stdout)["data"]["targets"]} == {str(repo), str(second)}
     assert load_control(repo / ".git").mode == "maintenance"
+
+
+def test_legacy_update_cli_resolves_symlinked_system_tempdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, _, pin, bundle = _legacy_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    real_temp = tmp_path / "real-temp"
+    real_temp.mkdir()
+    aliased_temp = tmp_path / "temp-alias"
+    aliased_temp.symlink_to(real_temp, target_is_directory=True)
+
+    def aliased_temporary_directory(*, prefix: str) -> TemporaryDirectory[str]:
+        return TemporaryDirectory(prefix=prefix, dir=aliased_temp)
+
+    def checked_archive(_source: object, _archive: bytes, destination: Path):
+        assert destination.parent == destination.parent.resolve(strict=True)
+        return bundle
+
+    monkeypatch.setattr(command_module, "TemporaryDirectory", aliased_temporary_directory)
+    monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(command_module, "verify_pinned_archive", checked_archive)
+    monkeypatch.setattr(command_module, "assert_candidate_assets_match_engine", lambda *_args: None)
+
+    preview = run_vnext(
+        ["installation", "update", "--commit", bundle.source.commit, "--maintenance", "--dry-run", "--json"],
+        invocation_cwd=repo,
+        engine_digest=pin.distribution_digest,
+        engine_version="0.2.4",
+        engine_pin=pin,
+    )
+
+    assert preview.exit_code == 0
+    assert load_control(repo / ".git") is None
 
 
 def test_installation_update_requires_confirmation_before_source_fetch(

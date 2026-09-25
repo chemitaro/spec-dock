@@ -215,7 +215,7 @@ def _run_engine_handover(
     source = resolve_fixed_source(version=None, commit=source_commit, timeout=ns.timeout)
     archive = download_pinned_archive(source, timeout=ns.timeout)
     with TemporaryDirectory(prefix="specdock-handover-") as directory:
-        bundle = verify_pinned_archive(source, archive, Path(directory) / "bundle")
+        bundle = verify_pinned_archive(source, archive, Path(directory).resolve(strict=True) / "bundle")
         assert_candidate_assets_match_engine(bundle, ASSETS)
         if ns.dry_run:
             targets = plan_engine_handover(
@@ -371,7 +371,7 @@ def run_installation_update(
     source = resolve_fixed_source(version=ns.version, commit=ns.commit, timeout=ns.timeout)
     archive = download_pinned_archive(source, timeout=ns.timeout)
     with TemporaryDirectory(prefix="specdock-install-") as directory:
-        bundle = verify_pinned_archive(source, archive, Path(directory) / "bundle")
+        bundle = verify_pinned_archive(source, archive, Path(directory).resolve(strict=True) / "bundle")
         if legacy or not ns.maintenance:
             assert_candidate_assets_match_engine(bundle, ASSETS)
         if ns.dry_run:
