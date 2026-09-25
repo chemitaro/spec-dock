@@ -48,6 +48,8 @@ ID: "iss-00409"
 
 修正では、最初のworktree変更より前に固定child journalを `planned` として永続化し、完成・同期済みの一時ファイルから復旧用 `.gitignore` を無上書きで公開するようにしました。既存ファイルの種別・内容・inodeを確認し、途中停止時は同じchild IDで準備を再開または巻き戻します。グループ完了前にも全childのマーカーを再検証します。マーカー公開中断、directory同期中断、同内容のinode差替え、グループ再開と巻戻しを結合テストへ追加しました。最終SHAでの全テスト、独立cloneでの再dogfooding、同じレビュアーの再審査結果は `.workbench` の証拠に保存します。
 
+この修正を含む `1e9fecc416bcd2dc778c86dbbff8506501305caa` の全テストは `2098 passed, 2 failed, 25 skipped` でした。失敗2件はいずれも配布元runtimeと、この開発worktreeのdogfooding用写しのbyte不一致です。実装・結合テストの失敗ではありません。写しを配布元に同期し、同じ二つの検査と最終固定SHAの全テストを再実行します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。
