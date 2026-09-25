@@ -279,6 +279,31 @@ def test_group_update_keeps_all_worktrees_in_maintenance(tmp_path: Path) -> None
         assert (root / "spec-dock/docs/source.txt").read_text(encoding="utf-8") == "spec-dock/docs"
 
 
+def test_existing_group_accepts_new_candidate_assets_only_under_maintenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, second, common_dir, _epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle)
+    monkeypatch.setattr(
+        command_module,
+        "assert_candidate_assets_match_engine",
+        lambda *_args: (_ for _ in ()).throw(ValueError("candidate assets differ from engine")),
+    )
+    command = ["installation", "update", "--commit", bundle.source.commit, "--yes", "--json"]
+    refused = run_vnext(command, invocation_cwd=repo, engine_digest=digest, engine_version="0.2.4")
+    assert refused.exit_code != 0 and "candidate assets differ" in refused.stdout
+    assert load_control(common_dir).mode == "ready"
+    accepted = run_vnext([*command, "--maintenance"], invocation_cwd=repo, engine_digest=digest, engine_version="0.2.4")
+    assert accepted.exit_code == 0, accepted.stdout
+    assert load_control(common_dir).mode == "maintenance"
+    for root in (repo, second):
+        assert (root / "spec-dock/docs/source.txt").read_text(encoding="utf-8") == "spec-dock/docs"
+
+
 def test_group_update_resumes_after_one_child_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
     import spec_dock_runtime.application.installation_update_vnext as update_module
