@@ -271,6 +271,8 @@ removeはmain/current/bare/missing-record、tracked dirty、untrackedを無条�
 
 bootstrapは `make init` の実行を明示的に依頼するコマンドです。**make -nでもMakefile評価による任意処理が起こり得るため、dry-runでmakeを起動しません。** 適用時は既存make initの検出/実行をtrust済みconsumerで行い、未定義targetは `BOOTSTRAP_UNAVAILABLE` として返します。実行済みなら失敗/中断時の副作用不明をcode 6で返します。任意scriptのnetworkをsandboxなしに禁止できないため、--offlineとの併用は拒否します。stdout/stderrはcaptureし、JSON時はenvelopeへrawログを埋めず、sanitized summaryとexit codeを返します。
 
+bootstrapの対象別記録が `running` または `partial` の間は同対象の再実行を拒否します。対象directoryの排他leaseにより実行中の回復操作も拒否します。operatorが子process停止と任意効果を確認した後、`worktree bootstrap TARGET --recover --yes` は記録を `reconciled` にするだけでhookを呼びません。再試行は別の明示操作です。無関係なScopeのwriteは停止しません。
+
 ## data / failure
 
 ### D-09 状態の分離と保存場所

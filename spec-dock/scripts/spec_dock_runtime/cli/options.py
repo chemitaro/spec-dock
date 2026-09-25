@@ -69,7 +69,7 @@ def _recovery_help(leaf: str) -> str:
     if leaf == "worktree create":
         return "Inspect the target record, path, Git ref, and registration; --recover ID retries only after all effects are absent."
     if leaf == "worktree bootstrap":
-        return "Inspect the recorded execution and project effects before an explicit retry; there is no --resume."
+        return "Inspect the target record and project effects; --recover --yes only acknowledges the attempt, then retry separately."
     if leaf == "workspace sync":
         return "Inspect the published generation pointer, then retry with the same source; there is no --resume."
     if leaf in MUTATING_LEAF_PATHS:
@@ -234,6 +234,8 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("branch create requires --base unless --resume is specified")
     if parsed.command_path == "worktree create" and parsed.recover and common.get("dry_run"):
         parser.error("worktree create --recover cannot be combined with --dry-run")
+    if parsed.command_path == "worktree bootstrap" and parsed.recover and common.get("dry_run"):
+        parser.error("worktree bootstrap --recover cannot be combined with --dry-run")
     if parsed.command_path not in MUTATING_LEAF_PATHS and (common.get("yes") or common.get("dry_run")):
         parser.error("--yes and --dry-run apply only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):

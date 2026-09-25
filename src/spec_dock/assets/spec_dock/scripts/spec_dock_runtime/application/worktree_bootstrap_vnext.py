@@ -128,6 +128,7 @@ def bootstrap_worktree(
     engine_digest: str,
     expected_epoch: int,
     reference: str,
+    recover: bool = False,
     dry_run: bool = False,
     offline: bool = False,
     timeout: float = 300.0,
@@ -136,6 +137,8 @@ def bootstrap_worktree(
     """Run make init only after explicit selection; record partial effects for this target."""
     if offline:
         raise ValueError("worktree bootstrap is unavailable offline")
+    if recover and dry_run:
+        raise ValueError("worktree bootstrap recovery cannot be combined with dry-run")
     if timeout <= 0:
         raise ValueError("bootstrap timeout must be positive")
     target = show_worktree(repo_root=repo_root, common_dir=common_dir, reference=reference)
@@ -146,7 +149,7 @@ def bootstrap_worktree(
     path = target.path
     lease_fd = _open_directory_no_follow(path)
     try:
-        fcntl.flock(lease_fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        fcntl.flock(lease_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
         _verify_worktree_path_binding(path, lease_fd)
         record_path = _record_path(common_dir, target.id)
         with WriterLock(common_dir, timeout=lock_timeout):
@@ -158,8 +161,18 @@ def bootstrap_worktree(
                 expected_epoch=expected_epoch,
             )
             previous = read_guarded_json(record_path)
-            if previous is not None and previous[0].get("status") == "running":
-                raise ValueError("bootstrap target has an unresolved running attempt")
+            pending = previous is not None and previous[0].get("status") in {"running", "partial"}
+            if recover:
+                if not pending:
+                    raise ValueError("bootstrap target has no unresolved attempt to recover")
+                attempt = int(previous[0]["attempt"])
+                prior_exit = previous[0].get("exit_code")
+                _publish_record(
+                    record_path, target_id=target.id, status="reconciled", attempt=attempt, exit_code=prior_exit
+                )
+                return BootstrapOutcome(target.id, "reconciled", False, prior_exit, False, "attempt acknowledged")
+            if pending:
+                raise ValueError("bootstrap target has an unresolved attempt; inspect effects before recovery")
             attempt = 1 if previous is None else int(previous[0]["attempt"]) + 1
             _publish_record(record_path, target_id=target.id, status="running", attempt=attempt, exit_code=None)
         started, exit_code, timed_out, diagnostic = _run_make(path, timeout=timeout)

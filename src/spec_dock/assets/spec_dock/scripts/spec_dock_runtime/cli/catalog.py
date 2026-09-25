@@ -200,7 +200,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "worktree list": (),
     "worktree show": (_arg("worktree_ref"),),
     "worktree remove": (_arg("worktree_ref"), _flag("--unlock"), _flag("--discard-ignored")),
-    "worktree bootstrap": (_arg("worktree_ref"),),
+    "worktree bootstrap": (_arg("worktree_ref"), _flag("--recover")),
     "workbench copy": (
         _required("--scope"),
         _required("--to-worktree"),

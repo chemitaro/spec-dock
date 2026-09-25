@@ -331,7 +331,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T04,T06,T22 |
 | 対象file群 | 既存 repo-local scriptのconsumer hook処理を分離、RT commands/worktree.py、application/worktree.py。 |
-| 実施内容 | bootstrap leafを追加し、dry-run/ offline時にmakeを起動しない規則を入れます。shared lease、timeout、capture、partialを実装します。 |
+| 実施内容 | bootstrap leafを追加し、dry-run/ offline時にmakeを起動しない規則を入れます。対象の排他lease、timeout、capture、partialを実装します。対象別のrunning/partial recordは再実行を止め、`--recover --yes` ではhookを呼ばず記録だけを確認済みにします。 |
 | 完了条件 | hook失敗はsuccessにならず、JSON stdoutを汚さず、子processからの危険な再入を拒否します。 |
 | 必要なテスト | 新設 tests/cli_runtime/test_worktree_bootstrap_vnext.py。make -n評価trap、missing target、stdout flood、timeout/kill、offline、child SpecDock metadata操作。途中停止・任意効果unknownでは自動再実行/rollbackがなく、対象の診断は残しつつ無関係なwriteをglobal停止しないことも確認します。 |
 | 対応AC | AC-18, AC-22, AC-29 |

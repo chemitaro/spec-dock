@@ -173,6 +173,7 @@ def run_worktree_change(ns: argparse.Namespace, context: WorkContext) -> Operati
             engine_digest=context.engine_digest,
             expected_epoch=context.expected_epoch,
             reference=ns.worktree_ref,
+            recover=ns.recover,
             dry_run=ns.dry_run,
             offline=ns.offline,
             timeout=ns.timeout,
@@ -185,6 +186,14 @@ def run_worktree_change(ns: argparse.Namespace, context: WorkContext) -> Operati
                 data=outcome,
                 exit_code=0,
                 effects=(Effect("worktree-bootstrap", "planned", outcome.id),),
+            )
+        if outcome.status == "reconciled":
+            return OperationResult(
+                command=ns.command_path,
+                status="succeeded",
+                data=outcome,
+                exit_code=0,
+                effects=(Effect("bootstrap-attempt-reconcile", "succeeded", outcome.id),),
             )
         if outcome.status == "succeeded":
             return OperationResult(
