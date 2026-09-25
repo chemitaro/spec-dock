@@ -131,6 +131,17 @@ def test_every_leaf_help_names_its_effects_and_recovery() -> None:
     assert "spec-dock work start <scope-id> --base HEAD" in work_start
 
 
+def test_help_examples_include_required_runtime_inputs_once() -> None:
+    worktree_help = explicit_help(("worktree", "create"))
+    worktree_example = worktree_help.split("Examples:\n", 1)[1].splitlines()[0]
+    assert worktree_example.count("--base") == 1
+
+    migration_help = explicit_help(("workspace", "migrate"))
+    migration_example = migration_help.split("Examples:\n", 1)[1].splitlines()[0]
+    assert "--mapping-file" in migration_example
+    assert "--mapping-file" in migration_help.split("Preconditions:\n", 1)[1].split("Confirmation:\n", 1)[0]
+
+
 def test_repository_operator_guidance_uses_current_cli() -> None:
     guidance = (Path(__file__).resolve().parents[2] / "AGENTS.md").read_text(encoding="utf-8")
     for command in ("work start/finish", "scope create/import", "installation update", "workspace validate"):

@@ -392,8 +392,10 @@ def _example(leaf: str) -> str:
                 words.append("<scope-id>")
         elif argument.options.get("required"):
             words.extend((name, placeholders.get(name, f"<{name.lstrip('-')}>")))
-    if leaf in {"work start", "branch create", "worktree create"}:
+    if leaf in {"work start", "branch create"}:
         words.extend(("--base", "HEAD"))
+    if leaf == "workspace migrate":
+        words.extend(("--mapping-file", "<mapping.json>"))
     if leaf == "active clear":
         words.append("--all")
     if leaf == "installation update":
@@ -435,6 +437,8 @@ def _help_spec(leaf: str) -> HelpSpec:
         if leaf in {"help", "completion"}
         else f"Resolve the target in the selected project; required inputs: {', '.join(required) or 'positional target/state guards'}."
     )
+    if leaf == "workspace migrate":
+        preconditions += " Applying a migration requires an inventory-bound --mapping-file."
     if leaf.startswith("scope create"):
         confirmation = "GitHub creation requires confirmation; local creation does not."
     elif leaf == "workbench copy":
