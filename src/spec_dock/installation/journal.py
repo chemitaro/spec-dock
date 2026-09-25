@@ -36,6 +36,26 @@ class InstallationRecord:
     before_hashes: dict[str, str | None]
     after_hashes: dict[str, str | None]
     error: str | None = None
+    marker_tracked: bool = False
+    marker_before: dict[str, int] | None = None
+    marker_publish: dict[str, int] | None = None
+
+
+def durable_mkdir(directory: Path) -> None:
+    """Publish every newly created directory entry before a journaled effect."""
+    absent: list[Path] = []
+    current = directory
+    while not current.exists():
+        absent.append(current)
+        current = current.parent
+    directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+    for created in absent:
+        for path in (created, created.parent):
+            descriptor = os.open(path, os.O_RDONLY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
 
 
 def operation_directory(journal_root: Path, operation_id: str) -> Path:
@@ -80,6 +100,18 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
             and (not isinstance(record.source_digest, str) or _DIGEST.fullmatch(record.source_digest) is None)
         )
         or (record.error is not None and not isinstance(record.error, str))
+        or not isinstance(record.marker_tracked, bool)
+        or any(
+            identity is not None
+            and (
+                not isinstance(identity, dict)
+                or set(identity) != {"device", "inode"}
+                or any(
+                    not isinstance(value, int) or isinstance(value, bool) or value < 0 for value in identity.values()
+                )
+            )
+            for identity in (record.marker_before, record.marker_publish)
+        )
     ):
         raise ValueError("installation journal content is invalid")
     for hashes in (record.before_hashes, record.after_hashes):
@@ -100,13 +132,16 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         record.before_hashes,
         record.after_hashes,
         record.error,
+        record.marker_tracked,
+        record.marker_before,
+        record.marker_publish,
     )
 
 
 def write_record(journal_root: Path, record: InstallationRecord, *, create: bool = False) -> None:
     directory = operation_directory(journal_root, record.operation_id)
     if create:
-        directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+        durable_mkdir(directory)
     elif not directory.is_dir() or directory.is_symlink():
         raise ValueError("installation journal directory is missing or unsafe")
     path = directory / "record.json"

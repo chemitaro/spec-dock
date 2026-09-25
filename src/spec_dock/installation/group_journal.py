@@ -10,6 +10,8 @@ from pathlib import Path
 import re
 import uuid
 
+from spec_dock.installation.journal import durable_mkdir
+
 _ID = re.compile(r"[0-9a-f]{32}\Z")
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
@@ -152,7 +154,7 @@ def write_group_record(common_dir: Path, record: InstallationGroupRecord, *, cre
         raise ValueError("installation group common directory differs")
     directory = _directory(common_dir, record.operation_id)
     if create:
-        directory.mkdir(mode=0o700, parents=True, exist_ok=False)
+        durable_mkdir(directory)
     elif not directory.is_dir():
         raise ValueError("installation group journal directory is missing")
     path = directory / "group.json"

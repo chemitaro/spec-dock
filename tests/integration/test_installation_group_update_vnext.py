@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 from pathlib import Path
+import subprocess
 import sys
 from tempfile import TemporaryDirectory
 from typing import cast
@@ -15,6 +16,7 @@ RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/sp
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock.installation.group_journal import read_group_record  # noqa: E402
+from spec_dock.installation.journal import read_record  # noqa: E402
 from spec_dock.installer import TOOL_DIRECTORIES  # noqa: E402
 from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin  # noqa: E402
 from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
@@ -429,6 +431,100 @@ def test_group_update_resumes_after_unjournaled_stage(tmp_path: Path, monkeypatc
     )
     assert completed.phase == "committed"
     assert pending_installation_groups(common_dir) == ()
+
+
+@pytest.mark.parametrize("recover_by", ["resume", "rollback"])
+def test_group_recovers_interrupted_marker_publication_with_fixed_child_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, recover_by: str
+) -> None:
+    repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("marker stop")))
+        with pytest.raises(OSError, match="marker stop"):
+            update_installation_group(
+                repo_root=repo,
+                common_dir=common_dir,
+                worktree_id="main",
+                engine_digest=digest,
+                expected_epoch=epoch,
+                bundle=bundle,
+                keep_maintenance=True,
+            )
+    (group_id,) = pending_installation_groups(common_dir)
+    group = read_group_record(common_dir, group_id)
+    first = group.targets[0]
+    assert first.child_operation_id is not None
+    # The group store's fixed child root is the authoritative location.
+    from spec_dock_runtime.application.installation_update_vnext import _child_root
+
+    child = read_record(_child_root(common_dir, group_id, first.worktree_id), first.child_operation_id)
+    assert child.phase == "planned"
+    if recover_by == "resume":
+        result = resume_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            operation_id=group_id,
+            bundle=bundle,
+        )
+        assert result.phase == "committed"
+    else:
+        result = rollback_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            operation_id=group_id,
+            expected_source_commit=bundle.source.commit,
+        )
+        assert result.phase == "rolled-back"
+    assert (Path(first.root) / ".spec-dock-installations/.gitignore").read_bytes() == b"*\n"
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=first.root,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert ".spec-dock-installations" not in status.stdout
+
+
+def test_group_commit_refuses_replaced_marker_after_child_apply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_apply = update_module.apply_installation
+    changed = False
+
+    def replace_after_apply(*args: object, **kwargs: object):
+        nonlocal changed
+        result = real_apply(*args, **kwargs)
+        if not changed:
+            marker = repo / ".spec-dock-installations/.gitignore"
+            replacement = marker.parent / "replacement"
+            replacement.write_bytes(b"*\n")
+            replacement.replace(marker)
+            changed = True
+        return result
+
+    monkeypatch.setattr(update_module, "apply_installation", replace_after_apply)
+    with pytest.raises(ValueError, match="changed identity"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+            bundle=bundle,
+            keep_maintenance=True,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    assert read_group_record(common_dir, group_id).phase == "recovery-required"
 
 
 def test_group_update_rolls_back_a_completed_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

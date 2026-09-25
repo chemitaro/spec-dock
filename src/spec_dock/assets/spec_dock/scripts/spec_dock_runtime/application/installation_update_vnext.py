@@ -15,7 +15,10 @@ from spec_dock.installation.executor import (
     apply_installation,
     preflight_rollback_installation,
     prepare_installation,
+    resume_preparation,
     rollback_installation,
+    validate_recovery_marker,
+    verify_installation_marker,
 )
 from spec_dock.installation.group_journal import (
     InstallationGroupRecord,
@@ -327,6 +330,8 @@ def _stage_missing(
         journal_path = journal_root / "installations" / target.child_operation_id / "record.json"
         if os.path.lexists(journal_path):
             child = read_record(journal_root, target.child_operation_id)
+            if child.phase == "planned":
+                child = resume_preparation(journal_root, target.child_operation_id, bundle=bundle)
         else:
             if recover_stage:
                 _quarantine_unjournaled_stage(target, journal_root)
@@ -378,7 +383,19 @@ def _apply_children(common_dir: Path, record: InstallationGroupRecord) -> Instal
     return record
 
 
+def _verify_group_markers(common_dir: Path, record: InstallationGroupRecord) -> None:
+    for target in record.targets:
+        assert target.child_operation_id is not None
+        journal_root = _child_root(common_dir, record.operation_id, target.worktree_id)
+        journal_path = journal_root / "installations" / target.child_operation_id / "record.json"
+        if os.path.lexists(journal_path):
+            verify_installation_marker(journal_root, target.child_operation_id)
+        else:
+            validate_recovery_marker(Path(target.root))
+
+
 def _commit_group(common_dir: Path, record: InstallationGroupRecord) -> InstallationGroupRecord:
+    _verify_group_markers(common_dir, record)
     control = load_control(common_dir)
     if control is None or control.engine_digest != record.engine_digest or control.epoch < record.control_epoch + 1:
         raise ValueError("installation control changed before completion")
@@ -658,6 +675,9 @@ def rollback_init_installation_group(
             if not os.path.lexists(child_path):
                 if target.completed:
                     raise ValueError("completed installation child has no journal")
+                if os.path.lexists(Path(target.root) / ".spec-dock-installations" / target.child_operation_id):
+                    raise ValueError("unjournaled installation preparation requires explicit recovery")
+                validate_recovery_marker(Path(target.root))
                 children.append(None)
                 continue
             child = preflight_rollback_installation(journal_root, target.child_operation_id, allow_committed=True)
@@ -693,6 +713,7 @@ def rollback_init_installation_group(
                     replace(current, mode="uninitialized", epoch=current.epoch + 1),
                     expected_epoch=current.epoch,
                 )
+            _verify_group_markers(common_dir, record)
             rolled_back = replace(record, phase="rolled-back", error=None)
             write_group_record(common_dir, rolled_back)
             return rolled_back
@@ -1105,6 +1126,9 @@ def rollback_installation_group(
                 if not os.path.lexists(journal_path):
                     if target.completed:
                         raise ValueError("completed installation child has no journal")
+                    if os.path.lexists(Path(target.root) / ".spec-dock-installations" / target.child_operation_id):
+                        raise ValueError("unjournaled installation preparation requires explicit recovery")
+                    validate_recovery_marker(Path(target.root))
                     children.append(None)
                     continue
                 child = preflight_rollback_installation(journal_root, target.child_operation_id, allow_committed=True)
@@ -1142,6 +1166,7 @@ def rollback_installation_group(
                     )
                 elif current_control is not None and current_control.mode != "uninitialized":
                     raise ValueError("bootstrap rollback lost maintenance control")
+            _verify_group_markers(common_dir, record)
             rolled_back = replace(record, phase="rolled-back", error=None)
             write_group_record(common_dir, rolled_back)
             return rolled_back

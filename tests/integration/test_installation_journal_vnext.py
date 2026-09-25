@@ -9,7 +9,12 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from spec_dock.installation.executor import apply_installation, prepare_installation, rollback_installation
+from spec_dock.installation.executor import (
+    apply_installation,
+    prepare_installation,
+    resume_preparation,
+    rollback_installation,
+)
 from spec_dock.installation.journal import InstallationRecord, read_record, write_record
 from spec_dock.installation.source import PinnedSource, VerifiedBundle, _digest_paths, _tooling_inventory
 from spec_dock.installer import TOOL_DIRECTORIES
@@ -134,6 +139,239 @@ def test_installation_recovery_area_does_not_dirty_git_worktree(tmp_path: Path) 
         text=True,
     )
     assert status.stdout == ""
+
+
+def test_installation_has_durable_planned_record_before_worktree_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    operation_id = "f" * 32
+    original_mkdir = type(target).mkdir
+
+    def interrupted_mkdir(path: Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+        if path.name == operation_id and path.parent.name == ".spec-dock-installations":
+            assert read_record(journal_root, operation_id).phase == "planned"
+            raise OSError("preparation interrupted")
+        original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+    monkeypatch.setattr(type(target), "mkdir", interrupted_mkdir)
+    with pytest.raises(OSError, match="preparation interrupted"):
+        prepare_installation(target, journal_root, action="init", bundle=_bundle(tmp_path), operation_id=operation_id)
+    assert read_record(journal_root, operation_id).phase == "planned"
+
+
+@pytest.mark.parametrize("marker_kind", ["empty", "symlink", "hardlink"])
+def test_installation_rejects_untrusted_existing_recovery_marker_before_mutation(
+    tmp_path: Path, marker_kind: str
+) -> None:
+    target = tmp_path / "consumer"
+    recovery = target / ".spec-dock-installations"
+    recovery.mkdir(parents=True)
+    marker = recovery / ".gitignore"
+    if marker_kind == "empty":
+        marker.write_bytes(b"")
+    elif marker_kind == "symlink":
+        marker.symlink_to(tmp_path / "external")
+    else:
+        external = tmp_path / "external"
+        external.write_bytes(b"*\n")
+        marker.hardlink_to(external)
+    with pytest.raises(ValueError, match="ignore marker"):
+        prepare_installation(target, tmp_path / "common", action="init", bundle=_bundle(tmp_path))
+    assert sorted(recovery.iterdir()) == [marker]
+
+
+def test_interrupted_marker_publication_resumes_same_child_and_restores_clean_git(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    journal_root = tmp_path / "common"
+    operation_id = "e" * 32
+    bundle = _bundle(tmp_path)
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("interrupted")))
+        with pytest.raises(OSError, match="interrupted"):
+            prepare_installation(target, journal_root, action="init", bundle=bundle, operation_id=operation_id)
+    assert read_record(journal_root, operation_id).phase == "planned"
+    assert not (target / ".spec-dock-installations/.gitignore").exists()
+    completed = resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert completed.phase == "staged" and completed.operation_id == operation_id
+    apply_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=target,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert (target / ".spec-dock-installations/.gitignore").read_bytes() == b"*\n"
+    assert ".spec-dock-installations" not in status.stdout
+
+
+def test_interrupted_marker_publication_rolls_back_same_child_without_git_dirt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    journal_root = tmp_path / "common"
+    operation_id = "d" * 32
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("interrupted")))
+        with pytest.raises(OSError, match="interrupted"):
+            prepare_installation(
+                target, journal_root, action="init", bundle=_bundle(tmp_path), operation_id=operation_id
+            )
+    restored = rollback_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    assert restored.phase == "rolled-back"
+    assert not (target / "spec-dock").exists()
+    assert (target / ".spec-dock-installations/.gitignore").read_bytes() == b"*\n"
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=target,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout == ""
+
+
+def test_published_marker_recovers_after_parent_directory_sync_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    operation_id = "c" * 32
+    bundle = _bundle(tmp_path)
+    import spec_dock.installation.executor as executor
+
+    original_sync = executor._sync_directory
+    stopped = False
+
+    def interrupted_sync(path: Path) -> None:
+        nonlocal stopped
+        if path == target / ".spec-dock-installations" and (path / ".gitignore").exists() and not stopped:
+            stopped = True
+            raise OSError("sync interrupted")
+        original_sync(path)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor, "_sync_directory", interrupted_sync)
+        with pytest.raises(OSError, match="sync interrupted"):
+            prepare_installation(target, journal_root, action="init", bundle=bundle, operation_id=operation_id)
+    assert read_record(journal_root, operation_id).phase == "planned"
+    staged = resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert staged.phase == "staged"
+    assert (target / ".spec-dock-installations/.gitignore").stat().st_nlink == 1
+
+
+def test_temporary_marker_sync_failure_rolls_back_without_partial_visible_marker(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    journal_root = tmp_path / "common"
+    operation_id = "b" * 32
+    import spec_dock.installation.executor as executor
+
+    original_sync = executor._sync_directory
+
+    def interrupted_sync(path: Path) -> None:
+        if path.name == operation_id and (path / "ignore-marker.tmp").exists():
+            raise OSError("temporary sync interrupted")
+        original_sync(path)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor, "_sync_directory", interrupted_sync)
+        with pytest.raises(OSError, match="temporary sync interrupted"):
+            prepare_installation(
+                target, journal_root, action="init", bundle=_bundle(tmp_path), operation_id=operation_id
+            )
+    assert read_record(journal_root, operation_id).phase == "planned"
+    assert not (target / ".spec-dock-installations/.gitignore").exists()
+    restored = rollback_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    assert restored.phase == "rolled-back"
+    assert (target / ".spec-dock-installations/.gitignore").read_bytes() == b"*\n"
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=target,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout == ""
+
+
+def test_planned_recovery_refuses_unowned_marker_without_replacing_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    operation_id = "9" * 32
+    bundle = _bundle(tmp_path)
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("interrupted")))
+        with pytest.raises(OSError, match="interrupted"):
+            prepare_installation(target, journal_root, action="init", bundle=bundle, operation_id=operation_id)
+    marker = target / ".spec-dock-installations/.gitignore"
+    marker.write_bytes(b"unexpected\n")
+    with pytest.raises(ValueError, match="ignore marker"):
+        resume_preparation(journal_root, operation_id, bundle=bundle)
+    with pytest.raises(ValueError, match="ignore marker"):
+        rollback_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    assert marker.read_bytes() == b"unexpected\n"
+
+
+@pytest.mark.parametrize("action", ["update", "uninstall"])
+def test_planned_update_and_uninstall_roll_back_after_marker_publication_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal_root = tmp_path / "common"
+    operation_id = "8" * 32
+    bundle = _bundle(tmp_path) if action == "update" else None
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("interrupted")))
+        with pytest.raises(OSError, match="interrupted"):
+            prepare_installation(target, journal_root, action=action, bundle=bundle, operation_id=operation_id)
+    restored = rollback_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    assert restored.phase == "rolled-back"
+    assert version.read_text(encoding="utf-8") == "old\n"
+    assert (target / ".spec-dock-installations/.gitignore").read_bytes() == b"*\n"
+
+
+def test_marker_same_content_replacement_blocks_apply_and_rollback(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    record = prepare_installation(target, journal_root, action="init", bundle=_bundle(tmp_path))
+    marker = target / ".spec-dock-installations/.gitignore"
+    replacement = marker.parent / "replacement"
+    replacement.write_bytes(b"*\n")
+    replacement.replace(marker)
+    with pytest.raises(ValueError, match="changed identity"):
+        apply_installation(journal_root, record.operation_id, enter_maintenance=lambda _record: None)
+    with pytest.raises(ValueError, match="changed identity"):
+        rollback_installation(journal_root, record.operation_id, enter_maintenance=lambda _record: None)
+    assert marker.read_bytes() == b"*\n"
 
 
 def test_installation_resumes_after_first_root_and_preserves_custom_ignore(tmp_path: Path) -> None:

@@ -44,6 +44,10 @@ ID: "iss-00409"
 
 独立cloneを置いた後の全テストでは `2084 passed, 1 failed, 25 skipped` でした。失敗は旧CLIのdogfooding検証fixtureが `spec-dock/initiatives/` を複製する際、Git管理外の `.workbench/dogfood/` に入った独立cloneまで複製し、同じ旧Issue IDを重複検出したためです。正本ツリーだけを複製するよう `.workbench` を除外し、該当テストを再実行して `1 passed` を確認しました。最終候補の全テスト結果は固定SHAに対して改めて取得します。
 
+固定候補 `c098d93f291d95ae50ad6141d4290e6079355583` は `make lint`、全テスト `2085 passed, 25 skipped`、固定wheelの構築・隔離導入を通過しました。同じレビュアーの Final Quality Gate Strict v2 は12観点の確認を完了しましたが、P1を1件認定して未通過でした。導入の復旧用 `.gitignore` が作成途中で中断すると、不完全なファイルがjournal外に残り、固定IDのresume/rollbackが終了してもGit作業場がdirtyのままになる問題です。別セッションの ChatGPT Analyze Review Findings Strict と現行コードの照合により、既存の復旧契約を維持した実装修正として扱いました。
+
+修正では、最初のworktree変更より前に固定child journalを `planned` として永続化し、完成・同期済みの一時ファイルから復旧用 `.gitignore` を無上書きで公開するようにしました。既存ファイルの種別・内容・inodeを確認し、途中停止時は同じchild IDで準備を再開または巻き戻します。グループ完了前にも全childのマーカーを再検証します。マーカー公開中断、directory同期中断、同内容のinode差替え、グループ再開と巻戻しを結合テストへ追加しました。最終SHAでの全テスト、独立cloneでの再dogfooding、同じレビュアーの再審査結果は `.workbench` の証拠に保存します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

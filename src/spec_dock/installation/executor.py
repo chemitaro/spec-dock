@@ -72,6 +72,103 @@ def _operation_area(target: Path, operation_id: str) -> Path:
     return area
 
 
+def _marker_identity(path: Path, *, temporary: Path | None = None) -> dict[str, int] | None:
+    if path.parent.is_symlink():
+        raise ValueError("installation recovery directory is a symlink")
+    try:
+        before = path.lstat()
+    except FileNotFoundError:
+        return None
+    linked = temporary is not None and temporary.exists()
+    if not stat.S_ISREG(before.st_mode) or before.st_nlink != (2 if linked else 1):
+        raise ValueError("installation recovery ignore marker is not a regular single-link file")
+    if (
+        linked
+        and temporary is not None
+        and (
+            temporary.is_symlink()
+            or (temporary.stat().st_dev, temporary.stat().st_ino) != (before.st_dev, before.st_ino)
+        )
+    ):
+        raise ValueError("installation recovery ignore marker has an unowned hardlink")
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    if nofollow is None:
+        raise ValueError("this platform cannot safely inspect the installation recovery marker")
+    descriptor = os.open(path, os.O_RDONLY | nofollow)
+    try:
+        current = os.fstat(descriptor)
+        if (before.st_dev, before.st_ino) != (current.st_dev, current.st_ino) or current.st_nlink != before.st_nlink:
+            raise ValueError("installation recovery ignore marker changed identity")
+        if os.read(descriptor, 3) != b"*\n":
+            raise ValueError("installation recovery ignore marker has unexpected content")
+        after = path.lstat()
+        if (after.st_dev, after.st_ino, after.st_nlink) != (current.st_dev, current.st_ino, current.st_nlink):
+            raise ValueError("installation recovery ignore marker changed identity")
+        return {"device": current.st_dev, "inode": current.st_ino}
+    finally:
+        os.close(descriptor)
+
+
+def validate_recovery_marker(target: Path) -> None:
+    """Reject unsafe shared recovery state even when this child was never prepared."""
+    recovery = target / ".spec-dock-installations"
+    identity = _marker_identity(recovery / ".gitignore")
+    if identity is None and recovery.is_dir() and any(recovery.iterdir()):
+        raise ValueError("unjournaled installation recovery bytes lack an ignore marker")
+
+
+def verify_installation_marker(journal_root: Path, operation_id: str) -> None:
+    record = read_record(journal_root, operation_id)
+    _verify_marker(record, _operation_area(Path(record.target), operation_id))
+
+
+def _verify_marker(record: InstallationRecord, area: Path, *, finish_link: bool = False) -> bool:
+    if not record.marker_tracked:
+        raise ValueError("installation recovery marker is not tracked by this journal")
+    marker = area.parent / ".gitignore"
+    temporary = area / "ignore-marker.tmp"
+    identity = _marker_identity(marker, temporary=temporary if record.marker_publish is not None else None)
+    expected = record.marker_before or record.marker_publish
+    if identity is None:
+        if record.marker_before is not None:
+            raise ValueError("installation recovery ignore marker disappeared")
+        return False
+    if expected is None or identity != expected:
+        raise ValueError("installation recovery ignore marker changed identity")
+    if finish_link and temporary.exists():
+        temporary.unlink()
+        _sync_directory(area)
+        if _marker_identity(marker) != expected:
+            raise ValueError("installation recovery ignore marker changed identity")
+    if finish_link:
+        _sync_directory(area.parent)
+    return True
+
+
+def _publish_marker(journal_root: Path, record: InstallationRecord, area: Path) -> InstallationRecord:
+    if _verify_marker(record, area, finish_link=True):
+        return record
+    temporary = area / "ignore-marker.tmp"
+    descriptor = os.open(temporary, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write(b"*\n")
+            stream.flush()
+            os.fsync(stream.fileno())
+        _sync_directory(area)
+        identity = {"device": temporary.stat().st_dev, "inode": temporary.stat().st_ino}
+        record = replace(record, marker_publish=identity)
+        write_record(journal_root, record)
+        os.link(temporary, area.parent / ".gitignore", follow_symlinks=False)
+        _sync_directory(area.parent)
+        if not _verify_marker(record, area, finish_link=True):
+            raise ValueError("installation recovery ignore marker publication failed")
+        return record
+    except BaseException:
+        # The planned journal owns the temporary and a possibly published marker.
+        raise
+
+
 def _asset_path(bundle: VerifiedBundle, relative: str) -> Path:
     if relative == "spec-dock/.workbench/README.md":
         return bundle.root / "src/spec_dock/assets/spec_dock/templates/root/.workbench/README.md"
@@ -143,13 +240,61 @@ def prepare_installation(
     if not isinstance(operation_id, str) or _OPERATION_ID.fullmatch(operation_id) is None:
         raise ValueError("installation operation ID is invalid")
     area = _operation_area(target, operation_id)
+    marker_before = _marker_identity(area.parent / ".gitignore")
+    record = InstallationRecord(
+        operation_id,
+        action,
+        str(target),
+        None if bundle is None else bundle.source.commit,
+        None if bundle is None else bundle.digest,
+        "planned",
+        (),
+        {},
+        {},
+        marker_tracked=True,
+        marker_before=marker_before,
+    )
+    write_record(journal_root, record, create=True)
+    return _stage_preparation(journal_root, record, bundle, installed_version=installed_version)
+
+
+def resume_preparation(journal_root: Path, operation_id: str, *, bundle: VerifiedBundle | None) -> InstallationRecord:
+    """Complete a planned child without changing its fixed target or source."""
+    record = read_record(journal_root, operation_id)
+    if record.phase != "planned" or not record.marker_tracked:
+        raise ValueError("installation child is not a recoverable planned preparation")
+    if (record.action == "uninstall") != (bundle is None) or (
+        bundle is not None and (record.source_commit != bundle.source.commit or record.source_digest != bundle.digest)
+    ):
+        raise ValueError("installation recovery bundle differs from planned source")
+    target = Path(record.target)
+    _guard_target(target)
+    if bundle is not None:
+        assert_disjoint_source_target(bundle.root, target)
+        verify_bundle_integrity(bundle)
+    return _stage_preparation(journal_root, record, bundle, recover=True)
+
+
+def _stage_preparation(
+    journal_root: Path,
+    record: InstallationRecord,
+    bundle: VerifiedBundle | None,
+    *,
+    installed_version: str | None = None,
+    recover: bool = False,
+) -> InstallationRecord:
+    target = Path(record.target)
+    action = record.action
+    area = _operation_area(target, record.operation_id)
+    if recover and area.exists():
+        if not area.is_dir() or any(os.path.lexists(area / name) for name in ("backup", "displaced")):
+            raise ValueError("planned installation area contains replacement evidence")
+        _verify_marker(record, area, finish_link=True)
+        area.rename(area.parent / f"{record.operation_id}.abandoned-{uuid.uuid4().hex}")
+        _sync_directory(area.parent)
     area.mkdir(mode=0o700, parents=True, exist_ok=False)
-    try:
-        with (area.parent / ".gitignore").open("x", encoding="utf-8") as ignore:
-            ignore.write("*\n")
-    except FileExistsError:
-        # The recovery directory is reserved, but never replace an existing ignore file.
-        pass
+    _sync_directory(area.parent)
+    record = _publish_marker(journal_root, record, area)
     before: dict[str, str | None] = {}
     after: dict[str, str | None] = {}
     try:
@@ -180,18 +325,9 @@ def prepare_installation(
                 _copy_entry(_asset_path(bundle, relative), staged)
                 after[relative] = _digest_path(staged)
         _fsync_stage(area)
-        record = InstallationRecord(
-            operation_id,
-            action,
-            str(target),
-            None if bundle is None else bundle.source.commit,
-            None if bundle is None else bundle.digest,
-            "staged",
-            (),
-            before,
-            after,
-        )
-        write_record(journal_root, record, create=True)
+        _verify_marker(record, area)
+        record = replace(record, phase="staged", before_hashes=before, after_hashes=after)
+        write_record(journal_root, record)
         return record
     except BaseException:
         # No managed path was touched; a failed staging area can be inspected or removed explicitly.
@@ -199,6 +335,15 @@ def prepare_installation(
 
 
 def _verify_record_paths(record: InstallationRecord) -> None:
+    if record.phase == "planned":
+        if (
+            record.marker_tracked
+            and not record.before_hashes
+            and not record.after_hashes
+            and not record.completed_roots
+        ):
+            return
+        raise ValueError("installation planned journal has unexpected path state")
     paths = _record_paths(record.action)
     if set(record.before_hashes) != set(paths) or set(record.after_hashes) != set(paths):
         raise ValueError("installation journal path inventory differs from this engine")
@@ -250,6 +395,8 @@ def apply_installation(
     """Apply or resume a pinned operation; caller owns writer locking and maintenance."""
     record = read_record(journal_root, operation_id)
     _verify_record_paths(record)
+    if record.phase == "planned":
+        raise ValueError("installation preparation must resume before apply")
     if record.phase in ("committed", "rolled-back"):
         raise ValueError("installation operation is already terminal")
     target = Path(record.target)
@@ -257,6 +404,7 @@ def apply_installation(
     area = _operation_area(target, operation_id)
     if not area.is_dir():
         raise ValueError("installation operation area is missing")
+    _verify_marker(record, area)
     enter_maintenance(record)
     try:
         record = replace(record, phase="replacing", error=None)
@@ -275,6 +423,7 @@ def apply_installation(
         for relative in _record_paths(record.action):
             if _digest_path(target / relative) != record.after_hashes[relative]:
                 raise ValueError(f"installed content verification failed: {relative}")
+        _verify_marker(record, area)
         record = replace(record, phase="committed")
         write_record(journal_root, record)
         return record
@@ -298,6 +447,22 @@ def rollback_installation(
     target = Path(record.target)
     enter_maintenance(record)
     area = _operation_area(target, operation_id)
+    if record.phase == "planned":
+        if area.exists():
+            if not area.is_dir() or any(os.path.lexists(area / name) for name in ("backup", "displaced")):
+                raise ValueError("planned installation area contains replacement evidence")
+            _verify_marker(record, area, finish_link=True)
+            if _marker_identity(area.parent / ".gitignore") is None:
+                area.rename(area.parent / f"{operation_id}.abandoned-{uuid.uuid4().hex}")
+                _sync_directory(area.parent)
+        if not area.exists():
+            area.mkdir(mode=0o700, parents=True, exist_ok=False)
+            _sync_directory(area.parent)
+        record = _publish_marker(journal_root, record, area)
+        record = replace(record, phase="rolled-back", error=None)
+        write_record(journal_root, record)
+        return record
+    _verify_marker(record, area)
     for relative in reversed(_record_paths(record.action)):
         destination = target / relative
         backup = area / "backup" / relative
@@ -318,6 +483,7 @@ def rollback_installation(
             backup.replace(destination)
             _sync_directory(destination.parent)
             _sync_directory(backup.parent)
+    _verify_marker(record, area)
     record = replace(record, phase="rolled-back", error=None)
     write_record(journal_root, record)
     return record
@@ -336,6 +502,14 @@ def preflight_rollback_installation(
     target = Path(record.target)
     _guard_target(target)
     area = _operation_area(target, operation_id)
+    if record.phase == "planned":
+        if area.exists() and (
+            not area.is_dir() or any(os.path.lexists(area / name) for name in ("backup", "displaced"))
+        ):
+            raise ValueError("planned installation area contains replacement evidence")
+        _verify_marker(record, area)
+        return record
+    _verify_marker(record, area)
     for relative in _record_paths(record.action):
         current = _digest_path(target / relative)
         expected = record.after_hashes[relative]
