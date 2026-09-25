@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 from pathlib import Path
 import stat
 import subprocess
 import sys
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
@@ -17,6 +19,7 @@ from spec_dock_runtime.application import work_lifecycle  # noqa: E402
 from spec_dock_runtime.application.active_selection import select_scope  # noqa: E402
 from spec_dock_runtime.application.branch_vnext import create_scope_branch  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
+from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
 from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
 from spec_dock_runtime.application.work_lifecycle import (  # noqa: E402
     plan_start_work,
@@ -30,6 +33,10 @@ from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
 from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.infra.contracts import GithubIssueRecord
 
 
 def _commit_fixture(repo_root: Path, message: str) -> str:
@@ -382,3 +389,46 @@ def test_registered_start_uses_ready_branch_instead_of_unready_current_graph(tmp
     result = start_work(target=issue.id, **arguments)
     assert result.branch == binding.name
     assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == issue.id
+
+
+def test_start_snapshot_queries_github_from_real_repository(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo_root = cast("Path", common["repo_root"])
+    local = create_local_scope(kind="initiative", title="Local", parent=None, ancestors=(), **common)
+    imported = import_github_scope(
+        kind="initiative",
+        github_ref="gh:example/repo#47",
+        repo_hint=None,
+        title="Remote prerequisite",
+        parent_id=None,
+        slug=None,
+        gateway=FakeGateway(_issue()),
+        **common,
+    )
+    _set_fixture_dependencies(local.path / ".meta.json", [imported.id])
+    _commit_fixture(repo_root, "remote prerequisite")
+
+    class CompletedGateway:
+        calls = 0
+
+        def get(self, observed_root: Path, repository: str, number: int) -> GithubIssueRecord:
+            self.calls += 1
+            assert observed_root == repo_root
+            assert repository == "example/repo" and number == 47
+            return replace(_issue(), state="completed", raw_state="closed", state_reason="completed")
+
+    gateway = CompletedGateway()
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": common["common_dir"],
+        "worktree_id": common["worktree_id"],
+        "engine_digest": common["engine_digest"],
+        "expected_epoch": common["expected_epoch"],
+        "target": local.id,
+        "base": "HEAD",
+        "source": "github",
+        "gateway": gateway,
+    }
+    assert preview_start_work(**arguments).target_id == local.id
+    assert start_work(**arguments).target_id == local.id
+    assert gateway.calls >= 3
