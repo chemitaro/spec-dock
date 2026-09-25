@@ -57,8 +57,13 @@ def _executing_engine(*, executable: Path, checkout_root: Path) -> VerifiedEngin
     distribution = executable.parent.parent
     package_file = Path(__file__).resolve(strict=True)
     assets = ASSETS.resolve(strict=True)
-    if not package_file.is_relative_to(distribution) or not assets.is_relative_to(distribution):
-        raise ValueError("external engine imported code outside its distribution")
+    fixed_package = distribution / "lib/spec_dock"
+    if (
+        package_file != fixed_package / "external_cli.py"
+        or assets != fixed_package / "assets"
+        or not (fixed_package / "version.txt").is_file()
+    ):
+        raise ValueError("external engine must use the fixed distribution layout")
     digest = digest_distribution(distribution)
     return verify_engine_pin(EnginePin(executable, distribution, digest), checkout_root=checkout_root)
 

@@ -72,6 +72,27 @@ def test_fixed_distribution_builder_rejects_checkout_destination(
         builder.build_fixed_engine(checkout / "engine")
 
 
+def test_wheel_layout_is_not_a_fixed_mutating_engine(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    import spec_dock.external_cli as module
+
+    checkout = tmp_path / "consumer"
+    checkout.mkdir()
+    distribution = tmp_path / "venv"
+    package = distribution / "lib/python3.12/site-packages/spec_dock"
+    assets = package / "assets"
+    assets.mkdir(parents=True)
+    package_file = package / "external_cli.py"
+    package_file.write_text("# wheel package\n", encoding="utf-8")
+    executable = distribution / "bin/spec-dock"
+    executable.parent.mkdir()
+    executable.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    executable.chmod(0o755)
+    monkeypatch.setattr(module, "__file__", str(package_file))
+    monkeypatch.setattr(module, "ASSETS", assets)
+    with pytest.raises(ValueError, match="fixed distribution layout"):
+        module._executing_engine(executable=executable, checkout_root=checkout)
+
+
 def test_public_entrypoints_use_fixed_engine() -> None:
     root = Path(__file__).resolve().parents[2]
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
@@ -199,6 +220,7 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
         library / "spec_dock",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"),
     )
+    (library / "spec_dock/version.txt").write_text("0.2.4\n", encoding="utf-8")
     executable = distribution / "bin/spec-dock"
     executable.parent.mkdir()
     executable.write_text(
@@ -266,6 +288,20 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
     assert scoped.returncode == 0, scoped.stderr
     assert json.loads(scoped.stdout)["status"] == "succeeded"
     assert not marker.exists()
+    original_engine = executable.read_bytes()
+    start_of_code = original_engine.index(b"\n") + 1
+    tamper_marker = tmp_path / "tampered-engine-ran"
+    executable.write_bytes(
+        original_engine[:start_of_code]
+        + f"from pathlib import Path\nPath({str(tamper_marker)!r}).write_text('unsafe')\n".encode()
+        + original_engine[start_of_code:]
+    )
+    refused = subprocess.run(
+        [str(shim), "--version"], cwd=repo, env=environment, capture_output=True, text=True, check=False
+    )
+    executable.write_bytes(original_engine)
+    assert refused.returncode != 0
+    assert not tamper_marker.exists()
     alternate = tmp_path / "other-engine"
     shutil.copytree(distribution, alternate)
     alternate_executable = alternate / "bin/spec-dock"

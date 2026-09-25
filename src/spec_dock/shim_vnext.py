@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -11,6 +12,32 @@ import subprocess
 import sys
 
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
+
+
+def _distribution_digest(root: Path) -> str:
+    """Verify the complete external package before executing any of its code."""
+    if not root.is_absolute() or root.is_symlink() or not root.is_dir():
+        raise ValueError("engine distribution root is invalid")
+    files: list[Path] = []
+    for path in root.rglob("*"):
+        if path.is_symlink():
+            raise ValueError("engine distribution contains a symlink")
+        if path.is_file():
+            files.append(path)
+        elif not path.is_dir():
+            raise ValueError("engine distribution contains an unsupported entry")
+    digest = hashlib.sha256()
+    for path in sorted(files, key=lambda item: item.relative_to(root).as_posix()):
+        relative = path.relative_to(root).as_posix().encode("utf-8")
+        metadata = path.stat()
+        digest.update(len(relative).to_bytes(8, "big"))
+        digest.update(relative)
+        digest.update((metadata.st_mode & 0o111).to_bytes(2, "big"))
+        digest.update(metadata.st_size.to_bytes(8, "big"))
+        with path.open("rb") as stream:
+            while chunk := stream.read(1024 * 1024):
+                digest.update(chunk)
+    return digest.hexdigest()
 
 
 def _common_directory(repo_root: Path) -> Path:
@@ -70,7 +97,7 @@ def _bound_invocation(repo_root: Path) -> None:
             raise ValueError("repository shim --project differs from its installed worktree")
 
 
-def _pinned_executable(common_dir: Path) -> Path:
+def _pinned_executable(common_dir: Path, repo_root: Path) -> Path:
     control_dir = common_dir / "spec-dock/control"
     locator = control_dir / "engine.json"
     control = control_dir / "control.json"
@@ -101,9 +128,14 @@ def _pinned_executable(common_dir: Path) -> Path:
         or executable.is_symlink()
         or distribution.is_symlink()
         or not executable.is_file()
+        or not os.access(executable, os.X_OK)
         or not executable.is_relative_to(distribution)
+        or distribution.resolve(strict=True).is_relative_to(repo_root)
+        or repo_root.is_relative_to(distribution.resolve(strict=True))
     ):
         raise ValueError("pinned engine executable is unavailable")
+    if _distribution_digest(distribution) != engine_data["distribution_digest"]:
+        raise ValueError("pinned engine distribution digest mismatch")
     return executable
 
 
@@ -111,7 +143,7 @@ def main() -> int:
     try:
         repo_root = Path(__file__).resolve(strict=True).parents[2]
         _bound_invocation(repo_root)
-        executable = _pinned_executable(_common_directory(repo_root))
+        executable = _pinned_executable(_common_directory(repo_root), repo_root)
         environment = os.environ.copy()
         for key in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONSTARTUP"):
             environment.pop(key, None)
