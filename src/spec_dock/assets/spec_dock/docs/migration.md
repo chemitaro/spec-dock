@@ -1,4 +1,4 @@
-# 導入・一括移行・復旧
+# 導入・導入先ごとの移行・復旧
 
 ## 固定distribution
 
@@ -16,15 +16,17 @@ spec-dock workspace validate
 
 導入前に対象repository、Git common directory、全worktree、既存dataを調べます。未導入の対象だけがinit可能です。失敗後はoperation IDとjournalを確認し、同じ固定distributionから `installation init PATH --resume ID --yes`、または `--rollback ID --yes` を実行します。partial stateに対して初回コマンドを盲目的に繰り返さないでください。
 
-## 既存環境の一括切替
+## 既存環境の明示更新
 
-1. 全consumerとlinked worktreeのinventoryを取り、現在のwriter、data path、Git common directoryを照合します。旧writerを停止します。
-2. 仕様・設定・tool導入先のbackupを隔離領域へ保存し、復元試験をします。同じ固定commitとbundle digestを全対象に使います。
+製品sourceの変更だけでは既存の導入先を更新しません。所有者が必要な時に一つのGit common directoryを選んで、以下を実行します。`installation update` は指定worktreeだけでなく、そのcommon directoryの全登録worktreeを対象にします。別のrepositoryや独立したcommon directoryには作用しません。
+
+1. 選んだGit common directoryの全linked worktreeのinventoryを取り、現在のwriterとdata pathを照合します。その単位の旧writerを停止します。
+2. その単位の仕様・設定・tool導入先のbackupを隔離領域へ保存し、復元試験をします。固定commitとbundle digestを記録します。
 3. `installation update --target PATH --commit SHA --maintenance --yes` で同じcommon directoryの全登録worktreeをmaintenanceにしてtool資産を更新します。
 4. `workspace migrate --to-schema 3 --dry-run --json` で全登録worktreeのinventory digestと阻害要因を確認します。`specdock.migration-map/v1` のmappingをそのdigestに固定し、空の対応配列しか要らない場合も `workspace migrate --to-schema 3 --mapping-file PATH --yes` で適用します。適用時のmapping省略は受け付けません。
-5. maintenance中に `installation show`、`workspace doctor`、`workspace validate` で全対象のprotocol、schema、journalを読取り確認します。全対象が同じ固定候補で検証できたら、各common directoryで `installation update --finalize --yes` を実行します。readyへの復帰後に `workspace sync --source cache` と再検証を行い、通常writerを再開します。
+5. maintenance中に `installation show`、`workspace doctor`、`workspace validate` でその単位の全登録worktreeのprotocol、schema、journalを読取り確認します。全登録worktreeが同じ固定候補で検証できたら、そのcommon directoryで `installation update --finalize --yes` を実行します。readyへの復帰後に `workspace sync --source cache` と再検証を行い、通常writerを再開します。
 
-途中失敗では一部だけ旧writerを再開しません。journalとbackupを保存し、同じoperation IDで対象leafの `--resume ID` または `--rollback ID` を使います。別のcommitやengineを混ぜないでください。GitHub Issue状態はtool移行のrollback対象ではありません。
+途中失敗ではその単位の一部だけ旧writerを再開しません。journalとbackupを保存し、同じoperation IDで対象leafの `--resume ID` または `--rollback ID` を使います。別のcommitやengineを混ぜないでください。GitHub Issue状態はtool移行のrollback対象ではありません。
 
 ## 削除
 
