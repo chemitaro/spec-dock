@@ -39,6 +39,8 @@ class InstallationRecord:
     marker_tracked: bool = False
     marker_before: dict[str, int] | None = None
     marker_publish: dict[str, int] | None = None
+    before_identities: dict[str, str | None] | None = None
+    requested_version: str | None = None
 
 
 def durable_mkdir(directory: Path) -> None:
@@ -100,6 +102,7 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
             and (not isinstance(record.source_digest, str) or _DIGEST.fullmatch(record.source_digest) is None)
         )
         or (record.error is not None and not isinstance(record.error, str))
+        or (record.requested_version is not None and not isinstance(record.requested_version, str))
         or not isinstance(record.marker_tracked, bool)
         or any(
             identity is not None
@@ -111,6 +114,17 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
                 )
             )
             for identity in (record.marker_before, record.marker_publish)
+        )
+        or (
+            record.before_identities is not None
+            and (
+                not isinstance(record.before_identities, dict)
+                or any(
+                    not isinstance(key, str)
+                    or (identity is not None and (not isinstance(identity, str) or _DIGEST.fullmatch(identity) is None))
+                    for key, identity in record.before_identities.items()
+                )
+            )
         )
     ):
         raise ValueError("installation journal content is invalid")
@@ -135,6 +149,8 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         record.marker_tracked,
         record.marker_before,
         record.marker_publish,
+        record.before_identities,
+        record.requested_version,
     )
 
 

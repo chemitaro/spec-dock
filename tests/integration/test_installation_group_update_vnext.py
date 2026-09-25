@@ -492,6 +492,42 @@ def test_group_recovers_interrupted_marker_publication_with_fixed_child_record(
     assert ".spec-dock-installations" not in status.stdout
 
 
+def test_group_resume_refuses_target_changed_after_planned_child(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("marker stop")))
+        with pytest.raises(OSError, match="marker stop"):
+            update_installation_group(
+                repo_root=repo,
+                common_dir=common_dir,
+                worktree_id="main",
+                engine_digest=digest,
+                expected_epoch=epoch,
+                bundle=bundle,
+                keep_maintenance=True,
+            )
+    (group_id,) = pending_installation_groups(common_dir)
+    group = read_group_record(common_dir, group_id)
+    first = group.targets[0]
+    version = Path(first.root) / "spec-dock/spec-dock.version"
+    version.write_text("changed after interruption\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="changed after planning"):
+        resume_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            operation_id=group_id,
+            bundle=bundle,
+        )
+    assert version.read_text(encoding="utf-8") == "changed after interruption\n"
+    assert pending_installation_groups(common_dir) == (group_id,)
+
+
 def test_group_commit_refuses_replaced_marker_after_child_apply(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import hashlib
+import json
 import os
 from pathlib import Path
 import re
@@ -52,6 +53,70 @@ def _digest_path(path: Path) -> str | None:
         else:
             raise ValueError(f"installation tree has an unsupported entry: {child}")
     return digest.hexdigest()
+
+
+def _path_identity(path: Path) -> str | None:
+    try:
+        path.lstat()
+    except FileNotFoundError:
+        return None
+    digest = hashlib.sha256()
+    entries = (path, *sorted(path.rglob("*"))) if path.is_dir() and not path.is_symlink() else (path,)
+    for entry in entries:
+        observed = entry.lstat()
+        kind = "directory" if stat.S_ISDIR(observed.st_mode) else "file"
+        if not (stat.S_ISDIR(observed.st_mode) or stat.S_ISREG(observed.st_mode)):
+            raise ValueError(f"installation path has an unsupported entry: {entry}")
+        if kind == "file" and observed.st_nlink != 1:
+            raise ValueError(f"installation path has an unowned hardlink: {entry}")
+        identity = (
+            entry.relative_to(path).as_posix(),
+            kind,
+            stat.S_IMODE(observed.st_mode),
+            observed.st_dev,
+            observed.st_ino,
+            observed.st_nlink,
+            observed.st_size,
+            observed.st_ctime_ns,
+        )
+        digest.update(json.dumps(identity, separators=(",", ":")).encode() + b"\n")
+    return digest.hexdigest()
+
+
+def _planned_snapshot(target: Path, action: str) -> tuple[dict[str, str | None], dict[str, str | None]]:
+    hashes: dict[str, str | None] = {}
+    identities: dict[str, str | None] = {}
+    for relative in _record_paths(action):
+        path = target / relative
+        identity = _path_identity(path)
+        digest = _digest_path(path)
+        if _path_identity(path) != identity or (identity is None) != (digest is None):
+            raise ValueError(f"installation target changed during planning: {relative}")
+        hashes[relative] = digest
+        identities[relative] = identity
+    for relative in hashes:
+        path = target / relative
+        if _path_identity(path) != identities[relative] or _digest_path(path) != hashes[relative]:
+            raise ValueError(f"installation target changed during planning: {relative}")
+    return hashes, identities
+
+
+def _verify_planned_before(record: InstallationRecord) -> None:
+    paths = _record_paths(record.action)
+    if (
+        record.before_identities is None
+        or set(record.before_hashes) != set(paths)
+        or set(record.before_identities) != set(paths)
+    ):
+        raise ValueError("planned installation lacks a fixed target snapshot; forward resume is unsafe")
+    target = Path(record.target)
+    for relative in paths:
+        path = target / relative
+        if (
+            _path_identity(path) != record.before_identities[relative]
+            or _digest_path(path) != record.before_hashes[relative]
+        ):
+            raise ValueError(f"installation target changed after planning: {relative}")
 
 
 def _guard_target(target: Path) -> None:
@@ -241,6 +306,7 @@ def prepare_installation(
         raise ValueError("installation operation ID is invalid")
     area = _operation_area(target, operation_id)
     marker_before = _marker_identity(area.parent / ".gitignore")
+    before_hashes, before_identities = _planned_snapshot(target, action)
     record = InstallationRecord(
         operation_id,
         action,
@@ -249,13 +315,15 @@ def prepare_installation(
         None if bundle is None else bundle.digest,
         "planned",
         (),
-        {},
+        before_hashes,
         {},
         marker_tracked=True,
         marker_before=marker_before,
+        before_identities=before_identities,
+        requested_version=installed_version,
     )
     write_record(journal_root, record, create=True)
-    return _stage_preparation(journal_root, record, bundle, installed_version=installed_version)
+    return _stage_preparation(journal_root, record, bundle)
 
 
 def resume_preparation(journal_root: Path, operation_id: str, *, bundle: VerifiedBundle | None) -> InstallationRecord:
@@ -272,6 +340,7 @@ def resume_preparation(journal_root: Path, operation_id: str, *, bundle: Verifie
     if bundle is not None:
         assert_disjoint_source_target(bundle.root, target)
         verify_bundle_integrity(bundle)
+    _verify_planned_before(record)
     return _stage_preparation(journal_root, record, bundle, recover=True)
 
 
@@ -280,12 +349,12 @@ def _stage_preparation(
     record: InstallationRecord,
     bundle: VerifiedBundle | None,
     *,
-    installed_version: str | None = None,
     recover: bool = False,
 ) -> InstallationRecord:
     target = Path(record.target)
     action = record.action
     area = _operation_area(target, record.operation_id)
+    _verify_planned_before(record)
     if recover and area.exists():
         if not area.is_dir() or any(os.path.lexists(area / name) for name in ("backup", "displaced")):
             raise ValueError("planned installation area contains replacement evidence")
@@ -295,19 +364,18 @@ def _stage_preparation(
     area.mkdir(mode=0o700, parents=True, exist_ok=False)
     _sync_directory(area.parent)
     record = _publish_marker(journal_root, record, area)
-    before: dict[str, str | None] = {}
+    before = record.before_hashes
     after: dict[str, str | None] = {}
     try:
         for relative in _record_paths(action):
             destination = target / relative
-            before[relative] = _digest_path(destination)
             staged = area / "stage" / relative
             if action == "uninstall":
                 # Consumer-specific ignore rules remain owned by the consumer.
                 after[relative] = before[relative] if relative == IGNORE_FILE else None
             elif relative == VERSION_FILE:
                 assert bundle is not None
-                version = installed_version or bundle.source.version or bundle.source.commit
+                version = record.requested_version or bundle.source.version or bundle.source.commit
                 if version is None:
                     raise ValueError("installation source has no version identity")
                 staged.parent.mkdir(parents=True, exist_ok=True)
@@ -326,6 +394,7 @@ def _stage_preparation(
                 after[relative] = _digest_path(staged)
         _fsync_stage(area)
         _verify_marker(record, area)
+        _verify_planned_before(record)
         record = replace(record, phase="staged", before_hashes=before, after_hashes=after)
         write_record(journal_root, record)
         return record
@@ -338,9 +407,16 @@ def _verify_record_paths(record: InstallationRecord) -> None:
     if record.phase == "planned":
         if (
             record.marker_tracked
-            and not record.before_hashes
             and not record.after_hashes
             and not record.completed_roots
+            and (
+                (not record.before_hashes and record.before_identities is None)
+                or (
+                    record.before_identities is not None
+                    and set(record.before_hashes) == set(_record_paths(record.action))
+                    and set(record.before_identities) == set(_record_paths(record.action))
+                )
+            )
         ):
             return
         raise ValueError("installation planned journal has unexpected path state")
@@ -353,16 +429,27 @@ def _verify_record_paths(record: InstallationRecord) -> None:
         raise ValueError("installation journal completed-root inventory is invalid")
 
 
-def _replace_root(target: Path, area: Path, relative: str, before: str | None, after: str | None) -> None:
+def _replace_root(
+    target: Path,
+    area: Path,
+    relative: str,
+    before: str | None,
+    after: str | None,
+    before_identity: str | None,
+) -> None:
     destination = target / relative
     backup = area / "backup" / relative
     staged = area / "stage" / relative
     current = _digest_path(destination)
     if current == after and (after is not None or before is None):
+        if before == after and before_identity is not None and _path_identity(destination) != before_identity:
+            raise ValueError(f"installation target changed after planning: {relative}")
         if before is not None and before != after and _digest_path(backup) != before:
             raise ValueError(f"installation backup does not match before state: {relative}")
         return
     if current == before and before is not None:
+        if before_identity is not None and _path_identity(destination) != before_identity:
+            raise ValueError(f"installation target changed after planning: {relative}")
         backup.parent.mkdir(parents=True, exist_ok=True)
         if backup.exists() or backup.is_symlink():
             raise ValueError(f"unexpected preexisting installation backup: {relative}")
@@ -405,6 +492,8 @@ def apply_installation(
     if not area.is_dir():
         raise ValueError("installation operation area is missing")
     _verify_marker(record, area)
+    if record.phase == "staged" and record.before_identities is not None:
+        _verify_planned_before(record)
     enter_maintenance(record)
     try:
         record = replace(record, phase="replacing", error=None)
@@ -415,7 +504,14 @@ def apply_installation(
                     raise ValueError(f"completed installation path changed: {relative}")
                 continue
             _guard_target(target)
-            _replace_root(target, area, relative, record.before_hashes[relative], record.after_hashes[relative])
+            _replace_root(
+                target,
+                area,
+                relative,
+                record.before_hashes[relative],
+                record.after_hashes[relative],
+                None if record.before_identities is None else record.before_identities[relative],
+            )
             record = replace(record, completed_roots=(*record.completed_roots, relative))
             write_record(journal_root, record)
             if after_root is not None:

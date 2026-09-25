@@ -50,6 +50,10 @@ ID: "iss-00409"
 
 この修正を含む `1e9fecc416bcd2dc778c86dbbff8506501305caa` の全テストは `2098 passed, 2 failed, 25 skipped` でした。失敗2件はいずれも配布元runtimeと、この開発worktreeのdogfooding用写しのbyte不一致です。実装・結合テストの失敗ではありません。写しを配布元に同期し、同じ二つの検査と最終固定SHAの全テストを再実行します。
 
+写しを同期した `3f62dc0b372d4376822dbae1c92c6a3d945242bf` では `make lint` と `git diff --check` が通過し、全テストは `2100 passed, 25 skipped` でした。同SHAから構築したwheelと固定engineを独立cloneに実導入し、239件の既存Scopeをschema 3へ移行しました。新規local Initiative・Epic・Issueの作成、各専用ブランチへの `work start` とcheckout、下位からの `work finish`、active解除、最終 `workspace validate` の `valid=true` を手動確認しました。他の稼働中worktree・consumerは更新していません。
+
+同じレビュアーによる Final Quality Gate Strict v2 では、前回のignore marker復旧P1は解消と判定されました。一方、`planned` child journalが管理対象の開始状態を固定せず、停止後に変更された対象を `resume` が新たなbefore-stateとして採用できるP1が残りました。別の ChatGPT Analyze Review Findings Strict で、AC-23/28とDesign D-13/D-16の既存契約を破る実装欠陥と確認しました。対処として、全管理pathの内容・種別・mode・inodeを含む開始状態と指定versionを、最初の対象変更前にchild journalへ永続化します。再開・stage完了前・apply直前・各pathの置換直前に同じ状態を照合し、変化を検出した場合は管理対象とbackupを変更せず停止します。旧形式の `planned` recordは現在状態から再計画せず、復旧用rollbackだけを許します。init/update/uninstall、同内容inode差替え、group再開、rollbackを結合テストで確認してから、固定SHAの全テストと同じレビュアーの再審査を実施します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

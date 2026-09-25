@@ -162,6 +162,200 @@ def test_installation_has_durable_planned_record_before_worktree_mutation(
     assert read_record(journal_root, operation_id).phase == "planned"
 
 
+@pytest.mark.parametrize("action", ["init", "update", "uninstall"])
+def test_planned_resume_rejects_managed_target_changed_after_interruption(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    version = target / "spec-dock/spec-dock.version"
+    if action != "init":
+        version.parent.mkdir()
+        version.write_text("old\n", encoding="utf-8")
+    bundle = None if action == "uninstall" else _bundle(tmp_path)
+    journal_root = tmp_path / "common"
+    operation_id = "7" * 32
+    original_mkdir = type(target).mkdir
+
+    def interrupted_mkdir(path: Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+        if path.name == operation_id and path.parent.name == ".spec-dock-installations":
+            raise OSError("preparation interrupted")
+        original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(target), "mkdir", interrupted_mkdir)
+        with pytest.raises(OSError, match="preparation interrupted"):
+            prepare_installation(target, journal_root, action=action, bundle=bundle, operation_id=operation_id)
+    assert read_record(journal_root, operation_id).phase == "planned"
+    version.parent.mkdir(parents=True, exist_ok=True)
+    version.write_text("changed after interruption\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="changed after planning"):
+        resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert version.read_text(encoding="utf-8") == "changed after interruption\n"
+    assert not (target / ".spec-dock-installations" / operation_id).exists()
+
+
+def test_planned_resume_rejects_new_scaffold_without_moving_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    operation_id = "6" * 32
+    bundle = _bundle(tmp_path)
+    original_mkdir = type(target).mkdir
+
+    def interrupted_mkdir(path: Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+        if path.name == operation_id and path.parent.name == ".spec-dock-installations":
+            raise OSError("preparation interrupted")
+        original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(target), "mkdir", interrupted_mkdir)
+        with pytest.raises(OSError, match="preparation interrupted"):
+            prepare_installation(target, journal_root, action="init", bundle=bundle, operation_id=operation_id)
+    scaffold = target / "spec-dock/workspace.json"
+    scaffold.parent.mkdir()
+    scaffold.write_text('{"owner":"consumer"}\n', encoding="utf-8")
+    with pytest.raises(ValueError, match="changed after planning"):
+        resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert scaffold.read_text(encoding="utf-8") == '{"owner":"consumer"}\n'
+    assert not (target / ".spec-dock-installations" / operation_id).exists()
+    rolled_back = rollback_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    assert rolled_back.phase == "rolled-back"
+    assert scaffold.read_text(encoding="utf-8") == '{"owner":"consumer"}\n'
+
+
+def test_planned_resume_rejects_same_content_inode_replacement(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal_root = tmp_path / "common"
+    operation_id = "5" * 32
+    bundle = _bundle(tmp_path)
+    original_mkdir = type(target).mkdir
+
+    def interrupted_mkdir(path: Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+        if path.name == operation_id and path.parent.name == ".spec-dock-installations":
+            raise OSError("preparation interrupted")
+        original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(target), "mkdir", interrupted_mkdir)
+        with pytest.raises(OSError, match="preparation interrupted"):
+            prepare_installation(target, journal_root, action="update", bundle=bundle, operation_id=operation_id)
+    replacement = version.parent / "replacement"
+    replacement.write_text("old\n", encoding="utf-8")
+    replacement.replace(version)
+    with pytest.raises(ValueError, match="changed after planning"):
+        resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert version.read_text(encoding="utf-8") == "old\n"
+
+
+def test_planned_resume_rejects_nested_same_content_inode_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    nested = target / "spec-dock/docs/guide.md"
+    nested.parent.mkdir()
+    nested.write_text("original\n", encoding="utf-8")
+    journal_root = tmp_path / "common"
+    operation_id = "3" * 32
+    bundle = _bundle(tmp_path)
+    original_mkdir = type(target).mkdir
+
+    def interrupted_mkdir(path: Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+        if path.name == operation_id and path.parent.name == ".spec-dock-installations":
+            raise OSError("preparation interrupted")
+        original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(target), "mkdir", interrupted_mkdir)
+        with pytest.raises(OSError, match="preparation interrupted"):
+            prepare_installation(target, journal_root, action="update", bundle=bundle, operation_id=operation_id)
+    replacement = nested.parent / "replacement"
+    replacement.write_text("original\n", encoding="utf-8")
+    replacement.replace(nested)
+    with pytest.raises(ValueError, match="changed after planning"):
+        resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert nested.read_text(encoding="utf-8") == "original\n"
+
+
+def test_planned_resume_keeps_requested_version(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal_root = tmp_path / "common"
+    operation_id = "4" * 32
+    bundle = _bundle(tmp_path)
+    original_mkdir = type(target).mkdir
+
+    def interrupted_mkdir(path: Path, mode: int = 0o777, parents: bool = False, exist_ok: bool = False) -> None:
+        if path.name == operation_id and path.parent.name == ".spec-dock-installations":
+            raise OSError("preparation interrupted")
+        original_mkdir(path, mode=mode, parents=parents, exist_ok=exist_ok)
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(target), "mkdir", interrupted_mkdir)
+        with pytest.raises(OSError, match="preparation interrupted"):
+            prepare_installation(
+                target,
+                journal_root,
+                action="init",
+                bundle=bundle,
+                operation_id=operation_id,
+                installed_version="requested-version",
+            )
+    planned = read_record(journal_root, operation_id)
+    assert planned.requested_version == "requested-version"
+    staged = resume_preparation(journal_root, operation_id, bundle=bundle)
+    assert staged.phase == "staged"
+    apply_installation(journal_root, operation_id, enter_maintenance=lambda _record: None)
+    assert (target / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "requested-version\n"
+
+
+def test_legacy_planned_record_cannot_replan_but_can_roll_back(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    bundle = _bundle(tmp_path)
+    journal_root = tmp_path / "common"
+    legacy = InstallationRecord(
+        "2" * 32,
+        "init",
+        str(target),
+        bundle.source.commit,
+        bundle.digest,
+        "planned",
+        (),
+        {},
+        {},
+        marker_tracked=True,
+    )
+    write_record(journal_root, legacy, create=True)
+    with pytest.raises(ValueError, match="fixed target snapshot"):
+        resume_preparation(journal_root, legacy.operation_id, bundle=bundle)
+    rolled_back = rollback_installation(journal_root, legacy.operation_id, enter_maintenance=lambda _record: None)
+    assert rolled_back.phase == "rolled-back"
+    assert not (target / "spec-dock").exists()
+
+
+def test_staged_apply_rejects_same_content_target_replacement(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal_root = tmp_path / "common"
+    record = prepare_installation(target, journal_root, action="update", bundle=_bundle(tmp_path))
+    replacement = version.parent / "replacement"
+    replacement.write_text("old\n", encoding="utf-8")
+    replacement.replace(version)
+    with pytest.raises(ValueError, match="changed after planning"):
+        apply_installation(journal_root, record.operation_id, enter_maintenance=lambda _record: None)
+    assert version.read_text(encoding="utf-8") == "old\n"
+    assert not (target / ".spec-dock-installations" / record.operation_id / "backup").exists()
+
+
 @pytest.mark.parametrize("marker_kind", ["empty", "symlink", "hardlink"])
 def test_installation_rejects_untrusted_existing_recovery_marker_before_mutation(
     tmp_path: Path, marker_kind: str
