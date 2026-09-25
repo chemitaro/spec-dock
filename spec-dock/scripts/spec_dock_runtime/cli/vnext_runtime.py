@@ -7,7 +7,10 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.application.active_selection import show_active_selection
 from spec_dock_runtime.application.installation_update_vnext import initial_worktree_id
+from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
+from spec_dock_runtime.cli.catalog import MUTATING_LEAF_PATHS
 from spec_dock_runtime.cli.options import completion_script, explicit_help, parse_vnext_output
 from spec_dock_runtime.commands.active_vnext import run_active_change, run_active_show
 from spec_dock_runtime.commands.artifact_vnext import run_artifact_change, run_artifact_query
@@ -30,6 +33,7 @@ from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace
 from spec_dock_runtime.commands.workspace_migrate_vnext import run_workspace_migrate
 from spec_dock_runtime.commands.workspace_sync_vnext import run_workspace_sync
 from spec_dock_runtime.commands.worktree_vnext import run_worktree_change, run_worktree_query
+from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import git_common_directory
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
@@ -37,6 +41,7 @@ from spec_dock_runtime.presentation.envelope import Diagnostic, Effect, Operatio
 from spec_dock_runtime.presentation.errors import CliMessageData, CompletionData
 
 if TYPE_CHECKING:
+    import argparse
     from collections.abc import Sequence
 
     from spec_dock.runtime_loader import VerifiedEngine
@@ -47,6 +52,10 @@ class RuntimeOutput:
     exit_code: int
     stdout: str
     stderr: str
+
+
+class ExpectationMismatch(ValueError):
+    """A caller-provided target guard disagrees with the current snapshot."""
 
 
 def _repository_root(candidate: Path) -> Path:
@@ -104,6 +113,53 @@ def _failure(command: str, code: str, message: str, exit_code: int, *, json_mode
         return RuntimeOutput(exit_code, render_json(result), "")
     stdout, stderr = render_text(result)
     return RuntimeOutput(exit_code, stdout, stderr)
+
+
+def _enforce_expectations(ns: argparse.Namespace, context: WorkContext) -> None:
+    command = ns.command_path
+    selectors = {
+        field: value
+        for field in ("target", "parent", "scope", "from_target", "to_target")
+        if isinstance((value := getattr(ns, field, None)), str)
+    }
+    active_fields = {
+        field: value for field, value in selectors.items() if value in {"@current", "@initiative", "@epic", "@issue"}
+    }
+    uses_current = bool(active_fields)
+    expected_current = getattr(ns, "expect_current", None)
+    if uses_current and command in MUTATING_LEAF_PATHS and ns.non_interactive and not expected_current:
+        raise ValueError("--expect-current is required for a non-interactive active selector mutation")
+    selection = None
+    if expected_current is not None:
+        parsed = parse_scope_selector(expected_current)
+        if not isinstance(parsed, ScopeIdSelector):
+            raise ValueError("--expect-current requires a complete Scope ID")
+        selection = show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id)
+        if selection.focus_id != parsed.id:
+            raise ExpectationMismatch("current Scope changed since the expected selection")
+
+    views = None
+    if uses_current and command in MUTATING_LEAF_PATHS:
+        if selection is None:
+            selection = show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id)
+        views = load_scope_views(context.repo_root / "spec-dock")
+        for field, value in active_fields.items():
+            setattr(ns, field, show_scope(views, value, selection=selection).id)
+
+    expected_backend = getattr(ns, "expect_backend", None)
+    if expected_backend is None:
+        return
+    target = getattr(ns, "target", None) or getattr(ns, "scope", None)
+    if not isinstance(target, str) or command.startswith(("scope create", "scope import")):
+        raise ValueError("--expect-backend requires one existing Scope target")
+    if selection is None:
+        selection = show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id)
+    if views is None:
+        views = load_scope_views(context.repo_root / "spec-dock")
+    view = show_scope(views, target, selection=selection)
+    actual_backend = "github" if view.github_ref is not None else "local"
+    if actual_backend != expected_backend:
+        raise ExpectationMismatch("Scope backend changed since the expected target")
 
 
 def run_vnext(
@@ -197,6 +253,7 @@ def run_vnext(
             stdout, stderr = render_text(result)
             return RuntimeOutput(result.exit_code, stdout, stderr)
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
+        _enforce_expectations(ns, context)
         if ns.command_path in {"scope list", "scope show"}:
             result = run_scope_query(ns, context)
         elif ns.command_path in {"scope create initiative", "scope create epic", "scope create issue"}:
@@ -255,6 +312,8 @@ def run_vnext(
         return _failure(ns.command_path, error.code, str(error), error.exit_code, json_mode=json_mode)
     except LookupError as error:
         return _failure(ns.command_path, "SCOPE_NOT_FOUND", str(error), 4, json_mode=json_mode)
+    except ExpectationMismatch as error:
+        return _failure(ns.command_path, "STATE_CONFLICT", str(error), 3, json_mode=json_mode)
     except ValueError as error:
         return _failure(ns.command_path, "PRECONDITION_FAILED", str(error), 3, json_mode=json_mode)
     except RuntimeError:

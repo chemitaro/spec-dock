@@ -26,13 +26,19 @@ def test_scope_list_show_and_edit_target_the_same_scope(tmp_path: Path) -> None:
     assert json.loads(shown.stdout)["data"]["item"]["id"] == issue.id
     document = issue.path / "requirement.md"
     before_document = document.read_bytes()
-    preview = run_vnext(["scope", "edit", "@current", "--title", "Renamed", "--dry-run", "--json"], **arguments)
+    preview = run_vnext(
+        ["scope", "edit", "@current", "--title", "Renamed", "--expect-current", issue.id, "--dry-run", "--json"],
+        **arguments,
+    )
     assert json.loads(preview.stdout)["status"] == "planned"
     assert (
         json.loads(run_vnext(["scope", "show", issue.id, "--json"], **arguments).stdout)["data"]["item"]["title"]
         == "Issue"
     )
-    edited = run_vnext(["scope", "edit", "@current", "--title", "Renamed", "--json"], **arguments)
+    edited = run_vnext(
+        ["scope", "edit", "@current", "--title", "Renamed", "--expect-current", issue.id, "--json"],
+        **arguments,
+    )
     assert edited.exit_code == 0 and json.loads(edited.stdout)["data"]["changed"]
     assert document.read_bytes() == before_document
     shown_after = run_vnext(["scope", "show", issue.id, "--json"], **arguments)

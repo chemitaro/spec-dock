@@ -53,3 +53,40 @@ def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: P
         repo, "scope", "close", created.id, "--reason", "not-planned", "--resume", abandoned_id, "--yes"
     )
     assert resumed_abandoned.exit_code == 0
+
+
+def test_scope_mutation_checks_expected_current_and_backend_before_edit(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    metadata = created.path / ".meta.json"
+    selected = _run(repo, "active", "set", created.id)
+    assert selected.exit_code == 0
+    before = metadata.read_bytes()
+
+    missing = _run(repo, "scope", "edit", "@current", "--title", "New")
+    assert missing.exit_code == 3
+    assert metadata.read_bytes() == before
+    mismatched = _run(repo, "scope", "edit", "@current", "--title", "New", "--expect-current", "init-local-99999")
+    assert mismatched.exit_code == 3
+    assert json.loads(mismatched.stdout)["error"]["code"] == "STATE_CONFLICT"
+    assert metadata.read_bytes() == before
+    wrong_backend = _run(repo, "scope", "edit", created.id, "--title", "New", "--expect-backend", "github")
+    assert wrong_backend.exit_code == 3
+    assert json.loads(wrong_backend.stdout)["error"]["code"] == "STATE_CONFLICT"
+    assert metadata.read_bytes() == before
+
+    changed = _run(
+        repo,
+        "scope",
+        "edit",
+        "@current",
+        "--title",
+        "New",
+        "--expect-current",
+        created.id,
+        "--expect-backend",
+        "local",
+    )
+    assert changed.exit_code == 0
+    assert json.loads(metadata.read_text())["title"] == "New"
