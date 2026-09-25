@@ -24,7 +24,11 @@ ID: "iss-00409"
 
 2026-09-25の修正作業では `make lint` と `git diff --check` が終了コード0、全テストの初回実行は `2047 passed, 6 failed, 25 skipped`（終了コード1）でした。失敗5件はGit helperの子プロセス環境で `PYTHONDONTWRITEBYTECODE` を落としたこと、1件は旧 `--to` 文面を期待するテストが原因です。該当6件の修正後の再実行は `6 passed`（終了コード0）、続く全テストは `2053 passed, 25 skipped`（終了コード0、926.73秒）でした。配布元とこのworktreeの写しのbyte一致テストも通過しました。これらは未コミット作業ツリーの結果であり、固定SHAに紐付く認証結果ではありません。
 
-修正中、実Git管理領域 `/Volumes/990p2t/workspace/tools/spec-dock/.git/worktrees/spec-dock4/index.lock` の作成が `Operation not permitted` となり、Git書込みを一旦停止しました。lockの消失と実Git経路を読み取り専用で確認した後、許可済みの通常 `git add` を権限付きで実行し、stageに成功しました。上記の全テストはstage前の同じ作業ツリーの結果です。本レポート作成時点で、固定SHAでの全テスト、wheel構築、同じChatGPTセッションの最終再レビューは未実施であり、後続の品質ゲート証跡にSHA・コマンド・終了コード・配布物ダイジェストを固定します。実導入先への適用は実行していません。
+修正中、実Git管理領域 `/Volumes/990p2t/workspace/tools/spec-dock/.git/worktrees/spec-dock4/index.lock` の作成が `Operation not permitted` となり、Git書込みを一旦停止しました。lockの消失と実Git経路を読み取り専用で確認した後、許可済みの通常Git操作を権限付きで実行し、実装payloadを `d7f5f6a081f8332ff598ed3f0e7a627a9a0737d8` として非forceでpushしました。HEAD・upstream・GitHub先頭は一致し、作業ツリーはcleanでした。
+
+この固定SHAで `make lint`、`git diff --check`、`uv run pytest` を再実行し、すべて終了コード0でした。pytestは `2053 passed, 25 skipped in 910.94s`。同じSHAから `uv build --wheel` で構築したwheelのSHA-256は `c08954fdf7dc31deace208d9f7c31d1aa189ddd70178d9d5430331803a1f765d` です。隔離venvへの導入、`--help --json`、`work start --help --json` はいずれも終了コード0で、wheel内のskill・runtime・migration guide・四つのWorkbench templateを確認しました。全テストには隔離fixtureでのinstallation/group updateのresume・rollback、workspace migrationの適用・復元が含まれます。実導入先への更新・migration・rollbackは実行していません。
+
+検証log・各SHA-256・コマンド別終了コードは本Issueの無追跡 `.workbench/chatgpt-final-quality-gate-strict-v2/issue409-cli-on-demand-update/test-results/manifest.json` に保存しました。このReportを含む後続commitではGit SHAが変わるため、最終レビュー対象SHAで必須コマンドを再実行してmanifestを更新します。追跡文書に自身のcommit SHAを埋め込む自己参照は行いません。最終レビューは前回と同じChatGPT conversationで実施します。
 
 ## Residual Risks / Follow-ups
 
