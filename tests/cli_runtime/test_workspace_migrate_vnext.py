@@ -5,7 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    import pytest
 
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
@@ -136,3 +139,117 @@ def test_workspace_migrate_apply_and_rollback_use_fixed_operation_id(tmp_path: P
     assert restored.exit_code == 0
     assert json.loads(restored.stdout)["data"]["phase"] == "rolled-back"
     assert json.loads((root / "spec-dock/.agent/active.json").read_text())["schema_version"] == 2
+
+
+def test_workspace_migrate_confirmation_rejects_mapping_swap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = _legacy_repo(tmp_path)
+    common = git_common_directory(root)
+    engine = "e" * 64
+    control = ControlState(
+        3,
+        "specdock.writer/v1",
+        1,
+        engine,
+        "maintenance",
+        (WorktreeRegistration("main", str(root), 1, "specdock.writer/v0", engine, True),),
+    )
+    store_control(common, control, expected_epoch=None)
+    inventory = inspect_migration_inventory(root)
+    mapping = tmp_path / "mapping.json"
+    original = {
+        "schema_version": "specdock.migration-map/v1",
+        "repository_uid": inventory.repository_uid,
+        "source_inventory_digest": inventory.digest,
+        "scope_backend_overrides": [],
+        "branch_bindings": [],
+        "active_repairs": [],
+        "worktrees": [],
+    }
+    mapping.write_text(json.dumps(original), encoding="utf-8")
+    initiative = next(scope for scope in inventory.worktrees[0].scopes if scope.kind == "initiative")
+    changed = dict(original)
+    changed["scope_backend_overrides"] = [
+        {
+            "worktree_id": "main",
+            "scope_id": initiative.id,
+            "metadata_digest": initiative.digest,
+            "backend": "local",
+        }
+    ]
+
+    class AnswerAfterSwap:
+        def isatty(self) -> bool:
+            return True
+
+        def readline(self) -> str:
+            mapping.write_text(json.dumps(changed), encoding="utf-8")
+            return "yes\n"
+
+    monkeypatch.setattr(sys, "stdin", AnswerAfterSwap())
+    metadata = root / initiative.path / ".meta.json"
+    before = metadata.read_bytes()
+    result = run_vnext(
+        ["workspace", "migrate", "--to-schema", "3", "--mapping-file", str(mapping)],
+        invocation_cwd=root,
+        engine_digest=engine,
+        engine_version="0.2.4",
+    )
+    assert result.exit_code == 3
+    assert metadata.read_bytes() == before
+    assert json.loads(metadata.read_text())["schema_version"] == 1
+
+
+def test_workspace_migrate_confirmation_shows_write_paths_and_applies_fixed_plan(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = _legacy_repo(tmp_path)
+    common = git_common_directory(root)
+    engine = "e" * 64
+    store_control(
+        common,
+        ControlState(
+            3,
+            "specdock.writer/v1",
+            1,
+            engine,
+            "maintenance",
+            (WorktreeRegistration("main", str(root), 1, "specdock.writer/v0", engine, True),),
+        ),
+        expected_epoch=None,
+    )
+    inventory = inspect_migration_inventory(root)
+    mapping = tmp_path / "mapping.json"
+    mapping.write_text(
+        json.dumps({
+            "schema_version": "specdock.migration-map/v1",
+            "repository_uid": inventory.repository_uid,
+            "source_inventory_digest": inventory.digest,
+            "scope_backend_overrides": [],
+            "branch_bindings": [],
+            "active_repairs": [],
+            "worktrees": [],
+        }),
+        encoding="utf-8",
+    )
+
+    class AnswerYes:
+        def isatty(self) -> bool:
+            return True
+
+        def readline(self) -> str:
+            return "yes\n"
+
+    monkeypatch.setattr(sys, "stdin", AnswerYes())
+    result = run_vnext(
+        ["workspace", "migrate", "--to-schema", "3", "--mapping-file", str(mapping)],
+        invocation_cwd=root,
+        engine_digest=engine,
+        engine_version="0.2.4",
+    )
+    assert result.exit_code == 0
+    assert (
+        "write-file:" + str(root / "spec-dock/initiatives/init-local-00001-plan/.meta.json") in capsys.readouterr().err
+    )
+    assert (
+        json.loads((root / "spec-dock/initiatives/init-local-00001-plan/.meta.json").read_text())["schema_version"] == 3
+    )

@@ -36,13 +36,14 @@ from spec_dock_runtime.infra.migration_journal import (
 from spec_dock_runtime.infra.migration_store import (
     branch_tip,
     inspect_migration_inventory,
+    mapping_file_identity,
     read_migration_map,
 )
 from spec_dock_runtime.infra.registry_store import RegistryStore, _encode_registry, historical_local_ids
 from spec_dock_runtime.infra.writer_lock import writer_transaction
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.infra.migration_store import MigrationInventory, MigrationMap
+    from spec_dock_runtime.infra.migration_store import MappingFileIdentity, MigrationInventory, MigrationMap
 
 
 def inspect_workspace_migration(repo_root: Path) -> MigrationInventory:
@@ -58,6 +59,28 @@ class MigrationChange:
     path: str
     before_digest: str | None
     after_bytes: bytes
+
+
+@dataclass(frozen=True)
+class PreparedMigrationPlan:
+    inventory: MigrationInventory
+    mapping: MigrationMap
+    mapping_path: Path
+    mapping_identity: MappingFileIdentity
+    updated_at: str
+    changes: tuple[MigrationChange, ...]
+
+
+def prepare_workspace_migration(
+    inventory: MigrationInventory, mapping_path: Path, *, updated_at: str
+) -> PreparedMigrationPlan:
+    before = mapping_file_identity(mapping_path)
+    mapping = read_migration_map(mapping_path, inventory)
+    after = mapping_file_identity(mapping_path)
+    if before != after:
+        raise ValueError("migration mapping changed while preparing the plan")
+    changes = plan_migration_changes(inventory, mapping, updated_at=updated_at)
+    return PreparedMigrationPlan(inventory, mapping, mapping_path, after, updated_at, changes)
 
 
 def _encode(payload: dict[str, object]) -> bytes:
@@ -272,9 +295,16 @@ def apply_workspace_migration(
     mapping: MigrationMap,
     updated_at: str,
     lock_timeout: float = 0.0,
+    prepared: PreparedMigrationPlan | None = None,
 ) -> MigrationRecord:
     """Apply one fixed migration under the common writer lock and maintenance mode."""
-    changes = plan_migration_changes(inventory, mapping, updated_at=updated_at)
+    if prepared is not None and (
+        prepared.inventory != inventory or prepared.mapping != mapping or prepared.updated_at != updated_at
+    ):
+        raise ValueError("migration prepared plan does not match the requested operation")
+    changes = (
+        prepared.changes if prepared is not None else plan_migration_changes(inventory, mapping, updated_at=updated_at)
+    )
     mapped = {row["root"]: row["registration_id"] for row in mapping.worktrees}
     roots = tuple((item.registration_id or mapped.get(item.root), item.root) for item in inventory.worktrees)
     if (
@@ -286,6 +316,8 @@ def apply_workspace_migration(
     with writer_transaction(common_dir, worktree_ids=tuple(item[0] for item in roots), timeout=lock_timeout):
         if inspect_migration_inventory(repo_root) != inventory:
             raise ValueError("migration inventory changed before the writer lock")
+        if prepared is not None and mapping_file_identity(prepared.mapping_path) != prepared.mapping_identity:
+            raise ValueError("migration mapping changed after confirmation")
         if plan_migration_changes(inventory, mapping, updated_at=updated_at) != changes:
             raise ValueError("migration plan changed before the writer lock")
         control = load_control(common_dir)

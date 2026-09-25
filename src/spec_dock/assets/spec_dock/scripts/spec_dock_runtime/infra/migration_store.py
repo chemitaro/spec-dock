@@ -8,6 +8,7 @@ import json
 import os
 from pathlib import Path
 import re
+import stat
 import subprocess
 
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
@@ -65,6 +66,33 @@ class MigrationMap:
     branch_bindings: tuple[dict[str, object], ...]
     active_repairs: tuple[dict[str, object], ...]
     worktrees: tuple[dict[str, object], ...]
+
+
+@dataclass(frozen=True)
+class MappingFileIdentity:
+    device: int
+    inode: int
+    digest: str
+
+
+def mapping_file_identity(path: Path) -> MappingFileIdentity:
+    """Bind a confirmation to both the mapping file identity and its bytes."""
+    try:
+        before = path.lstat()
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError("migration mapping must be a regular file")
+        data = path.read_bytes()
+        after = path.lstat()
+    except OSError as error:
+        raise ValueError("migration mapping is unavailable or changed") from error
+    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
+        after.st_dev,
+        after.st_ino,
+        after.st_size,
+        after.st_mtime_ns,
+    ) or not stat.S_ISREG(after.st_mode):
+        raise ValueError("migration mapping changed while being read")
+    return MappingFileIdentity(after.st_dev, after.st_ino, _digest(data))
 
 
 def branch_tip(repo_root: Path, branch: str) -> str:

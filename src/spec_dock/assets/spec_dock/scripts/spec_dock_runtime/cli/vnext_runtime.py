@@ -472,6 +472,7 @@ def _confirm_before_effect(
         else (getattr(ns, "target", None) or getattr(ns, "scope", None) or getattr(ns, "worktree_ref", None))
     )
     planned_effects: tuple[Effect, ...] = ()
+    migration_plan = None
     source_commit: str | None = None
     before_state = _confirmation_state(ns, context)
     if before_state != resolution_state:
@@ -503,6 +504,8 @@ def _confirm_before_effect(
             stdout, stderr = render_text(preview)
             return RuntimeOutput(preview.exit_code, stdout, stderr)
         planned_effects = preview.effects
+        if ns.command_path == "workspace migrate":
+            migration_plan = getattr(preview_ns, "_prepared_migration_plan", None)
         if ns.command_path == "installation update":
             candidate_commit = getattr(preview.data, "source_commit", None)
             if isinstance(candidate_commit, str):
@@ -517,7 +520,11 @@ def _confirm_before_effect(
     print(f"Repository: {context.repo_root}", file=sys.stderr)
     if source_commit is not None:
         print(f"Source commit: {source_commit}", file=sys.stderr)
-    writes = ", ".join(effect.kind for effect in planned_effects) or ns.command_path
+    writes = (
+        ", ".join(f"{effect.kind}:{effect.target}" for effect in planned_effects)
+        if ns.command_path == "workspace migrate"
+        else ", ".join(effect.kind for effect in planned_effects)
+    ) or ns.command_path
     print(f"Writes: {writes}", file=sys.stderr)
     print("Confirm [yes/no]: ", end="", file=sys.stderr, flush=True)
     if sys.stdin.readline().strip().lower() not in {"yes", "y"}:
@@ -538,6 +545,8 @@ def _confirm_before_effect(
             raise ExpectationMismatch("installation source changed while confirmation was pending")
         ns.version = None
         ns.commit = source_commit
+    if migration_plan is not None:
+        ns._prepared_migration_plan = migration_plan
     ns.yes = True
     return None
 

@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import hashlib
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.migrate_workspace_vnext import (
     apply_workspace_migration,
     inspect_workspace_migration,
-    load_workspace_migration_map,
-    plan_migration_changes,
+    prepare_workspace_migration,
     resume_workspace_migration,
     rollback_workspace_migration,
 )
@@ -37,6 +37,7 @@ class MigrationPreviewFile:
     path: str
     before_digest: str | None
     action: str
+    after_digest: str
 
 
 @dataclass(frozen=True)
@@ -88,18 +89,22 @@ def run_workspace_migrate(
             effects=(Effect("workspace-migration", "succeeded", record.operation_id),),
         )
     inventory = inspect_workspace_migration(context.repo_root)
+    prepared = getattr(ns, "_prepared_migration_plan", None)
     mapping = None
     if ns.mapping_file:
         mapping_path = Path(ns.mapping_file).expanduser()
         if not mapping_path.is_absolute():
             mapping_path = invocation_cwd / mapping_path
-        mapping = load_workspace_migration_map(mapping_path, inventory)
+        if prepared is None:
+            prepared = prepare_workspace_migration(
+                inventory, mapping_path, updated_at=datetime.now(timezone.utc).isoformat()
+            )
+        elif prepared.mapping_path != mapping_path or prepared.inventory != inventory:
+            raise ValueError("migration prepared plan no longer matches the target inventory")
+        mapping = prepared.mapping
     if ns.dry_run:
-        changes = (
-            plan_migration_changes(inventory, mapping, updated_at=datetime.now(timezone.utc).isoformat())
-            if mapping
-            else ()
-        )
+        changes = prepared.changes if prepared is not None else ()
+        ns._prepared_migration_plan = prepared
         preview = MigrationPreview(
             inventory.common_dir,
             inventory.repository_uid,
@@ -112,6 +117,7 @@ def run_workspace_migrate(
                     item.path,
                     item.before_digest,
                     "create" if item.before_digest is None else "replace",
+                    "sha256:" + hashlib.sha256(item.after_bytes).hexdigest(),
                 )
                 for item in changes
             ),
@@ -121,15 +127,17 @@ def run_workspace_migrate(
             "planned",
             preview,
             0,
-            effects=(Effect("workspace-migration", "planned", inventory.repository_uid),),
+            effects=tuple(Effect("write-file", "planned", item.path) for item in changes),
         )
     if mapping is None:
         raise ValueError("workspace migration apply requires an inventory-bound --mapping-file")
+    assert prepared is not None
     record = apply_workspace_migration(
         expected_epoch=context.expected_epoch,
         inventory=inventory,
         mapping=mapping,
-        updated_at=datetime.now(timezone.utc).isoformat(),
+        updated_at=prepared.updated_at,
+        prepared=prepared,
         **common,
     )
     outcome = MigrationOutcome(
