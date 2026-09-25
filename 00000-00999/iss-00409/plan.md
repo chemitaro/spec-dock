@@ -309,7 +309,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T06,T08,T16 |
 | 対象file群 | 既存 RT application/worktree.py、infra/git_cli.py、commands/worktree.py、worktree_target.py。 |
-| 実施内容 | stable selectorとregistryを導入し、createにbase必須・運用branch・空activeを実装します。consumer hook terminal requestをcreateから除きます。 |
+| 実施内容 | stable selectorとregistryを導入し、createにbase必須・運用branch・空activeを実装します。consumer hook terminal requestをcreateから除きます。createの対象別永続attemptと、効果なしを確認して同じIDを再利用する明示 `--recover` を追加します。 |
 | 完了条件 | new treeのcommitが固定され、makeは一度も起動せず、source/target安全境界が維持されます。 |
 | 必要なテスト | 新設 tests/cli_runtime/test_worktree_create_vnext.py。label省略/衝突、旧base省略拒否、detached base、same-filesystem、entrypoint置換、registry差替え。 |
 | 対応AC | AC-16, AC-30 |
