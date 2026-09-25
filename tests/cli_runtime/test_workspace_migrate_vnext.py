@@ -5,15 +5,16 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import sys
-from typing import TYPE_CHECKING, cast
+from typing import cast
 
-if TYPE_CHECKING:
-    import pytest
+import pytest
 
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock_runtime.application.migrate_workspace_vnext import prepare_workspace_migration  # noqa: E402
 from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
+from spec_dock_runtime.infra import migration_store  # noqa: E402
 from spec_dock_runtime.infra.control_store import ControlState, WorktreeRegistration, store_control  # noqa: E402
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
 from spec_dock_runtime.infra.migration_store import inspect_migration_inventory  # noqa: E402
@@ -71,6 +72,77 @@ def test_workspace_migrate_dry_run_requires_exact_mapping_inventory(tmp_path: Pa
         engine_version="0.2.4",
     )
     assert rejected.exit_code == 3
+
+
+def test_migration_plan_parses_the_same_mapping_bytes_as_its_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = _legacy_repo(tmp_path)
+    inventory = inspect_migration_inventory(root)
+    mapping = tmp_path / "mapping.json"
+    alternate = tmp_path / "alternate.json"
+    payload = {
+        "schema_version": "specdock.migration-map/v1",
+        "repository_uid": inventory.repository_uid,
+        "source_inventory_digest": inventory.digest,
+        "scope_backend_overrides": [],
+        "branch_bindings": [],
+        "active_repairs": [],
+        "worktrees": [{"root": str(root), "registration_id": "main"}],
+    }
+    mapping.write_text(json.dumps(payload), encoding="utf-8")
+    initiative = next(scope for scope in inventory.worktrees[0].scopes if scope.kind == "initiative")
+    changed = dict(payload)
+    changed["scope_backend_overrides"] = [
+        {
+            "worktree_id": "main",
+            "scope_id": initiative.id,
+            "metadata_digest": initiative.digest,
+            "backend": "local",
+        }
+    ]
+    alternate.write_text(json.dumps(changed), encoding="utf-8")
+    original_read = migration_store._read_json
+    switched = False
+
+    def read_during_swap(path: Path):
+        nonlocal switched
+        if path != mapping:
+            return original_read(path)
+        switched = True
+        saved = tmp_path / "saved-original.json"
+        mapping.replace(saved)
+        alternate.replace(mapping)
+        try:
+            return original_read(mapping)
+        finally:
+            mapping.replace(alternate)
+            saved.replace(mapping)
+
+    monkeypatch.setattr(migration_store, "_read_json", read_during_swap)
+    plan = prepare_workspace_migration(inventory, mapping, updated_at="2026-09-25T00:00:00Z")
+    assert not plan.mapping.scope_backend_overrides
+    assert not switched
+    assert plan.mapping_identity.digest == migration_store.mapping_file_identity(mapping).digest
+
+
+def test_mapping_snapshot_rejects_path_swap_before_descriptor_open(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    mapping = tmp_path / "mapping.json"
+    replacement = tmp_path / "replacement.json"
+    mapping.write_text('{"source":"A"}', encoding="utf-8")
+    replacement.write_text('{"source":"B"}', encoding="utf-8")
+    original_open = migration_store.os.open
+
+    def swapped_open(path: Path, flags: int) -> int:
+        if path == mapping:
+            replacement.replace(mapping)
+        return original_open(path, flags)
+
+    monkeypatch.setattr(migration_store.os, "open", swapped_open)
+    with pytest.raises(ValueError, match="changed"):
+        migration_store.read_mapping_snapshot(mapping)
 
 
 def test_workspace_migrate_apply_and_rollback_use_fixed_operation_id(tmp_path: Path) -> None:

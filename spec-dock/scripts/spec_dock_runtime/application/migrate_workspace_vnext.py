@@ -37,6 +37,7 @@ from spec_dock_runtime.infra.migration_store import (
     branch_tip,
     inspect_migration_inventory,
     mapping_file_identity,
+    read_mapping_snapshot,
     read_migration_map,
 )
 from spec_dock_runtime.infra.registry_store import RegistryStore, _encode_registry, historical_local_ids
@@ -74,13 +75,10 @@ class PreparedMigrationPlan:
 def prepare_workspace_migration(
     inventory: MigrationInventory, mapping_path: Path, *, updated_at: str
 ) -> PreparedMigrationPlan:
-    before = mapping_file_identity(mapping_path)
-    mapping = read_migration_map(mapping_path, inventory)
-    after = mapping_file_identity(mapping_path)
-    if before != after:
-        raise ValueError("migration mapping changed while preparing the plan")
+    mapping_bytes, identity = read_mapping_snapshot(mapping_path)
+    mapping = read_migration_map(mapping_path, inventory, mapping_bytes=mapping_bytes)
     changes = plan_migration_changes(inventory, mapping, updated_at=updated_at)
-    return PreparedMigrationPlan(inventory, mapping, mapping_path, after, updated_at, changes)
+    return PreparedMigrationPlan(inventory, mapping, mapping_path, identity, updated_at, changes)
 
 
 def _encode(payload: dict[str, object]) -> bytes:

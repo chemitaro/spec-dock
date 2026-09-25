@@ -116,9 +116,10 @@ def _installation_commands(record: object) -> tuple[tuple[str, ...], ...]:
             prefix += ("--maintenance",)
     elif record.action != "uninstall":
         return ()
+    rollback_prefix = prefix if record.action == "init" else ("spec-dock", "installation", record.action)
     return (
         (*prefix, "--resume", record.operation_id, "--yes"),
-        ("spec-dock", "installation", record.action, "--rollback", record.operation_id, "--yes"),
+        (*rollback_prefix, "--rollback", record.operation_id, "--yes"),
     )
 
 

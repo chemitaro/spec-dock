@@ -75,24 +75,40 @@ class MappingFileIdentity:
     digest: str
 
 
-def mapping_file_identity(path: Path) -> MappingFileIdentity:
-    """Bind a confirmation to both the mapping file identity and its bytes."""
+def read_mapping_snapshot(path: Path) -> tuple[bytes, MappingFileIdentity]:
+    """Read mapping bytes and identity through one guarded file descriptor."""
     try:
         before = path.lstat()
         if not stat.S_ISREG(before.st_mode):
             raise ValueError("migration mapping must be a regular file")
-        data = path.read_bytes()
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW)
+        try:
+            opened = os.fstat(fd)
+            with os.fdopen(fd, "rb", closefd=False) as stream:
+                data = stream.read()
+            read = os.fstat(fd)
+        finally:
+            os.close(fd)
         after = path.lstat()
     except OSError as error:
         raise ValueError("migration mapping is unavailable or changed") from error
-    if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns) != (
-        after.st_dev,
-        after.st_ino,
-        after.st_size,
-        after.st_mtime_ns,
-    ) or not stat.S_ISREG(after.st_mode):
+
+    def identity(item: os.stat_result) -> tuple[int, int, int, int, int]:
+        return item.st_dev, item.st_ino, item.st_size, item.st_mtime_ns, item.st_ctime_ns
+
+    if (
+        not stat.S_ISREG(opened.st_mode)
+        or identity(before) != identity(opened)
+        or identity(opened) != identity(read)
+        or identity(read) != identity(after)
+    ):
         raise ValueError("migration mapping changed while being read")
-    return MappingFileIdentity(after.st_dev, after.st_ino, _digest(data))
+    return data, MappingFileIdentity(opened.st_dev, opened.st_ino, _digest(data))
+
+
+def mapping_file_identity(path: Path) -> MappingFileIdentity:
+    """Bind a confirmation to both the mapping file identity and its bytes."""
+    return read_mapping_snapshot(path)[1]
 
 
 def branch_tip(repo_root: Path, branch: str) -> str:
@@ -125,11 +141,16 @@ def branch_tip(repo_root: Path, branch: str) -> str:
     return result.stdout.strip()
 
 
-def read_migration_map(path: Path, inventory: MigrationInventory) -> MigrationMap:
+def read_migration_map(
+    path: Path, inventory: MigrationInventory, *, mapping_bytes: bytes | None = None
+) -> MigrationMap:
     """Accept only decisions tied to exact, observed inventory entries."""
-    if not path.is_file() or path.is_symlink():
-        raise ValueError("migration mapping must be a regular file")
-    payload, _digest_value = _read_json(path)
+    if mapping_bytes is None:
+        mapping_bytes, _identity = read_mapping_snapshot(path)
+    try:
+        payload = json.loads(mapping_bytes.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ValueError(f"migration input is not valid UTF-8 JSON: {path}") from error
     fields = {
         "schema_version",
         "repository_uid",

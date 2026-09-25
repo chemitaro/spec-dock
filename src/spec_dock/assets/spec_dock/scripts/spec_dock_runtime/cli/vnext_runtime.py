@@ -477,6 +477,7 @@ def _confirm_before_effect(
     planned_effects: tuple[Effect, ...] = ()
     migration_plan = None
     source_commit: str | None = None
+    confirmed_repository: str | None = None
     before_state = _confirmation_state(ns, context)
     if before_state != resolution_state:
         raise ExpectationMismatch("operation state changed while resolving the confirmation plan")
@@ -509,6 +510,11 @@ def _confirm_before_effect(
         planned_effects = preview.effects
         if ns.command_path == "workspace migrate":
             migration_plan = getattr(preview_ns, "_prepared_migration_plan", None)
+        if ns.command_path.startswith("scope create ") and getattr(ns, "backend", None) == "github":
+            candidate_repository = getattr(preview.data, "repository", None)
+            if not isinstance(candidate_repository, str) or not candidate_repository:
+                raise ValueError("GitHub Scope preview did not resolve a repository")
+            confirmed_repository = candidate_repository
         if ns.command_path == "installation update":
             candidate_commit = getattr(preview.data, "source_commit", None)
             if isinstance(candidate_commit, str):
@@ -550,6 +556,8 @@ def _confirm_before_effect(
         ns.commit = source_commit
     if migration_plan is not None:
         ns._prepared_migration_plan = migration_plan
+    if confirmed_repository is not None:
+        ns._confirmed_repository = confirmed_repository
     ns.yes = True
     return None
 

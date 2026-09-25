@@ -34,6 +34,8 @@ ID: "iss-00409"
 
 続く固定候補 `1badca8bb9ca17e970d2494939590fc8840ba165` は `make lint`、`uv run pytest`（`2075 passed, 25 skipped`）、`git diff --check` と固定wheel検査を通過しましたが、同じ Final Quality Gate Strict v2 でP1が4件でした。指摘ごとに Strict 分析を行い、helpの実際のmode、移行時の確認計画とmapping identity、準備済みGitHub作成の再開とowner由来の復旧コマンド、Scopeの計画結果・一覧のJSON契約を修正しました。修正はproviderとこのworktreeのdogfood投影だけに適用し、`9b5fa8d9`、`84aa1614`、`710cc89e`、`847a7e1e` として順にコミット・非force pushしました。各範囲のfocused testsとlintは通過しています。最終候補での全テスト、固定wheel、Strict v2再審査の結果は、この後の固定SHAに結び付けて記録します。
 
+固定候補 `8613582da4cbe649cd7bd82ff75ce236e419a5b8` は全テスト `2080 passed, 25 skipped` と固定wheel検査を通過しました。同じ Final Quality Gate Strict v2 ではP1が3件残り、別の Strict 分析で原因と修正方針を確認しました。TTYで承認したGitHub repositoryをwriter lock内の実行対象へ照合し、移行マップは単一file descriptorから読んだbytesとidentityを一つの計画に束ねました。`installation init` のrollbackコマンドには必須のpathを含め、ローカルScopeの作成プレビューには正規化済みslugを含めました。配布元・このworktreeのdogfood投影・回帰テストに反映し、focused tests `67 passed`、`make lint`、全テスト `2084 passed, 25 skipped`、`git diff --check` が通過しました。固定SHAの検証結果と独立レビューの判定は、上記 `.workbench` のmanifestおよびレビューログに保存します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

@@ -25,6 +25,7 @@ class LocalCreateOutcome:
     scope_id: str | None
     kind: ScopeKind
     title: str
+    slug: str
     parent_id: str | None
     path: str | None
     operation_id: str | None
@@ -74,7 +75,7 @@ def create_local_scope_command(
     if dry_run:
         if resume_id is not None:
             raise ValueError("local Scope create recovery cannot be previewed")
-        return LocalCreateOutcome(None, kind, plan.title, plan.parent_id, None, None, plan.warnings)
+        return LocalCreateOutcome(None, kind, plan.title, plan.slug, plan.parent_id, None, None, plan.warnings)
     common = {
         "repo_root": repo_root,
         "common_dir": common_dir,
@@ -95,5 +96,5 @@ def create_local_scope_command(
     )
     path = created.path.relative_to(repo_root).as_posix()
     return LocalCreateOutcome(
-        created.id, kind, plan.title, plan.parent_id, path, created.operation_id, created.warnings
+        created.id, kind, plan.title, plan.slug, plan.parent_id, path, created.operation_id, created.warnings
     )

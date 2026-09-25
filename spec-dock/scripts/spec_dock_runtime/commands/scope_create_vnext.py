@@ -73,6 +73,7 @@ def run_scope_create(
             created = create_github_scope(
                 **common,
                 updated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                expected_repository=getattr(ns, "_confirmed_repository", None),
             )
         projection = project_scope(context, created.id)
         return OperationResult(
@@ -127,6 +128,8 @@ def run_scope_create(
                 projection.project,
                 projection.worktree,
                 projection.snapshot_id,
+                result.title,
+                result.slug,
             )
             if projection is not None and result.scope_id is not None
             else planned_scope_write(
@@ -135,7 +138,7 @@ def run_scope_create(
                 backend="local",
                 parent_id=result.parent_id,
                 title=result.title,
-                slug=None,
+                slug=result.slug,
             )
         ),
         exit_code=0,

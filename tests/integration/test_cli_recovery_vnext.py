@@ -199,6 +199,17 @@ def test_installation_init_prepared_failure_returns_group_operation_id(
         record.operation_id,
         "--yes",
     ]
+    rollback_argv = payload["recovery"]["commands"][1]
+    assert rollback_argv == [
+        "spec-dock",
+        "installation",
+        "init",
+        str(repo),
+        "--rollback",
+        record.operation_id,
+        "--yes",
+    ]
+    assert parse_vnext(rollback_argv[1:]).rollback == record.operation_id
 
 
 @pytest.mark.parametrize(

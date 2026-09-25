@@ -78,6 +78,24 @@ def test_local_scope_create_json_identifies_created_scope_and_observed_status(tm
     assert payload["data"]["snapshot_id"] == payload["target"]["snapshot_id"]
 
 
+def test_local_scope_create_preview_returns_normalized_slug(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    for title, options, expected in (
+        ("Program Plan", (), "program-plan"),
+        ("Program Plan", ("--slug", "custom"), "custom"),
+    ):
+        preview = _run(
+            repo, "scope", "create", "initiative", "--backend", "local", "--title", title, *options, "--dry-run"
+        )
+        assert preview.exit_code == 0
+        data = json.loads(preview.stdout)["data"]
+        assert data["slug"] == expected
+        assert data["scope"]["id"] is None
+        assert data["scope_id"] is None
+    assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
+
+
 def test_scope_show_json_uses_same_target_and_scope_snapshot(tmp_path: Path) -> None:
     common = _ready_repo(tmp_path)
     repo = cast("Path", common["repo_root"])
@@ -293,6 +311,40 @@ def test_github_scope_create_cli_previews_and_requires_confirmation(
     assert payload["data"]["scope_id"] == "init-00047"
     assert payload["data"]["github_ref"] == "gh:example/repo#47"
     assert gateway.calls == 1
+
+
+def test_github_create_confirmation_rejects_origin_change_before_remote_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    origin = {"repository": "example/repo"}
+    monkeypatch.setattr(
+        "spec_dock_runtime.application.create_github_scope.git_cli.origin_github_publication_repo_slug",
+        lambda _repo: origin["repository"],
+    )
+
+    class AnswerAfterOriginChange:
+        def isatty(self) -> bool:
+            return True
+
+        def readline(self) -> str:
+            origin["repository"] = "example/other"
+            return "yes\n"
+
+    monkeypatch.setattr(sys, "stdin", AnswerAfterOriginChange())
+    result = run_vnext(
+        ["scope", "create", "initiative", "--backend", "github", "--title", "Plan"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    assert result.exit_code == 3
+    assert gateway.calls == 0
+    assert not JournalStore(cast("Path", common["common_dir"])).pending()
+    assert not tuple((repo / "spec-dock/initiatives").glob("init-*"))
 
 
 def test_github_scope_create_cli_resumes_without_second_post(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

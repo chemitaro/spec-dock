@@ -160,6 +160,7 @@ def create_github_scope(
     gateway: GithubScopeGateway,
     updated_at: str,
     lock_timeout: float = 0.0,
+    expected_repository: str | None = None,
 ) -> GithubScopeCreated:
     """Validate local inputs first; never re-POST after the remote receipt is recorded."""
     normalized_title, normalized_slug = resolve_input_title_and_slug(title, slug)
@@ -178,6 +179,8 @@ def create_github_scope(
             expected_epoch=expected_epoch,
         )
         repository = git_cli.origin_github_publication_repo_slug(repo_root)
+        if expected_repository is not None and repository != expected_repository:
+            raise ValueError("GitHub repository changed while confirmation was pending")
         records = {record.id: record for record in fs_repo.load_node_records(specdock_dir)}
         ancestors = _parent_records(kind=kind, parent_id=parent_id, records=records)
         parent_meta_identity = _require_open_ancestors(
