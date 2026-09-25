@@ -36,7 +36,14 @@ ID: "iss-00409"
 
 固定候補 `8613582da4cbe649cd7bd82ff75ce236e419a5b8` は全テスト `2080 passed, 25 skipped` と固定wheel検査を通過しました。同じ Final Quality Gate Strict v2 ではP1が3件残り、別の Strict 分析で原因と修正方針を確認しました。TTYで承認したGitHub repositoryをwriter lock内の実行対象へ照合し、移行マップは単一file descriptorから読んだbytesとidentityを一つの計画に束ねました。`installation init` のrollbackコマンドには必須のpathを含め、ローカルScopeの作成プレビューには正規化済みslugを含めました。配布元・このworktreeのdogfood投影・回帰テストに反映し、focused tests `67 passed`、`make lint`、全テスト `2084 passed, 25 skipped`、`git diff --check` が通過しました。固定SHAの検証結果と独立レビューの判定は、上記 `.workbench` のmanifestおよびレビューログに保存します。
 
+固定候補 `c6e838fcf71b24a2e364ddb8d733eb74dd67db12` は全テスト `2084 passed, 25 skipped` と同じレビュアーの Final Quality Gate Strict v2（12観点、P0/P1=0、pass）を通過しました。ただし、このworktreeの実行CLIは旧版のままで、配布元と投影のbyte一致だけでは実際の導入・移行・作業開始を確認できていませんでした。
+
+利用者が承認した独立cloneで、新しい固定engineによる実導入とschema 3への移行を実施しました。最初の実行では、既存Scopeの一部に `depends_on` がなく、移行後の依存関係検査とworkspace validationが失敗しました。移行時に空リストを補完する修正を `1a89aaeebf774d1a7647545b9b054e08620f1f00` にコミットしました。次の実行では、導入の復旧用バックアップが未追跡ファイルとなり、`work start` のclean tree条件を妨げることを確認しました。復旧データを保持したまま専用ディレクトリ内でGit ignoreする修正を `812bf674897bd933abaa8ce81d2ca32bfbc00b93` にコミットしました。両修正には失敗を再現するテストを追加し、修正後に通過を確認しています。
+
+`812bf674` のGitHub上のcommitから作った、登録worktreeが一つだけの独立cloneでは、`installation update --maintenance`、239 Scopeの `workspace migrate --to-schema 3`、`installation update --finalize`、`workspace validate`、`workspace sync` が成功しました。移行差分を確認し、元の239 Scopeの属性・既存依存を保持したままschema 3、backend、空依存の初期値を設定したことを検査しました。clone内でlocal Initiative `init-local-00004`、Epic `epic-local-00002`、Issue `iss-local-00002` を作成し、`work start` を上位から順に実行して各専用ブランチへのcheckoutとactive選択を確認しました。`work finish` は下位から順に実行し、三つのScopeがcompleted、activeが空、最終 `workspace validate` がvalidであることを確認しました。GitHubのScopeは作成・変更していません。導入、移行、作業操作の証拠は本Issueの無追跡 `.workbench/dogfood/` に保存しました。共有Git領域を持つこの開発worktreeと他の稼働中worktreeは更新していません。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。
 - 既存の導入先を新CLIへ更新するまでは、その導入先で旧CLIが動きます。製品sourceの変更だけで実行中のwriterは切り替わりません。
+- 独立cloneの239件の既存GitHub Scopeはcacheに状態がないため、最終validationに `status_unknown` warningが239件残ります。local Scopeのstart/finishとworkspace整合性は成功しています。
