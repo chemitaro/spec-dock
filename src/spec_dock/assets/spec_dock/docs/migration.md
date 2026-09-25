@@ -21,8 +21,8 @@ spec-dock workspace validate
 1. 全consumerとlinked worktreeのinventoryを取り、現在のwriter、data path、Git common directoryを照合します。旧writerを停止します。
 2. 仕様・設定・tool導入先のbackupを隔離領域へ保存し、復元試験をします。同じ固定commitとbundle digestを全対象に使います。
 3. `installation update --target PATH --commit SHA --maintenance --yes` で同じcommon directoryの全登録worktreeをmaintenanceにしてtool資産を更新します。
-4. `workspace migrate --to-schema 3 --mapping-file PATH --yes` で全登録worktreeのdataを移行します。mappingが不要なら省略します。
-5. `installation show`、`workspace doctor`、`workspace validate`、`workspace sync --source cache` で全対象のprotocol、schema、journal、生成状態を確認してから通常writerを再開します。
+4. `workspace migrate --to-schema 3 --dry-run --json` で全登録worktreeのinventory digestと阻害要因を確認します。`specdock.migration-map/v1` のmappingをそのdigestに固定し、空の対応配列しか要らない場合も `workspace migrate --to-schema 3 --mapping-file PATH --yes` で適用します。適用時のmapping省略は受け付けません。
+5. maintenance中に `installation show`、`workspace doctor`、`workspace validate` で全対象のprotocol、schema、journalを読取り確認します。全対象が同じ固定候補で検証できたら、各common directoryで `installation update --finalize --yes` を実行します。readyへの復帰後に `workspace sync --source cache` と再検証を行い、通常writerを再開します。
 
 途中失敗では一部だけ旧writerを再開しません。journalとbackupを保存し、同じoperation IDで対象leafの `--resume ID` または `--rollback ID` を使います。別のcommitやengineを混ぜないでください。GitHub Issue状態はtool移行のrollback対象ではありません。
 
