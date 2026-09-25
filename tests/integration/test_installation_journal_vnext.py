@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import subprocess
 from typing import TYPE_CHECKING
 
 import pytest
@@ -117,6 +118,22 @@ def test_fresh_init_journals_scaffold_and_restores_absence(tmp_path: Path) -> No
     assert restored.phase == "rolled-back"
     assert not (target / "spec-dock/workspace.json").exists()
     assert not (target / "spec-dock/.workbench/README.md").exists()
+
+
+def test_installation_recovery_area_does_not_dirty_git_worktree(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    subprocess.run(["git", "init", "-q"], cwd=target, check=True)
+    record = prepare_installation(target, tmp_path / "common", action="init", bundle=_bundle(tmp_path))
+    assert (target / ".spec-dock-installations" / record.operation_id / "stage").is_dir()
+    status = subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=target,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert status.stdout == ""
 
 
 def test_installation_resumes_after_first_root_and_preserves_custom_ignore(tmp_path: Path) -> None:

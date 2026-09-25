@@ -144,6 +144,12 @@ def prepare_installation(
         raise ValueError("installation operation ID is invalid")
     area = _operation_area(target, operation_id)
     area.mkdir(mode=0o700, parents=True, exist_ok=False)
+    try:
+        with (area.parent / ".gitignore").open("x", encoding="utf-8") as ignore:
+            ignore.write("*\n")
+    except FileExistsError:
+        # The recovery directory is reserved, but never replace an existing ignore file.
+        pass
     before: dict[str, str | None] = {}
     after: dict[str, str | None] = {}
     try:
