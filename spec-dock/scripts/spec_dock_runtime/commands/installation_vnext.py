@@ -19,10 +19,13 @@ from spec_dock.installation.source import (
 from spec_dock.installer import ASSETS
 from spec_dock_runtime.application.installation_update_vnext import (
     bind_installation_engine,
+    finalize_installation_group,
     init_installation_group,
     inspect_legacy_installation,
     plan_init_installation_group,
+    plan_installation_finalization,
     resume_init_installation_group,
+    resume_installation_finalization,
     resume_installation_group,
     resume_uninstall_installation_group,
     rollback_init_installation_group,
@@ -45,6 +48,7 @@ if TYPE_CHECKING:
     from spec_dock.installation.group_journal import InstallationGroupRecord
     from spec_dock.runtime_loader import VerifiedEngine
     from spec_dock_runtime.commands.work_vnext import WorkContext
+    from spec_dock_runtime.infra.finalization_store import FinalizationRecord
 
 
 @dataclass(frozen=True)
@@ -65,6 +69,13 @@ class InstallationUninstallPlan:
 class InstallationInitPlan:
     targets: tuple[str, ...]
     engine_digest: str
+
+
+@dataclass(frozen=True)
+class InstallationFinalizePlan:
+    targets: tuple[str, ...]
+    engine_digest: str
+    control_epoch: int
 
 
 def run_installation_init(
@@ -151,10 +162,62 @@ def run_installation_show(
 
 
 def run_installation_update(
-    ns: argparse.Namespace, context: WorkContext, *, invocation_cwd: Path, engine_pin: VerifiedEngine | None = None
-) -> OperationResult[InstallationGroupRecord | InstallationUpdatePlan]:
+    ns: argparse.Namespace,
+    context: WorkContext,
+    *,
+    invocation_cwd: Path,
+    engine_version: str,
+    engine_pin: VerifiedEngine | None = None,
+) -> OperationResult[InstallationGroupRecord | InstallationUpdatePlan | InstallationFinalizePlan | FinalizationRecord]:
     if not ns.dry_run and not ns.yes:
         raise ValueError("installation update requires --yes")
+    if ns.finalize:
+        if ns.dry_run:
+            if ns.resume:
+                raise ValueError("installation finalization recovery cannot be previewed")
+            plan = plan_installation_finalization(
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                engine_digest=context.engine_digest,
+                engine_version=engine_version,
+            )
+            return OperationResult(
+                ns.command_path,
+                "planned",
+                InstallationFinalizePlan(
+                    tuple(item.id for item in plan.worktrees), context.engine_digest, plan.control_epoch
+                ),
+                0,
+                effects=(Effect("installation-finalize", "planned", None),),
+            )
+        if ns.resume:
+            finalized = resume_installation_finalization(
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                worktree_id=context.worktree_id,
+                engine_digest=context.engine_digest,
+                engine_version=engine_version,
+                operation_id=ns.resume,
+                lock_timeout=ns.lock_timeout,
+            )
+        else:
+            finalized = finalize_installation_group(
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                worktree_id=context.worktree_id,
+                engine_digest=context.engine_digest,
+                expected_epoch=context.expected_epoch,
+                engine_version=engine_version,
+                lock_timeout=ns.lock_timeout,
+            )
+        return OperationResult(
+            ns.command_path,
+            "succeeded",
+            finalized,
+            0,
+            operation_id=finalized.operation_id,
+            effects=(Effect("installation-finalize", "succeeded", finalized.operation_id),),
+        )
     target = Path(ns.target).expanduser() if ns.target else context.repo_root
     if not target.is_absolute():
         target = invocation_cwd / target

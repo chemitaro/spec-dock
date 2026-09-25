@@ -41,8 +41,18 @@ from spec_dock_runtime.infra.control_store import (
     load_control,
     store_control,
 )
+from spec_dock_runtime.infra.finalization_store import (
+    FinalizationRecord,
+    new_finalization,
+    pending_finalizations,
+    read_finalization,
+    write_finalization,
+)
 from spec_dock_runtime.infra.git_cli import worktree_list
 from spec_dock_runtime.infra.installation_group_store import pending_installation_groups
+from spec_dock_runtime.infra.json_store import read_guarded_json
+from spec_dock_runtime.infra.migration_journal import pending_migrations
+from spec_dock_runtime.infra.operation_journal import JournalStore
 from spec_dock_runtime.infra.writer_lock import writer_transaction
 
 if TYPE_CHECKING:
@@ -74,6 +84,128 @@ def _can_restore_ready(control: ControlState) -> bool:
         )
         for item in control.worktrees
     )
+
+
+def _verify_finalization_targets(group: InstallationGroup, *, engine_version: str) -> None:
+    if not group.worktrees or any(item.version != engine_version for item in group.worktrees):
+        raise ValueError("registered worktree installation versions differ from the executing engine")
+    for item in group.worktrees:
+        loaded = read_guarded_json(Path(item.root) / "spec-dock/workspace.json")
+        if (
+            loaded is None
+            or not isinstance(loaded[0], dict)
+            or (
+                loaded[0].get("schema_version") != WORKSPACE_SCHEMA
+                or loaded[0].get("writer_protocol") != WRITER_PROTOCOL
+            )
+        ):
+            raise ValueError(f"registered worktree schema is not ready: {item.id}")
+
+
+def plan_installation_finalization(
+    *, repo_root: Path, common_dir: Path, engine_digest: str, engine_version: str
+) -> InstallationGroup:
+    """Read-only eligibility snapshot for the final maintenance transition."""
+    group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    control = load_control(common_dir)
+    if control is None or control.mode != "maintenance" or control.engine_digest != engine_digest:
+        raise ValueError("installation group is not in this engine's maintenance state")
+    if not _can_restore_ready(control):
+        raise ValueError("registered worktree protocol differs from the engine")
+    if (
+        pending_installation_groups(common_dir)
+        or pending_migrations(common_dir)
+        or pending_finalizations(common_dir)
+        or JournalStore(common_dir).pending()
+    ):
+        raise ValueError("installation finalization has unresolved operations")
+    _verify_finalization_targets(group, engine_version=engine_version)
+    return group
+
+
+def finalize_installation_group(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    expected_epoch: int,
+    engine_version: str,
+    lock_timeout: float = 0.0,
+) -> FinalizationRecord:
+    """Journal the final maintenance-to-ready transition for one complete group."""
+    group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+    with writer_transaction(common_dir, worktree_ids=tuple(item.id for item in group.worktrees), timeout=lock_timeout):
+        if inspect_installation_group(repo_root=repo_root, common_dir=common_dir) != group:
+            raise ValueError("installation group changed before finalization")
+        control = load_control(common_dir)
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=expected_epoch,
+            maintenance_command="installation.update",
+        )
+        if control is None or control.mode != "maintenance" or not _can_restore_ready(control):
+            raise ValueError("installation group is not ready to leave maintenance")
+        if pending_finalizations(common_dir):
+            raise ValueError("a finalization attempt requires explicit recovery")
+        _verify_finalization_targets(group, engine_version=engine_version)
+        record = new_finalization(
+            common_dir,
+            control_epoch=control.epoch,
+            engine_digest=engine_digest,
+            targets=tuple(item.id for item in group.worktrees),
+        )
+        write_finalization(common_dir, record, create=True)
+        store_control(common_dir, replace(control, mode="ready", epoch=control.epoch + 1), expected_epoch=control.epoch)
+        completed = replace(record, phase="committed")
+        write_finalization(common_dir, completed)
+        return completed
+
+
+def resume_installation_finalization(
+    *,
+    repo_root: Path,
+    common_dir: Path,
+    worktree_id: str,
+    engine_digest: str,
+    engine_version: str,
+    operation_id: str,
+    lock_timeout: float = 0.0,
+) -> FinalizationRecord:
+    """Finish the same prepared transition after observing control and all targets."""
+    record = read_finalization(common_dir, operation_id)
+    if record.phase != "prepared" or record.engine_digest != engine_digest:
+        raise ValueError("finalization recovery record does not match this engine")
+    with writer_transaction(common_dir, worktree_ids=record.targets, timeout=lock_timeout):
+        if read_finalization(common_dir, operation_id) != record:
+            raise ValueError("finalization record changed before recovery")
+        control = load_control(common_dir)
+        if control is None or control.mode not in {"maintenance", "ready"}:
+            raise ValueError("finalization control is unavailable")
+        admit_writer(
+            control,
+            common_dir=common_dir,
+            worktree_id=worktree_id,
+            engine_digest=engine_digest,
+            expected_epoch=control.epoch,
+            recovery_operation_id=operation_id,
+        )
+        group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
+        if tuple(item.id for item in group.worktrees) != record.targets or not _can_restore_ready(control):
+            raise ValueError("finalization worktree inventory changed")
+        _verify_finalization_targets(group, engine_version=engine_version)
+        if control.mode == "maintenance" and control.epoch == record.control_epoch:
+            store_control(
+                common_dir, replace(control, mode="ready", epoch=control.epoch + 1), expected_epoch=control.epoch
+            )
+        elif control.mode != "ready" or control.epoch != record.control_epoch + 1:
+            raise ValueError("finalization control transition is ambiguous")
+        completed = replace(record, phase="committed")
+        write_finalization(common_dir, completed)
+        return completed
 
 
 def _fixed_targets(group: InstallationGroup, group_id: str) -> tuple[InstallationTarget, ...]:

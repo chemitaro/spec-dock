@@ -78,6 +78,8 @@ CommandSpec → typed Request → Application use case → typed Result
 
 固定engineの絶対path・distribution digestは導入control recordで検証し、PATH探索で見つけた同名実行物へ無条件に委譲しません。初回導入・復旧ではworktree外の検証済みengineを利用します。source packageの開発時入口は一時fixtureのみを既定対象とし、実consumerへの導入はcandidateを固定した後に行います。
 
+固定engine自身のPython importは自己digest照合より先に起こります。この境界では、固定供給元のSHAを確認して作ったdistributionをoperatorが信頼して起動することを前提にします。自己digestは起動後の配布一致とrepository pinの食い違いを検出するもので、悪意ある初回engineを実行前に無害化する仕組みではありません。この残余リスクを明記し、別の外側のengine managerは追加しません。
+
 CIの新規checkoutには導入controlも作業場固有のactive選択もありません。CIは固定commitの供給元を別checkoutし、Git SHAを照合してからworktree外にengineを構築し、distribution digestを記録します。そのengineからのみ `workspace validate --ci` を実行します。この読み取り専用経路はworkspace schema、Scope、依存、Artifactを検証し、control・導入pin・active・generation・branch registryを検証対象に含めません。通常の `workspace validate` は導入状態を含む診断のままです。`--ci` はmutatorで受け付けず、CIの検証結果をwriter admissionの根拠にしません。切替時に旧 `sync` / `validate` のCI呼出しをこの経路へ更新します。
 
 履歴branchの古いshimを直接Pythonで実行する利用者権限まで封鎖するものではありません。対応範囲はサポートする起動経路と停止手順です。旧agent、旧venv、旧task、shell aliasの起動経路を切替時に停止・更新します。旧branchはそのまま新writerで書けず、read-only調査または明示的な再導入/移行を必要とします。
@@ -593,6 +595,8 @@ new bundleをstageし、source digest、file type、permission、全write path�
 self-updateで削除されるpathにjournalや唯一のbackupを置きません。正常完了後もbackupを自動purgeしません。rollbackはafter digestが一致する所有物だけをbeforeへ戻します。後続の利用者変更があるなら上書きせず停止します。schema migrationを済ませた環境でtoolingだけを旧版へ戻してwriterを再開してはいけません。
 
 `--maintenance`はupdate後もcommon controlをmaintenanceに保つ補助optionです。切替時に全worktreeの導入とschema移行が完了するまで使います。単独の互換更新は、全登録worktreeが互換条件を満たす場合だけreadyへ戻れます。
+
+一括切替では `installation update --finalize` を、全登録worktreeのversion・schema・writer protocolの照合後に明示実行します。対象ID・engine digest・control epochをcommon controlへprepared recordとして先に記録し、readyをpublishしてからcommitted markerを書きます。途中停止ではrecordの固定IDを指定した `--finalize --resume` だけが、maintenanceまたはreadyの実状態を再観測して完了できます。未完了record中は通常mutatorを止めます。各common directoryの復帰後もglobal inventoryが揃うまで旧writerを再開しません。
 
 Uninstallは固定engine/manifestからofflineで実行し、同じjournal/backup境界を使います。仕様データを残すので制御backupも残ります。現在実行している外部engineそのものを削除しません。
 

@@ -79,4 +79,6 @@ CIを新しい入口へ切り替える際は、固定commitのSHAを確認して
 
 インストール済みCLIはworktree外の固定distributionから実行します。`spec-dock/scripts/spec-dock` はそのengineを参照する薄いshimです。更新は `installation update --commit SHA --maintenance --yes`、データ変換は `workspace migrate --to-schema 3 --yes` として別々に実行します。対象群の停止、backup、固定candidate、全worktreeのwriter protocol一致を先に確認してください。journalがpendingなら診断に従い、対象leafの `--resume OPERATION_ID` または `--rollback OPERATION_ID` を明示します。詳細は[移行・復旧](migration.md)を参照してください。
 
+全登録worktreeの導入・schema移行後、`installation update --finalize --dry-run --json` で復帰条件を確認します。成功したら同じ固定engineから `installation update --finalize --yes --json` を実行します。制御状態の更新後に中断した場合は、出力またはcommon controlの `finalizations/` に残るoperation IDを確認し、`installation update --finalize --resume OPERATION_ID --yes` で完了記録を復旧します。復旧記録が未完了の間は通常の変更操作を拒否します。
+
 [命名](reference_naming.md)・[依存](reference_deps.md)・[GitHub](reference_github.md)・[生成状態](reference_sync.md)・[worktree](reference_worktree.md)の参照と併せて使用してください。過去版の操作は[historical](historical/README.md)に隔離しています。

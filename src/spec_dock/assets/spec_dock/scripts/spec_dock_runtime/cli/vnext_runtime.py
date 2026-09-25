@@ -310,7 +310,9 @@ def run_vnext(
         elif ns.command_path == "installation show":
             result = run_installation_show(ns, context, engine_version=engine_version, invocation_cwd=invocation_cwd)
         elif ns.command_path == "installation update":
-            result = run_installation_update(ns, context, invocation_cwd=invocation_cwd, engine_pin=engine_pin)
+            result = run_installation_update(
+                ns, context, invocation_cwd=invocation_cwd, engine_version=engine_version, engine_pin=engine_pin
+            )
         elif ns.command_path == "installation uninstall":
             result = run_installation_uninstall(ns, context, invocation_cwd=invocation_cwd)
         elif ns.command_path == "scope edit":

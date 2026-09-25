@@ -219,11 +219,14 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("active clear requires exactly one of --from or --all")
     if parsed.command_path == "active set" and bool(parsed.target) == bool(parsed.from_branch):
         parser.error("active set requires exactly one of TARGET or --from-branch")
-    if parsed.command_path == "installation update" and (
-        (parsed.rollback and (parsed.version or parsed.commit))
-        or (not parsed.rollback and bool(parsed.version) == bool(parsed.commit))
-    ):
-        parser.error("installation update requires one source for update/resume and no source for rollback")
+    if parsed.command_path == "installation update":
+        if parsed.finalize:
+            if parsed.version or parsed.commit or parsed.maintenance or parsed.rollback:
+                parser.error("installation update --finalize accepts no source, maintenance, or rollback")
+        elif (parsed.rollback and (parsed.version or parsed.commit)) or (
+            not parsed.rollback and bool(parsed.version) == bool(parsed.commit)
+        ):
+            parser.error("installation update requires one source for update/resume and no source for rollback")
     resume = getattr(parsed, "resume", None)
     rollback = getattr(parsed, "rollback", None)
     if resume and rollback:
