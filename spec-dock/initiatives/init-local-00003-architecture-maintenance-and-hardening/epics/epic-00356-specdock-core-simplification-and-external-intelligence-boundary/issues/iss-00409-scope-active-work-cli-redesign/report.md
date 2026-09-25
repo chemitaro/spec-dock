@@ -32,6 +32,8 @@ ID: "iss-00409"
 
 前回の固定候補 `51dbb214dce6e49ad8afd4a13d43c8eb8fd014e5` は、lint・全テスト・wheel導入には成功しましたが、同じレビュアーの Final Quality Gate Strict v2 でP1が4件残りました。指摘はleaf別help、TTY確認と実行対象の固定、失敗時の復旧receipt、Scope群のJSON payloadです。本作業ツリーで配布元・dogfood投影・関連テストを修正しました。他の稼働中のworktreeおよびconsumerは更新していません。修正後の固定SHAで再検証し、同じレビュアーに再審査を依頼します。
 
+続く固定候補 `1badca8bb9ca17e970d2494939590fc8840ba165` は `make lint`、`uv run pytest`（`2075 passed, 25 skipped`）、`git diff --check` と固定wheel検査を通過しましたが、同じ Final Quality Gate Strict v2 でP1が4件でした。指摘ごとに Strict 分析を行い、helpの実際のmode、移行時の確認計画とmapping identity、準備済みGitHub作成の再開とowner由来の復旧コマンド、Scopeの計画結果・一覧のJSON契約を修正しました。修正はproviderとこのworktreeのdogfood投影だけに適用し、`9b5fa8d9`、`84aa1614`、`710cc89e`、`847a7e1e` として順にコミット・非force pushしました。各範囲のfocused testsとlintは通過しています。最終候補での全テスト、固定wheel、Strict v2再審査の結果は、この後の固定SHAに結び付けて記録します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。
