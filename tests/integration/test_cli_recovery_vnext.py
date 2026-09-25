@@ -31,6 +31,7 @@ from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     record_effect_result,
 )
 from spec_dock_runtime.cli import vnext_runtime  # noqa: E402
+from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
 from spec_dock_runtime.infra import (  # noqa: E402
     failure_receipts,
     operation_journal,
@@ -93,6 +94,16 @@ def test_migration_prepared_failure_returns_its_authoritative_operation_id(
     assert failed.exit_code == 3
     assert payload["operation_id"] == record.operation_id
     assert payload["recovery"]["can_resume"] is True
+    assert payload["recovery"]["commands"][0] == [
+        "spec-dock",
+        "workspace",
+        "migrate",
+        "--to-schema",
+        "3",
+        "--resume",
+        record.operation_id,
+        "--yes",
+    ]
 
 
 def test_installation_prepared_failure_returns_group_operation_id(
@@ -131,6 +142,16 @@ def test_installation_prepared_failure_returns_group_operation_id(
     assert failed.exit_code == 3
     assert payload["operation_id"] == record.operation_id
     assert payload["recovery"]["can_resume"] is True
+    assert payload["recovery"]["commands"][0] == [
+        "spec-dock",
+        "installation",
+        "update",
+        "--commit",
+        "c" * 40,
+        "--resume",
+        record.operation_id,
+        "--yes",
+    ]
 
 
 def test_installation_init_prepared_failure_returns_group_operation_id(
@@ -169,6 +190,15 @@ def test_installation_init_prepared_failure_returns_group_operation_id(
     assert failed.exit_code == 3
     assert payload["operation_id"] == record.operation_id
     assert payload["recovery"]["can_resume"] is True
+    assert payload["recovery"]["commands"][0] == [
+        "spec-dock",
+        "installation",
+        "init",
+        str(repo),
+        "--resume",
+        record.operation_id,
+        "--yes",
+    ]
 
 
 @pytest.mark.parametrize(
@@ -190,6 +220,7 @@ def test_finalization_receipt_observes_control_transition(
     )
     assert receipt.effect_started is (expected_status is not None)
     assert [effect.status for effect in receipt.effects] == ([] if expected_status is None else [expected_status])
+    assert parse_vnext(receipt.commands[0][1:]).resume == record.operation_id
 
 
 def test_prepared_engine_handover_receipt_does_not_claim_zero_effect(tmp_path: Path) -> None:
@@ -213,6 +244,37 @@ def test_prepared_engine_handover_receipt_does_not_claim_zero_effect(tmp_path: P
     )
     assert receipt.effect_started
     assert receipt.effects == (failure_receipts.ReceiptEffect("engine-handover", "unknown", str(tmp_path)),)
+    assert all(
+        parse_vnext(command[1:]).resume == record.operation_id
+        if "--resume" in command
+        else parse_vnext(command[1:]).rollback == record.operation_id
+        for command in receipt.commands
+    )
+
+
+def test_scope_delete_recovery_commands_do_not_repeat_original_plan_flags(tmp_path: Path) -> None:
+    operation = prepare_operation(
+        command="scope.delete",
+        fixed_targets={
+            "scope": "iss-00409",
+            "recursive": "true",
+            "clear_active": "true",
+            "detach_dependencies": "true",
+        },
+        request_fingerprint="sha256:delete",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=7,
+        effect_plan=("dependency-detach", "selection-clear", "quarantine-move", "registry-tombstone"),
+    )
+    JournalStore(tmp_path).create(operation)
+    receipt = failure_receipts.pending_failure_receipts(tmp_path)[0]
+    assert receipt.can_resume and receipt.can_rollback
+    assert receipt.commands == (
+        ("spec-dock", "scope", "delete", "iss-00409", "--resume", operation.operation_id, "--yes"),
+        ("spec-dock", "scope", "delete", "iss-00409", "--rollback", operation.operation_id, "--yes"),
+    )
+    assert parse_vnext(receipt.commands[0][1:]).resume == operation.operation_id
 
 
 def _prepare_and_hold(common_dir: str, command: str, ready: Queue[str]) -> None:

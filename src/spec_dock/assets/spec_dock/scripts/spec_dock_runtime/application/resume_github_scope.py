@@ -17,7 +17,7 @@ from spec_dock_runtime.application.create_github_scope import (
     _require_open_ancestors,
 )
 from spec_dock_runtime.application.create_node import CreatePlanExecutionError, execute_create_plan
-from spec_dock_runtime.application.github_create_effect import operation_marker
+from spec_dock_runtime.application.github_create_effect import create_github_issue_effect, operation_marker
 from spec_dock_runtime.application.github_scope_scaffold import build_github_scope_scaffold
 from spec_dock_runtime.application.operation_executor import (
     assert_resume_request,
@@ -57,7 +57,20 @@ def _remote_issue(
     repository: str,
     title: str,
 ) -> tuple[OperationRecord, GithubIssueRecord]:
-    if not operation.effects or operation.effects[0].id != "github-create":
+    if not operation.effects:
+        kind = dict(operation.fixed_targets).get("kind")
+        if operation.phase != "prepared" or kind not in {"initiative", "epic", "issue"}:
+            raise ValueError("GitHub create journal has an invalid prepared phase")
+        return create_github_issue_effect(
+            operation=operation,
+            journal=journal,
+            gateway=gateway,
+            repo_root=repo_root,
+            repository=repository,
+            title=title,
+            body=f"Created by SpecDock.\n\nType: {kind}\n",
+        )
+    if operation.effects[0].id != "github-create":
         raise ValueError("GitHub create journal has no remote intent")
     effect = operation.effects[0]
     if effect.status == "intent":

@@ -260,7 +260,10 @@ def _journal_receipt_failure(
             record
             for record in pending_failure_receipts(common_dir)
             if record.command == command
-            and (record.operation_id not in before or record.operation_id in {ns.resume, ns.rollback})
+            and (
+                record.operation_id not in before
+                or record.operation_id in {getattr(ns, "resume", None), getattr(ns, "rollback", None)}
+            )
         ]
     except (OSError, ValueError):
         return None
@@ -297,10 +300,10 @@ def _journal_receipt_failure(
         ),
         recovery=Recovery(
             record.operation_id,
-            True,
+            record.can_resume,
             record.can_rollback,
-            (),
-            "Inspect the fixed target and options in the operation journal before --resume or --rollback.",
+            record.commands,
+            record.blocked_reason,
         ),
     )
     if json_mode:

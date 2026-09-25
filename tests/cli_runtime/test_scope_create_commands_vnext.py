@@ -153,7 +153,8 @@ def test_prepared_create_failure_returns_recorded_recovery_id_without_claiming_e
     assert payload["operation_id"] == operation.operation_id
     assert payload["effects"] == []
     assert payload["recovery"]["operation_id"] == operation.operation_id
-    assert payload["recovery"]["can_resume"] is True
+    assert payload["recovery"]["can_resume"] is False
+    assert payload["recovery"]["commands"] == []
 
 
 def test_local_scope_create_cli_resumes_original_reserved_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -291,3 +292,52 @@ def test_github_scope_create_cli_resumes_without_second_post(tmp_path: Path, mon
     assert resumed.exit_code == 0
     assert json.loads(resumed.stdout)["operation_id"] == operation.operation_id
     assert gateway.calls == 1
+
+
+def test_github_scope_create_resumes_prepared_record_before_remote_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_before_remote_intent(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if not injected and record.effects and record.effects[0].id == "github-create":
+            injected = True
+            raise OSError("injected before remote intent publication")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_before_remote_intent)
+    prefix = ("scope", "create", "initiative", "--backend", "github", "--title", "Plan")
+    failed = _run(repo, *prefix, "--yes")
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert gateway.calls == 0
+    operation_id = payload["operation_id"]
+    assert operation_id
+    assert payload["recovery"]["can_resume"] is True
+    assert payload["recovery"]["commands"][0] == [
+        "spec-dock",
+        "scope",
+        "create",
+        "initiative",
+        "--backend",
+        "github",
+        "--title",
+        "Plan",
+        "--slug",
+        "plan",
+        "--resume",
+        operation_id,
+        "--yes",
+    ]
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    resumed = _run(repo, *prefix, "--resume", operation_id)
+    assert resumed.exit_code == 0
+    assert json.loads(resumed.stdout)["operation_id"] == operation_id
+    assert gateway.calls == 1
+    assert not JournalStore(cast("Path", common["common_dir"])).pending()
