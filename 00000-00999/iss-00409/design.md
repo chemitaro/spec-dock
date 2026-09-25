@@ -78,6 +78,8 @@ CommandSpec → typed Request → Application use case → typed Result
 
 固定engineの絶対path・distribution digestは導入control recordで検証し、PATH探索で見つけた同名実行物へ無条件に委譲しません。初回導入・復旧ではworktree外の検証済みengineを利用します。source packageの開発時入口は一時fixtureのみを既定対象とし、実consumerへの導入はcandidateを固定した後に行います。
 
+CIの新規checkoutには導入controlも作業場固有のactive選択もありません。CIは固定commitの供給元を別checkoutし、Git SHAを照合してからworktree外にengineを構築し、distribution digestを記録します。そのengineからのみ `workspace validate --ci` を実行します。この読み取り専用経路はworkspace schema、Scope、依存、Artifactを検証し、control・導入pin・active・generation・branch registryを検証対象に含めません。通常の `workspace validate` は導入状態を含む診断のままです。`--ci` はmutatorで受け付けず、CIの検証結果をwriter admissionの根拠にしません。切替時に旧 `sync` / `validate` のCI呼出しをこの経路へ更新します。
+
 履歴branchの古いshimを直接Pythonで実行する利用者権限まで封鎖するものではありません。対応範囲はサポートする起動経路と停止手順です。旧agent、旧venv、旧task、shell aliasの起動経路を切替時に停止・更新します。旧branchはそのまま新writerで書けず、read-only調査または明示的な再導入/移行を必要とします。
 
 ## 責務・Interface
