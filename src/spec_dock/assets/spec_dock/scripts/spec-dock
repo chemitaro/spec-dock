@@ -14,6 +14,34 @@ import sys
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 
 
+def _json_requested(arguments: list[str]) -> bool:
+    return "--json" in arguments[: arguments.index("--") if "--" in arguments else len(arguments)]
+
+
+def _preflight_failure(message: str) -> None:
+    if not _json_requested(sys.argv[1:]):
+        print(f"spec-dock: {message}", file=sys.stderr)
+        return
+    print(
+        json.dumps(
+            {
+                "schema_version": "specdock.cli/v1",
+                "command": "entrypoint",
+                "status": "failed",
+                "operation_id": None,
+                "target": None,
+                "data": {"help": None},
+                "effects": [],
+                "warnings": [],
+                "error": {"code": "ENGINE_PREFLIGHT_FAILED", "message": message, "details": {}},
+                "recovery": None,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+    )
+
+
 def _distribution_digest(root: Path) -> str:
     """Verify the complete external package before executing any of its code."""
     if not root.is_absolute() or root.is_symlink() or not root.is_dir():
@@ -150,7 +178,7 @@ def main() -> int:
         environment["PYTHONDONTWRITEBYTECODE"] = "1"
         os.execve(str(executable), [str(executable), *sys.argv[1:]], environment)
     except (OSError, ValueError, subprocess.TimeoutExpired) as error:
-        print(f"spec-dock: {error}", file=sys.stderr)
+        _preflight_failure(str(error))
         return 3
     return 0
 

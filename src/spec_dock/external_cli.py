@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 from pathlib import Path
 import subprocess
@@ -15,6 +16,34 @@ from spec_dock.runtime_loader import EnginePin, VerifiedEngine, digest_distribut
 if TYPE_CHECKING:
     import argparse
     from collections.abc import Sequence
+
+
+def _json_requested(argv: Sequence[str]) -> bool:
+    return "--json" in argv[: argv.index("--") if "--" in argv else len(argv)]
+
+
+def _preflight_failure(message: str, *, json_mode: bool) -> None:
+    if not json_mode:
+        print(f"spec-dock: {message}", file=sys.stderr)
+        return
+    print(
+        json.dumps(
+            {
+                "schema_version": "specdock.cli/v1",
+                "command": "entrypoint",
+                "status": "failed",
+                "operation_id": None,
+                "target": None,
+                "data": {"help": None},
+                "effects": [],
+                "warnings": [],
+                "error": {"code": "ENGINE_PREFLIGHT_FAILED", "message": message, "details": {}},
+                "recovery": None,
+            },
+            ensure_ascii=False,
+            separators=(",", ":"),
+        )
+    )
 
 
 def _git_root(candidate: Path) -> Path | None:
@@ -131,12 +160,13 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
 
 def main(argv: Sequence[str] | None = None) -> int:
     sys.dont_write_bytecode = True
+    arguments = sys.argv[1:] if argv is None else argv
     try:
         return run_external(
-            sys.argv[1:] if argv is None else argv,
+            arguments,
             executable=Path(sys.argv[0]).absolute(),
             invocation_cwd=Path.cwd(),
         )
     except (OSError, ValueError) as error:
-        print(f"spec-dock: {error}", file=sys.stderr)
+        _preflight_failure(str(error), json_mode=_json_requested(arguments))
         return 3

@@ -299,8 +299,21 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
     refused = subprocess.run(
         [str(shim), "--version"], cwd=repo, env=environment, capture_output=True, text=True, check=False
     )
+    refused_json = subprocess.run(
+        [str(shim), "scope", "list", "--json"],
+        cwd=repo,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
     executable.write_bytes(original_engine)
     assert refused.returncode != 0
+    assert refused_json.returncode == 3 and refused_json.stderr == ""
+    shim_error = json.loads(refused_json.stdout)
+    assert shim_error["schema_version"] == "specdock.cli/v1"
+    assert shim_error["error"]["code"] == "ENGINE_PREFLIGHT_FAILED"
+    assert shim_error["effects"] == []
     assert not tamper_marker.exists()
     alternate = tmp_path / "other-engine"
     shutil.copytree(distribution, alternate)
@@ -320,7 +333,11 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
         text=True,
         check=False,
     )
-    assert rejected.returncode == 3 and "differs from repository pin" in rejected.stderr
+    assert rejected.returncode == 3 and rejected.stderr == ""
+    engine_error = json.loads(rejected.stdout)
+    assert engine_error["schema_version"] == "specdock.cli/v1"
+    assert engine_error["error"]["code"] == "ENGINE_PREFLIGHT_FAILED"
+    assert engine_error["effects"] == []
 
 
 def test_two_consumers_share_one_fixed_engine_without_shared_control(tmp_path: Path) -> None:
