@@ -423,6 +423,8 @@ subprocessはargv配列で実行し、shell=True、eval、command substitution�
 | migrate/installation | inventory、schema/protocol/engine digest、phase、計画対象、適用結果、backup/journal識別 |
 | help/completion/version | `help`構造または`script`文字列、shell、version/digest。補完fileを直接書きません。 |
 
+`scope create` / `scope import` の `planned` は実在するScopeを表しません。`data.scope.id/path/revision` と `data.scope_id/path` は未確定の間 `null` とし、判明しているkind/backend/parent、計画対象のtitle/slug、project/worktree/snapshotを返します。`data.status` は観測値がないことを `state=unknown, source=unknown` で示します。`scope list` の `data.filter` は正規化したkind/parent_id/stateを、`data.project/worktree/snapshot_id` は読取り対象を示します。
+
 errorは `{code,message,details}`、warningsは同じcode付き配列、recoveryは `{operation_id,can_resume,can_rollback,commands,blocked_reason}` とします。回復commandはshell文字列だけでなくargv配列を保持して安全に引用します。変化し得る日本語messageをscriptの分岐に使いません。 D-16対象外のpartial/unknownでは`can_resume=false`、`can_rollback=false`とし、実在しない復旧commandを出しません。対象固有のread-only確認先と、盲目的な再実行を拒否する理由を`details`/`recovery.blocked_reason`に示します。
 
 | exit | 用途 |
