@@ -14,6 +14,7 @@ if TYPE_CHECKING:
 
 from spec_dock.installation.source import (
     PinnedSource,
+    assert_candidate_assets_match_engine,
     assert_disjoint_source_target,
     download_pinned_archive,
     fixed_archive_url,
@@ -180,3 +181,24 @@ def test_pinned_version_requires_matching_package_version(tmp_path: Path) -> Non
     with pytest.raises(ValueError, match="version differs"):
         verify_pinned_archive(source, _archive(_minimal_files()), tmp_path / "mismatch")
     assert not (tmp_path / "mismatch").exists()
+
+
+def test_update_candidate_assets_must_match_executing_engine(tmp_path: Path) -> None:
+    source = PinnedSource("chemitaro/spec-dock", "a" * 40, None)
+    files = _minimal_files()
+    bundle = verify_pinned_archive(source, _archive(files), tmp_path / "candidate")
+    assets = tmp_path / "engine-assets"
+    for name, content in files.items():
+        if not name.startswith("src/spec_dock/assets/"):
+            continue
+        path = assets / name.removeprefix("src/spec_dock/assets/")
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(content)
+    assert_candidate_assets_match_engine(bundle, assets)
+    (assets / "spec_dock/docs/readme.md").write_text("different", encoding="utf-8")
+    with pytest.raises(ValueError, match="candidate assets differ"):
+        assert_candidate_assets_match_engine(bundle, assets)
+    (assets / "spec_dock/docs/readme.md").write_bytes(files["src/spec_dock/assets/spec_dock/docs/readme.md"])
+    (assets / "spec_dock/docs/extra.md").write_text("extra", encoding="utf-8")
+    with pytest.raises(ValueError, match="candidate assets differ"):
+        assert_candidate_assets_match_engine(bundle, assets)

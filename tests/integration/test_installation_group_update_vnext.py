@@ -80,6 +80,7 @@ def test_legacy_update_cli_dry_run_then_bootstraps(tmp_path: Path, monkeypatch: 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
     monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle)
+    monkeypatch.setattr(command_module, "assert_candidate_assets_match_engine", lambda *_args: None)
     command = ["installation", "update", "--commit", bundle.source.commit, "--maintenance", "--json"]
     preview = run_vnext(
         [*command, "--dry-run"],
@@ -99,6 +100,49 @@ def test_legacy_update_cli_dry_run_then_bootstraps(tmp_path: Path, monkeypatch: 
     assert result.exit_code == 0
     assert {item["root"] for item in json.loads(result.stdout)["data"]["targets"]} == {str(repo), str(second)}
     assert load_control(repo / ".git").mode == "maintenance"
+
+
+def test_installation_update_requires_confirmation_before_source_fetch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _, pin, bundle = _legacy_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    def unexpected_source(**_kwargs: object) -> None:
+        raise AssertionError("source must not be fetched without confirmation")
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", unexpected_source)
+    result = run_vnext(
+        ["installation", "update", "--commit", bundle.source.commit, "--maintenance", "--json"],
+        invocation_cwd=repo,
+        engine_digest=pin.distribution_digest,
+        engine_version="0.2.4",
+        engine_pin=pin,
+    )
+    assert result.exit_code != 0
+    assert "--yes" in result.stdout
+    assert load_control(repo / ".git") is None
+
+
+def test_installation_update_rejects_another_candidates_assets_before_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, _, pin, bundle = _legacy_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle)
+    result = run_vnext(
+        ["installation", "update", "--commit", bundle.source.commit, "--maintenance", "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest=pin.distribution_digest,
+        engine_version="0.2.4",
+        engine_pin=pin,
+    )
+    assert result.exit_code != 0
+    assert "candidate assets differ" in result.stdout
+    assert load_control(repo / ".git") is None
 
 
 def test_legacy_update_resumes_if_control_publish_stops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -403,8 +447,19 @@ def test_installation_update_cli_updates_registered_group(tmp_path: Path, monkey
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source, raising=False)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive", raising=False)
     monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle, raising=False)
+    monkeypatch.setattr(command_module, "assert_candidate_assets_match_engine", lambda *_args: None)
     result = run_vnext(
-        ["installation", "update", "--target", str(repo), "--commit", bundle.source.commit, "--maintenance", "--json"],
+        [
+            "installation",
+            "update",
+            "--target",
+            str(repo),
+            "--commit",
+            bundle.source.commit,
+            "--maintenance",
+            "--yes",
+            "--json",
+        ],
         invocation_cwd=repo,
         engine_digest=digest,
         engine_version="0.2.4",
@@ -442,7 +497,7 @@ def test_installation_update_cli_rolls_back_without_source(tmp_path: Path, monke
         )
     (group_id,) = pending_installation_groups(common_dir)
     output = run_vnext(
-        ["installation", "update", "--rollback", group_id, "--offline", "--json"],
+        ["installation", "update", "--rollback", group_id, "--offline", "--yes", "--json"],
         invocation_cwd=repo,
         engine_digest=digest,
         engine_version="0.2.4",
@@ -458,6 +513,7 @@ def test_installation_update_dry_run_preserves_targets(tmp_path: Path, monkeypat
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
     monkeypatch.setattr(command_module, "verify_pinned_archive", lambda *_args, **_kwargs: bundle)
+    monkeypatch.setattr(command_module, "assert_candidate_assets_match_engine", lambda *_args: None)
     output = run_vnext(
         ["installation", "update", "--commit", bundle.source.commit, "--dry-run", "--json"],
         invocation_cwd=repo,
@@ -563,7 +619,7 @@ def test_installation_uninstall_cli_requires_yes_and_rolls_back_offline(tmp_path
     operation_id = json.loads(completed.stdout)["operation_id"]
     assert not (second / "spec-dock/docs").exists()
     wrong_recovery = run_vnext(
-        ["installation", "update", "--rollback", operation_id, "--offline", "--json"],
+        ["installation", "update", "--rollback", operation_id, "--offline", "--yes", "--json"],
         invocation_cwd=repo,
         engine_digest=digest,
         engine_version="0.2.4",

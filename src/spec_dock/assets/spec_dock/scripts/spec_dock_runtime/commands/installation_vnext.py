@@ -8,6 +8,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
 from spec_dock.installation.source import (
+    assert_candidate_assets_match_engine,
     assert_disjoint_source_target,
     download_pinned_archive,
     packaged_bundle,
@@ -152,6 +153,8 @@ def run_installation_show(
 def run_installation_update(
     ns: argparse.Namespace, context: WorkContext, *, invocation_cwd: Path, engine_pin: VerifiedEngine | None = None
 ) -> OperationResult[InstallationGroupRecord | InstallationUpdatePlan]:
+    if not ns.dry_run and not ns.yes:
+        raise ValueError("installation update requires --yes")
     target = Path(ns.target).expanduser() if ns.target else context.repo_root
     if not target.is_absolute():
         target = invocation_cwd / target
@@ -192,6 +195,7 @@ def run_installation_update(
     archive = download_pinned_archive(source, timeout=ns.timeout)
     with TemporaryDirectory(prefix="specdock-install-") as directory:
         bundle = verify_pinned_archive(source, archive, Path(directory) / "bundle")
+        assert_candidate_assets_match_engine(bundle, ASSETS)
         if ns.dry_run:
             if ns.resume:
                 raise ValueError("installation resume cannot be a dry run")

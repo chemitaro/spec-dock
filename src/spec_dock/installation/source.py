@@ -290,6 +290,32 @@ def verify_bundle_integrity(bundle: VerifiedBundle) -> None:
         raise ValueError("verified bundle content changed after archive validation")
 
 
+def assert_candidate_assets_match_engine(bundle: VerifiedBundle, assets_root: Path) -> None:
+    """Keep repository assets on the same candidate as the executing fixed engine."""
+    verify_bundle_integrity(bundle)
+    if not assets_root.is_dir() or assets_root.is_symlink():
+        raise ValueError("executing engine assets are unavailable")
+    prefix = "src/spec_dock/assets/"
+    candidate = {
+        name.removeprefix(prefix): bundle.root / name for name in bundle.tooling_paths if name.startswith(prefix)
+    }
+    actual = {
+        path.relative_to(assets_root).as_posix(): path
+        for path in assets_root.rglob("*")
+        if path.is_file() and "__pycache__" not in path.parts and path.suffix not in {".pyc", ".pyo"}
+    }
+    if candidate.keys() != actual.keys():
+        raise ValueError("candidate assets differ from the executing engine")
+    for name, source in candidate.items():
+        installed = actual[name]
+        if (
+            installed.is_symlink()
+            or source.read_bytes() != installed.read_bytes()
+            or bool(source.stat().st_mode & 0o111) != bool(installed.stat().st_mode & 0o111)
+        ):
+            raise ValueError("candidate assets differ from the executing engine")
+
+
 def packaged_bundle(*, assets_root: Path, destination: Path, version: str) -> VerifiedBundle:
     """Normalize the executing package's assets into a verified inert bundle."""
     if _VERSION.fullmatch(version) is None or not assets_root.is_absolute() or not assets_root.is_dir():

@@ -32,6 +32,44 @@ def _common_directory(repo_root: Path) -> Path:
     return common.resolve(strict=True)
 
 
+def _bound_invocation(repo_root: Path) -> None:
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    completed = subprocess.run(
+        ["git", "-C", str(Path.cwd()), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+        env=environment,
+    )
+    if (
+        completed.returncode != 0
+        or not completed.stdout.strip()
+        or Path(completed.stdout.strip()).resolve() != repo_root
+    ):
+        raise ValueError("repository shim must run from its installed worktree")
+    arguments = sys.argv[1:]
+    if any(arguments[index : index + 2] == ["installation", "init"] for index in range(len(arguments) - 1)):
+        raise ValueError("installation init must use the external fixed engine")
+    for index, item in enumerate(arguments):
+        if item == "--":
+            break
+        if item == "--project":
+            if index + 1 >= len(arguments):
+                raise ValueError("--project requires a path")
+            value = arguments[index + 1]
+        elif item.startswith("--project="):
+            value = item.split("=", 1)[1]
+        else:
+            continue
+        target = Path(value).expanduser()
+        if not target.is_absolute():
+            target = Path.cwd() / target
+        if target.resolve(strict=True) != repo_root:
+            raise ValueError("repository shim --project differs from its installed worktree")
+
+
 def _pinned_executable(common_dir: Path) -> Path:
     control_dir = common_dir / "spec-dock/control"
     locator = control_dir / "engine.json"
@@ -72,6 +110,7 @@ def _pinned_executable(common_dir: Path) -> Path:
 def main() -> int:
     try:
         repo_root = Path(__file__).resolve(strict=True).parents[2]
+        _bound_invocation(repo_root)
         executable = _pinned_executable(_common_directory(repo_root))
         environment = os.environ.copy()
         for key in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONSTARTUP"):

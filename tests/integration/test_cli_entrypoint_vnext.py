@@ -2,9 +2,15 @@
 
 import json
 from pathlib import Path
+import runpy
 import shutil
 import subprocess
 import sys
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib
 
 import pytest
 
@@ -15,6 +21,84 @@ from spec_dock.runtime_loader import (
     verify_engine_pin,
     write_engine_pin,
 )
+
+
+def test_fixed_distribution_builder_isolation_and_digest(tmp_path: Path) -> None:
+    from spec_dock.fixed_bundle import build_fixed_engine
+
+    distribution = tmp_path / "engine"
+    executable = build_fixed_engine(distribution)
+    assert executable == distribution / "bin/spec-dock"
+    assert executable.is_file()
+    repo = tmp_path / "consumer"
+    repo.mkdir()
+    subprocess.run(["git", "-C", str(repo), "init", "-q"], check=True)
+    output = subprocess.run(
+        [str(executable), "--help", "--json"],
+        cwd=repo,
+        env={"PATH": "/usr/bin:/bin", "PYTHONPATH": str(repo)},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert output.returncode == 0, output.stderr
+    assert json.loads(output.stdout)["status"] == "succeeded"
+    assert len(digest_distribution(distribution)) == 64
+
+
+def test_fixed_distribution_version_comes_from_its_own_bytes(tmp_path: Path) -> None:
+    import spec_dock
+
+    package = tmp_path / "spec_dock"
+    package.mkdir()
+    shutil.copy2(Path(spec_dock.__file__), package / "__init__.py")
+    (package / "version.txt").write_text("9.9.9\n", encoding="utf-8")
+    assert runpy.run_path(str(package / "__init__.py"))["__version__"] == "9.9.9"
+
+
+def test_fixed_distribution_builder_rejects_checkout_destination(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import spec_dock.fixed_bundle as builder
+
+    checkout = tmp_path / "repo"
+    source = checkout / "src/spec_dock"
+    source.mkdir(parents=True)
+    (source / "__init__.py").write_text("\n")
+    (source / "fixed_bundle.py").write_text("\n")
+    subprocess.run(["git", "init", "-q", str(checkout)], check=True)
+    monkeypatch.setattr(builder, "__file__", str(source / "fixed_bundle.py"))
+    with pytest.raises(ValueError, match="checkout"):
+        builder.build_fixed_engine(checkout / "engine")
+
+
+def test_public_entrypoints_use_fixed_engine() -> None:
+    root = Path(__file__).resolve().parents[2]
+    project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
+    assert project["project"]["scripts"]["spec-dock"] == "spec_dock.cli:main"
+    assert (root / "src/spec_dock/assets/spec_dock/scripts/spec-dock").read_bytes() == (
+        root / "src/spec_dock/shim_vnext.py"
+    ).read_bytes()
+
+
+def test_package_entrypoint_exposes_read_only_help_without_repository_pin(capsys: pytest.CaptureFixture[str]) -> None:
+    from spec_dock.cli import main
+
+    assert main(["--help", "--json"]) == 0
+    output = capsys.readouterr()
+    assert json.loads(output.out)["status"] == "succeeded"
+    assert "scope" in output.out and "work" in output.out
+
+
+def test_public_entrypoint_rejects_retired_installer_before_write(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.cli import main
+
+    assert main(["init", str(tmp_path), "--json"]) == 2
+    output = capsys.readouterr()
+    assert json.loads(output.out)["error"]["code"] in {"USAGE_ERROR", "COMMAND_REMOVED"}
+    assert not (tmp_path / "spec-dock").exists()
 
 
 def _fixture_engine(tmp_path: Path) -> tuple[Path, Path, Path]:
@@ -142,6 +226,15 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
     assert installed.returncode == 0, installed.stderr
     assert (repo / "spec-dock/workspace.json").is_file()
     assert read_engine_pin(repo / ".git", checkout_root=repo).executable == executable
+    outside_show = subprocess.run(
+        [str(executable), "installation", "show", "--target", str(repo), "--json"],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert outside_show.returncode == 0, outside_show.stderr
     shim = repo / "spec-dock/scripts/spec-dock"
     shim.write_bytes((Path(__file__).resolve().parents[2] / "src/spec_dock/shim_vnext.py").read_bytes())
     shim.chmod(0o755)
@@ -192,3 +285,74 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
         check=False,
     )
     assert rejected.returncode == 3 and "differs from repository pin" in rejected.stderr
+
+
+def test_two_consumers_share_one_fixed_engine_without_shared_control(tmp_path: Path) -> None:
+    from spec_dock.fixed_bundle import build_fixed_engine
+
+    executable = build_fixed_engine(tmp_path / "engine")
+    common_dirs: list[Path] = []
+    for name in ("first", "second"):
+        repo = tmp_path / name
+        repo.mkdir()
+        subprocess.run(["git", "init", "-q", str(repo)], check=True)
+        installed = subprocess.run(
+            [str(executable), "installation", "init", str(repo), "--yes", "--json"],
+            cwd=tmp_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert installed.returncode == 0, installed.stderr
+        created = subprocess.run(
+            [
+                str(repo / "spec-dock/scripts/spec-dock"),
+                "scope",
+                "create",
+                "initiative",
+                "--backend",
+                "local",
+                "--title",
+                name,
+                "--json",
+            ],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert created.returncode == 0, created.stderr
+        assert json.loads(created.stdout)["status"] == "succeeded"
+        common_dirs.append(repo / ".git/spec-dock/control")
+    assert common_dirs[0] != common_dirs[1]
+    for control in common_dirs:
+        assert (control / "engine.json").is_file()
+    first, second = tmp_path / "first", tmp_path / "second"
+    wrong_cwd = subprocess.run(
+        [str(first / "spec-dock/scripts/spec-dock"), "scope", "list", "--json"],
+        cwd=second,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert wrong_cwd.returncode != 0
+    wrong_project = subprocess.run(
+        [str(first / "spec-dock/scripts/spec-dock"), "--project", str(second), "scope", "list", "--json"],
+        cwd=first,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert wrong_project.returncode != 0
+    third = tmp_path / "third"
+    third.mkdir()
+    subprocess.run(["git", "init", "-q", str(third)], check=True)
+    wrong_init = subprocess.run(
+        [str(first / "spec-dock/scripts/spec-dock"), "installation", "init", str(third), "--yes", "--json"],
+        cwd=first,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert wrong_init.returncode != 0
+    assert not (third / "spec-dock").exists()

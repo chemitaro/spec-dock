@@ -28,6 +28,11 @@ _WORKBENCH_TEMPLATE_READMES = (
 _REQUIRED_WHEEL_ASSETS = (
     "spec_dock/assets/spec_dock/scripts/spec-dock",
     "spec_dock/assets/spec_dock/docs/README.md",
+    "spec_dock/assets/spec_dock/docs/reference_cli.md",
+    "spec_dock/assets/spec_dock/docs/cli-redesign-guide.html",
+    "spec_dock/assets/spec_dock/.gitignore",
+    "spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md",
+    "spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
     "spec_dock/assets/spec_dock/templates/root/.workbench/README.md",
 )
 _STALE_WHEEL_PATTERNS = (
@@ -99,6 +104,68 @@ class ExistingConsumer:
     canonical_before: FileSnapshot
     existing_scope_before: FileSnapshot
     graph_before: FileSnapshot
+
+
+def _legacy_wheel_cli(candidate_wheel: CandidateWheel) -> Path:
+    """Exercise retained old installer/runtime contracts without the public vNext CLI."""
+    executable = candidate_wheel.wheel_path.parent / "legacy-wheel-cli"
+    fixture = candidate_wheel.repo_root / "tests/fixtures/legacy_spec_dock.script"
+    executable.write_text(
+        f"#!{candidate_wheel.venv_python}\n"
+        "from pathlib import Path\nimport sys\n"
+        "from spec_dock.cli import legacy_installer_main\n"
+        "args = sys.argv[1:]\n"
+        "result = legacy_installer_main(args)\n"
+        "if result == 0 and args and args[0] in {'init', 'update'}:\n"
+        "    script = Path(args[1]).resolve() / 'spec-dock/scripts/spec-dock'\n"
+        f"    script.write_bytes(Path({str(fixture)!r}).read_bytes())\n"
+        "raise SystemExit(result)\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    return executable
+
+
+def test_candidate_wheel_exposes_vnext_help_and_builds_fixed_engine(candidate_wheel: CandidateWheel) -> None:
+    root = candidate_wheel.wheel_path.parent
+    public_cli = candidate_wheel.venv_python.parent / "spec-dock"
+    help_output = subprocess.run(
+        [str(public_cli), "--help", "--json"], cwd=root, capture_output=True, text=True, check=False
+    )
+    assert help_output.returncode == 0, help_output.stderr
+    assert json.loads(help_output.stdout)["status"] == "succeeded"
+
+    fixed = root / "vnext-fixed-engine"
+    built = subprocess.run(
+        [str(candidate_wheel.venv_python), "-m", "spec_dock.fixed_bundle", str(fixed)],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert built.returncode == 0, built.stderr
+    executable = fixed / "bin/spec-dock"
+    assert executable.is_file()
+    consumer = root / "vnext-consumer"
+    consumer.mkdir()
+    subprocess.run(["git", "init", "-q", str(consumer)], check=True)
+    initiated = subprocess.run(
+        [str(executable), "installation", "init", str(consumer), "--yes", "--json"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert initiated.returncode == 0, initiated.stderr
+    assert json.loads(initiated.stdout)["status"] == "succeeded"
+    listed = subprocess.run(
+        [str(consumer / "spec-dock/scripts/spec-dock"), "scope", "list", "--json"],
+        cwd=consumer,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert listed.returncode == 0, listed.stderr
 
 
 def _git(repo_root: Path, *args: str) -> str:
@@ -361,7 +428,7 @@ def _prepare_s03_consumer(
     target.mkdir()
     helper._init_origin_repo(target)
     env = _runtime_env(helper, temp_root)
-    installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+    installed_cli = _legacy_wheel_cli(candidate_wheel)
     assert installed_cli.is_file()
     init_result = subprocess.run(
         [str(installed_cli), "init", str(target)],
@@ -569,7 +636,7 @@ def _prepare_existing_consumer(candidate_wheel: CandidateWheel, suffix: str) -> 
     target.mkdir()
     helper._init_origin_repo(target)
     env = _runtime_env(helper, temp_root)
-    installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+    installed_cli = _legacy_wheel_cli(candidate_wheel)
     assert installed_cli.is_file()
 
     init_result = subprocess.run(
@@ -740,7 +807,7 @@ def test_tc_346_s01_004_fresh_consumer_installed_shell_and_generic_import(candid
     target.mkdir()
     helper._init_origin_repo(target)
     env = _runtime_env(helper, temp_root)
-    installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+    installed_cli = _legacy_wheel_cli(candidate_wheel)
     assert installed_cli.is_file()
 
     init_result = subprocess.run(
@@ -1085,7 +1152,7 @@ def test_tc_346_s03_003_actual_cross_filesystem_source(candidate_wheel: Candidat
         source_parent = Path(tempfile.mkdtemp(prefix="iss346-cross-fs-source-", dir=str(source_root)))
         helper._init_origin_repo(target)
         env = _runtime_env(helper, candidate_wheel.wheel_path.parent)
-        installed_cli = helper._issue_69_venv_spec_dock(candidate_wheel.venv_python)
+        installed_cli = _legacy_wheel_cli(candidate_wheel)
         init_result = subprocess.run(
             [str(installed_cli), "init", str(target)],
             cwd=candidate_wheel.wheel_path.parent,

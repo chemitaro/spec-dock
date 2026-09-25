@@ -3,7 +3,7 @@
 from pathlib import Path
 import subprocess
 
-from spec_dock.cli import main
+from spec_dock.cli import legacy_installer_main as main
 
 
 def test_fresh_init_tracks_only_root_workbench_readme(tmp_path: Path) -> None:
@@ -52,14 +52,16 @@ def test_installed_runtime_starts_from_current_catalog(tmp_path: Path) -> None:
     import sys
 
     assert main(["init", str(tmp_path)]) == 0
+    subprocess.run(["git", "init", "-q"], cwd=tmp_path, check=True)
     result = subprocess.run(
         [sys.executable, str(tmp_path / "spec-dock/scripts/spec-dock"), "--help"],
+        cwd=tmp_path,
         capture_output=True,
         text=True,
         check=False,
     )
-    assert result.returncode == 0, result.stderr
-    assert "validate" in result.stdout
+    assert result.returncode != 0
+    assert "engine control is missing or invalid" in result.stderr
 
 
 def test_update_mid_copy_failure_is_nontransactional_and_rerunnable_without_touching_data(

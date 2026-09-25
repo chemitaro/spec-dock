@@ -1,267 +1,126 @@
-#!/usr/bin/env python3
-"""Start the installed runtime without provider lifecycle admission."""
+#!/usr/bin/env -S python3 -I
+"""Standalone repository shim: delegate only to the absolute pinned engine."""
+
 from __future__ import annotations
 
-import contextlib
 import json
 import os
 from pathlib import Path
-import stat
+import re
 import subprocess
 import sys
 
-_MISSING_INIT_FRAGMENTS = (
-    "no rule to make target 'init'",
-    "no rule to make target `init'",
-    "no rule to make target init",
-    "no targets specified and no makefile found",
-    "no makefile found",
-)
+_DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 
 
-def _close(fd: int | None) -> None:
-    if fd is None:
-        return
-    with contextlib.suppress(OSError):
-        os.close(fd)
+def _common_directory(repo_root: Path) -> Path:
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    completed = subprocess.run(
+        ["git", "-C", str(repo_root), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+        env=environment,
+    )
+    if completed.returncode != 0 or not completed.stdout.strip():
+        raise ValueError("Git common directory could not be resolved")
+    common = Path(completed.stdout.strip())
+    if not common.is_absolute() or not common.is_dir() or common.is_symlink():
+        raise ValueError("Git common directory is invalid")
+    return common.resolve(strict=True)
 
 
-def _emit(text: object) -> None:
-    for warning in getattr(text, "warnings", ()):
-        print(f"spec-dock: (warn) {warning}", file=sys.stderr)
-    for line in getattr(text, "stderr_lines", ()):
-        print(line, file=sys.stderr)
-    for line in getattr(text, "stdout_lines", ()):
-        print(line)
-
-
-def _installer_exec(request: object, root_fd: int) -> int:
-    argv = tuple(getattr(request, "argv", ()))
-    if not argv or getattr(request, "environment_policy", None) != "inherit-without-lock-bypass":
-        raise RuntimeError("invalid installer terminal request")
-    _close(root_fd)
-    try:
-        os.execvpe(argv[0], list(argv), os.environ.copy())
-    except FileNotFoundError:
-        print("error: uvx could not be executed. Install uv/uvx or ensure uvx is on PATH, then retry.", file=sys.stderr)
-        return 127
-    except OSError as error:
-        print(f"error: {error.strerror or 'installer could not be executed'}", file=sys.stderr)
-        return 1
-    raise AssertionError("execvpe returned unexpectedly")
-
-
-def _is_missing_init(stderr: str) -> bool:
-    lowered = stderr.lower()
-    return any(fragment in lowered for fragment in _MISSING_INIT_FRAGMENTS)
-
-
-def _hook_child(
-    bound_fd: int,
-    write_fd: int,
-    detection_argv: tuple[str, ...],
-    execution_argv: tuple[str, ...],
-) -> None:
-    try:
-        os.fchdir(bound_fd)
-        try:
-            detection = subprocess.run(
-                list(detection_argv),
-                capture_output=True,
-                text=True,
-                check=False,
-            )
-        except FileNotFoundError:
-            result = {
-                "status": "detection_failed",
-                "command": " ".join(detection_argv),
-                "exit_code": None,
-                "warning": "make command not found",
-            }
-        else:
-            stderr = (detection.stderr or "").strip()
-            if detection.returncode != 0:
-                if _is_missing_init(stderr):
-                    result = {"status": "skipped", "command": None, "exit_code": None, "warning": None}
-                else:
-                    result = {
-                        "status": "detection_failed",
-                        "command": " ".join(detection_argv),
-                        "exit_code": detection.returncode,
-                        "warning": stderr or "unknown error",
-                    }
-            else:
-                run = subprocess.run(list(execution_argv), check=False)
-                result = {
-                    "status": "succeeded" if run.returncode == 0 else "failed",
-                    "command": " ".join(execution_argv),
-                    "exit_code": run.returncode,
-                    "warning": None
-                    if run.returncode == 0
-                    else f"{' '.join(execution_argv)} failed: exit={run.returncode}",
-                }
-        os.write(write_fd, json.dumps(result, separators=(",", ":")).encode("utf-8"))
-        os._exit(0)
-    except BaseException as error:
-        try:
-            os.write(
-                write_fd,
-                json.dumps(
-                    {
-                        "status": "detection_failed",
-                        "command": " ".join(detection_argv),
-                        "exit_code": None,
-                        "warning": str(error),
-                    },
-                    separators=(",", ":"),
-                ).encode("utf-8"),
-            )
-        finally:
-            os._exit(0)
-
-
-def _render_consumer_hook_result(request: object, result: dict[str, object]) -> int:
-    payload = dict(getattr(request, "result_payload", {}))
-    payload["bootstrap_status"] = result.get("status")
-    payload["bootstrap_command"] = result.get("command")
-    payload["bootstrap_exit_code"] = result.get("exit_code")
-    warnings = list(payload.get("warnings", ()))
-    if result.get("warning"):
-        warnings.append(str(result["warning"]))
-    payload["warnings"] = warnings
-    if getattr(request, "result_format", None) == "worktree-create-json-v1":
-        print(json.dumps({"status": "ok", "command": "worktree create", **payload}, ensure_ascii=False, indent=2))
-    else:
-        print(
-            f"spec-dock: ok (worktree create) id={payload.get('id')} "
-            f"branch={payload.get('branch_name')} path={payload.get('worktree_path')}"
-        )
-        print(
-            "spec-dock: worktree bootstrap "
-            f"status={payload.get('bootstrap_status')} command={payload.get('bootstrap_command') or '-'}"
-        )
-        for warning in warnings:
-            print(f"spec-dock: (warn) {warning}", file=sys.stderr)
-    return 0
-
-
-def _consumer_hook(request: object, root_fd: int) -> int:
-    bound_fd = int(request.bound_cwd_fd)
-    expected_device = int(request.bound_device)
-    expected_inode = int(request.bound_inode)
-    detection_argv = tuple(getattr(request, "detection_argv", ()))
-    execution_argv = tuple(getattr(request, "execution_argv", ()))
-    if detection_argv != ("make", "-n", "init") or execution_argv != ("make", "init"):
-        _close(root_fd)
-        _close(bound_fd)
-        print("error: invalid consumer hook request", file=sys.stderr)
-        return 1
-    try:
-        bound_stat = os.fstat(bound_fd)
-    except OSError as error:
-        _close(bound_fd)
-        _close(root_fd)
-        return _render_consumer_hook_result(
-            request,
-            {
-                "status": "detection_failed",
-                "command": "make -n init",
-                "exit_code": None,
-                "warning": f"worktree hook binding unavailable: {error}",
-            },
-        )
+def _bound_invocation(repo_root: Path) -> None:
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({"GIT_CONFIG_NOSYSTEM": "1", "GIT_CONFIG_GLOBAL": os.devnull})
+    completed = subprocess.run(
+        ["git", "-C", str(Path.cwd()), "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=10,
+        env=environment,
+    )
     if (
-        not stat.S_ISDIR(bound_stat.st_mode)
-        or bound_stat.st_dev != expected_device
-        or bound_stat.st_ino != expected_inode
+        completed.returncode != 0
+        or not completed.stdout.strip()
+        or Path(completed.stdout.strip()).resolve() != repo_root
     ):
-        _close(bound_fd)
-        _close(root_fd)
-        return _render_consumer_hook_result(
-            request,
-            {
-                "status": "detection_failed",
-                "command": "make -n init",
-                "exit_code": None,
-                "warning": "unsafe worktree binding",
-            },
-        )
-    _close(root_fd)
-    root_fd = -1
-    read_fd: int | None = None
-    write_fd: int | None = None
-    child_pid: int | None = None
+        raise ValueError("repository shim must run from its installed worktree")
+    arguments = sys.argv[1:]
+    if any(arguments[index : index + 2] == ["installation", "init"] for index in range(len(arguments) - 1)):
+        raise ValueError("installation init must use the external fixed engine")
+    for index, item in enumerate(arguments):
+        if item == "--":
+            break
+        if item == "--project":
+            if index + 1 >= len(arguments):
+                raise ValueError("--project requires a path")
+            value = arguments[index + 1]
+        elif item.startswith("--project="):
+            value = item.split("=", 1)[1]
+        else:
+            continue
+        target = Path(value).expanduser()
+        if not target.is_absolute():
+            target = Path.cwd() / target
+        if target.resolve(strict=True) != repo_root:
+            raise ValueError("repository shim --project differs from its installed worktree")
+
+
+def _pinned_executable(common_dir: Path) -> Path:
+    control_dir = common_dir / "spec-dock/control"
+    locator = control_dir / "engine.json"
+    control = control_dir / "control.json"
+    if any(path.is_symlink() for path in (control_dir, locator, control)):
+        raise ValueError("engine control is redirected")
     try:
-        read_fd, write_fd = os.pipe()
-        assert read_fd is not None and write_fd is not None
-        child_pid = os.fork()
-        if child_pid == 0:
-            _close(read_fd)
-            _close(root_fd)
-            _hook_child(bound_fd, write_fd, detection_argv, execution_argv)
-            raise AssertionError("hook child returned unexpectedly")
-        _close(write_fd)
-        write_fd = None
-        _close(bound_fd)
-        bound_fd = -1
-        _close(root_fd)
-        chunks: list[bytes] = []
-        assert read_fd is not None and child_pid is not None
-        while True:
-            chunk = os.read(read_fd, 4096)
-            if not chunk:
-                break
-            chunks.append(chunk)
-        _close(read_fd)
-        read_fd = None
-        _pid, status = os.waitpid(child_pid, 0)
-        del status
-        try:
-            result = json.loads(b"".join(chunks).decode("utf-8"))
-        except (UnicodeDecodeError, json.JSONDecodeError):
-            result = {
-                "status": "detection_failed",
-                "command": "make -n init",
-                "exit_code": None,
-                "warning": "hook result unavailable",
-            }
-        return _render_consumer_hook_result(request, result)
-    except OSError as error:
-        _close(read_fd)
-        _close(write_fd)
-        _close(bound_fd)
-        if child_pid is not None:
-            with contextlib.suppress(OSError):
-                os.waitpid(child_pid, 0)
-        return _render_consumer_hook_result(
-            request,
-            {
-                "status": "detection_failed",
-                "command": "make -n init",
-                "exit_code": None,
-                "warning": f"consumer hook failed: {error}",
-            },
-        )
+        engine_data = json.loads(locator.read_text(encoding="utf-8"))
+        control_data = json.loads(control.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, json.JSONDecodeError) as error:
+        raise ValueError("engine control is missing or invalid") from error
+    if (
+        not isinstance(engine_data, dict)
+        or set(engine_data) != {"schema_version", "executable", "distribution_root", "distribution_digest"}
+        or engine_data.get("schema_version") != 1
+        or not isinstance(engine_data.get("executable"), str)
+        or not isinstance(engine_data.get("distribution_root"), str)
+        or not isinstance(engine_data.get("distribution_digest"), str)
+        or _DIGEST.fullmatch(engine_data["distribution_digest"]) is None
+        or not isinstance(control_data, dict)
+        or control_data.get("engine_digest") != engine_data["distribution_digest"]
+    ):
+        raise ValueError("engine control identity is invalid")
+    executable = Path(engine_data["executable"])
+    distribution = Path(engine_data["distribution_root"])
+    if (
+        not executable.is_absolute()
+        or not distribution.is_absolute()
+        or executable.is_symlink()
+        or distribution.is_symlink()
+        or not executable.is_file()
+        or not executable.is_relative_to(distribution)
+    ):
+        raise ValueError("pinned engine executable is unavailable")
+    return executable
 
 
 def main() -> int:
-    sys.dont_write_bytecode = True
-    invocation_cwd = Path.cwd()
-    root = Path(__file__).resolve().parents[2]
-    sys.path.insert(0, str(root / "spec-dock/scripts"))
-    from spec_dock_runtime.app import run
-    from spec_dock_runtime.cli.bootstrap import build_runtime
-
-    context = build_runtime(root / "spec-dock", repo_root=root, invocation_cwd=invocation_cwd)
-    outcome = run(sys.argv[1:], context)
-    if outcome.terminal is not None:
-        if outcome.terminal.kind == "installer-exec":
-            return _installer_exec(outcome.terminal, -1)
-        if outcome.terminal.kind == "consumer-hook":
-            return _consumer_hook(outcome.terminal, -1)
-        raise RuntimeError("Unknown terminal request")
-    _emit(outcome.text)
-    return int(outcome.exit_code)
+    try:
+        repo_root = Path(__file__).resolve(strict=True).parents[2]
+        _bound_invocation(repo_root)
+        executable = _pinned_executable(_common_directory(repo_root))
+        environment = os.environ.copy()
+        for key in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONSTARTUP"):
+            environment.pop(key, None)
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        os.execve(str(executable), [str(executable), *sys.argv[1:]], environment)
+    except (OSError, ValueError, subprocess.TimeoutExpired) as error:
+        print(f"spec-dock: {error}", file=sys.stderr)
+        return 3
+    return 0
 
 
 if __name__ == "__main__":

@@ -41,6 +41,8 @@ def _project_candidate(namespace: argparse.Namespace, invocation_cwd: Path) -> P
         raw = namespace.path
     else:
         raw = getattr(namespace, "project", None)
+        if raw is None and getattr(namespace, "command_path", "").startswith("installation "):
+            raw = getattr(namespace, "target", None)
     if raw is None:
         return invocation_cwd
     candidate = Path(raw).expanduser()
@@ -64,15 +66,37 @@ def _executing_engine(*, executable: Path, checkout_root: Path) -> VerifiedEngin
 def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path) -> int:
     """Verify self and repository pin before loading any checkout runtime."""
     sys.dont_write_bytecode = True
-    engine = _executing_engine(executable=executable, checkout_root=invocation_cwd)
     sys.path.insert(0, str(ASSETS / "spec_dock/scripts"))
     from spec_dock_runtime.cli.options import parse_vnext_output
     from spec_dock_runtime.cli.vnext_runtime import run_vnext
 
     parsed = parse_vnext_output(argv, engine_version=__version__)
+    if parsed.namespace is None:
+        if parsed.stdout:
+            sys.stdout.write(parsed.stdout)
+        if parsed.stderr:
+            sys.stderr.write(parsed.stderr)
+        assert parsed.exit_code is not None
+        return parsed.exit_code
     namespace = parsed.namespace
+    if namespace.command_path in {"help", "completion"}:
+        output = run_vnext(argv, invocation_cwd=invocation_cwd, engine_digest="", engine_version=__version__)
+        if output.stdout:
+            sys.stdout.write(output.stdout)
+        if output.stderr:
+            sys.stderr.write(output.stderr)
+        return output.exit_code
     candidate = invocation_cwd if namespace is None else _project_candidate(namespace, invocation_cwd)
     project_root = _git_root(candidate)
+    engine = _executing_engine(executable=executable, checkout_root=project_root or candidate)
+    effective_argv = argv
+    if (
+        project_root is not None
+        and namespace.command_path in {"installation show", "installation update", "installation uninstall"}
+        and namespace.project is None
+        and namespace.target is not None
+    ):
+        effective_argv = ("--project", str(project_root), *argv)
     if project_root is not None:
         from spec_dock.runtime_loader import git_common_directory
 
@@ -87,7 +111,7 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
             if pinned != engine:
                 raise ValueError("executing engine differs from repository pin")
     output = run_vnext(
-        argv,
+        effective_argv,
         invocation_cwd=invocation_cwd,
         engine_digest=engine.distribution_digest,
         engine_version=__version__,

@@ -67,13 +67,15 @@ def test_issue_334_init_and_update_install_current_target_catalog_byte_exact(tmp
     assert main(["init", str(target)]) == 0
     assert os.access(target / "spec-dock/scripts/spec-dock", os.X_OK)
     assert not (target / "spec-dock/scripts/spec-dock-chatgpt").exists()
-    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
+    legacy_scripts = _managed_tree_bytes(provider_scripts)
+    legacy_scripts["spec-dock"] = (repo_root / "tests/fixtures/legacy_spec_dock.script").read_bytes()
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == legacy_scripts
     for skill_name in ("spec-dock", "spec-dock-grill-with-docs"):
         installed_skill = _managed_tree_bytes(target / ".agents/skills" / skill_name)
         assert installed_skill == _managed_tree_bytes(provider_skills / skill_name)
 
     assert main(["update", str(target)]) == 0
-    assert _managed_tree_bytes(target / "spec-dock/scripts") == _managed_tree_bytes(provider_scripts)
+    assert _managed_tree_bytes(target / "spec-dock/scripts") == legacy_scripts
 
 
 def test_issue_334_update_preserves_unmanaged_content(tmp_path: Path) -> None:
@@ -112,7 +114,18 @@ def test_issue_334_checked_in_dogfood_projection_matches_provider() -> None:
         ),
     )
     for provider, dogfood in comparisons:
-        assert _managed_tree_bytes(dogfood) == _managed_tree_bytes(provider)
+        provider_bytes = _managed_tree_bytes(provider)
+        dogfood_bytes = _managed_tree_bytes(dogfood)
+        if provider.name == "scripts":
+            # The dogfood writer stays on the old entrypoint until the coordinated cutover.
+            provider_script = provider_bytes.pop("spec-dock")
+            dogfood_script = dogfood_bytes.pop("spec-dock")
+            assert provider_script == (repo_root / "src/spec_dock/shim_vnext.py").read_bytes()
+            assert dogfood_script in {
+                provider_script,
+                (repo_root / "tests/fixtures/legacy_spec_dock.script").read_bytes(),
+            }
+        assert dogfood_bytes == provider_bytes
 
 
 def test_grill_with_docs_source_boundary_separates_access_context_from_evidence() -> None:
@@ -162,14 +175,14 @@ def test_issue_360_spec_dock_guidance_is_agent_first_and_not_present_only() -> N
     assert "agent-first" in skill
     assert "do not stop after merely presenting a command" in skill
     assert "do not ask for command-by-command confirmation" in skill
-    assert "issue lifecycle" in skill
-    assert "managed update" in skill
+    assert "`work start TARGET` and `work finish TARGET` accept Initiative, Epic, and Issue" in skill
+    assert "`installation` routes" in skill
     assert "Artifact creation and content authoring are one outcome" in skill
     assert "## Destructive boundary" in skill
     assert "Present-only" not in skill
     assert "SpecDock Agent-First Operations" in repository_agents
-    assert "Agent-first operation" in root_readme
-    assert "## Agent-first operations" in provider_docs
+    assert "agent-first" in root_readme
+    assert "## 運用と権限" in provider_docs
 
 
 _ISS_00031_EXCLUDE_PATTERNS = (
