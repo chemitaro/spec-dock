@@ -138,7 +138,7 @@ Updateは固定供給元から明示versionまたはcommitを解決し、journal
 | AC-20 | sync既定はcacheで、全sourceでactive/branch/一次仕様を変更しません。GitHub取得失敗をfreshなcacheと偽りません。生成物にsource・stale・validity・生成revisionが出ます。 |
 | AC-21 | validate/doctorは診断のみです。空workspaceは既定で有効、--require-nodesで拒否されます。doctorは未完了journalとwriter不整合を診断し、capability probeは完全指定時だけです。 |
 | AC-22 | 全44leafでJSON指定時のstdoutが一つのversioned JSON文書です。構文エラー・部分失敗も同じ外枠です。非対話は入力待ちにならず、--jsonは--yesを含意しません。終了コードがDesignと一致します。 |
-| AC-23 | init/update/showで固定distributionと適用対象が表示されます。updateはimmutable commitに固定し、供給元変更・壊れたbundle・path差替えを拒否します。journalの各停止点からresume/rollback可能範囲を判別できます。maintenanceからreadyへの復帰は全登録worktreeのIDを列挙した記録を先に残し、途中停止後は同じoperation IDで再開できます。 |
+| AC-23 | init/update/showで固定distributionと適用対象が表示されます。updateはimmutable commitに固定し、供給元変更・壊れたbundle・path差替えを拒否します。journalの各停止点からresume/rollback可能範囲を判別できます。旧pinから新固定engineへは全登録worktreeの適用後hashとsource archiveを照合し、locator/controlを記録付きで引き継ぎ、停止点から再開または後続変更前の巻戻しができます。maintenanceからreadyへの復帰は全登録worktreeのIDを列挙した記録を先に残し、途中停止後は同じoperation IDで再開できます。 |
 | AC-24 | uninstallはdry-runまたは明示確認の適用です。GitHub/供給元への通信なしでツールのみ除去し、仕様・Artifact・Workbench・回復用backupを保持します。--remove-specsは無変更で拒否します。 |
 | AC-25 | 移行前の全対象がinventoryに載り、全writer停止・backup/restore検証後に一回のcoordinated cutoverを実施できます。全worktreeのwriter protocol/必要schemaが揃うまで通常変更を再開できません。 |
 | AC-26 | 三文書・Artifact・Workbench・Git ref・index・未追跡/ignored payloadの保全を検証できます。移行対象外のbytesは同一で、変更するmetadataは差分一覧に限られます。移行だけでGitHub状態は変わりません。 |

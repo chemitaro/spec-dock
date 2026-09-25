@@ -598,7 +598,11 @@ self-updateで削除されるpathにjournalや唯一のbackupを置きません�
 
 既存の導入群で新candidateのassetsが実行中の旧engineと異なる場合、`installation update --maintenance` に限りその配布を許します。更新後も旧engine identityのcontrolとpinを保持し、通常writerはmaintenanceで拒否します。新engineのpinへの引継ぎを別の記録付き操作で完了するまではreadyにしません。初回のlegacy導入とmaintenanceを指定しない更新では、candidateと実行中engineのassets一致を引き続き要求します。
 
+引継ぎは新しい固定engineの絶対entrypointから `installation update --activate-engine --from-update UPDATE_ID --yes` を実行します。起動時に旧locatorとcontrolの整合、maintenanceを確認し、旧updateの固定commit archiveと新engineのassets、全登録worktreeのchild journalの適用後hashを照合します。common writer lock内で旧/new engine digest、対象ID、control epoch、元update IDをprepared recordに記録し、locatorをCASで新engineへ替え、controlと全登録engine digestを新世代へ更新してcommitted markerを残します。中断時は同じ新engineから `--activate-engine --resume HANDOVER_ID --yes`、後続の変更がない場合の復旧は `--activate-engine --rollback HANDOVER_ID --yes` を使用します。prepared/rolling-backの間は通常writerを拒否し、旧distributionはrollback用に保持します。引継ぎ後もmaintenanceのままとし、schema移行と全対象照合の後に `--finalize` します。
+
 一括切替では `installation update --finalize` を、全登録worktreeのversion・schema・writer protocolの照合後に明示実行します。対象ID・engine digest・control epochをcommon controlへprepared recordとして先に記録し、readyをpublishしてからcommitted markerを書きます。途中停止ではrecordの固定IDを指定した `--finalize --resume` だけが、maintenanceまたはreadyの実状態を再観測して完了できます。未完了record中は通常mutatorを止めます。各common directoryの復帰後もglobal inventoryが揃うまで旧writerを再開しません。
+
+`--commit SHA` から導入した場合、各worktreeのversion記録はengineの表示versionではなくそのSHAです。finalizeは全versionの一致に加え、committed updateと各childの適用後hash、および現engine digestとの一致かcommitted handoverによる引継ぎを確認します。表示versionのみを理由に固定commit導入を拒否しません。
 
 Uninstallは固定engine/manifestからofflineで実行し、同じjournal/backup境界を使います。仕様データを残すので制御backupも残ります。現在実行している外部engineそのものを削除しません。
 
