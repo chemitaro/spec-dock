@@ -177,6 +177,7 @@ def run_vnext(
         return RuntimeOutput(parsed.exit_code, parsed.stdout, parsed.stderr)
     ns = parsed.namespace
     json_mode = bool(ns.json)
+    dispatch_started = False
     try:
         if ns.command_path in {"help", "completion"}:
             content = explicit_help(ns.help_path) if ns.command_path == "help" else completion_script(ns.shell)
@@ -240,6 +241,7 @@ def run_vnext(
                 raise ValueError("installation init PATH must name a Git worktree root")
             if ns.project and Path(ns.project).expanduser().resolve(strict=True) != requested:
                 raise ValueError("--project and installation init PATH must name the same worktree")
+            dispatch_started = True
             result = run_installation_init(
                 ns,
                 repo_root=root,
@@ -254,6 +256,7 @@ def run_vnext(
             return RuntimeOutput(result.exit_code, stdout, stderr)
         context = _context(ns, invocation_cwd=invocation_cwd, engine_digest=engine_digest)
         _enforce_expectations(ns, context)
+        dispatch_started = True
         if ns.command_path in {"scope list", "scope show"}:
             result = run_scope_query(ns, context)
         elif ns.command_path in {"scope create initiative", "scope create epic", "scope create issue"}:
@@ -317,6 +320,10 @@ def run_vnext(
     except ValueError as error:
         return _failure(ns.command_path, "PRECONDITION_FAILED", str(error), 3, json_mode=json_mode)
     except RuntimeError:
+        if ns.command_path not in MUTATING_LEAF_PATHS or ns.dry_run or not dispatch_started:
+            return _failure(
+                ns.command_path, "INTERNAL_ERROR", "command failed before any effect", 1, json_mode=json_mode
+            )
         return _failure(
             ns.command_path,
             "EFFECT_STATE_UNKNOWN",
@@ -325,6 +332,14 @@ def run_vnext(
             json_mode=json_mode,
         )
     except OSError:
+        if ns.command_path in MUTATING_LEAF_PATHS and not ns.dry_run and dispatch_started:
+            return _failure(
+                ns.command_path,
+                "EFFECT_STATE_UNKNOWN",
+                "local I/O stopped; inspect the recorded effects before recovery",
+                6,
+                json_mode=json_mode,
+            )
         return _failure(ns.command_path, "LOCAL_IO_FAILED", "local I/O operation failed", 5, json_mode=json_mode)
     if json_mode:
         return RuntimeOutput(result.exit_code, render_json(result), "")
