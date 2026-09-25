@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import stat
 import subprocess
 import sys
 
@@ -28,6 +30,31 @@ from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
 from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
+
+
+def _commit_fixture(repo_root: Path, message: str) -> str:
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", message],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    return subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=repo_root, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _set_fixture_dependencies(meta_path: Path, targets: list[str]) -> None:
+    payload = json.loads(meta_path.read_text(encoding="utf-8"))
+    payload["depends_on"] = targets
+    payload["revision"] += 1
+    mode = stat.S_IMODE(meta_path.stat().st_mode)
+    meta_path.chmod(mode | stat.S_IWUSR)
+    try:
+        meta_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    finally:
+        meta_path.chmod(mode)
 
 
 def test_starting_open_sibling_requires_explicit_switch_active(tmp_path: Path) -> None:
@@ -273,3 +300,85 @@ def test_detached_start_requires_explicit_base(tmp_path: Path) -> None:
     assert JournalStore(repo_root / ".git").pending() == ()
     result = start_work(base="HEAD", **arguments)
     assert result.target_id == issue.id
+
+
+def test_new_start_rejects_unready_base_before_branch_creation_or_checkout(tmp_path: Path) -> None:
+    specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
+    repo_root = specdock_dir.parent
+    other = create_local_scope(
+        kind="issue",
+        title="Prerequisite",
+        parent=AncestorState(epic.id, "epic", "local", "open", False, initiative.id),
+        ancestors=(AncestorState(initiative.id, "initiative", "local", "open", False),),
+        repo_root=repo_root,
+        common_dir=repo_root / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        updated_at="2026-09-25T00:00:00Z",
+    )
+    _commit_fixture(repo_root, "ready graph")
+    meta_path = issue.path / ".meta.json"
+    _set_fixture_dependencies(meta_path, [other.id])
+    unready_base = _commit_fixture(repo_root, "unready graph")
+    _set_fixture_dependencies(meta_path, [])
+    current_head = _commit_fixture(repo_root, "ready current graph")
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+        "target": issue.id,
+        "base": unready_base,
+    }
+    for execute in (preview_start_work, start_work):
+        with pytest.raises(ValueError, match="START_NOT_READY"):
+            execute(**arguments)
+        assert (
+            subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=repo_root, check=True, capture_output=True, text=True
+            ).stdout.strip()
+            == current_head
+        )
+    assert (
+        subprocess.run(
+            ["git", "branch", "--list", f"{issue.id}-*"], cwd=repo_root, check=True, capture_output=True, text=True
+        ).stdout.strip()
+        == ""
+    )
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
+    assert JournalStore(repo_root / ".git").pending() == ()
+
+
+def test_registered_start_uses_ready_branch_instead_of_unready_current_graph(tmp_path: Path) -> None:
+    specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
+    repo_root = specdock_dir.parent
+    other = create_local_scope(
+        kind="issue",
+        title="Prerequisite",
+        parent=AncestorState(epic.id, "epic", "local", "open", False, initiative.id),
+        ancestors=(AncestorState(initiative.id, "initiative", "local", "open", False),),
+        repo_root=repo_root,
+        common_dir=repo_root / ".git",
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        updated_at="2026-09-25T00:00:00Z",
+    )
+    _commit_fixture(repo_root, "ready branch graph")
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    binding = create_scope_branch(scope_id=issue.id, base="HEAD", name=None, **arguments)
+    _set_fixture_dependencies(issue.path / ".meta.json", [other.id])
+    _commit_fixture(repo_root, "unready current graph")
+    preview = preview_start_work(target=issue.id, **arguments)
+    assert preview.branch == binding.name and not preview.branch_creation
+    result = start_work(target=issue.id, **arguments)
+    assert result.branch == binding.name
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == issue.id

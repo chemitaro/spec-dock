@@ -112,6 +112,7 @@ def check_scope_readiness(
     allow_stale: bool = False,
     offline: bool = False,
     gateway: GithubStateGateway | None = None,
+    gateway_repo_root: Path | None = None,
     worktree_id: str | None = None,
 ) -> ReadinessResult:
     """Observe only the target chain and effective prerequisites, without writes."""
@@ -141,7 +142,7 @@ def check_scope_readiness(
             assert isinstance(view.backend, GithubBackend)
             repository = f"{view.backend.repo_owner}/{view.backend.repo_name}"
             try:
-                observed = gateway.get(specdock_dir.parent, repository, view.backend.issue_number)
+                observed = gateway.get(gateway_repo_root or specdock_dir.parent, repository, view.backend.issue_number)
                 if observed.repository.lower() != repository.lower() or observed.number != view.backend.issue_number:
                     raise RemoteIssueError("GITHUB_ISSUE_ID_MISMATCH")
                 observations[view.id] = StatusObservation(

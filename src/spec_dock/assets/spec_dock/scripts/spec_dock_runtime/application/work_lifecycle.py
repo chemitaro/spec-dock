@@ -37,6 +37,7 @@ from spec_dock_runtime.domain.lifecycle import (
 from spec_dock_runtime.infra.active_store import load_selection_v3, save_selection_v3
 from spec_dock_runtime.infra.control_store import load_control
 from spec_dock_runtime.infra.git_cli import worktree_list
+from spec_dock_runtime.infra.git_snapshot import scope_graph_at_commit
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
@@ -162,36 +163,40 @@ def _current_start_state(
 def _start_plan(
     *,
     repo_root: Path,
-    worktree_id: str,
-    target: str,
+    views: tuple[ScopeView, ...],
+    selection: SelectionState,
+    target_id: str,
+    target_sha: str,
     source: str,
     allow_stale: bool,
     offline: bool,
     gateway: GithubIssueGateway | None,
     switch_active: bool,
-) -> tuple[tuple[ScopeView, ...], SelectionState, WorkStartPlan]:
+) -> WorkStartPlan:
     specdock_dir = repo_root / "spec-dock"
-    views = load_scope_views(specdock_dir)
-    selection, _ = load_selection_v3(specdock_dir, worktree_id=worktree_id)
-    readiness = check_scope_readiness(
-        specdock_dir,
-        target,
-        source=source,
-        for_start=True,
-        allow_stale=allow_stale,
-        offline=offline,
-        gateway=gateway,
-        worktree_id=worktree_id,
-    )
-    plan = plan_start_work(
+    _verify_scope_at_commit(repo_root, views, target_id, target_sha)
+    loaded_cache = read_guarded_json(specdock_dir / ".agent" / "github-status-cache.json")
+    with scope_graph_at_commit(
+        repo_root, target_sha, status_cache=loaded_cache[0] if loaded_cache is not None else None
+    ) as snapshot:
+        readiness = check_scope_readiness(
+            snapshot,
+            target_id,
+            source=source,
+            for_start=True,
+            allow_stale=allow_stale,
+            offline=offline,
+            gateway=gateway,
+            gateway_repo_root=repo_root,
+        )
+    return plan_start_work(
         views,
-        target=target,
+        target=target_id,
         selection=selection,
         current_state=_current_start_state(repo_root, views, selection, gateway),
         readiness=readiness,
         switch_active=switch_active,
     )
-    return views, selection, plan
 
 
 def preview_start_work(
@@ -219,18 +224,11 @@ def preview_start_work(
         expected_epoch=expected_epoch,
     )
     _require_clean_start(repo_root)
-    views, selection, plan = _start_plan(
-        repo_root=repo_root,
-        worktree_id=worktree_id,
-        target=target,
-        source=source,
-        allow_stale=allow_stale,
-        offline=offline,
-        gateway=gateway,
-        switch_active=switch_active,
-    )
+    views = load_scope_views(repo_root / "spec-dock")
+    selection, _ = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
+    target_id = show_scope(views, target, selection=selection).id
     try:
-        binding = show_scope_branch(repo_root, common_dir, plan.target_id)
+        binding = show_scope_branch(repo_root, common_dir, target_id)
     except LookupError:
         binding = None
     if binding is None:
@@ -242,20 +240,35 @@ def preview_start_work(
             worktree_id=worktree_id,
             engine_digest=engine_digest,
             expected_epoch=expected_epoch,
-            scope_id=plan.target_id,
+            scope_id=target_id,
             base=base,
             name=branch_name,
         )
-        return WorkStartPreview(planned.scope_id, planned.name, True, plan.selection_after != selection)
-    if base is not None:
-        raise ValueError("--base is valid only when creating a new canonical branch")
-    if branch_name is not None and branch_name != binding.name:
-        raise ValueError("requested branch differs from the canonical binding")
-    for worktree in worktree_list(repo_root):
-        if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
-            raise ValueError("canonical branch is checked out in another worktree")
-    _verify_scope_at_commit(repo_root, views, plan.target_id, _resolve_commit(repo_root, f"refs/heads/{binding.name}"))
-    return WorkStartPreview(plan.target_id, binding.name, False, plan.selection_after != selection)
+        target_sha = planned.initial_sha
+        branch = planned.name
+    else:
+        if base is not None:
+            raise ValueError("--base is valid only when creating a new canonical branch")
+        if branch_name is not None and branch_name != binding.name:
+            raise ValueError("requested branch differs from the canonical binding")
+        for worktree in worktree_list(repo_root):
+            if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
+                raise ValueError("canonical branch is checked out in another worktree")
+        target_sha = _resolve_commit(repo_root, f"refs/heads/{binding.name}")
+        branch = binding.name
+    plan = _start_plan(
+        repo_root=repo_root,
+        views=views,
+        selection=selection,
+        target_id=target_id,
+        target_sha=target_sha,
+        source=source,
+        allow_stale=allow_stale,
+        offline=offline,
+        gateway=gateway,
+        switch_active=switch_active,
+    )
+    return WorkStartPreview(plan.target_id, branch, binding is None, plan.selection_after != selection)
 
 
 def start_work(
@@ -277,33 +290,42 @@ def start_work(
 ) -> WorkStartResult:
     """Start one ready Scope with fixed checkout and selection effects."""
     _require_clean_start(repo_root)
-    _views, selection, plan = _start_plan(
+    views = load_scope_views(repo_root / "spec-dock")
+    selection, _ = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
+    target_id = show_scope(views, target, selection=selection).id
+    try:
+        binding = show_scope_branch(repo_root, common_dir, target_id)
+        if base is not None:
+            raise ValueError("--base is valid only when creating a new canonical branch")
+        if branch_name is not None and branch_name != binding.name:
+            raise ValueError("requested branch differs from the canonical binding")
+        target_sha = _resolve_commit(repo_root, f"refs/heads/{binding.name}")
+    except LookupError:
+        if base is None:
+            raise ValueError("new work start requires --base") from None
+        target_sha = _resolve_commit(repo_root, base)
+        binding = None
+    plan = _start_plan(
         repo_root=repo_root,
-        worktree_id=worktree_id,
-        target=target,
+        views=views,
+        selection=selection,
+        target_id=target_id,
+        target_sha=target_sha,
         source=source,
         allow_stale=allow_stale,
         offline=offline,
         gateway=gateway,
         switch_active=switch_active,
     )
-    try:
-        binding = show_scope_branch(repo_root, common_dir, plan.target_id)
-        if base is not None:
-            raise ValueError("--base is valid only when creating a new canonical branch")
-        if branch_name is not None and branch_name != binding.name:
-            raise ValueError("requested branch differs from the canonical binding")
-    except LookupError:
-        if base is None:
-            raise ValueError("new work start requires --base") from None
+    if binding is None:
         binding = create_scope_branch(
             repo_root=repo_root,
             common_dir=common_dir,
             worktree_id=worktree_id,
             engine_digest=engine_digest,
             expected_epoch=expected_epoch,
-            scope_id=plan.target_id,
-            base=base,
+            scope_id=target_id,
+            base=target_sha,
             name=branch_name,
             lock_timeout=lock_timeout,
         )
@@ -317,17 +339,9 @@ def start_work(
             expected_epoch=expected_epoch,
         )
         _require_clean_start(repo_root)
-        current_views, current_selection, current_plan = _start_plan(
-            repo_root=repo_root,
-            worktree_id=worktree_id,
-            target=plan.target_id,
-            source=source,
-            allow_stale=allow_stale,
-            offline=offline,
-            gateway=gateway,
-            switch_active=switch_active,
-        )
-        if current_selection != selection or current_plan.target_id != plan.target_id:
+        current_views = load_scope_views(repo_root / "spec-dock")
+        current_selection, _ = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
+        if current_selection != selection:
             raise ValueError("work start inputs changed before checkout")
         if show_scope_branch(repo_root, common_dir, plan.target_id) != binding:
             raise ValueError("canonical branch binding changed before work start")
@@ -335,7 +349,20 @@ def start_work(
             if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
                 raise ValueError("canonical branch is checked out in another worktree")
         branch_tip = _resolve_commit(repo_root, f"refs/heads/{binding.name}")
-        _verify_scope_at_commit(repo_root, current_views, plan.target_id, branch_tip)
+        if branch_tip != target_sha:
+            raise ValueError("canonical branch changed after start readiness check")
+        current_plan = _start_plan(
+            repo_root=repo_root,
+            views=current_views,
+            selection=current_selection,
+            target_id=plan.target_id,
+            target_sha=target_sha,
+            source=source,
+            allow_stale=allow_stale,
+            offline=offline,
+            gateway=gateway,
+            switch_active=switch_active,
+        )
         source_branch, source_sha = _head_state(repo_root)
         fixed = {
             "scope": plan.target_id,
@@ -381,6 +408,7 @@ def start_work(
             gateway=gateway,
             worktree_id=worktree_id,
         )
+        _verify_start_checkout(repo_root, fixed)
         selection_intent = record_effect_intent(
             checkout_done, effect_id="selection-set", kind="local", target=worktree_id
         )
@@ -559,6 +587,7 @@ def resume_start_work(
                 gateway=gateway,
                 worktree_id=worktree_id,
             )
+            _verify_start_checkout(repo_root, fixed)
         views = load_scope_views(specdock_dir)
         if select_scope(views, fixed["scope"], current=before) != after:
             raise ValueError("work start selection does not match the fixed Scope")
