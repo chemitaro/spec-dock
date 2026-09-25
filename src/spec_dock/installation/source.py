@@ -44,6 +44,7 @@ _REQUIRED_FILES = (
 )
 _MAX_ARCHIVE_SIZE = 200 * 1024 * 1024
 _MAX_FILE_SIZE = 50 * 1024 * 1024
+_MANAGED_ARCHIVE_ROOT = "src/spec_dock/assets"
 
 
 @dataclass(frozen=True)
@@ -194,9 +195,20 @@ def _members(archive: bytes) -> tuple[tuple[str, tarfile.TarInfo, bytes], ...]:
                 prefix = parts[0]
             if parts[0] != prefix:
                 raise ValueError("archive has multiple roots")
+            if member.issym():
+                relative = PurePosixPath(*parts[1:]).as_posix()
+                if (
+                    relative == "pyproject.toml"
+                    or relative == _MANAGED_ARCHIVE_ROOT
+                    or relative.startswith(f"{_MANAGED_ARCHIVE_ROOT}/")
+                    or _MANAGED_ARCHIVE_ROOT.startswith(f"{relative}/")
+                ):
+                    raise ValueError("archive contains a link or special file")
+                # Repository links outside the packaged distribution are never extracted.
+                continue
             if not member.isdir() and not member.isfile():
                 raise ValueError("archive contains a link or special file")
-            if member.mode & ~0o777 or member.mode & 0o022:
+            if member.mode & ~0o777:
                 raise ValueError("archive permissions are unsafe")
             if len(parts) == 1:
                 continue

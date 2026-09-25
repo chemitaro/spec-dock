@@ -103,6 +103,51 @@ def test_verified_bundle_includes_hidden_assets_and_has_stable_digest(tmp_path: 
     assert third.digest != first.digest
 
 
+def test_github_archive_group_write_modes_are_normalized(tmp_path: Path) -> None:
+    source = PinnedSource("chemitaro/spec-dock", "a" * 40, None)
+    buffer = BytesIO()
+    with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+        directory = tarfile.TarInfo("chemitaro-spec-dock-fixed/src")
+        directory.type = tarfile.DIRTYPE
+        directory.mode = 0o775
+        archive.addfile(directory)
+        for name, content in _minimal_files().items():
+            item = tarfile.TarInfo(f"chemitaro-spec-dock-fixed/{name}")
+            item.size = len(content)
+            item.mode = 0o664
+            archive.addfile(item, BytesIO(content))
+    bundle = verify_pinned_archive(source, buffer.getvalue(), tmp_path / "github-modes")
+    assert (bundle.root / "pyproject.toml").stat().st_mode & 0o777 == 0o644
+    assert (bundle.root / "src").stat().st_mode & 0o777 == 0o755
+
+
+def test_unrelated_repository_symlink_is_ignored_but_managed_symlink_is_rejected(tmp_path: Path) -> None:
+    source = PinnedSource("chemitaro/spec-dock", "a" * 40, None)
+
+    def archive_with_link(link_path: str) -> bytes:
+        buffer = BytesIO()
+        with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
+            for name, content in _minimal_files().items():
+                item = tarfile.TarInfo(f"chemitaro-spec-dock-fixed/{name}")
+                item.size = len(content)
+                item.mode = 0o644
+                archive.addfile(item, BytesIO(content))
+            link = tarfile.TarInfo(f"chemitaro-spec-dock-fixed/{link_path}")
+            link.type = tarfile.SYMTYPE
+            link.linkname = "../outside"
+            archive.addfile(link)
+        return buffer.getvalue()
+
+    bundle = verify_pinned_archive(source, archive_with_link("other/link"), tmp_path / "unrelated-link")
+    assert not (bundle.root / "other").exists()
+    with pytest.raises(ValueError, match="link or special"):
+        verify_pinned_archive(
+            source,
+            archive_with_link("src/spec_dock/assets/spec_dock/docs/link"),
+            tmp_path / "managed-link",
+        )
+
+
 def test_archive_download_checks_fixed_redirect_host(monkeypatch: pytest.MonkeyPatch) -> None:
     source = PinnedSource("chemitaro/spec-dock", "a" * 40, None)
 
@@ -156,7 +201,7 @@ def test_archive_traversal_links_and_missing_hidden_assets_are_rejected(tmp_path
         verify_pinned_archive(source, _archive(wrong_project), tmp_path / "wrong-project")
     buffer = BytesIO()
     with tarfile.open(fileobj=buffer, mode="w:gz") as archive:
-        item = tarfile.TarInfo("chemitaro-spec-dock-fixed/link")
+        item = tarfile.TarInfo("chemitaro-spec-dock-fixed/src/spec_dock/assets/link")
         item.type = tarfile.SYMTYPE
         item.linkname = "../outside"
         archive.addfile(item)
