@@ -46,6 +46,17 @@ def test_each_leaf_has_specific_preconditions_and_example(tmp_path: Path) -> Non
         assert parsed.namespace is not None, (leaf, parsed.stderr)
 
 
+def test_help_explains_supported_finish_and_migration_modes(tmp_path: Path) -> None:
+    finish = json.loads(_run(tmp_path, "help", "work", "finish", "--json").stdout)["data"]["help"]
+    assert "outside the active chain" in finish
+    assert "An active Scope must resolve" not in finish
+
+    migrate = json.loads(_run(tmp_path, "help", "workspace", "migrate", "--json").stdout)["data"]["help"]
+    assert "--dry-run" in migrate
+    assert "without --mapping-file" in migrate
+    assert "Applying a migration requires" in migrate
+
+
 def test_completions_include_every_catalog_leaf_without_writing_files(tmp_path: Path) -> None:
     before = tuple(tmp_path.iterdir())
     for shell in ("bash", "zsh", "fish"):
