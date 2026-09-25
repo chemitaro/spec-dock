@@ -1621,7 +1621,11 @@ class TestInitUpdate(CliRuntimeHarness):
             self._overlay_checked_in_dogfooding_runtime(target)
 
             target_initiatives_root = target / "spec-dock" / "initiatives"
-            shutil.copytree(checked_in_initiatives_root, target_initiatives_root)
+            shutil.copytree(
+                checked_in_initiatives_root,
+                target_initiatives_root,
+                ignore=shutil.ignore_patterns(".workbench"),
+            )
 
             def _find_issue_meta_path(issue_id: str) -> Path:
                 matches: list[Path] = []

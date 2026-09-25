@@ -42,6 +42,8 @@ ID: "iss-00409"
 
 `812bf674` のGitHub上のcommitから作った、登録worktreeが一つだけの独立cloneでは、`installation update --maintenance`、239 Scopeの `workspace migrate --to-schema 3`、`installation update --finalize`、`workspace validate`、`workspace sync` が成功しました。移行差分を確認し、元の239 Scopeの属性・既存依存を保持したままschema 3、backend、空依存の初期値を設定したことを検査しました。clone内でlocal Initiative `init-local-00004`、Epic `epic-local-00002`、Issue `iss-local-00002` を作成し、`work start` を上位から順に実行して各専用ブランチへのcheckoutとactive選択を確認しました。`work finish` は下位から順に実行し、三つのScopeがcompleted、activeが空、最終 `workspace validate` がvalidであることを確認しました。GitHubのScopeは作成・変更していません。導入、移行、作業操作の証拠は本Issueの無追跡 `.workbench/dogfood/` に保存しました。共有Git領域を持つこの開発worktreeと他の稼働中worktreeは更新していません。
 
+独立cloneを置いた後の全テストでは `2084 passed, 1 failed, 25 skipped` でした。失敗は旧CLIのdogfooding検証fixtureが `spec-dock/initiatives/` を複製する際、Git管理外の `.workbench/dogfood/` に入った独立cloneまで複製し、同じ旧Issue IDを重複検出したためです。正本ツリーだけを複製するよう `.workbench` を除外し、該当テストを再実行して `1 passed` を確認しました。最終候補の全テスト結果は固定SHAに対して改めて取得します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。
