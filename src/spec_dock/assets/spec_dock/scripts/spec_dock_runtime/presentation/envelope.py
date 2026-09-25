@@ -59,8 +59,8 @@ class OperationResult(Generic[T]):
 
     def __post_init__(self) -> None:
         if self.status == "partial":
-            if self.exit_code != 6 or self.error is None:
-                raise ValueError("partial result requires exit 6 and error")
+            if self.exit_code not in (6, 7) or self.error is None:
+                raise ValueError("partial result requires exit 6 or diagnostic exit 7 and error")
         elif self.status == "failed":
             if self.exit_code not in (1, 2, 3, 4, 5, 7) or self.error is None:
                 raise ValueError("failed result requires a failure exit and error")

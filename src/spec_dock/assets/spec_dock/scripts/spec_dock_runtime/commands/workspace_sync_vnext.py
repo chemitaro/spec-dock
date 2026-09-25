@@ -38,7 +38,7 @@ def run_workspace_sync(
         )
         return OperationResult(
             command=ns.command_path,
-            status="planned",
+            status="failed" if not preview.valid else "planned",
             data=WorkspaceSyncData(
                 None,
                 preview.node_count,
@@ -49,8 +49,11 @@ def run_workspace_sync(
                 preview.remote_count,
                 preview.findings,
             ),
-            exit_code=0,
-            effects=(Effect("generation-publish", "planned", None),),
+            exit_code=7 if not preview.valid else 0,
+            effects=() if not preview.valid else (Effect("generation-publish", "planned", None),),
+            error=Diagnostic("INVALID_GENERATION", "diagnostic generation contains invalid scope structure", {})
+            if not preview.valid
+            else None,
         )
     result = sync_workspace(
         repo_root=context.repo_root,
@@ -64,7 +67,15 @@ def run_workspace_sync(
         gateway=gateway,
         lock_timeout=ns.lock_timeout,
     )
-    partial = not result.complete or result.projection_stale
+    invalid = not result.generation.valid
+    partial = invalid or not result.complete or result.projection_stale
+    error = (
+        Diagnostic("INVALID_GENERATION", "diagnostic generation contains invalid scope structure", {})
+        if invalid
+        else Diagnostic("SYNC_INCOMPLETE", "workspace projection or GitHub refresh was incomplete", {})
+        if partial
+        else None
+    )
     return OperationResult(
         command=ns.command_path,
         status="partial" if partial else "succeeded",
@@ -78,9 +89,7 @@ def run_workspace_sync(
             None,
             result.findings,
         ),
-        exit_code=6 if partial else 0,
+        exit_code=7 if invalid else 6 if partial else 0,
         effects=(Effect("generation-publish", "succeeded", result.generation.id),),
-        error=Diagnostic("SYNC_INCOMPLETE", "workspace projection or GitHub refresh was incomplete", {})
-        if partial
-        else None,
+        error=error,
     )

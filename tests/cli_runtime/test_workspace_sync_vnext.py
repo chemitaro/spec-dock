@@ -131,6 +131,25 @@ def test_invalid_parent_requires_diagnostic_opt_in(tmp_path: Path, monkeypatch: 
     result = sync_workspace(**_sync_args(common), allow_invalid=True)
     assert result.generation.valid is False
     assert result.findings == ("invalid_parent:epic-local-00001",)
+    preview = run_vnext(
+        ["workspace", "sync", "--allow-invalid", "--dry-run", "--json"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    assert preview.exit_code == 7
+    assert json.loads(preview.stdout)["data"]["valid"] is False
+    cli = run_vnext(
+        ["workspace", "sync", "--allow-invalid", "--json"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    payload = json.loads(cli.stdout)
+    assert cli.exit_code == 7
+    assert payload["status"] == "partial"
+    assert payload["data"]["valid"] is False
+    assert payload["error"]["code"] == "INVALID_GENERATION"
 
 
 def test_projection_failure_keeps_generation_readable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
