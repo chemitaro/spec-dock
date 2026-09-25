@@ -32,10 +32,12 @@ from spec_dock_runtime.domain.dependency_vnext import ReadinessResult  # noqa: E
 from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
 from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
+from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
 from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
 
 if TYPE_CHECKING:
+    from spec_dock_runtime.domain.operation import OperationRecord
     from spec_dock_runtime.infra.contracts import GithubIssueRecord
 
 
@@ -233,6 +235,80 @@ def test_start_creates_canonical_branch_for_each_local_scope(tmp_path: Path, kin
     assert result.branch.startswith(selected.id + "-")
     assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == selected.id
     assert JournalStore(repo_root / ".git").pending() == ()
+    journal = JournalStore(repo_root / ".git")
+    operations = tuple(
+        operation
+        for path in journal.root.iterdir()
+        if (operation := journal.load(path.name)).command in {"branch.create", "work.start"}
+    )
+    assert len(operations) == 1
+    assert operations[0].command == "work.start"
+    assert operations[0].effect_plan == ("git-branch", "registry-bind", "checkout", "selection-set")
+
+
+@pytest.mark.parametrize("kind", ["initiative", "epic", "issue"])
+def test_new_start_resumes_after_branch_ref_before_registry_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, kind: str
+) -> None:
+    specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
+    selected = {"initiative": initiative, "epic": epic, "issue": issue}[kind]
+    repo_root = specdock_dir.parent
+    _commit_fixture(repo_root, "fixture")
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    original = RegistryStore.bind_locked
+
+    def stopped(self: RegistryStore, binding: object) -> object:
+        raise RuntimeError("binding stopped")
+
+    monkeypatch.setattr(RegistryStore, "bind_locked", stopped)
+    with pytest.raises(RuntimeError, match="binding stopped"):
+        start_work(target=selected.id, base="HEAD", **arguments)
+    pending = JournalStore(repo_root / ".git").pending()
+    assert len(pending) == 1 and pending[0].command == "work.start"
+    assert pending[0].effect_plan == ("git-branch", "registry-bind", "checkout", "selection-set")
+    monkeypatch.setattr(RegistryStore, "bind_locked", original)
+    resumed = resume_start_work(operation_id=pending[0].operation_id, **arguments)
+    assert resumed.target_id == selected.id and resumed.branch_created
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == selected.id
+    assert JournalStore(repo_root / ".git").pending() == ()
+
+
+def test_new_start_resumes_after_registry_binding_before_effect_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    repo_root = specdock_dir.parent
+    _commit_fixture(repo_root, "fixture")
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+    }
+    original = JournalStore.update
+
+    def stopped(self: JournalStore, record: OperationRecord, *, expected_sequence: int) -> None:
+        if record.effects and record.effects[-1].id == "registry-bind" and record.effects[-1].status == "succeeded":
+            raise RuntimeError("binding result stopped")
+        original(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", stopped)
+    with pytest.raises(RuntimeError, match="binding result stopped"):
+        start_work(target=issue.id, base="HEAD", **arguments)
+    pending = JournalStore(repo_root / ".git").pending()
+    assert len(pending) == 1 and pending[0].command == "work.start"
+    assert pending[0].effects[-1].id == "registry-bind" and pending[0].effects[-1].status == "intent"
+    monkeypatch.setattr(JournalStore, "update", original)
+    resumed = resume_start_work(operation_id=pending[0].operation_id, **arguments)
+    assert resumed.target_id == issue.id and resumed.branch_created
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == issue.id
 
 
 @pytest.mark.parametrize("kind", ["initiative", "epic", "issue"])

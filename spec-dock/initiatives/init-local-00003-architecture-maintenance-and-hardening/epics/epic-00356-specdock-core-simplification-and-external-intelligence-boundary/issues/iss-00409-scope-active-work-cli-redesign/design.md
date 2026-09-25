@@ -257,6 +257,8 @@ canonical branch対応は、tracked `.meta.json` に書きません。branch作�
 
 新規作成は --base必須で、commitに一度resolveして固定します。既存canonical branchには--baseを渡せず、resetもしません。branch createは常に新規作成操作です。既存branchを通常のbranch createでadoptする機能は公開せず、移行の明示mappingだけで既存対応を登録します。
 
+`work start` の新規branchは、独立した `branch.create` 完了記録を先行させず、同じ `work.start` journal内で `git-branch → registry-bind → checkout → selection-set` の順に実行します。各副作用の直前に意図を永続化し、再開時は固定branch名・SHA、registry revision、HEAD、選択状態の前後値を照合します。既存branchのstartは `checkout → selection-set` の二効果です。
+
 registry未登録なのに候補branchが既に存在する場合は `BRANCH_ADOPTION_REQUIRED` で停止します。既存の名前から勝手に関連づけず、停止中の `workspace migrate --mapping-file` で明示adoptします。registered branchが消えた場合は `CANONICAL_BRANCH_MISSING` とし、new baseで勝手に再作成しません。refを既知commitへ復元するか、明示復旧mappingを停止中に適用します。title編集やuninstallで対応を失効させません。
 
 start/switchは、変更前に新checkout先に対象のmetadata・親・対応schemaが存在すること、branchが他worktreeで使われていないこと、現在treeがcleanであることを確認します。検証からcheckoutまでのref差替えも再確認します。切替先graphが異なるときは開始条件をそのsnapshotで評価し、切替後に同じsnapshotを確認してactiveを書きます。targetがbaseに存在しないなら、まず利用者が仕様を適切なcommitへ含める必要があります。自動commit/cherry-pick/copyはしません。

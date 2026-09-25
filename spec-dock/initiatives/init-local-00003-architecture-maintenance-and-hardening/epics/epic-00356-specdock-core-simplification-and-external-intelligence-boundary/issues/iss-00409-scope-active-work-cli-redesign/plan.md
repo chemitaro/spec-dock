@@ -254,7 +254,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T08,T13,T15,T16 |
 | 対象file群 | 既存 RT application/issue_lifecycle.pyを分離。新設 application/work_lifecycle.py、commands/work.py。 |
-| 実施内容 | resolve/guards/branch/activeをtyped use caseで合成し、同じ階層内移動と別枝switch-activeを分けます。checkout後active失敗をjournalで回復します。 |
+| 実施内容 | resolve/guards/branch/activeをtyped use caseで合成し、同じ階層内移動と別枝switch-activeを分けます。新規branchの作成・registry対応・checkout・active選択を単一 `work.start` journalで記録し、各段階の停止から固定値を照合して再開します。 |
 | 完了条件 | 三kind×local/githubの開始と禁止effectが一致します。forceやCLI再帰呼出しを使用しません。 |
 | 必要なテスト | 新設 tests/cli_runtime/test_work_start_vnext.py。dirty、ancestor移動、sibling guard、stale opt-in、checkout後kill/active fail。 |
 | 対応AC | AC-08, AC-09, AC-28 |

@@ -9,10 +9,12 @@ from typing import TYPE_CHECKING
 
 from spec_dock_runtime.application.active_selection import clear_selection, select_scope
 from spec_dock_runtime.application.branch_vnext import (
+    _branch_exists,
     _git,
+    _plan_scope_branch_create,
     _resolve_commit,
+    _validate_name,
     _verify_scope_at_commit,
-    create_scope_branch,
     preview_scope_branch_create,
     show_scope_branch,
 )
@@ -26,6 +28,7 @@ from spec_dock_runtime.application.operation_executor import (
 from spec_dock_runtime.application.scope_completion import _descendants, plan_close
 from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock_runtime.cli.admission import admit_writer
+from spec_dock_runtime.domain.branch_binding import BranchBinding
 from spec_dock_runtime.domain.lifecycle import (
     GithubBackend,
     LocalBackend,
@@ -41,6 +44,7 @@ from spec_dock_runtime.infra.git_snapshot import scope_graph_at_commit
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
+from spec_dock_runtime.infra.registry_store import RegistryStore
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
@@ -82,6 +86,7 @@ class WorkStartResult:
     branch: str
     selection_changed: bool
     operation_id: str
+    branch_created: bool = False
 
 
 @dataclass(frozen=True)
@@ -305,6 +310,12 @@ def start_work(
             raise ValueError("new work start requires --base") from None
         target_sha = _resolve_commit(repo_root, base)
         binding = None
+    new_branch = binding is None
+    if new_branch:
+        candidate, _scope_revision, _registry_revision = _plan_scope_branch_create(
+            repo_root, common_dir, target_id, target_sha, branch_name
+        )
+        binding = candidate
     plan = _start_plan(
         repo_root=repo_root,
         views=views,
@@ -317,18 +328,6 @@ def start_work(
         gateway=gateway,
         switch_active=switch_active,
     )
-    if binding is None:
-        binding = create_scope_branch(
-            repo_root=repo_root,
-            common_dir=common_dir,
-            worktree_id=worktree_id,
-            engine_digest=engine_digest,
-            expected_epoch=expected_epoch,
-            scope_id=target_id,
-            base=target_sha,
-            name=branch_name,
-            lock_timeout=lock_timeout,
-        )
     with WriterLock(common_dir, timeout=lock_timeout):
         control = load_control(common_dir)
         admit_writer(
@@ -343,12 +342,20 @@ def start_work(
         current_selection, _ = load_selection_v3(repo_root / "spec-dock", worktree_id=worktree_id)
         if current_selection != selection:
             raise ValueError("work start inputs changed before checkout")
-        if show_scope_branch(repo_root, common_dir, plan.target_id) != binding:
+        registry_revision = None
+        if new_branch:
+            planned, _scope_revision, registry_revision = _plan_scope_branch_create(
+                repo_root, common_dir, plan.target_id, target_sha, branch_name
+            )
+            if planned != binding:
+                raise ValueError("canonical branch candidate changed before work start")
+        elif show_scope_branch(repo_root, common_dir, plan.target_id) != binding:
             raise ValueError("canonical branch binding changed before work start")
+        assert binding is not None
         for worktree in worktree_list(repo_root):
             if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(strict=True):
                 raise ValueError("canonical branch is checked out in another worktree")
-        branch_tip = _resolve_commit(repo_root, f"refs/heads/{binding.name}")
+        branch_tip = target_sha if new_branch else _resolve_commit(repo_root, f"refs/heads/{binding.name}")
         if branch_tip != target_sha:
             raise ValueError("canonical branch changed after start readiness check")
         current_plan = _start_plan(
@@ -380,16 +387,45 @@ def start_work(
         }
         assert control is not None
         journal = JournalStore(common_dir)
+        revisions = {"selection": selection.revision}
+        if registry_revision is not None:
+            revisions["registry"] = registry_revision
         operation = prepare_operation(
             command="work.start",
             fixed_targets=fixed,
-            effect_plan=("checkout", "selection-set"),
+            effect_plan=("git-branch", "registry-bind", "checkout", "selection-set")
+            if new_branch
+            else ("checkout", "selection-set"),
             request_fingerprint=_fingerprint(fixed),
-            before_revisions={"selection": selection.revision},
+            before_revisions=revisions,
             engine_digest=engine_digest,
             writer_epoch=control.epoch,
         )
         journal.create(operation)
+        if new_branch:
+            assert registry_revision is not None
+            branch_intent = record_effect_intent(operation, effect_id="git-branch", kind="git", target=binding.name)
+            journal.update(branch_intent, expected_sequence=operation.sequence)
+            created = _git(repo_root, "branch", binding.name, branch_tip)
+            if created.returncode != 0:
+                raise RuntimeError("work start branch creation failed; inspect the pending operation")
+            branch_done = record_effect_result(branch_intent, effect_id="git-branch", status="succeeded")
+            journal.update(branch_done, expected_sequence=branch_intent.sequence)
+            registry_intent = record_effect_intent(
+                branch_done, effect_id="registry-bind", kind="local", target=plan.target_id
+            )
+            journal.update(registry_intent, expected_sequence=branch_done.sequence)
+            bound = RegistryStore(common_dir).bind_locked(binding)
+            if bound.revision != registry_revision + 1:
+                raise ValueError("work start registry revision changed")
+            registry_done = record_effect_result(
+                registry_intent,
+                effect_id="registry-bind",
+                status="succeeded",
+                after_revisions={"registry": bound.revision},
+            )
+            journal.update(registry_done, expected_sequence=registry_intent.sequence)
+            operation = registry_done
         checkout_intent = record_effect_intent(operation, effect_id="checkout", kind="git", target=binding.name)
         journal.update(checkout_intent, expected_sequence=operation.sequence)
         if (source_branch, source_sha) != (binding.name, branch_tip):
@@ -433,7 +469,9 @@ def start_work(
             selection_done, phase="complete", terminal_status="succeeded", sequence=selection_done.sequence + 1
         )
         journal.update(terminal, expected_sequence=selection_done.sequence)
-        return WorkStartResult(plan.target_id, binding.name, after_selection != selection, operation.operation_id)
+        return WorkStartResult(
+            plan.target_id, binding.name, after_selection != selection, operation.operation_id, new_branch
+        )
 
 
 def _verify_start_checkout(repo_root: Path, fixed: Mapping[str, str]) -> None:
@@ -490,9 +528,11 @@ def resume_start_work(
         if expected_scope_id is not None and fixed.get("scope") != expected_scope_id:
             raise ValueError("work start recovery target differs from the recorded Scope ID")
         revisions = dict(operation.before_revisions)
+        branch_created = operation.effect_plan == ("git-branch", "registry-bind", "checkout", "selection-set")
         if (
             operation.command != "work.start"
-            or operation.effect_plan != ("checkout", "selection-set")
+            or operation.effect_plan
+            not in {("checkout", "selection-set"), ("git-branch", "registry-bind", "checkout", "selection-set")}
             or set(fixed)
             != {
                 "scope",
@@ -511,7 +551,7 @@ def resume_start_work(
             or fixed["worktree"] != worktree_id
             or fixed["readiness_source"] not in ("github", "cache")
             or any(fixed[item] not in ("true", "false") for item in ("allow_stale", "offline", "switch_active"))
-            or set(revisions) != {"selection"}
+            or set(revisions) != ({"selection", "registry"} if branch_created else {"selection"})
             or operation.request_fingerprint != _fingerprint(fixed)
             or operation.engine_digest != engine_digest
             or operation.writer_epoch != expected_epoch
@@ -526,7 +566,7 @@ def resume_start_work(
             revision=before.revision + (fixed["selection_before"] != fixed["selection_after"]),
         )
         if operation.terminal_status == "succeeded":
-            return WorkStartResult(fixed["scope"], fixed["branch"], before != after, operation_id)
+            return WorkStartResult(fixed["scope"], fixed["branch"], before != after, operation_id, branch_created)
         if operation.terminal_status != "pending":
             raise ValueError("work start recovery requires a pending operation")
         admit_writer(
@@ -537,11 +577,72 @@ def resume_start_work(
             expected_epoch=expected_epoch,
             recovery_operation_id=operation_id,
         )
-        binding = show_scope_branch(repo_root, common_dir, fixed["scope"])
-        if (
-            binding.name != fixed["branch"]
-            or _resolve_commit(repo_root, f"refs/heads/{binding.name}") != fixed["branch_sha"]
-        ):
+        binding = BranchBinding(fixed["scope"], fixed["branch"], fixed["branch_sha"])
+        _validate_name(repo_root, binding.name)
+        registry = RegistryStore(common_dir)
+        if branch_created:
+            state, _ = registry.load()
+            existing = tuple(
+                item for item in state.branches if item.scope_id == binding.scope_id or item.name == binding.name
+            )
+            if existing not in ((), (binding,)):
+                raise ValueError("work start canonical branch binding changed")
+            if (not existing and state.revision != revisions["registry"]) or (
+                existing and state.revision != revisions["registry"] + 1
+            ):
+                raise ValueError("work start registry revision changed")
+            if not operation.effects:
+                if existing or state.revision != revisions["registry"] or _branch_exists(repo_root, binding.name):
+                    raise ValueError("work start branch changed before effect intent")
+                advanced = record_effect_intent(operation, effect_id="git-branch", kind="git", target=binding.name)
+                journal.update(advanced, expected_sequence=operation.sequence)
+                operation = advanced
+            if operation.effects[0].id != "git-branch" or operation.effects[0].target != binding.name:
+                raise ValueError("work start branch effect differs")
+            if operation.effects[0].status == "intent":
+                if not _branch_exists(repo_root, binding.name):
+                    created = _git(repo_root, "branch", binding.name, fixed["branch_sha"])
+                    if created.returncode != 0:
+                        raise RuntimeError("work start branch creation failed during recovery")
+                if _resolve_commit(repo_root, f"refs/heads/{binding.name}") != fixed["branch_sha"]:
+                    raise ValueError("work start branch ref differs from recorded SHA")
+                advanced = record_effect_result(operation, effect_id="git-branch", status="succeeded")
+                journal.update(advanced, expected_sequence=operation.sequence)
+                operation = advanced
+            elif operation.effects[0].status != "succeeded":
+                raise ValueError("work start branch effect cannot be reconciled")
+            if _resolve_commit(repo_root, f"refs/heads/{binding.name}") != fixed["branch_sha"]:
+                raise ValueError("work start branch ref changed")
+            if len(operation.effects) == 1:
+                if existing:
+                    raise ValueError("work start registry changed before binding intent")
+                advanced = record_effect_intent(
+                    operation, effect_id="registry-bind", kind="local", target=binding.scope_id
+                )
+                journal.update(advanced, expected_sequence=operation.sequence)
+                operation = advanced
+            if operation.effects[1].id != "registry-bind" or operation.effects[1].target != binding.scope_id:
+                raise ValueError("work start registry effect differs")
+            if operation.effects[1].status == "intent":
+                if not existing:
+                    bound = registry.bind_locked(binding)
+                    if bound.revision != revisions["registry"] + 1:
+                        raise ValueError("work start registry revision changed")
+                advanced = record_effect_result(
+                    operation,
+                    effect_id="registry-bind",
+                    status="succeeded",
+                    after_revisions={"registry": revisions["registry"] + 1},
+                )
+                journal.update(advanced, expected_sequence=operation.sequence)
+                operation = advanced
+            elif operation.effects[1].status != "succeeded" or existing != (binding,):
+                raise ValueError("work start registry effect cannot be reconciled")
+            if show_scope_branch(repo_root, common_dir, fixed["scope"]) != binding:
+                raise ValueError("work start canonical branch changed")
+        elif show_scope_branch(repo_root, common_dir, fixed["scope"]) != binding:
+            raise ValueError("work start canonical branch changed")
+        if _resolve_commit(repo_root, f"refs/heads/{binding.name}") != fixed["branch_sha"]:
             raise ValueError("work start canonical branch changed")
         selection, selection_identity = load_selection_v3(specdock_dir, worktree_id=worktree_id)
         if selection not in (before, after):
@@ -552,15 +653,19 @@ def resume_start_work(
         if current not in (old, desired):
             raise ValueError("work start HEAD differs from recorded before/after state")
         _require_clean_start(repo_root)
-        if not operation.effects:
+        checkout_index = 2 if branch_created else 0
+        if len(operation.effects) == checkout_index:
             if current != old or selection != before:
                 raise ValueError("work start changed before checkout intent")
             advanced = record_effect_intent(operation, effect_id="checkout", kind="git", target=binding.name)
             journal.update(advanced, expected_sequence=operation.sequence)
             operation = advanced
-        if operation.effects[0].id != "checkout" or operation.effects[0].target != binding.name:
+        if (
+            operation.effects[checkout_index].id != "checkout"
+            or operation.effects[checkout_index].target != binding.name
+        ):
             raise ValueError("work start checkout effect differs")
-        if operation.effects[0].status == "intent":
+        if operation.effects[checkout_index].status == "intent":
             if current == old and current != desired:
                 for worktree in worktree_list(repo_root):
                     if worktree.branch == binding.name and worktree.path.resolve(strict=True) != repo_root.resolve(
@@ -574,7 +679,7 @@ def resume_start_work(
             advanced = record_effect_result(operation, effect_id="checkout", status="succeeded")
             journal.update(advanced, expected_sequence=operation.sequence)
             operation = advanced
-        elif operation.effects[0].status != "succeeded":
+        elif operation.effects[checkout_index].status != "succeeded":
             raise ValueError("work start checkout effect cannot be reconciled")
         _verify_start_checkout(repo_root, fixed)
         if selection == before:
@@ -591,15 +696,15 @@ def resume_start_work(
         views = load_scope_views(specdock_dir)
         if select_scope(views, fixed["scope"], current=before) != after:
             raise ValueError("work start selection does not match the fixed Scope")
-        if len(operation.effects) == 1:
+        if len(operation.effects) == checkout_index + 1:
             if selection != before:
                 raise ValueError("work start selection changed before effect intent")
             advanced = record_effect_intent(operation, effect_id="selection-set", kind="local", target=worktree_id)
             journal.update(advanced, expected_sequence=operation.sequence)
             operation = advanced
-        if len(operation.effects) != 2 or operation.effects[1].id != "selection-set":
+        if len(operation.effects) != checkout_index + 2 or operation.effects[checkout_index + 1].id != "selection-set":
             raise ValueError("work start selection effect differs")
-        if operation.effects[1].status == "intent":
+        if operation.effects[checkout_index + 1].status == "intent":
             if selection == before and after != before:
                 save_selection_v3(specdock_dir, after, views=views, expected_identity=selection_identity)
             advanced = record_effect_result(
@@ -610,11 +715,11 @@ def resume_start_work(
             )
             journal.update(advanced, expected_sequence=operation.sequence)
             operation = advanced
-        elif operation.effects[1].status != "succeeded" or selection != after:
+        elif operation.effects[checkout_index + 1].status != "succeeded" or selection != after:
             raise ValueError("work start selection effect cannot be reconciled")
         terminal = replace(operation, phase="complete", terminal_status="succeeded", sequence=operation.sequence + 1)
         journal.update(terminal, expected_sequence=operation.sequence)
-        return WorkStartResult(fixed["scope"], binding.name, before != after, operation_id)
+        return WorkStartResult(fixed["scope"], binding.name, before != after, operation_id, branch_created)
 
 
 def plan_finish_work(

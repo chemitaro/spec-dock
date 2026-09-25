@@ -110,6 +110,7 @@ def run_work_start(
         exit_code=0,
         operation_id=outcome.operation_id,
         effects=(
+            Effect("branch", "succeeded" if outcome.branch_created else "unchanged", outcome.branch),
             Effect("checkout", "succeeded", outcome.branch),
             Effect("selection", "succeeded" if outcome.selection_changed else "unchanged", outcome.target_id),
         ),
