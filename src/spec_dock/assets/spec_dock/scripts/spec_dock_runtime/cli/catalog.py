@@ -115,7 +115,7 @@ HELP_EFFECTS: dict[str, str] = {
     "worktree bootstrap": "Run the selected worktree's project-owned make init.",
     "workbench copy": "Copy one Scope Workbench into a selected worktree.",
     "workspace sync": "Publish a derived generation; do not alter primary Scope or active state.",
-    "workspace validate": "Read and validate the workspace; no changes.",
+    "workspace validate": "Read and validate the workspace; --ci checks committed data without installation state. No changes.",
     "workspace doctor": "Read installation and journal diagnostics; no repair.",
     "workspace migrate": "Migrate registered worktrees and control under maintenance.",
     "installation show": "Read installed engine and worktree inventory; no changes.",
@@ -207,7 +207,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--on-conflict", choices=("error", "overwrite"), default="error"),
     ),
     "workspace sync": (_arg("--source", choices=SOURCES, default="cache"), _flag("--allow-invalid")),
-    "workspace validate": (_flag("--require-nodes"),),
+    "workspace validate": (_flag("--require-nodes"), _flag("--ci")),
     "workspace doctor": (
         _arg("--github-repo"),
         _arg("--github-pr"),

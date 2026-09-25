@@ -21,6 +21,7 @@ from spec_dock.runtime_loader import (
     verify_engine_pin,
     write_engine_pin,
 )
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 
 
 def test_fixed_distribution_builder_isolation_and_digest(tmp_path: Path) -> None:
@@ -44,6 +45,40 @@ def test_fixed_distribution_builder_isolation_and_digest(tmp_path: Path) -> None
     assert output.returncode == 0, output.stderr
     assert json.loads(output.stdout)["status"] == "succeeded"
     assert len(digest_distribution(distribution)) == 64
+
+
+def test_fixed_engine_ci_validate_requires_no_repository_control_and_writes_nothing(tmp_path: Path) -> None:
+    from spec_dock.fixed_bundle import build_fixed_engine
+
+    common = _ready_repo(tmp_path)
+    repo = common["repo_root"]
+    assert isinstance(repo, Path)
+    control_directory = repo / ".git/spec-dock"
+    shutil.rmtree(control_directory)
+    before = (repo / "spec-dock/workspace.json").read_bytes()
+    executable = build_fixed_engine(tmp_path / "engine")
+    result = subprocess.run(
+        [str(executable), "workspace", "validate", "--ci", "--json"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["status"] == "succeeded"
+    assert payload["data"]["valid"] is True
+    assert payload["effects"] == []
+    assert (repo / "spec-dock/workspace.json").read_bytes() == before
+    assert not control_directory.exists()
+    ordinary = subprocess.run(
+        [str(executable), "workspace", "validate", "--json"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ordinary.returncode != 0
 
 
 def test_fixed_distribution_version_comes_from_its_own_bytes(tmp_path: Path) -> None:

@@ -237,6 +237,18 @@ def validate_workspace(
     return WorkspaceDiagnostics(len(views), tuple(findings))
 
 
+def validate_checkout_for_ci(*, repo_root: Path, require_nodes: bool = False) -> WorkspaceDiagnostics:
+    """Check committed workspace data without relying on local installation state."""
+    findings: list[WorkspaceFinding] = []
+    specdock_dir = repo_root / "spec-dock"
+    _load_workspace_schema(specdock_dir, findings)
+    views = _inspect_views(specdock_dir, findings)
+    _inspect_dependencies_and_artifacts(repo_root, views, findings)
+    if require_nodes and not views:
+        findings.append(_finding("nodes_required", "error", "at least one Scope is required"))
+    return WorkspaceDiagnostics(len(views), tuple(findings))
+
+
 def doctor_workspace(
     *,
     repo_root: Path,

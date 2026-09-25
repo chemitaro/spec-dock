@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import sys
 from typing import TYPE_CHECKING, cast
 
@@ -12,6 +13,7 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock_runtime.application import workspace_diagnostics_vnext as diagnostics_module  # noqa: E402
 from spec_dock_runtime.application.contracts import GitHubCapabilityDiagnostic  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
 from spec_dock_runtime.application.workspace_diagnostics_vnext import doctor_workspace, validate_workspace  # noqa: E402
@@ -33,6 +35,34 @@ def test_empty_workspace_is_valid_unless_nodes_required(tmp_path: Path) -> None:
     required = validate_workspace(**_arguments(common), require_nodes=True)
     assert required.exit_code == 7
     assert "nodes_required" in {finding.code for finding in required.findings}
+
+
+def test_ci_validation_reads_fresh_checkout_without_control_or_active_state(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    control_directory = cast("Path", common["common_dir"]) / "spec-dock"
+    shutil.rmtree(control_directory)
+    before = (repo / "spec-dock/workspace.json").read_bytes()
+    result = diagnostics_module.validate_checkout_for_ci(repo_root=repo, require_nodes=False)
+    assert result.exit_code == 0
+    assert result.node_count == 0
+    assert result.findings == ()
+    assert (repo / "spec-dock/workspace.json").read_bytes() == before
+    assert not control_directory.exists()
+
+
+def test_ci_validation_reports_invalid_committed_schema_without_installing(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    control_directory = cast("Path", common["common_dir"]) / "spec-dock"
+    shutil.rmtree(control_directory)
+    workspace = repo / "spec-dock/workspace.json"
+    workspace.write_text('{"schema_version":2}\n', encoding="utf-8")
+    result = diagnostics_module.validate_checkout_for_ci(repo_root=repo)
+    assert result.exit_code == 7
+    assert {finding.code for finding in result.findings} == {"workspace_schema_mismatch"}
+    assert workspace.read_text(encoding="utf-8") == '{"schema_version":2}\n'
+    assert not control_directory.exists()
 
 
 def test_corrupt_control_and_generation_are_findings_without_exposing_content(tmp_path: Path) -> None:

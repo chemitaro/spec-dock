@@ -73,6 +73,8 @@ spec-dock work finish epic-local-00001 --yes
 
 `work finish` 自体はcommit、push、PR、merge、test、reviewの完了を保証しません。実際のIDとbranchはcreate/startの出力を使ってください。GitHub backendの作成・終了にはGitHubの副作用があります。
 
+CIを新しい入口へ切り替える際は、固定commitのSHAを確認してworktree外にengineを構築し、そのdistribution digestを記録してから `spec-dock workspace validate --ci --json` を実行します。この経路はworkspace schema、Scope、依存、Artifactだけを読み、導入controlやactive選択を作成しません。導入済み作業場の検査には通常の `workspace validate` を使います。
+
 ## 配布と復旧
 
 インストール済みCLIはworktree外の固定distributionから実行します。`spec-dock/scripts/spec-dock` はそのengineを参照する薄いshimです。更新は `installation update --commit SHA --maintenance --yes`、データ変換は `workspace migrate --to-schema 3 --yes` として別々に実行します。対象群の停止、backup、固定candidate、全worktreeのwriter protocol一致を先に確認してください。journalがpendingなら診断に従い、対象leafの `--resume OPERATION_ID` または `--rollback OPERATION_ID` を明示します。詳細は[移行・復旧](migration.md)を参照してください。

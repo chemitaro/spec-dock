@@ -29,7 +29,10 @@ from spec_dock_runtime.commands.scope_lifecycle_vnext import run_scope_lifecycle
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.commands.workbench_vnext import run_workbench_copy
-from spec_dock_runtime.commands.workspace_diagnostics_vnext import run_workspace_diagnostics
+from spec_dock_runtime.commands.workspace_diagnostics_vnext import (
+    run_ci_workspace_validation,
+    run_workspace_diagnostics,
+)
 from spec_dock_runtime.commands.workspace_migrate_vnext import run_workspace_migrate
 from spec_dock_runtime.commands.workspace_sync_vnext import run_workspace_sync
 from spec_dock_runtime.commands.worktree_vnext import run_worktree_change, run_worktree_query
@@ -250,6 +253,17 @@ def run_vnext(
                 engine_version=engine_version,
                 engine_pin=engine_pin,
             )
+            if json_mode:
+                return RuntimeOutput(result.exit_code, render_json(result), "")
+            stdout, stderr = render_text(result)
+            return RuntimeOutput(result.exit_code, stdout, stderr)
+        if ns.command_path == "workspace validate" and ns.ci:
+            raw_project = getattr(ns, "project", None)
+            candidate = Path(raw_project).expanduser().resolve(strict=True) if raw_project else invocation_cwd
+            root = _repository_root(candidate)
+            if raw_project and root != candidate:
+                raise ValueError("--project must name the Git worktree root")
+            result = run_ci_workspace_validation(ns, root)
             if json_mode:
                 return RuntimeOutput(result.exit_code, render_json(result), "")
             stdout, stderr = render_text(result)

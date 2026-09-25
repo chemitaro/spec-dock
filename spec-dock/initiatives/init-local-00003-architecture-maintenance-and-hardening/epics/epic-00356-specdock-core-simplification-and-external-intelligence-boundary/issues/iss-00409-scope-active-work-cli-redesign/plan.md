@@ -364,9 +364,9 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T06,T07,T15,T26 |
 | 対象file群 | 既存 RT application/{validate_tree,doctor}.py、commands/{validate,doctor}.py。 |
-| 実施内容 | 新schema/registry/generation/未完了journal/installed engine不一致を診断します。空tree許容とrequire-nodes、GH probe all-or-noneを入れます。 |
+| 実施内容 | 新schema/registry/generation/未完了journal/installed engine不一致を診断します。空tree許容とrequire-nodes、GH probe all-or-noneを入れます。新規CI checkout向けに固定SHAで構築・digest確認したengineからのみ使う `workspace validate --ci` を追加し、一次データだけを読み取ります。 |
 | 完了条件 | 全診断がread-onlyで、repairはせず、code 7と安定finding codeを返します。 |
-| 必要なテスト | 新設 tests/cli_runtime/test_workspace_doctor_vnext.py。空、broken control、legacy branch、unknown cache、GitHub引数部分指定、redaction。 |
+| 必要なテスト | 新設 tests/cli_runtime/test_workspace_doctor_vnext.py。空、broken control、legacy branch、unknown cache、GitHub引数部分指定、redaction、controlを持たないCI checkoutの有効・無効schemaと無変更。 |
 | 対応AC | AC-21, AC-29 |
 
 ### T28 固定供給元のdistribution解決

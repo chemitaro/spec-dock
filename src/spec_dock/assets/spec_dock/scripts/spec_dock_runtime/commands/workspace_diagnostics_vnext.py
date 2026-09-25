@@ -8,12 +8,14 @@ from typing import TYPE_CHECKING
 from spec_dock_runtime.application.workspace_diagnostics_vnext import (
     WorkspaceDiagnostics,
     doctor_workspace,
+    validate_checkout_for_ci,
     validate_workspace,
 )
 from spec_dock_runtime.presentation.envelope import Diagnostic, OperationResult
 
 if TYPE_CHECKING:
     import argparse
+    from pathlib import Path
 
     from spec_dock_runtime.application.contracts import GitHubCapabilityDiagnostic
     from spec_dock_runtime.application.workspace_diagnostics_vnext import WorkspaceFinding
@@ -64,3 +66,8 @@ def run_workspace_diagnostics(
     else:
         raise ValueError("workspace diagnostics command is unsupported")
     return _result(ns.command_path, report)
+
+
+def run_ci_workspace_validation(ns: argparse.Namespace, repo_root: Path) -> OperationResult[WorkspaceDiagnosticsData]:
+    """Validate only versioned workspace data in an ephemeral CI checkout."""
+    return _result("workspace validate", validate_checkout_for_ci(repo_root=repo_root, require_nodes=ns.require_nodes))
