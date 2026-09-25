@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
@@ -12,6 +13,7 @@ from spec_dock_runtime.application.scope_completion import (
     resume_scope_lifecycle,
 )
 from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
+from spec_dock_runtime.commands.scope_result_vnext import ScopeData, ScopeStatusData, project_scope
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -19,6 +21,20 @@ if TYPE_CHECKING:
 
     from spec_dock_runtime.application.scope_completion import GithubIssueGateway
     from spec_dock_runtime.commands.work_vnext import WorkContext
+
+
+@dataclass(frozen=True)
+class ScopeLifecycleData:
+    target_id: str
+    before: object
+    after: str
+    changed: bool
+    descendants: tuple[str, ...]
+    scope: ScopeData
+    status: ScopeStatusData
+    project: str
+    worktree: str
+    snapshot_id: str
 
 
 def run_scope_lifecycle(
@@ -76,11 +92,27 @@ def run_scope_lifecycle(
         decision = outcome.decision
         operation_id = outcome.operation_id
         changed = outcome.changed
+    projection = project_scope(context, target_id, requested=ns.target)
+    status = projection.status
+    if changed and not ns.dry_run and projection.scope.backend == "github":
+        status = ScopeStatusData(decision.after, "github", False)
     return OperationResult(
         command=ns.command_path,
         status="planned" if ns.dry_run else "succeeded" if changed else "unchanged",
-        data=decision,
+        data=ScopeLifecycleData(
+            decision.target_id,
+            decision.before,
+            decision.after,
+            decision.changed,
+            decision.descendants,
+            projection.scope,
+            status,
+            projection.project,
+            projection.worktree,
+            projection.snapshot_id,
+        ),
         exit_code=0,
         operation_id=operation_id,
+        target=projection.target,
         effects=(Effect("lifecycle", "planned" if ns.dry_run else "succeeded", target_id),) if changed else (),
     )

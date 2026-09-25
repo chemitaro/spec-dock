@@ -4,13 +4,15 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.cli.catalog import LEAF_PATHS  # noqa: E402
+from spec_dock_runtime.cli.catalog import HELP_PRECONDITIONS, HELP_SPECS, LEAF_PATHS  # noqa: E402
+from spec_dock_runtime.cli.options import parse_vnext_output  # noqa: E402
 from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
 
 
@@ -27,6 +29,21 @@ def test_help_uses_catalog_and_does_not_require_project(tmp_path: Path) -> None:
     assert "--switch-active" in json.loads(leaf.stdout)["data"]["help"]
     missing = _run(tmp_path, "help", "unknown", "--json")
     assert missing.exit_code == 3
+
+
+def test_each_leaf_has_specific_preconditions_and_example(tmp_path: Path) -> None:
+    assert set(HELP_PRECONDITIONS) == set(LEAF_PATHS)
+    for leaf in LEAF_PATHS:
+        output = _run(tmp_path, "help", *leaf.split(), "--json")
+        assert output.exit_code == 0, leaf
+        content = json.loads(output.stdout)["data"]["help"]
+        assert HELP_PRECONDITIONS[leaf] in content
+        assert "Resolve the target in the selected project" not in content
+        assert f"spec-dock {leaf}" in content
+        words = shlex.split(HELP_SPECS[leaf].examples)
+        assert words[0] == "spec-dock"
+        parsed = parse_vnext_output(words[1:], engine_version="0.2.4", engine_digest="test-engine")
+        assert parsed.namespace is not None, (leaf, parsed.stderr)
 
 
 def test_completions_include_every_catalog_leaf_without_writing_files(tmp_path: Path) -> None:

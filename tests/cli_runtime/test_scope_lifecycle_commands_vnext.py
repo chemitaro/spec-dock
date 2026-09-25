@@ -6,8 +6,10 @@ import json
 import os
 from pathlib import Path
 import pty
+import select
 import subprocess
 import sys
+import time
 from typing import cast
 
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
@@ -54,6 +56,101 @@ def test_scope_close_prompts_on_tty_and_respects_denial(tmp_path: Path) -> None:
     assert json.loads((created.path / ".meta.json").read_text())["lifecycle"]["state"] == "completed"
 
 
+def test_scope_close_current_prompts_on_tty_without_noninteractive_guard(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    selected = _run(repo, "active", "set", created.id)
+    assert selected.exit_code == 0
+    metadata = created.path / ".meta.json"
+    before = metadata.read_bytes()
+    source = (
+        "from pathlib import Path; import sys; "
+        "sys.path.insert(0, sys.argv[1]); "
+        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
+        "result=run_vnext(['scope','close','@current'], invocation_cwd=Path(sys.argv[2]), "
+        "engine_digest='engine-a', engine_version='0.2.4'); "
+        "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
+    )
+    master, slave = pty.openpty()
+    try:
+        child = subprocess.Popen(
+            [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), str(repo)],
+            stdin=slave,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        os.close(slave)
+        os.write(master, b"no\n")
+        stdout, stderr = child.communicate(timeout=10)
+        assert child.returncode == 3, stdout + stderr
+        assert f"Target: {created.id}" in stderr
+        assert "Confirm [yes/no]" in stderr
+        assert metadata.read_bytes() == before
+    finally:
+        os.close(master)
+
+
+def test_scope_close_current_json_preserves_requested_selector(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    assert _run(repo, "active", "set", created.id).exit_code == 0
+    closed = _run(repo, "scope", "close", "@current", "--expect-current", created.id, "--yes")
+    payload = json.loads(closed.stdout)
+    assert closed.exit_code == 0
+    assert payload["target"]["requested"] == "@current"
+    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == created.id
+
+
+def test_scope_close_current_rejects_selection_change_during_prompt(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    first = create_local_scope(kind="initiative", title="First", parent=None, ancestors=(), **common)
+    second = create_local_scope(kind="initiative", title="Second", parent=None, ancestors=(), **common)
+    assert _run(repo, "active", "set", first.id).exit_code == 0
+    first_meta = first.path / ".meta.json"
+    before = first_meta.read_bytes()
+    source = (
+        "from pathlib import Path; import sys; "
+        "sys.path.insert(0, sys.argv[1]); "
+        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
+        "result=run_vnext(['scope','close','@current'], invocation_cwd=Path(sys.argv[2]), "
+        "engine_digest='engine-a', engine_version='0.2.4'); "
+        "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
+    )
+    master, slave = pty.openpty()
+    child = subprocess.Popen(
+        [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), str(repo)],
+        stdin=slave,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    os.close(slave)
+    try:
+        assert child.stderr is not None
+        prompt = bytearray()
+        deadline = time.monotonic() + 10
+        while b"Confirm [yes/no]" not in prompt and time.monotonic() < deadline:
+            ready, _, _ = select.select([child.stderr], [], [], 0.2)
+            if ready:
+                prompt.extend(os.read(child.stderr.fileno(), 4096))
+        assert b"Confirm [yes/no]" in prompt, prompt.decode(errors="replace")
+        assert first.id.encode() in prompt
+        assert _run(repo, "active", "set", second.id).exit_code == 0
+        os.write(master, b"yes\n")
+        stdout, stderr = child.communicate(timeout=10)
+        assert child.returncode == 3, (stdout + stderr).decode(errors="replace")
+        assert b"STATE_CONFLICT" in stderr
+        assert first_meta.read_bytes() == before
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=10)
+        os.close(master)
+
+
 def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: Path) -> None:
     common = _ready_repo(tmp_path)
     repo = cast("Path", common["repo_root"])
@@ -91,6 +188,20 @@ def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: P
         repo, "scope", "close", created.id, "--reason", "not-planned", "--resume", abandoned_id, "--yes"
     )
     assert resumed_abandoned.exit_code == 0
+
+
+def test_scope_close_json_reports_completed_scope_and_same_snapshot(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    closed = _run(repo, "scope", "close", created.id, "--yes")
+    assert closed.exit_code == 0
+    payload = json.loads(closed.stdout)
+    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == created.id
+    assert payload["data"]["status"] == {"state": "completed", "source": "local", "stale": False}
+    assert payload["target"]["snapshot_id"] == payload["data"]["snapshot_id"]
+    assert payload["data"]["project"] == str(repo)
+    assert payload["data"]["worktree"] == common["worktree_id"]
 
 
 def test_scope_mutation_checks_expected_current_and_backend_before_edit(tmp_path: Path) -> None:

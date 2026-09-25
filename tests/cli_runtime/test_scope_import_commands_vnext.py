@@ -40,6 +40,21 @@ def test_scope_import_cli_previews_and_creates_without_post(tmp_path: Path, monk
     assert gateway.calls == 0
 
 
+def test_scope_import_json_identifies_linked_scope(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    imported = _run(repo, "scope", "import", "github", "initiative", "gh:example/repo#47", "--title", "Local plan")
+    assert imported.exit_code == 0
+    payload = json.loads(imported.stdout)
+    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == "init-00047"
+    assert payload["data"]["scope"]["backend"] == "github"
+    assert payload["data"]["github_ref"] == "gh:example/repo#47"
+    assert payload["data"]["status"]["source"] in {"github", "cache", "unknown"}
+    assert payload["target"]["snapshot_id"] == payload["data"]["snapshot_id"]
+
+
 def test_scope_import_cli_resumes_after_uncertain_local_publication(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

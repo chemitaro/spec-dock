@@ -3,12 +3,12 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
-import json
 from pathlib import Path
 import subprocess
 import sys
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
+from spec_dock.installation.source import resolve_fixed_source
 from spec_dock_runtime.application.active_selection import show_active_selection
 from spec_dock_runtime.application.installation_update_vnext import initial_worktree_id
 from spec_dock_runtime.application.scope_query import list_scopes, load_scope_views, show_scope
@@ -30,6 +30,12 @@ from spec_dock_runtime.commands.scope_delete_vnext import run_scope_delete
 from spec_dock_runtime.commands.scope_import_vnext import run_scope_import
 from spec_dock_runtime.commands.scope_lifecycle_vnext import run_scope_lifecycle
 from spec_dock_runtime.commands.scope_query_vnext import run_scope_edit, run_scope_query
+from spec_dock_runtime.commands.scope_result_vnext import (
+    ScopeData,
+    ScopeFailureData,
+    ScopeStatusData,
+    project_scope,
+)
 from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
 from spec_dock_runtime.commands.workbench_vnext import run_workbench_copy
 from spec_dock_runtime.commands.workspace_diagnostics_vnext import (
@@ -39,23 +45,23 @@ from spec_dock_runtime.commands.workspace_diagnostics_vnext import (
 from spec_dock_runtime.commands.workspace_migrate_vnext import run_workspace_migrate
 from spec_dock_runtime.commands.workspace_sync_vnext import run_workspace_sync
 from spec_dock_runtime.commands.worktree_vnext import run_worktree_change, run_worktree_query
-from spec_dock_runtime.domain.operation import ROLLBACK_COMMANDS
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 from spec_dock_runtime.infra.control_store import load_control
+from spec_dock_runtime.infra.failure_receipts import pending_failure_receipts, pending_receipt_ids
 from spec_dock_runtime.infra.git_cli import git_common_directory, sanitized_git_environment
 from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
-from spec_dock_runtime.infra.operation_journal import JournalStore
 from spec_dock_runtime.infra.writer_lock import WriterLockBusy
 from spec_dock_runtime.presentation.envelope import (
     Diagnostic,
     Effect,
+    EffectStatus,
     OperationResult,
     Recovery,
     TargetRef,
     render_json,
     render_text,
 )
-from spec_dock_runtime.presentation.errors import CliMessageData, CompletionData
+from spec_dock_runtime.presentation.errors import CliMessageData, CompletionData, NonBlockingFailureData
 
 if TYPE_CHECKING:
     import argparse
@@ -73,6 +79,25 @@ class RuntimeOutput:
 
 class ExpectationMismatch(ValueError):
     """A caller-provided target guard disagrees with the current snapshot."""
+
+
+_NONBLOCKING_INSPECTION: dict[str, str] = {
+    "scope edit": "Run scope show for the fixed Scope ID and compare its title and revision.",
+    "active set": "Run active show and compare the focus and revision.",
+    "active clear": "Run active show and compare the focus and revision.",
+    "branch switch": "Inspect Git HEAD and run branch show for the fixed Scope ID.",
+    "dependency add": "Run dependency list for the affected Scope and inspect the declared edge.",
+    "dependency remove": "Run dependency list for the affected Scope and inspect the declared edge.",
+    "artifact create": "Run artifact list for the fixed Scope and inspect the target entry.",
+    "artifact import file": "Run artifact list for the fixed Scope and inspect the target entry.",
+    "worktree create": "Run worktree list and inspect the target path and Git branch.",
+    "worktree remove": "Run worktree list and inspect the target path and Git branch.",
+    "worktree bootstrap": "Run worktree show and inspect project-owned bootstrap effects before retrying.",
+    "workbench copy": "Inspect the source and destination Workbench entries before retrying.",
+    "workspace sync": "Inspect the published generation pointer and run workspace validate before retrying.",
+}
+if set(_NONBLOCKING_INSPECTION) != MUTATING_LEAF_PATHS - set(RECOVERY_LEAF_COMMANDS):
+    raise RuntimeError("non-blocking failure inspection must cover every non-D16 writer")
 
 
 def _repository_root(candidate: Path) -> Path:
@@ -131,12 +156,20 @@ def _context(ns: object, *, invocation_cwd: Path, engine_digest: str) -> WorkCon
 
 
 def _failure(
-    command: str, code: str, message: str, exit_code: int, *, json_mode: bool, target: TargetRef | None = None
+    command: str,
+    code: str,
+    message: str,
+    exit_code: int,
+    *,
+    json_mode: bool,
+    target: TargetRef | None = None,
+    context: WorkContext | None = None,
 ) -> RuntimeOutput:
+    data, target = _failure_data(command, context, target)
     result = OperationResult(
         command=command,
         status="partial" if exit_code == 6 else "failed",
-        data=CliMessageData(None),
+        data=data,
         exit_code=exit_code,
         target=target,
         effects=(Effect("operation", "unknown", None),) if exit_code == 6 else (),
@@ -148,6 +181,68 @@ def _failure(
     return RuntimeOutput(exit_code, stdout, stderr)
 
 
+def _failure_data(
+    command: str, context: WorkContext | None, target: TargetRef | None
+) -> tuple[CliMessageData | ScopeFailureData, TargetRef | None]:
+    if (
+        context is None
+        or target is None
+        or command
+        not in {
+            "scope create initiative",
+            "scope create epic",
+            "scope create issue",
+            "scope import github initiative",
+            "scope import github epic",
+            "scope import github issue",
+            "scope show",
+            "scope edit",
+            "scope close",
+            "scope reopen",
+        }
+    ):
+        return CliMessageData(None), target
+    try:
+        projection = project_scope(context, target.id, requested=target.requested)
+    except (LookupError, OSError, ValueError):
+        return (
+            ScopeFailureData(
+                None,
+                ScopeData(target.id, target.kind, target.backend, None, None, None),
+                ScopeStatusData("unknown", "unknown", True),
+                str(context.repo_root),
+                context.worktree_id,
+                target.snapshot_id,
+            ),
+            target,
+        )
+    return (
+        ScopeFailureData(
+            None,
+            projection.scope,
+            projection.status,
+            projection.project,
+            projection.worktree,
+            projection.snapshot_id,
+        ),
+        projection.target,
+    )
+
+
+def _target_for_failure(
+    ns: argparse.Namespace,
+    context: WorkContext | None,
+    target: TargetRef | None,
+    requested: str | None,
+) -> TargetRef | None:
+    if target is not None or context is None:
+        return target
+    try:
+        return _resolved_scope_target(ns, context, requested=requested)
+    except (LookupError, OSError, ValueError):
+        return None
+
+
 def _journal_receipt_failure(
     ns: argparse.Namespace,
     common_dir: Path | None,
@@ -155,6 +250,7 @@ def _journal_receipt_failure(
     *,
     json_mode: bool,
     target: TargetRef | None,
+    context: WorkContext | None,
 ) -> RuntimeOutput | None:
     if common_dir is None or ns.command_path not in RECOVERY_LEAF_COMMANDS:
         return None
@@ -162,60 +258,55 @@ def _journal_receipt_failure(
     try:
         candidates = [
             record
-            for record in JournalStore(common_dir).pending()
+            for record in pending_failure_receipts(common_dir)
             if record.command == command
             and (record.operation_id not in before or record.operation_id in {ns.resume, ns.rollback})
-            and any(effect.status in {"intent", "succeeded", "unknown"} for effect in record.effects)
         ]
     except (OSError, ValueError):
         return None
     if len(candidates) != 1:
         return None
     record = candidates[0]
-    fixed = dict(record.fixed_targets)
     if target is None:
-        resolved = fixed.get("scope") or fixed.get("target")
+        resolved = record.fixed_target
         if resolved is not None:
             target = TargetRef(
                 requested=resolved,
                 id=resolved,
-                kind=fixed.get("kind", "scope"),
-                backend=fixed.get("backend", "unknown"),
+                kind=record.fixed_kind or "scope",
+                backend=record.fixed_backend or "unknown",
                 snapshot_id="",
             )
     effects = tuple(
-        Effect(
-            effect.id,
-            "unknown"
-            if effect.status in {"intent", "unknown"}
-            else "succeeded"
-            if effect.status == "succeeded"
-            else "failed",
-            effect.target,
-        )
-        for effect in record.effects
+        Effect(effect.kind, cast("EffectStatus", effect.status), effect.target) for effect in record.effects
     )
+    effect_started = record.effect_started
+    data, target = _failure_data(ns.command_path, context, target)
     result = OperationResult(
         command=ns.command_path,
-        status="partial",
-        data=CliMessageData(None),
-        exit_code=6,
+        status="partial" if effect_started else "failed",
+        data=data,
+        exit_code=6 if effect_started else 3,
         operation_id=record.operation_id,
         target=target,
         effects=effects,
-        error=Diagnostic("EFFECT_STATE_UNKNOWN", "operation stopped; inspect recorded effects before recovery", {}),
+        error=Diagnostic(
+            "EFFECT_STATE_UNKNOWN" if effect_started else "RECOVERY_REQUIRED",
+            "operation stopped; inspect recorded effects before recovery",
+            {},
+        ),
         recovery=Recovery(
             record.operation_id,
             True,
-            command in ROLLBACK_COMMANDS,
+            record.can_rollback,
             (),
             "Inspect the fixed target and options in the operation journal before --resume or --rollback.",
         ),
     )
     if json_mode:
-        return RuntimeOutput(6, render_json(result), "")
+        return RuntimeOutput(result.exit_code, render_json(result), "")
     stdout, stderr = render_text(result)
-    return RuntimeOutput(6, stdout, stderr)
+    return RuntimeOutput(result.exit_code, stdout, stderr)
 
 
 def _classified_failure(
@@ -228,11 +319,94 @@ def _classified_failure(
     *,
     json_mode: bool,
     target: TargetRef | None,
+    context: WorkContext | None,
+    requested: str | None,
 ) -> RuntimeOutput:
-    receipt = _journal_receipt_failure(ns, common_dir, before, json_mode=json_mode, target=target)
+    target = _target_for_failure(ns, context, target, requested)
+    receipt = _journal_receipt_failure(ns, common_dir, before, json_mode=json_mode, target=target, context=context)
     if receipt is not None:
         return receipt
-    return _failure(ns.command_path, code, message, exit_code, json_mode=json_mode, target=target)
+    return _failure(ns.command_path, code, message, exit_code, json_mode=json_mode, target=target, context=context)
+
+
+def _nonblocking_io_receipt(
+    ns: argparse.Namespace, context: WorkContext | None, target: TargetRef | None, *, json_mode: bool
+) -> RuntimeOutput | None:
+    if ns.command_path != "scope edit" or context is None or target is None:
+        return None
+    try:
+        projection = project_scope(context, target.id, requested=target.requested)
+        if projection.snapshot_id == target.snapshot_id:
+            return None
+        views = load_scope_views(context.repo_root / "spec-dock")
+        current = show_scope(views, target.id, selection=None)
+        observed = "succeeded" if current.title == ns.title.strip() else "unknown"
+        data = ScopeFailureData(
+            None, projection.scope, projection.status, projection.project, projection.worktree, projection.snapshot_id
+        )
+        receipt_target = projection.target
+    except (LookupError, OSError, ValueError):
+        observed = "unknown"
+        data = ScopeFailureData(
+            None,
+            ScopeData(target.id, target.kind, target.backend, None, None, None),
+            ScopeStatusData("unknown", "unknown", True),
+            str(context.repo_root),
+            context.worktree_id,
+            target.snapshot_id,
+        )
+        receipt_target = target
+    result = OperationResult(
+        command=ns.command_path,
+        status="partial",
+        data=data,
+        exit_code=6,
+        target=receipt_target,
+        effects=(Effect("metadata", observed, target.id),),
+        error=Diagnostic(
+            "POST_PUBLISH_FAILURE",
+            "local I/O failed with a possible Scope metadata change; inspect the Scope before another edit",
+            {"scope_id": target.id, "observed_revision": data.scope.revision},
+        ),
+        recovery=Recovery(
+            None,
+            False,
+            False,
+            (),
+            "Run scope show for this ID and compare the title and revision before deciding on another edit.",
+        ),
+    )
+    if json_mode:
+        return RuntimeOutput(6, render_json(result), "")
+    stdout, stderr = render_text(result)
+    return RuntimeOutput(6, stdout, stderr)
+
+
+def _unknown_nonblocking_receipt(
+    ns: argparse.Namespace, context: WorkContext | None, target: TargetRef | None, *, json_mode: bool
+) -> RuntimeOutput | None:
+    if context is None or ns.command_path not in _NONBLOCKING_INSPECTION:
+        return None
+    target_id = target.id if target is not None else None
+    inspection = _NONBLOCKING_INSPECTION[ns.command_path]
+    result = OperationResult(
+        command=ns.command_path,
+        status="partial",
+        data=NonBlockingFailureData(str(context.repo_root), context.worktree_id, target_id, inspection),
+        exit_code=6,
+        target=target,
+        effects=(Effect(ns.command_path.replace(" ", "-"), "unknown", target_id),),
+        error=Diagnostic(
+            "EFFECT_STATE_UNKNOWN",
+            "the command stopped before its effect could be confirmed; inspect the target before retrying",
+            {"target_id": target_id, "inspection": inspection},
+        ),
+        recovery=Recovery(None, False, False, (), inspection),
+    )
+    if json_mode:
+        return RuntimeOutput(6, render_json(result), "")
+    stdout, stderr = render_text(result)
+    return RuntimeOutput(6, stdout, stderr)
 
 
 def _resolved_scope_target(
@@ -264,12 +438,13 @@ def _resolved_scope_target(
 
 def _confirm_before_effect(
     ns: argparse.Namespace,
-    argv: Sequence[str],
+    context: WorkContext,
     *,
     invocation_cwd: Path,
-    engine_digest: str,
     engine_version: str,
     engine_pin: VerifiedEngine | None,
+    target_ref: TargetRef | None,
+    resolution_state: tuple[str, int] | None,
 ) -> RuntimeOutput | None:
     if ns.command_path.startswith("scope create ") and getattr(ns, "resume", None):
         return None
@@ -282,45 +457,97 @@ def _confirm_before_effect(
     ):
         return None
     if ns.non_interactive or not sys.stdin.isatty():
-        return _failure(ns.command_path, "CONFIRMATION_REQUIRED", "confirmation requires --yes", 3, json_mode=ns.json)
-    target = getattr(ns, "target", None) or getattr(ns, "scope", None) or getattr(ns, "worktree_ref", None)
-    planned_effects: list[dict[str, object]] = []
-    if not (getattr(ns, "resume", None) or getattr(ns, "rollback", None) or getattr(ns, "recover", None)):
-        preview = run_vnext(
-            [*argv, "--dry-run", "--json"],
-            invocation_cwd=invocation_cwd,
-            engine_digest=engine_digest,
-            engine_version=engine_version,
-            engine_pin=engine_pin,
+        return _failure(
+            ns.command_path,
+            "CONFIRMATION_REQUIRED",
+            "confirmation requires --yes",
+            3,
+            json_mode=ns.json,
+            target=target_ref,
+            context=context,
         )
-        payload = json.loads(preview.stdout)
-        if preview.exit_code:
-            error = payload.get("error") or {}
-            return _failure(
-                ns.command_path,
-                str(error.get("code", "PRECONDITION_FAILED")),
-                str(error.get("message", "confirmation plan failed")),
-                preview.exit_code,
-                json_mode=ns.json,
+    target = (
+        target_ref.id
+        if target_ref is not None
+        else (getattr(ns, "target", None) or getattr(ns, "scope", None) or getattr(ns, "worktree_ref", None))
+    )
+    planned_effects: tuple[Effect, ...] = ()
+    source_commit: str | None = None
+    before_state = _confirmation_state(ns, context)
+    if before_state != resolution_state:
+        raise ExpectationMismatch("operation state changed while resolving the confirmation plan")
+    if not (getattr(ns, "resume", None) or getattr(ns, "rollback", None) or getattr(ns, "recover", None)):
+        preview_ns = type(ns)(**vars(ns))
+        preview_ns.dry_run = True
+        preview_ns.yes = True
+        if ns.command_path == "installation init":
+            preview = run_installation_init(
+                preview_ns,
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                engine_digest=context.engine_digest,
+                engine_version=engine_version,
+                engine_pin=engine_pin,
             )
-        planned_effects = payload.get("effects", [])
-        target_ref = payload.get("target")
-        if isinstance(target_ref, dict):
-            target = target_ref.get("id") or target
+        else:
+            preview = _dispatch_regular(
+                preview_ns,
+                context,
+                invocation_cwd=invocation_cwd,
+                engine_version=engine_version,
+                engine_pin=engine_pin,
+            )
+        if preview.exit_code:
+            if ns.json:
+                return RuntimeOutput(preview.exit_code, render_json(preview), "")
+            stdout, stderr = render_text(preview)
+            return RuntimeOutput(preview.exit_code, stdout, stderr)
+        planned_effects = preview.effects
+        if ns.command_path == "installation update":
+            candidate_commit = getattr(preview.data, "source_commit", None)
+            if isinstance(candidate_commit, str):
+                source_commit = candidate_commit
+        if preview.target is not None:
+            target = preview.target.id
         if not target:
-            target = next((effect.get("target") for effect in planned_effects if effect.get("target")), None)
+            target = next((effect.target for effect in planned_effects if effect.target), None)
     else:
         target = target or getattr(ns, "path", None) or getattr(ns, "resume", None) or getattr(ns, "rollback", None)
-    project = getattr(ns, "project", None) or invocation_cwd
     print(f"Target: {target or ns.command_path}", file=sys.stderr)
-    print(f"Repository: {Path(project).expanduser().resolve()}", file=sys.stderr)
-    writes = ", ".join(str(effect.get("kind")) for effect in planned_effects) or ns.command_path
+    print(f"Repository: {context.repo_root}", file=sys.stderr)
+    if source_commit is not None:
+        print(f"Source commit: {source_commit}", file=sys.stderr)
+    writes = ", ".join(effect.kind for effect in planned_effects) or ns.command_path
     print(f"Writes: {writes}", file=sys.stderr)
     print("Confirm [yes/no]: ", end="", file=sys.stderr, flush=True)
     if sys.stdin.readline().strip().lower() not in {"yes", "y"}:
-        return _failure(ns.command_path, "CONFIRMATION_DECLINED", "operation was not confirmed", 3, json_mode=ns.json)
+        return _failure(
+            ns.command_path,
+            "CONFIRMATION_DECLINED",
+            "operation was not confirmed",
+            3,
+            json_mode=ns.json,
+            target=target_ref,
+            context=context,
+        )
+    if _confirmation_state(ns, context) != before_state:
+        raise ExpectationMismatch("operation state changed while confirmation was pending")
+    if source_commit is not None and (ns.version or ns.commit):
+        current_source = resolve_fixed_source(version=ns.version, commit=ns.commit, timeout=ns.timeout)
+        if current_source.commit != source_commit:
+            raise ExpectationMismatch("installation source changed while confirmation was pending")
+        ns.version = None
+        ns.commit = source_commit
     ns.yes = True
     return None
+
+
+def _confirmation_state(ns: argparse.Namespace, context: WorkContext) -> tuple[str, int] | None:
+    if not ns.command_path.startswith(("scope ", "work ", "workbench ")):
+        return None
+    views = load_scope_views(context.repo_root / "spec-dock")
+    selection = show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id)
+    return list_scopes(views).snapshot_id, selection.revision
 
 
 def _enforce_expectations(ns: argparse.Namespace, context: WorkContext) -> None:
@@ -370,6 +597,66 @@ def _enforce_expectations(ns: argparse.Namespace, context: WorkContext) -> None:
         raise ExpectationMismatch("Scope backend changed since the expected target")
 
 
+def _dispatch_regular(
+    ns: argparse.Namespace,
+    context: WorkContext,
+    *,
+    invocation_cwd: Path,
+    engine_version: str,
+    engine_pin: VerifiedEngine | None,
+) -> OperationResult[object]:
+    command = ns.command_path
+    if command in {"scope list", "scope show"}:
+        return run_scope_query(ns, context)
+    if command in {"scope create initiative", "scope create epic", "scope create issue"}:
+        return run_scope_create(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+    if command in {"scope import github initiative", "scope import github epic", "scope import github issue"}:
+        return run_scope_import(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+    if command == "scope delete":
+        return run_scope_delete(ns, context)
+    if command in {"scope close", "scope reopen"}:
+        return run_scope_lifecycle(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+    if command in {"branch show", "branch create", "branch switch"}:
+        return run_branch_command(ns, context)
+    if command in {"dependency list", "dependency check"}:
+        return run_dependency_query(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+    if command in {"dependency add", "dependency remove"}:
+        return run_dependency_change(ns, context)
+    if command in {"artifact list", "artifact show"}:
+        return run_artifact_query(ns, context)
+    if command in {"artifact create", "artifact import file"}:
+        return run_artifact_change(ns, context, invocation_cwd=invocation_cwd)
+    if command in {"worktree list", "worktree show"}:
+        return run_worktree_query(ns, context)
+    if command in {"worktree create", "worktree remove", "worktree bootstrap"}:
+        return run_worktree_change(ns, context)
+    if command == "workbench copy":
+        return run_workbench_copy(ns, context)
+    if command in {"workspace validate", "workspace doctor"}:
+        return run_workspace_diagnostics(ns, context)
+    if command == "workspace sync":
+        return run_workspace_sync(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+    if command == "workspace migrate":
+        return run_workspace_migrate(ns, context, invocation_cwd=invocation_cwd)
+    if command == "installation show":
+        return run_installation_show(ns, context, engine_version=engine_version, invocation_cwd=invocation_cwd)
+    if command == "installation update":
+        return run_installation_update(
+            ns, context, invocation_cwd=invocation_cwd, engine_version=engine_version, engine_pin=engine_pin
+        )
+    if command == "installation uninstall":
+        return run_installation_uninstall(ns, context, invocation_cwd=invocation_cwd)
+    if command == "scope edit":
+        return run_scope_edit(ns, context)
+    if command == "active show":
+        return run_active_show(context)
+    if command in {"active set", "active clear"}:
+        return run_active_change(ns, context)
+    if command == "work start":
+        return run_work_start(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+    return run_work_finish(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
+
+
 def run_vnext(
     argv: Sequence[str],
     *,
@@ -390,6 +677,7 @@ def run_vnext(
     journal_common: Path | None = None
     journal_before: set[str] = set()
     target_ref: TargetRef | None = None
+    context: WorkContext | None = None
     requested_target = getattr(ns, "target", None) or getattr(ns, "scope", None)
     try:
         if ns.command_path in {"help", "completion"}:
@@ -399,16 +687,6 @@ def run_vnext(
                 result = OperationResult(ns.command_path, "succeeded", data, 0)
                 return RuntimeOutput(0, render_json(result), "")
             return RuntimeOutput(0, content, "")
-        declined = _confirm_before_effect(
-            ns,
-            argv,
-            invocation_cwd=invocation_cwd,
-            engine_digest=engine_digest,
-            engine_version=engine_version,
-            engine_pin=engine_pin,
-        )
-        if declined is not None:
-            return declined
         if ns.command_path not in {
             "work start",
             "work finish",
@@ -469,6 +747,20 @@ def run_vnext(
                 raise ValueError("installation init PATH must name a Git worktree root")
             if ns.project and Path(ns.project).expanduser().resolve(strict=True) != requested:
                 raise ValueError("--project and installation init PATH must name the same worktree")
+            context = WorkContext(root, common, initial_worktree_id(root), engine_digest, 0)
+            journal_common = common
+            journal_before = pending_receipt_ids(common)
+            declined = _confirm_before_effect(
+                ns,
+                context,
+                invocation_cwd=invocation_cwd,
+                engine_version=engine_version,
+                engine_pin=engine_pin,
+                target_ref=None,
+                resolution_state=None,
+            )
+            if declined is not None:
+                return declined
             result = run_installation_init(
                 ns,
                 repo_root=root,
@@ -497,73 +789,55 @@ def run_vnext(
             raise ValueError("runtime project differs from verified preflight root")
         if preflight_common is not None and context.common_dir != preflight_common:
             raise ValueError("runtime Git common directory differs from verified preflight")
+        resolution_state = (
+            _confirmation_state(ns, context)
+            if not ns.dry_run
+            and not ns.yes
+            and requires_confirmation(
+                ns.command_path, backend=getattr(ns, "backend", None), on_conflict=getattr(ns, "on_conflict", None)
+            )
+            else None
+        )
         _enforce_expectations(ns, context)
         target_ref = _resolved_scope_target(ns, context, requested=requested_target)
+        declined = _confirm_before_effect(
+            ns,
+            context,
+            invocation_cwd=invocation_cwd,
+            engine_version=engine_version,
+            engine_pin=engine_pin,
+            target_ref=target_ref,
+            resolution_state=resolution_state,
+        )
+        if declined is not None:
+            return declined
         journal_common = context.common_dir
-        journal_before = {record.operation_id for record in JournalStore(journal_common).pending()}
-        if ns.command_path in {"scope list", "scope show"}:
-            result = run_scope_query(ns, context)
-        elif ns.command_path in {"scope create initiative", "scope create epic", "scope create issue"}:
-            result = run_scope_create(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
-        elif ns.command_path in {
-            "scope import github initiative",
-            "scope import github epic",
-            "scope import github issue",
-        }:
-            result = run_scope_import(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
-        elif ns.command_path == "scope delete":
-            result = run_scope_delete(ns, context)
-        elif ns.command_path in {"scope close", "scope reopen"}:
-            result = run_scope_lifecycle(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
-        elif ns.command_path in {"branch show", "branch create", "branch switch"}:
-            result = run_branch_command(ns, context)
-        elif ns.command_path in {"dependency list", "dependency check"}:
-            result = run_dependency_query(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
-        elif ns.command_path in {"dependency add", "dependency remove"}:
-            result = run_dependency_change(ns, context)
-        elif ns.command_path in {"artifact list", "artifact show"}:
-            result = run_artifact_query(ns, context)
-        elif ns.command_path in {"artifact create", "artifact import file"}:
-            result = run_artifact_change(ns, context, invocation_cwd=invocation_cwd)
-        elif ns.command_path in {"worktree list", "worktree show"}:
-            result = run_worktree_query(ns, context)
-        elif ns.command_path in {"worktree create", "worktree remove", "worktree bootstrap"}:
-            result = run_worktree_change(ns, context)
-        elif ns.command_path == "workbench copy":
-            result = run_workbench_copy(ns, context)
-        elif ns.command_path in {"workspace validate", "workspace doctor"}:
-            result = run_workspace_diagnostics(ns, context)
-        elif ns.command_path == "workspace sync":
-            result = run_workspace_sync(ns, context, gateway=GithubIssueGateway(timeout=ns.timeout))
-        elif ns.command_path == "workspace migrate":
-            result = run_workspace_migrate(ns, context, invocation_cwd=invocation_cwd)
-        elif ns.command_path == "installation show":
-            result = run_installation_show(ns, context, engine_version=engine_version, invocation_cwd=invocation_cwd)
-        elif ns.command_path == "installation update":
-            result = run_installation_update(
-                ns, context, invocation_cwd=invocation_cwd, engine_version=engine_version, engine_pin=engine_pin
-            )
-        elif ns.command_path == "installation uninstall":
-            result = run_installation_uninstall(ns, context, invocation_cwd=invocation_cwd)
-        elif ns.command_path == "scope edit":
-            result = run_scope_edit(ns, context)
-        elif ns.command_path == "active show":
-            result = run_active_show(context)
-        elif ns.command_path in {"active set", "active clear"}:
-            result = run_active_change(ns, context)
-        elif ns.command_path == "work start":
-            gateway = GithubIssueGateway(timeout=ns.timeout)
-            result = run_work_start(ns, context, gateway=gateway)
-        else:
-            gateway = GithubIssueGateway(timeout=ns.timeout)
-            result = run_work_finish(ns, context, gateway=gateway)
+        journal_before = pending_receipt_ids(journal_common)
+        result = _dispatch_regular(
+            ns, context, invocation_cwd=invocation_cwd, engine_version=engine_version, engine_pin=engine_pin
+        )
     except WriterLockBusy:
         return _failure(
-            ns.command_path, "WRITER_LOCK_BUSY", "writer lock is busy", 3, json_mode=json_mode, target=target_ref
+            ns.command_path,
+            "WRITER_LOCK_BUSY",
+            "writer lock is busy",
+            3,
+            json_mode=json_mode,
+            target=_target_for_failure(ns, context, target_ref, requested_target),
+            context=context,
         )
     except AdmissionError as error:
         return _classified_failure(
-            ns, journal_common, journal_before, error.code, str(error), 3, json_mode=json_mode, target=target_ref
+            ns,
+            journal_common,
+            journal_before,
+            error.code,
+            str(error),
+            3,
+            json_mode=json_mode,
+            target=target_ref,
+            context=context,
+            requested=requested_target,
         )
     except RemoteIssueError as error:
         return _classified_failure(
@@ -575,6 +849,8 @@ def run_vnext(
             error.exit_code,
             json_mode=json_mode,
             target=target_ref,
+            context=context,
+            requested=requested_target,
         )
     except LookupError as error:
         return _classified_failure(
@@ -586,6 +862,8 @@ def run_vnext(
             4,
             json_mode=json_mode,
             target=target_ref,
+            context=context,
+            requested=requested_target,
         )
     except ExpectationMismatch as error:
         return _classified_failure(
@@ -597,6 +875,8 @@ def run_vnext(
             3,
             json_mode=json_mode,
             target=target_ref,
+            context=context,
+            requested=requested_target,
         )
     except ValueError as error:
         return _classified_failure(
@@ -608,11 +888,23 @@ def run_vnext(
             3,
             json_mode=json_mode,
             target=target_ref,
+            context=context,
+            requested=requested_target,
         )
     except RuntimeError:
-        receipt = _journal_receipt_failure(ns, journal_common, journal_before, json_mode=json_mode, target=target_ref)
+        target_ref = _target_for_failure(ns, context, target_ref, requested_target)
+        receipt = _journal_receipt_failure(
+            ns, journal_common, journal_before, json_mode=json_mode, target=target_ref, context=context
+        )
         if receipt is not None:
             return receipt
+        observed = _nonblocking_io_receipt(ns, context, target_ref, json_mode=json_mode)
+        if observed is not None:
+            return observed
+        if ns.command_path != "scope edit":
+            uncertain = _unknown_nonblocking_receipt(ns, context, target_ref, json_mode=json_mode)
+            if uncertain is not None:
+                return uncertain
         return _failure(
             ns.command_path,
             "INTERNAL_ERROR",
@@ -620,16 +912,36 @@ def run_vnext(
             1,
             json_mode=json_mode,
             target=target_ref,
+            context=context,
         )
     except OSError:
-        receipt = _journal_receipt_failure(ns, journal_common, journal_before, json_mode=json_mode, target=target_ref)
+        target_ref = _target_for_failure(ns, context, target_ref, requested_target)
+        receipt = _journal_receipt_failure(
+            ns, journal_common, journal_before, json_mode=json_mode, target=target_ref, context=context
+        )
         if receipt is not None:
             return receipt
+        observed = _nonblocking_io_receipt(ns, context, target_ref, json_mode=json_mode)
+        if observed is not None:
+            return observed
+        if ns.command_path != "scope edit":
+            uncertain = _unknown_nonblocking_receipt(ns, context, target_ref, json_mode=json_mode)
+            if uncertain is not None:
+                return uncertain
         return _failure(
-            ns.command_path, "LOCAL_IO_FAILED", "local I/O operation failed", 5, json_mode=json_mode, target=target_ref
+            ns.command_path,
+            "LOCAL_IO_FAILED",
+            "local I/O operation failed",
+            5,
+            json_mode=json_mode,
+            target=target_ref,
+            context=context,
         )
-    if target_ref is not None and result.target is None:
-        result = replace(result, target=target_ref)
+    if target_ref is not None:
+        if result.target is None:
+            result = replace(result, target=target_ref)
+        elif result.target.id == target_ref.id and result.target.requested != target_ref.requested:
+            result = replace(result, target=replace(result.target, requested=target_ref.requested))
     if json_mode:
         return RuntimeOutput(result.exit_code, render_json(result), "")
     stdout, stderr = render_text(result)

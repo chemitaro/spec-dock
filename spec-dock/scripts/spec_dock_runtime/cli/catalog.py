@@ -298,6 +298,56 @@ class HelpSpec:
     examples: str
 
 
+HELP_PRECONDITIONS: dict[str, str] = {
+    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository.",
+    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository.",
+    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository.",
+    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported.",
+    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve.",
+    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve.",
+    "scope list": "The selected project must contain a readable Scope tree.",
+    "scope show": "The Scope ID or @current selector must resolve in this worktree.",
+    "scope edit": "The Scope must resolve and its backend and revision guards must match.",
+    "scope close": "The Scope must resolve; its backend and expected state guards must match.",
+    "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
+    "scope delete": "Select the exact local Scope subtree and satisfy deletion safety guards.",
+    "active show": "The selected worktree must have readable active-selection state.",
+    "active set": "The Scope must resolve and its ancestors must form a valid hierarchy.",
+    "active clear": "Select an active subtree or pass --all to clear the whole selection.",
+    "work start": "The Scope must be ready, its dependencies satisfied, and branch base resolvable.",
+    "work finish": "An active Scope must resolve and its completion guards must pass.",
+    "branch show": "The Scope must resolve; a canonical branch binding may be absent.",
+    "branch create": "The Scope must resolve, Git base must exist, and branch ownership must be free.",
+    "branch switch": "The Scope must have a bound branch that is safe to check out here.",
+    "dependency list": "The selected Scope must resolve in the current hierarchy.",
+    "dependency check": "The selected Scope must resolve; --source github requires remote access.",
+    "dependency add": "Both endpoints must resolve and the edge must preserve dependency rules.",
+    "dependency remove": "Both endpoints must resolve; --missing-ok permits an absent declared edge.",
+    "artifact create": "The owner Scope must resolve and the Artifact type must be supported.",
+    "artifact import file": "The owner Scope and regular source file must exist.",
+    "artifact list": "The owner Scope must resolve and its catalog must be readable.",
+    "artifact show": "The owner Scope and Artifact ID must resolve.",
+    "worktree create": "The path must be available and the requested Git base must resolve.",
+    "worktree list": "The installation control must be readable.",
+    "worktree show": "The worktree ID or path must resolve in installation control.",
+    "worktree remove": "The target must be registered and pass active, branch, and path safety guards.",
+    "worktree bootstrap": "The target must be registered and have a project-owned make init target.",
+    "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
+    "workspace sync": "Primary Scope data must be readable; --allow-invalid explicitly permits invalid input.",
+    "workspace validate": "A readable workspace is required; --ci validates committed data without installation state.",
+    "workspace doctor": "The selected repository and its control records must be readable.",
+    "workspace migrate": "The inventory-bound --mapping-file and migration guards must validate.",
+    "installation show": "The selected repository must have readable installation control.",
+    "installation init": "PATH must be a Git worktree root eligible for initial installation.",
+    "installation update": "Select a pinned source commit or verified finalize path and satisfy update guards.",
+    "installation uninstall": "The installed worktree group must satisfy uninstall safety guards.",
+    "help": "No project is required.",
+    "completion": "No project is required; choose bash, zsh, or fish.",
+}
+if set(HELP_PRECONDITIONS) != set(LEAF_PATHS):
+    raise RuntimeError("help preconditions do not match the public CLI leaves")
+
+
 _CONFIRMATION_LEAVES = frozenset({
     "scope close",
     "scope reopen",
@@ -392,8 +442,10 @@ def _example(leaf: str) -> str:
                 words.append("<scope-id>")
         elif argument.options.get("required"):
             words.extend((name, placeholders.get(name, f"<{name.lstrip('-')}>")))
-    if leaf in {"work start", "branch create", "worktree create"}:
+    if leaf in {"work start", "branch create"}:
         words.extend(("--base", "HEAD"))
+    if leaf == "workspace migrate":
+        words.extend(("--mapping-file", "<mapping.json>"))
     if leaf == "active clear":
         words.append("--all")
     if leaf == "installation update":
@@ -429,12 +481,7 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
     elif leaf == "workspace migrate":
         does_not = "Does not migrate independent repositories outside the selected Git common directory."
-    required = [arg.names[0] for arg in LEAF_ARGUMENTS[leaf] if arg.options.get("required")]
-    preconditions = (
-        "No project is required."
-        if leaf in {"help", "completion"}
-        else f"Resolve the target in the selected project; required inputs: {', '.join(required) or 'positional target/state guards'}."
-    )
+    preconditions = HELP_PRECONDITIONS[leaf]
     if leaf.startswith("scope create"):
         confirmation = "GitHub creation requires confirmation; local creation does not."
     elif leaf == "workbench copy":

@@ -11,6 +11,14 @@ class CliMessageData:
 
 
 @dataclass(frozen=True)
+class NonBlockingFailureData:
+    project: str
+    worktree: str
+    target_id: str | None
+    inspection: str
+
+
+@dataclass(frozen=True)
 class VersionData:
     version: str
     engine_digest: str | None

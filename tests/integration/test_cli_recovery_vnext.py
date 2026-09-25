@@ -3,18 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import asdict, replace
+import hashlib
 import json
 from multiprocessing import Process, Queue
 import os
 from pathlib import Path
 import sys
 import time
+from types import SimpleNamespace
 
 import pytest
 
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock.installation.group_journal import (  # noqa: E402
+    InstallationGroupRecord,
+    InstallationTarget,
+    write_group_record,
+)
 from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     assert_resume_request,
     can_send_effect,
@@ -23,9 +30,189 @@ from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     record_effect_observation,
     record_effect_result,
 )
-from spec_dock_runtime.infra import operation_journal  # noqa: E402
+from spec_dock_runtime.cli import vnext_runtime  # noqa: E402
+from spec_dock_runtime.infra import (  # noqa: E402
+    failure_receipts,
+    operation_journal,
+)
+from spec_dock_runtime.infra.engine_handover_store import EngineHandoverRecord, write_engine_handover  # noqa: E402
+from spec_dock_runtime.infra.finalization_store import FinalizationRecord, write_finalization  # noqa: E402
 from spec_dock_runtime.infra.json_store import atomic_write_json, reconcile_atomic_json  # noqa: E402
+from spec_dock_runtime.infra.migration_journal import (  # noqa: E402
+    MigrationFile,
+    MigrationRecord,
+    write_migration_record,
+)
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+
+
+def test_migration_prepared_failure_returns_its_authoritative_operation_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = common["repo_root"]
+    git_common = common["common_dir"]
+    worktree_id = common["worktree_id"]
+    assert isinstance(repo, Path) and isinstance(git_common, Path) and isinstance(worktree_id, str)
+    workspace = repo / "spec-dock/workspace.json"
+    before = workspace.read_bytes()
+    after = before + b"\n"
+    item = MigrationFile(
+        str(workspace),
+        before,
+        after,
+        "sha256:" + hashlib.sha256(before).hexdigest(),
+        "sha256:" + hashlib.sha256(after).hexdigest(),
+    )
+    record = MigrationRecord(
+        "a" * 32,
+        str(git_common),
+        "sha256:" + "b" * 64,
+        "sha256:" + "c" * 64,
+        "d" * 64,
+        0,
+        ((worktree_id, str(repo)),),
+        (item,),
+        (),
+        "prepared",
+    )
+
+    def fail_after_preparation(*args: object, **kwargs: object) -> None:
+        write_migration_record(git_common, record, create=True)
+        raise OSError("injected after migration preparation")
+
+    monkeypatch.setattr(vnext_runtime, "run_workspace_migrate", fail_after_preparation)
+    failed = vnext_runtime.run_vnext(
+        ["workspace", "migrate", "--to-schema", "3", "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert payload["operation_id"] == record.operation_id
+    assert payload["recovery"]["can_resume"] is True
+
+
+def test_installation_prepared_failure_returns_group_operation_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = common["repo_root"]
+    git_common = common["common_dir"]
+    worktree_id = common["worktree_id"]
+    assert isinstance(repo, Path) and isinstance(git_common, Path) and isinstance(worktree_id, str)
+    record = InstallationGroupRecord(
+        "b" * 32,
+        "update",
+        str(git_common),
+        0,
+        "a" * 64,
+        "c" * 40,
+        "d" * 64,
+        False,
+        (InstallationTarget(worktree_id, str(repo), None, False),),
+        "preparing",
+    )
+
+    def fail_after_preparation(*args: object, **kwargs: object) -> None:
+        write_group_record(git_common, record, create=True)
+        raise OSError("injected after installation preparation")
+
+    monkeypatch.setattr(vnext_runtime, "run_installation_update", fail_after_preparation)
+    failed = vnext_runtime.run_vnext(
+        ["installation", "update", "--commit", "c" * 40, "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert payload["operation_id"] == record.operation_id
+    assert payload["recovery"]["can_resume"] is True
+
+
+def test_installation_init_prepared_failure_returns_group_operation_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = common["repo_root"]
+    git_common = common["common_dir"]
+    worktree_id = common["worktree_id"]
+    assert isinstance(repo, Path) and isinstance(git_common, Path) and isinstance(worktree_id, str)
+    record = InstallationGroupRecord(
+        "e" * 32,
+        "init",
+        str(git_common),
+        0,
+        "a" * 64,
+        None,
+        "d" * 64,
+        False,
+        (InstallationTarget(worktree_id, str(repo), None, False),),
+        "preparing",
+    )
+
+    def fail_after_preparation(*args: object, **kwargs: object) -> None:
+        write_group_record(git_common, record, create=True)
+        raise OSError("injected after installation init preparation")
+
+    monkeypatch.setattr(vnext_runtime, "run_installation_init", fail_after_preparation)
+    failed = vnext_runtime.run_vnext(
+        ["installation", "init", str(repo), "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert payload["operation_id"] == record.operation_id
+    assert payload["recovery"]["can_resume"] is True
+
+
+@pytest.mark.parametrize(
+    ("mode", "epoch", "expected_status"),
+    [("maintenance", 4, None), ("ready", 5, "succeeded"), ("maintenance", 5, "unknown")],
+)
+def test_finalization_receipt_observes_control_transition(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str, epoch: int, expected_status: str | None
+) -> None:
+    record = FinalizationRecord("f" * 32, str(tmp_path), 4, "a" * 64, ("worktree-a",), "prepared")
+    write_finalization(tmp_path, record, create=True)
+    monkeypatch.setattr(
+        failure_receipts,
+        "load_control",
+        lambda _common: SimpleNamespace(mode=mode, epoch=epoch, engine_digest="a" * 64),
+    )
+    receipt = next(
+        item for item in failure_receipts.pending_failure_receipts(tmp_path) if item.operation_id == record.operation_id
+    )
+    assert receipt.effect_started is (expected_status is not None)
+    assert [effect.status for effect in receipt.effects] == ([] if expected_status is None else [expected_status])
+
+
+def test_prepared_engine_handover_receipt_does_not_claim_zero_effect(tmp_path: Path) -> None:
+    record = EngineHandoverRecord(
+        "e" * 32,
+        str(tmp_path),
+        "a" * 32,
+        4,
+        str(tmp_path / "old/bin/spec-dock"),
+        str(tmp_path / "old"),
+        "a" * 64,
+        str(tmp_path / "new/bin/spec-dock"),
+        str(tmp_path / "new"),
+        "b" * 64,
+        ("worktree-a",),
+        "prepared",
+    )
+    write_engine_handover(tmp_path, record, create=True)
+    receipt = next(
+        item for item in failure_receipts.pending_failure_receipts(tmp_path) if item.operation_id == record.operation_id
+    )
+    assert receipt.effect_started
+    assert receipt.effects == (failure_receipts.ReceiptEffect("engine-handover", "unknown", str(tmp_path)),)
 
 
 def _prepare_and_hold(common_dir: str, command: str, ready: Queue[str]) -> None:

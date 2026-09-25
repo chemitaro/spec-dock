@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Literal, cast
 
@@ -11,6 +10,7 @@ from spec_dock_runtime.application.import_github_scope import (
     preview_import_github_scope,
     resume_github_scope_import,
 )
+from spec_dock_runtime.commands.scope_result_vnext import ScopeWriteData, project_scope
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -18,13 +18,6 @@ if TYPE_CHECKING:
 
     from spec_dock_runtime.application.create_github_scope import GithubScopeGateway
     from spec_dock_runtime.commands.work_vnext import WorkContext
-
-
-@dataclass(frozen=True)
-class GithubScopeImportData:
-    scope_id: str
-    path: str
-    github_ref: str
 
 
 def run_scope_import(
@@ -78,11 +71,22 @@ def run_scope_import(
             **common,
             updated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         )
+    projection = project_scope(context, imported.id)
     return OperationResult(
         command=ns.command_path,
         status="succeeded",
-        data=GithubScopeImportData(imported.id, str(imported.path), imported.github_ref),
+        data=ScopeWriteData(
+            imported.id,
+            str(imported.path),
+            imported.github_ref,
+            projection.scope,
+            projection.status,
+            projection.project,
+            projection.worktree,
+            projection.snapshot_id,
+        ),
         exit_code=0,
         operation_id=imported.operation_id,
+        target=projection.target,
         effects=(Effect("scaffold", "succeeded", imported.id),),
     )

@@ -30,6 +30,8 @@ ID: "iss-00409"
 
 検証log・各SHA-256・コマンド別終了コードは本Issueの無追跡 `.workbench/chatgpt-final-quality-gate-strict-v2/issue409-cli-on-demand-update/test-results/manifest.json` に保存しました。このReportを含む後続commitではGit SHAが変わるため、最終レビュー対象SHAで必須コマンドを再実行してmanifestを更新します。追跡文書に自身のcommit SHAを埋め込む自己参照は行いません。最終レビューは前回と同じChatGPT conversationで実施します。
 
+前回の固定候補 `51dbb214dce6e49ad8afd4a13d43c8eb8fd014e5` は、lint・全テスト・wheel導入には成功しましたが、同じレビュアーの Final Quality Gate Strict v2 でP1が4件残りました。指摘はleaf別help、TTY確認と実行対象の固定、失敗時の復旧receipt、Scope群のJSON payloadです。本作業ツリーで配布元・dogfood投影・関連テストを修正しました。他の稼働中のworktreeおよびconsumerは更新していません。修正後の固定SHAで再検証し、同じレビュアーに再審査を依頼します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

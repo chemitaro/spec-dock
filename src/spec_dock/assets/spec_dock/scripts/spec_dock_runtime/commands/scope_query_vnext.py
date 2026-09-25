@@ -8,6 +8,12 @@ from typing import TYPE_CHECKING
 from spec_dock_runtime.application.active_selection import show_active_selection
 from spec_dock_runtime.application.edit_scope import edit_scope_title
 from spec_dock_runtime.application.scope_query import list_scopes, load_scope_views, show_scope
+from spec_dock_runtime.commands.scope_result_vnext import (
+    ScopeData,
+    ScopeStatusData,
+    project_scope,
+    project_scope_view,
+)
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -41,6 +47,10 @@ class ScopeListData:
 class ScopeShowData:
     snapshot_id: str
     item: ScopeSummary
+    scope: ScopeData
+    status: ScopeStatusData
+    project: str
+    worktree: str
 
 
 @dataclass(frozen=True)
@@ -49,6 +59,11 @@ class ScopeEditData:
     title: str
     revision: int
     changed: bool
+    scope: ScopeData
+    status: ScopeStatusData
+    project: str
+    worktree: str
+    snapshot_id: str
 
 
 def _summary(context: WorkContext, view: ScopeView) -> ScopeSummary:
@@ -80,13 +95,23 @@ def run_scope_query(ns: argparse.Namespace, context: WorkContext) -> OperationRe
             listed.snapshot_id,
             tuple(_summary(context, item) for item in listed.items),
         )
+        target = None
     elif ns.command_path == "scope show":
         shown = show_scope(views, ns.target, selection=selection)
         snapshot = list_scopes(views).snapshot_id
-        data = ScopeShowData(snapshot, _summary(context, shown))
+        projection = project_scope_view(context, shown, snapshot_id=snapshot, requested=ns.target)
+        data = ScopeShowData(
+            snapshot,
+            _summary(context, shown),
+            projection.scope,
+            projection.status,
+            projection.project,
+            projection.worktree,
+        )
+        target = projection.target
     else:
         raise ValueError("unsupported Scope query")
-    return OperationResult(command=ns.command_path, status="succeeded", data=data, exit_code=0)
+    return OperationResult(command=ns.command_path, status="succeeded", data=data, exit_code=0, target=target)
 
 
 def run_scope_edit(ns: argparse.Namespace, context: WorkContext) -> OperationResult[ScopeEditData]:
@@ -112,10 +137,26 @@ def run_scope_edit(ns: argparse.Namespace, context: WorkContext) -> OperationRes
         )
         changed = outcome.changed
         revision = outcome.revision
+    projection = (
+        project_scope_view(context, selected, snapshot_id=list_scopes(views).snapshot_id, requested=ns.target)
+        if ns.dry_run
+        else project_scope(context, selected.id, requested=ns.target)
+    )
     return OperationResult(
         command="scope edit",
         status="planned" if ns.dry_run else "succeeded" if changed else "unchanged",
-        data=ScopeEditData(selected.id, title, revision, changed),
+        data=ScopeEditData(
+            selected.id,
+            title,
+            revision,
+            changed,
+            projection.scope,
+            projection.status,
+            projection.project,
+            projection.worktree,
+            projection.snapshot_id,
+        ),
         exit_code=0,
+        target=projection.target,
         effects=(Effect("metadata", "planned" if ns.dry_run else "succeeded", selected.id),) if changed else (),
     )
