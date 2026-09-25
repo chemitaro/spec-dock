@@ -22,7 +22,12 @@ def test_scope_list_show_and_edit_target_the_same_scope(tmp_path: Path) -> None:
     arguments = {"invocation_cwd": specdock_dir.parent, "engine_digest": "engine-a", "engine_version": "test"}
     listed = run_vnext(["scope", "list", "--kind", "issue", "--parent", epic.id, "--json"], **arguments)
     assert listed.exit_code == 0
-    items = json.loads(listed.stdout)["data"]["items"]
+    data = json.loads(listed.stdout)["data"]
+    items = data["items"]
+    assert data["filter"] == {"kind": "issue", "parent_id": epic.id, "state": None}
+    assert data["project"] == str(specdock_dir.parent)
+    assert data["worktree"]
+    assert data["snapshot_id"]
     assert len(items) == 1 and items[0]["id"] == issue.id and items[0]["backend"] == "local"
     assert items[0]["path"].startswith("spec-dock/initiatives/")
     run_vnext(["active", "set", issue.id], **arguments)

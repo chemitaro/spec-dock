@@ -31,7 +31,16 @@ def test_scope_import_cli_previews_and_creates_without_post(tmp_path: Path, monk
     prefix = ("scope", "import", "github", "initiative", "gh:example/repo#47", "--title", "Local plan")
     preview = _run(repo, *prefix, "--dry-run")
     assert preview.exit_code == 0
-    assert json.loads(preview.stdout)["status"] == "planned"
+    planned = json.loads(preview.stdout)
+    assert planned["status"] == "planned"
+    assert planned["data"]["scope"]["id"] is None
+    assert planned["data"]["scope"]["kind"] == "initiative"
+    assert planned["data"]["scope"]["backend"] == "github"
+    assert planned["data"]["status"]["state"] == "unknown"
+    assert planned["data"]["github_ref"] == "gh:example/repo#47"
+    assert planned["data"]["project"] == str(repo)
+    assert planned["data"]["worktree"] == common["worktree_id"]
+    assert planned["data"]["snapshot_id"]
     assert gateway.calls == 0
     imported = _run(repo, *prefix)
     assert imported.exit_code == 0

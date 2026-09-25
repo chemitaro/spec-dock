@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ScopeData:
-    id: str
+    id: str | None
     kind: str
     backend: str
     parent_id: str | None
@@ -43,14 +43,17 @@ class ScopeProjection:
 
 @dataclass(frozen=True)
 class ScopeWriteData:
-    scope_id: str
-    path: str
+    scope_id: str | None
+    path: str | None
     github_ref: str | None
     scope: ScopeData
     status: ScopeStatusData
     project: str
     worktree: str
     snapshot_id: str
+    title: str | None = None
+    slug: str | None = None
+    repository: str | None = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +64,34 @@ class ScopeFailureData:
     project: str
     worktree: str
     snapshot_id: str
+
+
+def planned_scope_write(
+    context: WorkContext,
+    *,
+    kind: str,
+    backend: str,
+    parent_id: str | None,
+    title: str,
+    slug: str | None,
+    github_ref: str | None = None,
+    repository: str | None = None,
+) -> ScopeWriteData:
+    """Keep the Scope result shape while leaving uncreated identity unresolved."""
+    snapshot_id = list_scopes(load_scope_views(context.repo_root / "spec-dock")).snapshot_id
+    return ScopeWriteData(
+        None,
+        None,
+        github_ref,
+        ScopeData(None, kind, backend, parent_id, None, None),
+        ScopeStatusData("unknown", "unknown", False),
+        str(context.repo_root),
+        context.worktree_id,
+        snapshot_id,
+        title,
+        slug,
+        repository,
+    )
 
 
 def project_scope(context: WorkContext, scope_id: str, *, requested: str | None = None) -> ScopeProjection:

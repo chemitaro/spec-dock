@@ -10,7 +10,7 @@ from spec_dock_runtime.application.import_github_scope import (
     preview_import_github_scope,
     resume_github_scope_import,
 )
-from spec_dock_runtime.commands.scope_result_vnext import ScopeWriteData, project_scope
+from spec_dock_runtime.commands.scope_result_vnext import ScopeWriteData, planned_scope_write, project_scope
 from spec_dock_runtime.presentation.envelope import Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -45,7 +45,16 @@ def run_scope_import(
         return OperationResult(
             command=ns.command_path,
             status="planned",
-            data=preview,
+            data=planned_scope_write(
+                context,
+                kind=preview.kind,
+                backend="github",
+                parent_id=preview.parent_id,
+                title=preview.title,
+                slug=preview.slug,
+                github_ref=preview.github_ref,
+                repository=preview.github_ref[3:].split("#", 1)[0],
+            ),
             exit_code=0,
             effects=(Effect("scaffold", "planned", preview.github_ref),),
         )

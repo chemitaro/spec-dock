@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal, cast
 from spec_dock_runtime.application.create_github_scope import create_github_scope, preview_github_scope_create
 from spec_dock_runtime.application.resume_github_scope import resume_github_scope_create
 from spec_dock_runtime.application.scope_create_vnext import create_local_scope_command
-from spec_dock_runtime.commands.scope_result_vnext import ScopeWriteData, project_scope
+from spec_dock_runtime.commands.scope_result_vnext import ScopeWriteData, planned_scope_write, project_scope
 from spec_dock_runtime.presentation.envelope import Diagnostic, Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -40,7 +40,15 @@ def run_scope_create(
             return OperationResult(
                 command=ns.command_path,
                 status="planned",
-                data=preview,
+                data=planned_scope_write(
+                    context,
+                    kind=preview.kind,
+                    backend="github",
+                    parent_id=preview.parent_id,
+                    title=preview.title,
+                    slug=preview.slug,
+                    repository=preview.repository,
+                ),
                 exit_code=0,
                 effects=(Effect("github-create", "planned", preview.repository), Effect("scaffold", "planned", None)),
             )
@@ -104,6 +112,8 @@ def run_scope_create(
         lock_timeout=ns.lock_timeout,
     )
     projection = project_scope(context, result.scope_id) if result.scope_id is not None and not ns.dry_run else None
+    if not ns.dry_run and (result.scope_id is None or projection is None):
+        raise ValueError("completed Scope creation did not resolve an identity")
     return OperationResult(
         command=ns.command_path,
         status="planned" if ns.dry_run else "succeeded",
@@ -119,7 +129,14 @@ def run_scope_create(
                 projection.snapshot_id,
             )
             if projection is not None and result.scope_id is not None
-            else result
+            else planned_scope_write(
+                context,
+                kind=result.kind,
+                backend="local",
+                parent_id=result.parent_id,
+                title=result.title,
+                slug=None,
+            )
         ),
         exit_code=0,
         operation_id=result.operation_id,

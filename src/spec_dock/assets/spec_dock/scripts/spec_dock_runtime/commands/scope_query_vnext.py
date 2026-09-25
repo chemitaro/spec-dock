@@ -41,6 +41,16 @@ class ScopeSummary:
 class ScopeListData:
     snapshot_id: str
     items: tuple[ScopeSummary, ...]
+    filter: ScopeListFilter
+    project: str
+    worktree: str
+
+
+@dataclass(frozen=True)
+class ScopeListFilter:
+    kind: str | None
+    parent_id: str | None
+    state: str | None
 
 
 @dataclass(frozen=True)
@@ -94,6 +104,9 @@ def run_scope_query(ns: argparse.Namespace, context: WorkContext) -> OperationRe
         data: ScopeListData | ScopeShowData = ScopeListData(
             listed.snapshot_id,
             tuple(_summary(context, item) for item in listed.items),
+            ScopeListFilter(ns.kind, parent, ns.state),
+            str(context.repo_root),
+            context.worktree_id,
         )
         target = None
     elif ns.command_path == "scope show":

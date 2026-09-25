@@ -29,7 +29,20 @@ def test_local_scope_create_cli_uses_explicit_parent_and_dry_run(tmp_path: Path)
     repo = cast("Path", common["repo_root"])
     preview = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program", "--dry-run")
     assert preview.exit_code == 0
-    assert json.loads(preview.stdout)["status"] == "planned"
+    planned = json.loads(preview.stdout)
+    assert planned["status"] == "planned"
+    assert planned["data"]["scope"] == {
+        "id": None,
+        "kind": "initiative",
+        "backend": "local",
+        "parent_id": None,
+        "path": None,
+        "revision": None,
+    }
+    assert planned["data"]["status"]["state"] == "unknown"
+    assert planned["data"]["project"] == str(repo)
+    assert planned["data"]["worktree"] == common["worktree_id"]
+    assert planned["data"]["snapshot_id"]
     assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
 
     initiative = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
@@ -263,6 +276,13 @@ def test_github_scope_create_cli_previews_and_requires_confirmation(
     preview = _run(repo, *prefix, "--dry-run")
     assert preview.exit_code == 0
     assert json.loads(preview.stdout)["status"] == "planned"
+    planned = json.loads(preview.stdout)
+    assert planned["data"]["scope"]["id"] is None
+    assert planned["data"]["scope"]["backend"] == "github"
+    assert planned["data"]["status"]["state"] == "unknown"
+    assert planned["data"]["project"] == str(repo)
+    assert planned["data"]["worktree"] == common["worktree_id"]
+    assert planned["data"]["snapshot_id"]
     assert gateway.calls == 0
     denied = _run(repo, *prefix)
     assert denied.exit_code == 3
