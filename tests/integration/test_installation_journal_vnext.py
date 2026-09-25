@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
+import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -123,6 +125,83 @@ def test_fresh_init_journals_scaffold_and_restores_absence(tmp_path: Path) -> No
     assert restored.phase == "rolled-back"
     assert not (target / "spec-dock/workspace.json").exists()
     assert not (target / "spec-dock/.workbench/README.md").exists()
+
+
+def test_staged_hardlink_is_rejected_before_replacement(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="init", bundle=_bundle(tmp_path))
+    stage = target / ".spec-dock-installations" / record.operation_id / "stage/spec-dock/spec-dock.version"
+    os.link(stage, tmp_path / "foreign-link")
+    with pytest.raises(ValueError, match=r"hardlink|identity"):
+        apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    assert not (target / "spec-dock/spec-dock.version").exists()
+
+
+def test_completed_same_content_inode_swap_blocks_rollback(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="init", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    installed = target / "spec-dock/spec-dock.version"
+    replacement = installed.with_name("same-content")
+    replacement.write_bytes(installed.read_bytes())
+    replacement.chmod(installed.stat().st_mode)
+    replacement.replace(installed)
+    with pytest.raises(ValueError, match=r"identity|later changes"):
+        rollback_installation(journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True)
+    assert installed.read_text(encoding="utf-8") == "0.2.4\n"
+
+
+def test_backup_same_content_inode_swap_blocks_rollback(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+
+    def interrupt(relative: str) -> None:
+        if relative == "spec-dock/spec-dock.version":
+            raise RuntimeError("stop after version")
+
+    with pytest.raises(RuntimeError, match="stop after version"):
+        apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None, after_root=interrupt)
+    backup = target / ".spec-dock-installations" / record.operation_id / "backup/spec-dock/spec-dock.version"
+    replacement = backup.with_name("foreign-backup")
+    shutil.copy2(backup, replacement)
+    replacement.replace(backup)
+    with pytest.raises(ValueError, match="backup changed identity"):
+        rollback_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    assert version.read_text(encoding="utf-8") == "0.2.4\n"
+
+
+def test_stage_identity_survives_rename_before_completion_record(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="init", bundle=_bundle(tmp_path))
+    original = type(target).replace
+    stopped = False
+
+    def interrupt(path: Path, destination: Path) -> Path:
+        nonlocal stopped
+        result = original(path, destination)
+        if not stopped and "/stage/" in str(path):
+            stopped = True
+            raise RuntimeError("rename completed before journal")
+        return result
+
+    with monkeypatch.context() as patch:
+        patch.setattr(type(target), "replace", interrupt)
+        with pytest.raises(RuntimeError, match="rename completed before journal"):
+            apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    completed = apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    assert completed.phase == "committed"
 
 
 def test_installation_recovery_area_does_not_dirty_git_worktree(tmp_path: Path) -> None:

@@ -320,6 +320,7 @@ def test_group_update_keeps_all_worktrees_in_maintenance(tmp_path: Path) -> None
         keep_maintenance=True,
     )
     assert result.phase == "committed"
+    assert result.requested_version == "0.2.4" and result.version_tracked
     assert len(result.targets) == 2 and all(target.completed for target in result.targets)
     assert pending_installation_groups(common_dir) == ()
     assert load_control(common_dir).mode == "maintenance"
@@ -528,6 +529,39 @@ def test_group_resume_refuses_target_changed_after_planned_child(
     assert pending_installation_groups(common_dir) == (group_id,)
 
 
+def test_group_resume_preserves_original_version_request(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, versioned_bundle = _group_fixture(tmp_path)
+    bundle = replace(versioned_bundle, source=replace(versioned_bundle.source, version=None))
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("marker stop")))
+        with pytest.raises(OSError, match="marker stop"):
+            update_installation_group(
+                repo_root=repo,
+                common_dir=common_dir,
+                worktree_id="main",
+                engine_digest=digest,
+                expected_epoch=epoch,
+                bundle=bundle,
+                requested_version="0.2.4",
+                keep_maintenance=True,
+            )
+    (group_id,) = pending_installation_groups(common_dir)
+    resumed = resume_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=group_id,
+        bundle=bundle,
+    )
+    assert resumed.phase == "committed"
+    assert resumed.requested_version == "0.2.4"
+    for root in (repo, second):
+        assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.4\n"
+
+
 def test_group_commit_refuses_replaced_marker_after_child_apply(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -561,6 +595,64 @@ def test_group_commit_refuses_replaced_marker_after_child_apply(
         )
     (group_id,) = pending_installation_groups(common_dir)
     assert read_group_record(common_dir, group_id).phase == "recovery-required"
+
+
+def test_group_commit_refuses_same_content_published_swap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    real_apply = update_module.apply_installation
+    changed = False
+
+    def replace_after_apply(*args: object, **kwargs: object):
+        nonlocal changed
+        result = real_apply(*args, **kwargs)
+        if not changed:
+            installed = repo / "spec-dock/spec-dock.version"
+            replacement = installed.with_name("same-content")
+            replacement.write_bytes(installed.read_bytes())
+            replacement.chmod(installed.stat().st_mode)
+            replacement.replace(installed)
+            changed = True
+        return result
+
+    monkeypatch.setattr(update_module, "apply_installation", replace_after_apply)
+    with pytest.raises(ValueError, match="changed identity"):
+        update_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            expected_epoch=epoch,
+            bundle=bundle,
+            keep_maintenance=True,
+        )
+    (group_id,) = pending_installation_groups(common_dir)
+    assert read_group_record(common_dir, group_id).phase == "recovery-required"
+
+
+def test_finalization_refuses_same_content_published_swap(tmp_path: Path) -> None:
+    repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.application.installation_update_vnext as update_module
+
+    result = update_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        expected_epoch=epoch,
+        bundle=bundle,
+        keep_maintenance=True,
+    )
+    assert result.phase == "committed"
+    installed = repo / "spec-dock/spec-dock.version"
+    replacement = installed.with_name("same-content")
+    replacement.write_bytes(installed.read_bytes())
+    replacement.chmod(installed.stat().st_mode)
+    replacement.replace(installed)
+    group = update_module.inspect_installation_group(repo_root=repo, common_dir=common_dir)
+    with pytest.raises(ValueError, match="changed identity"):
+        update_module._verify_latest_installed_children(common_dir, group)
 
 
 def test_group_update_rolls_back_a_completed_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

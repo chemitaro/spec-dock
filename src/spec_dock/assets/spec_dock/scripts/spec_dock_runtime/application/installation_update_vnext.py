@@ -18,6 +18,7 @@ from spec_dock.installation.executor import (
     resume_preparation,
     rollback_installation,
     validate_recovery_marker,
+    verify_installation_after,
     verify_installation_marker,
 )
 from spec_dock.installation.group_journal import (
@@ -133,6 +134,7 @@ def _commit_update_matches_engine(*, repo_root: Path, common_dir: Path, version:
 def _verify_finalization_targets(
     group: InstallationGroup, *, repo_root: Path, common_dir: Path, engine_version: str, engine_digest: str
 ) -> None:
+    _verify_latest_installed_children(common_dir, group)
     versions = {item.version for item in group.worktrees}
     if not group.worktrees or len(versions) != 1:
         raise ValueError("registered worktree installation versions differ from the executing engine")
@@ -156,6 +158,33 @@ def _verify_finalization_targets(
             )
         ):
             raise ValueError(f"registered worktree schema is not ready: {item.id}")
+
+
+def _verify_latest_installed_children(common_dir: Path, group: InstallationGroup) -> None:
+    """A ready transition must still own the latest published tooling."""
+    directory = common_dir / "spec-dock/control/installations"
+    if not directory.is_dir() or directory.is_symlink():
+        return
+    targets = tuple((item.id, item.root) for item in group.worktrees)
+    latest: InstallationGroupRecord | None = None
+    for path in directory.iterdir():
+        if path.is_symlink() or not path.is_dir():
+            raise ValueError("installation group record directory is unsafe")
+        record = read_group_record(common_dir, path.name)
+        if record.phase != "committed" or record.action not in {"init", "update"}:
+            continue
+        if tuple((item.worktree_id, item.root) for item in record.targets) != targets:
+            continue
+        if latest is None or record.control_epoch > latest.control_epoch:
+            latest = record
+    if latest is None:
+        return
+    for target in latest.targets:
+        if target.child_operation_id is None or not target.completed:
+            raise ValueError("latest installation group has incomplete targets")
+        verify_installation_after(
+            _child_root(common_dir, latest.operation_id, target.worktree_id), target.child_operation_id
+        )
 
 
 def plan_installation_finalization(
@@ -322,6 +351,8 @@ def _quarantine_unjournaled_stage(target: InstallationTarget, journal_root: Path
 def _stage_missing(
     common_dir: Path, record: InstallationGroupRecord, bundle: VerifiedBundle | None, *, recover_stage: bool = False
 ) -> InstallationGroupRecord:
+    if record.action == "update" and not record.version_tracked:
+        raise ValueError("installation recovery lacks the original version request")
     for target in record.targets:
         assert target.child_operation_id is not None
         if target.child_operation_id != child_operation_id(record.operation_id, target.worktree_id):
@@ -340,6 +371,7 @@ def _stage_missing(
                 journal_root,
                 action=record.action,
                 bundle=bundle,
+                installed_version=record.requested_version,
                 operation_id=target.child_operation_id,
             )
         if (
@@ -347,6 +379,7 @@ def _stage_missing(
             or child.action != record.action
             or child.source_commit != record.source_commit
             or child.source_digest != record.source_digest
+            or (record.version_tracked and child.requested_version != record.requested_version)
         ):
             raise ValueError("installation child record differs from the fixed group")
     staged = replace(record, phase="staged", error=None)
@@ -366,6 +399,7 @@ def _apply_children(common_dir: Path, record: InstallationGroupRecord) -> Instal
             or child.action != record.action
             or child.source_commit != record.source_commit
             or child.source_digest != record.source_digest
+            or (record.version_tracked and child.requested_version != record.requested_version)
         ):
             raise ValueError("installation child record differs from the fixed group")
         if child.phase != "committed":
@@ -376,6 +410,7 @@ def _apply_children(common_dir: Path, record: InstallationGroupRecord) -> Instal
                     common_dir, minimum_epoch=minimum_epoch, engine_digest=engine_digest
                 ),
             )
+        verify_installation_after(journal_root, target.child_operation_id)
         targets = list(record.targets)
         targets[index] = replace(target, completed=True)
         record = replace(record, phase="applying", targets=tuple(targets), error=None)
@@ -390,6 +425,9 @@ def _verify_group_markers(common_dir: Path, record: InstallationGroupRecord) -> 
         journal_path = journal_root / "installations" / target.child_operation_id / "record.json"
         if os.path.lexists(journal_path):
             verify_installation_marker(journal_root, target.child_operation_id)
+            child = read_record(journal_root, target.child_operation_id)
+            if child.phase == "committed":
+                verify_installation_after(journal_root, target.child_operation_id)
         else:
             validate_recovery_marker(Path(target.root))
 
@@ -731,6 +769,7 @@ def update_installation_group(
     engine_digest: str,
     expected_epoch: int,
     bundle: VerifiedBundle,
+    requested_version: str | None = None,
     keep_maintenance: bool,
     engine_pin: VerifiedEngine | None = None,
     lock_timeout: float = 0.0,
@@ -796,6 +835,8 @@ def update_installation_group(
             _fixed_targets(current, group_id),
             "preparing",
             bootstrap=bootstrap,
+            requested_version=requested_version if requested_version is not None else bundle.source.version,
+            version_tracked=True,
         )
         write_group_record(common_dir, record, create=True)
         try:

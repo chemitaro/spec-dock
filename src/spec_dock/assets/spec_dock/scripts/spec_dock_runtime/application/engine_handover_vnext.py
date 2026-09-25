@@ -6,7 +6,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from spec_dock.installation.executor import _digest_path
+from spec_dock.installation.executor import verify_installation_after
 from spec_dock.installation.group_journal import read_group_record
 from spec_dock.installation.journal import read_record
 from spec_dock.runtime_loader import (
@@ -61,11 +61,10 @@ def verify_source_update(
             or child.target != target.root
             or child.source_commit != update.source_commit
             or child.source_digest != update.source_digest
+            or (update.version_tracked and child.requested_version != update.requested_version)
         ):
             raise ValueError("engine handover child update changed")
-        for relative, expected in child.after_hashes.items():
-            if _digest_path(Path(target.root) / relative) != expected:
-                raise ValueError(f"engine handover target changed after update: {target.worktree_id}/{relative}")
+        verify_installation_after(child_root, target.child_operation_id)
     return targets
 
 

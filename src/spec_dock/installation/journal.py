@@ -41,6 +41,8 @@ class InstallationRecord:
     marker_publish: dict[str, int] | None = None
     before_identities: dict[str, str | None] | None = None
     requested_version: str | None = None
+    after_identities: dict[str, str | None] | None = None
+    identity_schema: int | None = None
 
 
 def durable_mkdir(directory: Path) -> None:
@@ -103,6 +105,7 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         )
         or (record.error is not None and not isinstance(record.error, str))
         or (record.requested_version is not None and not isinstance(record.requested_version, str))
+        or record.identity_schema not in (None, 2)
         or not isinstance(record.marker_tracked, bool)
         or any(
             identity is not None
@@ -123,6 +126,17 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
                     not isinstance(key, str)
                     or (identity is not None and (not isinstance(identity, str) or _DIGEST.fullmatch(identity) is None))
                     for key, identity in record.before_identities.items()
+                )
+            )
+        )
+        or (
+            record.after_identities is not None
+            and (
+                not isinstance(record.after_identities, dict)
+                or any(
+                    not isinstance(key, str)
+                    or (identity is not None and (not isinstance(identity, str) or _DIGEST.fullmatch(identity) is None))
+                    for key, identity in record.after_identities.items()
                 )
             )
         )
@@ -151,6 +165,8 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         record.marker_publish,
         record.before_identities,
         record.requested_version,
+        record.after_identities,
+        record.identity_schema,
     )
 
 

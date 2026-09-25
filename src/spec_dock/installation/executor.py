@@ -77,7 +77,6 @@ def _path_identity(path: Path) -> str | None:
             observed.st_ino,
             observed.st_nlink,
             observed.st_size,
-            observed.st_ctime_ns,
         )
         digest.update(json.dumps(identity, separators=(",", ":")).encode() + b"\n")
     return digest.hexdigest()
@@ -104,7 +103,8 @@ def _planned_snapshot(target: Path, action: str) -> tuple[dict[str, str | None],
 def _verify_planned_before(record: InstallationRecord) -> None:
     paths = _record_paths(record.action)
     if (
-        record.before_identities is None
+        record.identity_schema != 2
+        or record.before_identities is None
         or set(record.before_hashes) != set(paths)
         or set(record.before_identities) != set(paths)
     ):
@@ -321,6 +321,7 @@ def prepare_installation(
         marker_before=marker_before,
         before_identities=before_identities,
         requested_version=installed_version,
+        identity_schema=2,
     )
     write_record(journal_root, record, create=True)
     return _stage_preparation(journal_root, record, bundle)
@@ -365,7 +366,9 @@ def _stage_preparation(
     _sync_directory(area.parent)
     record = _publish_marker(journal_root, record, area)
     before = record.before_hashes
+    assert record.before_identities is not None
     after: dict[str, str | None] = {}
+    after_identities: dict[str, str | None] = {}
     try:
         for relative in _record_paths(action):
             destination = target / relative
@@ -393,9 +396,22 @@ def _stage_preparation(
                 _copy_entry(_asset_path(bundle, relative), staged)
                 after[relative] = _digest_path(staged)
         _fsync_stage(area)
+        for relative in _record_paths(action):
+            staged = area / "stage" / relative
+            after_identities[relative] = (
+                _path_identity(staged)
+                if staged.exists()
+                else record.before_identities[relative]
+                if after[relative] is not None
+                else None
+            )
+            if staged.exists() and _digest_path(staged) != after[relative]:
+                raise ValueError(f"installation stage changed during preparation: {relative}")
         _verify_marker(record, area)
         _verify_planned_before(record)
-        record = replace(record, phase="staged", before_hashes=before, after_hashes=after)
+        record = replace(
+            record, phase="staged", before_hashes=before, after_hashes=after, after_identities=after_identities
+        )
         write_record(journal_root, record)
         return record
     except BaseException:
@@ -423,6 +439,16 @@ def _verify_record_paths(record: InstallationRecord) -> None:
     paths = _record_paths(record.action)
     if set(record.before_hashes) != set(paths) or set(record.after_hashes) != set(paths):
         raise ValueError("installation journal path inventory differs from this engine")
+    if (
+        record.identity_schema != 2
+        or record.before_identities is None
+        or record.after_identities is None
+        or set(record.before_identities) != set(paths)
+        or set(record.after_identities) != set(paths)
+        or any((record.before_hashes[key] is None) != (record.before_identities[key] is None) for key in paths)
+        or any((record.after_hashes[key] is None) != (record.after_identities[key] is None) for key in paths)
+    ):
+        raise ValueError("installation journal lacks fixed ownership evidence")
     if len(set(record.completed_roots)) != len(record.completed_roots) or any(
         root not in paths for root in record.completed_roots
     ):
@@ -436,40 +462,69 @@ def _replace_root(
     before: str | None,
     after: str | None,
     before_identity: str | None,
+    after_identity: str | None,
 ) -> None:
     destination = target / relative
     backup = area / "backup" / relative
     staged = area / "stage" / relative
+    current_identity = _path_identity(destination)
     current = _digest_path(destination)
-    if current == after and (after is not None or before is None):
-        if before == after and before_identity is not None and _path_identity(destination) != before_identity:
-            raise ValueError(f"installation target changed after planning: {relative}")
-        if before is not None and before != after and _digest_path(backup) != before:
-            raise ValueError(f"installation backup does not match before state: {relative}")
+    backup_identity = _path_identity(backup)
+    if backup_identity is not None and (backup_identity != before_identity or _digest_path(backup) != before):
+        raise ValueError(f"installation backup changed identity: {relative}")
+    if before is None and backup_identity is not None:
+        raise ValueError(f"unexpected installation backup: {relative}")
+    if (
+        current_identity == after_identity
+        and current == after
+        and (before_identity == after_identity or before is None or backup_identity == before_identity)
+    ):
         return
-    if current == before and before is not None:
-        if before_identity is not None and _path_identity(destination) != before_identity:
-            raise ValueError(f"installation target changed after planning: {relative}")
+    if after is not None and (_path_identity(staged) != after_identity or _digest_path(staged) != after):
+        raise ValueError(f"installation stage changed identity: {relative}")
+    if current_identity == before_identity and current == before and before is not None:
         backup.parent.mkdir(parents=True, exist_ok=True)
-        if backup.exists() or backup.is_symlink():
+        if backup_identity is not None:
             raise ValueError(f"unexpected preexisting installation backup: {relative}")
         destination.replace(backup)
         _sync_directory(destination.parent)
         _sync_directory(backup.parent)
-    elif current is None and before is not None:
-        if _digest_path(backup) != before:
+        if _path_identity(backup) != before_identity or _digest_path(backup) != before:
+            raise ValueError(f"installation backup changed identity: {relative}")
+    elif current_identity is None and before is not None:
+        if backup_identity != before_identity:
             raise ValueError(f"installation backup does not match before state: {relative}")
-    elif current is not None:
+    elif current_identity is not None:
         raise ValueError(f"installation target changed after preparation: {relative}")
     if after is not None:
-        if _digest_path(staged) != after:
-            raise ValueError(f"installation stage does not match planned content: {relative}")
         destination.parent.mkdir(parents=True, exist_ok=True)
         staged.replace(destination)
         _sync_directory(destination.parent)
         _sync_directory(staged.parent)
-    if _digest_path(destination) != after:
+    if _path_identity(destination) != after_identity or _digest_path(destination) != after:
         raise ValueError(f"installation replacement did not reach planned state: {relative}")
+
+
+def _verify_published(record: InstallationRecord) -> None:
+    _verify_record_paths(record)
+    assert record.after_identities is not None
+    for relative in _record_paths(record.action):
+        path = Path(record.target) / relative
+        if (
+            _path_identity(path) != record.after_identities[relative]
+            or _digest_path(path) != record.after_hashes[relative]
+        ):
+            raise ValueError(f"completed installation path changed identity: {relative}")
+
+
+def verify_installation_after(journal_root: Path, operation_id: str) -> None:
+    """Verify the committed child owns every published path, including nested entries."""
+    record = read_record(journal_root, operation_id)
+    if record.phase != "committed":
+        raise ValueError("installation child is not committed")
+    _guard_target(Path(record.target))
+    _verify_marker(record, _operation_area(Path(record.target), operation_id))
+    _verify_published(record)
 
 
 def apply_installation(
@@ -492,16 +547,23 @@ def apply_installation(
     if not area.is_dir():
         raise ValueError("installation operation area is missing")
     _verify_marker(record, area)
-    if record.phase == "staged" and record.before_identities is not None:
+    if record.phase == "staged":
         _verify_planned_before(record)
+    assert record.before_identities is not None
+    assert record.after_identities is not None
+    for relative in record.completed_roots:
+        assert record.after_identities is not None
+        if (
+            _path_identity(target / relative) != record.after_identities[relative]
+            or _digest_path(target / relative) != record.after_hashes[relative]
+        ):
+            raise ValueError(f"completed installation path changed identity: {relative}")
     enter_maintenance(record)
     try:
         record = replace(record, phase="replacing", error=None)
         write_record(journal_root, record)
         for relative in _record_paths(record.action):
             if relative in record.completed_roots:
-                if _digest_path(target / relative) != record.after_hashes[relative]:
-                    raise ValueError(f"completed installation path changed: {relative}")
                 continue
             _guard_target(target)
             _replace_root(
@@ -510,15 +572,14 @@ def apply_installation(
                 relative,
                 record.before_hashes[relative],
                 record.after_hashes[relative],
-                None if record.before_identities is None else record.before_identities[relative],
+                record.before_identities[relative] if record.before_identities is not None else None,
+                record.after_identities[relative] if record.after_identities is not None else None,
             )
             record = replace(record, completed_roots=(*record.completed_roots, relative))
             write_record(journal_root, record)
             if after_root is not None:
                 after_root(relative)
-        for relative in _record_paths(record.action):
-            if _digest_path(target / relative) != record.after_hashes[relative]:
-                raise ValueError(f"installed content verification failed: {relative}")
+        _verify_published(record)
         _verify_marker(record, area)
         record = replace(record, phase="committed")
         write_record(journal_root, record)
@@ -562,8 +623,10 @@ def rollback_installation(
     for relative in reversed(_record_paths(record.action)):
         destination = target / relative
         backup = area / "backup" / relative
-        current = _digest_path(destination)
-        previous = record.before_hashes[relative]
+        assert record.before_identities is not None
+        assert record.after_identities is not None
+        previous = record.before_identities[relative]
+        current = _path_identity(destination)
         if current == previous:
             continue
         if current is not None:
@@ -579,6 +642,8 @@ def rollback_installation(
             backup.replace(destination)
             _sync_directory(destination.parent)
             _sync_directory(backup.parent)
+            if _path_identity(destination) != previous or _digest_path(destination) != record.before_hashes[relative]:
+                raise ValueError(f"installation rollback did not restore before identity: {relative}")
     _verify_marker(record, area)
     record = replace(record, phase="rolled-back", error=None)
     write_record(journal_root, record)
@@ -606,17 +671,41 @@ def preflight_rollback_installation(
         _verify_marker(record, area)
         return record
     _verify_marker(record, area)
+    if record.identity_schema != 2 and record.phase != "planned":
+        raise ValueError("installation rollback lacks fixed ownership evidence")
+    if record.phase != "planned":
+        assert record.before_identities is not None
+        assert record.after_identities is not None
+    assert record.before_identities is not None
+    assert record.after_identities is not None
     for relative in _record_paths(record.action):
+        current_identity = _path_identity(target / relative)
         current = _digest_path(target / relative)
+        expected_identity = record.after_identities[relative]
+        previous_identity = record.before_identities[relative]
         expected = record.after_hashes[relative]
         previous = record.before_hashes[relative]
         backup = area / "backup" / relative
-        if current not in (expected, previous, None):
+        backup_identity = _path_identity(backup)
+        if backup_identity is not None and (backup_identity != previous_identity or _digest_path(backup) != previous):
+            raise ValueError(f"installation rollback backup changed identity: {relative}")
+        if previous_identity is None and backup_identity is not None:
+            raise ValueError(f"installation rollback has unexpected backup: {relative}")
+        if current_identity == previous_identity and current == previous:
+            continue
+        if current_identity not in (expected_identity, None) or (
+            current_identity == expected_identity and current != expected
+        ):
             raise ValueError(f"installation rollback refuses later changes: {relative}")
-        if relative in record.completed_roots and expected is not None and current is None:
+        if relative in record.completed_roots and expected_identity is not None and current_identity is None:
             raise ValueError(f"installation rollback refuses later deletion: {relative}")
-        if current is None and previous is not None and _digest_path(backup) != previous:
+        if current_identity is None and previous_identity is not None and backup_identity != previous_identity:
             raise ValueError(f"installation rollback lacks before state: {relative}")
-        if current == expected and previous != expected and previous is not None and _digest_path(backup) != previous:
+        if (
+            current_identity == expected_identity
+            and previous_identity != expected_identity
+            and previous_identity is not None
+            and backup_identity != previous_identity
+        ):
             raise ValueError(f"installation rollback backup changed: {relative}")
     return record

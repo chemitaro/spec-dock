@@ -40,6 +40,8 @@ class InstallationGroupRecord:
     phase: str
     error: str | None = None
     bootstrap: bool = False
+    requested_version: str | None = None
+    version_tracked: bool = False
 
 
 def child_operation_id(group_id: str, worktree_id: str) -> str:
@@ -91,6 +93,13 @@ def _validate(record: InstallationGroupRecord) -> None:
         or not record.targets
         or (record.error is not None and not isinstance(record.error, str))
         or type(record.bootstrap) is not bool
+        or (
+            record.requested_version is not None
+            and (not isinstance(record.requested_version, str) or not record.requested_version)
+        )
+        or type(record.version_tracked) is not bool
+        or (record.requested_version is not None and not record.version_tracked)
+        or (record.version_tracked and record.action != "update")
     ):
         raise ValueError("invalid installation group record")
     identifiers: set[str] = set()
