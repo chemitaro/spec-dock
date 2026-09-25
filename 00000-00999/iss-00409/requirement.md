@@ -3,9 +3,9 @@
 ID: "iss-00409"
 タイトル: "SpecDock CLI Scope Active Work Redesign"
 関連GitHub: ["#409"]
-状態: "draft"
-原稿状態: "Issue #409 正本へ採用・実装前"
-最終更新: "2026-09-24"
+状態: "approved"
+原稿状態: "Issue #409 正本採用・製品実装中"
+最終更新: "2026-09-25"
 親: ["epic-00356", "init-local-00003"]
 基準Repository: "chemitaro/spec-dock"
 実装調査基準Branch: "codex/scope-start-finish-analysis"
@@ -32,7 +32,7 @@ Initiative・Epic・Issueのどの階層でも、利用者と自動実行agent�
 
 基準コミットには、repo-local runtimeの15コマンド系統・28実行leafと、別のinstaller入口があります。現行実装では、作業lifecycleはIssueのみ、finishは全active解除、deleteはGitHub close後にローカル削除、通常syncはbranchからactiveを推定、worktree createはbootstrapを実行し得ます。これは現行コードの事実です。根拠と対象fileはDesignの「Current / Target」にまとめています。
 
-本書が定める新体系は採用済みの将来仕様であり、実装調査基準コミットで実装済みという意味ではありません。Issue #409 の作成・開始と本書の採用は完了しています。新CLIのアプリケーションコードと導入済みconsumerはまだ変更していません。
+本書が定める新体系は実装調査基準コミットで実装済みという意味ではありません。Issue #409 の作成・開始と本書の採用は完了しています。製品側の実装状況は[Report](report.md)で追跡します。導入済みconsumerへの適用は本Issueの作業対象外です。
 
 ## 観測可能な要件
 
