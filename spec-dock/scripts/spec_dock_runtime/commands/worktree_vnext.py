@@ -115,6 +115,7 @@ def run_worktree_change(ns: argparse.Namespace, context: WorkContext) -> Operati
             base=ns.base,
             name=ns.name,
             root=root,
+            recover=ns.recover,
             lock_timeout=ns.lock_timeout,
         )
         return OperationResult(

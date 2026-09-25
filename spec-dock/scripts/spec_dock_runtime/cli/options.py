@@ -67,7 +67,7 @@ def _recovery_help(leaf: str) -> str:
         )
         return f"Inspect the operation record, then use --resume OPERATION_ID with the same target{rollback}."
     if leaf == "worktree create":
-        return "Inspect the target path, Git ref, and registration before retrying; there is no --resume."
+        return "Inspect the target record, path, Git ref, and registration; --recover ID retries only after all effects are absent."
     if leaf == "worktree bootstrap":
         return "Inspect the recorded execution and project effects before an explicit retry; there is no --resume."
     if leaf == "workspace sync":
@@ -232,6 +232,8 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("recovery requires a 32-character lowercase operation ID")
     if parsed.command_path == "branch create" and not resume and not parsed.base:
         parser.error("branch create requires --base unless --resume is specified")
+    if parsed.command_path == "worktree create" and parsed.recover and common.get("dry_run"):
+        parser.error("worktree create --recover cannot be combined with --dry-run")
     if parsed.command_path not in MUTATING_LEAF_PATHS and (common.get("yes") or common.get("dry_run")):
         parser.error("--yes and --dry-run apply only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):

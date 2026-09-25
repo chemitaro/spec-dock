@@ -196,7 +196,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "artifact import file": (_arg("path"), _required("--scope")),
     "artifact list": (_required("--scope"),),
     "artifact show": (_arg("artifact_id"), _required("--scope")),
-    "worktree create": (_arg("name", nargs="?"), _required("--base"), _arg("--root")),
+    "worktree create": (_arg("name", nargs="?"), _required("--base"), _arg("--root"), _arg("--recover")),
     "worktree list": (),
     "worktree show": (_arg("worktree_ref"),),
     "worktree remove": (_arg("worktree_ref"), _flag("--unlock"), _flag("--discard-ignored")),

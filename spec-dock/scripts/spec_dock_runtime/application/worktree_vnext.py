@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 from typing import TYPE_CHECKING
@@ -31,9 +32,11 @@ from spec_dock_runtime.infra.control_store import (
     WORKSPACE_SCHEMA,
     WRITER_PROTOCOL,
     WorktreeRegistration,
+    control_directory,
     load_control,
     store_control,
 )
+from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
@@ -208,6 +211,118 @@ def _next_id(repo_root: Path, container: Path, control: ControlState) -> str:
     raise RuntimeError("worktree stable ID capacity is exhausted")
 
 
+def _create_attempt_path(common_dir: Path, stable_id: str) -> Path:
+    return control_directory(common_dir) / "worktree-create" / f"{stable_id}.json"
+
+
+def _unresolved_create_attempt(common_dir: Path, *, alias: str | None, central_root: Path, commit: str) -> str | None:
+    directory = control_directory(common_dir) / "worktree-create"
+    if directory.is_symlink():
+        raise ValueError("worktree create records are redirected")
+    if not directory.exists():
+        return None
+    for path in sorted(directory.glob("*.json")):
+        loaded = read_guarded_json(path)
+        if loaded is None:
+            continue
+        record = loaded[0]
+        if not isinstance(record, dict) or record.get("status") not in {"running", "partial"}:
+            continue
+        if (
+            record.get("alias") == alias
+            and record.get("root") == str(central_root)
+            and (alias is not None or record.get("commit") == commit)
+        ):
+            return str(record.get("id", path.stem))
+    return None
+
+
+def _publish_create_attempt(
+    common_dir: Path,
+    *,
+    stable_id: str,
+    alias: str | None,
+    central_root: Path,
+    path: Path,
+    branch: str,
+    commit: str,
+    status: str,
+    phase: str,
+) -> None:
+    record_path = _create_attempt_path(common_dir, stable_id)
+    previous = read_guarded_json(record_path)
+    atomic_write_json(
+        record_path,
+        {
+            "schema_version": 1,
+            "id": stable_id,
+            "alias": alias,
+            "root": str(central_root),
+            "path": str(path),
+            "branch": branch,
+            "commit": commit,
+            "status": status,
+            "phase": phase,
+        },
+        expected_identity=previous[1] if previous is not None else None,
+    )
+
+
+def _reconcile_create_attempt(
+    *,
+    repo_root: Path,
+    main_root: Path,
+    control: ControlState,
+    common_dir: Path,
+    stable_id: str,
+    alias: str | None,
+    central_root: Path,
+    commit: str,
+) -> None:
+    if re.fullmatch(r"wt[1-9][0-9]*", stable_id) is None:
+        raise ValueError("worktree recovery requires a stable worktree ID")
+    record_path = _create_attempt_path(common_dir, stable_id)
+    loaded = read_guarded_json(record_path)
+    if loaded is None or not isinstance(loaded[0], dict):
+        raise ValueError("worktree create attempt record is missing")
+    record = loaded[0]
+    if record.get("status") not in {"running", "partial"}:
+        raise ValueError("worktree create attempt is not awaiting recovery")
+    if (
+        record.get("id") != stable_id
+        or record.get("alias") != alias
+        or record.get("root") != str(central_root)
+        or record.get("commit") != commit
+    ):
+        raise ValueError("worktree recovery request differs from the recorded target")
+    raw_path = record.get("path")
+    if not isinstance(raw_path, str):
+        raise ValueError("worktree recovery record path is invalid")
+    path = Path(raw_path)
+    branch = record.get("branch")
+    if path != central_root / main_root.name / f"{main_root.name}-{stable_id}" or branch != f"worktree/{stable_id}":
+        raise ValueError("worktree recovery record target is invalid")
+    if os.path.lexists(path):
+        raise ValueError("worktree recovery path still exists; inspect and remove only the recorded target")
+    if _branch_exists(repo_root, branch):
+        raise ValueError("worktree recovery branch still exists; inspect the recorded ref")
+    if any(item.path == path for item in git_cli.worktree_list(repo_root)):
+        raise ValueError("worktree recovery target remains in Git inventory")
+    if _next_id(repo_root, central_root / main_root.name, control) != stable_id:
+        raise ValueError("recovered worktree ID is no longer available")
+    _publish_create_attempt(
+        common_dir,
+        stable_id=stable_id,
+        alias=alias,
+        central_root=central_root,
+        path=path,
+        branch=branch,
+        commit=commit,
+        status="reconciled",
+        phase="no-effects",
+    )
+
+
 def _materialize(repo_root: Path, path: Path, commit: str, target_fd: int) -> None:
     witnesses = git_cli.materialize_worktree(repo_root, path=path, target_commit=commit, target_fd=target_fd)
     if git_cli.current_head_or_none(path) != commit:
@@ -260,6 +375,7 @@ def create_worktree(
     base: str,
     name: str | None = None,
     root: Path | None = None,
+    recover: str | None = None,
     lock_timeout: float = 0.0,
 ) -> WorktreeCreated:
     """Create an independent worktree; bootstrap is a separate explicit command."""
@@ -287,9 +403,25 @@ def create_worktree(
         }
         if alias is not None and alias in existing_names:
             raise ValueError("worktree name is already registered")
+        if recover is not None:
+            _reconcile_create_attempt(
+                repo_root=repo_root,
+                main_root=git_records[0].path,
+                control=control,
+                common_dir=common_dir,
+                stable_id=recover,
+                alias=alias,
+                central_root=central_root,
+                commit=commit,
+            )
+        unresolved = _unresolved_create_attempt(common_dir, alias=alias, central_root=central_root, commit=commit)
+        if unresolved is not None:
+            raise ValueError(f"worktree create has an unresolved attempt for {unresolved}; inspect its record")
         main_root = git_records[0].path
         container = central_root / main_root.name
         stable_id = _next_id(repo_root, container, control)
+        if recover is not None and stable_id != recover:
+            raise ValueError("recovered worktree ID is no longer available")
         if alias == stable_id:
             raise ValueError("worktree name conflicts with its stable ID")
         branch = f"worktree/{stable_id}"
@@ -301,10 +433,22 @@ def create_worktree(
             != 0
         ):
             raise ValueError("generated worktree branch is invalid")
-        container.mkdir(parents=True, exist_ok=True)
-        phase = "target-reservation"
+        _publish_create_attempt(
+            common_dir,
+            stable_id=stable_id,
+            alias=alias,
+            central_root=central_root,
+            path=path,
+            branch=branch,
+            commit=commit,
+            status="running",
+            phase="target-reservation",
+        )
+        phase = "container-create"
         target_fd: int | None = None
         try:
+            container.mkdir(parents=True, exist_ok=True)
+            phase = "target-reservation"
             target_fd = _open_created_exclusive_worktree(path, allow_symlink_at=central_root)
             source_fd = _open_source_directory_for_filesystem_probe(repo_root)
             try:
@@ -324,10 +468,32 @@ def create_worktree(
             )
             next_control = replace(control, epoch=control.epoch + 1, worktrees=(*control.worktrees, registration))
             store_control(common_dir, next_control, expected_epoch=control.epoch)
+            _publish_create_attempt(
+                common_dir,
+                stable_id=stable_id,
+                alias=alias,
+                central_root=central_root,
+                path=path,
+                branch=branch,
+                commit=commit,
+                status="succeeded",
+                phase="registered",
+            )
             return WorktreeCreated(stable_id, alias, path, branch, commit, next_control.epoch)
         except Exception as error:
+            _publish_create_attempt(
+                common_dir,
+                stable_id=stable_id,
+                alias=alias,
+                central_root=central_root,
+                path=path,
+                branch=branch,
+                commit=commit,
+                status="partial",
+                phase=phase,
+            )
             raise RuntimeError(
-                f"worktree create stopped at {phase}; inspect Git worktree, branch, and path before retrying"
+                f"worktree create stopped at {phase}; inspect record {stable_id}, Git worktree, branch, and path before retrying"
             ) from error
         finally:
             _close_fd(target_fd)

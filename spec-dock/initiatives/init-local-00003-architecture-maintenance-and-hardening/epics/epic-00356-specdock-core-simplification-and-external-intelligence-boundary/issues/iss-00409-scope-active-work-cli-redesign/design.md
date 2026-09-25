@@ -265,6 +265,8 @@ WorktreeはScopeとは独立した作業場です。`worktree create [NAME] --ba
 
 new worktreeのactiveは空です。baseが必要schema・導入protocolを満たさない場合は、通常の作業場生成を拒否し、旧branchからの移行はmaintenance操作へ分けます。createは利用者shellのCWDを変更しません。listはGit inventoryとcontrol registryを照合し、外部worktreeを読み取るだけで自動登録しません。未登録作業場への変更は拒否し、migration inventoryへ追加します。
 
+createはGit効果より前に対象ID・alias・root・path・branch・commit・phaseをcommon controlの対象別記録へ永続化し、成功/部分失敗を記録します。途中停止後の同じ対象への通常再実行は拒否します。`worktree create --recover wtN` は同じ入力と、path・branch・Git worktree登録がすべて存在しないことを照合してから同じIDを再利用します。効果が残る場合は自動削除・自動再試行せず、記録を用いて対象ごとに診断します。
+
 removeはmain/current/bare/missing-record、tracked dirty、untrackedを無条件に拒否します。lockedは--unlock、ignored payloadは--discard-ignoredを別途必要とします。--yesだけでは許可になりません。branchを削除せず、registryはworktreeをretiredとして残します。判定直後のinode/ref差替えを再照合し、別directoryを削除しません。
 
 bootstrapは `make init` の実行を明示的に依頼するコマンドです。**make -nでもMakefile評価による任意処理が起こり得るため、dry-runでmakeを起動しません。** 適用時は既存make initの検出/実行をtrust済みconsumerで行い、未定義targetは `BOOTSTRAP_UNAVAILABLE` として返します。実行済みなら失敗/中断時の副作用不明をcode 6で返します。任意scriptのnetworkをsandboxなしに禁止できないため、--offlineとの併用は拒否します。stdout/stderrはcaptureし、JSON時はenvelopeへrawログを埋めず、sanitized summaryとexit codeを返します。

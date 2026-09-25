@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from typing import cast
@@ -13,6 +15,7 @@ RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/sp
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock_runtime.application.worktree_vnext import create_worktree, list_worktrees, show_worktree  # noqa: E402
+from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
 from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
 from spec_dock_runtime.infra.control_store import load_control  # noqa: E402
 from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
@@ -85,3 +88,56 @@ def test_detached_source_can_create_from_explicit_base(tmp_path: Path) -> None:
     subprocess.run(["git", "switch", "--detach", "HEAD"], cwd=repo_root, check=True, capture_output=True)
     created = create_worktree(base="HEAD", name=None, root=tmp_path / "worktrees", **common)
     assert created.branch == "worktree/wt1"
+
+
+def test_create_failure_records_target_and_refuses_blind_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock_runtime.application import worktree_vnext as module
+
+    common = _committed_repo(tmp_path)
+    root = tmp_path / "worktrees"
+
+    def interrupted(*_args: object) -> None:
+        raise RuntimeError("simulated interruption")
+
+    monkeypatch.setattr(module, "_materialize", interrupted)
+    with pytest.raises(RuntimeError, match="worktree create stopped"):
+        create_worktree(base="HEAD", name="planning", root=root, **common)
+    record = cast("Path", common["common_dir"]) / "spec-dock/control/worktree-create/wt1.json"
+    payload = json.loads(record.read_text(encoding="utf-8"))
+    assert payload["status"] == "partial"
+    assert payload["phase"] == "materialization"
+    assert payload["branch"] == "worktree/wt1"
+    assert payload["path"] == str(root / "repo/repo-wt1")
+    with pytest.raises(ValueError, match=r"unresolved.*wt1"):
+        create_worktree(base="HEAD", name="planning", root=root, **common)
+
+
+def test_create_recovery_requires_effects_to_be_absent_before_reusing_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock_runtime.application import worktree_vnext as module
+
+    common = _committed_repo(tmp_path)
+    root = tmp_path / "worktrees"
+    original = module.git_cli.add_worktree_at_commit
+
+    def interrupted(*_args: object, **_kwargs: object) -> None:
+        raise RuntimeError("stopped before Git mutation")
+
+    monkeypatch.setattr(module.git_cli, "add_worktree_at_commit", interrupted)
+    with pytest.raises(RuntimeError, match="worktree create stopped"):
+        create_worktree(base="HEAD", name="planning", root=root, **common)
+    with pytest.raises(ValueError, match="path still exists"):
+        create_worktree(base="HEAD", name="planning", root=root, recover="wt1", **common)
+    shutil.rmtree(root / "repo/repo-wt1")
+    monkeypatch.setattr(module.git_cli, "add_worktree_at_commit", original)
+    result = create_worktree(base="HEAD", name="planning", root=root, recover="wt1", **common)
+    assert result.id == "wt1"
+    record = cast("Path", common["common_dir"]) / "spec-dock/control/worktree-create/wt1.json"
+    assert json.loads(record.read_text(encoding="utf-8"))["status"] == "succeeded"
+
+
+def test_create_cli_exposes_explicit_target_recovery() -> None:
+    parsed = parse_vnext(["worktree", "create", "--base", "main", "--recover", "wt3"])
+    assert parsed.command_path == "worktree create"
+    assert parsed.recover == "wt3"
