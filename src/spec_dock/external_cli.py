@@ -141,8 +141,23 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
         common = git_common_directory(project_root)
         control_path = common / "spec-dock/control/control.json"
         if control_path.exists() and namespace is not None:
-            pinned = read_engine_pin(common, checkout_root=project_root)
-            if pinned != engine:
+            handover = namespace.command_path == "installation update" and namespace.activate_engine
+            pinned = read_engine_pin(common, checkout_root=project_root, require_control_match=not handover)
+            if handover:
+                from spec_dock_runtime.infra.control_store import load_control
+
+                control = load_control(common)
+                if (
+                    control is None
+                    or control.mode != "maintenance"
+                    or pinned.distribution_digest
+                    not in {
+                        control.engine_digest,
+                        engine.distribution_digest,
+                    }
+                ):
+                    raise ValueError("engine handover requires verified maintenance control")
+            elif pinned != engine:
                 raise ValueError("executing engine differs from repository pin")
     output = run_vnext(
         effective_argv,

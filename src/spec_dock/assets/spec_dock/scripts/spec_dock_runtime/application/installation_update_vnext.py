@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -26,6 +27,7 @@ from spec_dock.installation.group_journal import (
 from spec_dock.installation.journal import InstallationRecord, read_record
 from spec_dock.installation.source import assert_disjoint_source_target, verify_bundle_integrity
 from spec_dock.runtime_loader import EnginePin, VerifiedEngine, verify_engine_pin, write_engine_pin
+from spec_dock_runtime.application.engine_handover_vnext import verify_source_update
 from spec_dock_runtime.application.installation_vnext import (
     InstallationGroup,
     InstalledWorktree,
@@ -41,6 +43,7 @@ from spec_dock_runtime.infra.control_store import (
     load_control,
     store_control,
 )
+from spec_dock_runtime.infra.engine_handover_store import read_engine_handover
 from spec_dock_runtime.infra.finalization_store import (
     FinalizationRecord,
     new_finalization,
@@ -86,8 +89,58 @@ def _can_restore_ready(control: ControlState) -> bool:
     )
 
 
-def _verify_finalization_targets(group: InstallationGroup, *, engine_version: str) -> None:
-    if not group.worktrees or any(item.version != engine_version for item in group.worktrees):
+def _commit_update_matches_engine(*, repo_root: Path, common_dir: Path, version: str, engine_digest: str) -> bool:
+    updates = common_dir / "spec-dock/control/installations"
+    if updates.is_symlink() or not updates.is_dir():
+        return False
+    handovers = common_dir / "spec-dock/control/engine-handovers"
+    if handovers.is_symlink():
+        raise ValueError("engine handover record directory is unsafe")
+    approved_updates: set[str] = set()
+    if handovers.is_dir():
+        for path in sorted(handovers.glob("*.json")):
+            record = read_engine_handover(common_dir, path.stem)
+            if record.phase == "committed" and record.next_digest == engine_digest:
+                approved_updates.add(record.source_update_id)
+    for directory in sorted(updates.iterdir()):
+        if directory.is_symlink() or not directory.is_dir():
+            raise ValueError("installation group record directory is unsafe")
+        record = read_group_record(common_dir, directory.name)
+        if (
+            record.action != "update"
+            or record.phase != "committed"
+            or record.source_commit != version
+            or (record.engine_digest != engine_digest and record.operation_id not in approved_updates)
+        ):
+            continue
+        try:
+            verify_source_update(
+                repo_root=repo_root,
+                common_dir=common_dir,
+                update_id=record.operation_id,
+                bundle=None,
+                allow_bootstrap=True,
+            )
+        except ValueError:
+            continue
+        return True
+    return False
+
+
+def _verify_finalization_targets(
+    group: InstallationGroup, *, repo_root: Path, common_dir: Path, engine_version: str, engine_digest: str
+) -> None:
+    versions = {item.version for item in group.worktrees}
+    if not group.worktrees or len(versions) != 1:
+        raise ValueError("registered worktree installation versions differ from the executing engine")
+    (version,) = versions
+    if version != engine_version and (
+        version is None
+        or re.fullmatch(r"[0-9a-f]{40}", version) is None
+        or not _commit_update_matches_engine(
+            repo_root=repo_root, common_dir=common_dir, version=version, engine_digest=engine_digest
+        )
+    ):
         raise ValueError("registered worktree installation versions differ from the executing engine")
     for item in group.worktrees:
         loaded = read_guarded_json(Path(item.root) / "spec-dock/workspace.json")
@@ -119,7 +172,9 @@ def plan_installation_finalization(
         or JournalStore(common_dir).pending()
     ):
         raise ValueError("installation finalization has unresolved operations")
-    _verify_finalization_targets(group, engine_version=engine_version)
+    _verify_finalization_targets(
+        group, repo_root=repo_root, common_dir=common_dir, engine_version=engine_version, engine_digest=engine_digest
+    )
     return group
 
 
@@ -151,7 +206,13 @@ def finalize_installation_group(
             raise ValueError("installation group is not ready to leave maintenance")
         if pending_finalizations(common_dir):
             raise ValueError("a finalization attempt requires explicit recovery")
-        _verify_finalization_targets(group, engine_version=engine_version)
+        _verify_finalization_targets(
+            group,
+            repo_root=repo_root,
+            common_dir=common_dir,
+            engine_version=engine_version,
+            engine_digest=engine_digest,
+        )
         record = new_finalization(
             common_dir,
             control_epoch=control.epoch,
@@ -196,7 +257,13 @@ def resume_installation_finalization(
         group = inspect_installation_group(repo_root=repo_root, common_dir=common_dir)
         if tuple(item.id for item in group.worktrees) != record.targets or not _can_restore_ready(control):
             raise ValueError("finalization worktree inventory changed")
-        _verify_finalization_targets(group, engine_version=engine_version)
+        _verify_finalization_targets(
+            group,
+            repo_root=repo_root,
+            common_dir=common_dir,
+            engine_version=engine_version,
+            engine_digest=engine_digest,
+        )
         if control.mode == "maintenance" and control.epoch == record.control_epoch:
             store_control(
                 common_dir, replace(control, mode="ready", epoch=control.epoch + 1), expected_epoch=control.epoch

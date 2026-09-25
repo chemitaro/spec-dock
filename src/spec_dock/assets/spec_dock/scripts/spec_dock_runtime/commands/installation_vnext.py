@@ -17,6 +17,13 @@ from spec_dock.installation.source import (
     verify_pinned_archive,
 )
 from spec_dock.installer import ASSETS
+from spec_dock_runtime.application.engine_handover_vnext import (
+    activate_engine_group,
+    handover_candidate,
+    plan_engine_handover,
+    resume_engine_handover,
+    rollback_engine_handover,
+)
 from spec_dock_runtime.application.installation_update_vnext import (
     bind_installation_engine,
     finalize_installation_group,
@@ -47,8 +54,9 @@ if TYPE_CHECKING:
 
     from spec_dock.installation.group_journal import InstallationGroupRecord
     from spec_dock.runtime_loader import VerifiedEngine
+    from spec_dock_runtime.application.engine_handover_vnext import EngineHandoverRecord
+    from spec_dock_runtime.application.installation_update_vnext import FinalizationRecord
     from spec_dock_runtime.commands.work_vnext import WorkContext
-    from spec_dock_runtime.infra.finalization_store import FinalizationRecord
 
 
 @dataclass(frozen=True)
@@ -76,6 +84,15 @@ class InstallationFinalizePlan:
     targets: tuple[str, ...]
     engine_digest: str
     control_epoch: int
+
+
+@dataclass(frozen=True)
+class EngineHandoverPlan:
+    source_update_id: str
+    source_commit: str
+    targets: tuple[str, ...]
+    prior_digest: str
+    next_digest: str
 
 
 def run_installation_init(
@@ -161,6 +178,94 @@ def run_installation_show(
     return OperationResult(command=ns.command_path, status="succeeded", data=view, exit_code=0)
 
 
+def _run_engine_handover(
+    ns: argparse.Namespace, context: WorkContext, *, engine_pin: VerifiedEngine | None
+) -> OperationResult[EngineHandoverPlan | EngineHandoverRecord]:
+    if engine_pin is None or ns.target is not None:
+        raise ValueError("engine handover requires a fixed external engine and no target override")
+    if ns.rollback:
+        if ns.dry_run:
+            raise ValueError("engine handover rollback cannot be previewed")
+        record = rollback_engine_handover(
+            repo_root=context.repo_root,
+            common_dir=context.common_dir,
+            worktree_id=context.worktree_id,
+            operation_id=ns.rollback,
+            expected_next_digest=engine_pin.distribution_digest,
+            lock_timeout=ns.lock_timeout,
+        )
+        return OperationResult(
+            ns.command_path,
+            "succeeded",
+            record,
+            0,
+            operation_id=record.operation_id,
+            effects=(Effect("engine-handover-rollback", "succeeded", record.operation_id),),
+        )
+    if ns.resume and ns.dry_run:
+        raise ValueError("engine handover resume cannot be previewed")
+    update_id, source_commit = handover_candidate(
+        context.common_dir,
+        update_id=ns.from_update,
+        operation_id=ns.resume,
+        expected_next_digest=engine_pin.distribution_digest,
+    )
+    if ns.offline:
+        raise ValueError("engine handover requires the fixed source archive")
+    source = resolve_fixed_source(version=None, commit=source_commit, timeout=ns.timeout)
+    archive = download_pinned_archive(source, timeout=ns.timeout)
+    with TemporaryDirectory(prefix="specdock-handover-") as directory:
+        bundle = verify_pinned_archive(source, archive, Path(directory) / "bundle")
+        assert_candidate_assets_match_engine(bundle, ASSETS)
+        if ns.dry_run:
+            targets = plan_engine_handover(
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                update_id=update_id,
+                bundle=bundle,
+                next_engine=engine_pin,
+            )
+            return OperationResult(
+                ns.command_path,
+                "planned",
+                EngineHandoverPlan(
+                    update_id, source.commit, targets, context.engine_digest, engine_pin.distribution_digest
+                ),
+                0,
+                effects=(Effect("engine-handover", "planned", None),),
+            )
+        if ns.resume:
+            record = resume_engine_handover(
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                worktree_id=context.worktree_id,
+                next_engine=engine_pin,
+                operation_id=ns.resume,
+                bundle=bundle,
+                lock_timeout=ns.lock_timeout,
+            )
+        else:
+            record = activate_engine_group(
+                repo_root=context.repo_root,
+                common_dir=context.common_dir,
+                worktree_id=context.worktree_id,
+                old_digest=context.engine_digest,
+                expected_epoch=context.expected_epoch,
+                next_engine=engine_pin,
+                update_id=update_id,
+                bundle=bundle,
+                lock_timeout=ns.lock_timeout,
+            )
+    return OperationResult(
+        ns.command_path,
+        "succeeded",
+        record,
+        0,
+        operation_id=record.operation_id,
+        effects=(Effect("engine-handover", "succeeded", record.operation_id),),
+    )
+
+
 def run_installation_update(
     ns: argparse.Namespace,
     context: WorkContext,
@@ -168,9 +273,18 @@ def run_installation_update(
     invocation_cwd: Path,
     engine_version: str,
     engine_pin: VerifiedEngine | None = None,
-) -> OperationResult[InstallationGroupRecord | InstallationUpdatePlan | InstallationFinalizePlan | FinalizationRecord]:
+) -> OperationResult[
+    InstallationGroupRecord
+    | InstallationUpdatePlan
+    | InstallationFinalizePlan
+    | FinalizationRecord
+    | EngineHandoverPlan
+    | EngineHandoverRecord
+]:
     if not ns.dry_run and not ns.yes:
         raise ValueError("installation update requires --yes")
+    if ns.activate_engine:
+        return _run_engine_handover(ns, context, engine_pin=engine_pin)
     if ns.finalize:
         if ns.dry_run:
             if ns.resume:

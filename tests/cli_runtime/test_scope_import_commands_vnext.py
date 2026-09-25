@@ -60,7 +60,8 @@ def test_scope_import_cli_resumes_after_uncertain_local_publication(
     monkeypatch.setattr(JournalStore, "update", fail_once)
     prefix = ("scope", "import", "github", "initiative", "gh:example/repo#47", "--title", "Plan")
     first = _run(repo, *prefix)
-    assert first.exit_code == 5
+    assert first.exit_code == 6
+    assert json.loads(first.stdout)["error"]["code"] == "EFFECT_STATE_UNKNOWN"
     monkeypatch.setattr(JournalStore, "update", original_update)
     operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
     resumed = _run(repo, *prefix, "--resume", operation.operation_id)

@@ -100,7 +100,7 @@ def git_common_directory(project_root: Path) -> Path:
     return common.resolve(strict=True)
 
 
-def read_engine_pin(common_dir: Path, *, checkout_root: Path) -> VerifiedEngine:
+def read_engine_pin(common_dir: Path, *, checkout_root: Path, require_control_match: bool = True) -> VerifiedEngine:
     """Decode and verify the absolute package location recorded in common control."""
     if not common_dir.is_absolute() or not checkout_root.is_absolute():
         raise ValueError("engine lookup requires absolute paths")
@@ -126,7 +126,7 @@ def read_engine_pin(common_dir: Path, *, checkout_root: Path) -> VerifiedEngine:
         or not isinstance(payload["distribution_root"], str)
         or not isinstance(payload["distribution_digest"], str)
         or not isinstance(control_payload, dict)
-        or control_payload.get("engine_digest") != payload["distribution_digest"]
+        or (require_control_match and control_payload.get("engine_digest") != payload["distribution_digest"])
     ):
         raise ValueError("fixed engine and repository control disagree")
     pin = EnginePin(Path(payload["executable"]), Path(payload["distribution_root"]), payload["distribution_digest"])
@@ -172,5 +172,48 @@ def write_engine_pin(common_dir: Path, engine: VerifiedEngine) -> None:
             os.fsync(parent_descriptor)
         finally:
             os.close(parent_descriptor)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+def replace_engine_pin(common_dir: Path, *, prior: VerifiedEngine, next_engine: VerifiedEngine) -> None:
+    """Change the locator under the common writer lock after comparing its old identity."""
+    if not common_dir.is_absolute() or prior == next_engine:
+        raise ValueError("engine handover requires two distinct fixed identities")
+    path = common_dir / "spec-dock/control/engine.json"
+    if path.is_symlink() or any(parent.is_symlink() for parent in path.parents):
+        raise ValueError("engine locator is redirected")
+    existing = json.loads(path.read_text(encoding="utf-8"))
+    expected = {
+        "schema_version": 1,
+        "executable": str(prior.executable),
+        "distribution_root": str(prior.distribution_root),
+        "distribution_digest": prior.distribution_digest,
+    }
+    if existing != expected:
+        raise ValueError("engine locator changed before handover")
+    before = path.stat()
+    payload = {
+        "schema_version": 1,
+        "executable": str(next_engine.executable),
+        "distribution_root": str(next_engine.distribution_root),
+        "distribution_digest": next_engine.distribution_digest,
+    }
+    temporary = path.parent / f".engine-{uuid.uuid4().hex}.tmp"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
+    try:
+        with os.fdopen(descriptor, "wb") as stream:
+            stream.write((json.dumps(payload, sort_keys=True, separators=(",", ":")) + "\n").encode())
+            stream.flush()
+            os.fsync(stream.fileno())
+        after = path.stat()
+        if (after.st_dev, after.st_ino) != (before.st_dev, before.st_ino):
+            raise ValueError("engine locator identity changed before handover")
+        temporary.replace(path)
+        directory_fd = os.open(path.parent, os.O_RDONLY)
+        try:
+            os.fsync(directory_fd)
+        finally:
+            os.close(directory_fd)
     finally:
         temporary.unlink(missing_ok=True)

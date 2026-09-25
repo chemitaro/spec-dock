@@ -223,6 +223,8 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--commit"),
         _flag("--maintenance"),
         _flag("--finalize"),
+        _flag("--activate-engine"),
+        _arg("--from-update"),
     ),
     "installation uninstall": (_arg("--target"),),
     "help": (_arg("help_path", nargs="*"),),

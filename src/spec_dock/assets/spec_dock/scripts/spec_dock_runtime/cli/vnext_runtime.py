@@ -95,6 +95,18 @@ def _context(ns: object, *, invocation_cwd: Path, engine_digest: str) -> WorkCon
         return WorkContext(
             root, common, initial_worktree_id(root), engine_digest, 0 if control is None else control.epoch
         )
+    if (
+        control is not None
+        and getattr(ns, "command_path", None) == "installation update"
+        and getattr(ns, "activate_engine", False)
+        and control.mode == "maintenance"
+    ):
+        matches = [
+            entry for entry in control.worktrees if entry.active and Path(entry.root).resolve(strict=True) == root
+        ]
+        if len(matches) != 1:
+            raise ValueError("current worktree is not uniquely registered")
+        return WorkContext(root, common, matches[0].id, control.engine_digest, control.epoch)
     if control is None or control.engine_digest != engine_digest:
         raise ValueError("external engine does not match repository control")
     matches = [entry for entry in control.worktrees if entry.active and Path(entry.root).resolve(strict=True) == root]

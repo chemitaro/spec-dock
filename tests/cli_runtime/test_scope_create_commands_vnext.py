@@ -90,7 +90,8 @@ def test_local_scope_create_cli_resumes_original_reserved_id(tmp_path: Path, mon
     monkeypatch.setattr(JournalStore, "update", fail_once)
     prefix = ("scope", "create", "initiative", "--backend", "local", "--title", "Program")
     first = _run(repo, *prefix)
-    assert first.exit_code == 5
+    assert first.exit_code == 6
+    assert json.loads(first.stdout)["error"]["code"] == "EFFECT_STATE_UNKNOWN"
     monkeypatch.setattr(JournalStore, "update", original_update)
     operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
     assert operation.effects[-1].status == "intent"

@@ -538,6 +538,7 @@ class TestRuntimeShellS11:
             "create_local_scope.py",
             "dependency_vnext.py",
             "edit_scope.py",
+            "engine_handover_vnext.py",
             "github_create_effect.py",
             "import_github_scope.py",
             "installation_vnext.py",

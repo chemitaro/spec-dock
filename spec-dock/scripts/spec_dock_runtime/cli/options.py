@@ -220,7 +220,16 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     if parsed.command_path == "active set" and bool(parsed.target) == bool(parsed.from_branch):
         parser.error("active set requires exactly one of TARGET or --from-branch")
     if parsed.command_path == "installation update":
-        if parsed.finalize:
+        if parsed.activate_engine:
+            if parsed.version or parsed.commit or parsed.maintenance or parsed.finalize:
+                parser.error("installation update --activate-engine accepts no source, maintenance, or finalize")
+            if sum(bool(item) for item in (parsed.from_update, parsed.resume, parsed.rollback)) != 1:
+                parser.error("installation update --activate-engine requires one update or recovery operation ID")
+            if parsed.from_update and re.fullmatch(r"[0-9a-f]{32}", parsed.from_update) is None:
+                parser.error("--from-update requires a 32-character lowercase operation ID")
+        elif parsed.from_update:
+            parser.error("--from-update requires --activate-engine")
+        elif parsed.finalize:
             if parsed.version or parsed.commit or parsed.maintenance or parsed.rollback:
                 parser.error("installation update --finalize accepts no source, maintenance, or rollback")
         elif (parsed.rollback and (parsed.version or parsed.commit)) or (
