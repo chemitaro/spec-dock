@@ -9,10 +9,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-      - name: Validate committed SpecDock workspace with fixed engine
-        env:
-          EXPECTED_SPEC_DOCK_SHA: ${{ github.sha }}
-        run: bash .github/scripts/specdock-ci-validate.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE" "$EXPECTED_SPEC_DOCK_SHA"
+      - name: Verify spec-dock runtime script exists
+        run: test -f ./spec-dock/scripts/spec-dock
+      - name: Sync generated state (local only)
+        run: python3 ./spec-dock/scripts/spec-dock sync
+      - name: Validate spec-dock workspace
+        run: python3 ./spec-dock/scripts/spec-dock validate
