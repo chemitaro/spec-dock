@@ -31,7 +31,7 @@ def test_work_commands_start_and_finish_all_three_kinds(tmp_path: Path) -> None:
     context = WorkContext(repo_root, repo_root / ".git", "main", "engine-a", 1)
     gateway = GithubIssueGateway()
     for scope in (initiative, epic, issue):
-        outcome = run_work_start(parse_vnext(["work", "start", scope.id]), context, gateway=gateway)
+        outcome = run_work_start(parse_vnext(["work", "start", scope.id, "--base", "HEAD"]), context, gateway=gateway)
         assert outcome.status == "succeeded"
         assert outcome.data.scope_id == scope.id
         assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == scope.id
@@ -57,7 +57,9 @@ def test_work_adapter_plans_start_and_finish_without_writes(tmp_path: Path) -> N
     context = WorkContext(repo_root, repo_root / ".git", "main", "engine-a", 1)
     gateway = GithubIssueGateway()
     before = (issue.path / ".meta.json").read_bytes()
-    start = run_work_start(parse_vnext(["work", "start", issue.id, "--dry-run"]), context, gateway=gateway)
+    start = run_work_start(
+        parse_vnext(["work", "start", issue.id, "--base", "HEAD", "--dry-run"]), context, gateway=gateway
+    )
     assert start.status == "planned"
     assert start.data.scope_id == issue.id
     assert start.data.branch.startswith(issue.id)

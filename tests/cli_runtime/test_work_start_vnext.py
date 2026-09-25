@@ -16,7 +16,12 @@ from spec_dock_runtime.application.active_selection import select_scope  # noqa:
 from spec_dock_runtime.application.branch_vnext import create_scope_branch  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
 from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
-from spec_dock_runtime.application.work_lifecycle import plan_start_work, resume_start_work, start_work  # noqa: E402
+from spec_dock_runtime.application.work_lifecycle import (  # noqa: E402
+    plan_start_work,
+    preview_start_work,
+    resume_start_work,
+    start_work,
+)
 from spec_dock_runtime.cli.admission import AdmissionError  # noqa: E402
 from spec_dock_runtime.domain.dependency_vnext import ReadinessResult  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
@@ -155,7 +160,7 @@ def test_start_resumes_after_checkout_when_selection_publication_fails(
 
     monkeypatch.setattr(work_lifecycle, "save_selection_v3", fail_once)
     with pytest.raises(OSError, match="injected active publication failure"):
-        start_work(target=issue.id, **arguments)
+        start_work(target=issue.id, base="HEAD", **arguments)
     pending = JournalStore(repo_root / ".git").pending()
     assert len(pending) == 1 and pending[0].command == "work.start"
     with pytest.raises(AdmissionError, match="pending blocking journal"):
@@ -188,10 +193,43 @@ def test_start_creates_canonical_branch_for_each_local_scope(tmp_path: Path, kin
         engine_digest="engine-a",
         expected_epoch=1,
         target=selected.id,
+        base="HEAD",
     )
     assert result.target_id == selected.id
     assert result.branch.startswith(selected.id + "-")
     assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == selected.id
+    assert JournalStore(repo_root / ".git").pending() == ()
+
+
+@pytest.mark.parametrize("kind", ["initiative", "epic", "issue"])
+def test_new_work_start_requires_explicit_base_before_any_write(tmp_path: Path, kind: str) -> None:
+    specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
+    selected = {"initiative": initiative, "epic": epic, "issue": issue}[kind]
+    repo_root = specdock_dir.parent
+    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+    )
+    arguments = {
+        "repo_root": repo_root,
+        "common_dir": repo_root / ".git",
+        "worktree_id": "main",
+        "engine_digest": "engine-a",
+        "expected_epoch": 1,
+        "target": selected.id,
+    }
+    before_branches = subprocess.run(["git", "branch", "--list"], cwd=repo_root, check=True, capture_output=True).stdout
+    for execute in (preview_start_work, start_work):
+        with pytest.raises(ValueError, match="new work start requires --base"):
+            execute(**arguments)
+    assert (
+        subprocess.run(["git", "branch", "--list"], cwd=repo_root, check=True, capture_output=True).stdout
+        == before_branches
+    )
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
     assert JournalStore(repo_root / ".git").pending() == ()
 
 
@@ -230,7 +268,7 @@ def test_detached_start_requires_explicit_base(tmp_path: Path) -> None:
         "expected_epoch": 1,
         "target": issue.id,
     }
-    with pytest.raises(ValueError, match="detached HEAD requires --base"):
+    with pytest.raises(ValueError, match="new work start requires --base"):
         start_work(**arguments)
     assert JournalStore(repo_root / ".git").pending() == ()
     result = start_work(base="HEAD", **arguments)

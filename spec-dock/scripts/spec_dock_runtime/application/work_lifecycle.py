@@ -234,8 +234,8 @@ def preview_start_work(
     except LookupError:
         binding = None
     if binding is None:
-        if base is None and not _head_state(repo_root)[0]:
-            raise ValueError("new work start from detached HEAD requires --base") from None
+        if base is None:
+            raise ValueError("new work start requires --base") from None
         planned = preview_scope_branch_create(
             repo_root=repo_root,
             common_dir=common_dir,
@@ -243,7 +243,7 @@ def preview_start_work(
             engine_digest=engine_digest,
             expected_epoch=expected_epoch,
             scope_id=plan.target_id,
-            base=base or "HEAD",
+            base=base,
             name=branch_name,
         )
         return WorkStartPreview(planned.scope_id, planned.name, True, plan.selection_after != selection)
@@ -294,8 +294,8 @@ def start_work(
         if branch_name is not None and branch_name != binding.name:
             raise ValueError("requested branch differs from the canonical binding")
     except LookupError:
-        if base is None and not _head_state(repo_root)[0]:
-            raise ValueError("new work start from detached HEAD requires --base") from None
+        if base is None:
+            raise ValueError("new work start requires --base") from None
         binding = create_scope_branch(
             repo_root=repo_root,
             common_dir=common_dir,
@@ -303,7 +303,7 @@ def start_work(
             engine_digest=engine_digest,
             expected_epoch=expected_epoch,
             scope_id=plan.target_id,
-            base=base or "HEAD",
+            base=base,
             name=branch_name,
             lock_timeout=lock_timeout,
         )

@@ -27,7 +27,7 @@ def test_vnext_cli_executes_three_kind_work_lifecycle_with_json(tmp_path: Path) 
     )
     arguments = {"invocation_cwd": root, "engine_digest": "engine-a", "engine_version": "test"}
     for scope in (initiative, epic, issue):
-        result = run_vnext(["work", "start", scope.id, "--json"], **arguments)
+        result = run_vnext(["work", "start", scope.id, "--base", "HEAD", "--json"], **arguments)
         assert result.exit_code == 0 and not result.stderr
         payload = json.loads(result.stdout)
         assert payload["command"] == "work start" and payload["data"]["scope_id"] == scope.id
@@ -52,6 +52,29 @@ def test_vnext_cli_rejects_engine_mismatch_before_work_mutation(tmp_path: Path) 
     assert result.exit_code == 3
     assert json.loads(result.stdout)["error"]["code"] == "PRECONDITION_FAILED"
     assert (issue.path / ".meta.json").read_bytes() == before
+
+
+def test_vnext_cli_requires_base_for_new_work_branch(tmp_path: Path) -> None:
+    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
+    root = specdock_dir.parent
+    subprocess.run(["git", "add", "-A"], cwd=root, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
+        cwd=root,
+        check=True,
+        capture_output=True,
+    )
+    before = subprocess.run(["git", "branch", "--list"], cwd=root, check=True, capture_output=True).stdout
+    result = run_vnext(
+        ["work", "start", issue.id, "--json"],
+        invocation_cwd=root,
+        engine_digest="engine-a",
+        engine_version="test",
+    )
+    assert result.exit_code == 3
+    assert "new work start requires --base" in result.stdout
+    assert subprocess.run(["git", "branch", "--list"], cwd=root, check=True, capture_output=True).stdout == before
+    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
 
 
 def test_vnext_active_show_set_clear_and_dry_run(tmp_path: Path) -> None:
