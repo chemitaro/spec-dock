@@ -12,6 +12,13 @@ DOCS = ASSETS / "docs"
 sys.path.insert(0, str(ASSETS / "scripts"))
 
 
+def test_workbench_templates_use_current_destination_flag() -> None:
+    for kind in ("root", "initiative", "epic", "issue"):
+        readme = (ASSETS / "templates" / kind / ".workbench/README.md").read_text(encoding="utf-8")
+        assert "workbench copy --scope <full-id> --to-worktree <linked-worktree>" in readme
+        assert "workbench copy --scope <full-id> --to <linked-worktree>" not in readme
+
+
 def test_command_reference_covers_all_public_leaves() -> None:
     from spec_dock_runtime.cli.catalog import LEAF_PATHS
 

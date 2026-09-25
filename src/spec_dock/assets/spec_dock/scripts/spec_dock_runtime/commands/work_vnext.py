@@ -89,9 +89,17 @@ def run_work_start(
         "lock_timeout": ns.lock_timeout,
     }
     if ns.resume is not None:
-        if ns.base is not None or ns.branch is not None or ns.switch_active or ns.allow_stale:
+        if ns.base is not None or ns.branch is not None:
             raise ValueError("work start recovery cannot change the recorded request")
-        outcome = resume_start_work(operation_id=ns.resume, expected_scope_id=ns.target, **common)
+        outcome = resume_start_work(
+            operation_id=ns.resume,
+            expected_scope_id=ns.target,
+            expected_source=ns.source,
+            expected_allow_stale=ns.allow_stale,
+            expected_offline=ns.offline,
+            expected_switch_active=ns.switch_active,
+            **common,
+        )
     else:
         outcome = start_work(
             target=ns.target,

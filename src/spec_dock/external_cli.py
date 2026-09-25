@@ -175,6 +175,9 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
 
 def main(argv: Sequence[str] | None = None) -> int:
     sys.dont_write_bytecode = True
+    for key in tuple(os.environ):
+        if key.startswith("GIT_"):
+            del os.environ[key]
     arguments = sys.argv[1:] if argv is None else argv
     try:
         return run_external(

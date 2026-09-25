@@ -323,6 +323,24 @@ def test_external_package_cli_runs_without_checkout_runtime_import(tmp_path: Pat
     assert scoped.returncode == 0, scoped.stderr
     assert json.loads(scoped.stdout)["status"] == "succeeded"
     assert not marker.exists()
+    hostile = tmp_path / "hostile-repo"
+    hostile.mkdir()
+    subprocess.run(["git", "-C", str(hostile), "init", "-q"], check=True)
+    hostile_environment = {
+        **environment,
+        "GIT_DIR": str(hostile / ".git"),
+        "GIT_WORK_TREE": str(hostile),
+    }
+    isolated = subprocess.run(
+        [str(shim), "scope", "list", "--json"],
+        cwd=repo,
+        env=hostile_environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert isolated.returncode == 0, isolated.stdout + isolated.stderr
+    assert json.loads(isolated.stdout)["status"] == "succeeded"
     original_engine = executable.read_bytes()
     start_of_code = original_engine.index(b"\n") + 1
     tamper_marker = tmp_path / "tampered-engine-ran"

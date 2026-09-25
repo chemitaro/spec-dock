@@ -172,7 +172,7 @@ def main() -> int:
         repo_root = Path(__file__).resolve(strict=True).parents[2]
         _bound_invocation(repo_root)
         executable = _pinned_executable(_common_directory(repo_root), repo_root)
-        environment = os.environ.copy()
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
         for key in ("PYTHONPATH", "PYTHONHOME", "PYTHONUSERBASE", "PYTHONSTARTUP"):
             environment.pop(key, None)
         environment["PYTHONDONTWRITEBYTECODE"] = "1"

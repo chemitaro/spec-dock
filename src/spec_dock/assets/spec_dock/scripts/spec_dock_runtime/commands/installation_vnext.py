@@ -349,14 +349,20 @@ def run_installation_update(
             target=target,
         )
     if ns.rollback:
-        if ns.dry_run or ns.version or ns.commit or ns.maintenance:
-            raise ValueError("installation rollback accepts no source, maintenance, or dry-run option")
+        if ns.dry_run or ns.maintenance:
+            raise ValueError("installation rollback accepts no maintenance or dry-run option")
+        if ns.offline and ns.version:
+            raise ValueError("offline rollback cannot resolve a version tag; use the recorded commit")
+        source_commit = None
+        if ns.version or ns.commit:
+            source_commit = resolve_fixed_source(version=ns.version, commit=ns.commit, timeout=ns.timeout).commit
         record = rollback_installation_group(
             repo_root=context.repo_root,
             common_dir=context.common_dir,
             worktree_id=context.worktree_id,
             engine_digest=context.engine_digest,
             operation_id=ns.rollback,
+            expected_source_commit=source_commit,
             lock_timeout=ns.lock_timeout,
         )
         return OperationResult(

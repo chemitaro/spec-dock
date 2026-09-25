@@ -149,4 +149,17 @@ def test_output_capture_is_bounded_and_redacts_obvious_credentials(tmp_path: Pat
     assert outcome.status == "succeeded"
     assert "sekret" not in outcome.diagnostic
     assert len(outcome.diagnostic) < 5000
-    assert "output truncated" in outcome.diagnostic
+    assert outcome.diagnostic == "make init finished; output omitted"
+
+
+def test_bootstrap_never_exposes_arbitrary_hook_output(tmp_path: Path) -> None:
+    _source, created, arguments = _created(tmp_path)
+    secret = "unlabelled-secret-value-409"
+    (created.path / "Makefile").write_text(
+        f"init:\n\t@printf '{secret}\\n'\n",
+        encoding="utf-8",
+    )
+    outcome = bootstrap_worktree(timeout=10, **arguments)
+    assert outcome.status == "succeeded"
+    assert secret not in outcome.diagnostic
+    assert outcome.diagnostic == "make init finished; output omitted"

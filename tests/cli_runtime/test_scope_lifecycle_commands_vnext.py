@@ -49,6 +49,8 @@ def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: P
     abandoned = _run(repo, "scope", "close", created.id, "--reason", "not-planned", "--yes")
     assert abandoned.exit_code == 0
     abandoned_id = json.loads(abandoned.stdout)["operation_id"]
+    implicit_completed = _run(repo, "scope", "close", created.id, "--resume", abandoned_id, "--yes")
+    assert implicit_completed.exit_code == 3
     resumed_abandoned = _run(
         repo, "scope", "close", created.id, "--reason", "not-planned", "--resume", abandoned_id, "--yes"
     )

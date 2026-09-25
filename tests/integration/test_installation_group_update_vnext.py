@@ -240,12 +240,23 @@ def test_legacy_update_can_rollback_before_control_is_published(
             engine_pin=pin,
         )
     (operation_id,) = pending_installation_groups(repo / ".git")
+    with pytest.raises(ValueError, match="rollback eligible"):
+        rollback_installation_group(
+            repo_root=repo,
+            common_dir=repo / ".git",
+            worktree_id="main",
+            engine_digest=pin.distribution_digest,
+            operation_id=operation_id,
+            expected_source_commit="f" * 40,
+        )
+    assert pending_installation_groups(repo / ".git") == (operation_id,)
     restored = rollback_installation_group(
         repo_root=repo,
         common_dir=repo / ".git",
         worktree_id="main",
         engine_digest=pin.distribution_digest,
         operation_id=operation_id,
+        expected_source_commit=bundle.source.commit,
     )
     assert restored.phase == "rolled-back" and load_control(repo / ".git") is None
     for root in (repo, second):

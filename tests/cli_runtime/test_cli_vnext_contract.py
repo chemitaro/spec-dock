@@ -105,13 +105,26 @@ def test_every_vnext_leaf_has_parseable_help() -> None:
 
 
 def test_every_leaf_help_names_its_effects_and_recovery() -> None:
+    headings = (
+        "Target:",
+        "Reads:",
+        "Writes:",
+        "Does not:",
+        "Preconditions:",
+        "Confirmation:",
+        "Recovery:",
+        "JSON:",
+        "Examples:",
+    )
     for path in LEAF_PATHS:
         text = explicit_help(path.split())
         assert "Effects:" in text, path
-        assert "Recovery:" in text, path
+        for heading in headings:
+            assert heading in text, (path, heading)
         parsed = parse_vnext_output([*path.split(), "--help", "--json"])
         assert parsed.exit_code == 0
-        assert "Effects:" in json.loads(parsed.stdout)["data"]["help"], path
+        assert parsed.stdout
+        assert json.loads(parsed.stdout)["data"]["help"] == text, path
     work_start = explicit_help(("work", "start"))
     assert "branch" in work_start and "checkout" in work_start
     assert "--resume" in work_start
@@ -150,6 +163,19 @@ def test_scope_create_requires_explicit_backend_parent_and_title() -> None:
     ])
     assert result.backend == "local"
     assert result.parent == "init-local-00001"
+
+
+def test_installation_rollback_accepts_matching_source_pin_for_verification() -> None:
+    parsed = parse_vnext([
+        "installation",
+        "update",
+        "--commit",
+        "a" * 40,
+        "--rollback",
+        "b" * 32,
+    ])
+    assert parsed.commit == "a" * 40
+    assert parsed.rollback == "b" * 32
 
 
 def test_active_clear_requires_explicit_target_or_all() -> None:

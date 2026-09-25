@@ -284,3 +284,88 @@ MUTATING_LEAF_PATHS = frozenset({
     "installation update",
     "installation uninstall",
 })
+
+
+@dataclass(frozen=True)
+class HelpSpec:
+    target: str
+    reads: str
+    writes: str
+    does_not: str
+    preconditions: str
+    confirmation: str
+    json: str
+    examples: str
+
+
+_CONFIRMATION_LEAVES = frozenset({
+    "scope close",
+    "scope reopen",
+    "scope delete",
+    "work finish",
+    "worktree remove",
+    "worktree bootstrap",
+    "workspace migrate",
+    "installation init",
+    "installation update",
+    "installation uninstall",
+})
+
+
+def _help_spec(leaf: str) -> HelpSpec:
+    arguments = {name for argument in LEAF_ARGUMENTS[leaf] for name in argument.names}
+    if leaf.startswith(("scope create", "scope import")):
+        target = f"New {leaf.split()[-1]} Scope; parent is --parent where required."
+    elif leaf.startswith("installation "):
+        target = "The selected Git common-directory installation and its registered worktrees."
+    elif leaf.startswith("worktree "):
+        target = "The selected registered worktree; create allocates a new worktree."
+    elif leaf in {"help", "completion"}:
+        target = "The CLI catalog; no repository is required."
+    elif "target" in arguments:
+        target = "The explicit Scope selector (or @current selection) in this worktree."
+    elif "--scope" in arguments:
+        target = "The Scope selected by --scope in this worktree."
+    elif leaf.startswith("active "):
+        target = "This worktree's active Scope selection."
+    else:
+        target = "The current project or the selectors shown in the usage line."
+    reads = (
+        "CLI catalog and arguments only."
+        if leaf in {"help", "completion"}
+        else "Selected project identity, Scope snapshot, and operation guards as applicable."
+    )
+    writes = HELP_EFFECTS[leaf] if leaf in MUTATING_LEAF_PATHS else "None; this command only reads."
+    does_not = (
+        "Does not implicitly update independent repositories or consumers."
+        if leaf.startswith("installation ")
+        else "Does not bypass target guards or perform an implicit installation update."
+    )
+    preconditions = (
+        "No project is required."
+        if leaf in {"help", "completion"}
+        else "Resolve the displayed target and satisfy the command's required arguments and state guards."
+    )
+    if leaf.startswith("scope create"):
+        confirmation = "GitHub creation requires confirmation; local creation does not."
+    elif leaf == "workbench copy":
+        confirmation = "--on-conflict overwrite requires confirmation; the default error policy does not."
+    elif leaf in _CONFIRMATION_LEAVES:
+        confirmation = (
+            "TTY prompts after planning; --yes skips only confirmation; JSON and non-interactive require --yes."
+        )
+    else:
+        confirmation = "No final confirmation is required for this leaf."
+    return HelpSpec(
+        target=target,
+        reads=reads,
+        writes=writes,
+        does_not=does_not,
+        preconditions=preconditions,
+        confirmation=confirmation,
+        json="--json returns one specdock.cli/v1 envelope with target, data, effects, and recovery.",
+        examples=f"spec-dock {leaf} --help",
+    )
+
+
+HELP_SPECS: dict[str, HelpSpec] = {leaf: _help_spec(leaf) for leaf in LEAF_PATHS}
