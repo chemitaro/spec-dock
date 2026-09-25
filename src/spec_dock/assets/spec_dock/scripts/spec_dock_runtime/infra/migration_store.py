@@ -13,7 +13,12 @@ import subprocess
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 from spec_dock_runtime.infra.control_store import control_directory, load_control
-from spec_dock_runtime.infra.git_cli import git_common_directory, origin_github_repo_slug, worktree_list
+from spec_dock_runtime.infra.git_cli import (
+    git_common_directory,
+    origin_github_repo_slug,
+    sanitized_git_environment,
+    worktree_list,
+)
 
 
 @dataclass(frozen=True)
@@ -70,6 +75,7 @@ def branch_tip(repo_root: Path, branch: str) -> str:
             text=True,
             check=False,
             timeout=10,
+            env=sanitized_git_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ValueError("migration branch mapping could not be inspected") from error
@@ -82,6 +88,7 @@ def branch_tip(repo_root: Path, branch: str) -> str:
             text=True,
             check=False,
             timeout=10,
+            env=sanitized_git_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise ValueError("migration branch mapping could not be inspected") from error

@@ -52,7 +52,7 @@ def run_scope_lifecycle(
             operation_id=ns.resume,
             expected_scope_id=target_id,
             expected_action=action,
-            expected_reason=reason if action == "close" and reason != "completed" else None,
+            expected_reason=reason if action == "close" else None,
             gateway=gateway,
             lock_timeout=ns.lock_timeout,
         )

@@ -69,10 +69,11 @@ def test_unexpected_failures_report_effect_uncertainty_by_command_kind(
 
     monkeypatch.setattr("spec_dock_runtime.cli.vnext_runtime.run_scope_edit", fail_write)
     write = run_vnext(["scope", "edit", initiative.id, "--title", "New", "--json"], **arguments)
-    assert write.exit_code == 6
+    assert write.exit_code == 5
     write_payload = json.loads(write.stdout)
-    assert write_payload["status"] == "partial"
-    assert write_payload["effects"][0]["status"] == "unknown"
+    assert write_payload["status"] == "failed"
+    assert write_payload["effects"] == []
+    assert write_payload["target"]["id"] == initiative.id
 
     def fail_context(*_args: object, **_kwargs: object) -> None:
         raise OSError("injected context failure")
@@ -82,3 +83,19 @@ def test_unexpected_failures_report_effect_uncertainty_by_command_kind(
         preflight = run_vnext(["scope", "edit", initiative.id, "--title", "New", "--json"], **arguments)
     assert preflight.exit_code == 5
     assert json.loads(preflight.stdout)["effects"] == []
+
+
+def test_runtime_rejects_preflight_identity_change_before_scope_edit(tmp_path: Path) -> None:
+    specdock_dir, _views, initiative, _epic, _issue = _three_scopes(tmp_path)
+    document = initiative.path / "requirement.md"
+    before = document.read_bytes()
+    result = run_vnext(
+        ["scope", "edit", initiative.id, "--title", "Wrong repo", "--json"],
+        invocation_cwd=specdock_dir.parent,
+        engine_digest="engine-a",
+        engine_version="test",
+        preflight_root=tmp_path / "other-repository",
+    )
+    assert result.exit_code == 3
+    assert json.loads(result.stdout)["effects"] == []
+    assert document.read_bytes() == before

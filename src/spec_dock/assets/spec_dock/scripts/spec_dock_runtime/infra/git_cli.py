@@ -11,13 +11,24 @@ import shutil
 import stat
 import subprocess
 import sys
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 from spec_dock_runtime.application.contracts import GitWorktreeRecord
 
 DirectoryWitness = tuple[int, int]
 DirectoryWitnesses = tuple[tuple[str, DirectoryWitness], ...]
+
+
+def sanitized_git_environment(environment: dict[str, str] | None = None) -> dict[str, str]:
+    """Discard caller-supplied Git repository/config overrides for bound Git calls."""
+    source = os.environ if environment is None else environment
+    return {key: value for key, value in source.items() if not key.startswith("GIT_")}
+
+
+def _run_git(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[Any]:
+    kwargs["env"] = sanitized_git_environment(kwargs.get("env"))
+    return subprocess.run(*args, **kwargs)
 
 
 def _ensure_git_available() -> None:
@@ -28,7 +39,7 @@ def _ensure_git_available() -> None:
 def git_common_directory(repo_root: Path) -> Path:
     """Ask Git for the shared metadata root rather than assuming .git is a directory."""
     _ensure_git_available()
-    result = subprocess.run(
+    result = _run_git(
         ["git", "rev-parse", "--git-common-dir"],
         cwd=str(repo_root),
         capture_output=True,
@@ -45,7 +56,7 @@ def git_common_directory(repo_root: Path) -> Path:
 def require_clean_working_tree(repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None:
     _ensure_git_available()
     try:
-        p = subprocess.run(
+        p = _run_git(
             ["git", "status", "--porcelain"],
             cwd=str(repo_root),
             capture_output=True,
@@ -72,7 +83,7 @@ def require_clean_working_tree(repo_root: Path, *, allowed_missing_paths: tuple[
 def current_branch_or_none(repo_root: Path) -> str | None:
     _ensure_git_available()
     try:
-        p = subprocess.run(
+        p = _run_git(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
             cwd=str(repo_root),
             capture_output=True,
@@ -89,7 +100,7 @@ def current_branch_or_none(repo_root: Path) -> str | None:
 
 def current_head_or_none(repo_root: Path) -> str | None:
     _ensure_git_available()
-    p = subprocess.run(
+    p = _run_git(
         ["git", "rev-parse", "HEAD"],
         cwd=str(repo_root),
         capture_output=True,
@@ -104,7 +115,7 @@ def current_head_or_none(repo_root: Path) -> str | None:
 
 def status_short_or_none(repo_root: Path) -> str | None:
     _ensure_git_available()
-    p = subprocess.run(
+    p = _run_git(
         ["git", "status", "--short"],
         cwd=str(repo_root),
         capture_output=True,
@@ -118,7 +129,7 @@ def status_short_or_none(repo_root: Path) -> str | None:
 
 def local_branch_exists(repo_root: Path, branch: str) -> bool:
     _ensure_git_available()
-    p = subprocess.run(
+    p = _run_git(
         ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
         cwd=str(repo_root),
         capture_output=True,
@@ -130,7 +141,7 @@ def local_branch_exists(repo_root: Path, branch: str) -> bool:
 
 def check_ref_format_branch(repo_root: Path, branch: str) -> bool:
     _ensure_git_available()
-    p = subprocess.run(
+    p = _run_git(
         ["git", "check-ref-format", "--branch", branch],
         cwd=str(repo_root),
         capture_output=True,
@@ -156,7 +167,7 @@ def _remote_get_url(repo_root: Path, *, push: bool) -> str:
     if push:
         cmd.append("--push")
     cmd.append("origin")
-    p = subprocess.run(
+    p = _run_git(
         cmd,
         cwd=str(repo_root),
         capture_output=True,
@@ -233,7 +244,7 @@ def worktree_list(repo_root: Path) -> list[GitWorktreeRecord]:
     _ensure_git_available()
     cmd = ["git", "worktree", "list", "--porcelain"]
     try:
-        p = subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        p = _run_git(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
     return _parse_worktree_porcelain(p.stdout or "")
@@ -253,7 +264,7 @@ def remove_worktree(
     cmd.append(str(path))
     _verify_worktree_target_binding(path, target_fd, phase="before Git mutation")
     try:
-        subprocess.run(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        _run_git(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as e:
         stderr = (e.stderr or "").strip()
         stdout = (e.stdout or "").strip()
@@ -312,7 +323,7 @@ def _runtime_scripts_root() -> Path:
 
 
 def _helper_environment() -> dict[str, str]:
-    environment = os.environ.copy()
+    environment = sanitized_git_environment()
     environment["PYTHONDONTWRITEBYTECODE"] = "1"
     runtime_scripts = str(_runtime_scripts_root())
     existing = environment.get("PYTHONPATH")
@@ -358,7 +369,7 @@ def _run_git_in_bound_cwd(
         "--",
         *command,
     ]
-    result = subprocess.run(
+    result = _run_git(
         helper,
         cwd=str(_runtime_scripts_root()),
         env=_helper_environment(),
@@ -381,7 +392,7 @@ def resolve_commit(repo_root: Path, ref: str) -> str:
     _ensure_git_available()
     command = ["git", "rev-parse", f"{ref}^{{commit}}"]
     try:
-        result = subprocess.run(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        result = _run_git(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as error:
         raise RuntimeError(f"git failed: {' '.join(command)}\n{(error.stderr or '').strip()}") from error
     return (result.stdout or "").strip()
@@ -389,7 +400,7 @@ def resolve_commit(repo_root: Path, ref: str) -> str:
 
 def _ls_tree_all(repo_root: Path, target_commit: str) -> bytes:
     command = ["git", "ls-tree", "-rz", "-r", "--full-tree", target_commit]
-    result = subprocess.run(command, cwd=str(repo_root), capture_output=True, check=False)
+    result = _run_git(command, cwd=str(repo_root), capture_output=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(
             f"git failed: {' '.join(command)}\n{(result.stderr or b'').decode(errors='replace').strip()}"
@@ -420,7 +431,7 @@ def _git_object_bytes(repo_root: Path, *, object_type: str, object_id: str) -> b
     if object_type != "blob":
         raise RuntimeError(f"provider closure contains unsupported Git object type: {object_type}")
     command = ["git", "cat-file", "blob", object_id]
-    result = subprocess.run(command, cwd=str(repo_root), capture_output=True, check=False)
+    result = _run_git(command, cwd=str(repo_root), capture_output=True, check=False)
     if result.returncode != 0:
         raise RuntimeError(
             f"git failed: {' '.join(command)}\n{(result.stderr or b'').decode(errors='replace').strip()}"
@@ -447,7 +458,7 @@ def checkout_fixed_ref(
 
     for command in commands:
         try:
-            subprocess.run(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
+            _run_git(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
         except subprocess.CalledProcessError as error:
             raise RuntimeError(f"git failed: {' '.join(command)}\n{(error.stderr or '').strip()}") from error
 
@@ -472,7 +483,7 @@ def add_worktree_at_commit(
     command = ["git", "worktree", "add", "--no-checkout", "-b", branch, str(path), target_commit]
     _verify_worktree_target_binding(path, target_fd, phase="before Git mutation")
     try:
-        subprocess.run(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        _run_git(command, cwd=str(repo_root), capture_output=True, text=True, check=True)
     except subprocess.CalledProcessError as error:
         details = "\n".join(part for part in ((error.stderr or "").strip(), (error.stdout or "").strip()) if part)
         raise RuntimeError(f"git failed: {' '.join(command)}\n{details}") from error

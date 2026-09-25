@@ -12,6 +12,7 @@ from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch
 from spec_dock_runtime.domain.registry import LocalIdRegistry, reserve_local_id
 from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 from spec_dock_runtime.infra.control_store import control_directory, load_control
+from spec_dock_runtime.infra.git_cli import sanitized_git_environment
 from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json
 from spec_dock_runtime.infra.writer_lock import WriterLock
 
@@ -103,6 +104,7 @@ def historical_local_ids(repo_root: Path) -> set[str]:
         capture_output=True,
         text=True,
         timeout=60,
+        env=sanitized_git_environment(),
     )
     if completed.returncode != 0:
         raise ValueError("Git history could not be scanned for local Scope IDs")

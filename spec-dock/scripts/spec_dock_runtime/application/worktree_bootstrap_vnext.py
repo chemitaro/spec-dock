@@ -7,7 +7,6 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import fcntl
 import os
-import re
 import signal
 import subprocess
 import threading
@@ -22,11 +21,6 @@ from spec_dock_runtime.infra.writer_lock import WriterLock
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-_MAX_DIAGNOSTIC_BYTES = 4096
-_ANSI_ESCAPE = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
-_URL_CREDENTIAL = re.compile(r"(https?://)[^\s/@:]+:[^\s/@]+@", re.IGNORECASE)
-_ASSIGNMENT_SECRET = re.compile(r"(?i)\b(token|password|secret|api[_-]?key)\s*[:=]\s*\S+")
 
 
 @dataclass(frozen=True)
@@ -67,16 +61,7 @@ def _publish_record(path: Path, *, target_id: str, status: str, attempt: int, ex
     )
 
 
-def _sanitize_output(raw: bytes) -> str:
-    value = raw.decode("utf-8", "replace")
-    value = _ANSI_ESCAPE.sub("", value)
-    value = "".join(char if char in "\n\t" or ord(char) >= 32 else "?" for char in value)
-    value = _URL_CREDENTIAL.sub(r"\1[redacted]@", value)
-    return _ASSIGNMENT_SECRET.sub(lambda match: match.group(1) + "=[redacted]", value).strip()
-
-
 def _run_make(path: Path, *, timeout: float) -> tuple[bool, int | None, bool, str]:
-    captured = bytearray()
     try:
         process = subprocess.Popen(
             ["make", "init"],
@@ -93,10 +78,8 @@ def _run_make(path: Path, *, timeout: float) -> tuple[bool, int | None, bool, st
 
     def drain() -> None:
         with stream:
-            while chunk := stream.read(4096):
-                remaining = _MAX_DIAGNOSTIC_BYTES - len(captured)
-                if remaining > 0:
-                    captured.extend(chunk[:remaining])
+            while stream.read(4096):
+                pass
 
     reader = threading.Thread(target=drain, daemon=True)
     reader.start()
@@ -114,10 +97,7 @@ def _run_make(path: Path, *, timeout: float) -> tuple[bool, int | None, bool, st
         with contextlib.suppress(ProcessLookupError):
             os.killpg(process.pid, signal.SIGKILL)
         reader.join(timeout=10)
-    diagnostic = _sanitize_output(bytes(captured))
-    if len(captured) == _MAX_DIAGNOSTIC_BYTES:
-        diagnostic += " [output truncated]"
-    return True, exit_code, timed_out, diagnostic
+    return True, exit_code, timed_out, "make init finished; output omitted"
 
 
 def bootstrap_worktree(

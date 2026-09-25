@@ -3,9 +3,9 @@
 ID: "iss-00409"
 タイトル: "SpecDock CLI Scope Active Work Redesign"
 関連GitHub: ["#409"]
-状態: "draft"
-原稿状態: "Issue #409 正本へ採用・実装前"
-最終更新: "2026-09-24"
+状態: "approved"
+原稿状態: "Issue #409 正本採用・製品実装中"
+最終更新: "2026-09-25"
 依存: ["requirement.md"]
 親: ["epic-00356", "init-local-00003"]
 基準Repository: "chemitaro/spec-dock"

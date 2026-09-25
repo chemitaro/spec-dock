@@ -1019,12 +1019,14 @@ def rollback_installation_group(
     engine_digest: str,
     operation_id: str,
     expected_action: str = "update",
+    expected_source_commit: str | None = None,
     lock_timeout: float = 0.0,
 ) -> InstallationGroupRecord:
     """Restore a pending or untouched committed update/uninstall group."""
     record = read_group_record(common_dir, operation_id)
     if (
         record.action != expected_action
+        or (expected_source_commit is not None and record.source_commit != expected_source_commit)
         or expected_action not in {"update", "uninstall"}
         or (record.phase == "committed" and not record.keep_maintenance)
     ):
@@ -1046,6 +1048,7 @@ def rollback_installation_group(
         record = read_group_record(common_dir, operation_id)
         if (
             record.action != expected_action
+            or (expected_source_commit is not None and record.source_commit != expected_source_commit)
             or expected_action not in {"update", "uninstall"}
             or (record.phase == "committed" and not record.keep_maintenance)
         ):

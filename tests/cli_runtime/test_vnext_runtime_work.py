@@ -31,11 +31,33 @@ def test_vnext_cli_executes_three_kind_work_lifecycle_with_json(tmp_path: Path) 
         assert result.exit_code == 0 and not result.stderr
         payload = json.loads(result.stdout)
         assert payload["command"] == "work start" and payload["data"]["scope_id"] == scope.id
+        assert payload["target"]["id"] == scope.id
+        assert {
+            "state_before",
+            "state_after",
+            "selection_before",
+            "selection_after",
+            "branch_before",
+            "branch_after",
+            "guard",
+            "derived_dirty",
+        } <= set(payload["data"])
     for scope in (issue, epic, initiative):
         result = run_vnext(["work", "finish", scope.id, "--json", "--yes"], **arguments)
         assert result.exit_code == 0 and not result.stderr
         payload = json.loads(result.stdout)
         assert payload["command"] == "work finish" and payload["data"]["scope_id"] == scope.id
+        assert payload["target"]["id"] == scope.id
+        assert {
+            "state_before",
+            "state_after",
+            "selection_before",
+            "selection_after",
+            "branch_before",
+            "branch_after",
+            "guard",
+            "derived_dirty",
+        } <= set(payload["data"])
     assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
 
 

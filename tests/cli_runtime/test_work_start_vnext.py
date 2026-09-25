@@ -30,7 +30,7 @@ from spec_dock_runtime.application.work_lifecycle import (  # noqa: E402
 from spec_dock_runtime.cli.admission import AdmissionError  # noqa: E402
 from spec_dock_runtime.domain.dependency_vnext import ReadinessResult  # noqa: E402
 from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
+from spec_dock_runtime.infra.active_store import load_selection_v3, save_selection_v3  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
 from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
@@ -508,3 +508,46 @@ def test_start_snapshot_queries_github_from_real_repository(tmp_path: Path) -> N
     assert preview_start_work(**arguments).target_id == local.id
     assert start_work(**arguments).target_id == local.id
     assert gateway.calls >= 3
+
+
+def test_offline_cache_start_never_queries_current_github_focus(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo_root = cast("Path", common["repo_root"])
+    local = create_local_scope(kind="initiative", title="Local", parent=None, ancestors=(), **common)
+    imported = import_github_scope(
+        kind="initiative",
+        github_ref="gh:example/repo#47",
+        repo_hint=None,
+        title="Remote focus",
+        parent_id=None,
+        slug=None,
+        gateway=FakeGateway(_issue()),
+        **common,
+    )
+    workspace = repo_root / "spec-dock"
+    views = load_scope_views(workspace)
+    current, identity = load_selection_v3(workspace, worktree_id="main")
+    save_selection_v3(
+        workspace, select_scope(views, imported.id, current=current), views=views, expected_identity=identity
+    )
+    _commit_fixture(repo_root, "offline cache start")
+
+    class ForbiddenGateway:
+        def get(self, *_args: object, **_kwargs: object) -> None:
+            raise AssertionError("offline start contacted GitHub")
+
+    preview = preview_start_work(
+        repo_root=repo_root,
+        common_dir=cast("Path", common["common_dir"]),
+        worktree_id="main",
+        engine_digest="engine-a",
+        expected_epoch=1,
+        target=local.id,
+        base="HEAD",
+        source="cache",
+        allow_stale=True,
+        offline=True,
+        switch_active=True,
+        gateway=ForbiddenGateway(),
+    )
+    assert preview.target_id == local.id

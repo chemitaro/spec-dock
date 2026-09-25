@@ -95,6 +95,7 @@ class WorkStartPreview:
     branch: str
     branch_creation: bool
     selection_changed: bool
+    selection_after: SelectionState
 
 
 def _ancestry(views: tuple[ScopeView, ...], scope_id: str) -> tuple[str, ...]:
@@ -141,6 +142,14 @@ def _head_state(repo_root: Path) -> tuple[str, str]:
     return branch.stdout.strip(), _resolve_commit(repo_root, "HEAD")
 
 
+def current_work_branch(repo_root: Path) -> str | None:
+    """Report the bound worktree branch without exposing Git infrastructure to adapters."""
+    branch = _git(repo_root, "branch", "--show-current")
+    if branch.returncode != 0:
+        raise RuntimeError("current Git branch could not be read")
+    return branch.stdout.strip() or None
+
+
 def _require_clean_start(repo_root: Path) -> None:
     status = _git(repo_root, "status", "--porcelain", "--untracked-files=all")
     if status.returncode != 0 or status.stdout.strip():
@@ -148,13 +157,21 @@ def _require_clean_start(repo_root: Path) -> None:
 
 
 def _current_start_state(
-    repo_root: Path, views: tuple[ScopeView, ...], selection: SelectionState, gateway: GithubIssueGateway | None
+    repo_root: Path,
+    views: tuple[ScopeView, ...],
+    selection: SelectionState,
+    gateway: GithubIssueGateway | None,
+    *,
+    source: str,
+    offline: bool,
 ) -> ObservedState | None:
     if selection.focus_id is None:
         return None
     current = show_scope(views, selection.focus_id)
-    if isinstance(current.backend, LocalBackend):
+    if isinstance(current.backend, LocalBackend) or source == "cache":
         return current.status.state
+    if offline:
+        raise ValueError("offline mode cannot observe the current GitHub Scope")
     if gateway is None:
         raise ValueError("live GitHub state is required for the current active Scope")
     remote = gateway.get(
@@ -198,7 +215,7 @@ def _start_plan(
         views,
         target=target_id,
         selection=selection,
-        current_state=_current_start_state(repo_root, views, selection, gateway),
+        current_state=_current_start_state(repo_root, views, selection, gateway, source=source, offline=offline),
         readiness=readiness,
         switch_active=switch_active,
     )
@@ -273,7 +290,9 @@ def preview_start_work(
         gateway=gateway,
         switch_active=switch_active,
     )
-    return WorkStartPreview(plan.target_id, branch, binding is None, plan.selection_after != selection)
+    return WorkStartPreview(
+        plan.target_id, branch, binding is None, plan.selection_after != selection, plan.selection_after
+    )
 
 
 def start_work(
@@ -516,6 +535,10 @@ def resume_start_work(
     expected_epoch: int,
     operation_id: str,
     expected_scope_id: str | None = None,
+    expected_source: str | None = None,
+    expected_allow_stale: bool | None = None,
+    expected_offline: bool | None = None,
+    expected_switch_active: bool | None = None,
     gateway: GithubIssueGateway | None = None,
     lock_timeout: float = 0.0,
 ) -> WorkStartResult:
@@ -527,6 +550,15 @@ def resume_start_work(
         fixed = dict(operation.fixed_targets)
         if expected_scope_id is not None and fixed.get("scope") != expected_scope_id:
             raise ValueError("work start recovery target differs from the recorded Scope ID")
+        if (
+            (expected_source is not None and fixed.get("readiness_source") != expected_source)
+            or (expected_allow_stale is not None and fixed.get("allow_stale") != str(expected_allow_stale).lower())
+            or (expected_offline is not None and fixed.get("offline") != str(expected_offline).lower())
+            or (
+                expected_switch_active is not None and fixed.get("switch_active") != str(expected_switch_active).lower()
+            )
+        ):
+            raise ValueError("work start recovery policy differs from the recorded request")
         revisions = dict(operation.before_revisions)
         branch_created = operation.effect_plan == ("git-branch", "registry-bind", "checkout", "selection-set")
         if (

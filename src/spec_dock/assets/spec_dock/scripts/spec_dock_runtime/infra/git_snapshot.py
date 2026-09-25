@@ -9,13 +9,22 @@ import subprocess
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.infra.git_cli import sanitized_git_environment
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
 
 def _git_bytes(repo_root: Path, *arguments: str) -> bytes:
     try:
-        result = subprocess.run(["git", *arguments], cwd=repo_root, capture_output=True, check=False, timeout=60.0)
+        result = subprocess.run(
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            check=False,
+            timeout=60.0,
+            env=sanitized_git_environment(),
+        )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise RuntimeError("committed Scope snapshot could not be read") from error
     if result.returncode != 0:

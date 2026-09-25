@@ -128,6 +128,7 @@ def test_every_leaf_help_names_its_effects_and_recovery() -> None:
     work_start = explicit_help(("work", "start"))
     assert "branch" in work_start and "checkout" in work_start
     assert "--resume" in work_start
+    assert "spec-dock work start <scope-id> --base HEAD" in work_start
 
 
 def test_repository_operator_guidance_uses_current_cli() -> None:

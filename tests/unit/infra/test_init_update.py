@@ -1258,7 +1258,7 @@ class TestInitUpdate(CliRuntimeHarness):
             "non-canonical",
             "Git ignore は security boundary",
             "./spec-dock/scripts/spec-dock artifact import file ...",
-            "./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>",
+            "./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to-worktree <linked-worktree>",
             "canonical adoption",
             "automatic hook",
         ):

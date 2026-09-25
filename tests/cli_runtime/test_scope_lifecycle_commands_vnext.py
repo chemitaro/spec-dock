@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
+import pty
+import subprocess
 import sys
 from typing import cast
 
@@ -17,6 +20,38 @@ from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
 
 def _run(repo: Path, *args: str):
     return run_vnext([*args, "--json"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4")
+
+
+def test_scope_close_prompts_on_tty_and_respects_denial(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
+    source = (
+        "from pathlib import Path; import sys; "
+        "sys.path.insert(0, sys.argv[1]); "
+        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
+        "result=run_vnext(['scope','close',sys.argv[2]], invocation_cwd=Path(sys.argv[3]), "
+        "engine_digest='engine-a', engine_version='0.2.4'); "
+        "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
+    )
+    for answer, expected_code in ((b"no\n", 3), (b"yes\n", 0)):
+        master, slave = pty.openpty()
+        try:
+            child = subprocess.Popen(
+                [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), created.id, str(repo)],
+                stdin=slave,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+            os.close(slave)
+            os.write(master, answer)
+            stdout, stderr = child.communicate(timeout=10)
+            assert child.returncode == expected_code, stdout + stderr
+            assert created.id in stderr and "Confirm" in stderr
+        finally:
+            os.close(master)
+    assert json.loads((created.path / ".meta.json").read_text())["lifecycle"]["state"] == "completed"
 
 
 def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: Path) -> None:
@@ -34,6 +69,7 @@ def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: P
     assert metadata.read_bytes() == before
     closed = _run(repo, "scope", "close", created.id, "--yes")
     assert closed.exit_code == 0
+    assert json.loads(closed.stdout)["target"]["id"] == created.id
     assert json.loads(metadata.read_text())["lifecycle"]["state"] == "completed"
     operation_id = json.loads(closed.stdout)["operation_id"]
     wrong_action = _run(repo, "scope", "reopen", created.id, "--resume", operation_id, "--yes")

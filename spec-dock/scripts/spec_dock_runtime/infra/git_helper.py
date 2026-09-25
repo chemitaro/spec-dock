@@ -8,6 +8,8 @@ import stat
 import subprocess
 import sys
 
+from spec_dock_runtime.infra.git_cli import sanitized_git_environment
+
 sys.dont_write_bytecode = True
 
 
@@ -45,7 +47,7 @@ def main(argv: list[str] | None = None) -> int:
         _validate_cwd_fd(namespace.cwd_fd, namespace.expected_device, namespace.expected_inode)
         os.fchdir(namespace.cwd_fd)
         os.close(namespace.cwd_fd)
-        child = subprocess.Popen(child_argv)
+        child = subprocess.Popen(child_argv, env=sanitized_git_environment())
         return int(child.wait())
     except RuntimeError as error:
         print(f"error: {error}", file=sys.stderr)

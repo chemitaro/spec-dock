@@ -91,7 +91,10 @@ def test_local_scope_create_cli_resumes_original_reserved_id(tmp_path: Path, mon
     prefix = ("scope", "create", "initiative", "--backend", "local", "--title", "Program")
     first = _run(repo, *prefix)
     assert first.exit_code == 6
-    assert json.loads(first.stdout)["error"]["code"] == "EFFECT_STATE_UNKNOWN"
+    failed_payload = json.loads(first.stdout)
+    assert failed_payload["error"]["code"] == "EFFECT_STATE_UNKNOWN"
+    assert failed_payload["operation_id"] is not None
+    assert failed_payload["effects"] and failed_payload["effects"][-1]["status"] == "unknown"
     monkeypatch.setattr(JournalStore, "update", original_update)
     operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
     assert operation.effects[-1].status == "intent"

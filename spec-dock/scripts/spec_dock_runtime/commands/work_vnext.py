@@ -6,7 +6,10 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from spec_dock_runtime.application.active_selection import show_active_selection
+from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock_runtime.application.work_lifecycle import (
+    current_work_branch,
     finish_work,
     preview_finish_work,
     preview_start_work,
@@ -37,6 +40,14 @@ class WorkStartData:
     scope_id: str
     branch: str
     selection_changed: bool
+    state_before: str
+    state_after: str
+    selection_before: object
+    selection_after: object
+    branch_before: str | None
+    branch_after: str | None
+    guard: dict[str, object]
+    derived_dirty: bool
 
 
 @dataclass(frozen=True)
@@ -44,12 +55,24 @@ class WorkFinishData:
     scope_id: str
     lifecycle_changed: bool
     selection_changed: bool
+    state_before: str
+    state_after: str
+    selection_before: object
+    selection_after: object
+    branch_before: str | None
+    branch_after: str | None
+    guard: dict[str, object]
+    derived_dirty: bool
 
 
 def run_work_start(
     ns: argparse.Namespace, context: WorkContext, *, gateway: GithubIssueGateway
 ) -> OperationResult[WorkStartData]:
     """Run or resume the recorded branch checkout and active selection."""
+    selection_before = show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id)
+    scope_before = show_scope(load_scope_views(context.repo_root / "spec-dock"), ns.target, selection=selection_before)
+    branch_before = current_work_branch(context.repo_root)
+    guard = {"ready": True, "source": ns.source, "allow_stale": ns.allow_stale, "offline": ns.offline}
     if ns.dry_run:
         if ns.resume is not None:
             raise ValueError("work start recovery cannot be previewed as a new request")
@@ -71,7 +94,19 @@ def run_work_start(
         return OperationResult(
             command="work start",
             status="planned",
-            data=WorkStartData(preview.target_id, preview.branch, preview.selection_changed),
+            data=WorkStartData(
+                preview.target_id,
+                preview.branch,
+                preview.selection_changed,
+                scope_before.status.state,
+                scope_before.status.state,
+                selection_before,
+                preview.selection_after,
+                branch_before,
+                preview.branch,
+                guard,
+                False,
+            ),
             exit_code=0,
             effects=(
                 Effect("branch", "planned", preview.branch),
@@ -89,9 +124,17 @@ def run_work_start(
         "lock_timeout": ns.lock_timeout,
     }
     if ns.resume is not None:
-        if ns.base is not None or ns.branch is not None or ns.switch_active or ns.allow_stale:
+        if ns.base is not None or ns.branch is not None:
             raise ValueError("work start recovery cannot change the recorded request")
-        outcome = resume_start_work(operation_id=ns.resume, expected_scope_id=ns.target, **common)
+        outcome = resume_start_work(
+            operation_id=ns.resume,
+            expected_scope_id=ns.target,
+            expected_source=ns.source,
+            expected_allow_stale=ns.allow_stale,
+            expected_offline=ns.offline,
+            expected_switch_active=ns.switch_active,
+            **common,
+        )
     else:
         outcome = start_work(
             target=ns.target,
@@ -106,7 +149,19 @@ def run_work_start(
     return OperationResult(
         command="work start",
         status="succeeded",
-        data=WorkStartData(outcome.target_id, outcome.branch, outcome.selection_changed),
+        data=WorkStartData(
+            outcome.target_id,
+            outcome.branch,
+            outcome.selection_changed,
+            scope_before.status.state,
+            show_scope(load_scope_views(context.repo_root / "spec-dock"), outcome.target_id).status.state,
+            selection_before,
+            show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id),
+            branch_before,
+            current_work_branch(context.repo_root),
+            guard,
+            False,
+        ),
         exit_code=0,
         operation_id=outcome.operation_id,
         effects=(
@@ -121,6 +176,10 @@ def run_work_finish(
     ns: argparse.Namespace, context: WorkContext, *, gateway: GithubIssueGateway
 ) -> OperationResult[WorkFinishData]:
     """Finish a selected Issue, Epic, or Initiative and clear its selection chain."""
+    selection_before = show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id)
+    scope_before = show_scope(load_scope_views(context.repo_root / "spec-dock"), ns.target, selection=selection_before)
+    branch_before = current_work_branch(context.repo_root)
+    guard = {"target_state": scope_before.status.state, "backend": "github" if scope_before.github_ref else "local"}
     if ns.dry_run:
         if ns.resume is not None:
             raise ValueError("work finish recovery cannot be previewed as a new request")
@@ -137,7 +196,19 @@ def run_work_finish(
         return OperationResult(
             command="work finish",
             status="planned",
-            data=WorkFinishData(preview.target_id, preview.completion.changed, selection_changed),
+            data=WorkFinishData(
+                preview.target_id,
+                preview.completion.changed,
+                selection_changed,
+                scope_before.status.state,
+                "completed" if preview.completion.changed else scope_before.status.state,
+                selection_before,
+                preview.selection_after,
+                branch_before,
+                branch_before,
+                guard,
+                preview.completion.changed,
+            ),
             exit_code=0,
             effects=(
                 Effect("lifecycle", "planned", preview.target_id),
@@ -167,7 +238,21 @@ def run_work_finish(
     return OperationResult(
         command="work finish",
         status="succeeded" if changed else "unchanged",
-        data=WorkFinishData(outcome.target_id, outcome.completion_changed, outcome.selection_changed),
+        data=WorkFinishData(
+            outcome.target_id,
+            outcome.completion_changed,
+            outcome.selection_changed,
+            scope_before.status.state,
+            "completed"
+            if outcome.completion_changed
+            else show_scope(load_scope_views(context.repo_root / "spec-dock"), outcome.target_id).status.state,
+            selection_before,
+            show_active_selection(repo_root=context.repo_root, worktree_id=context.worktree_id),
+            branch_before,
+            current_work_branch(context.repo_root),
+            guard,
+            outcome.completion_changed,
+        ),
         exit_code=0,
         operation_id=outcome.operation_id,
         effects=(

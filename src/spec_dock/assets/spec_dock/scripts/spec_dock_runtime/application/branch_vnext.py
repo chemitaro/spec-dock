@@ -19,7 +19,7 @@ from spec_dock_runtime.domain.branch_binding import BranchBinding
 from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock_runtime.infra.active_store import load_selection_v3
 from spec_dock_runtime.infra.control_store import load_control
-from spec_dock_runtime.infra.git_cli import worktree_list
+from spec_dock_runtime.infra.git_cli import sanitized_git_environment, worktree_list
 from spec_dock_runtime.infra.json_store import read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
 from spec_dock_runtime.infra.registry_store import RegistryStore
@@ -35,7 +35,13 @@ if TYPE_CHECKING:
 def _git(repo_root: Path, *arguments: str, timeout: float = 30.0) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
-            ["git", *arguments], cwd=repo_root, capture_output=True, text=True, check=False, timeout=timeout
+            ["git", *arguments],
+            cwd=repo_root,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=timeout,
+            env=sanitized_git_environment(),
         )
     except (OSError, subprocess.TimeoutExpired) as error:
         raise RuntimeError("Git operation could not be observed") from error

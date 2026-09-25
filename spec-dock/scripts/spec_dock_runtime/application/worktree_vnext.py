@@ -189,6 +189,7 @@ def _branch_exists(repo_root: Path, branch: str) -> bool:
     observed = subprocess.run(
         ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{branch}"],
         cwd=repo_root,
+        env=git_cli.sanitized_git_environment(),
         capture_output=True,
         check=False,
         timeout=30,
@@ -428,7 +429,11 @@ def create_worktree(
         path = container / f"{container.name}-{stable_id}"
         if (
             subprocess.run(
-                ["git", "check-ref-format", "--branch", branch], cwd=repo_root, capture_output=True, check=False
+                ["git", "check-ref-format", "--branch", branch],
+                cwd=repo_root,
+                env=git_cli.sanitized_git_environment(),
+                capture_output=True,
+                check=False,
             ).returncode
             != 0
         ):
@@ -504,6 +509,7 @@ def _target_payload_state(path: Path) -> tuple[bool, bool, bool]:
     observed = subprocess.run(
         ["git", "status", "--porcelain=v1", "-z", "--ignored=matching", "--untracked-files=all"],
         cwd=path,
+        env=git_cli.sanitized_git_environment(),
         capture_output=True,
         check=False,
         timeout=30,
@@ -528,7 +534,14 @@ def _target_payload_state(path: Path) -> tuple[bool, bool, bool]:
 
 
 def _discard_ignored_payload(path: Path) -> None:
-    cleaned = subprocess.run(["git", "clean", "-fdX", "--"], cwd=path, capture_output=True, check=False, timeout=60)
+    cleaned = subprocess.run(
+        ["git", "clean", "-fdX", "--"],
+        cwd=path,
+        env=git_cli.sanitized_git_environment(),
+        capture_output=True,
+        check=False,
+        timeout=60,
+    )
     if cleaned.returncode != 0:
         raise RuntimeError("ignored payload cleanup failed; inspect the target before retrying")
 
@@ -603,6 +616,7 @@ def remove_worktree(
                 unlocked = subprocess.run(
                     ["git", "worktree", "unlock", str(path)],
                     cwd=repo_root,
+                    env=git_cli.sanitized_git_environment(),
                     capture_output=True,
                     check=False,
                     timeout=30,

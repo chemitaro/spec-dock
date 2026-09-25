@@ -131,6 +131,7 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
         and namespace.target is not None
     ):
         effective_argv = ("--project", str(project_root), *argv)
+    common: Path | None = None
     if project_root is not None:
         from spec_dock.runtime_loader import git_common_directory
 
@@ -165,6 +166,8 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
         engine_digest=engine.distribution_digest,
         engine_version=__version__,
         engine_pin=engine,
+        preflight_root=project_root,
+        preflight_common=common,
     )
     if output.stdout:
         sys.stdout.write(output.stdout)

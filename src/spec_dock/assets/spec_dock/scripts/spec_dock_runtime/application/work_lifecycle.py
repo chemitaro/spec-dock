@@ -95,6 +95,7 @@ class WorkStartPreview:
     branch: str
     branch_creation: bool
     selection_changed: bool
+    selection_after: SelectionState
 
 
 def _ancestry(views: tuple[ScopeView, ...], scope_id: str) -> tuple[str, ...]:
@@ -139,6 +140,14 @@ def _head_state(repo_root: Path) -> tuple[str, str]:
     if branch.returncode != 0:
         raise RuntimeError("current Git branch could not be read")
     return branch.stdout.strip(), _resolve_commit(repo_root, "HEAD")
+
+
+def current_work_branch(repo_root: Path) -> str | None:
+    """Report the bound worktree branch without exposing Git infrastructure to adapters."""
+    branch = _git(repo_root, "branch", "--show-current")
+    if branch.returncode != 0:
+        raise RuntimeError("current Git branch could not be read")
+    return branch.stdout.strip() or None
 
 
 def _require_clean_start(repo_root: Path) -> None:
@@ -281,7 +290,9 @@ def preview_start_work(
         gateway=gateway,
         switch_active=switch_active,
     )
-    return WorkStartPreview(plan.target_id, branch, binding is None, plan.selection_after != selection)
+    return WorkStartPreview(
+        plan.target_id, branch, binding is None, plan.selection_after != selection, plan.selection_after
+    )
 
 
 def start_work(

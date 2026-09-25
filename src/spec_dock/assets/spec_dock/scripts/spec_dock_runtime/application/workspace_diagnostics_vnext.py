@@ -15,6 +15,7 @@ from spec_dock_runtime.application.scope_query import ScopeView, load_scope_view
 from spec_dock_runtime.infra.active_store import load_selection_v3
 from spec_dock_runtime.infra.control_store import WORKSPACE_SCHEMA, WRITER_PROTOCOL, load_control
 from spec_dock_runtime.infra.generation_store import load_generation
+from spec_dock_runtime.infra.git_cli import sanitized_git_environment
 from spec_dock_runtime.infra.github_capability_cli import GitHubCapabilityCliGateway
 from spec_dock_runtime.infra.json_store import read_guarded_json
 from spec_dock_runtime.infra.operation_journal import JournalStore
@@ -193,6 +194,7 @@ def _inspect_branch(repo_root: Path, common_dir: Path, findings: list[WorkspaceF
         completed = subprocess.run(
             ["git", "symbolic-ref", "--quiet", "--short", "HEAD"],
             cwd=repo_root,
+            env=sanitized_git_environment(),
             capture_output=True,
             text=True,
             check=False,

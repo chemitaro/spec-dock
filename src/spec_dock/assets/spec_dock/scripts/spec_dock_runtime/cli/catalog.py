@@ -312,6 +312,95 @@ _CONFIRMATION_LEAVES = frozenset({
 })
 
 
+def requires_confirmation(leaf: str, *, backend: str | None = None, on_conflict: str | None = None) -> bool:
+    return (
+        leaf in _CONFIRMATION_LEAVES
+        or (leaf.startswith("scope create ") and backend == "github")
+        or (leaf == "workbench copy" and on_conflict == "overwrite")
+    )
+
+
+_READS_BY_ROOT = {
+    "scope": "Scope metadata, hierarchy, cached state, and active selection; GitHub only for the named remote operation.",
+    "active": "This worktree's active selection and the local Scope hierarchy.",
+    "work": "Scope hierarchy and descendants, active selection, canonical branch, Git HEAD, and dependency status.",
+    "branch": "Canonical branch registry, Git refs, and worktree branch ownership.",
+    "dependency": "Declared Scope edges, inherited prerequisites, and status observations.",
+    "artifact": "The selected Scope's Artifact catalog and safe file metadata.",
+    "worktree": "Git worktree registration, target path, branch, HEAD, and control state.",
+    "workbench": "Source and destination worktree bindings, Scope identity, and Workbench entry types.",
+    "workspace": "Workspace schema, Scope data, derived generation, control, and pending records.",
+    "installation": "Pinned engine, control record, managed asset inventory, and the selected Git worktree group.",
+}
+
+_DOES_NOT_BY_ROOT = {
+    "scope": "Does not update other Scopes, change active selection, or implicitly switch branches.",
+    "active": "Does not change lifecycle, dependencies, Git branch, or GitHub state.",
+    "work": "Does not commit, push, merge, or delete the canonical branch.",
+    "branch": "Does not change Scope lifecycle or active selection.",
+    "dependency": "Does not close a prerequisite or change GitHub issue state.",
+    "artifact": "Does not print Artifact contents, source file hash, or external source path.",
+    "worktree": "Does not mutate an independent repository or implicitly run project bootstrap.",
+    "workbench": "Does not copy the root Workbench or start automatic synchronization.",
+    "workspace": "Does not silently repair primary Scope data or active selection.",
+    "installation": "Does not update any independent repository outside the selected Git common directory.",
+}
+
+_JSON_DATA_BY_ROOT = {
+    "scope": "Scope identity, backend, status, revision, and snapshot or list filters.",
+    "active": "Focus, ancestor chain, source, revision, and before/after selection on changes.",
+    "work": "Target, before/after state, selection, branch, readiness guards, and derived state.",
+    "branch": "Canonical name, base commit, ownership, and registry revision.",
+    "dependency": "Declared/effective edges, readiness, blockers, and status provenance.",
+    "artifact": "Artifact ID, owning Scope, relative path, creation type, and observed authority.",
+    "worktree": "Worktree ID, path, HEAD, branch, registration, blockers, and operation outcome.",
+    "workbench": "Source/destination worktree IDs, Scope, conflict policy, and mutation state.",
+    "workspace": "Snapshot, generation, validity, findings, status source, and pending recovery.",
+    "installation": "Inventory, schema/protocol, engine digest, phase, backups, and journal IDs.",
+}
+
+
+def _example(leaf: str) -> str:
+    if leaf == "help":
+        return "spec-dock help work start"
+    if leaf == "completion":
+        return "spec-dock completion zsh"
+    words = ["spec-dock", *leaf.split()]
+    placeholders = {
+        "target": "<scope-id>",
+        "github_ref": "gh:OWNER/REPO#NUMBER",
+        "path": "<path>",
+        "worktree_ref": "<worktree-id>",
+        "artifact_id": "<artifact-id>",
+        "--backend": "local",
+        "--title": "'Example title'",
+        "--parent": "<parent-id>",
+        "--from": "<from-scope-id>",
+        "--to": "<to-scope-id>",
+        "--scope": "<scope-id>",
+        "--type": "blank",
+        "--base": "HEAD",
+        "--to-worktree": "<worktree-id>",
+        "--to-schema": "3",
+    }
+    for argument in LEAF_ARGUMENTS[leaf]:
+        name = argument.names[0]
+        if not name.startswith("-"):
+            if argument.options.get("nargs") != "?":
+                words.append(placeholders.get(name, f"<{name}>"))
+            elif name == "target" and leaf == "active set":
+                words.append("<scope-id>")
+        elif argument.options.get("required"):
+            words.extend((name, placeholders.get(name, f"<{name.lstrip('-')}>")))
+    if leaf in {"work start", "branch create", "worktree create"}:
+        words.extend(("--base", "HEAD"))
+    if leaf == "active clear":
+        words.append("--all")
+    if leaf == "installation update":
+        words.extend(("--commit", "<fixed-commit-sha>"))
+    return " ".join(words)
+
+
 def _help_spec(leaf: str) -> HelpSpec:
     arguments = {name for argument in LEAF_ARGUMENTS[leaf] for name in argument.names}
     if leaf.startswith(("scope create", "scope import")):
@@ -330,21 +419,21 @@ def _help_spec(leaf: str) -> HelpSpec:
         target = "This worktree's active Scope selection."
     else:
         target = "The current project or the selectors shown in the usage line."
-    reads = (
-        "CLI catalog and arguments only."
-        if leaf in {"help", "completion"}
-        else "Selected project identity, Scope snapshot, and operation guards as applicable."
-    )
+    root = leaf.split()[0]
+    reads = "CLI catalog and arguments only." if leaf in {"help", "completion"} else _READS_BY_ROOT[root]
     writes = HELP_EFFECTS[leaf] if leaf in MUTATING_LEAF_PATHS else "None; this command only reads."
-    does_not = (
-        "Does not implicitly update independent repositories or consumers."
-        if leaf.startswith("installation ")
-        else "Does not bypass target guards or perform an implicit installation update."
-    )
+    does_not = "Does not read or write project data." if leaf in {"help", "completion"} else _DOES_NOT_BY_ROOT[root]
+    if leaf == "scope delete":
+        does_not = (
+            "Does not delete GitHub Issues or Git branches; only the explicitly authorized local subtree is removed."
+        )
+    elif leaf == "workspace migrate":
+        does_not = "Does not migrate independent repositories outside the selected Git common directory."
+    required = [arg.names[0] for arg in LEAF_ARGUMENTS[leaf] if arg.options.get("required")]
     preconditions = (
         "No project is required."
         if leaf in {"help", "completion"}
-        else "Resolve the displayed target and satisfy the command's required arguments and state guards."
+        else f"Resolve the target in the selected project; required inputs: {', '.join(required) or 'positional target/state guards'}."
     )
     if leaf.startswith("scope create"):
         confirmation = "GitHub creation requires confirmation; local creation does not."
@@ -363,8 +452,11 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not=does_not,
         preconditions=preconditions,
         confirmation=confirmation,
-        json="--json returns one specdock.cli/v1 envelope with target, data, effects, and recovery.",
-        examples=f"spec-dock {leaf} --help",
+        json=(
+            "--json returns one specdock.cli/v1 envelope. Data: "
+            + ("help text or shell script." if leaf in {"help", "completion"} else _JSON_DATA_BY_ROOT[root])
+        ),
+        examples=_example(leaf),
     )
 
 

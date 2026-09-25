@@ -20,7 +20,11 @@ ID: "iss-00409"
 
 ## Verification
 
-固定candidateのwheelと隔離engineを構築し、複数worktree・consumer fixtureで更新・移行を検証しました。実導入先への適用は実行していません。最終品質ゲートと必須テストの結果、検証したSHA、終了コードは完了時に追記します。
+製品sourceの前回候補 `3057e4f8a619070f868f96f31e7fb3f86084143e` では、固定wheelと隔離engineの検査に成功しました。同SHAの Final Quality Gate Strict v2 はP1が11件で未通過、必須の `uv run pytest` も配布元とdogfooding側の差分により未通過でした。これらを最終候補の成功証拠には流用しません。
+
+2026-09-25の修正作業では `make lint` と `git diff --check` が終了コード0、全テストの初回実行は `2047 passed, 6 failed, 25 skipped`（終了コード1）でした。失敗5件はGit helperの子プロセス環境で `PYTHONDONTWRITEBYTECODE` を落としたこと、1件は旧 `--to` 文面を期待するテストが原因です。該当6件の修正後の再実行は `6 passed`（終了コード0）、続く全テストは `2053 passed, 25 skipped`（終了コード0、926.73秒）でした。配布元とこのworktreeの写しのbyte一致テストも通過しました。これらは未コミット作業ツリーの結果であり、固定SHAに紐付く認証結果ではありません。
+
+修正中、実Git管理領域 `/Volumes/990p2t/workspace/tools/spec-dock/.git/worktrees/spec-dock4/index.lock` の作成が `Operation not permitted` となり、Git書込みを一旦停止しました。lockの消失と実Git経路を読み取り専用で確認した後、許可済みの通常 `git add` を権限付きで実行し、stageに成功しました。上記の全テストはstage前の同じ作業ツリーの結果です。本レポート作成時点で、固定SHAでの全テスト、wheel構築、同じChatGPTセッションの最終再レビューは未実施であり、後続の品質ゲート証跡にSHA・コマンド・終了コード・配布物ダイジェストを固定します。実導入先への適用は実行していません。
 
 ## Residual Risks / Follow-ups
 

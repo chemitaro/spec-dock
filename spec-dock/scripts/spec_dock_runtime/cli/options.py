@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from spec_dock_runtime.cli.catalog import (
     HELP_EFFECTS,
+    HELP_SPECS,
     LEAF_ARGUMENTS,
     LEAF_PATHS,
     MUTATING_LEAF_PATHS,
@@ -97,7 +98,20 @@ def build_vnext_parser() -> argparse.ArgumentParser:
         parents[parts].set_defaults(command_path=leaf)
         for argument in LEAF_ARGUMENTS[leaf]:
             parents[parts].add_argument(*argument.names, **argument.options)
-        parents[parts].epilog = f"Effects:\n  {HELP_EFFECTS[leaf]}\n\nRecovery:\n  {_recovery_help(leaf)}"
+        help_spec = HELP_SPECS[leaf]
+        sections = (
+            ("Target", help_spec.target),
+            ("Reads", help_spec.reads),
+            ("Writes", help_spec.writes),
+            ("Does not", help_spec.does_not),
+            ("Preconditions", help_spec.preconditions),
+            ("Confirmation", help_spec.confirmation),
+            ("Effects", HELP_EFFECTS[leaf]),
+            ("Recovery", _recovery_help(leaf)),
+            ("JSON", help_spec.json),
+            ("Examples", help_spec.examples),
+        )
+        parents[parts].epilog = "\n\n".join(f"{label}:\n  {value}" for label, value in sections)
     return parser
 
 
@@ -232,10 +246,10 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         elif parsed.finalize:
             if parsed.version or parsed.commit or parsed.maintenance or parsed.rollback:
                 parser.error("installation update --finalize accepts no source, maintenance, or rollback")
-        elif (parsed.rollback and (parsed.version or parsed.commit)) or (
+        elif (parsed.rollback and parsed.version and parsed.commit) or (
             not parsed.rollback and bool(parsed.version) == bool(parsed.commit)
         ):
-            parser.error("installation update requires one source for update/resume and no source for rollback")
+            parser.error("installation update requires one source for update/resume and at most one pin for rollback")
     resume = getattr(parsed, "resume", None)
     rollback = getattr(parsed, "rollback", None)
     if resume and rollback:
