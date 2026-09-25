@@ -13,31 +13,31 @@ ID: "iss-00409"
 実装調査基準Commit: "eeb3e5965f0cb42de9a24081bfaea15e27fd4451"
 ---
 
-# SpecDock CLI 案Bの全面採用と安全な一括切替 — 実装計画
+# SpecDock CLI 案Bの全面採用と導入先ごとの安全な更新 — 実装計画
 
-本書は[Requirement](requirement.md)と[Design](design.md)の実装・検証・一括切替の順序を示す完成原稿です。実装コードや試験結果ではありません。実装stepは未実行です。Issue #409 と親 Epic #356 を確定し、この三文書を正本に採用しました。
+本書は[Requirement](requirement.md)と[Design](design.md)の実装・検証、および後日の導入先ごとの更新手順を示します。実施済みの検証結果はReportに記録します。Issue #409 と親 Epic #356 の正本です。
 
 想定実装担当は利用者指定の **GPT-6 Sol / High** です。各stepは一つずつ完了・検証してから次へ進められる粒度にします。ただし、authoring規約に従い、この計画の完成条件やruntimeを特定providerの機能・subagent構成に依存させません。
 
 ## Planning Level
 
-**selected level: critical** とします。理由は変更量ではなく、GitHubの不可逆に近い状態変更、ローカル削除、任意consumer hook、供給元からの更新、全worktree/consumerへ跨るデータ移行を含み、誤対象・部分成功・旧writer混在時の回復が難しいためです。
+**selected level: critical** とします。理由は変更量ではなく、GitHubの不可逆に近い状態変更、ローカル削除、任意consumer hook、供給元からの更新、同じGit common directoryの全worktreeへ跨るデータ移行を含み、誤対象・部分成功・旧writer混在時の回復が難しいためです。
 
 risk factorは、失われる可能性のある仕様/証跡/ignored payload、remoteとlocalの非atomic性、権限/path差替え、実行中runtimeの置換、data schemaとwriter protocolの不一致です。critical Completion Guideのbackup/restore、kill switch、incident response、negative testを省略しません。levelはこの本文だけの文書上の選択であり、metadata、active manifest、runtime admissionへ複製しません。
 
 再評価条件は、新しいexternal providerの追加、破壊的対象の拡大、local/GitHub authorityの変更、未登録consumerの発見、復元不能なbackup、旧writerを停止できない状況です。この場合は該当stepを停止し、Requirement/Designの変更要否を明示して判断します。Plan内だけで仕様を変更しません。
 
-Guideのstaged rolloutは「一回のmaintenance内の検証・適用順」として実現します。公開版の複数releaseや長期移行期間は設けません。
+Guideのstaged rolloutは「選んだGit common directoryのmaintenance内の検証・適用順」として実現します。別の導入先は所有者が後日更新します。公開版の複数releaseや長期移行期間は設けません。
 
 ## 目標
 
-完成時の振る舞いはRequirement AC-01〜AC-32、具体契約はDesign D-01〜D-24を正とします。本書では再定義しません。成果は、全44新leaf、旧28leafの安全な切替、保全可能なschema migration/installer recovery、更新済みdocs/skillsと一括切替証跡です。
+完成時の振る舞いはRequirement AC-01〜AC-32、具体契約はDesign D-01〜D-24を正とします。本書では再定義しません。成果は、全44新leaf、旧28leafの安全な切替、保全可能なschema migration/installer recovery、更新済みdocs/skillsと製品側の検証証跡です。他の稼働中worktreeとconsumerへの実適用はIssue完了条件に含めません。
 
 実装中は、原則として各stepで「失敗するテスト→最小実装→回帰→小さいcommit」を行います。すべてを先にリファクタしてから最後に挙動を合わせる方式は採りません。仮実装でremote mutationを通す、未実装commandをsuccess/no-opと偽る、テストを一括skipすることを禁止します。
 
 ## 順序・依存
 
-### 一つの調整された作業としての区分
+### 製品実装と後日の導入作業の区分
 
 | 区分 | step | 次へ進む条件 |
 |---|---|---|
@@ -47,11 +47,11 @@ Guideのstaged rolloutは「一回のmaintenance内の検証・適用順」と�
 | 周辺操作 | T21〜T27 | Artifact/Worktree/Workbench/生成/診断の副作用境界を確認します。 |
 | 導入・移行 | T28〜T30 | supply pin、journal、backup/restore、全worktree移行をfixtureで検証します。 |
 | 文書・全体統合 | T31〜T32 | full regressionと配布物を確認します。 |
-| 一括切替・引渡し | T33〜T35 | 全対象を停止し、同じcandidateへ切り替えてから一括再開します。 |
+| 製品引渡し・後日更新 | T33〜T35 | 固定candidateと実装検証を引き渡し、選んだ導入先を後日更新する手順を残します。 |
 
-T番号の順に実施すれば依存は満たされます。T09〜T12のScope基礎、T13〜T16の選択/依存/branch、T21のArtifactは基盤完成後に並行検討できますが、同じfileへの並行編集は避けます。T17/T19は統合点、T32は全面検証の合流点です。
+製品実装はT33までの順に進め、T35で引き渡します。T34だけはIssue完了後に対象導入先を選んだ時の実適用です。T09〜T12のScope基礎、T13〜T16の選択/依存/branch、T21のArtifactは基盤完成後に並行検討できますが、同じfileへの並行編集は避けます。T17/T19は統合点、T32は全面検証の合流点です。
 
-必要な補助Issueは、この一つのcutoverの内部作業を分担するためだけに使います。補助Issueの実在IDは後で採録し、T番号を架空のIssueとして登録済み扱いしません。親Epic/Initiativeの目的をこのPlanで変更しません。
+必要な補助Issueがあれば実在IDを採録し、T番号を架空のIssueとして登録済み扱いしません。親Epic/Initiativeの目的をこのPlanで変更しません。
 
 ### 作業単位の読み方
 
@@ -424,37 +424,37 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 | 必要なテスト | make lint、uv run pytest、git diff --check、package buildとisolated install、two consumer fixtureのcutover rehearsal。 |
 | 対応AC | AC-01, AC-22, AC-27, AC-29, AC-32 |
 
-### T33 固定candidateと全対象inventoryの凍結
+### T33 製品candidateの固定と引渡し
 
 | 項目 | 内容 |
 |---|---|
 | 依存 | T32 |
-| 対象file群 | 実在candidate distribution、operatorが確認したprovider/dogfood/consumer/worktree inventory、バックアップ領域。 |
-| 実施内容 | candidate commit/digestと外部engineを固定します。全旧writerの起動源、data path、Git common directory、backup先、rollback担当を採録し、同一maintenance作業の実施を承認します。 |
-| 完了条件 | 未確認consumerがなく、before状態と復元試験が揃い、各対象を一意指定できます。 |
-| 必要なテスト | read-only inventory照合、backupを隔離領域に復元して比較、旧writer停止dry-run、候補engineのdigest一致。 |
+| 対象file群 | 製品source、固定candidate distribution、検証証跡、後日更新runbook。 |
+| 実施内容 | candidate commit/digestと外部engineを固定し、他の導入先には適用せず、後日選んだGit common directoryを更新する手順を引き渡します。 |
+| 完了条件 | 製品source・candidate・試験結果が特定でき、未適用の導入先を適用済みと扱いません。 |
+| 必要なテスト | candidate engineのdigest一致、隔離fixtureでのbackup/restoreと更新・移行rehearsal。 |
 | 対応AC | AC-25, AC-26, AC-30 |
 
-### T34 一回のcoordinated cutover
+### T34 導入先ごとの更新手順（後日実施）
 
 | 項目 | 内容 |
 |---|---|
-| 依存 | T33 |
-| 対象file群 | 承認済みinventoryの全導入先。source本体の設計変更はこのstepでは行いません。 |
-| 実施内容 | 下記cutover手順で停止→backup確定→全bundle更新maintenance→全schema移行→全対象検証→再開を行います。失敗した単位だけ旧writerを再開しません。 |
-| 完了条件 | global inventoryの全項目が同じ固定candidateで受入条件を満たし、pending operationがありません。 |
-| 必要なテスト | 適用先ごとのinstallation show/doctor/validate/sync cache、全worktree protocol、before/after bytes差分、旧入口無変更拒否。 |
+| 依存 | T33。実適用はこのIssueの完了後、所有者が対象を選んだ時に行います。 |
+| 対象file群 | 明示的に選んだGit common directoryの登録済みworktreeだけ。 |
+| 実施内容 | 下記手順でその単位を停止→backup確定→固定bundle更新maintenance→schema移行→検証→再開します。別の導入先は変更しません。 |
+| 完了条件 | 選んだ単位の全項目がready条件を満たし、pending operationがありません。製品Issueの完了判定には実適用を要求しません。 |
+| 必要なテスト | その単位のinstallation show/doctor/validate/sync cache、全登録worktree protocol、before/after bytes差分、旧入口無変更拒否。 |
 | 対応AC | AC-23, AC-25, AC-26, AC-27, AC-30 |
 
-### T35 再開後確認とhandoff
+### T35 製品実装のhandoff
 
 | 項目 | 内容 |
 |---|---|
-| 依存 | T34 |
-| 対象file群 | 選定IssueのReport、検証証跡、inventory/backup/journal retention情報。 |
-| 実施内容 | 新しい通常呼出しだけを再開し、代表的local正常系を隔離fixtureで再確認します。実データはread-only確認を基本とし、実GitHub closeは別途承認なしに実施しません。結果を薄いReportにまとめます。 |
-| 完了条件 | AC matrixに結果が入り、未確認事項・残余リスク・回復境界・所有者が明示されます。正本へ結果日誌を追記しません。 |
-| 必要なテスト | 最終handoff checklist、外部engine/shim照合、pending journalゼロ、旧automationなし、人間によるHTMLの移行説明確認。 |
+| 依存 | T33。T34の実適用は不要です。 |
+| 対象file群 | 選定IssueのReport、検証証跡、後日の導入手順。 |
+| 実施内容 | 代表的local正常系を隔離fixtureで確認し、製品実装の結果と未適用の導入先をReportにまとめます。 |
+| 完了条件 | AC matrixに結果が入り、未確認事項・残余リスク・回復境界が明示されます。正本へ結果日誌を追記しません。 |
+| 必要なテスト | 最終handoff checklist、隔離fixtureのengine/shim照合、HTMLの導入説明確認。 |
 | 対応AC | AC-31, AC-32 |
 
 
@@ -568,22 +568,22 @@ syncは生成物を書き換えるため、read-only確認と区別し、切替�
 
 CLIが `--json` を受けた全ケースで、stdoutをJSON parserへ渡して余分なログがないことを確認します。code 3/4/6/7を期待するnegative testは、exitだけでなくdata/effect/無変更snapshotも検証します。
 
-### V-04 一括切替の実行runbook
+### V-04 導入先ごとの更新runbook
 
-これはT33〜T35の実行順です。すべて一つの調整されたmaintenance作業で行い、区分間に旧writerと新writerを混在運用しません。
+これは製品実装後、所有者が一つのGit common directoryを選んだ時だけ実行するT34の手順です。このIssueの完了時には実行しません。選んだ単位のmaintenance作業中は旧writerと新writerを混在運用しません。
 
 | Gate | 実行内容 | 継続条件 / 停止条件 |
 |---|---|---|
-| G0 対象確定 | provider source、dogfood、全consumerと全worktree、旧起動経路、candidate SHA/digest、backup先、担当をinventory化します。 | 未登録/不明consumerや停止できないwriterがあれば実適用しません。 |
-| G1 停止 | agent/session/task/CI等のSpecDock writerを止めます。外部Git操作も禁止し、全process終了を確認します。 | 新markerだけを根拠に停止済みとしません。 |
+| G0 対象確定 | 選んだGit common directoryの全登録worktree、旧起動経路、candidate SHA/digest、backup先、担当をinventory化します。 | その単位に未登録/不明worktreeや停止できないwriterがあれば実適用しません。別の導入先は対象に含めません。 |
+| G1 停止 | その単位のagent/session/task/CI等のSpecDock writerを止めます。対象worktreeへの外部Git操作も一時停止し、process終了を確認します。 | 新markerだけを根拠に停止済みとしません。 |
 | G2 保全 | current HEAD/refs/index、全仕様/Artifact/Workbench、untracked/ignored、tooling、control/legacy stateをbackupします。復元を隔離領域で検証します。 | hash/permission/symlink metadataを含む復元不一致、容量不足なら停止します。Git bundleだけでuntracked保全済みとはしません。 |
 | G3 外部engine固定 | 検証済みcandidateをcheckout外の環境に配置し、absolute entrypointとdigestを記録します。旧PATH/alias/venvの起動を切替します。 | engine/source/targetの重なり、digest不一致で停止します。 |
-| G4 導入計画 | 各common directoryの全worktreeをinspectionし、update --dry-runで全writeとpreserve pathを確認します。 | custom tooling差分が未退避、unknown path、未対応filesystemなら停止します。 |
-| G5 導入適用 | 各projectで固定commitのupdate --maintenanceを実行します。全作業場をmaintenanceに保ちます。 | 一箇所でも失敗したら全体停止。成功した場所だけ通常運用へ戻しません。 |
+| G4 導入計画 | 選んだcommon directoryの全worktreeをinspectionし、update --dry-runで全writeとpreserve pathを確認します。 | custom tooling差分が未退避、unknown path、未対応filesystemなら停止します。 |
+| G5 導入適用 | 選んだ単位で固定commitのupdate --maintenanceを実行します。その単位の全登録worktreeをmaintenanceに保ちます。 | 一箇所でも失敗したら選んだ単位を停止し、一部だけ通常運用へ戻しません。 |
 | G6 移行計画 | migrate --to-schema 3 --dry-runで変換一覧を確認し、実inventoryからmappingを確定します。 | foreign/曖昧branch/不明schema/stale active未承認は停止します。 |
 | G7 移行適用 | 同じmappingで全登録worktreeへmigrationを適用します。必要なschema/tooling差分は通常commitにまとめます。履歴をrewriteしません。 | 各phase失敗はjournalを保持して停止。旧writerを再開しません。 |
-| G8 全面確認 | V-03のshow/validate/doctor/sync cache、差分照合、旧command無変更拒否、全作業場のepoch/digest一致を確認します。 | pending operation、未確認consumer、仕様bytesの予定外差分があれば再開不可です。 |
-| G9 一括再開 | global inventoryがすべてready条件を満たした後、新しい起動経路だけを再開します。 | remote mutationを再開した時点をrollback境界として記録します。 |
+| G8 対象単位の確認 | V-03のshow/validate/doctor/sync cache、差分照合、旧command無変更拒否、その単位の全登録worktreeのepoch/digest一致を確認します。 | pending operation、未確認worktree、仕様bytesの予定外差分があれば再開不可です。 |
+| G9 対象単位の再開 | 選んだ単位の全登録worktreeがready条件を満たした後、新しい起動経路だけを再開します。 | remote mutationを再開した時点をrollback境界として記録します。 |
 
 適用例は将来の新CLIです。candidate SHAとPROJECTはinventoryの値を使います。基準source SHAを「新実装のcandidate SHA」として流用しません。
 
@@ -603,7 +603,7 @@ CLIが `--json` を受けた全ケースで、stdoutをJSON parserへ渡して�
   --mapping-file "$MIGRATION_MAP" --yes --json
 ```
 
-user専用toolなので、candidateを固定した一つの実装成果から全対象へ適用します。update/migrateが複数repositoryに跨って物理atomicに実行されるとは扱いません。停止状態の維持とglobal inventoryによって部分適用を運用に露出させない方針です。
+candidateは製品実装の固定成果を用います。update/migrateは選んだGit common directoryの全登録worktreeを対象とします。独立したrepositoryには波及せず、後日それぞれで明示更新します。
 
 ## rollback
 
@@ -628,14 +628,14 @@ incidentの記録は、operation ID、固定target、candidate digest、実施�
 
 ### RB-03 Forward recoveryと再開判定
 
-checkpoint以後の操作を固定targetで再開し、remote実施済みeffectを繰り返しません。解決済みID以外の `@current` による再試行を案内しません。再開条件は全inventoryのwriter/schema一致、pending journalの解消、データ差分の承認、再検証の成功です。
+checkpoint以後の操作を固定targetで再開し、remote実施済みeffectを繰り返しません。解決済みID以外の `@current` による再試行を案内しません。再開条件は選んだGit common directoryの全登録worktreeのwriter/schema一致、pending journalの解消、データ差分の承認、再検証の成功です。
 
 backup/journalのpurgeは本切替の完了条件にしません。保持先・権限・必要容量を引き渡し、利用者が別途retentionを判断します。緊急時にも `git clean -fdx`、包括的 `rm -rf`、remote状態の推測修復を実行しません。
 
 ## exit / handoff
 
-完了時にRequirement AC-01〜AC-32へ結果を対応づけます。全44leaf、旧28leaf、安全境界、migration/update recovery、docs/skills、isolated distributionが検証され、全inventoryが固定candidateへ切り替わり、未完了journalがないことが必要です。
+製品実装の完了時にRequirement AC-01〜AC-32へ結果を対応づけます。全44leaf、旧28leaf、安全境界、migration/update recovery、docs/skills、isolated distributionを検証します。他の導入先を固定candidateへ切り替えることは完了条件ではありません。
 
-引渡しには、source/candidate SHAとdistribution digest、実施した検証commandとexit、consumer/worktree別適用状態、実際のbackup/journal配置、復元試験結果、残余リスク、次の管理者、停止/再開時刻を含めます。実施していないremote live-write試験は未実行と明示し、fake gateway試験をlive実行と表現しません。
+引渡しには、source/candidate SHAとdistribution digest、実施した検証commandとexit、未適用の導入先、隔離fixtureでの復元試験結果、残余リスクを含めます。後日の実適用では対象単位のbackup/journal配置、適用状態、停止/再開時刻を記録します。実施していないremote live-write試験は未実行と明示し、fake gateway試験をlive実行と表現しません。
 
 運用値以外の採用方針を再度未決に戻しません。実装が方針に反する必要がある場合はPlanで黙って差し替えず、Requirement/Designへ戻ります。今回の四file原稿には実装Reportを追加せず、将来の実在Issueで結果だけを薄く記録します。

@@ -12,9 +12,9 @@ ID: "iss-00409"
 実装調査基準Commit: "eeb3e5965f0cb42de9a24081bfaea15e27fd4451"
 ---
 
-# SpecDock CLI 案Bの全面採用と安全な一括切替 — 要件定義
+# SpecDock CLI 案Bの全面採用と導入先ごとの安全な更新 — 要件定義
 
-本書は Issue #409 の実装前の正本です。CLI案Bと本依頼に列挙された製品方針は利用者が採用済みです。Issue #409 は Epic #356／Initiative init-local-00003 の下に作成され、`issue start` によりactiveに設定されています。
+本書は Issue #409 の要件正本です。CLI案Bと本依頼に列挙された製品方針は利用者が採用済みです。Issue #409 は Epic #356／Initiative init-local-00003 の下に作成され、旧CLIの `issue start` によりactiveに設定されました。
 
 本書は成果・振る舞い・受入条件の正本です。構造と契約の詳細は[設計書](design.md)、実装順と検証は[実装計画書](plan.md)に分離します。[説明HTML](artifacts/cli-redesign-guide.html)は人間向けの説明資料であり、新たな仕様の決定権を持ちません。
 
@@ -24,7 +24,7 @@ Authoring根拠: `spec-dock/docs/authoring/requirement.md`、`scope-layering.md`
 
 Initiative・Epic・Issueのどの階層でも、利用者と自動実行agentが「何を対象に、どの状態を、どの外部副作用を伴って変更するか」を実行前に理解できるCLIに統一します。作業開始と終了を三階層で対称にし、選択・完了・Git作業場所・ローカル削除を独立して扱えるようにします。
 
-未公開の個人用ツールとして、同一の実装作業と一回の調整された切替で新体系へ移行します。公開版の複数リリースや長期互換期間は設けません。ただし、速度を優先して既存データ、他worktree、導入済みconsumerの安全性を犠牲にしません。
+未公開の個人用ツールとして、このIssueで新体系の製品実装を完成させます。公開版の複数リリースや長期互換期間は設けません。既存の導入先は所有者が必要な時に明示更新し、このIssueの完了のために稼働中の他worktreeやconsumerを変更しません。
 
 関係者の成果は次の三点です。利用者は結果と残る状態を予測できます。実装agentは共通selector・JSON・終了コードを使って対象を取り違えずに実行できます。新規参加者は会話履歴なしで仕様と移行を理解できます。
 
@@ -80,11 +80,11 @@ Syncは生成状態の再構築です。active推定を行わず、既定はcach
 
 未完了journalによる全変更の停止は、固定対象を使う明示的な復旧手順を持つ操作に限定します。その他の変更操作はatomic/CAS/identity検証と操作別の部分失敗診断で扱い、成否が不明な作成・外部効果を自動で再実行して二重適用しません。`workbench copy`と`worktree bootstrap`の任意・部分的な効果は自動rollbackや盲目的な再実行をせず、実施済み範囲を確認してから明示的に再実行します。これらの操作だけを理由に、無関係な変更を復旧不能なjournalで全体停止しません。
 
-### R-07 一括切替とデータ保全
+### R-07 導入先ごとの更新とデータ保全
 
 変更された旧コマンドを新しい副作用へ黙ってaliasしません。副作用を維持できる入口以外は無変更で停止し、新しい入力方法を提示します。全旧28leafの対応を文書と回帰テストで追跡します。
 
-providerの配布元、同repository内のdogfooding workspace、別repositoryの導入済みconsumer、各Git common directoryの全worktreeを区別して棚卸しします。旧writer停止・バックアップ・復元確認・固定bundle配布・schema移行・全作業場確認・再開を一回の切替作業として行います。未確認のwriterを残したまま新データの書込みを開始しません。
+製品のsource変更と、導入先への適用を別の操作として扱います。このIssueでは導入済みconsumerと他worktreeへ更新を適用しません。後日、明示的に選んだGit common directoryごとに登録済みworktreeを棚卸しし、旧writer停止・バックアップ・復元確認・固定bundle配布・schema移行・確認・再開を行います。その整合性単位内で未確認のwriterを残したまま新データの書込みを開始しません。別のGit common directoryの更新完了を待つ必要はありません。
 
 Updateは固定供給元から明示versionまたはcommitを解決し、journalと回復経路を持ちます。Uninstallはツールだけを削除します。移行も更新も既存仕様・Artifact・Workbenchの内容を勝手に正規化・削除しません。
 
@@ -140,19 +140,19 @@ Updateは固定供給元から明示versionまたはcommitを解決し、journal
 | AC-22 | 全44leafでJSON指定時のstdoutが一つのversioned JSON文書です。構文エラー・部分失敗も同じ外枠です。非対話は入力待ちにならず、--jsonは--yesを含意しません。終了コードがDesignと一致します。 |
 | AC-23 | init/update/showで固定distributionと適用対象が表示されます。updateはimmutable commitに固定し、供給元変更・壊れたbundle・path差替えを拒否します。journalの各停止点からresume/rollback可能範囲を判別できます。旧pinから新固定engineへは全登録worktreeの適用後hashとsource archiveを照合し、locator/controlを記録付きで引き継ぎ、停止点から再開または後続変更前の巻戻しができます。maintenanceからreadyへの復帰は全登録worktreeのIDを列挙した記録を先に残し、途中停止後は同じoperation IDで再開できます。 |
 | AC-24 | uninstallはdry-runまたは明示確認の適用です。GitHub/供給元への通信なしでツールのみ除去し、仕様・Artifact・Workbench・回復用backupを保持します。--remove-specsは無変更で拒否します。 |
-| AC-25 | 移行前の全対象がinventoryに載り、全writer停止・backup/restore検証後に一回のcoordinated cutoverを実施できます。全worktreeのwriter protocol/必要schemaが揃うまで通常変更を再開できません。 |
+| AC-25 | 明示的に選んだGit common directoryの全登録worktreeがinventoryに載り、その単位のwriter停止・backup/restore検証後に更新できます。その単位のwriter protocol/必要schemaが揃うまで通常変更を再開できません。別の導入先は変更せず、独立に後日更新できます。 |
 | AC-26 | 三文書・Artifact・Workbench・Git ref・index・未追跡/ignored payloadの保全を検証できます。移行対象外のbytesは同一で、変更するmetadataは差分一覧に限られます。移行だけでGitHub状態は変わりません。 |
 | AC-27 | 全旧28leafについて、効果維持または無変更の説明付き拒否が確認できます。旧delete/finish/sync/uninstall/createの意味を黙って新効果へ置き換えません。全実行入口・skills・automationの呼出しが更新されます。 |
 | AC-28 | 並行writer、current変更競合、checkout後active失敗、remote close後解除失敗、成否不明timeoutで対象と実施済みeffectが保持されます。明示resumeを備えた操作の未完了blocking journalだけが全変更を止め、固定IDと元operationで回復します。その他の部分失敗は同対象の衝突と二重適用を防ぎ、無関係な変更を全体停止しません。 |
 | AC-29 | symlink/hardlink、path traversal、異なるinodeへの差替え、credential付きURL、供給元偽装を無変更または明示partialとして扱います。secret、source本文/hash/byte count、リポジトリ外Artifact source絶対pathを出力しません。 |
-| AC-30 | provider sourceを先に完成させ、dogfoodingと全consumerを同じfixed bundleへ切り替えられます。consumer固有データをproviderの内容で上書きせず、履歴branchから旧writerが戻る経路を棚卸し・停止できます。 |
+| AC-30 | provider sourceを先に完成させ、このIssueでは他worktree・consumerへ配布を適用しません。後日選んだGit common directoryはfixed bundleで更新でき、consumer固有データをproviderの内容で上書きせず、その単位の履歴branchから旧writerが戻る経路を棚卸し・停止できます。 |
 | AC-31 | 人間向けHTMLが単独file・offline・スマートフォンで読めます。旧新対照、用語、状態/副作用、正常/失敗、移行手順があり、外部script/image/CDNに依存しません。 |
-| AC-32 | 実装・切替完了時に受入条件と検証結果、固定bundle、全対象inventory、backup、未解決journal、残余リスクを引き渡せます。未実行テストを実施済みと扱わず、未確認consumerを完了扱いしません。 |
+| AC-32 | 製品実装の完了時に受入条件と検証結果、固定candidate、未適用の導入先と残余リスクを引き渡せます。後日の導入先更新では、その単位のinventory、backup、journalと検証結果を記録します。未実行の適用やテストを実施済みと扱いません。 |
 
 ## 制約・前提
 
 基準SHAはGitHub connectorの指定branch ref取得により今回一致確認済みです。それ以外のbranchは本作業では確認していません。資料に記載するfile pathは基準実装のsource path、または明示的な新設計pathです。実端末のconsumer一覧、worktree一覧、backup先、採用bundleの将来SHAは実施時に採録する値であり、本書では捏造しません。
 
-案Bの採否、local backend、祖先保持、親完了ガード、base必須、固定供給元、一括切替の方針は未決ではありません。実装時に必要なのは切替対象inventory、停止承認、backup保存先、配布candidateの指定です。これらの運用値が欠けても文書の方針を再設計しませんが、実データへの切替は開始しません。
+案Bの採否、local backend、祖先保持、親完了ガード、base必須、固定供給元、導入先ごとの明示更新は決定済みです。後日実データへ適用する時には、そのGit common directoryのinventory、writer停止、backup保存先、配布candidateを確定します。これらが揃わない導入先へは適用しません。
 
 同一Git common directory内のwrite互換性と、独立clone間の業務状態の同期は別です。本作業は前者を保証対象にし、後者を自動実装しません。外部Git操作や利用者自身による旧コード直接実行を完全に封鎖するものではありません。停止・信頼する起動経路・操作時の検証を安全条件として明示します。

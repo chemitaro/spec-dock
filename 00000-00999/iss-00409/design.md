@@ -13,11 +13,11 @@ ID: "iss-00409"
 実装調査基準Commit: "eeb3e5965f0cb42de9a24081bfaea15e27fd4451"
 ---
 
-# SpecDock CLI 案Bの全面採用と安全な一括切替 — 設計
+# SpecDock CLI 案Bの全面採用と導入先ごとの安全な更新 — 設計
 
-本書は[Requirement](requirement.md)を実現する構造・状態・interface・failure contractを固定します。受入条件はRequirementのACを参照し、実装順は[Plan](plan.md)に置きます。本書は Issue #409 の正本であり、親は Epic #356／Initiative init-local-00003 です。ここに現れる新しいfile名・schema・error codeは**実装する将来仕様**であり、現行コードに存在するとの主張ではありません。
+本書は[Requirement](requirement.md)を実現する構造・状態・interface・failure contractを固定します。受入条件はRequirementのACを参照し、実装順は[Plan](plan.md)に置きます。本書は Issue #409 の正本であり、親は Epic #356／Initiative init-local-00003 です。設計時の基準SHAについて述べる節と、新CLIの実装契約を区別します。実装・検証の状態は[Report](report.md)に記録します。
 
-採用済み方針は案Bです。前回答の公開版四段階移行を、今回の依頼に従い一つのcoordinated cutoverへ置換します。細部が未定だったbranch対応の保存先、write admission、状態理由、recovery option、JSON payloadを本書で具体化します。コマンド名は変更せず、`active set`を使用します。
+採用済み方針は案Bです。製品sourceをこのIssueで完成させ、既存導入先は所有者が必要な時にGit common directory単位で明示更新します。細部が未定だったbranch対応の保存先、write admission、状態理由、recovery option、JSON payloadを本書で具体化します。コマンド名は変更せず、`active set`を使用します。
 
 Authoring根拠は添付のDesign GuideとIssue Design templateです。説明HTMLは本書の概念と操作を人間向けに展開する非正本資料です。
 
@@ -95,7 +95,7 @@ CIの新規checkoutには導入controlも作業場固有のactive選択もあり
 | Domain | 階層、selectorの構文型、lifecycle遷移、activeチェーン、依存、branch対応一意性、pure validation | path探索、clock呼出し、JSON I/O、subprocess、network |
 | Infra | guarded store、atomic replace、fsync、lock、Git ref固定、GitHub状態/理由、source pin、subprocess実行 | 隠れたpost-sync、勝手なfallback、暗黙のforce、human prompt |
 | Presentation | 結果のText/JSON/help変換、redaction、安定code、console output | 状態読取り直し、修復、対象再解決、partialを成功へ丸める処理 |
-| 外部installer | 固定bundleのstage/検証/replace、全作業場の導入記録、journal/resume/rollback | 一次仕様の内容変更、schemaの暗黙migrate、未固定供給元実行 |
+| 外部installer | 固定bundleのstage/検証/replace、選んだGit common directoryの全登録worktreeの導入記録、journal/resume/rollback | 一次仕様の内容変更、schemaの暗黙migrate、未固定供給元実行 |
 
 `work start` と `branch create/switch` / `active set` は共通の下位操作を使いますが、CLIの文字列を組み立てて再帰実行しません。`work finish` と `scope close` は共通CompletionPolicyとbackend gatewayを使い、finishだけが選択解除を合成します。
 
@@ -455,7 +455,7 @@ JSON指定時は最初のusage errorを含めstdout一文書です。stderrにpr
 | sync: generation公開前失敗 | 以前のgeneration pointerを維持します。 | same sourceで再実行。失敗したstageを無条件deleteせず所有確認します。 |
 | sync: pointer公開後旧projection失敗 | 新generationを一次の派生読取り先として維持、旧固定名のstaleを表示。 | syncでprojectionを修復。active authorityは変更しません。 |
 | copy / bootstrapの途中 | mutation_startedと実施済み範囲/exitを返します。任意consumer変更はunknownを許します。 | 内容を検査後、明示再実行。汎用rollbackなし。 |
-| update / migrateの途中 | 固定engine、backup、phase、各pathのbefore/after identity、inventory epoch。 | 旧writerを再開せず、resumeまたはwhole-cutover rollback。 |
+| update / migrateの途中 | 固定engine、backup、phase、各pathのbefore/after identity、inventory epoch。 | 選んだGit common directoryの旧writerを再開せず、resumeまたはその単位のrollback。 |
 
 Deleteは実削除前に対象treeを同filesystem内の操作専用quarantineへrenameし、依存/activeのbefore imageとともに保存します。操作完了後もbackupの自動purgeは行いません。利用者からは対象Scopeが消えますが、回復用copyはretention対象です。metadataを壊してからバックアップを取る順にはしません。disk不足や安全な退避ができない場合は削除を開始しません。
 
@@ -559,7 +559,7 @@ package側の旧 `init/update/uninstall` も別にtombstone化します。既存
 
 ### D-20 schema移行と保全規則
 
-migrationは停止中の全登録worktreeを対象とし、個々のcheckoutのmetadataを変換します。過去のGit commitをrewriteしません。必要なら各稼働branchへ通常commitでschema変更を含めます。これは一回の切替内の複数ローカル更新であり、複数製品releaseではありません。
+migrationは選んだGit common directoryの停止中の全登録worktreeを対象とし、個々のcheckoutのmetadataを変換します。過去のGit commitをrewriteしません。必要なら各稼働branchへ通常commitでschema変更を含めます。別のGit common directoryは変更せず、所有者が後日更新できます。
 
 | 入力データ | 変換 / 保全 |
 |---|---|
@@ -596,33 +596,33 @@ new bundleをstageし、source digest、file type、permission、全write path�
 
 self-updateで削除されるpathにjournalや唯一のbackupを置きません。正常完了後もbackupを自動purgeしません。rollbackはafter digestが一致する所有物だけをbeforeへ戻します。後続の利用者変更があるなら上書きせず停止します。schema migrationを済ませた環境でtoolingだけを旧版へ戻してwriterを再開してはいけません。
 
-`--maintenance`はupdate後もcommon controlをmaintenanceに保つ補助optionです。切替時に全worktreeの導入とschema移行が完了するまで使います。単独の互換更新は、全登録worktreeが互換条件を満たす場合だけreadyへ戻れます。
+`--maintenance`はupdate後もcommon controlをmaintenanceに保つ補助optionです。選んだGit common directoryの全登録worktreeの導入とschema移行が完了するまで使います。単独の互換更新は、その単位の全登録worktreeが互換条件を満たす場合だけreadyへ戻れます。
 
 既存の導入群で新candidateのassetsが実行中の旧engineと異なる場合、`installation update --maintenance` に限りその配布を許します。更新後も旧engine identityのcontrolとpinを保持し、通常writerはmaintenanceで拒否します。新engineのpinへの引継ぎを別の記録付き操作で完了するまではreadyにしません。初回のlegacy導入とmaintenanceを指定しない更新では、candidateと実行中engineのassets一致を引き続き要求します。
 
-引継ぎは新しい固定engineの絶対entrypointから `installation update --activate-engine --from-update UPDATE_ID --yes` を実行します。起動時に旧locatorとcontrolの整合、maintenanceを確認し、旧updateの固定commit archiveと新engineのassets、全登録worktreeのchild journalの適用後hashを照合します。common writer lock内で旧/new engine digest、対象ID、control epoch、元update IDをprepared recordに記録し、locatorをCASで新engineへ替え、controlと全登録engine digestを新世代へ更新してcommitted markerを残します。中断時は同じ新engineから `--activate-engine --resume HANDOVER_ID --yes`、後続の変更がない場合の復旧は `--activate-engine --rollback HANDOVER_ID --yes` を使用します。prepared/rolling-backの間は通常writerを拒否し、旧distributionはrollback用に保持します。引継ぎ後もmaintenanceのままとし、schema移行と全対象照合の後に `--finalize` します。
+引継ぎは新しい固定engineの絶対entrypointから `installation update --activate-engine --from-update UPDATE_ID --yes` を実行します。起動時に旧locatorとcontrolの整合、maintenanceを確認し、旧updateの固定commit archiveと新engineのassets、そのGit common directoryの全登録worktreeのchild journalの適用後hashを照合します。common writer lock内で旧/new engine digest、対象ID、control epoch、元update IDをprepared recordに記録し、locatorをCASで新engineへ替え、controlと全登録engine digestを新世代へ更新してcommitted markerを残します。中断時は同じ新engineから `--activate-engine --resume HANDOVER_ID --yes`、後続の変更がない場合の復旧は `--activate-engine --rollback HANDOVER_ID --yes` を使用します。prepared/rolling-backの間はその単位の通常writerを拒否し、旧distributionはrollback用に保持します。引継ぎ後もmaintenanceのままとし、その単位のschema移行と全対象照合の後に `--finalize` します。
 
-一括切替では `installation update --finalize` を、全登録worktreeのversion・schema・writer protocolの照合後に明示実行します。対象ID・engine digest・control epochをcommon controlへprepared recordとして先に記録し、readyをpublishしてからcommitted markerを書きます。途中停止ではrecordの固定IDを指定した `--finalize --resume` だけが、maintenanceまたはreadyの実状態を再観測して完了できます。未完了record中は通常mutatorを止めます。各common directoryの復帰後もglobal inventoryが揃うまで旧writerを再開しません。
+選んだGit common directoryでは `installation update --finalize` を、全登録worktreeのversion・schema・writer protocolの照合後に明示実行します。対象ID・engine digest・control epochをcommon controlへprepared recordとして先に記録し、readyをpublishしてからcommitted markerを書きます。途中停止ではrecordの固定IDを指定した `--finalize --resume` だけが、maintenanceまたはreadyの実状態を再観測して完了できます。未完了record中はその単位の通常mutatorを止めます。別のGit common directoryの旧writerはこの操作の対象ではありません。
 
 `--commit SHA` から導入した場合、各worktreeのversion記録はengineの表示versionではなくそのSHAです。finalizeは全versionの一致に加え、committed updateと各childの適用後hash、および現engine digestとの一致かcommitted handoverによる引継ぎを確認します。表示versionのみを理由に固定commit導入を拒否しません。
 
 Uninstallは固定engine/manifestからofflineで実行し、同じjournal/backup境界を使います。仕様データを残すので制御backupも残ります。現在実行している外部engineそのものを削除しません。
 
-### D-22 全worktree・dogfood・consumerのcoordinated cutover
+### D-22 導入先ごとの更新境界
 
-1つのGit common directoryを一つの整合性単位とします。別consumer repositoryは別単位ですが、今回の切替では対象inventory全体を同じcandidate bundleに揃えてから通常運用を再開します。どれかが未確認なら全体完了にしません。
+1つのGit common directoryを一つの整合性単位とします。導入先への更新は所有者がその単位を明示的に選んだ時だけ実行します。このIssueでは製品sourceを完成させ、稼働中の他worktreeやconsumerを更新しません。別consumer repositoryの状態は選んだ単位のready判定に影響しません。
 
-inventoryにはproviderのsource checkout、provider内dogfooding設置、全linked worktree、各consumer repositoryと全linked worktree、外部engine/venv、旧CLIを呼ぶagent/task/alias/CI/skillsを含めます。自動探索だけで全consumerを発見できるとはしないため、operator確認を必要にします。現在activeなしという一つの申告を全consumerのactiveなしへ一般化しません。
+更新する単位のinventoryにはそのGit common directoryの全linked worktree、外部engine/venv、旧CLIを呼ぶagent/task/alias/CI/skillsを含めます。自動探索で別consumerまで発見することは要件にしません。一つのworktreeでactiveなしでも、同じ単位の他worktreeの状態を推測しません。
 
 新writerを初めて許可する前に、旧processとautomationを停止します。data/version/controlだけでなくignored/untracked payload・index・refと復元可能性をbackupで確認します。新control markerを置けば古いPythonが従うという設計にはしません。
 
-固定candidateをworktree外から各導入先へstageし、同じcommon directoryではinstallation updateが全登録導入先をmaintenanceにして適用します。次にworkspace migrateがそのcommon directoryの全登録worktreeを検証・変換し、各checkoutのschemaとwriter protocolを揃えます。最後にglobal inventoryの全項目がready条件を満たしたことをoperatorが確認し、通常writerを再開します。
+固定candidateを選んだGit common directoryのworktree外からstageし、installation updateがその単位の全登録導入先をmaintenanceにして適用します。次にworkspace migrateがその単位の全登録worktreeを検証・変換し、各checkoutのschemaとwriter protocolを揃えます。その単位の全項目がready条件を満たしたことを確認して通常writerを再開します。独立した導入先には配布や停止を波及させません。
 
 履歴branchへcheckoutして旧schema/旧runtimeが現れた場合、新外部engineは通常writeを拒否します。read-only調査はraw snapshotを明示して扱い、mutatorへ暗黙migrationしません。履歴内容を新しい稼働branchで使う場合は、停止した作業場で固定bundle再導入・明示schema migration・新しい通常commitによって移行します。過去commitは変更しません。
 
 ### D-23 rollback境界
 
-cutover中に一つでも適用失敗したら、新旧writerを混在再開せず全体を停止します。remote mutationはcutoverで行わないため、backupからtooling・schema・controlを揃えて戻すことができます。ただし、通常運用再開後のGitHub close等はbackupで取り消せません。この境界を越えたら原則forward recoveryです。
+選んだGit common directoryの更新中に一つでも適用失敗したら、その単位の新旧writerを混在再開せず停止します。更新はremote mutationを行わないため、backupからtooling・schema・controlを揃えて戻すことができます。ただし、通常運用再開後のGitHub close等はbackupで取り消せません。この境界を越えたら原則forward recoveryです。
 
 rollback前には全writerを止め、after digest/revisionの一致を確認します。利用者が後から変更したfileやGit refは上書きしません。バックアップを別の隔離場所に復元して比較し、必要な個別復旧を明示します。`git reset --hard` / `git clean -fdx` を包括的な復旧手段として案内しません。
 
@@ -634,7 +634,7 @@ Domainはfilesystemなしで階層・selector・状態遷移・依存を検査�
 
 CLI contract suiteはD-04の44leafとD-19の28旧leafをデータ駆動で列挙し、help/JSON/noninteractive/禁止effectを検証します。JSON schemaとcompletionは同じcatalogを元にsnapshot化します。長いhuman message全体ではなく、code・対象・effect・必須help項目を安定契約にします。
 
-cutover testは複数worktreeと二つ以上の独立consumer fixture、dogfood fixtureを持ちます。旧writer起動試行、部分導入、mixed schema、履歴branch再出現、backup/restore、update各root間でのkill、pending operationのresume/rollbackを検査します。実consumerのremote書込みをテストの代わりに実行しません。
+更新testは複数worktreeと二つ以上の独立consumer fixture、dogfood fixtureを持ちます。選んだ単位だけの更新、旧writer起動試行、部分導入、mixed schema、履歴branch再出現、backup/restore、update各root間でのkill、pending operationのresume/rollbackを検査します。実consumerのremote書込みをテストの代わりに実行しません。
 
 ## risk
 
@@ -649,4 +649,4 @@ cutover testは複数worktreeと二つ以上の独立consumer fixture、dogfood 
 | criticalなbootstrap | 任意project codeです。信頼/承認/ログ分離を行い、offline保証のある単機能操作とは区別します。 |
 | fixed bundleの供給元侵害 | pinとdigestは同一性の保証です。供給元の信頼そのものはoperatorが管理します。 |
 
-製品方針の未決事項はありません。実施時に必要なIssue/parent/consumer inventory/backup先/candidate SHAは運用入力であり、本原稿が架空値で埋める対象ではありません。これらが未記録の状態で実データへcutoverしません。
+製品方針の未決事項はありません。後日選んだGit common directoryを更新する際のinventory/backup先/candidate SHAは運用入力です。これらが未記録の単位へ実データの更新を適用しません。
