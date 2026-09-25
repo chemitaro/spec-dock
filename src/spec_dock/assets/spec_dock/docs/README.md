@@ -30,4 +30,4 @@ spec-dock work finish iss-00123 --yes
 
 ## Historical
 
-[過去版の参照](historical/README.md)と[Historical authoring](authoring/historical.md)は履歴資料です。現在の実行手順には使いません。
+[過去版の参照](historical/README.md)と[Historical authoring](authoring/historical.md)は履歴資料です。Current の新規作成手順ではありません。

@@ -4,6 +4,8 @@
 
 `spec-dock` はworktree外の固定distributionから実行します。repository内の `spec-dock/scripts/spec-dock` はengine locatorを検証して同じ外部engineを起動するshimです。checkoutのPython moduleやPATH上の別実装へ自動fallbackしません。`installation show` で供給元commit、digest、writer protocol、登録済みworktreeを確認します。
 
+review済みwheelを隔離環境へ導入してから、`python -m spec_dock.fixed_bundle /absolute/path/to/fixed-engine` でworktree外の新しい固定engine directoryを作ります。出力された絶対実行pathとdigestをinventoryへ記録し、そのengineから以下の操作を行います。wheelのconsole scriptはhelp/version等の読取り確認用で、repositoryへの変更操作は固定engineの絶対実行pathを使います。
+
 ## 新規導入
 
 ```sh

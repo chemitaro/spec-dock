@@ -26,6 +26,8 @@ spec-dock work finish epic-00124 --yes
 
 新しい配布物はworktree外の固定distributionから実行します。初回導入は `spec-dock installation init PATH --yes`、固定commitへの更新は `spec-dock installation update --target PATH --commit SHA --maintenance --yes` を使います。既存導入先は停止・backup・inventoryを揃え、全登録worktreeを同じwriter protocolへ移行する必要があります。schema変換は `workspace migrate --to-schema 3 --yes` で別に実行します。途中失敗時はjournalのoperation IDを確認し、対象leafの `--resume` または `--rollback` に従います。詳細な手順とガードは[移行ガイド](src/spec_dock/assets/spec_dock/docs/migration.md)にあります。
 
+固定engineはreview済みwheelを隔離環境に導入し、`python -m spec_dock.fixed_bundle /absolute/path/to/fixed-engine` で作ります。変更操作には生成された `bin/spec-dock` の絶対pathを使います。
+
 `SPEC_DOCK_WORKTREE_ROOT` は管理対象linked worktreeの配置先です。使う場合は環境で絶対pathを指定してください。worktree作成には `--base REF` が必要です。
 
 ## 開発
