@@ -249,10 +249,14 @@ def _metadata_paths(root: Path) -> tuple[Path, ...]:
     paths: list[Path] = []
     for current, directories, files in os.walk(tree, followlinks=False):
         current_path = Path(current)
-        if any((current_path / name).is_symlink() for name in (*directories, *files)):
+        directories[:] = [name for name in directories if name != ".workbench"]
+        if any((current_path / name).is_symlink() for name in directories):
             raise ValueError("migration Scope tree contains a symlink")
         if ".meta.json" in files:
-            paths.append(current_path / ".meta.json")
+            metadata = current_path / ".meta.json"
+            if metadata.is_symlink():
+                raise ValueError("migration Scope metadata is a symlink")
+            paths.append(metadata)
     return tuple(sorted(paths))
 
 

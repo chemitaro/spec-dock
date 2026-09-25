@@ -122,6 +122,34 @@ def test_migration_inventory_reads_all_worktrees_and_stays_stable(tmp_path: Path
     )
 
 
+def test_migration_inventory_ignores_non_metadata_file_symlinks(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    rules = repo / "rules.md"
+    rules.write_text("existing guidance\n", encoding="utf-8")
+    (repo / "spec-dock/initiatives/init-local-00001-plan/rules.md").symlink_to(rules)
+
+    inventory = inspect_migration_inventory(repo)
+
+    assert inventory.blockers == ()
+    assert len(inventory.worktrees[0].scopes) == 3
+    assert inventory.worktrees[0].active_focus == "init-local-00001"
+
+
+def test_migration_inventory_does_not_scan_workbench(tmp_path: Path) -> None:
+    repo = _legacy_repo(tmp_path)
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    workbench = repo / "spec-dock/initiatives/init-local-00001-plan/.workbench"
+    workbench.mkdir()
+    (workbench / "external").symlink_to(scratch, target_is_directory=True)
+    (workbench / ".meta.json").write_text("not a Scope", encoding="utf-8")
+
+    inventory = inspect_migration_inventory(repo)
+
+    assert inventory.blockers == ()
+    assert len(inventory.worktrees[0].scopes) == 3
+
+
 def test_migration_inventory_marks_partial_link_and_broken_active(tmp_path: Path) -> None:
     repo = _legacy_repo(tmp_path)
     initiative = repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json"
