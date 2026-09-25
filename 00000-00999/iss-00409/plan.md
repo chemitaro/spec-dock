@@ -386,7 +386,7 @@ T番号の順に実施すれば依存は満たされます。T09〜T12のScope�
 |---|---|
 | 依存 | T06,T07,T28 |
 | 対象file群 | 既存 src/spec_dock/installer.py/cli.py。新設 installation/{executor,journal}.py、commands/installation.py。 |
-| 実施内容 | init/show/update/uninstallを新envelopeへ統一します。六managed rootsとversion/ignore差分、backup/stage/apply/verify、maintenance保持、resume/rollbackを実装します。 |
+| 実施内容 | init/show/update/uninstallを新envelopeへ統一します。六managed rootsとversion/ignore差分、backup/stage/apply/verify、maintenance保持、resume/rollbackを実装します。全対象・schema・engineを照合する `installation update --finalize` と復帰記録のresumeを追加します。 |
 | 完了条件 | self-update中にengine/journalを失わず、consumerデータをtouchしません。全登録作業場の部分適用を隠しません。 |
 | 必要なテスト | 新設 tests/integration/test_installation_journal_vnext.py。各root間kill、disk不足、後続変更rollback拒否、custom ignore保持、uninstall offline/data保全。 |
 | 対応AC | AC-23, AC-24, AC-26 |
