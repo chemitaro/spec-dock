@@ -150,6 +150,7 @@ def plan_migration_changes(
                 raise ValueError("migration Scope backend needs explicit mapping")
             converted = dict(payload)
             converted.update(schema_version=3, revision=0, backend=backend)
+            converted.setdefault("depends_on", [])
             if backend == "local":
                 converted["github"] = None
                 converted["lifecycle"] = {"state": "open", "revision": 0, "updated_at": updated_at}

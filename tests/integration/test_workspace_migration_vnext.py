@@ -308,6 +308,9 @@ def test_migration_applies_registered_worktree_and_keeps_maintenance(tmp_path: P
         updated_at="2026-01-01T00:00:00Z",
     )
     assert result.phase == "committed"
+    for scope in inventory.worktrees[0].scopes:
+        migrated = json.loads((repo / scope.path / ".meta.json").read_text(encoding="utf-8"))
+        assert migrated["depends_on"] == []
     meta = repo / "spec-dock/initiatives/init-local-00001-plan/.meta.json"
     assert json.loads(meta.read_text(encoding="utf-8"))["schema_version"] == 3
     active = repo / "spec-dock/.agent/active.json"
