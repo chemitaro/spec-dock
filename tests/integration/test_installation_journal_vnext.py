@@ -178,6 +178,74 @@ def test_backup_same_content_inode_swap_blocks_rollback(tmp_path: Path) -> None:
     assert version.read_text(encoding="utf-8") == "0.2.4\n"
 
 
+def test_rollback_rechecks_same_inode_content_after_preflight(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+    original_inode = version.stat().st_ino
+
+    def change_after_preflight(_record: InstallationRecord) -> None:
+        version.write_text("bad\n", encoding="utf-8")
+        assert version.stat().st_ino == original_inode
+
+    with pytest.raises(ValueError, match="later changes"):
+        rollback_installation(journal, record.operation_id, enter_maintenance=change_after_preflight)
+    assert version.read_text(encoding="utf-8") == "bad\n"
+    assert read_record(journal, record.operation_id).phase != "rolled-back"
+
+
+def test_rollback_preserves_changed_after_state_before_displacement(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    original_inode = version.stat().st_ino
+
+    def change_after_preflight(_record: InstallationRecord) -> None:
+        version.write_text("9.2.4\n", encoding="utf-8")
+        assert version.stat().st_ino == original_inode
+
+    with pytest.raises(ValueError, match="later changes"):
+        rollback_installation(
+            journal, record.operation_id, enter_maintenance=change_after_preflight, allow_committed=True
+        )
+    assert version.read_text(encoding="utf-8") == "9.2.4\n"
+    assert not (
+        target / ".spec-dock-installations" / record.operation_id / "displaced/spec-dock/spec-dock.version"
+    ).exists()
+    assert read_record(journal, record.operation_id).phase == "committed"
+
+
+def test_rollback_rechecks_backup_content_before_restore(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    backup = target / ".spec-dock-installations" / record.operation_id / "backup/spec-dock/spec-dock.version"
+    original_inode = backup.stat().st_ino
+
+    def change_after_preflight(_record: InstallationRecord) -> None:
+        backup.write_text("bad\n", encoding="utf-8")
+        assert backup.stat().st_ino == original_inode
+
+    with pytest.raises(ValueError, match="backup or target changed"):
+        rollback_installation(
+            journal, record.operation_id, enter_maintenance=change_after_preflight, allow_committed=True
+        )
+    assert backup.read_text(encoding="utf-8") == "bad\n"
+    assert version.read_text(encoding="utf-8") == "0.2.4\n"
+    assert read_record(journal, record.operation_id).phase != "rolled-back"
+
+
 def test_stage_identity_survives_rename_before_completion_record(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

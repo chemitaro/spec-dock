@@ -43,6 +43,7 @@ class InstallationRecord:
     requested_version: str | None = None
     after_identities: dict[str, str | None] | None = None
     identity_schema: int | None = None
+    version_tracked: bool = False
 
 
 def durable_mkdir(directory: Path) -> None:
@@ -105,6 +106,8 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         )
         or (record.error is not None and not isinstance(record.error, str))
         or (record.requested_version is not None and not isinstance(record.requested_version, str))
+        or type(record.version_tracked) is not bool
+        or (record.version_tracked and record.action != "update")
         or record.identity_schema not in (None, 2)
         or not isinstance(record.marker_tracked, bool)
         or any(
@@ -167,6 +170,7 @@ def read_record(journal_root: Path, operation_id: str) -> InstallationRecord:
         record.requested_version,
         record.after_identities,
         record.identity_schema,
+        record.version_tracked,
     )
 
 

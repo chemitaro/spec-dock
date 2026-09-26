@@ -562,6 +562,192 @@ def test_group_resume_preserves_original_version_request(tmp_path: Path, monkeyp
         assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.4\n"
 
 
+def test_commit_origin_resume_ignores_version_alias(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, versioned_bundle = _group_fixture(tmp_path)
+    commit_bundle = replace(versioned_bundle, source=replace(versioned_bundle.source, version=None))
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("marker stop")))
+        with pytest.raises(OSError, match="marker stop"):
+            update_installation_group(
+                repo_root=repo,
+                common_dir=common_dir,
+                worktree_id="main",
+                engine_digest=digest,
+                expected_epoch=epoch,
+                bundle=commit_bundle,
+                keep_maintenance=True,
+            )
+    (group_id,) = pending_installation_groups(common_dir)
+    assert read_group_record(common_dir, group_id).requested_version is None
+    resumed = resume_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=group_id,
+        bundle=versioned_bundle,
+    )
+    assert resumed.phase == "committed"
+    for root in (repo, second):
+        assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == commit_bundle.source.commit + "\n"
+
+
+def test_group_upgrades_planned_child_origin_from_fixed_parent(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    repo, second, common_dir, epoch, digest, versioned_bundle = _group_fixture(tmp_path)
+    commit_bundle = replace(versioned_bundle, source=replace(versioned_bundle.source, version=None))
+    import spec_dock.installation.executor as executor
+
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("marker stop")))
+        with pytest.raises(OSError, match="marker stop"):
+            update_installation_group(
+                repo_root=repo,
+                common_dir=common_dir,
+                worktree_id="main",
+                engine_digest=digest,
+                expected_epoch=epoch,
+                bundle=commit_bundle,
+                keep_maintenance=True,
+            )
+    (group_id,) = pending_installation_groups(common_dir)
+    first = read_group_record(common_dir, group_id).targets[0]
+    assert first.child_operation_id is not None
+    child_root = common_dir / "spec-dock/control/installations" / group_id / "targets" / first.worktree_id
+    journal_file = child_root / "installations" / first.child_operation_id / "record.json"
+    payload = json.loads(journal_file.read_text(encoding="utf-8"))
+    payload.pop("version_tracked")
+    journal_file.write_text(json.dumps(payload) + "\n", encoding="utf-8")
+
+    resumed = resume_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        operation_id=group_id,
+        bundle=versioned_bundle,
+    )
+    assert resumed.phase == "committed"
+    for root in (repo, second):
+        assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == commit_bundle.source.commit + "\n"
+
+
+def test_group_rollback_rechecks_each_child_after_batch_preflight(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
+    group = update_installation_group(
+        repo_root=repo,
+        common_dir=common_dir,
+        worktree_id="main",
+        engine_digest=digest,
+        expected_epoch=epoch,
+        bundle=bundle,
+        keep_maintenance=True,
+    )
+    import spec_dock.installation.executor as executor
+
+    real_preflight = executor.preflight_rollback_installation
+    changed = False
+
+    def change_after_child_preflight(journal_root: Path, operation_id: str, *, allow_committed: bool = False):
+        nonlocal changed
+        record = real_preflight(journal_root, operation_id, allow_committed=allow_committed)
+        if not changed:
+            changed = True
+            version = Path(record.target) / "spec-dock/spec-dock.version"
+            inode = version.stat().st_ino
+            version.write_text("9.2.4\n", encoding="utf-8")
+            assert version.stat().st_ino == inode
+        return record
+
+    monkeypatch.setattr(executor, "preflight_rollback_installation", change_after_child_preflight)
+    with pytest.raises(ValueError, match="later changes"):
+        rollback_installation_group(
+            repo_root=repo,
+            common_dir=common_dir,
+            worktree_id="main",
+            engine_digest=digest,
+            operation_id=group.operation_id,
+        )
+    assert changed
+    assert read_group_record(common_dir, group.operation_id).phase == "recovery-required"
+    assert pending_installation_groups(common_dir) == (group.operation_id,)
+    assert (second / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "9.2.4\n"
+
+
+@pytest.mark.parametrize(
+    ("initial_kind", "resume_kind", "expected_version"),
+    [
+        ("commit", "commit", "sha"),
+        ("commit", "version", "sha"),
+        ("version", "commit", "0.2.4"),
+        ("version", "version", "0.2.4"),
+    ],
+)
+def test_public_update_resume_preserves_source_origin(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    initial_kind: str,
+    resume_kind: str,
+    expected_version: str,
+) -> None:
+    repo, second, common_dir, _epoch, digest, versioned_bundle = _group_fixture(tmp_path)
+    import spec_dock.installation.executor as executor
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    def resolve_source(**kwargs: object):
+        version = "0.2.4" if kwargs.get("version") else None
+        return replace(versioned_bundle.source, version=version)
+
+    monkeypatch.setattr(command_module, "resolve_fixed_source", resolve_source)
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(
+        command_module,
+        "verify_pinned_archive",
+        lambda source, *_args: replace(versioned_bundle, source=source),
+    )
+    monkeypatch.setattr(command_module, "assert_candidate_assets_match_engine", lambda *_args: None)
+    with monkeypatch.context() as patch:
+        patch.setattr(executor.os, "link", lambda *_args, **_kwargs: (_ for _ in ()).throw(OSError("marker stop")))
+        stopped = run_vnext(
+            [
+                "installation",
+                "update",
+                f"--{initial_kind}",
+                versioned_bundle.source.commit if initial_kind == "commit" else "0.2.4",
+                "--maintenance",
+                "--yes",
+                "--json",
+            ],
+            invocation_cwd=repo,
+            engine_digest=digest,
+            engine_version="0.2.4",
+        )
+    assert stopped.exit_code != 0
+    (group_id,) = pending_installation_groups(common_dir)
+    resumed = run_vnext(
+        [
+            "installation",
+            "update",
+            f"--{resume_kind}",
+            versioned_bundle.source.commit if resume_kind == "commit" else "0.2.4",
+            "--resume",
+            group_id,
+            "--yes",
+            "--json",
+        ],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert resumed.exit_code == 0, resumed.stdout
+    label = versioned_bundle.source.commit if expected_version == "sha" else expected_version
+    for root in (repo, second):
+        assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == label + "\n"
+
+
 def test_group_commit_refuses_replaced_marker_after_child_apply(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

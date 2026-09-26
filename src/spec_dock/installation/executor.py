@@ -82,6 +82,15 @@ def _path_identity(path: Path) -> str | None:
     return digest.hexdigest()
 
 
+def _observed_path_state(path: Path) -> tuple[str | None, str | None]:
+    """Read content only while the entry graph remains the same."""
+    identity = _path_identity(path)
+    content = _digest_path(path)
+    if _path_identity(path) != identity or (identity is None) != (content is None):
+        raise ValueError(f"installation path changed during observation: {path}")
+    return identity, content
+
+
 def _planned_snapshot(target: Path, action: str) -> tuple[dict[str, str | None], dict[str, str | None]]:
     hashes: dict[str, str | None] = {}
     identities: dict[str, str | None] = {}
@@ -281,10 +290,13 @@ def prepare_installation(
     bundle: VerifiedBundle | None,
     installed_version: str | None = None,
     operation_id: str | None = None,
+    version_tracked: bool = False,
 ) -> InstallationRecord:
     """Stage and verify every replacement before publishing a recoverable journal."""
     if action not in ("init", "update", "uninstall") or (action == "uninstall") != (bundle is None):
         raise ValueError("installation action and bundle do not match")
+    if version_tracked and action != "update":
+        raise ValueError("only installation update tracks the source version")
     _guard_target(target)
     installed = (target / VERSION_FILE).exists()
     if action == "init" and installed:
@@ -322,6 +334,7 @@ def prepare_installation(
         before_identities=before_identities,
         requested_version=installed_version,
         identity_schema=2,
+        version_tracked=version_tracked,
     )
     write_record(journal_root, record, create=True)
     return _stage_preparation(journal_root, record, bundle)
@@ -378,7 +391,11 @@ def _stage_preparation(
                 after[relative] = before[relative] if relative == IGNORE_FILE else None
             elif relative == VERSION_FILE:
                 assert bundle is not None
-                version = record.requested_version or bundle.source.version or bundle.source.commit
+                version = (
+                    (record.requested_version if record.requested_version is not None else record.source_commit)
+                    if record.version_tracked
+                    else (record.requested_version or bundle.source.version or bundle.source.commit)
+                )
                 if version is None:
                     raise ValueError("installation source has no version identity")
                 staged.parent.mkdir(parents=True, exist_ok=True)
@@ -626,23 +643,35 @@ def rollback_installation(
         assert record.before_identities is not None
         assert record.after_identities is not None
         previous = record.before_identities[relative]
-        current = _path_identity(destination)
-        if current == previous:
+        current = _observed_path_state(destination)
+        before = (previous, record.before_hashes[relative])
+        after = (record.after_identities[relative], record.after_hashes[relative])
+        if current == before:
             continue
-        if current is not None:
+        if current not in (after, (None, None)):
+            raise ValueError(f"installation rollback refuses later changes: {relative}")
+        if previous is not None and _observed_path_state(backup) != before:
+            raise ValueError(f"installation rollback backup or target changed: {relative}")
+        if current[0] is not None:
             displaced = area / "displaced" / relative
             displaced.parent.mkdir(parents=True, exist_ok=True)
             if displaced.exists() or displaced.is_symlink():
                 raise ValueError(f"installation rollback displaced path exists: {relative}")
+            if _observed_path_state(destination) != after:
+                raise ValueError(f"installation rollback refuses later changes: {relative}")
             destination.replace(displaced)
             _sync_directory(destination.parent)
             _sync_directory(displaced.parent)
+            if _observed_path_state(displaced) != after:
+                raise ValueError(f"installation rollback displaced path changed: {relative}")
         if previous is not None:
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if _observed_path_state(backup) != before or _observed_path_state(destination) != (None, None):
+                raise ValueError(f"installation rollback backup or target changed: {relative}")
             backup.replace(destination)
             _sync_directory(destination.parent)
             _sync_directory(backup.parent)
-            if _path_identity(destination) != previous or _digest_path(destination) != record.before_hashes[relative]:
+            if _observed_path_state(destination) != before:
                 raise ValueError(f"installation rollback did not restore before identity: {relative}")
     _verify_marker(record, area)
     record = replace(record, phase="rolled-back", error=None)
@@ -679,15 +708,14 @@ def preflight_rollback_installation(
     assert record.before_identities is not None
     assert record.after_identities is not None
     for relative in _record_paths(record.action):
-        current_identity = _path_identity(target / relative)
-        current = _digest_path(target / relative)
+        current_identity, current = _observed_path_state(target / relative)
         expected_identity = record.after_identities[relative]
         previous_identity = record.before_identities[relative]
         expected = record.after_hashes[relative]
         previous = record.before_hashes[relative]
         backup = area / "backup" / relative
-        backup_identity = _path_identity(backup)
-        if backup_identity is not None and (backup_identity != previous_identity or _digest_path(backup) != previous):
+        backup_identity, backup_content = _observed_path_state(backup)
+        if backup_identity is not None and (backup_identity != previous_identity or backup_content != previous):
             raise ValueError(f"installation rollback backup changed identity: {relative}")
         if previous_identity is None and backup_identity is not None:
             raise ValueError(f"installation rollback has unexpected backup: {relative}")

@@ -28,7 +28,7 @@ from spec_dock.installation.group_journal import (
     read_group_record,
     write_group_record,
 )
-from spec_dock.installation.journal import InstallationRecord, read_record
+from spec_dock.installation.journal import InstallationRecord, read_record, write_record
 from spec_dock.installation.source import assert_disjoint_source_target, verify_bundle_integrity
 from spec_dock.runtime_loader import EnginePin, VerifiedEngine, verify_engine_pin, write_engine_pin
 from spec_dock_runtime.application.engine_handover_vnext import verify_source_update
@@ -362,6 +362,20 @@ def _stage_missing(
         if os.path.lexists(journal_path):
             child = read_record(journal_root, target.child_operation_id)
             if child.phase == "planned":
+                if record.version_tracked and not child.version_tracked:
+                    if (
+                        child.target != target.root
+                        or child.action != record.action
+                        or child.source_commit != record.source_commit
+                        or child.source_digest != record.source_digest
+                        or child.requested_version != record.requested_version
+                        or not child.marker_tracked
+                        or child.identity_schema != 2
+                        or child.before_identities is None
+                    ):
+                        raise ValueError("planned installation child lacks fixed source-origin proof")
+                    child = replace(child, version_tracked=True)
+                    write_record(journal_root, child)
                 child = resume_preparation(journal_root, target.child_operation_id, bundle=bundle)
         else:
             if recover_stage:
@@ -373,6 +387,7 @@ def _stage_missing(
                 bundle=bundle,
                 installed_version=record.requested_version,
                 operation_id=target.child_operation_id,
+                version_tracked=record.version_tracked,
             )
         if (
             child.target != target.root
@@ -380,6 +395,7 @@ def _stage_missing(
             or child.source_commit != record.source_commit
             or child.source_digest != record.source_digest
             or (record.version_tracked and child.requested_version != record.requested_version)
+            or (record.version_tracked and not child.version_tracked)
         ):
             raise ValueError("installation child record differs from the fixed group")
     staged = replace(record, phase="staged", error=None)
@@ -400,6 +416,7 @@ def _apply_children(common_dir: Path, record: InstallationGroupRecord) -> Instal
             or child.source_commit != record.source_commit
             or child.source_digest != record.source_digest
             or (record.version_tracked and child.requested_version != record.requested_version)
+            or (record.version_tracked and not child.version_tracked)
         ):
             raise ValueError("installation child record differs from the fixed group")
         if child.phase != "committed":
