@@ -139,7 +139,7 @@ def _verify_finalization_targets(
     if not group.worktrees or len(versions) != 1:
         raise ValueError("registered worktree installation versions differ from the executing engine")
     (version,) = versions
-    if version != engine_version and (
+    if version not in (engine_version, f"v{engine_version}") and (
         version is None
         or re.fullmatch(r"[0-9a-f]{40}", version) is None
         or not _commit_update_matches_engine(

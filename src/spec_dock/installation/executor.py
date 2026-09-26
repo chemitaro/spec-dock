@@ -646,6 +646,10 @@ def rollback_installation(
         current = _observed_path_state(destination)
         before = (previous, record.before_hashes[relative])
         after = (record.after_identities[relative], record.after_hashes[relative])
+        displaced = area / "displaced" / relative
+        displaced_state = _observed_path_state(displaced)
+        if displaced_state not in ((None, None), after):
+            raise ValueError(f"installation rollback displaced path changed: {relative}")
         if current == before:
             continue
         if current not in (after, (None, None)):
@@ -653,9 +657,8 @@ def rollback_installation(
         if previous is not None and _observed_path_state(backup) != before:
             raise ValueError(f"installation rollback backup or target changed: {relative}")
         if current[0] is not None:
-            displaced = area / "displaced" / relative
             displaced.parent.mkdir(parents=True, exist_ok=True)
-            if displaced.exists() or displaced.is_symlink():
+            if displaced_state != (None, None):
                 raise ValueError(f"installation rollback displaced path exists: {relative}")
             if _observed_path_state(destination) != after:
                 raise ValueError(f"installation rollback refuses later changes: {relative}")
@@ -664,6 +667,8 @@ def rollback_installation(
             _sync_directory(displaced.parent)
             if _observed_path_state(displaced) != after:
                 raise ValueError(f"installation rollback displaced path changed: {relative}")
+        elif relative in record.completed_roots and after[0] is not None and displaced_state != after:
+            raise ValueError(f"installation rollback refuses later deletion: {relative}")
         if previous is not None:
             destination.parent.mkdir(parents=True, exist_ok=True)
             if _observed_path_state(backup) != before or _observed_path_state(destination) != (None, None):
@@ -715,17 +720,29 @@ def preflight_rollback_installation(
         previous = record.before_hashes[relative]
         backup = area / "backup" / relative
         backup_identity, backup_content = _observed_path_state(backup)
+        displaced_identity, displaced_content = _observed_path_state(area / "displaced" / relative)
+        if displaced_identity is not None and (
+            displaced_identity != expected_identity or displaced_content != expected
+        ):
+            raise ValueError(f"installation rollback displaced path changed: {relative}")
         if backup_identity is not None and (backup_identity != previous_identity or backup_content != previous):
             raise ValueError(f"installation rollback backup changed identity: {relative}")
         if previous_identity is None and backup_identity is not None:
             raise ValueError(f"installation rollback has unexpected backup: {relative}")
         if current_identity == previous_identity and current == previous:
             continue
+        if displaced_identity is not None and current_identity is not None:
+            raise ValueError(f"installation rollback displaced path conflicts with target: {relative}")
         if current_identity not in (expected_identity, None) or (
             current_identity == expected_identity and current != expected
         ):
             raise ValueError(f"installation rollback refuses later changes: {relative}")
-        if relative in record.completed_roots and expected_identity is not None and current_identity is None:
+        if (
+            relative in record.completed_roots
+            and expected_identity is not None
+            and current_identity is None
+            and displaced_identity is None
+        ):
             raise ValueError(f"installation rollback refuses later deletion: {relative}")
         if current_identity is None and previous_identity is not None and backup_identity != previous_identity:
             raise ValueError(f"installation rollback lacks before state: {relative}")

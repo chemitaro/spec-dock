@@ -58,6 +58,10 @@ ID: "iss-00409"
 
 現行の修正では、groupの固定version起源をchild journalにも明示し、再開時のbundleの表記に依存せずversion記録を決定します。rollbackでは事前検査に加え、各移動・復元の直前と直後にinodeの所有証跡と内容digestを照合し、後続変更をterminal成功として受理しません。commit/versionの開始と再開の4組合せ、planned childの安全な引継ぎ、同一inode・同一長の変更、backup変更、複数worktreeのrollbackを結合テストで確認しています。固定SHAでの必須テストと配布wheel・独立cloneの手動確認を終えてから、同じレビュアーに再審査を依頼します。
 
+固定候補 `e47ff4e72232b1021b89b67eb7bf1d925e5d1109` では、`make lint`、`git diff --check`、全テスト `2127 passed, 25 skipped` が成功しました。同SHAのwheelを独立cloneへ導入し、schema 3移行、local Initiative/Epic/Issueのstart/finish、最終validation `valid=true` を手動確認しました。他の稼働中のworktree・consumerは更新していません。Final Quality Gate Strict v2の同一レビュアー会話へ送ったOracle実行は送信確定の検出でタイムアウトしました。同一会話から終端回答を受動的に取得できましたが、ラッパーの正式なreview結果としては採用されていません。その回答には、`v` 接頭辞付きversionのfinalize拒否と、rollbackでafter-stateを退避した直後の停止から同じoperation IDで再開できないというP1が2件記載されています。回答と機械的な取得制限は無追跡 `.workbench` に保存しました。
+
+この2経路を受入仕様と実装に照合し、配布元とdogfood投影のfinalize判定で正規の `v` 接頭辞を受け入れ、rollbackではoperation所有の退避先をidentity・digestで再観測して安全に再開する候補を作成しました。後続削除だけで退避証跡がない場合は引き続き拒否します。各再現テストをRed→Greenで確認し、関連結合テスト `49 passed`、`make lint`、`git diff --check`、全テスト `2130 passed, 25 skipped` を通過しました。これは修正作業ツリーの証拠であり、最終SHAに対するStrict v2認証の通過を意味しません。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

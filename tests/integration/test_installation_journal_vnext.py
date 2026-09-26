@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from spec_dock.installation import executor as installation_executor
 from spec_dock.installation.executor import (
     apply_installation,
     prepare_installation,
@@ -219,6 +220,53 @@ def test_rollback_preserves_changed_after_state_before_displacement(tmp_path: Pa
     assert not (
         target / ".spec-dock-installations" / record.operation_id / "displaced/spec-dock/spec-dock.version"
     ).exists()
+    assert read_record(journal, record.operation_id).phase == "committed"
+
+
+def test_rollback_resumes_after_after_state_is_displaced(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    displaced = target / ".spec-dock-installations" / record.operation_id / "displaced/spec-dock/spec-dock.version"
+    original_sync = installation_executor._sync_directory
+
+    def stop_after_displacement(directory: Path) -> None:
+        if directory == version.parent and displaced.exists() and not version.exists():
+            raise OSError("stop after displacement")
+        original_sync(directory)
+
+    monkeypatch.setattr(installation_executor, "_sync_directory", stop_after_displacement)
+    with pytest.raises(OSError, match="stop after displacement"):
+        rollback_installation(journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True)
+    assert not version.exists()
+    assert displaced.read_text(encoding="utf-8") == "0.2.4\n"
+    monkeypatch.setattr(installation_executor, "_sync_directory", original_sync)
+
+    restored = rollback_installation(
+        journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True
+    )
+
+    assert restored.phase == "rolled-back"
+    assert version.read_text(encoding="utf-8") == "old\n"
+
+
+def test_rollback_rejects_missing_after_state_without_owned_displacement(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    version.unlink()
+
+    with pytest.raises(ValueError, match="later deletion"):
+        rollback_installation(journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True)
+
     assert read_record(journal, record.operation_id).phase == "committed"
 
 
