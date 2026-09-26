@@ -3,7 +3,7 @@
 ID: "iss-00409"
 タイトル: "SpecDock CLI Scope Active Work Redesign"
 関連GitHub: ["#409"]
-最終更新: "2026-09-25"
+最終更新: "2026-09-26"
 依存: ["requirement.md", "design.md", "plan.md"]
 親: ["epic-00356", "init-local-00003"]
 ---
@@ -53,6 +53,10 @@ ID: "iss-00409"
 写しを同期した `3f62dc0b372d4376822dbae1c92c6a3d945242bf` では `make lint` と `git diff --check` が通過し、全テストは `2100 passed, 25 skipped` でした。同SHAから構築したwheelと固定engineを独立cloneに実導入し、239件の既存Scopeをschema 3へ移行しました。新規local Initiative・Epic・Issueの作成、各専用ブランチへの `work start` とcheckout、下位からの `work finish`、active解除、最終 `workspace validate` の `valid=true` を手動確認しました。他の稼働中worktree・consumerは更新していません。
 
 同じレビュアーによる Final Quality Gate Strict v2 では、前回のignore marker復旧P1は解消と判定されました。一方、`planned` child journalが管理対象の開始状態を固定せず、停止後に変更された対象を `resume` が新たなbefore-stateとして採用できるP1が残りました。別の ChatGPT Analyze Review Findings Strict で、AC-23/28とDesign D-13/D-16の既存契約を破る実装欠陥と確認しました。対処として、全管理pathの内容・種別・mode・inodeを含む開始状態と指定versionを、最初の対象変更前にchild journalへ永続化します。再開・stage完了前・apply直前・各pathの置換直前に同じ状態を照合し、変化を検出した場合は管理対象とbackupを変更せず停止します。旧形式の `planned` recordは現在状態から再計画せず、復旧用rollbackだけを許します。init/update/uninstall、同内容inode差替え、group再開、rollbackを結合テストで確認してから、固定SHAの全テストと同じレビュアーの再審査を実施します。
+
+その後の固定候補 `dc4a7a72f89eac7a5d086c6c41a7ce77c3b8f6fa` では、開始状態の再計画に関するP1は解消と判定されました。新たに、version指定で始めたupdateを標準のcommit指定で再開するとversion記録が変わる問題と、stage・公開後の別inodeやhardlinkを内容一致だけで受理する問題がP1となりました。固定候補 `b657db0d0bd5917b459bf261949b20ece49323ac` で元versionのgroup/child伝播とafter-stateのinode所有証跡を追加し、`make lint`、`git diff --check`、全テスト `2117 passed, 25 skipped`、独立cloneでの導入・移行・三階層work start/finishを確認しました。この候補の同じレビュアーによる再審査では、after-stateのP1は解消しましたが、commit指定で始めたupdateを同じcommitのversion指定で再開する逆方向の表記変化と、rollbackの事前検査後に同一inodeの内容が変更される競合をP1と判定したため、Final Quality Gateは未通過です。
+
+現行の修正では、groupの固定version起源をchild journalにも明示し、再開時のbundleの表記に依存せずversion記録を決定します。rollbackでは事前検査に加え、各移動・復元の直前と直後にinodeの所有証跡と内容digestを照合し、後続変更をterminal成功として受理しません。commit/versionの開始と再開の4組合せ、planned childの安全な引継ぎ、同一inode・同一長の変更、backup変更、複数worktreeのrollbackを結合テストで確認しています。固定SHAでの必須テストと配布wheel・独立cloneの手動確認を終えてから、同じレビュアーに再審査を依頼します。
 
 ## Residual Risks / Follow-ups
 
