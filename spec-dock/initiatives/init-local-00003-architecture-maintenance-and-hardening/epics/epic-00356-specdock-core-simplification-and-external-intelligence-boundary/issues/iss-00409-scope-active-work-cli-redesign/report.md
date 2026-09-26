@@ -62,6 +62,10 @@ ID: "iss-00409"
 
 この2経路を受入仕様と実装に照合し、配布元とdogfood投影のfinalize判定で正規の `v` 接頭辞を受け入れ、rollbackではoperation所有の退避先をidentity・digestで再観測して安全に再開する候補を作成しました。後続削除だけで退避証跡がない場合は引き続き拒否します。各再現テストをRed→Greenで確認し、関連結合テスト `49 passed`、`make lint`、`git diff --check`、全テスト `2130 passed, 25 skipped` を通過しました。これは修正作業ツリーの証拠であり、最終SHAに対するStrict v2認証の通過を意味しません。
 
+上記候補 `a75e682eba0644a4c0a0c68a2b295ef0097cf855` は非forceでpushし、同じSHAで `make lint`、`git diff --check`、全テスト `2130 passed, 25 skipped` を再実行して成功しました。続くChatGPT Analyze Review Strictの元セッションは長時間の応答後、Oracleの自動再接続が回答完了を確定できずに終了しました。同一会話から終端回答を受動的に取得しましたが、これは正式なStrict実行結果ではなく助言です。助言は、finalize側だけで `v` 接頭辞を許容しても、更新journalと導入先version fileに入力表記が残るというidentity分裂を指摘しました。
+
+受入仕様AC-23/25と設計D-21/22を再照合し、公開入力 `v0.2.4` を固定source解決時に正規version `0.2.4` へ変換し、group/child journalと導入先version fileにはその値を渡すよう修正しました。finalizeは正規versionとの完全一致を再び要求します。公開CLIから `v0.2.4` を指定してjournalと二worktreeのversion fileが `0.2.4` となり、maintenanceからreadyへのfinalizeも通るテストをRed→Greenで確認しました。rollbackの二つのfsync境界とbefore-state不在の中断復旧も追加検証しました。関連テストは `98 passed` です。全テストと最終SHAのStrict v2判定は、この追補時点では未実施です。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

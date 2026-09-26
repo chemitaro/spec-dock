@@ -42,7 +42,7 @@ def test_finalize_records_group_then_restores_ready(tmp_path: Path) -> None:
     assert after is not None and after.mode == "ready" and after.epoch == 3
 
 
-def test_finalize_accepts_v_prefixed_installed_version(tmp_path: Path) -> None:
+def test_finalize_rejects_noncanonical_installed_version(tmp_path: Path) -> None:
     common = _ready_repo(tmp_path)
     repo = cast("Path", common["repo_root"])
     git_common = cast("Path", common["common_dir"])
@@ -53,17 +53,17 @@ def test_finalize_accepts_v_prefixed_installed_version(tmp_path: Path) -> None:
     engine_version = version_file.read_text(encoding="utf-8").strip()
     version_file.write_text(f"v{engine_version}\n", encoding="utf-8")
 
-    record = installation_module.finalize_installation_group(
-        repo_root=repo,
-        common_dir=git_common,
-        worktree_id="main",
-        engine_digest="engine-a",
-        expected_epoch=2,
-        engine_version=engine_version,
-    )
+    with pytest.raises(ValueError, match="versions differ"):
+        installation_module.finalize_installation_group(
+            repo_root=repo,
+            common_dir=git_common,
+            worktree_id="main",
+            engine_digest="engine-a",
+            expected_epoch=2,
+            engine_version=engine_version,
+        )
 
-    assert record.phase == "committed"
-    assert load_control(git_common).mode == "ready"
+    assert load_control(git_common).mode == "maintenance"
 
 
 def test_finalize_resumes_recorded_attempt_after_control_write_stops(

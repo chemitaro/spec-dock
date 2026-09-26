@@ -419,7 +419,7 @@ def run_installation_update(
                 engine_digest=context.engine_digest,
                 expected_epoch=context.expected_epoch,
                 bundle=bundle,
-                requested_version=ns.version,
+                requested_version=source.version,
                 keep_maintenance=bool(ns.maintenance),
                 engine_pin=engine_pin,
                 lock_timeout=ns.lock_timeout,

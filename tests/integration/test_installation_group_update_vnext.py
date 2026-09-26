@@ -17,6 +17,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
 from spec_dock.installation.group_journal import read_group_record  # noqa: E402
 from spec_dock.installation.journal import read_record  # noqa: E402
+from spec_dock.installation.source import resolve_source  # noqa: E402
 from spec_dock.installer import TOOL_DIRECTORIES  # noqa: E402
 from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin  # noqa: E402
 from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
@@ -746,6 +747,48 @@ def test_public_update_resume_preserves_source_origin(
     label = versioned_bundle.source.commit if expected_version == "sha" else expected_version
     for root in (repo, second):
         assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == label + "\n"
+
+
+def test_public_version_alias_update_persists_canonical_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    repo, second, common_dir, _epoch, digest, bundle = _group_fixture(tmp_path)
+    import spec_dock_runtime.commands.installation_vnext as command_module
+
+    monkeypatch.setattr(
+        command_module,
+        "resolve_fixed_source",
+        lambda **kwargs: resolve_source(
+            version=kwargs["version"],
+            commit=kwargs["commit"],
+            ls_remote_tags=f"{bundle.source.commit}\trefs/tags/v0.2.4\n",
+        ),
+    )
+    monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
+    monkeypatch.setattr(
+        command_module,
+        "verify_pinned_archive",
+        lambda source, *_args: replace(bundle, source=source),
+    )
+    result = run_vnext(
+        ["installation", "update", "--version", "v0.2.4", "--maintenance", "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert result.exit_code == 0, result.stdout
+    operation_id = json.loads(result.stdout)["data"]["operation_id"]
+    assert read_group_record(common_dir, operation_id).requested_version == "0.2.4"
+    for root in (repo, second):
+        assert (root / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.4\n"
+    finalized = run_vnext(
+        ["installation", "update", "--finalize", "--yes", "--json"],
+        invocation_cwd=repo,
+        engine_digest=digest,
+        engine_version="0.2.4",
+    )
+    assert finalized.exit_code == 0, finalized.stdout
+    assert load_control(common_dir).mode == "ready"
 
 
 def test_group_commit_refuses_replaced_marker_after_child_apply(

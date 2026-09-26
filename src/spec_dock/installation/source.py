@@ -101,7 +101,7 @@ def resolve_source(*, version: str | None, commit: str | None, ls_remote_tags: s
     pinned = references.get("peeled") or references.get("direct")
     if pinned is None:
         raise ValueError("tag has no commit identity")
-    return PinnedSource(SOURCE_REPOSITORY, pinned, version)
+    return PinnedSource(SOURCE_REPOSITORY, pinned, version.removeprefix("v"))
 
 
 def resolve_fixed_source(*, version: str | None, commit: str | None, timeout: float = 30.0) -> PinnedSource:
