@@ -50,6 +50,10 @@ ID: "iss-00411"
 - provider を正本として、この repository の dogfood projection のみを同期する。
 - AC-411-01〜08 をコマンド出力と inventory ledger で検証可能にする。
 
+## 実装時の検証方針（2026-09-28 の依頼を反映）
+
+この Issue は撤去が主目的である。以下の step に記した新規 test file、網羅的な負例 fixture、assertion の機械的な移植案は、削除判断の調査項目として読む。実装では [確認シート](artifacts/20260927t154758z--implementation-checksheet.md) に各 step の現物確認と結果を記録し、既存の current-route tests と最小限の必要な assertion を使う。retired 実装の不存在を証明するためだけに大きな新規 test harness を作らない。旧 test の重要な current invariant に既存の移植先がない場合のみ、現行層に小さく追加する。Step 8 の `make lint`、`uv run pytest`、固定 bundle、clean checkout CI は維持する。変更された受け入れ判定は確認シートと inventory に具体的に記録する。
+
 ## 順序・依存
 
 ```text
