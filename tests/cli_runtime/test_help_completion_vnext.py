@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import shlex
+import shutil
 import subprocess
 import sys
 
@@ -65,7 +66,10 @@ def test_completions_include_every_catalog_leaf_without_writing_files(tmp_path: 
         assert "spec-dock" in output.stdout
         for leaf in LEAF_PATHS:
             assert leaf.split()[0] in output.stdout
-        if shell in ("bash", "zsh"):
-            syntax = subprocess.run([shell, "-n"], input=output.stdout, text=True, capture_output=True, check=False)
+        executable = shutil.which(shell) if shell in ("bash", "zsh") else None
+        if executable is not None:
+            syntax = subprocess.run(
+                [executable, "-n"], input=output.stdout, text=True, capture_output=True, check=False
+            )
             assert syntax.returncode == 0, syntax.stderr
     assert tuple(tmp_path.iterdir()) == before
