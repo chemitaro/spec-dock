@@ -397,14 +397,14 @@ The implementer must fill this table in the PR/report, not by editing historical
 | Assertion migration ledger complete | §8 family mapping と §15 実施判断 | pass |
 | Old source removed | provider / dogfood の旧 shell と command を撤去 | pass |
 | Fixed distribution retired-path absence | fixed bundle 実物で app/bootstrap/installer 不在 | pass |
-| CI workflow wiring and negative tests | current CI integration 19 passed、clean checkout 実行待ち | pending |
+| CI workflow wiring and negative tests | current CI integration 19 passed、独立 clean clone の固定SHA validator 成功 | pass |
 | Provider/dogfood byte parity | test_provider_distribution.py | pass |
 | Current docs stale scan | current docs 改訂、historical pointer 追加 | pass |
 | Focused tests | entrypoint / CI / parity 19 passed | pass |
 | `make lint` | ruff check / format、mypy 成功 | pass |
 | `uv run pytest` | 1212 passed / 1 skipped | pass |
 | `git diff --check` | 差分形式を確認 | pass |
-| Out-of-scope side-effect check | 3677 entries 差分 0、refs は commit 後に確認 | pending |
+| Out-of-scope side-effect check | 3677 entries 差分 0、refs は最終 push 後に確認 | pending |
 
 ## 15. 実装時の判断と証拠（2026-09-28）
 
@@ -413,4 +413,4 @@ The implementer must fill this table in the PR/report, not by editing historical
 - old harness、fixture、old command tests は旧構文や旧ディレクトリ installer を凍結していた。現行の 44 leaf / tombstone は `test_cli_vnext_contract.py` と `test_cli_entrypoint_vnext.py`、installation / migration / journal は現行 integration tests、Scope / Work / Artifact は各 `*_vnext.py` が検証する。current-named test の旧 `init` setup は provider scaffold へ差し替えた。旧 test 関数の機械的コピーは実施しない。
 - 配布 parity と shim equality だけを `test_provider_distribution.py` に置き、CI workflow wiring は既存 `test_ci_fixed_validation.py` に 1 件追加した。撤去確認専用の大規模 test harness は追加しない。旧ファイル不在は fixed bundle の実物照合で確認する。
 - `uv run pytest -q --maxfail=1`: 1212 passed / 1 skipped。`make lint`: ruff check / format、mypy 成功。固定 bundle の digest `fc4a0fa729e0d422bc15513cd29a7d5f7d9bb5966a5b7852f0e00f70def88f0e`、旧 app/bootstrap/installer ファイル不在、現行 help 成功。範囲 snapshot 3677 entries は、Issue #411 のみ除外して差分 0。
-- clean checkout CI、最終 SHA の照合、Strict v2 は commit / push 後に実施する。
+- `eb77cd9f` の独立 clean clone で full-SHA validator 成功（`valid=true`、240 nodes、digest `54f19658…`）。clone は clean で `.git/spec-dock` は存在しない。最終 SHA の照合と Strict v2 は最終 push 後に実施する。

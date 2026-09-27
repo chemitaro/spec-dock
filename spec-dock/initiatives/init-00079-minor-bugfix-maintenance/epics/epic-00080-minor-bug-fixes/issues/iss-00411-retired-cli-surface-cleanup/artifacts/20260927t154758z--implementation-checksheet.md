@@ -40,7 +40,7 @@
 ## Step 5: CI
 
 - [x] `.github/workflows/ci.yml` は full SHA の固定 validator のみを実行し、sync を行わない。
-- [ ] current CI integration は full suite で成功。commit 後に clean checkout の read-only / SHA / digest 境界を確認。
+- [x] current CI integration は full suite で成功。`eb77cd9f` の独立 clean clone に固定 validator を実行し `valid=true`、240 nodes、digest `54f19658…`。clone の Git 状態は clean、`.git/spec-dock` は未作成。
 - [x] provider CI に削除済み test path がない。
 
 ## Step 6: 文書
@@ -59,7 +59,7 @@
 - [x] focused current checks: 83 + 109、Artifact 28、unit 724 passed / 1 skipped。
 - [x] `make lint`: ruff check / format、mypy 成功。
 - [x] `uv run pytest -q --maxfail=1`: 1212 passed / 1 skipped。
-- [ ] fixed bundle の旧ファイル不在と help は確認。clean checkout CI は commit 後に実施。
+- [x] fixed bundle の旧ファイル不在と help、独立 clean clone での CI 検証を確認。
 - [x] `git diff --check` 成功、範囲 snapshot の user data / active / control 3677 entries に差分なし。refs / worktree は commit 後に再確認。
 
 ## Step 9: 最終品質ゲート
