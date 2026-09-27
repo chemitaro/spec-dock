@@ -101,6 +101,15 @@ test -z "$(git status --porcelain)"
 git diff --name-status "$BASE_SHA" HEAD
 ```
 
+実装開始時の full `HEAD` を JSON key `start_sha` として、ignored `.workbench/issue411-scope-baseline.json` に read-only の範囲スナップショットを保存する。後のcommitで `HEAD` は進むため、Step 8.6 は `start_sha..HEAD` を比較する。スナップショットは次を path、存在有無、file bytes/mode、symlink target まで記録する。
+
+- `spec-dock/initiatives/**` の Issue #411 以外の user data、および `spec-dock/.agent/**` と `spec-dock/active/**`（存在する場合）。
+- `.git/spec-dock/control/**` の live installation / active / journal state。`spec-dock/.agent/**` も含めて Git に無視される path を省略しない。
+- current branch 名、current 以外の local refs、`git worktree list --porcelain` の worktree path / branch と、他 worktree の `HEAD`。current branch とその upstream の SHA 更新は実装commit/pushとして別に記録する。
+- GitHub Issue #411 の read-only state と、作業中に実行した GitHub 操作の記録。Git push / PR の通常の開発手続と、cleanup code/test による GitHub Issue write を区別する。
+
+スナップショット作成手順と差分判定は Step 8.6 の scope check に同じ形で使う。baseline 取得後に他の actor が対象を変更した場合は勝手に上書きせず、差分の所有者と原因を調べる。
+
 ### 判定
 
 - branch が一致し、調査時の full SHA が現在の HEAD の祖先である。
@@ -132,7 +141,7 @@ source / test 削除前に、current route と「retired path が distribution �
 3. fixed bundle を temp directory に構築し、distribution 内に mandatory retired paths がないこと。
 4. current root files に retired module import / exact module-name string がないこと。
 5. `cli/legacy.py`、historical docs、migration docs、Issue specs は intentional allowlist であること。
-6. representative retired roots が current entrypoint で fail closed すること。
+6. representative retired roots が current entrypoint で fail closed すること。fixed bundle の subprocess 負例は remote を持たない一時 checkout と stub `gh` だけを使い、実作業 checkout では実行しない。exit code だけでなく `LEGACY_COMMAND_REMOVED` と replacement を確認し、repo file/active/control と Git refs の before/after を比較する。
 
 実装前は absence assertion が赤になる。expected failure を確認したら、`xfail` や skip を残さず後続 Step で green にする。
 
@@ -507,6 +516,8 @@ jobs:
 - `spec-dock/scripts/spec-dock sync`、`... validate`、`workspace sync` がない。
 - validator script の success / mismatch tests は保持する。read-only test は target root 全体の相対 path、file bytes、file mode、symlink target、directory set を実行前後で比較する。active、generated、installation control、`.git/spec-dock` も対象に含め、対象外の scratch engine は含めない。
 - dirty source に未追跡 file または変更済み file を置いた負例を追加する。validator は bundle build 前に失敗し、target root 全体の上記 snapshot と control state が変わらないことを確認する。
+- expected SHA が短縮形・非hexなど complete SHA 形式でない負例を追加し、bundle build 前に拒否され target が無変更であることを確認する。
+- 一時 source fixture の fixed bundle builder を不正な非64hex digest を返すように差し替えてから fixture を commit し、その正しい full SHA で validator を呼ぶ負例を追加する。builder 自体の失敗や SHA mismatch で先に落とさず、digest 形式の拒否と target 無変更を観測する。production builder は改変しない。
 
 ### 5.3 focused CI caller の確認
 
@@ -527,6 +538,7 @@ uv run pytest \
 - workflow に old root invocation がない。
 - exact SHA mismatch negative test が green。
 - dirty source 拒否の負例が bundle build 前の失敗と target 無変更を示す。
+- invalid expected SHA と invalid distribution digest の負例が所定の境界で失敗し、target 無変更を示す。
 - target workspace bytes / control state が変わらない。
 - provider-ci が削除済み test path を参照しない。
 
@@ -543,7 +555,7 @@ uv run pytest \
 
 ### 6.0 docs stale-current test の拡張（Red）
 
-`tests/integration/test_cli_docs_vnext.py` に、provider `scripts/README.md`、root current docs、`AGENTS.md`、current dogfood copies、workflows の executable retired invocation pattern を検出する test を追加する。historical / migration / tombstone / spec archive は理由付き最小 allowlist とし、generic words だけでは判定しない。`test_provider_distribution.py` には current docs / operator guidance の required current terms を追加する。既知の stale guidance について expected red を確認した後、6.1〜6.4 の修正で green にする。Red のまま Step 6 を完了しない。
+`tests/integration/test_cli_docs_vnext.py` に、provider `scripts/README.md`、root current docs、`AGENTS.md`、current dogfood copies、workflows の executable retired invocation pattern と、削除済み test path を実行案内する参照を検出する test を追加する。historical / migration / tombstone / spec archive は理由付き最小 allowlist とし、generic words だけでは判定しない。`test_provider_distribution.py` には current docs / operator guidance の required current terms を追加する。既知の stale guidance について expected red を確認した後、6.1〜6.4 の修正で green にする。Red のまま Step 6 を完了しない。
 
 ### 6.1 provider scripts README
 
@@ -562,7 +574,7 @@ uv run pytest \
 
 - `docs/github-issue-integration.md` を current Scope create/import、GitHub/local authority、explicit target、failure boundary へ書き換える。
 - `docs/sync-aggregation.md` を `workspace sync` の current generation/cache contract と CI validation distinction へ書き換える。
-- `AGENTS.md` の runtime architecture map を `options/catalog/vnext_runtime/admission/legacy tombstone` に更新する。
+- `AGENTS.md` の runtime architecture map を `options/catalog/vnext_runtime/admission/legacy tombstone` に更新し、削除する `tests/unit/infra/test_directory_installation.py` の開発コマンドを current test path に置き換える。
 - root `README.md`、provider `docs/reference_cli.md`、installed skills は stale scanで必要な箇所だけ更新する。
 
 ### 6.3 historical boundary
@@ -629,7 +641,7 @@ scan結果は historical / migration / tombstone / spec archive allowlistと照�
 
 ```bash
 rg -n --hidden \
-  'legacy_installer_main|legacy_spec_dock\.script|legacy_manifest\.json|spec_dock_runtime\.(app|cli\.(bootstrap|parser|registry|dispatch))' \
+  'legacy_installer_main|legacy_spec_dock\.script|legacy_manifest\.json|test_directory_installation\.py|spec_dock_runtime\.(app|cli\.(bootstrap|parser|registry|dispatch))' \
   . \
   -g '!spec-dock/initiatives/**' \
   -g '!src/spec_dock/assets/spec_dock/docs/historical/**' \
@@ -706,37 +718,14 @@ test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/
 
 ## 8.4 representative negative commands
 
-実際の entrypoint helperに合わせて JSON/textを検証する。
+Step 1.1 の fixed bundle subprocess 負例を実行する。fixture は一時 Git checkout を作成して remote を除去し、`gh` を stub 化する。`issue start`、`deps check`、`delete`、`init` を fixture checkout 内で実行し、各 command の exit code だけでなく `LEGACY_COMMAND_REMOVED`（`init` は current entrypoint の `USAGE_ERROR` または `COMMAND_REMOVED`）と replacement を確認する。fixture の files、active/control、Git refs、target directory を実行前後で比較し、success でも non-zero でも実作業 repository へ影響しないことを確認する。
 
 ```bash
-# いずれも test-built fixed engine を使い、old behavior を成功させない。
-set -euo pipefail
-TMP_NEG="$(mktemp -d "${TMPDIR:-/tmp}/specdock-negative-XXXXXX")"
-trap 'rm -rf -- "$TMP_NEG"' EXIT
-NEG_ENGINE="$TMP_NEG/engine"
-NEG_TARGET="$TMP_NEG/retired-init-probe"
-uv run python -m spec_dock.fixed_bundle "$NEG_ENGINE"
-CLI="$NEG_ENGINE/bin/spec-dock"
-
-set +e
-"$CLI" issue start iss-00411
-ISSUE_RC=$?
-"$CLI" deps check iss-00411
-DEPS_RC=$?
-"$CLI" delete iss-00411
-DELETE_RC=$?
-"$CLI" init "$NEG_TARGET"
-INIT_RC=$?
-set -e
-
-test "$ISSUE_RC" -ne 0
-test "$DEPS_RC" -ne 0
-test "$DELETE_RC" -ne 0
-test "$INIT_RC" -ne 0
-test ! -e "$NEG_TARGET"
+uv run pytest tests/integration/test_retired_cli_surface_cleanup.py \
+  -k fixed_bundle_retired_roots_fail_closed_in_isolated_checkout
 ```
 
-外部に導入済みの `spec-dock` や別 consumer は使わず、この checkout から作った isolated fixed engine だけで確認する。
+この test 名は Step 1.1 で確定してから上の選択子と一致させる。外部に導入済みの `spec-dock` や別 consumer は使わず、この checkout から作った fixed engine と一時 checkout だけで確認する。
 
 ## 8.5 clean-checkout CI reproduction
 
@@ -763,15 +752,20 @@ test -z "$(git -C "$SOURCE" status --porcelain)"
 ## 8.6 side-effect / scope check
 
 ```bash
-git status --short
-git diff --name-only
+START_SHA="$(python3 -c 'import json; print(json.load(open("spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00411-retired-cli-surface-cleanup/.workbench/issue411-scope-baseline.json"))["start_sha"])')"
+git status --porcelain --untracked-files=all
+git diff --name-status --find-renames "$START_SHA" HEAD
+git diff --name-status --find-renames
+git diff --cached --name-status --find-renames
 ```
+
+Step 0 の ignored `.workbench/issue411-scope-baseline.json` を同じ snapshot 手順で再取得し、path、file bytes/mode、symlink target、current branch 名、current 以外の local refs、worktree path/branchと他 worktree の `HEAD`、GitHub Issue #411 read-only stateを比較する。`START_SHA` は Step 0 に保存した実装開始時の full SHA であり、`d7c...` の調査基準や実行時 `HEAD` で代用しない。current branch/upstream の SHA 変化は実装commit/pushの記録に照合する。ignored path の生成や変更も判定に含める。
 
 確認:
 
-- Issue #411 R/D/P、inventory/report、provider/tooling source、tests、workflows、current docs/dogfood managed assets以外に予期しない差分がない。
-- `spec-dock/initiatives/**` の他Issue/Epic/Initiative dataに機械的migration差分がない。
-- active pointers、Git refs、worktree registry、GitHub stateを変更していない。
+- commit 済み・未commitの両方で、Issue #411 R/D/P、inventory/report、provider/tooling source、tests、workflows、current docs/dogfood managed assets以外に予期しない差分がない。削除・renameも確認する。
+- `spec-dock/initiatives/**` の他Issue/Epic/Initiative dataに機械的migration差分がなく、active pointers、installation control、他Git refs/worktree registryが baseline と一致する。
+- GitHub Issue write を行う production command は実行せず、negative test は stub `gh` に閉じる。GitHub Issue #411 state の read-only 比較と操作記録を照合する。外部 actor の変更や証拠不足は「無変更」とみなさず原因を切り分ける。
 
 ### verification failure recovery
 
