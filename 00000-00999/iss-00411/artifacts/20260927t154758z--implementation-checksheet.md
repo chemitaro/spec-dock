@@ -14,15 +14,15 @@
 
 ## Step 1: 削除前の守るべき契約
 
-- [ ] 44 leaf、help、JSON、tombstone、migration、fixed entrypoint の既存 test と実行入口を確認。
-- [ ] 旧 test が守る current invariant を inventory に列挙し、既存 test の移植先と不足だけを特定。
-- [ ] 新しい test は不足した重要契約だけに限定する。
+- [x] 44 leaf、help、JSON、tombstone、migration、fixed entrypoint の既存 test と実行入口を確認。83 passed。
+- [x] 旧 test の current invariant は installation / work / scope / artifact / migration の既存 `*_vnext` と integration suite に照合。旧 harness と同じ wire の再テストは移植しない。
+- [x] 新しい test は不足した重要契約だけに限定する。Step 1 では追加なし。
 
 ## Step 2: asset 定数の分離
 
-- [ ] current caller と installer 専用 caller を import scan で分ける。
-- [ ] neutral `asset_layout.py` への移設後に current entrypoint / installation tests を実行。
-- [ ] old installer behavior を neutral module に持ち込まない。
+- [x] current caller は external CLI、installation executor / command と current installation tests。legacy callable だけ old installer behavior を使用。
+- [x] `asset_layout.py` に配布パス定数を移設し、current entrypoint / installation 109 tests passed。
+- [x] neutral module には定数のみ。old installer behavior は移さない。
 
 ## Step 3: 旧 test / launcher 撤去
 
