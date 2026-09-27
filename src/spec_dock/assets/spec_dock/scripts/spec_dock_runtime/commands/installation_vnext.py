@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
+from spec_dock.asset_layout import ASSETS
 from spec_dock.installation.source import (
     assert_candidate_assets_match_engine,
     assert_disjoint_source_target,
@@ -16,7 +17,6 @@ from spec_dock.installation.source import (
     verify_bundle_integrity,
     verify_pinned_archive,
 )
-from spec_dock.asset_layout import ASSETS
 from spec_dock_runtime.application.engine_handover_vnext import (
     activate_engine_group,
     handover_candidate,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from multiprocessing import Process, Queue
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 
@@ -13,6 +14,8 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock import __version__  # noqa: E402
+from spec_dock.asset_layout import ASSETS, VERSION_FILE  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import (  # noqa: E402
     AncestorState,
     create_local_scope,
@@ -26,7 +29,6 @@ from spec_dock_runtime.infra.github_status_cache import cached_github_ancestor_o
 from spec_dock_runtime.infra.json_store import atomic_write_json  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
 from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
-from tests.cli_runtime import harness  # noqa: E402
 
 
 @pytest.mark.parametrize(
@@ -207,7 +209,8 @@ def test_two_linked_worktrees_share_history_aware_monotone_reservations(tmp_path
 
 def _ready_repo(tmp_path: Path) -> tuple[dict[str, object], Path]:
     repo = tmp_path / "repo"
-    assert harness.main(["init", str(repo)]) == 0
+    shutil.copytree(ASSETS / "spec_dock", repo / "spec-dock")
+    (repo / VERSION_FILE).write_text(__version__ + "\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
     (repo / "readme.txt").write_text("fixture\n", encoding="utf-8")
     subprocess.run(["git", "-C", str(repo), "add", "--", "readme.txt"], check=True, capture_output=True)

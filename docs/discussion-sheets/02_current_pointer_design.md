@@ -1,5 +1,7 @@
 # シート02: 「current initiative / epic / issue」を固定パスで明示する（ポインタ設計）
 
+> 歴史資料: v1/v2 移行期の検討記録です。現行操作は [CLI 参照](../../src/spec_dock/assets/spec_dock/docs/reference_cli.md) を参照してください。
+
 目的: 大量の Issue がある前提で、**“今これをやっている”** を人間にもエージェントにも明確にし、  
 Codex CLI / skill / AGENTS から **必ず同じ入口**に到達できる設計を確定する。
 

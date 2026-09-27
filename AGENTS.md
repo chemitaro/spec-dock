@@ -41,7 +41,8 @@ Read these first before changing code or tests:
 ## Project Structure & Module Organization
 
 - `src/spec_dock/`: installer package for the top-level `spec-dock` CLI.
-- `src/spec_dock/cli.py`: public fixed-engine entrypoint; its legacy installer is retained only for historical tests.
+- `src/spec_dock/cli.py`: public fixed-engine entrypoint.
+- `src/spec_dock/asset_layout.py`: shared shipped-asset path constants.
 - `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py`: fixed engine execution, bundle creation, and repository pin verification.
 - `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
 - `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/`.
@@ -77,11 +78,9 @@ src/spec_dock/
 `-- __init__.py
 
 tests/
-|-- test_cli.py
-|-- test_init_update.py
 |-- cli_runtime/
-|-- domain_runtime/
-`-- presentation_runtime/
+|-- integration/
+`-- unit/
 ```
 
 Read it like this:
@@ -101,7 +100,7 @@ Read it like this:
 
 The current runtime architecture is a hybrid layered architecture.
 
-- `cli/`: bootstrap, parser, registry, dispatch.
+- `cli/`: current options, catalog, admission, and runtime dispatch.
 - `commands/`: user-facing command handlers and command contracts.
 - `application/`: orchestration and use-case layer.
 - `domain/`: core rules, models, status/deps/tree/validation logic.
@@ -139,7 +138,7 @@ Do not collapse new work back into monolithic command files when a layer-specifi
 # Run all selected tests directly; no policy skip or regression ledger.
 uv run pytest
 uv run pytest tests/unit
-uv run pytest tests/unit/infra/test_directory_installation.py
+uv run pytest tests/unit/infra/test_provider_distribution.py
 
 # Build a fixed candidate outside the checkout, then inspect its help.
 uv run python -m spec_dock.fixed_bundle /private/tmp/spec-dock-candidate

@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock_runtime.application.artifact_query import ArtifactCatalogEntry, show_artifact
 from spec_dock_runtime.application.contracts import CreateArtifactDocRequest, FileArtifactImportRequest
+from spec_dock_runtime.application.create_artifact_doc import create_artifact_doc
+from spec_dock_runtime.application.import_file_artifact import import_file_artifact
 from spec_dock_runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock_runtime.cli.admission import admit_writer
 from spec_dock_runtime.domain.selectors import ArtifactRootSelector, parse_artifact_selector
@@ -92,17 +94,17 @@ def create_scope_artifact(
             expected_epoch=expected_epoch,
         )
         scope_id, kind = _selected_scope(repo_root=repo_root, worktree_id=worktree_id, scope=scope, selection=selection)
-        from spec_dock_runtime.cli.bootstrap import build_runtime
+        from spec_dock_runtime.infra.artifact_ports import artifact_ports
 
-        use_cases = build_runtime(repo_root / "spec-dock", repo_root=repo_root).use_cases
-        result = use_cases.create_artifact_doc(
+        result = create_artifact_doc(
             CreateArtifactDocRequest(
                 artifact_type=artifact_type,
                 scope_node_id=scope_id,
                 title=title,
                 slug=slug,
                 scope_kind=kind,
-            )
+            ),
+            artifact_ports(repo_root),
         )
         return show_artifact(repo_root=repo_root, scope=scope_id, artifact_id=result.artifact_id)
 
@@ -135,15 +137,15 @@ def import_scope_file(
             scope_id, kind = _selected_scope(
                 repo_root=repo_root, worktree_id=worktree_id, scope=scope, selection=selection
             )
-        from spec_dock_runtime.cli.bootstrap import build_runtime
+        from spec_dock_runtime.infra.artifact_ports import artifact_ports
 
-        use_cases = build_runtime(repo_root / "spec-dock", repo_root=repo_root).use_cases
-        result = use_cases.import_file_artifact(
+        result = import_file_artifact(
             FileArtifactImportRequest(
                 target_kind=kind,
                 target_value=None if root else scope_id,
                 source_path=source_path,
-            )
+            ),
+            artifact_ports(repo_root),
         )
         if not result.committed:
             raise RuntimeError("Artifact publication was not committed; inspect the destination before retrying")

@@ -12,8 +12,8 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock.installation.source import packaged_bundle  # noqa: E402
 from spec_dock.asset_layout import ASSETS  # noqa: E402
+from spec_dock.installation.source import packaged_bundle  # noqa: E402
 from spec_dock.runtime_loader import EnginePin, digest_distribution, read_engine_pin, verify_engine_pin  # noqa: E402
 from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
     init_installation_group,

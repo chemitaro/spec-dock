@@ -26,41 +26,41 @@
 
 ## Step 3: 旧 test / launcher 撤去
 
-- [ ] old harness、fixture、28 leaf manifest、old-only test を削除し、current-named test の旧 setup を解消。
-- [ ] assertion ごとの retain / remove 理由と current coverage を inventory に記録。
-- [ ] provider CI の focused caller を現行 test に変更。
-- [ ] test collection と現行 installation / migration / safety checks を確認。
+- [x] old harness、fixture、28 leaf manifest、old-only test を削除し、current-named test の旧 setup を解消。
+- [x] 旧 test family の retain / remove 理由と current coverage を inventory の §8 および実施記録に記録。
+- [x] provider CI の focused caller を現行 test に変更。
+- [x] test collection 1562 件（途中段階）、最終 full suite 1212 passed / 1 skipped で現行 installation / migration / safety checks を確認。
 
 ## Step 4: 旧 runtime 撤去
 
-- [ ] retired app/parser/registry/dispatch/bootstrap と old command modules の current 到達性を確認して削除。
-- [ ] conditional application/shared module は caller がある場合保持し、理由を記録。
-- [ ] fixed bundle 内の不在、現行 help / 拒否、provider と dogfood scripts の byte parity を確認。
+- [x] retired app/parser/registry/dispatch/bootstrap と old command modules の current 到達性を確認して削除。
+- [x] conditional application/shared module は caller がある場合保持し、理由を inventory に記録。
+- [x] fixed bundle 内の旧 app / bootstrap / installer 不在、現行 help、provider と dogfood scripts の byte parity を確認。
 
 ## Step 5: CI
 
-- [ ] `.github/workflows/ci.yml` は full SHA の固定 validator のみを実行し、sync を行わない。
-- [ ] current CI integration と clean checkout の read-only / SHA / digest 境界を確認。
-- [ ] provider CI に削除済み test path がない。
+- [x] `.github/workflows/ci.yml` は full SHA の固定 validator のみを実行し、sync を行わない。
+- [ ] current CI integration は full suite で成功。commit 後に clean checkout の read-only / SHA / digest 境界を確認。
+- [x] provider CI に削除済み test path がない。
 
 ## Step 6: 文書
 
-- [ ] provider scripts README、root current docs、AGENTS を現行 CLI に更新。
-- [ ] dogfood projection は provider から同期し byte parity を確認。
-- [ ] historical / migration 資料を保持し、現行案内との区別を確認。
+- [x] provider scripts README、root current docs、AGENTS を現行 CLI に更新。
+- [x] dogfood projection は provider から同期し byte parity を確認。
+- [x] historical / migration 資料を保持し、検討用文書に現行参照先を付記。
 
 ## Step 7: 残存参照
 
-- [ ] pyproject / workflow / docs / tests の削除先 import と stale current invocation を検索。
-- [ ] inventory の conditional item を retain 理由または削除証拠で閉じる。
+- [x] pyproject の削除済み test 用 mypy 例外を撤去し、workflow / docs / tests の削除先参照を検索。
+- [x] inventory の conditional item を retain 理由または削除証拠で閉じる。
 
 ## Step 8: 検証
 
-- [ ] focused current checks。
-- [ ] `make lint`。
-- [ ] `uv run pytest`。
-- [ ] fixed bundle / clean checkout CI。
-- [ ] `git diff --check` と範囲 snapshot 比較（user data、active、control、refs、他 worktree 無変更）。
+- [x] focused current checks: 83 + 109、Artifact 28、unit 724 passed / 1 skipped。
+- [x] `make lint`: ruff check / format、mypy 成功。
+- [x] `uv run pytest -q --maxfail=1`: 1212 passed / 1 skipped。
+- [ ] fixed bundle の旧ファイル不在と help は確認。clean checkout CI は commit 後に実施。
+- [x] `git diff --check` 成功、範囲 snapshot の user data / active / control 3677 entries に差分なし。refs / worktree は commit 後に再確認。
 
 ## Step 9: 最終品質ゲート
 

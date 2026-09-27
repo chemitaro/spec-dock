@@ -1,5 +1,7 @@
 # シート03: 状態の正（Source of Truth）と `sync` の深さ（GitHub 連携）
 
+> 歴史資料: v1/v2 移行期の検討記録です。現行操作は [CLI 参照](../../src/spec_dock/assets/spec_dock/docs/reference_cli.md) を参照してください。
+
 目的: 「完了/進捗/状態」を誰が管理するか（人間/エージェント/自動生成/GitHub）を確定し、  
 大量 Issue でも **乖離が起きない** 状態管理を設計する。
 

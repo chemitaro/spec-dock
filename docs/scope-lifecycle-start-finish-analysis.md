@@ -2,6 +2,8 @@
 
 状態: 検討用。現行仕様の変更決定や実装完了を示す文書ではない。
 
+現在の操作は [CLI 参照](../src/spec_dock/assets/spec_dock/docs/reference_cli.md) を参照。この文書の `issue start/finish`、旧 module path、挙動は移行前の調査記録である。
+
 ## 目的
 
 Initiative、Epic、Issue のどの階層でも、対象を active にして `<id>-<slug>` の作業ブランチを作成・checkout できる Start と、対象の作業を終了する Finish を提供する。現在の `issue start` / `issue finish` のコマンド体系も見直す。

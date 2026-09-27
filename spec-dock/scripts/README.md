@@ -1,67 +1,16 @@
-# spec-dock/scripts
+# SpecDock scripts
 
-このディレクトリは、`spec-dock` が作成する補助スクリプト置き場です。
+`spec-dock/scripts/spec-dock` は、導入済みの固定外部エンジンを呼ぶ薄い shim です。CLI の仕様と全コマンドは [CLI 参照](../docs/reference_cli.md)を確認してください。正確な引数は `spec-dock help COMMAND` で確認します。
 
-v2 では、日常運用（initiative/epic/issue/artifact の作成、active 切り替え、sync/validate）は
-このディレクトリ内の **ローカルスクリプト**で実行します。
-
-- `new initiative` / `new epic` / `new issue` はデフォルトで GitHub Issue を作成します。
-- 既存 current-repo Issue へ紐づける場合は `--github-issue <n>` を使います。
-- `--no-github` は node creation option ではありません。
-- working artifacts は `new artifact <type>` を使います（current catalog: `blank` / `interview` / `research` / `disc` / `decision-candidate` / `adr`）。
-- `pr-repair-batch` / `draft-*` / `scratch` / `note` は Historical-only です。既存 artifact は grandfathered として壊さず、新規 untyped capture は `blank` を使います。
-- `active set` は local node を選択して active state を更新するだけです。branch checkout、unfinished active Issue guard、dependency readiness は `issue start` が所有します。
-- `new/import {initiative,epic,issue}` と `new artifact <type>` の `--slug` は kebab-case が必要です（詳細は `spec-dock/docs/reference_naming.md`）。
-
-## 使い方（例）
-
-```bash
-# 新規作成（デフォルトで GitHub Issue を作成）
-./spec-dock/scripts/spec-dock new initiative --title "Auth platform"                    # id=init-00101
-./spec-dock/scripts/spec-dock new epic --initiative 101 --title "JWT auth"             # id=epic-00201
-./spec-dock/scripts/spec-dock new issue --epic 201 --title "Add refresh token"         # id=iss-00301
-
-# 既存 current-repo GitHub Issue へリンクする
-./spec-dock/scripts/spec-dock new issue --epic 201 --github-issue 302 --title "Rotate refresh token"
-
-# working artifacts（timestamp-prefixed filename）
-./spec-dock/scripts/spec-dock new artifact blank --issue iss-00123 --title "Kickoff memo"       # 20260329t123456z-kickoff-memo.md
-./spec-dock/scripts/spec-dock new artifact interview --issue iss-00123 --title "Rollout policy" # 20260329t123457z-interview-...
-./spec-dock/scripts/spec-dock new artifact research --issue iss-00123 --title "Benchmarks"      # 20260329t123458z-research-...
-./spec-dock/scripts/spec-dock new artifact disc --issue iss-00123 --title "API options"         # 20260329t123459z-disc-...
-./spec-dock/scripts/spec-dock new artifact decision-candidate --issue iss-00123 --title "Token options" # 20260329t123500z-decision-candidate-...
-./spec-dock/scripts/spec-dock new artifact adr --issue iss-00123 --title "Token rotation"       # 20260329t123501z-adr-...
-
-# active node selection（selection-only）
-./spec-dock/scripts/spec-dock active set 123
-
-# Issue lifecycle（branch checkout/create, guard, dependency readiness）
-./spec-dock/scripts/spec-dock issue start iss-00123
-
-# 状態集計を生成
-./spec-dock/scripts/spec-dock sync
-./spec-dock/scripts/spec-dock sync --no-github
-
-# 構造チェック
-./spec-dock/scripts/spec-dock validate
+```sh
+spec-dock scope create issue --backend github --parent epic-00080 --title "Cleanup"
+spec-dock work start iss-00411 --base main
+spec-dock active show
+spec-dock artifact create --scope iss-00411 --type blank --title "Memo"
+spec-dock workspace validate
+spec-dock workspace sync --source cache
 ```
 
-artifact 補足:
-- typed artifact のファイル名 contract は `<ts>-<type>-<slug>.md`、same-second collision 時は `<ts>-<nn>-<type>-<slug>.md` です。
-- `blank` artifact は filename に type token を含めず、`<ts>-<slug>.md` / `<ts>-<nn>-<slug>.md` を使います。
-- legacy discussion docs の timestamp contract は `<ts>-<kind>-<slug>.md` / `<ts>-<nn>-<kind>-<slug>.md` です。
-- `ts = yyyymmddthhmmssz`（UTC, lowercase `t` / `z`）、`nn = 01..99` です。
-- `artifact_id` は slugless identity（typed: `<ts>-<type>` / `<ts>-<nn>-<type>`、blank: `<ts>` / `<ts>-<nn>`）で、filename stem は `<artifact_id>-<slug>` です。
-- allocation 対象は valid timestamp-contract files のみです。
-- unrelated files は無視されます（例: `rules.md`, `README.md`）。
-- legacy sequential discussion docs（`<nnn>-<kind>-<slug>.md`）や legacy `scratch` / `note` files は grandfathered ですが、自動 rename や basename 再利用はしません。
-- `scratch` / `note` は grandfathered existing artifacts only; do not create new `scratch` / `note` artifacts.
-- ただし artifact intent を持つ malformed basename は explicit failure です（例: `foo-adr-kickoff.md`, `bogus-01-adr-kickoff.md`, `20260329x-adr-kickoff.md`）。
-- same-second collision suffix が `99` まで埋まると失敗します。follow-up issue で archive または contract 拡張を判断してください。
+`work start` は Initiative、Epic、Issue を受け付け、依存を確認して対応ブランチへ切り替え、対象を選択します。`work finish TARGET` は対象を完了し、選択中なら対象以下の選択を解除します。選択だけを変える場合は `active set TARGET`、完了状態だけを変える場合は `scope close TARGET` です。
 
-注:
-- `spec-dock/.agent/` と `spec-dock/active/` は生成物です（git 管理しません）。
-- 導入/更新は外部installerの `uvx spec-dock init/update` を使います。updateは次の固定6ディレクトリを順に丸ごと置換し、copy成功後に `spec-dock/spec-dock.version` を更新します:
-  `spec-dock/docs`, `spec-dock/templates`, `spec-dock/system`, `spec-dock/scripts`,
-  `.agents/skills/spec-dock`, `.agents/skills/spec-dock-grill-with-docs`。
-  updateはnontransactionalです。関連repository commandを停止し、copy failure後は原因を修正して外部installerを最初から実行してください。rollback/journal/resumeはありません。6ディレクトリとversion record以外の利用者dataは変更されません。
+導入・更新は固定エンジンの `installation init/update` を使います。更新、データ移行、エンジン引継ぎ、復旧は[移行・復旧](../docs/migration.md)を参照してください。`spec-dock/.agent/` と `spec-dock/active/` は生成状態であり、一次仕様ではありません。

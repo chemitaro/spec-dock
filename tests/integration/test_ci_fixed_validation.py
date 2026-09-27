@@ -12,6 +12,14 @@ from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 SCRIPT = Path(__file__).resolve().parents[2] / ".github/scripts/specdock-ci-validate.sh"
 PACKAGE = Path(__file__).resolve().parents[2] / "src/spec_dock"
 PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
+WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+
+
+def test_ci_workflow_uses_fixed_read_only_validator() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "specdock-ci-validate.sh" in workflow
+    assert "${{ github.sha }}" in workflow
+    assert "spec-dock sync" not in workflow
 
 
 def _source_checkout(root: Path) -> str:
