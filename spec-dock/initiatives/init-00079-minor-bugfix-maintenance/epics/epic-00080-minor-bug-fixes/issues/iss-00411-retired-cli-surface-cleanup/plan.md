@@ -300,6 +300,20 @@ old assertion を読む
 - old `active set --id` smoke を削除する。
 - current fixed-engine active smoke が current test に存在することを確認する。
 
+#### `tests/cli_runtime/test_distribution_cutover.py`
+
+- `tests.cli_runtime.harness.main` を直接 import しているため、conftest の一覧とは別に全 test function を Step 3.1 の台帳へ記録する。
+- provider/install-root catalog、provider/dogfood skill parity、実行可能ファイル境界は current provider distribution test へ移植する。
+- unmanaged content、consumer workflow、foreign fixed root の保持は current installation init/update contract と照合し、有効な invariant を current installation integration test へ移植する。
+- old `init` の置換動作だけを固定する assertion は current contract と一致しない限り移植しない。移植先が green になるまで、この file と共有 harness を削除しない。
+
+#### その他の direct harness caller
+
+- `test_generation_checkout.py`、`test_runtime_handoff.py`、`test_worktree_lifecycle_coordination.py` は `CliRuntimeHarness` を継承する。各 assertion を current safety invariant と旧 CLI wire に分け、current 側を現行 fixture/test に移す。
+- `test_scope_github_vnext.py` と `test_scope_local_vnext.py` は名前が current でも `harness.main(["init", ...])` を setup に使う。現行 installation setup へ替え、scope の current assertion を保持する。
+- `tests/unit/infra/test_fake_gh_harness.py` の fake-gh helper と GitHub status invariant は neutral test support と current unit test に移し、旧 harness 継承をなくす。
+- inventory §8.3 の全 direct caller と conftest 経由の利用を照合し、`rg -n 'tests\.cli_runtime\.harness|from \.harness|import harness' tests` で取りこぼしを確認してから共有 harness を削除する。
+
 ### 3.4 legacy setup を削除
 
 移植先が全て green になった後に、同一 coherent change で次を削除する。
@@ -341,7 +355,7 @@ uv run pytest \
 ### 完了判定
 
 - test collection に old harness import error がない。
-- `rg -n 'legacy_installer_main|legacy_spec_dock\.script|legacy_manifest\.json' tests src pyproject.toml` は intentional spec/history 以外ゼロ。
+- `rg -n 'legacy_installer_main|legacy_spec_dock\.script|legacy_manifest\.json|tests\.cli_runtime\.harness' tests src pyproject.toml` は intentional spec/history 以外ゼロ。
 - assertion migration ledger が全 old test family で完了している。
 - current installation / migration / safety tests が green。
 
@@ -475,7 +489,7 @@ jobs:
 - expected SHA source が `${{ github.sha }}` である。
 - `git rev-parse HEAD` comparison がある。
 - `spec-dock/scripts/spec-dock sync`、`... validate`、`workspace sync` がない。
-- validator script の success / mismatch / read-only tests は保持する。
+- validator script の success / mismatch tests は保持する。read-only test は target root 全体の相対 path、file bytes、file mode、symlink target、directory set を実行前後で比較する。active、generated、installation control、`.git/spec-dock` も対象に含め、対象外の scratch engine は含めない。
 
 ### 5.3 `.github/workflows/provider-ci.yml`
 
@@ -664,7 +678,8 @@ policy skip、regression ledgerによる除外、old-test allowlistによるcoll
 
 ```bash
 set -euo pipefail
-TMP_ROOT="$(mktemp -d)"
+TMP_ROOT="$(mktemp -d /private/tmp/specdock-bundle-XXXXXX)"
+trap 'rm -rf -- "$TMP_ROOT"' EXIT
 ENGINE="$TMP_ROOT/engine"
 uv run python -m spec_dock.fixed_bundle "$ENGINE"
 "$ENGINE/bin/spec-dock" --help --json
@@ -675,7 +690,6 @@ test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.
 test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py"
 test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/registry.py"
 test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/dispatch.py"
-rm -rf "$TMP_ROOT"
 ```
 
 ## 8.4 representative negative commands
@@ -685,7 +699,8 @@ rm -rf "$TMP_ROOT"
 ```bash
 # いずれも test-built fixed engine を使い、old behavior を成功させない。
 set -euo pipefail
-TMP_NEG="$(mktemp -d)"
+TMP_NEG="$(mktemp -d /private/tmp/specdock-negative-XXXXXX)"
+trap 'rm -rf -- "$TMP_NEG"' EXIT
 NEG_ENGINE="$TMP_NEG/engine"
 NEG_TARGET="$TMP_NEG/retired-init-probe"
 uv run python -m spec_dock.fixed_bundle "$NEG_ENGINE"
@@ -706,31 +721,32 @@ test "$ISSUE_RC" -ne 0
 test "$DEPS_RC" -ne 0
 test "$DELETE_RC" -ne 0
 test "$INIT_RC" -ne 0
-test ! -e "$NEG_TARGET/spec-dock"
-rm -rf "$TMP_NEG"
+test ! -e "$NEG_TARGET"
 ```
 
 外部に導入済みの `spec-dock` や別 consumer は使わず、この checkout から作った isolated fixed engine だけで確認する。
 
 ## 8.5 clean-checkout CI reproduction
 
-`.github/scripts/specdock-ci-validate.sh` はsource cleanを要求するため、implementation candidateをcommitした後にdetached clean worktreeで実行する。
+`.github/scripts/specdock-ci-validate.sh` はsource cleanを要求するため、implementation candidateをcommitした後に独立した一時 clone で実行する。これにより開発 repo の worktree registry を変更しない。
 
 ```bash
 set -euo pipefail
-TMP_ROOT="$(mktemp -d)"
+TMP_ROOT="$(mktemp -d /private/tmp/specdock-ci-XXXXXX)"
 SOURCE="$TMP_ROOT/source"
-git worktree add --detach "$SOURCE" HEAD
-SOURCE_SHA="$(git -C "$SOURCE" rev-parse --verify 'HEAD^{commit}')"
+trap 'rm -rf -- "$TMP_ROOT"' EXIT
+SOURCE_SHA="$(git rev-parse --verify 'HEAD^{commit}')"
+git clone --quiet --no-hardlinks --single-branch \
+  --branch "$(git branch --show-current)" "$PWD" "$SOURCE"
+test "$(git -C "$SOURCE" rev-parse --verify 'HEAD^{commit}')" = "$SOURCE_SHA"
 bash "$SOURCE/.github/scripts/specdock-ci-validate.sh" \
   "$SOURCE" \
   "$SOURCE" \
   "$SOURCE_SHA"
-git worktree remove "$SOURCE"
-rm -rf "$TMP_ROOT"
+test -z "$(git -C "$SOURCE" status --porcelain)"
 ```
 
-開発中のdirty checkoutではこの代わりに`test_ci_fixed_validation.py`を使う。validatorのdirty-source checkを無効化しない。
+開発中のdirty checkoutではこの代わりに`test_ci_fixed_validation.py`を使う。validatorのdirty-source checkを無効化しない。一時 clone は成功・失敗のどちらでも trap で除去する。
 
 ## 8.6 side-effect / scope check
 
