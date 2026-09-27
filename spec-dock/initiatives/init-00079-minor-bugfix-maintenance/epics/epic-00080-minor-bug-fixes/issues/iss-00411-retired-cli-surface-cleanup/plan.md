@@ -56,10 +56,10 @@ ID: "iss-00411"
 Step 0  provenance / clean baseline
   -> Step 1  current safety net + deletion gate
   -> Step 2  neutral asset layout split
-  -> Step 3  old test assertion migration + harness removal
-  -> Step 4  retired runtime / installer source removal
-  -> Step 5  CI caller cutover
-  -> Step 6  current docs + provider/dogfood projection
+  -> Step 3  old test assertion migration + focused CI caller cutover + harness removal
+  -> Step 4  retired runtime / installer source removal + dogfood runtime projection
+  -> Step 5  main CI caller cutover
+  -> Step 6  current docs + dogfood docs/skills projection
   -> Step 7  config / links / inventory finalization
   -> Step 8  focused + full + clean-checkout verification
   -> Step 9  exit / handoff
@@ -67,7 +67,7 @@ Step 0  provenance / clean baseline
 
 ### 並行可能性
 
-- Step 1 の docs stale-scan test と runtime absence test は並行して作成できる。
+- Step 1 の runtime absence test と provider distribution test は並行して作成できる。docs stale-scan 拡張は Step 6 で行う。
 - Step 3 の test assertion migration は command family ごとに並行できるが、old harness / conftest の削除は全 family の移植後に一回だけ行う。
 - Step 6 の文書本文は runtime / CI target が確定した後なら並行できる。
 
@@ -77,6 +77,7 @@ Step 0  provenance / clean baseline
 - old test file 削除を current assertion 移植より先に行わない。
 - provider docs を直さず dogfood mirror だけを手編集しない。
 - CI workflow を旧 test 名のまま残して test file を削除しない。
+- provider runtime asset の変更を dogfood runtime projection に反映せず、parity test を完了扱いにしない。
 
 ## 実装step
 
@@ -142,21 +143,14 @@ source / test 削除前に、current route と「retired path が distribution �
 - provider scripts/docs/skills と checked-in dogfood projection の byte parity
 - provider shipped shim と `src/spec_dock/shim_vnext.py` の byte equality
 - managed skill catalog の exact match
-- current docs / operator guidance の required current terms
+- current docs / operator guidance の required current terms は Step 6 で追加する（既知の stale guidance を Step 1 の green gate に混ぜない）
 - legacy fixture を dogfood mismatch の許容値にしない
 
-### 1.3 docs stale-current test の拡張
-
-`tests/integration/test_cli_docs_vnext.py` を更新する。
-
-- current guidance set に provider `scripts/README.md`、root current docs、`AGENTS.md`、current dogfood copies、workflows を含める。
-- historical / migration / tombstone / spec archive を理由付き allowlist にする。
-- generic wordsではなく executable retired invocation pattern を検査する。
-
-### 1.4 baseline focused tests
+### 1.3 baseline focused tests
 
 ```bash
 uv run pytest \
+  tests/unit/infra/test_provider_distribution.py \
   tests/cli_runtime/test_cli_vnext_contract.py \
   tests/integration/test_cli_entrypoint_vnext.py \
   tests/integration/test_ci_fixed_validation.py \
@@ -165,17 +159,17 @@ uv run pytest \
   tests/integration/test_workspace_migration_journal_vnext.py
 ```
 
-新しい absence test だけが expected red、既存 current tests は green であることを確認する。
+新しい absence test だけが expected red、既存 current tests と新設 provider distribution test は green であることを確認する。既知の stale guidance を検出する docs test 拡張は Step 6.0 に置き、修正前の Step 1 では実行しない。
 
 ### 完了判定
 
-- current public route、tombstone、CI validator、migration、docs を守る test が source deletion 前に存在する。
+- current public route、tombstone、CI validator、migration、既存 docs contract を守る test が source deletion 前に存在する。
 - inventory の test migration table に全 old test family と移植先が記載される。
 
 ### failure recovery
 
 - current baseline test が既に失敗する場合は cleanup を進めず、baseline failure と Issue #411 差分を分離する。
-- stale scan が historical content を誤検出する場合は broad skip を入れず、最小 path / pattern allowlist と理由を追加する。
+- Step 6 の stale scan が historical content を誤検出する場合は broad skip を入れず、最小 path / pattern allowlist と理由を追加する。
 
 ## Step 2 — current asset layout を old installer から分離する
 
@@ -247,7 +241,21 @@ current caller が additional installer constant を必要とする場合は、�
 
 各 port entry には移植先 test path と test function 名を記録する。file 単位の「全部 old」判断は禁止する。
 
-### 3.2 command family ごとの移植
+### 3.2 focused CI caller を先に切り替える
+
+old test file を削除する前に `.github/workflows/provider-ci.yml` の matrix focused step を、Step 1 で存在を確認した current test path に切り替える。
+
+```bash
+uv run pytest \
+  tests/unit/infra/test_provider_distribution.py \
+  tests/integration/test_cli_entrypoint_vnext.py \
+  tests/integration/test_installation_group_init_vnext.py \
+  tests/integration/test_retired_cli_surface_cleanup.py
+```
+
+この時点で retired-surface absence test は Step 4 まで expected red なので、focused job の最終 green は Step 4 完了時に判定する。ここでは参照先 path が全て存在し、削除予定の old test path を workflow が参照しないことを確認する。full provider suite (`make lint`, `uv run pytest`) の構造は維持する。
+
+### 3.3 command family ごとの移植
 
 順序は次に固定する。
 
@@ -269,7 +277,7 @@ old assertion を読む
 -> family focused tests を再実行
 ```
 
-### 3.3 special files
+### 3.4 special files
 
 #### `tests/cli_runtime/test_cli_vnext_contract.py`
 
@@ -279,7 +287,7 @@ old assertion を読む
 
 #### `tests/unit/infra/test_init_update.py`
 
-- current provider/docs/skills parity assertionsを `test_provider_distribution.py` へ移す。
+- Step 1 で `test_provider_distribution.py` へ移した current provider/docs/skills parity assertions に抜けがないことを確認する。
 - legacy fixture を parity の許容値にする branch を削除する。
 - old init/update wire assertions は current installation integration へ移植するか、old-only なら削除する。
 - file に current-only assertions が残らなければ file を削除する。
@@ -314,7 +322,7 @@ old assertion を読む
 - `tests/unit/infra/test_fake_gh_harness.py` の fake-gh helper と GitHub status invariant は neutral test support と current unit test に移し、旧 harness 継承をなくす。
 - inventory §8.3 の全 direct caller と conftest 経由の利用を照合し、`rg -n 'tests\.cli_runtime\.harness|from \.harness|import harness' tests` で取りこぼしを確認してから共有 harness を削除する。
 
-### 3.4 legacy setup を削除
+### 3.5 legacy setup を削除
 
 移植先が全て green になった後に、同一 coherent change で次を削除する。
 
@@ -327,7 +335,7 @@ tests/fixtures/cli_redesign/legacy_manifest.json
 
 `tests/cli_runtime/conftest.py` に current fixtures が必要なら current-only fixture だけを残し、`legacy_installer_main`、old shim replacement、old command syntax を参照しない。
 
-### 3.5 old installer entry を削除
+### 3.6 old installer entry を削除
 
 old test caller がゼロになった時点で次を行う。
 
@@ -358,6 +366,7 @@ uv run pytest \
 - `rg -n 'legacy_installer_main|legacy_spec_dock\.script|legacy_manifest\.json|tests\.cli_runtime\.harness' tests src pyproject.toml` は intentional spec/history 以外ゼロ。
 - assertion migration ledger が全 old test family で完了している。
 - current installation / migration / safety tests が green。
+- provider-ci focused job が削除した old test path を参照しない。runtime absence test の expected red は Step 4 で解消する。
 
 ### failure recovery
 
@@ -425,17 +434,24 @@ uv run pytest tests/integration/test_retired_cli_surface_cleanup.py
 追加の手動確認:
 
 ```bash
-TMP_ENGINE="$(mktemp -d)/engine"
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/specdock-step4-XXXXXX")"
+trap 'rm -rf -- "$TMP_ROOT"' EXIT
+TMP_ENGINE="$TMP_ROOT/engine"
 uv run python -m spec_dock.fixed_bundle "$TMP_ENGINE"
 test ! -e "$TMP_ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/app.py"
 test ! -e "$TMP_ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/parser.py"
 "$TMP_ENGINE/bin/spec-dock" --help --json
 ```
 
+### 4.5 dogfood runtime projection
+
+provider runtime asset の削除・変更を、この repository の `spec-dock/scripts/**` に current installation/projection contract で反映する。provider を正本とし、他 worktree / consumer は更新しない。`test_provider_distribution.py` の scripts byte parity と Step 3.2 の focused CI job が green になってから Step 4 を完了する。
+
 ### 完了判定
 
 - confirmed retired source が source tree / package data / fixed distribution にない。
 - current 44 leaf、tombstone、installation、migration tests が green。
+- provider runtime assets とこの repository の dogfood scripts が byte-equal であり、provider-ci focused job が green。
 - conditional modules は削除証拠または retain 理由が inventory に記録される。
 
 ### failure recovery
@@ -443,7 +459,7 @@ test ! -e "$TMP_ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
 - current import failure が出た場合、削除した shared module をそのまま old shell として復活させない。必要 symbol を current ownership へ forward-port し current tests を追加する。
 - 広範な architecture redesign が必要になった場合は本 Issue の範囲を超えるため、module を retain し residual item として記録する。
 
-## Step 5 — CI caller を fixed read-only route へ切り替える
+## Step 5 — main CI caller を fixed read-only route へ切り替える
 
 ### 目的
 
@@ -490,20 +506,11 @@ jobs:
 - `git rev-parse HEAD` comparison がある。
 - `spec-dock/scripts/spec-dock sync`、`... validate`、`workspace sync` がない。
 - validator script の success / mismatch tests は保持する。read-only test は target root 全体の相対 path、file bytes、file mode、symlink target、directory set を実行前後で比較する。active、generated、installation control、`.git/spec-dock` も対象に含め、対象外の scratch engine は含めない。
+- dirty source に未追跡 file または変更済み file を置いた負例を追加する。validator は bundle build 前に失敗し、target root 全体の上記 snapshot と control state が変わらないことを確認する。
 
-### 5.3 `.github/workflows/provider-ci.yml`
+### 5.3 focused CI caller の確認
 
-matrix focused step を次の current test setへ変更する（実際の file 名は Step 1/3 で確定したものと一致させる）。
-
-```bash
-uv run pytest \
-  tests/unit/infra/test_provider_distribution.py \
-  tests/integration/test_cli_entrypoint_vnext.py \
-  tests/integration/test_installation_group_init_vnext.py \
-  tests/integration/test_retired_cli_surface_cleanup.py
-```
-
-full provider suite (`make lint`, `uv run pytest`) は維持する。
+Step 3.2 で切り替えた `.github/workflows/provider-ci.yml` が、削除済み test path を参照せず、Step 4 後の current focused test set で green であることを再確認する。
 
 ### 検証
 
@@ -519,6 +526,7 @@ uv run pytest \
 
 - workflow に old root invocation がない。
 - exact SHA mismatch negative test が green。
+- dirty source 拒否の負例が bundle build 前の失敗と target 無変更を示す。
 - target workspace bytes / control state が変わらない。
 - provider-ci が削除済み test path を参照しない。
 
@@ -532,6 +540,10 @@ uv run pytest \
 ### 目的
 
 実行可能な current guidance から retired command を除き、historical / migration evidence は意図的に残す。
+
+### 6.0 docs stale-current test の拡張（Red）
+
+`tests/integration/test_cli_docs_vnext.py` に、provider `scripts/README.md`、root current docs、`AGENTS.md`、current dogfood copies、workflows の executable retired invocation pattern を検出する test を追加する。historical / migration / tombstone / spec archive は理由付き最小 allowlist とし、generic words だけでは判定しない。`test_provider_distribution.py` には current docs / operator guidance の required current terms を追加する。既知の stale guidance について expected red を確認した後、6.1〜6.4 の修正で green にする。Red のまま Step 6 を完了しない。
 
 ### 6.1 provider scripts README
 
@@ -561,7 +573,7 @@ uv run pytest \
 
 ### 6.4 dogfood projection
 
-provider変更後、この repository の managed projectionだけを更新する。
+Step 6 の provider docs/scripts README/skills 変更後、この repository の managed projectionだけを更新する。Step 4.5 で同期済みの runtime asset に未反映差分を残さない。
 
 - `src/spec_dock/assets/spec_dock/scripts/**` -> `spec-dock/scripts/**`
 - `src/spec_dock/assets/spec_dock/docs/**` -> `spec-dock/docs/**`
@@ -678,7 +690,7 @@ policy skip、regression ledgerによる除外、old-test allowlistによるcoll
 
 ```bash
 set -euo pipefail
-TMP_ROOT="$(mktemp -d /private/tmp/specdock-bundle-XXXXXX)"
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/specdock-bundle-XXXXXX")"
 trap 'rm -rf -- "$TMP_ROOT"' EXIT
 ENGINE="$TMP_ROOT/engine"
 uv run python -m spec_dock.fixed_bundle "$ENGINE"
@@ -699,7 +711,7 @@ test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/
 ```bash
 # いずれも test-built fixed engine を使い、old behavior を成功させない。
 set -euo pipefail
-TMP_NEG="$(mktemp -d /private/tmp/specdock-negative-XXXXXX)"
+TMP_NEG="$(mktemp -d "${TMPDIR:-/tmp}/specdock-negative-XXXXXX")"
 trap 'rm -rf -- "$TMP_NEG"' EXIT
 NEG_ENGINE="$TMP_NEG/engine"
 NEG_TARGET="$TMP_NEG/retired-init-probe"
@@ -732,7 +744,7 @@ test ! -e "$NEG_TARGET"
 
 ```bash
 set -euo pipefail
-TMP_ROOT="$(mktemp -d /private/tmp/specdock-ci-XXXXXX)"
+TMP_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/specdock-ci-XXXXXX")"
 SOURCE="$TMP_ROOT/source"
 trap 'rm -rf -- "$TMP_ROOT"' EXIT
 SOURCE_SHA="$(git rev-parse --verify 'HEAD^{commit}')"
