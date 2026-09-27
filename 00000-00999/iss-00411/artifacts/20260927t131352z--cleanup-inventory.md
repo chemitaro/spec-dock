@@ -149,7 +149,7 @@ A blank record means the module remains.
 |---|---|---|---|
 | `.github/workflows/ci.yml` | Runs `python3 ./spec-dock/scripts/spec-dock sync` then `validate` | `UPDATE-CURRENT` | Invoke `specdock-ci-validate.sh` with source root, target root, full `${{ github.sha }}`; no sync/write. |
 | `.github/scripts/specdock-ci-validate.sh` | Full SHA, clean source, scratch fixed engine, digest, read-only `workspace validate --ci --json` | `RETAIN-CURRENT` | Keep behavior; adjust only if workflow-testability/error clarity requires. |
-| `tests/integration/test_ci_fixed_validation.py` | Success, exact SHA output, target unchanged, wrong SHA failure | `RETAIN-CURRENT` | Extend with workflow wiring assertion or add adjacent test. |
+| `tests/integration/test_ci_fixed_validation.py` | Success, exact SHA output, target unchanged, wrong SHA failure | `RETAIN-CURRENT` | Extend with workflow wiring, dirty source, invalid expected SHA, and invalid distribution digest fail-closed cases; compare target state before/after. |
 | `.github/workflows/provider-ci.yml` | Full suite plus focused matrix running old installer/harness tests | `UPDATE-CURRENT` | Before deleting old test files in Step 3, switch focused matrix to `test_provider_distribution.py`, fixed entrypoint test, current installation init test, retired-surface absence test; its final green gate follows Step 4 source removal and dogfood runtime projection. |
 | `.github/workflows/commit-identity.yml` | Separate identity gate | `VERIFY-ONLY` | No Issue #411 change unless link/reference scan proves necessary. |
 
@@ -276,7 +276,7 @@ The migration tests and their fixture/helper data are intentional retain candida
 | `src/spec_dock/assets/spec_dock/docs/reference_cli.md` | Current 44-leaf, fixed CI, installation/migration | `RETAIN-CURRENT` | Update only if cleanup changes path wording/link. |
 | `src/spec_dock/assets/spec_dock/docs/migration.md` | Current migration/recovery; may mention old state | `RETAIN-CURRENT` with scan exception | Do not rewrite history merely to remove old tokens. |
 | root `README.md` | Current fixed engine and current commands | `VERIFY-ONLY` | No change unless link/stale scan finds issue. |
-| `AGENTS.md` | Current operation rules but architecture map still describes `parser/registry/dispatch` and test-only old installer | `UPDATE-CURRENT` | Replace map with `options/catalog/vnext_runtime/admission/legacy`; remove retired fixture guidance. |
+| `AGENTS.md` | Current operation rules but architecture map still describes `parser/registry/dispatch` and test-only old installer; development command names the soon-to-be-deleted `test_directory_installation.py` | `UPDATE-CURRENT` | Replace map with `options/catalog/vnext_runtime/admission/legacy`; remove retired fixture guidance and replace the deleted test command with a current test path. |
 | `src/spec_dock/assets/install_root/.agents/skills/**` | Current agent guidance introduced by cutover | `VERIFY-ONLY` | Stale-current scan; update only confirmed retired instructions. |
 | dogfood `.agents/skills/**` | Current projection | `VERIFY-ONLY` | Provider parity. |
 | Issue / Initiative / Epic specs under `spec-dock/initiatives/**` | Historical/project records; may contain old command text | `RETAIN-HISTORICAL` for scan purposes | Never mass-rewrite as cleanup. |
