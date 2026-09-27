@@ -71,7 +71,7 @@ Step 0  provenance / clean baseline
 
 ### 並行可能性
 
-- Step 1 の runtime absence test と provider distribution test は並行して作成できる。docs stale-scan 拡張は Step 6 で行う。
+- Step 1 の現行入口確認と provider distribution test は独立して進められる。docs stale-scan は Step 6 で行う。
 - Step 3 の test assertion migration は command family ごとに並行できるが、old harness / conftest の削除は全 family の移植後に一回だけ行う。
 - Step 6 の文書本文は runtime / CI target が確定した後なら並行できる。
 
@@ -144,18 +144,9 @@ test "$(git worktree list --porcelain | sed -n 's/^worktree //p')" = "$PWD"
 
 source / test 削除前に、current route と「retired path が distribution に残らない」ことを自動判定できるようにする。
 
-### 1.1 新規 retired-surface integration test
+### 1.1 既存の安全境界と削除対象を確認
 
-`tests/integration/test_retired_cli_surface_cleanup.py` を追加し、次を実装する。
-
-1. mandatory removal manifest の source paths が存在しないこと。
-2. `spec_dock.cli` が `legacy_installer_main` を公開しないこと。
-3. fixed bundle を temp directory に構築し、distribution 内に mandatory retired paths がないこと。
-4. current root files に retired module import / exact module-name string がないこと。
-5. `cli/legacy.py`、historical docs、migration docs、Issue specs は intentional allowlist であること。
-6. representative retired roots が current entrypoint で fail closed すること。fixed bundle の subprocess 負例は remote を持たない一時 checkout と stub `gh` だけを使い、実作業 checkout では実行しない。exit code だけでなく `LEGACY_COMMAND_REMOVED` と replacement を確認し、repo file/active/control と Git refs の before/after を比較する。
-
-実装前は absence assertion が赤になる。expected failure を確認したら、`xfail` や skip を残さず後続 Step で green にする。
+既存の `tests/integration/test_cli_entrypoint_vnext.py`、`tests/cli_runtime/test_cli_vnext_contract.py` と固定bundleの確認で、現行入口、44 leaf、旧コマンド拒否を確認する。mandatory removal manifest の不在は確認シートの source / bundle ファイル一覧で記録する。専用の不存在テストは増設しない。
 
 ### 1.2 provider distribution test の抽出
 
@@ -180,7 +171,7 @@ uv run pytest \
   tests/integration/test_workspace_migration_journal_vnext.py
 ```
 
-新しい absence test だけが expected red、既存 current tests と新設 provider distribution test は green であることを確認する。既知の stale guidance を検出する docs test 拡張は Step 6.0 に置き、修正前の Step 1 では実行しない。
+既存 current tests と新設 provider distribution test が green であることを確認する。文書の現状確認は Step 6 で行う。
 
 ### 完了判定
 
@@ -271,10 +262,10 @@ uv run pytest \
   tests/unit/infra/test_provider_distribution.py \
   tests/integration/test_cli_entrypoint_vnext.py \
   tests/integration/test_installation_group_init_vnext.py \
-  tests/integration/test_retired_cli_surface_cleanup.py
+  tests/integration/test_cli_entrypoint_vnext.py
 ```
 
-この時点で retired-surface absence test は Step 4 まで expected red なので、focused job の最終 green は Step 4 完了時に判定する。ここでは参照先 path が全て存在し、削除予定の old test path を workflow が参照しないことを確認する。full provider suite (`make lint`, `uv run pytest`) の構造は維持する。
+参照先 path が全て存在し、削除予定の old test path を workflow が参照しないことを確認する。full provider suite (`make lint`, `uv run pytest`) の構造は維持する。
 
 ### 3.3 command family ごとの移植
 
@@ -387,7 +378,7 @@ uv run pytest \
 - `rg -n 'legacy_installer_main|legacy_spec_dock\.script|legacy_manifest\.json|tests\.cli_runtime\.harness' tests src pyproject.toml` は intentional spec/history 以外ゼロ。
 - assertion migration ledger が全 old test family で完了している。
 - current installation / migration / safety tests が green。
-- provider-ci focused job が削除した old test path を参照しない。runtime absence test の expected red は Step 4 で解消する。
+- provider-ci focused job が削除した old test path を参照しない。
 
 ### failure recovery
 
@@ -449,7 +440,7 @@ rg -n --hidden \
 ### 4.4 package/distribution absence
 
 ```bash
-uv run pytest tests/integration/test_retired_cli_surface_cleanup.py
+uv run pytest tests/integration/test_cli_entrypoint_vnext.py
 ```
 
 追加の手動確認:
@@ -541,7 +532,6 @@ Step 3.2 で切り替えた `.github/workflows/provider-ci.yml` が、削除済�
 uv run pytest \
   tests/integration/test_ci_fixed_validation.py \
   tests/integration/test_cli_entrypoint_vnext.py \
-  tests/integration/test_retired_cli_surface_cleanup.py \
   tests/unit/infra/test_provider_distribution.py
 ```
 
@@ -684,7 +674,6 @@ rg -n --hidden \
 ```bash
 uv run pytest \
   tests/cli_runtime/test_cli_vnext_contract.py \
-  tests/integration/test_retired_cli_surface_cleanup.py \
   tests/integration/test_cli_entrypoint_vnext.py \
   tests/integration/test_cli_docs_vnext.py \
   tests/integration/test_ci_fixed_validation.py \
@@ -734,7 +723,7 @@ test ! -e "$ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/
 Step 1.1 の fixed bundle subprocess 負例を実行する。fixture は一時 Git checkout を作成して remote を除去し、`gh` を stub 化する。`issue start`、`deps check`、`delete`、`init` を fixture checkout 内で実行し、各 command の exit code だけでなく `LEGACY_COMMAND_REMOVED`（`init` は current entrypoint の `USAGE_ERROR` または `COMMAND_REMOVED`）と replacement を確認する。fixture の files、active/control、Git refs、target directory を実行前後で比較し、success でも non-zero でも実作業 repository へ影響しないことを確認する。
 
 ```bash
-uv run pytest tests/integration/test_retired_cli_surface_cleanup.py \
+uv run pytest tests/integration/test_cli_entrypoint_vnext.py \
   -k fixed_bundle_retired_roots_fail_closed_in_isolated_checkout
 ```
 
@@ -787,7 +776,7 @@ Step 0 の ignored `.workbench/issue411-scope-baseline.json` を同じ snapshot 
 |---|---|
 | focused test failure | 最後のgreen stepへsource restore/revertし、current invariantをforward-fix |
 | full suiteだけfailure | shared module/test migration漏れを特定し、old runtime fallbackを復活させずcurrent layerで修正 |
-| fixed bundleにretired file | source/package-data/referenceの残存を除去、absence testを強化 |
+| fixed bundleにretired file | source/package-data/referenceの残存を除去、削除一覧の照合を強化 |
 | CI validator SHA mismatch | checkout/expected SHA wiring修正。別branch/default refへfallbackしない |
 | dogfood parity mismatch | provider正本からprojection再作成 |
 | migration regression | cleanup deletionを戻し、migration module/testをretain。schema migrationは実行しない |
@@ -828,7 +817,7 @@ Step 0 の ignored `.workbench/issue411-scope-baseline.json` を同じ snapshot 
 | Acceptance | Primary step | Verification |
 |---|---|---|
 | AC-411-01 | Step 2, 3 | entrypoint tests、no `legacy_installer_main` |
-| AC-411-02 | Step 4 | retired-surface test、fixed bundle path check |
+| AC-411-02 | Step 4 | 現行入口 test、fixed bundle path check |
 | AC-411-03 | Step 1, 4, 8 | tombstone / no-write negative tests |
 | AC-411-04 | Step 5, 8 | CI integration、clean-checkout reproduction |
 | AC-411-05 | Step 6 | docs test、provider/dogfood parity |

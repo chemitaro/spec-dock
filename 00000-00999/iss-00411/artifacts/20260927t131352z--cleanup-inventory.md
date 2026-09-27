@@ -179,7 +179,6 @@ A blank record means the module remains.
 | `tests/cli_runtime/test_cli_vnext_contract.py::test_legacy_28_leaf_inventory_is_frozen_before_cutover` | `REMOVE-CONFIRMED` | Delete test and old parser/registry imports. |
 | Remaining `test_cli_vnext_contract.py` tests for 44 leaf/help/options/JSON/recovery/tombstone | `RETAIN-CURRENT` | Keep; rename wording from “future/vNext” to current where useful, without changing contract. |
 | `tests/integration/test_cli_entrypoint_vnext.py` | `RETAIN-CURRENT` | Keep fixed distribution, no checkout fallback, retired installer no-write tests; add assertion that public module has no `legacy_installer_main`. |
-| New `tests/integration/test_retired_cli_surface_cleanup.py` | `ADD-CURRENT` | Source and fixed-distribution absence, no retired imports, intentional allowlist. |
 
 ### 8.3 Old harness caller tests
 
@@ -393,16 +392,25 @@ The implementer must fill this table in the PR/report, not by editing historical
 
 | Gate | Result / command output summary | Status |
 |---|---|---|
-| Verified baseline / drift check |  | pending |
-| Current-root import/reference scan |  | pending |
-| Assertion migration ledger complete |  | pending |
-| Old source removed |  | pending |
-| Fixed distribution retired-path absence |  | pending |
-| CI workflow wiring and negative tests |  | pending |
-| Provider/dogfood byte parity |  | pending |
-| Current docs stale scan |  | pending |
-| Focused tests |  | pending |
-| `make lint` |  | pending |
-| `uv run pytest` |  | pending |
-| `git diff --check` |  | pending |
-| Out-of-scope side-effect check |  | pending |
+| Verified baseline / drift check | 独立 clone、branch、祖先、3677 entries snapshot | pass |
+| Current-root import/reference scan | §15 の現行 root / 共有 module 判断 | pass |
+| Assertion migration ledger complete | §8 family mapping と §15 実施判断 | pass |
+| Old source removed | provider / dogfood の旧 shell と command を撤去 | pass |
+| Fixed distribution retired-path absence | fixed bundle 実物で app/bootstrap/installer 不在 | pass |
+| CI workflow wiring and negative tests | current CI integration 19 passed、clean checkout 実行待ち | pending |
+| Provider/dogfood byte parity | test_provider_distribution.py | pass |
+| Current docs stale scan | current docs 改訂、historical pointer 追加 | pass |
+| Focused tests | entrypoint / CI / parity 19 passed | pass |
+| `make lint` | ruff check / format、mypy 成功 | pass |
+| `uv run pytest` | 1212 passed / 1 skipped | pass |
+| `git diff --check` | 差分形式を確認 | pass |
+| Out-of-scope side-effect check | 3677 entries 差分 0、refs は commit 後に確認 | pending |
+
+## 15. 実装時の判断と証拠（2026-09-28）
+
+- 現行の root は `spec_dock.cli:main` → `external_cli` → 固定配布、runtime は `cli.vnext_runtime` と `commands/*_vnext`。旧 `app.py`、`cli/bootstrap.py`、`parser.py`、`registry.py`、`dispatch.py` と旧 command 15 modules は現行 root から呼ばれず、旧 harness / test を除去後に provider と dogfood の双方から撤去した。
+- `application/issue_lifecycle.py`、`commands/targets.py`、`commands/node_id_normalizer.py` は旧 shell 専用の参照を確認して撤去した。`application/contracts.py` は現行 Artifact / Workbench が使用し、`application/resolve_target.py` は現行 target 解決の unit tests が使用するので保持した。`application/create_node.py`、`infra/git_helper.py` など古い名前の共有モジュールも現行呼び出しまたは動的呼び出しがあるため保持した。その他の application / infra / presentation は、この Issue での削除根拠がないものを保持した。
+- old harness、fixture、old command tests は旧構文や旧ディレクトリ installer を凍結していた。現行の 44 leaf / tombstone は `test_cli_vnext_contract.py` と `test_cli_entrypoint_vnext.py`、installation / migration / journal は現行 integration tests、Scope / Work / Artifact は各 `*_vnext.py` が検証する。current-named test の旧 `init` setup は provider scaffold へ差し替えた。旧 test 関数の機械的コピーは実施しない。
+- 配布 parity と shim equality だけを `test_provider_distribution.py` に置き、CI workflow wiring は既存 `test_ci_fixed_validation.py` に 1 件追加した。撤去確認専用の大規模 test harness は追加しない。旧ファイル不在は fixed bundle の実物照合で確認する。
+- `uv run pytest -q --maxfail=1`: 1212 passed / 1 skipped。`make lint`: ruff check / format、mypy 成功。固定 bundle の digest `fc4a0fa729e0d422bc15513cd29a7d5f7d9bb5966a5b7852f0e00f70def88f0e`、旧 app/bootstrap/installer ファイル不在、現行 help 成功。範囲 snapshot 3677 entries は、Issue #411 のみ除外して差分 0。
+- clean checkout CI、最終 SHA の照合、Strict v2 は commit / push 後に実施する。
