@@ -181,20 +181,25 @@ A blank record means the module remains.
 | `tests/integration/test_cli_entrypoint_vnext.py` | `RETAIN-CURRENT` | Keep fixed distribution, no checkout fallback, retired installer no-write tests; add assertion that public module has no `legacy_installer_main`. |
 | New `tests/integration/test_retired_cli_surface_cleanup.py` | `ADD-CURRENT` | Source and fixed-distribution absence, no retired imports, intentional allowlist. |
 
-### 8.3 Old runtime CLI modules named by `tests/cli_runtime/conftest.py`
+### 8.3 Old harness caller tests
 
-The following modules are confirmed old-launcher callers and must be handled assertion-by-assertion before removal:
+The following modules depend on the old harness directly or through `tests/cli_runtime/conftest.py` and must be handled assertion-by-assertion before removal. A `_vnext` filename does not make a direct harness import safe:
 
 - `tests/cli_runtime/test_active.py`
 - `tests/cli_runtime/test_artifact_import_file.py`
 - `tests/cli_runtime/test_artifact_import_s04.py`
 - `tests/cli_runtime/test_close.py`
 - `tests/cli_runtime/test_delete.py`
+- `tests/cli_runtime/test_distribution_cutover.py`
 - `tests/cli_runtime/test_deps.py`
 - `tests/cli_runtime/test_doctor.py`
+- `tests/cli_runtime/test_generation_checkout.py`
 - `tests/cli_runtime/test_import.py`
 - `tests/cli_runtime/test_issue_lifecycle.py`
 - `tests/cli_runtime/test_new.py`
+- `tests/cli_runtime/test_runtime_handoff.py`
+- `tests/cli_runtime/test_scope_github_vnext.py`
+- `tests/cli_runtime/test_scope_local_vnext.py`
 - `tests/cli_runtime/test_storage_core_cli.py`
 - `tests/cli_runtime/test_sync.py`
 - `tests/cli_runtime/test_uninstall.py`
@@ -202,7 +207,9 @@ The following modules are confirmed old-launcher callers and must be handled ass
 - `tests/cli_runtime/test_validate.py`
 - `tests/cli_runtime/test_workbench.py`
 - `tests/cli_runtime/test_worktree.py`
+- `tests/cli_runtime/test_worktree_lifecycle_coordination.py`
 - `tests/cli_runtime/test_wrappers.py`
+- `tests/unit/infra/test_fake_gh_harness.py`
 
 Additional non-`_vnext` `test_runtime_*` modules and unit command/presentation tests may exercise shared use cases rather than the old wire. They are `VERIFY-THEN-REMOVE`, not bulk-delete candidates.
 
@@ -225,6 +232,10 @@ Additional non-`_vnext` `test_runtime_*` modules and unit command/presentation t
 
 | Path | Observed state | Decision | Action |
 |---|---|---|---|
+| `tests/cli_runtime/test_distribution_cutover.py` | Directly imports old harness; mixes current provider/install-root catalog, skill parity, executable boundary, unmanaged-content and consumer-workflow preservation with old init replacement assertions | `UPDATE-CURRENT` then remove old wire | Classify every test function; move current parity to provider distribution tests and current installation invariants to installation integration tests before deleting the old harness/file. |
+| `tests/cli_runtime/test_generation_checkout.py`, `test_runtime_handoff.py`, `test_worktree_lifecycle_coordination.py` | Directly subclass old `CliRuntimeHarness`; some assertions may still express current workspace/branch safety | `VERIFY-THEN-REMOVE` | Port current invariants to current fixtures/tests before removing the old base class; delete only old init/CLI wire assertions. |
+| `tests/cli_runtime/test_scope_github_vnext.py`, `test_scope_local_vnext.py` | Current-named tests call `harness.main(["init", ...])` for setup | `UPDATE-CURRENT` | Replace setup with current fixed installation fixture; retain current scope behavior assertions. |
+| `tests/unit/infra/test_fake_gh_harness.py` | Uses old harness stub helpers while testing shared GitHub CLI/status invariants | `UPDATE-CURRENT` | Move fake-gh helpers to current neutral test support and preserve the shared invariant assertions. |
 | `tests/unit/infra/test_directory_installation.py` | Directly imports `legacy_installer_main`; asserts old replace-in-place and nontransactional update semantics | `REMOVE-CONFIRMED` after migration | Move only still-current data-preservation/security assertions to current installation tests; do not preserve old nontransactional contract. |
 | `tests/unit/infra/test_init_update.py` | Imports old harness; mixes old init/update tests with current docs/skills/provider-dogfood parity assertions | `UPDATE-CURRENT` then remove old portions | Move current parity/guidance assertions into `tests/unit/infra/test_provider_distribution.py`; migrate installation assertions; remove legacy fixture exceptions. |
 | `tests/unit/cli/test_cli_smoke.py` | Executes old `active set --id` through old harness | `REMOVE-CONFIRMED` | Current fixed-engine/current active integration test replaces it. |
