@@ -140,6 +140,105 @@ def test_staged_hardlink_is_rejected_before_replacement(tmp_path: Path) -> None:
     assert not (target / "spec-dock/spec-dock.version").exists()
 
 
+@pytest.mark.parametrize("level", ["root", "nested"])
+def test_rollback_rejects_displaced_symlink_without_outside_mutation(tmp_path: Path, level: str) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="init", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    displaced = target / ".spec-dock-installations" / record.operation_id / "displaced"
+    if level == "nested":
+        displaced.mkdir()
+        displaced /= "spec-dock"
+    displaced.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        rollback_installation(journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True)
+
+    assert list(outside.iterdir()) == []
+    assert (target / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.4\n"
+    assert read_record(journal, record.operation_id).phase == "committed"
+
+
+def test_rollback_rejects_displaced_redirect_inserted_after_preflight(tmp_path: Path) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="init", bundle=_bundle(tmp_path))
+    apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    displaced = target / ".spec-dock-installations" / record.operation_id / "displaced"
+
+    def redirect_after_preflight(_: InstallationRecord) -> None:
+        displaced.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        rollback_installation(
+            journal, record.operation_id, enter_maintenance=redirect_after_preflight, allow_committed=True
+        )
+
+    assert list(outside.iterdir()) == []
+    assert (target / "spec-dock/spec-dock.version").read_text(encoding="utf-8") == "0.2.4\n"
+    assert read_record(journal, record.operation_id).phase == "committed"
+
+
+@pytest.mark.parametrize("level", ["root", "nested"])
+def test_apply_rejects_backup_symlink_without_outside_mutation(tmp_path: Path, level: str) -> None:
+    target = tmp_path / "consumer"
+    version = target / "spec-dock/spec-dock.version"
+    version.parent.mkdir(parents=True)
+    version.write_text("old\n", encoding="utf-8")
+    journal = tmp_path / "common"
+    record = prepare_installation(target, journal, action="update", bundle=_bundle(tmp_path))
+
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    backup = target / ".spec-dock-installations" / record.operation_id / "backup"
+    if level == "nested":
+        backup.mkdir()
+        backup /= "spec-dock"
+    backup.symlink_to(outside, target_is_directory=True)
+
+    with pytest.raises(ValueError, match="symlink"):
+        apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
+
+    assert list(outside.iterdir()) == []
+    assert version.read_text(encoding="utf-8") == "old\n"
+    assert read_record(journal, record.operation_id).phase != "committed"
+
+
+@pytest.mark.parametrize("level", ["root", "nested"])
+def test_prepare_rejects_stage_symlink_without_outside_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, level: str
+) -> None:
+    target = tmp_path / "consumer"
+    target.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    publish_marker = installation_executor._publish_marker
+
+    def redirect_stage(journal_root: Path, record: InstallationRecord, area: Path) -> InstallationRecord:
+        published = publish_marker(journal_root, record, area)
+        stage = area / "stage"
+        if level == "nested":
+            stage.mkdir()
+            stage /= "spec-dock"
+        stage.symlink_to(outside, target_is_directory=True)
+        return published
+
+    monkeypatch.setattr(installation_executor, "_publish_marker", redirect_stage)
+    with pytest.raises(ValueError, match="symlink"):
+        prepare_installation(target, tmp_path / "common", action="init", bundle=_bundle(tmp_path))
+
+    assert list(outside.iterdir()) == []
+    assert not (target / "spec-dock/spec-dock.version").exists()
+
+
 def test_completed_same_content_inode_swap_blocks_rollback(tmp_path: Path) -> None:
     target = tmp_path / "consumer"
     target.mkdir()
@@ -236,20 +335,36 @@ def test_rollback_resumes_after_after_state_is_displaced(
     apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
     displaced = target / ".spec-dock-installations" / record.operation_id / "displaced/spec-dock/spec-dock.version"
     original_sync = installation_executor._sync_directory
-
-    stop_directory = version.parent if sync_boundary == "destination" else displaced.parent
+    original_fsync = installation_executor.os.fsync
 
     def stop_after_displacement(directory: Path) -> None:
-        if directory == stop_directory and displaced.exists() and not version.exists():
+        if (
+            sync_boundary == "destination"
+            and directory == version.parent
+            and displaced.exists()
+            and not version.exists()
+        ):
             raise OSError("stop after displacement")
         original_sync(directory)
 
+    def stop_after_displaced_sync(descriptor: int) -> None:
+        if (
+            sync_boundary == "displaced"
+            and displaced.exists()
+            and not version.exists()
+            and os.fstat(descriptor).st_ino == displaced.parent.stat().st_ino
+        ):
+            raise OSError("stop after displacement")
+        original_fsync(descriptor)
+
     monkeypatch.setattr(installation_executor, "_sync_directory", stop_after_displacement)
+    monkeypatch.setattr(installation_executor.os, "fsync", stop_after_displaced_sync)
     with pytest.raises(OSError, match="stop after displacement"):
         rollback_installation(journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True)
     assert not version.exists()
     assert displaced.read_text(encoding="utf-8") == "0.2.4\n"
     monkeypatch.setattr(installation_executor, "_sync_directory", original_sync)
+    monkeypatch.setattr(installation_executor.os, "fsync", original_fsync)
 
     restored = rollback_installation(
         journal, record.operation_id, enter_maintenance=lambda _: None, allow_committed=True
@@ -336,19 +451,18 @@ def test_stage_identity_survives_rename_before_completion_record(
     target.mkdir()
     journal = tmp_path / "common"
     record = prepare_installation(target, journal, action="init", bundle=_bundle(tmp_path))
-    original = type(target).replace
+    original = installation_executor.os.replace
     stopped = False
 
-    def interrupt(path: Path, destination: Path) -> Path:
+    def interrupt(source: str | Path, destination: str | Path, **kwargs: int) -> None:
         nonlocal stopped
-        result = original(path, destination)
-        if not stopped and "/stage/" in str(path):
+        original(source, destination, **kwargs)
+        if not stopped and kwargs.get("src_dir_fd") is not None:
             stopped = True
             raise RuntimeError("rename completed before journal")
-        return result
 
     with monkeypatch.context() as patch:
-        patch.setattr(type(target), "replace", interrupt)
+        patch.setattr(installation_executor.os, "replace", interrupt)
         with pytest.raises(RuntimeError, match="rename completed before journal"):
             apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)
     completed = apply_installation(journal, record.operation_id, enter_maintenance=lambda _: None)

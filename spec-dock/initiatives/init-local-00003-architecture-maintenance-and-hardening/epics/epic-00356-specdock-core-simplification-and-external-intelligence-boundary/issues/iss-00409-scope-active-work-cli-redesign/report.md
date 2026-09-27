@@ -66,6 +66,14 @@ ID: "iss-00409"
 
 受入仕様AC-23/25と設計D-21/22を再照合し、公開入力 `v0.2.4` を固定source解決時に正規version `0.2.4` へ変換し、group/child journalと導入先version fileにはその値を渡すよう修正しました。finalizeは正規versionとの完全一致を再び要求します。公開CLIから `v0.2.4` を指定してjournalと二worktreeのversion fileが `0.2.4` となり、maintenanceからreadyへのfinalizeも通るテストをRed→Greenで確認しました。rollbackの二つのfsync境界とbefore-state不在の中断復旧も追加検証しました。関連テストは `98 passed` です。全テストと最終SHAのStrict v2判定は、この追補時点では未実施です。
 
+## 2026-09-27 operation areaの領域外書込み対策
+
+同じレビュアーによる`057a48906b4e8d7ed57d4a4c10ee6fbe1628b0c5`のFinal Quality Gate Strict v2は、前回2件のP1を解消とし、installationのoperation area内に置く`backup`・`displaced`の祖先symlinkをたどって導入先の外へ書き出せるP1を1件検出しました。coverageは完了、判定はfailです。AC-29とDesign D-17は、領域外への変更を拒否し、公開・復元直前に所有したdirectory descriptorの下で操作することを要求しています。
+
+別会話のChatGPT Analyze Review Findings Strictで、これは既存仕様の意味を変更せず修正できる実装欠陥と分析しました。Oracleは回答取得を停止しましたが、同一会話の送信turn・終端回答・digestを照合して保存しました。回答の節見出しからMarkdownの`#`が脱落しているため、Strictの出力形式を満たす正式な分析パケットとしては扱わず、既存仕様・実装・テストに照らした補助分析として利用しています。
+
+`stage`・`backup`・`displaced`の各祖先をno-followで開き、親directory descriptorに相対的な作成・観測・rename・fsyncへ切り替えました。既存journal schema、CLI、source pin、後続変更の拒否、rollback再開の意味は変更していません。領域外symlinkの直接・入れ子・事前検査後差替えを公開installation APIの結合テストで検査し、修正前のRed、修正後のGreenを確認しました。関連installationテストは`186 passed`、更新したjournal結合テストは`51 passed`、`make lint`と`git diff --check`は終了コード0です。固定SHAの全テスト・独立clone確認・同じレビュアーの再審査は、次のコミット後に実施します。
+
 ## Residual Risks / Follow-ups
 
 - 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。

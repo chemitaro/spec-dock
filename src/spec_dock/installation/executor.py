@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from dataclasses import replace
 import hashlib
 import json
@@ -18,7 +19,7 @@ from spec_dock.installation.source import VerifiedBundle, assert_disjoint_source
 from spec_dock.installer import IGNORE_FILE, LEGACY_WORKBENCH_IGNORE, TOOL_DIRECTORIES, VERSION_FILE
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Iterator
 
 _MANAGED = (*TOOL_DIRECTORIES, VERSION_FILE, IGNORE_FILE)
 _INIT_SCAFFOLD = ("spec-dock/workspace.json", "spec-dock/.workbench/README.md")
@@ -146,6 +147,152 @@ def _operation_area(target: Path, operation_id: str) -> Path:
     return area
 
 
+@contextmanager
+def _operation_entry(area: Path, relative: str, *, create_parents: bool = False) -> Iterator[tuple[int, str]]:
+    """Bind an operation entry to a no-follow parent directory descriptor."""
+    nofollow = getattr(os, "O_NOFOLLOW", None)
+    directory = getattr(os, "O_DIRECTORY", None)
+    if nofollow is None or directory is None or not area.is_absolute():
+        raise ValueError("this platform cannot safely access installation operation paths")
+    parts = Path(relative).parts
+    if not parts or Path(relative).is_absolute() or any(part in ("", ".", "..") for part in parts):
+        raise ValueError("installation operation path is invalid")
+    descriptor = os.open("/", os.O_RDONLY | directory)
+    try:
+        area_parts = area.parts[1:]
+        for index, part in enumerate((*area_parts, *parts[:-1])):
+            if index >= len(area_parts) and create_parents:
+                try:
+                    os.mkdir(part, mode=0o700, dir_fd=descriptor)
+                    os.fsync(descriptor)
+                except FileExistsError:
+                    pass
+            try:
+                child = os.open(part, os.O_RDONLY | directory | nofollow, dir_fd=descriptor)
+            except OSError as error:
+                try:
+                    observed = os.stat(part, dir_fd=descriptor, follow_symlinks=False)
+                except FileNotFoundError:
+                    raise error from None
+                if stat.S_ISLNK(observed.st_mode):
+                    raise ValueError(f"installation operation path is a symlink: {area / relative}") from error
+                raise
+            os.close(descriptor)
+            descriptor = child
+        yield descriptor, parts[-1]
+    finally:
+        os.close(descriptor)
+
+
+def _entry_snapshot(parent: int, name: str) -> tuple[str, str] | None:
+    """Compute the journal's identity and content hashes without resolving path ancestors."""
+    entries: list[tuple[str, os.stat_result, bytes | None]] = []
+
+    def visit(directory: int, child_name: str, relative: str) -> None:
+        before = os.stat(child_name, dir_fd=directory, follow_symlinks=False)
+        if stat.S_ISDIR(before.st_mode):
+            kind = "directory"
+            flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+        elif stat.S_ISREG(before.st_mode):
+            kind = "file"
+            flags = os.O_RDONLY | os.O_NOFOLLOW
+        else:
+            raise ValueError(f"installation operation path has an unsupported entry: {relative}")
+        descriptor = os.open(child_name, flags, dir_fd=directory)
+        try:
+            observed = os.fstat(descriptor)
+            if (before.st_dev, before.st_ino, before.st_mode) != (
+                observed.st_dev,
+                observed.st_ino,
+                observed.st_mode,
+            ):
+                raise ValueError(f"installation operation path changed identity: {relative}")
+            if kind == "file" and observed.st_nlink != 1:
+                raise ValueError(f"installation operation path has an unowned hardlink: {relative}")
+            content: bytes | None = None
+            if kind == "file":
+                chunks = []
+                while chunk := os.read(descriptor, 1024 * 1024):
+                    chunks.append(chunk)
+                content = b"".join(chunks)
+            entries.append((relative, observed, content))
+            if kind == "directory":
+                for child in sorted(item.name for item in os.scandir(descriptor)):
+                    visit(descriptor, child, child if relative == "." else f"{relative}/{child}")
+            after = os.stat(child_name, dir_fd=directory, follow_symlinks=False)
+            current = os.fstat(descriptor)
+            if (
+                before.st_dev,
+                before.st_ino,
+                before.st_mode,
+                before.st_size,
+            ) != (
+                after.st_dev,
+                after.st_ino,
+                after.st_mode,
+                after.st_size,
+            ) or (
+                observed.st_dev,
+                observed.st_ino,
+                observed.st_mode,
+                observed.st_size,
+            ) != (
+                current.st_dev,
+                current.st_ino,
+                current.st_mode,
+                current.st_size,
+            ):
+                raise ValueError(f"installation operation path changed during observation: {relative}")
+        finally:
+            os.close(descriptor)
+
+    try:
+        visit(parent, name, ".")
+    except FileNotFoundError as error:
+        if not entries:
+            return None
+        raise ValueError(f"installation operation path changed during observation: {name}") from error
+    entries.sort(key=lambda entry: entry[0])
+    identity = hashlib.sha256()
+    content = hashlib.sha256()
+    root_mode = stat.S_IMODE(entries[0][1].st_mode).to_bytes(2, "big")
+    if entries[0][2] is None:
+        content.update(b"directory\0" + root_mode)
+    else:
+        content.update(b"file\0" + root_mode + entries[0][2])
+    for relative, observed, data in entries:
+        kind = "directory" if data is None else "file"
+        mode = stat.S_IMODE(observed.st_mode)
+        identity.update(
+            json.dumps(
+                (relative, kind, mode, observed.st_dev, observed.st_ino, observed.st_nlink, observed.st_size),
+                separators=(",", ":"),
+            ).encode()
+            + b"\n"
+        )
+        if relative == ".":
+            continue
+        relative_bytes = relative.encode()
+        mode_bytes = mode.to_bytes(2, "big")
+        if data is None:
+            content.update(b"directory\0" + relative_bytes + b"\0" + mode_bytes + b"\0")
+        else:
+            content.update(b"file\0" + relative_bytes + b"\0" + mode_bytes + data + b"\0")
+    return identity.hexdigest(), content.hexdigest()
+
+
+def _operation_observed_state(area: Path, relative: str) -> tuple[str | None, str | None]:
+    try:
+        with _operation_entry(area, relative) as (parent, name):
+            first = _entry_snapshot(parent, name)
+            second = _entry_snapshot(parent, name)
+            if first != second:
+                raise ValueError(f"installation operation path changed during observation: {relative}")
+            return first if first is not None else (None, None)
+    except FileNotFoundError:
+        return None, None
+
+
 def _marker_identity(path: Path, *, temporary: Path | None = None) -> dict[str, int] | None:
     if path.parent.is_symlink():
         raise ValueError("installation recovery directory is a symlink")
@@ -251,14 +398,30 @@ def _asset_path(bundle: VerifiedBundle, relative: str) -> Path:
     return bundle.root / "src/spec_dock/assets/install_root" / relative
 
 
-def _copy_entry(source: Path, destination: Path) -> None:
-    destination.parent.mkdir(parents=True, exist_ok=True)
-    if source.is_dir():
-        shutil.copytree(source, destination, symlinks=True)
-    elif source.is_file():
-        shutil.copy2(source, destination)
+def _copy_entry(source: Path, parent: int, name: str) -> None:
+    """Copy one verified source entry beneath an already bound stage directory."""
+    observed = source.lstat()
+    mode = stat.S_IMODE(observed.st_mode)
+    if stat.S_ISDIR(observed.st_mode):
+        os.mkdir(name, mode=0o700, dir_fd=parent)
+        directory = os.open(name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=parent)
+        try:
+            for child in sorted(source.iterdir()):
+                _copy_entry(child, directory, child.name)
+            os.fchmod(directory, mode)
+            os.fsync(directory)
+        finally:
+            os.close(directory)
+    elif stat.S_ISREG(observed.st_mode):
+        descriptor = os.open(name, os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW, 0o600, dir_fd=parent)
+        with os.fdopen(descriptor, "wb") as destination, source.open("rb") as origin:
+            shutil.copyfileobj(origin, destination)
+            destination.flush()
+            os.fchmod(destination.fileno(), mode)
+            os.fsync(destination.fileno())
     else:
-        raise ValueError(f"distribution entry missing: {source}")
+        raise ValueError(f"distribution entry is not a regular file or directory: {source}")
+    os.fsync(parent)
 
 
 def _sync_directory(directory: Path) -> None:
@@ -270,16 +433,37 @@ def _sync_directory(directory: Path) -> None:
 
 
 def _fsync_stage(area: Path) -> None:
-    stage = area / "stage"
-    for path in sorted(stage.rglob("*"), key=lambda item: len(item.parts), reverse=True):
-        if path.is_file():
-            with path.open("rb") as stream:
-                os.fsync(stream.fileno())
-        elif path.is_dir():
-            _sync_directory(path)
-    for directory in (stage, area, area.parent):
-        if directory.is_dir():
-            _sync_directory(directory)
+    def sync_tree(directory: int) -> None:
+        for child in os.scandir(directory):
+            observed = os.stat(child.name, dir_fd=directory, follow_symlinks=False)
+            if stat.S_ISDIR(observed.st_mode):
+                descriptor = os.open(child.name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+                try:
+                    sync_tree(descriptor)
+                finally:
+                    os.close(descriptor)
+            elif stat.S_ISREG(observed.st_mode):
+                descriptor = os.open(child.name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory)
+                try:
+                    os.fsync(descriptor)
+                finally:
+                    os.close(descriptor)
+            else:
+                raise ValueError(f"installation stage contains an unsupported entry: {child.name}")
+        os.fsync(directory)
+
+    with _operation_entry(area, "stage") as (area_descriptor, stage_name):
+        try:
+            stage_descriptor = os.open(stage_name, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=area_descriptor)
+        except FileNotFoundError:
+            pass
+        else:
+            try:
+                sync_tree(stage_descriptor)
+            finally:
+                os.close(stage_descriptor)
+        os.fsync(area_descriptor)
+    _sync_directory(area.parent)
 
 
 def prepare_installation(
@@ -385,7 +569,6 @@ def _stage_preparation(
     try:
         for relative in _record_paths(action):
             destination = target / relative
-            staged = area / "stage" / relative
             if action == "uninstall":
                 # Consumer-specific ignore rules remain owned by the consumer.
                 after[relative] = before[relative] if relative == IGNORE_FILE else None
@@ -398,31 +581,58 @@ def _stage_preparation(
                 )
                 if version is None:
                     raise ValueError("installation source has no version identity")
-                staged.parent.mkdir(parents=True, exist_ok=True)
-                staged.write_text(version + "\n", encoding="utf-8")
-                after[relative] = _digest_path(staged)
+                with _operation_entry(area, f"stage/{relative}", create_parents=True) as (
+                    stage_parent,
+                    stage_name,
+                ):
+                    descriptor = os.open(
+                        stage_name,
+                        os.O_CREAT | os.O_EXCL | os.O_WRONLY | os.O_NOFOLLOW,
+                        0o644,
+                        dir_fd=stage_parent,
+                    )
+                    with os.fdopen(descriptor, "wb") as stream:
+                        stream.write((version + "\n").encode())
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.fsync(stage_parent)
+                    staged = _entry_snapshot(stage_parent, stage_name)
+                    assert staged is not None
+                    after[relative] = staged[1]
             elif relative == IGNORE_FILE:
                 if before[relative] is not None and destination.read_bytes() != LEGACY_WORKBENCH_IGNORE:
                     after[relative] = before[relative]
                 else:
                     assert bundle is not None
-                    _copy_entry(_asset_path(bundle, relative), staged)
-                    after[relative] = _digest_path(staged)
+                    with _operation_entry(area, f"stage/{relative}", create_parents=True) as (
+                        stage_parent,
+                        stage_name,
+                    ):
+                        _copy_entry(_asset_path(bundle, relative), stage_parent, stage_name)
+                        staged = _entry_snapshot(stage_parent, stage_name)
+                        assert staged is not None
+                        after[relative] = staged[1]
             else:
                 assert bundle is not None
-                _copy_entry(_asset_path(bundle, relative), staged)
-                after[relative] = _digest_path(staged)
+                with _operation_entry(area, f"stage/{relative}", create_parents=True) as (
+                    stage_parent,
+                    stage_name,
+                ):
+                    _copy_entry(_asset_path(bundle, relative), stage_parent, stage_name)
+                    staged = _entry_snapshot(stage_parent, stage_name)
+                    assert staged is not None
+                    after[relative] = staged[1]
         _fsync_stage(area)
         for relative in _record_paths(action):
-            staged = area / "stage" / relative
+            staged_identity, staged_content = _operation_observed_state(area, f"stage/{relative}")
             after_identities[relative] = (
-                _path_identity(staged)
-                if staged.exists()
+                staged_identity
+                if staged_identity is not None
                 else record.before_identities[relative]
                 if after[relative] is not None
                 else None
             )
-            if staged.exists() and _digest_path(staged) != after[relative]:
+            if staged_identity is not None and staged_content != after[relative]:
                 raise ValueError(f"installation stage changed during preparation: {relative}")
         _verify_marker(record, area)
         _verify_planned_before(record)
@@ -482,12 +692,10 @@ def _replace_root(
     after_identity: str | None,
 ) -> None:
     destination = target / relative
-    backup = area / "backup" / relative
-    staged = area / "stage" / relative
     current_identity = _path_identity(destination)
     current = _digest_path(destination)
-    backup_identity = _path_identity(backup)
-    if backup_identity is not None and (backup_identity != before_identity or _digest_path(backup) != before):
+    backup_identity, backup_content = _operation_observed_state(area, f"backup/{relative}")
+    if backup_identity is not None and (backup_identity != before_identity or backup_content != before):
         raise ValueError(f"installation backup changed identity: {relative}")
     if before is None and backup_identity is not None:
         raise ValueError(f"unexpected installation backup: {relative}")
@@ -497,17 +705,23 @@ def _replace_root(
         and (before_identity == after_identity or before is None or backup_identity == before_identity)
     ):
         return
-    if after is not None and (_path_identity(staged) != after_identity or _digest_path(staged) != after):
+    if after is not None and _operation_observed_state(area, f"stage/{relative}") != (
+        after_identity,
+        after,
+    ):
         raise ValueError(f"installation stage changed identity: {relative}")
     if current_identity == before_identity and current == before and before is not None:
-        backup.parent.mkdir(parents=True, exist_ok=True)
-        if backup_identity is not None:
-            raise ValueError(f"unexpected preexisting installation backup: {relative}")
-        destination.replace(backup)
-        _sync_directory(destination.parent)
-        _sync_directory(backup.parent)
-        if _path_identity(backup) != before_identity or _digest_path(backup) != before:
-            raise ValueError(f"installation backup changed identity: {relative}")
+        with _operation_entry(area, f"backup/{relative}", create_parents=True) as (
+            backup_parent,
+            backup_name,
+        ):
+            if backup_identity is not None or _entry_snapshot(backup_parent, backup_name) is not None:
+                raise ValueError(f"unexpected preexisting installation backup: {relative}")
+            os.replace(destination, backup_name, dst_dir_fd=backup_parent)
+            _sync_directory(destination.parent)
+            os.fsync(backup_parent)
+            if _entry_snapshot(backup_parent, backup_name) != (before_identity, before):
+                raise ValueError(f"installation backup changed identity: {relative}")
     elif current_identity is None and before is not None:
         if backup_identity != before_identity:
             raise ValueError(f"installation backup does not match before state: {relative}")
@@ -515,9 +729,12 @@ def _replace_root(
         raise ValueError(f"installation target changed after preparation: {relative}")
     if after is not None:
         destination.parent.mkdir(parents=True, exist_ok=True)
-        staged.replace(destination)
-        _sync_directory(destination.parent)
-        _sync_directory(staged.parent)
+        with _operation_entry(area, f"stage/{relative}") as (stage_parent, stage_name):
+            if _entry_snapshot(stage_parent, stage_name) != (after_identity, after):
+                raise ValueError(f"installation stage changed identity: {relative}")
+            os.replace(stage_name, destination, src_dir_fd=stage_parent)
+            _sync_directory(destination.parent)
+            os.fsync(stage_parent)
     if _path_identity(destination) != after_identity or _digest_path(destination) != after:
         raise ValueError(f"installation replacement did not reach planned state: {relative}")
 
@@ -639,43 +856,48 @@ def rollback_installation(
     _verify_marker(record, area)
     for relative in reversed(_record_paths(record.action)):
         destination = target / relative
-        backup = area / "backup" / relative
         assert record.before_identities is not None
         assert record.after_identities is not None
         previous = record.before_identities[relative]
         current = _observed_path_state(destination)
         before = (previous, record.before_hashes[relative])
         after = (record.after_identities[relative], record.after_hashes[relative])
-        displaced = area / "displaced" / relative
-        displaced_state = _observed_path_state(displaced)
+        displaced_state = _operation_observed_state(area, f"displaced/{relative}")
         if displaced_state not in ((None, None), after):
             raise ValueError(f"installation rollback displaced path changed: {relative}")
         if current == before:
             continue
         if current not in (after, (None, None)):
             raise ValueError(f"installation rollback refuses later changes: {relative}")
-        if previous is not None and _observed_path_state(backup) != before:
+        if previous is not None and _operation_observed_state(area, f"backup/{relative}") != before:
             raise ValueError(f"installation rollback backup or target changed: {relative}")
         if current[0] is not None:
-            displaced.parent.mkdir(parents=True, exist_ok=True)
-            if displaced_state != (None, None):
-                raise ValueError(f"installation rollback displaced path exists: {relative}")
-            if _observed_path_state(destination) != after:
-                raise ValueError(f"installation rollback refuses later changes: {relative}")
-            destination.replace(displaced)
-            _sync_directory(destination.parent)
-            _sync_directory(displaced.parent)
-            if _observed_path_state(displaced) != after:
-                raise ValueError(f"installation rollback displaced path changed: {relative}")
+            with _operation_entry(area, f"displaced/{relative}", create_parents=True) as (
+                displaced_parent,
+                displaced_name,
+            ):
+                if displaced_state != (None, None) or _entry_snapshot(displaced_parent, displaced_name) is not None:
+                    raise ValueError(f"installation rollback displaced path exists: {relative}")
+                if _observed_path_state(destination) != after:
+                    raise ValueError(f"installation rollback refuses later changes: {relative}")
+                os.replace(destination, displaced_name, dst_dir_fd=displaced_parent)
+                _sync_directory(destination.parent)
+                os.fsync(displaced_parent)
+                if _entry_snapshot(displaced_parent, displaced_name) != after:
+                    raise ValueError(f"installation rollback displaced path changed: {relative}")
         elif relative in record.completed_roots and after[0] is not None and displaced_state != after:
             raise ValueError(f"installation rollback refuses later deletion: {relative}")
         if previous is not None:
             destination.parent.mkdir(parents=True, exist_ok=True)
-            if _observed_path_state(backup) != before or _observed_path_state(destination) != (None, None):
-                raise ValueError(f"installation rollback backup or target changed: {relative}")
-            backup.replace(destination)
-            _sync_directory(destination.parent)
-            _sync_directory(backup.parent)
+            with _operation_entry(area, f"backup/{relative}") as (backup_parent, backup_name):
+                if _entry_snapshot(backup_parent, backup_name) != before or _observed_path_state(destination) != (
+                    None,
+                    None,
+                ):
+                    raise ValueError(f"installation rollback backup or target changed: {relative}")
+                os.replace(backup_name, destination, src_dir_fd=backup_parent)
+                _sync_directory(destination.parent)
+                os.fsync(backup_parent)
             if _observed_path_state(destination) != before:
                 raise ValueError(f"installation rollback did not restore before identity: {relative}")
     _verify_marker(record, area)
@@ -718,9 +940,8 @@ def preflight_rollback_installation(
         previous_identity = record.before_identities[relative]
         expected = record.after_hashes[relative]
         previous = record.before_hashes[relative]
-        backup = area / "backup" / relative
-        backup_identity, backup_content = _observed_path_state(backup)
-        displaced_identity, displaced_content = _observed_path_state(area / "displaced" / relative)
+        backup_identity, backup_content = _operation_observed_state(area, f"backup/{relative}")
+        displaced_identity, displaced_content = _operation_observed_state(area, f"displaced/{relative}")
         if displaced_identity is not None and (
             displaced_identity != expected_identity or displaced_content != expected
         ):
