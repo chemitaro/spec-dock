@@ -6,11 +6,11 @@
 
 アクティブ対象を設定する例:
 
-```bash
-./spec-dock/scripts/spec-dock active set 123
-./spec-dock/scripts/spec-dock active set --github-issue 123
-./spec-dock/scripts/spec-dock active set iss-00123
-./spec-dock/scripts/spec-dock active set --id iss-00123
+```sh
+spec-dock active set iss-00123
+spec-dock active show
 ```
 
-（Epic/Initiative のみアクティブな場合、Issue は（なし）のままになることがあります）
+作業branchへ移る場合は `spec-dock work start iss-00123 --base main` を使います。
+
+Epic/Initiativeだけがアクティブな場合、Issueは（なし）のままです。

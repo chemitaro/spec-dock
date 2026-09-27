@@ -56,6 +56,7 @@ from spec_dock_runtime.infra import (
     template_scaffolder as infra_template_scaffolder,
 )
 from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
+from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -229,6 +230,9 @@ class _DepsTopologyReader:
 
 @dataclass(frozen=True)
 class _GitGateway:
+    def git_common_directory(self, repo_root: Path) -> Path:
+        return infra_git_cli.git_common_directory(repo_root)
+
     def require_clean_working_tree(self, repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None:
         infra_git_cli.require_clean_working_tree(repo_root, allowed_missing_paths=allowed_missing_paths)
 
@@ -407,6 +411,7 @@ def build_runtime(
         template_scaffolder=_TemplateScaffolder(),
         derived_state_reader=_DerivedStateReader(),
         issue_gateway=_IssueGateway(),
+        issue_lifecycle_gateway=GithubIssueGateway(),
         active_state_store=_ActiveStateStore(),
         deps_topology_reader=_DepsTopologyReader(),
         git_gateway=_GitGateway(),

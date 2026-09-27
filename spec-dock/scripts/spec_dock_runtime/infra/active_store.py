@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 import shutil
 import stat
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
+from spec_dock_runtime.domain.lifecycle import SelectionState
+from spec_dock_runtime.domain.selectors import ScopeIdSelector, parse_scope_selector
 from spec_dock_runtime.infra.clock import now_iso
 from spec_dock_runtime.infra.contracts import (
     ActiveManifest,
@@ -15,7 +17,93 @@ from spec_dock_runtime.infra.contracts import (
     PathState,
     ProjectionTreeState,
 )
-from spec_dock_runtime.infra.json_store import load_json, write_json
+from spec_dock_runtime.infra.json_store import atomic_write_json, load_json, read_guarded_json, write_json
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.application.scope_query import ScopeView
+
+
+def load_selection_v3(specdock_dir: Path, *, worktree_id: str) -> tuple[SelectionState, tuple[int, int] | None]:
+    """Read a v3 worktree-local selection and its CAS identity."""
+    loaded = read_guarded_json(specdock_dir / ".agent" / "active.json")
+    if loaded is None:
+        return SelectionState(worktree_id, 0, None, None, None, None), None
+    payload, identity = loaded
+    if not isinstance(payload, dict) or payload.get("schema_version") != 3:
+        raise ValueError("active selection requires schema_version 3")
+    revision = payload.get("revision")
+    if payload.get("worktree_id") != worktree_id or type(revision) is not int or revision < 0:
+        raise ValueError("active selection identity or revision is invalid")
+    selected: list[str | None] = []
+    for role in ("initiative", "epic", "issue"):
+        entry = payload.get(role)
+        if entry is None:
+            selected.append(None)
+            continue
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            raise ValueError("active selection entry is invalid")
+        selector = parse_scope_selector(entry["id"])
+        if not isinstance(selector, ScopeIdSelector) or selector.id != entry["id"] or selector.kind != role:
+            raise ValueError("active selection ID is invalid")
+        path = entry.get("path")
+        if not isinstance(path, str) or not path.startswith("spec-dock/") or ".." in Path(path).parts:
+            raise ValueError("active selection path is invalid")
+        selected.append(entry["id"])
+    focus = payload.get("focus_id")
+    if focus is not None and not isinstance(focus, str):
+        raise ValueError("active focus is invalid")
+    return SelectionState(worktree_id, revision, *selected, focus), identity
+
+
+def save_selection_v3(
+    specdock_dir: Path,
+    selection: SelectionState,
+    *,
+    views: tuple[ScopeView, ...],
+    expected_identity: tuple[int, int] | None,
+) -> None:
+    """Publish one selection revision without editing Scope lifecycle or Git state."""
+    path = specdock_dir / ".agent" / "active.json"
+    if expected_identity is None:
+        if selection.revision != 1:
+            raise ValueError("new active selection must start at revision one")
+    else:
+        loaded = read_guarded_json(path)
+        if loaded is None or loaded[1] != expected_identity or not isinstance(loaded[0], dict):
+            raise ValueError("active selection identity changed")
+        if loaded[0].get("worktree_id") != selection.worktree_id or loaded[0].get("revision") != selection.revision - 1:
+            raise ValueError("active selection revision changed")
+    by_id = {view.id: view for view in views}
+    entries: dict[str, object] = {}
+    for role, scope_id in (
+        ("initiative", selection.initiative_id),
+        ("epic", selection.epic_id),
+        ("issue", selection.issue_id),
+    ):
+        if scope_id is None:
+            entries[role] = None
+            continue
+        view = by_id.get(scope_id)
+        if view is None or view.kind != role:
+            raise ValueError("active Scope is absent from this snapshot")
+        try:
+            relative = view.path.relative_to(specdock_dir.parent).as_posix()
+        except ValueError as error:
+            raise ValueError("active Scope path is outside this repository") from error
+        entries[role] = {"id": scope_id, "path": relative}
+    if selection.epic_id is not None and by_id[selection.epic_id].parent_id != selection.initiative_id:
+        raise ValueError("active epic does not belong to selected initiative")
+    if selection.issue_id is not None and by_id[selection.issue_id].parent_id != selection.epic_id:
+        raise ValueError("active issue does not belong to selected epic")
+    payload = {
+        "schema_version": 3,
+        "worktree_id": selection.worktree_id,
+        "revision": selection.revision,
+        "focus_id": selection.focus_id,
+        **entries,
+    }
+    atomic_write_json(path, payload, expected_identity=expected_identity)
+
 
 _AGENT_DIRNAME = ".agent"
 _LEGACY_WORK_DIRNAME = ".work"

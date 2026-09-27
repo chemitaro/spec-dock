@@ -1,0 +1,81 @@
+---
+種別: レポート（Issue）
+ID: "iss-00409"
+タイトル: "SpecDock CLI Scope Active Work Redesign"
+関連GitHub: ["#409"]
+最終更新: "2026-09-26"
+依存: ["requirement.md", "design.md", "plan.md"]
+親: ["epic-00356", "init-local-00003"]
+---
+
+# Result Summary
+
+詳細: [Report Guide](../../../../../../docs/authoring/report.md)
+
+## Outcome
+
+新しい `scope / active / work` のコマンド体系、Initiative/Epic/Issueの `work start` / `work finish`、固定engineの導入・更新、schema移行と復旧経路をprovider sourceへ実装しました。製品sourceと同一worktree内の仕様・説明資料を本Issueの成果とします。
+
+2026-09-25の利用者指示により、稼働中の他worktree・consumerの一斉更新は本Issueの完了条件から除外しました。各導入先は所有者が必要な時に明示更新します。`installation update` と `workspace migrate` は指定されたGit common directoryの全登録worktreeを整合性単位として扱うため、その単位の更新時には同居するworktreeの停止・保全・検証が必要です。別のGit common directoryへは波及しません。
+
+## Verification
+
+製品sourceの前回候補 `3057e4f8a619070f868f96f31e7fb3f86084143e` では、固定wheelと隔離engineの検査に成功しました。同SHAの Final Quality Gate Strict v2 はP1が11件で未通過、必須の `uv run pytest` も配布元とdogfooding側の差分により未通過でした。これらを最終候補の成功証拠には流用しません。
+
+2026-09-25の修正作業では `make lint` と `git diff --check` が終了コード0、全テストの初回実行は `2047 passed, 6 failed, 25 skipped`（終了コード1）でした。失敗5件はGit helperの子プロセス環境で `PYTHONDONTWRITEBYTECODE` を落としたこと、1件は旧 `--to` 文面を期待するテストが原因です。該当6件の修正後の再実行は `6 passed`（終了コード0）、続く全テストは `2053 passed, 25 skipped`（終了コード0、926.73秒）でした。配布元とこのworktreeの写しのbyte一致テストも通過しました。これらは未コミット作業ツリーの結果であり、固定SHAに紐付く認証結果ではありません。
+
+修正中、実Git管理領域 `/Volumes/990p2t/workspace/tools/spec-dock/.git/worktrees/spec-dock4/index.lock` の作成が `Operation not permitted` となり、Git書込みを一旦停止しました。lockの消失と実Git経路を読み取り専用で確認した後、許可済みの通常Git操作を権限付きで実行し、実装payloadを `d7f5f6a081f8332ff598ed3f0e7a627a9a0737d8` として非forceでpushしました。HEAD・upstream・GitHub先頭は一致し、作業ツリーはcleanでした。
+
+この固定SHAで `make lint`、`git diff --check`、`uv run pytest` を再実行し、すべて終了コード0でした。pytestは `2053 passed, 25 skipped in 910.94s`。同じSHAから `uv build --wheel` で構築したwheelのSHA-256は `c08954fdf7dc31deace208d9f7c31d1aa189ddd70178d9d5430331803a1f765d` です。隔離venvへの導入、`--help --json`、`work start --help --json` はいずれも終了コード0で、wheel内のskill・runtime・migration guide・四つのWorkbench templateを確認しました。全テストには隔離fixtureでのinstallation/group updateのresume・rollback、workspace migrationの適用・復元が含まれます。実導入先への更新・migration・rollbackは実行していません。
+
+検証log・各SHA-256・コマンド別終了コードは本Issueの無追跡 `.workbench/chatgpt-final-quality-gate-strict-v2/issue409-cli-on-demand-update/test-results/manifest.json` に保存しました。このReportを含む後続commitではGit SHAが変わるため、最終レビュー対象SHAで必須コマンドを再実行してmanifestを更新します。追跡文書に自身のcommit SHAを埋め込む自己参照は行いません。最終レビューは前回と同じChatGPT conversationで実施します。
+
+前回の固定候補 `51dbb214dce6e49ad8afd4a13d43c8eb8fd014e5` は、lint・全テスト・wheel導入には成功しましたが、同じレビュアーの Final Quality Gate Strict v2 でP1が4件残りました。指摘はleaf別help、TTY確認と実行対象の固定、失敗時の復旧receipt、Scope群のJSON payloadです。本作業ツリーで配布元・dogfood投影・関連テストを修正しました。他の稼働中のworktreeおよびconsumerは更新していません。修正後の固定SHAで再検証し、同じレビュアーに再審査を依頼します。
+
+続く固定候補 `1badca8bb9ca17e970d2494939590fc8840ba165` は `make lint`、`uv run pytest`（`2075 passed, 25 skipped`）、`git diff --check` と固定wheel検査を通過しましたが、同じ Final Quality Gate Strict v2 でP1が4件でした。指摘ごとに Strict 分析を行い、helpの実際のmode、移行時の確認計画とmapping identity、準備済みGitHub作成の再開とowner由来の復旧コマンド、Scopeの計画結果・一覧のJSON契約を修正しました。修正はproviderとこのworktreeのdogfood投影だけに適用し、`9b5fa8d9`、`84aa1614`、`710cc89e`、`847a7e1e` として順にコミット・非force pushしました。各範囲のfocused testsとlintは通過しています。最終候補での全テスト、固定wheel、Strict v2再審査の結果は、この後の固定SHAに結び付けて記録します。
+
+固定候補 `8613582da4cbe649cd7bd82ff75ce236e419a5b8` は全テスト `2080 passed, 25 skipped` と固定wheel検査を通過しました。同じ Final Quality Gate Strict v2 ではP1が3件残り、別の Strict 分析で原因と修正方針を確認しました。TTYで承認したGitHub repositoryをwriter lock内の実行対象へ照合し、移行マップは単一file descriptorから読んだbytesとidentityを一つの計画に束ねました。`installation init` のrollbackコマンドには必須のpathを含め、ローカルScopeの作成プレビューには正規化済みslugを含めました。配布元・このworktreeのdogfood投影・回帰テストに反映し、focused tests `67 passed`、`make lint`、全テスト `2084 passed, 25 skipped`、`git diff --check` が通過しました。固定SHAの検証結果と独立レビューの判定は、上記 `.workbench` のmanifestおよびレビューログに保存します。
+
+固定候補 `c6e838fcf71b24a2e364ddb8d733eb74dd67db12` は全テスト `2084 passed, 25 skipped` と同じレビュアーの Final Quality Gate Strict v2（12観点、P0/P1=0、pass）を通過しました。ただし、このworktreeの実行CLIは旧版のままで、配布元と投影のbyte一致だけでは実際の導入・移行・作業開始を確認できていませんでした。
+
+利用者が承認した独立cloneで、新しい固定engineによる実導入とschema 3への移行を実施しました。最初の実行では、既存Scopeの一部に `depends_on` がなく、移行後の依存関係検査とworkspace validationが失敗しました。移行時に空リストを補完する修正を `1a89aaeebf774d1a7647545b9b054e08620f1f00` にコミットしました。次の実行では、導入の復旧用バックアップが未追跡ファイルとなり、`work start` のclean tree条件を妨げることを確認しました。復旧データを保持したまま専用ディレクトリ内でGit ignoreする修正を `812bf674897bd933abaa8ce81d2ca32bfbc00b93` にコミットしました。両修正には失敗を再現するテストを追加し、修正後に通過を確認しています。
+
+`812bf674` のGitHub上のcommitから作った、登録worktreeが一つだけの独立cloneでは、`installation update --maintenance`、239 Scopeの `workspace migrate --to-schema 3`、`installation update --finalize`、`workspace validate`、`workspace sync` が成功しました。移行差分を確認し、元の239 Scopeの属性・既存依存を保持したままschema 3、backend、空依存の初期値を設定したことを検査しました。clone内でlocal Initiative `init-local-00004`、Epic `epic-local-00002`、Issue `iss-local-00002` を作成し、`work start` を上位から順に実行して各専用ブランチへのcheckoutとactive選択を確認しました。`work finish` は下位から順に実行し、三つのScopeがcompleted、activeが空、最終 `workspace validate` がvalidであることを確認しました。GitHubのScopeは作成・変更していません。導入、移行、作業操作の証拠は本Issueの無追跡 `.workbench/dogfood/` に保存しました。共有Git領域を持つこの開発worktreeと他の稼働中worktreeは更新していません。
+
+独立cloneを置いた後の全テストでは `2084 passed, 1 failed, 25 skipped` でした。失敗は旧CLIのdogfooding検証fixtureが `spec-dock/initiatives/` を複製する際、Git管理外の `.workbench/dogfood/` に入った独立cloneまで複製し、同じ旧Issue IDを重複検出したためです。正本ツリーだけを複製するよう `.workbench` を除外し、該当テストを再実行して `1 passed` を確認しました。最終候補の全テスト結果は固定SHAに対して改めて取得します。
+
+固定候補 `c098d93f291d95ae50ad6141d4290e6079355583` は `make lint`、全テスト `2085 passed, 25 skipped`、固定wheelの構築・隔離導入を通過しました。同じレビュアーの Final Quality Gate Strict v2 は12観点の確認を完了しましたが、P1を1件認定して未通過でした。導入の復旧用 `.gitignore` が作成途中で中断すると、不完全なファイルがjournal外に残り、固定IDのresume/rollbackが終了してもGit作業場がdirtyのままになる問題です。別セッションの ChatGPT Analyze Review Findings Strict と現行コードの照合により、既存の復旧契約を維持した実装修正として扱いました。
+
+修正では、最初のworktree変更より前に固定child journalを `planned` として永続化し、完成・同期済みの一時ファイルから復旧用 `.gitignore` を無上書きで公開するようにしました。既存ファイルの種別・内容・inodeを確認し、途中停止時は同じchild IDで準備を再開または巻き戻します。グループ完了前にも全childのマーカーを再検証します。マーカー公開中断、directory同期中断、同内容のinode差替え、グループ再開と巻戻しを結合テストへ追加しました。最終SHAでの全テスト、独立cloneでの再dogfooding、同じレビュアーの再審査結果は `.workbench` の証拠に保存します。
+
+この修正を含む `1e9fecc416bcd2dc778c86dbbff8506501305caa` の全テストは `2098 passed, 2 failed, 25 skipped` でした。失敗2件はいずれも配布元runtimeと、この開発worktreeのdogfooding用写しのbyte不一致です。実装・結合テストの失敗ではありません。写しを配布元に同期し、同じ二つの検査と最終固定SHAの全テストを再実行します。
+
+写しを同期した `3f62dc0b372d4376822dbae1c92c6a3d945242bf` では `make lint` と `git diff --check` が通過し、全テストは `2100 passed, 25 skipped` でした。同SHAから構築したwheelと固定engineを独立cloneに実導入し、239件の既存Scopeをschema 3へ移行しました。新規local Initiative・Epic・Issueの作成、各専用ブランチへの `work start` とcheckout、下位からの `work finish`、active解除、最終 `workspace validate` の `valid=true` を手動確認しました。他の稼働中worktree・consumerは更新していません。
+
+同じレビュアーによる Final Quality Gate Strict v2 では、前回のignore marker復旧P1は解消と判定されました。一方、`planned` child journalが管理対象の開始状態を固定せず、停止後に変更された対象を `resume` が新たなbefore-stateとして採用できるP1が残りました。別の ChatGPT Analyze Review Findings Strict で、AC-23/28とDesign D-13/D-16の既存契約を破る実装欠陥と確認しました。対処として、全管理pathの内容・種別・mode・inodeを含む開始状態と指定versionを、最初の対象変更前にchild journalへ永続化します。再開・stage完了前・apply直前・各pathの置換直前に同じ状態を照合し、変化を検出した場合は管理対象とbackupを変更せず停止します。旧形式の `planned` recordは現在状態から再計画せず、復旧用rollbackだけを許します。init/update/uninstall、同内容inode差替え、group再開、rollbackを結合テストで確認してから、固定SHAの全テストと同じレビュアーの再審査を実施します。
+
+その後の固定候補 `dc4a7a72f89eac7a5d086c6c41a7ce77c3b8f6fa` では、開始状態の再計画に関するP1は解消と判定されました。新たに、version指定で始めたupdateを標準のcommit指定で再開するとversion記録が変わる問題と、stage・公開後の別inodeやhardlinkを内容一致だけで受理する問題がP1となりました。固定候補 `b657db0d0bd5917b459bf261949b20ece49323ac` で元versionのgroup/child伝播とafter-stateのinode所有証跡を追加し、`make lint`、`git diff --check`、全テスト `2117 passed, 25 skipped`、独立cloneでの導入・移行・三階層work start/finishを確認しました。この候補の同じレビュアーによる再審査では、after-stateのP1は解消しましたが、commit指定で始めたupdateを同じcommitのversion指定で再開する逆方向の表記変化と、rollbackの事前検査後に同一inodeの内容が変更される競合をP1と判定したため、Final Quality Gateは未通過です。
+
+現行の修正では、groupの固定version起源をchild journalにも明示し、再開時のbundleの表記に依存せずversion記録を決定します。rollbackでは事前検査に加え、各移動・復元の直前と直後にinodeの所有証跡と内容digestを照合し、後続変更をterminal成功として受理しません。commit/versionの開始と再開の4組合せ、planned childの安全な引継ぎ、同一inode・同一長の変更、backup変更、複数worktreeのrollbackを結合テストで確認しています。固定SHAでの必須テストと配布wheel・独立cloneの手動確認を終えてから、同じレビュアーに再審査を依頼します。
+
+固定候補 `e47ff4e72232b1021b89b67eb7bf1d925e5d1109` では、`make lint`、`git diff --check`、全テスト `2127 passed, 25 skipped` が成功しました。同SHAのwheelを独立cloneへ導入し、schema 3移行、local Initiative/Epic/Issueのstart/finish、最終validation `valid=true` を手動確認しました。他の稼働中のworktree・consumerは更新していません。Final Quality Gate Strict v2の同一レビュアー会話へ送ったOracle実行は送信確定の検出でタイムアウトしました。同一会話から終端回答を受動的に取得できましたが、ラッパーの正式なreview結果としては採用されていません。その回答には、`v` 接頭辞付きversionのfinalize拒否と、rollbackでafter-stateを退避した直後の停止から同じoperation IDで再開できないというP1が2件記載されています。回答と機械的な取得制限は無追跡 `.workbench` に保存しました。
+
+この2経路を受入仕様と実装に照合し、配布元とdogfood投影のfinalize判定で正規の `v` 接頭辞を受け入れ、rollbackではoperation所有の退避先をidentity・digestで再観測して安全に再開する候補を作成しました。後続削除だけで退避証跡がない場合は引き続き拒否します。各再現テストをRed→Greenで確認し、関連結合テスト `49 passed`、`make lint`、`git diff --check`、全テスト `2130 passed, 25 skipped` を通過しました。これは修正作業ツリーの証拠であり、最終SHAに対するStrict v2認証の通過を意味しません。
+
+上記候補 `a75e682eba0644a4c0a0c68a2b295ef0097cf855` は非forceでpushし、同じSHAで `make lint`、`git diff --check`、全テスト `2130 passed, 25 skipped` を再実行して成功しました。続くChatGPT Analyze Review Strictの元セッションは長時間の応答後、Oracleの自動再接続が回答完了を確定できずに終了しました。同一会話から終端回答を受動的に取得しましたが、これは正式なStrict実行結果ではなく助言です。助言は、finalize側だけで `v` 接頭辞を許容しても、更新journalと導入先version fileに入力表記が残るというidentity分裂を指摘しました。
+
+受入仕様AC-23/25と設計D-21/22を再照合し、公開入力 `v0.2.4` を固定source解決時に正規version `0.2.4` へ変換し、group/child journalと導入先version fileにはその値を渡すよう修正しました。finalizeは正規versionとの完全一致を再び要求します。公開CLIから `v0.2.4` を指定してjournalと二worktreeのversion fileが `0.2.4` となり、maintenanceからreadyへのfinalizeも通るテストをRed→Greenで確認しました。rollbackの二つのfsync境界とbefore-state不在の中断復旧も追加検証しました。関連テストは `98 passed` です。全テストと最終SHAのStrict v2判定は、この追補時点では未実施です。
+
+## 2026-09-27 operation areaの領域外書込み対策
+
+同じレビュアーによる`057a48906b4e8d7ed57d4a4c10ee6fbe1628b0c5`のFinal Quality Gate Strict v2は、前回2件のP1を解消とし、installationのoperation area内に置く`backup`・`displaced`の祖先symlinkをたどって導入先の外へ書き出せるP1を1件検出しました。coverageは完了、判定はfailです。AC-29とDesign D-17は、領域外への変更を拒否し、公開・復元直前に所有したdirectory descriptorの下で操作することを要求しています。
+
+別会話のChatGPT Analyze Review Findings Strictで、これは既存仕様の意味を変更せず修正できる実装欠陥と分析しました。Oracleは回答取得を停止しましたが、同一会話の送信turn・終端回答・digestを照合して保存しました。回答の節見出しからMarkdownの`#`が脱落しているため、Strictの出力形式を満たす正式な分析パケットとしては扱わず、既存仕様・実装・テストに照らした補助分析として利用しています。
+
+`stage`・`backup`・`displaced`の各祖先をno-followで開き、親directory descriptorに相対的な作成・観測・rename・fsyncへ切り替えました。既存journal schema、CLI、source pin、後続変更の拒否、rollback再開の意味は変更していません。領域外symlinkの直接・入れ子・事前検査後差替えを公開installation APIの結合テストで検査し、修正前のRed、修正後のGreenを確認しました。関連installationテストは`186 passed`、更新したjournal結合テストは`51 passed`、`make lint`と`git diff --check`は終了コード0です。固定SHAの全テスト・独立clone確認・同じレビュアーの再審査は、次のコミット後に実施します。
+
+## Residual Risks / Follow-ups
+
+- 他worktree・consumerは未更新です。更新時には[導入・移行・復旧手順](../../../../../../docs/migration.md)に沿って、選んだGit common directoryの全登録worktreeを確認してください。
+- 既存の導入先を新CLIへ更新するまでは、その導入先で旧CLIが動きます。製品sourceの変更だけで実行中のwriterは切り替わりません。
+- 独立cloneの239件の既存GitHub Scopeはcacheに状態がないため、最終validationに `status_unknown` warningが239件残ります。local Scopeのstart/finishとworkspace整合性は成功しています。

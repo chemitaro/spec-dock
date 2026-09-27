@@ -53,6 +53,55 @@ def test_copy_workbench_recursively_merges_source_wins_and_is_idempotent(tmp_pat
     assert _tree_snapshot(destination) == second_snapshot
 
 
+def test_vnext_conflict_error_preflights_all_entries_before_copy(tmp_path: Path) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    (source / "a-new.txt").write_bytes(b"new")
+    (source / "z-collision.txt").write_bytes(b"replace")
+    (destination / "z-collision.txt").write_bytes(b"preserve")
+    with pytest.raises(fs_cli.WorkbenchFilesystemError) as error:
+        fs_cli.copy_workbench(source, destination, on_conflict="error", relative_symlinks_only=True)
+    assert error.value.mutation_started is False
+    assert not (destination / "a-new.txt").exists()
+    assert (destination / "z-collision.txt").read_bytes() == b"preserve"
+
+
+def test_vnext_overwrite_is_explicit_and_absolute_symlink_is_rejected(tmp_path: Path) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    (source / "same.txt").write_bytes(b"new")
+    (destination / "same.txt").write_bytes(b"old")
+    fs_cli.copy_workbench(source, destination, on_conflict="overwrite", relative_symlinks_only=True)
+    assert (destination / "same.txt").read_bytes() == b"new"
+    (source / "outside-link").symlink_to(tmp_path / "outside")
+    with pytest.raises(fs_cli.WorkbenchFilesystemError) as error:
+        fs_cli.copy_workbench(source, destination, on_conflict="overwrite", relative_symlinks_only=True)
+    assert error.value.mutation_started is False
+
+
+def test_vnext_identical_entries_are_noop_and_destination_only_entries_survive(tmp_path: Path) -> None:
+    fs_cli = _runtime_fs_cli()
+    source = tmp_path / "source"
+    destination = tmp_path / "destination"
+    source.mkdir()
+    destination.mkdir()
+    (source / "readme.md").write_bytes(b"same")
+    (destination / "readme.md").write_bytes(b"same")
+    (destination / "local.txt").write_bytes(b"destination only")
+    (source / "relative-link").symlink_to("readme.md")
+    fs_cli.copy_workbench(source, destination, on_conflict="error", relative_symlinks_only=True)
+    assert (destination / "local.txt").read_bytes() == b"destination only"
+    assert (destination / "relative-link").is_symlink()
+    assert (destination / "relative-link").readlink() == Path("readme.md")
+    fs_cli.copy_workbench(source, destination, on_conflict="error", relative_symlinks_only=True)
+
+
 def test_copy_workbench_copies_opaque_ordinary_file_bytes_without_classification(tmp_path: Path) -> None:
     fs_cli = _runtime_fs_cli()
     source = tmp_path / "source"

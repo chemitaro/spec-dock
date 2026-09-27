@@ -21,7 +21,7 @@ Artifact は調査、対話、検討の evidence を残すための文書です�
 
 ## Stored Artifact validation
 
-Current creation catalogは`new artifact <type>`で選べるtypeを閉じるための契約です。一方、保存済みArtifactのvalidationはopen-worldです。有効なlowercase UTC timestamp、任意の`01..99` suffix、安全なnon-empty basenameを持つMarkdownは、既知typeに一致しなくてもuntyped evidenceとして受理します。`analysis`、`report`、`review`などのtype風ラベルや未知ラベルだけを理由にmalformedにはしません。
+Current creation catalogは`artifact create --scope TARGET --type TYPE --title TITLE`で選べるtypeを閉じるための契約です。一方、保存済みArtifactのvalidationはopen-worldです。有効なlowercase UTC timestamp、任意の`01..99` suffix、安全なnon-empty basenameを持つMarkdownは、既知typeに一致しなくてもuntyped evidenceとして受理します。`analysis`、`report`、`review`などのtype風ラベルや未知ラベルだけを理由にmalformedにはしません。
 
 untyped Artifactは後方互換のためruntime内部で`blank`と表現されますが、creation templateとしての`blank`とは別物です。known typed filenameはuntypedより先に認識され、ADR mirrorは明示的な`adr` filenameと必要なfrontmatter・eligibility条件を満たすものだけを対象にします。filenameがvalidであることやtype風ラベルを含むことは、内容の採用、review完了、canonical authorityを意味しません。
 

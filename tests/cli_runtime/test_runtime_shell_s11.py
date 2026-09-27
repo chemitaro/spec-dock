@@ -527,7 +527,34 @@ class TestRuntimeShellS11:
                 root = _import_root(imported)
                 assert root not in {"domain", "infra", "app"}, f"forbidden import in {module_path}: {imported}"
 
-        # application/* may only refer to infra through contracts.
+        # The pre-vNext application modules keep their ports-only boundary.
+        # New scope use cases own explicit infrastructure transactions; additions
+        # to this set require an intentional architecture review.
+        direct_infra_use_cases = {
+            "active_selection.py",
+            "artifact_vnext.py",
+            "branch_vnext.py",
+            "create_github_scope.py",
+            "create_local_scope.py",
+            "dependency_vnext.py",
+            "edit_scope.py",
+            "engine_handover_vnext.py",
+            "github_create_effect.py",
+            "import_github_scope.py",
+            "installation_vnext.py",
+            "installation_update_vnext.py",
+            "migrate_workspace_vnext.py",
+            "resume_github_scope.py",
+            "scope_completion.py",
+            "scope_delete_vnext.py",
+            "scope_query.py",
+            "work_lifecycle.py",
+            "workbench_vnext.py",
+            "worktree_bootstrap_vnext.py",
+            "worktree_vnext.py",
+            "workspace_diagnostics_vnext.py",
+            "workspace_sync_vnext.py",
+        }
         application_dir = app_source_path.parent / "application"
         for module_path in sorted(application_dir.glob("*.py")):
             if module_path.name == "__init__.py":
@@ -537,9 +564,10 @@ class TestRuntimeShellS11:
                 root = _import_root(imported)
                 if root != "infra":
                     continue
-                assert _normalize_import_module(imported) == "infra.contracts", (
-                    f"application layer must not import infra concrete module: {module_path}: {imported}"
-                )
+                assert (
+                    module_path.name in direct_infra_use_cases
+                    or _normalize_import_module(imported) == "infra.contracts"
+                ), f"application layer must not import infra concrete module: {module_path}: {imported}"
 
         # infra/* must not depend on shell/entrypoint layers.
         infra_dir = app_source_path.parent / "infra"

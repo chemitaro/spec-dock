@@ -5,18 +5,22 @@ ID: "epic-00356"
 関連GitHub: ["#356"]
 状態: "approved"
 作成者: "ChatGPT-use-strict / main orchestrator"
-最終更新: "2026-08-10"
+最終更新: "2026-09-24"
 親: ["init-local-00003"]
 ---
 
 # epic-00356 SpecDock Core Simplification and External Intelligence Boundary — 要件定義
+
+## 0. 後続決定と適用境界（2026-09-24）
+
+Product Ownerが全面採用したIssue [#409](issues/iss-00409-scope-active-work-cli-redesign/requirement.md) のCLI再設計を、該当する現行契約と実装担当の正本とする。従来の `issue start/finish`、`active set` の旧引数、`new artifact [type]` とoptional positional type、Issue 357/360への旧CLI/installer再設計担当割当は、初回Core簡素化の履歴であり、#409の範囲では現行契約ではない。#409は三階層の `work start/finish`、明示 `artifact create --type`、一括cutoverを一つのIssueで所有する。Storage Core、External Intelligence境界、既存データ保全、正本R/D/Pとaccepted ADRの権威は引き続き本Epicで有効とする。以下の旧slice・checkpoint・検証記録は初回Core簡素化の履歴として読む。#409のCLI/installer受入条件にはそのR/D/PとACを適用し、旧記述を競合する第二の現行契約として使わない。
 
 ## 1. 目的
 
 SpecDockを「認知的な作業手順を製品として所有する仕組み」から、次の二つを提供する小さな基盤へ縮小する。
 
 1. **Storage Core**
-   - Initiative / Epic / Issueの構造、GitHub linkage、依存DAG、active selection、薄いIssue lifecycle、scope-local Artifact、Workbench / Worktree、sync / validate / doctorを保持する。
+   - Initiative / Epic / Issueの構造、GitHub linkage、依存DAG、active selection、三階層の薄いWork lifecycle、scope-local Artifact、Workbench / Worktree、sync / validate / doctorを保持する。
    - 構造操作と不変条件を決定的に扱う。
 2. **Authoring Kit**
    - `requirement.md`、`design.md`、`plan.md`、薄い`report.md`、Artifactの意味、scope layering、Issue Planning Levelの文書ガイドを提供する。
@@ -43,7 +47,7 @@ Planning、Review、Execution、Assurance、Profile routing、provider固有impo
 - Fresh repositoryにはStorage Core、薄いAuthoring Kit、限定されたrepo-local skillだけが配布される。
 - Existing repositoryはnode identity、GitHub linkage、正本文書、Artifact、Discussion、ADR、既存の重いReport、`.assurance.json`、profile由来文書を一括削除・rename・rewriteせずupdateできる。
 - CLI helpとRuntime registryから撤去対象workflow surfaceが消え、別名fallbackも存在しない。
-- `active set`、`issue start`、`issue finish`、dependency readiness、Artifact作成／importが本書の意味で動作する。
+- `active set`、三階層の`work start` / `work finish`、dependency readiness、明示typeによるArtifact作成／importが#409の契約で動作する。
 - Fresh Initiative / Epic / Issueは単一のR/D/Pと薄い常設`report.md`を持ち、Reportが空でもvalidである。
 - Authoring Kitは一つのIssue `plan.md`、共通Plan Guide、`light` / `standard` / `strict` / `critical` Completion Guideを提供する。Runtimeはlevelを知らない。
 - Provider source、dogfood projection、fresh installed consumer、updated existing consumerの契約を検証できる。
@@ -61,17 +65,17 @@ parser、registry、domain、application、tests、docs、managed assetsのCurre
 
 Issue `plan.md`は一つとし、共通Guideと4種類のCompletion Guideを用意する。levelをmetadata、Runtime state、gate、routingにしない。
 
-### E-RQ-003 `issue finish`を薄い便利操作にする
+### E-RQ-003 三階層の`work finish`を薄い便利操作にする
 
-GitHub close、close成功後のactive clear、post-syncの順で行う。Review、Plan、Test、Report、EAL、authorityを判定しない。GitHub close失敗時はactiveを保持する。
+初回Core実装の`issue finish`に関するclose→全active clear→post-syncは履歴であり、#409の現行契約ではない。#409では対象Initiative / Epic / Issueをcompletedにし、選択チェーン内なら対象以下だけを解除して祖先を残す。未完了・取り止め・状態不明の子孫がいる親は完了できず、Git branch/HEADは変えない。Review、Plan、Test、Report、EAL、authorityを判定しない。close失敗時はactiveを保持する。
 
 ### E-RQ-004 activeとreadinessの意味を限定する
 
-`active set`はselectionだけを行う。`issue start`だけがunfinished active guardとdependency readinessを確認する。`ready`はdependency-onlyとする。blocked Issueもplanning / researchのため選択できる。
+`active set`はselectionだけを行う。三階層の`work start`が開始条件とdependency readinessを確認する。旧`issue start --force`契約は#409で廃止し、別作業への選択切替は`--switch-active`で明示する。`ready`はdependency-onlyとする。blocked Scopeもplanning / researchのため選択できる。
 
 ### E-RQ-005 Artifact interfaceを単純化する
 
-typeはoptional positionalとし、未指定は`blank`とする。Currentの新規作成可能型は`blank`、`research`、`interview`、`disc`、`decision-candidate`、`adr`に限定する。`analysis`は追加しない。履歴型は認識できるが、新規作成経路には出さない。
+初回Coreのoptional positional typeは履歴である。#409の現行作成入口は`artifact create --scope TARGET --type TYPE --title TITLE`とし、typeを明示する。Currentの新規作成可能型は`blank`、`research`、`interview`、`disc`、`decision-candidate`、`adr`に限定する。`analysis`は追加しない。履歴型は認識できるが、新規作成経路には出さない。
 
 ### E-RQ-006 Importはfile onlyにする
 
@@ -91,17 +95,18 @@ Fresh nodeは`Outcome`、`Verification`、`Residual Risks / Follow-ups`を持つ
 
 ## 5. Vertical slice要件
 
-既存Issueを水平レイヤーとして扱わず、各Issueが利用者に確認可能なend-to-end valueを閉じる。
+357〜360の行は初回Core簡素化のslice履歴である。後続のCLI再設計は#409の単一sliceとして追加し、初回担当を現在の再設計担当に読み替えない。各Issueは利用者に確認可能なend-to-end valueを閉じる。
 
 | Slice | 利用者価値 | 同じIssue内で閉じる範囲 |
 |---|---|---|
-| `iss-00357` | 薄いStorage Core CLIでnode / dependency / active / lifecycle / Artifactを安全に扱える | Runtime code、CLI help、tests、historical compatibility、Runtime migration notes |
+| `iss-00357`（初回Core） | 初回Storage Core CLIでnode / dependency / active / lifecycle / Artifactを安全に扱える | 初回Runtime code、CLI help、tests、historical compatibility。#409の再設計は所有しない |
 | `iss-00358` | Fresh nodeの薄いR/D/P/ReportとAuthoring Guideだけで仕様を作成できる | templates、guides、navigation、artifact semantics、tests、projection、existing-doc preservation |
 | `iss-00359` | Agent / operatorが二つのrepo-local skillからCoreとKitを正しく利用できる | skill contracts、provider assets、docs、negative behavior、tests、legacy handoff inventory |
-| `iss-00360` | Fresh / update / uninstall consumerが旧workflowを配布されず、既存データを失わない | installer、managed prune、dogfood、migration、compatibility、consumer matrix、docs、tests |
+| `iss-00360`（初回配布） | 初回Fresh / update / uninstall consumerが旧workflowを配布されず、既存データを失わない | 初回installer、managed prune、dogfood、migration、compatibility。#409の一括cutoverは所有しない |
+| `iss-00409`（現行CLI再設計） | Initiative / Epic / Issueを同じWork lifecycleで扱い、明確なnamespaceと安全なcutoverを得る | 44 leafのCLI・Runtime・installer/schema migration・docs・testsを一つのIssueで所有する |
 | 品質・統合・deliverable handoff候補 | 全implementation sliceを統合し、独立した最終検証と引渡し証跡を閉じる | full regression、cross-consumer smoke、defect-only fixes、diff audit、change-set handoff |
 
-最後の行は新規Issue候補であり、node作成と番号付与には人間の明示承認を必要とする。
+最後の品質・統合行は初回Core計画時の新規Issue候補であり、#409のIssue作成・一括実装判断とは別である。
 
 ## 6. スコープ
 
@@ -109,8 +114,8 @@ Fresh nodeは`Outcome`、`Verification`、`Residual Risks / Follow-ups`を持つ
 
 - Epic 00356とIssue 357〜360のR/D/P再定義
 - Runtime parser / registry / application / domain / infra / presentationのworkflow removal
-- Active selection、Issue start / finish、dependency semantics
-- ArtifactのCurrent / Historical分離、optional positional type、generic file import
+- Active selection、三階層のWork start / finish、dependency semantics（#409を正本とする）
+- ArtifactのCurrent / Historical分離、明示`--type`、generic file import（#409のCLI契約）
 - Fresh node scaffoldとthin Report mechanism
 - R/D/P/Report template、Authoring Guide、Planning Level Completion Guide
 - Current / Historical docs navigation
@@ -153,11 +158,11 @@ Fresh nodeは`Outcome`、`Verification`、`Residual Risks / Follow-ups`を持つ
 
 ### E-AC-002 Thin lifecycle
 
-`active set`はselection-only、`issue start`はunfinished guardとdependencyを確認し、`--force`はunfinished guardだけを迂回する。`issue finish`はclose / clear / syncの順序とpartial-failure契約を満たし、quality evidenceを読まない。
+`active set`はselection-only。三階層の`work start`は#409の開始条件とdependencyを確認し、`work finish`は対象をcompletedにして選択中なら対象以下だけを解除する。親の完了には全子孫completedを要し、quality evidenceは読まない。旧`issue start/finish`の順序・`--force`・全active clearは初回Coreの履歴である。
 
 ### E-AC-003 Artifact contract
 
-type omittedとexplicit `blank`が動き、Current 6種だけを作成できる。Historical typeは認識されるが新規作成できない。Generic importは一ファイルだけをopaqueに保存し、provider固有routeは存在しない。
+#409の現行CLIでは`--type`を明示してCurrent 6種だけを作成できる。旧type omitted/positionalは初回Coreの履歴である。Historical typeは認識されるが新規作成できない。Generic importは一ファイルだけをopaqueに保存し、provider固有routeは存在しない。
 
 ### E-AC-004 Fresh authoring contract
 
@@ -181,7 +186,7 @@ Provider / dogfood / installed parity、internal link、Currentで禁止する�
 
 ### E-AC-009 Vertical slice completion
 
-各implementation Issueがcode / test / docs / migration or compatibilityを自身の範囲で閉じ、次のsliceへhandoff contractを渡す。
+初回357〜360はそれぞれのcode / test / docs / migration or compatibilityを閉じる。後続のCLI/Runtime/installer/schema再設計は#409が一つのIssueで所有し、旧sliceへの二重割当をしない。
 
 ### E-AC-010 Final integration
 
@@ -192,7 +197,7 @@ Provider / dogfood / installed parity、internal link、Currentで禁止する�
 | リスク | 保護策 |
 |---|---|
 | workflow撤去時に構造invariantまで失う | Storage Core retain inventoryとremoved inventoryを分け、positive / negative testを置く |
-| 357と358のshared fileが衝突する | 357はmechanism、358はtemplate / guide contentを所有し、統合checkpointでcontract fixtureを合わせる |
+| 初回357と358のshared fileが衝突する | 初回は357がmechanism、358がtemplate / guide contentを所有した。#409のCLI再設計所有権は#409に一本化する |
 | Historical typeをunknownとして壊す | current creatableとhistorical recognizableを別API / test matrixにする |
 | Updateがuser dataを削除する | managed ownership inventory、preflight、preservation fixture、partial-failure recoveryを用意する |
 | docs-only LevelがRuntimeへ再侵入する | forbidden code / metadata scanとbehavior invariance testを置く |

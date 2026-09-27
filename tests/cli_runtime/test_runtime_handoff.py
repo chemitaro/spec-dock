@@ -37,7 +37,7 @@ class TestRuntimeHandoff(CliRuntimeHarness):
     def test_consumer_hook_parent_io_failure_is_detection_failure_with_exit_zero(
         self, monkeypatch, capsys, tmp_path: Path
     ) -> None:
-        script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
+        script = Path(__file__).resolve().parents[2] / "tests/fixtures/legacy_spec_dock.script"
         loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap", str(script))
         spec = importlib.util.spec_from_loader(loader.name, loader)
         assert spec is not None
@@ -78,7 +78,7 @@ class TestRuntimeHandoff(CliRuntimeHarness):
         assert captured.err == ""
 
     def test_consumer_hook_binding_mismatch_is_detection_failure_with_exit_zero(self, capsys, tmp_path: Path) -> None:
-        script = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/spec-dock"
+        script = Path(__file__).resolve().parents[2] / "tests/fixtures/legacy_spec_dock.script"
         loader = importlib.machinery.SourceFileLoader("frozen_spec_dock_bootstrap_binding", str(script))
         spec = importlib.util.spec_from_loader(loader.name, loader)
         assert spec is not None

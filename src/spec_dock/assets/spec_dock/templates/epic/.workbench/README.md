@@ -23,7 +23,7 @@
 - その他の ignored Workbench file は自動 copy / sync されません。
 - Initiative、Epic、Issue の対応する node-scoped ignored payload は、必要な場合だけ full ID を指定して manual one-shot helper を実行します。
 
-`./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to <linked-worktree>`
+`./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to-worktree <linked-worktree>`
 
 - root `.workbench/` の ignored payload はこの helper の対象外です。root で durable に残す一 file は generic Artifact import を使ってください。
 - automatic hook、watch、sync、copy-back はありません。

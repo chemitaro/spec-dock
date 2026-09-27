@@ -470,20 +470,33 @@ def write_meta(dest_dir: Path, record: StoredMetaRecord) -> None:
 
 
 def write_meta_at(dest_dir_fd: int, record: StoredMetaRecord) -> None:
-    payload = (json.dumps(_build_meta_payload(record), ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+    _write_metadata_bytes_at(dest_dir_fd, _build_meta_payload(record))
+
+
+def write_meta_payload_at(dest_dir_fd: int, payload: dict[str, Any]) -> None:
+    """Publish validated schema-three metadata inside an unpublished scaffold."""
+    from spec_dock_runtime.domain.lifecycle import decode_scope_metadata
+
+    decode_scope_metadata(payload)
+    _write_metadata_bytes_at(dest_dir_fd, payload)
+
+
+def _write_metadata_bytes_at(dest_dir_fd: int, payload: dict[str, Any]) -> None:
+    encoded = (json.dumps(payload, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
     meta_fd = os.open(
         _META_FILENAME,
-        os.O_WRONLY | os.O_CREAT | os.O_EXCL,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
         0o666,
         dir_fd=dest_dir_fd,
     )
     try:
         offset = 0
-        while offset < len(payload):
-            written = os.write(meta_fd, payload[offset:])
+        while offset < len(encoded):
+            written = os.write(meta_fd, encoded[offset:])
             if written == 0:
                 raise OSError("short metadata write")
             offset += written
+        os.fsync(meta_fd)
         os.fchmod(meta_fd, stat.S_IMODE(os.fstat(meta_fd).st_mode) & ~0o222)
     finally:
         os.close(meta_fd)

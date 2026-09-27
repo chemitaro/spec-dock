@@ -1,0 +1,415 @@
+"""The vNext Scope create leaf resolves explicit ancestry before writing."""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+import sys
+from typing import TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    import pytest
+
+RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
+sys.path.insert(0, str(RUNTIME_SCRIPTS))
+
+from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
+from spec_dock_runtime.cli import vnext_runtime  # noqa: E402
+from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
+from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+
+
+def _run(repo: Path, *args: str):
+    return run_vnext([*args, "--json"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4")
+
+
+def test_local_scope_create_cli_uses_explicit_parent_and_dry_run(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    preview = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program", "--dry-run")
+    assert preview.exit_code == 0
+    planned = json.loads(preview.stdout)
+    assert planned["status"] == "planned"
+    assert planned["data"]["scope"] == {
+        "id": None,
+        "kind": "initiative",
+        "backend": "local",
+        "parent_id": None,
+        "path": None,
+        "revision": None,
+    }
+    assert planned["data"]["status"]["state"] == "unknown"
+    assert planned["data"]["project"] == str(repo)
+    assert planned["data"]["worktree"] == common["worktree_id"]
+    assert planned["data"]["snapshot_id"]
+    assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
+
+    initiative = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    assert initiative.exit_code == 0
+    initiative_id = json.loads(initiative.stdout)["data"]["scope_id"]
+    assert initiative_id == "init-local-00001"
+    epic = _run(repo, "scope", "create", "epic", "--backend", "local", "--parent", initiative_id, "--title", "Plan")
+    assert epic.exit_code == 0
+    epic_id = json.loads(epic.stdout)["data"]["scope_id"]
+    issue = _run(repo, "scope", "create", "issue", "--backend", "local", "--parent", epic_id, "--title", "Build")
+    assert issue.exit_code == 0
+    issue_id = json.loads(issue.stdout)["data"]["scope_id"]
+    shown = _run(repo, "scope", "show", issue_id)
+    assert json.loads(shown.stdout)["data"]["item"]["parent_id"] == epic_id
+
+
+def test_local_scope_create_json_identifies_created_scope_and_observed_status(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    assert created.exit_code == 0
+    payload = json.loads(created.stdout)
+    scope = payload["data"]["scope"]
+    assert scope["id"] == payload["target"]["id"] == "init-local-00001"
+    assert scope["kind"] == payload["target"]["kind"] == "initiative"
+    assert scope["backend"] == payload["target"]["backend"] == "local"
+    assert scope["parent_id"] is None
+    assert scope["revision"] == 0
+    assert scope["path"].startswith("spec-dock/initiatives/")
+    assert payload["data"]["status"] == {"state": "open", "source": "local", "stale": False}
+    assert payload["data"]["project"] == str(repo)
+    assert payload["data"]["worktree"] == common["worktree_id"]
+    assert payload["data"]["snapshot_id"] == payload["target"]["snapshot_id"]
+
+
+def test_local_scope_create_preview_returns_normalized_slug(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    for title, options, expected in (
+        ("Program Plan", (), "program-plan"),
+        ("Program Plan", ("--slug", "custom"), "custom"),
+    ):
+        preview = _run(
+            repo, "scope", "create", "initiative", "--backend", "local", "--title", title, *options, "--dry-run"
+        )
+        assert preview.exit_code == 0
+        data = json.loads(preview.stdout)["data"]
+        assert data["slug"] == expected
+        assert data["scope"]["id"] is None
+        assert data["scope_id"] is None
+    assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
+
+
+def test_scope_show_json_uses_same_target_and_scope_snapshot(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    scope_id = json.loads(created.stdout)["data"]["scope_id"]
+    shown = _run(repo, "scope", "show", scope_id)
+    assert shown.exit_code == 0
+    payload = json.loads(shown.stdout)
+    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == scope_id
+    assert payload["target"]["snapshot_id"] == payload["data"]["snapshot_id"]
+    assert payload["data"]["status"] == {"state": "open", "source": "local", "stale": False}
+    assert payload["data"]["project"] == str(repo)
+    assert payload["data"]["worktree"] == common["worktree_id"]
+
+
+def test_scope_edit_json_reports_the_changed_revision_and_status(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    scope_id = json.loads(created.stdout)["data"]["scope_id"]
+    edited = _run(repo, "scope", "edit", scope_id, "--title", "Updated")
+    assert edited.exit_code == 0
+    payload = json.loads(edited.stdout)
+    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == scope_id
+    assert payload["data"]["scope"]["revision"] == payload["data"]["revision"] == 1
+    assert payload["data"]["status"] == {"state": "open", "source": "local", "stale": False}
+    assert payload["target"]["snapshot_id"] == payload["data"]["snapshot_id"]
+
+
+def test_local_scope_create_cli_rejects_missing_parent(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    result = _run(
+        repo, "scope", "create", "epic", "--backend", "local", "--parent", "init-local-00999", "--title", "Plan"
+    )
+    assert result.exit_code == 4
+    assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
+
+
+def test_local_scope_create_cli_does_not_retry_a_recovery_request_as_new(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    result = _run(
+        repo,
+        "scope",
+        "create",
+        "initiative",
+        "--backend",
+        "local",
+        "--title",
+        "Program",
+        "--resume",
+        "a" * 32,
+    )
+    assert result.exit_code == 4
+    assert not tuple((repo / "spec-dock" / "initiatives").glob("init-local-*"))
+
+
+def test_prepared_create_failure_returns_recorded_recovery_id_without_claiming_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    store = JournalStore(cast("Path", common["common_dir"]))
+    operation = prepare_operation(
+        command="scope.create",
+        fixed_targets={"kind": "initiative", "target": "init-local-00001"},
+        request_fingerprint="sha256:prepared-create",
+        before_revisions={},
+        engine_digest="engine-a",
+        writer_epoch=0,
+        effect_plan=("scope-create",),
+    )
+
+    def fail_after_preparation(**kwargs: object) -> None:
+        store.create(operation)
+        raise OSError("injected after durable preparation")
+
+    monkeypatch.setattr(
+        "spec_dock_runtime.commands.scope_create_vnext.create_local_scope_command", fail_after_preparation
+    )
+    failed = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert payload["status"] == "failed"
+    assert payload["operation_id"] == operation.operation_id
+    assert payload["effects"] == []
+    assert payload["recovery"]["operation_id"] == operation.operation_id
+    assert payload["recovery"]["can_resume"] is False
+    assert payload["recovery"]["commands"] == []
+
+
+def test_local_scope_create_cli_resumes_original_reserved_id(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_once(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if not injected and record.effects and record.effects[-1].status == "succeeded":
+            injected = True
+            raise OSError("injected journal failure")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_once)
+    prefix = ("scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    first = _run(repo, *prefix)
+    assert first.exit_code == 6
+    failed_payload = json.loads(first.stdout)
+    assert failed_payload["error"]["code"] == "EFFECT_STATE_UNKNOWN"
+    assert failed_payload["operation_id"] is not None
+    assert failed_payload["effects"] and failed_payload["effects"][-1]["status"] == "unknown"
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
+    assert operation.effects[-1].status == "intent"
+    resumed = _run(repo, *prefix, "--resume", operation.operation_id)
+    assert resumed.exit_code == 0
+    payload = json.loads(resumed.stdout)
+    assert payload["data"]["scope_id"] == "init-local-00001"
+    assert payload["operation_id"] == operation.operation_id
+
+
+def test_scope_edit_post_publication_io_failure_reports_observed_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    scope_id = json.loads(created.stdout)["data"]["scope_id"]
+    from spec_dock_runtime.commands import scope_query_vnext
+
+    original = scope_query_vnext.edit_scope_title
+
+    def publish_then_fail(**kwargs: object) -> None:
+        original(**kwargs)
+        raise OSError("injected after metadata publication")
+
+    monkeypatch.setattr(scope_query_vnext, "edit_scope_title", publish_then_fail)
+    failed = _run(repo, "scope", "edit", scope_id, "--title", "Updated")
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 6
+    assert payload["status"] == "partial"
+    assert payload["target"]["id"] == scope_id
+    assert payload["effects"] == [{"kind": "metadata", "status": "succeeded", "target": scope_id}]
+    assert payload["recovery"]["can_resume"] is False
+    assert payload["recovery"]["can_rollback"] is False
+
+
+def test_scope_edit_guard_failure_keeps_resolved_scope_payload(tmp_path: Path) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    scope_id = json.loads(created.stdout)["data"]["scope_id"]
+    failed = _run(repo, "scope", "edit", scope_id, "--title", "Updated", "--expect-backend", "github")
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == scope_id
+    assert payload["data"]["status"] == {"state": "open", "source": "local", "stale": False}
+    assert payload["target"]["snapshot_id"] == payload["data"]["snapshot_id"]
+
+
+def test_scope_edit_io_failure_with_unreadable_after_state_is_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
+    scope_id = json.loads(created.stdout)["data"]["scope_id"]
+    from spec_dock_runtime.commands import scope_query_vnext
+
+    def unreadable_after_state(**kwargs: object) -> None:
+        raise OSError("publication state could not be read")
+
+    def unreadable_projection(*args: object, **kwargs: object) -> None:
+        raise OSError("scope state could not be read")
+
+    monkeypatch.setattr(scope_query_vnext, "edit_scope_title", unreadable_after_state)
+    monkeypatch.setattr(vnext_runtime, "project_scope", unreadable_projection)
+    failed = _run(repo, "scope", "edit", scope_id, "--title", "Updated")
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 6
+    assert payload["target"]["id"] == scope_id
+    assert payload["effects"] == [{"kind": "metadata", "status": "unknown", "target": scope_id}]
+    assert payload["recovery"]["can_resume"] is False
+
+
+def test_github_scope_create_cli_previews_and_requires_confirmation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    prefix = ("scope", "create", "initiative", "--backend", "github", "--title", "Plan")
+    preview = _run(repo, *prefix, "--dry-run")
+    assert preview.exit_code == 0
+    assert json.loads(preview.stdout)["status"] == "planned"
+    planned = json.loads(preview.stdout)
+    assert planned["data"]["scope"]["id"] is None
+    assert planned["data"]["scope"]["backend"] == "github"
+    assert planned["data"]["status"]["state"] == "unknown"
+    assert planned["data"]["project"] == str(repo)
+    assert planned["data"]["worktree"] == common["worktree_id"]
+    assert planned["data"]["snapshot_id"]
+    assert gateway.calls == 0
+    denied = _run(repo, *prefix)
+    assert denied.exit_code == 3
+    assert gateway.calls == 0
+    created = _run(repo, *prefix, "--yes")
+    assert created.exit_code == 0
+    payload = json.loads(created.stdout)
+    assert payload["data"]["scope_id"] == "init-00047"
+    assert payload["data"]["github_ref"] == "gh:example/repo#47"
+    assert gateway.calls == 1
+
+
+def test_github_create_confirmation_rejects_origin_change_before_remote_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    origin = {"repository": "example/repo"}
+    monkeypatch.setattr(
+        "spec_dock_runtime.application.create_github_scope.git_cli.origin_github_publication_repo_slug",
+        lambda _repo: origin["repository"],
+    )
+
+    class AnswerAfterOriginChange:
+        def isatty(self) -> bool:
+            return True
+
+        def readline(self) -> str:
+            origin["repository"] = "example/other"
+            return "yes\n"
+
+    monkeypatch.setattr(sys, "stdin", AnswerAfterOriginChange())
+    result = run_vnext(
+        ["scope", "create", "initiative", "--backend", "github", "--title", "Plan"],
+        invocation_cwd=repo,
+        engine_digest="engine-a",
+        engine_version="0.2.4",
+    )
+    assert result.exit_code == 3
+    assert gateway.calls == 0
+    assert not JournalStore(cast("Path", common["common_dir"])).pending()
+    assert not tuple((repo / "spec-dock/initiatives").glob("init-*"))
+
+
+def test_github_scope_create_cli_resumes_without_second_post(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    destination = repo / "spec-dock/initiatives/init-00047-plan"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text("occupied\n", encoding="utf-8")
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    prefix = ("scope", "create", "initiative", "--backend", "github", "--title", "Plan")
+    first = _run(repo, *prefix, "--yes")
+    assert first.exit_code == 6
+    operation = JournalStore(cast("Path", common["common_dir"])).pending()[0]
+    destination.unlink()
+    resumed = _run(repo, *prefix, "--resume", operation.operation_id)
+    assert resumed.exit_code == 0
+    assert json.loads(resumed.stdout)["operation_id"] == operation.operation_id
+    assert gateway.calls == 1
+
+
+def test_github_scope_create_resumes_prepared_record_before_remote_intent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    common = _ready_repo(tmp_path)
+    repo = cast("Path", common["repo_root"])
+    gateway = FakeGateway(_issue())
+    monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
+    original_update = JournalStore.update
+    injected = False
+
+    def fail_before_remote_intent(self: JournalStore, record, *, expected_sequence: int) -> None:
+        nonlocal injected
+        if not injected and record.effects and record.effects[0].id == "github-create":
+            injected = True
+            raise OSError("injected before remote intent publication")
+        original_update(self, record, expected_sequence=expected_sequence)
+
+    monkeypatch.setattr(JournalStore, "update", fail_before_remote_intent)
+    prefix = ("scope", "create", "initiative", "--backend", "github", "--title", "Plan")
+    failed = _run(repo, *prefix, "--yes")
+    payload = json.loads(failed.stdout)
+    assert failed.exit_code == 3
+    assert gateway.calls == 0
+    operation_id = payload["operation_id"]
+    assert operation_id
+    assert payload["recovery"]["can_resume"] is True
+    assert payload["recovery"]["commands"][0] == [
+        "spec-dock",
+        "scope",
+        "create",
+        "initiative",
+        "--backend",
+        "github",
+        "--title",
+        "Plan",
+        "--slug",
+        "plan",
+        "--resume",
+        operation_id,
+        "--yes",
+    ]
+    monkeypatch.setattr(JournalStore, "update", original_update)
+    resumed = _run(repo, *prefix, "--resume", operation_id)
+    assert resumed.exit_code == 0
+    assert json.loads(resumed.stdout)["operation_id"] == operation_id
+    assert gateway.calls == 1
+    assert not JournalStore(cast("Path", common["common_dir"])).pending()

@@ -25,6 +25,7 @@ if TYPE_CHECKING:
         ActiveStateSnapshot,
         DepsTopologyLoadResult,
         DirectDependencyResolution,
+        GithubIssueRecord,
         StoredMetaRecord,
     )
     from spec_dock_runtime.presentation.contracts import ArtifactBundle
@@ -102,6 +103,22 @@ class IssueGateway(Protocol):
     ) -> IssueSnapshot: ...
 
 
+class IssueLifecycleGateway(Protocol):
+    def get(self, repo_root: Path, repository: str, number: int) -> GithubIssueRecord: ...
+
+    def create(self, repo_root: Path, repository: str, *, title: str, body: str) -> GithubIssueRecord: ...
+
+    def set_state(
+        self,
+        repo_root: Path,
+        repository: str,
+        number: int,
+        *,
+        state: Literal["open", "closed"],
+        reason: Literal["completed", "not_planned"] | None,
+    ) -> GithubIssueRecord: ...
+
+
 class ActiveStateStore(Protocol):
     def load_active_manifest(self, specdock_dir: Path) -> ActiveManifestLoadResult: ...
 
@@ -149,6 +166,8 @@ class DepsTopologyReader(Protocol):
 
 
 class GitGateway(Protocol):
+    def git_common_directory(self, repo_root: Path) -> Path: ...
+
     def require_clean_working_tree(self, repo_root: Path, *, allowed_missing_paths: tuple[str, ...] = ()) -> None: ...
 
     def current_branch_or_none(self, repo_root: Path) -> str | None: ...
@@ -282,6 +301,7 @@ class Ports:
     template_scaffolder: TemplateScaffolder | None = None
     derived_state_reader: DerivedStateReader | None = None
     issue_gateway: IssueGateway | None = None
+    issue_lifecycle_gateway: IssueLifecycleGateway | None = None
     active_state_store: ActiveStateStore | None = None
     deps_topology_reader: DepsTopologyReader | None = None
     git_gateway: GitGateway | None = None

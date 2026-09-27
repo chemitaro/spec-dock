@@ -11,12 +11,24 @@ import sys
 import pytest
 
 try:
-    from spec_dock.cli import main
+    from spec_dock.cli import legacy_installer_main
 except ModuleNotFoundError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
-    from spec_dock.cli import main
+    from spec_dock.cli import legacy_installer_main
 
 __all__ = ["main"]
+
+
+def main(argv: list[str]) -> int:
+    """Install the historical runtime only inside legacy behavior fixtures."""
+    result = legacy_installer_main(argv)
+    if result == 0 and argv and argv[0] in {"init", "update"}:
+        target = Path(argv[1]).expanduser().resolve() if len(argv) > 1 else Path.cwd()
+        script = target / "spec-dock/scripts/spec-dock"
+        if script.is_file():
+            fixture = Path(__file__).resolve().parents[1] / "fixtures/legacy_spec_dock.script"
+            script.write_bytes(fixture.read_bytes())
+    return result
 
 
 def _expected_spec_dock_version() -> str:

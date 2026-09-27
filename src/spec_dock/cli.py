@@ -1,4 +1,4 @@
-"""Command line for the fixed-directory installer."""
+"""Public fixed-engine CLI and retained internal legacy-installer fixture."""
 
 from __future__ import annotations
 
@@ -25,7 +25,8 @@ def _tool_version() -> str:
     return match.group(1) if match else __version__
 
 
-def main(argv: list[str] | None = None) -> int:
+def legacy_installer_main(argv: list[str] | None = None) -> int:
+    """Exercise the retired directory installer in historical compatibility tests."""
     parser = argparse.ArgumentParser(prog="spec-dock")
     parser.add_argument("--version", action="version", version=f"spec-dock {_tool_version()}")
     commands = parser.add_subparsers(dest="command", required=True)
@@ -74,6 +75,13 @@ def main(argv: list[str] | None = None) -> int:
     else:
         print(f"spec-dock: {status} ({args.command}) -> {target}")
     return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Enter the pinned external engine for every public invocation."""
+    from spec_dock.external_cli import main as external_main
+
+    return external_main(argv)
 
 
 if __name__ == "__main__":

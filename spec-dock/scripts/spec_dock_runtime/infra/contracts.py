@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import TYPE_CHECKING, Literal
+
+if TYPE_CHECKING:
+    from spec_dock_runtime.domain.lifecycle import ObservedState
 
 ProjectionEntryState = tuple[Literal["directory", "file", "symlink"], bytes | str | None]
 ProjectionTreeState = dict[str, ProjectionEntryState]
@@ -9,6 +12,18 @@ PathState = tuple[
     Literal["missing", "directory", "file", "symlink"],
     bytes | str | ProjectionTreeState | None,
 ]
+
+
+@dataclass(frozen=True)
+class GithubIssueRecord:
+    number: int
+    repository: str
+    title: str
+    state: ObservedState
+    raw_state: str
+    state_reason: str | None
+    updated_at: str
+    url: str
 
 
 @dataclass(frozen=True)

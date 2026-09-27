@@ -30,6 +30,9 @@ STORAGE_CORE_REFERENCE_TARGETS = frozenset({
 })
 CURRENT_FIRST_READ_DESTINATIONS = frozenset({
     *STORAGE_CORE_REFERENCE_TARGETS,
+    "reference_cli.md",
+    "reference_worktree.md",
+    "cli-redesign-guide.html",
     "migration.md",
     "authoring/overview.md",
 })
@@ -617,7 +620,7 @@ def test_current_navigation_first_read_route_is_storage_core_and_authoring_kit(n
     assert content.index("## Current") < content.index("## Historical")
     assert _has_exact_current_first_read_destinations(current)
     assert "authoring/historical.md" not in _markdown_link_destinations(current)
-    assert _markdown_link_destinations(historical) == ("authoring/historical.md",)
+    assert set(_markdown_link_destinations(historical)) == {"authoring/historical.md", "historical/README.md"}
     assert "Current の新規作成手順ではありません" in historical
 
 
