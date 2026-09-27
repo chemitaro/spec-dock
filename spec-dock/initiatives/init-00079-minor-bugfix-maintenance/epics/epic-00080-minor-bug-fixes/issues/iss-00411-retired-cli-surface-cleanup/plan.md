@@ -99,13 +99,21 @@ test "$(git branch --show-current)" = "$EXPECTED_BRANCH"
 git merge-base --is-ancestor "$BASE_SHA" HEAD
 test -z "$(git status --porcelain)"
 git diff --name-status "$BASE_SHA" HEAD
+GIT_DIR="$(git rev-parse --path-format=absolute --git-dir)"
+COMMON_DIR="$(git rev-parse --path-format=absolute --git-common-dir)"
+test -d .git
+test "$GIT_DIR" = "$COMMON_DIR"
+test "$(git worktree list --porcelain | rg -c '^worktree ')" = 1
+test "$(git worktree list --porcelain | sed -n 's/^worktree //p')" = "$PWD"
 ```
+
+この Issue の実装 checkout は現在の単一 worktree の独立 clone とする。上の isolation gate が失敗した linked/shared checkout では scope baseline を取らず、provider/dogfood の更新も始めない。verified branch の独立 clone を用意して同じ gate を通す。既存の他 worktree を削除・更新して gate を通すことはしない。
 
 実装開始時の full `HEAD` を JSON key `start_sha` として、ignored `.workbench/issue411-scope-baseline.json` に read-only の範囲スナップショットを保存する。後のcommitで `HEAD` は進むため、Step 8.6 は `start_sha..HEAD` を比較する。スナップショットは次を path、存在有無、file bytes/mode、symlink target まで記録する。
 
 - `spec-dock/initiatives/**` の Issue #411 以外の user data、および `spec-dock/.agent/**` と `spec-dock/active/**`（存在する場合）。
-- `.git/spec-dock/control/**` の live installation / active / journal state。`spec-dock/.agent/**` も含めて Git に無視される path を省略しない。
-- current branch 名、current 以外の local refs、`git worktree list --porcelain` の worktree path / branch と、他 worktree の `HEAD`。current branch とその upstream の SHA 更新は実装commit/pushとして別に記録する。
+- `git rev-parse --path-format=absolute --git-common-dir` が返す common directory 配下の `spec-dock/control/**` にある live installation / active / journal state。`.git` の固定パスを仮定せず、`spec-dock/.agent/**` も含めて Git に無視される path を省略しない。
+- current branch 名、current 以外の local refs、単一登録 worktree の path / branch。current branch とその upstream の SHA 更新は実装commit/pushとして別に記録する。worktree が2件以上なら baseline 不成立として停止する。
 - GitHub Issue #411 の read-only state と、作業中に実行した GitHub 操作の記録。Git push / PR の通常の開発手続と、cleanup code/test による GitHub Issue write を区別する。
 
 スナップショット作成手順と差分判定は Step 8.6 の scope check に同じ形で使う。baseline 取得後に他の actor が対象を変更した場合は勝手に上書きせず、差分の所有者と原因を調べる。
@@ -454,7 +462,7 @@ test ! -e "$TMP_ENGINE/lib/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/
 
 ### 4.5 dogfood runtime projection
 
-provider runtime asset の削除・変更を、この repository の `spec-dock/scripts/**` に current installation/projection contract で反映する。provider を正本とし、他 worktree / consumer は更新しない。`test_provider_distribution.py` の scripts byte parity と Step 3.2 の focused CI job が green になってから Step 4 を完了する。
+provider runtime asset の削除・変更を、この独立 clone の `spec-dock/scripts/**` に provider-first で投影する。live `installation update` は呼ばず、common directory の installation control も変更しない。provider を正本とし、他 worktree / consumer は更新しない。`test_provider_distribution.py` の scripts byte parity と Step 3.2 の focused CI job が green になってから Step 4 を完了する。
 
 ### 完了判定
 
@@ -694,9 +702,10 @@ uv run pytest \
 make lint
 uv run pytest
 git diff --check
+git diff --cached --check
 ```
 
-policy skip、regression ledgerによる除外、old-test allowlistによるcollection回避を追加しない。
+policy skip、regression ledgerによる除外、old-test allowlistによるcollection回避を追加しない。新規 file を含む候補は明示 path で stage し、stage 済み差分全体を確認してから Step 8.5 の candidate commit を作る。untracked の in-scope file を残して `git diff --check` だけを成功扱いにしない。
 
 ## 8.3 fixed bundle smoke
 
@@ -754,17 +763,18 @@ test -z "$(git -C "$SOURCE" status --porcelain)"
 ```bash
 START_SHA="$(python3 -c 'import json; print(json.load(open("spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00411-retired-cli-surface-cleanup/.workbench/issue411-scope-baseline.json"))["start_sha"])')"
 git status --porcelain --untracked-files=all
+git diff --check "$START_SHA" HEAD
 git diff --name-status --find-renames "$START_SHA" HEAD
 git diff --name-status --find-renames
 git diff --cached --name-status --find-renames
 ```
 
-Step 0 の ignored `.workbench/issue411-scope-baseline.json` を同じ snapshot 手順で再取得し、path、file bytes/mode、symlink target、current branch 名、current 以外の local refs、worktree path/branchと他 worktree の `HEAD`、GitHub Issue #411 read-only stateを比較する。`START_SHA` は Step 0 に保存した実装開始時の full SHA であり、`d7c...` の調査基準や実行時 `HEAD` で代用しない。current branch/upstream の SHA 変化は実装commit/pushの記録に照合する。ignored path の生成や変更も判定に含める。
+Step 0 の ignored `.workbench/issue411-scope-baseline.json` を同じ snapshot 手順で再取得し、path、file bytes/mode、symlink target、common directory の control state、current branch 名、current 以外の local refs、単一 worktree の path/branch、GitHub Issue #411 read-only stateを比較する。`git worktree list --porcelain` が2件以上または登録 path が変化した場合は失敗とする。`START_SHA` は Step 0 に保存した実装開始時の full SHA であり、`d7c...` の調査基準や実行時 `HEAD` で代用しない。current branch/upstream の SHA 変化は実装commit/pushの記録に照合する。ignored path の生成や変更も判定に含める。
 
 確認:
 
 - commit 済み・未commitの両方で、Issue #411 R/D/P、inventory/report、provider/tooling source、tests、workflows、current docs/dogfood managed assets以外に予期しない差分がない。削除・renameも確認する。
-- `spec-dock/initiatives/**` の他Issue/Epic/Initiative dataに機械的migration差分がなく、active pointers、installation control、他Git refs/worktree registryが baseline と一致する。
+- `spec-dock/initiatives/**` の他Issue/Epic/Initiative dataに機械的migration差分がなく、active pointers、installation control、他Git refs/worktree registryが baseline と一致する。独立 clone の外にある worktree / consumer への更新コマンドを実行していない。
 - GitHub Issue write を行う production command は実行せず、negative test は stub `gh` に閉じる。GitHub Issue #411 state の read-only 比較と操作記録を照合する。外部 actor の変更や証拠不足は「無変更」とみなさず原因を切り分ける。
 
 ### verification failure recovery
