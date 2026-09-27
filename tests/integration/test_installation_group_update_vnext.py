@@ -18,7 +18,7 @@ sys.path.insert(0, str(RUNTIME_SCRIPTS))
 from spec_dock.installation.group_journal import read_group_record  # noqa: E402
 from spec_dock.installation.journal import read_record  # noqa: E402
 from spec_dock.installation.source import resolve_source  # noqa: E402
-from spec_dock.installer import TOOL_DIRECTORIES  # noqa: E402
+from spec_dock.asset_layout import TOOL_DIRECTORIES  # noqa: E402
 from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin  # noqa: E402
 from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
     resume_installation_group,

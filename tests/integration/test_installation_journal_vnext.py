@@ -20,7 +20,7 @@ from spec_dock.installation.executor import (
 )
 from spec_dock.installation.journal import InstallationRecord, read_record, write_record
 from spec_dock.installation.source import PinnedSource, VerifiedBundle, _digest_paths, _tooling_inventory
-from spec_dock.installer import TOOL_DIRECTORIES
+from spec_dock.asset_layout import TOOL_DIRECTORIES
 
 if TYPE_CHECKING:
     from pathlib import Path

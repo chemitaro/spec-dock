@@ -16,7 +16,7 @@ import uuid
 
 from spec_dock.installation.journal import InstallationRecord, read_record, write_record
 from spec_dock.installation.source import VerifiedBundle, assert_disjoint_source_target, verify_bundle_integrity
-from spec_dock.installer import IGNORE_FILE, LEGACY_WORKBENCH_IGNORE, TOOL_DIRECTORIES, VERSION_FILE
+from spec_dock.asset_layout import IGNORE_FILE, LEGACY_WORKBENCH_IGNORE, TOOL_DIRECTORIES, VERSION_FILE
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
