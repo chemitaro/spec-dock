@@ -150,7 +150,7 @@ A blank record means the module remains.
 | `.github/workflows/ci.yml` | Runs `python3 ./spec-dock/scripts/spec-dock sync` then `validate` | `UPDATE-CURRENT` | Invoke `specdock-ci-validate.sh` with source root, target root, full `${{ github.sha }}`; no sync/write. |
 | `.github/scripts/specdock-ci-validate.sh` | Full SHA, clean source, scratch fixed engine, digest, read-only `workspace validate --ci --json` | `RETAIN-CURRENT` | Keep behavior; adjust only if workflow-testability/error clarity requires. |
 | `tests/integration/test_ci_fixed_validation.py` | Success, exact SHA output, target unchanged, wrong SHA failure | `RETAIN-CURRENT` | Extend with workflow wiring assertion or add adjacent test. |
-| `.github/workflows/provider-ci.yml` | Full suite plus focused matrix running old installer/harness tests | `UPDATE-CURRENT` | Focused matrix runs `test_provider_distribution.py`, fixed entrypoint test, current installation init test, retired-surface absence test. |
+| `.github/workflows/provider-ci.yml` | Full suite plus focused matrix running old installer/harness tests | `UPDATE-CURRENT` | Before deleting old test files in Step 3, switch focused matrix to `test_provider_distribution.py`, fixed entrypoint test, current installation init test, retired-surface absence test; its final green gate follows Step 4 source removal and dogfood runtime projection. |
 | `.github/workflows/commit-identity.yml` | Separate identity gate | `VERIFY-ONLY` | No Issue #411 change unless link/reference scan proves necessary. |
 
 ### CI acceptance details
