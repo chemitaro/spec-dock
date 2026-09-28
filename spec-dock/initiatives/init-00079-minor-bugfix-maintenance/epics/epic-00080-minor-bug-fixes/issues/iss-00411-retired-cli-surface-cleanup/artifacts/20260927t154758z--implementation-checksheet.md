@@ -43,6 +43,15 @@
 - [x] current CI integration は full suite で成功。`eb77cd9f` の独立 clean clone に固定 validator を実行し `valid=true`、240 nodes、digest `54f19658…`。clone の Git 状態は clean、`.git/spec-dock` は未作成。
 - [x] provider CI に削除済み test path がない。
 
+### Step 5 補完: CI境界（2026-09-29）
+
+- [x] P1 `FQG-411-CI-BOUNDARY-COVERAGE` を別Strict analystで分析し、既存要件のtest-remediationと確認。
+- [x] 正常・full SHA mismatch・tracked/untracked dirty・short/non-hex SHA・invalid digestの7 casesを既存CI integration内で確認。
+- [x] 全ケースでtarget全体のpath/type/bytes/mode/link/directory（Git/control/active/generated含む、除外なし）不変を確認。
+- [x] workflowの固定validator1回・GitHub SHA・旧shim/sync不在と、script側完全HEAD比較を確認。
+- [x] 4種の一時的な異常をすべてassertionで検出。production script/workflowは変更なし。CI/entrypoint/parity 24 passed、lint成功（開発中の結果）。
+- [ ] 最新commitで独立test laneと同じreviewerのP1 closureを確認。
+
 ## Step 6: 文書
 
 - [x] provider scripts README、root current docs、AGENTS を現行 CLI に更新。

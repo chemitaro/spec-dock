@@ -397,10 +397,10 @@ The implementer must fill this table in the PR/report, not by editing historical
 | Assertion migration ledger complete | §8 family mapping と §15 実施判断 | pass |
 | Old source removed | provider / dogfood の旧 shell と command を撤去 | pass |
 | Fixed distribution retired-path absence | fixed bundle 実物で app/bootstrap/installer 不在 | pass |
-| CI workflow wiring and negative tests | current CI integration 19 passed、独立 clean clone の固定SHA validator 成功 | pass |
+| CI workflow wiring and negative tests | CI境界7 cases + entrypoint/parity 計24 passed（開発中の確認）。最新commitのStrictと独立laneは再実行予定 | pass |
 | Provider/dogfood byte parity | test_provider_distribution.py | pass |
 | Current docs stale scan | current docs 改訂、historical pointer 追加 | pass |
-| Focused tests | entrypoint / CI / parity 19 passed | pass |
+| Focused tests | entrypoint / CI / parity 24 passed（開発中の確認） | pass |
 | `make lint` | ruff check / format、mypy 成功 | pass |
 | `uv run pytest` | 1212 passed / 1 skipped | pass |
 | `git diff --check` | 差分形式を確認 | pass |
@@ -414,3 +414,11 @@ The implementer must fill this table in the PR/report, not by editing historical
 - 配布 parity と shim equality だけを `test_provider_distribution.py` に置き、CI workflow wiring は既存 `test_ci_fixed_validation.py` に 1 件追加した。撤去確認専用の大規模 test harness は追加しない。旧ファイル不在は fixed bundle の実物照合で確認する。
 - `uv run pytest -q --maxfail=1`: 1212 passed / 1 skipped。`make lint`: ruff check / format、mypy 成功。固定 bundle の digest `fc4a0fa729e0d422bc15513cd29a7d5f7d9bb5966a5b7852f0e00f70def88f0e`、旧 app/bootstrap/installer ファイル不在、現行 help 成功。範囲 snapshot 3677 entries は、Issue #411 のみ除外して差分 0。
 - `eb77cd9f` の独立 clean clone で full-SHA validator 成功（`valid=true`、240 nodes、digest `54f19658…`）。clone は clean で `.git/spec-dock` は存在しない。最終 SHA の照合と Strict v2 は最終 push 後に実施する。
+
+## 16. CI境界の検証不足を補完（2026-09-29）
+
+正式Strict v2は `1061d159df7266850c22ad700a139de88f85ab68` に対し、`FQG-411-CI-BOUNDARY-COVERAGE` (P1) を報告した。dirty source / invalid SHA / invalid digest と target全体の不変検証が不足し、§14の旧pass記録は広すぎた。別analystのStrict分析でも既存要件・guardは正しく、`test-remediation` と判定された。
+
+既存 `tests/integration/test_ci_fixed_validation.py` のみを拡張した。正常系とwrong full SHA、tracked/untracked dirty、short/non-hex SHA、committed fixture builderの不正digestを確認する7 cases。全ケースでtarget root全体（`.git`、active symlink、generated sentinel、存在するcontrolを含む）のpath/type/bytes/mode/link/directoryを比較し、除外はない。pre-build拒否ではbuilder markerが存在せず、digest拒否ではmarkerが存在する。workflowは固定validatorを1回呼び、GitHub SHAを渡し、repo-local shim / syncを呼ばないことと、script側の完全HEAD比較を確認する。
+
+一時コピーでdirty guard解除、digest guard解除、generatedへの書込み、workflow sync追加の4異常を注入し、4件とも対応assertionが失敗した。production script/workflowは一度も変更していない。一時検証基盤はignored Workbenchに置き、恒久testへ追加していない。focused 24 passed、lint成功。最終のcommit SHAに結び付くfull suiteと同じreviewerの再認証を実施するまでP1はopenとして扱う。
