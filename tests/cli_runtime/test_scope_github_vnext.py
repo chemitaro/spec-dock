@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 from typing import cast
@@ -13,6 +14,8 @@ import pytest
 RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
 sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
+from spec_dock import __version__  # noqa: E402
+from spec_dock.asset_layout import ASSETS, VERSION_FILE  # noqa: E402
 from spec_dock_runtime.application.create_github_scope import create_github_scope  # noqa: E402
 from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
 from spec_dock_runtime.application.create_node import CreatePlanExecutionError  # noqa: E402
@@ -31,7 +34,6 @@ from spec_dock_runtime.infra.control_store import ControlState, WorktreeRegistra
 from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
 from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError  # noqa: E402
 from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from tests.cli_runtime import harness  # noqa: E402
 
 
 class FakeGateway:
@@ -186,7 +188,8 @@ def test_remote_timeout_with_duplicate_markers_stays_unknown(tmp_path: Path) -> 
 
 def _ready_repo(tmp_path: Path) -> dict[str, object]:
     repo = tmp_path / "repo"
-    assert harness.main(["init", str(repo)]) == 0
+    shutil.copytree(ASSETS / "spec_dock", repo / "spec-dock")
+    (repo / VERSION_FILE).write_text(__version__ + "\n", encoding="utf-8")
     subprocess.run(["git", "init", "-q", str(repo)], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(repo), "remote", "add", "origin", "https://github.com/example/repo.git"],

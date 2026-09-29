@@ -90,67 +90,6 @@ exclude = [
     "^\\.nox/",
 ]
 
-[[tool.mypy.overrides]]
-module = [
-    "tests.cli_runtime.harness",
-    "tests.cli_runtime.test_runtime_delete_s13",
-    "tests.cli_runtime.test_runtime_deps_s04",
-    "tests.cli_runtime.test_runtime_validate_s02",
-]
-disable_error_code = ["attr-defined"]
-
-[[tool.mypy.overrides]]
-module = [
-    "tests.cli_runtime.test_issue_lifecycle",
-    "tests.cli_runtime.test_runtime_close_s12",
-]
-disable_error_code = ["var-annotated"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_deps"
-disable_error_code = ["arg-type", "dict-item"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_delete"
-disable_error_code = ["func-returns-value"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_new"
-disable_error_code = ["override", "union-attr"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_runtime_active_s06"
-disable_error_code = ["assignment", "var-annotated"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_runtime_import_s10"
-disable_error_code = ["method-assign"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_runtime_shell_s11"
-disable_error_code = ["attr-defined", "func-returns-value", "name-defined"]
-
-[[tool.mypy.overrides]]
-module = "tests.cli_runtime.test_worktree"
-disable_error_code = ["index", "var-annotated"]
-
-[[tool.mypy.overrides]]
-module = "tests.unit.commands.test_runtime_new_s08"
-disable_error_code = ["attr-defined", "call-overload", "var-annotated"]
-
-[[tool.mypy.overrides]]
-module = "tests.unit.infra.test_init_update"
-disable_error_code = [
-    "arg-type",
-    "assignment",
-    "attr-defined",
-    "func-returns-value",
-    "index",
-    "method-assign",
-    "operator",
-    "var-annotated",
-]
-
 [project.scripts]
 spec-dock = "spec_dock.cli:main"
 

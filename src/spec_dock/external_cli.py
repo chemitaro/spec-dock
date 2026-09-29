@@ -10,7 +10,7 @@ import sys
 from typing import TYPE_CHECKING
 
 from spec_dock import __version__
-from spec_dock.installer import ASSETS
+from spec_dock.asset_layout import ASSETS
 from spec_dock.runtime_loader import EnginePin, VerifiedEngine, digest_distribution, read_engine_pin, verify_engine_pin
 
 if TYPE_CHECKING:

@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00411",
+  "title": "Remove retired SpecDock CLI surfaces after scope active work cutover",
+  "slug": "retired-cli-surface-cleanup",
+  "parent_id": "epic-00080",
+  "initiative_id": "init-00079",
+  "epic_id": "epic-00080",
+  "depends_on": [],
+  "backend": "github",
+  "github": {
+    "issue_number": 411,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 0
+}

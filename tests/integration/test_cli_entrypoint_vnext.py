@@ -129,7 +129,10 @@ def test_wheel_layout_is_not_a_fixed_mutating_engine(tmp_path: Path, monkeypatch
 
 
 def test_public_entrypoints_use_fixed_engine() -> None:
+    import spec_dock.cli as package_cli
+
     root = Path(__file__).resolve().parents[2]
+    assert not hasattr(package_cli, "legacy_installer_main")
     project = tomllib.loads((root / "pyproject.toml").read_text(encoding="utf-8"))
     assert project["project"]["scripts"]["spec-dock"] == "spec_dock.cli:main"
     assert (root / "src/spec_dock/assets/spec_dock/scripts/spec-dock").read_bytes() == (
