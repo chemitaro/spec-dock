@@ -50,7 +50,7 @@
 - [x] 全ケースでtarget全体のpath/type/bytes/mode/link/directory（Git/control/active/generated含む、除外なし）不変を確認。
 - [x] workflowの固定validator1回・GitHub SHA・旧shim/sync不在と、script側完全HEAD比較を確認。
 - [x] 4種の一時的な異常をすべてassertionで検出。production script/workflowは変更なし。CI/entrypoint/parity 24 passed、lint成功（開発中の結果）。
-- [ ] 最新commitで独立test laneと同じreviewerのP1 closureを確認。
+- [x] `3c21176f` の独立laneは1217 passed / 1 skipped、focused24、lint成功。同reviewerがP1 closed、Strict v2 pass。
 
 ## Step 6: 文書
 
@@ -73,7 +73,9 @@
 
 ## Step 9: 最終品質ゲート
 
-- [ ] in-scope 変更を小さな単位で commit / push し、local・upstream・GitHub SHA を一致させる。
-- [ ] ChatGPT Final Quality Gate Strict v2 の review と独立 test lane を完了。
-- [ ] P0/P1 と coverage blocker があれば分析、修正、同一 reviewer で再レビュー。
-- [ ] 最終差分、削除数、保持した安全境界、残余事項を報告。
+- [x] in-scope 変更を小さな単位で commit / push し、local・upstream・GitHub SHA を一致させる。
+- [x] ChatGPT Final Quality Gate Strict v2 の review と独立 test lane を完了。
+- [x] P0/P1 と coverage blocker があれば分析、修正、同一 reviewer で再レビュー。
+- [x] 最終差分、削除数、保持した安全境界、残余事項を報告。
+
+認証済み実装SHA `3c21176f170e4c1934b17927d1087c4b2ab0ecf3` は10観点complete、P0/P1=0、P2/P3=0。同SHAの独立clean clone4656 entries不変、既存保護対象3677 entries不変、他local ref・worktree登録不変を確認。実装基点から537行追加・63823行削除。詳細はreportの認証記録に記載。この記録の更新commitについても、同campaignで最終提出SHAのreviewと必須laneを再確認する。

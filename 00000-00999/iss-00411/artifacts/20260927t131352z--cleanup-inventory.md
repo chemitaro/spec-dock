@@ -397,14 +397,14 @@ The implementer must fill this table in the PR/report, not by editing historical
 | Assertion migration ledger complete | §8 family mapping と §15 実施判断 | pass |
 | Old source removed | provider / dogfood の旧 shell と command を撤去 | pass |
 | Fixed distribution retired-path absence | fixed bundle 実物で app/bootstrap/installer 不在 | pass |
-| CI workflow wiring and negative tests | CI境界7 cases + entrypoint/parity 計24 passed（開発中の確認）。最新commitのStrictと独立laneは再実行予定 | pass |
+| CI workflow wiring and negative tests | `3c21176f` のCI境界7 cases + entrypoint/parity 計24 passed、Strict v2 P1 closed/pass | pass |
 | Provider/dogfood byte parity | test_provider_distribution.py | pass |
 | Current docs stale scan | current docs 改訂、historical pointer 追加 | pass |
-| Focused tests | entrypoint / CI / parity 24 passed（開発中の確認） | pass |
+| Focused tests | `3c21176f` のentrypoint / CI / parity 24 passed | pass |
 | `make lint` | ruff check / format、mypy 成功 | pass |
-| `uv run pytest` | 1212 passed / 1 skipped | pass |
+| `uv run pytest` | `3c21176f` 1217 passed / 1 skipped | pass |
 | `git diff --check` | 差分形式を確認 | pass |
-| Out-of-scope side-effect check | 3677 entries 差分 0、refs は最終 push 後に確認 | pending |
+| Out-of-scope side-effect check | 3677 entries 差分 0、他local ref・worktree登録不変 | pass |
 
 ## 15. 実装時の判断と証拠（2026-09-28）
 
@@ -422,3 +422,5 @@ The implementer must fill this table in the PR/report, not by editing historical
 既存 `tests/integration/test_ci_fixed_validation.py` のみを拡張した。正常系とwrong full SHA、tracked/untracked dirty、short/non-hex SHA、committed fixture builderの不正digestを確認する7 cases。全ケースでtarget root全体（`.git`、active symlink、generated sentinel、存在するcontrolを含む）のpath/type/bytes/mode/link/directoryを比較し、除外はない。pre-build拒否ではbuilder markerが存在せず、digest拒否ではmarkerが存在する。workflowは固定validatorを1回呼び、GitHub SHAを渡し、repo-local shim / syncを呼ばないことと、script側の完全HEAD比較を確認する。
 
 一時コピーでdirty guard解除、digest guard解除、generatedへの書込み、workflow sync追加の4異常を注入し、4件とも対応assertionが失敗した。production script/workflowは一度も変更していない。一時検証基盤はignored Workbenchに置き、恒久testへ追加していない。focused 24 passed、lint成功。最終のcommit SHAに結び付くfull suiteと同じreviewerの再認証を実施するまでP1はopenとして扱う。
+
+補完後の正式結果: `3c21176f170e4c1934b17927d1087c4b2ab0ecf3` の同reviewer `fqg-v2-f5f30c6e-1bed9dec` はP1をclosedと判定し、Strict v2 pass（10観点complete、findingsなし）。独立lint/full/focusedは成功し、full1217 passed / 1 skipped、focused24 passed。同SHAの独立clean clone4656 entriesは変更0、valid=true。上記のopen記録は補完時点の履歴であり、現在の未解決事項ではない。
