@@ -53,7 +53,14 @@ def resolve_context(project: str | None, cwd: Path) -> ProjectContext:
     common_text = _git(root, "rev-parse", "--git-common-dir").removesuffix("\n")
     common_path = Path(common_text)
     common = (common_path if common_path.is_absolute() else root / common_path).resolve(strict=True)
-    loaded = read_guarded_json(root / "spec-dock/workspace.json")
+    workspace = read_workspace_declaration(root / "spec-dock/workspace.json")
+    head = _git(root, "rev-parse", "--verify", "HEAD", allow_missing=True).removesuffix("\n") or None
+    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD", allow_missing=True).removesuffix("\n") or None
+    return ProjectContext(root, common, physical_identity(common), physical_identity(root), head, branch, workspace)
+
+
+def read_workspace_declaration(path: Path) -> dict[str, object]:
+    loaded = read_guarded_json(path)
     if loaded is None or not isinstance(loaded[0], dict):
         raise ValueError("workspace declaration is missing or invalid")
     workspace = loaded[0]
@@ -61,9 +68,7 @@ def resolve_context(project: str | None, cwd: Path) -> ProjectContext:
         raise ValueError("workspace requires known schema 3")
     if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
         raise ValueError("workspace writer protocol is unknown")
-    head = _git(root, "rev-parse", "--verify", "HEAD", allow_missing=True).removesuffix("\n") or None
-    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD", allow_missing=True).removesuffix("\n") or None
-    return ProjectContext(root, common, physical_identity(common), physical_identity(root), head, branch, workspace)
+    return workspace
 
 
 def _git(root: Path, *args: str, allow_missing: bool = False) -> str:

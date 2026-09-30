@@ -31,22 +31,33 @@ def write_json(path: Path, data: Any) -> None:
 
 def read_guarded_json(path: Path) -> tuple[Any, tuple[int, int]] | None:
     """Read a single-link regular JSON file through a verified parent descriptor."""
+    loaded = read_guarded_json_bytes(path)
+    return (loaded[0], loaded[2]) if loaded is not None else None
+
+
+def read_guarded_json_bytes(path: Path) -> tuple[Any, bytes, tuple[int, int]] | None:
+    """Capture exact input bytes and identity without JSON reserialization."""
     if not path.is_absolute():
         raise ValueError("JSON source must be absolute")
     if not path.parent.exists():
         return None
     directory_fd = _open_directory_without_links(path.parent)
     try:
-        return read_guarded_json_at(directory_fd, path.name)
+        return read_guarded_json_bytes_at(directory_fd, path.name)
     finally:
         os.close(directory_fd)
 
 
 def read_guarded_json_at(directory_fd: int, name: str) -> tuple[Any, tuple[int, int]] | None:
+    loaded = read_guarded_json_bytes_at(directory_fd, name)
+    return (loaded[0], loaded[2]) if loaded is not None else None
+
+
+def read_guarded_json_bytes_at(directory_fd: int, name: str) -> tuple[Any, bytes, tuple[int, int]] | None:
     if not name or name in (".", "..") or "/" in name or "\\" in name:
         raise ValueError("JSON name must be a single path component")
     try:
-        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+        fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory_fd)
     except FileNotFoundError:
         return None
     except OSError as exc:
@@ -57,8 +68,8 @@ def read_guarded_json_at(directory_fd: int, name: str) -> tuple[Any, tuple[int, 
         metadata = os.fstat(stream.fileno())
         if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
             raise ValueError("JSON source must be a single-link regular file")
-        payload = json.load(stream)
-        return payload, (metadata.st_dev, metadata.st_ino)
+        payload = stream.read()
+        return json.loads(payload), payload, (metadata.st_dev, metadata.st_ino)
 
 
 def open_guarded_directory(path: Path) -> int:

@@ -110,3 +110,17 @@ Windows physical identityはread-only/non-inheritableな既存directory handle�
 P-06入口ではStartの`--source cache`、`--allow-stale`、`--resume`、`--rollback`をcontext前にARGUMENT_RETIRED/exit2で拒否し、help/補完から受付optionを除いた。欠損projectを指定した五通りが、読取/効果なしで拒否するRed→Greenを確認した。これはStart行の移行であり、他leafの旧option整理は既存担当stepへ残す。
 
 選択試験103 passed（3.71秒）とinventory/lock option/fresh wheelの7 passed（6.51秒）。全source/testのRuff check/format成功、新しい4 sourceのmypyとWindows platform指定3 sourceのmypy成功。これらは全体型gate/全試験の代替ではない。
+
+## P-06 切替先snapshotとreadinessの途中checkpoint
+
+固定OIDのGit treeからworkspace宣言とScope metadataだけを一時領域へ読み、checkout前に新writer/schema、三階層、対象/祖先のID・backend・GitHub linkage、dependency graphを検証する境界を追加した。対象が切替先commitにないケースは、従来のbranch/checkout後partialから、副作用前exit3へRed→Greenで変更した。三階層のmetadata列挙も独立fixtureでRed→Green。切替先のタイトル差を同じScope identityで許し、checkout後はcandidateの全metadata paths/exact bytesへ照合する。旧control/cache helperは通常Startへ接続していない。
+
+実効依存はtargetと祖先の宣言から既存domain規則で組み立て、必要なGitHub Scopeを各一回だけGETする。target/祖先はopen、依存自身はcompletedを要求し、未完了依存はREADINESS_NOT_SATISFIED/exit3/効果0、完了依存ならStart成立を検証した。真正の既存local-backedだけで構成されるStartはofflineを一律拒否しない。新規local作成を復活させる変更ではない。
+
+`--expect-current`のcanonical IDを一度固定し、`--expect-backend`とともにpreflight/lock内で比較する。empty directの期待ID指定とbackend不一致は効果0で拒否する。
+
+workspaceと読んだ全own metadataのexact bytes/file identityをmemoryに捕捉し、lock内で再照合する。Git update-indexのassume-unchangedによってstatusがcleanでも、GH GET待ち中に祖先metadataの末尾改行が増えたらGit効果前に停止する実fixtureをRed→Greenで追加した。guarded JSON境界から正確なbytesを返し、JSON再serializeで比較しない。特殊fileはnonblocking open後のregular/single-link検査で拒否する。
+
+Start公開経路とinfra全体は435 passed、1 skipped、4.92秒。skipは既存試験でありWindows native成功を意味しない。Ruff check成功、変更した4 sourceの限定mypy成功。実Scope 240件とworkspace宣言のhash変更0。
+
+このcheckpointもP-06全完了ではない。StartPlanへの純粋なselection決定、same-Scope別branch/switch-active置換、branch tip/全inventoryの最終再照合、Git異常後の現物判定、publish rename後unknown、recovery/C-04の残る公開情報、全platform受入は継続する。

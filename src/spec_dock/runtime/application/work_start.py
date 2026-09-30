@@ -9,16 +9,21 @@ from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import load_scope_views
+from spec_dock.runtime.application.start_snapshot import (
+    capture_local_inputs,
+    observe_readiness,
+    read_candidate,
+    verify_candidate,
+    verify_local_inputs,
+)
 from spec_dock.runtime.application.worktree_observation import (
-    ancestors_for,
     observe_worktrees,
     read_selection,
     resolve_scope,
 )
-from spec_dock.runtime.domain.lifecycle import GithubBackend
 from spec_dock.runtime.domain.work_target import WorkTarget
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
-from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
+from spec_dock.runtime.infra.github_lifecycle import RemoteIssueError
 from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
 from spec_dock.runtime.infra.work_target_store import WorkTargetStore
@@ -75,6 +80,16 @@ def _check_private_state(context: ProjectContext, timeout: float) -> None:
             raise ValueError("work target state must be ignored by Git")
 
 
+def _check_expectations(
+    target: ScopeView, selection: SelectionObservation, expected_current: str | None, expected_backend: str | None
+) -> None:
+    if expected_backend is not None and target.backend.kind != expected_backend:
+        raise StartPrecondition("EXPECTATION_FAILED", "target backend does not match --expect-backend")
+    current_id = selection.record.scope_id if selection.record is not None else None
+    if expected_current is not None and current_id != expected_current:
+        raise StartPrecondition("EXPECTATION_FAILED", "direct target does not match --expect-current")
+
+
 @dataclass(frozen=True)
 class StartData:
     scope_id: str
@@ -97,21 +112,13 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         context.require_writer()
         _check_private_state(context, namespace.timeout)
         views = load_scope_views(context.root / "spec-dock")
+        local_inputs = capture_local_inputs(context, views)
         target = resolve_scope(context, views, namespace.target)
         scope_id = target.id
-        if namespace.offline:
-            raise ValueError("Start requires live GitHub readiness; --offline cannot start this Scope")
-        gateway = GithubIssueGateway(timeout=namespace.timeout)
-        for required in (*ancestors_for(views, target), target):
-            if isinstance(required.backend, GithubBackend):
-                backend = required.backend
-                state = gateway.get(
-                    context.root, f"{backend.repo_owner}/{backend.repo_name}", backend.issue_number
-                ).state
-            else:
-                state = required.status.state
-            if state != "open":
-                raise ValueError(f"Scope is not open: {required.id}")
+        expected_current = (
+            resolve_scope(context, views, namespace.expect_current).id if namespace.expect_current else None
+        )
+        _check_expectations(target, read_selection(context, views), expected_current, namespace.expect_backend)
         metadata = (target.path / ".meta.json").read_bytes()
         slug = json.loads(metadata)["slug"]
         branch = namespace.branch or f"{target.id}-{slug}"
@@ -142,6 +149,13 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 .decode()
                 .removesuffix("\n")
             )
+        candidate = read_candidate(context, tip, target, views, timeout=namespace.timeout)
+        readiness = observe_readiness(
+            context, candidate, target.id, timeout=namespace.timeout, offline=namespace.offline
+        )
+        if not readiness.ready:
+            blocked = ", ".join(blocker.scope_id for blocker in readiness.blockers)
+            raise StartPrecondition("READINESS_NOT_SATISFIED", f"required Scope states are not satisfied: {blocked}")
         if run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
             raise ValueError("worktree must be clean before Start")
         planned_selection = _check_selection(context, views, target)
@@ -166,6 +180,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             if root_handle.identity != context.worktree_identity or lock.identity != context.clone_identity:
                 raise ValueError("project physical identity changed")
             current = resolve_context(str(context.root), context.root)
+            verify_local_inputs(current, local_inputs)
             if (
                 current.head != context.head
                 or current.branch != context.branch
@@ -175,6 +190,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             if run_git(current.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
                 raise ValueError("worktree clean state changed before Start effects")
             selection = _check_selection(current, views, target)
+            _check_expectations(target, selection, expected_current, namespace.expect_backend)
             if selection != planned_selection:
                 raise ValueError("direct selection changed before Start effects")
             _check_private_state(current, namespace.timeout)
@@ -202,8 +218,9 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             branch_after = after.branch
             root_handle.verify()
             lock.verify()
-            if after.branch != branch or after.head != tip or (target.path / ".meta.json").read_bytes() != metadata:
+            if after.branch != branch or after.head != tip:
                 raise ValueError("checkout target snapshot changed")
+            verify_candidate(after, candidate)
             _check_private_state(after, namespace.timeout)
             phase = "selection.publish"
             record = WorkTarget(

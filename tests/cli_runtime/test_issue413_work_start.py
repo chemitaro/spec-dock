@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import json
 import subprocess
 from typing import TYPE_CHECKING
@@ -65,6 +66,234 @@ def open_issue(root: Path, repository: str, number: int) -> GithubIssueRecord:
         "2026-09-30T00:00:00Z",
         f"https://github.com/{repository}/issues/{number}",
     )
+
+
+@pytest.mark.parametrize("guard", [["--expect-backend", "local"], ["--expect-current", "init-00001"]])
+def test_start_expectation_mismatch_stops_before_git_effects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], guard: list[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    branch_before = subprocess.run(
+        ["git", "-C", str(root), "symbolic-ref", "--short", "HEAD"], check=True, capture_output=True
+    ).stdout
+    assert main(["--project", str(root), "work", "start", "init-00001", "--base", "HEAD", *guard, "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "EXPECTATION_FAILED"
+    assert result["effects"] == []
+    assert not (root / "spec-dock/.agent/work-target").exists()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(root), "symbolic-ref", "--short", "HEAD"], check=True, capture_output=True
+        ).stdout
+        == branch_before
+    )
+
+
+def test_start_rejects_candidate_without_scope_before_creating_or_checking_out_branch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    original = subprocess.run(
+        ["git", "-C", str(root), "symbolic-ref", "--short", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.rstrip("\n")
+    subprocess.run(["git", "-C", str(root), "checkout", "-qb", "bad-base"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "rm", "spec-dock/initiatives/init-00001-fixture/.meta.json"],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "no scope",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(root), "checkout", "-q", original], check=True, capture_output=True)
+
+    assert main(["--project", str(root), "work", "start", "init-00001", "--base", "bad-base", "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    assert not (root / "spec-dock/.agent/work-target").exists()
+    assert (
+        subprocess.run(
+            ["git", "-C", str(root), "symbolic-ref", "--short", "HEAD"], check=True, capture_output=True, text=True
+        ).stdout
+        == original + "\n"
+    )
+    assert (
+        subprocess.run(
+            ["git", "-C", str(root), "show-ref", "--verify", "refs/heads/init-00001-fixture"], capture_output=True
+        ).returncode
+        != 0
+    )
+
+
+@pytest.mark.parametrize("ancestor_changed", [False, True])
+def test_start_reads_three_level_candidate_metadata_before_checkout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], ancestor_changed: bool
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    initiative = root / "spec-dock/initiatives/init-00001-fixture"
+    base = json.loads((initiative / ".meta.json").read_bytes())
+    epic = initiative / "epics/epic-00002-fixture"
+    issue = epic / "issues/iss-00003-fixture"
+    for path, scope_id, kind, parent, number, epic_id in (
+        (epic, "epic-00002", "epic", "init-00001", 2, None),
+        (issue, "iss-00003", "issue", "epic-00002", 3, "epic-00002"),
+    ):
+        path.mkdir(parents=True)
+        metadata = dict(base, id=scope_id, type=kind, parent_id=parent, initiative_id="init-00001", epic_id=epic_id)
+        metadata["github"] = dict(base["github"], issue_number=number)
+        (path / ".meta.json").write_text(json.dumps(metadata))
+    subprocess.run(["git", "-C", str(root), "add", "spec-dock"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "hierarchy",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    if ancestor_changed:
+        subprocess.run(
+            ["git", "-C", str(root), "update-index", "--assume-unchanged", str(epic.relative_to(root) / ".meta.json")],
+            check=True,
+            capture_output=True,
+        )
+
+    def get_live(_, repo_root, repository, number):
+        if ancestor_changed and number == 3:
+            metadata_path = epic / ".meta.json"
+            metadata_path.write_bytes(metadata_path.read_bytes() + b"\n")
+        return open_issue(repo_root, repository, number)
+
+    monkeypatch.setattr("spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", get_live)
+    assert main(["--project", str(root), "work", "start", "iss-00003", "--base", "HEAD", "--json"]) == (
+        3 if ancestor_changed else 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["scope_id"] == "iss-00003"
+    assert result["data"]["started"] is not ancestor_changed
+    if ancestor_changed:
+        assert result["effects"] == []
+
+
+@pytest.mark.parametrize("completed", [False, True])
+def test_start_requires_candidate_dependency_itself_to_be_completed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], completed: bool
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    first = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    metadata = json.loads(first.read_bytes())
+    second = first.parent.parent / "init-00002-fixture"
+    second.mkdir()
+    dependency = dict(metadata, id="init-00002", github=dict(metadata["github"], issue_number=2))
+    (second / ".meta.json").write_text(json.dumps(dependency))
+    metadata["depends_on"] = ["init-00002"]
+    first.write_text(json.dumps(metadata))
+    subprocess.run(["git", "-C", str(root), "add", "spec-dock"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "dependency",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    calls: list[int] = []
+
+    def get_live(_, repo_root, repository, number):
+        calls.append(number)
+        record = open_issue(repo_root, repository, number)
+        return (
+            replace(record, state="completed", raw_state="closed", state_reason="completed")
+            if number == 2 and completed
+            else record
+        )
+
+    monkeypatch.setattr("spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", get_live)
+    assert main(["--project", str(root), "work", "start", "init-00001", "--base", "HEAD", "--json"]) == (
+        0 if completed else 3
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert sorted(calls) == [1, 2]
+    if not completed:
+        assert result["error"]["code"] == "READINESS_NOT_SATISFIED"
+        assert result["effects"] == []
+        assert not (root / "spec-dock/.agent/work-target").exists()
+    else:
+        assert result["data"]["started"] is True
+
+
+def test_start_allows_candidate_title_change_with_same_scope_identity(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata_path = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = subprocess.run(
+        ["git", "-C", str(root), "symbolic-ref", "--short", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.rstrip("\n")
+    subprocess.run(["git", "-C", str(root), "checkout", "-qb", "revised-base"], check=True, capture_output=True)
+    metadata = json.loads(metadata_path.read_bytes())
+    metadata["title"] = "Revised title"
+    metadata_path.write_text(json.dumps(metadata))
+    subprocess.run(["git", "-C", str(root), "add", "spec-dock"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "title",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(root), "checkout", "-q", original], check=True, capture_output=True)
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    assert main(["--project", str(root), "work", "start", "init-00001", "--base", "revised-base", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["started"] is True
+    assert json.loads(metadata_path.read_bytes())["title"] == "Revised title"
 
 
 def test_start_creates_checks_out_and_selects_without_git_control(
