@@ -139,3 +139,11 @@ ChatGPT Use Strictをclean mainから直接実行した。sessionは `specdock-g
 ## 2026-09-30 独立仕様レビュー初回とP1補正
 
 GPT-6 Proの初回レビューは内容上fail / P1一件。JSON形式不備によってレビューを破棄しないという利用者指示を記録し、[原文と対応分析](artifacts/review-analysis.md)を保全した。既存D-10のscopesがCLI契約/schemaから欠落していたため、未選択Scopeのlifecycle行・例・P-08/AC-23検証を補正した。製品コードは未変更、再レビュー合格は未取得。
+
+## 2026-09-30 独立仕様再レビュー合格
+
+利用者の新規会話許可を受け、chatgpt-spec-review-strict / GPT-6 Pro / Proで候補7e895803cba0d43957e504c9f97637d307bc6a78を再レビューした。session specdock-413-spec-rereviewはexit0、pass・指摘0件。初回P1の解消と指定15文書全体の実装開始可能性が確認された。[原文・モデル証拠・判断](artifacts/review-analysis.md)を保全した。
+
+回答の引用マーカーによるJSON形式不備は今回もあるが、利用者の明示指示に従って原文の意味を採用した。仕様の規範JSON schemaの検査とは区別する。
+
+合格後の変更はレビュー記録、README/HTMLの進捗表示、manifestと配送ZIPのみ。要件・設計・計画・規範契約を変更していない。GPT-6.1 Sol / HighはP-01から実装開始可能。製品コード・製品テスト・正式import/Start・人間merge・実環境移行は未実施。

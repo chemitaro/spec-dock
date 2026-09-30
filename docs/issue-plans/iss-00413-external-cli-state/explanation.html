@@ -307,13 +307,13 @@
 </head>
 <body>
   <main>
-<p class="notice">ローカル採用状況：確定インタビューを保持し、要件・設計・計画を全面差替えしました。4図と拡大操作、schemaと既存240件の保全を検査済みです。以下の「未確認」「ZIPに含めない」はChatGPT生成時点の記録で、納品ZIPには実施記録とインタビューも含めます。製品実装は未着手です。最新の検証結果は<a href="report.md">実施記録</a>を参照してください。</p>
+<p class="notice">ローカル採用状況：確定インタビューを保持し、要件・設計・計画を全面差替えしました。4図と拡大操作、schemaと既存240件の保全を検査済みです。以下の「未確認」「ZIPに含めない」はChatGPT生成時点の記録で、納品ZIPには実施記録とインタビューも含めます。GPT-6 Proの独立再レビューはpass・指摘0件です（仕様commit: 7e895803）。GPT-6.1 Sol / Highが実装計画のP-01から着手できます。製品実装は未着手です。<a href="artifacts/review-analysis.md">レビュー記録</a>と最新の検証結果は<a href="report.md">実施記録</a>を参照してください。</p>
 
 <header id="top">
 <p class="eyebrow">SPECDOCK · ISSUE #413 · PLANNING PACK</p>
 <h1>普段のCLIとして動かし、<br>作業対象だけを各worktreeに残す</h1>
 <p class="lead">helpを見るために独自の制御情報を復旧する必要はありません。外部にインストールしたSpecDockを起動し、作業場所ごとに一つの対象を選び、必要なときだけ他の作業場所を確認する形へ改めます。</p>
-<div class="notice"><p><strong>この資料は、これから実装する仕様の説明です。</strong>製品コード、製品試験、実導入、正式Scope登録、Start、commit/push、公開、人間mergeは未着手です。</p><p>利用者が確定した回答を反映した全面差替え版です。従来草案の「active・Start・Finishを全て廃止する」「完全にstatelessにする」という案は採用しません。</p></div>
+<div class="notice"><p><strong>この資料は、これから実装する仕様の説明です。</strong>製品コード、製品試験、実導入、正式Scope登録、Start、人間mergeは未着手です。文書のcommit/pushと説明資料の配信は実施済みです。</p><p>利用者が確定した回答を反映した全面差替え版です。従来草案の「active・Start・Finishを全て廃止する」「完全にstatelessにする」という案は採用しません。</p></div>
 <p>初めて読む方も、このHTMLだけで背景、正常操作、失敗時の振る舞い、変更範囲、移行と実装の順番を追えるようにしています。詳しい実装契約は <a href="requirement.md">要件</a>・<a href="design.md">設計</a>・<a href="plan.md">計画</a>にあります。</p>
 <p class="source-note">基準実装：chemitaro/spec-dock / 指定branch main / <span class="mono">6fec3099d8759b4e5b3b393b2987534b46dfa383</span>。接続GitHubの指定refを最初に照会し、完全SHA一致を確認しました。新要求の根拠は<a href="artifacts/user-decisions.md">2026年9月30日の確定回答</a>です。</p>
 <nav aria-label="この資料の目次"><h2>目次</h2><ol class="toc"><li><a href="#purpose">何を直し、何を残すのか</a></li><li><a href="#engine-history">なぜengineとcontrolが追加されたのか</a></li><li><a href="#words">状態を三つに分けて読む</a></li><li><a href="#architecture">新しい全体構成と保存場所</a></li><li><a href="#start">Startはbranch操作まで行う</a></li><li><a href="#finish">Finishは完了とCloseを行う</a></li><li><a href="#parallel">複数worktreeとSyncの見方</a></li><li><a href="#changes">既存CLIで変わること・残ること</a></li><li><a href="#failures">失敗したときに何が残るのか</a></li><li><a href="#ids">IDと既存データを守る</a></li><li><a href="#migration">controlなしの環境から切り替える</a></li><li><a href="#implementation">実装する順番と完了証拠</a></li><li><a href="#checks">実装前・採用前に確認すること</a></li></ol></nav>

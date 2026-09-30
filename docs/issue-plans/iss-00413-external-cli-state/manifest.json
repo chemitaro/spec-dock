@@ -67,8 +67,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 4844,
-      "sha256": "d7a4b2bdf7c67afc08d39ee38a105393ecc6efc53abcc032e291b16e2edceac5"
+      "bytes": 4971,
+      "sha256": "50307be99a179890e23d047aa9dc10a609571026b29eee7416859136348046d0"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
@@ -111,9 +111,14 @@
       "sha256": "5f6fd1d8e26c1229eaffd6504df3de39fcf778867c3d09d108b53738142f13bb"
     },
     {
+      "path": "artifacts/review-002-raw.md",
+      "bytes": 4184,
+      "sha256": "f89199591dbfed61d3be23f023fe118c1a034a982cdd6d9c33ed26695fe8d92c"
+    },
+    {
       "path": "artifacts/review-analysis.md",
-      "bytes": 3217,
-      "sha256": "14cefa1b421603a083becbe2a7a3b7fe11e3bc5219dcdb5577c0d2e168ab19ad"
+      "bytes": 5837,
+      "sha256": "632f0c061a636a8e3a9007484e7446f7a9e82d7c49d46ecf0c1f3aac464248f2"
     },
     {
       "path": "artifacts/self-check.md",
@@ -147,8 +152,8 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 66931,
-      "sha256": "59f5080a62b8adce801cd176a0744f1858243c571aaca332453885e6f6e9050a"
+      "bytes": 67197,
+      "sha256": "ce9df387c2358df8ae3bc837751e5eb94bc0124230e43da13791b52509db70ae"
     },
     {
       "path": "index.html",
@@ -162,8 +167,8 @@
     },
     {
       "path": "report.md",
-      "bytes": 16115,
-      "sha256": "923b9e429f46d494fa58d594440a0a1c499d5c7175355351c0cdc3e0c0c06326"
+      "bytes": 17085,
+      "sha256": "3196f2de2e087c91a81686c2f0db012640a3ff6ecd92a1d2230cba230beb3575"
     },
     {
       "path": "requirement.md",
@@ -283,7 +288,7 @@
     "reviewer_session": "specdock-413-spec-review",
     "initial_result": "semantic fail; P1=1; original JSON malformed; user authorized content interpretation",
     "correction": "D-10 scopes reflected in C-03/schema/examples/P-08/AC-23 and human explanation",
-    "status": "local checks passed; re-review pending",
+    "status": "closed by subsequent semantic review pass",
     "checks": {
       "bundled_examples_valid": 13,
       "old_schema_rejects_corrected_sync": true,
@@ -292,5 +297,19 @@
       "metadata_and_interview_unchanged": true,
       "html_browser": "4/4 SVG; zoom pass"
     }
+  },
+  "independent_review": {
+    "status": "pass",
+    "findings": 0,
+    "reviewed_sha": "7e895803cba0d43957e504c9f97637d307bc6a78",
+    "reviewer_session": "specdock-413-spec-rereview",
+    "requested_model": "gpt-6-pro",
+    "requested_thinking": "pro",
+    "model_ui_verified": true,
+    "thinking_ui_verified": true,
+    "raw_result": "artifacts/review-002-raw.md",
+    "interpretation": "user-authorized semantic acceptance; raw JSON malformed by citation quotes",
+    "post_review_changes": "evidence/status/package only; normative specifications unchanged",
+    "implementation_status": "not started"
   }
 }
