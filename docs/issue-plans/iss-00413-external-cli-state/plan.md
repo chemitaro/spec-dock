@@ -17,7 +17,7 @@
 <a id="p-01"></a>
 ## P-01 契約・既存回帰・Redを固定する
 
-**状態: 未着手。前提/依存: なし。** 読む節: [D-01](design.md#d-01), [D-11](design.md#d-11), [D-13](design.md#d-13)。補足: D-01, D-11, D-13。
+**状態: 進行中。変更前baselineはlint成功・1217 passed/1 skipped、44 leafの契約照合と最初の公開入口Redを記録済み。個別回帰のRed→Greenは後続stepで追加し、全体gateは未完了。前提/依存: なし。** 読む節: [D-01](design.md#d-01), [D-11](design.md#d-11), [D-13](design.md#d-13)。補足: D-01, D-11, D-13。
 
 **所有/対象file**: 既存 tests/cli_runtime/test_cli_vnext_contract.py、test_active_vnext.py、test_work_start_vnext.py、test_work_finish_vnext.py、test_workspace_sync_vnext.py、tests/integration/test_cli_entrypoint_vnext.py。新 tests/cli_runtime/test_issue413_contract.py（予定）。
 
@@ -156,6 +156,8 @@ uv run pytest tests/integration/test_start_lock.py -q
 <a id="p-06"></a>
 ## P-06 Git効果を含むStartを閉じる
 
+第6回Strictは`e6513650`のP-03〜P-08を対象にP1一件・P2四件でfail。全件を[分析記録](artifacts/code-review-p06-06-analysis.md)へ残し、未知/重複inventoryの行単位診断・Start停止、残存stageのpublication unknownをTDDで修正した。関連252 testsが通過し、fresh Strict passは未取得。P2の分類を変えず、同じfail batchに対する利用者の明示的な修正認可を適用した。
+
 **状態: 実装中（第3回独立レビューは8ad73cfdを対象にfail。全5件を分析後、no-op checkout、checkout後clean、候補Scope/container構造、未確認token、sole selection公開確認を修正し、関連619件を検証。branch leafとPOSIX stage/rename/unlink強制停止も検証済み。Windows store/native受入と現在候補の独立レビュー等は未完了）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
 
 **所有/対象file**: NRT/application/work_lifecycle.py、branch_vnext.py、commands/work_vnext.py、branch_vnext.py、infra/git_cli.py、presentation/envelope.py。tests/cli_runtime/test_work_start_vnext.py、test_branch_vnext.py、新 tests/integration/test_issue413_start.py（予定）。
@@ -182,6 +184,8 @@ uv run pytest tests/cli_runtime/test_work_start_vnext.py tests/cli_runtime/test_
 
 <a id="p-07"></a>
 ## P-07 Finishとactiveの解除を閉じる
+
+第6回Strictの物理identity不一致recordの無確認clearを修正し、captured recordを保全して`--all --yes`確認だけで解除できることを検証した。新しいlock・別WT操作・metadata補完は追加していない。
 
 **状態: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。GitHub-backed Finishの完了確認→captured token解除、子孫guard、dry-run、metadata再確認、native遅延解除/Start-only排他を検証。真正の既存local backendは単一metadataの保全更新を接続・検証。現在候補の独立認定、Windows nativeと旧runtime/testの退役は未完了。P-06の独立レビュー、Windows adapter/native受入は引き続き未完了）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
 
@@ -211,6 +215,8 @@ uv run pytest tests/cli_runtime/test_active_vnext.py tests/cli_runtime/test_work
 
 <a id="p-08"></a>
 ## P-08 Syncの複数選択表示を完成させる
+
+第6回Strictに基づき、stale/unavailableで読めた直接recordの既知ID/refと件数を保持し、metadataがないGH refも今回のGET対象へ含めた。ID→refとref→IDの両方向のidentity conflictを検出する。unknown、祖先不明、readonly partial/7を維持し、記録や派生cacheを作らない。
 
 **状態: 実装中（通常dispatchのreadonly Sync、現在treeと同clone各WTの必要対象/祖先、直接/子孫件数、local/github lifecycle、矛盾/不明の診断、JSON schemaとtextを検証。現在候補の独立レビュー、旧generation実装/testの退役、Windows nativeと全体gateは未完了）。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
 

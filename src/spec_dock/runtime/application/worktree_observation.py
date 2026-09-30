@@ -138,6 +138,8 @@ def observe_worktrees(context: ProjectContext, *, timeout: float = 30) -> tuple[
         direct: StoredSelection | None = None
         identity: PhysicalIdentity | None = None
         try:
+            if entry.inventory_error is not None:
+                raise ValueError(entry.inventory_error)
             if entry.bare:
                 raise ValueError("bare repository is not a working tree")
             other = resolve_context(str(entry.path), context.root, timeout=timeout)

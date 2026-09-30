@@ -11,7 +11,7 @@ import pytest
 
 from spec_dock.runtime.domain.work_target import PhysicalIdentity, WorkTarget
 from spec_dock.runtime.infra.identity import DirectoryIdentity
-from spec_dock.runtime.infra.work_target_store import WorkTargetStore
+from spec_dock.runtime.infra.work_target_store import SelectionPublicationUnknown, WorkTargetStore
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -143,7 +143,7 @@ def test_failed_sync_does_not_publish_half_json(tmp_path: Path, monkeypatch: pyt
             raise OSError("injected disk sync failure")
 
         monkeypatch.setattr("os.fsync", reject_sync)
-        with pytest.raises(OSError, match="injected"):
+        with pytest.raises(SelectionPublicationUnknown, match="injected"):
             store.publish(_record())
         assert not list(store.path.glob("target-*.json"))
         assert store.read().record is None

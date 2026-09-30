@@ -299,6 +299,31 @@ def test_clear_corrupt_record_requires_yes_then_removes_only_regular_observed_na
     assert not record.exists()
 
 
+@pytest.mark.parametrize("identity", ["clone_identity", "worktree_identity"])
+def test_clear_physical_identity_mismatch_requires_explicit_yes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], identity: str
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    payload = json.loads(record.read_bytes())
+    payload[identity]["device"] = str(int(payload[identity]["device"]) + 1)
+    record.write_text(json.dumps(payload))
+    before = record.read_bytes()
+    assert main(["--project", str(root), "active", "clear", "--all", "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    assert record.read_bytes() == before
+    assert main(["--project", str(root), "active", "clear", "--all", "--dry-run", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["effects"] == [
+        {"kind": "selection.clear", "status": "planned", "target": record.name[7:-5]}
+    ]
+    assert record.read_bytes() == before
+    assert main(["--project", str(root), "active", "clear", "--all", "--yes", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["selection"]["status"] == "empty"
+    assert not record.exists()
+
+
 def test_corrupt_clear_dry_run_requires_no_approval_and_preserves_record(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

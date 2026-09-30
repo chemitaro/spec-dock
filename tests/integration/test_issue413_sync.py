@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
@@ -158,6 +159,43 @@ def test_conflicting_github_linkages_keep_each_observed_ref_and_lifecycle(
     assert record.read_bytes() == before
 
 
+def test_same_github_ref_under_different_scope_ids_is_an_identity_conflict(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "main")
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"],
+        check=True,
+        capture_output=True,
+    )
+    scope = linked / "spec-dock/initiatives/init-00001-fixture"
+    renamed = scope.with_name("init-local-00001-fixture")
+    scope.rename(renamed)
+    payload = json.loads((renamed / ".meta.json").read_bytes())
+    payload["id"] = "init-local-00001"
+    (renamed / ".meta.json").write_text(json.dumps(payload))
+    record = select_fixture(linked, scope_id="init-local-00001")
+    before = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    assert main(["--project", str(root), "workspace", "sync", "--source", "github", "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    data = result["data"]
+    assert data["complete"] is False
+    assert data["scopes"] == [
+        {"scope_id": "init-00001", "github_ref": "gh:example/repo#1", "lifecycle": "open"},
+        {"scope_id": "init-local-00001", "github_ref": "gh:example/repo#1", "lifecycle": "open"},
+    ]
+    assert any(item["code"] == "SCOPE_IDENTITY_CONFLICT" for item in data["findings"])
+    assert data["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 0, "descendant_selected_count": 0, "complete": False},
+        {"scope_id": "init-local-00001", "direct_selected_count": 1, "descendant_selected_count": 0, "complete": False},
+    ]
+    assert len(log.read_text().splitlines()) == 1
+    assert record.read_bytes() == before
+
+
 def test_existing_duplicate_selections_are_displayed_without_automatic_clear(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -236,6 +274,48 @@ def test_unreadable_worktree_record_keeps_known_counts_incomplete_and_preserves_
     assert all(path.read_bytes() == value for path, value in before.items())
     assert not (root / ".git/spec-dock").exists()
     assert set(record.parent.iterdir()) == {record}
+
+
+@pytest.mark.parametrize("source", ["local", "github"])
+def test_stale_selection_keeps_its_known_scope_and_direct_count_without_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], source: str
+) -> None:
+    root = committed_workspace(tmp_path / "main")
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"],
+        check=True,
+        capture_output=True,
+    )
+    record = select_fixture(linked)
+    before = record.read_bytes()
+    for worktree in (root, linked):
+        shutil.rmtree(worktree / "spec-dock/initiatives/init-00001-fixture")
+    log = github_fixture(tmp_path, monkeypatch, {"1": "completed"})
+    assert main(["--project", str(root), "workspace", "sync", "--source", source, "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    data = result["data"]
+    assert data["complete"] is False
+    assert data["scopes"] == [
+        {
+            "scope_id": "init-00001",
+            "github_ref": "gh:example/repo#1",
+            "lifecycle": "completed" if source == "github" else "unknown",
+        }
+    ]
+    assert data["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 1, "descendant_selected_count": 0, "complete": False}
+    ]
+    row = next(row for row in data["worktrees"] if row["path"] == str(linked))
+    assert row["selection"]["status"] == "stale"
+    assert row["selection"]["scope_id"] == "init-00001"
+    assert row["lifecycle"] == ("completed" if source == "github" else "unknown")
+    assert record.read_bytes() == before
+    if source == "github":
+        assert len(log.read_text().splitlines()) == 1
+    else:
+        assert not log.exists()
 
 
 def test_github_sync_separates_lifecycle_from_selection_without_a_cache(

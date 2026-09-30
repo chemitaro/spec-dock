@@ -169,6 +169,7 @@ class GitWorktreeRecord:
     prunable: bool = False
     locked_reason: str | None = None
     prunable_reason: str | None = None
+    inventory_error: str | None = None
 
 
 @dataclass(frozen=True)

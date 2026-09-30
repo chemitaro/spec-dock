@@ -281,10 +281,11 @@ def _parse_worktree_porcelain(text: str) -> list[GitWorktreeRecord]:
         if isinstance(branch_ref, str):
             prefix = "refs/heads/"
             branch = branch_ref[len(prefix) :] if branch_ref.startswith(prefix) else branch_ref
+        head = current.get("head")
         records.append(
             GitWorktreeRecord(
                 path=Path(str(current["path"])),
-                head=current.get("head") if isinstance(current.get("head"), str) else None,
+                head=head if isinstance(head, str) else None,
                 branch=branch,
                 detached=bool(current.get("detached", False)),
                 bare=bool(current.get("bare", False)),
@@ -322,19 +323,26 @@ def _parse_worktree_porcelain_nul(text: str) -> list[GitWorktreeRecord]:
         if not group:
             continue
         attributes: dict[str, str] = {}
+        problems: list[str] = []
         for field in group.split("\0"):
             if not field:
                 continue
             key, _, value = field.partition(" ")
+            if key not in {"worktree", "HEAD", "branch", "detached", "bare", "locked", "prunable"}:
+                problems.append(f"unknown Git worktree inventory attribute: {key}")
+            if key in {"detached", "bare"} and value:
+                problems.append(f"invalid Git worktree inventory attribute value: {key}")
             if key in attributes:
-                raise ValueError("duplicate Git worktree inventory attribute")
+                problems.append(f"duplicate Git worktree inventory attribute: {key}")
+                continue
             attributes[key] = value
         path = attributes.get("worktree")
         if not path or not Path(path).is_absolute():
             raise ValueError("Git worktree inventory has no absolute path")
         branch = attributes.get("branch")
         if branch is not None and not branch.startswith("refs/heads/"):
-            raise ValueError("Git worktree inventory has invalid branch ref")
+            problems.append("Git worktree inventory has invalid branch ref")
+            branch = None
         records.append(
             GitWorktreeRecord(
                 path=Path(path),
@@ -346,6 +354,7 @@ def _parse_worktree_porcelain_nul(text: str) -> list[GitWorktreeRecord]:
                 prunable="prunable" in attributes,
                 locked_reason=attributes.get("locked") or None,
                 prunable_reason=attributes.get("prunable") or None,
+                inventory_error="; ".join(problems) or None,
             )
         )
     return records

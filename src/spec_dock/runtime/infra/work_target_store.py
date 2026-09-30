@@ -25,7 +25,7 @@ _MAX_BYTES = 65536
 
 
 class SelectionPublicationUnknown(RuntimeError):
-    """Rename succeeded, but durable publication or readback could not be confirmed."""
+    """An owned stage or final record may persist without confirmed publication."""
 
     def __init__(self, token: str, cause: Exception) -> None:
         self.token = token
@@ -178,13 +178,13 @@ class WorkTargetStore:
         name = f"target-{token}.json"
         payload = (json.dumps(asdict(record), ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
         descriptor = os.open(stage, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory_fd)
-        with os.fdopen(descriptor, "wb") as stream:
-            stream.write(payload)
-            stream.flush()
-            os.fsync(stream.fileno())
-        self._verify_directory(directory_fd)
-        _rename_no_replace_at(directory_fd, stage, directory_fd, name)
         try:
+            with os.fdopen(descriptor, "wb") as stream:
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            self._verify_directory(directory_fd)
+            _rename_no_replace_at(directory_fd, stage, directory_fd, name)
             os.fsync(directory_fd)
             self._verify_directory(directory_fd)
             observed_payload, handle = self._read_file(directory_fd, name)
@@ -194,7 +194,7 @@ class WorkTargetStore:
             if selection.status != "selected" or selection.handle != handle or selection.record != record:
                 raise ValueError("published work target is not the sole valid selection")
             self._verify_directory(directory_fd)
-        except (OSError, ValueError) as error:
+        except (OSError, ValueError, RuntimeError) as error:
             raise SelectionPublicationUnknown(token, error) from error
         return handle
 

@@ -70,9 +70,14 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
             handles = captured.observed_handles if selected_handles is None else selected_handles
             if captured.status == "unavailable":
                 raise ValueError(captured.reason or "selection cannot be read safely")
-            if captured.status == "invalid" and (
-                (not namespace.yes and not namespace.dry_run) or not captured.observed_handles
-            ):
+            invalid = captured.status == "invalid" or (
+                captured.record is not None
+                and (
+                    captured.record.clone_identity != context.clone_identity
+                    or captured.record.worktree_identity != context.worktree_identity
+                )
+            )
+            if invalid and ((not namespace.yes and not namespace.dry_run) or not captured.observed_handles):
                 raise ValueError("invalid selection requires --all --yes and safely observed regular records")
             if namespace.dry_run:
                 observed = _observe(context)

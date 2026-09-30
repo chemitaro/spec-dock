@@ -191,6 +191,78 @@ def test_start_publication_unknown_has_no_confirmed_selection_token(
     assert len(list(directory.glob("target-*.json"))) == 1
 
 
+def test_start_retained_stage_is_a_partial_publication_even_when_git_is_unchanged(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    directory = root / "spec-dock/.agent/work-target"
+    real_fsync = os.fsync
+
+    def syncing(descriptor):
+        if directory.exists() and any(
+            path.stat().st_ino == os.fstat(descriptor).st_ino for path in directory.glob(".stage-*")
+        ):
+            raise OSError("fixture staged record sync failed")
+        return real_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial"
+    assert result["data"]["started"] is False
+    assert result["data"]["selection_token"] is None
+    assert result["error"]["code"] == "SELECTION_PUBLICATION_UNKNOWN"
+    assert {effect["kind"]: effect["status"] for effect in result["effects"]} == {
+        "git.branch.create": "unchanged",
+        "git.checkout": "unchanged",
+        "selection.publish": "unknown",
+    }
+    assert result["recovery"]["instructions"]
+    assert len(list(directory.glob(".stage-*"))) == 1
+    assert not list(directory.glob("target-*.json"))
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX permission boundary")
+def test_start_retains_stage_and_reports_unknown_when_native_rename_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    directory = root / "spec-dock/.agent/work-target"
+    real_fsync = os.fsync
+    restricted = False
+
+    def syncing(descriptor):
+        nonlocal restricted
+        real_fsync(descriptor)
+        if directory.exists() and any(
+            path.stat().st_ino == os.fstat(descriptor).st_ino for path in directory.glob(".stage-*")
+        ):
+            directory.chmod(0o500)
+            restricted = True
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    try:
+        exit_code = main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"])
+    finally:
+        if directory.exists():
+            directory.chmod(0o700)
+    result = json.loads(capsys.readouterr().out)
+    assert restricted
+    assert exit_code == 6
+    assert result["status"] == "partial"
+    assert result["error"]["code"] == "SELECTION_PUBLICATION_UNKNOWN"
+    assert next(effect for effect in result["effects"] if effect["kind"] == "selection.publish")["status"] == "unknown"
+    assert len(list(directory.glob(".stage-*"))) == 1
+    assert not list(directory.glob("target-*.json"))
+
+
 @pytest.mark.parametrize("additional", ["record", "unknown"])
 def test_start_does_not_confirm_publication_with_an_additional_entry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], additional: str
@@ -894,7 +966,7 @@ def test_start_reports_publication_unknown_when_sync_fails_after_record_rename(
     assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"init-00001-fixture\n"
 
 
-def test_start_reports_failed_publication_when_stage_sync_fails_before_rename(
+def test_start_reports_unknown_publication_when_a_stage_remains_before_rename(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = committed_workspace(tmp_path / "consumer")
@@ -912,7 +984,7 @@ def test_start_reports_failed_publication_when_stage_sync_fails_before_rename(
     monkeypatch.setattr(os, "fsync", fail_stage_sync)
     assert main(["--project", str(root), "work", "start", "init-00001", "--base", "HEAD", "--json"]) == 6
     result = json.loads(capsys.readouterr().out)
-    assert result["effects"][-1] == {"kind": "selection.publish", "status": "failed", "target": "init-00001"}
+    assert result["effects"][-1] == {"kind": "selection.publish", "status": "unknown", "target": "init-00001"}
     assert not list(directory.glob("target-*.json"))
     assert len(list(directory.glob(".stage-*"))) == 1
 

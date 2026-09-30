@@ -294,3 +294,15 @@ public CLIを使う19件の統合テストで、選択中かつcompletedのAと�
 関連公開CLI/統合テストとstore/committed-workspace/Gateway/envelopeは262 passed（78.06秒）。この結果は後続のactive clear追加4件より前であり、その後の修正unitでは別途166 passed（35.83秒）を確認した。全source/test Ruff check/format（372 files）とSync/Finish/dispatch/data/envelope/catalog/optionsの7 source限定mypyが成功した。初期fixture/collectionの不備は訂正し製品Redと区別した。既存local矛盾の追加では集計前参照による3件の回帰を検出し、未追加identityのguardを修正した後で拡張選択を成功させた。
 
 このunitはP-08の通常POSIX経路の機能検証であり、独立Strict合格、旧generation module/testの退役、Windows native、full suite/lint、最終品質ゲートや実dogfood移行の証拠ではない。P-09以後を継続する。
+
+## 第6回Strictコードレビューと既存契約内の修正
+
+`e6513650c419e827fba29746f91d8870ee4ab8aa`のP-03〜P-08通常POSIX経路をfresh Strictで再レビューした。configured upstreamとclean HEADのfull SHA一致を検証して開始し、GPT-5.6 Sol / Proで44分09秒後にwrapper exit10、`review_status=fail`となった。P1一件、P2四件の原文をbyte一致で[JSON](artifacts/code-review-p06-06.json)へ残し、全件のauthority・到達性・根本原因・認可・修正・検証を[分析記録](artifacts/code-review-p06-06-analysis.md)へ記録した。
+
+未知/重複fieldのGit inventoryを完全観測にしない行単位診断を追加した。健全なWTはSyncで保持し、不完全行をunavailable/complete=false/exit7とする。Startは同じ不完全inventoryをGit効果前に拒否する。stale/unavailableでも読めた直接ID/refのScope観測とknown件数を保持し、GH modeでは既知refをdeduplicateして今回だけGETする。異なるID/同refもidentity conflictとして両観測を保全する。
+
+`active clear --all`は捕捉recordのclone/worktree physical identity不一致をinvalidの明示確認条件へ含める。stage作成後のStart公開失敗は残存候補を無効果と偽らずpublication unknown/partial6とし、再観測案内を返す。native stage fsync拒否とnative POSIX rename拒否を公開CLIで確認した。stageの自動purge、rollback、resume、中央状態、全writer lock、UUID、編集権限制御は追加していない。
+
+関連回帰の初回は251 passed/1 failed（69.70秒）。失敗は同じ残存stageの旧failed分類を期待する既存testであり、確定C-04へ合わせた訂正後は252 passed（65.38秒）。変更6 sourceの限定mypy、全source/test Ruff check/format（377 files）が成功した。collection指定やfixture fieldの誤りは製品Redから除外する。
+
+P-09作成経路の未コミット作業は別unitとして保持する。この修正はローカル検証済みで、fresh Strict pass、Windows native/store、full lint/test、P-09以後、Final Quality Gateと手動製品確認は未完了。goalをactiveとして継続する。
