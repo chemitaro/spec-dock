@@ -5,21 +5,21 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
-from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
 from spec_dock.runtime.domain.ids import parse_id
-from spec_dock.runtime.domain.lifecycle import GithubBackend, LocalBackend, StatusObservation, decode_scope_metadata
+from spec_dock.runtime.domain.lifecycle import LocalBackend, StatusObservation
 from spec_dock.runtime.domain.selectors import (
     ActiveScopeSelector,
     GithubScopeSelector,
     ScopeIdSelector,
     parse_scope_selector,
 )
-from spec_dock.runtime.infra import fs_repo
-from spec_dock.runtime.infra.json_store import read_guarded_json
+from spec_dock.runtime.infra.scope_tree import load_scope_tree
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from spec_dock.runtime.domain.lifecycle import ObservedState, ScopeBackend, SelectionState
     from spec_dock.runtime.domain.selectors import ScopeKind
 
@@ -46,49 +46,18 @@ class ScopeListResult:
     state: ObservedState | None
 
 
-def _cached_status(payload: object, scope_id: str, backend: GithubBackend) -> StatusObservation:
-    unknown = StatusObservation("unknown", "github", "unknown", None, None, True)
-    if payload is None:
-        return unknown
-    if (
-        not isinstance(payload, dict)
-        or payload.get("schema_version") != 1
-        or not isinstance(payload.get("items"), dict)
-    ):
-        raise ValueError("GitHub status cache schema is invalid")
-    item = payload["items"].get(scope_id)
-    if item is None:
-        return unknown
-    expected_ref = f"gh:{backend.repo_owner.lower()}/{backend.repo_name.lower()}#{backend.issue_number}"
-    if not isinstance(item, dict) or item.get("github_ref") != expected_ref:
-        return unknown
-    state = item.get("state")
-    observed_at = item.get("observed_at")
-    if state not in ("open", "completed", "not-planned", "unknown") or not isinstance(observed_at, str):
-        return unknown
-    return StatusObservation(cast("ObservedState", state), "github", "cache", observed_at, None, True)
-
-
 def load_scope_views(specdock_dir: Path) -> tuple[ScopeView, ...]:
-    """Read local metadata and saved status only; never contact GitHub or mutate files."""
+    """Read current metadata; GitHub lifecycle is unknown until a live observation."""
     if specdock_dir.is_symlink() or not specdock_dir.is_dir():
         raise ValueError("SpecDock workspace root is missing or redirected")
-    loaded_cache = read_guarded_json(specdock_dir / ".agent" / "github-status-cache.json")
-    cache = loaded_cache[0] if loaded_cache is not None else None
     views: list[ScopeView] = []
-    for record in fs_repo.load_node_records(specdock_dir):
-        loaded = read_guarded_json(Path(record.meta_path))
-        if loaded is None or not isinstance(loaded[0], dict):
-            raise ValueError("Scope metadata is missing or invalid")
-        metadata = decode_scope_metadata(loaded[0])
-        if (
-            metadata.raw.get("id") != record.id
-            or metadata.raw.get("type") != record.kind
-            or metadata.raw.get("title") != record.title
-            or metadata.raw.get("parent_id") != record.parent_id
-        ):
-            raise ValueError("Scope metadata changed during query")
-        path = Path(record.path).resolve(strict=True)
+    for record in load_scope_tree(specdock_dir):
+        metadata = record.metadata
+        raw = metadata.raw
+        scope_id, kind, title, parent = raw["id"], raw["type"], raw["title"], raw["parent_id"]
+        assert isinstance(scope_id, str) and isinstance(kind, str) and isinstance(title, str)
+        assert parent is None or isinstance(parent, str)
+        path = record.path.resolve(strict=True)
         if not path.is_relative_to(specdock_dir.resolve(strict=True)):
             raise ValueError("Scope path is outside this workspace")
         if isinstance(metadata.backend, LocalBackend):
@@ -96,17 +65,17 @@ def load_scope_views(specdock_dir: Path) -> tuple[ScopeView, ...]:
             status = StatusObservation(lifecycle.state, "local", "local", lifecycle.updated_at, None, False)
             github_ref = None
         else:
-            status = _cached_status(cache, record.id, metadata.backend)
+            status = StatusObservation("unknown", "github", "unknown", None, None, False)
             github_ref = (
                 f"gh:{metadata.backend.repo_owner.lower()}/{metadata.backend.repo_name.lower()}"
                 f"#{metadata.backend.issue_number}"
             )
         views.append(
             ScopeView(
-                id=record.id,
-                kind=cast("ScopeKind", record.kind),
-                title=record.title,
-                parent_id=record.parent_id,
+                id=scope_id,
+                kind=cast("ScopeKind", kind),
+                title=title,
+                parent_id=parent,
                 backend=metadata.backend,
                 path=path,
                 revision=metadata.revision,

@@ -35,7 +35,7 @@ def test_scope_query_filters_local_and_cached_github_without_network_or_write(tm
     assert (local.path / ".meta.json").read_bytes() == before_meta
 
 
-def test_scope_query_keeps_github_status_source_and_stale_flag(tmp_path: Path) -> None:
+def test_scope_query_ignores_retired_github_status_cache(tmp_path: Path) -> None:
     common = _ready_repo(tmp_path)
     repo = cast("Path", common["repo_root"])
     specdock_dir = repo / "spec-dock"
@@ -68,10 +68,10 @@ def test_scope_query_keeps_github_status_source_and_stale_flag(tmp_path: Path) -
     )
     views = load_scope_views(specdock_dir)
     item = show_scope(views, imported.id)
-    assert item.status.state == "completed"
-    assert item.status.source == "cache"
-    assert item.status.stale
-    assert [scope.id for scope in list_scopes(views, state="completed").items] == [imported.id]
+    assert item.status.state == "unknown"
+    assert item.status.source == "unknown"
+    assert not item.status.stale
+    assert list_scopes(views, state="completed").items == ()
 
 
 def test_scope_title_edit_preserves_slug_backend_and_read_only_mode(tmp_path: Path) -> None:

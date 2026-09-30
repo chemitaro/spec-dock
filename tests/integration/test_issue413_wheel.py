@@ -26,7 +26,13 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     wheel = next(wheel_dir.glob("*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
-        assert len([name for name in names if name.startswith("spec_dock/runtime/") and name.endswith(".py")]) == 138
+        expected_runtime = {
+            "spec_dock/" + path.relative_to(ROOT / "src/spec_dock").as_posix()
+            for path in (ROOT / "src/spec_dock/runtime").rglob("*.py")
+        }
+        assert {
+            name for name in names if name.startswith("spec_dock/runtime/") and name.endswith(".py")
+        } == expected_runtime
         assert "spec_dock/runtime/cli/options.py" in names
         assert not any("/scripts/spec_dock_runtime/" in name for name in names)
         assert not any("__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names)

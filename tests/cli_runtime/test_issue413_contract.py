@@ -65,3 +65,96 @@ def test_independent_scope_read_does_not_require_control(tmp_path: Path, capsys:
     assert not output.err
     assert metadata.read_bytes() == before
     assert not (root / ".git/spec-dock").exists()
+
+
+def test_project_root_with_crlf_is_not_normalized(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = make_workspace(tmp_path / "consumer\r\nname")
+    assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["result"]["scope"]["id"] == "init-00001"
+
+
+def test_scope_state_filter_does_not_adopt_retired_status_cache(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    agent = root / "spec-dock/.agent"
+    agent.mkdir()
+    cache = agent / "github-status-cache.json"
+    cache.write_text(
+        json.dumps({
+            "schema_version": 1,
+            "items": {
+                "init-00001": {
+                    "github_ref": "gh:example/repo#1",
+                    "state": "completed",
+                    "observed_at": "2026-09-29T00:00:00Z",
+                }
+            },
+        })
+    )
+    before = cache.read_bytes()
+    assert main(["--project", str(root), "scope", "list", "--state", "completed", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["result"]["items"] == []
+    assert result["data"]["result"]["unknown_filtered_count"] == 1
+    assert cache.read_bytes() == before
+    assert not output.err
+
+
+def test_old_writer_workspace_is_readable_without_control(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    declaration = root / "spec-dock/workspace.json"
+    declaration.write_text('{"schema_version":3,"writer_protocol":"specdock.writer/v1"}\n')
+    before = declaration.read_bytes()
+    assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "succeeded"
+    assert declaration.read_bytes() == before
+
+
+def test_active_show_empty_is_read_only_and_does_not_create_state(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    assert main(["--project", str(root), "active", "show", "--json"]) == 0
+    output = capsys.readouterr()
+    data = json.loads(output.out)["data"]
+    assert data["kind"] == "active"
+    assert data["selection"]["status"] == "empty"
+    assert data["selection"]["scope_id"] is None
+    assert data["ancestors"] == []
+    assert not (root / "spec-dock/.agent").exists()
+    assert not (root / ".git/spec-dock").exists()
+
+
+def test_dynamic_scope_uses_direct_record_and_keeps_it_stale_when_scope_disappears(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application.project_context import resolve_context
+    from spec_dock.runtime.domain.work_target import WorkTarget
+    from spec_dock.runtime.infra.work_target_store import WorkTargetStore
+
+    root = make_workspace(tmp_path / "consumer")
+    context = resolve_context(str(root), root)
+    with WorkTargetStore(root) as store:
+        handle = store.publish(
+            WorkTarget(
+                "specdock.work-target/v1",
+                "init-00001",
+                "gh:example/repo#1",
+                "selected-branch",
+                "2026-09-30T00:00:00Z",
+                context.clone_identity,
+                context.worktree_identity,
+            )
+        )
+        path = store.path / handle.basename
+        before = path.read_bytes()
+        assert main(["--project", str(root), "scope", "show", "@current", "--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["data"]["result"]["scope"]["id"] == "init-00001"
+        metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+        metadata.unlink()
+        # Missing metadata is an incomplete tree, never an empty selection.
+        assert main(["--project", str(root), "scope", "show", "@current", "--json"]) != 0
+        capsys.readouterr()
+        assert path.read_bytes() == before

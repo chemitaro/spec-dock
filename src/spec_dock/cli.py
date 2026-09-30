@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 import sys
 
 from spec_dock.runtime.cli.options import completion_script, explicit_help, parse_vnext_output
@@ -31,14 +32,12 @@ def main(argv: list[str] | None = None) -> int:
             return 2
         sys.stdout.write(render_utility_json(command, text) if namespace.json else text)
         return 0
-    # This intermediate milestone deliberately has no business effects.
-    # P-04 connects the control-free context; never execute the retired engine.
-    message = "business dispatch is not connected to the normal package yet"
-    if namespace.json:
-        sys.stdout.write(render_diagnostic_json(command, "BUSINESS_NOT_CONNECTED", message, exit_code=3))
-    else:
-        sys.stderr.write(f"error [BUSINESS_NOT_CONNECTED] {message}\n")
-    return 3
+    from spec_dock.runtime.commands.runtime_dispatch import dispatch
+
+    exit_code, stdout, stderr = dispatch(namespace, Path.cwd())
+    sys.stdout.write(stdout)
+    sys.stderr.write(stderr)
+    return exit_code
 
 
 if __name__ == "__main__":

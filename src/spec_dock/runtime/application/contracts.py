@@ -166,6 +166,9 @@ class GitWorktreeRecord:
     detached: bool = False
     bare: bool = False
     locked: bool = False
+    prunable: bool = False
+    locked_reason: str | None = None
+    prunable_reason: str | None = None
 
 
 @dataclass(frozen=True)

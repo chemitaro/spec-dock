@@ -108,7 +108,7 @@ def render_diagnostic_json(command: str, code: str, message: str, *, exit_code: 
     """Render a front-door failure before any business effects."""
     return (
         json.dumps(
-            {
+            _redact({
                 "schema_version": "specdock.cli/v2",
                 "command": command,
                 "status": "failed",
@@ -118,7 +118,7 @@ def render_diagnostic_json(command: str, code: str, message: str, *, exit_code: 
                 "warnings": [],
                 "error": {"code": code, "message": message, "details": {}},
                 "recovery": None,
-            },
+            }),
             ensure_ascii=False,
             separators=(",", ":"),
         )
@@ -140,6 +140,24 @@ def render_json(result: OperationResult[object]) -> str:
         "warnings": [asdict(warning) for warning in result.warnings],
         "error": asdict(result.error) if result.error is not None else None,
         "recovery": asdict(result.recovery) if result.recovery is not None else None,
+    }
+    return json.dumps(_redact(payload), ensure_ascii=False, separators=(",", ":")) + "\n"
+
+
+def render_json_v2(result: OperationResult[object]) -> str:
+    """Public stateless envelope; legacy operation IDs are never exposed."""
+    if not is_dataclass(result.data) or isinstance(result.data, type):
+        raise TypeError("command data must be a typed dataclass")
+    payload = {
+        "schema_version": "specdock.cli/v2",
+        "command": result.command,
+        "status": result.status,
+        "exit_code": result.exit_code,
+        "data": asdict(result.data),
+        "effects": [asdict(effect) for effect in result.effects],
+        "warnings": [asdict(item) for item in result.warnings],
+        "error": asdict(result.error) if result.error else None,
+        "recovery": None,
     }
     return json.dumps(_redact(payload), ensure_ascii=False, separators=(",", ":")) + "\n"
 

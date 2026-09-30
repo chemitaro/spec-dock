@@ -242,12 +242,12 @@ def origin_github_repo_slug(repo_root: Path) -> str | None:
 
 def worktree_list(repo_root: Path) -> list[GitWorktreeRecord]:
     _ensure_git_available()
-    cmd = ["git", "worktree", "list", "--porcelain"]
+    cmd = ["git", "worktree", "list", "--porcelain", "-z"]
     try:
-        p = _run_git(cmd, cwd=str(repo_root), capture_output=True, text=True, check=True)
+        p = _run_git(cmd, cwd=str(repo_root), capture_output=True, check=True)
     except subprocess.CalledProcessError as e:
         raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
-    return _parse_worktree_porcelain(p.stdout or "")
+    return _parse_worktree_porcelain_nul(os.fsdecode(p.stdout or b""))
 
 
 def remove_worktree(
@@ -315,6 +315,42 @@ def _parse_worktree_porcelain(text: str) -> list[GitWorktreeRecord]:
         elif line == "locked" or line.startswith("locked "):
             current["locked"] = True
     flush()
+    return records
+
+
+def _parse_worktree_porcelain_nul(text: str) -> list[GitWorktreeRecord]:
+    """Parse Git's unquoted NUL records without stripping path characters."""
+    records: list[GitWorktreeRecord] = []
+    for group in text.split("\0\0"):
+        if not group:
+            continue
+        attributes: dict[str, str] = {}
+        for field in group.split("\0"):
+            if not field:
+                continue
+            key, _, value = field.partition(" ")
+            if key in attributes:
+                raise ValueError("duplicate Git worktree inventory attribute")
+            attributes[key] = value
+        path = attributes.get("worktree")
+        if not path or not Path(path).is_absolute():
+            raise ValueError("Git worktree inventory has no absolute path")
+        branch = attributes.get("branch")
+        if branch is not None and not branch.startswith("refs/heads/"):
+            raise ValueError("Git worktree inventory has invalid branch ref")
+        records.append(
+            GitWorktreeRecord(
+                path=Path(path),
+                head=attributes.get("HEAD"),
+                branch=branch.removeprefix("refs/heads/") if branch is not None else None,
+                detached="detached" in attributes,
+                bare="bare" in attributes,
+                locked="locked" in attributes,
+                prunable="prunable" in attributes,
+                locked_reason=attributes.get("locked") or None,
+                prunable_reason=attributes.get("prunable") or None,
+            )
+        )
     return records
 
 

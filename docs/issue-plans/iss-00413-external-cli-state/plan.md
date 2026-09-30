@@ -75,7 +75,7 @@ uv run pytest tests/integration/test_issue413_wheel.py tests/integration/test_cl
 <a id="p-03"></a>
 ## P-03 schema3と直接対象一件の保存境界を作る
 
-**状態: 未着手。前提/依存: P-02。** 読む節: [D-03](design.md#d-03), [D-09](design.md#d-09)。補足: D-03, D-09。
+**状態: 実装中（POSIX境界を検証、Windowsと後続接続は未完了）。前提/依存: P-02。** 読む節: [D-03](design.md#d-03), [D-09](design.md#d-09)。補足: D-03, D-09。
 
 **所有/対象file**: NRT/domain/work_target.py、infra/work_target_store.py、infra/identity.py（新設）、domain/lifecycle.py、ids.py、selectors.py、infra/active_store.py。新 tests/unit/infra/test_work_target_store.py（予定）。
 
@@ -102,7 +102,7 @@ uv run pytest tests/unit/infra/test_work_target_store.py tests/cli_runtime/test_
 <a id="p-04"></a>
 ## P-04 Git inventoryとstale観測を接続する
 
-**状態: 未着手。前提/依存: P-03。** 読む節: [D-02](design.md#d-02), [D-04](design.md#d-04)。補足: D-02, D-04。
+**状態: 実装中（POSIX境界を検証、Windowsと後続接続は未完了）。前提/依存: P-03。** 読む節: [D-02](design.md#d-02), [D-04](design.md#d-04)。補足: D-02, D-04。
 
 **所有/対象file**: NRT/infra/git_cli.py、application/worktree_observation.py（新設）、cli/vnext_runtime.py::_context、application/scope_query.py。新 tests/integration/test_issue413_observation.py（予定）。
 
@@ -129,7 +129,7 @@ uv run pytest tests/integration/test_issue413_observation.py -q
 <a id="p-05"></a>
 ## P-05 Start専用のOS排他を実装する
 
-**状態: 未着手。前提/依存: P-04。** 読む節: [D-05](design.md#d-05)。補足: D-05。
+**状態: 実装中（POSIX境界を検証、Windowsと後続接続は未完了）。前提/依存: P-04。** 読む節: [D-05](design.md#d-05)。補足: D-05。
 
 **所有/対象file**: NRT/infra/start_lock.py、identity.py（新設）、既存writer_lock.py/admission参照の整理。新 tests/integration/test_start_lock.py（予定）。
 
