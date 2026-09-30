@@ -306,3 +306,17 @@ public CLIを使う19件の統合テストで、選択中かつcompletedのAと�
 関連回帰の初回は251 passed/1 failed（69.70秒）。失敗は同じ残存stageの旧failed分類を期待する既存testであり、確定C-04へ合わせた訂正後は252 passed（65.38秒）。変更6 sourceの限定mypy、全source/test Ruff check/format（377 files）が成功した。collection指定やfixture fieldの誤りは製品Redから除外する。
 
 P-09作成経路の未コミット作業は別unitとして保持する。この修正はローカル検証済みで、fresh Strict pass、Windows native/store、full lint/test、P-09以後、Final Quality Gateと手動製品確認は未完了。goalをactiveとして継続する。
+
+## P-09 三階層のGitHub-only createを通常経路へ接続
+
+`scope create initiative|epic|issue --backend github`を通常dispatchへ接続した。local新規発行はcontextへ入る前にARGUMENT_RETIRED/exit2、offline発行は効果前拒否とする。既存title/slug・親kind/階層・祖先openの純粋な規則を再利用し、originのcredential-free fetch/push endpointが一つの同じGitHub repositoryであることをnative Gitで検証する。Git lookup失敗の元stderr/returncodeはerror.details.gitへ残す。
+
+必要なlocal metadataとworkspace bytes/identity、repositoryを固定し、GH POST前、応答後、directory公開直前にcooperativeな再照合を行う。GitHub createはoperation markerなしの一回だけ。確定番号#57から三kindの既存形式IDを生成し、同FSのignored `spec-dock/.agent/staging/.stage-<opaque>`でmetadata/文書/rules linkを完成してから、無上書きdirectory公開する。独自allocator、Scope UUID、control、journal、全writer lock、旧engine fallbackは使わない。
+
+POST応答が不明ならscope=null、remote effect unknown、scaffold not_attempted、partial6としてblind retryをしない。確定refの後にmetadata/originが変わった場合やID/refが重複した場合は、確認済みGH refを返してlocal公開を止め、新しい明示importを案内する。local公開後のdescriptor cleanup失敗でも確認済みscaffold成功を失わない。missing template、redirected/unignored stagingはPOST前に停止する。実directory stageの全entryがGit管理外であることを検証した。
+
+実TTYでの計画後確認・承認・取消を確認した。JSON/非対話で--yesがない場合とdry-runはwrite0。leaf helpはGH発行番号とv2結果を説明し、旧local creation/resume/journalの案内を撤去した。公開前stageへnative FIFOを注入するとopenがblockするRedを隔離子processで確認し、特殊entryの事前拒否とnonblocking openで、既知GH refを保ったlocal失敗を返すようにした。
+
+22 creation testsにpublic contract/fresh wheelを合わせた29 testsが13.38秒で通過。対象Ruffと変更6 source限定mypyが成功した。最初の不足実装、POST unknown、既知remote後の変更・重複、hidden stage ignore、cleanup後の効果、repo変更、Git原文、TTY、FIFO、helpのRed→Greenを各公開境界で確認した。三階層の追加は既存pure規則で最初からGreenであり、fixture/collection不備をRedとして数えない。
+
+このcheckpointはcreate縦経路の証拠である。import/edit/close/reopen/dependency、旧writer/helper importの抽出・退役、Windows native、全体gate、最新候補のStrict、Final Quality Gate、手動製品確認は未完了。実dogfood metadataやdeclaration、正式Issue #413の選択は変更していない。

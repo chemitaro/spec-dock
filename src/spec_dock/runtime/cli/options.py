@@ -68,6 +68,11 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf.startswith("scope create "):
+        return (
+            "Inspect GitHub and local Scope paths before a new explicit operation. "
+            "After an uncertain creation, identify the exact Issue and use scope import github."
+        )
     if leaf == "work start":
         return (
             "Inspect the current Git branch, HEAD, worktree status, and direct selection before a new explicit Start."
@@ -99,9 +104,10 @@ def _reject_retired_start(argv: list[str]) -> None:
     start = argv[:2] == ["work", "start"]
     finish = argv[:2] == ["work", "finish"]
     sync = argv[:2] == ["workspace", "sync"]
+    create = argv[:2] == ["scope", "create"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
-    if not start and not finish and not branch and not active and not sync:
+    if not start and not finish and not branch and not active and not sync and not create:
         return
     index = 2
     while index < len(argv):
@@ -115,7 +121,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             )
         if active and argv[1] == "set" and name == "--from-branch":
             raise RetiredArgumentError("--from-branch was retired; only work start can acquire a direct selection")
-        if name in ("--branch", "--base", "--source", "--name", "--from"):
+        if name in ("--branch", "--base", "--source", "--name", "--from", "--backend", "--title", "--slug", "--parent"):
             if not separator and index + 1 < len(argv):
                 index += 1
                 value = argv[index]
@@ -123,6 +129,8 @@ def _reject_retired_start(argv: list[str]) -> None:
                 raise RetiredArgumentError("--source cache was retired; Start uses live GitHub readiness")
             if sync and name == "--source" and value == "cache":
                 raise RetiredArgumentError("--source cache was retired; use local or github observations")
+            if create and name == "--backend" and value == "local":
+                raise RetiredArgumentError("--backend local was retired; new Scopes require GitHub-issued numbers")
         index += 1
 
 

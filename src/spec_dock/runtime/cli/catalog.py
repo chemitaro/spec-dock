@@ -88,9 +88,9 @@ LEAF_PATHS: tuple[str, ...] = (
 )
 
 HELP_EFFECTS: dict[str, str] = {
-    "scope create initiative": "Create Initiative files; GitHub backend also creates an Issue.",
-    "scope create epic": "Create Epic files; GitHub backend also creates an Issue.",
-    "scope create issue": "Create Issue files; GitHub backend also creates an Issue.",
+    "scope create initiative": "Create a GitHub Issue, then publish Initiative files using its confirmed number.",
+    "scope create epic": "Create a GitHub Issue, then publish Epic files using its confirmed number.",
+    "scope create issue": "Create a GitHub Issue, then publish Issue files using its confirmed number.",
     "scope import github initiative": "Read a GitHub Issue and create linked Initiative files.",
     "scope import github epic": "Read a GitHub Issue and create linked Epic files.",
     "scope import github issue": "Read a GitHub Issue and create linked Issue files.",
@@ -138,15 +138,15 @@ if set(HELP_EFFECTS) != set(LEAF_PATHS):
 
 
 LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
-    "scope create initiative": (_required("--backend", choices=BACKENDS), _required("--title"), _arg("--slug")),
+    "scope create initiative": (_required("--backend", choices=("github",)), _required("--title"), _arg("--slug")),
     "scope create epic": (
-        _required("--backend", choices=BACKENDS),
+        _required("--backend", choices=("github",)),
         _required("--parent"),
         _required("--title"),
         _arg("--slug"),
     ),
     "scope create issue": (
-        _required("--backend", choices=BACKENDS),
+        _required("--backend", choices=("github",)),
         _required("--parent"),
         _required("--title"),
         _arg("--slug"),
@@ -239,7 +239,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
 }
 
 RECOVERY_LEAF_COMMANDS: dict[str, str] = {
-    **{f"scope create {kind}": "scope.create" for kind in KINDS},
     **{f"scope import github {kind}": "scope.import" for kind in KINDS},
     "scope close": "scope.close",
     "scope reopen": "scope.reopen",
@@ -492,7 +491,9 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_version = "specdock.cli/v2"
         json_data = "observed_at, source, complete, worktrees, scopes, counts, findings; process_state=not_observed."
     if leaf.startswith("scope create"):
-        confirmation = "GitHub creation requires confirmation; local creation does not."
+        reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."
+        json_version = "specdock.cli/v2"
+        confirmation = "TTY prompts after planning; --yes confirms creation; JSON and non-interactive require --yes."
     elif leaf == "workbench copy":
         confirmation = "--on-conflict overwrite requires confirmation; the default error policy does not."
     elif leaf in _CONFIRMATION_LEAVES:
