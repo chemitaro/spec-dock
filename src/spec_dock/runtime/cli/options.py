@@ -72,6 +72,8 @@ def _recovery_help(leaf: str) -> str:
         return (
             "Inspect the current Git branch, HEAD, worktree status, and direct selection before a new explicit Start."
         )
+    if leaf.startswith("branch "):
+        return "Inspect the Git ref, HEAD, and worktree status before a new explicit operation; no journal or rollback."
     command = RECOVERY_LEAF_COMMANDS.get(leaf)
     if command is not None:
         rollback = (
@@ -90,7 +92,9 @@ def _recovery_help(leaf: str) -> str:
 
 
 def _reject_retired_start(argv: list[str]) -> None:
-    if argv[:2] != ["work", "start"]:
+    start = argv[:2] == ["work", "start"]
+    branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
+    if not start and not branch:
         return
     index = 2
     while index < len(argv):
@@ -98,13 +102,15 @@ def _reject_retired_start(argv: list[str]) -> None:
         if token == "--":
             return
         name, separator, value = token.partition("=")
-        if name in ("--allow-stale", "--resume", "--rollback"):
-            raise RetiredArgumentError(f"{name} was retired; inspect the current state and issue a new explicit Start")
-        if name in ("--branch", "--base", "--source"):
+        if name in ("--resume", "--rollback") or (start and name == "--allow-stale"):
+            raise RetiredArgumentError(
+                f"{name} was retired; inspect the current state and issue a new explicit operation"
+            )
+        if name in ("--branch", "--base", "--source", "--name"):
             if not separator and index + 1 < len(argv):
                 index += 1
                 value = argv[index]
-            if name == "--source" and value == "cache":
+            if start and name == "--source" and value == "cache":
                 raise RetiredArgumentError("--source cache was retired; Start uses live GitHub readiness")
         index += 1
 
@@ -294,7 +300,7 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     if any(value is not None and re.fullmatch(r"[0-9a-f]{32}", value) is None for value in (resume, rollback)):
         parser.error("recovery requires a 32-character lowercase operation ID")
     if parsed.command_path == "branch create" and not resume and not parsed.base:
-        parser.error("branch create requires --base unless --resume is specified")
+        parser.error("branch create requires --base")
     if parsed.command_path == "worktree create" and parsed.recover and common.get("dry_run"):
         parser.error("worktree create --recover cannot be combined with --dry-run")
     if parsed.command_path == "worktree bootstrap" and parsed.recover and common.get("dry_run"):
@@ -317,6 +323,7 @@ def parse_vnext_output(
     argv: Sequence[str], *, engine_version: str | None = None, engine_digest: str | None = None, public_v2: bool = False
 ) -> ParseOutcome:
     json_mode = _json_requested(argv)
+    result: OperationResult[object]
     if _version_arguments(argv) in (["--version"], ["-V"]):
         if engine_version is None:
             return _parse_failure("ENGINE_VERSION_UNAVAILABLE", "engine version is unavailable", json_mode, public_v2)

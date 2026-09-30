@@ -195,3 +195,30 @@ P-06は独立レビュー待ちであり、Windows immutable store/native受入�
 | 実Scope240件/workspace宣言のhash | 変更0 |
 
 この修正候補は独立再レビュー前であり、passとは扱わない。Windows immutable store/native受入、record公開/解除の残るkill境界、branch leafの通常経路、P-07以後、全体lint/test、最終品質ゲート、手動製品確認は継続する。
+
+## P-06 branchの通常経路とrecordの強制停止境界
+
+修正を`8ad73cfdc75ca53e5cc505adf15b49765207699f`にcommit/pushし、同SHAの第3回StrictレビューをGPT-5.6 Sol / Proの新規Oracle会話で開始した。以下はそのSHAより後の実装であり、第3回レビューの合格範囲には含めない。
+
+`branch show/create/switch`を共有registry/journalなしの通常dispatchへ接続した。明示`--name`または`<Scope ID>-<slug>`候補を使い、showはGit refの有無とtipを観測する。createは固定baseとcandidate Scope/祖先/schema/linkageを検査し、新refだけを作る。既存refをresetせずcheckoutもしない。switchはclean、candidate、他WTのbranch占有を効果前に検査し、checkout後のGit/metadata/physical identityを確認する。immutable直接選択記録は書き換えない。dry-runはref/checkoutを予約しない。新しい直接選択の取得は引き続きStartだけである。
+
+通常branch経路、baseに対象がないケース、dry-run、Git hook非0終了後の確認済みcheckout、index.lockによる変更なしの確定、ref作成後の非0終了、誤ったtip、clone置換、占有と期待条件について公開CLIのRed→Greenを実施した。元Git stderr/returncodeを保持し、成功済み/unknown効果があればpartial6を返す。branchのjournal optionをcontext前にARGUMENT_RETIRED/exit2へ変更し、helpからregistryとresume/rollbackを除いた。Startのcandidate readerは、branch単機能では記録を作らないためtoken/ignore判定を要求しない。Startでは従来通り実tokenを必須で渡している。
+
+別processが実directory flockを保持していてもbranch createが成立した。これはStart-only排他の独立したGreen証拠であり、新機能のRed証拠とは区別する。
+
+実CLIを外部OSのfsync/unlink境界で強制停止する3件も成功した。stageのfile fsync後、最終rename後・directory fsync前、捕捉した旧recordのunlink後にSIGKILLし、JSON未返却・checkout保持・OS lock解放・独自common-dir stateなしを確認した。
+
+- stageだけ残った場合は選択をinvalidとして保全し、新Startは効果0で拒否した。stageを有効な選択として扱わず、自動除去もしない。
+- 最終recordが見える場合はactive showでselectedを観測し、既存branchへの新しい明示Startはunchangedとして成立した。
+- 旧record解除後ならemptyを観測し、新しい明示Startで直接選択を取得した。旧選択は自動復活しない。
+
+これらはprocess終了と実FS上の可視状態の試験であり、電源断耐久性やWindows native受入を認定するものではない。
+
+| 検証 | 実結果 |
+|---|---|
+| branch、Start、infra全体、複数WT/native Git/record強制停止、CLI catalog/envelope | 597 passed、1 skipped、52.04秒 |
+| 全source/test Ruff check・format check | 成功、363 files formatted |
+| 変更した5 sourceの限定mypy | 成功。optionsの既存generic推論不整合も明示型で解消した |
+| 実Scope240件/workspace宣言のhash | 変更0 |
+
+P-06と全製品の完了認定は継続中。Windows immutable store/native受入、全体型gate、独立した現在候補のレビュー、P-07以後、最終品質ゲート、手動製品確認は未完了である。

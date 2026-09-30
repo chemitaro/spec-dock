@@ -48,6 +48,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.work_start import start_work
 
             result = start_work(namespace, context)
+        elif command in ("branch show", "branch create", "branch switch"):
+            from spec_dock.runtime.application.branch_operations import branch_operation
+
+            result = branch_operation(namespace, context)
         elif command == "active show":
             observation = read_selection(context, load_scope_views(context.root / "spec-dock"))
             result = OperationResult(command, "succeeded", ActiveData(observation.view(), observation.ancestors), 0)

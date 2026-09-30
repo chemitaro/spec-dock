@@ -96,10 +96,12 @@ def read_candidate(
     current_views: tuple[ScopeView, ...],
     *,
     timeout: float,
-    proposed_token: str,
+    proposed_token: str | None,
 ) -> CandidateSnapshot:
     with committed_workspace(context.root, oid, timeout=timeout) as workspace:
-        for basename in (f"target-{proposed_token}.json", f".stage-{proposed_token}"):
+        # Branch-only operations do not acquire or publish a direct target.
+        private_paths = (f"target-{proposed_token}.json", f".stage-{proposed_token}") if proposed_token else ()
+        for basename in private_paths:
             if not run_git(
                 workspace.parent,
                 f"--git-dir={context.common_dir}",
