@@ -67,23 +67,23 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 4523,
-      "sha256": "9cc4e7fde841c688a863f3394c1580b022faba075f95c3efa1b166fe935a3e8d"
+      "bytes": 4844,
+      "sha256": "d7a4b2bdf7c67afc08d39ee38a105393ecc6efc53abcc032e291b16e2edceac5"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
-      "bytes": 18038,
-      "sha256": "6a1bac420fbe773c2dd7fd53529c1d59b5cdaa94f4198b82c0dc7ca7e2fbb337"
+      "bytes": 18183,
+      "sha256": "be275118d52dcaf2d229badd7f67605d241027e747f2d762c50de966e50c510e"
     },
     {
       "path": "artifacts/cli-contract.md",
-      "bytes": 27971,
-      "sha256": "c42626bffe56a29a83fc427a3079fbcb1d6d200215ab707ae89f5c75a8291b1b"
+      "bytes": 29083,
+      "sha256": "c8a72926c1e3d7e55000dc951ab06416f91a3e5f73f5deb25eb1163aa0fa60fc"
     },
     {
       "path": "artifacts/cli-schema.json",
-      "bytes": 16218,
-      "sha256": "3b6a6048bee67230e5f4618f82761bdf8fad9396f06e26ce5f5f3a339d95c693"
+      "bytes": 16918,
+      "sha256": "ccea5bb08e8fb1bc8addf95f04f6330d19bae39c08ca604276b55db78f1d9a51"
     },
     {
       "path": "artifacts/data-schema.json",
@@ -92,8 +92,8 @@
     },
     {
       "path": "artifacts/examples.json",
-      "bytes": 10656,
-      "sha256": "5fb68bc248e86e5bcc3b86c3318ec2dfe546c96bf45f2d815d3d22cff2418117"
+      "bytes": 13540,
+      "sha256": "2344413a4f629cca167db945f9c85238c39b95eff96868305da4cc9fa499d737"
     },
     {
       "path": "artifacts/interview-worktree-start.md",
@@ -104,6 +104,16 @@
       "path": "artifacts/migration-runbook.md",
       "bytes": 15296,
       "sha256": "03201a531551ef3c67d10d71adfd02f70c9382323d2c6db90db14d215e0987d5"
+    },
+    {
+      "path": "artifacts/review-001-raw.md",
+      "bytes": 4120,
+      "sha256": "5f6fd1d8e26c1229eaffd6504df3de39fcf778867c3d09d108b53738142f13bb"
+    },
+    {
+      "path": "artifacts/review-analysis.md",
+      "bytes": 3217,
+      "sha256": "14cefa1b421603a083becbe2a7a3b7fe11e3bc5219dcdb5577c0d2e168ab19ad"
     },
     {
       "path": "artifacts/self-check.md",
@@ -132,13 +142,13 @@
     },
     {
       "path": "design.md",
-      "bytes": 42788,
-      "sha256": "08e28e785cd55c994bce895f7367ac6dc71c4d216b8e1472897e9601264eee1f"
+      "bytes": 43254,
+      "sha256": "49a13c4c289504e157fe723e70979581f3d7b74f59ce5dbab35d9b160d6e5a5b"
     },
     {
       "path": "explanation.html",
-      "bytes": 66428,
-      "sha256": "4bf8df3a28b75dcc3642a17468dcfdd53c1dbb407306215ec067834b4c69381a"
+      "bytes": 66931,
+      "sha256": "59f5080a62b8adce801cd176a0744f1858243c571aaca332453885e6f6e9050a"
     },
     {
       "path": "index.html",
@@ -147,13 +157,13 @@
     },
     {
       "path": "plan.md",
-      "bytes": 44162,
-      "sha256": "f675c8077bff08d83faa3fdc8c1e3ea0cf07c3d3deef07e835123e4324cc9c5c"
+      "bytes": 44743,
+      "sha256": "24dfee21bfdf4191d39d630b4dec81a0149d3c2773008c23ad11c315f1620828"
     },
     {
       "path": "report.md",
-      "bytes": 15618,
-      "sha256": "6b6582afc611572e2bc9725917e1cf66e0d62758c72c25627b06dad545ce1c4d"
+      "bytes": 16115,
+      "sha256": "923b9e429f46d494fa58d594440a0a1c499d5c7175355351c0cdc3e0c0c06326"
     },
     {
       "path": "requirement.md",
@@ -267,5 +277,20 @@
     "published_url": "http://100.85.74.8:8765/specdock-issue-413/explanation.html",
     "publication_check": "15 linked files HTTP200 no-store and exact source bytes",
     "changes_from_generated": "README and HTML adoption notice, report append, retained interview, index redirect and manifest provenance only. R/D/P unchanged."
+  },
+  "review_correction": {
+    "reviewed_sha": "ea68e211b2fe807f903500cae027157b0743f7e3",
+    "reviewer_session": "specdock-413-spec-review",
+    "initial_result": "semantic fail; P1=1; original JSON malformed; user authorized content interpretation",
+    "correction": "D-10 scopes reflected in C-03/schema/examples/P-08/AC-23 and human explanation",
+    "status": "local checks passed; re-review pending",
+    "checks": {
+      "bundled_examples_valid": 13,
+      "old_schema_rejects_corrected_sync": true,
+      "missing_scopes_rejected": true,
+      "invalid_lifecycle_rejected": true,
+      "metadata_and_interview_unchanged": true,
+      "html_browser": "4/4 SVG; zoom pass"
+    }
   }
 }

@@ -481,6 +481,7 @@ end note
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="parallel"><h2>07　複数worktreeとSyncの見方</h2>
 
 <p>同じcloneのmainとlinked worktreeだけをGitから列挙します。各作業場所の直接記録を必要時に読み、その観測結果をSyncのstdoutまたはJSONに返します。中央ファイルへ全員分の選択を複製せず、generationやGitHub cacheも保存しません。</p>
+<p>選択されていないIssueも表示対象です。例えばAを作業場所で選択したままGitHubで完了し、Bは誰も選択せずGitHubでオープンなら、「A：選択1件・完了」「B：選択0件・オープン」と別々に表します。JSONもIssueごとの状態一覧と選択件数を分けて返すため、未選択のBが一覧から消えることはありません。一部の作業場所を読めない場合は件数が不完全であると明示します。</p>
 <script type="text/plain" class="plantuml-source" id="source-sync" data-target="diagram-sync">
 @startuml
 title 別の子Issueは並行でき、親には件数を表示する

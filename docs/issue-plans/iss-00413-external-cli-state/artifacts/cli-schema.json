@@ -377,6 +377,12 @@
           "items": {
             "$ref": "#/$defs/diagnostic"
           }
+        },
+        "scopes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scope_observation"
+          }
         }
       },
       "required": [
@@ -385,6 +391,7 @@
         "source",
         "complete",
         "worktrees",
+        "scopes",
         "counts",
         "findings"
       ],
@@ -466,6 +473,34 @@
       "required": [
         "kind",
         "result"
+      ],
+      "additionalProperties": false
+    },
+    "scope_observation": {
+      "type": "object",
+      "properties": {
+        "scope_id": {
+          "type": "string"
+        },
+        "github_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "lifecycle": {
+          "enum": [
+            "open",
+            "completed",
+            "not-planned",
+            "unknown"
+          ]
+        }
+      },
+      "required": [
+        "scope_id",
+        "github_ref",
+        "lifecycle"
       ],
       "additionalProperties": false
     }

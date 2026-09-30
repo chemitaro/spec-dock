@@ -214,13 +214,13 @@ uv run pytest tests/cli_runtime/test_active_vnext.py tests/cli_runtime/test_work
 
 **所有/対象file**: NRT/application/workspace_sync_vnext.py、commands/workspace_sync_vnext.py、presentation、domain表示型。tests/cli_runtime/test_workspace_sync_vnext.py、新 tests/integration/test_issue413_sync.py（予定）。
 
-**具体的変更順**: generation/cache読書きを外し、worktree_observationからmemory viewを作る。local/github source、direct/descendant件数、親関係不一致、unknown/selected/プロセス未観測を表示する。CLIは既存workspace syncのまま。
+**具体的変更順**: generation/cache読書きを外し、worktree_observationからmemory viewを作る。local/github source、direct/descendant件数、親関係不一致、unknown/selected/プロセス未観測を表示する。CLIは既存workspace syncのまま。C-03のscopes行とcounts行をscope_idで対応させ、現在treeの未選択Scopeもlifecycleを出力する。scopesはJSON schemaの必須fieldとし、対応worktrees行のlifecycleと同じ観測結果を使う。
 
 **変更禁止**: 中央active snapshot保存、cached GH状態のfresh化、activeによる依存完了、daemon/PID観測、未知件数を0へ補完することは禁止。
 
 **入力/出力例**: 入力: 同親A/B選択、別WT読取不能、Aがremote closed。出力: 親descendant known count、complete=false、selectedとcompletedを独立表示。
 
-**Red → Green / 検証**: Red: 旧Syncがcurrent active一つだけ、generation書込、cacheを使う。Green: 二WTが表示され、全record/metadata bytes不変、必要対象/祖先以外の他WT metadata読取0。
+**Red → Green / 検証**: Red: 旧Syncがcurrent active一つだけ、generation書込、cacheを使う。Green: 二WTが表示され、全record/metadata bytes不変、必要対象/祖先以外の他WT metadata読取0。AC-413-23ではA選択中/completed・B未選択/openを同時に置き、scopesに両行、countsにdirect=1/0、worktreesにAだけを要求する。CLI実出力をcli-schema.jsonで検証し、scopes欠落・不正lifecycle・未選択Bの脱落がRedになることを確認する。local modeでは同じGH-backed行がunknownとなる例も検証する。
 
 **実行コマンド（将来実行）**:
 

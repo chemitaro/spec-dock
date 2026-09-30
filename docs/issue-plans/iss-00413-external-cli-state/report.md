@@ -134,3 +134,8 @@ ChatGPT Use Strictをclean mainから直接実行した。sessionは `specdock-g
 今回の検証: 240件の既存Scopeとメモリ上のworkspaceをschema照合、JSON Schema 2件・例3件、20 RQ・40 AC・16 step、内部リンク366件・一意HTML ID123件を確認。実行JSは改訂前と一致。HTML validatorは4/4 SVG描画と拡大modalのキーボード・フォーカス・終了動作で合格。既存IABの新章表示を目視し、幅585pxで文書全体の横overflowなし（表は自身の横スクロール領域）。Tailscale URLはHTTP200・no-store、配信bytesと正本が一致。manifestと14ファイルのZIPを再生成し、CRC・ハッシュ・展開相当bytes一致を検査した。
 
 製品コード・正式metadata・GitHub情報の変更、製品試験、移行、commit/pushは行っていない。今回は説明資料の追記であり、外部ChatGPT分析の新規実行や独立Strict仕様レビューではない。
+
+
+## 2026-09-30 独立仕様レビュー初回とP1補正
+
+GPT-6 Proの初回レビューは内容上fail / P1一件。JSON形式不備によってレビューを破棄しないという利用者指示を記録し、[原文と対応分析](artifacts/review-analysis.md)を保全した。既存D-10のscopesがCLI契約/schemaから欠落していたため、未選択Scopeのlifecycle行・例・P-08/AC-23検証を補正した。製品コードは未変更、再レビュー合格は未取得。

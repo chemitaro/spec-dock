@@ -249,6 +249,8 @@ GH変更は一回だけ。現gatewayの確認GETは維持できますが、確�
 
 `SyncView(observed_at, source, complete, worktrees, scopes, counts, findings)` をメモリで作り、textまたはJSONへ返します。各WTのdirect、現在branch、選択時branch、selection状態、GH観測状態は別fieldです。Codex processは `process_state="not_observed"` 固定で、PID/セッションを調べません。
 
+`scopes:ScopeObservation[]` は未選択を除外せず、現在treeの表示対象と他WTの必要な直接対象/祖先のlifecycleを保持します。各行はscope_id/github_ref/lifecycleで、選択件数は同じscope_idのcounts行に分けます。全読取成功時の未選択Scopeはdirect=0を明示し、GitHubのopen/completedとは独立して表します。型・不完全時の扱いは[C-03](artifacts/cli-contract.md#work)が規定します。
+
 親の `descendant_selected_count` は自分以外の子孫を直接選択しているWT数、`direct_selected_count` はそのScope自体を直接選択しているWT数。例えば同じEpic配下A/Bの二WTならEpicはdescendant=2、direct=0です。Epicを別WTで直接選択していればdirect=1、descendant=2です。記録がGitHub closedでも選択件数に含め、completed件数とは別表示します。
 
 他WTの祖先関係はそのWTの現在metadataから導出します。同じID/refに矛盾する親が観測されればconflictとして当該集計を不完全にし、一方を黙って採用しません。不明なWT/祖先があればknown件数は表示しますが `complete=false` とし、「全件0」と誤認させません。重複記録が手操作等で既にある場合は両行を示しduplicate findingを付け、自動解除しません。
