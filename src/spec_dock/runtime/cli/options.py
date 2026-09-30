@@ -87,6 +87,8 @@ def _recovery_help(leaf: str) -> str:
         )
     if leaf.startswith("branch "):
         return "Inspect the Git ref, HEAD, and worktree status before a new explicit operation; no journal or rollback."
+    if leaf.startswith("dependency "):
+        return "Inspect current metadata and validate the dependency graph before a new explicit operation."
     command = RECOVERY_LEAF_COMMANDS.get(leaf)
     if command is not None:
         rollback = (
@@ -111,6 +113,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     create = argv[:2] == ["scope", "create"]
     imported = argv[:3] == ["scope", "import", "github"]
     lifecycle = len(argv) >= 2 and argv[0] == "scope" and argv[1] in ("close", "reopen")
+    dependency = len(argv) >= 2 and argv[0] == "dependency"
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -122,6 +125,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not create
         and not imported
         and not lifecycle
+        and not dependency
     ):
         return
     index = 2
@@ -130,7 +134,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         if token == "--":
             return
         name, separator, value = token.partition("=")
-        if name in ("--resume", "--rollback") or (start and name == "--allow-stale"):
+        if name in ("--resume", "--rollback") or ((start or dependency) and name == "--allow-stale"):
             raise RetiredArgumentError(
                 f"{name} was retired; inspect the current state and issue a new explicit operation"
             )
@@ -142,6 +146,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--source",
             "--name",
             "--from",
+            "--to",
             "--backend",
             "--title",
             "--slug",
@@ -154,7 +159,7 @@ def _reject_retired_start(argv: list[str]) -> None:
                 value = argv[index]
             if start and name == "--source" and value == "cache":
                 raise RetiredArgumentError("--source cache was retired; Start uses live GitHub readiness")
-            if sync and name == "--source" and value == "cache":
+            if (sync or dependency) and name == "--source" and value == "cache":
                 raise RetiredArgumentError("--source cache was retired; use local or github observations")
             if create and name == "--backend" and value == "local":
                 raise RetiredArgumentError("--backend local was retired; new Scopes require GitHub-issued numbers")
@@ -349,8 +354,8 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("worktree create --recover cannot be combined with --dry-run")
     if parsed.command_path == "worktree bootstrap" and parsed.recover and common.get("dry_run"):
         parser.error("worktree bootstrap --recover cannot be combined with --dry-run")
-    if parsed.command_path not in MUTATING_LEAF_PATHS and (common.get("yes") or common.get("dry_run")):
-        parser.error("--yes and --dry-run apply only to changing commands")
+    if parsed.command_path not in MUTATING_LEAF_PATHS and common.get("yes"):
+        parser.error("--yes applies only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
         setattr(parsed, key, common.get(key, False if key in _COMMON_SWITCHES.values() else None))
     if parsed.command_path != "work start" and parsed.lock_timeout is not None:

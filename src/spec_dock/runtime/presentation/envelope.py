@@ -7,7 +7,7 @@ import json
 import re
 from typing import Generic, Literal, TypeVar, cast
 
-from spec_dock.runtime.presentation.command_data import SyncData
+from spec_dock.runtime.presentation.command_data import FamilyData, SyncData
 
 ResultStatus = Literal["succeeded", "unchanged", "planned", "failed", "partial"]
 EffectStatus = Literal["planned", "succeeded", "unchanged", "failed", "not_attempted", "unknown"]
@@ -175,10 +175,22 @@ def render_json_v2(result: OperationResult[object]) -> str:
     return json.dumps(_redact(payload), ensure_ascii=False, separators=(",", ":")) + "\n"
 
 
-def render_text(result: OperationResult[object], *, native_git: bool = False) -> tuple[str, str]:
+def render_text(
+    result: OperationResult[object], *, native_git: bool = False, dependency_view: str | None = None
+) -> tuple[str, str]:
     stdout_lines = [f"spec-dock: {result.status} ({result.command})"]
     if isinstance(result.data, SyncData):
         stdout_lines.extend(_sync_text(result.data))
+    elif result.command == "dependency list" and isinstance(result.data, FamilyData):
+        stdout_lines.append(f"scope_id={_field_text(result.data.result['scope_id'])}")
+        for view in (dependency_view,) if dependency_view is not None else ("declared", "effective"):
+            stdout_lines.append(f"{view}={json.dumps(_redact(result.data.result[view]), ensure_ascii=False)}")
+    elif result.command == "dependency check" and isinstance(result.data, FamilyData):
+        stdout_lines.append(
+            f"scope_id={_field_text(result.data.result['scope_id'])} ready={str(result.data.result['ready']).lower()}"
+        )
+        for blocker in cast("tuple[Diagnostic, ...]", result.data.result["blockers"]):
+            stdout_lines.append(f"blocker [{blocker.code}] {_text_escape(blocker.message)}")
     for effect in result.effects:
         target = f" target={_text_escape(effect.target)}" if effect.target is not None else ""
         stdout_lines.append(f"effect {effect.kind} status={effect.status}{target}")

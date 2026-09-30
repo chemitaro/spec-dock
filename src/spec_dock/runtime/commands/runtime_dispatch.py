@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+from spec_dock.runtime.cli.catalog import MUTATING_LEAF_PATHS
 from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData, FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult, render_json_v2, render_text
@@ -48,6 +50,14 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_scope_lifecycle import lifecycle_scope
 
             result = lifecycle_scope(namespace, context)
+        elif command in ("dependency list", "dependency check"):
+            from spec_dock.runtime.application.direct_dependencies import query_dependencies
+
+            result = query_dependencies(namespace, context)
+        elif command in ("dependency add", "dependency remove"):
+            from spec_dock.runtime.application.direct_dependencies import mutate_dependencies
+
+            result = mutate_dependencies(namespace, context)
         elif command in ("branch show", "branch create", "branch switch"):
             from spec_dock.runtime.application.branch_operations import branch_operation
 
@@ -114,9 +124,24 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
         result = failure(command, "PRECONDITION_FAILED", str(error), 3)
     except (OSError, RuntimeError) as error:
         result = failure(command, "LOCAL_IO_FAILED", str(error), 5)
+    if namespace.dry_run and command not in MUTATING_LEAF_PATHS:
+        if isinstance(result.data, FamilyData):
+            result = replace(
+                result,
+                data=FamilyData(
+                    result.data.kind,
+                    {
+                        **result.data.result,
+                        "can_apply": result.exit_code == 0,
+                        "blockers": result.data.result.get("blockers", (result.error,) if result.error else ()),
+                    },
+                ),
+            )
+        if result.exit_code == 0:
+            result = replace(result, status="planned")
     if namespace.json:
         return result.exit_code, render_json_v2(result), ""
-    stdout, stderr = render_text(result, native_git=True)
+    stdout, stderr = render_text(result, native_git=True, dependency_view=getattr(namespace, "view", None))
     return result.exit_code, stdout, stderr
 
 

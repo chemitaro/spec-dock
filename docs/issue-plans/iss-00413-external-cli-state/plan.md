@@ -247,7 +247,7 @@ uv run pytest tests/cli_runtime/test_workspace_sync_vnext.py tests/integration/t
 <a id="p-09"></a>
 ## P-09 GitHub発行・lifecycle・依存を台帳から切り離す
 
-**状態: 実装中。三階層のGitHub-only create、GET-only import、確認済み番号によるdirectory公開、close/reopen、unknown/既知remote後の失敗、入力・repository再照合、ignore/path・TTY確認を検証。dependencyと旧writer退役、独立レビューは未完了。前提/依存: P-07。** 読む節: [D-09](design.md#d-09)。補足: D-09。
+**状態: 実装中。三階層のGitHub-only create、GET-only import、close/reopenとdependencyの通常経路を検証。r8はcreate/import/close/reopenまでpass。dependencyの独立レビューと旧writer退役は未完了。前提/依存: P-07。** 読む節: [D-09](design.md#d-09)。補足: D-09。
 
 通常createはNRT/application/direct_scope_publish.py、infra/directory_publication.py・github_remote.py、commands/runtime_dispatch.pyへ接続した。旧create/importのwriterは実行せず、既存のpure scaffold/親判定helperを再利用する。これらの旧moduleへのimport依存の抽出・退役はP-12で閉じる。22 creation testsとpublic contract/fresh wheelを含む29 tests、対象Ruffと変更6 source限定mypyが通過した。GitHub番号の旧allocator/marker/journalやScope UUIDを通常createへ戻さない。
 
@@ -256,6 +256,10 @@ importは同じ通常publicationに接続し、完全ref/URL/明示repository付
 close/reopenはdirect_scope_lifecycleへ接続した。必要なlive target・子孫/祖先を観測し、純粋な完了/再開規則を維持する。選択とGit branchは変更せず、GitHub変更は一回のPATCHとGET確認だけ、真正の既存localはmetadataの未知fieldを保持して安全に置換する。unknownでは再送・Open推定をしない。実TTY確認と旧resumeのcontext前拒否も検証した。
 
 第7回Strictは93b15112にP1二件でfailとなり、原文と[完全分析](artifacts/code-review-p06-07-analysis.md)を保存した。Finish内のnative Git診断、Scope dry-run必須field、確認済みdirectory公開後のScope結果をTDDで修正した。途中でidentity/linkageが変わったScopeは推定せずscope=nullを保つ。作成・取り込み・close/reopen・Finishの88 tests（28.76秒）が通過した。ローカル修正だけでは指摘を閉じず、新しいclean・push済みSHAでのfresh Strict passを必要とする。
+
+第8回Strictは29d53925でpassとなった。P1はなく、P2二件を原文と[完全分析](artifacts/code-review-p06-08-analysis.md)へ保存した。Startとactive clearの並行解除、全leaf helpのv2表示は明示利用者認可に基づいて修正する。限定passをIssue全体や最終gateの完了へ読み替えない。
+
+dependencyはdirect_dependenciesへ接続し、metadataから宣言/継承を毎回導出する。checkの既定localは未観測GHをunknownとし、明示githubは対象/祖先/実効前提だけをGETする。add/removeは未知fieldとmodeを保全した一metadata置換で、全writer lockを取得しない。捕捉snapshotと物理identityの再検査、graph循環拒否、前段の並行編集保全、確認済み/不明な公開効果、readonly preview、text viewを公開境界で検証した。新公開/共有境界332 testsと旧dependency/query/help24 tests、全Ruff（383 files）・変更6 source限定mypyが通過した。旧read helperのpure部分抽出と旧writer退役はP-12で閉じる。
 
 **所有/対象file**: NRT/application/create_github_scope.py、import_github_scope.py、scope_create_vnext.py、scope_completion.py、dependency_vnext.py、github_scope_scaffold.py、infra/github_lifecycle.py。tests/cli_runtime/test_scope_github_vnext.py、test_scope_create_commands_vnext.py、test_scope_import_commands_vnext.py、test_scope_local_vnext.py、test_dependency_vnext.py。
 

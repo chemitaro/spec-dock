@@ -346,3 +346,15 @@ F1はFinishのGit例外を診断へ変換する際のdetails欠落だった。na
 F2はScopeのresult projectionの不備だった。create dry-runのcan_apply欠落と、確認済みdirectory公開後cleanup失敗時のscope=nullをRedとして確認した。create/importの有効な乾式計画にcan_apply=true/blockers=[]を返し、確認済み公開後はnamed-targetを安全に再観測してScopeViewを回復する。path・kind・parent・ref・title・revisionを公開時と照合し、不一致ならactorの編集を保全してscope=null、changed=trueと確認済み効果を維持する。close/reopen dry-runも同じ必須fieldのRed→Greenを確認した。全writer lockや台帳、UUID、権限制御、rollbackは追加していない。
 
 作成・取り込み・close/reopen・Finishの公開CLI選択は88 passed（28.76秒）。public contract/fresh wheelの7 testsも6.27秒で通過した。mypyのLiteral不足はtyping-only correctionとして修正した。C-05の同じ乾式result invariantを既存branchにも照合し、can_apply欠落のRedを確認して共通成功projectionへ修正した。branchの23 testsが5.61秒で通過し、最終的な変更7 source限定mypyと全source/testsのRuff check/format（381 files）も成功した。実TTYのfixture配置不備やcollection errorは製品Redに含めない。現在unitの独立Strict pass、dependency、旧moduleの抽出・退役、native Windows、全体lint/test、Final Quality Gate、手動製品確認と実dogfood切替は未完了であり、goalをactiveに保つ。
+
+## P-09 dependencyの通常経路とr8
+
+三階層metadataから宣言/実効edgeを毎回求めるlist/checkと、一metadataだけを置換するadd/removeを接続した。新しいregistry、共有採番、cache、journal、Start lockを利用しない。checkのdefaultをlocalへ変え、GH未観測はunknownのblockerとして返す。明示--source githubは対象・祖先・実効前提だけをGETし、取得不能も元のremote診断とunknownを保つ。offlineで必要なGETは実行前に拒否する。既存の真正localのlifecycleは保全互換性として読み、GHの完了を選択件数で代用しない。
+
+add/removeでは同じ捕捉直接選択からfrom/toとguardを解決し、全metadata bytesとphysical identityを再確認する。自己・祖先/子孫・継承WaitGraph循環を公開前に拒否し、未知fieldと元のfile modeを保つ。変更なしはunchanged、missing-okだけが不存在edgeを許す。確認済み置換後のcleanup失敗はsucceeded effectを保持してpartial6へ、不明な置換はunknown effectと操作前snapshotの明示へ進み、巻戻し/再送をしない。ネイティブfsync/replace境界とPOSIX別processで、並行編集保全とStart排他ロック中の更新を確認した。
+
+query dry-runがparserで拒否されるRedを確認し、readonly previewを許可してC-05のcan_apply/blockersとplannedを返すようにした。listの--viewはtextを宣言/実効へ切り替え、JSONは必須の両配列を維持する。checkのtextはreadyとblockerを表示する。新依存helperのunconnected、不要なGH GET、offline実行、dry-run書込、unknown effect欠落、guard無視、actor競合分類、help/text不足、unignored stage許可を各focused Red→Greenで確認した。既存のgraph/local authority/readonly preview/Start lock非使用の確認はGreenの回帰検証で、架空のRedを数えない。
+
+関連公開CLI/Start/Finish/Sync/observation/store/envelopeの332 testsは76.98秒で通過し、旧dependency/query/helpの24 testsは2.99秒で通過した。初回の旧runtime catalog guard collection errorは、通常経路へ移行済みScope leafを旧inspection表にも反映して解消した。通常dispatchへ旧writerを接続していない。全source/test Ruff check/format（383 files）と変更6 source限定mypyが成功した。
+
+独立Strict r8は29d539254164f0daa814cd8d81e8c67e94ba10a2をGPT-5.6 Sol/Proでレビューし、38m22s、validated exit0/pass、P0/P1なし、P2二件となった。原文JSONをbyte保全し、関連検証完了後の完全batch分析をartifacts/code-review-p06-08-analysis.mdへ保存した。r7のP1修正はr8範囲で合格したが、今回のdependency unitはその後の未レビュー変更である。P2の分類とnon-blockingを保ち、利用者の指摘修正の明示指示に従って次のunitで対応する。P-10以後、旧helperの抽出・退役、native Windows、全体lint/test、Final Quality Gate、手動製品確認、実dogfood切替は未完了であり、goalはactiveである。

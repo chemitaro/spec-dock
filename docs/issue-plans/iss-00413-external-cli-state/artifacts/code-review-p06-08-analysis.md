@@ -1,0 +1,27 @@
+# Strict r8 の完全証拠batch分析
+
+## 対象と証拠の確定
+
+Issue #413のP-02〜P-08とP-09 create/import/close/reopenを対象にしたfresh Strictである。利用者固定点は6fec3099d8759b4e5b3b393b2987534b46dfa383、exact reviewed HEADは29d539254164f0daa814cd8d81e8c67e94ba10a2。ブラウザー会話specdock-413-code-p06-r8はGPT-5.6 Sol/Proで38m22s後に完了し、wrapper exit0、validated review_status=passとなった。原文JSONのbyteを保全し、SHA256は25b562e00efcbdc547d28061a92bcae361883122d87aaaaa5196e9fd33789364である。reviewerはtestsを独立実行していない。前回r7のP1二件を含む現在範囲にはP0/P1が報告されなかった。
+
+現在のHEADも29d53925だが、未コミットのdependency接続、readonly preview、text表示と旧検査のcatalog追従を含む追加unitがある。このunitはr8の対象外である。関連検証が完了するまで応答分析を待ち、新公開CLI・Start/Finish/active・Sync・record/observation・envelopeの332 tests（76.98秒）、旧dependency/query/helpの24 tests（2.99秒）、全Ruff check/format（383 files）、変更6 source限定mypyの成功を確認してからanalyze-review-findingsを適用した。最初の旧vnext_runtimeのcatalog検査によるcollection errorは、旧inspection表へ既に移行済みleafを追加して解消した。旧writerを通常dispatchへ接続した証拠ではない。
+
+権威は利用者の全実装・指摘分析/修正/再レビューの明示指示、確定requirement/design、C-02〜C-05、AGENTS.md、P-06/P-09/P-13以後である。レビュー推奨を新しい要件として採用しない。StrictのgateはP0/P1または評価不能がblockingであり、今回のsource-native P2二件はnon-blockingのまま保存する。P2だけならStrictスキルの通常運用は記録にとどめるが、今回の親タスクでは利用者が指摘事項の修正・再レビューを明示している。この既存の認可を修正根拠とし、review自身を編集権と扱わない。
+
+## F1: [P2] 並行active clearが進行中Startを取り消す
+
+妥当で到達可能。既存選択Aを別対象/branchへ切り替えるStartの公開直前inventory検査後、Start lockに参加しないactive clearが捕捉tokenを先に削除すると、WorkTargetStore.remove_observedはalready_absentを返せる。reviewed work_start.pyはremoved以外をfailed/SELECTION_CHANGEDへ変換するため、衝突のない解除でもGit checkout後のpartialへ止める。これはC-03の捕捉済みtokenだけを解除する意味とC-04のunchanged分類に整合しない。最初のfault layerは実装の安全な解除結果の分類である。
+
+primary routeはimplementation-remediation。removedをsucceeded、already_absentをunchangedとして後続の空状態・physical context・Git HEAD・candidate・inventory検査を維持し、conflictだけを拒否する。別recordや変更bytesは解除せず、Startの排他保証、未知効果のpartial、Git失敗の原文、selection公開の境界は変えない。公開CLIとネイティブunlink境界で並行解除を再現し、checkout後でも新しい記録を安全に公開できることと、conflictの既存拒否回帰を検証する。新しいlock、状態、コマンド、再送、回復保証は不要であり、人間の追加判断を必要としない。
+
+## F2: [P2] Work/branch/active helpがv1 envelopeを誤表示する
+
+妥当で到達可能。通常dispatchとutilityはspecdock.cli/v2を返す一方、catalogのhelp JSON versionのdefaultがv1であり、明示上書きされていないleafの利用者に旧契約を示す。現在dependencyの四leafは未コミットunitでv2へ合わせたが、Work/branch/activeなどの根本原因は残る。違反する命題はC-02/C-04の全公開leafのv2 envelopeであり、最初のfault layerはhelp契約の実装projectionである。
+
+primary routeはimplementation-remediation。helpのdefaultをv2へ合わせ、全44leafで実parser/helpとJSON契約を照合する。現在未接続のleafの業務完成を意味する変更ではなく、通常診断も含む公開envelopeの説明を訂正する。意味の変更、互換性の新しい約束、旧runtimeの復活は行わない。公開helpをプロジェクトなしで検査するfocused Red→Greenを行う。既存の明示利用者認可内であり、人間の追加判断は不要である。
+
+## 親workflowへの帰結と残る義務
+
+r8のpassは対象範囲の合格として採用し、P2をP1へ格上げしない。二つの独立した実装root causeは明示認可されたTDD修正と通常の変更単位へ進め、その後のfreshレビューに現在の証拠を含める。P2を独立reviewへの新たな合格条件として渡さない。原文レビューを次のpromptに添付しない。
+
+dependency以後の未接続操作、pure helper/旧writer退役、native Windows、全体mypy/test、Final Quality Gate pilotへの明示応答、最終gateと手動製品確認、実consumer切替・正式work startが未完了である。これらは次の計画段階のmaterial coverage obligationであり、r8の限定passで閉じない。goalをactiveに保って実装を継続する。

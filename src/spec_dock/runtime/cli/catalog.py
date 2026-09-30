@@ -187,7 +187,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "branch create": (_arg("target"), _arg("--name"), _arg("--base")),
     "branch switch": (_arg("target"), _arg("--name")),
     "dependency list": (_arg("target"), _arg("--view", choices=("declared", "effective"))),
-    "dependency check": (_arg("target"), _arg("--source", choices=SOURCES, default="cache")),
+    "dependency check": (_arg("target"), _arg("--source", choices=("local", "github"), default="local")),
     "dependency add": (_required("--from", dest="from_target"), _required("--to", dest="to_target")),
     "dependency remove": (
         _required("--from", dest="from_target"),
@@ -504,6 +504,12 @@ def _help_spec(leaf: str) -> HelpSpec:
         confirmation = (
             "TTY prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
         )
+    elif leaf.startswith("dependency "):
+        reads = "Current metadata, inherited dependency edges, and the direct record for selectors; live GitHub only with --source github."
+        does_not = "Does not change direct selection or Git checkout, acquire a Start lock, or persist GitHub state."
+        json_version = "specdock.cli/v2"
+        json_data = "scope_id, declared, effective, ready, blockers, changed; dry-run adds can_apply."
+        confirmation = "No final confirmation is required for this leaf."
     elif leaf == "workbench copy":
         confirmation = "--on-conflict overwrite requires confirmation; the default error policy does not."
     elif leaf in _CONFIRMATION_LEAVES:

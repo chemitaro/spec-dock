@@ -124,7 +124,7 @@ def evaluate_start_readiness(
     observations: dict[str, StatusObservation] | None = None,
 ) -> ReadinessResult:
     """Apply one policy for dependency check and work start on the same graph."""
-    if source not in ("cache", "github") or mode not in ("check", "start"):
+    if source not in ("local", "cache", "github") or mode not in ("check", "start"):
         raise ValueError("invalid readiness source or mode")
     validate_dependency_graph(views, raw)
     by_id = {view.id: view for view in views}

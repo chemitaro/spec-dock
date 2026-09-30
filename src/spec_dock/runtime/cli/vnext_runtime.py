@@ -97,7 +97,14 @@ _NONBLOCKING_INSPECTION: dict[str, str] = {
     "worktree remove": "Run worktree list and inspect the target path and Git branch.",
     "worktree bootstrap": "Run worktree show and inspect project-owned bootstrap effects before retrying.",
     "workbench copy": "Inspect the source and destination Workbench entries before retrying.",
+    "scope close": "Inspect the exact Scope and current backend state before a new explicit operation.",
+    "scope reopen": "Inspect the exact Scope and current backend state before a new explicit operation.",
 }
+_NONBLOCKING_INSPECTION.update({
+    leaf: "Inspect the exact GitHub Issue and local Scope paths before a new explicit operation."
+    for leaf in MUTATING_LEAF_PATHS
+    if leaf.startswith(("scope create ", "scope import github "))
+})
 if set(_NONBLOCKING_INSPECTION) != MUTATING_LEAF_PATHS - set(RECOVERY_LEAF_COMMANDS):
     raise RuntimeError("non-blocking failure inspection must cover every non-D16 writer")
 

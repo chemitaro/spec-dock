@@ -67,6 +67,20 @@ def test_independent_scope_read_does_not_require_control(tmp_path: Path, capsys:
     assert not (root / ".git/spec-dock").exists()
 
 
+def test_scope_read_dry_run_exposes_a_valid_preview_without_writes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    before = metadata.read_bytes()
+    assert main(["--project", str(root), "scope", "show", "init-00001", "--dry-run", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "planned"
+    assert result["data"]["result"]["can_apply"] is True and result["data"]["result"]["blockers"] == []
+    assert metadata.read_bytes() == before and result["effects"] == []
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+
+
 def test_project_root_with_crlf_is_not_normalized(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = make_workspace(tmp_path / "consumer\r\nname")
     assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 0
