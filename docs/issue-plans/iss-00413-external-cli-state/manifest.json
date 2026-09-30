@@ -1,0 +1,271 @@
+{
+  "manifest_version": 1,
+  "archive_root": "iss-00413-planning-pack",
+  "document_date": "2026-09-30",
+  "encoding": "UTF-8",
+  "purpose": "Issue #413 documentation-only full replacement planning pack",
+  "status": "documentation generated; product implementation and acceptance not performed",
+  "implementation_assignment": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "status": "future assignment; not invoked in this run"
+  },
+  "basis": {
+    "repository": "chemitaro/spec-dock",
+    "target_branch": "main",
+    "ref": "refs/heads/main",
+    "object_type": "commit",
+    "expected_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "retrieved_tip_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "comparison": "exact ASCII byte equality",
+    "verification": "passed via connected GitHub direct ref fetch before source use",
+    "other_branch_fallback": false,
+    "code_read_ref": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "new_requirements_authority": "artifacts/user-decisions.md plus current user instructions"
+  },
+  "preserved_external_files": [
+    {
+      "path": "report.md",
+      "owner": "Codex",
+      "action": "existing history preserved; current adoption appended",
+      "included_in_zip": true
+    },
+    {
+      "path": "artifacts/interview-worktree-start.md",
+      "owner": "Codex",
+      "action": "preserved byte-for-byte",
+      "included_in_zip": true
+    }
+  ],
+  "self_hash_policy": "manifest.json excluded from payload hashes to avoid self-reference; archive hash recorded outside the archive",
+  "checks": {
+    "utf8": "passed",
+    "safe_single_root": "passed",
+    "json_schemas": 2,
+    "bundled_examples_valid": 12,
+    "extra_positive_cases_valid": 5,
+    "negative_cases_rejected": 35,
+    "requirements": 18,
+    "acceptance_conditions": 42,
+    "plan_steps": 17,
+    "catalog_leaves": 44,
+    "local_link_occurrences": 353,
+    "external_preserved_paths": 2,
+    "unresolved_generated_paths_or_anchors": 0,
+    "template_executable_scripts_byte_equal": true,
+    "template_shared_modal_suffix_byte_equal": true,
+    "diagram_sources": 4,
+    "html_unique_ids": 32,
+    "node_script_syntax_checks": 2,
+    "browser_dynamic": "not verified; file and loopback navigation blocked with ERR_BLOCKED_BY_ADMINISTRATOR",
+    "product_tests": "not run",
+    "metadata_240_full_check": "not run",
+    "zip_crc": "passed",
+    "member_bytes_vs_files": "passed",
+    "manifest_hashes_vs_members": "passed"
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 4523,
+      "sha256": "9cc4e7fde841c688a863f3394c1580b022faba075f95c3efa1b166fe935a3e8d"
+    },
+    {
+      "path": "artifacts/acceptance-matrix.md",
+      "bytes": 18038,
+      "sha256": "6a1bac420fbe773c2dd7fd53529c1d59b5cdaa94f4198b82c0dc7ca7e2fbb337"
+    },
+    {
+      "path": "artifacts/cli-contract.md",
+      "bytes": 27971,
+      "sha256": "c42626bffe56a29a83fc427a3079fbcb1d6d200215ab707ae89f5c75a8291b1b"
+    },
+    {
+      "path": "artifacts/cli-schema.json",
+      "bytes": 16218,
+      "sha256": "3b6a6048bee67230e5f4618f82761bdf8fad9396f06e26ce5f5f3a339d95c693"
+    },
+    {
+      "path": "artifacts/data-schema.json",
+      "bytes": 9744,
+      "sha256": "7fa2a4b71f88a6daf69a82acb09b7f8e0a03e96469cbc6d10c2857469b473654"
+    },
+    {
+      "path": "artifacts/examples.json",
+      "bytes": 10656,
+      "sha256": "5fb68bc248e86e5bcc3b86c3318ec2dfe546c96bf45f2d815d3d22cff2418117"
+    },
+    {
+      "path": "artifacts/interview-worktree-start.md",
+      "bytes": 5646,
+      "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "artifacts/migration-runbook.md",
+      "bytes": 15296,
+      "sha256": "03201a531551ef3c67d10d71adfd02f70c9382323d2c6db90db14d215e0987d5"
+    },
+    {
+      "path": "artifacts/self-check.md",
+      "bytes": 9157,
+      "sha256": "a13addef80abc6ee4fa15b049bfd65d221ac14efbc0291546c3a0c79167277d9"
+    },
+    {
+      "path": "artifacts/source-basis.md",
+      "bytes": 29846,
+      "sha256": "0d0e15141315fe82b4e6e74158e5b91b176ccbd9f63afc913688003818c64710"
+    },
+    {
+      "path": "artifacts/traceability.json",
+      "bytes": 16996,
+      "sha256": "8f75479ee86f9df8fa5d8994a7a356969acd0c074e0ee5d586141335e8c7a628"
+    },
+    {
+      "path": "artifacts/user-decisions.md",
+      "bytes": 5646,
+      "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "decision-questions.md",
+      "bytes": 1094,
+      "sha256": "2336b77aa8e025449244717d3e63b79e6c4ee58e1cc8430a0c6098b9d600a2c1"
+    },
+    {
+      "path": "design.md",
+      "bytes": 42788,
+      "sha256": "08e28e785cd55c994bce895f7367ac6dc71c4d216b8e1472897e9601264eee1f"
+    },
+    {
+      "path": "explanation.html",
+      "bytes": 66428,
+      "sha256": "4bf8df3a28b75dcc3642a17468dcfdd53c1dbb407306215ec067834b4c69381a"
+    },
+    {
+      "path": "index.html",
+      "bytes": 222,
+      "sha256": "c46e1f20bad0cf75d39e98978e9bb683658087ea0b9f76d98bb08c9c6f3900e2"
+    },
+    {
+      "path": "plan.md",
+      "bytes": 44162,
+      "sha256": "f675c8077bff08d83faa3fdc8c1e3ea0cf07c3d3deef07e835123e4324cc9c5c"
+    },
+    {
+      "path": "report.md",
+      "bytes": 15618,
+      "sha256": "6b6582afc611572e2bc9725917e1cf66e0d62758c72c25627b06dad545ce1c4d"
+    },
+    {
+      "path": "requirement.md",
+      "bytes": 23741,
+      "sha256": "6948b6ab9764037e659e9f7f3ca1a549cb556ce7acd05d2512ffc1249adcbcea"
+    }
+  ],
+  "origin_generated_files": [
+    {
+      "path": "README.md",
+      "bytes": 4149,
+      "sha256": "a5a183d7e221a037b958bf1b5cb9241ff0b5eaa6ebbb5a50380de32533b53565"
+    },
+    {
+      "path": "artifacts/acceptance-matrix.md",
+      "bytes": 18038,
+      "sha256": "6a1bac420fbe773c2dd7fd53529c1d59b5cdaa94f4198b82c0dc7ca7e2fbb337"
+    },
+    {
+      "path": "artifacts/cli-contract.md",
+      "bytes": 27971,
+      "sha256": "c42626bffe56a29a83fc427a3079fbcb1d6d200215ab707ae89f5c75a8291b1b"
+    },
+    {
+      "path": "artifacts/cli-schema.json",
+      "bytes": 16218,
+      "sha256": "3b6a6048bee67230e5f4618f82761bdf8fad9396f06e26ce5f5f3a339d95c693"
+    },
+    {
+      "path": "artifacts/data-schema.json",
+      "bytes": 9744,
+      "sha256": "7fa2a4b71f88a6daf69a82acb09b7f8e0a03e96469cbc6d10c2857469b473654"
+    },
+    {
+      "path": "artifacts/examples.json",
+      "bytes": 10656,
+      "sha256": "5fb68bc248e86e5bcc3b86c3318ec2dfe546c96bf45f2d815d3d22cff2418117"
+    },
+    {
+      "path": "artifacts/migration-runbook.md",
+      "bytes": 15296,
+      "sha256": "03201a531551ef3c67d10d71adfd02f70c9382323d2c6db90db14d215e0987d5"
+    },
+    {
+      "path": "artifacts/self-check.md",
+      "bytes": 9157,
+      "sha256": "a13addef80abc6ee4fa15b049bfd65d221ac14efbc0291546c3a0c79167277d9"
+    },
+    {
+      "path": "artifacts/source-basis.md",
+      "bytes": 29846,
+      "sha256": "0d0e15141315fe82b4e6e74158e5b91b176ccbd9f63afc913688003818c64710"
+    },
+    {
+      "path": "artifacts/traceability.json",
+      "bytes": 16996,
+      "sha256": "8f75479ee86f9df8fa5d8994a7a356969acd0c074e0ee5d586141335e8c7a628"
+    },
+    {
+      "path": "artifacts/user-decisions.md",
+      "bytes": 5646,
+      "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "decision-questions.md",
+      "bytes": 1094,
+      "sha256": "2336b77aa8e025449244717d3e63b79e6c4ee58e1cc8430a0c6098b9d600a2c1"
+    },
+    {
+      "path": "design.md",
+      "bytes": 42788,
+      "sha256": "08e28e785cd55c994bce895f7367ac6dc71c4d216b8e1472897e9601264eee1f"
+    },
+    {
+      "path": "explanation.html",
+      "bytes": 65931,
+      "sha256": "ed04dda311d8397ca3cea0ec3e274063ccfce3e4b700019d03ca89888c0bbc93"
+    },
+    {
+      "path": "plan.md",
+      "bytes": 44162,
+      "sha256": "f675c8077bff08d83faa3fdc8c1e3ea0cf07c3d3deef07e835123e4324cc9c5c"
+    },
+    {
+      "path": "requirement.md",
+      "bytes": 23741,
+      "sha256": "6948b6ab9764037e659e9f7f3ca1a549cb556ce7acd05d2512ffc1249adcbcea"
+    }
+  ],
+  "local_adoption": {
+    "date": "2026-09-30",
+    "source_zip_sha256": "7d8534010862d1187a79f005a64d97686ac729b4beb6b3556e1bad134dadd949",
+    "source_zip_bytes": 125642,
+    "oracle_session": "specdock-worktree-start-planning",
+    "files": 20,
+    "product_implementation": "not started",
+    "checks": {
+      "examples_validated": 12,
+      "metadata_validated_unchanged": 240,
+      "metadata_aggregate_sha256": "6b8ea9bc184d2aef5c715e593dd3dc2ee5df6ffc4315eb96e63f7093d0cdd33f",
+      "workspace_sha256_unchanged": "53920a4d2f3fd34c51e37f47d1e0baa87227f34bef7b5d2cb8f2f07700fea8b0",
+      "requirements": 18,
+      "acceptance_conditions": 42,
+      "plan_steps": 17,
+      "template_modal_suffix_equal": true,
+      "plantuml_svg": 4,
+      "zoom": "passed",
+      "zip_sha256": "7d8534010862d1187a79f005a64d97686ac729b4beb6b3556e1bad134dadd949"
+    },
+    "browser": "4/4 SVG and zoom validator passed; IAB 1280px and 390px without document overflow",
+    "published_url": "http://100.85.74.8:8765/specdock-issue-413/explanation.html",
+    "publication_check": "15 linked files HTTP200 no-store and exact source bytes",
+    "changes_from_generated": "README and HTML adoption notice, report append, retained interview, index redirect and manifest provenance only. R/D/P unchanged."
+  }
+}

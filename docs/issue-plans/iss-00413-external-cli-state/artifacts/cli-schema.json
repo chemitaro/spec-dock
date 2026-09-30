@@ -1,0 +1,826 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:specdock:cli:v2",
+  "title": "Issue 413 proposed CLI v2 envelope",
+  "description": "Work/active/Sync shapes and envelope invariants. Other result-family fields and effect ordering are additionally checked against cli-contract.md. No persistent operation identifier.",
+  "$defs": {
+    "diagnostic": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]*$"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "code",
+        "message",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "effect": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "planned",
+            "succeeded",
+            "unchanged",
+            "failed",
+            "not_attempted",
+            "unknown"
+          ]
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "status",
+        "target"
+      ],
+      "additionalProperties": false
+    },
+    "selection": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "enum": [
+            "empty",
+            "selected",
+            "stale",
+            "unavailable",
+            "invalid"
+          ]
+        },
+        "scope_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "github_ref": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection_token": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selected_branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "current_branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch_changed": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "status",
+        "scope_id",
+        "github_ref",
+        "selection_token",
+        "selected_branch",
+        "current_branch",
+        "branch_changed"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "empty"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "scope_id": {
+                "type": "null"
+              },
+              "github_ref": {
+                "type": "null"
+              },
+              "selection_token": {
+                "type": "null"
+              },
+              "selected_branch": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "const": "selected"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "scope_id": {
+                "type": "string"
+              },
+              "selection_token": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{32}$"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "work_start": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "work-start"
+        },
+        "started": {
+          "type": "boolean"
+        },
+        "scope_id": {
+          "type": "string"
+        },
+        "branch_before": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch_after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection_token": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "started",
+        "scope_id",
+        "branch_before",
+        "branch_after",
+        "selection_token"
+      ],
+      "additionalProperties": false
+    },
+    "work_finish": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "work-finish"
+        },
+        "completed": {
+          "type": "boolean"
+        },
+        "scope_id": {
+          "type": "string"
+        },
+        "branch_before": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "branch_after": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "selection_token": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9a-f]{32}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "completed",
+        "scope_id",
+        "branch_before",
+        "branch_after",
+        "selection_token"
+      ],
+      "additionalProperties": false
+    },
+    "active": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "active"
+        },
+        "selection": {
+          "$ref": "#/$defs/selection"
+        },
+        "ancestors": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "selection",
+        "ancestors"
+      ],
+      "additionalProperties": false
+    },
+    "worktree_observation": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "selection": {
+          "$ref": "#/$defs/selection"
+        },
+        "lifecycle": {
+          "enum": [
+            "open",
+            "completed",
+            "not-planned",
+            "unknown"
+          ]
+        },
+        "process_state": {
+          "const": "not_observed"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        }
+      },
+      "required": [
+        "path",
+        "selection",
+        "lifecycle",
+        "process_state",
+        "findings"
+      ],
+      "additionalProperties": false
+    },
+    "count": {
+      "type": "object",
+      "properties": {
+        "scope_id": {
+          "type": "string"
+        },
+        "direct_selected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "descendant_selected_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "complete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scope_id",
+        "direct_selected_count",
+        "descendant_selected_count",
+        "complete"
+      ],
+      "additionalProperties": false
+    },
+    "sync": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "sync"
+        },
+        "observed_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source": {
+          "enum": [
+            "local",
+            "github"
+          ]
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "worktrees": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/worktree_observation"
+          }
+        },
+        "counts": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/count"
+          }
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "observed_at",
+        "source",
+        "complete",
+        "worktrees",
+        "counts",
+        "findings"
+      ],
+      "additionalProperties": false
+    },
+    "diagnostic_data": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "diagnostic"
+        },
+        "findings": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        },
+        "unverified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "kind",
+        "findings",
+        "unverified"
+      ],
+      "additionalProperties": false
+    },
+    "utility": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "const": "utility"
+        },
+        "text": {
+          "type": "string"
+        },
+        "version": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "kind",
+        "text",
+        "version"
+      ],
+      "additionalProperties": false
+    },
+    "other_data": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "enum": [
+            "scope",
+            "scope-list",
+            "deletion",
+            "branch",
+            "dependency",
+            "artifact",
+            "artifact-list",
+            "worktree",
+            "worktree-list",
+            "workbench",
+            "installation",
+            "migration",
+            "validation"
+          ]
+        },
+        "result": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "kind",
+        "result"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": "specdock.cli/v2"
+    },
+    "command": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "succeeded",
+        "unchanged",
+        "planned",
+        "failed",
+        "partial"
+      ]
+    },
+    "exit_code": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 7
+    },
+    "data": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/work_start"
+        },
+        {
+          "$ref": "#/$defs/work_finish"
+        },
+        {
+          "$ref": "#/$defs/active"
+        },
+        {
+          "$ref": "#/$defs/sync"
+        },
+        {
+          "$ref": "#/$defs/diagnostic_data"
+        },
+        {
+          "$ref": "#/$defs/utility"
+        },
+        {
+          "$ref": "#/$defs/other_data"
+        }
+      ]
+    },
+    "effects": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/effect"
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/diagnostic"
+      }
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/diagnostic"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "recovery": {
+      "anyOf": [
+        {
+          "type": "object",
+          "properties": {
+            "can_resume": {
+              "const": false
+            },
+            "can_rollback": {
+              "const": false
+            },
+            "instructions": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "can_resume",
+            "can_rollback",
+            "instructions"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "command",
+    "status",
+    "exit_code",
+    "data",
+    "effects",
+    "warnings",
+    "error",
+    "recovery"
+  ],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "succeeded",
+              "unchanged",
+              "planned"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "const": 0
+          },
+          "error": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "failed"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "enum": [
+              1,
+              2,
+              3,
+              4,
+              5,
+              7
+            ]
+          },
+          "error": {
+            "$ref": "#/$defs/diagnostic"
+          },
+          "effects": {
+            "not": {
+              "contains": {
+                "properties": {
+                  "status": {
+                    "enum": [
+                      "succeeded",
+                      "unknown"
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "partial"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "exit_code": {
+            "enum": [
+              6,
+              7
+            ]
+          },
+          "error": {
+            "$ref": "#/$defs/diagnostic"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 6
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "const": "partial"
+          },
+          "effects": {
+            "contains": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "succeeded",
+                    "unknown"
+                  ]
+                }
+              }
+            },
+            "minContains": 1
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "exit_code": {
+            "const": 7
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "status": {
+            "enum": [
+              "failed",
+              "partial"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "succeeded"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "effects": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "succeeded",
+                    "unchanged"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "unchanged"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "effects": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "unchanged"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "planned"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "effects": {
+            "items": {
+              "properties": {
+                "status": {
+                  "enum": [
+                    "planned"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "failed",
+              "partial"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "data": {
+            "if": {
+              "properties": {
+                "kind": {
+                  "const": "work-start"
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "started": {
+                  "const": false
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}
