@@ -173,8 +173,19 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
             status = "planned"
             effects = (Effect("git.checkout", "planned", name),)
         else:
-            _fresh_context(context, namespace.timeout)
+            current_context = _fresh_context(context, namespace.timeout)
             verify_local_inputs(context, source_inputs)
+            if current_context.branch == name and current_context.head == tip:
+                verify_candidate(current_context, candidate)
+                if run_git(current_context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                    raise ValueError("branch switch requires a clean worktree")
+                return OperationResult(
+                    namespace.command_path,
+                    "unchanged",
+                    _data(target.id, name, tip, created=False, switched=False),
+                    0,
+                    effects=(Effect("git.checkout", "unchanged", name),),
+                )
             try:
                 run_git(context.root, "checkout", name, timeout=namespace.timeout, mutation=True)
                 effects = (Effect("git.checkout", "succeeded", name),)

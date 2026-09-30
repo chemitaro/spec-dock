@@ -45,6 +45,23 @@ def test_branch_show_observes_default_candidate_without_binding_store(
     assert not (root / ".git/spec-dock").exists()
 
 
+def test_switch_current_branch_is_unchanged_and_does_not_run_checkout_hook(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    marker = tmp_path / "checkout-hook-ran"
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text(f"#!/bin/sh\ntouch {shlex.quote(str(marker))}\n")
+    hook.chmod(0o755)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "main", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "unchanged"
+    assert result["data"]["result"]["switched"] is False
+    assert result["effects"] == [{"kind": "git.checkout", "status": "unchanged", "target": "main"}]
+    assert not marker.exists()
+    assert not (root / "spec-dock/.agent").exists()
+
+
 def test_branch_create_only_creates_ref_at_fixed_base(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = committed_workspace(tmp_path / "consumer")
     tip = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"]).decode().removesuffix("\n")

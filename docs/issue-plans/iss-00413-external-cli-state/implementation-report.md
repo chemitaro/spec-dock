@@ -238,3 +238,7 @@ active set/clearをimmutable direct recordの通常dispatchへ接続した。set
 別processがnative flockを保持していてもclearが成功するGreen証拠を取得した。Start以外の共通排他は追加しない。Git/remote/lifecycleは変更しない。共有data型はpresentation/command_data.pyに置き、applicationからdispatchへの依存を作らない。
 
 新activeの32件を含む関連選択は655 passed/1 skipped、54.66秒。全Ruff check/format（367 files）と変更6 sourceの限定mypyが成功。実Scope240件のhash変更0を確認した。Finish、Windows native/immutable adapter、全体mypy、現在候補の独立再レビュー、最終gate/製品手動確認は未完了。実dogfoodの選択や宣言を変更した証拠とは扱わない。
+
+## P-06 branch switchの無変更分類
+
+第3回レビューのC-04効果分類を同じGit checkout境界にも照合し、branch switchで既にcurrent branch/HEADと固定tipが一致するケースを追加した。修正前は不要なpost-checkout hookを起動しsucceeded/switched=trueだった。fresh physical context・source bytes・candidate・cleanを照合後、checkoutを省略してunchanged/switched=falseを返す。選択の記録は作らない。公開CLIのRed→Greenとbranch関連23件、対象Ruffと限定mypyが成功した。独立再レビューは次の現在SHAで実施する。
