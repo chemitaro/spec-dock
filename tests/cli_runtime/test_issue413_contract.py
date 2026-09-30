@@ -17,7 +17,7 @@ from spec_dock.cli import main
 def make_workspace(root: Path) -> Path:
     """Build a GitHub-backed schema-3 test fixture, never real dogfood metadata."""
     root.mkdir()
-    subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+    subprocess.run(["git", "init", "--initial-branch=main", "-q", str(root)], check=True, capture_output=True)
     workspace = root / "spec-dock"
     scope = workspace / "initiatives/init-00001-fixture"
     scope.mkdir(parents=True)

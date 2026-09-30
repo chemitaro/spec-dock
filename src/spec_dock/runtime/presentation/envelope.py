@@ -45,6 +45,13 @@ class Recovery:
 
 
 @dataclass(frozen=True)
+class RecoveryInstructions:
+    instructions: tuple[str, ...]
+    can_resume: Literal[False] = False
+    can_rollback: Literal[False] = False
+
+
+@dataclass(frozen=True)
 class OperationResult(Generic[T]):
     command: str
     status: ResultStatus
@@ -55,7 +62,7 @@ class OperationResult(Generic[T]):
     effects: tuple[Effect, ...] = ()
     warnings: tuple[Diagnostic, ...] = ()
     error: Diagnostic | None = None
-    recovery: Recovery | None = None
+    recovery: Recovery | RecoveryInstructions | None = None
 
     def __post_init__(self) -> None:
         if self.status == "partial":
@@ -157,7 +164,7 @@ def render_json_v2(result: OperationResult[object]) -> str:
         "effects": [asdict(effect) for effect in result.effects],
         "warnings": [asdict(item) for item in result.warnings],
         "error": asdict(result.error) if result.error else None,
-        "recovery": None,
+        "recovery": asdict(result.recovery) if isinstance(result.recovery, RecoveryInstructions) else None,
     }
     return json.dumps(_redact(payload), ensure_ascii=False, separators=(",", ":")) + "\n"
 
@@ -176,7 +183,9 @@ def render_text(result: OperationResult[object], *, native_git: bool = False) ->
             native_stderr = str(_redact(git_details["stderr"]))
         else:
             stderr_lines.append(f"error [{result.error.code}] {_text_escape(result.error.message)}")
-    if result.recovery is not None and result.recovery.blocked_reason:
+    if isinstance(result.recovery, RecoveryInstructions):
+        stderr_lines.extend(f"recovery: {_text_escape(item)}" for item in result.recovery.instructions)
+    elif result.recovery is not None and result.recovery.blocked_reason:
         stderr_lines.append(f"recovery: {_text_escape(result.recovery.blocked_reason)}")
     return "\n".join(stdout_lines) + "\n", "\n".join(stderr_lines) + ("\n" if stderr_lines else "") + native_stderr
 

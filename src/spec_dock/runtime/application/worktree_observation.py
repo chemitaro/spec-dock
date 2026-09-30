@@ -124,20 +124,21 @@ class WorktreeSelection:
     views: tuple[ScopeView, ...]
     worktree_identity: PhysicalIdentity | None
     git: GitWorktreeRecord
+    error: OSError | ValueError | RuntimeError | None = None
 
 
-def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
+def observe_worktrees(context: ProjectContext, *, timeout: float = 30) -> tuple[WorktreeSelection, ...]:
     from spec_dock.runtime.application.scope_query import load_scope_views
 
     seen: set[object] = set()
     rows: list[WorktreeSelection] = []
-    for entry in worktree_list(context.root):
+    for entry in worktree_list(context.root, timeout=timeout):
         direct: StoredSelection | None = None
         identity: PhysicalIdentity | None = None
         try:
             if entry.bare:
                 raise ValueError("bare repository is not a working tree")
-            other = resolve_context(str(entry.path), context.root)
+            other = resolve_context(str(entry.path), context.root, timeout=timeout)
             identity = other.worktree_identity
             if other.clone_identity != context.clone_identity:
                 raise ValueError("worktree common directory identity mismatch")
@@ -167,6 +168,7 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
                     (),
                     identity,
                     entry,
+                    error,
                 )
             )
     return tuple(rows)

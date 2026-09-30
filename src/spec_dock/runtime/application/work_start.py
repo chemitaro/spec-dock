@@ -10,7 +10,17 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import load_scope_views
-from spec_dock.runtime.application.start_selection import StartSelectionError, plan_selection
+from spec_dock.runtime.application.start_plan import (
+    StartLiveObservations,
+    StartLocalSnapshot,
+    StartPlanError,
+    StartRequest,
+    check_branch_occupancy as _check_branch_occupancy,
+    check_expectations as _check_expectations,
+    check_inventory,
+    plan_start,
+)
+from spec_dock.runtime.application.start_selection import StartSelectionError
 from spec_dock.runtime.application.start_snapshot import (
     StartSnapshotError,
     capture_local_inputs,
@@ -24,6 +34,7 @@ from spec_dock.runtime.application.worktree_observation import (
     read_selection,
     resolve_scope,
 )
+from spec_dock.runtime.domain.git_ref import parse_commit_oid
 from spec_dock.runtime.domain.work_target import WorkTarget
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.github_lifecycle import RemoteIssueError
@@ -34,14 +45,14 @@ from spec_dock.runtime.infra.work_target_store import (
     SelectionRemovalUnknown,
     WorkTargetStore,
 )
-from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, OperationResult
+from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, OperationResult, RecoveryInstructions
 
 if TYPE_CHECKING:
     import argparse
 
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
-    from spec_dock.runtime.application.start_snapshot import CandidateSnapshot
+    from spec_dock.runtime.application.start_snapshot import CandidateSnapshot, LocalInput
     from spec_dock.runtime.application.worktree_observation import SelectionObservation, WorktreeSelection
 
 
@@ -58,9 +69,29 @@ class StartGitFailure(GitProcessError):
         branch_after: str | None,
         effect_status: Literal["succeeded", "failed", "unknown"],
     ) -> None:
-        super().__init__(error.argv, error.stderr, error.returncode, uncertain=error.uncertain, stdout=error.stdout)
+        super().__init__(
+            error.argv,
+            error.stderr,
+            error.returncode,
+            uncertain=error.uncertain,
+            stdout=error.stdout,
+            timed_out=error.timed_out,
+        )
         self.branch_after = branch_after
         self.effect_status = effect_status
+
+
+def _resolve_bound_context(
+    context: ProjectContext, root_handle: DirectoryIdentity, lock: StartLock, *, timeout: float
+) -> ProjectContext:
+    root_handle.verify()
+    lock.verify()
+    fresh = resolve_context(str(context.root), context.root, timeout=timeout)
+    root_handle.verify()
+    lock.verify()
+    if fresh.worktree_identity != root_handle.identity or fresh.clone_identity != lock.identity:
+        raise StartPrecondition("PROJECT_IDENTITY_CHANGED", "fresh Git context differs from held root/common identity")
+    return fresh
 
 
 def _mutate_git(
@@ -68,6 +99,7 @@ def _mutate_git(
     root_handle: DirectoryIdentity,
     lock: StartLock,
     candidate: CandidateSnapshot,
+    source_inputs: tuple[LocalInput, ...],
     *,
     phase: str,
     branch: str,
@@ -75,6 +107,7 @@ def _mutate_git(
     timeout: float,
     args: tuple[str, ...],
 ) -> None:
+    _resolve_bound_context(context, root_handle, lock, timeout=timeout)
     try:
         run_git(context.root, *args, timeout=timeout, mutation=True)
     except GitProcessError as error:
@@ -83,7 +116,7 @@ def _mutate_git(
         try:
             root_handle.verify()
             lock.verify()
-            after = resolve_context(str(context.root), context.root)
+            after = _resolve_bound_context(context, root_handle, lock, timeout=timeout)
             observed_branch = after.branch
             if phase == "git.branch.create":
                 observed_tip = (
@@ -108,30 +141,19 @@ def _mutate_git(
                 if not run_git(after.root, "status", "--porcelain", "-z", timeout=timeout):
                     effect_status = "succeeded"
             elif after.branch == context.branch and after.head == context.head and not error.uncertain:
-                effect_status = "failed"
+                verify_local_inputs(after, source_inputs)
+                if not run_git(after.root, "status", "--porcelain", "-z", timeout=timeout):
+                    effect_status = "failed"
         except (OSError, ValueError, RuntimeError):
             pass
         raise StartGitFailure(error, observed_branch, effect_status) from error
 
 
 def _check_selection(
-    context: ProjectContext, views: tuple[ScopeView, ...], target: ScopeView
+    context: ProjectContext, views: tuple[ScopeView, ...], target: ScopeView, *, timeout: float
 ) -> tuple[SelectionObservation, tuple[WorktreeSelection, ...]]:
-    rows = observe_worktrees(context)
-    for row in rows:
-        other = row.selection.record
-        if (
-            row.worktree_identity != context.worktree_identity
-            and other
-            and (
-                other.scope_id == target.id or (target.github_ref is not None and other.github_ref == target.github_ref)
-            )
-        ):
-            raise StartPrecondition("SCOPE_ALREADY_SELECTED", "Scope is already selected by another worktree")
-        if row.selection.status in ("invalid", "unavailable"):
-            raise ValueError(row.selection.reason or "worktree selection is unavailable")
-    if not any(row.worktree_identity == context.worktree_identity for row in rows):
-        raise StartPrecondition("WORKTREE_INVENTORY_CHANGED", "current worktree is missing from Git inventory")
+    rows = observe_worktrees(context, timeout=timeout)
+    check_inventory(context, rows, target)
     return read_selection(context, views), rows
 
 
@@ -142,6 +164,7 @@ def _verify_inventory(
     *,
     checkout: bool = False,
     cleared: bool = False,
+    refresh_other: bool = False,
 ) -> None:
     old = {row.path: row for row in before}
     current = {row.path: row for row in after}
@@ -149,13 +172,25 @@ def _verify_inventory(
         raise StartPrecondition("WORKTREE_INVENTORY_CHANGED", "Git worktree inventory changed during Start")
     for path, row in current.items():
         expected = old[path]
-        if checkout and row.worktree_identity == context.worktree_identity:
+        if refresh_other and row.worktree_identity != context.worktree_identity:
             row = replace(
                 row,
                 git=replace(
                     row.git, head=expected.git.head, branch=expected.git.branch, detached=expected.git.detached
                 ),
-                selection=replace(row.selection, current_branch=expected.selection.current_branch),
+                selection=expected.selection,
+                views=expected.views,
+                error=expected.error,
+            )
+        if checkout and row.worktree_identity == context.worktree_identity:
+            if row.selection.record != expected.selection.record or row.selection.handle != expected.selection.handle:
+                raise StartPrecondition("SELECTION_CHANGED", "captured direct target changed during checkout")
+            row = replace(
+                row,
+                git=replace(
+                    row.git, head=expected.git.head, branch=expected.git.branch, detached=expected.git.detached
+                ),
+                selection=expected.selection,
                 views=expected.views,
             )
         if cleared and row.worktree_identity == context.worktree_identity:
@@ -164,11 +199,6 @@ def _verify_inventory(
             row = replace(row, selection=expected.selection, views=expected.views)
         if row != expected:
             raise StartPrecondition("WORKTREE_INVENTORY_CHANGED", "Git worktree or direct target changed during Start")
-
-
-def _check_branch_occupancy(context: ProjectContext, rows: tuple[WorktreeSelection, ...], branch: str) -> None:
-    if any(row.worktree_identity != context.worktree_identity and row.git.branch == branch for row in rows):
-        raise StartPrecondition("BRANCH_IN_USE", "requested branch is checked out by another worktree")
 
 
 def _check_private_state(context: ProjectContext, timeout: float, proposed_token: str) -> None:
@@ -185,16 +215,6 @@ def _check_private_state(context: ProjectContext, timeout: float, proposed_token
             missing_ok=True,
         ):
             raise StartPrecondition("WORK_TARGET_PATH_NOT_IGNORED", "work target state must be ignored by Git")
-
-
-def _check_expectations(
-    target: ScopeView, selection: SelectionObservation, expected_current: str | None, expected_backend: str | None
-) -> None:
-    if expected_backend is not None and target.backend.kind != expected_backend:
-        raise StartPrecondition("EXPECTATION_FAILED", "target backend does not match --expect-backend")
-    current_id = selection.record.scope_id if selection.record is not None else None
-    if expected_current is not None and current_id != expected_current:
-        raise StartPrecondition("EXPECTATION_FAILED", "direct target does not match --expect-current")
 
 
 @dataclass(frozen=True)
@@ -219,6 +239,8 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     details: dict[str, object]
     try:
         context.require_writer()
+        if context.head is not None:
+            parse_commit_oid(context.head.encode("ascii"))
         proposed_token = secrets.token_hex(16)
         _check_private_state(context, namespace.timeout, proposed_token)
         views = load_scope_views(context.root / "spec-dock")
@@ -234,7 +256,9 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         branch = namespace.branch or f"{target.id}-{slug}"
         if not branch.isascii():
             raise StartPrecondition("INVALID_BRANCH", "branch name must be ASCII")
-        run_git(context.root, "check-ref-format", "--branch", branch, timeout=namespace.timeout)
+        checked_branch = run_git(context.root, "check-ref-format", "--branch", branch, timeout=namespace.timeout)
+        if checked_branch != (branch + "\n").encode("ascii"):
+            raise StartPrecondition("INVALID_BRANCH", "branch must name a literal branch, not checkout shorthand")
         existing = run_git(
             context.root,
             "rev-parse",
@@ -250,43 +274,50 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 raise ValueError(f"existing branch requires explicit --branch {branch}")
             if namespace.base:
                 raise ValueError("existing branch reuse does not accept --base")
-            tip = existing.decode().removesuffix("\n")
+            tip = parse_commit_oid(existing)
         else:
             if not namespace.base:
                 raise ValueError("a new branch requires --base")
-            tip = (
+            tip = parse_commit_oid(
                 run_git(
-                    context.root, "rev-parse", "--verify", f"{namespace.base}^{{commit}}", timeout=namespace.timeout
+                    context.root,
+                    "rev-parse",
+                    "--verify",
+                    "--end-of-options",
+                    f"{namespace.base}^{{commit}}",
+                    timeout=namespace.timeout,
                 )
-                .decode()
-                .removesuffix("\n")
             )
+        if context.head is not None and len(tip) != len(context.head):
+            raise ValueError("resolved commit OID differs from the repository object format")
         candidate = read_candidate(
             context, tip, target, views, timeout=namespace.timeout, proposed_token=proposed_token
         )
         readiness = observe_readiness(
             context, candidate, target.id, timeout=namespace.timeout, offline=namespace.offline
         )
-        if not readiness.ready:
-            blocked = ", ".join(blocker.scope_id for blocker in readiness.blockers)
-            raise StartPrecondition("READINESS_NOT_SATISFIED", f"required Scope states are not satisfied: {blocked}")
         if run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
             raise ValueError("worktree must be clean before Start")
-        planned_selection, planned_inventory = _check_selection(context, views, target)
-        _check_branch_occupancy(context, planned_inventory, branch)
-        selection_plan = plan_selection(
-            planned_selection,
-            scope_id=target.id,
-            branch=branch,
-            tip=tip,
-            current_branch=context.branch,
-            current_head=context.head,
-            switch_active=namespace.switch_active,
+        planned_selection, planned_inventory = _check_selection(context, views, target, timeout=namespace.timeout)
+        request = StartRequest(
+            target.id,
+            namespace.branch,
+            namespace.base,
+            namespace.switch_active,
+            expected_current,
+            namespace.expect_backend,
         )
+        snapshot = StartLocalSnapshot(target, local_inputs, planned_selection, planned_inventory)
+        observed = StartLiveObservations(branch, tip, create_branch, readiness)
+        plan = plan_start(request, context, snapshot, observed)
+        branch, tip, create_branch = plan.branch, plan.resolved_tip, plan.create_branch
+        selection_plan = plan.selection
         if selection_plan.action in ("replace_same_scope", "switch_scope"):
             assert planned_selection.record is not None
             old_scope_id = planned_selection.record.scope_id
         if namespace.dry_run:
+            if selection_plan.action == "unchanged":
+                verify_candidate(context, candidate)
             planned_effects = [
                 Effect("git.branch.create", "planned", branch),
                 Effect("git.checkout", "planned", branch),
@@ -310,7 +341,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             lock.verify()
             if root_handle.identity != context.worktree_identity or lock.identity != context.clone_identity:
                 raise ValueError("project physical identity changed")
-            current = resolve_context(str(context.root), context.root)
+            current = _resolve_bound_context(context, root_handle, lock, timeout=namespace.timeout)
             verify_local_inputs(current, local_inputs)
             if (
                 current.head != context.head
@@ -320,24 +351,18 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 raise ValueError("Start snapshot changed")
             if run_git(current.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
                 raise ValueError("worktree clean state changed before Start effects")
-            selection, locked_inventory = _check_selection(current, views, target)
-            _verify_inventory(current, planned_inventory, locked_inventory)
+            selection, locked_inventory = _check_selection(current, views, target, timeout=namespace.timeout)
+            _verify_inventory(current, planned_inventory, locked_inventory, refresh_other=True)
             _check_branch_occupancy(current, locked_inventory, branch)
             _check_expectations(target, selection, expected_current, namespace.expect_backend)
             if selection != planned_selection:
                 raise ValueError("direct selection changed before Start effects")
             _check_private_state(current, namespace.timeout, proposed_token)
-            fresh_plan = plan_selection(
-                selection,
-                scope_id=target.id,
-                branch=branch,
-                tip=tip,
-                current_branch=current.branch,
-                current_head=current.head,
-                switch_active=namespace.switch_active,
+            fresh_plan = plan_start(
+                request, current, replace(snapshot, selection=selection, inventory=locked_inventory), observed
             )
-            if fresh_plan != selection_plan:
-                raise ValueError("direct selection plan changed before Start effects")
+            if fresh_plan != plan:
+                raise ValueError("Start plan changed before effects")
             current_tip = (
                 run_git(
                     current.root,
@@ -369,6 +394,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                     root_handle,
                     lock,
                     candidate,
+                    local_inputs,
                     phase=phase,
                     branch=branch,
                     tip=tip,
@@ -376,12 +402,22 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                     args=("branch", branch, tip),
                 )
             effects.append(Effect(phase, "succeeded" if create_branch else "unchanged", branch))
+            root_handle.verify()
+            lock.verify()
+            confirmed_tip = parse_commit_oid(
+                run_git(
+                    current.root, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}", timeout=namespace.timeout
+                )
+            )
+            if confirmed_tip != tip:
+                raise StartPrecondition("BRANCH_CHANGED", "created or reused branch differs from fixed commit")
             phase = "git.checkout"
             _mutate_git(
                 current,
                 root_handle,
                 lock,
                 candidate,
+                local_inputs,
                 phase=phase,
                 branch=branch,
                 tip=tip,
@@ -389,7 +425,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 args=("checkout", branch),
             )
             effects.append(Effect(phase, "succeeded", branch))
-            after = resolve_context(str(context.root), context.root)
+            after = _resolve_bound_context(context, root_handle, lock, timeout=namespace.timeout)
             branch_after = after.branch
             root_handle.verify()
             lock.verify()
@@ -397,7 +433,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 raise ValueError("checkout target snapshot changed")
             verify_candidate(after, candidate)
             _check_private_state(after, namespace.timeout, proposed_token)
-            _, checkout_inventory = _check_selection(after, candidate.views, target)
+            _, checkout_inventory = _check_selection(after, candidate.views, target, timeout=namespace.timeout)
             _verify_inventory(after, locked_inventory, checkout_inventory, checkout=True)
             record = WorkTarget(
                 "specdock.work-target/v1",
@@ -411,7 +447,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             with WorkTargetStore(context.root, root_handle=root_handle) as store:
                 root_handle.verify()
                 lock.verify()
-                _, publish_inventory = _check_selection(after, candidate.views, target)
+                _, publish_inventory = _check_selection(after, candidate.views, target, timeout=namespace.timeout)
                 _verify_inventory(after, checkout_inventory, publish_inventory)
                 if selection.handle is not None and selection.record is not None:
                     phase = "selection.clear"
@@ -425,12 +461,12 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                         )
                     root_handle.verify()
                     lock.verify()
-                    latest = resolve_context(str(context.root), context.root)
+                    latest = _resolve_bound_context(context, root_handle, lock, timeout=namespace.timeout)
                     if latest.branch != branch or latest.head != tip:
                         raise StartPrecondition("BRANCH_CHANGED", "checkout changed before publication")
                     verify_candidate(latest, candidate)
                     _check_private_state(latest, namespace.timeout, proposed_token)
-                    _, cleared_inventory = _check_selection(latest, candidate.views, target)
+                    _, cleared_inventory = _check_selection(latest, candidate.views, target, timeout=namespace.timeout)
                     _verify_inventory(latest, publish_inventory, cleared_inventory, cleared=True)
                 phase = "selection.publish"
                 handle = store.publish(record, token=proposed_token)
@@ -440,7 +476,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                     lock.verify()
                 except (OSError, ValueError) as error:
                     raise SelectionPublicationUnknown(token, error) from error
-            effects.append(Effect(phase, "succeeded", target.id))
+                effects.append(Effect(phase, "succeeded", target.id))
         return OperationResult(
             "work start",
             "succeeded",
@@ -465,7 +501,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             code, details, exit_code = error.code, {}, error.exit_code
         elif isinstance(error, StartLockBusy):
             code, details, exit_code = "START_LOCK_BUSY", {}, 3
-        elif isinstance(error, (StartPrecondition, StartSelectionError, StartSnapshotError)):
+        elif isinstance(error, (StartPrecondition, StartPlanError, StartSelectionError, StartSnapshotError)):
             code, details, exit_code = error.code, {}, 3
         else:
             code, details, exit_code = "PRECONDITION_FAILED", {}, 3 if isinstance(error, ValueError) else 5
@@ -497,4 +533,11 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             6 if partial else exit_code,
             effects=tuple(effects),
             error=Diagnostic(code, str(error), details),
+            recovery=RecoveryInstructions((
+                "現在のbranch/HEAD、branch show、active showで現物を確認してください。",
+                "原因を修正後、branchが存在すれば--branchを明示して新しいwork startを実行してください。--baseは付けません。",
+                "選択がinvalid/unknownならworkspace doctorで確認してください。記録やGit効果は自動で巻き戻しません。",
+            ))
+            if partial
+            else None,
         )

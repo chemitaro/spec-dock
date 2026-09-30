@@ -76,6 +76,13 @@ def capture_local_inputs(context: ProjectContext, views: tuple[ScopeView, ...]) 
 
 
 def verify_local_inputs(context: ProjectContext, inputs: tuple[LocalInput, ...]) -> None:
+    current_views = load_scope_views(context.root / "spec-dock")
+    current_paths = {
+        "spec-dock/workspace.json",
+        *((view.path / ".meta.json").relative_to(context.root).as_posix() for view in current_views),
+    }
+    if current_paths != {expected.relative_path for expected in inputs}:
+        raise ValueError("local Start planning metadata paths changed")
     for expected in inputs:
         loaded = read_guarded_json_bytes(context.root / expected.relative_path)
         if loaded is None or loaded[1] != expected.payload or loaded[2] != expected.identity:

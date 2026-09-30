@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult, render_json_v2, render_text
 
 if TYPE_CHECKING:
@@ -42,7 +43,7 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
     command = namespace.command_path
     result: OperationResult[object]
     try:
-        context = resolve_context(namespace.project, cwd)
+        context = resolve_context(namespace.project, cwd, timeout=namespace.timeout)
         if command == "work start":
             from spec_dock.runtime.application.work_start import start_work
 
@@ -89,6 +90,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             )
         else:
             result = failure(command, "BUSINESS_NOT_CONNECTED", "business command is not connected yet", 3)
+    except GitProcessError as error:
+        result = OperationResult(
+            command, "failed", DiagnosticData(), 5, error=Diagnostic("GIT_FAILED", str(error), error.details())
+        )
     except FileNotFoundError as error:
         result = failure(command, "LOCAL_TARGET_NOT_FOUND", str(error), 4)
     except LookupError as error:

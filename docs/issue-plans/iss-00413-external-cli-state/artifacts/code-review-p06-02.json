@@ -1,0 +1,61 @@
+{
+  "findings": [
+    {
+      "title": "[P1] 再解決したclone identityを保持中lockへ照合する",
+      "body": "direct selectionが空のlinked worktreeで、.git/commondirがlock取得後に別cloneのcommon-dirへ切り替わっても、元のcommon directory自体が残ればlock.verify()は成功し、ここで得たcurrent.clone_identity/worktree_identityを保持中handleと比較しないため、同じHEAD・inventoryを持つ別cloneへGit効果とrecord公開を進められます。その場合は別clone側のStartと排他されず、公開recordも旧clone identityを保存して直後からinvalidになるため、各resolve_context後かつ利用前にfresh identityをroot_handle/lockのidentityへ照合してください。",
+      "confidence_score": 0.96,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 313,
+          "end": 314
+        }
+      }
+    },
+    {
+      "title": "[P1] HEAD不変だけでcheckoutの効果なしを確定しない",
+      "body": "既存branchへのcheckoutがsmudge filterやI/O失敗で一部fileを更新・削除した後に非0終了し、HEAD/branchだけが開始前のまま残ると、この分岐はworking tree/indexを再確認せずgit.checkout=failedとして全体をexit 5にできます。実際の変更効果を隠してC-04とRQ-413-09に反するため、開始前と同じclean状態まで確認できた場合だけfailedとし、それ以外はunknown/partial 6にしてください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 110,
+          "end": 111
+        }
+      }
+    },
+    {
+      "title": "[P1] checkoutで旧対象がstale化しても明示switchを拒否しない",
+      "body": "Aを有効に直接選択中に、Bは存在するがAが存在しない、またはAのlinkage/祖先だけが異なる有効なcandidateへwork start B --switch-activeすると、checkout後のA recordはcandidate上でstaleへ再解釈されますが、この正規化はcurrent_branchとviewsだけを開始前へ戻すためWORKTREE_INVENTORY_CHANGEDとなり、checkout済みpartialのままAを解除せずBも公開しません。明示switchは捕捉済みAを解除してBを公開する契約なので、現在WTではrecord/handle/physical identityが同一かを比較し、checkoutだけに起因する旧対象のsemanticなstale化を許可してください。",
+      "confidence_score": 0.98,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 158,
+          "end": 159
+        }
+      }
+    },
+    {
+      "title": "[P2] store close失敗で確認済みpublishをfailedへ戻さない",
+      "body": "store.publish()のrename・directory fsync・readbackと直後のroot/lock検証が完了しても、WorkTargetStore.__exit__のdirectory descriptor closeが失敗すると、このsucceeded effectを追加する行へ到達せず、例外処理がselection.publish=failedとしてstarted=falseを返します。recordは既に確認済みなので公開結果を誤表示しないよう、確認直後にsucceededを記録するか、cleanup失敗を別結果として扱ってください。",
+      "confidence_score": 0.94,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 443,
+          "end": 443
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "chemitaro/spec-dockの検証済み範囲6fec3099d8759b4e5b3b393b2987534b46dfa383..c0389222a7defc891d9b56c10d9b10090db40151について、P-03〜P-06の契約、Start実装、直接対象store、物理identity/lock、Git/GitHub境界、関連試験を照合した。必須契約を破るP1を3件と、公開結果を誤分類するP2を1件確認した。リポジトリのtestは当レビューでは再実行しておらず、提示された497 passed/1 skipped等を実測再現とは扱っていない。明示された後続課題であるpure StartPlan、OID/option境界、Git inventory/context timeout、native timeout/signal/kill、Windows native受入、全体mypy、P-07以後は本checkpointの欠陥として採用していない。",
+  "review_status": "fail",
+  "review_status_reason": "Start専用排他のclone binding、明示switch-active、Git失敗後の効果分類という必須gateを破るP1が3件あるため。",
+  "overall_confidence_score": 0.97
+}

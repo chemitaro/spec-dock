@@ -4,7 +4,7 @@
 
 2026-09-30の利用者指示に基づき、レビュー合格済み要件・設計・計画に沿ってTDDで段階実装する。区切りごとに検証・コミット・GPT-5.6 Sol / ProによるChatGPT Code Review Strictを行い、必要な指摘の分析・修正・再レビューを実施する。最終候補ではStrict Final Quality Gateと独立した必須試験、実consoleによる手動動作確認を完了する。
 
-必要な具体化にはImplementation Brief Strictを利用する。実装担当の契約はGPT-6.1 Sol / High。人間によるPRマージ、package公開、実環境適用は製品実装・検証と別の証拠として扱う。
+必要な具体化にはImplementation Brief Strictを利用する。実装担当の当初契約はGPT-6.1 Sol / High。2026-09-30の追加指示で実装側の推論レベルはMaxへ引き上げた。外部Strictレビューは指定済みのGPT-5.6 Sol / Proを維持する。人間によるPRマージ、package公開、実環境適用は製品実装・検証と別の証拠として扱う。
 
 - 製品基準: `6fec3099d8759b4e5b3b393b2987534b46dfa383`
 - 独立仕様レビュー合格対象: `7e895803cba0d43957e504c9f97637d307bc6a78`
@@ -152,3 +152,46 @@ recordのrename後fsync/readback失敗はselection.publish unknown、stage同期
 | 実Scope240件/workspace宣言のhash | 変更0 |
 
 P-06は引き続き途中。完全なpure StartPlanへの整理、OID/option境界、native timeout/signal/killの受入、Git inventory/context timeoutとraw failure整備、C-04の案内、Windows native/store、兄弟Issue同時Start/全platformの証拠が残る。四件の修正はローカル検証済みであり、独立再レビューのpassをまだ取得していない。P-07以降、全体lint/test、最終品質ゲート、手動製品確認、merge後の実dogfood切替は未完了。
+
+## P-06 pure StartPlan・Git境界・兄弟Issueの並行開始
+
+候補`c0389222a7defc891d9b56c10d9b10090db40151`をpushし、第2回の新規Strictレビューを通常Oracle wrapperで開始した。対象はGPT-5.6 Sol / Pro、固定点は`6fec3099d8759b4e5b3b393b2987534b46dfa383`。追記時点では元のセッションで回答生成が継続している。以下は既存P-06義務を進めた変更であり、そのレビュー対象SHAより後の実装である。
+
+`plan_start(request, context, local_snapshot, live_observations)`をmemory-only APIとして追加した。対象ID/ref、branch、固定commit、作成有無、exact inputのSHA256、旧handle、switch許可、selection actionをimmutable StartPlanへまとめる。readiness、期待条件、直接対象重複、branch使用を同じ純粋判断に集約し、lock内の再観測で再計画した結果を照合する。GHアクセス・Git mutation・ファイル操作は計画関数に入れない。既知literalのhashと計画結果を公開API試験で確認した。
+
+以下を縦にRed→Greenで検証した。
+
+- project/context/inventoryおよび他WT探索のnative failureを、元stdout/stderr/returncode付きGIT_FAILED/exit5へ統一した。`--timeout`を各Git呼出しへ渡し、取得済み出力・returncode=null・timed_outを保持する。signal中断はunknownの可能性を保持して現物を再観測する。quiet probeのmissing扱いはexit1かつ両出力が空の場合だけに限定する。
+- baseの解決に`--end-of-options`を使い、完全な40/64桁commit OIDだけを採用する。branchはGit ref-format結果が明示名と完全一致することを要求し、`@{-1}`をINVALID_BRANCH/効果0で拒否する。作成後のrefが固定OIDと違えばcheckoutへ進まず、branchを残してpartialを返す。
+- same-Scope/same-branchのdry-runにもcandidate全metadata照合を適用する。Git statusがcleanでも未commit bytesが異なる場合はexit3/効果0。readiness待ち中に新しいignored Scopeが追加された場合もcaptured path集合を照合し、branch作成前に停止する。
+- 同じEpicの兄弟Issueを二つの実CLI processでStartすると、従来は他方の先行Startを一覧変更として拒否していた。lock取得前の他WTのHEAD/branch/直接対象は最新観測で判定し直す。一覧のpath/物理identity/flags、自WT、効果開始後の全inventoryは変化を拒否する。兄弟Issue二件は両方成立、同じScope二件は成立一つ・敗者効果0となった。
+- partial StartへC-04の人向けinstructionsを付ける。resume/rollbackはfalseであり、現物確認と新しい明示Startを案内する。Git原文はtext stderr末尾に保持し、実行権やjournalを作らない。
+
+実CLIをpost-checkout barrierで強制停止する受入試験も追加した。JSONは返らずcheckout済みbranchを残し、OS lockは解放される。次processは既存branchを明示した新Startで成立し、journal/resumeを要求しない。これは既存挙動のGreen確認であり、新しい修正のRed証拠とは区別する。recordのstage/rename/unlinkに関する全kill境界とWindows native受入の代替ではない。
+
+| 検証 | 実結果 |
+|---|---|
+| Start、infra全体、複数WT観測/並行/強制停止、Git境界、pure plan、OID、redaction/envelope | 519 passed、1 skipped、32.01秒 |
+| 全source/test Ruff check・format check | 成功、360 files formatted |
+| 変更した9 sourceの限定mypy | 成功。全体型gateの代替ではない |
+| 実Scope240件/workspace宣言のhash | 変更0 |
+
+P-06は独立レビュー待ちであり、Windows immutable store/native受入、record公開/解除の残るkill境界、branch leafの通常経路接続を含めて完了とはしない。P-07以後と最終品質ゲート・手動製品確認も未完了である。
+
+## P-06 第2回独立レビューとnative境界の修正
+
+第2回レビューは候補`c0389222a7defc891d9b56c10d9b10090db40151`、GPT-5.6 Sol / Pro、新規通常Oracle会話で完了した。exit10、`review_status=fail`、P1三件/P2一件。[原文JSON](artifacts/code-review-p06-02.json)を元stdout bytesのまま保存し、[全件分析](artifacts/code-review-p06-02-analysis.md)を完了してから修正した。P2だけによる新しい受入条件やレビューcycleは加えていない。
+
+- fresh Git contextのroot/common physical identityを、Startが保持したdirectoryとlockのidentityへ毎回照合する。native Git参照をlock取得後に別cloneへ切り替える試験では、修正前は誤ったcloneへのbranch作成とrecord公開が成功した。修正後は効果前PROJECT_IDENTITY_CHANGED/exit3となった。
+- Git checkout失敗後、HEAD/branch不変だけではfailedと断定しない。実required smudge filter失敗で追跡ファイル削除を再現し、元metadataとcleanを確認できない場合はunknown/partial6とした。元Git stdout/stderr/returncodeは保持する。
+- 明示switchのcheckout後は、自WTの捕捉record/handleが同一であることを必須とし、旧対象のsemantic解釈だけを正規化する。候補から旧対象が欠落するケースのRed→Greenに加え、GitHub linkage差でstaleになるケースも成功した。
+- publish/readback/held handle確認済みの成功効果をstore退出前に記録する。実os.close後のcleanup例外は公開失敗へ分類し直さず、recordを保全してpartialを返す。
+
+| 検証 | 実結果 |
+|---|---|
+| Start、infra全体、複数WT観測/並行/強制停止、Git境界、pure plan、OID、redaction/envelope | 524 passed、1 skipped、37.74秒 |
+| 全source/test Ruff check・format check | 成功、360 files formatted |
+| 変更した9 sourceの限定mypy | 成功。全体型gateの代替ではない |
+| 実Scope240件/workspace宣言のhash | 変更0 |
+
+この修正候補は独立再レビュー前であり、passとは扱わない。Windows immutable store/native受入、record公開/解除の残るkill境界、branch leafの通常経路、P-07以後、全体lint/test、最終品質ゲート、手動製品確認は継続する。

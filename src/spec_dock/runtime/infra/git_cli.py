@@ -240,14 +240,11 @@ def origin_github_repo_slug(repo_root: Path) -> str | None:
     return _parse_github_repo_slug(_remote_get_url(repo_root, push=False))
 
 
-def worktree_list(repo_root: Path) -> list[GitWorktreeRecord]:
-    _ensure_git_available()
-    cmd = ["git", "worktree", "list", "--porcelain", "-z"]
-    try:
-        p = _run_git(cmd, cwd=str(repo_root), capture_output=True, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"git failed: {' '.join(cmd)}\n{(e.stderr or '').strip()}") from e
-    return _parse_worktree_porcelain_nul(os.fsdecode(p.stdout or b""))
+def worktree_list(repo_root: Path, *, timeout: float = 30) -> list[GitWorktreeRecord]:
+    from spec_dock.runtime.infra.git_process import run_git
+
+    output = run_git(repo_root, "worktree", "list", "--porcelain", "-z", timeout=timeout)
+    return _parse_worktree_porcelain_nul(os.fsdecode(output))
 
 
 def remove_worktree(

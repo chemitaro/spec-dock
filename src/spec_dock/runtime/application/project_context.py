@@ -5,11 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-import subprocess
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.domain.writer_admission import require_workspace_write
-from spec_dock.runtime.infra.git_cli import sanitized_git_environment
+from spec_dock.runtime.infra.git_process import run_git
 from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import read_guarded_json
 
@@ -41,21 +40,27 @@ def physical_identity(path: Path) -> PhysicalIdentity:
         return opened.identity
 
 
-def resolve_context(project: str | None, cwd: Path) -> ProjectContext:
+def resolve_context(project: str | None, cwd: Path, *, timeout: float = 30) -> ProjectContext:
     candidate = Path(project).expanduser() if project else cwd
     if not candidate.is_absolute():
         candidate = cwd / candidate
     candidate = candidate.resolve(strict=True)
-    root_text = _git(candidate, "rev-parse", "--show-toplevel")
+    root_text = _git(candidate, "rev-parse", "--show-toplevel", timeout=timeout)
     root = Path(root_text.removesuffix("\n")).resolve(strict=True)
     if project and candidate != root:
         raise ValueError("--project must name the exact Git worktree root")
-    common_text = _git(root, "rev-parse", "--git-common-dir").removesuffix("\n")
+    common_text = _git(root, "rev-parse", "--git-common-dir", timeout=timeout).removesuffix("\n")
     common_path = Path(common_text)
     common = (common_path if common_path.is_absolute() else root / common_path).resolve(strict=True)
     workspace = read_workspace_declaration(root / "spec-dock/workspace.json")
-    head = _git(root, "rev-parse", "--verify", "HEAD", allow_missing=True).removesuffix("\n") or None
-    branch = _git(root, "symbolic-ref", "--quiet", "--short", "HEAD", allow_missing=True).removesuffix("\n") or None
+    head = (
+        _git(root, "rev-parse", "--verify", "--quiet", "HEAD", allow_missing=True, timeout=timeout).removesuffix("\n")
+        or None
+    )
+    branch = (
+        _git(root, "symbolic-ref", "--quiet", "--short", "HEAD", allow_missing=True, timeout=timeout).removesuffix("\n")
+        or None
+    )
     return ProjectContext(root, common, physical_identity(common), physical_identity(root), head, branch, workspace)
 
 
@@ -71,14 +76,5 @@ def read_workspace_declaration(path: Path) -> dict[str, object]:
     return workspace
 
 
-def _git(root: Path, *args: str, allow_missing: bool = False) -> str:
-    completed = subprocess.run(
-        ["git", "-C", str(root), *args],
-        capture_output=True,
-        check=False,
-        env=sanitized_git_environment(),
-        timeout=30,
-    )
-    if completed.returncode and not allow_missing:
-        raise ValueError(completed.stderr.decode("utf-8", errors="replace"))
-    return os.fsdecode(completed.stdout) if not completed.returncode else ""
+def _git(root: Path, *args: str, allow_missing: bool = False, timeout: float = 30) -> str:
+    return os.fsdecode(run_git(root, *args, missing_ok=allow_missing, timeout=timeout))
