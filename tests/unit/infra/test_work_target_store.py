@@ -132,3 +132,17 @@ def test_unknown_record_field_is_invalid_and_scope_id_never_changes(tmp_path: Pa
         path.write_text(json.dumps(data))
         assert store.read().status == "invalid"
         assert store.read().record is None
+
+
+@pytest.mark.parametrize("timestamp", ["2026-09-30Z", "2026-09-30 00:00:00Z", "2026-09-30T00:00Z"])
+def test_non_rfc3339_record_is_invalid_instead_of_selected(tmp_path: Path, timestamp: str) -> None:
+    (tmp_path / "spec-dock").mkdir()
+    with WorkTargetStore(tmp_path) as store:
+        handle = store.publish(_record())
+        path = store.path / handle.basename
+        payload = json.loads(path.read_bytes())
+        payload["selected_at"] = timestamp
+        before = json.dumps(payload).encode()
+        path.write_bytes(before)
+        assert store.read().status == "invalid"
+        assert path.read_bytes() == before

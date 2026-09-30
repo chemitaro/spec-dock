@@ -19,7 +19,7 @@ from spec_dock.runtime.cli.catalog import (
     RECOVERY_LEAF_COMMANDS,
     ROLLBACK_COMMANDS,
 )
-from spec_dock.runtime.cli.legacy import LegacyCommandError, reject_legacy_root
+from spec_dock.runtime.cli.legacy import LegacyCommandError, RetiredArgumentError, reject_legacy_root
 from spec_dock.runtime.presentation.envelope import (
     Diagnostic,
     OperationResult,
@@ -68,6 +68,10 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf == "work start":
+        return (
+            "Inspect the current Git branch, HEAD, worktree status, and direct selection before a new explicit Start."
+        )
     command = RECOVERY_LEAF_COMMANDS.get(leaf)
     if command is not None:
         rollback = (
@@ -83,6 +87,26 @@ def _recovery_help(leaf: str) -> str:
     if leaf in MUTATING_LEAF_PATHS:
         return "Inspect the target and observed effects before retrying; there is no --resume."
     return "No mutation to recover; correct the reported input or environment and rerun."
+
+
+def _reject_retired_start(argv: list[str]) -> None:
+    if argv[:2] != ["work", "start"]:
+        return
+    index = 2
+    while index < len(argv):
+        token = argv[index]
+        if token == "--":
+            return
+        name, separator, value = token.partition("=")
+        if name in ("--allow-stale", "--resume", "--rollback"):
+            raise RetiredArgumentError(f"{name} was retired; inspect the current state and issue a new explicit Start")
+        if name in ("--branch", "--base", "--source"):
+            if not separator and index + 1 < len(argv):
+                index += 1
+                value = argv[index]
+            if name == "--source" and value == "cache":
+                raise RetiredArgumentError("--source cache was retired; Start uses live GitHub readiness")
+        index += 1
 
 
 def build_vnext_parser() -> argparse.ArgumentParser:
@@ -239,6 +263,7 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     if help_requested:
         remaining.append("--help")
     reject_legacy_root(remaining)
+    _reject_retired_start(remaining)
     parser = build_vnext_parser()
     parsed = parser.parse_args(remaining)
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):

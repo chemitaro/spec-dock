@@ -1,0 +1,48 @@
+{
+  "findings": [
+    {
+      "title": "[P2] 秘匿済みparse診断にredacted情報を付ける",
+      "body": "既知tokenまたはURL userinfoを含む不正入力を--jsonで渡すと、render_diagnostic_jsonはerror.messageを[redacted]へ置換しますが、同時にerror.detailsを空オブジェクトのまま返すため、C-04が要求するredacted=trueと秘匿理由が公開v2診断から欠落します。秘密自体は隠れるもののconsumerは入力が加工済みか判定できず診断契約を満たさないため、秘匿が発生した場合だけdetailsへflagと理由を付け、JSON回帰試験で固定してください。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/presentation/envelope.py",
+        "line_range": {
+          "start": 119,
+          "end": 119
+        }
+      }
+    },
+    {
+      "title": "[P2] leaf helpのJSON契約をv2へ合わせる",
+      "body": "任意のleafでhelpを表示すると、このJSON節は--jsonがspecdock.cli/v1 envelopeを返すと案内しますが、通常consoleはpublic_v2=Trueで同じleafの--jsonをspecdock.cli/v2として返します。公開utilityがwire contractを誤案内すると利用者や自動化がoperation_id等を含む旧shapeへ実装する具体的riskがあるため、HELP_SPECSの表記をv2へ更新し、44 leafの実console help本文で検査してください。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/cli/catalog.py",
+        "line_range": {
+          "start": 509,
+          "end": 509
+        }
+      }
+    },
+    {
+      "title": "[P3] runtime移設後のrepository guideを新pathへ更新する",
+      "body": "通常consoleはここからspec_dock.runtimeを読み込む構造へ移りましたが、適用されるAGENTS.mdは依然としてsrc/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/をprovider-side runtimeのsource of truthと変更開始点に指定しています。この案内に従う後続変更は存在しない旧pathで止まるかP-02が禁止するruntime二重化を再導入する保守riskがあるため、directory mapとworkflowをsrc/spec_dock/runtime/へ同期してください。",
+      "confidence_score": 0.98,
+      "priority": 3,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/cli.py",
+        "line_range": {
+          "start": 8,
+          "end": 8
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is correct",
+  "overall_explanation": "GitHub connectorでchemitaro/spec-dockのcodex/iss-00413-external-cli-state先端がddef15e82abf24adf43ec1afc916c9f6b201c1deでexpected SHAと完全一致し、固定点・merge-baseが6fec3099d8759b4e5b3b393b2987534b46dfa383であることを確認した上で、指定rangeのP-02通常wheel/utility縦経路を契約、実装、package設定、関連testと照合しました。utility前のbusiness import分離、source/package構成上の通常runtime単一化、installed metadata version、hidden/static資産のpackage-data指定はcheckpoint目的に整合します。一方、公開parse診断の秘匿metadata欠落、leaf helpのv1表記、runtime移設後のrepository guide未同期をP2/P3として記録します。本レビューではtestを実行しておらず、repository記録の101 passedおよびRuff成功を再実測結果としては主張しません。全体mypy、旧fixed-entrypoint characterization、Windows対応、P-03〜P-06以降の未完了gateは成功扱いせず、今回のcheckpoint合否とは分離しています。",
+  "review_status": "pass",
+  "review_status_reason": "正しさを評価するためのrepository evidenceを参照でき、P0/P1は認められませんでした。検出事項は安全な秘匿自体を維持したまま診断契約・help案内・保守guideに残るP2/P3であるため、checkpoint gateはpassです。",
+  "overall_confidence_score": 0.98
+}

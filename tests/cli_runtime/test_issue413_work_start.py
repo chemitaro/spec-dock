@@ -6,6 +6,8 @@ import json
 import subprocess
 from typing import TYPE_CHECKING
 
+import pytest
+
 from spec_dock.cli import main
 from spec_dock.runtime.infra.contracts import GithubIssueRecord
 from tests.cli_runtime.test_issue413_contract import make_workspace
@@ -13,7 +15,21 @@ from tests.cli_runtime.test_issue413_contract import make_workspace
 if TYPE_CHECKING:
     from pathlib import Path
 
-    import pytest
+
+@pytest.mark.parametrize(
+    "retired",
+    [["--source", "cache"], ["--source=cache"], ["--allow-stale"], ["--resume", "0" * 32], ["--rollback", "0" * 32]],
+)
+def test_start_rejects_retired_inputs_before_project_access(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], retired: list[str]
+) -> None:
+    assert main(["--project", str(tmp_path / "missing"), "work", "start", "iss-00413", *retired, "--json"]) == 2
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["error"]["code"] == "ARGUMENT_RETIRED"
+    assert result["effects"] == []
+    assert output.err == ""
+    assert list(tmp_path.iterdir()) == []
 
 
 def committed_workspace(root: Path) -> Path:

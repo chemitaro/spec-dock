@@ -8,6 +8,10 @@ class LegacyCommandError(ValueError):
     error_code = "LEGACY_COMMAND_REMOVED"
 
 
+class RetiredArgumentError(LegacyCommandError):
+    error_code = "ARGUMENT_RETIRED"
+
+
 LEGACY_ROOT_REPLACEMENTS: dict[str, str] = {
     "new": "scope create / artifact create",
     "delete": "scope delete",

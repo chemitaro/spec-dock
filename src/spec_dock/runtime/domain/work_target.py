@@ -53,7 +53,7 @@ class WorkTarget:
             raise ValueError("invalid canonical GitHub linkage")
         if not self.selected_branch or any(ord(c) < 32 for c in self.selected_branch):
             raise ValueError("invalid selected branch")
-        if not self.selected_at.endswith("Z"):
+        if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?Z", self.selected_at):
             raise ValueError("selection time must be UTC RFC3339")
         datetime.fromisoformat(self.selected_at[:-1] + "+00:00")
 

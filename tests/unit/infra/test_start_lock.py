@@ -14,6 +14,16 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+def test_windows_mutex_uses_only_canonical_physical_identity() -> None:
+    from spec_dock.runtime.domain.work_target import PhysicalIdentity
+    from spec_dock.runtime.infra import start_lock
+
+    identity = PhysicalIdentity("windows", "123", "00112233445566778899aabbccddeeff")
+    assert start_lock.windows_mutex_name(identity) == (
+        "Global\\SpecDock.Start.v1.bd36d6268c667cb9379b596ae36f9ea3cdece8d75199671d26feb8891eebc882"
+    )
+
+
 def test_start_lock_excludes_another_process_without_creating_files(tmp_path: Path) -> None:
     common = tmp_path / "common"
     common.mkdir()

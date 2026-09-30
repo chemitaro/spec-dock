@@ -91,4 +91,22 @@ P-06はまだ途中。実効依存のlive readiness、切替先の全必要snaps
 
 ## 現在の段階
 
-P-02は修正済みだが独立再レビュー待ち。P-03〜P-06は途中実装。P-07〜P-17は未着手。全機能受入、全体lint/test、最終品質ゲート、手動製品確認は未完了。実dogfoodのmetadata/workspace宣言は保持している。
+P-02の独立checkpointレビューはpass。P-03〜P-06は途中実装。P-07〜P-17は未着手。全機能受入、全体lint/test、最終品質ゲート、手動製品確認は未完了。実dogfoodのmetadata/workspace宣言は保持している。
+
+## P-02第三回レビューの合格とP-06具体化
+
+通常Strict wrapperによる第三回レビューはexit 0、`review_status=pass`、P0/P1=0。[原文](artifacts/code-review-p02-03.json)、[全件分析](artifacts/code-review-p02-03-analysis.md)。残ったP2/P3は秘匿metadata、helpのv1表記、repository guideの旧pathであり、既存P-06/P-12/P-14義務として追跡する。単独のP2/P3修正・再レビューcycleは開始しない。
+
+P-06のImplementation Brief StrictはGPT-5.6 Sol / Pro、候補`ddef15e82abf24adf43ec1afc916c9f6b201c1de`のGitHub SHA完全一致を確認してexit 0。[ブリーフ（末尾空白のみ正規化、取得原文はWorkbenchに保全）](artifacts/implementation-brief-p06.md)、[会話](https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6abcc8fc-b194-83ee-a565-3068e1f30d71)。全体を読んで正本に照合した。candidate metadataをcheckout前に読む、実効依存をlive確認、local bytes/branch tip/inventoryを再照合、token限定置換、Git効果の事後観測、公開rename後unknownという順序を採用する。内部collaboratorをwrapするfixture提案はTDDスキルの外部境界原則に合わせ、実Git/OS/Git hookまたは外部API境界を優先する。
+
+## P-03/P-05 Windows API契約とP-06入口
+
+Windows physical identityはread-only/non-inheritableな既存directory handleからVolumeSerialNumber/FileId128を取得するadapterを追加した。各path componentのreparseを拒否し、handleを操作中保持する。Startのnamed mutexはcompact canonical identityのSHA256によるGlobal namespaceだけを使い、ACL変更、Local/PID/file fallbackなし。WAIT_ABANDONEDは所有取得として区別し、通常Startの現物再確認を省略しない。API代替によるread identity/abandoned/timeout/failure解放とcanonical hashをRed→Greenで検査し、POSIXの実別process排他・owner終了解放を保持した。
+
+これはWindows native動作認定ではない。macOS上の外部kernel32 API契約試験とWindows platform指定の型検査を分ける。Windows実process/NTFS試験およびWindows immutable storeは未達であり、P-03/P-05完了とはしない。
+
+直接recordの時刻はUTC RFC3339秒まで必須として、日付のみ/空白separator/分までの三つをinvalidとして保全する試験をRed→Greenで追加した。
+
+P-06入口ではStartの`--source cache`、`--allow-stale`、`--resume`、`--rollback`をcontext前にARGUMENT_RETIRED/exit2で拒否し、help/補完から受付optionを除いた。欠損projectを指定した五通りが、読取/効果なしで拒否するRed→Greenを確認した。これはStart行の移行であり、他leafの旧option整理は既存担当stepへ残す。
+
+選択試験103 passed（3.71秒）とinventory/lock option/fresh wheelの7 passed（6.51秒）。全source/testのRuff check/format成功、新しい4 sourceのmypyとWindows platform指定3 sourceのmypy成功。これらは全体型gate/全試験の代替ではない。
