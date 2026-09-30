@@ -25,3 +25,11 @@ primary routeはimplementation-remediation。helpのdefaultをv2へ合わせ、�
 r8のpassは対象範囲の合格として採用し、P2をP1へ格上げしない。二つの独立した実装root causeは明示認可されたTDD修正と通常の変更単位へ進め、その後のfreshレビューに現在の証拠を含める。P2を独立reviewへの新たな合格条件として渡さない。原文レビューを次のpromptに添付しない。
 
 dependency以後の未接続操作、pure helper/旧writer退役、native Windows、全体mypy/test、Final Quality Gate pilotへの明示応答、最終gateと手動製品確認、実consumer切替・正式work startが未完了である。これらは次の計画段階のmaterial coverage obligationであり、r8の限定passで閉じない。goalをactiveに保って実装を継続する。
+
+## 実施した修正と検証
+
+F1は公開Startの捕捉tokenのネイティブunlink直前に、別processの公開active clear --fromを実行して再現した。修正前はcheckout成功後もSELECTION_CHANGED/partial6となり、新しい直接記録を公開できなかった。removed/already_absent/conflictを区別する最小変更で、既に解除済みのeffectをunchangedとして後続の空状態・Git・metadata・inventory再検査へ進め、sole new recordの公開に成功した。conflictの拒否やStart lock範囲は維持した。最初のGreen確認でfixtureが永続fieldをbranchと誤記していた点はselected_branchへ訂正し、製品Redとは区別した。
+
+F2は全44leafの公開helpをprojectなしで実行するテストで、scope listから旧v1表示のRedを確認した。catalogのdefault一箇所をv2へ合わせ、全leafのv2 envelopeとhelp記述を照合してGreenにした。現在未接続のleafの業務実装を完成と主張しない。
+
+Start/active/contract/store/help/branch/envelope/lock optionの175 testsが36.78秒で通過した。全Ruff check/format（383 files）、変更2 source限定mypyとdiff checkも成功した。利用者の明示修正認可に従った結果であり、r8のsource-native P2/non-blocking/passを変更しない。新しい通常unitと合わせた後続fresh Strictへ進み、最終gate等の既存義務は継続する。

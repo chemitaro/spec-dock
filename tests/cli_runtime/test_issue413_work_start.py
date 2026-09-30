@@ -7,6 +7,7 @@ import json
 import os
 import shlex
 import subprocess
+import sys
 from typing import TYPE_CHECKING
 
 import pytest
@@ -55,6 +56,74 @@ def committed_workspace(root: Path) -> Path:
         capture_output=True,
     )
     return root
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX unlink and Start lock boundary")
+def test_start_accepts_a_parallel_clear_of_the_same_captured_token_before_replacement(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    assert (
+        main(["--project", str(root), "work", "start", "init-00001", "--branch", "first", "--base", "HEAD", "--json"])
+        == 0
+    )
+    old_token = json.loads(capsys.readouterr().out)["data"]["selection_token"]
+    original_unlink = os.unlink
+    clears: list[dict[str, object]] = []
+
+    def unlink(path: str, *, dir_fd: int | None = None) -> None:
+        if path == f"target-{old_token}.json" and not clears:
+            cleared = subprocess.run(
+                [
+                    sys.executable,
+                    "-c",
+                    "import sys; from spec_dock.cli import main; sys.exit(main(sys.argv[1:]))",
+                    "--project",
+                    str(root),
+                    "active",
+                    "clear",
+                    "--from",
+                    "init-00001",
+                    "--json",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+            )
+            assert cleared.returncode == 0, cleared.stdout + cleared.stderr
+            clears.append(json.loads(cleared.stdout))
+        original_unlink(path, dir_fd=dir_fd)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            "init-00001",
+            "--branch",
+            "second",
+            "--base",
+            "HEAD",
+            "--switch-active",
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert len(clears) == 1 and clears[0]["status"] == "succeeded"
+    assert result["status"] == "succeeded" and result["data"]["started"] is True
+    assert result["effects"][-2] == {"kind": "selection.clear", "status": "unchanged", "target": "init-00001"}
+    records = list((root / "spec-dock/.agent/work-target").glob("target-*.json"))
+    assert [path.name for path in records] == [f"target-{result['data']['selection_token']}.json"]
+    assert (
+        result["data"]["selection_token"] != old_token
+        and json.loads(records[0].read_bytes())["selected_branch"] == "second"
+    )
 
 
 def open_issue(root: Path, repository: str, number: int) -> GithubIssueRecord:

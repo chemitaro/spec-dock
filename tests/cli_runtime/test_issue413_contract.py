@@ -81,6 +81,22 @@ def test_scope_read_dry_run_exposes_a_valid_preview_without_writes(
     assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
 
 
+def test_every_public_leaf_help_describes_the_v2_envelope_without_project_access(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.cli.catalog import LEAF_PATHS
+
+    assert len(LEAF_PATHS) == 44
+    for leaf in LEAF_PATHS:
+        assert main(["--project", str(tmp_path / "missing"), "help", *leaf.split(), "--json"]) == 0
+        output = capsys.readouterr()
+        result = json.loads(output.out)
+        assert result["schema_version"] == "specdock.cli/v2" and result["effects"] == [] and output.err == ""
+        help_text = result["data"]["text"]
+        assert "specdock.cli/v2" in help_text and "specdock.cli/v1" not in help_text, leaf
+    assert list(tmp_path.iterdir()) == []
+
+
 def test_project_root_with_crlf_is_not_normalized(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = make_workspace(tmp_path / "consumer\r\nname")
     assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 0

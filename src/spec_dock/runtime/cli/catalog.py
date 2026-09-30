@@ -480,7 +480,7 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not migrate independent repositories outside the selected Git common directory."
     preconditions = HELP_PRECONDITIONS[leaf]
     json_data = "help text or shell script." if leaf in {"help", "completion"} else _JSON_DATA_BY_ROOT[root]
-    json_version = "specdock.cli/v1"
+    json_version = "specdock.cli/v2"
     if leaf == "workspace sync":
         target = "The current Scope tree and main/linked worktrees in this Git clone."
         reads = "Current metadata, Git worktree inventory, direct records and their ancestors; live GitHub only with --source github."

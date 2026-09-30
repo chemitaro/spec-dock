@@ -460,9 +460,17 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                     phase = "selection.clear"
                     removed = store.remove_observed(selection.handle)
                     effects.append(
-                        Effect(phase, "succeeded" if removed == "removed" else "failed", selection.record.scope_id)
+                        Effect(
+                            phase,
+                            "succeeded"
+                            if removed == "removed"
+                            else "unchanged"
+                            if removed == "already_absent"
+                            else "failed",
+                            selection.record.scope_id,
+                        )
                     )
-                    if removed != "removed":
+                    if removed == "conflict":
                         raise StartPrecondition(
                             "SELECTION_CHANGED", "captured direct target changed before replacement"
                         )

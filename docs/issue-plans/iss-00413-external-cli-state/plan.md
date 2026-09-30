@@ -257,7 +257,7 @@ close/reopenはdirect_scope_lifecycleへ接続した。必要なlive target・�
 
 第7回Strictは93b15112にP1二件でfailとなり、原文と[完全分析](artifacts/code-review-p06-07-analysis.md)を保存した。Finish内のnative Git診断、Scope dry-run必須field、確認済みdirectory公開後のScope結果をTDDで修正した。途中でidentity/linkageが変わったScopeは推定せずscope=nullを保つ。作成・取り込み・close/reopen・Finishの88 tests（28.76秒）が通過した。ローカル修正だけでは指摘を閉じず、新しいclean・push済みSHAでのfresh Strict passを必要とする。
 
-第8回Strictは29d53925でpassとなった。P1はなく、P2二件を原文と[完全分析](artifacts/code-review-p06-08-analysis.md)へ保存した。Startとactive clearの並行解除、全leaf helpのv2表示は明示利用者認可に基づいて修正する。限定passをIssue全体や最終gateの完了へ読み替えない。
+第8回Strictは29d53925でpassとなった。P1はなく、P2二件を原文と[完全分析](artifacts/code-review-p06-08-analysis.md)へ保存した。Startとactive clearの並行解除、全leaf helpのv2表示は明示利用者認可に基づいてTDD修正し、関連175 tests・全Ruff・変更2 source限定mypyを通過した。限定passをIssue全体や最終gateの完了へ読み替えない。
 
 dependencyはdirect_dependenciesへ接続し、metadataから宣言/継承を毎回導出する。checkの既定localは未観測GHをunknownとし、明示githubは対象/祖先/実効前提だけをGETする。add/removeは未知fieldとmodeを保全した一metadata置換で、全writer lockを取得しない。捕捉snapshotと物理identityの再検査、graph循環拒否、前段の並行編集保全、確認済み/不明な公開効果、readonly preview、text viewを公開境界で検証した。新公開/共有境界332 testsと旧dependency/query/help24 tests、全Ruff（383 files）・変更6 source限定mypyが通過した。旧read helperのpure部分抽出と旧writer退役はP-12で閉じる。
 

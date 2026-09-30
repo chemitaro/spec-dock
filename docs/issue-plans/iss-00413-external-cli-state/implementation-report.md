@@ -358,3 +358,11 @@ query dry-runがparserで拒否されるRedを確認し、readonly previewを許
 関連公開CLI/Start/Finish/Sync/observation/store/envelopeの332 testsは76.98秒で通過し、旧dependency/query/helpの24 testsは2.99秒で通過した。初回の旧runtime catalog guard collection errorは、通常経路へ移行済みScope leafを旧inspection表にも反映して解消した。通常dispatchへ旧writerを接続していない。全source/test Ruff check/format（383 files）と変更6 source限定mypyが成功した。
 
 独立Strict r8は29d539254164f0daa814cd8d81e8c67e94ba10a2をGPT-5.6 Sol/Proでレビューし、38m22s、validated exit0/pass、P0/P1なし、P2二件となった。原文JSONをbyte保全し、関連検証完了後の完全batch分析をartifacts/code-review-p06-08-analysis.mdへ保存した。r7のP1修正はr8範囲で合格したが、今回のdependency unitはその後の未レビュー変更である。P2の分類とnon-blockingを保ち、利用者の指摘修正の明示指示に従って次のunitで対応する。P-10以後、旧helperの抽出・退役、native Windows、全体lint/test、Final Quality Gate、手動製品確認、実dogfood切替は未完了であり、goalはactiveである。
+
+## r8のP2を明示認可されたTDDで修正
+
+Startが切替前の同じtokenを捕捉し、Git checkout後のunlink直前に別processのactive clear --fromが削除するケースを公開境界で再現した。修正前は既に安全に解除済みでもselection.clear=failed、SELECTION_CHANGED/partial6で停止した。already_absentをunchangedとして扱い、conflictだけを拒否する最小変更により、後続の空状態・物理identity・HEAD・metadata・inventoryの再検査とsole new record公開まで完了した。scope_id/tokenの対象固定、変更recordの拒否、Start lockの範囲、rollback禁止は変わらない。
+
+全44leafのproject不要helpを検査し、catalog defaultのv1表示をRedとして確認した。default一箇所をspecdock.cli/v2へ合わせ、実envelopeとhelpの表示を一致させた。未接続の業務leafの完成を示す変更ではない。二件ともreview-native P2とr8 passを保ち、レビュー自体ではなく利用者の指摘修正の既存明示指示から認可を得ている。
+
+関連175 tests（36.78秒）、全Ruff check/format（383 files）、変更2 source限定mypyとdiff checkが通過した。fixtureのbranch/selected_branch誤記は製品のRedに含めない。dependency unit d76d34c01079b8bfa420658c750ec713f8251cadと合わせた現在候補を次のfresh Strictへ進める。P-10以後、旧writer/helper退役、native Windows、全体gate、Final Quality Gateと手動製品確認、実consumer切替は未完了であり、goalをactiveに維持する。
