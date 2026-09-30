@@ -222,3 +222,9 @@ P-06は独立レビュー待ちであり、Windows immutable store/native受入�
 | 実Scope240件/workspace宣言のhash | 変更0 |
 
 P-06と全製品の完了認定は継続中。Windows immutable store/native受入、全体型gate、独立した現在候補のレビュー、P-07以後、最終品質ゲート、手動製品確認は未完了である。
+
+## P-06 第3回Strict指摘の修正
+
+レビュー対象8ad73cfd、GPT-5.6 Sol / Proの元JSONはexit10/fail、P1三件とP2二件。全件分析を記録してからTDDで修正した。現在branchへのcheckoutを省略して無変更とし、checkout後のdirty状態では選択変更へ進まない。候補commitのScope/containerはtreeとして事前確認し、公開不能ではtokenをnullにする。record公開後は自handle一件のvalid selectionを再確認する。追加entryや確認済みGit効果は保全し、rollback/新lock/台帳は追加しない。
+
+公開CLIとOS/Git境界の関連選択は619 passed/1 skipped、52.50秒。対象Ruffと変更3 sourceの限定mypyが成功。詳細Red/Greenと各原文分類はartifacts/code-review-p06-03-analysis.mdへ記録した。再レビューpass、Windows native、全体mypy、P-07以後、最終gate/手動製品確認は未完了。並行して進めたP-07 active接続はこの修正commitから分離する。

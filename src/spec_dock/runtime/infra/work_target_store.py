@@ -190,6 +190,9 @@ class WorkTargetStore:
             observed_payload, handle = self._read_file(directory_fd, name)
             if observed_payload != payload:
                 raise ValueError("published work target bytes changed")
+            selection = self.read()
+            if selection.status != "selected" or selection.handle != handle or selection.record != record:
+                raise ValueError("published work target is not the sole valid selection")
             self._verify_directory(directory_fd)
         except (OSError, ValueError) as error:
             raise SelectionPublicationUnknown(token, error) from error

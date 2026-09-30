@@ -70,6 +70,162 @@ def open_issue(root: Path, repository: str, number: int) -> GithubIssueRecord:
     )
 
 
+def test_start_current_branch_skips_checkout_and_its_hook(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    marker = tmp_path / "hook-was-run"
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text(f"#!/bin/sh\ntouch {shlex.quote(str(marker))}\n")
+    hook.chmod(0o755)
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert not marker.exists()
+    assert result["data"]["started"] is True
+    assert next(effect for effect in result["effects"] if effect["kind"] == "git.checkout")["status"] == "unchanged"
+
+
+def test_noop_checkout_does_not_make_prepublication_failure_partial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    real_open = os.open
+
+    def opening(path, *args, **kwargs):
+        if isinstance(path, str) and path.startswith(".stage-"):
+            raise OSError("fixture stage creation refused")
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", opening)
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"]) == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed"
+    assert result["data"]["started"] is False
+    assert {effect["status"] for effect in result["effects"]} <= {"unchanged", "failed", "not_attempted"}
+    assert result["data"]["selection_token"] is None
+
+
+@pytest.mark.parametrize("tracked", [True, False])
+def test_start_stops_before_selection_replacement_when_checkout_hook_dirties_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], tracked: bool
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    note = root / "notes.txt"
+    if tracked:
+        note.write_text("before\n")
+        subprocess.run(["git", "-C", str(root), "add", "notes.txt"], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                "note",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"]) == 0
+    token = json.loads(capsys.readouterr().out)["data"]["selection_token"]
+    old_record = root / "spec-dock/.agent/work-target" / f"target-{token}.json"
+    before = old_record.read_bytes()
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text(f"#!/bin/sh\nprintf 'after\\n' > {shlex.quote(str(note))}\n")
+    hook.chmod(0o755)
+    assert (
+        main(["--project", str(root), "work", "start", "init-00001", "--base", "HEAD", "--branch", "next", "--json"])
+        == 6
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["started"] is False
+    assert result["error"]["code"] == "WORKTREE_CHANGED"
+    assert next(effect for effect in result["effects"] if effect["kind"] == "git.checkout")["status"] == "succeeded"
+    assert (
+        next(effect for effect in result["effects"] if effect["kind"] == "selection.clear")["status"] == "not_attempted"
+    )
+    assert old_record.read_bytes() == before
+    assert list(old_record.parent.glob("target-*.json")) == [old_record]
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"next\n"
+
+
+def test_start_publication_unknown_has_no_confirmed_selection_token(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    directory = root / "spec-dock/.agent/work-target"
+    real_fsync = os.fsync
+
+    def syncing(fd):
+        if (
+            directory.exists()
+            and os.fstat(fd).st_ino == directory.stat().st_ino
+            and list(directory.glob("target-*.json"))
+        ):
+            raise OSError("fixture publication sync failure")
+        real_fsync(fd)
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["started"] is False
+    assert result["error"]["code"] == "SELECTION_PUBLICATION_UNKNOWN"
+    assert result["data"]["selection_token"] is None
+    assert next(effect for effect in result["effects"] if effect["kind"] == "selection.publish")["status"] == "unknown"
+    assert len(list(directory.glob("target-*.json"))) == 1
+
+
+@pytest.mark.parametrize("additional", ["record", "unknown"])
+def test_start_does_not_confirm_publication_with_an_additional_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], additional: str
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    directory = root / "spec-dock/.agent/work-target"
+    real_fsync = os.fsync
+    inserted = False
+
+    def syncing(fd):
+        nonlocal inserted
+        real_fsync(fd)
+        if not inserted and directory.exists() and os.fstat(fd).st_ino == directory.stat().st_ino:
+            final = list(directory.glob("target-*.json"))
+            if final:
+                inserted = True
+                if additional == "record":
+                    (directory / ("target-" + "b" * 32 + ".json")).write_bytes(final[0].read_bytes())
+                else:
+                    (directory / "unexpected").write_bytes(b"preserve")
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "main", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert inserted
+    assert result["data"]["started"] is False
+    assert result["data"]["selection_token"] is None
+    assert result["error"]["code"] == "SELECTION_PUBLICATION_UNKNOWN"
+    assert next(effect for effect in result["effects"] if effect["kind"] == "selection.publish")["status"] == "unknown"
+    assert len(list(directory.iterdir())) == 2
+
+
 @pytest.mark.parametrize("guard", [["--expect-backend", "local"], ["--expect-current", "init-00001"]])
 def test_start_expectation_mismatch_stops_before_git_effects(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], guard: list[str]

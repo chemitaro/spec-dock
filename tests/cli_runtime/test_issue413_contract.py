@@ -158,3 +158,23 @@ def test_dynamic_scope_uses_direct_record_and_keeps_it_stale_when_scope_disappea
         assert main(["--project", str(root), "scope", "show", "@current", "--json"]) != 0
         capsys.readouterr()
         assert path.read_bytes() == before
+
+
+def add_scope(root: Path, scope_id: str, kind: str, parent_id: str, parent: Path) -> Path:
+    metadata = json.loads((root / "spec-dock/initiatives/init-00001-fixture/.meta.json").read_bytes())
+    path = parent / ("epics" if kind == "epic" else "issues") / f"{scope_id}-fixture"
+    path.mkdir(parents=True)
+    (path / ".meta.json").write_text(
+        json.dumps(
+            dict(
+                metadata,
+                id=scope_id,
+                type=kind,
+                parent_id=parent_id,
+                initiative_id="init-00001",
+                epic_id=parent_id if kind == "issue" else None,
+                github=dict(metadata["github"], issue_number=int(scope_id.split("-")[-1])),
+            )
+        )
+    )
+    return path

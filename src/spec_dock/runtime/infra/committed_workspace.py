@@ -19,6 +19,7 @@ def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Pat
         root,
         "ls-tree",
         "-r",
+        "-t",
         "-z",
         oid,
         "--",
@@ -50,6 +51,34 @@ def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Pat
             if any(part in ("", ".", "..") for part in parts) or (parts[0] != "spec-dock" and not rules):
                 raise ValueError("committed planning path is unsafe")
             relative = PurePosixPath(decoded)
+            structure = (
+                parts == ["spec-dock"]
+                or parts == ["spec-dock", "initiatives"]
+                or (len(parts) == 3 and parts[:2] == ["spec-dock", "initiatives"])
+                or (len(parts) == 4 and parts[:2] == ["spec-dock", "initiatives"] and parts[3] == "epics")
+                or (len(parts) == 5 and parts[:2] == ["spec-dock", "initiatives"] and parts[3] == "epics")
+                or (
+                    len(parts) == 6
+                    and parts[:2] == ["spec-dock", "initiatives"]
+                    and parts[3] == "epics"
+                    and parts[5] == "issues"
+                )
+                or (
+                    len(parts) == 7
+                    and parts[:2] == ["spec-dock", "initiatives"]
+                    and parts[3] == "epics"
+                    and parts[5] == "issues"
+                )
+            )
+            if structure:
+                if mode != b"040000" or kind != b"tree":
+                    raise ValueError("committed Scope or container is not a directory")
+                if any("\\" in part or ":" in part for part in parts):
+                    raise ValueError("committed planning path is unsafe on Windows")
+                temporary_root.joinpath(*parts).mkdir(parents=True, exist_ok=True)
+                continue
+            if kind == b"tree":
+                continue
             if rules or parts == ["spec-dock", "workspace.json"]:
                 metadata = True
             elif len(parts) >= 4 and parts[1] == "initiatives":

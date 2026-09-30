@@ -1,0 +1,74 @@
+{
+  "findings": [
+    {
+      "title": "[P1] no-op checkoutを実行してsucceededと公開しない",
+      "body": "direct選択が空で、明示した既存branchが既にcurrent branch/HEADかつ固定tipにある場合でもcheckoutを起動し、戻り値直後に`succeeded`を追加します。この経路では実効果は`unchanged`なのに、後続のrename前publish失敗までsucceeded effectのためpartial/6へ誤昇格し、不要なpost-checkout hookも実行されます。branch/HEAD一致時はprocessを起動せず`unchanged`とし、実行したcheckoutは事後確認後だけ`succeeded`にしてください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 427,
+          "end": 427
+        }
+      }
+    },
+    {
+      "title": "[P1] checkout後のdirty worktreeへselectionを公開しない",
+      "body": "`git checkout`が0で終了してbranch/HEADとScope metadataがtargetに一致しても、post-checkout hookや並行編集が別のtracked/untracked fileを変更すると、この経路はcandidate、private state、inventoryだけを確認してclean状態を再観測せず、そのままrecordを公開して`started=true`を返します。checkout後のclean条件を確認するまで`selection.clear`/`selection.publish`へ進まず、dirtyならGit効果を保持したpartialとして停止してください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 434,
+          "end": 437
+        }
+      }
+    },
+    {
+      "title": "[P1] 非directoryのScope nodeをcheckout前に拒否する",
+      "body": "candidate commitで要求対象以外の`spec-dock/initiatives/<scope>`または`epics`/`issues` containerをblob、symlink、gitlinkへ置換すると、`ls-tree -r`のそのleafはこの分岐で黙って捨てられ、temporary snapshotは有効に見えます。実checkout後の`load_scope_views()`で初めて不正構造となり、事前に判定可能なcandidate defectのためbranch/checkout効果を残すので、Scope/container位置に現れる非tree entryをmaterialize時に拒否してください。",
+      "confidence_score": 0.98,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/infra/committed_workspace.py",
+        "line_range": {
+          "start": 55,
+          "end": 66
+        }
+      }
+    },
+    {
+      "title": "[P2] publish unknownでは未確認tokenを返さない",
+      "body": "`SelectionPublicationUnknown`はrename後のdirectory fsync/readback/identity確認不能を表すのに、catchで試行tokenを`StartData.selection_token`へ入れるため、`status=partial`/`started=false`と同時に未確認recordのhandleを確定値のように公開します。未確定値はnullというCLI契約に合わせ、この経路ではtokenを設定せず、`active show`による現物再観測だけを案内してください。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 490,
+          "end": 490
+        }
+      }
+    },
+    {
+      "title": "[P2] publish成功前にstore全体の一意性を確認する",
+      "body": "初回のempty確認後からown basenameのreadbackまでに別の正規`target-*.json`または未知entryが現れても、ここでは自分のfile bytesだけを確認してhandleを返すため、2件またはinvalidなstoreを`selection.publish=succeeded`かつ`started=true`として公開できます。final directoryを再読して自分のhandleだけから成る一件のvalid selectionであることを確認し、追加entryがあれば`unknown`または`failed`として扱ってください。",
+      "confidence_score": 0.94,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/infra/work_target_store.py",
+        "line_range": {
+          "start": 190,
+          "end": 196
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "検証済みのchemitaro/spec-dock範囲6fec3099d8759b4e5b3b393b2987534b46dfa383..8ad73cfdc75ca53e5cc505adf15b49765207699fを独立に確認した結果、no-op checkoutの効果分類、checkout後のclean postcondition、candidate Scope構造の効果前検証にP1があり、publish unknownとimmutable store確認にもP2があります。指定された主要契約・実装・関連試験はGitHub上で照合しましたが、レビュー側では試験を実行しておらず、利用者提示の524 passed等は独立確認していません。Windows native/store、残るkill境界、branch単機能leaf、全体mypy、P-07以後はこのcheckpointの合否として扱っていません。",
+  "review_status": "fail",
+  "review_status_reason": "P1が3件あり、必須のGit effect/exit分類、checkout後の安全条件、Git効果前のcandidate検証というmerge-blocking gateを破るためfailです。",
+  "overall_confidence_score": 0.98
+}

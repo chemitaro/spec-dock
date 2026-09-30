@@ -412,19 +412,22 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             if confirmed_tip != tip:
                 raise StartPrecondition("BRANCH_CHANGED", "created or reused branch differs from fixed commit")
             phase = "git.checkout"
-            _mutate_git(
-                current,
-                root_handle,
-                lock,
-                candidate,
-                local_inputs,
-                phase=phase,
-                branch=branch,
-                tip=tip,
-                timeout=namespace.timeout,
-                args=("checkout", branch),
-            )
-            effects.append(Effect(phase, "succeeded", branch))
+            if current.branch == branch and current.head == tip:
+                effects.append(Effect(phase, "unchanged", branch))
+            else:
+                _mutate_git(
+                    current,
+                    root_handle,
+                    lock,
+                    candidate,
+                    local_inputs,
+                    phase=phase,
+                    branch=branch,
+                    tip=tip,
+                    timeout=namespace.timeout,
+                    args=("checkout", branch),
+                )
+                effects.append(Effect(phase, "succeeded", branch))
             after = _resolve_bound_context(context, root_handle, lock, timeout=namespace.timeout)
             branch_after = after.branch
             root_handle.verify()
@@ -432,6 +435,8 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             if after.branch != branch or after.head != tip:
                 raise ValueError("checkout target snapshot changed")
             verify_candidate(after, candidate)
+            if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                raise StartPrecondition("WORKTREE_CHANGED", "worktree is no longer clean after checkout")
             _check_private_state(after, namespace.timeout, proposed_token)
             _, checkout_inventory = _check_selection(after, candidate.views, target, timeout=namespace.timeout)
             _verify_inventory(after, locked_inventory, checkout_inventory, checkout=True)
@@ -449,6 +454,8 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 lock.verify()
                 _, publish_inventory = _check_selection(after, candidate.views, target, timeout=namespace.timeout)
                 _verify_inventory(after, checkout_inventory, publish_inventory)
+                if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                    raise StartPrecondition("WORKTREE_CHANGED", "worktree is no longer clean before selection change")
                 if selection.handle is not None and selection.record is not None:
                     phase = "selection.clear"
                     removed = store.remove_observed(selection.handle)
@@ -465,6 +472,8 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                     if latest.branch != branch or latest.head != tip:
                         raise StartPrecondition("BRANCH_CHANGED", "checkout changed before publication")
                     verify_candidate(latest, candidate)
+                    if run_git(latest.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                        raise StartPrecondition("WORKTREE_CHANGED", "worktree is no longer clean before publication")
                     _check_private_state(latest, namespace.timeout, proposed_token)
                     _, cleared_inventory = _check_selection(latest, candidate.views, target, timeout=namespace.timeout)
                     _verify_inventory(latest, publish_inventory, cleared_inventory, cleared=True)
@@ -487,7 +496,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     except (ValueError, OSError, RuntimeError) as error:
         if isinstance(error, SelectionPublicationUnknown):
             code, details, exit_code = "SELECTION_PUBLICATION_UNKNOWN", {}, 6
-            token = error.token
+            token = None
             effects.append(Effect("selection.publish", "unknown", scope_id))
         elif isinstance(error, SelectionRemovalUnknown):
             code, details, exit_code = "SELECTION_REMOVAL_UNKNOWN", {}, 6
