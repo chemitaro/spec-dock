@@ -228,3 +228,13 @@ P-06と全製品の完了認定は継続中。Windows immutable store/native受�
 レビュー対象8ad73cfd、GPT-5.6 Sol / Proの元JSONはexit10/fail、P1三件とP2二件。全件分析を記録してからTDDで修正した。現在branchへのcheckoutを省略して無変更とし、checkout後のdirty状態では選択変更へ進まない。候補commitのScope/containerはtreeとして事前確認し、公開不能ではtokenをnullにする。record公開後は自handle一件のvalid selectionを再確認する。追加entryや確認済みGit効果は保全し、rollback/新lock/台帳は追加しない。
 
 公開CLIとOS/Git境界の関連選択は619 passed/1 skipped、52.50秒。対象Ruffと変更3 sourceの限定mypyが成功。詳細Red/Greenと各原文分類はartifacts/code-review-p06-03-analysis.mdへ記録した。再レビューpass、Windows native、全体mypy、P-07以後、最終gate/手動製品確認は未完了。並行して進めたP-07 active接続はこの修正commitから分離する。
+
+## P-07 activeの通常経路
+
+active set/clearをimmutable direct recordの通常dispatchへ接続した。setは同じ妥当なdirectだけunchangedで、空/別対象の取得はWORK_START_REQUIREDとなる。clear --fromは現在のdirect/祖先に一致するとdirect全体を解除し、既知チェーン外はunchanged、不明IDはexit4。親へ昇格しない。clear --allは捕捉した正規basenameとfile/directory identity・exact hashだけを対象とし、未知entry/redirect/stageは削除しない。壊れJSONの本実行には--yesを要求し、dry-runは承認なしで予定効果だけ返す。
+
+外部OS境界で初回selection読取直後に新tokenへ置換するRedを確認し、--fromでは最初のhandleだけを解除するよう修正した。unlink直前に別process相当の解除/新公開を挿入するRedも確認し、旧basename消失はalready_absent/unchanged、新recordは保全する。unlink後fsync失敗はunknown/partial6として、確認済み効果と後の失敗を分ける。期待条件、破損/未知entry、dry-run、旧from-branch/resume/rollbackのcontext前拒否、helpを公開CLIでRed→Greenにした。動的roleの導出と、解除後に親が新選択されないことも確認した。
+
+別processがnative flockを保持していてもclearが成功するGreen証拠を取得した。Start以外の共通排他は追加しない。Git/remote/lifecycleは変更しない。共有data型はpresentation/command_data.pyに置き、applicationからdispatchへの依存を作らない。
+
+新activeの32件を含む関連選択は655 passed/1 skipped、54.66秒。全Ruff check/format（367 files）と変更6 sourceの限定mypyが成功。実Scope240件のhash変更0を確認した。Finish、Windows native/immutable adapter、全体mypy、現在候補の独立再レビュー、最終gate/製品手動確認は未完了。実dogfoodの選択や宣言を変更した証拠とは扱わない。

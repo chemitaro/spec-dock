@@ -94,7 +94,8 @@ def _recovery_help(leaf: str) -> str:
 def _reject_retired_start(argv: list[str]) -> None:
     start = argv[:2] == ["work", "start"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
-    if not start and not branch:
+    active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
+    if not start and not branch and not active:
         return
     index = 2
     while index < len(argv):
@@ -106,7 +107,9 @@ def _reject_retired_start(argv: list[str]) -> None:
             raise RetiredArgumentError(
                 f"{name} was retired; inspect the current state and issue a new explicit operation"
             )
-        if name in ("--branch", "--base", "--source", "--name"):
+        if active and argv[1] == "set" and name == "--from-branch":
+            raise RetiredArgumentError("--from-branch was retired; only work start can acquire a direct selection")
+        if name in ("--branch", "--base", "--source", "--name", "--from"):
             if not separator and index + 1 < len(argv):
                 index += 1
                 value = argv[index]
@@ -274,8 +277,6 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     parsed = parser.parse_args(remaining)
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):
         parser.error("active clear requires exactly one of --from or --all")
-    if parsed.command_path == "active set" and bool(parsed.target) == bool(parsed.from_branch):
-        parser.error("active set requires exactly one of TARGET or --from-branch")
     if parsed.command_path == "installation update":
         if parsed.activate_engine:
             if parsed.version or parsed.commit or parsed.maintenance or parsed.finalize:

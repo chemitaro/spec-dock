@@ -214,7 +214,10 @@ class WorkTargetStore:
             return "already_absent"
         if current != handle:
             return "conflict"
-        os.unlink(handle.basename, dir_fd=directory_fd)
+        try:
+            os.unlink(handle.basename, dir_fd=directory_fd)
+        except FileNotFoundError:
+            return "already_absent"
         try:
             os.fsync(directory_fd)
         except OSError as error:

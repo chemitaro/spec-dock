@@ -183,7 +183,7 @@ uv run pytest tests/cli_runtime/test_work_start_vnext.py tests/cli_runtime/test_
 <a id="p-07"></a>
 ## P-07 Finishとactiveの解除を閉じる
 
-**状態: 未着手。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
+**状態: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。Finishは未着手。P-06の独立レビュー、Windows adapter/native受入は引き続き未完了）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
 
 **所有/対象file**: NRT/application/work_lifecycle.py、active_selection.py、scope_completion.py、commands/work_vnext.py、active_vnext.py、domain/selectors.py。tests/cli_runtime/test_active_vnext.py、test_work_finish_vnext.py、test_work_commands_vnext.py。新 tests/integration/test_issue413_finish_race.py（予定）。
 

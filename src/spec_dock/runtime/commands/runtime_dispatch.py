@@ -2,13 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.infra.git_process import GitProcessError
+from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData, FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult, render_json_v2, render_text
 
 if TYPE_CHECKING:
@@ -17,26 +17,6 @@ if TYPE_CHECKING:
 
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
-
-
-@dataclass(frozen=True)
-class FamilyData:
-    kind: str
-    result: dict[str, object]
-
-
-@dataclass(frozen=True)
-class DiagnosticData:
-    findings: tuple[Diagnostic, ...] = ()
-    unverified: tuple[str, ...] = ()
-    kind: str = "diagnostic"
-
-
-@dataclass(frozen=True)
-class ActiveData:
-    selection: dict[str, object]
-    ancestors: tuple[str, ...]
-    kind: str = "active"
 
 
 def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
@@ -55,6 +35,14 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
         elif command == "active show":
             observation = read_selection(context, load_scope_views(context.root / "spec-dock"))
             result = OperationResult(command, "succeeded", ActiveData(observation.view(), observation.ancestors), 0)
+        elif command == "active set":
+            from spec_dock.runtime.application.direct_active import set_direct
+
+            result = set_direct(namespace, context)
+        elif command == "active clear":
+            from spec_dock.runtime.application.direct_active import clear_direct
+
+            result = clear_direct(namespace, context)
         elif command == "scope show":
             scope = resolve_scope(context, load_scope_views(context.root / "spec-dock"), namespace.target)
             result = OperationResult(
