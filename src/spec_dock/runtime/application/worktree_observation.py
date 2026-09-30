@@ -13,9 +13,10 @@ from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.work_target_store import WorkTargetStore
 
 if TYPE_CHECKING:
+    from spec_dock.runtime.application.contracts import GitWorktreeRecord
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
-    from spec_dock.runtime.domain.work_target import WorkTarget
+    from spec_dock.runtime.domain.work_target import PhysicalIdentity, WorkTarget
     from spec_dock.runtime.infra.work_target_store import SelectionHandle, StoredSelection
 
 
@@ -121,6 +122,8 @@ class WorktreeSelection:
     path: str
     selection: SelectionObservation
     views: tuple[ScopeView, ...]
+    worktree_identity: PhysicalIdentity | None
+    git: GitWorktreeRecord
 
 
 def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
@@ -130,10 +133,12 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
     rows: list[WorktreeSelection] = []
     for entry in worktree_list(context.root):
         direct: StoredSelection | None = None
+        identity: PhysicalIdentity | None = None
         try:
             if entry.bare:
                 raise ValueError("bare repository is not a working tree")
             other = resolve_context(str(entry.path), context.root)
+            identity = other.worktree_identity
             if other.clone_identity != context.clone_identity:
                 raise ValueError("worktree common directory identity mismatch")
             if other.worktree_identity in seen:
@@ -147,7 +152,7 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
                 else ()
             )
             selection = read_selection(other, views)
-            rows.append(WorktreeSelection(str(entry.path), selection, views))
+            rows.append(WorktreeSelection(str(entry.path), selection, views, identity, entry))
         except (OSError, ValueError, RuntimeError) as error:
             rows.append(
                 WorktreeSelection(
@@ -160,6 +165,8 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
                         reason=str(error),
                     ),
                     (),
+                    identity,
+                    entry,
                 )
             )
     return tuple(rows)

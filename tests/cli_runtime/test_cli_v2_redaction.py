@@ -23,6 +23,8 @@ def test_parse_error_redacts_credentials(credential: str, json_mode: bool, capsy
         assert payload["schema_version"] == "specdock.cli/v2"
         assert payload["error"]["code"] == "USAGE_ERROR"
         assert payload["effects"] == []
+        assert payload["error"]["details"]["redacted"] is True
+        assert payload["error"]["details"]["redaction_reasons"] == ["credential"]
     assert "[redacted]" in output.out + output.err
     assert credential not in output.out + output.err
     assert "fixture_secret" not in output.out + output.err

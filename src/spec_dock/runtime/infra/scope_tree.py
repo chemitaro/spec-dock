@@ -8,6 +8,7 @@ import stat
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.domain.lifecycle import decode_scope_metadata
+from spec_dock.runtime.domain.writer_admission import require_scope_structure
 from spec_dock.runtime.infra.json_store import read_guarded_json
 
 if TYPE_CHECKING:
@@ -48,6 +49,7 @@ def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tupl
             loaded = read_guarded_json(directory / ".meta.json")
             if loaded is None or not isinstance(loaded[0], dict):
                 raise ValueError("Scope metadata is missing or invalid")
+            require_scope_structure(loaded[0])
             metadata = decode_scope_metadata(loaded[0])
             raw = metadata.raw
             scope_id = raw.get("id")

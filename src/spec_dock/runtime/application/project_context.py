@@ -8,6 +8,7 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.domain.writer_admission import require_workspace_write
 from spec_dock.runtime.infra.git_cli import sanitized_git_environment
 from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import read_guarded_json
@@ -32,8 +33,7 @@ class ProjectContext:
     def require_writer(self) -> None:
         if self.workspace.get("writer_protocol") != NEW_WRITER_PROTOCOL:
             raise ValueError("workspace requires explicit migration to specdock.worktree-writer/v1")
-        if self.workspace.get("required_features"):
-            raise ValueError("workspace requires unsupported features")
+        require_workspace_write(self.workspace)
 
 
 def physical_identity(path: Path) -> PhysicalIdentity:

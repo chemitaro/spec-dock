@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
+import os
 from typing import TYPE_CHECKING
 
 import pytest
 
 from spec_dock.runtime.domain.work_target import PhysicalIdentity, WorkTarget
+from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.work_target_store import WorkTargetStore
 
 if TYPE_CHECKING:
@@ -48,6 +50,34 @@ def _record() -> WorkTarget:
         PhysicalIdentity("posix", "1", "2"),
         PhysicalIdentity("posix", "1", "3"),
     )
+
+
+def test_publish_bound_to_held_root_rejects_replacement_before_opening_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "original"
+    replacement = tmp_path / "replacement"
+    displaced = tmp_path / "displaced"
+    for path in (root, replacement):
+        (path / "spec-dock").mkdir(parents=True)
+    real_open = os.open
+    switched = False
+    with DirectoryIdentity(root) as held:
+
+        def replace_root_before_open(path, flags, mode=0o777, *, dir_fd=None):
+            nonlocal switched
+            if path == root.name and dir_fd is not None and not switched:
+                root.rename(displaced)
+                replacement.rename(root)
+                switched = True
+            return real_open(path, flags, mode, dir_fd=dir_fd)
+
+        monkeypatch.setattr(os, "open", replace_root_before_open)
+        with WorkTargetStore(root, root_handle=held) as store, pytest.raises(ValueError, match="identity"):
+            store.publish(replace(_record(), worktree_identity=held.identity))
+    assert switched
+    assert not (root / "spec-dock/.agent").exists()
+    assert not (displaced / "spec-dock/.agent").exists()
 
 
 def test_late_removal_does_not_delete_new_selection_even_for_same_scope(tmp_path: Path) -> None:

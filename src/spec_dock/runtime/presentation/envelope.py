@@ -197,14 +197,39 @@ def redact_text(value: str) -> str:
 
 def _redact(value: object) -> object:
     if isinstance(value, dict):
-        return {
+        rendered = {
             key: "[redacted]"
             if isinstance(key, str) and key.lower().replace("-", "_") in _SENSITIVE_KEYS
             else _redact(item)
             for key, item in value.items()
         }
+        if all(key in value for key in ("code", "message", "details")):
+            details = rendered.get("details")
+            reasons = _redaction_reasons((value["message"], value["details"]))
+            if isinstance(details, dict) and reasons:
+                details.update(redacted=True, redaction_reasons=sorted(reasons))
+        if all(key in value for key in ("argv", "stderr", "redacted")):
+            reasons = _redaction_reasons((value["argv"], value["stderr"], value.get("stdout")))
+            if reasons:
+                rendered.update(redacted=True, redaction_reasons=sorted(reasons))
+        return rendered
     if isinstance(value, (list, tuple)):
         return [_redact(item) for item in value]
     if isinstance(value, str):
         return redact_text(value)
     return value
+
+
+def _redaction_reasons(value: object) -> set[str]:
+    if isinstance(value, str):
+        return ({"credential"} if _CREDENTIAL_PATTERN.search(value) else set()) | (
+            {"url-userinfo"} if _USERINFO_PATTERN.search(value) else set()
+        )
+    if isinstance(value, (list, tuple)):
+        return set().union(*(_redaction_reasons(item) for item in value))
+    if isinstance(value, dict):
+        reasons = set().union(*(_redaction_reasons(item) for item in value.values()))
+        if any(isinstance(key, str) and key.lower().replace("-", "_") in _SENSITIVE_KEYS for key in value):
+            reasons.add("sensitive-field")
+        return reasons
+    return set()

@@ -18,8 +18,22 @@ if TYPE_CHECKING:
     from pathlib import Path
     from types import TracebackType
 
+    from spec_dock.runtime.infra.identity import DirectoryIdentity
+
 _NAME = re.compile(r"target-([0-9a-f]{32})\.json\Z")
 _MAX_BYTES = 65536
+
+
+class SelectionPublicationUnknown(RuntimeError):
+    """Rename succeeded, but durable publication or readback could not be confirmed."""
+
+    def __init__(self, token: str, cause: Exception) -> None:
+        self.token = token
+        super().__init__(str(cause))
+
+
+class SelectionRemovalUnknown(RuntimeError):
+    """Unlink succeeded, but durable removal could not be confirmed."""
 
 
 @dataclass(frozen=True)
@@ -44,8 +58,9 @@ class StoredSelection:
 
 
 class WorkTargetStore:
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, root_handle: DirectoryIdentity | None = None) -> None:
         self.root = root
+        self._root_handle = root_handle
         self.path = root / "spec-dock/.agent/work-target"
         self._directory_fd: int | None = None
 
@@ -63,7 +78,17 @@ class WorkTargetStore:
         if os.name == "nt":
             raise NotImplementedError("Windows selection adapter is not connected yet")
         if self._directory_fd is None:
-            parent = open_guarded_directory(self.root / "spec-dock")
+            if self._root_handle is not None:
+                self._root_handle.verify()
+                if self._root_handle.descriptor is None:
+                    raise ValueError("held root descriptor is not available")
+                parent = os.open(
+                    "spec-dock",
+                    os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW,
+                    dir_fd=self._root_handle.descriptor,
+                )
+            else:
+                parent = open_guarded_directory(self.root / "spec-dock")
             try:
                 for name in (".agent", "work-target"):
                     if create:
@@ -84,6 +109,8 @@ class WorkTargetStore:
         return self._directory_fd
 
     def _verify_directory(self, directory_fd: int) -> None:
+        if self._root_handle is not None:
+            self._root_handle.verify()
         fresh = open_guarded_directory(self.path)
         try:
             if _identity(os.fstat(fresh)) != _identity(os.fstat(directory_fd)):
@@ -137,12 +164,16 @@ class WorkTargetStore:
         except (OSError, ValueError) as error:
             return StoredSelection("unavailable", reason=str(error))
 
-    def publish(self, record: WorkTarget) -> SelectionHandle:
+    def publish(self, record: WorkTarget, *, token: str | None = None) -> SelectionHandle:
+        token = secrets.token_hex(16) if token is None else token
+        if not _NAME.fullmatch(f"target-{token}.json"):
+            raise ValueError("invalid publication token")
+        if self._root_handle is not None and self._root_handle.identity != record.worktree_identity:
+            raise ValueError("work target root physical identity mismatch")
         directory_fd = self._open(create=True)
         self._verify_directory(directory_fd)
         if self.read().status != "empty":
             raise FileExistsError("work target directory is not empty")
-        token = secrets.token_hex(16)
         stage = f".stage-{token}"
         name = f"target-{token}.json"
         payload = (json.dumps(asdict(record), ensure_ascii=False, separators=(",", ":")) + "\n").encode("utf-8")
@@ -153,10 +184,15 @@ class WorkTargetStore:
             os.fsync(stream.fileno())
         self._verify_directory(directory_fd)
         _rename_no_replace_at(directory_fd, stage, directory_fd, name)
-        os.fsync(directory_fd)
-        observed_payload, handle = self._read_file(directory_fd, name)
-        if observed_payload != payload:
-            raise ValueError("published work target bytes changed")
+        try:
+            os.fsync(directory_fd)
+            self._verify_directory(directory_fd)
+            observed_payload, handle = self._read_file(directory_fd, name)
+            if observed_payload != payload:
+                raise ValueError("published work target bytes changed")
+            self._verify_directory(directory_fd)
+        except (OSError, ValueError) as error:
+            raise SelectionPublicationUnknown(token, error) from error
         return handle
 
     def remove_observed(self, handle: SelectionHandle) -> Literal["removed", "already_absent", "conflict"]:
@@ -176,7 +212,10 @@ class WorkTargetStore:
         if current != handle:
             return "conflict"
         os.unlink(handle.basename, dir_fd=directory_fd)
-        os.fsync(directory_fd)
+        try:
+            os.fsync(directory_fd)
+        except OSError as error:
+            raise SelectionRemovalUnknown(str(error)) from error
         return "removed"
 
 

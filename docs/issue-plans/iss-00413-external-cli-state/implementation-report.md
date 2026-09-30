@@ -124,3 +124,31 @@ workspaceと読んだ全own metadataのexact bytes/file identityをmemoryに捕�
 Start公開経路とinfra全体は435 passed、1 skipped、4.92秒。skipは既存試験でありWindows native成功を意味しない。Ruff check成功、変更した4 sourceの限定mypy成功。実Scope 240件とworkspace宣言のhash変更0。
 
 このcheckpointもP-06全完了ではない。StartPlanへの純粋なselection決定、same-Scope別branch/switch-active置換、branch tip/全inventoryの最終再照合、Git異常後の現物判定、publish rename後unknown、recovery/C-04の残る公開情報、全platform受入は継続する。
+
+## P-06 selection切替・inventory・途中失敗と第1回レビュー修正
+
+same-Scope別branchは捕捉した旧tokenだけを解除し、新tokenへ置換する。異なるScopeは--switch-active必須。pureなSelectionPlanを一度作り、lock内で再計画と一致を確認する。既存branch tipがGH GET待ち中に変わった場合はGit効果前に停止する。branch名のASCII契約も公開入口で検証した。
+
+Git inventoryの各行へ物理WT identityとGitのHEAD/branch/flagsを保持し、自WT判定にpathname文字列ではなく物理identityを使う。Start前、lock取得後、checkout後、公開直前、旧record解除後に再観測する。他WTの状態や一覧が変われば停止し、成功済みGitは残す。実post-checkout hookで別WTを追加するケースと、外部unlink境界で旧record解除後に別WTを追加するケースをRed→Greenで検査した。他WTにcheckout済みのbranchは効果0で拒否する。
+
+Git mutationエラー時はlockを保持したままHEAD/ref/必要metadataとcleanを再観測し、確認済みの効果だけsucceededとする。実post-checkout hookのexit1でもHEAD/branchが切替済みならその現物を返し、新選択へ進まない。元stdout/stderr/returncodeを薄いGitProcessErrorに保持する。readonly probe失敗が直前の成功済みcheckoutをfailedへ再分類しないこともRed→Greenで検査した。timeout/signalのnative全境界はまだ受入未了である。
+
+recordのrename後fsync/readback失敗はselection.publish unknown、stage同期のrename前失敗はfailed、unlink後fsync失敗はselection.clear unknownとして後続効果を止める。未着手のclear/publishはnot_attemptedを返す。新しいjournal/rollback/再送権は作っていない。既存C-04の秘匿metadata義務として、診断とGit detailsにredacted=trueとcredential/url-userinfo/sensitive-fieldの該当理由を付けるようにした。
+
+独立Strict第1回は候補ad73a06a、GPT-5.6 Sol / Pro、exit10/P1四件でfail。[原文](artifacts/code-review-p06-01.json)、[全件分析](artifacts/code-review-p06-01-analysis.md)。全件分析後、以下を既存要件内で修正した。
+
+- F1: tokenを効果前に一度生成し、exact stage/final pathをcurrentとfixed candidateの双方でGit check-ignoreする。candidateのGit ignoreファイルだけを一時metadata領域へ読み、既存common-dir/configによるread-only Git判定を使う。公開storeへ同tokenを渡す。zero probe専用規則のcurrent/candidateをいずれも効果前exit3とするRed→Greenを確認した。
+- F2: required_featuresは省略または対応済みの空string arrayだけを許す。falsyな不正型、未知必須feature、workspaceのtype/control_epochをwriter admissionで拒否する。全current/candidate Scopeへwriter条件を適用し、必須nullable fieldの欠落も構造エラーにする。unknown任意fieldの書換えは行わない。current/candidate workspace16ケースとScope feature、必須field欠落の公開CLIをRed→Greenで確認した。
+- F3: unchanged成功前にもcandidate全metadata path/bytesを照合する。assume-unchangedでGit statusがcleanでも未commit metadataが違えば、既存recordを変えず効果0/exit3となるRed→Greenを確認した。
+- F4: storeをStartが保持したroot descriptorへ相対bindする。rootとrecordの物理identity一致、公開前・readback後・共通handleの最終照合を維持する。replacement pathを成功扱いせず、公開後の確認不能はunknownとする。held-root bindingの公開adapter試験はmissing capability(TypeError)をRedとして追加し、外部os.open境界でrootを置換したとき、replacementにもdisplaced rootにも.agentを作らず拒否するGreenを確認した。元候補のleakを実行再現したという証拠とは区別する。
+
+二つの独立CLI processとbarrier付きGET専用gh実行fixtureで、同じScopeの同時Startを検証した。成立は一つ、敗者はSCOPE_ALREADY_SELECTED/exit3/効果0。macOS実Git・実processの証拠であり、Windows native認定ではない。
+
+| 検証 | 実結果 |
+|---|---|
+| Start公開経路、infra全体、複数WT観測/同時Start、redaction/envelope | 497 passed、1 skipped、18.68秒 |
+| 全source/test Ruff check・format check | 成功、355 files formatted |
+| 変更した11 sourceの限定mypy | 成功。全体型gateの代替ではない |
+| 実Scope240件/workspace宣言のhash | 変更0 |
+
+P-06は引き続き途中。完全なpure StartPlanへの整理、OID/option境界、native timeout/signal/killの受入、Git inventory/context timeoutとraw failure整備、C-04の案内、Windows native/store、兄弟Issue同時Start/全platformの証拠が残る。四件の修正はローカル検証済みであり、独立再レビューのpassをまだ取得していない。P-07以降、全体lint/test、最終品質ゲート、手動製品確認、merge後の実dogfood切替は未完了。

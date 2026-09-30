@@ -16,7 +16,9 @@ from spec_dock.runtime.domain.dependency_vnext import (
     validate_dependency_graph,
 )
 from spec_dock.runtime.domain.lifecycle import GithubBackend, StatusObservation, decode_scope_metadata
+from spec_dock.runtime.domain.writer_admission import require_scope_write
 from spec_dock.runtime.infra.committed_workspace import committed_workspace
+from spec_dock.runtime.infra.git_process import run_git
 from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway
 from spec_dock.runtime.infra.json_store import read_guarded_json_bytes
 
@@ -41,6 +43,12 @@ class LocalInput:
     identity: tuple[int, int]
 
 
+class StartSnapshotError(ValueError):
+    def __init__(self, code: str, message: str) -> None:
+        self.code = code
+        super().__init__(message)
+
+
 def capture_local_inputs(context: ProjectContext, views: tuple[ScopeView, ...]) -> tuple[LocalInput, ...]:
     inputs: list[LocalInput] = []
     paths = (context.root / "spec-dock/workspace.json", *(view.path / ".meta.json" for view in views))
@@ -52,6 +60,7 @@ def capture_local_inputs(context: ProjectContext, views: tuple[ScopeView, ...]) 
         payload, exact, identity = loaded
         if path in by_path:
             view = by_path[path]
+            require_scope_write(payload)
             metadata = decode_scope_metadata(payload)
             if (
                 metadata.backend != view.backend
@@ -74,11 +83,34 @@ def verify_local_inputs(context: ProjectContext, inputs: tuple[LocalInput, ...])
 
 
 def read_candidate(
-    context: ProjectContext, oid: str, target: ScopeView, current_views: tuple[ScopeView, ...], *, timeout: float
+    context: ProjectContext,
+    oid: str,
+    target: ScopeView,
+    current_views: tuple[ScopeView, ...],
+    *,
+    timeout: float,
+    proposed_token: str,
 ) -> CandidateSnapshot:
     with committed_workspace(context.root, oid, timeout=timeout) as workspace:
+        for basename in (f"target-{proposed_token}.json", f".stage-{proposed_token}"):
+            if not run_git(
+                workspace.parent,
+                f"--git-dir={context.common_dir}",
+                f"--work-tree={workspace.parent}",
+                "check-ignore",
+                "--no-index",
+                "--",
+                f"spec-dock/.agent/work-target/{basename}",
+                timeout=timeout,
+                missing_ok=True,
+            ):
+                raise StartSnapshotError(
+                    "WORK_TARGET_PATH_NOT_IGNORED", "candidate work target state must be ignored by Git"
+                )
         replace(context, workspace=read_workspace_declaration(workspace / "workspace.json")).require_writer()
         views = load_scope_views(workspace)
+        for view in views:
+            require_scope_write(json.loads((view.path / ".meta.json").read_bytes()))
         try:
             candidate = show_scope(views, target.id)
         except LookupError as error:

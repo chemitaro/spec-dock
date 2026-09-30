@@ -16,7 +16,18 @@ if TYPE_CHECKING:
 @contextmanager
 def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Path]:
     listed = run_git(
-        root, "ls-tree", "-r", "-z", oid, "--", "spec-dock/workspace.json", "spec-dock/initiatives", timeout=timeout
+        root,
+        "ls-tree",
+        "-r",
+        "-z",
+        oid,
+        "--",
+        "spec-dock/workspace.json",
+        "spec-dock/initiatives",
+        ".gitignore",
+        "spec-dock/.gitignore",
+        "spec-dock/.agent",
+        timeout=timeout,
     )
     with TemporaryDirectory(prefix="spec-dock-start-") as temporary:
         temporary_root = Path(temporary).resolve(strict=True)
@@ -31,10 +42,15 @@ def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Pat
             mode, kind, object_id = header.split()
             decoded = raw_path.decode("utf-8")
             parts = decoded.split("/")
-            if any(part in ("", ".", "..") for part in parts) or parts[0] != "spec-dock":
+            rules = decoded in (".gitignore", "spec-dock/.gitignore", "spec-dock/.agent/.gitignore")
+            if decoded in ("spec-dock/.agent", "spec-dock/.agent/work-target") or decoded.startswith(
+                "spec-dock/.agent/work-target/"
+            ):
+                raise ValueError("candidate work target state or its parent is tracked by Git")
+            if any(part in ("", ".", "..") for part in parts) or (parts[0] != "spec-dock" and not rules):
                 raise ValueError("committed planning path is unsafe")
             relative = PurePosixPath(decoded)
-            if parts == ["spec-dock", "workspace.json"]:
+            if rules or parts == ["spec-dock", "workspace.json"]:
                 metadata = True
             elif len(parts) >= 4 and parts[1] == "initiatives":
                 # Scope directories remain observable even when their metadata is missing.
@@ -43,6 +59,8 @@ def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Pat
                     depth += 2
                 metadata = len(parts) == depth and parts[-1] == ".meta.json"
                 directory_parts = parts[: depth - 1]
+                if any("\\" in part or ":" in part for part in directory_parts):
+                    raise ValueError("committed planning path is unsafe on Windows")
                 temporary_root.joinpath(*directory_parts).mkdir(parents=True, exist_ok=True)
             else:
                 continue
