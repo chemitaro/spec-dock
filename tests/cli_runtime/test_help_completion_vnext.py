@@ -3,18 +3,17 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shlex
 import shutil
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.cli.catalog import HELP_PRECONDITIONS, HELP_SPECS, LEAF_PATHS
+from spec_dock.runtime.cli.options import parse_vnext_output
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
 
-from spec_dock_runtime.cli.catalog import HELP_PRECONDITIONS, HELP_SPECS, LEAF_PATHS  # noqa: E402
-from spec_dock_runtime.cli.options import parse_vnext_output  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _run(tmp_path: Path, *args: str):

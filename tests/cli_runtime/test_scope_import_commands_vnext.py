@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-import sys
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.cli import vnext_runtime  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+from spec_dock.runtime.cli import vnext_runtime
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo
 
 
 def _run(repo: Path, *args: str):

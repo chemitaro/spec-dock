@@ -100,9 +100,8 @@ def _executing_engine(*, executable: Path, checkout_root: Path) -> VerifiedEngin
 def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path) -> int:
     """Verify self and repository pin before loading any checkout runtime."""
     sys.dont_write_bytecode = True
-    sys.path.insert(0, str(ASSETS / "spec_dock/scripts"))
-    from spec_dock_runtime.cli.options import parse_vnext_output
-    from spec_dock_runtime.cli.vnext_runtime import run_vnext
+    from spec_dock.runtime.cli.options import parse_vnext_output
+    from spec_dock.runtime.cli.vnext_runtime import run_vnext
 
     parsed = parse_vnext_output(argv, engine_version=__version__)
     if parsed.namespace is None:
@@ -145,7 +144,7 @@ def run_external(argv: Sequence[str], *, executable: Path, invocation_cwd: Path)
             handover = namespace.command_path == "installation update" and namespace.activate_engine
             pinned = read_engine_pin(common, checkout_root=project_root, require_control_match=not handover)
             if handover:
-                from spec_dock_runtime.infra.control_store import load_control
+                from spec_dock.runtime.infra.control_store import load_control
 
                 control = load_control(common)
                 if (

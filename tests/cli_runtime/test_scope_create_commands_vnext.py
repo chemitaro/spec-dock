@@ -3,21 +3,20 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
 from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
 
-from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
-from spec_dock_runtime.cli import vnext_runtime  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+from spec_dock.runtime.application.operation_executor import prepare_operation
+from spec_dock.runtime.cli import vnext_runtime
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo
 
 
 def _run(repo: Path, *args: str):
@@ -175,7 +174,7 @@ def test_prepared_create_failure_returns_recorded_recovery_id_without_claiming_e
         raise OSError("injected after durable preparation")
 
     monkeypatch.setattr(
-        "spec_dock_runtime.commands.scope_create_vnext.create_local_scope_command", fail_after_preparation
+        "spec_dock.runtime.commands.scope_create_vnext.create_local_scope_command", fail_after_preparation
     )
     failed = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
     payload = json.loads(failed.stdout)
@@ -226,7 +225,7 @@ def test_scope_edit_post_publication_io_failure_reports_observed_partial(
     repo = cast("Path", common["repo_root"])
     created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
     scope_id = json.loads(created.stdout)["data"]["scope_id"]
-    from spec_dock_runtime.commands import scope_query_vnext
+    from spec_dock.runtime.commands import scope_query_vnext
 
     original = scope_query_vnext.edit_scope_title
 
@@ -265,7 +264,7 @@ def test_scope_edit_io_failure_with_unreadable_after_state_is_partial(
     repo = cast("Path", common["repo_root"])
     created = _run(repo, "scope", "create", "initiative", "--backend", "local", "--title", "Program")
     scope_id = json.loads(created.stdout)["data"]["scope_id"]
-    from spec_dock_runtime.commands import scope_query_vnext
+    from spec_dock.runtime.commands import scope_query_vnext
 
     def unreadable_after_state(**kwargs: object) -> None:
         raise OSError("publication state could not be read")
@@ -322,7 +321,7 @@ def test_github_create_confirmation_rejects_origin_change_before_remote_effect(
     monkeypatch.setattr(vnext_runtime, "GithubIssueGateway", lambda timeout: gateway)
     origin = {"repository": "example/repo"}
     monkeypatch.setattr(
-        "spec_dock_runtime.application.create_github_scope.git_cli.origin_github_publication_repo_slug",
+        "spec_dock.runtime.application.create_github_scope.git_cli.origin_github_publication_repo_slug",
         lambda _repo: origin["repository"],
     )
 

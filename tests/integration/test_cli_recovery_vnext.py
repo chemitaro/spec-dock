@@ -8,21 +8,17 @@ import json
 from multiprocessing import Process, Queue
 import os
 from pathlib import Path
-import sys
 import time
 from types import SimpleNamespace
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock.installation.group_journal import (  # noqa: E402
+from spec_dock.installation.group_journal import (
     InstallationGroupRecord,
     InstallationTarget,
     write_group_record,
 )
-from spec_dock_runtime.application.operation_executor import (  # noqa: E402
+from spec_dock.runtime.application.operation_executor import (
     assert_resume_request,
     can_send_effect,
     prepare_operation,
@@ -30,22 +26,22 @@ from spec_dock_runtime.application.operation_executor import (  # noqa: E402
     record_effect_observation,
     record_effect_result,
 )
-from spec_dock_runtime.cli import vnext_runtime  # noqa: E402
-from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
-from spec_dock_runtime.infra import (  # noqa: E402
+from spec_dock.runtime.cli import vnext_runtime
+from spec_dock.runtime.cli.options import parse_vnext
+from spec_dock.runtime.infra import (
     failure_receipts,
     operation_journal,
 )
-from spec_dock_runtime.infra.engine_handover_store import EngineHandoverRecord, write_engine_handover  # noqa: E402
-from spec_dock_runtime.infra.finalization_store import FinalizationRecord, write_finalization  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, reconcile_atomic_json  # noqa: E402
-from spec_dock_runtime.infra.migration_journal import (  # noqa: E402
+from spec_dock.runtime.infra.engine_handover_store import EngineHandoverRecord, write_engine_handover
+from spec_dock.runtime.infra.finalization_store import FinalizationRecord, write_finalization
+from spec_dock.runtime.infra.json_store import atomic_write_json, reconcile_atomic_json
+from spec_dock.runtime.infra.migration_journal import (
     MigrationFile,
     MigrationRecord,
     write_migration_record,
 )
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 
 
 def test_migration_prepared_failure_returns_its_authoritative_operation_id(
@@ -687,7 +683,7 @@ def test_atomic_json_exchange_failure_keeps_previous_bytes(tmp_path: Path, monke
     def fail_exchange(*args: object, **kwargs: object) -> None:
         raise OSError("injected exchange failure")
 
-    monkeypatch.setattr("spec_dock_runtime.infra.json_store._rename_exchange_at", fail_exchange)
+    monkeypatch.setattr("spec_dock.runtime.infra.json_store._rename_exchange_at", fail_exchange)
     with pytest.raises(OSError, match="exchange failure"):
         identity = path.stat()
         atomic_write_json(path, {"new": True}, expected_identity=(identity.st_dev, identity.st_ino))
@@ -701,7 +697,7 @@ def test_atomic_json_exchange_preserves_racing_destination(tmp_path: Path, monke
     competitor = tmp_path / "competitor.json"
     competitor.write_bytes(b'{"competitor":true}\n')
 
-    from spec_dock_runtime.infra import json_store
+    from spec_dock.runtime.infra import json_store
 
     real_exchange = json_store._rename_exchange_at
     raced = False
@@ -727,7 +723,7 @@ def test_atomic_json_exchange_error_after_effect_blocks_blind_retry(
     path = tmp_path / "state.json"
     path.write_bytes(b'{"original":true}\n')
     identity = path.stat()
-    from spec_dock_runtime.infra import json_store
+    from spec_dock.runtime.infra import json_store
 
     real_exchange = json_store._rename_exchange_at
 
@@ -766,7 +762,7 @@ def test_journal_create_preserves_original_publish_error_with_retained_stage(
     def fail_publish(*args: object, **kwargs: object) -> None:
         raise OSError("injected publish failure")
 
-    monkeypatch.setattr("spec_dock_runtime.infra.json_store._rename_no_replace_at", fail_publish)
+    monkeypatch.setattr("spec_dock.runtime.infra.json_store._rename_no_replace_at", fail_publish)
     with pytest.raises(OSError, match="injected publish failure"):
         JournalStore(tmp_path).create(record)
     operation_dir = JournalStore(tmp_path).root / record.operation_id
@@ -775,7 +771,7 @@ def test_journal_create_preserves_original_publish_error_with_retained_stage(
 
 
 def _exchange_then_hold(path_value: str, ready: Queue[str]) -> None:
-    from spec_dock_runtime.infra import json_store
+    from spec_dock.runtime.infra import json_store
 
     path = Path(path_value)
     identity = path.stat()

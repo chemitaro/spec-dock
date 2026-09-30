@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra.active_store import load_selection_v3
+from tests.cli_runtime.test_active_vnext import _three_scopes
 
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_vnext_cli_executes_three_kind_work_lifecycle_with_json(tmp_path: Path) -> None:

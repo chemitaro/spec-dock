@@ -6,33 +6,29 @@ from dataclasses import replace
 import json
 from pathlib import Path
 import subprocess
-import sys
 from tempfile import TemporaryDirectory
 from typing import cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock.asset_layout import TOOL_DIRECTORIES  # noqa: E402
-from spec_dock.installation.group_journal import read_group_record  # noqa: E402
-from spec_dock.installation.journal import read_record  # noqa: E402
-from spec_dock.installation.source import resolve_source  # noqa: E402
-from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin  # noqa: E402
-from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
+from spec_dock.asset_layout import TOOL_DIRECTORIES
+from spec_dock.installation.group_journal import read_group_record
+from spec_dock.installation.journal import read_record
+from spec_dock.installation.source import resolve_source
+from spec_dock.runtime.application.installation_update_vnext import (
     resume_installation_group,
     rollback_installation_group,
     update_installation_group,
 )
-from spec_dock_runtime.application.migrate_workspace_vnext import inspect_workspace_migration  # noqa: E402
-from spec_dock_runtime.application.worktree_vnext import create_worktree  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra.control_store import load_control, store_control  # noqa: E402
-from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
-from tests.cli_runtime.test_worktree_create_vnext import _committed_repo  # noqa: E402
-from tests.integration.test_installation_group_init_vnext import _fresh_repo  # noqa: E402
-from tests.integration.test_installation_journal_vnext import _bundle  # noqa: E402
+from spec_dock.runtime.application.migrate_workspace_vnext import inspect_workspace_migration
+from spec_dock.runtime.application.worktree_vnext import create_worktree
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra.control_store import load_control, store_control
+from spec_dock.runtime.infra.installation_group_store import pending_installation_groups
+from spec_dock.runtime_loader import EnginePin, digest_distribution, verify_engine_pin
+from tests.cli_runtime.test_worktree_create_vnext import _committed_repo
+from tests.integration.test_installation_group_init_vnext import _fresh_repo
+from tests.integration.test_installation_journal_vnext import _bundle
 
 
 def _legacy_fixture(tmp_path: Path):
@@ -79,7 +75,7 @@ def test_legacy_update_bootstraps_maintenance_control_without_migrating_data(tmp
 
 def test_legacy_update_cli_dry_run_then_bootstraps(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, pin, bundle = _legacy_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
@@ -108,7 +104,7 @@ def test_legacy_update_cli_dry_run_then_bootstraps(tmp_path: Path, monkeypatch: 
 
 def test_legacy_update_cli_resolves_symlinked_system_tempdir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, _, pin, bundle = _legacy_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     real_temp = tmp_path / "real-temp"
     real_temp.mkdir()
@@ -144,7 +140,7 @@ def test_installation_update_requires_confirmation_before_source_fetch(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, _, pin, bundle = _legacy_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     def unexpected_source(**_kwargs: object) -> None:
         raise AssertionError("source must not be fetched without confirmation")
@@ -166,7 +162,7 @@ def test_installation_update_rejects_another_candidates_assets_before_writes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, _, pin, bundle = _legacy_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
@@ -185,7 +181,7 @@ def test_installation_update_rejects_another_candidates_assets_before_writes(
 
 def test_legacy_update_resumes_if_control_publish_stops(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, pin, bundle = _legacy_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as module
+    import spec_dock.runtime.application.installation_update_vnext as module
 
     real_store = module.store_control
 
@@ -225,7 +221,7 @@ def test_legacy_update_can_rollback_before_control_is_published(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, second, pin, bundle = _legacy_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as module
+    import spec_dock.runtime.application.installation_update_vnext as module
 
     def stop_before_control(*_args: object, **_kwargs: object) -> None:
         raise RuntimeError("control publish stopped")
@@ -333,7 +329,7 @@ def test_existing_group_accepts_new_candidate_assets_only_under_maintenance(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, second, common_dir, _epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
@@ -356,7 +352,7 @@ def test_existing_group_accepts_new_candidate_assets_only_under_maintenance(
 
 def test_group_update_resumes_after_one_child_completed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     attempts = 0
@@ -398,7 +394,7 @@ def test_group_update_resumes_after_one_child_completed(tmp_path: Path, monkeypa
 
 def test_group_update_resumes_after_unjournaled_stage(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, _, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_prepare = update_module.prepare_installation
 
@@ -459,7 +455,7 @@ def test_group_recovers_interrupted_marker_publication_with_fixed_child_record(
     first = group.targets[0]
     assert first.child_operation_id is not None
     # The group store's fixed child root is the authoritative location.
-    from spec_dock_runtime.application.installation_update_vnext import _child_root
+    from spec_dock.runtime.application.installation_update_vnext import _child_root
 
     child = read_record(_child_root(common_dir, group_id, first.worktree_id), first.child_operation_id)
     assert child.phase == "planned"
@@ -696,7 +692,7 @@ def test_public_update_resume_preserves_source_origin(
 ) -> None:
     repo, second, common_dir, _epoch, digest, versioned_bundle = _group_fixture(tmp_path)
     import spec_dock.installation.executor as executor
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     def resolve_source(**kwargs: object):
         version = "0.2.4" if kwargs.get("version") else None
@@ -753,7 +749,7 @@ def test_public_version_alias_update_persists_canonical_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, second, common_dir, _epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(
         command_module,
@@ -795,7 +791,7 @@ def test_group_commit_refuses_replaced_marker_after_child_apply(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     changed = False
@@ -828,7 +824,7 @@ def test_group_commit_refuses_replaced_marker_after_child_apply(
 
 def test_group_commit_refuses_same_content_published_swap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     changed = False
@@ -862,7 +858,7 @@ def test_group_commit_refuses_same_content_published_swap(tmp_path: Path, monkey
 
 def test_finalization_refuses_same_content_published_swap(tmp_path: Path) -> None:
     repo, _second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     result = update_installation_group(
         repo_root=repo,
@@ -886,7 +882,7 @@ def test_finalization_refuses_same_content_published_swap(tmp_path: Path) -> Non
 
 def test_group_update_rolls_back_a_completed_child(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     attempts = 0
@@ -927,7 +923,7 @@ def test_group_update_rolls_back_a_completed_child(tmp_path: Path, monkeypatch: 
 
 def test_group_rollback_checks_all_children_before_restoring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     attempts = 0
@@ -966,7 +962,7 @@ def test_group_rollback_checks_all_children_before_restoring(tmp_path: Path, mon
 
 def test_installation_update_cli_updates_registered_group(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, _, _, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source, raising=False)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive", raising=False)
@@ -996,7 +992,7 @@ def test_installation_update_cli_updates_registered_group(tmp_path: Path, monkey
 
 def test_installation_update_cli_rolls_back_without_source(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, _, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     attempts = 0
@@ -1032,7 +1028,7 @@ def test_installation_update_cli_rolls_back_without_source(tmp_path: Path, monke
 
 def test_installation_update_dry_run_preserves_targets(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, common_dir, epoch, digest, bundle = _group_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")
@@ -1054,7 +1050,7 @@ def test_installation_update_dry_run_preserves_targets(tmp_path: Path, monkeypat
 
 def test_group_uninstall_preserves_spec_data_and_can_restore_tooling(tmp_path: Path) -> None:
     repo, second, common_dir, epoch, digest, _bundle_value = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     data = repo / "spec-dock/initiatives/kept.md"
     data.parent.mkdir(parents=True, exist_ok=True)
@@ -1089,7 +1085,7 @@ def test_group_uninstall_preserves_spec_data_and_can_restore_tooling(tmp_path: P
 
 def test_group_uninstall_resumes_offline_after_one_worktree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second, common_dir, epoch, digest, _bundle_value = _group_fixture(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     real_apply = update_module.apply_installation
     attempts = 0
@@ -1174,7 +1170,7 @@ def test_committed_maintenance_update_can_be_rolled_back_before_resume(tmp_path:
         keep_maintenance=True,
     )
     assert (repo / "spec-dock/docs/source.txt").is_file()
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     rolled_back = update_module.rollback_installation_group(
         repo_root=repo,
@@ -1203,7 +1199,7 @@ def test_committed_update_rollback_rejects_later_control_epoch(tmp_path: Path) -
     control = load_control(common_dir)
     assert control is not None
     store_control(common_dir, replace(control, epoch=control.epoch + 1), expected_epoch=control.epoch)
-    import spec_dock_runtime.application.installation_update_vnext as update_module
+    import spec_dock.runtime.application.installation_update_vnext as update_module
 
     with pytest.raises(ValueError, match="changed after completion"):
         update_module.rollback_installation_group(

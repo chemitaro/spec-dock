@@ -5,17 +5,16 @@ from __future__ import annotations
 from dataclasses import replace
 import hashlib
 import json
-from pathlib import Path
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_migration_journal_round_trip_and_pending_scan(tmp_path: Path) -> None:
-    import spec_dock_runtime.infra.migration_journal as journal
+    import spec_dock.runtime.infra.migration_journal as journal
 
     common = tmp_path / "repo.git"
     common.mkdir()
@@ -48,7 +47,7 @@ def test_migration_journal_round_trip_and_pending_scan(tmp_path: Path) -> None:
 
 
 def test_migration_journal_rejects_modified_after_bytes(tmp_path: Path) -> None:
-    import spec_dock_runtime.infra.migration_journal as journal
+    import spec_dock.runtime.infra.migration_journal as journal
 
     common = tmp_path / "repo.git"
     common.mkdir()

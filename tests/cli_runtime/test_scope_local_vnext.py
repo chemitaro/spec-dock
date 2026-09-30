@@ -7,28 +7,24 @@ from multiprocessing import Process, Queue
 from pathlib import Path
 import shutil
 import subprocess
-import sys
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock import __version__  # noqa: E402
-from spec_dock.asset_layout import ASSETS, VERSION_FILE  # noqa: E402
-from spec_dock_runtime.application.create_local_scope import (  # noqa: E402
+from spec_dock import __version__
+from spec_dock.asset_layout import ASSETS, VERSION_FILE
+from spec_dock.runtime.application.create_local_scope import (
     AncestorState,
     create_local_scope,
     plan_local_scope_create,
 )
-from spec_dock_runtime.domain.lifecycle import GithubBackend  # noqa: E402
-from spec_dock_runtime.domain.registry import LocalIdRegistry, reserve_local_id  # noqa: E402
-from spec_dock_runtime.infra.control_store import ControlState, WorktreeRegistration, store_control  # noqa: E402
-from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.github_status_cache import cached_github_ancestor_open  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
+from spec_dock.runtime.domain.lifecycle import GithubBackend
+from spec_dock.runtime.domain.registry import LocalIdRegistry, reserve_local_id
+from spec_dock.runtime.infra.control_store import ControlState, WorktreeRegistration, store_control
+from spec_dock.runtime.infra.git_cli import git_common_directory
+from spec_dock.runtime.infra.github_status_cache import cached_github_ancestor_open
+from spec_dock.runtime.infra.json_store import atomic_write_json
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from spec_dock.runtime.infra.registry_store import RegistryStore
 
 
 @pytest.mark.parametrize(
@@ -288,7 +284,7 @@ def test_parent_directory_swap_before_publication_cannot_redirect_child(
     common, common_dir = _ready_repo(tmp_path)
     initiative = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
     parent = AncestorState(initiative.id, "initiative", "local", "open", False)
-    from spec_dock_runtime.application import create_node
+    from spec_dock.runtime.application import create_node
 
     real_execute = create_node.execute_create_plan
 
@@ -312,7 +308,7 @@ def test_parent_swap_at_atomic_publish_never_writes_replacement(
     common, common_dir = _ready_repo(tmp_path)
     initiative = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
     parent = AncestorState(initiative.id, "initiative", "local", "open", False)
-    from spec_dock_runtime.application import create_node
+    from spec_dock.runtime.application import create_node
 
     real_rename = create_node._rename_node_tree_no_replace_between_at
 

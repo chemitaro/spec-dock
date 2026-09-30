@@ -15,13 +15,10 @@ def _explicit_cleanup_state(named_stage_state: str) -> str:
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import contracts
-        from spec_dock_runtime.infra import binary_artifact_publisher
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import contracts
+    from spec_dock.runtime.infra import binary_artifact_publisher
+
     return contracts, binary_artifact_publisher
 
 

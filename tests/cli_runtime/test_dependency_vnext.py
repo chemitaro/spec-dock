@@ -4,31 +4,28 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
-from pathlib import Path
 import stat
-import sys
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
-from spec_dock_runtime.application.dependency_vnext import (  # noqa: E402
+from spec_dock.runtime.application.create_local_scope import AncestorState, create_local_scope
+from spec_dock.runtime.application.dependency_vnext import (
     check_scope_readiness,
     list_scope_dependencies,
     mutate_scope_dependency,
 )
-from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
-from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
-from spec_dock_runtime.domain.dependency_vnext import evaluate_start_readiness  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import GithubBackend, StatusObservation  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+from spec_dock.runtime.application.import_github_scope import import_github_scope
+from spec_dock.runtime.application.scope_query import load_scope_views
+from spec_dock.runtime.domain.dependency_vnext import evaluate_start_readiness
+from spec_dock.runtime.domain.lifecycle import GithubBackend, StatusObservation
+from spec_dock.runtime.infra.json_store import atomic_write_json, read_guarded_json
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.infra.contracts import GithubIssueRecord
+    from pathlib import Path
+
+    from spec_dock.runtime.infra.contracts import GithubIssueRecord
 
 
 def _two_trees(tmp_path: Path):

@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.application.worktree_vnext import create_worktree, list_worktrees, show_worktree
+from spec_dock.runtime.cli.options import parse_vnext
+from spec_dock.runtime.infra.active_store import load_selection_v3
+from spec_dock.runtime.infra.control_store import load_control
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 
-from spec_dock_runtime.application.worktree_vnext import create_worktree, list_worktrees, show_worktree  # noqa: E402
-from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.control_store import load_control  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _committed_repo(tmp_path: Path) -> dict[str, object]:
@@ -91,7 +89,7 @@ def test_detached_source_can_create_from_explicit_base(tmp_path: Path) -> None:
 
 
 def test_create_failure_records_target_and_refuses_blind_retry(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from spec_dock_runtime.application import worktree_vnext as module
+    from spec_dock.runtime.application import worktree_vnext as module
 
     common = _committed_repo(tmp_path)
     root = tmp_path / "worktrees"
@@ -115,7 +113,7 @@ def test_create_failure_records_target_and_refuses_blind_retry(tmp_path: Path, m
 def test_create_recovery_requires_effects_to_be_absent_before_reusing_target(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    from spec_dock_runtime.application import worktree_vnext as module
+    from spec_dock.runtime.application import worktree_vnext as module
 
     common = _committed_repo(tmp_path)
     root = tmp_path / "worktrees"

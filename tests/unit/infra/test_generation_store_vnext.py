@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.infra import generation_store
 
-from spec_dock_runtime.infra import generation_store  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_generation_publish_and_read_immutable_bytes(tmp_path: Path) -> None:

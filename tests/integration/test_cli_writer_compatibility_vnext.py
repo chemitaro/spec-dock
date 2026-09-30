@@ -6,7 +6,6 @@ from multiprocessing import Process, Queue
 import os
 from pathlib import Path
 import subprocess
-import sys
 
 import pytest
 
@@ -15,23 +14,19 @@ from spec_dock.installation.group_journal import (
     InstallationTarget,
     write_group_record,
 )
-
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
-from spec_dock_runtime.cli.admission import AdmissionError, admit_writer  # noqa: E402
-from spec_dock_runtime.infra.control_store import (  # noqa: E402
+from spec_dock.runtime.application.operation_executor import prepare_operation
+from spec_dock.runtime.cli.admission import AdmissionError, admit_writer
+from spec_dock.runtime.infra.control_store import (
     ControlState,
     WorktreeRegistration,
     load_control,
     store_control,
 )
-from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
-from spec_dock_runtime.infra.migration_journal import MigrationRecord, write_migration_record  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from spec_dock_runtime.infra.writer_lock import (  # noqa: E402
+from spec_dock.runtime.infra.git_cli import git_common_directory
+from spec_dock.runtime.infra.installation_group_store import pending_installation_groups
+from spec_dock.runtime.infra.migration_journal import MigrationRecord, write_migration_record
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from spec_dock.runtime.infra.writer_lock import (
     WorktreeLease,
     WriterLock,
     WriterLockBusy,

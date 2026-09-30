@@ -2,29 +2,27 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.scope_completion import (  # noqa: E402
+from spec_dock.runtime.application.scope_completion import (
     change_scope_lifecycle,
     plan_close,
     plan_reopen,
     resume_scope_lifecycle,
 )
-from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import LocalBackend, ObservedState, decode_scope_metadata  # noqa: E402
-from spec_dock_runtime.infra.contracts import GithubIssueRecord  # noqa: E402
-from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from spec_dock.runtime.application.scope_query import load_scope_views
+from spec_dock.runtime.domain.lifecycle import LocalBackend, ObservedState, decode_scope_metadata
+from spec_dock.runtime.infra.contracts import GithubIssueRecord
+from spec_dock.runtime.infra.github_lifecycle import RemoteIssueError
+from spec_dock.runtime.infra.json_store import atomic_write_json, read_guarded_json
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from tests.cli_runtime.test_active_vnext import _three_scopes
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_completed_parent_rechecks_each_descendant_even_if_already_completed(tmp_path: Path) -> None:
@@ -61,7 +59,7 @@ def test_close_reason_conflict_and_reopen_ancestor_guard(tmp_path: Path) -> None
 
 def test_local_close_and_reopen_persist_only_lifecycle(tmp_path: Path) -> None:
     common = _ready_repo(tmp_path)
-    from spec_dock_runtime.application.create_local_scope import create_local_scope
+    from spec_dock.runtime.application.create_local_scope import create_local_scope
 
     initiative = create_local_scope(kind="initiative", title="Init", parent=None, ancestors=(), **common)
     metadata_path = initiative.path / ".meta.json"
@@ -194,7 +192,7 @@ def test_local_close_resume_reconciles_saved_state_after_journal_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     common = _ready_repo(tmp_path)
-    from spec_dock_runtime.application.create_local_scope import create_local_scope
+    from spec_dock.runtime.application.create_local_scope import create_local_scope
 
     initiative = create_local_scope(kind="initiative", title="Init", parent=None, ancestors=(), **common)
     arguments = {k: v for k, v in common.items() if k != "updated_at"}

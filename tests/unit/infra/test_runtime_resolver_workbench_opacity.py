@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -9,12 +8,9 @@ if TYPE_CHECKING:
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import delete_node
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import delete_node
+
     return delete_node
 
 

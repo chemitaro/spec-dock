@@ -1,8 +1,9 @@
-"""Paths and names shared by the fixed distribution and installation flow."""
+"""Static resources shipped by the installed package."""
 
+from importlib.resources import files
 from pathlib import Path
 
-ASSETS = Path(__file__).parent / "assets"
+ASSETS = Path(str(files("spec_dock").joinpath("assets")))
 ROOTS = ("docs", "templates", "system", "scripts")
 SKILLS = ("spec-dock", "spec-dock-grill-with-docs")
 TOOL_DIRECTORIES = tuple(f"spec-dock/{name}" for name in ROOTS) + tuple(f".agents/skills/{name}" for name in SKILLS)

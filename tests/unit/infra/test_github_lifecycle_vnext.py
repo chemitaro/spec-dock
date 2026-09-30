@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 
-from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _reply(status: int, payload: object) -> subprocess.CompletedProcess[str]:

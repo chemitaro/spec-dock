@@ -2,19 +2,17 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.application.artifact_query import list_artifacts, show_artifact
+from spec_dock.runtime.application.artifact_vnext import create_scope_artifact, import_scope_file
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 
-from spec_dock_runtime.application.artifact_query import list_artifacts, show_artifact  # noqa: E402
-from spec_dock_runtime.application.artifact_vnext import create_scope_artifact, import_scope_file  # noqa: E402
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_artifact_catalog_accepts_current_historical_unknown_and_generic_without_reading_body(tmp_path: Path) -> None:

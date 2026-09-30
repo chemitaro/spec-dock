@@ -1,24 +1,20 @@
 from dataclasses import replace
 import json
 from pathlib import Path
-import sys
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import (
-            check_deps as app_check_deps,
-            contracts as app_contracts,
-            ports as app_ports,
-        )
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.infra import contracts as infra_contracts
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import (
+        check_deps as app_check_deps,
+        contracts as app_contracts,
+        ports as app_ports,
+    )
+    from spec_dock.runtime.domain import models as domain_models
+    from spec_dock.runtime.infra import contracts as infra_contracts
+
     return app_check_deps, app_contracts, app_ports, domain_models, infra_contracts
 
 
@@ -928,14 +924,9 @@ class TestCheckDepsApplication:
 
     def test_local_high_level_default_open_does_not_mask_done_descendant_aggregate(self) -> None:
         app_check_deps, app_contracts, app_ports, _domain_models, infra_contracts = _runtime_modules()
-        runtime_scripts_dir = (
-            Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-        )
-        sys.path.insert(0, str(runtime_scripts_dir))
-        try:
-            from spec_dock_runtime.domain.tree import build_graph
-        finally:
-            sys.path.pop(0)
+
+        from spec_dock.runtime.domain.tree import build_graph
+
         records = [
             *self._records(infra_contracts),
             infra_contracts.StoredMetaRecord(

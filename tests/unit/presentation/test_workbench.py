@@ -1,19 +1,14 @@
 import json
-from pathlib import Path
-import sys
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application.contracts import WorkbenchCopyError
-        from spec_dock_runtime.presentation.cli_text import (
-            render_workbench_copy_error_json,
-            render_workbench_copy_error_text,
-        )
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application.contracts import WorkbenchCopyError
+    from spec_dock.runtime.presentation.cli_text import (
+        render_workbench_copy_error_json,
+        render_workbench_copy_error_text,
+    )
+
     return WorkbenchCopyError, render_workbench_copy_error_json, render_workbench_copy_error_text
 
 

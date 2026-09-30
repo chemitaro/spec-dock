@@ -3,24 +3,21 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
-import sys
 from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application import workspace_diagnostics_vnext as diagnostics_module  # noqa: E402
-from spec_dock_runtime.application.contracts import GitHubCapabilityDiagnostic  # noqa: E402
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.workspace_diagnostics_vnext import doctor_workspace, validate_workspace  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from spec_dock.runtime.application import workspace_diagnostics_vnext as diagnostics_module
+from spec_dock.runtime.application.contracts import GitHubCapabilityDiagnostic
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from spec_dock.runtime.application.workspace_diagnostics_vnext import doctor_workspace, validate_workspace
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.infra.github_capability_cli import GitHubCapabilityCliGateway
+    from pathlib import Path
+
+    from spec_dock.runtime.infra.github_capability_cli import GitHubCapabilityCliGateway
 
 
 def _arguments(common: dict[str, object]) -> dict[str, object]:

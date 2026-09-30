@@ -1,14 +1,8 @@
 """Strict vNext selector syntax and snapshot resolution."""
 
-from pathlib import Path
-import sys
-
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.domain.selectors import (  # noqa: E402
+from spec_dock.runtime.domain.selectors import (
     ActiveScopeSelector,
     ArtifactRootSelector,
     GithubScopeSelector,

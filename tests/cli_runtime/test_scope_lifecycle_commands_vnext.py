@@ -12,11 +12,11 @@ import sys
 import time
 from typing import cast
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+ROOT = Path(__file__).resolve().parents[2]
 
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
+
+from spec_dock.runtime.application.create_local_scope import create_local_scope  # noqa: E402
+from spec_dock.runtime.cli.vnext_runtime import run_vnext  # noqa: E402
 from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
 
 
@@ -30,8 +30,7 @@ def test_scope_close_prompts_on_tty_and_respects_denial(tmp_path: Path) -> None:
     created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
     source = (
         "from pathlib import Path; import sys; "
-        "sys.path.insert(0, sys.argv[1]); "
-        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
+        "from spec_dock.runtime.cli.vnext_runtime import run_vnext; "
         "result=run_vnext(['scope','close',sys.argv[2]], invocation_cwd=Path(sys.argv[3]), "
         "engine_digest='engine-a', engine_version='0.2.4'); "
         "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
@@ -40,7 +39,7 @@ def test_scope_close_prompts_on_tty_and_respects_denial(tmp_path: Path) -> None:
         master, slave = pty.openpty()
         try:
             child = subprocess.Popen(
-                [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), created.id, str(repo)],
+                [sys.executable, "-c", source, str(ROOT), created.id, str(repo)],
                 stdin=slave,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
@@ -66,8 +65,7 @@ def test_scope_close_current_prompts_on_tty_without_noninteractive_guard(tmp_pat
     before = metadata.read_bytes()
     source = (
         "from pathlib import Path; import sys; "
-        "sys.path.insert(0, sys.argv[1]); "
-        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
+        "from spec_dock.runtime.cli.vnext_runtime import run_vnext; "
         "result=run_vnext(['scope','close','@current'], invocation_cwd=Path(sys.argv[2]), "
         "engine_digest='engine-a', engine_version='0.2.4'); "
         "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
@@ -75,7 +73,7 @@ def test_scope_close_current_prompts_on_tty_without_noninteractive_guard(tmp_pat
     master, slave = pty.openpty()
     try:
         child = subprocess.Popen(
-            [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), str(repo)],
+            [sys.executable, "-c", source, str(ROOT), str(repo)],
             stdin=slave,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -114,15 +112,14 @@ def test_scope_close_current_rejects_selection_change_during_prompt(tmp_path: Pa
     before = first_meta.read_bytes()
     source = (
         "from pathlib import Path; import sys; "
-        "sys.path.insert(0, sys.argv[1]); "
-        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
+        "from spec_dock.runtime.cli.vnext_runtime import run_vnext; "
         "result=run_vnext(['scope','close','@current'], invocation_cwd=Path(sys.argv[2]), "
         "engine_digest='engine-a', engine_version='0.2.4'); "
         "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
     )
     master, slave = pty.openpty()
     child = subprocess.Popen(
-        [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), str(repo)],
+        [sys.executable, "-c", source, str(ROOT), str(repo)],
         stdin=slave,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

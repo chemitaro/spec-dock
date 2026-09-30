@@ -4,31 +4,30 @@ from __future__ import annotations
 
 from dataclasses import replace
 import json
-from pathlib import Path
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock.runtime_loader import (  # noqa: E402
+from spec_dock.runtime.application import engine_handover_vnext as handover_module
+from spec_dock.runtime.application.installation_update_vnext import (
+    finalize_installation_group,
+    update_installation_group,
+)
+from spec_dock.runtime.cli.admission import AdmissionError, admit_writer
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra.control_store import load_control, store_control
+from spec_dock.runtime.infra.engine_handover_store import pending_engine_handovers
+from spec_dock.runtime_loader import (
     EnginePin,
     digest_distribution,
     read_engine_pin,
     verify_engine_pin,
     write_engine_pin,
 )
-from spec_dock_runtime.application import engine_handover_vnext as handover_module  # noqa: E402
-from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
-    finalize_installation_group,
-    update_installation_group,
-)
-from spec_dock_runtime.cli.admission import AdmissionError, admit_writer  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra.control_store import load_control, store_control  # noqa: E402
-from spec_dock_runtime.infra.engine_handover_store import pending_engine_handovers  # noqa: E402
-from tests.integration.test_installation_group_update_vnext import _group_fixture  # noqa: E402
+from tests.integration.test_installation_group_update_vnext import _group_fixture
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _fixed_pin(tmp_path: Path, name: str, checkout: Path):
@@ -236,7 +235,7 @@ def test_external_entrypoint_allows_only_recorded_engine_handover(
 ) -> None:
     repo, _second, common_dir, bundle, _prior, next_engine, update = _handover_fixture(tmp_path)
     import spec_dock.external_cli as external_module
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(external_module, "_executing_engine", lambda **_kwargs: next_engine)
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
@@ -254,7 +253,7 @@ def test_external_entrypoint_allows_only_recorded_engine_handover(
 
 def test_engine_handover_cli_uses_new_engine_with_old_control(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, _second, common_dir, bundle, _prior, next_engine, update = _handover_fixture(tmp_path)
-    import spec_dock_runtime.commands.installation_vnext as command_module
+    import spec_dock.runtime.commands.installation_vnext as command_module
 
     monkeypatch.setattr(command_module, "resolve_fixed_source", lambda **_kwargs: bundle.source)
     monkeypatch.setattr(command_module, "download_pinned_archive", lambda *_args, **_kwargs: b"archive")

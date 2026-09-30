@@ -3,29 +3,26 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-import sys
 from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application import work_lifecycle  # noqa: E402
-from spec_dock_runtime.application.active_selection import select_scope  # noqa: E402
-from spec_dock_runtime.application.scope_completion import change_scope_lifecycle  # noqa: E402
-from spec_dock_runtime.application.work_lifecycle import finish_work, plan_finish_work, resume_finish_work  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import LocalBackend, SelectionState, decode_scope_metadata  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
-from tests.cli_runtime.test_scope_close_vnext import _Gateway  # noqa: E402
+from spec_dock.runtime.application import work_lifecycle
+from spec_dock.runtime.application.active_selection import select_scope
+from spec_dock.runtime.application.scope_completion import change_scope_lifecycle
+from spec_dock.runtime.application.work_lifecycle import finish_work, plan_finish_work, resume_finish_work
+from spec_dock.runtime.domain.lifecycle import LocalBackend, SelectionState, decode_scope_metadata
+from spec_dock.runtime.infra.active_store import load_selection_v3
+from spec_dock.runtime.infra.github_lifecycle import RemoteIssueError
+from spec_dock.runtime.infra.json_store import atomic_write_json, read_guarded_json
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from tests.cli_runtime.test_active_vnext import _three_scopes
+from tests.cli_runtime.test_scope_close_vnext import _Gateway
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.domain.operation import OperationRecord
+    from pathlib import Path
+
+    from spec_dock.runtime.domain.operation import OperationRecord
 
 
 def test_issue_finish_preserves_selected_epic_and_initiative(tmp_path: Path) -> None:
@@ -78,7 +75,7 @@ def test_explicit_finish_outside_selected_chain_does_not_clear_selection(tmp_pat
 
 def test_local_issue_finish_records_completion_and_clears_only_issue(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     selection = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selection, views=views, expected_identity=None)
@@ -108,7 +105,7 @@ def test_finish_resume_after_lifecycle_write_keeps_fixed_target(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
@@ -149,7 +146,7 @@ def test_finish_resume_after_lifecycle_write_keeps_fixed_target(
 
 def test_already_completed_issue_finish_clears_selection_without_metadata_write(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
@@ -174,7 +171,7 @@ def test_resume_observes_selection_published_before_journal_result(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
@@ -210,7 +207,7 @@ def test_resume_observes_selection_published_before_journal_result(
 
 def test_epic_and_initiative_finish_clear_one_selected_level_at_a_time(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
@@ -234,7 +231,7 @@ def test_epic_and_initiative_finish_clear_one_selected_level_at_a_time(tmp_path:
 
 def test_finish_resume_rejects_same_revision_metadata_tamper(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     specdock_dir, views, _initiative, _epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     selected = select_scope(views, issue.id, current=SelectionState("main", 0, None, None, None, None))
     save_selection_v3(specdock_dir, selected, views=views, expected_identity=None)
@@ -268,7 +265,7 @@ def test_finish_resume_rejects_same_revision_metadata_tamper(tmp_path: Path, mon
 
 def test_github_issue_finish_updates_remote_then_clears_only_issue(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     path = issue.path / ".meta.json"
     loaded = read_guarded_json(path)
@@ -304,7 +301,7 @@ def test_github_finish_resume_after_remote_success_does_not_resend(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     path = issue.path / ".meta.json"
     loaded = read_guarded_json(path)
@@ -345,7 +342,7 @@ def test_github_finish_resume_after_remote_success_does_not_resend(
 
 def test_uncertain_github_finish_waits_for_live_completed_observation_before_selection_clear(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     path = issue.path / ".meta.json"
     loaded = read_guarded_json(path)
@@ -389,7 +386,7 @@ def test_uncertain_github_finish_waits_for_live_completed_observation_before_sel
 
 def test_already_completed_github_issue_clears_selection_without_remote_write(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     path = issue.path / ".meta.json"
     loaded = read_guarded_json(path)
@@ -422,7 +419,7 @@ def test_already_completed_github_issue_clears_selection_without_remote_write(tm
 
 def test_local_epic_finish_uses_live_github_descendant_state(tmp_path: Path) -> None:
     specdock_dir, views, initiative, epic, issue = _three_scopes(tmp_path)
-    from spec_dock_runtime.infra.active_store import save_selection_v3
+    from spec_dock.runtime.infra.active_store import save_selection_v3
 
     path = issue.path / ".meta.json"
     loaded = read_guarded_json(path)

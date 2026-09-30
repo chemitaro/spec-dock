@@ -1,0 +1,123 @@
+"""Normal wheel distribution and real, isolated console utilities (Issue #413)."""
+
+from __future__ import annotations
+
+import json
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tarfile
+import zipfile
+
+try:
+    import tomllib
+except ModuleNotFoundError:  # pragma: no cover - Python 3.10
+    import tomli as tomllib
+
+from tests.cli_runtime.test_cli_vnext_contract import LEAF_PATHS
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_path: Path) -> None:
+    wheel_dir = tmp_path / "wheels"
+    subprocess.run(["uv", "build", "--wheel", "--out-dir", str(wheel_dir)], cwd=ROOT, check=True, capture_output=True)
+    wheel = next(wheel_dir.glob("*.whl"))
+    with zipfile.ZipFile(wheel) as archive:
+        names = archive.namelist()
+        assert len([name for name in names if name.startswith("spec_dock/runtime/") and name.endswith(".py")]) == 138
+        assert "spec_dock/runtime/cli/options.py" in names
+        assert not any("/scripts/spec_dock_runtime/" in name for name in names)
+        assert not any("__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names)
+        assert "spec_dock/assets/spec_dock/.gitignore" in names
+        assert "spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md" in names
+
+    # The real sdist build must ship the same package, including hidden assets.
+    sdist_dir = tmp_path / "sdist"
+    subprocess.run(["uv", "build", "--sdist", "--out-dir", str(sdist_dir)], cwd=ROOT, check=True, capture_output=True)
+    unpacked = tmp_path / "unpacked"
+    with tarfile.open(next(sdist_dir.glob("*.tar.gz"))) as archive:
+        archive.extractall(unpacked, filter="data") if sys.version_info >= (3, 12) else archive.extractall(unpacked)
+    source = next(unpacked.iterdir())
+    derived_dir = tmp_path / "derived-wheel"
+    subprocess.run(
+        ["uv", "build", "--wheel", "--out-dir", str(derived_dir)], cwd=source, check=True, capture_output=True
+    )
+    with zipfile.ZipFile(next(derived_dir.glob("*.whl"))) as archive:
+        assert {name for name in names if name.startswith("spec_dock/")} == {
+            name for name in archive.namelist() if name.startswith("spec_dock/")
+        }
+
+    environment = {key: value for key, value in os.environ.items() if key not in {"PYTHONPATH", "PYTHONHOME"}}
+    venv = tmp_path / "installed"
+    subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True, capture_output=True, env=environment)
+    python = venv / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    subprocess.run(
+        [str(python), "-m", "pip", "install", "--no-deps", str(wheel)],
+        check=True,
+        capture_output=True,
+        env=environment,
+    )
+    package_path = subprocess.check_output(
+        [str(python), "-I", "-c", "import spec_dock; print(spec_dock.__file__)"], text=True, env=environment
+    ).strip()
+    assert Path(package_path).is_relative_to(venv)
+    probe = subprocess.run(
+        [
+            str(python),
+            "-I",
+            "-c",
+            "import sys; from spec_dock.cli import main; "
+            "main(['--project', '/missing', '--help']); "
+            "assert not any(name.startswith(('spec_dock.runtime.application', "
+            "'spec_dock.runtime.commands', 'spec_dock.runtime.infra', "
+            "'spec_dock.runtime.domain.operation', 'spec_dock.fixed_bundle', "
+            "'spec_dock.runtime_loader')) for name in sys.modules)",
+        ],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+    assert probe.returncode == 0, probe.stderr
+    Path(package_path).with_name("version.txt").write_text("9.9.9\n", encoding="utf-8")
+    expected_version = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]["version"]
+    console = venv / ("Scripts/spec-dock.exe" if os.name == "nt" else "bin/spec-dock")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    environment.update(PATH="", PYTHONDONTWRITEBYTECODE="1")
+    calls = [["--help"], ["--version"], *([*leaf.split(), "--help"] for leaf in LEAF_PATHS)]
+    calls.extend(["completion", shell] for shell in ("bash", "zsh", "fish"))
+    for arguments in calls:
+        completed = subprocess.run(
+            [str(console), "--project", str(outside / "missing"), *arguments, "--json"],
+            cwd=outside,
+            env=environment,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert completed.returncode == 0, (arguments, completed.stdout, completed.stderr)
+        payload = json.loads(completed.stdout)
+        assert payload["schema_version"] == "specdock.cli/v2"
+        assert payload["status"] == "succeeded"
+        assert payload["exit_code"] == completed.returncode
+        assert payload["data"]["kind"] == "utility"
+        assert payload["effects"] == []
+        assert "operation_id" not in payload
+        if arguments == ["--version"]:
+            assert payload["data"]["version"] == expected_version
+        assert not completed.stderr
+    invalid = subprocess.run(
+        [str(console), "--project", str(outside / "missing"), "work", "release", "--json"],
+        cwd=outside,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert invalid.returncode == 2
+    assert not invalid.stderr
+    assert json.loads(invalid.stdout)["schema_version"] == "specdock.cli/v2"
+    assert not tuple(outside.iterdir())

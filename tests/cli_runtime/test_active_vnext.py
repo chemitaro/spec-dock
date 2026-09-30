@@ -2,25 +2,23 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.active_selection import (  # noqa: E402
+from spec_dock.runtime.application.active_selection import (
     change_active_selection,
     clear_selection,
     select_scope,
 )
-from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
-from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3, save_selection_v3  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from spec_dock.runtime.application.create_local_scope import AncestorState, create_local_scope
+from spec_dock.runtime.application.scope_query import load_scope_views
+from spec_dock.runtime.domain.lifecycle import SelectionState
+from spec_dock.runtime.infra.active_store import load_selection_v3, save_selection_v3
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _three_scopes(tmp_path: Path):

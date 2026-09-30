@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.cli.options import parse_vnext
+from spec_dock.runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start
+from spec_dock.runtime.infra.active_store import load_selection_v3
+from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway
+from tests.cli_runtime.test_active_vnext import _three_scopes
 
-from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
-from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway  # noqa: E402
-from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_work_commands_start_and_finish_all_three_kinds(tmp_path: Path) -> None:

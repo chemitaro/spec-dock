@@ -1,23 +1,19 @@
 from dataclasses import fields, replace
 from pathlib import Path
-import sys
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import (
-            contracts as app_contracts,
-            ports as app_ports,
-            set_active as app_set_active,
-        )
-        from spec_dock_runtime.domain import models as domain_models
-        from spec_dock_runtime.infra import contracts as infra_contracts
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import (
+        contracts as app_contracts,
+        ports as app_ports,
+        set_active as app_set_active,
+    )
+    from spec_dock.runtime.domain import models as domain_models
+    from spec_dock.runtime.infra import contracts as infra_contracts
+
     return app_contracts, app_ports, app_set_active, domain_models, infra_contracts
 
 
@@ -456,7 +452,7 @@ class TestSetActiveApplication:
     ) -> None:
         app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
         del app_contracts
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         repo_root = tmp_path
         specdock_dir = repo_root / "spec-dock"
@@ -531,7 +527,7 @@ class TestSetActiveApplication:
     @pytest.mark.parametrize("agent_kind", ["crlf_file", "symlink"])
     def test_commit_active_state_rolls_back_agent_manifest_verbatim(self, tmp_path, fail_phase, agent_kind) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         specdock_dir = tmp_path / "spec-dock"
         for layer in ("initiative", "epic", "issue"):
@@ -591,7 +587,7 @@ class TestSetActiveApplication:
         self, tmp_path, managed_name, via_symlink
     ) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         specdock_dir = tmp_path / "spec-dock"
         for layer in ("initiative", "epic", "issue"):
@@ -658,7 +654,7 @@ class TestSetActiveApplication:
     @pytest.mark.parametrize("managed_kind", ["single_link_file", "single_link_symlink"])
     def test_commit_active_state_accepts_single_link_managed_json(self, tmp_path, managed_kind) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         specdock_dir = tmp_path / "spec-dock"
         for layer in ("initiative", "epic", "issue"):
@@ -705,7 +701,7 @@ class TestSetActiveApplication:
     @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
     def test_commit_active_state_rolls_back_root_symlink_and_external_projection(self, tmp_path, fail_phase) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         specdock_dir = tmp_path / "spec-dock"
         for layer in ("initiative", "epic", "issue"):
@@ -758,7 +754,7 @@ class TestSetActiveApplication:
         self, tmp_path, fail_phase, managed_kind
     ) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         specdock_dir = tmp_path / "spec-dock"
         for layer in ("initiative", "epic", "issue"):
@@ -813,7 +809,7 @@ class TestSetActiveApplication:
     @pytest.mark.parametrize("fail_phase", ["manifest", "pointers", "managed"])
     def test_commit_active_state_rolls_back_directory_path_trees_verbatim(self, tmp_path, fail_phase) -> None:
         _app_contracts, app_ports, app_set_active, _domain_models, infra_contracts = _runtime_modules()
-        from spec_dock_runtime.infra import active_store as infra_active_store
+        from spec_dock.runtime.infra import active_store as infra_active_store
 
         specdock_dir = tmp_path / "spec-dock"
         agent_dir = specdock_dir / ".agent"

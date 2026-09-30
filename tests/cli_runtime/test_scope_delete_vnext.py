@@ -4,37 +4,33 @@ from __future__ import annotations
 
 from pathlib import Path
 import subprocess
-import sys
 from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application import scope_delete_vnext  # noqa: E402
-from spec_dock_runtime.application.active_selection import select_scope  # noqa: E402
-from spec_dock_runtime.application.branch_vnext import create_scope_branch  # noqa: E402
-from spec_dock_runtime.application.create_local_scope import AncestorState, create_local_scope  # noqa: E402
-from spec_dock_runtime.application.import_github_scope import import_github_scope  # noqa: E402
-from spec_dock_runtime.application.scope_delete_vnext import (  # noqa: E402
+from spec_dock.runtime.application import scope_delete_vnext
+from spec_dock.runtime.application.active_selection import select_scope
+from spec_dock.runtime.application.branch_vnext import create_scope_branch
+from spec_dock.runtime.application.create_local_scope import AncestorState, create_local_scope
+from spec_dock.runtime.application.import_github_scope import import_github_scope
+from spec_dock.runtime.application.scope_delete_vnext import (
     delete_scope,
     plan_scope_delete,
     resume_scope_delete,
     rollback_scope_delete,
 )
-from spec_dock_runtime.application.scope_query import load_scope_views  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3, save_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
-from spec_dock_runtime.infra.writer_lock import WriterLock  # noqa: E402
-from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo  # noqa: E402
+from spec_dock.runtime.application.scope_query import load_scope_views
+from spec_dock.runtime.domain.lifecycle import SelectionState
+from spec_dock.runtime.infra.active_store import load_selection_v3, save_selection_v3
+from spec_dock.runtime.infra.json_store import atomic_write_json, read_guarded_json
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from spec_dock.runtime.infra.registry_store import RegistryStore
+from spec_dock.runtime.infra.writer_lock import WriterLock
+from tests.cli_runtime.test_active_vnext import _three_scopes
+from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue, _ready_repo
 
 if TYPE_CHECKING:
-    from spec_dock_runtime.domain.operation import OperationRecord
+    from spec_dock.runtime.domain.operation import OperationRecord
 
 
 def test_delete_requires_explicit_recursive_active_and_dependency_choices(tmp_path: Path) -> None:

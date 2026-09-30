@@ -3,27 +3,26 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock.asset_layout import ASSETS  # noqa: E402
-from spec_dock.installation.source import packaged_bundle  # noqa: E402
-from spec_dock.runtime_loader import EnginePin, digest_distribution, read_engine_pin, verify_engine_pin  # noqa: E402
-from spec_dock_runtime.application.installation_update_vnext import (  # noqa: E402
+from spec_dock.asset_layout import ASSETS
+from spec_dock.installation.source import packaged_bundle
+from spec_dock.runtime.application.installation_update_vnext import (
     init_installation_group,
     resume_init_installation_group,
     rollback_init_installation_group,
 )
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra.control_store import load_control  # noqa: E402
-from spec_dock_runtime.infra.installation_group_store import pending_installation_groups  # noqa: E402
-from tests.integration.test_installation_journal_vnext import _bundle  # noqa: E402
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra.control_store import load_control
+from spec_dock.runtime.infra.installation_group_store import pending_installation_groups
+from spec_dock.runtime_loader import EnginePin, digest_distribution, read_engine_pin, verify_engine_pin
+from tests.integration.test_installation_journal_vnext import _bundle
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _git(repo: Path, *args: str) -> None:
@@ -64,7 +63,7 @@ def test_init_installs_all_worktrees_and_marks_control_ready(tmp_path: Path) -> 
 def test_init_resumes_after_first_worktree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     repo, second = _fresh_repo(tmp_path)
     bundle = _bundle(tmp_path)
-    import spec_dock_runtime.application.installation_update_vnext as module
+    import spec_dock.runtime.application.installation_update_vnext as module
 
     real_apply = module.apply_installation
     attempts = 0

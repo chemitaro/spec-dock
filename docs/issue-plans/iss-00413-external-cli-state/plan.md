@@ -47,7 +47,7 @@ uv run pytest tests/cli_runtime/test_issue413_contract.py -q
 <a id="p-02"></a>
 ## P-02 通常wheelとutilityだけの縦経路を成立させる
 
-**状態: 未着手。前提/依存: P-01。** 読む節: [D-02](design.md#d-02)。補足: D-02。
+**状態: 実装中。utility/package縦経路は検証済み、全gate未合格。実結果は[実装記録](implementation-report.md)。前提/依存: P-01。** 読む節: [D-02](design.md#d-02)。補足: D-02。
 
 **所有/対象file**: src/spec_dock/cli.py、external_cli.py、pyproject.toml、setup.py、asset_layout.py。RT→NRT移設、tests/integration/test_cli_entrypoint_vnext.py。新 tests/integration/test_issue413_wheel.py（予定）。
 

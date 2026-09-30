@@ -3,22 +3,20 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.application.contracts import WorkbenchCopyError
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from spec_dock.runtime.application.workbench_vnext import copy_workbench
+from spec_dock.runtime.application.worktree_vnext import create_worktree
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from tests.cli_runtime.test_worktree_create_vnext import _committed_repo
 
-from spec_dock_runtime.application.contracts import WorkbenchCopyError  # noqa: E402
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.workbench_vnext import copy_workbench  # noqa: E402
-from spec_dock_runtime.application.worktree_vnext import create_worktree  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from tests.cli_runtime.test_worktree_create_vnext import _committed_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_copy_local_scope_defaults_to_conflict_error_and_supports_explicit_overwrite(tmp_path: Path) -> None:

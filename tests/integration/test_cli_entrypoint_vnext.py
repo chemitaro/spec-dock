@@ -81,14 +81,15 @@ def test_fixed_engine_ci_validate_requires_no_repository_control_and_writes_noth
     assert ordinary.returncode != 0
 
 
-def test_fixed_distribution_version_comes_from_its_own_bytes(tmp_path: Path) -> None:
+def test_package_version_ignores_retired_fixed_distribution_version_file(tmp_path: Path) -> None:
     import spec_dock
 
     package = tmp_path / "spec_dock"
     package.mkdir()
     shutil.copy2(Path(spec_dock.__file__), package / "__init__.py")
     (package / "version.txt").write_text("9.9.9\n", encoding="utf-8")
-    assert runpy.run_path(str(package / "__init__.py"))["__version__"] == "9.9.9"
+    project = tomllib.loads((Path(__file__).resolve().parents[2] / "pyproject.toml").read_text(encoding="utf-8"))
+    assert runpy.run_path(str(package / "__init__.py"))["__version__"] == project["project"]["version"]
 
 
 def test_fixed_distribution_builder_rejects_checkout_destination(

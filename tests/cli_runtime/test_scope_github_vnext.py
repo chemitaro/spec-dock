@@ -3,37 +3,35 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import shutil
 import subprocess
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, TypedDict, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock import __version__  # noqa: E402
-from spec_dock.asset_layout import ASSETS, VERSION_FILE  # noqa: E402
-from spec_dock_runtime.application.create_github_scope import create_github_scope  # noqa: E402
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.create_node import CreatePlanExecutionError  # noqa: E402
-from spec_dock_runtime.application.github_create_effect import (  # noqa: E402
+from spec_dock import __version__
+from spec_dock.asset_layout import ASSETS, VERSION_FILE
+from spec_dock.runtime.application.create_github_scope import create_github_scope
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from spec_dock.runtime.application.create_node import CreatePlanExecutionError
+from spec_dock.runtime.application.github_create_effect import (
     create_github_issue_effect,
     operation_marker,
 )
-from spec_dock_runtime.application.import_github_scope import (  # noqa: E402
+from spec_dock.runtime.application.import_github_scope import (
     import_github_scope,
     resume_github_scope_import,
 )
-from spec_dock_runtime.application.operation_executor import prepare_operation  # noqa: E402
-from spec_dock_runtime.application.resume_github_scope import resume_github_scope_create  # noqa: E402
-from spec_dock_runtime.infra.contracts import GithubIssueRecord  # noqa: E402
-from spec_dock_runtime.infra.control_store import ControlState, WorktreeRegistration, store_control  # noqa: E402
-from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.github_lifecycle import RemoteIssueError  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
+from spec_dock.runtime.application.operation_executor import prepare_operation
+from spec_dock.runtime.application.resume_github_scope import resume_github_scope_create
+from spec_dock.runtime.infra.contracts import GithubIssueRecord
+from spec_dock.runtime.infra.control_store import ControlState, WorktreeRegistration, store_control
+from spec_dock.runtime.infra.git_cli import git_common_directory
+from spec_dock.runtime.infra.github_lifecycle import RemoteIssueError
+from spec_dock.runtime.infra.operation_journal import JournalStore
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 class FakeGateway:
@@ -186,7 +184,16 @@ def test_remote_timeout_with_duplicate_markers_stays_unknown(tmp_path: Path) -> 
     assert gateway.calls == 1
 
 
-def _ready_repo(tmp_path: Path) -> dict[str, object]:
+class ReadyRepository(TypedDict):
+    repo_root: Path
+    common_dir: Path
+    worktree_id: str
+    engine_digest: str
+    expected_epoch: int
+    updated_at: str
+
+
+def _ready_repo(tmp_path: Path) -> ReadyRepository:
     repo = tmp_path / "repo"
     shutil.copytree(ASSETS / "spec_dock", repo / "spec-dock")
     (repo / VERSION_FILE).write_text(__version__ + "\n", encoding="utf-8")

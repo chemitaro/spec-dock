@@ -30,7 +30,7 @@ target-version = "py310"
 line-length = 120
 indent-width = 4
 preview = true
-src = ["src", "src/spec_dock/assets/spec_dock/scripts"]
+src = ["src"]
 exclude = [
   "build/",
   "dist/",

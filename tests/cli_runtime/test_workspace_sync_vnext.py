@@ -3,30 +3,28 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.scope_query import ScopeView  # noqa: E402
-from spec_dock_runtime.application.workspace_diagnostics_vnext import doctor_workspace  # noqa: E402
-from spec_dock_runtime.application.workspace_sync_vnext import sync_workspace  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import (  # noqa: E402
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from spec_dock.runtime.application.scope_query import ScopeView
+from spec_dock.runtime.application.workspace_diagnostics_vnext import doctor_workspace
+from spec_dock.runtime.application.workspace_sync_vnext import sync_workspace
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.domain.lifecycle import (
     GithubBackend,
     LocalBackend,
     LocalLifecycle,
     StatusObservation,
 )
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.generation_store import load_generation  # noqa: E402
-from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from spec_dock.runtime.infra.active_store import load_selection_v3
+from spec_dock.runtime.infra.generation_store import load_generation
+from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _sync_args(common: dict[str, object]) -> dict[str, object]:
@@ -91,7 +89,7 @@ def test_live_failure_is_incomplete_and_does_not_mark_unknown_fresh(
         "gh:example/repo#47",
     )
     monkeypatch.setattr(
-        "spec_dock_runtime.application.workspace_sync_vnext.load_scope_views", lambda _directory: (fake,)
+        "spec_dock.runtime.application.workspace_sync_vnext.load_scope_views", lambda _directory: (fake,)
     )
 
     class FailingGateway:
@@ -123,7 +121,7 @@ def test_invalid_parent_requires_diagnostic_opt_in(tmp_path: Path, monkeypatch: 
         None,
     )
     monkeypatch.setattr(
-        "spec_dock_runtime.application.workspace_sync_vnext.load_scope_views", lambda _directory: (orphan,)
+        "spec_dock.runtime.application.workspace_sync_vnext.load_scope_views", lambda _directory: (orphan,)
     )
     with pytest.raises(ValueError, match="structure"):
         sync_workspace(**_sync_args(common))
@@ -159,7 +157,7 @@ def test_projection_failure_keeps_generation_readable(tmp_path: Path, monkeypatc
     def fail_projection(*_args: object, **_kwargs: object) -> None:
         raise OSError("injected projection failure")
 
-    monkeypatch.setattr("spec_dock_runtime.application.workspace_sync_vnext.atomic_write_json", fail_projection)
+    monkeypatch.setattr("spec_dock.runtime.application.workspace_sync_vnext.atomic_write_json", fail_projection)
     result = sync_workspace(**_sync_args(common))
     assert result.projection_stale is True
     assert load_generation(repo / "spec-dock") == result.generation

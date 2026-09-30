@@ -80,12 +80,12 @@ def _load_runtime() -> tuple[Any, Any, Any] | None:
         package_root = Path(spec_dock.__file__).resolve().parent
         if not any(part in {"site-packages", "dist-packages"} for part in package_root.parts):
             return None
-        runtime_scripts = package_root / "assets" / "spec_dock" / "scripts"
-        if not runtime_scripts.is_dir():
+
+        if not (package_root / "runtime").is_dir():
             return None
-        sys.path.insert(0, str(runtime_scripts))
-        from spec_dock_runtime.application import contracts
-        from spec_dock_runtime.infra import binary_artifact_publisher
+
+        from spec_dock.runtime.application import contracts
+        from spec_dock.runtime.infra import binary_artifact_publisher
     except (ImportError, OSError, RuntimeError):
         return None
     return contracts, binary_artifact_publisher, package_root

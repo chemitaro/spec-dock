@@ -1,28 +1,24 @@
 import builtins
 from pathlib import Path
-import sys
 import tempfile
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import (
-            contracts as app_contracts,
-            ports as app_ports,
-            validate_tree as app_validate_tree,
-        )
-        from spec_dock_runtime.domain import (
-            models as domain_models,
-            tree as domain_tree,
-            validation as domain_validation,
-        )
-        from spec_dock_runtime.infra import contracts as infra_contracts
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import (
+        contracts as app_contracts,
+        ports as app_ports,
+        validate_tree as app_validate_tree,
+    )
+    from spec_dock.runtime.domain import (
+        models as domain_models,
+        tree as domain_tree,
+        validation as domain_validation,
+    )
+    from spec_dock.runtime.infra import contracts as infra_contracts
+
     return (
         app_contracts,
         app_ports,
@@ -44,14 +40,8 @@ class _StubNodeReader:
 
 class TestValidateApplication:
     def test_discussion_doc_parser_catalog_handles_hyphenated_and_existing_types(self) -> None:
-        runtime_scripts_dir = (
-            Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-        )
-        sys.path.insert(0, str(runtime_scripts_dir))
-        try:
-            from spec_dock_runtime.domain import discussion_docs
-        finally:
-            sys.path.pop(0)
+
+        from spec_dock.runtime.domain import discussion_docs
 
         parsed = discussion_docs.parse_timestamp_discussion_doc_filename(
             "20260329t123456z-draft-requirement-kickoff.md"
@@ -77,14 +67,8 @@ class TestValidateApplication:
         assert discussion_docs.parse_legacy_discussion_doc_filename("001-scratch-legacy-capture.md") is None
 
     def test_discussion_doc_malformed_candidates_remain_fail_closed(self) -> None:
-        runtime_scripts_dir = (
-            Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-        )
-        sys.path.insert(0, str(runtime_scripts_dir))
-        try:
-            from spec_dock_runtime.domain import discussion_docs
-        finally:
-            sys.path.pop(0)
+
+        from spec_dock.runtime.domain import discussion_docs
 
         for name in (
             "draft-requirement-kickoff.md",

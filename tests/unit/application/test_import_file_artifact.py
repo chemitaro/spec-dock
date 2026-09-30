@@ -1,6 +1,5 @@
 import os
 from pathlib import Path
-import sys
 import threading
 from types import SimpleNamespace
 
@@ -8,13 +7,10 @@ import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import contracts, import_file_artifact, ports
-        from spec_dock_runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import contracts, import_file_artifact, ports
+    from spec_dock.runtime.infra.binary_artifact_publisher import FilesystemBinaryArtifactPublisher
+
     return contracts, import_file_artifact, ports, FilesystemBinaryArtifactPublisher
 
 
@@ -305,16 +301,12 @@ def test_missing_or_kind_mismatched_target_precedes_source_guard_and_setup(
 
 
 def test_generic_markdown_filename_is_not_a_malformed_typed_candidate(tmp_path) -> None:
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.domain.artifacts import (
-            is_malformed_artifact_candidate,
-            parse_artifact_filename,
-            parse_generic_imported_artifact_filename,
-        )
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.domain.artifacts import (
+        is_malformed_artifact_candidate,
+        parse_artifact_filename,
+        parse_generic_imported_artifact_filename,
+    )
 
     path = tmp_path / "20260730t010203z--opaque.md"
     path.write_bytes(b"\xff\x00not semantic markdown")

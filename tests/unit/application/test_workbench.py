@@ -1,18 +1,13 @@
-from pathlib import Path
 import shutil
-import sys
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import contracts, ports, workbench
-        from spec_dock_runtime.infra import contracts as infra_contracts
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import contracts, ports, workbench
+    from spec_dock.runtime.infra import contracts as infra_contracts
+
     return contracts, ports, workbench, infra_contracts
 
 
@@ -323,12 +318,8 @@ def test_ancestry_guard_failure_is_unsafe_path_before_copy(tmp_path):
 @pytest.mark.parametrize("linked_level", ["initiative", "epic", "issue"])
 def test_scope_ancestor_symlink_is_rejected_before_external_metadata_reader_runs(tmp_path, linked_level):
     contracts, workbench, ports, filesystem, node_repo, scope_id, _, _ = _fixture(tmp_path)
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.infra import fs_cli
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.infra import fs_cli
 
     initiatives = ports.specdock_dir / "initiatives"
     initiatives.mkdir()
@@ -363,12 +354,8 @@ def test_scope_ancestor_symlink_is_rejected_before_external_metadata_reader_runs
 @pytest.mark.parametrize("meta_parent", ["initiatives-root", "unexpected-directory"])
 def test_unexpected_metadata_symlink_is_rejected_before_external_reader_runs(tmp_path, meta_parent):
     contracts, workbench, ports, filesystem, node_repo, scope_id, _, _ = _fixture(tmp_path)
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.infra import fs_cli
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.infra import fs_cli
 
     initiatives = ports.specdock_dir / "initiatives"
     initiatives.mkdir()

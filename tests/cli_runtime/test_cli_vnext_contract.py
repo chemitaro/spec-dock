@@ -4,16 +4,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-import sys
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.cli.catalog import LEAF_PATHS, RECOVERY_LEAF_COMMANDS  # noqa: E402
-from spec_dock_runtime.cli.legacy import LegacyCommandError  # noqa: E402
-from spec_dock_runtime.cli.options import explicit_help, parse_vnext, parse_vnext_output  # noqa: E402
+from spec_dock.runtime.cli.catalog import LEAF_PATHS, RECOVERY_LEAF_COMMANDS
+from spec_dock.runtime.cli.legacy import LegacyCommandError
+from spec_dock.runtime.cli.options import explicit_help, parse_vnext, parse_vnext_output
 
 
 def test_vnext_catalog_matches_approved_44_leaf_design() -> None:

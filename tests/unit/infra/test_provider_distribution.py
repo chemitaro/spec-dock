@@ -1,4 +1,4 @@
-"""Current provider assets must match this repository's managed projection."""
+"""Static assets retain parity; the retired dogfood runtime awaits cutover."""
 
 from pathlib import Path
 
@@ -15,11 +15,21 @@ def _files(root: Path) -> dict[str, bytes]:
 
 def test_provider_matches_dogfood_managed_assets() -> None:
     for provider, dogfood in (
-        ("src/spec_dock/assets/spec_dock/scripts", "spec-dock/scripts"),
         ("src/spec_dock/assets/spec_dock/docs", "spec-dock/docs"),
         ("src/spec_dock/assets/install_root/.agents/skills", ".agents/skills"),
     ):
         assert _files(ROOT / provider) == _files(ROOT / dogfood)
+
+
+def test_provider_scripts_are_static_and_match_pre_cutover_dogfood() -> None:
+    provider = _files(ROOT / "src/spec_dock/assets/spec_dock/scripts")
+    dogfood = {
+        name: content
+        for name, content in _files(ROOT / "spec-dock/scripts").items()
+        if not name.startswith("spec_dock_runtime/")
+    }
+    assert set(provider) == {"README.md", "spec-dock"}
+    assert provider == dogfood
 
 
 def test_provider_shim_is_the_fixed_engine_delegator() -> None:

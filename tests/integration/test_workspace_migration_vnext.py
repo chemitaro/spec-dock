@@ -5,26 +5,22 @@ from __future__ import annotations
 import json
 from pathlib import Path
 import subprocess
-import sys
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.infra.control_store import (  # noqa: E402
+from spec_dock.runtime.infra.control_store import (
     ControlState,
     WorktreeRegistration,
     load_control,
     store_control,
 )
-from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.migration_store import (  # noqa: E402
+from spec_dock.runtime.infra.git_cli import git_common_directory
+from spec_dock.runtime.infra.migration_store import (
     MigrationMap,
     inspect_migration_inventory,
     read_migration_map,
 )
-from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
+from spec_dock.runtime.infra.registry_store import RegistryStore
 
 
 def _legacy_repo(tmp_path: Path) -> Path:
@@ -243,7 +239,7 @@ def test_migration_plan_preserves_unknown_fields_and_active_focus(tmp_path: Path
     mapping = MigrationMap(
         inventory.repository_uid, inventory.digest, (), (), (), ({"root": str(repo), "registration_id": "main"},)
     )
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     changes = migration_module.plan_migration_changes(inventory, mapping, updated_at="2026-01-01T00:00:00Z")
     by_path = {change.path: json.loads(change.after_bytes) for change in changes}
@@ -264,7 +260,7 @@ def test_migration_plan_preserves_unknown_fields_and_active_focus(tmp_path: Path
 def test_migration_plan_rejects_missing_registration_and_changed_metadata(tmp_path: Path) -> None:
     repo = _legacy_repo(tmp_path)
     inventory = inspect_migration_inventory(repo)
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     empty_mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
     with pytest.raises(ValueError, match="registration"):
@@ -295,7 +291,7 @@ def test_migration_applies_registered_worktree_and_keeps_maintenance(tmp_path: P
     store_control(common, control, expected_epoch=None)
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     result = migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -340,8 +336,8 @@ def test_migration_resumes_after_one_file_was_published(tmp_path: Path, monkeypa
     )
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
-    import spec_dock_runtime.infra.migration_journal as journal
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.infra.migration_journal as journal
 
     real_apply = migration_module.apply_migration_file
     attempts = 0
@@ -398,7 +394,7 @@ def test_committed_migration_rollback_restores_before_bytes_in_maintenance(tmp_p
     store_control(common, control, expected_epoch=None)
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     active = repo / "spec-dock/.agent/active.json"
     before = active.read_bytes()
@@ -445,7 +441,7 @@ def test_migration_rollback_refuses_later_user_edit_without_partial_restore(tmp_
     )
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     completed = migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -491,8 +487,8 @@ def test_migration_rollback_resumes_after_interruption(tmp_path: Path, monkeypat
     )
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
-    import spec_dock_runtime.infra.migration_journal as journal
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.infra.migration_journal as journal
 
     completed = migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -579,7 +575,7 @@ def test_migration_adopts_explicit_existing_branch_and_rolls_binding_back(tmp_pa
         encoding="utf-8",
     )
     mapping = read_migration_map(mapping_path, inventory)
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     completed = migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -637,7 +633,7 @@ def test_migration_applies_and_restores_all_registered_worktrees(tmp_path: Path)
     )
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     completed = migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -699,7 +695,7 @@ def test_migration_registers_explicitly_mapped_worktree_and_rollback_removes_reg
         encoding="utf-8",
     )
     mapping = read_migration_map(mapping_path, inventory)
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     completed = migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -777,7 +773,7 @@ def test_migration_reserves_deleted_historical_local_id(tmp_path: Path) -> None:
     )
     inventory = inspect_migration_inventory(repo)
     mapping = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     migration_module.apply_workspace_migration(
         repo_root=repo,
@@ -815,7 +811,7 @@ def test_migration_repairs_malformed_active_only_with_explicit_clear_and_restore
     )
     inventory = inspect_migration_inventory(repo)
     assert "ACTIVE_REPAIR_REQUIRED" in inventory.blockers
-    import spec_dock_runtime.application.migrate_workspace_vnext as migration_module
+    import spec_dock.runtime.application.migrate_workspace_vnext as migration_module
 
     unapproved = MigrationMap(inventory.repository_uid, inventory.digest, (), (), (), ())
     with pytest.raises(ValueError, match="active repair"):

@@ -1,22 +1,18 @@
 """A command resolves every target from one immutable selection snapshot."""
 
 from pathlib import Path
-import sys
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.resolve_target import (  # noqa: E402
+from spec_dock.runtime.application.resolve_target import (
     ScopeSnapshot,
     WorktreeRecord,
     resolve_scope_targets,
     resolve_worktree_target,
 )
-from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
-from spec_dock_runtime.domain.models import SpecNode  # noqa: E402
-from spec_dock_runtime.domain.selectors import parse_scope_selector, parse_worktree_selector  # noqa: E402
+from spec_dock.runtime.domain.lifecycle import SelectionState
+from spec_dock.runtime.domain.models import SpecNode
+from spec_dock.runtime.domain.selectors import parse_scope_selector, parse_worktree_selector
 
 
 def _node(kind: str, node_id: str, parent_id: str | None, number: int | None = None) -> SpecNode:

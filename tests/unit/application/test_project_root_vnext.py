@@ -1,14 +1,10 @@
 """Project context is fixed before target lookup or effects."""
 
 from pathlib import Path
-import sys
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.resolve_target import resolve_project_root  # noqa: E402
+from spec_dock.runtime.application.resolve_target import resolve_project_root
 
 
 def test_implicit_project_uses_nearest_git_root_from_child(tmp_path: Path) -> None:

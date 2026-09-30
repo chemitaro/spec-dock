@@ -3,23 +3,22 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.application.migrate_workspace_vnext import prepare_workspace_migration
+from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.infra import migration_store
+from spec_dock.runtime.infra.control_store import ControlState, WorktreeRegistration, store_control
+from spec_dock.runtime.infra.git_cli import git_common_directory
+from spec_dock.runtime.infra.migration_store import inspect_migration_inventory
+from tests.cli_runtime.test_worktree_create_vnext import _committed_repo
+from tests.integration.test_workspace_migration_vnext import _legacy_repo
 
-from spec_dock_runtime.application.migrate_workspace_vnext import prepare_workspace_migration  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from spec_dock_runtime.infra import migration_store  # noqa: E402
-from spec_dock_runtime.infra.control_store import ControlState, WorktreeRegistration, store_control  # noqa: E402
-from spec_dock_runtime.infra.git_cli import git_common_directory  # noqa: E402
-from spec_dock_runtime.infra.migration_store import inspect_migration_inventory  # noqa: E402
-from tests.cli_runtime.test_worktree_create_vnext import _committed_repo  # noqa: E402
-from tests.integration.test_workspace_migration_vnext import _legacy_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_workspace_migrate_dry_run_inventories_all_worktrees(tmp_path: Path) -> None:

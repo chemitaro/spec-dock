@@ -3,20 +3,18 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import stat
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from spec_dock.runtime.application.edit_scope import edit_scope_title
+from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views, show_scope
+from spec_dock.runtime.domain.lifecycle import SelectionState
+from spec_dock.runtime.infra.json_store import atomic_write_json, read_guarded_json
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
 
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.edit_scope import edit_scope_title  # noqa: E402
-from spec_dock_runtime.application.scope_query import list_scopes, load_scope_views, show_scope  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def test_scope_query_filters_local_and_cached_github_without_network_or_write(tmp_path: Path) -> None:
@@ -41,7 +39,7 @@ def test_scope_query_keeps_github_status_source_and_stale_flag(tmp_path: Path) -
     common = _ready_repo(tmp_path)
     repo = cast("Path", common["repo_root"])
     specdock_dir = repo / "spec-dock"
-    from spec_dock_runtime.application.import_github_scope import import_github_scope
+    from spec_dock.runtime.application.import_github_scope import import_github_scope
     from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue
 
     imported = import_github_scope(

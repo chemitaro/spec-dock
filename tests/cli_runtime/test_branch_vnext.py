@@ -2,30 +2,28 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 import subprocess
-import sys
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.application.active_selection import change_active_selection  # noqa: E402
-from spec_dock_runtime.application.branch_vnext import (  # noqa: E402
+from spec_dock.runtime.application.active_selection import change_active_selection
+from spec_dock.runtime.application.branch_vnext import (
     create_scope_branch,
     resume_scope_branch_create,
     scope_from_current_branch,
     show_scope_branch,
     switch_scope_branch,
 )
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.domain.branch_binding import BranchBinding, bind_branch  # noqa: E402
-from spec_dock_runtime.domain.registry import LocalIdRegistry  # noqa: E402
-from spec_dock_runtime.infra.operation_journal import JournalStore  # noqa: E402
-from spec_dock_runtime.infra.registry_store import RegistryStore  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+from spec_dock.runtime.application.create_local_scope import create_local_scope
+from spec_dock.runtime.domain.branch_binding import BranchBinding, bind_branch
+from spec_dock.runtime.domain.registry import LocalIdRegistry
+from spec_dock.runtime.infra.operation_journal import JournalStore
+from spec_dock.runtime.infra.registry_store import RegistryStore
+from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _committed_repo(tmp_path: Path):

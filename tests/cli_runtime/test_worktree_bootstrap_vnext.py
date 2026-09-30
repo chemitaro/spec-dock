@@ -2,23 +2,21 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-import sys
 import threading
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.application.worktree_bootstrap_vnext import bootstrap_worktree
+from spec_dock.runtime.application.worktree_vnext import create_worktree
+from spec_dock.runtime.cli.admission import admit_writer
+from spec_dock.runtime.cli.options import parse_vnext
+from spec_dock.runtime.infra.control_store import load_control
+from spec_dock.runtime.infra.json_store import read_guarded_json
+from tests.cli_runtime.test_worktree_create_vnext import _committed_repo
 
-from spec_dock_runtime.application.worktree_bootstrap_vnext import bootstrap_worktree  # noqa: E402
-from spec_dock_runtime.application.worktree_vnext import create_worktree  # noqa: E402
-from spec_dock_runtime.cli.admission import admit_writer  # noqa: E402
-from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
-from spec_dock_runtime.infra.control_store import load_control  # noqa: E402
-from spec_dock_runtime.infra.json_store import read_guarded_json  # noqa: E402
-from tests.cli_runtime.test_worktree_create_vnext import _committed_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _created(tmp_path: Path):
@@ -94,7 +92,7 @@ def test_partial_bootstrap_requires_explicit_target_recovery_without_rerunning_m
 
 
 def test_bootstrap_recovery_cannot_acknowledge_a_live_attempt(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from spec_dock_runtime.application import worktree_bootstrap_vnext as module
+    from spec_dock.runtime.application import worktree_bootstrap_vnext as module
 
     _source, _created_worktree, arguments = _created(tmp_path)
     entered = threading.Event()
