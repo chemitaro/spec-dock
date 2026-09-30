@@ -68,6 +68,8 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf in ("scope close", "scope reopen"):
+        return "Inspect the exact Scope and its backend state before a new explicit operation; do not blindly repeat a mutation."
     if leaf.startswith("scope import github "):
         return "Inspect the exact GitHub Issue and local Scope paths before a new explicit import."
     if leaf.startswith("scope create "):
@@ -108,9 +110,19 @@ def _reject_retired_start(argv: list[str]) -> None:
     sync = argv[:2] == ["workspace", "sync"]
     create = argv[:2] == ["scope", "create"]
     imported = argv[:3] == ["scope", "import", "github"]
+    lifecycle = len(argv) >= 2 and argv[0] == "scope" and argv[1] in ("close", "reopen")
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
-    if not start and not finish and not branch and not active and not sync and not create and not imported:
+    if (
+        not start
+        and not finish
+        and not branch
+        and not active
+        and not sync
+        and not create
+        and not imported
+        and not lifecycle
+    ):
         return
     index = 2
     while index < len(argv):
@@ -135,6 +147,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--slug",
             "--parent",
             "--github-repo",
+            "--reason",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1

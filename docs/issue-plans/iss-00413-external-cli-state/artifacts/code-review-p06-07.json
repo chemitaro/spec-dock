@@ -1,0 +1,35 @@
+{
+  "findings": [
+    {
+      "title": "[P1] Finish内のGit失敗がネイティブ診断を失う",
+      "body": "GitHub-backed Finishのbefore_change、Close確認後、またはlocal metadata公開時のverify_source／verify_stageでGitコマンドが失敗すると、GitProcessErrorがRuntimeErrorとしてこのcatchに入り、WORK_FINISH_INCOMPLETEかつdetails={}へ置換されます。そのためC-04で必須のerror.details.git.stderrとreturncodeが失われ、利用者がGitの実際の失敗原因を確認できません。GitProcessErrorを明示的に分岐し、現在のeffects、status、exit_code判定を保ったままGIT_FAILEDとerror.details()を返してください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_finish.py",
+        "line_range": {
+          "start": 244,
+          "end": 244
+        }
+      }
+    },
+    {
+      "title": "[P1] Scope作成resultが必須形状と公開済み状態に反する",
+      "body": "scope createのdry-run、確認拒否、remote失敗用previewとpublication例外用payloadはC-05必須のchangedを欠き、dry-runではcan_applyとblockersも欠落します。さらにDirectoryPublicationIncomplete.confirmed=trueではscaffold効果をsucceededとして実directoryの公開を確認済みなのにscope=nullを返すため、JSON利用者が未公開と誤認して不要なimportを試みます。全経路でscope、github_ref、changedを返し、dry-runにはcan_applyとblockersを加え、confirmed publicationでは再読したScopeViewとchanged=trueを返してください。",
+      "confidence_score": 0.98,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_scope_publish.py",
+        "line_range": {
+          "start": 193,
+          "end": 193
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "検証済みのchemitaro/spec-dock@93b151129bf6e193aaa92605b729d83077fc3514について、6fec3099d8759b4e5b3b393b2987534b46dfa383..93b151129bf6e193aaa92605b729d83077fc3514のP-02からP-08およびP-09 create縦経路を、適用契約、実装、関連testと照合しました。通常package入口、物理project context、worktree-local直接選択、Start専用排他、branch／readiness、active操作、Scope query、read-only Sync、GitHub採番とdirectory公開の主要経路は概ね契約に沿っていますが、FinishのGit診断保持とScope作成resultの必須形状／確認済み公開状態にmerge-blockingな不整合があります。本レビューではtestを実行しておらず、repository内のGreen記録は独立したpass証拠として扱っていません。",
+  "review_status": "fail",
+  "review_status_reason": "C-04のGit診断保持とC-05のScope result契約を決定的に破るP1 findingがあるためです。",
+  "overall_confidence_score": 0.98
+}

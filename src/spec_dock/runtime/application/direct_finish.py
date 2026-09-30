@@ -19,7 +19,7 @@ from spec_dock.runtime.domain.lifecycle import (
     encode_scope_metadata,
 )
 from spec_dock.runtime.infra.direct_json import MetadataPublicationIncomplete, replace_existing_json
-from spec_dock.runtime.infra.git_process import run_git
+from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock.runtime.infra.work_target_store import SelectionRemovalUnknown, WorkTargetStore
 from spec_dock.runtime.presentation.command_data import DiagnosticData
@@ -241,7 +241,13 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             6 if applied else 5 if isinstance(error, (OSError, RuntimeError)) else 3,
             effects=tuple(effects),
             error=Diagnostic(
-                error.code if isinstance(error, RemoteIssueError) else "WORK_FINISH_INCOMPLETE", str(error), {}
+                error.code
+                if isinstance(error, RemoteIssueError)
+                else "GIT_FAILED"
+                if isinstance(error, GitProcessError)
+                else "WORK_FINISH_INCOMPLETE",
+                str(error),
+                error.details() if isinstance(error, GitProcessError) else {},
             ),
         )
     return OperationResult(

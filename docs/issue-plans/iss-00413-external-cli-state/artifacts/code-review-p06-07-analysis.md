@@ -1,0 +1,35 @@
+# Strict r7 の完全証拠batch分析
+
+## 識別と根拠
+
+対象はIssue #413のP-02〜P-08とP-09 create縦経路。利用者固定点は6fec3099d8759b4e5b3b393b2987534b46dfa383、exact reviewed HEADは93b151129bf6e193aaa92605b729d83077fc3514。fresh browser会話specdock-413-code-p06-r7（GPT-5.6 Sol/Pro、model選択確認・promptSubmitted=true）が46m11sで完了し、native wrapper exit10、validated review_status=fail。原本はcode-review-p06-07.jsonへbyteを変更せず保存した。reviewerはtestsを実行しておらず、コード・契約の照合結果として扱う。
+
+現在の実装HEADは05f60cae48a6fb5b17ed16ee87dfedca2303e43cである。create/importの追加後の47 tests、共有tree影響の164 testsはGreen。さらに未コミットのclose/reopen unitを含む最新関連83 tests（25.95秒）はGreenで、全Ruff check/format（381 files）が完了した。一方、限定mypyにはlifecycle reasonのLiteral annotation不足が一件あり、未解決としてこのbatchへ含める。これは製品Redではなく型検査の証拠である。review生成と関連検証が完了した後にanalyze-review-findingsを適用した。
+
+権威は利用者の全実装・指摘修正・fresh Strict passへの指示、確定requirement/design、C-04/C-05、AGENTS.md、P-09とP-13以後である。code/testsとreviewの推奨は実態証拠で、契約を変更する権限ではない。parentのStrict政策はP0/P1がblocking、P2/P3単独では改修・再レビューを開始しない。今回の二件のsource-native P1を保持する。
+
+## F1: [P1] Finish内のGit失敗がネイティブ診断を失う
+
+妥当・到達可能・blocking。reviewed sourceのdirect_finish.py:244で、verify_source/verify_stage/before_changeから届くGitProcessErrorをRuntimeErrorとして受け、code=WORK_FINISH_INCOMPLETE、details={}へ潰す。command dispatchへ到達する前に結果として返すため、dispatchのnative Git分岐では回復できない。C-04のstderr/returncode保持に反する。effectsとpartialの既存判定は維持できるので、最初の誤りは実装の例外→診断変換である。
+
+primary routeはimplementation-remediation。GitProcessErrorの型を認識し、GIT_FAILEDとerror.details()を保持する。GitHubのPATCH前と確認済みclose後のnative Git shim失敗をpublic CLIで再現し、未実行または確認済み効果、CLI exit5/6、元の複数行stderr/returncodeを一緒に検証する。旧Finishの対象/token固定とselection clearの保全、再送禁止を変えない。利用者がこのIssueの修正を明示認可済みで、API意味・状態所有者・復旧保証を変更しないため人間の追加判断は不要。
+
+## F2: [P1] Scope作成resultが必須形状と公開済み状態に反する
+
+妥当・到達可能・blocking。reviewed candidateのpreview/publication errorはC-05のchangedを欠き、dry-runのcan_apply/blockersもない。DirectoryPublicationIncomplete.confirmed=trueでもscope=nullを返す実装は、確認済みのscaffold succeededと利用者が読むScope結果を一致させていない。最初の誤りは実装のresult projectionである。
+
+primary routeはimplementation-remediation。05f60caeの未レビュー追加ではpreview/errorのchangedと公開後競合の場所診断を既に修正したが、dry-runのcan_apply/blockersとconfirmed cleanupのScopeView回復は未充足である。create/importおよび同じC-05を使うclose/reopenのdry-runを公開境界で検査し、現在の計画が有効なときcan_apply=true/blockers=[]を返す。確認済み公開後のcleanup errorは安全なnamed-target再読取でScopeViewを回復し、changed=trueと確認済み効果を保つ。
+
+review推奨の「confirmedなら常に再読ScopeView」を、named-targetが安全に読める範囲へ限定する。再読取不能・redirected・同IDの複数path・identity/linkage不一致ならScopeViewを捏造しない。scopeのnullable契約とerror/partialを保ち、確認済み公開効果を消さず、競合pathを提示して新しい明示操作前の現物確認を案内する。全writer lockや自動削除、再POST/importを導入しない。これは保証の追加や意味の変更ではなく、既存の保全・unknown契約を同時に満たす最小の扱いである。人間の追加判断は不要。
+
+## 残る検証とparentへの帰結
+
+二つの独立した実装root causeを同じ現在batchとして分析した。Literal型不備は現在unitのtyping-only correctionとして修正し、Green behaviorを保つ。修正後に関連public tests、Ruff、限定mypy、exact artifact/plan/reportを確認してcheckpoint commitし、clean・非強制push済みの新しいSHAでfresh Strictを実施する。過去のreviewを依頼promptへ添付しない。ローカルGreenだけではP1を閉じず、次の独立reviewがpassとなるまで継続する。
+
+Scope/dependency以後、legacy pure helperの抽出・退役、native Windows、全lint/test、Final Quality Gate pilot承認、手動製品確認、dogfood移行と正式work startは未完了の既存obligationである。今回の限定reviewと修正で完了を主張せず、goalをactiveに保つ。
+
+## 実施した修正と検証
+
+F1のPATCH直前native Git失敗を公開CLIでRedとし、GitProcessErrorのGIT_FAILED/details保持へ修正してGreen。確認済みClose後のGit失敗もpartial6・完了済み効果と未解除recordを保全した。F2のcreate dry-run can_apply欠落、確認済み公開後cleanupのScopeView欠落、close/reopen dry-run必須field欠落をそれぞれRed→Greenで修正した。import乾式経路も同じresult契約へ合わせた。確認済みdirectoryのScopeViewはnamed-targetのpath/kind/parent/ref/title/revisionを照合してから返し、actorがlinkageを変更した追加回帰ではscope=nullと確認済み効果を保全する。
+
+関連88 testsが28.76秒で通過した。初回全Ruffには例外抑制のstyle一件があり、contextlib.suppressへ直した後に全check/format（381 files）を通過した。public contract/fresh wheelの7 testsも6.27秒で通過した。同じC-05 invariantを既に接続済みのbranchへ広げ、create dry-runのcan_apply欠落をRed→Greenで修正した。新しい契約を追加せず既存必須fieldを満たす変更であり、branchの23 tests（5.61秒）、最終変更7 source限定mypyが通過した。fresh Strictのgate未取得は維持し、local Greenをレビューpassへ読み替えない。

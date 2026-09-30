@@ -287,6 +287,7 @@ def test_branch_create_dry_run_does_not_reserve_ref(tmp_path: Path, capsys: pyte
     )
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "planned"
+    assert result["data"]["result"]["can_apply"] is True and result["data"]["result"]["blockers"] == []
     assert result["data"]["result"]["created"] is False
     assert result["effects"] == [{"kind": "git.branch.create", "status": "planned", "target": "init-00001-fixture"}]
     assert main(["--project", str(root), "branch", "show", "init-00001", "--json"]) == 0

@@ -244,6 +244,7 @@ def test_import_dry_run_reads_the_issue_without_creating_local_files(
     )
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "planned" and result["data"]["result"]["changed"] is False
+    assert result["data"]["result"]["can_apply"] is True and result["data"]["result"]["blockers"] == []
     assert result["effects"] == [{"kind": "scaffold", "status": "planned", "target": None}]
     assert all(path.read_bytes() == value for path, value in before.items())
     assert not (root / "spec-dock/.agent").exists()

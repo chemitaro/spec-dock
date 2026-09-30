@@ -239,8 +239,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
 }
 
 RECOVERY_LEAF_COMMANDS: dict[str, str] = {
-    "scope close": "scope.close",
-    "scope reopen": "scope.reopen",
     "scope delete": "scope.delete",
     "workspace migrate": "workspace.migrate",
     "installation init": "installation.init",
@@ -497,6 +495,15 @@ def _help_spec(leaf: str) -> HelpSpec:
         reads = "Current metadata, templates, origin publication repository, the exact GitHub Issue and live ancestor state."
         json_version = "specdock.cli/v2"
         confirmation = "No final confirmation is required; import makes no remote mutation."
+    elif leaf in ("scope close", "scope reopen"):
+        reads = "Current metadata and the direct record for selectors; live GitHub states for the target and required descendants or ancestors."
+        does_not = (
+            "Does not change direct selection or Git checkout, automatically close children, or save a lifecycle cache."
+        )
+        json_version = "specdock.cli/v2"
+        confirmation = (
+            "TTY prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
+        )
     elif leaf == "workbench copy":
         confirmation = "--on-conflict overwrite requires confirmation; the default error policy does not."
     elif leaf in _CONFIRMATION_LEAVES:

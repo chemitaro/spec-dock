@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 import json
 import os
+import shutil
 import subprocess
 import sys
 from typing import TYPE_CHECKING
@@ -86,6 +87,51 @@ def github_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, states: dict
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", str(bin_dir) + os.pathsep + os.environ["PATH"])
     return log
+
+
+@pytest.mark.parametrize("request_count,exit_code", [(2, 5), (4, 6)])
+def test_finish_native_git_failure_retains_original_diagnostic_and_confirmed_effects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    request_count: int,
+    exit_code: int,
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    real_git = shutil.which("git")
+    assert real_git is not None
+    executable = tmp_path / "gh-bin/git"
+    original_error = "fatal: fixture Git observation refused\nsecond original line\n"
+    executable.write_text(
+        f"#!{sys.executable}\nimport os,sys\nfrom pathlib import Path\n"
+        f"log=Path({str(log)!r})\n"
+        f"if '--show-toplevel' in sys.argv and log.exists() and len(log.read_text().splitlines())>={request_count}:\n"
+        f" sys.stderr.write({original_error!r}); sys.exit(73)\n"
+        f"os.execv({real_git!r},['git',*sys.argv[1:]])\n"
+    )
+    executable.chmod(0o755)
+    assert main(["--project", str(root), "work", "finish", "@current", "--yes", "--json"]) == exit_code
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["error"]["code"] == "GIT_FAILED"
+    assert result["error"]["details"]["git"]["stderr"] == original_error
+    assert result["error"]["details"]["git"]["returncode"] == 73
+    assert result["data"]["completed"] is (request_count == 4) and output.err == ""
+    if request_count == 2:
+        assert result["status"] == "failed" and result["effects"] == []
+        expected_methods = ["GET", "GET"]
+    else:
+        assert result["status"] == "partial"
+        assert result["effects"] == [
+            {"kind": "github.issue.close", "status": "succeeded", "target": "gh:example/repo#1"},
+            {"kind": "selection.clear", "status": "not_attempted", "target": record.name[7:-5]},
+        ]
+        expected_methods = ["GET", "GET", "PATCH", "GET"]
+    assert [json.loads(line)["method"] for line in log.read_text().splitlines()] == expected_methods
+    assert record.read_bytes() == before
 
 
 def test_finish_closes_github_issue_once_before_releasing_capture(

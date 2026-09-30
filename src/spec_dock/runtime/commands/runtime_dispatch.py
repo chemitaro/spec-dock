@@ -44,6 +44,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_scope_publish import import_scope
 
             result = import_scope(namespace, context)
+        elif command in ("scope close", "scope reopen"):
+            from spec_dock.runtime.application.direct_scope_lifecycle import lifecycle_scope
+
+            result = lifecycle_scope(namespace, context)
         elif command in ("branch show", "branch create", "branch switch"):
             from spec_dock.runtime.application.branch_operations import branch_operation
 

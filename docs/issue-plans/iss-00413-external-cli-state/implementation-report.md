@@ -334,3 +334,15 @@ GET中のactor編集を再照合して保全し、既知refとscaffold not_attem
 不足dispatch、事前二重登録GET、取得中の入力変化による不正partial、live状態欠落、競合path欠落、metadata編集制限、help、resumeの各focused cycleを確認した。既存純粋規則から継承できたreference形式・offline/foreign/PR/remote未検証の拒否・dry-runは最初からGreenの回帰確認であり、架空のRedを主張しない。作成23/取り込み17/public contract・fresh wheelを合わせた47 testsが18.79秒で通過した。共有tree変更の影響をStart/active/Finish/observation/Syncへ広げ、164 testsが42.02秒で通過した。全source/test Ruff checkとformat（379 files）、変更6 source限定mypy、diff checkも成功した。
 
 close/reopen/dependency、旧moduleへのpure helper依存の抽出・退役、Windows native、全体gate、Final Quality Gate、手動製品確認、正式dogfood切替は未完了である。goalはactiveとして次の縦経路へ進む。
+
+## P-09 close/reopenと第7回Strictの修正
+
+93b151129bf6e193aaa92605b729d83077fc3514を固定したr7は46分11秒後にnative wrapper exit10、validated review_status=failで完了した。P1二件の原文を[JSON](artifacts/code-review-p06-07.json)へbyteを変えず保存し、05f60caeおよび未コミットclose/reopen unitと最新検証を区別して[完全batch分析](artifacts/code-review-p06-07-analysis.md)を記録した。レビューはtestsを実行していない。
+
+Scope close/reopenは必要なtarget・子孫/祖先の今回のGitHub観測から既存pure規則で計画する。completed親の再Closeでも子孫完了を確認し、not-planned Closeは子孫IDを提示してtargetのみ変更する。再開は既にOpenでも祖先Openを要求する。GitHub PATCHは一回と確認GET、真正の既存localは未知metadataを保全してrevision/lifecycle revisionを増やすatomic置換とした。選択record、HEAD、branchを変更しない。部分成功/unknownは効果を保ち、unknown Scope statusへ落として再送しない。localの確認済み公開後cleanup失敗でも新しい状態とsucceeded effectを保持する。JSON・非対話では--yesを要求し、実TTYの計画後確認・取消を検証した。helpはv2へ更新し、旧resumeはcontextに入る前にARGUMENT_RETIRED/exit2で拒否する。
+
+F1はFinishのGit例外を診断へ変換する際のdetails欠落だった。native Git executableで、PATCH直前の複数行stderrがWORK_FINISH_INCOMPLETEへ潰れるRedを確認し、GIT_FAILEDと元stderr/returncodeを返してGreenにした。確認済みClose後の同じGit失敗ではpartial6、completed=true、close succeeded、clear not_attemptedとなり捕捉recordを保全することも確認した。PATCHを再送しない。
+
+F2はScopeのresult projectionの不備だった。create dry-runのcan_apply欠落と、確認済みdirectory公開後cleanup失敗時のscope=nullをRedとして確認した。create/importの有効な乾式計画にcan_apply=true/blockers=[]を返し、確認済み公開後はnamed-targetを安全に再観測してScopeViewを回復する。path・kind・parent・ref・title・revisionを公開時と照合し、不一致ならactorの編集を保全してscope=null、changed=trueと確認済み効果を維持する。close/reopen dry-runも同じ必須fieldのRed→Greenを確認した。全writer lockや台帳、UUID、権限制御、rollbackは追加していない。
+
+作成・取り込み・close/reopen・Finishの公開CLI選択は88 passed（28.76秒）。public contract/fresh wheelの7 testsも6.27秒で通過した。mypyのLiteral不足はtyping-only correctionとして修正した。C-05の同じ乾式result invariantを既存branchにも照合し、can_apply欠落のRedを確認して共通成功projectionへ修正した。branchの23 testsが5.61秒で通過し、最終的な変更7 source限定mypyと全source/testsのRuff check/format（381 files）も成功した。実TTYのfixture配置不備やcollection errorは製品Redに含めない。現在unitの独立Strict pass、dependency、旧moduleの抽出・退役、native Windows、全体lint/test、Final Quality Gate、手動製品確認と実dogfood切替は未完了であり、goalをactiveに保つ。

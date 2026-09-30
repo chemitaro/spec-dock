@@ -102,6 +102,9 @@ def test_create_dry_run_needs_no_confirmation_and_publishes_nothing(
     )
     result = json.loads(capsys.readouterr().out)
     assert result["status"] == "planned"
+    assert result["data"]["result"]["can_apply"] is True
+    assert result["data"]["result"]["blockers"] == []
+    assert result["data"]["result"]["changed"] is False
     assert [effect["status"] for effect in result["effects"]] == ["planned", "planned"]
     assert result["data"]["result"]["scope"] is None
     assert not log.exists()
@@ -316,8 +319,9 @@ def test_create_uses_the_confirmed_github_number_without_control_or_a_marker(
     assert created["parent_id"] is None and created["revision"] == 0
 
 
+@pytest.mark.parametrize("changed_identity", [False, True])
 def test_confirmed_directory_publication_keeps_success_effect_after_descriptor_cleanup_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], changed_identity: bool
 ) -> None:
     root, log = publication_fixture(tmp_path, monkeypatch)
     published = root / "spec-dock/initiatives/init-00057-new-scope"
@@ -334,6 +338,11 @@ def test_confirmed_directory_publication_keeps_success_effect_after_descriptor_c
         real_close(descriptor)
         if should_fail:
             failed = True
+            if changed_identity:
+                metadata_path = published / ".meta.json"
+                metadata = json.loads(metadata_path.read_bytes())
+                metadata["github"]["issue_number"] = 99
+                metadata_path.write_text(json.dumps(metadata))
             raise OSError("fixture: descriptor cleanup failed after confirmed publication")
 
     monkeypatch.setattr(os, "close", close)
@@ -360,6 +369,17 @@ def test_confirmed_directory_publication_keeps_success_effect_after_descriptor_c
         ("scaffold", "succeeded"),
     ]
     assert json.loads((published / ".meta.json").read_bytes())["id"] == "init-00057"
+    assert result["data"]["result"]["changed"] is True
+    scope = result["data"]["result"]["scope"]
+    if changed_identity:
+        assert scope is None
+        assert json.loads((published / ".meta.json").read_bytes())["github"]["issue_number"] == 99
+    else:
+        assert scope["id"] == "init-00057" and scope["github_ref"] == "gh:example/repo#57"
+        assert scope["path"] == "spec-dock/initiatives/init-00057-new-scope"
+        assert scope["kind"] == "initiative" and scope["title"] == "New Scope" and scope["parent_id"] is None
+        assert scope["revision"] == 0 and scope["backend"] == "github"
+        assert scope["status"]["state"] == "open" and scope["status"]["source"] == "github"
     assert len(log.read_text().splitlines()) == 1
 
 

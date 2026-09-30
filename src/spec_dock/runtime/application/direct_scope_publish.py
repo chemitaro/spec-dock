@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import replace
 from datetime import datetime, timezone
 import secrets
@@ -38,6 +39,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from spec_dock.runtime.application.project_context import ProjectContext
+    from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.selectors import ScopeKind
     from spec_dock.runtime.presentation.envelope import EffectStatus
 
@@ -126,7 +128,7 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
         return OperationResult(
             namespace.command_path,
             "planned",
-            preview,
+            FamilyData("scope", {**preview.result, "can_apply": True, "blockers": ()}),
             0,
             effects=(
                 *((Effect("github-create", "planned", repository),) if create else ()),
@@ -173,6 +175,7 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
     scope_id = format_id({"initiative": "init", "epic": "epic", "issue": "iss"}[kind], remote.number)
     scaffold_attempted = False
     published = False
+    created: ScopeView | None = None
     try:
         verify_source()
         if any(view.id == scope_id or view.github_ref == ref for view in load_scope_views(workspace)):
@@ -197,6 +200,27 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
                 _create_relative_symlink_at(descriptor, node_dir=plan.dest_dir, link_path=link, target_path=target)
             write_new_scope_metadata_at(descriptor, metadata)
 
+        def read_published(*, targeted: bool = False) -> ScopeView:
+            fresh = resolve_context(str(context.root), context.root, timeout=namespace.timeout)
+            if fresh.clone_identity != context.clone_identity or fresh.worktree_identity != context.worktree_identity:
+                raise ValueError("Git project physical identity changed after publication")
+            fresh.require_writer()
+            observed = show_scope(load_scope_views(workspace, target_id=scope_id if targeted else None), scope_id)
+            if (
+                observed.path != plan.dest_dir
+                or observed.kind != kind
+                or observed.parent_id != parent_id
+                or observed.github_ref != ref
+                or observed.backend.kind != "github"
+                or observed.title != title
+                or observed.revision != 0
+            ):
+                raise ValueError("published Scope identity or metadata changed")
+            return replace(
+                observed,
+                status=StatusObservation(remote.state, "github", "github", observed_at, remote.updated_at, False),
+            )
+
         scaffold_attempted = True
         publish_directory(
             plan.dest_dir,
@@ -207,12 +231,12 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
             stage_name=stage_name,
         )
         published = True
-        created = replace(
-            show_scope(load_scope_views(workspace), plan.meta.id),
-            status=StatusObservation(remote.state, "github", "github", observed_at, remote.updated_at, False),
-        )
+        created = read_published()
     except (ValueError, OSError, RuntimeError) as error:
         published = published or (isinstance(error, DirectoryPublicationIncomplete) and error.confirmed)
+        if isinstance(error, DirectoryPublicationIncomplete) and error.confirmed:
+            with suppress(LookupError, ValueError, OSError, RuntimeError):
+                created = read_published(targeted=True)
         scaffold_status: EffectStatus = (
             "succeeded"
             if published
@@ -226,7 +250,16 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
         return OperationResult(
             namespace.command_path,
             "partial" if partial else "failed",
-            FamilyData("scope", {"scope": None, "github_ref": ref, "title": title, "slug": slug, "changed": published}),
+            FamilyData(
+                "scope",
+                {
+                    "scope": _scope_payload(created, context) if created is not None else None,
+                    "github_ref": ref,
+                    "title": title,
+                    "slug": slug,
+                    "changed": published,
+                },
+            ),
             6 if partial else 5 if scaffold_attempted or isinstance(error, OSError) else 3,
             effects=(
                 *((Effect("github-create", "succeeded", ref),) if create else ()),
@@ -246,28 +279,14 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
                 f"Use a new explicit scope import github {kind} {ref} operation after resolving any local conflict.",
             )),
         )
+    assert created is not None
     return OperationResult(
         namespace.command_path,
         "succeeded",
         FamilyData(
             "scope",
             {
-                "scope": {
-                    "id": created.id,
-                    "kind": created.kind,
-                    "title": created.title,
-                    "parent_id": created.parent_id,
-                    "backend": created.backend.kind,
-                    "github_ref": created.github_ref,
-                    "path": str(created.path.relative_to(context.root)),
-                    "revision": created.revision,
-                    "status": {
-                        "state": created.status.state,
-                        "authority": created.status.authority,
-                        "source": created.status.source,
-                        "observed_at": created.status.observed_at,
-                    },
-                },
+                "scope": _scope_payload(created, context),
                 "github_ref": ref,
                 "changed": True,
             },
@@ -278,3 +297,22 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
             Effect("scaffold", "succeeded", created.id),
         ),
     )
+
+
+def _scope_payload(scope: ScopeView, context: ProjectContext) -> dict[str, object]:
+    return {
+        "id": scope.id,
+        "kind": scope.kind,
+        "title": scope.title,
+        "parent_id": scope.parent_id,
+        "backend": scope.backend.kind,
+        "github_ref": scope.github_ref,
+        "path": str(scope.path.relative_to(context.root)),
+        "revision": scope.revision,
+        "status": {
+            "state": scope.status.state,
+            "authority": scope.status.authority,
+            "source": scope.status.source,
+            "observed_at": scope.status.observed_at,
+        },
+    }

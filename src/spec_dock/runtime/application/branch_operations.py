@@ -229,10 +229,13 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                         error.details() if isinstance(error, GitProcessError) else {},
                     ),
                 )
+    data = _data(target.id, name, tip, created=created, switched=switched)
+    if namespace.dry_run:
+        data = BranchData({**data.result, "can_apply": True, "blockers": ()})
     return OperationResult(
         namespace.command_path,
         status,
-        _data(target.id, name, tip, created=created, switched=switched),
+        data,
         0,
         effects=effects,
     )
