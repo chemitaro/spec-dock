@@ -97,7 +97,6 @@ _NONBLOCKING_INSPECTION: dict[str, str] = {
     "worktree remove": "Run worktree list and inspect the target path and Git branch.",
     "worktree bootstrap": "Run worktree show and inspect project-owned bootstrap effects before retrying.",
     "workbench copy": "Inspect the source and destination Workbench entries before retrying.",
-    "workspace sync": "Inspect the published generation pointer and run workspace validate before retrying.",
 }
 if set(_NONBLOCKING_INSPECTION) != MUTATING_LEAF_PATHS - set(RECOVERY_LEAF_COMMANDS):
     raise RuntimeError("non-blocking failure inspection must cover every non-D16 writer")

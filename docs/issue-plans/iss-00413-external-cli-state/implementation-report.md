@@ -282,3 +282,15 @@ Closeの結果が不明/拒否、または確認済みClose後・解除前に処
 Finish29 testsとactive36 testsが通過し、最終的な関連公開CLI/Start/record store/envelopeの選択は166 passed（35.83秒）。全source/test Ruff check/format（372 files）と変更2 sourceの限定mypyが成功した。並行して進めたP-08の変更は、この修正unitとは分けてcommitする。新しい全writer lock、journal、rollback、Scope ID、未知entry削除、別WT操作を追加していない。
 
 現在候補のfresh Strict pass、Windows adapter/native受入、残る各stage、full gates、最終品質ゲート、手動製品確認、dogfood移行は継続する。実装側の推論レベルは2026-10-01の利用者指示によりGPT-6.1 Sol / Maxへ更新した。独立レビューのGPT-5.6 Sol / Pro指定は維持する。
+
+## P-08 都度観測によるreadonly Sync
+
+`workspace sync`を通常packageのdirect_syncへ接続した。現在treeの未選択Scopeを含む全Scopeと、Git inventoryが示す同clone各WTの直接対象/必要祖先をメモリ内で集計する。他WTの無関係なmetadataはロードしない。各Scopeの直接/子孫選択件数、各WTのselected/empty/invalid等とbranch差、lifecycle、観測時刻をJSON/textへ出力し、process_stateはnot_observedとする。GitHub-backedのlocal sourceはunknown、github sourceはcanonical refを重複排除してlive GETする。選択を完了や実行中processへ読み替えない。
+
+他WTの読取不能、重複選択、Scope IDの異なるGitHub linkage、祖先関係や真正の既存local lifecycleの食い違いは、観測できた行/件数を保全し診断付きpartial/exit7を返す。件数のcomplete=falseを維持し、不明分を0へ補完しない。GitHub取得失敗/未知状態はunknown、effects=[]であり、古いcacheで補完しない。other-WTのGit失敗の元stderr/returncodeはJSON/textにも保持する。現treeの未知metadata schemaは--allow-invalidでも解釈を進めずexit7にする。同期によるmetadata/record/generated projection/controlへの書込はない。
+
+public CLIを使う19件の統合テストで、選択中かつcompletedのAと未選択かつopenのB、同親の並行選択、親の直接/子孫件数、他WTにしかない必要祖先、無関係な壊れmetadataの非読取、GitHub ref dedup、取得失敗、旧cacheの非使用、矛盾、invalid record、native Git原文、text/helpを確認した。実出力をcli-schema.json/FormatCheckerで検証し、scopes欠落・不正lifecycleを拒否した。source cacheは両構文ともcontext前のARGUMENT_RETIRED/exit2へ変更した。schema検査には開発依存のjsonschemaを追加し、製品wheelの実行依存は増やしていない。
+
+関連公開CLI/統合テストとstore/committed-workspace/Gateway/envelopeは262 passed（78.06秒）。この結果は後続のactive clear追加4件より前であり、その後の修正unitでは別途166 passed（35.83秒）を確認した。全source/test Ruff check/format（372 files）とSync/Finish/dispatch/data/envelope/catalog/optionsの7 source限定mypyが成功した。初期fixture/collectionの不備は訂正し製品Redと区別した。既存local矛盾の追加では集計前参照による3件の回帰を検出し、未追加identityのguardを修正した後で拡張選択を成功させた。
+
+このunitはP-08の通常POSIX経路の機能検証であり、独立Strict合格、旧generation module/testの退役、Windows native、full suite/lint、最終品質ゲートや実dogfood移行の証拠ではない。P-09以後を継続する。

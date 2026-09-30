@@ -122,7 +122,7 @@ HELP_EFFECTS: dict[str, str] = {
     "worktree remove": "Remove one worktree directory and registration; keep its branch.",
     "worktree bootstrap": "Run the selected worktree's project-owned make init.",
     "workbench copy": "Copy one Scope Workbench into a selected worktree.",
-    "workspace sync": "Publish a derived generation; do not alter primary Scope or active state.",
+    "workspace sync": "Observe current Scope lifecycle and same-clone worktree selections without writing files.",
     "workspace validate": "Read and validate the workspace; --ci checks committed data without installation state. No changes.",
     "workspace doctor": "Read installation and journal diagnostics; no repair.",
     "workspace migrate": "Migrate registered worktrees and control under maintenance.",
@@ -213,7 +213,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _required("--to-worktree"),
         _arg("--on-conflict", choices=("error", "overwrite"), default="error"),
     ),
-    "workspace sync": (_arg("--source", choices=SOURCES, default="cache"), _flag("--allow-invalid")),
+    "workspace sync": (_arg("--source", choices=("local", "github"), default="local"), _flag("--allow-invalid")),
     "workspace validate": (_flag("--require-nodes"), _flag("--ci")),
     "workspace doctor": (
         _arg("--github-repo"),
@@ -280,7 +280,6 @@ MUTATING_LEAF_PATHS = frozenset({
     "worktree remove",
     "worktree bootstrap",
     "workbench copy",
-    "workspace sync",
     "workspace migrate",
     "installation init",
     "installation update",
@@ -335,7 +334,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "worktree remove": "The target must be registered and pass active, branch, and path safety guards.",
     "worktree bootstrap": "The target must be registered and have a project-owned make init target.",
     "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
-    "workspace sync": "Primary Scope data must be readable; --allow-invalid explicitly permits invalid input.",
+    "workspace sync": "Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.",
     "workspace validate": "A readable workspace is required; --ci validates committed data without installation state.",
     "workspace doctor": "The selected repository and its control records must be readable.",
     "workspace migrate": "Inspection with --dry-run can inventory without --mapping-file. Applying a migration requires an inventory-bound --mapping-file, maintenance state, and valid migration guards.",
@@ -484,6 +483,14 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "workspace migrate":
         does_not = "Does not migrate independent repositories outside the selected Git common directory."
     preconditions = HELP_PRECONDITIONS[leaf]
+    json_data = "help text or shell script." if leaf in {"help", "completion"} else _JSON_DATA_BY_ROOT[root]
+    json_version = "specdock.cli/v1"
+    if leaf == "workspace sync":
+        target = "The current Scope tree and main/linked worktrees in this Git clone."
+        reads = "Current metadata, Git worktree inventory, direct records and their ancestors; live GitHub only with --source github."
+        does_not = "Does not save derived state, acquire a Start lock, repair selections, or inspect Codex processes."
+        json_version = "specdock.cli/v2"
+        json_data = "observed_at, source, complete, worktrees, scopes, counts, findings; process_state=not_observed."
     if leaf.startswith("scope create"):
         confirmation = "GitHub creation requires confirmation; local creation does not."
     elif leaf == "workbench copy":
@@ -501,10 +508,7 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not=does_not,
         preconditions=preconditions,
         confirmation=confirmation,
-        json=(
-            "--json returns one specdock.cli/v1 envelope. Data: "
-            + ("help text or shell script." if leaf in {"help", "completion"} else _JSON_DATA_BY_ROOT[root])
-        ),
+        json=f"--json returns one {json_version} envelope. Data: {json_data}",
         examples=_example(leaf),
     )
 

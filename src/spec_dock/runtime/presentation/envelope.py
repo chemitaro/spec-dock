@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, is_dataclass
 import json
 import re
-from typing import Generic, Literal, TypeVar
+from typing import Generic, Literal, TypeVar, cast
+
+from spec_dock.runtime.presentation.command_data import SyncData
 
 ResultStatus = Literal["succeeded", "unchanged", "planned", "failed", "partial"]
 EffectStatus = Literal["planned", "succeeded", "unchanged", "failed", "not_attempted", "unknown"]
@@ -85,7 +87,11 @@ class OperationResult(Generic[T]):
             raise ValueError("planned result cannot contain executed effects")
         if self.status == "failed" and effect_states & {"succeeded", "unknown"}:
             raise ValueError("failed result cannot hide applied or unknown effects")
-        if self.status == "partial" and not ("unknown" in effect_states or "succeeded" in effect_states):
+        if (
+            self.status == "partial"
+            and self.exit_code == 6
+            and not ("unknown" in effect_states or "succeeded" in effect_states)
+        ):
             raise ValueError("partial result requires an applied or unknown effect")
 
 
@@ -171,6 +177,8 @@ def render_json_v2(result: OperationResult[object]) -> str:
 
 def render_text(result: OperationResult[object], *, native_git: bool = False) -> tuple[str, str]:
     stdout_lines = [f"spec-dock: {result.status} ({result.command})"]
+    if isinstance(result.data, SyncData):
+        stdout_lines.extend(_sync_text(result.data))
     for effect in result.effects:
         target = f" target={_text_escape(effect.target)}" if effect.target is not None else ""
         stdout_lines.append(f"effect {effect.kind} status={effect.status}{target}")
@@ -188,6 +196,37 @@ def render_text(result: OperationResult[object], *, native_git: bool = False) ->
     elif result.recovery is not None and result.recovery.blocked_reason:
         stderr_lines.append(f"recovery: {_text_escape(result.recovery.blocked_reason)}")
     return "\n".join(stdout_lines) + "\n", "\n".join(stderr_lines) + ("\n" if stderr_lines else "") + native_stderr
+
+
+def _sync_text(data: SyncData) -> list[str]:
+    lines = [f"observed_at={data.observed_at} source={data.source} complete={str(data.complete).lower()}"]
+    for row in data.worktrees:
+        selected = cast("dict[str, object]", row["selection"])
+        lines.append(f'worktree path="{_text_escape(str(row["path"]))}"')
+        lines.append(
+            f"  selection={selected['status']} scope_id={_field_text(selected['scope_id'])} "
+            f"lifecycle={row['lifecycle']} current_branch={_field_text(selected['current_branch'])} "
+            f"selected_branch={_field_text(selected['selected_branch'])} "
+            f"branch_changed={str(selected['branch_changed']).lower()} process_state={row['process_state']}"
+        )
+    counts = {str(row["scope_id"]): row for row in data.counts}
+    for scope in data.scopes:
+        count = counts[str(scope["scope_id"])]
+        lines.append(
+            f"scope_id={scope['scope_id']} github_ref={_field_text(scope['github_ref'])} lifecycle={scope['lifecycle']} "
+            f"direct_selected_count={count['direct_selected_count']} "
+            f"descendant_selected_count={count['descendant_selected_count']} complete={str(count['complete']).lower()}"
+        )
+    lines.extend(
+        f"finding [{finding.code}] {_text_escape(finding.message)} "
+        f"details={json.dumps(_redact(finding.details), ensure_ascii=False)}"
+        for finding in data.findings
+    )
+    return lines
+
+
+def _field_text(value: object) -> str:
+    return "null" if value is None else _text_escape(str(value))
 
 
 def _text_escape(value: str) -> str:

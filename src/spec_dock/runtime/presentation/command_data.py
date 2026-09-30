@@ -27,3 +27,15 @@ class ActiveData:
     selection: dict[str, object]
     ancestors: tuple[str, ...]
     kind: str = "active"
+
+
+@dataclass(frozen=True)
+class SyncData:
+    observed_at: str
+    source: str
+    complete: bool
+    worktrees: tuple[dict[str, object], ...]
+    scopes: tuple[dict[str, object], ...]
+    counts: tuple[dict[str, object], ...]
+    findings: tuple[Diagnostic, ...] = ()
+    kind: str = "sync"

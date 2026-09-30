@@ -1,6 +1,6 @@
 # Issue #413 実装計画書
 
-**全17 stepは未着手です。** ChatGPTによるこのpackの生成・静的自己点検とは別の、後続実装とCodexのローカル作業です。
+**全17 stepの実装を進行中です。** 各stepの実装・検証・独立レビューの状態は下記と[実装記録](implementation-report.md)で区別します。ChatGPTによるこのpackの生成・静的自己点検は、後続実装や製品の合格証拠とは別です。
 
 実装担当は利用者指定の **GPT-6.1 Sol / reasoning Max**（2026-10-01の追加指示でHighから変更）。設定値は `model="gpt-6.1-sol"`、`reasoning_effort="max"`。本資料の著述モデルや独立Strictレビュー用のGPT-5.6 Sol / Proと混同せず、gpt-5.6系専用coder roleへ置き換えません。モデルの公開状況や能力比較はこの作業契約の判断材料にしません。
 
@@ -212,7 +212,9 @@ uv run pytest tests/cli_runtime/test_active_vnext.py tests/cli_runtime/test_work
 <a id="p-08"></a>
 ## P-08 Syncの複数選択表示を完成させる
 
-**状態: 未着手。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
+**状態: 実装中（通常dispatchのreadonly Sync、現在treeと同clone各WTの必要対象/祖先、直接/子孫件数、local/github lifecycle、矛盾/不明の診断、JSON schemaとtextを検証。現在候補の独立レビュー、旧generation実装/testの退役、Windows nativeと全体gateは未完了）。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
+
+通常実装はNRT/application/direct_sync.py、presentation/command_data.py・envelope.py、cli/catalog.py・options.py、commands/runtime_dispatch.pyに配置した。旧workspace_sync_vnextは通常経路へ戻さず、P-12で実装/testを退役させる。readonly partial/exit7はeffects=[]であり、変更後失敗のpartial/exit6と区別する。
 
 **所有/対象file**: NRT/application/workspace_sync_vnext.py、commands/workspace_sync_vnext.py、presentation、domain表示型。tests/cli_runtime/test_workspace_sync_vnext.py、新 tests/integration/test_issue413_sync.py（予定）。
 

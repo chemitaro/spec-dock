@@ -32,6 +32,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_finish import finish_work
 
             result = finish_work(namespace, context)
+        elif command == "workspace sync":
+            from spec_dock.runtime.application.direct_sync import sync_workspace
+
+            result = sync_workspace(namespace, context)
         elif command in ("branch show", "branch create", "branch switch"):
             from spec_dock.runtime.application.branch_operations import branch_operation
 

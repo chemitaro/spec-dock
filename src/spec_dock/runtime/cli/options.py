@@ -89,7 +89,7 @@ def _recovery_help(leaf: str) -> str:
     if leaf == "worktree bootstrap":
         return "Inspect the target record and project effects; --recover --yes only acknowledges the attempt, then retry separately."
     if leaf == "workspace sync":
-        return "Inspect the published generation pointer, then retry with the same source; there is no --resume."
+        return "No mutation to recover; inspect incomplete observations and issue a new Sync."
     if leaf in MUTATING_LEAF_PATHS:
         return "Inspect the target and observed effects before retrying; there is no --resume."
     return "No mutation to recover; correct the reported input or environment and rerun."
@@ -98,9 +98,10 @@ def _recovery_help(leaf: str) -> str:
 def _reject_retired_start(argv: list[str]) -> None:
     start = argv[:2] == ["work", "start"]
     finish = argv[:2] == ["work", "finish"]
+    sync = argv[:2] == ["workspace", "sync"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
-    if not start and not finish and not branch and not active:
+    if not start and not finish and not branch and not active and not sync:
         return
     index = 2
     while index < len(argv):
@@ -120,6 +121,8 @@ def _reject_retired_start(argv: list[str]) -> None:
                 value = argv[index]
             if start and name == "--source" and value == "cache":
                 raise RetiredArgumentError("--source cache was retired; Start uses live GitHub readiness")
+            if sync and name == "--source" and value == "cache":
+                raise RetiredArgumentError("--source cache was retired; use local or github observations")
         index += 1
 
 
