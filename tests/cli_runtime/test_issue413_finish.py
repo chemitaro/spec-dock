@@ -482,3 +482,267 @@ def test_finish_unavailable_observation_reports_gateway_failure_without_effects(
     assert result["error"]["code"] == "GITHUB_REMOTE_UNAVAILABLE"
     assert result["effects"] == []
     assert record.read_bytes() == before
+
+
+def test_finish_preserves_existing_local_backend_and_optional_metadata_without_control(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application.project_context import resolve_context
+    from spec_dock.runtime.domain.work_target import WorkTarget
+    from spec_dock.runtime.infra.work_target_store import WorkTargetStore
+
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    existing = json.loads(metadata.read_bytes())
+    existing.update(
+        backend="local",
+        github=None,
+        revision=5,
+        lifecycle={"state": "open", "revision": 3, "updated_at": "2020-01-01T00:00:00Z", "optional": {"keep": True}},
+        optional={"keep": [1, 2]},
+    )
+    metadata.write_text(json.dumps(existing))
+    context = resolve_context(str(root), root)
+    with WorkTargetStore(root) as store:
+        handle = store.publish(
+            WorkTarget(
+                "specdock.work-target/v1",
+                "init-00001",
+                None,
+                "main",
+                "2026-09-30T00:00:00Z",
+                context.clone_identity,
+                context.worktree_identity,
+            )
+        )
+        record = store.path / handle.basename
+    assert main(["--project", str(root), "work", "finish", "@current", "--yes", "--offline", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["completed"] is True
+    assert not record.exists()
+    after = json.loads(metadata.read_bytes())
+    assert after["revision"] == 6
+    assert after["lifecycle"]["state"] == "completed"
+    assert after["lifecycle"]["revision"] == 4
+    assert after["lifecycle"]["updated_at"] != existing["lifecycle"]["updated_at"]
+    assert after["lifecycle"]["optional"] == existing["lifecycle"]["optional"]
+    assert {k: v for k, v in after.items() if k not in ("revision", "lifecycle")} == {
+        k: v for k, v in existing.items() if k not in ("revision", "lifecycle")
+    }
+    assert result["effects"][0] == {"kind": "scope.lifecycle", "status": "succeeded", "target": "init-00001"}
+    assert not list(root.rglob(".specdock-json-transactions"))
+    assert not (root / ".git/spec-dock").exists()
+
+
+def test_local_finish_redirected_private_parent_never_creates_external_stage(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    before = metadata.read_bytes()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "spec-dock/.agent").symlink_to(outside, target_is_directory=True)
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--offline", "--json"]) == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    assert metadata.read_bytes() == before
+    assert list(outside.iterdir()) == []
+
+
+def test_local_finish_stage_collision_preserves_foreign_stage(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    before = metadata.read_bytes()
+    real_open = os.open
+    collisions = []
+
+    def opening(path, *args, **kwargs):
+        if isinstance(path, str) and path.startswith(".stage-"):
+            descriptor = real_open(path, *args, **kwargs)
+            os.write(descriptor, b"foreign preserve")
+            os.close(descriptor)
+            collisions.append(root / "spec-dock/.agent/staging" / path)
+        return real_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "open", opening)
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    assert metadata.read_bytes() == before
+    assert len(collisions) == 1
+    assert collisions[0].read_bytes() == b"foreign preserve"
+
+
+def test_local_finish_replace_cleanup_failure_preserves_confirmed_completion_effect(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    real_close = os.close
+    triggered = False
+
+    def closing(descriptor):
+        nonlocal triggered
+        stage = root / "spec-dock/.agent/staging"
+        is_stage = stage.exists() and os.fstat(descriptor).st_ino == stage.stat().st_ino
+        real_close(descriptor)
+        if is_stage and not triggered and json.loads(metadata.read_bytes())["lifecycle"]["state"] == "completed":
+            triggered = True
+            raise OSError("fixture stage cleanup refused")
+
+    monkeypatch.setattr(os, "close", closing)
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert triggered
+    assert result["data"]["completed"] is True
+    assert result["effects"] == [{"kind": "scope.lifecycle", "status": "succeeded", "target": "init-00001"}]
+    assert json.loads(metadata.read_bytes())["lifecycle"]["state"] == "completed"
+
+
+def test_local_finish_replacement_parent_redirect_is_unknown_and_preserves_new_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    parent_identity = metadata.parent.stat().st_ino
+    real_fsync = os.fsync
+    triggered = False
+
+    def syncing(descriptor):
+        nonlocal triggered
+        real_fsync(descriptor)
+        if os.fstat(descriptor).st_ino == parent_identity and not triggered:
+            triggered = True
+            metadata.parent.rename(tmp_path / "moved-scope")
+            metadata.parent.mkdir()
+            metadata.write_text(json.dumps(dict(original, title="external preserve")))
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert triggered
+    assert result["data"]["completed"] is False
+    assert result["effects"] == [{"kind": "scope.lifecycle", "status": "unknown", "target": "init-00001"}]
+    assert json.loads(metadata.read_bytes())["lifecycle"]["state"] == "open"
+    assert json.loads(metadata.read_bytes())["title"] == "external preserve"
+
+
+def test_local_finish_requires_ignored_stage_before_creating_private_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    before = metadata.read_bytes()
+    (root / "spec-dock/.gitignore").write_text("")
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 3
+    assert json.loads(capsys.readouterr().out)["effects"] == []
+    assert metadata.read_bytes() == before
+    assert not (root / "spec-dock/.agent").exists()
+
+
+def test_local_finish_preserves_metadata_permissions_during_atomic_replace(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    metadata.chmod(0o660)
+    previous_umask = os.umask(0o022)
+    try:
+        assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["data"]["completed"] is True
+    finally:
+        os.umask(previous_umask)
+    assert metadata.stat().st_mode & 0o777 == 0o660
+
+
+def test_local_finish_inflight_metadata_edit_is_preserved_without_replace(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    original = json.loads(metadata.read_bytes())
+    original.update(
+        backend="local", github=None, lifecycle={"state": "open", "revision": 0, "updated_at": "2020-01-01T00:00:00Z"}
+    )
+    metadata.write_text(json.dumps(original))
+    real_fsync = os.fsync
+    changed = False
+
+    def syncing(descriptor):
+        nonlocal changed
+        real_fsync(descriptor)
+        if not changed and os.fstat(descriptor).st_ino != metadata.parent.stat().st_ino:
+            changed = True
+            metadata.write_text(json.dumps(dict(original, title="concurrent preserve")))
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 3
+    assert json.loads(capsys.readouterr().out)["effects"] == []
+    assert changed
+    assert json.loads(metadata.read_bytes())["title"] == "concurrent preserve"
+    assert json.loads(metadata.read_bytes())["lifecycle"]["state"] == "open"
+    assert list((root / "spec-dock/.agent/staging").iterdir()) == []
+
+
+def test_finish_resolves_dynamic_target_and_handle_from_one_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    old = select_fixture(root)
+    github_fixture(tmp_path, monkeypatch, {"1": "completed"})
+    real_close = os.close
+    replaced = False
+    selection_closes = 0
+    new = None
+
+    def closing(descriptor):
+        nonlocal replaced, new, selection_closes
+        is_selection = os.fstat(descriptor).st_ino == old.parent.stat().st_ino
+        real_close(descriptor)
+        if is_selection:
+            selection_closes += 1
+        if selection_closes == 2 and not replaced:
+            replaced = True
+            old.unlink()
+            new = select_fixture(root)
+
+    monkeypatch.setattr(os, "close", closing)
+    assert main(["--project", str(root), "work", "finish", "@current", "--yes", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert replaced and new is not None
+    assert new.exists()
+    assert result["data"]["selection_token"] == new.name[7:-5]
+    assert result["effects"][-1] == {"kind": "selection.clear", "status": "unchanged", "target": old.name[7:-5]}

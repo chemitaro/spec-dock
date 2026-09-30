@@ -99,11 +99,13 @@ def read_selection(context: ProjectContext, views: tuple[ScopeView, ...]) -> Sel
     )
 
 
-def resolve_scope(context: ProjectContext, views: tuple[ScopeView, ...], target: str) -> ScopeView:
+def resolve_scope(
+    context: ProjectContext, views: tuple[ScopeView, ...], target: str, *, selection: SelectionObservation | None = None
+) -> ScopeView:
     selector = parse_scope_selector(target)
     if not isinstance(selector, ActiveScopeSelector):
         return show_scope(views, target)
-    selection = read_selection(context, views)
+    selection = read_selection(context, views) if selection is None else selection
     if selection.status == "empty":
         raise LookupError("active selection is empty")
     if selection.status != "selected" or selection.record is None:

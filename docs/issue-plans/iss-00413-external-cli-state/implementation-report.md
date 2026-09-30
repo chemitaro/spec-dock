@@ -254,3 +254,19 @@ native gh fixtureを外部プロセスとして起動し、GET/PATCHとcanonical
 拡張選択は229 passed/4 failed（43.10秒）。失敗4件は廃止対象のvnext_runtimeを直接呼び、通常catalogから削除済みのactive set --from-branch属性を参照する旧lifecycle CLIテストだった。旧runtimeのnonblocking inspection parityは現在catalogに合わせたが、廃止経路の復活はしない。P-12で退役module/testと新しい公開CLIの対応を整理する。全suite成功の証拠には扱わない。その後の最終context/metadata再照合を含むFinish/共有Gateway選択は37 passed（7.05秒）。変更した5 sourceの限定mypy、全source/test Ruff check/format（369 files）が成功した。
 
 真正の既存local backend保全互換性はまだ未接続であり、このcheckpointをP-07完了とは扱わない。Windows adapter/native受入、P-08以後、全体mypy/test、現在候補の独立Strict再レビュー、最終品質ゲート、手動製品確認も継続する。実dogfood workspace/Scopeを変更した証拠ではない。
+
+## P-07 既存local backend保全互換性と単一metadata更新
+
+4fc5bd259210501c17e8d24e4332746a6f46ea8eをcommit/pushし、通常のStrict wrapperで第5試行（第4試行はunsupported native optionによる送信前失敗）をGPT-5.6 Sol / Proで開始した。GitHub upstreamとlocalのfull SHA一致、clean branch、固定baseからの非空差分を確認した。以下の変更はそのレビュー対象SHAより後であり、レビュー認定には含めない。
+
+真正の既存local backendのFinishを、schema3の既存lifecycle codecによる保全更新へ接続した。新規local発行、backend変換、Scope ID変更は追加しない。unknown optional field、lifecycle内optional field、既存IDを保持し、revisionとcompletionだけを一fileのatomic replaceで更新する。already completedなら書き換えない。全writer lock/transaction intent/journalは作らず、同FSのignored .agent/stagingに実行中の一時fileだけを作る。実際のstage名がGitでignoredであることを作成前に検査する。
+
+source bytes/identity、writer feature宣言、destination parent identityを公開直前とreadback時に確認する。nofollowのdirectory descriptorから不足するprivate directoryだけを作り、redirectされた.agentの外へstage directoryを作らない。stage名衝突では既存の他fileを削除しない。前提失敗時に自身のstageだけを片付け、rename結果unknownではrollbackせず選択を保持する。fsync/readbackまで確認済みのmetadata更新を、後のdescriptor cleanup例外で未実施へ降格しない。既存modeを保存し、編集を禁止する権限機構は追加しない。
+
+公開CLIでlocal未接続、redirect親への外部stage生成、stage衝突時の他file削除、cleanup後の確認済み効果消失、rename後の親置換、umaskによる元mode喪失のRed→Greenを確認した。更新中の外部metadata編集はoverwriteせず、自stageだけを片付けるGreenも確認した。
+
+Finishの動的selectorと期待selectorは最初のSelectionObservationを共有し、target解決とhandle捕捉で別々のcurrentを読まない。初回観測のstore退出直後に外部OS境界でtokenを入れ替えた場合にも、新tokenを保持するGreenを確認した。この試験とignore試験では初期fixtureの介入位置/ignore位置を訂正したため、初期失敗を製品Redの根拠にはしない。
+
+関連公開CLI、Start/active、共有Gateway、複数WT観測は157 passed（35.62秒）。全source/test Ruff check/format（370 files）、変更3 sourceの限定mypyが成功した。前commitの自動生成bodyの「484件」はtest fileの行数であり、当時のFinishは18 tests、共有Gatewayを含む実測は37 passedである。履歴は書き換えず、実測の正本は本reportとpytest結果とする。
+
+P-07のPOSIX機能検証は進んだが、現在候補の独立レビューとWindows native、P-08以後、全体gate/最終品質ゲート/手動製品確認、実dogfoodの移行は未完了である。元Scope240件や実workspace declarationを手編集して復旧した証拠ではない。

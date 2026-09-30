@@ -2,14 +2,24 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
+import json
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
 from spec_dock.runtime.application.worktree_observation import ancestors_for, read_selection, resolve_scope
-from spec_dock.runtime.domain.lifecycle import GithubBackend
+from spec_dock.runtime.domain.lifecycle import (
+    GithubBackend,
+    LocalBackend,
+    LocalLifecycle,
+    decode_scope_metadata,
+    encode_scope_metadata,
+)
+from spec_dock.runtime.infra.direct_json import MetadataPublicationIncomplete, replace_existing_json
+from spec_dock.runtime.infra.git_process import run_git
 from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock.runtime.infra.work_target_store import SelectionRemovalUnknown, WorkTargetStore
 from spec_dock.runtime.presentation.command_data import DiagnosticData
@@ -17,6 +27,7 @@ from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, Operatio
 
 if TYPE_CHECKING:
     import argparse
+    from pathlib import Path
 
     from spec_dock.runtime.application.project_context import ProjectContext
 
@@ -36,25 +47,25 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
     if not namespace.yes and not namespace.dry_run:
         raise ValueError("work finish requires --yes")
     views = load_scope_views(context.root / "spec-dock")
-    target = resolve_scope(context, views, namespace.target)
-    inputs = capture_local_inputs(context, views)
     captured = read_selection(context, views)
+    target = resolve_scope(context, views, namespace.target, selection=captured)
+    inputs = capture_local_inputs(context, views)
     if namespace.expect_backend is not None and target.backend.kind != namespace.expect_backend:
         raise ValueError("target backend does not match --expect-backend")
     if namespace.expect_current is not None:
-        expected = resolve_scope(context, views, namespace.expect_current).id
+        expected = resolve_scope(context, views, namespace.expect_current, selection=captured).id
         if captured.status != "selected" or captured.record is None or captured.record.scope_id != expected:
             raise ValueError("direct target does not match --expect-current")
     backend = target.backend
-    if not isinstance(backend, GithubBackend):
-        raise ValueError("legacy local Finish is not connected yet")
-    if namespace.offline:
+    descendants = tuple(view for view in views if target.id in {ancestor.id for ancestor in ancestors_for(views, view)})
+    if namespace.offline and any(isinstance(view.backend, GithubBackend) for view in (target, *descendants)):
         raise ValueError("offline mode cannot fetch required GitHub state")
     gateway = GithubIssueGateway(timeout=namespace.timeout)
     try:
-        remote = gateway.get(context.root, f"{backend.repo_owner}/{backend.repo_name}", backend.issue_number)
-        descendants = tuple(
-            view for view in views if target.id in {ancestor.id for ancestor in ancestors_for(views, view)}
+        observed_state = (
+            gateway.get(context.root, f"{backend.repo_owner}/{backend.repo_name}", backend.issue_number).state
+            if isinstance(backend, GithubBackend)
+            else target.status.state
         )
         for child in descendants:
             child_backend = child.backend
@@ -71,12 +82,14 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         return OperationResult(
             "work finish", "failed", DiagnosticData(), 5, error=Diagnostic(error.code, str(error), {})
         )
-    if remote.state == "unknown":
+    if observed_state == "unknown":
         raise ValueError("SCOPE_STATUS_UNKNOWN")
-    if remote.state == "not-planned":
+    if observed_state == "not-planned":
         raise ValueError("TERMINAL_REASON_CONFLICT: reopen is required")
+    effect_kind = "github.issue.close" if isinstance(backend, GithubBackend) else "scope.lifecycle"
+    effect_target = target.github_ref if isinstance(backend, GithubBackend) else target.id
     if namespace.dry_run:
-        planned = [Effect("github.issue.close", "planned", target.github_ref)]
+        planned = [Effect(effect_kind, "planned", effect_target)]
         if (
             captured.status == "selected"
             and captured.record is not None
@@ -89,7 +102,7 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             "planned",
             FinishData(
                 target.id,
-                remote.state == "completed",
+                observed_state == "completed",
                 context.branch,
                 context.branch,
                 captured.handle.token if captured.handle else None,
@@ -107,7 +120,7 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         return fresh
 
     verify_source()
-    already_completed = remote.state == "completed"
+    already_completed = observed_state == "completed"
     change_requested = False
 
     def before_change() -> None:
@@ -115,10 +128,23 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         verify_source()
         change_requested = True
 
+    def verify_stage(path: Path) -> None:
+        verify_source()
+        if not run_git(
+            context.root,
+            "check-ignore",
+            "--no-index",
+            "--",
+            path.relative_to(context.root).as_posix(),
+            missing_ok=True,
+            timeout=namespace.timeout,
+        ):
+            raise ValueError("metadata staging path must be ignored by Git")
+
     effects: list[Effect] = []
     completed = False
     try:
-        if not already_completed:
+        if not already_completed and isinstance(backend, GithubBackend):
             try:
                 gateway.set_state(
                     context.root,
@@ -133,10 +159,44 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
                     Effect("github.issue.close", "unknown" if error.uncertain else "failed", target.github_ref)
                 )
                 raise
+        elif not already_completed and isinstance(backend, LocalBackend):
+            relative = (target.path / ".meta.json").relative_to(context.root).as_posix()
+            captured_input = next(item for item in inputs if item.relative_path == relative)
+            metadata = decode_scope_metadata(json.loads(captured_input.payload))
+            updated = replace(
+                metadata,
+                revision=metadata.revision + 1,
+                backend=LocalBackend(
+                    LocalLifecycle(
+                        "completed",
+                        backend.lifecycle.revision + 1,
+                        datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    )
+                ),
+            )
+            try:
+                published = replace_existing_json(
+                    target.path / ".meta.json",
+                    encode_scope_metadata(updated),
+                    expected_bytes=captured_input.payload,
+                    expected_identity=captured_input.identity,
+                    staging_dir=context.root / "spec-dock/.agent/staging",
+                    before_replace=verify_source,
+                    before_stage=verify_stage,
+                )
+            except MetadataPublicationIncomplete as error:
+                completed = error.published is not None
+                effects.append(Effect(effect_kind, "succeeded" if completed else "unknown", effect_target))
+                raise
+            inputs = tuple(
+                replace(item, payload=published.payload, identity=published.identity)
+                if item == captured_input
+                else item
+                for item in inputs
+            )
+            change_requested = True
         completed = True
-        effects.append(
-            Effect("github.issue.close", "succeeded" if change_requested else "unchanged", target.github_ref)
-        )
+        effects.append(Effect(effect_kind, "succeeded" if change_requested else "unchanged", effect_target))
         verify_source()
         if (
             captured.status == "selected"
