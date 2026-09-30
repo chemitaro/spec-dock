@@ -58,6 +58,14 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_scope_delete import delete_scope
 
             result = delete_scope(namespace, context)
+        elif command in ("artifact list", "artifact show"):
+            from spec_dock.runtime.application.direct_artifact import query_artifact
+
+            result = query_artifact(namespace, context)
+        elif command in ("artifact create", "artifact import file"):
+            from spec_dock.runtime.application.direct_artifact import mutate_artifact
+
+            result = mutate_artifact(namespace, context, cwd)
         elif command in ("dependency list", "dependency check"):
             from spec_dock.runtime.application.direct_dependencies import query_dependencies
 

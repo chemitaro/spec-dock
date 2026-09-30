@@ -390,7 +390,9 @@ def scan_artifact_duplicate_state(artifacts_dir: Path) -> tuple[str | None, set[
     return error, set(ledger.artifact_ids)
 
 
-def scan_artifact_slot_ledger(artifacts_dir: Path) -> tuple[str | None, ArtifactSlotLedger]:
+def scan_artifact_slot_ledger(
+    artifacts_dir: Path, *, directory_fd: int | None = None
+) -> tuple[str | None, ArtifactSlotLedger]:
     empty = ArtifactSlotLedger(used_slots=frozenset(), artifact_ids=frozenset())
     if artifacts_dir.is_symlink():
         return f"Unsafe artifact directory under {artifacts_dir}: artifacts directory must not be a symlink", empty
@@ -399,7 +401,7 @@ def scan_artifact_slot_ledger(artifacts_dir: Path) -> tuple[str | None, Artifact
     slots: dict[ArtifactSlot, list[str]] = {}
     artifact_ids: set[str] = set()
     if artifacts_dir.exists():
-        with os.scandir(artifacts_dir) as entries:
+        with os.scandir(artifacts_dir if directory_fd is None else directory_fd) as entries:
             direct_entries = sorted(entries, key=lambda entry: entry.name)
         for entry in direct_entries:
             if entry.name == "rules.md":

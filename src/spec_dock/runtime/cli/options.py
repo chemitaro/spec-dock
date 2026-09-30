@@ -68,6 +68,8 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf.startswith("artifact "):
+        return "Inspect the owner catalog and retained candidate files before a new explicit operation; uncertain publications are not automatically repeated."
     if leaf == "scope delete":
         return "Inspect the retained backup and applied or remaining paths before a new explicit operation; changes are not automatically undone."
     if leaf == "scope edit":
@@ -121,6 +123,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     lifecycle = len(argv) >= 2 and argv[0] == "scope" and argv[1] in ("close", "reopen")
     delete = argv[:2] == ["scope", "delete"]
     dependency = len(argv) >= 2 and argv[0] == "dependency"
+    artifact = len(argv) >= 2 and argv[0] == "artifact"
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -134,6 +137,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not lifecycle
         and not delete
         and not dependency
+        and not artifact
     ):
         return
     index = 2
@@ -162,6 +166,8 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--github-repo",
             "--reason",
             "--backup-dir",
+            "--scope",
+            "--type",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1

@@ -406,3 +406,20 @@ backupのpathをリンクを解決せず正規化し、.gitと削除対象の重
 公開CLIとnative mkdir/open/fsync/replace/unlink/listdir/close/Git境界を使い、制御なし通常削除、再帰・guard・incoming・選択条件、backup unknown、確認済み効果とcleanup、並行入力変更・新file保全をRed→Greenで検証した。POSIX実端末、モード/link保全、FIFOの非block拒否、別processでStart flock保持中の削除、同clone別WTの記録保全とcheckout後stale、古いtokenが既に解除された後の新token保全も確認した。既存保存原語から最初にGreenだったケースを、架空のRedへ数えない。FDコピー変更に合わせたfault fixtureのnative IO境界変更も、製品Redと区別する。
 
 関連160 tests（26.86秒）、全source/testsのRuff check/format（389 files）、変更6 source限定mypyとdiff checkが成功した。初回の関連test collectionは旧vnext inspection表に新しい非journal deleteの行がなかったため失敗した。その表を補正し再実行した結果であり、旧writerを通常dispatchへ戻していない。全体mypy、native Windows、fresh Strict、Artifact/Workbench/worktree/bootstrap、P-11以後、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfoodのmetadata、workspace宣言、直接選択は変更していない。
+
+
+## P-10 Artifactを通常経路へ接続
+
+Scope deleteを3e300afaa3b286074139f3b6ccc6a2494ca7c691へコミットし、親7ae4ebcc、branch、Git identityと空indexを確認した。通常push後にclean・secure upstream・local/upstreamと二回のremote full SHA一致を検証し、GPT-5.6 Sol / Pro指定のfresh Strict r10を送信した。以下のArtifact unitはその固定範囲に含まれない。
+
+Artifact list/show/create/import fileをdirect_artifactから通常dispatchへ接続した。所有者の現存ファイルだけから従来のtimestamp/suffixを選び、六creation type、既存Markdown・generic・sequentialのfilename、未知evidence、opaque bytesとbasename、既存custom templateのScope/GitHub置換tokenを保つ。root createは従来どおり拒否し、rootのimport/list/showは無関係なScope metadataを必要としない。dynamic ownerとexpect guardは捕捉した同じ直接選択で解決し、そのrecordを書き換えない。
+
+完成した実候補bytesを同directoryの排他的stageへ書き、捕捉入力、stageのbytes・identity、directory bindingを検査して無上書きlinkで公開する。deterministicなslot名は候補file自身の一時名であり、共有採番台帳、予約marker、journal、counterや共通writer lockではない。並行する同slot・異なるslug/typeの候補は副作用なしの競合として止まり、勝手に別番号で再送しない。失敗した候補の不明な実体を自動回収せず、確認できた公開済みfileを巻き戻さない。
+
+一覧はheld directory FDから安全に列挙し、本文・hash・外部source pathを開示しない。symlink、hardlink、directory、FIFOのsource、unsafe destination、stageの置換を拒否する。root importでもworkspace宣言・物理Git identityを再確認する。確認済み公開後のnative Git失敗は元の複数行stderr/returncodeとartifact succeededを保持してpartial6、linkの応答不明はunknown、mkdirの応答不明はdirectory unknownと後続not_attempted、確認済み公開後のdescriptor cleanup失敗はsucceededを返す。Start共通flockが別processで保持されていてもArtifact作成が完了することを確認した。
+
+未接続の公開leaf、custom token欠落、無関係なScope破損へのroot依存、公開後Git失敗の欠落、置換されたstageの誤公開、catalog列挙中の外部alias開示、mkdir結果不明、help契約不足をfocused Red→Greenで確認した。六type・採番・候補衝突・dry-run・source safety・unknown link等の最初からGreenだった回帰も区別した。ADRのtemplate fieldとcleanup faultの注入位置に対する初回の誤ったfixture期待は修正し、製品Redへ数えない。
+
+Artifact全体と関連contract/fresh wheel/helpの227 passed/1 skipped（14.12秒）、source/testsのRuff check/format（392 files）、変更7 source限定mypyが通過した。追加でrepository全体にRuffを向けたところ、CI対象外の既存.github/scripts二fileにimport/formatの問題があった。無関係なfileを変更せず、source/testsの通常対象と区別した。全体mypy、native Windows、Workbench/worktree/bootstrap、P-11以後、fresh Strict・Final Quality Gate・手動製品確認・実consumer切替は未完了である。実dogfood metadata・宣言・選択を変更していない。
+
+コミット前の差分点検で、このArtifact unitが使わない将来の置換分岐をfile_publicationから除き、無上書き公開だけに限定した。その後の公開Artifact全30ケースが4.50秒で通過した。置換が必要なWorkbenchは次の独立したRedから実装する。
