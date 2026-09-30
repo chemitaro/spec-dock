@@ -1,0 +1,43 @@
+# 第9回Strictの完全batch分析
+
+## 固定範囲・証拠・認可
+
+目的はIssue #413の確定R/D/PとC-02〜C-05に沿って、接続済みP-02〜P-09を実装可能な品質で閉じること。利用者固定点は`6fec3099d8759b4e5b3b393b2987534b46dfa383`、merge-baseも同じ、レビューHEADは`3c68053e36f3476ab843b0f4e339b24c2d490e68`。clean・attached branch・設定済みsecure upstream・local/upstream/remote full SHA一致を確認して独立の一回の会話を開始した。
+
+native wrapperは36m35sで終了10、実際のモデル表示はGPT-5.6 Sol、Thinking timeはPro。出力はschemaに適合するfail、P1一件・P2二件。原文を[JSON](code-review-p06-09.json)へbyteを変えず保存した。SHA-256は`1f84f3a9a766f650b4f5282b77192095510e38be51abe1b49714efe30c77c660`。レビューモデルはtestsを実行していないと明記している。
+
+先行の関連332 tests・175 testsと型/静的検査が完了済み。レビュー終了時に実行中だったP-10 Scope deleteの16 testsも2.92秒で完了した後、本分析を開始した。P-10 Scope editは`de47237ff6a81c2f6b93076ff01d2f495622811e`、deleteは未コミットであり、r9のレビュー証拠へ混入させない。三指摘の対象sourceはレビューHEADから現在までdiffがなく、現在読取した制御経路はレビュー対象と一致する。全体lint/test、native Windows、P-10の残り/P-11以後、実consumer切替、最終gateは別の未完義務であり、この限定batchを全Issueの完成に読み替えない。
+
+Strictのgateはreview_statusだけ。P1が今回候補をblockする。P2はsource-nativeのnon-blocking情報のままで、fail理由へ昇格しない。修正とfresh re-reviewの認可は利用者の親タスク「指摘事項があった場合には分析・修正・再レビューし、通過するコードを提出」に由来する。レビュー自身や本分析skillが編集を認可するわけではない。利用者が全指摘の修正を明示した作業契約を適用し、P2のみで自動修正しないStrictの既定とは区別する。
+
+## F1: P1 Scope発行の明示guard無視
+
+妥当。`direct_scope_publish._publish_scope`は共通parserが受け取るexpect-current/backendを検査せず、現在treeの読取からorigin検証、祖先GET、create POSTまたはimportのGET・local公開へ到達する。既存Scopeがあるが直接選択が空の状態で`--expect-current init-00001`を付けることも、GitHub発行に`--expect-backend local`を付けることも到達可能である。明示条件に反したremote/local効果を防げない。
+
+違反authorityはC-02「expect-currentはcanonical化した自WTの直接対象IDと比較」「expect-backendは対象backendと比較」、--yesは安全条件を迂回しないこと、P-09のGitHub発行を必要な条件確認後に一回だけ行う設計。最初の誤りはapplication実装で、guardをsource capture/remote観測より前に適用していないこと。要件・公開optionの意味変更は不要。
+
+主routeは`implementation-remediation`。現在treeと直接recordを一度捕捉し、既存selectorでexpect-currentを解決して直接IDと比較する。新ScopeのbackendはGitHub発行/importなのでgithubと比較し、不一致ならGET/POST/stageより前に停止する。parentのdynamic selectorも同じ捕捉選択から解決する。全三kindとcreate/importへ適用される共通usecaseを直し、不一致時のremote logなし・metadata/record bytes不変と、合法なguard・dynamic parentが通常操作を妨げないことを公開CLIで確認する。
+
+この修正はGitHub番号SSOT、新規local禁止、既存真正localのcodec、operation一回、台帳/UUID/共通lockなし、部分効果の保持を維持する。remote/global CASや新しい選択取得を加えない。既存明示認可で自律対応でき、人間の設計判断は不要。P1は修正後のfresh Strict passまで未閉鎖。
+
+## F2: P2 branch switchのcheckout後clean確認欠落
+
+妥当。`branch_operations`は事前statusと「既に同じbranch」の無変更経路ではcleanを検査するが、通常checkout成功後はbranch/HEAD/候補metadataだけを確認してswitched=trueへ進む。成功するネイティブpost-checkout hookがmetadata外のtracked/untracked fileを変えるとcandidate照合が通るため、dirtyなまま成功を返す。失敗checkoutの再観測経路には既にstatus検査があり、正常経路だけが欠落している。
+
+違反authorityはD-06のclean/候補照合とGit効果を残す途中失敗、C-04の確認済み効果をfailedや空effectsへ落とさないこと、維持対象のbranch安全性。最初の誤りはapplicationの成功後verificationである。主routeは`implementation-remediation`。通常checkout後の既存try内でstatusを再検査し、dirtyならCHECKOUT_VERIFICATION_FAILED/partial6を返す。git.checkout=succeededは保持し、hookが生成した内容、branch/HEAD、選択recordを巻き戻さない。dirtyが検出された際のswitchedは既存partialの意味に合わせて確認済み操作全体としてはfalseを維持する。
+
+ネイティブhookを使い、tracked/untrackedの両ケースでRed→Greenを確認する。cleanな成功・無変更・native Git失敗・元stderrの回帰も通す。source-native P2/non-blockingを維持し、利用者の全指摘修正指示から認可を得る。新lock/state/rollback/編集権限や要件変更は不要で、人間判断も不要。
+
+## F3: P2 stale/unavailable重複recordの診断欠落
+
+妥当。Syncのknown_recordsは安全に読めたselected/stale/unavailable recordを表示/件数へ含めるが、重複比較はselectedだけに限定する。そのため二WTの同じScope/refが消失してstaleとなると、direct_selected_count=2と両行を返してもSELECTION_DUPLICATEがない。current treeから読めない場合にも安全にdecodeしたrecordは観測経路が保持するため、unavailableについても同じ欠落が到達可能である。
+
+違反authorityはD-10の既存重複は両行とduplicate findingを返し、自動解除しないこと、D-04の未知/stale/unavailableを空と扱わないこと。最初の誤りはapplicationの集計/診断で、既知record集合と重複比較集合の条件が一致していない。主routeは`implementation-remediation`。安全にdecode済みrecordの同じknown分類を重複比較にも用い、既存stale/unavailable findingを消さず併記する。invalidなrecordを成功状態へ昇格しない。
+
+同cloneのmain/linked二WTに同じ直接recordを置き、両metadata消失、片方のmetadata読取不能を公開Syncで確認する。件数・行・重複finding・既存状態finding・complete=false・effects=[]と全record bytes不変を検査する。source-native P2/non-blockingを維持し、利用者の全指摘修正指示から認可を得る。Startの重複防止、local/GitHub lifecycle、必要対象/祖先だけの読取、プロセス未観測、cache/registryなしを維持し、新規stateや復旧概念を加えない。人間判断は不要。
+
+## 親workflowへの結果
+
+三件は独立した既存契約の実装欠落である。受理済み契約と状態所有者は変えず、局所的なguard/verification/診断集合の修正へ収束する。新しいstate owner、永続化、API、lock、journal、retry/rollbackや大規模共通制御を必要としないことを構造的に再確認した。部分実装の義務を見逃さず、全件のTDD修正・関連検証・実施記録・coherent checkpoint commitの後、clean・push済みの新SHAで同じ固定点から独立Strictを新しい会話で実施する。前レビューJSONを次のreviewerへ添付したり、新しい受入条件へ変換したりしない。
+
+分析時点で修正、再レビュー、Final Quality Gate、全製品手動確認は未完了。goalはactiveのまま継続する。

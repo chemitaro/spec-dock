@@ -49,6 +49,85 @@ def test_scope_create_help_describes_only_github_numbered_publication(
     assert "journal" not in output
 
 
+@pytest.mark.parametrize("imported", [False, True])
+@pytest.mark.parametrize("guard", [["--expect-current", "init-00001"], ["--expect-backend", "local"]])
+def test_scope_publication_expectation_mismatch_stops_before_remote_observation_or_local_write(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    imported: bool,
+    guard: list[str],
+) -> None:
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    before = metadata.read_bytes()
+    command = (
+        ["scope", "import", "github", "initiative", "gh:example/repo#413"]
+        if imported
+        else ["scope", "create", "initiative", "--backend", "github"]
+    )
+    assert main(["--project", str(root), *command, "--title", "Guarded Scope", *guard, "--yes", "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED" and result["effects"] == []
+    assert metadata.read_bytes() == before and not log.exists() and not (root / "spec-dock/.agent").exists()
+    assert sorted(path.name for path in (root / "spec-dock/initiatives").iterdir()) == ["init-00001-fixture"]
+
+
+@pytest.mark.parametrize("kind,prefix", [("initiative", "init"), ("epic", "epic"), ("issue", "iss")])
+@pytest.mark.parametrize("imported", [False, True])
+def test_scope_publication_accepts_canonical_current_and_backend_guards_with_dynamic_parents(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    kind: str,
+    prefix: str,
+    imported: bool,
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    number = 1
+    scope_id = "init-00001"
+    parent: list[str] = []
+    if kind == "epic":
+        parent = ["--parent", "@initiative"]
+    elif kind == "issue":
+        epic = add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
+        add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+        scope_id, number, parent = "iss-00003", 3, ["--parent", "@epic"]
+    record = select_fixture(root, scope_id=scope_id, number=number)
+    before = record.read_bytes()
+    command = (
+        ["scope", "import", "github", kind, "gh:example/repo#413"]
+        if imported
+        else ["scope", "create", kind, "--backend", "github"]
+    )
+    assert (
+        main([
+            "--project",
+            str(root),
+            *command,
+            *parent,
+            "--title",
+            "Guarded Scope",
+            "--expect-current",
+            f"gh:example/repo#{number}",
+            "--expect-backend",
+            "github",
+            "--yes",
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["result"]["scope"]["id"] == f"{prefix}-{413 if imported else 57:05d}"
+    assert record.read_bytes() == before
+    calls = [json.loads(line) for line in log.read_text().splitlines()]
+    assert sum(row["method"] == "POST" for row in calls) == (0 if imported else 1)
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_created_metadata_remains_editable_without_a_permission_lock(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

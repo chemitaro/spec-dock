@@ -126,7 +126,7 @@ def sync_workspace(
     selected_refs: dict[str, str] = {}
     for row in observations:
         record = row.selection.record
-        if row.selection.status != "selected" or record is None:
+        if row.selection.status not in ("selected", "stale", "unavailable") or record is None:
             continue
         previous = selected_ids.get(record.scope_id) or selected_refs.get(record.github_ref or "")
         if previous is not None:

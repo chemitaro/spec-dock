@@ -193,6 +193,8 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                 if after.branch != name or after.head != tip:
                     raise ValueError("checkout differs from the fixed branch snapshot")
                 verify_candidate(after, candidate)
+                if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                    raise ValueError("checkout left a dirty worktree")
                 switched = True
             except (OSError, ValueError, RuntimeError) as error:
                 if isinstance(error, GitProcessError) and not effects:

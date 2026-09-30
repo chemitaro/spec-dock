@@ -378,3 +378,15 @@ Scope editはtitleのtrimと非空検査、同じ捕捉選択からのdynamic se
 redirected stagingのtestは初めexit3を期待したが、実際のGit check-ignoreがsymlink先を原文stderrで拒否し、exit5/effects=[]/外部file・metadata不変を既に満たしていた。C-04に合わせた期待値訂正であり製品Redとして扱わない。真正の既存local、並行編集、Start lock非使用、置換不明の確認も初回Greenの回帰証拠である。存在しないtest fileを指定したcollection失敗は検証実績へ含めない。
 
 関連124 tests（24.83秒）、全source/test Ruff check/format（385 files）、変更4 source限定mypyとdiff checkが通過した。Scope editのfresh Strict、P-10の残りfamily、P-11以後、旧writer/helper退役、native Windows、全体lint/test、Final Quality Gate、手動製品確認、正式dogfood切替は未完了である。実consumer metadata・workspace宣言・選択を変更せず、goalをactiveとして次のdelete縦経路へ進む。
+
+## 第9回Strictの全三件を修正
+
+3c68053e36f3476ab843b0f4e339b24c2d490e68を固定したr9は36m35sでnative exit10、review_status=fail（P1一件、P2二件）となった。実際の表示はGPT-5.6 Sol / Thinking time Pro。原文をbyte保全し、全件のauthority・最初の誤り・修正route・認可を[分析記録](artifacts/code-review-p06-09-analysis.md)へ残してから修正した。Scope editのde47237fと未コミットdeleteはこのレビューへ含まれない。
+
+F1ではScope create/importが受け取ったexpect-current/backendを無視するRedを四ケースで確認した。現在treeと直接recordを一度捕捉し、既存canonical selectorで直接IDを比較、新規Scope backendはgithubと比較して、remote GET/POSTやstageより前に拒否する。dynamic parentも同じ捕捉選択を使う。合法なguard・dynamic parentを三階層/create・importの六ケースで確認し、選択bytesを保全した。
+
+F2では成功するnative post-checkout hookによるtracked/untrackedの変更が、dirtyのままswitched=true/exit0になるRedを確認した。通常checkout成功後にもstatusを検査し、dirtyならCHECKOUT_VERIFICATION_FAILED/partial6へ進む。確認済みgit.checkout=succeededを保持し、branch、HEAD、hookの変更、選択recordを巻き戻さない。新testへ誤って継承された既存assertionのfixture配置を修正した失敗は、製品Redとして数えない。
+
+F3ではmain/linkedの両方のScope資料が消えた場合、stale二行と件数2だけを返して重複findingが欠落するRedを確認した。既知recordのselected/stale/unavailable集合を重複診断にも使い、既存の状態findingとSELECTION_DUPLICATEを併記する。linked metadataが壊れても安全にdecode済みのrecordを保持し、invalidなrecordは件数・重複へ昇格させない。effects=[]、全record bytes不変、共通stateやcacheなしを確認した。
+
+関連Scope発行・branch・Syncの83 testsが25.02秒で通過し、変更3 source限定mypy、変更6 fileのRuff check/formatが成功した。P2の元の分類とnon-blockingを保ち、利用者の全指摘修正指示に従った。fresh Strict pass、P-10以後、旧runtimeの退役、native Windows、全体gate、Final Quality Gate、手動製品確認、実consumer切替は未完了である。

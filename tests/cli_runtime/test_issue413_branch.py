@@ -62,6 +62,51 @@ def test_switch_current_branch_is_unchanged_and_does_not_run_checkout_hook(
     assert not (root / "spec-dock/.agent").exists()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX post-checkout hook")
+@pytest.mark.parametrize("tracked", [False, True])
+def test_successful_checkout_hook_dirtying_the_workspace_keeps_checkout_effect_but_returns_partial(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], tracked: bool
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    file = root / "hook-change.txt"
+    if tracked:
+        file.write_text("original tracked content\n")
+        subprocess.run(["git", "-C", str(root), "add", "--", file.name], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                "fixture tracked content",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    subprocess.run(["git", "-C", str(root), "branch", "candidate"], check=True, capture_output=True)
+    record = select_fixture(root)
+    before = record.read_bytes()
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text(f"#!/bin/sh\nprintf 'hook change\\n' > {shlex.quote(str(file))}\n")
+    hook.chmod(0o700)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "candidate", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial" and result["error"]["code"] == "CHECKOUT_VERIFICATION_FAILED"
+    assert result["effects"] == [{"kind": "git.checkout", "status": "succeeded", "target": "candidate"}]
+    assert result["data"]["result"]["switched"] is False and record.read_bytes() == before
+    assert file.read_text() == "hook change\n"
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"candidate\n"
+    assert subprocess.check_output(["git", "-C", str(root), "status", "--porcelain", "-z"])
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_branch_create_only_creates_ref_at_fixed_base(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = committed_workspace(tmp_path / "consumer")
     tip = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"]).decode().removesuffix("\n")

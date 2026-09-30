@@ -20,7 +20,7 @@ from spec_dock.runtime.application.github_scope_scaffold import build_github_sco
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
-from spec_dock.runtime.application.worktree_observation import resolve_scope
+from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.domain.ids import format_id, resolve_input_title_and_slug
 from spec_dock.runtime.domain.lifecycle import StatusObservation
 from spec_dock.runtime.domain.selectors import parse_github_ref
@@ -77,6 +77,13 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
     if any(path.is_symlink() for path in (staging, *staging.parents)):
         raise ValueError("Scope staging path is redirected")
     views = load_scope_views(workspace)
+    selection = read_selection(context, views)
+    if namespace.expect_backend is not None and namespace.expect_backend != "github":
+        raise ValueError("target backend does not match --expect-backend")
+    if namespace.expect_current is not None:
+        expected = resolve_scope(context, views, namespace.expect_current, selection=selection).id
+        if selection.status != "selected" or selection.record is None or selection.record.scope_id != expected:
+            raise ValueError("direct target does not match --expect-current")
     inputs = capture_local_inputs(context, views)
     repository = github_publication_repository(context.root, timeout=namespace.timeout)
     imported = None if create else parse_github_ref(namespace.github_ref, repo_hint=namespace.github_repo)
@@ -113,7 +120,7 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
     verify_stage(staging / stage_name)
     gateway = GithubIssueGateway(timeout=namespace.timeout)
     parent_target = getattr(namespace, "parent", None)
-    parent_id = resolve_scope(context, views, parent_target).id if parent_target else None
+    parent_id = resolve_scope(context, views, parent_target, selection=selection).id if parent_target else None
     records = {record.id: record for record in fs_repo.load_node_records(workspace)}
     ancestors = _parent_records(kind=kind, parent_id=parent_id, records=records)
     _require_open_ancestors(ancestors=ancestors, repo_root=context.root, repository=repository, gateway=gateway)

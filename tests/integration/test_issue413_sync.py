@@ -224,6 +224,75 @@ def test_existing_duplicate_selections_are_displayed_without_automatic_clear(
     assert all(path.read_bytes() == value for path, value in before.items())
 
 
+def test_stale_duplicate_selections_keep_both_state_and_duplicate_findings(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "main")
+    record = select_fixture(root)
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"],
+        check=True,
+        capture_output=True,
+    )
+    duplicate = select_fixture(linked)
+    before = {record: record.read_bytes(), duplicate: duplicate.read_bytes()}
+    for worktree in (root, linked):
+        shutil.rmtree(worktree / "spec-dock/initiatives/init-00001-fixture")
+
+    assert main(["--project", str(root), "workspace", "sync", "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial"
+    assert result["effects"] == []
+    data = result["data"]
+    assert data["complete"] is False
+    assert data["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 2, "descendant_selected_count": 0, "complete": False}
+    ]
+    assert len(data["worktrees"]) == 2
+    assert all(row["selection"]["status"] == "stale" for row in data["worktrees"])
+    codes = [item["code"] for item in data["findings"]]
+    assert codes.count("WORKTREE_SELECTION_STALE") == 2
+    assert codes.count("SELECTION_DUPLICATE") == 1
+    assert all(path.read_bytes() == value for path, value in before.items())
+    assert not (root / ".git/spec-dock").exists()
+
+
+def test_unavailable_duplicate_keeps_its_decoded_record_and_both_findings(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "main")
+    record = select_fixture(root)
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"],
+        check=True,
+        capture_output=True,
+    )
+    duplicate = select_fixture(linked)
+    unreadable = linked / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    unreadable.write_bytes(b"not valid metadata JSON")
+    before = {record: record.read_bytes(), duplicate: duplicate.read_bytes(), unreadable: unreadable.read_bytes()}
+
+    assert main(["--project", str(root), "workspace", "sync", "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial"
+    assert result["effects"] == []
+    data = result["data"]
+    assert data["complete"] is False
+    assert data["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 2, "descendant_selected_count": 0, "complete": False}
+    ]
+    rows = {row["path"]: row for row in data["worktrees"]}
+    assert rows[str(root)]["selection"]["status"] == "selected"
+    assert rows[str(linked)]["selection"]["status"] == "unavailable"
+    assert rows[str(linked)]["selection"]["scope_id"] == "init-00001"
+    codes = {item["code"] for item in rows[str(linked)]["findings"]}
+    assert codes == {"WORKTREE_SELECTION_UNAVAILABLE", "SELECTION_DUPLICATE"}
+    assert all(path.read_bytes() == value for path, value in before.items())
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_github_sync_cannot_report_a_complete_observation_for_unknown_remote_state(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

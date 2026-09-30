@@ -286,6 +286,8 @@ uv run pytest tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/tes
 <a id="p-10"></a>
 ## P-10 残る既存操作を狭い契約へ接続する
 
+第9回Strictは`3c68053e`のP-02〜P-09を固定し、P1一件・P2二件でfailした。[完全batch分析](artifacts/code-review-p06-09-analysis.md)後、Scope create/importの明示guard、branch switchのcheckout後clean検査、stale/unavailableの既知recordを含むSync重複診断をTDDで修正した。関連83 tests（25.02秒）、変更3 source限定mypy、変更6 fileのRuff check/formatが通過した。P2のnon-blocking分類を維持し、利用者の全指摘修正の明示認可を適用する。Scope edit/deleteはr9の対象外であり、全体のfresh Strict合格は未取得。
+
 **状態: 着手。Scope query/editの通常経路をローカル検証済み。delete、Artifact、Workbench、worktree/bootstrapとfresh Strictは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
 
 Scope editは一つの捕捉直接選択からdynamic selectorとguardを解決し、全metadata/workspaceのbytes・identityを再照合してtitle/revisionだけを変更する。未知field、本文、既存file mode、真正の既存local lifecycle、選択recordを保全し、GH通信・Start lock・control・journalを使わない。無変更はbytes/revision/identityを保持する。dry-runはstageを作らずC-05の必須fieldを返す。確認済み公開後のcleanup/Git失敗、置換結果不明、並行編集保全を公開CLIとネイティブOS/Git境界で確認した。関連124 tests（24.83秒）、全Ruff check/format（385 files）、変更4 source限定mypyとdiff checkが通過した。redirected stagingのexit3を期待したtestは、実際にはGitの原文拒否・exit5・write0が成立していたため、C-04へ期待値を訂正したもので製品Redではない。
