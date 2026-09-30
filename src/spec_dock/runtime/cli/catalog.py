@@ -304,7 +304,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve.",
     "scope list": "The selected project must contain a readable Scope tree.",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
-    "scope edit": "The Scope must resolve and its backend and revision guards must match.",
+    "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
     "scope delete": "Select the exact local Scope subtree and satisfy deletion safety guards.",
@@ -504,6 +504,11 @@ def _help_spec(leaf: str) -> HelpSpec:
         confirmation = (
             "TTY prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
         )
+    elif leaf == "scope edit":
+        reads = "Current local metadata and the direct record for selectors and optional expectation guards."
+        does_not = "Does not modify documents, GitHub state, direct selection or checkout, or acquire a Start lock."
+        json_data = "scope, github_ref, changed; dry-run adds can_apply and blockers."
+        confirmation = "No final confirmation is required for a local title edit."
     elif leaf.startswith("dependency "):
         reads = "Current metadata, inherited dependency edges, and the direct record for selectors; live GitHub only with --source github."
         does_not = "Does not change direct selection or Git checkout, acquire a Start lock, or persist GitHub state."

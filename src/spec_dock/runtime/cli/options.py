@@ -68,6 +68,10 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf == "scope edit":
+        return (
+            "Inspect the exact Scope metadata before a new explicit edit; do not automatically revert applied changes."
+        )
     if leaf in ("scope close", "scope reopen"):
         return "Inspect the exact Scope and its backend state before a new explicit operation; do not blindly repeat a mutation."
     if leaf.startswith("scope import github "):

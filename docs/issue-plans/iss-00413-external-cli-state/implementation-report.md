@@ -366,3 +366,15 @@ Startが切替前の同じtokenを捕捉し、Git checkout後のunlink直前に�
 全44leafのproject不要helpを検査し、catalog defaultのv1表示をRedとして確認した。default一箇所をspecdock.cli/v2へ合わせ、実envelopeとhelpの表示を一致させた。未接続の業務leafの完成を示す変更ではない。二件ともreview-native P2とr8 passを保ち、レビュー自体ではなく利用者の指摘修正の既存明示指示から認可を得ている。
 
 関連175 tests（36.78秒）、全Ruff check/format（383 files）、変更2 source限定mypyとdiff checkが通過した。fixtureのbranch/selected_branch誤記は製品のRedに含めない。dependency unit d76d34c01079b8bfa420658c750ec713f8251cadと合わせた現在候補を次のfresh Strictへ進める。P-10以後、旧writer/helper退役、native Windows、全体gate、Final Quality Gateと手動製品確認、実consumer切替は未完了であり、goalをactiveに維持する。
+
+## P-10 Scope editを通常経路へ接続
+
+3c68053e36f3476ab843b0f4e339b24c2d490e68までのP-02〜P-09とr8修正を非強制pushし、clean・設定済みsecure upstream・local/upstream/remote full SHA一致を検証して、独立Strict r9（GPT-5.6 Sol / Pro）を送信した。r9はこの固定候補で実行中であり、以下のScope editはレビュー範囲に含まれない。主実装の推論設定は利用者の最新指定によりGPT-6.1 Sol / Max、外部レビューモデルは従来指定を維持する。
+
+Scope editはtitleのtrimと非空検査、同じ捕捉選択からのdynamic selector/guard解決、現在treeの入力bytes・identityと物理Git contextの再検査を行う。一つのmetadataのtitle/revisionだけをignored同FS stagingから置換し、ID/slug/path/backend、未知field、本文、既存mode、真正の既存local lifecycleを保全する。GH通信、選択更新、Start lock、control、共有状態、journal、編集権限制御を追加しない。無変更のtitleはstageなしで元のbytes/revision/inodeを維持し、有効dry-runは候補ScopeViewとcan_apply/blockersを返す。
+
+未接続dispatch、dry-runの実書込、無変更のrevision更新、guard無視、確認済み公開後cleanup失敗の効果欠落、helpの旧cache/journal案内をfocused Red→Greenで修正した。置換が実行されて応答だけ失敗するネイティブos.replace境界ではpartial6/unknown、scope=null、変更済みと推定せず再送しない。fsync中のactor編集は置換前に検出して保全する。公開後のネイティブGit失敗は元の複数行stderr/returncodeとmetadata succeededを保持し、partial6を返す。POSIX別processでStart排他が保持されている間にも編集が完了することを確認した。
+
+redirected stagingのtestは初めexit3を期待したが、実際のGit check-ignoreがsymlink先を原文stderrで拒否し、exit5/effects=[]/外部file・metadata不変を既に満たしていた。C-04に合わせた期待値訂正であり製品Redとして扱わない。真正の既存local、並行編集、Start lock非使用、置換不明の確認も初回Greenの回帰証拠である。存在しないtest fileを指定したcollection失敗は検証実績へ含めない。
+
+関連124 tests（24.83秒）、全source/test Ruff check/format（385 files）、変更4 source限定mypyとdiff checkが通過した。Scope editのfresh Strict、P-10の残りfamily、P-11以後、旧writer/helper退役、native Windows、全体lint/test、Final Quality Gate、手動製品確認、正式dogfood切替は未完了である。実consumer metadata・workspace宣言・選択を変更せず、goalをactiveとして次のdelete縦経路へ進む。
