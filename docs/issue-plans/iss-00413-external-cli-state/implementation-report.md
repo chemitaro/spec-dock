@@ -320,3 +320,17 @@ POST応答が不明ならscope=null、remote effect unknown、scaffold not_attem
 22 creation testsにpublic contract/fresh wheelを合わせた29 testsが13.38秒で通過。対象Ruffと変更6 source限定mypyが成功した。最初の不足実装、POST unknown、既知remote後の変更・重複、hidden stage ignore、cleanup後の効果、repo変更、Git原文、TTY、FIFO、helpのRed→Greenを各公開境界で確認した。三階層の追加は既存pure規則で最初からGreenであり、fixture/collection不備をRedとして数えない。
 
 このcheckpointはcreate縦経路の証拠である。import/edit/close/reopen/dependency、旧writer/helper importの抽出・退役、Windows native、全体gate、最新候補のStrict、Final Quality Gate、手動製品確認は未完了。実dogfood metadataやdeclaration、正式Issue #413の選択は変更していない。
+
+## P-09 GET-only importと編集可能なmetadata
+
+create unitを93b151129bf6e193aaa92605b729d83077fc3514にコミットし、設定済みoriginへ非強制pushした。clean branchとfull SHA一致を確認してfresh Strict r7（GPT-5.6 Sol/Pro）を送信した。r7はこのSHAを固定して実行中である。以下の追加はr7のレビュー対象には含まれない。
+
+通常scope import githubをpublication usecaseへ接続した。完全gh参照、正確なIssue URL、--github-repo付き裸番号を既存parserで正規化し、originとの一致・現在treeのID/ref重複をGET前に確認する。GitHubのGET以外の変更を行わず、確定番号を既存三階層scaffoldへ渡す。remote状態は今回の応答から返し、metadata lifecycle=nullを維持してcacheを作らない。乾式実行はGETと計画のみでlocal write0。廃止resumeはcontext前にARGUMENT_RETIRED/2、helpもv2・明示再importを説明する。
+
+GET中のactor編集を再照合して保全し、既知refとscaffold not_attemptedを返す。remote mutationのないimportを誤ってpartial6にする問題を修正した。公開後に異なるIDの同refが出現する競合は、scaffold succeeded/partial6として両pathを報告し、双方を自動削除しない。scope_treeの重複診断は従来のValueError意味を保つ型へ場所を付加した。
+
+競合fixtureの最初の試行ではコピーしたreadonly metadataへの編集が阻まれ、目的の競合条件に届かなかった。このfixture failureを製品Redから除外して、actorが自身のfileを置換する試行で、場所欠落のRed→Greenを確認した。一方、通常createが旧fs_repoヘルパーからchmodでmetadataをreadonlyにする別の実不具合を発見した。新しい公開metadataを通常のwrite_textで編集できないPermissionErrorを製品Redとして再現し、専用のexclusive writerへ切替えてGreenとした。既存の実consumer filesのmodeは変更していない。
+
+不足dispatch、事前二重登録GET、取得中の入力変化による不正partial、live状態欠落、競合path欠落、metadata編集制限、help、resumeの各focused cycleを確認した。既存純粋規則から継承できたreference形式・offline/foreign/PR/remote未検証の拒否・dry-runは最初からGreenの回帰確認であり、架空のRedを主張しない。作成23/取り込み17/public contract・fresh wheelを合わせた47 testsが18.79秒で通過した。共有tree変更の影響をStart/active/Finish/observation/Syncへ広げ、164 testsが42.02秒で通過した。全source/test Ruff checkとformat（379 files）、変更6 source限定mypy、diff checkも成功した。
+
+close/reopen/dependency、旧moduleへのpure helper依存の抽出・退役、Windows native、全体gate、Final Quality Gate、手動製品確認、正式dogfood切替は未完了である。goalはactiveとして次の縦経路へ進む。

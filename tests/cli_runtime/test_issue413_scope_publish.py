@@ -49,6 +49,36 @@ def test_scope_create_help_describes_only_github_numbered_publication(
     assert "journal" not in output
 
 
+def test_created_metadata_remains_editable_without_a_permission_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _ = publication_fixture(tmp_path, monkeypatch)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "scope",
+            "create",
+            "initiative",
+            "--backend",
+            "github",
+            "--title",
+            "New Scope",
+            "--yes",
+            "--json",
+        ])
+        == 0
+    )
+    capsys.readouterr()
+    path = root / "spec-dock/initiatives/init-00057-new-scope/.meta.json"
+    metadata = json.loads(path.read_bytes())
+    metadata["title"] = "Manual Edit"
+    path.write_text(json.dumps(metadata))
+    assert main(["--project", str(root), "scope", "show", "init-00057", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["result"]["scope"]["title"] == "Manual Edit"
+
+
 def test_create_dry_run_needs_no_confirmation_and_publishes_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

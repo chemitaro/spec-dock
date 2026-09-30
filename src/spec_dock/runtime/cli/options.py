@@ -68,6 +68,8 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf.startswith("scope import github "):
+        return "Inspect the exact GitHub Issue and local Scope paths before a new explicit import."
     if leaf.startswith("scope create "):
         return (
             "Inspect GitHub and local Scope paths before a new explicit operation. "
@@ -105,9 +107,10 @@ def _reject_retired_start(argv: list[str]) -> None:
     finish = argv[:2] == ["work", "finish"]
     sync = argv[:2] == ["workspace", "sync"]
     create = argv[:2] == ["scope", "create"]
+    imported = argv[:3] == ["scope", "import", "github"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
-    if not start and not finish and not branch and not active and not sync and not create:
+    if not start and not finish and not branch and not active and not sync and not create and not imported:
         return
     index = 2
     while index < len(argv):
@@ -121,7 +124,18 @@ def _reject_retired_start(argv: list[str]) -> None:
             )
         if active and argv[1] == "set" and name == "--from-branch":
             raise RetiredArgumentError("--from-branch was retired; only work start can acquire a direct selection")
-        if name in ("--branch", "--base", "--source", "--name", "--from", "--backend", "--title", "--slug", "--parent"):
+        if name in (
+            "--branch",
+            "--base",
+            "--source",
+            "--name",
+            "--from",
+            "--backend",
+            "--title",
+            "--slug",
+            "--parent",
+            "--github-repo",
+        ):
             if not separator and index + 1 < len(argv):
                 index += 1
                 value = argv[index]

@@ -239,7 +239,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
 }
 
 RECOVERY_LEAF_COMMANDS: dict[str, str] = {
-    **{f"scope import github {kind}": "scope.import" for kind in KINDS},
     "scope close": "scope.close",
     "scope reopen": "scope.reopen",
     "scope delete": "scope.delete",
@@ -422,7 +421,7 @@ def _example(leaf: str) -> str:
         "path": "<path>",
         "worktree_ref": "<worktree-id>",
         "artifact_id": "<artifact-id>",
-        "--backend": "local",
+        "--backend": "github",
         "--title": "'Example title'",
         "--parent": "<parent-id>",
         "--from": "<from-scope-id>",
@@ -494,6 +493,10 @@ def _help_spec(leaf: str) -> HelpSpec:
         reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."
         json_version = "specdock.cli/v2"
         confirmation = "TTY prompts after planning; --yes confirms creation; JSON and non-interactive require --yes."
+    elif leaf.startswith("scope import github"):
+        reads = "Current metadata, templates, origin publication repository, the exact GitHub Issue and live ancestor state."
+        json_version = "specdock.cli/v2"
+        confirmation = "No final confirmation is required; import makes no remote mutation."
     elif leaf == "workbench copy":
         confirmation = "--on-conflict overwrite requires confirmation; the default error policy does not."
     elif leaf in _CONFIRMATION_LEAVES:

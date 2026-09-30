@@ -25,10 +25,16 @@ class StoredScope:
     metadata: ScopeMetadata
 
 
+class ScopeIdentityConflict(ValueError):
+    def __init__(self, message: str, paths: tuple[Path, Path]) -> None:
+        self.paths = paths
+        super().__init__(message)
+
+
 def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tuple[StoredScope, ...]:
     rows: list[StoredScope] = []
-    identities: set[str] = set()
-    linkages: set[tuple[str, str, int]] = set()
+    identities: dict[str, Path] = {}
+    linkages: dict[tuple[str, str, int], Path] = {}
     selected_paths = _selected_paths(specdock_dir, target_id) if target_id is not None else None
 
     def walk(container: Path, kind: str, chain: tuple[str, ...]) -> None:
@@ -68,14 +74,14 @@ def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tupl
             ):
                 raise ValueError("Scope metadata does not match its current tree position")
             if scope_id in identities:
-                raise ValueError("duplicate Scope ID")
-            identities.add(scope_id)
+                raise ScopeIdentityConflict("duplicate Scope ID", (identities[scope_id], directory))
+            identities[scope_id] = directory
             github = raw.get("github")
             if isinstance(github, dict):
                 identity = (github["repo_owner"].lower(), github["repo_name"].lower(), github["issue_number"])
                 if identity in linkages:
-                    raise ValueError("duplicate GitHub linkage")
-                linkages.add(identity)
+                    raise ScopeIdentityConflict("duplicate GitHub linkage", (linkages[identity], directory))
+                linkages[identity] = directory
             dependencies = raw.get("depends_on")
             if not isinstance(dependencies, list) or any(not isinstance(value, str) for value in dependencies):
                 raise ValueError("Scope dependencies require an ID array")

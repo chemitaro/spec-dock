@@ -40,6 +40,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_scope_publish import create_scope
 
             result = create_scope(namespace, context)
+        elif command.startswith("scope import github "):
+            from spec_dock.runtime.application.direct_scope_publish import import_scope
+
+            result = import_scope(namespace, context)
         elif command in ("branch show", "branch create", "branch switch"):
             from spec_dock.runtime.application.branch_operations import branch_operation
 
