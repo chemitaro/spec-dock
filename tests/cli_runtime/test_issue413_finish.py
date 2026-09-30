@@ -289,7 +289,10 @@ def test_finish_uncertain_close_retains_capture_and_reports_unknown_effect(
     assert result["status"] == "partial"
     assert result["data"]["completed"] is False
     assert result["data"]["selection_token"] == record.name[7:-5]
-    assert result["effects"] == [{"kind": "github.issue.close", "status": "unknown", "target": "gh:example/repo#1"}]
+    assert result["effects"] == [
+        {"kind": "github.issue.close", "status": "unknown", "target": "gh:example/repo#1"},
+        {"kind": "selection.clear", "status": "not_attempted", "target": record.name[7:-5]},
+    ]
     assert record.read_bytes() == before
     assert [json.loads(line)["method"] for line in log.read_text().splitlines()] == ["GET", "GET", "PATCH", "GET"]
 
@@ -317,6 +320,62 @@ def test_finish_confirmed_close_with_clear_sync_failure_reports_completed_partia
         {"kind": "selection.clear", "status": "unknown", "target": record.name[7:-5]},
     ]
     assert not record.exists()
+
+
+def test_finish_confirmed_patch_rejection_reports_clear_not_attempted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    executable = tmp_path / "gh-bin/gh"
+    executable.write_text(
+        executable.read_text().replace(
+            "states[str(number)]='completed'", "print('HTTP/2.0 422 Rejected\\n\\n{}'); sys.exit(1)"
+        )
+    )
+    assert main(["--project", str(root), "work", "finish", "@current", "--yes", "--json"]) == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed"
+    assert result["data"]["completed"] is False
+    assert result["effects"] == [
+        {"kind": "github.issue.close", "status": "failed", "target": "gh:example/repo#1"},
+        {"kind": "selection.clear", "status": "not_attempted", "target": record.name[7:-5]},
+    ]
+    assert record.read_bytes() == before
+    assert [json.loads(line)["method"] for line in log.read_text().splitlines()] == ["GET", "GET", "PATCH"]
+
+
+def test_finish_verified_close_keeps_capture_when_metadata_changes_before_clear(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    executable = tmp_path / "gh-bin/gh"
+    executable.write_text(
+        executable.read_text().replace(
+            "states=json.loads(states_path.read_bytes())",
+            f"metadata=Path({str(metadata)!r})\n"
+            "if method=='GET' and len(log.read_text().splitlines())==4:\n"
+            " changed=json.loads(metadata.read_bytes())\n changed['title']='concurrent preserve'\n"
+            " metadata.write_text(json.dumps(changed))\n"
+            "states=json.loads(states_path.read_bytes())",
+        )
+    )
+    assert main(["--project", str(root), "work", "finish", "@current", "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["completed"] is True
+    assert result["effects"] == [
+        {"kind": "github.issue.close", "status": "succeeded", "target": "gh:example/repo#1"},
+        {"kind": "selection.clear", "status": "not_attempted", "target": record.name[7:-5]},
+    ]
+    assert record.read_bytes() == before
+    assert json.loads(metadata.read_bytes())["title"] == "concurrent preserve"
+    assert [json.loads(line)["method"] for line in log.read_text().splitlines()] == ["GET", "GET", "PATCH", "GET"]
 
 
 def test_finish_rejects_journal_recovery_input_before_project_access(

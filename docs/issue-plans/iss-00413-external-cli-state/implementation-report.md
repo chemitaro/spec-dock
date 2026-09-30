@@ -270,3 +270,15 @@ Finishの動的selectorと期待selectorは最初のSelectionObservationを共�
 関連公開CLI、Start/active、共有Gateway、複数WT観測は157 passed（35.62秒）。全source/test Ruff check/format（370 files）、変更3 sourceの限定mypyが成功した。前commitの自動生成bodyの「484件」はtest fileの行数であり、当時のFinishは18 tests、共有Gatewayを含む実測は37 passedである。履歴は書き換えず、実測の正本は本reportとpytest結果とする。
 
 P-07のPOSIX機能検証は進んだが、現在候補の独立レビューとWindows native、P-08以後、全体gate/最終品質ゲート/手動製品確認、実dogfoodの移行は未完了である。元Scope240件や実workspace declarationを手編集して復旧した証拠ではない。
+
+## P-07 第5回Strictの指摘分析と効果表示の修正
+
+GPT-5.6 Sol / Proによる第5試行は、固定対象4fc5bd259210501c17e8d24e4332746a6f46ea8eに対してexit10、review_status=failで完了した。2件のP1と1件のP2を原文JSONのまま保存し、analyze-review-findingsで全件を現在コード/確定契約と照合した。単一selection観測からのFinish target/handle固定はa9e9997で先行修正済みだったが、この後続SHAはレビュー済みとは扱わない。
+
+Closeの結果が不明/拒否、または確認済みClose後・解除前に処理を停止した場合、捕捉したclear handleをnot_attemptedとして表示するよう修正した。初期GETや最終PATCH直前の前提失敗でoperationを開始していない場合はeffects=[]を維持する。503のmissing clear effectを意図したRedとして確認し、422の確定拒否とClose確認後のmetadata変更でも記録保全・completed/effectsが整合した。新しい捕捉handleを採用し直さない。
+
+明示されたIssue全実装/指摘修正の範囲で、非blocking P2の複数record clearもC-04の既存意味へ合わせた。失敗したhandleをfailed/unknown、その後の捕捉済みhandleすべてをnot_attemptedとして返す。適用済み/unknownがない初回失敗はfailed5/3であり、partialへ偽昇格させない。第2 unlinkでの停止と初回unlinkでeffectsが消えるRedを確認した。directory fsyncのunknown、先行unlink直後の外部bytes変更によるconflictでも、残る記録を保全した。capture順を辞書順とした初期fixtureは訂正しており、その仮定を製品保証へ追加しない。
+
+Finish29 testsとactive36 testsが通過し、最終的な関連公開CLI/Start/record store/envelopeの選択は166 passed（35.83秒）。全source/test Ruff check/format（372 files）と変更2 sourceの限定mypyが成功した。並行して進めたP-08の変更は、この修正unitとは分けてcommitする。新しい全writer lock、journal、rollback、Scope ID、未知entry削除、別WT操作を追加していない。
+
+現在候補のfresh Strict pass、Windows adapter/native受入、残る各stage、full gates、最終品質ゲート、手動製品確認、dogfood移行は継続する。実装側の推論レベルは2026-10-01の利用者指示によりGPT-6.1 Sol / Maxへ更新した。独立レビューのGPT-5.6 Sol / Pro指定は維持する。

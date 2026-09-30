@@ -328,6 +328,123 @@ def test_active_clear_all_removes_observed_record_without_git_or_remote_effects(
     assert not (root / ".git/spec-dock").exists()
 
 
+def test_clear_multiple_records_reports_failed_and_unattempted_handles_after_unlink_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    original = select_fixture(root)
+    payload = original.read_bytes()
+    records = [original.with_name(f"target-{letter * 32}.json") for letter in ("a", "b", "c")]
+    original.unlink()
+    for record in records:
+        record.write_bytes(payload)
+    real_unlink = os.unlink
+    attempted: list[str] = []
+
+    def unlink(path, *args, **kwargs):
+        if path in {record.name for record in records}:
+            attempted.append(path)
+            if len(attempted) == 2:
+                raise PermissionError("fixture second record refused")
+        return real_unlink(path, *args, **kwargs)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    assert main(["--project", str(root), "active", "clear", "--all", "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial"
+    assert len(attempted) == 2
+    unattempted = next(record for record in records if record.name not in attempted)
+    assert result["effects"] == [
+        {"kind": "selection.clear", "status": "succeeded", "target": attempted[0][7:-5]},
+        {"kind": "selection.clear", "status": "failed", "target": attempted[1][7:-5]},
+        {"kind": "selection.clear", "status": "not_attempted", "target": unattempted.name[7:-5]},
+    ]
+    assert not (original.parent / attempted[0]).exists()
+    assert (original.parent / attempted[1]).read_bytes() == payload and unattempted.read_bytes() == payload
+
+
+def test_clear_first_failure_returns_effects_without_claiming_a_partial_mutation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    original = select_fixture(root)
+    payload = original.read_bytes()
+    second = original.with_name("target-" + "b" * 32 + ".json")
+    second.write_bytes(payload)
+    attempted = []
+
+    def unlink(path, *args, **kwargs):
+        attempted.append(path)
+        raise PermissionError("fixture first unlink refused")
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    assert main(["--project", str(root), "active", "clear", "--all", "--yes", "--json"]) == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed"
+    assert len(attempted) == 1
+    assert [effect["status"] for effect in result["effects"]] == ["failed", "not_attempted"]
+    assert result["effects"][0]["target"] == attempted[0][7:-5]
+    assert {effect["target"] for effect in result["effects"]} == {original.name[7:-5], "b" * 32}
+    assert original.read_bytes() == payload and second.read_bytes() == payload
+
+
+def test_clear_unknown_directory_sync_reports_all_later_handles_as_unattempted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    original = select_fixture(root)
+    payload = original.read_bytes()
+    records = [original, *(original.with_name(f"target-{letter * 32}.json") for letter in ("b", "c"))]
+    for record in records[1:]:
+        record.write_bytes(payload)
+    real_fsync = os.fsync
+
+    def syncing(descriptor):
+        if os.fstat(descriptor).st_ino == original.parent.stat().st_ino and not all(
+            record.exists() for record in records
+        ):
+            raise OSError("fixture directory sync refused")
+        return real_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", syncing)
+    assert main(["--project", str(root), "active", "clear", "--all", "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert [effect["status"] for effect in result["effects"]] == ["unknown", "not_attempted", "not_attempted"]
+    assert {effect["target"] for effect in result["effects"]} == {record.name[7:-5] for record in records}
+    assert sum(record.exists() for record in records) == 2
+    assert all(record.read_bytes() == payload for record in records if record.exists())
+
+
+def test_clear_conflicting_record_retains_changed_bytes_and_unattempted_handles(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    original = select_fixture(root)
+    payload = original.read_bytes()
+    records = [original, *(original.with_name(f"target-{letter * 32}.json") for letter in ("b", "c"))]
+    for record in records[1:]:
+        record.write_bytes(payload)
+    changed = payload + b" "
+    real_unlink = os.unlink
+    unlinked = []
+
+    def unlink(path, *args, **kwargs):
+        real_unlink(path, *args, **kwargs)
+        unlinked.append(path)
+        for record in records:
+            if record.exists():
+                record.write_bytes(changed)
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    assert main(["--project", str(root), "active", "clear", "--all", "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert len(unlinked) == 1
+    assert [effect["status"] for effect in result["effects"]] == ["succeeded", "failed", "not_attempted"]
+    assert {effect["target"] for effect in result["effects"]} == {record.name[7:-5] for record in records}
+    assert sum(record.exists() for record in records) == 2
+    assert all(record.read_bytes() == changed for record in records if record.exists())
+
+
 @pytest.mark.parametrize("from_target", ["init-00001", "epic-00002", "iss-00003", "iss-00004", "iss-00099"])
 def test_active_clear_from_removes_whole_direct_only_for_its_current_chain(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], from_target: str

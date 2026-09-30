@@ -58,6 +58,13 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             raise ValueError("direct target does not match --expect-current")
     backend = target.backend
     descendants = tuple(view for view in views if target.id in {ancestor.id for ancestor in ancestors_for(views, view)})
+    clear_handle = (
+        captured.handle
+        if captured.status == "selected"
+        and captured.record is not None
+        and captured.record.scope_id in {target.id, *(child.id for child in descendants)}
+        else None
+    )
     if namespace.offline and any(isinstance(view.backend, GithubBackend) for view in (target, *descendants)):
         raise ValueError("offline mode cannot fetch required GitHub state")
     gateway = GithubIssueGateway(timeout=namespace.timeout)
@@ -90,13 +97,8 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
     effect_target = target.github_ref if isinstance(backend, GithubBackend) else target.id
     if namespace.dry_run:
         planned = [Effect(effect_kind, "planned", effect_target)]
-        if (
-            captured.status == "selected"
-            and captured.record is not None
-            and captured.record.scope_id in {target.id, *(child.id for child in descendants)}
-            and captured.handle is not None
-        ):
-            planned.append(Effect("selection.clear", "planned", captured.handle.token))
+        if clear_handle is not None:
+            planned.append(Effect("selection.clear", "planned", clear_handle.token))
         return OperationResult(
             "work finish",
             "planned",
@@ -198,32 +200,27 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         completed = True
         effects.append(Effect(effect_kind, "succeeded" if change_requested else "unchanged", effect_target))
         verify_source()
-        if (
-            captured.status == "selected"
-            and captured.record is not None
-            and captured.record.scope_id in {target.id, *(child.id for child in descendants)}
-            and captured.handle is not None
-        ):
+        if clear_handle is not None:
             with WorkTargetStore(context.root) as store:
                 try:
-                    outcome = store.remove_observed(captured.handle)
+                    outcome = store.remove_observed(clear_handle)
                 except SelectionRemovalUnknown:
-                    effects.append(Effect("selection.clear", "unknown", captured.handle.token))
+                    effects.append(Effect("selection.clear", "unknown", clear_handle.token))
                     raise
                 except (OSError, ValueError, RuntimeError):
-                    effects.append(Effect("selection.clear", "failed", captured.handle.token))
+                    effects.append(Effect("selection.clear", "failed", clear_handle.token))
                     raise
                 if outcome == "conflict":
-                    effects.append(Effect("selection.clear", "failed", captured.handle.token))
+                    effects.append(Effect("selection.clear", "failed", clear_handle.token))
                     raise ValueError("captured selection changed")
                 effects.append(
-                    Effect(
-                        "selection.clear", "succeeded" if outcome == "removed" else "unchanged", captured.handle.token
-                    )
+                    Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", clear_handle.token)
                 )
         after_context = verify_source()
         after = read_selection(after_context, load_scope_views(context.root / "spec-dock"))
     except (ValueError, OSError, RuntimeError) as error:
+        if effects and clear_handle is not None and not any(effect.kind == "selection.clear" for effect in effects):
+            effects.append(Effect("selection.clear", "not_attempted", clear_handle.token))
         applied = any(effect.status in ("succeeded", "unknown") for effect in effects)
         branch, token = None, None
         try:

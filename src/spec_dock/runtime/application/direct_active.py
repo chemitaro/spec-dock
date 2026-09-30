@@ -83,25 +83,35 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                     0,
                     effects=tuple(Effect("selection.clear", "planned", handle.token) for handle in handles),
                 )
-            for handle in handles:
+            for index, handle in enumerate(handles):
                 try:
                     outcome = store.remove_observed(handle)
-                except SelectionRemovalUnknown:
-                    effects.append(Effect("selection.clear", "unknown", handle.token))
+                    if outcome == "conflict":
+                        raise ValueError("observed selection changed")
+                except (ValueError, OSError, RuntimeError) as error:
+                    effects.append(
+                        Effect(
+                            "selection.clear",
+                            "unknown" if isinstance(error, SelectionRemovalUnknown) else "failed",
+                            handle.token,
+                        )
+                    )
+                    effects.extend(
+                        Effect("selection.clear", "not_attempted", other.token) for other in handles[index + 1 :]
+                    )
                     raise
-                if outcome == "conflict":
-                    raise ValueError("observed selection changed")
                 effects.append(
                     Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", handle.token)
                 )
         observed = _observe(context)
     except (ValueError, OSError, RuntimeError) as error:
-        if any(effect.status in ("succeeded", "unknown") for effect in effects):
+        if effects:
+            applied = any(effect.status in ("succeeded", "unknown") for effect in effects)
             return OperationResult(
                 namespace.command_path,
-                "partial",
+                "partial" if applied else "failed",
                 DiagnosticData(),
-                6,
+                6 if applied else 5 if isinstance(error, (OSError, RuntimeError)) else 3,
                 effects=tuple(effects),
                 error=Diagnostic("SELECTION_CLEAR_INCOMPLETE", str(error), {}),
             )

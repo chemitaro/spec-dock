@@ -2,7 +2,7 @@
 
 **全17 stepは未着手です。** ChatGPTによるこのpackの生成・静的自己点検とは別の、後続実装とCodexのローカル作業です。
 
-実装担当は利用者指定の **GPT-6.1 Sol / reasoning High**。将来の設定値は `model="gpt-6.1-sol"`、`reasoning_effort="high"`。本資料の著述モデルと混同せず、gpt-5.6系専用coder roleへ置き換えません。モデルの公開状況や能力比較はこの作業契約の判断材料にしません。
+実装担当は利用者指定の **GPT-6.1 Sol / reasoning Max**（2026-10-01の追加指示でHighから変更）。設定値は `model="gpt-6.1-sol"`、`reasoning_effort="max"`。本資料の著述モデルや独立Strictレビュー用のGPT-5.6 Sol / Proと混同せず、gpt-5.6系専用coder roleへ置き換えません。モデルの公開状況や能力比較はこの作業契約の判断材料にしません。
 
 ## 作業の境界・進め方
 
@@ -184,6 +184,8 @@ uv run pytest tests/cli_runtime/test_work_start_vnext.py tests/cli_runtime/test_
 ## P-07 Finishとactiveの解除を閉じる
 
 **状態: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。GitHub-backed Finishの完了確認→captured token解除、子孫guard、dry-run、metadata再確認、native遅延解除/Start-only排他を検証。真正の既存local backendは単一metadataの保全更新を接続・検証。現在候補の独立認定、Windows nativeと旧runtime/testの退役は未完了。P-06の独立レビュー、Windows adapter/native受入は引き続き未完了）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
+
+第5回Strictの2件のP1と1件のP2を `artifacts/code-review-p06-05-analysis.md` で全件分析した。単一selection観測からのFinish target/handle固定、Close停止時のclear not_attempted、複数record解除のfailed/unknown/後続not_attemptedをTDDとOS境界で検証した。後続候補のfresh Strict passはまだ未取得であり、P-07完了とは扱わない。
 
 **所有/対象file**: NRT/application/work_lifecycle.py、active_selection.py、scope_completion.py、commands/work_vnext.py、active_vnext.py、domain/selectors.py。tests/cli_runtime/test_active_vnext.py、test_work_finish_vnext.py、test_work_commands_vnext.py。新 tests/integration/test_issue413_finish_race.py（予定）。
 
