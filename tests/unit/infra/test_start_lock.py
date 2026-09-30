@@ -60,6 +60,18 @@ def test_terminated_owner_releases_lock_without_cleanup(tmp_path: Path) -> None:
             owner.stdout.close()
 
 
+def test_lock_keeps_physical_common_directory_and_detects_replacement(tmp_path: Path) -> None:
+    common = tmp_path / "common"
+    common.mkdir()
+    with StartLock(common, timeout=0) as lock:
+        lock.verify()
+        common.rename(tmp_path / "original")
+        common.mkdir()
+        with pytest.raises(ValueError, match="identity changed"):
+            lock.verify()
+        assert list(common.iterdir()) == []
+
+
 @pytest.mark.parametrize("timeout", [float("nan"), float("inf"), -1, 301])
 def test_invalid_timeout_is_rejected_before_any_path_access(tmp_path: Path, timeout: float) -> None:
     with pytest.raises(ValueError, match="finite"), StartLock(tmp_path / "missing", timeout=timeout):

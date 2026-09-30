@@ -23,6 +23,7 @@ from spec_dock.runtime.cli.legacy import LegacyCommandError, reject_legacy_root
 from spec_dock.runtime.presentation.envelope import (
     Diagnostic,
     OperationResult,
+    redact_text,
     render_diagnostic_json,
     render_json,
     render_utility_json,
@@ -217,8 +218,13 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
                     duration = float(value)
                 except ValueError:
                     error_parser.error(f"{name} requires a number")
-                if not math.isfinite(duration) or duration < 0 or (key == "timeout" and duration == 0):
-                    error_parser.error(f"{name} requires a positive value")
+                if (
+                    not math.isfinite(duration)
+                    or duration < 0
+                    or duration > 300
+                    or (key == "timeout" and duration == 0)
+                ):
+                    error_parser.error(f"{name} requires a finite value up to 300 seconds")
                 normalized_value = duration
             if key in common and common[key] != normalized_value:
                 error_parser.error(f"conflicting duplicate {name}")
@@ -272,8 +278,10 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("--yes and --dry-run apply only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
         setattr(parsed, key, common.get(key, False if key in _COMMON_SWITCHES.values() else None))
+    if parsed.command_path != "work start" and parsed.lock_timeout is not None:
+        parser.error("--lock-timeout applies only to work start")
     parsed.non_interactive = bool(parsed.non_interactive or parsed.json)
-    parsed.lock_timeout = 0.0 if parsed.lock_timeout is None else parsed.lock_timeout
+    parsed.lock_timeout = 5.0 if parsed.lock_timeout is None else parsed.lock_timeout
     parsed.timeout = (
         (300.0 if parsed.command_path == "worktree bootstrap" else 30.0) if parsed.timeout is None else parsed.timeout
     )
@@ -369,4 +377,4 @@ def _parse_failure(code: str, message: str, json_mode: bool, public_v2: bool = F
             error=Diagnostic(code, message, {}),
         )
         return ParseOutcome(None, 2, render_json(result), "")
-    return ParseOutcome(None, 2, "", f"error [{code}] {message}\n")
+    return ParseOutcome(None, 2, "", f"error [{code}] {redact_text(message)}\n")

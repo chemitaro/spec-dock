@@ -67,6 +67,28 @@ POSIX StartLockは既存common-dirのread-only directory descriptorにOS flock�
 
 Windows identity/store/mutexは未実装で、対応を認定しない。Git inventoryの全異常行、ignore/tracked判定、doctor、GH live readiness、Start効果、Finish/Syncは後続作業。特に全WT全metadata読取は現時点の暫定実装であり、D-04の必要対象限定へ絞る必要がある。
 
+## P-02 再レビューの内容と追加修正
+
+二回目の新規Strict回答は、text parseの既知tokenとURL userinfo未秘匿をP1として指摘した。引用記法により機械JSON検査はexit20だったが、利用者指示に従って意味を分析し、原回答を保全した。[回答](artifacts/code-review-p02-02-response.txt)、[分析](artifacts/code-review-p02-02-analysis.md)。共通秘匿処理をJSON/textに適用し、URLのuserinfoだけを置換、host/pathを維持した。関連20試験が成功。P2/P3のhelp/AGENTS不一致は既存のP-12/P-14義務として記録し、単独のblocking条件に昇格しない。独立再レビューのpassは未取得。
+
+## P-04〜P-06 観測限定と最初のStart縦経路
+
+別WTでは直接recordを先に読み、必要な対象と現在の祖先だけのmetadataを読むように変更した。無関係な壊れmetadataを読まない試験をRed→Greenで確認。対象が消えた予約は残し、読めない対象でも既知recordのID/refを捨てない。
+
+共通dir/rootの物理handleを保持し、同じpathnameの実体置換を検出する。POSIX StartLockで別process排他と強制終了後解放を維持。`--lock-timeout`はStartだけ、既定5秒、有限0〜300秒へ変更した。
+
+通常consoleのStartへGH GET→lock内再観測→branch→checkout→immutable直接記録を接続した。GH GETはロック外。dry-runはlock/write/branch/checkoutなし。既存branchは明示`--branch`かつ`--base`なしを要求し、同じ妥当な対象/branchは記録bytesとtokenを変えずunchanged。Git自身のindex.lockでcheckoutが失敗する実fixtureでは、作成済みbranchを残しpartial6、Git原文のstderr/returncodeをJSON/textへ保持、selection.publishはnot_attemptedとした。ignore不足とlock取得後dirtyはGit効果前に拒否する。
+
+| 選択検証 | 実結果 |
+|---|---|
+| 新contract/Start/lock/identity/inventory/store/observation/envelopeとfresh wheel | 101 passed、11.64秒 |
+| Ruff check/format、全source/test | 成功 |
+| 新しい10 source fileのmypy（follow-imports=silent） | 成功。全体型gateとは別 |
+| 実Scope metadata 240件のhash | 変更0 |
+| 実workspace宣言hash | 変更0 |
+
+P-06はまだ途中。実効依存のlive readiness、切替先の全必要snapshot事前検証、branch tip/inventoryの最終照合、switch-activeと同Scope別branch置換、Git timeout/signalの事後照合、publish確認不能のeffect分類、expect-current/backendなどは未完了。Windows adapterも未実装。現時点の成功試験を全Start受入としない。
+
 ## 現在の段階
 
-P-02 package/utilityの修正を検証したがStrict再レビュー待ち。P-03〜P-05はPOSIXの途中実装。P-06〜P-17は未着手。全機能受入、全体lint/test、最終品質ゲート、手動製品確認は未完了。実dogfoodのmetadata/workspace宣言は保持している。
+P-02は修正済みだが独立再レビュー待ち。P-03〜P-06は途中実装。P-07〜P-17は未着手。全機能受入、全体lint/test、最終品質ゲート、手動製品確認は未完了。実dogfoodのmetadata/workspace宣言は保持している。

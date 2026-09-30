@@ -7,9 +7,13 @@ import os
 import time
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.infra.identity import DirectoryIdentity
+
 if TYPE_CHECKING:
     from pathlib import Path
     from types import TracebackType
+
+    from spec_dock.runtime.domain.work_target import PhysicalIdentity
 
 
 class StartLockBusy(TimeoutError):
@@ -21,6 +25,7 @@ class StartLock:
         self.common_dir = common_dir
         self.timeout = timeout
         self._fd: int | None = None
+        self._directory: DirectoryIdentity | None = None
 
     def __enter__(self) -> StartLock:
         if not math.isfinite(self.timeout) or not 0 <= self.timeout <= 300:
@@ -31,8 +36,9 @@ class StartLock:
             raise NotImplementedError("Start lock is not supported on this platform")
         import fcntl
 
-        fd = os.open(self.common_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-        os.set_inheritable(fd, False)
+        directory = DirectoryIdentity(self.common_dir).__enter__()
+        fd = directory.descriptor
+        assert fd is not None
         deadline = time.monotonic() + self.timeout
         try:
             while True:
@@ -45,10 +51,22 @@ class StartLock:
                         raise StartLockBusy("another work start holds the clone lock") from error
                     time.sleep(min(0.05, remaining))
         except BaseException:
-            os.close(fd)
+            directory.__exit__(None, None, None)
             raise
         self._fd = fd
+        self._directory = directory
         return self
+
+    @property
+    def identity(self) -> PhysicalIdentity:
+        if self._directory is None:
+            raise RuntimeError("Start lock is not held")
+        return self._directory.identity
+
+    def verify(self) -> None:
+        if self._directory is None:
+            raise RuntimeError("Start lock is not held")
+        self._directory.verify()
 
     def __exit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None
@@ -60,4 +78,6 @@ class StartLock:
             try:
                 fcntl.flock(fd, fcntl.LOCK_UN)
             finally:
-                os.close(fd)
+                directory, self._directory = self._directory, None
+                assert directory is not None
+                directory.__exit__(None, None, None)

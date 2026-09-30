@@ -156,7 +156,7 @@ uv run pytest tests/integration/test_start_lock.py -q
 <a id="p-06"></a>
 ## P-06 Git効果を含むStartを閉じる
 
-**状態: 未着手。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
+**状態: 実装中（Startの最初の縦経路・途中Git失敗を検証、未完了条件あり）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
 
 **所有/対象file**: NRT/application/work_lifecycle.py、branch_vnext.py、commands/work_vnext.py、branch_vnext.py、infra/git_cli.py、presentation/envelope.py。tests/cli_runtime/test_work_start_vnext.py、test_branch_vnext.py、新 tests/integration/test_issue413_start.py（予定）。
 

@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.work_target import WorkTarget
-    from spec_dock.runtime.infra.work_target_store import SelectionHandle
+    from spec_dock.runtime.infra.work_target_store import SelectionHandle, StoredSelection
 
 
 @dataclass(frozen=True)
@@ -129,6 +129,7 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
     seen: set[object] = set()
     rows: list[WorktreeSelection] = []
     for entry in worktree_list(context.root):
+        direct: StoredSelection | None = None
         try:
             if entry.bare:
                 raise ValueError("bare repository is not a working tree")
@@ -138,7 +139,13 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
             if other.worktree_identity in seen:
                 continue
             seen.add(other.worktree_identity)
-            views = load_scope_views(other.root / "spec-dock")
+            with WorkTargetStore(other.root) as store:
+                direct = store.read()
+            views = (
+                load_scope_views(other.root / "spec-dock", target_id=direct.record.scope_id)
+                if direct.record is not None
+                else ()
+            )
             selection = read_selection(other, views)
             rows.append(WorktreeSelection(str(entry.path), selection, views))
         except (OSError, ValueError, RuntimeError) as error:
@@ -147,8 +154,8 @@ def observe_worktrees(context: ProjectContext) -> tuple[WorktreeSelection, ...]:
                     str(entry.path),
                     SelectionObservation(
                         "unavailable",
-                        None,
-                        None,
+                        direct.record if direct else None,
+                        direct.handle if direct else None,
                         entry.branch,
                         reason=str(error),
                     ),

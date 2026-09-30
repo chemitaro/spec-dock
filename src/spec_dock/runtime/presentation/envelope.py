@@ -162,17 +162,23 @@ def render_json_v2(result: OperationResult[object]) -> str:
     return json.dumps(_redact(payload), ensure_ascii=False, separators=(",", ":")) + "\n"
 
 
-def render_text(result: OperationResult[object]) -> tuple[str, str]:
+def render_text(result: OperationResult[object], *, native_git: bool = False) -> tuple[str, str]:
     stdout_lines = [f"spec-dock: {result.status} ({result.command})"]
     for effect in result.effects:
         target = f" target={_text_escape(effect.target)}" if effect.target is not None else ""
         stdout_lines.append(f"effect {effect.kind} status={effect.status}{target}")
     stderr_lines = [f"warning [{item.code}] {_text_escape(item.message)}" for item in result.warnings]
+    native_stderr = ""
     if result.error is not None:
-        stderr_lines.append(f"error [{result.error.code}] {_text_escape(result.error.message)}")
+        git_details = result.error.details.get("git")
+        if native_git and isinstance(git_details, dict) and isinstance(git_details.get("stderr"), str):
+            stderr_lines.append(f"error [{result.error.code}]")
+            native_stderr = str(_redact(git_details["stderr"]))
+        else:
+            stderr_lines.append(f"error [{result.error.code}] {_text_escape(result.error.message)}")
     if result.recovery is not None and result.recovery.blocked_reason:
         stderr_lines.append(f"recovery: {_text_escape(result.recovery.blocked_reason)}")
-    return "\n".join(stdout_lines) + "\n", "\n".join(stderr_lines) + ("\n" if stderr_lines else "")
+    return "\n".join(stdout_lines) + "\n", "\n".join(stderr_lines) + ("\n" if stderr_lines else "") + native_stderr
 
 
 def _text_escape(value: str) -> str:
@@ -181,6 +187,12 @@ def _text_escape(value: str) -> str:
 
 _SENSITIVE_KEYS = {"token", "access_token", "password", "secret", "authorization", "cookie", "api_key", "client_secret"}
 _CREDENTIAL_PATTERN = re.compile(r"(?i)\bBearer\s+\S+|\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9_]+")
+_USERINFO_PATTERN = re.compile(r"(?i)(\b[a-z][a-z0-9+.-]*://)[^\s/?#\"'<>]*@")
+
+
+def redact_text(value: str) -> str:
+    """Keep normal wording and URL host/path while removing credential portions."""
+    return _CREDENTIAL_PATTERN.sub("[redacted]", _USERINFO_PATTERN.sub(r"\1[redacted]@", value))
 
 
 def _redact(value: object) -> object:
@@ -194,5 +206,5 @@ def _redact(value: object) -> object:
     if isinstance(value, (list, tuple)):
         return [_redact(item) for item in value]
     if isinstance(value, str):
-        return _CREDENTIAL_PATTERN.sub("[redacted]", value)
+        return redact_text(value)
     return value

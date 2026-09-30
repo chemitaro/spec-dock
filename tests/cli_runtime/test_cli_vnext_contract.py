@@ -219,7 +219,7 @@ def test_common_numeric_timeout_rejects_negative_values() -> None:
 
 def test_common_timeouts_are_typed_finite_and_explicit() -> None:
     default = parse_vnext(["work", "start", "iss-00409", "--json"])
-    assert default.lock_timeout == pytest.approx(0.0)
+    assert default.lock_timeout == pytest.approx(5.0)
     assert default.timeout == pytest.approx(30.0)
     assert default.non_interactive is True
     assert parse_vnext(["worktree", "bootstrap", "wt:one"]).timeout == pytest.approx(300.0)

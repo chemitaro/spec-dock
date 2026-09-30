@@ -24,10 +24,11 @@ class StoredScope:
     metadata: ScopeMetadata
 
 
-def load_scope_tree(specdock_dir: Path) -> tuple[StoredScope, ...]:
+def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tuple[StoredScope, ...]:
     rows: list[StoredScope] = []
     identities: set[str] = set()
     linkages: set[tuple[str, str, int]] = set()
+    selected_paths = _selected_paths(specdock_dir, target_id) if target_id is not None else None
 
     def walk(container: Path, kind: str, chain: tuple[str, ...]) -> None:
         try:
@@ -39,6 +40,8 @@ def load_scope_tree(specdock_dir: Path) -> tuple[StoredScope, ...]:
         pattern = re.compile(rf"{_PREFIXES[kind]}(?:-local)?-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\Z")
         for directory in sorted(container.iterdir()):
             if not pattern.fullmatch(directory.name):
+                continue
+            if selected_paths is not None and directory not in selected_paths:
                 continue
             if not stat.S_ISDIR(directory.lstat().st_mode):
                 raise ValueError("Scope path is redirected or not a directory")
@@ -82,3 +85,36 @@ def load_scope_tree(specdock_dir: Path) -> tuple[StoredScope, ...]:
 
     walk(specdock_dir / "initiatives", "initiative", ())
     return tuple(rows)
+
+
+def _selected_paths(specdock_dir: Path, target_id: str) -> set[Path]:
+    """Locate only directory names, then read the target's current ancestor chain."""
+    matches: list[tuple[Path, ...]] = []
+    prefix = target_id.partition("-")[0]
+
+    def scan(container: Path, kind: str, parents: tuple[Path, ...]) -> None:
+        try:
+            mode = container.lstat().st_mode
+        except FileNotFoundError:
+            return
+        if not stat.S_ISDIR(mode):
+            raise ValueError("Scope container is redirected or not a directory")
+        pattern = re.compile(rf"(?P<id>{_PREFIXES[kind]}(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+        for directory in container.iterdir():
+            match = pattern.fullmatch(directory.name)
+            if match is None:
+                continue
+            if not stat.S_ISDIR(directory.lstat().st_mode):
+                raise ValueError("Scope path is redirected or not a directory")
+            chain = (*parents, directory)
+            if match["id"] == target_id:
+                matches.append(chain)
+            if kind == "initiative" and prefix != "init":
+                scan(directory / "epics", "epic", chain)
+            elif kind == "epic" and prefix == "iss":
+                scan(directory / "issues", "issue", chain)
+
+    scan(specdock_dir / "initiatives", "initiative", ())
+    if len(matches) > 1:
+        raise ValueError("duplicate selected Scope ID")
+    return set(matches[0]) if matches else set()

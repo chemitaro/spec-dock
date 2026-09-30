@@ -43,7 +43,11 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
     result: OperationResult[object]
     try:
         context = resolve_context(namespace.project, cwd)
-        if command == "active show":
+        if command == "work start":
+            from spec_dock.runtime.application.work_start import start_work
+
+            result = start_work(namespace, context)
+        elif command == "active show":
             observation = read_selection(context, load_scope_views(context.root / "spec-dock"))
             result = OperationResult(command, "succeeded", ActiveData(observation.view(), observation.ancestors), 0)
         elif command == "scope show":
@@ -95,7 +99,7 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
         result = failure(command, "LOCAL_IO_FAILED", str(error), 5)
     if namespace.json:
         return result.exit_code, render_json_v2(result), ""
-    stdout, stderr = render_text(result)
+    stdout, stderr = render_text(result, native_git=True)
     return result.exit_code, stdout, stderr
 
 

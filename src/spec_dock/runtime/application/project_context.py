@@ -6,10 +6,14 @@ from dataclasses import dataclass
 import os
 from pathlib import Path
 import subprocess
+from typing import TYPE_CHECKING
 
-from spec_dock.runtime.domain.work_target import PhysicalIdentity
 from spec_dock.runtime.infra.git_cli import sanitized_git_environment
+from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import read_guarded_json
+
+if TYPE_CHECKING:
+    from spec_dock.runtime.domain.work_target import PhysicalIdentity
 
 NEW_WRITER_PROTOCOL = "specdock.worktree-writer/v1"
 OLD_WRITER_PROTOCOL = "specdock.writer/v1"
@@ -33,8 +37,8 @@ class ProjectContext:
 
 
 def physical_identity(path: Path) -> PhysicalIdentity:
-    value = path.stat()
-    return PhysicalIdentity("posix", str(value.st_dev), str(value.st_ino))
+    with DirectoryIdentity(path) as opened:
+        return opened.identity
 
 
 def resolve_context(project: str | None, cwd: Path) -> ProjectContext:

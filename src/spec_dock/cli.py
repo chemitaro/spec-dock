@@ -6,7 +6,7 @@ from pathlib import Path
 import sys
 
 from spec_dock.runtime.cli.options import completion_script, explicit_help, parse_vnext_output
-from spec_dock.runtime.presentation.envelope import render_diagnostic_json, render_utility_json
+from spec_dock.runtime.presentation.envelope import redact_text, render_diagnostic_json, render_utility_json
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -28,7 +28,7 @@ def main(argv: list[str] | None = None) -> int:
             if namespace.json:
                 sys.stdout.write(render_diagnostic_json(command, "USAGE_ERROR", str(error), exit_code=2))
             else:
-                sys.stderr.write(f"error [USAGE_ERROR] {error}\n")
+                sys.stderr.write(f"error [USAGE_ERROR] {redact_text(str(error))}\n")
             return 2
         sys.stdout.write(render_utility_json(command, text) if namespace.json else text)
         return 0
