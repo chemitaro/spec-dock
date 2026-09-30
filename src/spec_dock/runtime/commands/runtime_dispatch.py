@@ -54,6 +54,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_scope_edit import edit_scope
 
             result = edit_scope(namespace, context)
+        elif command == "scope delete":
+            from spec_dock.runtime.application.direct_scope_delete import delete_scope
+
+            result = delete_scope(namespace, context)
         elif command in ("dependency list", "dependency check"):
             from spec_dock.runtime.application.direct_dependencies import query_dependencies
 

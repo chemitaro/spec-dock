@@ -390,3 +390,19 @@ F2では成功するnative post-checkout hookによるtracked/untrackedの変更
 F3ではmain/linkedの両方のScope資料が消えた場合、stale二行と件数2だけを返して重複findingが欠落するRedを確認した。既知recordのselected/stale/unavailable集合を重複診断にも使い、既存の状態findingとSELECTION_DUPLICATEを併記する。linked metadataが壊れても安全にdecode済みのrecordを保持し、invalidなrecordは件数・重複へ昇格させない。effects=[]、全record bytes不変、共通stateやcacheなしを確認した。
 
 関連Scope発行・branch・Syncの83 testsが25.02秒で通過し、変更3 source限定mypy、変更6 fileのRuff check/formatが成功した。P2の元の分類とnon-blockingを保ち、利用者の全指摘修正指示に従った。fresh Strict pass、P-10以後、旧runtimeの退役、native Windows、全体gate、Final Quality Gate、手動製品確認、実consumer切替は未完了である。
+
+## P-10 Scope deleteの実体保全と局所効果
+
+r9の全三件の修正と原文・分析・検証記録を7ae4ebccedbda067a7e47ad1574072338b1fb5feへ保存した。親de47237f、branchとGit identityの維持、indexが空であることを確認した。その後、未完了だったScope delete unitを仕上げた。
+
+明示したtargetと現在の直接recordを一度捕捉し、recursive、incoming依存のdetach、現在WTの選択解除、共通expect guardを検査する。不正・読取不能recordをemptyとみなさない。新しい--backup-dir ABSへ対象subtree、変更する参照元metadata、解除する捕捉recordの実体を保存する。source bytes・identity・tree内容とbackup内容を確認してから参照元metadata→捕捉token解除→subtree削除へ進み、GitHub Closeやbranch削除、別WTへの変更は行わない。metadataの未知fieldとmodeを維持し、Start共通lock・control・台帳・journal・権限制御や自動巻戻しを追加しない。
+
+backupのpathをリンクを解決せず正規化し、.gitと削除対象の重複、既存path、redirected parentを拒否する。held directory descriptorから無上書きコピーし、本文・ignored成果物・mode・link文字列を保全する。リンク先の実体へ書き込まない。根拠のあるバックアップ確認後だけ業務変更を行う。sourceやbackupのredirect、途中の書込・mkdirの応答不明では実体を残し、backup unknownと後続not_attemptedを返す。
+
+削除は捕捉したentryの集合とidentity/contentのstatを照合しながら、held descriptorでfile単位に進める。backup後に追加・変更されたfileを保全し、すでに削除したpathを失わず、remaining_pathsと各effectを返す。確認済みmetadata置換、captured clear、subtree削除後のcleanup/Git失敗もpartial6へ保持する。不明な置換・unlinkを成功と推定せず、再送・復元をしない。Git stderrとreturncodeは元の複数行を返す。全treeのserializable transactionや任意の外部writerに対するatomic CASを新しく保証する実装ではない。
+
+実TTYで計画表示後の承認・取消を確認した。JSON/非対話は--yesを要求し、dry-runはbackup・stage・metadata・recordを変更せず、dependency editとclearを含む全予定効果とcan_apply/blockersを返す。redirected stagingはnative Gitが元の診断で拒否する。helpはv2のdeletion fieldと実backupを説明し、旧resume/rollbackはproject解決前にARGUMENT_RETIRED/2で拒否する。
+
+公開CLIとnative mkdir/open/fsync/replace/unlink/listdir/close/Git境界を使い、制御なし通常削除、再帰・guard・incoming・選択条件、backup unknown、確認済み効果とcleanup、並行入力変更・新file保全をRed→Greenで検証した。POSIX実端末、モード/link保全、FIFOの非block拒否、別processでStart flock保持中の削除、同clone別WTの記録保全とcheckout後stale、古いtokenが既に解除された後の新token保全も確認した。既存保存原語から最初にGreenだったケースを、架空のRedへ数えない。FDコピー変更に合わせたfault fixtureのnative IO境界変更も、製品Redと区別する。
+
+関連160 tests（26.86秒）、全source/testsのRuff check/format（389 files）、変更6 source限定mypyとdiff checkが成功した。初回の関連test collectionは旧vnext inspection表に新しい非journal deleteの行がなかったため失敗した。その表を補正し再実行した結果であり、旧writerを通常dispatchへ戻していない。全体mypy、native Windows、fresh Strict、Artifact/Workbench/worktree/bootstrap、P-11以後、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfoodのmetadata、workspace宣言、直接選択は変更していない。

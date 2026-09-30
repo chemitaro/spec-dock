@@ -86,6 +86,7 @@ _NONBLOCKING_INSPECTION: dict[str, str] = {
     "work finish": "Inspect current completion and direct selection before a new explicit Finish.",
     "branch create": "Inspect the Git ref before a new explicit branch operation.",
     "scope edit": "Run scope show for the fixed Scope ID and compare its title and revision.",
+    "scope delete": "Inspect the retained backup and applied or remaining local paths before a new explicit operation.",
     "active set": "Run active show and compare the focus and revision.",
     "active clear": "Run active show and compare the focus and revision.",
     "branch switch": "Inspect Git HEAD and run branch show for the fixed Scope ID.",

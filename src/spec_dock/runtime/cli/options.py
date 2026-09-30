@@ -68,6 +68,8 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf == "scope delete":
+        return "Inspect the retained backup and applied or remaining paths before a new explicit operation; changes are not automatically undone."
     if leaf == "scope edit":
         return (
             "Inspect the exact Scope metadata before a new explicit edit; do not automatically revert applied changes."
@@ -117,6 +119,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     create = argv[:2] == ["scope", "create"]
     imported = argv[:3] == ["scope", "import", "github"]
     lifecycle = len(argv) >= 2 and argv[0] == "scope" and argv[1] in ("close", "reopen")
+    delete = argv[:2] == ["scope", "delete"]
     dependency = len(argv) >= 2 and argv[0] == "dependency"
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
@@ -129,6 +132,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not create
         and not imported
         and not lifecycle
+        and not delete
         and not dependency
     ):
         return
@@ -157,6 +161,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--parent",
             "--github-repo",
             "--reason",
+            "--backup-dir",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1

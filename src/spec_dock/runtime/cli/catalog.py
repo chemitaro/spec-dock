@@ -171,7 +171,13 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "scope edit": (_arg("target"), _required("--title")),
     "scope close": (_arg("target"), _arg("--reason", choices=("completed", "not-planned"), default="completed")),
     "scope reopen": (_arg("target"),),
-    "scope delete": (_arg("target"), _flag("--recursive"), _flag("--clear-active"), _flag("--detach-dependencies")),
+    "scope delete": (
+        _arg("target"),
+        _flag("--recursive"),
+        _flag("--clear-active"),
+        _flag("--detach-dependencies"),
+        _arg("--backup-dir"),
+    ),
     "active show": (),
     "active set": (_arg("target"),),
     "active clear": (_arg("--from", dest="from_target"), _flag("--all")),
@@ -239,7 +245,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
 }
 
 RECOVERY_LEAF_COMMANDS: dict[str, str] = {
-    "scope delete": "scope.delete",
     "workspace migrate": "workspace.migrate",
     "installation init": "installation.init",
     "installation update": "installation.update",
@@ -307,7 +312,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
-    "scope delete": "Select the exact local Scope subtree and satisfy deletion safety guards.",
+    "scope delete": "Require --backup-dir ABS for a new real backup; descendants require --recursive, incoming edges require --detach-dependencies, and a selected descendant requires --clear-active.",
     "active show": "The selected worktree must have readable active-selection state.",
     "active set": "Only the same valid direct target is unchanged; use work start to acquire a selection.",
     "active clear": "--from requires a valid current chain; --all --yes permits discarding observed corrupt regular records. Unknown entries are preserved; ancestors are never promoted.",
@@ -408,6 +413,8 @@ _JSON_DATA_BY_ROOT = {
 
 
 def _example(leaf: str) -> str:
+    if leaf == "scope delete":
+        return "spec-dock scope delete <scope-id> --backup-dir /absolute/backup --yes"
     if leaf == "help":
         return "spec-dock help work start"
     if leaf == "completion":
@@ -509,6 +516,12 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not modify documents, GitHub state, direct selection or checkout, or acquire a Start lock."
         json_data = "scope, github_ref, changed; dry-run adds can_apply and blockers."
         confirmation = "No final confirmation is required for a local title edit."
+    elif leaf == "scope delete":
+        reads = "Current Scope subtree, incoming dependency metadata, and this worktree's captured direct selection."
+        json_data = "removed_ids, changed_paths, remaining_paths, backup_path; dry-run adds can_apply and blockers."
+        confirmation = (
+            "TTY prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
+        )
     elif leaf.startswith("dependency "):
         reads = "Current metadata, inherited dependency edges, and the direct record for selectors; live GitHub only with --source github."
         does_not = "Does not change direct selection or Git checkout, acquire a Start lock, or persist GitHub state."
