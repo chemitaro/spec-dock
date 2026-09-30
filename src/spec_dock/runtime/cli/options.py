@@ -72,6 +72,10 @@ def _recovery_help(leaf: str) -> str:
         return (
             "Inspect the current Git branch, HEAD, worktree status, and direct selection before a new explicit Start."
         )
+    if leaf == "work finish":
+        return (
+            "Inspect current completion and direct selection, then issue a new explicit Finish; no journal or rollback."
+        )
     if leaf.startswith("branch "):
         return "Inspect the Git ref, HEAD, and worktree status before a new explicit operation; no journal or rollback."
     command = RECOVERY_LEAF_COMMANDS.get(leaf)
@@ -93,9 +97,10 @@ def _recovery_help(leaf: str) -> str:
 
 def _reject_retired_start(argv: list[str]) -> None:
     start = argv[:2] == ["work", "start"]
+    finish = argv[:2] == ["work", "finish"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
-    if not start and not branch and not active:
+    if not start and not finish and not branch and not active:
         return
     index = 2
     while index < len(argv):

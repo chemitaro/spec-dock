@@ -242,3 +242,15 @@ active set/clearをimmutable direct recordの通常dispatchへ接続した。set
 ## P-06 branch switchの無変更分類
 
 第3回レビューのC-04効果分類を同じGit checkout境界にも照合し、branch switchで既にcurrent branch/HEADと固定tipが一致するケースを追加した。修正前は不要なpost-checkout hookを起動しsucceeded/switched=trueだった。fresh physical context・source bytes・candidate・cleanを照合後、checkoutを省略してunchanged/switched=falseを返す。選択の記録は作らない。公開CLIのRed→Greenとbranch関連23件、対象Ruffと限定mypyが成功した。独立再レビューは次の現在SHAで実施する。
+
+## P-07 GitHub-backed Finishの通常経路
+
+GitHub-backedのFinishを通常package dispatchへ接続した。対象/selection handleをremote前に固定し、対象と子孫のlive状態を確認する。GitHub completedの確認後に、自WTの捕捉した対象/配下の正確なbasenameだけを解除し、親を選び直さない。既にcompletedならPATCHせず、Gatewayの最終GETで他actorの完了が見えた場合もunchangedを返す。dry-runは--yes不要、予定効果のみ。offline/期待条件/未完了子孫/unknown/not-plannedは効果前に停止する。
+
+source bytes/identityとworkspace declaration、clone/worktree physical identityを捕捉し、Gatewayの最終GETの後、PATCH直前にも照合する。任意編集を禁止するロックや権限変更は追加しない。GH closeの結果unknownでは選択を保全し、confirmed close後の解除失敗はcompleted=trueとclose/clearの別effectで返す。新しい明示Finishではlive GETをし、完了確認済みなら重複PATCHを行わない。journalのresume/rollbackはcontext前にARGUMENT_RETIREDで拒否する。
+
+native gh fixtureを外部プロセスとして起動し、GET/PATCHとcanonical repository/Issue bindingを検証した。最終GET中のmetadata変更、他actorのremote完了、503によるClose不明、unlink/fsync失敗に対する公開CLIのRed→Greenを確認した。別processが共通directory flockを保持したままでもFinishが成功した。Finishの最初のGET中に別のnative processでclear→Startを実行し、同じScopeの新tokenでも遅い旧token解除が新記録を消さないことを確認した。後二件は設計済み境界のGreen証拠であり、新規Redとは区別する。
+
+拡張選択は229 passed/4 failed（43.10秒）。失敗4件は廃止対象のvnext_runtimeを直接呼び、通常catalogから削除済みのactive set --from-branch属性を参照する旧lifecycle CLIテストだった。旧runtimeのnonblocking inspection parityは現在catalogに合わせたが、廃止経路の復活はしない。P-12で退役module/testと新しい公開CLIの対応を整理する。全suite成功の証拠には扱わない。その後の最終context/metadata再照合を含むFinish/共有Gateway選択は37 passed（7.05秒）。変更した5 sourceの限定mypy、全source/test Ruff check/format（369 files）が成功した。
+
+真正の既存local backend保全互換性はまだ未接続であり、このcheckpointをP-07完了とは扱わない。Windows adapter/native受入、P-08以後、全体mypy/test、現在候補の独立Strict再レビュー、最終品質ゲート、手動製品確認も継続する。実dogfood workspace/Scopeを変更した証拠ではない。

@@ -204,6 +204,7 @@ class GithubIssueGateway:
         *,
         state: Literal["open", "closed"],
         reason: Literal["completed", "not_planned"] | None,
+        before_change: Callable[[], None] | None = None,
     ) -> GithubIssueRecord:
         if (state == "closed") != (reason is not None):
             raise ValueError("closed requires completed or not_planned; open requires no reason")
@@ -211,8 +212,12 @@ class GithubIssueGateway:
         desired: ObservedState = "open" if state == "open" else "completed" if reason == "completed" else "not-planned"
         if current.state == desired:
             return current
+        if current.state == "unknown":
+            raise RemoteIssueError("GITHUB_STATE_UNKNOWN")
         if current.raw_state.lower() == state:
             raise RemoteIssueError("GITHUB_REASON_CHANGE_REQUIRES_REOPEN")
+        if before_change is not None:
+            before_change()
         data: dict[str, str] = {"state": state, "state_reason": reason or "reopened"}
         try:
             self._api(

@@ -28,6 +28,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.work_start import start_work
 
             result = start_work(namespace, context)
+        elif command == "work finish":
+            from spec_dock.runtime.application.direct_finish import finish_work
+
+            result = finish_work(namespace, context)
         elif command in ("branch show", "branch create", "branch switch"):
             from spec_dock.runtime.application.branch_operations import branch_operation
 

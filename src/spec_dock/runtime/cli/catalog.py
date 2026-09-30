@@ -244,7 +244,6 @@ RECOVERY_LEAF_COMMANDS: dict[str, str] = {
     "scope close": "scope.close",
     "scope reopen": "scope.reopen",
     "scope delete": "scope.delete",
-    "work finish": "work.finish",
     "workspace migrate": "workspace.migrate",
     "installation init": "installation.init",
     "installation update": "installation.update",

@@ -82,6 +82,9 @@ class ExpectationMismatch(ValueError):
 
 
 _NONBLOCKING_INSPECTION: dict[str, str] = {
+    "work start": "Inspect the current Git branch and direct selection before a new explicit Start.",
+    "work finish": "Inspect current completion and direct selection before a new explicit Finish.",
+    "branch create": "Inspect the Git ref before a new explicit branch operation.",
     "scope edit": "Run scope show for the fixed Scope ID and compare its title and revision.",
     "active set": "Run active show and compare the focus and revision.",
     "active clear": "Run active show and compare the focus and revision.",
