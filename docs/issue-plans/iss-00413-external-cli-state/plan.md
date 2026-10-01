@@ -392,6 +392,8 @@ README・配布reference・migration・offline HTML・二skillを外部CLIと一
 
 公開migration helpの復旧option注入を一件のRed→Greenで除去し、native bash/zshの補完でも旧flagを提示しないことを確認した。CLI契約とhelp suiteを新契約/public mainへportし、旧44 leaf・引数・有限timeout・usage/JSON等の検査目的は維持する。関連113 tests（22.36秒）、型境界補足後のhelp 29 tests（0.78秒）、全source/tests Ruff check/format（423 files）、変更四file限定mypyが成功した。残る旧内部dispatcher用対応表・provider/runtime helpersの退役とfull gateは未完了。
 
+旧fixed-entrypoint suiteを通常wheelの非editable外部venvと実consoleへportした。廃止/維持する各保証の根拠は[公開入口テストの移行](artifacts/test-port-entrypoint.md)へ全15旧test単位で記録する。Issue Start→Sync→Finish、旧locator不採用、環境分離、二cloneの独立観測、通常/CI validateの書込0を確認した。entrypoint 14 cases（6.23秒）と関連wheel/shim/providerの30 tests（23.84秒）が成功した。実Gitのbranch保持とfake GHのIssue一回closeも別に照合した。これは既存実装のGreen回帰であり、native Windows/full gate/fresh Strict/最終手動検証ではない。
+
 **変更禁止**: 実導入先への無断一括同期、Scope/成果物/直接状態の削除、未知ユーザー改変の上書き、gpt-5.6専用coder roleへの誘導を禁止。
 
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。

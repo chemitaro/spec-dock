@@ -621,3 +621,15 @@ help suiteは旧run_vnextを直接起動せず、実public mainから stdout/std
 `uv run pytest tests/cli_runtime/test_cli_vnext_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_issue413_contract.py tests/integration/test_issue413_migration.py tests/integration/test_issue413_wheel.py -q --tb=short` は113 passed（22.36秒）。全source/tests Ruff check/format（423 files）と変更四file限定mypyが成功した。限定mypyではpytest.skipをAnyと見なすとnative executableがstrへ絞れなかったため、skip後の明示assertを追加した。製品変更ではなくtest helperの型境界であり、help/native補完の29 testsをfresh runで再確認（0.78秒）した。全体type gateの代替ではない。
 
 legacy provider/runtime helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer切替は未完了。実dogfoodの状態を変更せず、レビュー用pushの回答を待ちながら認可済みローカル作業を続ける。
+
+## P-12 公開入口の通常wheel・実consoleへのport
+
+旧fixed入口suiteの全15 testsを本文と確定仕様で照合し、廃止するpin/digest/builder/control APIと維持する公開保証を[移行根拠](artifacts/test-port-entrypoint.md)へ記録した。通常wheelをcheckout外のfresh venvへ非editable・no-index導入し、import元が外部site-packagesであることを確認する。fake固定bin/libや旧run_vnextを入口にしない。root/leafのparse、環境分離、対象Git rootと読取不変の目的は実consoleへ移した。
+
+三階層のGitHub-backed fixtureで実consoleによるIssue Start→Sync→Finishを確認した。Gitは実programでbranch作成とcheckoutを行い、開始後と完了後のbranchを独立したnative Git呼出しでも照合する。stateful gh executableは別の一時場所にあり、Issue #3だけを一度PATCHしてcompletedにする。Syncはdirectと祖先の件数を表示し、記録bytesを変更しない。Finishは捕捉記録だけを解除し、祖先のremote状態、全Scope metadata、workspace宣言とbranchを保持する。独自`.git/spec-dock`を作らない。これはhermetic fake GitHubとmacOS実processの証拠で、live GitHubやWindows受入ではない。
+
+旧locatorの不正JSON/相対path/欠けたpackage/digest不一致は通常Scope読取の実行権限を持たず、元のGit bytesも変更しない。通常/CI validateはcontrolなしで成功してtree不変。実wheelのstatic shimはconsumer sitecustomize/local package/runtimeを実行せず、GIT_DIR/GIT_WORK_TREEで別repoへ誤誘導されない。外部consoleへの正当なsymlinkを許し、同じpackageを使う二つのcloneではCWD/明示projectの各Scopeとinventoryだけを観測する。明示subdirectoryは拒否する。origin shimへの拘束と独自pinによるprogram改変検出を新契約へ戻さない。
+
+最初の実console lifecycle一件は1 passed（3.84秒）、port後entrypoint suiteは14 passed（6.23秒）で、いずれも既存実装のGreen回帰。新しい製品不具合のRedとは扱わない。native Gitによるbranch照合を補強してから `uv run pytest tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py -q --tb=short` を実行し、30 passed（23.84秒）を確認した。全source/tests Ruff check/format（423 files）、変更test一file限定mypy、diff checkも成功した。formatで余分な空行とlayoutを整えた修正は製品不具合ではない。
+
+旧CI固定bundle routeとprovider/runtime helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer切替は未完了。実dogfood workspace・metadata・shim・.agents・状態は保持する。レビュー用pushの回答を待ちながら認可済みローカル実装を続け、P-12とgoalは進行中とする。
