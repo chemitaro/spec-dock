@@ -909,3 +909,13 @@ clean `2c45e885ca48c32616d4899ee79844c553d96dc5` の通常 `make lint` はRuff�
 array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 passed（0.03秒）、refactor後の同testも2 passed（0.03秒）で確認した。既存Greenのcharacterization/refactorであり、製品Redではない。POST endpointの初期期待をargv末尾としたfixture誤り1 passed/1 failed（0.04秒）は正しい--method後の位置へ訂正し、失敗logを保持した。関連七suiteは131 passed（40.62秒）、work finishは33 passed（11.93秒）、全Ruff check/format（347 files）・変更source/test限定mypy・diff/AST検査が成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-github-marker-retirement-{before,after,related}.logに保持。
 
 このunit前のclean d7f47fc0の通常make lintはRuff成功・mypy 55 errors/19 files（266 source files）、source 40/test 15 errors、make exit2で未合格。元logはiss-00413-implementation/lint-p12-d7f47fc0.log。旧95 errorsとは別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 旧migration・共通writer admissionの退役
+
+**旧migration・共通writer admissionの退役**
+
+旧二test filesの22 test関数・920行と旧五source filesの52 symbols・1505行を全文確認し、[個別対応](artifacts/test-port-migration-retirement.md)を保存した。schema1変換、全WT登録/control/epoch/branch binding/local ID予約、UUID journal/resume/rollbackを廃止した。現schema3 bytes、current一宣言の切替、外部実backup/restore、途中user edit拒否、他WT/Git/旧activeの保全を公開CLIへ対応づける。現domain/writer_admission、migration_backup、legacy_reader、current writerは保持する。候補外source/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+追加確認は不正metadata/旧active四casesで4 passed（0.46秒）、scoped Workbenchのopaque metadata/外部link保全で1 passed（0.25秒）。既存Greenのcharacterizationである。通常wheelの旧五module実収録禁止はRed 1 failed（0.82秒）、source/test退役後の同testはGreen 1 passed（14.40秒）。関連migration/doctor/validate/公開adapter四suiteは159 passed（23.91秒）。初回関連suiteの旧filename誤指定はpytest exit4、0 tests（0.00秒）で、実inventory確認後に訂正し元logを保持した。製品Redに数えない。
+
+全Ruff check/format（340 files）、変更二test限定mypyとdiff checkが成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-migration-retirement-port.log、pytest-migration-retirement-source-{red,green}.log、pytest-migration-retirement-related.logへ保持。55 errorsの通常lintはclean d7f47fc0の別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

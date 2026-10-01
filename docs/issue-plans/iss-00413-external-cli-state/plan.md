@@ -553,6 +553,14 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 
 このunit前のclean d7f47fc0の通常make lintはRuff成功・mypy 55 errors/19 files（266 source files）、source 40/test 15 errors、make exit2で未合格。元logはiss-00413-implementation/lint-p12-d7f47fc0.log。旧95 errorsとは別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**旧migration・共通writer admissionの退役**
+
+旧二test filesの22 test関数・920行と旧五source filesの52 symbols・1505行を全文確認し、[個別対応](artifacts/test-port-migration-retirement.md)を保存した。schema1変換、全WT登録/control/epoch/branch binding/local ID予約、UUID journal/resume/rollbackを廃止した。現schema3 bytes、current一宣言の切替、外部実backup/restore、途中user edit拒否、他WT/Git/旧activeの保全を公開CLIへ対応づける。現domain/writer_admission、migration_backup、legacy_reader、current writerは保持する。候補外source/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+追加確認は不正metadata/旧active四casesで4 passed（0.46秒）、scoped Workbenchのopaque metadata/外部link保全で1 passed（0.25秒）。既存Greenのcharacterizationである。通常wheelの旧五module実収録禁止はRed 1 failed（0.82秒）、source/test退役後の同testはGreen 1 passed（14.40秒）。関連migration/doctor/validate/公開adapter四suiteは159 passed（23.91秒）。初回関連suiteの旧filename誤指定はpytest exit4、0 tests（0.00秒）で、実inventory確認後に訂正し元logを保持した。製品Redに数えない。
+
+全Ruff check/format（340 files）、変更二test限定mypyとdiff checkが成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-migration-retirement-port.log、pytest-migration-retirement-source-{red,green}.log、pytest-migration-retirement-related.logへ保持。55 errorsの通常lintはclean d7f47fc0の別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

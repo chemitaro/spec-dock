@@ -68,6 +68,50 @@ def test_migration_preview_without_control_writes_no_backup_stage_or_git_state(
     assert not (root / "spec-dock/.agent").exists()
 
 
+def test_migration_preview_keeps_scoped_workbench_metadata_opaque_and_preserves_its_external_link(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = legacy_workspace(tmp_path / "consumer")
+    metadata = next((root / "spec-dock/initiatives").rglob(".meta.json"))
+    workbench = metadata.parent / ".workbench"
+    workbench.mkdir()
+    private = b"private scratch metadata is not a Scope: \xff\x00"
+    (workbench / ".meta.json").write_bytes(private)
+    external = tmp_path / "external-work"
+    external.mkdir()
+    (external / ".meta.json").write_bytes(b"foreign arbitrary metadata")
+    link = workbench / "external"
+    link.symlink_to(external, target_is_directory=True)
+    before = tree_digest(root)
+    outside_before = tree_digest(external)
+    backup = tmp_path / "backup"
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workspace",
+            "migrate",
+            *TARGET,
+            "--backup-dir",
+            str(backup),
+            "--dry-run",
+            "--json",
+        ])
+        == 0
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "planned" and result["data"]["result"]["scope_count"] == 1
+    assert result["data"]["result"]["can_apply"] is True
+    assert result["data"]["result"]["planned_paths"] == ["spec-dock/workspace.json"]
+    assert tree_digest(root) == before and tree_digest(external) == outside_before
+    assert (workbench / ".meta.json").read_bytes() == private and link.is_symlink()
+    assert "private scratch" not in output.out + output.err
+    assert not backup.exists() and not (root / "spec-dock/.agent").exists()
+
+
 @pytest.mark.parametrize(
     "changed",
     [
@@ -107,6 +151,68 @@ def test_migration_refuses_unknown_declarations_without_creating_a_backup(
     result = json.loads(capsys.readouterr().out)
     assert result["effects"] == [] and tree_digest(root) == before
     assert not backup.exists()
+
+
+@pytest.mark.parametrize("corruption", ["metadata-symlink", "duplicate-id", "partial-link", "malformed-active"])
+def test_migration_rejects_unverified_scope_or_old_active_without_backup_repair_or_remote_observation(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    corruption: str,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = legacy_workspace(tmp_path / "consumer")
+    metadata = next((root / "spec-dock/initiatives").rglob(".meta.json"))
+    private = "private-legacy-corruption-must-not-be-echoed"
+    if corruption == "metadata-symlink":
+        external = tmp_path / "metadata.json"
+        external.write_bytes(metadata.read_bytes())
+        metadata.unlink()
+        metadata.symlink_to(external)
+    elif corruption == "duplicate-id":
+        duplicate = root / "spec-dock/initiatives/init-00002-duplicate"
+        duplicate.mkdir()
+        (duplicate / ".meta.json").write_bytes(metadata.read_bytes())
+    elif corruption == "partial-link":
+        payload = json.loads(metadata.read_bytes())
+        payload.update(github={"issue_number": 1}, consumer_extension=private)
+        metadata.write_text(json.dumps(payload))
+    else:
+        active = root / "spec-dock/.agent/active.json"
+        active.parent.mkdir()
+        active.write_bytes(("{malformed old active: " + private).encode())
+    bin_dir = tmp_path / "gh-bin"
+    bin_dir.mkdir()
+    remote_log = tmp_path / "github-was-called"
+    executable = bin_dir / "gh"
+    executable.write_text(
+        f"#!{sys.executable}\nfrom pathlib import Path\nPath({str(remote_log)!r}).touch()\nraise SystemExit(98)\n"
+    )
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir) + os.pathsep + os.environ["PATH"])
+    backup = tmp_path / "backup"
+    before = tree_digest(root)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workspace",
+            "migrate",
+            *TARGET,
+            "--backup-dir",
+            str(backup),
+            "--confirm-old-writers-stopped",
+            "--yes",
+            "--json",
+        ])
+        == 3
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["effects"] == []
+    assert tree_digest(root) == before and not backup.exists() and not remote_log.exists()
+    assert private not in output.out + output.err and not (root / ".git/spec-dock").exists()
 
 
 def test_migration_rechecks_verified_backup_before_publication(
