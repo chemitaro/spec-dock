@@ -37,6 +37,8 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
             "spec_dock/runtime/application/engine_handover_vnext.py",
             "spec_dock/runtime/application/edit_scope.py",
             "spec_dock/runtime/application/work_lifecycle.py",
+            "spec_dock/runtime/application/worktree_vnext.py",
+            "spec_dock/runtime/application/worktree_bootstrap_vnext.py",
             "spec_dock/runtime/application/scope_completion.py",
             "spec_dock/runtime/application/installation_update_vnext.py",
             "spec_dock/runtime/active.py",

@@ -839,3 +839,13 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 通常wheelの旧writer収録禁止はRed 1 failed（0.76秒）、source削除後の同testはGreen 1 passed（13.71秒）。関連Scope lifecycle/Finish/旧・現行Scope deleteの115 tests（34.01秒）、全Ruff check/format（368 files）、変更二test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-scope-lifecycle-port.log、pytest-scope-lifecycle-source-{red,green}.log、pytest-scope-lifecycle-retirement.logへ保持する。
 
 このunit前のclean 0c04677bada135dbb50ea0c48f7fc3b4aae368c9の通常make lintはRuff成功・mypy 313 errors/40 files（289 source files）、source 54/test 259 errors、make exit2で未合格だった。元logはiss-00413-implementation/lint-p12-0c04677b.logへ保持。旧407 errorsとはsnapshotが異なる。残る旧private writersの整理と現行型問題、full gates、native Windows/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 旧Worktree試験・writerの退役
+
+旧Worktree create/bootstrap/remove三filesの20 test関数・433行と、旧二writerの28 symbols・809行を全文確認し、[個別対応](artifacts/test-port-worktree-retirement.md)を保存した。明示NAME/base/path・Git inventory・branch/payload保全・明示makeと出力省略を公開CLIへ対応づけ、control/epoch/registry/receipt/recover/Start以外の共通排他を廃止した。まだ旧callerを持つworktree_target.pyはこのunitで削除しない。退役五filesへのsource/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+新しい公開保証は元選択保持1 passed（0.50秒）、detached base1 passed（0.49秒）、base/path/branch拒否3 passed（0.39秒）、成功hookの大出力省略1 passed（0.26秒）、欠落/non-native target2 passed（0.30秒）。現行Greenのcharacterizationである。欠落pathをexit5とした初期期待はv2のLOCAL_TARGET_NOT_FOUND/exit4へ訂正し、失敗logを保持した。
+
+通常wheelの収録禁止はRed 1 failed（0.78秒）、source削除後の同testはGreen 1 passed（13.87秒）。関連Worktree/native Git観測124 tests（23.14秒）、全Ruff check/format（363 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-worktree-retirement-port.log、pytest-worktree-retirement-source-{red,green}.log、pytest-worktree-retirement-related.logへ保持する。
+
+直近通常lintの313 errors/full gate、残る旧source/private helpers、native OS/別Python、fresh Strict、最終手動確認は未完了である。実consumer/live GitHubは未変更。

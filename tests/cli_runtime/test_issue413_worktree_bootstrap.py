@@ -5,6 +5,7 @@ from __future__ import annotations
 import errno
 import json
 import os
+import shlex
 import shutil
 import signal
 import subprocess
@@ -417,3 +418,49 @@ def test_bootstrap_keeps_a_started_hook_unknown_when_process_termination_reports
     assert result["data"]["result"]["observed"]["started"] is True
     assert result["data"]["result"]["observed"]["timed_out"] is True
     assert result["effects"] == [{"kind": "worktree-bootstrap", "status": "unknown", "target": str(other)}]
+
+
+def test_successful_bootstrap_omits_large_and_secret_hook_output_from_both_streams(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, other = linked_workspace(tmp_path)
+    script = (
+        'import sys; print("hook-secret-413"); print("x" * 100000); '
+        'print("error-secret-413", file=sys.stderr); print("e" * 100000, file=sys.stderr)'
+    )
+    makefile = other / "Makefile"
+    makefile.write_text(
+        f"init:\n\t@{shlex.quote(sys.executable)} -c {shlex.quote(script)}\n\t@printf 'one run\\n' > bootstrap-ran\n",
+        encoding="utf-8",
+    )
+    exact_makefile = makefile.read_bytes()
+    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "succeeded" and result["data"]["result"]["observed"]["returncode"] == 0
+    assert result["data"]["result"]["observed"]["diagnostic"] == "make init finished; output omitted"
+    assert "hook-secret-413" not in output.out + output.err and "error-secret-413" not in output.out + output.err
+    assert len(output.out + output.err) < 5000 and not output.err
+    assert (other / "bootstrap-ran").read_bytes() == b"one run\n" and makefile.read_bytes() == exact_makefile
+    assert not (root / "bootstrap-ran").exists() and not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("exists", [False, True])
+def test_bootstrap_rejects_a_missing_or_non_native_target_without_running_a_hook(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], exists: bool
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, other = linked_workspace(tmp_path)
+    target = tmp_path / "not-a-worktree"
+    if exists:
+        target.mkdir()
+        (target / "Makefile").write_text("init:\n\t@touch trap-ran\n", encoding="utf-8")
+    before = tree_digest(tmp_path)
+    assert main(["--project", str(root), "worktree", "bootstrap", str(target), "--yes", "--json"]) == 4
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["effects"] == [] and not output.err
+    assert tree_digest(tmp_path) == before
+    assert not (target / "trap-ran").exists() and not (other / "bootstrap-ran").exists()
+    assert not (root / ".git/spec-dock").exists()

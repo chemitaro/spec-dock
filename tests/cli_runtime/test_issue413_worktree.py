@@ -109,6 +109,8 @@ def test_create_uses_the_explicit_name_and_fixed_base_without_registration_or_bo
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = committed_workspace(tmp_path / "consumer")
+    selected = select_fixture(root)
+    exact_selection = selected.read_bytes()
     head = subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
@@ -142,6 +144,7 @@ def test_create_uses_the_explicit_name_and_fixed_base_without_registration_or_bo
     )
     assert (created / "spec-dock/workspace.json").read_bytes() == (root / "spec-dock/workspace.json").read_bytes()
     assert not (created / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+    assert selected.read_bytes() == exact_selection
     assert not (created / "bootstrap-ran").exists()
     assert (
         subprocess.run(
@@ -898,3 +901,85 @@ def test_known_directory_collision_preserves_the_actor_path_without_claiming_an_
         ).returncode
         == 1
     )
+
+
+def test_create_from_a_detached_source_keeps_its_head_and_pins_the_explicit_base(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    subprocess.run(["git", "-C", str(root), "switch", "--detach", "HEAD"], check=True, capture_output=True)
+    head = subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+    container = tmp_path / "worktrees"
+    assert (
+        main([
+            "--project",
+            str(root),
+            "worktree",
+            "create",
+            "detached-plan",
+            "--base",
+            "HEAD",
+            "--root",
+            str(container),
+            "--json",
+        ])
+        == 0
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    created = container / "detached-plan"
+    assert not output.err and result["status"] == "succeeded"
+    assert result["data"]["result"]["head"] == head
+    assert result["data"]["result"]["branch"] == "worktree/detached-plan"
+    assert (
+        subprocess.run(
+            ["git", "-C", str(created), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+        == head
+    )
+    assert subprocess.run(["git", "-C", str(root), "symbolic-ref", "-q", "HEAD"], capture_output=True).returncode == 1
+    assert (
+        subprocess.run(
+            ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+        ).stdout.strip()
+        == head
+    )
+    assert not (created / "spec-dock/.agent").exists() and not (created / "bootstrap-ran").exists()
+    assert not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize(("blocked", "exit_code"), [("missing-base", 5), ("path", 3), ("branch", 3)])
+def test_create_rejects_an_unknown_base_or_existing_name_before_any_effect(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], blocked: str, exit_code: int
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = committed_workspace(tmp_path / "consumer")
+    container = tmp_path / "worktrees"
+    if blocked == "path":
+        (container / "planning").mkdir(parents=True)
+        (container / "planning/evidence.bin").write_bytes(b"actor content")
+    elif blocked == "branch":
+        subprocess.run(["git", "-C", str(root), "branch", "worktree/planning", "HEAD"], check=True, capture_output=True)
+    before = tree_digest(tmp_path)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "worktree",
+            "create",
+            "planning",
+            "--base",
+            "missing-ref" if blocked == "missing-base" else "HEAD",
+            "--root",
+            str(container),
+            "--json",
+        ])
+        == exit_code
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["effects"] == [] and not output.err
+    assert tree_digest(tmp_path) == before and not (root / ".git/spec-dock").exists()
