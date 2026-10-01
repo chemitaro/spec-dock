@@ -21,18 +21,12 @@ def test_provider_matches_dogfood_managed_assets() -> None:
         assert _files(ROOT / provider) == _files(ROOT / dogfood)
 
 
-def test_provider_scripts_are_static_and_match_pre_cutover_dogfood() -> None:
+def test_provider_scripts_contain_only_the_static_entrypoint_assets() -> None:
     provider = _files(ROOT / "src/spec_dock/assets/spec_dock/scripts")
-    dogfood = {
-        name: content
-        for name, content in _files(ROOT / "spec-dock/scripts").items()
-        if not name.startswith("spec_dock_runtime/")
-    }
     assert set(provider) == {"README.md", "spec-dock"}
-    assert provider == dogfood
 
 
-def test_provider_shim_is_the_fixed_engine_delegator() -> None:
+def test_provider_shim_matches_the_standalone_external_console_delegator() -> None:
     assert (ROOT / "src/spec_dock/assets/spec_dock/scripts/spec-dock").read_bytes() == (
         ROOT / "src/spec_dock/shim_vnext.py"
     ).read_bytes()

@@ -40,6 +40,14 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         assert not any("__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names)
         assert "spec_dock/assets/spec_dock/.gitignore" in names
         assert "spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md" in names
+        assert (
+            archive.read("spec_dock/assets/spec_dock/scripts/spec-dock")
+            == (ROOT / "src/spec_dock/shim_vnext.py").read_bytes()
+        )
+        assert (
+            archive.read("spec_dock/assets/spec_dock/scripts/README.md")
+            == (ROOT / "src/spec_dock/assets/spec_dock/scripts/README.md").read_bytes()
+        )
 
     # The real sdist build must ship the same package, including hidden assets.
     sdist_dir = tmp_path / "sdist"
@@ -154,3 +162,24 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         assert not validation.stderr and "private" not in validation.stdout
         assert tree_digest(consumer) == before
         assert not (consumer / "spec-dock/.agent").exists() and not (consumer / ".git/spec-dock").exists()
+
+    installed_shim = Path(package_path).with_name("assets") / "spec_dock/scripts/spec-dock"
+    consumer_shim = consumer / "spec-dock/scripts/spec-dock"
+    consumer_shim.parent.mkdir()
+    consumer_shim.write_bytes(installed_shim.read_bytes())
+    console_environment = dict(
+        validation_environment, PATH=str(console.parent) + os.pathsep + validation_environment["PATH"]
+    )
+    before = tree_digest(consumer)
+    delegated = subprocess.run(
+        [sys.executable, "-I", str(consumer_shim), "--version", "--json"],
+        cwd=outside,
+        env=console_environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert delegated.returncode == 0, delegated.stdout + delegated.stderr
+    assert json.loads(delegated.stdout)["data"]["version"] == expected_version and not delegated.stderr
+    assert tree_digest(consumer) == before

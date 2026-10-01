@@ -549,3 +549,17 @@ dataはC-05のvalidation familyで、valid/findings/snapshot_sourceにnode_count
 関連run `uv run pytest tests/cli_runtime/test_issue413_workspace_doctor.py tests/cli_runtime/test_workspace_doctor_vnext.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_issue413_work_start.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_finish.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_dependency_vnext.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree_bootstrap.py tests/integration/test_issue413_observation.py tests/integration/test_issue413_sync.py tests/unit/infra/test_work_target_store.py tests/unit/infra/test_start_lock.py tests/integration/test_issue413_migration.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_issue413_workbench.py tests/cli_runtime/test_issue413_scope_delete.py tests/cli_runtime/test_artifact_vnext.py tests/cli_runtime/test_artifact_commands_vnext.py tests/cli_runtime/test_scope_delete_vnext.py tests/unit/infra/test_issue413_committed_workspace.py -q --tb=short` は646 passed（114.68秒）。修正済みmigration helpもfresh runで成功した。元processの完了とexit0を確認し、quiet outputを理由にjobを再起動していない。
 
 P-12以後、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択を変更していない。通常非force pushの利用者回答が未着であるため、現在SHAの一致を満たさないStrictは起動せず、認可済みローカル実装を継続する。goalはactiveである。
+
+## P-12 PATH委譲の静的shimを実装
+
+provider `shim_vnext.py`と配布`assets/spec_dock/scripts/spec-dock`を同じstandalone shimへ置換した。PATH上の外部consoleを解決し、argv・cwd・native stdout/stderr・終了値を保持してexecする。Git common-dir、engine locator/control、distribution digest、consumer Pythonを読まず、固定engineへの別経路を作らない。自身と同inodeのcandidate、symlink/hardlink、同shimのコピー、既知旧shimは実行前にSHIM_RECURSIONで拒否する。copy識別は先頭4096 bytesに限定し、正常な外部consoleへのsymlinkは受理する。
+
+外部console不在や起動不能は導入/PATH確認の案内とexit3を返す。JSON指定時はv2 diagnostic envelope・effects=[]・stderr空で返し、double-dash後のjson文字列は制御指定にしない。shim自身はisolated Pythonで起動し、外部consoleにもcallerのPYTHONPATH/PYTHONHOME/PYTHONUSERBASE/PYTHONSTARTUPを渡さない。通常の利用者設定は保持する。Git stateやproject bindingの検査は外部CLIが担当する。
+
+Git不在での10 failuresをRedとして確認し、native standalone委譲へ接続して10 passedになった。追加二casesは元からGreenとして記録し、実行可能な`./spec -h` symlink、shim directoryのjson/shutil moduleとcaller PYTHONPATHによるimport置換の防止を検証した。引数のspace・Unicode・改行・shell文字列、nested cwd、missing project、外部stderr/非0終了値もそのまま保持した。fake executableはhermetic fixtureであり、実GitHub通信の実績ではない。
+
+provider scriptsと未切替dogfood scriptsの全bytes一致を期待した旧testは、意図した供給版更新で一件失敗した。P-16の実consumer切替と混同しないよう、このtestをstatic asset集合の検査へ更新し、供給sourceとstatic shimの完全bytes一致を維持した。fresh wheel内のshim/README bytesをproviderと比較し、sdistからのwheelとの資産集合一致も確認する。外部venvの実consoleを配布shimから起動してpackage metadataのversionを確認した。現consumerのshimは変更していない。
+
+`uv run pytest tests/integration/test_issue413_shim.py tests/integration/test_issue413_wheel.py tests/unit/infra/test_provider_distribution.py -q --tb=short` は16 passed（6.71秒）。全source/testsのRuff check/format（417 files）、変更四source/test限定mypy、diff checkが成功した。`uv run pytest tests/integration/test_cli_entrypoint_vnext.py -q --tb=short` は13 passed/2 failed（3.92秒）。PATHを無視してpinを使う旧保証の一件はD-02と異なり、旧group initの一件はP-02から未完了の経路である。旧pin/tamper/group-init test群は後続のinstallationとfixed helper退役で新契約へportし、成功したことにせずfull gate前に閉じる。
+
+static inventory・installation・配布skills・旧実装退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。P-12は実装中であり、goalをactiveに維持する。

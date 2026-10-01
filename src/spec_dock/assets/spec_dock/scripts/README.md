@@ -1,6 +1,10 @@
 # SpecDock scripts
 
-`spec-dock/scripts/spec-dock` は、導入済みの固定外部エンジンを呼ぶ薄い shim です。CLI の仕様と全コマンドは [CLI 参照](../docs/reference_cli.md)を確認してください。正確な引数は `spec-dock help COMMAND` で確認します。
+`spec-dock/scripts/spec-dock` は、PATH上の外部`spec-dock`へ引数をそのまま渡す互換shimです。標準の入口は、package managerで導入した外部`spec-dock`コマンドです。shimはGitのcontrolやrepository内のPython runtimeを必要としません。
+
+外部consoleが見つからない場合は、packageの導入とPATHを確認してください。委譲先が自身・同じshimのコピー・既知の旧shimなら再帰を防いで停止します。旧branchのshimへ戻った場合も、外部`spec-dock`を直接実行できます。
+
+CLIの仕様と全コマンドは[CLI参照](../docs/reference_cli.md)を確認してください。正確な引数は`spec-dock help COMMAND`で確認します。
 
 ```sh
 spec-dock scope create issue --backend github --parent epic-00080 --title "Cleanup"
