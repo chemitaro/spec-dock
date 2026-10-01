@@ -18,6 +18,7 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 from spec_dock.runtime.infra.tree_backup import tree_digest
 from tests.cli_runtime.test_cli_vnext_contract import LEAF_PATHS
 from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.integration.test_issue413_assets import uninitialized_worktree
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -40,6 +41,11 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         assert not any("__pycache__" in name or name.endswith((".pyc", ".pyo")) for name in names)
         assert "spec_dock/assets/spec_dock/.gitignore" in names
         assert "spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md" in names
+        assert "spec_dock/assets/static-inventory.json" in names
+        assert json.loads(archive.read("spec_dock/assets/spec_dock/workspace.json")) == {
+            "schema_version": 3,
+            "writer_protocol": "specdock.worktree-writer/v1",
+        }
         assert (
             archive.read("spec_dock/assets/spec_dock/scripts/spec-dock")
             == (ROOT / "src/spec_dock/shim_vnext.py").read_bytes()
@@ -183,3 +189,38 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     assert delegated.returncode == 0, delegated.stdout + delegated.stderr
     assert json.loads(delegated.stdout)["data"]["version"] == expected_version and not delegated.stderr
     assert tree_digest(consumer) == before
+
+    initialized = uninitialized_worktree(tmp_path / "new-consumer")
+    git_before = tree_digest(initialized / ".git")
+    init = subprocess.run(
+        [str(console), "installation", "init", str(initialized), "--yes", "--json"],
+        cwd=outside,
+        env=console_environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert init.returncode == 0, init.stdout + init.stderr
+    payload = json.loads(init.stdout)
+    assert payload["data"]["result"]["package_version"] == expected_version and not init.stderr
+    assert payload["data"]["result"]["target"] == str(initialized)
+    assert json.loads((initialized / "spec-dock/workspace.json").read_bytes()) == {
+        "schema_version": 3,
+        "writer_protocol": "specdock.worktree-writer/v1",
+    }
+    assert not (initialized / "spec-dock/scripts/spec_dock_runtime").exists()
+    assert not (initialized / "spec-dock/.agent").exists() and tree_digest(initialized / ".git") == git_before
+    shown_before = tree_digest(initialized)
+    show = subprocess.run(
+        [str(console), "installation", "show", "--target", str(initialized), "--json"],
+        cwd=outside,
+        env=console_environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert show.returncode == 0, show.stdout + show.stderr
+    assert all(asset["classification"] == "current" for asset in json.loads(show.stdout)["data"]["result"]["assets"])
+    assert not show.stderr and tree_digest(initialized) == shown_before

@@ -374,13 +374,15 @@ uv run pytest tests/cli_runtime/test_workspace_migrate_vnext.py tests/cli_runtim
 <a id="p-12"></a>
 ## P-12 static資産・shim・配布skillsを更新する
 
-**状態: 実装中。PATH委譲shimとsource/wheelの一致をローカル検証済み。static inventory・installation・skillsと旧実装退役は未完了。前提/依存: P-11（ローカル検証済み・fresh Strict未完了）。** 読む節: [D-02](design.md#d-02), [D-11](design.md#d-11), [D-12](design.md#d-12)。補足: D-02, D-11, D-12。
+**状態: 実装中。PATH委譲shim、package資産inventory、単WTのinstallation init/showとsource/wheelの一致をローカル検証済み。既知旧hashの更新・退役、installation update/uninstall、skillsと旧実装退役は未完了。前提/依存: P-11（ローカル検証済み・fresh Strict未完了）。** 読む節: [D-02](design.md#d-02), [D-11](design.md#d-11), [D-12](design.md#d-12)。補足: D-02, D-11, D-12。
 
 `shim_vnext.py`と配布static shimを、PATH上の外部consoleへargv/cwd/終了値/stderrを保持して委譲する入口へ置換した。Git/control/engine digest/consumer Pythonの取得を削除し、自身の同inode・symlink・hardlink・同shimのコピー・既知旧shimを委譲先に認めない。既存package managerで導入したconsoleへの正常symlinkは受理する。外部console不在等は導入案内とv2診断を返し、double-dash後のjson文字列は共通flagとして解釈しない。caller Python import環境を外し、通常の利用者設定は保持する。
 
 native POSIX `./spec -h` symlink経路、Git不在・nested cwd・不正project・Unicode/改行を含む引数、外部stderr/終了値、再帰防止とPython import分離を12 casesで確認した。fresh wheel/sdist/外部venv/配布shim実起動とprovider parityを含む16 tests（6.71秒）、全source/testsのRuff check/format（417 files）、変更四file限定mypy、diff checkが成功した。実consumerのshim/本文/状態は未更新。旧fixed-entrypoint suiteは13 passed/2 failed（3.92秒）で、PATHを無視するpin期待と旧group init経路を残している。前者は新PATH契約へ、後者と旧engine helpersは後続installation/退役作業へportし、full gate前に閉じる。native Windowsとfresh Strictは未完了。
 
-**所有/対象file**: src/spec_dock/shim_vnext.py、asset_layout.py、installation関連、assets/install_root/.agents/skills/spec-dock/SKILL.md、spec-dock-grill-with-docs/SKILL.md、assets/spec_dock/docs/templates、static inventory（package内新設）。tests/unit/infra/test_provider_distribution.py、tests/integration/test_installation_group_init_vnext.py、新 tests/integration/test_issue413_assets.py（予定）。
+`installation init ABS`と`show --target ABS`はGit-only admissionで明示rootを解決し、未導入先でも共通controlなしで動く。initはpackage inventoryの86 static filesと新writer宣言を一件ずつ公開し、既存fileを計画時に拒否する。dry-runはdirectory/stage/recordを作らない。途中失敗では公開済みdirectory/file、unknown publication/候補、未実施資産を区別し、自動巻戻ししない。main/linked間の一括適用は行わず、実consumerも未変更である。新規導入・unsafe entries・guard・途中失敗・Traversable ZIP資産・fresh wheel/sdist/外部venvの実consoleを含む関連67 tests（18.05秒）、全source/tests Ruff check/format（420 files）、変更七file限定mypy、diff checkが成功した。full-suite/type gateとfresh Strictの実績ではない。
+
+**所有/対象file**: src/spec_dock/shim_vnext.py、asset_layout.py、runtime/application/direct_installation.py、runtime/infra/static_assets.py、installation関連、assets/install_root/.agents/skills/spec-dock/SKILL.md、spec-dock-grill-with-docs/SKILL.md、assets/spec_dock/docs/templates、assets/static-inventory.json。tests/unit/infra/test_provider_distribution.py、tests/integration/test_installation_group_init_vnext.py、tests/integration/test_issue413_assets.py、tests/integration/test_issue413_wheel.py。
 
 **具体的変更順**: package静的inventoryに既知tool-owned path/hashを収録する。installation show/init/update/uninstallを単WT static処理へ限定する。shimを外部console委譲へ改修する。skills/referenceのfixedengine/active取得/Sync世代/復旧説明を新契約へ変更する。配布parityはrealconsumer一括適用と切り離し、wheel内staticとprovider契約を比較する。
 

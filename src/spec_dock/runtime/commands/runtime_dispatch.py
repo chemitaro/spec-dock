@@ -26,6 +26,11 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
     command = namespace.command_path
     result: OperationResult[object]
     try:
+        if command.startswith("installation "):
+            from spec_dock.runtime.application.direct_installation import install_static_assets, installation_context
+
+            result = install_static_assets(namespace, installation_context(namespace, cwd))
+            return _render_result(namespace, result)
         if command == "workspace validate" and namespace.ci:
             from spec_dock.runtime.application.direct_validation import validate_committed_workspace
             from spec_dock.runtime.application.project_context import resolve_git_context

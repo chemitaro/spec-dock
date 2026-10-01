@@ -563,3 +563,17 @@ provider scriptsと未切替dogfood scriptsの全bytes一致を期待した旧te
 `uv run pytest tests/integration/test_issue413_shim.py tests/integration/test_issue413_wheel.py tests/unit/infra/test_provider_distribution.py -q --tb=short` は16 passed（6.71秒）。全source/testsのRuff check/format（417 files）、変更四source/test限定mypy、diff checkが成功した。`uv run pytest tests/integration/test_cli_entrypoint_vnext.py -q --tb=short` は13 passed/2 failed（3.92秒）。PATHを無視してpinを使う旧保証の一件はD-02と異なり、旧group initの一件はP-02から未完了の経路である。旧pin/tamper/group-init test群は後続のinstallationとfixed helper退役で新契約へportし、成功したことにせずfull gate前に閉じる。
 
 static inventory・installation・配布skills・旧実装退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。P-12は実装中であり、goalをactiveに維持する。
+
+## P-12 単worktreeのstatic初期導入と確認
+
+`installation init ABS`と`installation show --target ABS`を、workspaceが未導入でも使えるGit-only admissionへ接続した。従来dispatchは明示された導入先を使わずCWDを解決していた。新しい処理は対象を正確なGit rootへ照合し、`--project`との矛盾、相対path、subdirectory、解決対象のないbackend guard、検証不能なcurrent guardを副作用前に拒否する。showはpackage version、workspaceの限定header、各static資産の分類を読む。任意bodyを出力せず、control/登録WT/engine digestを要求しない。
+
+package内の`assets/static-inventory.json`に86 filesの許可target、resource source、SHA-256、mode、init専用区分を固定し、`importlib.resources.files`のTraversableからbytesを取得・検証する。initは新writer protocolのworkspace宣言と静的資産だけを置く。runtimeコピー、.agent、Git内のSpecDock独自領域は作らず、既存project内容を保持する。既存fileが一件でもあれば計画時に全適用を止め、symlink/hardlink/FIFOとunsafeな親を追跡して上書きしない。既知旧hash・退役inventoryとupdate/uninstallは次の単位で実装し、現時点の空のknown-old集合を移行所有権の証明には使わない。
+
+適用は安全な親descriptorと一件ごとの候補・no-replace公開を使う。directory/fileの確認済み効果、unknown publication/残った候補、未実施資産をpartial6へ残す。成功済みのfileを削除して元へ戻さず、途中記録やjournalを新設しない。dry-runはdirectory、stage、backup、直接記録、Git/GitHub mutation、Start lockを一切行わない。実linked worktreeの導入ではmainとcommon-Gitの全実体が不変だった。
+
+最初の6ケースはCWDの誤解決または未接続dispatchでRedになった。衝突テストの初回3 Greenは、誤ったrepoでの未接続exit3による偶然であり、衝突pathと診断まで検査して6 Redとして取り直した。途中失敗の2 casesは未実施資産と残った候補の表示欠落でRed、help/recoveryの4 casesは旧group/engine説明と廃止引数の遅い判定でRedになり、それぞれGreenへ修正した。親symlinkのexit5/3不一致もRedとして分類を訂正した。FIFOを全tree digestへ渡したfixture失敗は製品Redに数えず、FIFO自身のidentity/typeと周辺treeを別々に比較した。他のguard、別WT、archive資産の回帰は元からGreenとして区別する。
+
+`uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py tests/cli_runtime/test_help_completion_vnext.py -q --tb=short` は67 passed（18.05秒）。そのうち新asset suiteは25 cases。fresh wheel/sdist/外部venvから実consoleでinit/showし、新宣言・runtime不在・control不在・show副作用0を確認した。sourceの通常Path以外にTraversable ZIPでも同じshim bytesを配置できた。全source/tests Ruff check/format（420 files）と変更七file限定mypy、diff checkが成功した。型注釈だけのfault fixture修正後にも部分失敗の2 casesを再実行し、2 passed（0.19秒）を確認した。
+
+installation update/uninstall、配布docs/skillsと旧実装退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer適用は未完了。実dogfood workspace・metadata・shim・状態は変更していない。レビュー用pushの利用者回答を待ちながら、認可済みローカル実装を続ける。P-12とgoalは進行中である。

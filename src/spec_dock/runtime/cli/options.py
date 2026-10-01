@@ -69,6 +69,8 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf == "installation init":
+        return "Inspect installed and remaining static paths before a new operation; no replay, resume or automatic rollback."
     if leaf == "workbench copy":
         return "Inspect copied and remaining paths and retained candidate files before a new explicit copy; changes are not automatically undone."
     if leaf.startswith("artifact "):
@@ -130,6 +132,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     workbench = argv[:2] == ["workbench", "copy"]
     worktree = len(argv) >= 2 and argv[0] == "worktree"
     migrate = argv[:2] == ["workspace", "migrate"]
+    installation_init = argv[:2] == ["installation", "init"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -147,6 +150,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not workbench
         and not worktree
         and not migrate
+        and not installation_init
     ):
         return
     index = 2

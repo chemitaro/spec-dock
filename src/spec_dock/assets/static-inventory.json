@@ -1,0 +1,693 @@
+{
+  "schema_version": "specdock.static-inventory/v1",
+  "files": [
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "sha256": "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".agents/skills/spec-dock/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock/SKILL.md",
+      "sha256": "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/.gitignore",
+      "source": "spec_dock/.gitignore",
+      "sha256": "0385b3b649b323ac319d80539925af586af96f6d82f65c83e413f719cd2bf98b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/README.md",
+      "source": "spec_dock/docs/README.md",
+      "sha256": "aadfdce1f6e61af65e95d3cd39efb3fd87b7cd83a3a3272356ef7cd68b21ba4e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/artifacts.md",
+      "source": "spec_dock/docs/authoring/artifacts.md",
+      "sha256": "f51fdb9afd445978c379bae411be385be0548fec3848680049c0a801d3c8fe0d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/design.md",
+      "source": "spec_dock/docs/authoring/design.md",
+      "sha256": "216332356e46faf7b07f95779ff3be5cae2cac43acdf9abdf3c83e79064a504f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/historical.md",
+      "source": "spec_dock/docs/authoring/historical.md",
+      "sha256": "0074ff1c57c39130a0ceee7d1aa5d858a9b22c1f7fd4e699d9bf268fdd75b7c3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/critical.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/critical.md",
+      "sha256": "ec2d8a40bad9913bb6158ace81a369bc3680f03314cf74399ed4b3d967772497",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/light.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/light.md",
+      "sha256": "3ae80247687e405138f3d238afbded507cad6de995eff123bd56d39611da9934",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/standard.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/standard.md",
+      "sha256": "75bb6ba7f9c076ebe0bef7dc4c32480be0e1c31357937028afdc3dd1fc5d899f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/strict.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/strict.md",
+      "sha256": "0303436c3c3abb6f29c2a2810fc4b0dd1ae5bd3d7cd41c7779c30da5acf91b4a",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan.md",
+      "source": "spec_dock/docs/authoring/issue-plan.md",
+      "sha256": "4b4d6ac04307fb960dccc8d7e7a9392a76cce08237b55c268a7f7efeaeb1ca27",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/overview.md",
+      "source": "spec_dock/docs/authoring/overview.md",
+      "sha256": "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/report.md",
+      "source": "spec_dock/docs/authoring/report.md",
+      "sha256": "822fe03a7a8b029b0b60aecc8e9a30b7c698b5c595e90216a71b735067428b91",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/requirement.md",
+      "source": "spec_dock/docs/authoring/requirement.md",
+      "sha256": "6acd6b1e9da78b66aced244043befdc4d85c9335c93ec2746024edfcef88218b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/scope-layering.md",
+      "source": "spec_dock/docs/authoring/scope-layering.md",
+      "sha256": "0be56200566b2fa5f6e6bb84c82c7c876e8585d397de74c5773fc5c91a20e724",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/cli-redesign-guide.html",
+      "source": "spec_dock/docs/cli-redesign-guide.html",
+      "sha256": "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/guide.md",
+      "source": "spec_dock/docs/guide.md",
+      "sha256": "ffe223494a62ace617adb8e092be122917e646e0c2b674c08993cd59f742dbe8",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/historical/README.md",
+      "source": "spec_dock/docs/historical/README.md",
+      "sha256": "148dfcc5ab2dd0f3b0a352f619f1e43ade403308fb835dc8fa011d2d6cfcdc5d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_deps.md",
+      "source": "spec_dock/docs/historical/reference_deps.md",
+      "sha256": "69423133351387071c22887004b7e267174add66690f3d16ca793d0632cf038c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_github.md",
+      "source": "spec_dock/docs/historical/reference_github.md",
+      "sha256": "33c16064f02afcc03b366510f0bc6ab9559e1e32e4b8e0831d10024491c38fed",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_naming.md",
+      "source": "spec_dock/docs/historical/reference_naming.md",
+      "sha256": "aa9f531fed003822f1260819f72aef55c2cf3a2a38df66783c2c7c3cf1ff8886",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_sync.md",
+      "source": "spec_dock/docs/historical/reference_sync.md",
+      "sha256": "63ee7d9e8f15aeb50a5cbae109738dfa2f6a9abca9c14e0d635c54b260f08b0a",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_worktree.md",
+      "source": "spec_dock/docs/historical/reference_worktree.md",
+      "sha256": "43257bd27e1e8dc5d7e409f97c58accfb7437aefb23e8a3dff2f11500b719458",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/migration.md",
+      "source": "spec_dock/docs/migration.md",
+      "sha256": "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/reference_cli.md",
+      "source": "spec_dock/docs/reference_cli.md",
+      "sha256": "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/reference_deps.md",
+      "source": "spec_dock/docs/reference_deps.md",
+      "sha256": "162184232a51b8869789f1975bbd15219699353bd57eb1dc96e247dcd91bade2",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/reference_github.md",
+      "source": "spec_dock/docs/reference_github.md",
+      "sha256": "53f8bf8a6eca9809da1ff36ab09f1236e9a7b16d3641ddd676e3faf2c04e7b44",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/reference_naming.md",
+      "source": "spec_dock/docs/reference_naming.md",
+      "sha256": "bc31afff6f395cd158cca6214660dcbfed7f6790ed6ab01cf37d0d340e92faa5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/reference_sync.md",
+      "source": "spec_dock/docs/reference_sync.md",
+      "sha256": "033d0e18e3668e28777f2c3b551b3d86b9cd0e3b0da9fa6a1d08842c9a8cdece",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/reference_worktree.md",
+      "source": "spec_dock/docs/reference_worktree.md",
+      "sha256": "a30f9ff2149743f1e44614354eadadf506549f5f6677d1194d6b697a5f884880",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/epic/artifacts.md",
+      "source": "spec_dock/docs/rules/epic/artifacts.md",
+      "sha256": "da10a6a917e704c236db4cfbab87d2bda4b6c82c0003ac81ec758886944985c9",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/epic/discussions.md",
+      "source": "spec_dock/docs/rules/epic/discussions.md",
+      "sha256": "32f8549c62e66c65b01069219219d668e42437ae81e49fbe29d338fb3bff1397",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/epic/issues.md",
+      "source": "spec_dock/docs/rules/epic/issues.md",
+      "sha256": "e16e50489d23b7b388cf82c45b3cbde0e406f3260755dc64b527b050ce0fd967",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/initiative/artifacts.md",
+      "source": "spec_dock/docs/rules/initiative/artifacts.md",
+      "sha256": "1a3238c290c97e02d00090029eb8b88ce79a3b13d6b4e8c95c3c34c30a1a0619",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/initiative/discussions.md",
+      "source": "spec_dock/docs/rules/initiative/discussions.md",
+      "sha256": "4fcd65d522647186ee8e4569398a342f81992e6b06026dca6bff03609aa9e88b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/initiative/epics.md",
+      "source": "spec_dock/docs/rules/initiative/epics.md",
+      "sha256": "52c976233113167f4b54080135170a8250cfe536b480f2ae129d276ca682ccfa",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/issue/artifacts.md",
+      "source": "spec_dock/docs/rules/issue/artifacts.md",
+      "sha256": "69da9fa472bdc05550726ec0eaa29507f6badde73cdc2f11bb4be4153b61b9cf",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/issue/discussions.md",
+      "source": "spec_dock/docs/rules/issue/discussions.md",
+      "sha256": "d9e9a307aaad17f27772ace45bd8c8ed3504c05131f444c221684741ab705737",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/root/artifacts.md",
+      "source": "spec_dock/docs/rules/root/artifacts.md",
+      "sha256": "e63c08ef5f332f963420eeb1780dcdb7bcd9f924beb80485bc2a3afb304f0abb",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/scripts/README.md",
+      "source": "spec_dock/scripts/README.md",
+      "sha256": "0032ba08b6e4b6eb8a8c7842b979c086246542af5813c90ec26781efd32196d8",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/scripts/spec-dock",
+      "source": "spec_dock/scripts/spec-dock",
+      "sha256": "6363f63b3d71e966f4bf759c63358fa1aa6b6b02c49d3541fcc3ea82f9dbe4ed",
+      "mode": 493,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/.runtime/README.md",
+      "source": "spec_dock/system/.runtime/README.md",
+      "sha256": "d9aae3088e6082e1e76b1f402cc97dad1a8db3b261f4fb8e6a81eafa93e2414d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/README.md",
+      "source": "spec_dock/system/README.md",
+      "sha256": "71a7579f3d9fb0f1f5141bbf14ec96d2cd5762c5f935934a8af0604e6008fe53",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/README.md",
+      "source": "spec_dock/system/active-none/README.md",
+      "sha256": "aca9368da8ba736f1920dc96e9fa2a57a288386ab97533a1e47c89fd7a73f641",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/README.md",
+      "source": "spec_dock/system/active-none/epic/README.md",
+      "sha256": "0c0963cf1260de6d8737bd1f3c6a1b5237a5b6d596d1681bed37e685e2b3b389",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/design.md",
+      "source": "spec_dock/system/active-none/epic/design.md",
+      "sha256": "b17a9b84a7a7463edc179e8e99150b381b4b9e52e4aaa0e1f2318cd8108fe978",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/plan.md",
+      "source": "spec_dock/system/active-none/epic/plan.md",
+      "sha256": "104a64455a1f49ba31928f7073becd8a3534d116c3854065053cbe766fdf4f0f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/report.md",
+      "source": "spec_dock/system/active-none/epic/report.md",
+      "sha256": "985fa30deacf5b580fd5c8760674b92f82e5c74edd4f5876c8560c1183a603d3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/requirement.md",
+      "source": "spec_dock/system/active-none/epic/requirement.md",
+      "sha256": "d3c1cc0ba23eda6e0324855b5d47d186e5568a80220f746988569cc3da56749c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/README.md",
+      "source": "spec_dock/system/active-none/initiative/README.md",
+      "sha256": "f0a88c09ecf88adf103cbf4c9707b28fc70cf1f3e06a7d5b307b6b595fc41dd4",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/design.md",
+      "source": "spec_dock/system/active-none/initiative/design.md",
+      "sha256": "a22ccea06899d1a249c728f1019c6fd6f4272b21620f794017f8c375ef03a4c3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/plan.md",
+      "source": "spec_dock/system/active-none/initiative/plan.md",
+      "sha256": "ced586209ef7e9de4c0ae3559dccc153cbece2539c33e2e45adbcb8b0293464b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/report.md",
+      "source": "spec_dock/system/active-none/initiative/report.md",
+      "sha256": "2cfa7ff502ebda32e9d581b2fe87698b81bf852020ddd7ba2f09d7544ddeccc4",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/requirement.md",
+      "source": "spec_dock/system/active-none/initiative/requirement.md",
+      "sha256": "af3744e6266ef1e9ec4d075f51ffd852998a8c6c9e17cfcb548612a18e2bd56e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/README.md",
+      "source": "spec_dock/system/active-none/issue/README.md",
+      "sha256": "03e203932404195e191ff662f09e2d97c4e62a62d8c16bbb1b2b27dc43aaea30",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/design.md",
+      "source": "spec_dock/system/active-none/issue/design.md",
+      "sha256": "31ff82bcff64a6baf4c99862cae3efa74533a42f769ebb3b8eeab5e0b5fe61d4",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/plan.md",
+      "source": "spec_dock/system/active-none/issue/plan.md",
+      "sha256": "13488b061eb36afc66638a64fe5013fa500ef29febc0e6eae441f0064b840c66",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/report.md",
+      "source": "spec_dock/system/active-none/issue/report.md",
+      "sha256": "5ea25694830957e1789b09b38ba64afffd2a9f0fbca092cbd233f6e8f7ec74dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/requirement.md",
+      "source": "spec_dock/system/active-none/issue/requirement.md",
+      "sha256": "29647fe4824fcde37c2aa92d6e3fbaa5ff9400b16803434f91cca4cc953a15d6",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/README.md",
+      "source": "spec_dock/templates/README.md",
+      "sha256": "d7202728624c4632646c4b077155699e5342484b15de11fa936566541045c1e2",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/adr.md",
+      "source": "spec_dock/templates/artifacts/adr.md",
+      "sha256": "7891cbfc90f581aa6789c7511e4e8f939c3a0c9d3be7c3c943dade7e9906e647",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/blank.md",
+      "source": "spec_dock/templates/artifacts/blank.md",
+      "sha256": "a150eb7914f815db10b82db347f6717a1b33bc5021f667a786e320b684927488",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/decision-candidate.md",
+      "source": "spec_dock/templates/artifacts/decision-candidate.md",
+      "sha256": "279c9dde73cd47b7213082b6b7fe6037bbbed90327cd8ddbcb579091b11dc32c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/disc.md",
+      "source": "spec_dock/templates/artifacts/disc.md",
+      "sha256": "331ac13852dbacd9e9ae4e4b94ec8c61dd13c9f27a5443164d41e0c97cf96536",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/interview.md",
+      "source": "spec_dock/templates/artifacts/interview.md",
+      "sha256": "0d526becee3603701cbca776e3c0fdb3488601f885b820450310166defd8ccd6",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/research.md",
+      "source": "spec_dock/templates/artifacts/research.md",
+      "sha256": "5e92d1ba03ce1a5747b0c6444cd04541910c573a33589ed7c001ef31236ef2fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/.workbench/README.md",
+      "source": "spec_dock/templates/epic/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/design.md",
+      "source": "spec_dock/templates/epic/design.md",
+      "sha256": "4ea5d2c52b4a6da12015c9b55625d71a71b445f62f2a3641e74778c840909489",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/plan.md",
+      "source": "spec_dock/templates/epic/plan.md",
+      "sha256": "afe00783b61561a88e89e9971ca6b8c7872841d9cb6fee59923234c6527d7928",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/report.md",
+      "source": "spec_dock/templates/epic/report.md",
+      "sha256": "cff9a127eed4a910d50c43262842a082e86df669437e0090f8cfeb2fdacdfa60",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/requirement.md",
+      "source": "spec_dock/templates/epic/requirement.md",
+      "sha256": "640c5177c4fba61126f85ca79370f64cb6dbb11ab4aa54b110a90641e48b40ec",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/.workbench/README.md",
+      "source": "spec_dock/templates/initiative/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/design.md",
+      "source": "spec_dock/templates/initiative/design.md",
+      "sha256": "a5681fab80831bb999b149f3e0e721391fc27b3b2964ad151f24fa47352214b0",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/plan.md",
+      "source": "spec_dock/templates/initiative/plan.md",
+      "sha256": "52f0d714a10531ca5e69b0f3a2e702bf72f3a631ccad03efd652c1801e99885d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/report.md",
+      "source": "spec_dock/templates/initiative/report.md",
+      "sha256": "e8749e3de129e4b70ddf5d31bc3a26bb60aa8871bca88d1402f37bc1415cba7f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/requirement.md",
+      "source": "spec_dock/templates/initiative/requirement.md",
+      "sha256": "6519af868ee7ea35d18d3cb78a0220888ab5052fed0e62058b18b45ffa6bfd60",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/.workbench/README.md",
+      "source": "spec_dock/templates/issue/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/design.md",
+      "source": "spec_dock/templates/issue/design.md",
+      "sha256": "218bc2c2bf25e862d4a6e9d64501a52331df40a3a19aa96dfdf78eaa1738067c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/plan.md",
+      "source": "spec_dock/templates/issue/plan.md",
+      "sha256": "d36dce3e90394837b37a8cf42acebb2b8a888db6c062b21f4f1287f3358f7906",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/report.md",
+      "source": "spec_dock/templates/issue/report.md",
+      "sha256": "ca7680ce24060b7966ca3e2bef583073bf2f26adf28fcfded50540f0257b679f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/requirement.md",
+      "source": "spec_dock/templates/issue/requirement.md",
+      "sha256": "7db442c756f242e2110628d037ad1b3fdcdd6221de2ca94356071b4d5ec48e79",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/root/.workbench/README.md",
+      "source": "spec_dock/templates/root/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/workspace.json",
+      "source": "spec_dock/workspace.json",
+      "sha256": "9562d15aad1bd1e1fd81623f4a1d9fedfc09440ee1f568c72fecbbefa13ea990",
+      "mode": 420,
+      "init_only": true,
+      "known_old_sha256": []
+    }
+  ]
+}

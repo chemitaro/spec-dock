@@ -126,8 +126,8 @@ HELP_EFFECTS: dict[str, str] = {
     "workspace validate": "Validate working-tree structure; --ci checks a fixed HEAD without installation or execution state. No changes.",
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
     "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
-    "installation show": "Read installed engine and worktree inventory; no changes.",
-    "installation init": "Install managed tooling and initial control in a Git repository.",
+    "installation show": "Read the package version and static resources in one Git worktree; no changes.",
+    "installation init": "Place package static resources and a new workspace declaration in one Git worktree.",
     "installation update": "Replace managed tooling from one pinned source; --finalize verifies all targets and leaves maintenance.",
     "installation uninstall": "Remove managed tooling while preserving Scope data.",
     "help": "Print command help; no changes.",
@@ -258,6 +258,8 @@ RECOVERY_LEAF_COMMANDS: dict[str, str] = {
     "installation uninstall": "installation.uninstall",
 }
 for _leaf, _command in RECOVERY_LEAF_COMMANDS.items():
+    if _leaf == "installation init":
+        continue
     LEAF_ARGUMENTS[_leaf] += (_arg("--resume"),)
     if _command in ROLLBACK_COMMANDS:
         LEAF_ARGUMENTS[_leaf] += (_arg("--rollback"),)
@@ -346,7 +348,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "workspace validate": "Readable schema-3 metadata is required; --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
     "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
-    "installation show": "The selected repository must have readable installation control.",
+    "installation show": "The selected target must be one exact Git worktree root; no workspace or control record is required.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
     "installation update": "Ordinary apply needs one pinned --version or --commit. --finalize verifies the maintained group without a new source. --activate-engine needs the recorded --from-update. --resume and --rollback require their fixed operation ID and mode-specific guards.",
     "installation uninstall": "The installed worktree group must satisfy uninstall safety guards.",
@@ -515,6 +517,18 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         json_data = "items, unknown_filtered_count." if leaf == "scope list" else "scope, github_ref, changed=false."
         confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf in ("installation init", "installation show"):
+        target = "Only one explicit Git worktree root: PATH for init, --target or --project/current root for show."
+        reads = "The installed package resource inventory and selected worktree's declaration and static asset bytes."
+        does_not = "Does not contact GitHub, write Git metadata, install a runtime copy, inspect other worktrees, acquire a Start lock, or manage shared control."
+        json_data = "installation: target, package_version, created_paths, changed_paths, retired_paths, backup_path."
+        confirmation = (
+            "Apply requires --yes; --dry-run needs no confirmation."
+            if leaf == "installation init"
+            else "No final confirmation is required for this read-only leaf."
+        )
+        if leaf == "installation init":
+            writes = "Only previously absent package-owned static files and a new workspace declaration; conflicts stop before changes."
     elif leaf == "workspace validate":
         target = "The current working-tree structure, or one fixed HEAD with --ci."
         reads = "Workspace declaration, Scope metadata, dependencies and Artifact entry names/types; live direct selection only for an explicit --expect-current outside --ci."
