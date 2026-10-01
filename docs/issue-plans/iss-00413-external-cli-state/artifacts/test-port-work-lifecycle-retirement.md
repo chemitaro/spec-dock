@@ -1,0 +1,74 @@
+# 旧Start/Finish試験・writerの退役と現行保証
+
+D-03/D-06/D-07/D-08/D-11は直接一件の選択、Start時だけの短い排他、GH完了確認後の捕捉記録解除を採用する。同じ祖先だから無断で対象を切り替えること、Finishで親へ自動昇格すること、中央registry/epoch/operation journal/cacheからの再開を後継へ移さない。
+
+旧test_work_start_vnext.pyの全550行・14 test関数、test_work_finish_vnext.pyの全452行・15 test関数、application/work_lifecycle.pyの全1175行・26 top-level関数/classを確認した。次の対応表で保証ごとに判断し、二つの旧test fileと参照を失う旧writerを一緒に退役する。skip/pytest収集除外は増やさない。他のprivate callersが残るactive_selection/branch/Scope等のsourceはこのunitでまとめて削除しない。
+
+## Startの十四関数
+
+| 旧test | 判断・公開側の後継 |
+|---|---|
+| `test_starting_open_sibling_requires_explicit_switch_active` | 保持。公開test_different_scope_requires_explicit_switch_and_replaces_only_old_targetで異なる直接対象は明示--switch-activeを要求し、旧tokenだけを置換。 |
+| `test_start_within_same_ancestry_needs_no_switch_flag` | 従来の暗黙許可を廃止。新test_start_requires_explicit_switch_even_for_direct_ancestor_or_descendantの二方向で、同じ祖先関係でも異なる直接対象は明示switch必須・全local tree/remote state保全を確認。 |
+| `test_start_checks_out_registered_issue_branch_and_selects_issue` | registry/bindingを廃止。明示--branchで既存refを再利用し、--base拒否とcheckout/直接一件はtest_existing_branch_requires_explicit_reuse_and_no_base、test_start_creates_checks_out_and_selects_without_git_controlで保持。 |
+| `test_start_resumes_after_checkout_when_selection_publication_fails` | journal resumeを廃止。公開publication未知/段階残存/checkout失敗の試験とtest_killed_start_preserves_checkout_and_next_start_needs_no_journalで現物・partial・次の明示Startを保持。自動Rollbackしない。 |
+| `test_start_creates_canonical_branch_for_each_local_scope` | 新local Scope/永久bindingを廃止。公開test_work_commands_start_and_finish_all_three_kindsの三kindでGH番号Scopeのbranch作成・checkout・一record・branch保持を確認。既存local codec/Finishは別testで保持。 |
+| `test_new_start_resumes_after_branch_ref_before_registry_binding` | registry bind/operation復旧を廃止。branch作成後の失敗でもrefを保持し、raw Git診断とpartialを返すtest_checkout_failure_preserves_created_branch_and_native_stderr、およびkill後の新Startへ対応。 |
+| `test_new_start_resumes_after_registry_binding_before_effect_result` | registry/journal intent/result保存を廃止。公開test_start_retains_stage_and_reports_unknown_when_native_rename_is_refused、test_store_cleanup_failure_preserves_confirmed_publication_effectで実効果と確認状態を分ける。 |
+| `test_new_work_start_requires_explicit_base_before_any_write` | 新branchの--base必須は保持。新test_new_start_requires_explicit_base_from_attached_or_detached_headの三kind×attached/detached六casesでbaseなし効果0を確認。既存branch再利用の--base拒否はtest_existing_branch_requires_explicit_reuse_and_no_baseへ対応。旧control/journalへのwrite条件は保証にしない。 |
+| `test_dirty_start_has_no_branch_or_journal_effect` | clean検査は保持。公開test_start_rechecks_clean_state_after_acquiring_lock、checkout hookでdirty化する試験で変更前/後の停止と既存内容保全を検査。journalなしを現行構造の条件とする。 |
+| `test_detached_start_requires_explicit_base` | 新test_new_start_requires_explicit_base_from_attached_or_detached_headでbaseなし拒否を確認し、detachedの三kindは--base HEADを明示してbranch作成・checkout・直接record取得まで成功。旧control/journalは不要。 |
+| `test_new_start_rejects_unready_base_before_branch_creation_or_checkout` | 切替先commitのScope/祖先/実効依存を検査する契約を保持。test_start_requires_candidate_dependency_itself_to_be_completed、test_start_rejects_candidate_without_scope_before_creating_or_checking_out_branchで効果0を検査。 |
+| `test_registered_start_uses_ready_branch_instead_of_unready_current_graph` | registryは廃止し、切替先のreadinessを保持。新test_explicit_branch_start_uses_candidate_readiness_instead_of_current_dependenciesで現在側にopen依存があってもreadyな明示branchへ開始し、candidateの必要GH refだけをGET。 |
+| `test_start_snapshot_queries_github_from_real_repository` | live GH/readinessを保持。公開stateful gh/native Gitの新candidate-readiness試験と三kind Start/Finish、既存candidate dependency試験へ対応。fixtureの新local作成は使わない。 |
+| `test_offline_cache_start_never_queries_current_github_focus` | saved cache/allow-staleによるStartを廃止。test_start_rejects_retired_inputs_before_project_accessがcache系optionを拒否。真正の既存local metadataの保全互換性は維持。 |
+
+## Finishの十五関数
+
+| 旧test | 判断・公開側の後継 |
+|---|---|
+| `test_issue_finish_preserves_selected_epic_and_initiative` | 親自動昇格を廃止。公開Finishは捕捉した直接一件だけを解除して無選択にする。三kind公開testとtest_finish_closes_github_issue_once_before_releasing_captureへ対応。 |
+| `test_epic_finish_requires_completed_child_then_preserves_initiative` | 子完了条件は保持し、親の自動選択を廃止。test_finish_parent_releases_captured_descendant_without_selecting_parentと新mixed-backend試験へ対応。 |
+| `test_parent_finish_rejects_unfinished_descendant_before_selection_change` | 保持。test_finish_completed_parent_still_requires_all_descendants_completedと新test_existing_local_parent_finish_requires_live_completed_github_descendantでlocal tree/直接recordを保持。 |
+| `test_explicit_finish_outside_selected_chain_does_not_clear_selection` | 保持。新test_finish_explicit_child_preserves_directly_selected_ancestorは子IssueだけをGH Closeし、直接選択中の祖先token/metadata/tree/branchをそのまま保持。 |
+| `test_local_issue_finish_records_completion_and_clears_only_issue` | 既存local lifecycle更新は保持し、親への昇格を廃止。test_finish_preserves_existing_local_backend_and_optional_metadata_without_controlと公開mixed-backend親試験へ対応。 |
+| `test_finish_resume_after_lifecycle_write_keeps_fixed_target` | journal resumeを廃止。固定target/ref・確認されたcompletionと解除失敗のpartial、次の明示Finishによる再観測を公開test_finish_confirmed_close_with_clear_sync_failure_reports_completed_partialとretry試験で保持。 |
+| `test_already_completed_issue_finish_clears_selection_without_metadata_write` | 保持。公開test_finish_already_completed_uses_live_observation_and_clears_captureはlive completedを確認しPATCHしない。既存local metadata preservationは現行local Finish suiteで保持。 |
+| `test_resume_observes_selection_published_before_journal_result` | journal result復旧を廃止。公開test_finish_confirmed_close_with_clear_sync_failure_reports_completed_partial、解除/cleanupのnative失敗で確認/unknownを区別し現物を残す。 |
+| `test_epic_and_initiative_finish_clear_one_selected_level_at_a_time` | 階層chainの段階解除/親昇格を廃止。公開Finish三kindは直接対象を解除して無選択、branch維持、GH Closeまで実施。三階層自体は維持。 |
+| `test_finish_resume_rejects_same_revision_metadata_tamper` | resumeを廃止し、metadata bytes/identityの再確認は保持。test_finish_rechecks_metadata_after_gateway_get_before_patch、test_finish_verified_close_keeps_capture_when_metadata_changes_before_clear、local inflight edit試験へ対応。 |
+| `test_github_issue_finish_updates_remote_then_clears_only_issue` | Close順序を保持し親昇格を廃止。test_finish_closes_github_issue_once_before_releasing_captureは一PATCH/GET確定後に捕捉tokenだけを解除し、GH metadataを変更しない。 |
+| `test_github_finish_resume_after_remote_success_does_not_resend` | journal resumeを廃止し再PATCH禁止は保持。test_finish_retry_observes_completion_and_avoids_duplicate_patchが新しい明示Finishでlive completed確認後、PATCHなしで適切な記録を解除。 |
+| `test_uncertain_github_finish_waits_for_live_completed_observation_before_selection_clear` | 保持。test_finish_uncertain_close_retains_capture_and_reports_unknown_effectとretry試験へ対応。unknownで捕捉recordを残し、過去operation IDは使わない。 |
+| `test_already_completed_github_issue_clears_selection_without_remote_write` | 保持。test_finish_already_completed_uses_live_observation_and_clears_capture、test_finish_concurrent_remote_completion_is_reported_unchanged_without_patchへ対応。 |
+| `test_local_epic_finish_uses_live_github_descendant_state` | 保持。新test_existing_local_parent_finish_requires_live_completed_github_descendantでchild openなら拒否、live completed後に既存local親だけを完了しcapture解除。GH childへPATCHせずmetadataも保持。 |
+
+## 旧writerの二十六symbols
+
+| 旧symbols | 判断・現行authority |
+|---|---|
+| `WorkFinishPlan, WorkFinishResult, WorkStartPlan, WorkStartResult, WorkStartPreview` | 旧chain/operation ID/registry型を退役。現行StartPlan/selection plan/StartData/FinishDataと公開v2 effects/tokenがauthority。五classを互換aliasとして残さない。 |
+| `_ancestry, plan_start_work, _selection_chain, _decode_selection_chain` | 四処理の旧永続chainと同祖先暗黙switchを退役。現行直接recordと必要時の祖先導出・plan_startがauthority。 |
+| `_head_state, current_work_branch, _require_clean_start` | 三Git helperを退役。current ProjectContext/branch_operations/git_processによる実HEAD/clean/raw diagnosticへ統合済み。 |
+| `_current_start_state, _start_plan, _verify_start_checkout, _require_start_readiness` | 四旧snapshot/cache処理を退役。現行start_snapshot/candidate/readinessと公開前比較がauthority。必要GH GETは短いStart排他の外。 |
+| `preview_start_work, start_work` | 旧control/epoch/registry/journalを使う二入口を退役。現行work_start.plan_start/start_workはnative短期StartLock・一record・明示branch/base・raw Git・no rollback。 |
+| `resume_start_work, _fingerprint` | 旧pending operation復旧とfingerprintの二処理を廃止。unknown/partialを返し、現物確認後の新しい明示Startへ案内する。 |
+| `plan_finish_work, _live_statuses, preview_finish_work, finish_work` | 四旧control付きFinishを退役。direct_finishとpure scope_completion_planがtarget/descendant live確認、legacy local保全、Close確定後のcapture解除を提供する。 |
+| `_metadata_digest` | 旧journal前後digestを退役。現在のmetadata bytes/identity捕捉・verify_local_inputsを使い、operation履歴を保存しない。 |
+| `resume_finish_work` | journal resumeを廃止。新しい明示Finishのlive再観測とconfirmed/unknown/partialで扱い、blind PATCHをしない。 |
+
+candidate三file外の全source/tests ASTでTYPE_CHECKINGとfrom-import子moduleを含めinbound import 0だった。文字列・symbol参照も確認し、既知asset inventoryの旧path/digestはownershipデータとして保持する。通常wheelから旧writerを除き、新alias/fallback/build除外は作らない。
+
+## 追加した公開native保証
+
+public main/実Git/stateful ghを使い、①explicit child Finishが直接選択中の祖先を保持、②既存local親のFinishがGH子のlive completedを要求し、確認後は親だけを更新・捕捉child token解除・無選択にする、③同祖先の異なる直接対象でも--switch-active必須、④明示branch Startのreadinessはcandidate commitのgraphで判定する、⑤三kind×attached/detachedで新branchのbase必須とdetachedからの明示開始を追加した。fixtureは既存metadataとして作り、新local発行/control付きwriterを使わない。製品内部moduleはmockせずfilesystem/ghの境界で観測する。
+
+①は1 passed（0.75秒）。②はchild open拒否が1 passed（0.48秒）、completedへの再観測を加えた同testが1 passed（0.67秒）だった。③の二方向は2 passed（1.12秒）。④は1 passed（0.82秒）、現在側のopen依存をcandidateへ混入せずGH GETは必要な#1一回だけだった。⑤はattached三casesが3 passed（0.46秒）、detachedの拒否/明示開始を追加した六casesが6 passed（2.96秒）。いずれも既存公開実装のcharacterizationで製品Redではない。
+
+③の最初は既存switch parametrizationを新testへ誤って付けたためexit4/collection error、次はreadonly GH GETも0とする過剰な期待で2 failed（1.24秒）だった。parametrizationを元のtestへ戻し、指定された保証であるeffects空/local tree保全/remote state保全/GETのみを検査するよう訂正した。両中断・失敗logは保持し、成功の代わりにしない。Workbench scriptはPATH上の短縮名で127となった後、skill指定の絶対pathで既存root/全log targetを検証した。
+
+通常wheelの明示収録禁止は、旧writerが含まれるRed 1 failed（1.11秒）、source退役後の同testはGreen 1 passed（14.59秒）。fresh wheel/sdist/外部非editable venv/実console/局所static操作と入力保全を確認した。
+
+関連Start/Finish/Active/Scope lifecycle/native並行Startの187 tests（66.63秒）が成功した。この回帰実行後にbaseの六casesを追加してfocused実行し、全source/tests Ruff check/format（370 files）、変更三test限定mypy --follow-imports=silent、diff checkも成功した。追加testのためにwheel製品Greenを重複実行していない。
+
+元logは既存Epic Workbenchのiss-00413-implementation/pytest-work-lifecycle-port.log、pytest-work-start-candidate-readiness.log、pytest-work-lifecycle-source-{red,green}.log、pytest-work-lifecycle-retirement-related.logへ保持する。直近通常make lintは407 errorsの旧snapshotで未合格であり、今回の限定結果を全体gateへ読み替えない。残る旧private writersの整理、full type/pytest、native Windows/別Python、fresh Strict、最終手動製品確認を継続する。実consumer・既存WT・旧Git領域・live GitHubは未変更。

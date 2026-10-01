@@ -189,6 +189,86 @@ def test_finish_completed_parent_still_requires_all_descendants_completed(
     assert [(request["method"], request["number"]) for request in requests] == [("GET", 1), ("GET", 2)]
 
 
+def test_finish_explicit_child_preserves_directly_selected_ancestor(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_work_commands_vnext import three_kind_workspace
+
+    root = three_kind_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = tree_digest(root)
+    exact_record = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    assert main(["--project", str(root), "work", "finish", "iss-00003", "--yes", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["scope_id"] == "iss-00003" and result["data"]["completed"] is True
+    assert result["data"]["branch_after"] == "main" and not output.err
+    assert result["effects"] == [{"kind": "github.issue.close", "status": "succeeded", "target": "gh:example/repo#3"}]
+    assert record.read_bytes() == exact_record and tree_digest(root) == before
+    requests = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [(request["method"], request["number"]) for request in requests] == [
+        ("GET", 3),
+        ("GET", 3),
+        ("PATCH", 3),
+        ("GET", 3),
+    ]
+    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": "open", "2": "open", "3": "completed"}
+
+
+def test_existing_local_parent_finish_requires_live_completed_github_descendant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_work_commands_vnext import three_kind_workspace
+
+    root = three_kind_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/.meta.json"
+    existing = json.loads(metadata.read_bytes())
+    existing.update(
+        backend="local",
+        github=None,
+        lifecycle={"state": "open", "revision": 3, "updated_at": "2020-01-01T00:00:00Z", "optional": True},
+        optional={"keep": [1, 2]},
+    )
+    metadata.write_text(json.dumps(existing))
+    record = select_fixture(root, scope_id="iss-00003", number=3)
+    before = tree_digest(root)
+    exact_record = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"3": "open"})
+    assert main(["--project", str(root), "work", "finish", "@epic", "--yes", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert "DESCENDANT_NOT_COMPLETED" in result["error"]["message"]
+    assert result["effects"] == [] and not output.err
+    assert record.read_bytes() == exact_record and tree_digest(root) == before
+    assert [json.loads(line) for line in log.read_text().splitlines()] == [{"method": "GET", "number": 3, "body": None}]
+    other_metadata = {path: path.read_bytes() for path in (root / "spec-dock").rglob(".meta.json") if path != metadata}
+    (tmp_path / "remote-states.json").write_text(json.dumps({"3": "completed"}))
+    assert main(["--project", str(root), "work", "finish", "@epic", "--yes", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["scope_id"] == "epic-00002" and result["data"]["completed"] is True
+    assert result["data"]["selection_token"] is None and result["data"]["branch_after"] == "main"
+    assert not record.exists() and not list(record.parent.glob("target-*.json")) and not output.err
+    after = json.loads(metadata.read_bytes())
+    assert after["revision"] == existing["revision"] + 1
+    assert after["lifecycle"]["state"] == "completed" and after["lifecycle"]["revision"] == 4
+    assert after["lifecycle"]["optional"] is True
+    assert {key: value for key, value in after.items() if key not in ("revision", "lifecycle")} == {
+        key: value for key, value in existing.items() if key not in ("revision", "lifecycle")
+    }
+    assert all(path.read_bytes() == payload for path, payload in other_metadata.items())
+    assert [json.loads(line) for line in log.read_text().splitlines()] == [
+        {"method": "GET", "number": 3, "body": None},
+        {"method": "GET", "number": 3, "body": None},
+    ]
+    assert [effect["kind"] for effect in result["effects"]] == ["scope.lifecycle", "selection.clear"]
+    assert all(effect["status"] == "succeeded" for effect in result["effects"])
+    assert not list(root.rglob(".specdock-json-transactions")) and not (root / ".git/spec-dock").exists()
+
+
 def test_finish_parent_releases_captured_descendant_without_selecting_parent(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

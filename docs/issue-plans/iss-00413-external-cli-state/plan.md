@@ -467,6 +467,16 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 
 直近通常lintの407 errors/full gate・native Windows/別Python/fresh Strict・最終手動確認は未完了である。旧作業/Scope/private writersの整理を続ける。実consumer/live GitHubは未変更。
 
+**旧Start/Finish試験・writerの退役**
+
+旧二filesの29 test関数・1002行と旧work_lifecycle.pyの26 symbols・1175行を全文確認し、[保証別の個別判断](artifacts/test-port-work-lifecycle-retirement.md)を残した。candidate外importはTYPE_CHECKING/from-import子moduleを含め0。暗黙祖先switch/Finish後の親昇格/registry/epoch/journal/cache resumeを廃止し、必要な保証は公開main/native Git/stateful ghへ対応づけた。skip/収集除外は増やさない。
+
+新しい公開試験では、子だけのFinishが直接選択中の祖先を保持（1 passed/0.75秒）、既存local親がGH子のopenを拒否しlive completed後に親だけを完了・capture解除（1 passed/0.67秒）、親子どちら向きのStartも明示switch必須（2 passed/1.12秒）、candidate graphでの明示branch readiness（1 passed/0.82秒）、三kind×attached/detachedのbase必須とdetached明示開始（6 passed/2.96秒）を検査した。現行Greenのcharacterizationである。parametrizationのcollection誤りとreadonly GETも0とした過剰期待は訂正し、元失敗logを保持した。
+
+通常wheelの旧writer収録禁止はRed 1 failed（1.11秒）、source削除後の同testはGreen 1 passed（14.59秒）。関連Start/Finish/Active/lifecycle/native並行Startは187 tests（66.63秒）が成功し、その後base六casesをfocused実行した。全Ruff check/format（370 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-work-lifecycle-port.log、pytest-work-start-candidate-readiness.log、pytest-work-lifecycle-source-{red,green}.log、pytest-work-lifecycle-retirement-related.logへ保持する。
+
+旧source/private helpersの残り、通常full type/pytest、native Windows/別Python、fresh Strict、最終手動確認は継続中である。直近通常lintの407 errorsは別snapshotの未合格記録で、今回の限定成功で置換しない。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

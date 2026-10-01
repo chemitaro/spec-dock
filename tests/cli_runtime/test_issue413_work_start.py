@@ -763,6 +763,55 @@ def test_start_requires_candidate_dependency_itself_to_be_completed(
         assert result["data"]["started"] is True
 
 
+def test_explicit_branch_start_uses_candidate_readiness_instead_of_current_dependencies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    metadata_path = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    metadata = json.loads(metadata_path.read_bytes())
+    other = metadata_path.parent.parent / "init-00002-fixture"
+    other.mkdir()
+    (other / ".meta.json").write_text(
+        json.dumps(dict(metadata, id="init-00002", github=dict(metadata["github"], issue_number=2)))
+    )
+    for message in ("ready candidate graph", "unready current graph"):
+        subprocess.run(["git", "-C", str(root), "add", "spec-dock"], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                message,
+            ],
+            check=True,
+            capture_output=True,
+        )
+        if message == "ready candidate graph":
+            subprocess.run(["git", "-C", str(root), "branch", "ready-candidate"], check=True, capture_output=True)
+            metadata["depends_on"] = ["init-00002"]
+            metadata["revision"] += 1
+            metadata_path.write_text(json.dumps(metadata))
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open"})
+    assert main(["--project", str(root), "work", "start", "init-00001", "--branch", "ready-candidate", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["started"] is True and result["data"]["branch_after"] == "ready-candidate"
+    assert not output.err and result["data"]["selection_token"] is not None
+    assert json.loads(metadata_path.read_bytes()).get("depends_on", []) == []
+    record = root / "spec-dock/.agent/work-target" / f"target-{result['data']['selection_token']}.json"
+    assert json.loads(record.read_bytes())["scope_id"] == "init-00001"
+    assert [json.loads(line) for line in log.read_text().splitlines()] == [{"method": "GET", "number": 1, "body": None}]
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_start_allows_candidate_title_change_with_same_scope_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -836,6 +885,35 @@ def test_same_scope_on_different_branch_replaces_only_captured_token(
         {"kind": "selection.publish", "status": "succeeded", "target": "init-00001"},
     ]
     assert [path.name for path in (root / "spec-dock/.agent/work-target").iterdir()] == [f"target-{new_token}.json"]
+
+
+@pytest.mark.parametrize("selected,number,target", [("iss-00003", 3, "epic-00002"), ("epic-00002", 2, "iss-00003")])
+def test_start_requires_explicit_switch_even_for_direct_ancestor_or_descendant(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    selected: str,
+    number: int,
+    target: str,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_active import select_fixture
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+    from tests.cli_runtime.test_work_commands_vnext import three_kind_workspace
+
+    root = three_kind_workspace(tmp_path / "consumer")
+    record = select_fixture(root, scope_id=selected, number=number)
+    before = tree_digest(root)
+    exact_record = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    assert main(["--project", str(root), "work", "start", target, "--base", "HEAD", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert "--switch-active" in result["error"]["message"] and result["effects"] == [] and not output.err
+    assert record.read_bytes() == exact_record and tree_digest(root) == before
+    requests = [json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []
+    assert all(request["method"] == "GET" for request in requests)
+    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": "open", "2": "open", "3": "open"}
 
 
 @pytest.mark.parametrize("switch", [False, True])
@@ -1645,3 +1723,39 @@ def test_start_rejects_probe_only_ignore_rule_before_git_effects(
     assert result["effects"] == []
     assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == refs_before
     assert subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"]) == b""
+
+
+@pytest.mark.parametrize("target,number", [("init-00001", 1), ("epic-00002", 2), ("iss-00003", 3)])
+@pytest.mark.parametrize("detached", [False, True])
+def test_new_start_requires_explicit_base_from_attached_or_detached_head(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    target: str,
+    number: int,
+    detached: bool,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+    from tests.cli_runtime.test_work_commands_vnext import three_kind_workspace
+
+    root = three_kind_workspace(tmp_path / "consumer")
+    if detached:
+        subprocess.run(["git", "-C", str(root), "checkout", "--detach", "HEAD"], check=True, capture_output=True)
+    before = tree_digest(root)
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    assert main(["--project", str(root), "work", "start", target, "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert "new branch requires --base" in result["error"]["message"]
+    assert result["effects"] == [] and not output.err and tree_digest(root) == before
+    assert not log.exists() and not (root / "spec-dock/.agent/work-target").exists()
+    if detached:
+        assert main(["--project", str(root), "work", "start", target, "--base", "HEAD", "--json"]) == 0
+        output = capsys.readouterr()
+        result = json.loads(output.out)
+        assert result["data"]["started"] is True and result["data"]["scope_id"] == target
+        assert result["data"]["branch_after"] == target + "-fixture" and not output.err
+        record = root / "spec-dock/.agent/work-target" / f"target-{result['data']['selection_token']}.json"
+        assert json.loads(record.read_bytes())["github_ref"] == f"gh:example/repo#{number}"
+        assert not (root / ".git/spec-dock").exists()
