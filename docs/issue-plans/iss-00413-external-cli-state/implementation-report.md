@@ -969,3 +969,13 @@ clean e1397459の通常make lintはRuff成功・mypy 41 errors/16 files（240 so
 AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerでの検証を現構成へ更新した。既存二suite 236 passed（2.37秒）、全source/tests Ruff check/format（317 files）、MYPYPATH=srcの変更三Python file限定mypyとdiff checkが成功した。通常wheel hash 97378c2ab1a8a9d88f23c926a0a2c7b0009b267ca355f19a5b439a552830538bを再照合し、provider外の非editable実consoleで五read-onlyコマンドの表示/JSON/全tree不変を確認した（0.66秒、exit0）。一時fixtureは削除済み。選択recordはtest準備であり、実Start/実dogfood適用ではない。初回確認scriptのcurrent_branch項目名誤りは別logへ保持した。
 
 この変更前のclean 32c372e1で通常全pytestは1878 passed/1 skipped（340.17秒、exit0）。skip理由は元実行で収集していない。通常make lintはRuff成功・mypy 37 errors/12旧source files（236 source files）、make exit2で未合格。旧helpersの退役、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 旧generation・状態cache・cache付きGit snapshotの退役
+
+**旧generation・状態cache・cache付きGit snapshotの退役**
+
+旧三source files（299行・11 symbols）と旧generation三test関数（60行）を全文確認し、[個別対応](artifacts/test-port-generated-state-retirement.md)を保存した。候補外importは絶対／相対／TYPE_CHECKING／子moduleを含め0。UUID付き世代/manifest/current pointerの公開・saved OPENの採用・cacheを混ぜる一時Git snapshotを削除した。通常Syncの必要時観測、unknown/partial、直接record、固定HEAD/候補OIDの読取と旧証拠保全を維持する。旧consumerのpath/hash inventoryは変更しない。
+
+旧generation pointerが正常/不正でも旧filesと直接recordを全tree保全し、現在のlocal Syncだけを表示する二caseを退役前に確認した（2 passed/24 deselected、0.49秒、exit0）。既存Greenのcharacterizationである。通常wheelの旧三module収録禁止はRed 1 failed（0.71秒、exit1）→同test Green 1 passed（13.55秒、exit0）。関連Sync/Validate/Doctor/query/Start/wheelの六suiteは231 passed（65.73秒）、exit0。全Ruff check/format（313 files）、MYPYPATH=srcの変更二test限定mypy、diff checkが成功した。skip/収集除外を増やさない。旧generationのatomic pointer/rollback保証を新しい機能として温存しない。
+
+元logsは既存Epic Workbenchのiss-00413-implementation/pytest-generated-state-retirement-{before,source-red,source-green,related}.logへ保持した。37 errorsの通常lintはclean 32c372e1の別snapshotである。残る旧source/tests、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

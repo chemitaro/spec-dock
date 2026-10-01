@@ -66,6 +66,37 @@ def test_sync_rejects_retired_cache_source_before_resolving_the_project(
     assert list(tmp_path.iterdir()) == []
 
 
+@pytest.mark.parametrize(
+    "pointer", ['{"schema_version":1,"generation_id":"' + "f" * 32 + '"}', '{"generation_id":"../x"}']
+)
+def test_sync_ignores_and_preserves_retired_generations_and_current_pointer(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], pointer: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    agent = record.parent.parent
+    (agent / "generation.json").write_text(pointer)
+    previous = agent / "generations" / ("f" * 32)
+    previous.mkdir(parents=True)
+    (previous / "manifest.json").write_text('{"source":"github","valid":false}')
+    (previous / "index.json").write_text('{"private-body":"must not be displayed","state":"completed"}')
+    before = tree_digest(root)
+    assert main(["--project", str(root), "workspace", "sync", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["effects"] == [] and result["data"]["complete"] is True
+    assert result["data"]["source"] == "local"
+    assert result["data"]["scopes"] == [
+        {"scope_id": "init-00001", "github_ref": "gh:example/repo#1", "lifecycle": "unknown"}
+    ]
+    assert result["data"]["worktrees"][0]["selection"]["scope_id"] == "init-00001"
+    assert "private-body" not in output.out + output.err and output.err == ""
+    assert tree_digest(root) == before and set(record.parent.iterdir()) == {record}
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_sync_offline_mode_refuses_requested_github_observation_before_a_get(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
