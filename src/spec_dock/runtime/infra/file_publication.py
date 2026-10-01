@@ -13,6 +13,8 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
+    from spec_dock.runtime.infra.workbench_snapshot import WorkbenchEntry
+
 
 @dataclass(frozen=True)
 class FileSnapshot:
@@ -77,6 +79,8 @@ def publish_file(
     stage_name: str,
     verify: Callable[[], object],
     mode: int = 0o666,
+    expected: FileSnapshot | WorkbenchEntry | None = None,
+    preserve_mode: bool = False,
 ) -> None:
     """Publish from a held same-directory stage, preserving an uncertain outcome.
 
@@ -89,9 +93,25 @@ def publish_file(
     parent = open_guarded_directory(path.parent)
     descriptor: int | None = None
     attempted = confirmed = False
+
+    def verify_expected() -> None:
+        if expected is None:
+            return
+        if isinstance(expected, FileSnapshot):
+            observed: FileSnapshot | WorkbenchEntry = read_regular_file(path)
+        else:
+            from spec_dock.runtime.infra.workbench_snapshot import read_entry
+
+            if expected.kind != "symlink":
+                raise ValueError("replacement expected entry must be a regular file or a symbolic link")
+            observed = read_entry(path)
+        if observed != expected:
+            raise ValueError("destination changed before replacement")
+
     try:
         verify()
-        if os.path.lexists(path):
+        verify_expected()
+        if expected is None and os.path.lexists(path):
             raise ValueError("destination already exists")
         try:
             descriptor = os.open(stage_name, os.O_RDWR | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode, dir_fd=parent)
@@ -100,6 +120,8 @@ def publish_file(
         with os.fdopen(os.dup(descriptor), "wb") as stream:
             stream.write(payload)
             stream.flush()
+            if preserve_mode:
+                os.fchmod(descriptor, mode)
             os.fsync(stream.fileno())
         verify()
         fresh = open_guarded_directory(path.parent)
@@ -110,19 +132,31 @@ def publish_file(
             os.close(fresh)
         candidate = read_regular_file(path.parent / stage_name)
         staged = os.fstat(descriptor)
-        if candidate.identity != (staged.st_dev, staged.st_ino) or candidate.payload != payload:
+        if (
+            candidate.identity != (staged.st_dev, staged.st_ino)
+            or candidate.payload != payload
+            or (preserve_mode and candidate.mode != mode)
+        ):
             raise ValueError("publication stage identity or bytes changed")
+        verify_expected()
         attempted = True
-        try:
-            os.link(stage_name, path.name, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
-        except FileExistsError as error:
-            attempted = False
-            raise ValueError("destination publication conflict") from error
-        os.unlink(stage_name, dir_fd=parent)
+        if expected is not None:
+            os.replace(stage_name, path.name, src_dir_fd=parent, dst_dir_fd=parent)
+        else:
+            try:
+                os.link(stage_name, path.name, src_dir_fd=parent, dst_dir_fd=parent, follow_symlinks=False)
+            except FileExistsError as error:
+                attempted = False
+                raise ValueError("destination publication conflict") from error
+            os.unlink(stage_name, dir_fd=parent)
         os.fsync(parent)
         observed = read_regular_file(path)
         staged = os.fstat(descriptor)
-        if observed.payload != payload or observed.identity != (staged.st_dev, staged.st_ino):
+        if (
+            observed.payload != payload
+            or observed.identity != (staged.st_dev, staged.st_ino)
+            or (preserve_mode and observed.mode != mode)
+        ):
             raise ValueError("published file readback changed")
         confirmed = True
     except (OSError, ValueError, RuntimeError) as error:

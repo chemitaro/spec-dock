@@ -434,7 +434,7 @@ def _example(leaf: str) -> str:
         "--scope": "<scope-id>",
         "--type": "blank",
         "--base": "HEAD",
-        "--to-worktree": "<worktree-id>",
+        "--to-worktree": "/absolute/worktree",
         "--to-schema": "3",
     }
     for argument in LEAF_ARGUMENTS[leaf]:
@@ -536,7 +536,13 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = "scope_id, declared, effective, ready, blockers, changed; dry-run adds can_apply."
         confirmation = "No final confirmation is required for this leaf."
     elif leaf == "workbench copy":
-        confirmation = "--on-conflict overwrite requires confirmation; the default error policy does not."
+        target = "One Scope Workbench in this worktree and the same Scope in another worktree of the same Git clone."
+        reads = "Native Git worktree inventory, current Scope metadata, the direct record for dynamic selectors, and source/destination bytes and identities."
+        does_not = "Does not remove destination-only files, acquire a Start lock, change selection, or automatically restore overwritten files."
+        json_data = "scope_id, source_path, destination_path, copied_paths, remaining_paths; copied/remaining paths are relative to the Workbench root."
+        confirmation = (
+            "Overwrite prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
+        )
     elif leaf in _CONFIRMATION_LEAVES:
         confirmation = (
             "TTY prompts after planning; --yes skips only confirmation; JSON and non-interactive require --yes."

@@ -7,6 +7,7 @@ from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 from io import StringIO
 import math
+from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any
 
@@ -68,6 +69,8 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
+    if leaf == "workbench copy":
+        return "Inspect copied and remaining paths and retained candidate files before a new explicit copy; changes are not automatically undone."
     if leaf.startswith("artifact "):
         return "Inspect the owner catalog and retained candidate files before a new explicit operation; uncertain publications are not automatically repeated."
     if leaf == "scope delete":
@@ -124,6 +127,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     delete = argv[:2] == ["scope", "delete"]
     dependency = len(argv) >= 2 and argv[0] == "dependency"
     artifact = len(argv) >= 2 and argv[0] == "artifact"
+    workbench = argv[:2] == ["workbench", "copy"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -138,6 +142,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not delete
         and not dependency
         and not artifact
+        and not workbench
     ):
         return
     index = 2
@@ -168,6 +173,8 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--backup-dir",
             "--scope",
             "--type",
+            "--to-worktree",
+            "--on-conflict",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1
@@ -338,6 +345,8 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     _reject_retired_start(remaining)
     parser = build_vnext_parser()
     parsed = parser.parse_args(remaining)
+    if parsed.command_path == "workbench copy" and not Path(parsed.to_worktree).expanduser().is_absolute():
+        parser.error("--to-worktree requires an absolute worktree path; registered aliases were retired")
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):
         parser.error("active clear requires exactly one of --from or --all")
     if parsed.command_path == "installation update":

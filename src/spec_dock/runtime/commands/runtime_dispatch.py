@@ -66,6 +66,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_artifact import mutate_artifact
 
             result = mutate_artifact(namespace, context, cwd)
+        elif command == "workbench copy":
+            from spec_dock.runtime.application.direct_workbench import copy_workbench
+
+            result = copy_workbench(namespace, context)
         elif command in ("dependency list", "dependency check"):
             from spec_dock.runtime.application.direct_dependencies import query_dependencies
 

@@ -83,7 +83,7 @@ def test_workbench_copy_cli_preview_conflict_and_explicit_overwrite(tmp_path: Pa
     source_workbench.mkdir(exist_ok=True)
     (source_workbench / "note.txt").write_text("source", encoding="utf-8")
     target_workbench = target.path / initiative.path.relative_to(source) / ".workbench"
-    prefix = ["workbench", "copy", "--scope", initiative.id, "--to-worktree", "planning"]
+    prefix = ["workbench", "copy", "--scope", initiative.id, "--to-worktree", str(target.path)]
 
     def run(*options: str):
         return run_vnext(

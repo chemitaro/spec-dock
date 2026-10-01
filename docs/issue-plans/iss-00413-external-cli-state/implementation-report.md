@@ -435,3 +435,17 @@ F1のcheckout成功hookによるignored direct recordの削除・basename置換�
 F2のP3は通常Scope list/show helpへ残ったcached stateの誤説明をRedとして確認し、current metadata・dynamic selector用の当該記録・未観測GitHub stateはunknownという現行契約へ限定した。元のP3とnon-blockingを変更せず、利用者の全指摘修正の明示認可を適用した。通常readのネットワーク・保存・状態authorityを変更していない。
 
 branch/contract/観測/active/Start/store/helpの関連171 tests（35.84秒）、変更5 fileのRuff check/format、変更3 source限定mypy、diff checkが通過した。全source/testsの再認定や全体mypy、native Windows、fresh Strict、P-10残り、P-11以後、Final Quality Gate、手動製品確認、実consumer切替は未完了。Workbenchの進行中変更はこの修正コミットに含めない。
+
+## P-10 Workbenchの同cloneコピーを通常経路へ接続
+
+`workbench copy --scope TARGET --to-worktree ABS` をexternal runtimeへ接続した。main/linkedのnative Git inventoryと物理clone/WT identityで明示先を確認し、既存ScopeのID/kind/parent/backend kind/正規化GitHub refが同じであることを検査する。台帳・wt alias・採番・新Scope IDを作らない。無関係なprunable WTが消えていても、明示コピー先の確認にはその実体を要求しない。
+
+source treeは実file bytes/mode、relative link文字列、空directoryまでメモリで捕捉する。destinationはsourceに対応するpathとその実directoryだけをno-followで観測し、destination-only evidenceは列挙対象外として保持する。errorは全衝突を最初に拒否し、overwriteは変更pathを提示して確認する。fileは実候補の同directory stageから無上書きlinkまたはatomic replaceで公開し、relative linkはdereferenceせず文字列を公開する。source modeは自分のprivate candidateに設定し、既存sourceや成果物の編集権限を管理しない。directoryはexclusive作成し、捕捉したmetadata/context/source/destinationを各段階で再確認する。
+
+適用済みpath、結果不明path、未実施pathをeffectsとcopied_paths/remaining_pathsに分ける。mkdir/link/replaceの結果不明はpartial6として現状と候補を保全し、確認済み公開後のGit失敗は原文stderr/native codeとsucceeded効果を保持する。foreign stageやpathを削除せず、共通Start排他・全writer lock・journal・retry・全体rollbackを加えていない。dry-runは同じ差分を予定効果として返し、destinationやstageを作らない。
+
+通常入口未接続、conflict/overwrite、nested/empty directory、mode、linkとregular file間の置換、unknown mkdir、絶対pathの構文、dry-run予定directoryとhelp/旧option分類を、各focused Red→Greenで確認した。同一GitHub linkageの大小文字差と無関係なmissing WTでの不要な停止も、実Gitの公開入口Red→Greenで解消した。初回のbackend fixture構造の誤り、link rootの安全なnative exit5をexit3と仮定した期待、存在しない関連test名でのcollection failureは製品Redに含めない。
+
+元からGreenの回帰として、実TTYのyes/no、dynamic scope/guardと直接recordのbyte保全、foreign stage置換、destination-only opaque/FIFOの保全、source変更、atomic replacementの結果不明、native Git原文、別processで共通Start排他を保持中のcopyを確認した。既存CLI regressionのto-worktree aliasだけをC-05の絶対pathへ改め、preview/conflict/overwriteの検査を残した。旧application helper自体はP-12で別途退役し、通常のfallbackには接続していない。
+
+関連検証コマンド `uv run pytest tests/cli_runtime/test_issue413_workbench.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_workbench_vnext.py tests/cli_runtime/test_artifact_vnext.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/integration/test_issue413_wheel.py tests/unit/infra/test_runtime_fs_repo_workbench_opacity.py tests/unit/infra/test_runtime_fs_cli_workbench.py tests/unit/infra/test_runtime_resolver_workbench_opacity.py -q` は153 passed（27.36秒）。`uv run ruff check src tests` と `uv run ruff format --check src tests`（396 files）、変更7 sourceの `uv run mypy --follow-imports=silent ...`、`git diff --check` が成功した。限定型検査は全体gateの代替ではない。native Windows、worktree/bootstrap、P-11以後、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替を継続する。実dogfood metadata・workspace宣言・直接選択は変更していない。
