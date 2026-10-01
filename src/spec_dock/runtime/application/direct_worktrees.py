@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -107,6 +108,248 @@ def resolve_native_target(reference: str, context: ProjectContext, *, timeout: f
             raise ValueError("worktree is attached to another physical clone")
         held.verify()
         return entry
+
+
+def _removal_observation(context: ProjectContext, path: Path, *, timeout: float) -> dict[str, object]:
+    inventory = worktree_list(context.root, timeout=timeout)
+    if not inventory or any(row.inventory_error is not None for row in inventory):
+        raise ValueError("native Git worktree inventory is incomplete")
+    present = any(row.path.resolve() == path.resolve() for row in inventory)
+    path_present = os.path.lexists(path)
+    return {"removed": not present and not path_present, "inventory_present": present, "path_present": path_present}
+
+
+def remove_native_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
+    context.require_writer()
+    if namespace.expect_backend is not None:
+        raise ValueError("--expect-backend requires one existing Scope target")
+    with WorkTargetStore(context.root) as store:
+        captured_selection = store.read()
+    if captured_selection.status not in ("empty", "selected"):
+        raise ValueError("source direct selection cannot be captured for a Git mutation")
+    if captured_selection.record is not None and (
+        captured_selection.record.clone_identity,
+        captured_selection.record.worktree_identity,
+    ) != (context.clone_identity, context.worktree_identity):
+        raise ValueError("source direct selection physical identity mismatch")
+    check_current_expectation(namespace, context, stored=captured_selection)
+    if not namespace.yes and not namespace.dry_run:
+        raise ValueError("worktree removal requires --yes")
+    entry = resolve_native_target(namespace.worktree_ref, context, timeout=namespace.timeout)
+    result: OperationResult[object] | None = None
+    try:
+        with DirectoryIdentity(entry.path) as held_target:
+            result = _remove_captured_worktree(namespace, context, entry, captured_selection, held_target)
+    except OSError as error:
+        if result is None:
+            raise
+        partial = any(effect.status in ("succeeded", "unknown") for effect in result.effects)
+        diagnostic = (
+            Diagnostic(result.error.code, result.error.message, {**result.error.details, "cleanup_error": str(error)})
+            if result.error is not None
+            else Diagnostic("LOCAL_IO_FAILED", str(error), {})
+        )
+        return replace(
+            result,
+            status="partial" if partial else "failed",
+            exit_code=6 if partial else 5,
+            effects=tuple(
+                replace(effect, status="not_attempted") if effect.status == "planned" else effect
+                for effect in result.effects
+            ),
+            error=diagnostic,
+            recovery=RecoveryInstructions((
+                "Inspect native inventory and the target path before a new explicit operation.",
+            ))
+            if partial
+            else None,
+        )
+    return result
+
+
+def _remove_captured_worktree(
+    namespace: argparse.Namespace,
+    context: ProjectContext,
+    entry: GitWorktreeRecord,
+    captured_selection: StoredSelection,
+    held_target: DirectoryIdentity,
+) -> OperationResult[object]:
+    if entry.locked and not namespace.unlock:
+        raise ValueError("locked worktree removal requires --unlock")
+    git_dir = Path(
+        os.fsdecode(run_git(entry.path, "rev-parse", "--absolute-git-dir", timeout=namespace.timeout)).removesuffix(
+            "\n"
+        )
+    )
+    if entry.bare or physical_identity(git_dir.resolve(strict=True)) == context.clone_identity:
+        raise ValueError("main or bare worktrees cannot be removed")
+    if physical_identity(entry.path) == context.worktree_identity:
+        raise ValueError("the current worktree cannot be removed")
+    if run_git(entry.path, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=namespace.timeout):
+        raise ValueError("worktree removal requires no tracked or untracked changes")
+    ignored = run_git(
+        entry.path,
+        "ls-files",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        "--directory",
+        "-z",
+        timeout=namespace.timeout,
+    )
+    if ignored and not namespace.discard_ignored:
+        raise ValueError("ignored worktree content requires --discard-ignored and explicit confirmation")
+    captured_observed: dict[str, object] = {"removed": False}
+    data: dict[str, object] = {
+        "path": str(entry.path),
+        "branch": entry.branch,
+        "head": entry.head,
+        "changed": False,
+        "observed": captured_observed,
+    }
+    effects: list[Effect] = []
+
+    def verify_source() -> None:
+        fresh = resolve_context(str(context.root), context.root, timeout=namespace.timeout)
+        fresh.require_writer()
+        if (fresh.clone_identity, fresh.worktree_identity, fresh.branch, fresh.head, fresh.workspace) != (
+            context.clone_identity,
+            context.worktree_identity,
+            context.branch,
+            context.head,
+            context.workspace,
+        ):
+            raise ValueError("source Git worktree context changed")
+        with WorkTargetStore(context.root) as store:
+            if store.read() != captured_selection:
+                raise ValueError("source direct selection changed during the Git operation")
+
+    def verify_target(*, locked: bool) -> None:
+        nonlocal captured_observed
+        held_target.verify()
+        fresh_target = resolve_native_target(str(entry.path), context, timeout=namespace.timeout)
+        if (
+            fresh_target.branch,
+            fresh_target.head,
+            fresh_target.bare,
+            fresh_target.detached,
+            fresh_target.prunable,
+        ) != (
+            entry.branch,
+            entry.head,
+            entry.bare,
+            entry.detached,
+            entry.prunable,
+        ) or fresh_target.locked != locked:
+            captured_observed = {
+                "removed": False,
+                "branch": fresh_target.branch,
+                "head": fresh_target.head,
+                "locked": fresh_target.locked,
+            }
+            data["observed"] = captured_observed
+            raise ValueError("native worktree branch, HEAD or flags changed before removal")
+        if run_git(entry.path, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=namespace.timeout):
+            raise ValueError("worktree changed before removal")
+        if not namespace.discard_ignored and run_git(
+            entry.path,
+            "ls-files",
+            "--others",
+            "--ignored",
+            "--exclude-standard",
+            "--directory",
+            "-z",
+            timeout=namespace.timeout,
+        ):
+            raise ValueError("ignored worktree content changed before removal")
+        held_target.verify()
+
+    verify_source()
+    verify_target(locked=entry.locked)
+    if namespace.dry_run:
+        data.update(can_apply=True, blockers=())
+        if entry.locked:
+            effects.append(Effect("git.worktree.unlock", "planned", str(entry.path)))
+        effects.append(Effect("git.worktree.remove", "planned", str(entry.path)))
+        return OperationResult(
+            namespace.command_path, "planned", FamilyData("worktree", data), 0, effects=tuple(effects)
+        )
+    attempted: str | None = None
+    try:
+        verify_source()
+        verify_target(locked=entry.locked)
+        if entry.locked:
+            attempted = "git.worktree.unlock"
+            run_git(context.root, "worktree", "unlock", "--", str(entry.path), mutation=True, timeout=namespace.timeout)
+            unlocked = resolve_native_target(str(entry.path), context, timeout=namespace.timeout)
+            if unlocked.locked:
+                raise ValueError("native Git worktree remains locked after unlock")
+            effects.append(Effect("git.worktree.unlock", "succeeded", str(entry.path)))
+            attempted = None
+            held_target.verify()
+            verify_source()
+        verify_target(locked=False)
+        attempted = "git.worktree.remove"
+        run_git(context.root, "worktree", "remove", "--", str(entry.path), mutation=True, timeout=namespace.timeout)
+        removed_observation = _removal_observation(context, entry.path, timeout=namespace.timeout)
+        captured_observed = removed_observation
+        data["observed"] = removed_observation
+        if removed_observation["removed"] is not True:
+            raise ValueError("Git removal did not leave both the native inventory and target path absent")
+        effects.append(Effect("git.worktree.remove", "succeeded", str(entry.path)))
+        attempted = None
+        verify_source()
+    except (GitProcessError, OSError, ValueError, RuntimeError, LookupError) as error:
+        status: EffectStatus = (
+            "unknown"
+            if not isinstance(error, GitProcessError) or error.returncode is not None or error.uncertain
+            else "failed"
+        )
+        details = error.details() if isinstance(error, GitProcessError) else {}
+        observed: dict[str, object] = {"removed": None} if attempted is not None else dict(captured_observed)
+        if attempted == "git.worktree.unlock":
+            try:
+                held_target.verify()
+                actual = resolve_native_target(str(entry.path), context, timeout=namespace.timeout)
+                observed = {"removed": False, "locked": actual.locked, "branch": actual.branch, "head": actual.head}
+                if not actual.locked and (
+                    not isinstance(error, GitProcessError) or error.returncode is not None or error.uncertain
+                ):
+                    status = "succeeded"
+            except (OSError, ValueError, RuntimeError, LookupError) as verification_error:
+                details["verification_error"] = str(verification_error)
+        if attempted == "git.worktree.remove":
+            try:
+                observed = _removal_observation(context, entry.path, timeout=namespace.timeout)
+                if observed["removed"] is True:
+                    status = "succeeded"
+            except (OSError, ValueError, RuntimeError) as verification_error:
+                details["verification_error"] = str(verification_error)
+        if attempted is not None:
+            effects.append(Effect(attempted, status, str(entry.path)))
+        if entry.locked and not any(effect.kind == "git.worktree.unlock" for effect in effects):
+            effects.append(Effect("git.worktree.unlock", "not_attempted", str(entry.path)))
+        if not any(effect.kind == "git.worktree.remove" for effect in effects):
+            effects.append(Effect("git.worktree.remove", "not_attempted", str(entry.path)))
+        partial = any(effect.status in ("succeeded", "unknown") for effect in effects)
+        data.update(changed=any(effect.status == "succeeded" for effect in effects), observed=observed)
+        return OperationResult(
+            namespace.command_path,
+            "partial" if partial else "failed",
+            FamilyData("worktree", data),
+            6 if partial else (3 if isinstance(error, ValueError) else 5),
+            effects=tuple(effects),
+            error=Diagnostic(
+                "GIT_FAILED" if isinstance(error, GitProcessError) else "WORKTREE_REMOVE_FAILED", str(error), details
+            ),
+            recovery=RecoveryInstructions((
+                "Inspect native inventory and the target path before a new explicit operation.",
+            ))
+            if partial
+            else None,
+        )
+    data.update(changed=True, observed={"removed": True})
+    return OperationResult(namespace.command_path, "succeeded", FamilyData("worktree", data), 0, effects=tuple(effects))
 
 
 def create_native_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:

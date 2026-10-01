@@ -292,7 +292,7 @@ uv run pytest tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/tes
 
 第9回Strictは`3c68053e`のP-02〜P-09を固定し、P1一件・P2二件でfailした。[完全batch分析](artifacts/code-review-p06-09-analysis.md)後、Scope create/importの明示guard、branch switchのcheckout後clean検査、stale/unavailableの既知recordを含むSync重複診断をTDDで修正した。関連83 tests（25.02秒）、変更3 source限定mypy、変更6 fileのRuff check/formatが通過した。P2のnon-blocking分類を維持し、利用者の全指摘修正の明示認可を適用する。Scope edit/deleteはr9の対象外であり、全体のfresh Strict合格は未取得。
 
-**状態: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/showの通常経路をローカル検証済み。worktree remove/bootstrapと今回変更のfresh Strictは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
+**状態: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/show/removeの通常経路をローカル検証済み。worktree bootstrapと今回変更のfresh Strictは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
 
 Scope editは一つの捕捉直接選択からdynamic selectorとguardを解決し、全metadata/workspaceのbytes・identityを再照合してtitle/revisionだけを変更する。未知field、本文、既存file mode、真正の既存local lifecycle、選択recordを保全し、GH通信・Start lock・control・journalを使わない。無変更はbytes/revision/identityを保持する。dry-runはstageを作らずC-05の必須fieldを返す。確認済み公開後のcleanup/Git失敗、置換結果不明、並行編集保全を公開CLIとネイティブOS/Git境界で確認した。関連124 tests（24.83秒）、全Ruff check/format（385 files）、変更4 source限定mypyとdiff checkが通過した。redirected stagingのexit3を期待したtestは、実際にはGitの原文拒否・exit5・write0が成立していたため、C-04へ期待値を訂正したもので製品Redではない。
 
@@ -307,6 +307,10 @@ Artifactは所有者directoryの現存fileからtimestamp/suffixを候補化し�
 Workbenchは同cloneの明示された絶対pathをGit inventoryへ照合し、同Scopeの現存成果物をfile単位でコピーする。GitHub linkageは既存の正規化refで比較し、大小文字やlifecycle観測値を別Scopeと誤判定しない。errorは全衝突を適用前に拒否、overwriteは完全な候補を原子的に置換してdestination-onlyを保持する。相対link文字列・file mode・空directoryを保全し、source/destination/contextを再確認する。途中失敗では確認済み/unknown/未実施を分け、Gitエラー原文を保持する。共通Start排他・registry・journal・一括巻戻しは追加しない。実TTY、dynamic selector/guard、stage置換、unknown publication、無関係なprunable WTを公開CLIで検証し、関連153 tests（27.36秒）、source/tests Ruff check/format（396 files）、変更7 source限定mypyが通過した。旧CLI testのalias指定だけをC-05の絶対pathへ移し、既存のconflict/overwrite検査を維持した。全体型gateとfresh Strictは別途継続する。
 
 native Worktree create/list/showはGitのNUL inventoryと同cloneの明示pathを使う。createのNAME必須化、root指定/既存環境変数、固定baseから`worktree/NAME`への作成を接続し、registry/receipt/recoverを使わない。sourceのclean/physical identity/直接recordを捕捉・再照合し、Git hookがselection/ref/作業treeを変えた場合や配置先の置換では現物を保全してpartialにする。dry-runは配置directoryもrefも作らない。関連52 tests（14.16秒）、旧createの六tests（4.10秒）、398 filesのRuff check/format、変更四source限定mypyが成功した。旧CLI recovery assertionはC-02の退役拒否と明示NAMEへ更新し、旧helperの退役はP-12へ残す。remove/bootstrapとこのunitの独立Strictは次の工程である。
+
+native Worktree removeも同cloneの明示絶対pathへ接続した。main/current/bare、tracked/untracked dirty、locked/ignoredの無許可処理を適用前に拒否し、branchと外部pathを保全する。必要なsource contextと直接選択、保持したtargetの物理identity、native branch/HEAD/flagsとdirty/ignored条件をdry-run・unlock前・remove前に再確認する。unlock後のactor編集・ignored追加・branch変更・同path置換では後続削除を止め、完了したunlockは残す。Git途中エラー・timeout/signal・起動失敗・確認済み効果後のhandle cleanupを区別し、raw Git診断と確認済み/unknown/未実施の効果を返す。receipt/共通lock/force/branch削除/自動巻戻しを足さない。関連119 tests（24.90秒）、全source/testsのRuff check/format（401 files）、変更三source限定mypy、diff checkが成功した。bootstrap、fresh Strict、native OS検証と後続stepは未完了。
+
+fresh Strict用の通常pushは自動承認審査により二回、実行前に拒否された。現在branchの通常非force pushについて明示的な利用者許可を質問中であり、回答前に再実行しない。既存Strict skillの一般的なpreapproval記述は審査で認可根拠として受理されなかった。ローカル実装・検証・checkpointは既存の実装認可に従って継続する。remoteとのSHA一致がない状態でStrictを起動したとは扱わない。
 
 **変更禁止**: 業務leafの大量削除、無関係なsyntax置換、overwrite/安全flagの理由なし廃止、make自動実行、stable WT ID台帳、metadataのchmod編集禁止は追加しない。
 

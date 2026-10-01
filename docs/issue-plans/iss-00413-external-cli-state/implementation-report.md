@@ -477,3 +477,15 @@ Artifact importのsource readは、外部pathや本文を診断に開示せず�
 関連検証 `uv run pytest tests/cli_runtime/test_issue413_branch.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_issue413_query_guards.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_workbench.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_scope_query_vnext.py tests/cli_runtime/test_artifact_vnext.py tests/cli_runtime/test_workbench_vnext.py tests/cli_runtime/test_dependency_vnext.py tests/cli_runtime/test_help_completion_vnext.py tests/integration/test_issue413_sync.py tests/integration/test_issue413_wheel.py -q` は344 passed（63.50秒）。全source/testsのRuff check/format（400 files）、変更9 source限定mypy、diff checkが成功した。Scope listのfixtureに既存Epicが四件目としてあることをassertionへ反映した修正を、製品Redに数えない。
 
 本unitは実dogfoodのmetadata・workspace宣言・直接選択を変更していない。native Worktree create/list/showと本修正を含むfresh Strict、remove/bootstrap、P-11以後、native Windows、full-suite/type gate、最終gate、手動製品確認、実consumer切替は引き続き未完了。goalはactiveである。
+
+## P-10 native Worktree removeを接続
+
+`worktree remove ABS [--unlock] [--discard-ignored] --yes`を通常external runtimeへ接続した。Gitの現行inventoryと同じ物理cloneを参照し、main/current/bareの削除とtracked/untracked dirtyを拒否する。locked targetは明示unlock、ignored内容は明示discardと確認を要求する。dry-runでは同じ条件を読み取り、予定効果だけを返す。branchは残し、ignoredな外部向けsymlinkを含む対象を削除しても外部fileの内容を変更しない。
+
+sourceのworkspace/branch/HEAD/物理identityと一度捕捉した直接選択を再確認し、targetのdirectory handleを操作中保持する。native branch/HEAD/flagsとdirty/ignored条件もunlock前・remove前・dry-runに再確認する。unlock後に新しいuntracked/ignored内容、別branch、同pathの別directory、sourceの選択変更が現れた場合はactorの変更を保全して後続削除を止める。権限制御、registry、receipt、Start共通lock、force、branch削除、自動巻戻しは追加していない。
+
+公開CLIの未接続経路と、処理中のignored追加・同path置換・unlock前のbranch変更・実unlock後にネイティブエラーを返すケース・削除確認後のhandle close失敗をfocused Red→Greenで確認した。実unlockと実removeの確認にはnative inventoryを使い、removeはpath消失も確認する。exit zeroだけで成功と呼ばず、Gitエラー後でも確認できた効果はsucceededとしてpartial6へ残す。timeout/signalはunknown、process開始不能はfailed、後続はnot_attemptedとし、原文stderr/stdout/returncodeを保持する。textでもGitの複数行エラーを保つ。process faultや元から通る安全guardの回帰を、架空のRedとして数えない。
+
+`uv run pytest tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/integration/test_issue413_wheel.py -q` は119 passed（24.90秒）。`uv run ruff check src tests`、`uv run ruff format --check src tests`（401 files）、変更三source限定のmypy、`git diff --check`が成功した。限定型検査は全体gateの代替ではない。bootstrap、native Windows、P-11以後、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了である。実dogfood metadata・宣言・直接選択は変更していない。
+
+fresh Strict準備の通常非force pushは自動承認審査で二回、process開始前に拒否された。HEAD `9b829ec6d3ebf75cbd0667321b670e7a2781c895`とupstream/remote `8c59994c8dad473697dcd8314721aeeef3f52d79`の差は既知のローカル二commitで、remote変更は実行されていない。AGENTS.mdのremote操作の明示認可要件について、このIssue/branchのレビュー用push許可を利用者へ質問中である。Strict skillの一般的なpreapproval文は審査で認可根拠として認められなかった。回答前にpushを再試行せず、SHA一致を満たさないStrictを実行しない。既存の実装認可に基づくローカル作業は継続し、goalをactiveに保つ。
