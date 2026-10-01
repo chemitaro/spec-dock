@@ -1053,3 +1053,275 @@ def test_workbench_rejects_retired_operation_ids_before_project_access(
     result = json.loads(capsys.readouterr().out)
     assert result["error"]["code"] == "ARGUMENT_RETIRED" and result["effects"] == []
     assert list(tmp_path.iterdir()) == []
+
+
+def _refuse_external_metadata_open(monkeypatch: pytest.MonkeyPatch, files: list[Path]) -> None:
+    identities = {(path.stat().st_dev, path.stat().st_ino) for path in files}
+    native_open = os.open
+
+    def open_file(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        descriptor = native_open(path, flags, mode, dir_fd=dir_fd)
+        observed = os.fstat(descriptor)
+        if (observed.st_dev, observed.st_ino) in identities:
+            os.close(descriptor)
+            raise AssertionError("external metadata must not be opened")
+        return descriptor
+
+    monkeypatch.setattr(os, "open", open_file)
+
+
+@pytest.mark.parametrize("backend", ["github", "local"])
+def test_copy_resolves_existing_scope_ids_independently_of_each_worktrees_slug(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], backend: str
+) -> None:
+    root, other, source, destination = workbench_workspace(tmp_path)
+    scope_id = "iss-00003"
+    if backend == "local":
+        scope_id = "iss-local-00003"
+        remapped = []
+        for owner in (source.parent, destination.parent):
+            metadata = owner / ".meta.json"
+            payload = json.loads(metadata.read_bytes())
+            payload.update(
+                id=scope_id,
+                backend="local",
+                github=None,
+                lifecycle={"state": "open", "revision": 0, "updated_at": "2026-09-30T00:00:00Z"},
+            )
+            metadata.write_text(json.dumps(payload))
+            moved = owner.with_name(scope_id + "-fixture")
+            owner.rename(moved)
+            remapped.append(moved / ".workbench")
+        source, destination = remapped
+    target_owner = destination.parent
+    target_metadata = target_owner / ".meta.json"
+    payload = json.loads(target_metadata.read_bytes())
+    payload["slug"] = "different-slug"
+    target_metadata.write_text(json.dumps(payload))
+    moved = target_owner.with_name(scope_id + "-different-slug")
+    target_owner.rename(moved)
+    destination = moved / ".workbench"
+    (source / "note.bin").write_bytes(b"opaque source evidence\x00\xff")
+    metadata_bytes = {
+        path: path.read_bytes() for tree in (root, other) for path in tree.glob("spec-dock/**/.meta.json")
+    }
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workbench",
+            "copy",
+            "--scope",
+            "  " + scope_id.upper() + "  ",
+            "--to-worktree",
+            str(other),
+            "--json",
+        ])
+        == 0
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["result"]["scope_id"] == scope_id
+    assert result["data"]["result"]["source_path"] == str(source)
+    assert result["data"]["result"]["destination_path"] == str(destination)
+    assert result["data"]["result"]["copied_paths"] == ["note.bin"]
+    assert (
+        (destination / "note.bin").read_bytes()
+        == (source / "note.bin").read_bytes()
+        == b"opaque source evidence\x00\xff"
+    )
+    assert all(path.read_bytes() == exact for path, exact in metadata_bytes.items())
+    assert output.err == "" and not (root / ".git/spec-dock").exists()
+    assert not (root / "spec-dock/.agent").exists() and not (other / "spec-dock/.agent").exists()
+
+
+@pytest.mark.parametrize("side", ["source", "destination"])
+@pytest.mark.parametrize("defect", ["missing", "malformed", "duplicate"])
+def test_copy_rejects_invalid_scope_inventory_before_copying_any_file(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], side: str, defect: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, other, source, destination = workbench_workspace(tmp_path)
+    (source / "note.txt").write_bytes(b"source evidence")
+    destination.mkdir()
+    (destination / "keep.txt").write_bytes(b"destination evidence")
+    owner = source.parent if side == "source" else destination.parent
+    metadata = owner / ".meta.json"
+    if defect == "missing":
+        metadata.unlink()
+    elif defect == "malformed":
+        metadata.write_bytes(b"invalid metadata")
+    else:
+        duplicate = owner.with_name("iss-00003-another-copy")
+        shutil.copytree(owner, duplicate)
+        payload = json.loads((duplicate / ".meta.json").read_bytes())
+        payload["slug"] = "another-copy"
+        (duplicate / ".meta.json").write_text(json.dumps(payload))
+    before = (tree_digest(root), tree_digest(other))
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workbench",
+            "copy",
+            "--scope",
+            "iss-00003",
+            "--to-worktree",
+            str(other),
+            "--json",
+        ])
+        == 3
+    )
+    output = capsys.readouterr()
+    assert json.loads(output.out)["effects"] == [] and output.err == ""
+    assert before == (tree_digest(root), tree_digest(other))
+    assert list(destination.iterdir()) == [destination / "keep.txt"]
+
+
+@pytest.mark.parametrize("existing_destination", [False, True])
+def test_copy_missing_source_workbench_preserves_the_entire_destination(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], existing_destination: bool
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, other, source, destination = workbench_workspace(tmp_path)
+    source.rmdir()
+    if existing_destination:
+        destination.mkdir()
+        (destination / "keep.txt").write_bytes(b"destination evidence")
+    before = (tree_digest(root), tree_digest(other))
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workbench",
+            "copy",
+            "--scope",
+            "iss-00003",
+            "--to-worktree",
+            str(other),
+            "--json",
+        ])
+        == 4
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["effects"] == [] and output.err == ""
+    assert before == (tree_digest(root), tree_digest(other))
+
+
+@pytest.mark.parametrize("side", ["source", "destination"])
+@pytest.mark.parametrize("level", ["initiative", "epic", "issue"])
+def test_copy_rejects_redirected_scope_ancestors_before_opening_external_metadata(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], side: str, level: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, other, source, destination = workbench_workspace(tmp_path)
+    (source / "note.txt").write_bytes(b"opaque source evidence")
+    owner = source.parent if side == "source" else destination.parent
+    redirected = {"issue": owner, "epic": owner.parent.parent, "initiative": owner.parent.parent.parent.parent}[level]
+    outside = tmp_path / "outside"
+    redirected.rename(outside)
+    redirected.symlink_to(outside, target_is_directory=True)
+    external_metadata = list(outside.rglob(".meta.json"))
+    assert external_metadata
+    before = (tree_digest(root), tree_digest(other), tree_digest(outside))
+    with monkeypatch.context() as observed:
+        _refuse_external_metadata_open(observed, external_metadata)
+        assert (
+            main([
+                "--project",
+                str(root),
+                "workbench",
+                "copy",
+                "--scope",
+                "iss-00003",
+                "--to-worktree",
+                str(other),
+                "--json",
+            ])
+            == 3
+        )
+    output = capsys.readouterr()
+    assert json.loads(output.out)["effects"] == [] and output.err == ""
+    assert before == (tree_digest(root), tree_digest(other), tree_digest(outside))
+
+
+@pytest.mark.parametrize("placement", ["initiatives-root", "unexpected-directory"])
+def test_copy_ignores_unrelated_metadata_links_without_opening_their_external_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], placement: str
+) -> None:
+    root, other, source, destination = workbench_workspace(tmp_path)
+    (source / "note.txt").write_bytes(b"source evidence")
+    outside = tmp_path / "outside-meta.json"
+    private = b"external private metadata must remain unread"
+    outside.write_bytes(private)
+    container = root / "spec-dock/initiatives"
+    if placement == "unexpected-directory":
+        container = container / "unexpected-directory"
+        container.mkdir()
+    redirect = container / ".meta.json"
+    redirect.symlink_to(outside)
+    with monkeypatch.context() as observed:
+        _refuse_external_metadata_open(observed, [outside])
+        assert (
+            main([
+                "--project",
+                str(root),
+                "workbench",
+                "copy",
+                "--scope",
+                "iss-00003",
+                "--to-worktree",
+                str(other),
+                "--json",
+            ])
+            == 0
+        )
+    output = capsys.readouterr()
+    assert (destination / "note.txt").read_bytes() == b"source evidence"
+    assert outside.read_bytes() == private and redirect.readlink() == outside
+    assert private.decode() not in output.out + output.err
+    assert not (root / ".git/spec-dock").exists() and not (other / "spec-dock/.agent").exists()
+
+
+@pytest.mark.parametrize("side", ["source", "destination"])
+def test_copy_rejects_file_instead_of_a_workbench_directory_before_writing(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], side: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, other, source, destination = workbench_workspace(tmp_path)
+    (source / "note.txt").write_bytes(b"source evidence")
+    if side == "source":
+        (source / "note.txt").unlink()
+        source.rmdir()
+        source.write_bytes(b"invalid source root")
+    else:
+        destination.write_bytes(b"invalid destination root")
+    before = (tree_digest(root), tree_digest(other))
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workbench",
+            "copy",
+            "--scope",
+            "iss-00003",
+            "--to-worktree",
+            str(other),
+            "--json",
+        ])
+        == 5
+    )
+    output = capsys.readouterr()
+    assert json.loads(output.out)["effects"] == [] and output.err == ""
+    assert before == (tree_digest(root), tree_digest(other))
