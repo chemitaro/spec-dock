@@ -808,3 +808,12 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 旧local createの十二test関数と二helpersを全文確認し、[保証別の判断](artifacts/test-port-local-scope-retirement.md)で退役した。候補外helper importは0。独自local採番/high-water/cache/offline createの成功条件を残さず、GH番号SSOTと既存local metadata保全を維持する。親差替えsafetyはpublic main/native Git/stateful gh/OS fsyncの境界へ移し、replacement tree不変・元metadata/ref保全・partial/6を二casesで確認した（2 passed、1.15秒）。最初のnot_attempted期待はstage開始済みを反映したfailedへ訂正し、製品Redには数えない。
 
 関連current publication/import/create/query/lifecycle/migrationの128 tests（38.34秒）、全Ruff check/format（374 files）、変更publication test限定mypy --follow-imports=silentとdiff checkが成功した。最初の存在しない二test file指定はexit4/zero testsで、実在fileへ訂正した結果だけを回帰証拠にする。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-local-creation-retirement-related.log（中断）とpytest-local-creation-retirement-related-2.log（成功）へ保持した。全体lintは直近407 errorsで未合格のまま。旧source/private writersの整理、full gates、native Windows/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+
+## P-12 Scope照会・タイトル編集試験の公開CLI移行
+
+旧三testを[公開CLIの保証へ置換](artifacts/test-port-scope-query-edit.md)した。既存local/GH metadataのkind/state/query、直接recordの@current、旧cache非採用、title/revision以外の未知field・仕様bytes・既存mode保存、同title noopを確認する。新local作成/control付きfixtureを残さず、gh request 0・effects空・tree保全を公開main/native境界で検査した。一件ずつ1 passed（0.34/0.24/0.34秒）で、既存Greenのcharacterizationであり製品Redではない。
+
+参照を失った旧edit_scope.pyの二symbolsを全文・source/test import確認のうえ退役した。通常wheelの収録禁止はRed 1 failed（0.77秒）、source削除後の同testはGreen 1 passed（13.37秒）。関連query/edit/create/契約40 tests（6.23秒）、全Ruff check/format（373 files）、変更二test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-scope-query-port.log、pytest-scope-query-source-{red,green}.log、pytest-scope-query-port-related.logへ保持する。
+
+直近通常lintの407 errors/full gate・native Windows/別Python/fresh Strict・最終手動確認は未完了である。旧作業/Scope/private writersの整理を続ける。実consumer/live GitHubは未変更。
