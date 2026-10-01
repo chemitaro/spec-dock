@@ -609,3 +609,15 @@ provider parityは新CLIで初期化した一時consumerへportした。実dogfo
 最終差分確認でworktree参照のNAME省略案内も必須名へ訂正し、同じ旧commit hashを保持してpackage inventoryを更新した。その候補を文書/配布/helper suiteとfresh wheelで再検証し、214 passed（15.57秒）を確認した。最終候補の全86 resource hashと、新規導入先の全86 bytesが一致する。
 
 provider旧helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer切替は未完了。通常非force pushへの回答が未着で、Strictのlocal/upstream SHA一致も未成立である。actual dogfood workspace・metadata・shim・.agents・状態は変更せず、認可済みローカル実装を続ける。
+
+## P-12 公開help・補完と旧CLI契約のport
+
+workspace migrateのparser catalogが、廃止済み--resume/--rollbackをusage/optionsと補完へ注入していた。public mainのhelpを使う一件のRedで検出し、注入loopを削除して同じtestをGreenにした。非公開の旧dispatcher用対応表は後続の旧実装退役まで隔離して残すが、公開syntaxを生成しない。optionsから未使用の旧recovery案内・operation ID検査を除き、未使用backend/source/rollback定数も退役させた。通常のbranch createのbase必須検査は保持する。
+
+旧CLI契約suiteの11 failed/17 passedは、mapping-file、local作成、engine pin/journal復旧、cache既定、readのdry-run拒否、worktree alias等の旧期待値だった。確定#413契約へportし、Scope作成の明示backend/parent/title、共通option位置と重複、finite timeout、廃止診断、44 leaf構成とhelp、原文/JSONという検査目的を保持した。旧四recovery leafはvalid/invalid tokenと二flagの16 casesで、副作用前ARGUMENT_RETIRED/exit2、effects空、未導入projectへの書込み0を確認する。syntaxのportで新要求を決め直した実績ではなく、既に実装された新契約を確認する回帰である。
+
+help suiteは旧run_vnextを直接起動せず、実public mainから stdout/stderr/終了値を捕捉する。repositoryがないproject指定でも全44 leafのusage/optionsから復旧flagが消え、全例が現在parserで解釈できることを確認した。native bash/zshの実補完はmigrationの新optionを提示し、旧二flagを提示しない。root version、help、usage errorはv2 utility/diagnostic envelopeへ照合する。
+
+`uv run pytest tests/cli_runtime/test_cli_vnext_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_issue413_contract.py tests/integration/test_issue413_migration.py tests/integration/test_issue413_wheel.py -q --tb=short` は113 passed（22.36秒）。全source/tests Ruff check/format（423 files）と変更四file限定mypyが成功した。限定mypyではpytest.skipをAnyと見なすとnative executableがstrへ絞れなかったため、skip後の明示assertを追加した。製品変更ではなくtest helperの型境界であり、help/native補完の29 testsをfresh runで再確認（0.78秒）した。全体type gateの代替ではない。
+
+legacy provider/runtime helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer切替は未完了。実dogfoodの状態を変更せず、レビュー用pushの回答を待ちながら認可済みローカル作業を続ける。

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import redirect_stderr, redirect_stdout
+from dataclasses import dataclass
+import io
 import json
 import shlex
 import shutil
@@ -12,15 +15,37 @@ import pytest
 
 from spec_dock.cli import main
 from spec_dock.runtime.cli.catalog import HELP_PRECONDITIONS, HELP_SPECS, LEAF_PATHS
-from spec_dock.runtime.cli.options import parse_vnext_output
-from spec_dock.runtime.cli.vnext_runtime import run_vnext
+from spec_dock.runtime.cli.options import parse_vnext
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _run(tmp_path: Path, *args: str):
-    return run_vnext(args, invocation_cwd=tmp_path, engine_digest="test-engine", engine_version="0.2.4")
+@dataclass(frozen=True)
+class _ConsoleOutput:
+    exit_code: int
+    stdout: str
+    stderr: str
+
+
+def _run(tmp_path: Path, *args: str) -> _ConsoleOutput:
+    stdout, stderr = io.StringIO(), io.StringIO()
+    with redirect_stdout(stdout), redirect_stderr(stderr):
+        code = main(["--project", str(tmp_path / "missing"), *args])
+    return _ConsoleOutput(code, stdout.getvalue(), stderr.getvalue())
+
+
+def test_public_migration_help_does_not_advertise_retired_journal_options(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    before = tuple(tmp_path.iterdir())
+    assert main(["--project", str(tmp_path / "missing"), "help", "workspace", "migrate", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["kind"] == "utility" and result["effects"] == []
+    text = result["data"]["text"]
+    assert "--backup-dir" in text and "--confirm-old-writers-stopped" in text
+    assert "--resume" not in text and "--rollback" not in text
+    assert tuple(tmp_path.iterdir()) == before
 
 
 def test_help_uses_catalog_and_does_not_require_project(tmp_path: Path) -> None:
@@ -29,9 +54,9 @@ def test_help_uses_catalog_and_does_not_require_project(tmp_path: Path) -> None:
     assert "scope" in root.stdout and "installation" in root.stdout
     leaf = _run(tmp_path, "help", "work", "start", "--json")
     assert leaf.exit_code == 0
-    assert "--switch-active" in json.loads(leaf.stdout)["data"]["help"]
+    assert "--switch-active" in json.loads(leaf.stdout)["data"]["text"]
     missing = _run(tmp_path, "help", "unknown", "--json")
-    assert missing.exit_code == 3
+    assert missing.exit_code == 2
 
 
 def test_each_leaf_has_specific_preconditions_and_example(tmp_path: Path) -> None:
@@ -39,22 +64,24 @@ def test_each_leaf_has_specific_preconditions_and_example(tmp_path: Path) -> Non
     for leaf in LEAF_PATHS:
         output = _run(tmp_path, "help", *leaf.split(), "--json")
         assert output.exit_code == 0, leaf
-        content = json.loads(output.stdout)["data"]["help"]
+        content = json.loads(output.stdout)["data"]["text"]
+        syntax = content.split("\nTarget:\n", 1)[0]
+        assert "--resume" not in syntax and "--rollback" not in syntax
         assert HELP_PRECONDITIONS[leaf] in content
         assert "Resolve the target in the selected project" not in content
         assert f"spec-dock {leaf}" in content
         words = shlex.split(HELP_SPECS[leaf].examples)
         assert words[0] == "spec-dock"
-        parsed = parse_vnext_output(words[1:], engine_version="0.2.4", engine_digest="test-engine")
-        assert parsed.namespace is not None, (leaf, parsed.stderr)
+        parsed = parse_vnext(words[1:])
+        assert parsed.command_path == leaf, leaf
 
 
 def test_help_explains_supported_finish_and_migration_modes(tmp_path: Path) -> None:
-    finish = json.loads(_run(tmp_path, "help", "work", "finish", "--json").stdout)["data"]["help"]
+    finish = json.loads(_run(tmp_path, "help", "work", "finish", "--json").stdout)["data"]["text"]
     assert "outside the active chain" in finish
     assert "An active Scope must resolve" not in finish
 
-    migrate = json.loads(_run(tmp_path, "help", "workspace", "migrate", "--json").stdout)["data"]["help"]
+    migrate = json.loads(_run(tmp_path, "help", "workspace", "migrate", "--json").stdout)["data"]["text"]
     assert "--dry-run" in migrate
     assert "--to-writer-protocol" in migrate and "--confirm-old-writers-stopped" in migrate
     assert "--mapping-file" not in migrate and "--resume OPERATION_ID" not in migrate
@@ -88,10 +115,22 @@ def test_native_completion_keeps_leaf_options_after_scope_operands(
     assert {"--expect-current", "--expect-backend", "--json"} <= choices
 
 
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_native_migration_completion_omits_retired_journal_options(
+    capsys: pytest.CaptureFixture[str], shell: str
+) -> None:
+    assert main(["completion", shell]) == 0
+    script = capsys.readouterr().out
+    choices = _native_completion(script, shell, ["spec-dock", "workspace", "migrate", ""])
+    assert {"--to-schema", "--to-writer-protocol", "--backup-dir"} <= choices
+    assert not {"--resume", "--rollback"} & choices
+
+
 def _native_completion(script: str, shell: str, words: list[str]) -> set[str]:
     executable = shutil.which(shell)
     if executable is None:
         pytest.skip(f"native {shell} is unavailable")
+    assert executable is not None
     quoted = shlex.join(words)
     if shell == "bash":
         harness = (

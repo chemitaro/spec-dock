@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from io import StringIO
 import math
 from pathlib import Path
-import re
 from typing import TYPE_CHECKING, Any
 
 from spec_dock.runtime.cli.catalog import (
@@ -17,8 +16,6 @@ from spec_dock.runtime.cli.catalog import (
     LEAF_ARGUMENTS,
     LEAF_PATHS,
     MUTATING_LEAF_PATHS,
-    RECOVERY_LEAF_COMMANDS,
-    ROLLBACK_COMMANDS,
 )
 from spec_dock.runtime.cli.legacy import LegacyCommandError, RetiredArgumentError, reject_legacy_root
 from spec_dock.runtime.presentation.envelope import (
@@ -106,12 +103,6 @@ def _recovery_help(leaf: str) -> str:
         return "Inspect the native Git inventory, ref, target path and observed effects before a new explicit operation; no registry, receipt or automatic rollback."
     if leaf == "workspace migrate":
         return "Inspect actual declaration bytes and the retained backup before a new explicit migration; no legacy replay, resume or automatic rollback."
-    command = RECOVERY_LEAF_COMMANDS.get(leaf)
-    if command is not None:
-        rollback = (
-            "; --rollback OPERATION_ID is available for verified local rollback" if command in ROLLBACK_COMMANDS else ""
-        )
-        return f"Inspect the operation record, then use --resume OPERATION_ID with the same target{rollback}."
     if leaf == "workspace sync":
         return "No mutation to recover; inspect incomplete observations and issue a new Sync."
     if leaf in MUTATING_LEAF_PATHS:
@@ -462,13 +453,7 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("worktree reference requires an absolute path; registered aliases were retired")
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):
         parser.error("active clear requires exactly one of --from or --all")
-    resume = getattr(parsed, "resume", None)
-    rollback = getattr(parsed, "rollback", None)
-    if resume and rollback:
-        parser.error("--resume and --rollback are mutually exclusive")
-    if any(value is not None and re.fullmatch(r"[0-9a-f]{32}", value) is None for value in (resume, rollback)):
-        parser.error("recovery requires a 32-character lowercase operation ID")
-    if parsed.command_path == "branch create" and not resume and not parsed.base:
+    if parsed.command_path == "branch create" and not parsed.base:
         parser.error("branch create requires --base")
     if parsed.command_path not in MUTATING_LEAF_PATHS and common.get("yes"):
         parser.error("--yes applies only to changing commands")

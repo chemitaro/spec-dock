@@ -5,16 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
-# Syntax-only compatibility data for the internal pre-cutover dispatcher.
-# The public utility path must not load the journal/domain implementation.
-ROLLBACK_COMMANDS = frozenset({
-    "scope.delete",
-    "workspace.migrate",
-    "installation.init",
-    "installation.update",
-    "installation.uninstall",
-})
-
 
 @dataclass(frozen=True)
 class ArgumentSpec:
@@ -35,9 +25,7 @@ def _flag(name: str) -> ArgumentSpec:
 
 
 KINDS = ("initiative", "epic", "issue")
-BACKENDS = ("github", "local")
 STATES = ("open", "completed", "not-planned", "unknown")
-SOURCES = ("github", "cache")
 ARTIFACT_TYPES = ("blank", "research", "interview", "disc", "decision-candidate", "adr")
 
 LEAF_PATHS: tuple[str, ...] = (
@@ -243,20 +231,13 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
 
+# Temporary compatibility for the retired internal dispatcher, never public syntax.
 RECOVERY_LEAF_COMMANDS: dict[str, str] = {
     "workspace migrate": "workspace.migrate",
     "installation init": "installation.init",
     "installation update": "installation.update",
     "installation uninstall": "installation.uninstall",
 }
-for _leaf, _command in RECOVERY_LEAF_COMMANDS.items():
-    if _leaf.startswith("installation "):
-        continue
-    LEAF_ARGUMENTS[_leaf] += (_arg("--resume"),)
-    if _command in ROLLBACK_COMMANDS:
-        LEAF_ARGUMENTS[_leaf] += (_arg("--rollback"),)
-
-
 MUTATING_LEAF_PATHS = frozenset({
     "scope create initiative",
     "scope create epic",
