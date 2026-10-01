@@ -400,6 +400,8 @@ CIのfixed bundle経路も通常wheelへ移し、新writerのHEAD検証が旧v1/
 
 **変更禁止**: 実導入先への無断一括同期、Scope/成果物/直接状態の削除、未知ユーザー改変の上書き、gpt-5.6専用coder roleへの誘導を禁止。
 
+Work/branch旧adapter三filesも公開mainへportし、[七旧関数の対応](artifacts/test-port-work-branch.md)を記録した。三kindの一件選択/Finish、ref非reset、preview書込0、v2/current selector、親昇格なしを九casesで確認し、既存hook/Start/active/Finishと合わせた186 tests（62.83秒）が成功した。全Ruffと変更三test file限定mypyも成功。旧Scope/installation/recovery経路のport、provider/runtime退役と全体gateは引き続き未完了。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

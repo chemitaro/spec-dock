@@ -1,69 +1,62 @@
-"""Branch leaves use exact Scope bindings and preserve dry-run boundaries."""
+"""Public branch leaves observe refs and preserve dry-run boundaries."""
 
 from __future__ import annotations
 
 import json
 import subprocess
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
-from spec_dock.runtime.cli.options import parse_vnext
-from spec_dock.runtime.cli.vnext_runtime import run_vnext
-from spec_dock.runtime.commands.branch_vnext import run_branch_command
-from spec_dock.runtime.commands.work_vnext import WorkContext
-from tests.cli_runtime.test_branch_vnext import _committed_repo
+from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
 
-def test_branch_adapter_create_show_switch_and_dry_run(tmp_path: Path) -> None:
-    common, initiative = _committed_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    context = WorkContext(repo, cast("Path", common["common_dir"]), "main", "engine-a", 1)
-    planned = run_branch_command(
-        parse_vnext(["branch", "create", initiative.id, "--base", "HEAD", "--dry-run"]), context
-    )
-    assert planned.status == "planned" and planned.operation_id is None
-    routed_plan = run_vnext(
-        ["branch", "create", initiative.id, "--base", "HEAD", "--dry-run", "--json"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    assert routed_plan.exit_code == 0 and json.loads(routed_plan.stdout)["status"] == "planned"
-    assert parse_vnext(["branch", "create", initiative.id, "--resume", "a" * 32]).base is None
+
+def test_branch_adapter_create_show_switch_and_dry_run(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    arguments = ["--project", str(root), "branch"]
+    before = tree_digest(root)
+    tip = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"], text=True).strip()
+    assert main([*arguments, "create", "init-00001", "--base", "HEAD", "--dry-run", "--json"]) == 0
+    planned = json.loads(capsys.readouterr().out)
+    assert planned["status"] == "planned" and tree_digest(root) == before
+    assert planned["data"]["result"]["name"] == "init-00001-fixture"
     assert (
         subprocess.run(
-            ["git", "show-ref", "--verify", "--quiet", f"refs/heads/{planned.data.branch}"],
-            cwd=repo,
-            check=False,
+            ["git", "-C", str(root), "show-ref", "--verify", "--quiet", "refs/heads/init-00001-fixture"],
+            capture_output=True,
         ).returncode
         == 1
     )
-    created = run_branch_command(parse_vnext(["branch", "create", initiative.id, "--base", "HEAD"]), context)
-    assert created.status == "succeeded"
-    assert created.operation_id is not None
-    shown = run_branch_command(parse_vnext(["branch", "show", initiative.id]), context)
-    assert shown.data.branch == created.data.branch
-    routed = run_vnext(
-        ["branch", "show", initiative.id, "--json"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    assert routed.exit_code == 0
-    assert json.loads(routed.stdout)["data"]["branch"] == created.data.branch
-    before = subprocess.run(
-        ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
-    ).stdout.strip()
-    preview = run_branch_command(parse_vnext(["branch", "switch", initiative.id, "--dry-run"]), context)
-    assert preview.status == "planned"
-    assert (
-        subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
-        ).stdout.strip()
-        == before
-    )
-    switched = run_branch_command(parse_vnext(["branch", "switch", initiative.id]), context)
-    assert switched.status == "succeeded"
-    assert switched.data.branch == shown.data.branch
+    assert main([*arguments, "create", "init-00001", "--base", "HEAD", "--json"]) == 0
+    created = json.loads(capsys.readouterr().out)
+    assert created["data"]["result"] == {
+        "scope_id": "init-00001",
+        "name": "init-00001-fixture",
+        "tip": tip,
+        "created": True,
+        "switched": False,
+        "binding_persisted": False,
+    }
+    assert created["effects"] == [{"kind": "git.branch.create", "status": "succeeded", "target": "init-00001-fixture"}]
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
+    assert main([*arguments, "show", "init-00001", "--json"]) == 0
+    shown = json.loads(capsys.readouterr().out)
+    assert shown["data"]["result"]["tip"] == tip and shown["effects"] == []
+    before = tree_digest(root)
+    assert main([*arguments, "switch", "init-00001", "--dry-run", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "planned" and tree_digest(root) == before
+    assert main([*arguments, "switch", "init-00001", "--json"]) == 0
+    switched = json.loads(capsys.readouterr().out)
+    assert switched["data"]["result"]["switched"] is True
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"init-00001-fixture\n"
+    before = subprocess.check_output(["git", "-C", str(root), "show-ref"])
+    assert main([*arguments, "create", "init-00001", "--base", "HEAD", "--json"]) == 3
+    rejected = json.loads(capsys.readouterr().out)
+    assert rejected["effects"] == [] and "already exists" in rejected["error"]["message"]
+    assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == before
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()

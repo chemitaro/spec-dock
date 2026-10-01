@@ -661,3 +661,11 @@ cleanな`323caf28084f7d7087e8ea96999e3ee2e2fad033`から、通常wheelを外部�
 さらに実common-dirのStartLockを保持した親processから、別linked WTのpublic mainを別processで起動してScope編集が成功することを確認した。自WT/旧controlのbytesは不変、直接記録の生成0で、短いStart排他を全編集の権限やleaseに広げない。既存の別process競合・owner強制終了後の解放・同Scope重複/兄弟並行開始は現行Start試験で維持し、旧leaseの内部呼出し順を製品保証へ戻さない。
 
 新しい四casesは4 passed（0.77秒）。続いて公開Scope編集、Start排他・同時開始、migrationと合わせた `uv run pytest tests/integration/test_cli_writer_compatibility_vnext.py tests/cli_runtime/test_issue413_scope_edit.py tests/unit/infra/test_start_lock.py tests/integration/test_issue413_start.py tests/integration/test_issue413_migration.py -q --tb=short` は63 passed（14.63秒）。全source/tests Ruff check/format（423 files）、変更一test file限定mypy、diff checkも成功した。既存実装のGreen回帰であり、製品修正のRedではない。元old writer APIsを新しい製品経路へつなぐ変更は行っていない。旧runtime/provider helperの退役、79旧経路失敗の個別port、native Windows、全体gate、fresh Strict、Final Quality Gate、最終手動確認、実consumer適用は未完了。goalをactiveのまま継続する。
+
+## P-12 Work / branch adapterの公開入口移行
+
+旧三files・七関数を全文確認し、[移行根拠](artifacts/test-port-work-branch.md)へ各保証の維持/撤去を記録した。旧WorkContext/run_vnext/active_storeを公開main、GH-backed三階層と実Gitへ置換する。三kindそれぞれで一件選択→対象Issueだけcompleted→捕捉解除・branch保持を確認した。Finish/Startのpreviewはref・metadata・remote・選択を変更せず、Finishは--yesなしでremote観測前に拒否する。
+
+branch create/show/switchのtipとdry-runはnative Gitでも比較し、既存refの再createでresetが起きないことを確認した。空からのactive setはWORK_START_REQUIRED、ancestor clearは親へ昇格せずemptyになり、remote/checkoutは不変である。独自engine digestの拒否を実行権へ戻さず、自WT旧writer宣言での効果前停止を確認した。
+
+最初の四失敗は移行testが既存branchの明示--branchを欠き、旧v1 target欄を期待したものだった。確定契約へ期待を訂正し、製品Red/新しい互換要求とは扱わない。三filesの九casesは9 passed（7.31秒）。hook、直接記録、同時Start、遅いFinishの現行suiteも含む `uv run pytest tests/cli_runtime/test_work_commands_vnext.py tests/cli_runtime/test_branch_commands_vnext.py tests/cli_runtime/test_vnext_runtime_work.py tests/cli_runtime/test_issue413_branch.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_work_start.py tests/cli_runtime/test_issue413_finish.py -q --tb=short` は186 passed（62.83秒）。全source/tests Ruff check/format（423 files）、変更三test file限定mypy、diff checkも成功した。macOS/hermetic GitHubの回帰であり、Windows native、全件gate、fresh Strict、最終手動確認と実consumer適用は未完了である。
