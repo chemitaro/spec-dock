@@ -700,3 +700,11 @@ native Gitのcontext故障をread/edit双方で注入し、元stderr/returncode/
 旧二ファイルの九関数を全文確認して[対応表](artifacts/test-port-workspace-diagnostics.md)を記録した。旧run_vnext/private diagnosis/control admission/new local fixtureを外し、公開mainで空workspaceの通常validate・require-nodes・doctor、HEADの有効/無効schema検査を行う。通常Doctorは旧control/generationをauthorityにしない。--legacyを明示した診断だけで旧controlのinvalid_jsonを報告し、private bodyを露出せず全treeを保持する。依存とartifactの二不整合を同時に置く試験では、validate/doctor双方が二findingを報告し、外部symlink先も書き換えない。
 
 後継二ファイルは5 passed（0.78秒）。現行Doctor/validationの公開suiteを合わせた `uv run pytest tests/cli_runtime/test_workspace_diagnostics_commands_vnext.py tests/cli_runtime/test_workspace_doctor_vnext.py tests/cli_runtime/test_issue413_workspace_doctor.py tests/cli_runtime/test_issue413_workspace_validate.py -q --tb=short` は122 passed（16.75秒）。全source/testsのRuff check/format（423 files）、変更二test限定 `mypy --follow-imports=silent`、diff checkも成功。限定Greenであり、full type/pytest、native Windows、fresh Strict、実consumer切替と最終手動動作確認は未完了である。
+
+## P-12 Workspace migrate / syncの公開入口移行
+
+旧二ファイル・十二関数を全文確認し、[移行判断](artifacts/test-port-workspace-migrate-sync.md)を保存した。migration previewは別WTの未知宣言を編集せず、明示した自workspaceの宣言だけを計画する。applyは外部backup、旧writer停止の明示確認、--yesを要求し、保全物の実copy/restoreを検証してから宣言だけを更新する。全Scope bytes/未知設定を保全し、旧mapping-file/rollback/operation IDを復活させない。
+
+Syncは通常/previewともdirect記録とopaqueな旧generationを更新せず、現物からscope lifecycle・選択件数を返す。真正の既存localと空treeの互換を保つ。GH GETが失敗するとpartial/exit7とunknownを返し、記録を消さない。安全に解釈できないparent metadataは--allow-invalidでも完全な観測にしない。初回の一失敗はpreview statusをsucceededと期待したものだったが、公開dispatcherの契約はplannedのため期待を訂正した。製品Redには数えない。
+
+後継二ファイルは9 passed（1.74秒）。現行migration/syncのintegrationを合わせた `uv run pytest tests/cli_runtime/test_workspace_migrate_vnext.py tests/cli_runtime/test_workspace_sync_vnext.py tests/integration/test_issue413_migration.py tests/integration/test_issue413_sync.py -q --tb=short` は67 passed（16.30秒）。全source/testsのRuff check/format（423 files）、変更二test限定 `mypy --follow-imports=silent`、diff checkも成功。実consumer/live GitHubは未変更で、旧worktree/installation/recovery入口とprovider退役、全体type/pytest、native Windows、fresh Strict、最終手動確認を継続する。

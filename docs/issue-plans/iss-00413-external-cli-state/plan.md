@@ -410,6 +410,8 @@ Scope create/importの旧二十関数も[個別の移行判断](artifacts/test-p
 
 Workspace diagnosticsの旧二ファイル・九関数も[移行対応](artifacts/test-port-workspace-diagnostics.md)を記録して公開mainへ移し、関連122 tests（16.75秒）が成功した。空tree、HEADのCI検査、旧制御情報の明示legacy診断、同時dependency/artifact不整合をread-onlyで保護する。全Ruff/変更二test限定mypyも成功。移行/同期/旧配布経路とprovider退役は継続する。
 
+Workspace migrate/syncの旧十二関数も[対応表](artifacts/test-port-workspace-migrate-sync.md)を作り、公開mainの九casesへ移した。自宣言だけのpreview/backup後apply、退役mapping/rollback拒否、既存local/空tree、directとopaque旧cacheの保全、GH取得失敗とinvalid metadataを検査。現行integrationを合わせて67 tests（16.30秒）、全Ruffと変更二test限定mypyが成功した。全体gate/provider退役/Windowsは継続中。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

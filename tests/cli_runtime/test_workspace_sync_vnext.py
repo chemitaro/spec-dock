@@ -1,170 +1,130 @@
-"""Sync publishes a derived snapshot without modifying the active selection."""
+"""Readonly Sync observes direct selection and lifecycle without publishing a cache."""
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
-from spec_dock.runtime.application.create_local_scope import create_local_scope
-from spec_dock.runtime.application.scope_query import ScopeView
-from spec_dock.runtime.application.workspace_diagnostics_vnext import doctor_workspace
-from spec_dock.runtime.application.workspace_sync_vnext import sync_workspace
-from spec_dock.runtime.cli.vnext_runtime import run_vnext
-from spec_dock.runtime.domain.lifecycle import (
-    GithubBackend,
-    LocalBackend,
-    LocalLifecycle,
-    StatusObservation,
-)
-from spec_dock.runtime.infra.active_store import load_selection_v3
-from spec_dock.runtime.infra.generation_store import load_generation
-from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.cli_runtime.test_issue413_active import select_fixture
+from tests.cli_runtime.test_issue413_finish import github_fixture
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.cli_runtime.test_scope_lifecycle_commands_vnext import existing_local_workspace
 
 if TYPE_CHECKING:
     from pathlib import Path
 
 
-def _sync_args(common: dict[str, object]) -> dict[str, object]:
-    return {key: common[key] for key in ("repo_root", "common_dir", "worktree_id", "engine_digest", "expected_epoch")}
-
-
-def test_workspace_sync_cli_preview_and_publish_preserve_selection(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    before = load_selection_v3(repo / "spec-dock", worktree_id="main")[0]
-
-    def run(*options: str):
-        return run_vnext(
-            ["workspace", "sync", *options, "--json"],
-            invocation_cwd=repo,
-            engine_digest="engine-a",
-            engine_version="0.2.4",
-        )
-
-    preview = run("--dry-run")
-    assert preview.exit_code == 0
-    assert json.loads(preview.stdout)["status"] == "planned"
-    assert load_generation(repo / "spec-dock") is None
-    published = run()
-    assert published.exit_code == 0
-    data = json.loads(published.stdout)["data"]
-    assert data["node_count"] == 0 and data["source"] == "cache"
-    assert data["generation_id"] == load_generation(repo / "spec-dock").id
-    assert load_selection_v3(repo / "spec-dock", worktree_id="main")[0] == before
-
-
-def test_empty_and_local_workspace_sync_leave_selection_unchanged(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    selection_before = load_selection_v3(repo / "spec-dock", worktree_id="main")[0]
-    empty = sync_workspace(**_sync_args(common))
-    assert empty.node_count == 0 and empty.generation.valid and empty.complete
-    assert json.loads(empty.generation.files["index.json"])["nodes"] == {}
-    assert load_selection_v3(repo / "spec-dock", worktree_id="main")[0] == selection_before
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    local = sync_workspace(**_sync_args(common))
-    payload = json.loads(local.generation.files["index.json"])
-    assert payload["nodes"][created.id]["status"]["source"] == "local"
-    assert load_generation(repo / "spec-dock") == local.generation
-    assert load_selection_v3(repo / "spec-dock", worktree_id="main")[0] == selection_before
-
-
-def test_live_failure_is_incomplete_and_does_not_mark_unknown_fresh(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize("preview", [False, True])
+def test_sync_preserves_direct_selection_and_opaque_old_projection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    preview: bool,
 ) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    fake = ScopeView(
-        "init-00047",
-        "initiative",
-        "Plan",
-        None,
-        GithubBackend(47, "example", "repo"),
-        repo / "spec-dock" / "initiatives" / "fake",
-        0,
-        StatusObservation("unknown", "github", "unknown", None, None, True),
-        "gh:example/repo#47",
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    generation = root / "spec-dock/.agent/generation.json"
+    generation.write_bytes(b"opaque old generation, never read or repaired")
+    before = tree_digest(root)
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workspace",
+            "sync",
+            *(["--dry-run"] if preview else []),
+            "--json",
+        ])
+        == 0
     )
-    monkeypatch.setattr(
-        "spec_dock.runtime.application.workspace_sync_vnext.load_scope_views", lambda _directory: (fake,)
+    result = json.loads(capsys.readouterr().out)
+    data = result["data"]
+    assert result["status"] == ("planned" if preview else "succeeded") and result["effects"] == []
+    assert data["source"] == "local" and data["complete"] is True
+    assert data["scopes"] == [{"scope_id": "init-00001", "github_ref": "gh:example/repo#1", "lifecycle": "unknown"}]
+    assert data["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 1, "descendant_selected_count": 0, "complete": True},
+    ]
+    assert data["worktrees"][0]["selection"]["scope_id"] == "init-00001"
+    assert data["worktrees"][0]["process_state"] == "not_observed"
+    assert not log.exists() and tree_digest(root) == before
+    assert set(record.parent.iterdir()) == {record} and not (root / ".git/spec-dock").exists()
+
+
+def test_sync_keeps_existing_local_lifecycle_and_empty_workspace_readonly(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root, metadata = existing_local_workspace(tmp_path / "consumer")
+    command = ["--project", str(root), "workspace", "sync", "--json"]
+    before = tree_digest(root)
+    assert main(command) == 0
+    local = json.loads(capsys.readouterr().out)
+    assert local["data"]["scopes"] == [{"scope_id": "init-00001", "github_ref": None, "lifecycle": "open"}]
+    assert local["data"]["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 0, "descendant_selected_count": 0, "complete": True},
+    ]
+    assert local["effects"] == [] and tree_digest(root) == before
+    metadata.unlink()
+    metadata.parent.rmdir()
+    empty_before = tree_digest(root)
+    assert main(command) == 0
+    empty = json.loads(capsys.readouterr().out)
+    assert empty["data"]["scopes"] == [] and empty["data"]["counts"] == []
+    assert empty["data"]["complete"] is True and empty["effects"] == []
+    assert tree_digest(root) == empty_before and not (root / "spec-dock/.agent").exists()
+
+
+def test_live_sync_failure_returns_unknown_and_keeps_the_captured_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = tree_digest(root)
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert main(["--project", str(root), "workspace", "sync", "--source", "github", "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial" and result["effects"] == []
+    assert result["data"]["complete"] is False
+    assert result["data"]["scopes"] == [
+        {"scope_id": "init-00001", "github_ref": "gh:example/repo#1", "lifecycle": "unknown"},
+    ]
+    assert any(item["details"].get("github_ref") == "gh:example/repo#1" for item in result["data"]["findings"])
+    assert [json.loads(line)["method"] for line in log.read_text().splitlines()] == ["GET"]
+    assert tree_digest(root) == before and set(record.parent.iterdir()) == {record}
+
+
+@pytest.mark.parametrize("allow_invalid", [False, True])
+def test_sync_never_treats_invalid_parent_metadata_as_a_complete_observation(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    allow_invalid: bool,
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    payload = json.loads(metadata.read_bytes())
+    payload["parent_id"] = "epic-99999"
+    metadata.write_text(json.dumps(payload))
+    before = tree_digest(root)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workspace",
+            "sync",
+            *(["--allow-invalid"] if allow_invalid else []),
+            "--json",
+        ])
+        == 7
     )
-
-    class FailingGateway:
-        def get(self, _repo: Path, _repository: str, _number: int) -> None:
-            raise RemoteIssueError("GITHUB_REMOTE_UNAVAILABLE")
-
-    result = sync_workspace(**_sync_args(common), source="github", gateway=cast("GithubIssueGateway", FailingGateway()))
-    node = json.loads(result.generation.files["index.json"])["nodes"][fake.id]
-    assert result.complete is False
-    assert node["status"]["state"] == "unknown"
-    assert node["status"]["stale"] is True
-    assert result.findings == ("github_unavailable:init-00047",)
-    with pytest.raises(ValueError, match="offline"):
-        sync_workspace(**_sync_args(common), source="github", offline=True)
-
-
-def test_invalid_parent_requires_diagnostic_opt_in(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    orphan = ScopeView(
-        "epic-local-00001",
-        "epic",
-        "Orphan",
-        "init-local-99999",
-        LocalBackend(LocalLifecycle("open", 0, "2026-09-25T00:00:00Z")),
-        repo / "spec-dock" / "initiatives" / "fake" / "epics" / "fake",
-        0,
-        StatusObservation("open", "local", "local", "2026-09-25T00:00:00Z", None, False),
-        None,
-    )
-    monkeypatch.setattr(
-        "spec_dock.runtime.application.workspace_sync_vnext.load_scope_views", lambda _directory: (orphan,)
-    )
-    with pytest.raises(ValueError, match="structure"):
-        sync_workspace(**_sync_args(common))
-    assert load_generation(repo / "spec-dock") is None
-    result = sync_workspace(**_sync_args(common), allow_invalid=True)
-    assert result.generation.valid is False
-    assert result.findings == ("invalid_parent:epic-local-00001",)
-    preview = run_vnext(
-        ["workspace", "sync", "--allow-invalid", "--dry-run", "--json"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    assert preview.exit_code == 7
-    assert json.loads(preview.stdout)["data"]["valid"] is False
-    cli = run_vnext(
-        ["workspace", "sync", "--allow-invalid", "--json"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    payload = json.loads(cli.stdout)
-    assert cli.exit_code == 7
-    assert payload["status"] == "partial"
-    assert payload["data"]["valid"] is False
-    assert payload["error"]["code"] == "INVALID_GENERATION"
-
-
-def test_projection_failure_keeps_generation_readable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-
-    def fail_projection(*_args: object, **_kwargs: object) -> None:
-        raise OSError("injected projection failure")
-
-    monkeypatch.setattr("spec_dock.runtime.application.workspace_sync_vnext.atomic_write_json", fail_projection)
-    result = sync_workspace(**_sync_args(common))
-    assert result.projection_stale is True
-    assert load_generation(repo / "spec-dock") == result.generation
-    diagnosed = doctor_workspace(
-        repo_root=repo,
-        common_dir=cast("Path", common["common_dir"]),
-        worktree_id="main",
-        engine_digest="engine-a",
-    )
-    assert "projection_stale" in {finding.code for finding in diagnosed.findings}
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed" and result["error"]["code"] == "SYNC_INPUT_INVALID"
+    assert result["effects"] == [] and tree_digest(root) == before
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
