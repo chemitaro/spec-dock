@@ -95,6 +95,7 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
             "spec_dock/runtime/github.py",
             "spec_dock/runtime/ids.py",
             "spec_dock/runtime/infra/artifact_writer.py",
+            "spec_dock/runtime/infra/artifact_ports.py",
             "spec_dock/runtime/infra/derived_state_reader.py",
             "spec_dock/runtime/infra/failure_receipts.py",
             "spec_dock/runtime/infra/make_cli.py",

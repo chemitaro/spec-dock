@@ -1021,3 +1021,9 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 旧application三files・1366行/54 symbolsと旧unit testの416行/13関数を全文・[個別判断](artifacts/test-port-workbench-helper-retirement.md)で確認し、外部production参照0の閉じた群を退役した。両WTの別slug、trim/大文字、真正の既存local ID、両側の不正metadata、missing/regular-file Workbench root、三階層のリンク差替えと外部metadata非読取を公開main/native Gitへ移す。無関係なmetadata linkの一律拒否・旧private結果型・登録ID/独自採番/Worktree flockは同等保証として温存しない。共有infraと別callerの残る旧rendererは保持する。
 
 後継十八casesは18 passed（3.90秒）、root file二casesは2 passed（0.48秒）。wheel収録禁止はRed 1 failed（0.75秒）→Green 1 passed（12.86秒）。関連九suiteは245 passed（37.68秒）、実Python 3.10.15の新二十casesは20 passed（4.35秒）、全てexit0。初回collection/spy fixtureの失敗は元logsを保全し、製品Redとは区別した。全Ruff（307 files）、MYPYPATH=srcの変更二files限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 30 errors/10旧files（226 filesを検査）、make exit2で未合格。残る旧source、Linux全件再検証、Windows、fresh Strict、最終手動確認を続ける。実consumer/live GitHubは未変更。
+
+**旧Artifact composition adapterの退役**
+
+未使用infra/artifact_ports.py全57行・四symbolsを全文確認し、候補外参照0をAST/文字列検索で確認して退役した。[対応記録](artifacts/test-port-artifact-adapter-retirement.md)に各wrapperの理由を保存する。現行Artifactと別callerのあるbinary publisher、その試験、旧静的inventoryのpath/hashは保持する。test削除・skip/型ignore/収集除外追加0。
+
+wheel禁止のRed 1 failed（0.83秒）→Green 1 passed（17.35秒）、関連三suite 105 passed/1 skipped（10.89秒）、全て期待したexitとなった。skipは既存Linux O_TMPFILE試験でDarwinでは未実施。全Ruff（306 files）、MYPYPATH=srcの変更test限定mypy、diff checkが成功。Linux全件は別候補c4c26bdbで実行中、通常full lint・残る旧source・Windows・fresh Strict・最終手動確認は未完了。実consumer/live GitHubは未変更。
