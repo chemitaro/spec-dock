@@ -1,4 +1,4 @@
-"""Static assets retain parity; the retired dogfood runtime awaits cutover."""
+"""Shipped static assets match a fresh installation before dogfood cutover."""
 
 from pathlib import Path
 
@@ -13,12 +13,12 @@ def _files(root: Path) -> dict[str, bytes]:
     }
 
 
-def test_provider_matches_dogfood_managed_assets() -> None:
-    for provider, dogfood in (
+def test_provider_matches_fresh_consumer_managed_assets(installed_static_consumer: Path) -> None:
+    for provider, consumer in (
         ("src/spec_dock/assets/spec_dock/docs", "spec-dock/docs"),
         ("src/spec_dock/assets/install_root/.agents/skills", ".agents/skills"),
     ):
-        assert _files(ROOT / provider) == _files(ROOT / dogfood)
+        assert _files(ROOT / provider) == _files(installed_static_consumer / consumer)
 
 
 def test_provider_scripts_contain_only_the_static_entrypoint_assets() -> None:

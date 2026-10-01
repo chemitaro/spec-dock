@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -42,6 +43,11 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         assert "spec_dock/assets/spec_dock/.gitignore" in names
         assert "spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md" in names
         assert "spec_dock/assets/static-inventory.json" in names
+        inventory = json.loads(archive.read("spec_dock/assets/static-inventory.json"))
+        for entry in inventory["files"]:
+            payload = archive.read("spec_dock/assets/" + entry["source"])
+            assert payload == (ROOT / "src/spec_dock/assets" / entry["source"]).read_bytes()
+            assert hashlib.sha256(payload).hexdigest() == entry["sha256"]
         assert json.loads(archive.read("spec_dock/assets/spec_dock/workspace.json")) == {
             "schema_version": 3,
             "writer_protocol": "specdock.worktree-writer/v1",
@@ -211,6 +217,10 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     }
     assert not (initialized / "spec-dock/scripts/spec_dock_runtime").exists()
     assert not (initialized / "spec-dock/.agent").exists() and tree_digest(initialized / ".git") == git_before
+    for entry in inventory["files"]:
+        payload = (initialized / entry["path"]).read_bytes()
+        assert payload == (ROOT / "src/spec_dock/assets" / entry["source"]).read_bytes()
+        assert hashlib.sha256(payload).hexdigest() == entry["sha256"]
     shown_before = tree_digest(initialized)
     show = subprocess.run(
         [str(console), "installation", "show", "--target", str(initialized), "--json"],

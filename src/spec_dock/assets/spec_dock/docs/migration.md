@@ -1,41 +1,47 @@
-# 導入・導入先ごとの移行・復旧
+# 導入・移行・保全（Current）
 
-## 固定distribution
+## 外部CLI
 
-`spec-dock` はworktree外の固定distributionから実行します。repository内の `spec-dock/scripts/spec-dock` はengine locatorを検証して同じ外部engineを起動するshimです。checkoutのPython moduleやPATH上の別実装へ自動fallbackしません。`installation show` で供給元commit、digest、writer protocol、登録済みworktreeを確認します。
+package managerでレビュー・通常試験が済んだwheelをworktree外へ導入します。例えば `uv tool install /absolute/path/spec_dock-VERSION-py3-none-any.whl` です。PATH上の `spec-dock` が全コマンドの入口です。packageの更新とcheckoutのstatic資産更新は別操作です。
 
-review済みwheelを隔離環境へ導入してから、`python -m spec_dock.fixed_bundle /absolute/path/to/fixed-engine` でworktree外の新しい固定engine directoryを作ります。出力された絶対実行pathとdigestをinventoryへ記録し、そのengineから以下の操作を行います。wheelのconsole scriptはhelp/version等の読取り確認用で、repositoryへの変更操作は固定engineの絶対実行pathを使います。
+`spec-dock/scripts/spec-dock` はPATH上の外部consoleへ引数と終了値を渡すshimです。Git共有controlやcheckout内Pythonを探しません。旧branchの古いshimが戻っても外部 `spec-dock` は直接使えます。外部consoleがなければ導入/PATH確認へ戻り、自動installや旧engineへのfallbackはしません。
 
 ## 新規導入
 
 ```sh
-spec-dock installation init /absolute/path/to/project --yes
-spec-dock installation show --target /absolute/path/to/project
-spec-dock workspace validate
+spec-dock installation init /absolute/project --dry-run --json
+spec-dock installation init /absolute/project --yes --json
+spec-dock installation show --target /absolute/project --json
+spec-dock --project /absolute/project workspace validate --json
 ```
 
-導入前に対象repository、Git common directory、全worktree、既存dataを調べます。未導入の対象だけがinit可能です。失敗後はoperation IDとjournalを確認し、同じ固定distributionから `installation init PATH --resume ID --yes`、または `--rollback ID --yes` を実行します。partial stateに対して初回コマンドを盲目的に繰り返さないでください。
+対象は正確なGit worktree root一つです。initは新writerのworkspace宣言と静的資産だけを置き、既存の配布先fileがあれば書込み前に停止します。main/linkedを一括導入せず、runtime、直接作業記録、Git内の独自領域を作りません。
 
-## 既存環境の明示更新
+## schema3の旧writerから移行
 
-製品sourceの変更だけでは既存の導入先を更新しません。所有者が必要な時に一つのGit common directoryを選んで、以下を実行します。`installation update` は指定worktreeだけでなく、そのcommon directoryの全登録worktreeを対象にします。別のrepositoryや独立したcommon directoryには作用しません。
-
-1. 選んだGit common directoryの全linked worktreeのinventoryを取り、現在のwriterとdata pathを照合します。その単位の旧writerを停止します。
-2. その単位の仕様・設定・tool導入先のbackupを隔離領域へ保存し、復元試験をします。固定commitとbundle digestを記録します。
-3. `installation update --target PATH --commit SHA --maintenance --yes` で同じcommon directoryの全登録worktreeをmaintenanceにしてtool資産を更新します。
-4. `workspace migrate --to-schema 3 --dry-run --json` で全登録worktreeのinventory digestと阻害要因を確認します。`specdock.migration-map/v1` のmappingをそのdigestに固定し、空の対応配列しか要らない場合も `workspace migrate --to-schema 3 --mapping-file PATH --yes` で適用します。適用時のmapping省略は受け付けません。
-5. maintenance中に `installation show`、`workspace doctor`、`workspace validate` でその単位の全登録worktreeのprotocol、schema、journalを読取り確認します。全登録worktreeが同じ固定候補で検証できたら、そのcommon directoryで `installation update --finalize --yes` を実行します。readyへの復帰後に `workspace sync --source cache` と再検証を行い、通常writerを再開します。
-
-途中失敗ではその単位の一部だけ旧writerを再開しません。journalとbackupを保存し、同じoperation IDで対象leafの `--resume ID` または `--rollback ID` を使います。別のcommitやengineを混ぜないでください。GitHub Issue状態はtool移行のrollback対象ではありません。
-
-## 削除
+旧writer・自動起動の停止を確認し、仕様、ignored成果物、旧Git独自領域を含む実体の外部保全と復元確認を先行します。旧writer停止を確認できない状態では適用しません。
 
 ```sh
-spec-dock installation uninstall --target /absolute/path/to/project --yes
+spec-dock --project /absolute/project workspace doctor --raw --legacy --json
+spec-dock --project /absolute/project workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --dry-run --json
+spec-dock --project /absolute/project workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --backup-dir /absolute/new-migration-backup --confirm-old-writers-stopped --yes --json
 ```
 
-管理対象のtool資産だけを除去し、仕様履歴は残します。事前のdry-runで対象を確認し、journalとbackupのretentionを決めてください。削除後はrepository内shimでは復旧できないため、外部distributionから `installation show` と対象leafの復旧操作を行います。
+自workspaceのschema3宣言のwriter_protocolだけを切り替え、旧control_epochがある場合だけ除きます。Scope ID/path/linkage、文書、未知設定は保持します。旧activeを新予約へ取り込まず、旧Git独自領域に新値を書きません。schema3未満や未知protocolは本版の対象外です。切替後の新Startで直接対象を取得します。
 
-## 旧版
+## static資産の更新・削除
 
-以前の非transactionalな導入・更新・削除手順は[historical](historical/README.md)にある履歴資料です。現行engineでは使いません。
+```sh
+spec-dock installation update --target /absolute/project --dry-run --json
+spec-dock installation update --target /absolute/project --backup-dir /absolute/new-static-backup --yes --json
+# 正確な対象のtool資産削除が許可されている場合だけ
+spec-dock installation uninstall --target /absolute/project --backup-dir /absolute/new-uninstall-backup --yes --json
+```
+
+新writer workspaceで既知path/hashのstatic filesだけを変更します。更新は欠けたfileを補い、既知旧bytesを置換し、既知旧runtime filesを個別退役させます。削除も所有権検証を行い、workspace宣言・ignore規則・仕様・Artifact・Workbench・直接記録・directoryを残します。未知改変は人間によるmergeへ戻し、directoryごとの削除はしません。
+
+旧static bytes/modeを `backup/static/<relative>` へ保存し、別の一時場所へ実際に復元して比較します。backup先は全clone worktree、Git metadata、installed packageの外で、既存の通常parent下の新しい絶対pathです。既存backupを再利用しません。
+
+## 途中で停止した場合
+
+dry-runは書込み・backup・GitHub更新・Start lockを行いません。適用途中のexit6は確認済み・unknown・未実施effectsを区別します。残った候補、backup、実体pathを保全し、観測してから新しい明示操作を判断します。自動巻戻しやjournal replayはありません。コードrevertはGitHubへの完了・作成効果を元へ戻しません。

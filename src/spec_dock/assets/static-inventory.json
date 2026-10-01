@@ -4,10 +4,12 @@
     {
       "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
-      "sha256": "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18",
+      "sha256": "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18"
+      ]
     },
     {
       "path": ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
@@ -28,10 +30,12 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3",
+      "sha256": "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3"
+      ]
     },
     {
       "path": "spec-dock/.gitignore",
@@ -44,10 +48,12 @@
     {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
-      "sha256": "aadfdce1f6e61af65e95d3cd39efb3fd87b7cd83a3a3272356ef7cd68b21ba4e",
+      "sha256": "ddbd3e6cb3b216f4217eed6057ed8fdf7221760c18649f7ca997335e8304b353",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "aadfdce1f6e61af65e95d3cd39efb3fd87b7cd83a3a3272356ef7cd68b21ba4e"
+      ]
     },
     {
       "path": "spec-dock/docs/authoring/artifacts.md",
@@ -148,122 +154,152 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
+      "sha256": "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103"
+      ]
     },
     {
       "path": "spec-dock/docs/guide.md",
       "source": "spec_dock/docs/guide.md",
-      "sha256": "ffe223494a62ace617adb8e092be122917e646e0c2b674c08993cd59f742dbe8",
+      "sha256": "de474364d5f574766e3e8fa4f3540b8aeb23680ea9c4c2681e2965d9ca96a39a",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "ffe223494a62ace617adb8e092be122917e646e0c2b674c08993cd59f742dbe8"
+      ]
     },
     {
       "path": "spec-dock/docs/historical/README.md",
       "source": "spec_dock/docs/historical/README.md",
-      "sha256": "148dfcc5ab2dd0f3b0a352f619f1e43ade403308fb835dc8fa011d2d6cfcdc5d",
+      "sha256": "af17600e62f9fbe737fc73a2e17fe5b2a3de1e52044d02875b30ee67c060089e",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "148dfcc5ab2dd0f3b0a352f619f1e43ade403308fb835dc8fa011d2d6cfcdc5d"
+      ]
     },
     {
       "path": "spec-dock/docs/historical/reference_deps.md",
       "source": "spec_dock/docs/historical/reference_deps.md",
-      "sha256": "69423133351387071c22887004b7e267174add66690f3d16ca793d0632cf038c",
+      "sha256": "1d9c64cf50243a91489cb9692d6a198cfc1d330d4e1a49f4f57328312d9f6e19",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "69423133351387071c22887004b7e267174add66690f3d16ca793d0632cf038c"
+      ]
     },
     {
       "path": "spec-dock/docs/historical/reference_github.md",
       "source": "spec_dock/docs/historical/reference_github.md",
-      "sha256": "33c16064f02afcc03b366510f0bc6ab9559e1e32e4b8e0831d10024491c38fed",
+      "sha256": "866134b11a8a1da492213ff9d70e69702ab387daf311d99384fdbe508cbf13a7",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "33c16064f02afcc03b366510f0bc6ab9559e1e32e4b8e0831d10024491c38fed"
+      ]
     },
     {
       "path": "spec-dock/docs/historical/reference_naming.md",
       "source": "spec_dock/docs/historical/reference_naming.md",
-      "sha256": "aa9f531fed003822f1260819f72aef55c2cf3a2a38df66783c2c7c3cf1ff8886",
+      "sha256": "d74545ae6ccea5077953653f046ae6fea4556f30b621e9b62b1c388043626be6",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "aa9f531fed003822f1260819f72aef55c2cf3a2a38df66783c2c7c3cf1ff8886"
+      ]
     },
     {
       "path": "spec-dock/docs/historical/reference_sync.md",
       "source": "spec_dock/docs/historical/reference_sync.md",
-      "sha256": "63ee7d9e8f15aeb50a5cbae109738dfa2f6a9abca9c14e0d635c54b260f08b0a",
+      "sha256": "233939e7b5a681db33cd563c0271e9dec36e48a9db9d4b61a53dd957fd354bf2",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "63ee7d9e8f15aeb50a5cbae109738dfa2f6a9abca9c14e0d635c54b260f08b0a"
+      ]
     },
     {
       "path": "spec-dock/docs/historical/reference_worktree.md",
       "source": "spec_dock/docs/historical/reference_worktree.md",
-      "sha256": "43257bd27e1e8dc5d7e409f97c58accfb7437aefb23e8a3dff2f11500b719458",
+      "sha256": "eeb56f3aae75913bc865c700e84fcc7a92ab1a6a53357cd2b16442779f8e969b",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "43257bd27e1e8dc5d7e409f97c58accfb7437aefb23e8a3dff2f11500b719458"
+      ]
     },
     {
       "path": "spec-dock/docs/migration.md",
       "source": "spec_dock/docs/migration.md",
-      "sha256": "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5",
+      "sha256": "d0da61a3ab362b168f784efe59c5a47781571d3fdefb86b862fe822b2060055c",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5"
+      ]
     },
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
+      "sha256": "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32"
+      ]
     },
     {
       "path": "spec-dock/docs/reference_deps.md",
       "source": "spec_dock/docs/reference_deps.md",
-      "sha256": "162184232a51b8869789f1975bbd15219699353bd57eb1dc96e247dcd91bade2",
+      "sha256": "d2d1d508d864132e31a566fafa9efa549059d75283451a706a6cd153d61a2de3",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "162184232a51b8869789f1975bbd15219699353bd57eb1dc96e247dcd91bade2"
+      ]
     },
     {
       "path": "spec-dock/docs/reference_github.md",
       "source": "spec_dock/docs/reference_github.md",
-      "sha256": "53f8bf8a6eca9809da1ff36ab09f1236e9a7b16d3641ddd676e3faf2c04e7b44",
+      "sha256": "3aeb5ab1791b49f1190da45db30428d3ee2ea32a141e169c396342cebab4ae10",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "53f8bf8a6eca9809da1ff36ab09f1236e9a7b16d3641ddd676e3faf2c04e7b44"
+      ]
     },
     {
       "path": "spec-dock/docs/reference_naming.md",
       "source": "spec_dock/docs/reference_naming.md",
-      "sha256": "bc31afff6f395cd158cca6214660dcbfed7f6790ed6ab01cf37d0d340e92faa5",
+      "sha256": "fe00f3409d5d28617b6651612abcc91b962f3d72b1b714ec4a4cd217c20ab769",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "bc31afff6f395cd158cca6214660dcbfed7f6790ed6ab01cf37d0d340e92faa5"
+      ]
     },
     {
       "path": "spec-dock/docs/reference_sync.md",
       "source": "spec_dock/docs/reference_sync.md",
-      "sha256": "033d0e18e3668e28777f2c3b551b3d86b9cd0e3b0da9fa6a1d08842c9a8cdece",
+      "sha256": "60cd3f01861356112a2147b6dab5ad7009c1d7c591acfa102967cb705a00efc9",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "033d0e18e3668e28777f2c3b551b3d86b9cd0e3b0da9fa6a1d08842c9a8cdece"
+      ]
     },
     {
       "path": "spec-dock/docs/reference_worktree.md",
       "source": "spec_dock/docs/reference_worktree.md",
-      "sha256": "a30f9ff2149743f1e44614354eadadf506549f5f6677d1194d6b697a5f884880",
+      "sha256": "10f68e42bbe8c8d6750941dcd6890f3ec27272cceb379639be96336279e873ed",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "a30f9ff2149743f1e44614354eadadf506549f5f6677d1194d6b697a5f884880"
+      ]
     },
     {
       "path": "spec-dock/docs/rules/epic/artifacts.md",

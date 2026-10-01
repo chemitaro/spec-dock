@@ -374,7 +374,7 @@ uv run pytest tests/cli_runtime/test_workspace_migrate_vnext.py tests/cli_runtim
 <a id="p-12"></a>
 ## P-12 static資産・shim・配布skillsを更新する
 
-**状態: 実装中。PATH委譲shim、package資産inventory、単WTのinstallation四leafとsource/wheelの一致をローカル検証済み。既知旧hashの更新・退役と保全・部分失敗も確認した。配布docs/skillsとprovider旧実装退役は未完了。前提/依存: P-11（ローカル検証済み・fresh Strict未完了）。** 読む節: [D-02](design.md#d-02), [D-11](design.md#d-11), [D-12](design.md#d-12)。補足: D-02, D-11, D-12。
+**状態: 実装中。PATH委譲shim、package資産inventory、単WTのinstallation四leaf、配布docs/skillsとsource/wheel/新規consumerの一致をローカル検証済み。既知旧hashの更新・退役と保全・部分失敗も確認した。provider旧実装退役は未完了。前提/依存: P-11（ローカル検証済み・fresh Strict未完了）。** 読む節: [D-02](design.md#d-02), [D-11](design.md#d-11), [D-12](design.md#d-12)。補足: D-02, D-11, D-12。
 
 `shim_vnext.py`と配布static shimを、PATH上の外部consoleへargv/cwd/終了値/stderrを保持して委譲する入口へ置換した。Git/control/engine digest/consumer Pythonの取得を削除し、自身の同inode・symlink・hardlink・同shimのコピー・既知旧shimを委譲先に認めない。既存package managerで導入したconsoleへの正常symlinkは受理する。外部console不在等は導入案内とv2診断を返し、double-dash後のjson文字列は共通flagとして解釈しない。caller Python import環境を外し、通常の利用者設定は保持する。
 
@@ -385,6 +385,8 @@ native POSIX `./spec -h` symlink経路、Git不在・nested cwd・不正project�
 `update/uninstall --target ABS --backup-dir ABS --yes`を新writer workspaceの既知static hashへ限定した。置換・退役する旧bytesは外部backupで実際に復元・比較し、未知改変は保全前に拒否する。workspace宣言の未知設定、Scope、Artifact、Workbench、直接記録、Git内の旧情報は変更しない。uninstallはworkspace宣言とignore規則も残す。既知旧runtime138 filesとversion一fileのpath/hashは基準commitへ照合済みで、名前だけの再帰削除をしない。外部保全の後片付け・公開・退役失敗はbackupと実施済み/unknown/未実施をpartial6へ残す。四leafのhelpと廃止引数も更新した。関連98 tests（75.93秒）、全source/tests Ruff check/format（421 files）、変更八file限定mypyが成功した。fresh wheelの外部venvでupdate/uninstallも実行した。旧provider helpers、配布docs/skills、native Windows、full gate、fresh Strictは引き続き未完了。
 
 **所有/対象file**: src/spec_dock/shim_vnext.py、asset_layout.py、runtime/application/direct_installation.py、runtime/infra/static_assets.py、installation関連、assets/install_root/.agents/skills/spec-dock/SKILL.md、spec-dock-grill-with-docs/SKILL.md、assets/spec_dock/docs/templates、assets/static-inventory.json。tests/unit/infra/test_provider_distribution.py、tests/integration/test_installation_group_init_vnext.py、tests/integration/test_issue413_assets.py、tests/integration/test_issue413_wheel.py。
+
+README・配布reference・migration・offline HTML・二skillを外部CLIと一件直接対象の契約へ改定した。active setは同一妥当directへのunchangedだけ、Syncはdata直下の観測、Artifactはdata.result.artifact.pathを使う。旧engine/control/cache/新規local作成のHistorical操作案内は退役通知へ置換し、pathsは保持した。実dogfoodを更新せず、新CLIによる一時consumerとwheel全86静的資産をproviderへ照合する。変更18資産の旧hashはfb42d21fe53e993439c293a1412e746665a81399のblobから検証・登録した。文書/配布/Grill helperの213 tests（2.35秒）、wheel/installation/shim/help関連98 tests（74.42秒）、全source/tests Ruff check/format（423 files）、変更五test file限定mypyが成功した。Grill finalizerが実Artifact JSON pathを受け、16 canonical文書とmetadata/Gitを保持することも確認した。HTMLは24 unique IDs・35解決済みlinks・外部依存0の静的検査を通過した。最終人間資料・ブラウザ検査・native Windows・full gate・fresh Strictは別途未完了。
 
 **具体的変更順**: package静的inventoryに既知tool-owned path/hashを収録する。installation show/init/update/uninstallを単WT static処理へ限定する。shimを外部console委譲へ改修する。skills/referenceのfixedengine/active取得/Sync世代/復旧説明を新契約へ変更する。配布parityはrealconsumer一括適用と切り離し、wheel内staticとprovider契約を比較する。
 

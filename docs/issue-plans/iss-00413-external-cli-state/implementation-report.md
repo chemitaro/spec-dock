@@ -593,3 +593,19 @@ TDDではupdate二cases、欠けたfile/directory、既知runtime退役、uninst
 `uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py tests/cli_runtime/test_help_completion_vnext.py -q --tb=short` は98 passed（75.93秒）。asset suiteは56 cases。fresh wheel→sdist由来wheelの資産一致、外部venvの実consoleによるinit/show/update/uninstall、外部backup、仕様・ignore保持とGit副作用0まで確認した。全source/testsのRuff check/format（421 files）と変更八file限定mypyは成功した。限定mypyのtest trap注釈をNoneへ修正し、follow-imports=skipでも戻り値不整合を残していない。
 
 provider旧helpersの退役、配布docs/skills、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer適用は未完了。実dogfood workspace・metadata・shim・状態は変更していない。通常非force pushの利用者回答を待ちながら認可済みローカル実装を続け、P-12とgoalを進行中に維持する。
+
+## P-12 配布docs・skillsと実配布の整合性
+
+root README、providerのCurrent reference/migration、単独offline HTML、二つの配布skillを通常外部CLIへ合わせた。GitHub番号と既存IDを正本にし、新規local/offline Scope、UUID、中央control、engine pin、cache/generation、journal再開を操作案内から外した。Historical六fileは同じpathに退役通知とCurrentへの入口を残し、旧操作を新規作成手順へ戻さない。ユーザーの実dogfood資料を直接差し替えた実績ではない。
+
+改稿時は確定requirement/design/CLI契約と現行公開handlerを照合した。active setのchain内focus変更という誤った草稿を、同一妥当directのunchangedだけへ訂正した。Syncの観測値はdata直下であり、FamilyDataと同じdata.resultではない。worktree createのNAMEは必須で、旧optional表記を現在helpへ合わせた。Startだけの短い排他、通常編集の権限制度なし、FinishのGitHub完了確認・捕捉記録だけ解除・branch保持を明示する。
+
+Grill skillは明示起動用frontmatterを持ち、外部CLIのexit0/v2/succeeded/artifactを確認してdata.result.artifact.pathを受け取る。partial/unknownなら本文確定や自動再作成をしない。既存finalizerのidentity/finalize境界は変更していない。公開CLIで生成したresearch Artifactを実helper processで確定し、元frontmatter/title/prefixを保持して本文だけを完成できた。16 canonical文書、全Scope metadata、Git bytesは不変で、直接記録も作らない。この追加は既存実装のGreen回帰であり、新しい製品不具合のRedとは呼ばない。
+
+provider parityは新CLIで初期化した一時consumerへportした。実dogfood切替前のbyte差を理由にruntime/controlを再配布しない。最初の関連runは旧S01のREADME/guide比較二casesが失敗し、211 passedだった。これらも一時consumerとの同じbyte比較へ移し、削除/skipせず維持した。wheel内の全86 static payloadとhash、実consoleが新規consumerへ置いた全86 payloadもproviderへ照合する。18変更資産のknown-old hashはfb42d21fe53e993439c293a1412e746665a81399のGit blobと個別照合し、86 current / 139 retiredのpath・mode・退役根拠は保持した。
+
+`uv run pytest tests/unit/infra/test_authoring_kit_assets.py tests/unit/infra/test_provider_distribution.py tests/unit/infra/test_issue_359_skill_helpers.py tests/integration/test_cli_docs_vnext.py tests/integration/test_issue413_artifact_skill.py -q --tb=short` は213 passed（2.35秒）。`uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py tests/cli_runtime/test_help_completion_vnext.py -q --tb=short` は98 passed（74.42秒）。両runは一部重なるため、独立件数の合算とはしない。全source/tests Ruff check/format（423 files）、変更五test file限定mypy、diff checkが成功した。offline HTMLは24 unique IDs、35解決済みlinks、script/外部stylesheet/通信依存0とCSPを静的確認した。最終ブラウザ・Tailscale資料検査の代替ではない。
+
+最終差分確認でworktree参照のNAME省略案内も必須名へ訂正し、同じ旧commit hashを保持してpackage inventoryを更新した。その候補を文書/配布/helper suiteとfresh wheelで再検証し、214 passed（15.57秒）を確認した。最終候補の全86 resource hashと、新規導入先の全86 bytesが一致する。
+
+provider旧helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer切替は未完了。通常非force pushへの回答が未着で、Strictのlocal/upstream SHA一致も未成立である。actual dogfood workspace・metadata・shim・.agents・状態は変更せず、認可済みローカル実装を続ける。
