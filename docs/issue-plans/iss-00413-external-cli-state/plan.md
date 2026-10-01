@@ -404,6 +404,8 @@ Work/branch旧adapter三filesも公開mainへportし、[七旧関数の対応](a
 
 Scope lifecycleの旧確認競合保証は公開processへ移し、確認中に別Startで選択を変更しても旧対象をCloseしてしまうRedを検出した。[修正根拠](artifacts/scope-confirmation-recheck.md)の自WT再読取比較で同じtestをGreenにし、関連90 tests（20.90秒）と変更source/test限定mypyが成功した。共通lock/lease/権限は追加せず、Scope確認だけの楽観的比較を保持する。新候補の独立Strictは未実施。
 
+Scope lifecycle/query/deleteの旧三filesも[十一関数の判断](artifacts/test-port-scope-lifecycle-query-delete.md)を記録して公開mainへ移した。既存local codec保全、GH-backed current/guard、読取とtitle/revision編集、確認・preview・実backup後の削除を十casesで確認し、guard省略を含む確認競合四casesと現行Scope suiteを合わせて81 tests（21.05秒）が成功した。全Ruff/変更四test限定mypyも成功。残る旧公開経路のport・provider退役・全体gateは引き続き進行中である。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

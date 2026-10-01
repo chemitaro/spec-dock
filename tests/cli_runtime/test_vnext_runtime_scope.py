@@ -1,104 +1,98 @@
-"""Read-only Scope projections and a title-only edit through the new CLI."""
+"""Public Scope projections and title edits preserve the selected document."""
 
 from __future__ import annotations
 
 import json
+import os
+import sys
 from typing import TYPE_CHECKING
+
+import pytest
+
+from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.cli_runtime.test_issue413_active import select_fixture
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.cli_runtime.test_work_commands_vnext import three_kind_workspace
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    import pytest
 
-
-from spec_dock.runtime.cli.vnext_runtime import run_vnext
-from tests.cli_runtime.test_active_vnext import _three_scopes
-
-
-def test_scope_list_show_and_edit_target_the_same_scope(tmp_path: Path) -> None:
-    specdock_dir, _views, _initiative, epic, issue = _three_scopes(tmp_path)
-    arguments = {"invocation_cwd": specdock_dir.parent, "engine_digest": "engine-a", "engine_version": "test"}
-    listed = run_vnext(["scope", "list", "--kind", "issue", "--parent", epic.id, "--json"], **arguments)
-    assert listed.exit_code == 0
-    data = json.loads(listed.stdout)["data"]
-    items = data["items"]
-    assert data["filter"] == {"kind": "issue", "parent_id": epic.id, "state": None}
-    assert data["project"] == str(specdock_dir.parent)
-    assert data["worktree"]
-    assert data["snapshot_id"]
-    assert len(items) == 1 and items[0]["id"] == issue.id and items[0]["backend"] == "local"
-    assert items[0]["path"].startswith("spec-dock/initiatives/")
-    run_vnext(["active", "set", issue.id], **arguments)
-    shown = run_vnext(["scope", "show", "@current", "--json"], **arguments)
-    assert json.loads(shown.stdout)["data"]["item"]["id"] == issue.id
-    document = issue.path / "requirement.md"
-    before_document = document.read_bytes()
-    preview = run_vnext(
-        ["scope", "edit", "@current", "--title", "Renamed", "--expect-current", issue.id, "--dry-run", "--json"],
-        **arguments,
-    )
-    assert json.loads(preview.stdout)["status"] == "planned"
-    assert (
-        json.loads(run_vnext(["scope", "show", issue.id, "--json"], **arguments).stdout)["data"]["item"]["title"]
-        == "Issue"
-    )
-    edited = run_vnext(
-        ["scope", "edit", "@current", "--title", "Renamed", "--expect-current", issue.id, "--json"],
-        **arguments,
-    )
-    assert edited.exit_code == 0 and json.loads(edited.stdout)["data"]["changed"]
-    assert document.read_bytes() == before_document
-    shown_after = run_vnext(["scope", "show", issue.id, "--json"], **arguments)
-    assert json.loads(shown_after.stdout)["data"]["item"]["title"] == "Renamed"
-
-
-def test_unexpected_failures_report_effect_uncertainty_by_command_kind(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    specdock_dir, _views, initiative, _epic, _issue = _three_scopes(tmp_path)
-    arguments = {"invocation_cwd": specdock_dir.parent, "engine_digest": "engine-a", "engine_version": "test"}
-
-    def fail_read(*_args: object, **_kwargs: object) -> None:
-        raise RuntimeError("injected read failure")
-
-    monkeypatch.setattr("spec_dock.runtime.cli.vnext_runtime.run_scope_query", fail_read)
-    read = run_vnext(["scope", "list", "--json"], **arguments)
-    assert read.exit_code == 1
-    read_payload = json.loads(read.stdout)
-    assert read_payload["status"] == "failed" and read_payload["effects"] == []
-
-    def fail_write(*_args: object, **_kwargs: object) -> None:
-        raise OSError("injected write failure")
-
-    monkeypatch.setattr("spec_dock.runtime.cli.vnext_runtime.run_scope_edit", fail_write)
-    write = run_vnext(["scope", "edit", initiative.id, "--title", "New", "--json"], **arguments)
-    assert write.exit_code == 5
-    write_payload = json.loads(write.stdout)
-    assert write_payload["status"] == "failed"
-    assert write_payload["effects"] == []
-    assert write_payload["target"]["id"] == initiative.id
-
-    def fail_context(*_args: object, **_kwargs: object) -> None:
-        raise OSError("injected context failure")
-
-    with monkeypatch.context() as context_patch:
-        context_patch.setattr("spec_dock.runtime.cli.vnext_runtime._context", fail_context)
-        preflight = run_vnext(["scope", "edit", initiative.id, "--title", "New", "--json"], **arguments)
-    assert preflight.exit_code == 5
-    assert json.loads(preflight.stdout)["effects"] == []
-
-
-def test_runtime_rejects_preflight_identity_change_before_scope_edit(tmp_path: Path) -> None:
-    specdock_dir, _views, initiative, _epic, _issue = _three_scopes(tmp_path)
-    document = initiative.path / "requirement.md"
+def test_scope_list_show_and_edit_target_the_same_scope(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    root = three_kind_workspace(tmp_path / "consumer")
+    issue = root / "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture"
+    document = issue / "requirement.md"
+    document.write_text("# Existing specification\nKeep this body.\n")
     before = document.read_bytes()
-    result = run_vnext(
-        ["scope", "edit", initiative.id, "--title", "Wrong repo", "--json"],
-        invocation_cwd=specdock_dir.parent,
-        engine_digest="engine-a",
-        engine_version="test",
-        preflight_root=tmp_path / "other-repository",
+    record = select_fixture(root, scope_id="iss-00003", number=3)
+    selected = record.read_bytes()
+    prefix = ["--project", str(root), "scope"]
+    assert main([*prefix, "list", "--kind", "issue", "--parent", "epic-00002", "--json"]) == 0
+    payload = json.loads(capsys.readouterr().out)
+    items = payload["data"]["result"]["items"]
+    assert [item["id"] for item in items] == ["iss-00003"]
+    assert items[0]["backend"] == "github" and items[0]["path"] == issue.relative_to(root).as_posix()
+    assert items[0]["status"]["state"] == "unknown"
+    assert main([*prefix, "show", "@current", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["result"]["scope"]["id"] == "iss-00003"
+    assert (
+        main([
+            *prefix,
+            "edit",
+            "@current",
+            "--title",
+            "Renamed",
+            "--expect-current",
+            "iss-00003",
+            "--dry-run",
+            "--json",
+        ])
+        == 0
     )
-    assert result.exit_code == 3
-    assert json.loads(result.stdout)["effects"] == []
-    assert document.read_bytes() == before
+    assert json.loads(capsys.readouterr().out)["status"] == "planned"
+    assert json.loads((issue / ".meta.json").read_bytes())["title"] == "Fixture"
+    assert main([*prefix, "edit", "@current", "--title", "Renamed", "--expect-current", "iss-00003", "--json"]) == 0
+    edited = json.loads(capsys.readouterr().out)
+    assert edited["data"]["result"]["changed"] is True
+    assert edited["data"]["result"]["scope"]["revision"] == 1
+    assert main([*prefix, "show", "iss-00003", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["result"]["scope"]["title"] == "Renamed"
+    assert document.read_bytes() == before and record.read_bytes() == selected
+    assert not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("command", [["scope", "list"], ["scope", "edit", "init-00001", "--title", "New"]])
+def test_native_context_failure_keeps_git_diagnostic_and_no_effects(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], command: list[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    before = tree_digest(root)
+    bin_dir = tmp_path / "blocked-git"
+    bin_dir.mkdir()
+    original = "fatal: fixture Git context refused\nsecond original line\n"
+    executable = bin_dir / "git"
+    executable.write_text(f"#!{sys.executable}\nimport sys\nsys.stderr.write({original!r})\nsys.exit(73)\n")
+    executable.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir) + os.pathsep + os.environ["PATH"])
+    assert main(["--project", str(root), *command, "--json"]) == 5
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert not output.err and result["error"]["code"] == "GIT_FAILED" and result["effects"] == []
+    assert result["error"]["details"]["git"]["stderr"] == original
+    assert result["error"]["details"]["git"]["returncode"] == 73
+    assert tree_digest(root) == before
+
+
+def test_runtime_rejects_a_nonroot_project_before_scope_edit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    before = tree_digest(root)
+    assert (
+        main(["--project", str(root / "spec-dock"), "scope", "edit", "init-00001", "--title", "Wrong root", "--json"])
+        == 3
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED" and result["effects"] == []
+    assert tree_digest(root) == before

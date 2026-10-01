@@ -176,8 +176,9 @@ def test_scope_close_accepts_a_terminal_confirmation_after_planning(
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX confirmation and parallel Start processes")
 @pytest.mark.parametrize("action,state", [("close", "open"), ("reopen", "completed")])
+@pytest.mark.parametrize("guard", [[], ["--expect-current", "init-00001"]])
 def test_scope_lifecycle_refuses_a_changed_direct_selection_after_terminal_confirmation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str, state: str
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str, state: str, guard: list[str]
 ) -> None:
     import pty
     import select
@@ -222,8 +223,7 @@ def test_scope_lifecycle_refuses_a_changed_direct_selection_after_terminal_confi
             "scope",
             action,
             "@current",
-            "--expect-current",
-            "init-00001",
+            *guard,
         ],
         stdin=slave,
         stdout=subprocess.PIPE,

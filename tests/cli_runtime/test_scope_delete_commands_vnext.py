@@ -1,45 +1,50 @@
-"""The vNext delete leaf previews its fixed subtree before quarantine."""
+"""Public Scope deletion requires approval and a verified external backup."""
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+import subprocess
+from typing import TYPE_CHECKING
 
-from spec_dock.runtime.application.create_local_scope import create_local_scope
-from spec_dock.runtime.cli.vnext_runtime import run_vnext
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.cli_runtime.test_issue413_finish import github_fixture
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
 
-def test_scope_delete_cli_requires_confirmation_and_previews_without_writes(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    command = ["scope", "delete", created.id, "--json"]
-    rejected = run_vnext(command, invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4")
-    assert rejected.exit_code == 3
-    assert created.path.exists()
-    preview = run_vnext([*command, "--dry-run"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4")
-    assert preview.exit_code == 0
-    assert json.loads(preview.stdout)["data"]["deleted_ids"] == [created.id]
-    assert created.path.exists()
-    deleted = run_vnext([*command, "--yes"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4")
-    assert deleted.exit_code == 0
-    assert not created.path.exists()
-    operation_id = json.loads(deleted.stdout)["operation_id"]
-    wrong_target = run_vnext(
-        ["scope", "delete", "init-local-99999", "--resume", operation_id, "--yes", "--json"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    assert wrong_target.exit_code == 3
-    resumed = run_vnext(
-        [*command, "--resume", operation_id, "--yes"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    assert resumed.exit_code == 0
+
+def test_scope_delete_cli_requires_confirmation_and_previews_without_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    scope = root / "spec-dock/initiatives/init-00001-fixture"
+    document = scope / "requirement.md"
+    document.write_bytes(b"Preserve the exact specification.\n")
+    before = {path.relative_to(root): path.read_bytes() for path in scope.rglob("*") if path.is_file()}
+    backup = (tmp_path / "backup").resolve()
+    log = github_fixture(tmp_path, monkeypatch, {})
+    command = ["--project", str(root), "scope", "delete", "init-00001", "--backup-dir", str(backup), "--json"]
+    snapshot = tree_digest(root)
+    assert main(command) == 3
+    assert json.loads(capsys.readouterr().out)["effects"] == [] and tree_digest(root) == snapshot
+    assert main([*command, "--dry-run"]) == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["status"] == "planned" and preview["data"]["result"]["can_apply"] is True
+    assert preview["data"]["result"]["removed_ids"] == []
+    assert preview["data"]["result"]["remaining_paths"] == [scope.relative_to(root).as_posix()]
+    assert tree_digest(root) == snapshot and not backup.exists()
+    assert main([*command, "--yes"]) == 0
+    deleted = json.loads(capsys.readouterr().out)
+    assert deleted["status"] == "succeeded" and deleted["data"]["result"]["removed_ids"] == ["init-00001"]
+    assert deleted["data"]["result"]["remaining_paths"] == [] and not scope.exists()
+    assert all((backup / relative).read_bytes() == exact for relative, exact in before.items())
+    assert main([*command, "--yes"]) == 3
+    rejected = json.loads(capsys.readouterr().out)
+    assert rejected["effects"] == [] and "backup destination already exists" in rejected["error"]["message"]
+    assert all((backup / relative).read_bytes() == exact for relative, exact in before.items())
+    assert not log.exists() and not (root / ".git/spec-dock").exists()
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"

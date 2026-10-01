@@ -675,3 +675,11 @@ branch create/show/switchのtipとdry-runはnative Gitでも比較し、既存re
 旧Scope lifecycle suiteを仕様へ照合する中で、保持すべき端末確認の競合検査を公開mainへ移し、不具合を再現した。元Scope #1の確認表示中に別processの実Startで#2へ切り替えると、元processはyes後に#1をCloseしてexit0を返した。Redは1 failed（1.34秒）、native Git/PTY/二CLI processとstateful ghによる製品挙動の失敗である。[分析と修正](artifacts/scope-confirmation-recheck.md)に旧testとの対応を残す。
 
 確認を必要とするScope close/reopenだけで、metadata/physical contextの再検査に加え、捕捉した自WTのselection status/record/handleを再読取結果へ照合する。選択が変わればremote変更前にexit3で止め、新記録を保全する。全編集lockや権限制御を追加せず、Finish/--yesの契約は維持した。同じClose testは1 passed（1.31秒）。関連Scope lifecycle/Finish/active/writer suiteは90 passed（20.90秒）。その後Close/Reopen二casesへ広げ、2 passed（2.31秒）で両経路の新記録・metadata・remote不変とPATCH0を確認した。全source/tests Ruff check/format（423 files）と変更source/test二file限定mypyも成功した。fresh Strict、全体gate、Windows、実consumer適用は未完了である。
+
+## P-12 Scope lifecycle / query / deleteの公開入口移行
+
+旧三files・十一関数を全文確認し、[個別の移行判断](artifacts/test-port-scope-lifecycle-query-delete.md)を記録した。新規local発行・control登録・旧run_vnext・journalをfixture/入口から除き、既存localのclose/reopen/not-planned codec、GH-backed current selectorとguard、kind/parent読取、title/revision編集・本文保全、確認/dry-run・外部backup後削除を公開mainと現物へ比較する。端末代替のstdin試験は実PTYの証拠とは区別する。
+
+native Gitのcontext故障をread/edit双方で注入し、元stderr/returncode/effects空とrepo不変を確認した。削除後の再操作は旧journalのreplayではなく、既存backupを上書きせず拒否する。最初の移行runで、その拒否をexit4と期待した一件は実装契約のexit3へ訂正した。製品Redには数えない。三filesは10 passed（3.04秒）。さらに元の確認競合testにあったguard省略条件を、guard有無×Close/Reopenの四実process casesで確認した。
+
+`uv run pytest tests/cli_runtime/test_scope_lifecycle_commands_vnext.py tests/cli_runtime/test_vnext_runtime_scope.py tests/cli_runtime/test_scope_delete_commands_vnext.py tests/cli_runtime/test_issue413_scope_lifecycle.py tests/cli_runtime/test_issue413_scope_edit.py tests/cli_runtime/test_issue413_scope_delete.py -q --tb=short` は81 passed（21.05秒）。全source/tests Ruff check/format（423 files）、変更四test file限定mypy、diff checkも成功した。実consumer・Git内の旧独自領域は保持する。旧create/import/installation/recovery経路とprovider/runtime退役、native Windows、全件type/pytest gate、fresh Strictと最終手動確認は未完了で、goal/P-12をactiveのまま継続する。
