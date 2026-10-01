@@ -489,3 +489,15 @@ sourceのworkspace/branch/HEAD/物理identityと一度捕捉した直接選択�
 `uv run pytest tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/integration/test_issue413_wheel.py -q` は119 passed（24.90秒）。`uv run ruff check src tests`、`uv run ruff format --check src tests`（401 files）、変更三source限定のmypy、`git diff --check`が成功した。限定型検査は全体gateの代替ではない。bootstrap、native Windows、P-11以後、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了である。実dogfood metadata・宣言・直接選択は変更していない。
 
 fresh Strict準備の通常非force pushは自動承認審査で二回、process開始前に拒否された。HEAD `9b829ec6d3ebf75cbd0667321b670e7a2781c895`とupstream/remote `8c59994c8dad473697dcd8314721aeeef3f52d79`の差は既知のローカル二commitで、remote変更は実行されていない。AGENTS.mdのremote操作の明示認可要件について、このIssue/branchのレビュー用push許可を利用者へ質問中である。Strict skillの一般的なpreapproval文は審査で認可根拠として認められなかった。回答前にpushを再試行せず、SHA一致を満たさないStrictを実行しない。既存の実装認可に基づくローカル作業は継続し、goalをactiveに保つ。
+
+## P-10 native Worktree bootstrapを接続
+
+`worktree bootstrap ABS --yes`を通常external runtimeへ接続した。同cloneのnative Git targetでproject-owned `make init`を一回実行し、main/currentやworkspace宣言のない初期化対象も扱う。bareとunsafe pathは拒否する。実実行の確認がない場合とoffline applyは副作用前に停止し、dry-runはmakeの構文を評価しない。makefileはGNUmakefile/makefile/Makefileの優先順位で、安全なregular fileだけを捕捉し、必要bytes/identityとsourceのGit context・一度捕捉した直接選択を実行前に再確認する。途中で変わった内容や選択を復元しない。
+
+任意hookのstdout/stderrは保持・開示せず、継承MAKEFILES/MAKEFLAGS/GNUMAKEFLAGS/MFLAGS/MAKELEVELとGit context overrideを渡さない。process起動不能はfailed/exit5、開始後の非zero/signal/timeoutはunknown/partial6としてprojectの現物確認へ渡す。makeが完了した後のtarget置換とhandle cleanup失敗は、実行済みのsucceeded効果を維持してpartial6にする。POSIXではtimeout後に子process groupを停止し、途中で作られたfileを残す。receipt、recover、共有Start lock、権限制御、rollback、暗黙再実行を加えていない。非POSIXのprocess adapterは未接続で、Windows対応を実装済みとしない。
+
+未接続dispatch、project makefile欠落、継承追加makefile注入、捕捉後の直接選択変更、実行後のtarget置換、確認済み実行後のclose失敗、実行前のmakefile変更、process停止のIOエラーでstarted効果が失われるケースをfocused Red→Greenで確認した。元からGreenの回帰として、実dry-run/offline/no確認でmake呼出し0、native timeout後の子process停止、任意hook出力の非公開、新しい明示依頼だけで二回目の実行、main/current/target宣言なし、canonical guard、native signal、process開始不能、別processがStart排他を保持する間の実行を確認した。初回Greenを架空のRedとして記録しない。
+
+`uv run pytest tests/cli_runtime/test_issue413_worktree_bootstrap.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_worktree_bootstrap_vnext.py tests/cli_runtime/test_worktree_remove_vnext.py tests/cli_runtime/test_worktree_create_vnext.py tests/integration/test_issue413_wheel.py -q` は168 passed（44.82秒）。全source/testsのRuff check/format（404 files）、変更四source限定mypyとdiff checkが成功した。旧bootstrapのCLI recovery assertionだけを退役拒否/絶対pathへ更新し、旧helperとreceiptはP-12で別に退役させる。設計D-14の実装推論設定も利用者の最新指定Maxへ同期した。
+
+native Windowsのprocess/file adaptersと実OS確認、fresh Strict、P-11以後、full-suite/type gate、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択は変更していない。レビュー用pushの明示許可への回答を待ちながらローカル作業を継続し、goalをactiveに保つ。

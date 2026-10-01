@@ -83,6 +83,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_worktrees import remove_native_worktree
 
             result = remove_native_worktree(namespace, context)
+        elif command == "worktree bootstrap":
+            from spec_dock.runtime.application.direct_bootstrap import bootstrap_native_worktree
+
+            result = bootstrap_native_worktree(namespace, context)
         elif command == "workbench copy":
             from spec_dock.runtime.application.direct_workbench import copy_workbench
 

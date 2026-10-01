@@ -320,4 +320,4 @@ producer sourceのtest import成功だけでは配布成功としません。fre
 
 このpackは文書生成物です。schemaの自己検証やZIP整合は製品ACのpassではありません。HTMLの実行JS/modal byte一致は動的なSVG描画成功の代わりではありません。
 
-実装担当は利用者指定の **GPT-6.1 Sol / reasoning High**、将来設定 `gpt-6.1-sol` / `high`。この資料を書いたモデルの識別と混同しません。コード変更、テスト、成果物レビュー、人間merge、実環境dogfood、#413 import/Startを別step・別証拠にします。自動commit/push/merge/公開は含めません。利用者の別途承認した作業契約が必要です。
+実装担当は利用者の最新指定の **GPT-6.1 Sol / reasoning Max**、指定設定 `gpt-6.1-sol` / `max`。この資料を書いたモデルの識別と混同しません。コード変更、テスト、成果物レビュー、人間merge、実環境dogfood、#413 import/Startを別step・別証拠にします。自動commit/push/merge/公開は含めません。利用者の別途承認した作業契約が必要です。

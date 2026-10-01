@@ -10,6 +10,7 @@ import pytest
 from spec_dock.runtime.application.worktree_bootstrap_vnext import bootstrap_worktree
 from spec_dock.runtime.application.worktree_vnext import create_worktree
 from spec_dock.runtime.cli.admission import admit_writer
+from spec_dock.runtime.cli.legacy import RetiredArgumentError
 from spec_dock.runtime.cli.options import parse_vnext
 from spec_dock.runtime.infra.control_store import load_control
 from spec_dock.runtime.infra.json_store import read_guarded_json
@@ -124,10 +125,12 @@ def test_bootstrap_recovery_cannot_acknowledge_a_live_attempt(tmp_path: Path, mo
     assert not failures
 
 
-def test_bootstrap_cli_recovery_is_explicit() -> None:
-    parsed = parse_vnext(["worktree", "bootstrap", "wt:wt1", "--recover", "--yes"])
+def test_bootstrap_cli_recovery_is_retired_and_the_target_requires_an_absolute_path() -> None:
+    with pytest.raises(RetiredArgumentError, match="--recover was retired"):
+        parse_vnext(["worktree", "bootstrap", "wt:wt1", "--recover", "--yes"])
+    parsed = parse_vnext(["worktree", "bootstrap", "/absolute/worktree", "--yes"])
     assert parsed.command_path == "worktree bootstrap"
-    assert parsed.recover and parsed.yes
+    assert parsed.worktree_ref == "/absolute/worktree" and parsed.yes
 
 
 def test_missing_target_fails_before_make_or_record(tmp_path: Path) -> None:
