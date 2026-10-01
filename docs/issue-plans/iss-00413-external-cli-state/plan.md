@@ -700,6 +700,10 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 現在もvalidation・dependency・binary Artifact・rendererで使う共有コードの通常mypy十件を、実際の有限状態Literal、os.stat_result、返却型、JSON payload型と同一関数内の変数名へ合わせた。業務分岐、出力、試験選択、skip条件、型ignoreは変更しない。変更前の通常make lintは10 errors/5 files（215 source files）、exit2。修正後の通常make lintはRuff check/format（296 files）・mypy全215 source filesが成功し、exit0。関連dependency/validation/binary publisher/ports/presentation/Scope Delete八群は170 passed/1 skipped（10.06秒）、exit0。skipは既存Linux O_TMPFILE capability testでありDarwinでのnative成功ではない。元logsはiss-00413-implementation/lint-shared-source-typing.log、pytest-shared-source-typing-related.logへ保持した。現在候補の全pytest/native Windows/fresh Strict/Final Quality Gate/最終手動確認は別途継続する。
 
+**配布consoleの一連の作業検証（P-13の準備）**
+
+[実consoleの記録](artifacts/fresh-console-lifecycle.md)に、fresh wheel/別venv/offline依存解決/pip check/source path改名から、実Gitのclone/linked WT、Start重複拒否、兄弟Issue並行、readonly Sync、completed GET確認後のFinish、次Issue Startまでを保存した。製品APIをmockせず、GitHubだけをstateful外部gh processで代替する。macOS/APFSの実Python 3.12は1 passed（8.73秒）、実3.10は1 passed（9.06秒）、共にexit0。初回の誤selectorによるfixture失敗は別logに残し、製品Redとは区別する。通常make lintはRuff（297 files）・mypy（216 source files）が成功、exit0。test追加前のclean e11f1879全macOS pytestは1843 passed/1 skipped（446.22秒）、exit0であり、追加caseを合算しない。P-12/fresh Strict、現在候補のLinux/Windows/native full gates、P-13完了認定、Final Quality Gate/手動確認、実consumer適用は未完了。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
