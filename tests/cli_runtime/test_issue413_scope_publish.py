@@ -630,6 +630,44 @@ def test_creation_refuses_unignored_staging_before_a_post(
     assert "operation_id" not in result
 
 
+@pytest.mark.parametrize("status", [400, 410, 422])
+def test_confirmed_create_rejection_keeps_all_inputs_and_does_not_retry_or_allocate_an_id(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], status: int
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    executable = tmp_path / "gh-bin/gh"
+    executable.write_text(executable.read_text().replace("HTTP/2.0 201 Created", f"HTTP/2.0 {status} Rejected"))
+    before = tree_digest(root)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "scope",
+            "create",
+            "initiative",
+            "--backend",
+            "github",
+            "--title",
+            "Rejected Scope",
+            "--yes",
+            "--json",
+        ])
+        == 5
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed" and result["data"]["result"]["scope"] is None
+    assert result["data"]["result"]["github_ref"] is None and result["data"]["result"]["changed"] is False
+    assert result["effects"] == [
+        {"kind": "github-create", "status": "failed", "target": "example/repo"},
+        {"kind": "scaffold", "status": "not_attempted", "target": None},
+    ]
+    assert [row["method"] for row in map(json.loads, log.read_text().splitlines())] == ["POST"]
+    assert tree_digest(root) == before and not (root / "spec-dock/.agent").exists()
+    assert not (root / ".git/spec-dock").exists() and "operation_id" not in result
+
+
 def test_unknown_create_response_keeps_scope_unpublished_and_never_retries_post(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -917,6 +955,62 @@ def test_all_three_scope_kinds_keep_github_numbered_hierarchy_and_live_parents(
     calls = list(map(json.loads, log.read_text().splitlines()))
     assert [row["endpoint"] for row in calls if row["method"] == "GET"] == expected_gets
     assert sum(row["method"] == "POST" for row in calls) == 1
+
+
+@pytest.mark.parametrize("kind,closed_number", [("epic", 1), ("issue", 2), ("issue", 1)])
+@pytest.mark.parametrize("reason", ["completed", "not_planned"])
+def test_scope_create_rejects_a_live_closed_parent_or_ancestor_before_post_and_keeps_all_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    kind: str,
+    closed_number: int,
+    reason: str,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    parent = "init-00001"
+    if kind == "issue":
+        add_scope(root, "epic-00002", "epic", parent, root / "spec-dock/initiatives/init-00001-fixture")
+        parent = "epic-00002"
+    executable = tmp_path / "gh-bin/gh"
+    executable.write_text(
+        executable.read_text().replace(
+            " print('HTTP/2.0 200 OK\\n\\n'+json.dumps(response)); sys.exit(0)\n",
+            f" if number=={closed_number}: response.update(state='closed',state_reason={reason!r})\n"
+            " print('HTTP/2.0 200 OK\\n\\n'+json.dumps(response)); sys.exit(0)\n",
+        )
+    )
+    before = tree_digest(root)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "scope",
+            "create",
+            kind,
+            "--backend",
+            "github",
+            "--title",
+            "Blocked Child",
+            "--parent",
+            parent,
+            "--yes",
+            "--json",
+        ])
+        == 3
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed" and result["effects"] == []
+    calls = list(map(json.loads, log.read_text().splitlines()))
+    expected_numbers = [2, 1] if kind == "issue" and closed_number == 1 else [closed_number]
+    assert [(row["method"], row["endpoint"]) for row in calls] == [
+        ("GET", f"repos/example/repo/issues/{number}") for number in expected_numbers
+    ]
+    assert tree_digest(root) == before and not (root / "spec-dock/.agent").exists()
+    assert not (root / ".git/spec-dock").exists()
 
 
 def test_repository_change_during_create_keeps_the_confirmed_old_ref_without_local_publication(

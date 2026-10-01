@@ -535,6 +535,16 @@ clean `2c45e885ca48c32616d4899ee79844c553d96dc5` の通常 `make lint` はRuff�
 
 このunit前のclean 82240b58の通常make lintはRuff成功・mypy 95 errors/26 files（274 source files）、source 47/test 48 errors、make exit2で未合格。元logはiss-00413-implementation/lint-p12-82240b58.log。旧189 errorsとはsnapshotが異なる。残る旧source/tests、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**旧Scope発行・取り込み・復旧の退役**
+
+旧十九test関数（698行）と旧五source files（1478行・27 symbols）を全文確認し、[個別対応](artifacts/test-port-scope-github-retirement.md)を保存した。GitHub番号、三階層、live open親、明示title/ref、GET-only import、効果と既存資料保全を公開CLIへ対応づける。新規local採番・marker・control/epoch・共通WriterLock・registry/tombstone・永続journal/resumeを除去した。pure github_scope_scaffold/scope_ancestors/scope_scaffoldと既存local codecは維持する。候補外source/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+追加確認は階層import 2 passed（1.47秒）、terminal親/祖先のPOST前拒否6 passed（2.49秒）、GET後競合と新しい明示import 1 passed（0.88秒）、確定拒否のfailed/5・一POST・ID未発行3 passed（1.37秒）。既存Greenのcharacterizationである。最初の衝突fixtureを起動前から不正Scope pathにした期待誤り1 failed（0.20秒）は、確認済みGET中の競合を測るよう訂正し、失敗logも保持した。
+
+通常wheelの五旧module収録禁止はRed 1 failed（0.76秒）、source/test退役後の同testはGreen 1 passed（13.82秒）。関連Scope create/import/GitHub gateway五suiteは99 passed（27.76秒）。全Ruff check/format（347 files）、変更三test限定mypyとdiff checkが成功した。元logは既存Epic Workbenchのiss-00413-implementation/pytest-scope-github-retirement-port.log、pytest-scope-github-retirement-source-{red,green}.log、pytest-scope-github-retirement-related.logに保持する。
+
+95 errorsの通常lintはclean 82240b58の別snapshotであり、現在値としない。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

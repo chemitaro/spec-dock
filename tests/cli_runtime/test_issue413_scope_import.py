@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
 from tests.cli_runtime.test_issue413_scope_publish import publication_fixture
 
 if TYPE_CHECKING:
@@ -81,6 +82,60 @@ def test_import_publishes_the_confirmed_issue_number_with_get_only(
     assert [(call["method"], call["endpoint"]) for call in calls] == [("GET", "repos/example/repo/issues/413")]
     assert existing.read_bytes() == before and not (root / ".git/spec-dock").exists()
     assert "operation_id" not in result
+
+
+@pytest.mark.parametrize("kind", ["epic", "issue"])
+def test_import_keeps_explicit_live_parent_hierarchy_and_existing_metadata_with_get_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
+) -> None:
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    initiative = root / "spec-dock/initiatives/init-00001-fixture"
+    parent = initiative if kind == "epic" else add_scope(root, "epic-00002", "epic", "init-00001", initiative)
+    parent_id = "init-00001" if kind == "epic" else "epic-00002"
+    metadata_path = parent / ".meta.json"
+    payload = json.loads(metadata_path.read_bytes())
+    payload["consumer_extension"] = {"preserve": ["nested", {"value": 1}]}
+    metadata_path.write_text(json.dumps(payload))
+    metadata_path.chmod(0o640)
+    before = {path: (path.read_bytes(), path.stat().st_mode) for path in root.glob("spec-dock/**/.meta.json")}
+    git_before = tree_digest(root / ".git")
+    assert (
+        main([
+            "--project",
+            str(root),
+            "scope",
+            "import",
+            "github",
+            kind,
+            "gh:example/repo#413",
+            "--title",
+            "Imported Child",
+            "--parent",
+            parent_id,
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    prefix, container = ("epic", "epics") if kind == "epic" else ("iss", "issues")
+    metadata = json.loads((parent / container / f"{prefix}-00413-imported-child/.meta.json").read_bytes())
+    assert metadata["schema_version"] == 3 and metadata["type"] == kind
+    assert metadata["id"] == f"{prefix}-00413" and metadata["parent_id"] == parent_id
+    assert metadata["initiative_id"] == "init-00001"
+    assert metadata["epic_id"] == ("epic-00002" if kind == "issue" else None)
+    assert metadata["github"] == {"issue_number": 413, "repo_owner": "example", "repo_name": "repo"}
+    assert metadata["lifecycle"] is None and metadata["revision"] == 0
+    assert result["data"]["result"]["scope"]["id"] == f"{prefix}-00413"
+    assert result["data"]["result"]["scope"]["title"] == "Imported Child"
+    expected_numbers = [1, 413] if kind == "epic" else [2, 1, 413]
+    assert [(row["method"], row["endpoint"]) for row in map(json.loads, log.read_text().splitlines())] == [
+        ("GET", f"repos/example/repo/issues/{number}") for number in expected_numbers
+    ]
+    assert all((path.read_bytes(), path.stat().st_mode) == exact for path, exact in before.items())
+    assert tree_digest(root / ".git") == git_before and not (root / "spec-dock/.agent/work").exists()
+    assert not (root / ".git/spec-dock").exists() and "operation_id" not in result
 
 
 def test_import_returns_the_live_closed_reason_without_persisting_a_lifecycle_cache(
@@ -321,6 +376,56 @@ def test_import_of_an_already_linked_ref_fails_without_a_mutation_or_partial_suc
     assert existing.read_bytes() == before
     assert not (root / "spec-dock/initiatives/init-00001-duplicate-scope").exists()
     assert not log.exists()
+
+
+def test_import_preserves_an_occupied_destination_and_accepts_a_new_explicit_operation_after_resolution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    destination = root / "spec-dock/initiatives/init-00413-imported-scope"
+    executable = tmp_path / "gh-bin/gh"
+    original = executable.read_text()
+    executable.write_text(
+        original.replace(
+            "if method=='GET':\n",
+            "if method=='GET':\n"
+            " from pathlib import Path\n"
+            f" Path({str(destination)!r}).write_bytes(b'Unrelated existing file.\\n')\n"
+            f" Path({str(destination)!r}).chmod(0o640)\n",
+        )
+    )
+    before = {path: (path.read_bytes(), path.stat().st_mode) for path in root.glob("spec-dock/**/.meta.json")}
+    git_before = tree_digest(root / ".git")
+    command = [
+        "--project",
+        str(root),
+        "scope",
+        "import",
+        "github",
+        "initiative",
+        "gh:example/repo#413",
+        "--title",
+        "Imported Scope",
+        "--json",
+    ]
+    assert main(command) == 3
+    failed = json.loads(capsys.readouterr().out)
+    assert failed["status"] == "failed" and failed["data"]["result"]["changed"] is False
+    assert failed["data"]["result"]["github_ref"] == "gh:example/repo#413"
+    assert failed["effects"] == [{"kind": "scaffold", "status": "not_attempted", "target": "init-00413"}]
+    assert all((path.read_bytes(), path.stat().st_mode) == exact for path, exact in before.items())
+    assert tree_digest(root / ".git") == git_before
+    assert destination.read_bytes() == b"Unrelated existing file.\n" and destination.stat().st_mode & 0o777 == 0o640
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+    destination.unlink()  # The operator resolves the conflict before submitting a new operation.
+    executable.write_text(original)
+    assert main(command) == 0
+    succeeded = json.loads(capsys.readouterr().out)
+    assert succeeded["data"]["result"]["scope"]["id"] == "init-00413"
+    assert json.loads((destination / ".meta.json").read_bytes())["title"] == "Imported Scope"
+    assert [row["method"] for row in map(json.loads, log.read_text().splitlines())] == ["GET", "GET"]
+    assert tree_digest(root / ".git") == git_before and not (root / ".git/spec-dock").exists()
+    assert "operation_id" not in failed and "operation_id" not in succeeded
 
 
 def test_import_retains_the_exact_ref_after_input_changes_during_get_without_claiming_a_remote_mutation(
