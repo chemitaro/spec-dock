@@ -361,7 +361,10 @@ def test_legacy_doctor_does_not_treat_known_schema_alone_as_a_readable_complete_
     if kind in ("journal", "missing_journal"):
         path = base / "operations" / ("a" * 32) / "journal.json"
     path.parent.mkdir(parents=True)
-    payload = {"schema_version": 1 if kind in ("engine", "registry") else 3, "private": "private-body-secret"}
+    payload: dict[str, object] = {
+        "schema_version": 1 if kind in ("engine", "registry") else 3,
+        "private": "private-body-secret",
+    }
     if kind == "journal":
         payload = {"terminal_status": "succeeded", "effects": [], "private": "private-body-secret"}
     if kind != "missing_journal":

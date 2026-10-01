@@ -67,8 +67,8 @@ def test_directory_identity_uses_win32_volume_and_128_bit_file_id(tmp_path) -> N
 
     class KernelDirectoryAPI:
         def __init__(self) -> None:
-            self.opened = []
-            self.closed = []
+            self.opened: list[tuple[object, ...]] = []
+            self.closed: list[int] = []
 
         def CreateFileW(self, *args):
             self.opened.append(args)

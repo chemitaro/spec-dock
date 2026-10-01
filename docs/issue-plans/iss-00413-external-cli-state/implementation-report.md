@@ -859,3 +859,11 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 通常wheel収録禁止はRed 1 failed（0.80秒）、source退役後の同testはGreen 1 passed（15.49秒）。関連Active/branch/Scope delete/Finish148 tests（34.11秒）、全Ruff check/format（357 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-selection-retirement-port.log、pytest-selection-retirement-source-{red,green}.log、pytest-selection-retirement-related.logへ保持。
 
 直近通常lintの313 errorsは別snapshotの未合格記録である。残る旧Source/tests、現行型問題、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 通常型gateと現行試験の型補正
+
+clean `2c45e885ca48c32616d4899ee79844c553d96dc5` の通常 `make lint` はRuff成功、mypy 189 errors/32 files（276 source files）、make exit2で未合格だった。元logは既存Epic Workbenchの `iss-00413-implementation/lint-p12-2c45e885.log` に保持した。313 errorsは旧snapshotの記録である。
+
+現行のGit診断・Windows外部API fixture・branch adapter・legacy doctor・migrationの五test filesについて29件の型問題を補正した。Git診断のdict形状をassertし、空list/JSON payloadの型、bytes refとtree digestの変数を区別した。migrationの障害注入callbackは実際のbackup/context/OS replaceの引数と返値へ揃え、検証条件と障害時機を保持した。ignore/cast/skip/収集除外を増やさず、製品sourceやconsumer状態は変更しない。
+
+五suiteは108 passed（18.48秒）、全source/tests Ruff check/format（357 files）、変更五test限定mypy `--follow-imports=silent` とdiff checkが成功した。元logは `iss-00413-implementation/pytest-current-test-types.log`。これは既存試験の型補正であり、新機能Red→Green、Windows native、通常full gate、fresh Strictの合格ではない。残る旧実装の個別退役と全体検証を続ける。

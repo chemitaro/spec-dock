@@ -54,9 +54,9 @@ def test_branch_adapter_create_show_switch_and_dry_run(tmp_path: Path, capsys: p
     switched = json.loads(capsys.readouterr().out)
     assert switched["data"]["result"]["switched"] is True
     assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"init-00001-fixture\n"
-    before = subprocess.check_output(["git", "-C", str(root), "show-ref"])
+    refs_before = subprocess.check_output(["git", "-C", str(root), "show-ref"])
     assert main([*arguments, "create", "init-00001", "--base", "HEAD", "--json"]) == 3
     rejected = json.loads(capsys.readouterr().out)
     assert rejected["effects"] == [] and "already exists" in rejected["error"]["message"]
-    assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == before
+    assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == refs_before
     assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()

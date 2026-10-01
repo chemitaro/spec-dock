@@ -16,7 +16,11 @@ from spec_dock.cli import main
 from tests.cli_runtime.test_issue413_work_start import committed_workspace
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
+
+    from spec_dock.runtime.application.project_context import ProjectContext
+    from spec_dock.runtime.infra.migration_backup import BackupTree, VerifiedBackup
 
 
 TARGET = ["--to-schema", "3", "--to-writer-protocol", "specdock.worktree-writer/v1"]
@@ -115,8 +119,10 @@ def test_migration_rechecks_verified_backup_before_publication(
     backup = tmp_path / "backup"
     original = direct_migration.create_verified_backup
 
-    def replace_backup(*args: object, **kwargs: object) -> object:
-        result = original(*args, **kwargs)
+    def replace_backup(
+        backup_path: Path, sources: tuple[BackupTree, ...], *, verify: Callable[[], None]
+    ) -> VerifiedBackup:
+        result = original(backup_path, sources, verify=verify)
         (backup / "checkout/spec-dock/workspace.json").write_bytes(b"backup replaced after verification\n")
         return result
 
@@ -152,8 +158,14 @@ def test_migration_after_publication_interruption_reports_uncertainty_and_fresh_
     backup = tmp_path / "backup"
     original = os.replace
 
-    def replace_then_fail(source: str, target: str, **kwargs: object) -> None:
-        original(source, target, **kwargs)
+    def replace_then_fail(
+        source: str | Path,
+        target: str | Path,
+        *,
+        src_dir_fd: int | None = None,
+        dst_dir_fd: int | None = None,
+    ) -> None:
+        original(source, target, src_dir_fd=src_dir_fd, dst_dir_fd=dst_dir_fd)
         if target == "workspace.json":
             raise OSError("interrupted after atomic publication")
 
@@ -718,8 +730,10 @@ def test_migration_detects_an_unrelated_user_edit_after_backup_and_leaves_it_int
     backup = tmp_path / "backup"
     original = direct_migration.create_verified_backup
 
-    def concurrent_edit(*args: object, **kwargs: object) -> object:
-        verified = original(*args, **kwargs)
+    def concurrent_edit(
+        backup_path: Path, sources: tuple[BackupTree, ...], *, verify: Callable[[], None]
+    ) -> VerifiedBackup:
+        verified = original(backup_path, sources, verify=verify)
         body.write_bytes(b"concurrent user edit\n")
         return verified
 
@@ -759,13 +773,15 @@ def test_migration_retains_native_git_errors_after_a_confirmed_backup_or_publica
     original_backup = direct_migration.create_verified_backup
     backup_returned = False
 
-    def backup_and_mark(*args: object, **kwargs: object) -> object:
+    def backup_and_mark(
+        backup_path: Path, sources: tuple[BackupTree, ...], *, verify: Callable[[], None]
+    ) -> VerifiedBackup:
         nonlocal backup_returned
-        verified = original_backup(*args, **kwargs)
+        verified = original_backup(backup_path, sources, verify=verify)
         backup_returned = True
         return verified
 
-    def context_or_error(*args: object, **kwargs: object) -> object:
+    def context_or_error(project: str | None, cwd: Path, *, timeout: float = 30) -> ProjectContext:
         published = (
             json.loads((root / "spec-dock/workspace.json").read_bytes())["writer_protocol"]
             == "specdock.worktree-writer/v1"
@@ -782,7 +798,7 @@ def test_migration_retains_native_git_errors_after_a_confirmed_backup_or_publica
                 128,
                 stdout=b"native stdout\n",
             )
-        return original_context(*args, **kwargs)
+        return original_context(project, cwd, timeout=timeout)
 
     monkeypatch.setattr(direct_migration, "create_verified_backup", backup_and_mark)
     monkeypatch.setattr(direct_migration, "resolve_context", context_or_error)
