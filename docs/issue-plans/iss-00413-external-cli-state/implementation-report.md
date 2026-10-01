@@ -919,3 +919,11 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 追加確認は不正metadata/旧active四casesで4 passed（0.46秒）、scoped Workbenchのopaque metadata/外部link保全で1 passed（0.25秒）。既存Greenのcharacterizationである。通常wheelの旧五module実収録禁止はRed 1 failed（0.82秒）、source/test退役後の同testはGreen 1 passed（14.40秒）。関連migration/doctor/validate/公開adapter四suiteは159 passed（23.91秒）。初回関連suiteの旧filename誤指定はpytest exit4、0 tests（0.00秒）で、実inventory確認後に訂正し元logを保持した。製品Redに数えない。
 
 全Ruff check/format（340 files）、変更二test限定mypyとdiff checkが成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-migration-retirement-port.log、pytest-migration-retirement-source-{red,green}.log、pytest-migration-retirement-related.logへ保持。55 errorsの通常lintはclean d7f47fc0の別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 旧control・registry・writer lock helpersの退役
+
+**旧control・registry・writer lock helpersの退役**
+
+旧七source filesの1002行・38 top-level symbolsを全文確認し、[対応記録](artifacts/test-port-control-retirement.md)を保存した。絶対／相対／TYPE_CHECKING／子moduleを含む候補外importは0。Git共通領域のcontrol/epoch/engine登録、local採番予約・永久branch binding、operation/handover/finalization journal、全writer lock file／WT lifetime leaseを削除した。current Startだけの排他、直接選択・捕捉token解除、現schema/protocol検査、readonly legacy診断は維持する。旧Git内データと別packageのgroup journalはこのunitで変更しない。
+
+通常wheelの旧七module収録禁止はRed 1 failed（0.90秒）、退役後の同testはGreen 1 passed（16.52秒）。Start/lock options/Doctor/別process競合・kill/migration/static assets七suiteは259 passed（120.89秒）、exit0。全Ruff check/format（333 files）・変更test限定mypy・diff checkが成功。既存test削除0、skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-control-retirement-source-{red,green}.logとpytest-control-retirement-related.logへ保持。残る旧source、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

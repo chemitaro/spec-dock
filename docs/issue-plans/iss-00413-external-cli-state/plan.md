@@ -561,6 +561,12 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 
 全Ruff check/format（340 files）、変更二test限定mypyとdiff checkが成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-migration-retirement-port.log、pytest-migration-retirement-source-{red,green}.log、pytest-migration-retirement-related.logへ保持。55 errorsの通常lintはclean d7f47fc0の別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**旧control・registry・writer lock helpersの退役**
+
+旧七source filesの1002行・38 top-level symbolsを全文確認し、[対応記録](artifacts/test-port-control-retirement.md)を保存した。絶対／相対／TYPE_CHECKING／子moduleを含む候補外importは0。Git共通領域のcontrol/epoch/engine登録、local採番予約・永久branch binding、operation/handover/finalization journal、全writer lock file／WT lifetime leaseを削除した。current Startだけの排他、直接選択・捕捉token解除、現schema/protocol検査、readonly legacy診断は維持する。旧Git内データと別packageのgroup journalはこのunitで変更しない。
+
+通常wheelの旧七module収録禁止はRed 1 failed（0.90秒）、退役後の同testはGreen 1 passed（16.52秒）。Start/lock options/Doctor/別process競合・kill/migration/static assets七suiteは259 passed（120.89秒）、exit0。全Ruff check/format（333 files）・変更test限定mypy・diff checkが成功。既存test削除0、skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-control-retirement-source-{red,green}.logとpytest-control-retirement-related.logへ保持。残る旧source、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
