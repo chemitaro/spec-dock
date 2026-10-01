@@ -643,3 +643,21 @@ CI scriptのfixed bin/lib生成、asset copy、version.txt、digest preflightと
 旧CI七casesの判断は[移行根拠](artifacts/test-port-ci.md)へ記録した。tracked/untracked dirty、短縮/不正SHAとSHA不一致はbuild前に拒否する。旧engine digest形式検査はwheel build故障に置換し、故障時の実console未実行、source/target不変を確認する。全casesでentry type/mode/bytesのsource/target snapshotを比較した。`uv run pytest tests/integration/test_ci_fixed_validation.py -q --tb=short` は7 passed（4.42秒）。native Bashのsyntax checkと変更test一file限定mypyも成功した。CI workflowへPython 3.11とuvの明示導入を追加し、既存Provider配布laneを新wheel/単WT static installationへ変更した。通常lintと全pytestを削らない。
 
 これはmacOSローカルのscript実行とhermetic fixtureの証拠であり、GitHub Actionsの実ジョブ成功ではない。provider/runtime helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer適用は未完了。実dogfoodとGit内の旧独自領域は変更せず、P-12とgoalを進行中に維持する。
+
+## P-12 実consumerのCI読取と全件pytestの途中確認
+
+cleanな`323caf28084f7d7087e8ea96999e3ee2e2fad033`から、通常wheelを外部へbuild/installする同じCI scriptで実consumerのHEADを読み取った。最初の通常python3（3.12.6）はfresh venvの標準libraryを解決できず、wheel install前にexit2となった。元logはWorkbenchに保持した。グローバルPythonや製品依存を変更せず、試験で使う有効な`uv run python`（3.12.11）の環境で再確認した。
+
+後者はexit0/v2/succeeded、snapshot_source=HEAD、snapshot_oid=`323caf28084f7d7087e8ea96999e3ee2e2fad033`、valid=true/node_count=240/findings=0/effects=[]だった。実metadata集約hashは前後とも`0d380bdcfb2efd492eaaae8b072e105538b75c1d6099de8df321b6f9ea449e74`、workspace宣言は前後とも`53920a4d2f3fd34c51e37f47d1e0baa87227f34bef7b5d2cb8f2f07700fea8b0`。旧writerの宣言や実Scopeは変更していない。read-only CIの実console確認であり、正式Start・migration・dogfood切替や最終手動製品受入ではない。
+
+同じsource候補で未除外の`uv run pytest -q --tb=short`を全件実行し、exit1/79 failed/2056 passed/1 skipped（417.10秒）だった。失敗は旧CLI adapter、旧内部dispatcher、全WT installation/recoveryなど18 filesにある。廃止引数、旧Namespace属性、旧v1 payload/中央controlの期待が目立つが、名前だけで全件を不要と判断しない。各fileを本文/正本/現行回帰へ対応させ、full gate前に閉じる。成功件数を全体合格へ読み替えず、policy skip/除外ledgerを追加しない。
+
+完全なraw logとJSON要約は既存Epicのignored Workbench `iss-00413-implementation/ci-current-323caf28{,-uv}.{log,json}` と `pytest-p12-323caf28.log` に保持する。実repoのbranch/HEADは保持され、tracked差分0だった。
+
+## P-12 Writer admissionの公開境界へのport
+
+中央登録/engine digest/epoch、maintenance mode、global pending recovery、全writer leaseを要求する旧14 casesの判断を[移行根拠](artifacts/test-port-writer-admission.md)へ記録し、自WTのwriter宣言と公開Scope編集の四casesへ置換した。新protocolは中央登録なしでも動き、自WTの旧protocolではeffect0/exit3で拒否する。別linked WTが旧protocolでも自WTを編集でき、他WTと旧control/opaque記録を変更しない。Git common-dirの実共有は維持する。
+
+さらに実common-dirのStartLockを保持した親processから、別linked WTのpublic mainを別processで起動してScope編集が成功することを確認した。自WT/旧controlのbytesは不変、直接記録の生成0で、短いStart排他を全編集の権限やleaseに広げない。既存の別process競合・owner強制終了後の解放・同Scope重複/兄弟並行開始は現行Start試験で維持し、旧leaseの内部呼出し順を製品保証へ戻さない。
+
+新しい四casesは4 passed（0.77秒）。続いて公開Scope編集、Start排他・同時開始、migrationと合わせた `uv run pytest tests/integration/test_cli_writer_compatibility_vnext.py tests/cli_runtime/test_issue413_scope_edit.py tests/unit/infra/test_start_lock.py tests/integration/test_issue413_start.py tests/integration/test_issue413_migration.py -q --tb=short` は63 passed（14.63秒）。全source/tests Ruff check/format（423 files）、変更一test file限定mypy、diff checkも成功した。既存実装のGreen回帰であり、製品修正のRedではない。元old writer APIsを新しい製品経路へつなぐ変更は行っていない。旧runtime/provider helperの退役、79旧経路失敗の個別port、native Windows、全体gate、fresh Strict、Final Quality Gate、最終手動確認、実consumer適用は未完了。goalをactiveのまま継続する。

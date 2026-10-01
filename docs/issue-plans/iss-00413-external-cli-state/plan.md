@@ -396,6 +396,8 @@ README・配布reference・migration・offline HTML・二skillを外部CLIと一
 
 CIのfixed bundle経路も通常wheelへ移し、新writerのHEAD検証が旧v1/exit7からv2/exit0へ変わるRed→Greenを確認した。[CIテストの移行](artifacts/test-port-ci.md)に七casesの維持/変更理由を記録する。source SHA/clean確認後のGit archiveをbuildし、外部venvの実consoleで読取だけを行う。元source/targetは全entry type/mode/bytesが不変、旧builder sentinelの実行0。CI suite 7 tests（4.42秒）が成功した。既存Ubuntu/macOS配布laneは新wheel/static installationの試験へ切替え、通常lint/全pytestは保持した。remote CI実行、Windows、全体gateは未完了。
 
+同候補の実consumerを通常wheel/実consoleでHEAD検証し、240 nodes/valid/効果0、metadata/workspace hash不変を確認した。通常全pytestの途中確認は79 failed/2056 passed/1 skipped（417.10秒）で、18旧経路filesの個別portが残る。[Writer admission移行](artifacts/test-port-writer-admission.md)では旧14 casesの仕様判断を記録し、自WT宣言、他WT protocol不一致の非干渉、実Start排他中の別WT Scope編集を四公開cases（0.77秒）で確認した。全件成功/Windows native/実cutover/fresh Strictの実績へ読み替えない。
+
 **変更禁止**: 実導入先への無断一括同期、Scope/成果物/直接状態の削除、未知ユーザー改変の上書き、gpt-5.6専用coder roleへの誘導を禁止。
 
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
