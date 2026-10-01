@@ -418,6 +418,8 @@ Worktree旧adapterの三関数も[移行記録](artifacts/test-port-worktree-ada
 
 旧group installation/finalization/engine handover四files・54関数も[個別判断](artifacts/test-port-installation-retirement.md)を記録して退役した。新仕様と逆向きの全WT control/epoch/rollback成功条件を外し、公開static・wheel/provider/retired-option suiteで後継を維持する。native fsync境界でsame-bytes/mode・別inodeの外部差替えを注入するupdate/uninstall二casesも成功し、関連99 tests（74.91秒）、全Ruff/変更一test限定mypyが成功した。旧sourceの参照整理と全体gateは継続する。
 
+旧fixed bundleの二入口も[製品退役の判断](artifacts/provider-retirement-fixed-entrypoints.md)を記録し、先行した実wheel収録禁止のRed（1 failed/0.80秒）から二source削除後のGreen（1 passed/14.34秒）を確認した。fresh sdist/通常wheel/外部venv/実consoleと静的資産保全を検査し、関連24 tests（13.03秒）と全Ruff/変更test限定mypyが成功。runtime_loaderと旧dispatcher/制御sourceの参照整理、README/AGENTS記述、通常全体gateは継続する。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

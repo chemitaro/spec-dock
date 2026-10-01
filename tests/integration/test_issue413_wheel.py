@@ -30,6 +30,9 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     wheel = next(wheel_dir.glob("*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
+        retired_entrypoints = {"spec_dock/external_cli.py", "spec_dock/fixed_bundle.py"}
+        included_retired = retired_entrypoints.intersection(names)
+        assert included_retired == set(), sorted(included_retired)
         expected_runtime = {
             "spec_dock/" + path.relative_to(ROOT / "src/spec_dock").as_posix()
             for path in (ROOT / "src/spec_dock/runtime").rglob("*.py")

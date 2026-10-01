@@ -732,3 +732,12 @@ Syncは通常/previewともdirect記録とopaqueな旧generationを更新せず�
 旧試験のsame-content inode差替え条件を公開static操作に移した。native fsync後のbackup directoryを境界に、外部actorが観測済み資産を同bytes/mode・別inodeへ置換する。update一件は1 passed（2.42秒）、uninstallへ広げた二casesは2 passed（4.52秒）だった。既存実装のGreen確認であり、製品Redではない。CLIはpartial/6、backup/restore成功、全変更/退役not_attemptedを返し、actorのファイル・target/Git tree・実backupを保持した。
 
 `uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_cli_entrypoint_vnext.py tests/unit/infra/test_provider_distribution.py tests/integration/test_cli_recovery_vnext.py -q --tb=short` は99 passed（74.91秒）。既存Epic Workbenchのiss-00413-implementation/pytest-installation-retirement.logへ保持する。全source/tests Ruff check/format（420 files）、変更一test限定mypy --follow-imports=silent、diff checkも成功した。限定Greenを全体gateへ読み替えず、provider/runtime旧経路の退役、full type/pytest、native Windows、fresh Strict、最終手動製品確認を継続する。実consumer・既存WT・live GitHubへの適用は行っていない。
+
+
+## P-12 fixed bundle入口の製品source退役
+
+二つの旧sourceを全文確認し、[関数単位の移行判断](artifacts/provider-retirement-fixed-entrypoints.md)へ残した。普通のspec_dock.cli:mainへ既に統合された旧external preflight/control/locator経路と、bin/libを追加copyするfixed builderを退役する。sourceのinboundは旧builderのlauncher文字列だけで、両moduleを同時に削除した。testの禁止文字列とCI sentinelを実行参照と混同しない。runtime_loaderと旧runtime/application/commandは後続の参照整理へ残す。
+
+実wheelの収録禁止を先に追加し、正常buildのartifactに二つの旧入口が存在するRedを確認した（1 failed/0.80秒）。二source削除後、同じtestは1 passed（14.34秒）。通常wheel/sdist、非editable外部venv、context不要utility、Scope/CI validate、shimとstatic操作を確認する既存受入れ経路を最後まで実行した。既存build_pyがbuild_libのpackageを新しく作り直すため、過去のbuild出力を同梱しない。新除外条件・builder fallbackは追加していない。
+
+`uv run pytest tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_ci_fixed_validation.py tests/unit/infra/test_provider_distribution.py -q --tb=short` は24 passed（13.03秒）。既存Epic Workbenchのiss-00413-implementation/pytest-fixed-entrypoint-retirement.logへ保持。全source/tests Ruff check/format（418 files）、変更wheel test限定mypy --follow-imports=silent、diff checkも成功した。実consumer/live GitHubを変更せず、旧source/README/AGENTSの退役整理、full type/pytest、native Windows/Python3.10、fresh Strictと最終手動確認を継続する。
