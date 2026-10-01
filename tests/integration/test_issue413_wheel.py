@@ -120,6 +120,18 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         }
         included_retired = retired_entrypoints.intersection(names)
         assert included_retired == set(), sorted(included_retired)
+        json_helpers = archive.read("spec_dock/runtime/infra/json_store.py")
+        for retired_function in (
+            "atomic_write_json",
+            "reconcile_atomic_json",
+            "_rename_exchange_at",
+            "_exchange_topology",
+            "_write_transaction_record",
+            "_target_identity",
+        ):
+            assert f"def {retired_function}(".encode() not in json_helpers
+        assert b".specdock-json-transactions" not in json_helpers
+        assert b"import uuid" not in json_helpers
         expected_runtime = {
             "spec_dock/" + path.relative_to(ROOT / "src/spec_dock").as_posix()
             for path in (ROOT / "src/spec_dock/runtime").rglob("*.py")

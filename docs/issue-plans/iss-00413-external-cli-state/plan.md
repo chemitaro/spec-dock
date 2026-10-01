@@ -644,6 +644,14 @@ uv build --wheel
 
 修正後、3.10の関連二suiteは56 passed/1 skipped（0.30秒）、既定3.12の同suiteは56 passed/1 skipped（0.21秒）、実3.10の通常全pytestは1866 passed/1 skipped（365.74秒）、全てexit0。skipは既存Linux O_TMPFILE capability testでありDarwinでのnative成功ではない。全Ruff（311 files）、MYPYPATH=srcの変更test限定mypyとdiff checkが成功した。P-12中の予備検証であり、残る旧source/tests、実Linux/Python3.11、Windows native、通常full lint、fresh Strict、最終手動確認は継続中。実consumer/live GitHubは未変更。
 
+## P-12 旧JSON transaction writerの退役
+
+旧json_store.py全345行・16 functionsと旧八test（157行）を全文確認し、[個別対応](artifacts/test-port-json-journal-retirement.md)を保存した。guarded reader/物理directory/native no-replaceと基本JSON I/Oは残し、UUID付きintent/stage/done、exchange後復元、reconcileを退役した。旧六関数を削除し、flag切替helperを現行no-replaceへ統合した。候補外import/attribute参照は0。現行のbytes/identity再検査、一file置換、unknown/partialを維持し、任意writerの原子的CASや旧bytes常設保存と同じ保証を主張しない。旧consumerの証拠/path/hashは変更しない。
+
+削除前の後継九casesは9 passed（0.20秒）、既存Greenのcharacterizationである。通常wheelの旧writer収録禁止はRed 1 failed（0.73秒）→Green 1 passed（13.49秒）。関連九suiteは236 passed（79.68秒）、実Python 3.10.15の後継/native record kill/store三suiteは23 passed（4.14秒）、全てexit0。全Ruff（311 files）、MYPYPATH=srcの変更三Python files限定mypyとdiff checkが成功した。初回のregex/OS callback型の二指摘はfixtureの実契約へ修正し、ignore/cast/skip/収集除外を増やさない。
+
+通常make lintは今回Python差分適用後にRuff成功・mypy 32 errors/11旧source files（230 source files）、make exit2。先行3.10全件成功は別候補であり、残る旧source/tests、今回の全件/native Linux/Python3.11/Windows、fresh Strict、最終手動確認は継続中。元logsはiss-00413-implementation/pytest-direct-json-retirement-{port,source-red,source-green,related,python310}.log、direct-json-test-typing.log、lint-direct-json-retirement.logへ保持。実consumer/live GitHubは未変更。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
