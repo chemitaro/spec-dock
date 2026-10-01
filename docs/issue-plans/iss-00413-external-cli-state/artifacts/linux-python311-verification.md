@@ -50,3 +50,13 @@ clean `c4c26bdb231a37c6491a5ac1d3614dde564e0ca5` を同じLinux/Python 3.11.16�
 | 全Ruff check/format（304 files）、MYPYPATH=srcの変更test限定mypy、diff check | 成功。full lintの代替ではない |
 
 test削除、assertion緩和、skip/収集除外追加、製品source変更は0。現在のadapter/Delete退役を含まない全件結果とfocused結果を合算してpassにせず、後のclean候補でfull gateを閉じる。元logsは `pytest-linux-python311-c4c26bdb.log`、`pytest-linux-hook-isolation.log`、`pytest-bootstrap-timeout-{linux,macos}.log`。全件runner/補正候補runnerと検証cloneはWorkbench内の一時dataであり、実consumerやGitHubへの変更ではない。
+
+## 三回目のclean全件
+
+clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは **1851 passed / 17 skipped、932.00秒（15分31秒）、exit0**。同じ実Linux/Python 3.11.16、実効capability0、USER未設定、offline/no-network、Linux tmpfs fixtureで実行した。run前にclean HEAD、uv.lock/pyproject/testの主checkoutとのbytes一致、実prefix/provider import元を再確認し、元の一回のsessionを完了まで待った。
+
+17 skipはZsh未導入の12 cases、macOS named-stage capability probeの一case、Linux匿名stageでは適用しないpathname cleanupの四cases。skip追加、test選択変更、native成功への読み替えはない。UID0でもcapabilityを全て外しており、実directory権限によるStart rename拒否もこの全件に含む。
+
+この結果にはadapter/Delete退役とbootstrap timeout fixture補正が含まれる。後続 `7d29648d` の旧Create/Artifact writer退役・追加試験は含まれない。先行の失敗/個別試験を合算して合格にせず、このclean SHA一回のexit0だけを全件証拠とする。P-12中の予備検証であり、現在候補のfull lint、P-13、Windows native、fresh Strict、Final Quality Gate、最終手動確認の完了ではない。
+
+元logは `iss-00413-implementation/pytest-linux-python311-0fd8764f.log`。独立clone・offline依存・runnerは必要な後続検証へ再利用し、所有した一時dataだけを後で整理する。実consumer/live GitHubは未変更。

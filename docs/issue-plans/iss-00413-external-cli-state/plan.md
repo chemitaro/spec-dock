@@ -686,6 +686,10 @@ clean c4c26bdbの実Linux/Python 3.11.16全件は1839 passed/1 failed/17 skipped
 
 削除前の保全十一casesは11 passed/107 deselected（1.36秒）。通常wheel収録禁止はRed 1 failed（0.88秒）→Green 1 passed（15.35秒）、関連六suite 235 passed/1 skipped（37.91秒）、実Python 3.10.15の同十一cases 11 passed/107 deselected（1.32秒）、全て期待したexitとなった。skipは既存Linux O_TMPFILE capability testである。全Ruff（300 files）、変更三test限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 17 errors/8旧source files（219 files）、make exit2。型ignore/収集除外/skip追加0。今回より前の0fd8764fのLinux全件成功を今回の全件証拠とは扱わない。残る旧source/Windows/full gates/fresh Strict/最終手動確認を継続し、実consumer/live GitHubは未変更。
 
+**実Linux/Python 3.11のclean全件再検証**
+
+clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passed/17 skipped（932.00秒）、exit0。[環境と元runの記録](artifacts/linux-python311-verification.md)へ保存した。capability0、USER未設定、offline、Linux tmpfs、HEAD/clean/source/prefixを再照合し、同一sessionで完了した。skipの内訳はZsh 12/macOS専用probe 1/Linux匿名stageで非該当cleanup 4でありnative成功に数えない。後続7d29648dの旧Create/Artifact退役は含まず、現在候補のfull lint・P-13・Windows native・fresh Strict・Final Quality Gate・最終手動確認は未完了。実consumer/live GitHubは未変更。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
