@@ -22,6 +22,7 @@ from spec_dock.runtime.infra.json_store import open_guarded_directory
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.lifecycle import SelectionState
 
 
@@ -41,7 +42,13 @@ class ArtifactCatalog:
     items: tuple[ArtifactCatalogEntry, ...]
 
 
-def list_artifacts(*, repo_root: Path, scope: str, selection: SelectionState | None = None) -> ArtifactCatalog:
+def list_artifacts(
+    *,
+    repo_root: Path,
+    scope: str,
+    selection: SelectionState | None = None,
+    views: tuple[ScopeView, ...] | None = None,
+) -> ArtifactCatalog:
     """Return identifiers only; source paths, contents, hashes, and sizes stay private."""
     specdock_dir = repo_root / "spec-dock"
     if specdock_dir.is_symlink() or not specdock_dir.is_dir():
@@ -51,7 +58,7 @@ def list_artifacts(*, repo_root: Path, scope: str, selection: SelectionState | N
         scope_id = "root"
         owner = specdock_dir
     else:
-        target = show_scope(load_scope_views(specdock_dir), scope, selection=selection)
+        target = show_scope(views if views is not None else load_scope_views(specdock_dir), scope, selection=selection)
         scope_id = target.id
         owner = target.path
     artifacts_dir = owner / "artifacts"

@@ -35,7 +35,7 @@ def inspect_structure(root: Path) -> tuple[tuple[ScopeView, ...], tuple[Diagnost
         findings.append(Diagnostic("DEPENDENCY_INVALID", "Scope dependency graph cannot be verified", {}))
     for scope in ("@root", *(view.id for view in views)):
         try:
-            list_artifacts(repo_root=root, scope=scope)
+            list_artifacts(repo_root=root, scope=scope, views=views)
         except (OSError, ValueError, RuntimeError):
             findings.append(
                 Diagnostic("ARTIFACT_INVALID", "Artifact catalog cannot be read safely", {"scope_id": scope})

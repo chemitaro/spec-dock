@@ -125,7 +125,7 @@ HELP_EFFECTS: dict[str, str] = {
     "workspace sync": "Observe current Scope lifecycle and same-clone worktree selections without writing files.",
     "workspace validate": "Read and validate the workspace; --ci checks committed data without installation state. No changes.",
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
-    "workspace migrate": "Migrate registered worktrees and control under maintenance.",
+    "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
     "installation show": "Read installed engine and worktree inventory; no changes.",
     "installation init": "Install managed tooling and initial control in a Git repository.",
     "installation update": "Replace managed tooling from one pinned source; --finalize verifies all targets and leaves maintenance.",
@@ -229,7 +229,12 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--github-head-sha"),
         _flag("--github-extended"),
     ),
-    "workspace migrate": (_required("--to-schema"), _arg("--mapping-file")),
+    "workspace migrate": (
+        _required("--to-schema"),
+        _required("--to-writer-protocol"),
+        _arg("--backup-dir"),
+        _flag("--confirm-old-writers-stopped"),
+    ),
     "installation show": (_arg("--target"),),
     "installation init": (_arg("path"),),
     "installation update": (
@@ -340,7 +345,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "workspace sync": "Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.",
     "workspace validate": "A readable workspace is required; --ci validates committed data without installation state.",
     "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
-    "workspace migrate": "Inspection with --dry-run can inventory without --mapping-file. Applying a migration requires an inventory-bound --mapping-file, maintenance state, and valid migration guards.",
+    "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
     "installation show": "The selected repository must have readable installation control.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
     "installation update": "Ordinary apply needs one pinned --version or --commit. --finalize verifies the maintained group without a new source. --activate-engine needs the recorded --from-update. --resume and --rollback require their fixed operation ID and mode-specific guards.",
@@ -438,6 +443,7 @@ def _example(leaf: str) -> str:
         "--base": "HEAD",
         "--to-worktree": "/absolute/worktree",
         "--to-schema": "3",
+        "--to-writer-protocol": "specdock.worktree-writer/v1",
     }
     for argument in LEAF_ARGUMENTS[leaf]:
         name = argument.names[0]
@@ -453,7 +459,7 @@ def _example(leaf: str) -> str:
     if leaf == "worktree create":
         words.extend(("--root", "/absolute/worktrees"))
     if leaf == "workspace migrate":
-        words.extend(("--mapping-file", "<mapping.json>"))
+        words.extend(("--backup-dir", "/absolute/backup", "--confirm-old-writers-stopped", "--yes"))
     if leaf == "active clear":
         words.append("--all")
     if leaf == "installation update":
@@ -492,7 +498,7 @@ def _help_spec(leaf: str) -> HelpSpec:
             "Does not delete GitHub Issues or Git branches; only the explicitly authorized local subtree is removed."
         )
     elif leaf == "workspace migrate":
-        does_not = "Does not migrate independent repositories outside the selected Git common directory."
+        does_not = "Does not rewrite Scope data, import legacy active, alter other worktrees or Git metadata, acquire a Start lock, or replay old records."
     preconditions = HELP_PRECONDITIONS[leaf]
     json_data = "help text or shell script." if leaf in {"help", "completion"} else _JSON_DATA_BY_ROOT[root]
     json_version = "specdock.cli/v2"
@@ -514,6 +520,11 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not execute the retired engine, repair control, resume journals, acquire a Start lock, or write any project state."
         json_data = "findings and unverified observations; unsafe, unknown or incomplete evidence returns exit 7."
         confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf == "workspace migrate":
+        target = "Only this worktree's spec-dock/workspace.json declaration."
+        reads = "Current Scope structure, Git worktree inventory, retired record headers, and actual checkout/common-Git data for the external backup."
+        json_data = "target, before_protocol, after_protocol, changed_paths, backup_path, backup_verified and restore_verified; legacy active is preserved without import."
+        confirmation = "Apply requires --yes and --confirm-old-writers-stopped; the latter is a human operational confirmation, not a monitored guarantee. --dry-run needs neither."
     elif leaf.startswith("scope create"):
         reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."
         json_version = "specdock.cli/v2"

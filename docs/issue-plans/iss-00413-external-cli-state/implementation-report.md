@@ -517,3 +517,19 @@ raw flags未接続のexit2、旧pending操作を無視したexit0、GitHub指定
 検証 `uv run pytest tests/cli_runtime/test_issue413_workspace_doctor.py tests/cli_runtime/test_workspace_doctor_vnext.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_issue413_work_start.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_finish.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_dependency_vnext.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree_bootstrap.py tests/integration/test_issue413_observation.py tests/integration/test_issue413_sync.py tests/integration/test_issue413_wheel.py tests/unit/infra/test_work_target_store.py tests/unit/infra/test_start_lock.py -q` は460 passed（88.15秒）。全source/testsのRuff check/format（410 files）、変更12 source限定mypy、diff checkが成功した。限定型検査は全体gateの代替ではない。
 
 局所migrationとvalidate、P-12以後、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択は変更していない。レビュー用pushの回答を待ち、SHA一致を満たさないStrictは起動せず、既存の実装認可に基づくローカル作業を継続する。goalはactiveである。
+
+## P-11 schema3 workspaceの局所移行を接続
+
+`workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1`を通常external runtimeへ接続した。現在のschema3 workspace宣言だけをatomicに切り替え、存在する旧control_epochだけを除去する。既存のtitle/project_linkageがなければ追加せず、未知任意設定、全Scope ID/path/backend/linkage/親子/依存/本文のbytesを保全する。整数schema以外、未知protocol、unsupported required_features、構造不適合は副作用前に拒否する。既に新しい妥当な宣言ならunchangedとし、旧journalの再開やactiveの自動取得を行わない。
+
+applyには`--backup-dir ABS --confirm-old-writers-stopped --yes`を必要とする。旧writer停止は利用者の運用確認であり、flagをprocess停止の観測証拠や強制封鎖として扱わない。保全先は既存の物理親directoryの下にある未存在directoryで、同cloneの全worktree・Git管理領域・installed packageとの重なりを拒否する。現在checkoutの仕様・Artifact・Workbench・static資産・未commit/ignored/untrackedの利用者成果物とGit実体を`checkout/`へ、linked等で外部にあるcommon-Gitを`common-git/`へコピーする。任意symlinkのtargetをたどらずlink値を保全し、特殊fileは適用前停止する。バックアップを別の隔離directoryへ復元して比較し、manifestだけで保全済みとしない。
+
+保全先とsourceの物理identity・bytes/type/mode/linkを確認し、公開前後もsourceと保全内容を再確認する。新しいignored stage自身と新規の空親directoryだけを比較から除く。別のuser editや保全先の改変を見つけたら宣言の変更を止め、他actorの変更を戻さない。外部backup作成後の失敗はpartial6とし、確認済み/不明のbackup・未実行/確認済み/不明の宣言公開を分けてeffectsへ残す。Git由来の失敗は原文stderr/stdout/returncodeを維持する。旧activeの所在とpreserved-not-imported方針を出力し、未確定旧記録は手動の現物照合へ戻す。旧.git独自領域、別worktree、Git ref/index、GitHub、Start lock、ACL、registry、永続operation record、rollbackを変更・追加しない。
+
+公開CLIの新option未接続、浮動小数schemaの誤受入、確認済みbackupの事後改変の見落とし、公開後中断時の誤ったafter_protocol、unsafe backup parentのIO分類、途中Gitエラーの隠蔽をfocused Red→Greenで確認した。240 Scope fixtureの全metadata bytes・二つの旧local綴りGitHub ID・未知任意fieldを保持した。Artifact構造検査が各Scopeのたびに全treeをロードして57,840 metadata readsになったため、取得済みviewsを同じ検査内だけで再利用し、240 readsまで減らした。永続cacheを導入せず、read-count試験をRed→Greenで検証した。
+
+native POSIX別processを宣言公開の直前/直後で実際にSIGKILLし、fresh processが現protocolからplanned/unchangedを返すことを確認した。保全コピー/隔離復元の失敗、確認flag不足、旧remote unknownの拒否、外部symlink target非追跡、linked worktreeだけの切替、同cloneのcommon-Gitとmain workspace不変、後続user edit保全も回帰試験を通した。patch配置のfixture修正や初回からGreenのguardを、製品Redとして数えない。
+
+関連25 fileのrunは643 passed/1 failed（131.65秒）。失敗は旧mapping移行を期待したhelp assertionで、新しい宣言切替と旧syntax退役の契約へportした。migration/helpのfresh runは60 passed（10.98秒）。全source/testsのRuff check/format（413 files）、変更9 source限定mypy、diff checkが成功した。限定検査と個別修正後のfocused runをfull-suite/type gateの合格と混同しない。
+
+validate、P-12以後、native Windows、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択は変更していない。通常非force pushの利用者回答を待ちながらローカル実装を続け、goalをactiveに保つ。

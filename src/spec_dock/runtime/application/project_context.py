@@ -91,7 +91,7 @@ def read_workspace_declaration(path: Path) -> dict[str, object]:
     if loaded is None or not isinstance(loaded[0], dict):
         raise ValueError("workspace declaration is missing or invalid")
     workspace = loaded[0]
-    if workspace.get("schema_version") != 3 or isinstance(workspace.get("schema_version"), bool):
+    if type(workspace.get("schema_version")) is not int or workspace.get("schema_version") != 3:
         raise ValueError("workspace requires known schema 3")
     if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
         raise ValueError("workspace writer protocol is unknown")

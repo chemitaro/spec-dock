@@ -56,8 +56,9 @@ def test_help_explains_supported_finish_and_migration_modes(tmp_path: Path) -> N
 
     migrate = json.loads(_run(tmp_path, "help", "workspace", "migrate", "--json").stdout)["data"]["help"]
     assert "--dry-run" in migrate
-    assert "without --mapping-file" in migrate
-    assert "Applying a migration requires" in migrate
+    assert "--to-writer-protocol" in migrate and "--confirm-old-writers-stopped" in migrate
+    assert "--mapping-file" not in migrate and "--resume OPERATION_ID" not in migrate
+    assert "restore verification" in migrate and "human operational confirmation" in migrate
 
 
 def test_completions_include_every_catalog_leaf_without_writing_files(tmp_path: Path) -> None:

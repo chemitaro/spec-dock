@@ -132,13 +132,15 @@ def _write_all(descriptor: int, payload: bytes) -> None:
         remaining = remaining[written:]
 
 
-def tree_digest(root: Path) -> str:
+def tree_digest(root: Path, *, excluded_entries: frozenset[str] = frozenset()) -> str:
     if any(path.is_symlink() for path in (root, *root.parents)) or not root.is_dir():
         raise ValueError("tree root must be a real directory without redirected parents")
     digest = hashlib.sha256()
     for path in (root, *sorted(root.rglob("*"), key=lambda item: item.relative_to(root).as_posix())):
         observed = path.lstat()
         relative = "." if path == root else path.relative_to(root).as_posix()
+        if relative in excluded_entries:
+            continue
         digest.update(relative.encode("utf-8", "surrogateescape"))
         digest.update(b"\0")
         digest.update(str(stat.S_IMODE(observed.st_mode)).encode("ascii"))

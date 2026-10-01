@@ -71,7 +71,7 @@ spec-dock --project /projects/spec-dock workspace migrate --to-schema 3 --to-wri
 spec-dock --project /projects/spec-dock workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --backup-dir /backups/specdock-cutover-01 --confirm-old-writers-stopped --yes --json
 ```
 
-上のbackup pathは説明例です。実体保全先を明示し、既存backupへ無条件上書きしません。dry-runはlock、stage、backup作成、Git/GitHub変更をしません。本実行は改めて現物を検査します。
+上のbackup pathは説明例です。既存の物理directoryを親に持ち、全clone worktree・Git管理領域・installed packageの外にある、新しい実体保全先を明示します。親のsymlinkと既存backupへの上書きを拒否します。現在checkoutの実体は `BACKUP/checkout/`、common-Gitがcheckout外にある場合は `BACKUP/common-git/` に保全します。隔離directoryへ復元して比較し、宣言公開の直前にも保全先の物理identityと内容を確認します。symlinkはlink値だけを保全し、任意targetをたどりません。特殊fileの保全は人間の別手順が必要です。dry-runはlock、stage、backup作成、Git/GitHub変更をしません。本実行は改めて現物を検査します。
 
 許可するtracked差分は自worktreeの `spec-dock/workspace.json` のwriter_protocolを `specdock.worktree-writer/v1` にし、存在する旧control_epochだけを除くことです。schema_versionは3。title/project_linkageが元々なければ追加しません。未知の任意設定を保持します。全Scope metadataのID/path/backend/linkage/親子/依存/本文のbytesは不変です。
 

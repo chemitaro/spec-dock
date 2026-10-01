@@ -335,11 +335,15 @@ uv run pytest tests/cli_runtime/test_scope_delete_vnext.py tests/cli_runtime/tes
 <a id="p-11"></a>
 ## P-11 旧記録の保全診断とworkspace局所移行を実装する
 
-**状態: 実装中。通常/raw/legacy Doctorをローカル検証済み。局所移行・validate・fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
+**状態: 実装中。通常/raw/legacy Doctorとworkspace局所移行をローカル検証済み。validate・fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
 
 通常Doctorは共通controlを必要とせず、現在のScope構造・依存・Artifact・直接選択を読み取る。raw専用のGit-only admissionは未知workspaceでも安全なfile情報を返し、通常コマンドの既知schema/protocol判定を弱めない。`--legacy`だけが旧control/engine/registry/activeと操作・移行・installation・finalization・handoverの記録を読む。各fileは1 MiB、各記録directoryは4096 entriesまでに限定し、unsafe/破損/未知/途中記録は診断不完全のexit7とする。旧実行物を起動せず、phaseを現物の成功証明として採用せず、旧activeを新recordへ自動変換しない。任意bodyを出力せず、旧記録のdecoded bodyも分類後に保持しない。GitHub capability診断はrepository/PR/headの全指定と応答の一致を検査し、offline・指定不備を副作用前に拒否する。関連460 tests（88.15秒）、全source/testsのRuff check/format（410 files）、変更12 source限定mypy、diff checkが成功した。実consumerの宣言・metadata・直接選択は変更していない。
 
-**所有/対象file**: NRT/infra/legacy_reader.py（新設）、application/migrate_workspace_vnext.py、workspace_diagnostics_vnext.py、commands、cli/catalog.py。tests/cli_runtime/test_workspace_migrate_vnext.py、test_workspace_doctor_vnext.py、新 tests/integration/test_issue413_migration.py（予定）。
+局所移行は新 `application/direct_migration.py` と `infra/migration_backup.py` に分離し、通常dispatchへ接続した。applyは新しい外部保全先・旧writer停止の運用確認・`--yes`を必要とし、dry-runはlock/stage/backup/Git/GitHub writeを行わない。現在checkoutの全実体と、外部common-Gitがある場合はその実体を保全し、隔離directoryへ復元してbytes/type/mode/symlink値を比較する。確認後も保全先の物理identity/contentとsourceを公開前後に再確認する。変更するtracked fileは自workspace宣言だけで、既存control_epochだけを除き、title/project_linkageや未知設定を追加・改名しない。旧activeは保全し新recordへ取り込まない。未確定旧記録は適用前停止とする。新宣言で妥当なら旧記録をresumeせずunchangedを返す。
+
+240 Scope fixtureの全metadata bytes・二つの旧local綴りGitHub ID・未知任意fieldを保全した。構造検査のArtifact読取に取得済みviewsを渡し、Scope metadataの再ロードを57,840回から240回へ減らした。永続cacheは追加していない。native別processを公開前後の境界でSIGKILLし、fresh processの未切替/切替済み判定を確認した。保全・復元の失敗、後続のuser edit、保全先改変、原文Gitエラーとpartial効果も検証した。関連runは643 passed/1 failed（旧mapping help assertion、131.65秒）で、現在の宣言切替helpへport後、migration/help 60 tests（10.98秒）と全source/testsのRuff check/format（413 files）、変更9 source限定mypy、diff checkが成功した。全体gateやfresh Strictの合格とは扱わない。
+
+**所有/対象file**: 新runtime `src/spec_dock/runtime/` の infra/legacy_reader.py、infra/migration_backup.py、application/direct_migration.py、workspace_structure.py、commands/runtime_dispatch.py、cli/catalog.py/options.py。旧application/migrate_workspace_vnext.pyとworkspace_diagnostics_vnext.pyの退役はP-12。tests/integration/test_issue413_migration.py、cli_runtime/test_issue413_workspace_doctor.pyとhelp tests。
 
 **具体的変更順**: 旧control/registry/active/journalを実行しないreaderに切り分ける。backupの実体確認後、schema3 workspaceのwriter_protocolだけ変更する。旧activeは自動変換せず、所在/保全方針を出力する。新protocolならunchanged、未知値は停止。通常経路に残った旧writer/receipt参照を除く。
 

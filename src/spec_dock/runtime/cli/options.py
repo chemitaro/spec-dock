@@ -102,6 +102,8 @@ def _recovery_help(leaf: str) -> str:
         return "Inspect current metadata and validate the dependency graph before a new explicit operation."
     if leaf.startswith("worktree "):
         return "Inspect the native Git inventory, ref, target path and observed effects before a new explicit operation; no registry, receipt or automatic rollback."
+    if leaf == "workspace migrate":
+        return "Inspect actual declaration bytes and the retained backup before a new explicit migration; no legacy replay, resume or automatic rollback."
     command = RECOVERY_LEAF_COMMANDS.get(leaf)
     if command is not None:
         rollback = (
@@ -127,6 +129,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     artifact = len(argv) >= 2 and argv[0] == "artifact"
     workbench = argv[:2] == ["workbench", "copy"]
     worktree = len(argv) >= 2 and argv[0] == "worktree"
+    migrate = argv[:2] == ["workspace", "migrate"]
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -143,6 +146,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not artifact
         and not workbench
         and not worktree
+        and not migrate
     ):
         return
     index = 2
@@ -155,6 +159,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             name in ("--resume", "--rollback")
             or ((start or dependency) and name == "--allow-stale")
             or (worktree and name == "--recover")
+            or (migrate and name in ("--mapping-file", "--maintenance"))
         ):
             raise RetiredArgumentError(
                 f"{name} was retired; inspect the current state and issue a new explicit operation"
@@ -180,6 +185,8 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--to-worktree",
             "--on-conflict",
             "--root",
+            "--to-schema",
+            "--to-writer-protocol",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1

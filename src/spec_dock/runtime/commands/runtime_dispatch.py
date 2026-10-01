@@ -51,6 +51,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_diagnostics import diagnose_workspace
 
             result = diagnose_workspace(namespace, context)
+        elif command == "workspace migrate":
+            from spec_dock.runtime.application.direct_migration import migrate_workspace
+
+            result = migrate_workspace(namespace, context)
         elif command.startswith("scope create "):
             from spec_dock.runtime.application.direct_scope_publish import create_scope
 
