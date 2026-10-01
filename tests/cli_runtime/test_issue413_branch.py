@@ -595,3 +595,82 @@ def test_branch_create_expectation_mismatch_has_no_git_effects(
     assert result["effects"] == []
     assert main(["--project", str(root), "branch", "show", "init-00001", "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["data"]["result"]["tip"] is None
+
+
+@pytest.mark.parametrize("name", ["existing", "日本語"])
+def test_branch_create_preserves_existing_refs_and_rejects_non_ascii_names_before_any_effect(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], name: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = committed_workspace(tmp_path / "consumer")
+    if name == "existing":
+        subprocess.run(["git", "-C", str(root), "branch", name, "HEAD"], check=True, capture_output=True)
+    before = tree_digest(root)
+    assert (
+        main(["--project", str(root), "branch", "create", "init-00001", "--base", "HEAD", "--name", name, "--json"])
+        == 3
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["effects"] == [] and result["status"] == "failed" and not output.err
+    assert tree_digest(root) == before and not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("tracked", [False, True])
+def test_branch_switch_refuses_unfinished_changes_and_preserves_the_direct_record(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], tracked: bool
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    exact_record = record.read_bytes()
+    subprocess.run(["git", "-C", str(root), "branch", "candidate", "HEAD"], check=True, capture_output=True)
+    changed = root / "spec-dock/.gitignore" if tracked else root / "unfinished.txt"
+    changed.write_bytes(changed.read_bytes() + b"# unfinished tracked change\n" if tracked else b"unfinished payload")
+    before = tree_digest(root)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "candidate", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["effects"] == [] and "clean" in result["error"]["message"] and not output.err
+    assert record.read_bytes() == exact_record and tree_digest(root) == before
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
+
+
+def test_branch_switch_refuses_a_moved_ref_without_the_scope_and_keeps_selection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    subprocess.run(["git", "-C", str(root), "switch", "-c", "without-target"], check=True, capture_output=True)
+    subprocess.run(["git", "-C", str(root), "rm", "-r", "--", "spec-dock/initiatives"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "candidate without target",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(root), "switch", "main"], check=True, capture_output=True)
+    record = select_fixture(root)
+    exact_record = record.read_bytes()
+    before = tree_digest(root)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "without-target", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["effects"] == [] and "candidate" in result["error"]["message"] and not output.err
+    assert record.read_bytes() == exact_record and tree_digest(root) == before
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"

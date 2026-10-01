@@ -137,6 +137,25 @@ def test_scope_delete_backs_up_the_exact_subtree_and_preserves_other_scopes_and_
     scratch.write_bytes(b"\x00\xffignored evidence")
     before = {path.relative_to(root): path.read_bytes() for path in (metadata, document, scratch)}
     parent_before = parent.read_bytes()
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "scope delete fixture",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(["git", "-C", str(root), "branch", "iss-00003-retained", "HEAD"], check=True, capture_output=True)
+    exact_branch = subprocess.check_output(["git", "-C", str(root), "rev-parse", "refs/heads/iss-00003-retained"])
     backup = tmp_path / "delete-backup"
     log = github_fixture(tmp_path, monkeypatch, {})
     assert (
@@ -157,6 +176,10 @@ def test_scope_delete_backs_up_the_exact_subtree_and_preserves_other_scopes_and_
     ]
     assert not metadata.parent.exists() and parent.read_bytes() == parent_before
     assert all((backup / relative).read_bytes() == exact for relative, exact in before.items())
+    assert (
+        subprocess.check_output(["git", "-C", str(root), "rev-parse", "refs/heads/iss-00003-retained"]) == exact_branch
+    )
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
     assert not log.exists() and not (root / ".git/spec-dock").exists()
 
 

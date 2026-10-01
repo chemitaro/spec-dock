@@ -497,6 +497,16 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 
 直近通常lintの313 errors/full gate、残る旧source/private helpers、native OS/別Python、fresh Strict、最終手動確認は未完了である。実consumer/live GitHubは未変更。
 
+**旧Active・branch・Scope deleteの退役**
+
+旧Active/branch/Scope deleteの三test files（28 test関数・815行）と三writer（53 symbols・1400行）を全文確認し、[個別判断](artifacts/test-port-selection-retirement.md)を保存した。dirty/候補graph/他WT占有、metadata/直接record/branch/backup保全を公開CLIへ対応づけた。親自動昇格・from-branch取得・永久binding・local ID tombstone・共通WriterLock・operation journal/recoveryを廃止する。退役六filesへのsource/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+新しい公開保証は既存ref/非ASCII拒否2 passed（0.30秒）、tracked/untracked拒否2 passed（0.49秒）、Scopeを失った候補refの切替拒否1 passed（0.31秒）、tracked subtreeのbackup/元branch/checkout/GH保全1 passed（0.39秒）。既存Greenのcharacterizationである。
+
+通常wheel収録禁止はRed 1 failed（0.80秒）、source退役後の同testはGreen 1 passed（15.49秒）。関連Active/branch/Scope delete/Finish148 tests（34.11秒）、全Ruff check/format（357 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-selection-retirement-port.log、pytest-selection-retirement-source-{red,green}.log、pytest-selection-retirement-related.logへ保持。
+
+直近通常lintの313 errorsは別snapshotの未合格記録である。残る旧Source/tests、現行型問題、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

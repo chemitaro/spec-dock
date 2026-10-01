@@ -849,3 +849,13 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 通常wheelの収録禁止はRed 1 failed（0.78秒）、source削除後の同testはGreen 1 passed（13.87秒）。関連Worktree/native Git観測124 tests（23.14秒）、全Ruff check/format（363 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-worktree-retirement-port.log、pytest-worktree-retirement-source-{red,green}.log、pytest-worktree-retirement-related.logへ保持する。
 
 直近通常lintの313 errors/full gate、残る旧source/private helpers、native OS/別Python、fresh Strict、最終手動確認は未完了である。実consumer/live GitHubは未変更。
+
+## P-12 旧Active・branch・Scope deleteの退役
+
+旧Active/branch/Scope deleteの三test files（28 test関数・815行）と三writer（53 symbols・1400行）を全文確認し、[個別判断](artifacts/test-port-selection-retirement.md)を保存した。dirty/候補graph/他WT占有、metadata/直接record/branch/backup保全を公開CLIへ対応づけた。親自動昇格・from-branch取得・永久binding・local ID tombstone・共通WriterLock・operation journal/recoveryを廃止する。退役六filesへのsource/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+新しい公開保証は既存ref/非ASCII拒否2 passed（0.30秒）、tracked/untracked拒否2 passed（0.49秒）、Scopeを失った候補refの切替拒否1 passed（0.31秒）、tracked subtreeのbackup/元branch/checkout/GH保全1 passed（0.39秒）。既存Greenのcharacterizationである。
+
+通常wheel収録禁止はRed 1 failed（0.80秒）、source退役後の同testはGreen 1 passed（15.49秒）。関連Active/branch/Scope delete/Finish148 tests（34.11秒）、全Ruff check/format（357 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-selection-retirement-port.log、pytest-selection-retirement-source-{red,green}.log、pytest-selection-retirement-related.logへ保持。
+
+直近通常lintの313 errorsは別snapshotの未合格記録である。残る旧Source/tests、現行型問題、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
