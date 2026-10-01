@@ -412,6 +412,8 @@ Workspace diagnosticsの旧二ファイル・九関数も[移行対応](artifact
 
 Workspace migrate/syncの旧十二関数も[対応表](artifacts/test-port-workspace-migrate-sync.md)を作り、公開mainの九casesへ移した。自宣言だけのpreview/backup後apply、退役mapping/rollback拒否、既存local/空tree、directとopaque旧cacheの保全、GH取得失敗とinvalid metadataを検査。現行integrationを合わせて67 tests（16.30秒）、全Ruffと変更二test限定mypyが成功した。全体gate/provider退役/Windowsは継続中。
 
+Worktree旧adapterの三関数も[移行記録](artifacts/test-port-worktree-adapter.md)を残して公開mainへ移し、native path/list/show、create/removeのpreviewとbranch保持、make initの明示実行を検査した。関連115 tests（23.83秒）、全Ruff/変更一test限定mypyが成功。旧installation/recoveryとprovider退役、通常全体gateは継続する。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

@@ -708,3 +708,9 @@ native Gitのcontext故障をread/edit双方で注入し、元stderr/returncode/
 Syncは通常/previewともdirect記録とopaqueな旧generationを更新せず、現物からscope lifecycle・選択件数を返す。真正の既存localと空treeの互換を保つ。GH GETが失敗するとpartial/exit7とunknownを返し、記録を消さない。安全に解釈できないparent metadataは--allow-invalidでも完全な観測にしない。初回の一失敗はpreview statusをsucceededと期待したものだったが、公開dispatcherの契約はplannedのため期待を訂正した。製品Redには数えない。
 
 後継二ファイルは9 passed（1.74秒）。現行migration/syncのintegrationを合わせた `uv run pytest tests/cli_runtime/test_workspace_migrate_vnext.py tests/cli_runtime/test_workspace_sync_vnext.py tests/integration/test_issue413_migration.py tests/integration/test_issue413_sync.py -q --tb=short` は67 passed（16.30秒）。全source/testsのRuff check/format（423 files）、変更二test限定 `mypy --follow-imports=silent`、diff checkも成功。実consumer/live GitHubは未変更で、旧worktree/installation/recovery入口とprovider退役、全体type/pytest、native Windows、fresh Strict、最終手動確認を継続する。
+
+## P-12 Worktree adapterの公開入口移行
+
+旧三関数を全文確認して[移行判断](artifacts/test-port-worktree-adapter.md)を記録した。registered ID・control・run_vnextを外し、公開mainでnative Gitのpath/branch/HEADとlist/showを比較する。壊れた無関係のScope metadataを読ませず、全tree不変を確認した。create/removeは明示root/name/base/pathと確認を保ち、previewでGit/targetを変更せず、実remove後もnative branch refのtipを保持する。明示bootstrapのmake initは該当WTだけで実行し、preview/offlineではmakeを評価せず、ファイルを作らない。
+
+後継三casesは3 passed（1.57秒）。現在のnative worktree/remove/bootstrap suiteを合わせた `uv run pytest tests/cli_runtime/test_worktree_commands_vnext.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree_bootstrap.py -q --tb=short` は115 passed（23.83秒）。全source/testsのRuff check/format（423 files）、変更一test限定 `mypy --follow-imports=silent`、diff checkも成功した。tmp fixtureだけを作成/削除しており、実consumer・既存worktree・live GitHubは未変更。旧installation/recoveryとprovider/runtime退役、full type/pytest、native Windows、fresh Strictと最終手動確認を継続する。
