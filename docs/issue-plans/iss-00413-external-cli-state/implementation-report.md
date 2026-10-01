@@ -1027,3 +1027,9 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 未使用infra/artifact_ports.py全57行・四symbolsを全文確認し、候補外参照0をAST/文字列検索で確認して退役した。[対応記録](artifacts/test-port-artifact-adapter-retirement.md)に各wrapperの理由を保存する。現行Artifactと別callerのあるbinary publisher、その試験、旧静的inventoryのpath/hashは保持する。test削除・skip/型ignore/収集除外追加0。
 
 wheel禁止のRed 1 failed（0.83秒）→Green 1 passed（17.35秒）、関連三suite 105 passed/1 skipped（10.89秒）、全て期待したexitとなった。skipは既存Linux O_TMPFILE試験でDarwinでは未実施。全Ruff（306 files）、MYPYPATH=srcの変更test限定mypy、diff checkが成功。Linux全件は別候補c4c26bdbで実行中、通常full lint・残る旧source・Windows・fresh Strict・最終手動確認は未完了。実consumer/live GitHubは未変更。
+
+**旧Delete use caseとprivate resolver testの退役**
+
+通常production参照0の旧Delete全1437行/42 symbolsと旧opacity test全44行/一関数を全文確認し、[個別判断](artifacts/test-port-delete-helper-retirement.md)に基づき退役した。公開CLIの三階層/.workbench・near-name/現存・ghost target十二casesへprivate metadata非読取・保全を移す。旧一般walkの列挙順、三段Active restore、GitHub自動Close、自動SyncはC-05/D-03の決定に従い残さない。退役後AST参照0、旧inventory path/hashと現在のDelete安全性suiteは保持する。
+
+後継は削除前12 passed/37 deselected（2.22秒）。wheel禁止のRed 1 failed（0.77秒）→Green 1 passed（16.35秒）、関連三suite 56 passed（9.56秒）、実Python 3.10.15の後継12 passed/37 deselected（1.91秒）、全て期待したexitとなった。初回関連runの誤test path/no tests ranは別logへ保持した。全Ruff（304 files）、MYPYPATH=srcの変更二files限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 30 errors/10旧files（223 files）、make exit2。Linux全件の別候補に残る失敗、残り旧source、Windows、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

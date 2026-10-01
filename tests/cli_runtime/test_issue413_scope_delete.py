@@ -21,6 +21,94 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+@pytest.mark.parametrize("container_kind", ["initiative", "epic", "issue"])
+@pytest.mark.parametrize("private_name", [".workbench", ".workbench-copy"])
+@pytest.mark.parametrize("target", ["iss-00003", "iss-00099"])
+def test_scope_delete_ignores_private_and_noncanonical_containers_without_reading_them(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    container_kind: str,
+    private_name: str,
+    target: str,
+) -> None:
+    from pathlib import Path
+
+    root, parent, metadata = dependency_workspace(tmp_path)
+    containers = {
+        "initiative": root / "spec-dock/initiatives",
+        "epic": parent.parent.parent,
+        "issue": metadata.parent.parent,
+    }
+    private = containers[container_kind] / private_name
+    ghost = private / "iss-00099-private"
+    ghost.mkdir(parents=True)
+    (ghost / ".meta.json").write_bytes(b"{private malformed metadata")
+    duplicate = private / metadata.parent.name
+    duplicate.mkdir()
+    (duplicate / ".meta.json").write_bytes(metadata.read_bytes())
+    (private / "evidence.bin").write_bytes(b"\x00\xffprivate evidence")
+    private_before = {path.relative_to(private): path.read_bytes() for path in private.rglob("*") if path.is_file()}
+    target_before = {
+        path.relative_to(metadata.parent): path.read_bytes() for path in metadata.parent.rglob("*") if path.is_file()
+    }
+    parent_before = parent.read_bytes()
+    metadata_inodes = {(path.stat().st_dev, path.stat().st_ino) for path in private.rglob(".meta.json")}
+    backup = tmp_path / "delete-backup"
+    log = github_fixture(tmp_path, monkeypatch, {})
+    original_open, original_iterdir = os.open, Path.iterdir
+
+    def guarded_open(
+        path: str | bytes | os.PathLike[str] | os.PathLike[bytes],
+        flags: int,
+        mode: int = 0o777,
+        *,
+        dir_fd: int | None = None,
+    ) -> int:
+        try:
+            observed = os.stat(path, dir_fd=dir_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            pass
+        else:
+            if (observed.st_dev, observed.st_ino) in metadata_inodes:
+                raise AssertionError("Scope delete attempted to read private metadata")
+        return original_open(path, flags, mode, dir_fd=dir_fd)
+
+    def guarded_iterdir(path: Path):
+        if path == private or path.is_relative_to(private):
+            raise AssertionError("Scope delete attempted to enumerate a noncanonical container")
+        return original_iterdir(path)
+
+    with monkeypatch.context() as guard:
+        guard.setattr(os, "open", guarded_open)
+        guard.setattr(Path, "iterdir", guarded_iterdir)
+        code = main(["--project", str(root), "scope", "delete", target, "--backup-dir", str(backup), "--yes", "--json"])
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert output.err == ""
+    assert {
+        path.relative_to(private): path.read_bytes() for path in private.rglob("*") if path.is_file()
+    } == private_before
+    assert parent.read_bytes() == parent_before and not log.exists()
+    assert not (root / ".git/spec-dock").exists()
+    if target == "iss-00003":
+        assert code == 0 and result["status"] == "succeeded"
+        assert result["data"]["result"]["removed_ids"] == [target]
+        assert not metadata.parent.exists()
+        restored = backup / metadata.parent.relative_to(root)
+        assert {
+            path.relative_to(restored): path.read_bytes() for path in restored.rglob("*") if path.is_file()
+        } == target_before
+    else:
+        assert code == 4 and result["error"]["code"] == "SCOPE_NOT_FOUND" and result["effects"] == []
+        assert not backup.exists()
+        assert {
+            path.relative_to(metadata.parent): path.read_bytes()
+            for path in metadata.parent.rglob("*")
+            if path.is_file()
+        } == target_before
+
+
 def test_scope_delete_help_explains_verified_backup_and_per_path_results(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["scope", "delete", "--help"]) == 0
     output = capsys.readouterr().out
