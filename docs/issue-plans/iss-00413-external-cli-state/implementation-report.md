@@ -683,3 +683,14 @@ branch create/show/switchのtipとdry-runはnative Gitでも比較し、既存re
 native Gitのcontext故障をread/edit双方で注入し、元stderr/returncode/effects空とrepo不変を確認した。削除後の再操作は旧journalのreplayではなく、既存backupを上書きせず拒否する。最初の移行runで、その拒否をexit4と期待した一件は実装契約のexit3へ訂正した。製品Redには数えない。三filesは10 passed（3.04秒）。さらに元の確認競合testにあったguard省略条件を、guard有無×Close/Reopenの四実process casesで確認した。
 
 `uv run pytest tests/cli_runtime/test_scope_lifecycle_commands_vnext.py tests/cli_runtime/test_vnext_runtime_scope.py tests/cli_runtime/test_scope_delete_commands_vnext.py tests/cli_runtime/test_issue413_scope_lifecycle.py tests/cli_runtime/test_issue413_scope_edit.py tests/cli_runtime/test_issue413_scope_delete.py -q --tb=short` は81 passed（21.05秒）。全source/tests Ruff check/format（423 files）、変更四test file限定mypy、diff checkも成功した。実consumer・Git内の旧独自領域は保持する。旧create/import/installation/recovery経路とprovider/runtime退役、native Windows、全件type/pytest gate、fresh Strictと最終手動確認は未完了で、goal/P-12をactiveのまま継続する。
+
+
+## P-12 Scope create / importの公開入口移行
+
+旧二ファイルの二十関数を全文確認し、[対応表](artifacts/test-port-scope-create-import.md)へ保存した。新規local発行は三kindともproject読取前のexit2で拒否し、真正の既存local codecのshow/editと日本語本文の保全は維持する。新規作成は確認済みGH番号から正式IDを生成し、previewではIDを割り当てない。importはexact refをGETし、POSTとlifecycle cache書込みを行わない。
+
+確認回答時にnative Gitでoriginを変更すると、捕捉したrepositoryとの相違によりPOST前に停止する。GH作成が確定した直後に別actorがローカルpathを占有するケースでは、partialに確定refを表示し、既存pathを保全する。旧resumeを拒否した後、利用者がpath衝突を解消して新しい明示importを実行すると、同じIssueへGETだけで正式IDを復旧できた。合計通信はPOST一回・GET一回であり、旧journal・prepared ID・自動rollbackは追加しない。
+
+初回の十三cases中一失敗は、作成前の不正なScope pathがPOST前に拒否されるfixtureを、remote後のpartialと誤って期待したものだった。実装の安全な事前拒否を保持し、衝突をremote確定後に発生させるfixtureへ訂正した。製品Redには数えない。訂正後は13 passed（3.55秒）。関連publication/import/editを含む `uv run pytest tests/cli_runtime/test_scope_create_commands_vnext.py tests/cli_runtime/test_scope_import_commands_vnext.py tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime/test_issue413_scope_import.py tests/cli_runtime/test_issue413_scope_edit.py -q --tb=short` は78 passed（24.92秒）。
+
+全source/testsのRuff check/format（423 files）、変更二test限定 `mypy --follow-imports=silent`、diff checkを実施した。stdin代替の型を修正した後は限定mypyが成功し、変更したorigin確認testも1 passed（0.45秒）。限定type結果を全体mypy合格とは扱わない。実consumer・旧独自Git領域・live GitHubは変更していない。残るdiagnostics/migration/sync/worktree/installation/recoveryの移行、provider/runtime退役、native Windows、全体type/pytest、fresh Strict、最終製品手動確認を継続する。

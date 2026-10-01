@@ -406,6 +406,8 @@ Scope lifecycleの旧確認競合保証は公開processへ移し、確認中に�
 
 Scope lifecycle/query/deleteの旧三filesも[十一関数の判断](artifacts/test-port-scope-lifecycle-query-delete.md)を記録して公開mainへ移した。既存local codec保全、GH-backed current/guard、読取とtitle/revision編集、確認・preview・実backup後の削除を十casesで確認し、guard省略を含む確認競合四casesと現行Scope suiteを合わせて81 tests（21.05秒）が成功した。全Ruff/変更四test限定mypyも成功。残る旧公開経路のport・provider退役・全体gateは引き続き進行中である。
 
+Scope create/importの旧二十関数も[個別の移行判断](artifacts/test-port-scope-create-import.md)を記録し、公開mainの十三casesへ移した。GH番号・preview・承認・不存在親・既存local codec・確認中origin変更・remote成功後の明示importを検査し、関連publication/import/editを合わせて78 tests（24.92秒）が成功した。全Ruffと変更二test限定mypyも成功。通常全体gateとprovider退役は未完了のまま継続する。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
