@@ -694,3 +694,9 @@ native Gitのcontext故障をread/edit双方で注入し、元stderr/returncode/
 初回の十三cases中一失敗は、作成前の不正なScope pathがPOST前に拒否されるfixtureを、remote後のpartialと誤って期待したものだった。実装の安全な事前拒否を保持し、衝突をremote確定後に発生させるfixtureへ訂正した。製品Redには数えない。訂正後は13 passed（3.55秒）。関連publication/import/editを含む `uv run pytest tests/cli_runtime/test_scope_create_commands_vnext.py tests/cli_runtime/test_scope_import_commands_vnext.py tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime/test_issue413_scope_import.py tests/cli_runtime/test_issue413_scope_edit.py -q --tb=short` は78 passed（24.92秒）。
 
 全source/testsのRuff check/format（423 files）、変更二test限定 `mypy --follow-imports=silent`、diff checkを実施した。stdin代替の型を修正した後は限定mypyが成功し、変更したorigin確認testも1 passed（0.45秒）。限定type結果を全体mypy合格とは扱わない。実consumer・旧独自Git領域・live GitHubは変更していない。残るdiagnostics/migration/sync/worktree/installation/recoveryの移行、provider/runtime退役、native Windows、全体type/pytest、fresh Strict、最終製品手動確認を継続する。
+
+## P-12 Workspace diagnosticsの公開入口移行
+
+旧二ファイルの九関数を全文確認して[対応表](artifacts/test-port-workspace-diagnostics.md)を記録した。旧run_vnext/private diagnosis/control admission/new local fixtureを外し、公開mainで空workspaceの通常validate・require-nodes・doctor、HEADの有効/無効schema検査を行う。通常Doctorは旧control/generationをauthorityにしない。--legacyを明示した診断だけで旧controlのinvalid_jsonを報告し、private bodyを露出せず全treeを保持する。依存とartifactの二不整合を同時に置く試験では、validate/doctor双方が二findingを報告し、外部symlink先も書き換えない。
+
+後継二ファイルは5 passed（0.78秒）。現行Doctor/validationの公開suiteを合わせた `uv run pytest tests/cli_runtime/test_workspace_diagnostics_commands_vnext.py tests/cli_runtime/test_workspace_doctor_vnext.py tests/cli_runtime/test_issue413_workspace_doctor.py tests/cli_runtime/test_issue413_workspace_validate.py -q --tb=short` は122 passed（16.75秒）。全source/testsのRuff check/format（423 files）、変更二test限定 `mypy --follow-imports=silent`、diff checkも成功。限定Greenであり、full type/pytest、native Windows、fresh Strict、実consumer切替と最終手動動作確認は未完了である。

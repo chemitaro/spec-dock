@@ -408,6 +408,8 @@ Scope lifecycle/query/deleteの旧三filesも[十一関数の判断](artifacts/t
 
 Scope create/importの旧二十関数も[個別の移行判断](artifacts/test-port-scope-create-import.md)を記録し、公開mainの十三casesへ移した。GH番号・preview・承認・不存在親・既存local codec・確認中origin変更・remote成功後の明示importを検査し、関連publication/import/editを合わせて78 tests（24.92秒）が成功した。全Ruffと変更二test限定mypyも成功。通常全体gateとprovider退役は未完了のまま継続する。
 
+Workspace diagnosticsの旧二ファイル・九関数も[移行対応](artifacts/test-port-workspace-diagnostics.md)を記録して公開mainへ移し、関連122 tests（16.75秒）が成功した。空tree、HEADのCI検査、旧制御情報の明示legacy診断、同時dependency/artifact不整合をread-onlyで保護する。全Ruff/変更二test限定mypyも成功。移行/同期/旧配布経路とprovider退役は継続する。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

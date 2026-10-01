@@ -1,37 +1,42 @@
-"""Workspace validation and doctor leaves preserve read-only diagnostic outcomes."""
+"""Workspace diagnostics preserve readonly validation and doctor outcomes."""
 
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
-from spec_dock.runtime.cli.vnext_runtime import run_vnext
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.cli_runtime.test_issue413_workspace_validate import commit_fixture
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
 
-def test_workspace_diagnostics_cli_reports_valid_and_required_nodes(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    control = cast("Path", common["common_dir"]) / "spec-dock" / "control" / "control.json"
-    before = control.read_bytes()
-    valid = run_vnext(
-        ["workspace", "validate", "--json"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4"
-    )
-    assert valid.exit_code == 0
-    assert json.loads(valid.stdout)["data"]["valid"] is True
-    required = run_vnext(
-        ["workspace", "validate", "--require-nodes", "--json"],
-        invocation_cwd=repo,
-        engine_digest="engine-a",
-        engine_version="0.2.4",
-    )
-    assert required.exit_code == 7
-    assert "nodes_required" in {item["code"] for item in json.loads(required.stdout)["data"]["findings"]}
-    doctor = run_vnext(
-        ["workspace", "doctor", "--json"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4"
-    )
-    assert doctor.exit_code == 0
-    assert control.read_bytes() == before
+
+def test_workspace_diagnostics_cli_reports_valid_and_required_nodes(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    metadata.unlink()
+    metadata.parent.rmdir()
+    commit_fixture(root)
+    before = tree_digest(root)
+    prefix = ["--project", str(root), "workspace"]
+    assert main([*prefix, "validate", "--json"]) == 0
+    valid = json.loads(capsys.readouterr().out)
+    assert valid["data"]["result"]["valid"] is True
+    assert valid["data"]["result"]["node_count"] == 0 and valid["effects"] == []
+    assert main([*prefix, "validate", "--require-nodes", "--json"]) == 7
+    required = json.loads(capsys.readouterr().out)
+    assert [item["code"] for item in required["data"]["result"]["findings"]] == ["NODES_REQUIRED"]
+    assert required["effects"] == []
+    assert main([*prefix, "doctor", "--json"]) == 0
+    doctor = json.loads(capsys.readouterr().out)
+    assert doctor["data"]["kind"] == "diagnostic" and doctor["effects"] == []
+    assert tree_digest(root) == before
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()

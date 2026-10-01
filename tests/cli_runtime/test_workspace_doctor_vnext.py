@@ -1,166 +1,91 @@
-"""Workspace diagnostics are read-only and report stable finding codes."""
+"""Current public diagnosis treats legacy files as explicit readonly evidence."""
 
 from __future__ import annotations
 
 import json
-import shutil
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import pytest
 
-from spec_dock.runtime.application import workspace_diagnostics_vnext as diagnostics_module
-from spec_dock.runtime.application.contracts import GitHubCapabilityDiagnostic
-from spec_dock.runtime.application.create_local_scope import create_local_scope
-from spec_dock.runtime.application.workspace_diagnostics_vnext import doctor_workspace, validate_workspace
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo
+from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.cli_runtime.test_issue413_workspace_validate import commit_fixture
 
 if TYPE_CHECKING:
     from pathlib import Path
 
-    from spec_dock.runtime.infra.github_capability_cli import GitHubCapabilityCliGateway
+
+@pytest.mark.parametrize("invalid", [False, True])
+def test_ci_validation_reads_committed_schema_without_installing_or_writing_state(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    invalid: bool,
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    workspace = root / "spec-dock/workspace.json"
+    if invalid:
+        workspace.write_text('{"schema_version":2}\n', encoding="utf-8")
+        commit_fixture(root)
+    before = tree_digest(root)
+    assert main(["--project", str(root), "workspace", "validate", "--ci", "--json"]) == (7 if invalid else 0)
+    result = json.loads(capsys.readouterr().out)
+    data = result["data"]["result"]
+    assert data["valid"] is not invalid and data["snapshot_source"] == "HEAD"
+    assert [item["code"] for item in data["findings"]] == (["WORKSPACE_DECLARATION_INVALID"] if invalid else [])
+    assert result["effects"] == [] and tree_digest(root) == before
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
 
 
-def _arguments(common: dict[str, object]) -> dict[str, object]:
-    return {key: common[key] for key in ("repo_root", "common_dir", "worktree_id", "engine_digest")}
+def test_old_control_and_generation_are_not_authority_and_legacy_diagnosis_redacts_bodies(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    control = root / ".git/spec-dock/control/control.json"
+    control.parent.mkdir(parents=True)
+    control.write_bytes(b"private-body-secret\n{broken")
+    generation = root / "spec-dock/.agent/generation.json"
+    generation.parent.mkdir()
+    generation.write_bytes(b"private-generation-secret\n{broken")
+    before = tree_digest(root)
+    command = ["--project", str(root), "workspace", "doctor", "--json"]
+    assert main(command) == 0
+    ordinary = capsys.readouterr()
+    assert json.loads(ordinary.out)["effects"] == []
+    assert "private-body-secret" not in ordinary.out + ordinary.err
+    assert "private-generation-secret" not in ordinary.out + ordinary.err
+    assert main([*command, "--legacy"]) == 7
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    entry = next(item["details"] for item in result["data"]["findings"] if item["details"].get("path") == str(control))
+    assert entry["classification"] == "invalid_json" and result["effects"] == []
+    assert "private-body-secret" not in output.out + output.err
+    assert "private-generation-secret" not in output.out + output.err
+    assert tree_digest(root) == before
 
 
-def test_empty_workspace_is_valid_unless_nodes_required(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    valid = validate_workspace(**_arguments(common))
-    assert valid.node_count == 0 and valid.exit_code == 0
-    assert [finding.code for finding in valid.findings] == ["generation_missing"]
-    required = validate_workspace(**_arguments(common), require_nodes=True)
-    assert required.exit_code == 7
-    assert "nodes_required" in {finding.code for finding in required.findings}
-
-
-def test_ci_validation_reads_fresh_checkout_without_control_or_active_state(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    control_directory = cast("Path", common["common_dir"]) / "spec-dock"
-    shutil.rmtree(control_directory)
-    before = (repo / "spec-dock/workspace.json").read_bytes()
-    result = diagnostics_module.validate_checkout_for_ci(repo_root=repo, require_nodes=False)
-    assert result.exit_code == 0
-    assert result.node_count == 0
-    assert result.findings == ()
-    assert (repo / "spec-dock/workspace.json").read_bytes() == before
-    assert not control_directory.exists()
-
-
-def test_ci_validation_reports_invalid_committed_schema_without_installing(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    control_directory = cast("Path", common["common_dir"]) / "spec-dock"
-    shutil.rmtree(control_directory)
-    workspace = repo / "spec-dock/workspace.json"
-    workspace.write_text('{"schema_version":2}\n', encoding="utf-8")
-    result = diagnostics_module.validate_checkout_for_ci(repo_root=repo)
-    assert result.exit_code == 7
-    assert {finding.code for finding in result.findings} == {"workspace_schema_mismatch"}
-    assert workspace.read_text(encoding="utf-8") == '{"schema_version":2}\n'
-    assert not control_directory.exists()
-
-
-def test_corrupt_control_and_generation_are_findings_without_exposing_content(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    control = cast("Path", common["common_dir"]) / "spec-dock" / "control" / "control.json"
-    control.write_text("secret=should-not-appear\n{broken", encoding="utf-8")
-    agent = repo / "spec-dock" / ".agent"
-    agent.mkdir(exist_ok=True)
-    (agent / "generation.json").write_text("secret=should-not-appear\n{broken", encoding="utf-8")
-    result = doctor_workspace(**_arguments(common))
-    assert result.exit_code == 7
-    assert {item.code for item in result.findings} >= {"control_invalid", "generation_invalid"}
-    assert "secret=should-not-appear" not in repr(result)
-
-
-def test_doctor_github_probe_arguments_are_all_or_none(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    with pytest.raises(ValueError, match="requires"):
-        doctor_workspace(**_arguments(common), github_repo="example/repo")
-    with pytest.raises(ValueError, match="requires"):
-        doctor_workspace(**_arguments(common), github_extended=True)
-    with pytest.raises(ValueError, match="invalid"):
-        doctor_workspace(**_arguments(common), github_repo="example/repo", github_pr=1, github_head_sha="not-a-sha")
-
-
-def test_engine_mismatch_is_diagnosed_without_mutating_control(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    control = cast("Path", common["common_dir"]) / "spec-dock" / "control" / "control.json"
-    before = control.read_bytes()
-    result = doctor_workspace(
-        repo_root=cast("Path", common["repo_root"]),
-        common_dir=cast("Path", common["common_dir"]),
-        worktree_id="main",
-        engine_digest="other-engine",
-    )
-    assert result.exit_code == 7
-    assert "engine_mismatch" in {item.code for item in result.findings}
-    assert control.read_bytes() == before
-
-
-def test_complete_github_probe_arguments_delegate_once(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    requests: list[object] = []
-
-    class FakeProbe:
-        def probe(self, request: object) -> list[object]:
-            requests.append(request)
-            return []
-
-    result = doctor_workspace(
-        **_arguments(common),
-        github_repo="example/repo",
-        github_pr=42,
-        github_head_sha="a" * 40,
-        capability_gateway=cast("GitHubCapabilityCliGateway", FakeProbe()),
-    )
-    assert result.exit_code == 0
-    assert len(requests) == 1
-    blocked = GitHubCapabilityDiagnostic(
-        "github_auth_missing",
-        "repo_metadata_read",
-        "auth_missing",
-        "unknown",
-        "gh repo view",
-        "blocking",
-        "authentication unavailable",
-        "configure access",
-        True,
-        None,
-        "core",
-    )
-
-    class BlockedProbe:
-        def probe(self, _request: object) -> list[GitHubCapabilityDiagnostic]:
-            return [blocked]
-
-    failed = doctor_workspace(
-        **_arguments(common),
-        github_repo="example/repo",
-        github_pr=42,
-        github_head_sha="a" * 40,
-        capability_gateway=cast("GitHubCapabilityCliGateway", BlockedProbe()),
-    )
-    assert failed.exit_code == 7
-
-
-def test_dependency_and_artifact_faults_are_read_only_findings(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    metadata_path = created.path / ".meta.json"
-    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-    metadata["depends_on"] = ["iss-local-99999"]
-    metadata_path.chmod(0o600)
-    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
-    artifacts = repo / "spec-dock" / "artifacts"
-    artifacts.symlink_to(tmp_path)
-    before = metadata_path.read_bytes()
-    result = validate_workspace(**_arguments(common))
-    assert result.exit_code == 7
-    assert {item.code for item in result.findings} >= {"dependency_invalid", "artifact_invalid"}
-    assert metadata_path.read_bytes() == before
-    assert artifacts.is_symlink()
+def test_dependency_and_artifact_faults_are_both_readonly_findings(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    payload = json.loads(metadata.read_bytes())
+    payload["depends_on"] = ["iss-99999"]
+    metadata.write_text(json.dumps(payload), encoding="utf-8")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    secret = outside / "private.txt"
+    secret.write_bytes(b"private-artifact-secret")
+    (root / "spec-dock/artifacts").symlink_to(outside, target_is_directory=True)
+    before = tree_digest(root)
+    for leaf in ("validate", "doctor"):
+        assert main(["--project", str(root), "workspace", leaf, "--json"]) == 7
+        output = capsys.readouterr()
+        result = json.loads(output.out)
+        findings = result["data"]["result"]["findings"] if leaf == "validate" else result["data"]["findings"]
+        assert {item["code"] for item in findings} >= {"DEPENDENCY_INVALID", "ARTIFACT_INVALID"}
+        assert result["effects"] == [] and "private-artifact-secret" not in output.out + output.err
+        assert tree_digest(root) == before and secret.read_bytes() == b"private-artifact-secret"
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
