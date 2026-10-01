@@ -367,6 +367,37 @@ def test_init_reads_package_resources_from_a_traversable_archive(
     assert (target / "spec-dock/scripts/spec-dock").read_bytes() == (package / "shim_vnext.py").read_bytes()
 
 
+def test_init_rejects_modified_package_bytes_before_publishing_any_static_assets(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    package = Path(__file__).resolve().parents[2] / "src/spec_dock"
+    archive_path = tmp_path / "modified-resources.zip"
+    corrupted = "spec_dock/docs/README.md"
+    private = b"private corrupt package content must not be published or echoed\n"
+    with zipfile.ZipFile(archive_path, "w") as archive:
+        for path in (package / "assets").rglob("*"):
+            if path.is_file() and "__pycache__" not in path.parts:
+                resource = path.relative_to(package / "assets").as_posix()
+                payload = path.read_bytes()
+                archive.writestr(
+                    "spec_dock/assets/" + resource, payload + private if resource == corrupted else payload
+                )
+    target = uninitialized_worktree(tmp_path / "consumer")
+    before = tree_digest(target)
+    with zipfile.ZipFile(archive_path) as archive:
+        # Replace only the stdlib package-resource boundary with real ZIP bytes.
+        monkeypatch.setattr(
+            "spec_dock.runtime.infra.static_assets.files", lambda _package: zipfile.Path(archive, "spec_dock/")
+        )
+        assert main(["installation", "init", str(target), "--yes", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED" and result["effects"] == []
+    assert "does not match its inventory" in result["error"]["message"]
+    assert tree_digest(target) == before and not (target / "spec-dock").exists() and not (target / ".agents").exists()
+    assert private.decode().strip() not in output.out + output.err
+
+
 @pytest.mark.parametrize("dry_run", [False, True])
 def test_update_replaces_only_verified_old_static_bytes_after_an_external_backup(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, dry_run: bool
@@ -666,6 +697,42 @@ def test_static_changes_refuse_unknown_current_or_retired_files_before_preservat
     assert "private modified user contents" not in output.out + output.err
 
 
+@pytest.mark.parametrize("leaf", ["update", "uninstall"])
+@pytest.mark.parametrize(
+    "relative", ["spec-dock/docs/README.md", "spec-dock/scripts/spec_dock_runtime/infra/control_store.py"]
+)
+def test_static_changes_refuse_hardlinked_current_or_retired_files_without_touching_the_other_owner(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], leaf: str, relative: str
+) -> None:
+    target = uninitialized_worktree(tmp_path / "consumer")
+    assert main(["installation", "init", str(target), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    installed = target / relative
+    if not installed.exists():
+        installed.parent.mkdir(parents=True, exist_ok=True)
+        installed.write_bytes(
+            (Path(__file__).resolve().parents[1] / "fixtures/issue413/legacy-control-store.txt").read_bytes()
+        )
+    original_bytes = installed.read_bytes()
+    foreign = tmp_path / "foreign-owned-file"
+    foreign.write_bytes(original_bytes)
+    installed.unlink()
+    os.link(foreign, installed)
+    identity = foreign.stat().st_ino
+    before = tree_digest(target)
+    backup = tmp_path / "backup"
+    assert main(["installation", leaf, "--target", str(target), "--backup-dir", str(backup), "--yes", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["effects"] == []
+    assert result["error"]["code"] == "PRECONDITION_FAILED"
+    assert tree_digest(target) == before and not backup.exists()
+    assert foreign.read_bytes() == original_bytes and installed.read_bytes() == original_bytes
+    assert foreign.stat().st_ino == installed.stat().st_ino == identity and foreign.stat().st_nlink == 2
+    assert original_bytes.decode() not in output.out + output.err
+    assert not (target / ".spec-dock-installations").exists() and not (target / ".git/spec-dock").exists()
+
+
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX symbolic-link fixture")
 @pytest.mark.parametrize(
     "relative", ["spec-dock/docs/README.md", "spec-dock/scripts/spec_dock_runtime/infra/control_store.py"]
@@ -839,3 +906,106 @@ def test_static_changes_stop_if_the_observed_asset_is_replaced_with_same_bytes_d
     assert installed.stat().st_ino == replaced[0] and installed.read_bytes() == old_bytes
     assert (backup / "static" / relative).read_bytes() == old_bytes
     assert tree_digest(target) == before and tree_digest(target / ".git") == git_before
+
+
+def test_static_update_rejects_a_hardlinked_candidate_before_replacing_the_captured_asset(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    target = uninitialized_worktree(tmp_path / "consumer")
+    assert main(["installation", "init", str(target), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    relative = "spec-dock/scripts/spec-dock"
+    installed = target / relative
+    old_bytes = (Path(__file__).resolve().parents[1] / "fixtures/issue413/legacy-shim.txt").read_bytes()
+    installed.write_bytes(old_bytes)
+    before = tree_digest(target)
+    backup = tmp_path / "backup"
+    foreign = tmp_path / "foreign-candidate"
+    native_sync = os.fsync
+    linked: list[int] = []
+
+    def link_candidate_after_sync(descriptor: int) -> None:
+        native_sync(descriptor)
+        if linked or not backup.is_dir():
+            return
+        held = os.fstat(descriptor)
+        for candidate in installed.parent.glob(".install-*.tmp"):
+            visible = candidate.stat()
+            if (visible.st_dev, visible.st_ino) == (held.st_dev, held.st_ino):
+                os.link(candidate, foreign)
+                linked.append(visible.st_ino)
+                return
+
+    monkeypatch.setattr(os, "fsync", link_candidate_after_sync)
+    assert (
+        main(["installation", "update", "--target", str(target), "--backup-dir", str(backup), "--yes", "--json"]) == 6
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    data = result["data"]["result"]
+    assert len(linked) == 1 and result["status"] == "partial"
+    assert data["changed_paths"] == data["created_paths"] == data["retired_paths"] == []
+    assert data["backup_verified"] is True and data["restore_verified"] is True
+    assert result["effects"] == [
+        {"kind": "backup", "status": "succeeded", "target": str(backup)},
+        {"kind": "installation.change", "status": "not_attempted", "target": relative},
+    ]
+    assert foreign.stat().st_ino == linked[0] and foreign.stat().st_nlink == 1
+    assert foreign.read_bytes() == (Path(__file__).resolve().parents[2] / "src/spec_dock/shim_vnext.py").read_bytes()
+    assert (backup / "static" / relative).read_bytes() == old_bytes
+    assert tree_digest(target) == before and not tuple(installed.parent.glob(".install-*.tmp"))
+    assert not (target / ".spec-dock-installations").exists() and not output.err
+
+
+@pytest.mark.parametrize("changed", ["asset", "backup"])
+def test_static_update_keeps_same_inode_edits_to_the_asset_or_verified_backup_and_stops_before_publication(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, changed: str
+) -> None:
+    target = uninitialized_worktree(tmp_path / "consumer")
+    assert main(["installation", "init", str(target), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    relative = "spec-dock/scripts/spec-dock"
+    installed = target / relative
+    old_bytes = (Path(__file__).resolve().parents[1] / "fixtures/issue413/legacy-shim.txt").read_bytes()
+    installed.write_bytes(old_bytes)
+    before = tree_digest(target)
+    other_before = tree_digest(target, excluded_entries=frozenset({relative}))
+    backup = tmp_path / "backup"
+    backed_up = backup / "static" / relative
+    private = b"private same-inode actor edit must remain intact\n"
+    native_cleanup = tempfile.TemporaryDirectory.cleanup
+    edited: list[int] = []
+
+    def edit_after_restore_cleanup(directory: tempfile.TemporaryDirectory[str]) -> None:
+        native_cleanup(directory)
+        if edited or not Path(directory.name).name.startswith(".specdock-restore-") or not backed_up.exists():
+            return
+        entry = installed if changed == "asset" else backed_up
+        original = entry.stat().st_ino
+        entry.write_bytes(private)
+        assert entry.stat().st_ino == original
+        edited.append(original)
+
+    monkeypatch.setattr(tempfile.TemporaryDirectory, "cleanup", edit_after_restore_cleanup)
+    assert (
+        main(["installation", "update", "--target", str(target), "--backup-dir", str(backup), "--yes", "--json"]) == 6
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    data = result["data"]["result"]
+    assert len(edited) == 1 and result["status"] == "partial"
+    assert data["changed_paths"] == data["created_paths"] == data["retired_paths"] == []
+    assert data["backup_verified"] is True and data["restore_verified"] is True
+    assert result["effects"] == [
+        {"kind": "backup", "status": "succeeded", "target": str(backup)},
+        {"kind": "installation.change", "status": "not_attempted", "target": relative},
+    ]
+    assert installed.read_bytes() == (private if changed == "asset" else old_bytes)
+    assert backed_up.read_bytes() == (private if changed == "backup" else old_bytes)
+    edited_entry = installed if changed == "asset" else backed_up
+    assert edited_entry.stat().st_ino == edited[0]
+    assert tree_digest(target, excluded_entries=frozenset({relative})) == other_before
+    if changed == "backup":
+        assert tree_digest(target) == before
+    assert private.decode().strip() not in output.out + output.err and not output.err
+    assert not tuple(installed.parent.glob(".install-*.tmp")) and not (target / ".spec-dock-installations").exists()

@@ -573,6 +573,12 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 
 通常wheelの旧四module収録禁止はRed 1 failed（0.73秒、exit1）、退役後の同testはGreen 1 passed（15.02秒、exit0）。公開Scope create/import/lifecycle/branch/recovery argument拒否の五suiteは156 passed（47.47秒）、exit0。全Ruff check/format（329 files）・変更test限定mypy・diff checkが成功。既存test削除0、skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-domain-retirement-source-{red,green}.logとpytest-domain-retirement-related.logへ保持。残る旧installation等、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**旧fixed-source installer・journal・復旧executorの退役**
+
+旧五source filesの1750行・58 symbolsと旧三test filesの1378行・56 test関数を全文確認し、[個別対応](artifacts/test-port-fixed-installer-retirement.md)を保存した。package/相対/TYPE_CHECKING/子moduleを含む候補外importは0。固定GitHub sourceのtag/commit/archive取得、engine candidate照合、group/child UUID journal、recovery area/ignore marker、全root交換とresume/rollbackを削除した。current static manifest/bytes検査、明示一WT、外部実backup/restore、個別file公開・unknown/partial、user仕様/選択/未知file/Git保全は維持する。旧backup子inodeのrollback所有認証と現行root identity/bytes検査を同じ保証と主張しない。
+
+公開CLIにhardlink拒否四case（4 passed、8.10秒）、候補hardlink化（1 passed、2.41秒）、asset/backup same-inode edit（2 passed、4.56秒）、実ZIP package bytes改変拒否（1 passed、0.20秒）を追加した。既存Greenのcharacterizationである。通常wheelの旧五module収録禁止はRed 1 failed（0.80秒、exit1）、退役後の同testはGreen 1 passed（14.77秒、exit0）。関連五suiteは208 passed（97.97秒）、exit0。後から追加したZIP改変一caseは別focused runであり、この208へ加算しない。全Ruff check/format（321 files）・変更二test限定mypy・diff checkが成功。skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-installation-retirement-{port,source-red,source-green,related}.logへ保持。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
