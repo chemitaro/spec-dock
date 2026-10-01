@@ -567,6 +567,12 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 
 通常wheelの旧七module収録禁止はRed 1 failed（0.90秒）、退役後の同testはGreen 1 passed（16.52秒）。Start/lock options/Doctor/別process競合・kill/migration/static assets七suiteは259 passed（120.89秒）、exit0。全Ruff check/format（333 files）・変更test限定mypy・diff checkが成功。既存test削除0、skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-control-retirement-source-{red,green}.logとpytest-control-retirement-related.logへ保持。残る旧source、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**旧domain台帳・復旧契約の退役**
+
+旧四source filesの435行・14 top-level symbolsを全文確認し、[対応記録](artifacts/test-port-domain-retirement.md)を保存した。local採番予約、高水位/tombstone/永久branch binding、UUID付き操作計画・epoch/engine/revision固定・intent再送/resumeの型とexecutorを削除した。候補外importは絶対／相対／TYPE_CHECKING／子moduleを含め0。既存ID/selector codec、current Git branch検査、今回操作のeffects/partial/unknown、readonly legacy診断は維持する。
+
+通常wheelの旧四module収録禁止はRed 1 failed（0.73秒、exit1）、退役後の同testはGreen 1 passed（15.02秒、exit0）。公開Scope create/import/lifecycle/branch/recovery argument拒否の五suiteは156 passed（47.47秒）、exit0。全Ruff check/format（329 files）・変更test限定mypy・diff checkが成功。既存test削除0、skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-domain-retirement-source-{red,green}.logとpytest-domain-retirement-related.logへ保持。残る旧installation等、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
