@@ -414,7 +414,7 @@ class GuardedExplicitFileSource:
         *,
         source_path: Path,
         descriptor: int,
-        initial_status: object,
+        initial_status: os.stat_result,
         source_visibility: FileArtifactSourceVisibility,
         source_display: str,
     ) -> None:

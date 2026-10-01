@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Literal
 
 from spec_dock.runtime.domain.ids import deps_node_sort_key, find_existing_id_by_num, format_id, parse_id
 from spec_dock.runtime.infra.contracts import DepsDependencyContext, DepsTopologyLoadResult, DirectDependencyResolution
@@ -406,7 +406,9 @@ def load_issue_depends_on_map(specdock_dir: Path, graph: SpecGraph) -> DepsTopol
         for dep_node_id in direct_dep_node_ids:
             dep_node = graph.nodes_by_id[dep_node_id]
             dep_issue_ids = _issue_ids_for_dep_node(graph, dep_node_id)
-            expansion = "empty" if not dep_issue_ids else "issue" if dep_node.kind == "issue" else "expanded"
+            expansion: Literal["issue", "expanded", "empty"] = (
+                "empty" if not dep_issue_ids else "issue" if dep_node.kind == "issue" else "expanded"
+            )
             target_issue_ids = tuple(dep_issue_ids)
             for src_issue_id in src_issue_ids:
                 dependency_contexts[src_issue_id].append(

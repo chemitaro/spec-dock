@@ -785,7 +785,7 @@ def _build_delete_json_payload(result: DeleteNodeResult) -> dict[str, object]:
             ],
         }
     # `ok`
-    payload = {
+    payload: dict[str, object] = {
         "status": status,
         "target_id": result.target_id,
         "deleted_node_ids": list(result.deleted_node_ids),

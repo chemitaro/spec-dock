@@ -62,9 +62,9 @@ def _render_dashboard_md(
         "UNKNOWN": [],
     }
     for entry in entries:
-        state = entry.get("state")
-        if isinstance(state, str) and state in by_state:
-            by_state[state].append(entry)
+        entry_state = entry.get("state")
+        if isinstance(entry_state, str) and entry_state in by_state:
+            by_state[entry_state].append(entry)
 
     lines: list[str] = []
     lines.append("# Dashboard (generated)")

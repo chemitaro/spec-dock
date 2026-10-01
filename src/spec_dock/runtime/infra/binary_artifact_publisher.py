@@ -25,6 +25,8 @@ from spec_dock.runtime.application.contracts import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from spec_dock.runtime.application.contracts import FileArtifactSourceVisibility
+
 
 _UNSUPPORTED_PUBLICATION_ERRNOS = {
     errno.EACCES,
@@ -582,7 +584,7 @@ def _classify_explicit_source(
     repo_root: Path,
     source_path: Path,
     opened_status: os.stat_result,
-) -> tuple[str, str]:
+) -> tuple[FileArtifactSourceVisibility, str]:
     try:
         resolved_root = repo_root.resolve(strict=True)
         resolved_source = source_path.resolve(strict=True)

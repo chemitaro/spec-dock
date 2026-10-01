@@ -696,6 +696,10 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 削除前の保全十九casesは19 passed/47 deselected（4.33秒）、追加継承二casesは2 passed/66 deselected（0.53秒）。wheel収録禁止はRed 1 failed（0.83秒）→Green 1 passed（14.76秒）、関連六suite 243 passed（60.26秒）、実Python 3.10.15の後継二十一cases 21 passed/47 deselected（4.59秒）、全て期待したexitとなった。初回関連runの誤test path/no tests ranは別logへ保持。全Ruff（296 files）、変更二test限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 10 errors/5保持source（215 source files）、make exit2。skip/型ignore/収集除外追加0。残るshared型契約、Windows/native full gates、fresh Strict、最終手動確認を継続し、実consumer/live GitHubは未変更。
 
+**保持する共有コードの型契約**
+
+現在もvalidation・dependency・binary Artifact・rendererで使う共有コードの通常mypy十件を、実際の有限状態Literal、os.stat_result、返却型、JSON payload型と同一関数内の変数名へ合わせた。業務分岐、出力、試験選択、skip条件、型ignoreは変更しない。変更前の通常make lintは10 errors/5 files（215 source files）、exit2。修正後の通常make lintはRuff check/format（296 files）・mypy全215 source filesが成功し、exit0。関連dependency/validation/binary publisher/ports/presentation/Scope Delete八群は170 passed/1 skipped（10.06秒）、exit0。skipは既存Linux O_TMPFILE capability testでありDarwinでのnative成功ではない。元logsはiss-00413-implementation/lint-shared-source-typing.log、pytest-shared-source-typing-related.logへ保持した。現在候補の全pytest/native Windows/fresh Strict/Final Quality Gate/最終手動確認は別途継続する。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 

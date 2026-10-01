@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
-from typing import TypeAlias
+from typing import Literal, TypeAlias
 
 from spec_dock.runtime.domain.ids import deps_node_sort_key
 from spec_dock.runtime.domain.models import (
@@ -230,6 +230,7 @@ def _build_evaluation(
     closure = list(blockers)
     target_ready = target_ready and len(node_blockers) == 0
 
+    guard_reason: Literal["ready", "blocked", "unknown"]
     if target_ready:
         guard_reason = "ready"
     else:
@@ -522,8 +523,10 @@ def _with_direct_node_dependencies(
     for dependency in unresolved:
         if dependency.target_node_kind == "issue" or dependency.expansion != "empty":
             continue
-        reason = "empty_open" if dependency.dependency_disposition == "blocking" else "empty_unknown"
-        state = "open" if dependency.dependency_disposition == "blocking" else "unknown"
+        reason: Literal["empty_open", "empty_unknown"] = (
+            "empty_open" if dependency.dependency_disposition == "blocking" else "empty_unknown"
+        )
+        state: Literal["open", "unknown"] = "open" if dependency.dependency_disposition == "blocking" else "unknown"
         node_blockers_by_id[dependency.target_node_id] = DepsNodeBlocker(
             node_id=dependency.target_node_id,
             reason=reason,
@@ -535,7 +538,7 @@ def _with_direct_node_dependencies(
             dependency_disposition=dependency.dependency_disposition,
             disposition_basis=dependency.disposition_basis,
         )
-    guard_reason = (
+    guard_reason: Literal["ready", "blocked", "unknown"] = (
         "unknown"
         if evaluation.guard_reason == "unknown"
         or any(dependency.dependency_disposition == "indeterminate" for dependency in unresolved)
