@@ -723,3 +723,12 @@ Syncは通常/previewともdirect記録とopaqueな旧generationを更新せず�
 初回と訂正後の各24失敗はschema名とrecovery fieldのtest期待の誤りだった。確定CLI契約のspecdock.cli/v2・recovery=nullへ訂正し、製品Redには数えない。八既存atomic casesは最初から成功し、訂正後の二filesは32 passed（0.14秒）。`uv run pytest tests/integration/test_cli_recovery_vnext.py tests/integration/test_atomic_json_publication.py tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime/test_issue413_scope_import.py tests/cli_runtime/test_issue413_finish.py tests/integration/test_issue413_migration.py -q --tb=short` は148 passed（39.36秒）。ログは既に選択したEpic Workbenchのiss-00413-implementation/pytest-recovery-related.logへ保持する。
 
 全source/tests Ruff check/format（424 files）、変更二test限定mypy --follow-imports=silent、diff checkが成功した。実consumer・Git内の独自領域・live GitHubは未変更。旧installation/handoverとproviderの退役、full type/pytest、native Windows、fresh Strict、最終手動確認を続ける。このcheckpointは旧providerの全退役や全体gateの合格ではない。
+
+
+## P-12 旧group installation / finalization / engine handover試験の退役
+
+旧四ファイルの54関数（8/7/6/33）を読み、[個別判断](artifacts/test-port-installation-retirement.md)へ保存した。全WT中央control、ready/maintenance、epoch、fixed engine source、journal resume/rollback、whole-group finalizationは新仕様の保証にしない。既存公開assets/通常wheel/provider distribution/退役診断のsuiteへ必要な安全性を対応させ、obsolete fixtureの外部参照が二つの四ファイル内部だけであることを確認して一緒に退役した。pytestの条件除外やskipは増やしていない。製品側の旧source退役は参照閉包の別stepである。
+
+旧試験のsame-content inode差替え条件を公開static操作に移した。native fsync後のbackup directoryを境界に、外部actorが観測済み資産を同bytes/mode・別inodeへ置換する。update一件は1 passed（2.42秒）、uninstallへ広げた二casesは2 passed（4.52秒）だった。既存実装のGreen確認であり、製品Redではない。CLIはpartial/6、backup/restore成功、全変更/退役not_attemptedを返し、actorのファイル・target/Git tree・実backupを保持した。
+
+`uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_cli_entrypoint_vnext.py tests/unit/infra/test_provider_distribution.py tests/integration/test_cli_recovery_vnext.py -q --tb=short` は99 passed（74.91秒）。既存Epic Workbenchのiss-00413-implementation/pytest-installation-retirement.logへ保持する。全source/tests Ruff check/format（420 files）、変更一test限定mypy --follow-imports=silent、diff checkも成功した。限定Greenを全体gateへ読み替えず、provider/runtime旧経路の退役、full type/pytest、native Windows、fresh Strict、最終手動製品確認を継続する。実consumer・既存WT・live GitHubへの適用は行っていない。

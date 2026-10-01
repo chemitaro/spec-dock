@@ -764,3 +764,58 @@ def test_update_checks_backup_location_and_confirmation_before_any_effect(
     result = json.loads(output.out)
     assert result["effects"] == [] and tree_digest(target) == before and tree_digest(tmp_path) == surrounding
     assert "private existing backup" not in output.out + output.err
+
+
+@pytest.mark.parametrize("leaf", ["update", "uninstall"])
+def test_static_changes_stop_if_the_observed_asset_is_replaced_with_same_bytes_during_backup(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, leaf: str
+) -> None:
+    target = uninitialized_worktree(tmp_path / "consumer")
+    assert main(["installation", "init", str(target), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    relative = "spec-dock/scripts/spec-dock"
+    installed = target / relative
+    old_bytes = (Path(__file__).resolve().parents[1] / "fixtures/issue413/legacy-shim.txt").read_bytes()
+    installed.write_bytes(old_bytes)
+    original = installed.stat()
+    before, git_before = tree_digest(target), tree_digest(target / ".git")
+    backup = tmp_path / "backup"
+    native_sync = os.fsync
+    replaced: list[int] = []
+
+    def replace_after_backup_sync(descriptor: int) -> None:
+        native_sync(descriptor)
+        if replaced or not backup.is_dir():
+            return
+        observed, expected = os.fstat(descriptor), backup.stat()
+        if (observed.st_dev, observed.st_ino) != (expected.st_dev, expected.st_ino):
+            return
+        replacement = installed.with_name("same-content-actor")
+        replacement.write_bytes(old_bytes)
+        replacement.chmod(original.st_mode & 0o777)
+        replacement.replace(installed)
+        replaced.append(installed.stat().st_ino)
+
+    monkeypatch.setattr(os, "fsync", replace_after_backup_sync)
+    assert main(["installation", leaf, "--target", str(target), "--backup-dir", str(backup), "--yes", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    data = result["data"]["result"]
+    assert len(replaced) == 1 and replaced[0] != original.st_ino
+    assert result["status"] == "partial" and result["error"]["code"] == "INSTALLATION_INCOMPLETE"
+    assert data["changed_paths"] == data["created_paths"] == data["retired_paths"] == []
+    assert data["backup_verified"] is True and data["restore_verified"] is True
+    assert result["effects"][0] == {"kind": "backup", "status": "succeeded", "target": str(backup)}
+    if leaf == "update":
+        assert result["effects"][1:] == [
+            {"kind": "installation.change", "status": "not_attempted", "target": relative},
+        ]
+    else:
+        assert len(result["effects"]) == 85
+        assert all(
+            effect["kind"] == "installation.retire" and effect["status"] == "not_attempted"
+            for effect in result["effects"][1:]
+        )
+        assert {"kind": "installation.retire", "status": "not_attempted", "target": relative} in result["effects"]
+    assert installed.stat().st_ino == replaced[0] and installed.read_bytes() == old_bytes
+    assert (backup / "static" / relative).read_bytes() == old_bytes
+    assert tree_digest(target) == before and tree_digest(target / ".git") == git_before
