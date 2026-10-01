@@ -156,6 +156,8 @@ uv run pytest tests/integration/test_start_lock.py -q
 <a id="p-06"></a>
 ## P-06 Git効果を含むStartを閉じる
 
+第10回Strictは`3e300afa`を固定してP1一件・P3一件でfail。全件を[分析記録](artifacts/code-review-p06-10-analysis.md)へ残し、branch familyのGit変更前後で捕捉したimmutable直接記録のidentity/hashを照合する修正と、Scope read helpの旧cache説明の訂正を行った。実checkout/reference-transaction hookで削除・置換・追記・空からの新規記録、nativeエラー経路を確認し、関連171 testsと変更3 source限定mypyが通過した。hookの変更を復元せず、確認済みGit効果と原文エラーをpartialへ保持する。P3の分類と利用者の修正認可を分けて記録し、fresh Strict passは未取得。
+
 第6回Strictは`e6513650`のP-03〜P-08を対象にP1一件・P2四件でfail。全件を[分析記録](artifacts/code-review-p06-06-analysis.md)へ残し、未知/重複inventoryの行単位診断・Start停止、残存stageのpublication unknownをTDDで修正した。関連252 testsが通過し、fresh Strict passは未取得。P2の分類を変えず、同じfail batchに対する利用者の明示的な修正認可を適用した。
 
 **状態: 実装中（第3回独立レビューは8ad73cfdを対象にfail。全5件を分析後、no-op checkout、checkout後clean、候補Scope/container構造、未確認token、sole selection公開確認を修正し、関連619件を検証。branch leafとPOSIX stage/rename/unlink強制停止も検証済み。Windows store/native受入と現在候補の独立レビュー等は未完了）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。

@@ -18,6 +18,7 @@ from spec_dock.runtime.domain.git_ref import parse_commit_oid
 from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.json_store import read_guarded_json
+from spec_dock.runtime.infra.work_target_store import StoredSelection, WorkTargetStore
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, EffectStatus, OperationResult, ResultStatus
 
 if TYPE_CHECKING:
@@ -34,14 +35,16 @@ class BranchData:
 
 def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[BranchData]:
     views = load_scope_views(context.root / "spec-dock")
-    target = resolve_scope(context, views, namespace.target)
+    source_selection = _capture_selection(context) if namespace.command_path != "branch show" else None
+    selection = read_selection(context, views, stored=source_selection) if source_selection is not None else None
+    target = resolve_scope(context, views, namespace.target, selection=selection)
     if namespace.command_path != "branch show":
         if namespace.expect_backend is not None and target.backend.kind != namespace.expect_backend:
             raise ValueError("target backend does not match --expect-backend")
         if namespace.expect_current is not None:
-            expected = resolve_scope(context, views, namespace.expect_current).id
-            current = read_selection(context, views)
-            if current.record is None or current.record.scope_id != expected:
+            expected = resolve_scope(context, views, namespace.expect_current, selection=selection).id
+            current = selection if selection is not None else read_selection(context, views)
+            if current.status != "selected" or current.record is None or current.record.scope_id != expected:
                 raise ValueError("direct target does not match --expect-current")
     loaded = read_guarded_json(target.path / ".meta.json")
     if loaded is None or not isinstance(loaded[0], dict):
@@ -89,6 +92,8 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
             effects = (Effect("git.branch.create", "planned", name),)
         else:
             _fresh_context(context, namespace.timeout)
+            assert source_selection is not None
+            _verify_selection(context, source_selection)
             try:
                 run_git(context.root, "branch", name, tip, timeout=namespace.timeout, mutation=True)
                 created = True
@@ -107,6 +112,7 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                 )
                 if tip != expected_tip:
                     raise ValueError("created branch differs from the fixed base commit")
+                _verify_selection(context, source_selection)
             except (OSError, ValueError, RuntimeError) as error:
                 if effects:
                     return OperationResult(
@@ -147,6 +153,7 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                         tip = actual_tip
                     elif not error.uncertain:
                         create_effect = "failed"
+                    _verify_selection(after, source_selection)
                 except (OSError, ValueError, RuntimeError):
                     pass
                 partial = create_effect != "failed"
@@ -175,10 +182,13 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
         else:
             current_context = _fresh_context(context, namespace.timeout)
             verify_local_inputs(context, source_inputs)
+            assert source_selection is not None
+            _verify_selection(context, source_selection)
             if current_context.branch == name and current_context.head == tip:
                 verify_candidate(current_context, candidate)
                 if run_git(current_context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
                     raise ValueError("branch switch requires a clean worktree")
+                _verify_selection(context, source_selection)
                 return OperationResult(
                     namespace.command_path,
                     "unchanged",
@@ -195,8 +205,10 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                 verify_candidate(after, candidate)
                 if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
                     raise ValueError("checkout left a dirty worktree")
+                _verify_selection(after, source_selection)
                 switched = True
             except (OSError, ValueError, RuntimeError) as error:
+                verification_error: str | None = None
                 if isinstance(error, GitProcessError) and not effects:
                     effect_status: EffectStatus = "unknown"
                     try:
@@ -207,16 +219,19 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                         ):
                             raise ValueError("Git project identity changed")
                         if after.branch == name and after.head == tip:
+                            effect_status = "succeeded"
                             verify_candidate(after, candidate)
-                            if not run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
-                                switched = True
-                                effect_status = "succeeded"
+                            if run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                                raise ValueError("checkout left a dirty worktree")
+                            _verify_selection(after, source_selection)
+                            switched = True
                         elif after.branch == context.branch and after.head == context.head and not error.uncertain:
                             verify_local_inputs(after, source_inputs)
+                            _verify_selection(after, source_selection)
                             if not run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
                                 effect_status = "failed"
-                    except (OSError, ValueError, RuntimeError):
-                        pass
+                    except (OSError, ValueError, RuntimeError) as validation_error:
+                        verification_error = str(validation_error)
                     effects = (Effect("git.checkout", effect_status, name),)
                 partial = any(effect.status in ("succeeded", "unknown") for effect in effects)
                 return OperationResult(
@@ -228,7 +243,10 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
                     error=Diagnostic(
                         "GIT_FAILED" if isinstance(error, GitProcessError) else "CHECKOUT_VERIFICATION_FAILED",
                         str(error),
-                        error.details() if isinstance(error, GitProcessError) else {},
+                        {
+                            **(error.details() if isinstance(error, GitProcessError) else {}),
+                            **({"verification_error": verification_error} if verification_error is not None else {}),
+                        },
                     ),
                 )
     data = _data(target.id, name, tip, created=created, switched=switched)
@@ -259,3 +277,18 @@ def _fresh_context(context: ProjectContext, timeout: float) -> ProjectContext:
     if fresh.clone_identity != context.clone_identity or fresh.worktree_identity != context.worktree_identity:
         raise ValueError("Git project physical identity changed")
     return fresh
+
+
+def _capture_selection(context: ProjectContext) -> StoredSelection:
+    with WorkTargetStore(context.root) as store:
+        captured = store.read()
+    if captured.status not in ("empty", "selected"):
+        raise ValueError("direct selection cannot be captured for a Git branch mutation")
+    return captured
+
+
+def _verify_selection(context: ProjectContext, expected: StoredSelection) -> None:
+    with WorkTargetStore(context.root) as store:
+        observed = store.read()
+    if observed != expected:
+        raise ValueError("direct selection changed during the Git branch operation")

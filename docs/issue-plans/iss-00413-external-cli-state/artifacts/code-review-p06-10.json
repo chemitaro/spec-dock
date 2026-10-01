@@ -1,0 +1,35 @@
+{
+  "findings": [
+    {
+      "title": "[P1] checkout hookによるdirect record変更を見逃す",
+      "body": "branch switch 実行時に post-checkout hook が spec-dock/.agent/work-target/target-*.json を削除または置換して正常終了すると、checkout後は branch/HEAD、candidate metadata、git status しか再確認せず、ignored なdirect recordの変更を検出できないため、status=succeeded・switched=trueを返しながら選択が消失または別対象へ変わります。これはbranch switchが直接記録を不変にする公開契約を破り、後続のStart重複判定やFinish対象を誤らせるので、checkout前に捕捉した StoredSelection/SelectionHandle をcheckout後とGit失敗後の再観測経路で同一性確認し、差分があればcheckout効果だけを残すpartialとして返してください。",
+      "confidence_score": 0.98,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/branch_operations.py",
+        "line_range": {
+          "start": 192,
+          "end": 198
+        }
+      }
+    },
+    {
+      "title": "[P3] Scope read helpが退役cacheを読むと誤案内する",
+      "body": "scope list と scope show の公開helpはこの共通Reads文言から「cached state」を読むと表示しますが、今回の契約と接続済み実装は退役status cacheを採用せず、未観測のGitHub状態をunknownとして返します。実行結果は正しくても状態根拠を誤案内するため、接続済みScope read leafのReadsをcurrent metadataと未観測unknownに合わせてください。",
+      "confidence_score": 0.97,
+      "priority": 3,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/cli/catalog.py",
+        "line_range": {
+          "start": 376,
+          "end": 376
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "検証済みの6fec3099d8759b4e5b3b393b2987534b46dfa383..3e300afaa3b286074139f3b6ccc6a2494ca7c691について、指定された契約、接続済み実装、関連testsを縦経路ごとに静的照合しました。branch switchの必須な直接記録不変条件に、Git checkoutが実行するpost-checkout hook経由で破れる未検出経路があるため、patch全体を正しいとは判定できません。実装記録にある試験結果は証拠として確認しましたが、本レビューではtestsを再実行していません。利用者が後続義務と明示した残りのP-10、P-11、P-12、全platform・全suite・consumer cutover・最終製品認定は今回のgate対象から除外しました。",
+  "review_status": "fail",
+  "review_status_reason": "branch switchが直接記録を不変にする必須公開契約を、post-checkout hookがignoredな直接記録を変更する到達可能経路で保証できず、成功として誤報するためです。",
+  "overall_confidence_score": 0.97
+}

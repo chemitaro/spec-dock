@@ -14,6 +14,16 @@ if TYPE_CHECKING:
 from spec_dock.cli import main
 
 
+def test_scope_read_help_explains_current_metadata_and_unobserved_github_state(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    for leaf in ("list", "show"):
+        assert main(["scope", leaf, "--help"]) == 0
+        help_text = capsys.readouterr().out
+        assert "unknown" in help_text and "Current metadata" in help_text
+        assert "cached state" not in help_text and "specdock.cli/v2" in help_text
+
+
 def make_workspace(root: Path) -> Path:
     """Build a GitHub-backed schema-3 test fixture, never real dogfood metadata."""
     root.mkdir()

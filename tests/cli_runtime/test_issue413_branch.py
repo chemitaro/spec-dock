@@ -107,6 +107,133 @@ def test_successful_checkout_hook_dirtying_the_workspace_keeps_checkout_effect_b
     assert not (root / ".git/spec-dock").exists()
 
 
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX post-checkout hook")
+@pytest.mark.parametrize("change", ["remove", "replace", "rewrite"])
+def test_checkout_hook_changing_ignored_direct_record_is_partial_without_restoration(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], change: str
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    subprocess.run(["git", "-C", str(root), "branch", "candidate"], check=True, capture_output=True)
+    record = select_fixture(root)
+    before = record.read_bytes()
+    replacement = record.parent / ("target-" + "b" * 32 + ".json")
+    body = {
+        "remove": f"rm {shlex.quote(str(record))}\n",
+        "replace": f"mv {shlex.quote(str(record))} {shlex.quote(str(replacement))}\n",
+        "rewrite": f"printf '\\n' >> {shlex.quote(str(record))}\n",
+    }[change]
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text("#!/bin/sh\n" + body)
+    hook.chmod(0o700)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "candidate", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "partial" and result["error"]["code"] == "CHECKOUT_VERIFICATION_FAILED"
+    assert "direct selection changed" in result["error"]["message"]
+    assert result["data"]["result"]["switched"] is False
+    assert result["effects"] == [{"kind": "git.checkout", "status": "succeeded", "target": "candidate"}]
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"candidate\n"
+    assert not subprocess.check_output(["git", "-C", str(root), "status", "--porcelain", "-z"])
+    if change == "rewrite":
+        assert record.read_bytes() == before + b"\n"
+    else:
+        assert not record.exists()
+        if change == "replace":
+            assert replacement.read_bytes() == before
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX post-checkout hook")
+def test_failed_checkout_hook_changing_direct_record_keeps_git_error_and_confirmed_checkout(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    subprocess.run(["git", "-C", str(root), "branch", "candidate"], check=True, capture_output=True)
+    record = select_fixture(root)
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text(f"#!/bin/sh\nrm {shlex.quote(str(record))}\nprintf 'hook failed\\nsecond line\\n' >&2\nexit 17\n")
+    hook.chmod(0o700)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "candidate", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["result"]["switched"] is False
+    assert result["effects"] == [{"kind": "git.checkout", "status": "succeeded", "target": "candidate"}]
+    assert result["error"]["code"] == "GIT_FAILED"
+    assert result["error"]["details"]["git"]["returncode"] == 1
+    assert result["error"]["details"]["git"]["stderr"] == "Switched to branch 'candidate'\nhook failed\nsecond line\n"
+    assert "direct selection changed" in result["error"]["details"]["verification_error"]
+    assert not record.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX reference-transaction hook")
+def test_branch_creation_hook_changing_direct_record_is_partial_with_created_ref_retained(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    hook = root / ".git/hooks/reference-transaction"
+    hook.write_text(f'#!/bin/sh\nif [ "$1" = committed ]; then rm {shlex.quote(str(record))}; fi\nexit 0\n')
+    hook.chmod(0o700)
+    assert main(["--project", str(root), "branch", "create", "init-00001", "--base", "HEAD", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "BRANCH_VERIFICATION_FAILED"
+    assert "direct selection changed" in result["error"]["message"]
+    assert result["data"]["result"]["created"] is True and result["data"]["result"]["switched"] is False
+    assert result["effects"] == [{"kind": "git.branch.create", "status": "succeeded", "target": "init-00001-fixture"}]
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
+    assert subprocess.check_output(["git", "-C", str(root), "rev-parse", "refs/heads/init-00001-fixture"])
+    assert not record.exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX post-checkout hook")
+def test_checkout_hook_acquiring_a_direct_record_from_empty_selection_returns_partial(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    subprocess.run(["git", "-C", str(root), "branch", "candidate"], check=True, capture_output=True)
+    record = select_fixture(root)
+    seed = tmp_path / "record-seed.json"
+    seed.write_bytes(record.read_bytes())
+    record.unlink()
+    hook = root / ".git/hooks/post-checkout"
+    hook.write_text(f"#!/bin/sh\ncp {shlex.quote(str(seed))} {shlex.quote(str(record))}\n")
+    hook.chmod(0o700)
+    assert main(["--project", str(root), "branch", "switch", "init-00001", "--name", "candidate", "--json"]) == 6
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["result"]["switched"] is False
+    assert result["effects"] == [{"kind": "git.checkout", "status": "succeeded", "target": "candidate"}]
+    assert record.read_bytes() == seed.read_bytes()
+
+
+@pytest.mark.parametrize("leaf", ["create", "switch"])
+def test_branch_mutation_refuses_unobservable_direct_record_before_git_changes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], leaf: str
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    subprocess.run(["git", "-C", str(root), "branch", "candidate"], check=True, capture_output=True)
+    directory = root / "spec-dock/.agent/work-target"
+    directory.mkdir(parents=True)
+    record = directory / ("target-" + "a" * 32 + ".json")
+    record.write_bytes(b"invalid immutable selection")
+    arguments = ["--base", "HEAD"] if leaf == "create" else ["--name", "candidate"]
+    assert main(["--project", str(root), "branch", leaf, "init-00001", *arguments, "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == [] and record.read_bytes() == b"invalid immutable selection"
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
+    assert (
+        subprocess.run(
+            ["git", "-C", str(root), "show-ref", "--verify", "--quiet", "refs/heads/init-00001-fixture"],
+            capture_output=True,
+        ).returncode
+        == 1
+    )
+
+
 def test_branch_create_only_creates_ref_at_fixed_base(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = committed_workspace(tmp_path / "consumer")
     tip = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"]).decode().removesuffix("\n")

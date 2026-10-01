@@ -59,9 +59,14 @@ def ancestors_for(views: tuple[ScopeView, ...], target: ScopeView) -> tuple[Scop
     return tuple(reversed(chain))
 
 
-def read_selection(context: ProjectContext, views: tuple[ScopeView, ...]) -> SelectionObservation:
-    with WorkTargetStore(context.root) as store:
-        observation = store.read()
+def read_selection(
+    context: ProjectContext, views: tuple[ScopeView, ...], *, stored: StoredSelection | None = None
+) -> SelectionObservation:
+    if stored is None:
+        with WorkTargetStore(context.root) as store:
+            observation = store.read()
+    else:
+        observation = stored
     if observation.status == "empty" and context.workspace.get("writer_protocol") == OLD_WRITER_PROTOCOL:
         try:
             value = (context.root / "spec-dock/.agent/active.json").lstat()

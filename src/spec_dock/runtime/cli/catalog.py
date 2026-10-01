@@ -494,7 +494,14 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not save derived state, acquire a Start lock, repair selections, or inspect Codex processes."
         json_version = "specdock.cli/v2"
         json_data = "observed_at, source, complete, worktrees, scopes, counts, findings; process_state=not_observed."
-    if leaf.startswith("scope create"):
+    if leaf in ("scope list", "scope show"):
+        reads = "Current metadata and this worktree's direct record for dynamic selectors; unobserved GitHub lifecycle is unknown."
+        does_not = (
+            "Does not contact GitHub, read a retired status cache, modify metadata or selection, or change Git refs."
+        )
+        json_data = "items, unknown_filtered_count." if leaf == "scope list" else "scope, github_ref, changed=false."
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf.startswith("scope create"):
         reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."
         json_version = "specdock.cli/v2"
         confirmation = "TTY prompts after planning; --yes confirms creation; JSON and non-interactive require --yes."

@@ -423,3 +423,15 @@ Artifact list/show/create/import fileをdirect_artifactから通常dispatchへ�
 Artifact全体と関連contract/fresh wheel/helpの227 passed/1 skipped（14.12秒）、source/testsのRuff check/format（392 files）、変更7 source限定mypyが通過した。追加でrepository全体にRuffを向けたところ、CI対象外の既存.github/scripts二fileにimport/formatの問題があった。無関係なfileを変更せず、source/testsの通常対象と区別した。全体mypy、native Windows、Workbench/worktree/bootstrap、P-11以後、fresh Strict・Final Quality Gate・手動製品確認・実consumer切替は未完了である。実dogfood metadata・宣言・選択を変更していない。
 
 コミット前の差分点検で、このArtifact unitが使わない将来の置換分岐をfile_publicationから除き、無上書き公開だけに限定した。その後の公開Artifact全30ケースが4.50秒で通過した。置換が必要なWorkbenchは次の独立したRedから実装する。
+
+## 第10回Strictの二件を修正
+
+固定候補3e300afaa3b286074139f3b6ccc6a2494ca7c691のr10が43分34秒、GPT-5.6 Sol / Proのverified browser経路で完了した。wrapper exit10、P1一件/P3一件、review_status=fail。原文JSONをbyte保全し、SHA-256 `922aa2ef0b62a0f75253d8dc71b80634898c80c7ecf7f42895ea1c3ce872112e` と[全件分析](artifacts/code-review-p06-10-analysis.md)を記録した。Artifact 35068763753bed493f7a8fb608bbd6726581d4f1と進行中Workbenchはこの固定gateへ含まれない。
+
+F1のcheckout成功hookによるignored direct recordの削除・basename置換・同一inodeのbytes変更を公開CLI/実GitでRedとして確認した。Git前にStoredSelectionとhash/identity付きhandleを一度捕捉し、dynamic target/expect guard、Git前後/no-op/native failureを同じ観測に結び付ける。branch createのreference-transaction hookでも同じ不変条件違反をRedにして照合を追加した。空からのhook選択、観測不能記録の変更前停止、古い成功・no-op・dirty・原文Gitエラーを回帰確認した。直接状態を新規作成/編集/復元する処理、Start共通lock、権限制御、hook無効化を追加しない。
+
+非zeroのcheckout hookが記録を消した場合は、実際のcheckout=succeeded、switched=false、partial6、GIT_FAILEDと元のstderr/returncodeを保持し、追加のverification_errorで直接状態の差異を説明する。hookがexit17でも実Git checkoutのnative returncodeは1だったため、新testの期待を実測した1へ訂正した。このnative値の仮定誤りを製品Redとして数えない。git.checkout効果の成立と操作全体の成功を混同せず、hookが残した記録/checkoutを巻き戻さない。
+
+F2のP3は通常Scope list/show helpへ残ったcached stateの誤説明をRedとして確認し、current metadata・dynamic selector用の当該記録・未観測GitHub stateはunknownという現行契約へ限定した。元のP3とnon-blockingを変更せず、利用者の全指摘修正の明示認可を適用した。通常readのネットワーク・保存・状態authorityを変更していない。
+
+branch/contract/観測/active/Start/store/helpの関連171 tests（35.84秒）、変更5 fileのRuff check/format、変更3 source限定mypy、diff checkが通過した。全source/testsの再認定や全体mypy、native Windows、fresh Strict、P-10残り、P-11以後、Final Quality Gate、手動製品確認、実consumer切替は未完了。Workbenchの進行中変更はこの修正コミットに含めない。
