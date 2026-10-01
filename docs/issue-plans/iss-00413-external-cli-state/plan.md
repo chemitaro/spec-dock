@@ -680,6 +680,12 @@ clean c4c26bdbの実Linux/Python 3.11.16全件は1839 passed/1 failed/17 skipped
 
 補正候補はLinux bootstrap全suite 32 passed（20.48秒）、macOSの同suite 32 passed（7.82秒）、全てexit0。Linux base/test hash・変更一file・実効capability0とprovider/prefix、主checkoutとの関連production bytes一致を照合した。全Ruff（304 files）、MYPYPATH=srcの変更test限定mypy、diff checkが成功。現在の全件再合格、通常full lint、残る旧source、Windows、fresh Strict、最終手動確認は別途継続する。実consumer/live GitHubは未変更。
 
+**旧Create / Artifact writer群の退役**
+
+外部production参照0の旧application三files全3044行/120 symbolsと旧import test全965行/20関数を全文・[個別判断](artifacts/test-port-create-artifact-helper-retirement.md)で確認し退役した。一つの純粋分類testはdomainへ移し全assertionsを保持する。Create lock/UUID/PID/TTL回収、mutation journal、動的rules symlink/rollback、自動rescan/retryとprivate cleanup結果を廃止し、公開exact owner先行・source privacy・有限100slot・no-overwrite・actor/証拠保全を維持する。共有scope_scaffold、binary publisher/ports試験、旧inventory path/hashは保持。退役後AST参照0。
+
+削除前の保全十一casesは11 passed/107 deselected（1.36秒）。通常wheel収録禁止はRed 1 failed（0.88秒）→Green 1 passed（15.35秒）、関連六suite 235 passed/1 skipped（37.91秒）、実Python 3.10.15の同十一cases 11 passed/107 deselected（1.32秒）、全て期待したexitとなった。skipは既存Linux O_TMPFILE capability testである。全Ruff（300 files）、変更三test限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 17 errors/8旧source files（219 files）、make exit2。型ignore/収集除外/skip追加0。今回より前の0fd8764fのLinux全件成功を今回の全件証拠とは扱わない。残る旧source/Windows/full gates/fresh Strict/最終手動確認を継続し、実consumer/live GitHubは未変更。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 

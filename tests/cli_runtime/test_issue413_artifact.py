@@ -98,7 +98,7 @@ def test_root_create_renders_legacy_scope_placeholders_without_inventing_a_scope
     assert (root / artifact["path"]).read_text() == "root||||||||||\nRoot artifact\n"
 
 
-@pytest.mark.parametrize("failure", ["missing", "denied", "io"])
+@pytest.mark.parametrize("failure", ["missing", "denied", "io", "invalid"])
 def test_import_source_errors_keep_the_public_exit_class_and_hide_the_source_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], failure: str
 ) -> None:
@@ -110,6 +110,8 @@ def test_import_source_errors_keep_the_public_exit_class_and_hide_the_source_pat
 
         def open_file(path, flags, mode=0o777, **kwargs):
             if path == "private-source.bin" and "dir_fd" in kwargs:
+                if failure == "invalid":
+                    raise ValueError(f"private-parent body hash count sentinel: {source}")
                 raise OSError(errno.EACCES if failure == "denied" else errno.EIO, "fixture source failed", str(source))
             return native_open(path, flags, mode, **kwargs)
 
@@ -124,13 +126,73 @@ def test_import_source_errors_keep_the_public_exit_class_and_hide_the_source_pat
         "--scope",
         "iss-00003",
         "--json",
-    ]) == (4 if failure == "missing" else 5)
+    ]) == (4 if failure == "missing" else 3 if failure == "invalid" else 5)
     output = capsys.readouterr()
     result = json.loads(output.out)
     assert output.err == "" and str(source) not in output.out and "private source bytes" not in output.out
+    assert "private-parent" not in output.out and "body hash count sentinel" not in output.out
     assert result["status"] == "failed" and result["effects"] == [] and not (owner / "artifacts").exists()
     if failure != "missing":
         assert source.read_bytes() == b"private source bytes"
+
+
+@pytest.mark.parametrize("target", ["iss-00001", "iss-00999"])
+def test_import_resolves_the_exact_owner_before_opening_the_source(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], target: str
+) -> None:
+    root, owner = artifact_workspace(tmp_path)
+    source = tmp_path / "private-source.bin"
+    source.write_bytes(b"private source bytes")
+    native_open = os.open
+
+    def refuse_source_open(path, flags, mode=0o777, **kwargs):
+        if path == source.name and "dir_fd" in kwargs:
+            pytest.fail("An invalid owner must fail before the explicit source is opened")
+        return native_open(path, flags, mode, **kwargs)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(os, "open", refuse_source_open)
+        assert (
+            main(["--project", str(root), "artifact", "import", "file", str(source), "--scope", target, "--json"]) == 4
+        )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert output.err == "" and result["error"]["code"] == "SCOPE_NOT_FOUND" and result["effects"] == []
+    assert str(source) not in output.out and "private source bytes" not in output.out
+    assert source.read_bytes() == b"private source bytes" and not (owner / "artifacts").exists()
+
+
+@pytest.mark.parametrize("operation", ["create", "import"])
+def test_artifact_shared_slot_exhaustion_preserves_all_evidence_without_a_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], operation: str
+) -> None:
+    root, owner = artifact_workspace(tmp_path)
+    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-07-30T01:02:03+00:00")
+    artifacts = owner / "artifacts"
+    artifacts.mkdir()
+    timestamp = "20260730t010203z"
+    (artifacts / f"{timestamp}-adr-existing.md").write_bytes(b"standard")
+    for suffix in range(1, 100):
+        name = f"{timestamp}-{suffix:02d}-existing.md" if suffix % 2 else f"{timestamp}-{suffix:02d}--existing.bin"
+        (artifacts / name).write_bytes(str(suffix).encode())
+    before = {path.name: path.read_bytes() for path in artifacts.iterdir()}
+    metadata = (owner / ".meta.json").read_bytes()
+    source = tmp_path / "private-source.bin"
+    source.write_bytes(b"private source bytes")
+    arguments = (
+        ["create", "--type", "research", "--title", "Evidence", "--slug", "evidence"]
+        if operation == "create"
+        else ["import", "file", str(source)]
+    )
+    assert main(["--project", str(root), "artifact", *arguments, "--scope", "iss-00003", "--json"]) == 5
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert output.err == "" and result["status"] == "failed" and result["effects"] == []
+    assert result["error"]["code"] == "LOCAL_IO_FAILED" and "Artifact timestamp suffix exhaustion" in output.out
+    assert str(source) not in output.out and "private source bytes" not in output.out
+    assert {path.name: path.read_bytes() for path in artifacts.iterdir()} == before
+    assert (owner / ".meta.json").read_bytes() == metadata and source.read_bytes() == b"private source bytes"
+    assert not (root / ".git/spec-dock").exists()
 
 
 def test_root_artifact_catalog_reads_only_identity_without_control_or_body(
@@ -560,6 +622,62 @@ def test_replaced_stage_is_preserved_and_is_never_published_as_the_artifact(
     assert changed and result["effects"] == []
     assert stage.read_bytes() == b"actor stage that must never become the Artifact"
     assert not (artifacts / "20261001t000000z-research-evidence.md").exists()
+
+
+@pytest.mark.parametrize("replacement", ["owner", "artifacts"])
+def test_artifact_publication_refuses_a_replaced_directory_and_preserves_actor_files(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], replacement: str
+) -> None:
+    root, owner = artifact_workspace(tmp_path)
+    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
+    artifacts = owner / "artifacts"
+    artifacts.mkdir()
+    preserved = {"rules.md": b"actor rules must survive", "existing.bin": b"opaque evidence\x00\xff"}
+    for name, payload in preserved.items():
+        (artifacts / name).write_bytes(payload)
+    directory = owner if replacement == "owner" else artifacts
+    held = tmp_path / "held-directory"
+    stage = artifacts / ".publish-20261001t000000z.tmp"
+    native_fsync = os.fsync
+    changed = False
+
+    def replace_directory(descriptor: int) -> None:
+        nonlocal changed
+        if stage.exists() and not changed:
+            changed = True
+            directory.rename(held)
+            shutil.copytree(held, directory, ignore=shutil.ignore_patterns(".publish-*"))
+            (directory / "actor-only.bin").write_bytes(b"replacement actor bytes")
+        native_fsync(descriptor)
+
+    monkeypatch.setattr(os, "fsync", replace_directory)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "artifact",
+            "create",
+            "--scope",
+            "iss-00003",
+            "--type",
+            "research",
+            "--title",
+            "Evidence",
+            "--slug",
+            "evidence",
+            "--json",
+        ])
+        == 3
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert changed and result["effects"] == [] and result["data"]["result"]["artifact"] is None
+    assert (directory / "actor-only.bin").read_bytes() == b"replacement actor bytes"
+    held_artifacts = held / "artifacts" if replacement == "owner" else held
+    for name, payload in preserved.items():
+        assert (artifacts / name).read_bytes() == payload and (held_artifacts / name).read_bytes() == payload
+    assert not list(artifacts.glob("*research-evidence.md")) and not list(held_artifacts.glob("*research-evidence.md"))
+    assert not list(artifacts.glob(".publish-*")) and not list(held_artifacts.glob(".publish-*"))
+    assert not (root / ".git/spec-dock").exists()
 
 
 @pytest.mark.parametrize("operation", ["create", "import"])
