@@ -5,8 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import load_scope_views
-from spec_dock.runtime.application.worktree_observation import observe_worktrees
+from spec_dock.runtime.application.worktree_observation import observe_worktrees, read_selection
 from spec_dock.runtime.domain.lifecycle import LocalBackend
 from spec_dock.runtime.domain.selectors import GithubScopeSelector, parse_scope_selector
 from spec_dock.runtime.infra.git_process import GitProcessError
@@ -30,6 +31,16 @@ def sync_workspace(
         finding = Diagnostic("SYNC_INPUT_INVALID", str(error), {"path": str(context.root / "spec-dock")})
         return OperationResult(
             "workspace sync", "failed", DiagnosticData((finding,), ("current Scope tree",)), 7, error=finding
+        )
+    if namespace.expect_current is not None or namespace.expect_backend is not None:
+        selection = read_selection(context, views)
+        check_scope_expectations(
+            context,
+            views,
+            selection,
+            target=None,
+            expected_current=namespace.expect_current,
+            expected_backend=namespace.expect_backend,
         )
     observations = observe_worktrees(context, timeout=namespace.timeout)
     included = {(view.id, view.github_ref): view for view in views}

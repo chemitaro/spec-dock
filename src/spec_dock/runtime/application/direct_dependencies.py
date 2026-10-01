@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.dependency_vnext import _read_raw_edges
 from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
 from spec_dock.runtime.application.worktree_observation import ancestors_for, read_selection, resolve_scope
@@ -34,7 +35,16 @@ if TYPE_CHECKING:
 
 def query_dependencies(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     views = load_scope_views(context.root / "spec-dock")
-    target = resolve_scope(context, views, namespace.target)
+    selection = read_selection(context, views)
+    target = resolve_scope(context, views, namespace.target, selection=selection)
+    check_scope_expectations(
+        context,
+        views,
+        selection,
+        target=target,
+        expected_current=namespace.expect_current,
+        expected_backend=namespace.expect_backend,
+    )
     raw, _metadata = _read_raw_edges(views)
     listing = dependency_listing(views, raw, target.id)
     ready: bool | None = None

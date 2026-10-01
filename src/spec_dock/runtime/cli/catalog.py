@@ -112,7 +112,7 @@ HELP_EFFECTS: dict[str, str] = {
     "dependency check": "Read dependency readiness and status evidence; no changes.",
     "dependency add": "Add a dependency edge to local Scope metadata.",
     "dependency remove": "Remove a dependency edge from local Scope metadata.",
-    "artifact create": "Publish one complete Scope-owned Markdown file without overwrite or a shared counter.",
+    "artifact create": "Publish one complete Scope-owned or @root Markdown file without overwrite or a shared counter.",
     "artifact import file": "Publish one opaque regular file in the selected Scope or @root without overwrite or a shared counter.",
     "artifact list": "Read Artifact identifiers; no changes.",
     "artifact show": "Read Artifact metadata without exposing its content; no changes.",
@@ -325,10 +325,10 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "dependency check": "The selected Scope must resolve; --source github requires remote access.",
     "dependency add": "Both endpoints must resolve and the edge must preserve dependency rules.",
     "dependency remove": "Both endpoints must resolve; --missing-ok permits an absent declared edge.",
-    "artifact create": "The owner Scope must resolve and the Artifact type must be supported.",
-    "artifact import file": "The owner Scope and regular source file must exist.",
-    "artifact list": "The owner Scope must resolve and its catalog must be readable.",
-    "artifact show": "The owner Scope and Artifact ID must resolve.",
+    "artifact create": "The owner must be an existing Scope or @root, and the Artifact type must be supported.",
+    "artifact import file": "The owner must be an existing Scope or @root, and the regular source file must exist.",
+    "artifact list": "The owner must be an existing Scope or @root, and its catalog must be readable.",
+    "artifact show": "The owner must be an existing Scope or @root, and the Artifact ID must resolve.",
     "worktree create": "A clean source, explicit lowercase NAME and fixed Git base are required. Placement uses --root, then SPEC_DOCK_WORKTREE_ROOT; the path and branch must be absent.",
     "worktree list": "The current clone must have readable native Git worktree inventory.",
     "worktree show": "An absolute worktree path must resolve in the same physical Git clone; aliases were retired.",
@@ -472,7 +472,11 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif "target" in arguments:
         target = "The explicit Scope selector (or @current selection) in this worktree."
     elif "--scope" in arguments:
-        target = "The Scope selected by --scope in this worktree."
+        target = (
+            "The Scope or @root owner selected by --scope in this worktree."
+            if leaf.startswith("artifact ")
+            else "The Scope selected by --scope in this worktree."
+        )
     elif leaf.startswith("active "):
         target = "This worktree's active Scope selection."
     else:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 from pathlib import Path
@@ -22,6 +23,113 @@ def artifact_workspace(tmp_path: Path) -> tuple[Path, Path]:
     assets = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock"
     shutil.copytree(assets / "templates/artifacts", root / "spec-dock/templates/artifacts")
     return root, child.parent
+
+
+@pytest.mark.parametrize("kind", ["blank", "research", "interview", "disc", "decision-candidate", "adr"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_root_create_supports_all_templates_and_preview_without_unrelated_scope_metadata(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str, dry_run: bool
+) -> None:
+    root, owner = artifact_workspace(tmp_path)
+    (owner / ".meta.json").write_bytes(b"unrelated invalid metadata")
+    flags = ["--dry-run"] if dry_run else []
+    assert (
+        main([
+            "--project",
+            str(root),
+            "artifact",
+            "create",
+            "--scope",
+            "@root",
+            "--type",
+            kind,
+            "--title",
+            "Root evidence",
+            "--slug",
+            "root-evidence",
+            *flags,
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    artifact = result["data"]["result"]["artifact"]
+    path = root / artifact["path"]
+    assert artifact["scope_id"] == "root" and path.parent == root / "spec-dock/artifacts"
+    assert result["data"]["result"]["changed"] is not dry_run
+    assert path.exists() is not dry_run
+    if dry_run:
+        assert result["status"] == "planned" and not path.parent.exists()
+        assert all(effect["status"] == "planned" for effect in result["effects"])
+    else:
+        text = path.read_text()
+        assert "Root evidence" in text and artifact["id"] in text and "<SCOPE_ID>" not in text
+        assert main(["--project", str(root), "artifact", "list", "--scope", "@root", "--json"]) == 0
+        assert json.loads(capsys.readouterr().out)["data"]["result"]["items"] == [artifact]
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
+
+
+def test_root_create_renders_legacy_scope_placeholders_without_inventing_a_scope_or_github_issue(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _owner = artifact_workspace(tmp_path)
+    (root / "spec-dock/templates/artifacts/research.md").write_text(
+        "<SCOPE_ID>|<INIT_ID>|<INIT_TITLE>|<EPIC_ID>|<EPIC_TITLE>|<ISS_ID>|<ISS_TITLE>|"
+        "<FEATURE_ID>|<FEATURE_NAME>|<GITHUB_ISSUE_NUMBER_OR_URL>|<ISSUE_NUMBER_OR_URL>\n<RESEARCH_TITLE>\n"
+    )
+    assert (
+        main([
+            "--project",
+            str(root),
+            "artifact",
+            "create",
+            "--scope",
+            "@root",
+            "--type",
+            "research",
+            "--title",
+            "Root artifact",
+            "--json",
+        ])
+        == 0
+    )
+    artifact = json.loads(capsys.readouterr().out)["data"]["result"]["artifact"]
+    assert (root / artifact["path"]).read_text() == "root||||||||||\nRoot artifact\n"
+
+
+@pytest.mark.parametrize("failure", ["missing", "denied", "io"])
+def test_import_source_errors_keep_the_public_exit_class_and_hide_the_source_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], failure: str
+) -> None:
+    root, owner = artifact_workspace(tmp_path)
+    source = tmp_path / "private-source.bin"
+    if failure != "missing":
+        source.write_bytes(b"private source bytes")
+        native_open = os.open
+
+        def open_file(path, flags, mode=0o777, **kwargs):
+            if path == "private-source.bin" and "dir_fd" in kwargs:
+                raise OSError(errno.EACCES if failure == "denied" else errno.EIO, "fixture source failed", str(source))
+            return native_open(path, flags, mode, **kwargs)
+
+        monkeypatch.setattr(os, "open", open_file)
+    assert main([
+        "--project",
+        str(root),
+        "artifact",
+        "import",
+        "file",
+        str(source),
+        "--scope",
+        "iss-00003",
+        "--json",
+    ]) == (4 if failure == "missing" else 5)
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert output.err == "" and str(source) not in output.out and "private source bytes" not in output.out
+    assert result["status"] == "failed" and result["effects"] == [] and not (owner / "artifacts").exists()
+    if failure != "missing":
+        assert source.read_bytes() == b"private source bytes"
 
 
 def test_root_artifact_catalog_reads_only_identity_without_control_or_body(

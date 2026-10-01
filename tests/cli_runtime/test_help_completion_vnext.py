@@ -8,6 +8,9 @@ import shutil
 import subprocess
 from typing import TYPE_CHECKING
 
+import pytest
+
+from spec_dock.cli import main
 from spec_dock.runtime.cli.catalog import HELP_PRECONDITIONS, HELP_SPECS, LEAF_PATHS
 from spec_dock.runtime.cli.options import parse_vnext_output
 from spec_dock.runtime.cli.vnext_runtime import run_vnext
@@ -72,3 +75,92 @@ def test_completions_include_every_catalog_leaf_without_writing_files(tmp_path: 
             )
             assert syntax.returncode == 0, syntax.stderr
     assert tuple(tmp_path.iterdir()) == before
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_native_completion_keeps_leaf_options_after_scope_operands(
+    capsys: pytest.CaptureFixture[str], shell: str
+) -> None:
+    assert main(["completion", shell]) == 0
+    script = capsys.readouterr().out
+    choices = _native_completion(script, shell, ["spec-dock", "scope", "show", "gh:example/repo#1", ""])
+    assert {"--expect-current", "--expect-backend", "--json"} <= choices
+
+
+def _native_completion(script: str, shell: str, words: list[str]) -> set[str]:
+    executable = shutil.which(shell)
+    if executable is None:
+        pytest.skip(f"native {shell} is unavailable")
+    quoted = shlex.join(words)
+    if shell == "bash":
+        harness = (
+            f"COMP_WORDS=({quoted})\nCOMP_CWORD={len(words) - 1}\n"
+            "_spec_dock_complete\nprintf '%s\\n' \"${COMPREPLY[@]}\"\n"
+        )
+        setup = ""
+    else:
+        setup = "compdef() { :; }\ncompadd() { shift; printf '%s\\n' \"$@\"; }\n"
+        harness = f"words=({quoted})\nCURRENT={len(words)}\n_spec_dock_complete\n"
+    completed = subprocess.run(
+        [executable, "-f"], input=setup + script + harness, text=True, capture_output=True, check=False, timeout=5
+    )
+    assert completed.returncode == 0, completed.stderr
+    return set(completed.stdout.split())
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_native_completion_skips_common_option_values_before_the_command_path(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], shell: str
+) -> None:
+    before = tuple(tmp_path.iterdir())
+    assert main(["--project", str(tmp_path / "not-a-repository"), "completion", shell]) == 0
+    script = capsys.readouterr().out
+    choices = _native_completion(script, shell, ["spec-dock", "--project", "/not a repository", "scope", ""])
+    assert {"show", "create", "import", "list"} <= choices
+    assert tuple(tmp_path.iterdir()) == before
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_native_completion_does_not_offer_command_options_for_a_required_leaf_value(
+    capsys: pytest.CaptureFixture[str], shell: str
+) -> None:
+    assert main(["completion", shell]) == 0
+    script = capsys.readouterr().out
+    choices = _native_completion(script, shell, ["spec-dock", "artifact", "create", "--scope", "@root", "--title", ""])
+    assert choices == set()
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+def test_native_completion_treats_words_after_double_dash_as_operands(
+    capsys: pytest.CaptureFixture[str], shell: str
+) -> None:
+    assert main(["completion", shell]) == 0
+    script = capsys.readouterr().out
+    choices = _native_completion(
+        script, shell, ["spec-dock", "artifact", "import", "file", "--scope", "@root", "--", "--scope", ""]
+    )
+    assert {"--scope", "--json"} <= choices
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh"])
+@pytest.mark.parametrize(
+    ("words", "expected"),
+    [
+        (["spec-dock", "--project=/not/git", "scope", ""], {"show", "create"}),
+        (["spec-dock", "scope", "--timeout", "5", "show", "init-00001", "--json", ""], {"--color"}),
+        (["spec-dock", "artifact", "import", "file", "/source with spaces", "--scope", "@root", ""], {"--scope"}),
+        (
+            ["spec-dock", "work", "start", "iss-00003", "--branch", "scope", "--base", "HEAD", "--switch-active", ""],
+            {"--base"},
+        ),
+        (["spec-dock", "branch", "show", "@current", "--name=scope", ""], {"--name"}),
+        (["spec-dock", "--project", ""], set()),
+        (["spec-dock", "scop", ""], set()),
+    ],
+)
+def test_native_completion_handles_inline_values_flags_and_command_depth(
+    capsys: pytest.CaptureFixture[str], shell: str, words: list[str], expected: set[str]
+) -> None:
+    assert main(["completion", shell]) == 0
+    choices = _native_completion(capsys.readouterr().out, shell, words)
+    assert expected <= choices if expected else choices == set()

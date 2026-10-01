@@ -461,3 +461,19 @@ source treeは実file bytes/mode、relative link文字列、空directoryまで�
 `uv run pytest tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/integration/test_issue413_wheel.py -q` は52 passed（14.16秒）。旧createの六testsは4.10秒で成功。旧parserのrecover成功assertionはC-02/C-05の退役拒否と明示NAME/base/rootへ変更し、legacy helperの退役はP-12へ残す。Ruff check/format（398 files）、変更四source限定mypyが成功した。dict invarianceを明示型で修正した。expect-current testの不存在Epic fixtureは補正し、fixture誤りのexit 4を製品Redと混同していない。
 
 第11回Strictはこのnative unit前の`8c59994c`を対象にpass/P0-P1なし/P2五件で終了した。原文と完全batch分析を別artifactで保全し、利用者の指摘修正指示に従って次のunitで対応する。このcommitはそのcode修正を含めない。worktree remove/bootstrap、P-11以後、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・宣言・直接選択を変更せず、goalはactiveである。
+
+## 第11回Strictの五件を修正
+
+原文のpass/P2/non-blocking分類を保ち、[完全batch分析](artifacts/code-review-p06-11-analysis.md)を完了してから、利用者の全指摘修正指示を適用した。review単独を修正認可にせず、現在候補のfresh Strictを別に実施する。
+
+root Artifact createは六typeの実作成・dry-runに接続し、root ownerを既存catalogから解決する。Scope専用の旧template置換文字列は空にし、root ScopeやUUIDを作らない。六typeの12 casesとroot旧置換の一case、Workbenchの同一bytes・異なるregular-file modeの四casesをRed→Greenで確認した。既存Scope置換の回帰も含むroot作成関連14 casesが成功した。error policyはmode差でも副作用前拒否、overwriteはsource modeで公開、dry-runは変更せず予定差分を示す。これは既存fileの編集権限を管理する仕組みではない。
+
+読取用expect guardをstateless helperに接続し、branch show、Scope show/list、dependency list/check、Artifact list/show、active show、Syncで受理した条件を無視しない。dynamic targetとguardは同じ捕捉選択から解決し、canonical GitHub selector、不一致、empty/stale、root ownerを22公開CLI casesで確認した。対象Scopeのないbackend guardは明示拒否し、dependency/Syncの条件不一致ではGitHub GET前に停止する。新しいlock、record、cache、global CASは追加していない。
+
+Artifact importのsource readは、外部pathや本文を診断に開示せず、不存在をexit4、環境IOをexit5、unsafe inputをexit3へ分類する。missing/native permission/EIOの三casesをRed→Greenで確認し、symlink/hardlink/directory/FIFOを含む七casesで回帰確認した。部分適用後の既存partial/unknown規則を変更しない。
+
+補完は同じcatalogのcommand depthとoption arityからcommand componentだけを抽出する。common optionのprefix/suffix/inline値、leaf operand、値を待つoption、double-dash後のoperand、flag、未知prefixをBash/Zsh実processで確認し、公開help/completion全26 casesが成功した。Fishの同じ生成経路も変更したが、この環境にnative Fishはなく、実shellでの検証済みとは扱わない。CLI utilityはGit/通信/状態書込を行わない。Artifact helpもScopeまたはroot ownerの契約へ同期した。
+
+関連検証 `uv run pytest tests/cli_runtime/test_issue413_branch.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_issue413_query_guards.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_workbench.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_scope_query_vnext.py tests/cli_runtime/test_artifact_vnext.py tests/cli_runtime/test_workbench_vnext.py tests/cli_runtime/test_dependency_vnext.py tests/cli_runtime/test_help_completion_vnext.py tests/integration/test_issue413_sync.py tests/integration/test_issue413_wheel.py -q` は344 passed（63.50秒）。全source/testsのRuff check/format（400 files）、変更9 source限定mypy、diff checkが成功した。Scope listのfixtureに既存Epicが四件目としてあることをassertionへ反映した修正を、製品Redに数えない。
+
+本unitは実dogfoodのmetadata・workspace宣言・直接選択を変更していない。native Worktree create/list/showと本修正を含むfresh Strict、remove/bootstrap、P-11以後、native Windows、full-suite/type gate、最終gate、手動製品確認、実consumer切替は引き続き未完了。goalはactiveである。

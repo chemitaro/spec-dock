@@ -255,11 +255,81 @@ def completion_script(shell: str) -> str:
         )
         children[leaf].update((*_COMMON_SWITCHES, *_COMMON_VALUES, "--help"))
     entries = [(key, " ".join(sorted(values))) for key, values in sorted(children.items())]
+    common_values = "|".join(sorted(_COMMON_VALUES))
+    paths = [path for path, _words in entries if path]
+    command_paths = "|".join(f'"{path}"' for path in paths)
+    leaf_paths = "|".join(f'"{path}"' for path in LEAF_PATHS)
+    fish_command_paths = " ".join(f'"{path}"' for path in paths)
+    fish_leaf_paths = " ".join(f'"{path}"' for path in LEAF_PATHS)
+    leaf_values = [
+        f"{leaf}|{name}"
+        for leaf in LEAF_PATHS
+        for argument in LEAF_ARGUMENTS[leaf]
+        if argument.options.get("action") != "store_true"
+        for name in argument.names
+        if name.startswith("-")
+    ]
+    leaf_value_cases = "|".join(f'"{entry}"' for entry in leaf_values)
+    fish_leaf_value_cases = " ".join(f'"{entry}"' for entry in leaf_values)
+    option_step = f'    case "$key|$word" in {leaf_value_cases}) skip_value=1; continue ;; esac\n'
+    operand_step = f'    if [[ "$word" == -- ]]; then case "$key" in {leaf_paths}) break ;; *) return 0 ;; esac; fi\n'
+    path_step = (
+        '    [[ "$word" == -* ]] && continue\n'
+        '    next="${key:+$key }$word"\n'
+        f'    case "$next" in\n      {command_paths}) key="$next" ;;\n'
+        f'      *) case "$key" in {leaf_paths}) ;; *) return 0 ;; esac ;;\n'
+        "    esac\n"
+    )
     if shell == "fish":
         lines = [
             "function __spec_dock_path_is",
             "  set -l seen (commandline -opc)",
-            "  test (string join ' ' $seen[2..]) = \"$argv[1]\"",
+            "  set -l key ''",
+            "  set -l skip_value 0",
+            "  for word in $seen[2..]",
+            "    if test $skip_value = 1",
+            "      set skip_value 0",
+            "      continue",
+            "    end",
+            '    if test "$word" = --',
+            '      switch "$key"',
+            f"        case {fish_leaf_paths}",
+            "          break",
+            "        case '*'",
+            "          return 1",
+            "      end",
+            "    end",
+            "    switch $word",
+            f"      case {' '.join(sorted(_COMMON_VALUES))}",
+            "        set skip_value 1",
+            "        continue",
+            "    end",
+            '    switch "$key|$word"',
+            f"      case {fish_leaf_value_cases}",
+            "        set skip_value 1",
+            "        continue",
+            "    end",
+            "    switch $word",
+            "      case '-*'",
+            "        continue",
+            "    end",
+            '    set -l next "$word"',
+            '    if test -n "$key"',
+            '      set next "$key $word"',
+            "    end",
+            '    switch "$next"',
+            f"      case {fish_command_paths}",
+            '        set key "$next"',
+            "      case '*'",
+            '        switch "$key"',
+            f"          case {fish_leaf_paths}",
+            "            continue",
+            "          case '*'",
+            "            return 1",
+            "        end",
+            "    end",
+            "  end",
+            '  test $skip_value = 0; and test "$key" = "$argv[1]"',
             "end",
             "complete -c spec-dock -f",
         ]
@@ -270,22 +340,33 @@ def completion_script(shell: str) -> str:
     if shell == "bash":
         return (
             "_spec_dock_complete() {\n"
-            '  local key="" choices="" word i\n'
+            '  local key="" choices="" word next i skip_value=0\n'
+            "  COMPREPLY=()\n"
             "  for ((i=1; i<COMP_CWORD; i++)); do\n"
             '    word="${COMP_WORDS[i]}"\n'
-            '    [[ "$word" == -* ]] || key="${key:+$key }$word"\n'
+            "    if ((skip_value)); then skip_value=0; continue; fi\n"
+            f"{operand_step}"
+            f'    case "$word" in {common_values}) skip_value=1; continue ;; esac\n'
+            f"{option_step}"
+            f"{path_step}"
             "  done\n"
+            "  ((skip_value)) && return 0\n"
             f'  case "$key" in\n{cases}\n  esac\n'
             '  COMPREPLY=( $(compgen -W "$choices" -- "${COMP_WORDS[COMP_CWORD]}") )\n'
             "}\ncomplete -F _spec_dock_complete spec-dock\n"
         )
     return (
         "#compdef spec-dock\n_spec_dock_complete() {\n"
-        '  local key="" choices="" word i\n'
+        '  local key="" choices="" word next i skip_value=0\n'
         "  for ((i=2; i<CURRENT; i++)); do\n"
         '    word="${words[i]}"\n'
-        '    [[ "$word" == -* ]] || key="${key:+$key }$word"\n'
+        "    if ((skip_value)); then skip_value=0; continue; fi\n"
+        f"{operand_step}"
+        f'    case "$word" in {common_values}) skip_value=1; continue ;; esac\n'
+        f"{option_step}"
+        f"{path_step}"
         "  done\n"
+        "  ((skip_value)) && return 0\n"
         f'  case "$key" in\n{cases}\n  esac\n'
         "  compadd -- ${(z)choices}\n}\ncompdef _spec_dock_complete spec-dock\n"
     )

@@ -288,6 +288,8 @@ uv run pytest tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/tes
 <a id="p-10"></a>
 ## P-10 残る既存操作を狭い契約へ接続する
 
+第11回Strictは `8c59994c` を対象にpass、P0/P1なし、P2五件。[原文](artifacts/code-review-p06-11.json)と[完全batch分析](artifacts/code-review-p06-11-analysis.md)を保全し、利用者の全指摘修正指示に従って、root Artifact create、Workbenchのmode競合、読取expect guard、Artifact sourceの終了値分類、静的shell補完をTDDで修正した。関連344 tests（63.50秒）、全source/testsのRuff check/format（400 files）、変更9 source限定mypy、diff checkが通過した。Bash/Zshは実shellで検証し、未導入のFishのnative検証を未実施として残す。native Worktree create/list/showは先行commit `245bcc1b` で検証済み。修正とnative unitを含む現在候補のfresh Strict、後続step、全体gateは未完了。
+
 第9回Strictは`3c68053e`のP-02〜P-09を固定し、P1一件・P2二件でfailした。[完全batch分析](artifacts/code-review-p06-09-analysis.md)後、Scope create/importの明示guard、branch switchのcheckout後clean検査、stale/unavailableの既知recordを含むSync重複診断をTDDで修正した。関連83 tests（25.02秒）、変更3 source限定mypy、変更6 fileのRuff check/formatが通過した。P2のnon-blocking分類を維持し、利用者の全指摘修正の明示認可を適用する。Scope edit/deleteはr9の対象外であり、全体のfresh Strict合格は未取得。
 
 **状態: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/showの通常経路をローカル検証済み。worktree remove/bootstrapと今回変更のfresh Strictは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。

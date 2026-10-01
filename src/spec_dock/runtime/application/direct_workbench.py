@@ -85,9 +85,7 @@ def copy_workbench(namespace: argparse.Namespace, context: ProjectContext) -> Op
         if current is None or current.kind != entry.kind:
             pending.append(name)
         elif entry.kind == "file" and entry.file is not None and current.file is not None:
-            if current.file.payload != entry.file.payload or (
-                namespace.on_conflict == "overwrite" and current.mode != entry.mode
-            ):
+            if current.file.payload != entry.file.payload or current.mode != entry.mode:
                 pending.append(name)
         elif entry.kind == "symlink" and current.link != entry.link:
             pending.append(name)

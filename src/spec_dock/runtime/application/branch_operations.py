@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import physical_identity, resolve_context
+from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_snapshot import (
     capture_local_inputs,
@@ -36,16 +37,16 @@ class BranchData:
 def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[BranchData]:
     views = load_scope_views(context.root / "spec-dock")
     source_selection = _capture_selection(context) if namespace.command_path != "branch show" else None
-    selection = read_selection(context, views, stored=source_selection) if source_selection is not None else None
+    selection = read_selection(context, views, stored=source_selection)
     target = resolve_scope(context, views, namespace.target, selection=selection)
-    if namespace.command_path != "branch show":
-        if namespace.expect_backend is not None and target.backend.kind != namespace.expect_backend:
-            raise ValueError("target backend does not match --expect-backend")
-        if namespace.expect_current is not None:
-            expected = resolve_scope(context, views, namespace.expect_current, selection=selection).id
-            current = selection if selection is not None else read_selection(context, views)
-            if current.status != "selected" or current.record is None or current.record.scope_id != expected:
-                raise ValueError("direct target does not match --expect-current")
+    check_scope_expectations(
+        context,
+        views,
+        selection,
+        target=target,
+        expected_current=namespace.expect_current,
+        expected_backend=namespace.expect_backend,
+    )
     loaded = read_guarded_json(target.path / ".meta.json")
     if loaded is None or not isinstance(loaded[0], dict):
         raise ValueError("Scope metadata disappeared")

@@ -6,6 +6,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.cli.catalog import MUTATING_LEAF_PATHS
@@ -95,7 +96,16 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
 
             result = branch_operation(namespace, context)
         elif command == "active show":
-            observation = read_selection(context, load_scope_views(context.root / "spec-dock"))
+            views = load_scope_views(context.root / "spec-dock")
+            observation = read_selection(context, views)
+            check_scope_expectations(
+                context,
+                views,
+                observation,
+                target=None,
+                expected_current=namespace.expect_current,
+                expected_backend=namespace.expect_backend,
+            )
             result = OperationResult(command, "succeeded", ActiveData(observation.view(), observation.ancestors), 0)
         elif command == "active set":
             from spec_dock.runtime.application.direct_active import set_direct
@@ -106,7 +116,17 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
 
             result = clear_direct(namespace, context)
         elif command == "scope show":
-            scope = resolve_scope(context, load_scope_views(context.root / "spec-dock"), namespace.target)
+            views = load_scope_views(context.root / "spec-dock")
+            selection = read_selection(context, views)
+            scope = resolve_scope(context, views, namespace.target, selection=selection)
+            check_scope_expectations(
+                context,
+                views,
+                selection,
+                target=scope,
+                expected_current=namespace.expect_current,
+                expected_backend=namespace.expect_backend,
+            )
             result = OperationResult(
                 command,
                 "succeeded",
@@ -122,7 +142,18 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             )
         elif command == "scope list":
             views = load_scope_views(context.root / "spec-dock")
-            parent = resolve_scope(context, views, namespace.parent).id if namespace.parent else None
+            selection = read_selection(context, views)
+            check_scope_expectations(
+                context,
+                views,
+                selection,
+                target=None,
+                expected_current=namespace.expect_current,
+                expected_backend=namespace.expect_backend,
+            )
+            parent = (
+                resolve_scope(context, views, namespace.parent, selection=selection).id if namespace.parent else None
+            )
             listed = list_scopes(views, kind=namespace.kind, parent_id=parent, state=namespace.state)
             unknown_filtered = sum(
                 view.status.state == "unknown" and namespace.state not in (None, "unknown")

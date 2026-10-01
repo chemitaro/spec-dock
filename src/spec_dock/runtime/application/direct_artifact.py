@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import errno
 import os
 from pathlib import Path
 import re
@@ -10,6 +11,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.artifact_query import list_artifacts, show_artifact
 from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
@@ -55,15 +57,21 @@ def _verify_captured(context: ProjectContext, inputs: tuple[LocalInput, ...], *,
 
 
 def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    views = () if namespace.scope == "@root" else load_scope_views(context.root / "spec-dock")
-    selection = None if namespace.scope == "@root" else read_selection(context, views)
-    inputs = capture_local_inputs(context, views)
-    scope = (
-        "@root"
-        if namespace.scope == "@root"
-        else resolve_scope(context, views, namespace.scope, selection=selection).id
+    root_without_current = namespace.scope == "@root" and namespace.expect_current is None
+    views = () if root_without_current else load_scope_views(context.root / "spec-dock")
+    selection = None if root_without_current else read_selection(context, views)
+    target = None if namespace.scope == "@root" else resolve_scope(context, views, namespace.scope, selection=selection)
+    check_scope_expectations(
+        context,
+        views,
+        selection,
+        target=target,
+        expected_current=namespace.expect_current,
+        expected_backend=namespace.expect_backend,
     )
-    owner = context.root / "spec-dock" if scope == "@root" else next(view.path for view in views if view.id == scope)
+    inputs = capture_local_inputs(context, views)
+    scope = target.id if target is not None else "@root"
+    owner = target.path if target is not None else context.root / "spec-dock"
     descriptor = open_guarded_directory(owner)
     try:
         if namespace.command_path == "artifact list":
@@ -92,8 +100,6 @@ def mutate_artifact(
 ) -> OperationResult[object]:
     context.require_writer()
     imported = namespace.command_path == "artifact import file"
-    if namespace.scope == "@root" and not imported:
-        raise ValueError("Artifact creation requires a Scope; @root accepts file import only")
     views = (
         ()
         if namespace.scope == "@root" and namespace.expect_current is None
@@ -127,8 +133,14 @@ def mutate_artifact(
         def source_snapshot():
             try:
                 return read_regular_file(source_path)
-            except (ValueError, OSError) as error:
+            except FileNotFoundError as error:
+                raise FileNotFoundError("Artifact source was not found") from error
+            except ValueError as error:
                 raise ValueError("Artifact source is unavailable or is not a single-link regular file") from error
+            except OSError as error:
+                if error.errno in (errno.ELOOP, errno.ENOTDIR):
+                    raise ValueError("Artifact source is unavailable or is not a single-link regular file") from error
+                raise OSError(error.errno, "Artifact source is unavailable due to an I/O failure") from error
 
         source = source_snapshot()
         name_max = (
@@ -161,25 +173,40 @@ def mutate_artifact(
             "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
             "YYYY-MM-DD": date.date().isoformat(),
         }
-        assert target is not None
-        issue_ref = "#" + target.github_ref.rsplit("#", 1)[1] if target.github_ref is not None else ""
+        issue_ref = (
+            "#" + target.github_ref.rsplit("#", 1)[1] if target is not None and target.github_ref is not None else ""
+        )
         replacements["<GITHUB_ISSUE_NUMBER_OR_URL>"] = issue_ref
-        prefix = {"initiative": "INIT", "epic": "EPIC", "issue": "ISS"}[target.kind]
-        replacements[f"<{prefix}_ID>"] = target.id
-        replacements[f"<{prefix}_TITLE>"] = target.title
-        if target.kind == "epic":
-            assert target.parent_id is not None
-            replacements["<INIT_ID>"] = target.parent_id
-        elif target.kind == "issue":
-            parent_scope = next(view for view in views if view.id == target.parent_id)
-            assert parent_scope.parent_id is not None
-            replacements.update({
-                "<EPIC_ID>": parent_scope.id,
-                "<INIT_ID>": parent_scope.parent_id,
-                "<FEATURE_ID>": target.id,
-                "<FEATURE_NAME>": target.title,
-                "<ISSUE_NUMBER_OR_URL>": issue_ref,
-            })
+        if target is not None:
+            prefix = {"initiative": "INIT", "epic": "EPIC", "issue": "ISS"}[target.kind]
+            replacements[f"<{prefix}_ID>"] = target.id
+            replacements[f"<{prefix}_TITLE>"] = target.title
+            if target.kind == "epic":
+                assert target.parent_id is not None
+                replacements["<INIT_ID>"] = target.parent_id
+            elif target.kind == "issue":
+                parent_scope = next(view for view in views if view.id == target.parent_id)
+                assert parent_scope.parent_id is not None
+                replacements.update({
+                    "<EPIC_ID>": parent_scope.id,
+                    "<INIT_ID>": parent_scope.parent_id,
+                    "<FEATURE_ID>": target.id,
+                    "<FEATURE_NAME>": target.title,
+                    "<ISSUE_NUMBER_OR_URL>": issue_ref,
+                })
+        else:
+            for field in (
+                "INIT_ID",
+                "INIT_TITLE",
+                "EPIC_ID",
+                "EPIC_TITLE",
+                "ISS_ID",
+                "ISS_TITLE",
+                "FEATURE_ID",
+                "FEATURE_NAME",
+                "ISSUE_NUMBER_OR_URL",
+            ):
+                replacements[f"<{field}>"] = ""
         for prefix in ("ARTIFACT", "ADR", "DISC", "RESEARCH", "INTERVIEW", "DECISION_CANDIDATE", "PR_REPAIR_BATCH"):
             replacements[f"<{prefix}_ID>"] = artifact_id
             replacements[f"<{prefix}_TITLE>"] = title

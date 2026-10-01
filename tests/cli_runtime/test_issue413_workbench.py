@@ -46,6 +46,47 @@ def workbench_workspace(tmp_path: Path) -> tuple[Path, Path, Path, Path]:
     return root, other, source, destination
 
 
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX file mode")
+@pytest.mark.parametrize("policy", ["error", "overwrite"])
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_same_bytes_with_different_file_modes_follow_the_explicit_conflict_policy(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], policy: str, dry_run: bool
+) -> None:
+    root, other, source, destination = workbench_workspace(tmp_path)
+    destination.mkdir()
+    source_file, target_file = source / "script.sh", destination / "script.sh"
+    source_file.write_bytes(b"#!/bin/sh\nexit 0\n")
+    target_file.write_bytes(b"#!/bin/sh\nexit 0\n")
+    source_file.chmod(0o700)
+    target_file.chmod(0o600)
+    flags = ["--yes", "--dry-run"] if dry_run else ["--yes"]
+    assert main([
+        "--project",
+        str(root),
+        "workbench",
+        "copy",
+        "--scope",
+        "iss-00003",
+        "--to-worktree",
+        str(other),
+        "--on-conflict",
+        policy,
+        *flags,
+        "--json",
+    ]) == (3 if policy == "error" else 0)
+    result = json.loads(capsys.readouterr().out)
+    assert source_file.read_bytes() == target_file.read_bytes() == b"#!/bin/sh\nexit 0\n"
+    assert stat.S_IMODE(source_file.stat().st_mode) == 0o700
+    if policy == "error":
+        assert result["effects"] == [] and stat.S_IMODE(target_file.stat().st_mode) == 0o600
+    elif dry_run:
+        assert result["status"] == "planned" and stat.S_IMODE(target_file.stat().st_mode) == 0o600
+        assert result["data"]["result"]["remaining_paths"] == ["script.sh"]
+    else:
+        assert result["status"] == "succeeded" and stat.S_IMODE(target_file.stat().st_mode) == 0o700
+        assert result["data"]["result"]["copied_paths"] == ["script.sh"]
+
+
 def test_copy_publishes_scope_file_to_native_linked_worktree_without_control(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

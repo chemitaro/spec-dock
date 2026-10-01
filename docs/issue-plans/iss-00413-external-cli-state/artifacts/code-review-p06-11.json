@@ -1,0 +1,74 @@
+{
+  "findings": [
+    {
+      "title": "[P2] @rootのArtifact createが常に拒否される",
+      "body": "`artifact create --scope @root --type ...`はC-01の公開形として六つのcreation typeを許可しているが、この分岐はimport以外の`@root`を常に`PRECONDITION_FAILED`で止めるため、root ownerではdry-runも作成も一件も到達しない。`@root`向けのowner/catalogとroot-safeなlegacy template置換を実装し、Scope専用の`target`参照を分岐させる必要がある。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_artifact.py",
+        "line_range": {
+          "start": 95,
+          "end": 96
+        }
+      }
+    },
+    {
+      "title": "[P2] 同一bytesのmode差がWorkbenchで無視される",
+      "body": "`--on-conflict error`でsourceとdestinationのregular fileが同じbytesだがmodeだけ異なる場合、mode比較が`overwrite`時にしか実行されないためpathが`pending`に入らず、commandは`unchanged`としてdestinationのmodeを残す。これはregular-file modeを保存し、error policyでは競合を副作用前に止める契約に反するため、mode差は両policyで差分として認識し、errorでは拒否、overwriteではsource modeを公開する必要がある。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_workbench.py",
+        "line_range": {
+          "start": 88,
+          "end": 90
+        }
+      }
+    },
+    {
+      "title": "[P2] 読取leafでexpect guardが無効になる",
+      "body": "共通optionとして受理される`--expect-current`と`--expect-backend`を`branch show`は明示的に検査対象外とし、`scope show`、`dependency list/check`、`artifact list/show`も検査せず成功を返すため、直接対象またはbackendが不一致でもexit 0になり、scriptが指定したCAS guardが黙って無効になる。targetを持つ読取leafでは解決直後かつ成功出力前に同じguardを適用する必要がある。",
+      "confidence_score": 0.97,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/branch_operations.py",
+        "line_range": {
+          "start": 38,
+          "end": 42
+        }
+      }
+    },
+    {
+      "title": "[P2] Artifact importの欠落sourceがexit 3になる",
+      "body": "明示したimport元PATHが存在しない場合の`FileNotFoundError`や、読取権限・媒体I/Oによる`OSError`まで一律に`ValueError`へ変換するため、dispatcherはすべてpreconditionのexit 3として返す。公開exit契約では明示local targetの不存在はexit 4、効果前のI/O環境失敗はexit 5なので、pathを露出しないdiagnosticは維持しつつ、不存在・unsafe input・環境I/Oを別の例外または結果codeへ分類する必要がある。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_artifact.py",
+        "line_range": {
+          "start": 130,
+          "end": 131
+        }
+      }
+    },
+    {
+      "title": "[P2] 補完pathにoption値とoperandが混入する",
+      "body": "生成されたbash/zsh/fish補完は先行tokenのうち`-`で始まらないものをすべてcommand pathへ連結するため、`spec-dock --project /repo scope <TAB>`ではkeyが`/repo scope`になり、leafのtarget入力後もoperandを含む未定義keyとなって候補が消える。共通optionをleaf前後に置けるCLI契約で通常の補完が機能しないため、既知optionのarityとcommand depthを使ってoption値とoperandを除外し、実際のcommand componentだけでcatalog keyを組み立てる必要がある。",
+      "confidence_score": 0.99,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/cli/options.py",
+        "line_range": {
+          "start": 269,
+          "end": 271
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is correct",
+  "overall_explanation": "GitHub connectorで`chemitaro/spec-dock`の`codex/iss-00413-external-cli-state`が`8c59994c8dad473697dcd8314721aeeef3f52d79`であることを確認し、`6fec3099d8759b4e5b3b393b2987534b46dfa383..8c59994c8dad473697dcd8314721aeeef3f52d79`の契約、実装、関連testsを照合した。Start-only排他、直接record、live/local境界、captured-token解除、GitHub完了確認、partial/unknown報告、Scope/Dependency/Artifact/Workbenchの主要経路にはP0/P1を認めなかったが、Artifactのroot作成、Workbench mode差、読取guard、import exit分類、completionに五件の具体的なP2がある。repositoryに記録されたcheckpointは参照したが、このレビューではtestを実行していない。明示されたP-10以降の残務、full-suite/type gate、consumer cutover、最終certificationは判定対象外とした。",
+  "review_status": "pass",
+  "review_status_reason": "採用findingはいずれも現在の公開挙動に実害があるP2だが、必須merge gateを破るP0/P1ではないため、review-methodのgate規則に従いpassとする。",
+  "overall_confidence_score": 0.96
+}
