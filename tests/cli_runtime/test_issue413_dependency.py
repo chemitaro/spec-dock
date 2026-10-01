@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import stat
 import subprocess
 import sys
@@ -98,8 +99,9 @@ def test_offline_live_dependency_check_refuses_before_any_github_access(
     assert all(path.read_bytes() == exact for path, exact in before.items())
 
 
+@pytest.mark.parametrize("stored_state", ["closed", "malformed"])
 def test_dependency_check_defaults_to_unknown_github_state_and_never_reads_retired_cache(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], stored_state: str
 ) -> None:
     root, _source, child = dependency_workspace(tmp_path)
     payload = json.loads(child.read_bytes())
@@ -108,7 +110,24 @@ def test_dependency_check_defaults_to_unknown_github_state_and_never_reads_retir
     record = select_fixture(root, scope_id="iss-00003", number=3)
     cache = root / "spec-dock/.agent/github-status-cache.json"
     cache.write_text('{"items":{"iss-00003":{"state":"open"},"epic-00004":{"state":"completed"}}}')
-    before = {path: path.read_bytes() for path in (*root.glob("spec-dock/**/.meta.json"), record, cache)}
+    retired_indexes = [cache.parent / name for name in ("index-all.json", "index.json")]
+    for index in retired_indexes:
+        index.write_bytes(
+            json.dumps({
+                "nodes": {
+                    "epic-00004": {
+                        "type": "epic",
+                        "github": {"state": "CLOSED", "updated_at": "2026-06-05T00:00:00Z"},
+                        "private": "private old cache sentinel",
+                    },
+                },
+            }).encode()
+            if stored_state == "closed"
+            else b"{private malformed cache sentinel"
+        )
+    before = {
+        path: path.read_bytes() for path in (*root.glob("spec-dock/**/.meta.json"), record, cache, *retired_indexes)
+    }
     log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open", "4": "completed"})
     assert main(["--project", str(root), "dependency", "check", "@current", "--json"]) == 0
     output = capsys.readouterr()
@@ -124,7 +143,122 @@ def test_dependency_check_defaults_to_unknown_github_state_and_never_reads_retir
     }
     assert all(item["details"]["observed_state"] == "unknown" for item in data["blockers"])
     assert result["effects"] == [] and output.err == "" and not log.exists()
+    assert "private old cache sentinel" not in output.out and "private malformed cache sentinel" not in output.out
     assert all(path.read_bytes() == exact for path, exact in before.items())
+    assert not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("target", ["epic-00002", "iss-00003"])
+def test_dependency_list_merges_each_ancestor_once_and_preserves_all_inputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], target: str
+) -> None:
+    root, left, right = two_dependency_trees(tmp_path)
+    sibling = add_scope(root, "iss-00007", "issue", "epic-00005", right[1].parent) / ".meta.json"
+    payload = json.loads(sibling.read_bytes())
+    payload["initiative_id"] = "init-00004"
+    sibling.write_text(json.dumps(payload))
+    for path, dependencies in zip(left, (["iss-00006"], ["iss-00006", "iss-00007"], ["iss-00007"]), strict=True):
+        payload = json.loads(path.read_bytes())
+        payload["depends_on"] = dependencies
+        path.write_text(json.dumps(payload))
+    record = select_fixture(root, scope_id="iss-00003", number=3)
+    before = {path: path.read_bytes() for path in (*left, *right, sibling, record)}
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert main(["--project", str(root), "dependency", "list", target, "--view", "effective", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    data = result["data"]["result"]
+    assert data["scope_id"] == target and data["ready"] is None and data["changed"] is False
+    assert data["effective"] == (["iss-00006", "iss-00007"] if target == "epic-00002" else ["iss-00007", "iss-00006"])
+    assert data["declared"] == (["iss-00006", "iss-00007"] if target == "epic-00002" else ["iss-00007"])
+    assert result["effects"] == [] and not log.exists()
+    assert all(path.read_bytes() == payload for path, payload in before.items())
+    assert not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("kind", ["initiative", "epic"])
+@pytest.mark.parametrize("backend", ["github", "local"])
+@pytest.mark.parametrize("state", ["open", "completed"])
+@pytest.mark.parametrize("populated", [False, True])
+def test_high_level_prerequisite_uses_its_own_observed_lifecycle_without_completing_from_children(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    kind: str,
+    backend: str,
+    state: str,
+    populated: bool,
+) -> None:
+    root, left, right = two_dependency_trees(tmp_path)
+    if not populated:
+        shutil.rmtree(right[1 if kind == "initiative" else 2].parent)
+    metadata_paths = tuple(path for path in (*left, *right) if path.exists())
+    prerequisite = "init-00004" if kind == "initiative" else "epic-00005"
+    number = 4 if kind == "initiative" else 5
+    for path in metadata_paths:
+        payload = json.loads(path.read_bytes())
+        if path == left[2]:
+            payload["depends_on"] = [prerequisite]
+        if backend == "local":
+            payload.update(
+                backend="local",
+                github=None,
+                lifecycle={
+                    "state": state if payload["id"] == prerequisite else "open",
+                    "revision": 7,
+                    "updated_at": "2026-09-29T00:00:00Z",
+                },
+            )
+        path.write_text(json.dumps(payload))
+    before = {path: path.read_bytes() for path in metadata_paths}
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open", str(number): state})
+    assert (
+        main([
+            "--project",
+            str(root),
+            "dependency",
+            "check",
+            "iss-00003",
+            "--source",
+            backend,
+            *(["--offline"] if backend == "local" else []),
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    data = result["data"]["result"]
+    assert data["ready"] is (state == "completed") and data["effective"] == [prerequisite]
+    assert data["changed"] is False and result["effects"] == []
+    assert [item["details"]["scope_id"] for item in data["blockers"]] == ([prerequisite] if state == "open" else [])
+    if backend == "github":
+        requests = [json.loads(line) for line in log.read_text().splitlines()]
+        assert len(requests) == 4 and {item["number"] for item in requests} == {1, 2, 3, number}
+        assert all(item["method"] == "GET" for item in requests)
+    else:
+        assert not log.exists()
+    assert all(path.read_bytes() == payload for path, payload in before.items())
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
+
+
+def test_dependency_check_refuses_an_empty_container_cycle_before_any_remote_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _source, _child = dependency_workspace(tmp_path)
+    initiative = root / "spec-dock/initiatives/init-00001-fixture"
+    other = add_scope(root, "epic-00005", "epic", "init-00001", initiative)
+    empty = initiative / "epics/epic-00004-fixture"
+    for owner, dependency in ((empty, "epic-00005"), (other, "epic-00004")):
+        metadata = owner / ".meta.json"
+        payload = json.loads(metadata.read_bytes())
+        payload["depends_on"] = [dependency]
+        metadata.write_text(json.dumps(payload))
+    before = {path: path.read_bytes() for path in root.glob("spec-dock/**/.meta.json")}
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert main(["--project", str(root), "dependency", "check", "epic-00004", "--source", "github", "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED" and result["effects"] == []
+    assert "cycle" in result["error"]["message"] and not log.exists()
+    assert all(path.read_bytes() == payload for path, payload in before.items())
     assert not (root / ".git/spec-dock").exists()
 
 

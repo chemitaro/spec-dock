@@ -690,6 +690,12 @@ clean c4c26bdbの実Linux/Python 3.11.16全件は1839 passed/1 failed/17 skipped
 
 clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passed/17 skipped（932.00秒）、exit0。[環境と元runの記録](artifacts/linux-python311-verification.md)へ保存した。capability0、USER未設定、offline、Linux tmpfs、HEAD/clean/source/prefixを再照合し、同一sessionで完了した。skipの内訳はZsh 12/macOS専用probe 1/Linux匿名stageで非該当cleanup 4でありnative成功に数えない。後続7d29648dの旧Create/Artifact退役は含まず、現在候補のfull lint・P-13・Windows native・fresh Strict・Final Quality Gate・最終手動確認は未完了。実consumer/live GitHubは未変更。
 
+**旧Active / Sync / 依存チェック群の退役**
+
+外部production参照0の旧application三files全1647行/70 symbolsと旧test全991行/18 methodsを全文・[個別判断](artifacts/test-port-active-sync-deps-retirement.md)で確認し退役した。三段Active/context-pack、branch推定、中央ADR mirror/UUID probe、cache/full repo index採用、自動Sync/rollback、子doneから親を完了へ昇格するpolicyを撤去。現在のexact対象chain/prerequisite・自身のGH/local状態、同clone必要時観測/known counts、直接record・元資料/他WT保全を維持する。旧inventory path/hashと別callerのあるpure deps/validation/rendererは保持。退役後AST参照0。
+
+削除前の保全十九casesは19 passed/47 deselected（4.33秒）、追加継承二casesは2 passed/66 deselected（0.53秒）。wheel収録禁止はRed 1 failed（0.83秒）→Green 1 passed（14.76秒）、関連六suite 243 passed（60.26秒）、実Python 3.10.15の後継二十一cases 21 passed/47 deselected（4.59秒）、全て期待したexitとなった。初回関連runの誤test path/no tests ranは別logへ保持。全Ruff（296 files）、変更二test限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 10 errors/5保持source（215 source files）、make exit2。skip/型ignore/収集除外追加0。残るshared型契約、Windows/native full gates、fresh Strict、最終手動確認を継続し、実consumer/live GitHubは未変更。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
