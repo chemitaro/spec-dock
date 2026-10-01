@@ -7,7 +7,7 @@ import json
 import re
 from typing import Generic, Literal, TypeVar, cast
 
-from spec_dock.runtime.presentation.command_data import FamilyData, SyncData
+from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData, FamilyData, SyncData
 
 ResultStatus = Literal["succeeded", "unchanged", "planned", "failed", "partial"]
 EffectStatus = Literal["planned", "succeeded", "unchanged", "failed", "not_attempted", "unknown"]
@@ -191,6 +191,10 @@ def render_text(
         )
         for blocker in cast("tuple[Diagnostic, ...]", result.data.result["blockers"]):
             stdout_lines.append(f"blocker [{blocker.code}] {_text_escape(blocker.message)}")
+    elif isinstance(result.data, (ActiveData, FamilyData)) or (
+        isinstance(result.data, DiagnosticData) and (result.data.findings or result.data.unverified)
+    ):
+        stdout_lines.extend(json.dumps(_redact(asdict(result.data)), ensure_ascii=False, indent=2).splitlines())
     for effect in result.effects:
         target = f" target={_text_escape(effect.target)}" if effect.target is not None else ""
         stdout_lines.append(f"effect {effect.kind} status={effect.status}{target}")

@@ -959,3 +959,13 @@ clean e1397459の通常make lintはRuff成功・mypy 41 errors/16 files（240 so
 旧二source filesの246行・10 symbolsと旧二test filesの185行・12 test関数を全文確認し、[個別対応](artifacts/test-port-target-resolver-retirement.md)を保存した。候補外importは0。旧三role保存snapshotとregistry ID/aliasを削除し、current tree/direct/guard/native inventory/外部shimのargv/cwdを維持する。補完は公開cli/optionsへ統一する。旧consumer静的資産の退役hash/pathは保持する。
 
 公開project context/完全GH linkageの八caseを退役前に8 passed（0.60秒）、exit0で確認した。診断codeのfixture誤りによる初回3 failed/5 passed（0.62秒）はSCOPE_NOT_FOUNDへ訂正し、製品Redに数えない。通常wheelの旧二module収録禁止はRed 1 failed（0.77秒、exit1）→Green 1 passed（13.53秒、exit0）。関連七suiteは169 passed（18.55秒）、exit0。全Ruff check/format（317 files）、MYPYPATH=srcを明示した変更二test限定mypyとdiff checkが成功した。skip/収集除外追加0、旧helper以外のproduction変更0。元logsはiss-00413-implementation/pytest-resolve-retirement-{before,before-2,source-red,source-green,related}.log。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 標準text表示と現行開発手順の整合
+
+**標準text表示と現行開発手順の整合**
+
+[C-01/C-04の表示不足](artifacts/public-text-output.md)を公開Scope/Activeと診断の三testで再現した（Red 3 failed/21 deselected、0.22秒、exit1）。typed dataを既存の秘匿処理後に表示する修正で同三testがGreen（3 passed/21 deselected、0.22秒、exit0）となり、関連九suite 176 passed（42.57秒）が成功した。JSON v2、既存Sync/依存表示、raw Git stderrは維持し、永続状態や書込を追加しない。
+
+AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerでの検証を現構成へ更新した。既存二suite 236 passed（2.37秒）、全source/tests Ruff check/format（317 files）、MYPYPATH=srcの変更三Python file限定mypyとdiff checkが成功した。通常wheel hash 97378c2ab1a8a9d88f23c926a0a2c7b0009b267ca355f19a5b439a552830538bを再照合し、provider外の非editable実consoleで五read-onlyコマンドの表示/JSON/全tree不変を確認した（0.66秒、exit0）。一時fixtureは削除済み。選択recordはtest準備であり、実Start/実dogfood適用ではない。初回確認scriptのcurrent_branch項目名誤りは別logへ保持した。
+
+この変更前のclean 32c372e1で通常全pytestは1878 passed/1 skipped（340.17秒、exit0）。skip理由は元実行で収集していない。通常make lintはRuff成功・mypy 37 errors/12旧source files（236 source files）、make exit2で未合格。旧helpersの退役、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

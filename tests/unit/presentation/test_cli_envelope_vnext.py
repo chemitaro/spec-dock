@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spec_dock.runtime.cli.options import completion_script
-from spec_dock.runtime.presentation.command_data import ActiveData
+from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData
 from spec_dock.runtime.presentation.envelope import (
     Diagnostic,
     Effect,
@@ -163,3 +163,21 @@ def test_json_renderer_redacts_secret_bearing_details() -> None:
 
     assert "private-value" not in output
     assert json.loads(output)["error"]["details"]["access_token"] == "[redacted]"
+
+
+def test_text_diagnostic_displays_findings_and_unverified_items_with_secret_redaction() -> None:
+    result = OperationResult(
+        command="workspace doctor",
+        status="partial",
+        data=DiagnosticData(
+            findings=(Diagnostic("LEGACY_UNREADABLE", "legacy header is unreadable", {"access_token": "private"}),),
+            unverified=("remote completion has not been observed",),
+        ),
+        exit_code=7,
+        error=Diagnostic("INCOMPLETE_OBSERVATION", "inspect the retained files", {}),
+    )
+    stdout, stderr = render_text(result)
+    for value in ("LEGACY_UNREADABLE", "legacy header is unreadable", "remote completion has not been observed"):
+        assert value in stdout
+    assert "INCOMPLETE_OBSERVATION" in stderr and "[redacted]" in stdout
+    assert "private" not in stdout + stderr

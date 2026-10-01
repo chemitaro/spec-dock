@@ -12,6 +12,7 @@ if TYPE_CHECKING:
     import pytest
 
 from spec_dock.cli import main
+from spec_dock.runtime.infra.tree_backup import tree_digest
 
 
 def test_scope_read_help_explains_current_metadata_and_unobserved_github_state(
@@ -89,6 +90,38 @@ def test_scope_read_dry_run_exposes_a_valid_preview_without_writes(
     assert result["data"]["result"]["can_apply"] is True and result["data"]["result"]["blockers"] == []
     assert metadata.read_bytes() == before and result["effects"] == []
     assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+
+
+def test_scope_text_read_displays_the_target_authority_and_path_without_changing_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = make_workspace(tmp_path / "consumer")
+    before = tree_digest(root)
+    assert main(["--project", str(root), "scope", "show", "init-00001"]) == 0
+    output = capsys.readouterr()
+    for value in ("init-00001", "Fixture", "github", "unknown", "spec-dock/initiatives/init-00001-fixture"):
+        assert value in output.out, output.out
+    assert output.err == "" and tree_digest(root) == before
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
+
+
+def test_active_text_read_displays_empty_or_selected_direct_and_current_branch(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = make_workspace(tmp_path / "consumer")
+    for selected in (False, True):
+        if selected:
+            select_fixture(root)
+        before = tree_digest(root)
+        assert main(["--project", str(root), "active", "show"]) == 0
+        output = capsys.readouterr()
+        assert ("selected" if selected else "empty") in output.out
+        if selected:
+            assert "init-00001" in output.out and "gh:example/repo#1" in output.out
+        assert "main" in output.out and output.err == ""
+        assert tree_digest(root) == before and not (root / ".git/spec-dock").exists()
 
 
 def test_every_public_leaf_help_describes_the_v2_envelope_without_project_access(
