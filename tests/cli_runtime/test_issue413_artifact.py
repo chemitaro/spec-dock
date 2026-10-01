@@ -16,6 +16,7 @@ import pytest
 from spec_dock.cli import main
 from tests.cli_runtime.test_issue413_active import select_fixture
 from tests.cli_runtime.test_issue413_dependency import dependency_workspace
+from tests.cli_runtime.test_issue413_finish import github_fixture
 
 
 def artifact_workspace(tmp_path: Path) -> tuple[Path, Path]:
@@ -158,6 +159,76 @@ def test_root_artifact_catalog_reads_only_identity_without_control_or_body(
     assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
 
 
+def test_scope_artifact_catalog_preserves_typed_historical_unknown_and_generic_evidence_without_opening_bodies(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, owner = artifact_workspace(tmp_path)
+    catalog = owner / "artifacts"
+    catalog.mkdir()
+    cases = [
+        ("001-note-old.md", "001-note", "historical-note"),
+        ("20260925t000000z-research-study.md", "20260925t000000z-research", "research"),
+        ("20260925t000001z-newtype-study.md", "20260925t000001z", "untyped-markdown"),
+        ("20260925t000002z--source.bin", "20260925t000002z--source.bin", "generic-file"),
+    ]
+    for name, _artifact_id, _kind in cases:
+        (catalog / name).write_bytes(b"private evidence body\x00\xff")
+    before = tree_digest(root)
+    native_open = os.open
+
+    def refuse_evidence_body(path, flags, mode=0o777, **kwargs):
+        if os.fsdecode(path).rsplit(os.sep, 1)[-1] in {row[0] for row in cases}:
+            pytest.fail("Artifact list/show must not open evidence bodies")
+        return native_open(path, flags, mode, **kwargs)
+
+    with monkeypatch.context() as patched:
+        patched.setattr(os, "open", refuse_evidence_body)
+        assert main(["--project", str(root), "artifact", "list", "--scope", "iss-00003", "--json"]) == 0
+        output = capsys.readouterr()
+        result = json.loads(output.out)
+        expected = [
+            {
+                "id": artifact_id,
+                "scope_id": "iss-00003",
+                "path": (catalog / name).relative_to(root).as_posix(),
+                "type": kind,
+            }
+            for name, artifact_id, kind in cases
+        ]
+        assert result["data"]["result"]["items"] == expected and result["effects"] == []
+        assert "private evidence body" not in output.out + output.err
+        assert main(["--project", str(root), "artifact", "show", "001-note", "--scope", "iss-00003", "--json"]) == 0
+        output = capsys.readouterr()
+        assert json.loads(output.out)["data"]["result"]["artifact"] == expected[0]
+        assert "private evidence body" not in output.out + output.err
+    assert tree_digest(root) == before
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("scope", ["@root", "iss-00003"])
+def test_duplicate_artifact_timestamp_slots_refuse_catalog_reads_without_changes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], scope: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, issue = artifact_workspace(tmp_path)
+    owner = root / "spec-dock" if scope == "@root" else issue
+    catalog = owner / "artifacts"
+    catalog.mkdir()
+    first = catalog / "20260925t000000z--first.bin"
+    first.write_bytes(b"first evidence")
+    (catalog / "20260925t000000z--second.bin").write_bytes(b"second evidence")
+    before = tree_digest(root)
+    for command in (["list"], ["show", first.name]):
+        assert main(["--project", str(root), "artifact", *command, "--scope", scope, "--json"]) == 3
+        result = json.loads(capsys.readouterr().out)
+        assert result["error"]["message"] == "ARTIFACT_CATALOG_INVALID" and result["effects"] == []
+    assert tree_digest(root) == before
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+
+
 def test_create_artifact_preserves_six_type_template_and_existing_scope_files(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -198,6 +269,66 @@ def test_create_artifact_preserves_six_type_template_and_existing_scope_files(
         {"kind": "artifact", "status": "succeeded", "target": path.relative_to(root).as_posix()}
     ]
     assert metadata.read_bytes() == before and not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("kind", ["blank", "research", "interview", "disc", "decision-candidate", "adr"])
+def test_existing_local_initiative_accepts_all_artifact_types_and_preserves_metadata_and_documents(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
+) -> None:
+    root, _issue = artifact_workspace(tmp_path)
+    owner = root / "spec-dock/initiatives/init-00001-fixture"
+    metadata = owner / ".meta.json"
+    payload = json.loads(metadata.read_bytes())
+    payload.update(
+        backend="local",
+        github=None,
+        lifecycle={"state": "open", "revision": 7, "updated_at": "2026-09-29T00:00:00Z"},
+        optional={"private": "existing local metadata must survive"},
+    )
+    metadata.write_text(json.dumps(payload))
+    metadata.chmod(0o640)
+    document = owner / "requirement.md"
+    document.write_bytes(b"existing local specification\n")
+    before = {path: path.read_bytes() for path in (*root.glob("spec-dock/**/.meta.json"), document)}
+    refs_before = subprocess.check_output(["git", "-C", str(root), "show-ref"])
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert (
+        main([
+            "--project",
+            str(root),
+            "artifact",
+            "create",
+            "--scope",
+            "init-00001",
+            "--type",
+            kind,
+            "--title",
+            "Existing local evidence",
+            "--slug",
+            "evidence",
+            "--expect-backend",
+            "local",
+            "--offline",
+            "--json",
+        ])
+        == 0
+    )
+    output = capsys.readouterr()
+    artifact = json.loads(output.out)["data"]["result"]["artifact"]
+    destination = root / artifact["path"]
+    assert destination.parent == owner / "artifacts"
+    assert artifact["scope_id"] == "init-00001" and artifact["type"] == (
+        "untyped-markdown" if kind == "blank" else kind
+    )
+    assert set(artifact) == {"id", "scope_id", "path", "type"}
+    assert main(["--project", str(root), "artifact", "show", artifact["id"], "--scope", "init-00001", "--json"]) == 0
+    shown = capsys.readouterr()
+    assert json.loads(shown.out)["data"]["result"]["artifact"] == artifact
+    assert all(path.read_bytes() == exact for path, exact in before.items())
+    assert metadata.stat().st_mode & 0o777 == 0o640
+    assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == refs_before
+    assert not log.exists() and "existing local metadata must survive" not in output.out + shown.out
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
 
 
 def test_import_one_opaque_file_to_root_preserves_bytes_name_source_and_privacy(

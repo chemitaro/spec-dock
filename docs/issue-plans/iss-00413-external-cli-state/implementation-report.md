@@ -877,3 +877,13 @@ clean `2c45e885ca48c32616d4899ee79844c553d96dc5` の通常 `make lint` はRuff�
 通常wheelの収録禁止はRed 1 failed（0.77秒）、source退役後の同testはGreen 1 passed（14.01秒）。関連dependency/Start/Scope delete/pure domain 188 tests（48.28秒）、全Ruff check/format（355 files）、変更二test限定mypyとdiff checkが成功した。元logは既存Epic Workbenchのiss-00413-implementation/pytest-dependency-retirement-port.log、pytest-dependency-retirement-source-{red,green}.log、pytest-dependency-retirement-related.logへ保持。
 
 直近通常lintの189 errorsはclean 2c45e885の別snapshotである。残る旧source/private helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 旧Artifact writer・試験の退役
+
+旧五test関数（111行）と旧application/artifact_vnext.py（152行・六関数/classと一type alias）を全文確認し、[個別対応](artifacts/test-port-artifact-retirement.md)を保存した。mixed catalog、本文非読取、重複slot拒否、六template、既存local/root、metadata/資料/privacy保全を公開CLIへ対応づけ、control/epoch・共通WriterLock・三段旧activeのadapterを削除した。現行artifact_queryと局所publicationは維持する。退役二filesへのsource/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+追加確認はmixed catalog本文open 0で1 passed（0.23秒）、root/Scope重複slotと全tree保全2 passed（0.37秒）、既存local Initiativeの六type・metadata/仕様/mode/ref保全6 passed（1.45秒）。既存Greenのcharacterizationである。最初の本文open拒否を試験側digestまで延長したharness失敗1 failed（0.31秒）はCLIのcontextへ限定して訂正し、元logを保持した。
+
+通常wheelの収録禁止はRed 1 failed（0.77秒）、source退役後の同testはGreen 1 passed（14.08秒）。Artifact/Grill finalizer/domain/templateの関連141 tests（8.89秒）、全Ruff check/format（353 files）、変更二test限定mypyとdiff checkが成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-artifact-retirement-port.log、pytest-artifact-retirement-source-{red,green}.log、pytest-artifact-retirement-related.logへ保持。
+
+このunit前のclean 82240b58の通常make lintはRuff成功・mypy 95 errors/26 files（274 source files）、source 47/test 48 errors、make exit2で未合格。元logはiss-00413-implementation/lint-p12-82240b58.log。旧189 errorsとはsnapshotが異なる。残る旧source/tests、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
