@@ -30,6 +30,31 @@ def dependency_workspace(tmp_path: Path) -> tuple[Path, Path, Path]:
     return root, source / ".meta.json", child / ".meta.json"
 
 
+def two_dependency_trees(tmp_path: Path) -> tuple[Path, tuple[Path, Path, Path], tuple[Path, Path, Path]]:
+    """Construct two existing GitHub-backed fixture trees with unique issue numbers."""
+    root = committed_workspace(tmp_path / "consumer")
+    left_init = root / "spec-dock/initiatives/init-00001-fixture"
+    left_epic = add_scope(root, "epic-00002", "epic", "init-00001", left_init)
+    left_issue = add_scope(root, "iss-00003", "issue", "epic-00002", left_epic)
+    right_init = root / "spec-dock/initiatives/init-00004-fixture"
+    right_init.mkdir()
+    template = json.loads((left_init / ".meta.json").read_bytes())
+    (right_init / ".meta.json").write_text(
+        json.dumps({**template, "id": "init-00004", "github": {**template["github"], "issue_number": 4}})
+    )
+    right_epic = add_scope(root, "epic-00005", "epic", "init-00004", right_init)
+    right_issue = add_scope(root, "iss-00006", "issue", "epic-00005", right_epic)
+    for scope in (right_epic, right_issue):
+        metadata = scope / ".meta.json"
+        payload = json.loads(metadata.read_bytes())
+        metadata.write_text(json.dumps({**payload, "initiative_id": "init-00004"}))
+    return (
+        root,
+        (left_init / ".meta.json", left_epic / ".meta.json", left_issue / ".meta.json"),
+        (right_init / ".meta.json", right_epic / ".meta.json", right_issue / ".meta.json"),
+    )
+
+
 def test_dependency_list_derives_inherited_edges_from_current_metadata_without_control(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -186,6 +211,63 @@ def test_dependency_add_updates_only_the_source_metadata_and_preserves_optional_
     assert not log.exists() and not (root / ".git/spec-dock").exists()
     assert main(["--project", str(root), "dependency", "list", "iss-00003", "--view", "effective", "--json"]) == 0
     assert json.loads(capsys.readouterr().out)["data"]["result"]["effective"] == ["epic-00004"]
+
+
+@pytest.mark.parametrize("source_index", [0, 1, 2])
+@pytest.mark.parametrize("target_index", [0, 1, 2])
+def test_dependency_all_kind_pairs_preserve_metadata_mode_other_scopes_and_selection(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    source_index: int,
+    target_index: int,
+) -> None:
+    root, left, right = two_dependency_trees(tmp_path)
+    source, target = left[source_index], right[target_index]
+    payload = json.loads(source.read_bytes())
+    payload["optional"] = {"nested": ["日本語", {"keep": True}]}
+    source.write_text(json.dumps(payload))
+    source.chmod(0o640)
+    target_id = json.loads(target.read_bytes())["id"]
+    record = select_fixture(root, scope_id="iss-00003", number=3)
+    before = {path: path.read_bytes() for path in (*left, *right, record)}
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert (
+        main(["--project", str(root), "dependency", "add", "--from", payload["id"], "--to", target_id, "--json"]) == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["result"]["changed"] is True
+    assert json.loads(source.read_bytes()) == {
+        **payload,
+        "depends_on": [target_id],
+        "revision": payload["revision"] + 1,
+    }
+    assert source.stat().st_mode & 0o777 == 0o640
+    assert all(path.read_bytes() == exact for path, exact in before.items() if path != source)
+    assert not log.exists() and not (root / ".git/spec-dock").exists()
+
+
+def test_dependency_duplicate_add_is_unchanged_and_preserves_every_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, source, _child = dependency_workspace(tmp_path)
+    record = select_fixture(root, scope_id="iss-00003", number=3)
+    log = github_fixture(tmp_path, monkeypatch, {})
+    arguments = ["--project", str(root), "dependency", "add", "--from", "epic-00002", "--to", "epic-00004", "--json"]
+    assert main(arguments) == 0
+    capsys.readouterr()
+    before = tree_digest(root)
+    source_before, record_before = source.read_bytes(), record.read_bytes()
+    assert main(arguments) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "unchanged" and result["data"]["result"]["changed"] is False
+    assert result["effects"] == [{"kind": "dependency-edge", "status": "unchanged", "target": "epic-00002->epic-00004"}]
+    assert source.read_bytes() == source_before and record.read_bytes() == record_before
+    assert tree_digest(root) == before and output.err == "" and not log.exists()
+    assert not (root / ".git/spec-dock").exists()
 
 
 def test_dependency_add_dry_run_plans_edges_without_creating_stage_or_changing_metadata(
@@ -414,6 +496,35 @@ def test_dependency_add_rejects_self_ancestry_and_inherited_wait_cycles_before_w
     assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
 
 
+@pytest.mark.parametrize(
+    "first,second",
+    [
+        (("init-00001", "epic-00005"), ("epic-00005", "iss-00003")),
+        (("iss-00003", "epic-00005"), ("epic-00005", "init-00001")),
+    ],
+)
+def test_dependency_rejects_cross_tree_inheritance_and_parent_completion_cycles(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    first: tuple[str, str],
+    second: tuple[str, str],
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, _left, _right = two_dependency_trees(tmp_path)
+    arguments = ["--project", str(root), "dependency", "add"]
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert main([*arguments, "--from", first[0], "--to", first[1], "--json"]) == 0
+    capsys.readouterr()
+    before = tree_digest(root)
+    assert main([*arguments, "--from", second[0], "--to", second[1], "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert "cycle" in result["error"]["message"] and result["effects"] == []
+    assert tree_digest(root) == before and not log.exists()
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_uncertain_dependency_replace_retains_unknown_effect_and_never_rolls_back(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -539,3 +650,51 @@ def test_dependency_local_check_preserves_genuine_existing_local_authority(
     assert result["data"]["result"]["ready"] is True and result["data"]["result"]["blockers"] == []
     assert result["data"]["result"]["effective"] == ["epic-00004"] and result["effects"] == []
     assert not log.exists() and all(path.read_bytes() == exact for path, exact in before.items())
+
+
+@pytest.mark.parametrize("target,ready", [("init-00001", True), ("iss-00003", False)])
+def test_readiness_ignores_child_dependencies_and_completed_children_do_not_complete_the_parent(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    target: str,
+    ready: bool,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, left, right = two_dependency_trees(tmp_path)
+    for path in (*left, *right):
+        payload = json.loads(path.read_bytes())
+        payload.update(
+            backend="local",
+            github=None,
+            lifecycle={
+                "state": "completed" if path in right[1:] else "open",
+                "revision": 7,
+                "updated_at": "2026-09-29T00:00:00Z",
+            },
+        )
+        if path == left[2]:
+            payload["depends_on"] = ["init-00004"]
+        path.write_text(json.dumps(payload))
+    before = tree_digest(root)
+    log = github_fixture(tmp_path, monkeypatch, {})
+    assert main(["--project", str(root), "dependency", "check", target, "--offline", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    data = result["data"]["result"]
+    assert data["ready"] is ready and result["effects"] == []
+    if ready:
+        assert data["effective"] == [] and data["blockers"] == []
+    else:
+        assert data["effective"] == ["init-00004"]
+        assert [item["details"] for item in data["blockers"]] == [
+            {
+                "scope_id": "init-00004",
+                "required_state": "completed",
+                "observed_state": "open",
+                "source": "local",
+                "stale": False,
+            }
+        ]
+    assert tree_digest(root) == before and not log.exists()
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()

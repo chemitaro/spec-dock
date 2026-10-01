@@ -867,3 +867,13 @@ clean `2c45e885ca48c32616d4899ee79844c553d96dc5` の通常 `make lint` はRuff�
 現行のGit診断・Windows外部API fixture・branch adapter・legacy doctor・migrationの五test filesについて29件の型問題を補正した。Git診断のdict形状をassertし、空list/JSON payloadの型、bytes refとtree digestの変数を区別した。migrationの障害注入callbackは実際のbackup/context/OS replaceの引数と返値へ揃え、検証条件と障害時機を保持した。ignore/cast/skip/収集除外を増やさず、製品sourceやconsumer状態は変更しない。
 
 五suiteは108 passed（18.48秒）、全source/tests Ruff check/format（357 files）、変更五test限定mypy `--follow-imports=silent` とdiff checkが成功した。元logは `iss-00413-implementation/pytest-current-test-types.log`。これは既存試験の型補正であり、新機能Red→Green、Windows native、通常full gate、fresh Strictの合格ではない。残る旧実装の個別退役と全体検証を続ける。
+
+## P-12 旧dependency writer・試験の退役
+
+旧七test関数・二helpers（218行）と旧application/dependency_vnext.pyの十symbols（235行）を全文確認し、[個別対応](artifacts/test-port-dependency-retirement.md)を保存した。宣言/継承・循環・未知field/mode・直接record保全・必要対象だけのlive観測を公開CLIへ対応づける。control/epoch・共通WriterLock・旧selection/cache/stale opt-inのadapterを削除し、現行pure domainとraw snapshot helperは維持する。退役二filesへのsource/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+公開確認は三kind×三kind 9 passed（2.02秒）、duplicate add全tree保全1 passed（0.37秒）、cross-tree継承/親完了待ちcycle 2 passed（0.57秒）、子の依存/完了を親と混同しないreadiness 2 passed（0.28秒）。既存Greenのcharacterizationである。
+
+通常wheelの収録禁止はRed 1 failed（0.77秒）、source退役後の同testはGreen 1 passed（14.01秒）。関連dependency/Start/Scope delete/pure domain 188 tests（48.28秒）、全Ruff check/format（355 files）、変更二test限定mypyとdiff checkが成功した。元logは既存Epic Workbenchのiss-00413-implementation/pytest-dependency-retirement-port.log、pytest-dependency-retirement-source-{red,green}.log、pytest-dependency-retirement-related.logへ保持。
+
+直近通常lintの189 errorsはclean 2c45e885の別snapshotである。残る旧source/private helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
