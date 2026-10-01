@@ -33,6 +33,9 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         retired_entrypoints = {
             "spec_dock/external_cli.py",
             "spec_dock/fixed_bundle.py",
+            "spec_dock/runtime_loader.py",
+            "spec_dock/runtime/application/engine_handover_vnext.py",
+            "spec_dock/runtime/application/installation_update_vnext.py",
             "spec_dock/runtime/cli/vnext_runtime.py",
             "spec_dock/runtime/commands/active_vnext.py",
             "spec_dock/runtime/commands/artifact_vnext.py",

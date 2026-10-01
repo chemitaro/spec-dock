@@ -429,6 +429,14 @@ Worktree旧adapterの三関数も[移行記録](artifacts/test-port-worktree-ada
 
 現行Scope publicationの旧writer importも[十一helpersの分離](artifacts/provider-scope-helper-isolation.md)で解消した。公開previewが旧七modulesを読むRed 1 failed（0.44秒）→同test Green 1 passed（0.32秒）、GH importを含む二cases（0.92秒）を確認。関連97 tests（23.72秒）と通常wheel一test（15.66秒）が成功した。通常make lintはRuff成功・mypy 443 errors/49 filesで未合格。旧private writers/controlの退役と残る型問題は継続する。
 
+## P-12 fixed engine locator / group installationの製品退役
+
+旧三module・48 symbolsの全文と候補内外のimportを確認し、[個別判断](artifacts/provider-retirement-engine-group.md)を保存した。candidate外source/test importはTYPE_CHECKINGを含め0で、閉じた三moduleを一緒に削除した。engine pin、全WT control/epoch、group journal、handover/finalization/resume/rollbackを通常配布から除去し、既存legacy証拠の読取・保全は維持する。互換alias・fallback・build除外は追加していない。
+
+通常wheelへ三moduleの収録禁止を先行し、正常build後に旧codeが存在するRed 1 failed（0.96秒）を確認した。削除後、同じ受入れ試験は1 passed（14.12秒）。fresh wheel/sdist/外部非editable venv/実console/局所static操作とtree保全を検査した。公開assets/entrypoint/provider/retired-recoveryの関連100 tests（72.84秒）も成功。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-engine-retirement-{red,green,related}.logへ保持した。
+
+全source/tests Ruff check/format（395 files）、変更wheel test限定mypy --follow-imports=silent、diff checkが成功した。直近通常make lintの443 errors/49 filesは未合格のままで、この限定検証をfull gateへ読み替えない。旧private writers/journal/registry/shared helpersの参照整理、残る型問題、native Windows/別Python、fresh Strict、最終手動確認を続ける。実consumer・既存WT・旧Git領域・live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

@@ -774,3 +774,12 @@ fresh processでpublic Scope create previewを実行し、七退役moduleの読�
 移動した九scaffold処理と二親処理のAST本体が元HEADと同一であることを照合した（gatewayのProtocol注釈だけを正規化）。旧moduleに残る64/5 definitions、現行publisher四functions/scaffold builder一functionも不変だった。`uv run pytest tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime/test_issue413_scope_import.py tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/test_scope_local_vnext.py tests/cli_runtime/test_artifact_vnext.py -q --tb=short` は97 passed（23.72秒）。通常wheel/sdist/isolated consoleは1 passed（15.66秒）。ログはiss-00413-implementation/pytest-scope-helper-isolation-related.log、pytest-scope-helper-wheel.logへ保存した。
 
 全source/tests Ruff check/format（398 files）、新二authority・現行publisher/scaffold/test限定mypy --follow-imports=silentの五files、diff checkが成功した。通常make lintも実行しRuffは成功、mypyは443 errors/49 files（317 source filesを検査）、make exit2で未完了だった。親e9437b74+今回helpers差分のcandidateであり、前回clean a3844fc3の559 errorsとはsnapshotが異なる。logはiss-00413-implementation/lint-p12-e9437b74-helper.logへ保持する。旧private writers/controlの退役、残る型問題、native Windows/別Python、fresh Strict、最終手動確認を続ける。実consumerとlive GitHubは未変更。
+
+
+## P-12 fixed engine locator / group installationの製品退役
+
+旧三module・48 symbolsの全文と候補内外のimportを確認し、[個別判断](artifacts/provider-retirement-engine-group.md)を保存した。candidate外source/test importはTYPE_CHECKINGを含め0で、閉じた三moduleを一緒に削除した。engine pin、全WT control/epoch、group journal、handover/finalization/resume/rollbackを通常配布から除去し、既存legacy証拠の読取・保全は維持する。互換alias・fallback・build除外は追加していない。
+
+通常wheelへ三moduleの収録禁止を先行し、正常build後に旧codeが存在するRed 1 failed（0.96秒）を確認した。削除後、同じ受入れ試験は1 passed（14.12秒）。fresh wheel/sdist/外部非editable venv/実console/局所static操作とtree保全を検査した。公開assets/entrypoint/provider/retired-recoveryの関連100 tests（72.84秒）も成功。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-engine-retirement-{red,green,related}.logへ保持した。
+
+全source/tests Ruff check/format（395 files）、変更wheel test限定mypy --follow-imports=silent、diff checkが成功した。直近通常make lintの443 errors/49 filesは未合格のままで、この限定検証をfull gateへ読み替えない。旧private writers/journal/registry/shared helpersの参照整理、残る型問題、native Windows/別Python、fresh Strict、最終手動確認を続ける。実consumer・既存WT・旧Git領域・live GitHubは未変更。
