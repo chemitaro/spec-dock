@@ -669,3 +669,9 @@ cleanな`323caf28084f7d7087e8ea96999e3ee2e2fad033`から、通常wheelを外部�
 branch create/show/switchのtipとdry-runはnative Gitでも比較し、既存refの再createでresetが起きないことを確認した。空からのactive setはWORK_START_REQUIRED、ancestor clearは親へ昇格せずemptyになり、remote/checkoutは不変である。独自engine digestの拒否を実行権へ戻さず、自WT旧writer宣言での効果前停止を確認した。
 
 最初の四失敗は移行testが既存branchの明示--branchを欠き、旧v1 target欄を期待したものだった。確定契約へ期待を訂正し、製品Red/新しい互換要求とは扱わない。三filesの九casesは9 passed（7.31秒）。hook、直接記録、同時Start、遅いFinishの現行suiteも含む `uv run pytest tests/cli_runtime/test_work_commands_vnext.py tests/cli_runtime/test_branch_commands_vnext.py tests/cli_runtime/test_vnext_runtime_work.py tests/cli_runtime/test_issue413_branch.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_work_start.py tests/cli_runtime/test_issue413_finish.py -q --tb=short` は186 passed（62.83秒）。全source/tests Ruff check/format（423 files）、変更三test file限定mypy、diff checkも成功した。macOS/hermetic GitHubの回帰であり、Windows native、全件gate、fresh Strict、最終手動確認と実consumer適用は未完了である。
+
+## P-09/P-12 Scope確認中の直接選択変更の再検査
+
+旧Scope lifecycle suiteを仕様へ照合する中で、保持すべき端末確認の競合検査を公開mainへ移し、不具合を再現した。元Scope #1の確認表示中に別processの実Startで#2へ切り替えると、元processはyes後に#1をCloseしてexit0を返した。Redは1 failed（1.34秒）、native Git/PTY/二CLI processとstateful ghによる製品挙動の失敗である。[分析と修正](artifacts/scope-confirmation-recheck.md)に旧testとの対応を残す。
+
+確認を必要とするScope close/reopenだけで、metadata/physical contextの再検査に加え、捕捉した自WTのselection status/record/handleを再読取結果へ照合する。選択が変わればremote変更前にexit3で止め、新記録を保全する。全編集lockや権限制御を追加せず、Finish/--yesの契約は維持した。同じClose testは1 passed（1.31秒）。関連Scope lifecycle/Finish/active/writer suiteは90 passed（20.90秒）。その後Close/Reopen二casesへ広げ、2 passed（2.31秒）で両経路の新記録・metadata・remote不変とPATCH0を確認した。全source/tests Ruff check/format（423 files）と変更source/test二file限定mypyも成功した。fresh Strict、全体gate、Windows、実consumer適用は未完了である。

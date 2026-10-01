@@ -104,6 +104,14 @@ def lifecycle_scope(namespace: argparse.Namespace, context: ProjectContext) -> O
             raise ValueError("Git project physical identity changed")
         fresh.require_writer()
         verify_local_inputs(fresh, inputs)
+        if not namespace.yes:
+            observed = read_selection(fresh, views)
+            if (observed.status, observed.record, observed.handle) != (
+                selection.status,
+                selection.record,
+                selection.handle,
+            ):
+                raise ValueError("direct selection changed during confirmation")
 
     verify_source()
     if not namespace.yes:

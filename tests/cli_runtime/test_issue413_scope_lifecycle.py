@@ -174,6 +174,108 @@ def test_scope_close_accepts_a_terminal_confirmation_after_planning(
     assert record.read_bytes() == before
 
 
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX confirmation and parallel Start processes")
+@pytest.mark.parametrize("action,state", [("close", "open"), ("reopen", "completed")])
+def test_scope_lifecycle_refuses_a_changed_direct_selection_after_terminal_confirmation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str, state: str
+) -> None:
+    import pty
+    import select
+    import time
+
+    root = committed_workspace(tmp_path / "consumer")
+    source = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    payload = json.loads(source.read_bytes())
+    other = source.parent.parent / "init-00002-fixture"
+    other.mkdir()
+    (other / ".meta.json").write_text(
+        json.dumps(dict(payload, id="init-00002", github=dict(payload["github"], issue_number=2)))
+    )
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "other scope",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    selected = select_fixture(root)
+    metadata_before = {path: path.read_bytes() for path in (root / "spec-dock").rglob(".meta.json")}
+    log = github_fixture(tmp_path, monkeypatch, {"1": state, "2": "open"})
+    master, slave = pty.openpty()
+    process = subprocess.Popen(
+        [
+            sys.executable,
+            "-m",
+            "spec_dock.cli",
+            "--project",
+            str(root),
+            "scope",
+            action,
+            "@current",
+            "--expect-current",
+            "init-00001",
+        ],
+        stdin=slave,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    try:
+        assert process.stderr is not None
+        prompt = bytearray()
+        deadline = time.monotonic() + 10
+        while b"Confirm [yes/no]" not in prompt and time.monotonic() < deadline:
+            ready, _, _ = select.select([process.stderr], [], [], 0.2)
+            if ready:
+                prompt.extend(os.read(process.stderr.fileno(), 4096))
+        assert b"Confirm [yes/no]" in prompt and b"init-00001" in prompt, prompt
+        started = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "spec_dock.cli",
+                "--project",
+                str(root),
+                "work",
+                "start",
+                "init-00002",
+                "--branch",
+                "main",
+                "--switch-active",
+                "--json",
+            ],
+            capture_output=True,
+            timeout=10,
+        )
+        assert started.returncode == 0, started.stdout + started.stderr
+        new_token = json.loads(started.stdout)["data"]["selection_token"]
+        new_record = selected.parent / f"target-{new_token}.json"
+        before = new_record.read_bytes()
+        os.write(master, b"yes\n")
+        stdout, stderr = process.communicate(timeout=10)
+        assert process.returncode == 3, stdout + stderr
+        assert b"selection changed" in stderr
+        assert new_record.read_bytes() == before and not selected.exists()
+        assert all(path.read_bytes() == exact for path, exact in metadata_before.items())
+        assert not any(json.loads(line)["method"] == "PATCH" for line in log.read_text().splitlines())
+        assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": state, "2": "open"}
+    finally:
+        if process.poll() is None:
+            process.kill()
+            process.wait(timeout=10)
+        os.close(master)
+        os.close(slave)
+
+
 def test_not_planned_close_lists_children_and_never_closes_them(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
