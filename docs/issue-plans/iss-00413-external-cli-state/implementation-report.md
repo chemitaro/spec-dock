@@ -714,3 +714,12 @@ Syncは通常/previewともdirect記録とopaqueな旧generationを更新せず�
 旧三関数を全文確認して[移行判断](artifacts/test-port-worktree-adapter.md)を記録した。registered ID・control・run_vnextを外し、公開mainでnative Gitのpath/branch/HEADとlist/showを比較する。壊れた無関係のScope metadataを読ませず、全tree不変を確認した。create/removeは明示root/name/base/pathと確認を保ち、previewでGit/targetを変更せず、実remove後もnative branch refのtipを保持する。明示bootstrapのmake initは該当WTだけで実行し、preview/offlineではmakeを評価せず、ファイルを作らない。
 
 後継三casesは3 passed（1.57秒）。現在のnative worktree/remove/bootstrap suiteを合わせた `uv run pytest tests/cli_runtime/test_worktree_commands_vnext.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree_bootstrap.py -q --tb=short` は115 passed（23.83秒）。全source/testsのRuff check/format（423 files）、変更一test限定 `mypy --follow-imports=silent`、diff checkも成功した。tmp fixtureだけを作成/削除しており、実consumer・既存worktree・live GitHubは未変更。旧installation/recoveryとprovider/runtime退役、full type/pytest、native Windows、fresh Strictと最終手動確認を継続する。
+
+
+## P-12 旧recovery入口の退役診断と低水準保存試験の分離
+
+旧31関数を[対応表](artifacts/test-port-recovery.md)へ保存した。新しい公開matrixでは十二操作×resume/rollbackの24 casesを実行し、project/Git/ghへ到達する前にexit2・ARGUMENT_RETIRED・effects空を返し、既存のopaque証拠とtreeを保全する。永続operation IDやblocking journalを後継へ移植しない。既存atomic JSON八関数とprocess helperは本文を変更せず別integration fileへ移し、低水準の保全条件を保持した。共有native read/rename helpersと旧transaction APIの退役判断はproviderの参照閉包確認に残す。
+
+初回と訂正後の各24失敗はschema名とrecovery fieldのtest期待の誤りだった。確定CLI契約のspecdock.cli/v2・recovery=nullへ訂正し、製品Redには数えない。八既存atomic casesは最初から成功し、訂正後の二filesは32 passed（0.14秒）。`uv run pytest tests/integration/test_cli_recovery_vnext.py tests/integration/test_atomic_json_publication.py tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime/test_issue413_scope_import.py tests/cli_runtime/test_issue413_finish.py tests/integration/test_issue413_migration.py -q --tb=short` は148 passed（39.36秒）。ログは既に選択したEpic Workbenchのiss-00413-implementation/pytest-recovery-related.logへ保持する。
+
+全source/tests Ruff check/format（424 files）、変更二test限定mypy --follow-imports=silent、diff checkが成功した。実consumer・Git内の独自領域・live GitHubは未変更。旧installation/handoverとproviderの退役、full type/pytest、native Windows、fresh Strict、最終手動確認を続ける。このcheckpointは旧providerの全退役や全体gateの合格ではない。

@@ -414,6 +414,8 @@ Workspace migrate/syncの旧十二関数も[対応表](artifacts/test-port-works
 
 Worktree旧adapterの三関数も[移行記録](artifacts/test-port-worktree-adapter.md)を残して公開mainへ移し、native path/list/show、create/removeのpreviewとbranch保持、make initの明示実行を検査した。関連115 tests（23.83秒）、全Ruff/変更一test限定mypyが成功。旧installation/recoveryとprovider退役、通常全体gateは継続する。
 
+旧recovery suiteの31関数も[個別の判断](artifacts/test-port-recovery.md)を記録した。23件のjournal/control前提は公開matrixへ移し、十二操作×resume/rollbackの24 casesでproject読取前の拒否・旧証拠保全を検査した。低水準atomic JSON八件は本文を変えず別suiteへ分離し、共有helpersと旧transaction APIの参照整理は後続stepへ残す。関連Scope publication/import/Finish/migrationを合わせた148 tests（39.36秒）、全Ruff/変更二test限定mypyが成功した。provider退役、全体gate、native Windowsとfresh Strictは継続中。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
