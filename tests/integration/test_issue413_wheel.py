@@ -30,7 +30,28 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     wheel = next(wheel_dir.glob("*.whl"))
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
-        retired_entrypoints = {"spec_dock/external_cli.py", "spec_dock/fixed_bundle.py"}
+        retired_entrypoints = {
+            "spec_dock/external_cli.py",
+            "spec_dock/fixed_bundle.py",
+            "spec_dock/runtime/cli/vnext_runtime.py",
+            "spec_dock/runtime/commands/active_vnext.py",
+            "spec_dock/runtime/commands/artifact_vnext.py",
+            "spec_dock/runtime/commands/branch_vnext.py",
+            "spec_dock/runtime/commands/dependency_vnext.py",
+            "spec_dock/runtime/commands/installation_vnext.py",
+            "spec_dock/runtime/commands/scope_create_vnext.py",
+            "spec_dock/runtime/commands/scope_delete_vnext.py",
+            "spec_dock/runtime/commands/scope_import_vnext.py",
+            "spec_dock/runtime/commands/scope_lifecycle_vnext.py",
+            "spec_dock/runtime/commands/scope_query_vnext.py",
+            "spec_dock/runtime/commands/scope_result_vnext.py",
+            "spec_dock/runtime/commands/work_vnext.py",
+            "spec_dock/runtime/commands/workbench_vnext.py",
+            "spec_dock/runtime/commands/workspace_diagnostics_vnext.py",
+            "spec_dock/runtime/commands/workspace_migrate_vnext.py",
+            "spec_dock/runtime/commands/workspace_sync_vnext.py",
+            "spec_dock/runtime/commands/worktree_vnext.py",
+        }
         included_retired = retired_entrypoints.intersection(names)
         assert included_retired == set(), sorted(included_retired)
         expected_runtime = {

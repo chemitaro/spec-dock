@@ -423,6 +423,9 @@ Worktree旧adapterの三関数も[移行記録](artifacts/test-port-worktree-ada
 
 通常全pytestはclean a3844fc3で2048 passed/1 skipped（369.70秒）、失敗0になった。同snapshotの通常make lintはRuff成功・mypy 559 errors/63 filesで未合格。最後の旧CLI adapter四files・十二関数も[個別対応](artifacts/test-port-remaining-adapters.md)に従い退役し、公開Installation showの非Git target保全/raw Git診断を補った。後継四suiteは182 tests（94.98秒）、全Ruffと変更一test限定mypyが成功した。旧providerの退役・通常型gate・native Windows・fresh Strictは引き続き未完了である。
 
+
+旧dispatcherとcommand 17 files・84 symbolsも[製品退役の対応](artifacts/provider-retirement-dispatcher.md)を確認し、候補外import 0で一緒に削除した。実wheelの収録禁止はRed 1 failed（0.79秒）→同じtestのGreen 1 passed（14.41秒）。関連公開入口/44 leaf/CI/recovery/providerの88 tests（13.37秒）、通常collection 2038件、全Ruff/変更wheel test限定mypyが成功した。旧application/control/journalの共有helpers分離と退役、full type gateは引き続き継続する。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

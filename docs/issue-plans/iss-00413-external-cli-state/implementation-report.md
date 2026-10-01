@@ -752,3 +752,14 @@ clean a3844fc35dbc0065b95951d43109a1077a6a45ddで `uv run pytest -q --tb=short` 
 旧dispatcherをtestから参照する最後の四filesを全文確認し、[十二関数の対応表](artifacts/test-port-remaining-adapters.md)へ保存した。中央registration/group control・new local Scope・旧receiptを後継仕様に残さず、既存公開Dependency/Artifact/Workbench/Static installationの保証へ個別に対応づけて退役した。新しい非Git targetのInstallation show一件はv2/exit5・raw Git argv/stderrと双方tree不変を検査し、1 passed（0.15秒）。既存実装のGreenであり製品Redではない。
 
 `uv run pytest tests/integration/test_issue413_assets.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_issue413_workbench.py -q --tb=short` は182 passed（94.98秒）。ログはiss-00413-implementation/pytest-test-retirement-public.logへ保持した。全source/tests Ruff check/format（414 files）、変更assets test限定mypy --follow-imports=silent、diff checkも成功した。旧dispatcherとcommandsのsource側参照閉包整理は別stepとして残す。実consumer・Git内の独自領域・live GitHubは未変更。
+
+
+## P-12 旧dispatcher / command層の製品退役
+
+旧dispatcherとcommand 17 filesの全文・84 top-level symbolsを読み、[現行保証との対応](artifacts/provider-retirement-dispatcher.md)へ保存した。candidate外のsource/test importはTYPE_CHECKINGとfrom-importの子moduleを含め0だった。残るstatic inventoryのlegacy path/digestは既知旧資産のownership証拠として保持し、実行参照と混同しない。十八moduleを一緒に削除し、fallback/deprecated alias/新wheel除外は加えなかった。
+
+通常wheelの受入れ試験へ十八moduleの明示収録禁止を先行し、正常buildしたartifactに旧codeが存在するRedを検出した（1 failed、0.79秒）。source削除後、同じtestは1 passed（14.41秒）。fresh wheel/sdist同一inventory・isolated console・help/version/completion・static installationと入力保全を検査した。ログは既存Epic Workbenchのiss-00413-implementation/pytest-dispatcher-retirement-{red,green}.logへ保持する。
+
+`uv run pytest tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_cli_recovery_vnext.py tests/integration/test_ci_fixed_validation.py tests/cli_runtime/test_cli_vnext_contract.py tests/unit/infra/test_provider_distribution.py -q --tb=short` は88 passed（13.37秒）。`uv run pytest --collect-only -q` は2038 tests collected（0.41秒）、exit0で旧moduleへのcollection importがない。全source/tests Ruff check/format（396 files）、変更wheel test限定mypy --follow-imports=silent、diff checkも成功。元ログはiss-00413-implementation/pytest-dispatcher-retirement-{related,collection}.logへ保持した。これは再度の全pytest/full mypy合格ではない。
+
+旧application/control/journal/runtime_loaderにはprivate testや現行経路が共有するhelpersが残るため、このcheckpointでは削除しない。正常経路からの共有helpers分離と残るprovider退役、通常型gate、native Windows/別Python、fresh Strict、最終手動確認を続ける。実consumerとlive GitHubは未変更。
