@@ -90,8 +90,8 @@ def _exchange_then_hold(path_value: str, ready: Queue[str]) -> None:
     identity = path.stat()
     real_exchange = json_store._rename_exchange_at
 
-    def exchange_then_pause(source_fd: int, source_name: str, target_fd: int, target_name: str) -> None:
-        real_exchange(source_fd, source_name, target_fd, target_name)
+    def exchange_then_pause(source_fd: int, source: str, target_fd: int, target: str) -> None:
+        real_exchange(source_fd, source, target_fd, target)
         ready.put("exchanged")
         time.sleep(30)
 

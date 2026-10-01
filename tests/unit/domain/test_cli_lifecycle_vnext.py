@@ -108,7 +108,9 @@ def test_local_lifecycle_is_supported_for_each_scope_kind(kind: str, state: str)
         "github": None,
         "lifecycle": {"state": state, "revision": 0, "updated_at": "2026-09-24T00:00:00Z"},
     }
-    assert decode_scope_metadata(payload).backend.lifecycle.state == state
+    decoded = decode_scope_metadata(payload)
+    assert isinstance(decoded.backend, LocalBackend)
+    assert decoded.backend.lifecycle.state == state
 
 
 def test_metadata_codec_rejects_kind_and_id_mismatch() -> None:

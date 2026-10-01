@@ -579,6 +579,12 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 
 公開CLIにhardlink拒否四case（4 passed、8.10秒）、候補hardlink化（1 passed、2.41秒）、asset/backup same-inode edit（2 passed、4.56秒）、実ZIP package bytes改変拒否（1 passed、0.20秒）を追加した。既存Greenのcharacterizationである。通常wheelの旧五module収録禁止はRed 1 failed（0.80秒、exit1）、退役後の同testはGreen 1 passed（14.77秒、exit0）。関連五suiteは208 passed（97.97秒）、exit0。後から追加したZIP改変一caseは別focused runであり、この208へ加算しない。全Ruff check/format（321 files）・変更二test限定mypy・diff checkが成功。skip/収集除外追加0。元logは既存Epic Workbenchのiss-00413-implementation/pytest-installation-retirement-{port,source-red,source-green,related}.logへ保持。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**公開v2出力と維持する実file試験の型整合**
+
+旧v1出力を固定していた七test関数は、同じ名前のまま公開v2・直接一件のActiveData・operation IDなし・can_resume/can_rollback=falseの案内へ更新した。成功/unknown効果をtop-levelで隠せない検査、stderr、秘密値秘匿、現行CLI補完を保持する。[対応記録](artifacts/test-port-public-output.md)へ記録した。既存local lifecycleはLocalBackendを実際に確認してからstateを検査する。原子的JSONの別process kill試験は保持し、代入するOS callbackのkeyword契約だけを合わせた。production変更0、test削除0、skip追加0。
+
+clean e1397459の通常make lintはRuff成功・mypy 41 errors/16 files（240 source files）、make exit2。限定mypyはMYPYPATH未指定だとsource importを解決せず0と表示したが、MYPYPATH=srcを明示すると対象三filesの3 errorsを再現した。修正後は同条件で0、関連三suite 43 passed（0.13秒）、Ruff check/format・diff checkが成功。最初の型注釈importをfuture annotationsなしで追加したcollection error（0.09秒）はharness修正として別logを保持し、製品Redに数えない。元logsはiss-00413-implementation/lint-p12-e1397459.log、pytest-retained-output-type.log（collection error）、pytest-retained-output-type-2.log（成功）。通常full gate、旧helpers、native OS/別Python、fresh Strictは継続中。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
