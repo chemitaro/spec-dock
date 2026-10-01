@@ -23,33 +23,34 @@ if [[ "$(git -C "$target_root" rev-parse --show-toplevel)" != "$target_root" ]];
 fi
 actual_sha="$(git -C "$source_root" rev-parse --verify 'HEAD^{commit}')"
 if [[ "$actual_sha" != "$expected_sha" ]]; then
-  echo "fixed SpecDock source SHA mismatch" >&2
+  echo "SpecDock source SHA mismatch" >&2
   exit 3
 fi
 if [[ -n "$(git -C "$source_root" status --porcelain --untracked-files=all)" ]]; then
-  echo "fixed SpecDock source checkout is dirty" >&2
+  echo "SpecDock source checkout is dirty" >&2
   exit 3
 fi
 
 scratch="$(mktemp -d "${TMPDIR:-/tmp}/specdock-ci.XXXXXXXX")"
 scratch="$(cd "$scratch" && pwd -P)"
 trap 'rm -rf "$scratch"' EXIT
-engine_root="$scratch/engine"
-package_root="$scratch/package"
-mkdir "$package_root"
-cp -R "$source_root/src/spec_dock" "$package_root/spec_dock"
-version="$(python3 -c 'import sys, tomllib; print(tomllib.load(open(sys.argv[1], "rb"))["project"]["version"])' "$source_root/pyproject.toml")"
-printf '%s\n' "$version" > "$package_root/spec_dock/version.txt"
-build_output="$(cd "$scratch" && PYTHONPATH="$package_root" PYTHONDONTWRITEBYTECODE=1 python3 -m spec_dock.fixed_bundle "$engine_root")"
-engine_path="$engine_root/bin/spec-dock"
-if [[ "$build_output" != "$engine_path "* ]]; then
-  echo "fixed SpecDock engine builder returned an unexpected result" >&2
+build_root="$scratch/source"
+wheel_dir="$scratch/wheels"
+venv_root="$scratch/installed"
+mkdir "$build_root"
+git -C "$source_root" archive "$actual_sha" src/spec_dock pyproject.toml README.md setup.py | tar -x -C "$build_root"
+unset PYTHONPATH PYTHONHOME PYTHONUSERBASE PYTHONSTARTUP
+export PYTHONDONTWRITEBYTECODE=1
+cd "$scratch"
+uv build --wheel --out-dir "$wheel_dir" "$build_root" >&2
+wheels=("$wheel_dir"/*.whl)
+if [[ ${#wheels[@]} -ne 1 || ! -f "${wheels[0]}" ]]; then
+  echo "SpecDock build must produce exactly one wheel" >&2
   exit 3
 fi
-distribution_digest="${build_output#"$engine_path "}"
-if [[ ! "$distribution_digest" =~ ^[0-9a-f]{64}$ ]]; then
-  echo "fixed SpecDock engine digest is invalid" >&2
-  exit 3
-fi
-printf 'SpecDock CI source=%s distribution=%s\n' "$actual_sha" "$distribution_digest"
-"$engine_path" --project "$target_root" workspace validate --ci --json
+wheel="${wheels[0]}"
+wheel_sha="$(python3 -c 'import hashlib, pathlib, sys; print(hashlib.sha256(pathlib.Path(sys.argv[1]).read_bytes()).hexdigest())' "$wheel")"
+python3 -m venv --without-pip "$venv_root"
+uv pip install --python "$venv_root/bin/python" "$wheel" >&2
+printf 'SpecDock CI source=%s wheel_sha256=%s\n' "$actual_sha" "$wheel_sha"
+"$venv_root/bin/spec-dock" --project "$target_root" workspace validate --ci --json

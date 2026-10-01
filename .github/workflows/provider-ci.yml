@@ -45,4 +45,4 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install uv
       - name: Verify current distribution and installation basics
-        run: uv run pytest tests/unit/infra/test_provider_distribution.py tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_installation_group_init_vnext.py
+        run: uv run pytest tests/unit/infra/test_provider_distribution.py tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_assets.py

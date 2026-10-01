@@ -394,6 +394,8 @@ README・配布reference・migration・offline HTML・二skillを外部CLIと一
 
 旧fixed-entrypoint suiteを通常wheelの非editable外部venvと実consoleへportした。廃止/維持する各保証の根拠は[公開入口テストの移行](artifacts/test-port-entrypoint.md)へ全15旧test単位で記録する。Issue Start→Sync→Finish、旧locator不採用、環境分離、二cloneの独立観測、通常/CI validateの書込0を確認した。entrypoint 14 cases（6.23秒）と関連wheel/shim/providerの30 tests（23.84秒）が成功した。実Gitのbranch保持とfake GHのIssue一回closeも別に照合した。これは既存実装のGreen回帰であり、native Windows/full gate/fresh Strict/最終手動検証ではない。
 
+CIのfixed bundle経路も通常wheelへ移し、新writerのHEAD検証が旧v1/exit7からv2/exit0へ変わるRed→Greenを確認した。[CIテストの移行](artifacts/test-port-ci.md)に七casesの維持/変更理由を記録する。source SHA/clean確認後のGit archiveをbuildし、外部venvの実consoleで読取だけを行う。元source/targetは全entry type/mode/bytesが不変、旧builder sentinelの実行0。CI suite 7 tests（4.42秒）が成功した。既存Ubuntu/macOS配布laneは新wheel/static installationの試験へ切替え、通常lint/全pytestは保持した。remote CI実行、Windows、全体gateは未完了。
+
 **変更禁止**: 実導入先への無断一括同期、Scope/成果物/直接状態の削除、未知ユーザー改変の上書き、gpt-5.6専用coder roleへの誘導を禁止。
 
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。

@@ -633,3 +633,13 @@ legacy provider/runtime helpersの退役、native Windows、full-suite/type gate
 最初の実console lifecycle一件は1 passed（3.84秒）、port後entrypoint suiteは14 passed（6.23秒）で、いずれも既存実装のGreen回帰。新しい製品不具合のRedとは扱わない。native Gitによるbranch照合を補強してから `uv run pytest tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py -q --tb=short` を実行し、30 passed（23.84秒）を確認した。全source/tests Ruff check/format（423 files）、変更test一file限定mypy、diff checkも成功した。formatで余分な空行とlayoutを整えた修正は製品不具合ではない。
 
 旧CI固定bundle routeとprovider/runtime helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer切替は未完了。実dogfood workspace・metadata・shim・.agents・状態は保持する。レビュー用pushの回答を待ちながら認可済みローカル実装を続け、P-12とgoalは進行中とする。
+
+## P-12 CI検証経路の通常wheelへの切替え
+
+CI scriptのfixed bin/lib生成、asset copy、version.txt、digest preflightと旧external_cli起動を、確認済みcommitのpackageを通常wheelへbuildする経路に置換した。full SHA、正確なGit root、clean sourceの事前検査を保持する。Git archiveでcommitを専用scratchへ取り出してbuildし、外部fresh venvへ非editable installする。wheel hashは実行結果の識別表示にとどめ、Git内のpinを書かない。実consoleは`workspace validate --ci --json`だけを実行する。
+
+最初にsource fixtureの不足build入力でsetupが不成立になったため、存在するREADME/setup.pyだけへ訂正した。旧targetが検証対象HEADにworkspaceを持たない構成も現在のcommit済みfixtureへ変更した。これらは製品Redに数えない。成立したfixtureでは旧CI経路が新writerをworkspace_schema_mismatch/exit7/v1として拒否した。同じ公開scriptを通常wheelへ改修した後、1 passed（2.09秒）、v2/HEAD/valid/効果0を確認した。旧builderを不活性sentinelに置換した回帰では、それを実行せず通常package経路だけが動く。
+
+旧CI七casesの判断は[移行根拠](artifacts/test-port-ci.md)へ記録した。tracked/untracked dirty、短縮/不正SHAとSHA不一致はbuild前に拒否する。旧engine digest形式検査はwheel build故障に置換し、故障時の実console未実行、source/target不変を確認する。全casesでentry type/mode/bytesのsource/target snapshotを比較した。`uv run pytest tests/integration/test_ci_fixed_validation.py -q --tb=short` は7 passed（4.42秒）。native Bashのsyntax checkと変更test一file限定mypyも成功した。CI workflowへPython 3.11とuvの明示導入を追加し、既存Provider配布laneを新wheel/単WT static installationへ変更した。通常lintと全pytestを削らない。
+
+これはmacOSローカルのscript実行とhermetic fixtureの証拠であり、GitHub Actionsの実ジョブ成功ではない。provider/runtime helpersの退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer適用は未完了。実dogfoodとGit内の旧独自領域は変更せず、P-12とgoalを進行中に維持する。
