@@ -20,13 +20,17 @@ OLD_WRITER_PROTOCOL = "specdock.writer/v1"
 
 
 @dataclass(frozen=True)
-class ProjectContext:
+class GitContext:
     root: Path
     common_dir: Path
     clone_identity: PhysicalIdentity
     worktree_identity: PhysicalIdentity
     head: str | None
     branch: str | None
+
+
+@dataclass(frozen=True)
+class ProjectContext(GitContext):
     workspace: dict[str, object]
 
     def require_writer(self) -> None:
@@ -41,6 +45,21 @@ def physical_identity(path: Path) -> PhysicalIdentity:
 
 
 def resolve_context(project: str | None, cwd: Path, *, timeout: float = 30) -> ProjectContext:
+    root, common = _resolve_git_paths(project, cwd, timeout=timeout)
+    workspace = read_workspace_declaration(root / "spec-dock/workspace.json")
+    git = _read_git_context(root, common, timeout=timeout)
+    return ProjectContext(
+        git.root, git.common_dir, git.clone_identity, git.worktree_identity, git.head, git.branch, workspace
+    )
+
+
+def resolve_git_context(project: str | None, cwd: Path, *, timeout: float = 30) -> GitContext:
+    """Admit read-only raw diagnosis without interpreting the workspace declaration."""
+    root, common = _resolve_git_paths(project, cwd, timeout=timeout)
+    return _read_git_context(root, common, timeout=timeout)
+
+
+def _resolve_git_paths(project: str | None, cwd: Path, *, timeout: float) -> tuple[Path, Path]:
     candidate = Path(project).expanduser() if project else cwd
     if not candidate.is_absolute():
         candidate = cwd / candidate
@@ -52,7 +71,10 @@ def resolve_context(project: str | None, cwd: Path, *, timeout: float = 30) -> P
     common_text = _git(root, "rev-parse", "--git-common-dir", timeout=timeout).removesuffix("\n")
     common_path = Path(common_text)
     common = (common_path if common_path.is_absolute() else root / common_path).resolve(strict=True)
-    workspace = read_workspace_declaration(root / "spec-dock/workspace.json")
+    return root, common
+
+
+def _read_git_context(root: Path, common: Path, *, timeout: float) -> GitContext:
     head = (
         _git(root, "rev-parse", "--verify", "--quiet", "HEAD", allow_missing=True, timeout=timeout).removesuffix("\n")
         or None
@@ -61,7 +83,7 @@ def resolve_context(project: str | None, cwd: Path, *, timeout: float = 30) -> P
         _git(root, "symbolic-ref", "--quiet", "--short", "HEAD", allow_missing=True, timeout=timeout).removesuffix("\n")
         or None
     )
-    return ProjectContext(root, common, physical_identity(common), physical_identity(root), head, branch, workspace)
+    return GitContext(root, common, physical_identity(common), physical_identity(root), head, branch)
 
 
 def read_workspace_declaration(path: Path) -> dict[str, object]:

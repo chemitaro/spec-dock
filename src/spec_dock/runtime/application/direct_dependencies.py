@@ -8,7 +8,7 @@ import json
 import secrets
 from typing import TYPE_CHECKING
 
-from spec_dock.runtime.application.dependency_vnext import _read_raw_edges
+from spec_dock.runtime.application.dependency_snapshot import read_raw_edges
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import load_scope_views
@@ -45,7 +45,7 @@ def query_dependencies(namespace: argparse.Namespace, context: ProjectContext) -
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
-    raw, _metadata = _read_raw_edges(views)
+    raw, _metadata = read_raw_edges(views)
     listing = dependency_listing(views, raw, target.id)
     ready: bool | None = None
     blockers: tuple[Diagnostic, ...] = ()
@@ -132,7 +132,7 @@ def mutate_dependencies(namespace: argparse.Namespace, context: ProjectContext) 
         expected = resolve_scope(context, views, namespace.expect_current, selection=selection).id
         if selection.status != "selected" or selection.record is None or selection.record.scope_id != expected:
             raise ValueError("direct target does not match --expect-current")
-    raw, metadata = _read_raw_edges(views)
+    raw, metadata = read_raw_edges(views)
     inputs = capture_local_inputs(context, views)
     by_path = {item.relative_path: item for item in inputs}
     if any(

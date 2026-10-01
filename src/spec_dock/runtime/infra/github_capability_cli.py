@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import hashlib
+import json
 import os
 import subprocess
 
@@ -19,6 +20,8 @@ from spec_dock.runtime.application.contracts import (
 
 @dataclass(frozen=True)
 class GitHubCapabilityCliGateway:
+    timeout: float = 30
+
     def probe(self, request: GitHubCapabilityProbeRequest) -> list[GitHubCapabilityDiagnostic]:
         diagnostics: list[GitHubCapabilityDiagnostic] = []
         fixed_checks: list[tuple[GitHubCapability, GitHubCapabilityGroup, str, list[str]]] = [
@@ -70,18 +73,19 @@ class GitHubCapabilityCliGateway:
             _review_threads_graphql_check(request),
         ]
         for capability, group, api, command in fixed_checks:
-            completed = _run_fixed_gh(command)
-            diagnostics.append(
-                _diagnostic_from_completed_process(
-                    capability=capability,
-                    group=group,
-                    api=api,
-                    completed=completed,
-                )
+            completed = _run_fixed_gh(command, timeout=self.timeout)
+            diagnostic = _diagnostic_from_completed_process(
+                capability=capability,
+                group=group,
+                api=api,
+                completed=completed,
             )
+            if diagnostic.status == "ok" and capability in ("repo_metadata_read", "pull_request_read"):
+                diagnostic = _verify_fixed_target(diagnostic, completed.stdout, request)
+            diagnostics.append(diagnostic)
         if request.include_extended:
             for capability, group, api, command in _extended_checks():
-                completed = _run_fixed_gh(command)
+                completed = _run_fixed_gh(command, timeout=self.timeout)
                 diagnostics.append(
                     _diagnostic_from_completed_process(
                         capability=capability,
@@ -141,16 +145,61 @@ def _github_repo_owner_name(github_repo: str) -> tuple[str, str]:
     return owner, name
 
 
-def _run_fixed_gh(command: list[str]) -> subprocess.CompletedProcess[str]:
+def _run_fixed_gh(command: list[str], *, timeout: float = 30) -> subprocess.CompletedProcess[str]:
     try:
         return subprocess.run(
             command,
             check=False,
             text=True,
             capture_output=True,
+            timeout=timeout,
         )
     except FileNotFoundError:
         return subprocess.CompletedProcess(command, 127, "", "gh executable not found")
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(command, 1, "", "fixed GitHub capability probe timed out")
+    except OSError:
+        return subprocess.CompletedProcess(command, 1, "", "fixed GitHub capability probe could not be started")
+
+
+def _verify_fixed_target(
+    diagnostic: GitHubCapabilityDiagnostic,
+    raw: str,
+    request: GitHubCapabilityProbeRequest,
+) -> GitHubCapabilityDiagnostic:
+    try:
+        payload = json.loads(raw)
+    except (ValueError, RecursionError):
+        payload = None
+    if not isinstance(payload, dict):
+        return replace(
+            diagnostic,
+            code="github_schema_unavailable",
+            status="schema_unavailable",
+            severity="blocking",
+            message="Fixed GitHub target response is unavailable.",
+        )
+    if diagnostic.capability == "repo_metadata_read":
+        observed = payload.get("nameWithOwner")
+        matches = isinstance(observed, str) and observed.lower() == request.github_repo.lower()
+    else:
+        number, head = payload.get("number"), payload.get("headRefOid")
+        matches = (
+            type(number) is int
+            and number == request.github_pr
+            and isinstance(head, str)
+            and head.lower() == request.github_head_sha.lower()
+        )
+    if not matches:
+        return replace(
+            diagnostic,
+            code="github_probe_target_mismatch",
+            status="target_unavailable",
+            severity="blocking",
+            message="Observed GitHub repository, PR or head differs from the fixed requested target.",
+            recommended_next_action="verify_fixed_github_repo_pr_and_head",
+        )
+    return diagnostic
 
 
 def _diagnostic_from_completed_process(

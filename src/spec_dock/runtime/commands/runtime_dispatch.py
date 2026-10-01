@@ -26,6 +26,14 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
     command = namespace.command_path
     result: OperationResult[object]
     try:
+        if command == "workspace doctor" and namespace.raw:
+            from spec_dock.runtime.application.direct_diagnostics import diagnose_raw_workspace
+            from spec_dock.runtime.application.project_context import resolve_git_context
+
+            result = diagnose_raw_workspace(
+                namespace, resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
+            )
+            return _render_result(namespace, result)
         context = resolve_context(namespace.project, cwd, timeout=namespace.timeout)
         if command == "work start":
             from spec_dock.runtime.application.work_start import start_work
@@ -39,6 +47,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_sync import sync_workspace
 
             result = sync_workspace(namespace, context)
+        elif command == "workspace doctor":
+            from spec_dock.runtime.application.direct_diagnostics import diagnose_workspace
+
+            result = diagnose_workspace(namespace, context)
         elif command.startswith("scope create "):
             from spec_dock.runtime.application.direct_scope_publish import create_scope
 
@@ -195,6 +207,11 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
         result = failure(command, "PRECONDITION_FAILED", str(error), 3)
     except (OSError, RuntimeError) as error:
         result = failure(command, "LOCAL_IO_FAILED", str(error), 5)
+    return _render_result(namespace, result)
+
+
+def _render_result(namespace: argparse.Namespace, result: OperationResult[object]) -> tuple[int, str, str]:
+    command = namespace.command_path
     if namespace.dry_run and command not in MUTATING_LEAF_PATHS:
         if isinstance(result.data, FamilyData):
             result = replace(

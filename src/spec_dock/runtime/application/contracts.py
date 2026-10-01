@@ -108,6 +108,7 @@ GitHubCapabilityDiagnosticCode = Literal[
     "github_transient_unknown",
     "github_schema_unavailable",
     "github_capability_skipped",
+    "github_probe_target_mismatch",
 ]
 
 

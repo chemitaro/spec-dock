@@ -335,7 +335,9 @@ uv run pytest tests/cli_runtime/test_scope_delete_vnext.py tests/cli_runtime/tes
 <a id="p-11"></a>
 ## P-11 旧記録の保全診断とworkspace局所移行を実装する
 
-**状態: 未着手。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
+**状態: 実装中。通常/raw/legacy Doctorをローカル検証済み。局所移行・validate・fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
+
+通常Doctorは共通controlを必要とせず、現在のScope構造・依存・Artifact・直接選択を読み取る。raw専用のGit-only admissionは未知workspaceでも安全なfile情報を返し、通常コマンドの既知schema/protocol判定を弱めない。`--legacy`だけが旧control/engine/registry/activeと操作・移行・installation・finalization・handoverの記録を読む。各fileは1 MiB、各記録directoryは4096 entriesまでに限定し、unsafe/破損/未知/途中記録は診断不完全のexit7とする。旧実行物を起動せず、phaseを現物の成功証明として採用せず、旧activeを新recordへ自動変換しない。任意bodyを出力せず、旧記録のdecoded bodyも分類後に保持しない。GitHub capability診断はrepository/PR/headの全指定と応答の一致を検査し、offline・指定不備を副作用前に拒否する。関連460 tests（88.15秒）、全source/testsのRuff check/format（410 files）、変更12 source限定mypy、diff checkが成功した。実consumerの宣言・metadata・直接選択は変更していない。
 
 **所有/対象file**: NRT/infra/legacy_reader.py（新設）、application/migrate_workspace_vnext.py、workspace_diagnostics_vnext.py、commands、cli/catalog.py。tests/cli_runtime/test_workspace_migrate_vnext.py、test_workspace_doctor_vnext.py、新 tests/integration/test_issue413_migration.py（予定）。
 

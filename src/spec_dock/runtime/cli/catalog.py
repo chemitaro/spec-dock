@@ -124,7 +124,7 @@ HELP_EFFECTS: dict[str, str] = {
     "workbench copy": "Copy one Scope Workbench into a selected worktree.",
     "workspace sync": "Observe current Scope lifecycle and same-clone worktree selections without writing files.",
     "workspace validate": "Read and validate the workspace; --ci checks committed data without installation state. No changes.",
-    "workspace doctor": "Read installation and journal diagnostics; no repair.",
+    "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
     "workspace migrate": "Migrate registered worktrees and control under maintenance.",
     "installation show": "Read installed engine and worktree inventory; no changes.",
     "installation init": "Install managed tooling and initial control in a Git repository.",
@@ -222,6 +222,8 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "workspace sync": (_arg("--source", choices=("local", "github"), default="local"), _flag("--allow-invalid")),
     "workspace validate": (_flag("--require-nodes"), _flag("--ci")),
     "workspace doctor": (
+        _flag("--raw"),
+        _flag("--legacy"),
         _arg("--github-repo"),
         _arg("--github-pr"),
         _arg("--github-head-sha"),
@@ -337,7 +339,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
     "workspace sync": "Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.",
     "workspace validate": "A readable workspace is required; --ci validates committed data without installation state.",
-    "workspace doctor": "The selected repository and its control records must be readable.",
+    "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "workspace migrate": "Inspection with --dry-run can inventory without --mapping-file. Applying a migration requires an inventory-bound --mapping-file, maintenance state, and valid migration guards.",
     "installation show": "The selected repository must have readable installation control.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
@@ -506,6 +508,11 @@ def _help_spec(leaf: str) -> HelpSpec:
             "Does not contact GitHub, read a retired status cache, modify metadata or selection, or change Git refs."
         )
         json_data = "items, unknown_filtered_count." if leaf == "scope list" else "scope, github_ref, changed=false."
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf == "workspace doctor":
+        reads = "Current workspace metadata and this worktree's direct record; safe file information in --raw mode, retired records only with --legacy, and GitHub only with explicit fixed probe arguments."
+        does_not = "Does not execute the retired engine, repair control, resume journals, acquire a Start lock, or write any project state."
+        json_data = "findings and unverified observations; unsafe, unknown or incomplete evidence returns exit 7."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf.startswith("scope create"):
         reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."

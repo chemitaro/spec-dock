@@ -501,3 +501,19 @@ fresh Strict準備の通常非force pushは自動承認審査で二回、process
 `uv run pytest tests/cli_runtime/test_issue413_worktree_bootstrap.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_worktree_bootstrap_vnext.py tests/cli_runtime/test_worktree_remove_vnext.py tests/cli_runtime/test_worktree_create_vnext.py tests/integration/test_issue413_wheel.py -q` は168 passed（44.82秒）。全source/testsのRuff check/format（404 files）、変更四source限定mypyとdiff checkが成功した。旧bootstrapのCLI recovery assertionだけを退役拒否/絶対pathへ更新し、旧helperとreceiptはP-12で別に退役させる。設計D-14の実装推論設定も利用者の最新指定Maxへ同期した。
 
 native Windowsのprocess/file adaptersと実OS確認、fresh Strict、P-11以後、full-suite/type gate、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択は変更していない。レビュー用pushの明示許可への回答を待ちながらローカル作業を継続し、goalをactiveに保つ。
+
+## P-11 control非依存の通常/raw/legacy Doctorを接続
+
+通常 `workspace doctor` をexternal runtimeへ接続し、現在のScope構造・依存・Artifact・直接選択を読み取る。共通controlやgeneration cacheを要求せず、構造不良や不完全な選択をeffects=[]の診断不完全/exit7で返す。依存snapshotのpure readerを独立moduleへ抽出し、通常dependency操作から旧writer moduleへのimportを除いた。旧helperの互換性は残し、P-12の退役を完了したとは扱わない。
+
+`--raw`はGit-only contextから入り、通常の既知schema/protocol admissionと分離した。未知・不在・不正workspaceでも安全なentry type/size/schema情報まで表示し、通常writerの制約を迂回しない。JSON重複memberと非JSON constantを拒否し、任意bodyを出力しない。`--expect-current`は検証できる現在の対象だけを比較し、未知workspaceでは検証不能として停止する。解決対象のないbackend guardを無視しない。
+
+`--legacy`だけが旧engine/control/registry/active、通常operation、migration、installation group、finalization、engine handoverのfileを読む。single-link regular file・安全なancestor・読取前後のidentity/content属性を確認し、1 MiB/fileと4096 entries/directoryの上限を設けた。symlink/hardlink/directory/FIFO、未知schema、破損JSON、欠落journal、未確定効果、移行やinstallationの途中を別に分類する。headerのshapeを読めたことをremoteや所有状態の確認と混同せず、unverifiedへ明示する。旧実行物の起動、復旧、phase移植、再送、旧activeの自動採用、control修復、Start lock、権限制御、state writeを行わない。分類後は旧bodyを保持せずschema情報だけを残す。
+
+既存GitHub PR capability optionsも通常/raw双方へ接続した。repository/PR/headの全指定と形式を副作用前に検査し、offline probeを拒否する。repository名・PR番号・HEADの応答を固定要求と照合し、異なるHEADを成功として表示しない。明示probeは有限timeoutでread-only `gh` commandsを実行し、stderrは分類/hashだけを残す。今回実試験はhermeticなnative executable stubで行い、実GitHubへのprobeや業務書込はしていない。
+
+raw flags未接続のexit2、旧pending操作を無視したexit0、GitHub指定不備を無視したexit0、構造不良のexit3/未検査、重複JSONの誤った既知判定、固定HEAD不一致の誤成功、既知schemaだけの不完全headerの誤成功、migration/installation途中記録の見落としをfocused Red→Greenで確認した。元からGreenのunsafe file・秘密body非公開・old active非採用・native probe failure/timeoutも回帰として記録する。fixture path、patch配置、外部processの起動まで待てない実験timeoutの訂正を製品Redに数えない。
+
+検証 `uv run pytest tests/cli_runtime/test_issue413_workspace_doctor.py tests/cli_runtime/test_workspace_doctor_vnext.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_issue413_work_start.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_finish.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_dependency_vnext.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree_bootstrap.py tests/integration/test_issue413_observation.py tests/integration/test_issue413_sync.py tests/integration/test_issue413_wheel.py tests/unit/infra/test_work_target_store.py tests/unit/infra/test_start_lock.py -q` は460 passed（88.15秒）。全source/testsのRuff check/format（410 files）、変更12 source限定mypy、diff checkが成功した。限定型検査は全体gateの代替ではない。
+
+局所migrationとvalidate、P-12以後、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択は変更していない。レビュー用pushの回答を待ち、SHA一致を満たさないStrictは起動せず、既存の実装認可に基づくローカル作業を継続する。goalはactiveである。
