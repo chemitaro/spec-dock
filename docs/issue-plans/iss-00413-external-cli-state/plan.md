@@ -674,6 +674,12 @@ wheel禁止のRed 1 failed（0.83秒）→Green 1 passed（17.35秒）、関連�
 
 後継は削除前12 passed/37 deselected（2.22秒）。wheel禁止のRed 1 failed（0.77秒）→Green 1 passed（16.35秒）、関連三suite 56 passed（9.56秒）、実Python 3.10.15の後継12 passed/37 deselected（1.91秒）、全て期待したexitとなった。初回関連runの誤test path/no tests ranは別logへ保持した。全Ruff（304 files）、MYPYPATH=srcの変更二files限定mypy、diff checkが成功。通常make lintはRuff成功・mypy 30 errors/10旧files（223 files）、make exit2。Linux全件の別候補に残る失敗、残り旧source、Windows、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**Linux全件の二回目とnative bootstrap fixture**
+
+clean c4c26bdbの実Linux/Python 3.11.16全件は1839 passed/1 failed/17 skipped（921.27秒、exit1）。残る失敗はmake起動前のGit rev-parseが100msでtimeoutしたもので、同じSHAの単独再実行は1 passed（0.74秒）。[環境と切分け記録](artifacts/linux-python311-verification.md)へ結果を追記した。testの有限timeoutを2.0秒へ修正し、sleep5に対する実timeout・native process-group終了と応答OSError、unknown効果の元assertionsを維持する。製品挙動/test選択/skip条件は変更しない。
+
+補正候補はLinux bootstrap全suite 32 passed（20.48秒）、macOSの同suite 32 passed（7.82秒）、全てexit0。Linux base/test hash・変更一file・実効capability0とprovider/prefix、主checkoutとの関連production bytes一致を照合した。全Ruff（304 files）、MYPYPATH=srcの変更test限定mypy、diff checkが成功。現在の全件再合格、通常full lint、残る旧source、Windows、fresh Strict、最終手動確認は別途継続する。実consumer/live GitHubは未変更。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 

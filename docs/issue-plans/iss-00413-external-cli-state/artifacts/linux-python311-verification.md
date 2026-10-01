@@ -34,3 +34,19 @@ Linux補正候補は上記base SHAと、変更一testのSHA256 `0e140621c391b297
 初回17 skipは、未導入Zshの12 cases、macOS専用named-stageの一case、Linux anonymous publicationで適用しないnamed-stage cleanupの四cases。いずれもnative成功件数に含めない。
 
 元logsは既存Epic Workbenchの`iss-00413-implementation/pytest-linux-python311-bdf44fe2.log`、`pytest-linux-capability-isolation.log`、`pytest-linux-fixture-green.log`、`pytest-linux-fixture-macos.log`、準備の`linux-prepare-bdf44fe2.log`と`linux-prepare-bdf44fe2-2.log`へ保持する。試験用runnerとcloneは次のLinux全件検証に再利用し、完了後に所有した一時dataを整理する。
+
+## 二回目の全件とbootstrap fixtureの補正
+
+clean `c4c26bdb231a37c6491a5ac1d3614dde564e0ca5` を同じLinux/Python 3.11.16環境で再検証した。実効capability0、USER未設定、source/import/prefixとclean HEADを再照合した全件結果は **1839 passed / 1 failed / 17 skipped、921.27秒、exit1**。Artifact六casesとnative Start拒否は成功した。skipの内訳は初回と同じで、native成功には数えない。
+
+残る `test_bootstrap_keeps_a_started_hook_unknown_when_process_termination_reports_io_failure` はhook起動前のGit rev-parseが100msのCLI timeoutを超え、GIT_FAILED/exit5/effects=[]となった。意図したmake起動後の終了応答失敗には到達していない。同じclean SHAでの単独再実行は **1 passed、0.74秒、exit0** であり、常に起きる製品不具合とは判定しない。仮想化・変換を介した全件実行の負荷でもGit preflightへ到達できるよう、testの有限timeoutを2.0秒にした。hookのsleep5より短く、実際のtimeout・process-group終了・OSError・unknown効果と元assertionsを全て維持する。製品のtimeout処理は変更しない。
+
+補正候補は旧c4c26bdbと変更一testのSHA256 `c5c094c27a08d278a8b70fe91d5caf915d26a345824bb2663fe9db99627a611a` を照合した。Linux cloneのtracked変更はこの一fileだけ、staged変更なし。direct_bootstrap.pyとproject_hook.pyのbytesは現在の主checkoutとも一致する。
+
+| 補正候補の検証 | 実測 |
+|---|---|
+| Linux/Python 3.11.16、capability0、bootstrap全suite | **32 passed、20.48秒、exit0** |
+| macOS/既定Python 3.12、bootstrap全suite | **32 passed、7.82秒、exit0** |
+| 全Ruff check/format（304 files）、MYPYPATH=srcの変更test限定mypy、diff check | 成功。full lintの代替ではない |
+
+test削除、assertion緩和、skip/収集除外追加、製品source変更は0。現在のadapter/Delete退役を含まない全件結果とfocused結果を合算してpassにせず、後のclean候補でfull gateを閉じる。元logsは `pytest-linux-python311-c4c26bdb.log`、`pytest-linux-hook-isolation.log`、`pytest-bootstrap-timeout-{linux,macos}.log`。全件runner/補正候補runnerと検証cloneはWorkbench内の一時dataであり、実consumerやGitHubへの変更ではない。

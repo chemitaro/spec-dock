@@ -410,8 +410,10 @@ def test_bootstrap_keeps_a_started_hook_unknown_when_process_termination_reports
         raise OSError(errno.EIO, "fixture failure after process-group termination")
 
     monkeypatch.setattr(os, "killpg", killpg)
+    # The CLI timeout also bounds native Git preflight. Allow process startup
+    # while keeping this deadline below the hook's five-second sleep.
     assert (
-        main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--timeout", "0.1", "--json"]) == 6
+        main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--timeout", "2.0", "--json"]) == 6
     )
     result = json.loads(capsys.readouterr().out)
     assert calls == 1 and (other / "before-timeout").exists()
