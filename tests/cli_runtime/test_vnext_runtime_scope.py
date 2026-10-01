@@ -96,3 +96,76 @@ def test_runtime_rejects_a_nonroot_project_before_scope_edit(
     result = json.loads(capsys.readouterr().out)
     assert result["error"]["code"] == "PRECONDITION_FAILED" and result["effects"] == []
     assert tree_digest(root) == before
+
+
+@pytest.mark.parametrize("mode", ["implicit-child", "explicit-child", "non-git"])
+def test_scope_read_resolves_native_project_context_without_changing_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    child = root / "nested/child"
+    child.mkdir(parents=True)
+    outside = tmp_path / "non-git"
+    outside.mkdir()
+    before = tree_digest(root)
+    outside_before = tree_digest(outside)
+    monkeypatch.chdir(outside if mode == "non-git" else child)
+    project = ["--project", str(child)] if mode == "explicit-child" else []
+    assert (
+        main([*project, "scope", "show", "init-00001", "--json"])
+        == {
+            "implicit-child": 0,
+            "explicit-child": 3,
+            "non-git": 5,
+        }[mode]
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    if mode == "implicit-child":
+        assert result["data"]["result"]["scope"]["id"] == "init-00001"
+    else:
+        assert result["error"]["code"] == ("GIT_FAILED" if mode == "non-git" else "PRECONDITION_FAILED")
+        if mode == "non-git":
+            assert "not a git repository" in result["error"]["details"]["git"]["stderr"]
+    assert tree_digest(root) == before and tree_digest(outside) == outside_before
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
+
+
+@pytest.mark.parametrize("case", ["exact", "foreign", "unimported", "missing-id", "duplicate"])
+def test_scope_query_uses_only_exact_imported_github_linkage_and_rejects_ambiguity(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, case: str
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    if case == "duplicate":
+        original = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+        metadata = json.loads(original.read_bytes())
+        other = original.parent.parent / "init-00002-duplicate"
+        other.mkdir()
+        metadata.update(id="init-00002", title="Duplicate", slug="duplicate")
+        (other / ".meta.json").write_text(json.dumps(metadata) + "\n")
+    before = tree_digest(root)
+
+    def unexpected_get(*_args: object, **_kwargs: object) -> None:
+        raise AssertionError("local Scope lookup must not perform a GitHub GET")
+
+    monkeypatch.setattr("spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", unexpected_get)
+    target = {
+        "exact": "gh:EXAMPLE/REPO#1",
+        "foreign": "gh:other/repo#1",
+        "unimported": "gh:example/repo#99",
+        "missing-id": "iss-99999",
+        "duplicate": "gh:example/repo#1",
+    }[case]
+    assert main(["--project", str(root), "scope", "show", target, "--json"]) == {
+        "exact": 0,
+        "duplicate": 3,
+    }.get(case, 4)
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == []
+    if case == "exact":
+        assert result["data"]["result"]["scope"]["id"] == "init-00001"
+    elif case == "duplicate":
+        assert "duplicate GitHub linkage" in result["error"]["message"]
+    else:
+        assert result["error"]["code"] == "SCOPE_NOT_FOUND"
+    assert tree_digest(root) == before and not (root / ".git/spec-dock").exists()

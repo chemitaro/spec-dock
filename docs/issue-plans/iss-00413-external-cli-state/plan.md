@@ -585,6 +585,12 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 
 clean e1397459の通常make lintはRuff成功・mypy 41 errors/16 files（240 source files）、make exit2。限定mypyはMYPYPATH未指定だとsource importを解決せず0と表示したが、MYPYPATH=srcを明示すると対象三filesの3 errorsを再現した。修正後は同条件で0、関連三suite 43 passed（0.13秒）、Ruff check/format・diff checkが成功。最初の型注釈importをfuture annotationsなしで追加したcollection error（0.09秒）はharness修正として別logを保持し、製品Redに数えない。元logsはiss-00413-implementation/lint-p12-e1397459.log、pytest-retained-output-type.log（collection error）、pytest-retained-output-type-2.log（成功）。通常full gate、旧helpers、native OS/別Python、fresh Strictは継続中。実consumer/live GitHubは未変更。
 
+**旧target resolver・補完rendererの退役**
+
+旧二source filesの246行・10 symbolsと旧二test filesの185行・12 test関数を全文確認し、[個別対応](artifacts/test-port-target-resolver-retirement.md)を保存した。候補外importは0。旧三role保存snapshotとregistry ID/aliasを削除し、current tree/direct/guard/native inventory/外部shimのargv/cwdを維持する。補完は公開cli/optionsへ統一する。旧consumer静的資産の退役hash/pathは保持する。
+
+公開project context/完全GH linkageの八caseを退役前に8 passed（0.60秒）、exit0で確認した。診断codeのfixture誤りによる初回3 failed/5 passed（0.62秒）はSCOPE_NOT_FOUNDへ訂正し、製品Redに数えない。通常wheelの旧二module収録禁止はRed 1 failed（0.77秒、exit1）→Green 1 passed（13.53秒、exit0）。関連七suiteは169 passed（18.55秒）、exit0。全Ruff check/format（317 files）、MYPYPATH=srcを明示した変更二test限定mypyとdiff checkが成功した。skip/収集除外追加0、旧helper以外のproduction変更0。元logsはiss-00413-implementation/pytest-resolve-retirement-{before,before-2,source-red,source-green,related}.log。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

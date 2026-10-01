@@ -951,3 +951,11 @@ array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 pass
 旧v1出力を固定していた七test関数は、同じ名前のまま公開v2・直接一件のActiveData・operation IDなし・can_resume/can_rollback=falseの案内へ更新した。成功/unknown効果をtop-levelで隠せない検査、stderr、秘密値秘匿、現行CLI補完を保持する。[対応記録](artifacts/test-port-public-output.md)へ記録した。既存local lifecycleはLocalBackendを実際に確認してからstateを検査する。原子的JSONの別process kill試験は保持し、代入するOS callbackのkeyword契約だけを合わせた。production変更0、test削除0、skip追加0。
 
 clean e1397459の通常make lintはRuff成功・mypy 41 errors/16 files（240 source files）、make exit2。限定mypyはMYPYPATH未指定だとsource importを解決せず0と表示したが、MYPYPATH=srcを明示すると対象三filesの3 errorsを再現した。修正後は同条件で0、関連三suite 43 passed（0.13秒）、Ruff check/format・diff checkが成功。最初の型注釈importをfuture annotationsなしで追加したcollection error（0.09秒）はharness修正として別logを保持し、製品Redに数えない。元logsはiss-00413-implementation/lint-p12-e1397459.log、pytest-retained-output-type.log（collection error）、pytest-retained-output-type-2.log（成功）。通常full gate、旧helpers、native OS/別Python、fresh Strictは継続中。実consumer/live GitHubは未変更。
+
+## P-12 旧target resolver・補完rendererの退役
+
+**旧target resolver・補完rendererの退役**
+
+旧二source filesの246行・10 symbolsと旧二test filesの185行・12 test関数を全文確認し、[個別対応](artifacts/test-port-target-resolver-retirement.md)を保存した。候補外importは0。旧三role保存snapshotとregistry ID/aliasを削除し、current tree/direct/guard/native inventory/外部shimのargv/cwdを維持する。補完は公開cli/optionsへ統一する。旧consumer静的資産の退役hash/pathは保持する。
+
+公開project context/完全GH linkageの八caseを退役前に8 passed（0.60秒）、exit0で確認した。診断codeのfixture誤りによる初回3 failed/5 passed（0.62秒）はSCOPE_NOT_FOUNDへ訂正し、製品Redに数えない。通常wheelの旧二module収録禁止はRed 1 failed（0.77秒、exit1）→Green 1 passed（13.53秒、exit0）。関連七suiteは169 passed（18.55秒）、exit0。全Ruff check/format（317 files）、MYPYPATH=srcを明示した変更二test限定mypyとdiff checkが成功した。skip/収集除外追加0、旧helper以外のproduction変更0。元logsはiss-00413-implementation/pytest-resolve-retirement-{before,before-2,source-red,source-green,related}.log。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
