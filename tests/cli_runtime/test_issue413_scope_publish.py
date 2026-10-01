@@ -14,6 +14,64 @@ import pytest
 from spec_dock.cli import main
 
 
+@pytest.mark.parametrize("operation", ["create", "import"])
+def test_scope_publication_preview_does_not_load_retired_writers_or_control(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, operation: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    before = tree_digest(root)
+    command = (
+        ["scope", "create", "initiative", "--backend", "github"]
+        if operation == "create"
+        else ["scope", "import", "github", "initiative", "gh:example/repo#413"]
+    )
+    script = (
+        "import sys\nfrom spec_dock.cli import main\n"
+        "assert main(sys.argv[1:]) == 0\n"
+        "retired = {'spec_dock.runtime.application.create_node', "
+        "'spec_dock.runtime.application.create_github_scope', "
+        "'spec_dock.runtime.application.operation_executor', "
+        "'spec_dock.runtime.application.sync_state', "
+        "'spec_dock.runtime.infra.writer_lock', "
+        "'spec_dock.runtime.infra.operation_journal', "
+        "'spec_dock.runtime.infra.control_store'}\n"
+        "loaded = sorted(retired.intersection(sys.modules))\nassert loaded == [], loaded\n"
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            script,
+            "--project",
+            str(root),
+            *command,
+            "--title",
+            "Isolated publication",
+            "--dry-run",
+            "--json",
+        ],
+        cwd=tmp_path,
+        env=dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2] / "src")),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=15,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["schema_version"] == "specdock.cli/v2" and result["status"] == "planned"
+    assert all(effect["status"] == "planned" for effect in result["effects"])
+    assert not completed.stderr and tree_digest(root) == before
+    if operation == "create":
+        assert not log.exists()
+    else:
+        assert [(call["method"], call["endpoint"]) for call in map(json.loads, log.read_text().splitlines())] == [
+            ("GET", "repos/example/repo/issues/413")
+        ]
+
+
 def test_new_local_scope_is_rejected_before_project_access(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert (
         main([

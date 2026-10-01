@@ -426,6 +426,9 @@ Worktree旧adapterの三関数も[移行記録](artifacts/test-port-worktree-ada
 
 旧dispatcherとcommand 17 files・84 symbolsも[製品退役の対応](artifacts/provider-retirement-dispatcher.md)を確認し、候補外import 0で一緒に削除した。実wheelの収録禁止はRed 1 failed（0.79秒）→同じtestのGreen 1 passed（14.41秒）。関連公開入口/44 leaf/CI/recovery/providerの88 tests（13.37秒）、通常collection 2038件、全Ruff/変更wheel test限定mypyが成功した。旧application/control/journalの共有helpers分離と退役、full type gateは引き続き継続する。
 
+
+現行Scope publicationの旧writer importも[十一helpersの分離](artifacts/provider-scope-helper-isolation.md)で解消した。公開previewが旧七modulesを読むRed 1 failed（0.44秒）→同test Green 1 passed（0.32秒）、GH importを含む二cases（0.92秒）を確認。関連97 tests（23.72秒）と通常wheel一test（15.66秒）が成功した。通常make lintはRuff成功・mypy 443 errors/49 filesで未合格。旧private writers/controlの退役と残る型問題は継続する。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

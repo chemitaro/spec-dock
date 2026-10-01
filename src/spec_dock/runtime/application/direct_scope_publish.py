@@ -9,16 +9,16 @@ import secrets
 import sys
 from typing import TYPE_CHECKING, cast
 
-from spec_dock.runtime.application.create_github_scope import _parent_records, _require_open_ancestors
-from spec_dock.runtime.application.create_node import (
+from spec_dock.runtime.application.github_scope_scaffold import build_github_scope_scaffold
+from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.scope_ancestors import _parent_records, _require_open_ancestors
+from spec_dock.runtime.application.scope_query import load_scope_views, show_scope
+from spec_dock.runtime.application.scope_scaffold import (
     _create_relative_symlink_at,
     _precheck_pre_github_create_rules_sources,
     _rules_scaffold_specs,
     _scaffold_file_paths,
 )
-from spec_dock.runtime.application.github_scope_scaffold import build_github_scope_scaffold
-from spec_dock.runtime.application.project_context import resolve_context
-from spec_dock.runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.domain.ids import format_id, resolve_input_title_and_slug

@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.contracts import CreatePlan
-from spec_dock.runtime.application.create_node import _replacements, _rules_scaffold_specs, _scaffold_file_paths
+from spec_dock.runtime.application.scope_scaffold import _replacements, _rules_scaffold_specs, _scaffold_file_paths
 from spec_dock.runtime.domain.ids import format_id
 from spec_dock.runtime.infra.contracts import StoredMetaRecord
 

@@ -763,3 +763,14 @@ clean a3844fc35dbc0065b95951d43109a1077a6a45ddで `uv run pytest -q --tb=short` 
 `uv run pytest tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_cli_recovery_vnext.py tests/integration/test_ci_fixed_validation.py tests/cli_runtime/test_cli_vnext_contract.py tests/unit/infra/test_provider_distribution.py -q --tb=short` は88 passed（13.37秒）。`uv run pytest --collect-only -q` は2038 tests collected（0.41秒）、exit0で旧moduleへのcollection importがない。全source/tests Ruff check/format（396 files）、変更wheel test限定mypy --follow-imports=silent、diff checkも成功。元ログはiss-00413-implementation/pytest-dispatcher-retirement-{related,collection}.logへ保持した。これは再度の全pytest/full mypy合格ではない。
 
 旧application/control/journal/runtime_loaderにはprivate testや現行経路が共有するhelpersが残るため、このcheckpointでは削除しない。正常経路からの共有helpers分離と残るprovider退役、通常型gate、native Windows/別Python、fresh Strict、最終手動確認を続ける。実consumerとlive GitHubは未変更。
+
+
+## P-12 Scope publicationからの旧writer import分離
+
+公開create/importが旧create_node/create_github_scopeからhelpersを借り、実行しない旧control/WriterLock/journalをimportしていた。[十一helpersのauthority](artifacts/provider-scope-helper-isolation.md)をscope_scaffold.py/scope_ancestors.pyへ移し、現行publisherとscaffold builderは直接importする。元moduleのdefinitionsを削除し、実在する旧private callersも同じauthorityを使う。重複実装・fallback・新local作成・remote効果は加えなかった。
+
+fresh processでpublic Scope create previewを実行し、七退役moduleの読込を実際に検出するRedを確認した（1 failed、0.44秒）。分離後の同testは1 passed（0.32秒）。その後GH import previewを含む二casesへ広げ、2 passed（0.92秒）。createはremote接触0、importは指定Issue GET一回だけで両local tree不変。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-scope-helper-isolation-{red,green}.logに保存した。
+
+移動した九scaffold処理と二親処理のAST本体が元HEADと同一であることを照合した（gatewayのProtocol注釈だけを正規化）。旧moduleに残る64/5 definitions、現行publisher四functions/scaffold builder一functionも不変だった。`uv run pytest tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime/test_issue413_scope_import.py tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/test_scope_local_vnext.py tests/cli_runtime/test_artifact_vnext.py -q --tb=short` は97 passed（23.72秒）。通常wheel/sdist/isolated consoleは1 passed（15.66秒）。ログはiss-00413-implementation/pytest-scope-helper-isolation-related.log、pytest-scope-helper-wheel.logへ保存した。
+
+全source/tests Ruff check/format（398 files）、新二authority・現行publisher/scaffold/test限定mypy --follow-imports=silentの五files、diff checkが成功した。通常make lintも実行しRuffは成功、mypyは443 errors/49 files（317 source filesを検査）、make exit2で未完了だった。親e9437b74+今回helpers差分のcandidateであり、前回clean a3844fc3の559 errorsとはsnapshotが異なる。logはiss-00413-implementation/lint-p12-e9437b74-helper.logへ保持する。旧private writers/controlの退役、残る型問題、native Windows/別Python、fresh Strict、最終手動確認を続ける。実consumerとlive GitHubは未変更。
