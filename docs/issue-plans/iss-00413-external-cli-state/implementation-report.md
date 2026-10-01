@@ -792,3 +792,12 @@ fresh processでpublic Scope create previewを実行し、七退役moduleの読�
 fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61秒）、分離後の同testはGreen 1 passed（0.58秒）。reopenへ広げた二casesは2 passed（0.94秒）。GH GET一回だけ、v2/planned、tree不変を確認した。関連old lifecycle/current lifecycle/Finishの76 tests（22.00秒）、通常wheel一test（13.60秒）、全Ruff check/format（396 files）、変更三files限定mypy --follow-imports=silentとdiff checkも成功。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-completion-isolation-{red,green,related,wheel}.logへ保存した。
 
 通常全体lintは直近443 errors/49 filesで未合格のまま。通常source rootsの保守的AST closureは88 modules、未到達96 modulesだが、これだけを一括削除の根拠にしない。old writer/private testsの個別対応と製品参照確認、残る型問題、native Windows/別Python、fresh Strict、最終手動検証を継続する。実consumer/live GitHubは未変更。
+
+
+## P-12 参照を失った旧入口・facade・派生保存adapterの退役
+
+旧21 modules・136 top-level関数/classの全文と[個別責務](artifacts/provider-retirement-unused-entrypoints.md)を確認して削除した。AST importに加えてsource/tests/setup/pyproject/scripts/CIの文字列参照を検査し、候補外import 0・内部deps→ids一件だけを確認。未使用に見えたgit_helperは旧git_cliのpython -m呼出しがあったため保持した。現在の三階層/ID codec/業務/safetyと、明示操作の後継を照合し、中央control/cache/派生保存/復旧receiptを温存しない。
+
+通常wheelは先行した収録禁止でRed 1 failed（0.75秒）、削除後の同testはGreen 1 passed（13.38秒）。通常collectionは2042 tests（0.38秒）、関連公開CLI/entrypoint/Doctor/Sync/依存/Workbenchは222 tests（36.58秒）が成功した。通常make lintはRuff成功・mypy 407 errors/45 files（294 source files）、exit2で未合格。source 58/test 349 errorsを個別に整理・修正する。変更wheel test限定mypyとdiff checkも成功。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-unused-entrypoints-{red,green,collection,related}.log、lint-p12-c633-retirement.logへ保存した。
+
+通常全pytestの再合格、full type gate、native Windows/別Python、fresh Strict、最終手動検証は未完了である。実consumer・既存WT・旧Git領域・live GitHubは未変更。

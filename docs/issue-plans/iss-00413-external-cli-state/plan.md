@@ -445,6 +445,14 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 
 通常全体lintは直近443 errors/49 filesで未合格のまま。通常source rootsの保守的AST closureは88 modules、未到達96 modulesだが、これだけを一括削除の根拠にしない。old writer/private testsの個別対応と製品参照確認、残る型問題、native Windows/別Python、fresh Strict、最終手動検証を継続する。実consumer/live GitHubは未変更。
 
+**参照を失った旧入口・facade・派生保存adapterの退役**
+
+旧21 modules・136 top-level関数/classの全文と[個別責務](artifacts/provider-retirement-unused-entrypoints.md)を確認して削除した。AST importに加えてsource/tests/setup/pyproject/scripts/CIの文字列参照を検査し、候補外import 0・内部deps→ids一件だけを確認。未使用に見えたgit_helperは旧git_cliのpython -m呼出しがあったため保持した。現在の三階層/ID codec/業務/safetyと、明示操作の後継を照合し、中央control/cache/派生保存/復旧receiptを温存しない。
+
+通常wheelは先行した収録禁止でRed 1 failed（0.75秒）、削除後の同testはGreen 1 passed（13.38秒）。通常collectionは2042 tests（0.38秒）、関連公開CLI/entrypoint/Doctor/Sync/依存/Workbenchは222 tests（36.58秒）が成功した。通常make lintはRuff成功・mypy 407 errors/45 files（294 source files）、exit2で未合格。source 58/test 349 errorsを個別に整理・修正する。変更wheel test限定mypyとdiff checkも成功。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-unused-entrypoints-{red,green,collection,related}.log、lint-p12-c633-retirement.logへ保存した。
+
+通常全pytestの再合格、full type gate、native Windows/別Python、fresh Strict、最終手動検証は未完了である。実consumer・既存WT・旧Git領域・live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
