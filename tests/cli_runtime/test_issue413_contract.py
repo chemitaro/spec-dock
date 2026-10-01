@@ -57,6 +57,8 @@ def make_workspace(root: Path) -> Path:
         + "\n",
         encoding="utf-8",
     )
+    for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (scope / filename).write_text("# Fixture\n", encoding="utf-8")
     return root
 
 
@@ -250,4 +252,6 @@ def add_scope(root: Path, scope_id: str, kind: str, parent_id: str, parent: Path
             )
         )
     )
+    for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (path / filename).write_text("# Fixture\n", encoding="utf-8")
     return path

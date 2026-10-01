@@ -318,7 +318,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "worktree bootstrap": "Use an absolute path in the same clone, a project-owned regular makefile, and --yes. Dry-run never runs make; offline apply is refused.",
     "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
     "workspace sync": "Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.",
-    "workspace validate": "Readable schema-3 metadata is required; --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
+    "workspace validate": "Readable schema-3 metadata and regular requirement.md/design.md/plan.md/report.md files are required for each Scope; document bodies are not judged. --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
     "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
     "installation show": "The selected target must be one exact Git worktree root; no workspace or control record is required.",

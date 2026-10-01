@@ -699,6 +699,16 @@ def test_migration_preserves_240_scope_metadata_bytes_including_two_legacy_spell
             encoding="utf-8",
         )
         (issue / "requirement.md").write_bytes(b"user-authored requirement; preserve exactly\n")
+    for owner in [
+        renamed,
+        second,
+        *(epic for epic, _epic_id, _initiative_id in epics),
+        *workspace.rglob("iss-*-fixture"),
+    ]:
+        for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+            path = owner / filename
+            if not path.exists():
+                path.write_bytes(b"user-authored planning document; preserve exactly\n")
     metadata = {path.relative_to(root): path.read_bytes() for path in workspace.rglob(".meta.json")}
     assert len(metadata) == 240
     metadata_reads: list[Path] = []

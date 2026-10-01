@@ -284,11 +284,12 @@
     {
       "path": "spec-dock/docs/reference_sync.md",
       "source": "spec_dock/docs/reference_sync.md",
-      "sha256": "60cd3f01861356112a2147b6dab5ad7009c1d7c591acfa102967cb705a00efc9",
+      "sha256": "691c8f7974a5a8e837ee7eaaba25e1753749763ad2aa2f58a972de5abf8b0b01",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "033d0e18e3668e28777f2c3b551b3d86b9cd0e3b0da9fa6a1d08842c9a8cdece"
+        "033d0e18e3668e28777f2c3b551b3d86b9cd0e3b0da9fa6a1d08842c9a8cdece",
+        "60cd3f01861356112a2147b6dab5ad7009c1d7c591acfa102967cb705a00efc9"
       ]
     },
     {

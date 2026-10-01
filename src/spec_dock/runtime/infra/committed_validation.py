@@ -10,6 +10,7 @@ from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.infra.git_process import run_git
+from spec_dock.runtime.infra.scope_documents import REQUIRED_SCOPE_DOCUMENTS
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -83,6 +84,8 @@ def _entry_role(parts: tuple[str, ...]) -> EntryRole | None:
             return "directory"
         if tail == (".meta.json",):
             return "metadata"
+        if len(tail) == 1 and tail[0] in REQUIRED_SCOPE_DOCUMENTS:
+            return "artifact"
         if len(tail) == 2 and tail[0] == "artifacts":
             return "artifact"
         if depth == 2 or tail[0] != ("epics" if depth == 0 else "issues"):

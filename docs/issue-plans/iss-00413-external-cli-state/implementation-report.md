@@ -989,3 +989,11 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 公開unchangedの四selectorと、旧manifest/projection/cache/不正directory/hardlink保全の二caseは退役前に6 passed/38 deselected（0.53秒）、exit0。通常wheelの旧module収録禁止はRed 1 failed（0.73秒、exit1）→同test Green 1 passed（14.47秒、exit0）。関連Active/record/Finish/native kill/Sync/Doctor/wheel七suiteは185 passed（49.75秒）、exit0。後から追加した現record hardlinkのSet/Clear拒否は別runで2 passed/44 deselected（0.25秒）、exit0であり、この185に加算しない。全Ruff check/format（310 files）、MYPYPATH=srcの変更二test限定mypy、diff checkが成功した。skip/収集除外を増やさない。
 
 通常make lintはこのunitのPython差分を適用したc93100ba基準でRuff成功・mypy 32 errors/11旧source files（229 source files）、make exit2。37 errorsはclean 32c372e1の旧snapshotである。元logsは既存Epic Workbenchのiss-00413-implementation/pytest-old-active-infra-retirement-{before,source-red,source-green,related}.log、pytest-old-active-infra-hardlink.log、lint-p12-old-active-infra.logへ保持した。残る旧source/tests、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 Validateの必須Scope文書検査の維持
+
+**Validateの必須Scope文書検査の維持**
+
+旧構造検査を照合し、現行経路が四canonical文書の欠落を見逃す差異を[記録](artifacts/validation-required-documents.md)した。公開CLIのRed 28 failed/2 passed（4.40秒、exit1）を、guarded descriptorで名前/通常fileだけを検査する修正でGreen 30 passed（4.44秒、exit0）にした。固定HEADでもmetadata以外の本文を取得せず、本文・承認・計画レベルをgateにしない。Doctorと明示移行前の構造検査にも接続し、旧validate source/testsはこのunitでは削除しない。
+
+共有fixtureを完全なScope構造に揃えた。通常全pytestの初回は1863 passed/3 failed/1 skipped（355.05秒、exit1）。増えた文書に伴う三削除途中の一覧期待値を修正し、240件移行fixtureと合わせ4 passed、Validate/Scope Delete全二suiteは117 passed（16.52秒、exit0）。限定mypyは変更10 Python filesで成功し、全Ruff（311 files）も成功。通常make lintの旧graph 32 errors/11 filesと、修正後の通常全pytest再実行、native OS/別Python、fresh Strict、最終手動確認は未完了であり、部分成功をfull gate合格にしない。CLI help・配布reference・一行のstatic hashを更新し、実consumer/live GitHubは未変更。

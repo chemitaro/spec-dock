@@ -223,6 +223,8 @@ def test_empty_workspace_is_valid_unless_nodes_are_required(
     root = committed_workspace(tmp_path / "consumer")
     metadata = next((root / "spec-dock/initiatives").rglob(".meta.json"))
     metadata.unlink()
+    for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (metadata.parent / filename).unlink()
     metadata.parent.rmdir()
     commit_fixture(root)
     before = tree_digest(root)
@@ -447,3 +449,111 @@ def test_validation_detects_duplicate_scope_ids_on_different_paths(
     result = json.loads(capsys.readouterr().out)
     assert result["data"]["result"]["valid"] is False and result["effects"] == []
     assert tree_digest(root) == before
+
+
+@pytest.mark.parametrize("ci", [False, True])
+@pytest.mark.parametrize("kind", ["initiative", "epic", "issue"])
+@pytest.mark.parametrize("filename", ["requirement.md", "design.md", "plan.md", "report.md"])
+def test_validation_rejects_missing_required_scope_documents_without_changing_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], ci: bool, kind: str, filename: str
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    owners = _three_level_documents(root)
+    target = owners[kind] / filename
+    target.unlink()
+    commit_fixture(root)
+    if ci:
+        # A valid working copy cannot repair a missing committed document.
+        target.write_text("private uncommitted replacement")
+    before = tree_digest(root)
+    assert main(["--project", str(root), "workspace", "validate", *(["--ci"] if ci else []), "--json"]) == 7
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    data = result["data"]["result"]
+    assert data["valid"] is False and data["node_count"] == 3
+    finding = next(item for item in data["findings"] if item["code"] == "REQUIRED_DOCUMENT_INVALID")
+    assert finding["details"] == {
+        "scope_id": {"initiative": "init-00001", "epic": "epic-00002", "issue": "iss-00003"}[kind],
+        "relative_path": target.relative_to(root).as_posix(),
+    }
+    assert result["effects"] == [] and tree_digest(root) == before
+    assert "private" not in output.out + output.err and not output.err
+    assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
+
+
+@pytest.mark.skipif(os.name != "posix", reason="native directory and symlink document fixture")
+@pytest.mark.parametrize("ci", [False, True])
+@pytest.mark.parametrize("fault", ["directory", "symlink"])
+def test_validation_rejects_nonregular_required_documents_without_reading_redirected_bodies(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], ci: bool, fault: str
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    owners = _three_level_documents(root)
+    document = owners["issue"] / "report.md"
+    document.unlink()
+    outside = tmp_path / "private-outside.md"
+    outside.write_bytes(b"private redirected body")
+    if fault == "directory":
+        document.mkdir()
+        (document / "private.txt").write_bytes(b"private directory body")
+    else:
+        document.symlink_to(outside)
+    commit_fixture(root)
+    before = tree_digest(root), outside.read_bytes()
+    assert main(["--project", str(root), "workspace", "validate", *(["--ci"] if ci else []), "--json"]) == 7
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert any(item["code"] == "REQUIRED_DOCUMENT_INVALID" for item in result["data"]["result"]["findings"])
+    assert result["effects"] == [] and "private" not in output.out + output.err
+    assert (tree_digest(root), outside.read_bytes()) == before
+
+
+@pytest.mark.parametrize("ci", [False, True])
+def test_validation_treats_required_document_contents_and_historical_authority_as_opaque(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, ci: bool
+) -> None:
+    from pathlib import Path as ConcretePath
+
+    root = committed_workspace(tmp_path / "consumer")
+    owners = _three_level_documents(root)
+    names = {"requirement.md", "design.md", "plan.md", "report.md"}
+    for owner in owners.values():
+        (owner / "report.md").write_bytes(b"")
+        (owner / "design.md").write_bytes(b"\xff\x00private draft approval: pending")
+        (owner / "plan.md").write_text("private legacy reviewer: blocked")
+        (owner / ".assurance.json").write_text('{"grade":"blocked","private":true}')
+    commit_fixture(root)
+    before = tree_digest(root)
+    original_open = ConcretePath.open
+
+    def refuse_body_read(
+        path: Path,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: str | None = None,
+        errors: str | None = None,
+        newline: str | None = None,
+    ) -> object:
+        assert path.name not in names | {".assurance.json"}, "required document body was opened"
+        return original_open(path, mode, buffering, encoding, errors, newline)
+
+    monkeypatch.setattr(ConcretePath, "open", refuse_body_read)
+    assert main(["--project", str(root), "workspace", "validate", *(["--ci"] if ci else []), "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["result"]["valid"] is True and result["effects"] == []
+    assert "private" not in output.out + output.err
+    # Restore the instrumentation before the test-only tree digest reads document bodies.
+    monkeypatch.undo()
+    assert tree_digest(root) == before
+
+
+def _three_level_documents(root: Path) -> dict[str, Path]:
+    initiative = root / "spec-dock/initiatives/init-00001-fixture"
+    epic = add_scope(root, "epic-00002", "epic", "init-00001", initiative)
+    issue = add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+    owners = {"initiative": initiative, "epic": epic, "issue": issue}
+    for owner in owners.values():
+        for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+            (owner / filename).write_text("private planning body")
+    return owners

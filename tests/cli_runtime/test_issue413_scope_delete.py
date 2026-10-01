@@ -1043,14 +1043,21 @@ def test_subtree_unlink_with_unknown_outcome_retains_backup_and_reports_each_unf
     result = json.loads(capsys.readouterr().out)
     assert attempted and not child.exists() and child.parent.is_dir()
     assert (backup / child.relative_to(root)).read_bytes() == before
+    documents = [child.parent / filename for filename in ("design.md", "plan.md", "report.md", "requirement.md")]
+    assert all(path.read_bytes() == (backup / path.relative_to(root)).read_bytes() for path in documents)
     assert result["data"]["result"]["removed_ids"] == [] and result["data"]["result"]["changed_paths"] == []
     assert result["data"]["result"]["remaining_paths"] == [
         child.relative_to(root).as_posix(),
+        *(path.relative_to(root).as_posix() for path in documents),
         child.parent.relative_to(root).as_posix(),
     ]
     assert result["effects"] == [
         {"kind": "backup", "status": "succeeded", "target": str(backup)},
         {"kind": "scope.delete", "status": "unknown", "target": child.relative_to(root).as_posix()},
+        *(
+            {"kind": "scope.delete", "status": "not_attempted", "target": path.relative_to(root).as_posix()}
+            for path in documents
+        ),
         {"kind": "scope.delete", "status": "not_attempted", "target": child.parent.relative_to(root).as_posix()},
     ]
 
@@ -1087,13 +1094,23 @@ def test_subtree_removal_preserves_a_new_file_that_was_not_in_the_verified_backu
     assert injected and late.read_bytes() == b"actor content without a backup"
     assert not (backup / late.relative_to(root)).exists()
     assert result["data"]["result"]["removed_ids"] == []
-    assert result["data"]["result"]["changed_paths"] == [child.relative_to(root).as_posix()]
+    assert result["data"]["result"]["changed_paths"] == [
+        child.relative_to(root).as_posix(),
+        (child.parent / "design.md").relative_to(root).as_posix(),
+    ]
+    documents = [child.parent / filename for filename in ("plan.md", "report.md", "requirement.md")]
+    assert all(path.read_bytes() == (backup / path.relative_to(root)).read_bytes() for path in documents)
     assert result["data"]["result"]["remaining_paths"] == [
         late.relative_to(root).as_posix(),
+        *(path.relative_to(root).as_posix() for path in documents),
         child.parent.relative_to(root).as_posix(),
     ]
-    assert result["effects"][-2:] == [
+    assert result["effects"][-5:] == [
         {"kind": "scope.delete", "status": "not_attempted", "target": late.relative_to(root).as_posix()},
+        *(
+            {"kind": "scope.delete", "status": "not_attempted", "target": path.relative_to(root).as_posix()}
+            for path in documents
+        ),
         {"kind": "scope.delete", "status": "not_attempted", "target": child.parent.relative_to(root).as_posix()},
     ]
 
@@ -1124,13 +1141,23 @@ def test_subtree_removal_preserves_a_file_changed_after_backup_and_before_its_un
     assert injected and document.read_bytes() == b"actor replacement that must be preserved"
     assert (backup / document.relative_to(root)).read_bytes() == b"original document"
     assert result["data"]["result"]["removed_ids"] == []
-    assert result["data"]["result"]["changed_paths"] == [child.relative_to(root).as_posix()]
+    assert result["data"]["result"]["changed_paths"] == [
+        child.relative_to(root).as_posix(),
+        (child.parent / "design.md").relative_to(root).as_posix(),
+    ]
+    untouched = [child.parent / filename for filename in ("plan.md", "report.md", "requirement.md")]
+    assert all(path.read_bytes() == (backup / path.relative_to(root)).read_bytes() for path in untouched)
     assert result["data"]["result"]["remaining_paths"] == [
         document.relative_to(root).as_posix(),
+        *(path.relative_to(root).as_posix() for path in untouched),
         child.parent.relative_to(root).as_posix(),
     ]
-    assert result["effects"][-2:] == [
+    assert result["effects"][-5:] == [
         {"kind": "scope.delete", "status": "not_attempted", "target": document.relative_to(root).as_posix()},
+        *(
+            {"kind": "scope.delete", "status": "not_attempted", "target": path.relative_to(root).as_posix()}
+            for path in untouched
+        ),
         {"kind": "scope.delete", "status": "not_attempted", "target": child.parent.relative_to(root).as_posix()},
     ]
 

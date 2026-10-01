@@ -615,6 +615,12 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 
 通常make lintはこのunitのPython差分を適用したc93100ba基準でRuff成功・mypy 32 errors/11旧source files（229 source files）、make exit2。37 errorsはclean 32c372e1の旧snapshotである。元logsは既存Epic Workbenchのiss-00413-implementation/pytest-old-active-infra-retirement-{before,source-red,source-green,related}.log、pytest-old-active-infra-hardlink.log、lint-p12-old-active-infra.logへ保持した。残る旧source/tests、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**Validateの必須Scope文書検査の維持**
+
+旧構造検査を照合し、現行経路が四canonical文書の欠落を見逃す差異を[記録](artifacts/validation-required-documents.md)した。公開CLIのRed 28 failed/2 passed（4.40秒、exit1）を、guarded descriptorで名前/通常fileだけを検査する修正でGreen 30 passed（4.44秒、exit0）にした。固定HEADでもmetadata以外の本文を取得せず、本文・承認・計画レベルをgateにしない。Doctorと明示移行前の構造検査にも接続し、旧validate source/testsはこのunitでは削除しない。
+
+共有fixtureを完全なScope構造に揃えた。通常全pytestの初回は1863 passed/3 failed/1 skipped（355.05秒、exit1）。増えた文書に伴う三削除途中の一覧期待値を修正し、240件移行fixtureと合わせ4 passed、Validate/Scope Delete全二suiteは117 passed（16.52秒、exit0）。限定mypyは変更10 Python filesで成功し、全Ruff（311 files）も成功。通常make lintの旧graph 32 errors/11 filesと、修正後の通常全pytest再実行、native OS/別Python、fresh Strict、最終手動確認は未完了であり、部分成功をfull gate合格にしない。CLI help・配布reference・一行のstatic hashを更新し、実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

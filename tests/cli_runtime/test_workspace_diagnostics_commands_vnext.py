@@ -23,6 +23,8 @@ def test_workspace_diagnostics_cli_reports_valid_and_required_nodes(
     root = committed_workspace(tmp_path / "consumer")
     metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
     metadata.unlink()
+    for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (metadata.parent / filename).unlink()
     metadata.parent.rmdir()
     commit_fixture(root)
     before = tree_digest(root)

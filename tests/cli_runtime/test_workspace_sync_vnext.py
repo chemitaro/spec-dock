@@ -71,6 +71,8 @@ def test_sync_keeps_existing_local_lifecycle_and_empty_workspace_readonly(
     ]
     assert local["effects"] == [] and tree_digest(root) == before
     metadata.unlink()
+    for filename in ("requirement.md", "design.md", "plan.md", "report.md"):
+        (metadata.parent / filename).unlink()
     metadata.parent.rmdir()
     empty_before = tree_digest(root)
     assert main(command) == 0
