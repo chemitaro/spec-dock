@@ -15,7 +15,9 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10
     import tomli as tomllib
 
+from spec_dock.runtime.infra.tree_backup import tree_digest
 from tests.cli_runtime.test_cli_vnext_contract import LEAF_PATHS
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -127,3 +129,28 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     assert not invalid.stderr
     assert json.loads(invalid.stdout)["schema_version"] == "specdock.cli/v2"
     assert not tuple(outside.iterdir())
+
+    consumer = committed_workspace(tmp_path / "consumer")
+    validation_environment = dict(environment, PATH=os.environ.get("PATH", ""))
+    for flags in ([], ["--ci"]):
+        if flags:
+            (consumer / "spec-dock/workspace.json").write_bytes(b"private uncommitted declaration")
+            next((consumer / "spec-dock/initiatives").rglob(".meta.json")).write_bytes(b"private uncommitted metadata")
+        before = tree_digest(consumer)
+        validation = subprocess.run(
+            [str(console), "--project", str(consumer), "workspace", "validate", *flags, "--json"],
+            cwd=outside,
+            env=validation_environment,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+        assert validation.returncode == 0, validation.stdout + validation.stderr
+        payload = json.loads(validation.stdout)
+        assert payload["data"]["kind"] == "validation" and payload["data"]["result"]["valid"] is True
+        assert payload["data"]["result"]["snapshot_source"] == ("HEAD" if flags else "working-tree")
+        assert payload["data"]["result"]["node_count"] == 1 and payload["effects"] == []
+        assert not validation.stderr and "private" not in validation.stdout
+        assert tree_digest(consumer) == before
+        assert not (consumer / "spec-dock/.agent").exists() and not (consumer / ".git/spec-dock").exists()

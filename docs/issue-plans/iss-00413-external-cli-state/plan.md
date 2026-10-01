@@ -335,7 +335,7 @@ uv run pytest tests/cli_runtime/test_scope_delete_vnext.py tests/cli_runtime/tes
 <a id="p-11"></a>
 ## P-11 旧記録の保全診断とworkspace局所移行を実装する
 
-**状態: 実装中。通常/raw/legacy Doctorとworkspace局所移行をローカル検証済み。validate・fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
+**状態: 実装中。通常/raw/legacy Doctor、workspace局所移行、working-tree/固定HEAD validateをローカル検証済み。fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
 
 通常Doctorは共通controlを必要とせず、現在のScope構造・依存・Artifact・直接選択を読み取る。raw専用のGit-only admissionは未知workspaceでも安全なfile情報を返し、通常コマンドの既知schema/protocol判定を弱めない。`--legacy`だけが旧control/engine/registry/activeと操作・移行・installation・finalization・handoverの記録を読む。各fileは1 MiB、各記録directoryは4096 entriesまでに限定し、unsafe/破損/未知/途中記録は診断不完全のexit7とする。旧実行物を起動せず、phaseを現物の成功証明として採用せず、旧activeを新recordへ自動変換しない。任意bodyを出力せず、旧記録のdecoded bodyも分類後に保持しない。GitHub capability診断はrepository/PR/headの全指定と応答の一致を検査し、offline・指定不備を副作用前に拒否する。関連460 tests（88.15秒）、全source/testsのRuff check/format（410 files）、変更12 source限定mypy、diff checkが成功した。実consumerの宣言・metadata・直接選択は変更していない。
 
@@ -343,7 +343,13 @@ uv run pytest tests/cli_runtime/test_scope_delete_vnext.py tests/cli_runtime/tes
 
 240 Scope fixtureの全metadata bytes・二つの旧local綴りGitHub ID・未知任意fieldを保全した。構造検査のArtifact読取に取得済みviewsを渡し、Scope metadataの再ロードを57,840回から240回へ減らした。永続cacheは追加していない。native別processを公開前後の境界でSIGKILLし、fresh processの未切替/切替済み判定を確認した。保全・復元の失敗、後続のuser edit、保全先改変、原文Gitエラーとpartial効果も検証した。関連runは643 passed/1 failed（旧mapping help assertion、131.65秒）で、現在の宣言切替helpへport後、migration/help 60 tests（10.98秒）と全source/testsのRuff check/format（413 files）、変更9 source限定mypy、diff checkが成功した。全体gateやfresh Strictの合格とは扱わない。
 
-**所有/対象file**: 新runtime `src/spec_dock/runtime/` の infra/legacy_reader.py、infra/migration_backup.py、application/direct_migration.py、workspace_structure.py、commands/runtime_dispatch.py、cli/catalog.py/options.py。旧application/migrate_workspace_vnext.pyとworkspace_diagnostics_vnext.pyの退役はP-12。tests/integration/test_issue413_migration.py、cli_runtime/test_issue413_workspace_doctor.pyとhelp tests。
+validateは`application/direct_validation.py`と`infra/committed_validation.py`へ接続した。通常は現在の既知workspaceの構造だけを検査し、明示expect-currentがある時だけ直接選択の期待条件を確認する。CIはGit-only contextでHEADを一度固定し、固定OIDのtreeとmetadata blobだけからworkspace/三階層Scope/親子/依存/Artifactの名前・種類を検査する。Artifact本文、実行状態、旧記録を取得せず、作業treeの未commit破損や検査中のHEAD移動に混ぜない。CIのlive expect-current/expect-backendは無視せず明示拒否する。構造不適合はexit7、原文Git失敗は効果0のexit5。空workspaceは通常valid、require-nodes時だけ不適合とする。Start lock、Git/GitHub write、永続cache・検査recordを追加していない。
+
+公開CLI 50 tests（5.26秒）とfresh wheel/sdist/外部venv実consoleを含む51 tests（11.51秒）が成功した。固定HEADとworking copyの逆方向の破損、HEAD移動、linked自身のHEAD、三階層、Artifact slot衝突とsymlink、metadata bodyだけの取得、旧protocol reader、未知実行状態非採用、期待条件、dry-run、Git原文エラーを検証した。全source/testsのRuff check/format（416 files）、変更source/test六file限定mypy、diff checkが成功した。全体gate・native Windows・fresh Strictの合格とは扱わない。
+
+Doctor・migration・Start・Finish・Sync・依存・Artifact・Workbench・Worktree・store/lock・helpの関連24 filesは646 passed（114.68秒）。修正済みmigration helpもこのfresh runで成功した。独立Strictの取得までP-11の状態は実装中として維持する。
+
+**所有/対象file**: 新runtime `src/spec_dock/runtime/` の infra/legacy_reader.py、infra/migration_backup.py、infra/committed_validation.py、application/direct_migration.py、application/direct_validation.py、application/workspace_structure.py、commands/runtime_dispatch.py、cli/catalog.py/options.py。旧application/migrate_workspace_vnext.pyとworkspace_diagnostics_vnext.pyの退役はP-12。tests/integration/test_issue413_migration.py、cli_runtime/test_issue413_workspace_doctor.py、cli_runtime/test_issue413_workspace_validate.py、integration/test_issue413_wheel.pyとhelp tests。
 
 **具体的変更順**: 旧control/registry/active/journalを実行しないreaderに切り分ける。backupの実体確認後、schema3 workspaceのwriter_protocolだけ変更する。旧activeは自動変換せず、所在/保全方針を出力する。新protocolならunchanged、未知値は停止。通常経路に残った旧writer/receipt参照を除く。
 

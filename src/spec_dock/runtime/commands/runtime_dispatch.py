@@ -26,6 +26,14 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
     command = namespace.command_path
     result: OperationResult[object]
     try:
+        if command == "workspace validate" and namespace.ci:
+            from spec_dock.runtime.application.direct_validation import validate_committed_workspace
+            from spec_dock.runtime.application.project_context import resolve_git_context
+
+            result = validate_committed_workspace(
+                namespace, resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
+            )
+            return _render_result(namespace, result)
         if command == "workspace doctor" and namespace.raw:
             from spec_dock.runtime.application.direct_diagnostics import diagnose_raw_workspace
             from spec_dock.runtime.application.project_context import resolve_git_context
@@ -51,6 +59,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_diagnostics import diagnose_workspace
 
             result = diagnose_workspace(namespace, context)
+        elif command == "workspace validate":
+            from spec_dock.runtime.application.direct_validation import validate_workspace
+
+            result = validate_workspace(namespace, context)
         elif command == "workspace migrate":
             from spec_dock.runtime.application.direct_migration import migrate_workspace
 

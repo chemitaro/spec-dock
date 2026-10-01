@@ -533,3 +533,19 @@ native POSIX別processを宣言公開の直前/直後で実際にSIGKILLし、fr
 関連25 fileのrunは643 passed/1 failed（131.65秒）。失敗は旧mapping移行を期待したhelp assertionで、新しい宣言切替と旧syntax退役の契約へportした。migration/helpのfresh runは60 passed（10.98秒）。全source/testsのRuff check/format（413 files）、変更9 source限定mypy、diff checkが成功した。限定検査と個別修正後のfocused runをfull-suite/type gateの合格と混同しない。
 
 validate、P-12以後、native Windows、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択は変更していない。通常非force pushの利用者回答を待ちながらローカル実装を続け、goalをactiveに保つ。
+
+## P-11 control不要の構造validateを接続
+
+`workspace validate [--ci] [--require-nodes]`を通常external runtimeへ接続した。通常は現在のworking-tree構造を読み、CIはlive workspace宣言を読まないGit-only admissionからHEADを一度固定する。CIは固定OIDでtreeを列挙し、固定blob IDでworkspace宣言と認識された三階層Scope metadataだけを一時領域へ読み取る。Artifactは名前とregular/nonregular種類だけを再現して既存catalog検査へ渡し、本文やsymlink先を取得しない。RDP、Workbench、直接record、consumer runtime、旧controlのbodyも取得しない。永続cache・inspection record・Git内の独自fileを追加せず、一時領域はcontext終了時に除去する。
+
+dataはC-05のvalidation familyで、valid/findings/snapshot_sourceにnode_countとCIのsnapshot_oidを加えた。構造不適合・不完全はfailed/7・effects=[]で返す。空workspaceはrequire-nodesなしでvalid、同optionありではNODES_REQUIREDとする。検査はGitHub lifecycleの成功証明ではない。Git環境の失敗は原文argv/stderr/stdout/returncodeを保ったfailed/5で返す。通常の既知schema/protocol admissionを弱めず、既知旧writer宣言は変更せず検査できる。
+
+通常は実行状態を検査しない。明示expect-currentがある場合だけ同じ構造viewsと捕捉選択で条件を確認し、対象Scopeのないexpect-backendは拒否する。CIでlive expect-current/expect-backendを指定した場合は明示拒否し、受理した条件を無視しない。dry-runは同じ読取結果とcan_apply/blockersを返し、作業やbranchを予約しない。helpの旧generation/pending recovery説明をこのleafでは新契約へ置換した。
+
+未接続の公開CLI、CIがworking workspace宣言を参照する不具合、未commit修正でcommit破損を隠す挙動、空workspace/require-nodes、root/Scope Artifact slot衝突の20 casesをRed→Greenで確認した。helpの固定HEAD説明不足もfocused Red→Greenで確認した。追加回帰は元からGreenとして区別し、検査中に実GitでHEADを移動しても初期OIDを使用すること、Artifact等のbodyへのcat-fileを禁止してmetadata blobだけを取得すること、root/Scope Artifact directory/file symlinkの非追跡、三階層の依存/親子/metadata破損、同ID別path、無関係entry非採用を検証した。linkedとmainで異なるHEAD・件数を検査し、linkedの未commit宣言をCIに混ぜないことも確認した。
+
+公開CLI 50 testsは5.26秒で成功。fresh wheel・sdistからのwheel・外部venv・実consoleの通常/CI validateを含むfresh runは51 passed（11.51秒）。配布版はsource checkout外から実行し、privateな未commit宣言/metadataでもCIがcommitの一Scopeを検査できた。全source/testsのRuff check/format（416 files）、変更source/test六file限定mypy、diff checkが成功した。限定型検査は全体type gateの代替ではない。
+
+関連run `uv run pytest tests/cli_runtime/test_issue413_workspace_doctor.py tests/cli_runtime/test_workspace_doctor_vnext.py tests/cli_runtime/test_issue413_contract.py tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/test_issue413_work_start.py tests/cli_runtime/test_issue413_active.py tests/cli_runtime/test_issue413_finish.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_dependency_vnext.py tests/cli_runtime/test_issue413_worktree.py tests/cli_runtime/test_issue413_worktree_remove.py tests/cli_runtime/test_issue413_worktree_bootstrap.py tests/integration/test_issue413_observation.py tests/integration/test_issue413_sync.py tests/unit/infra/test_work_target_store.py tests/unit/infra/test_start_lock.py tests/integration/test_issue413_migration.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_issue413_workbench.py tests/cli_runtime/test_issue413_scope_delete.py tests/cli_runtime/test_artifact_vnext.py tests/cli_runtime/test_artifact_commands_vnext.py tests/cli_runtime/test_scope_delete_vnext.py tests/unit/infra/test_issue413_committed_workspace.py -q --tb=short` は646 passed（114.68秒）。修正済みmigration helpもfresh runで成功した。元processの完了とexit0を確認し、quiet outputを理由にjobを再起動していない。
+
+P-12以後、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer切替は未完了。実dogfood metadata・workspace宣言・直接選択を変更していない。通常非force pushの利用者回答が未着であるため、現在SHAの一致を満たさないStrictは起動せず、認可済みローカル実装を継続する。goalはactiveである。

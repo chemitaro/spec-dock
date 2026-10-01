@@ -123,7 +123,7 @@ HELP_EFFECTS: dict[str, str] = {
     "worktree bootstrap": "Run make init once in one explicit native worktree; hook output is omitted.",
     "workbench copy": "Copy one Scope Workbench into a selected worktree.",
     "workspace sync": "Observe current Scope lifecycle and same-clone worktree selections without writing files.",
-    "workspace validate": "Read and validate the workspace; --ci checks committed data without installation state. No changes.",
+    "workspace validate": "Validate working-tree structure; --ci checks a fixed HEAD without installation or execution state. No changes.",
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
     "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
     "installation show": "Read installed engine and worktree inventory; no changes.",
@@ -343,7 +343,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "worktree bootstrap": "Use an absolute path in the same clone, a project-owned regular makefile, and --yes. Dry-run never runs make; offline apply is refused.",
     "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
     "workspace sync": "Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.",
-    "workspace validate": "A readable workspace is required; --ci validates committed data without installation state.",
+    "workspace validate": "Readable schema-3 metadata is required; --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
     "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
     "installation show": "The selected repository must have readable installation control.",
@@ -514,6 +514,12 @@ def _help_spec(leaf: str) -> HelpSpec:
             "Does not contact GitHub, read a retired status cache, modify metadata or selection, or change Git refs."
         )
         json_data = "items, unknown_filtered_count." if leaf == "scope list" else "scope, github_ref, changed=false."
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf == "workspace validate":
+        target = "The current working-tree structure, or one fixed HEAD with --ci."
+        reads = "Workspace declaration, Scope metadata, dependencies and Artifact entry names/types; live direct selection only for an explicit --expect-current outside --ci."
+        does_not = "Does not fetch Artifact bodies, contact GitHub, require installation control, acquire a Start lock, repair data, or write project state."
+        json_data = "validation: valid, findings, snapshot_source, snapshot_oid and node_count."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "workspace doctor":
         reads = "Current workspace metadata and this worktree's direct record; safe file information in --raw mode, retired records only with --legacy, and GitHub only with explicit fixed probe arguments."
