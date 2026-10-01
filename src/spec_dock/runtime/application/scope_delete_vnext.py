@@ -18,7 +18,7 @@ from spec_dock.runtime.application.operation_executor import (
     record_effect_intent,
     record_effect_result,
 )
-from spec_dock.runtime.application.scope_completion import _descendants
+from spec_dock.runtime.application.scope_completion_plan import _descendants
 from spec_dock.runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock.runtime.cli.admission import admit_writer
 from spec_dock.runtime.domain.lifecycle import SelectionState

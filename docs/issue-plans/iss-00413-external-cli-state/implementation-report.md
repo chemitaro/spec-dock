@@ -828,3 +828,14 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 通常wheelの旧writer収録禁止はRed 1 failed（1.11秒）、source削除後の同testはGreen 1 passed（14.59秒）。関連Start/Finish/Active/lifecycle/native並行Startは187 tests（66.63秒）が成功し、その後base六casesをfocused実行した。全Ruff check/format（370 files）、変更三test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-work-lifecycle-port.log、pytest-work-start-candidate-readiness.log、pytest-work-lifecycle-source-{red,green}.log、pytest-work-lifecycle-retirement-related.logへ保持する。
 
 旧source/private helpersの残り、通常full type/pytest、native Windows/別Python、fresh Strict、最終手動確認は継続中である。直近通常lintの407 errorsは別snapshotの未合格記録で、今回の限定成功で置換しない。実consumer/live GitHubは未変更。
+
+
+## P-12 旧Scope lifecycle試験・writerの退役
+
+旧八test・一fixture class（303行）と旧scope_completion.pyの七symbols（494行）を全文確認し、[個別対応](artifacts/test-port-scope-lifecycle-retirement.md)を保存した。pure completion planの本体を維持し、最後のScope delete helper importだけをauthorityへ向けた。一importのmodule field以外、全ASTは元HEADと同一で、退役二fileへのsource/test importはTYPE_CHECKING/子moduleを含め0。skip/収集除外を増やさない。
+
+公開Close/Reopenの子/祖先三状態guardは六casesで6 passed（2.24秒）、terminal reason conflictは1 passed（0.46秒）、既存local noop/任意field/metadata/record/tree保全は1 passed（0.37秒）だった。collection parametrization誤りとnoop effectsの過剰な空期待を訂正し、失敗logも保持した。現行Greenのcharacterizationであり製品Redではない。
+
+通常wheelの旧writer収録禁止はRed 1 failed（0.76秒）、source削除後の同testはGreen 1 passed（13.71秒）。関連Scope lifecycle/Finish/旧・現行Scope deleteの115 tests（34.01秒）、全Ruff check/format（368 files）、変更二test限定mypyとdiff checkも成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-scope-lifecycle-port.log、pytest-scope-lifecycle-source-{red,green}.log、pytest-scope-lifecycle-retirement.logへ保持する。
+
+このunit前のclean 0c04677bada135dbb50ea0c48f7fc3b4aae368c9の通常make lintはRuff成功・mypy 313 errors/40 files（289 source files）、source 54/test 259 errors、make exit2で未合格だった。元logはiss-00413-implementation/lint-p12-0c04677b.logへ保持。旧407 errorsとはsnapshotが異なる。残る旧private writersの整理と現行型問題、full gates、native Windows/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

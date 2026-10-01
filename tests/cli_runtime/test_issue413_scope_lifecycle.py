@@ -114,8 +114,9 @@ def test_scope_close_confirms_completed_without_releasing_the_direct_record(
     assert not (root / ".git/spec-dock").exists()
 
 
+@pytest.mark.parametrize("child_state", ["open", "not-planned", "unknown"])
 def test_completed_parent_close_still_checks_unfinished_descendants(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], child_state: str
 ) -> None:
     from tests.cli_runtime.test_issue413_contract import add_scope
 
@@ -123,19 +124,23 @@ def test_completed_parent_close_still_checks_unfinished_descendants(
     add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
     record = select_fixture(root)
     before = record.read_bytes()
-    log = github_fixture(tmp_path, monkeypatch, {"1": "completed", "2": "open"})
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    before_tree = tree_digest(root)
+    log = github_fixture(tmp_path, monkeypatch, {"1": "completed", "2": child_state})
     assert main(["--project", str(root), "scope", "close", "@current", "--yes", "--json"]) == 3
     result = json.loads(capsys.readouterr().out)
     assert result["effects"] == [] and "DESCENDANT_NOT_COMPLETED" in result["error"]["message"]
-    assert record.read_bytes() == before
+    assert record.read_bytes() == before and tree_digest(root) == before_tree
     assert [(row["method"], row["number"]) for row in map(json.loads, log.read_text().splitlines())] == [
         ("GET", 1),
         ("GET", 2),
     ]
 
 
+@pytest.mark.parametrize("ancestor_state", ["completed", "not-planned", "unknown"])
 def test_reopen_even_an_open_child_requires_open_ancestors(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], ancestor_state: str
 ) -> None:
     from tests.cli_runtime.test_issue413_contract import add_scope
 
@@ -143,7 +148,10 @@ def test_reopen_even_an_open_child_requires_open_ancestors(
     add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
     record = select_fixture(root, scope_id="epic-00002", number=2)
     before = record.read_bytes()
-    log = github_fixture(tmp_path, monkeypatch, {"1": "completed", "2": "open"})
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    before_tree = tree_digest(root)
+    log = github_fixture(tmp_path, monkeypatch, {"1": ancestor_state, "2": "open"})
     assert main(["--project", str(root), "scope", "reopen", "@current", "--yes", "--json"]) == 3
     result = json.loads(capsys.readouterr().out)
     assert "ANCESTOR_TERMINAL" in result["error"]["message"] and result["effects"] == []
@@ -151,7 +159,7 @@ def test_reopen_even_an_open_child_requires_open_ancestors(
         ("GET", 2),
         ("GET", 1),
     ]
-    assert record.read_bytes() == before
+    assert record.read_bytes() == before and tree_digest(root) == before_tree
 
 
 def test_local_close_retains_confirmed_effect_after_descriptor_cleanup_failure(
@@ -397,6 +405,8 @@ def test_scope_reopen_uses_one_confirmed_patch_and_keeps_selection(
 def test_existing_local_scope_close_preserves_unknown_metadata_and_selection_offline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
     root = committed_workspace(tmp_path / "consumer")
     metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
     payload = json.loads(metadata.read_bytes())
@@ -420,6 +430,16 @@ def test_existing_local_scope_close_preserves_unknown_metadata_and_selection_off
     assert result["data"]["result"]["scope"]["status"]["source"] == "local"
     assert result["effects"] == [{"kind": "scope.lifecycle", "status": "succeeded", "target": "init-00001"}]
     assert record.read_bytes() == before and not log.exists() and not (root / ".git/spec-dock").exists()
+    completed_tree = tree_digest(root)
+    exact_metadata = metadata.read_bytes()
+    assert main(["--project", str(root), "scope", "close", "init-00001", "--offline", "--yes", "--json"]) == 0
+    output = capsys.readouterr()
+    repeated = json.loads(output.out)
+    assert repeated["status"] == "unchanged" and repeated["data"]["result"]["changed"] is False
+    assert repeated["effects"] == [{"kind": "scope.lifecycle", "status": "unchanged", "target": "init-00001"}]
+    assert not output.err
+    assert metadata.read_bytes() == exact_metadata and record.read_bytes() == before
+    assert tree_digest(root) == completed_tree and not log.exists()
 
 
 def test_unconfirmed_close_reports_unknown_and_never_repeats_a_patch(
@@ -449,6 +469,25 @@ def test_unconfirmed_close_reports_unknown_and_never_repeats_a_patch(
     assert result["recovery"]["can_resume"] is False and result["recovery"]["can_rollback"] is False
     assert [row["method"] for row in map(json.loads, log.read_text().splitlines())] == ["GET", "GET", "PATCH", "GET"]
     assert record.read_bytes() == before
+
+
+def test_completed_close_requires_reopen_after_not_planned_and_preserves_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = tree_digest(root)
+    exact_record = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "not-planned"})
+    assert main(["--project", str(root), "scope", "close", "@current", "--yes", "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert "TERMINAL_REASON_CONFLICT" in result["error"]["message"] and result["effects"] == [] and not output.err
+    assert record.read_bytes() == exact_record and tree_digest(root) == before
+    assert [json.loads(line) for line in log.read_text().splitlines()] == [{"method": "GET", "number": 1, "body": None}]
+    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": "not-planned"}
 
 
 @pytest.mark.parametrize("action", ["close", "reopen"])
