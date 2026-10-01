@@ -577,3 +577,19 @@ package内の`assets/static-inventory.json`に86 filesの許可target、resource
 `uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py tests/cli_runtime/test_help_completion_vnext.py -q --tb=short` は67 passed（18.05秒）。そのうち新asset suiteは25 cases。fresh wheel/sdist/外部venvから実consoleでinit/showし、新宣言・runtime不在・control不在・show副作用0を確認した。sourceの通常Path以外にTraversable ZIPでも同じshim bytesを配置できた。全source/tests Ruff check/format（420 files）と変更七file限定mypy、diff checkが成功した。型注釈だけのfault fixture修正後にも部分失敗の2 casesを再実行し、2 passed（0.19秒）を確認した。
 
 installation update/uninstall、配布docs/skillsと旧実装退役、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、手動製品確認、実consumer適用は未完了。実dogfood workspace・metadata・shim・状態は変更していない。レビュー用pushの利用者回答を待ちながら、認可済みローカル実装を続ける。P-12とgoalは進行中である。
+
+## P-12 単worktreeのstatic更新・退役・アンインストール
+
+`installation update/uninstall --target ABS --backup-dir ABS --yes`を通常packageからの単worktree処理へ接続した。新writer workspaceを要求し、宣言の未知設定を含めてbytesを保持する。current/known-old hashに一致するstatic filesだけを計画し、ユーザー改変・未知hash・unsafe entryは副作用前に停止する。native Git inventoryは外部backupの配置境界を確認するためにだけ使い、他WTの資産・Scopeを一括更新しない。GitHub通信とStart lockを行わず、旧controlの状態を適用判断へ使わない。
+
+外部backupは置換・退役対象の旧static bytesとmodeだけを`backup/static/<relative>`へ保全する。独立した一時場所へ実際に復元して比較し、backupの実体と内容も公開・退役の各境界で再検証する。仕様、Artifact、Workbench、直接記録、Git metadataをstatic backupへ混ぜない。新規fileだけの更新でも空のstatic保全先を確認し、workspace宣言を変更しない。既存fileのmodeを保持し、欠けたfile/directoryだけを作る。
+
+旧standalone shimの既知hashを記録し、旧runtime138 filesと旧version一fileを退役inventoryへ追加した。139件の`source_basis`はすべて基準`6fec3099d8759b4e5b3b393b2987534b46dfa383`のblobと照合済みである。旧shim/control-storeのfixtureはそのblobの不活性bytesであり、旧実装を実行しない。既知path/hashに一致するfileだけを保全後に一件ずつunlinkし、directoryや同じ場所のユーザー追加fileをまとめて削除しない。uninstallは仕様・状態の保持に加えてworkspace宣言、ignore規則、directoryを残し、二回目はunchangedになる。
+
+途中失敗では確認済みbackup・file/directory効果、結果unknownの公開/削除、残った候補、未実施対象を区別してpartial6へ返す。backup作成後の一時capture cleanup失敗を「副作用なし」のexit5へ落としていた経路を実Redで確認し、backup succeeded/残りnot_attemptedへ修正した。native unlinkの直前/直後故障では結果を推測せずunknownとし、実体とbackupを保持する。自動rollback、journal、operation replay、共通writer lockを設けない。
+
+TDDではupdate二cases、欠けたfile/directory、既知runtime退役、uninstall二cases、help二cases、cleanup失敗、redirected current/retired entry二cases、runtimeを配布してしまう不正inventoryを、それぞれ公開CLIからRed→Greenで確認した。fault fixtureの一時directoryがmacOSの`/var` aliasだった不成立はtool管理の実体pathへ修正した。追加testの配置ミスはfixture修正後に元init二casesと退役Redを取り直し、製品成功に混同しない。旧runtimeの削除直前/直後、未知改変、backup guard、廃止引数、linked WT隔離等は既にある実装の回帰としてGreenを確認した。
+
+`uv run pytest tests/integration/test_issue413_assets.py tests/integration/test_issue413_wheel.py tests/integration/test_issue413_shim.py tests/unit/infra/test_provider_distribution.py tests/cli_runtime/test_help_completion_vnext.py -q --tb=short` は98 passed（75.93秒）。asset suiteは56 cases。fresh wheel→sdist由来wheelの資産一致、外部venvの実consoleによるinit/show/update/uninstall、外部backup、仕様・ignore保持とGit副作用0まで確認した。全source/testsのRuff check/format（421 files）と変更八file限定mypyは成功した。限定mypyのtest trap注釈をNoneへ修正し、follow-imports=skipでも戻り値不整合を残していない。
+
+provider旧helpersの退役、配布docs/skills、native Windows、full-suite/type gate、fresh Strict、Final Quality Gate、最終手動製品確認、実consumer適用は未完了。実dogfood workspace・metadata・shim・状態は変更していない。通常非force pushの利用者回答を待ちながら認可済みローカル実装を続け、P-12とgoalを進行中に維持する。

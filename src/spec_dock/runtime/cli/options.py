@@ -69,7 +69,7 @@ class _StrictParser(argparse.ArgumentParser):
 
 
 def _recovery_help(leaf: str) -> str:
-    if leaf == "installation init":
+    if leaf.startswith("installation "):
         return "Inspect installed and remaining static paths before a new operation; no replay, resume or automatic rollback."
     if leaf == "workbench copy":
         return "Inspect copied and remaining paths and retained candidate files before a new explicit copy; changes are not automatically undone."
@@ -132,7 +132,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     workbench = argv[:2] == ["workbench", "copy"]
     worktree = len(argv) >= 2 and argv[0] == "worktree"
     migrate = argv[:2] == ["workspace", "migrate"]
-    installation_init = argv[:2] == ["installation", "init"]
+    installation_init = len(argv) >= 2 and argv[0] == "installation"
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -167,6 +167,17 @@ def _reject_retired_start(argv: list[str]) -> None:
         ):
             raise RetiredArgumentError(
                 f"{name} was retired; inspect the current state and issue a new explicit operation"
+            )
+        if installation_init and name in (
+            "--version",
+            "--commit",
+            "--maintenance",
+            "--finalize",
+            "--activate-engine",
+            "--from-update",
+        ):
+            raise RetiredArgumentError(
+                f"{name} was retired; update the external package and apply only this worktree's known static assets"
             )
         if active and argv[1] == "set" and name == "--from-branch":
             raise RetiredArgumentError("--from-branch was retired; only work start can acquire a direct selection")
@@ -451,23 +462,6 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("worktree reference requires an absolute path; registered aliases were retired")
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):
         parser.error("active clear requires exactly one of --from or --all")
-    if parsed.command_path == "installation update":
-        if parsed.activate_engine:
-            if parsed.version or parsed.commit or parsed.maintenance or parsed.finalize:
-                parser.error("installation update --activate-engine accepts no source, maintenance, or finalize")
-            if sum(bool(item) for item in (parsed.from_update, parsed.resume, parsed.rollback)) != 1:
-                parser.error("installation update --activate-engine requires one update or recovery operation ID")
-            if parsed.from_update and re.fullmatch(r"[0-9a-f]{32}", parsed.from_update) is None:
-                parser.error("--from-update requires a 32-character lowercase operation ID")
-        elif parsed.from_update:
-            parser.error("--from-update requires --activate-engine")
-        elif parsed.finalize:
-            if parsed.version or parsed.commit or parsed.maintenance or parsed.rollback:
-                parser.error("installation update --finalize accepts no source, maintenance, or rollback")
-        elif (parsed.rollback and parsed.version and parsed.commit) or (
-            not parsed.rollback and bool(parsed.version) == bool(parsed.commit)
-        ):
-            parser.error("installation update requires one source for update/resume and at most one pin for rollback")
     resume = getattr(parsed, "resume", None)
     rollback = getattr(parsed, "rollback", None)
     if resume and rollback:

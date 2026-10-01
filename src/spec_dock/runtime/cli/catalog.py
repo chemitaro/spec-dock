@@ -128,8 +128,8 @@ HELP_EFFECTS: dict[str, str] = {
     "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
     "installation show": "Read the package version and static resources in one Git worktree; no changes.",
     "installation init": "Place package static resources and a new workspace declaration in one Git worktree.",
-    "installation update": "Replace managed tooling from one pinned source; --finalize verifies all targets and leaves maintenance.",
-    "installation uninstall": "Remove managed tooling while preserving Scope data.",
+    "installation update": "Update package static resources in one Git worktree after verified external preservation.",
+    "installation uninstall": "Remove known package static resources from one Git worktree while preserving user work and state.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -237,16 +237,8 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     ),
     "installation show": (_arg("--target"),),
     "installation init": (_arg("path"),),
-    "installation update": (
-        _arg("--target"),
-        _arg("--version"),
-        _arg("--commit"),
-        _flag("--maintenance"),
-        _flag("--finalize"),
-        _flag("--activate-engine"),
-        _arg("--from-update"),
-    ),
-    "installation uninstall": (_arg("--target"),),
+    "installation update": (_arg("--target"), _arg("--backup-dir")),
+    "installation uninstall": (_arg("--target"), _arg("--backup-dir")),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -258,7 +250,7 @@ RECOVERY_LEAF_COMMANDS: dict[str, str] = {
     "installation uninstall": "installation.uninstall",
 }
 for _leaf, _command in RECOVERY_LEAF_COMMANDS.items():
-    if _leaf == "installation init":
+    if _leaf.startswith("installation "):
         continue
     LEAF_ARGUMENTS[_leaf] += (_arg("--resume"),)
     if _command in ROLLBACK_COMMANDS:
@@ -350,8 +342,8 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
     "installation show": "The selected target must be one exact Git worktree root; no workspace or control record is required.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
-    "installation update": "Ordinary apply needs one pinned --version or --commit. --finalize verifies the maintained group without a new source. --activate-engine needs the recorded --from-update. --resume and --rollback require their fixed operation ID and mode-specific guards.",
-    "installation uninstall": "The installed worktree group must satisfy uninstall safety guards.",
+    "installation update": "A schema-3 worktree-writer workspace and known static hashes are required. Changes need a new external --backup-dir under an existing physical parent and --yes; --dry-run writes nothing. Modified or unknown files require manual merge.",
+    "installation uninstall": "Use a schema-3 worktree-writer workspace. Remove only known static hashes after a new external --backup-dir and --yes; --dry-run writes nothing. Modified files stop before changes.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -391,7 +383,7 @@ _READS_BY_ROOT = {
     "worktree": "Native Git worktree inventory, physical clone and path identity, branch and HEAD; Scope metadata only for --expect-current.",
     "workbench": "Source and destination worktree bindings, Scope identity, and Workbench entry types.",
     "workspace": "Workspace schema, Scope data, derived generation, control, and pending records.",
-    "installation": "Pinned engine, control record, managed asset inventory, and the selected Git worktree group.",
+    "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
 }
 
 _DOES_NOT_BY_ROOT = {
@@ -404,7 +396,7 @@ _DOES_NOT_BY_ROOT = {
     "worktree": "Does not mutate an independent repository or implicitly run project bootstrap.",
     "workbench": "Does not copy the root Workbench or start automatic synchronization.",
     "workspace": "Does not silently repair primary Scope data or active selection.",
-    "installation": "Does not update any independent repository outside the selected Git common directory.",
+    "installation": "Does not change other worktrees, Scope data, Artifacts, Workbenches, direct selections or Git metadata.",
 }
 
 _JSON_DATA_BY_ROOT = {
@@ -417,11 +409,17 @@ _JSON_DATA_BY_ROOT = {
     "worktree": "path, branch, head, changed, observed; list returns items with path, branch, head, bare, locked, prunable.",
     "workbench": "Source/destination worktree IDs, Scope, conflict policy, and mutation state.",
     "workspace": "Snapshot, generation, validity, findings, status source, and pending recovery.",
-    "installation": "Inventory, schema/protocol, engine digest, phase, backups, and journal IDs.",
+    "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
 }
 
 
 def _example(leaf: str) -> str:
+    if leaf == "installation init":
+        return "spec-dock installation init /absolute/worktree --yes"
+    if leaf == "installation show":
+        return "spec-dock installation show --target /absolute/worktree"
+    if leaf in ("installation update", "installation uninstall"):
+        return f"spec-dock {leaf} --target /absolute/worktree --backup-dir /absolute/backup --yes"
     if leaf == "scope delete":
         return "spec-dock scope delete <scope-id> --backup-dir /absolute/backup --yes"
     if leaf == "help":
@@ -464,8 +462,6 @@ def _example(leaf: str) -> str:
         words.extend(("--backup-dir", "/absolute/backup", "--confirm-old-writers-stopped", "--yes"))
     if leaf == "active clear":
         words.append("--all")
-    if leaf == "installation update":
-        words.extend(("--commit", "<fixed-commit-sha>"))
     return " ".join(words)
 
 
@@ -517,18 +513,24 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         json_data = "items, unknown_filtered_count." if leaf == "scope list" else "scope, github_ref, changed=false."
         confirmation = "No final confirmation is required for this read-only leaf."
-    elif leaf in ("installation init", "installation show"):
-        target = "Only one explicit Git worktree root: PATH for init, --target or --project/current root for show."
-        reads = "The installed package resource inventory and selected worktree's declaration and static asset bytes."
-        does_not = "Does not contact GitHub, write Git metadata, install a runtime copy, inspect other worktrees, acquire a Start lock, or manage shared control."
+    elif leaf.startswith("installation "):
+        target = (
+            "Only one explicit Git worktree root: PATH for init, --target or --project/current root for other leaves."
+        )
+        reads = "The installed package resource inventory and selected worktree's declaration and static asset bytes; native Git inventory only for the external backup boundary."
+        does_not = "Does not contact GitHub, write Git metadata, install a runtime copy, change other worktrees, acquire a Start lock, or manage shared control."
         json_data = "installation: target, package_version, created_paths, changed_paths, retired_paths, backup_path."
         confirmation = (
-            "Apply requires --yes; --dry-run needs no confirmation."
-            if leaf == "installation init"
-            else "No final confirmation is required for this read-only leaf."
+            "No final confirmation is required for this read-only leaf."
+            if leaf == "installation show"
+            else "Changes require --yes; --dry-run needs no confirmation. Update/uninstall also require a new external --backup-dir."
         )
         if leaf == "installation init":
             writes = "Only previously absent package-owned static files and a new workspace declaration; conflicts stop before changes."
+        elif leaf == "installation update":
+            writes = "Preserve and restore-check changed static bytes, add missing package assets, replace known old files and retire known legacy files only in this worktree."
+        elif leaf == "installation uninstall":
+            writes = "Preserve and restore-check known static bytes before removing only those files. Keep workspace declaration, ignore rules, user work, state and directories."
     elif leaf == "workspace validate":
         target = "The current working-tree structure, or one fixed HEAD with --ci."
         reads = "Workspace declaration, Scope metadata, dependencies and Artifact entry names/types; live direct selection only for an explicit --expect-current outside --ci."

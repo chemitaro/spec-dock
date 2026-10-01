@@ -7,6 +7,7 @@ import hashlib
 from importlib.resources import files
 import json
 from pathlib import PurePosixPath
+import re
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -23,6 +24,12 @@ class StaticAsset:
     known_old_sha256: tuple[str, ...]
 
 
+@dataclass(frozen=True)
+class RetiredStaticAsset:
+    path: str
+    known_old_sha256: tuple[str, ...]
+
+
 def package_static_assets() -> tuple[StaticAsset, ...]:
     root = files("spec_dock").joinpath("assets")
     inventory = json.loads(root.joinpath("static-inventory.json").read_bytes())
@@ -34,12 +41,17 @@ def package_static_assets() -> tuple[StaticAsset, ...]:
         relative = _relative_path(path)
         if (
             not (
-                path in ("spec-dock/workspace.json", "spec-dock/.gitignore")
+                path
+                in (
+                    "spec-dock/workspace.json",
+                    "spec-dock/.gitignore",
+                    "spec-dock/scripts/README.md",
+                    "spec-dock/scripts/spec-dock",
+                )
                 or path.startswith((
                     "spec-dock/docs/",
                     "spec-dock/templates/",
                     "spec-dock/system/",
-                    "spec-dock/scripts/",
                 ))
                 or path.startswith((".agents/skills/spec-dock/", ".agents/skills/spec-dock-grill-with-docs/"))
             )
@@ -76,6 +88,35 @@ def _relative_path(value: str) -> PurePosixPath:
     ):
         raise ValueError("package static path is invalid")
     return relative
+
+
+def package_retired_assets() -> tuple[RetiredStaticAsset, ...]:
+    root = files("spec_dock").joinpath("assets")
+    inventory = json.loads(root.joinpath("static-inventory.json").read_bytes())
+    if inventory.get("schema_version") != "specdock.static-inventory/v1":
+        raise ValueError("package static inventory is invalid")
+    result: list[RetiredStaticAsset] = []
+    current = {entry["path"] for entry in inventory["files"]}
+    for entry in inventory.get("retired", []):
+        path = entry["path"]
+        _relative_path(path)
+        if path in current or not (
+            path == "spec-dock/spec-dock.version"
+            or (path.startswith("spec-dock/scripts/spec_dock_runtime/") and path.endswith(".py"))
+        ):
+            raise ValueError("retired static inventory contains an unsafe target")
+        hashes = entry["known_old_sha256"]
+        if (
+            not isinstance(hashes, list)
+            or not hashes
+            or any(not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None for value in hashes)
+        ):
+            raise ValueError("retired static inventory hashes are invalid")
+        result.append(RetiredStaticAsset(path, tuple(hashes)))
+    paths = tuple(entry.path for entry in result)
+    if paths != tuple(sorted(set(paths))):
+        raise ValueError("retired static inventory paths must be unique and ordered")
+    return tuple(result)
 
 
 def _resource(root: Traversable, source: str) -> Traversable:

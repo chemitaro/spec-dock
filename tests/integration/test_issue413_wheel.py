@@ -224,3 +224,60 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     assert show.returncode == 0, show.stdout + show.stderr
     assert all(asset["classification"] == "current" for asset in json.loads(show.stdout)["data"]["result"]["assets"])
     assert not show.stderr and tree_digest(initialized) == shown_before
+
+    workspace_before = (initialized / "spec-dock/workspace.json").read_bytes()
+    opaque = initialized / "spec-dock/artifacts/user-evidence.bin"
+    opaque.parent.mkdir()
+    opaque.write_bytes(b"private user evidence\n")
+    old_shim = (ROOT / "tests/fixtures/issue413/legacy-shim.txt").read_bytes()
+    (initialized / "spec-dock/scripts/spec-dock").write_bytes(old_shim)
+    update_backup = tmp_path / "update-backup"
+    updated = subprocess.run(
+        [
+            str(console),
+            "installation",
+            "update",
+            "--target",
+            str(initialized),
+            "--backup-dir",
+            str(update_backup),
+            "--yes",
+            "--json",
+        ],
+        cwd=outside,
+        env=console_environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert updated.returncode == 0, updated.stdout + updated.stderr
+    assert json.loads(updated.stdout)["data"]["result"]["changed_paths"] == ["spec-dock/scripts/spec-dock"]
+    assert (update_backup / "static/spec-dock/scripts/spec-dock").read_bytes() == old_shim
+    assert (initialized / "spec-dock/scripts/spec-dock").read_bytes() == installed_shim.read_bytes()
+    uninstalled = subprocess.run(
+        [
+            str(console),
+            "installation",
+            "uninstall",
+            "--target",
+            str(initialized),
+            "--backup-dir",
+            str(tmp_path / "uninstall-backup"),
+            "--yes",
+            "--json",
+        ],
+        cwd=outside,
+        env=console_environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+    assert uninstalled.returncode == 0, uninstalled.stdout + uninstalled.stderr
+    assert "spec-dock/scripts/spec-dock" in json.loads(uninstalled.stdout)["data"]["result"]["retired_paths"]
+    assert not (initialized / "spec-dock/scripts/spec-dock").exists()
+    assert (initialized / "spec-dock/workspace.json").read_bytes() == workspace_before
+    assert opaque.read_bytes() == b"private user evidence\n" and (initialized / "spec-dock/.gitignore").is_file()
+    assert tree_digest(initialized / ".git") == git_before and not tuple(outside.iterdir())
+    assert not updated.stderr and not uninstalled.stderr

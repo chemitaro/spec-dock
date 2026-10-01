@@ -104,8 +104,12 @@ def install_static_assets(namespace: argparse.Namespace, context: GitContext) ->
             observed.append({"path": asset.path, "classification": classification})
         data["assets"] = tuple(observed)
         return OperationResult(namespace.command_path, "succeeded", FamilyData("installation", data), 0)
+    if namespace.command_path in ("installation update", "installation uninstall"):
+        from spec_dock.runtime.application.direct_static_update import update_static_assets
+
+        return update_static_assets(namespace, context, assets, data)
     if namespace.command_path != "installation init":
-        raise ValueError("static update and uninstall are not connected yet")
+        raise ValueError("unsupported installation command")
     for asset in assets:
         _verify_parent_chain(context.root / asset.path)
         if os.path.lexists(context.root / asset.path):

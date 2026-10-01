@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import errno
 import os
 import stat
 from typing import TYPE_CHECKING
@@ -70,6 +71,87 @@ class FilePublicationIncomplete(RuntimeError):
     def __init__(self, message: str, *, confirmed: bool = False) -> None:
         self.confirmed = confirmed
         super().__init__(message)
+
+
+class FileRetirementIncomplete(RuntimeError):
+    def __init__(self, message: str, *, confirmed: bool = False) -> None:
+        self.confirmed = confirmed
+        super().__init__(message)
+
+
+def retire_file(path: Path, *, expected: FileSnapshot, verify: Callable[[], object]) -> None:
+    """Unlink one captured regular file, without recursive deletion or rollback."""
+    parent = open_guarded_directory(path.parent)
+    attempted = confirmed = False
+    try:
+        verify()
+        if read_regular_file(path) != expected:
+            raise ValueError("static retirement input changed")
+        _verify_file_parent(path, parent)
+        attempted = True
+        os.unlink(path.name, dir_fd=parent)
+        os.fsync(parent)
+        _verify_file_parent(path, parent)
+        if os.path.lexists(path):
+            raise ValueError("retired static path is occupied again")
+        confirmed = True
+    except (OSError, ValueError, RuntimeError) as error:
+        if attempted:
+            raise FileRetirementIncomplete(str(error), confirmed=confirmed) from error
+        raise
+    finally:
+        try:
+            os.close(parent)
+        except OSError as error:
+            if attempted:
+                raise FileRetirementIncomplete(str(error), confirmed=confirmed) from error
+            raise
+
+
+def _verify_file_parent(path: Path, held: int) -> None:
+    fresh = open_guarded_directory(path.parent)
+    try:
+        current, previous = os.fstat(fresh), os.fstat(held)
+        if (current.st_dev, current.st_ino) != (previous.st_dev, previous.st_ino):
+            raise ValueError("static file parent physical identity changed")
+    finally:
+        os.close(fresh)
+
+
+def verify_existing_parent(path: Path) -> None:
+    """Inspect the nearest existing ancestor without creating or following links."""
+    parent = path.parent
+    while not os.path.lexists(parent):
+        parent = parent.parent
+    if any(item.is_symlink() for item in (parent, *parent.parents)):
+        raise ValueError("file publication parent must not be a symbolic link")
+    try:
+        descriptor = open_guarded_directory(parent)
+    except OSError as error:
+        if error.errno in (errno.ELOOP, errno.ENOTDIR):
+            raise ValueError("file publication parent must be a regular directory") from error
+        raise
+    os.close(descriptor)
+
+
+def create_missing_parents(root: Path, path: Path, *, on_created: Callable[[Path], None]) -> None:
+    """Create contained directories, reporting each before subsequent IO can fail."""
+    directory = root
+    for part in path.parent.relative_to(root).parts:
+        parent = open_guarded_directory(directory)
+        directory /= part
+        try:
+            try:
+                os.mkdir(part, mode=0o755, dir_fd=parent)
+            except FileExistsError:
+                pass
+            else:
+                on_created(directory)
+                os.fsync(parent)
+            opened = open_guarded_directory(directory)
+            os.close(opened)
+        finally:
+            os.close(parent)
 
 
 def publish_file(
