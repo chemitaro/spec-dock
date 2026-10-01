@@ -899,3 +899,13 @@ clean `2c45e885ca48c32616d4899ee79844c553d96dc5` の通常 `make lint` はRuff�
 通常wheelの五旧module収録禁止はRed 1 failed（0.76秒）、source/test退役後の同testはGreen 1 passed（13.82秒）。関連Scope create/import/GitHub gateway五suiteは99 passed（27.76秒）。全Ruff check/format（347 files）、変更三test限定mypyとdiff checkが成功した。元logは既存Epic Workbenchのiss-00413-implementation/pytest-scope-github-retirement-port.log、pytest-scope-github-retirement-source-{red,green}.log、pytest-scope-github-retirement-related.logに保持する。
 
 95 errorsの通常lintはclean 82240b58の別snapshotであり、現在値としない。残る旧helpers、通常full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
+## P-12 GitHubの旧マーカー検索の退役
+
+**GitHubの旧マーカー検索の退役**
+
+[個別対応](artifacts/test-port-github-marker-retirement.md)に従い、最後の旧writer退役後にcallerを失ったGithubIssueGateway.find_by_markerと二private試験を削除した。全Issueページ走査/marker検索を現行writerへ移さない。専用array decoder optionを除去し、GET/POST/PATCHの単一Issue object返値を明確にした。repository/record/HTTP分類/完了処理のASTと元の残る13 test関数は同一で、skip/収集除外を増やさない。
+
+array応答のGET/5・create unknown/6・再送なしを旧sourceで先に2 passed（0.03秒）、refactor後の同testも2 passed（0.03秒）で確認した。既存Greenのcharacterization/refactorであり、製品Redではない。POST endpointの初期期待をargv末尾としたfixture誤り1 passed/1 failed（0.04秒）は正しい--method後の位置へ訂正し、失敗logを保持した。関連七suiteは131 passed（40.62秒）、work finishは33 passed（11.93秒）、全Ruff check/format（347 files）・変更source/test限定mypy・diff/AST検査が成功。元logは既存Epic Workbenchのiss-00413-implementation/pytest-github-marker-retirement-{before,after,related}.logに保持。
+
+このunit前のclean d7f47fc0の通常make lintはRuff成功・mypy 55 errors/19 files（266 source files）、source 40/test 15 errors、make exit2で未合格。元logはiss-00413-implementation/lint-p12-d7f47fc0.log。旧95 errorsとは別snapshotであり、残る旧helpers、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
