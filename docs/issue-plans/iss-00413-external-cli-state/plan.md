@@ -638,6 +638,12 @@ uv build --wheel
 
 **失敗時の停止/戻り先**: static ownershipを立証できないfileはD-12へ戻す。名前だけでdirectoryごと削除しない。
 
+## P-12 対応下限Pythonの予備検証
+
+[Python 3.10互換性の記録](artifacts/python-compatibility.md)を保存した。実3.10.15の隔離venvとprovider import元を照合し、全pytestの初回1864 passed/2 failed/1 skipped（380.34秒、exit1）を切り分けた。spawn時に確認用runnerがpytestを再実行する不具合と、Path.statのaccessor差によるLinux模擬の不達を修正した。製品source、既存assertions、kill境界、test選択とskip条件は維持する。runnerだけの修正後も一件のfixture失敗が再現したことを別logへ保持し、製品Redと区別した。
+
+修正後、3.10の関連二suiteは56 passed/1 skipped（0.30秒）、既定3.12の同suiteは56 passed/1 skipped（0.21秒）、実3.10の通常全pytestは1866 passed/1 skipped（365.74秒）、全てexit0。skipは既存Linux O_TMPFILE capability testでありDarwinでのnative成功ではない。全Ruff（311 files）、MYPYPATH=srcの変更test限定mypyとdiff checkが成功した。P-12中の予備検証であり、残る旧source/tests、実Linux/Python3.11、Windows native、通常full lint、fresh Strict、最終手動確認は継続中。実consumer/live GitHubは未変更。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 

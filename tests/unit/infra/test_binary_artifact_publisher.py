@@ -344,7 +344,7 @@ def test_linux_explicit_import_uses_anonymous_staging_without_visible_probe_or_u
     destination = artifacts_dir / "formal.bin"
     original_open = publisher_module.os.open
     original_unlink = publisher_module.os.unlink
-    original_stat = publisher_module.os.stat
+    original_stat = Path.stat
     original_fsync = publisher_module.os.fsync
     anonymous_flag = 0x40000000
     anonymous_fd = None
@@ -406,7 +406,7 @@ def test_linux_explicit_import_uses_anonymous_staging_without_visible_probe_or_u
         return original_fsync(descriptor)
 
     monkeypatch.setattr(publisher_module.os, "open", open_spy)
-    monkeypatch.setattr(publisher_module.os, "stat", stat_spy)
+    monkeypatch.setattr(Path, "stat", stat_spy)
     monkeypatch.setattr(publisher_module.os, "fsync", fsync_spy)
     monkeypatch.setattr(publisher_module, "_commit_descriptor_no_replace", commit_spy)
     monkeypatch.setattr(publisher_module.os, "unlink", unlink_spy)

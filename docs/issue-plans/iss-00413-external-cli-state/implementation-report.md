@@ -997,3 +997,9 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 旧構造検査を照合し、現行経路が四canonical文書の欠落を見逃す差異を[記録](artifacts/validation-required-documents.md)した。公開CLIのRed 28 failed/2 passed（4.40秒、exit1）を、guarded descriptorで名前/通常fileだけを検査する修正でGreen 30 passed（4.44秒、exit0）にした。固定HEADでもmetadata以外の本文を取得せず、本文・承認・計画レベルをgateにしない。Doctorと明示移行前の構造検査にも接続し、旧validate source/testsはこのunitでは削除しない。
 
 共有fixtureを完全なScope構造に揃えた。通常全pytestの初回は1863 passed/3 failed/1 skipped（355.05秒、exit1）。増えた文書に伴う三削除途中の一覧期待値を修正し、240件移行fixtureと合わせ4 passed、Validate/Scope Delete全二suiteは117 passed（16.52秒、exit0）。限定mypyは変更10 Python filesで成功し、全Ruff（311 files）も成功。通常make lintの旧graph 32 errors/11 filesと、修正後の通常全pytest再実行、native OS/別Python、fresh Strict、最終手動確認は未完了であり、部分成功をfull gate合格にしない。CLI help・配布reference・一行のstatic hashを更新し、実consumer/live GitHubは未変更。
+
+## P-12 対応下限Pythonの予備検証
+
+[Python 3.10互換性の記録](artifacts/python-compatibility.md)を保存した。実3.10.15の隔離venvとprovider import元を照合し、全pytestの初回1864 passed/2 failed/1 skipped（380.34秒、exit1）を切り分けた。spawn時に確認用runnerがpytestを再実行する不具合と、Path.statのaccessor差によるLinux模擬の不達を修正した。製品source、既存assertions、kill境界、test選択とskip条件は維持する。runnerだけの修正後も一件のfixture失敗が再現したことを別logへ保持し、製品Redと区別した。
+
+修正後、3.10の関連二suiteは56 passed/1 skipped（0.30秒）、既定3.12の同suiteは56 passed/1 skipped（0.21秒）、実3.10の通常全pytestは1866 passed/1 skipped（365.74秒）、全てexit0。skipは既存Linux O_TMPFILE capability testでありDarwinでのnative成功ではない。全Ruff（311 files）、MYPYPATH=srcの変更test限定mypyとdiff checkが成功した。P-12中の予備検証であり、残る旧source/tests、実Linux/Python3.11、Windows native、通常full lint、fresh Strict、最終手動確認は継続中。実consumer/live GitHubは未変更。
