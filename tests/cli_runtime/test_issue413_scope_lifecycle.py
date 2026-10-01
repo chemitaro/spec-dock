@@ -17,6 +17,55 @@ from tests.cli_runtime.test_issue413_work_start import committed_workspace
 
 
 @pytest.mark.parametrize("action,state", [("close", "open"), ("reopen", "completed")])
+def test_scope_lifecycle_preview_does_not_load_retired_writers_or_control(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, action: str, state: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = committed_workspace(tmp_path / "consumer")
+    select_fixture(root)
+    log = github_fixture(tmp_path, monkeypatch, {"1": state})
+    before = tree_digest(root)
+    script = (
+        "import sys\nfrom spec_dock.cli import main\n"
+        "assert main(sys.argv[1:]) == 0\n"
+        "retired = {'spec_dock.runtime.application.scope_completion', "
+        "'spec_dock.runtime.application.operation_executor', "
+        "'spec_dock.runtime.cli.admission', "
+        "'spec_dock.runtime.infra.writer_lock', "
+        "'spec_dock.runtime.infra.operation_journal', "
+        "'spec_dock.runtime.infra.control_store'}\n"
+        "loaded = sorted(retired.intersection(sys.modules))\nassert loaded == [], loaded\n"
+    )
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            script,
+            "--project",
+            str(root),
+            "scope",
+            action,
+            "@current",
+            "--dry-run",
+            "--json",
+        ],
+        cwd=tmp_path,
+        env=dict(os.environ, PYTHONPATH=str(Path(__file__).resolve().parents[2] / "src")),
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=15,
+    )
+    assert completed.returncode == 0, completed.stdout + completed.stderr
+    result = json.loads(completed.stdout)
+    assert result["schema_version"] == "specdock.cli/v2" and result["status"] == "planned"
+    assert result["effects"] == [{"kind": f"github.issue.{action}", "status": "planned", "target": "gh:example/repo#1"}]
+    assert not completed.stderr and tree_digest(root) == before
+    assert [(call["method"], call["number"]) for call in map(json.loads, log.read_text().splitlines())] == [("GET", 1)]
+
+
+@pytest.mark.parametrize("action,state", [("close", "open"), ("reopen", "completed")])
 def test_lifecycle_dry_run_exposes_a_valid_plan_without_mutating_authority_or_selection(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], action: str, state: str
 ) -> None:

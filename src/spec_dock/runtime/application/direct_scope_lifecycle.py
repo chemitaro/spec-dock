@@ -9,7 +9,7 @@ import sys
 from typing import TYPE_CHECKING, cast
 
 from spec_dock.runtime.application.project_context import resolve_context
-from spec_dock.runtime.application.scope_completion import plan_close, plan_reopen
+from spec_dock.runtime.application.scope_completion_plan import plan_close, plan_reopen
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
 from spec_dock.runtime.application.worktree_observation import ancestors_for, read_selection, resolve_scope
@@ -32,7 +32,7 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from spec_dock.runtime.application.project_context import ProjectContext
-    from spec_dock.runtime.application.scope_completion import CompletionReason
+    from spec_dock.runtime.application.scope_completion_plan import CompletionReason
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.lifecycle import ObservedState, ScopeMetadata
 
