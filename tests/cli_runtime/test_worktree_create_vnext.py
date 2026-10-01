@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 import pytest
 
 from spec_dock.runtime.application.worktree_vnext import create_worktree, list_worktrees, show_worktree
+from spec_dock.runtime.cli.legacy import RetiredArgumentError
 from spec_dock.runtime.cli.options import parse_vnext
 from spec_dock.runtime.infra.active_store import load_selection_v3
 from spec_dock.runtime.infra.control_store import load_control
@@ -135,7 +136,9 @@ def test_create_recovery_requires_effects_to_be_absent_before_reusing_target(
     assert json.loads(record.read_text(encoding="utf-8"))["status"] == "succeeded"
 
 
-def test_create_cli_exposes_explicit_target_recovery() -> None:
-    parsed = parse_vnext(["worktree", "create", "--base", "main", "--recover", "wt3"])
+def test_create_cli_requires_an_explicit_name_and_retires_target_recovery() -> None:
+    with pytest.raises(RetiredArgumentError, match="--recover was retired"):
+        parse_vnext(["worktree", "create", "--base", "main", "--recover", "wt3"])
+    parsed = parse_vnext(["worktree", "create", "planning", "--base", "main", "--root", "/absolute/worktrees"])
     assert parsed.command_path == "worktree create"
-    assert parsed.recover == "wt3"
+    assert parsed.name == "planning" and parsed.base == "main" and parsed.root == "/absolute/worktrees"

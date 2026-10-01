@@ -116,9 +116,9 @@ HELP_EFFECTS: dict[str, str] = {
     "artifact import file": "Publish one opaque regular file in the selected Scope or @root without overwrite or a shared counter.",
     "artifact list": "Read Artifact identifiers; no changes.",
     "artifact show": "Read Artifact metadata without exposing its content; no changes.",
-    "worktree create": "Create and register one Git worktree; bootstrap is separate.",
-    "worktree list": "Read registered Git worktrees; no changes.",
-    "worktree show": "Read one worktree and its removal blockers; no changes.",
+    "worktree create": "Create branch worktree/NAME from the fixed base and attach root/NAME using native Git; bootstrap is separate.",
+    "worktree list": "Read native Git worktree inventory; no changes.",
+    "worktree show": "Read one absolute path in the native Git worktree inventory; no changes.",
     "worktree remove": "Remove one worktree directory and registration; keep its branch.",
     "worktree bootstrap": "Run the selected worktree's project-owned make init.",
     "workbench copy": "Copy one Scope Workbench into a selected worktree.",
@@ -209,11 +209,11 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "artifact import file": (_arg("path"), _required("--scope")),
     "artifact list": (_required("--scope"),),
     "artifact show": (_arg("artifact_id"), _required("--scope")),
-    "worktree create": (_arg("name", nargs="?"), _required("--base"), _arg("--root"), _arg("--recover")),
+    "worktree create": (_arg("name"), _required("--base"), _arg("--root")),
     "worktree list": (),
     "worktree show": (_arg("worktree_ref"),),
     "worktree remove": (_arg("worktree_ref"), _flag("--unlock"), _flag("--discard-ignored")),
-    "worktree bootstrap": (_arg("worktree_ref"), _flag("--recover")),
+    "worktree bootstrap": (_arg("worktree_ref"),),
     "workbench copy": (
         _required("--scope"),
         _required("--to-worktree"),
@@ -329,9 +329,9 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "artifact import file": "The owner Scope and regular source file must exist.",
     "artifact list": "The owner Scope must resolve and its catalog must be readable.",
     "artifact show": "The owner Scope and Artifact ID must resolve.",
-    "worktree create": "The path must be available and the requested Git base must resolve.",
-    "worktree list": "The installation control must be readable.",
-    "worktree show": "The worktree ID or path must resolve in installation control.",
+    "worktree create": "A clean source, explicit lowercase NAME and fixed Git base are required. Placement uses --root, then SPEC_DOCK_WORKTREE_ROOT; the path and branch must be absent.",
+    "worktree list": "The current clone must have readable native Git worktree inventory.",
+    "worktree show": "An absolute worktree path must resolve in the same physical Git clone; aliases were retired.",
     "worktree remove": "The target must be registered and pass active, branch, and path safety guards.",
     "worktree bootstrap": "The target must be registered and have a project-owned make init target.",
     "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
@@ -379,7 +379,7 @@ _READS_BY_ROOT = {
     "branch": "Current Scope metadata, Git refs, and Git worktree branch occupancy.",
     "dependency": "Declared Scope edges, inherited prerequisites, and status observations.",
     "artifact": "The selected Scope's Artifact catalog and safe file metadata.",
-    "worktree": "Git worktree registration, target path, branch, HEAD, and control state.",
+    "worktree": "Native Git worktree inventory, physical clone and path identity, branch and HEAD; Scope metadata only for --expect-current.",
     "workbench": "Source and destination worktree bindings, Scope identity, and Workbench entry types.",
     "workspace": "Workspace schema, Scope data, derived generation, control, and pending records.",
     "installation": "Pinned engine, control record, managed asset inventory, and the selected Git worktree group.",
@@ -405,7 +405,7 @@ _JSON_DATA_BY_ROOT = {
     "branch": "Scope ID, candidate ref name, observed tip, created/switched, and binding_persisted=false.",
     "dependency": "Declared/effective edges, readiness, blockers, and status provenance.",
     "artifact": "artifact:{id,scope_id,path,type},changed; list returns scope_id,items. Bodies and external source paths remain private.",
-    "worktree": "Worktree ID, path, HEAD, branch, registration, blockers, and operation outcome.",
+    "worktree": "path, branch, head, changed, observed; list returns items with path, branch, head, bare, locked, prunable.",
     "workbench": "Source/destination worktree IDs, Scope, conflict policy, and mutation state.",
     "workspace": "Snapshot, generation, validity, findings, status source, and pending recovery.",
     "installation": "Inventory, schema/protocol, engine digest, phase, backups, and journal IDs.",
@@ -424,7 +424,7 @@ def _example(leaf: str) -> str:
         "target": "<scope-id>",
         "github_ref": "gh:OWNER/REPO#NUMBER",
         "path": "<path>",
-        "worktree_ref": "<worktree-id>",
+        "worktree_ref": "/absolute/worktree",
         "artifact_id": "<artifact-id>",
         "--backend": "github",
         "--title": "'Example title'",
@@ -448,6 +448,8 @@ def _example(leaf: str) -> str:
             words.extend((name, placeholders.get(name, f"<{name.lstrip('-')}>")))
     if leaf in {"work start", "branch create"}:
         words.extend(("--base", "HEAD"))
+    if leaf == "worktree create":
+        words.extend(("--root", "/absolute/worktrees"))
     if leaf == "workspace migrate":
         words.extend(("--mapping-file", "<mapping.json>"))
     if leaf == "active clear":
@@ -464,7 +466,7 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf.startswith("installation "):
         target = "The selected Git common-directory installation and its registered worktrees."
     elif leaf.startswith("worktree "):
-        target = "The selected registered worktree; create allocates a new worktree."
+        target = "The explicit absolute path in this clone's native Git inventory; create uses root/NAME."
     elif leaf in {"help", "completion"}:
         target = "The CLI catalog; no repository is required."
     elif "target" in arguments:

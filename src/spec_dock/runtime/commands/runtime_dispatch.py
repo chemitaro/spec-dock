@@ -66,6 +66,18 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             from spec_dock.runtime.application.direct_artifact import mutate_artifact
 
             result = mutate_artifact(namespace, context, cwd)
+        elif command == "worktree create":
+            from spec_dock.runtime.application.direct_worktrees import create_native_worktree
+
+            result = create_native_worktree(namespace, context)
+        elif command == "worktree list":
+            from spec_dock.runtime.application.direct_worktrees import list_native_worktrees
+
+            result = list_native_worktrees(namespace, context)
+        elif command == "worktree show":
+            from spec_dock.runtime.application.direct_worktrees import show_native_worktree
+
+            result = show_native_worktree(namespace, context)
         elif command == "workbench copy":
             from spec_dock.runtime.application.direct_workbench import copy_workbench
 

@@ -100,16 +100,14 @@ def _recovery_help(leaf: str) -> str:
         return "Inspect the Git ref, HEAD, and worktree status before a new explicit operation; no journal or rollback."
     if leaf.startswith("dependency "):
         return "Inspect current metadata and validate the dependency graph before a new explicit operation."
+    if leaf.startswith("worktree "):
+        return "Inspect the native Git inventory, ref, target path and observed effects before a new explicit operation; no registry, receipt or automatic rollback."
     command = RECOVERY_LEAF_COMMANDS.get(leaf)
     if command is not None:
         rollback = (
             "; --rollback OPERATION_ID is available for verified local rollback" if command in ROLLBACK_COMMANDS else ""
         )
         return f"Inspect the operation record, then use --resume OPERATION_ID with the same target{rollback}."
-    if leaf == "worktree create":
-        return "Inspect the target record, path, Git ref, and registration; --recover ID retries only after all effects are absent."
-    if leaf == "worktree bootstrap":
-        return "Inspect the target record and project effects; --recover --yes only acknowledges the attempt, then retry separately."
     if leaf == "workspace sync":
         return "No mutation to recover; inspect incomplete observations and issue a new Sync."
     if leaf in MUTATING_LEAF_PATHS:
@@ -128,6 +126,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     dependency = len(argv) >= 2 and argv[0] == "dependency"
     artifact = len(argv) >= 2 and argv[0] == "artifact"
     workbench = argv[:2] == ["workbench", "copy"]
+    worktree = len(argv) >= 2 and argv[0] == "worktree"
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
     if (
@@ -143,6 +142,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not dependency
         and not artifact
         and not workbench
+        and not worktree
     ):
         return
     index = 2
@@ -151,7 +151,11 @@ def _reject_retired_start(argv: list[str]) -> None:
         if token == "--":
             return
         name, separator, value = token.partition("=")
-        if name in ("--resume", "--rollback") or ((start or dependency) and name == "--allow-stale"):
+        if (
+            name in ("--resume", "--rollback")
+            or ((start or dependency) and name == "--allow-stale")
+            or (worktree and name == "--recover")
+        ):
             raise RetiredArgumentError(
                 f"{name} was retired; inspect the current state and issue a new explicit operation"
             )
@@ -175,6 +179,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--type",
             "--to-worktree",
             "--on-conflict",
+            "--root",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1
@@ -347,6 +352,11 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     parsed = parser.parse_args(remaining)
     if parsed.command_path == "workbench copy" and not Path(parsed.to_worktree).expanduser().is_absolute():
         parser.error("--to-worktree requires an absolute worktree path; registered aliases were retired")
+    if (
+        parsed.command_path in ("worktree show", "worktree remove", "worktree bootstrap")
+        and not Path(parsed.worktree_ref).expanduser().is_absolute()
+    ):
+        parser.error("worktree reference requires an absolute path; registered aliases were retired")
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):
         parser.error("active clear requires exactly one of --from or --all")
     if parsed.command_path == "installation update":
@@ -374,10 +384,6 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("recovery requires a 32-character lowercase operation ID")
     if parsed.command_path == "branch create" and not resume and not parsed.base:
         parser.error("branch create requires --base")
-    if parsed.command_path == "worktree create" and parsed.recover and common.get("dry_run"):
-        parser.error("worktree create --recover cannot be combined with --dry-run")
-    if parsed.command_path == "worktree bootstrap" and parsed.recover and common.get("dry_run"):
-        parser.error("worktree bootstrap --recover cannot be combined with --dry-run")
     if parsed.command_path not in MUTATING_LEAF_PATHS and common.get("yes"):
         parser.error("--yes applies only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
