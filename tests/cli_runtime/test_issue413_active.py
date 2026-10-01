@@ -144,6 +144,90 @@ def test_active_set_same_direct_is_unchanged_and_preserves_exact_record(
     assert record.read_bytes() == before
 
 
+@pytest.mark.parametrize("target", ["init-00001", "init-1", "gh:example/repo#1", "@current"])
+def test_active_set_existing_direct_resolves_exact_selectors_without_acquisition_or_remote_calls(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], target: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = make_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+
+    def unexpected(*_args: object, **_kwargs: object) -> object:
+        pytest.fail("unchanged Active set must not acquire a Start lock or call GitHub")
+
+    monkeypatch.setattr("spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", unexpected)
+    monkeypatch.setattr("spec_dock.runtime.infra.start_lock.StartLock.__enter__", unexpected)
+    before = tree_digest(root)
+    assert main(["--project", str(root), "active", "set", target, "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "unchanged" and result["effects"] == []
+    assert result["data"]["selection"]["scope_id"] == "init-00001"
+    assert record.exists() and tree_digest(root) == before
+
+
+@pytest.mark.parametrize("legacy_kind", ["files", "directories-and-hardlink"])
+def test_active_clear_preserves_legacy_manifests_projections_and_cache_bytes(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], legacy_kind: str
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = make_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    agent = record.parent.parent
+    work = root / "spec-dock/.work"
+    projection = root / "spec-dock/active"
+    work.mkdir()
+    projection.mkdir()
+    old_bytes = b'{"schema_version":2,"issue":{"id":"iss-00099","future_field":"keep"}}\r\n'
+    for path in (work / "active.json", work / "current.json", agent / "active.json"):
+        path.write_bytes(old_bytes)
+    cached = agent / "index.json"
+    cached.write_bytes(b'{"active":{"issue":{"id":"iss-00099"}},"nodes":{}}\r\n')
+    generated = projection / "current-runbook.json"
+    if legacy_kind == "files":
+        generated.write_bytes(b"private old runbook\r\n")
+    else:
+        generated.mkdir()
+        (generated / "preserve.bin").write_bytes(b"\x00private\xff")
+        (tmp_path / "outside-alias.json").hardlink_to(cached)
+    legacy_trees = {path: tree_digest(path) for path in (work, projection, root / ".git")}
+    preserved = {
+        path: path.read_bytes() for path in (agent / "active.json", cached, *root.glob("spec-dock/**/.meta.json"))
+    }
+    assert main(["--project", str(root), "active", "clear", "--all", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["selection"]["status"] == "empty" and not record.exists()
+    assert result["status"] == "succeeded" and output.err == ""
+    assert all(tree_digest(path) == digest for path, digest in legacy_trees.items())
+    assert all(path.read_bytes() == content for path, content in preserved.items())
+    assert cached.stat().st_nlink == (2 if legacy_kind == "directories-and-hardlink" else 1)
+    assert "private" not in output.out and "iss-00099" not in output.out
+    assert not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("arguments", [["set", "@current"], ["clear", "--all"]])
+def test_active_refuses_a_hardlinked_current_record_without_changing_the_record_or_external_alias(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], arguments: list[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = make_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    alias = tmp_path / "external-selection-alias.json"
+    alias.hardlink_to(record)
+    before = tree_digest(root)
+    old_alias = alias.read_bytes()
+    assert main(["--project", str(root), "active", *arguments, "--json"]) == 3
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["effects"] == []
+    assert record.exists() and record.stat().st_nlink == 2
+    assert tree_digest(root) == before and alias.read_bytes() == old_alias
+    assert str(alias) not in output.out + output.err
+
+
 def test_clear_all_preserves_stale_selection_until_it_is_explicitly_removed(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

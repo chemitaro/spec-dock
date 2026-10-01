@@ -76,6 +76,7 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
             "spec_dock/runtime/infra/generation_store.py",
             "spec_dock/runtime/infra/github_status_cache.py",
             "spec_dock/runtime/infra/git_snapshot.py",
+            "spec_dock/runtime/infra/active_store.py",
             "spec_dock/runtime/application/installation_update_vnext.py",
             "spec_dock/runtime/active.py",
             "spec_dock/runtime/application/close_node.py",

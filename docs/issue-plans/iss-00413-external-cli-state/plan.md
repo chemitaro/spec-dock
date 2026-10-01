@@ -607,6 +607,14 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 
 元logsは既存Epic Workbenchのiss-00413-implementation/pytest-generated-state-retirement-{before,source-red,source-green,related}.logへ保持した。37 errorsの通常lintはclean 32c372e1の別snapshotである。残る旧source/tests、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
 
+**旧三段Active保存・投影adapterの退役**
+
+旧infra/active_store.py（645行・29 functions）と旧二test files（1067行・18 test関数）を全文確認し、[個別対応](artifacts/test-port-active-projection-retirement.md)を保存した。候補外importは絶対／相対／TYPE_CHECKING／子moduleを含め0。固定active.jsonへの三段保存、旧manifest自動採用/.work prune、symlink/path/context-pack投影、index/tree patch、全体snapshot/restoreを削除した。直接一件/現存祖先、捕捉tokenだけの解除、legacy資料の安全な観測と保全は維持する。application/set_active等の残る旧graphは別の退役対象であり、このunitで全て削除したとは扱わない。
+
+公開unchangedの四selectorと、旧manifest/projection/cache/不正directory/hardlink保全の二caseは退役前に6 passed/38 deselected（0.53秒）、exit0。通常wheelの旧module収録禁止はRed 1 failed（0.73秒、exit1）→同test Green 1 passed（14.47秒、exit0）。関連Active/record/Finish/native kill/Sync/Doctor/wheel七suiteは185 passed（49.75秒）、exit0。後から追加した現record hardlinkのSet/Clear拒否は別runで2 passed/44 deselected（0.25秒）、exit0であり、この185に加算しない。全Ruff check/format（310 files）、MYPYPATH=srcの変更二test限定mypy、diff checkが成功した。skip/収集除外を増やさない。
+
+通常make lintはこのunitのPython差分を適用したc93100ba基準でRuff成功・mypy 32 errors/11旧source files（229 source files）、make exit2。37 errorsはclean 32c372e1の旧snapshotである。元logsは既存Epic Workbenchのiss-00413-implementation/pytest-old-active-infra-retirement-{before,source-red,source-green,related}.log、pytest-old-active-infra-hardlink.log、lint-p12-old-active-infra.logへ保持した。残る旧source/tests、full gates、native OS/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。
