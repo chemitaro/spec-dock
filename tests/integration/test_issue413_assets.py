@@ -105,6 +105,26 @@ def test_installation_show_does_not_require_a_workspace_or_control_record(
     assert result["effects"] == [] and tree_digest(target) == before
 
 
+def test_installation_show_preserves_a_non_git_target_and_reports_the_native_git_error(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = uninitialized_worktree(tmp_path / "consumer")
+    target = tmp_path / "other"
+    target.mkdir()
+    (target / "evidence.bin").write_bytes(b"opaque user-owned evidence")
+    monkeypatch.chdir(root)
+    before, target_before = tree_digest(root), tree_digest(target)
+    assert main(["installation", "show", "--target", str(target), "--json"]) == 5
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed" and result["effects"] == []
+    assert result["error"]["code"] == "GIT_FAILED"
+    diagnostic = result["error"]["details"]["git"]
+    assert diagnostic["argv"] == ["git", "-C", str(target), "rev-parse", "--show-toplevel"]
+    assert diagnostic["returncode"] != 0 and "not a git repository" in diagnostic["stderr"]
+    assert diagnostic["redacted"] is False
+    assert tree_digest(root) == before and tree_digest(target) == target_before
+
+
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX directory-descriptor publication fixtures")
 @pytest.mark.parametrize("after_publication", [False, True])
 def test_init_reports_partial_publication_and_each_unattempted_asset_without_rollback(

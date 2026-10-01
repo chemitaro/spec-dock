@@ -741,3 +741,14 @@ Syncは通常/previewともdirect記録とopaqueな旧generationを更新せず�
 実wheelの収録禁止を先に追加し、正常buildのartifactに二つの旧入口が存在するRedを確認した（1 failed/0.80秒）。二source削除後、同じtestは1 passed（14.34秒）。通常wheel/sdist、非editable外部venv、context不要utility、Scope/CI validate、shimとstatic操作を確認する既存受入れ経路を最後まで実行した。既存build_pyがbuild_libのpackageを新しく作り直すため、過去のbuild出力を同梱しない。新除外条件・builder fallbackは追加していない。
 
 `uv run pytest tests/integration/test_cli_entrypoint_vnext.py tests/integration/test_ci_fixed_validation.py tests/unit/infra/test_provider_distribution.py -q --tb=short` は24 passed（13.03秒）。既存Epic Workbenchのiss-00413-implementation/pytest-fixed-entrypoint-retirement.logへ保持。全source/tests Ruff check/format（418 files）、変更wheel test限定mypy --follow-imports=silent、diff checkも成功した。実consumer/live GitHubを変更せず、旧source/README/AGENTSの退役整理、full type/pytest、native Windows/Python3.10、fresh Strictと最終手動確認を継続する。
+
+
+## P-12 通常全pytestの再確認と最後の旧CLI adapter退役
+
+clean a3844fc35dbc0065b95951d43109a1077a6a45ddで `uv run pytest -q --tb=short` を実行し、2048 passed/1 skipped（369.70秒）、exit0を確認した。以前の79失敗はこのsnapshotで解消した。ログは既存Epic Workbenchのiss-00413-implementation/pytest-p12-a3844fc3.logへ保持した。1 skipは成功件数に含めず、Windows native/別Python/full AC検証の代わりにしない。
+
+同snapshotの通常 `make lint` はexit2。Ruff check/format（418 files）は成功したがmypyは559 errors/63 files（337 source filesを検査）だった。source 166/test 393 errorsで、旧control/dispatcher/applicationとそのprivate fixturesの型不整合が多数を占める。現行経路の型問題も含むため、退役と実際の型修正を行い、限定mypyの成功をfull gateへ読み替えない。元ログはiss-00413-implementation/lint-p12-a3844fc3.logへ保持した。
+
+旧dispatcherをtestから参照する最後の四filesを全文確認し、[十二関数の対応表](artifacts/test-port-remaining-adapters.md)へ保存した。中央registration/group control・new local Scope・旧receiptを後継仕様に残さず、既存公開Dependency/Artifact/Workbench/Static installationの保証へ個別に対応づけて退役した。新しい非Git targetのInstallation show一件はv2/exit5・raw Git argv/stderrと双方tree不変を検査し、1 passed（0.15秒）。既存実装のGreenであり製品Redではない。
+
+`uv run pytest tests/integration/test_issue413_assets.py tests/cli_runtime/test_issue413_dependency.py tests/cli_runtime/test_issue413_artifact.py tests/cli_runtime/test_issue413_workbench.py -q --tb=short` は182 passed（94.98秒）。ログはiss-00413-implementation/pytest-test-retirement-public.logへ保持した。全source/tests Ruff check/format（414 files）、変更assets test限定mypy --follow-imports=silent、diff checkも成功した。旧dispatcherとcommandsのsource側参照閉包整理は別stepとして残す。実consumer・Git内の独自領域・live GitHubは未変更。
