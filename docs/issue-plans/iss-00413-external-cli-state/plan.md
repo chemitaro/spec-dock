@@ -453,6 +453,12 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 
 通常全pytestの再合格、full type gate、native Windows/別Python、fresh Strict、最終手動検証は未完了である。実consumer・既存WT・旧Git領域・live GitHubは未変更。
 
+**新規local Scope作成試験の退役**
+
+旧local createの十二test関数と二helpersを全文確認し、[保証別の判断](artifacts/test-port-local-scope-retirement.md)で退役した。候補外helper importは0。独自local採番/high-water/cache/offline createの成功条件を残さず、GH番号SSOTと既存local metadata保全を維持する。親差替えsafetyはpublic main/native Git/stateful gh/OS fsyncの境界へ移し、replacement tree不変・元metadata/ref保全・partial/6を二casesで確認した（2 passed、1.15秒）。最初のnot_attempted期待はstage開始済みを反映したfailedへ訂正し、製品Redには数えない。
+
+関連current publication/import/create/query/lifecycle/migrationの128 tests（38.34秒）、全Ruff check/format（374 files）、変更publication test限定mypy --follow-imports=silentとdiff checkが成功した。最初の存在しない二test file指定はexit4/zero testsで、実在fileへ訂正した結果だけを回帰証拠にする。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-local-creation-retirement-related.log（中断）とpytest-local-creation-retirement-related-2.log（成功）へ保持した。全体lintは直近407 errorsで未合格のまま。旧source/private writersの整理、full gates、native Windows/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。
+
 **入力/出力例**: 入力: 既知旧資産、ユーザー改変資産、古いbranchから戻ったshim。出力: 既知差分だけのplan/apply、改変資産は停止、外部consoleは独立動作。
 
 **Red → Green / 検証**: Red: 新installがruntime/controlをconsumerへ置く、更新が別WTへ及ぶ。Green: staticのみ、source/wheel整合、既存code更新でも仕様bytes不変。

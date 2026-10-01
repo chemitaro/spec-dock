@@ -801,3 +801,10 @@ fresh processの公開close previewは旧六modules読込でRed 1 failed（0.61�
 通常wheelは先行した収録禁止でRed 1 failed（0.75秒）、削除後の同testはGreen 1 passed（13.38秒）。通常collectionは2042 tests（0.38秒）、関連公開CLI/entrypoint/Doctor/Sync/依存/Workbenchは222 tests（36.58秒）が成功した。通常make lintはRuff成功・mypy 407 errors/45 files（294 source files）、exit2で未合格。source 58/test 349 errorsを個別に整理・修正する。変更wheel test限定mypyとdiff checkも成功。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-unused-entrypoints-{red,green,collection,related}.log、lint-p12-c633-retirement.logへ保存した。
 
 通常全pytestの再合格、full type gate、native Windows/別Python、fresh Strict、最終手動検証は未完了である。実consumer・既存WT・旧Git領域・live GitHubは未変更。
+
+
+## P-12 新規local Scope作成試験の退役
+
+旧local createの十二test関数と二helpersを全文確認し、[保証別の判断](artifacts/test-port-local-scope-retirement.md)で退役した。候補外helper importは0。独自local採番/high-water/cache/offline createの成功条件を残さず、GH番号SSOTと既存local metadata保全を維持する。親差替えsafetyはpublic main/native Git/stateful gh/OS fsyncの境界へ移し、replacement tree不変・元metadata/ref保全・partial/6を二casesで確認した（2 passed、1.15秒）。最初のnot_attempted期待はstage開始済みを反映したfailedへ訂正し、製品Redには数えない。
+
+関連current publication/import/create/query/lifecycle/migrationの128 tests（38.34秒）、全Ruff check/format（374 files）、変更publication test限定mypy --follow-imports=silentとdiff checkが成功した。最初の存在しない二test file指定はexit4/zero testsで、実在fileへ訂正した結果だけを回帰証拠にする。元ログは既存Epic Workbenchのiss-00413-implementation/pytest-local-creation-retirement-related.log（中断）とpytest-local-creation-retirement-related-2.log（成功）へ保持した。全体lintは直近407 errorsで未合格のまま。旧source/private writersの整理、full gates、native Windows/別Python、fresh Strict、最終手動確認を継続する。実consumer/live GitHubは未変更。

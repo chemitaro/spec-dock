@@ -406,6 +406,89 @@ def publication_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tupl
     return root, log
 
 
+@pytest.mark.parametrize("phase,scaffold_status", [("before-publish", "failed"), ("after-publish", "unknown")])
+def test_parent_directory_swap_during_scaffold_sync_never_writes_the_replacement(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    phase: str,
+    scaffold_status: str,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    parent = root / "spec-dock/initiatives/init-00001-fixture"
+    (parent / "epics").mkdir(exist_ok=True)
+    metadata = (parent / ".meta.json").read_bytes()
+    detached = tmp_path / "detached-parent"
+    original_fsync = os.fsync
+    swapped = False
+    replacement_digest = None
+
+    def sync(descriptor: int) -> None:
+        nonlocal swapped, replacement_digest
+        original_fsync(descriptor)
+        if swapped:
+            return
+        opened = os.fstat(descriptor)
+        if phase == "before-publish":
+            directories = tuple((root / "spec-dock/.agent/staging").glob(".stage-*"))
+        elif (parent / "epics/epic-00057-new-epic").is_dir():
+            directories = (parent / "epics",)
+        else:
+            return
+        if not any((item.stat().st_dev, item.stat().st_ino) == (opened.st_dev, opened.st_ino) for item in directories):
+            return
+        parent.rename(detached)
+        parent.mkdir()
+        (parent / ".meta.json").write_bytes(metadata)
+        (parent / "epics").mkdir()
+        (parent / "epics/external.txt").write_bytes(b"external replacement")
+        replacement_digest = tree_digest(parent)
+        swapped = True
+
+    monkeypatch.setattr(os, "fsync", sync)
+    assert (
+        main([
+            "--project",
+            str(root),
+            "scope",
+            "create",
+            "epic",
+            "--backend",
+            "github",
+            "--parent",
+            "init-00001",
+            "--title",
+            "New Epic",
+            "--yes",
+            "--json",
+        ])
+        == 6
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert swapped and output.err == "" and result["status"] == "partial"
+    assert result["data"]["result"]["github_ref"] == "gh:example/repo#57"
+    assert [(effect["kind"], effect["status"]) for effect in result["effects"]] == [
+        ("github-create", "succeeded"),
+        ("scaffold", scaffold_status),
+    ]
+    assert result["error"] is not None
+    assert tree_digest(parent) == replacement_digest
+    assert (detached / ".meta.json").read_bytes() == metadata
+    published = detached / "epics/epic-00057-new-epic"
+    if phase == "before-publish":
+        assert not published.exists()
+    else:
+        assert json.loads((published / ".meta.json").read_bytes())["id"] == "epic-00057"
+    assert [(call["method"], call["endpoint"]) for call in map(json.loads, log.read_text().splitlines())] == [
+        ("GET", "repos/example/repo/issues/1"),
+        ("POST", "repos/example/repo/issues"),
+    ]
+    assert not (root / ".git/spec-dock").exists()
+
+
 def test_create_uses_the_confirmed_github_number_without_control_or_a_marker(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
