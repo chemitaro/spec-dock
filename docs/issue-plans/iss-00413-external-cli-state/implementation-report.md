@@ -1011,3 +1011,7 @@ AGENTS.mdの実装path、現在選択の取得、通常wheel、独立consumerで
 削除前の後継九casesは9 passed（0.20秒）、既存Greenのcharacterizationである。通常wheelの旧writer収録禁止はRed 1 failed（0.73秒）→Green 1 passed（13.49秒）。関連九suiteは236 passed（79.68秒）、実Python 3.10.15の後継/native record kill/store三suiteは23 passed（4.14秒）、全てexit0。全Ruff（311 files）、MYPYPATH=srcの変更三Python files限定mypyとdiff checkが成功した。初回のregex/OS callback型の二指摘はfixtureの実契約へ修正し、ignore/cast/skip/収集除外を増やさない。
 
 通常make lintは今回Python差分適用後にRuff成功・mypy 32 errors/11旧source files（230 source files）、make exit2。先行3.10全件成功は別候補であり、残る旧source/tests、今回の全件/native Linux/Python3.11/Windows、fresh Strict、最終手動確認は継続中。元logsはiss-00413-implementation/pytest-direct-json-retirement-{port,source-red,source-green,related,python310}.log、direct-json-test-typing.log、lint-direct-json-retirement.logへ保持。実consumer/live GitHubは未変更。
+
+**実Linux / Python 3.11の予備検証**
+
+[環境とfixture補正](artifacts/linux-python311-verification.md)を記録した。clean bdf44fe2のDocker Linux/Python 3.11.16全件は1844 passed/7 failed/17 skipped（870.24秒、exit1）。Artifact六casesのUSER未設定依存と、root capabilityがStart試験のnative書込み拒否を迂回する条件を切り分けた。capabilityだけを外した再実行は6 failed/1 passed（5.56秒）で、両原因を混同しない。試験のUSERを明示し、作成者文字列もassertした補正候補のLinux七casesは7 passed（5.53秒）、macOSのArtifact/Start全二suiteは139 passed（40.56秒）、全てexit0。全Ruff（311 files）、MYPYPATH=srcの変更test限定mypy、diff checkが成功した。製品挙動・元のnative拒否・skip条件は維持し、full Linux再合格と通常full lint、Windows、fresh Strict、最終手動確認は別途継続する。

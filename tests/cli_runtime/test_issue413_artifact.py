@@ -372,6 +372,7 @@ def test_all_creation_templates_and_owner_local_timestamp_slots_are_preserved(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
 ) -> None:
     root, owner = artifact_workspace(tmp_path)
+    monkeypatch.setenv("USER", "Fixture author")
     monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
     artifacts = owner / "artifacts"
     artifacts.mkdir()
@@ -398,6 +399,7 @@ def test_all_creation_templates_and_owner_local_timestamp_slots_are_preserved(
     path = root / artifact["path"]
     assert path.name.startswith("20261001t000000z-01-") and artifact["id"] in path.read_text()
     assert "<SCOPE_ID>" not in path.read_text() and "<YOUR_NAME>" not in path.read_text()
+    assert '作成者: "Fixture author"' in path.read_text()
     assert ('authority: "draft"' if kind == "adr" else f'template: "{kind}"') in path.read_text()
     assert existing.read_bytes() == b"existing evidence"
     assert not list(artifacts.glob(".publish-*")) and not (root / ".git/spec-dock").exists()
