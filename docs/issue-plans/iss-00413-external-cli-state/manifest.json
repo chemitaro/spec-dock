@@ -12,16 +12,12 @@
   },
   "basis": {
     "repository": "chemitaro/spec-dock",
-    "target_branch": "main",
-    "ref": "refs/heads/main",
-    "object_type": "commit",
-    "expected_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
-    "retrieved_tip_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
-    "comparison": "exact ASCII byte equality",
-    "verification": "passed via connected GitHub direct ref fetch before source use",
-    "other_branch_fallback": false,
-    "code_read_ref": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
-    "new_requirements_authority": "artifacts/user-decisions.md plus current user instructions"
+    "target_branch": "codex/iss-00413-external-cli-state",
+    "ref": "refs/heads/codex/iss-00413-external-cli-state",
+    "expected_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+    "retrieved_tip_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+    "verification": "Strict third-party brief connector verification at immutable base; subsequent source checkpoint recorded separately",
+    "new_requirements_authority": "artifacts/os-support-decision.md plus current user instructions"
   },
   "preserved_external_files": [
     {
@@ -44,10 +40,10 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 580,
+    "local_link_occurrences_checked": 581,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
-    "browser_dynamic": "4/4 SVG and zoom validator passed on current explanation HTML",
+    "browser_dynamic": "prior validated HTML bytes unchanged",
     "mobile": "Previous HTML viewport check retained as history; current edit is not claimed as a new mobile check",
     "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
     "product_acceptance": "incomplete; see current_implementation_evidence",
@@ -377,6 +373,26 @@
       "sha256": "1b9ed87a6afcf5856385c3687253f9266f4e1ebe0deef4b97c3656dcfa38e953"
     },
     {
+      "path": "artifacts/p18-implementation-brief-dd90ca97-raw.json",
+      "bytes": 43337,
+      "sha256": "3b5ab4ae7f955758f1e924e7e811a69a7fc6cbb0e0edc1131daf4f466a0b97aa"
+    },
+    {
+      "path": "artifacts/p18-implementation-brief-dd90ca97.md",
+      "bytes": 41782,
+      "sha256": "c367712801916f5e344dca1d6a4f8732ffbedb3c1aaf3979d48b140df40362e5"
+    },
+    {
+      "path": "artifacts/p18-retirement-focused-evidence.json",
+      "bytes": 282581,
+      "sha256": "99e24c577a56919e7abd9fced8ec6e5150057d479a19348a53108da45f3688ed"
+    },
+    {
+      "path": "artifacts/p18-retirement-implementation.md",
+      "bytes": 4501,
+      "sha256": "a397a48932adbc61bf8c4fbce84e48c23080eac41632cf86542f17ce64b2459d"
+    },
+    {
       "path": "artifacts/provider-retirement-dispatcher.md",
       "bytes": 7489,
       "sha256": "453e70408eb33d98372452a772e06e7301990414fddab702b670344e2a75ab17"
@@ -698,8 +714,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 156665,
-      "sha256": "1ec91fd47b502b7783039cfad8f20e87c7d33253c3b91a99dbab8cb275aef1e2"
+      "bytes": 157192,
+      "sha256": "8b7b5bd8ca1895e8db70c96aa2278570202f96c8feb3b9fc1721c591a83a7a0b"
     },
     {
       "path": "preview-entry.html",
@@ -919,7 +935,7 @@
       "exit_code": 10,
       "evidence": "artifacts/code-review-p06-12-analysis.md"
     },
-    "additional_work": "P-18 planned; Strict implementation brief and product changes pending; P-07 Finish P1 repair pending; fresh Code Review/FQ and P-16/P-17 pending"
+    "additional_work": "P-18.2/P-18.3 source/test focused Green; CI/docs/OS full/manual pending; P-07 Finish P1 repair and fresh Code Review/FQ and P-16/P-17 pending"
   },
   "os_retirement_authoring": {
     "model": "gpt-5.6-sol",
@@ -929,5 +945,35 @@
     "raw_zip_sha256": "31cfc245b0b393a626d02c877b029542ef4c4f845569744da1dccc5531b93a29",
     "decision": "artifacts/os-support-decision.md",
     "raw_response": "artifacts/os-retirement-chatgpt-121228c6.md"
+  },
+  "origin_basis": {
+    "repository": "chemitaro/spec-dock",
+    "target_branch": "main",
+    "ref": "refs/heads/main",
+    "object_type": "commit",
+    "expected_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "retrieved_tip_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "comparison": "exact ASCII byte equality",
+    "verification": "passed via connected GitHub direct ref fetch before source use",
+    "other_branch_fallback": false,
+    "code_read_ref": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "new_requirements_authority": "artifacts/user-decisions.md plus current user instructions"
+  },
+  "p18_brief": {
+    "oracle_session": "iss413-p18-retirement-brief",
+    "verified_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+    "author_model": "gpt-5.6-sol",
+    "thinking": "pro",
+    "ui_model_verified": true,
+    "ui_thinking_verified": true,
+    "actual_exit": 0,
+    "bytes": 41579,
+    "sha256": "8edbafc2f5e20e58f1a326f16a9cd03e86874cc8eed9834bb14d77242339cbec"
+  },
+  "p18_progress": {
+    "record": "artifacts/p18-retirement-implementation.md",
+    "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
+    "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+    "full_acceptance": "not certified"
   }
 }

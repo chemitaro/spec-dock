@@ -31,6 +31,7 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     with zipfile.ZipFile(wheel) as archive:
         names = archive.namelist()
         retired_entrypoints = {
+            "spec_dock/runtime/infra/windows_handles.py",
             "spec_dock/external_cli.py",
             "spec_dock/fixed_bundle.py",
             "spec_dock/runtime_loader.py",

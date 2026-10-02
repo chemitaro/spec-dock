@@ -1,4 +1,4 @@
-"""Real OS handles and separate processes; this is not Windows store acceptance."""
+"""Real POSIX handles and separate processes without Git metadata writes."""
 
 from __future__ import annotations
 
@@ -14,8 +14,6 @@ import sys
 import time
 from typing import TYPE_CHECKING, Any
 
-import pytest
-
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
 
 if TYPE_CHECKING:
@@ -25,7 +23,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def _environment(tmp_path: Path) -> dict[str, str]:
-    environment = {key: os.environ[key] for key in ("PATH", "SYSTEMROOT", "WINDIR", "TMP", "TEMP") if key in os.environ}
+    environment = {key: os.environ[key] for key in ("PATH",) if key in os.environ}
     environment.update({
         "HOME": str(tmp_path),
         "PYTHONPATH": str(ROOT / "src"),
@@ -102,8 +100,6 @@ def _holder(
             time.sleep(0.01)
         payload = json.loads(ready.read_bytes())
         assert payload["provider"] == str((ROOT / "src/spec_dock/__init__.py").resolve())
-        if sys.platform == "win32":
-            assert payload["filesystem"] == "NTFS", payload
         print(json.dumps({"native_holder": payload}, sort_keys=True))
         yield process, payload
     finally:
@@ -176,56 +172,6 @@ def test_terminated_owner_releases_native_start_lock_without_pid_recovery(tmp_pa
     assert _snapshot(common) == before
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="native Win32 WAIT_ABANDONED requires Windows")
-def test_windows_abandoned_mutex_is_acquired_then_released_on_real_ntfs(tmp_path: Path) -> None:
-    from spec_dock.runtime.domain.work_target import PhysicalIdentity
-    from spec_dock.runtime.infra.start_lock import windows_mutex_name
-    from spec_dock.runtime.infra.windows_handles import WindowsMutex, _native_mutex_api
-
-    environment = _environment(tmp_path)
-    common = _repository(tmp_path, "clone", environment) / ".git"
-    before = _snapshot(common)
-    with _holder(tmp_path, common, environment) as (process, held):
-        name = windows_mutex_name(PhysicalIdentity(**held["identity"]))
-        api = _native_mutex_api()
-        # Keep an unowned real handle open, so termination cannot destroy the mutex object.
-        retained = api.CreateMutexW(None, 0, name)
-        assert retained
-        try:
-            process.kill()
-            assert process.wait(timeout=5) != 0
-            with WindowsMutex(name, timeout=0) as acquired:
-                assert acquired.abandoned is True
-            with WindowsMutex(name, timeout=0) as normal:
-                assert normal.abandoned is False
-        finally:
-            assert api.CloseHandle(retained)
-    assert _snapshot(common) == before
-
-
-def _filesystem(path: Path) -> str | None:
-    if sys.platform != "win32":
-        return None
-    import ctypes
-
-    api = ctypes.WinDLL("kernel32", use_last_error=True)
-    api.GetVolumeInformationW.argtypes = [
-        ctypes.c_wchar_p,
-        ctypes.c_wchar_p,
-        ctypes.c_uint32,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_void_p,
-        ctypes.c_wchar_p,
-        ctypes.c_uint32,
-    ]
-    api.GetVolumeInformationW.restype = ctypes.c_int
-    filesystem = ctypes.create_unicode_buffer(261)
-    if not api.GetVolumeInformationW(path.anchor, None, 0, None, None, None, filesystem, len(filesystem)):
-        raise ctypes.WinError(ctypes.get_last_error())
-    return filesystem.value
-
-
 def _native_process() -> int:
     import spec_dock
 
@@ -240,7 +186,6 @@ def _native_process() -> int:
                 "platform": sys.platform,
                 "python": sys.version,
                 "provider": str(Path(spec_dock.__file__).resolve()),
-                "filesystem": _filesystem(common),
             }
             if mode == "hold":
                 ready = Path(sys.argv[3])

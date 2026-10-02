@@ -392,7 +392,7 @@ def test_validation_preview_is_read_only_and_does_not_reserve_any_work(
     assert tree_digest(root) == before
 
 
-@pytest.mark.skipif(os.name != "posix", reason="native POSIX selection store; Windows adapter is tested separately")
+@pytest.mark.skipif(os.name != "posix", reason="native POSIX selection store")
 @pytest.mark.parametrize("selected", [False, True])
 def test_working_validation_checks_an_explicit_current_scope_expectation(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], selected: bool

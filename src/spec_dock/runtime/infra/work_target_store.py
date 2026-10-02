@@ -75,8 +75,6 @@ class WorkTargetStore:
             self._directory_fd = None
 
     def _open(self, *, create: bool = False) -> int:
-        if os.name == "nt":
-            raise NotImplementedError("Windows selection adapter is not connected yet")
         if self._directory_fd is None:
             if self._root_handle is not None:
                 self._root_handle.verify()

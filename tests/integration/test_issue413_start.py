@@ -19,7 +19,6 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-@pytest.mark.skipif(os.name == "nt", reason="Windows native immutable store is not connected yet")
 @pytest.mark.parametrize("same_scope", [True, False])
 def test_concurrent_starts_share_exclusion_and_only_same_scope_conflicts(tmp_path: Path, same_scope: bool) -> None:
     root = committed_workspace(tmp_path / "main")

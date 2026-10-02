@@ -38,18 +38,6 @@ def read_guarded_json_bytes(path: Path) -> tuple[Any, bytes, tuple[int, int]] | 
     """Capture exact input bytes and identity without JSON reserialization."""
     if not path.is_absolute():
         raise ValueError("JSON source must be absolute")
-    if os.name == "nt":
-        from spec_dock.runtime.infra.windows_handles import WindowsDirectory
-
-        try:
-            with WindowsDirectory(path.parent) as directory:
-                captured = directory.read_file_bytes(path.name)
-        except FileNotFoundError:
-            return None
-        if captured is None:
-            return None
-        payload, identity = captured
-        return json.loads(payload), payload, identity
     if not path.parent.exists():
         return None
     directory_fd = _open_directory_without_links(path.parent)

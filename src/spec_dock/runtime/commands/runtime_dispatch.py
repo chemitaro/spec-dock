@@ -3,14 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import replace
+import sys
 from typing import TYPE_CHECKING
 
-from spec_dock.runtime.application.project_context import resolve_context
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
-from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
-from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.cli.catalog import MUTATING_LEAF_PATHS
-from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData, FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult, render_json_v2, render_text
 
@@ -24,6 +20,17 @@ if TYPE_CHECKING:
 
 def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
     command = namespace.command_path
+    if sys.platform not in ("linux", "darwin"):
+        return _render_result(
+            namespace,
+            failure(command, "UNSUPPORTED_PLATFORM", "business commands support Linux and macOS", 3),
+        )
+    from spec_dock.runtime.application.project_context import resolve_context
+    from spec_dock.runtime.application.scope_expectations import check_scope_expectations
+    from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
+    from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+    from spec_dock.runtime.infra.git_process import GitProcessError
+
     result: OperationResult[object]
     try:
         if command.startswith("installation "):

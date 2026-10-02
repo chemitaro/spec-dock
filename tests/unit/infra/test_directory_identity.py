@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -17,7 +16,7 @@ def test_held_directory_detects_same_path_different_object(tmp_path: Path) -> No
     directory = tmp_path / "root"
     directory.mkdir()
     with DirectoryIdentity(directory) as held:
-        assert held.identity.platform == ("windows" if os.name == "nt" else "posix")
+        assert held.identity.platform == "posix"
         before = held.identity
         held.verify()
         directory.rename(tmp_path / "old")

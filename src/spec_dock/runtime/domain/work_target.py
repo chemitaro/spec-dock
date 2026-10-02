@@ -15,15 +15,14 @@ _GITHUB_REF = re.compile(r"^gh:[a-z0-9][a-z0-9-]*/[a-z0-9_.-]+#[1-9][0-9]*$")
 
 @dataclass(frozen=True)
 class PhysicalIdentity:
-    platform: Literal["posix", "windows"]
+    platform: Literal["posix"]
     device: str
     file_id: str
 
     def __post_init__(self) -> None:
-        pattern = r"[0-9]+" if self.platform == "posix" else r"[0-9a-f]{32}"
-        if self.platform not in ("posix", "windows") or not re.fullmatch(r"[0-9]+", self.device):
+        if self.platform != "posix" or not re.fullmatch(r"[0-9]+", self.device):
             raise ValueError("invalid physical identity")
-        if not re.fullmatch(pattern, self.file_id):
+        if not re.fullmatch(r"[0-9]+", self.file_id):
             raise ValueError("invalid physical file identity")
 
     @classmethod
@@ -31,7 +30,7 @@ class PhysicalIdentity:
         if not isinstance(payload, dict) or set(payload) != {"platform", "device", "file_id"}:
             raise ValueError("invalid physical identity fields")
         platform, device, file_id = payload["platform"], payload["device"], payload["file_id"]
-        if platform not in ("posix", "windows") or not isinstance(device, str) or not isinstance(file_id, str):
+        if platform != "posix" or not isinstance(device, str) or not isinstance(file_id, str):
             raise ValueError("invalid physical identity types")
         return cls(platform, device, file_id)
 

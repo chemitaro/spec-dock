@@ -69,7 +69,7 @@ def test_unconnected_directory_platform_returns_a_public_failure_before_writes(
 
     root = make_workspace(tmp_path / "consumer")
     before = tree_digest(root)
-    # Neither the POSIX descriptor nor the Windows handle adapter supports this OS.
+    # A missing POSIX adapter still fails closed on an otherwise supported OS.
     monkeypatch.setattr("spec_dock.runtime.infra.json_store.os", SimpleNamespace(name="unavailable"))
     assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 5
     output = capsys.readouterr()
