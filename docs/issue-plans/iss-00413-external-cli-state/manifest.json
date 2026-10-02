@@ -44,12 +44,12 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 438,
+    "local_link_occurrences_checked": 444,
     "html_unique_ids": 33,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "4/4 SVG and zoom validator passed on current explanation HTML",
     "mobile": "IAB viewport 390px; document width 375px; no horizontal document overflow; restored viewport",
-    "source_publication": "ten documents and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
+    "source_publication": "eleven documents and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
     "product_acceptance": "incomplete; see current_implementation_evidence",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
@@ -58,8 +58,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 5864,
-      "sha256": "fdb65a6fc745b95e726dff1673382710975b1f0fae0f6cb9fd89bd9e1662c0d6"
+      "bytes": 6248,
+      "sha256": "5206b320c53db778c61ecac8241f1d5348339843785828a5c9dc2ca92d28a89f"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
@@ -223,8 +223,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 5116,
-      "sha256": "b3c9c12b14ca4bbe15add80e00cb3e0ca57afae15d638885be838bed9132af84"
+      "bytes": 5446,
+      "sha256": "2900616147ba2e59b55877f43c115f3ba7bf0040f3940a27a8c538fb8e57be4c"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -543,13 +543,18 @@
     },
     {
       "path": "artifacts/windows-adapter-connection-review.md",
-      "bytes": 4345,
-      "sha256": "aa43e8ab80bdb41633e503cb9b7451050b9dea399740fb87933f714e595ee629"
+      "bytes": 4968,
+      "sha256": "45898c0ab88ea72af65e0d28b4c262cb4955e053b8d491dcb114e2d04f6c7bdb"
     },
     {
       "path": "artifacts/windows-directory-anchor.md",
       "bytes": 5291,
       "sha256": "a071b829dd6143a8dfac5a2496bca2aacc0177819376261c5b296c5377b37c24"
+    },
+    {
+      "path": "artifacts/windows-json-read.md",
+      "bytes": 4947,
+      "sha256": "22c85790c85fc54e57c9e4f209b9cb6e8ea45c80146dc2ac7c016e411b993199"
     },
     {
       "path": "decision-questions.md",
@@ -563,13 +568,13 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 70249,
-      "sha256": "1d6cb57a73a55f72fb07c3b85aab57e68439cd982f11406b1dcc9a8b68df22f3"
+      "bytes": 70966,
+      "sha256": "4d921f4bc0fcc52dd77803f4b6fe53c3e3f74e022253b0f49d18c99b810d3de6"
     },
     {
       "path": "implementation-report.md",
-      "bytes": 221323,
-      "sha256": "9d8bdcbaad14eac48c4bc8d705e579b94e5c7d5ce5cd409b9f9e322db497114f"
+      "bytes": 222008,
+      "sha256": "17cfe8e4f088b0a7ae16177d4badb50a1aa993177820a47b3fd20a3add52ede2"
     },
     {
       "path": "index.html",
@@ -578,8 +583,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 139456,
-      "sha256": "8685867c940bc297a3c2c5446981826bae91d5caabbab976020bfab23280a6d4"
+      "bytes": 140136,
+      "sha256": "69342100b59a0b3865a0a489802038c162d39f5472db71890423b6ab167bc573"
     },
     {
       "path": "preview-entry.html",
@@ -588,8 +593,8 @@
     },
     {
       "path": "report.md",
-      "bytes": 23650,
-      "sha256": "16ba2c03d1371e18f3ba17d93f8a2907afaee1dec4be7052463f89f33676b31b"
+      "bytes": 24485,
+      "sha256": "8e7d06176e28ce2dc18db09ff614eb428c4befc9051b7c0677f1379449732ab5"
     },
     {
       "path": "requirement.md",
@@ -768,7 +773,8 @@
   "current_implementation_evidence": {
     "provider_candidate_sha": "3b0c69e8d61ad7ad5b01307dd301963a2cab180d",
     "provider_candidate_scope": "macOS full-test candidate including WindowsDirectory handle anchoring",
-    "provider_source_unchanged_since": "3b0c69e8d61ad7ad5b01307dd301963a2cab180d",
+    "provider_source_unchanged_since": null,
+    "provider_source_changes_after_full": "Windows JSON reader connection after baseline9a97f758; related tests only",
     "record": "artifacts/implementation-acceptance-evidence.md",
     "manual_record": "artifacts/manual-product-smoke.md",
     "macos_full_pytest": "exit 0; 1853 passed, 2 skipped; 402.78 seconds; main-guarded runner and external Trace2 diagnostic",
@@ -788,6 +794,17 @@
       "record": "artifacts/windows-directory-anchor.md",
       "macos_related": "21 passed, 1 skipped; exit0; 1.49 seconds",
       "python310_related": "21 passed, 1 skipped; exit0; 1.38 seconds",
+      "native_windows": "not executed; no acceptance claim"
+    },
+    "windows_json_read_change": {
+      "baseline_sha": "9a97f758c9948aa638ab40c3ed34f8565c09d81c",
+      "record": "artifacts/windows-json-read.md",
+      "source_hashes": {
+        "src/spec_dock/runtime/infra/json_store.py": "6b6b80ed3272f650bf4cc4069bbb626335b4b152993d06b2910315fd69273053",
+        "src/spec_dock/runtime/infra/windows_handles.py": "75c9e3f6b50bde4a1fa3c544835a0a4862c8676e9651c5e612703ebe2d841bae"
+      },
+      "macos_related": "58 passed, 3 skipped; exit0; 2.12 seconds",
+      "python310_related": "58 passed, 3 skipped; exit0; 2.30 seconds",
       "native_windows": "not executed; no acceptance claim"
     },
     "fresh_code_review": "pending",

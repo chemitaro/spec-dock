@@ -24,6 +24,8 @@ Linuxの18 skipはzsh不在12件、Win32限定1件、macOS stage契約1件、Lin
 
 baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更した。[境界の記録](windows-directory-anchor.md)に二つのRed→Greenと、Mac/実3.10各21 passed/1 skipped、通常make lint成功を保存した。変更後のclean 3b0c69e8は上表のmacOS全件を成功させた。Linux/手動の8a70a8b3と製品source差分があるため、それらを後続候補の全面合格へ読み替えない。Windows保存/native受入と現在候補のStrict/FQは未完了。
 
+続くbaseline9a97f758から[Windows JSON reader](windows-json-read.md)を接続した。関連八suiteはMac3.12/実3.10で各58 passed/3 skipped、通常lint成功。3b0c69e8の全件後の製品source差分であり、この変更を含む全件・Windows native・保存/各公開/processとStrict/FQの合格ではない。
+
 ## 認定と実環境作業
 
 - P-12進行中。P-13/P-14の試験・資料準備を先行しているが、依存stepの完了認定とは別。

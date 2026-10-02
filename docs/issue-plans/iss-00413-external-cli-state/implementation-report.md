@@ -1113,3 +1113,7 @@ baseline ccf9637d後、[親path置換のAPI境界Red](artifacts/windows-director
 ## 2026-10-02 Windows補強候補のmacOS全件
 
 通常commit3b0c69e8のclean/parent/branchを照合し、実3.12.11・provider/prefixを固定した。[全件記録](artifacts/macos-full-3b0c69e8.md)に最初の2 failed/1851 passed/2 skipped（452.60秒）、修正runnerの該当二case 2 passed/7 deselected（0.16秒）、同SHAの全件1853 passed/2 skipped（402.78秒）、最終exit0を保存した。最初はCodexのignored診断runnerがmultiprocessing childでも実行される不備で、main guardを加える修正だけで解消した。製品source・既存tests・timeout・skipを変更しない。旧8a70a8b3のreadonly比較不一致と別件である。Linux/手動は別source、Windows保存/native・fresh Strict/FQ・実consumer適用は未完了。
+
+## P-03 WindowsのJSON readerを親handleへ接続
+
+baseline9a97f758から[読取境界](artifacts/windows-json-read.md)をTDDで接続した。NtOpenFileの保持した親から元bytesと全FileId128を取得し、regular/single-link、非redirect、失敗時解放を検査。関連八suiteはMac3.12/実3.10で各58 passed/3 skipped、通常make lintも成功。未知OSの公開CLI停止契約を保持した。新規native二caseとCI設定は実行待ちで、選択保存/無上書き公開/同期/捕捉解除・各公開/processは未接続のまま。過去の全件・手動を別sourceとして保持し、P-03全体や現在候補Strict/FQの完了を宣言しない。

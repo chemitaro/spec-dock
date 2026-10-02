@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ctypes
+import errno
 import math
 import sys
 import time
@@ -53,6 +54,8 @@ class DirectoryAPI(Protocol):
     ) -> int: ...
     def RtlNtStatusToDosError(self, status: int) -> int: ...
     def GetFileInformationByHandleEx(self, handle: int, kind: int, buffer: object, size: int) -> int: ...
+    def GetFileType(self, handle: int) -> int: ...
+    def ReadFile(self, handle: int, buffer: object, size: int, count: object, overlapped: object) -> int: ...
     def CloseHandle(self, handle: int) -> int: ...
 
 
@@ -62,6 +65,16 @@ class _FileAttributeTagInfo(ctypes.Structure):
 
 class _FileIdInfo(ctypes.Structure):
     _fields_ = [("VolumeSerialNumber", ctypes.c_uint64), ("FileId", ctypes.c_ubyte * 16)]
+
+
+class _FileStandardInfo(ctypes.Structure):
+    _fields_ = [
+        ("AllocationSize", ctypes.c_int64),
+        ("EndOfFile", ctypes.c_int64),
+        ("NumberOfLinks", ctypes.c_uint32),
+        ("DeletePending", ctypes.c_ubyte),
+        ("Directory", ctypes.c_ubyte),
+    ]
 
 
 class _UnicodeString(ctypes.Structure):
@@ -107,6 +120,16 @@ def _native_directory_api() -> DirectoryAPI:
     kernel.CreateFileW.restype = ctypes.c_void_p
     kernel.GetFileInformationByHandleEx.argtypes = [ctypes.c_void_p, ctypes.c_int, ctypes.c_void_p, ctypes.c_uint32]
     kernel.GetFileInformationByHandleEx.restype = ctypes.c_int
+    kernel.GetFileType.argtypes = [ctypes.c_void_p]
+    kernel.GetFileType.restype = ctypes.c_uint32
+    kernel.ReadFile.argtypes = [
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_uint32,
+        ctypes.POINTER(ctypes.c_uint32),
+        ctypes.c_void_p,
+    ]
+    kernel.ReadFile.restype = ctypes.c_int
     kernel.CloseHandle.argtypes = [ctypes.c_void_p]
     kernel.CloseHandle.restype = ctypes.c_int
     native = ctypes.WinDLL("ntdll")
@@ -128,25 +151,32 @@ def _native_directory_api() -> DirectoryAPI:
             NtOpenFile=native.NtOpenFile,
             RtlNtStatusToDosError=native.RtlNtStatusToDosError,
             GetFileInformationByHandleEx=kernel.GetFileInformationByHandleEx,
+            GetFileType=kernel.GetFileType,
+            ReadFile=kernel.ReadFile,
             CloseHandle=kernel.CloseHandle,
         ),
     )
 
 
-def _open_child_directory(api: DirectoryAPI, parent: int, name: str) -> int:
+def _open_child(api: DirectoryAPI, parent: int, name: str, *, directory: bool) -> int:
     if not name or name in (".", "..") or any(character in name for character in ("/", "\\", "\0", ":")):
-        raise ValueError("physical directory name must be a single path component")
+        raise ValueError("physical entry name must be a single path component")
     encoded = name.encode("utf-16-le")
     if len(encoded) > 65532:
-        raise ValueError("physical directory name is too long")
+        raise ValueError("physical entry name is too long")
     buffer = ctypes.create_string_buffer(encoded + b"\0\0")
     string = _UnicodeString(len(encoded), len(encoded) + 2, ctypes.cast(buffer, ctypes.POINTER(ctypes.c_uint16)))
     attributes = _ObjectAttributes(ctypes.sizeof(_ObjectAttributes), parent, ctypes.pointer(string), 0x40, None, None)
     result = ctypes.c_void_p()
     io_status = _IoStatusBlock()
-    # FILE_READ_ATTRIBUTES | SYNCHRONIZE; directory, synchronous, no reparse traversal.
+    # Read attributes/data as needed; synchronous and no reparse traversal.
     status = api.NtOpenFile(
-        ctypes.byref(result), 0x100080, ctypes.byref(attributes), ctypes.byref(io_status), 7, 0x200021
+        ctypes.byref(result),
+        0x100080 if directory else 0x100081,
+        ctypes.byref(attributes),
+        ctypes.byref(io_status),
+        7,
+        0x200021 if directory else 0x200060,
     )
     if status != 0:
         if (
@@ -158,9 +188,11 @@ def _open_child_directory(api: DirectoryAPI, parent: int, name: str) -> int:
             raise _api_error("CloseHandle")
         if sys.platform == "win32":
             raise ctypes.WinError(api.RtlNtStatusToDosError(status))
+        if status & 0xFFFFFFFF in (0xC000000F, 0xC0000034, 0xC000003A):
+            raise FileNotFoundError(errno.ENOENT, f"NtOpenFile failed: NTSTATUS 0x{status & 0xFFFFFFFF:08x}", name)
         raise OSError(f"NtOpenFile failed: NTSTATUS 0x{status & 0xFFFFFFFF:08x}")
     if not result.value or result.value == ctypes.c_void_p(-1).value:
-        raise OSError("NtOpenFile returned an invalid directory handle")
+        raise OSError("NtOpenFile returned an invalid entry handle")
     return result.value
 
 
@@ -180,7 +212,7 @@ class WindowsDirectory:
         try:
             for component in (*reversed(self.path.parents), self.path):
                 if self._handles:
-                    handle = _open_child_directory(api, self._handles[-1], component.name)
+                    handle = _open_child(api, self._handles[-1], component.name, directory=True)
                 else:
                     handle = api.CreateFileW(str(component), 0x80, 7, None, 3, 0x02200000, None)
                 if not handle or handle == ctypes.c_void_p(-1).value:
@@ -206,6 +238,42 @@ class WindowsDirectory:
         ):
             raise _api_error("GetFileInformationByHandleEx")
         return PhysicalIdentity("windows", str(observed.VolumeSerialNumber), bytes(observed.FileId).hex())
+
+    def read_file_bytes(self, name: str) -> tuple[bytes, tuple[int, int]] | None:
+        """Read a regular single-link leaf from this held parent, without reopening paths."""
+        if not self._handles or self._api is None:
+            raise RuntimeError("physical directory handle is not open")
+        api = self._api
+        try:
+            handle = _open_child(api, self._handles[-1], name, directory=False)
+        except FileNotFoundError:
+            return None
+        try:
+            if api.GetFileType(handle) != 1:
+                raise ValueError("JSON source must be a single-link regular file")
+            attributes = _FileAttributeTagInfo()
+            standard = _FileStandardInfo()
+            identity = _FileIdInfo()
+            for kind, info in ((9, attributes), (1, standard), (18, identity)):
+                if not api.GetFileInformationByHandleEx(handle, kind, ctypes.byref(info), ctypes.sizeof(info)):
+                    raise _api_error("GetFileInformationByHandleEx")
+            if attributes.FileAttributes & 0x410 or standard.Directory or standard.NumberOfLinks != 1:
+                raise ValueError("JSON source must be a single-link regular file")
+            buffer = ctypes.create_string_buffer(65536)
+            chunks: list[bytes] = []
+            while True:
+                count = ctypes.c_uint32()
+                if not api.ReadFile(handle, buffer, len(buffer), ctypes.byref(count), None):
+                    raise _api_error("ReadFile")
+                if count.value > len(buffer):
+                    raise OSError("ReadFile returned an invalid byte count")
+                if count.value == 0:
+                    break
+                chunks.append(buffer.raw[: count.value])
+            return b"".join(chunks), (identity.VolumeSerialNumber, int.from_bytes(bytes(identity.FileId), "little"))
+        finally:
+            if not api.CloseHandle(handle):
+                raise _api_error("CloseHandle")
 
     def __exit__(
         self, exc_type: type[BaseException] | None, exc: BaseException | None, tb: TracebackType | None

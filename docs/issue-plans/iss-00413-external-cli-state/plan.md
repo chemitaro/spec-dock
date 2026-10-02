@@ -103,6 +103,8 @@ uv run pytest tests/unit/infra/test_work_target_store.py tests/cli_runtime/test_
 
 **失敗時の停止/戻り先**: token再利用、二件公開、前の解除が次を消す挙動があればD-03へ戻り、Finishへ共通lockを足して隠さない。
 
+**2026-10-02 Windows JSON読取の接続**: [親handleからのreader](artifacts/windows-json-read.md)をbaseline9a97f758から一単位として接続した。public readerの未接続Red→Green、正確なbytes/128bit identity、非redirect・regular/single-link、不存在と権限不足の区別、失敗時handle解放を確認。関連八suiteはMac3.12で58 passed/3 skipped（2.12秒）、実3.10で58 passed/3 skipped（2.30秒）、通常make lintはRuff300/mypy219でexit0。新規native二caseをWindows CIへ用意したが、実Windows/NTFS・選択保存/公開/解除・各公開/processと現在候補Strict/FQは未完了。P-03全体を完了にしない。
+
 <a id="p-04"></a>
 ## P-04 Git inventoryとstale観測を接続する
 

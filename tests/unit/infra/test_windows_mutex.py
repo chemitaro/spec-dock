@@ -110,6 +110,12 @@ def test_directory_identity_uses_win32_volume_and_128_bit_file_id(tmp_path) -> N
             self.closed.append(handle)
             return 1
 
+        def GetFileType(self, handle):
+            pytest.fail("directory identity must not query a leaf file type")
+
+        def ReadFile(self, handle, buffer, size, count, overlapped):
+            pytest.fail("directory identity must not read leaf bytes")
+
     api = KernelDirectoryAPI()
     with WindowsDirectory(tmp_path, kernel32=api) as held:
         assert held.identity.platform == "windows"

@@ -51,7 +51,7 @@ jobs:
           tests/integration/test_issue413_assets.py tests/integration/test_issue413_e2e.py -s
 
   provider-windows-native-adapters:
-    name: Windows native identity and Start lock boundary
+    name: Windows native identity, JSON read and Start lock boundary
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,8 +72,8 @@ jobs:
           }
       - name: Install provider package tooling
         run: python -m pip install uv
-      - name: Verify real Windows handles and separate-process exclusion
+      - name: Verify real Windows handles, JSON readers and separate-process exclusion
         run: >-
           uv run pytest tests/integration/test_issue413_native_lock.py
           tests/unit/infra/test_directory_identity.py tests/unit/infra/test_windows_mutex.py
-          tests/unit/infra/test_windows_directory.py -q -s -ra
+          tests/unit/infra/test_windows_directory.py tests/unit/infra/test_windows_json_read.py -q -s -ra

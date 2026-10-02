@@ -8,6 +8,8 @@
 
 後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[最新macOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux/手動consoleの候補から製品source差分があり、それらの結果を後続候補の全面合格へ読み替えません。Windows保存/native受入は引き続き未完了です。
 
+全件候補3b0c69e8の後に、[WindowsのJSON reader](artifacts/windows-json-read.md)も親handleへ接続しました。関連八suiteはMac3.12と実3.10で各58 passed/3 skipped、通常lint成功です。この追加変更を含む全件・native Windowsの合格はまだありません。選択保存/公開/同期/解除と各公開/processは引き続き未接続です。
+
 ## 正本と優先順位
 
 新しい要求の根拠は2026-09-30確定の [利用者回答](artifacts/user-decisions.md) です。これは添付からの内容保持コピーで、正式Artifactを新規登録したものではありません。旧草案のactive/work全面廃止、全writerロック、完全stateless、新規local発行は採用しません。

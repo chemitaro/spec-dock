@@ -27,3 +27,7 @@ Microsoftの[FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/a
 ## 2026-10-02 追記: 物理directoryの親handle基準open
 
 baseline ccf9637d後、WindowsDirectoryの各階層の絶対path再openを、NtOpenFileによる保持した親handleからの子openへ変更した。[Red→Greenと一次資料の記録](windows-directory-anchor.md)を保存した。これはidentity adapterの補強であり、上表のJSON reader・選択保存・各公開・init processは未接続のままである。通常make lintとMac/実3.10の関連suiteは成功。Windows CIへ境界suiteを追加したが、実NTFSのnative結果は未取得である。
+
+## 2026-10-02 追記: JSON読取経路の接続
+
+baseline9a97f758から[Windows JSON reader](windows-json-read.md)を接続した。保持した親handleからregular/single-linkのleafを読み、元bytesと全128bit identityを返す。上表のJSON readerはこの実装単位によって進んだが、native Windows/NTFSの受入は未取得。選択保存/公開/同期/捕捉解除、各公開とinit processは引き続き未接続である。関連八suiteはMac3.12と実3.10で各58 passed/3 skipped、通常lint成功。新しいnative二caseをCIへ追加したことと、実OSでの成功を区別する。

@@ -65,15 +65,12 @@ def make_workspace(root: Path) -> Path:
 def test_unconnected_directory_platform_returns_a_public_failure_before_writes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    import os
     from types import SimpleNamespace
 
     root = make_workspace(tmp_path / "consumer")
     before = tree_digest(root)
-    # The external OS boundary has no POSIX descriptor API on this platform.
-    monkeypatch.setattr(
-        "spec_dock.runtime.infra.json_store.os", SimpleNamespace(name="nt", open=os.open, O_RDONLY=os.O_RDONLY)
-    )
+    # Neither the POSIX descriptor nor the Windows handle adapter supports this OS.
+    monkeypatch.setattr("spec_dock.runtime.infra.json_store.os", SimpleNamespace(name="unavailable"))
     assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 5
     output = capsys.readouterr()
     result = json.loads(output.out)

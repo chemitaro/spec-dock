@@ -60,6 +60,12 @@ class DirectoryKernel:
         self.closed.append(handle)
         return 1
 
+    def GetFileType(self, handle):
+        pytest.fail("directory identity must not query a leaf file type")
+
+    def ReadFile(self, handle, buffer, size, count, overlapped):
+        pytest.fail("directory identity must not read leaf bytes")
+
 
 @pytest.mark.parametrize("components", [("parent", "child"), ("親📦", "子")])
 def test_parent_path_replacement_cannot_redirect_the_held_child_identity(
