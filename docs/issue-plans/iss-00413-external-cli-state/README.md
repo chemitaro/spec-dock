@@ -2,7 +2,7 @@
 
 > ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**候補CLIの実装・製品試験を進行中です。Linuxの通常全件試験は成功、macOSの全件試験には未解明の比較不一致が一件あり、Windows保存adapter/native受入は未完了です。現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Pro再レビューpass・指摘0件（対象commit: 7e895803）と、コードの現在の認定を区別します。実装設定は利用者の追加指示によってGPT-6.1 Sol / Maxです。**
+**候補CLIの実装・製品試験を進行中です。Linux/8a70a8b3とmacOS/1e5d2586の通常全件試験はそれぞれ成功しました。過去のmacOS/8a70a8b3の比較不一致は原因未確定で、Windows保存adapter/native受入も未完了です。現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Pro再レビューpass・指摘0件（対象commit: 7e895803）と、コードの現在の認定を区別します。実装設定は利用者の追加指示によってGPT-6.1 Sol / Maxです。**
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 

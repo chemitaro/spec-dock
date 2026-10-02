@@ -4,6 +4,8 @@
 
 2026-10-02の予備検証と[手動確認](artifacts/manual-product-smoke.md)を[製品の検証証拠](artifacts/implementation-acceptance-evidence.md)へ集約した。clean `8a70a8b3` のLinux通常全件は1832 passed/18 skipped/exit0、macOS全件は1 failed/1847 passed/2 skipped/exit1。readonly比較不一致を調査し、元結果と変更pathが分かる診断を保持する。P-12進行中、P-13/P-14は準備を先行した段階であり、完了認定・Windows native/store・fresh Strict・FQ・実consumer切替は未完了。
 
+追加診断を保存したclean `1e5d2586` のmacOS通常全件は1848 passed/2 skipped（424.21秒）、exit0。製品source不変、元の失敗原因は未確定。過去結果の撤回、OSごとの件数合算、Windowsや独立gateの完了認定を行わない。
+
 実装担当は利用者指定の **GPT-6.1 Sol / reasoning Max**（2026-10-01の追加指示でHighから変更）。設定値は `model="gpt-6.1-sol"`、`reasoning_effort="max"`。本資料の著述モデルや独立Strictレビュー用のGPT-5.6 Sol / Proと混同せず、gpt-5.6系専用coder roleへ置き換えません。モデルの公開状況や能力比較はこの作業契約の判断材料にしません。
 
 ## 作業の境界・進め方

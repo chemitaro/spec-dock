@@ -159,3 +159,11 @@ clean 8a70a8b3のLinux通常全pytestは1832 passed/18 skipped/exit0、macOSは1
 更新後の実ブラウザvalidatorは4/4 SVG、クリック/キーボード/倍率範囲/フォーカストラップ/終了/フォーカス復帰に合格。sandbox内のChrome起動timeoutはexit1として残し、同一validatorの実行許可付き再実行でexit0を取得した。四図と全script・共有modalのhashは改訂前と一致。IABの390px検査でdocument幅375px（scrollbar除く）、横overflowなし、SVG四件と現在表示を確認し、viewportを復元して所有する検証tabを閉じた。
 
 従来の単体HTML URLでは`requirement.md`がrootへ解決されて404になることを発見。同じ名前の公開link一件を、`preview-entry.html`を指す入口へ置換した。正本は削除せず、他の公開entryやserverを変更しない。ブラウザで旧URLの`#progress`を維持したまま`/specdock-issue-413/explanation.html#progress`へ移動し、資料リンクがsite配下へ解決されることを確認した。source文書八件がHTTP200/no-store・bytes一致。canonical URLは `http://100.85.74.8:8765/specdock-issue-413/explanation.html`。実ファイル/manifest/ZIPのhash・CRC・展開相当比較は更新した採用版の検査記録へ残す。
+
+## 2026-10-02 追記: macOS最新全件とWindows接続条件
+
+clean 1e5d2586のmacOS通常全件は1848 passed/2 skipped（424.21秒）、exit0だった。Linux全件/手動consoleの8a70a8b3とは製品sourceが同一だが、SHA別の結果として保持した。元のmacOS失敗を撤回せず、traceがfixture setupと子processまでの限定観測であることも[調査記録](artifacts/validation-readonly-investigation.md)へ保存した。
+
+HTMLの最新全件表示を更新し、同じ公式validatorでstatic四図、4/4 inline SVG、zoom/keyboard/focusの成功を取得した。IABで最新結果の本文を確認し、390pxではdocument幅375px・progress幅355pxで横overflowなし。requirementへのURLもsite配下を向いた。viewportを元へ戻して所有するtabを閉じた。IABのSVG用selectorは対象を一致検出できなかったため、その件数は描画証拠に使わず、公式validatorの独立した四図検査と区別する。
+
+[Windows接続箇所](artifacts/windows-adapter-connection-review.md)を現sourceとMicrosoft一次資料へ照合した。Win32 mutex/identityのAPI経路と、未接続の保存/公開/process経路を区別する。directory同期の成立を資料だけから仮定せず、P-03のImplementation Brief Strict用promptをWorkbenchへ準備した。外部送信・Windows保存接続・NTFS受入は未実施。通常pushの先行承認回答とFQ v2 pilotの選択回答を待ち、現在候補のStrict/FQを実行済みと記録しない。

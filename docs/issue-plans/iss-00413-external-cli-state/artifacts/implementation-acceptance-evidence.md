@@ -6,6 +6,7 @@
 
 | 対象SHA・範囲 | 実行条件・結果 | 証拠と制限 |
 |---|---|---|
+| `1e5d2586678927866e9ec0eae804cdd4d55ff138` / 通常全pytest | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1848 passed / 2 skipped、424.21秒、exit 0 | `pytest-macos-full-1e5d2586.log`。変更pathの比較診断を含む全件。Git Trace2は外部owned logだけへ保存し、製品のGit環境除去を変更しない。過去の不一致の原因確定とは別 |
 | `8a70a8b30e69fe0bda6db6c45ef555f44411236d` / 通常全pytest | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1 failed / 1847 passed / 2 skipped、479.73秒、exit 1 | `pytest-macos-full-8a70a8b3.log`。[比較不一致の調査](validation-readonly-investigation.md)。全件成功とは扱わない |
 | 同SHA / 通常全pytest | Linux 7.0.14 / glibc 2.41 / x86_64、実Python 3.11.16、clean独立clone。1832 passed / 18 skipped、1125.68秒、exit 0 | `pytest-linux-python311-8a70a8b3.log`。固定Docker image、ネットワークなし、read-only root、capability 0、tmpfs fixture。arm64ホスト上のamd64実行であり物理Linux端末とは区別 |
 | 同SHAの製品source / 手動console | 通常wheelを外部venvへ非editable install、pip check成功、コピーしたsource pathを参照不能にした実console。help→Start→重複拒否→兄弟Start→Sync→Finish→次Start→native hook部分失敗→現物確認を個別実行 | [手動確認](manual-product-smoke.md) と [原文・観測](manual-console-8a70a8b3.json)。実Git、GitHub境界だけstateful fake gh。pytestのtest bodyを手動結果に読み替えていない |
@@ -22,5 +23,5 @@ Linuxの18 skipはzsh不在12件、Win32限定1件、macOS stage契約1件、Lin
 
 - P-12進行中。P-13/P-14の試験・資料準備を先行しているが、依存stepの完了認定とは別。
 - 現在候補のCode Review Strict、Final Quality Gate、merge-ready PRは未完了。仕様の独立レビューpassや過去のコードレビューpassを流用しない。
-- Windows保存・native受入、macOS全件の比較不一致、最終候補の全件検査を未完了として保持する。
+- Windows保存・native受入、過去のmacOS比較不一致の原因、最終認定候補の全件検査を未完了として保持する。macOSの最新全件成功を過去の失敗の撤回へ使わない。
 - 人間merge後のP-16実consumer切替、P-17正式#413 import/Startは未実施。旧control/metadata/activeを復旧例外で手編集しない。

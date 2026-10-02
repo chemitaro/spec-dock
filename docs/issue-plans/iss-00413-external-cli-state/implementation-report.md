@@ -1099,3 +1099,9 @@ clean `8a70a8b30e69fe0bda6db6c45ef555f44411236d` の通常全件を固定して�
 別のowned fixtureへ通常wheelを非editable installし、sourceコピーを参照不能にした実consoleを外部CWDから個別に12回操作した。[手動証拠](artifacts/manual-product-smoke.md)と[stdout/stderr/実exit・現物](artifacts/manual-console-8a70a8b3.json)を保持。Start、同じIssueの拒否、兄弟の並行、無変更Sync、Finishの完了確認→捕捉record解除→現在branch保持、次Issue開始、native hookエラーのpartialと自動巻き戻しなしを確認した。GitHub境界はstateful fake ghであり、本consumer/live GitHubは未変更。tracked specのfold hashとC/B recordを照合した。最終候補の全面手動認定とは別。
 
 人間向けHTML・READMEの「製品未着手」「High」の古い現在表示を、実装進行中・Max・候補単位の成功/失敗/未実施へ更新した。生成時のself-check/インタビュー/レビュー原文を保持し、[現在の検証証拠](artifacts/implementation-acceptance-evidence.md)を追加した。P-12進行中、P-13/P-14準備、Windows保存/native、macOS比較不一致、fresh Strict/FQ、人間merge、P-16/17は未完了。新しい業務commandやACL制度は追加していない。
+
+## 2026-10-02 診断付きclean候補のmacOS全件
+
+手動証拠・比較診断・資料を通常hooksのcheckpoint `1e5d2586678927866e9ec0eae804cdd4d55ff138` へ保存し、parent=8a70a8b3・branch不変・cleanを確認した。同候補の通常 `uv run pytest -q --tb=short -ra` は1848 passed/2 skipped（424.21秒）、exit0。実3.12.11・provider/prefix・clean SHAを開始時に照合。8a70a8b3から製品source deltaは0であり、異なるSHAのLinux件数とは合算しない。
+
+外部owned logへのGit Trace2で該当fixtureの最初のcommitからmaintenance起動を捕捉したが、不一致やpack書換えは再現せず、原因の証明には使わない。製品の全GIT_*除去を変更していないため、traceの観測範囲も限定して[調査記録](artifacts/validation-readonly-investigation.md)へ保存した。元の失敗は撤回しない。Windowsの保存・公開・process境界とNTFS native受入、現在候補のStrict/FQは未完了。
