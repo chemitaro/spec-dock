@@ -67,3 +67,7 @@
 ## 2026-10-02 撤去の進捗
 
 上表の未実施表記は生成時点の全AC認定状態です。[P-18実装記録](p18-retirement-implementation.md)ではsource/test撤去c0f8add1、Windows専用CI撤去a552e73cとworking候補のfocused74件・影響195件・lint・通常収集を確認しています。単一guard、POSIX-only identity、Windows moduleのfresh wheel非収録が成立しています。配布文書同期、撤去後のLinux/macOS full/manual、P-07 P1の修正とfresh Strict/FQが残るため、AC全体をpassへ書き換えません。
+
+## 2026-10-02 新OS候補の製品検証
+
+表の生成時状態は履歴です。[3b803cedの全件・最低版・両OS手動・独立Code Review](supported-os-verification-3b803ced.md)を別証拠として追加しました。最終ゲート提出前の記録であり、AC-413-42の人間merge・実適用・正式import/Startは未実施です。

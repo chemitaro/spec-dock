@@ -4,7 +4,7 @@
   "document_date": "2026-09-30",
   "encoding": "UTF-8",
   "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
-  "status": "implementation in progress; acceptance and final certification incomplete",
+  "status": "premerge implementation verified; final certification and postmerge operations pending",
   "implementation_assignment": {
     "model": "gpt-6.1-sol",
     "reasoning_effort": "max",
@@ -40,11 +40,11 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 600,
+    "local_link_occurrences_checked": 612,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
-    "browser_dynamic": "4/4 SVG and zoom browser pass for exact HTML SHA; see artifacts/p18-docs-ci-evidence.json",
-    "mobile": "Previous HTML viewport check retained as history; current edit is not claimed as a new mobile check",
+    "browser_dynamic": "4/4 SVG and zoom browser pass for exact HTML SHA; see artifacts/supported-os-verification-3b803ced.json",
+    "mobile": "390px current HTML viewport and SVG/table bounds checked; see artifacts/supported-os-verification-3b803ced.json",
     "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
     "product_acceptance": "incomplete; see current_implementation_evidence",
     "zip_crc": "passed",
@@ -54,13 +54,13 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 7722,
-      "sha256": "50c1e830f9e1c42e8075cc19d9699ed22c53835da5a0b1737f4a76551b0cfee7"
+      "bytes": 7501,
+      "sha256": "2f92ad42dbd26312104b610122de38391e96b716980141a3b0d6d4a79b7e882a"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
-      "bytes": 21231,
-      "sha256": "30c4f0775aff68850d759ce9d3e55284c1d1561d191f9e11ada12aab43264d3b"
+      "bytes": 21582,
+      "sha256": "623556b8611478a7dde03e626ec7b421b80e8b8a12c1a33a4e465db7c86f84ac"
     },
     {
       "path": "artifacts/cli-contract.md",
@@ -71,6 +71,11 @@
       "path": "artifacts/cli-schema.json",
       "bytes": 16918,
       "sha256": "ccea5bb08e8fb1bc8addf95f04f6330d19bae39c08ca604276b55db78f1d9a51"
+    },
+    {
+      "path": "artifacts/code-review-linux-macos-3b803ced.json",
+      "bytes": 2238,
+      "sha256": "cbd78ad46613105b039b4296f096a318bbe79d52b95339ce61f51bcb63b644e9"
     },
     {
       "path": "artifacts/code-review-p02-01.json",
@@ -229,8 +234,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 14143,
-      "sha256": "960a1b006cb3e63639a0a81944d21fc4b37183f844a1939958128d20157e41e8"
+      "bytes": 15230,
+      "sha256": "50d9114b3d3ff1adf3b8206734574c9df9db3157045ebf3839fd345ad0fc84c6"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -308,6 +313,11 @@
       "sha256": "ac5b04cba800bcf4a4e664e186125fbddc44cbd711a77c282ab0bfa761ad06eb"
     },
     {
+      "path": "artifacts/manual-console-3b803ced.json",
+      "bytes": 34665,
+      "sha256": "8ae376132de9934c41a54fa7232a1b6b38d997f56de38103782540f8c2c11b6c"
+    },
+    {
       "path": "artifacts/manual-console-75ac5760.json",
       "bytes": 35159,
       "sha256": "980b02eee08b6e9ef548fbb7bbb7b0a2b731c133ab6e987c7de47e84ef7b02c6"
@@ -321,6 +331,11 @@
       "path": "artifacts/manual-console-8a70a8b3.json",
       "bytes": 30468,
       "sha256": "5070b28561383a29fde32ef68136fb365af87cbb433174f0a26df3dfc0854eeb"
+    },
+    {
+      "path": "artifacts/manual-linux-3b803ced.json",
+      "bytes": 26509,
+      "sha256": "7c042990be4bd28170a7bb7667c1cf4d2c6d67c323a4081e91727171d2c5d31a"
     },
     {
       "path": "artifacts/manual-product-smoke.md",
@@ -479,13 +494,23 @@
     },
     {
       "path": "artifacts/source-basis.md",
-      "bytes": 31299,
-      "sha256": "7305c32d2e7a8d5ceb9569d10ed8e1a29eefc4e72b3e8581515d48f5183ce702"
+      "bytes": 31742,
+      "sha256": "583af4403416eeb0cc19bbf686a4a600edc978c37437cb3246ce373e108422ed"
     },
     {
       "path": "artifacts/start-publication-capability.md",
       "bytes": 4277,
       "sha256": "bc77f202818d21758bfe107bc90e0ceb3afc8fa08042291a8ffc0e977e47cbad"
+    },
+    {
+      "path": "artifacts/supported-os-verification-3b803ced.json",
+      "bytes": 16458,
+      "sha256": "ae5170c377d40d80d909700518802930658167cda2fed5af605c51fd54cf6339"
+    },
+    {
+      "path": "artifacts/supported-os-verification-3b803ced.md",
+      "bytes": 6207,
+      "sha256": "bd11568b375bd54e2748ca2a9097f823cae475360952607f3d2c10717f2fa090"
     },
     {
       "path": "artifacts/test-port-active-projection-retirement.md",
@@ -709,13 +734,13 @@
     },
     {
       "path": "design.md",
-      "bytes": 45007,
-      "sha256": "9e54f0c087c0d54152a2d96b8deeaae2193bdb873db32e49141428601715b11b"
+      "bytes": 45422,
+      "sha256": "955b74fc43b789cdee7ef8cf3765846ae83b30ca9284904526fdd715c2246913"
     },
     {
       "path": "explanation.html",
-      "bytes": 72683,
-      "sha256": "b9514c5a5e4bc0b3faa99bcc66dc647cf4f5b4bd11ba8f0b5e6b1b4c573a9aaf"
+      "bytes": 73427,
+      "sha256": "4bec12f4aada362c3a866cd54f361a17eea1bb2ca713bdd3bd1e99dfdcfa8eaf"
     },
     {
       "path": "implementation-report.md",
@@ -729,8 +754,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 157654,
-      "sha256": "383a623790e6e7b043f17a7d6090931318fe87b7cb7e01f78cf51c2f7faadf67"
+      "bytes": 160914,
+      "sha256": "0de5bad67e2d231fbe86d11fa75d6311d8a2e1d4a3d0b2d8b361c2725a2c5315"
     },
     {
       "path": "preview-entry.html",
@@ -744,8 +769,8 @@
     },
     {
       "path": "requirement.md",
-      "bytes": 28493,
-      "sha256": "a6cd5aae3253c5f7687aa128bdea437ca67058704dbc614c2ffff882b031ef48"
+      "bytes": 28908,
+      "sha256": "aad2df57ebe04c6698bd32b8c18fd23d1f71accd7ca648c32a2bf53b512efe32"
     }
   ],
   "origin_generated_files": [
@@ -917,40 +942,45 @@
   },
   "status_date": "2026-10-02",
   "current_implementation_evidence": {
-    "baseline_only": true,
-    "source_sha": "121228c6fca1fd016e7bccef009902396112ba43",
+    "baseline_only": false,
+    "source_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
     "supported_os": [
       "linux",
       "darwin"
     ],
+    "evidence": "artifacts/supported-os-verification-3b803ced.md",
+    "raw_evidence": "artifacts/supported-os-verification-3b803ced.json",
     "linux_full": {
-      "passed": 1900,
-      "skipped": 20,
-      "seconds": 977.9,
-      "exit_code": 0,
-      "evidence": "artifacts/linux-full-121228c6.md",
-      "input_hash": "2bcbce60d8b318761f81529c4b998fae4d43027b52470fba317143400547494e"
+      "passed": 1883,
+      "skipped": 17,
+      "seconds": 1094.09,
+      "actual_exit": 0
     },
     "macos_full": {
-      "source_sha": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
-      "passed": 1916,
-      "skipped": 4,
-      "exit_code": 0,
-      "evidence": "artifacts/macos-full-2b2be5e2.md"
+      "passed": 1899,
+      "skipped": 1,
+      "seconds": 428.0,
+      "actual_exit": 0
+    },
+    "python310": {
+      "passed": 61,
+      "actual_exit": 0
     },
     "manual": {
-      "source_sha": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
-      "operations": 14,
-      "fake_gh_requests": 26,
+      "operations_each_os": 14,
+      "fake_gh_requests_each_os": 26,
       "live_github": false
     },
-    "code_review_r12": {
-      "review_status": "fail",
-      "p1": 1,
-      "exit_code": 10,
-      "evidence": "artifacts/code-review-p06-12-analysis.md"
+    "code_review": {
+      "review_status": "pass",
+      "findings": 0,
+      "actual_exit": 0,
+      "evidence": "artifacts/code-review-linux-macos-3b803ced.json"
     },
-    "additional_work": "P-18.2-P-18.5 source/test/CI/provider docs/static inventory complete; P-07 R12 P1 locally repaired with focused99 and lint; OS full/manual and fresh Strict/FQ pending"
+    "final_quality_gate": "not submitted",
+    "human_merge": "not performed",
+    "actual_dogfood": "not performed",
+    "formal_issue413_import_start": "not performed"
   },
   "os_retirement_authoring": {
     "model": "gpt-5.6-sol",
@@ -989,15 +1019,16 @@
     "record": "artifacts/p18-retirement-implementation.md",
     "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
     "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
-    "full_acceptance": "not certified",
+    "full_acceptance": "supported OS full/manual verified; Final Quality Gate pending",
     "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
     "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
-    "docs_evidence": "artifacts/p18-docs-ci-evidence.json"
+    "docs_evidence": "artifacts/p18-docs-ci-evidence.json",
+    "supported_os_evidence": "artifacts/supported-os-verification-3b803ced.md"
   },
   "p07_finish_observation_repair": {
     "record": "artifacts/p07-finish-observation-repair.md",
     "evidence": "artifacts/p07-finish-observation-repair.json",
     "baseline_sha": "aa91b756f886ac3e42085b665e1e9ca93c20f9f5",
-    "reviewer_closure": "pending fresh review"
+    "reviewer_closure": "fresh full-range r13 pass/no findings at 3b803ced; Final Quality Gate pending"
   }
 }

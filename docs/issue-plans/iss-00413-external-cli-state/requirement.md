@@ -1,6 +1,8 @@
 # Issue #413 要件定義書
 
-状態: 対応OS決定と第三者分析を採用した正本。P-18実装前。製品受け入れは全件未認定。検証済み対象SHA: `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準: `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+原本生成時の状態: 対応OS決定と第三者分析を採用した正本。P-18実装前。製品受け入れは全件未認定。検証済み対象SHA: `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準: `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+
+2026-10-02の採用後進捗: P-18とP-07の候補実装、Linux/macOS通常全件、両OSの外部console個別操作、新OS範囲Code Reviewを確認しました。[対象SHAと実結果](artifacts/supported-os-verification-3b803ced.md)を参照してください。本書の要求/設計意味を変えず、Final Quality Gate・人間merge・実導入の完了と分けて記録します。
 
 <a id="background"></a>
 ## 背景・目的

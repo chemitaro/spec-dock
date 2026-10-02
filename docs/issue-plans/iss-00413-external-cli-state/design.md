@@ -1,6 +1,8 @@
 # Issue #413 設計書
 
-状態: 対応OS決定と第三者分析を採用した設計。P-18は未実装。検証済み対象SHAは `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準は `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+原本生成時の状態: 対応OS決定と第三者分析を採用した設計。P-18は未実装。検証済み対象SHAは `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準は `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+
+2026-10-02の採用後進捗: P-18とP-07の候補実装、Linux/macOS通常全件、両OSの外部console個別操作、新OS範囲Code Reviewを確認しました。[対象SHAと実結果](artifacts/supported-os-verification-3b803ced.md)を参照してください。本書の要求/設計意味を変えず、Final Quality Gate・人間merge・実導入の完了と分けて記録します。
 
 [要件](requirement.md) / [CLI契約](artifacts/cli-contract.md) / [実装計画](plan.md) / [出典](artifacts/source-basis.md)。本文のAPI名・新pathは実装予定の契約であり、基準に存在するとは限りません。
 

@@ -1,0 +1,224 @@
+{
+  "candidate_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+  "scope": "P-18 retirement and P-07 repair; pre-Final Quality Gate product candidate",
+  "supported_os": [
+    "linux",
+    "darwin"
+  ],
+  "macos_full": {
+    "candidate_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+    "clean_after": true,
+    "command": "uv run pytest -q --tb=short -ra",
+    "actual_exit": 0,
+    "result": "1899 passed, 1 skipped in 428.00s (0:07:08)",
+    "input_count": 321,
+    "inputs_sha256": "83a680b4933d672c7887092bd272855c5ff67e03e72ef03f67b05c60c7b3ec36",
+    "log_sha256": "4cbf65d8d5ba0487a5a8345d64709edd49bbe00fa1d9969fbc9d362965c4e781",
+    "log_bytes": 2385,
+    "host": "macOS-27.0.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "skip": "Linux O_TMPFILE capability test; not a product pass"
+  },
+  "linux_full": {
+    "command": "uv run pytest -q --tb=short -ra in isolated fixed Linux container",
+    "actual_exit": 0,
+    "passed": 1883,
+    "skipped": 17,
+    "seconds": 1094.09,
+    "before": {
+      "phase": "before",
+      "candidate_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+      "clean": true,
+      "python": "3.11.16 (main, Aug 13 2026, 19:40:55) [GCC 14.2.0]",
+      "executable": "/fixture/project/.venv/bin/python3",
+      "prefix": "/fixture/project/.venv",
+      "provider": "/fixture/project/src/spec_dock/__init__.py",
+      "package_version": "0.2.4",
+      "platform": "Linux-7.0.14-orbstack-00380-ga7e0a2dc9535-x86_64-with-glibc2.41",
+      "machine": "x86_64",
+      "uid": 0,
+      "effective_capabilities": "0000000000000000",
+      "user_env": null,
+      "fixture_fs": "tmpfs",
+      "offline": "1",
+      "input_count": 321,
+      "inputs_sha256": "83a680b4933d672c7887092bd272855c5ff67e03e72ef03f67b05c60c7b3ec36"
+    },
+    "after": {
+      "phase": "after",
+      "candidate_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+      "clean": true,
+      "python": "3.11.16 (main, Aug 13 2026, 19:40:55) [GCC 14.2.0]",
+      "executable": "/fixture/project/.venv/bin/python3",
+      "prefix": "/fixture/project/.venv",
+      "provider": "/fixture/project/src/spec_dock/__init__.py",
+      "package_version": "0.2.4",
+      "platform": "Linux-7.0.14-orbstack-00380-ga7e0a2dc9535-x86_64-with-glibc2.41",
+      "machine": "x86_64",
+      "uid": 0,
+      "effective_capabilities": "0000000000000000",
+      "user_env": null,
+      "fixture_fs": "tmpfs",
+      "offline": "1",
+      "input_count": 321,
+      "inputs_sha256": "83a680b4933d672c7887092bd272855c5ff67e03e72ef03f67b05c60c7b3ec36"
+    },
+    "physical_linux_host": false,
+    "container_image": "sha256:c514701300438939d8f2f3fd75cc57ea2eff502c1920e5cc98c713cf17452e3d"
+  },
+  "minimum_python": {
+    "python": "3.10.15",
+    "command": "UV_OFFLINE=1 uv run --isolated --python /Users/iwasawayuuta/.local/share/uv/python/cpython-3.10.15-macos-aarch64-none/bin/python3.10 pytest tests/cli_runtime/test_os_support_retirement.py tests/cli_runtime/test_issue413_finish.py tests/unit/infra/test_directory_identity.py tests/unit/infra/test_start_lock.py tests/integration/test_issue413_native_lock.py tests/integration/test_issue413_e2e.py -q --tb=short -ra",
+    "passed": 61,
+    "skipped": 0,
+    "seconds": 24.33,
+    "actual_exit": 0
+  },
+  "code_review": {
+    "raw_response": "code-review-linux-macos-3b803ced.json",
+    "raw_sha256": "cbd78ad46613105b039b4296f096a318bbe79d52b95339ce61f51bcb63b644e9",
+    "actual_exit": 0,
+    "review_status": "pass",
+    "findings": 0,
+    "model": "gpt-5.6-sol",
+    "model_selection": {
+      "requestedModel": "GPT-5.6 Sol",
+      "resolvedLabel": "GPT-5.6 Sol",
+      "strategy": "select",
+      "status": "switched",
+      "verified": true,
+      "source": "chatgpt-model-picker",
+      "capturedAt": "2026-10-02T10:19:14.763Z"
+    },
+    "thinking_selection": {
+      "requestedLevel": "pro",
+      "status": "already-selected",
+      "resolvedLabel": "Pro",
+      "verified": true,
+      "strictFailClosed": true,
+      "targetModelKind": null,
+      "observedModelKind": null,
+      "source": "chatgpt-thinking-picker",
+      "capturedAt": "2026-10-02T10:19:14.974Z"
+    },
+    "prompt_submitted": true,
+    "conversation_id": "6abf8529-4d94-83e8-8ab0-e345edfcc1f2",
+    "conversation_url": "https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6abf8529-4d94-83e8-8ab0-e345edfcc1f2",
+    "independent_tests_run_by_reviewer": false
+  },
+  "manual": {
+    "macos": {
+      "operations": 14,
+      "github_requests": 26,
+      "source_sha256": "406d985677ff6b811c11d34b407db06241cb7b8b97608d398fe1a66bdaa9b50d",
+      "raw_response": "manual-console-3b803ced.json"
+    },
+    "linux": {
+      "operations": 14,
+      "github_requests": 26,
+      "source_sha256": "406d985677ff6b811c11d34b407db06241cb7b8b97608d398fe1a66bdaa9b50d",
+      "raw_response": "manual-linux-3b803ced.json"
+    },
+    "live_github": false,
+    "test_body_called": false,
+    "expected_negative_exits": {
+      "duplicate_start": 3,
+      "native_checkout_partial": 6
+    },
+    "helper_recovery": {
+      "macos_setup": "Initial script-path invocation could not import tests; cwd runpy setup succeeded without product changes or repeated product operations. Original prepare.log retained.",
+      "linux_export": {
+        "failure_boundary": "manual evidence export only",
+        "product_operations_repeated": false,
+        "source_changed": false,
+        "initial_copy_actual_exit": 1,
+        "initial_copy_diagnostic": "Error response from daemon: container rootfs is marked read-only",
+        "initial_export_actual_exit": 1,
+        "initial_export_diagnostic": "FileNotFoundError: /tmp/lifecycle-inspection.json",
+        "recovery": "Use exact saved inspection bytes through the existing owned bind mount; preserve read-only root and network isolation."
+      }
+    }
+  },
+  "raw_logs": [
+    {
+      "name": "macos-full-3b803ced.log",
+      "actual_exit": 0,
+      "bytes": 2385,
+      "sha256": "4cbf65d8d5ba0487a5a8345d64709edd49bbe00fa1d9969fbc9d362965c4e781",
+      "utf8_text": "........................................................................ [  3%]\n........................................................................ [  7%]\n........................................................................ [ 11%]\n........................................................................ [ 15%]\n........................................................................ [ 18%]\n........................................................................ [ 22%]\n........................................................................ [ 26%]\n........................................................................ [ 30%]\n........................................................................ [ 34%]\n........................................................................ [ 37%]\n........................................................................ [ 41%]\n........................................................................ [ 45%]\n........................................................................ [ 49%]\n........................................................................ [ 53%]\n........................................................................ [ 56%]\n........................................................................ [ 60%]\n........................................................................ [ 64%]\n........................................................................ [ 68%]\n........................................................................ [ 72%]\n........................................................................ [ 75%]\n........................................................................ [ 79%]\n........................................................................ [ 83%]\n........................................................................ [ 87%]\n...................................................................s.... [ 90%]\n........................................................................ [ 94%]\n........................................................................ [ 98%]\n............................                                             [100%]\n=========================== short test summary info ============================\nSKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:627: Linux O_TMPFILE capability test\n1899 passed, 1 skipped in 428.00s (0:07:08)\n"
+    },
+    {
+      "name": "linux-full-3b803ced.log",
+      "actual_exit": 0,
+      "bytes": 2869,
+      "sha256": "557b35f54e73809061a3f828e7d01b7b4354d4c870031d16d951d9ca948950bf",
+      "utf8_text": ".......................................................s.s.s.s.s.s.s.s.s [  3%]\n.s.s.s.................................................................. [  7%]\n........................................................................ [ 11%]\n........................................................................ [ 15%]\n........................................................................ [ 18%]\n........................................................................ [ 22%]\n........................................................................ [ 26%]\n........................................................................ [ 30%]\n........................................................................ [ 34%]\n........................................................................ [ 37%]\n........................................................................ [ 41%]\n........................................................................ [ 45%]\n........................................................................ [ 49%]\n........................................................................ [ 53%]\n........................................................................ [ 56%]\n........................................................................ [ 60%]\n........................................................................ [ 64%]\n........................................................................ [ 68%]\n........................................................................ [ 72%]\n........................................................................ [ 75%]\n........................................................................ [ 79%]\n........................................................................ [ 83%]\n........................................................................ [ 87%]\n...........................................................s............ [ 90%]\n.....ss..........ss..................................................... [ 94%]\n........................................................................ [ 98%]\n............................                                             [100%]\n=========================== short test summary info ============================\nSKIPPED [12] tests/cli_runtime/test_help_completion_vnext.py:135: native zsh is unavailable\nSKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:309: macOS named-stage capability probe contract\nSKIPPED [2] tests/unit/infra/test_binary_artifact_publisher.py:873: Linux explicit import uses anonymous staging without pathname cleanup\nSKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:1069: Linux explicit import has no pathname cleanup seam\nSKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:1101: Linux explicit import has no pathname cleanup seam\n1883 passed, 17 skipped in 1094.09s (0:18:14)\n"
+    },
+    {
+      "name": "python310-3b803ced.log",
+      "actual_exit": 0,
+      "bytes": 130,
+      "sha256": "33b56956ca3ec3c458f51d0bd5afe7f3e7cea7d2e8933f07025b51afba963b05",
+      "utf8_text": "Installed 20 packages in 92ms\n.............................................................            [100%]\n61 passed in 24.33s\n"
+    },
+    {
+      "name": "html-supported-final.log",
+      "actual_exit": 0,
+      "bytes": 341,
+      "sha256": "4d1ad140216997d75a8f21878ce59c8f80ba65359979a06ebdcec5f96803fd8b",
+      "utf8_text": "PASS static: 4 PlantUML source(s), @plantuml/core@1.2026.6\nPASS browser: 4/4 diagram(s) rendered to inline SVG\nPASS zoom: click, keyboard, bounds, focus trap, dismissal, and focus restoration\nVALIDATED /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/docs/issue-plans/iss-00413-external-cli-state/explanation.html\n"
+    },
+    {
+      "name": "html-mobile-supported-final.log",
+      "actual_exit": 1,
+      "bytes": 755,
+      "sha256": "ac64341a83b943a750f530f41714c247f1549e6a55efa5296e545484c6fc18b5",
+      "utf8_text": "PASS static: 4 PlantUML source(s), @plantuml/core@1.2026.6\nFAIL 390px mobile layout failed: {\"width\":390,\"scrollWidth\":390,\"diagrams\":[{\"id\":\"\",\"width\":390,\"svgWidth\":306},{\"id\":\"diagram-architecture\",\"width\":336,\"svgWidth\":306},{\"id\":\"diagram-start\",\"width\":336,\"svgWidth\":306},{\"id\":\"diagram-finish\",\"width\":336,\"svgWidth\":306},{\"id\":\"diagram-sync\",\"width\":336,\"svgWidth\":306}],\"tables\":[{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"}]}\n"
+    },
+    {
+      "name": "html-mobile-supported-final-retry.log",
+      "actual_exit": 0,
+      "bytes": 980,
+      "sha256": "5b388b3799a20a5af3f29f406c8447c2cce89ecb9d750acb681068d2c915c5a2",
+      "utf8_text": "PASS static: 4 PlantUML source(s), @plantuml/core@1.2026.6\nPASS mobile: {\"width\":390,\"scrollWidth\":390,\"diagrams\":[{\"id\":\"diagram-architecture\",\"width\":336,\"svgWidth\":306},{\"id\":\"diagram-start\",\"width\":336,\"svgWidth\":306},{\"id\":\"diagram-finish\",\"width\":336,\"svgWidth\":306},{\"id\":\"diagram-sync\",\"width\":336,\"svgWidth\":306}],\"tables\":[{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"},{\"width\":336,\"overflowX\":\"auto\"}]}\nPASS browser: 4/4 diagram(s) rendered to inline SVG\nPASS zoom: click, keyboard, bounds, focus trap, dismissal, and focus restoration\nVALIDATED /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/docs/issue-plans/iss-00413-external-cli-state/explanation.html\n"
+    }
+  ],
+  "final_quality_gate": "not submitted",
+  "human_merge": "not performed",
+  "actual_dogfood_cutover": "not performed",
+  "formal_issue413_import_start": "not performed",
+  "html": {
+    "actual_exit": 0,
+    "sha256": "4bec12f4aada362c3a866cd54f361a17eea1bb2ca713bdd3bd1e99dfdcfa8eaf",
+    "bytes": 73427,
+    "scope": "Document-only candidate after product SHA 3b803ced; not included in its prior Code Review. Final Quality Gate will bind the next complete candidate.",
+    "diagrams_rendered": 4,
+    "zoom_keyboard_focus": "passed",
+    "mobile": {
+      "actual_exit": 0,
+      "viewport_width": 390,
+      "document_scroll_width": 390,
+      "diagram_panels_width": 336,
+      "svg_width": 306,
+      "table_panels": 11,
+      "overflow_x": "auto"
+    },
+    "http": {
+      "url": "http://100.85.74.8:8765/specdock-issue-413/explanation.html",
+      "status": 200,
+      "cache_control": "no-store",
+      "source_sha256": "4bec12f4aada362c3a866cd54f361a17eea1bb2ca713bdd3bd1e99dfdcfa8eaf",
+      "http_sha256": "4bec12f4aada362c3a866cd54f361a17eea1bb2ca713bdd3bd1e99dfdcfa8eaf",
+      "source_bytes": 73427,
+      "exact_bytes": true,
+      "scope": "Current document-only candidate after product SHA 3b803ced; existing managed publication reused."
+    },
+    "harness_recovery": {
+      "initial_actual_exit": 1,
+      "cause": "Extra mobile harness selector included the body success marker as a fifth diagram.",
+      "correction": "Select the same four native targetIds used by the unchanged original validator.",
+      "product_html_changed": false,
+      "retry_actual_exit": 0
+    }
+  }
+}

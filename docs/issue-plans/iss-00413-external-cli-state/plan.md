@@ -1,5 +1,7 @@
 # Issue #413 実装計画書
 
+**2026-10-02の最新進捗**: P-01〜P-12とP-18の候補実装を含む3b803cedで、Linux/macOS全件、最低Python3.10の関連境界、両OS各14手動操作、新OS範囲Code Review Strict（pass・指摘0）を確認しました。[実結果](artifacts/supported-os-verification-3b803ced.md)。以下各stepの前回記録は履歴として残します。P-13の製品検査は実行済み、P-14は更新HTMLの検査と最終認定を進行中です。Final Quality Gate v2、人間merge、P-16/P-17の完了はまだ認定しません。
+
 **既存P-01〜P-17に、必須追加作業P-18を加えた全18 stepです。** P-18はP-13の最終実入口検証より前に完了させます。各stepの実装・検証・独立レビューの状態は下記と[実装記録](implementation-report.md)で区別します。この第三者分析packの生成・静的自己点検は、P-18実装や製品の合格証拠ではありません。
 
 2026-10-02 JSTの最新利用者決定で、対応OSはLinux/macOSに確定し、Windows対応の要求・設計・実装義務は失効した。既存P-01〜P-17中の「Windows未完了」「Windows native/storeを完了する」という記述は、その時点の履歴・raw evidenceとして残すが、現在の完了条件ではない。削除対象と保全対象は[P-18](#p-18)と[撤去分析](artifacts/os-support-retirement-analysis.md)を正本とする。
@@ -25,7 +27,9 @@ P-01〜P-17の既存実装履歴では、利用者指定の **GPT-6.1 Sol / reas
 <a id="p-01"></a>
 ## P-01 契約・既存回帰・Redを固定する
 
-**状態: 進行中。変更前baselineはlint成功・1217 passed/1 skipped、44 leafの契約照合と最初の公開入口Redを記録済み。個別回帰のRed→Greenは後続stepで追加し、全体gateは未完了。前提/依存: なし。** 読む節: [D-01](design.md#d-01), [D-11](design.md#d-11), [D-13](design.md#d-13)。補足: D-01, D-11, D-13。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 進行中。変更前baselineはlint成功・1217 passed/1 skipped、44 leafの契約照合と最初の公開入口Redを記録済み。個別回帰のRed→Greenは後続stepで追加し、全体gateは未完了。前提/依存: なし。** 読む節: [D-01](design.md#d-01), [D-11](design.md#d-11), [D-13](design.md#d-13)。補足: D-01, D-11, D-13。
 
 **所有/対象file**: 既存 tests/cli_runtime/test_cli_vnext_contract.py、test_active_vnext.py、test_work_start_vnext.py、test_work_finish_vnext.py、test_workspace_sync_vnext.py、tests/integration/test_cli_entrypoint_vnext.py。新 tests/cli_runtime/test_issue413_contract.py（予定）。
 
@@ -55,7 +59,9 @@ uv run pytest tests/cli_runtime/test_issue413_contract.py -q
 <a id="p-02"></a>
 ## P-02 通常wheelとutilityだけの縦経路を成立させる
 
-**状態: 実装中。utility/package縦経路は検証済み、全gate未合格。実結果は[実装記録](implementation-report.md)。前提/依存: P-01。** 読む節: [D-02](design.md#d-02)。補足: D-02。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。utility/package縦経路は検証済み、全gate未合格。実結果は[実装記録](implementation-report.md)。前提/依存: P-01。** 読む節: [D-02](design.md#d-02)。補足: D-02。
 
 **所有/対象file**: src/spec_dock/cli.py、external_cli.py、pyproject.toml、setup.py、asset_layout.py。RT→NRT移設、tests/integration/test_cli_entrypoint_vnext.py。新 tests/integration/test_issue413_wheel.py（予定）。
 
@@ -83,7 +89,9 @@ uv run pytest tests/integration/test_issue413_wheel.py tests/integration/test_cl
 <a id="p-03"></a>
 ## P-03 schema3と直接対象一件の保存境界を作る
 
-**状態: 実装中。POSIX保存境界は候補実装済み。Windows API/storeはP-18の撤去対象であり、本stepの残完了条件ではない。前提/依存: P-02。** 読む節: [D-03](design.md#d-03), [D-09](design.md#d-09)。補足: D-03, D-09。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。POSIX保存境界は候補実装済み。Windows API/storeはP-18の撤去対象であり、本stepの残完了条件ではない。前提/依存: P-02。** 読む節: [D-03](design.md#d-03), [D-09](design.md#d-09)。補足: D-03, D-09。
 
 **所有/対象file**: NRT/domain/work_target.py、infra/work_target_store.py、infra/identity.py（新設）、domain/lifecycle.py、ids.py、selectors.py、infra/active_store.py。新 tests/unit/infra/test_work_target_store.py（予定）。
 
@@ -112,7 +120,9 @@ uv run pytest tests/unit/infra/test_work_target_store.py tests/cli_runtime/test_
 <a id="p-04"></a>
 ## P-04 Git inventoryとstale観測を接続する
 
-**状態: 実装中。POSIX観測境界は候補実装済み。Windows identity接続はP-18の撤去対象であり、本stepの残完了条件ではない。前提/依存: P-03。** 読む節: [D-02](design.md#d-02), [D-04](design.md#d-04)。補足: D-02, D-04。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。POSIX観測境界は候補実装済み。Windows identity接続はP-18の撤去対象であり、本stepの残完了条件ではない。前提/依存: P-03。** 読む節: [D-02](design.md#d-02), [D-04](design.md#d-04)。補足: D-02, D-04。
 
 **所有/対象file**: NRT/infra/git_cli.py、application/worktree_observation.py（新設）、cli/vnext_runtime.py::_context、application/scope_query.py。新 tests/integration/test_issue413_observation.py（予定）。
 
@@ -139,7 +149,9 @@ uv run pytest tests/integration/test_issue413_observation.py -q
 <a id="p-05"></a>
 ## P-05 Start専用のOS排他を実装する
 
-**状態: 実装中。Linux/macOSのdescriptor/flock境界を残し、Windows named mutexはP-18で撤去する。前提/依存: P-04。** 読む節: [D-05](design.md#d-05)。補足: D-05。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。Linux/macOSのdescriptor/flock境界を残し、Windows named mutexはP-18で撤去する。前提/依存: P-04。** 読む節: [D-05](design.md#d-05)。補足: D-05。
 
 **所有/対象file**: NRT/infra/start_lock.py、identity.py（新設）、既存writer_lock.py/admission参照の整理。新 tests/integration/test_start_lock.py（予定）。
 
@@ -174,7 +186,9 @@ uv run pytest tests/integration/test_start_lock.py -q
 
 第6回Strictは`e6513650`のP-03〜P-08を対象にP1一件・P2四件でfail。全件を[分析記録](artifacts/code-review-p06-06-analysis.md)へ残し、未知/重複inventoryの行単位診断・Start停止、残存stageのpublication unknownをTDDで修正した。関連252 testsが通過し、fresh Strict passは未取得。P2の分類を変えず、同じfail batchに対する利用者の明示的な修正認可を適用した。
 
-**状態: 実装中（第3回独立レビューは8ad73cfdを対象にfail。全5件を分析後、no-op checkout、checkout後clean、候補Scope/container構造、未確認token、sole selection公開確認を修正し、関連619件を検証。branch leafとPOSIX stage/rename/unlink強制停止も検証済み。Windows store/native受入はP-18で失効・撤去対象。現在候補の独立レビュー等は未完了）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中（第3回独立レビューは8ad73cfdを対象にfail。全5件を分析後、no-op checkout、checkout後clean、候補Scope/container構造、未確認token、sole selection公開確認を修正し、関連619件を検証。branch leafとPOSIX stage/rename/unlink強制停止も検証済み。Windows store/native受入はP-18で失効・撤去対象。現在候補の独立レビュー等は未完了）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
 
 **所有/対象file**: NRT/application/work_lifecycle.py、branch_vnext.py、commands/work_vnext.py、branch_vnext.py、infra/git_cli.py、presentation/envelope.py。tests/cli_runtime/test_work_start_vnext.py、test_branch_vnext.py、新 tests/integration/test_issue413_start.py（予定）。
 
@@ -205,7 +219,9 @@ uv run pytest tests/cli_runtime/test_work_start_vnext.py tests/cli_runtime/test_
 
 第6回Strictの物理identity不一致recordの無確認clearを修正し、captured recordを保全して`--all --yes`確認だけで解除できることを検証した。新しいlock・別WT操作・metadata補完は追加していない。
 
-**状態: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。GitHub-backed Finishの完了確認→captured token解除、子孫guard、dry-run、metadata再確認、native遅延解除/Start-only排他を検証。真正の既存local backendは単一metadataの保全更新を接続・検証。現在候補の独立認定と旧runtime/testの退役は未完了。Windows adapter/nativeはP-18で撤去し、P-06の独立レビューは新OS範囲で別に行う）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。GitHub-backed Finishの完了確認→captured token解除、子孫guard、dry-run、metadata再確認、native遅延解除/Start-only排他を検証。真正の既存local backendは単一metadataの保全更新を接続・検証。現在候補の独立認定と旧runtime/testの退役は未完了。Windows adapter/nativeはP-18で撤去し、P-06の独立レビューは新OS範囲で別に行う）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
 
 第5回Strictの2件のP1と1件のP2を `artifacts/code-review-p06-05-analysis.md` で全件分析した。単一selection観測からのFinish target/handle固定、Close停止時のclear not_attempted、複数record解除のfailed/unknown/後続not_attemptedをTDDとOS境界で検証した。後続候補のfresh Strict passはまだ未取得であり、P-07完了とは扱わない。
 
@@ -242,7 +258,9 @@ uv run pytest tests/cli_runtime/test_active_vnext.py tests/cli_runtime/test_work
 
 第6回Strictに基づき、stale/unavailableで読めた直接recordの既知ID/refと件数を保持し、metadataがないGH refも今回のGET対象へ含めた。ID→refとref→IDの両方向のidentity conflictを検出する。unknown、祖先不明、readonly partial/7を維持し、記録や派生cacheを作らない。
 
-**状態: 実装中（通常dispatchのreadonly Sync、現在treeと同clone各WTの必要対象/祖先、直接/子孫件数、local/github lifecycle、矛盾/不明の診断、JSON schemaとtextを検証。現在候補の独立レビュー、旧generation実装/testの退役、P-18と全体gateは未完了）。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中（通常dispatchのreadonly Sync、現在treeと同clone各WTの必要対象/祖先、直接/子孫件数、local/github lifecycle、矛盾/不明の診断、JSON schemaとtextを検証。現在候補の独立レビュー、旧generation実装/testの退役、P-18と全体gateは未完了）。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
 
 通常実装はNRT/application/direct_sync.py、presentation/command_data.py・envelope.py、cli/catalog.py・options.py、commands/runtime_dispatch.pyに配置した。旧workspace_sync_vnextは通常経路へ戻さず、P-12で実装/testを退役させる。readonly partial/exit7はeffects=[]であり、変更後失敗のpartial/exit6と区別する。
 
@@ -271,7 +289,9 @@ uv run pytest tests/cli_runtime/test_workspace_sync_vnext.py tests/integration/t
 <a id="p-09"></a>
 ## P-09 GitHub発行・lifecycle・依存を台帳から切り離す
 
-**状態: 実装中。三階層のGitHub-only create、GET-only import、close/reopenとdependencyの通常経路を検証。r8はcreate/import/close/reopenまでpass。dependencyの独立レビューと旧writer退役は未完了。前提/依存: P-07。** 読む節: [D-09](design.md#d-09)。補足: D-09。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。三階層のGitHub-only create、GET-only import、close/reopenとdependencyの通常経路を検証。r8はcreate/import/close/reopenまでpass。dependencyの独立レビューと旧writer退役は未完了。前提/依存: P-07。** 読む節: [D-09](design.md#d-09)。補足: D-09。
 
 通常createはNRT/application/direct_scope_publish.py、infra/directory_publication.py・github_remote.py、commands/runtime_dispatch.pyへ接続した。旧create/importのwriterは実行せず、既存のpure scaffold/親判定helperを再利用する。これらの旧moduleへのimport依存の抽出・退役はP-12で閉じる。22 creation testsとpublic contract/fresh wheelを含む29 tests、対象Ruffと変更6 source限定mypyが通過した。GitHub番号の旧allocator/marker/journalやScope UUIDを通常createへ戻さない。
 
@@ -316,7 +336,9 @@ uv run pytest tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/tes
 
 第9回Strictは`3c68053e`のP-02〜P-09を固定し、P1一件・P2二件でfailした。[完全batch分析](artifacts/code-review-p06-09-analysis.md)後、Scope create/importの明示guard、branch switchのcheckout後clean検査、stale/unavailableの既知recordを含むSync重複診断をTDDで修正した。関連83 tests（25.02秒）、変更3 source限定mypy、変更6 fileのRuff check/formatが通過した。P2のnon-blocking分類を維持し、利用者の全指摘修正の明示認可を適用する。Scope edit/deleteはr9の対象外であり、全体のfresh Strict合格は未取得。
 
-**状態: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/show/removeとPOSIX bootstrapの通常経路をローカル検証済み。P-18、今回変更のfresh Strictと後続stepは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/show/removeとPOSIX bootstrapの通常経路をローカル検証済み。P-18、今回変更のfresh Strictと後続stepは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
 
 Scope editは一つの捕捉直接選択からdynamic selectorとguardを解決し、全metadata/workspaceのbytes・identityを再照合してtitle/revisionだけを変更する。未知field、本文、既存file mode、真正の既存local lifecycle、選択recordを保全し、GH通信・Start lock・control・journalを使わない。無変更はbytes/revision/identityを保持する。dry-runはstageを作らずC-05の必須fieldを返す。確認済み公開後のcleanup/Git失敗、置換結果不明、並行編集保全を公開CLIとネイティブOS/Git境界で確認した。関連124 tests（24.83秒）、全Ruff check/format（385 files）、変更4 source限定mypyとdiff checkが通過した。redirected stagingのexit3を期待したtestは、実際にはGitの原文拒否・exit5・write0が成立していたため、C-04へ期待値を訂正したもので製品Redではない。
 
@@ -359,7 +381,9 @@ uv run pytest tests/cli_runtime/test_scope_delete_vnext.py tests/cli_runtime/tes
 <a id="p-11"></a>
 ## P-11 旧記録の保全診断とworkspace局所移行を実装する
 
-**状態: 実装中。通常/raw/legacy Doctor、workspace局所移行、working-tree/固定HEAD validateをローカル検証済み。fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。通常/raw/legacy Doctor、workspace局所移行、working-tree/固定HEAD validateをローカル検証済み。fresh Strictは未完了。前提/依存: P-10。** 読む節: [D-03](design.md#d-03), [D-12](design.md#d-12)。補足: D-03, D-12。
 
 通常Doctorは共通controlを必要とせず、現在のScope構造・依存・Artifact・直接選択を読み取る。raw専用のGit-only admissionは未知workspaceでも安全なfile情報を返し、通常コマンドの既知schema/protocol判定を弱めない。`--legacy`だけが旧control/engine/registry/activeと操作・移行・installation・finalization・handoverの記録を読む。各fileは1 MiB、各記録directoryは4096 entriesまでに限定し、unsafe/破損/未知/途中記録は診断不完全のexit7とする。旧実行物を起動せず、phaseを現物の成功証明として採用せず、旧activeを新recordへ自動変換しない。任意bodyを出力せず、旧記録のdecoded bodyも分類後に保持しない。GitHub capability診断はrepository/PR/headの全指定と応答の一致を検査し、offline・指定不備を副作用前に拒否する。関連460 tests（88.15秒）、全source/testsのRuff check/format（410 files）、変更12 source限定mypy、diff checkが成功した。実consumerの宣言・metadata・直接選択は変更していない。
 
@@ -398,7 +422,9 @@ uv run pytest tests/cli_runtime/test_workspace_migrate_vnext.py tests/cli_runtim
 <a id="p-12"></a>
 ## P-12 static資産・shim・配布skillsを更新する
 
-**状態: 実装中。PATH委譲shim、package資産inventory、単WTのinstallation四leaf、配布docs/skillsとsource/wheel/新規consumerの一致をローカル検証済み。既知旧hashの更新・退役と保全・部分失敗も確認した。provider旧実装退役は未完了。前提/依存: P-11（ローカル検証済み・fresh Strict未完了）。** 読む節: [D-02](design.md#d-02), [D-11](design.md#d-11), [D-12](design.md#d-12)。補足: D-02, D-11, D-12。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。PATH委譲shim、package資産inventory、単WTのinstallation四leaf、配布docs/skillsとsource/wheel/新規consumerの一致をローカル検証済み。既知旧hashの更新・退役と保全・部分失敗も確認した。provider旧実装退役は未完了。前提/依存: P-11（ローカル検証済み・fresh Strict未完了）。** 読む節: [D-02](design.md#d-02), [D-11](design.md#d-11), [D-12](design.md#d-12)。補足: D-02, D-11, D-12。
 
 `shim_vnext.py`と配布static shimを、PATH上の外部consoleへargv/cwd/終了値/stderrを保持して委譲する入口へ置換した。Git/control/engine digest/consumer Pythonの取得を削除し、自身の同inode・symlink・hardlink・同shimのコピー・既知旧shimを委譲先に認めない。既存package managerで導入したconsoleへの正常symlinkは受理する。外部console不在等は導入案内とv2診断を返し、double-dash後のjson文字列は共通flagとして解釈しない。caller Python import環境を外し、通常の利用者設定は保持する。
 
@@ -751,7 +777,9 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 **2026-10-02実施更新**: [採用ブリーフと実装記録](artifacts/p18-retirement-implementation.md)を保存。P-18.2/P-18.3のPOSIX identity、単一guard、Windows source/test撤去をTDDで実施し、focused74件・影響195件・通常収集・lintは成功。source/schemaと廃止testをc0f8add1の一Green checkpointにまとめ、Windows専用CIをa552e73cの別commitで削除。P-18.5のprovider docs/skills/inventoryを同期し配布71件とHTML4図/zoomを確認。full/手動/Strict/FQとP-07修正は未完了。以下の契約と停止条件は維持します。
 
-**状態: 実装中。P-18.2〜P-18.4 source/test/CI撤去済み。P-18.5文書/配布71件/HTMLを確認、fullは未完了。前提/依存: P-12の候補実装と証拠を読み、更新済みR/D/P/schema/decisionを通常pushした後、独立ChatGPT Implementation Brief Strictを成功させること。後続: P-13より前に必須。** 読むauthority: [対応OS決定](artifacts/os-support-decision.md)、[第三者分析](artifacts/os-support-retirement-analysis.md)、[詳細計画](artifacts/os-support-retirement-plan.md)、[D-02](design.md#d-02)、[D-03](design.md#d-03)、[D-05](design.md#d-05)、[D-13](design.md#d-13)。
+**現在: 候補実装、Linux/macOSの製品検証、新OS範囲Code Review済み。Final Quality Gateの認定待ち。**
+
+**前回記録: 実装中。P-18.2〜P-18.4 source/test/CI撤去済み。P-18.5文書/配布71件/HTMLを確認、fullは未完了。前提/依存: P-12の候補実装と証拠を読み、更新済みR/D/P/schema/decisionを通常pushした後、独立ChatGPT Implementation Brief Strictを成功させること。後続: P-13より前に必須。** 読むauthority: [対応OS決定](artifacts/os-support-decision.md)、[第三者分析](artifacts/os-support-retirement-analysis.md)、[詳細計画](artifacts/os-support-retirement-plan.md)、[D-02](design.md#d-02)、[D-03](design.md#d-03)、[D-05](design.md#d-05)、[D-13](design.md#d-13)。
 
 P-18の目的は、Issue #413の外部CLI・最小直接状態・Start-only排他を維持したまま、誤って追加したWindows要求・設計・source/test/CI接続を撤去することです。計画登録、文書push、Implementation Brief作成はSpecDock正式 `work start` の成功ではありません。P-16実consumer切替とP-17正式import/Startはhuman merge後の別手順のままです。
 
@@ -852,7 +880,9 @@ uv build --wheel
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
-**状態: 未着手。前提/依存: P-18。** 読む節: [D-13](design.md#d-13)。補足: D-13 / 全D節。
+**現在: 通常全件・fresh wheel E2E・最低Python版・両OSの個別consoleを検査済み。最終認定待ち。**
+
+**前回記録: 未着手。前提/依存: P-18。** 読む節: [D-13](design.md#d-13)。補足: D-13 / 全D節。
 
 **所有/対象file**: 全tests、.github/workflows/provider-ci.yml、fresh wheel harness。新 tests/integration/test_issue413_e2e.py（予定）。
 
@@ -885,7 +915,9 @@ uv run pytest tests/integration/test_issue413_e2e.py -q
 <a id="p-14"></a>
 ## P-14 Codexの成果物レビューとブラウザ検査
 
-**状態: 未着手。前提/依存: P-13。** 読む節: [D-14](design.md#d-14)。補足: D-14 / requirement / CLI契約。
+**現在: 更新HTMLは4/4 SVG・zoom/keyboard/focus・390pxのbrowser検査とHTTP byte一致を確認済み。manifest/ZIP検査とFinal Quality Gateは別の実行記録で確定する。**
+
+**前回記録: 未着手。前提/依存: P-13。** 読む節: [D-14](design.md#d-14)。補足: D-14 / requirement / CLI契約。
 
 **所有/対象file**: 本packの採用コピー、provider docs/skills、local report.mdとartifacts/interview-worktree-start.mdはCodexが保持。
 
@@ -1044,14 +1076,18 @@ spec-dock --project "$ROOT" scope import github issue gh:chemitaro/spec-dock#413
 | 証拠 | 所有者・実施step | 現在 |
 |---|---|---|
 | ChatGPTのpack静的自己点検 | artifacts/self-check.md | この納品内に実測範囲のみ記録 |
-| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | 進行中。P-18.2〜P-18.5 source/test/CI/文書を実施、全OS/fullは未完了 |
-| Codex成果物レビュー/実ブラウザ | Codex、P-14、保有reportへ追記 | 未着手 |
+| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | 3b803cedの両OS全件・最低版関連境界・手動操作は確認済み。Final Quality Gate候補SHAの検査は別途実施 |
+| Codex成果物レビュー/実ブラウザ | Codex、P-14、保有証拠へ追記 | 新OS範囲Code Review pass・指摘0。更新HTMLの4/4 SVG・zoom・390px検査はexit0。最終認定前 |
 | 人間merge/任意の公開 | 人間、P-15 / 別途許可 | 未着手 |
 | dogfood適用と実metadata保全 | 許可された実施者、P-16 | 未着手 |
 | 正式#413 import / work start | 実施者、P-17 | 未着手 |
 
-`report.md`、`implementation-report.md`、`artifacts/user-decisions.md`、`artifacts/interview-worktree-start.md` は既存証拠/履歴であり、このpackの生成scriptや静的検査は書き換えません。P-18の作業ブリーフは更新済み正本push後の別sessionで作成します。unknown remote、旧writer停止不明、実体backup不足があれば該当適用を止めます。コードrevertでGitHub効果まで戻ったとは説明しません。
+`report.md`、`implementation-report.md`、`artifacts/user-decisions.md`、`artifacts/interview-worktree-start.md` は既存証拠/履歴であり、このpackの生成scriptや静的検査は書き換えません。P-18の作業ブリーフは更新済み正本push後に独立sessionで作成・採用済みです。unknown remote、旧writer停止不明、実体backup不足があれば該当適用を止めます。コードrevertでGitHub効果まで戻ったとは説明しません。
 
 ## P-18計画採用時点の最新baseline
 
 [同SHAのLinux通常全件](artifacts/linux-full-121228c6.md)はPATHだけ補正して1900 passed/20 skipped、exit0。元exit1を保全する。P-18の製品変更後の証拠ではなく、撤去後は新SHAで確認する。r12はfail/P1一件でP-07へ登録済み。P-18.1の限定scanではWindows record 0。製品source/test/CI変更はまだ行っていない。
+
+## 2026-10-02 Windows撤去後の最終ゲート提出準備
+
+[P-18/P-07を含む製品検証](artifacts/supported-os-verification-3b803ced.md)は3b803cedの実測です。両OSの全件と手動、最低Python版、fresh独立Code Reviewを別々に保存しました。文書更新だけの次候補でFinal Quality Gate v2を実施し、同じ正確なSHAの必要test laneを再検査します。旧Windows scopeのcampaign/stateを移植しません。P-15人間mergeとP-16/P-17は未着手のままです。

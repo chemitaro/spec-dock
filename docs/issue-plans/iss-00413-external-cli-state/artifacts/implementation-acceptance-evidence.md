@@ -75,3 +75,9 @@ baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更�
 ## 2026-10-02 P-07 r12 P1のローカル修正
 
 [選択観測のadmission修正](p07-finish-observation-repair.md)を別TDD単位で実施。基準aa91b756、公開corrupt JSONの意図したRed→Green、GitHub/localの実redirected store apply/dry-runと妥当なemptyを確認、関連99 passed（23.93秒）、全lint pass、actual exit0。r12の原判定をpassへ改変せず、fresh reviewerのclosureを待ちます。撤去後の全OS/full/manual/FQは未完了です。
+
+## 2026-10-02 Windows撤去・P-07修正後の新候補
+
+[候補3b803cedの記録](supported-os-verification-3b803ced.md)と[元log/provenance](supported-os-verification-3b803ced.json)を保存しました。macOS通常全件1899 passed/1 skipped（428.00秒）、Linux通常全件1883 passed/17 skipped（1094.09秒）、実Python3.10関連61 passed（24.33秒）、actual exit0。321 tracked source/test/configのfoldは83a680b4933d672c7887092bd272855c5ff67e03e72ef03f67b05c60c7b3ec36で一致。両OSの手動14操作は各26のfake gh requestで、live GitHubの効果ではありません。fresh Code Review Strictはpass/指摘0/actual exit0で、モデルGPT-5.6 SolとProをともにUI verified=trueで確認しました。旧r12をpassへ変えていません。
+
+これはFinal Quality Gateに提出する前の証拠です。新OS範囲のFinal Quality Gate v2と同SHAの必要test、人間merge、実consumer適用、正式#413 import/Startを別に完了させます。ここまでの全件・手動・Code Review成功を後段実環境の成功へ転記しません。

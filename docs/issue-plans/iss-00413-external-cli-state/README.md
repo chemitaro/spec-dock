@@ -2,7 +2,7 @@
 
 > ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**対応OSはLinux/macOS。Windows対応を撤回し、[P-18](plan.md#p-18)の追加作業として撤去範囲を定義しました。独立Implementation Brief Strict（GPT-5.6 Sol／Pro、基準dd90ca97）を完了し、source/test撤去をc0f8add1、Windows専用CI削除をa552e73cで実施しました。[撤去記録](artifacts/p18-retirement-implementation.md)にfocused74件・影響195件・lintの結果を保存しています。配布文書と静的inventoryを同期し、配布試験71件と人間向けHTMLの4図・拡大操作を検証しました。撤去後の全件・手動確認は未完了です。121228c6のLinux通常全件はPATHのみ補正して1900 passed/20 skipped、exit0。macOSは同じsourceの2b2be5e2で1916 passed/4 skipped、exit0。r12はP1一件・failでP-07修正を登録しました。新候補のStrict/FQ、人間merge、実導入、正式#413 Startは未完了。実装担当はGPT-6.1 Sol / Maxです。**
+**対応OSはLinux/macOSです。P-18のWindows専用source/test/CI撤去とP-07のFinish事前拒否修正を完了し、候補3b803cedを検証しました。macOS全件は1899 passed/1 skipped、Linux全件は1883 passed/17 skipped、最低Python3.10の関連61件も成功、actual exitはいずれも0。両OSの通常install CLIを各14操作確認し、GPT-5.6 Sol／Proの独立Code Review Strictはpass・指摘0でした。[最新の検証記録](artifacts/supported-os-verification-3b803ced.md)を参照してください。これは最終ゲート提出前の記録です。Final Quality Gate v2、人間merge、実導入、正式#413 import/Startの完了証拠とは別です。実装担当はGPT-6.1 Sol / Maxです。**
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 

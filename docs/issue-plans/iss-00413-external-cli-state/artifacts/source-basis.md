@@ -166,3 +166,7 @@ HTMLは本文・補助CSS・text/plain図だけを変更し、実行scriptと共
 ## 2026-10-02 P-18作業ブリーフと撤去checkpoint
 
 [独立ブリーフ](p18-implementation-brief-dd90ca97.md)は指定branchのdd90ca978fd711c32df7bbdf38aea516f62bbb1cをGitHub connectorで完全一致確認したGPT-5.6 Sol／Pro回答です。native実行はactual exit0、model/thinking UI verified=true。[原文bytes](p18-implementation-brief-dd90ca97-raw.json)を保全し、[採用補正](p18-retirement-implementation.md)をローカル現物へ照合しました。source/test撤去c0f8add1、CI撤去a552e73cはその後のローカル実装であり、dd90の第三者読取結果と区別します。main baselineの出典表と歴史記述は保存します。
+
+## 2026-10-02 Windows撤去後のpushed候補
+
+3b803ced470bf58439bbee342b61c91c20de74b6に対するfresh Code Review StrictはGitHub connectorで完全一致を確認し、pass/指摘0でした。Linux/macOS通常全件と両OSの外部console実測は[新しい製品証拠](supported-os-verification-3b803ced.md)。旧121228c6、原本生成時の6fec3099、各過去logを上書きせず、最終ゲート・実導入と分離します。
