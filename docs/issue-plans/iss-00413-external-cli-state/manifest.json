@@ -44,12 +44,12 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 462,
+    "local_link_occurrences_checked": 482,
     "html_unique_ids": 33,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "4/4 SVG and zoom validator passed on current explanation HTML",
     "mobile": "IAB viewport 390px; document width 375px; no horizontal document overflow; restored viewport",
-    "source_publication": "thirteen documents and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
+    "source_publication": "sixteen payloads and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
     "product_acceptance": "incomplete; see current_implementation_evidence",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
@@ -58,8 +58,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 6314,
-      "sha256": "f341e4280845d8aabad01055f2d52be173a9449d09c0a4cecf381d8ced8a4709"
+      "bytes": 6584,
+      "sha256": "28bf460e476753b86ea6c2ced12229d7c8f6e6bb66cabe2d88c5fb215b52fef5"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
@@ -223,8 +223,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 6271,
-      "sha256": "b80a7ace409a2cb3ae634a3b3a45848f7c7ad4defc78803f555e45c2770ab7af"
+      "bytes": 7085,
+      "sha256": "496c9c546b9839d1a271f469a0868c65f4b7d8fe4bb6749ededec7671e26f2d6"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -250,6 +250,21 @@
       "path": "artifacts/macos-full-6032621c.md",
       "bytes": 1724,
       "sha256": "2c23e19499f8bdc92253d0b31d2bf31d81ab1569d3c527476946c8338303de05"
+    },
+    {
+      "path": "artifacts/macos-full-75ac5760.md",
+      "bytes": 2272,
+      "sha256": "3e452c108eac4df6dd0e964a9f467cd6802f7fc1b0a497e2cc3d983b7b771bac"
+    },
+    {
+      "path": "artifacts/manual-console-75ac5760.json",
+      "bytes": 35159,
+      "sha256": "980b02eee08b6e9ef548fbb7bbb7b0a2b731c133ab6e987c7de47e84ef7b02c6"
+    },
+    {
+      "path": "artifacts/manual-console-75ac5760.md",
+      "bytes": 3428,
+      "sha256": "83af09f4fa545c128094ea4f639002b4a25b112d32fb6c9910eb5e2fcf5e453d"
     },
     {
       "path": "artifacts/manual-console-8a70a8b3.json",
@@ -338,8 +353,8 @@
     },
     {
       "path": "artifacts/scope-publication-capability.md",
-      "bytes": 3443,
-      "sha256": "667e770195a4dd38a147fb916971b18ea6c53ef0b2838a60c2a4cfe67fb33291"
+      "bytes": 3591,
+      "sha256": "2e559a9ef406b3d2fbd66886b06a6d5c726da1c6318c1682f04dd263de280bd2"
     },
     {
       "path": "artifacts/self-check.md",
@@ -578,13 +593,13 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 71098,
-      "sha256": "5f152840b4d9b1306a9ba7c33a3e36ad3280c25df82865dfd3f21835b9fc540d"
+      "bytes": 71549,
+      "sha256": "cf387e15961e377675613217e38fc33d3820cb9680dca9d8fa1469eecdf61289"
     },
     {
       "path": "implementation-report.md",
-      "bytes": 223864,
-      "sha256": "87d36061e98d61cd605efdc8e6c6247cf5b97fc685d967c90dd960e7682e7aa2"
+      "bytes": 225379,
+      "sha256": "9600f7384fdeeec63cf11864667e42dac3514d6757bee99ac4a1b76d302fd28b"
     },
     {
       "path": "index.html",
@@ -593,8 +608,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 140854,
-      "sha256": "586a199d5dc1b7f2863d00d40057a65abb217de1c61b71e5c765b2404cf0ad7b"
+      "bytes": 141238,
+      "sha256": "bad3589790cc8539965f8d0f8493fd187bfe8bfca83117e735a4888dd291f5a8"
     },
     {
       "path": "preview-entry.html",
@@ -603,8 +618,8 @@
     },
     {
       "path": "report.md",
-      "bytes": 26740,
-      "sha256": "81bf2bcb05a75ba60e144bb2d7012d63f7d2b0ca699540e6adfad293802b0c98"
+      "bytes": 28860,
+      "sha256": "ca7d6f9f4636de1365d51a67e45bba1d3f40dedad97fb71fff167e26348315e6"
     },
     {
       "path": "requirement.md",
@@ -781,22 +796,29 @@
   },
   "status_date": "2026-10-02",
   "current_implementation_evidence": {
-    "provider_candidate_sha": "6032621c2bd68ab9051b8929dd17d536a4114ad7",
-    "provider_candidate_scope": "macOS full-test candidate including Windows JSON reader connection",
-    "provider_source_unchanged_since": null,
-    "provider_source_changes_after_full": "Scope publication capability preflight after baseline6032621c; related tests only",
+    "provider_candidate_sha": "75ac57604f5b95f1c50a2e7214d711bc720fb0eb",
+    "provider_candidate_scope": "macOS full-test and installed manual-console candidate including Windows JSON read and Scope capability preflight",
+    "provider_source_unchanged_since": "75ac57604f5b95f1c50a2e7214d711bc720fb0eb",
+    "provider_source_changes_after_full": "none; only planning and verification documents updated",
     "record": "artifacts/implementation-acceptance-evidence.md",
-    "manual_record": "artifacts/manual-product-smoke.md",
-    "macos_full_pytest": "exit 0; 1876 passed, 4 skipped; 366.99 seconds; direct ordinary uv run pytest",
-    "macos_full_record": "artifacts/macos-full-6032621c.md",
+    "manual_record": "artifacts/manual-console-75ac5760.md",
+    "manual_raw_record": "artifacts/manual-console-75ac5760.json",
+    "macos_full_pytest": "exit 0; 1900 passed, 4 skipped; 388.57 seconds; direct ordinary uv run pytest",
+    "macos_full_record": "artifacts/macos-full-75ac5760.md",
+    "previous_macos_reader_full_record": "artifacts/macos-full-6032621c.md",
     "macos_runner_record": "artifacts/macos-full-3b0c69e8.md",
     "macos_first_runner_failure": "prior SHA3b0c69e8: 2 failed, 1851 passed, 2 skipped; missing main guard in ignored runner; product/tests unchanged; raw log retained",
     "previous_macos_failure": "8a70a8b3: exit 1; 1 failed, 1847 passed, 2 skipped; cause unresolved; original evidence retained",
     "linux_full_pytest_sha": "8a70a8b30e69fe0bda6db6c45ef555f44411236d",
     "linux_full_pytest": "exit 0; 1832 passed, 18 skipped",
     "linux_source_limitation": "8a70a8b3 predates the WindowsDirectory source change in 3b0c69e8",
-    "manual_console_sha": "8a70a8b30e69fe0bda6db6c45ef555f44411236d",
-    "manual_source_limitation": "8a70a8b3 predates the WindowsDirectory source change in 3b0c69e8",
+    "manual_console_sha": "75ac57604f5b95f1c50a2e7214d711bc720fb0eb",
+    "manual_source_limitation": "14 individual installed-console operations with real Git and stateful fake gh; no live GitHub or native Windows acceptance",
+    "previous_manual_record": "artifacts/manual-product-smoke.md",
+    "manual_operations": 14,
+    "manual_github_requests": 28,
+    "manual_wheel_sha256": "84001559f6ca328a42aa52d21f7fd0561dab12396818f107434335cc39302a9a",
+    "manual_provider_source_sha256": "126058d7bcbe1d1a6d5cf77d60c96592016497dd9554e8000aa6f849a6f871c5",
     "windows_native_and_store": "not accepted; native execution and store connection pending",
     "additional_source_change": {
       "baseline_sha": "ccf9637d453a4f0d7988a7f9f3471a147c427bbd",

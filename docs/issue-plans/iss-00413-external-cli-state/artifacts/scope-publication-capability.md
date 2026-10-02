@@ -22,4 +22,4 @@
 
 source SHA256: `json_store.py` = `ba9850a8d31176d8c5b894d77aed6d93f696fb7f8175ccfb96f19fd3f0e2ae5b`、`direct_scope_publish.py` = `cf193d6b5dc151a1622507e972fc0d224ca0bb59c18c56f55419d1075cd883f7`。
 
-このsourceを含む候補の全件検査、Windows保存/各公開/processとnative受入、fresh Strict/FQは未完了。[直前の全件](macos-full-6032621c.md)と[保存adapterの接続条件](windows-adapter-connection-review.md)を保持する。
+このsourceを含む[clean75ac5760の全件](macos-full-75ac5760.md)は1900 passed/4 skipped（388.57秒）、exit0。[同候補の手動14操作](manual-console-75ac5760.md)も確認した。Windows保存/各公開/processとnative受入、fresh Strict/FQは未完了。[直前の全件](macos-full-6032621c.md)と[保存adapterの接続条件](windows-adapter-connection-review.md)を保持する。

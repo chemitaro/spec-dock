@@ -197,3 +197,13 @@ Windows補強を含むclean 3b0c69e8のmacOS全件は、最終1853 passed/2 skip
 Scope原語確認の最終差分でEpicのparent GETの順序も再現した（8 failed/63 deselected、3.83秒）。判定を親GET前へ移して同じ選択を8 passed/63 deselected（1.45秒）にし、三階層の24組合せを含む関連九suiteはMac3.12で287 passed/2 skipped（68.15秒）、実3.10で287 passed/2 skipped（68.17秒）。最終の通常lintもRuff300/mypy219でexit0。先の八case・271件は途中段階の実結果として保全し、今回の最終sourceと区別する。Windows保存/native、後続候補全件とStrict/FQは引き続き必要。
 
 最終HTMLも公式validatorの四図・拡大/keyboard/focusをexit0で再確認。390pxでdocument375px/section355px、三階層24ケースと287件を読み取れた。overrideを解除し新規空tabの1280pxを照合して、確認専用tabを閉じた。配信bytesとZIPは、この最終本文を対象に再照合する。
+
+
+## 2026-10-02 clean75ac5760の全件と通常install CLIの手動確認
+
+Scope公開の事前判定を通常checkpoint75ac5760へ保存し、parent6032621c・branch不変・cleanを確認した。[同候補のmacOS全件](artifacts/macos-full-75ac5760.md)は通常uv run pytestを直接実行して1900 passed/4 skipped（388.57秒）、実exit0。実3.12.11・prefix/providerと実行前後のHEAD/clean/source不変を照合した。旧候補・関連287件の結果へ合算しない。
+
+[同じ製品sourceの通常install CLI](artifacts/manual-console-75ac5760.md)は14操作を個別実行した。非editable wheel・外部fresh venv・pip check・元provider pathを参照不能にしたsite-packages consoleを使用し、pytest bodyは呼び出していない。[原文](artifacts/manual-console-75ac5760.json)に実exit/stdout/stderr/前後entryと28件の外部gh requestを保持する。Start重複拒否、兄弟二件のSync、Close確認後の捕捉解除とbranch保持、次Issue開始、native hookエラーのpartialと自動rollbackなしを確認。Git本来のbranch/HEAD/reflog以外の独自controlは作らず、tracked仕様とC/B recordを照合した。
+
+GitHub境界はstateful fake ghであり、live GitHubや本consumerは変更していない。Windows保存/各公開/process/native、現在候補Strict/FQ、人間merge後のP-16/17は未完了。旧macOS比較不一致・旧runner不備・別sourceのLinux/手動の証拠を保持し、今回の成功で撤回しない。
+公式HTML validatorは四図のstatic・4/4 SVG・拡大/keyboard/focusで実exit0。IABの390pxではdocument375px/section355px、横overflowなし、最新75ac5760・1,900件・手動14操作・Windows未完了の表示を確認した。overrideを解除し新規空tabの1280pxを照合し、確認専用tabを閉じた。十六payloadとmanifestの十七sourceをTailscale経由でHTTP200/no-store/正本bytesへ照合した。採用ZIPは115 member/114 payload、二schema/13例/482内部リンク/33 HTML ID、CRC/bytes/hashを確認した。資料の確認と製品の未完了gateを分ける。

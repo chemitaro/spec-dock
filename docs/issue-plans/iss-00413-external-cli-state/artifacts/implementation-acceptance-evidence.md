@@ -6,6 +6,8 @@
 
 | 対象SHA・範囲 | 実行条件・結果 | 証拠と制限 |
 |---|---|---|
+| 75ac57604f5b95f1c50a2e7214d711bc720fb0eb / 通常全pytest | macOS arm64、実Python3.12.11、clean checkout。1900 passed / 4 skipped、388.57秒、exit0 | [Scope事前判定を含む最新全件](macos-full-75ac5760.md)。通常pytestを直接実行、実行前後のHEAD/clean/source不変を照合 |
+| 同SHAの製品source / 手動console | 外部fresh venvへ通常wheelを非editable install、pip check、元provider pathを参照不能にした実consoleで14操作を個別実行 | [最新手動確認](manual-console-75ac5760.md)と[原文・観測](manual-console-75ac5760.json)。実Git、GitHub境界だけstateful fake gh。旧手動証拠は別sourceとして保持 |
 | `6032621c2bd68ab9051b8929dd17d536a4114ad7` / 通常全pytest | macOS arm64、実Python 3.12.11、clean checkout。1876 passed / 4 skipped、366.99秒、exit0 | [Windows JSON読取を含む全件](macos-full-6032621c.md)。独自runnerなし。この後のScope原語確認の追加変更は含まない |
 | `3b0c69e8d61ad7ad5b01307dd301963a2cab180d` / 通常全pytestと同じ選択 | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1853 passed / 2 skipped、402.78秒、exit0 | [runner修正と全件](macos-full-3b0c69e8.md)。最初の2 failed / 1851 passed / 2 skippedも保持。製品source/testsを変更せず、ignored runnerだけを修正 |
 | `1e5d2586678927866e9ec0eae804cdd4d55ff138` / 通常全pytest | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1848 passed / 2 skipped、424.21秒、exit 0 | `pytest-macos-full-1e5d2586.log`。変更pathの比較診断を含む全件。Git Trace2は外部owned logだけへ保存し、製品のGit環境除去を変更しない。過去の不一致の原因確定とは別 |
@@ -27,7 +29,7 @@ baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更�
 
 続くbaseline9a97f758から[Windows JSON reader](windows-json-read.md)を接続した。関連八suiteはMac3.12/実3.10で各58 passed/3 skipped、通常lint成功。接続時は3b0c69e8の全件後のsource差分だったが、そのreaderを含むclean6032621cの通常全件は上表のとおり1876 passed/4 skipped、exit0で成功した。Windows native・保存/各公開/processとStrict/FQの合格ではない。
 
-[Scope公開の原語確認](scope-publication-capability.md)はbaseline6032621c後の追加修正。既知の未対応をremote観測/変更とdry-run成功判定の前に検出し、関連九suiteはMac3.12/実3.10各287 passed/2 skipped、通常lint成功。後続sourceの全件検査は引き続き必要である。
+[Scope公開の原語確認](scope-publication-capability.md)はbaseline6032621c後の追加修正。既知の未対応をremote観測/変更とdry-run成功判定の前に検出し、関連九suiteはMac3.12/実3.10各287 passed/2 skipped、通常lint成功。その修正を含むclean75ac5760の全件は上表の1900 passed/4 skipped、exit0。sourceの関連287件へ合算せず、Windows保存/nativeとStrict/FQは未完了として扱う。
 
 ## 認定と実環境作業
 

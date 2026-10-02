@@ -6,6 +6,8 @@
 
 追加診断を保存したclean `1e5d2586` のmacOS通常全件は1848 passed/2 skipped（424.21秒）、exit0。製品source不変、元の失敗原因は未確定。過去結果の撤回、OSごとの件数合算、Windowsや独立gateの完了認定を行わない。
 
+最新のclean75ac5760は[通常macOS全件](artifacts/macos-full-75ac5760.md)1900 passed/4 skipped（388.57秒）、exit0。[同候補の通常install CLIの手動14操作](artifacts/manual-console-75ac5760.md)も確認した。これはWindows保存/native、fresh Strict/FQ、実導入の完了認定とは別であり、P-12進行中とP-13/P-14準備の状態は維持する。
+
 実装担当は利用者指定の **GPT-6.1 Sol / reasoning Max**（2026-10-01の追加指示でHighから変更）。設定値は `model="gpt-6.1-sol"`、`reasoning_effort="max"`。本資料の著述モデルや独立Strictレビュー用のGPT-5.6 Sol / Proと混同せず、gpt-5.6系専用coder roleへ置き換えません。モデルの公開状況や能力比較はこの作業契約の判断材料にしません。
 
 ## 作業の境界・進め方

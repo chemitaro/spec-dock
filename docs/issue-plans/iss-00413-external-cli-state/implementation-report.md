@@ -1131,3 +1131,12 @@ baseline9a97f758から[読取境界](artifacts/windows-json-read.md)をTDDで接
 ## 2026-10-02 追記: 親GitHub取得より先の能力確認
 
 Scope原語確認の最終差分でEpicのparent GETの順序も再現した（8 failed/63 deselected、3.83秒）。判定を親GET前へ移して同じ選択を8 passed/63 deselected（1.45秒）にし、三階層の24組合せを含む関連九suiteはMac3.12で287 passed/2 skipped（68.15秒）、実3.10で287 passed/2 skipped（68.17秒）。最終の通常lintもRuff300/mypy219でexit0。先の八case・271件は途中段階の実結果として保全し、今回の最終sourceと区別する。Windows保存/native、後続候補全件とStrict/FQは引き続き必要。
+
+
+## 2026-10-02 clean75ac5760の全件と通常install CLIの手動確認
+
+Scope公開の事前判定を通常checkpoint75ac5760へ保存し、parent6032621c・branch不変・cleanを確認した。[同候補のmacOS全件](artifacts/macos-full-75ac5760.md)は通常uv run pytestを直接実行して1900 passed/4 skipped（388.57秒）、実exit0。実3.12.11・prefix/providerと実行前後のHEAD/clean/source不変を照合した。旧候補・関連287件の結果へ合算しない。
+
+[同じ製品sourceの通常install CLI](artifacts/manual-console-75ac5760.md)は14操作を個別実行した。非editable wheel・外部fresh venv・pip check・元provider pathを参照不能にしたsite-packages consoleを使用し、pytest bodyは呼び出していない。[原文](artifacts/manual-console-75ac5760.json)に実exit/stdout/stderr/前後entryと28件の外部gh requestを保持する。Start重複拒否、兄弟二件のSync、Close確認後の捕捉解除とbranch保持、次Issue開始、native hookエラーのpartialと自動rollbackなしを確認。Git本来のbranch/HEAD/reflog以外の独自controlは作らず、tracked仕様とC/B recordを照合した。
+
+GitHub境界はstateful fake ghであり、live GitHubや本consumerは変更していない。Windows保存/各公開/process/native、現在候補Strict/FQ、人間merge後のP-16/17は未完了。旧macOS比較不一致・旧runner不備・別sourceのLinux/手動の証拠を保持し、今回の成功で撤回しない。
