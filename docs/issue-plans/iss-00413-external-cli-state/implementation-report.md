@@ -1076,6 +1076,14 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 公開work finishのhelpに残るselected subtree/canonical branch/derived stateを、captured direct recordの条件付き解除、completedのlive GET確認、現在branch保持、Start lockなし、正確なFinishDataへ変更した。Scope/Work/Workspaceの共通説明から旧cache/control/generation/共有branch bindingの前提も外した。既存公開help caseのRedは1 failed（0.06秒）、Greenは1 passed（0.03秒）。全help/completion、公開contract、Finish、fresh wheel四群は75 passed（31.92秒）、通常make lint（Ruff 297/mypy 216）も成功、exit0。業務処理や44 leafのsyntax、現consumerは未変更。元logsはpytest-current-finish-help-{red,green,related}.log、lint-current-finish-help.log。fresh Strict/Final Quality Gate/未完了のWindows接続・native受入をこのhelp補正で完了とは扱わない。
 
+## P-12 OS排他のnative試験と配布CIの準備
+
+**OS排他のnative試験と配布CIの準備**
+
+[実OS境界の記録](artifacts/native-start-lock-boundary.md)へ、実Git common-dir、main/linkedと別clone、別processの保持/拒否/通常解放/強制終了を保存した。Mac 3.12のnative/identity/API契約三群は8 passed/1 skipped（0.82秒）、実3.10のnativeは3 passed/1 skipped（0.89秒）、共にexit0。Win32専用skipは未実施であり成功に数えない。製品adapterの変更はなく、test-onlyの受入準備とする。通常make lint（Ruff 298/mypy 217）、workflowのYAML/候補checkout/通常pytest維持の静的検査も成功。Windows native laneを追加したが実OSでの実行は未取得。
+
+既存Ubuntu/macOS配布laneへ実console E2Eとprovenance出力を追加した。同じ五suiteのMacローカル検証は86 passed（122.39秒）、exit0。baseline 15bdcd05から製品source delta0、copy入力SHA256 b07821e35492f31ba68516552f050a398d345dc8fc546e075c36c63d097576b4、wheel SHA256 f8884f8d1e624fd8aa85c50f7eac763e646669df73431dab36eef7bd242c2761を元logへ保存した。CI実行/現在候補全pytest/Windows保存・公開/独立レビュー/P-13認定/最終手動確認/実consumer適用の完了へ転記しない。
+
 ## P-12 OS別の受入と未接続directory診断
 
 **OS別の受入と未接続directory診断**

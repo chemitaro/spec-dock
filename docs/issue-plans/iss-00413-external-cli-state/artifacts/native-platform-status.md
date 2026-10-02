@@ -7,7 +7,7 @@
 | macOS 27.0.1 arm64 / APFS / Python 3.12.11 | clean e11f1879の通常全件1843 passed/1 skipped、446.22秒、exit0 | 既存Linux O_TMPFILE専用skipはnative成功にしない。後続変更の全件ではない |
 | Linux local tmpfs / Python 3.11.16 | clean e11f1879の通常全件1827 passed/17 skipped、1016.04秒、exit0 | ARM host上のamd64変換を使う隔離container。物理Linux機/Windows/ネットワークFSの保証へ転記しない |
 | 配布wheelの実console | macOS実3.12/3.10とclean 6824b3f8のLinux実3.11でStart→重複拒否→兄弟並行→Sync→Finish→次Issue Startが成立。Linux一caseは25.04秒、exit0 | 先行fullと追加caseの件数を合算しない。GitHubは外部gh scriptによる代替境界 |
-| Windows | windows_handles.pyのdirectory identity/mutexと、Win32 API代替を使う契約試験が存在 | Windows/NTFS上の別process試験ではない。work_target_storeのWindows保存、JSON/file/directory公開、project_hookのWindows process経路は未接続 |
+| Windows | windows_handles.pyのdirectory identity/mutexとWin32 API契約試験が存在。[実OS境界試験とWindows CI lane](native-start-lock-boundary.md)を追加 | Windows/NTFSでの実結果は未取得。work_target_storeのWindows保存、JSON/file/directory公開、project_hookのWindows process経路は未接続 |
 
 Linuxは同一の固定image `sha256:c514701300438939d8f2f3fd75cc57ea2eff502c1920e5cc98c713cf17452e3d` を使う。read-only root、network none、cap-drop ALL、USER未設定、UV_OFFLINE=1、clean候補SHA・prefix・providerを開始時に照合した。17 skipはZsh 12、macOS専用probe 1、Linux匿名stageでは非該当のpathname cleanup 4である。
 
