@@ -40,10 +40,10 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 581,
+    "local_link_occurrences_checked": 595,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
-    "browser_dynamic": "prior validated HTML bytes unchanged",
+    "browser_dynamic": "4/4 SVG and zoom browser pass for exact HTML SHA; see artifacts/p18-docs-ci-evidence.json",
     "mobile": "Previous HTML viewport check retained as history; current edit is not claimed as a new mobile check",
     "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
     "product_acceptance": "incomplete; see current_implementation_evidence",
@@ -54,13 +54,13 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 7321,
-      "sha256": "3a9ad8b5dbfb7e75fa0cd79b8baad880f688d58fab3c25cd8b690726abc1761c"
+      "bytes": 7722,
+      "sha256": "50c1e830f9e1c42e8075cc19d9699ed22c53835da5a0b1737f4a76551b0cfee7"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
-      "bytes": 20667,
-      "sha256": "eb2bd48a30974cabcd51eeb14cd36c73ac7d0e57daf11e5723734335203c4d83"
+      "bytes": 21231,
+      "sha256": "30c4f0775aff68850d759ce9d3e55284c1d1561d191f9e11ada12aab43264d3b"
     },
     {
       "path": "artifacts/cli-contract.md",
@@ -229,8 +229,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 12392,
-      "sha256": "b32fa4f6ad5749a6ed9d1f43fa63b84d6e06f5de535e05cbaf2811b147761aa7"
+      "bytes": 13662,
+      "sha256": "a8d5a2ca1785997e9608d89d173f988b5373ce990ef523ff573482b3ef2b6812"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -373,6 +373,11 @@
       "sha256": "1b9ed87a6afcf5856385c3687253f9266f4e1ebe0deef4b97c3656dcfa38e953"
     },
     {
+      "path": "artifacts/p18-docs-ci-evidence.json",
+      "bytes": 2302,
+      "sha256": "f906feb6ea2fd6ff50037f87abd0e73fb3799227b73447f2a1b7ebeb3ecddb55"
+    },
+    {
       "path": "artifacts/p18-implementation-brief-dd90ca97-raw.json",
       "bytes": 43337,
       "sha256": "3b5ab4ae7f955758f1e924e7e811a69a7fc6cbb0e0edc1131daf4f466a0b97aa"
@@ -389,8 +394,8 @@
     },
     {
       "path": "artifacts/p18-retirement-implementation.md",
-      "bytes": 4501,
-      "sha256": "a397a48932adbc61bf8c4fbce84e48c23080eac41632cf86542f17ce64b2459d"
+      "bytes": 5756,
+      "sha256": "936401b01979fe8d4963df61f6c35f8823df711875fc3e508e8b1a70d955fc29"
     },
     {
       "path": "artifacts/provider-retirement-dispatcher.md",
@@ -464,8 +469,8 @@
     },
     {
       "path": "artifacts/source-basis.md",
-      "bytes": 30618,
-      "sha256": "cb535d3861e4be3abedaab2f28690012f18efd39be6f3b527e2d5de358801736"
+      "bytes": 31299,
+      "sha256": "7305c32d2e7a8d5ceb9569d10ed8e1a29eefc4e72b3e8581515d48f5183ce702"
     },
     {
       "path": "artifacts/start-publication-capability.md",
@@ -699,8 +704,8 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 72300,
-      "sha256": "e72597f612d59617e8254367d4ff872465b0631ca2507128a89a38155b11b447"
+      "bytes": 72683,
+      "sha256": "b9514c5a5e4bc0b3faa99bcc66dc647cf4f5b4bd11ba8f0b5e6b1b4c573a9aaf"
     },
     {
       "path": "implementation-report.md",
@@ -714,8 +719,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 157192,
-      "sha256": "8b7b5bd8ca1895e8db70c96aa2278570202f96c8feb3b9fc1721c591a83a7a0b"
+      "bytes": 157378,
+      "sha256": "a8bfd40415719c58865321d0a172dd04207aa38f98d6c883b5f6827870a65fd9"
     },
     {
       "path": "preview-entry.html",
@@ -935,7 +940,7 @@
       "exit_code": 10,
       "evidence": "artifacts/code-review-p06-12-analysis.md"
     },
-    "additional_work": "P-18.2/P-18.3 source/test focused Green; CI/docs/OS full/manual pending; P-07 Finish P1 repair and fresh Code Review/FQ and P-16/P-17 pending"
+    "additional_work": "P-18.2-P-18.5 source/test/CI/provider docs/static inventory complete with focused and HTML evidence; OS full/manual and P-07 P1/fresh Strict/FQ pending"
   },
   "os_retirement_authoring": {
     "model": "gpt-5.6-sol",
@@ -974,6 +979,9 @@
     "record": "artifacts/p18-retirement-implementation.md",
     "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
     "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
-    "full_acceptance": "not certified"
+    "full_acceptance": "not certified",
+    "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
+    "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
+    "docs_evidence": "artifacts/p18-docs-ci-evidence.json"
   }
 }

@@ -7,6 +7,8 @@ description: Operate and author SpecDock scopes, canonical documents, Artifacts,
 
 Use the installed external `spec-dock` console. Read current root and leaf help before commands; canonical documents and actual CLI/Git/GitHub evidence are authoritative. The repository shim only delegates through PATH. Do not execute checkout Python, the retired fixed bundle or shared control as a fallback.
 
+Business commands support Linux and macOS with Python 3.10+. Other operating systems return `UNSUPPORTED_PLATFORM` (exit 3) before project admission or effects. Help, version and completion remain context-free utilities.
+
 ## Resolve the context and target
 
 1. Bind one repository/worktree, using its exact absolute root with `--project` when needed.

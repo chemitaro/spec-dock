@@ -17,7 +17,7 @@
 </head>
 <body>
 <a class="skip" href="#overview">本文へ移動</a>
-<header class="hero"><div class="eyebrow">SPECDOCK / EXTERNAL CLI / DIRECT WORK TARGET</div><h1>仕様を共有し、<br>現在の作業を各worktreeで記録します。</h1><p class="lead">実行プログラムはworktree外へ導入し、GitHub番号と既存仕様を正本にします。同じcloneの並行作業は必要時に観測し、Startだけ短い排他で重複を防ぎます。</p><div class="badges"><span class="badge">外部CLI・直接対象方式</span><span class="badge">三階層・GitHub番号</span><span class="badge">単独HTML・外部依存なし</span></div><p class="meta">配布ガイド改定: 2026-10-01 / Issue #413</p></header>
+<header class="hero"><div class="eyebrow">SPECDOCK / EXTERNAL CLI / DIRECT WORK TARGET</div><h1>仕様を共有し、<br>現在の作業を各worktreeで記録します。</h1><p class="lead">実行プログラムはworktree外へ導入し、GitHub番号と既存仕様を正本にします。同じcloneの並行作業は必要時に観測し、Startだけ短い排他で重複を防ぎます。</p><div class="badges"><span class="badge">外部CLI・直接対象方式</span><span class="badge">三階層・GitHub番号</span><span class="badge">単独HTML・外部依存なし</span></div><p class="meta">配布ガイド改定: 2026-10-02 / Issue #413</p></header>
 <div class="layout"><nav class="sidebar" aria-label="目次"><p>CONTENTS</p><a href="#overview"><span>01</span>まず理解すること</a>
 <a href="#engine"><span>02</span>実行プログラムとGitの役割</a>
 <a href="#storage"><span>03</span>何をどこへ置くか</a>
@@ -43,6 +43,7 @@
 <a href="#safety"><span>11</span>この方式が保証する範囲</a>
 <a href="#sources"><span>12</span>詳細へ進む</a></nav></details>
 <section id="overview" aria-labelledby="overview-title"><div class="section-label">01</div><h2 id="overview-title">まず理解すること</h2><p class="intro">SpecDockは、GitHub Issueに結び付いた仕様をInitiative・Epic・Issueの三階層で扱うCLIです。実行プログラムは通常のPython packageとしてworktree外に導入し、各作業場には仕様と最小限の作業記録を置きます。</p>
+<p>対応OSはLinuxとmacOS、Pythonは3.10以上です。他のOSでは業務コマンドを開始せず、変更前に<code>UNSUPPORTED_PLATFORM</code>（終了値3）を返します。help・version・completionは、repositoryや業務用のOS機能に依存せず利用できます。</p>
 <div class="cards"><article class="card"><h3>仕様の正本</h3><p>Requirement・Design・PlanはGitで共有する一次仕様です。Reportは実施・検証の記録、Artifactは採用前も含む証拠です。</p></article><article class="card"><h3>Scopeの番号</h3><p>新規Scopeは必ずGitHubを使います。GitHubが発行した番号を既存のIDに使い、UUIDやオフライン用の新しい連番を追加しません。</p></article><article class="card"><h3>現在の作業</h3><p>一つのworktreeの直接対象は同時に一件です。親Epic・Initiativeは文脈や集計であり、別の作業を暗黙に開始しません。</p></article><article class="card"><h3>並行作業の観測</h3><p>Gitが列挙する同じcloneのmainとlinked worktreeを必要時に読みます。別clone、別PC、Codexのプロセスは探索しません。</p></article></div>
 <p>正確な引数は導入版の<code>spec-dock help COMMAND</code>と各leafの<code>--help</code>で確認できます。本書は外部CLI・直接対象方式の操作を説明します。実装、テスト、レビュー、PR、mergeはそれぞれ独立した完了証拠です。</p>
 </section>

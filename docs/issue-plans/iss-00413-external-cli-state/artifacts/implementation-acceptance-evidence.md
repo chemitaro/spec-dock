@@ -33,7 +33,7 @@ Linuxの18 skipはzsh不在12件、Win32限定1件、macOS stage契約1件、Lin
 - Windows関連commit・test・測定は、混入経路と削除理由を監査できるraw evidenceとして残す。過去ログの削除、成功/失敗の書換え、異なるSHAの件数合算をしない。
 - `b33b7a71` と `8a70a8b3` にはWindows変更とLinux/macOS共通修正/E2Eが同居するため、commit単位revertを採用しない。file/symbol単位のP-18とPOSIX characterizationを先行する。
 - current Code Review Strict r12は `121228c6fca1fd016e7bccef009902396112ba43` のcheckpoint分析だが旧Windows要求を添付した別sessionで完了しP1一件・failで、新OS範囲の最終gateや重複reviewではない。
-- P-18実装、撤去後のLinux/macOS full/wheel/manual、fresh Strict、Final Quality Gateは未実施。PATH補正後の121228c6 fullは下記のbaseline証拠。
+- P-18.2〜P-18.4のsource/test/CI撤去は実施済み。撤去後のLinux/macOS full/manual、fresh Strict、Final Quality Gateは未実施。PATH補正後の121228c6 fullは下記のbaseline証拠。
 
 ## 2026-10-02 後続のWindows物理directory補強（履歴証拠）
 
@@ -49,7 +49,7 @@ baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更�
 
 ## 認定と実環境作業
 
-- P-12進行中。P-18は追加計画のみで実装未着手。P-13/P-14の準備を先行していても、依存stepの完了認定とは別。
+- P-12進行中。P-18はsource/test/CI撤去、配布文書/HTMLの同期と検査済み。P-13/P-14の準備を先行していても、依存stepの完了認定とは別。
 - 現在候補の新OS範囲Code Review Strict、Final Quality Gate、merge-ready PRは未完了。旧要求付きr12、仕様の独立レビューpass、過去のコードレビューpassを流用しない。
 - Windows保存・native受入は未完了条件ではなく撤去対象。過去のmacOS比較不一致、Windows未実行、Linux PATH失敗の元結果を保持し、新しい成功で撤回しない。
 - 人間merge後のP-16実consumer切替、P-17正式#413 import/Startは未実施。旧control/metadata/activeやWindows identityを復旧例外で手編集しない。
@@ -63,3 +63,11 @@ baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更�
 - [r12 complete batch](code-review-p06-12-analysis.md): actual exit10、P1一件、review_status=fail。invalid/unavailableの選択観測でも明示FinishがCloseへ進む不具合はPOSIXにも存在するためP-07で修正します。新OS範囲のfinal passには流用しません。
 - 実装担当は利用者の継続指定GPT-6.1 Sol / Max。後続briefの著述モデルはGPT-5.6 Sol / Proで、担当設定の再決定ではありません。
 - Windows source撤去と、それをimportする廃止testの削除は一つのGreenなcommitにし、壊れた収集状態をcheckpointとして提出しません。独立CI変更は別commitにします。
+
+## 2026-10-02 P-18のsource/test/CI撤去
+
+独立GPT-5.6 Sol／Proブリーフはdd90ca978fd711c32df7bbdf38aea516f62bbb1cをconnectorで照合、actual exit0、model/thinkingともUI verified=true。[採用と実施記録](p18-retirement-implementation.md)と[exact raw回答](p18-implementation-brief-dd90ca97-raw.json)を保存しました。source/testのcheckpointはc0f8add123de1ba2cc16074841589c294242b090。Windows専用CIだけのcheckpointはa552e73c4371eb9e58b4b396fb6d623796582559です。
+
+変更working候補でfocused74 passed（16.84秒）、影響195 passed（56.10秒）、lint pass、通常1895 tests収集、actual exitはいずれも0。[Red/Greenを含む元log](p18-retirement-focused-evidence.json)に失敗も保全します。これらは新候補の通常full、別OS、手動、fresh Strict/FQの完了ではありません。r12のP-07 P1は別変更で修正します。
+
+[P-18配布・文書証拠](p18-docs-ci-evidence.json)にprovider distribution/static assets/fresh wheelの71 passed（99.34秒）・actual exit0、更新HTMLの4/4 SVG/zoom browser pass・actual exit0とTailscale HTTP exact bytesを保存しました。full/手動/Strict/FQの証拠とは別です。

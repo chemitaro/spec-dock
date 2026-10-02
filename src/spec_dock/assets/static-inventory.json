@@ -4,11 +4,12 @@
     {
       "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
-      "sha256": "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51",
+      "sha256": "2dbe53d0d26f35c13ce2f027eeb4ace16a9bb95b894aeabea75cd234b92d9e37",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18"
+        "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18",
+        "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51"
       ]
     },
     {
@@ -30,11 +31,12 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538",
+      "sha256": "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3"
+        "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3",
+        "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538"
       ]
     },
     {
@@ -154,11 +156,12 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e",
+      "sha256": "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103"
+        "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
+        "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e"
       ]
     },
     {
@@ -234,21 +237,23 @@
     {
       "path": "spec-dock/docs/migration.md",
       "source": "spec_dock/docs/migration.md",
-      "sha256": "d0da61a3ab362b168f784efe59c5a47781571d3fdefb86b862fe822b2060055c",
+      "sha256": "fbfee85c564b0718a9c0c6b0a92e8ef30b6781e98f2ac903a84a84de587be112",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5"
+        "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5",
+        "d0da61a3ab362b168f784efe59c5a47781571d3fdefb86b862fe822b2060055c"
       ]
     },
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5",
+      "sha256": "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32"
+        "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
+        "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5"
       ]
     },
     {

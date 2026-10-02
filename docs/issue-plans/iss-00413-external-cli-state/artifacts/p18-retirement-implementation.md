@@ -38,4 +38,12 @@ Win32 module、directory/JSON/mutex呼出し、専用三test、shared suiteのWi
 
 ## 残作業
 
-Windows CI jobの別commit、provider docs/skills/static inventory、HTML/ZIP状態同期、OS別実検証は未完了。P-07のr12 P1も未修正。実dogfood metadata/active/controlは変更していません。この記録やブリーフ採用はSpecDock正式Startではありません。
+撤去後のOS別full/手動、P-07修正、fresh Strict/FQは未完了。CIとprovider docs/skills/static inventory、HTMLの更新は下記の後続記録を参照してください。P-07のr12 P1も未修正。実dogfood metadata/active/controlは変更していません。この記録やブリーフ採用はSpecDock正式Startではありません。
+
+## P-18.4/P-18.5 後続のCI・配布資料
+
+Windows専用CI jobはa552e73c4371eb9e58b4b396fb6d623796582559で削除しました。Ruby YAMLで構文とjob集合を検査し、Linux/macOS jobの本文が元bytesと同一であることを確認、actual exit0。先行PyYAML probeは依存なしでexit1だったため成功扱いにしていません。
+
+README、配布CLI参照/移行/HTML、2つの配布skillへLinux/macOSと非対応OSの事前拒否を明記。static inventoryの5つの現在hashを更新し、前版hashをknown_oldへ保全、他entryは不変です。実dogfoodと実際のinstalled skillsは変更していません。
+
+[元ログと検査証拠](p18-docs-ci-evidence.json): fresh wheel、provider distribution、static init/updateを含む71 passed（99.34秒）、actual exit0。人間向けHTMLは4/4 SVG、click/keyboard/zoom/focus/dismiss/restorationが成功、actual exit0。同じTailscale URLのHTTP200/no-store/authoritative HTML exact bytesも一致しました。生成時の原本ZIP、report、implementation-report、interview、decision、過去raw evidenceは保全しています。新OSのfullやfresh review passへ読み替えません。

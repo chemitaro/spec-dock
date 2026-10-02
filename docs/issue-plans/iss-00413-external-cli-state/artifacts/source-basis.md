@@ -162,3 +162,7 @@ HTMLは本文・補助CSS・text/plain図だけを変更し、実行scriptと共
 ## 2026-10-02 OS撤回の追加出典
 
 最新OS authorityは[対応OS決定](os-support-decision.md)。第三者は指定branch codex/iss-00413-external-cli-stateのfull SHA121228c6fca1fd016e7bccef009902396112ba43をconnectorで完全一致確認した。[分析](os-support-retirement-analysis.md)と[原文](os-retirement-chatgpt-121228c6.md)を保全。親2b2be5e2とのsource/tests/CI差分は0。[限定record scan](os-retirement-record-scan-121228c6.json)、[Linux実測](linux-full-121228c6.md)、[r12分析](code-review-p06-12-analysis.md)をCodexが追加照合した。旧mainの出典表は当時のbaselineとして保持し、現sourceのpathへ書き換えない。b33b7a71と8a70a8b3には共通POSIX修正/E2Eも同居するため一括revertしない。
+
+## 2026-10-02 P-18作業ブリーフと撤去checkpoint
+
+[独立ブリーフ](p18-implementation-brief-dd90ca97.md)は指定branchのdd90ca978fd711c32df7bbdf38aea516f62bbb1cをGitHub connectorで完全一致確認したGPT-5.6 Sol／Pro回答です。native実行はactual exit0、model/thinking UI verified=true。[原文bytes](p18-implementation-brief-dd90ca97-raw.json)を保全し、[採用補正](p18-retirement-implementation.md)をローカル現物へ照合しました。source/test撤去c0f8add1、CI撤去a552e73cはその後のローカル実装であり、dd90の第三者読取結果と区別します。main baselineの出典表と歴史記述は保存します。

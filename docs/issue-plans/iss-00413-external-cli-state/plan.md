@@ -749,9 +749,9 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 <a id="p-18"></a>
 ## P-18 対応OS確定とWindows対応の撤去
 
-**2026-10-02実施更新**: [採用ブリーフと実装記録](artifacts/p18-retirement-implementation.md)を保存。P-18.2/P-18.3のPOSIX identity、単一guard、Windows source/test撤去をTDDで実施し、focused74件・影響195件・通常収集・lintは成功。source/schemaと廃止testを一Green checkpointにまとめ、CIは別commit。P-18.4以降、full/手動/Strict/FQとP-07修正は未完了。以下の契約と停止条件は維持します。
+**2026-10-02実施更新**: [採用ブリーフと実装記録](artifacts/p18-retirement-implementation.md)を保存。P-18.2/P-18.3のPOSIX identity、単一guard、Windows source/test撤去をTDDで実施し、focused74件・影響195件・通常収集・lintは成功。source/schemaと廃止testをc0f8add1の一Green checkpointにまとめ、Windows専用CIをa552e73cの別commitで削除。P-18.5のprovider docs/skills/inventoryを同期し配布71件とHTML4図/zoomを確認。full/手動/Strict/FQとP-07修正は未完了。以下の契約と停止条件は維持します。
 
-**状態: 実装中。P-18.2/P-18.3 focused Green、CI/docs/fullは未完了。前提/依存: P-12の候補実装と証拠を読み、更新済みR/D/P/schema/decisionを通常pushした後、独立ChatGPT Implementation Brief Strictを成功させること。後続: P-13より前に必須。** 読むauthority: [対応OS決定](artifacts/os-support-decision.md)、[第三者分析](artifacts/os-support-retirement-analysis.md)、[詳細計画](artifacts/os-support-retirement-plan.md)、[D-02](design.md#d-02)、[D-03](design.md#d-03)、[D-05](design.md#d-05)、[D-13](design.md#d-13)。
+**状態: 実装中。P-18.2〜P-18.4 source/test/CI撤去済み。P-18.5文書/配布71件/HTMLを確認、fullは未完了。前提/依存: P-12の候補実装と証拠を読み、更新済みR/D/P/schema/decisionを通常pushした後、独立ChatGPT Implementation Brief Strictを成功させること。後続: P-13より前に必須。** 読むauthority: [対応OS決定](artifacts/os-support-decision.md)、[第三者分析](artifacts/os-support-retirement-analysis.md)、[詳細計画](artifacts/os-support-retirement-plan.md)、[D-02](design.md#d-02)、[D-03](design.md#d-03)、[D-05](design.md#d-05)、[D-13](design.md#d-13)。
 
 P-18の目的は、Issue #413の外部CLI・最小直接状態・Start-only排他を維持したまま、誤って追加したWindows要求・設計・source/test/CI接続を撤去することです。計画登録、文書push、Implementation Brief作成はSpecDock正式 `work start` の成功ではありません。P-16実consumer切替とP-17正式import/Startはhuman merge後の別手順のままです。
 
@@ -1044,7 +1044,7 @@ spec-dock --project "$ROOT" scope import github issue gh:chemitaro/spec-dock#413
 | 証拠 | 所有者・実施step | 現在 |
 |---|---|---|
 | ChatGPTのpack静的自己点検 | artifacts/self-check.md | この納品内に実測範囲のみ記録 |
-| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | 進行中。P-18.2/P-18.3 focused実施、全OS/fullは未完了 |
+| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | 進行中。P-18.2〜P-18.5 source/test/CI/文書を実施、全OS/fullは未完了 |
 | Codex成果物レビュー/実ブラウザ | Codex、P-14、保有reportへ追記 | 未着手 |
 | 人間merge/任意の公開 | 人間、P-15 / 別途許可 | 未着手 |
 | dogfood適用と実metadata保全 | 許可された実施者、P-16 | 未着手 |

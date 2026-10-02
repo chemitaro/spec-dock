@@ -4,6 +4,8 @@
 
 新規ScopeはGitHub番号が正本です。Requirement・Design・Planが一次仕様、Artifactは証拠、Workbenchは一時作業です。Syncはその時点の観測で、派生状態を保存しません。
 
+業務コマンドの対応OSはLinuxとmacOS、Pythonは3.10以上です。その他のOSではproject解決やGit/GitHub・file操作より前に `UNSUPPORTED_PLATFORM` / exit3 / effects=[]を返します。help・version・completionはこの業務判定やOS固有の依存を読み込まず利用できます。
+
 ## 全コマンド
 
 共通optionの--project ABSは正確なworktree root、--jsonはv2 envelopeです。--dry-runは計画のみ、--yesはCLI確認の省略です。必要なguardを迂回しません。applyで保全を要求するleafは外部の新しい--backup-dir ABSを使います。

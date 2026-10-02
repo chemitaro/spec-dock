@@ -2,13 +2,13 @@
 
 > ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**対応OSはLinux/macOS。Windows対応を撤回し、[P-18](plan.md#p-18)の追加作業として撤去範囲を定義しました。製品変更は、更新正本のpushと独立Implementation Brief Strictの後に行います。121228c6のLinux通常全件はPATHのみ補正して1900 passed/20 skipped、exit0。macOSは同じsourceの2b2be5e2で1916 passed/4 skipped、exit0。r12はP1一件・failでP-07修正を登録しました。新候補のStrict/FQ、人間merge、実導入、正式#413 Startは未完了。実装担当はGPT-6.1 Sol / Maxです。**
+**対応OSはLinux/macOS。Windows対応を撤回し、[P-18](plan.md#p-18)の追加作業として撤去範囲を定義しました。独立Implementation Brief Strict（GPT-5.6 Sol／Pro、基準dd90ca97）を完了し、source/test撤去をc0f8add1、Windows専用CI削除をa552e73cで実施しました。[撤去記録](artifacts/p18-retirement-implementation.md)にfocused74件・影響195件・lintの結果を保存しています。配布文書と静的inventoryを同期し、配布試験71件と人間向けHTMLの4図・拡大操作を検証しました。撤去後の全件・手動確認は未完了です。121228c6のLinux通常全件はPATHのみ補正して1900 passed/20 skipped、exit0。macOSは同じsourceの2b2be5e2で1916 passed/4 skipped、exit0。r12はP1一件・failでP-07修正を登録しました。新候補のStrict/FQ、人間merge、実導入、正式#413 Startは未完了。実装担当はGPT-6.1 Sol / Maxです。**
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 
-後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[過去のmacOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux全件の候補から製品source差分があり、その結果を後続候補の全面合格へ読み替えません。旧手動結果も別sourceとして保持しています。このWindows専用実装は最新OS決定によりP-18の撤去対象です。
+後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[過去のmacOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux全件の候補から製品source差分があり、その結果を後続候補の全面合格へ読み替えません。旧手動結果も別sourceとして保持しています。このWindows専用実装は最新OS決定に従いc0f8add1で撤去済みです。
 
-[WindowsのJSON reader](artifacts/windows-json-read.md)を親handleへ接続し、それを含む[clean6032621cの全件](artifacts/macos-full-6032621c.md)は成功しました。後続の[Scope公開の原語確認](artifacts/scope-publication-capability.md)は、既知の未対応をGitHub変更前に拒否する修正です。native Windowsと専用保存接続の完成義務は撤回し、P-18で専用コードを撤去します。
+[WindowsのJSON reader](artifacts/windows-json-read.md)を親handleへ接続し、それを含む[clean6032621cの全件](artifacts/macos-full-6032621c.md)は成功しました。後続の[Scope公開の原語確認](artifacts/scope-publication-capability.md)は、既知の未対応をGitHub変更前に拒否する修正です。native Windowsと専用保存接続の完成義務は撤回し、c0f8add1で専用コードを撤去しました。
 
 先行候補の[clean75ac5760全件](artifacts/macos-full-75ac5760.md)と[インストール済みCLIの手動14操作](artifacts/manual-console-75ac5760.md)も保存しています。Scope公開の事前判定を含むsourceでの実結果であり、後続候補へ件数を合算しません。
 

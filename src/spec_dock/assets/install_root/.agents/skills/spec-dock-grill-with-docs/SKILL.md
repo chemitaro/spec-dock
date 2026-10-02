@@ -8,6 +8,8 @@ disable-model-invocation: true
 
 Run this skill only when the user explicitly invokes it. It combines the operator-owned `grilling` and `domain-modeling` capabilities under a stricter read-only boundary, then creates exactly one scope-local Artifact through the Current SpecDock CLI.
 
+The Artifact business CLI supports Linux and macOS with Python 3.10+. Other operating systems return `UNSUPPORTED_PLATFORM` (exit 3) before project admission or writes; context-free help, version and completion remain available.
+
 ## Required inputs
 
 Before reading sources or calling either external capability, require all of the following:

@@ -63,3 +63,7 @@
 実装担当はACごとにcandidate SHA、wheel hash、test/command、OS/Python/FS、actual exit、pass/fail/skip/未実施、証拠の所在を結び付けます。複数stepの準備完了だけでACをpassにしません。fake GHはremote境界のfixtureであり実GitHub操作の証拠ではありません。
 
 [traceability.json](traceability.json) はリンク/IDの機械検査用です。判定本文の第二正本や成功証拠の台帳ではありません。実施者の [report](../report.md) を本packで生成しません。
+
+## 2026-10-02 撤去の進捗
+
+上表の未実施表記は生成時点の全AC認定状態です。[P-18実装記録](p18-retirement-implementation.md)ではsource/test撤去c0f8add1、Windows専用CI撤去a552e73cとworking候補のfocused74件・影響195件・lint・通常収集を確認しています。単一guard、POSIX-only identity、Windows moduleのfresh wheel非収録が成立しています。配布文書同期、撤去後のLinux/macOS full/manual、P-07 P1の修正とfresh Strict/FQが残るため、AC全体をpassへ書き換えません。

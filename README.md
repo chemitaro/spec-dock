@@ -2,6 +2,8 @@
 
 SpecDockはGitHub Issueに結び付いたInitiative・Epic・Issueの三階層で仕様・依存・成果物を管理するPython CLIです。番号はGitHubを正本にし、新規Scopeのオフライン作成やUUIDを使いません。業務CLIは `scope`（仕様ノード）、`active`（現在の直接対象）、`work`（開始・完了）を分け、branch、dependency、artifact、worktree、workspace、installationを独立した操作群として提供します。
 
+対応OSはLinuxとmacOS、Pythonは3.10以上です。業務コマンドは他のOSでは変更前に `UNSUPPORTED_PLATFORM`（exit 3）で停止します。help・version・completionはrepositoryや業務用のOS原語に依存しません。
+
 ## 入口
 
 - [現行CLIの全44コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
