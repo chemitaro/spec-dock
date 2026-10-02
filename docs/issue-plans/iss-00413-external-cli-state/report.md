@@ -183,3 +183,17 @@ Windows補強を含むclean 3b0c69e8のmacOS全件は、最終1853 passed/2 skip
 ## 2026-10-02 追記: Windows JSON reader
 
 [Windows JSON読取](artifacts/windows-json-read.md)のRed→Greenと、Mac3.12/実3.10各58 passed/3 skipped、通常lintを保存した。説明HTMLには全件試験後の追加変更として記載し、旧SHAの全件成功と今回の境界試験を分けた。新HTMLの公式validatorは四図のstatic/4 SVG/拡大/keyboard/focusでexit0。390pxでdocument375px・section355pxを確認し、追加した58件の記載と全件未完了の説明も表示された。override解除後の新規空tabは既定1280pxで、すべての確認専用tabを閉じた。十一文書とmanifestの十二sourceをHTTP200/no-store/正本bytesへ照合し、採用ZIPのschema/例/内部リンク/CRCとbytes/hashを検査した。native Windows/保存接続/Strict/FQの完了とはしない。
+
+
+## 2026-10-02 追記: reader全件とScope原語の事前判定
+
+[clean6032621cの全件](artifacts/macos-full-6032621c.md)は通常pytestで1876 passed/4 skipped（366.99秒）、exit0。この後の[Scope事前判定](artifacts/scope-publication-capability.md)もTDDで修正し、関連九suiteはMac3.12/実3.10で各271 passed/2 skipped、通常lint成功。説明資料は候補別の結果と後続修正を区別し、全Windows writerが副作用前に止まるという広すぎる説明を除いた。Windows保存/nativeとfresh Strict/FQは未完了。文書・配信の検査結果は別途記録する。
+
+新HTMLの公式validatorは四図のstatic/4 SVG、拡大・keyboard・focusでexit0。IABの390pxではdocument375px/section355px、1876件と271件の表示、後続sourceの全件未完了の説明を確認した。viewport解除後の新規空tabで既定1280pxを照合し、確認専用tabを全て閉じた。十三文書とmanifestの十四sourceをTailscale経由でHTTP200/no-store/正本bytesに照合した。採用ZIPの112 member/111 payload、二schema/13例/462内部リンク/33 HTML ID、CRC/bytes/hashを検査した。これは文書の確認であり、Windows保存/nativeや現在候補Strict/FQの代わりにはしない。
+
+
+## 2026-10-02 追記: 親GitHub取得より先の能力確認
+
+Scope原語確認の最終差分でEpicのparent GETの順序も再現した（8 failed/63 deselected、3.83秒）。判定を親GET前へ移して同じ選択を8 passed/63 deselected（1.45秒）にし、三階層の24組合せを含む関連九suiteはMac3.12で287 passed/2 skipped（68.15秒）、実3.10で287 passed/2 skipped（68.17秒）。最終の通常lintもRuff300/mypy219でexit0。先の八case・271件は途中段階の実結果として保全し、今回の最終sourceと区別する。Windows保存/native、後続候補全件とStrict/FQは引き続き必要。
+
+最終HTMLも公式validatorの四図・拡大/keyboard/focusをexit0で再確認。390pxでdocument375px/section355px、三階層24ケースと287件を読み取れた。overrideを解除し新規空tabの1280pxを照合して、確認専用tabを閉じた。配信bytesとZIPは、この最終本文を対象に再照合する。

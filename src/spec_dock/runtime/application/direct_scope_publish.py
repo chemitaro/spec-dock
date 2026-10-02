@@ -29,6 +29,7 @@ from spec_dock.runtime.infra.directory_publication import DirectoryPublicationIn
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 from spec_dock.runtime.infra.github_remote import github_publication_repository
+from spec_dock.runtime.infra.json_store import require_directory_publication_support
 from spec_dock.runtime.infra.scope_metadata import write_new_scope_metadata_at
 from spec_dock.runtime.infra.scope_tree import ScopeIdentityConflict
 from spec_dock.runtime.presentation.command_data import DiagnosticData, FamilyData
@@ -118,6 +119,7 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
             raise ValueError("Scope staging path must be ignored by Git")
 
     verify_stage(staging / stage_name)
+    require_directory_publication_support()
     gateway = GithubIssueGateway(timeout=namespace.timeout)
     parent_target = getattr(namespace, "parent", None)
     parent_id = resolve_scope(context, views, parent_target, selection=selection).id if parent_target else None

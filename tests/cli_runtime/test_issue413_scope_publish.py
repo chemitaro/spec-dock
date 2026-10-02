@@ -72,6 +72,63 @@ def test_scope_publication_preview_does_not_load_retired_writers_or_control(
         ]
 
 
+@pytest.mark.parametrize("kind", ["initiative", "epic", "issue"])
+@pytest.mark.parametrize("operation", ["create", "import"])
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("missing", ["platform", "native-symbol"])
+def test_scope_publication_without_a_safe_primitive_stops_before_side_effects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    operation: str,
+    dry_run: bool,
+    missing: str,
+    kind: str,
+) -> None:
+    from types import SimpleNamespace
+
+    from spec_dock.runtime.infra import json_store
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    parent: list[str] = []
+    if kind == "epic":
+        parent = ["--parent", "init-00001"]
+    elif kind == "issue":
+        from tests.cli_runtime.test_issue413_contract import add_scope
+
+        add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
+        parent = ["--parent", "epic-00002"]
+    before = tree_digest(root)
+    if missing == "platform":
+        monkeypatch.setattr(json_store, "sys", SimpleNamespace(platform="unavailable"))
+    else:
+        monkeypatch.setattr(json_store, "ctypes", SimpleNamespace(CDLL=lambda *args, **kwargs: SimpleNamespace()))
+    command = (
+        ["scope", "create", kind, "--backend", "github"]
+        if operation == "create"
+        else ["scope", "import", "github", kind, "gh:example/repo#413"]
+    )
+    assert (
+        main([
+            "--project",
+            str(root),
+            *command,
+            *parent,
+            "--title",
+            "Unavailable publication",
+            "--yes",
+            *(["--dry-run"] if dry_run else []),
+            "--json",
+        ])
+        == 5
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "LOCAL_IO_FAILED" and result["effects"] == []
+    assert not log.exists() and not (root / "spec-dock/.agent").exists()
+    assert tree_digest(root) == before
+
+
 def test_new_local_scope_is_rejected_before_project_access(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     assert (
         main([

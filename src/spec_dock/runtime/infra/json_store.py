@@ -89,7 +89,14 @@ def open_guarded_directory(path: Path) -> int:
     return _open_directory_without_links(path)
 
 
-def _rename_no_replace_at(source_fd: int, source: str, target_fd: int, target: str) -> None:
+def require_directory_publication_support() -> None:
+    """Reject a known unconnected publication adapter without writing a probe."""
+    if os.name != "posix":
+        raise NotImplementedError("guarded directory publication adapter is not connected for this platform")
+    _no_replace_rename_function()
+
+
+def _no_replace_rename_function() -> tuple[Any, int]:
     library = ctypes.CDLL(None, use_errno=True)
     if sys.platform.startswith("linux"):
         function = getattr(library, "renameat2", None)
@@ -103,6 +110,11 @@ def _rename_no_replace_at(source_fd: int, source: str, target_fd: int, target: s
         raise NotImplementedError("safe JSON rename is unavailable")
     function.argtypes = (ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint)
     function.restype = ctypes.c_int
+    return function, flag
+
+
+def _rename_no_replace_at(source_fd: int, source: str, target_fd: int, target: str) -> None:
+    function, flag = _no_replace_rename_function()
     if function(source_fd, os.fsencode(source), target_fd, os.fsencode(target), flag) == 0:
         return
     error = ctypes.get_errno()

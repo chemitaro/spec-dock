@@ -32,3 +32,7 @@ source SHA256: `json_store.py` = `6b6b80ed3272f650bf4cc4069bbb626335b4b152993d06
 Microsoftの[NtOpenFile](https://learn.microsoft.com/en-us/windows/win32/api/winternl/nf-winternl-ntopenfile)と[NtCreateFileのoptions](https://learn.microsoft.com/en-us/windows-hardware/drivers/ddi/ntifs/nf-ntifs-ntcreatefile)で、読取access・同期・非directory・reparse非追跡を確認した。[FILE_STANDARD_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_standard_info)でlinks/directoryを、[GetFileType](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getfiletype)でdisk/pipe/deviceの区別を確認した。[ReadFile](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-readfile)と[同期EOF](https://learn.microsoft.com/en-us/windows/win32/fileio/testing-for-the-end-of-a-file)を参照した。API文書の存在は実NTFS受入ではない。
 
 P-03の選択公開・同期・捕捉解除、各metadata/Artifact/Scope公開、init process、実Windowsの別process/NTFS試験、現在候補のStrict/FQは引き続き必要である。[接続条件](windows-adapter-connection-review.md)を保持し、D-03のdirectory同期を弱めたり、HANDLEをPOSIX fdとして渡したりしない。
+
+## 2026-10-02 後続の通常全件
+
+このreaderを含む[clean6032621cの全件](macos-full-6032621c.md)は1876 passed/4 skipped（366.99秒）、exit0。その後の[Scope原語確認](scope-publication-capability.md)によってjson_store.pyに追加変更があるため、上記hashはreader単位と6032621cの記録として保持する。native Windowsと選択保存の成立は引き続き未検証である。

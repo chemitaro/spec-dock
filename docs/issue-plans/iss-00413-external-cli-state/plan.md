@@ -295,6 +295,8 @@ uv run pytest tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/tes
 
 **失敗時の停止/戻り先**: 旧local testを全削除して構造安全まで失ったらD-09へ。通常metadata競合に全writer lockを戻さない。
 
+**2026-10-02 原語確認の追加**: [Scope公開の事前判定](artifacts/scope-publication-capability.md)をbaseline6032621cからTDDで追加。未対応原語がGitHub作成後に分かるRed（exit6）を、変更前のLOCAL_IO_FAILED/exit5へ修正した。作成/取り込み・apply/dry-run・未対応platform/欠落symbolと三階層の24 caseでgh呼出し0・effects=[]・全bytes不変。関連九suiteはMac3.12で287 passed/2 skipped（68.15秒）、実3.10で287 passed/2 skipped（68.17秒）、通常lint成功。Windows保存/native、後続候補全件とStrict/FQは未完了。直前の[6032621c全件](artifacts/macos-full-6032621c.md)は1876 passed/4 skipped、exit0として別記する。
+
 <a id="p-10"></a>
 ## P-10 残る既存操作を狭い契約へ接続する
 

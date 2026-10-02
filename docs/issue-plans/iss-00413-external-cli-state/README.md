@@ -2,13 +2,13 @@
 
 > ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**候補CLIの実装・製品試験を進行中です。最新macOS/3b0c69e8の全件選択は1853 passed/2 skippedで成功し、Linux全件は別sourceの8a70a8b3で成功しています。最初のmacOS診断runnerの不備を製品変更なしで修正し、失敗logも保持しました。旧macOS/8a70a8b3の比較不一致は原因未確定で、Windows保存adapter/native受入も未完了です。現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Pro再レビューpass・指摘0件（対象commit: 7e895803）と、コードの現在の認定を区別します。実装設定は利用者の追加指示によってGPT-6.1 Sol / Maxです。**
+**候補CLIの実装・製品試験を進行中です。最新macOS全件は6032621cで1876 passed/4 skipped、exit0です。Linux全件と手動consoleは別sourceの8a70a8b3の証拠です。この全件後にScope公開の原語確認も修正し、関連9 suiteはMac3.12/実3.10で各287 passed/2 skipped、通常lint成功。この追加変更を含む全件は未完了です。旧macOS/8a70a8b3の比較不一致は原因未確定で、Windows保存/native受入、現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Proレビューpass（7e895803）を製品の現在の認定と区別します。実装担当は利用者指定のGPT-6.1 Sol / Maxです。**
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 
-後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[最新macOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux/手動consoleの候補から製品source差分があり、それらの結果を後続候補の全面合格へ読み替えません。Windows保存/native受入は引き続き未完了です。
+後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[過去のmacOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux/手動consoleの候補から製品source差分があり、それらの結果を後続候補の全面合格へ読み替えません。Windows保存/native受入は引き続き未完了です。
 
-全件候補3b0c69e8の後に、[WindowsのJSON reader](artifacts/windows-json-read.md)も親handleへ接続しました。関連八suiteはMac3.12と実3.10で各58 passed/3 skipped、通常lint成功です。この追加変更を含む全件・native Windowsの合格はまだありません。選択保存/公開/同期/解除と各公開/processは引き続き未接続です。
+[WindowsのJSON reader](artifacts/windows-json-read.md)を親handleへ接続し、それを含む[clean6032621cの全件](artifacts/macos-full-6032621c.md)は成功しました。後続の[Scope公開の原語確認](artifacts/scope-publication-capability.md)は、既知の未対応をGitHub変更前に拒否する修正です。native Windowsと選択保存/公開/同期/解除、各公開/processは引き続き未完了です。
 
 ## 正本と優先順位
 

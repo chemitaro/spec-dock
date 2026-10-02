@@ -1117,3 +1117,17 @@ baseline ccf9637d後、[親path置換のAPI境界Red](artifacts/windows-director
 ## P-03 WindowsのJSON readerを親handleへ接続
 
 baseline9a97f758から[読取境界](artifacts/windows-json-read.md)をTDDで接続した。NtOpenFileの保持した親から元bytesと全FileId128を取得し、regular/single-link、非redirect、失敗時解放を検査。関連八suiteはMac3.12/実3.10で各58 passed/3 skipped、通常make lintも成功。未知OSの公開CLI停止契約を保持した。新規native二caseとCI設定は実行待ちで、選択保存/無上書き公開/同期/捕捉解除・各公開/processは未接続のまま。過去の全件・手動を別sourceとして保持し、P-03全体や現在候補Strict/FQの完了を宣言しない。
+
+
+## 2026-10-02 Windows JSON readerを含む通常全件
+
+[clean6032621cの全件](artifacts/macos-full-6032621c.md)は独自runnerを使わず通常uv run pytestで1876 passed/4 skipped（366.99秒）、exit0。実Python3.12.11・provider/prefixと実行前後のclean/HEADを照合した。skipに実Windows JSON二caseを含め、native成功へ読み替えない。Linux/手動の別sourceと、旧比較不一致・旧runner不備の履歴も保持する。
+
+## P-09 既知の未対応公開原語をGitHub変更前に拒否
+
+[原語確認の修正](artifacts/scope-publication-capability.md)はbaseline6032621c。public Redは期待exit5に対してPOST後のpartial6で1 failed（0.74秒）、Greenは1 passed（0.29秒）。OS/libraryの能力照合をprobe書込みなしで追加し、実renameの選択も共用する。作成/取り込み・apply/dry-run・欠落platform/symbolの八caseでgh呼出し0・effects=[]・fixture bytes不変。関連九suiteはMac3.12で271 passed/2 skipped（66.61秒）、実3.10で271 passed/2 skipped（65.58秒）、通常lintはRuff300/mypy219でexit0。この後続sourceの全件、Windows保存/native、fresh Strict/FQ、実consumer適用は未完了。
+
+
+## 2026-10-02 追記: 親GitHub取得より先の能力確認
+
+Scope原語確認の最終差分でEpicのparent GETの順序も再現した（8 failed/63 deselected、3.83秒）。判定を親GET前へ移して同じ選択を8 passed/63 deselected（1.45秒）にし、三階層の24組合せを含む関連九suiteはMac3.12で287 passed/2 skipped（68.15秒）、実3.10で287 passed/2 skipped（68.17秒）。最終の通常lintもRuff300/mypy219でexit0。先の八case・271件は途中段階の実結果として保全し、今回の最終sourceと区別する。Windows保存/native、後続候補全件とStrict/FQは引き続き必要。

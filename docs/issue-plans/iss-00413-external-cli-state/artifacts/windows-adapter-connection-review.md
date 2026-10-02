@@ -31,3 +31,7 @@ baseline ccf9637d後、WindowsDirectoryの各階層の絶対path再openを、NtO
 ## 2026-10-02 追記: JSON読取経路の接続
 
 baseline9a97f758から[Windows JSON reader](windows-json-read.md)を接続した。保持した親handleからregular/single-linkのleafを読み、元bytesと全128bit identityを返す。上表のJSON readerはこの実装単位によって進んだが、native Windows/NTFSの受入は未取得。選択保存/公開/同期/捕捉解除、各公開とinit processは引き続き未接続である。関連八suiteはMac3.12と実3.10で各58 passed/3 skipped、通常lint成功。新しいnative二caseをCIへ追加したことと、実OSでの成功を区別する。
+
+## 2026-10-02 追記: 公開原語の事前判定
+
+readerを含むclean6032621cの通常全件は1876 passed/4 skipped、exit0。その後、Scope作成/取り込みでOS/libraryの既知の未対応をGitHub変更前に検出する[事前判定](scope-publication-capability.md)を追加した。Windowsの保存接続や各writer全体の成立を保証するものではなく、実FSの後続失敗は引き続き実際の効果で報告する。D-03の同期条件とBrief/native受入の順序は維持する。
