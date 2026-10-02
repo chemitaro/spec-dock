@@ -48,6 +48,8 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         raise ValueError("work finish requires --yes")
     views = load_scope_views(context.root / "spec-dock")
     captured = read_selection(context, views)
+    if captured.status in ("invalid", "unavailable"):
+        raise ValueError(f"direct selection is {captured.status}: {captured.reason or 'cannot be safely observed'}")
     target = resolve_scope(context, views, namespace.target, selection=captured)
     inputs = capture_local_inputs(context, views)
     if namespace.expect_backend is not None and target.backend.kind != namespace.expect_backend:

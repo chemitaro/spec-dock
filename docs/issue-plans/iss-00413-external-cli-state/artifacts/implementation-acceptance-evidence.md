@@ -71,3 +71,7 @@ baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更�
 変更working候補でfocused74 passed（16.84秒）、影響195 passed（56.10秒）、lint pass、通常1895 tests収集、actual exitはいずれも0。[Red/Greenを含む元log](p18-retirement-focused-evidence.json)に失敗も保全します。これらは新候補の通常full、別OS、手動、fresh Strict/FQの完了ではありません。r12のP-07 P1は別変更で修正します。
 
 [P-18配布・文書証拠](p18-docs-ci-evidence.json)にprovider distribution/static assets/fresh wheelの71 passed（99.34秒）・actual exit0、更新HTMLの4/4 SVG/zoom browser pass・actual exit0とTailscale HTTP exact bytesを保存しました。full/手動/Strict/FQの証拠とは別です。
+
+## 2026-10-02 P-07 r12 P1のローカル修正
+
+[選択観測のadmission修正](p07-finish-observation-repair.md)を別TDD単位で実施。基準aa91b756、公開corrupt JSONの意図したRed→Green、GitHub/localの実redirected store apply/dry-runと妥当なemptyを確認、関連99 passed（23.93秒）、全lint pass、actual exit0。r12の原判定をpassへ改変せず、fresh reviewerのclosureを待ちます。撤去後の全OS/full/manual/FQは未完了です。

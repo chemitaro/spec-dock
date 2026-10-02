@@ -89,6 +89,72 @@ def github_fixture(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, states: dict
     return log
 
 
+def test_explicit_finish_rejects_corrupt_selection_before_remote_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    record.write_bytes(b"{broken selection\n")
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    before = metadata.read_bytes(), record.read_bytes(), (root / ".git/HEAD").read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    remote = tmp_path / "remote-states.json"
+    remote_before = remote.read_bytes()
+
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED"
+    assert result["effects"] == [] and not log.exists()
+    assert remote.read_bytes() == remote_before
+    assert (metadata.read_bytes(), record.read_bytes(), (root / ".git/HEAD").read_bytes()) == before
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_explicit_finish_rejects_redirected_selection_before_remote_observation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], dry_run: bool
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    saved = tmp_path / "saved-selections"
+    record.parent.rename(saved)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    sentinel = outside / "keep.txt"
+    sentinel.write_bytes(b"foreign content\n")
+    record.parent.symlink_to(outside, target_is_directory=True)
+    metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    before = metadata.read_bytes(), (saved / record.name).read_bytes(), (root / ".git/HEAD").read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    remote = tmp_path / "remote-states.json"
+    remote_before = remote.read_bytes()
+    mode = ["--dry-run"] if dry_run else ["--yes"]
+
+    assert main(["--project", str(root), "work", "finish", "init-00001", *mode, "--json"]) == 3
+    result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED"
+    assert "unavailable" in result["error"]["message"]
+    assert result["effects"] == [] and not log.exists()
+    assert remote.read_bytes() == remote_before
+    assert (metadata.read_bytes(), (saved / record.name).read_bytes(), (root / ".git/HEAD").read_bytes()) == before
+    assert list(outside.iterdir()) == [sentinel] and sentinel.read_bytes() == b"foreign content\n"
+    assert record.parent.is_symlink()
+
+
+def test_explicit_finish_keeps_valid_empty_selection_and_closes_fixed_target(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    head_before = (root / ".git/HEAD").read_bytes()
+    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["completed"] is True and result["data"]["selection_token"] is None
+    assert result["effects"] == [{"kind": "github.issue.close", "status": "succeeded", "target": "gh:example/repo#1"}]
+    assert [json.loads(line)["method"] for line in log.read_text().splitlines()] == ["GET", "GET", "PATCH", "GET"]
+    assert (root / ".git/HEAD").read_bytes() == head_before
+    assert not (root / "spec-dock/.agent/work-target").exists()
+
+
 @pytest.mark.parametrize("request_count,exit_code", [(2, 5), (4, 6)])
 def test_finish_native_git_failure_retains_original_diagnostic_and_confirmed_effects(
     tmp_path: Path,
@@ -719,8 +785,9 @@ def test_finish_preserves_existing_local_backend_and_optional_metadata_without_c
     assert not (root / ".git/spec-dock").exists()
 
 
+@pytest.mark.parametrize("dry_run", [False, True])
 def test_local_finish_redirected_private_parent_never_creates_external_stage(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], dry_run: bool
 ) -> None:
     root = committed_workspace(tmp_path / "consumer")
     metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
@@ -733,8 +800,10 @@ def test_local_finish_redirected_private_parent_never_creates_external_stage(
     outside = tmp_path / "outside"
     outside.mkdir()
     (root / "spec-dock/.agent").symlink_to(outside, target_is_directory=True)
-    assert main(["--project", str(root), "work", "finish", "init-00001", "--yes", "--offline", "--json"]) == 5
+    mode = ["--dry-run"] if dry_run else ["--yes"]
+    assert main(["--project", str(root), "work", "finish", "init-00001", *mode, "--offline", "--json"]) == 3
     result = json.loads(capsys.readouterr().out)
+    assert result["error"]["code"] == "PRECONDITION_FAILED"
     assert result["effects"] == []
     assert metadata.read_bytes() == before
     assert list(outside.iterdir()) == []

@@ -235,7 +235,7 @@ uv run pytest tests/cli_runtime/test_active_vnext.py tests/cli_runtime/test_work
 
 [完全batch分析](artifacts/code-review-p06-12-analysis.md)のP1一件を修正する。`application/direct_finish.py` と `tests/cli_runtime/test_issue413_finish.py` が対象。実corrupt JSON・読取不能の選択を持つ明示TARGET Finishが、remote GET/PATCH・真正local lifecycle更新前に停止し、effects=[]・保存bytes不変となる公開CLIのRed→Greenを一件ずつ進める。valid empty/selected、既存chain外Finish、captured-tokenの遅い解除、子孫guard、unknown Close、branch保持は維持する。Start共通lock・permission制度・自動修復は追加しない。
 
-この修正は既存RQ-413-08/14、AC-413-16/31、D-03/04/08の実装是正であり、新機能ではない。P-18の正本更新とbrief作成後、独立したTDD単位で修正し、fresh Code Review Strictへ渡す。P1未修正の現在候補は合格と扱わない。
+この修正は既存RQ-413-08/14、AC-413-16/31、D-03/04/08の実装是正であり、新機能ではない。P-18の正本更新とbrief作成後、独立したTDD単位で修正し、fresh Code Review Strictへ渡す。[ローカル修正と証拠](artifacts/p07-finish-observation-repair.md): 基準aa91b756後に二行guardをTDDで追加し、公開corrupt JSON Red→Green、実unavailableのGitHub/local apply/dry-run、valid emptyを確認。関連99件と全lintはpass。fresh StrictのP1 closureと新OS full/manual/FQは未認定です。
 
 <a id="p-08"></a>
 ## P-08 Syncの複数選択表示を完成させる

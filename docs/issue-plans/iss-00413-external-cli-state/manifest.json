@@ -40,7 +40,7 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 595,
+    "local_link_occurrences_checked": 600,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "4/4 SVG and zoom browser pass for exact HTML SHA; see artifacts/p18-docs-ci-evidence.json",
@@ -229,8 +229,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 13662,
-      "sha256": "a8d5a2ca1785997e9608d89d173f988b5373ce990ef523ff573482b3ef2b6812"
+      "bytes": 14143,
+      "sha256": "960a1b006cb3e63639a0a81944d21fc4b37183f844a1939958128d20157e41e8"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -371,6 +371,16 @@
       "path": "artifacts/os-support-retirement-plan.md",
       "bytes": 10274,
       "sha256": "1b9ed87a6afcf5856385c3687253f9266f4e1ebe0deef4b97c3656dcfa38e953"
+    },
+    {
+      "path": "artifacts/p07-finish-observation-repair.json",
+      "bytes": 4099,
+      "sha256": "d28783900ad0958014f6f2a19c70fc27d0017a812db79938dc3144b8c1c1cd56"
+    },
+    {
+      "path": "artifacts/p07-finish-observation-repair.md",
+      "bytes": 2889,
+      "sha256": "a11e28e857f591e584a2fa5ac0af3cca8e0c6fc0096cf71f2233cd6c956260cd"
     },
     {
       "path": "artifacts/p18-docs-ci-evidence.json",
@@ -719,8 +729,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 157378,
-      "sha256": "a8bfd40415719c58865321d0a172dd04207aa38f98d6c883b5f6827870a65fd9"
+      "bytes": 157654,
+      "sha256": "383a623790e6e7b043f17a7d6090931318fe87b7cb7e01f78cf51c2f7faadf67"
     },
     {
       "path": "preview-entry.html",
@@ -940,7 +950,7 @@
       "exit_code": 10,
       "evidence": "artifacts/code-review-p06-12-analysis.md"
     },
-    "additional_work": "P-18.2-P-18.5 source/test/CI/provider docs/static inventory complete with focused and HTML evidence; OS full/manual and P-07 P1/fresh Strict/FQ pending"
+    "additional_work": "P-18.2-P-18.5 source/test/CI/provider docs/static inventory complete; P-07 R12 P1 locally repaired with focused99 and lint; OS full/manual and fresh Strict/FQ pending"
   },
   "os_retirement_authoring": {
     "model": "gpt-5.6-sol",
@@ -983,5 +993,11 @@
     "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
     "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
     "docs_evidence": "artifacts/p18-docs-ci-evidence.json"
+  },
+  "p07_finish_observation_repair": {
+    "record": "artifacts/p07-finish-observation-repair.md",
+    "evidence": "artifacts/p07-finish-observation-repair.json",
+    "baseline_sha": "aa91b756f886ac3e42085b665e1e9ca93c20f9f5",
+    "reviewer_closure": "pending fresh review"
   }
 }
