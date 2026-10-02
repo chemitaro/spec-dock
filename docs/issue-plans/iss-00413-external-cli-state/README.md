@@ -12,6 +12,8 @@
 
 最新の[clean75ac5760全件](artifacts/macos-full-75ac5760.md)と[インストール済みCLIの手動14操作](artifacts/manual-console-75ac5760.md)を保存しました。Scope公開の事前判定を含むsourceで確認しており、Windows・live GitHub・最終認定を成功扱いにはしません。
 
+後続の[Startの保存原語確認](artifacts/start-publication-capability.md)を追加しました。公開が必要なStartは、既知の未対応をGit変更前に拒否します。三階層・dry-run・旧記録の保全と公開不要の同一Startを含む16組、および関連8 suiteがMac3.12/実3.10で各266件成功しました。通常lintも成功。上記75ac5760の全件・手動確認は、この追加変更を含まない候補の証拠です。後続sourceの全件・最終手動確認と現在候補Strict/FQを完了扱いにはしません。
+
 ## 正本と優先順位
 
 新しい要求の根拠は2026-09-30確定の [利用者回答](artifacts/user-decisions.md) です。これは添付からの内容保持コピーで、正式Artifactを新規登録したものではありません。旧草案のactive/work全面廃止、全writerロック、完全stateless、新規local発行は採用しません。

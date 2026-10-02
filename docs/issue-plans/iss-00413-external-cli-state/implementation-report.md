@@ -1140,3 +1140,7 @@ Scope公開の事前判定を通常checkpoint75ac5760へ保存し、parent603262
 [同じ製品sourceの通常install CLI](artifacts/manual-console-75ac5760.md)は14操作を個別実行した。非editable wheel・外部fresh venv・pip check・元provider pathを参照不能にしたsite-packages consoleを使用し、pytest bodyは呼び出していない。[原文](artifacts/manual-console-75ac5760.json)に実exit/stdout/stderr/前後entryと28件の外部gh requestを保持する。Start重複拒否、兄弟二件のSync、Close確認後の捕捉解除とbranch保持、次Issue開始、native hookエラーのpartialと自動rollbackなしを確認。Git本来のbranch/HEAD/reflog以外の独自controlは作らず、tracked仕様とC/B recordを照合した。
 
 GitHub境界はstateful fake ghであり、live GitHubや本consumerは変更していない。Windows保存/各公開/process/native、現在候補Strict/FQ、人間merge後のP-16/17は未完了。旧macOS比較不一致・旧runner不備・別sourceのLinux/手動の証拠を保持し、今回の成功で撤回しない。
+
+## 2026-10-02 Startの保存原語確認
+
+2026-10-02、baseline578f27e3から[Startの保存原語確認](artifacts/start-publication-capability.md)を追加した。未対応symbolの公開RedはGit branch/checkout後のpartial6（1 failed、0.66秒）。計画が公開を必要とする場合だけ、dry-run成功・lock/Git変更前に既存の能力照合を行う。三階層と既存記録の保全・公開不要の同一Startを含む16組は成功。関連八suiteはMac3.12で266 passed（102.42秒）、実3.10で266 passed（102.77秒）、通常lintはRuff300/mypy219でexit0。既存の実rename/同期失敗とpartial/unknown、自動rollbackなしを維持する。75ac5760の全件・手動結果をこの後続sourceへ転記せず、Windows保存/nativeと現在候補Strict/FQは未完了。

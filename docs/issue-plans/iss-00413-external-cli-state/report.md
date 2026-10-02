@@ -207,3 +207,9 @@ Scope公開の事前判定を通常checkpoint75ac5760へ保存し、parent603262
 
 GitHub境界はstateful fake ghであり、live GitHubや本consumerは変更していない。Windows保存/各公開/process/native、現在候補Strict/FQ、人間merge後のP-16/17は未完了。旧macOS比較不一致・旧runner不備・別sourceのLinux/手動の証拠を保持し、今回の成功で撤回しない。
 公式HTML validatorは四図のstatic・4/4 SVG・拡大/keyboard/focusで実exit0。IABの390pxではdocument375px/section355px、横overflowなし、最新75ac5760・1,900件・手動14操作・Windows未完了の表示を確認した。overrideを解除し新規空tabの1280pxを照合し、確認専用tabを閉じた。十六payloadとmanifestの十七sourceをTailscale経由でHTTP200/no-store/正本bytesへ照合した。採用ZIPは115 member/114 payload、二schema/13例/482内部リンク/33 HTML ID、CRC/bytes/hashを確認した。資料の確認と製品の未完了gateを分ける。
+
+## 2026-10-02 Startの保存原語確認
+
+2026-10-02、baseline578f27e3から[Startの保存原語確認](artifacts/start-publication-capability.md)を追加した。未対応symbolの公開RedはGit branch/checkout後のpartial6（1 failed、0.66秒）。計画が公開を必要とする場合だけ、dry-run成功・lock/Git変更前に既存の能力照合を行う。三階層と既存記録の保全・公開不要の同一Startを含む16組は成功。関連八suiteはMac3.12で266 passed（102.42秒）、実3.10で266 passed（102.77秒）、通常lintはRuff300/mypy219でexit0。既存の実rename/同期失敗とpartial/unknown、自動rollbackなしを維持する。75ac5760の全件・手動結果をこの後続sourceへ転記せず、Windows保存/nativeと現在候補Strict/FQは未完了。
+
+新HTMLの公式validatorは最初にstatic成功後、Chrome DevTools起動待ちで実exit1。元logを保持し、同じHTML/検証条件を必要な実行権限で再検査して、四図のstatic・4/4 SVG・拡大/keyboard/bounds/focus/dismissal/restorationを実exit0で確認した。IAB390pxはdocument375px/section355px、横overflowなし、追加した16ケース・266件・後続sourceの全件/手動未実施が表示された。overrideを解除し新規空tabの既定1280pxを確認、確認専用tabを閉じた。十七payloadとmanifestの十八sourceをTailscale経由でHTTP200/no-store/正本bytesに照合。採用ZIPは116 member/115 payload、二schema/13例/489内部リンク/33 HTML ID、CRC/bytes/hashを検査した。report/確定interviewの原文を保持し、sourceの先行候補と現在の未完了gateを区別する。元logsはhtml-start-capability{,-retry}.log、http-start-capability.log、refresh-start-capability-pack.log。

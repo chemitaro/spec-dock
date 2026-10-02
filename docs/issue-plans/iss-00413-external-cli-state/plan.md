@@ -196,6 +196,8 @@ uv run pytest tests/cli_runtime/test_work_start_vnext.py tests/cli_runtime/test_
 
 **失敗時の停止/戻り先**: 重複を保証できなければD-05へ、branch効果が消えるならD-06へ。新しいjournalを戻して解決しない。
 
+2026-10-02、baseline578f27e3から[Startの保存原語確認](artifacts/start-publication-capability.md)を追加した。未対応symbolの公開RedはGit branch/checkout後のpartial6（1 failed、0.66秒）。計画が公開を必要とする場合だけ、dry-run成功・lock/Git変更前に既存の能力照合を行う。三階層と既存記録の保全・公開不要の同一Startを含む16組は成功。関連八suiteはMac3.12で266 passed（102.42秒）、実3.10で266 passed（102.77秒）、通常lintはRuff300/mypy219でexit0。既存の実rename/同期失敗とpartial/unknown、自動rollbackなしを維持する。75ac5760の全件・手動結果をこの後続sourceへ転記せず、Windows保存/nativeと現在候補Strict/FQは未完了。
+
 <a id="p-07"></a>
 ## P-07 Finishとactiveの解除を閉じる
 

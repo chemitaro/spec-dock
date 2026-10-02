@@ -31,6 +31,10 @@ baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更�
 
 [Scope公開の原語確認](scope-publication-capability.md)はbaseline6032621c後の追加修正。既知の未対応をremote観測/変更とdry-run成功判定の前に検出し、関連九suiteはMac3.12/実3.10各287 passed/2 skipped、通常lint成功。その修正を含むclean75ac5760の全件は上表の1900 passed/4 skipped、exit0。sourceの関連287件へ合算せず、Windows保存/nativeとStrict/FQは未完了として扱う。
 
+## 2026-10-02 後続Startの保存原語確認
+
+[追加修正](start-publication-capability.md)はbaseline578f27e3。既知の未対応symbolによるGit branch/checkout後のpartial6を公開CLIで再現し、公開を必要とするStartだけをGit変更前に拒否するよう修正した。三階層・apply/dry-run・platform/symbol欠落、旧記録保全と公開不要の同一Startの16組を検証。関連八suiteはMac3.12で266 passed（102.42秒）、実3.10で266 passed（102.77秒）、通常lint成功。上表の75ac5760全件・手動結果はこの後続sourceを含まず、今回の266件と合算しない。実Windows保存/native、現在候補の全件・最終手動・Strict/FQは未完了。
+
 ## 認定と実環境作業
 
 - P-12進行中。P-13/P-14の試験・資料準備を先行しているが、依存stepの完了認定とは別。

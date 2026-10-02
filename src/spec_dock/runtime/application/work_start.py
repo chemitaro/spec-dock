@@ -39,6 +39,7 @@ from spec_dock.runtime.domain.work_target import WorkTarget
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.github_lifecycle import RemoteIssueError
 from spec_dock.runtime.infra.identity import DirectoryIdentity
+from spec_dock.runtime.infra.json_store import require_directory_publication_support
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
 from spec_dock.runtime.infra.work_target_store import (
     SelectionPublicationUnknown,
@@ -312,6 +313,8 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         plan = plan_start(request, context, snapshot, observed)
         branch, tip, create_branch = plan.branch, plan.resolved_tip, plan.create_branch
         selection_plan = plan.selection
+        if selection_plan.action != "unchanged":
+            require_directory_publication_support()
         if selection_plan.action in ("replace_same_scope", "switch_scope"):
             assert planned_selection.record is not None
             old_scope_id = planned_selection.record.scope_id

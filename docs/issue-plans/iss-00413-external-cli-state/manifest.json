@@ -44,12 +44,12 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 482,
+    "local_link_occurrences_checked": 489,
     "html_unique_ids": 33,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "4/4 SVG and zoom validator passed on current explanation HTML",
     "mobile": "IAB viewport 390px; document width 375px; no horizontal document overflow; restored viewport",
-    "source_publication": "sixteen payloads and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
+    "source_publication": "seventeen payloads and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
     "product_acceptance": "incomplete; see current_implementation_evidence",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
@@ -58,8 +58,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 6584,
-      "sha256": "28bf460e476753b86ea6c2ced12229d7c8f6e6bb66cabe2d88c5fb215b52fef5"
+      "bytes": 7157,
+      "sha256": "9b7dd46a74c93ec012ea9f99de1a53dfddc7788008f5802fe480463c1397428d"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
@@ -223,8 +223,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 7085,
-      "sha256": "496c9c546b9839d1a271f469a0868c65f4b7d8fe4bb6749ededec7671e26f2d6"
+      "bytes": 7810,
+      "sha256": "9a26a982e0373a682b43c573f5b977ecc2856c35270349c1c2360828fafdae17"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -365,6 +365,11 @@
       "path": "artifacts/source-basis.md",
       "bytes": 29846,
       "sha256": "0d0e15141315fe82b4e6e74158e5b91b176ccbd9f63afc913688003818c64710"
+    },
+    {
+      "path": "artifacts/start-publication-capability.md",
+      "bytes": 4097,
+      "sha256": "d8bc23f42aabc099bd4c4726d9c30afa3cdd4b7dd9f7d2239749896f325106b5"
     },
     {
       "path": "artifacts/test-port-active-projection-retirement.md",
@@ -593,13 +598,13 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 71549,
-      "sha256": "cf387e15961e377675613217e38fc33d3820cb9680dca9d8fa1469eecdf61289"
+      "bytes": 72347,
+      "sha256": "d0baab6135271149f18158d2f8452732c5af08923bcc8406c30d5a284d3db227"
     },
     {
       "path": "implementation-report.md",
-      "bytes": 225379,
-      "sha256": "9600f7384fdeeec63cf11864667e42dac3514d6757bee99ac4a1b76d302fd28b"
+      "bytes": 226194,
+      "sha256": "5bd50d8ae2c285c4324466b109f3a3d4eefde5b52a9945ad58d0109f2269a763"
     },
     {
       "path": "index.html",
@@ -608,8 +613,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 141238,
-      "sha256": "bad3589790cc8539965f8d0f8493fd187bfe8bfca83117e735a4888dd291f5a8"
+      "bytes": 142011,
+      "sha256": "9a3ddb817fa1690e494ca78eca470abfe8cc826d5ad87f7ef0a5a45881b5e18f"
     },
     {
       "path": "preview-entry.html",
@@ -618,8 +623,8 @@
     },
     {
       "path": "report.md",
-      "bytes": 28860,
-      "sha256": "ca7d6f9f4636de1365d51a67e45bba1d3f40dedad97fb71fff167e26348315e6"
+      "bytes": 30649,
+      "sha256": "efad887b5ecdf2d4fe693e2aae1477d82c699dfb785002946cd332d391a4e477"
     },
     {
       "path": "requirement.md",
@@ -797,9 +802,9 @@
   "status_date": "2026-10-02",
   "current_implementation_evidence": {
     "provider_candidate_sha": "75ac57604f5b95f1c50a2e7214d711bc720fb0eb",
-    "provider_candidate_scope": "macOS full-test and installed manual-console candidate including Windows JSON read and Scope capability preflight",
-    "provider_source_unchanged_since": "75ac57604f5b95f1c50a2e7214d711bc720fb0eb",
-    "provider_source_changes_after_full": "none; only planning and verification documents updated",
+    "provider_candidate_scope": "most recent completed macOS full-test and installed manual-console candidate; excludes later Start capability preflight",
+    "provider_source_unchanged_since": null,
+    "provider_source_changes_after_full": "work_start.py capability preflight; full/manual evidence at 75ac5760 excludes this later source unit",
     "record": "artifacts/implementation-acceptance-evidence.md",
     "manual_record": "artifacts/manual-console-75ac5760.md",
     "manual_raw_record": "artifacts/manual-console-75ac5760.json",
@@ -853,6 +858,21 @@
       "macos_related": "287 passed, 2 skipped; exit0; 68.15 seconds",
       "python310_related": "287 passed, 2 skipped; exit0; 68.17 seconds",
       "native_windows": "not executed; no acceptance claim"
+    },
+    "start_publication_preflight_change": {
+      "baseline_sha": "578f27e3c125fd6cfd0c448ec06ee0e716f6337c",
+      "record": "artifacts/start-publication-capability.md",
+      "source_hashes": {
+        "src/spec_dock/runtime/application/work_start.py": "a2cb777b07888d2cd5934a949acb6d26043944f099b47260bb3c06a5b385ad6d",
+        "tests/cli_runtime/test_issue413_work_start.py": "cde8430ec2ef87b6a7269f45b0172db3425254048de692f0b63ac21d0faf126c",
+        "src/spec_dock/runtime/infra/json_store.py": "ba9850a8d31176d8c5b894d77aed6d93f696fb7f8175ccfb96f19fd3f0e2ae5b"
+      },
+      "focused": "16 passed, 84 deselected; exit0; 3.93 seconds",
+      "macos_related": "266 passed; exit0; 102.42 seconds",
+      "python310_related": "266 passed; exit0; 102.77 seconds",
+      "ordinary_lint": "Ruff300 and mypy219; exit0",
+      "full_and_manual_after_change": "not yet performed; 75ac5760 evidence predates this source delta",
+      "native_windows": "not executed; store/publication/process not connected; no acceptance claim"
     }
   }
 }

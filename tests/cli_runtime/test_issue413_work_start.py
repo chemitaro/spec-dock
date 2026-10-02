@@ -139,6 +139,158 @@ def open_issue(root: Path, repository: str, number: int) -> GithubIssueRecord:
     )
 
 
+@pytest.mark.parametrize("scope_id", ["init-00001", "epic-00002", "iss-00003"])
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("missing", ["platform", "native-symbol"])
+def test_start_missing_publication_primitive_stops_before_git_effects(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    scope_id: str,
+    dry_run: bool,
+    missing: str,
+) -> None:
+    from types import SimpleNamespace
+
+    from spec_dock.runtime.infra import json_store
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root = committed_workspace(tmp_path / "consumer")
+    if scope_id != "init-00001":
+        epic = add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
+        if scope_id == "iss-00003":
+            add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+        subprocess.run(["git", "-C", str(root), "add", "--", "spec-dock/initiatives"], check=True, capture_output=True)
+        subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "-c",
+                "user.name=Fixture",
+                "-c",
+                "user.email=fixture@example.invalid",
+                "commit",
+                "-qm",
+                "child fixtures",
+            ],
+            check=True,
+            capture_output=True,
+        )
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    before = tree_digest(root)
+    if missing == "platform":
+        monkeypatch.setattr(json_store, "sys", SimpleNamespace(platform="unavailable"))
+    else:
+        monkeypatch.setattr(json_store, "ctypes", SimpleNamespace(CDLL=lambda *args, **kwargs: SimpleNamespace()))
+
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            scope_id,
+            "--branch",
+            "unsupported-publication",
+            "--base",
+            "HEAD",
+            *(["--dry-run"] if dry_run else []),
+            "--json",
+        ])
+        == 5
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["data"]["started"] is False
+    assert result["data"]["branch_before"] == result["data"]["branch_after"] == "main"
+    assert result["data"]["selection_token"] is None and result["effects"] == []
+    assert "safe JSON rename is unavailable" in result["error"]["message"]
+    assert output.err == "" and tree_digest(root) == before
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_start_known_unsupported_publication_preserves_captured_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], dry_run: bool
+) -> None:
+    from types import SimpleNamespace
+
+    from spec_dock.runtime.infra import json_store
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = tree_digest(root)
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    monkeypatch.setattr(json_store, "ctypes", SimpleNamespace(CDLL=lambda *args, **kwargs: SimpleNamespace()))
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            "init-00001",
+            "--branch",
+            "replacement",
+            "--base",
+            "HEAD",
+            *(["--dry-run"] if dry_run else []),
+            "--json",
+        ])
+        == 5
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == "failed" and result["effects"] == []
+    assert result["data"]["started"] is False and result["data"]["branch_after"] == "main"
+    assert record.is_file() and tree_digest(root) == before
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+def test_unchanged_start_does_not_require_a_publication_primitive(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], dry_run: bool
+) -> None:
+    from types import SimpleNamespace
+
+    from spec_dock.runtime.infra import json_store
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_active import select_fixture
+
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = tree_digest(root)
+    token = record.name[7:-5]
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    monkeypatch.setattr(json_store, "ctypes", SimpleNamespace(CDLL=lambda *args, **kwargs: SimpleNamespace()))
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            "init-00001",
+            "--branch",
+            "main",
+            *(["--dry-run"] if dry_run else []),
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["status"] == ("planned" if dry_run else "unchanged")
+    if not dry_run:
+        assert result["data"]["selection_token"] == token and result["effects"] == []
+    assert tree_digest(root) == before
+
+
 def test_start_current_branch_skips_checkout_and_its_hook(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

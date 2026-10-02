@@ -327,6 +327,7 @@
 <p>Windowsでは、親フォルダーが途中で差し替わる場合に備え、保持した親ハンドルから子を開く処理へ補強しました。<a href="artifacts/windows-directory-anchor.md">API境界のRed→Green</a>と<a href="artifacts/macos-full-3b0c69e8.md">過去の全件・runner修正</a>を保存しています。<a href="artifacts/windows-json-read.md">JSON読取り</a>も同じ親ハンドルから元bytesとファイル識別情報を取得し、リンク・特殊ファイル・権限不足・破損を拒否します。</p>
 <p>Scope作成・取り込みでは必要な保存原語を事前に確認します。既知の未対応ならGitHubへのリクエストや保存先の作成前に停止し、dry-runも適用可能とは返しません。三階層すべてで24ケースの変更なしを確認し、関連9組はPython 3.12と実3.10で各287件成功・2件skip、通常lint成功です。<a href="artifacts/scope-publication-capability.md">再現と修正記録</a>に加え、この変更を含む<a href="artifacts/macos-full-75ac5760.md">最新の全件1,900件</a>も確認しました。</p>
 <p><a href="artifacts/manual-console-75ac5760.md">最新候補の手動確認</a>では、同じIssueの重複Startを拒否し、兄弟Issue二つの並行作業をSyncで表示できました。FinishはGitHub境界での完了確認後に対象の選択だけを解除し、現在のブランチを保ちます。Gitのフックが失敗した場合も、エラー原文と旧選択を保ち、自動で巻き戻しませんでした。追跡済みの仕様書は変わらず、独自の <code>.git/spec-dock</code> は作成されていません。</p>
+<p>この全件・手動確認の後で、<a href="artifacts/start-publication-capability.md">Startの保存原語確認</a>を追加しました。必要な無上書きrename原語がない環境では、記録を公開するStartをブランチ作成・checkout前に止めます。dry-runも適用可能とは返しません。既存記録を保ち、公開が不要な同じ対象のStartは引き続き使えます。三階層を含む16ケースと関連8組を確認し、Python 3.12・実3.10で各266件成功、通常lintも成功しました。上記の1,900件・手動14操作はこの追加変更を含まない候補の結果です。原語があっても実操作や同期が後から失敗した場合は、実際の部分効果を報告し、自動で巻き戻しません。</p>
 <p>4件のskipには実Windows専用の確認が含まれます。Windowsでの選択保存・公開・同期・解除、各公開処理・processや実機受入、最新候補の独立レビューとFinal Quality Gateは未完了です。旧macOS比較不一致の原因は未確定で、過去の記録を保持しています。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section>
 <section id="purpose"><h2>01　何を直し、何を残すのか</h2>
