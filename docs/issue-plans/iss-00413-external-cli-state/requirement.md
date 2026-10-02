@@ -1,6 +1,6 @@
 # Issue #413 要件定義書
 
-状態: 差替え用定義版。製品受け入れは全件未実施。基準SHA: `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+状態: 対応OS決定と第三者分析を採用した正本。P-18実装前。製品受け入れは全件未認定。検証済み対象SHA: `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準: `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
 
 <a id="background"></a>
 ## 背景・目的
@@ -11,9 +11,9 @@ SpecDockはInitiative、Epic、Issueの三階層で仕様・依存・成果物�
 
 ## 対象・非対象
 
-対象は起動/配布、直接対象、Start/Finish/active/Sync、その変更に不可避なCLI/context/storage/資産/移行/通常testです。既存Scope、依存、Artifact、Workbenchの業務契約は必要な変更以外維持します。
+対象は起動/配布、直接対象、Start/Finish/active/Sync、その変更に不可避なCLI/context/storage/資産/移行/通常testです。既存Scope、依存、Artifact、Workbenchの業務契約は必要な変更以外維持します。対応OSはLinuxおよびmacOSです。
 
-非対象はdaemon、別clone/PC探索、全worktree登録台帳、canonical branch binding台帳、独自Scope採番、永続operation journal、自動resume/rollback、初期cache、Release追加、品質ゲート組織、通常編集の包括的排他です。GitHubへのexactly-once、非協調editor/Git/旧writerの完全封鎖、複数ホスト共有filesystemでの排他は約束しません。今回の文書生成は製品変更・投稿・公開ではありません。
+非対象はWindows対応、daemon、別clone/PC探索、全worktree登録台帳、canonical branch binding台帳、独自Scope採番、永続operation journal、自動resume/rollback、初期cache、Release追加、品質ゲート組織、通常編集の包括的排他です。Windowsを止める代替として別のlock/store/台帳/daemonを追加しません。GitHubへのexactly-once、非協調editor/Git/旧writerの完全封鎖、複数ホスト共有filesystemでの排他は約束しません。今回の文書生成は製品変更・投稿・公開ではありません。
 
 ## 用語
 
@@ -28,13 +28,26 @@ SpecDockはInitiative、Epic、Issueの三階層で仕様・依存・成果物�
 | 排他 | 同じcloneの協調Startが重複判定と記録を同時実行しないための短いOS操作 |
 | partial / unknown | 効果の一部が成立、または成否を確定できない状態。未実行と混同しない |
 | 設計判断 | 確定要求を実現するために本書群で採用した技術上の選択。利用者回答の引用とは区別する |
+| 対応OS | 製品業務コマンドの受け入れ対象。LinuxおよびmacOS。help/version/completionのcontext-free性とは別概念 |
+| 非対応OS | 製品業務コマンドの動作を保証しないOS。Windowsを含む。代替管理基盤を意味しない |
 
 <a id="priority"></a>
 ## 要件の優先順位とauthority
 
 最優先はデータ/成果物保全、確定回答、効果の正直な報告です。次に今回の目的である外部CLI、最小直接状態、Startだけの重複防止を満たします。既存の便利機能はこの範囲で維持し、台帳を必要とする旧保証と衝突した場合は変更を明記します。速度の最適化や高度な並行機構より、この小さな保証を優先します。
 
-新要求は[確定回答](artifacts/user-decisions.md)、実装の事実は[検証済みSHA](artifacts/source-basis.md)によります。旧#409設計、旧#413草案、Issue本文は経緯の証拠であり、新要求を逆転するauthorityではありません。以下はすべて必須（MUST）。ACの数は旧版へ固定せず、本版の識別子を採用します。
+OS範囲については2026-10-02 JSTの[対応OS決定](artifacts/os-support-decision.md)を最上位authorityとします。そこではWindows対応を撤回し、対応OSをLinuxおよびmacOSへ確定しています。[確定回答](artifacts/user-decisions.md)のQ1〜Q8と合意事項は、それと衝突しない範囲で引き続きauthorityです。実装の事実は、GitHub connectorでrepository・branch・full SHAを一致確認した[検証済みSHA](artifacts/source-basis.md)と、[撤去分析](artifacts/os-support-retirement-analysis.md)によります。旧#409設計、旧#413草案、Windows用Implementation Brief、Windows調査、既存P-01〜P-17の測定ログは経緯・raw evidenceであり、現在のWindows完成義務を復活させるauthorityではありません。以下はすべて必須（MUST）。RQ/ACの既存識別子とリンクを維持します。
+
+<a id="os-support"></a>
+## 対応OS・必要原語・非対応OS
+
+製品業務コマンドの対応OSは **LinuxおよびmacOS** です。対象filesystemは、既存directory descriptor、`fstat(st_dev, st_ino)`、nofollowでのdirectory/file open、single-link regular file検査、file/directory `fsync`、未存在名への無上書きrename、既存directory descriptorへの `fcntl.flock` を実用上提供するlocal filesystemです。LinuxとmacOSで同じ抽象名を掲げるだけでなく、各OS/FSで実process・実Git・実consoleの証拠を別に残します。network filesystem、複数host共有mount、異なるOSからの同時mountは保証しません。
+
+Windowsは非対応です。`WindowsDirectory`、`WindowsMutex`、Win32 identity/JSON reader、WAIT_ABANDONED/NTFS lane、Windows work-target storeを完成させる要求は失効します。撤去時にWindowsの代替lock file、PID file、mkdir lock、ACL変更、registry、cache、daemon、別storeを追加しません。
+
+root/leaf help、version、completionは対応OS判定より先に処理し、Git・project・control・認証・通信・filesystem adapterへ到達しません。業務コマンドはutility dispatch後に小さな対応OSguardを一度通し、非対応OSではproject解決、Git/GitHub呼出し、stage作成、branch変更、consumer書込より前に `UNSUPPORTED_PLATFORM`、effects=[]で停止します。Windows全機能のtest/portは要求せず、この副作用前拒否とutility独立だけを境界試験にします。
+
+`specdock.work-target/v1` はversionを増やさず、`clone_identity` と `worktree_identity` を `{platform:"posix", device:<10進文字列>, file_id:<10進文字列>}` に限定します。Scope schema3、既存Scope ID、親子・依存・GitHub linkage、workspace writer protocolは変更しません。Windows形は公開/解除writerが未接続で、実Windows/NTFS合格証拠もないため、未導入形の互換性を新versionやunionで温存しません。ただし、provider fixture、許可対象consumer、保全物のいずれかに実在する `platform:"windows"` のwork-target v1 recordが見つかった場合、P-18を停止し、削除・変換せず別の明示決定へ戻します。
 
 <a id="requirements"></a>
 ## RQと測定可能なAC
@@ -47,10 +60,10 @@ SpecDockはInitiative、Epic、Issueの三階層で仕様・依存・成果物�
 根拠: 利用者の目的・合意8。設計: [D-02](design.md#d-02)。
 
 <a id="ac-413-01"></a>
-**AC-413-01** — Git/ghがPATHにない、project指定先が壊れている条件でrootと44 leafのhelp、version、3 shellのcompletionを実consoleで実行し、exit 0、Git/gh呼出し0、consumer書込0を確認する。
+**AC-413-01** — Git/ghがPATHにない、project指定先が壊れている条件でrootと44 leafのhelp、version、3 shellのcompletionを実consoleで実行し、exit 0、Git/gh呼出し0、consumer書込0を確認する。対応OSguardを含むbusiness/context import・IOへ到達しない。
 
 <a id="ac-413-02"></a>
-**AC-413-02** — fresh wheelをcheckout外へ非editable installし、provider sourceを参照不能にしても実consoleのScope読取・Start・Finish・Syncが動く。fixed bundle、consumer runtimeの追加コピー、control作成はいずれも0。
+**AC-413-02** — Linux/macOSでfresh wheelをcheckout外へ非editable installし、provider sourceを参照不能にしても実consoleのScope読取・Start・Finish・Syncが動く。fixed bundle、consumer runtimeの追加コピー、control作成はいずれも0。
 
 
 <a id="rq-413-02"></a>
@@ -64,7 +77,7 @@ SpecDockはInitiative、Epic、Issueの三階層で仕様・依存・成果物�
 **AC-413-03** — help/read/Start/Finish/Syncを含む全公開経路の許可write先を監視し、独自.gitファイル・Git config/refへの独自情報・registry・journal・cache・全worktree名簿の作成更新0を確認する。Git自身のrefs/index等の効果は別に記録する。
 
 <a id="ac-413-04"></a>
-**AC-413-04** — 直接対象は自分のspec-dock/.agent/work-target/に0または1件だけ。選択・解除の前後でtracked metadataと本文のhashが一致し、git statusに記録由来の差分が出ない。保存先がtrackedまたはignoreされていない場合は記録前に拒否する。
+**AC-413-04** — 直接対象は自分のspec-dock/.agent/work-target/に0または1件だけ。work-target v1の二identityはplatform=posixと10進device/file_idだけを受理する。選択・解除の前後でtracked metadataと本文のhashが一致し、git statusに記録由来の差分が出ない。保存先がtrackedまたはignoreされていない場合は記録前に拒否する。
 
 
 <a id="rq-413-03"></a>
@@ -117,10 +130,10 @@ Startはreadiness確認、必要なbranch作成、checkout、直接対象記録�
 根拠: 合意1/2。設計: [D-05](design.md#d-05)。
 
 <a id="ac-413-11"></a>
-**AC-413-11** — 二processのbarrier試験で重複走査→branch作成→checkout→記録公開の区間が重ならず、記録公開前にロックを解放する実装を検出する。prompt・GitHub待ちは区間外である。
+**AC-413-11** — Linux/macOSの二process barrier試験で重複走査→branch作成→checkout→記録公開の区間が重ならず、記録公開前にロックを解放する実装を検出する。prompt・GitHub待ちは区間外である。
 
 <a id="ac-413-12"></a>
-**AC-413-12** — Startがロックを保持していても通常ファイル編集、metadata操作、Sync、Finishはこの共通ロックを取得しない。timeout・取消・process強制終了でハンドルが解放され、新しいlockファイルや監視processは残らない。
+**AC-413-12** — Linux/macOSでStartがロックを保持していても通常ファイル編集、metadata操作、Sync、Finishはこの共通ロックを取得しない。timeout・取消・process強制終了でdescriptor/flockが解放され、新しいlockファイルや監視processは残らない。
 
 
 <a id="rq-413-07"></a>
@@ -279,34 +292,34 @@ Syncは複数選択と親の配下件数を表示するが、選択から完了�
 
 
 <a id="rq-413-17"></a>
-### RQ-413-17 通常試験と実入口で確認する
+### RQ-413-17 Linux/macOSの通常試験と実入口で確認する
 
-通常lint/pytestを維持し、fresh wheel/clone/linked worktreeと実consoleの動作で受け入れる。
+通常lint/pytestを維持し、Linux/macOSのfresh wheel/clone/linked worktreeと実consoleの動作で受け入れる。非対応OSの全機能portを品質gateへ含めない。
 
 根拠: 制約10・計画要求。設計: [D-13](design.md#d-13)。
 
 <a id="ac-413-38"></a>
-**AC-413-38** — make lint、uv run pytest、git diff --checkを全体で実施し、旧保証に対応する削除/更新理由を残す。基準の既存失敗、新しいRed、skip、未実施を別記録する。
+**AC-413-38** — make lint、uv run pytest、git diff --checkを全体で実施し、Windows専用source/test/CIの撤去を含む旧保証ごとの削除/更新理由を残す。基準の既存失敗、新しいRed、skip、未実施を別記録し、元logを削除しない。
 
 <a id="ac-413-39"></a>
-**AC-413-39** — fresh wheel→checkout外venv→fresh clone+linked→controlなし→help/Start/Finish/Syncを実行する。stateful fake ghとlive環境を区別し、最低Python3.10・CI3.11、OS/FS別の実結果を記録する。
+**AC-413-39** — LinuxおよびmacOSでfresh wheel→checkout外venv→fresh clone+linked→controlなし→help/Start/Finish/Syncを実行する。stateful fake ghとlive環境を区別し、最低Python3.10・CI3.11、OS/FS別の実結果を記録する。Linuxの既存PATH不備runは失敗のまま保全し、検証containerのPATHだけを補正した再実行と分ける。Windows native/NTFSは要求しない。
 
 
 <a id="rq-413-18"></a>
 ### RQ-413-18 納品・実装・正式登録を区別する
 
-今回は差替え文書だけ。実装担当設定を明記し、製品実装、レビュー、merge、dogfood、正式importの完了証拠を分離する。
+今回は第三者分析と差替え文書だけ。著述モデルと後続実装の作業契約を分け、製品実装、レビュー、merge、dogfood、正式importの完了証拠を分離する。
 
 根拠: Q&A最終指示・制約10。設計: [D-14](design.md#d-14)。
 
 <a id="ac-413-40"></a>
-**AC-413-40** — HTMLが背景/構成/正常/異常/移行/実装順を自己完結して説明し、3〜5図、目次、top/engine-history/idsを備える。テンプレート実行JSと共有modalがbyte一致し、実描画は別検証として結果を記録する。
+**AC-413-40** — HTMLが背景/構成/正常/異常/移行/実装順に加え、対応OS=Linux/macOS、Windows義務の失効、P-18の位置を自己完結して説明し、3〜5図、目次、top/engine-history/idsを備える。テンプレート実行JSと共有modalがbyte一致し、実描画は別検証として結果を記録する。
 
 <a id="ac-413-41"></a>
-**AC-413-41** — 単一rootのUTF-8 ZIP、schema/examples/リンク/ID対応、manifest sha256/bytes、ZIP CRCと展開bytesが整合する。report.mdとartifacts/interview-worktree-start.mdを生成/上書きせずpayload manifest外とする。
+**AC-413-41** — 単一rootのUTF-8 ZIP、schema/examples/リンク/ID対応、manifest sha256/bytes、ZIP CRCと展開bytesが整合する。第三者の差替えpayloadはreport.md、implementation-report.md、既存decision/interview/raw evidenceを生成/上書きしない。ローカル採用版ZIPには保有原文を変更せず収録し、manifestで生成・採用・実測の由来を区別する。
 
 <a id="ac-413-42"></a>
-**AC-413-42** — 実装担当をgpt-6.1-sol/highと明記し、human merge・dogfood適用・既存#413の正式importと開始を別の未着手stepへ置く。既存#413を再作成せず、生成先へCodex保有証拠を保全して移動する。
+**AC-413-42** — 実装担当は利用者の最新指定gpt-6.1-sol/maxを維持し、本追加分析と後続briefの著述モデルGPT-5.6 Sol / Proと区別する。P-18の実装開始は、更新済み正本を通常pushした後の独立ChatGPT Implementation Brief Strictで具体化し、そのbriefの成功をSpecDock正式Startと呼ばない。human merge・P-16 dogfood適用・P-17既存#413正式import/Startを別の未着手stepへ置き、既存#413を再作成せずCodex保有証拠を保全する。
 
 
 <a id="guarantees"></a>
@@ -322,15 +335,16 @@ Syncは複数選択と親の配下件数を表示するが、選択から完了�
 | operation IDで続行/巻戻し | 現物を再観測して新しい明示操作。失った送信意図は復元できない | journal、自動復旧を持たない |
 | generationとGitHub cacheの同期 | Syncはその場の表示。保存済み観測からfresh/完了を作らない | 初期cache・中央選択コピーなし |
 | installationがcommon-dirの全作業場を更新 | 自分が指定したworktreeのstatic資産だけ | mainや全worktreeを制御単位にしない |
+| Linux/macOS/Windowsの最小adapterと三OS受入 | Linux/macOSだけを対応OSとし、Windows専用source/test/CIと未完了義務を撤去する。utilityはcontext-freeのまま | 2026-10-02 JSTの最新利用者決定 |
 
 通常metadataへの楽観的な再検査は維持できますが、ロックを除いても従来の全writer直列化保証が残るとは説明しません。依存の同時編集は、読み取ったsnapshot内の検査と公開前再確認、後続validateで検出します。任意の並行非協調変更まで循環を絶対防止する保証はありません。
 
 <a id="start-conditions"></a>
 ## 実装開始条件・残余リスク
 
-利用者のQ1〜Q8は解決済みです。本版は保存方式、activeの最小制限、CLI引数差分を設計判断として固定しており、実装者が一般的な製品再検討を始める必要はありません。基準sourceとの対応表を再確認し、差分があれば該当stepだけ止めてD節を修正します。
+利用者のQ1〜Q8は解決済みです。本版は保存方式、activeの最小制限、CLI引数差分を設計判断として固定しており、実装者が一般的な製品再検討を始める必要はありません。対応OS判断も解決済みで、Windowsを完成させる再検討は行いません。検証済みSHAとの対応表を再確認し、差分があれば該当stepだけ止めてD節を修正します。
 
-OS/FS上の原語、fresh wheel、既存240 metadataの全件schema適合、ブラウザ実描画は試験開始/公開条件であって、今回の生成で充足していません。Windows経路が現sourceにあることと、全CLIがWindowsで保証済みであることは別です。本版はWindows用の最小adapterまで設計しますが、未試験のOS/FSを対応済みと公表しません。
+Linux/macOSのOS/FS原語、fresh wheel、既存240 metadataの全件schema適合、ブラウザ実描画は公開条件であり、今回の資料生成だけでは充足しません。Windows専用実装と未完了testはP-18の撤去対象で、完成・port・native受入の残作業ではありません。P-18は更新済み正本のpushと独立Implementation Brief Strictより前にコードへ着手しません。
 
 同一cloneを異なるOSユーザーや複数ホストで共有する新保証は追加しません。それが実際の導入先の必須条件であると判明した場合は、勝手な権限変更や別lock方式へfallbackせず、該当環境への適用を停止するmaterialな適用判断です。core実装の無関係な機能を増やす理由にはしません。
 

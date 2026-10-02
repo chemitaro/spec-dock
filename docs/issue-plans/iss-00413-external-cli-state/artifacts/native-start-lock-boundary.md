@@ -31,3 +31,7 @@ YAMLを既存Ruby/Psychで解析し、候補checkout、通常pytest維持、nati
 Microsoftの[Kernel object namespaces](https://learn.microsoft.com/en-us/windows/win32/termserv/kernel-object-namespaces)、[WaitForSingleObject](https://learn.microsoft.com/en-us/windows/win32/api/synchapi/nf-synchapi-waitforsingleobject)、[GetVolumeInformationW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-getvolumeinformationw)へAPI条件を照合した。WAIT_ABANDONEDは所有取得の結果であり、保護対象の内容が正常という証拠にはしない。API説明の読取と実OSでの検証結果を混同しない。
 
 元logsは既存Epic Workbenchのiss-00413-implementation/pytest-native-lock-boundary-{macos,macos-2,python310}.log、lint-native-lock-boundary.log、provider-native-workflow-static.log。Linuxの現在候補とWindowsのnative実行は後続結果を別記録する。fresh Strict/Final Quality Gate、P-13の全受入認定、最終手動確認、実consumer適用は未完了。
+
+## 2026-10-02以降の位置づけ
+
+本文は記録当時の実装・試験・未実施事項を保全した履歴です。[最新OS決定](os-support-decision.md)によりWindows完成・native/NTFS受入の義務は失効しました。専用実装・test・CIは[P-18](../plan.md#p-18)で撤去します。POSIXの保全境界と既存実測は維持し、[最新baseline](implementation-acceptance-evidence.md)と区別します。

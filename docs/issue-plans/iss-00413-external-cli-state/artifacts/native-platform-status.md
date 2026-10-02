@@ -36,3 +36,7 @@ clean 31b1ffe12c36739c56375eea0a764ac2a5719d0aのLinux/Python 3.11.16で、配�
 実装調査でMicrosoftの[CreateFileW](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-createfilew)、[SetFileInformationByHandle](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-setfileinformationbyhandle)、[FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_rename_info)、[FlushFileBuffers](https://learn.microsoft.com/en-us/windows/win32/api/fileapi/nf-fileapi-flushfilebuffers)を読取した。sharing/access、relative renameとflushのAPI条件はWindows writerの実装判断に必要だが、文書の存在をdirectory同期・NTFS writerの実測成功とは扱わない。
 
 元logsは既存Epic Workbenchのiss-00413-implementationに保存する。主要fileはpytest-linux-python311-e11f1879.log、pytest-linux-python311-fresh-console-6824b3f8.log、pytest-unconnected-directory-platform-{red,red-2,red-3,green,related,python310}.log、lint-unconnected-directory-platform.log、lint-unconnected-directory-platform-2.log、pytest-fresh-console-provenance.log。real consumer/live GitHubは未変更であり、fresh Strict/Final Quality Gate/手動確認/P-16以降の実適用は完了していない。
+
+## 2026-10-02以降の位置づけ
+
+本文は記録当時の実装・試験・未実施事項を保全した履歴です。[最新OS決定](os-support-decision.md)によりWindows完成・native/NTFS受入の義務は失効しました。専用実装・test・CIは[P-18](../plan.md#p-18)で撤去します。POSIXの保全境界と既存実測は維持し、[最新baseline](implementation-acceptance-evidence.md)と区別します。

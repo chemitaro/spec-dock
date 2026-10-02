@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:specdock:issue413:data:v1",
-  "title": "Issue 413 proposed schema3 preservation and minimal direct target",
-  "description": "Proposed storage contract. OS identity, file count, ancestry equality, GitHub-number equality for NEW scopes, path safety, no-ABA file removal and graph rules require application validation. Existing data is not converted by this schema.",
+  "title": "Issue 413 schema3 preservation and POSIX direct target",
+  "description": "Storage contract after the 2026-10-02 OS decision. Existing Scope schema3 data is not converted. work-target/v1 uses POSIX physical identities only; count, ancestry equality, GitHub-number equality, path safety, no-ABA removal and graph rules require application validation.",
   "oneOf": [
     {
       "$ref": "#/$defs/scope"
@@ -23,10 +23,7 @@
       "type": "object",
       "properties": {
         "platform": {
-          "enum": [
-            "posix",
-            "windows"
-          ]
+          "const": "posix"
         },
         "device": {
           "type": "string",
@@ -34,7 +31,7 @@
         },
         "file_id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[0-9]+$"
         }
       },
       "required": [
@@ -42,32 +39,7 @@
         "device",
         "file_id"
       ],
-      "additionalProperties": false,
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "platform": {
-                "const": "posix"
-              }
-            }
-          },
-          "then": {
-            "properties": {
-              "file_id": {
-                "pattern": "^[0-9]+$"
-              }
-            }
-          },
-          "else": {
-            "properties": {
-              "file_id": {
-                "pattern": "^[0-9a-f]{32}$"
-              }
-            }
-          }
-        }
-      ]
+      "additionalProperties": false
     },
     "github": {
       "type": "object",

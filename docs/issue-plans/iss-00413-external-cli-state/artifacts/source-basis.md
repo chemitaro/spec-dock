@@ -158,3 +158,7 @@ Windowsの動作保証、network FSの排他、異なるOSユーザー間の共�
 | plantuml-browser-rendering.md | 7242 | `a9c7d35f69a9984f20e280e0a9f2bade5bd31373824c6c734bccc5215dfedf4c` |
 
 HTMLは本文・補助CSS・text/plain図だけを変更し、実行scriptと共有modalは復元templateから保持します。図ソースを外部rendererに送らず、固定CDN libraryをブラウザ内で使います。実行JSのbyte一致、DOM構造の静的確認、実際のSVG/modal操作検証は別の検査です。実施範囲はself-checkに示します。
+
+## 2026-10-02 OS撤回の追加出典
+
+最新OS authorityは[対応OS決定](os-support-decision.md)。第三者は指定branch codex/iss-00413-external-cli-stateのfull SHA121228c6fca1fd016e7bccef009902396112ba43をconnectorで完全一致確認した。[分析](os-support-retirement-analysis.md)と[原文](os-retirement-chatgpt-121228c6.md)を保全。親2b2be5e2とのsource/tests/CI差分は0。[限定record scan](os-retirement-record-scan-121228c6.json)、[Linux実測](linux-full-121228c6.md)、[r12分析](code-review-p06-12-analysis.md)をCodexが追加照合した。旧mainの出典表は当時のbaselineとして保持し、現sourceのpathへ書き換えない。b33b7a71と8a70a8b3には共通POSIX修正/E2Eも同居するため一括revertしない。

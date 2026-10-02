@@ -44,12 +44,12 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 510,
-    "html_unique_ids": 33,
+    "local_link_occurrences_checked": 580,
+    "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "4/4 SVG and zoom validator passed on current explanation HTML",
-    "mobile": "IAB viewport 390px; document width 375px; no horizontal document overflow; restored viewport",
-    "source_publication": "twenty payloads and manifest HTTP200/no-store/exact bytes; legacy entry preserves fragment and resolves site-relative links",
+    "mobile": "Previous HTML viewport check retained as history; current edit is not claimed as a new mobile check",
+    "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
     "product_acceptance": "incomplete; see current_implementation_evidence",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
@@ -58,13 +58,13 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 7307,
-      "sha256": "fbe7de5766ca32dd2288b86633cf53dfdc943fc38bd692143058df8fa69141fd"
+      "bytes": 7321,
+      "sha256": "3a9ad8b5dbfb7e75fa0cd79b8baad880f688d58fab3c25cd8b690726abc1761c"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
-      "bytes": 18410,
-      "sha256": "16fc39c21b13dbfd5073cb445efff629048aea49d68a55ffeb052d6b3f560236"
+      "bytes": 20667,
+      "sha256": "eb2bd48a30974cabcd51eeb14cd36c73ac7d0e57daf11e5723734335203c4d83"
     },
     {
       "path": "artifacts/cli-contract.md",
@@ -207,9 +207,19 @@
       "sha256": "2f144e8328f27004e757c6da7d77ec1cde2465de7ed7b217b10e309be434c024"
     },
     {
+      "path": "artifacts/code-review-p06-12-analysis.md",
+      "bytes": 4428,
+      "sha256": "a926c6e5d70d1378773e136a2db65308d750eb93beef82673cd07e478af4525b"
+    },
+    {
+      "path": "artifacts/code-review-p06-12.json",
+      "bytes": 3000,
+      "sha256": "4b7c170004525cdf6ddee787df3cdffa7fb6885c34e91990720afd1c1e626853"
+    },
+    {
       "path": "artifacts/data-schema.json",
-      "bytes": 9744,
-      "sha256": "7fa2a4b71f88a6daf69a82acb09b7f8e0a03e96469cbc6d10c2857469b473654"
+      "bytes": 9216,
+      "sha256": "2c925518dc9aa8f573edb320da5611e639bea3e7e489e5a07d2fd24aa33382cf"
     },
     {
       "path": "artifacts/examples.json",
@@ -223,8 +233,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 8584,
-      "sha256": "c815036de2b015967fd03b0c52efcd845cb330722f25af3662163646b4422d26"
+      "bytes": 12392,
+      "sha256": "b32fa4f6ad5749a6ed9d1f43fa63b84d6e06f5de535e05cbaf2811b147761aa7"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -235,6 +245,36 @@
       "path": "artifacts/interview-worktree-start.md",
       "bytes": 5646,
       "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-after.txt",
+      "bytes": 662,
+      "sha256": "a9ee8c3cc72457cf8666b9bded1958bdcc54a2d313c39dc47b95f6f55b887304"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-before.txt",
+      "bytes": 663,
+      "sha256": "ad3f4bdb975c7feabd5bb7271767aa68b810826e017b88e8cb880b5b116b87e7"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-original-raw.json",
+      "bytes": 17012,
+      "sha256": "e5f16669157338e43d11faa20af0303572335f71e162542ecb26183973096ea7"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-original.txt",
+      "bytes": 16514,
+      "sha256": "3c8e55096f009ad12afa187073c1611bcae4fab1b9726866cb1541232451dc75"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-path-fixed.txt",
+      "bytes": 3164,
+      "sha256": "bc759325bf679f6b7cd81860b003c7e07fa27cf0e181d853031b1b4bc8f982a5"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6.md",
+      "bytes": 2178,
+      "sha256": "062b6321026bcd6ce33206d919871082bcab0d96a86da481306d006e5bb1e807"
     },
     {
       "path": "artifacts/linux-python311-verification.md",
@@ -298,13 +338,43 @@
     },
     {
       "path": "artifacts/native-platform-status.md",
-      "bytes": 6193,
-      "sha256": "4a302ee869fea146ea0b9315467b728c5d31fc4e15599416b65bec8d303ad10c"
+      "bytes": 6630,
+      "sha256": "0a3d765e7b05ad1b08a6ff815656095e4871257c0c329321abe64bf5b40ee876"
     },
     {
       "path": "artifacts/native-start-lock-boundary.md",
-      "bytes": 4411,
-      "sha256": "df2f1768b49fc797b42a1a7cb69cc837d4f761eec09fca1d63bc9a7f8692576e"
+      "bytes": 4848,
+      "sha256": "f4477a45d10b7b28025c5477d5eea6297f3f2ab77c84b2c6b5dfaccbede09948"
+    },
+    {
+      "path": "artifacts/os-retirement-chatgpt-121228c6-raw.json",
+      "bytes": 14862,
+      "sha256": "fb483c53f6993c611dfa1242c778bef8c6dc0ec69484bc97561d6ba753f6eafc"
+    },
+    {
+      "path": "artifacts/os-retirement-chatgpt-121228c6.md",
+      "bytes": 14623,
+      "sha256": "a0ec33b8fa76d4aa1903dfcd0e53b0c5c2ae3f71e8cf76e2615d5bfad50e895b"
+    },
+    {
+      "path": "artifacts/os-retirement-record-scan-121228c6.json",
+      "bytes": 4414,
+      "sha256": "41e9b905148fd49f587b87a0985453bee78bc974e48a8cd3e7187072b744e20e"
+    },
+    {
+      "path": "artifacts/os-support-decision.md",
+      "bytes": 2509,
+      "sha256": "01963bf51eee56076d1e0a47ab986010f1221ecbef5a5bef35a21ad2b3fa3235"
+    },
+    {
+      "path": "artifacts/os-support-retirement-analysis.md",
+      "bytes": 12592,
+      "sha256": "ab42bf1292244d08c94de1ac242c2af272885e70cb3658669f5c8c8141a8c792"
+    },
+    {
+      "path": "artifacts/os-support-retirement-plan.md",
+      "bytes": 10274,
+      "sha256": "1b9ed87a6afcf5856385c3687253f9266f4e1ebe0deef4b97c3656dcfa38e953"
     },
     {
       "path": "artifacts/provider-retirement-dispatcher.md",
@@ -378,8 +448,8 @@
     },
     {
       "path": "artifacts/source-basis.md",
-      "bytes": 29846,
-      "sha256": "0d0e15141315fe82b4e6e74158e5b91b176ccbd9f63afc913688003818c64710"
+      "bytes": 30618,
+      "sha256": "cb535d3861e4be3abedaab2f28690012f18efd39be6f3b527e2d5de358801736"
     },
     {
       "path": "artifacts/start-publication-capability.md",
@@ -568,8 +638,8 @@
     },
     {
       "path": "artifacts/traceability.json",
-      "bytes": 16996,
-      "sha256": "8f75479ee86f9df8fa5d8994a7a356969acd0c074e0ee5d586141335e8c7a628"
+      "bytes": 18461,
+      "sha256": "d00bbcfe39a2df6b7133e9d27d8ee170f1051c7146b2c07be3c2a3beb7adaa92"
     },
     {
       "path": "artifacts/user-decisions.md",
@@ -588,8 +658,8 @@
     },
     {
       "path": "artifacts/windows-adapter-connection-review.md",
-      "bytes": 5487,
-      "sha256": "8c1388de9da032381097994d4a66d7c8cbfedca44165e6def766f50e4cc6e6d6"
+      "bytes": 5924,
+      "sha256": "00024e698c63adc3dc0f37f0c7be1759ab5fe1245d6fded3135d6a8856f39384"
     },
     {
       "path": "artifacts/windows-directory-anchor.md",
@@ -608,13 +678,13 @@
     },
     {
       "path": "design.md",
-      "bytes": 43261,
-      "sha256": "236effef41b0bf2abeaa8becec81cae98ff379e10141c4e5c42c3c3aa94ccf4c"
+      "bytes": 45007,
+      "sha256": "9e54f0c087c0d54152a2d96b8deeaae2193bdb873db32e49141428601715b11b"
     },
     {
       "path": "explanation.html",
-      "bytes": 72337,
-      "sha256": "326e913480d6c08610a2e9b414d65157fee7598c09918e0952054a50e67306ed"
+      "bytes": 72300,
+      "sha256": "e72597f612d59617e8254367d4ff872465b0631ca2507128a89a38155b11b447"
     },
     {
       "path": "implementation-report.md",
@@ -628,8 +698,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 142845,
-      "sha256": "fe5dd63b4d5b6e2b4e06c1e5c9b4458d7a8e7b078bde5b172ad3cbafeb9696a7"
+      "bytes": 156665,
+      "sha256": "1ec91fd47b502b7783039cfad8f20e87c7d33253c3b91a99dbab8cb275aef1e2"
     },
     {
       "path": "preview-entry.html",
@@ -643,8 +713,8 @@
     },
     {
       "path": "requirement.md",
-      "bytes": 23741,
-      "sha256": "6948b6ab9764037e659e9f7f3ca1a549cb556ce7acd05d2512ffc1249adcbcea"
+      "bytes": 28493,
+      "sha256": "a6cd5aae3253c5f7687aa128bdea437ca67058704dbc614c2ffff882b031ef48"
     }
   ],
   "origin_generated_files": [
@@ -816,82 +886,48 @@
   },
   "status_date": "2026-10-02",
   "current_implementation_evidence": {
-    "provider_candidate_sha": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
-    "provider_candidate_scope": "latest completed macOS full-test and individually invoked installed-console candidate; includes Start capability preflight",
-    "provider_source_unchanged_since": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
-    "provider_source_changes_after_full": null,
-    "record": "artifacts/implementation-acceptance-evidence.md",
-    "manual_record": "artifacts/manual-console-2b2be5e2.md",
-    "manual_raw_record": "artifacts/manual-console-2b2be5e2.json",
-    "macos_full_pytest": "exit 0; 1916 passed, 4 skipped; 434.98 seconds; direct ordinary uv run pytest",
-    "macos_full_record": "artifacts/macos-full-2b2be5e2.md",
-    "previous_macos_reader_full_record": "artifacts/macos-full-6032621c.md",
-    "macos_runner_record": "artifacts/macos-full-3b0c69e8.md",
-    "macos_first_runner_failure": "prior SHA3b0c69e8: 2 failed, 1851 passed, 2 skipped; missing main guard in ignored runner; product/tests unchanged; raw log retained",
-    "previous_macos_failure": "8a70a8b3: exit 1; 1 failed, 1847 passed, 2 skipped; cause unresolved; original evidence retained",
-    "linux_full_pytest_sha": "8a70a8b30e69fe0bda6db6c45ef555f44411236d",
-    "linux_full_pytest": "exit 0; 1832 passed, 18 skipped",
-    "linux_source_limitation": "8a70a8b3 predates the WindowsDirectory source change in 3b0c69e8",
-    "manual_console_sha": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
-    "manual_source_limitation": "14 individual installed-console operations with real Git and 26 stateful fake gh requests; no live GitHub or native Windows acceptance",
-    "previous_manual_record": "artifacts/manual-console-75ac5760.md",
-    "manual_operations": 14,
-    "manual_github_requests": 26,
-    "manual_wheel_sha256": "45d494b7abf19b865d2cca4b9090bed80ff5b6fb81b4f106e35b2a20624c1551",
-    "manual_provider_source_sha256": "585aa7d3d1c206d4418765cb38fc0f55a726ff22af6581483e24ec5602b0ace3",
-    "windows_native_and_store": "not accepted; native execution and store connection pending",
-    "additional_source_change": {
-      "baseline_sha": "ccf9637d453a4f0d7988a7f9f3471a147c427bbd",
-      "path": "src/spec_dock/runtime/infra/windows_handles.py",
-      "sha256": "65f1f48d2975cdb7a8ccfa1da9dc3fd7a2507264381759debb96bc424412ce64",
-      "record": "artifacts/windows-directory-anchor.md",
-      "macos_related": "21 passed, 1 skipped; exit0; 1.49 seconds",
-      "python310_related": "21 passed, 1 skipped; exit0; 1.38 seconds",
-      "native_windows": "not executed; no acceptance claim"
+    "baseline_only": true,
+    "source_sha": "121228c6fca1fd016e7bccef009902396112ba43",
+    "supported_os": [
+      "linux",
+      "darwin"
+    ],
+    "linux_full": {
+      "passed": 1900,
+      "skipped": 20,
+      "seconds": 977.9,
+      "exit_code": 0,
+      "evidence": "artifacts/linux-full-121228c6.md",
+      "input_hash": "2bcbce60d8b318761f81529c4b998fae4d43027b52470fba317143400547494e"
     },
-    "windows_json_read_change": {
-      "baseline_sha": "9a97f758c9948aa638ab40c3ed34f8565c09d81c",
-      "record": "artifacts/windows-json-read.md",
-      "source_hashes": {
-        "src/spec_dock/runtime/infra/json_store.py": "6b6b80ed3272f650bf4cc4069bbb626335b4b152993d06b2910315fd69273053",
-        "src/spec_dock/runtime/infra/windows_handles.py": "75c9e3f6b50bde4a1fa3c544835a0a4862c8676e9651c5e612703ebe2d841bae"
-      },
-      "macos_related": "58 passed, 3 skipped; exit0; 2.12 seconds",
-      "python310_related": "58 passed, 3 skipped; exit0; 2.30 seconds",
-      "native_windows": "not executed; no acceptance claim"
+    "macos_full": {
+      "source_sha": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
+      "passed": 1916,
+      "skipped": 4,
+      "exit_code": 0,
+      "evidence": "artifacts/macos-full-2b2be5e2.md"
     },
-    "fresh_code_review": "pending",
-    "final_quality_gate": "pending; original Strict skill absent in known roots; v2 pilot choice unanswered",
-    "real_consumer_cutover": "not performed",
-    "scope_publication_preflight_change": {
-      "baseline_sha": "6032621c2bd68ab9051b8929dd17d536a4114ad7",
-      "record": "artifacts/scope-publication-capability.md",
-      "source_hashes": {
-        "src/spec_dock/runtime/infra/json_store.py": "ba9850a8d31176d8c5b894d77aed6d93f696fb7f8175ccfb96f19fd3f0e2ae5b",
-        "src/spec_dock/runtime/application/direct_scope_publish.py": "cf193d6b5dc151a1622507e972fc0d224ca0bb59c18c56f55419d1075cd883f7"
-      },
-      "macos_related": "287 passed, 2 skipped; exit0; 68.15 seconds",
-      "python310_related": "287 passed, 2 skipped; exit0; 68.17 seconds",
-      "native_windows": "not executed; no acceptance claim"
+    "manual": {
+      "source_sha": "2b2be5e227ddf4d067da083bba15a8ec23d21367",
+      "operations": 14,
+      "fake_gh_requests": 26,
+      "live_github": false
     },
-    "start_publication_preflight_change": {
-      "baseline_sha": "578f27e3c125fd6cfd0c448ec06ee0e716f6337c",
-      "record": "artifacts/start-publication-capability.md",
-      "source_hashes": {
-        "src/spec_dock/runtime/application/work_start.py": "a2cb777b07888d2cd5934a949acb6d26043944f099b47260bb3c06a5b385ad6d",
-        "tests/cli_runtime/test_issue413_work_start.py": "cde8430ec2ef87b6a7269f45b0172db3425254048de692f0b63ac21d0faf126c",
-        "src/spec_dock/runtime/infra/json_store.py": "ba9850a8d31176d8c5b894d77aed6d93f696fb7f8175ccfb96f19fd3f0e2ae5b"
-      },
-      "focused": "16 passed, 84 deselected; exit0; 3.93 seconds",
-      "macos_related": "266 passed; exit0; 102.42 seconds",
-      "python310_related": "266 passed; exit0; 102.77 seconds",
-      "ordinary_lint": "Ruff300 and mypy219; exit0",
-      "full_and_manual_after_change": "clean2b2be5e2: 1916 passed, 4 skipped, 434.98 seconds, exit0; 14 individual installed-console operations; no Windows/Strict/FQ acceptance claim",
-      "native_windows": "not executed; store/publication/process not connected; no acceptance claim"
+    "code_review_r12": {
+      "review_status": "fail",
+      "p1": 1,
+      "exit_code": 10,
+      "evidence": "artifacts/code-review-p06-12-analysis.md"
     },
-    "previous_scope_macos_full_record": "artifacts/macos-full-75ac5760.md",
-    "manual_raw_sha256": "e7b99aae6d816775fa4cfbfea5d930ec87bb50095bc84173dcc662a78d758021",
-    "current_upstream_readonly_sha": "8c59994c8dad473697dcd8314721aeeef3f52d79",
-    "strict_admission": "not admitted: local/upstream SHA mismatch; previous ordinary-push consent question unanswered"
+    "additional_work": "P-18 planned; Strict implementation brief and product changes pending; P-07 Finish P1 repair pending; fresh Code Review/FQ and P-16/P-17 pending"
+  },
+  "os_retirement_authoring": {
+    "model": "gpt-5.6-sol",
+    "reasoning": "pro",
+    "verified_sha": "121228c6fca1fd016e7bccef009902396112ba43",
+    "raw_zip": "../iss-00413-os-retirement.zip",
+    "raw_zip_sha256": "31cfc245b0b393a626d02c877b029542ef4c4f845569744da1dccc5531b93a29",
+    "decision": "artifacts/os-support-decision.md",
+    "raw_response": "artifacts/os-retirement-chatgpt-121228c6.md"
   }
 }

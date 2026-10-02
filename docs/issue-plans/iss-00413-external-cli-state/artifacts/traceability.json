@@ -24,20 +24,22 @@
     {
       "id": "AC-413-01",
       "rq": "RQ-413-01",
-      "criterion": "Git/ghがPATHにない、project指定先が壊れている条件でrootと44 leafのhelp、version、3 shellのcompletionを実consoleで実行し、exit 0、Git/gh呼出し0、consumer書込0を確認する。",
+      "criterion": "Git/ghがPATHにない、project指定先が壊れている条件でrootと44 leafのhelp、version、3 shellのcompletionを実consoleで実行し、exit 0、Git/gh呼出し0、consumer書込0を確認する。対応OSguardを含むbusiness/context import・IOへ到達しない。",
       "design": "D-02",
       "plans": [
         "P-02",
+        "P-18",
         "P-13"
       ]
     },
     {
       "id": "AC-413-02",
       "rq": "RQ-413-01",
-      "criterion": "fresh wheelをcheckout外へ非editable installし、provider sourceを参照不能にしても実consoleのScope読取・Start・Finish・Syncが動く。fixed bundle、consumer runtimeの追加コピー、control作成はいずれも0。",
+      "criterion": "Linux/macOSでfresh wheelをcheckout外へ非editable installし、provider sourceを参照不能にしても実consoleのScope読取・Start・Finish・Syncが動く。fixed bundle、consumer runtimeの追加コピー、control作成はいずれも0。",
       "design": "D-02",
       "plans": [
         "P-02",
+        "P-18",
         "P-13"
       ]
     },
@@ -55,11 +57,12 @@
     {
       "id": "AC-413-04",
       "rq": "RQ-413-02",
-      "criterion": "直接対象は自分のspec-dock/.agent/work-target/に0または1件だけ。選択・解除の前後でtracked metadataと本文のhashが一致し、git statusに記録由来の差分が出ない。保存先がtrackedまたはignoreされていない場合は記録前に拒否する。",
+      "criterion": "直接対象は自分のspec-dock/.agent/work-target/に0または1件だけ。work-target v1の二identityはplatform=posixと10進device/file_idだけを受理する。選択・解除の前後でtracked metadataと本文のhashが一致し、git statusに記録由来の差分が出ない。保存先がtrackedまたはignoreされていない場合は記録前に拒否する。",
       "design": "D-03",
       "plans": [
         "P-03",
-        "P-05"
+        "P-05",
+        "P-18"
       ]
     },
     {
@@ -90,6 +93,7 @@
       "plans": [
         "P-05",
         "P-06",
+        "P-18",
         "P-13"
       ]
     },
@@ -126,20 +130,22 @@
     {
       "id": "AC-413-11",
       "rq": "RQ-413-06",
-      "criterion": "二processのbarrier試験で重複走査→branch作成→checkout→記録公開の区間が重ならず、記録公開前にロックを解放する実装を検出する。prompt・GitHub待ちは区間外である。",
+      "criterion": "Linux/macOSの二process barrier試験で重複走査→branch作成→checkout→記録公開の区間が重ならず、記録公開前にロックを解放する実装を検出する。prompt・GitHub待ちは区間外である。",
       "design": "D-05",
       "plans": [
         "P-05",
-        "P-06"
+        "P-06",
+        "P-18"
       ]
     },
     {
       "id": "AC-413-12",
       "rq": "RQ-413-06",
-      "criterion": "Startがロックを保持していても通常ファイル編集、metadata操作、Sync、Finishはこの共通ロックを取得しない。timeout・取消・process強制終了でハンドルが解放され、新しいlockファイルや監視processは残らない。",
+      "criterion": "Linux/macOSでStartがロックを保持していても通常ファイル編集、metadata操作、Sync、Finishはこの共通ロックを取得しない。timeout・取消・process強制終了でdescriptor/flockが解放され、新しいlockファイルや監視processは残らない。",
       "design": "D-05",
       "plans": [
         "P-05",
+        "P-18",
         "P-13"
       ]
     },
@@ -326,7 +332,8 @@
       "design": "D-04",
       "plans": [
         "P-03",
-        "P-04"
+        "P-04",
+        "P-18"
       ]
     },
     {
@@ -388,51 +395,65 @@
     {
       "id": "AC-413-38",
       "rq": "RQ-413-17",
-      "criterion": "make lint、uv run pytest、git diff --checkを全体で実施し、旧保証に対応する削除/更新理由を残す。基準の既存失敗、新しいRed、skip、未実施を別記録する。",
+      "criterion": "make lint、uv run pytest、git diff --checkを全体で実施し、Windows専用source/test/CIの撤去を含む旧保証ごとの削除/更新理由を残す。基準の既存失敗、新しいRed、skip、未実施を別記録し、元logを削除しない。",
       "design": "D-13",
       "plans": [
         "P-01",
+        "P-18",
         "P-13"
       ]
     },
     {
       "id": "AC-413-39",
       "rq": "RQ-413-17",
-      "criterion": "fresh wheel→checkout外venv→fresh clone+linked→controlなし→help/Start/Finish/Syncを実行する。stateful fake ghとlive環境を区別し、最低Python3.10・CI3.11、OS/FS別の実結果を記録する。",
+      "criterion": "LinuxおよびmacOSでfresh wheel→checkout外venv→fresh clone+linked→controlなし→help/Start/Finish/Syncを実行する。stateful fake ghとlive環境を区別し、最低Python3.10・CI3.11、OS/FS別の実結果を記録する。Linuxの既存PATH不備runは失敗のまま保全し、検証containerのPATHだけを補正した再実行と分ける。Windows native/NTFSは要求しない。",
       "design": "D-13",
       "plans": [
+        "P-18",
         "P-13"
       ]
     },
     {
       "id": "AC-413-40",
       "rq": "RQ-413-18",
-      "criterion": "HTMLが背景/構成/正常/異常/移行/実装順を自己完結して説明し、3〜5図、目次、top/engine-history/idsを備える。テンプレート実行JSと共有modalがbyte一致し、実描画は別検証として結果を記録する。",
+      "criterion": "HTMLが背景/構成/正常/異常/移行/実装順に加え、対応OS=Linux/macOS、Windows義務の失効、P-18の位置を自己完結して説明し、3〜5図、目次、top/engine-history/idsを備える。テンプレート実行JSと共有modalがbyte一致し、実描画は別検証として結果を記録する。",
       "design": "D-14",
       "plans": [
+        "P-18",
         "P-14"
       ]
     },
     {
       "id": "AC-413-41",
       "rq": "RQ-413-18",
-      "criterion": "単一rootのUTF-8 ZIP、schema/examples/リンク/ID対応、manifest sha256/bytes、ZIP CRCと展開bytesが整合する。report.mdとartifacts/interview-worktree-start.mdを生成/上書きせずpayload manifest外とする。",
+      "criterion": "単一rootのUTF-8 ZIP、schema/examples/リンク/ID対応、manifest sha256/bytes、ZIP CRCと展開bytesが整合する。第三者の差替えpayloadはreport.md、implementation-report.md、既存decision/interview/raw evidenceを生成/上書きしない。ローカル採用版ZIPには保有原文を変更せず収録し、manifestで生成・採用・実測の由来を区別する。",
       "design": "D-14",
       "plans": [
+        "P-18",
         "P-14"
       ]
     },
     {
       "id": "AC-413-42",
       "rq": "RQ-413-18",
-      "criterion": "実装担当をgpt-6.1-sol/highと明記し、human merge・dogfood適用・既存#413の正式importと開始を別の未着手stepへ置く。既存#413を再作成せず、生成先へCodex保有証拠を保全して移動する。",
+      "criterion": "実装担当は利用者の最新指定gpt-6.1-sol/maxを維持し、本追加分析と後続briefの著述モデルGPT-5.6 Sol / Proと区別する。P-18の実装開始は、更新済み正本を通常pushした後の独立ChatGPT Implementation Brief Strictで具体化し、そのbriefの成功をSpecDock正式Startと呼ばない。human merge・P-16 dogfood適用・P-17既存#413正式import/Startを別の未着手stepへ置き、既存#413を再作成せずCodex保有証拠を保全する。",
       "design": "D-14",
       "plans": [
+        "P-18",
         "P-15",
         "P-16",
         "P-17"
       ]
     }
   ],
-  "plan_status": "all_not_started"
+  "plan_status": "implementation_in_progress; P-18 product changes not started",
+  "os_authority": "artifacts/os-support-decision.md",
+  "additional_plan_units": [
+    {
+      "id": "P-18",
+      "before": "P-13",
+      "details": "artifacts/os-support-retirement-plan.md",
+      "analysis": "artifacts/os-support-retirement-analysis.md"
+    }
+  ]
 }

@@ -1,6 +1,6 @@
 # Issue #413 設計書
 
-状態: 実装用の差替え設計。製品コードは未実装。基準は `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+状態: 対応OS決定と第三者分析を採用した設計。P-18は未実装。検証済み対象SHAは `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準は `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
 
 [要件](requirement.md) / [CLI契約](artifacts/cli-contract.md) / [実装計画](plan.md) / [出典](artifacts/source-basis.md)。本文のAPI名・新pathは実装予定の契約であり、基準に存在するとは限りません。
 
@@ -20,6 +20,7 @@
 | 同じ対象の定義 | 完全Scope ID一致、または完全GH linkage一致を重複とする | 旧ID綴りの違いで同じ実Issueを二重開始しない |
 | writer宣言 | schema3を維持しworkspaceだけ `specdock.worktree-writer/v1` へ切替 | 全Scope変換なし。旧writer封鎖の証拠ではない |
 | CLI範囲 | 既存44 leafを維持し、台帳依存の機能/optionだけ退役 | 新namespace/Release/管理制度を追加しない |
+| 対応OS | Linux/macOSのPOSIX原語だけを製品契約に残す | Windows adapterを完成させず、代替管理基盤も追加しない |
 
 上表の実装細部を利用者が逐語承認したと記録しません。Q1〜Q8と合意事項は [確定回答](artifacts/user-decisions.md) にそのまま保持します。技術上の具体化が要求に反することが判明した場合は該当実装を止め、本設計を直してから進めます。
 
@@ -30,7 +31,7 @@
 
 `pyproject.toml` の `spec-dock = "spec_dock.cli:main"` は維持します。asset内RTを `src/spec_dock/runtime/`（以下NRT）へ移し、通常subpackageとして配布します。import先を `spec_dock.runtime.*` に統一します。`assets/scripts` をsys.pathへ追加する処理、fixed bin/lib、独自version.txt要求、digest pin、別runtimeへのfallbackを通常経路から除きます。installed metadataでversionを取得します。pyprojectのPython>=3.10を維持し、3.11専用APIを無条件で使いません。
 
-root/leaf help、version、completion、syntax/廃止入力判定を先に行い、Git/project/control/ネットワークを解決しません。`--project` が壊れていてもhelpは動きます。引数parserを使うためにbusiness/contextをimportしてIOしない構造にします。v2 JSONを一度だけ出力する責務はpresentationに置きます。
+root/leaf help、version、completion、syntax/廃止入力判定を先に行い、Git/project/control/ネットワークと対応OSguardを解決しません。`--project` が壊れていてもhelpは動きます。引数parserを使うためにbusiness/contextをimportしてIOしない構造にします。utility dispatch後の業務コマンドだけ、`runtime_dispatch.dispatch` の先頭でLinux/macOSを確認し、非対応OSはproject/Git/GitHub/file効果前に `UNSUPPORTED_PLATFORM`・effects=[]で止めます。この一箇所のguardを広範なOS抽象化へ発展させません。v2 JSONを一度だけ出力する責務はpresentationに置きます。
 
 consumerに配布するのは仕様template、説明・skills等のstatic資産だけです。Python runtimeのコピーは配布しません。static資産の読取はpackageの `importlib.resources.files("spec_dock")` から行い、filesystem上の固定lib配置を仮定しません。`setup.py` のbuild先清掃とbytecode除外を保ち、sdistからのwheelも同じ収録内容にします。
 
@@ -70,8 +71,8 @@ readerは既知schema3の旧writer宣言でも安全な範囲を読めます。�
 | github_ref | 正規化した `gh:owner/repo#number`。真正の既存local backendだけnull |
 | selected_branch | 開始確定時のbranch名。履歴/手掛かりでありbinding正本ではない |
 | selected_at | UTC RFC3339。期限や稼働判定には使わない |
-| clone_identity | Git common-dirのOS物理identity |
-| worktree_identity | worktree rootのOS物理identity |
+| clone_identity | Git common-dirのPOSIX物理identity `(st_dev, st_ino)` |
+| worktree_identity | worktree rootのPOSIX物理identity `(st_dev, st_ino)` |
 
 親ID、GitHub完了値、PID、Codex実行状態、branch対応表、revisionカウンタ、operation phase、remote送信意図、全worktree一覧を保存しません。`SelectionObservation` は `status=empty|selected|stale|unavailable|invalid`、直接record、token、現在branch、現存祖先、理由をメモリ上に持ちます。CLIの `selection_token` は保存実体名から得た不透明値で、過去操作の再開tokenとして受け付けません。
 
@@ -79,7 +80,7 @@ readerは既知schema3の旧writer宣言でも安全な範囲を読めます。�
 
 `WorkTargetStore.read() -> SelectionObservation`、`publish(record) -> SelectionHandle`、`remove_observed(handle) -> removed|already_absent|conflict` を用意します。`SelectionHandle` は安全に開いたdirectory、basename、inode/file identity、bytes hashをそのprocessだけが保持します。
 
-Startのロック内で完成JSONを同directoryの `.stage-<random>` に排他的作成し、write/flush/fsync後、未存在の最終名へ無上書きrenameしdirectoryを同期します。最終名だけを読取対象にし、不完全なstageを選択と見なしません。POSIXの名前衝突保護、Windowsの非置換moveはadapterで実装します。並行Startは共通排他に参加するため同じ保存先に最終recordを二つ作りません。未知の最終名/特殊fileを見つけたら勝手に上書きしません。
+Startのロック内で完成JSONを同directoryの `.stage-<random>` に排他的作成し、write/flush/fsync後、Linuxの `renameat2(RENAME_NOREPLACE)` またはmacOSの `renameatx_np(RENAME_EXCL)` によって未存在の最終名へ無上書きrenameし、directoryを同期します。最終名だけを読取対象にし、不完全なstageを選択と見なしません。並行Startは共通排他に参加するため同じ保存先に最終recordを二つ作りません。未知の最終名/特殊fileを見つけたら勝手に上書きしません。Windows move adapterは設計・実装対象から除きます。
 
 解除は読取時の**正確なbasenameだけ**を消します。最新recordを再読込して「現在の一件」を無条件unlinkする実装は禁止です。basenameは再利用されないため、Finish Aの遅い解除は新しいBや新しいAに触れません。既に旧basenameがない場合は `already_absent`。保存先directoryのidentityが変わった場合は停止します。nofollow/descriptor基準でpathを扱い、手動の悪意ある置換まで原子的CASと主張しません。
 
@@ -118,7 +119,7 @@ Startはロック取得後に一覧と直接記録を必ず取り直し、記録
 通常の `scope show ID` は自treeだけを読むため、無関係なWTの不調で停止しません。Syncは可能な行を返す診断として不完全性を示します。これを全writerのready判定に流用しません。
 
 <a id="d-05"></a>
-## D-05 Startだけの共通排他と物理識別
+## D-05 Startだけの共通排他とPOSIX物理識別
 
 ### 保証する区間
 
@@ -126,22 +127,22 @@ Startはロック取得後に一覧と直接記録を必ず取り直し、記録
 
 GitHubの最新性は今回の明示観測であり、世界的なatomic transactionではありません。取得した対象/依存snapshotがロック内のlocal再観測と一致しなければ、Git効果前に止めます。remote再観測が必要な場合は解放して新しい操作としてやり直す案内を出し、ロック内にnetwork待ちを戻しません。外部GitHub writerとのraceまでlockで防げるとはしません。
 
-### OS別最小adapter（未試験の設計）
+### Linux/macOSの最小原語
 
-| OS | identity / 排他 | 終了・異常 |
+| OS | identity / 排他 | 公開・終了・異常 |
 |---|---|---|
-| Linux/macOS | 開いた既存common-dirのfstat `(st_dev,st_ino)`。read-only directory descriptorへ `fcntl.flock(LOCK_EX\|LOCK_NB)`。新しい.git entryを作らない | LOCK_UN/close。descriptorは非継承。unsupportedは副作用前停止 |
-| Windows | common-dir directory handleのVolumeSerialNumberとFileId128。名前 `Global\\SpecDock.Start.v1.<sha256(canonical identity)>` の `CreateMutexW(FALSE)`→`WaitForSingleObject` | 同じthreadでReleaseMutex/CloseHandle。WAIT_ABANDONEDは所有取得後に現物再検査、正常データの証拠にしない |
+| Linux | 開いた既存common-dir/rootの `fstat(st_dev,st_ino)`。read-only directory descriptorへ `fcntl.flock(LOCK_EX\|LOCK_NB)`。新しい.git entryを作らない | `renameat2(RENAME_NOREPLACE)`、file/directory fsync、LOCK_UN/close。descriptorは非継承。原語不足は副作用前停止 |
+| macOS | 開いた既存common-dir/rootの `fstat(st_dev,st_ino)`。read-only directory descriptorへ `fcntl.flock(LOCK_EX\|LOCK_NB)`。新しい.git entryを作らない | `renameatx_np(RENAME_EXCL)`、file/directory fsync、LOCK_UN/close。descriptorは非継承。原語不足は副作用前停止 |
 
-identityは `{platform:"posix"|"windows", device:string, file_id:string}`。POSIXはunsigned整数の10進文字列、Windowsはvolumeの10進文字列とFileId128のlower hex32に正規化します。mutex hash入力はUTF-8のcompact JSON配列 `["specdock.start/v1",platform,device,file_id]`。branch名、remote URL、path文字列、Scope番号をkeyにしません。common-dir/rootのhandleは操作の間保持し、pathが同じでも実体が変われば停止します。
+identityは `{platform:"posix", device:string, file_id:string}`。`device` と `file_id` はunsigned整数の10進文字列です。branch名、remote URL、path文字列、Scope番号をidentityやlock keyにしません。common-dir/rootのdescriptorは操作の間保持し、pathが同じでも実体が変われば停止します。
 
-Windowsの既存mutexを開けない、APIが使えない、権限が足りない場合はそのまま診断します。Local namespace、PID file、mkdir lock、独自lease台帳へのfallbackや認証/ACL自動変更を行いません。悪意ある他processによるmutex妨害を防ぐsecurity境界ではありません。
+Windows named mutex、VolumeSerialNumber/FileId128、Win32 directory/JSON handle、WAIT_ABANDONED、NTFS受入は削除対象です。非対応OSを動かすためのLocal namespace、PID file、mkdir lock、独自lease台帳、ACL変更、registry/cache/daemon、別storeへのfallbackを作りません。utilityはD-02の順序で独立し、業務コマンドは一つの対応OSguardで副作用前に停止します。
 
 `--lock-timeout` は取得待ちだけ。既定5秒、0は即時、有限0〜300秒。単調時計で総待ちを測り、NaN/inf/負数を拒否します。Git subprocess `--timeout` は既定30秒、有限0超〜300秒。一回の呼出しの上限です。短い区間とは効果のために必要な区間であり、何ms以内という架空の実測保証は置きません。Git timeout時は現在ref/HEADを安全に再観測し、確定不能ならunknownです。
 
 通常編集、metadata/依存/Artifact操作、branch単機能操作、worktree操作、Sync、GitHub操作、Finish、active clear、migrate、installationはこの共通ロックを取得しません。OSファイル公開の原子性やGit自身のindex/refロックは、SpecDock全writerロックとは区別します。
 
-既存sourceにUnixとWindowsのlock分岐がありますが、確認したCIはUbuntu/macOSです。新adapterのLinux local FS、macOS APFS、Windows NTFSで別process試験が必要です。network FS/複数ホスト、異なるOSの同時mountは保証対象外。OS API文書の存在だけで対応を認定せず、原語が提供されない環境ではStartだけ安全に拒否します。[外部一次資料](artifacts/source-basis.md#external) を参照してください。
+Linux local filesystemとmacOS APFSで別processの保持/timeout/kill後解放、同clone/別clone、no-follow、publication/removalを実測します。network filesystem、複数host、異なるOSの同時mountは保証対象外です。OS API文書やmockだけで対応を認定しません。[対応OS撤去計画](artifacts/os-support-retirement-plan.md)を参照してください。
 
 <a id="d-06"></a>
 ## D-06 Startとbranchの順序・途中失敗
@@ -222,7 +223,7 @@ Finish AがGET/PATCH中に、利用者が既存clearまたは `Start B --switch-
 
 ### schemaとID
 
-現Scope schema3と既存numeric ID codecを維持します。IDのlocalという綴りからbackendを決めません。利用者/Codexの添付証拠では240件全てschema3/github、`init-local-00002`→#39、`init-local-00003`→#31です。本生成環境は240件全bytesを取得して再検査していないため、全件適合は後続試験です。
+現Scope schema3と既存numeric ID codecを維持します。IDのlocalという綴りからbackendを決めません。利用者/Codexの添付証拠では240件全てschema3/github、`init-local-00002`→#39、`init-local-00003`→#31です。本生成環境は240件全bytesを取得して再検査していないため、全件適合は後続試験です。work-target v1はScope metadataとは別で、identityだけをPOSIX形へ狭めます。schema/version/ID採番を増やさず、実在Windows recordが見つかった場合は変換せずP-18を停止します。
 
 新規は既存syntax `scope create KIND --backend github ...` と `scope import github KIND REF ...` に限定します。--backend localはsyntax段階でexit2、正式local IDを生成しません。GH create成功/GET importで確認した番号を `format_id(prefix,number)` に渡します。kind別prefixはinit/epic/iss、最小5桁。UUID・予約・high-water・履歴採番は不要です。
 
@@ -285,10 +286,12 @@ RT=`src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`、NRT=`src/spec_d
 | RT application/worktree_vnext.py, worktree_target.py, worktree_bootstrap_vnext.py | 移設・改修 | 明示NAME/path、Git一覧、明示make init。registry/receipt/recoverなし |
 | RT application/installation_vnext.py, installation_update_vnext.py, migrate_workspace_vnext.py, engine_handover_vnext.py | 最初の3つを局所化、handover削除 | 明示static資産とworkspace宣言切替。全worktree更新/engine世代なし |
 | src/spec_dock/installation のgroup_journal/journal/source等 | 利用箇所を検査して旧制御部分削除 | static差分/保全の再利用可能部分だけ維持。旧engine取得をしない |
-| NRT infra/start_lock.py, identity.py, work_target_store.py, legacy_reader.py | 新設 | OS原語/物理identity/直接一件/旧read-only decodeだけ |
-| NRT domain/work_target.py, application/worktree_observation.py | 新設 | 新型と必要時観測。常駐サービスなし |
+| NRT infra/start_lock.py, identity.py, work_target_store.py, legacy_reader.py | 改修/維持 | Linux/macOSのPOSIX descriptor/flock/直接一件/旧read-only decodeだけ。Windows分岐を残さない |
+| NRT infra/windows_handles.py | 削除 | Win32 directory/mutex/JSON readerを互換aliasやfallbackなしで撤去 |
+| NRT domain/work_target.py, artifacts/data-schema.json | 改修 | PhysicalIdentityをplatform=posixと10進device/file_idに限定。work-target v1は維持 |
+| NRT application/worktree_observation.py | 維持 | 必要時観測。常駐サービスなし |
 | assets/install_root/.agents/skills/spec-dock、spec-dock-grill-with-docs | 改修 | 新入口/直接対象/失敗を説明。既存read-only/一Artifact境界保持 |
-| tests、provider-ci.yml、docs/authoring/reference、README/AGENTS | 改修 | 旧保証→新保証を個別対応。gpt-6.1-sol/high、human merge境界 |
+| tests、provider-ci.yml、docs/authoring/reference、README/AGENTS | 改修 | Windows専用三testとnative WAIT_ABANDONED部分、Windows CI laneを撤去。共有POSIX/E2Eを保持し、GPT-5.6 Sol / Proの分析と後続brief境界を明記 |
 | dogfood spec-dock/workspace.json / 全Scope .meta.json | 実適用は別step | workspace宣言だけ明示切替。全Scope bytes不変 |
 
 Scope deleteの--recursive/--clear-active/--detach-dependencies、Workbenchのoverwrite、worktreeの--unlock/--discard-ignored、明示bootstrapは、旧草案のように理由なく一括廃止しません。手順・入力・安全な部分失敗を [CLI契約](artifacts/cli-contract.md#other-operations) に固定します。--clear-activeも観測済みtokenだけを消し、新規選択や共通lockを増やしません。
@@ -313,11 +316,11 @@ Scope deleteの--recursive/--clear-active/--detach-dependencies、Workbenchのov
 
 [AC対応表](artifacts/acceptance-matrix.md) と [Plan](plan.md#regression) の実測が必要です。threadだけでなく別processでStart/clear/Finishの順序を固定して競合を検査します。全writerロックが残っている実装、Check→unlock→recordという誤実装、固定active.jsonを後で消す誤実装がRedになる試験を用意します。
 
-producer sourceのtest import成功だけでは配布成功としません。fresh wheel/外部venv/実console/別clone/linked worktree/controlなし/実Gitとstateful fake ghを通します。通常 `make lint` と `uv run pytest` を維持し、OS/Python/FS/候補SHA/wheel hash/exit/skipを記録します。ベンチマーク制度やcacheを増やしません。最小のIO検査として、scope showが他WT全Scopeを走査しないこと、Syncが必要な直接対象/祖先だけを読むことを測ります。
+producer sourceのtest import成功だけでは配布成功としません。Linux/macOSでfresh wheel/外部venv/実console/別clone/linked worktree/controlなし/実Gitとstateful fake ghを通します。通常 `make lint` と `uv run pytest` を維持し、OS/Python/FS/候補SHA/wheel hash/exit/skipを記録します。Windows native/NTFS laneはgateにしません。非対応OSの境界は、utilityがcontext-freeであることと、代表的な業務writerがGit/GitHub/file効果前にeffects=[]で拒否されることだけをplatform simulationで検査します。ベンチマーク制度やcacheを増やしません。最小のIO検査として、scope showが他WT全Scopeを走査しないこと、Syncが必要な直接対象/祖先だけを読むことを測ります。
 
 <a id="d-14"></a>
 ## D-14 実施境界・完成証拠
 
 このpackは文書生成物です。schemaの自己検証やZIP整合は製品ACのpassではありません。HTMLの実行JS/modal byte一致は動的なSVG描画成功の代わりではありません。
 
-実装担当は利用者の最新指定の **GPT-6.1 Sol / reasoning Max**、指定設定 `gpt-6.1-sol` / `max`。この資料を書いたモデルの識別と混同しません。コード変更、テスト、成果物レビュー、人間merge、実環境dogfood、#413 import/Startを別step・別証拠にします。自動commit/push/merge/公開は含めません。利用者の別途承認した作業契約が必要です。
+本追加分析と差替え候補の著述モデルは、利用者指定の **GPT-5.6 Sol / Pro** です。既存P-01〜P-17の実装履歴に記録された別モデル設定を改ざんしません。P-18を含む実装担当は既に利用者指定のGPT-6.1 Sol / Max（gpt-6.1-sol / max）です。具体commandと実在test pathは、更新済み正本を通常pushした後の独立ChatGPT Implementation Brief Strictで具体化します。本資料だけで実装開始可能、SpecDock正式Start成功、レビュー/FQ完了とは扱いません。コード変更、テスト、成果物レビュー、人間merge、実環境dogfood、#413 import/Startを別step・別証拠にし、自動commit/push/merge/公開を含めません。

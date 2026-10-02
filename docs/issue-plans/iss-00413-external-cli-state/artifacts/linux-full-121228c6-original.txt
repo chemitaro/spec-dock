@@ -1,0 +1,228 @@
+.......................................................s.s.s.s.s.s.s.s.s [  3%]
+.s.s.s.................................................................. [  7%]
+........................................................................ [ 11%]
+........................................................................ [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 22%]
+........................................................................ [ 26%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 37%]
+........................................................................ [ 41%]
+........................................................................ [ 45%]
+........................................................................ [ 48%]
+........................................................................ [ 52%]
+........................................F....F....E..EEEEEEEEEEE........ [ 56%]
+........................................................................ [ 60%]
+............................F........................................... [ 63%]
+................s.............................................F......... [ 67%]
+........................................................................ [ 71%]
+........................................................................ [ 75%]
+........................................................................ [ 78%]
+........................................................................ [ 82%]
+........................................................................ [ 86%]
+............................................s.................ss........ [ 90%]
+..ss.................................................................... [ 93%]
+....................................................................ss.. [ 97%]
+................................................                         [100%]
+==================================== ERRORS ====================================
+_ ERROR at setup of test_installed_console_starts_syncs_and_finishes_an_issue_without_control _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_____ ERROR at setup of test_installed_help_needs_no_git_repository_or_pin _____
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_installed_entrypoint_rejects_retired_installer_before_write _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_installed_validation_needs_no_control_and_writes_nothing[working-tree] _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_installed_validation_needs_no_control_and_writes_nothing[head] _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_retired_locators_are_not_execution_authority[invalid-json] _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_retired_locators_are_not_execution_authority[relative-tampered] _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_retired_locators_are_not_execution_authority[missing-package] _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_retired_locators_are_not_execution_authority[mismatched-digest] _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_installed_shim_ignores_checkout_python_and_hostile_git_environment _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_path_shim_accepts_a_symlink_to_the_installed_console __
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+_ ERROR at setup of test_two_consumers_use_one_package_and_resolve_the_requested_git_root _
+tests/integration/test_cli_entrypoint_vnext.py:29: in installed_console
+    subprocess.run(
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+=================================== FAILURES ===================================
+_______ test_ci_validator_checks_source_sha_and_keeps_target_unmodified ________
+tests/integration/test_ci_fixed_validation.py:125: in test_ci_validator_checks_source_sha_and_keeps_target_unmodified
+    assert verified.returncode == 0, verified.stdout + verified.stderr
+E   AssertionError: /fixture/project/.github/scripts/specdock-ci-validate.sh: line 45: uv: command not found
+E
+E   assert 127 == 0
+E    +  where 127 = CompletedProcess(args=['bash', '/fixture/project/.github/scripts/specdock-ci-validate.sh', '/tmp/pytest-of-root/pytest...de=127, stdout='', stderr='/fixture/project/.github/scripts/specdock-ci-validate.sh: line 45: uv: command not found\n').returncode
+____ test_ci_validator_stops_on_failed_wheel_build_without_touching_target _____
+tests/integration/test_ci_fixed_validation.py:169: in test_ci_validator_stops_on_failed_wheel_build_without_touching_target
+    assert rejected.returncode != 0 and "fixture wheel build refused" in rejected.stderr
+E   AssertionError: assert (127 != 0 and 'fixture wheel build refused' in '/fixture/project/.github/scripts/specdock-ci-validate.sh: line 45: uv: command not found\n')
+E    +  where 127 = CompletedProcess(args=['bash', '/fixture/project/.github/scripts/specdock-ci-validate.sh', '/tmp/pytest-of-root/pytest...de=127, stdout='', stderr='/fixture/project/.github/scripts/specdock-ci-validate.sh: line 45: uv: command not found\n').returncode
+E    +  and   '/fixture/project/.github/scripts/specdock-ci-validate.sh: line 45: uv: command not found\n' = CompletedProcess(args=['bash', '/fixture/project/.github/scripts/specdock-ci-validate.sh', '/tmp/pytest-of-root/pytest...de=127, stdout='', stderr='/fixture/project/.github/scripts/specdock-ci-validate.sh: line 45: uv: command not found\n').stderr
+_________ test_fresh_console_start_parallel_sync_finish_and_next_issue _________
+tests/integration/test_issue413_e2e.py:220: in test_fresh_console_start_parallel_sync_finish_and_next_issue
+    console = install_console(tmp_path)
+              ^^^^^^^^^^^^^^^^^^^^^^^^^
+tests/integration/test_issue413_e2e.py:62: in install_console
+    cache = subprocess.check_output(["uv", "cache", "dir"], text=True).strip()
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:466: in check_output
+    return run(*popenargs, stdout=PIPE, timeout=timeout, check=True,
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+___ test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities ____
+tests/integration/test_issue413_wheel.py:29: in test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities
+    subprocess.run(["uv", "build", "--wheel", "--out-dir", str(wheel_dir)], cwd=ROOT, check=True, capture_output=True)
+/usr/local/lib/python3.11/subprocess.py:548: in run
+    with Popen(*popenargs, **kwargs) as process:
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+/usr/local/lib/python3.11/subprocess.py:1026: in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+/usr/local/lib/python3.11/subprocess.py:1955: in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+E   FileNotFoundError: [Errno 2] No such file or directory: 'uv'
+=========================== short test summary info ============================
+SKIPPED [12] tests/cli_runtime/test_help_completion_vnext.py:135: native zsh is unavailable
+SKIPPED [1] tests/integration/test_issue413_native_lock.py:179: native Win32 WAIT_ABANDONED requires Windows
+SKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:309: macOS named-stage capability probe contract
+SKIPPED [2] tests/unit/infra/test_binary_artifact_publisher.py:873: Linux explicit import uses anonymous staging without pathname cleanup
+SKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:1069: Linux explicit import has no pathname cleanup seam
+SKIPPED [1] tests/unit/infra/test_binary_artifact_publisher.py:1101: Linux explicit import has no pathname cleanup seam
+SKIPPED [1] tests/unit/infra/test_windows_json_read.py:213: native Windows reader boundary
+SKIPPED [1] tests/unit/infra/test_windows_json_read.py:228: native Windows held parent boundary
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_installed_console_starts_syncs_and_finishes_an_issue_without_control
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_installed_help_needs_no_git_repository_or_pin
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_installed_entrypoint_rejects_retired_installer_before_write
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_installed_validation_needs_no_control_and_writes_nothing[working-tree]
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_installed_validation_needs_no_control_and_writes_nothing[head]
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_retired_locators_are_not_execution_authority[invalid-json]
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_retired_locators_are_not_execution_authority[relative-tampered]
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_retired_locators_are_not_execution_authority[missing-package]
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_retired_locators_are_not_execution_authority[mismatched-digest]
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_installed_shim_ignores_checkout_python_and_hostile_git_environment
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_path_shim_accepts_a_symlink_to_the_installed_console
+ERROR tests/integration/test_cli_entrypoint_vnext.py::test_two_consumers_use_one_package_and_resolve_the_requested_git_root
+FAILED tests/integration/test_ci_fixed_validation.py::test_ci_validator_checks_source_sha_and_keeps_target_unmodified
+FAILED tests/integration/test_ci_fixed_validation.py::test_ci_validator_stops_on_failed_wheel_build_without_touching_target
+FAILED tests/integration/test_issue413_e2e.py::test_fresh_console_start_parallel_sync_finish_and_next_issue
+FAILED tests/integration/test_issue413_wheel.py::test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities
+4 failed, 1884 passed, 20 skipped, 12 errors in 947.99s (0:15:47)

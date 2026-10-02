@@ -1,14 +1,16 @@
 # Issue #413 実装計画書
 
-**全17 stepの実装を進行中です。** 各stepの実装・検証・独立レビューの状態は下記と[実装記録](implementation-report.md)で区別します。ChatGPTによるこのpackの生成・静的自己点検は、後続実装や製品の合格証拠とは別です。
+**既存P-01〜P-17に、必須追加作業P-18を加えた全18 stepです。** P-18はP-13の最終実入口検証より前に完了させます。各stepの実装・検証・独立レビューの状態は下記と[実装記録](implementation-report.md)で区別します。この第三者分析packの生成・静的自己点検は、P-18実装や製品の合格証拠ではありません。
 
-2026-10-02の予備検証と[手動確認](artifacts/manual-product-smoke.md)を[製品の検証証拠](artifacts/implementation-acceptance-evidence.md)へ集約した。clean `8a70a8b3` のLinux通常全件は1832 passed/18 skipped/exit0、macOS全件は1 failed/1847 passed/2 skipped/exit1。readonly比較不一致を調査し、元結果と変更pathが分かる診断を保持する。P-12進行中、P-13/P-14は準備を先行した段階であり、完了認定・Windows native/store・fresh Strict・FQ・実consumer切替は未完了。
+2026-10-02 JSTの最新利用者決定で、対応OSはLinux/macOSに確定し、Windows対応の要求・設計・実装義務は失効した。既存P-01〜P-17中の「Windows未完了」「Windows native/storeを完了する」という記述は、その時点の履歴・raw evidenceとして残すが、現在の完了条件ではない。削除対象と保全対象は[P-18](#p-18)と[撤去分析](artifacts/os-support-retirement-analysis.md)を正本とする。
 
-追加診断を保存したclean `1e5d2586` のmacOS通常全件は1848 passed/2 skipped（424.21秒）、exit0。製品source不変、元の失敗原因は未確定。過去結果の撤回、OSごとの件数合算、Windowsや独立gateの完了認定を行わない。
+2026-10-02の予備検証と[手動確認](artifacts/manual-product-smoke.md)を[製品の検証証拠](artifacts/implementation-acceptance-evidence.md)へ集約した。clean `8a70a8b3` のLinux通常全件は1832 passed/18 skipped/exit0、macOS全件は1 failed/1847 passed/2 skipped/exit1。readonly比較不一致を調査し、元結果と変更pathが分かる診断を保持する。P-12進行中、P-13/P-14は準備を先行した段階であり、P-18、fresh Strict、新OS範囲のFQ、実consumer切替は未完了。Windows native/storeは未完了義務ではなくP-18撤去対象である。
 
-先行候補のclean75ac5760は[通常macOS全件](artifacts/macos-full-75ac5760.md)1900 passed/4 skipped（388.57秒）、exit0。[同候補の通常install CLIの手動14操作](artifacts/manual-console-75ac5760.md)も保持する。最新のclean2b2be5e2は、Start保存原語確認を含む[通常macOS全件](artifacts/macos-full-2b2be5e2.md)が1916 passed/4 skipped（434.98秒）、exit0。[同じ製品sourceの通常install CLIの手動14操作](artifacts/manual-console-2b2be5e2.md)も個別に確認した。Windows保存/native、fresh Strict/FQ、実導入の完了認定とは別であり、P-12進行中とP-13/P-14準備の状態は維持する。
+追加診断を保存したclean `1e5d2586` のmacOS通常全件は1848 passed/2 skipped（424.21秒）、exit0。製品source不変、元の失敗原因は未確定。過去結果の撤回、OSごとの件数合算、独立gateの完了認定を行わない。Windows関連結果もraw evidenceとして保持し、対応義務へ戻さない。
 
-実装担当は利用者指定の **GPT-6.1 Sol / reasoning Max**（2026-10-01の追加指示でHighから変更）。設定値は `model="gpt-6.1-sol"`、`reasoning_effort="max"`。本資料の著述モデルや独立Strictレビュー用のGPT-5.6 Sol / Proと混同せず、gpt-5.6系専用coder roleへ置き換えません。モデルの公開状況や能力比較はこの作業契約の判断材料にしません。
+先行候補のclean75ac5760は[通常macOS全件](artifacts/macos-full-75ac5760.md)1900 passed/4 skipped（388.57秒）、exit0。[同候補の通常install CLIの手動14操作](artifacts/manual-console-75ac5760.md)も保持する。最新のclean2b2be5e2は、Start保存原語確認を含む[通常macOS全件](artifacts/macos-full-2b2be5e2.md)が1916 passed/4 skipped（434.98秒）、exit0。[同じ製品sourceの通常install CLIの手動14操作](artifacts/manual-console-2b2be5e2.md)も個別に確認した。P-18によるWindows撤去、fresh Strict、新OS範囲のFQ、実導入の完了認定とは別であり、P-12進行中とP-13/P-14準備の状態は維持する。
+
+P-01〜P-17の既存実装履歴では、利用者指定の **GPT-6.1 Sol / reasoning Max**（2026-10-01にHighから変更）が使われた記録をそのまま保持します。本追加分析・採用資料の著述モデルは **GPT-5.6 Sol / Pro** です。P-18も利用者の既存指定どおりGPT-6.1 Sol / Max（gpt-6.1-sol / max）で実装します。後続の独立ChatGPT Implementation Brief Strictは具体的な作業手順を作り、この設定を再決定しません。
 
 ## 作業の境界・進め方
 
@@ -18,7 +20,7 @@
 
 通常編集やmetadataに包括的lock/権限制度を足しません。sourceの変更、製品テスト、成果物レビュー、人間merge、dogfood、正式#413 import/Startを別の証拠で扱います。後半の実環境作業は明示許可が前提で、コマンド例を掲載しただけでは実施許可や成功実績になりません。
 
-依存の主経路はP-01→02→03→04→05→06→07→09、P-08は04/07後、P-10は08/09後、以後11→12→13→14→15→16→17です。OS test設計/資料レビュー準備は先行しても、同じ保存原語を別々に実装しません。
+依存の主経路はP-01→02→03→04→05→06→07→09、P-08は04/07後、P-10は08/09後、以後11→12→**18**→13→14→15→16→17です。P-18前のOS test設計/資料レビュー準備は履歴として保持しても、Windows完成を再開せず、同じPOSIX保存原語を別々に実装しません。
 
 <a id="p-01"></a>
 ## P-01 契約・既存回帰・Redを固定する
@@ -81,7 +83,7 @@ uv run pytest tests/integration/test_issue413_wheel.py tests/integration/test_cl
 <a id="p-03"></a>
 ## P-03 schema3と直接対象一件の保存境界を作る
 
-**状態: 実装中（POSIX境界とWindows API契約を検証、Windows native/storeと後続接続は未完了）。前提/依存: P-02。** 読む節: [D-03](design.md#d-03), [D-09](design.md#d-09)。補足: D-03, D-09。
+**状態: 実装中。POSIX保存境界は候補実装済み。Windows API/storeはP-18の撤去対象であり、本stepの残完了条件ではない。前提/依存: P-02。** 読む節: [D-03](design.md#d-03), [D-09](design.md#d-09)。補足: D-03, D-09。
 
 **所有/対象file**: NRT/domain/work_target.py、infra/work_target_store.py、infra/identity.py（新設）、domain/lifecycle.py、ids.py、selectors.py、infra/active_store.py。新 tests/unit/infra/test_work_target_store.py（予定）。
 
@@ -105,12 +107,12 @@ uv run pytest tests/unit/infra/test_work_target_store.py tests/cli_runtime/test_
 
 **失敗時の停止/戻り先**: token再利用、二件公開、前の解除が次を消す挙動があればD-03へ戻り、Finishへ共通lockを足して隠さない。
 
-**2026-10-02 Windows JSON読取の接続**: [親handleからのreader](artifacts/windows-json-read.md)をbaseline9a97f758から一単位として接続した。public readerの未接続Red→Green、正確なbytes/128bit identity、非redirect・regular/single-link、不存在と権限不足の区別、失敗時handle解放を確認。関連八suiteはMac3.12で58 passed/3 skipped（2.12秒）、実3.10で58 passed/3 skipped（2.30秒）、通常make lintはRuff300/mypy219でexit0。新規native二caseをWindows CIへ用意したが、実Windows/NTFS・選択保存/公開/解除・各公開/processと現在候補Strict/FQは未完了。P-03全体を完了にしない。
+**履歴証拠（2026-10-02、現決定で完成義務は失効）— Windows JSON読取の接続**: [親handleからのreader](artifacts/windows-json-read.md)をbaseline9a97f758から一単位として接続した。public readerの未接続Red→Green、正確なbytes/128bit identity、非redirect・regular/single-link、不存在と権限不足の区別、失敗時handle解放を確認。関連八suiteはMac3.12で58 passed/3 skipped（2.12秒）、実3.10で58 passed/3 skipped（2.30秒）、通常make lintはRuff300/mypy219でexit0。新規native二caseをWindows CIへ用意したが、実Windows/NTFS・選択保存/公開/解除・各公開/processと現在候補Strict/FQは未完了。P-03全体を完了にしない。
 
 <a id="p-04"></a>
 ## P-04 Git inventoryとstale観測を接続する
 
-**状態: 実装中（POSIX境界とWindows API契約を検証、Windows native/storeと後続接続は未完了）。前提/依存: P-03。** 読む節: [D-02](design.md#d-02), [D-04](design.md#d-04)。補足: D-02, D-04。
+**状態: 実装中。POSIX観測境界は候補実装済み。Windows identity接続はP-18の撤去対象であり、本stepの残完了条件ではない。前提/依存: P-03。** 読む節: [D-02](design.md#d-02), [D-04](design.md#d-04)。補足: D-02, D-04。
 
 **所有/対象file**: NRT/infra/git_cli.py、application/worktree_observation.py（新設）、cli/vnext_runtime.py::_context、application/scope_query.py。新 tests/integration/test_issue413_observation.py（予定）。
 
@@ -137,13 +139,13 @@ uv run pytest tests/integration/test_issue413_observation.py -q
 <a id="p-05"></a>
 ## P-05 Start専用のOS排他を実装する
 
-**状態: 実装中（POSIX境界とWindows API契約を検証、Windows native/storeと後続接続は未完了）。前提/依存: P-04。** 読む節: [D-05](design.md#d-05)。補足: D-05。
+**状態: 実装中。Linux/macOSのdescriptor/flock境界を残し、Windows named mutexはP-18で撤去する。前提/依存: P-04。** 読む節: [D-05](design.md#d-05)。補足: D-05。
 
 **所有/対象file**: NRT/infra/start_lock.py、identity.py（新設）、既存writer_lock.py/admission参照の整理。新 tests/integration/test_start_lock.py（予定）。
 
-**具体的変更順**: POSIX directory flock、Windows common identity由来named mutexを小adapterとして実装する。wait budgetと非継承handle、finally解放、abandoned再観測を共通化する。Start以外のdispatchにcommon lockが接続されないことをspyではなく別processの進行でも検査する。
+**具体的変更順**: Linux/macOSのPOSIX directory flock、wait budget、非継承descriptor、finally解放を維持する。Windows common identity/named mutex/abandoned処理はP-18で削除する。Start以外のdispatchにcommon lockが接続されないことをspyではなく別processの進行でも検査する。
 
-**変更禁止**: 新lock file、mkdir/PID回収、daemon、対象別lock、全writer lock、Windows権限変更や別namespace fallbackを禁止。
+**変更禁止**: 新lock file、mkdir/PID回収、daemon、対象別lock、全writer lock、Windows撤去の代替となる権限変更・別namespace・別store fallbackを禁止。
 
 **入力/出力例**: 入力: 同commonのpath alias二processと別clone二process。出力: 同cloneだけ直列、別clone独立。timeoutは副作用前exit3。
 
@@ -155,13 +157,13 @@ uv run pytest tests/integration/test_issue413_observation.py -q
 uv run pytest tests/integration/test_start_lock.py -q
 ```
 
-**期待結果・完了条件**: Linux/macOS/Windowsで実行/skip/未実施を別記録する。各対応宣言には別processと実FSの証拠がある。
+**期待結果・完了条件**: Linux/macOSで実行/skip/未実施を別記録し、各対応宣言に別processと実FSの証拠がある。Windowsは対応宣言・native受入の対象外で、専用adapter/test/CIが残らない。
 
 **対応**: RQ-413-02, RQ-413-04, RQ-413-06 ／ AC-413-04, AC-413-07, AC-413-11, AC-413-12。
 
 **失敗時の停止/戻り先**: 必要原語がないOS/FSはD-05のunsupported経路へ。既存directory上のflockを未試験のまま保証済みにしない。
 
-**2026-10-02 物理directoryのWindows境界補強**: [親handle基準のopen](artifacts/windows-directory-anchor.md)を一単位として実装した。API代替の親path置換Red→Greenに基づき、filesystem anchor以外はNtOpenFileのRootDirectoryへ保持した親handleを渡す。reparse拒否・非継承・通常編集を妨げないshareを維持し、未完了openのhandle解放も別のRed→Greenで確認した。最終関連五suiteはMac 3.12で21 passed/1 skipped（1.49秒）、実3.10で21 passed/1 skipped（1.38秒）。通常make lintはRuff299/mypy218でexit0。Windows CIへ境界suiteを追加したが、native/NTFS、保存接続と現在候補Strict/FQは未完了。過去の全件合格は別source候補として保持する。
+**履歴証拠（2026-10-02、P-18で撤去対象）— 物理directoryのWindows境界補強**: [親handle基準のopen](artifacts/windows-directory-anchor.md)を一単位として実装した。API代替の親path置換Red→Greenに基づき、filesystem anchor以外はNtOpenFileのRootDirectoryへ保持した親handleを渡す。reparse拒否・非継承・通常編集を妨げないshareを維持し、未完了openのhandle解放も別のRed→Greenで確認した。最終関連五suiteはMac 3.12で21 passed/1 skipped（1.49秒）、実3.10で21 passed/1 skipped（1.38秒）。通常make lintはRuff299/mypy218でexit0。Windows CIへ境界suiteを追加したが、native/NTFS、保存接続と現在候補Strict/FQは未完了。過去の全件合格は別source候補として保持する。
 
 同unitのclean commit3b0c69e8は[macOS全件](artifacts/macos-full-3b0c69e8.md)を1853 passed/2 skipped（402.78秒）、exit0で完了した。最初の二失敗はCodex診断runnerのmain guard不備で、ignored runnerだけを修正し、製品source/testsは変更しない。Linux/手動の別sourceとWindows/最終認定の未完了を維持する。
 
@@ -172,7 +174,7 @@ uv run pytest tests/integration/test_start_lock.py -q
 
 第6回Strictは`e6513650`のP-03〜P-08を対象にP1一件・P2四件でfail。全件を[分析記録](artifacts/code-review-p06-06-analysis.md)へ残し、未知/重複inventoryの行単位診断・Start停止、残存stageのpublication unknownをTDDで修正した。関連252 testsが通過し、fresh Strict passは未取得。P2の分類を変えず、同じfail batchに対する利用者の明示的な修正認可を適用した。
 
-**状態: 実装中（第3回独立レビューは8ad73cfdを対象にfail。全5件を分析後、no-op checkout、checkout後clean、候補Scope/container構造、未確認token、sole selection公開確認を修正し、関連619件を検証。branch leafとPOSIX stage/rename/unlink強制停止も検証済み。Windows store/native受入と現在候補の独立レビュー等は未完了）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
+**状態: 実装中（第3回独立レビューは8ad73cfdを対象にfail。全5件を分析後、no-op checkout、checkout後clean、候補Scope/container構造、未確認token、sole selection公開確認を修正し、関連619件を検証。branch leafとPOSIX stage/rename/unlink強制停止も検証済み。Windows store/native受入はP-18で失効・撤去対象。現在候補の独立レビュー等は未完了）。前提/依存: P-05。** 読む節: [D-05](design.md#d-05), [D-06](design.md#d-06), [D-09](design.md#d-09)。補足: D-05, D-06, D-09。
 
 **所有/対象file**: NRT/application/work_lifecycle.py、branch_vnext.py、commands/work_vnext.py、branch_vnext.py、infra/git_cli.py、presentation/envelope.py。tests/cli_runtime/test_work_start_vnext.py、test_branch_vnext.py、新 tests/integration/test_issue413_start.py（予定）。
 
@@ -203,7 +205,7 @@ uv run pytest tests/cli_runtime/test_work_start_vnext.py tests/cli_runtime/test_
 
 第6回Strictの物理identity不一致recordの無確認clearを修正し、captured recordを保全して`--all --yes`確認だけで解除できることを検証した。新しいlock・別WT操作・metadata補完は追加していない。
 
-**状態: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。GitHub-backed Finishの完了確認→captured token解除、子孫guard、dry-run、metadata再確認、native遅延解除/Start-only排他を検証。真正の既存local backendは単一metadataの保全更新を接続・検証。現在候補の独立認定、Windows nativeと旧runtime/testの退役は未完了。P-06の独立レビュー、Windows adapter/native受入は引き続き未完了）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
+**状態: 実装中（POSIXの既存record境界を使いactive set/clearと動的selectorを接続・検証。GitHub-backed Finishの完了確認→captured token解除、子孫guard、dry-run、metadata再確認、native遅延解除/Start-only排他を検証。真正の既存local backendは単一metadataの保全更新を接続・検証。現在候補の独立認定と旧runtime/testの退役は未完了。Windows adapter/nativeはP-18で撤去し、P-06の独立レビューは新OS範囲で別に行う）。前提/依存: P-06。** 読む節: [D-03](design.md#d-03), [D-07](design.md#d-07), [D-08](design.md#d-08)。補足: D-03, D-07, D-08。
 
 第5回Strictの2件のP1と1件のP2を `artifacts/code-review-p06-05-analysis.md` で全件分析した。単一selection観測からのFinish target/handle固定、Close停止時のclear not_attempted、複数record解除のfailed/unknown/後続not_attemptedをTDDとOS境界で検証した。後続候補のfresh Strict passはまだ未取得であり、P-07完了とは扱わない。
 
@@ -229,12 +231,18 @@ uv run pytest tests/cli_runtime/test_active_vnext.py tests/cli_runtime/test_work
 
 **失敗時の停止/戻り先**: active setのために第二stateやlockが必要になったらD-07へ。Close効果と解除成否が混ざればD-08へ戻る。
 
+### 2026-10-02 r12指摘によるP-07追加修正
+
+[完全batch分析](artifacts/code-review-p06-12-analysis.md)のP1一件を修正する。`application/direct_finish.py` と `tests/cli_runtime/test_issue413_finish.py` が対象。実corrupt JSON・読取不能の選択を持つ明示TARGET Finishが、remote GET/PATCH・真正local lifecycle更新前に停止し、effects=[]・保存bytes不変となる公開CLIのRed→Greenを一件ずつ進める。valid empty/selected、既存chain外Finish、captured-tokenの遅い解除、子孫guard、unknown Close、branch保持は維持する。Start共通lock・permission制度・自動修復は追加しない。
+
+この修正は既存RQ-413-08/14、AC-413-16/31、D-03/04/08の実装是正であり、新機能ではない。P-18の正本更新とbrief作成後、独立したTDD単位で修正し、fresh Code Review Strictへ渡す。P1未修正の現在候補は合格と扱わない。
+
 <a id="p-08"></a>
 ## P-08 Syncの複数選択表示を完成させる
 
 第6回Strictに基づき、stale/unavailableで読めた直接recordの既知ID/refと件数を保持し、metadataがないGH refも今回のGET対象へ含めた。ID→refとref→IDの両方向のidentity conflictを検出する。unknown、祖先不明、readonly partial/7を維持し、記録や派生cacheを作らない。
 
-**状態: 実装中（通常dispatchのreadonly Sync、現在treeと同clone各WTの必要対象/祖先、直接/子孫件数、local/github lifecycle、矛盾/不明の診断、JSON schemaとtextを検証。現在候補の独立レビュー、旧generation実装/testの退役、Windows nativeと全体gateは未完了）。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
+**状態: 実装中（通常dispatchのreadonly Sync、現在treeと同clone各WTの必要対象/祖先、直接/子孫件数、local/github lifecycle、矛盾/不明の診断、JSON schemaとtextを検証。現在候補の独立レビュー、旧generation実装/testの退役、P-18と全体gateは未完了）。前提/依存: P-04,P-07。** 読む節: [D-04](design.md#d-04), [D-10](design.md#d-10)。補足: D-04, D-10。
 
 通常実装はNRT/application/direct_sync.py、presentation/command_data.py・envelope.py、cli/catalog.py・options.py、commands/runtime_dispatch.pyに配置した。旧workspace_sync_vnextは通常経路へ戻さず、P-12で実装/testを退役させる。readonly partial/exit7はeffects=[]であり、変更後失敗のpartial/exit6と区別する。
 
@@ -308,7 +316,7 @@ uv run pytest tests/cli_runtime/test_scope_github_vnext.py tests/cli_runtime/tes
 
 第9回Strictは`3c68053e`のP-02〜P-09を固定し、P1一件・P2二件でfailした。[完全batch分析](artifacts/code-review-p06-09-analysis.md)後、Scope create/importの明示guard、branch switchのcheckout後clean検査、stale/unavailableの既知recordを含むSync重複診断をTDDで修正した。関連83 tests（25.02秒）、変更3 source限定mypy、変更6 fileのRuff check/formatが通過した。P2のnon-blocking分類を維持し、利用者の全指摘修正の明示認可を適用する。Scope edit/deleteはr9の対象外であり、全体のfresh Strict合格は未取得。
 
-**状態: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/show/removeとPOSIX bootstrapの通常経路をローカル検証済み。native Windows、今回変更のfresh Strictと後続stepは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
+**状態: 進行中。Scope query/edit/delete、Artifact、Workbench、native Worktree create/list/show/removeとPOSIX bootstrapの通常経路をローカル検証済み。P-18、今回変更のfresh Strictと後続stepは未完了。前提/依存: P-08,P-09。** 読む節: [D-07](design.md#d-07), [D-11](design.md#d-11)。補足: D-07, D-11, C-05。
 
 Scope editは一つの捕捉直接選択からdynamic selectorとguardを解決し、全metadata/workspaceのbytes・identityを再照合してtitle/revisionだけを変更する。未知field、本文、既存file mode、真正の既存local lifecycle、選択recordを保全し、GH通信・Start lock・control・journalを使わない。無変更はbytes/revision/identityを保持する。dry-runはstageを作らずC-05の必須fieldを返す。確認済み公開後のcleanup/Git失敗、置換結果不明、並行編集保全を公開CLIとネイティブOS/Git境界で確認した。関連124 tests（24.83秒）、全Ruff check/format（385 files）、変更4 source限定mypyとdiff checkが通過した。redirected stagingのexit3を期待したtestは、実際にはGitの原文拒否・exit5・write0が成立していたため、C-04へ期待値を訂正したもので製品Redではない。
 
@@ -738,14 +746,115 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 既存Ubuntu/macOS配布laneへ実console E2Eとprovenance出力を追加した。同じ五suiteのMacローカル検証は86 passed（122.39秒）、exit0。baseline 15bdcd05から製品source delta0、copy入力SHA256 b07821e35492f31ba68516552f050a398d345dc8fc546e075c36c63d097576b4、wheel SHA256 f8884f8d1e624fd8aa85c50f7eac763e646669df73431dab36eef7bd242c2761を元logへ保存した。CI実行/現在候補全pytest/Windows保存・公開/独立レビュー/P-13認定/最終手動確認/実consumer適用の完了へ転記しない。
 
+<a id="p-18"></a>
+## P-18 対応OS確定とWindows対応の撤去
+
+**状態: 追加計画を定義済み、実装未着手。前提/依存: P-12の候補実装と証拠を読み、更新済みR/D/P/schema/decisionを通常pushした後、独立ChatGPT Implementation Brief Strictを成功させること。後続: P-13より前に必須。** 読むauthority: [対応OS決定](artifacts/os-support-decision.md)、[第三者分析](artifacts/os-support-retirement-analysis.md)、[詳細計画](artifacts/os-support-retirement-plan.md)、[D-02](design.md#d-02)、[D-03](design.md#d-03)、[D-05](design.md#d-05)、[D-13](design.md#d-13)。
+
+P-18の目的は、Issue #413の外部CLI・最小直接状態・Start-only排他を維持したまま、誤って追加したWindows要求・設計・source/test/CI接続を撤去することです。計画登録、文書push、Implementation Brief作成はSpecDock正式 `work start` の成功ではありません。P-16実consumer切替とP-17正式import/Startはhuman merge後の別手順のままです。
+
+### P-18.1 authority固定・現物inventory・停止scan
+
+**対象**: requirement.md、design.md、plan.md、artifacts/data-schema.json、acceptance-matrix.md、implementation-acceptance-evidence.md、新decision/analysis/plan、`src/spec_dock/runtime/`、tests、`.github/workflows/provider-ci.yml`、実装branch上のconsumer read-only scan。
+
+**順序**:
+1. repository=`chemitaro/spec-dock`、branch=`codex/iss-00413-external-cli-state`、作業開始時full SHA、clean status、upstreamを再取得する。期待SHAから進んでいる場合は新tipを明記して更新済み正本との親子関係を確認し、別branchへfallbackしない。
+2. `rg` とAST/import検索で `windows_handles`、`WindowsDirectory`、`WindowsMutex`、`windows_mutex_name`、`win32`、`NTFS`、`WAIT_ABANDONED`、`platform:"windows"`、Windows CI jobを全列挙する。文字列だけで一括削除せず、現行callerと歴史資料を分類する。
+3. provider fixture、現在branchのconsumer、許可された保全物をread-onlyで走査し、実在work-target v1に `platform:"windows"` がないことを確認する。Scope metadata、workspace、Artifact、Workbenchを変更しない。
+
+**characterization**: 現SHAでPOSIX direct targetのencode/decode、exact-token removal、Start lock、utility help、Linux/macOS distribution laneを先にGreenで固定する。Windows専用testが存在すること自体はbaseline事実で、削除前に件数・path・責務を記録する。
+
+**停止条件**: SHA/branch不一致、dirty/未push差分、consumerにWindows identity record、Windows moduleへの未分類caller、正本間のOS決定矛盾、raw evidence所在不明。該当時は削除・変換・revertをせず原因を記録して止める。
+
+### P-18.2 POSIX work-target v1と対応OSguardを先にRed/Green化
+
+**対象file/symbol**: `src/spec_dock/runtime/domain/work_target.py::PhysicalIdentity`、`artifacts/data-schema.json::$defs.identity`、`src/spec_dock/runtime/commands/runtime_dispatch.py::dispatch`、utility先行dispatch、既存CLI contract tests、新 `tests/cli_runtime/test_os_support_retirement.py` または同等の既存test hunk。
+
+**意味あるRed**:
+- `PhysicalIdentity.from_payload` とJSON Schemaが `platform:"windows"` を受理する。
+- 非対応platformを模擬した代表writerがproject/Git/GitHub/file effectへ到達する。
+- support guardをutilityより前へ置く誤実装でhelp/version/completionが失敗する。
+
+**Green**:
+- work-target v1は `platform:"posix"` と10進device/file_idだけを受理し、既存POSIX bytes/例/Scope schema3を保持する。schema version、Scope ID、workspace protocolを増やさない。
+- utilityはcontext-freeのまま。業務コマンドは一つのguardで `UNSUPPORTED_PLATFORM`、effects=[]、Git/gh呼出し0、consumer write0となる。
+- 新しいOS abstraction/module/registry/cache/daemonを作らない。
+
+**停止条件**: 実在Windows record、既存POSIX recordのbytes変更、helpのbusiness import、error schemaを壊す必要、guardが複数familyへ複製される設計。
+
+### P-18.3 Windows source接続を小さい依存順で撤去
+
+**変更順と対象**:
+1. `infra/json_store.py::read_guarded_json_bytes` のWindowsDirectory分岐を削除し、POSIX guarded reader/no-follow/single-link/exact bytesを維持する。
+2. `infra/identity.py::DirectoryIdentity` の `_windows` field/import/branch/closeを削除し、held descriptor、verify、fstat identityを維持する。
+3. `infra/start_lock.py` の `windows_mutex_name`、WindowsMutex型/import、win32 acquisition/release branchを削除し、timeout validation、POSIX flock、finally解放、identity verifyを維持する。
+4. `infra/work_target_store.py::_open` のWindows専用NotImplementedError文言を除き、対応OSguardとPOSIX descriptor境界へ一本化する。publish/removeのno-follow、fsync、no-replace、exact handleを変更しない。
+5. `infra/windows_handles.py` を削除する。互換alias、lazy fallback、dead code copyを残さない。
+
+**Red/Greenまたは削除保全**: 各1〜4の前に対応POSIX testを単独実行し、削除後に同一assertionを再実行する。source収録禁止testは `windows_handles.py` がwheel/sourceに残る状態でRed、削除後Greenとする。単純なimport/collection failureをRed完了としない。
+
+**停止条件**: POSIX read/publish/remove/lock testの意味が弱まる、Git原文/partial/effectsが変わる、Start以外へlockを追加する必要、Windows撤去を理由にpermission fallbackやlock fileが必要になる。
+
+### P-18.4 Windows専用test/CIを撤去し、共有testを保持
+
+**削除対象**: `tests/unit/infra/test_windows_mutex.py`、`test_windows_directory.py`、`test_windows_json_read.py`、`.github/workflows/provider-ci.yml::provider-windows-native-adapters`。
+
+**部分編集対象**: `tests/integration/test_issue413_native_lock.py` からNTFS assertion、WAIT_ABANDONED native case、Windows helperだけを除去し、main/linked同clone、別clone、別process timeout、通常解放、kill後解放、Git common-dir write0のPOSIX casesを残す。`tests/unit/infra/test_directory_identity.py` はconditional期待をPOSIX期待へ狭める。Windows外部API fixtureの型補正履歴はraw evidenceに残し、現行testとして温存しない。
+
+**CI**: Ubuntu/macOS distribution parity、通常lint、通常full pytest、candidate SHA検査を保持する。Windows job削除を理由にLinux/macOS laneを減らさない。workflow static検査でWindows runner/job/test pathが0、Ubuntu/macOSが各1以上であることを確認する。
+
+**停止条件**: 共有E2E、POSIX native lock、Python3.10/3.11、wheel parityまで一緒に消えるdiff、skip/collection除外でGreenを作る変更、履歴logの削除。
+
+### P-18.5 正本・HTML・ZIP・証拠の整合
+
+**置換/追加対象**: 本R/D/P、data-schema、acceptance-matrix、implementation-acceptance-evidence、os-support-decision/analysis/plan。既存 `source-basis.md`、`traceability.json`、README、CLI/reference/skills、`explanation.html`、既存pack manifestは実体を読み、OS範囲・P-18順序・新pathだけを同期する。
+
+**保全**: report.md、implementation-report.md、既存interview/user-decisions、raw reviews、過去Windows調査/測定、macOS/Linux元logを生成・上書き・削除しない。古い「Windows未完了」は履歴時点の記述として残し、現在の義務ではない注記を付ける。旧Implementation Briefは失効資料として保全し、実行入力にしない。
+
+**HTML/ZIP**: HTMLの対応OS、P-18、検証順を更新し、既存共有JS/modal/template一致と実ブラウザ検査をP-14へ渡す。単一root ZIPとmanifestのrelative path/sha256/bytes、CRC、展開bytes、UTF-8、リンク/anchor/schemaを検査する。
+
+**停止条件**: sourceがない巨大fileを推測で全文上書き、raw evidenceをcurrent SSOTへ書換え、第三者差替えpayloadによるreport類の上書き（保有原文の採用版ZIPへの収録は許可済み）、broken link/duplicate ID、manifest不一致。
+
+### P-18.6 focused・full・wheel・manual gateと証拠固定
+
+**focused commands（実装時に実在pathを再確認）**:
+
+```text
+git diff --check
+make lint
+uv run pytest tests/unit/infra/test_work_target_store.py tests/unit/infra/test_directory_identity.py tests/integration/test_issue413_native_lock.py -q -s -ra
+uv run pytest tests/cli_runtime/test_os_support_retirement.py tests/cli_runtime/test_cli_vnext_contract.py -q
+uv build --wheel
+```
+
+**macOS**: clean candidate、実Python3.12系と必要な3.10下限、APFS、通常 `uv run pytest -q --tb=short -ra`、fresh wheel/外部noneditable venv/元source参照不能、実consoleの既存14操作相当を実施する。stateful fake ghとlive GitHubを明記し、source/wheel/hash/exit/skipを保存する。
+
+**Linux**: x86_64/Python3.11系のclean candidateで通常full pytestを実施する。`121228c6` の4 failed/1884 passed/20 skipped/12 errors・exit1は、child processがPATHからuvを見つけられない検証container設定として元logを保持し、成功または製品不具合と断定しない。再実行は検証containerのPATHだけを修正し、provider source/testsのbefore/after hash一致を確認する。再実行が非0ならそのまま未合格として該当ownerへ戻す。
+
+**完了条件**:
+- Windows source/import/test/CI current pathが0。歴史文書/raw evidenceは残る。
+- Linux/macOS focused、full lint/pytest、wheel、実console、Git diffが候補SHA単位で合格し、skip/未実施を分離。
+- POSIX descriptor/no-follow、Start-only flock、Git原文/partial、直接状態・Scope metadata・utility独立が維持。
+- current Code Review StrictとFinal Quality Gateを新OS範囲で別に実施できるclean/pushed candidateがある。旧要求付きr12はcheckpoint evidenceに留める。
+
+**commit/review境界（将来のbriefで具体commandを確定）**:
+1. authority/R-D-P/schema/characterization test。
+2. POSIX domain/guardとWindows source撤去。
+3. Windows専用test/CI撤去とfocused Green。
+4. docs/reference/HTML/manifest/evidence同期。
+5. Linux/macOS full/wheel/manual結果だけのevidence更新。
+各commitをGreenで成立させます。module削除と、そのmoduleをimportする廃止testの削除は同じsource撤去commitに含め、CIは独立単位にできます。一括revertにせず、通常非force pushと独立reviewを行う。いずれも本分析呼出しでは未実施。
+
+**対応**: RQ-413-01, RQ-413-02, RQ-413-04, RQ-413-06, RQ-413-09, RQ-413-15, RQ-413-17, RQ-413-18 ／ AC-413-01, AC-413-02, AC-413-03, AC-413-04, AC-413-07, AC-413-11, AC-413-12, AC-413-19, AC-413-31, AC-413-32, AC-413-38, AC-413-39, AC-413-40, AC-413-41, AC-413-42。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
-**状態: 未着手。前提/依存: P-12。** 読む節: [D-13](design.md#d-13)。補足: D-13 / 全D節。
+**状態: 未着手。前提/依存: P-18。** 読む節: [D-13](design.md#d-13)。補足: D-13 / 全D節。
 
 **所有/対象file**: 全tests、.github/workflows/provider-ci.yml、fresh wheel harness。新 tests/integration/test_issue413_e2e.py（予定）。
 
-**具体的変更順**: 下記E2E仕様を通常pytestへ組み込み、source importだけの検査と分離する。既存Ubuntu/macOS distribution laneを新wheelへ更新し、Windows adapterの実検査を明示する。最低Python3.10とCI3.11を含め、全部の通常testsを走らせる。
+**具体的変更順**: 下記E2E仕様を通常pytestへ組み込み、source importだけの検査と分離する。既存Ubuntu/macOS distribution laneを新wheelへ更新し、P-18後のLinux/macOSだけを実検査する。最低Python3.10とCI3.11を含め、全部の通常testsを走らせる。Windows adapter/native laneは存在しないことを確認する。
 
 **変更禁止**: 部分Greenを全ACpassにする、skipをpassと記録する、fake GHをlive実績と呼ぶ、消えた保証のテストを理由なし削除、追加cacheによるテスト回避を禁止。
 
@@ -769,7 +878,7 @@ uv run pytest tests/integration/test_issue413_e2e.py -q
 
 **失敗時の停止/戻り先**: 失敗は該当D節/所有stepへ戻す。未試験OSをrelease対応として先に表明しない。
 
-**2026-10-02 P-13の検証準備を更新**: clean2b2be5e2の通常macOS全件は[1916 passed/4 skipped、434.98秒、exit0](artifacts/macos-full-2b2be5e2.md)。Start保存原語確認を含む同じsourceの[通常install CLIの手動14操作](artifacts/manual-console-2b2be5e2.md)も個別に確認した。実Git、GitHub境界だけstateful fake gh（26 request）。native hook失敗の原文/partial、C/B記録とtracked仕様保全を照合。現在のWindows保存/native・Strict/FQは未完了であり、P-13完了認定を行わない。
+**2026-10-02 P-13の検証準備を更新**: clean2b2be5e2の通常macOS全件は[1916 passed/4 skipped、434.98秒、exit0](artifacts/macos-full-2b2be5e2.md)。Start保存原語確認を含む同じsourceの[通常install CLIの手動14操作](artifacts/manual-console-2b2be5e2.md)も個別に確認した。実Git、GitHub境界だけstateful fake gh（26 request）。native hook失敗の原文/partial、C/B記録とtracked仕様保全を照合。P-18・新OS範囲のStrict/FQは未完了であり、P-13完了認定を行わない。
 
 <a id="p-14"></a>
 ## P-14 Codexの成果物レビューとブラウザ検査
@@ -924,7 +1033,7 @@ spec-dock --project "$ROOT" scope import github issue gh:chemitaro/spec-dock#413
 5. stateful fake ghを別実行fileとしてPATHへ置き、GET/POST/PATCHの状態と回数を記録する。製品APIへ直接mockしただけでconsole成功と呼ばない。実Gitを使ってStartのnew branch/checkout/record、別WT重複拒否、兄弟Issue並行、Sync複数行を検査する。
 6. Finishはfake remoteをcompletedにし、記録だけ解除、branch不変を確認する。A Finish→B Start、途中checkout失敗/Close unknownを試す。wire通信を遮断し、live GitHub writeは0であることを検査する。
 7. 前後で許可対象のbytes/mode/entry type、refs/index、記録file、禁止領域を比較する。read/dry-run/Syncの書込0、Start以外のcommon lock0を確かめる。OS atimeは内容変更証拠から除外する。
-8. Linux/macOS/Windows adapterとPython3.10/3.11の実施状況を記録する。Windows起動/FS未確認を単なるPython unit testからpassへ変えない。ネットワークFS保証は追加しない。
+8. Linux/macOS adapterとPython3.10/3.11の実施状況を記録する。Windows adapter/native test/CIがcurrent treeにないことを確認し、非対応OSのplatform simulationを製品対応passと呼ばない。ネットワークFS保証は追加しない。
 
 通常CIは `git diff --check`、`make lint`、`uv run pytest` を維持します。配布専用laneの見直しは現在のprovider-ci内で行い、新しい品質ゲート組織や承認台帳を作りません。
 
@@ -933,10 +1042,14 @@ spec-dock --project "$ROOT" scope import github issue gh:chemitaro/spec-dock#413
 | 証拠 | 所有者・実施step | 現在 |
 |---|---|---|
 | ChatGPTのpack静的自己点検 | artifacts/self-check.md | この納品内に実測範囲のみ記録 |
-| 製品実装とfocused/全test | 実装担当、P-01〜13 | 未着手 |
+| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | 進行中。P-18は未着手 |
 | Codex成果物レビュー/実ブラウザ | Codex、P-14、保有reportへ追記 | 未着手 |
 | 人間merge/任意の公開 | 人間、P-15 / 別途許可 | 未着手 |
 | dogfood適用と実metadata保全 | 許可された実施者、P-16 | 未着手 |
 | 正式#413 import / work start | 実施者、P-17 | 未着手 |
 
-`report.md` と `artifacts/interview-worktree-start.md` はCodexの既存証拠であり、このpackの生成scriptや静的検査は書き換えません。unknown remote、旧writer停止不明、実体backup不足があれば該当適用を止めます。コードrevertでGitHub効果まで戻ったとは説明しません。
+`report.md`、`implementation-report.md`、`artifacts/user-decisions.md`、`artifacts/interview-worktree-start.md` は既存証拠/履歴であり、このpackの生成scriptや静的検査は書き換えません。P-18の作業ブリーフは更新済み正本push後の別sessionで作成します。unknown remote、旧writer停止不明、実体backup不足があれば該当適用を止めます。コードrevertでGitHub効果まで戻ったとは説明しません。
+
+## P-18計画採用時点の最新baseline
+
+[同SHAのLinux通常全件](artifacts/linux-full-121228c6.md)はPATHだけ補正して1900 passed/20 skipped、exit0。元exit1を保全する。P-18の製品変更後の証拠ではなく、撤去後は新SHAで確認する。r12はfail/P1一件でP-07へ登録済み。P-18.1の限定scanではWindows record 0。製品source/test/CI変更はまだ行っていない。
