@@ -30,4 +30,6 @@ Windows CI laneへ新しい境界suiteを加えた。実Windowsで既存の物�
 
 workflowはRuby/Psychで解析し、Windows platform・PR head固定・四suiteの現存path・通常全pytestの維持を静的確認した（exit0）。GitHub Actionsの実行成功とは区別する。
 
+このunitを通常commit `3b0c69e8d61ad7ad5b01307dd301963a2cab180d` へ保存し、parent=ccf9637d・branch不変・cleanを照合した。同SHAの[macOS全件](macos-full-3b0c69e8.md)は、診断runnerのmain guard不備を修正後、1853 passed/2 skipped（402.78秒）、exit0。製品source/testsの変更はない。最初のrunnerによる二失敗も別logへ保持した。
+
 修正後 `src/spec_dock/runtime/infra/windows_handles.py` のSHA256は `65f1f48d2975cdb7a8ccfa1da9dc3fd7a2507264381759debb96bc424412ce64`。過去の全macOS/Linux/手動console候補とは製品source差分があるため、それらの全件件数を今回の合格へ転記しない。元logsはEpicのignored Workbench `iss-00413-implementation/pytest-windows-directory-{anchor-red,anchor-green,pending-red,pending-green,related-final,python310}.log`、`lint-windows-directory-anchor{,-green}.log` に保存した。現在候補のStrict/FQ、Windows保存/native受入、実consumer適用は未完了。

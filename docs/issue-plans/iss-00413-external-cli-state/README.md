@@ -2,11 +2,11 @@
 
 > ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**候補CLIの実装・製品試験を進行中です。Linux/8a70a8b3とmacOS/1e5d2586の通常全件試験はそれぞれ成功しました。過去のmacOS/8a70a8b3の比較不一致は原因未確定で、Windows保存adapter/native受入も未完了です。現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Pro再レビューpass・指摘0件（対象commit: 7e895803）と、コードの現在の認定を区別します。実装設定は利用者の追加指示によってGPT-6.1 Sol / Maxです。**
+**候補CLIの実装・製品試験を進行中です。最新macOS/3b0c69e8の全件選択は1853 passed/2 skippedで成功し、Linux全件は別sourceの8a70a8b3で成功しています。最初のmacOS診断runnerの不備を製品変更なしで修正し、失敗logも保持しました。旧macOS/8a70a8b3の比較不一致は原因未確定で、Windows保存adapter/native受入も未完了です。現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Pro再レビューpass・指摘0件（対象commit: 7e895803）と、コードの現在の認定を区別します。実装設定は利用者の追加指示によってGPT-6.1 Sol / Maxです。**
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 
-後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)を参照してください。過去の全件候補から製品source差分があり、それらの結果を後続候補の全面合格へ読み替えません。Windows保存/native受入は引き続き未完了です。
+後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[最新macOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux/手動consoleの候補から製品source差分があり、それらの結果を後続候補の全面合格へ読み替えません。Windows保存/native受入は引き続き未完了です。
 
 ## 正本と優先順位
 

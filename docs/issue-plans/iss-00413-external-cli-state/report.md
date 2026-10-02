@@ -173,3 +173,9 @@ HTMLの最新全件表示を更新し、同じ公式validatorでstatic四図、4
 WindowsDirectoryの各階層の絶対path openでは、途中の親pathが差し替わると新しい子を開き得ることをAPI境界Redで確認した。保持した親handleに対するNtOpenFileへ変更し、未完了openのhandle解放もRed→Greenで確認。[実装と証拠](artifacts/windows-directory-anchor.md)を保存した。通常make lintとMac/実3.10の関連五suiteは成功、native Windows/NTFSは未実施。現在候補の製品source差分をHTML/READMEへ明示し、過去の全件・手動結果の対象SHAを保持する。要件・設計・確定インタビューは変更しない。
 
 説明HTMLの公式validatorは四図のstatic検査、4/4 SVG、拡大・keyboard・focusで成功（exit0）。実行JS/style/共有modalは既存bytesを保持した。採用版のUTF-8・二schema・13例・内部リンク・manifest/ZIPのCRCとbytes/hashを検査し、Tailscaleの九文書とmanifestもHTTP200/no-storeで正本bytesへ照合した。これは資料の確認であり、native Windows/現在候補のStrict/FQの合格ではない。
+
+## 2026-10-02 追記: 最新候補の全件と診断runnerの修正
+
+Windows補強を含むclean 3b0c69e8のmacOS全件は、最終1853 passed/2 skipped（402.78秒）、exit0。[原文・原因箇所・再確認](artifacts/macos-full-3b0c69e8.md)を保存した。初回の二失敗はCodexが作成したignored runnerのmain guard不足であり、製品source/testsを変更せずに修正した。旧候補のreadonly比較不一致や、native Windowsの受入と混同しない。説明HTML/READMEの最新候補・件数を更新し、別sourceのLinux/手動結果を保持する。現在候補のStrict/FQとWindows保存/nativeは未完了。
+
+更新後の公式HTML validatorは四図のstatic検査、4/4 SVGと拡大・keyboard・focusでexit0。IABの390px表示でdocument幅375px、検証状況section幅355px、本文の横はみ出しがないことと最新1853件の表示を確認した。表は表内の横スクロールで読み、viewportを1280pxへ戻して確認専用tabを閉じた。十文書とmanifestの十一sourceをTailscale経由でHTTP200/no-store/正本bytesへ照合した。採用版ZIPは109 memberで、二schema、13例、438内部リンク、33 HTML ID、CRC/bytes/hashを確認した。これらは資料の検証であり、製品の未完了受入を埋める証拠にはしない。

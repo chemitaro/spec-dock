@@ -159,6 +159,8 @@ uv run pytest tests/integration/test_start_lock.py -q
 
 **2026-10-02 物理directoryのWindows境界補強**: [親handle基準のopen](artifacts/windows-directory-anchor.md)を一単位として実装した。API代替の親path置換Red→Greenに基づき、filesystem anchor以外はNtOpenFileのRootDirectoryへ保持した親handleを渡す。reparse拒否・非継承・通常編集を妨げないshareを維持し、未完了openのhandle解放も別のRed→Greenで確認した。最終関連五suiteはMac 3.12で21 passed/1 skipped（1.49秒）、実3.10で21 passed/1 skipped（1.38秒）。通常make lintはRuff299/mypy218でexit0。Windows CIへ境界suiteを追加したが、native/NTFS、保存接続と現在候補Strict/FQは未完了。過去の全件合格は別source候補として保持する。
 
+同unitのclean commit3b0c69e8は[macOS全件](artifacts/macos-full-3b0c69e8.md)を1853 passed/2 skipped（402.78秒）、exit0で完了した。最初の二失敗はCodex診断runnerのmain guard不備で、ignored runnerだけを修正し、製品source/testsは変更しない。Linux/手動の別sourceとWindows/最終認定の未完了を維持する。
+
 <a id="p-06"></a>
 ## P-06 Git効果を含むStartを閉じる
 

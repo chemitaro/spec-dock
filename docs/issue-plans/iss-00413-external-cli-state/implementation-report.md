@@ -1109,3 +1109,7 @@ clean `8a70a8b30e69fe0bda6db6c45ef555f44411236d` の通常全件を固定して�
 ## P-05 Windows物理directoryの親handle基準open
 
 baseline ccf9637d後、[親path置換のAPI境界Red](artifacts/windows-directory-anchor.md)を確認し、filesystem anchor以外の子をNtOpenFileのRootDirectoryから開くようにした。属性検査・非継承・通常編集を許すshareを維持し、未完了openのhandle解放も別Red→Greenで確認。最終関連五suiteはMac/Python3.12で21 passed/1 skipped（1.49秒）、実3.10で21 passed/1 skipped（1.38秒）、通常make lintはRuff299/mypy218でexit0だった。Windows CIへ境界suiteを接続したが、native専用skipを実OS成功に数えない。過去の全件候補から製品source差分があるため、件数を現在候補へ転記しない。Windows保存・公開・processの接続、NTFS native、fresh Strict/FQと実consumer適用は未完了。
+
+## 2026-10-02 Windows補強候補のmacOS全件
+
+通常commit3b0c69e8のclean/parent/branchを照合し、実3.12.11・provider/prefixを固定した。[全件記録](artifacts/macos-full-3b0c69e8.md)に最初の2 failed/1851 passed/2 skipped（452.60秒）、修正runnerの該当二case 2 passed/7 deselected（0.16秒）、同SHAの全件1853 passed/2 skipped（402.78秒）、最終exit0を保存した。最初はCodexのignored診断runnerがmultiprocessing childでも実行される不備で、main guardを加える修正だけで解消した。製品source・既存tests・timeout・skipを変更しない。旧8a70a8b3のreadonly比較不一致と別件である。Linux/手動は別source、Windows保存/native・fresh Strict/FQ・実consumer適用は未完了。

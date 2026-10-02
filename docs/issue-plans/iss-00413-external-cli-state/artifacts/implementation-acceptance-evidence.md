@@ -6,6 +6,7 @@
 
 | 対象SHA・範囲 | 実行条件・結果 | 証拠と制限 |
 |---|---|---|
+| `3b0c69e8d61ad7ad5b01307dd301963a2cab180d` / 通常全pytestと同じ選択 | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1853 passed / 2 skipped、402.78秒、exit0 | [runner修正と全件](macos-full-3b0c69e8.md)。最初の2 failed / 1851 passed / 2 skippedも保持。製品source/testsを変更せず、ignored runnerだけを修正 |
 | `1e5d2586678927866e9ec0eae804cdd4d55ff138` / 通常全pytest | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1848 passed / 2 skipped、424.21秒、exit 0 | `pytest-macos-full-1e5d2586.log`。変更pathの比較診断を含む全件。Git Trace2は外部owned logだけへ保存し、製品のGit環境除去を変更しない。過去の不一致の原因確定とは別 |
 | `8a70a8b30e69fe0bda6db6c45ef555f44411236d` / 通常全pytest | macOS 27.0.1 arm64、実Python 3.12.11、clean checkout。1 failed / 1847 passed / 2 skipped、479.73秒、exit 1 | `pytest-macos-full-8a70a8b3.log`。[比較不一致の調査](validation-readonly-investigation.md)。全件成功とは扱わない |
 | 同SHA / 通常全pytest | Linux 7.0.14 / glibc 2.41 / x86_64、実Python 3.11.16、clean独立clone。1832 passed / 18 skipped、1125.68秒、exit 0 | `pytest-linux-python311-8a70a8b3.log`。固定Docker image、ネットワークなし、read-only root、capability 0、tmpfs fixture。arm64ホスト上のamd64実行であり物理Linux端末とは区別 |
@@ -21,7 +22,7 @@ Linuxの18 skipはzsh不在12件、Win32限定1件、macOS stage契約1件、Lin
 
 ## 2026-10-02 後続のWindows物理directory補強
 
-baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更した。[境界の記録](windows-directory-anchor.md)に二つのRed→Greenと、Mac/実3.10各21 passed/1 skipped、通常make lint成功を保存した。これ以後の候補には製品source差分がある。上表の全件・wheel・手動結果はそれぞれのSHAで有効だが、後続候補の全面合格へ読み替えない。Windows保存/native受入と現在候補のStrict/FQは未完了。
+baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更した。[境界の記録](windows-directory-anchor.md)に二つのRed→Greenと、Mac/実3.10各21 passed/1 skipped、通常make lint成功を保存した。変更後のclean 3b0c69e8は上表のmacOS全件を成功させた。Linux/手動の8a70a8b3と製品source差分があるため、それらを後続候補の全面合格へ読み替えない。Windows保存/native受入と現在候補のStrict/FQは未完了。
 
 ## 認定と実環境作業
 
