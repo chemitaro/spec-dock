@@ -147,3 +147,15 @@ GPT-6 Proの初回レビューは内容上fail / P1一件。JSON形式不備に�
 回答の引用マーカーによるJSON形式不備は今回もあるが、利用者の明示指示に従って原文の意味を採用した。仕様の規範JSON schemaの検査とは区別する。
 
 合格後の変更はレビュー記録、README/HTMLの進捗表示、manifestと配送ZIPのみ。要件・設計・計画・規範契約を変更していない。GPT-6.1 Sol / HighはP-01から実装開始可能。製品コード・製品テスト・正式import/Start・人間merge・実環境移行は未実施。
+
+## 2026-10-02 追記: 候補実装の実績と説明資料の現在表示
+
+ここまでの実装・試験は[実装記録](implementation-report.md)と[現在の検証証拠](artifacts/implementation-acceptance-evidence.md)へ残す。仕様生成時の「製品未着手」は過去の記録として保持し、README/説明HTMLの現在表示を更新した。実装は利用者の追加指示によってGPT-6.1 Sol / Max。通常wheel/実Gitの手動確認はstateful fake ghを用いた別fixtureで行い、live GitHub・実consumerへの導入と区別する。
+
+clean 8a70a8b3のLinux通常全pytestは1832 passed/18 skipped/exit0、macOSは1 failed/1847 passed/2 skipped/exit1。readonly比較不一致の原因は未確定。全件成功や最終認定を表示しない。Windows保存adapter/native受入、現在コードのStrict/FQ、人間merge、正式#413 import/Startと実導入も未完了。
+
+説明HTMLは、現在の検証状況、未完了事項、手動確認の範囲を冒頭から単独で読めるようにした。PlantUML四図・実行JS・共有modalは変更せず、更新後の実ブラウザvalidator、ファイル/ZIP検査、既存Tailscale URLのsource bytes一致を別途記録する。要件・設計の判断条件と確定インタビューを再生成していない。
+
+更新後の実ブラウザvalidatorは4/4 SVG、クリック/キーボード/倍率範囲/フォーカストラップ/終了/フォーカス復帰に合格。sandbox内のChrome起動timeoutはexit1として残し、同一validatorの実行許可付き再実行でexit0を取得した。四図と全script・共有modalのhashは改訂前と一致。IABの390px検査でdocument幅375px（scrollbar除く）、横overflowなし、SVG四件と現在表示を確認し、viewportを復元して所有する検証tabを閉じた。
+
+従来の単体HTML URLでは`requirement.md`がrootへ解決されて404になることを発見。同じ名前の公開link一件を、`preview-entry.html`を指す入口へ置換した。正本は削除せず、他の公開entryやserverを変更しない。ブラウザで旧URLの`#progress`を維持したまま`/specdock-issue-413/explanation.html#progress`へ移動し、資料リンクがsite配下へ解決されることを確認した。source文書八件がHTTP200/no-store・bytes一致。canonical URLは `http://100.85.74.8:8765/specdock-issue-413/explanation.html`。実ファイル/manifest/ZIPのhash・CRC・展開相当比較は更新した採用版の検査記録へ残す。

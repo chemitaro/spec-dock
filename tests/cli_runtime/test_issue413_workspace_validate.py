@@ -175,9 +175,20 @@ def test_validation_checks_committed_dependency_and_parent_structure(
         metadata.write_text(json.dumps(payload))
     commit_fixture(root)
     before = tree_digest(root)
+    before_files = {
+        path.relative_to(root).as_posix(): (path.stat().st_mode, path.read_bytes())
+        for path in root.rglob("*")
+        if path.is_file()
+    }
     assert main(["--project", str(root), "workspace", "validate", *(["--ci"] if ci else []), "--json"]) == 7
     result = json.loads(capsys.readouterr().out)
-    assert result["data"]["result"]["findings"] and result["effects"] == [] and tree_digest(root) == before
+    assert result["data"]["result"]["findings"] and result["effects"] == []
+    assert {
+        path.relative_to(root).as_posix(): (path.stat().st_mode, path.read_bytes())
+        for path in root.rglob("*")
+        if path.is_file()
+    } == before_files
+    assert tree_digest(root) == before
 
 
 def test_ci_preserves_native_git_failure_details_without_any_effects(

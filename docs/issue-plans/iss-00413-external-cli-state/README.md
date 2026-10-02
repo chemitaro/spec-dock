@@ -1,10 +1,10 @@
 # Issue #413 — 外部CLIとworktreeごとの最小状態
 
-> ローカル採用済み: 生成された17ファイルへ保有する実施記録・確定インタビューを加え、配信用入口を含む20ファイルを採用後、独立レビュー原文・対応分析を加えた23ファイルのZIPに再梱包しました。以下の「本ZIPに含めない」はChatGPT受領原本についての記録です。現行の検証・Tailscale配信は [report.md](report.md) を参照してください。
+> ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**全面差替え用の文書一式です。製品実装・製品テスト・実導入・正式Scope登録・work start・人間mergeは未着手です。文書のcommit/pushとHTML配信は実施済み。独立レビューは初回P1を補正し、GPT-6 Proの再レビューでpass・指摘0件となりました（対象commit: 7e895803）。GPT-6.1 Sol / HighがP-01から実装開始できる状態です。**
+**候補CLIの実装・製品試験を進行中です。Linuxの通常全件試験は成功、macOSの全件試験には未解明の比較不一致が一件あり、Windows保存adapter/native受入は未完了です。現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未実施です。仕様のGPT-6 Pro再レビューpass・指摘0件（対象commit: 7e895803）と、コードの現在の認定を区別します。実装設定は利用者の追加指示によってGPT-6.1 Sol / Maxです。**
 
-[人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。本文中の新契約のコマンドは将来仕様の例です。基準実装で動作済みという意味ではありません。
+[人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 
 ## 正本と優先順位
 
@@ -18,7 +18,7 @@ RQ/ACの正本はrequirement.md、技術的選択と保存/操作順の正本は
 
 ZIPのrootは `iss-00413-planning-pack/` です。一旦別directoryへ展開し、旧文書を外部へ保全してからpayloadだけを差し替えます。directory名は正式Scope登録の証拠ではありません。
 
-**既存の [report.md](report.md) と [interview-worktree-start.md](artifacts/interview-worktree-start.md) はCodexが原文を保持します。本ZIPには含めず、manifestのpayload対象外です。** リンクは採用先でこの二つが隣に残る構成です。単独展開ではこの二リンクは未解決ですが、許可された外部保有依存として扱います。消去型同期（`--delete`等）を使わず、この二つを生成し直さないでください。
+**既存の [report.md](report.md) と [interview-worktree-start.md](artifacts/interview-worktree-start.md) はCodexが原文を保持し、採用版ZIPにも含めます。** ChatGPT原本のpayload対象外だったという履歴はmanifestに残します。消去型同期（`--delete`等）を使わず、保有する原文を生成し直さないでください。
 
 復旧Issueだけの許可済み例外配置は `docs/issue-plans/iss-00413-external-cli-state/`。正式import後はCLIが返したScope pathへ資料と保有証拠を保全移動し、二重正本を残しません。[旧質問票の置換](decision-questions.md) も参照してください。
 
@@ -28,10 +28,11 @@ ZIPのrootは `iss-00413-planning-pack/` です。一旦別directoryへ展開し
 |---|---|
 | requirement.md | 18 RQ、42 AC、変更する保証と開始条件 |
 | design.md | 単一外部runtime、直接対象一件、Startだけの排他、失敗・移行・file map |
-| plan.md | 17の未着手step。実装担当 `gpt-6.1-sol` / `high` |
+| plan.md | 17 stepの作業契約と進捗。実装担当 `gpt-6.1-sol` / `max` |
 | explanation.html | 初見の人向けの全体説明、4つのブラウザ内PlantUML図 |
 | artifacts/*.md / *.json | 詳細契約・機械schema・例・出典・対応表・自己点検 |
 | manifest.json | 配布payloadのsha256/bytes。自己hashは循環になるため含めない |
+| implementation-report.md / artifacts/implementation-acceptance-evidence.md | 候補SHAごとの製品試験・手動操作・未完了事項。生成時の自己点検と分離 |
 
 ## HTMLと検証
 

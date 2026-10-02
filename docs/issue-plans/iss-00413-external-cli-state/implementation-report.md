@@ -1091,3 +1091,11 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 [OS別状態](artifacts/native-platform-status.md)と[Linux記録](artifacts/linux-python311-verification.md)へ、clean e11f1879の全件1827 passed/17 skipped（1016.04秒）と、製品source差分0のclean 6824b3f8の追加console case 1 passed（25.04秒）、共にexit0を保存した。合算/別SHAへの転記は行わない。
 
 未接続OSでPOSIX専用O_DIRECTORYへ進む公開CLIのRed 1 failed/11 deselected（0.18秒）を、OS名先行確認の二行でGreen 1 passed/11 deselected（0.11秒）へ修正した。LOCAL_IO_FAILED/exit5/effects=[]、stderrなし、fixture/独自Git領域保全を確認。実3.10の同caseは1 passed/11 deselected（0.13秒）、関連八群は61 passed（28.82秒）、通常全lintも成功（Ruff 297/mypy 216）。provenance stdout追加後のconsole一caseは1 passed（9.03秒）。Windowsの保存/公開/nativeを完成・保証済みには変えず、ACL/namespace/別writerへのfallbackを追加しない。現在sourceのdelta/hashとbaseline HEADを区別して残す。fresh Strict/Final Quality Gate/手動確認とP-13完了認定・実consumer適用は未完了。
+
+## 2026-10-02 全件結果・手動console・資料の現在状態
+
+clean `8a70a8b30e69fe0bda6db6c45ef555f44411236d` の通常全件を固定して待機し、original sessionのexitとlogを取得した。Linux/実Python 3.11.16は1832 passed/18 skipped（1125.68秒）、exit0。macOS/実Python 3.12.11は1 failed/1847 passed/2 skipped（479.73秒）、exit1。失敗はinvalid dependency fixtureの公開validate前後のtree digest不一致で、[調査記録](artifacts/validation-readonly-investigation.md)に証拠を残した。製品sourceは変更せず、既存digest assertionと並べてfile mode/bytesの差分診断を追加。該当suite80 passed（12.70秒）と独立40回のfixture比較は成功したが、原因確定・全件合格の代わりにはしない。通常make lintはRuff298/mypy217でexit0。
+
+別のowned fixtureへ通常wheelを非editable installし、sourceコピーを参照不能にした実consoleを外部CWDから個別に12回操作した。[手動証拠](artifacts/manual-product-smoke.md)と[stdout/stderr/実exit・現物](artifacts/manual-console-8a70a8b3.json)を保持。Start、同じIssueの拒否、兄弟の並行、無変更Sync、Finishの完了確認→捕捉record解除→現在branch保持、次Issue開始、native hookエラーのpartialと自動巻き戻しなしを確認した。GitHub境界はstateful fake ghであり、本consumer/live GitHubは未変更。tracked specのfold hashとC/B recordを照合した。最終候補の全面手動認定とは別。
+
+人間向けHTML・READMEの「製品未着手」「High」の古い現在表示を、実装進行中・Max・候補単位の成功/失敗/未実施へ更新した。生成時のself-check/インタビュー/レビュー原文を保持し、[現在の検証証拠](artifacts/implementation-acceptance-evidence.md)を追加した。P-12進行中、P-13/P-14準備、Windows保存/native、macOS比較不一致、fresh Strict/FQ、人間merge、P-16/17は未完了。新しい業務commandやACL制度は追加していない。

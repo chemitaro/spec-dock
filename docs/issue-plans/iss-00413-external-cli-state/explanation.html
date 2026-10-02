@@ -307,19 +307,24 @@
 </head>
 <body>
   <main>
-<p class="notice">ローカル採用状況：確定インタビューを保持し、要件・設計・計画を全面差替えしました。4図と拡大操作、schemaと既存240件の保全を検査済みです。以下の「未確認」「ZIPに含めない」はChatGPT生成時点の記録で、納品ZIPには実施記録とインタビューも含めます。GPT-6 Proの独立再レビューはpass・指摘0件です（仕様commit: 7e895803）。GPT-6.1 Sol / Highが実装計画のP-01から着手できます。製品実装は未着手です。<a href="artifacts/review-analysis.md">レビュー記録</a>と最新の検証結果は<a href="report.md">実施記録</a>を参照してください。</p>
+<p class="notice">2026年10月2日の状況：確定した要件・設計に沿って候補CLIを実装し、通常wheel、実Git、複数worktreeの試験を進めています。製品全体の完了認定はまだです。下の<a href="#progress">検証状況</a>に、成功・失敗・未実施を分けて記載しました。仕様の独立再レビューはpass・指摘0件（仕様commit: 7e895803）で、現在のコードの最終合格とは別です。</p>
 
 <header id="top">
 <p class="eyebrow">SPECDOCK · ISSUE #413 · PLANNING PACK</p>
 <h1>普段のCLIとして動かし、<br>作業対象だけを各worktreeに残す</h1>
 <p class="lead">helpを見るために独自の制御情報を復旧する必要はありません。外部にインストールしたSpecDockを起動し、作業場所ごとに一つの対象を選び、必要なときだけ他の作業場所を確認する形へ改めます。</p>
-<div class="notice"><p><strong>この資料は、これから実装する仕様の説明です。</strong>製品コード、製品試験、実導入、正式Scope登録、Start、人間mergeは未着手です。文書のcommit/pushと説明資料の配信は実施済みです。</p><p>利用者が確定した回答を反映した全面差替え版です。従来草案の「active・Start・Finishを全て廃止する」「完全にstatelessにする」という案は採用しません。</p></div>
+<div class="notice"><p><strong>候補コードの検証と、このrepositoryへの導入は別の段階です。</strong>製品実装・試験は進行中です。人間のmerge、実環境の切替、正式Scope登録と#413のStartは未実施です。現在の旧consumerで、この資料の操作例をそのまま実行しないでください。</p><p>利用者が確定した回答を反映した設計です。三階層、作業開始、完了・Closeの意味を維持し、管理状態を減らします。</p></div>
 <p>初めて読む方も、このHTMLだけで背景、正常操作、失敗時の振る舞い、変更範囲、移行と実装の順番を追えるようにしています。詳しい実装契約は <a href="requirement.md">要件</a>・<a href="design.md">設計</a>・<a href="plan.md">計画</a>にあります。</p>
 <p class="source-note">基準実装：chemitaro/spec-dock / 指定branch main / <span class="mono">6fec3099d8759b4e5b3b393b2987534b46dfa383</span>。接続GitHubの指定refを最初に照会し、完全SHA一致を確認しました。新要求の根拠は<a href="artifacts/user-decisions.md">2026年9月30日の確定回答</a>です。</p>
 <nav aria-label="この資料の目次"><h2>目次</h2><ol class="toc"><li><a href="#purpose">何を直し、何を残すのか</a></li><li><a href="#engine-history">なぜengineとcontrolが追加されたのか</a></li><li><a href="#words">状態を三つに分けて読む</a></li><li><a href="#architecture">新しい全体構成と保存場所</a></li><li><a href="#start">Startはbranch操作まで行う</a></li><li><a href="#finish">Finishは完了とCloseを行う</a></li><li><a href="#parallel">複数worktreeとSyncの見方</a></li><li><a href="#changes">既存CLIで変わること・残ること</a></li><li><a href="#failures">失敗したときに何が残るのか</a></li><li><a href="#ids">IDと既存データを守る</a></li><li><a href="#migration">controlなしの環境から切り替える</a></li><li><a href="#implementation">実装する順番と完了証拠</a></li><li><a href="#checks">実装前・採用前に確認すること</a></li></ol></nav>
 <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
 <p class="source-note">図の初回描画には、固定版 @plantuml/core@1.2026.6 をCDNから取得するインターネット通信が必要です。図ソースは外部の描画サーバーへ送りません。CDNに接続できなくても本文は読めます。描画できた図はクリック、Enter、Spaceで拡大できます。</p>
 </header>
+<section id="progress"><h2>現在の検証状況</h2>
+<p>候補 <code>8a70a8b3</code> の実績です。異なる候補の試験結果を合算したり、skipを成功に数えたりしません。詳しい対象SHA・環境・ログは<a href="artifacts/implementation-acceptance-evidence.md">製品の検証証拠</a>と<a href="implementation-report.md">段階別の実装記録</a>にあります。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="検証結果と未完了事項"><table><thead><tr><th scope="col">確認範囲</th><th scope="col">実際の結果</th><th scope="col">残る確認</th></tr></thead><tbody><tr><td>Linux・Python 3.11の通常全件試験</td><td>1,832件成功・18件skip、exit 0。ネットワークを切ったDocker内で実Gitと実CLIを使用</td><td>skipしたWindows・macOS・zshの条件は、この成功に含めない</td></tr><tr><td>macOS・Python 3.12の通常全件試験</td><td>1件失敗・1,847件成功・2件skip、exit 1。検証コマンド前後のtree比較が一度不一致</td><td>原因調査中。該当80件の再確認と独立40回の確認は成功したが、全件合格にはしない</td></tr><tr><td>通常インストールした候補CLI</td><td>sourceコピーを参照不能にし、外部venvの実consoleでhelp・Start・並行Sync・Finishを確認</td><td>GitHub境界はstateful fake gh。実GitHubでIssueをCloseした実績とは区別する</td></tr><tr><td>開始時だけのOS排他</td><td>macOS/Linuxで別process・同一clone・別clone・強制終了後の解放を試験</td><td>Windows/NTFSのnative試験は未実施。Windows保存adapterも未接続</td></tr><tr><td>独立レビュー・最終認定</td><td>過去候補のCode Review Strict原文と修正記録を保持</td><td>現在候補の再レビュー、Final Quality Gate、実導入は未完了</td></tr></tbody></table></div>
+<p>通常の <code>make lint</code> は成功しています。WindowsのCI laneは用意していますが、設定を追加したことを実Windowsでの成功とは扱いません。未接続の保存原語は副作用前に明示的に停止します。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section>
 <section id="purpose"><h2>01　何を直し、何を残すのか</h2>
 
 <p>SpecDockは、Initiative・Epic・Issueの三階層で仕様、依存関係、成果物を管理するPython製CLIです。providerの <code>src/spec_dock/</code> は製品のソースで、<code>spec-dock/</code> はこのrepository自身がSpecDockを使うためのデータです。この二つの役割を混同しません。</p>
@@ -390,7 +395,7 @@ end note
 
 <p><code>work start</code> は、記録だけを置くコマンドには縮小しません。対象と依存を確認し、必要ならbranchを作り、checkoutしてから選択を確定します。三階層のどのScopeにも使えます。</p>
 <p>新しいbranchを作るときは <code>--base</code> が必要です。名前を省略すれば従来と同じ <code>&lt;Scope ID&gt;-&lt;slug&gt;</code> を候補にします。既存branchを使うときは <code>--branch</code> で名前を明示し、<code>--base</code> は付けません。共有binding台帳による自動判定をやめる代わりに、利用する名前を確かめます。</p>
-<pre><code># 未実装の新仕様例：対象を含むcleanなcommitから新branchを作る
+<pre><code># 候補CLIの仕様例：対象を含むcleanなcommitから新branchを作る
 spec-dock work start iss-00413 --branch fix/external-cli --base HEAD --dry-run --json
 spec-dock work start iss-00413 --branch fix/external-cli --base HEAD --json
 
@@ -431,13 +436,13 @@ end note
 <details><summary>この図のPlantUMLソースを確認する</summary><pre data-source-copy="source-start"></pre></details>
 <h3>排他は、通常編集の禁止ではない</h3>
 <p>重複確認だけをしてロックを解放すると、二つのStartが両方「空いている」と判断してしまいます。そのためbranch効果と記録公開までを一つの区間にします。取得後もcurrent treeと他worktreeを確認し直します。GitHub待ちや利用者の確認promptはこの区間に入れません。</p>
-<p>Linux/macOSでは既存common-dirのdescriptorに対する <code>flock</code>、Windowsではその物理identity由来のnamed mutexを最小adapterとして使う設計です。Git内部に新しい独自lock fileを置きません。実OS/FSでの別process試験は未実施で、API文書があるだけで成功とはしません。</p>
+<p>Linux/macOSでは既存common-dirのdescriptorに対する <code>flock</code>、Windowsではその物理identity由来のnamed mutexを最小adapterとして使う設計です。Git内部に新しい独自lock fileを置きません。macOS/Linuxの別process試験は実施済みです。Windows/NTFSの試験と保存adapterの接続は未完了で、API契約の試験やCI設定だけをnative成功とはしません。</p>
 <p>通常ファイル編集、metadata更新、Sync、GitHub操作、Finish、active clearはこの共通ロックを取りません。Git自身の通常index/ref lockまでなくすという意味でもありません。非協調の外部Gitや手編集を全面封鎖する保証はありません。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="finish"><h2>06　Finishは完了とCloseを行う</h2>
 
 <p><code>work finish TARGET --yes</code> は対象をcompletedにし、GitHub-backed ScopeならIssueをCloseします。単なる中断、選択解除、引継ぎをFinishとは呼びません。終了後も現在branchに留まり、自動checkout、branch削除、commit/push/mergeはしません。</p>
 <p>親を完了するには、必要な子孫自身のcompletedを確認します。Open、unknown、not-plannedの子を完了済みに数えません。GitHubが既にcompletedなら余計なPATCHを送らず、その時点の条件を確認します。真正の旧local backendが他consumerに残る場合の既存データ保全は、GitHubをCloseした実績と区別します。</p>
-<pre><code># 未実装の新仕様例。製品の完了判断と確認後だけ実行する
+<pre><code># 候補CLIの仕様例。製品の完了判断と確認後だけ実行する
 spec-dock work finish iss-00413 --dry-run --json
 spec-dock work finish iss-00413 --yes --json
 
@@ -541,24 +546,24 @@ Aborting</code></pre>
 <p>正式な新しいInitiative・Epic・Issueは、GitHubのcreateまたは既存Issueのimportで作ります。独自の最大番号+1、予約台帳、UUID、オフライン正式発行は追加しません。GitHubが番号を確定するまでは、正式Scopeを公開しません。</p>
 <p>Issue #413を新規形式でimportする場合、IDは <code>iss-00413</code> です。prefixは階層を表し、番号は5桁以上に整形します。既存IDはこの規則へ無理に付け替えません。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">守る対象</th><th scope="col">具体的な扱い</th></tr></thead><tbody><tr><td>既存IDとGitHub linkage</td><td>IDのlocalという綴りからbackendやGitHub番号を推定しない</td></tr><tr><td>schema3のScope metadata</td><td>不要な全件schema bump、ID/path/親子/依存の改名をしない</td></tr><tr><td>workspace.json</td><td>schema3のままwriter_protocolだけを明示切替。存在する旧control_epochだけ除く</td></tr><tr><td>未知の任意field・欠けている任意field</td><td>既存値を保持する。元々ないtitle/project_linkageを架空補完しない</td></tr><tr><td>削除の履歴</td><td>旧tombstoneは必要なら人間向けに保全。新CLIの永久再import禁止台帳にはしない</td></tr></tbody></table></div>
-<p>添付のCodex記録では240件の現metadataはschema3/backend githubです。<code>init-local-00002</code> はGitHub #39、<code>init-local-00003</code> は#31に紐づきます。localという綴りがあるだけで、ローカル発行の新規要件へ戻してはいけません。本生成環境で240件全てのbytesを取得・再検査したわけではないため、実装後の保全試験で全件照合します。</p>
+<p>採用時にCodexが240件の現metadataを再検査し、schema3/backend githubとbytesの保全を記録しました。<code>init-local-00002</code> はGitHub #39、<code>init-local-00003</code> は#31に紐づきます。localという綴りから、新しいローカル発行を認める意味を読み取りません。この過去の照合と、実環境を切り替える直前・直後の全件照合は別です。</p>
 <p>現在の一treeに同じIDやGitHub参照が二重登録されていないかは検査します。ただし別branchに同じScopeが存在するのはGitのversionコピーです。全branch履歴を監視する独自台帳を復活させません。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="migration"><h2>11　controlなしの環境から切り替える</h2>
 
 <p>復旧のために旧controlを作り直すことを、移行の前提にはしません。新しい通常CLIでhelpと安全なreaderを成立させた後、許可された対象にだけ切替を適用します。これは製品実装とは別の実環境作業です。</p>
 <ol class="steps"><li><strong>対象と実行物を確認します。</strong>同じclone、適用するworktree、外部console、candidate sourceとwheelを確認します。</li><li><strong>旧writerを止め、実体を保全します。</strong>仕様、ignored成果物、旧active、必要なregistry/journal、static資産をcheckout/Git外に保存し、復元して比較します。</li><li><strong>controlなしで診断します。</strong>旧記録は読取りに限定します。未知のremote結果を人が照合し、影響を特定できなければ適用を止めます。</li><li><strong>workspace宣言だけを切り替えます。</strong>dry-run後にbefore bytesを確認し、schema3を保ったまま新writer_protocolへ移ります。全Scope bytesは変えません。</li><li><strong>static資産と旧入口を整えます。</strong>既知のtool-owned fileだけを明示更新し、未知改変は人間が比較します。</li><li><strong>既存#413を正式importし、資料を移します。</strong>新規createではなく既存Issueを取り込み、CLIが返したpathを使います。</li></ol>
-<pre><code># 未実装の新仕様例：最初は無変更のplanを確認する
+<pre><code># 候補CLIの仕様例：最初は無変更のplanを確認する
 spec-dock workspace migrate --to-schema 3   --to-writer-protocol specdock.worktree-writer/v1 --dry-run --json
 
 # 既存Issueを取り込む例。適用直前に親と重複を再確認する
 spec-dock scope import github issue gh:chemitaro/spec-dock#413   --parent epic-00356 --title "External CLI State"   --slug external-cli-state --dry-run --json</code></pre>
 <p>旧activeは自動で新記録へ移しません。それを行うと、Startの重複確認を通さず新しい直接対象を取得してしまうためです。最後の意図を保全してから、現在のGit状態を確認し、新しい明示Startで選び直します。</p>
-<p>復旧Issueについて許可された例外配置は <code>docs/issue-plans/iss-00413-external-cli-state/</code> です。正式import後は生成されたScopeへ資料を保全移動し、旧場所は案内だけにします。Codexが持つ <a href="report.md">report.md</a> と <a href="artifacts/interview-worktree-start.md">interview-worktree-start.md</a> は本ZIPに含めず、隣に残す前提です。差替え処理で消したり、新しく作り直したりしません。</p>
+<p>復旧Issueについて許可された例外配置は <code>docs/issue-plans/iss-00413-external-cli-state/</code> です。正式import後は生成されたScopeへ資料を保全移動し、旧場所は案内だけにします。Codexが持つ <a href="report.md">report.md</a> と <a href="artifacts/interview-worktree-start.md">interview-worktree-start.md</a> は採用版ZIPにも保有する原文を含めます。差替え処理で消したり、新しく作り直したりしません。</p>
 <p>import後はtracked差分を通常Gitで保存する必要があります。対象・祖先を候補commitに含め、clean条件を満たしてからStartを確認します。import、資料移動、Start、最終Finishは別の証拠です。資料を置いただけで#413を完了扱いにしません。</p>
 <p>移行に失敗したら現物とbackupを比較します。sourceをrevertしてもGitHubの効果まで戻るわけではありません。後続編集やremote結果を無視した自動rollback、旧writerの無条件再開は行いません。実行条件と具体的停止点は<a href="artifacts/migration-runbook.md">移行runbook</a>で確認できます。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="implementation"><h2>12　実装する順番と完了証拠</h2>
 
-<p>実装担当は利用者指定の <strong>GPT-6.1 Sol / reasoning High</strong>、将来設定は <code>gpt-6.1-sol</code> / <code>high</code> です。これは本資料を書いたモデルの識別ではありません。gpt-5.6系専用coder roleへの誘導や、そのモデルの公開能力の推測はしません。</p>
+<p>実装担当は利用者指定の <strong>GPT-6.1 Sol / reasoning Max</strong> です。追加指示によってHighから変更しました。設定は <code>gpt-6.1-sol</code> / <code>max</code>、独立Strictレビューは指定のGPT-5.6 Sol / Proを使います。実装の設定変更と、要件・設計の変更は別です。</p>
 <p>計画は17段階です。各段階には前提・依存、読む設計節、所有file、具体的変更順、変更禁止、入出力例、意味のあるRed→Green、実行コマンド、完了条件、RQ/AC対応、停止時に戻る節があります。以下は、実装担当以外の方が全体の順序を把握するための説明です。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">順番</th><th scope="col">成立させる成果</th><th scope="col">確かめること</th></tr></thead><tbody><tr><td>P-01〜02</td><td>既存44 leafと回帰の基準、通常wheelとutility</td><td>source importだけでなく、fresh環境の実consoleでhelpが動く</td></tr><tr><td>P-03〜04</td><td>直接対象一件のstore、Git一覧とstale観測</td><td>旧recordの解除が新recordを消さない。読取不能をemptyにしない</td></tr><tr><td>P-05〜07</td><td>Start排他、branch効果、Finishとactive</td><td>同時開始で一方だけ成功。通常編集/Finishを共通lockに巻き込まない</td></tr><tr><td>P-08〜10</td><td>複数対象Sync、GitHub発行、関連CLI</td><td>兄弟Issueの並行と親件数、ID保全、既存業務の必要変更</td></tr><tr><td>P-11〜12</td><td>journalなし移行、static資産・shim・skills</td><td>旧controlを新設しない。全Scope bytesを変えず入口を統一する</td></tr><tr><td>P-13〜14</td><td>通常CI・fresh wheel E2E、別途の文書/ブラウザレビュー</td><td>実console→fresh clone/linked→controlなし→help/Start/Finish/Sync。文書検査と製品検査を分ける</td></tr><tr><td>P-15〜17</td><td>人間merge、許可されたdogfood切替、正式#413 import/Start</td><td>mergeだけで公開・実移行・作業開始を完了扱いにしない</td></tr></tbody></table></div>
 <p>通常の <code>make lint</code> と <code>uv run pytest</code> を残します。旧testは名前が古いから一括削除するのではなく、維持する業務条件、変更する保証、廃止するjournal等を個別に対応させます。例えば親の自動昇格とresumeは新しい期待へ置換しますが、子孫完了、対象固定、既存ID保全、安全なファイル公開は残します。</p>
@@ -566,12 +571,12 @@ spec-dock scope import github issue gh:chemitaro/spec-dock#413   --parent epic-0
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="checks"><h2>13　実装前・採用前に確認すること</h2>
 
 <p>利用者のQ1〜Q8は確定しています。本版はその答えを聞き直したり、三階層やFinishの意味を再び未決に戻したりしません。保存方式、activeの制限、CLI差分は技術設計として具体化しています。重要な要求と矛盾する実装事実が新たに見つかった場合だけ、該当段階を止めて設計を直します。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">確認するもの</th><th scope="col">今回の文書生成との関係</th></tr></thead><tbody><tr><td>18 RQ・42 AC・17 Planの対応、schemaと実例、リンク、ZIP hash/CRC</td><td>ChatGPTの文書自己点検。詳細と実施範囲はself-checkに記録する</td></tr><tr><td>template実行JS/modalのbyte一致</td><td>静的検査。SVGの実描画や操作成功とは別</td></tr><tr><td>実ブラウザの4図・拡大・keyboard・focus・mobile表示</td><td>Codexの後続ローカル検査が必要。旧reportの合格を新HTMLへ流用しない</td></tr><tr><td>通常CI、fresh wheel、同時Start、途中停止、OS/FS</td><td>製品実装後の検査。今回は製品を実行していない</td></tr><tr><td>旧writer停止、backup復元、unknown remote、対象許可</td><td>実環境cutoverの開始条件。文書の完成では満たされない</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">確認するもの</th><th scope="col">証拠の扱い</th></tr></thead><tbody><tr><td>18 RQ・42 AC・17 Planの対応、schemaと実例、リンク、ZIP hash/CRC</td><td>生成時の自己点検と、採用後のファイル検査を区別して記録する</td></tr><tr><td>template実行JS/modalのbyte一致</td><td>静的検査。SVGの実描画や操作成功とは別</td></tr><tr><td>実ブラウザの4図・拡大・keyboard・focus・mobile表示</td><td>更新したHTMLで再検査し、旧版の合格を流用しない</td></tr><tr><td>通常CI、fresh wheel、同時Start、途中停止、OS/FS</td><td>対象SHAと実行環境を固定して記録する。結果と未完了事項は上の検証状況を参照</td></tr><tr><td>旧writer停止、backup復元、unknown remote、対象許可</td><td>実環境cutoverの開始条件。文書や候補試験の完成だけでは満たされない</td></tr></tbody></table></div>
 <p>同じcloneを複数ホストや異なるOSユーザーで共有することが実際の必須条件だと判明した場合、この版の想定を黙って拡張しません。その環境への適用を止め、必要な保証を確認します。新しいdaemon、ACL管理、全writer台帳をその場で増やす理由にはしません。</p>
-<p>利用者が取得するZIPは実ファイルの差替え一式です。単独展開ではCodex保有のreport/interviewへの二つの相対pathは存在しません。採用先にそれらを残した上でpayloadを重ね、消去型同期を使わず、相互リンクとhashを再確認してください。</p>
+<p>採用版ZIPは正本の実ファイルと保有する記録をまとめたものです。生成時の原本ZIPとの違いはmanifestに残します。既存の報告と確定インタビューを保全し、消去型同期を使わず、展開後に相互リンクとhashを確認してください。</p>
 <p><a href="artifacts/self-check.md">今回の自己点検</a> ／ <a href="artifacts/source-basis.md">出典・未確認範囲</a> ／ <a href="artifacts/acceptance-matrix.md">受け入れ対応表</a> ／ <a href="decision-questions.md">旧質問票の置換</a></p>
 <div class="notice"><p><strong>この変更の中心は、作業の意味を残したまま制御状態を減らすことです。</strong>直接対象は各worktreeに一つ、重複確認はStartの一つの排他区間、Finishは完了とClose、失敗は現物と原文を示す。この範囲を越える管理機構は追加しません。</p></div>
-<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><footer><p>Issue #413 planning pack · 2026-09-30 · 全面差替え設計版。実装・導入の実績は含みません。</p></footer>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><footer><p>Issue #413 planning pack · 設計確定 2026-09-30 / 検証状況更新 2026-10-02 · 候補実装は進行中。実環境への導入は未実施です。</p></footer>
   </main>
 
   <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>

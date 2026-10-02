@@ -1,5 +1,5 @@
 {
-  "description": "すべて説明用の未実装契約例。OS identity/時刻/token/Git原文は試験fixture。現環境の観測や#413の正式登録実績ではない。",
+  "description": "説明用の契約例。OS identity/時刻/token/Git原文は試験fixture。候補実装の進捗はimplementation-acceptance-evidence.mdに記録し、この例を現環境の観測や#413の正式登録実績とは扱わない。",
   "work_target": {
     "schema_version": "specdock.work-target/v1",
     "scope_id": "iss-00413",

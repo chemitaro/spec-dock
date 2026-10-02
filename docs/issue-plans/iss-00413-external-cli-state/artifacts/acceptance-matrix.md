@@ -1,8 +1,8 @@
 # 受け入れ対応表
 
-判定条件の正本は [requirement.md](../requirement.md#requirements)。**製品検証の状態は全件未実施**。ChatGPTの静的文書検査と、後続Codexの製品/ブラウザ/実適用検査は別です。
+判定条件の正本は [requirement.md](../requirement.md#requirements)。以下の「未実施」は**文書生成時点**の記録です。採用後の対象SHA・実行環境・実結果と未完了事項は [製品の検証証拠](implementation-acceptance-evidence.md) と [実装記録](../implementation-report.md) を参照してください。一部の関連case成功を、AC全体の最終合格へ読み替えません。
 
-| AC | RQ | 設計 | Plan | 判定観点（正本への導線） | 製品検証 |
+| AC | RQ | 設計 | Plan | 判定観点（正本への導線） | 生成時の製品検証 |
 |---|---|---|---|---|---|
 | [AC-413-01](../requirement.md#ac-413-01) | [RQ-413-01](../requirement.md#rq-413-01) | [D-02](../design.md#d-02) | [P-02](../plan.md#p-02), [P-13](../plan.md#p-13) | Git/ghがPATHにない、project指定先が壊れている条件でrootと44 leafのhelp、version、3 shellのcompletionを実consoleで実行し、exit 0、Git/gh呼出し0、consumer書込0を確認する。 | 未実施 |
 | [AC-413-02](../requirement.md#ac-413-02) | [RQ-413-01](../requirement.md#rq-413-01) | [D-02](../design.md#d-02) | [P-02](../plan.md#p-02), [P-13](../plan.md#p-13) | fresh wheelをcheckout外へ非editable installし、provider sourceを参照不能にしても実consoleのScope読取・Start・Finish・Syncが動く。fixed bundle、consumer runtimeの追加コピー、control作成はいずれも0。 | 未実施 |
