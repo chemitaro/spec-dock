@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import ctypes
 from typing import TYPE_CHECKING
 
 import pytest
@@ -68,11 +69,31 @@ def test_directory_identity_uses_win32_volume_and_128_bit_file_id(tmp_path) -> N
     class KernelDirectoryAPI:
         def __init__(self) -> None:
             self.opened: list[tuple[object, ...]] = []
+            self.relative_opened: list[tuple[object, ...]] = []
             self.closed: list[int] = []
 
         def CreateFileW(self, *args):
             self.opened.append(args)
             return len(self.opened)
+
+        def NtOpenFile(self, result, access, attributes, status, share, options):
+            attributes = attributes._obj
+            name = attributes.ObjectName.contents
+            component = ctypes.string_at(name.Buffer, name.Length).decode("utf-16-le")
+            self.relative_opened.append((
+                attributes.RootDirectory,
+                component,
+                attributes.Attributes,
+                attributes.SecurityDescriptor,
+                access,
+                share,
+                options,
+            ))
+            result._obj.value = len(self.opened) + len(self.relative_opened)
+            return 0
+
+        def RtlNtStatusToDosError(self, status):
+            pytest.fail(f"unexpected NTSTATUS error: {status}")
 
         def GetFileInformationByHandleEx(self, handle, kind, buffer, size):
             if kind == 9:
@@ -94,5 +115,7 @@ def test_directory_identity_uses_win32_volume_and_128_bit_file_id(tmp_path) -> N
         assert held.identity.platform == "windows"
         assert held.identity.device == "123"
         assert held.identity.file_id == "00112233445566778899aabbccddeeff"
+        assert len(api.opened) == 1  # Only the filesystem anchor uses an absolute Win32 name.
         assert all(args[1:] == (0x80, 7, None, 3, 0x02200000, None) for args in api.opened)
-    assert sorted(api.closed) == list(range(1, len(api.opened) + 1))
+        assert all(args[2:] == (0x40, None, 0x100080, 7, 0x200021) for args in api.relative_opened)
+    assert sorted(api.closed) == list(range(1, len(api.opened) + len(api.relative_opened) + 1))

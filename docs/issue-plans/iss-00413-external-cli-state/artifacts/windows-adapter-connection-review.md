@@ -23,3 +23,7 @@ Microsoftの[FILE_RENAME_INFO](https://learn.microsoft.com/en-us/windows/win32/a
 3. 一つの公開境界ごとのRed→Greenで接続し、通常保存・遅い解除・途中停止・並行Startを検証する。Mutexの成功だけで保存の成立を認定しない。
 
 共通registry、独自.git entry、Scope UUID、ACL変更、Local mutex fallback、通常編集を覆う共通lockは追加しない。現時点ではBriefの外部送信、保存接続、native受入とも未実施である。
+
+## 2026-10-02 追記: 物理directoryの親handle基準open
+
+baseline ccf9637d後、WindowsDirectoryの各階層の絶対path再openを、NtOpenFileによる保持した親handleからの子openへ変更した。[Red→Greenと一次資料の記録](windows-directory-anchor.md)を保存した。これはidentity adapterの補強であり、上表のJSON reader・選択保存・各公開・init processは未接続のままである。通常make lintとMac/実3.10の関連suiteは成功。Windows CIへ境界suiteを追加したが、実NTFSのnative結果は未取得である。

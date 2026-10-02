@@ -6,6 +6,7 @@ import ctypes
 import math
 import sys
 import time
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, Protocol, cast
 
 from spec_dock.runtime.domain.work_target import PhysicalIdentity
@@ -47,6 +48,10 @@ class DirectoryAPI(Protocol):
     def CreateFileW(
         self, name: str, access: int, share: int, security: object, disposition: int, flags: int, template: object
     ) -> int: ...
+    def NtOpenFile(
+        self, result: object, access: int, attributes: object, status: object, share: int, options: int
+    ) -> int: ...
+    def RtlNtStatusToDosError(self, status: int) -> int: ...
     def GetFileInformationByHandleEx(self, handle: int, kind: int, buffer: object, size: int) -> int: ...
     def CloseHandle(self, handle: int) -> int: ...
 
@@ -57,6 +62,33 @@ class _FileAttributeTagInfo(ctypes.Structure):
 
 class _FileIdInfo(ctypes.Structure):
     _fields_ = [("VolumeSerialNumber", ctypes.c_uint64), ("FileId", ctypes.c_ubyte * 16)]
+
+
+class _UnicodeString(ctypes.Structure):
+    _fields_ = [
+        ("Length", ctypes.c_uint16),
+        ("MaximumLength", ctypes.c_uint16),
+        ("Buffer", ctypes.POINTER(ctypes.c_uint16)),
+    ]
+
+
+class _ObjectAttributes(ctypes.Structure):
+    _fields_ = [
+        ("Length", ctypes.c_uint32),
+        ("RootDirectory", ctypes.c_void_p),
+        ("ObjectName", ctypes.POINTER(_UnicodeString)),
+        ("Attributes", ctypes.c_uint32),
+        ("SecurityDescriptor", ctypes.c_void_p),
+        ("SecurityQualityOfService", ctypes.c_void_p),
+    ]
+
+
+class _IoStatusValue(ctypes.Union):
+    _fields_ = (("Status", ctypes.c_int32), ("Pointer", ctypes.c_void_p))
+
+
+class _IoStatusBlock(ctypes.Structure):
+    _fields_ = [("Value", _IoStatusValue), ("Information", ctypes.c_size_t)]
 
 
 def _native_directory_api() -> DirectoryAPI:
@@ -77,7 +109,59 @@ def _native_directory_api() -> DirectoryAPI:
     kernel.GetFileInformationByHandleEx.restype = ctypes.c_int
     kernel.CloseHandle.argtypes = [ctypes.c_void_p]
     kernel.CloseHandle.restype = ctypes.c_int
-    return cast("DirectoryAPI", kernel)
+    native = ctypes.WinDLL("ntdll")
+    native.NtOpenFile.argtypes = [
+        ctypes.POINTER(ctypes.c_void_p),
+        ctypes.c_uint32,
+        ctypes.POINTER(_ObjectAttributes),
+        ctypes.POINTER(_IoStatusBlock),
+        ctypes.c_uint32,
+        ctypes.c_uint32,
+    ]
+    native.NtOpenFile.restype = ctypes.c_int32
+    native.RtlNtStatusToDosError.argtypes = [ctypes.c_int32]
+    native.RtlNtStatusToDosError.restype = ctypes.c_uint32
+    return cast(
+        "DirectoryAPI",
+        SimpleNamespace(
+            CreateFileW=kernel.CreateFileW,
+            NtOpenFile=native.NtOpenFile,
+            RtlNtStatusToDosError=native.RtlNtStatusToDosError,
+            GetFileInformationByHandleEx=kernel.GetFileInformationByHandleEx,
+            CloseHandle=kernel.CloseHandle,
+        ),
+    )
+
+
+def _open_child_directory(api: DirectoryAPI, parent: int, name: str) -> int:
+    if not name or name in (".", "..") or any(character in name for character in ("/", "\\", "\0", ":")):
+        raise ValueError("physical directory name must be a single path component")
+    encoded = name.encode("utf-16-le")
+    if len(encoded) > 65532:
+        raise ValueError("physical directory name is too long")
+    buffer = ctypes.create_string_buffer(encoded + b"\0\0")
+    string = _UnicodeString(len(encoded), len(encoded) + 2, ctypes.cast(buffer, ctypes.POINTER(ctypes.c_uint16)))
+    attributes = _ObjectAttributes(ctypes.sizeof(_ObjectAttributes), parent, ctypes.pointer(string), 0x40, None, None)
+    result = ctypes.c_void_p()
+    io_status = _IoStatusBlock()
+    # FILE_READ_ATTRIBUTES | SYNCHRONIZE; directory, synchronous, no reparse traversal.
+    status = api.NtOpenFile(
+        ctypes.byref(result), 0x100080, ctypes.byref(attributes), ctypes.byref(io_status), 7, 0x200021
+    )
+    if status != 0:
+        if (
+            ctypes.c_int32(status).value >= 0
+            and result.value
+            and result.value != ctypes.c_void_p(-1).value
+            and not api.CloseHandle(result.value)
+        ):
+            raise _api_error("CloseHandle")
+        if sys.platform == "win32":
+            raise ctypes.WinError(api.RtlNtStatusToDosError(status))
+        raise OSError(f"NtOpenFile failed: NTSTATUS 0x{status & 0xFFFFFFFF:08x}")
+    if not result.value or result.value == ctypes.c_void_p(-1).value:
+        raise OSError("NtOpenFile returned an invalid directory handle")
+    return result.value
 
 
 class WindowsDirectory:
@@ -95,7 +179,10 @@ class WindowsDirectory:
         self._api = api
         try:
             for component in (*reversed(self.path.parents), self.path):
-                handle = api.CreateFileW(str(component), 0x80, 7, None, 3, 0x02200000, None)
+                if self._handles:
+                    handle = _open_child_directory(api, self._handles[-1], component.name)
+                else:
+                    handle = api.CreateFileW(str(component), 0x80, 7, None, 3, 0x02200000, None)
                 if not handle or handle == ctypes.c_void_p(-1).value:
                     raise _api_error("CreateFileW")
                 self._handles.append(handle)

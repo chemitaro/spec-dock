@@ -157,6 +157,8 @@ uv run pytest tests/integration/test_start_lock.py -q
 
 **失敗時の停止/戻り先**: 必要原語がないOS/FSはD-05のunsupported経路へ。既存directory上のflockを未試験のまま保証済みにしない。
 
+**2026-10-02 物理directoryのWindows境界補強**: [親handle基準のopen](artifacts/windows-directory-anchor.md)を一単位として実装した。API代替の親path置換Red→Greenに基づき、filesystem anchor以外はNtOpenFileのRootDirectoryへ保持した親handleを渡す。reparse拒否・非継承・通常編集を妨げないshareを維持し、未完了openのhandle解放も別のRed→Greenで確認した。最終関連五suiteはMac 3.12で21 passed/1 skipped（1.49秒）、実3.10で21 passed/1 skipped（1.38秒）。通常make lintはRuff299/mypy218でexit0。Windows CIへ境界suiteを追加したが、native/NTFS、保存接続と現在候補Strict/FQは未完了。過去の全件合格は別source候補として保持する。
+
 <a id="p-06"></a>
 ## P-06 Git効果を含むStartを閉じる
 

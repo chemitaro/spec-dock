@@ -19,6 +19,10 @@
 
 Linuxの18 skipはzsh不在12件、Win32限定1件、macOS stage契約1件、Linux匿名stageにpathname cleanupがない4件です。macOSの2 skipはWin32限定1件、Linux O_TMPFILE限定1件です。これらを別OSでの実行成功と呼びません。
 
+## 2026-10-02 後続のWindows物理directory補強
+
+baseline ccf9637dからWindowsDirectoryを親handle基準のNtOpenFileへ変更した。[境界の記録](windows-directory-anchor.md)に二つのRed→Greenと、Mac/実3.10各21 passed/1 skipped、通常make lint成功を保存した。これ以後の候補には製品source差分がある。上表の全件・wheel・手動結果はそれぞれのSHAで有効だが、後続候補の全面合格へ読み替えない。Windows保存/native受入と現在候補のStrict/FQは未完了。
+
 ## 認定と実環境作業
 
 - P-12進行中。P-13/P-14の試験・資料準備を先行しているが、依存stepの完了認定とは別。

@@ -75,4 +75,5 @@ jobs:
       - name: Verify real Windows handles and separate-process exclusion
         run: >-
           uv run pytest tests/integration/test_issue413_native_lock.py
-          tests/unit/infra/test_directory_identity.py tests/unit/infra/test_windows_mutex.py -q -s -ra
+          tests/unit/infra/test_directory_identity.py tests/unit/infra/test_windows_mutex.py
+          tests/unit/infra/test_windows_directory.py -q -s -ra

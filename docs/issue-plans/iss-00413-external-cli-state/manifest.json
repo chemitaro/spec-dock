@@ -44,7 +44,7 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 423,
+    "local_link_occurrences_checked": 430,
     "html_unique_ids": 33,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "4/4 SVG and zoom validator passed on current explanation HTML",
@@ -58,8 +58,8 @@
   "files": [
     {
       "path": "README.md",
-      "bytes": 5245,
-      "sha256": "fb92143cd2ab6c1bf71ebc186c0f58f8f23fc71124a624b4bf927aec5d061a1c"
+      "bytes": 5647,
+      "sha256": "8f732ccc8181963d8abd2a11d0e4fce7ded23627e08db3a8b45f0f2844c14a6f"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
@@ -223,8 +223,8 @@
     },
     {
       "path": "artifacts/implementation-acceptance-evidence.md",
-      "bytes": 4203,
-      "sha256": "252fa49cbe459a15603d15757f63b6f1e20d9e25a2650245376d6b0aa7cf60e0"
+      "bytes": 4749,
+      "sha256": "241bec6dbf6a3568780fc09b4df9b510645074a3278d6843c75337290dba5626"
     },
     {
       "path": "artifacts/implementation-brief-p06.md",
@@ -538,8 +538,13 @@
     },
     {
       "path": "artifacts/windows-adapter-connection-review.md",
-      "bytes": 3760,
-      "sha256": "2c0869a39013797041e677a899d27bb11154110bdb6a49f8b9b608ea53cd7bac"
+      "bytes": 4345,
+      "sha256": "aa43e8ab80bdb41633e503cb9b7451050b9dea399740fb87933f714e595ee629"
+    },
+    {
+      "path": "artifacts/windows-directory-anchor.md",
+      "bytes": 4905,
+      "sha256": "acba3a3b42938b6c9d91fbcfac49bb9066dd7dd59587c69ee1269d95bc8c9cca"
     },
     {
       "path": "decision-questions.md",
@@ -553,13 +558,13 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 69505,
-      "sha256": "e6660b54de726031f913fc6edacad0ac47814a07c5cfa74d80069846ab9dd9c3"
+      "bytes": 70127,
+      "sha256": "c54d5211336c82b0e942fde5917647e685c863e3e9797b85ced2049115b1f06a"
     },
     {
       "path": "implementation-report.md",
-      "bytes": 219690,
-      "sha256": "8fca1e8c59b6fc7ebcf68eb7f30bf63ca679d9cd211fa2284e252b76b8741760"
+      "bytes": 220545,
+      "sha256": "c8b6c3b1716ce61c86950c9a8e94357162832f43a5082d2f5d6743fa20ea8353"
     },
     {
       "path": "index.html",
@@ -568,8 +573,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 138329,
-      "sha256": "638bc69bd442735b0cf5438157b93740fa9603c44e69cd6a49eb03de59d5c5c5"
+      "bytes": 139095,
+      "sha256": "5b92428d084409b061e4f4333a721913da1cbd3d61daa1834de7cbb8cdf95fa1"
     },
     {
       "path": "preview-entry.html",
@@ -578,8 +583,8 @@
     },
     {
       "path": "report.md",
-      "bytes": 21171,
-      "sha256": "c03744c69e43fe3f6877f782edd6e28dcfd09e10c6616528a62da129fb6d6dc7"
+      "bytes": 22315,
+      "sha256": "4ccf5f3974177b45ea3a1139762f8eab3142456c63c7813b6777f2e448f9346f"
     },
     {
       "path": "requirement.md",
@@ -757,6 +762,7 @@
   "status_date": "2026-10-02",
   "current_implementation_evidence": {
     "provider_candidate_sha": "1e5d2586678927866e9ec0eae804cdd4d55ff138",
+    "provider_candidate_scope": "macOS full-test candidate; subsequent Windows-only source change documented separately",
     "provider_source_unchanged_since": "8a70a8b30e69fe0bda6db6c45ef555f44411236d",
     "record": "artifacts/implementation-acceptance-evidence.md",
     "manual_record": "artifacts/manual-product-smoke.md",
@@ -766,6 +772,15 @@
     "linux_full_pytest": "exit 0; 1832 passed, 18 skipped",
     "manual_console_sha": "8a70a8b30e69fe0bda6db6c45ef555f44411236d",
     "windows_native_and_store": "not accepted; native execution and store connection pending",
+    "additional_source_change": {
+      "baseline_sha": "ccf9637d453a4f0d7988a7f9f3471a147c427bbd",
+      "path": "src/spec_dock/runtime/infra/windows_handles.py",
+      "sha256": "65f1f48d2975cdb7a8ccfa1da9dc3fd7a2507264381759debb96bc424412ce64",
+      "record": "artifacts/windows-directory-anchor.md",
+      "macos_related": "21 passed, 1 skipped; exit0; 1.49 seconds",
+      "python310_related": "21 passed, 1 skipped; exit0; 1.38 seconds",
+      "native_windows": "not executed; no acceptance claim"
+    },
     "fresh_code_review": "pending",
     "final_quality_gate": "pending",
     "real_consumer_cutover": "not performed"

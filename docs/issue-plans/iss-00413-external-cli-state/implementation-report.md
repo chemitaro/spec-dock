@@ -1105,3 +1105,7 @@ clean `8a70a8b30e69fe0bda6db6c45ef555f44411236d` の通常全件を固定して�
 手動証拠・比較診断・資料を通常hooksのcheckpoint `1e5d2586678927866e9ec0eae804cdd4d55ff138` へ保存し、parent=8a70a8b3・branch不変・cleanを確認した。同候補の通常 `uv run pytest -q --tb=short -ra` は1848 passed/2 skipped（424.21秒）、exit0。実3.12.11・provider/prefix・clean SHAを開始時に照合。8a70a8b3から製品source deltaは0であり、異なるSHAのLinux件数とは合算しない。
 
 外部owned logへのGit Trace2で該当fixtureの最初のcommitからmaintenance起動を捕捉したが、不一致やpack書換えは再現せず、原因の証明には使わない。製品の全GIT_*除去を変更していないため、traceの観測範囲も限定して[調査記録](artifacts/validation-readonly-investigation.md)へ保存した。元の失敗は撤回しない。Windowsの保存・公開・process境界とNTFS native受入、現在候補のStrict/FQは未完了。
+
+## P-05 Windows物理directoryの親handle基準open
+
+baseline ccf9637d後、[親path置換のAPI境界Red](artifacts/windows-directory-anchor.md)を確認し、filesystem anchor以外の子をNtOpenFileのRootDirectoryから開くようにした。属性検査・非継承・通常編集を許すshareを維持し、未完了openのhandle解放も別Red→Greenで確認。最終関連五suiteはMac/Python3.12で21 passed/1 skipped（1.49秒）、実3.10で21 passed/1 skipped（1.38秒）、通常make lintはRuff299/mypy218でexit0だった。Windows CIへ境界suiteを接続したが、native専用skipを実OS成功に数えない。過去の全件候補から製品source差分があるため、件数を現在候補へ転記しない。Windows保存・公開・processの接続、NTFS native、fresh Strict/FQと実consumer適用は未完了。

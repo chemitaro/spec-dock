@@ -167,3 +167,9 @@ clean 1e5d2586のmacOS通常全件は1848 passed/2 skipped（424.21秒）、exit
 HTMLの最新全件表示を更新し、同じ公式validatorでstatic四図、4/4 inline SVG、zoom/keyboard/focusの成功を取得した。IABで最新結果の本文を確認し、390pxではdocument幅375px・progress幅355pxで横overflowなし。requirementへのURLもsite配下を向いた。viewportを元へ戻して所有するtabを閉じた。IABのSVG用selectorは対象を一致検出できなかったため、その件数は描画証拠に使わず、公式validatorの独立した四図検査と区別する。
 
 [Windows接続箇所](artifacts/windows-adapter-connection-review.md)を現sourceとMicrosoft一次資料へ照合した。Win32 mutex/identityのAPI経路と、未接続の保存/公開/process経路を区別する。directory同期の成立を資料だけから仮定せず、P-03のImplementation Brief Strict用promptをWorkbenchへ準備した。外部送信・Windows保存接続・NTFS受入は未実施。通常pushの先行承認回答とFQ v2 pilotの選択回答を待ち、現在候補のStrict/FQを実行済みと記録しない。
+
+## 2026-10-02 追記: Windows物理識別の安全な子open
+
+WindowsDirectoryの各階層の絶対path openでは、途中の親pathが差し替わると新しい子を開き得ることをAPI境界Redで確認した。保持した親handleに対するNtOpenFileへ変更し、未完了openのhandle解放もRed→Greenで確認。[実装と証拠](artifacts/windows-directory-anchor.md)を保存した。通常make lintとMac/実3.10の関連五suiteは成功、native Windows/NTFSは未実施。現在候補の製品source差分をHTML/READMEへ明示し、過去の全件・手動結果の対象SHAを保持する。要件・設計・確定インタビューは変更しない。
+
+説明HTMLの公式validatorは四図のstatic検査、4/4 SVG、拡大・keyboard・focusで成功（exit0）。実行JS/style/共有modalは既存bytesを保持した。採用版のUTF-8・二schema・13例・内部リンク・manifest/ZIPのCRCとbytes/hashを検査し、Tailscaleの九文書とmanifestもHTTP200/no-storeで正本bytesへ照合した。これは資料の確認であり、native Windows/現在候補のStrict/FQの合格ではない。
