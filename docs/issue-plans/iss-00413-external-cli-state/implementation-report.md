@@ -1069,3 +1069,11 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 ## P-13の準備: 配布consoleの一連の作業検証
 
 [実consoleの記録](artifacts/fresh-console-lifecycle.md)に、fresh wheel/別venv/offline依存解決/pip check/source path改名から、実Gitのclone/linked WT、Start重複拒否、兄弟Issue並行、readonly Sync、completed GET確認後のFinish、次Issue Startまでを保存した。製品APIをmockせず、GitHubだけをstateful外部gh processで代替する。macOS/APFSの実Python 3.12は1 passed（8.73秒）、実3.10は1 passed（9.06秒）、共にexit0。初回の誤selectorによるfixture失敗は別logに残し、製品Redとは区別する。通常make lintはRuff（297 files）・mypy（216 source files）が成功、exit0。test追加前のclean e11f1879全macOS pytestは1843 passed/1 skipped（446.22秒）、exit0であり、追加caseを合算しない。P-12/fresh Strict、現在候補のLinux/Windows/native full gates、P-13完了認定、Final Quality Gate/手動確認、実consumer適用は未完了。
+
+## P-12 OS別の受入と未接続directory診断
+
+**OS別の受入と未接続directory診断**
+
+[OS別状態](artifacts/native-platform-status.md)と[Linux記録](artifacts/linux-python311-verification.md)へ、clean e11f1879の全件1827 passed/17 skipped（1016.04秒）と、製品source差分0のclean 6824b3f8の追加console case 1 passed（25.04秒）、共にexit0を保存した。合算/別SHAへの転記は行わない。
+
+未接続OSでPOSIX専用O_DIRECTORYへ進む公開CLIのRed 1 failed/11 deselected（0.18秒）を、OS名先行確認の二行でGreen 1 passed/11 deselected（0.11秒）へ修正した。LOCAL_IO_FAILED/exit5/effects=[]、stderrなし、fixture/独自Git領域保全を確認。実3.10の同caseは1 passed/11 deselected（0.13秒）、関連八群は61 passed（28.82秒）、通常全lintも成功（Ruff 297/mypy 216）。provenance stdout追加後のconsole一caseは1 passed（9.03秒）。Windowsの保存/公開/nativeを完成・保証済みには変えず、ACL/namespace/別writerへのfallbackを追加しない。現在sourceのdelta/hashとbaseline HEADを区別して残す。fresh Strict/Final Quality Gate/手動確認とP-13完了認定・実consumer適用は未完了。

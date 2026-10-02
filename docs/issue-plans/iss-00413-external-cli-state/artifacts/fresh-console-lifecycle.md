@@ -42,4 +42,12 @@ testの最終形で通常make lintはRuff check/format（297 files）とmypy（2
 - lint-fresh-console-lifecycle.log、lint-fresh-console-lifecycle-2.log
 - fresh-console-lifecycle-macos-python{312,310}.json
 
-現在候補のLinux全件とこのconsole caseのLinux実行、Windows store/native、fresh Strict、Final Quality Gate、最終手動確認は未完了。
+ここまでの記録の時点ではLinux console caseと後続受入は未完了だった。追加結果を下に記録する。
+
+## Linuxでの追加確認とprovenance強化
+
+clean 6824b3f8のLinux/Python 3.11.16で同じconsole caseは1 passed（25.04秒）、exit0。前候補e11f1879とのsrc/README/pyproject/uv.lockのdiffは0を確認した。全件試験はe11f1879の1827 passed/17 skipped（1016.04秒）、exit0として[別記録](linux-python311-verification.md)へ保存し、case数を合算しない。
+
+後続harnessはbaseline HEAD、製品sourceのtracked status、コピーした入力fileの相対名/内容hashのfold、wheel hashをstdoutへ記録する。作業中のsource deltaをHEADと同一にしない。未接続directory adapterの修正候補を含むmacOS console caseは1 passed（9.03秒）、exit0。source statusはjson_store.pyの変更一件で、入力SHA256はaedb8204b19e3694c0a14842b5149921d039f8731beda5eed5b8a7af189da0e4、wheel SHA256は2db17f135866086b1608843f11a7c7c9d50ce953964b091f83dc1df20fc915d7。元logはpytest-fresh-console-provenance.log。
+
+[OS別の状態](native-platform-status.md)と併せて解釈する。Windows保存/公開/native、現在候補のfresh Strict/Final Quality Gate/最終手動確認、実consumerへの適用は未完了。

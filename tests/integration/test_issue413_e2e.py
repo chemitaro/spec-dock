@@ -47,6 +47,11 @@ def install_console(tmp_path: Path) -> InstalledConsole:
     shutil.copytree(ROOT / "src", source / "src", ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.egg-info"))
     for name in ("README.md", "pyproject.toml"):
         shutil.copy2(ROOT / name, source / name)
+    source_digest = hashlib.sha256()
+    for path in sorted(source.rglob("*")):
+        if path.is_file():
+            source_digest.update(path.relative_to(source).as_posix().encode() + b"\0")
+            source_digest.update(hashlib.sha256(path.read_bytes()).digest())
     outside = tmp_path / "outside"
     outside.mkdir()
     home = tmp_path / "home"
@@ -98,6 +103,12 @@ def install_console(tmp_path: Path) -> InstalledConsole:
     assert "PYTHONPATH" not in environment and "PYTHONHOME" not in environment
     provenance = {
         "provider_head": subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip(),
+        "provider_source_status": subprocess.check_output(
+            ["git", "status", "--porcelain", "--", "src", "README.md", "pyproject.toml", "uv.lock"],
+            cwd=ROOT,
+            text=True,
+        ),
+        "provider_source_sha256": source_digest.hexdigest(),
         "wheel_sha256": hashlib.sha256(wheel.read_bytes()).hexdigest(),
         "imported_package": imported,
         "python": sys.version,
@@ -293,3 +304,4 @@ def test_fresh_console_start_parallel_sync_finish_and_next_issue(tmp_path: Path)
     assert not (root / "spec-dock/scripts/spec_dock_runtime").exists()
     evidence["github_calls"] = [json.loads(line) for line in log.read_text().splitlines()]
     (tmp_path / "evidence.json").write_text(json.dumps(evidence, indent=2), encoding="utf-8")
+    print(json.dumps({"console_provenance": console.provenance}, sort_keys=True))

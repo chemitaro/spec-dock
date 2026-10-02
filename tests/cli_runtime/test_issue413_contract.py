@@ -62,6 +62,29 @@ def make_workspace(root: Path) -> Path:
     return root
 
 
+def test_unconnected_directory_platform_returns_a_public_failure_before_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    import os
+    from types import SimpleNamespace
+
+    root = make_workspace(tmp_path / "consumer")
+    before = tree_digest(root)
+    # The external OS boundary has no POSIX descriptor API on this platform.
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.json_store.os", SimpleNamespace(name="nt", open=os.open, O_RDONLY=os.O_RDONLY)
+    )
+    assert main(["--project", str(root), "scope", "show", "init-00001", "--json"]) == 5
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "failed" and result["error"]["code"] == "LOCAL_IO_FAILED"
+    assert result["effects"] == []
+    assert "directory adapter" in result["error"]["message"]
+    assert "not connected" in result["error"]["message"]
+    assert output.err == "" and tree_digest(root) == before
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+
+
 def test_independent_scope_read_does_not_require_control(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = make_workspace(tmp_path / "consumer")
     metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"

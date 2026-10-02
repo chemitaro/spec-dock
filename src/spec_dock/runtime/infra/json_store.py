@@ -100,6 +100,8 @@ def _rename_no_replace_at(source_fd: int, source: str, target_fd: int, target: s
 
 
 def _open_directory_without_links(directory: Path) -> int:
+    if os.name != "posix":
+        raise NotImplementedError("guarded directory adapter is not connected for this platform")
     fd = os.open("/", os.O_RDONLY | os.O_DIRECTORY)
     try:
         for part in directory.parts[1:]:

@@ -60,3 +60,11 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは **1851 pa
 この結果にはadapter/Delete退役とbootstrap timeout fixture補正が含まれる。後続 `7d29648d` の旧Create/Artifact writer退役・追加試験は含まれない。先行の失敗/個別試験を合算して合格にせず、このclean SHA一回のexit0だけを全件証拠とする。P-12中の予備検証であり、現在候補のfull lint、P-13、Windows native、fresh Strict、Final Quality Gate、最終手動確認の完了ではない。
 
 元logは `iss-00413-implementation/pytest-linux-python311-0fd8764f.log`。独立clone・offline依存・runnerは必要な後続検証へ再利用し、所有した一時dataだけを後で整理する。実consumer/live GitHubは未変更。
+
+## 四回目のclean全件と配布console
+
+clean `e11f187931a70ce2859527bb8eaf3ffc6e8b8fc9` の通常全pytestは **1827 passed / 17 skipped、1016.04秒、exit0**。旧Create/Artifact・Active/Sync/依存チェックの退役と共有型修正を含む。実効capability0、USER未設定、offline/no-network、Linux tmpfs、候補HEAD/clean statusと実prefix/providerを元の一回のsessionで検査した。17 skipはZsh 12/macOS専用probe 1/匿名stageのpathname cleanup非該当4であり、native成功へ換算しない。
+
+全件job終了後、同じ所有cloneを通常のlocal fetch/detached checkoutでclean `6824b3f834f076f99372ba34e64bb76bcabe0d44` へ進めた。前候補とのsrc/README/pyproject/uv.lockのdiffは0。このSHAで追加した配布consoleの一caseは **1 passed、25.04秒、exit0**。別venv・非editable wheel・offline依存解決とpip check、source path改名、実Git clone/linked WT、重複Startの無副作用拒否、兄弟Issue並行、readonly Sync、completed GET後のFinish、次Issue Startを検査した。GitHubはstateful gh process代替でありlive実績ではない。全件と追加caseを合算して別SHAの全件成功にしない。
+
+元logsはpytest-linux-python311-e11f1879.log、pytest-linux-python311-fresh-console-6824b3f8.log。後続の非POSIX directory診断とprovenance強化はこの二runに含まれず、[OS別状態](native-platform-status.md)へ分けて記録する。Windows接続/native、現在候補のfresh Strict/Final Quality Gate/手動確認、実consumer適用は未完了。
