@@ -710,6 +710,11 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 未接続OSでPOSIX専用O_DIRECTORYへ進む公開CLIのRed 1 failed/11 deselected（0.18秒）を、OS名先行確認の二行でGreen 1 passed/11 deselected（0.11秒）へ修正した。LOCAL_IO_FAILED/exit5/effects=[]、stderrなし、fixture/独自Git領域保全を確認。実3.10の同caseは1 passed/11 deselected（0.13秒）、関連八群は61 passed（28.82秒）、通常全lintも成功（Ruff 297/mypy 216）。provenance stdout追加後のconsole一caseは1 passed（9.03秒）。Windowsの保存/公開/nativeを完成・保証済みには変えず、ACL/namespace/別writerへのfallbackを追加しない。現在sourceのdelta/hashとbaseline HEADを区別して残す。fresh Strict/Final Quality Gate/手動確認とP-13完了認定・実consumer適用は未完了。
 
+
+**現行helpのFinish説明を実処理へ合わせる**
+
+公開work finishのhelpに残るselected subtree/canonical branch/derived stateを、captured direct recordの条件付き解除、completedのlive GET確認、現在branch保持、Start lockなし、正確なFinishDataへ変更した。Scope/Work/Workspaceの共通説明から旧cache/control/generation/共有branch bindingの前提も外した。既存公開help caseのRedは1 failed（0.06秒）、Greenは1 passed（0.03秒）。全help/completion、公開contract、Finish、fresh wheel四群は75 passed（31.92秒）、通常make lint（Ruff 297/mypy 216）も成功、exit0。業務処理や44 leafのsyntax、現consumerは未変更。元logsはpytest-current-finish-help-{red,green,related}.log、lint-current-finish-help.log。fresh Strict/Final Quality Gate/未完了のWindows接続・native受入をこのhelp補正で完了とは扱わない。
+
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 

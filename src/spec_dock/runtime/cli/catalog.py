@@ -92,7 +92,7 @@ HELP_EFFECTS: dict[str, str] = {
     "active set": "Return unchanged for the same valid direct selection; acquiring another selection requires work start.",
     "active clear": "Remove only observed local direct records; never promote an ancestor.",
     "work start": "Create or reuse a branch, checkout it, and select the ready Scope.",
-    "work finish": "Complete the Scope and clear its selected subtree; Git delivery is separate.",
+    "work finish": "Complete the Scope, then clear the captured direct record only if it selects that Scope or a descendant; keep the current branch.",
     "branch show": "Observe the explicit or default candidate Git ref; no binding is persisted.",
     "branch create": "Create only a new Git branch at a fixed base; no checkout or binding record.",
     "branch switch": "Checkout an existing Git branch; the direct selection record stays unchanged.",
@@ -355,22 +355,22 @@ def requires_confirmation(leaf: str, *, backend: str | None = None, on_conflict:
 
 
 _READS_BY_ROOT = {
-    "scope": "Scope metadata, hierarchy, cached state, and active selection; GitHub only for the named remote operation.",
+    "scope": "Current Scope metadata and hierarchy, direct selection for selectors, and live GitHub only for an explicit remote operation.",
     "active": "This worktree's active selection and the local Scope hierarchy.",
-    "work": "Scope hierarchy and descendants, active selection, canonical branch, Git HEAD, and dependency status.",
+    "work": "Current Scope hierarchy, direct selection, Git branch and HEAD, dependency evidence, and required live GitHub state.",
     "branch": "Current Scope metadata, Git refs, and Git worktree branch occupancy.",
     "dependency": "Declared Scope edges, inherited prerequisites, and status observations.",
     "artifact": "The selected Scope's Artifact catalog and safe file metadata.",
     "worktree": "Native Git worktree inventory, physical clone and path identity, branch and HEAD; Scope metadata only for --expect-current.",
     "workbench": "Source and destination worktree bindings, Scope identity, and Workbench entry types.",
-    "workspace": "Workspace schema, Scope data, derived generation, control, and pending records.",
+    "workspace": "Workspace declaration, current Scope structure, and explicitly requested local or remote observations.",
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
 }
 
 _DOES_NOT_BY_ROOT = {
     "scope": "Does not update other Scopes, change active selection, or implicitly switch branches.",
     "active": "Does not change lifecycle, dependencies, Git branch, or GitHub state.",
-    "work": "Does not commit, push, merge, or delete the canonical branch.",
+    "work": "Does not commit, push, merge, delete branches, or automatically roll back completed effects.",
     "branch": "Does not change Scope lifecycle or active selection.",
     "dependency": "Does not close a prerequisite or change GitHub issue state.",
     "artifact": "Does not print Artifact contents, source file hash, or external source path.",
@@ -383,13 +383,13 @@ _DOES_NOT_BY_ROOT = {
 _JSON_DATA_BY_ROOT = {
     "scope": "Scope identity, backend, status, revision, and snapshot or list filters.",
     "active": "Direct selection status/token, derived ancestors, selected/current branch, and branch_changed.",
-    "work": "Target, before/after state, selection, branch, readiness guards, and derived state.",
+    "work": "Direct Scope ID, started or completed result, before/after branch, selection token, and effect outcomes.",
     "branch": "Scope ID, candidate ref name, observed tip, created/switched, and binding_persisted=false.",
     "dependency": "Declared/effective edges, readiness, blockers, and status provenance.",
     "artifact": "artifact:{id,scope_id,path,type},changed; list returns scope_id,items. Bodies and external source paths remain private.",
     "worktree": "path, branch, head, changed, observed; list returns items with path, branch, head, bare, locked, prunable.",
     "workbench": "Source/destination worktree IDs, Scope, conflict policy, and mutation state.",
-    "workspace": "Snapshot, generation, validity, findings, status source, and pending recovery.",
+    "workspace": "Current observations, validity, findings, declaration changes, or verified preservation results.",
     "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
 }
 
@@ -528,6 +528,11 @@ def _help_spec(leaf: str) -> HelpSpec:
         reads = "Current Scope structure, Git worktree inventory, retired record headers, and actual checkout/common-Git data for the external backup."
         json_data = "target, before_protocol, after_protocol, changed_paths, backup_path, backup_verified and restore_verified; legacy active is preserved without import."
         confirmation = "Apply requires --yes and --confirm-old-writers-stopped; the latter is a human operational confirmation, not a monitored guarantee. --dry-run needs neither."
+    elif leaf == "work finish":
+        reads = "Current metadata, required target and descendant lifecycle, and this worktree's captured direct record. GitHub-backed completion is confirmed completed by a live GET before clearing that record."
+        does_not = "Keeps the current branch; no Start lock, automatic parent selection, child completion, commit, push, merge, or rollback. A Scope outside the active chain leaves the direct record unchanged."
+        json_data = "kind=work-finish, scope_id, completed, branch_before, branch_after, selection_token; effects report completion and any captured-record clear separately."
+        confirmation = "Apply requires --yes; --dry-run needs no confirmation."
     elif leaf.startswith("scope create"):
         reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."
         json_version = "specdock.cli/v2"

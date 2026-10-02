@@ -1070,6 +1070,12 @@ clean `0fd8764f0b1e64778344615e04c9d6428f1b827b` の通常全pytestは1851 passe
 
 [実consoleの記録](artifacts/fresh-console-lifecycle.md)に、fresh wheel/別venv/offline依存解決/pip check/source path改名から、実Gitのclone/linked WT、Start重複拒否、兄弟Issue並行、readonly Sync、completed GET確認後のFinish、次Issue Startまでを保存した。製品APIをmockせず、GitHubだけをstateful外部gh processで代替する。macOS/APFSの実Python 3.12は1 passed（8.73秒）、実3.10は1 passed（9.06秒）、共にexit0。初回の誤selectorによるfixture失敗は別logに残し、製品Redとは区別する。通常make lintはRuff（297 files）・mypy（216 source files）が成功、exit0。test追加前のclean e11f1879全macOS pytestは1843 passed/1 skipped（446.22秒）、exit0であり、追加caseを合算しない。P-12/fresh Strict、現在候補のLinux/Windows/native full gates、P-13完了認定、Final Quality Gate/手動確認、実consumer適用は未完了。
 
+## P-12 現行helpのFinish説明
+
+**現行helpのFinish説明を実処理へ合わせる**
+
+公開work finishのhelpに残るselected subtree/canonical branch/derived stateを、captured direct recordの条件付き解除、completedのlive GET確認、現在branch保持、Start lockなし、正確なFinishDataへ変更した。Scope/Work/Workspaceの共通説明から旧cache/control/generation/共有branch bindingの前提も外した。既存公開help caseのRedは1 failed（0.06秒）、Greenは1 passed（0.03秒）。全help/completion、公開contract、Finish、fresh wheel四群は75 passed（31.92秒）、通常make lint（Ruff 297/mypy 216）も成功、exit0。業務処理や44 leafのsyntax、現consumerは未変更。元logsはpytest-current-finish-help-{red,green,related}.log、lint-current-finish-help.log。fresh Strict/Final Quality Gate/未完了のWindows接続・native受入をこのhelp補正で完了とは扱わない。
+
 ## P-12 OS別の受入と未接続directory診断
 
 **OS別の受入と未接続directory診断**

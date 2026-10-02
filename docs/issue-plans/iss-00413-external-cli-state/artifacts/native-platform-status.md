@@ -27,6 +27,8 @@ console harnessはbaseline HEADに加えて、製品sourceのtracked status、�
 
 ## Windowsの受入に残るもの
 
+clean 31b1ffe12c36739c56375eea0a764ac2a5719d0aのLinux/Python 3.11.16で、配布consoleと未接続OS診断の二caseは2 passed（25.04秒）、exit0。copy入力SHA256はaedb8204b19e3694c0a14842b5149921d039f8731beda5eed5b8a7af189da0e4、非editable wheel SHA256はde1aa39b781e4a8e679a0dea8319dc7da21872c1329bf3b908374fd6bf6db534。製品source statusは空で、baseline HEADと候補は同一。元log pytest-linux-python311-console-platform-31b1ffe1.logに実prefix/import元・capability0・tmpfs・offlineとprovenanceを保持した。全件やWindows nativeの成功へ合算しない。
+
 現実装の正本はinfra/identity.py、windows_handles.py、start_lock.py、work_target_store.py、json_store.py、direct_json.py、file_publication.py、directory_publication.py、project_hook.pyである。最小identity/mutex API、CLIでの未接続診断、保存/公開の接続、NTFS別process検証を別々に扱う。
 
 設計D-03/D-05とP-03〜P-07/P-13のWindows保存/公開/強制終了・排他の受入は未完了。Global mutex取得不能時のLocal fallback、PID/mkdir lock、permission/ACL自動変更、独自.git stateは追加しない。未試験のOS/FSを対応済みと公表しないというrequirementの条件を維持する。

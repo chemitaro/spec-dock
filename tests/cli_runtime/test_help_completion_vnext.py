@@ -80,6 +80,9 @@ def test_help_explains_supported_finish_and_migration_modes(tmp_path: Path) -> N
     finish = json.loads(_run(tmp_path, "help", "work", "finish", "--json").stdout)["data"]["text"]
     assert "outside the active chain" in finish
     assert "An active Scope must resolve" not in finish
+    assert "confirmed completed" in finish and "captured direct record" in finish
+    assert "current branch" in finish and "no Start lock" in finish
+    assert "selected subtree" not in finish and "canonical branch" not in finish and "derived state" not in finish
 
     migrate = json.loads(_run(tmp_path, "help", "workspace", "migrate", "--json").stdout)["data"]["text"]
     assert "--dry-run" in migrate
