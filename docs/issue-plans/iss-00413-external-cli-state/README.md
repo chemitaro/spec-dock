@@ -2,7 +2,7 @@
 
 > ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
 
-**候補CLIの実装・製品試験を進行中です。最新macOS全件はclean75ac5760で1900 passed/4 skipped（388.57秒）、exit0。同じ候補sourceの通常インストールCLIは14操作を個別に確認しました。Linux全件は別sourceの8a70a8b3の証拠です。旧macOS比較不一致は原因未確定で記録を保持します。Windows保存/native受入、現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未完了です。仕様のGPT-6 Proレビューpass（7e895803）を製品の現在の認定と区別します。実装担当は利用者指定のGPT-6.1 Sol / Maxです。**
+**候補CLIの実装・製品試験を進行中です。最新macOS全件はclean2b2be5e2で1916 passed/4 skipped（434.98秒）、exit0。Startの保存原語確認を含む同じ候補sourceの通常インストールCLIは14操作を個別に確認しました。Linux全件は別sourceの8a70a8b3の証拠です。旧macOS比較不一致は原因未確定で記録を保持します。Windows保存/native受入、現在候補の再レビュー、Final Quality Gate、人間merge、実導入、正式Scope登録と#413のStartは未完了です。仕様のGPT-6 Proレビューpass（7e895803）を製品の現在の認定と区別します。実装担当は利用者指定のGPT-6.1 Sol / Maxです。**
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
 
@@ -10,9 +10,9 @@
 
 [WindowsのJSON reader](artifacts/windows-json-read.md)を親handleへ接続し、それを含む[clean6032621cの全件](artifacts/macos-full-6032621c.md)は成功しました。後続の[Scope公開の原語確認](artifacts/scope-publication-capability.md)は、既知の未対応をGitHub変更前に拒否する修正です。native Windowsと選択保存/公開/同期/解除、各公開/processは引き続き未完了です。
 
-最新の[clean75ac5760全件](artifacts/macos-full-75ac5760.md)と[インストール済みCLIの手動14操作](artifacts/manual-console-75ac5760.md)を保存しました。Scope公開の事前判定を含むsourceで確認しており、Windows・live GitHub・最終認定を成功扱いにはしません。
+先行候補の[clean75ac5760全件](artifacts/macos-full-75ac5760.md)と[インストール済みCLIの手動14操作](artifacts/manual-console-75ac5760.md)も保存しています。Scope公開の事前判定を含むsourceでの実結果であり、後続候補へ件数を合算しません。
 
-後続の[Startの保存原語確認](artifacts/start-publication-capability.md)を追加しました。公開が必要なStartは、既知の未対応をGit変更前に拒否します。三階層・dry-run・旧記録の保全と公開不要の同一Startを含む16組、および関連8 suiteがMac3.12/実3.10で各266件成功しました。通常lintも成功。上記75ac5760の全件・手動確認は、この追加変更を含まない候補の証拠です。後続sourceの全件・最終手動確認と現在候補Strict/FQを完了扱いにはしません。
+後続の[Startの保存原語確認](artifacts/start-publication-capability.md)は、公開が必要なStartで既知の未対応をGit変更前に拒否します。三階層・dry-run・旧記録の保全と公開不要の同一Startを含む16組、および関連8 suiteがMac3.12/実3.10で各266件成功し、通常lintも成功しました。この変更を含む[clean2b2be5e2の通常全件](artifacts/macos-full-2b2be5e2.md)は1916 passed/4 skipped、exit0。[同じ製品sourceの手動14操作](artifacts/manual-console-2b2be5e2.md)と[原文](artifacts/manual-console-2b2be5e2.json)を保存しました。Windows・live GitHub・現在候補Strict/FQを完了扱いにはしません。
 
 ## 正本と優先順位
 

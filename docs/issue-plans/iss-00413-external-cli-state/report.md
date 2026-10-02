@@ -213,3 +213,13 @@ GitHub境界はstateful fake ghであり、live GitHubや本consumerは変更し
 2026-10-02、baseline578f27e3から[Startの保存原語確認](artifacts/start-publication-capability.md)を追加した。未対応symbolの公開RedはGit branch/checkout後のpartial6（1 failed、0.66秒）。計画が公開を必要とする場合だけ、dry-run成功・lock/Git変更前に既存の能力照合を行う。三階層と既存記録の保全・公開不要の同一Startを含む16組は成功。関連八suiteはMac3.12で266 passed（102.42秒）、実3.10で266 passed（102.77秒）、通常lintはRuff300/mypy219でexit0。既存の実rename/同期失敗とpartial/unknown、自動rollbackなしを維持する。75ac5760の全件・手動結果をこの後続sourceへ転記せず、Windows保存/nativeと現在候補Strict/FQは未完了。
 
 新HTMLの公式validatorは最初にstatic成功後、Chrome DevTools起動待ちで実exit1。元logを保持し、同じHTML/検証条件を必要な実行権限で再検査して、四図のstatic・4/4 SVG・拡大/keyboard/bounds/focus/dismissal/restorationを実exit0で確認した。IAB390pxはdocument375px/section355px、横overflowなし、追加した16ケース・266件・後続sourceの全件/手動未実施が表示された。overrideを解除し新規空tabの既定1280pxを確認、確認専用tabを閉じた。十七payloadとmanifestの十八sourceをTailscale経由でHTTP200/no-store/正本bytesに照合。採用ZIPは116 member/115 payload、二schema/13例/489内部リンク/33 HTML ID、CRC/bytes/hashを検査した。report/確定interviewの原文を保持し、sourceの先行候補と現在の未完了gateを区別する。元logsはhtml-start-capability{,-retry}.log、http-start-capability.log、refresh-start-capability-pack.log。
+
+## 2026-10-02 clean2b2be5e2の全件と通常install CLIの手動確認
+
+Start保存原語確認を含むclean2b2be5e2の[通常macOS全pytest](artifacts/macos-full-2b2be5e2.md)は1916 passed/4 skipped（434.98秒）、実exit0。直接uv run pytestを起動し、元session65514を待った。前後のHEAD/clean、実Python3.12.11のprefix/providerと製品source hashが一致した。tracked source/docsは実行中に変更していない。元logのSHA256はad28c1d958c750d2852400c09c238bd05117fa8c00f316d145ae9d6128b2424f。
+
+[同じ製品sourceの手動14操作](artifacts/manual-console-2b2be5e2.md)はfresh wheel/外部venv/非editable install/pip check/sourceコピー元改名後の実consoleを個別に起動した。[原文](artifacts/manual-console-2b2be5e2.json)に実exit/stdout/stderr/entry比較、26件のstateful fake gh request、実Gitとrecordの観測を保持する。重複拒否、兄弟の並行Sync、completed GET後のFinish/branch保持、次Issue Start、native checkout hook失敗の原文/partial/rollbackなしを確認。C/B recordは部分失敗前後で同じbytes/hash、tracked仕様は同一fold、独自.git/spec-dockは不存在。補助的な表示形式の検査ミスは原文再読で補正し、製品の再実行やsource変更はしていない。
+
+live GitHub branchはread-only ls-remoteで8c59994cを返し、ローカル候補と不一致。通常pushは過去の自動承認審査による拒否のまま、明示的リモート操作許可の既存質問へ未回答であり再試行しない。元Final Quality Gate Strictはcatalog内に見つからず、v2 pilotの明示選択も未回答。新しいOracle/Strict/FQは実施していない。Windows保存/各公開/process/native、現在候補Strict/FQ、人間merge後のP-16/17は未完了。今回の全件・手動結果を最終認定へ変換せず、先行候補と旧失敗の証拠も保持する。
+
+更新したHTMLの公式validatorは四図のstatic・4/4 SVG・拡大/keyboard/bounds/focus/dismissal/restorationで実exit0。IAB390pxでdocument375px/section353px、横overflowなし、最新2b2be5e2・1,916件・手動14操作・Windows/最終gate未完了を確認した。viewportを解除し新規空tabの既定1280x720を照合、確認専用の二tabを閉じた。二十payloadとmanifestの二十一sourceはTailscale経由でHTTP200/no-store/正本bytesへ一致。採用ZIPの119 member/118 payload、二schema/13例/510内部リンク/33 HTML ID、CRC/bytes/hashを検査した。元logsはhtml-full-2b2be5e2.log、http-full-2b2be5e2.log。本文追記後の最終ZIP・配信bytesも再照合する。

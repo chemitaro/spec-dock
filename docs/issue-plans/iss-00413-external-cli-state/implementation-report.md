@@ -1144,3 +1144,11 @@ GitHub境界はstateful fake ghであり、live GitHubや本consumerは変更し
 ## 2026-10-02 Startの保存原語確認
 
 2026-10-02、baseline578f27e3から[Startの保存原語確認](artifacts/start-publication-capability.md)を追加した。未対応symbolの公開RedはGit branch/checkout後のpartial6（1 failed、0.66秒）。計画が公開を必要とする場合だけ、dry-run成功・lock/Git変更前に既存の能力照合を行う。三階層と既存記録の保全・公開不要の同一Startを含む16組は成功。関連八suiteはMac3.12で266 passed（102.42秒）、実3.10で266 passed（102.77秒）、通常lintはRuff300/mypy219でexit0。既存の実rename/同期失敗とpartial/unknown、自動rollbackなしを維持する。75ac5760の全件・手動結果をこの後続sourceへ転記せず、Windows保存/nativeと現在候補Strict/FQは未完了。
+
+## 2026-10-02 clean2b2be5e2の全件と通常install CLIの手動確認
+
+Start保存原語確認を通常checkpoint2b2be5e2へ保存した後、[通常macOS全pytest](artifacts/macos-full-2b2be5e2.md)を直接実行し、1916 passed/4 skipped（434.98秒）、実exit0を元sessionで確認した。前後のHEAD/clean、実Python3.12.11のprefix/provider、製品source hash不変を照合。関連266件や先行1900件に合算しない。
+
+[同じ製品sourceの手動14操作](artifacts/manual-console-2b2be5e2.md)はfresh wheel/外部venv/非editable install/pip check/コピー元source改名後の実consoleで個別に実行した。[原文](artifacts/manual-console-2b2be5e2.json)へstdout/stderr/実exit/前後entry、26件のstateful fake gh requestを保存した。Start重複拒否、兄弟二件のSync、completed GET後の捕捉解除とbranch保持、次Issue開始、Initiative Startのnative hookエラー/partial/rollbackなしを確認。tracked仕様のfold、C/B recordのbytes/hash、独自.git/spec-dock不在を照合した。補助検査の表記取り違えは保存原文を再読して補正し、CLIを再実行して成功を作り直していない。
+
+同じbranchのlive上流はread-only ls-remoteで8c59994cを返し、cleanローカル2b2be5e2と不一致だった。新しいpush/Oracle/Strict/FQは実行していない。通常pushへの明示許可とv2 pilotの選択は以前の質問への回答待ち。Windows保存・各公開/process・native受入、人間merge後の実consumer適用・正式#413 import/Startも未完了であり、元の全実装goalを達成済みにしない。

@@ -32,4 +32,4 @@
 
 ## 残る条件
 
-[全件1900件と手動14操作](macos-full-75ac5760.md)は75ac5760の製品sourceの証拠であり、今回のStart追加変更を含みません。現在候補の全件・最終手動確認、[Windows保存/native受入](windows-adapter-connection-review.md)、fresh Code Review StrictとFinal Quality Gateは引き続き必要です。P-03/P-06/P-13の完了認定、実consumer切替、正式#413 import/Startをこの一単位で完了にはしません。
+[先行候補の全件1900件と手動14操作](macos-full-75ac5760.md)は75ac5760の製品sourceの証拠であり、今回のStart追加変更を含みません。その後、この修正を含むclean2b2be5e2で[通常macOS全件1916 passed/4 skipped](macos-full-2b2be5e2.md)と[通常install CLIの個別手動14操作](manual-console-2b2be5e2.md)を確認しました。[Windows保存/native受入](windows-adapter-connection-review.md)、fresh Code Review StrictとFinal Quality Gateは引き続き必要です。P-03/P-06/P-13の完了認定、実consumer切替、正式#413 import/Startをこの一単位で完了にはしません。
