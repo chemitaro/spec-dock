@@ -17,6 +17,7 @@ from tests.cli_runtime.test_issue413_work_start import committed_workspace
 
 if TYPE_CHECKING:
     from pathlib import Path
+    from typing import Any
 
 
 def test_local_sync_is_readonly_and_includes_unselected_scopes(
@@ -503,6 +504,198 @@ def test_sync_includes_another_worktrees_target_chain_without_reading_its_unrela
     assert rows[str(linked)]["selection"]["current_branch"] is None
     assert rows[str(linked)]["process_state"] == "not_observed"
     assert record.read_bytes() == before
+
+
+@pytest.mark.parametrize("unrelated_kind", ["file", "symlink", "container-symlink"])
+def test_sync_ignores_an_unrelated_scope_shaped_file_in_a_selected_worktree(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, unrelated_kind: str
+) -> None:
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root = committed_workspace(tmp_path / "main")
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"],
+        check=True,
+        capture_output=True,
+    )
+    epic = add_scope(linked, "epic-00002", "epic", "init-00001", linked / "spec-dock/initiatives/init-00001-fixture")
+    add_scope(linked, "iss-00003", "issue", "epic-00002", epic)
+    unrelated = epic / "issues/iss-00099-unrelated"
+    if unrelated_kind == "file":
+        unrelated.write_bytes(b"not the selected Scope")
+    else:
+        if unrelated_kind == "container-symlink":
+            unrelated = linked / "spec-dock/initiatives/init-00099-unrelated"
+            unrelated.mkdir()
+            unrelated = unrelated / "epics"
+        unrelated.symlink_to(tmp_path / "absent", target_is_directory=True)
+    record = select_fixture(linked, scope_id="iss-00003", number=3)
+    before = {path: path.read_bytes() for path in linked.glob("spec-dock/**/.meta.json")}
+    before[record] = record.read_bytes()
+    if unrelated_kind == "file":
+        before[unrelated] = unrelated.read_bytes()
+    original_lstat = type(linked).lstat
+
+    def guarded_lstat(path: Path, *args: object, **kwargs: object) -> object:
+        if path == unrelated or path.is_relative_to(unrelated):
+            raise AssertionError("the product inspected an unrelated Scope entry")
+        return original_lstat(path, *args, **kwargs)
+
+    monkeypatch.setattr("pathlib.Path.lstat", guarded_lstat)
+
+    assert main(["--project", str(root), "workspace", "sync", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["effects"] == [] and result["data"]["complete"] is True
+    rows = {row["path"]: row for row in result["data"]["worktrees"]}
+    assert rows[str(linked)]["selection"]["status"] == "selected"
+    assert rows[str(linked)]["selection"]["scope_id"] == "iss-00003"
+    assert result["data"]["counts"] == [
+        {"scope_id": "init-00001", "direct_selected_count": 0, "descendant_selected_count": 1, "complete": True},
+        {"scope_id": "epic-00002", "direct_selected_count": 0, "descendant_selected_count": 1, "complete": True},
+        {"scope_id": "iss-00003", "direct_selected_count": 1, "descendant_selected_count": 0, "complete": True},
+    ]
+    assert all(path.read_bytes() == value for path, value in before.items())
+
+
+@pytest.mark.parametrize("change", ["ignored", "renamed"])
+def test_sync_resolves_the_current_scope_path_including_untracked_and_ignored_files(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], change: str
+) -> None:
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root = committed_workspace(tmp_path / "main")
+    epic = add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
+    add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+    subprocess.run(["git", "-C", str(root), "add", "spec-dock/initiatives"], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "scopes",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"], check=True, capture_output=True
+    )
+    selected = linked / "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture"
+    record = select_fixture(linked, scope_id="iss-00003", number=3)
+    if change == "renamed":
+        selected = selected.rename(selected.with_name("iss-00003-renamed"))
+        metadata = json.loads((selected / ".meta.json").read_bytes())
+        metadata["slug"] = "renamed"
+        (selected / ".meta.json").write_text(json.dumps(metadata))
+    else:
+        subprocess.run(
+            ["git", "-C", str(linked), "rm", "--cached", "-r", str(selected)], check=True, capture_output=True
+        )
+        with (linked / ".gitignore").open("a") as stream:
+            stream.write("\nspec-dock/initiatives/**/issues/\n")
+        assert (
+            subprocess.run(["git", "-C", str(linked), "check-ignore", str(selected)], capture_output=True).returncode
+            == 0
+        )
+    before = {path: path.read_bytes() for path in linked.glob("spec-dock/**/.meta.json")}
+    before[record] = record.read_bytes()
+    assert main(["--project", str(root), "workspace", "sync", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    other = next(row for row in result["data"]["worktrees"] if row["path"] == str(linked))
+    assert result["effects"] == [] and result["data"]["complete"] is True
+    assert other["selection"]["status"] == "selected" and other["selection"]["scope_id"] == "iss-00003"
+    assert all(path.read_bytes() == value for path, value in before.items())
+
+
+@pytest.mark.parametrize("damage", ["duplicate", "redirect", "deleted"])
+def test_sync_keeps_the_known_selection_when_the_selected_chain_is_not_safe(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], damage: str
+) -> None:
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root = committed_workspace(tmp_path / "main")
+    epic = add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
+    add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "scopes",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"], check=True, capture_output=True
+    )
+    selected = linked / "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture"
+    record = select_fixture(linked, scope_id="iss-00003", number=3)
+    if damage == "duplicate":
+        shutil.copytree(selected, selected.with_name("iss-00003-other"))
+    elif damage == "redirect":
+        ancestor = selected.parent.parent
+        outside = ancestor.rename(tmp_path / "outside")
+        ancestor.symlink_to(outside, target_is_directory=True)
+    else:
+        shutil.rmtree(selected)
+    before = record.read_bytes()
+    assert main(["--project", str(root), "workspace", "sync", "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    other = next(row for row in result["data"]["worktrees"] if row["path"] == str(linked))
+    assert result["effects"] == [] and result["data"]["complete"] is False
+    assert other["selection"]["status"] == ("stale" if damage == "deleted" else "unavailable")
+    assert other["selection"]["scope_id"] == "iss-00003" and other["selection"]["github_ref"] == "gh:example/repo#3"
+    assert record.read_bytes() == before
+
+
+@pytest.mark.parametrize("failure", ["exit", "timeout", "warning"])
+def test_sync_reports_incomplete_git_pathname_search_without_releasing_the_selection(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, failure: str
+) -> None:
+    root = committed_workspace(tmp_path / "main")
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"], check=True, capture_output=True
+    )
+    record = select_fixture(linked)
+    before = record.read_bytes()
+    original_run = subprocess.run
+    timeouts: list[float] = []
+
+    def failing_git(argv: list[str] | tuple[str, ...], **kwargs: Any) -> subprocess.CompletedProcess[bytes]:
+        if "ls-files" in argv:
+            timeouts.append(kwargs["timeout"])
+            if failure == "timeout":
+                raise subprocess.TimeoutExpired(argv, kwargs["timeout"], stderr=b"target lookup timed out")
+            return subprocess.CompletedProcess(argv, 128 if failure == "exit" else 0, b"", b"target lookup incomplete")
+        return original_run(argv, **kwargs)
+
+    monkeypatch.setattr(subprocess, "run", failing_git)
+    assert main(["--project", str(root), "workspace", "sync", "--timeout", "2", "--json"]) == 7
+    result = json.loads(capsys.readouterr().out)
+    other = next(row for row in result["data"]["worktrees"] if row["path"] == str(linked))
+    assert result["effects"] == [] and result["data"]["complete"] is False
+    assert other["selection"]["status"] == "unavailable"
+    assert other["selection"]["scope_id"] == "init-00001" and other["selection"]["github_ref"] == "gh:example/repo#1"
+    assert "target lookup" in json.dumps(other["findings"])
+    assert timeouts == [2] and record.read_bytes() == before
 
 
 def test_unavailable_github_observation_is_partial_without_effects_or_cached_fallback(

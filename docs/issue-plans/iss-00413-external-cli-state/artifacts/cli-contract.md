@@ -102,6 +102,8 @@ ScopeObservation = `scope_id:string`, `github_ref:string|null`, `lifecycle:open|
 
 `scopes` は選択の有無で絞らず、現在treeの表示対象と他WTから必要な直接対象/祖先を含めます。同一identityの行は重複させません。lifecycleは同じ観測集合から作り、対応するworktrees行と一致させます。local sourceのGH-backedはunknown、github sourceは今回GETした状態だけです。
 
+他WTの直接対象pathはGitのNUL区切りpathname検索からその都度導出します。tracked/untracked（ignore対象を含む）の現在pathを扱い、製品のmetadata読取とnofollow実体検証は対象/祖先に限定します。無関係なScope-shaped file/symlinkは観測を妨げません。Git検索のエラー・不完全な警告・timeout、現存候補重複、選択chainのredirectはunavailable、現存対象がない場合はstaleとして、読めた直接記録のID/refを保持します。いずれもcomplete=falseであり、Startの重複確認をすり抜けません。直接記録のfieldと公開JSON schemaは追加しません。
+
 `counts` は各scopes行のscope_idに対応する行を持ち、未選択も既知件数0で明示します。complete=falseの0は全WTで未選択との確定ではありません。未知の対象や祖先を架空行で補完せずfindingsとcomplete=falseで示す規則は維持します。例えばAが選択中かつcompleted、Bが未選択かつopenなら、scopesにA/Bのlifecycle、countsにAのdirect=1/Bのdirect=0（全読取成功ならcomplete=true）を返します。これは表示用memory値で、永続化しません。
 
 `started` は今回要求したStartの全必須効果を確認できた場合だけtrue。既存の同じ妥当記録/branchならunchangedかつtrue。partialではfalseです。記録公開後に確認不能なら、現物が存在していても今回started=trueとは返しません。

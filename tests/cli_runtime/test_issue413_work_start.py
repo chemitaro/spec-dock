@@ -1635,6 +1635,143 @@ def test_other_worktree_stale_selection_reserves_scope_id(
     assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == before_refs
 
 
+def test_start_accepts_the_standard_rule_documents_created_by_scope_import(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+
+    root = tmp_path / "consumer"
+    root.mkdir()
+    subprocess.run(["git", "-C", str(root), "init", "-q", "-b", "main"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), "remote", "add", "origin", "https://github.com/example/repo.git"],
+        check=True,
+        capture_output=True,
+    )
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    assert main(["installation", "init", str(root), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    for kind, number, parent in (("initiative", 1, None), ("epic", 2, "init-00001"), ("issue", 3, "epic-00002")):
+        args = [
+            "--project",
+            str(root),
+            "scope",
+            "import",
+            "github",
+            kind,
+            f"gh:example/repo#{number}",
+            "--title",
+            "Fixture",
+            "--slug",
+            "fixture",
+            "--json",
+        ]
+        if parent is not None:
+            args += ["--parent", parent]
+        assert main(args) == 0
+        capsys.readouterr()
+    rule = root / "spec-dock/initiatives/init-00001-fixture/epics/rules.md"
+    assert rule.is_file()
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "imported scopes",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    before = rule.read_bytes()
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            "iss-00003",
+            "--branch",
+            "imported-issue",
+            "--base",
+            "HEAD",
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["started"] is True and result["data"]["scope_id"] == "iss-00003"
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]).strip() == b"imported-issue"
+    assert rule.read_bytes() == before
+
+
+def test_start_is_not_blocked_by_an_unrelated_scope_shaped_file_in_a_peer_worktree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from tests.cli_runtime.test_issue413_active import select_fixture
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root = committed_workspace(tmp_path / "consumer")
+    epic = add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
+    add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+    add_scope(root, "iss-00004", "issue", "epic-00002", epic)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "scopes",
+        ],
+        check=True,
+        capture_output=True,
+    )
+    linked = tmp_path / "linked"
+    subprocess.run(
+        ["git", "-C", str(root), "worktree", "add", "--detach", str(linked), "HEAD"], check=True, capture_output=True
+    )
+    record = select_fixture(linked, scope_id="iss-00003", number=3)
+    unrelated = linked / "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00099-unrelated"
+    unrelated.write_bytes(b"not a Scope directory")
+    before = record.read_bytes()
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get",
+        lambda self, root, repo, number: open_issue(root, repo, number),
+    )
+
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            "iss-00004",
+            "--branch",
+            "work-four",
+            "--base",
+            "HEAD",
+            "--json",
+        ])
+        == 0
+    )
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["started"] is True and result["data"]["scope_id"] == "iss-00004"
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]).strip() == b"work-four"
+    assert record.read_bytes() == before and unrelated.read_bytes() == b"not a Scope directory"
+
+
 def test_same_valid_target_on_same_branch_is_unchanged(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:

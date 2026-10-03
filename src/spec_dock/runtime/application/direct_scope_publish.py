@@ -214,7 +214,10 @@ def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, cr
             if fresh.clone_identity != context.clone_identity or fresh.worktree_identity != context.worktree_identity:
                 raise ValueError("Git project physical identity changed after publication")
             fresh.require_writer()
-            observed = show_scope(load_scope_views(workspace, target_id=scope_id if targeted else None), scope_id)
+            observed = show_scope(
+                load_scope_views(workspace, target_id=scope_id if targeted else None, timeout=namespace.timeout),
+                scope_id,
+            )
             if (
                 observed.path != plan.dest_dir
                 or observed.kind != kind

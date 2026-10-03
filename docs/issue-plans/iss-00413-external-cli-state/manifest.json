@@ -4,7 +4,7 @@
   "document_date": "2026-09-30",
   "encoding": "UTF-8",
   "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
-  "status": "current worktree dogfooding applied and verified; all 8 aa44ea1d test lanes passed; FQ v2 fail with one P1 requiring a design decision; peer and formal Start preconditions remain unresolved",
+  "status": "Adopted A implemented; current external package updated; 257 related tests and external console manual pass; fresh independent Code Review and FQ v2 pending; other WT and formal Start prerequisites unchanged",
   "implementation_assignment": {
     "model": "gpt-6.1-sol",
     "reasoning_effort": "max",
@@ -40,13 +40,13 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 612,
+    "local_link_occurrences_checked": 776,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
-    "browser_dynamic": "4/4 SVG and zoom browser pass for exact HTML SHA; see artifacts/supported-os-verification-3b803ced.json",
+    "browser_dynamic": "2026-10-03 adopted-A HTML: 4/4 SVG and zoom validator pass; scripts unchanged",
     "mobile": "390px current HTML viewport and SVG/table bounds checked; see artifacts/supported-os-verification-3b803ced.json",
     "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
-    "product_acceptance": "current WT manual dogfooding and all aa44ea1d test lanes passed; FQ v2 P1 open; formal Start and clone-wide sync prerequisites not met",
+    "product_acceptance": "Adopted-A related tests and current external CLI verified; fresh full-candidate gates pending",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
     "manifest_hashes_vs_members": "passed"
@@ -59,13 +59,13 @@
     },
     {
       "path": "artifacts/acceptance-matrix.md",
-      "bytes": 21582,
-      "sha256": "623556b8611478a7dde03e626ec7b421b80e8b8a12c1a33a4e465db7c86f84ac"
+      "bytes": 21750,
+      "sha256": "cc6b2b6886a5c38a6240af96c46a600d246b70e9d384633d39f84c0410809c58"
     },
     {
       "path": "artifacts/cli-contract.md",
-      "bytes": 29083,
-      "sha256": "c8a72926c1e3d7e55000dc951ab06416f91a3e5f73f5deb25eb1163aa0fa60fc"
+      "bytes": 29761,
+      "sha256": "c5465218d2c99cedc931d02077c748de948d770b3589f21d36f53fb1da400ec4"
     },
     {
       "path": "artifacts/cli-schema.json",
@@ -226,6 +226,16 @@
       "path": "artifacts/dogfooding-20261003.md",
       "bytes": 10223,
       "sha256": "3c57352e0489e7040d224f2c98d67927b9c6300ca713d180222217a2e7998108"
+    },
+    {
+      "path": "artifacts/dogfooding-a-decision-20261003.md",
+      "bytes": 2000,
+      "sha256": "2c7d32c913a552df9694b493317c5550153704d4d39c8545d0139c72f1a50cd4"
+    },
+    {
+      "path": "artifacts/dogfooding-a-implementation-20261003.md",
+      "bytes": 3825,
+      "sha256": "4faa8c3eeee4f12a637deda123166c668e837efc1cd6e448bbe08e06673eb0a9"
     },
     {
       "path": "artifacts/dogfooding-review-aa44ea1d.json",
@@ -759,13 +769,13 @@
     },
     {
       "path": "design.md",
-      "bytes": 45422,
-      "sha256": "955b74fc43b789cdee7ef8cf3765846ae83b30ca9284904526fdd715c2246913"
+      "bytes": 47231,
+      "sha256": "9fed3aafbff3960a5988674f87e3ec8e02f34820c62e6d52c5131ad7fb4a5203"
     },
     {
       "path": "explanation.html",
-      "bytes": 73427,
-      "sha256": "4bec12f4aada362c3a866cd54f361a17eea1bb2ca713bdd3bd1e99dfdcfa8eaf"
+      "bytes": 75625,
+      "sha256": "def666c4b6dc3ace5cdd131b3d6b2088d9f349056bcbdf54b7b89c4a52da4e18"
     },
     {
       "path": "implementation-report.md",
@@ -779,8 +789,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 162157,
-      "sha256": "1933a71410f06a5a083f0e7ad576fd143dd664f73277eed72a352b9a040746ea"
+      "bytes": 165324,
+      "sha256": "78f046edb71dca3a5287d1c77a6a34360f4ddf08186dcce5bd2b528407fc7a14"
     },
     {
       "path": "preview-entry.html",
@@ -794,8 +804,8 @@
     },
     {
       "path": "requirement.md",
-      "bytes": 28908,
-      "sha256": "aad2df57ebe04c6698bd32b8c18fd23d1f71accd7ca648c32a2bf53b512efe32"
+      "bytes": 29503,
+      "sha256": "60102994e5e5782e356e043c8e291e2bb3e085a138a74627836e3c0db525ddc8"
     }
   ],
   "origin_generated_files": [
@@ -1068,7 +1078,7 @@
     "migration_restore_verified": true,
     "static_backup_verified": true,
     "static_restore_verified": true,
-    "latest_quality_gate": "aa44ea1d FQ v2 completed: fail, P1=1, P2=2; design decision pending; no current certification",
+    "latest_quality_gate": "Previous aa44ea1d FQ fail preserved; A decision adopted and remediation implemented; fresh campaign pending",
     "verification": {
       "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
       "required_lanes": 8,
@@ -1094,6 +1104,15 @@
       ],
       "decision": "pending; no implementation or normative specification change",
       "gate_closed": false
+    },
+    "adopted_a": {
+      "authority": "artifacts/dogfooding-a-decision-20261003.md",
+      "implementation": "artifacts/dogfooding-a-implementation-20261003.md",
+      "related_tests": 257,
+      "current_package_updated": true,
+      "fresh_code_review": "pending",
+      "fresh_fq_v2": "pending",
+      "formal_start": false
     }
   }
 }

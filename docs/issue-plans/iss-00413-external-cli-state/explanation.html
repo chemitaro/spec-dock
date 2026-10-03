@@ -321,6 +321,8 @@
 <p class="source-note">図の初回描画には、固定版 @plantuml/core@1.2026.6 をCDNから取得するインターネット通信が必要です。図ソースは外部の描画サーバーへ送りません。CDNに接続できなくても本文は読めます。描画できた図はクリック、Enter、Spaceで拡大できます。</p>
 </header>
 <section id="progress"><h2>現在の検証状況</h2>
+<p>2026年10月3日時点で、この0805作業環境への外部パッケージ導入と旧起動スクリプトの更新は実施済みです。実際の <code>./spec -h</code> は正常終了し、<code>workspace validate</code> は240件すべて妥当でした。メインを含む別の作業環境の更新と、正式なIssue #413の開始は別途の前提があり、完了扱いにはしていません。</p>
+<p>実導入後の品質レビューでは、別worktreeにある無関係なファイルがStartやSyncを止める問題が見つかりました。利用者が採用した「Gitのファイル名検索で対象を絞る方式A」で修正を進めています。前回の不合格記録は保存し、修正版の検証と品質ゲートを改めて実施します。次の表は以前の候補の実績です。</p>
 <p>2026年10月2日に対応OSをLinuxとmacOSへ確定しました。GPT-5.6 Proによる第三者分析と具体的な作業ブリーフに基づき、Windows専用コード・関連テスト・専用CIを撤去しました。さらに、選択記録が壊れている場合にFinishがIssueを閉じてしまう問題も修正し、変更前に停止するようにしました。</p>
 <p>以下は、最終品質ゲートへ提出する前の候補 <code>3b803ced</code> の確認記録です。LinuxとmacOSの全件テスト、両OSに通常インストールしたCLIの個別操作、独立コードレビューを別々に確認しています。件数は候補やOSをまたいで合算せず、skipを成功に数えません。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="最終ゲート提出前の検証結果"><table><thead><tr><th scope="col">確認範囲</th><th scope="col">実際の結果</th><th scope="col">結果の読み方</th></tr></thead><tbody><tr><td>Linux・Python 3.11の通常全件試験</td><td>1,883件成功・17件skip、終了コード0</td><td>固定Docker環境で実行。物理Linux端末の実績とは区別し、skipの理由も保存</td></tr><tr><td>macOS・Python 3.12の通常全件試験</td><td>1,899件成功・1件skip、終了コード0</td><td>skipはLinux専用の原語確認。macOSの失敗を隠したものではない</td></tr><tr><td>最低対応版Python 3.10</td><td>OS判定・保存・Start排他・Finish・実consoleの61件成功</td><td>関連境界の検査。Python 3.10で全件を実行したという意味ではない</td></tr><tr><td>通常インストールした候補CLI</td><td>両OSで各14操作を個別確認。重複拒否、並行Sync、Finish、次Start、Git部分失敗を確認</td><td>実Gitを使用。GitHub通信だけは所有する疑似ghで検証し、live GitHubのClose実績とは分ける</td></tr><tr><td>独立コードレビューr13</td><td>GPT-5.6 Proでpass・指摘0件。GitHubの同じbranchと完全なSHAを確認</td><td>レビュアー自身のテスト実行とは区別。以前のr12のP1/fail原文は保存</td></tr><tr><td>Windows専用実装の撤去とFinish修正</td><td>撤去sourceはc0f8add1、専用CIはa552e73c、Finish修正は3b803ced。POSIXの保存・Start排他を維持</td><td>新しい管理台帳・daemon・編集権限の仕組みを追加していない</td></tr></tbody></table></div>
@@ -495,6 +497,10 @@ end note
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="parallel"><h2>07　複数worktreeとSyncの見方</h2>
 
 <p>同じcloneのmainとlinked worktreeだけをGitから列挙します。各作業場所の直接記録を必要時に読み、その観測結果をSyncのstdoutまたはJSONに返します。中央ファイルへ全員分の選択を複製せず、generationやGitHub cacheも保存しません。</p>
+<h3>選択IDから現在のファイルを探す方法</h3>
+<p>作業記録にはIssueのIDとGitHub参照を残します。Issueの保存先はGitのファイル名検索で、その都度探します。まだコミットしていないファイルやignore対象の現在ファイルも含めます。ファイル名を探した後、SpecDockが内容と安全性を確認するのは、そのIssueと親Epic・Initiativeだけです。別のIssueの場所に通常ファイルやシンボリックリンクがあっても、正常な作業対象の観測を妨げません。</p>
+<p>例えば <code>iss-00413-old-name</code> を <code>iss-00413-new-name</code> へ移した場合は、現在の保存先とmetadataを読みます。同じIDの現存先が二つある場合は、どちらかを勝手に選びません。Git検索が失敗した場合や、対象・祖先が安全に読めない場合も不完全として扱います。記録の既知IDとGitHub参照は残るため、不明な作業対象を空扱いして二重に開始することはありません。</p>
+<p>Git内部の未追跡ファイル名探索には時間がかかる場合があります。全体が必ず三ファイル分の時間で終わる保証はせず、有限の待ち時間を設けます。新しいパス台帳や保存キャッシュは作りません。</p>
 <p>選択されていないIssueも表示対象です。例えばAを作業場所で選択したままGitHubで完了し、Bは誰も選択せずGitHubでオープンなら、「A：選択1件・完了」「B：選択0件・オープン」と別々に表します。JSONもIssueごとの状態一覧と選択件数を分けて返すため、未選択のBが一覧から消えることはありません。一部の作業場所を読めない場合は件数が不完全であると明示します。</p>
 <script type="text/plain" class="plantuml-source" id="source-sync" data-target="diagram-sync">
 @startuml

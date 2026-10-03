@@ -211,7 +211,7 @@ Syncは複数選択と親の配下件数を表示するが、選択から完了�
 **AC-413-23** — 選択中かつGitHub closed、未選択かつopen、selectedかつprocess不明を別fieldで表す。PID探索0。--source localではGH状態unknown、--source githubだけ今回のGETを使い、保存cacheを読書きしない。
 
 <a id="ac-413-24"></a>
-**AC-413-24** — Syncは自/他worktreeの記録を更新せず、世代・中央active一覧も保存しない。親集計は各対象の現存祖先を根拠にし、未読/不整合時はknown件数とcomplete=falseを出す。別worktreeの全Scopeを横断ロードしない。
+**AC-413-24** — Syncは自/他worktreeの記録を更新せず、世代・中央active一覧も保存しない。親集計は各対象の現存祖先を根拠にし、未読/不整合時はknown件数とcomplete=falseを出す。別worktreeの全Scopeの内容・実体を横断検証しない。選択IDから現在pathを導出するGitのファイル名検索は許容し、追跡済み・現在の未追跡（ignore対象を含む）の対象を扱う。製品がmetadataとpath安全性を検証する範囲は対象とその祖先に限定し、無関係なScopeの不正な実体によって選択観測を失敗させない。Gitの名前検索は定数時間を保証せず、有限timeout・検索失敗・重複対象・対象/祖先の安全性不明では不完全とする。現在tree全体を表示する通常のScope一覧の検証範囲は変更しない。
 
 
 <a id="rq-413-12"></a>

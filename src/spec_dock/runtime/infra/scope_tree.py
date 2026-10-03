@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 import re
 import stat
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.domain.ids import parse_id
 from spec_dock.runtime.domain.lifecycle import decode_scope_metadata
 from spec_dock.runtime.domain.writer_admission import require_scope_structure
+from spec_dock.runtime.infra.git_process import run_git
 from spec_dock.runtime.infra.json_store import read_guarded_json
 
 if TYPE_CHECKING:
@@ -31,13 +34,21 @@ class ScopeIdentityConflict(ValueError):
         super().__init__(message)
 
 
-def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tuple[StoredScope, ...]:
+def load_scope_tree(
+    specdock_dir: Path, *, target_id: str | None = None, timeout: float = 30
+) -> tuple[StoredScope, ...]:
     rows: list[StoredScope] = []
     identities: dict[str, Path] = {}
     linkages: dict[tuple[str, str, int], Path] = {}
-    selected_paths = _selected_paths(specdock_dir, target_id) if target_id is not None else None
+    selected_children = (
+        {path.parent: path for path in _selected_paths(specdock_dir, target_id, timeout=timeout)}
+        if target_id is not None
+        else None
+    )
 
     def walk(container: Path, kind: str, chain: tuple[str, ...]) -> None:
+        if selected_children is not None and container not in selected_children:
+            return
         try:
             mode = container.lstat().st_mode
         except FileNotFoundError:
@@ -45,10 +56,9 @@ def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tupl
         if not stat.S_ISDIR(mode):
             raise ValueError("Scope container is redirected or not a directory")
         pattern = re.compile(rf"{_PREFIXES[kind]}(?:-local)?-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*\Z")
-        for directory in sorted(container.iterdir()):
+        directories = (selected_children[container],) if selected_children is not None else sorted(container.iterdir())
+        for directory in directories:
             if not pattern.fullmatch(directory.name):
-                continue
-            if selected_paths is not None and directory not in selected_paths:
                 continue
             if not stat.S_ISDIR(directory.lstat().st_mode):
                 raise ValueError("Scope path is redirected or not a directory")
@@ -95,34 +105,66 @@ def load_scope_tree(specdock_dir: Path, *, target_id: str | None = None) -> tupl
     return tuple(rows)
 
 
-def _selected_paths(specdock_dir: Path, target_id: str) -> set[Path]:
-    """Locate only directory names, then read the target's current ancestor chain."""
+def _selected_paths(specdock_dir: Path, target_id: str, *, timeout: float) -> tuple[Path, ...]:
+    """Use Git names to locate a current chain without inspecting unrelated Scopes."""
+    prefix, _, _ = parse_id(target_id)
+    if target_id != target_id.strip().lower():
+        raise ValueError("selected Scope ID is not canonical")
+    depth = {"init": 1, "epic": 2, "iss": 3}[prefix]
+    containers = ("initiatives", "epics", "issues")[:depth]
+    prefixes = ("init", "epic", "iss")[:depth]
+    components = [specdock_dir.name]
+    for index, container in enumerate(containers):
+        components.extend((container, f"{target_id}-*" if index == depth - 1 else "*"))
+    target_glob = "/".join(components)
+    names = run_git(
+        specdock_dir.parent,
+        "ls-files",
+        "--full-name",
+        "-z",
+        "--cached",
+        "--others",
+        "--",
+        f":(glob){target_glob}",
+        f":(glob){target_glob}/**",
+        timeout=timeout,
+        require_clean_stderr=True,
+    )
+    if names and not names.endswith(b"\0"):
+        raise ValueError("Git Scope pathname output is not NUL-terminated")
+    candidates: set[tuple[Path, ...]] = set()
+    for name in names.split(b"\0"):
+        if not name:
+            continue
+        parts = os.fsdecode(name).split("/")
+        if len(parts) < 1 + depth * 2 or parts[0] != specdock_dir.name:
+            raise ValueError("Git Scope pathname is outside the requested hierarchy")
+        candidate: list[Path] = []
+        parent = specdock_dir
+        for index, (container, scope_prefix) in enumerate(zip(containers, prefixes, strict=True)):
+            directory_name = parts[2 + index * 2]
+            if parts[1 + index * 2] != container or not re.fullmatch(
+                rf"{scope_prefix}(?:-local)?-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", directory_name
+            ):
+                raise ValueError("selected Scope pathname is not a canonical hierarchy")
+            if index == depth - 1 and not directory_name.startswith(f"{target_id}-"):
+                raise ValueError("Git Scope pathname does not match the selected ID")
+            parent = parent / container / directory_name
+            candidate.append(parent)
+        candidates.add(tuple(candidate))
+
     matches: list[tuple[Path, ...]] = []
-    prefix = target_id.partition("-")[0]
-
-    def scan(container: Path, kind: str, parents: tuple[Path, ...]) -> None:
-        try:
-            mode = container.lstat().st_mode
-        except FileNotFoundError:
-            return
-        if not stat.S_ISDIR(mode):
-            raise ValueError("Scope container is redirected or not a directory")
-        pattern = re.compile(rf"(?P<id>{_PREFIXES[kind]}(?:-local)?-[0-9]+)-[a-z0-9]+(?:-[a-z0-9]+)*\Z")
-        for directory in container.iterdir():
-            match = pattern.fullmatch(directory.name)
-            if match is None:
-                continue
-            if not stat.S_ISDIR(directory.lstat().st_mode):
-                raise ValueError("Scope path is redirected or not a directory")
-            chain = (*parents, directory)
-            if match["id"] == target_id:
-                matches.append(chain)
-            if kind == "initiative" and prefix != "init":
-                scan(directory / "epics", "epic", chain)
-            elif kind == "epic" and prefix == "iss":
-                scan(directory / "issues", "issue", chain)
-
-    scan(specdock_dir / "initiatives", "initiative", ())
+    for chain in sorted(candidates):
+        for directory in chain:
+            try:
+                container_mode = directory.parent.lstat().st_mode
+                directory_mode = directory.lstat().st_mode
+            except FileNotFoundError:
+                break
+            if not stat.S_ISDIR(container_mode) or not stat.S_ISDIR(directory_mode):
+                raise ValueError("selected Scope path is redirected or not a directory")
+        else:
+            matches.append(chain)
     if len(matches) > 1:
         raise ValueError("duplicate selected Scope ID")
-    return set(matches[0]) if matches else set()
+    return matches[0] if matches else ()

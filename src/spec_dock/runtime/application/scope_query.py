@@ -46,12 +46,12 @@ class ScopeListResult:
     state: ObservedState | None
 
 
-def load_scope_views(specdock_dir: Path, *, target_id: str | None = None) -> tuple[ScopeView, ...]:
+def load_scope_views(specdock_dir: Path, *, target_id: str | None = None, timeout: float = 30) -> tuple[ScopeView, ...]:
     """Read current metadata; GitHub lifecycle is unknown until a live observation."""
     if specdock_dir.is_symlink() or not specdock_dir.is_dir():
         raise ValueError("SpecDock workspace root is missing or redirected")
     views: list[ScopeView] = []
-    for record in load_scope_tree(specdock_dir, target_id=target_id):
+    for record in load_scope_tree(specdock_dir, target_id=target_id, timeout=timeout):
         metadata = record.metadata
         raw = metadata.raw
         scope_id, kind, title, parent = raw["id"], raw["type"], raw["title"], raw["parent_id"]

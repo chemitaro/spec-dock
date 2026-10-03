@@ -157,7 +157,7 @@ def observe_worktrees(context: ProjectContext, *, timeout: float = 30) -> tuple[
             with WorkTargetStore(other.root) as store:
                 direct = store.read()
             views = (
-                load_scope_views(other.root / "spec-dock", target_id=direct.record.scope_id)
+                load_scope_views(other.root / "spec-dock", target_id=direct.record.scope_id, timeout=timeout)
                 if direct.record is not None
                 else ()
             )

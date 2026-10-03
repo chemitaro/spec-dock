@@ -286,6 +286,20 @@ uv run pytest tests/cli_runtime/test_workspace_sync_vnext.py tests/integration/t
 
 **失敗時の停止/戻り先**: 表示のために中央storeが必要になればD-10へ戻る。枝違いの祖先を片方へ黙って統一しない。
 
+### P-08.A 2026-10-03採用Aによる対象限定観測の修正
+
+利用者の「Aを採用します。タスクを再開して下さい」を根拠に、[採用記録](artifacts/dogfooding-a-decision-20261003.md)の範囲を実施する。前回FQのP1 FQG-413-001を解消する。AC-413-24 / D-10 / D-13を、Gitの名前検索は許容し、無関係なScopeの内容・実体の製品側検証を禁止する契約へ具体化した。直接記録の7field、Start時だけの短い共通lock、既知ID/refの予約、readonly Syncは維持する。
+
+1. 公開Syncで、別WTの選択Issueとは無関係なScope-shaped fileが観測を失敗させるRedを固定する。
+2. NRT/infra/scope_tree.pyに既存bounded Git adapterによる対象IDのpathname検索と直接chain読取を実装する。全件loaderは保持し、対象限定loaderは兄弟/別階層を列挙・lstatしない。NRT/application/scope_query.pyと対象限定callerでtimeoutを渡す。
+3. 同じ公開SyncをGreenにし、未追跡/ignore対象、tracked旧pathと新pathの移動、対象重複、選択chainのredirect、Git失敗/timeout、readonly bytesを一件ずつ検証する。公開Startでも無関係な実体の影響がなく、同一ID/refの重複は拒否されることを確認する。Scope公開とactive解除の既存回帰を実行する。
+4. fresh wheelを外部の非editable環境へ導入し、実console/実Gitのlinked WTでmanual smokeする。合意済みの現在0805 WTの外部packageを更新し、`./spec -h`・validate・選択・Syncの実測を残す。別の4実WTとclosed祖先は変更しない。
+5. scoped commit/non-force push後、GPT-5.6 Sol / ProのCode Review Strictを実施する。重大指摘は完全batch分析後に修正し、再レビューする。変更したIO契約のためFinal Quality Gate v2は新campaignとして開始し、旧fail campaignは保全する。同一候補SHAの必須検証と独立レビューがpassになるまで認定しない。
+
+**完了条件**: 無関係なScope実体がStart/Syncの選択観測を妨げず、選択chainの未知状態はfail-closedで予約を保持する。Linux/macOS通常検証、fresh distribution/manual dogfood、Strict Code Review、fresh FQ v2を通過する。新コマンド、Scope path field、UUID、中央engine/registry/cache、permission制度、P2別指摘の改修は含めない。
+
+**外部manualで見つかったStartの既存契約不具合**: fresh installation init→CLIの三階層import→commit→Startが、標準生成される `epics/rules.md` をEpic directoryと誤認してexit3となった。`infra/committed_workspace.py` のdepthだけによる構造判定を修正し、通常loaderと同じScope dirname規則を満たす階層だけをScope構造として扱う。Scope-shaped file/symlinkの拒否は維持する。公開CLIで標準import後のStartのRed→Greenを固定し、同じ実consumerの失敗証拠を保全して、修正版consoleで残る操作を再開する。RQ-413-06 / AC-413-10〜13の既存Start動作を成立させる修正であり、新しい要件・管理機構・操作は追加しない。
+
 <a id="p-09"></a>
 ## P-09 GitHub発行・lifecycle・依存を台帳から切り離す
 

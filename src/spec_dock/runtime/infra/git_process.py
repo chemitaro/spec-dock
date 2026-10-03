@@ -46,7 +46,14 @@ class GitProcessError(RuntimeError):
         }
 
 
-def run_git(root: Path, *args: str, timeout: float = 30, mutation: bool = False, missing_ok: bool = False) -> bytes:
+def run_git(
+    root: Path,
+    *args: str,
+    timeout: float = 30,
+    mutation: bool = False,
+    missing_ok: bool = False,
+    require_clean_stderr: bool = False,
+) -> bytes:
     argv = ("git", "-C", str(root), *args)
     try:
         result = subprocess.run(
@@ -64,4 +71,6 @@ def run_git(root: Path, *args: str, timeout: float = 30, mutation: bool = False,
         raise GitProcessError(
             argv, result.stderr, result.returncode, uncertain=mutation and result.returncode < 0, stdout=result.stdout
         )
+    if require_clean_stderr and result.stderr:
+        raise GitProcessError(argv, result.stderr, result.returncode, stdout=result.stdout)
     return result.stdout

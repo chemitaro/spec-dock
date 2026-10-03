@@ -80,7 +80,7 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
             if invalid and ((not namespace.yes and not namespace.dry_run) or not captured.observed_handles):
                 raise ValueError("invalid selection requires --all --yes and safely observed regular records")
             if namespace.dry_run:
-                observed = _observe(context)
+                observed = _observe(context, timeout=namespace.timeout)
                 return OperationResult(
                     namespace.command_path,
                     "planned",
@@ -108,7 +108,7 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 effects.append(
                     Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", handle.token)
                 )
-        observed = _observe(context)
+        observed = _observe(context, timeout=namespace.timeout)
     except (ValueError, OSError, RuntimeError) as error:
         if effects:
             applied = any(effect.status in ("succeeded", "unknown") for effect in effects)
@@ -130,11 +130,11 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     )
 
 
-def _observe(context: ProjectContext) -> SelectionObservation:
+def _observe(context: ProjectContext, *, timeout: float) -> SelectionObservation:
     with WorkTargetStore(context.root) as store:
         observed = store.read()
     views = (
-        load_scope_views(context.root / "spec-dock", target_id=observed.record.scope_id)
+        load_scope_views(context.root / "spec-dock", target_id=observed.record.scope_id, timeout=timeout)
         if observed.record is not None
         else ()
     )

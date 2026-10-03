@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from pathlib import Path, PurePosixPath
+import re
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING
 
@@ -50,6 +51,21 @@ def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Pat
                 raise ValueError("candidate work target state or its parent is tracked by Git")
             if any(part in ("", ".", "..") for part in parts) or (parts[0] != "spec-dock" and not rules):
                 raise ValueError("committed planning path is unsafe")
+            if parts[:2] == ["spec-dock", "initiatives"]:
+                scope_path = True
+                for index, (container, prefix) in enumerate((
+                    ("initiatives", "init"),
+                    ("epics", "epic"),
+                    ("issues", "iss"),
+                )):
+                    position = 2 + index * 2
+                    if len(parts) <= position or parts[position - 1] != container:
+                        break
+                    if not re.fullmatch(rf"{prefix}(?:-local)?-[0-9]+-[a-z0-9]+(?:-[a-z0-9]+)*", parts[position]):
+                        scope_path = False
+                        break
+                if not scope_path:
+                    continue
             relative = PurePosixPath(decoded)
             structure = (
                 parts == ["spec-dock"]

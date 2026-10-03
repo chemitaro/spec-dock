@@ -248,7 +248,11 @@ GH変更は一回だけ。現gatewayの確認GETは維持できますが、確�
 <a id="d-10"></a>
 ## D-10 Syncは複数worktreeのその場の観測
 
-`workspace sync [--source local|github] [--allow-invalid]`。既定はlocal（旧cacheはexit2で移行案内）。current treeの仕様を読み、Git inventoryに含まれる各WTからD-03の直接記録と、必要な対象/祖先だけを読みます。other WT全Scope treeを走査する方式や中央一覧の書込みをしません。
+`workspace sync [--source local|github] [--allow-invalid]`。既定はlocal（旧cacheはexit2で移行案内）。current treeの仕様を読み、Git inventoryに含まれる各WTからD-03の直接記録と、必要な対象/祖先だけを読みます。other WTの全Scopeの内容・実体を横断検証する方式や中央一覧の書込みをしません。
+
+**2026-10-03採用A: IDから現在pathをGitで検索する。** 固定7fieldの直接記録を維持し、path locatorやcacheを追加しません。`git ls-files -z --cached --others -- PATHSPEC...` により対象IDを含む正規の三階層pathを検索します。ignore対象も検索し、現在の未追跡Scopeを落としません。環境変数を除去する既存Git adapterと有限timeoutを使い、NUL区切りを解釈します。追跡済みの旧pathが消えていれば候補から除き、現存する新pathを採用します。現存候補が複数なら曖昧な選択をせず停止します。対象と祖先のcontainer/directoryをnofollowで確認し、metadataのID、親、GitHub ref、構造を既存規則で検証します。対象不存在はstaleとして既知ID/refを保持し、検索失敗・重複・選択chainのredirect等はunavailableとして保持します。無関係なScopeのmetadata読取・実体検証は行いません。
+
+Git内部の未追跡ファイル名探索は許容するため、IO全体を対象3件だけ・定数時間と約束しません。Gitの名前検索を許容することと、製品が全Scopeの内容や実体を検証することを区別します。この規則はStartの他WT確認、Sync、対象限定のactive解除、公開直後の未追跡Scope検証に共通適用します。現在tree全体を扱う通常の一覧/検証は従来どおり全件を検証します。
 
 `SyncView(observed_at, source, complete, worktrees, scopes, counts, findings)` をメモリで作り、textまたはJSONへ返します。各WTのdirect、現在branch、選択時branch、selection状態、GH観測状態は別fieldです。Codex processは `process_state="not_observed"` 固定で、PID/セッションを調べません。
 
@@ -318,7 +322,7 @@ Scope deleteの--recursive/--clear-active/--detach-dependencies、Workbenchのov
 
 [AC対応表](artifacts/acceptance-matrix.md) と [Plan](plan.md#regression) の実測が必要です。threadだけでなく別processでStart/clear/Finishの順序を固定して競合を検査します。全writerロックが残っている実装、Check→unlock→recordという誤実装、固定active.jsonを後で消す誤実装がRedになる試験を用意します。
 
-producer sourceのtest import成功だけでは配布成功としません。Linux/macOSでfresh wheel/外部venv/実console/別clone/linked worktree/controlなし/実Gitとstateful fake ghを通します。通常 `make lint` と `uv run pytest` を維持し、OS/Python/FS/候補SHA/wheel hash/exit/skipを記録します。Windows native/NTFS laneはgateにしません。非対応OSの境界は、utilityがcontext-freeであることと、代表的な業務writerがGit/GitHub/file効果前にeffects=[]で拒否されることだけをplatform simulationで検査します。ベンチマーク制度やcacheを増やしません。最小のIO検査として、scope showが他WT全Scopeを走査しないこと、Syncが必要な直接対象/祖先だけを読むことを測ります。
+producer sourceのtest import成功だけでは配布成功としません。Linux/macOSでfresh wheel/外部venv/実console/別clone/linked worktree/controlなし/実Gitとstateful fake ghを通します。通常 `make lint` と `uv run pytest` を維持し、OS/Python/FS/候補SHA/wheel hash/exit/skipを記録します。Windows native/NTFS laneはgateにしません。非対応OSの境界は、utilityがcontext-freeであることと、代表的な業務writerがGit/GitHub/file効果前にeffects=[]で拒否されることだけをplatform simulationで検査します。ベンチマーク制度やcacheを増やしません。最小のIO検査として、scope showが他WT全Scopeを読まないこと、Syncの製品側metadata読取・path安全性検証が必要な直接対象/祖先に限定されることを測ります。Gitのファイル名探索は許容し、全IOが定数時間であるという検査に置き換えません。無関係なfile/symlink、未追跡対象、path移動、対象重複、選択chainのredirect、Git検索の失敗/timeoutを公開CLIで検証します。
 
 <a id="d-14"></a>
 ## D-14 実施境界・完成証拠
