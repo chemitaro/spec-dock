@@ -1,0 +1,113 @@
+{
+  "reviewed_repository": "chemitaro/spec-dock",
+  "reviewed_branch": "codex/iss-00413-external-cli-state",
+  "reviewed_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+  "status": "fail",
+  "coverage_complete": true,
+  "perspectives": [
+    {
+      "id": "functional-correctness",
+      "status": "complete",
+      "summary": "外部CLI、Start/Finish/active、Scope/依存、Artifact/Workbench、Sync、migration、installationの正常・境界・失敗経路を照合した。Start/Syncが他worktreeの無関係なScope entryに依存するP1をperformance-capacityへ集約した。"
+    },
+    {
+      "id": "requirements-closure",
+      "status": "complete",
+      "summary": "RQ-413-01〜18、AC-413-01〜42、D-01〜14、P-01〜18とP-16/P-17の実施境界を実装・証拠へ対応付けた。P-16実施済みという本文と末尾サマリーの矛盾をP2として記録した。"
+    },
+    {
+      "id": "test-adequacy",
+      "status": "complete",
+      "summary": "POSIX原語、Python 3.10、外部wheel、E2E、migration、static update、Finish競合、Sync dedupの試験を検査した。無関係treeのdirectory列挙と確定的mkdir失敗の分類を検出できない具体的な保護欠落は各findingへ反映した。reviewerはtest_commandsを実行していない。"
+    },
+    {
+      "id": "e2e-user-flow",
+      "status": "complete",
+      "summary": "通常package→薄いshim→help/read→Start/Finish/Sync、およびbackup→workspace migrate→static update→validateの利用者経路を確認した。現在WTのreader/Artifact成功、他4 WTによるSync不完全、closed祖先によるP-17拒否を正式Start成功と混同していない。"
+    },
+    {
+      "id": "api-contract",
+      "status": "complete",
+      "summary": "44 leaf、共通option、v2 envelope、CLI/data schema、exit/effects/raw Git契約を照合した。Artifact/Workbenchの確定的なdirectory作成失敗がpartial/unknownになるP2を記録した。"
+    },
+    {
+      "id": "integration-boundaries",
+      "status": "complete",
+      "summary": "Git inventory、GitHub GET/POST/PATCH、filesystem descriptor/no-follow/fsync/no-replace、外部console、同clone worktree境界を検査した。他WTの無関係Scope pathが観測境界へ流入する影響はFQG-413-001に集約した。"
+    },
+    {
+      "id": "compatibility-regression",
+      "status": "complete",
+      "summary": "Linux/macOS限定、Python 3.10下限、schema3、既存local綴りID・未知field、44 leaf、既知static hash更新と未知改変拒否を確認した。Windows native義務は復活させていない。"
+    },
+    {
+      "id": "security-baseline",
+      "status": "complete",
+      "summary": "credential redaction、Git環境の束縛、single-link regular file、nofollow descriptor、symlink外部target不追跡、非対応OSの副作用前拒否を確認した。追加macOS保全修正はlink自身のmodeだけを扱う。"
+    },
+    {
+      "id": "reliability-recovery",
+      "status": "complete",
+      "summary": "captured token解除、partial/unknown、GitHub送信後不明、process強制終了、descriptor解放、backup保持、自動resume/rollbackなしを確認した。確定的mkdir失敗の過剰なunknown報告はFQG-413-002に集約した。"
+    },
+    {
+      "id": "data-migration",
+      "status": "complete",
+      "summary": "artifacts/data-schema.jsonを正本として、schema3維持、current WT一宣言切替、外部backup/復元照合、symlink modeと外部target不変、旧active非自動移植を確認した。P-17は前提不成立のまま未実施である。"
+    },
+    {
+      "id": "performance-capacity",
+      "status": "complete",
+      "summary": "D-10/D-13の必要対象・祖先、GitHub ref dedup、有限timeout、descriptor寿命だけを評価した。GitHub GET dedupとbounded timeoutは成立する一方、他WTの全Scope directory走査が残るP1を確認した。"
+    },
+    {
+      "id": "release-rollback",
+      "status": "complete",
+      "summary": "wheel/sdist、非editable console、薄いshim、単WT static inventory、既知hash限定更新・139既知file退役、backup保持と自動rollbackなしを確認した。P-16状態のサマリー矛盾はrelease evidenceにも二次影響する。"
+    },
+    {
+      "id": "repository-conformance",
+      "status": "complete",
+      "summary": "provider正本src/spec_dock、consumer dogfood spec-dock、assets/inventory mirrors、Linux/macOS CI、AGENTSのlayer境界、data-schema.json正本を照合した。旧worktree-state-schema.jsonを要求していない。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "FQG-413-001",
+      "severity": "P1",
+      "perspective": "performance-capacity",
+      "title": "他worktreeの直接対象解決が全Scope directoryを走査し、無関係なentryでStart/Syncを停止する",
+      "location": "src/spec_dock/runtime/infra/scope_tree.py:98-128",
+      "evidence": "target_id付きload_scope_treeは_selected_pathsで、issueなら全initiative配下の全epic・全issue directoryをiterdir/lstatしてから対象chainを選ぶ。observe_worktreesは直接recordを持つ各WTでこの経路を呼び、無関係なmatching directoryがsymlink・非directory・読取不能ならrowをunavailableにする。Startのcheck_inventoryはそのunavailable rowを副作用前に拒否し、Syncはcomplete=falseになる。既存のunrelated-tree試験は無関係.meta.json本文を壊すだけで、directory列挙/lstatを検出しない。これはD-10/D-13の「他WTは直接対象と必要祖先だけを読む」「全Scope treeを走査しない」という固定契約に反する。",
+      "impact": "同cloneの別WTで直接対象chainが正常でも、無関係なScope entry一件の異常により新しいStartが成立せず、Syncも不完全になる。正常時も観測コストが各WTの全Scope数に比例し、必要対象・祖先だけという受け入れ境界を満たさないため、現在候補の認定を阻害する。",
+      "root_cause": "直接recordが保持するIDから対象pathを局所解決せず、対象探索をhierarchy全体のdirectory-name scanで実装したため。試験もmetadata body openだけを監視し、directory traversalを保護していない。",
+      "recommendation": "D-10/D-13の既存契約どおり、他worktreeでは直接recordの対象と必要祖先以外を列挙・lstatせず、無関係なScope entryの異常をStart/Syncの成否へ持ち込まないこと。"
+    },
+    {
+      "id": "FQG-413-002",
+      "severity": "P2",
+      "perspective": "api-contract",
+      "title": "確定的なdirectory作成失敗をpartial・unknown effectとして報告する",
+      "location": null,
+      "evidence": "direct_artifact.py:256-306はos.mkdir前にdirectory_attempted=trueとし、任意のOSErrorでpartial=true、artifact.directory=unknown、exit6を返す。direct_workbench.py:172-249も同じ順序でworkbench-directory=unknownを返す。そのため、directoryを作成する前にPermissionError/EACCESが返りpath不在が確定している経路でも未知の変更効果を報告する。既存試験は実際にmkdirを成功させた後で例外を投げる不明結果だけを覆う。C-04は変更効果がないと確認できるIO失敗をfailed/exit5として区別する。",
+      "impact": "API利用者と運用者は、何も作成されていない権限拒否を部分適用として扱い、不要な現物確認・recovery判断を要求される。データ破壊は示されないが、公開effects/exit契約の正確性が損なわれる。",
+      "root_cause": "mutation syscallを呼び出そうとした事実と、効果が発生した可能性を同じattempted flagで表し、errnoまたは事後存在確認による確定失敗を分類していない。",
+      "recommendation": "情報提供のみ。是正不要。"
+    },
+    {
+      "id": "FQG-413-003",
+      "severity": "P2",
+      "perspective": "requirements-closure",
+      "title": "P-16実施済みの本文と完成証拠サマリーが矛盾している",
+      "location": "docs/issue-plans/iss-00413-external-cli-state/plan.md:1076-1095",
+      "evidence": "同じplan.mdのP-16節は2026-10-03にcurrent WTへの導入・移行・動作確認を実施済みとし、P-17だけを前提不成立・未実施と記録する。一方、末尾の「完成証拠の別管理」はP-16を未着手とし、続く最終ゲート準備段落もP-16/P-17をともに未着手と記載する。dogfooding-20261003.mdもP-16のbackup・migration・20資産更新・139 file退役・reader/Artifact成功と、P-17拒否を分離している。",
+      "impact": "exact candidateのauthorityを読むreviewerやrelease operatorが、既に適用されたcurrent WTを未適用と誤認し、P-16/P-17の境界や再実行判断を誤る可能性がある。製品挙動は直接壊さないが、受け入れ証拠の整合性を損なう。",
+      "root_cause": "追加許可によるP-16の順序変更と実施結果をP-16本文へ反映した後、末尾の生成時サマリーと基準段落のmirror更新が漏れた。",
+      "recommendation": "情報提供のみ。是正不要。"
+    }
+  ],
+  "unreviewed_areas": [],
+  "unresolved_items": [],
+  "prior_obligation_dispositions": [],
+  "summary": "exact branch tip aa44ea1d37220f8d9f013df3ac44f22632099ee7を検証して全選択perspectiveを評価した。macOS symlink mode保全、known-hash限定static更新、Linux/macOS/Python 3.10境界、P-16 current WTの実適用とP-17前提不成立の分離は確認できたが、他WTの必要対象・祖先だけを読む固定契約に反して全Scope directoryを走査し、無関係なentryでStart/Syncを停止するP1があるためfail。reviewerは独立test laneのtest_commandsを実行しておらず、その実行実績を主張しない。レビュー手順は固定scopeのmap、全体sweep、deepening、omission checkに従った。attachments-bundle"
+}

@@ -1,0 +1,66 @@
+{
+  "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+  "actual_worktree_writes": false,
+  "cases": [
+    {
+      "location": "sibling-issue",
+      "entry_kind": "regular-file",
+      "selection_status": "unavailable",
+      "selection_reason": "Scope path is redirected or not a directory",
+      "sync_exit": 7,
+      "sync_complete": false,
+      "sync_effects": [],
+      "selection_bytes_preserved": true,
+      "git_target_query_exit": 0,
+      "git_target_query_paths": [
+        "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture/.meta.json"
+      ],
+      "git_target_query_stderr": ""
+    },
+    {
+      "location": "sibling-issue",
+      "entry_kind": "symlink",
+      "selection_status": "unavailable",
+      "selection_reason": "Scope path is redirected or not a directory",
+      "sync_exit": 7,
+      "sync_complete": false,
+      "sync_effects": [],
+      "selection_bytes_preserved": true,
+      "git_target_query_exit": 0,
+      "git_target_query_paths": [
+        "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture/.meta.json"
+      ],
+      "git_target_query_stderr": ""
+    },
+    {
+      "location": "other-initiative",
+      "entry_kind": "regular-file",
+      "selection_status": "unavailable",
+      "selection_reason": "Scope path is redirected or not a directory",
+      "sync_exit": 7,
+      "sync_complete": false,
+      "sync_effects": [],
+      "selection_bytes_preserved": true,
+      "git_target_query_exit": 0,
+      "git_target_query_paths": [
+        "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture/.meta.json"
+      ],
+      "git_target_query_stderr": ""
+    },
+    {
+      "location": "other-initiative",
+      "entry_kind": "symlink",
+      "selection_status": "unavailable",
+      "selection_reason": "Scope path is redirected or not a directory",
+      "sync_exit": 7,
+      "sync_complete": false,
+      "sync_effects": [],
+      "selection_bytes_preserved": true,
+      "git_target_query_exit": 0,
+      "git_target_query_paths": [
+        "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture/.meta.json"
+      ],
+      "git_target_query_stderr": ""
+    }
+  ]
+}

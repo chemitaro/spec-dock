@@ -4,7 +4,7 @@
   "document_date": "2026-09-30",
   "encoding": "UTF-8",
   "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
-  "status": "current-worktree dogfooding applied and manual checks passed; clone-wide sync and formal admission blocked by existing peer/ancestor preconditions; final repaired-candidate verification pending",
+  "status": "current worktree dogfooding applied and verified; all 8 aa44ea1d test lanes passed; FQ v2 fail with one P1 requiring a design decision; peer and formal Start preconditions remain unresolved",
   "implementation_assignment": {
     "model": "gpt-6.1-sol",
     "reasoning_effort": "max",
@@ -46,7 +46,7 @@
     "browser_dynamic": "4/4 SVG and zoom browser pass for exact HTML SHA; see artifacts/supported-os-verification-3b803ced.json",
     "mobile": "390px current HTML viewport and SVG/table bounds checked; see artifacts/supported-os-verification-3b803ced.json",
     "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
-    "product_acceptance": "incomplete; see current_implementation_evidence",
+    "product_acceptance": "current WT manual dogfooding and all aa44ea1d test lanes passed; FQ v2 P1 open; formal Start and clone-wide sync prerequisites not met",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
     "manifest_hashes_vs_members": "passed"
@@ -226,6 +226,26 @@
       "path": "artifacts/dogfooding-20261003.md",
       "bytes": 10223,
       "sha256": "3c57352e0489e7040d224f2c98d67927b9c6300ca713d180222217a2e7998108"
+    },
+    {
+      "path": "artifacts/dogfooding-review-aa44ea1d.json",
+      "bytes": 10113,
+      "sha256": "dbfea0f08f2f0ac0c040a4bc1388e4cd317952757512c402e756ff857d3510bf"
+    },
+    {
+      "path": "artifacts/dogfooding-review-analysis-20261003.md",
+      "bytes": 10185,
+      "sha256": "bb7669ba7c8980e55995667659db70f81f09969ab80a7cee6f454bc5cb9fd549"
+    },
+    {
+      "path": "artifacts/dogfooding-target-resolution-aa44ea1d.json",
+      "bytes": 2282,
+      "sha256": "a4110ea5a34072c834cf52a9548b01d750aa1215a5d73713d61d932810a98494"
+    },
+    {
+      "path": "artifacts/dogfooding-verification-aa44ea1d.json",
+      "bytes": 9368,
+      "sha256": "5e2529bca37f5217430a4ab87bb5ddc7ce4f719a4ac27ecf9a23ab5ad8d6d414"
     },
     {
       "path": "artifacts/examples.json",
@@ -1048,6 +1068,32 @@
     "migration_restore_verified": true,
     "static_backup_verified": true,
     "static_restore_verified": true,
-    "latest_quality_gate": "not certified yet; prior 495d10ab gate does not cover source repairs"
+    "latest_quality_gate": "aa44ea1d FQ v2 completed: fail, P1=1, P2=2; design decision pending; no current certification",
+    "verification": {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "required_lanes": 8,
+      "completed_lanes": 8,
+      "all_required_lanes_passed": true,
+      "native_test_evidence": "artifacts/dogfooding-verification-aa44ea1d.json",
+      "review_result": "artifacts/dogfooding-review-aa44ea1d.json",
+      "analysis": "artifacts/dogfooding-review-analysis-20261003.md",
+      "reproduction": "artifacts/dogfooding-target-resolution-aa44ea1d.json",
+      "model": "gpt-5.6-sol",
+      "thinking": "pro",
+      "model_ui_verified": true,
+      "thinking_ui_verified": true,
+      "review_actual_exit": 10,
+      "review_status": "fail",
+      "coverage_complete": true,
+      "blocking_findings": [
+        "FQG-413-001"
+      ],
+      "informational_findings": [
+        "FQG-413-002",
+        "FQG-413-003"
+      ],
+      "decision": "pending; no implementation or normative specification change",
+      "gate_closed": false
+    }
   }
 }

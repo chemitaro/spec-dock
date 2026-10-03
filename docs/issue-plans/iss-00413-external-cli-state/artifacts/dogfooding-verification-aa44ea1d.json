@@ -1,0 +1,201 @@
+{
+  "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+  "repository": "chemitaro/spec-dock",
+  "branch": "codex/iss-00413-external-cli-state",
+  "base_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+  "test_commands": [
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "git diff --check",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "passed",
+      "log": "final-diff-check.log",
+      "log_bytes": 0,
+      "log_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "native_record": "dogfood-iss00413-20261003/logs/final-diff-check.json",
+      "elapsed_seconds": 0.015
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "make lint",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "passed",
+      "log": "final-lint.log",
+      "log_bytes": 239,
+      "log_sha256": "f848934f656989f99a850bbf9f02e4459a052519f089909cb31f595832925448",
+      "native_record": "dogfood-iss00413-20261003/logs/final-lint.json",
+      "elapsed_seconds": 0.301
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "uv run pytest -q --tb=short -ra",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "1902 passed, 1 skipped in 408.31s (0:06:48)",
+      "log": "final-macos-full.log",
+      "log_bytes": 2385,
+      "log_sha256": "b713ef1d96d74e86d1a3dc6f93dd042017f5677f39c5e844f350776988c5eeaf",
+      "elapsed_seconds": 408.674
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "docker run --rm --pull never --platform linux/amd64 --network none --read-only --cap-drop ALL --security-opt no-new-privileges --cpus 2 --memory 4g --tmpfs /tmp:rw,exec,size=1g --mount type=bind,source=/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/linux-validation/candidate-f1gadq36,target=/fixture --workdir /fixture/project --env UV_OFFLINE=1 --env UV_CACHE_DIR=/fixture/cache --env PYTHONDONTWRITEBYTECODE=1 --env PATH=/fixture/tools/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin --name iss413-dogfood-aa44ea1d-linux sha256:c514701300438939d8f2f3fd75cc57ea2eff502c1920e5cc98c713cf17452e3d /fixture/tools/bin/uv run pytest -q --tb=short -ra",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "1886 passed, 17 skipped in 1037.17s (0:17:17)",
+      "log": "final-linux-full.log",
+      "log_bytes": 2869,
+      "log_sha256": "98b0ee887cb249df149a4868cf9ea9ee0011372797601c87694d978b44bfd462",
+      "elapsed_seconds": 1038.836,
+      "physical_linux_host": false,
+      "skip_reasons": {
+        "native_zsh_unavailable": 12,
+        "macos_named_stage_contract": 1,
+        "linux_anonymous_staging_pathname_cleanup_not_applicable": 4
+      }
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "UV_OFFLINE=1 uv run --isolated --python /Users/iwasawayuuta/.local/share/uv/python/cpython-3.10.15-macos-aarch64-none/bin/python3.10 pytest tests/cli_runtime/test_os_support_retirement.py tests/cli_runtime/test_issue413_finish.py tests/unit/infra/test_directory_identity.py tests/unit/infra/test_start_lock.py tests/integration/test_issue413_native_lock.py tests/integration/test_issue413_e2e.py tests/integration/test_issue413_migration.py tests/integration/test_issue413_assets.py -q --tb=short -ra",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "170 passed in 126.12s (0:02:06)",
+      "log": "final-python310.log",
+      "log_bytes": 303,
+      "log_sha256": "0b0422cd4ce0f49ad2f8a2decf4fc45b84060edc4edcc9c60f9738501bd46573",
+      "native_record": "dogfood-iss00413-20261003/logs/final-python310.json",
+      "elapsed_seconds": 126.791
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "uv build --wheel --offline --out-dir /private/tmp/spec-dock-issue413-dogfood-aa44ea1d-dist",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "passed",
+      "log": "final-wheel-build.log",
+      "log_bytes": 71349,
+      "log_sha256": "dfe9c47e3266522826e9f07538aec72ac582aaccba41ae953e013dc89c230972",
+      "elapsed_seconds": 0.913
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "./spec -h",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "passed",
+      "log": "final-shim-help.log",
+      "log_bytes": 361,
+      "log_sha256": "10888d89d03ec741bf98c2c912c4097f0b71a0c53d8b8295b91477f77d737ccf",
+      "native_record": "dogfood-iss00413-20261003/logs/final-shim-help.json",
+      "elapsed_seconds": 0.104
+    },
+    {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "command": "./spec workspace validate --json",
+      "state": "completed",
+      "actual_exit": 0,
+      "result": "passed",
+      "log": "final-workspace-validate.log",
+      "log_bytes": 296,
+      "log_sha256": "5d82e9cc77414f2b90817487122ed259c579956a73f333f730a8d4c9ee830746",
+      "native_record": "dogfood-iss00413-20261003/logs/final-workspace-validate.json",
+      "elapsed_seconds": 0.466
+    }
+  ],
+  "review_lane": {
+    "state": "completed",
+    "actual_exit": 10,
+    "result": "fail",
+    "reviewed_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+    "coverage_complete": true,
+    "p1": [
+      "FQG-413-001"
+    ],
+    "p2": [
+      "FQG-413-002",
+      "FQG-413-003"
+    ],
+    "raw_result": "../review-result-1.json",
+    "analysis": "docs/issue-plans/iss-00413-external-cli-state/artifacts/dogfooding-review-analysis-20261003.md"
+  },
+  "provenance_before": {
+    "macos": {
+      "phase": "at-test-start",
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "clean": true,
+      "python": "3.12.11 (main, Oct  7 2025, 15:53:48) [Clang 20.1.4 ]",
+      "executable": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/.venv/bin/python",
+      "platform": "macOS-27.0.1-arm64-arm-64bit",
+      "machine": "arm64",
+      "input_count": 322,
+      "inputs_sha256": "013800ae1517dc2f80da4107f0fbcff63b76c9d511e6bd73ad7e4c49e46dc574"
+    },
+    "linux": {
+      "phase": "before",
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "clean": true,
+      "python": "3.11.16 (main, Aug 13 2026, 19:40:55) [GCC 14.2.0]",
+      "executable": "/fixture/project/.venv/bin/python",
+      "prefix": "/fixture/project/.venv",
+      "provider": "/fixture/project/src/spec_dock/__init__.py",
+      "package_version": "0.2.4",
+      "platform": "Linux-7.0.14-orbstack-00380-ga7e0a2dc9535-x86_64-with-glibc2.41",
+      "machine": "x86_64",
+      "uid": 0,
+      "effective_capabilities": "0000000000000000",
+      "user_env": null,
+      "fixture_fs": "tmpfs",
+      "offline": "1",
+      "input_count": 322,
+      "inputs_sha256": "013800ae1517dc2f80da4107f0fbcff63b76c9d511e6bd73ad7e4c49e46dc574"
+    }
+  },
+  "provenance_after": {
+    "macos": {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "phase": "after-macos-full-and-wheel",
+      "clean": true,
+      "inputs_sha256": "013800ae1517dc2f80da4107f0fbcff63b76c9d511e6bd73ad7e4c49e46dc574"
+    },
+    "linux": {
+      "phase": "after",
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "clean": true,
+      "python": "3.11.16 (main, Aug 13 2026, 19:40:55) [GCC 14.2.0]",
+      "executable": "/fixture/project/.venv/bin/python",
+      "prefix": "/fixture/project/.venv",
+      "provider": "/fixture/project/src/spec_dock/__init__.py",
+      "package_version": "0.2.4",
+      "platform": "Linux-7.0.14-orbstack-00380-ga7e0a2dc9535-x86_64-with-glibc2.41",
+      "machine": "x86_64",
+      "uid": 0,
+      "effective_capabilities": "0000000000000000",
+      "user_env": null,
+      "fixture_fs": "tmpfs",
+      "offline": "1",
+      "input_count": 322,
+      "inputs_sha256": "013800ae1517dc2f80da4107f0fbcff63b76c9d511e6bd73ad7e4c49e46dc574"
+    }
+  },
+  "wheel": {
+    "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+    "path": "/private/tmp/spec-dock-issue413-dogfood-aa44ea1d-dist/spec_dock-0.2.4-py3-none-any.whl",
+    "bytes": 382705,
+    "sha256": "28a09fc00a4709d6578c74e32b45382a6fcd5fd94af0df53233a7898bec60203",
+    "crc": "pass",
+    "provider_and_installed_payload_identical": 197
+  },
+  "extra_manual_checks": [
+    {
+      "actual_exit": 0,
+      "native_record": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-20261003/logs/dogfood-validate-ci.json"
+    },
+    {
+      "actual_exit": 0,
+      "native_record": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-20261003/logs/dogfood-worktree-list.json"
+    }
+  ],
+  "gate_closed": false
+}
