@@ -977,7 +977,7 @@ git status --short
 <a id="p-16"></a>
 ## P-16 許可されたdogfood環境だけに適用する
 
-**状態: 未着手。前提/依存: P-15。** 読む節: [D-12](design.md#d-12)。補足: D-12 / runbook M-01〜M-05。
+**状態: 2026-10-03の追加許可により、このWTへの導入・移行・動作確認を実施済み。** 当初の依存P-15に対し、利用者がこのWTの導入をmergeに先行して許可しました。読む節: [D-12](design.md#d-12)。補足: D-12 / runbook M-01〜M-05。[実測記録](artifacts/dogfooding-20261003.md)に保全・復元照合、既存240 Scope不変、外部CLI、薄いshim、通常readerと残るclone全体の前提不足を記載しています。他WTへの展開・human mergeは実施していません。
 
 **所有/対象file**: 許可されたcloneと対象WT、旧writer起動元、外部backup、承認wheel、workspace/static資産。
 
@@ -1007,7 +1007,7 @@ spec-dock --project "$ROOT" workspace migrate --to-schema 3 --to-writer-protocol
 <a id="p-17"></a>
 ## P-17 既存#413を正式importし、資料と開始証拠を結び付ける
 
-**状態: 未着手。前提/依存: P-16。** 読む節: [D-14](design.md#d-14)。補足: D-14 / runbook M-06。
+**状態: 2026-10-03の実import dry-runで前提不成立。正式import/Startは未実施。前提/依存: P-16。** 読む節: [D-14](design.md#d-14)。補足: D-14 / runbook M-06。CLIが `GitHub Scope ancestor is not open`（exit3、effects=[]）を返しました。また同cloneの他4 WTを完全観測できません。祖先のreopen・linkage変更、schema1 WTの移行や除外を自動実施せず、[実測記録](artifacts/dogfooding-20261003.md)へ判断材料を残します。
 
 **所有/対象file**: 既存GitHub #413、親epic-00356、許可例外配置、importが返すScope、Codexが保持するreport/interview。
 

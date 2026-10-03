@@ -4,7 +4,7 @@
   "document_date": "2026-09-30",
   "encoding": "UTF-8",
   "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
-  "status": "dogfooding started; preservation and static-upgrade repairs verified in focused tests; final candidate verification pending",
+  "status": "current-worktree dogfooding applied and manual checks passed; clone-wide sync and formal admission blocked by existing peer/ancestor preconditions; final repaired-candidate verification pending",
   "implementation_assignment": {
     "model": "gpt-6.1-sol",
     "reasoning_effort": "max",
@@ -224,8 +224,8 @@
     },
     {
       "path": "artifacts/dogfooding-20261003.md",
-      "bytes": 5338,
-      "sha256": "bc92caea24792a7fd2ef8e18b36747388473a3ebaf7b579e0b39836de0daf568"
+      "bytes": 10223,
+      "sha256": "3c57352e0489e7040d224f2c98d67927b9c6300ca713d180222217a2e7998108"
     },
     {
       "path": "artifacts/examples.json",
@@ -759,8 +759,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 161346,
-      "sha256": "92d48d7b9c410e3005a6b40ec56a99a7341ff6a54921363a3b98030931481bb5"
+      "bytes": 162157,
+      "sha256": "1933a71410f06a5a083f0e7ad576fd143dd664f73277eed72a352b9a040746ea"
     },
     {
       "path": "preview-entry.html",
@@ -1037,11 +1037,17 @@
     "reviewer_closure": "fresh full-range r13 pass/no findings at 3b803ced; Final Quality Gate pending"
   },
   "dogfooding_progress": {
-    "record": "artifacts/dogfooding-20261003.md",
-    "start_source_sha": "495d10ab7e47b02f2ba873df976afd6a12a0ad88",
-    "scope": "authorized current worktree only; no merge or other-worktree writes",
-    "migration_first_apply": "exit 6; workspace unchanged; backup retained",
-    "repairs": "symlink mode preservation and exact historical scripts README inventory",
-    "final_certification": "pending for changed candidate"
+    "artifact": "artifacts/dogfooding-20261003.md",
+    "source_candidate_sha": "49aeef8f68ba2f6b521d25aa4d218471c2c747be",
+    "wheel_sha256": "95bb921ae3dbca34d808e54b7736172f51e81f6d774f1a78648916ccdafa3045",
+    "p16": "current authorized worktree applied and manually verified",
+    "p17": "blocked before import by closed GitHub ancestor; no formal Start",
+    "scope_count_preserved": 240,
+    "scope_files_preserved": 2900,
+    "migration_backup_verified": true,
+    "migration_restore_verified": true,
+    "static_backup_verified": true,
+    "static_restore_verified": true,
+    "latest_quality_gate": "not certified yet; prior 495d10ab gate does not cover source repairs"
   }
 }

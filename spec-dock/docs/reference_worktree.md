@@ -1,17 +1,18 @@
 # Git worktree（Current）
 
-worktreeは同一Git common directoryに属する作業場です。`worktree create` は明示したbaseから作業場を作って登録します。tool導入や任意projectの初期化は実行しません。
+同じphysical cloneのmain/linked worktreeをnative `git worktree list --porcelain -z` から都度取得します。独自registry・alias・stable worktree IDは作りません。対象は絶対pathで指定します。
 
 ```sh
-spec-dock worktree create feature-a --base main
-spec-dock worktree list
-spec-dock worktree show feature-a
-spec-dock worktree bootstrap feature-a --yes
-spec-dock worktree remove feature-a --yes
+spec-dock worktree create feature-a --base main --root /absolute/worktrees
+spec-dock worktree list --json
+spec-dock worktree show /absolute/worktrees/feature-a --json
+spec-dock worktree bootstrap /absolute/worktrees/feature-a --yes --json
+# この作業場の削除が許可されている場合だけ
+spec-dock worktree remove /absolute/worktrees/feature-a --yes --json
 ```
 
-`worktree bootstrap` は対象で `make init` を実行するため、実行先と副作用を先に確認してください。`worktree remove` はmain/current/bare、dirty、未登録などを拒否し、branch自体は残します。locked状態やignored payloadには個別の明示flagが必要です。Workbenchのscope-localコピーは `workbench copy --scope TARGET --to-worktree WORKTREE_REF` で行い、正本にはしません。旧版の詳説は[historical](historical/reference_worktree.md)です。
+createは既存physical rootの直下 `root/NAME` にnative worktreeを置き、`worktree/NAME` branchを固定baseから作ります。NAMEは必須で、小文字英数字とhyphenを使い、既存branch/pathとの衝突を拒否します。bootstrapとtool導入は別操作です。Gitエラー原文、作成済みbranch/path、不確かな効果を返し、自動reset/stash/rollbackをしません。
 
-`worktree create` が停止した場合、Git common directory の `spec-dock/control/worktree-create/wtN.json` に対象・固定commit・停止段階が残ります。同じNAME（NAME省略時は同じrootとbase）への盲目的な再実行を拒否します。記録と `git worktree list --porcelain`、対象path、`refs/heads/worktree/wtN`、control登録を読み取り専用で照合してください。効果が残っていれば対象を保全して個別に復旧します。path・branch・Git登録がすべて存在しない状態に安全に戻した後だけ、同じ `--base`、NAME、`--root` で `worktree create ... --recover wtN` を実行できます。`--recover` は対象の同一性と効果なしを再確認し、元のstable IDを再利用します。
+bootstrapはproject-owned makefileを確認して `make init` を一回実行します。対象と任意projectの副作用を確認して許可してください。hook本文は出力せず、失敗・timeout・結果不明ではeffectsと現物を確認します。共通Git内に実行履歴を保存しません。
 
-`worktree bootstrap` の実行記録は同じcommon directoryの `spec-dock/control/bootstrap/wtN.json` に残ります。`running` / `partial` の対象は再実行を拒否します。対象の `make init` と子processが停止し、その副作用を確認した後、`worktree bootstrap wt:wtN --recover --yes` で前回の試行を確認済みにします。この操作は `make init` を呼びません。再実行が安全と判断できる場合に限り、別の `worktree bootstrap wt:wtN --yes` を実行してください。
+removeはmain/current/bare、dirty等を拒否し、branchを残します。lockedには--unlock、ignored payloadには--discard-ignoredの明示許可が必要です。直接記録がignored領域にあることも削除前に確認します。`workbench copy --scope TARGET --to-worktree /absolute/worktree` は一回のコピーで、自動同期や正本化ではありません。
