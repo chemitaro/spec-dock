@@ -69,4 +69,4 @@ make lint
 uv run pytest
 ```
 
-Provider CIもlintと通常のpytestを実行します。仕様と検証記録は対象IssueのRequirement、Design、Plan、Reportで追跡します。
+Provider CIもlintと通常のpytestを実行します。[CIの役割・対応OSの配布検証・再実行権限](docs/ci.md)に各チェックの目的と失敗時の確認手順をまとめています。仕様と検証記録は対象IssueのRequirement、Design、Plan、Reportで追跡します。

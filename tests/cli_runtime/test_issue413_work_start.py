@@ -58,6 +58,28 @@ def committed_workspace(root: Path) -> Path:
     return root
 
 
+def test_committed_fixture_does_not_launch_automatic_git_maintenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trace = (tmp_path / "git-trace.json").resolve()
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "0")
+    monkeypatch.setenv("GIT_TRACE2_EVENT", str(trace))
+
+    committed_workspace((tmp_path / "consumer").resolve())
+
+    events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
+    automatic_maintenance = [
+        event["argv"]
+        for event in events
+        if event.get("event") == "child_start"
+        and "--auto" in event["argv"]
+        and any(command in event["argv"] for command in ("maintenance", "gc"))
+    ]
+    assert automatic_maintenance == []
+
+
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX unlink and Start lock boundary")
 def test_start_accepts_a_parallel_clear_of_the_same_captured_token_before_replacement(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]

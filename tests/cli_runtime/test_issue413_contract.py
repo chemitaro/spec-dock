@@ -29,6 +29,12 @@ def make_workspace(root: Path) -> Path:
     """Build a GitHub-backed schema-3 test fixture, never real dogfood metadata."""
     root.mkdir()
     subprocess.run(["git", "init", "--initial-branch=main", "-q", str(root)], check=True, capture_output=True)
+    # Snapshot tests must not race Git's detached maintenance after fixture commits.
+    subprocess.run(
+        ["git", "-C", str(root), "config", "--local", "maintenance.auto", "false"],
+        check=True,
+        capture_output=True,
+    )
     workspace = root / "spec-dock"
     scope = workspace / "initiatives/init-00001-fixture"
     scope.mkdir(parents=True)
