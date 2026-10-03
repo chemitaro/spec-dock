@@ -10,6 +10,8 @@ GPT-5.6 Sol / ProのChatGPT Use Strictで、GitHub上の指定branchとfull SHA 
 
 配布元16資産のhashと既知旧hashを実体から更新し、公開CLIの `installation update` で現在0805 worktreeへ反映しました。手作業でconsumerや`.agents`を正本化していません。Gitの空行検査で見つかったrequirement.mdとprovider template READMEの余分な末尾空行一行だけを正規化し、原ダウンロードは不変で保持しました。pack READMEの入口と派生manifest/ZIPも現在の証拠へ更新しました。
 
+PRの初回CIでは、Canonical文書がArtifactではないという定型文を言い換えたことで、既存testの文字列一致条件に一件失敗しました。三階層のArtifact rulesを「は artifacts ではありません。durableな仕様・結果の正本です。」へ統一し、新しい説明を維持しました。元の「main orchestrator」の説明は復活させていません。ローカルRed（exit 1）を再現し、既存test module 30件がGreen（exit 0）となりました。testやruntimeは変更していません。
+
 ## 既存Final Quality Gateの扱い
 
 [原Gate](final-quality-gate-8606e132.json)は、対象SHA `8606e132327066d56567556e336e4bc1ae6a0b17`、pass、13観点、coverage complete、P0/P1=0、情報提供P2=3のまま保持しました。原文SHA-256は `133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6` です。[同SHAのCode Review](code-review-8606e132.json)と[完了証拠](completion-evidence-8606e132.json)もbyteを変更せず保存しています。
@@ -20,7 +22,7 @@ GPT-5.6 Sol / ProのChatGPT Use Strictで、GitHub上の指定branchとfull SHA 
 
 ## 今回の現物確認
 
-- 文書・配布・authoring・fresh wheelの既存試験: 269 passed、actual exit 0。
+- 文書・配布・authoring・Artifact templates・fresh wheelの既存試験: 299 passed、actual exit 0。
 - `make lint`: ruff check、ruff format、mypyがすべて成功。
 - provider source・最終wheel・導入済み通常packageの197 fileがbyte一致。
 - 一時consumerの86静的資産と現在consumerの85管理対象資産が配布元とbyte一致（init-only workspace宣言は現更新対象外）。
@@ -32,4 +34,4 @@ GPT-5.6 Sol / ProのChatGPT Use Strictで、GitHub上の指定branchとfull SHA 
 
 ## 今回完了扱いにしないもの
 
-mainとほか3 linked worktreeの移行、clone全体の完全なSync、正式Issue #413 import/Start、ancestor #31のreopen/付替え、人間merge、package publicationは実施していません。文書整備後は通常commit/pushとPR作成へ進み、提出後の最新check状態はGitHub PRを参照します。復旧planning packは引き続き実装資料の正本であり、正式Start成功の証拠ではありません。
+mainとほか3 linked worktreeの移行、clone全体の完全なSync、正式Issue #413 import/Start、ancestor #31のreopen/付替え、人間merge、package publicationは実施していません。[PR #414](https://github.com/chemitaro/spec-dock/pull/414)を作成済みで、文書のCI修正は通常commit/pushで同PRへ反映します。最新check状態は同PRを参照してください。復旧planning packは引き続き実装資料の正本であり、正式Start成功の証拠ではありません。

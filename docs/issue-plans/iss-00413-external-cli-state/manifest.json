@@ -40,7 +40,7 @@
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 741,
+    "local_link_occurrences_checked": 742,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
     "browser_dynamic": "Updated HTML: 4/4 inline SVG and zoom/keyboard/focus validator passed, actual exit 0",
@@ -235,8 +235,8 @@
     },
     {
       "path": "artifacts/documentation-alignment-20261004.md",
-      "bytes": 4617,
-      "sha256": "fb5cbe1cc08d2804ba6b83acc29b2453641e92cf423ac7dde219370c191df2be"
+      "bytes": 5283,
+      "sha256": "4989099ae120da1711882cecfbd91101b54618501892e38796f82a765e9fcb14"
     },
     {
       "path": "artifacts/documentation-analysis-20261003.md",
@@ -260,8 +260,8 @@
     },
     {
       "path": "artifacts/documentation-verification-20261004.json",
-      "bytes": 2386,
-      "sha256": "41a3b8587efbe86e89a0f14dbc6720fa08397a4556ec147291f0d96146bc86ab"
+      "bytes": 3417,
+      "sha256": "04f49a325273e585b1b8c9f2d06bf1480822c4b7a251459496bcdf95829b869a"
     },
     {
       "path": "artifacts/dogfooding-20261003.md",
@@ -820,8 +820,8 @@
     },
     {
       "path": "explanation.html",
-      "bytes": 71798,
-      "sha256": "528e01a3a2fd7c73478a1a49d327803a2e08f5eb5238e88d168ec42e9ae808f0"
+      "bytes": 72766,
+      "sha256": "831d12460baa91c14355c0e2a4a08cd780104abf6a3419137c16ba1c655ae33c"
     },
     {
       "path": "implementation-report.md",

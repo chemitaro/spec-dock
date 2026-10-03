@@ -313,11 +313,12 @@
     {
       "path": "spec-dock/docs/rules/epic/artifacts.md",
       "source": "spec_dock/docs/rules/epic/artifacts.md",
-      "sha256": "55046eca0302b52b88cda2e58c8ad450bbcd558f2f01872d9b01a1ecf93d3ed1",
+      "sha256": "515d7adc8ade9c05b318d60e21914624b0b747db0d671a47a3c4663727df3d4f",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "da10a6a917e704c236db4cfbab87d2bda4b6c82c0003ac81ec758886944985c9"
+        "da10a6a917e704c236db4cfbab87d2bda4b6c82c0003ac81ec758886944985c9",
+        "55046eca0302b52b88cda2e58c8ad450bbcd558f2f01872d9b01a1ecf93d3ed1"
       ]
     },
     {
@@ -341,11 +342,12 @@
     {
       "path": "spec-dock/docs/rules/initiative/artifacts.md",
       "source": "spec_dock/docs/rules/initiative/artifacts.md",
-      "sha256": "25bdec3909bb84bc96f66c6777e4112fc74054036898818b2557d7fcd4340d61",
+      "sha256": "dea5c7ee36b270c028ccfc5ecb3ecd837c846cb3784262aed90527f2b3a2638d",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "1a3238c290c97e02d00090029eb8b88ce79a3b13d6b4e8c95c3c34c30a1a0619"
+        "1a3238c290c97e02d00090029eb8b88ce79a3b13d6b4e8c95c3c34c30a1a0619",
+        "25bdec3909bb84bc96f66c6777e4112fc74054036898818b2557d7fcd4340d61"
       ]
     },
     {
@@ -369,11 +371,12 @@
     {
       "path": "spec-dock/docs/rules/issue/artifacts.md",
       "source": "spec_dock/docs/rules/issue/artifacts.md",
-      "sha256": "e92c5ad870f1670c0415011dd76aa659fabf24193fa34121469eb4862dceac13",
+      "sha256": "75943dcafdfb6e2f4f25ea0633a7bd3f1801a3692c800871d17b7e11c2e6742b",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "69da9fa472bdc05550726ec0eaa29507f6badde73cdc2f11bb4be4153b61b9cf"
+        "69da9fa472bdc05550726ec0eaa29507f6badde73cdc2f11bb4be4153b61b9cf",
+        "e92c5ad870f1670c0415011dd76aa659fabf24193fa34121469eb4862dceac13"
       ]
     },
     {

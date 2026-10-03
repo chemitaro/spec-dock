@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-10-03T15:41:05.675938+00:00",
+  "recorded_at": "2026-10-03T16:06:26.869868+00:00",
   "implementation_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
   "documentation_authoring_model": "gpt-5.6-sol",
   "documentation_authoring_thinking": "pro",
@@ -18,14 +18,28 @@
     "original_download_unchanged": true,
     "response_display_copy_trailing_whitespace_normalized": true,
     "original_response_preserved_in_workbench": true,
-    "original_response_sha256": "1c02a46d9860d671e48feb12a9db604e89801fd4c2f3fd0135be5a14b8836857"
+    "original_response_sha256": "1c02a46d9860d671e48feb12a9db604e89801fd4c2f3fd0135be5a14b8836857",
+    "ci_wording_compatibility": {
+      "reason": "Existing artifact rules contract asserts the canonical-docs distinction literally",
+      "files": [
+        "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
+        "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
+        "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md"
+      ],
+      "requirement_behavior_changed": false,
+      "tests_changed": false,
+      "ci_first_run": "37134501157",
+      "red_actual_exit": 1
+    },
+    "human_html_current_pr_handoff_added": true,
+    "html_scripts_styles_and_sources_unchanged": true
   },
   "protected_implementation_tests_ci_build_dependency_files_unchanged": 237,
   "consumer_scope_and_writer_files_unchanged": 2636,
   "provider_wheel_installed_files_equal": 197,
   "current_consumer_static_matches": 85,
   "fresh_consumer_static_matches": 86,
-  "wheel_sha256": "b1d04859d17c76d78ab2bc880c3705c7de60682ebf3bda73999ae90ac42ffddd",
+  "wheel_sha256": "4acc5407bc9d775c1929e9828e90be82bf05c9f0913cf4e47f6318e92b675e18",
   "existing_gate": {
     "status": "pass",
     "sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
@@ -38,8 +52,18 @@
   "new_review_or_quality_gate_performed": false,
   "document_distribution_tests": {
     "actual_exit": 0,
-    "passed": 269,
+    "passed": 299,
     "skipped": 0
+  },
+  "ci_documentation_contract_repair": {
+    "first_run": "37134501157",
+    "first_head": "6f32655dc1140051e47cf7800c7d6344afcf313e",
+    "first_result": "1 failed, 1898 passed, 18 skipped",
+    "cause": "Literal canonical-document distinction wording changed",
+    "local_red_actual_exit": 1,
+    "local_green_actual_exit": 0,
+    "local_green_passed": 30,
+    "runtime_or_tests_changed": false
   },
   "lint": {
     "actual_exit": 0,

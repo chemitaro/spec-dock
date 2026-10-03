@@ -307,7 +307,8 @@
 </head>
 <body>
   <main>
-<p class="notice">2026年10月3日の現在状態：製品コードと合意済み仕様の固定点は <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> です。同SHAの既存Final Quality Gate v2証拠、OS別試験、現在0805 worktreeへの限定適用を保持し、mainとほか3 linked worktreeの移行、正式Issue #413のStart、人間merge、package publicationは未完了として分けます。この文書差し替え自体に新しいGate認定は付けません。</p>
+<p class="notice"><strong>2026年10月4日の文書整備:</strong> ChatGPT Use Strictの全文置換を採用し、配布元と現在0805 worktreeの文書を更新しました。実行コードと既存Final Quality Gateの対象は変わりません。<a href="https://github.com/chemitaro/spec-dock/pull/414">PR #414</a>を作成済みです。文書の定型文を確認するCI指摘を修正し、文書・配布の関連299件が成功しました。最新のCIとマージ準備状況はPR、採用内容は<a href="artifacts/documentation-alignment-20261004.md">文書整備の記録</a>を参照してください。人間merge、他worktreeの移行、正式Issue Start、package publicationは未完了です。</p>
+<p class="notice">原稿生成時の観測（2026年10月3日）：製品コードと合意済み仕様の固定点は <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> です。同SHAの既存Final Quality Gate v2証拠、OS別試験、現在0805 worktreeへの限定適用を保持し、mainとほか3 linked worktreeの移行、正式Issue #413のStart、人間merge、package publicationは未完了として分けます。この文書差し替え自体に新しいGate認定は付けません。</p>
 
 <header id="top">
 <p class="eyebrow">SPECDOCK · ISSUE #413 · PLANNING PACK</p>
@@ -320,12 +321,12 @@
 <div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
 <p class="source-note">図の初回描画には、固定版 @plantuml/core@1.2026.6 をCDNから取得するインターネット通信が必要です。図ソースは外部の描画サーバーへ送りません。CDNに接続できなくても本文は読めます。描画できた図はクリック、Enter、Spaceで拡大できます。</p>
 </header>
-<section id="progress"><h2>現在の検証状況</h2>
+<section id="progress"><h2>実装固定点の検証と導入状況（2026年10月3日観測）</h2>
 <p>製品コードと合意済み仕様は、GitHub connectorでbranch tip一致を確認した <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> が固定点です。既存のFinal Quality Gate v2はこのSHAでcoverage complete、13 perspective、P0/P1は0、情報提供P2は3件です。今回の文書差し替え候補を新しくGate認定したものではありません。</p>
 <div class="table-scroll" tabindex="0" role="region" aria-label="現在の検証結果"><table><thead><tr><th scope="col">確認範囲</th><th scope="col">保持する結果</th><th scope="col">読み方</th></tr></thead><tbody><tr><td>native macOS</td><td>1916件成功・1件skip</td><td>exact SHAに結び付く既存lane。レビュアー自身の実行証拠とは分ける</td></tr><tr><td>Linux</td><td>1900件成功・17件skip</td><td>exact SHAに結び付く既存lane。macOS件数と合算しない</td></tr><tr><td>Python 3.10境界</td><td>210件成功</td><td>対応下限の境界試験で、別環境の全件試験という意味ではない</td></tr><tr><td>外部consoleの手動flow</td><td>14操作</td><td>実Gitとstateful gh stubを使用。live GitHub Close認定ではない</td></tr><tr><td>Final Quality Gate v2</td><td>coverage complete、13 perspective、P0/P1=0、P2=3</td><td>原Gate JSONとexact SHAを保持。将来の文書commitへ合格を転記しない</td></tr></tbody></table></div>
 <p>三つの情報提供P2は、効果前のdirectory作成失敗をpartial/unknownへ分類し得る点、plan末尾がP-16詳細へ追随していなかった点、非UTF-8 pathnameを含む診断がUTF-8 JSON保証を破り得る点です。この版ではplanの集約表示だけを文書上直します。残る二つは製品コードの既知事項で、今回の文書作業では変更しません。</p>
 <p>caller-provided local observationでは、現在0805 worktreeにnon-editableな0.2.4 package、薄いshim、writer宣言、静的資産が適用済みです。<code>spec-dock help</code>、empty active、240 Scopeのvalidateを確認しました。mainとほか3 linked worktreeは未移行で、clone全体のSyncはpartial（exit 7）です。mainのmigration dry-runはlegacy active schema 2の影響を確定できず <code>LEGACY_IMPACT_UNVERIFIED</code>（exit 3）で停止しました。</p>
-<p>正式なIssue #413 import/Start、PR、human merge、package publicationは完了していません。caller-provided観測では#413と#356はopen、ancestor #31はclosed/completedです。この資料は#31のreopenや付替えを指示せず、他worktree移行や正式Startを完了扱いにしません。</p>
+<p>原稿生成時点では、正式なIssue #413 import/Start、PR、human merge、package publicationは未完了でした。2026年10月4日にPR #414を作成しました。正式Start、人間merge、package publicationは引き続き未完了です。caller-provided観測では#413と#356はopen、ancestor #31はclosed/completedです。この資料は#31のreopenや付替えを指示せず、他worktree移行や正式Startを完了扱いにしません。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section>
 <section id="os-support"><h2>対応OSを確定し、Windows専用部分を撤去した</h2>
 <p>対応するOSは<strong>LinuxとmacOS</strong>です。help・version・completionは対応OS判定より先に処理し、業務コマンドは非対応OSでproject、Git、GitHub、保存先へ作用する前に <code>UNSUPPORTED_PLATFORM</code>（exit 3）で停止します。</p>
@@ -574,7 +575,7 @@ spec-dock --project "$ROOT" scope import github issue   gh:chemitaro/spec-dock#4
 <p>配布元文書を差し替えた後は、Codexがstatic inventoryの新hashと <code>known_old_sha256</code>、pack manifest/ZIPを更新し、Current CLIで現在consumerへ反映します。inventoryを推測で生成せず、対象worktreeと既知hashを現物から確認します。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="implementation"><h2>12　実装履歴と現在の完了証拠</h2>
 <p>計画P-01〜P-18の過去記録、旧レビュー、旧試験、Windows検討は、どの順序で設計と実装が進んだかを示すraw historyです。現在の製品固定点は <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> であり、古いcandidate SHAや「将来実行」という語を現在の状態へ読み替えません。</p>
-<div class="table-scroll" tabindex="0" role="region" aria-label="現在の実装とrollout状態"><table><thead><tr><th scope="col">段階</th><th scope="col">現在の扱い</th><th scope="col">完了扱いにしないもの</th></tr></thead><tbody><tr><td>P-01〜P-14、P-18</td><td>製品実装・通常検証・既存Gate証拠をexact SHAへ固定</td><td>今回の文書commitの新しいreview/FQ認定</td></tr><tr><td>P-15</td><td>人間mergeへ渡す段階</td><td>PR、merge、package publicationはいずれも未実施</td></tr><tr><td>P-16</td><td>0805 worktreeだけ限定適用済み</td><td>mainとほか3 linked worktree、clone全体のcompleteなSync</td></tr><tr><td>P-17</td><td>formal #413 import/Startは前提不成立で停止</td><td>#31のreopen/付替え、架空のStart証拠、Finish/Close</td></tr></tbody></table></div>
+<div class="table-scroll" tabindex="0" role="region" aria-label="現在の実装とrollout状態"><table><thead><tr><th scope="col">段階</th><th scope="col">現在の扱い</th><th scope="col">完了扱いにしないもの</th></tr></thead><tbody><tr><td>P-01〜P-14、P-18</td><td>製品実装・通常検証・既存Gate証拠をexact SHAへ固定</td><td>今回の文書commitの新しいreview/FQ認定</td></tr><tr><td>P-15</td><td>人間mergeへ渡す段階</td><td>2026年10月4日にPR #414を作成済み。mergeとpackage publicationは未実施</td></tr><tr><td>P-16</td><td>0805 worktreeだけ限定適用済み</td><td>mainとほか3 linked worktree、clone全体のcompleteなSync</td></tr><tr><td>P-17</td><td>formal #413 import/Startは前提不成立で停止</td><td>#31のreopen/付替え、架空のStart証拠、Finish/Close</td></tr></tbody></table></div>
 <p>program updateは利用者の外部tool環境に共有され、static updateは明示したworktree一つずつです。ignored direct recordはさらに別のruntime stateです。これらのどれかが更新されたことを、別層の更新証拠として代用しません。</p>
 <p>existing Gateの三つのP2は情報提供です。planの集約表示はこの文書整備で更新しますが、効果前mkdirの分類と非UTF-8 pathname診断は製品コード側の既知事項として残します。新しいコマンド、runtime、test、CI、依存、Git内部の管理領域、通常編集のpermission controlは追加しません。</p>
 <p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="checks"><h2>13　文書差し替えと残るrolloutの確認</h2>
