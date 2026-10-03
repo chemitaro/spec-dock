@@ -455,6 +455,43 @@ def test_update_replaces_only_verified_old_static_bytes_after_an_external_backup
         assert installed.stat().st_mode & 0o777 == 0o755
 
 
+@pytest.mark.parametrize("modified", [False, True])
+def test_update_accepts_only_the_exact_pre_cutover_scripts_readme_and_preserves_its_backup(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], modified: bool
+) -> None:
+    target = uninitialized_worktree(tmp_path / "consumer")
+    assert main(["installation", "init", str(target), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    fixture = Path(__file__).resolve().parents[1] / "fixtures/issue413/scripts-readme-v3.txt"
+    old_bytes = fixture.read_bytes()
+    assert hashlib.sha256(old_bytes).hexdigest() == "38b8a802dcac5e0e3ba4505ddac63fd89380c370b60443cdfb2734ada698b794"
+    installed = target / "spec-dock/scripts/README.md"
+    installed.write_bytes(old_bytes + (b"\nuser customization\n" if modified else b""))
+    before = tree_digest(target)
+    backup = tmp_path / "backup"
+    exit_code = main([
+        "installation",
+        "update",
+        "--target",
+        str(target),
+        "--backup-dir",
+        str(backup),
+        "--yes",
+        "--json",
+    ])
+    result = json.loads(capsys.readouterr().out)
+    if modified:
+        assert exit_code == 3 and result["effects"] == []
+        assert "modified or unknown" in result["error"]["message"]
+        assert tree_digest(target) == before and not backup.exists()
+    else:
+        assert exit_code == 0 and result["status"] == "succeeded"
+        assert result["data"]["result"]["changed_paths"] == ["spec-dock/scripts/README.md"]
+        assert (backup / "static/spec-dock/scripts/README.md").read_bytes() == old_bytes
+        provider = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts/README.md"
+        assert installed.read_bytes() == provider.read_bytes()
+
+
 def test_update_adds_a_missing_static_file_without_rewriting_the_workspace(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:

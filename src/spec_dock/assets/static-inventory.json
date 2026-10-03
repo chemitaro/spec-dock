@@ -382,10 +382,13 @@
     {
       "path": "spec-dock/scripts/README.md",
       "source": "spec_dock/scripts/README.md",
-      "sha256": "0032ba08b6e4b6eb8a8c7842b979c086246542af5813c90ec26781efd32196d8",
+      "sha256": "7e30d6d4b5bccc55a915fb7a53f70b0e9109c0599fe4649ca140cb6dfbb4d3e5",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "0032ba08b6e4b6eb8a8c7842b979c086246542af5813c90ec26781efd32196d8",
+        "38b8a802dcac5e0e3ba4505ddac63fd89380c370b60443cdfb2734ada698b794"
+      ]
     },
     {
       "path": "spec-dock/scripts/spec-dock",

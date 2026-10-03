@@ -80,6 +80,9 @@ def _copy_directory(source_fd: int, destination_fd: int) -> None:
         observed = os.stat(name, dir_fd=source_fd, follow_symlinks=False)
         if stat.S_ISLNK(observed.st_mode):
             os.symlink(os.readlink(name, dir_fd=source_fd), name, dir_fd=destination_fd)
+            mode = stat.S_IMODE(observed.st_mode)
+            if stat.S_IMODE(os.stat(name, dir_fd=destination_fd, follow_symlinks=False).st_mode) != mode:
+                os.chmod(name, mode, dir_fd=destination_fd, follow_symlinks=False)
             continue
         if not stat.S_ISREG(observed.st_mode) and not stat.S_ISDIR(observed.st_mode):
             raise ValueError("backup source contains an unsupported entry")

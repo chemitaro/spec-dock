@@ -4,7 +4,7 @@
   "document_date": "2026-09-30",
   "encoding": "UTF-8",
   "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
-  "status": "premerge implementation verified; final certification and postmerge operations pending",
+  "status": "dogfooding started; preservation and static-upgrade repairs verified in focused tests; final candidate verification pending",
   "implementation_assignment": {
     "model": "gpt-6.1-sol",
     "reasoning_effort": "max",
@@ -221,6 +221,11 @@
       "path": "artifacts/data-schema.json",
       "bytes": 9216,
       "sha256": "2c925518dc9aa8f573edb320da5611e639bea3e7e489e5a07d2fd24aa33382cf"
+    },
+    {
+      "path": "artifacts/dogfooding-20261003.md",
+      "bytes": 5338,
+      "sha256": "bc92caea24792a7fd2ef8e18b36747388473a3ebaf7b579e0b39836de0daf568"
     },
     {
       "path": "artifacts/examples.json",
@@ -754,8 +759,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 160914,
-      "sha256": "0de5bad67e2d231fbe86d11fa75d6311d8a2e1d4a3d0b2d8b361c2725a2c5315"
+      "bytes": 161346,
+      "sha256": "92d48d7b9c410e3005a6b40ec56a99a7341ff6a54921363a3b98030931481bb5"
     },
     {
       "path": "preview-entry.html",
@@ -940,7 +945,7 @@
     "reasoning_effort": "high",
     "status": "future assignment; not invoked in this run"
   },
-  "status_date": "2026-10-02",
+  "status_date": "2026-10-03",
   "current_implementation_evidence": {
     "baseline_only": false,
     "source_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
@@ -1030,5 +1035,13 @@
     "evidence": "artifacts/p07-finish-observation-repair.json",
     "baseline_sha": "aa91b756f886ac3e42085b665e1e9ca93c20f9f5",
     "reviewer_closure": "fresh full-range r13 pass/no findings at 3b803ced; Final Quality Gate pending"
+  },
+  "dogfooding_progress": {
+    "record": "artifacts/dogfooding-20261003.md",
+    "start_source_sha": "495d10ab7e47b02f2ba873df976afd6a12a0ad88",
+    "scope": "authorized current worktree only; no merge or other-worktree writes",
+    "migration_first_apply": "exit 6; workspace unchanged; backup retained",
+    "repairs": "symlink mode preservation and exact historical scripts README inventory",
+    "final_certification": "pending for changed candidate"
   }
 }

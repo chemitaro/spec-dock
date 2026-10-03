@@ -7,14 +7,15 @@
 CLIの仕様と全コマンドは[CLI参照](../docs/reference_cli.md)を確認してください。正確な引数は`spec-dock help COMMAND`で確認します。
 
 ```sh
-spec-dock scope create issue --backend github --parent epic-00080 --title "Cleanup"
-spec-dock work start iss-00411 --base main
+spec-dock --help
+spec-dock help work start
 spec-dock active show
-spec-dock artifact create --scope iss-00411 --type blank --title "Memo"
 spec-dock workspace validate
-spec-dock workspace sync --source cache
+spec-dock workspace sync --source local
 ```
 
-`work start` は Initiative、Epic、Issue を受け付け、依存を確認して対応ブランチへ切り替え、対象を選択します。`work finish TARGET` は対象を完了し、選択中なら対象以下の選択を解除します。選択だけを変える場合は `active set TARGET`、完了状態だけを変える場合は `scope close TARGET` です。
+`work start TARGET` はInitiative、Epic、Issueを受け付け、依存と他worktreeの選択を確認し、branchを作成またはcheckoutして、そのworktreeの直接対象一件を選択します。既存branchは`--branch`で明示し、新規branchの作成では`--base`を指定します。初回選択と対象切替には`work start`を使い、現在の選択は`active show`で読み、解除は`active clear`で行います。
 
-導入・更新は固定エンジンの `installation init/update` を使います。更新、データ移行、エンジン引継ぎ、復旧は[移行・復旧](../docs/migration.md)を参照してください。`spec-dock/.agent/` と `spec-dock/active/` は生成状態であり、一次仕様ではありません。
+`work finish TARGET --yes` はGitHub IssueをcompletedとしてCloseし、該当する直接選択を解除します。現在branchに留まり、commit、push、mergeやbranch削除は行いません。
+
+package本体の更新には通常のpackage managerを使います。`installation init/update` は、対象worktreeの静的資産だけを扱います。既存のschema 3 workspace宣言は明示した`workspace migrate`で切り替え、詳細は[移行手順](../docs/migration.md)を参照してください。`spec-dock/.agent/` はGit管理外のworktree-local状態であり、一次仕様はScope内の文書です。

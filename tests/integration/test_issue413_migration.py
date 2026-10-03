@@ -638,6 +638,49 @@ def test_migration_preserves_symlink_itself_without_copying_arbitrary_targets(
     assert (external / "private.txt").read_bytes() == b"arbitrary external data must not be traversed"
 
 
+def test_migration_preserves_symlink_permissions_under_a_different_creation_umask_without_touching_target(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = legacy_workspace(tmp_path / "consumer")
+    external = tmp_path / "external.bin"
+    external.write_bytes(b"outside target must stay untouched")
+    external.chmod(0o640)
+    link = root / "external-link"
+    previous = os.umask(0)
+    try:
+        link.symlink_to("../external.bin")
+    finally:
+        os.umask(previous)
+    assert stat.S_IMODE(link.lstat().st_mode) == 0o777
+    backup = tmp_path / "backup"
+    previous = os.umask(0o022)
+    try:
+        exit_code = main([
+            "--project",
+            str(root),
+            "workspace",
+            "migrate",
+            *TARGET,
+            "--backup-dir",
+            str(backup),
+            "--confirm-old-writers-stopped",
+            "--yes",
+            "--json",
+        ])
+    finally:
+        os.umask(previous)
+    result = json.loads(capsys.readouterr().out)
+    assert exit_code == 0 and result["status"] == "succeeded"
+    assert result["data"]["result"]["backup_verified"] is True
+    assert result["data"]["result"]["restore_verified"] is True
+    preserved = backup / "checkout/external-link"
+    assert preserved.is_symlink() and str(preserved.readlink()) == "../external.bin"
+    assert stat.S_IMODE(preserved.lstat().st_mode) == 0o777
+    assert stat.S_IMODE(link.lstat().st_mode) == 0o777
+    assert external.read_bytes() == b"outside target must stay untouched"
+    assert stat.S_IMODE(external.stat().st_mode) == 0o640
+
+
 def test_migration_preserves_240_scope_metadata_bytes_including_two_legacy_spelled_github_ids(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
