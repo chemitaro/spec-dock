@@ -139,6 +139,80 @@ def open_issue(root: Path, repository: str, number: int) -> GithubIssueRecord:
     )
 
 
+def test_work_start_dry_run_ignores_non_utf8_non_scope_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+
+    def git_bytes(*arguments: str, payload: bytes | None = None) -> bytes:
+        return subprocess.run(
+            ["git", "-C", str(root), *arguments], input=payload, capture_output=True, check=True
+        ).stdout
+
+    def replace_tree_entry(treeish: str, name: bytes, tree: bytes) -> bytes:
+        entries = [
+            entry + b"\0"
+            for entry in git_bytes("ls-tree", "-z", treeish).split(b"\0")
+            if entry and entry.partition(b"\t")[2] != name
+        ]
+        entries.append(b"040000 tree " + tree + b"\t" + name + b"\0")
+        return git_bytes("mktree", "-z", payload=b"".join(entries)).strip()
+
+    head = git_bytes("rev-parse", "HEAD").strip()
+    blob = git_bytes("hash-object", "-w", "--stdin", payload=b"{}").strip()
+    non_scope = git_bytes("mktree", "-z", payload=b"100644 blob " + blob + b"\t.meta.json\0").strip()
+    initiatives = git_bytes(
+        "mktree",
+        "-z",
+        payload=git_bytes("ls-tree", "-z", "HEAD:spec-dock/initiatives") + b"040000 tree " + non_scope + b"\t\xff\0",
+    ).strip()
+    workspace = replace_tree_entry("HEAD:spec-dock", b"initiatives", initiatives)
+    tree = replace_tree_entry("HEAD", b"spec-dock", workspace)
+    candidate = (
+        git_bytes(
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit-tree",
+            tree.decode("ascii"),
+            "-p",
+            head.decode("ascii"),
+            "-m",
+            "non-Scope byte pathname",
+        )
+        .decode("ascii")
+        .strip()
+    )
+    assert b"\xff/.meta.json\0" in git_bytes("ls-tree", "-r", "-z", candidate)
+    monkeypatch.setattr(
+        "spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", lambda _, *args: open_issue(*args)
+    )
+    assert (
+        main([
+            "--project",
+            str(root),
+            "work",
+            "start",
+            "init-00001",
+            "--base",
+            candidate,
+            "--branch",
+            "nonutf8",
+            "--dry-run",
+            "--json",
+        ])
+        == 0
+    )
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "planned" and output.err == ""
+    assert all(effect["status"] == "planned" for effect in result["effects"])
+    assert git_bytes("rev-parse", "HEAD").strip() == head
+    assert git_bytes("status", "--porcelain") == b""
+    assert not list((root / "spec-dock/.agent/work-target").glob("target-*.json"))
+
+
 @pytest.mark.parametrize("scope_id", ["init-00001", "epic-00002", "iss-00003"])
 @pytest.mark.parametrize("dry_run", [False, True])
 @pytest.mark.parametrize("missing", ["platform", "native-symbol"])

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+import os
 from pathlib import Path, PurePosixPath
 import re
 from tempfile import TemporaryDirectory
@@ -42,7 +43,7 @@ def committed_workspace(root: Path, oid: str, *, timeout: float) -> Iterator[Pat
             if not separator or len(header.split()) != 3:
                 raise ValueError("committed planning tree entry is invalid")
             mode, kind, object_id = header.split()
-            decoded = raw_path.decode("utf-8")
+            decoded = os.fsdecode(raw_path)
             parts = decoded.split("/")
             rules = decoded in (".gitignore", "spec-dock/.gitignore", "spec-dock/.agent/.gitignore")
             if decoded in ("spec-dock/.agent", "spec-dock/.agent/work-target") or decoded.startswith(
