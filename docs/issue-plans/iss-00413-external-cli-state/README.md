@@ -1,10 +1,14 @@
 # Issue #413 — 外部CLIとworktreeごとの最小状態
 
-> ローカル採用済み: ChatGPTの原本を採用し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。生成時の原本ZIPと現在の採用版をmanifestで区別します。現行の製品検証は [実装記録](implementation-report.md) と [検証証拠](artifacts/implementation-acceptance-evidence.md)、文書とTailscale配信は [report.md](report.md) を参照してください。
+> ローカル採用済み: ChatGPTの原本と取得ZIPを保持し、保有する実施記録・確定インタビュー・独立レビュー・実装証拠を加えています。現在の製品完了は [8606e132の証拠](artifacts/completion-evidence-8606e132.json)、今回の文書採用は [文書整備の記録](artifacts/documentation-alignment-20261004.md) を参照してください。[実装記録](implementation-report.md)、[過去の検証証拠](artifacts/implementation-acceptance-evidence.md)、[report.md](report.md) は各時点の原文履歴として保持しています。生成時の原本ZIPと現在の採用版はmanifestで区別します。
 
-**対応OSはLinux/macOSです。P-18のWindows専用source/test/CI撤去とP-07のFinish事前拒否修正を完了し、候補3b803cedを検証しました。macOS全件は1899 passed/1 skipped、Linux全件は1883 passed/17 skipped、最低Python3.10の関連61件も成功、actual exitはいずれも0。両OSの通常install CLIを各14操作確認し、GPT-5.6 Sol／Proの独立Code Review Strictはpass・指摘0でした。[最新の検証記録](artifacts/supported-os-verification-3b803ced.md)を参照してください。これは最終ゲート提出前の記録です。Final Quality Gate v2、人間merge、実導入、正式#413 import/Startの完了証拠とは別です。実装担当はGPT-6.1 Sol / Maxです。**
+**現在の製品固定点は `8606e132327066d56567556e336e4bc1ae6a0b17` です。対応OSはLinux/macOS、実装担当はGPT-6.1 Sol / Maxです。同SHAでFinal Quality Gate v2はpass、13観点を完了、P0/P1は0件でした。[原Gate](artifacts/final-quality-gate-8606e132.json)と[完了証拠](artifacts/completion-evidence-8606e132.json)を保持しています。macOS全件1916 passed/1 skipped、Linux全件1900 passed/17 skipped、最低Python 3.10の関連境界210件が成功しました。手動14操作は実Gitとstateful gh stubによる確認で、live GitHub Closeの確認ではありません。**
+
+**実環境への適用は現在0805 worktreeまでです。** mainとほか3 linked worktreeの移行、clone全体の完全なSync、正式#413 import/Start、人間によるmerge、パッケージ公開は別の未完了事項です。今回の文書整備はGPT-5.6 Sol / Proの[ChatGPT Use Strict分析](artifacts/documentation-analysis-20261003.md)と全文置換ZIPに基づきます。実行コード・テスト・CI・依存を変更せず、既存Gateの原文と対象SHAを保持します。今回の文書差分には追加レビューやFinal Quality Gateの再実施を行いません。
 
 [人間向け説明](explanation.html) → [要件定義](requirement.md) → [設計](design.md) → [実装計画](plan.md) の順で読めます。操作例は候補CLIの契約です。実consumerの旧入口への適用や、live GitHub変更の完了実績とは区別します。
+
+## 実装途中の履歴（現在の完了状態ではありません）
 
 後続のWindowsDirectoryは、保持した親handleから子を開く方式へ補強しました。[API境界のRed→Greenと確認結果](artifacts/windows-directory-anchor.md)と[過去のmacOS全件の記録](artifacts/macos-full-3b0c69e8.md)を参照してください。Linux全件の候補から製品source差分があり、その結果を後続候補の全面合格へ読み替えません。旧手動結果も別sourceとして保持しています。このWindows専用実装は最新OS決定に従いc0f8add1で撤去済みです。
 
@@ -18,7 +22,7 @@
 
 OS範囲の最上位authorityは[2026-10-02の決定](artifacts/os-support-decision.md)です。それ以外の新しい要求の根拠は2026-09-30確定の [利用者回答](artifacts/user-decisions.md) です。これは添付からの内容保持コピーで、正式Artifactを新規登録したものではありません。旧草案のactive/work全面廃止、全writerロック、完全stateless、新規local発行は採用しません。
 
-実装の基準は `chemitaro/spec-dock` / 指定branch `main` / `6fec3099d8759b4e5b3b393b2987534b46dfa383` です。今回接続GitHubの `git/ref/heads/main` を直接照会し、返却ref=refs/heads/main、type=commit、full SHAのASCII bytesが期待値と一致しました。他branch/default branchへのfallbackはありません。[出典と読取範囲](artifacts/source-basis.md) に事実と未確認を分けています。
+原設計生成時点の比較基準は `chemitaro/spec-dock` / 指定branch `main` / `6fec3099d8759b4e5b3b393b2987534b46dfa383` です。当時の接続GitHubの `git/ref/heads/main` を直接照会し、返却ref=refs/heads/main、type=commit、full SHAのASCII bytesが期待値と一致しました。他branch/default branchへのfallbackはありません。[出典と読取範囲](artifacts/source-basis.md) に事実と未確認を分けています。
 
 RQ/ACの正本はrequirement.md、技術的選択と保存/操作順の正本はdesign.md、実装作業契約はplan.mdです。CLIの詳細は [cli-contract](artifacts/cli-contract.md)、機械構造は [data schema](artifacts/data-schema.json) と [CLI schema](artifacts/cli-schema.json)、手順は [移行runbook](artifacts/migration-runbook.md)、対応は [acceptance matrix](artifacts/acceptance-matrix.md) です。
 

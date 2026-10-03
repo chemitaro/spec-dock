@@ -1,13 +1,15 @@
 # Issue #413 要件定義書
 
-原本生成時の状態: 対応OS決定と第三者分析を採用した正本。P-18実装前。製品受け入れは全件未認定。検証済み対象SHA: `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準: `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+**現在の実装正本と証拠（2026-10-03）**: repository `chemitaro/spec-dock`、branch `codex/iss-00413-external-cli-state` のtip `8606e132327066d56567556e336e4bc1ae6a0b17` をGitHub connectorで完全一致確認しました。製品コードと合意済み仕様の現在正本はこのSHAです。同SHAには既存のFinal Quality Gate v2証拠があり、coverage complete、13 perspective、P0/P1=0、情報提供P2=3です。native macOSは1916 passed / 1 skipped、Linuxは1900 passed / 17 skipped、Python 3.10境界は210 passedです。レビュアー自身がこれらを実行した証拠ではなく、手動14操作も実Gitとstateful gh stubによるものでlive GitHub Close認定ではありません。
 
-2026-10-02の採用後進捗: P-18とP-07の候補実装、Linux/macOS通常全件、両OSの外部console個別操作、新OS範囲Code Reviewを確認しました。[対象SHAと実結果](artifacts/supported-os-verification-3b803ced.md)を参照してください。本書の要求/設計意味を変えず、Final Quality Gate・人間merge・実導入の完了と分けて記録します。
+**現在のrollout状態**: caller-provided local observationでは、0805 worktreeに外部0.2.4 package、薄いshim、writer宣言と静的資産が適用済みで、240 Scopeのvalidateとempty activeを確認しています。mainとほか3 linked worktreeは未移行で、clone全体のsyncはpartial（exit 7）です。正式なIssue #413 import/Start、人間merge、package publicationは未完了です。GitHub #31はclosed/completed、#356と#413はopenという観測であり、本書は#31のreopenや付替えを指示しません。
+
+**履歴の読み方**: 以下に残る `121228c6`、`3b803ced`、P-18実装前、旧レビュー・旧試験・Windows検討の記述は、その作成時点のraw historyです。現在の完了/保留表示は上記と末尾のcurrent dispositionを優先し、履歴値を消去・改ざんしません。今回の文書差し替えは新しい製品実装、追加review、Final Quality Gate再実施ではなく、将来の文書commitに既存Gate認定を転記しません。
 
 <a id="background"></a>
 ## 背景・目的
 
-SpecDockはInitiative、Epic、Issueの三階層で仕様・依存・成果物を扱うPython CLIです。`src/spec_dock/` はprovider、`spec-dock/` はこのrepository自身のdogfoodingデータです。固定engine本体はcheckout外にありますが、shimが先にGit common-dirのlocator/controlを読みます。このためcontrol欠落でhelpへ到達しない経路があります。これは[基準source S-02/S-03](artifacts/source-basis.md#implementation)で確認した構造で、利用者端末の障害をこの環境で再現したという意味ではありません。
+SpecDockはInitiative、Epic、Issueの三階層で仕様・依存・成果物を扱うPython CLIです。`src/spec_dock/` はproviderの開発source、worktree外に通常導入したpackageが実行runtime、`src/spec_dock/assets/` から各consumer worktreeへ置く文書・template・skill・shimは静的資産、`spec-dock/.agent/work-target/` はignoredな直接作業記録です。現在のshimはPATH上の外部consoleへ委譲し、Git common-dirの独自locator/controlやcheckout内Pythonを起動前提にしません。旧shimがlocator/controlを先に要求してhelpへ到達できなかった構造は[基準source S-02/S-03](artifacts/source-basis.md#implementation)に残る歴史的baselineであり、現在実装の説明ではありません。
 
 目的は、通常の外部インストールCLIを使い、Git管理領域の独自運用基盤なしで、複数worktreeの作業対象を混同せず進められることです。全状態を捨てることではありません。worktreeごとの直接対象だけは残します。Startはbranch準備を行い、FinishはGitHubを完了します。通常のファイル編集をCLIの権限管理下に置きません。
 
@@ -351,3 +353,10 @@ Linux/macOSのOS/FS原語、fresh wheel、既存240 metadataの全件schema適�
 同一cloneを異なるOSユーザーや複数ホストで共有する新保証は追加しません。それが実際の導入先の必須条件であると判明した場合は、勝手な権限変更や別lock方式へfallbackせず、該当環境への適用を停止するmaterialな適用判断です。core実装の無関係な機能を増やす理由にはしません。
 
 実適用には旧writer停止、実体backupと復元確認、unknown remoteの照合、対象への許可が必要です。直接状態はignoredなので強制clean/手削除で失えます。電源断、媒体故障、非協調Git、記録をコピーした後のidentity再利用まで、永続台帳なしに完全検知できるとはしません。これらの限界を運用へ渡します。
+
+### 2026-10-03 current disposition
+
+- RQ/ACの製品実装と既存検証証拠は、検証済みSHA `8606e132327066d56567556e336e4bc1ae6a0b17` に結び付けます。今回の文書置換fileはその後の候補であり、新しいGate合格を主張しません。
+- 実行runtimeは利用者の外部tool環境にあるpackageです。program更新はその環境に共有されます。docs/system/templates/skills/shim/workspace宣言は明示したworktree単位の静的資産で、直接作業記録はさらに別のignored runtime stateです。
+- P-16は0805 worktreeへの適用だけ完了観測があります。mainとほか3 linked worktreeの移行、clone全体のcompleteなSync、P-17の正式#413 import/Start、P-15の人間merge、package publicationは完了扱いにしません。
+- 既存Gateの情報提供P2のうち、plan集約状態の不整合は本差し替えで文書上修正します。効果前mkdirのpartial分類と非UTF-8 pathname診断のJSON境界は製品コードの既知事項として残り、本作業では変更しません。

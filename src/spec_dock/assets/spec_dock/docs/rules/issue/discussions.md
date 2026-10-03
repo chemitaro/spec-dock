@@ -6,7 +6,7 @@
 - Naming rules: `spec-dock/docs/reference_naming.md`
 - Existing docs in this directory are timestamp-prefixed originals（標準: `<ts>-<kind>-<slug>.md` / same-second collision: `<ts>-<nn>-<kind>-<slug>.md`）。legacy sequential files は grandfathered で、自動 rename しません。
 - Currentの新規作成catalogは`blank` / `research` / `interview` / `disc` / `decision-candidate` / `adr`だけです。新規working artifactは`artifacts/`直下へ保存します。
-- Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は main orchestrator single-writer authority です。artifact draft は evidence であり、採用した内容は Requirement、Design、Plan または accepted ADR に明示的に再記述します。
+- Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` はdurableな仕様・結果の正本です。legacy discussionやartifact draftはevidenceであり、採用した内容はRequirement、Design、Planまたはaccepted ADRへ明示的に再記述します。
 - Canonical `report.md` は scope の実測記録です。legacy discussion-local report artifact は Current artifact catalog に含めません。
 - Historical delegated-authoring manifest/Profile/probe/session artifacts は grandfathered evidence です。current delegated drafts が flat model を使うことだけを理由に削除、rename、validation failure 化しません。
 - 実行場所: コマンドはリポジトリ root から実行してください。`./spec-dock/scripts/spec-dock ...` はその位置で保証される実行経路で、nested directory では相対 path が変わります。

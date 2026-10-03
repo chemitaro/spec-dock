@@ -1,10 +1,12 @@
 # Issue #413 実装計画書
 
-**2026-10-02の最新進捗**: P-01〜P-12とP-18の候補実装を含む3b803cedで、Linux/macOS全件、最低Python3.10の関連境界、両OS各14手動操作、新OS範囲Code Review Strict（pass・指摘0）を確認しました。[実結果](artifacts/supported-os-verification-3b803ced.md)。以下各stepの前回記録は履歴として残します。P-13の製品検査は実行済み、P-14は更新HTMLの検査と最終認定を進行中です。Final Quality Gate v2、人間merge、P-16/P-17の完了はまだ認定しません。
+**2026-10-03のcurrent aggregate**: 製品コードと合意済み仕様は、GitHub connectorでtip一致を確認した `8606e132327066d56567556e336e4bc1ae6a0b17` が正本です。同SHAの既存Final Quality Gate v2はcoverage complete、13 perspective、P0/P1=0、情報提供P2=3です。native macOS 1916 passed / 1 skipped、Linux 1900 passed / 17 skipped、Python 3.10境界210 passedの証拠を保持します。レビュアー自身のtest実行やlive GitHub Closeを意味しません。P-13/P-14の製品・既存成果物検証はこの証拠へ結び付けますが、今回の文書差し替え候補には新しいreview/FQ認定を付けません。P-15人間mergeとpublicationは未完了、P-16は0805 worktreeだけ適用済みでmainとほか3 linked worktreeは未移行、P-17の正式#413 import/Startは未実施です。
 
 **既存P-01〜P-17に、必須追加作業P-18を加えた全18 stepです。** P-18はP-13の最終実入口検証より前に完了させます。各stepの実装・検証・独立レビューの状態は下記と[実装記録](implementation-report.md)で区別します。この第三者分析packの生成・静的自己点検は、P-18実装や製品の合格証拠ではありません。
 
 2026-10-02 JSTの最新利用者決定で、対応OSはLinux/macOSに確定し、Windows対応の要求・設計・実装義務は失効した。既存P-01〜P-17中の「Windows未完了」「Windows native/storeを完了する」という記述は、その時点の履歴・raw evidenceとして残すが、現在の完了条件ではない。削除対象と保全対象は[P-18](#p-18)と[撤去分析](artifacts/os-support-retirement-analysis.md)を正本とする。
+
+以下の旧candidate SHA、旧test件数、旧レビュー状態、Windows検討、実装前/将来実行という表現は、各時点のraw historyです。current aggregate、各step先頭のCurrent状態、末尾の現在集約を優先して読み、古い記録を現在の保留理由や再実装義務へ変換しません。
 
 2026-10-02の予備検証と[手動確認](artifacts/manual-product-smoke.md)を[製品の検証証拠](artifacts/implementation-acceptance-evidence.md)へ集約した。clean `8a70a8b3` のLinux通常全件は1832 passed/18 skipped/exit0、macOS全件は1 failed/1847 passed/2 skipped/exit1。readonly比較不一致を調査し、元結果と変更pathが分かる診断を保持する。P-12進行中、P-13/P-14は準備を先行した段階であり、P-18、fresh Strict、新OS範囲のFQ、実consumer切替は未完了。Windows native/storeは未完了義務ではなくP-18撤去対象である。
 
@@ -293,7 +295,7 @@ uv run pytest tests/cli_runtime/test_workspace_sync_vnext.py tests/integration/t
 1. 公開Syncで、別WTの選択Issueとは無関係なScope-shaped fileが観測を失敗させるRedを固定する。
 2. NRT/infra/scope_tree.pyに既存bounded Git adapterによる対象IDのpathname検索と直接chain読取を実装する。全件loaderは保持し、対象限定loaderは兄弟/別階層を列挙・lstatしない。NRT/application/scope_query.pyと対象限定callerでtimeoutを渡す。
 3. 同じ公開SyncをGreenにし、未追跡/ignore対象、tracked旧pathと新pathの移動、対象重複、選択chainのredirect、Git失敗/timeout、readonly bytesを一件ずつ検証する。公開Startでも無関係な実体の影響がなく、同一ID/refの重複は拒否されることを確認する。Scope公開とactive解除の既存回帰を実行する。
-4. fresh wheelを外部の非editable環境へ導入し、実console/実Gitのlinked WTでmanual smokeする。合意済みの現在0805 WTの外部packageを更新し、`./spec -h`・validate・選択・Syncの実測を残す。別の4実WTとclosed祖先は変更しない。
+4. fresh wheelを外部の非editable環境へ導入し、実console/実Gitのlinked WTでmanual smokeする。合意済みの現在0805 WTの外部packageを更新し、installed `spec-dock help` と薄い `./spec-dock/scripts/spec-dock help`、validate、選択、Syncの実測を残す。mainとほか3 linked worktree、closed祖先は変更しない。
 5. scoped commit/non-force push後、GPT-5.6 Sol / ProのCode Review Strictを実施する。重大指摘は完全batch分析後に修正し、再レビューする。変更したIO契約のためFinal Quality Gate v2は新campaignとして開始し、旧fail campaignは保全する。同一候補SHAの必須検証と独立レビューがpassになるまで認定しない。
 
 **完了条件**: 無関係なScope実体がStart/Syncの選択観測を妨げず、選択chainの未知状態はfail-closedで予約を保持する。Linux/macOS通常検証、fresh distribution/manual dogfood、Strict Code Review、fresh FQ v2を通過する。新コマンド、Scope path field、UUID、中央engine/registry/cache、permission制度、P2別指摘の改修は含めない。
@@ -894,7 +896,7 @@ uv build --wheel
 <a id="p-13"></a>
 ## P-13 実入口E2Eと通常CIを閉じる
 
-**現在: 通常全件・fresh wheel E2E・最低Python版・両OSの個別consoleを検査済み。最終認定待ち。**
+**Current: 製品実装と通常/fresh wheel E2E・最低Python版・両OSconsoleの証拠は、既存Final Quality Gate対象 `8606e132327066d56567556e336e4bc1ae6a0b17` に結び付きました。新しい文書commitの再認定は行いません。**
 
 **前回記録: 未着手。前提/依存: P-18。** 読む節: [D-13](design.md#d-13)。補足: D-13 / 全D節。
 
@@ -929,7 +931,7 @@ uv run pytest tests/integration/test_issue413_e2e.py -q
 <a id="p-14"></a>
 ## P-14 Codexの成果物レビューとブラウザ検査
 
-**現在: 更新HTMLは4/4 SVG・zoom/keyboard/focus・390pxのbrowser検査とHTTP byte一致を確認済み。manifest/ZIP検査とFinal Quality Gateは別の実行記録で確定する。**
+**Current: 旧採用HTMLの4/4 SVG・zoom/keyboard/focus・390px検査はraw historyとして保持します。本差し替えHTMLはPlantUML契約v2・4 source・固定JS/styleの静的同一性を確認しますが、追加reviewやFinal Quality Gateの新規実施結果は主張しません。**
 
 **前回記録: 未着手。前提/依存: P-13。** 読む節: [D-14](design.md#d-14)。補足: D-14 / requirement / CLI契約。
 
@@ -991,7 +993,7 @@ git status --short
 <a id="p-16"></a>
 ## P-16 許可されたdogfood環境だけに適用する
 
-**状態: 2026-10-03の追加許可により、このWTへの導入・移行・動作確認を実施済み。** 当初の依存P-15に対し、利用者がこのWTの導入をmergeに先行して許可しました。読む節: [D-12](design.md#d-12)。補足: D-12 / runbook M-01〜M-05。[実測記録](artifacts/dogfooding-20261003.md)に保全・復元照合、既存240 Scope不変、外部CLI、薄いshim、通常readerと残るclone全体の前提不足を記載しています。他WTへの展開・human mergeは実施していません。
+**状態: 2026-10-03の追加許可により、0805 worktreeへの外部package・writer migration・薄いshim・静的資産の適用と動作確認を実施済み。** 当初の依存P-15に対し、利用者がこのWTの導入をmergeに先行して許可しました。読む節: [D-12](design.md#d-12)。補足: D-12 / runbook M-01〜M-05。[実測記録](artifacts/dogfooding-20261003.md)に保全・復元照合、既存240 Scope不変、外部CLI、薄いshim、通常readerと残るclone全体の前提不足を記載しています。mainとほか3 linked worktreeへの展開、clone全体のcompleteなSync、human mergeは実施していません。
 
 **所有/対象file**: 許可されたcloneと対象WT、旧writer起動元、外部backup、承認wheel、workspace/static資産。
 
@@ -1089,21 +1091,29 @@ spec-dock --project "$ROOT" scope import github issue gh:chemitaro/spec-dock#413
 
 ## 完成証拠の別管理
 
-| 証拠 | 所有者・実施step | 現在 |
+| 証拠 | 所有者・実施step | 2026-10-03現在 |
 |---|---|---|
-| ChatGPTのpack静的自己点検 | artifacts/self-check.md | この納品内に実測範囲のみ記録 |
-| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | 3b803cedの両OS全件・最低版関連境界・手動操作は確認済み。Final Quality Gate候補SHAの検査は別途実施 |
-| Codex成果物レビュー/実ブラウザ | Codex、P-14、保有証拠へ追記 | 新OS範囲Code Review pass・指摘0。更新HTMLの4/4 SVG・zoom・390px検査はexit0。最終認定前 |
-| 人間merge/任意の公開 | 人間、P-15 / 別途許可 | 未着手 |
-| dogfood適用と実metadata保全 | 許可された実施者、P-16 | 未着手 |
-| 正式#413 import / work start | 実施者、P-17 | 未着手 |
+| 製品実装とfocused/全test | 実装担当、P-01〜12・P-18・P-13 | exact SHA `8606e132327066d56567556e336e4bc1ae6a0b17` の既存証拠へ固定。macOS 1916/1 skip、Linux 1900/17 skip、Python 3.10境界210。実行者とreviewerを混同しない |
+| 既存Final Quality Gate v2 | 原Gate JSON | 同SHAでcoverage complete、13 perspective、P0/P1=0、P2=3。今回の文書差し替えcommitには流用しない |
+| 成果物/HTML | P-14と各時点の保有証拠 | 旧ブラウザ結果はraw history。今回のHTMLは契約v2・4 source・JS/style保持をZIP生成時に静的確認し、新しいreview/FQ認定は付けない |
+| 人間merge/任意の公開 | 人間、P-15 / 別途許可 | 未実施。PR、merge、package publicationを完了扱いにしない |
+| dogfood適用と実metadata保全 | 許可された実施者、P-16 | 0805 worktreeのみ適用済み。mainとほか3 linked worktreeは未移行、Syncはpartial |
+| 正式#413 import / work start | 実施者、P-17 | 未実施。closed/completedの#31を勝手にreopen/付替えしない |
 
 `report.md`、`implementation-report.md`、`artifacts/user-decisions.md`、`artifacts/interview-worktree-start.md` は既存証拠/履歴であり、このpackの生成scriptや静的検査は書き換えません。P-18の作業ブリーフは更新済み正本push後に独立sessionで作成・採用済みです。unknown remote、旧writer停止不明、実体backup不足があれば該当適用を止めます。コードrevertでGitHub効果まで戻ったとは説明しません。
 
-## P-18計画採用時点の最新baseline
+## Raw history: P-18計画採用時点のbaseline
 
 [同SHAのLinux通常全件](artifacts/linux-full-121228c6.md)はPATHだけ補正して1900 passed/20 skipped、exit0。元exit1を保全する。P-18の製品変更後の証拠ではなく、撤去後は新SHAで確認する。r12はfail/P1一件でP-07へ登録済み。P-18.1の限定scanではWindows record 0。製品source/test/CI変更はまだ行っていない。
 
-## 2026-10-02 Windows撤去後の最終ゲート提出準備
+## Raw history: 2026-10-02 Windows撤去後の最終ゲート提出準備
 
-[P-18/P-07を含む製品検証](artifacts/supported-os-verification-3b803ced.md)は3b803cedの実測です。両OSの全件と手動、最低Python版、fresh独立Code Reviewを別々に保存しました。文書更新だけの次候補でFinal Quality Gate v2を実施し、同じ正確なSHAの必要test laneを再検査します。旧Windows scopeのcampaign/stateを移植しません。P-15人間mergeとP-16/P-17は未着手のままです。
+[P-18/P-07を含む製品検証](artifacts/supported-os-verification-3b803ced.md)は3b803cedの実測です。両OSの全件と手動、最低Python版、fresh独立Code Reviewを別々に保存しました。旧Windows scopeのcampaign/stateを移植しません。この段落の「次候補」「未着手」は当時の状態であり、現在集約は次節を正とします。
+
+## 2026-10-03 current state snapshot
+
+- 製品実装・合意済み仕様・既存Gate証拠の固定点は `8606e132327066d56567556e336e4bc1ae6a0b17` です。既存GateはこのSHAだけに結び付き、文書差し替え後のcommitを新たに認定しません。
+- P-13/P-14の製品検証と既存成果物検査は完了証拠へ結び付きました。GateのP2三件は情報提供で、plan集約不整合だけを本文上修正し、二つの製品コード事項は残します。
+- P-15は未実施です。PR、human merge、package publicationを完了扱いにしません。
+- P-16は0805 worktreeだけ適用済みです。mainとほか3 linked worktreeは未移行で、current Syncのpartialをcompleteへ読み替えません。
+- P-17の正式Issue #413 import/Startは未実施です。#413と#356はopen、ancestor #31はclosed/completedというcaller-provided観測を保持し、#31を勝手にreopen/付替えしません。

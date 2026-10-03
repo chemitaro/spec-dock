@@ -1,0 +1,8 @@
+{
+  "findings": [],
+  "overall_correctness": "patch is correct",
+  "overall_explanation": "GitHub connectorでchemitaro/spec-dockのcodex/iss-00413-external-cli-state先端が8606e132327066d56567556e336e4bc1ae6a0b17と完全一致すること、およびb15f56585bd15b36504dd5d0c919c4f31b1ef039..8606e132327066d56567556e336e4bc1ae6a0b17が指定された変更範囲であることを確認した。実装はWorkTargetの固定7fieldを変更せず、GitのNUL区切りpathname検索から選択Scopeの現在pathを導出し、tracked・untracked・ignore対象を扱っている。pathnameはos.fsdecodeでfilesystem表現へ変換され、ASCIIのScope directory grammarに合致する対象と祖先だけがnofollowで検査される。metadata本文については従来どおりrequired structure、tree位置、ID・parent・GitHub linkage・dependenciesを検証し、未知optional fieldを追加で拒否する境界には広げていない。対象不存在はstale、Git検索のexit・warning・timeout、現存候補重複、redirectなどはunavailableとなり、いずれも既知のID/refを保持する。Startのinventory判定はstatus判定より先に既知recordのID/ref重複を拒否するため、staleまたはunavailableによる重複確認のすり抜けも認められない。committed_workspaceはGit tree pathnameを同じfilesystem decodeとASCII grammarで分類し、標準Scope importが生成するepics/rules.mdなどをScope directoryと誤認せず、POSIX上の非Scope名を一時snapshotへ展開しない一方、正規Scope-shaped file・symlink、metadata欠落・不整合の従来の拒否は維持している。通常のfull-tree読取、readonly Sync、Start-only lock、branch作成・checkout、Finish時のCloseとbranch保持に変更範囲由来の回帰は確認できなかった。このレビューではテストを実行していない。repository内の257件・lint・外部consoleの実測記録は先行実装時点の証拠であり、その後に追加されたPOSIX非Scope名テストと非UTF-8 pathname修正を含むexact HEADでの実行結果は独立には再確認していない。",
+  "review_status": "pass",
+  "review_status_reason": "指定された仕様、変更実装、直接影響するcaller、Start・Sync・committed snapshotの経路、および関連テストを照合した結果、今回の変更が導入した再現可能なP0、P1、P2、P3の問題は確認できなかった。未実行テストの残存リスクはあるが、正しさを評価するために必要なcodeとcontractは参照でき、blockerはない。",
+  "overall_confidence_score": 0.92
+}

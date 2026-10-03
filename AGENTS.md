@@ -7,7 +7,7 @@
 
 ## SpecDock Agent-First Operations
 
-- Codex agents operate SpecDock through the installed external `spec-dock` package or its thin repository shim. Inspect the verified candidate's current leaf help. During the coordinated cutover, verify candidates in isolated consumers; apply installation and writer migration to actual dogfooding data only in their approved steps. Do not run the retired repository-local implementation as a fallback. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results.
+- Codex agents operate SpecDock through the installed external `spec-dock` package or its thin repository shim. Inspect the verified candidate's current leaf help. The Issue 413 handoff recorded on 2026-10-03 has the installed package, thin shim, and writer declaration applied only to the current 0805 worktree; main and three linked peers remain unmigrated, while formal Issue 413 Start, human merge, and publication remain pending. This rollout note is caller-provided local status, not implementation authority or a new permission gate. Do not run the retired repository-local implementation as a fallback. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results.
 - Treat the request or approved plan as authorization for the command's ordinary documented local, Git, and GitHub side effects. Inspect current root and leaf help, resolve exact targets, and preserve the CLI's fail-closed boundaries.
 - Require an exact target and explicit destructive outcome in the request or approved plan before running `scope delete`, `installation uninstall`, or `worktree remove`. Once authorized, execute and verify them rather than handing them back for manual entry.
 - Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
@@ -19,6 +19,8 @@
 - `src/spec_dock/` is the provider-side source of truth.
 - `spec-dock/` is the generated consumer-side workspace used for dogfooding, validation, and active docs.
 - `src/spec_dock/assets/spec_dock/...` produces what later appears under `spec-dock/...`.
+- Source edits or branch switches do not update the installed external package. A package update changes the user's tool environment; static installation/update changes only the explicitly targeted worktree.
+- The ignored `spec-dock/.agent/work-target/` record belongs to that worktree at runtime. Its opaque file token is not a Scope ID and is not a provider or consumer static asset.
 - When implementation and generated files look similar, edit the provider side first.
 - Do not treat `spec-dock/` as the implementation source of truth unless the task is explicitly about dogfooding data or generated output.
 

@@ -1,10 +1,10 @@
 # Issue #413 設計書
 
-原本生成時の状態: 対応OS決定と第三者分析を採用した設計。P-18は未実装。検証済み対象SHAは `121228c6fca1fd016e7bccef009902396112ba43`、main比較基準は `6fec3099d8759b4e5b3b393b2987534b46dfa383`。
+**現在の設計実装点（2026-10-03）**: repository `chemitaro/spec-dock`、branch `codex/iss-00413-external-cli-state`、full SHA `8606e132327066d56567556e336e4bc1ae6a0b17` をGitHub connectorで完全一致確認しました。本文の外部package、44 leaf、worktree-local direct record、Start-only POSIX flock、GitHub番号Scope、Linux/macOS、static installation/migration契約はこのSHAに実装されています。同SHAの既存Final Quality Gate v2証拠は保持しますが、今回の文書差し替え候補を新たに認定したものではありません。
 
-2026-10-02の採用後進捗: P-18とP-07の候補実装、Linux/macOS通常全件、両OSの外部console個別操作、新OS範囲Code Reviewを確認しました。[対象SHAと実結果](artifacts/supported-os-verification-3b803ced.md)を参照してください。本書の要求/設計意味を変えず、Final Quality Gate・人間merge・実導入の完了と分けて記録します。
+**現在のrollout境界**: caller-provided local observationでは0805 worktreeだけが外部package・薄いshim・writer宣言・静的資産の適用済みです。mainとほか3 linked worktreeは未移行で、正式#413 import/Start、人間merge、package publicationは未完了です。下記に残るP-18未実装、旧SHA、旧試験・Windows検討の文はraw historyとして読み、現在状態へ上書きしません。
 
-[要件](requirement.md) / [CLI契約](artifacts/cli-contract.md) / [実装計画](plan.md) / [出典](artifacts/source-basis.md)。本文のAPI名・新pathは実装予定の契約であり、基準に存在するとは限りません。
+[要件](requirement.md) / [CLI契約](artifacts/cli-contract.md) / [実装計画](plan.md) / [出典](artifacts/source-basis.md)。設計契約の現在実装根拠は上記exact SHAです。履歴節にある「予定」「未実装」は、その記録時点の語として保持します。
 
 <a id="d-01"></a>
 ## D-01 採用する小さな構造と判断の区別
@@ -36,6 +36,9 @@
 root/leaf help、version、completion、syntax/廃止入力判定を先に行い、Git/project/control/ネットワークと対応OSguardを解決しません。`--project` が壊れていてもhelpは動きます。引数parserを使うためにbusiness/contextをimportしてIOしない構造にします。utility dispatch後の業務コマンドだけ、`runtime_dispatch.dispatch` の先頭でLinux/macOSを確認し、非対応OSはproject/Git/GitHub/file効果前に `UNSUPPORTED_PLATFORM`・effects=[]で止めます。この一箇所のguardを広範なOS抽象化へ発展させません。v2 JSONを一度だけ出力する責務はpresentationに置きます。
 
 consumerに配布するのは仕様template、説明・skills等のstatic資産だけです。Python runtimeのコピーは配布しません。static資産の読取はpackageの `importlib.resources.files("spec_dock")` から行い、filesystem上の固定lib配置を仮定しません。`setup.py` のbuild先清掃とbytecode除外を保ち、sdistからのwheelも同じ収録内容にします。
+
+
+更新単位は四層に分けます。`src/spec_dock/` は開発source、外部tool環境のinstalled packageは実行runtime、各consumerのdocs/system/templates/skills/shim/workspace宣言はworktree単位の静的投影、`.agent/work-target/target-<token>.json` はignoredな直接記録です。source編集やbranch切替はinstalled packageを更新せず、package更新は利用者のtool環境に共有されます。static更新は明示したworktree一つだけを対象にし、file tokenをScope IDへ転用しません。
 
 ### 既存 `./spec` の扱い
 
@@ -327,6 +330,12 @@ producer sourceのtest import成功だけでは配布成功としません。Lin
 <a id="d-14"></a>
 ## D-14 実施境界・完成証拠
 
+#### 原計画時点の境界（raw history）
+
 このpackは文書生成物です。schemaの自己検証やZIP整合は製品ACのpassではありません。HTMLの実行JS/modal byte一致は動的なSVG描画成功の代わりではありません。
 
 本追加分析と差替え候補の著述モデルは、利用者指定の **GPT-5.6 Sol / Pro** です。既存P-01〜P-17の実装履歴に記録された別モデル設定を改ざんしません。P-18を含む実装担当は既に利用者指定のGPT-6.1 Sol / Max（gpt-6.1-sol / max）です。具体commandと実在test pathは、更新済み正本を通常pushした後の独立ChatGPT Implementation Brief Strictで具体化します。本資料だけで実装開始可能、SpecDock正式Start成功、レビュー/FQ完了とは扱いません。コード変更、テスト、成果物レビュー、人間merge、実環境dogfood、#413 import/Startを別step・別証拠にし、自動commit/push/merge/公開を含めません。
+
+#### 2026-10-03 current disposition
+
+製品実装、通常試験、既存Final Quality Gate証拠はexact SHA `8606e132327066d56567556e336e4bc1ae6a0b17` へ結び付きました。現在0805 worktreeへの限定適用も観測済みです。一方、今回の文書差し替え候補には新しいreview/FQ認定を付けず、mainとほか3 linked worktreeの移行、formal #413 import/Start、人間merge、package publicationを保留のまま分離します。GitHub #31のclosed/completed状態は前提不成立の観測であり、reopen・付替えを設計上の自動回復にしません。

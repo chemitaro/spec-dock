@@ -10,7 +10,7 @@
   - blank artifacts: `<ts>-<slug>.md`
   - blank same-second collision: `<ts>-<nn>-<slug>.md`
 - `blank` は filename token を使わず、front matter の `template: "blank"` で template identity を示します。
-- Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` は artifacts ではありません。canonical docs は main orchestrator single-writer authority です。
+- Canonical `requirement.md` / `design.md` / `plan.md` / `report.md` はartifactsではなく、durableな仕様・結果の正本です。Artifactの存在や作成者によって自動更新されず、採用した内容だけを該当するcanonical文書またはaccepted ADRへ明示的に反映します。
 - Artifact は evidence / draft / synthesis / decision candidate の作業面です。採用した内容は Requirement、Design、Plan または accepted ADR に明示的に再記述します。
 - `artifact import file PATH --scope TARGET` は、Workbench を要求せず、一件の明示 regular file を generic Artifact として保存します。source は変更せず、bytes は opaque evidence のままです。`canonical=false` は自動採用しないことを表します。命名は [reference_naming.md](../../reference_naming.md)、privacy-safe result と publication / retry state は [guide.md](../../guide.md) を参照してください。
 - Legacy `discussions/` は preservation surface です。既存 discussion docs は削除、移動、rename せず grandfathered evidence として扱います。

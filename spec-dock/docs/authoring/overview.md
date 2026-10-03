@@ -24,10 +24,12 @@ Issue の canonical `plan.md` は一つです。完成基準は選んだ一つ�
 
 ## Agent assistance
 
-Agent assistance は、現在存在する次の二つの repo-local skill が担います。
+provider側の正本は `src/spec_dock/assets/install_root/.agents/skills/` にある次の二つです。導入時に、明示したconsumer worktreeのroot `.agents/skills/` へ静的資産として投影されます。consumer側のskillは実行runtimeではなく、installed external `spec-dock` の利用手順です。package更新は利用者のtool環境、skill更新はworktree単位であり、source編集や別worktreeの更新から自動伝播しません。
 
-- `.agents/skills/spec-dock/SKILL.md`: SpecDock の scope、文書、Artifact、依存、lifecycle、worktree、managed installation を current CLI で操作・執筆します。
-- `.agents/skills/spec-dock-grill-with-docs/SKILL.md`: read-only grilling と domain clarification の後に scope-local evidence Artifact を作成します。
+- `.agents/skills/spec-dock/SKILL.md`: SpecDock の scope、文書、Artifact、依存、lifecycle、worktree、managed installation をcurrent CLIで操作・執筆します。
+- `.agents/skills/spec-dock-grill-with-docs/SKILL.md`: read-only grilling と domain clarification の後にscope-local evidence Artifactを作成します。
+
+これらは支援手順であり、canonical文書を自動採用したり、通常編集に新しい許可gateを加えたりするものではありません。
 
 ## 基本原則
 

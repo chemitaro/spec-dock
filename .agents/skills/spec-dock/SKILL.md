@@ -9,6 +9,16 @@ Use the installed external `spec-dock` console. Read current root and leaf help 
 
 Business commands support Linux and macOS with Python 3.10+. Other operating systems return `UNSUPPORTED_PLATFORM` (exit 3) before project admission or effects. Help, version and completion remain context-free utilities.
 
+
+## Distinguish the four owned layers
+
+- `src/spec_dock/` is provider development source. `src/spec_dock/runtime/` implements the packaged CLI; `src/spec_dock/assets/` is the provider authority for shipped static content.
+- The actual command is the non-editably installed external package in the user's tool environment. Editing source or switching a checkout branch does not update that installed package. Updating it is user/tool-environment-wide, not a runtime copy inside each consumer.
+- `spec-dock/docs`, `spec-dock/system`, `spec-dock/templates`, the root `.agents/skills`, workspace declaration and shim are static projections in one explicit consumer worktree. Installation init/update does not silently update another worktree.
+- `spec-dock/.agent/work-target/target-<32-hex-token>.json` is an ignored, worktree-local direct record. The opaque filename token identifies one captured record; it is not a Scope ID, GitHub issue number, UUID or operation journal entry.
+
+Choose package update, static installation/update, or lifecycle operation according to the layer that actually owns the requested outcome. Do not describe parity between layers as proof that another layer was updated.
+
 ## Resolve the context and target
 
 1. Bind one repository/worktree, using its exact absolute root with `--project` when needed.

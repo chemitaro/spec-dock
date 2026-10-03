@@ -31,6 +31,18 @@ Startはlive readiness確認、branch作成またはcheckout、worktree自身の
 
 Finishはbackendのcompletedを確認して、捕捉した直接記録だけを解除します。GitHub Issueは完了理由でclosedとなり、branchには留まります。commit、test、review、push、PR、mergeは別途確認します。`active clear` は選択だけ、`scope close` は完了状態だけを変えます。`active set` は同じ妥当な直接対象へのunchangedだけを許し、空/別対象の取得はStartへ戻します。
 
+
+## 実行package・配布資産・worktree状態の境界
+
+同じ「SpecDock」に見えるものでも、更新単位と正本は異なります。
+
+- `src/spec_dock/` はproviderの開発sourceです。CLI実装は主に `src/spec_dock/runtime/`、配布する文書・template・skill・shimは `src/spec_dock/assets/` にあります。
+- 利用者が実行するのは、worktree外のtool環境へ通常packageとして導入した `spec-dock` です。sourceの編集やbranch切替だけでは、導入済みpackageは更新されません。package更新はその利用者のtool環境に対する更新で、consumerごとにPython runtimeをコピーする操作ではありません。
+- 各consumer worktreeに置く `spec-dock/docs`、`spec-dock/system`、`spec-dock/templates`、root `.agents/skills`、shim、workspace宣言は静的資産です。新しいconsumerはこれらを受け取りますが、Python runtimeは受け取りません。既存consumerの静的資産更新は、明示したworktree一つずつ行います。
+- `spec-dock/.agent/work-target/target-<32桁token>.json` は、そのworktreeだけのignoredな直接作業記録です。file tokenは記録実体を安全に捕捉するための識別子であり、GitHub番号から作るScope ID、UUID、operation IDではありません。
+
+このrepositoryの `spec-dock/` とroot `.agents/` はconsumer側の投影です。製品sourceや配布元を変更するときはprovider側を正本とし、consumer側はCLIによる明示更新と現物確認を別に行います。
+
 ## 導入と更新
 
 レビュー・通常試験が済んだwheelを、例えば `uv tool install /absolute/path/spec_dock-VERSION-py3-none-any.whl` でworktree外に導入します。packageの更新とcheckoutの静的資産更新は別操作です。

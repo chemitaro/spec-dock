@@ -4,7 +4,7 @@
   "document_date": "2026-09-30",
   "encoding": "UTF-8",
   "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
-  "status": "Adopted A implemented; current external package updated; 257 related tests and external console manual pass; fresh independent Code Review and FQ v2 pending; other WT and formal Start prerequisites unchanged",
+  "status": "Implementation at 8606e132 has an existing passing FQ v2; documentation replacements adopted and locally verified; current 0805 static assets updated; other worktrees, formal Start, human merge and publication remain incomplete",
   "implementation_assignment": {
     "model": "gpt-6.1-sol",
     "reasoning_effort": "max",
@@ -14,10 +14,10 @@
     "repository": "chemitaro/spec-dock",
     "target_branch": "codex/iss-00413-external-cli-state",
     "ref": "refs/heads/codex/iss-00413-external-cli-state",
-    "expected_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
-    "retrieved_tip_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
-    "verification": "Strict third-party brief connector verification at immutable base; subsequent source checkpoint recorded separately",
-    "new_requirements_authority": "artifacts/os-support-decision.md plus current user instructions"
+    "expected_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "retrieved_tip_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "verification": "ChatGPT Use Strict connector verified exact branch tip; documentation-only changes follow this immutable implementation point",
+    "new_requirements_authority": "No new product requirements; existing accepted decisions preserved"
   },
   "preserved_external_files": [
     {
@@ -35,27 +35,28 @@
   ],
   "self_hash_policy": "manifest.json excluded from payload hashes to avoid self-reference; archive hash recorded outside the archive",
   "checks": {
-    "scope": "adopted pack verification; original generator checks retained separately",
+    "scope": "Documentation adoption and packaging verification only; existing implementation Gate remains tied to 8606e132",
     "utf8": "passed",
     "safe_single_root": "passed",
     "json_schemas": 2,
     "bundled_examples_valid": 13,
-    "local_link_occurrences_checked": 776,
+    "local_link_occurrences_checked": 741,
     "html_unique_ids": 34,
     "template_scripts_styles_modal_unchanged": true,
-    "browser_dynamic": "2026-10-03 adopted-A HTML: 4/4 SVG and zoom validator pass; scripts unchanged",
-    "mobile": "390px current HTML viewport and SVG/table bounds checked; see artifacts/supported-os-verification-3b803ced.json",
-    "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
-    "product_acceptance": "Adopted-A related tests and current external CLI verified; fresh full-candidate gates pending",
+    "browser_dynamic": "Updated HTML: 4/4 inline SVG and zoom/keyboard/focus validator passed, actual exit 0",
+    "mobile": "Historical previous-HTML 390px measurements retained in the original evidence; updated HTML mobile viewport not remeasured in this documentation-only verification",
+    "source_publication": "Existing managed Tailscale URL HTTP 200; current source byte match",
+    "product_acceptance": "Existing implementation Gate preserved at 8606e132; no new review or Gate for documentation commit",
     "zip_crc": "passed",
     "member_bytes_vs_files": "passed",
-    "manifest_hashes_vs_members": "passed"
+    "manifest_hashes_vs_members": "passed",
+    "json_documents_parsed": 40
   },
   "files": [
     {
       "path": "README.md",
-      "bytes": 7501,
-      "sha256": "2f92ad42dbd26312104b610122de38391e96b716980141a3b0d6d4a79b7e882a"
+      "bytes": 8305,
+      "sha256": "c9dc53f9e1cb456d2d8abe00c581a7849d3dd6ccf186dadcbf46a89a54f1843c"
     },
     {
       "path": "artifacts/acceptance-matrix.md",
@@ -71,6 +72,11 @@
       "path": "artifacts/cli-schema.json",
       "bytes": 16918,
       "sha256": "ccea5bb08e8fb1bc8addf95f04f6330d19bae39c08ca604276b55db78f1d9a51"
+    },
+    {
+      "path": "artifacts/code-review-8606e132.json",
+      "bytes": 2666,
+      "sha256": "656695cf8b20d5ac3e439ebe86fd8c7abbd57739f259038ebfd70621dcefdfb2"
     },
     {
       "path": "artifacts/code-review-linux-macos-3b803ced.json",
@@ -218,9 +224,44 @@
       "sha256": "4b7c170004525cdf6ddee787df3cdffa7fb6885c34e91990720afd1c1e626853"
     },
     {
+      "path": "artifacts/completion-evidence-8606e132.json",
+      "bytes": 11927,
+      "sha256": "cd626463cb861a194935ae6b9ef2acea123e8f9b79f02f4c7a8975a969b80730"
+    },
+    {
       "path": "artifacts/data-schema.json",
       "bytes": 9216,
       "sha256": "2c925518dc9aa8f573edb320da5611e639bea3e7e489e5a07d2fd24aa33382cf"
+    },
+    {
+      "path": "artifacts/documentation-alignment-20261004.md",
+      "bytes": 4617,
+      "sha256": "fb5cbe1cc08d2804ba6b83acc29b2453641e92cf423ac7dde219370c191df2be"
+    },
+    {
+      "path": "artifacts/documentation-analysis-20261003.md",
+      "bytes": 10787,
+      "sha256": "a0e3d79dce116f930bd57075d6f82e00ba49e01f18a4ab35b395e7b266822bbc"
+    },
+    {
+      "path": "artifacts/documentation-replacements-manifest-20261003.json",
+      "bytes": 12403,
+      "sha256": "266a0b263eb47eb92d216783e63fbd6e89662b034f25d0f61875a428c2a44318"
+    },
+    {
+      "path": "artifacts/documentation-response-20261003.md",
+      "bytes": 3107,
+      "sha256": "f7284d6a0dc1c3bca080f13e6508dde6654ae7fc951bfb6e04eb8c73ba298efb"
+    },
+    {
+      "path": "artifacts/documentation-unchanged-20261003.md",
+      "bytes": 12533,
+      "sha256": "d7ab06deff48a64d75946594fd9772c10cd28f35c054083fcace0b45d5626028"
+    },
+    {
+      "path": "artifacts/documentation-verification-20261004.json",
+      "bytes": 2386,
+      "sha256": "41a3b8587efbe86e89a0f14dbc6720fa08397a4556ec147291f0d96146bc86ab"
     },
     {
       "path": "artifacts/dogfooding-20261003.md",
@@ -261,6 +302,11 @@
       "path": "artifacts/examples.json",
       "bytes": 13616,
       "sha256": "c22122c7732f9ced4aef70ed36843f28ee0f5a4c5535fbd94a8235ef97a40470"
+    },
+    {
+      "path": "artifacts/final-quality-gate-8606e132.json",
+      "bytes": 12129,
+      "sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6"
     },
     {
       "path": "artifacts/fresh-console-lifecycle.md",
@@ -769,13 +815,13 @@
     },
     {
       "path": "design.md",
-      "bytes": 47231,
-      "sha256": "9fed3aafbff3960a5988674f87e3ec8e02f34820c62e6d52c5131ad7fb4a5203"
+      "bytes": 48879,
+      "sha256": "c42070312c6ff0395f93624ae0330e8795a123c099947dfd2cf530ad87956f8d"
     },
     {
       "path": "explanation.html",
-      "bytes": 75625,
-      "sha256": "def666c4b6dc3ace5cdd131b3d6b2088d9f349056bcbdf54b7b89c4a52da4e18"
+      "bytes": 71798,
+      "sha256": "528e01a3a2fd7c73478a1a49d327803a2e08f5eb5238e88d168ec42e9ae808f0"
     },
     {
       "path": "implementation-report.md",
@@ -789,8 +835,8 @@
     },
     {
       "path": "plan.md",
-      "bytes": 165324,
-      "sha256": "78f046edb71dca3a5287d1c77a6a34360f4ddf08186dcce5bd2b528407fc7a14"
+      "bytes": 167657,
+      "sha256": "7f7e1b582245d17e7161cb4ab0262f826ec8c1d9dd03e0dd38945e5c99669d08"
     },
     {
       "path": "preview-entry.html",
@@ -804,8 +850,8 @@
     },
     {
       "path": "requirement.md",
-      "bytes": 29503,
-      "sha256": "60102994e5e5782e356e043c8e291e2bb3e085a138a74627836e3c0db525ddc8"
+      "bytes": 31873,
+      "sha256": "51c131bbf9a59ca8f78f5d204ad6ca6621c44f37abb5f6dab733d790fe46767e"
     }
   ],
   "origin_generated_files": [
@@ -942,7 +988,8 @@
     "raw_result": "artifacts/review-002-raw.md",
     "interpretation": "user-authorized semantic acceptance; raw JSON malformed by citation quotes",
     "post_review_changes": "evidence/status/package only; normative specifications unchanged",
-    "implementation_status": "not started"
+    "implementation_status": "not started",
+    "historical_record_only": true
   },
   "origin_generation_checks": {
     "utf8": "passed",
@@ -975,46 +1022,50 @@
     "reasoning_effort": "high",
     "status": "future assignment; not invoked in this run"
   },
-  "status_date": "2026-10-03",
+  "status_date": "2026-10-04",
   "current_implementation_evidence": {
-    "baseline_only": false,
-    "source_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+    "source_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "implementation_status": "complete",
     "supported_os": [
       "linux",
       "darwin"
     ],
-    "evidence": "artifacts/supported-os-verification-3b803ced.md",
-    "raw_evidence": "artifacts/supported-os-verification-3b803ced.json",
-    "linux_full": {
-      "passed": 1883,
-      "skipped": 17,
-      "seconds": 1094.09,
-      "actual_exit": 0
-    },
-    "macos_full": {
-      "passed": 1899,
-      "skipped": 1,
-      "seconds": 428.0,
-      "actual_exit": 0
-    },
-    "python310": {
-      "passed": 61,
-      "actual_exit": 0
+    "evidence": "artifacts/completion-evidence-8606e132.json",
+    "native_test_counts": {
+      "macos": {
+        "passed": 1916,
+        "skipped": 1
+      },
+      "linux": {
+        "passed": 1900,
+        "skipped": 17
+      },
+      "python310_selected_boundary": {
+        "passed": 210,
+        "skipped": 0
+      }
     },
     "manual": {
-      "operations_each_os": 14,
-      "fake_gh_requests_each_os": 26,
+      "operations": 14,
       "live_github": false
     },
     "code_review": {
       "review_status": "pass",
       "findings": 0,
-      "actual_exit": 0,
-      "evidence": "artifacts/code-review-linux-macos-3b803ced.json"
+      "reviewed_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+      "evidence": "artifacts/code-review-8606e132.json"
     },
-    "final_quality_gate": "not submitted",
+    "final_quality_gate": {
+      "status": "pass",
+      "sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+      "coverage_complete": true,
+      "perspectives": 13,
+      "p0_p1": 0,
+      "p2": 3,
+      "raw_sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6"
+    },
     "human_merge": "not performed",
-    "actual_dogfood": "not performed",
+    "actual_dogfood": "current 0805 only; other worktrees not migrated",
     "formal_issue413_import_start": "not performed"
   },
   "os_retirement_authoring": {
@@ -1054,7 +1105,7 @@
     "record": "artifacts/p18-retirement-implementation.md",
     "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
     "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
-    "full_acceptance": "supported OS full/manual verified; Final Quality Gate pending",
+    "full_acceptance": "Implementation included in existing passing 8606e132 FQ v2; original supported-OS evidence remains historical",
     "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
     "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
     "docs_evidence": "artifacts/p18-docs-ci-evidence.json",
@@ -1078,7 +1129,7 @@
     "migration_restore_verified": true,
     "static_backup_verified": true,
     "static_restore_verified": true,
-    "latest_quality_gate": "Previous aa44ea1d FQ fail preserved; A decision adopted and remediation implemented; fresh campaign pending",
+    "latest_quality_gate": "Existing 8606e132 FQ v2 pass preserved unchanged; documentation changes do not receive a new Gate certification",
     "verification": {
       "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
       "required_lanes": 8,
@@ -1103,16 +1154,217 @@
         "FQG-413-003"
       ],
       "decision": "pending; no implementation or normative specification change",
-      "gate_closed": false
+      "gate_closed": false,
+      "historical_record_only": true
     },
     "adopted_a": {
       "authority": "artifacts/dogfooding-a-decision-20261003.md",
       "implementation": "artifacts/dogfooding-a-implementation-20261003.md",
       "related_tests": 257,
       "current_package_updated": true,
-      "fresh_code_review": "pending",
-      "fresh_fq_v2": "pending",
-      "formal_start": false
+      "fresh_code_review": "pass at 8606e132",
+      "fresh_fq_v2": "pass at 8606e132",
+      "formal_start": false,
+      "documentation_verification": "artifacts/documentation-verification-20261004.json"
+    },
+    "current_verification": {
+      "source_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+      "implementation_status": "complete",
+      "supported_os": [
+        "linux",
+        "darwin"
+      ],
+      "evidence": "artifacts/completion-evidence-8606e132.json",
+      "native_test_counts": {
+        "macos": {
+          "passed": 1916,
+          "skipped": 1
+        },
+        "linux": {
+          "passed": 1900,
+          "skipped": 17
+        },
+        "python310_selected_boundary": {
+          "passed": 210,
+          "skipped": 0
+        }
+      },
+      "manual": {
+        "operations": 14,
+        "live_github": false
+      },
+      "code_review": {
+        "review_status": "pass",
+        "findings": 0,
+        "reviewed_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+        "evidence": "artifacts/code-review-8606e132.json"
+      },
+      "final_quality_gate": {
+        "status": "pass",
+        "sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+        "coverage_complete": true,
+        "perspectives": 13,
+        "p0_p1": 0,
+        "p2": 3,
+        "raw_sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6"
+      },
+      "human_merge": "not performed",
+      "actual_dogfood": "current 0805 only; other worktrees not migrated",
+      "formal_issue413_import_start": "not performed"
     }
+  },
+  "pre_documentation_alignment_snapshot": {
+    "status": "Adopted A implemented; current external package updated; 257 related tests and external console manual pass; fresh independent Code Review and FQ v2 pending; other WT and formal Start prerequisites unchanged",
+    "basis": {
+      "repository": "chemitaro/spec-dock",
+      "target_branch": "codex/iss-00413-external-cli-state",
+      "ref": "refs/heads/codex/iss-00413-external-cli-state",
+      "expected_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+      "retrieved_tip_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+      "verification": "Strict third-party brief connector verification at immutable base; subsequent source checkpoint recorded separately",
+      "new_requirements_authority": "artifacts/os-support-decision.md plus current user instructions"
+    },
+    "checks": {
+      "scope": "adopted pack verification; original generator checks retained separately",
+      "utf8": "passed",
+      "safe_single_root": "passed",
+      "json_schemas": 2,
+      "bundled_examples_valid": 13,
+      "local_link_occurrences_checked": 776,
+      "html_unique_ids": 34,
+      "template_scripts_styles_modal_unchanged": true,
+      "browser_dynamic": "2026-10-03 adopted-A HTML: 4/4 SVG and zoom validator pass; scripts unchanged",
+      "mobile": "390px current HTML viewport and SVG/table bounds checked; see artifacts/supported-os-verification-3b803ced.json",
+      "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
+      "product_acceptance": "Adopted-A related tests and current external CLI verified; fresh full-candidate gates pending",
+      "zip_crc": "passed",
+      "member_bytes_vs_files": "passed",
+      "manifest_hashes_vs_members": "passed"
+    },
+    "current_implementation_evidence": {
+      "baseline_only": false,
+      "source_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+      "supported_os": [
+        "linux",
+        "darwin"
+      ],
+      "evidence": "artifacts/supported-os-verification-3b803ced.md",
+      "raw_evidence": "artifacts/supported-os-verification-3b803ced.json",
+      "linux_full": {
+        "passed": 1883,
+        "skipped": 17,
+        "seconds": 1094.09,
+        "actual_exit": 0
+      },
+      "macos_full": {
+        "passed": 1899,
+        "skipped": 1,
+        "seconds": 428.0,
+        "actual_exit": 0
+      },
+      "python310": {
+        "passed": 61,
+        "actual_exit": 0
+      },
+      "manual": {
+        "operations_each_os": 14,
+        "fake_gh_requests_each_os": 26,
+        "live_github": false
+      },
+      "code_review": {
+        "review_status": "pass",
+        "findings": 0,
+        "actual_exit": 0,
+        "evidence": "artifacts/code-review-linux-macos-3b803ced.json"
+      },
+      "final_quality_gate": "not submitted",
+      "human_merge": "not performed",
+      "actual_dogfood": "not performed",
+      "formal_issue413_import_start": "not performed"
+    },
+    "dogfooding_progress": {
+      "artifact": "artifacts/dogfooding-20261003.md",
+      "source_candidate_sha": "49aeef8f68ba2f6b521d25aa4d218471c2c747be",
+      "wheel_sha256": "95bb921ae3dbca34d808e54b7736172f51e81f6d774f1a78648916ccdafa3045",
+      "p16": "current authorized worktree applied and manually verified",
+      "p17": "blocked before import by closed GitHub ancestor; no formal Start",
+      "scope_count_preserved": 240,
+      "scope_files_preserved": 2900,
+      "migration_backup_verified": true,
+      "migration_restore_verified": true,
+      "static_backup_verified": true,
+      "static_restore_verified": true,
+      "latest_quality_gate": "Previous aa44ea1d FQ fail preserved; A decision adopted and remediation implemented; fresh campaign pending",
+      "verification": {
+        "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+        "required_lanes": 8,
+        "completed_lanes": 8,
+        "all_required_lanes_passed": true,
+        "native_test_evidence": "artifacts/dogfooding-verification-aa44ea1d.json",
+        "review_result": "artifacts/dogfooding-review-aa44ea1d.json",
+        "analysis": "artifacts/dogfooding-review-analysis-20261003.md",
+        "reproduction": "artifacts/dogfooding-target-resolution-aa44ea1d.json",
+        "model": "gpt-5.6-sol",
+        "thinking": "pro",
+        "model_ui_verified": true,
+        "thinking_ui_verified": true,
+        "review_actual_exit": 10,
+        "review_status": "fail",
+        "coverage_complete": true,
+        "blocking_findings": [
+          "FQG-413-001"
+        ],
+        "informational_findings": [
+          "FQG-413-002",
+          "FQG-413-003"
+        ],
+        "decision": "pending; no implementation or normative specification change",
+        "gate_closed": false
+      },
+      "adopted_a": {
+        "authority": "artifacts/dogfooding-a-decision-20261003.md",
+        "implementation": "artifacts/dogfooding-a-implementation-20261003.md",
+        "related_tests": 257,
+        "current_package_updated": true,
+        "fresh_code_review": "pending",
+        "fresh_fq_v2": "pending",
+        "formal_start": false
+      }
+    },
+    "p18_progress": {
+      "record": "artifacts/p18-retirement-implementation.md",
+      "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
+      "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+      "full_acceptance": "supported OS full/manual verified; Final Quality Gate pending",
+      "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
+      "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
+      "docs_evidence": "artifacts/p18-docs-ci-evidence.json",
+      "supported_os_evidence": "artifacts/supported-os-verification-3b803ced.md"
+    },
+    "independent_review": {
+      "status": "pass",
+      "findings": 0,
+      "reviewed_sha": "7e895803cba0d43957e504c9f97637d307bc6a78",
+      "reviewer_session": "specdock-413-spec-rereview",
+      "requested_model": "gpt-6-pro",
+      "requested_thinking": "pro",
+      "model_ui_verified": true,
+      "thinking_ui_verified": true,
+      "raw_result": "artifacts/review-002-raw.md",
+      "interpretation": "user-authorized semantic acceptance; raw JSON malformed by citation quotes",
+      "post_review_changes": "evidence/status/package only; normative specifications unchanged",
+      "implementation_status": "not started"
+    }
+  },
+  "documentation_alignment": {
+    "record": "artifacts/documentation-alignment-20261004.md",
+    "verification": "artifacts/documentation-verification-20261004.json",
+    "raw_replacement_manifest": "artifacts/documentation-replacements-manifest-20261003.json",
+    "model": "gpt-5.6-sol",
+    "thinking": "pro",
+    "actual_exit": 0,
+    "download_zip_sha256": "d2e2d3305fc2cdd7212c75b86730a1a4268c2e23d1bae88194ba3269e5e80f9f",
+    "whole_file_replacements": 22,
+    "additional_review_or_gate": false
   }
 }
