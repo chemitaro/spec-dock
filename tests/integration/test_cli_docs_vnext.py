@@ -4,12 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "src/spec_dock/assets/spec_dock"
 DOCS = ASSETS / "docs"
-sys.path.insert(0, str(ASSETS / "scripts"))
 
 
 def test_workbench_templates_use_current_destination_flag() -> None:
@@ -20,7 +18,7 @@ def test_workbench_templates_use_current_destination_flag() -> None:
 
 
 def test_command_reference_covers_all_public_leaves() -> None:
-    from spec_dock_runtime.cli.catalog import LEAF_PATHS
+    from spec_dock.runtime.cli.catalog import LEAF_PATHS
 
     reference = (DOCS / "reference_cli.md").read_text()
     for leaf in LEAF_PATHS:

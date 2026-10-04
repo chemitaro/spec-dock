@@ -1,88 +1,78 @@
-# CLI 参照（Current）
+# CLI参照（Current）
 
-SpecDock の公開CLIは `scope`、`active`、`work`、`branch`、`dependency`、`artifact`、`worktree`、`workbench`、`workspace`、`installation` に操作をまとめます。この表は44個の実行可能なleafを示します。正確な引数と復旧オプションは、配布された外部 `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認してください。`TARGET` は明示的な Scope ID、GitHub Issue番号、またはURLを解決します。曖昧なら書込み前に拒否します。
+通常packageの外部 `spec-dock` が公開44 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。TARGETはScope ID、GitHub番号/ref、URL、許可されたdynamic selectorから一意に解決します。曖昧な対象は副作用前に拒否します。
 
-`work start TARGET` は Initiative、Epic、Issue のいずれでも依存を検査し、対応branchへcheckoutしてそのScopeを選択します。`work finish TARGET` は対象を完了し、選択中ならその対象以下の選択を解除します。単なる選択変更は `active set TARGET`、単なる状態変更は `scope close TARGET`、branchのみの切替は `branch switch TARGET` を使います。これらの副作用を混同しないでください。
+新規ScopeはGitHub番号が正本です。Requirement・Design・Planが一次仕様、Artifactは証拠、Workbenchは一時作業です。Syncはその時点の観測で、派生状態を保存しません。
 
-GitHubとlocal backendの状態は別のauthorityです。ScopeのRequirement、Design、Planが一次仕様、Artifactが採用前の証拠、`workspace sync` のindex/treeは再生成できる観測結果です。CLIの確認に `--yes` を使っても対象・依存・path等のガードは省略されません。
+業務コマンドの対応OSはLinuxとmacOS、Pythonは3.10以上です。その他のOSではproject解決やGit/GitHub・file操作より前に `UNSUPPORTED_PLATFORM` / exit3 / effects=[]を返します。help・version・completionはこの業務判定やOS固有の依存を読み込まず利用できます。
 
 ## 全コマンド
 
+共通optionの--project ABSは正確なworktree root、--jsonはv2 envelopeです。--dry-runは計画のみ、--yesはCLI確認の省略です。必要なguardを迂回しません。applyで保全を要求するleafは外部の新しい--backup-dir ABSを使います。
+
 | ID | Command / leaf | 引数・固有option | 対象と効果 | 主な副作用 |
 |---|---|---|---|---|
-| C01 | `scope create initiative` | `--backend {github,local} --title TITLE [--slug SLUG]` | Initiativeを新規作成します。GitHub backendはIssueを新規作成します。 | 一次仕様、必要時GitHub |
-| C02 | `scope create epic` | `--backend {github,local} --parent TARGET --title TITLE [--slug SLUG]` | 明示したInitiativeの下にEpicを作成します。 | 一次仕様、必要時GitHub |
-| C03 | `scope create issue` | `--backend {github,local} --parent TARGET --title TITLE [--slug SLUG]` | 明示したEpicの下にIssueを作成します。 | 一次仕様、必要時GitHub |
-| C04 | `scope import github initiative` | `GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存GitHub Issueを読取り確認してInitiativeを作成します。 | GitHub読取り、一次仕様 |
-| C05 | `scope import github epic` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存GitHub Issueを明示した親のEpicとして取り込みます。 | GitHub読取り、一次仕様 |
-| C06 | `scope import github issue` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存GitHub Issueを明示した親のIssueとして取り込みます。 | GitHub読取り、一次仕様 |
-| C07 | `scope list` | `[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]` | 現在のworktreeに存在するScopeを安定したID順で表示します。 | 読取りのみ |
-| C08 | `scope show` | `TARGET` | 指定Scopeのmetadata、状態の出典、親子、branch対応を表示します。 | 読取りのみ |
-| C09 | `scope edit` | `TARGET --title TITLE` | ローカルmetadataのtitleだけを変更します。 | 一次仕様 |
-| C10 | `scope close` | `TARGET [--reason {completed,not-planned}]` | reason省略はcompleted、not-plannedは明示指定のみです。backendに従って終端状態を設定し、選択は変更しません。 | local状態またはGitHub |
-| C11 | `scope reopen` | `TARGET` | 対象だけをopenへ戻します。選択もbranchも変更しません。 | local状態またはGitHub |
-| C12 | `scope delete` | `TARGET [--recursive] [--clear-active] [--detach-dependencies]` | 指定したローカルScopeの所有物を削除します。GitHubは閉じません。 | 一次仕様、明示許可時の選択・依存 |
-| C13 | `active show` | `` | worktree-localな選択チェーンと中心対象を表示します。 | 読取りのみ |
-| C14 | `active set` | `(TARGET \| --from-branch)` | 対象と祖先を選択します。branchからの解決も明示操作だけです。 | 選択のみ |
-| C15 | `active clear` | `(--from TARGET \| --all)` | 指定対象以下、または全階層の選択を解除します。 | 選択のみ |
-| C16 | `work start` | `TARGET [--branch NAME] [--base REF] [--switch-active] [--source {github,cache}] [--allow-stale]` | 対象と依存を確認し、対応branchを作成またはcheckoutして選択します。 | Git、branch対応、選択、状態観測 |
-| C17 | `work finish` | `TARGET` | 対象をcompletedにし、選択中なら対象以下だけを解除します。 | local状態またはGitHub、選択 |
-| C18 | `branch show` | `TARGET` | canonical branchの対応、存在、利用worktreeを表示します。 | 読取りのみ |
-| C19 | `branch create` | `TARGET [--name NAME] --base REF` | 明示baseからcanonical branchを作成して対応を登録します。checkoutしません。 | Git ref、branch対応 |
-| C20 | `branch switch` | `TARGET` | 登録済みcanonical branchへcheckoutします。選択は変更しません。 | Gitのみ |
-| C21 | `dependency list` | `TARGET [--view {declared,effective}]` | 依存元から前提対象へのedgeを表示します。 | 読取りのみ |
-| C22 | `dependency check` | `TARGET [--source {github,cache}]` | 開始用readinessと根拠を表示します。 | 状態読取りのみ |
-| C23 | `dependency add` | `--from TARGET --to TARGET` | fromがtoに依存するedgeを追加します。重複追加はno-opです。 | 依存metadata |
-| C24 | `dependency remove` | `--from TARGET --to TARGET [--missing-ok]` | 指定edgeを除去します。不存在は既定でエラーです。 | 依存metadata |
-| C25 | `artifact create` | `--scope TARGET --type {blank,research,interview,disc,decision-candidate,adr} --title TITLE [--slug SLUG]` | scope-localな文書をテンプレートから生成します。 | Artifact |
-| C26 | `artifact import file` | `PATH --scope ARTIFACT_SCOPE` | 明示した単一regular fileをopaque evidenceとして保存します。 | Artifact |
-| C27 | `artifact list` | `--scope ARTIFACT_SCOPE` | 所有Artifactの識別情報だけを一覧表示します。 | 読取りのみ |
-| C28 | `artifact show` | `ARTIFACT_ID --scope ARTIFACT_SCOPE` | 識別情報、相対配置先、種別・authority観測を表示します。本文は出力しません。 | 読取りのみ |
-| C29 | `worktree create` | `[NAME] --base REF [--root PATH]` | 明示baseから別のGit作業場を作ります。bootstrapしません。 | Git worktree、作業場登録 |
-| C30 | `worktree list` | `` | 同じGit common directoryに属する作業場を表示します。 | 読取りのみ |
-| C31 | `worktree show` | `WORKTREE_REF` | 指定作業場のbranch、状態、削除阻害要因を表示します。 | 読取りのみ |
-| C32 | `worktree remove` | `WORKTREE_REF [--unlock] [--discard-ignored]` | 作業場を除去します。branchは残します。 | Git worktree、対象directory |
-| C33 | `worktree bootstrap` | `WORKTREE_REF` | 明示承認された対象でmake initを実行します。 | 利用者projectの任意処理 |
-| C34 | `workbench copy` | `--scope TARGET --to-worktree WORKTREE_REF [--on-conflict {error,overwrite}]` | 同じScopeの非正本作業領域を一回だけマージコピーします。 | 宛先Workbench |
-| C35 | `workspace sync` | `[--source {github,cache}] [--allow-invalid]` | 生成状態を再構築します。activeは変更しません。 | 生成物、明示時GitHub読取り |
-| C36 | `workspace validate` | `[--require-nodes]` | 仕様、依存、Artifact、schemaの整合性を検証します。 | 読取りのみ |
-| C37 | `workspace doctor` | `[--github-repo OWNER/REPO --github-pr NUMBER --github-head-sha SHA] [--github-extended]` | 状態・運用・未完了journalを診断します。自動修復しません。 | 読取り、明示時capability probe |
-| C38 | `workspace migrate` | `--to-schema VERSION [--mapping-file PATH]` | 停止中の全登録worktreeを計画に従ってデータ移行します。 | schema、制御状態、journal |
-| C39 | `installation show` | `[--target PATH]` | engine、固定供給元、writer protocol、全作業場の導入状態を表示します。 | 読取りのみ |
-| C40 | `installation init` | `PATH` | 未導入projectに現在実行中の固定distributionを導入します。 | ツール資産、初期制御状態 |
-| C41 | `installation update` | `[--target PATH] (--version VERSION \| --commit SHA) [--maintenance]` | 固定供給元のimmutable bundleでツールをjournal付き更新します。 | ツール資産、導入journal |
-| C42 | `installation uninstall` | `[--target PATH]` | ツール資産だけを除去します。仕様履歴を残します。 | ツール資産、導入journal |
-| C43 | `help` | `[COMMAND PATH]` | 共通構造のヘルプを表示します。 | 読取りのみ |
-| C44 | `completion` | `{bash,zsh,fish}` | 選んだshellの補完定義をstdoutへ出力します。shell設定fileは書きません。 | 出力のみ |
+| C01 | `scope create initiative` | `--backend github --title TITLE [--slug SLUG]` | GitHubで番号を発行してInitiativeを作ります。 | GitHub作成、ローカルScope |
+| C02 | `scope create epic` | `--backend github --parent TARGET --title TITLE [--slug SLUG]` | 明示したInitiativeの下にEpicを作ります。 | GitHub作成、ローカルScope |
+| C03 | `scope create issue` | `--backend github --parent TARGET --title TITLE [--slug SLUG]` | 明示したEpicの下にIssueを作ります。 | GitHub作成、ローカルScope |
+| C04 | `scope import github initiative` | `GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存Issueを確認してInitiativeへ取り込みます。 | GitHub読取り、ローカルScope |
+| C05 | `scope import github epic` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存IssueをEpicへ取り込みます。 | GitHub読取り、ローカルScope |
+| C06 | `scope import github issue` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存IssueをIssue Scopeへ取り込みます。 | GitHub読取り、ローカルScope |
+| C07 | `scope list` | `[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]` | 現在treeのScopeを表示します。 | 読取りのみ |
+| C08 | `scope show` | `TARGET` | metadata、親子、未観測を含む状態を表示します。 | 読取りのみ |
+| C09 | `scope edit` | `TARGET --title TITLE` | titleだけを変更し、ID/linkageを保ちます。 | metadata |
+| C10 | `scope close` | `TARGET [--reason {completed,not-planned}]` | 対象backendを閉じます。reason既定はcompletedです。 | GitHub状態、既存local互換状態 |
+| C11 | `scope reopen` | `TARGET` | 対象だけをopenへ戻します。 | GitHub状態、既存local互換状態 |
+| C12 | `scope delete` | `TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]` | 明示したローカルsubtreeだけを保全・削除します。GitHub/branchは削除しません。 | backup、明示対象 |
+| C13 | `active show` | 共通optionのみ | 一つの直接記録と現在の祖先を表示します。 | 読取りのみ |
+| C14 | `active set` | `TARGET` | 現在の妥当な直接対象と同じならunchangedです。空/別対象はWORK_START_REQUIREDで停止します。 | 変更なし |
+| C15 | `active clear` | `--from TARGET` または `--all` | 捕捉した直接記録だけを解除します。 | selectionのみ |
+| C16 | `work start` | `TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]` | live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行います。 | Git、worktree局所selection |
+| C17 | `work finish` | `TARGET` | 完了確認後に捕捉selectionだけ解除し、branchに留まります。 | GitHub完了、selection |
+| C18 | `branch show` | `TARGET [--name NAME]` | 現在のref/占有を観測します。対応台帳は保存しません。 | 読取りのみ |
+| C19 | `branch create` | `TARGET [--name NAME] --base REF` | 固定baseからbranchを作り、checkoutしません。既存refをresetしません。 | Git ref |
+| C20 | `branch switch` | `TARGET [--name NAME]` | branchへcheckoutし、selection取得/解除は行いません。 | Gitのみ |
+| C21 | `dependency list` | `TARGET [--view {declared,effective}]` | 宣言/継承依存を表示します。 | 読取りのみ |
+| C22 | `dependency check` | `TARGET [--source {local,github}]` | readinessと根拠を観測します。既定local、未観測GitHubはunknownです。 | 読取りのみ |
+| C23 | `dependency add` | `--from TARGET --to TARGET` | fromがtoを前提とするedgeを追加します。重複はunchangedです。 | metadata |
+| C24 | `dependency remove` | `--from TARGET --to TARGET [--missing-ok]` | 指定edgeを除きます。 | metadata |
+| C25 | `artifact create` | `--scope ARTIFACT_SCOPE --type {blank,research,interview,disc,decision-candidate,adr} --title TITLE [--slug SLUG]` | templateから一件のMarkdownをno-replace公開します。 | Artifact |
+| C26 | `artifact import file` | `PATH --scope ARTIFACT_SCOPE` | 一件のregular fileをopaque evidenceとして保存します。 | Artifact |
+| C27 | `artifact list` | `--scope ARTIFACT_SCOPE` | 識別情報だけを一覧表示します。 | 読取りのみ |
+| C28 | `artifact show` | `ARTIFACT_ID --scope ARTIFACT_SCOPE` | path/type等を表示し、本文を出力しません。 | 読取りのみ |
+| C29 | `worktree create` | `NAME --base REF [--root ABS]` | native root/NAMEとworktree/NAME branchを作ります。bootstrapは別です。 | native Git |
+| C30 | `worktree list` | 共通optionのみ | 同じphysical cloneのnative inventoryを表示します。 | 読取りのみ |
+| C31 | `worktree show` | `ABS` | 一つのnative worktreeを表示します。 | 読取りのみ |
+| C32 | `worktree remove` | `ABS [--unlock] [--discard-ignored]` | 明示作業場を除去し、branchを残します。 | native Git、対象directory |
+| C33 | `worktree bootstrap` | `ABS` | project-owned make initを一回実行します。 | 任意project処理 |
+| C34 | `workbench copy` | `--scope TARGET --to-worktree ABS [--on-conflict {error,overwrite}]` | 同じScopeの一時作業を一回コピーします。 | 宛先Workbench |
+| C35 | `workspace sync` | `[--source {local,github}] [--allow-invalid]` | 複数WTの予約・論理active・祖先とlifecycleを都度観測します。 | 読取りのみ |
+| C36 | `workspace validate` | `[--require-nodes] [--ci]` | working treeまたは固定HEADの構造を検証します。 | 読取りのみ |
+| C37 | `workspace doctor` | `[--raw] [--legacy] [--github-repo OWNER/REPO --github-pr NUMBER --github-head-sha SHA] [--github-extended]` | 明示した現在/旧状態・capabilityをread-only診断します。 | 読取り、明示時GitHub照会 |
+| C38 | `workspace migrate` | `--to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 [--backup-dir ABS] [--confirm-old-writers-stopped]` | 一つのschema3 workspace宣言だけを保全・切替します。 | 外部backup、workspace宣言 |
+| C39 | `installation show` | `[--target ABS]` | package版と一つのWTのstatic資産分類を表示します。 | 読取りのみ |
+| C40 | `installation init` | `ABS` | 未導入WTへ静的資産と新writer宣言を置きます。 | static資産、workspace |
+| C41 | `installation update` | `[--target ABS] [--backup-dir ABS]` | 既知static資産だけを保全して更新・個別退役します。 | 外部backup、static資産 |
+| C42 | `installation uninstall` | `[--target ABS] [--backup-dir ABS]` | 既知static資産だけを保全・削除し、workspace/ignore/ユーザー成果を残します。 | 外部backup、static資産 |
+| C43 | `help` | `[COMMAND PATH]` | 現在helpを表示します。repository不要です。 | 出力のみ |
+| C44 | `completion` | `{bash,zsh,fish}` | 補完をstdoutへ返し、shell設定を変更しません。 | 出力のみ |
 
-## 操作例
+ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象ではありません。通常操作はworkspaceの新writer宣言を検証します。help/version/completion、raw doctor、installation show/init、CI validateは各leafの限定的なcontextを使います。
 
-```sh
-spec-dock scope create initiative --backend local --title "Platform"
-spec-dock scope create epic --backend local --parent init-local-00001 --title "Authentication"
-spec-dock scope create issue --backend local --parent epic-local-00001 --title "Refresh tokens"
-spec-dock scope show iss-local-00001
-spec-dock work start epic-local-00001 --base main
-spec-dock active show
-spec-dock dependency check epic-local-00001 --source cache
-spec-dock workspace validate
-spec-dock workspace sync --source cache
-# 成果のdelivery確認後、明示した対象を完了する
-spec-dock work finish epic-local-00001 --yes
-```
+## Start・Finishと排他
 
-`work finish` 自体はcommit、push、PR、merge、test、reviewの完了を保証しません。実際のIDとbranchはcreate/startの出力を使ってください。GitHub backendの作成・終了にはGitHubの副作用があります。
+新規branchのStartには--base REF、既存branchの再利用には明示--branch NAMEとbase省略が必要です。GitHub照会は短いStart排他の外です。排他内で同cloneの予約を再観測し、checkoutから直接記録公開まで保持します。通常編集、Artifact、Sync、Finish、migration、installationは共通Start lockを取りません。
 
-CIを新しい入口へ切り替える際は、固定commitのSHAを確認してworktree外にengineを構築し、そのdistribution digestを記録してから `spec-dock workspace validate --ci --json` を実行します。この経路はworkspace schema、Scope、依存、Artifactだけを読み、導入controlやactive選択を作成しません。導入済み作業場の検査には通常の `workspace validate` を使います。
+同一direct target/branchのStartはunchangedです。別branchへ移った予約、破損/複数記録も重複検査から捨てません。active setは同じ妥当な直接対象へのno-opだけで、新規取得や親への切替は行いません。clearはselectionだけ、FinishはGitHub完了を確認してから解除します。後から始まった別対象は消さず、元branchへ戻りません。
 
-## 配布と復旧
+## JSONと途中失敗
 
-インストール済みCLIはworktree外の固定distributionから実行します。`spec-dock/scripts/spec-dock` はそのengineを参照する薄いshimです。更新は `installation update --commit SHA --maintenance --yes`、データ変換は `workspace migrate --to-schema 3 --yes` として別々に実行します。対象群の停止、backup、固定candidate、全worktreeのwriter protocol一致を先に確認してください。journalがpendingなら診断に従い、対象leafの `--resume OPERATION_ID` または `--rollback OPERATION_ID` を明示します。詳細は[移行・復旧](migration.md)を参照してください。
+v2はschema_version、command、status、exit_code、data、effects、warnings、error、recoveryです。operation IDや固定engine digestを通常authorityにしません。exit6のeffectsはsucceeded/unknown/not_attemptedを区別します。Gitのargv/stdout/stderr/returncodeを隠蔽せず、unknownなremote結果を成功や未実施と断定しません。
 
-既存導入群のengine世代を替える際は、旧engineから `installation update --commit NEW_SHA --maintenance --yes` を実行し、そのupdate IDを控えます。新しい固定engineを同じSHAからcheckout外に作成してdigestを検証し、その絶対entrypointから `installation update --activate-engine --from-update UPDATE_ID --dry-run --json`、続いて `--yes --json` を実行します。中断時は `--activate-engine --resume HANDOVER_ID --yes`、後続変更前の巻戻しは `--activate-engine --rollback HANDOVER_ID --yes` です。引継ぎ後もmaintenanceを保持します。
+Artifact create/importは `data.result.artifact.path` を使います。Syncは `data.complete`、`data.worktrees`、`data.scopes`、`data.counts` 等を返し、process_state=not_observedです。CI validateは固定snapshot_oidを返します。正確な各data形状は現在helpと実JSONを確認してください。
 
-全登録worktreeの導入・schema移行後、`installation update --finalize --dry-run --json` で復帰条件を確認します。成功したら同じ固定engineから `installation update --finalize --yes --json` を実行します。制御状態の更新後に中断した場合は、出力またはcommon controlの `finalizations/` に残るoperation IDを確認し、`installation update --finalize --resume OPERATION_ID --yes` で完了記録を復旧します。復旧記録が未完了の間は通常の変更操作を拒否します。
+## 導入・移行
 
-`--commit SHA` で導入したworktreeのversion記録はSHAです。finalizeは表示versionとの文字列一致だけに頼らず、固定update記録、適用後hash、engine引継ぎの記録を照合します。
+詳細は[移行ガイド](migration.md)です。package更新は外部環境だけ、static更新は明示WTだけに作用します。未知改変fileはmanual merge、旧writer停止や復元確認の不足は適用停止です。廃止されたcache/stale、engine pin/maintenance/finalize、registry alias、resume/rollbackの操作を再導入しません。
 
-[命名](reference_naming.md)・[依存](reference_deps.md)・[GitHub](reference_github.md)・[生成状態](reference_sync.md)・[worktree](reference_worktree.md)の参照と併せて使用してください。過去版の操作は[historical](historical/README.md)に隔離しています。
+既存true-local metadataのread/Finish互換性は、新規local Scope作成を許すものではありません。Finishの成功と実装・検証・PR・mergeの完了は別の証拠です。

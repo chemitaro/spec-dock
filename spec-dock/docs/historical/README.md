@@ -1,9 +1,5 @@
-# 過去版の参照資料
+# 過去版の資料
 
-このディレクトリの文書は旧CLIで書かれた履歴資料です。現在の実行手順ではありません。現行コマンドは[CLI参照](../reference_cli.md)と配布engineのhelpを使ってください。
+旧版の実行手順はこの配布資料から退役しました。現在の操作は[現在版の参照](../README.md)と外部CLIのhelpを使ってください。
 
-- [依存](reference_deps.md)
-- [GitHub](reference_github.md)
-- [命名](reference_naming.md)
-- [生成状態](reference_sync.md)
-- [worktree](reference_worktree.md)
+過去の仕様はSpecDock repositoryのGit履歴（Issue #413の基準 `6fec3099d8759b4e5b3b393b2987534b46dfa383` など）で確認できます。既存consumerの仕様・Artifact・旧状態は、この案内の改定では変更されません。新規local Scope、旧engine/control、状態cache、journal replayの手順を現在の操作へ持ち込みません。

@@ -1,75 +1,59 @@
 ---
 name: spec-dock
-description: Operate and author SpecDock scopes, documents, Artifacts, dependencies, lifecycle state, worktrees, and managed installation through the current repository-local CLI. Use when Codex needs to inspect SpecDock or execute an in-scope SpecDock outcome instead of handing commands back to the user.
+description: Operate and author SpecDock scopes, canonical documents, Artifacts, dependencies, work and native Git worktrees through the installed external CLI. Use for an in-scope SpecDock outcome and verify the command result and actual post-state.
 ---
 
 # SpecDock
 
-Use this skill as the agent-first operating guide for the current SpecDock Storage Core and Authoring Kit. Treat local canonical files, current CLI help, and command results as the authority. Execute the SpecDock work covered by the user's request or approved plan; do not stop after merely presenting a command that can be run safely in the current environment.
+Use the installed external `spec-dock` console. Read current root and leaf help before commands; canonical documents and actual CLI/Git/GitHub evidence are authoritative. The repository shim only delegates through PATH. Do not execute checkout Python, the retired fixed bundle or shared control as a fallback.
 
-## Resolve the scope
+Business commands support Linux and macOS with Python 3.10+. Other operating systems return `UNSUPPORTED_PLATFORM` (exit 3) before project admission or effects. Help, version and completion remain context-free utilities.
 
-1. Prefer an explicit Initiative, Epic, Issue, repository, or worktree target from the request or approved plan.
-2. When an existing scope is needed and no target is supplied, run `./spec-dock/scripts/spec-dock active show` and select the deepest unambiguous active scope in its parent chain: Issue, then Epic, then Initiative.
-3. Stop before mutation when the target or parent is ambiguous. Do not mutate active state to manufacture certainty.
-4. Resolve node targets to one canonical path under `spec-dock/initiatives/`. After creation or import, verify the reported ID and path from local files.
 
-## Execute the outcome
+## Distinguish the four owned layers
 
-1. Read root help and the relevant leaf help immediately before using a command. Current help owns syntax and available operations.
-2. Inspect only the canonical docs, references, metadata, Artifact rules, dependency state, and worktree facts needed to validate the operation.
-3. Execute every in-scope SpecDock command needed for the requested outcome. A user request or approved plan authorizes its ordinary documented local, Git, and GitHub side effects; do not ask for command-by-command confirmation.
-4. Verify command output and post-state. Run `workspace validate`, `workspace sync`, `active show`, `dependency check`, or worktree inspection when the changed surface requires them.
-5. Continue through the requested SpecDock outcome. Keep lifecycle admission, implementation evidence, PR delivery, merge, and lifecycle closure distinct rather than treating one command as proof of all of them.
+- `src/spec_dock/` is provider development source. `src/spec_dock/runtime/` implements the packaged CLI; `src/spec_dock/assets/` is the provider authority for shipped static content.
+- The actual command is the non-editably installed external package in the user's tool environment. Editing source or switching a checkout branch does not update that installed package. Updating it is user/tool-environment-wide, not a runtime copy inside each consumer.
+- `spec-dock/docs`, `spec-dock/system`, `spec-dock/templates`, the root `.agents/skills`, workspace declaration and shim are static projections in one explicit consumer worktree. Installation init/update does not silently update another worktree.
+- `spec-dock/.agent/work-target/target-<32-hex-token>.json` is an ignored, worktree-local direct record. The opaque filename token identifies one captured record; it is not a Scope ID, GitHub issue number, UUID or operation journal entry.
 
-Ordinary agent execution includes `scope create/import/show`, `active`, `work`, `branch`, `dependency`, `artifact`, `worktree`, `workbench`, `workspace`, and `installation` routes when the requested outcome needs them. This includes their documented GitHub issue and Git checkout effects. Use the fixed external distribution or its pinned repository shim; never fall back to checkout code after engine verification fails.
+Choose package update, static installation/update, or lifecycle operation according to the layer that actually owns the requested outcome. Do not describe parity between layers as proof that another layer was updated.
 
-`work start TARGET` and `work finish TARGET` accept Initiative, Epic, and Issue. Start checks readiness, creates or checks out the corresponding branch, and selects the target. Supply `--base REF` when start must create a new branch; omit it when the target already has a canonical branch. Finish completes the target and clears its selected subtree. For selection alone use `active set` or `active clear`; for state alone use `scope close` or `scope reopen`; for branch alone use `branch create` or `branch switch`. Finish is not proof of commit, push, PR, merge, test, or review completion.
+## Resolve the context and target
 
-For a future or unfamiliar command, inspect its leaf help and Current reference docs. Execute it when its semantics are non-destructive and in scope. Stop and explain the unresolved effect when the documentation is insufficient to classify it safely.
+1. Bind one repository/worktree, using its exact absolute root with `--project` when needed.
+2. Prefer the explicit Initiative, Epic, Issue or path supplied by the request or approved plan. Resolve it to one canonical path under `spec-dock/initiatives/`.
+3. If a Scope is needed without an explicit selector, inspect `spec-dock active show --json` and use the deepest unambiguous Scope in its valid chain. Empty, stale, corrupt or ambiguous observations do not supply a mutation target.
+4. Read the target metadata, parent chain and relevant Requirement, Design, Plan and Report. Preserve their distinct authority; Artifact and external model output remain evidence until explicitly adopted.
 
-## Destructive boundary
+## Execute the requested outcome
 
-Require the user's request or an approved plan to name the exact target and destructive outcome before executing:
+Read help, inspect the necessary preconditions, execute the in-scope command and verify its effects and post-state. A request or approved plan authorizes ordinary documented local, Git and GitHub effects; routine operations do not need command-by-command permission. Keep lifecycle admission, implementation, review, delivery and merge evidence separate.
 
-- `scope delete`, including recursive deletion
-- `installation uninstall`
-- `worktree remove`
-- `worktree bootstrap` when its project-owned `make init` effects are not yet understood
-
-Once that exact authorization exists, execute and verify the command rather than returning it for manual entry. Reconfirm only when the resolved target, deletion set, or effect is materially broader than authorized.
-
-PR merge remains a human action in repositories whose `AGENTS.md` says so. Execute the preceding and following SpecDock commands under the authorization rules above.
+- New Scope creation always uses `--backend github`; GitHub issues the number. Preserve existing IDs/ref/path and do not create offline/local Scopes or add UUID Scope identities.
+- Start accepts Initiative, Epic and Issue. A new branch needs `--base REF`; existing branch reuse needs explicit `--branch NAME` and no base. Start checks live readiness outside the short exclusion, then rechecks same-clone reservations, checks out and publishes one direct target while excluded.
+- One worktree has at most one direct target. Only Start acquires it. `active set TARGET` is an unchanged no-op only for the same valid direct target; an empty or different target requires Start. `active clear` releases the captured direct record without closing GitHub or changing branch.
+- Finish completes the fixed GitHub Scope and confirms closed(completed) before clearing only the captured selection. It stays on the branch. Parent completion requires completed descendants. Finish is not handover or proof of delivery, test, review or merge completion.
+- Branch leaves change/observe native Git refs without a branch registry. Dependency mutations use metadata through the CLI.
+- Sync observes current same-clone main/linked worktrees and their direct targets; it writes no cache, generation or projection and does not infer running Codex processes. Use `--source github` for explicit live lifecycle observations.
+- Installation changes only known static resources in one worktree. Init refuses existing destinations. Update/uninstall require verified external preservation for changes; unknown modified files require manual merge. Package updates are separate from static updates.
 
 ## Documents and Artifacts
 
-Read one resolved scope in this order when the task needs its contents:
+Load only sources needed for the task: canonical metadata/docs, named direct-child Artifacts and rules, dependencies and applicable references under `spec-dock/docs/`. Use `workspace validate`, `workspace sync`, `active show` and relevant queries when verifying that changed surface.
 
-1. `.meta.json` and parent chain
-2. `requirement.md`, `design.md`, `plan.md`, and `report.md`
-3. direct-child `artifacts/`, `rules.md`, and named Artifacts
-4. direct dependencies and generated projections needed for observation
-5. relevant files under `spec-dock/docs/authoring/` and `spec-dock/docs/reference_*.md`
+Author canonical Requirement, Design, Plan, Report and accepted ADR when requested or assigned by the approved plan. Use `artifact create --scope TARGET --type TYPE --title TITLE --json` for a supported Markdown type, then populate the returned `data.result.artifact.path`. Use `artifact import file PATH --scope TARGET --json` for one complete opaque evidence file. Prepare other formats in an ignored Workbench and import the completed file; do not invent an Artifact ID or filename. Artifact creation and content authoring are one requested outcome.
 
-Edit canonical Requirement, Design, Plan, Report, or ADR files when the user requests authoring or an approved plan assigns that work. Preserve their distinct roles and do not treat an Artifact, generated projection, external response, or Report as durable authority automatically.
+## Destructive boundary
 
-Use `artifact create --scope TARGET --type TYPE --title TITLE` for supported Markdown Artifact types and populate the returned path. Use `artifact import file PATH --scope TARGET` for one explicit opaque evidence file. For another requested evidence format, such as HTML, create it in the resolved scope's direct-child `artifacts/` directory and apply the format-specific validation skill. Artifact creation and content authoring are one outcome; do not leave an empty scaffold for the operator to finish.
+Require an exact target and destructive result in the request or approved plan for `scope delete`, `installation uninstall` and `worktree remove`. Understand project-owned `make init` effects before executing bootstrap. Once authorized, execute and verify rather than returning the command for manual entry. Reconfirm only if the actual scope materially exceeds the authorization. Keep any repository human PR merge gate.
 
-## Guardrails
+## Failure and protected data
 
-- Use command-first mutation for metadata, active state, dependencies, generated projections, node lifecycle, and worktrees. Do not hand-edit their storage as a command fallback.
-- Preserve user-owned content and follow Current fail-closed diagnostics. Do not bypass a failed command with raw filesystem, low-level Git, or direct GitHub mutation.
-- Do not restore removed commands, retired bundled orchestration, provider-specific routes, or third-party composition as a fallback.
-- Distinguish canonical documents, evidence Artifacts, generated projections, CLI observations, Git state, and GitHub state in the result.
+Use commands for metadata, lifecycle, dependencies, selection and native worktrees. Do not manufacture state by hand after a failed command. Ordinary file editing has no shared SpecDock lock or permission enforcement.
+
+Preserve raw Git error details and the CLI's confirmed/unknown/not-attempted effects. Keep backups, uncertain records and candidates. Inspect actual local/remote state before a new explicit operation; do not automatically replay an unknown GitHub mutation, revert Git effects or resume a retired journal. Broken or multiple direct records are diagnostics, not an empty worktree.
 
 ## Report
 
-Return the smallest useful evidence set:
-
-- resolved target, parent chain, and canonical path
-- commands executed and their material side effects
-- created or changed IDs and paths
-- validation and post-state results
-- blockers, destructive scope mismatches, or remaining human gates
-
-Command examples are supporting evidence, not a substitute for execution.
+Return the resolved target/path, material command effects, verification and remaining gates. A successful query, readiness result or document review does not by itself finish the Issue.

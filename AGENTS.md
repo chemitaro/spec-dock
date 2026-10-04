@@ -7,7 +7,7 @@
 
 ## SpecDock Agent-First Operations
 
-- Codex agents operate SpecDock through the verified fixed external `spec-dock` engine or its pinned repository shim. During the coordinated cutover, use the fixed candidate engine and its current leaf help; do not run the retired repository-local implementation as a fallback. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results.
+- Codex agents operate SpecDock through the installed external `spec-dock` package or its thin repository shim. Inspect the verified candidate's current leaf help. The Issue 413 handoff recorded on 2026-10-03 has the installed package, thin shim, and writer declaration applied only to the current 0805 worktree; main and three linked peers remain unmigrated, while formal Issue 413 Start, human merge, and publication remain pending. This rollout note is caller-provided local status, not implementation authority or a new permission gate. Do not run the retired repository-local implementation as a fallback. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results.
 - Treat the request or approved plan as authorization for the command's ordinary documented local, Git, and GitHub side effects. Inspect current root and leaf help, resolve exact targets, and preserve the CLI's fail-closed boundaries.
 - Require an exact target and explicit destructive outcome in the request or approved plan before running `scope delete`, `installation uninstall`, or `worktree remove`. Once authorized, execute and verify them rather than handing them back for manual entry.
 - Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
@@ -19,46 +19,53 @@
 - `src/spec_dock/` is the provider-side source of truth.
 - `spec-dock/` is the generated consumer-side workspace used for dogfooding, validation, and active docs.
 - `src/spec_dock/assets/spec_dock/...` produces what later appears under `spec-dock/...`.
+- Source edits or branch switches do not update the installed external package. A package update changes the user's tool environment; static installation/update changes only the explicitly targeted worktree.
+- The ignored `spec-dock/.agent/work-target/` record belongs to that worktree at runtime. Its opaque file token is not a Scope ID and is not a provider or consumer static asset.
 - When implementation and generated files look similar, edit the provider side first.
 - Do not treat `spec-dock/` as the implementation source of truth unless the task is explicitly about dogfooding data or generated output.
 
 ## Canonical Paths
 
-Read these first before changing code or tests:
+Read the canonical Requirement, Design, and Plan for the authorized work before changing code or tests.
 
-- When an active initiative / epic / issue is set, the source of truth is the symlink paths under `spec-dock/active/`. Read these first:
-  - `spec-dock/active/initiative/requirement.md`
-  - `spec-dock/active/initiative/design.md`
-  - `spec-dock/active/initiative/plan.md`
-  - `spec-dock/active/epic/requirement.md`
-  - `spec-dock/active/epic/design.md`
-  - `spec-dock/active/epic/plan.md`
-  - `spec-dock/active/issue/requirement.md`
-  - `spec-dock/active/issue/design.md`
-  - `spec-dock/active/issue/plan.md`
-- Accepted architecture and roadmap decisions are reflected in the current runtime structure and dogfooding workflow below.
+- Resolve the current direct selection with `spec-dock active show --json`; resolve its current hierarchy and paths with `spec-dock scope show TARGET --json`.
+- Read `requirement.md`, `design.md`, and `plan.md` under the returned Scope paths, including applicable Initiative and Epic documents.
+- An explicitly authorized recovery planning pack remains authoritative when the consumer cannot resolve an active Scope. Keep that distinction in the implementation record; the pack is not evidence of a successful `work start`.
+- With no selected context or explicit planning pack, read `spec-dock/system/active-none/`.
+- Retained legacy `spec-dock/active/` links are not the new writer's direct selection. Observe the current record instead of guessing from a branch or old projection.
+
+Accepted architecture and roadmap decisions are reflected in the current runtime structure and dogfooding workflow below.
 
 ## Project Structure & Module Organization
 
-- `src/spec_dock/`: installer package for the top-level `spec-dock` CLI.
-- `src/spec_dock/cli.py`: public fixed-engine entrypoint.
+- `src/spec_dock/`: ordinary installed Python package for the public `spec-dock` CLI.
+- `src/spec_dock/cli.py`: public console entrypoint; utilities run before project admission.
 - `src/spec_dock/asset_layout.py`: shared shipped-asset path constants.
-- `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py`: fixed engine execution, bundle creation, and repository pin verification.
+- `src/spec_dock/runtime/`: implementation of the installed CLI. Keep runtime code outside the consumer workspace.
+- `src/spec_dock/shim_vnext.py`: source for the thin shim that delegates argv/cwd/exit to the external console.
 - `src/spec_dock/assets/`: shipped scaffold assets copied into target repos.
 - `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/`.
   - `.agents/skills/spec-dock/SKILL.md`
   - `.agents/skills/spec-dock-grill-with-docs/SKILL.md`
 - Legacy `src/spec_dock/assets/codex_skills/` tree was retired and removed from the current repo; use historical issue records under `spec-dock/initiatives/**` when legacy context is needed.
 - `src/spec_dock/assets/spec_dock/`: provider-side scaffold source of truth for files that are generated into managed repos.
-- `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/`: provider-side runtime CLI shipped into managed repos.
+- `src/spec_dock/assets/spec_dock/scripts/spec-dock`: static repository shim; it does not import a checkout-local runtime.
 - `spec-dock/`: local dogfooding workspace scaffolded into this repository. Use it for validation, dogfooding, and active docs, not as the primary implementation source.
-- `tests/`: regression suite for installer behavior and shipped runtime behavior.
+- `tests/`: regression suite for installed CLI, static assets, safety boundaries, and real distribution behavior.
 
 ### Provider-Side Directory Map
 
 ```text
 src/spec_dock/
 |-- cli.py
+|-- shim_vnext.py
+|-- runtime/
+|   |-- cli/
+|   |-- commands/
+|   |-- application/
+|   |-- domain/
+|   |-- infra/
+|   `-- presentation/
 |-- assets/
 |   |-- install_root/
 |   |   `-- .agents/
@@ -67,14 +74,7 @@ src/spec_dock/
 |       |-- templates/
 |       |-- system/
 |       `-- scripts/
-|           |-- spec-dock
-|           `-- spec_dock_runtime/
-|               |-- cli/
-|               |-- commands/
-|               |-- application/
-|               |-- domain/
-|               |-- infra/
-|               `-- presentation/
+|           `-- spec-dock
 `-- __init__.py
 
 tests/
@@ -85,46 +85,48 @@ tests/
 
 Read it like this:
 
-- Change fixed distribution behavior: start at `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py` and the runtime `application/installation_*` modules.
+- Change distribution behavior: start at `pyproject.toml`, `setup.py`, and `src/spec_dock/cli.py`; verify a fresh wheel and non-editable external environment.
+- Change static installation: start at `src/spec_dock/runtime/application/{direct_installation,direct_static_update}.py` and `src/spec_dock/runtime/infra/static_assets.py`.
 - Change the two installed skills: start at `src/spec_dock/assets/install_root/`.
 - Treat `src/spec_dock/assets/install_root/` as the only current authority for the installed skills.
 - Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
-- Change runtime command entrypoints: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/{cli,commands}/`.
-- Change orchestration or use cases: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/`.
-- Change business rules or models: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/`.
-- Change filesystem/git/github/persistence behavior: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/`.
-- Change JSON/markdown/PUML/CLI output: start at `src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/`.
+- Change runtime command entrypoints: start at `src/spec_dock/runtime/{cli,commands}/`.
+- Change orchestration or use cases: start at `src/spec_dock/runtime/application/`.
+- Change business rules or models: start at `src/spec_dock/runtime/domain/`.
+- Change filesystem/git/github/persistence behavior: start at `src/spec_dock/runtime/infra/`.
+- Change public JSON/text/diagnostic output: start at `src/spec_dock/runtime/presentation/`.
 - Choose tests by surface: installer/scaffold in `tests/unit/infra/`, runtime in `tests/cli_runtime/`, application/domain/presentation in `tests/unit/{application,domain,presentation}/`, and external boundary smoke in `tests/integration/`.
 
 ### Runtime Architecture
 
 The current runtime architecture is a hybrid layered architecture.
 
-- `cli/`: current options, catalog, admission, and runtime dispatch.
+- `cli/`: current options, catalog, context-free utilities, and argument admission.
 - `commands/`: user-facing command handlers and command contracts.
 - `application/`: orchestration and use-case layer.
 - `domain/`: core rules, models, status/deps/tree/validation logic.
-- `infra/`: filesystem, git/github, active store, artifact writing, persistence adapters.
-- `presentation/`: JSON, markdown, PUML, and CLI rendering.
+- `infra/`: filesystem, Git/GitHub, worktree-local direct records, artifact publication, and OS adapters.
+- `presentation/`: typed public JSON, text, and diagnostic rendering.
 
 Do not collapse new work back into monolithic command files when a layer-specific home already exists.
 
 ## Dogfooding Rules
 
 - Assume `spec-dock` in this repo is an active consumer of the shipped scaffold.
-- Expect duplication-by-design between `src/spec_dock/assets/spec_dock/...` and `spec-dock/...`.
-- In normal development, edit `src/spec_dock/assets/spec_dock/...` and then verify the result in `spec-dock/...`.
+- Expect duplication-by-design for static assets between `src/spec_dock/assets/spec_dock/...` and `spec-dock/...`. Runtime implementation is shipped only in the installed package.
+- For static changes, edit provider assets first and verify a fresh isolated consumer against them. Inspect the actual dogfood workspace and apply changes only in its approved installation/migration step.
 - When changing shipped assets under `src/spec_dock/assets/`, consider the impact on both newly initialized repos and this local dogfooding repo.
 - Prefer commands and flows that will also work for a real consumer repo; avoid one-off local shortcuts unless they are explicitly test-only.
 - If a change affects scaffold structure, docs, templates, scripts, or runtime contracts, treat it as a shipped asset API change.
 
 ## Development Workflow
 
-1. Read the relevant docs under `spec-dock/active/`, or `spec-dock/system/active-none/` if no active context is set.
+1. Read the canonical documents for the authorized plan, using the current direct selection when available.
 2. Identify the layer or surface you are changing:
-   - fixed engine and installer: `src/spec_dock/{external_cli,fixed_bundle,runtime_loader}.py`, runtime installation use cases, asset sync/update behavior
+   - external CLI and distribution: `src/spec_dock/cli.py`, `pyproject.toml`, `setup.py`, and fresh wheel verification
+   - static installation and migration: `src/spec_dock/runtime/application/{direct_installation,direct_static_update,direct_migration}.py` and guarded publication/backup adapters
    - installed skills: `src/spec_dock/assets/install_root/` is the current authority; use historical issue records for retired-artifact context
-   - runtime command surface: `.../spec_dock_runtime/cli/` and `.../commands/`
+   - runtime command surface: `.../runtime/cli/` and `.../commands/`
    - orchestration or business logic: `.../application/` and `.../domain/`
    - external adapters or persistence: `.../infra/`
    - output/rendering: `.../presentation/`
@@ -140,11 +142,14 @@ uv run pytest
 uv run pytest tests/unit
 uv run pytest tests/unit/infra/test_provider_distribution.py
 
-# Build a fixed candidate outside the checkout, then inspect its help.
-uv run python -m spec_dock.fixed_bundle /private/tmp/spec-dock-candidate
+# Choose unused absolute candidate directories outside all worktrees.
+uv build --wheel --out-dir /private/tmp/spec-dock-candidate-dist
+uv venv /private/tmp/spec-dock-candidate
+# Replace this path with the actual wheel just built.
+uv pip install --python /private/tmp/spec-dock-candidate/bin/python /absolute/path/spec_dock-VERSION-py3-none-any.whl
 /private/tmp/spec-dock-candidate/bin/spec-dock help
 
-# After installation and migration are ready, use the pinned engine or shim.
+# After the approved installation and migration, use the installed console or shim.
 spec-dock workspace validate
 ```
 

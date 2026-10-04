@@ -1,0 +1,61 @@
+{
+  "findings": [
+    {
+      "title": "[P1] 固定probeでは実際のwork-targetがignore済みと確認できない",
+      "body": "`_check_private_state()`はall-zero tokenのfinal/stage二件だけを`git check-ignore`へ渡すため、そのprobeだけに一致するignore規則（例として`target-0*.json`と`.stage-0*`）でもgateを通過します。実際に`secrets.token_hex(16)`が生成した名前がその規則に一致しなければ、Startはuntracked selectionを公開して成功を返し、AC-413-04の記録由来の`git status`差分0と効果前拒否を破ります。効果前に実tokenを生成し、そのexact stage/final pathをcurrent/candidate checkoutの双方で検査して同じtokenを`publish()`へ渡す必要があります。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 70,
+          "end": 70
+        }
+      }
+    },
+    {
+      "title": "[P1] candidate schema検査がrequired_featuresと禁止fieldを通す",
+      "body": "`read_candidate()`は`read_workspace_declaration().require_writer()`と`load_scope_views()`をschema検査済みとして扱いますが、前者はnew-writer workspaceの`control_epoch`/`type`やfalsyな不正`required_features`を受理し、後者はScopeの`required_features`を一切判定しません。そのため未対応feature付きtarget/ancestorやdata-schema不適合workspaceでもreadiness後にGit効果とselection公開へ進み、D-09の未知feature/schema write拒否を破ります。current/candidateのworkspaceと全Scope payloadにwriter用schema/feature admissionを適用し、未知feature・禁止field・不正型を効果前に拒否する必要があります。",
+      "confidence_score": 0.98,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/start_snapshot.py",
+        "line_range": {
+          "start": 80,
+          "end": 81
+        }
+      }
+    },
+    {
+      "title": "[P1] unchanged経路がcandidate bytes照合前にstarted=trueを返す",
+      "body": "既存recordのbranchとcurrent branchが一致し`HEAD == tip`なら、この分岐は`verify_candidate()`より前に`started=true`でreturnします。tracked metadataを`assume-unchanged`/`skip-worktree`の下で事前変更すると`git status`はcleanで、local inputのcapture/recheckも同じ変更bytesを承認するため、例えば実worktreeの`depends_on`に未完了依存を追加してもreadinessはcommit側の古いcandidateを使い、Startはunchanged成功になります。同一branchのidempotent return前にもcandidateの全metadata path/bytesを現在checkoutと照合し、不一致を効果前失敗にする必要があります。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 197,
+          "end": 204
+        }
+      }
+    },
+    {
+      "title": "[P1] held rootを使わず別worktreeへselectionを公開できる",
+      "body": "post-checkoutの`root_handle.verify()`/`lock.verify()`後にcandidate検査と複数Git subprocessを実行したのち、`WorkTargetStore(context.root)`がheld root descriptorとは無関係にpathnameを再openします。この間に同じpathnameを別の有効なworktree/cloneへ差し替えると、そのreplacementがcandidate bytesとignore条件を満たすだけで、元のclone/worktree identityを持つrecordをreplacementへ公開してStart成功を返せます。storeをheld rootへdescriptor-relativeにbindするか、opened store root/common identityをheld handlesと公開直前・readback後に照合して、path replacementを成功扱いしない必要があります。",
+      "confidence_score": 0.96,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/work_start.py",
+        "line_range": {
+          "start": 235,
+          "end": 236
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "検証済みの`chemitaro/spec-dock`、branch `codex/iss-00413-external-cli-state`、HEAD `ad73a06a5838aded54dc36cf1704aecdd1aca3f8`について、固定range `6fec3099d8759b4e5b3b393b2987534b46dfa383..ad73a06a5838aded54dc36cf1704aecdd1aca3f8`をD-03〜D-06/D-09、data/CLI contract、指定source/testと照合しました。ignore実名検査、candidate schema admission、idempotent unchangedのexact bytes/readiness、最終物理identity bindingの必須gateが破られています。P-06の明示された後続事項やWindows native受入未完了そのものはfindingにしておらず、このレビューではtestを実行していません。",
+  "review_status": "fail",
+  "review_status_reason": "P1が4件あり、いずれも今回の変更範囲で必須のschema・readiness・物理path安全性・直接対象公開gateを破るため、Strict review gateはfailです。",
+  "overall_confidence_score": 0.98
+}

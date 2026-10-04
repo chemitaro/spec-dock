@@ -1,0 +1,48 @@
+{
+  "findings": [
+    {
+      "title": "[P1] Finishが別snapshotのtokenを解除する",
+      "body": "TARGETが`@current`のとき、`resolve_scope`が旧token AからScope Aを解決した直後かつ`captured = read_selection(...)`より前に別processがclear→Startで同Scopeの新token Bを公開すると、targetはAのままhandleだけBを捕捉し、Close確認後にBを削除します。これはAC-413-15とD-08の固定target/handleおよび遅い解除の保全契約を破るため、selectionを一度だけ捕捉し、その同じ観測から動的selectorと`--expect-current`を解決してremote前に固定してください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_finish.py",
+        "line_range": {
+          "start": 39,
+          "end": 41
+        }
+      }
+    },
+    {
+      "title": "[P1] Close未確認時のselection.clear段階がeffectsから消える",
+      "body": "`captured`が対象または配下のrecordを持つ状態でPATCHがtimeoutや503等により`RemoteIssueError`になると、このexceptは`github.issue.close=unknown|failed`だけを追加して外へ抜け、保全された`selection.clear`を`not_attempted`として返しません。C-04とremote-unknown例が要求する段階別effectsを欠き、解除未実行とeffect欠落を区別できないため、Closeを確認できずclearへ進まない全経路で捕捉tokenの`selection.clear=not_attempted`を追加してください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_finish.py",
+        "line_range": {
+          "start": 131,
+          "end": 134
+        }
+      }
+    },
+    {
+      "title": "[P2] 複数record解除の途中失敗で残りのeffectsが欠落する",
+      "body": "複数の正規recordを捕捉した`active clear --all --yes`で先頭の解除後に次の`remove_observed`がconflictまたはOSErrorになると、現在tokenの`failed`も未走査tokenの`not_attempted`も追加せず、外側のpartial応答は先に成功したeffectだけを返します。C-04の部分失敗精度を満たすため、失敗した現在handleのeffectと、その後ろの捕捉済みhandleすべての`not_attempted`を返してください。",
+      "confidence_score": 0.96,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_active.py",
+        "line_range": {
+          "start": 86,
+          "end": 93
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "GitHub connectorで指定repositoryとtarget branchのtipがexpected SHAと完全一致し、fixed point、merge-base、HEADおよび指定rangeを確認したうえで、P-03〜P-07の通常POSIX経路を静的に照合しました。Finishの動的selectorと解除handleが別snapshotになり新tokenを削除し得る点、およびClose未確認時に必須のnot_attempted効果を落とす点はP1です。active clearの複数record途中失敗にもP2のeffects欠落があります。Windows immutable store/native受入、真正のlocal backend Finish互換性、P-08以後、旧runtime退役、全体型・test gateは依頼どおり製品完了認定の対象外としました。テストは実行していません。",
+  "review_status": "fail",
+  "review_status_reason": "P1 findingが2件あり、固定targetと捕捉tokenの解除安全性、および公開CLIの部分失敗effects契約を破るためfailです。",
+  "overall_confidence_score": 0.98
+}

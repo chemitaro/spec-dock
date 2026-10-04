@@ -1,0 +1,163 @@
+{
+  "schema_version": 1,
+  "repository": "chemitaro/spec-dock",
+  "target_branch": "codex/iss-00413-external-cli-state",
+  "verified_tip_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+  "scope": "documentation whole-file replacements only",
+  "files": [
+    {
+      "repository_relative_path": "AGENTS.md",
+      "zip_member": "specdock-413-documentation-replacements/files/AGENTS.md",
+      "original_sha256": "514b8e442fbb2e4c6cdcbba121e95badfdc813389eb1aec5619671d65e3ecde3",
+      "replacement_sha256": "6af1cf1e53afce30552504f819455422e8c026791b2de156e88a05d835587506",
+      "reason": "旧dogfood切替中の注意を0805適用済み・mainと3 peer未移行の現在状態へ更新し、既存agent-first運用と人間merge gateを維持"
+    },
+    {
+      "repository_relative_path": "README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/README.md",
+      "original_sha256": "a3cd16247809f29001d0144d1a4a4f54d09ca32816d7faee5a2f78f62607a3ba",
+      "replacement_sha256": "8e493ec50c091de06b1bb07142ec9dcfaf0233fc65692ab39019989e5559ce23",
+      "reason": "provider source、導入済みpackage、worktree単位の静的資産、ignored直接記録の更新単位と正本を明記"
+    },
+    {
+      "repository_relative_path": "docs/issue-plans/iss-00413-external-cli-state/design.md",
+      "zip_member": "specdock-413-documentation-replacements/files/docs/issue-plans/iss-00413-external-cli-state/design.md",
+      "original_sha256": "9fed3aafbff3960a5988674f87e3ec8e02f34820c62e6d52c5131ad7fb4a5203",
+      "replacement_sha256": "c42070312c6ff0395f93624ae0330e8795a123c099947dfd2cf530ad87956f8d",
+      "reason": "設計の現在実装点と四層の更新境界を明記し、D-14の原計画履歴と現在の完了/保留を分離"
+    },
+    {
+      "repository_relative_path": "docs/issue-plans/iss-00413-external-cli-state/explanation.html",
+      "zip_member": "specdock-413-documentation-replacements/files/docs/issue-plans/iss-00413-external-cli-state/explanation.html",
+      "original_sha256": "def666c4b6dc3ace5cdd131b3d6b2088d9f349056bcbdf54b7b89c4a52da4e18",
+      "replacement_sha256": "528e01a3a2fd7c73478a1a49d327803a2e08f5eb5238e88d168ec42e9ae808f0",
+      "reason": "pre-Gate途中説明を8606e132の既存証拠、四層の所有境界、0805限定適用、peer/Start/merge/publication保留へ全面更新"
+    },
+    {
+      "repository_relative_path": "docs/issue-plans/iss-00413-external-cli-state/plan.md",
+      "zip_member": "specdock-413-documentation-replacements/files/docs/issue-plans/iss-00413-external-cli-state/plan.md",
+      "original_sha256": "78f046edb71dca3a5287d1c77a6a34360f4ddf08186dcce5bd2b528407fc7a14",
+      "replacement_sha256": "7f7e1b582245d17e7161cb4ab0262f826ec8c1d9dd03e0dd38945e5c99669d08",
+      "reason": "末尾のP-16未着手/FQ pending表示を8606e132の既存証拠、0805限定適用、P-15/P-17保留へ修正しraw historyを保持"
+    },
+    {
+      "repository_relative_path": "docs/issue-plans/iss-00413-external-cli-state/requirement.md",
+      "zip_member": "specdock-413-documentation-replacements/files/docs/issue-plans/iss-00413-external-cli-state/requirement.md",
+      "original_sha256": "60102994e5e5782e356e043c8e291e2bb3e085a138a74627836e3c0db525ddc8",
+      "replacement_sha256": "0cade0a2989990cbdbf2910816f44f64f9f4e84ef90f70e4b59f756ce00c302d",
+      "reason": "pre-Gate進捗を8606e132の既存証拠と現在rollout状態へ更新し、旧履歴と未完了stepを分離"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md",
+      "original_sha256": "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c",
+      "replacement_sha256": "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
+      "reason": "skillにprovider source、installed package、consumer静的投影、ignored直接記録の所有境界を追加"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/authoring/overview.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/authoring/overview.md",
+      "original_sha256": "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
+      "replacement_sha256": "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
+      "reason": "provider skill正本とconsumer投影、installed runtimeとの境界を明記"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/epic/artifacts.md",
+      "original_sha256": "da10a6a917e704c236db4cfbab87d2bda4b6c82c0003ac81ec758886944985c9",
+      "replacement_sha256": "55046eca0302b52b88cda2e58c8ad450bbcd558f2f01872d9b01a1ecf93d3ed1",
+      "reason": "退役したmain orchestrator表現を、canonical文書とevidence Artifactの現行authority境界へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/epic/discussions.md",
+      "original_sha256": "32f8549c62e66c65b01069219219d668e42437ae81e49fbe29d338fb3bff1397",
+      "replacement_sha256": "ab16cf1ff68a19bbb3679de06826a1585483a4f8deea22f1dfa2a9510e133fb0",
+      "reason": "legacy discussionを保持しつつ、退役したmain orchestrator表現を現行authority境界へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/initiative/artifacts.md",
+      "original_sha256": "1a3238c290c97e02d00090029eb8b88ce79a3b13d6b4e8c95c3c34c30a1a0619",
+      "replacement_sha256": "25bdec3909bb84bc96f66c6777e4112fc74054036898818b2557d7fcd4340d61",
+      "reason": "退役したmain orchestrator表現を、canonical文書とevidence Artifactの現行authority境界へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/initiative/discussions.md",
+      "original_sha256": "4fcd65d522647186ee8e4569398a342f81992e6b06026dca6bff03609aa9e88b",
+      "replacement_sha256": "44a1a85647ff7b788ffba7a3b1deccd9aead01f73abf916c145d8c4841ae6ea5",
+      "reason": "legacy discussionを保持しつつ、退役したmain orchestrator表現を現行authority境界へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/issue/artifacts.md",
+      "original_sha256": "69da9fa472bdc05550726ec0eaa29507f6badde73cdc2f11bb4be4153b61b9cf",
+      "replacement_sha256": "e92c5ad870f1670c0415011dd76aa659fabf24193fa34121469eb4862dceac13",
+      "reason": "退役したmain orchestrator表現を、canonical文書とevidence Artifactの現行authority境界へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/issue/discussions.md",
+      "original_sha256": "d9e9a307aaad17f27772ace45bd8c8ed3504c05131f444c221684741ab705737",
+      "replacement_sha256": "445d06e9b1c4364fa1f532df9aa99a4a17614f48aa834cdb21057cdf9092827b",
+      "reason": "legacy discussionを保持しつつ、退役したmain orchestrator表現を現行authority境界へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/docs/rules/root/artifacts.md",
+      "original_sha256": "e63c08ef5f332f963420eeb1780dcdb7bcd9f924beb80485bc2a3afb304f0abb",
+      "replacement_sha256": "5c3ba34ddf1ea778269e2a1a4298cbce4ae31353846ed05834364db215dc7d36",
+      "reason": "退役したroot import文法と旧publication fieldをCurrent CLIのartifact import file PATH --scope @root契約へ差し替え"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/system/.runtime/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/system/.runtime/README.md",
+      "original_sha256": "d9aae3088e6082e1e76b1f402cc97dad1a8db3b261f4fb8e6a81eafa93e2414d",
+      "replacement_sha256": "bf164f4ffedb272cff9877ca0ce7d9800a5fbacd01c1ed0f1267a1f7bfa3af57",
+      "reason": "存在しないcreate.lock/shared lease説明を、Start-only flockと直接記録の実装へ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/system/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/system/README.md",
+      "original_sha256": "71a7579f3d9fb0f1f5141bbf14ec96d2cd5762c5f935934a8af0604e6008fe53",
+      "replacement_sha256": "759c504cabf3d467b28d87e8a6af33f5cddf430b8fd93f2b38598f44bb705feb",
+      "reason": "legacy active symlinkとbest-effort read-only説明を、ignored直接記録とactive-none fallbackの現行モデルへ差し替え"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/system/active-none/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/system/active-none/README.md",
+      "original_sha256": "aca9368da8ba736f1920dc96e9fa2a57a288386ab97533a1e47c89fd7a73f641",
+      "replacement_sha256": "067114e645ff28e1b8f1166221c7d6d6e6a40e23bab406ee63007496e29494c3",
+      "reason": "active symlinkとread-only permissionの旧説明を、Current direct target不在時のfallbackへ更新"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/system/active-none/epic/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/system/active-none/epic/README.md",
+      "original_sha256": "0c0963cf1260de6d8737bd1f3c6a1b5237a5b6d596d1681bed37e685e2b3b389",
+      "replacement_sha256": "9781c7e8d84b4e473dc52044622c9a9c9e36952345537069a8bb7c461be62d12",
+      "reason": "active setによる取得例をwork startへ更新し、Epic不在fallbackと直接記録を区別"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/system/active-none/initiative/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/system/active-none/initiative/README.md",
+      "original_sha256": "f0a88c09ecf88adf103cbf4c9707b28fc70cf1f3e06a7d5b307b6b595fc41dd4",
+      "replacement_sha256": "583c400f25c9a2a7e784c95948de4f7142d4715b2a91ae3db20557e8fd9317d1",
+      "reason": "active setによる取得例をwork startへ更新し、Initiative不在fallbackと直接記録を区別"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/system/active-none/issue/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/system/active-none/issue/README.md",
+      "original_sha256": "03e203932404195e191ff662f09e2d97c4e62a62d8c16bbb1b2b27dc43aaea30",
+      "replacement_sha256": "457321ce7c573e59d01b55ea29da99c9d01d53790d06407a9ceddf52821be231",
+      "reason": "active setによる取得例をwork startへ更新し、Issue不在fallbackと直接記録を区別"
+    },
+    {
+      "repository_relative_path": "src/spec_dock/assets/spec_dock/templates/README.md",
+      "zip_member": "specdock-413-documentation-replacements/files/src/spec_dock/assets/spec_dock/templates/README.md",
+      "original_sha256": "d7202728624c4632646c4b077155699e5342484b15de11fa936566541045c1e2",
+      "replacement_sha256": "5ee4beb40099fb1a872742a9384eaa801562f4ccabc9ee2b10f08ce7167f163b",
+      "reason": "GitHub番号Scope ID、work-target file token、template/static資産の境界を追記"
+    }
+  ]
+}

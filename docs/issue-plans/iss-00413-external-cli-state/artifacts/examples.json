@@ -1,0 +1,482 @@
+{
+  "description": "説明用の契約例。OS identity/時刻/token/Git原文は試験fixture。候補実装の進捗はimplementation-acceptance-evidence.mdに記録し、この例を現環境の観測や#413の正式登録実績とは扱わない。",
+  "work_target": {
+    "schema_version": "specdock.work-target/v1",
+    "scope_id": "iss-00413",
+    "github_ref": "gh:chemitaro/spec-dock#413",
+    "selected_branch": "fix/external-cli",
+    "selected_at": "2026-09-30T03:00:00Z",
+    "clone_identity": {
+      "platform": "posix",
+      "device": "1",
+      "file_id": "100"
+    },
+    "worktree_identity": {
+      "platform": "posix",
+      "device": "1",
+      "file_id": "200"
+    }
+  },
+  "scope": {
+    "schema_version": 3,
+    "type": "issue",
+    "id": "iss-00413",
+    "title": "External CLI State",
+    "slug": "external-cli-state",
+    "parent_id": "epic-00356",
+    "initiative_id": "init-local-00003",
+    "epic_id": "epic-00356",
+    "depends_on": [],
+    "backend": "github",
+    "github": {
+      "issue_number": 413,
+      "repo_owner": "chemitaro",
+      "repo_name": "spec-dock"
+    },
+    "lifecycle": null,
+    "revision": 0
+  },
+  "legacy_github_spelling": {
+    "schema_version": 3,
+    "type": "initiative",
+    "id": "init-local-00003",
+    "title": "Example Legacy Spelling",
+    "slug": "example-legacy-spelling",
+    "parent_id": null,
+    "initiative_id": null,
+    "epic_id": null,
+    "depends_on": [],
+    "backend": "github",
+    "github": {
+      "issue_number": 31,
+      "repo_owner": "chemitaro",
+      "repo_name": "spec-dock"
+    },
+    "lifecycle": null,
+    "revision": 0,
+    "custom_note": "preserved"
+  },
+  "workspace": {
+    "schema_version": 3,
+    "writer_protocol": "specdock.worktree-writer/v1"
+  },
+  "cli": [
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "work start",
+      "status": "succeeded",
+      "exit_code": 0,
+      "data": {
+        "kind": "work-start",
+        "scope_id": "iss-00413",
+        "started": true,
+        "branch_before": "main",
+        "branch_after": "fix/external-cli",
+        "selection_token": "11111111111111111111111111111111"
+      },
+      "effects": [
+        {
+          "kind": "git.branch.create",
+          "status": "succeeded",
+          "target": "fix/external-cli"
+        },
+        {
+          "kind": "git.checkout",
+          "status": "succeeded",
+          "target": "fix/external-cli"
+        },
+        {
+          "kind": "selection.publish",
+          "status": "succeeded",
+          "target": "iss-00413"
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "recovery": null
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "work start",
+      "status": "failed",
+      "exit_code": 3,
+      "data": {
+        "kind": "diagnostic",
+        "findings": [],
+        "unverified": []
+      },
+      "effects": [],
+      "warnings": [],
+      "error": {
+        "code": "SCOPE_ALREADY_SELECTED",
+        "message": "同じcloneの別worktreeで直接対象に選択されています。",
+        "details": {
+          "scope_id": "iss-00413",
+          "worktree": "/projects/linked"
+        }
+      },
+      "recovery": null
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "work start",
+      "status": "partial",
+      "exit_code": 6,
+      "data": {
+        "kind": "work-start",
+        "scope_id": "iss-00413",
+        "started": false,
+        "branch_before": "main",
+        "branch_after": "main",
+        "selection_token": null
+      },
+      "effects": [
+        {
+          "kind": "git.branch.create",
+          "status": "succeeded",
+          "target": "fix/external-cli"
+        },
+        {
+          "kind": "git.checkout",
+          "status": "failed",
+          "target": "fix/external-cli"
+        },
+        {
+          "kind": "selection.publish",
+          "status": "not_attempted",
+          "target": "iss-00413"
+        }
+      ],
+      "warnings": [],
+      "error": {
+        "code": "GIT_CHECKOUT_FAILED",
+        "message": "Git checkoutが失敗しました。成功済みbranchを残しています。",
+        "details": {
+          "git": {
+            "argv": [
+              "git",
+              "checkout",
+              "fix/external-cli"
+            ],
+            "returncode": 1,
+            "stderr": "error: Your local changes to the following files would be overwritten by checkout:\n\tspec-dock/workspace.json\nPlease commit your changes or stash them before you switch branches.\nAborting\n",
+            "stdout": "",
+            "timed_out": false,
+            "redacted": false,
+            "decoding_replaced": false
+          }
+        }
+      },
+      "recovery": {
+        "can_resume": false,
+        "can_rollback": false,
+        "instructions": [
+          "現在のbranch/HEADとactive showを確認してください。",
+          "原因を修正後、既存branchを--branchで明示して新しいwork startを実行してください。--baseは付けません。"
+        ]
+      }
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "work finish",
+      "status": "partial",
+      "exit_code": 6,
+      "data": {
+        "kind": "work-finish",
+        "scope_id": "iss-00413",
+        "completed": false,
+        "branch_before": "fix/external-cli",
+        "branch_after": "fix/external-cli",
+        "selection_token": "11111111111111111111111111111111"
+      },
+      "effects": [
+        {
+          "kind": "github.issue.close",
+          "status": "unknown",
+          "target": "gh:chemitaro/spec-dock#413"
+        },
+        {
+          "kind": "selection.clear",
+          "status": "not_attempted",
+          "target": "iss-00413"
+        }
+      ],
+      "warnings": [],
+      "error": {
+        "code": "GITHUB_EFFECT_UNKNOWN",
+        "message": "Closeの成否を確認できないため選択を残しました。",
+        "details": {}
+      },
+      "recovery": {
+        "can_resume": false,
+        "can_rollback": false,
+        "instructions": [
+          "GitHubの現在状態を確認してください。",
+          "必要なら新しいwork finishを--dry-runで確認し、明示的に実行してください。"
+        ]
+      }
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "active show",
+      "status": "succeeded",
+      "exit_code": 0,
+      "data": {
+        "kind": "active",
+        "selection": {
+          "status": "selected",
+          "scope_id": "iss-00413",
+          "github_ref": "gh:chemitaro/spec-dock#413",
+          "selection_token": "11111111111111111111111111111111",
+          "selected_branch": "fix/external-cli",
+          "current_branch": "fix/external-cli",
+          "branch_changed": false
+        },
+        "ancestors": [
+          "init-local-00003",
+          "epic-00356"
+        ]
+      },
+      "effects": [],
+      "warnings": [],
+      "error": null,
+      "recovery": null
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "workspace sync",
+      "status": "partial",
+      "exit_code": 7,
+      "data": {
+        "kind": "sync",
+        "observed_at": "2026-09-30T03:01:00Z",
+        "source": "local",
+        "complete": false,
+        "worktrees": [
+          {
+            "path": "/projects/spec-dock",
+            "selection": {
+              "status": "selected",
+              "scope_id": "iss-00413",
+              "github_ref": "gh:chemitaro/spec-dock#413",
+              "selection_token": "11111111111111111111111111111111",
+              "selected_branch": "fix/external-cli",
+              "current_branch": "fix/external-cli",
+              "branch_changed": false
+            },
+            "lifecycle": "unknown",
+            "process_state": "not_observed",
+            "findings": []
+          },
+          {
+            "path": "/projects/linked",
+            "selection": {
+              "status": "unavailable",
+              "scope_id": null,
+              "github_ref": null,
+              "selection_token": null,
+              "selected_branch": null,
+              "current_branch": null,
+              "branch_changed": false
+            },
+            "lifecycle": "unknown",
+            "process_state": "not_observed",
+            "findings": [
+              {
+                "code": "WORKTREE_UNAVAILABLE",
+                "message": "worktreeを読み取れません。",
+                "details": {}
+              }
+            ]
+          }
+        ],
+        "counts": [
+          {
+            "scope_id": "epic-00356",
+            "direct_selected_count": 0,
+            "descendant_selected_count": 1,
+            "complete": false
+          },
+          {
+            "scope_id": "iss-00413",
+            "direct_selected_count": 1,
+            "descendant_selected_count": 0,
+            "complete": false
+          },
+          {
+            "scope_id": "iss-00414",
+            "direct_selected_count": 0,
+            "descendant_selected_count": 0,
+            "complete": false
+          }
+        ],
+        "findings": [
+          {
+            "code": "WORKTREE_UNAVAILABLE",
+            "message": "一部のworktreeの選択を確認できません。",
+            "details": {}
+          }
+        ],
+        "scopes": [
+          {
+            "scope_id": "iss-00413",
+            "github_ref": "gh:chemitaro/spec-dock#413",
+            "lifecycle": "unknown"
+          },
+          {
+            "scope_id": "iss-00414",
+            "github_ref": "gh:chemitaro/spec-dock#414",
+            "lifecycle": "unknown"
+          },
+          {
+            "scope_id": "epic-00356",
+            "github_ref": "gh:chemitaro/spec-dock#356",
+            "lifecycle": "unknown"
+          }
+        ]
+      },
+      "effects": [],
+      "warnings": [],
+      "error": {
+        "code": "OBSERVATION_INCOMPLETE",
+        "message": "既知の件数だけを表示しています。",
+        "details": {}
+      },
+      "recovery": null
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "work finish",
+      "status": "succeeded",
+      "exit_code": 0,
+      "data": {
+        "kind": "work-finish",
+        "scope_id": "iss-00413",
+        "completed": true,
+        "branch_before": "fix/external-cli",
+        "branch_after": "fix/external-cli",
+        "selection_token": null
+      },
+      "effects": [
+        {
+          "kind": "github.issue.close",
+          "status": "succeeded",
+          "target": "gh:chemitaro/spec-dock#413"
+        },
+        {
+          "kind": "selection.clear",
+          "status": "succeeded",
+          "target": "iss-00413"
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "recovery": null
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "work start",
+      "status": "planned",
+      "exit_code": 0,
+      "data": {
+        "kind": "work-start",
+        "scope_id": "iss-00413",
+        "started": false,
+        "branch_before": "main",
+        "branch_after": "fix/external-cli",
+        "selection_token": null
+      },
+      "effects": [
+        {
+          "kind": "git.branch.create",
+          "status": "planned",
+          "target": "fix/external-cli"
+        },
+        {
+          "kind": "git.checkout",
+          "status": "planned",
+          "target": "fix/external-cli"
+        },
+        {
+          "kind": "selection.publish",
+          "status": "planned",
+          "target": "iss-00413"
+        }
+      ],
+      "warnings": [],
+      "error": null,
+      "recovery": null
+    },
+    {
+      "schema_version": "specdock.cli/v2",
+      "command": "workspace sync",
+      "status": "succeeded",
+      "exit_code": 0,
+      "data": {
+        "kind": "sync",
+        "observed_at": "2026-09-30T03:01:00Z",
+        "source": "github",
+        "complete": true,
+        "worktrees": [
+          {
+            "path": "/projects/spec-dock",
+            "selection": {
+              "status": "selected",
+              "scope_id": "iss-00413",
+              "github_ref": "gh:chemitaro/spec-dock#413",
+              "selection_token": "11111111111111111111111111111111",
+              "selected_branch": "fix/external-cli",
+              "current_branch": "fix/external-cli",
+              "branch_changed": false
+            },
+            "lifecycle": "completed",
+            "process_state": "not_observed",
+            "findings": []
+          }
+        ],
+        "counts": [
+          {
+            "scope_id": "epic-00356",
+            "direct_selected_count": 0,
+            "descendant_selected_count": 1,
+            "complete": true
+          },
+          {
+            "scope_id": "iss-00413",
+            "direct_selected_count": 1,
+            "descendant_selected_count": 0,
+            "complete": true
+          },
+          {
+            "scope_id": "iss-00414",
+            "direct_selected_count": 0,
+            "descendant_selected_count": 0,
+            "complete": true
+          }
+        ],
+        "findings": [],
+        "scopes": [
+          {
+            "scope_id": "iss-00413",
+            "github_ref": "gh:chemitaro/spec-dock#413",
+            "lifecycle": "completed"
+          },
+          {
+            "scope_id": "iss-00414",
+            "github_ref": "gh:chemitaro/spec-dock#414",
+            "lifecycle": "open"
+          },
+          {
+            "scope_id": "epic-00356",
+            "github_ref": "gh:chemitaro/spec-dock#356",
+            "lifecycle": "open"
+          }
+        ]
+      },
+      "effects": [],
+      "warnings": [],
+      "error": null,
+      "recovery": null
+    }
+  ]
+}

@@ -3,16 +3,15 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError
 
-from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway, RemoteIssueError  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _reply(status: int, payload: object) -> subprocess.CompletedProcess[str]:
@@ -188,24 +187,23 @@ def test_create_success_response_without_identity_is_unknown_effect(tmp_path: Pa
     assert caught.value.exit_code == 6
 
 
-def test_marker_scan_reads_all_pages_and_excludes_pull_requests(tmp_path: Path) -> None:
-    marker = "<!-- spec-dock-operation:0123456789abcdef0123456789abcdef -->"
-    first_page = [_issue(number=number) for number in range(1, 101)]
-    first_page[13]["body"] = marker
-    first_page[14]["body"] = marker
-    first_page[14]["pull_request"] = {"url": "https://api.github.com/repos/example/product/pulls/15"}
-    runner = FakeRun(_reply(200, first_page), _reply(200, [{**_issue(number=101), "body": "unrelated"}]))
-    matches = GithubIssueGateway(runner=runner).find_by_marker(tmp_path, "example/product", marker)
-    assert [record.number for record in matches] == [14]
-    assert "page=1" in runner.calls[0][0][-1]
-    assert "page=2" in runner.calls[1][0][-1]
-
-
-def test_marker_scan_rejects_incomplete_page(tmp_path: Path) -> None:
-    marker = "<!-- spec-dock-operation:0123456789abcdef0123456789abcdef -->"
-    runner = FakeRun(_reply(200, {"unexpected": "object"}))
-    with pytest.raises(RemoteIssueError, match="GITHUB_RESPONSE_INVALID"):
-        GithubIssueGateway(runner=runner).find_by_marker(tmp_path, "example/product", marker)
+@pytest.mark.parametrize("operation,exit_code", [("get", 5), ("create", 6)])
+def test_issue_operations_reject_array_responses_without_scanning_or_retrying(
+    tmp_path: Path, operation: str, exit_code: int
+) -> None:
+    runner = FakeRun(_reply(200 if operation == "get" else 201, [_issue()]))
+    gateway = GithubIssueGateway(runner=runner)
+    with pytest.raises(RemoteIssueError, match="GITHUB_RESPONSE_INVALID") as caught:
+        if operation == "get":
+            gateway.get(tmp_path, "example/product", 8)
+        else:
+            gateway.create(tmp_path, "example/product", title="Plan", body="body")
+    assert caught.value.exit_code == exit_code and caught.value.uncertain is (operation == "create")
+    assert len(runner.calls) == 1
+    argv = runner.calls[0][0]
+    assert argv[argv.index("--method") + 2] == (
+        "repos/example/product/issues/8" if operation == "get" else "repos/example/product/issues"
+    )
 
 
 @pytest.mark.parametrize("status", [400, 410, 422])

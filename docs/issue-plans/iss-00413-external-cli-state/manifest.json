@@ -1,0 +1,1370 @@
+{
+  "manifest_version": 1,
+  "archive_root": "iss-00413-planning-pack",
+  "document_date": "2026-09-30",
+  "encoding": "UTF-8",
+  "purpose": "Issue #413 adopted planning, implementation evidence and human explanation pack",
+  "status": "Implementation at 8606e132 has an existing passing FQ v2; documentation replacements adopted and locally verified; current 0805 static assets updated; other worktrees, formal Start, human merge and publication remain incomplete",
+  "implementation_assignment": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "max",
+    "status": "active user-authorized assignment"
+  },
+  "basis": {
+    "repository": "chemitaro/spec-dock",
+    "target_branch": "codex/iss-00413-external-cli-state",
+    "ref": "refs/heads/codex/iss-00413-external-cli-state",
+    "expected_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "retrieved_tip_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "verification": "ChatGPT Use Strict connector verified exact branch tip; documentation-only changes follow this immutable implementation point",
+    "new_requirements_authority": "No new product requirements; existing accepted decisions preserved"
+  },
+  "preserved_external_files": [
+    {
+      "path": "report.md",
+      "owner": "Codex",
+      "action": "existing history preserved; current adoption appended",
+      "included_in_zip": true
+    },
+    {
+      "path": "artifacts/interview-worktree-start.md",
+      "owner": "Codex",
+      "action": "preserved byte-for-byte",
+      "included_in_zip": true
+    }
+  ],
+  "self_hash_policy": "manifest.json excluded from payload hashes to avoid self-reference; archive hash recorded outside the archive",
+  "checks": {
+    "scope": "Documentation adoption and packaging verification only; existing implementation Gate remains tied to 8606e132",
+    "utf8": "passed",
+    "safe_single_root": "passed",
+    "json_schemas": 2,
+    "bundled_examples_valid": 13,
+    "local_link_occurrences_checked": 742,
+    "html_unique_ids": 34,
+    "template_scripts_styles_modal_unchanged": true,
+    "browser_dynamic": "Updated HTML: 4/4 inline SVG and zoom/keyboard/focus validator passed, actual exit 0",
+    "mobile": "Historical previous-HTML 390px measurements retained in the original evidence; updated HTML mobile viewport not remeasured in this documentation-only verification",
+    "source_publication": "Existing managed Tailscale URL HTTP 200; current source byte match",
+    "product_acceptance": "Existing implementation Gate preserved at 8606e132; no new review or Gate for documentation commit",
+    "zip_crc": "passed",
+    "member_bytes_vs_files": "passed",
+    "manifest_hashes_vs_members": "passed",
+    "json_documents_parsed": 40
+  },
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 8305,
+      "sha256": "c9dc53f9e1cb456d2d8abe00c581a7849d3dd6ccf186dadcbf46a89a54f1843c"
+    },
+    {
+      "path": "artifacts/acceptance-matrix.md",
+      "bytes": 21750,
+      "sha256": "cc6b2b6886a5c38a6240af96c46a600d246b70e9d384633d39f84c0410809c58"
+    },
+    {
+      "path": "artifacts/cli-contract.md",
+      "bytes": 29761,
+      "sha256": "c5465218d2c99cedc931d02077c748de948d770b3589f21d36f53fb1da400ec4"
+    },
+    {
+      "path": "artifacts/cli-schema.json",
+      "bytes": 16918,
+      "sha256": "ccea5bb08e8fb1bc8addf95f04f6330d19bae39c08ca604276b55db78f1d9a51"
+    },
+    {
+      "path": "artifacts/code-review-8606e132.json",
+      "bytes": 2666,
+      "sha256": "656695cf8b20d5ac3e439ebe86fd8c7abbd57739f259038ebfd70621dcefdfb2"
+    },
+    {
+      "path": "artifacts/code-review-linux-macos-3b803ced.json",
+      "bytes": 2238,
+      "sha256": "cbd78ad46613105b039b4296f096a318bbe79d52b95339ce61f51bcb63b644e9"
+    },
+    {
+      "path": "artifacts/code-review-p02-01.json",
+      "bytes": 1828,
+      "sha256": "257a1e92a16e3ef75cae956d5fd2cfd802839f7f3e887ad01686da855122734b"
+    },
+    {
+      "path": "artifacts/code-review-p02-02-analysis.md",
+      "bytes": 2449,
+      "sha256": "ec70dda7211e891028201357fe4693822432e52a405c4849f5deef209bf52b8f"
+    },
+    {
+      "path": "artifacts/code-review-p02-02-response.txt",
+      "bytes": 3519,
+      "sha256": "f581529eaad9595604ef2a6978aaa374ccf7dffaa51b70cf1dd25e821917aa12"
+    },
+    {
+      "path": "artifacts/code-review-p02-03-analysis.md",
+      "bytes": 2317,
+      "sha256": "00e1b0a1fc66fcbe7f5c9309ce3489d2f8ba1b3b6d38bf9b85a54b493ac8440b"
+    },
+    {
+      "path": "artifacts/code-review-p02-03.json",
+      "bytes": 4079,
+      "sha256": "3e7690a9b1fd62fcca6aa64999f9634a2165e766af0b6c03be077e5a25257ce6"
+    },
+    {
+      "path": "artifacts/code-review-p02-analysis.md",
+      "bytes": 2088,
+      "sha256": "ca08b00949d513f423557be690f9bc3ecfd5da6c4ac5638465d284b9e410c1a5"
+    },
+    {
+      "path": "artifacts/code-review-p06-01-analysis.md",
+      "bytes": 3675,
+      "sha256": "c4e3eda90294cb69c1e62bac8bd217f71dcc949c1aa5bdd8c109c5651c875392"
+    },
+    {
+      "path": "artifacts/code-review-p06-01.json",
+      "bytes": 5226,
+      "sha256": "a116d2a24fef7abf3c8a2c43c85dae67a592dddd299bc949b16c3e074c11fd98"
+    },
+    {
+      "path": "artifacts/code-review-p06-02-analysis.md",
+      "bytes": 6715,
+      "sha256": "a812fbe76675451dcd3799548f0d18d0a579e90aa38862232eae44a387f8d3b3"
+    },
+    {
+      "path": "artifacts/code-review-p06-02.json",
+      "bytes": 4840,
+      "sha256": "ae2c7e093be85d3973ff4cd3a8744d48de0628d3ac568528bbe9cf2298330836"
+    },
+    {
+      "path": "artifacts/code-review-p06-03-analysis.md",
+      "bytes": 7506,
+      "sha256": "1efdbdf90543ed594e42ee13e218e416dc9a7b98617f3cf85f424cb96978f42b"
+    },
+    {
+      "path": "artifacts/code-review-p06-03.json",
+      "bytes": 5401,
+      "sha256": "3682db9c611e43f0aab50d61a34e4836a941add0d5ae9f601bee35b3fa005866"
+    },
+    {
+      "path": "artifacts/code-review-p06-05-analysis.md",
+      "bytes": 9481,
+      "sha256": "5b353e82818afae89f44852624cf02a0044b17347574d8d6afc5137cb8db07ba"
+    },
+    {
+      "path": "artifacts/code-review-p06-05.json",
+      "bytes": 3742,
+      "sha256": "058ea5dcdf6c4330a177f1d8bdd1a916236875b38139735b217fd20f81a8ca44"
+    },
+    {
+      "path": "artifacts/code-review-p06-06-analysis.md",
+      "bytes": 11981,
+      "sha256": "94a43ee49f413fbae963d1762e30690c3983e0fcb8ddc47838e4916e4fb7d54c"
+    },
+    {
+      "path": "artifacts/code-review-p06-06.json",
+      "bytes": 5282,
+      "sha256": "2b9b36dd58d727f0c72ec8b02ff07a20e840a34ae2f36bc76ccd60b2b54abdd2"
+    },
+    {
+      "path": "artifacts/code-review-p06-07-analysis.md",
+      "bytes": 6636,
+      "sha256": "c5e7e0a9fead4055e5a13623a0eca61694dbb9d13603d273b9b9768fc255b997"
+    },
+    {
+      "path": "artifacts/code-review-p06-07.json",
+      "bytes": 3039,
+      "sha256": "d4c2fe2eba5ac0195061651640c5f8bf7d3186bfc0db238135fafe88db4ca1a3"
+    },
+    {
+      "path": "artifacts/code-review-p06-08-analysis.md",
+      "bytes": 6757,
+      "sha256": "0a9f73ff4e7c14697d151c0afb693fefd48786db51891345b79dd564943e7a07"
+    },
+    {
+      "path": "artifacts/code-review-p06-08.json",
+      "bytes": 2618,
+      "sha256": "25b562e00efcbdc547d28061a92bcae361883122d87aaaaa5196e9fd33789364"
+    },
+    {
+      "path": "artifacts/code-review-p06-09-analysis.md",
+      "bytes": 8113,
+      "sha256": "58c4fc889415c5773de19d76e22088277c5d00700a517211dcdfe05bda7378b0"
+    },
+    {
+      "path": "artifacts/code-review-p06-09.json",
+      "bytes": 4048,
+      "sha256": "1f84f3a9a766f650b4f5282b77192095510e38be51abe1b49714efe30c77c660"
+    },
+    {
+      "path": "artifacts/code-review-p06-10-analysis.md",
+      "bytes": 6113,
+      "sha256": "9d09b849a8d5a1e8c380860369d927b9f6a97958c7228b8032f8cc7d8eb9548f"
+    },
+    {
+      "path": "artifacts/code-review-p06-10.json",
+      "bytes": 3041,
+      "sha256": "922aa2ef0b62a0f75253d8dc71b80634898c80c7ecf7f42895ea1c3ce872112e"
+    },
+    {
+      "path": "artifacts/code-review-p06-11-analysis.md",
+      "bytes": 6697,
+      "sha256": "1fe6b5c2268d5026984a06350876c055d3f554630ba72309ed48100732464ab7"
+    },
+    {
+      "path": "artifacts/code-review-p06-11.json",
+      "bytes": 5443,
+      "sha256": "2f144e8328f27004e757c6da7d77ec1cde2465de7ed7b217b10e309be434c024"
+    },
+    {
+      "path": "artifacts/code-review-p06-12-analysis.md",
+      "bytes": 4428,
+      "sha256": "a926c6e5d70d1378773e136a2db65308d750eb93beef82673cd07e478af4525b"
+    },
+    {
+      "path": "artifacts/code-review-p06-12.json",
+      "bytes": 3000,
+      "sha256": "4b7c170004525cdf6ddee787df3cdffa7fb6885c34e91990720afd1c1e626853"
+    },
+    {
+      "path": "artifacts/completion-evidence-8606e132.json",
+      "bytes": 11927,
+      "sha256": "cd626463cb861a194935ae6b9ef2acea123e8f9b79f02f4c7a8975a969b80730"
+    },
+    {
+      "path": "artifacts/data-schema.json",
+      "bytes": 9216,
+      "sha256": "2c925518dc9aa8f573edb320da5611e639bea3e7e489e5a07d2fd24aa33382cf"
+    },
+    {
+      "path": "artifacts/documentation-alignment-20261004.md",
+      "bytes": 5283,
+      "sha256": "4989099ae120da1711882cecfbd91101b54618501892e38796f82a765e9fcb14"
+    },
+    {
+      "path": "artifacts/documentation-analysis-20261003.md",
+      "bytes": 10787,
+      "sha256": "a0e3d79dce116f930bd57075d6f82e00ba49e01f18a4ab35b395e7b266822bbc"
+    },
+    {
+      "path": "artifacts/documentation-replacements-manifest-20261003.json",
+      "bytes": 12403,
+      "sha256": "266a0b263eb47eb92d216783e63fbd6e89662b034f25d0f61875a428c2a44318"
+    },
+    {
+      "path": "artifacts/documentation-response-20261003.md",
+      "bytes": 3107,
+      "sha256": "f7284d6a0dc1c3bca080f13e6508dde6654ae7fc951bfb6e04eb8c73ba298efb"
+    },
+    {
+      "path": "artifacts/documentation-unchanged-20261003.md",
+      "bytes": 12533,
+      "sha256": "d7ab06deff48a64d75946594fd9772c10cd28f35c054083fcace0b45d5626028"
+    },
+    {
+      "path": "artifacts/documentation-verification-20261004.json",
+      "bytes": 3417,
+      "sha256": "04f49a325273e585b1b8c9f2d06bf1480822c4b7a251459496bcdf95829b869a"
+    },
+    {
+      "path": "artifacts/dogfooding-20261003.md",
+      "bytes": 10223,
+      "sha256": "3c57352e0489e7040d224f2c98d67927b9c6300ca713d180222217a2e7998108"
+    },
+    {
+      "path": "artifacts/dogfooding-a-decision-20261003.md",
+      "bytes": 2000,
+      "sha256": "2c7d32c913a552df9694b493317c5550153704d4d39c8545d0139c72f1a50cd4"
+    },
+    {
+      "path": "artifacts/dogfooding-a-implementation-20261003.md",
+      "bytes": 3825,
+      "sha256": "4faa8c3eeee4f12a637deda123166c668e837efc1cd6e448bbe08e06673eb0a9"
+    },
+    {
+      "path": "artifacts/dogfooding-review-aa44ea1d.json",
+      "bytes": 10113,
+      "sha256": "dbfea0f08f2f0ac0c040a4bc1388e4cd317952757512c402e756ff857d3510bf"
+    },
+    {
+      "path": "artifacts/dogfooding-review-analysis-20261003.md",
+      "bytes": 10185,
+      "sha256": "bb7669ba7c8980e55995667659db70f81f09969ab80a7cee6f454bc5cb9fd549"
+    },
+    {
+      "path": "artifacts/dogfooding-target-resolution-aa44ea1d.json",
+      "bytes": 2282,
+      "sha256": "a4110ea5a34072c834cf52a9548b01d750aa1215a5d73713d61d932810a98494"
+    },
+    {
+      "path": "artifacts/dogfooding-verification-aa44ea1d.json",
+      "bytes": 9368,
+      "sha256": "5e2529bca37f5217430a4ab87bb5ddc7ce4f719a4ac27ecf9a23ab5ad8d6d414"
+    },
+    {
+      "path": "artifacts/examples.json",
+      "bytes": 13616,
+      "sha256": "c22122c7732f9ced4aef70ed36843f28ee0f5a4c5535fbd94a8235ef97a40470"
+    },
+    {
+      "path": "artifacts/final-quality-gate-8606e132.json",
+      "bytes": 12129,
+      "sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6"
+    },
+    {
+      "path": "artifacts/fresh-console-lifecycle.md",
+      "bytes": 5775,
+      "sha256": "733a1a4f4d9dd6041bd65265e67c792a7d58150794efc25134b5c95d0770c12f"
+    },
+    {
+      "path": "artifacts/implementation-acceptance-evidence.md",
+      "bytes": 15230,
+      "sha256": "50d9114b3d3ff1adf3b8206734574c9df9db3157045ebf3839fd345ad0fc84c6"
+    },
+    {
+      "path": "artifacts/implementation-brief-p06.md",
+      "bytes": 38605,
+      "sha256": "0ce2d30e99d86734e800d8c2ec18bc760510306087828f1ed231b4f83be341cc"
+    },
+    {
+      "path": "artifacts/interview-worktree-start.md",
+      "bytes": 5646,
+      "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-after.txt",
+      "bytes": 662,
+      "sha256": "a9ee8c3cc72457cf8666b9bded1958bdcc54a2d313c39dc47b95f6f55b887304"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-before.txt",
+      "bytes": 663,
+      "sha256": "ad3f4bdb975c7feabd5bb7271767aa68b810826e017b88e8cb880b5b116b87e7"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-original-raw.json",
+      "bytes": 17012,
+      "sha256": "e5f16669157338e43d11faa20af0303572335f71e162542ecb26183973096ea7"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-original.txt",
+      "bytes": 16514,
+      "sha256": "3c8e55096f009ad12afa187073c1611bcae4fab1b9726866cb1541232451dc75"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6-path-fixed.txt",
+      "bytes": 3164,
+      "sha256": "bc759325bf679f6b7cd81860b003c7e07fa27cf0e181d853031b1b4bc8f982a5"
+    },
+    {
+      "path": "artifacts/linux-full-121228c6.md",
+      "bytes": 2178,
+      "sha256": "062b6321026bcd6ce33206d919871082bcab0d96a86da481306d006e5bb1e807"
+    },
+    {
+      "path": "artifacts/linux-python311-verification.md",
+      "bytes": 9558,
+      "sha256": "c2952c88e952e05dbf49640a15e36808524a2f8c89d1a948a3a59618b95d11a0"
+    },
+    {
+      "path": "artifacts/macos-full-2b2be5e2.md",
+      "bytes": 2283,
+      "sha256": "ff2c3e928134b9a95c4511325d64e87206ba3f0e4b3c35a9f30efd76176d0c84"
+    },
+    {
+      "path": "artifacts/macos-full-3b0c69e8.md",
+      "bytes": 3304,
+      "sha256": "788eabe8f34427eeb895e5321d57cf1a0e0e75aefa4311d00139bf7a8b17c92a"
+    },
+    {
+      "path": "artifacts/macos-full-6032621c.md",
+      "bytes": 1724,
+      "sha256": "2c23e19499f8bdc92253d0b31d2bf31d81ab1569d3c527476946c8338303de05"
+    },
+    {
+      "path": "artifacts/macos-full-75ac5760.md",
+      "bytes": 2272,
+      "sha256": "3e452c108eac4df6dd0e964a9f467cd6802f7fc1b0a497e2cc3d983b7b771bac"
+    },
+    {
+      "path": "artifacts/manual-console-2b2be5e2.json",
+      "bytes": 33993,
+      "sha256": "e7b99aae6d816775fa4cfbfea5d930ec87bb50095bc84173dcc662a78d758021"
+    },
+    {
+      "path": "artifacts/manual-console-2b2be5e2.md",
+      "bytes": 3821,
+      "sha256": "ac5b04cba800bcf4a4e664e186125fbddc44cbd711a77c282ab0bfa761ad06eb"
+    },
+    {
+      "path": "artifacts/manual-console-3b803ced.json",
+      "bytes": 34665,
+      "sha256": "8ae376132de9934c41a54fa7232a1b6b38d997f56de38103782540f8c2c11b6c"
+    },
+    {
+      "path": "artifacts/manual-console-75ac5760.json",
+      "bytes": 35159,
+      "sha256": "980b02eee08b6e9ef548fbb7bbb7b0a2b731c133ab6e987c7de47e84ef7b02c6"
+    },
+    {
+      "path": "artifacts/manual-console-75ac5760.md",
+      "bytes": 3428,
+      "sha256": "83af09f4fa545c128094ea4f639002b4a25b112d32fb6c9910eb5e2fcf5e453d"
+    },
+    {
+      "path": "artifacts/manual-console-8a70a8b3.json",
+      "bytes": 30468,
+      "sha256": "5070b28561383a29fde32ef68136fb365af87cbb433174f0a26df3dfc0854eeb"
+    },
+    {
+      "path": "artifacts/manual-linux-3b803ced.json",
+      "bytes": 26509,
+      "sha256": "7c042990be4bd28170a7bb7667c1cf4d2c6d67c323a4081e91727171d2c5d31a"
+    },
+    {
+      "path": "artifacts/manual-product-smoke.md",
+      "bytes": 3242,
+      "sha256": "c4315032bd2b713193a8b497a1536a89170ef5bc4b7eae448bb5321bfc0613be"
+    },
+    {
+      "path": "artifacts/migration-runbook.md",
+      "bytes": 15832,
+      "sha256": "72a1507123bce57d6d511f4e098f8d0a0c919536ec5e2d94b931a54fc38a8460"
+    },
+    {
+      "path": "artifacts/native-platform-status.md",
+      "bytes": 6630,
+      "sha256": "0a3d765e7b05ad1b08a6ff815656095e4871257c0c329321abe64bf5b40ee876"
+    },
+    {
+      "path": "artifacts/native-start-lock-boundary.md",
+      "bytes": 4848,
+      "sha256": "f4477a45d10b7b28025c5477d5eea6297f3f2ab77c84b2c6b5dfaccbede09948"
+    },
+    {
+      "path": "artifacts/os-retirement-chatgpt-121228c6-raw.json",
+      "bytes": 14862,
+      "sha256": "fb483c53f6993c611dfa1242c778bef8c6dc0ec69484bc97561d6ba753f6eafc"
+    },
+    {
+      "path": "artifacts/os-retirement-chatgpt-121228c6.md",
+      "bytes": 14623,
+      "sha256": "a0ec33b8fa76d4aa1903dfcd0e53b0c5c2ae3f71e8cf76e2615d5bfad50e895b"
+    },
+    {
+      "path": "artifacts/os-retirement-record-scan-121228c6.json",
+      "bytes": 4414,
+      "sha256": "41e9b905148fd49f587b87a0985453bee78bc974e48a8cd3e7187072b744e20e"
+    },
+    {
+      "path": "artifacts/os-support-decision.md",
+      "bytes": 2509,
+      "sha256": "01963bf51eee56076d1e0a47ab986010f1221ecbef5a5bef35a21ad2b3fa3235"
+    },
+    {
+      "path": "artifacts/os-support-retirement-analysis.md",
+      "bytes": 12592,
+      "sha256": "ab42bf1292244d08c94de1ac242c2af272885e70cb3658669f5c8c8141a8c792"
+    },
+    {
+      "path": "artifacts/os-support-retirement-plan.md",
+      "bytes": 10274,
+      "sha256": "1b9ed87a6afcf5856385c3687253f9266f4e1ebe0deef4b97c3656dcfa38e953"
+    },
+    {
+      "path": "artifacts/p07-finish-observation-repair.json",
+      "bytes": 4099,
+      "sha256": "d28783900ad0958014f6f2a19c70fc27d0017a812db79938dc3144b8c1c1cd56"
+    },
+    {
+      "path": "artifacts/p07-finish-observation-repair.md",
+      "bytes": 2889,
+      "sha256": "a11e28e857f591e584a2fa5ac0af3cca8e0c6fc0096cf71f2233cd6c956260cd"
+    },
+    {
+      "path": "artifacts/p18-docs-ci-evidence.json",
+      "bytes": 2302,
+      "sha256": "f906feb6ea2fd6ff50037f87abd0e73fb3799227b73447f2a1b7ebeb3ecddb55"
+    },
+    {
+      "path": "artifacts/p18-implementation-brief-dd90ca97-raw.json",
+      "bytes": 43337,
+      "sha256": "3b5ab4ae7f955758f1e924e7e811a69a7fc6cbb0e0edc1131daf4f466a0b97aa"
+    },
+    {
+      "path": "artifacts/p18-implementation-brief-dd90ca97.md",
+      "bytes": 41782,
+      "sha256": "c367712801916f5e344dca1d6a4f8732ffbedb3c1aaf3979d48b140df40362e5"
+    },
+    {
+      "path": "artifacts/p18-retirement-focused-evidence.json",
+      "bytes": 282581,
+      "sha256": "99e24c577a56919e7abd9fced8ec6e5150057d479a19348a53108da45f3688ed"
+    },
+    {
+      "path": "artifacts/p18-retirement-implementation.md",
+      "bytes": 5756,
+      "sha256": "936401b01979fe8d4963df61f6c35f8823df711875fc3e508e8b1a70d955fc29"
+    },
+    {
+      "path": "artifacts/provider-retirement-dispatcher.md",
+      "bytes": 7489,
+      "sha256": "453e70408eb33d98372452a772e06e7301990414fddab702b670344e2a75ab17"
+    },
+    {
+      "path": "artifacts/provider-retirement-engine-group.md",
+      "bytes": 8340,
+      "sha256": "f963103a6636d24e229cca34187fa292cf8580cfc25ed273e2ca2d6b82c0848d"
+    },
+    {
+      "path": "artifacts/provider-retirement-fixed-entrypoints.md",
+      "bytes": 4073,
+      "sha256": "e8d37524035396ac1cf315d0ccb0819963572396fc2f98752071bae0ee9eeb06"
+    },
+    {
+      "path": "artifacts/provider-retirement-unused-entrypoints.md",
+      "bytes": 10334,
+      "sha256": "e063e0f249decf87ee39d7f495a56d2032cf500b4a474681c60cf9709a077cc7"
+    },
+    {
+      "path": "artifacts/provider-scope-completion-isolation.md",
+      "bytes": 3027,
+      "sha256": "0bce0aee2a7244d55234ca5c5bffb848674449e12f3fa2a1a5d1b490930b2c90"
+    },
+    {
+      "path": "artifacts/provider-scope-helper-isolation.md",
+      "bytes": 3488,
+      "sha256": "097a0ec85d9d2351bea5a4963b165f98ebc349abf0d2df2a9ba94f5f42ed95f7"
+    },
+    {
+      "path": "artifacts/public-text-output.md",
+      "bytes": 4971,
+      "sha256": "3ea1605a904834e17529754eb4799ee9272ee89bb236ac48408ee2cb97243a65"
+    },
+    {
+      "path": "artifacts/python-compatibility.md",
+      "bytes": 3413,
+      "sha256": "7453dfe1c566f91edf0440d48e149df13fbae8afe1b1221931670a4be718c33b"
+    },
+    {
+      "path": "artifacts/review-001-raw.md",
+      "bytes": 4120,
+      "sha256": "5f6fd1d8e26c1229eaffd6504df3de39fcf778867c3d09d108b53738142f13bb"
+    },
+    {
+      "path": "artifacts/review-002-raw.md",
+      "bytes": 4184,
+      "sha256": "f89199591dbfed61d3be23f023fe118c1a034a982cdd6d9c33ed26695fe8d92c"
+    },
+    {
+      "path": "artifacts/review-analysis.md",
+      "bytes": 5837,
+      "sha256": "632f0c061a636a8e3a9007484e7446f7a9e82d7c49d46ecf0c1f3aac464248f2"
+    },
+    {
+      "path": "artifacts/scope-confirmation-recheck.md",
+      "bytes": 2191,
+      "sha256": "447e9e9c9017d7e508eee0ffa45845bb25f02214a8a120e8d71759e6ab8f106e"
+    },
+    {
+      "path": "artifacts/scope-publication-capability.md",
+      "bytes": 3591,
+      "sha256": "2e559a9ef406b3d2fbd66886b06a6d5c726da1c6318c1682f04dd263de280bd2"
+    },
+    {
+      "path": "artifacts/self-check.md",
+      "bytes": 9157,
+      "sha256": "a13addef80abc6ee4fa15b049bfd65d221ac14efbc0291546c3a0c79167277d9"
+    },
+    {
+      "path": "artifacts/source-basis.md",
+      "bytes": 31742,
+      "sha256": "583af4403416eeb0cc19bbf686a4a600edc978c37437cb3246ce373e108422ed"
+    },
+    {
+      "path": "artifacts/start-publication-capability.md",
+      "bytes": 4277,
+      "sha256": "bc77f202818d21758bfe107bc90e0ceb3afc8fa08042291a8ffc0e977e47cbad"
+    },
+    {
+      "path": "artifacts/supported-os-verification-3b803ced.json",
+      "bytes": 16458,
+      "sha256": "ae5170c377d40d80d909700518802930658167cda2fed5af605c51fd54cf6339"
+    },
+    {
+      "path": "artifacts/supported-os-verification-3b803ced.md",
+      "bytes": 6207,
+      "sha256": "bd11568b375bd54e2748ca2a9097f823cae475360952607f3d2c10717f2fa090"
+    },
+    {
+      "path": "artifacts/test-port-active-projection-retirement.md",
+      "bytes": 8758,
+      "sha256": "f622db48d189d2c051428d9f05e1947df050f46c49f16e85023e302f2b50e19d"
+    },
+    {
+      "path": "artifacts/test-port-active-sync-deps-retirement.md",
+      "bytes": 11700,
+      "sha256": "45b0fbdab9de507bce0367c1a41c82d85d5724418e9e0e83cd15aaee4c02b7bd"
+    },
+    {
+      "path": "artifacts/test-port-artifact-adapter-retirement.md",
+      "bytes": 2356,
+      "sha256": "1129a6ea43728b4b89f712de1aca7fd7ddffc7f5279c0c40e7c9d900c68373ed"
+    },
+    {
+      "path": "artifacts/test-port-artifact-retirement.md",
+      "bytes": 6353,
+      "sha256": "928d6cb974635ca11364f0a7d194eecdf22a60dfc8cda0b9a45800ce6fc4c760"
+    },
+    {
+      "path": "artifacts/test-port-ci.md",
+      "bytes": 2832,
+      "sha256": "b52eb0c1b4a09c601be5c342f4bfc333e2efc9638c86cced4a0ad642030c451f"
+    },
+    {
+      "path": "artifacts/test-port-control-retirement.md",
+      "bytes": 5727,
+      "sha256": "8c85297e889c61d4ad351cd7d770253d92edbba7fc439fa5938e725b2381d48a"
+    },
+    {
+      "path": "artifacts/test-port-create-artifact-helper-retirement.md",
+      "bytes": 13993,
+      "sha256": "b58611557cb455b187913f9b4ba8ee13c3517d5779a527d5c2cc4d053391e857"
+    },
+    {
+      "path": "artifacts/test-port-delete-helper-retirement.md",
+      "bytes": 5931,
+      "sha256": "e4c9d505f5ff1e63417870147fc80e3f45cfe3ba9f6ae4e525e878b115feb3fb"
+    },
+    {
+      "path": "artifacts/test-port-dependency-retirement.md",
+      "bytes": 7214,
+      "sha256": "746d5626f3593229c3b7bf8817bccc427269d21799e4b16006304af04e104054"
+    },
+    {
+      "path": "artifacts/test-port-domain-retirement.md",
+      "bytes": 3215,
+      "sha256": "a8ad59a8b4a6c188ab32a44b8e6fb82454eb72d2db67a369ce722d70560cfd6c"
+    },
+    {
+      "path": "artifacts/test-port-entrypoint.md",
+      "bytes": 5320,
+      "sha256": "67bf7e3812143e90ad02e2af7809698cd11a396284f7f7524105ebf47de3d65d"
+    },
+    {
+      "path": "artifacts/test-port-fixed-installer-retirement.md",
+      "bytes": 28029,
+      "sha256": "4c3188fe6f7875fe7f63903fee55eecb13d06e9526ddf541286226f17150ea40"
+    },
+    {
+      "path": "artifacts/test-port-generated-state-retirement.md",
+      "bytes": 4425,
+      "sha256": "4e14e04cbcd799b149a61b15d41264295413c330f3e9cb6b9d9f405ff4a68281"
+    },
+    {
+      "path": "artifacts/test-port-github-marker-retirement.md",
+      "bytes": 3348,
+      "sha256": "1062d8609a44cd5fb509953e2ec3251721186dc30c93506a65317d4c921d6ce5"
+    },
+    {
+      "path": "artifacts/test-port-installation-retirement.md",
+      "bytes": 13889,
+      "sha256": "3ba55e6ea0f7e4e53c1989f39163c7b3207152237fd5a8e410cc7712141a34e4"
+    },
+    {
+      "path": "artifacts/test-port-json-journal-retirement.md",
+      "bytes": 5441,
+      "sha256": "358be2bf8926122c70fdb2146225d33c4821d74f37e3a93aba32744d830374f0"
+    },
+    {
+      "path": "artifacts/test-port-local-scope-retirement.md",
+      "bytes": 5699,
+      "sha256": "957f57565714ebeb993af0723bd57cde2e25d149800e82fce661f6c64e04e3c0"
+    },
+    {
+      "path": "artifacts/test-port-migration-retirement.md",
+      "bytes": 13223,
+      "sha256": "0dc5fa20b9f6b838c09f31d3719f590fd08218fb4eb88a7e9dd06a96ceb1585e"
+    },
+    {
+      "path": "artifacts/test-port-public-output.md",
+      "bytes": 2823,
+      "sha256": "a9a05c6b569fd4c90f63e513b1e52c95576559a62b9d99d9fa38e370f36b7936"
+    },
+    {
+      "path": "artifacts/test-port-recovery.md",
+      "bytes": 8955,
+      "sha256": "0367f6f141b02093f5c47e6426314e088b2fd7e16be780585f305f9ee3f2605d"
+    },
+    {
+      "path": "artifacts/test-port-remaining-adapters.md",
+      "bytes": 5638,
+      "sha256": "a9e892c25f263e52c4f08373c0a64e0023185646ca5a6901bdae1a4071baa5f2"
+    },
+    {
+      "path": "artifacts/test-port-scope-create-import.md",
+      "bytes": 6060,
+      "sha256": "a8a2d03fd50c5caa4f83540b153d9ff0d7905da68594dff9b2675aeca6bf4422"
+    },
+    {
+      "path": "artifacts/test-port-scope-github-retirement.md",
+      "bytes": 12091,
+      "sha256": "0ec564345a1c18a80bbe328876e8245706a9748793eb027f19689071c5772a57"
+    },
+    {
+      "path": "artifacts/test-port-scope-lifecycle-query-delete.md",
+      "bytes": 4920,
+      "sha256": "d61c766584824a26de6d8ef89a20d3d9a8c78e4cff71dfe77344fd3992fde53d"
+    },
+    {
+      "path": "artifacts/test-port-scope-lifecycle-retirement.md",
+      "bytes": 7276,
+      "sha256": "63e23350ac47f44b0850e5840e743720c59055bebb7cd5646e88c016c2105959"
+    },
+    {
+      "path": "artifacts/test-port-scope-query-edit.md",
+      "bytes": 4468,
+      "sha256": "b82591f678720b559854ab6841649858c6c5bc803774ead9c42e06194f4f3421"
+    },
+    {
+      "path": "artifacts/test-port-selection-retirement.md",
+      "bytes": 16310,
+      "sha256": "47fe430c4a4f767aec73b1402d9b5eb95b71a9ec26e682798b8fb8826b917ab1"
+    },
+    {
+      "path": "artifacts/test-port-target-resolver-retirement.md",
+      "bytes": 6246,
+      "sha256": "6646cf9dd388e4369f8c4267a74cf48f2310718406ee984c7c0c8249bff5a65a"
+    },
+    {
+      "path": "artifacts/test-port-work-branch.md",
+      "bytes": 3167,
+      "sha256": "21db217d2a7782ef7c2d3380099d9f231851e7756bfe46f46918598e88a77f8b"
+    },
+    {
+      "path": "artifacts/test-port-work-lifecycle-retirement.md",
+      "bytes": 14749,
+      "sha256": "be6926a89b7786508c92c1a3c43bdb8cf147cfd188672e333442fe7f9a97434a"
+    },
+    {
+      "path": "artifacts/test-port-workbench-helper-retirement.md",
+      "bytes": 11831,
+      "sha256": "696c24e2f8e8a2b2f0292e2409cafbb98fe5f40727f80f38651a0862c52aceaa"
+    },
+    {
+      "path": "artifacts/test-port-workspace-diagnostics.md",
+      "bytes": 3352,
+      "sha256": "0640934785bb261be61cf630d00a5a9f3efb919f2483083641f0dd6e89e7d2cf"
+    },
+    {
+      "path": "artifacts/test-port-workspace-migrate-sync.md",
+      "bytes": 4690,
+      "sha256": "4a991768c84b6559df834d1ee8092d88caeb3fa9d22c4081dae77848226414d7"
+    },
+    {
+      "path": "artifacts/test-port-worktree-adapter.md",
+      "bytes": 1584,
+      "sha256": "50de5cbb7706971fe7b00332818ef022b1830278e39675e137c4b95374ff0cff"
+    },
+    {
+      "path": "artifacts/test-port-worktree-retirement.md",
+      "bytes": 11465,
+      "sha256": "cf3fbfc156bcf03532557fcbea3d21289b256f91c71626fa4d4758aff4fddf18"
+    },
+    {
+      "path": "artifacts/test-port-writer-admission.md",
+      "bytes": 4243,
+      "sha256": "5d57d9c3161ea827c074c6d21887566260cbcf23cccbe970dea9965c99b1c0e7"
+    },
+    {
+      "path": "artifacts/traceability.json",
+      "bytes": 18461,
+      "sha256": "d00bbcfe39a2df6b7133e9d27d8ee170f1051c7146b2c07be3c2a3beb7adaa92"
+    },
+    {
+      "path": "artifacts/user-decisions.md",
+      "bytes": 5646,
+      "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "artifacts/validation-readonly-investigation.md",
+      "bytes": 3618,
+      "sha256": "32088097428ee55bab869410009edc5fc12d44136d8ca6bcda6b4848edf27a66"
+    },
+    {
+      "path": "artifacts/validation-required-documents.md",
+      "bytes": 4706,
+      "sha256": "7c72830333cc9a7fffc196e835ccc6090285f32653d08b23d1bca4eab0e4da3d"
+    },
+    {
+      "path": "artifacts/windows-adapter-connection-review.md",
+      "bytes": 5924,
+      "sha256": "00024e698c63adc3dc0f37f0c7be1759ab5fe1245d6fded3135d6a8856f39384"
+    },
+    {
+      "path": "artifacts/windows-directory-anchor.md",
+      "bytes": 5291,
+      "sha256": "a071b829dd6143a8dfac5a2496bca2aacc0177819376261c5b296c5377b37c24"
+    },
+    {
+      "path": "artifacts/windows-json-read.md",
+      "bytes": 5370,
+      "sha256": "f0fd15c8fb7edbf456514ba61384266d17c17f40742fea3747ec8c30d95b01cf"
+    },
+    {
+      "path": "decision-questions.md",
+      "bytes": 1094,
+      "sha256": "2336b77aa8e025449244717d3e63b79e6c4ee58e1cc8430a0c6098b9d600a2c1"
+    },
+    {
+      "path": "design.md",
+      "bytes": 48879,
+      "sha256": "c42070312c6ff0395f93624ae0330e8795a123c099947dfd2cf530ad87956f8d"
+    },
+    {
+      "path": "explanation.html",
+      "bytes": 72766,
+      "sha256": "831d12460baa91c14355c0e2a4a08cd780104abf6a3419137c16ba1c655ae33c"
+    },
+    {
+      "path": "implementation-report.md",
+      "bytes": 227831,
+      "sha256": "676d633b96497a2ef2a95de441010c74cb19045d9c4b1ad34107070e9dbd7fe5"
+    },
+    {
+      "path": "index.html",
+      "bytes": 222,
+      "sha256": "c46e1f20bad0cf75d39e98978e9bb683658087ea0b9f76d98bb08c9c6f3900e2"
+    },
+    {
+      "path": "plan.md",
+      "bytes": 167657,
+      "sha256": "7f7e1b582245d17e7161cb4ab0262f826ec8c1d9dd03e0dd38945e5c99669d08"
+    },
+    {
+      "path": "preview-entry.html",
+      "bytes": 564,
+      "sha256": "896a944490d2279424d51e0f0367e181ba2db321ec22f8118d06d8e6a5d18eeb"
+    },
+    {
+      "path": "report.md",
+      "bytes": 33296,
+      "sha256": "4c75c09ec24c1e76b124f45f27fe2a1107dc54a530d7378c59305f68dbd2e1fc"
+    },
+    {
+      "path": "requirement.md",
+      "bytes": 31873,
+      "sha256": "51c131bbf9a59ca8f78f5d204ad6ca6621c44f37abb5f6dab733d790fe46767e"
+    }
+  ],
+  "origin_generated_files": [
+    {
+      "path": "README.md",
+      "bytes": 4149,
+      "sha256": "a5a183d7e221a037b958bf1b5cb9241ff0b5eaa6ebbb5a50380de32533b53565"
+    },
+    {
+      "path": "artifacts/acceptance-matrix.md",
+      "bytes": 18038,
+      "sha256": "6a1bac420fbe773c2dd7fd53529c1d59b5cdaa94f4198b82c0dc7ca7e2fbb337"
+    },
+    {
+      "path": "artifacts/cli-contract.md",
+      "bytes": 27971,
+      "sha256": "c42626bffe56a29a83fc427a3079fbcb1d6d200215ab707ae89f5c75a8291b1b"
+    },
+    {
+      "path": "artifacts/cli-schema.json",
+      "bytes": 16218,
+      "sha256": "3b6a6048bee67230e5f4618f82761bdf8fad9396f06e26ce5f5f3a339d95c693"
+    },
+    {
+      "path": "artifacts/data-schema.json",
+      "bytes": 9744,
+      "sha256": "7fa2a4b71f88a6daf69a82acb09b7f8e0a03e96469cbc6d10c2857469b473654"
+    },
+    {
+      "path": "artifacts/examples.json",
+      "bytes": 10656,
+      "sha256": "5fb68bc248e86e5bcc3b86c3318ec2dfe546c96bf45f2d815d3d22cff2418117"
+    },
+    {
+      "path": "artifacts/migration-runbook.md",
+      "bytes": 15296,
+      "sha256": "03201a531551ef3c67d10d71adfd02f70c9382323d2c6db90db14d215e0987d5"
+    },
+    {
+      "path": "artifacts/self-check.md",
+      "bytes": 9157,
+      "sha256": "a13addef80abc6ee4fa15b049bfd65d221ac14efbc0291546c3a0c79167277d9"
+    },
+    {
+      "path": "artifacts/source-basis.md",
+      "bytes": 29846,
+      "sha256": "0d0e15141315fe82b4e6e74158e5b91b176ccbd9f63afc913688003818c64710"
+    },
+    {
+      "path": "artifacts/traceability.json",
+      "bytes": 16996,
+      "sha256": "8f75479ee86f9df8fa5d8994a7a356969acd0c074e0ee5d586141335e8c7a628"
+    },
+    {
+      "path": "artifacts/user-decisions.md",
+      "bytes": 5646,
+      "sha256": "32fc35c2116d3d6f4a2e4e99f8ecf7e2a8761217e63f8858510790d782202e12"
+    },
+    {
+      "path": "decision-questions.md",
+      "bytes": 1094,
+      "sha256": "2336b77aa8e025449244717d3e63b79e6c4ee58e1cc8430a0c6098b9d600a2c1"
+    },
+    {
+      "path": "design.md",
+      "bytes": 42788,
+      "sha256": "08e28e785cd55c994bce895f7367ac6dc71c4d216b8e1472897e9601264eee1f"
+    },
+    {
+      "path": "explanation.html",
+      "bytes": 65931,
+      "sha256": "ed04dda311d8397ca3cea0ec3e274063ccfce3e4b700019d03ca89888c0bbc93"
+    },
+    {
+      "path": "plan.md",
+      "bytes": 44162,
+      "sha256": "f675c8077bff08d83faa3fdc8c1e3ea0cf07c3d3deef07e835123e4324cc9c5c"
+    },
+    {
+      "path": "requirement.md",
+      "bytes": 23741,
+      "sha256": "6948b6ab9764037e659e9f7f3ca1a549cb556ce7acd05d2512ffc1249adcbcea"
+    }
+  ],
+  "local_adoption": {
+    "date": "2026-09-30",
+    "source_zip_sha256": "7d8534010862d1187a79f005a64d97686ac729b4beb6b3556e1bad134dadd949",
+    "source_zip_bytes": 125642,
+    "oracle_session": "specdock-worktree-start-planning",
+    "files": 20,
+    "product_implementation": "not started",
+    "checks": {
+      "examples_validated": 12,
+      "metadata_validated_unchanged": 240,
+      "metadata_aggregate_sha256": "6b8ea9bc184d2aef5c715e593dd3dc2ee5df6ffc4315eb96e63f7093d0cdd33f",
+      "workspace_sha256_unchanged": "53920a4d2f3fd34c51e37f47d1e0baa87227f34bef7b5d2cb8f2f07700fea8b0",
+      "requirements": 18,
+      "acceptance_conditions": 42,
+      "plan_steps": 17,
+      "template_modal_suffix_equal": true,
+      "plantuml_svg": 4,
+      "zoom": "passed",
+      "zip_sha256": "7d8534010862d1187a79f005a64d97686ac729b4beb6b3556e1bad134dadd949"
+    },
+    "browser": "4/4 SVG and zoom validator passed; IAB 1280px and 390px without document overflow",
+    "published_url": "http://100.85.74.8:8765/specdock-issue-413/explanation.html",
+    "publication_check": "15 linked files HTTP200 no-store and exact source bytes",
+    "changes_from_generated": "README and HTML adoption notice, report append, retained interview, index redirect and manifest provenance only. R/D/P unchanged."
+  },
+  "review_correction": {
+    "reviewed_sha": "ea68e211b2fe807f903500cae027157b0743f7e3",
+    "reviewer_session": "specdock-413-spec-review",
+    "initial_result": "semantic fail; P1=1; original JSON malformed; user authorized content interpretation",
+    "correction": "D-10 scopes reflected in C-03/schema/examples/P-08/AC-23 and human explanation",
+    "status": "closed by subsequent semantic review pass",
+    "checks": {
+      "bundled_examples_valid": 13,
+      "old_schema_rejects_corrected_sync": true,
+      "missing_scopes_rejected": true,
+      "invalid_lifecycle_rejected": true,
+      "metadata_and_interview_unchanged": true,
+      "html_browser": "4/4 SVG; zoom pass"
+    }
+  },
+  "independent_review": {
+    "status": "pass",
+    "findings": 0,
+    "reviewed_sha": "7e895803cba0d43957e504c9f97637d307bc6a78",
+    "reviewer_session": "specdock-413-spec-rereview",
+    "requested_model": "gpt-6-pro",
+    "requested_thinking": "pro",
+    "model_ui_verified": true,
+    "thinking_ui_verified": true,
+    "raw_result": "artifacts/review-002-raw.md",
+    "interpretation": "user-authorized semantic acceptance; raw JSON malformed by citation quotes",
+    "post_review_changes": "evidence/status/package only; normative specifications unchanged",
+    "implementation_status": "not started",
+    "historical_record_only": true
+  },
+  "origin_generation_checks": {
+    "utf8": "passed",
+    "safe_single_root": "passed",
+    "json_schemas": 2,
+    "bundled_examples_valid": 12,
+    "extra_positive_cases_valid": 5,
+    "negative_cases_rejected": 35,
+    "requirements": 18,
+    "acceptance_conditions": 42,
+    "plan_steps": 17,
+    "catalog_leaves": 44,
+    "local_link_occurrences": 353,
+    "external_preserved_paths": 2,
+    "unresolved_generated_paths_or_anchors": 0,
+    "template_executable_scripts_byte_equal": true,
+    "template_shared_modal_suffix_byte_equal": true,
+    "diagram_sources": 4,
+    "html_unique_ids": 32,
+    "node_script_syntax_checks": 2,
+    "browser_dynamic": "not verified; file and loopback navigation blocked with ERR_BLOCKED_BY_ADMINISTRATOR",
+    "product_tests": "not run",
+    "metadata_240_full_check": "not run",
+    "zip_crc": "passed",
+    "member_bytes_vs_files": "passed",
+    "manifest_hashes_vs_members": "passed"
+  },
+  "origin_implementation_assignment": {
+    "model": "gpt-6.1-sol",
+    "reasoning_effort": "high",
+    "status": "future assignment; not invoked in this run"
+  },
+  "status_date": "2026-10-04",
+  "current_implementation_evidence": {
+    "source_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "implementation_status": "complete",
+    "supported_os": [
+      "linux",
+      "darwin"
+    ],
+    "evidence": "artifacts/completion-evidence-8606e132.json",
+    "native_test_counts": {
+      "macos": {
+        "passed": 1916,
+        "skipped": 1
+      },
+      "linux": {
+        "passed": 1900,
+        "skipped": 17
+      },
+      "python310_selected_boundary": {
+        "passed": 210,
+        "skipped": 0
+      }
+    },
+    "manual": {
+      "operations": 14,
+      "live_github": false
+    },
+    "code_review": {
+      "review_status": "pass",
+      "findings": 0,
+      "reviewed_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+      "evidence": "artifacts/code-review-8606e132.json"
+    },
+    "final_quality_gate": {
+      "status": "pass",
+      "sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+      "coverage_complete": true,
+      "perspectives": 13,
+      "p0_p1": 0,
+      "p2": 3,
+      "raw_sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6"
+    },
+    "human_merge": "not performed",
+    "actual_dogfood": "current 0805 only; other worktrees not migrated",
+    "formal_issue413_import_start": "not performed"
+  },
+  "os_retirement_authoring": {
+    "model": "gpt-5.6-sol",
+    "reasoning": "pro",
+    "verified_sha": "121228c6fca1fd016e7bccef009902396112ba43",
+    "raw_zip": "../iss-00413-os-retirement.zip",
+    "raw_zip_sha256": "31cfc245b0b393a626d02c877b029542ef4c4f845569744da1dccc5531b93a29",
+    "decision": "artifacts/os-support-decision.md",
+    "raw_response": "artifacts/os-retirement-chatgpt-121228c6.md"
+  },
+  "origin_basis": {
+    "repository": "chemitaro/spec-dock",
+    "target_branch": "main",
+    "ref": "refs/heads/main",
+    "object_type": "commit",
+    "expected_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "retrieved_tip_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "comparison": "exact ASCII byte equality",
+    "verification": "passed via connected GitHub direct ref fetch before source use",
+    "other_branch_fallback": false,
+    "code_read_ref": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+    "new_requirements_authority": "artifacts/user-decisions.md plus current user instructions"
+  },
+  "p18_brief": {
+    "oracle_session": "iss413-p18-retirement-brief",
+    "verified_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+    "author_model": "gpt-5.6-sol",
+    "thinking": "pro",
+    "ui_model_verified": true,
+    "ui_thinking_verified": true,
+    "actual_exit": 0,
+    "bytes": 41579,
+    "sha256": "8edbafc2f5e20e58f1a326f16a9cd03e86874cc8eed9834bb14d77242339cbec"
+  },
+  "p18_progress": {
+    "record": "artifacts/p18-retirement-implementation.md",
+    "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
+    "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+    "full_acceptance": "Implementation included in existing passing 8606e132 FQ v2; original supported-OS evidence remains historical",
+    "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
+    "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
+    "docs_evidence": "artifacts/p18-docs-ci-evidence.json",
+    "supported_os_evidence": "artifacts/supported-os-verification-3b803ced.md"
+  },
+  "p07_finish_observation_repair": {
+    "record": "artifacts/p07-finish-observation-repair.md",
+    "evidence": "artifacts/p07-finish-observation-repair.json",
+    "baseline_sha": "aa91b756f886ac3e42085b665e1e9ca93c20f9f5",
+    "reviewer_closure": "fresh full-range r13 pass/no findings at 3b803ced; Final Quality Gate pending"
+  },
+  "dogfooding_progress": {
+    "artifact": "artifacts/dogfooding-20261003.md",
+    "source_candidate_sha": "49aeef8f68ba2f6b521d25aa4d218471c2c747be",
+    "wheel_sha256": "95bb921ae3dbca34d808e54b7736172f51e81f6d774f1a78648916ccdafa3045",
+    "p16": "current authorized worktree applied and manually verified",
+    "p17": "blocked before import by closed GitHub ancestor; no formal Start",
+    "scope_count_preserved": 240,
+    "scope_files_preserved": 2900,
+    "migration_backup_verified": true,
+    "migration_restore_verified": true,
+    "static_backup_verified": true,
+    "static_restore_verified": true,
+    "latest_quality_gate": "Existing 8606e132 FQ v2 pass preserved unchanged; documentation changes do not receive a new Gate certification",
+    "verification": {
+      "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+      "required_lanes": 8,
+      "completed_lanes": 8,
+      "all_required_lanes_passed": true,
+      "native_test_evidence": "artifacts/dogfooding-verification-aa44ea1d.json",
+      "review_result": "artifacts/dogfooding-review-aa44ea1d.json",
+      "analysis": "artifacts/dogfooding-review-analysis-20261003.md",
+      "reproduction": "artifacts/dogfooding-target-resolution-aa44ea1d.json",
+      "model": "gpt-5.6-sol",
+      "thinking": "pro",
+      "model_ui_verified": true,
+      "thinking_ui_verified": true,
+      "review_actual_exit": 10,
+      "review_status": "fail",
+      "coverage_complete": true,
+      "blocking_findings": [
+        "FQG-413-001"
+      ],
+      "informational_findings": [
+        "FQG-413-002",
+        "FQG-413-003"
+      ],
+      "decision": "pending; no implementation or normative specification change",
+      "gate_closed": false,
+      "historical_record_only": true
+    },
+    "adopted_a": {
+      "authority": "artifacts/dogfooding-a-decision-20261003.md",
+      "implementation": "artifacts/dogfooding-a-implementation-20261003.md",
+      "related_tests": 257,
+      "current_package_updated": true,
+      "fresh_code_review": "pass at 8606e132",
+      "fresh_fq_v2": "pass at 8606e132",
+      "formal_start": false,
+      "documentation_verification": "artifacts/documentation-verification-20261004.json"
+    },
+    "current_verification": {
+      "source_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+      "implementation_status": "complete",
+      "supported_os": [
+        "linux",
+        "darwin"
+      ],
+      "evidence": "artifacts/completion-evidence-8606e132.json",
+      "native_test_counts": {
+        "macos": {
+          "passed": 1916,
+          "skipped": 1
+        },
+        "linux": {
+          "passed": 1900,
+          "skipped": 17
+        },
+        "python310_selected_boundary": {
+          "passed": 210,
+          "skipped": 0
+        }
+      },
+      "manual": {
+        "operations": 14,
+        "live_github": false
+      },
+      "code_review": {
+        "review_status": "pass",
+        "findings": 0,
+        "reviewed_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+        "evidence": "artifacts/code-review-8606e132.json"
+      },
+      "final_quality_gate": {
+        "status": "pass",
+        "sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+        "coverage_complete": true,
+        "perspectives": 13,
+        "p0_p1": 0,
+        "p2": 3,
+        "raw_sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6"
+      },
+      "human_merge": "not performed",
+      "actual_dogfood": "current 0805 only; other worktrees not migrated",
+      "formal_issue413_import_start": "not performed"
+    }
+  },
+  "pre_documentation_alignment_snapshot": {
+    "status": "Adopted A implemented; current external package updated; 257 related tests and external console manual pass; fresh independent Code Review and FQ v2 pending; other WT and formal Start prerequisites unchanged",
+    "basis": {
+      "repository": "chemitaro/spec-dock",
+      "target_branch": "codex/iss-00413-external-cli-state",
+      "ref": "refs/heads/codex/iss-00413-external-cli-state",
+      "expected_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+      "retrieved_tip_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+      "verification": "Strict third-party brief connector verification at immutable base; subsequent source checkpoint recorded separately",
+      "new_requirements_authority": "artifacts/os-support-decision.md plus current user instructions"
+    },
+    "checks": {
+      "scope": "adopted pack verification; original generator checks retained separately",
+      "utf8": "passed",
+      "safe_single_root": "passed",
+      "json_schemas": 2,
+      "bundled_examples_valid": 13,
+      "local_link_occurrences_checked": 776,
+      "html_unique_ids": 34,
+      "template_scripts_styles_modal_unchanged": true,
+      "browser_dynamic": "2026-10-03 adopted-A HTML: 4/4 SVG and zoom validator pass; scripts unchanged",
+      "mobile": "390px current HTML viewport and SVG/table bounds checked; see artifacts/supported-os-verification-3b803ced.json",
+      "source_publication": "Existing managed Tailscale live link retained; current HTTP byte check recorded separately",
+      "product_acceptance": "Adopted-A related tests and current external CLI verified; fresh full-candidate gates pending",
+      "zip_crc": "passed",
+      "member_bytes_vs_files": "passed",
+      "manifest_hashes_vs_members": "passed"
+    },
+    "current_implementation_evidence": {
+      "baseline_only": false,
+      "source_sha": "3b803ced470bf58439bbee342b61c91c20de74b6",
+      "supported_os": [
+        "linux",
+        "darwin"
+      ],
+      "evidence": "artifacts/supported-os-verification-3b803ced.md",
+      "raw_evidence": "artifacts/supported-os-verification-3b803ced.json",
+      "linux_full": {
+        "passed": 1883,
+        "skipped": 17,
+        "seconds": 1094.09,
+        "actual_exit": 0
+      },
+      "macos_full": {
+        "passed": 1899,
+        "skipped": 1,
+        "seconds": 428.0,
+        "actual_exit": 0
+      },
+      "python310": {
+        "passed": 61,
+        "actual_exit": 0
+      },
+      "manual": {
+        "operations_each_os": 14,
+        "fake_gh_requests_each_os": 26,
+        "live_github": false
+      },
+      "code_review": {
+        "review_status": "pass",
+        "findings": 0,
+        "actual_exit": 0,
+        "evidence": "artifacts/code-review-linux-macos-3b803ced.json"
+      },
+      "final_quality_gate": "not submitted",
+      "human_merge": "not performed",
+      "actual_dogfood": "not performed",
+      "formal_issue413_import_start": "not performed"
+    },
+    "dogfooding_progress": {
+      "artifact": "artifacts/dogfooding-20261003.md",
+      "source_candidate_sha": "49aeef8f68ba2f6b521d25aa4d218471c2c747be",
+      "wheel_sha256": "95bb921ae3dbca34d808e54b7736172f51e81f6d774f1a78648916ccdafa3045",
+      "p16": "current authorized worktree applied and manually verified",
+      "p17": "blocked before import by closed GitHub ancestor; no formal Start",
+      "scope_count_preserved": 240,
+      "scope_files_preserved": 2900,
+      "migration_backup_verified": true,
+      "migration_restore_verified": true,
+      "static_backup_verified": true,
+      "static_restore_verified": true,
+      "latest_quality_gate": "Previous aa44ea1d FQ fail preserved; A decision adopted and remediation implemented; fresh campaign pending",
+      "verification": {
+        "candidate_sha": "aa44ea1d37220f8d9f013df3ac44f22632099ee7",
+        "required_lanes": 8,
+        "completed_lanes": 8,
+        "all_required_lanes_passed": true,
+        "native_test_evidence": "artifacts/dogfooding-verification-aa44ea1d.json",
+        "review_result": "artifacts/dogfooding-review-aa44ea1d.json",
+        "analysis": "artifacts/dogfooding-review-analysis-20261003.md",
+        "reproduction": "artifacts/dogfooding-target-resolution-aa44ea1d.json",
+        "model": "gpt-5.6-sol",
+        "thinking": "pro",
+        "model_ui_verified": true,
+        "thinking_ui_verified": true,
+        "review_actual_exit": 10,
+        "review_status": "fail",
+        "coverage_complete": true,
+        "blocking_findings": [
+          "FQG-413-001"
+        ],
+        "informational_findings": [
+          "FQG-413-002",
+          "FQG-413-003"
+        ],
+        "decision": "pending; no implementation or normative specification change",
+        "gate_closed": false
+      },
+      "adopted_a": {
+        "authority": "artifacts/dogfooding-a-decision-20261003.md",
+        "implementation": "artifacts/dogfooding-a-implementation-20261003.md",
+        "related_tests": 257,
+        "current_package_updated": true,
+        "fresh_code_review": "pending",
+        "fresh_fq_v2": "pending",
+        "formal_start": false
+      }
+    },
+    "p18_progress": {
+      "record": "artifacts/p18-retirement-implementation.md",
+      "focused_evidence": "artifacts/p18-retirement-focused-evidence.json",
+      "source_base_sha": "dd90ca978fd711c32df7bbdf38aea516f62bbb1c",
+      "full_acceptance": "supported OS full/manual verified; Final Quality Gate pending",
+      "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
+      "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
+      "docs_evidence": "artifacts/p18-docs-ci-evidence.json",
+      "supported_os_evidence": "artifacts/supported-os-verification-3b803ced.md"
+    },
+    "independent_review": {
+      "status": "pass",
+      "findings": 0,
+      "reviewed_sha": "7e895803cba0d43957e504c9f97637d307bc6a78",
+      "reviewer_session": "specdock-413-spec-rereview",
+      "requested_model": "gpt-6-pro",
+      "requested_thinking": "pro",
+      "model_ui_verified": true,
+      "thinking_ui_verified": true,
+      "raw_result": "artifacts/review-002-raw.md",
+      "interpretation": "user-authorized semantic acceptance; raw JSON malformed by citation quotes",
+      "post_review_changes": "evidence/status/package only; normative specifications unchanged",
+      "implementation_status": "not started"
+    }
+  },
+  "documentation_alignment": {
+    "record": "artifacts/documentation-alignment-20261004.md",
+    "verification": "artifacts/documentation-verification-20261004.json",
+    "raw_replacement_manifest": "artifacts/documentation-replacements-manifest-20261003.json",
+    "model": "gpt-5.6-sol",
+    "thinking": "pro",
+    "actual_exit": 0,
+    "download_zip_sha256": "d2e2d3305fc2cdd7212c75b86730a1a4268c2e23d1bae88194ba3269e5e80f9f",
+    "whole_file_replacements": 22,
+    "additional_review_or_gate": false
+  }
+}

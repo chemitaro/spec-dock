@@ -15,13 +15,10 @@ def _explicit_cleanup_state(named_stage_state: str) -> str:
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.application import contracts
-        from spec_dock_runtime.infra import binary_artifact_publisher
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.application import contracts
+    from spec_dock.runtime.infra import binary_artifact_publisher
+
     return contracts, binary_artifact_publisher
 
 
@@ -347,7 +344,7 @@ def test_linux_explicit_import_uses_anonymous_staging_without_visible_probe_or_u
     destination = artifacts_dir / "formal.bin"
     original_open = publisher_module.os.open
     original_unlink = publisher_module.os.unlink
-    original_stat = publisher_module.os.stat
+    original_stat = Path.stat
     original_fsync = publisher_module.os.fsync
     anonymous_flag = 0x40000000
     anonymous_fd = None
@@ -409,7 +406,7 @@ def test_linux_explicit_import_uses_anonymous_staging_without_visible_probe_or_u
         return original_fsync(descriptor)
 
     monkeypatch.setattr(publisher_module.os, "open", open_spy)
-    monkeypatch.setattr(publisher_module.os, "stat", stat_spy)
+    monkeypatch.setattr(Path, "stat", stat_spy)
     monkeypatch.setattr(publisher_module.os, "fsync", fsync_spy)
     monkeypatch.setattr(publisher_module, "_commit_descriptor_no_replace", commit_spy)
     monkeypatch.setattr(publisher_module.os, "unlink", unlink_spy)

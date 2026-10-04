@@ -1,0 +1,419 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:specdock:issue413:data:v1",
+  "title": "Issue 413 schema3 preservation and POSIX direct target",
+  "description": "Storage contract after the 2026-10-02 OS decision. Existing Scope schema3 data is not converted. work-target/v1 uses POSIX physical identities only; count, ancestry equality, GitHub-number equality, path safety, no-ABA removal and graph rules require application validation.",
+  "oneOf": [
+    {
+      "$ref": "#/$defs/scope"
+    },
+    {
+      "$ref": "#/$defs/workspace"
+    },
+    {
+      "$ref": "#/$defs/work_target"
+    }
+  ],
+  "$defs": {
+    "scope_id": {
+      "type": "string",
+      "pattern": "^(?:init|epic|iss)-(?:local-)?(?:0000[1-9]|000[1-9][0-9]|00[1-9][0-9]{2}|0[1-9][0-9]{3}|[1-9][0-9]{4,})$"
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "platform": {
+          "const": "posix"
+        },
+        "device": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        },
+        "file_id": {
+          "type": "string",
+          "pattern": "^[0-9]+$"
+        }
+      },
+      "required": [
+        "platform",
+        "device",
+        "file_id"
+      ],
+      "additionalProperties": false
+    },
+    "github": {
+      "type": "object",
+      "properties": {
+        "issue_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "repo_owner": {
+          "type": "string",
+          "minLength": 1
+        },
+        "repo_name": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "issue_number",
+        "repo_owner",
+        "repo_name"
+      ],
+      "additionalProperties": true
+    },
+    "local_lifecycle": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "enum": [
+            "open",
+            "completed",
+            "not-planned"
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "updated_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "state",
+        "revision",
+        "updated_at"
+      ],
+      "additionalProperties": true
+    },
+    "scope": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 3
+        },
+        "type": {
+          "enum": [
+            "initiative",
+            "epic",
+            "issue"
+          ]
+        },
+        "id": {
+          "$ref": "#/$defs/scope_id"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "slug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parent_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scope_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "initiative_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scope_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "epic_id": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/scope_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/scope_id"
+          },
+          "uniqueItems": true
+        },
+        "backend": {
+          "enum": [
+            "local",
+            "github"
+          ]
+        },
+        "github": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/github"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "lifecycle": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/local_lifecycle"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "required_features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "type",
+        "id",
+        "title",
+        "slug",
+        "parent_id",
+        "initiative_id",
+        "epic_id",
+        "depends_on",
+        "backend",
+        "github",
+        "lifecycle",
+        "revision"
+      ],
+      "additionalProperties": true,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "backend": {
+                "const": "github"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "github": {
+                "$ref": "#/$defs/github"
+              },
+              "lifecycle": {
+                "type": "null"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "github": {
+                "type": "null"
+              },
+              "lifecycle": {
+                "$ref": "#/$defs/local_lifecycle"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "initiative"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^init-"
+              },
+              "parent_id": {
+                "type": "null"
+              },
+              "initiative_id": {
+                "type": "null"
+              },
+              "epic_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "epic"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^epic-"
+              },
+              "parent_id": {
+                "type": "string",
+                "pattern": "^init-"
+              },
+              "initiative_id": {
+                "type": "string",
+                "pattern": "^init-"
+              },
+              "epic_id": {
+                "type": "null"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "type": {
+                "const": "issue"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "id": {
+                "pattern": "^iss-"
+              },
+              "parent_id": {
+                "type": "string",
+                "pattern": "^epic-"
+              },
+              "initiative_id": {
+                "type": "string",
+                "pattern": "^init-"
+              },
+              "epic_id": {
+                "type": "string",
+                "pattern": "^epic-"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "workspace": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": 3
+        },
+        "writer_protocol": {
+          "const": "specdock.worktree-writer/v1"
+        },
+        "required_features": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "schema_version",
+        "writer_protocol"
+      ],
+      "additionalProperties": true,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "type"
+            ]
+          },
+          {
+            "required": [
+              "control_epoch"
+            ]
+          }
+        ]
+      }
+    },
+    "work_target": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "const": "specdock.work-target/v1"
+        },
+        "scope_id": {
+          "$ref": "#/$defs/scope_id"
+        },
+        "github_ref": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^gh:[a-z0-9][a-z0-9-]*/[a-z0-9_.-]+#[1-9][0-9]*$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "selected_branch": {
+          "type": "string",
+          "minLength": 1
+        },
+        "selected_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "clone_identity": {
+          "$ref": "#/$defs/identity"
+        },
+        "worktree_identity": {
+          "$ref": "#/$defs/identity"
+        }
+      },
+      "required": [
+        "schema_version",
+        "scope_id",
+        "github_ref",
+        "selected_branch",
+        "selected_at",
+        "clone_identity",
+        "worktree_identity"
+      ],
+      "additionalProperties": false
+    },
+    "new_github_scope": {
+      "allOf": [
+        {
+          "$ref": "#/$defs/scope"
+        },
+        {
+          "properties": {
+            "backend": {
+              "const": "github"
+            },
+            "id": {
+              "pattern": "^(?:init|epic|iss)-(?:0000[1-9]|000[1-9][0-9]|00[1-9][0-9]{2}|0[1-9][0-9]{3}|[1-9][0-9]{4,})$"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

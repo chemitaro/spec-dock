@@ -1,0 +1,48 @@
+{
+  "findings": [
+    {
+      "title": "[P1] Scope発行で明示expect guardを無視しない",
+      "body": "`--expect-current`と`--expect-backend`は共通optionとして受理されますが、`_publish_scope`は両方を一度も検査しないため、たとえばdirect selectionが空または別対象の状態で`scope create initiative --backend github --expect-current init-00001 --yes`を実行してもGitHub POSTまで進みます。`--expect-backend local`も無視され、importでは不一致なguardのままlocal publicationまで進むため、canonical化した現在のdirect selectionと明示backendを、GitHub観測・mutation・local writeのいずれよりも前に照合してください。",
+      "confidence_score": 0.99,
+      "priority": 1,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_scope_publish.py",
+        "line_range": {
+          "start": 55,
+          "end": 57
+        }
+      }
+    },
+    {
+      "title": "[P2] checkout後のdirty worktreeを成功扱いしない",
+      "body": "`branch switch`はcheckout前にはcleanを確認しますが、通常の成功経路では`git checkout`後にbranch、HEAD、Scope metadataだけを検証して成功を返します。成功終了する`post-checkout` hookが`spec-dock`外のtrackedまたはuntracked fileを変更すると`verify_candidate`を通過し、dirtyなworktreeのまま`succeeded`かつ`switched=true`になります。従来のbranch切替にあったclean保証を保つため、checkout後にもstatusを再確認し、dirtyならcheckout効果を`succeeded`として保全しつつ`partial`とverification failureを返してください。",
+      "confidence_score": 0.98,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/branch_operations.py",
+        "line_range": {
+          "start": 192,
+          "end": 196
+        }
+      }
+    },
+    {
+      "title": "[P2] staleな重複direct recordにもduplicate findingを出す",
+      "body": "Syncはstaleまたはunavailableでも安全に読めたdirect recordを既知件数へ残しますが、重複検査だけは`selection.status == \"selected\"`以外を無条件に除外します。二つのworktreeが同じdirect recordを持った後に対象metadataが消えた場合、両行と`direct_selected_count=2`は出る一方、契約上必要な`SELECTION_DUPLICATE`が欠落し、利用者はstaleを修復するまで重複選択の存在を診断できません。recordが安全にdecode済みならstatusにかかわらず重複比較へ含め、既存のstaleまたはunavailable findingも併記してください。",
+      "confidence_score": 0.97,
+      "priority": 2,
+      "code_location": {
+        "repository_relative_path": "src/spec_dock/runtime/application/direct_sync.py",
+        "line_range": {
+          "start": 129,
+          "end": 130
+        }
+      }
+    }
+  ],
+  "overall_correctness": "patch is incorrect",
+  "overall_explanation": "検証済みの固定範囲を、確定した要件・設計・CLI契約と接続済みP-02〜P-09の実装およびtestsに照合しました。Scopeのremote発行が明示expect guardを無視する問題は、利用者が設定した安全条件に反して不可逆なGitHub作成またはlocal publicationへ進めるP1です。さらに、branch switchのcheckout後clean確認の欠落と、staleまたはunavailableな重複recordに対するSync診断の欠落があります。P-10以後の明示的な後続義務は判定対象から除外しました。repositoryに記録された試験証拠とtest実装は確認しましたが、このレビュー中にtestsは実行していません。",
+  "review_status": "fail",
+  "review_status_reason": "P1が一件あり、remote作成およびlocal publication前に適用されるべき明示expect guardという必須の公開安全gateが保たれていないためです。",
+  "overall_confidence_score": 0.98
+}

@@ -1,16 +1,12 @@
 from pathlib import Path
-import sys
 
 import pytest
 
 
 def _runtime_modules():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.domain import deps as domain_deps, models as domain_models, tree as domain_tree
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.domain import deps as domain_deps, models as domain_models, tree as domain_tree
+
     return domain_deps, domain_models, domain_tree
 
 

@@ -1,79 +1,104 @@
-"""The new work leaves compose the same lifecycle for every Scope kind."""
+"""Public work leaves keep one direct target and finish it through GitHub."""
 
 from __future__ import annotations
 
-from pathlib import Path
+import json
 import subprocess
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.cli import main
+from tests.cli_runtime.test_issue413_contract import add_scope, make_workspace
+from tests.cli_runtime.test_issue413_finish import github_fixture
 
-from spec_dock_runtime.cli.options import parse_vnext  # noqa: E402
-from spec_dock_runtime.commands.work_vnext import WorkContext, run_work_finish, run_work_start  # noqa: E402
-from spec_dock_runtime.infra.active_store import load_selection_v3  # noqa: E402
-from spec_dock_runtime.infra.github_lifecycle import GithubIssueGateway  # noqa: E402
-from tests.cli_runtime.test_active_vnext import _three_scopes  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
-def test_work_commands_start_and_finish_all_three_kinds(tmp_path: Path) -> None:
-    specdock_dir, _views, initiative, epic, issue = _three_scopes(tmp_path)
-    repo_root = specdock_dir.parent
-    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
+def three_kind_workspace(root: Path) -> Path:
+    make_workspace(root)
+    initiative = root / "spec-dock/initiatives/init-00001-fixture"
+    epic = add_scope(root, "epic-00002", "epic", "init-00001", initiative)
+    add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
     subprocess.run(
-        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
-        cwd=repo_root,
+        [
+            "git",
+            "-C",
+            str(root),
+            "-c",
+            "user.name=Fixture",
+            "-c",
+            "user.email=fixture@example.invalid",
+            "commit",
+            "-qm",
+            "fixture",
+        ],
         check=True,
         capture_output=True,
     )
-    context = WorkContext(repo_root, repo_root / ".git", "main", "engine-a", 1)
-    gateway = GithubIssueGateway()
-    for scope in (initiative, epic, issue):
-        outcome = run_work_start(parse_vnext(["work", "start", scope.id, "--base", "HEAD"]), context, gateway=gateway)
-        assert outcome.status == "succeeded"
-        assert outcome.data.scope_id == scope.id
-        assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id == scope.id
-        preview = run_work_start(parse_vnext(["work", "start", scope.id, "--dry-run"]), context, gateway=gateway)
-        assert preview.status == "planned" and preview.data.branch == outcome.data.branch
-    for scope in (issue, epic, initiative):
-        outcome = run_work_finish(parse_vnext(["work", "finish", scope.id, "--yes"]), context, gateway=gateway)
-        assert outcome.status == "succeeded"
-        assert outcome.data.scope_id == scope.id
-    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
+    return root
 
 
-def test_work_adapter_plans_start_and_finish_without_writes(tmp_path: Path) -> None:
-    specdock_dir, _views, _initiative, _epic, issue = _three_scopes(tmp_path)
-    repo_root = specdock_dir.parent
-    subprocess.run(["git", "add", "-A"], cwd=repo_root, check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture"],
-        cwd=repo_root,
-        check=True,
-        capture_output=True,
-    )
-    context = WorkContext(repo_root, repo_root / ".git", "main", "engine-a", 1)
-    gateway = GithubIssueGateway()
-    before = (issue.path / ".meta.json").read_bytes()
-    start = run_work_start(
-        parse_vnext(["work", "start", issue.id, "--base", "HEAD", "--dry-run"]), context, gateway=gateway
-    )
-    assert start.status == "planned"
-    assert start.data.scope_id == issue.id
-    assert start.data.branch.startswith(issue.id)
-    assert start.operation_id is None
-    assert not (repo_root / ".git" / "spec-dock" / "journal").exists()
-    finish = run_work_finish(parse_vnext(["work", "finish", issue.id, "--dry-run"]), context, gateway=gateway)
-    assert finish.status == "planned"
-    assert finish.data.scope_id == issue.id
-    assert finish.data.lifecycle_changed
-    assert finish.operation_id is None
-    assert (
-        subprocess.run(["git", "status", "--porcelain"], cwd=repo_root, check=True, capture_output=True).stdout == b""
-    )
-    with pytest.raises(ValueError, match="requires --yes"):
-        run_work_finish(parse_vnext(["work", "finish", issue.id]), context, gateway=gateway)
-    assert (issue.path / ".meta.json").read_bytes() == before
-    assert load_selection_v3(specdock_dir, worktree_id="main")[0].focus_id is None
+@pytest.mark.parametrize("target,number", [("init-00001", 1), ("epic-00002", 2), ("iss-00003", 3)])
+def test_work_commands_start_and_finish_all_three_kinds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], target: str, number: int
+) -> None:
+    root = three_kind_workspace(tmp_path / "consumer")
+    states = {"1": "open", "2": "completed" if number == 1 else "open", "3": "completed" if number < 3 else "open"}
+    log = github_fixture(tmp_path, monkeypatch, states)
+    metadata = {path: path.read_bytes() for path in (root / "spec-dock").rglob(".meta.json")}
+    arguments = ["--project", str(root)]
+    assert main([*arguments, "work", "start", target, "--base", "HEAD", "--json"]) == 0
+    started = json.loads(capsys.readouterr().out)
+    assert started["status"] == "succeeded" and started["data"]["scope_id"] == target
+    branch = started["data"]["branch_after"]
+    record = root / "spec-dock/.agent/work-target" / f"target-{started['data']['selection_token']}.json"
+    assert json.loads(record.read_bytes())["scope_id"] == target
+    assert list(record.parent.glob("target-*.json")) == [record]
+    before = record.read_bytes()
+    assert main([*arguments, "work", "start", target, "--branch", branch, "--dry-run", "--json"]) == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["status"] == "planned" and preview["data"]["branch_after"] == branch
+    assert record.read_bytes() == before
+    assert main([*arguments, "work", "finish", target, "--yes", "--json"]) == 0
+    finished = json.loads(capsys.readouterr().out)
+    assert finished["data"]["completed"] is True and finished["data"]["scope_id"] == target
+    assert finished["data"]["branch_after"] == branch and finished["data"]["selection_token"] is None
+    assert not record.exists()
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"], text=True).strip() == branch
+    requests = [json.loads(line) for line in log.read_text().splitlines()]
+    assert [(row["method"], row["number"]) for row in requests if row["method"] == "PATCH"] == [("PATCH", number)]
+    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {**states, str(number): "completed"}
+    assert all(path.read_bytes() == exact for path, exact in metadata.items())
+    assert not (root / ".git/spec-dock").exists()
+    assert subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"]) == b""
+
+
+def test_work_adapter_plans_start_and_finish_without_writes(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = three_kind_workspace(tmp_path / "consumer")
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    metadata = {path: path.read_bytes() for path in (root / "spec-dock").rglob(".meta.json")}
+    branches = subprocess.check_output(["git", "-C", str(root), "show-ref"])
+    arguments = ["--project", str(root)]
+    assert main([*arguments, "work", "start", "iss-00003", "--base", "HEAD", "--dry-run", "--json"]) == 0
+    start = json.loads(capsys.readouterr().out)
+    assert start["status"] == "planned" and start["data"]["scope_id"] == "iss-00003"
+    assert start["data"]["selection_token"] is None
+    assert all(effect["status"] in ("planned", "unchanged") for effect in start["effects"])
+    assert main([*arguments, "work", "finish", "iss-00003", "--dry-run", "--json"]) == 0
+    finish = json.loads(capsys.readouterr().out)
+    assert finish["status"] == "planned" and finish["data"]["completed"] is False
+    assert finish["effects"] == [{"kind": "github.issue.close", "status": "planned", "target": "gh:example/repo#3"}]
+    calls = log.read_bytes()
+    assert main([*arguments, "work", "finish", "iss-00003", "--json"]) == 3
+    assert "requires --yes" in json.loads(capsys.readouterr().out)["error"]["message"]
+    assert log.read_bytes() == calls
+    assert all(path.read_bytes() == exact for path, exact in metadata.items())
+    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": "open", "2": "open", "3": "open"}
+    assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == branches
+    assert subprocess.check_output(["git", "-C", str(root), "status", "--porcelain"]) == b""
+    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()

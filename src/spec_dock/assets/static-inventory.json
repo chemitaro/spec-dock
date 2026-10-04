@@ -1,0 +1,2167 @@
+{
+  "schema_version": "specdock.static-inventory/v1",
+  "files": [
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "sha256": "2dbe53d0d26f35c13ce2f027eeb4ace16a9bb95b894aeabea75cd234b92d9e37",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18",
+        "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51"
+      ]
+    },
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".agents/skills/spec-dock/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock/SKILL.md",
+      "sha256": "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3",
+        "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538",
+        "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c"
+      ]
+    },
+    {
+      "path": "spec-dock/.gitignore",
+      "source": "spec_dock/.gitignore",
+      "sha256": "0385b3b649b323ac319d80539925af586af96f6d82f65c83e413f719cd2bf98b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/README.md",
+      "source": "spec_dock/docs/README.md",
+      "sha256": "ddbd3e6cb3b216f4217eed6057ed8fdf7221760c18649f7ca997335e8304b353",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "aadfdce1f6e61af65e95d3cd39efb3fd87b7cd83a3a3272356ef7cd68b21ba4e"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/authoring/artifacts.md",
+      "source": "spec_dock/docs/authoring/artifacts.md",
+      "sha256": "f51fdb9afd445978c379bae411be385be0548fec3848680049c0a801d3c8fe0d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/design.md",
+      "source": "spec_dock/docs/authoring/design.md",
+      "sha256": "216332356e46faf7b07f95779ff3be5cae2cac43acdf9abdf3c83e79064a504f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/historical.md",
+      "source": "spec_dock/docs/authoring/historical.md",
+      "sha256": "0074ff1c57c39130a0ceee7d1aa5d858a9b22c1f7fd4e699d9bf268fdd75b7c3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/critical.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/critical.md",
+      "sha256": "ec2d8a40bad9913bb6158ace81a369bc3680f03314cf74399ed4b3d967772497",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/light.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/light.md",
+      "sha256": "3ae80247687e405138f3d238afbded507cad6de995eff123bd56d39611da9934",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/standard.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/standard.md",
+      "sha256": "75bb6ba7f9c076ebe0bef7dc4c32480be0e1c31357937028afdc3dd1fc5d899f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan-levels/strict.md",
+      "source": "spec_dock/docs/authoring/issue-plan-levels/strict.md",
+      "sha256": "0303436c3c3abb6f29c2a2810fc4b0dd1ae5bd3d7cd41c7779c30da5acf91b4a",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/issue-plan.md",
+      "source": "spec_dock/docs/authoring/issue-plan.md",
+      "sha256": "4b4d6ac04307fb960dccc8d7e7a9392a76cce08237b55c268a7f7efeaeb1ca27",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/overview.md",
+      "source": "spec_dock/docs/authoring/overview.md",
+      "sha256": "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/authoring/report.md",
+      "source": "spec_dock/docs/authoring/report.md",
+      "sha256": "822fe03a7a8b029b0b60aecc8e9a30b7c698b5c595e90216a71b735067428b91",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/requirement.md",
+      "source": "spec_dock/docs/authoring/requirement.md",
+      "sha256": "6acd6b1e9da78b66aced244043befdc4d85c9335c93ec2746024edfcef88218b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/scope-layering.md",
+      "source": "spec_dock/docs/authoring/scope-layering.md",
+      "sha256": "0be56200566b2fa5f6e6bb84c82c7c876e8585d397de74c5773fc5c91a20e724",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/cli-redesign-guide.html",
+      "source": "spec_dock/docs/cli-redesign-guide.html",
+      "sha256": "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
+        "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/guide.md",
+      "source": "spec_dock/docs/guide.md",
+      "sha256": "de474364d5f574766e3e8fa4f3540b8aeb23680ea9c4c2681e2965d9ca96a39a",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "ffe223494a62ace617adb8e092be122917e646e0c2b674c08993cd59f742dbe8"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/historical/README.md",
+      "source": "spec_dock/docs/historical/README.md",
+      "sha256": "af17600e62f9fbe737fc73a2e17fe5b2a3de1e52044d02875b30ee67c060089e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "148dfcc5ab2dd0f3b0a352f619f1e43ade403308fb835dc8fa011d2d6cfcdc5d"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_deps.md",
+      "source": "spec_dock/docs/historical/reference_deps.md",
+      "sha256": "1d9c64cf50243a91489cb9692d6a198cfc1d330d4e1a49f4f57328312d9f6e19",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "69423133351387071c22887004b7e267174add66690f3d16ca793d0632cf038c"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_github.md",
+      "source": "spec_dock/docs/historical/reference_github.md",
+      "sha256": "866134b11a8a1da492213ff9d70e69702ab387daf311d99384fdbe508cbf13a7",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "33c16064f02afcc03b366510f0bc6ab9559e1e32e4b8e0831d10024491c38fed"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_naming.md",
+      "source": "spec_dock/docs/historical/reference_naming.md",
+      "sha256": "d74545ae6ccea5077953653f046ae6fea4556f30b621e9b62b1c388043626be6",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "aa9f531fed003822f1260819f72aef55c2cf3a2a38df66783c2c7c3cf1ff8886"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_sync.md",
+      "source": "spec_dock/docs/historical/reference_sync.md",
+      "sha256": "233939e7b5a681db33cd563c0271e9dec36e48a9db9d4b61a53dd957fd354bf2",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "63ee7d9e8f15aeb50a5cbae109738dfa2f6a9abca9c14e0d635c54b260f08b0a"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/historical/reference_worktree.md",
+      "source": "spec_dock/docs/historical/reference_worktree.md",
+      "sha256": "eeb56f3aae75913bc865c700e84fcc7a92ab1a6a53357cd2b16442779f8e969b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "43257bd27e1e8dc5d7e409f97c58accfb7437aefb23e8a3dff2f11500b719458"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/migration.md",
+      "source": "spec_dock/docs/migration.md",
+      "sha256": "fbfee85c564b0718a9c0c6b0a92e8ef30b6781e98f2ac903a84a84de587be112",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5",
+        "d0da61a3ab362b168f784efe59c5a47781571d3fdefb86b862fe822b2060055c"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/reference_cli.md",
+      "source": "spec_dock/docs/reference_cli.md",
+      "sha256": "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
+        "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/reference_deps.md",
+      "source": "spec_dock/docs/reference_deps.md",
+      "sha256": "d2d1d508d864132e31a566fafa9efa549059d75283451a706a6cd153d61a2de3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "162184232a51b8869789f1975bbd15219699353bd57eb1dc96e247dcd91bade2"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/reference_github.md",
+      "source": "spec_dock/docs/reference_github.md",
+      "sha256": "3aeb5ab1791b49f1190da45db30428d3ee2ea32a141e169c396342cebab4ae10",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "53f8bf8a6eca9809da1ff36ab09f1236e9a7b16d3641ddd676e3faf2c04e7b44"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/reference_naming.md",
+      "source": "spec_dock/docs/reference_naming.md",
+      "sha256": "fe00f3409d5d28617b6651612abcc91b962f3d72b1b714ec4a4cd217c20ab769",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "bc31afff6f395cd158cca6214660dcbfed7f6790ed6ab01cf37d0d340e92faa5"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/reference_sync.md",
+      "source": "spec_dock/docs/reference_sync.md",
+      "sha256": "691c8f7974a5a8e837ee7eaaba25e1753749763ad2aa2f58a972de5abf8b0b01",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "033d0e18e3668e28777f2c3b551b3d86b9cd0e3b0da9fa6a1d08842c9a8cdece",
+        "60cd3f01861356112a2147b6dab5ad7009c1d7c591acfa102967cb705a00efc9"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/reference_worktree.md",
+      "source": "spec_dock/docs/reference_worktree.md",
+      "sha256": "10f68e42bbe8c8d6750941dcd6890f3ec27272cceb379639be96336279e873ed",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "a30f9ff2149743f1e44614354eadadf506549f5f6677d1194d6b697a5f884880"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/epic/artifacts.md",
+      "source": "spec_dock/docs/rules/epic/artifacts.md",
+      "sha256": "515d7adc8ade9c05b318d60e21914624b0b747db0d671a47a3c4663727df3d4f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "da10a6a917e704c236db4cfbab87d2bda4b6c82c0003ac81ec758886944985c9",
+        "55046eca0302b52b88cda2e58c8ad450bbcd558f2f01872d9b01a1ecf93d3ed1"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/epic/discussions.md",
+      "source": "spec_dock/docs/rules/epic/discussions.md",
+      "sha256": "ab16cf1ff68a19bbb3679de06826a1585483a4f8deea22f1dfa2a9510e133fb0",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "32f8549c62e66c65b01069219219d668e42437ae81e49fbe29d338fb3bff1397"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/epic/issues.md",
+      "source": "spec_dock/docs/rules/epic/issues.md",
+      "sha256": "e16e50489d23b7b388cf82c45b3cbde0e406f3260755dc64b527b050ce0fd967",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/initiative/artifacts.md",
+      "source": "spec_dock/docs/rules/initiative/artifacts.md",
+      "sha256": "dea5c7ee36b270c028ccfc5ecb3ecd837c846cb3784262aed90527f2b3a2638d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "1a3238c290c97e02d00090029eb8b88ce79a3b13d6b4e8c95c3c34c30a1a0619",
+        "25bdec3909bb84bc96f66c6777e4112fc74054036898818b2557d7fcd4340d61"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/initiative/discussions.md",
+      "source": "spec_dock/docs/rules/initiative/discussions.md",
+      "sha256": "44a1a85647ff7b788ffba7a3b1deccd9aead01f73abf916c145d8c4841ae6ea5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "4fcd65d522647186ee8e4569398a342f81992e6b06026dca6bff03609aa9e88b"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/initiative/epics.md",
+      "source": "spec_dock/docs/rules/initiative/epics.md",
+      "sha256": "52c976233113167f4b54080135170a8250cfe536b480f2ae129d276ca682ccfa",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/rules/issue/artifacts.md",
+      "source": "spec_dock/docs/rules/issue/artifacts.md",
+      "sha256": "75943dcafdfb6e2f4f25ea0633a7bd3f1801a3692c800871d17b7e11c2e6742b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "69da9fa472bdc05550726ec0eaa29507f6badde73cdc2f11bb4be4153b61b9cf",
+        "e92c5ad870f1670c0415011dd76aa659fabf24193fa34121469eb4862dceac13"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/issue/discussions.md",
+      "source": "spec_dock/docs/rules/issue/discussions.md",
+      "sha256": "445d06e9b1c4364fa1f532df9aa99a4a17614f48aa834cdb21057cdf9092827b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "d9e9a307aaad17f27772ace45bd8c8ed3504c05131f444c221684741ab705737"
+      ]
+    },
+    {
+      "path": "spec-dock/docs/rules/root/artifacts.md",
+      "source": "spec_dock/docs/rules/root/artifacts.md",
+      "sha256": "5c3ba34ddf1ea778269e2a1a4298cbce4ae31353846ed05834364db215dc7d36",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "e63c08ef5f332f963420eeb1780dcdb7bcd9f924beb80485bc2a3afb304f0abb"
+      ]
+    },
+    {
+      "path": "spec-dock/scripts/README.md",
+      "source": "spec_dock/scripts/README.md",
+      "sha256": "7e30d6d4b5bccc55a915fb7a53f70b0e9109c0599fe4649ca140cb6dfbb4d3e5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "0032ba08b6e4b6eb8a8c7842b979c086246542af5813c90ec26781efd32196d8",
+        "38b8a802dcac5e0e3ba4505ddac63fd89380c370b60443cdfb2734ada698b794"
+      ]
+    },
+    {
+      "path": "spec-dock/scripts/spec-dock",
+      "source": "spec_dock/scripts/spec-dock",
+      "sha256": "6363f63b3d71e966f4bf759c63358fa1aa6b6b02c49d3541fcc3ea82f9dbe4ed",
+      "mode": 493,
+      "init_only": false,
+      "known_old_sha256": [
+        "680e8f38e1ba1a1eecdade39a201ad6238e2b7d13d11d376afd4744c4439aa06"
+      ]
+    },
+    {
+      "path": "spec-dock/system/.runtime/README.md",
+      "source": "spec_dock/system/.runtime/README.md",
+      "sha256": "bf164f4ffedb272cff9877ca0ce7d9800a5fbacd01c1ed0f1267a1f7bfa3af57",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "d9aae3088e6082e1e76b1f402cc97dad1a8db3b261f4fb8e6a81eafa93e2414d"
+      ]
+    },
+    {
+      "path": "spec-dock/system/README.md",
+      "source": "spec_dock/system/README.md",
+      "sha256": "759c504cabf3d467b28d87e8a6af33f5cddf430b8fd93f2b38598f44bb705feb",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "71a7579f3d9fb0f1f5141bbf14ec96d2cd5762c5f935934a8af0604e6008fe53"
+      ]
+    },
+    {
+      "path": "spec-dock/system/active-none/README.md",
+      "source": "spec_dock/system/active-none/README.md",
+      "sha256": "067114e645ff28e1b8f1166221c7d6d6e6a40e23bab406ee63007496e29494c3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "aca9368da8ba736f1920dc96e9fa2a57a288386ab97533a1e47c89fd7a73f641"
+      ]
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/README.md",
+      "source": "spec_dock/system/active-none/epic/README.md",
+      "sha256": "9781c7e8d84b4e473dc52044622c9a9c9e36952345537069a8bb7c461be62d12",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "0c0963cf1260de6d8737bd1f3c6a1b5237a5b6d596d1681bed37e685e2b3b389"
+      ]
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/design.md",
+      "source": "spec_dock/system/active-none/epic/design.md",
+      "sha256": "b17a9b84a7a7463edc179e8e99150b381b4b9e52e4aaa0e1f2318cd8108fe978",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/plan.md",
+      "source": "spec_dock/system/active-none/epic/plan.md",
+      "sha256": "104a64455a1f49ba31928f7073becd8a3534d116c3854065053cbe766fdf4f0f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/report.md",
+      "source": "spec_dock/system/active-none/epic/report.md",
+      "sha256": "985fa30deacf5b580fd5c8760674b92f82e5c74edd4f5876c8560c1183a603d3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/epic/requirement.md",
+      "source": "spec_dock/system/active-none/epic/requirement.md",
+      "sha256": "d3c1cc0ba23eda6e0324855b5d47d186e5568a80220f746988569cc3da56749c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/README.md",
+      "source": "spec_dock/system/active-none/initiative/README.md",
+      "sha256": "583c400f25c9a2a7e784c95948de4f7142d4715b2a91ae3db20557e8fd9317d1",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "f0a88c09ecf88adf103cbf4c9707b28fc70cf1f3e06a7d5b307b6b595fc41dd4"
+      ]
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/design.md",
+      "source": "spec_dock/system/active-none/initiative/design.md",
+      "sha256": "a22ccea06899d1a249c728f1019c6fd6f4272b21620f794017f8c375ef03a4c3",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/plan.md",
+      "source": "spec_dock/system/active-none/initiative/plan.md",
+      "sha256": "ced586209ef7e9de4c0ae3559dccc153cbece2539c33e2e45adbcb8b0293464b",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/report.md",
+      "source": "spec_dock/system/active-none/initiative/report.md",
+      "sha256": "2cfa7ff502ebda32e9d581b2fe87698b81bf852020ddd7ba2f09d7544ddeccc4",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/initiative/requirement.md",
+      "source": "spec_dock/system/active-none/initiative/requirement.md",
+      "sha256": "af3744e6266ef1e9ec4d075f51ffd852998a8c6c9e17cfcb548612a18e2bd56e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/README.md",
+      "source": "spec_dock/system/active-none/issue/README.md",
+      "sha256": "457321ce7c573e59d01b55ea29da99c9d01d53790d06407a9ceddf52821be231",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "03e203932404195e191ff662f09e2d97c4e62a62d8c16bbb1b2b27dc43aaea30"
+      ]
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/design.md",
+      "source": "spec_dock/system/active-none/issue/design.md",
+      "sha256": "31ff82bcff64a6baf4c99862cae3efa74533a42f769ebb3b8eeab5e0b5fe61d4",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/plan.md",
+      "source": "spec_dock/system/active-none/issue/plan.md",
+      "sha256": "13488b061eb36afc66638a64fe5013fa500ef29febc0e6eae441f0064b840c66",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/report.md",
+      "source": "spec_dock/system/active-none/issue/report.md",
+      "sha256": "5ea25694830957e1789b09b38ba64afffd2a9f0fbca092cbd233f6e8f7ec74dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/active-none/issue/requirement.md",
+      "source": "spec_dock/system/active-none/issue/requirement.md",
+      "sha256": "29647fe4824fcde37c2aa92d6e3fbaa5ff9400b16803434f91cca4cc953a15d6",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/README.md",
+      "source": "spec_dock/templates/README.md",
+      "sha256": "3ec4263314f2a31fb4042799cf993f2a31098d1cc27c9db7e651e123103d3d5e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "d7202728624c4632646c4b077155699e5342484b15de11fa936566541045c1e2",
+        "5ee4beb40099fb1a872742a9384eaa801562f4ccabc9ee2b10f08ce7167f163b"
+      ]
+    },
+    {
+      "path": "spec-dock/templates/artifacts/adr.md",
+      "source": "spec_dock/templates/artifacts/adr.md",
+      "sha256": "7891cbfc90f581aa6789c7511e4e8f939c3a0c9d3be7c3c943dade7e9906e647",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/blank.md",
+      "source": "spec_dock/templates/artifacts/blank.md",
+      "sha256": "a150eb7914f815db10b82db347f6717a1b33bc5021f667a786e320b684927488",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/decision-candidate.md",
+      "source": "spec_dock/templates/artifacts/decision-candidate.md",
+      "sha256": "279c9dde73cd47b7213082b6b7fe6037bbbed90327cd8ddbcb579091b11dc32c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/disc.md",
+      "source": "spec_dock/templates/artifacts/disc.md",
+      "sha256": "331ac13852dbacd9e9ae4e4b94ec8c61dd13c9f27a5443164d41e0c97cf96536",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/interview.md",
+      "source": "spec_dock/templates/artifacts/interview.md",
+      "sha256": "0d526becee3603701cbca776e3c0fdb3488601f885b820450310166defd8ccd6",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/artifacts/research.md",
+      "source": "spec_dock/templates/artifacts/research.md",
+      "sha256": "5e92d1ba03ce1a5747b0c6444cd04541910c573a33589ed7c001ef31236ef2fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/.workbench/README.md",
+      "source": "spec_dock/templates/epic/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/design.md",
+      "source": "spec_dock/templates/epic/design.md",
+      "sha256": "4ea5d2c52b4a6da12015c9b55625d71a71b445f62f2a3641e74778c840909489",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/plan.md",
+      "source": "spec_dock/templates/epic/plan.md",
+      "sha256": "afe00783b61561a88e89e9971ca6b8c7872841d9cb6fee59923234c6527d7928",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/report.md",
+      "source": "spec_dock/templates/epic/report.md",
+      "sha256": "cff9a127eed4a910d50c43262842a082e86df669437e0090f8cfeb2fdacdfa60",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/epic/requirement.md",
+      "source": "spec_dock/templates/epic/requirement.md",
+      "sha256": "640c5177c4fba61126f85ca79370f64cb6dbb11ab4aa54b110a90641e48b40ec",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/.workbench/README.md",
+      "source": "spec_dock/templates/initiative/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/design.md",
+      "source": "spec_dock/templates/initiative/design.md",
+      "sha256": "a5681fab80831bb999b149f3e0e721391fc27b3b2964ad151f24fa47352214b0",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/plan.md",
+      "source": "spec_dock/templates/initiative/plan.md",
+      "sha256": "52f0d714a10531ca5e69b0f3a2e702bf72f3a631ccad03efd652c1801e99885d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/report.md",
+      "source": "spec_dock/templates/initiative/report.md",
+      "sha256": "e8749e3de129e4b70ddf5d31bc3a26bb60aa8871bca88d1402f37bc1415cba7f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/initiative/requirement.md",
+      "source": "spec_dock/templates/initiative/requirement.md",
+      "sha256": "6519af868ee7ea35d18d3cb78a0220888ab5052fed0e62058b18b45ffa6bfd60",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/.workbench/README.md",
+      "source": "spec_dock/templates/issue/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/design.md",
+      "source": "spec_dock/templates/issue/design.md",
+      "sha256": "218bc2c2bf25e862d4a6e9d64501a52331df40a3a19aa96dfdf78eaa1738067c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/plan.md",
+      "source": "spec_dock/templates/issue/plan.md",
+      "sha256": "d36dce3e90394837b37a8cf42acebb2b8a888db6c062b21f4f1287f3358f7906",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/report.md",
+      "source": "spec_dock/templates/issue/report.md",
+      "sha256": "ca7680ce24060b7966ca3e2bef583073bf2f26adf28fcfded50540f0257b679f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/issue/requirement.md",
+      "source": "spec_dock/templates/issue/requirement.md",
+      "sha256": "7db442c756f242e2110628d037ad1b3fdcdd6221de2ca94356071b4d5ec48e79",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/root/.workbench/README.md",
+      "source": "spec_dock/templates/root/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/workspace.json",
+      "source": "spec_dock/workspace.json",
+      "sha256": "9562d15aad1bd1e1fd81623f4a1d9fedfc09440ee1f568c72fecbbefa13ea990",
+      "mode": 420,
+      "init_only": true,
+      "known_old_sha256": []
+    }
+  ],
+  "retired": [
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/__init__.py",
+      "known_old_sha256": [
+        "158cfb3ae9f7e604da5fa8c15789527bfcc756ca7edf343e2c3558b6c9ca6f7d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/__init__.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/active.py",
+      "known_old_sha256": [
+        "1acc4cddec38756dd9ecb81c8db7981ed1e671804b849a127068931891913c9c"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/active.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/active_selection.py",
+      "known_old_sha256": [
+        "9985cd388da2f54369e97da0f06bc2868fbcf3f801c072c4bb5405027254ff02"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/active_selection.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/artifact_preflight.py",
+      "known_old_sha256": [
+        "9101547e1b989b03bfa9b7cb739e6886404ce0b4f60343fcac34c63963e54ebb"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/artifact_preflight.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/artifact_query.py",
+      "known_old_sha256": [
+        "4a8377547d3f837ca8708da4ad7f10150c5b589815cc34f756b179f60049ecc1"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/artifact_query.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/artifact_vnext.py",
+      "known_old_sha256": [
+        "71260a874a69b23d6f7c16ff6e2592f3993d9b56ac87c6f9cfebb89b3e1b7f43"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/artifact_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/branch_vnext.py",
+      "known_old_sha256": [
+        "d6a2e12a829b48e325de254791094a1ee332becbcc47cca3649fddac55e1aac7"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/branch_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/check_deps.py",
+      "known_old_sha256": [
+        "bb3dc9e82741f7b59101e99c7d027d006f3bb4a6420c1a0f1d8261b76c09dd67"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/check_deps.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/close_node.py",
+      "known_old_sha256": [
+        "e8b7c057e26b5a0afc36a816df39070cf93b7fa2ccc17aed7035e7babe207365"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/close_node.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/contracts.py",
+      "known_old_sha256": [
+        "1d7a25ae60d8e0844f60ff0d828be63fe0f820f0db3268d229a2ded6b298b851"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/contracts.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/create_artifact_doc.py",
+      "known_old_sha256": [
+        "fa75e156f1b0888f16d964b9a5489103820fd0e8476c87bb9586c6cc35ce7a74"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_artifact_doc.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/create_github_scope.py",
+      "known_old_sha256": [
+        "561b8bfd264446eb61de5be68fdbef0acf9840a166b1eda128be7cb976006bdd"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_github_scope.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/create_local_scope.py",
+      "known_old_sha256": [
+        "0a3f4ddc90114e56184d92fed0ecf3bf6e702e98fcc247cb96331d827cd31496"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_local_scope.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/create_node.py",
+      "known_old_sha256": [
+        "9181f4d8e70acecb28a498eddbedc102727084ce25e7cbfd54feb99628b45efc"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/create_node.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/delete_node.py",
+      "known_old_sha256": [
+        "2ec41693bd6f769aa0f6e7b7ec2eb4a0c290ffc75ae3069f19b718fa0bfc6629"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/delete_node.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/dependency_vnext.py",
+      "known_old_sha256": [
+        "e80e6fb2804e6c9754d3fcc4e3d5711628f5e6a7eae8315c7d9b7378e5ebff7f"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/dependency_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/doctor.py",
+      "known_old_sha256": [
+        "c0664a71965d1527567f389a623dff66b5cec3ad0b9619ea8eb4adec3b808f5a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/doctor.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/edit_scope.py",
+      "known_old_sha256": [
+        "3afa658340744818f73239e7a79c53b3c06b81792f5bfed92861c55a73881699"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/edit_scope.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/engine_handover_vnext.py",
+      "known_old_sha256": [
+        "d804ee6c9faddcb41fc2ceca613ac2760d3b335045df7e014e3b653cce7bcc2d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/engine_handover_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/github_create_effect.py",
+      "known_old_sha256": [
+        "4e512bf0ed98a9405ee95b3f914e85e3545884ec1d228884799196b3de7000b5"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/github_create_effect.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/github_issue_targets.py",
+      "known_old_sha256": [
+        "890f6cb5136cd3e372ced4fda2289c177c146deed2e1dc2880122b206f213dd9"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/github_issue_targets.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/github_scope_scaffold.py",
+      "known_old_sha256": [
+        "2f1d1cbc90c7011a2d32a730af3b6985a6a18d17d20c40b8cd2e9c477a26cf79"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/github_scope_scaffold.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/import_file_artifact.py",
+      "known_old_sha256": [
+        "824f4f664fe410fa3b3a06cadc831a4f149d3f673df050f6b9360189cd015211"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_file_artifact.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/import_github_scope.py",
+      "known_old_sha256": [
+        "8f89f1b1ccb317c2c63e2a68397b9afef07932129ef4319bef9354645219926f"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_github_scope.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/import_node.py",
+      "known_old_sha256": [
+        "b23639ca7b6fc257cee7ac2c066ea0c99062871baff9624408e08137b3d55dbf"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/import_node.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/installation_update_vnext.py",
+      "known_old_sha256": [
+        "e76a607f6ec8fbcb4d53fe62612cd05b30889dddb4dc4cc55af9d533f81ba52e"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/installation_update_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/installation_vnext.py",
+      "known_old_sha256": [
+        "cf96dba9c81aa60f1ea9d2af740c1e7cb8b185f51f1ff95820ae257cda2823b5"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/installation_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/migrate_workspace_vnext.py",
+      "known_old_sha256": [
+        "bc67c2371c0094d406af8afa19e8c6f1c383212a6b7641a3c1ca82fde23e6834"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/migrate_workspace_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/mutate_deps.py",
+      "known_old_sha256": [
+        "285394ce41c12483d3f077f2760e810da50b971089ccecee1809ba6652a29082"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/mutate_deps.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/operation_executor.py",
+      "known_old_sha256": [
+        "dbd885990f0d7ce24558d3891d7ee57debc373777f286076c552d869b540cc88"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/operation_executor.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/ports.py",
+      "known_old_sha256": [
+        "ea5c2613bdc1b77cb81bcb6df69562e8652d91650b10d7b0e83ea635a27d2551"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/ports.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/repo_context.py",
+      "known_old_sha256": [
+        "7bf74471fc4d5968e26966292f969948fcd7f25409125279d8b42f9ad1844914"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/repo_context.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/resolve_target.py",
+      "known_old_sha256": [
+        "87aae290c4de1b7bc48d28d6c76f56a54fef7395d69035d12a318124361143c2"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/resolve_target.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/resume_github_scope.py",
+      "known_old_sha256": [
+        "64c1670155d721d2885c7fe33529db131feea166fdf00bafb75003c9a58a486d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/resume_github_scope.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/scope_completion.py",
+      "known_old_sha256": [
+        "4d23d569369f08f69d9a3e0c09e2ce8ca620196b2f7c9177dd8ff191cbf47f1c"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/scope_completion.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/scope_create_vnext.py",
+      "known_old_sha256": [
+        "25d192e2f7aa9718c70f27ac9a1cd0c5c28499a17375ccd581eaea937ae18e66"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/scope_create_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/scope_delete_vnext.py",
+      "known_old_sha256": [
+        "0c8a680502b6331b4b959bbaef29c6ad8f3bb5d3ebabc20d836a8cbd49f77307"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/scope_delete_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/scope_query.py",
+      "known_old_sha256": [
+        "6af37095338379eb46860f72574e6b3f3233f59bbf542737e570b1d4ee31e3ff"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/scope_query.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/set_active.py",
+      "known_old_sha256": [
+        "da7a62e5958d4fdb0b4e2eb3ccfeb1ad0134fb79e973f60e043e19773d07306b"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/set_active.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/status_context.py",
+      "known_old_sha256": [
+        "433f3673a6d0fcd6585cdc83bcb80473846f27030b9e841cab9530372d485217"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/status_context.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/sync_state.py",
+      "known_old_sha256": [
+        "8b34f483c1b312ac40e9649a87cadaf392d75e378ab02282fe3dadcb6b5438a0"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/sync_state.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/validate_tree.py",
+      "known_old_sha256": [
+        "bf8bc2e4fc6cf1313c844f059f7273f4b787c418308a4dc9c4408aeb97e8b72a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/validate_tree.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/work_lifecycle.py",
+      "known_old_sha256": [
+        "6f12da219e6ac2364e6ff82502d3de0cce15462aa36b47624ec18719066afece"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/work_lifecycle.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/workbench.py",
+      "known_old_sha256": [
+        "e55b07b6ac22c2ccf08cdeb423a0cea22ea88860d05d121bfecdf1da79bc2825"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workbench.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/workbench_vnext.py",
+      "known_old_sha256": [
+        "b32610e40362dec5f5f19ccf5249862958f3b5b1fd1879c067d1530eeca70677"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workbench_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/workspace_diagnostics_vnext.py",
+      "known_old_sha256": [
+        "6418eef22dd538d299240fce95c289b2c8ac6b3223b7638a2e07647ba6cbb1e2"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workspace_diagnostics_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/workspace_sync_vnext.py",
+      "known_old_sha256": [
+        "b8a2b59aae17a79667ed78c74f126138eb6ad3c547877627b95b47b6df6ec3ff"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/workspace_sync_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/worktree.py",
+      "known_old_sha256": [
+        "3ac2abfc946fbacf7422647d12750ddefa4e80646c9e823b5de279bbb966cda1"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/worktree_bootstrap_vnext.py",
+      "known_old_sha256": [
+        "21b2456623235d3b9f1bb74e9af86c4e263ec94fd552f7aba0df65ab00d6f6b4"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree_bootstrap_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/worktree_target.py",
+      "known_old_sha256": [
+        "0e5fa49f8c55798e5268540ab9046164daf28255179e7ac7d15e14a5dbbd9577"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree_target.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/application/worktree_vnext.py",
+      "known_old_sha256": [
+        "cb13b144fda1405339abb12a5aba099ab34514d455908b20bc60fcdf17aab7a3"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/application/worktree_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/cli/__init__.py",
+      "known_old_sha256": [
+        "c8d64b2e7a2c9d8b30883a0bd612dab94541ef420d7b9d0273c1aa7f314e7ad6"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/__init__.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/cli/admission.py",
+      "known_old_sha256": [
+        "79a64bf6169c12edf980b4e57467d69a54e1337a131c0824da37103c7c8c051c"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/admission.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/cli/catalog.py",
+      "known_old_sha256": [
+        "ad9376b80f9335c4cb8b017a12f5b2d3b36a4c75227a5051beeb1ede38e5ca42"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/catalog.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/cli/legacy.py",
+      "known_old_sha256": [
+        "b715d756d3ddef4eca3cbaa56bc3e22e39f39596a0cb0f11c8c3a38ac7c6de77"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/legacy.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/cli/options.py",
+      "known_old_sha256": [
+        "b3a1ebeda82aa500bcfca47f19af8a956c24d5e9f6dc95d8d83fcda6da323efa"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/options.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/cli/vnext_runtime.py",
+      "known_old_sha256": [
+        "c96fbce09b5afff29d69a6ae52028e36c25227b465adc925f254c396040e735a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/cli/vnext_runtime.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/__init__.py",
+      "known_old_sha256": [
+        "3a1a3643a05fc68db287c66c93e7661ead973fba147ce1f3f7e06616935d6bc0"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/__init__.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/active_vnext.py",
+      "known_old_sha256": [
+        "db332eef8f6fa0d4c30e8b785cd70cc797d2afae0ca3616ec4e8d43972366a1b"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/active_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/artifact_vnext.py",
+      "known_old_sha256": [
+        "c9bbda7614639148e232d52d91f538986ee34e1fa267667c0e2687dd1acc96fd"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/artifact_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/branch_vnext.py",
+      "known_old_sha256": [
+        "a8de63709bc1b2dcd569edd05daf48da7c17b87cf94a2d65ba1e8a8bf81f7d1a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/branch_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/dependency_vnext.py",
+      "known_old_sha256": [
+        "b1b87c5395cd45d652ef6a10b89e410371ade434d76e27e28796fe0a4c400cfb"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/dependency_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/installation_vnext.py",
+      "known_old_sha256": [
+        "d20acb2aee8d6f177e60c3cf1d6b05397c5b7fd019787bb91a87f77c94564225"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/installation_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/scope_create_vnext.py",
+      "known_old_sha256": [
+        "2774f5712e117b3ded13103d5106c702aef79efc5beec6fe369ae44ea099c5cf"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/scope_create_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/scope_delete_vnext.py",
+      "known_old_sha256": [
+        "92b3b56a5c7bc131299f7d3a2294484718d738d52966fa55922d1d38e9ca724f"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/scope_delete_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/scope_import_vnext.py",
+      "known_old_sha256": [
+        "151bb72b28934c94846b232697055f833b08816b62a2940310e285de33360679"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/scope_import_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/scope_lifecycle_vnext.py",
+      "known_old_sha256": [
+        "509d72dca8f7712a419ae037f8f9c2a788c695387ac368eab24a07881fb784cb"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/scope_lifecycle_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/scope_query_vnext.py",
+      "known_old_sha256": [
+        "bf2247dbb8b21e2ef36b14fc6ca32f806891bf4268fb8f3b9d8c1753d8a5c6b8"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/scope_query_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/scope_result_vnext.py",
+      "known_old_sha256": [
+        "ae8b43fcd80cd1907ef15eb7d3815194073013c90497ee07d72318732ff462e8"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/scope_result_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/work_vnext.py",
+      "known_old_sha256": [
+        "074673fbfef640f04230a6e7441364628246f7923584bcc2a22f7bbadade535e"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/work_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/workbench_vnext.py",
+      "known_old_sha256": [
+        "f25083c66147ea82cf343fed4dde46b0eb4403983db706394eea38b69fd1974a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workbench_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/workspace_diagnostics_vnext.py",
+      "known_old_sha256": [
+        "7cf9c5ea1504787dfb503361b3cd4d6d1ad3fb8728bfdaee090b5b7a05a09426"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workspace_diagnostics_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/workspace_migrate_vnext.py",
+      "known_old_sha256": [
+        "5cba78d7f4bca192906bdec2237bf1f2f6c887a57c62a89a27162d671db28462"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workspace_migrate_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/workspace_sync_vnext.py",
+      "known_old_sha256": [
+        "e74769066e27f1eabfee4aeb3e529c8d1a4a1450e29d5b93b6363645af6d2704"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/workspace_sync_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/commands/worktree_vnext.py",
+      "known_old_sha256": [
+        "5ad3e1a8c3a35d2a34c1b436903568b9327d247599c4ebd98d389d7455756038"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/commands/worktree_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/deps.py",
+      "known_old_sha256": [
+        "29fc18ec15463efd09ee46c800e3774ed821c6f1ac6a9e921f9534398523f1cd"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/deps.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/__init__.py",
+      "known_old_sha256": [
+        "1616229d1d1b2fdd83ed848e52489a9aa455cedd7661bfdd25226a70a8e27cfb"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/__init__.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/active.py",
+      "known_old_sha256": [
+        "95dcff4eddffda92519390d84335f8463b45962e1555795cecc6104666f7e016"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/active.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/artifacts.py",
+      "known_old_sha256": [
+        "2a88443eeaeaefa092d0394b72ac32f155bb4ba9a1499bad8a85bf72dad3a775"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/artifacts.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/branch_binding.py",
+      "known_old_sha256": [
+        "a6c212bba7f7941d170d8ccac59e86eb6ef87911993913c21908272cb0881060"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/branch_binding.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/dependency_vnext.py",
+      "known_old_sha256": [
+        "137ee6698b0839aa43d5ea2376c082cf41c3546dd987584fe9359e5462647c84"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/dependency_vnext.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/deps.py",
+      "known_old_sha256": [
+        "7e70af0dded1af52f6a7511ff2ef03162ba90a8256c797e094aa0af55bdb69ac"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/deps.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/discussion_docs.py",
+      "known_old_sha256": [
+        "dfde9bd46dffc0c664cc77e64b2f9e0ac344841c6339f1b2bd930d0a33bafe30"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/discussion_docs.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/ids.py",
+      "known_old_sha256": [
+        "53e9d21a52be572b5d45a625df82e7ff38dc0371b469a0c49350a5e47bd40762"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/ids.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/lifecycle.py",
+      "known_old_sha256": [
+        "ff6539dae360989fbdd5d2f83108d640a7c219e9742846d91b473fcb4464bd45"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/lifecycle.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/models.py",
+      "known_old_sha256": [
+        "f71371e96d816d60a718dd40c84d64b8e3f5fe0acaa5fdc808b4059892cb6f34"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/models.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/operation.py",
+      "known_old_sha256": [
+        "47210db44e4063ee19ec440db03d3cb142d31516e3993bbea67d14e10f68884d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/operation.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/registry.py",
+      "known_old_sha256": [
+        "8fda7a1f578c89f2e3c9263ed1a25c8777a3f64b644227d8fe534f01f1e12853"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/registry.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/selectors.py",
+      "known_old_sha256": [
+        "925cfac29d2d11901c4889818fac986b9a2009967eb2e6a0327d1d6085453b20"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/selectors.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/status.py",
+      "known_old_sha256": [
+        "439becba2aec20f5409f98919b0c5597a7d6f235edd08dbad358b79c0a967b88"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/status.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/tree.py",
+      "known_old_sha256": [
+        "1ddf6548752bc174b078add530fdcec2b480fcf6e87a1557191e5fa4b9ccca7d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/tree.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/domain/validation.py",
+      "known_old_sha256": [
+        "a118388ce4504406534d7ef164a15afc8e8269657cf15f402dee639412d69375"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/domain/validation.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/github.py",
+      "known_old_sha256": [
+        "b161dfcd50ad3d92f43f0b82903145375f8a06d6beb23441ee19619c15ad69af"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/github.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/ids.py",
+      "known_old_sha256": [
+        "f2b16b0d55f3d19de3d2721fd600f8af11a23188fa77fb11d9d66d9c7e5298b0"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/ids.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/active_store.py",
+      "known_old_sha256": [
+        "ccc5a7895c6c3550030385301d0fd790511ad2b9ded5c67deabb93db802b6983"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/active_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/artifact_ports.py",
+      "known_old_sha256": [
+        "37e8ae78ded700d7cb99e4eaa9127f2ac6fd55129283d4b5bf05f07e11d3bf95"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_ports.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/artifact_writer.py",
+      "known_old_sha256": [
+        "376c5b1331065b0c282ef5fcd5cf29e5de5535031ae46a3bbf6ea7431971fcba"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/artifact_writer.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py",
+      "known_old_sha256": [
+        "dc5cfbb0676a19c26d21372b71698478e62c69662ec56fbd0b04a070ea189a80"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/binary_artifact_publisher.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/clock.py",
+      "known_old_sha256": [
+        "f43ff62a3d41a00d524195a7193a6bd194077d37d581269212ada856f572e40d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/clock.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/contracts.py",
+      "known_old_sha256": [
+        "362d1a40e64e4645fdcb23d89727e9f98a66baafaff7a705ed3698f961e063e3"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/contracts.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/control_store.py",
+      "known_old_sha256": [
+        "2654aad26375efede2a8123c197496817573638657322e79c0dc57abe645d86d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/control_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/deps_reader.py",
+      "known_old_sha256": [
+        "8d1a8d9c1a9ddac4ef9a4b0c80dbe1401549544708db03e1cdf5e1edd1b60d7d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/deps_reader.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/derived_state_reader.py",
+      "known_old_sha256": [
+        "38b6bc6b49a9e9c3ec6c1181fbba03fa75c4f7696b0dd27095485bfbaaab3437"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/derived_state_reader.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/engine_handover_store.py",
+      "known_old_sha256": [
+        "43e3c586e5469c0c0a1d681898dd1f5aabb29027161102b12e15f73e87fce6f8"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/engine_handover_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/failure_receipts.py",
+      "known_old_sha256": [
+        "9161de34e1ef393eb1206eed2ec647a5ee74167b2a05a263b8c97c50fa8efa53"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/failure_receipts.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/finalization_store.py",
+      "known_old_sha256": [
+        "48131b95a39aa1405c47e84f273c39853661bfc2ea9e10cdca587176740a4b7e"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/finalization_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/fs_cli.py",
+      "known_old_sha256": [
+        "9178f29f966cc7d42df8b58e162632d2c321308b6182aa1bfd0d684292867cac"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_cli.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/fs_repo.py",
+      "known_old_sha256": [
+        "37197f4dcd0de2a827cae80da81da678d4d0a029464fd71755203d4db64375e0"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/fs_repo.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/generation_store.py",
+      "known_old_sha256": [
+        "303ee41ba772efd4636c2bbd105bafe87d883e81704b1a294e34c63af1bc0139"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/generation_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/git_cli.py",
+      "known_old_sha256": [
+        "49689e8070cac25ef525815b5dc6014ff6a6063d58347c2ab969e940a5e3e429"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_cli.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/git_helper.py",
+      "known_old_sha256": [
+        "b16591f922e4bfe1a1cbffc26315b9b1b6b19c89b782f352b4c6f0b20659365b"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_helper.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/git_snapshot.py",
+      "known_old_sha256": [
+        "64b015f03bdcb7658e26a157c9dd194ba8fa81f76a418de092ee1ba826e3bd23"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/git_snapshot.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/github_capability_cli.py",
+      "known_old_sha256": [
+        "7a56504f7a44dde7e3bc2728b13883446311f433a1b650274f12ee345fc07c73"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_capability_cli.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/github_cli.py",
+      "known_old_sha256": [
+        "8b6beddc548b47b950d27978b5bc7de4de5aee855a5075d0b3306f35ddc726cc"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_cli.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/github_lifecycle.py",
+      "known_old_sha256": [
+        "3e89d9799d1d6d9402a47c248370da67cbcf6d3a52e587d99398f93c3901ea39"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_lifecycle.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/github_status_cache.py",
+      "known_old_sha256": [
+        "3d3905e34ef25b130b5503782d1d87891770a62f5f494c3bb6f4ec315f7e8abc"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/github_status_cache.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/installation_group_store.py",
+      "known_old_sha256": [
+        "229ea0d476efa929748557682de01af333c9c5198833a99f82af59b43c5d4c7c"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/installation_group_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/json_store.py",
+      "known_old_sha256": [
+        "a121aef5ba960030bbfa0912ee755845d7a299258cc4337631b8e090e4662405"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/json_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/make_cli.py",
+      "known_old_sha256": [
+        "9359b7173f28a94394b7f0f037e3073ec7a590bd0281d65259446b1d462a81d7"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/make_cli.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/migration_executor.py",
+      "known_old_sha256": [
+        "8975d69a9f665b6bc5a77123e2519419390747fe21b13e4a6460c1aa2fd17d75"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/migration_executor.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/migration_journal.py",
+      "known_old_sha256": [
+        "441f80a6ed47211415f07dcbeba156e9418b02a7b7ba713b9600f7bd4fd046b6"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/migration_journal.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/migration_store.py",
+      "known_old_sha256": [
+        "5241cc3ae454c9d42b2b2d6fd9c6c36c6426aa3963be4b5c082f1abd06c6bb47"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/migration_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/operation_journal.py",
+      "known_old_sha256": [
+        "5c25d4a6733e1826de8f2e6b1ec789b81cda2b410214d9893282a8658ae86a58"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/operation_journal.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/registry_store.py",
+      "known_old_sha256": [
+        "617e6e81253b16aa0a03c7ab402c93fb064bec18cabf91e879817c32b02f3f97"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/registry_store.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/template_scaffolder.py",
+      "known_old_sha256": [
+        "41ed82bd352ddaa5ba2d0c0ebd9e4f308fc65a82274d31d1b358196041614cf0"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/template_scaffolder.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/infra/writer_lock.py",
+      "known_old_sha256": [
+        "e34bd625f5002a07815dfe4b801019a9664133effcf9132485f74b8d799afda7"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/infra/writer_lock.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/io_json.py",
+      "known_old_sha256": [
+        "ab841c2e03f235520709ccb5badfae4e521fb9483f2e472b12b7309200e24924"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/io_json.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/nodes.py",
+      "known_old_sha256": [
+        "810cc07715243f552fb436d255acd26559763851dfe56310436ec80b94ef8a87"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/nodes.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/cli_text.py",
+      "known_old_sha256": [
+        "9998d622dfd6293d82660298a2fbb993c4fc3376d2a527b1b7b8926167909155"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/cli_text.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/completion.py",
+      "known_old_sha256": [
+        "e899ffe684a8209031985620b446a49db6275a3982f46688a8ab3427e1db779d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/completion.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/contracts.py",
+      "known_old_sha256": [
+        "7757ae83bf6cf9e4376a0be0623d497dee05208696beb893b473bf8d9939a11e"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/contracts.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/envelope.py",
+      "known_old_sha256": [
+        "e1f720ab91f801f1dd6128d74d223d3b732dbc588ef417a23b6f1c29d41ddd16"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/envelope.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/errors.py",
+      "known_old_sha256": [
+        "ef9b33260da9d40bd02df236a142540688ed8e7a6fb845c659b992a55e06ed3a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/errors.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/json_state.py",
+      "known_old_sha256": [
+        "cab662cb04608a33dcbacba14baf3125c302758bb58a2c6b35a264b8bbf2ce49"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/json_state.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/markdown.py",
+      "known_old_sha256": [
+        "8695fe9b07c87681f37b8710bd28d738156b513191006539cf68add2734b561a"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/markdown.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/presentation/puml.py",
+      "known_old_sha256": [
+        "82ba94ea946f61721a47b073840b21fdbbb5b0c0ea987a9fd64a5373bc389d54"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/presentation/puml.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/render_md.py",
+      "known_old_sha256": [
+        "86bf5efd629c529cbabc10459e4c74922056ffdcf9f94ff418e17d2c17b3e5b0"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_md.py"
+      }
+    },
+    {
+      "path": "spec-dock/scripts/spec_dock_runtime/render_puml.py",
+      "known_old_sha256": [
+        "8e15922a8ca8ab463cc13d082d6e7148713e7d9b22f2a0ef43750a64836a1bce"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "src/spec_dock/assets/spec_dock/scripts/spec_dock_runtime/render_puml.py"
+      }
+    },
+    {
+      "path": "spec-dock/spec-dock.version",
+      "known_old_sha256": [
+        "2856851f22efcce3c92748c3cbf5299e1fd6e043cf4c3f5f318e94e3baeac72d"
+      ],
+      "source_basis": {
+        "commit": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+        "path": "spec-dock/spec-dock.version"
+      }
+    }
+  ]
+}

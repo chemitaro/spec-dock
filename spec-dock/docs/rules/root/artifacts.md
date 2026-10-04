@@ -1,25 +1,17 @@
 # ルートの成果物ルール（root / artifacts/rules.md）
 
-`artifact import file --root --file <path>` は、一件の明示 regular file を
-root の `spec-dock/artifacts/` へ generic Artifact として保存する経路です。
-Workbench は入力要件ではありません。source は変更・削除せず、imported bytes
-は opaque evidence として扱います。
+ルートのgeneric Artifactは、リポジトリrootから次のCurrent CLIで一件の明示regular fileをopaque evidenceとして保存します。
 
-- generic Artifact は canonical specification、review 済み内容、承認済み内容、
-  または採用済み判断ではありません。保存結果の `canonical=false` はこの境界を
-  表します。採用する主張だけを canonical docs または accepted ADR へ明示的に
-  反映し、必要な reviewer gate を通してください。
-- source が repository 内で安全に識別できるときだけ result は repo-relative
-  source を表示します。それ以外は basename だけを表示します。source bytes、
-  hash、byte count、repository 外の絶対 path は generic result に出しません。
-- success は `committed=true` です。通常は
-  `publication_state=committed`、commit 後に許可された durability / cleanup
-  warning が残る場合は `committed_with_warning` になります。どちらも
-  `retry_disposition=not_needed` です。commit 前 failure は
-  `not_committed` と `safe_after_remediation` で返ります。
-- filename、timestamp slot、collision と normalized basename の契約は
-  [reference_naming.md](../../reference_naming.md) を参照してください。
+```sh
+./spec-dock/scripts/spec-dock artifact import file <path> --scope @root --json
+```
 
-root Artifact storage を初期化すると、`spec-dock/artifacts/rules.md` はこの
-provider-managed rules source への relative symlink になります。この
-`rules.md` は入口だけであり、本文の正本を node ごとに複製しません。
+PATH上の外部consoleを直接使う場合は、先頭を `spec-dock` に置き換えます。`@root` はルートArtifact置き場を選ぶ予約selectorであり、GitHub番号に対応するScope ID、work-targetのfile token、UUIDではありません。Workbenchは入力要件ではありません。
+
+- sourceはsingle-link regular fileとして読み、source自体を変更・削除しません。読んだbytesを `spec-dock/artifacts/` の一件のgeneric fileとしてno-replace公開します。
+- 保存したgeneric Artifactはcanonical specification、review済み内容、承認済み内容、採用済み判断ではありません。filename、拡張子、本文からtypeやauthorityを推測せず、採用する主張だけをRequirement、Design、Planまたはaccepted ADRへ明示的に反映します。
+- CLIが返す `data.result.artifact` のID、repository-relative path、typeを正本にします。Current v2 envelopeの `status`、`effects`、exit codeで成功、部分結果、不明、未実行を区別し、退役済みの `committed` / `publication_state` / `retry_disposition` fieldを前提にしません。
+- 作成時刻slot、normalized basename、collisionの契約は [reference_naming.md](../../reference_naming.md) を参照してください。保存済みArtifactのauthority flowは [Artifact Guide](../../authoring/artifacts.md) を参照してください。
+- Artifact公開はStartの同clone排他を取得せず、通常編集をSpecDockの権限制御下へ置きません。入力・owner・catalogの再確認と安全なno-replace公開はCurrent CLIが行います。
+
+root Artifact storageを初期化すると、`spec-dock/artifacts/rules.md` はこのprovider-managed rules sourceへのrelative symlinkになります。この `rules.md` は入口だけであり、本文の正本をnodeごとに複製しません。

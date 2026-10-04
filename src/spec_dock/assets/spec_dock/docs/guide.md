@@ -2,19 +2,22 @@
 
 ## Current
 
-Storage Core の操作は、現存する runtime command と次の参照を使います。
+通常packageの外部CLIを使い、仕様は各Scopeのcanonical filesから読みます。
 
-- [移行ガイド](migration.md)
+- [導入・移行・保全](migration.md)
 - [CLI参照](reference_cli.md)
 - [人間向け説明HTML](cli-redesign-guide.html)
 - [命名参照](reference_naming.md)
 - [依存関係管理参照](reference_deps.md)
-- [状態集計参照](reference_sync.md)
-- [GitHub 連携参照](reference_github.md)
+- [状態の観測](reference_sync.md)
+- [GitHub連携参照](reference_github.md)
 - [worktree参照](reference_worktree.md)
+- [Authoring Kit概要](authoring/overview.md)
 
-仕様を作成・更新するときは、[Authoring Kit 概要](authoring/overview.md) から始めます。文書の役割、scope の境界、Planning Level、Artifact の扱いは Authoring Kit で確認します。
+新規ScopeはGitHubの番号を使います。Startにはbranch作成・checkoutと直接記録、FinishにはGitHub完了確認と捕捉記録の解除があります。仕様の編集や作業の引継ぎをIssue完了と混同しません。
+
+複数worktreeの状態は `workspace sync` で都度観測します。成果物を生成し直して保存するコマンドではなく、複数の予約・論理active・祖先をまとめて返します。Codex processの実行状況は推定しません。
 
 ## Historical
 
-既存証跡の扱いは [Historical authoring](authoring/historical.md) と[過去版CLI](historical/README.md) に分けています。Current の新規作成手順ではありません。
+[Historical authoring](authoring/historical.md)と[過去版の位置づけ](historical/README.md)は既存証跡の確認用です。Current の新規作成手順ではありません。

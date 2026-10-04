@@ -1,0 +1,868 @@
+<!doctype html>
+<html lang="ja" data-plantuml-status="pending" data-plantuml-contract="2">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>SpecDock #413 — 外部CLIとworktreeごとの最小状態</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --background: #f3f6fb;
+      --surface: #ffffff;
+      --text: #182230;
+      --muted: #536273;
+      --border: #d8e0ea;
+      --accent: #175cd3;
+      --success: #067647;
+      --success-bg: #ecfdf3;
+      --error: #b42318;
+      --error-bg: #fef3f2;
+      --code-bg: #101828;
+      --code-text: #f2f4f7;
+    }
+
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--background);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic", sans-serif;
+      line-height: 1.75;
+    }
+
+    main {
+      width: min(100% - 24px, 960px);
+      margin: 0 auto;
+      padding: max(24px, env(safe-area-inset-top)) 0 max(48px, env(safe-area-inset-bottom));
+    }
+
+    header, section {
+      margin-top: 20px;
+      padding: 22px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      box-shadow: 0 6px 24px rgb(16 24 40 / 8%);
+    }
+
+    header { margin-top: 0; }
+    h1, h2 { line-height: 1.4; }
+    h1 { margin: 0 0 12px; font-size: clamp(1.6rem, 5vw, 2.25rem); }
+    h2 { margin: 0 0 8px; font-size: clamp(1.2rem, 4vw, 1.5rem); }
+    p { margin: 8px 0; }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+    .plantuml-status {
+      margin-top: 16px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: var(--success-bg);
+      color: var(--success);
+      font-weight: 700;
+    }
+
+    .plantuml-status.error { background: var(--error-bg); color: var(--error); }
+    .plantuml-diagram {
+      position: relative;
+      min-height: 160px;
+      margin-top: 14px;
+      padding: 14px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: #ffffff;
+      color: #182230;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .plantuml-diagram[data-zoom-ready="true"] { cursor: zoom-in; }
+    .plantuml-diagram[data-zoom-ready="true"]:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .diagram-zoom-hint {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      padding: 5px 9px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface);
+      color: var(--accent);
+      box-shadow: 0 2px 8px rgb(16 24 40 / 14%);
+      font-size: 0.78rem;
+      font-weight: 700;
+      pointer-events: none;
+    }
+
+    .plantuml-diagram svg {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+
+    details { margin-top: 12px; }
+    summary { cursor: pointer; color: var(--accent); font-weight: 700; }
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      overflow-x: auto;
+      border-radius: 10px;
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-size: 0.8rem;
+      line-height: 1.55;
+      white-space: pre;
+    }
+
+    .muted { color: var(--muted); }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    body.diagram-zoom-open { overflow: hidden; }
+
+    .diagram-zoom-dialog[hidden] { display: none !important; }
+    .diagram-zoom-dialog {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: grid;
+      place-items: center;
+      padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+      background: rgb(3 10 21 / 78%);
+    }
+
+    .diagram-zoom-panel {
+      display: flex;
+      flex-direction: column;
+      width: min(1800px, 100%);
+      height: min(1200px, 100%);
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: var(--surface);
+      box-shadow: 0 24px 80px rgb(0 0 0 / 45%);
+    }
+
+    .diagram-zoom-header {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      margin: 0;
+      padding: 6px 8px;
+      border: 0;
+      border-bottom: 1px solid var(--border);
+      border-radius: 0;
+      background: var(--surface);
+      box-shadow: none;
+    }
+
+    .diagram-zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .diagram-zoom-controls button {
+      display: inline-grid;
+      place-items: center;
+      width: 40px;
+      height: 40px;
+      padding: 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--surface);
+      color: var(--text);
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    .diagram-zoom-controls button svg {
+      width: 20px;
+      height: 20px;
+      fill: none;
+      stroke: currentcolor;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .diagram-zoom-controls button:hover,
+    .diagram-zoom-controls button:focus-visible {
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    .diagram-zoom-controls button:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+    }
+
+    .diagram-zoom-level {
+      min-width: 3.5rem;
+      text-align: center;
+      font-variant-numeric: tabular-nums;
+      font-weight: 700;
+    }
+
+    #diagram-zoom-reset {
+      width: auto;
+      min-width: 58px;
+      padding-inline: 8px;
+    }
+
+    .diagram-zoom-viewport {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      background: #ffffff;
+      overscroll-behavior: contain;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .diagram-zoom-canvas {
+      width: max-content;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 24px;
+    }
+
+    .diagram-zoom-canvas svg {
+      display: block;
+      max-width: none;
+      height: auto;
+      margin: 0;
+    }
+
+    @media (max-width: 640px) {
+      .diagram-zoom-dialog { padding: 0; }
+      .diagram-zoom-panel { border-radius: 0; }
+      .diagram-zoom-canvas { padding: 16px; }
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --background: #0c111d;
+        --surface: #161b26;
+        --text: #f5f7fa;
+        --muted: #b9c2cf;
+        --border: #333b48;
+        --success-bg: #053321;
+        --error-bg: #55160c;
+      }
+    }
+
+    /* 本文用の補助スタイル。描画処理と共有modalは変更しない。 */
+    html { scroll-behavior: smooth; scroll-padding-top: 16px; }
+    a { color: var(--accent); text-underline-offset: .2em; }
+    h2 a, h3 a { color: inherit; }
+    h3 { line-height: 1.45; margin: 24px 0 10px; font-size: 1.08rem; }
+    p, li, td, th { overflow-wrap: anywhere; }
+    p code, li code, td code { font-size: .9em; }
+    .eyebrow { color: var(--muted); font-size: .8rem; letter-spacing: .07em; font-weight: 700; }
+    .lead { font-size: 1.06rem; }
+    .notice { border-left: 4px solid var(--accent); padding: 12px 16px; margin: 18px 0; background: var(--background); border-radius: 0 9px 9px 0; }
+    .notice p { margin: 4px 0; }
+    nav { margin-top: 22px; }
+    .toc { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 4px 22px; padding-left: 1.5rem; }
+    .toc li { padding: 3px 0; }
+    .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 18px 0; border: 1px solid var(--border); border-radius: 10px; }
+    table { width: 100%; border-collapse: collapse; min-width: 520px; font-size: .9rem; }
+    caption { text-align: left; padding: 12px; font-weight: 700; }
+    th, td { text-align: left; padding: 12px; vertical-align: top; border-bottom: 1px solid var(--border); }
+    th { background: var(--background); }
+    tbody tr:last-child td { border-bottom: 0; }
+    .back { margin-top: 24px; font-size: .85rem; text-align: right; }
+    .source-note { color: var(--muted); font-size: .82rem; }
+    .steps { padding-left: 1.5rem; }
+    .steps li { padding: 5px 0; }
+    .tag { display: inline-block; font-size: .78rem; font-weight: 700; padding: 2px 8px; border-radius: 5px; background: var(--background); color: var(--muted); }
+    .mono { font-family: ui-monospace,SFMono-Regular,Menlo,monospace; font-size: .86rem; }
+    footer { padding: 20px 6px; font-size: .85rem; color: var(--muted); }
+    @media (max-width: 640px) {
+      main { width: min(100% - 20px,960px); }
+      main > header, main > section { padding: 16px; border-radius: 12px; }
+      .toc { grid-template-columns: minmax(0,1fr); }
+      th,td { padding: 10px; }
+      pre { font-size: .74rem; }
+    }
+    @media (prefers-color-scheme: dark) { a { color: #84adff; } }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+  </style>
+</head>
+<body>
+  <main>
+<p class="notice"><strong>2026年10月4日の文書整備:</strong> ChatGPT Use Strictの全文置換を採用し、配布元と現在0805 worktreeの文書を更新しました。実行コードと既存Final Quality Gateの対象は変わりません。<a href="https://github.com/chemitaro/spec-dock/pull/414">PR #414</a>を作成済みです。文書の定型文を確認するCI指摘を修正し、文書・配布の関連299件が成功しました。最新のCIとマージ準備状況はPR、採用内容は<a href="artifacts/documentation-alignment-20261004.md">文書整備の記録</a>を参照してください。人間merge、他worktreeの移行、正式Issue Start、package publicationは未完了です。</p>
+<p class="notice">原稿生成時の観測（2026年10月3日）：製品コードと合意済み仕様の固定点は <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> です。同SHAの既存Final Quality Gate v2証拠、OS別試験、現在0805 worktreeへの限定適用を保持し、mainとほか3 linked worktreeの移行、正式Issue #413のStart、人間merge、package publicationは未完了として分けます。この文書差し替え自体に新しいGate認定は付けません。</p>
+
+<header id="top">
+<p class="eyebrow">SPECDOCK · ISSUE #413 · PLANNING PACK</p>
+<h1>普段のCLIとして動かし、<br>作業対象だけを各worktreeに残す</h1>
+<p class="lead">helpを見るために独自の制御情報を復旧する必要はありません。外部にインストールしたSpecDockを起動し、作業場所ごとに一つの対象を選び、必要なときだけ他の作業場所を確認する形へ改めます。</p>
+<div class="notice"><p><strong>製品実装の固定点とrollout状態を分けて読みます。</strong>現在0805 worktreeには外部package、薄いshim、writer宣言、静的資産が適用済みです。ほかのworktreeへ自動伝播したとは扱わず、formal #413 Start、merge、publicationも未完了です。</p><p>三階層、GitHub番号のScope ID、Start、Finish、同clone観測の意味を維持しながら、独自control・registry・journal・cacheを常設しない構成です。</p></div>
+<p>初めて読む方も、このHTMLだけで背景、正常操作、失敗時の振る舞い、変更範囲、移行と実装の順番を追えるようにしています。詳しい実装契約は <a href="requirement.md">要件</a>・<a href="design.md">設計</a>・<a href="plan.md">計画</a>にあります。</p>
+<p class="source-note">現在の製品正本：chemitaro/spec-dock / <code>codex/iss-00413-external-cli-state</code> / <span class="mono">8606e132327066d56567556e336e4bc1ae6a0b17</span>。接続GitHubでbranch tipの完全SHA一致を確認しました。直近の0805・peer・GitHub Issue状態はGitHub未収録のcaller-provided観測であり、実装sourceの根拠とは分けます。確定要求の根拠は<a href="artifacts/user-decisions.md">2026年9月30日の回答</a>です。</p>
+<nav aria-label="この資料の目次"><h2>目次</h2><ol class="toc"><li><a href="#os-support">対応OSとWindows撤去</a></li><li><a href="#purpose">何を直し、何を残すのか</a></li><li><a href="#engine-history">なぜengineとcontrolが追加されたのか</a></li><li><a href="#words">状態を三つに分けて読む</a></li><li><a href="#architecture">新しい全体構成と保存場所</a></li><li><a href="#start">Startはbranch操作まで行う</a></li><li><a href="#finish">Finishは完了とCloseを行う</a></li><li><a href="#parallel">複数worktreeとSyncの見方</a></li><li><a href="#changes">既存CLIで変わること・残ること</a></li><li><a href="#failures">失敗したときに何が残るのか</a></li><li><a href="#ids">IDと既存データを守る</a></li><li><a href="#migration">controlなしの環境から切り替える</a></li><li><a href="#implementation">実装履歴と現在の完了証拠</a></li><li><a href="#checks">文書差し替えと残るrolloutの確認</a></li></ol></nav>
+<div id="plantuml-status" class="plantuml-status" role="status" aria-live="polite">図を読み込んでいます。</div>
+<p class="source-note">図の初回描画には、固定版 @plantuml/core@1.2026.6 をCDNから取得するインターネット通信が必要です。図ソースは外部の描画サーバーへ送りません。CDNに接続できなくても本文は読めます。描画できた図はクリック、Enter、Spaceで拡大できます。</p>
+</header>
+<section id="progress"><h2>実装固定点の検証と導入状況（2026年10月3日観測）</h2>
+<p>製品コードと合意済み仕様は、GitHub connectorでbranch tip一致を確認した <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> が固定点です。既存のFinal Quality Gate v2はこのSHAでcoverage complete、13 perspective、P0/P1は0、情報提供P2は3件です。今回の文書差し替え候補を新しくGate認定したものではありません。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="現在の検証結果"><table><thead><tr><th scope="col">確認範囲</th><th scope="col">保持する結果</th><th scope="col">読み方</th></tr></thead><tbody><tr><td>native macOS</td><td>1916件成功・1件skip</td><td>exact SHAに結び付く既存lane。レビュアー自身の実行証拠とは分ける</td></tr><tr><td>Linux</td><td>1900件成功・17件skip</td><td>exact SHAに結び付く既存lane。macOS件数と合算しない</td></tr><tr><td>Python 3.10境界</td><td>210件成功</td><td>対応下限の境界試験で、別環境の全件試験という意味ではない</td></tr><tr><td>外部consoleの手動flow</td><td>14操作</td><td>実Gitとstateful gh stubを使用。live GitHub Close認定ではない</td></tr><tr><td>Final Quality Gate v2</td><td>coverage complete、13 perspective、P0/P1=0、P2=3</td><td>原Gate JSONとexact SHAを保持。将来の文書commitへ合格を転記しない</td></tr></tbody></table></div>
+<p>三つの情報提供P2は、効果前のdirectory作成失敗をpartial/unknownへ分類し得る点、plan末尾がP-16詳細へ追随していなかった点、非UTF-8 pathnameを含む診断がUTF-8 JSON保証を破り得る点です。この版ではplanの集約表示だけを文書上直します。残る二つは製品コードの既知事項で、今回の文書作業では変更しません。</p>
+<p>caller-provided local observationでは、現在0805 worktreeにnon-editableな0.2.4 package、薄いshim、writer宣言、静的資産が適用済みです。<code>spec-dock help</code>、empty active、240 Scopeのvalidateを確認しました。mainとほか3 linked worktreeは未移行で、clone全体のSyncはpartial（exit 7）です。mainのmigration dry-runはlegacy active schema 2の影響を確定できず <code>LEGACY_IMPACT_UNVERIFIED</code>（exit 3）で停止しました。</p>
+<p>原稿生成時点では、正式なIssue #413 import/Start、PR、human merge、package publicationは未完了でした。2026年10月4日にPR #414を作成しました。正式Start、人間merge、package publicationは引き続き未完了です。caller-provided観測では#413と#356はopen、ancestor #31はclosed/completedです。この資料は#31のreopenや付替えを指示せず、他worktree移行や正式Startを完了扱いにしません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section>
+<section id="os-support"><h2>対応OSを確定し、Windows専用部分を撤去した</h2>
+<p>対応するOSは<strong>LinuxとmacOS</strong>です。help・version・completionは対応OS判定より先に処理し、業務コマンドは非対応OSでproject、Git、GitHub、保存先へ作用する前に <code>UNSUPPORTED_PLATFORM</code>（exit 3）で停止します。</p>
+<p>過去の設計にはWindows用adapter、test、CIを完成させる要求がありましたが、2026年10月2日の利用者決定で失効しました。Windows専用source/test/CIは現在の製品treeから撤去済みです。歴史的な検討、試験、失敗記録はraw historyとして残し、現在の未完了義務へ戻しません。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="撤去した部分と維持する部分"><table><thead><tr><th scope="col">撤去した部分</th><th scope="col">維持した部分</th></tr></thead><tbody><tr><td>WindowsDirectory、WindowsMutex、Win32 reader、Windows専用test/CI</td><td>Linux/macOSのphysical identity、nofollow読取、安全な公開・解除</td></tr><tr><td>Windows native/NTFS合格義務</td><td>Startだけの短いflock、branch/checkout、Finish、複数worktree Sync</td></tr></tbody></table></div>
+<p>work-target v1の物理識別はPOSIX形式です。Scope schema3、GitHub番号のID、親子、依存、linkageは変えません。代替の中央台帳、daemon、cache、lock file、ACL/permission管理を追加していません。</p>
+<p>この撤去とLinux/macOSでの製品検証はexact SHAの既存実装・証拠として完了しています。今後残るのは、未移行worktreeの明示的な移行、formal #413 Start、人間merge、任意のpackage publicationであり、Windows portではありません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section>
+<section id="purpose"><h2>01　何を直し、何を残すのか</h2>
+<p>SpecDockは、Initiative・Epic・Issueの三階層で仕様、依存関係、成果物を管理するPython CLIです。現在は、開発source、実行package、consumerの静的資産、worktree-localな直接記録を別の所有物として扱います。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="SpecDockの四つの層"><table><thead><tr><th scope="col">層</th><th scope="col">場所と役割</th><th scope="col">更新単位</th></tr></thead><tbody><tr><td>provider開発source</td><td><code>src/spec_dock/</code>。製品コードと配布assetの正本</td><td>repositoryのsource変更</td></tr><tr><td>installed runtime</td><td>利用者のtool環境に通常導入した <code>spec-dock</code></td><td>利用者共通のpackage更新。source編集やbranch切替では変わらない</td></tr><tr><td>consumer静的資産</td><td>docs/system/templates、root skills、shim、workspace宣言</td><td>明示したworktree一つずつ。Python runtimeはコピーしない</td></tr><tr><td>直接作業記録</td><td><code>spec-dock/.agent/work-target/target-&lt;token&gt;.json</code></td><td>そのworktreeだけのignored runtime state</td></tr></tbody></table></div>
+<p>旧方式では、checkout外の独自engineへ到達する前にlocator/controlを読んだため、controlが欠けるとhelpさえ表示できない経路がありました。これは今回の変更理由を示す歴史的baselineです。Current shimはPATH上の外部consoleへargv、cwd、exitを委譲し、checkout内PythonやGit common-dirの独自controlを実行前提にしません。</p>
+<p>main worktreeを制御拠点にはしません。一方、「どのScopeを作業対象にしているか」は各worktreeに一件だけ残します。file tokenはその記録実体用であり、GitHub番号から作るScope ID、UUID、operation IDではありません。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="残すことと取り除いたこと"><table><thead><tr><th scope="col">残すこと</th><th scope="col">取り除いたこと</th></tr></thead><tbody><tr><td>三階層、既存ID、依存、仕様・Artifact・Workbench</td><td>独自採番台帳、共有branch binding台帳、全worktree登録名簿</td></tr><tr><td>branch作成・checkoutを含むStart、完了・Closeを含むFinish</td><td>独自engine locator/controlの必須化、永続operation journal、自動resume/rollback</td></tr><tr><td>一worktree一対象、同じ直接対象の二重開始防止、複数対象のSync表示</td><td>daemon、常時監視、初期cache、通常編集全体のlockや権限制御</td></tr></tbody></table></div>
+<p class="source-note">設計経緯と旧実装のraw historyは<a href="artifacts/source-basis.md">source-basis</a>、現在の製品契約はこの資料の正本SHAとR/D/Pで区別して確認します。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="engine-history"><h2>02　なぜengineとcontrolが追加されたのか</h2>
+
+<p>旧方式にも解こうとした問題がありました。CLI自身のソースをcheckout内から読むと、コマンドの途中でbranchを切り替えた後、まだ読み込んでいないmoduleだけが別版になるおそれがあります。#409の設計D-02は、このコード混在を避けるため、checkout外の固定engineを採用しました。</p>
+<p>さらに、branchとScopeの対応をtracked metadataへ書くと、それだけで作業treeがdirtyになり、checkoutを妨げます。D-08はその対応をGit common-dirのregistryへ移す理由を示しました。D-09とD-13は、共有controlと各worktreeのactiveを分け、登録worktreeの互換性や書き込み許可を判定する仕組みを定めました。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">旧要素</th><th scope="col">実際の役割</th><th scope="col">今回の扱い</th></tr></thead><tbody><tr><td>engineの実体</td><td>checkout外に置いた実行コード。処理を行う本体</td><td>通常のインストール済みpackageへ統合する</td></tr><tr><td>engine.json（locator）</td><td>どこにある実体を、どのdigestで使うかの案内</td><td>通常起動では不要にする。これ自体は実行コードではない</td></tr><tr><td>control.json</td><td>mode、世代、登録worktree、互換性などの制御状態</td><td>新しい中央controlを設けない</td></tr><tr><td>active / registry</td><td>前者は作業対象、後者は採番・削除記録・任意branch対応</td><td>直接対象一件だけを各worktreeに残し、共有台帳はなくす</td></tr><tr><td>journal / writer lock</td><td>複数段階操作の中断復旧、広い書き込みの直列化</td><td>journalはなくす。排他はStartの短い区間だけにする</td></tr></tbody></table></div>
+<p>例えば旧Startの新branch経路は、branch作成、registryへの対応保存、checkout、選択保存という段階をjournalへ記録していました。復旧を自動化するためには、その段階や前像も維持する必要がありました。journalは単なる表示用cacheではありません。</p>
+<p>今回もコードをcheckout外に置く狙いは残します。ただし、通常の外部インストールを使うので、SpecDock独自の固定配布物をもう一度作る必要はありません。復旧は「現物を確認して、新しい明示操作を行う」方式へ変え、失った過去の送信意図まで自動復元する保証は手放します。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">時期（日本時間）</th><th scope="col">確認したcommit metadataの要旨</th></tr></thead><tbody><tr><td>2026-09-24 19:03　7a10e783</td><td>CLI再設計の要件・設計・計画、状態分離・復旧・移行を拡充</td></tr><tr><td>同日21:35　f44cc4f8 / 22:00　d96065a2</td><td>共通writer制御・互換性検証、その後に外部固定配布物の検証を追加</td></tr><tr><td>2026-09-25 08:40　1226d700 / 09:46　9c879c8a</td><td>外部CLI・shim、固定engine経由の公開入口と構築を追加</td></tr><tr><td>同日14:20　7964b6c1</td><td>engine世代の引継ぎ、activate/resume/rollbackを追加</td></tr></tbody></table></div>
+<p class="source-note">経緯は<a href="artifacts/source-basis.md#history">#409設計・報告と6 commitの確認範囲</a>に基づきます。今回直接検証した歴史commitはSHA・日時・messageであり、全diffや過去版D-02の全文を再検査したとはしていません。過去agentの内心や全consumerへの展開完了も推測しません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="words"><h2>03　状態を三つに分けて読む</h2>
+
+<p>「作業中」という一言では、違う種類の状態が混ざります。この設計では、次の三つを別々に表示します。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">状態</th><th scope="col">意味</th><th scope="col">意味しないこと</th></tr></thead><tbody><tr><td>作業対象として選択中</td><td>そのworktreeに直接対象の記録が一件ある</td><td>人が今キーボードを操作している、Codexが稼働している</td></tr><tr><td>GitHubのOpen / Closedと理由</td><td>今回確認したIssueの状態。completed、not-planned、unknownを区別する</td><td>選択されているだけで完了した、Closedなら必ずcompleted</td></tr><tr><td>Codexプロセス稼働</td><td>この版では観測しない。表示値はnot_observed</td><td>選択日時やPIDの推測による稼働確認</td></tr></tbody></table></div>
+<p>例えばGitHubがcompletedになっても、別の作業場所に選択記録が残ることはあります。Syncは両方をそのまま示します。その記録を見て「依存条件が満たされた」とは判定しません。依存先自身がcompletedであるという確認が必要です。</p>
+<p><strong>直接対象</strong>とは、今そのworktreeが一つだけ選んでいるScopeです。Issueを選んだときに表示される親EpicやInitiativeは文脈であり、同時に三つの対象を取得しているわけではありません。<strong>main worktree</strong>はcloneの最初の作業場所で、mainというbranch名とは別です。</p>
+<p><strong>unknown</strong>は、状態や操作結果を確認できていないという意味です。「存在しない」「未送信」「完了した」のどれにも置き換えません。<strong>stale</strong>は、選択記録はあるものの、現在のcheckoutの対象・linkageなどと一致を確認できない状態です。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="architecture"><h2>04　新しい全体構成と保存場所</h2>
+
+<p>各worktreeのruntime stateとして置くのは、直接対象を示す一件の小さなignored fileだけです。docs/system/templates/skills/shimは別の静的資産で、外部packageはさらに別の利用者tool環境にあります。同じcloneの作業場所を知るときはGitの一覧を読み、SpecDockが同じ名簿をもう一つ保存することはありません。</p>
+<script type="text/plain" class="plantuml-source" id="source-architecture" data-target="diagram-architecture">
+@startuml
+title 通常の外部CLIと各worktreeの一件だけの記録
+top to bottom direction
+actor "利用者" as User
+component "checkout外の\nインストール済みSpecDock" as CLI
+component "Git\n同じcloneのworktree一覧" as Git
+package "main worktree（特別な制御役ではない）" {
+  artifact "仕様・metadata" as MainDocs
+  artifact "直接対象 A の一件\nignored・Git内部ではない" as MainState
+}
+package "linked worktree" {
+  artifact "仕様・metadata" as LinkedDocs
+  artifact "直接対象 B の一件\nignored・Git内部ではない" as LinkedState
+}
+cloud "GitHub\n必要なIssueの状態" as GH
+User --> CLI : コマンドを実行する
+CLI --> Git : 必要時に一覧を読む
+CLI --> MainDocs : 自分の仕様を読む
+CLI --> LinkedDocs : 集計に必要な対象と祖先を読む
+CLI --> MainState : 直接対象を読む
+CLI --> LinkedState : 直接対象を読む
+CLI --> GH : 必要なときだけ確認・変更する
+note bottom of CLI
+中央台帳・daemon・cacheは置かない
+Startの同時開始だけOS排他で調整する
+end note
+@enduml
+</script>
+<div id="diagram-architecture" class="plantuml-diagram">構成図を描画しています。</div>
+<details><summary>この図のPlantUMLソースを確認する</summary><pre data-source-copy="source-architecture"></pre></details>
+<h3>保存する場所と内容</h3>
+<pre><code>&lt;worktree-root&gt;/spec-dock/.agent/work-target/
+  target-&lt;32桁の不透明なtoken&gt;.json   ← 最終ファイルは0件または1件</code></pre>
+<p>このtokenは、一件の保存実体を区別する名前です。ScopeのUUID、独自採番、operation ID、過去の履歴ではありません。同じScopeを選び直す場合も別の名前を使い、古いファイルは解除時に削除します。</p>
+<p>記録するのはScope ID、GitHub参照、選択時branch、選択時刻、clone/worktreeの物理的な識別情報とschemaです。親や完了状態、PID、全worktree一覧、操作のphaseは保存しません。親は現在のmetadataから導出します。記録の具体例と型は<a href="artifacts/examples.json">実例</a>と<a href="artifacts/data-schema.json">data schema</a>にあります。</p>
+<p>既存の配布assetでは <code>.agent/</code> はignore対象です。それでもStartの前には現在のcheckoutで本当に未追跡・ignore対象かを調べます。追跡されている、ignoreされていない場合は止まり、Git内部や <code>.git/info/exclude</code> を自動変更して逃げません。選択によるtracked差分は作りません。</p>
+<h3>checkoutした後も記録は残る</h3>
+<p>通常Gitで別branchへ移っても記録は勝手に切り替わりません。選択時branchと現在branchを別に表示します。対象と祖先が現在treeにもあれば選択を利用できます。対象が消えた、linkageが変わった場合はstaleとして動的操作を止め、<code>active clear --all</code> で明示的に解除できます。</p>
+<p>プロセスが終了しても、時間がたっても記録は残ります。逆にignoredファイルを強制cleanや手削除で失った場合は、台帳から復活させません。Gitとremoteの現状を確認し、新しいStartで選び直します。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="start"><h2>05　Startはbranch操作まで行う</h2>
+
+<p><code>work start</code> は、記録だけを置くコマンドには縮小しません。対象と依存を確認し、必要ならbranchを作り、checkoutしてから選択を確定します。三階層のどのScopeにも使えます。</p>
+<p>新しいbranchを作るときは <code>--base</code> が必要です。名前を省略すれば従来と同じ <code>&lt;Scope ID&gt;-&lt;slug&gt;</code> を候補にします。既存branchを使うときは <code>--branch</code> で名前を明示し、<code>--base</code> は付けません。共有binding台帳による自動判定をやめる代わりに、利用する名前を確かめます。</p>
+<pre><code># Current CLI：対象を含むcleanなcommitから新branchを作る
+spec-dock work start iss-00413 --branch fix/external-cli --base HEAD --dry-run --json
+spec-dock work start iss-00413 --branch fix/external-cli --base HEAD --json
+
+# 既存branchを再利用するとき（現物確認後、--baseなし）
+spec-dock work start iss-00413 --branch fix/external-cli --json</code></pre>
+<p>importや資料編集でtracked差分がある場合、Startが自動stashやcommitを行うことはありません。通常Gitで必要な保存を済ませ、切替先commitにもScope/祖先が存在するようにしてから進みます。</p>
+<script type="text/plain" class="plantuml-source" id="source-start" data-target="diagram-start">
+@startuml
+title Startの重複確認から開始記録までを一つの排他区間にする
+actor "利用者" as U
+participant "外部CLI" as C
+participant "GitHub" as H
+participant "OSの共通排他" as L
+participant "Git" as G
+participant "各worktreeの記録" as W
+U -> C : Startを指定する
+C -> H : 対象・祖先・依存の必要な状態を確認する
+H --> C : 今回の観測を返す
+C -> C : 対象・確認内容を固定する
+group 共通排他を保持する区間（Startだけ）
+C -> L : 同じcloneの開始排他を取得する
+C -> G : worktree一覧・branch・現物を再確認する
+C -> W : 全直接対象を読んで重複を調べる
+C -> G : 必要ならbranchを作成しcheckoutする
+G --> C : 成否と元のエラー出力を返す
+C -> C : 切替後の対象と保存先を照合する
+C -> W : 成功時だけ直接対象一件を公開する
+C -> L : 成功・失敗のどちらでも解放する
+end
+C --> U : 成功または部分失敗と効果を返す
+note over C,L
+GitHub待ち・確認promptは排他の外
+確認後に解放してから記録する方式にはしない
+end note
+@enduml
+</script>
+<div id="diagram-start" class="plantuml-diagram">Startの操作図を描画しています。</div>
+<details><summary>この図のPlantUMLソースを確認する</summary><pre data-source-copy="source-start"></pre></details>
+<h3>排他は、通常編集の禁止ではない</h3>
+<p>重複確認だけをしてロックを解放すると、二つのStartが両方「空いている」と判断してしまいます。そのためbranch効果と記録公開までを一つの区間にします。取得後もcurrent treeと他worktreeを確認し直します。GitHub待ちや利用者の確認promptはこの区間に入れません。</p>
+<p>Linux/macOSでは既存common-dirを開いたdescriptorに <code>flock</code> をかけます。Git内部や <code>system/.runtime/</code> に新しい独自lock fileを置きません。このStart-only境界はexact SHAの実装・既存試験証拠で確認済みです。Windowsのnamed mutexと保存adapterは対応範囲外です。</p>
+<p>通常ファイル編集、metadata更新、Sync、GitHub操作、Finish、active clearはこの共通ロックを取りません。Git自身の通常index/ref lockまでなくすという意味でもありません。非協調の外部Gitや手編集を全面封鎖する保証はありません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="finish"><h2>06　Finishは完了とCloseを行う</h2>
+
+<p><code>work finish TARGET --yes</code> は対象をcompletedにし、GitHub-backed ScopeならIssueをCloseします。単なる中断、選択解除、引継ぎをFinishとは呼びません。終了後も現在branchに留まり、自動checkout、branch削除、commit/push/mergeはしません。</p>
+<p>親を完了するには、必要な子孫自身のcompletedを確認します。Open、unknown、not-plannedの子を完了済みに数えません。GitHubが既にcompletedなら余計なPATCHを送らず、その時点の条件を確認します。真正の旧local backendが他consumerに残る場合の既存データ保全は、GitHubをCloseした実績と区別します。</p>
+<pre><code># Current CLI。製品の完了判断と確認後だけ実行する
+spec-dock work finish iss-00413 --dry-run --json
+spec-dock work finish iss-00413 --yes --json
+
+# 中断だけなら既存の解除を使う。IssueはCloseしない
+spec-dock active clear --all</code></pre>
+<script type="text/plain" class="plantuml-source" id="source-finish" data-target="diagram-finish">
+@startuml
+title Finishは完了確認後に捕捉済みの選択だけを解除する
+actor "利用者" as U
+participant "外部CLI" as C
+participant "GitHub" as H
+participant "自worktreeの記録" as W
+U -> C : Finish Aを指定し確認する
+C -> W : Aの記録名を一度だけ捕捉する
+C -> H : 対象・子孫を確認してCloseする
+alt 完了を確認できた
+H --> C : completedを確認できた
+C -> W : 最初に捕捉したAの記録だけを解除する
+W --> C : 解除済み、または既に不在
+C --> U : 完了と解除の結果を返す
+else Closeの成否を確認できない
+H --> C : 応答不明または確認失敗
+C --> U : unknown・部分失敗として返す
+note right of W
+Aの記録を残す
+完了したことにしない
+end note
+end
+note over C,W
+共通Startロックは取らない
+途中で新しいBが選択されてもBの記録を消さない
+Git branchはそのままにする
+end note
+@enduml
+</script>
+<div id="diagram-finish" class="plantuml-diagram">Finishの操作図を描画しています。</div>
+<details><summary>この図のPlantUMLソースを確認する</summary><pre data-source-copy="source-finish"></pre></details>
+<h3>遅れて終わるFinishが、次の対象を消さない</h3>
+<p>例えばFinish AがGitHub応答を待っている間に、利用者が明示的にAを解除してBをStartしたとします。Finish Aが戻った時点で「現在のactiveファイル」を消すと、Bを誤って消してしまいます。このため、最初に読んだAの記録名だけを解除します。新しいBの名前は別なので残ります。同じAを選び直した場合も、新しい記録を消しません。</p>
+<p>正常な連続利用は「AをFinish → BをStart」です。途中で別対象へ切り替える場合の <code>--switch-active</code> は明示的な選択変更で、Aの完了を捏造しません。Releaseという新しいコマンドは追加しません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="parallel"><h2>07　複数worktreeとSyncの見方</h2>
+
+<p>同じcloneのmainとlinked worktreeだけをGitから列挙します。各作業場所の直接記録を必要時に読み、その観測結果をSyncのstdoutまたはJSONに返します。中央ファイルへ全員分の選択を複製せず、generationやGitHub cacheも保存しません。</p>
+<h3>選択IDから現在のファイルを探す方法</h3>
+<p>作業記録にはIssueのIDとGitHub参照を残します。Issueの保存先はGitのファイル名検索で、その都度探します。まだコミットしていないファイルやignore対象の現在ファイルも含めます。ファイル名を探した後、SpecDockが内容と安全性を確認するのは、そのIssueと親Epic・Initiativeだけです。別のIssueの場所に通常ファイルやシンボリックリンクがあっても、正常な作業対象の観測を妨げません。</p>
+<p>例えば <code>iss-00413-old-name</code> を <code>iss-00413-new-name</code> へ移した場合は、現在の保存先とmetadataを読みます。同じIDの現存先が二つある場合は、どちらかを勝手に選びません。Git検索が失敗した場合や、対象・祖先が安全に読めない場合も不完全として扱います。記録の既知IDとGitHub参照は残るため、不明な作業対象を空扱いして二重に開始することはありません。</p>
+<p>Git内部の未追跡ファイル名探索には時間がかかる場合があります。全体が必ず三ファイル分の時間で終わる保証はせず、有限の待ち時間を設けます。新しいパス台帳や保存キャッシュは作りません。</p>
+<p>選択されていないIssueも表示対象です。例えばAを作業場所で選択したままGitHubで完了し、Bは誰も選択せずGitHubでオープンなら、「A：選択1件・完了」「B：選択0件・オープン」と別々に表します。JSONもIssueごとの状態一覧と選択件数を分けて返すため、未選択のBが一覧から消えることはありません。一部の作業場所を読めない場合は件数が不完全であると明示します。</p>
+<script type="text/plain" class="plantuml-source" id="source-sync" data-target="diagram-sync">
+@startuml
+title 別の子Issueは並行でき、親には件数を表示する
+top to bottom direction
+rectangle "同じcloneのGit一覧" as G
+rectangle "main worktree\n直接対象：Issue A" as A
+rectangle "linked worktree\n直接対象：Issue B" as B
+rectangle "Sync\n各記録と必要な祖先をその場で読む" as S
+rectangle "親Epicの表示\n直接選択 0件・配下選択 2件" as P
+rectangle "別項目として表示\nGitHub状態 / Codexは未観測" as V
+G --> A : 一覧に含まれる
+G --> B : 一覧に含まれる
+A --> S : Aの一件を読む
+B --> S : Bの一件を読む
+S --> P : 同じ親の子孫として集計する
+S --> V : 選択と完了を混ぜない
+note bottom of S
+同一の直接Scopeを二つの作業場では開始しない
+異なる子Issueは同じ親でも並行できる
+親自身の直接選択は配下件数とは別
+end note
+@enduml
+</script>
+<div id="diagram-sync" class="plantuml-diagram">Syncの集計図を描画しています。</div>
+<details><summary>この図のPlantUMLソースを確認する</summary><pre data-source-copy="source-sync"></pre></details>
+<p>上の例では、Epicを直接選択した作業場所はありませんが、配下で二つのIssueが選択されています。親Epic自体を別worktreeで選ぶ場合、その直接件数を別に示します。親子関係があるという理由だけで、異なる直接Scopeの作業を禁止しません。</p>
+<pre><code># 通信なしの必要時観測。GitHub-backedの状態はunknownになる
+spec-dock workspace sync --source local --json
+
+# 必要なGitHub状態も今回取得して表示する
+spec-dock workspace sync --source github --json</code></pre>
+<p>worktreeが消えている、権限で読めない、記録が壊れている場合は、不明な行と <code>complete=false</code> を返します。既知の件数を示しても「全件0」とは表示しません。明示GitHub取得が失敗した場合もunknownです。通常の読取が全て完了したlocal modeでは、GitHub未観測を明記したうえで成功にできます。</p>
+<p>新しいStartは重複を確認する必要があるため、同じcloneの一覧に読めない作業場があれば開始前に止まります。自動prune、別名簿からの補完、別cloneの探索はしません。一方、自分の <code>scope show ID</code> のような独立した読取まで、他作業場の不調で止めません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="changes"><h2>08　既存CLIで変わること・残ること</h2>
+
+<p>現catalogの44 leafは全件対応表に残します。名前を全て捨てて別CLIへ作り直す案ではありません。ただし、台帳や旧復旧保証をなくすために必要な意味・引数変更は明示します。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">操作</th><th scope="col">新しい契約</th><th scope="col">利用者への影響</th></tr></thead><tbody><tr><td>active show / 動的selector</td><td>直接対象と現在の祖先を表示。@current等は維持</td><td>前回の選択を参照できる。staleは黙って別対象へ変えない</td></tr><tr><td>active set</td><td>同じ妥当な直接対象ならunchanged。空/別対象の取得はStartへ</td><td>lock外のsetで二重開始を迂回できない。閲覧だけならscope showを使う</td></tr><tr><td>active clear / Finish後の選択</td><td>該当直接記録を解除し、親を自動選択しない</td><td>親Epicを作業対象にするなら、改めてStartする</td></tr><tr><td>branch show/create/switch</td><td>Scopeを指定する既存操作を維持、任意名は明示。共有bindingなし</td><td>branch切替だけでは作業対象を変えない</td></tr><tr><td>scope / dependency / Artifact</td><td>主な業務を維持。新規ScopeはGitHub必須、既存IDは保持</td><td>通常metadata編集へ全writerロックを追加しない</td></tr><tr><td>worktree / Workbench</td><td>Git一覧・明示path。既存copyや明示bootstrapも必要範囲で維持</td><td>独自WT ID/alias・receipt/recoverはなくす。破壊的範囲は明示する</td></tr><tr><td>workspace sync</td><td>コマンド名は維持し、その場の表示に変更</td><td>保存済みgenerationを正本やcacheとして読まない</td></tr><tr><td>installation / migrate</td><td>指定worktreeのstatic資産とworkspace宣言に限定</td><td>package更新・全worktree制御・engine世代を混ぜない</td></tr></tbody></table></div>
+<p>active setを制限する理由は、作業対象を取得する入口をStart以外に残すと、開始時だけの排他をすり抜けるためです。第二の閲覧用activeや第二のロックを作るのではなく、取得を一つに絞ります。これは利用者が逐語指定した旧仕様ではなく、確定要求を満たすために本版が選んだ技術設計です。</p>
+<p>旧部分clearやFinishでは親が次のfocusになっていました。それを残すと、別のworktreeで同じ親を選択中でも、ロックを取らず新しい直接対象を取得してしまいます。この暗黙の昇格をやめ、親は文脈と配下件数として扱います。</p>
+<p><code>--resume</code>、<code>--rollback</code>、<code>--recover</code>、cache指定、engine世代更新などは、対応する永続状態と一緒に廃止します。parserで具体的な代替を示し、副作用前に止めます。全optionと各操作の入力・出力は<a href="artifacts/cli-contract.md#catalog">44 leafの契約表</a>にまとめています。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="failures"><h2>09　失敗したときに何が残るのか</h2>
+
+<p>「成功か失敗か」だけでは、GitやGitHubに何が起きたか分かりません。新CLIは確定した効果、未実施、失敗、不明を分けて返します。<code>effects</code> は今回の返答内の説明であり、次のprocessが読む永続journalではありません。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">失敗点</th><th scope="col">残るもの</th><th scope="col">結果と次の確認</th></tr></thead><tbody><tr><td>重複、readiness、lock待ちで停止</td><td>Gitも選択も変更しない</td><td>原因を直し、新しいStartを行う</td></tr><tr><td>branch作成成功後、checkout失敗</td><td>新branch。旧選択があればそのまま</td><td>partial / exit6、started=false。Git原文とref/HEADを確認する</td></tr><tr><td>checkout成功後、記録公開失敗</td><td>現在branchと成功済みGit効果</td><td>partial。自動で元branchに戻さず、active showとGitを確認する</td></tr><tr><td>明示切替で旧記録解除後、新記録が保存できない</td><td>現在branch、選択は空になり得る</td><td>解除成功と公開失敗を別effectで返す。旧選択を自動復活しない</td></tr><tr><td>Closeの応答・確認が不明</td><td>選択は残す。remoteは完了したかもしれない</td><td>unknown / partial6。現GitHubを確認して新しい明示操作へ</td></tr><tr><td>Close成功後、選択解除が失敗</td><td>GitHubはcompleted、選択が残り得る</td><td>partial6。次の明示FinishはcompletedをGET確認し、不要な再PATCHをしない</td></tr><tr><td>強制停止で返答も失った</td><td>停止点までの現物だけ</td><td>次processは過去intentを知らない。自動resume/rollbackしない</td></tr></tbody></table></div>
+<h3>Gitの原文を隠さない</h3>
+<p>例えば、事前確認後に外部編集が入り、checkoutが次のようなエラーを返した場合です。これは説明用のfixtureであり、利用者端末で今回取得したエラーではありません。</p>
+<pre><code>error: Your local changes to the following files would be overwritten by checkout:
+    spec-dock/workspace.json
+Please commit your changes or stash them before you switch branches.
+Aborting</code></pre>
+<p>この文面を単に「checkoutに失敗しました」に置き換えません。text modeでは原文をstderrへ示します。JSON modeではstdoutを一個のJSONに保ち、原文を <code>error.details.git.stderr</code> に改行ごと保存し、制御下のstderrは空にします。GitのreturncodeとCLIのexit_codeを分けます。branchが既に作られていれば、Gitがexit1でもCLIはpartialのexit6です。</p>
+<p>認証tokenやURL内の秘密だけは最小限秘匿し、秘匿したことを明示します。通常のGit文面やpathを一律に削りません。既存Gateの情報提供P2では、filesystem/Git由来の非UTF-8 pathnameが診断へ入るとUTF-8 JSON保証を破り得る境界が記録されています。Currentの既知制限として保持し、この文書差し替えで修正済みとは扱いません。</p>
+<h3>例外を隠して全体の成功にしない</h3>
+<p>通常編集へ全writerロックを掛けないため、複数metadataの同時編集全体を一つのtransactionにはしません。公開前のsnapshot確認、無上書き公開、後続validateで不整合を検出し、事後の競合はpartialとして現物を示します。Startの重複開始防止と、任意の非協調編集まで完全に防ぐことを区別します。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="ids"><h2>10　IDと既存データを守る</h2>
+
+<p>正式な新しいInitiative・Epic・Issueは、GitHubのcreateまたは既存Issueのimportで作ります。独自の最大番号+1、予約台帳、UUID、オフライン正式発行は追加しません。GitHubが番号を確定するまでは、正式Scopeを公開しません。</p>
+<p>Issue #413を新規形式でimportする場合、IDは <code>iss-00413</code> です。prefixは階層を表し、番号は5桁以上に整形します。既存IDはこの規則へ無理に付け替えません。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="横にスクロールできる比較表"><table><thead><tr><th scope="col">守る対象</th><th scope="col">具体的な扱い</th></tr></thead><tbody><tr><td>既存IDとGitHub linkage</td><td>IDのlocalという綴りからbackendやGitHub番号を推定しない</td></tr><tr><td>schema3のScope metadata</td><td>不要な全件schema bump、ID/path/親子/依存の改名をしない</td></tr><tr><td>workspace.json</td><td>schema3のままwriter_protocolだけを明示切替。存在する旧control_epochだけ除く</td></tr><tr><td>未知の任意field・欠けている任意field</td><td>既存値を保持する。元々ないtitle/project_linkageを架空補完しない</td></tr><tr><td>削除の履歴</td><td>旧tombstoneは必要なら人間向けに保全。新CLIの永久再import禁止台帳にはしない</td></tr></tbody></table></div>
+<p>採用時にCodexが240件の現metadataを再検査し、schema3/backend githubとbytesの保全を記録しました。<code>init-local-00002</code> はGitHub #39、<code>init-local-00003</code> は#31に紐づきます。localという綴りから、新しいローカル発行を認める意味を読み取りません。この過去の照合と、実環境を切り替える直前・直後の全件照合は別です。</p>
+<p>現在の一treeに同じIDやGitHub参照が二重登録されていないかは検査します。ただし別branchに同じScopeが存在するのはGitのversionコピーです。全branch履歴を監視する独自台帳を復活させません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="migration"><h2>11　controlなしの環境から切り替える</h2>
+<p>製品runtimeとconsumer切替は別です。通常packageは利用者のtool環境へ導入し、static資産とworkspace宣言は明示したworktree一つずつ更新します。新しいconsumerはdocs/templates/system/skills/shimを受け取りますが、Python runtimeをcheckoutへコピーしません。source編集やbranch切替だけではinstalled packageも既存consumer資産も更新されません。</p>
+<ol class="steps"><li><strong>対象と実行物を確認します。</strong>同じclone、明示したworktree、外部console、candidate sourceとwheelを区別します。</li><li><strong>旧writerを止め、実体を保全します。</strong>仕様、ignored成果物、旧active、必要なregistry/journal、static資産をcheckout/Git外に保存し、復元比較します。</li><li><strong>controlなしで診断します。</strong>旧記録はread-only観測に限定し、unknown remoteやlegacy impactを確定できなければ止めます。</li><li><strong>workspace宣言だけを切り替えます。</strong>schema3を保ち、writer_protocolを <code>specdock.worktree-writer/v1</code> へ変更します。全Scope bytesを変更しません。</li><li><strong>static資産をworktree単位で更新します。</strong>既知path/hashだけを更新し、未知改変はmanual mergeへ戻します。</li><li><strong>Startで直接対象を取り直します。</strong>旧activeを新recordへ自動importせず、現在のGit状態と同clone予約を再確認します。</li></ol>
+<pre><code># 一つの明示worktreeを無変更で診断する
+spec-dock --project "$ROOT" workspace migrate --to-schema 3   --to-writer-protocol specdock.worktree-writer/v1 --dry-run --json
+
+# 既存Issue #413を取り込む計画だけを確認する
+spec-dock --project "$ROOT" scope import github issue   gh:chemitaro/spec-dock#413 --parent epic-00356   --title "External CLI State" --slug external-cli-state --dry-run --json</code></pre>
+<p>2026年10月3日のcaller-provided観測では、0805 worktreeは外部0.2.4 package、薄いshim、writer宣言、静的資産の適用済みです。mainとほか3 linked worktreeは未移行です。mainのdry-runはlegacy active schema 2の影響を確定できず <code>LEGACY_IMPACT_UNVERIFIED</code> で停止し、mainは変更されていません。</p>
+<p>formal #413 import/Startは、ancestor #31がclosed/completedであり、同cloneのpeer観測もcompleteでないため未実施です。#31のreopen、linkageの付替え、peerの自動移行・除外をこの資料から行いません。import、資料移動、Start、Finish、merge、publicationは別の証拠です。</p>
+<p>配布元文書を差し替えた後は、Codexがstatic inventoryの新hashと <code>known_old_sha256</code>、pack manifest/ZIPを更新し、Current CLIで現在consumerへ反映します。inventoryを推測で生成せず、対象worktreeと既知hashを現物から確認します。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="implementation"><h2>12　実装履歴と現在の完了証拠</h2>
+<p>計画P-01〜P-18の過去記録、旧レビュー、旧試験、Windows検討は、どの順序で設計と実装が進んだかを示すraw historyです。現在の製品固定点は <code>8606e132327066d56567556e336e4bc1ae6a0b17</code> であり、古いcandidate SHAや「将来実行」という語を現在の状態へ読み替えません。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="現在の実装とrollout状態"><table><thead><tr><th scope="col">段階</th><th scope="col">現在の扱い</th><th scope="col">完了扱いにしないもの</th></tr></thead><tbody><tr><td>P-01〜P-14、P-18</td><td>製品実装・通常検証・既存Gate証拠をexact SHAへ固定</td><td>今回の文書commitの新しいreview/FQ認定</td></tr><tr><td>P-15</td><td>人間mergeへ渡す段階</td><td>2026年10月4日にPR #414を作成済み。mergeとpackage publicationは未実施</td></tr><tr><td>P-16</td><td>0805 worktreeだけ限定適用済み</td><td>mainとほか3 linked worktree、clone全体のcompleteなSync</td></tr><tr><td>P-17</td><td>formal #413 import/Startは前提不成立で停止</td><td>#31のreopen/付替え、架空のStart証拠、Finish/Close</td></tr></tbody></table></div>
+<p>program updateは利用者の外部tool環境に共有され、static updateは明示したworktree一つずつです。ignored direct recordはさらに別のruntime stateです。これらのどれかが更新されたことを、別層の更新証拠として代用しません。</p>
+<p>existing Gateの三つのP2は情報提供です。planの集約表示はこの文書整備で更新しますが、効果前mkdirの分類と非UTF-8 pathname診断は製品コード側の既知事項として残します。新しいコマンド、runtime、test、CI、依存、Git内部の管理領域、通常編集のpermission controlは追加しません。</p>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><section id="checks"><h2>13　文書差し替えと残るrolloutの確認</h2>
+<p>このHTMLは、現在の製品契約、既存証拠、caller-provided rollout観測、未完了stepを一つの現在説明にまとめます。文書の自己点検と製品品質認定は別です。</p>
+<div class="table-scroll" tabindex="0" role="region" aria-label="文書差し替えの確認事項"><table><thead><tr><th scope="col">確認するもの</th><th scope="col">このZIPでの扱い</th></tr></thead><tbody><tr><td>PlantUML契約v2、4 source、固定CDN、render/zoom JS、style</td><td>元HTMLとのbyte/hash同一性を静的確認。PNG、pre-rendered SVG、remote renderer、新依存を追加しない</td></tr><tr><td>R/D/Pのcurrent aggregateとraw history</td><td>8606e132の既存証拠、0805限定適用、P-15/P-17/peer移行の保留を分離</td></tr><tr><td>provider sourceとconsumer projection</td><td>provider正本だけをZIPへ収録。root `.agents/` とconsumer `spec-dock/` は編集しない</td></tr><tr><td>static inventoryと配布pack</td><td>差し替え後にCodexが現物hashで派生更新。推測したinventoryは同梱しない</td></tr><tr><td>review、Final Quality Gate、merge、publication</td><td>既存Gateをexact SHAに保持。追加review/FQのpass/failや、未実施のmerge/publicationを主張しない</td></tr></tbody></table></div>
+<p>ブラウザでの4図描画やzoom操作を後から再確認する場合も、それは更新HTMLの表示確認です。既存の製品Gateや新しい文書commitの認定と混同しません。</p>
+<div class="notice"><p><strong>現在の契約は、作業の意味を残したまま制御状態を減らすことです。</strong>GitHub番号のScope、各worktreeに一つの直接対象、Startだけの短い排他、完了とCloseを行うFinish、現物と原文を示す失敗報告を維持します。</p></div>
+<p class="back"><a href="#top">目次へ戻る ↑</a></p></section><footer><p>Issue #413 planning pack · 設計確定 2026-09-30 / 現在状態更新 2026-10-03 · 製品固定点 8606e132。0805限定適用済み、peer移行・formal Start・merge・publicationは未完了です。</p></footer>
+  </main>
+
+  <div id="diagram-zoom-dialog" class="diagram-zoom-dialog" hidden>
+    <section class="diagram-zoom-panel"
+             role="dialog"
+             aria-modal="true"
+             aria-labelledby="diagram-zoom-title">
+      <h2 id="diagram-zoom-title" class="visually-hidden">図を拡大表示</h2>
+      <header class="diagram-zoom-header">
+        <div class="diagram-zoom-controls" aria-label="図の拡大率を操作する">
+          <button type="button" id="diagram-zoom-out" aria-label="図を縮小する" title="縮小">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-reset" aria-label="100%に戻す" title="100%に戻す">
+            <span id="diagram-zoom-level" class="diagram-zoom-level" aria-live="polite">100%</span>
+          </button>
+          <button type="button" id="diagram-zoom-in" aria-label="図を拡大する" title="拡大">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          </button>
+          <button type="button" id="diagram-zoom-close" aria-label="拡大表示を閉じる" title="閉じる">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+          </button>
+        </div>
+      </header>
+      <div id="diagram-zoom-viewport" class="diagram-zoom-viewport" tabindex="0">
+        <div id="diagram-zoom-canvas" class="diagram-zoom-canvas"></div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    (() => {
+      const sources = [...document.querySelectorAll(".plantuml-source")];
+      const status = document.getElementById("plantuml-status");
+
+      window.__plantumlDocumentState = {
+        expected: sources.length,
+        rendered: 0,
+        errors: [],
+        completed: false
+      };
+
+      window.__plantumlFail = message => {
+        const state = window.__plantumlDocumentState;
+        state.errors.push(String(message));
+        state.completed = true;
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図の描画に失敗しました: ${message}`;
+      };
+
+      for (const output of document.querySelectorAll("[data-source-copy]")) {
+        const source = document.getElementById(output.dataset.sourceCopy);
+        if (source) output.textContent = source.textContent.trim();
+      }
+
+      document.documentElement.dataset.plantumlStatus = "running";
+    })();
+  </script>
+
+  <script
+    src="https://unpkg.com/@plantuml/core@1.2026.6/viz-global.js"
+    onerror="window.__plantumlFail('viz-global.jsを読み込めませんでした。')"></script>
+
+  <script type="module">
+    const state = window.__plantumlDocumentState;
+    const status = document.getElementById("plantuml-status");
+    const zoomDialog = document.getElementById("diagram-zoom-dialog");
+    const zoomTitle = document.getElementById("diagram-zoom-title");
+    const zoomViewport = document.getElementById("diagram-zoom-viewport");
+    const zoomCanvas = document.getElementById("diagram-zoom-canvas");
+    const zoomLevelOutput = document.getElementById("diagram-zoom-level");
+    const zoomOutButton = document.getElementById("diagram-zoom-out");
+    const zoomInButton = document.getElementById("diagram-zoom-in");
+    const zoomResetButton = document.getElementById("diagram-zoom-reset");
+    const zoomCloseButton = document.getElementById("diagram-zoom-close");
+    let zoomLevel = 1;
+    let zoomBaseWidth = 0;
+    let zoomedSvg = null;
+    let zoomReturnFocus = null;
+
+    const diagramTitle = sourceElement => {
+      const titleLine = sourceElement.textContent.match(/^\s*title\s+(.+)$/m);
+      return titleLine?.[1]?.trim() || "図を拡大表示";
+    };
+
+    const applyDiagramZoom = () => {
+      if (!zoomedSvg || zoomBaseWidth <= 0) return;
+      zoomedSvg.style.width = `${Math.round(zoomBaseWidth * zoomLevel)}px`;
+      zoomedSvg.style.height = "auto";
+      zoomLevelOutput.value = `${Math.round(zoomLevel * 100)}%`;
+      zoomLevelOutput.textContent = zoomLevelOutput.value;
+      zoomResetButton.setAttribute("aria-label", `100%に戻す（現在${zoomLevelOutput.value}）`);
+      zoomOutButton.disabled = zoomLevel <= 0.5;
+      zoomInButton.disabled = zoomLevel >= 3;
+    };
+
+    const setDiagramZoom = nextLevel => {
+      zoomLevel = Math.min(3, Math.max(0.5, nextLevel));
+      applyDiagramZoom();
+    };
+
+    const closeDiagramZoom = () => {
+      if (zoomDialog.hidden) return;
+      zoomDialog.hidden = true;
+      document.body.classList.remove("diagram-zoom-open");
+      zoomCanvas.replaceChildren();
+      zoomedSvg = null;
+      zoomBaseWidth = 0;
+      zoomReturnFocus?.focus();
+      zoomReturnFocus = null;
+    };
+
+    const openDiagramZoom = (target, sourceElement) => {
+      const sourceSvg = target.querySelector("svg");
+      if (!sourceSvg) return;
+
+      zoomReturnFocus = target;
+      zoomedSvg = sourceSvg.cloneNode(true);
+      zoomedSvg.removeAttribute("height");
+      zoomedSvg.style.maxWidth = "none";
+      const viewBoxWidth = zoomedSvg.viewBox?.baseVal?.width || 0;
+      const declaredWidth = Number.parseFloat(zoomedSvg.getAttribute("width")) || 0;
+      zoomBaseWidth = Math.max(viewBoxWidth, declaredWidth, sourceSvg.getBoundingClientRect().width);
+      zoomLevel = 1;
+      zoomTitle.textContent = diagramTitle(sourceElement);
+      zoomCanvas.replaceChildren(zoomedSvg);
+      zoomDialog.hidden = false;
+      document.body.classList.add("diagram-zoom-open");
+      zoomViewport.scrollTo({ top: 0, left: 0 });
+      applyDiagramZoom();
+      zoomCloseButton.focus();
+    };
+
+    const prepareDiagramZoom = (target, sourceElement) => {
+      target.dataset.zoomReady = "true";
+      target.tabIndex = 0;
+      target.setAttribute("role", "button");
+      target.setAttribute("aria-label", `${diagramTitle(sourceElement)}を拡大表示する`);
+      const hint = document.createElement("span");
+      hint.className = "diagram-zoom-hint";
+      hint.textContent = "クリックして拡大";
+      hint.setAttribute("aria-hidden", "true");
+      target.append(hint);
+      target.addEventListener("click", () => openDiagramZoom(target, sourceElement));
+      target.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          openDiagramZoom(target, sourceElement);
+        }
+      });
+    };
+
+    const focusableZoomElements = () => [...zoomDialog.querySelectorAll(
+      'button:not([disabled]), [href], [tabindex]:not([tabindex="-1"])'
+    )].filter(element => !element.hidden && element.getClientRects().length > 0);
+
+    zoomOutButton.addEventListener("click", () => setDiagramZoom(zoomLevel - 0.25));
+    zoomInButton.addEventListener("click", () => setDiagramZoom(zoomLevel + 0.25));
+    zoomResetButton.addEventListener("click", () => setDiagramZoom(1));
+    zoomCloseButton.addEventListener("click", closeDiagramZoom);
+    zoomDialog.addEventListener("click", event => {
+      if (event.target === zoomDialog) closeDiagramZoom();
+    });
+    document.addEventListener("keydown", event => {
+      if (zoomDialog.hidden) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeDiagramZoom();
+        return;
+      }
+      if (event.key !== "Tab") return;
+
+      const focusable = focusableZoomElements();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable.at(-1);
+      if (event.shiftKey && (document.activeElement === first || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (document.activeElement === last || !zoomDialog.contains(document.activeElement))) {
+        event.preventDefault();
+        first.focus();
+      }
+    });
+
+    try {
+      const { renderToString } = await import(
+        "https://unpkg.com/@plantuml/core@1.2026.6/plantuml.js"
+      );
+
+      const renderDiagram = lines => new Promise((resolve, reject) => {
+        renderToString(
+          lines,
+          svg => resolve(svg),
+          message => reject(new Error(message))
+        );
+      });
+
+      const normalizeDiagnosticText = value => String(value ?? "").replace(/\s+/g, " ").trim();
+
+      const inspectRenderedSvg = svgMarkup => {
+        const parsed = new DOMParser().parseFromString(svgMarkup, "image/svg+xml");
+        const root = parsed.documentElement;
+        if (!root || root.localName.toLowerCase() === "parsererror" || parsed.querySelector("parsererror")) {
+          throw new Error("PlantUMLが不正なSVGを返しました。");
+        }
+        if (root.localName.toLowerCase() !== "svg") {
+          throw new Error("PlantUMLの描画結果がSVGではありません。");
+        }
+
+        const fullText = normalizeDiagnosticText(root.textContent);
+        const diagramType = root.getAttribute("data-diagram-type")?.toLowerCase() ?? "";
+        const hasKnownErrorText = /Syntax Error\?|An error has occurred/i.test(fullText);
+        const hasDiagnosticStructure = /PlantUML version\b/i.test(fullText)
+          && /\[From [^\]]*\(line \d+\)\s*\]/i.test(fullText)
+          && /@startuml/i.test(fullText);
+
+        if (diagramType === "error" || hasKnownErrorText || hasDiagnosticStructure) {
+          const diagnosticLines = [...root.querySelectorAll("text")]
+            .filter(element => {
+              const presentation = [
+                element.getAttribute("fill"),
+                element.getAttribute("style"),
+                element.getAttribute("text-decoration")
+              ].filter(Boolean).join(" ").toLowerCase().replace(/\s+/g, "");
+              return /(?:fill:)?(?:#ff0000|#f00|red|rgb\(255,0,0\))/.test(presentation)
+                || presentation.includes("wavy");
+            })
+            .map(element => normalizeDiagnosticText(element.textContent))
+            .filter(Boolean);
+          const reason = [...new Set(diagnosticLines)].join(" / ").slice(0, 500)
+            || (hasKnownErrorText
+              ? fullText.match(/Syntax Error\?|An error has occurred/i)?.[0]
+              : "PlantUMLの診断画面が返されました。");
+          throw new Error(`PlantUMLの診断SVGが検出されました: ${reason}`);
+        }
+
+        return root;
+      };
+
+      for (const sourceElement of document.querySelectorAll(".plantuml-source")) {
+        const target = document.getElementById(sourceElement.dataset.target);
+        if (!target) {
+          state.errors.push(`${sourceElement.id}: 描画先がありません。`);
+          continue;
+        }
+
+        try {
+          const lines = sourceElement.textContent.trim().split(/\r?\n/);
+          const svgMarkup = await renderDiagram(lines);
+          const svg = inspectRenderedSvg(svgMarkup);
+          target.replaceChildren(document.importNode(svg, true));
+          prepareDiagramZoom(target, sourceElement);
+          target.dataset.plantumlStatus = "success";
+          state.rendered += 1;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          state.errors.push(`${sourceElement.id}: ${message}`);
+          target.dataset.plantumlStatus = "error";
+          target.textContent = `この図の描画に失敗しました: ${message}`;
+        }
+      }
+
+      state.completed = true;
+      if (state.rendered === state.expected && state.errors.length === 0) {
+        document.documentElement.dataset.plantumlStatus = "success";
+        status.textContent = `図を${state.rendered}件すべて描画できました。`;
+      } else {
+        document.documentElement.dataset.plantumlStatus = "error";
+        status.className = "plantuml-status error";
+        status.textContent = `図を${state.rendered}件描画し、${state.errors.length}件のエラーが発生しました。`;
+      }
+    } catch (error) {
+      window.__plantumlFail(error instanceof Error ? error.message : String(error));
+    }
+  </script>
+</body>
+</html>

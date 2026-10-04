@@ -1,0 +1,37 @@
+{
+  "baseline_sha": "aa91b756f886ac3e42085b665e1e9ca93c20f9f5",
+  "scope": "P-07 R12-F1 implementation repair in working candidate; fresh review closure pending",
+  "classification": "P1",
+  "route": "implementation-remediation",
+  "source_delta_sha256": "4e5fc19b94ba04ac3086f3ef1f05578c9b353c1dac51a00970335e27253c116a",
+  "raw_logs": [
+    {
+      "name": "p07-finish-red.log",
+      "actual_exit": 1,
+      "bytes": 2302,
+      "sha256": "ff625d9b4eacfb4c48ccf6d5850e63f036acb3d5457ea25c837bd6ec17a9777c",
+      "utf8_text": "F                                                                        [100%]\n=================================== FAILURES ===================================\n___ test_explicit_finish_rejects_corrupt_selection_before_remote_observation ___\n\ntmp_path = PosixPath('/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/pytest-of-iwasawayuuta/pytest-1706/test_explicit_finish_rejects_c0')\nmonkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x10b9dfb30>\ncapsys = <_pytest.capture.CaptureFixture object at 0x10b9dfb00>\n\n    def test_explicit_finish_rejects_corrupt_selection_before_remote_observation(\n        tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]\n    ) -> None:\n        root = committed_workspace(tmp_path / \"consumer\")\n        record = select_fixture(root)\n        record.write_bytes(b\"{broken selection\\n\")\n        metadata = root / \"spec-dock/initiatives/init-00001-fixture/.meta.json\"\n        before = metadata.read_bytes(), record.read_bytes(), (root / \".git/HEAD\").read_bytes()\n        log = github_fixture(tmp_path, monkeypatch, {\"1\": \"open\"})\n        remote = tmp_path / \"remote-states.json\"\n        remote_before = remote.read_bytes()\n    \n>       assert main([\"--project\", str(root), \"work\", \"finish\", \"init-00001\", \"--yes\", \"--json\"]) == 3\nE       AssertionError: assert 0 == 3\nE        +  where 0 = main(['--project', '/private/var/folders/0v/jkf8ysk1621277d4xmr584cc0000gn/T/pytest-of-iwasawayuuta/pytest-1706/test_explicit_finish_rejects_c0/consumer', 'work', 'finish', 'init-00001', '--yes', ...])\n\ntests/cli_runtime/test_issue413_finish.py:104: AssertionError\n----------------------------- Captured stdout call -----------------------------\n{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work finish\",\"status\":\"succeeded\",\"exit_code\":0,\"data\":{\"scope_id\":\"init-00001\",\"completed\":true,\"branch_before\":\"main\",\"branch_after\":\"main\",\"selection_token\":null,\"kind\":\"work-finish\"},\"effects\":[{\"kind\":\"github.issue.close\",\"status\":\"succeeded\",\"target\":\"gh:example/repo#1\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n=========================== short test summary info ============================\nFAILED tests/cli_runtime/test_issue413_finish.py::test_explicit_finish_rejects_corrupt_selection_before_remote_observation\n1 failed in 0.69s\n"
+    },
+    {
+      "name": "p07-finish-green.log",
+      "actual_exit": 0,
+      "bytes": 98,
+      "sha256": "fa8e3e1f0a4b084326a7027307e5cc3a94f799f9733ea598c3b878fa3c70f37c",
+      "utf8_text": ".                                                                        [100%]\n1 passed in 0.18s\n"
+    },
+    {
+      "name": "p07-finish-regression.log",
+      "actual_exit": 0,
+      "bytes": 180,
+      "sha256": "d9ff786ed1ddd2153ce1ff2fe64b0d712b82dd0d814c3a8b9342ce356331bd25",
+      "utf8_text": "........................................................................ [ 72%]\n...........................                                              [100%]\n99 passed in 23.93s\n"
+    },
+    {
+      "name": "p07-finish-lint.log",
+      "actual_exit": 0,
+      "bytes": 239,
+      "sha256": "f848934f656989f99a850bbf9f02e4459a052519f089909cb31f595832925448",
+      "utf8_text": "./scripts/static_analysis/run.sh\n==> ruff check\nAll checks passed!\n==> ruff format check\n297 files already formatted\n==> mypy\nSuccess: no issues found in 216 source files\n\nSummary:\n- ruff check: pass\n- ruff format check: pass\n- mypy: pass\n"
+    }
+  ]
+}

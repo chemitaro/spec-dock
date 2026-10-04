@@ -1,0 +1,166 @@
+{
+  "kind": "issue413-current-candidate-evidence",
+  "recorded_at": "2026-10-03T05:00:08.623379+00:00",
+  "repository": "chemitaro/spec-dock",
+  "branch": "codex/iss-00413-external-cli-state",
+  "base_sha": "6fec3099d8759b4e5b3b393b2987534b46dfa383",
+  "candidate_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+  "phase": "fixed-scope-certified",
+  "certified": true,
+  "code_review_status": "pass",
+  "code_review_findings": [],
+  "required_tests_complete": true,
+  "required_tests_passed": true,
+  "native_test_counts": {
+    "macos": {
+      "passed": 1916,
+      "skipped": 1
+    },
+    "linux": {
+      "passed": 1900,
+      "skipped": 17
+    },
+    "python310_selected_boundary": {
+      "passed": 210,
+      "skipped": 0
+    }
+  },
+  "external_manual_operations": 14,
+  "external_manual_live_github": false,
+  "final_quality_gate": {
+    "native_session": 41503,
+    "actual_exit": 0,
+    "status": "pass",
+    "coverage_complete": true,
+    "completed_perspectives": [
+      "functional-correctness",
+      "requirements-closure",
+      "test-adequacy",
+      "e2e-user-flow",
+      "api-contract",
+      "integration-boundaries",
+      "compatibility-regression",
+      "security-baseline",
+      "reliability-recovery",
+      "data-migration",
+      "performance-capacity",
+      "release-rollback",
+      "repository-conformance"
+    ],
+    "blocking_findings": 0,
+    "informational_findings": [
+      {
+        "id": "FQG-413-002",
+        "severity": "P2",
+        "perspective": "api-contract",
+        "title": "効果前のdirectory作成失敗をpartial/unknownとして返す",
+        "location": "src/spec_dock/runtime/application/direct_artifact.py; src/spec_dock/runtime/application/direct_workbench.py; src/spec_dock/runtime/application/direct_worktrees.py",
+        "evidence": "各経路はos.mkdir呼出し直前にdirectory_attempted=trueを設定し、EACCESやEROFS等でmkdirが何も作らず失敗しても、created=falseのままdirectory effectをunknown、operationをpartial/exit 6にする。C-04のv2契約では、確認済み効果のないlocal I/O failureはfailed/exit 5であり、partial/exit 6はsucceededまたは本当に成否不明なeffectを必要とする。",
+        "impact": "自動化と運用者は、実際には変更がない失敗を「変更された可能性あり」と扱い、不要な停止・現物調査・手動回復判断を要求される。データ破壊や受入阻害までは立証されないためP2である。",
+        "root_cause": "「syscallを試行したこと」と「syscall効果の成否が不明であること」を同じattempted flagで表しており、例外種別または事後観測でno-effectを確定していない。",
+        "recommendation": "情報提供のみ。是正対応は不要です。"
+      },
+      {
+        "id": "FQG-413-003",
+        "severity": "P2",
+        "perspective": "requirements-closure",
+        "title": "P-16/P-17の集約状態が詳細節と実測記録に追随していない",
+        "location": "docs/issue-plans/iss-00413-external-cli-state/plan.md（P-16/P-17節、「完成証拠の別管理」表、末尾状態記述）",
+        "evidence": "同じ現SHAで、P-16詳細節は現在WTへの導入・移行・動作確認を実施済みとし、P-17詳細節はdry-runがclosed祖先と他WT不完全観測で停止し正式import/Start未実施とする。一方、後段の完成証拠表はP-16を未着手とし、末尾はP-15/P-16/P-17をすべて未着手と記載する。",
+        "impact": "release・rollback・次工程を読む人または機械が、current WTに適用済みである事実を見落とし、再適用や保全範囲の判断を誤る可能性がある。詳細節と専用dogfood記録から真値を復元できるためP2である。",
+        "root_cause": "2026-10-03の先行dogfood許可と実測を詳細節へ追記した後、文書末尾の履歴集約表と状態サマリが更新されていない。",
+        "recommendation": "情報提供のみ。是正対応は不要です。"
+      },
+      {
+        "id": "FQG-413-004",
+        "severity": "P2",
+        "perspective": "api-contract",
+        "title": "非UTF-8 pathnameを含む診断がUTF-8 JSON保証を破る",
+        "location": "src/spec_dock/runtime/infra/work_target_store.py::WorkTargetStore.read; src/spec_dock/runtime/infra/git_cli.py::worktree_list; src/spec_dock/runtime/presentation/envelope.py::render_json_v2; src/spec_dock/cli.py::main",
+        "evidence": "WorkTargetStore.readはos.listdir(fd)で得た未知basenameをそのままreasonへ埋め込み、worktree_listはGitのNUL bytesをos.fsdecodeする。POSIX上の復号不能byteはsurrogateescape文字となるが、render_json_v2はensure_ascii=falseでそのsurrogateを含むstrを生成し、mainはsys.stdout.writeする。例えばwork-target directoryに0xffを含む未知entryがある状態でactive showまたはSyncを--json実行すると、stdout error handler次第で不正UTF-8 byte列またはUnicodeEncodeErrorとなり、C-02/C-04の「UTF-8 JSON object一個」とD-03の未知entry診断を満たさない。",
+        "impact": "破損・手操作・攻撃的pathnameをfail-closedで報告すべき場面で、JSON consumerが応答をparseできず、状態確認と回復判断ができない。対象recordを自動解除したりデータを書き換えたりはしないためP2である。",
+        "root_cause": "filesystem/Git由来のsurrogateescape文字をJSON境界でASCII escapeまたは明示的なreplacement表現へ正規化せず、通常Unicode文字と同じensure_ascii=false経路へ渡している。",
+        "recommendation": "情報提供のみ。是正対応は不要です。"
+      }
+    ],
+    "result_path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/chatgpt-final-quality-gate-strict-v2/iss-00413-adopted-a-20261003/review-result.json",
+    "result_sha256": "133314892aef89d82d62c943bc95aeace197fdb67ef72044a62b9e535abbf0a6",
+    "state_result_digest_matches": true,
+    "staging_retired": true,
+    "oracle_session_slug": "fqg-v2-1231527b-d9389036",
+    "conversation_id": "6ac0808f-eb84-83ee-a81b-e3ea7a370a36",
+    "conversation_url": "https://chatgpt.com/g/g-p-69fd45693ed48191a7defd8273c37115-for-codex-app/c/6ac0808f-eb84-83ee-a81b-e3ea7a370a36",
+    "actual_browser_model": "GPT-5.6 Sol",
+    "actual_browser_thinking": "Pro",
+    "actual_model_verified": "chatgpt-model-picker / 2026-10-03T04:11:49.436Z",
+    "actual_thinking_verified": "chatgpt-thinking-picker / 2026-10-03T04:11:49.607Z",
+    "campaign": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/chatgpt-final-quality-gate-strict-v2/iss-00413-adopted-a-20261003",
+    "followups": false
+  },
+  "evidence": {
+    "code_review": {
+      "path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-a-search-20261003/code-review-r3.json",
+      "sha256": "656695cf8b20d5ac3e439ebe86fd8c7abbd57739f259038ebfd70621dcefdfb2"
+    },
+    "required_tests": {
+      "path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/chatgpt-final-quality-gate-strict-v2/iss-00413-adopted-a-20261003/test-results/manifest.json",
+      "sha256": "a2edb2c5de167e52aaf0aa065ca55ecb60e45f1efaa78a8d0cb0d7f42c3d99ba"
+    },
+    "external_manual": {
+      "path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-a-search-20261003/manual-a-r3-corrected.json",
+      "sha256": "9d4cabca03487e3a07df7d92436dc6795b38d9f8fb85087e4af3d1280a137486"
+    },
+    "external_package": {
+      "path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-a-search-20261003/candidate-8606e132-package-equivalence.json",
+      "sha256": "3e88e293c354385035ef8d0651e5bbc7d1c1c5818bd113eeb314cf46ec53e677"
+    },
+    "current_consumer": {
+      "path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-a-search-20261003/current-consumer-r3.json",
+      "sha256": "a5ed820920d3738cec4a7db9c4ef9c10aca1f67de57426126aa59c2d901d6cee"
+    },
+    "main_preview": {
+      "path": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/dogfood-iss00413-a-search-20261003/main-migration-preview.json",
+      "sha256": "2621bc125160cdcc86562c72646d8148b9ee5a51e526856716256c6d6a7a04b7"
+    }
+  },
+  "implementation_scope": "Linux/macOS external package/direct-state/adopted A; actual dogfood cutover only current0805 worktree",
+  "operational_remainders": [
+    "Other four actual worktrees are unmigrated and read-only; Sync reports unavailable rather than healthy empty.",
+    "Main standard migration dry-run fails for empty legacy active schema2, effects[], without changing main.",
+    "Formal Issue413 import/Start is not completed; its current GitHub ancestor31 is CLOSED.",
+    "PR creation, human merge, package publication, other actual cutovers are outside current write authorization."
+  ],
+  "final_identity": {
+    "worktree_clean": true,
+    "local_head": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "configured_upstream_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "live_github_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+    "remote": "https://github.com/chemitaro/spec-dock.git",
+    "verification": "Native git status, rev-parse and live ls-remote all exit0 after both review/test lanes completed."
+  },
+  "final_package_parity": {
+    "file_count": 197,
+    "source_wheel_current_fresh_bytes_equal": true,
+    "package_fold": "b6435995f6193dbd44edae5ad339aff3a37e3b77f2580944cbb60b9da6be81b7",
+    "wheel_sha256": "7e830f452b55d838dd185a4dd093abce31364f881d2b9a0435f1f1f8ea9b90ab"
+  },
+  "delivery": {
+    "html_url": "http://100.85.74.8:8765/specdock-issue-413/explanation.html",
+    "http_status": 200,
+    "served_source_bytes_equal": true,
+    "html_sha256": "def666c4b6dc3ace5cdd131b3d6b2088d9f349056bcbdf54b7b89c4a52da4e18",
+    "zip_crc_ok": true,
+    "zip_entry_count": 152,
+    "zip_sha256": "ae423ac5b7834d17e620ee6b7f4b9eef4bf165a655797446813caf4bdc2b8b70"
+  },
+  "github_operational_state_verified_after_gate": {
+    "31": "CLOSED/completed",
+    "356": "OPEN",
+    "413": "OPEN"
+  },
+  "main_external_help_after_package_update": {
+    "native_exit": 0,
+    "old_repository_shim_updated": false
+  },
+  "p2_policy": "Informational only. No fixes, tasks, backlog or additional review initiated for these findings."
+}

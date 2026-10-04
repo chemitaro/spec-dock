@@ -16,6 +16,7 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "jsonschema>=4.18",
     "mypy>=2.1.0",
     "pytest>=8.0",
     "ruff>=0.12.0",
@@ -30,7 +31,7 @@ target-version = "py310"
 line-length = 120
 indent-width = 4
 preview = true
-src = ["src", "src/spec_dock/assets/spec_dock/scripts"]
+src = ["src"]
 exclude = [
   "build/",
   "dist/",

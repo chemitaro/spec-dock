@@ -1,53 +1,59 @@
-"""Stable vNext CLI output contract."""
+"""Public v2 CLI output keeps honest effects and stateless recovery guidance."""
 
-from dataclasses import dataclass
+from __future__ import annotations
+
 import json
-from pathlib import Path
-import sys
+from typing import TYPE_CHECKING
 
 import pytest
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[3] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
-
-from spec_dock_runtime.presentation.completion import completion_script  # noqa: E402
-from spec_dock_runtime.presentation.envelope import (  # noqa: E402
+from spec_dock.runtime.cli.options import completion_script
+from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData
+from spec_dock.runtime.presentation.envelope import (
     Diagnostic,
     Effect,
     OperationResult,
-    Recovery,
-    render_json,
+    RecoveryInstructions,
+    render_json_v2,
     render_text,
 )
 
+if TYPE_CHECKING:
+    from spec_dock.runtime.presentation.envelope import ResultStatus
 
-@dataclass(frozen=True)
-class ActiveShowData:
-    focus_id: str | None
-    initiative: str | None
-    epic: str | None
-    issue: str | None
-    revision: int
+
+def _active(scope_id: str | None = None) -> ActiveData:
+    return ActiveData(
+        {
+            "status": "selected" if scope_id else "empty",
+            "scope_id": scope_id,
+            "github_ref": "gh:chemitaro/spec-dock#409" if scope_id else None,
+            "selection_token": "b" * 32 if scope_id else None,
+            "selected_branch": "iss-00409-redesign-cli" if scope_id else None,
+            "current_branch": "iss-00409-redesign-cli" if scope_id else "main",
+            "branch_changed": False,
+        },
+        ("init-local-00003", "epic-00356") if scope_id else (),
+    )
 
 
 def test_empty_active_json_is_one_complete_envelope() -> None:
     result = OperationResult(
-        command="active.show",
+        command="active show",
         status="succeeded",
-        data=ActiveShowData(None, None, None, None, 0),
+        data=_active(),
         exit_code=0,
     )
 
-    output = render_json(result)
+    output = render_json_v2(result)
 
     assert output.endswith("\n") and output.count("\n") == 1
     assert json.loads(output) == {
-        "schema_version": "specdock.cli/v1",
-        "command": "active.show",
+        "schema_version": "specdock.cli/v2",
+        "command": "active show",
         "status": "succeeded",
-        "operation_id": None,
-        "target": None,
-        "data": {"focus_id": None, "initiative": None, "epic": None, "issue": None, "revision": 0},
+        "exit_code": 0,
+        "data": {"kind": "active", "selection": _active().selection, "ancestors": []},
         "effects": [],
         "warnings": [],
         "error": None,
@@ -57,33 +63,36 @@ def test_empty_active_json_is_one_complete_envelope() -> None:
 
 def test_partial_result_keeps_unknown_effect_and_recovery_boundary() -> None:
     result = OperationResult(
-        command="work.finish",
+        command="work finish",
         status="partial",
-        data=ActiveShowData("iss-00409", "init-local-00003", "epic-00356", "iss-00409", 3),
+        data=_active("iss-00409"),
         exit_code=6,
-        operation_id="op-123",
         effects=(Effect("github.close", "unknown", "iss-00409"),),
         error=Diagnostic("REMOTE_EFFECT_UNKNOWN", "状態が不明\n確認してください", {"secret_redacted": True}),
-        recovery=Recovery(
-            "op-123", True, False, (("spec-dock", "work", "finish", "iss-00409", "--resume", "op-123"),), None
-        ),
+        recovery=RecoveryInstructions(("spec-dock active show --json", "Confirm the current GitHub Issue state")),
     )
 
-    output = render_json(result)
+    output = render_json_v2(result)
     decoded = json.loads(output)
 
     assert output.count("\n") == 1
     assert decoded["effects"][0] == {"kind": "github.close", "status": "unknown", "target": "iss-00409"}
     assert decoded["error"]["message"] == "状態が不明\n確認してください"
-    assert decoded["recovery"]["commands"][0][3] == "iss-00409"
+    assert decoded["exit_code"] == 6 and "operation_id" not in decoded and "target" not in decoded
+    assert decoded["recovery"] == {
+        "instructions": ["spec-dock active show --json", "Confirm the current GitHub Issue state"],
+        "can_resume": False,
+        "can_rollback": False,
+    }
+    assert "--resume" not in output and "op-123" not in output
 
 
 def test_result_rejects_success_exit_with_partial_effect() -> None:
     with pytest.raises(ValueError, match="partial"):
         OperationResult(
-            command="work.finish",
+            command="work finish",
             status="partial",
-            data=ActiveShowData(None, None, None, None, 0),
+            data=_active(),
             exit_code=0,
             effects=(Effect("github.close", "unknown", "iss-00409"),),
             error=Diagnostic("UNKNOWN", "unknown", {}),
@@ -99,12 +108,14 @@ def test_result_rejects_success_exit_with_partial_effect() -> None:
         ("failed", 5, (Effect("github.close", "unknown", "iss-00409"),)),
     ],
 )
-def test_top_level_result_cannot_hide_effect_state(status: str, exit_code: int, effects: tuple[Effect, ...]) -> None:
+def test_top_level_result_cannot_hide_effect_state(
+    status: ResultStatus, exit_code: int, effects: tuple[Effect, ...]
+) -> None:
     with pytest.raises(ValueError, match="effect"):
         OperationResult(
-            command="work.finish",
+            command="work finish",
             status=status,
-            data=ActiveShowData(None, None, None, None, 0),
+            data=_active(),
             exit_code=exit_code,
             effects=effects,
             error=Diagnostic("FAILURE", "failure", {}) if status == "failed" else None,
@@ -113,9 +124,9 @@ def test_top_level_result_cannot_hide_effect_state(status: str, exit_code: int, 
 
 def test_text_renderer_reports_same_effect_and_error_codes() -> None:
     result = OperationResult(
-        command="work.finish",
+        command="work finish",
         status="partial",
-        data=ActiveShowData("iss-00409", None, None, "iss-00409", 4),
+        data=_active("iss-00409"),
         exit_code=6,
         effects=(Effect("github.close", "succeeded", "iss-00409"), Effect("active.clear", "failed", "iss-00409")),
         error=Diagnostic("STATE_CONFLICT", "選択が変更されました", {}),
@@ -123,7 +134,7 @@ def test_text_renderer_reports_same_effect_and_error_codes() -> None:
 
     stdout, stderr = render_text(result)
 
-    assert "work.finish" in stdout
+    assert "work finish" in stdout
     assert "github.close" in stdout and "succeeded" in stdout
     assert "active.clear" in stdout and "failed" in stdout
     assert "STATE_CONFLICT" in stderr
@@ -141,14 +152,32 @@ def test_completion_script_contains_catalog_driven_scope_children(shell: str) ->
 
 def test_json_renderer_redacts_secret_bearing_details() -> None:
     result = OperationResult(
-        command="workspace.doctor",
+        command="workspace doctor",
         status="failed",
-        data=ActiveShowData(None, None, None, None, 0),
+        data=_active(),
         exit_code=5,
         error=Diagnostic("REMOTE_FAILED", "Authorization: Bearer private-value", {"access_token": "private-value"}),
     )
 
-    output = render_json(result)
+    output = render_json_v2(result)
 
     assert "private-value" not in output
     assert json.loads(output)["error"]["details"]["access_token"] == "[redacted]"
+
+
+def test_text_diagnostic_displays_findings_and_unverified_items_with_secret_redaction() -> None:
+    result = OperationResult(
+        command="workspace doctor",
+        status="partial",
+        data=DiagnosticData(
+            findings=(Diagnostic("LEGACY_UNREADABLE", "legacy header is unreadable", {"access_token": "private"}),),
+            unverified=("remote completion has not been observed",),
+        ),
+        exit_code=7,
+        error=Diagnostic("INCOMPLETE_OBSERVATION", "inspect the retained files", {}),
+    )
+    stdout, stderr = render_text(result)
+    for value in ("LEGACY_UNREADABLE", "legacy header is unreadable", "remote completion has not been observed"):
+        assert value in stdout
+    assert "INCOMPLETE_OBSERVATION" in stderr and "[redacted]" in stdout
+    assert "private" not in stdout + stderr

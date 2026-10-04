@@ -1,0 +1,113 @@
+{
+  "reviewed_repository": "chemitaro/spec-dock",
+  "reviewed_branch": "codex/iss-00413-external-cli-state",
+  "reviewed_sha": "8606e132327066d56567556e336e4bc1ae6a0b17",
+  "status": "pass",
+  "coverage_complete": true,
+  "perspectives": [
+    {
+      "id": "functional-correctness",
+      "status": "complete",
+      "summary": "固定baseから検証済みSHAまで、外部CLI、三階層Scope、Start/Finish/active/Sync、Artifact、Workbench、Worktree、installation・migration・validateを横断した。採用Aは対象IDからtracked/untracked/ignore対象の現在pathを有限timeout付きGit検索で導出し、対象/祖先だけをnofollow検証し、欠落をstale、検索失敗・重複・redirectをunavailableとして既知ID/refを予約する。標準importのrules.mdをScope directoryと誤認しないStart修正も成立しており、P0/P1は認めなかった。"
+    },
+    {
+      "id": "requirements-closure",
+      "status": "complete",
+      "summary": "RQ-413-01〜18、AC-413-01〜42、D-01〜14、P-01〜18、CLI/data schema、Linux/macOS決定、採用A、P-16/P-17の実施境界を実装・試験・配布物へ対応付けた。実装上の未閉塞要件はないが、plan.mdの集約状態が詳細節へ追随していないFQG-413-003はP2として残る。"
+    },
+    {
+      "id": "test-adequacy",
+      "status": "complete",
+      "summary": "現SHAの試験実装を検査し、pathname検索のtracked/untracked/ignored、path移動、重複、redirect、Git failure/timeout/warning、無関係なScope-shaped file/symlink、readonly保全、GitHub dedup、標準import後Start、非UTF-8の無関係path、競合・partial・migration・wheel/static資産を覆うことを確認した。指定test_commandsは独立agent-owned laneであり、本reviewerは実行済みとは主張しない。FQG-413-004の診断pathname自体が非UTF-8である境界はP2で未保護である。"
+    },
+    {
+      "id": "e2e-user-flow",
+      "status": "complete",
+      "summary": "fresh installation init→GitHub-backed三階層import→commit→Start、複数WT観測→Sync、completed確認→Finish、次対象Startまでの構成と失敗・再観測経路を検査した。現在0805 WTの明示導入記録と、closed祖先・他4 WT不完全観測によりP-17を副作用前停止した記録は分離され、別候補のtest/manual/review証拠を現在候補の成功に転記していない。"
+    },
+    {
+      "id": "api-contract",
+      "status": "complete",
+      "summary": "44 leaf、共通option、v2 envelope、exit/status/effects、raw Git診断、Selection/Sync shape、廃止入力をproducer/consumer側で照合した。主要契約は整合するが、効果前mkdir失敗のpartial/unknown誤分類FQG-413-002と、surrogate pathnameでUTF-8 JSON保証を破るFQG-413-004をP2として認めた。"
+    },
+    {
+      "id": "integration-boundaries",
+      "status": "complete",
+      "summary": "Git inventory・pathname検索・branch/checkout、gh GET/POST/PATCH、filesystem descriptor/no-follow/no-replace/fsync、外部console/shim、subprocess timeoutとエラー翻訳を両側から検査した。Git検索失敗やremote送信後unknownは再送せず、既知効果・unknown・not_attemptedを分離し、GitHub ref取得はdeduplicateされる。P0/P1はない。"
+    },
+    {
+      "id": "compatibility-regression",
+      "status": "complete",
+      "summary": "Python 3.10+、Linux/macOS、既存44 leaf、schema3、既存numeric/legacy-local綴りID、真正legacy local backend、未知metadata field、六Artifact type、Workbench dest-only、branch保持、旧static資産のhash限定退役を確認した。Windows専用source/test/CIは現authorityどおり撤去され、非対応OS utility独立と副作用前拒否が維持される。"
+    },
+    {
+      "id": "security-baseline",
+      "status": "complete",
+      "summary": "明示project/repository、Git環境除去、ref/path検証、nofollow descriptor、single-link regular file、物理identity、secret/userinfo秘匿、unsupported OSの早期guard、shim再帰防止を検査した。独自control/cache/daemon/permission fallbackは追加されていない。FQG-413-004は悪意ある・破損したpathnameに対するJSON可用性/完全性のP2副作用を持つが、データ上書き境界は迂回しない。"
+    },
+    {
+      "id": "reliability-recovery",
+      "status": "complete",
+      "summary": "Start-only flockの保持区間、immutable token publication、captured handleだけの解除、遅いFinish/clearと新recordの競合、branch/checkout後partial、Close unknown、kill後の現物再観測、journal/resume/automatic rollback不使用を検査した。成功済み効果とunknownを保存し、stale/unavailableをemptyに変換しない。FQG-413-002は回復案内を不要に増やすP2である。"
+    },
+    {
+      "id": "data-migration",
+      "status": "complete",
+      "summary": "workspace migrateは明示一WTのschema3 writer_protocolだけを切り替え、外部backup/restore照合後に一file公開し、旧active/control/journalと全Scope bytes・未知fieldを保全する。installationも許可済みstatic path/hashだけを個別更新・退役し、現在WT以外やScope/Artifact/Workbench/直接記録を変更しない。自動rollbackや他4 WT移行を完了扱いしていない。"
+    },
+    {
+      "id": "performance-capacity",
+      "status": "complete",
+      "summary": "採用Aの製品側読取・実体検証は選択対象と祖先chainに限定され、Git subprocessごとに有限timeoutを持ち、GitHub refはdeduplicateされ、descriptorはfinallyで閉じられる。Gitの未追跡pathname探索が定数時間でないことは採用済み運用モデルどおりであり、新cache/path field/benchmark保証を要求しない。容量前提を破るP0/P1はない。"
+    },
+    {
+      "id": "release-rollback",
+      "status": "complete",
+      "summary": "通常wheel/sdist、外部console entrypoint、薄いshim、static inventory、Linux/macOS CI、migration runbook、外部backup、手動復元境界を検査した。コードrevertとGitHub/後続編集の巻戻しを混同せず、P-16 current WT適用、P-17保留、人間merge、package公開を別状態にしている。FQG-413-003だけが集約文書のP2表示不整合である。"
+    },
+    {
+      "id": "repository-conformance",
+      "status": "complete",
+      "summary": "AGENTS.mdのprovider source-of-truth、runtime/application/domain/infra/presentationの層、install_rootのskill authority、provider assetとdogfood mirror、pytest配置、通常lint/full pytest CIに照らして検査した。旧checkout-local runtime・control/registry/journal/cache・Windows adapter群の退役と新runtimeのpackage収録は現構成に適合し、deliveryを妨げる逸脱はない。"
+    }
+  ],
+  "findings": [
+    {
+      "id": "FQG-413-002",
+      "severity": "P2",
+      "perspective": "api-contract",
+      "title": "効果前のdirectory作成失敗をpartial/unknownとして返す",
+      "location": "src/spec_dock/runtime/application/direct_artifact.py; src/spec_dock/runtime/application/direct_workbench.py; src/spec_dock/runtime/application/direct_worktrees.py",
+      "evidence": "各経路はos.mkdir呼出し直前にdirectory_attempted=trueを設定し、EACCESやEROFS等でmkdirが何も作らず失敗しても、created=falseのままdirectory effectをunknown、operationをpartial/exit 6にする。C-04のv2契約では、確認済み効果のないlocal I/O failureはfailed/exit 5であり、partial/exit 6はsucceededまたは本当に成否不明なeffectを必要とする。",
+      "impact": "自動化と運用者は、実際には変更がない失敗を「変更された可能性あり」と扱い、不要な停止・現物調査・手動回復判断を要求される。データ破壊や受入阻害までは立証されないためP2である。",
+      "root_cause": "「syscallを試行したこと」と「syscall効果の成否が不明であること」を同じattempted flagで表しており、例外種別または事後観測でno-effectを確定していない。",
+      "recommendation": "情報提供のみ。是正対応は不要です。"
+    },
+    {
+      "id": "FQG-413-003",
+      "severity": "P2",
+      "perspective": "requirements-closure",
+      "title": "P-16/P-17の集約状態が詳細節と実測記録に追随していない",
+      "location": "docs/issue-plans/iss-00413-external-cli-state/plan.md（P-16/P-17節、「完成証拠の別管理」表、末尾状態記述）",
+      "evidence": "同じ現SHAで、P-16詳細節は現在WTへの導入・移行・動作確認を実施済みとし、P-17詳細節はdry-runがclosed祖先と他WT不完全観測で停止し正式import/Start未実施とする。一方、後段の完成証拠表はP-16を未着手とし、末尾はP-15/P-16/P-17をすべて未着手と記載する。",
+      "impact": "release・rollback・次工程を読む人または機械が、current WTに適用済みである事実を見落とし、再適用や保全範囲の判断を誤る可能性がある。詳細節と専用dogfood記録から真値を復元できるためP2である。",
+      "root_cause": "2026-10-03の先行dogfood許可と実測を詳細節へ追記した後、文書末尾の履歴集約表と状態サマリが更新されていない。",
+      "recommendation": "情報提供のみ。是正対応は不要です。"
+    },
+    {
+      "id": "FQG-413-004",
+      "severity": "P2",
+      "perspective": "api-contract",
+      "title": "非UTF-8 pathnameを含む診断がUTF-8 JSON保証を破る",
+      "location": "src/spec_dock/runtime/infra/work_target_store.py::WorkTargetStore.read; src/spec_dock/runtime/infra/git_cli.py::worktree_list; src/spec_dock/runtime/presentation/envelope.py::render_json_v2; src/spec_dock/cli.py::main",
+      "evidence": "WorkTargetStore.readはos.listdir(fd)で得た未知basenameをそのままreasonへ埋め込み、worktree_listはGitのNUL bytesをos.fsdecodeする。POSIX上の復号不能byteはsurrogateescape文字となるが、render_json_v2はensure_ascii=falseでそのsurrogateを含むstrを生成し、mainはsys.stdout.writeする。例えばwork-target directoryに0xffを含む未知entryがある状態でactive showまたはSyncを--json実行すると、stdout error handler次第で不正UTF-8 byte列またはUnicodeEncodeErrorとなり、C-02/C-04の「UTF-8 JSON object一個」とD-03の未知entry診断を満たさない。",
+      "impact": "破損・手操作・攻撃的pathnameをfail-closedで報告すべき場面で、JSON consumerが応答をparseできず、状態確認と回復判断ができない。対象recordを自動解除したりデータを書き換えたりはしないためP2である。",
+      "root_cause": "filesystem/Git由来のsurrogateescape文字をJSON境界でASCII escapeまたは明示的なreplacement表現へ正規化せず、通常Unicode文字と同じensure_ascii=false経路へ渡している。",
+      "recommendation": "情報提供のみ。是正対応は不要です。"
+    }
+  ],
+  "unreviewed_areas": [],
+  "unresolved_items": [],
+  "prior_obligation_dispositions": [],
+  "summary": "GitHub connectorで対象repository・branchのtipを8606e132327066d56567556e336e4bc1ae6a0b17と完全一致確認した上で、固定baseからの全scopeを13 perspectiveで評価した。採用Aは対象限定chain読取、有限Git timeout、tracked/untracked/ignored・path移動・重複・redirect・検索失敗のfail-closed、既知ID/ref予約、readonly Sync、GH dedup、7 field recordを維持し、前campaignのP1現象を現SHAで閉じている。標準import後Start、current WT dogfood、P-17保留、旧候補証拠の分離も契約に整合する。P0/P1はなく、P2三件は情報提供のみであるためpass。test_commandsは独立agent-owned laneであり、本reviewerが実行した証拠としては扱っていない。"
+}

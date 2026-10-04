@@ -1,241 +1,156 @@
-"""Scope close and reopen are independent from active selection."""
+"""Public Scope close/reopen preserve existing data and direct selection."""
 
 from __future__ import annotations
 
+import io
 import json
-import os
-from pathlib import Path
-import pty
-import select
 import subprocess
 import sys
-import time
-from typing import cast
+from typing import TYPE_CHECKING
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.cli import main
+from tests.cli_runtime.test_issue413_active import select_fixture
+from tests.cli_runtime.test_issue413_finish import github_fixture
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.cli_runtime.test_work_commands_vnext import three_kind_workspace
 
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.cli.vnext_runtime import run_vnext  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
-def _run(repo: Path, *args: str):
-    return run_vnext([*args, "--json"], invocation_cwd=repo, engine_digest="engine-a", engine_version="0.2.4")
+class TerminalAnswer(io.StringIO):
+    def isatty(self) -> bool:
+        return True
 
 
-def test_scope_close_prompts_on_tty_and_respects_denial(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    source = (
-        "from pathlib import Path; import sys; "
-        "sys.path.insert(0, sys.argv[1]); "
-        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
-        "result=run_vnext(['scope','close',sys.argv[2]], invocation_cwd=Path(sys.argv[3]), "
-        "engine_digest='engine-a', engine_version='0.2.4'); "
-        "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
+def existing_local_workspace(root: Path) -> tuple[Path, Path]:
+    committed_workspace(root)
+    path = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
+    payload = json.loads(path.read_bytes())
+    payload.update(
+        backend="local",
+        github=None,
+        lifecycle={"state": "open", "revision": 0, "updated_at": "2026-09-30T00:00:00Z"},
     )
-    for answer, expected_code in ((b"no\n", 3), (b"yes\n", 0)):
-        master, slave = pty.openpty()
-        try:
-            child = subprocess.Popen(
-                [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), created.id, str(repo)],
-                stdin=slave,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
-            os.close(slave)
-            os.write(master, answer)
-            stdout, stderr = child.communicate(timeout=10)
-            assert child.returncode == expected_code, stdout + stderr
-            assert created.id in stderr and "Confirm" in stderr
-        finally:
-            os.close(master)
-    assert json.loads((created.path / ".meta.json").read_text())["lifecycle"]["state"] == "completed"
+    path.write_text(json.dumps(payload))
+    return root, path
 
 
-def test_scope_close_current_prompts_on_tty_without_noninteractive_guard(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    selected = _run(repo, "active", "set", created.id)
-    assert selected.exit_code == 0
-    metadata = created.path / ".meta.json"
+def test_scope_close_prompts_and_respects_denial_for_existing_local_data(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, metadata = existing_local_workspace(tmp_path / "consumer")
     before = metadata.read_bytes()
-    source = (
-        "from pathlib import Path; import sys; "
-        "sys.path.insert(0, sys.argv[1]); "
-        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
-        "result=run_vnext(['scope','close','@current'], invocation_cwd=Path(sys.argv[2]), "
-        "engine_digest='engine-a', engine_version='0.2.4'); "
-        "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
+    for answer, expected in (("no\n", 3), ("yes\n", 0)):
+        monkeypatch.setattr(sys, "stdin", TerminalAnswer(answer))
+        assert main(["--project", str(root), "scope", "close", "init-00001"]) == expected
+        output = capsys.readouterr()
+        assert "init-00001" in output.err and "Confirm [yes/no]" in output.err
+        if expected == 3:
+            assert metadata.read_bytes() == before
+    assert json.loads(metadata.read_bytes())["lifecycle"]["state"] == "completed"
+    assert not (root / ".git/spec-dock").exists()
+
+
+def test_scope_close_current_prompts_without_a_noninteractive_guard_and_respects_denial(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    monkeypatch.setattr(sys, "stdin", TerminalAnswer("no\n"))
+    assert main(["--project", str(root), "scope", "close", "@current"]) == 3
+    output = capsys.readouterr()
+    assert "Target: init-00001" in output.err and "Confirm [yes/no]" in output.err
+    assert record.read_bytes() == before
+    assert all(json.loads(line)["method"] == "GET" for line in log.read_text().splitlines())
+    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": "open"}
+
+
+def test_scope_close_current_json_returns_the_resolved_scope_without_clearing_selection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    record = select_fixture(root)
+    before = record.read_bytes()
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    assert (
+        main([
+            "--project",
+            str(root),
+            "scope",
+            "close",
+            "@current",
+            "--expect-current",
+            "init-00001",
+            "--yes",
+            "--json",
+        ])
+        == 0
     )
-    master, slave = pty.openpty()
-    try:
-        child = subprocess.Popen(
-            [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), str(repo)],
-            stdin=slave,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-        )
-        os.close(slave)
-        os.write(master, b"no\n")
-        stdout, stderr = child.communicate(timeout=10)
-        assert child.returncode == 3, stdout + stderr
-        assert f"Target: {created.id}" in stderr
-        assert "Confirm [yes/no]" in stderr
-        assert metadata.read_bytes() == before
-    finally:
-        os.close(master)
+    output = capsys.readouterr()
+    payload = json.loads(output.out)
+    assert payload["schema_version"] == "specdock.cli/v2" and not output.err
+    scope = payload["data"]["result"]["scope"]
+    assert scope["id"] == "init-00001" and scope["status"]["state"] == "completed"
+    assert scope["status"]["source"] == "github" and scope["status"]["authority"] == "github"
+    assert payload["data"]["result"]["changed"] is True
+    assert payload["effects"] == [{"kind": "github.issue.close", "status": "succeeded", "target": "gh:example/repo#1"}]
+    assert [
+        (row["number"], row["body"])
+        for row in map(json.loads, log.read_text().splitlines())
+        if row["method"] == "PATCH"
+    ] == [(1, {"state": "closed", "state_reason": "completed"})]
+    assert record.read_bytes() == before
 
 
-def test_scope_close_current_json_preserves_requested_selector(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    assert _run(repo, "active", "set", created.id).exit_code == 0
-    closed = _run(repo, "scope", "close", "@current", "--expect-current", created.id, "--yes")
-    payload = json.loads(closed.stdout)
-    assert closed.exit_code == 0
-    assert payload["target"]["requested"] == "@current"
-    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == created.id
-
-
-def test_scope_close_current_rejects_selection_change_during_prompt(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    first = create_local_scope(kind="initiative", title="First", parent=None, ancestors=(), **common)
-    second = create_local_scope(kind="initiative", title="Second", parent=None, ancestors=(), **common)
-    assert _run(repo, "active", "set", first.id).exit_code == 0
-    first_meta = first.path / ".meta.json"
-    before = first_meta.read_bytes()
-    source = (
-        "from pathlib import Path; import sys; "
-        "sys.path.insert(0, sys.argv[1]); "
-        "from spec_dock_runtime.cli.vnext_runtime import run_vnext; "
-        "result=run_vnext(['scope','close','@current'], invocation_cwd=Path(sys.argv[2]), "
-        "engine_digest='engine-a', engine_version='0.2.4'); "
-        "sys.stdout.write(result.stdout); sys.stderr.write(result.stderr); sys.exit(result.exit_code)"
-    )
-    master, slave = pty.openpty()
-    child = subprocess.Popen(
-        [sys.executable, "-c", source, str(RUNTIME_SCRIPTS), str(repo)],
-        stdin=slave,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-    )
-    os.close(slave)
-    try:
-        assert child.stderr is not None
-        prompt = bytearray()
-        deadline = time.monotonic() + 10
-        while b"Confirm [yes/no]" not in prompt and time.monotonic() < deadline:
-            ready, _, _ = select.select([child.stderr], [], [], 0.2)
-            if ready:
-                prompt.extend(os.read(child.stderr.fileno(), 4096))
-        assert b"Confirm [yes/no]" in prompt, prompt.decode(errors="replace")
-        assert first.id.encode() in prompt
-        assert _run(repo, "active", "set", second.id).exit_code == 0
-        os.write(master, b"yes\n")
-        stdout, stderr = child.communicate(timeout=10)
-        assert child.returncode == 3, (stdout + stderr).decode(errors="replace")
-        assert b"STATE_CONFLICT" in stderr
-        assert first_meta.read_bytes() == before
-    finally:
-        if child.poll() is None:
-            child.kill()
-            child.wait(timeout=10)
-        os.close(master)
-
-
-def test_scope_close_reopen_cli_previews_and_updates_local_lifecycle(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    metadata = created.path / ".meta.json"
+def test_scope_close_reopen_previews_and_updates_only_existing_local_lifecycle(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, metadata = existing_local_workspace(tmp_path / "consumer")
     before = metadata.read_bytes()
-    planned = _run(repo, "scope", "close", created.id, "--dry-run")
-    assert planned.exit_code == 0
-    assert json.loads(planned.stdout)["status"] == "planned"
-    assert metadata.read_bytes() == before
-    unconfirmed = _run(repo, "scope", "close", created.id)
-    assert unconfirmed.exit_code == 3
-    assert metadata.read_bytes() == before
-    closed = _run(repo, "scope", "close", created.id, "--yes")
-    assert closed.exit_code == 0
-    assert json.loads(closed.stdout)["target"]["id"] == created.id
-    assert json.loads(metadata.read_text())["lifecycle"]["state"] == "completed"
-    operation_id = json.loads(closed.stdout)["operation_id"]
-    wrong_action = _run(repo, "scope", "reopen", created.id, "--resume", operation_id, "--yes")
-    assert wrong_action.exit_code == 3
-    resumed = _run(repo, "scope", "close", created.id, "--resume", operation_id, "--yes")
-    assert resumed.exit_code == 0
-    unconfirmed_reopen = _run(repo, "scope", "reopen", created.id)
-    assert unconfirmed_reopen.exit_code == 3
-    assert json.loads(metadata.read_text())["lifecycle"]["state"] == "completed"
-    reopened = _run(repo, "scope", "reopen", created.id, "--yes")
-    assert reopened.exit_code == 0
-    assert json.loads(metadata.read_text())["lifecycle"]["state"] == "open"
-    abandoned = _run(repo, "scope", "close", created.id, "--reason", "not-planned", "--yes")
-    assert abandoned.exit_code == 0
-    abandoned_id = json.loads(abandoned.stdout)["operation_id"]
-    implicit_completed = _run(repo, "scope", "close", created.id, "--resume", abandoned_id, "--yes")
-    assert implicit_completed.exit_code == 3
-    resumed_abandoned = _run(
-        repo, "scope", "close", created.id, "--reason", "not-planned", "--resume", abandoned_id, "--yes"
+    head = subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"])
+    prefix = ["--project", str(root), "scope"]
+    assert main([*prefix, "close", "init-00001", "--dry-run", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["status"] == "planned" and metadata.read_bytes() == before
+    for action, state in (("close", "completed"), ("reopen", "open")):
+        before = metadata.read_bytes()
+        assert main([*prefix, action, "init-00001", "--json"]) == 3
+        assert json.loads(capsys.readouterr().out)["effects"] == [] and metadata.read_bytes() == before
+        assert main([*prefix, action, "init-00001", "--yes", "--json"]) == 0
+        payload = json.loads(capsys.readouterr().out)
+        scope = payload["data"]["result"]["scope"]
+        assert scope["id"] == "init-00001" and scope["status"]["state"] == state
+        assert scope["status"]["source"] == "local" and scope["status"]["authority"] == "local"
+        assert payload["effects"] == [{"kind": "scope.lifecycle", "status": "succeeded", "target": "init-00001"}]
+        assert json.loads(metadata.read_bytes())["lifecycle"]["state"] == state
+    assert main([*prefix, "close", "init-00001", "--reason", "not-planned", "--yes", "--json"]) == 0
+    assert json.loads(capsys.readouterr().out)["data"]["result"]["scope"]["status"]["state"] == "not-planned"
+    assert json.loads(metadata.read_bytes())["lifecycle"]["state"] == "not-planned"
+    assert subprocess.check_output(["git", "-C", str(root), "rev-parse", "HEAD"]) == head
+    assert subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"]) == b"main\n"
+    assert not (root / ".git/spec-dock").exists()
+
+
+def test_scope_mutation_checks_expected_current_and_backend_before_edit(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = three_kind_workspace(tmp_path / "consumer")
+    record = select_fixture(root, scope_id="iss-00003", number=3)
+    metadata = (
+        root / "spec-dock/initiatives/init-00001-fixture/epics/epic-00002-fixture/issues/iss-00003-fixture/.meta.json"
     )
-    assert resumed_abandoned.exit_code == 0
-
-
-def test_scope_close_json_reports_completed_scope_and_same_snapshot(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    closed = _run(repo, "scope", "close", created.id, "--yes")
-    assert closed.exit_code == 0
-    payload = json.loads(closed.stdout)
-    assert payload["target"]["id"] == payload["data"]["scope"]["id"] == created.id
-    assert payload["data"]["status"] == {"state": "completed", "source": "local", "stale": False}
-    assert payload["target"]["snapshot_id"] == payload["data"]["snapshot_id"]
-    assert payload["data"]["project"] == str(repo)
-    assert payload["data"]["worktree"] == common["worktree_id"]
-
-
-def test_scope_mutation_checks_expected_current_and_backend_before_edit(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    created = create_local_scope(kind="initiative", title="Plan", parent=None, ancestors=(), **common)
-    metadata = created.path / ".meta.json"
-    selected = _run(repo, "active", "set", created.id)
-    assert selected.exit_code == 0
-    before = metadata.read_bytes()
-
-    missing = _run(repo, "scope", "edit", "@current", "--title", "New")
-    assert missing.exit_code == 3
-    assert metadata.read_bytes() == before
-    mismatched = _run(repo, "scope", "edit", "@current", "--title", "New", "--expect-current", "init-local-99999")
-    assert mismatched.exit_code == 3
-    assert json.loads(mismatched.stdout)["error"]["code"] == "STATE_CONFLICT"
-    assert metadata.read_bytes() == before
-    wrong_backend = _run(repo, "scope", "edit", created.id, "--title", "New", "--expect-backend", "github")
-    assert wrong_backend.exit_code == 3
-    assert json.loads(wrong_backend.stdout)["error"]["code"] == "STATE_CONFLICT"
-    assert metadata.read_bytes() == before
-
-    changed = _run(
-        repo,
-        "scope",
-        "edit",
-        "@current",
-        "--title",
-        "New",
-        "--expect-current",
-        created.id,
-        "--expect-backend",
-        "local",
-    )
-    assert changed.exit_code == 0
-    assert json.loads(metadata.read_text())["title"] == "New"
+    before = metadata.read_bytes(), record.read_bytes()
+    prefix = ["--project", str(root), "scope", "edit", "@current", "--title", "New", "--json"]
+    for guard in (["--expect-current", "init-00001"], ["--expect-backend", "local"]):
+        assert main([*prefix, *guard]) == 3
+        result = json.loads(capsys.readouterr().out)
+        assert result["error"]["code"] == "PRECONDITION_FAILED" and result["effects"] == []
+        assert (metadata.read_bytes(), record.read_bytes()) == before
+    assert main([*prefix, "--expect-current", "iss-00003", "--expect-backend", "github"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["data"]["result"]["scope"]["id"] == "iss-00003"
+    assert json.loads(metadata.read_bytes())["title"] == "New" and record.read_bytes() == before[1]

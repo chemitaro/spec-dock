@@ -1,0 +1,74 @@
+{
+  "source_sha": "121228c6fca1fd016e7bccef009902396112ba43",
+  "method": "read-only direct records in same-clone Git worktree inventory and owned Issue 413 Workbench consumers/backups; cache/venv/git skipped; no unrelated filesystem scan",
+  "worktrees": [
+    "/Volumes/990p2t/workspace/tools/spec-dock",
+    "/Users/iwasawayuuta/orca/workspaces/spec-dock/scup",
+    "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock",
+    "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/3936/spec-dock",
+    "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/7276/spec-dock",
+    "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/8c20/spec-dock",
+    "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/8c49/spec-dock"
+  ],
+  "record_directories": 13,
+  "records": [
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-cl80iocg/linked/spec-dock/.agent/work-target/target-5020e7ecc24a48647aa4d68b21b8a654.json",
+      "sha256": "60582cee03c16fc4130d4beaba252803514fcd7a1648d643deccb8c5296788ed",
+      "schema_version": "specdock.work-target/v1",
+      "platforms": {
+        "clone_identity": "posix",
+        "worktree_identity": "posix"
+      }
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-cl80iocg/main/spec-dock/.agent/work-target/target-90017ba4f19e1e570ee0614195fd022f.json",
+      "sha256": "4c58a18d80ebe0b82ff206362b9700db396bfe45ccd66d1c9a6df10e29203753",
+      "schema_version": "specdock.work-target/v1",
+      "platforms": {
+        "clone_identity": "posix",
+        "worktree_identity": "posix"
+      }
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-jghonti2/linked/spec-dock/.agent/work-target/target-6034ffe5c1f534e27306cc641ed6a6d6.json",
+      "sha256": "746812bc8202db7d8225d43bf507c4a31e536d28ba3097e984521e37ecadd85c",
+      "schema_version": "specdock.work-target/v1",
+      "platforms": {
+        "clone_identity": "posix",
+        "worktree_identity": "posix"
+      }
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-jghonti2/main/spec-dock/.agent/work-target/target-aa6a17c62e2d0bb59d1bd1813581d6f7.json",
+      "sha256": "62a73345ff8220d148d0b52e4ad246197c1407392b8b5addead9b7316f06085f",
+      "schema_version": "specdock.work-target/v1",
+      "platforms": {
+        "clone_identity": "posix",
+        "worktree_identity": "posix"
+      }
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-plggczeh/linked/spec-dock/.agent/work-target/target-9453d5c78b6f60dfaf116392530f8e4b.json",
+      "sha256": "0b5a4dc7fdbe506193e1a9fff3aced40a204e1a3ad448c2cc09b5a2c0fb5c6a4",
+      "schema_version": "specdock.work-target/v1",
+      "platforms": {
+        "clone_identity": "posix",
+        "worktree_identity": "posix"
+      }
+    },
+    {
+      "path": "spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-plggczeh/main/spec-dock/.agent/work-target/target-0b732a6cb81c1bc8fffff85d58bd5e30.json",
+      "sha256": "aa2adf1a516b1eec908040d37f21fefa24e24ecb020ec6903c92da30a20b0142",
+      "schema_version": "specdock.work-target/v1",
+      "platforms": {
+        "clone_identity": "posix",
+        "worktree_identity": "posix"
+      }
+    }
+  ],
+  "windows_records": [],
+  "errors": [],
+  "unknown_external_backups": "not inspected; no such backup was provided or identified in the authorized scope",
+  "consumer_or_record_mutations": 0
+}

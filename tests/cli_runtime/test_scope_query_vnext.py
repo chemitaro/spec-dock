@@ -1,106 +1,137 @@
-"""Scope list/show are stable, cache-aware, and read-only."""
+"""Public Scope reads and title edits preserve existing data without control."""
 
 from __future__ import annotations
 
 import json
-from pathlib import Path
 import stat
-import sys
-from typing import cast
+from typing import TYPE_CHECKING
 
-RUNTIME_SCRIPTS = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/scripts"
-sys.path.insert(0, str(RUNTIME_SCRIPTS))
+from spec_dock.cli import main
+from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.domain.work_target import WorkTarget
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from spec_dock.runtime.infra.work_target_store import WorkTargetStore
+from tests.cli_runtime.test_issue413_finish import github_fixture
+from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.cli_runtime.test_scope_lifecycle_commands_vnext import existing_local_workspace
 
-from spec_dock_runtime.application.create_local_scope import create_local_scope  # noqa: E402
-from spec_dock_runtime.application.edit_scope import edit_scope_title  # noqa: E402
-from spec_dock_runtime.application.scope_query import list_scopes, load_scope_views, show_scope  # noqa: E402
-from spec_dock_runtime.domain.lifecycle import SelectionState  # noqa: E402
-from spec_dock_runtime.infra.json_store import atomic_write_json, read_guarded_json  # noqa: E402
-from tests.cli_runtime.test_scope_github_vnext import _ready_repo  # noqa: E402
+if TYPE_CHECKING:
+    from pathlib import Path
 
-
-def test_scope_query_filters_local_and_cached_github_without_network_or_write(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    local = create_local_scope(kind="initiative", title="Local", parent=None, ancestors=(), **common)
-    repo = cast("Path", common["repo_root"])
-    specdock_dir = repo / "spec-dock"
-    before_meta = (local.path / ".meta.json").read_bytes()
-    views = load_scope_views(specdock_dir)
-    result = list_scopes(views, kind="initiative")
-    assert [item.id for item in result.items] == [local.id]
-    assert result.items[0].status.state == "open"
-    assert result.items[0].status.source == "local"
-    assert list_scopes(views, kind="issue").items == ()
-    assert show_scope(views, local.id).id == local.id
-    selection = SelectionState("main", 0, local.id, None, None, local.id)
-    assert show_scope(views, "@current", selection=selection).id == local.id
-    assert (local.path / ".meta.json").read_bytes() == before_meta
+    import pytest
 
 
-def test_scope_query_keeps_github_status_source_and_stale_flag(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    repo = cast("Path", common["repo_root"])
-    specdock_dir = repo / "spec-dock"
-    from spec_dock_runtime.application.import_github_scope import import_github_scope
-    from tests.cli_runtime.test_scope_github_vnext import FakeGateway, _issue
-
-    imported = import_github_scope(
-        kind="initiative",
-        github_ref="gh:example/repo#47",
-        repo_hint=None,
-        title="Imported",
-        parent_id=None,
-        slug=None,
-        gateway=FakeGateway(_issue()),
-        **common,
+def test_scope_query_filters_existing_local_data_without_network_or_write(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, _metadata = existing_local_workspace(tmp_path / "consumer")
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    context = resolve_context(str(root), root)
+    WorkTargetStore(root).publish(
+        WorkTarget(
+            "specdock.work-target/v1",
+            "init-00001",
+            None,
+            "main",
+            "2026-09-30T00:00:00Z",
+            context.clone_identity,
+            context.worktree_identity,
+        )
     )
-    cache_path = specdock_dir / ".agent" / "github-status-cache.json"
-    atomic_write_json(
-        cache_path,
-        {
+    before = tree_digest(root)
+    prefix = ["--project", str(root), "scope"]
+    assert main([*prefix, "list", "--kind", "initiative", "--state", "open", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    items = result["data"]["result"]["items"]
+    assert [item["id"] for item in items] == ["init-00001"]
+    assert items[0]["backend"] == "local"
+    assert items[0]["status"]["state"] == "open" and items[0]["status"]["source"] == "local"
+    assert result["effects"] == [] and not output.err
+    assert main([*prefix, "list", "--kind", "issue", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["result"]["items"] == [] and result["effects"] == [] and not output.err
+    for selector in ("init-00001", "@current"):
+        assert main([*prefix, "show", selector, "--json"]) == 0
+        output = capsys.readouterr()
+        result = json.loads(output.out)
+        scope = result["data"]["result"]["scope"]
+        assert scope["id"] == "init-00001" and scope["backend"] == "local"
+        assert scope["github_ref"] is None and result["effects"] == [] and not output.err
+    assert not log.exists() and tree_digest(root) == before
+    assert not (root / ".git/spec-dock").exists()
+
+
+def test_scope_query_ignores_retired_github_status_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = committed_workspace(tmp_path / "consumer")
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    cache = root / "spec-dock/.agent/github-status-cache.json"
+    cache.parent.mkdir()
+    cache.write_text(
+        json.dumps({
             "schema_version": 1,
             "items": {
-                imported.id: {
-                    "github_ref": imported.github_ref,
+                "init-00001": {
+                    "github_ref": "gh:example/repo#1",
                     "state": "completed",
                     "observed_at": "2026-09-25T00:00:00Z",
                 }
             },
-        },
+        })
     )
-    views = load_scope_views(specdock_dir)
-    item = show_scope(views, imported.id)
-    assert item.status.state == "completed"
-    assert item.status.source == "cache"
-    assert item.status.stale
-    assert [scope.id for scope in list_scopes(views, state="completed").items] == [imported.id]
+    before = tree_digest(root)
+    prefix = ["--project", str(root), "scope"]
+    assert main([*prefix, "show", "init-00001", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    status = result["data"]["result"]["scope"]["status"]
+    assert status == {"state": "unknown", "authority": "github", "source": "unknown", "observed_at": None}
+    assert result["effects"] == [] and not output.err
+    assert main([*prefix, "list", "--state", "completed", "--json"]) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["data"]["result"]["items"] == []
+    assert result["data"]["result"]["unknown_filtered_count"] == 1
+    assert result["effects"] == [] and not output.err
+    assert not log.exists() and tree_digest(root) == before
 
 
-def test_scope_title_edit_preserves_slug_backend_and_read_only_mode(tmp_path: Path) -> None:
-    common = _ready_repo(tmp_path)
-    local = create_local_scope(kind="initiative", title="Original", parent=None, ancestors=(), **common)
-    meta_path = local.path / ".meta.json"
-    before = json.loads(meta_path.read_text(encoding="utf-8"))
+def test_scope_title_edit_preserves_existing_fields_documents_and_mode(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, meta_path = existing_local_workspace(tmp_path / "consumer")
+    log = github_fixture(tmp_path, monkeypatch, {"1": "open"})
+    before = json.loads(meta_path.read_bytes())
     before["custom_note"] = {"owner": "test", "priority": 4}
-    loaded = read_guarded_json(meta_path)
-    assert loaded is not None
-    atomic_write_json(meta_path, before, expected_identity=loaded[1])
+    meta_path.write_text(json.dumps(before))
+    meta_path.chmod(0o444)
+    for name in ("requirement.md", "design.md", "plan.md"):
+        (meta_path.parent / name).write_text(f"# Existing {name}\nKeep this exact body.\n")
     before_mode = stat.S_IMODE(meta_path.stat().st_mode)
-    document_bytes = {path.name: path.read_bytes() for path in local.path.glob("*.md")}
-    result = edit_scope_title(
-        target_id=local.id, title="Revised", **{key: value for key, value in common.items() if key != "updated_at"}
-    )
-    after = json.loads(meta_path.read_text(encoding="utf-8"))
-    assert result.changed
+    document_bytes = {path.name: path.read_bytes() for path in meta_path.parent.glob("*.md")}
+    command = ["--project", str(root), "scope", "edit", "init-00001", "--title", "Revised", "--json"]
+    assert main(command) == 0
+    output = capsys.readouterr()
+    result = json.loads(output.out)
+    assert result["status"] == "succeeded" and result["data"]["result"]["changed"] is True
+    assert result["data"]["result"]["scope"]["backend"] == "local" and not output.err
+    after_bytes = meta_path.read_bytes()
+    after = json.loads(after_bytes)
     assert after["title"] == "Revised"
     assert after["revision"] == before["revision"] + 1
     assert {key: value for key, value in after.items() if key not in ("title", "revision")} == {
         key: value for key, value in before.items() if key not in ("title", "revision")
     }
     assert stat.S_IMODE(meta_path.stat().st_mode) == before_mode
-    assert {path.name: path.read_bytes() for path in local.path.glob("*.md")} == document_bytes
-    same = edit_scope_title(
-        target_id=local.id, title="Revised", **{key: value for key, value in common.items() if key != "updated_at"}
-    )
-    assert not same.changed
-    assert json.loads(meta_path.read_text(encoding="utf-8")) == after
+    assert {path.name: path.read_bytes() for path in meta_path.parent.glob("*.md")} == document_bytes
+    edited_tree = tree_digest(root)
+    assert main(command) == 0
+    output = capsys.readouterr()
+    same = json.loads(output.out)
+    assert same["status"] == "unchanged" and same["data"]["result"]["changed"] is False
+    assert same["effects"] == [] and not output.err
+    assert meta_path.read_bytes() == after_bytes and tree_digest(root) == edited_tree
+    assert not log.exists() and not (root / ".git/spec-dock").exists()

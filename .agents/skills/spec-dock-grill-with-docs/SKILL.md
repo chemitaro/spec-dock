@@ -1,11 +1,14 @@
 ---
 name: spec-dock-grill-with-docs
-description: Explicitly create one scope-local SpecDock evidence Artifact after read-only grilling and domain clarification.
+description: Read-only grilling and domain clarification, followed by one explicit Scope-local evidence Artifact through the installed external SpecDock CLI.
+disable-model-invocation: true
 ---
 
 # SpecDock Grill with Docs
 
 Run this skill only when the user explicitly invokes it. It combines the operator-owned `grilling` and `domain-modeling` capabilities under a stricter read-only boundary, then creates exactly one scope-local Artifact through the Current SpecDock CLI.
+
+The Artifact business CLI supports Linux and macOS with Python 3.10+. Other operating systems return `UNSUPPORTED_PLATFORM` (exit 3) before project admission or writes; context-free help, version and completion remain available.
 
 ## Required inputs
 
@@ -37,7 +40,7 @@ Complete this preflight twice: before external capability use and immediately be
 8. Require this skill's `agents/openai.yaml` and `scripts/finalize-artifact.py` to exist as non-empty ordinary files inside this skill directory.
 9. Confirm both external capabilities are available and can obey this skill's read-only boundary.
 
-Do not create or repair directories, templates, rules links, active state, locks, or bootstrap files. The Current Artifact CLI remains the authority for collision, lock, no-replace publication, and final destination safety.
+Do not create or repair directories, templates, rules links, active state, locks, or bootstrap files. The installed external Artifact CLI remains authoritative for collision, no-replace publication and final destination safety; it does not acquire a shared writer lock.
 
 ## External capability boundary
 
@@ -79,13 +82,14 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 4. Invoke the Current CLI exactly once, passing arguments without shell interpolation:
 
    ```text
-   ./spec-dock/scripts/spec-dock artifact create \
+   spec-dock artifact create \
      --scope <scope-id> --type <route> \
      --title <title> \
-     [--slug <slug>]
+     [--slug <slug>] --json
    ```
 
-5. Accept only the exact path text returned by a successful command. Require it to identify a new direct-child Markdown file under the selected scope's `artifacts/` directory. The helper accepts the canonical repository-relative form and, when present, one leading repository-basename component emitted by the Current formatter; reject every other prefix.
+5. Require exit 0, `schema_version=specdock.cli/v2`, `status=succeeded` and `data.kind=artifact`; read the exact repository-relative `data.result.artifact.path`. Require it to identify one new direct-child Markdown file under the selected Scope's `artifacts/` directory. Do not parse a text summary or invent a path. The helper accepts the canonical repository-relative form and its preserved compatibility prefix; new CLI results use the canonical form.
+   If the CLI instead reports a partial or unknown publication, retain its exact returned path and effects for Partial Artifact recovery; do not finalize or repeat the creation automatically.
 6. Run the skill-local helper's read-only identity command with argument-vector execution:
 
    ```text

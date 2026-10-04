@@ -1,17 +1,13 @@
 import os
 from pathlib import Path
-import sys
 
 import pytest
 
 
 def _artifacts_module():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        from spec_dock_runtime.domain import artifacts
-    finally:
-        sys.path.pop(0)
+
+    from spec_dock.runtime.domain import artifacts
+
     return artifacts
 
 
@@ -109,6 +105,16 @@ def test_existing_generic_import_catalog_is_recognized_as_opaque_identity(tmp_pa
     assert parsed is not None
     assert parsed.artifact_id == filename
     assert artifacts.is_malformed_artifact_candidate(tmp_path / filename) is False
+
+
+def test_generic_markdown_filename_is_not_a_malformed_typed_candidate(tmp_path: Path) -> None:
+    artifacts = _artifacts_module()
+    path = tmp_path / "20260730t010203z--opaque.md"
+    path.write_bytes(b"\xff\x00not semantic markdown")
+
+    assert artifacts.parse_generic_imported_artifact_filename(path.name) is not None
+    assert artifacts.parse_artifact_filename(path.name) is None
+    assert artifacts.is_malformed_artifact_candidate(path) is False
 
 
 @pytest.mark.parametrize(

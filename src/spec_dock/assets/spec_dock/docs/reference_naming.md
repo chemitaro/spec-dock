@@ -1,7 +1,9 @@
 # 命名と識別子（Current）
 
-Scope IDは `init-`、`epic-`、`iss-` で種別を表し、GitHub backendはIssue番号、local backendは `local-` を含む連番を使います。作成時のtitle/slugの制約と実際の割当結果は `scope create KIND --help` と返却されたIDで確認します。IDやArtifact pathを手で推測してmetadataを編集しないでください。
+Scope IDはGitHub番号にkind prefix `init-`、`epic-`、`iss-` を付けたものです。既存metadataのID/親/番号/refを保持し、新規ScopeにUUIDやlocal連番を追加しません。create/importのIDとcanonical pathを使い、metadataを手で作りません。
 
-branchはScope IDとtitleから決定的な名前を割り当て、branch対応を記録します。`work start` で新しい対応branchを作るときは `--base REF` が必須です。既存の対応branchを再開するときは `--base` を渡せません。`branch create TARGET --base REF` はcheckoutせずに対応を作ります。`branch switch TARGET` は選択を変えずにcheckoutします。`--branch NAME` は明示した名前の検査後だけ使用します。
+branchの既定名はIDとmetadataのslugから決め、独自対応台帳は保存しません。新規Startは--base REFが必要です。既存branchの再開は--branch NAMEを明示し、--baseを渡しません。branch create/show/switchの--nameとStartの--branchはGitで検証します。同一branchの同時checkoutはGitが、別branchの同一Scope重複はStartの観測・短い排他が防ぎます。
 
-Artifactは `artifact create --scope TARGET --type TYPE --title TITLE` が生成した識別子・pathを使います。`artifact import file PATH --scope TARGET` は一件のregular fileをopaque evidenceとして保存します。正本に採用した内容はRequirement、Design、Planまたはaccepted ADRへ明示的に反映します。過去版の詳細な命名規約は[historical](historical/reference_naming.md)です。
+直接作業記録のtokenは捕捉した一fileの識別用です。Scope identity、GitHub番号、永続操作台帳ではありません。Finish/clearはその捕捉記録だけを解除し、後から始まった別対象を消しません。
+
+ArtifactはCLIのID/pathを使います。createはtimestamp/type/title、import fileはtimestampと元basenameを基に一件のopaque fileを保存します。本文からauthorityを推測せず、採用内容をRequirement・Design・Planまたはaccepted ADRへ明示的に反映します。

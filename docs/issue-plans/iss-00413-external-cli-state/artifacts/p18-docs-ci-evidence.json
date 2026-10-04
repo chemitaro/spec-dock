@@ -1,0 +1,53 @@
+{
+  "source_checkpoint": "c0f8add123de1ba2cc16074841589c294242b090",
+  "ci_checkpoint": "a552e73c4371eb9e58b4b396fb6d623796582559",
+  "scope": "P-18.4/P-18.5 working document candidate; OS full/manual and P-07/fresh Strict/FQ incomplete",
+  "supported_os": [
+    "linux",
+    "darwin"
+  ],
+  "distribution_tests": {
+    "command": "uv run pytest tests/unit/infra/test_provider_distribution.py tests/integration/test_issue413_assets.py tests/integration/test_issue413_wheel.py -q -ra",
+    "actual_exit": 0,
+    "result": "71 passed in 99.34s"
+  },
+  "static_inventory": {
+    "changed_current_files": 5,
+    "known_old_hashes_preserved": true,
+    "unrelated_entries_unchanged": true,
+    "actual_dogfood_and_installed_skills_diff": 0
+  },
+  "ci": {
+    "removed_only": "provider-windows-native-adapters",
+    "linux_macos_jobs_retained": true,
+    "retained_job_contents_exact": true,
+    "yaml_parse": "Ruby YAML actual exit0",
+    "prior_parser_probe": "uv Python PyYAML missing, exit1; not a product failure or Red"
+  },
+  "html": {
+    "path": "explanation.html",
+    "sha256": "b9514c5a5e4bc0b3faa99bcc66dc647cf4f5b4bd11ba8f0b5e6b1b4c573a9aaf",
+    "actual_exit": 0,
+    "browser": "4/4 inline SVG plus zoom/keyboard/focus/dismiss/restoration pass",
+    "url": "http://100.85.74.8:8765/specdock-issue-413/explanation.html",
+    "http_status": 200,
+    "cache_control": "no-store",
+    "http_bytes_exact": true
+  },
+  "raw_logs": [
+    {
+      "name": "p18-docs-tests.log",
+      "actual_exit": 0,
+      "bytes": 110,
+      "sha256": "97ce4a931518ceb7923a0594d23583d196e247d4503733648cd98c97d0fe4e07",
+      "utf8_text": ".......................................................................  [100%]\n71 passed in 99.34s (0:01:39)\n"
+    },
+    {
+      "name": "p18-html-validation.log",
+      "actual_exit": 0,
+      "bytes": 341,
+      "sha256": "4d1ad140216997d75a8f21878ce59c8f80ba65359979a06ebdcec5f96803fd8b",
+      "utf8_text": "PASS static: 4 PlantUML source(s), @plantuml/core@1.2026.6\nPASS browser: 4/4 diagram(s) rendered to inline SVG\nPASS zoom: click, keyboard, bounds, focus trap, dismissal, and focus restoration\nVALIDATED /Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/docs/issue-plans/iss-00413-external-cli-state/explanation.html\n"
+    }
+  ]
+}

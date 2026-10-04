@@ -4,16 +4,11 @@ import importlib
 import os
 from pathlib import Path
 import stat
-import sys
 
 
 def _template_scaffolder():
-    runtime_scripts_dir = Path(__file__).resolve().parents[3] / "src" / "spec_dock" / "assets" / "spec_dock" / "scripts"
-    sys.path.insert(0, str(runtime_scripts_dir))
-    try:
-        return importlib.import_module("spec_dock_runtime.infra.template_scaffolder")
-    finally:
-        sys.path.pop(0)
+
+    return importlib.import_module("spec_dock.runtime.infra.template_scaffolder")
 
 
 def test_copy_scaffolded_tree_uses_exact_copy_for_unchanged_utf8_bytes(tmp_path: Path) -> None:

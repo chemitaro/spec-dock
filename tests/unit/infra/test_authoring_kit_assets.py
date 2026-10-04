@@ -555,11 +555,13 @@ def test_s07_parity_manifest_rejects_missing_extra_and_duplicate_rows() -> None:
     assert _owned_manifest_delta(duplicate_row)[2] == (S07_OWNED_ASSET_MANIFEST[0],)
 
 
-def test_s07_parity_owned_assets_exist_and_match_dogfood_projection_byte_exact() -> None:
+def test_s07_parity_owned_assets_exist_and_match_fresh_projection_byte_exact(
+    installed_static_consumer: Path,
+) -> None:
     assert not _projection_violations(
         S07_OWNED_ASSET_MANIFEST,
         DOCS_ROOT.parent,
-        DOGFOOD_DOCS_ROOT.parent,
+        installed_static_consumer / "spec-dock",
     )
 
 
@@ -729,13 +731,17 @@ def test_s06_navigation_asset_relative_links_resolve(scaffold_root: Path, relati
 
 
 @pytest.mark.parametrize("relative_path", S06_MANAGED_ASSET_PATHS)
-def test_s06_navigation_assets_match_dogfood_projection(relative_path: str) -> None:
-    assert (DOCS_ROOT.parent / relative_path).read_bytes() == (DOGFOOD_DOCS_ROOT.parent / relative_path).read_bytes()
+def test_s06_navigation_assets_match_fresh_projection(relative_path: str, installed_static_consumer: Path) -> None:
+    assert (DOCS_ROOT.parent / relative_path).read_bytes() == (
+        installed_static_consumer / "spec-dock" / relative_path
+    ).read_bytes()
 
 
 @pytest.mark.parametrize("relative_path", S01_OWNED_DOC_PATHS)
-def test_s01_authoring_docs_match_dogfood_projection(relative_path: str) -> None:
-    assert (DOCS_ROOT / relative_path).read_bytes() == (DOGFOOD_DOCS_ROOT / relative_path).read_bytes()
+def test_s01_authoring_docs_match_fresh_projection(relative_path: str, installed_static_consumer: Path) -> None:
+    assert (DOCS_ROOT / relative_path).read_bytes() == (
+        installed_static_consumer / "spec-dock/docs" / relative_path
+    ).read_bytes()
 
 
 @pytest.mark.parametrize("name", FOUNDATION_DOCS)
@@ -1411,13 +1417,13 @@ def _s09_design_contract_violations(design_section: str) -> tuple[str, ...]:
     )
 
 
-def test_s09_ic1_contract_input_is_exact_and_provider_dogfood_complete() -> None:
+def test_s09_ic1_contract_input_is_exact_and_provider_consumer_complete(installed_static_consumer: Path) -> None:
     assert _s09_contract_violations(S09_IC1_CONTRACT) == ()
     assert S09_IC1_CONTRACT["consumer"] == S09_CONTRACT_CONSUMER
     assert S09_IC1_CONTRACT["version"] == S09_CONTRACT_VERSION
     manifest = S09_IC1_CONTRACT["owned_asset_manifest"]
     assert manifest == S07_OWNED_ASSET_MANIFEST
-    assert not _projection_violations(manifest, DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent)
+    assert not _projection_violations(manifest, DOCS_ROOT.parent, installed_static_consumer / "spec-dock")
 
     for relative_path in S09_SCOPE_PATHS + S09_ISSUE_PLAN_PATHS + S09_LEVEL_GUIDE_PATHS:
         assert relative_path in manifest

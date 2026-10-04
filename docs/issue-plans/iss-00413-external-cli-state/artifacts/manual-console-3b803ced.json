@@ -1,0 +1,579 @@
+{
+  "evidence_kind": "individually invoked installed-console manual observations",
+  "provenance": {
+    "provider_head": "3b803ced470bf58439bbee342b61c91c20de74b6",
+    "provider_source_status": "",
+    "provider_source_sha256": "406d985677ff6b811c11d34b407db06241cb7b8b97608d398fe1a66bdaa9b50d",
+    "wheel_sha256": "9dfcf4ef9d82c72c0b49b514b38aa2e25cb72da36a50f0be2a4744be1f5fb97c",
+    "imported_package": "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/lib/python3.12/site-packages/spec_dock/__init__.py",
+    "python": "3.12.11 (main, Oct  7 2025, 15:53:48) [Clang 20.1.4 ]",
+    "platform": "darwin"
+  },
+  "github_boundary": "owned stateful external gh substitute; no live GitHub",
+  "operations_original_sha256": "b8614aa6992f640b6e5d9f88eea8733e5140d8170a39c2ec5f53d7a03a032c0d",
+  "operations": [
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "help"
+      ],
+      "exit_code": 0,
+      "stdout": "usage: spec-dock [-h]\n                 {scope,active,work,branch,dependency,artifact,worktree,workbench,workspace,installation,help,completion}\n                 ...\n\npositional arguments:\n  {scope,active,work,branch,dependency,artifact,worktree,workbench,workspace,installation,help,completion}\n\noptions:\n  -h, --help            show this help message and exit\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "work",
+        "start",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "usage: spec-dock work start [-h] [--branch BRANCH] [--base BASE]\n                            [--switch-active] [--source {github}]\n                            target\n\npositional arguments:\n  target\n\noptions:\n  -h, --help         show this help message and exit\n  --branch BRANCH\n  --base BASE\n  --switch-active\n  --source {github}\n\nTarget:\n  The explicit Scope selector (or @current selection) in this worktree.\n\nReads:\n  Current Scope hierarchy, direct selection, Git branch and HEAD, dependency evidence, and required live GitHub state.\n\nWrites:\n  Create or reuse a branch, checkout it, and select the ready Scope.\n\nDoes not:\n  Does not commit, push, merge, delete branches, or automatically roll back completed effects.\n\nPreconditions:\n  The Scope must be ready, its dependencies satisfied, and branch base resolvable.\n\nConfirmation:\n  No final confirmation is required for this leaf.\n\nEffects:\n  Create or reuse a branch, checkout it, and select the ready Scope.\n\nRecovery:\n  Inspect the current Git branch, HEAD, worktree status, and direct selection before a new explicit Start.\n\nJSON:\n  --json returns one specdock.cli/v2 envelope. Data: Direct Scope ID, started or completed result, before/after branch, selection token, and effect outcomes.\n\nExamples:\n  spec-dock work start <scope-id> --base HEAD\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "workspace",
+        "sync",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "usage: spec-dock workspace sync [-h] [--source {local,github}]\n                                [--allow-invalid]\n\noptions:\n  -h, --help            show this help message and exit\n  --source {local,github}\n  --allow-invalid\n\nTarget:\n  The current Scope tree and main/linked worktrees in this Git clone.\n\nReads:\n  Current metadata, Git worktree inventory, direct records and their ancestors; live GitHub only with --source github.\n\nWrites:\n  None; this command only reads.\n\nDoes not:\n  Does not save derived state, acquire a Start lock, repair selections, or inspect Codex processes.\n\nPreconditions:\n  Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.\n\nConfirmation:\n  No final confirmation is required for this leaf.\n\nEffects:\n  Observe current Scope lifecycle and same-clone worktree selections without writing files.\n\nRecovery:\n  No mutation to recover; inspect incomplete observations and issue a new Sync.\n\nJSON:\n  --json returns one specdock.cli/v2 envelope. Data: observed_at, source, complete, worktrees, scopes, counts, findings; process_state=not_observed.\n\nExamples:\n  spec-dock workspace sync\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "work",
+        "finish",
+        "--help"
+      ],
+      "exit_code": 0,
+      "stdout": "usage: spec-dock work finish [-h] target\n\npositional arguments:\n  target\n\noptions:\n  -h, --help  show this help message and exit\n\nTarget:\n  The explicit Scope selector (or @current selection) in this worktree.\n\nReads:\n  Current metadata, required target and descendant lifecycle, and this worktree's captured direct record. GitHub-backed completion is confirmed completed by a live GET before clearing that record.\n\nWrites:\n  Complete the Scope, then clear the captured direct record only if it selects that Scope or a descendant; keep the current branch.\n\nDoes not:\n  Keeps the current branch; no Start lock, automatic parent selection, child completion, commit, push, merge, or rollback. A Scope outside the active chain leaves the direct record unchanged.\n\nPreconditions:\n  The explicit Scope must resolve and its completion guards must pass. A Scope outside the active chain can be completed without changing the current selection.\n\nConfirmation:\n  Apply requires --yes; --dry-run needs no confirmation.\n\nEffects:\n  Complete the Scope, then clear the captured direct record only if it selects that Scope or a descendant; keep the current branch.\n\nRecovery:\n  Inspect current completion and direct selection, then issue a new explicit Finish; no journal or rollback.\n\nJSON:\n  --json returns one specdock.cli/v2 envelope. Data: kind=work-finish, scope_id, completed, branch_before, branch_after, selection_token; effects report completion and any captured-record clear separately.\n\nExamples:\n  spec-dock work finish <scope-id>\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "work",
+        "start",
+        "iss-00003",
+        "--branch",
+        "issue-a",
+        "--base",
+        "HEAD",
+        "--dry-run",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work start\",\"status\":\"planned\",\"exit_code\":0,\"data\":{\"scope_id\":\"iss-00003\",\"started\":false,\"branch_before\":\"main\",\"branch_after\":\"issue-a\",\"selection_token\":null,\"kind\":\"work-start\"},\"effects\":[{\"kind\":\"git.branch.create\",\"status\":\"planned\",\"target\":\"issue-a\"},{\"kind\":\"git.checkout\",\"status\":\"planned\",\"target\":\"issue-a\"},{\"kind\":\"selection.publish\",\"status\":\"planned\",\"target\":\"iss-00003\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "work",
+        "start",
+        "iss-00003",
+        "--branch",
+        "issue-a",
+        "--base",
+        "HEAD",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work start\",\"status\":\"succeeded\",\"exit_code\":0,\"data\":{\"scope_id\":\"iss-00003\",\"started\":true,\"branch_before\":\"main\",\"branch_after\":\"issue-a\",\"selection_token\":\"d7330576f74c05cdcc5305f66dc4858b\",\"kind\":\"work-start\"},\"effects\":[{\"kind\":\"git.branch.create\",\"status\":\"succeeded\",\"target\":\"issue-a\"},{\"kind\":\"git.checkout\",\"status\":\"succeeded\",\"target\":\"issue-a\"},{\"kind\":\"selection.publish\",\"status\":\"succeeded\",\"target\":\"iss-00003\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": [
+        ".git/HEAD",
+        ".git/logs/HEAD",
+        ".git/logs/refs/heads/issue-a",
+        ".git/refs/heads/issue-a",
+        "spec-dock/.agent",
+        "spec-dock/.agent/work-target",
+        "spec-dock/.agent/work-target/target-d7330576f74c05cdcc5305f66dc4858b.json"
+      ]
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/linked",
+        "work",
+        "start",
+        "iss-00003",
+        "--branch",
+        "duplicate-a",
+        "--base",
+        "HEAD",
+        "--json"
+      ],
+      "exit_code": 3,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work start\",\"status\":\"failed\",\"exit_code\":3,\"data\":{\"scope_id\":\"iss-00003\",\"started\":false,\"branch_before\":null,\"branch_after\":null,\"selection_token\":null,\"kind\":\"work-start\"},\"effects\":[],\"warnings\":[],\"error\":{\"code\":\"SCOPE_ALREADY_SELECTED\",\"message\":\"Scope is already selected by another worktree\",\"details\":{}},\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/linked",
+        "work",
+        "start",
+        "iss-00004",
+        "--branch",
+        "issue-b",
+        "--base",
+        "HEAD",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work start\",\"status\":\"succeeded\",\"exit_code\":0,\"data\":{\"scope_id\":\"iss-00004\",\"started\":true,\"branch_before\":null,\"branch_after\":\"issue-b\",\"selection_token\":\"adab1d6acb1fd26051ac093130514c80\",\"kind\":\"work-start\"},\"effects\":[{\"kind\":\"git.branch.create\",\"status\":\"succeeded\",\"target\":\"issue-b\"},{\"kind\":\"git.checkout\",\"status\":\"succeeded\",\"target\":\"issue-b\"},{\"kind\":\"selection.publish\",\"status\":\"succeeded\",\"target\":\"iss-00004\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": [
+        "spec-dock/.agent",
+        "spec-dock/.agent/work-target",
+        "spec-dock/.agent/work-target/target-adab1d6acb1fd26051ac093130514c80.json"
+      ]
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "workspace",
+        "sync",
+        "--source",
+        "github",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"workspace sync\",\"status\":\"succeeded\",\"exit_code\":0,\"data\":{\"observed_at\":\"2026-10-02T10:22:34.354361Z\",\"source\":\"github\",\"complete\":true,\"worktrees\":[{\"path\":\"/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main\",\"selection\":{\"status\":\"selected\",\"scope_id\":\"iss-00003\",\"github_ref\":\"gh:example/repo#3\",\"selection_token\":\"d7330576f74c05cdcc5305f66dc4858b\",\"selected_branch\":\"issue-a\",\"current_branch\":\"issue-a\",\"branch_changed\":false},\"lifecycle\":\"open\",\"process_state\":\"not_observed\",\"findings\":[]},{\"path\":\"/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/linked\",\"selection\":{\"status\":\"selected\",\"scope_id\":\"iss-00004\",\"github_ref\":\"gh:example/repo#4\",\"selection_token\":\"adab1d6acb1fd26051ac093130514c80\",\"selected_branch\":\"issue-b\",\"current_branch\":\"issue-b\",\"branch_changed\":false},\"lifecycle\":\"open\",\"process_state\":\"not_observed\",\"findings\":[]}],\"scopes\":[{\"scope_id\":\"init-00001\",\"github_ref\":\"gh:example/repo#1\",\"lifecycle\":\"open\"},{\"scope_id\":\"epic-00002\",\"github_ref\":\"gh:example/repo#2\",\"lifecycle\":\"open\"},{\"scope_id\":\"iss-00003\",\"github_ref\":\"gh:example/repo#3\",\"lifecycle\":\"open\"},{\"scope_id\":\"iss-00004\",\"github_ref\":\"gh:example/repo#4\",\"lifecycle\":\"open\"},{\"scope_id\":\"iss-00005\",\"github_ref\":\"gh:example/repo#5\",\"lifecycle\":\"open\"}],\"counts\":[{\"scope_id\":\"init-00001\",\"direct_selected_count\":0,\"descendant_selected_count\":2,\"complete\":true},{\"scope_id\":\"epic-00002\",\"direct_selected_count\":0,\"descendant_selected_count\":2,\"complete\":true},{\"scope_id\":\"iss-00003\",\"direct_selected_count\":1,\"descendant_selected_count\":0,\"complete\":true},{\"scope_id\":\"iss-00004\",\"direct_selected_count\":1,\"descendant_selected_count\":0,\"complete\":true},{\"scope_id\":\"iss-00005\",\"direct_selected_count\":0,\"descendant_selected_count\":0,\"complete\":true}],\"findings\":[],\"kind\":\"sync\"},\"effects\":[],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "work",
+        "finish",
+        "iss-00003",
+        "--dry-run",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work finish\",\"status\":\"planned\",\"exit_code\":0,\"data\":{\"scope_id\":\"iss-00003\",\"completed\":false,\"branch_before\":\"issue-a\",\"branch_after\":\"issue-a\",\"selection_token\":\"d7330576f74c05cdcc5305f66dc4858b\",\"kind\":\"work-finish\"},\"effects\":[{\"kind\":\"github.issue.close\",\"status\":\"planned\",\"target\":\"gh:example/repo#3\"},{\"kind\":\"selection.clear\",\"status\":\"planned\",\"target\":\"d7330576f74c05cdcc5305f66dc4858b\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": []
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "work",
+        "finish",
+        "iss-00003",
+        "--yes",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work finish\",\"status\":\"succeeded\",\"exit_code\":0,\"data\":{\"scope_id\":\"iss-00003\",\"completed\":true,\"branch_before\":\"issue-a\",\"branch_after\":\"issue-a\",\"selection_token\":null,\"kind\":\"work-finish\"},\"effects\":[{\"kind\":\"github.issue.close\",\"status\":\"succeeded\",\"target\":\"gh:example/repo#3\"},{\"kind\":\"selection.clear\",\"status\":\"succeeded\",\"target\":\"d7330576f74c05cdcc5305f66dc4858b\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": [
+        "spec-dock/.agent/work-target/target-d7330576f74c05cdcc5305f66dc4858b.json"
+      ]
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "work",
+        "start",
+        "iss-00005",
+        "--branch",
+        "issue-c",
+        "--base",
+        "HEAD",
+        "--json"
+      ],
+      "exit_code": 0,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work start\",\"status\":\"succeeded\",\"exit_code\":0,\"data\":{\"scope_id\":\"iss-00005\",\"started\":true,\"branch_before\":\"issue-a\",\"branch_after\":\"issue-c\",\"selection_token\":\"535b31ded1f4ba1b1079ddc68ffcc16e\",\"kind\":\"work-start\"},\"effects\":[{\"kind\":\"git.branch.create\",\"status\":\"succeeded\",\"target\":\"issue-c\"},{\"kind\":\"git.checkout\",\"status\":\"succeeded\",\"target\":\"issue-c\"},{\"kind\":\"selection.publish\",\"status\":\"succeeded\",\"target\":\"iss-00005\"}],\"warnings\":[],\"error\":null,\"recovery\":null}\n",
+      "stderr": "",
+      "changed_entries": [
+        ".git/HEAD",
+        ".git/logs/HEAD",
+        ".git/logs/refs/heads/issue-c",
+        ".git/refs/heads/issue-c",
+        "spec-dock/.agent/work-target/target-535b31ded1f4ba1b1079ddc68ffcc16e.json"
+      ]
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "work",
+        "start",
+        "init-00001",
+        "--branch",
+        "hook-failure",
+        "--base",
+        "HEAD",
+        "--switch-active",
+        "--json"
+      ],
+      "exit_code": 6,
+      "stdout": "{\"schema_version\":\"specdock.cli/v2\",\"command\":\"work start\",\"status\":\"partial\",\"exit_code\":6,\"data\":{\"scope_id\":\"init-00001\",\"started\":false,\"branch_before\":\"issue-c\",\"branch_after\":\"hook-failure\",\"selection_token\":null,\"kind\":\"work-start\"},\"effects\":[{\"kind\":\"git.branch.create\",\"status\":\"succeeded\",\"target\":\"hook-failure\"},{\"kind\":\"git.checkout\",\"status\":\"succeeded\",\"target\":\"hook-failure\"},{\"kind\":\"selection.clear\",\"status\":\"not_attempted\",\"target\":\"iss-00005\"},{\"kind\":\"selection.publish\",\"status\":\"not_attempted\",\"target\":\"init-00001\"}],\"warnings\":[],\"error\":{\"code\":\"GIT_FAILED\",\"message\":\"Switched to branch 'hook-failure'\\nmanual checkout hook failure\\nsecond native line\\n\",\"details\":{\"git\":{\"argv\":[\"git\",\"-C\",\"/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main\",\"checkout\",\"hook-failure\"],\"stderr\":\"Switched to branch 'hook-failure'\\nmanual checkout hook failure\\nsecond native line\\n\",\"stdout\":\"\",\"returncode\":1,\"timed_out\":false,\"decoding_replaced\":false,\"redacted\":false}}},\"recovery\":{\"instructions\":[\"現在のbranch/HEAD、branch show、active showで現物を確認してください。\",\"原因を修正後、branchが存在すれば--branchを明示して新しいwork startを実行してください。--baseは付けません。\",\"選択がinvalid/unknownならworkspace doctorで確認してください。記録やGit効果は自動で巻き戻しません。\"],\"can_resume\":false,\"can_rollback\":false}}\n",
+      "stderr": "",
+      "changed_entries": [
+        ".git/HEAD",
+        ".git/logs/HEAD",
+        ".git/logs/refs/heads/hook-failure",
+        ".git/refs/heads/hook-failure"
+      ]
+    },
+    {
+      "argv": [
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/installed/bin/spec-dock",
+        "--project",
+        "/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/0805/spec-dock/spec-dock/initiatives/init-local-00003-architecture-maintenance-and-hardening/epics/epic-00356-specdock-core-simplification-and-external-intelligence-boundary/.workbench/iss-00413-implementation/manual-console-3b803ced/manual-console-86tpozl2/main",
+        "active",
+        "show"
+      ],
+      "exit_code": 0,
+      "stdout": "spec-dock: succeeded (active show)\n{\n  \"selection\": {\n    \"status\": \"selected\",\n    \"scope_id\": \"iss-00005\",\n    \"github_ref\": \"gh:example/repo#5\",\n    \"selection_token\": \"535b31ded1f4ba1b1079ddc68ffcc16e\",\n    \"selected_branch\": \"issue-c\",\n    \"current_branch\": \"hook-failure\",\n    \"branch_changed\": true\n  },\n  \"ancestors\": [\n    \"init-00001\",\n    \"epic-00002\"\n  ],\n  \"kind\": \"active\"\n}\n",
+      "stderr": "",
+      "changed_entries": []
+    }
+  ],
+  "github_requests": [
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 4,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 4,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 5,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "PATCH",
+      "number": 3,
+      "request": {
+        "state": "closed",
+        "state_reason": "completed"
+      }
+    },
+    {
+      "method": "GET",
+      "number": 3,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 5,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    },
+    {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    }
+  ],
+  "lifecycle_inspection": {
+    "github_state": {
+      "1": "open",
+      "2": "open",
+      "3": "completed",
+      "4": "open",
+      "5": "open"
+    },
+    "worktrees": [
+      {
+        "target": "seed",
+        "branch": "main",
+        "git_status": "",
+        "tracked_spec_fold_sha256": "fc82c99b584ca0eb73923a28b6818b759121d059f5661aad76916c210f79ab23",
+        "records": {}
+      },
+      {
+        "target": "root",
+        "branch": "issue-c",
+        "git_status": "",
+        "tracked_spec_fold_sha256": "fc82c99b584ca0eb73923a28b6818b759121d059f5661aad76916c210f79ab23",
+        "records": {
+          "target-535b31ded1f4ba1b1079ddc68ffcc16e.json": {
+            "sha256": "88dcde855383b7b4ab62134bf5cae2d16b97adce443a8d1fad7e9e09391c0b94",
+            "value": {
+              "schema_version": "specdock.work-target/v1",
+              "scope_id": "iss-00005",
+              "github_ref": "gh:example/repo#5",
+              "selected_branch": "issue-c",
+              "selected_at": "2026-10-02T10:22:58.052097Z",
+              "clone_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705164"
+              },
+              "worktree_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705163"
+              }
+            }
+          }
+        }
+      },
+      {
+        "target": "linked",
+        "branch": "issue-b",
+        "git_status": "",
+        "tracked_spec_fold_sha256": "fc82c99b584ca0eb73923a28b6818b759121d059f5661aad76916c210f79ab23",
+        "records": {
+          "target-adab1d6acb1fd26051ac093130514c80.json": {
+            "sha256": "da53d40a2630dfa95a88edba5c3de9a7a9dbbacd03dc2079e34a4bbc6c25544b",
+            "value": {
+              "schema_version": "specdock.work-target/v1",
+              "scope_id": "iss-00004",
+              "github_ref": "gh:example/repo#4",
+              "selected_branch": "issue-b",
+              "selected_at": "2026-10-02T10:22:33.613462Z",
+              "clone_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705164"
+              },
+              "worktree_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705303"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "central_control_exists": false,
+    "close_calls": [
+      {
+        "method": "PATCH",
+        "number": 3,
+        "request": {
+          "state": "closed",
+          "state_reason": "completed"
+        }
+      }
+    ],
+    "last_github_call": {
+      "method": "GET",
+      "number": 2,
+      "request": null
+    }
+  },
+  "partial_inspection": {
+    "github_state": {
+      "1": "open",
+      "2": "open",
+      "3": "completed",
+      "4": "open",
+      "5": "open"
+    },
+    "worktrees": [
+      {
+        "target": "seed",
+        "branch": "main",
+        "git_status": "",
+        "tracked_spec_fold_sha256": "fc82c99b584ca0eb73923a28b6818b759121d059f5661aad76916c210f79ab23",
+        "records": {}
+      },
+      {
+        "target": "root",
+        "branch": "hook-failure",
+        "git_status": "",
+        "tracked_spec_fold_sha256": "fc82c99b584ca0eb73923a28b6818b759121d059f5661aad76916c210f79ab23",
+        "records": {
+          "target-535b31ded1f4ba1b1079ddc68ffcc16e.json": {
+            "sha256": "88dcde855383b7b4ab62134bf5cae2d16b97adce443a8d1fad7e9e09391c0b94",
+            "value": {
+              "schema_version": "specdock.work-target/v1",
+              "scope_id": "iss-00005",
+              "github_ref": "gh:example/repo#5",
+              "selected_branch": "issue-c",
+              "selected_at": "2026-10-02T10:22:58.052097Z",
+              "clone_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705164"
+              },
+              "worktree_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705163"
+              }
+            }
+          }
+        }
+      },
+      {
+        "target": "linked",
+        "branch": "issue-b",
+        "git_status": "",
+        "tracked_spec_fold_sha256": "fc82c99b584ca0eb73923a28b6818b759121d059f5661aad76916c210f79ab23",
+        "records": {
+          "target-adab1d6acb1fd26051ac093130514c80.json": {
+            "sha256": "da53d40a2630dfa95a88edba5c3de9a7a9dbbacd03dc2079e34a4bbc6c25544b",
+            "value": {
+              "schema_version": "specdock.work-target/v1",
+              "scope_id": "iss-00004",
+              "github_ref": "gh:example/repo#4",
+              "selected_branch": "issue-b",
+              "selected_at": "2026-10-02T10:22:33.613462Z",
+              "clone_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705164"
+              },
+              "worktree_identity": {
+                "platform": "posix",
+                "device": "16777244",
+                "file_id": "28705303"
+              }
+            }
+          }
+        }
+      }
+    ],
+    "central_control_exists": false,
+    "close_calls": [
+      {
+        "method": "PATCH",
+        "number": 3,
+        "request": {
+          "state": "closed",
+          "state_reason": "completed"
+        }
+      }
+    ],
+    "last_github_call": {
+      "method": "GET",
+      "number": 1,
+      "request": null
+    }
+  }
+}

@@ -9,5 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Validate dogfood workspace with fixed source
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install wheel build and install tooling
+        run: python -m pip install uv
+      - name: Validate dogfood workspace with verified source wheel
         run: bash .github/scripts/specdock-ci-validate.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE" "${{ github.sha }}"
