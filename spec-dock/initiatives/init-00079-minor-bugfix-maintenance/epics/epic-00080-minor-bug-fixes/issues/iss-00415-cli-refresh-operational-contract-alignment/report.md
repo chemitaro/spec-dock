@@ -2,7 +2,7 @@
 
 ## 現在の実装状態（2026-10-06）
 
-ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。S-01〜08は実装・検証・適用済み。ユーザーはv2を明示選択済みです。初回StrictレビューはP1一件で不合格となり、その外部適用面を復元しました。再レビュー、最終handoff、Issue Finishは未完了です。
+ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。S-01〜08は実装・検証・適用済み。ユーザーはv2を明示選択済みです。初回StrictレビューはP1一件で不合格となり、その外部適用面を復元しました。同一レビュアーの再レビューはpass、全8観点を確認済みで指摘0件です。Issue Finishも成功しました。最終記録のcommitは別途同じcampaignで認証します。
 
 - `spec-dock work start iss-00415 --branch codex/iss-00415-cli-refresh-specs --json`: exit 0、同branchを再利用し直接対象を取得。active showで対象・祖先を再確認。
 - S-01: macOS 27.0.1 arm64、開始HEADの `make lint` exit 0。`uv run pytest` exit 0、1917 passed / 1 skipped / 450.76秒。生ログはIssue Workbench `implementation/baseline.log`。
@@ -100,7 +100,7 @@ Linux初回は **307 failed / 1687 passed / 6 skipped / 312.01秒**でした。�
 
 保存後の独立live GETで、D-415-007のdescriptionと完全一致しました。topicsは `[]` のままです。Website入力・checkboxは未操作ですが、UI保存時にhomepageのAPI表現が `null` から `""` に変わりました。URLは未設定のままです。この差をbytes一致や全field不変とは報告しません。旧値・失敗・UI経路・独立GETは `implementation/about-evidence.json`、画面は `about-after.jpg` に保持しました。
 
-## S-09 受入対応と残るゲート
+## S-09 受入対応と完了証拠
 
 | 受入 | 実証拠・状態 |
 |---|---|
@@ -112,9 +112,9 @@ Linux初回は **307 failed / 1687 passed / 6 skipped / 312.01秒**でした。�
 | AC-415-006 | 44 leaf×三shell生成、native三shell、parser/値処理回帰。両OSで確認 |
 | AC-415-007 | description独立GET一致。初回はhomepage副次変更で未達。下記の限定復元後にhomepage=null／topics=[]を独立GETで確認 |
 | AC-415-008 | inventory、fresh wheel、外部console、fresh/known-old/unknown consumer、実適用と保全 |
-| AC-415-009 | c50a0ee0全lint/pytest、配布、実運用を確認。最終Strict認証は未実施 |
+| AC-415-009 | 配布・実運用を確認。faeb9a7aの全必須testとStrict認証がpass（下記） |
 
-未完了: ユーザーが求めたGPT 5.6 ProのStrict Final Quality Gate、そこで必要となる修正・再レビュー、最終handoffとIssue Finish。ユーザーがv2を明示選択済みで、同一レビュアーの再判定を行います。実装依頼と現在upstreamへの通常push許可は維持します。人間のPR mergeは別責務です。
+完了: GPT 5.6 ProのStrict Final Quality Gate、P1修正と同一レビュアーの再レビュー、Issue Finish。最終記録を含む提出SHAの認証結果は既存campaignへ保存します。実装依頼と現在upstreamへの通常push許可は維持します。人間のPR mergeは別責務です。
 
 
 ## Strict Final Quality Gate 初回とP1対応
@@ -132,4 +132,15 @@ Linux初回は **307 failed / 1687 passed / 6 skipped / 312.01秒**でした。�
 - homepage: `null`（変更前値に復元）
 - topics: `[]`（変更前値と一致）
 
-生証拠は `implementation/about-homepage-recovery.json`。現在のS-08完了はこの復元後の状態を根拠とし、途中の副次変更がなかったとは主張しません。製品runtime/tests・要求意味は変更していません。P1を閉じられるかは同一レビュアーへ再判定を求めます。campaignは Issue Workbench `chatgpt-final-quality-gate-strict-v2/issue415` に継続し、要件・設計・base・scopeは維持します。
+生証拠は `implementation/about-homepage-recovery.json`。現在のS-08完了はこの復元後の状態を根拠とし、途中の副次変更がなかったとは主張しません。製品runtime/tests・要求意味は変更していません。同一レビュアーが次節の再レビューでP1をclosedと判定しました。campaignは Issue Workbench `chatgpt-final-quality-gate-strict-v2/issue415` に継続し、要件・設計・base・scopeは維持します。
+
+
+## 再レビュー合格とIssue Finish（2026-10-07 JST）
+
+対象SHA `faeb9a7a6e15c4a9381813d5bebe6ad68904c75a` を同一会話で再レビューしました。session `fqg-v2-7e26b5a9-e327cd88`、wrapper exit 0、review_status=pass、coverage_complete=true、8観点すべてcomplete、P0/P1/P2/P3すべて0です。既存P1はclosed。レビュアーはGitHub live Aboutのdescription、homepage=null、topics=[]も再確認しました。会話・scope・baseは継続し、モデルは初回に確認したGPT-5.6 Sol / Proを継承しています。
+
+同じSHAの独立検証5commandはすべてexit 0です。`make lint`、`uv run pytest`（macOS 1992 passed / 8 skipped）、`git diff --check`、`spec-dock workspace validate --json`（241件、指摘なし）、Linux/Python 3.10.22でlintとpytest（1995 passed / 5 skipped）。Linuxは前述のtmpfs条件です。生ログはcampaignの `review-2.log` と `test-results/round2-*.log`、manifestに保持しています。合格時にworktree clean、local HEAD／upstream／live GitHub full SHA一致を再確認しました。
+
+続いて `spec-dock work finish iss-00415 --yes --json` がexit 0、completed=true。GitHub Issue #415はcompletedとしてclose、直接選択は解除、作業branchは維持されました。独立GETでstate=closed、state_reason=completed、closed_at=2026-10-06T15:21:22Z、active showで選択なしを確認。証拠は `implementation/finish.json` です。人間のmerge、package公開、他worktree更新は別責務として残ります。
+
+この追記は完了記録だけであり、製品code／要求／設計の意味を変更しません。記録を含む最終commitも同じcampaign・同じ会話・必須5commandで認証し、その最終SHAと結果はWorkbenchおよび提出回答に残します。

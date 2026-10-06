@@ -74,7 +74,7 @@ S-02の診断、S-03の文書、S-04の補完は責務上分離できます。�
 | S-06 | 現在候補の通常全体検証と配布確認 | 完了（環境差はReport参照） |
 | S-07 | 外部packageと明示consumerの別々の適用 | 完了 |
 | S-08 | GitHub About descriptionの独立適用・確認 | 完了（副次変更の復元確認済み） |
-| S-09 | 全ACの照合とhandoff | Strict Final Quality Gate待ち |
+| S-09 | 全ACの照合とhandoff | 完了（Strict pass・Issue Finish済み） |
 
 仕様作成時に行った資料読取り・ZIP自己点検は、この表の製品実装stepの完了に数えません。実測は後続で[report.md](report.md)へ記録し、本計画を日誌化しません。
 
@@ -292,7 +292,7 @@ gh api --hostname github.com --method GET repos/chemitaro/spec-dock \
 **失敗時:** 権限不足ならその事実を記録して停止し、認証設定を自動変更しません。応答不明ならGETを先行し、送信していないと断定せず、自動再送しません。他設定や第三者の変更を戻さず、R-04へ進みます。
 
 <a id="s-09"></a>
-### S-09 全ACを実証拠へ結び付けてhandoffする — 未実施
+### S-09 全ACを実証拠へ結び付けてhandoffする — 完了
 
 **依存:** S-01〜08の実結果です。human mergeはこのstepに含めません。
 
@@ -426,7 +426,7 @@ source差分、provider資産、inventory、実consumer、Aboutを別々にレ�
 
 | 状態 | 判定に必要なもの |
 |---|---|
-| 仕様候補作成 | 三文書の役割分離、RQ/AC対応、実在参照、ZIPの整合です。現在の納品はここだけです |
+| 仕様候補作成 | 三文書の役割分離、RQ/AC対応、実在参照、ZIPの整合です。仕様採用時点の状態です。現在の実施結果はreport.mdを参照します |
 | 実装候補検証済み | S-02〜06の現在候補への実証拠です。Aboutや実環境の更新は含意しません |
 | 運用適用確認済み | S-07のpackage／consumerの別証拠と、S-08のlive read-backです |
 | Issueの七件整合完了 | AC-415-001〜009の全実証拠と、未達なしのhandoffです。human mergeは別責務です |
