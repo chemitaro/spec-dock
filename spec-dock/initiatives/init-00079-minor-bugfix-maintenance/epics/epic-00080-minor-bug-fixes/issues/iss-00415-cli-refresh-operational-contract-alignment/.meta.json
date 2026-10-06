@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00415",
+  "title": "Align operational contracts after CLI refresh",
+  "slug": "cli-refresh-operational-contract-alignment",
+  "parent_id": "epic-00080",
+  "initiative_id": "init-00079",
+  "epic_id": "epic-00080",
+  "depends_on": [],
+  "backend": "github",
+  "github": {
+    "issue_number": 415,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 0
+}
