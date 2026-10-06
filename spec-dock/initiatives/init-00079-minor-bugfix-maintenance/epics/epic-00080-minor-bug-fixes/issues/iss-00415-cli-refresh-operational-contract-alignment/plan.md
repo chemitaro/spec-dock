@@ -73,7 +73,7 @@ S-02の診断、S-03の文書、S-04の補完は責務上分離できます。�
 | S-05 | inventory／fresh wheel／fresh consumer | 完了 |
 | S-06 | 現在候補の通常全体検証と配布確認 | 完了（環境差はReport参照） |
 | S-07 | 外部packageと明示consumerの別々の適用 | 完了 |
-| S-08 | GitHub About descriptionの独立適用・確認 | 完了（空値表現差はReport参照） |
+| S-08 | GitHub About descriptionの独立適用・確認 | 完了（副次変更の復元確認済み） |
 | S-09 | 全ACの照合とhandoff | Strict Final Quality Gate待ち |
 
 仕様作成時に行った資料読取り・ZIP自己点検は、この表の製品実装stepの完了に数えません。実測は後続で[report.md](report.md)へ記録し、本計画を日誌化しません。
