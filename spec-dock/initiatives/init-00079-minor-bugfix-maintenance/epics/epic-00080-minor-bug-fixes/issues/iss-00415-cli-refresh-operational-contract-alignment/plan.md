@@ -3,7 +3,7 @@
 ID: "iss-00415"
 タイトル: "共通CLI刷新後の操作案内・補完契約の整合"
 関連GitHub: ["#415"]
-状態: "draft"
+状態: "実装承認済み"
 最終更新: "2026-10-06"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00080", "init-00079"]
@@ -62,7 +62,7 @@ SD-OPS-001〜007を現行受付契約に合わせ、利用者が診断・例・�
 
 S-02の診断、S-03の文書、S-04の補完は責務上分離できます。ただし、共有する文書テスト・fixtureへの変更は一人の統合担当が調整し、同じtestを互いに上書きしません。配布hashは文書bytes確定後に更新します。実環境適用はcandidateの合格後です。
 
-### 実施状態の初期値
+### 実施状態
 
 | step | 成果 | 現在 |
 |---|---|---|
@@ -70,11 +70,11 @@ S-02の診断、S-03の文書、S-04の補完は責務上分離できます。�
 | S-02 | legacy診断と公開negative test | 完了 |
 | S-03 | README／TARGET／Sync／AGENTS整合 | 完了 |
 | S-04 | 三shellの候補整合とnative検査 | 完了 |
-| S-05 | inventory／fresh wheel／fresh consumer | 固定候補確認中 |
-| S-06 | 現在候補の通常全体検証と配布確認 | 未実施 |
-| S-07 | 外部packageと明示consumerの別々の適用 | 未実施 |
-| S-08 | GitHub About descriptionの独立適用・確認 | 未実施 |
-| S-09 | 全ACの照合とhandoff | 未実施 |
+| S-05 | inventory／fresh wheel／fresh consumer | 完了 |
+| S-06 | 現在候補の通常全体検証と配布確認 | 完了（環境差はReport参照） |
+| S-07 | 外部packageと明示consumerの別々の適用 | 完了 |
+| S-08 | GitHub About descriptionの独立適用・確認 | 完了（空値表現差はReport参照） |
+| S-09 | 全ACの照合とhandoff | Strict Final Quality Gate待ち |
 
 仕様作成時に行った資料読取り・ZIP自己点検は、この表の製品実装stepの完了に数えません。実測は後続で[report.md](report.md)へ記録し、本計画を日誌化しません。
 
@@ -157,7 +157,7 @@ uv run pytest tests/cli_runtime/test_help_completion_vnext.py tests/cli_runtime/
 **失敗時:** 実shell不在はそのnative検証の未実施として扱います。既存の環境依存skipを全て廃止する必要はありませんが、三shellの受入を文字列検査だけで閉じず、必要なshellを備えた認可済み検証環境で確認します。新しいpolicy skip／ledgerで未確認を隠しません。
 
 <a id="s-05"></a>
-### S-05 inventory、fresh wheel、fresh consumerを結合して確認する — 未実施
+### S-05 inventory、fresh wheel、fresh consumerを結合して確認する — 完了
 
 **依存:** S-02〜04。[D-415-008](design.md#d-415-008)、V-008です。
 
@@ -203,7 +203,7 @@ fresh consumerは一時Git repositoryです。新しい外部consoleでinitし�
 **失敗時:** wheelとログ・実hashを保全し、利用者環境へ進みません。unknownをknown-oldに追加したり、既知旧資産の保全検査を削ったりして解決しません。
 
 <a id="s-06"></a>
-### S-06 現在候補の通常検証・OS境界・配布を受け入れる — 未実施
+### S-06 現在候補の通常検証・OS境界・配布を受け入れる — 完了
 
 **依存:** S-05。V-001〜006、V-008、V-009です。
 
@@ -222,7 +222,7 @@ git diff --check
 **失敗時:** 関連stepへ戻り、元ログを残します。CIの権限・環境不足を製品修正で隠さず、正規の環境確認へ分離します。新しいしきい値緩和、policy skip、ledger、全件検査の削除は行いません。
 
 <a id="s-07"></a>
-### S-07 利用者packageと指定worktreeへ別々に適用する — 未実施
+### S-07 利用者packageと指定worktreeへ別々に適用する — 完了
 
 **依存:** S-06。実施時の対象・更新結果が明示された許可が必要です。本仕様作成依頼そのものは実適用許可ではありません。承認済みの実施計画がその対象・操作を明示している場合は、その範囲で実行します。
 
@@ -254,7 +254,7 @@ spec-dock installation show --target "$PROJECT" --json
 **失敗時:** unknownや範囲外の計画は適用前停止です。partialならsucceeded／unknown／not_attemptedとbackupを残し、後述R-03の復元・forward recoveryへ進みます。他worktree更新や旧資産一括削除で辻褄を合わせません。
 
 <a id="s-08"></a>
-### S-08 About descriptionを独立して適用・read-backする — 未実施
+### S-08 About descriptionを独立して適用・read-backする — 完了
 
 **依存:** S-06、[D-415-007](design.md#d-415-007)の候補の採否、descriptionだけの実施許可、正規の操作手段です。READMEのcommitやZIP採用は実施結果でも追加の設定変更許可でもありません。
 
