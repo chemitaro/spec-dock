@@ -1,0 +1,18 @@
+{
+  "zip": "spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00415-cli-refresh-operational-contract-alignment/.workbench/cli-refresh/iss-00415-cli-refresh-specifications.zip",
+  "zip_sha256": "d6fcb257b6cb9ef27318a4137ef10af236f7e39999dbc9adb6cb610f387c20b0",
+  "files": {
+    "requirement.md": {
+      "sha256": "e19b09e78d7d8d73d9da12f74e340fe48776b9ed2e4760d1b70b61c968ed9c54",
+      "bytes": 22212
+    },
+    "design.md": {
+      "sha256": "57ea17aa0306798456d6b845b9089bcb051640015920f50331d7a30d4b6344ef",
+      "bytes": 34643
+    },
+    "plan.md": {
+      "sha256": "94382d36442cae248264ddc283c0e45e1d733ed9d8a738691106b08f7496681d",
+      "bytes": 46186
+    }
+  }
+}
