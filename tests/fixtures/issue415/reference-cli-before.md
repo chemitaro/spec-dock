@@ -1,12 +1,6 @@
 # CLI参照（Current）
 
-通常packageの外部 `spec-dock` が公開44 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
-
-| 用途 | 入力 | 境界 |
-|---|---|---|
-| 通常Scope TARGET | 完全Scope ID、`gh:OWNER/REPO#NUMBER`、各leafで許可された`@current`／`@initiative`／`@epic`／`@issue` | 裸番号・Issue URL・任意filesystem pathは使えません。対象の存在と選択状態は別途検査します。 |
-| `scope import github KIND REF` | 完全gh ref、完全GitHub Issue URL、または裸番号＋`--github-repo OWNER/REPO` | repositoryを暗黙推定しません。矛盾するhintや別repositoryは拒否します。 |
-| Artifact所有者 | Scope selectorに加えて許可されたArtifact操作の`@root` | `@root`をScope作成やStartの対象にはできません。 |
+通常packageの外部 `spec-dock` が公開44 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。TARGETはScope ID、GitHub番号/ref、URL、許可されたdynamic selectorから一意に解決します。曖昧な対象は副作用前に拒否します。
 
 新規ScopeはGitHub番号が正本です。Requirement・Design・Planが一次仕様、Artifactは証拠、Workbenchは一時作業です。Syncはその時点の観測で、派生状態を保存しません。
 

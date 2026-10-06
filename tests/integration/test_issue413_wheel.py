@@ -405,3 +405,84 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     assert opaque.read_bytes() == b"private user evidence\n" and (initialized / "spec-dock/.gitignore").is_file()
     assert tree_digest(initialized / ".git") == git_before and not tuple(outside.iterdir())
     assert not updated.stderr and not uninstalled.stderr
+
+    verify_issue415_console(console, tmp_path, console_environment)
+
+
+def verify_issue415_console(console: Path, tmp_path: Path, environment: dict[str, str]) -> None:
+    """Exercise the revised contracts from the wheel, not checkout imports."""
+    import shutil
+
+    from tests.cli_runtime.test_help_completion_vnext import _native_completion
+    from tests.integration.test_cli_docs_vnext import readme_creation_commands, sequential_github_stub
+
+    target = uninitialized_worktree(tmp_path / "issue415-consumer")
+    subprocess.run(
+        ["git", "-C", str(target), "remote", "add", "origin", "https://github.com/example/repo.git"],
+        check=True,
+        capture_output=True,
+    )
+    bin_dir = tmp_path / "issue415-bin"
+    bin_dir.mkdir()
+    log = tmp_path / "issue415-gh.jsonl"
+    sequential_github_stub(bin_dir / "gh", log)
+    env = dict(environment, PATH=str(bin_dir) + os.pathsep + environment["PATH"])
+
+    def run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            [str(console), "--project", str(target), *arguments],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=30,
+        )
+
+    created = run(["installation", "init", str(target), "--yes", "--json"])
+    assert created.returncode == 0, created.stdout + created.stderr
+    parent = None
+    for command in readme_creation_commands():
+        if parent is not None:
+            command[command.index("--parent") + 1] = parent
+        assert "--yes" in command and "--json" in command
+        before = tree_digest(target)
+        requests = log.read_bytes() if log.exists() else b""
+        denied = run([word for word in command if word != "--yes"])
+        assert denied.returncode == 3 and json.loads(denied.stdout)["error"]["code"] == "CONFIRMATION_REQUIRED"
+        assert tree_digest(target) == before and (log.read_bytes() if log.exists() else b"") == requests
+        applied = run(command)
+        assert applied.returncode == 0, applied.stdout + applied.stderr
+        scope = json.loads(applied.stdout)["data"]["result"]["scope"]
+        assert scope["parent_id"] == parent
+        parent = scope["id"]
+    for selector, expected in (
+        ("iss-00503", 0),
+        ("gh:example/repo#503", 0),
+        ("503", 3),
+        ("https://github.com/example/repo/issues/503", 3),
+    ):
+        observed = run(["scope", "show", selector, "--json"])
+        assert observed.returncode == expected, observed.stdout + observed.stderr
+    metadata = next((target / "spec-dock/initiatives").glob("*/.meta.json"))
+    metadata.with_name("meta.json").write_bytes(b"private old metadata")
+    before, requests = tree_digest(target), log.read_bytes()
+    for command in (
+        ["scope", "create", "initiative", "--backend", "github"],
+        ["scope", "import", "github", "initiative", "gh:example/repo#999"],
+    ):
+        denied = run([*command, "--title", "Legacy guard", "--yes", "--json"])
+        result = json.loads(denied.stdout)
+        assert denied.returncode == 5 and result["effects"] == []
+        assert result["error"]["code"] == "LOCAL_IO_FAILED"
+        assert "preserve both files and compare" in result["error"]["message"]
+        assert "manually" in result["error"]["message"]
+        assert tree_digest(target) == before and log.read_bytes() == requests
+    for shell in ("bash", "zsh", "fish"):
+        generated = run(["completion", shell])
+        assert generated.returncode == 0, generated.stdout + generated.stderr
+        if shutil.which(shell):
+            read = _native_completion(generated.stdout, shell, ["spec-dock", "scope", "list", "--"])
+            assert "--json" in read and not {"--yes", "-y", "--lock-timeout"} & read
+            start = _native_completion(generated.stdout, shell, ["spec-dock", "work", "start", "iss-00503", "--"])
+            assert {"--yes", "--lock-timeout", "--base"} <= start

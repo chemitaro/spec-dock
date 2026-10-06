@@ -344,7 +344,11 @@ def ensure_no_legacy_meta_json(specdock_dir: Path) -> None:
         return
     listed = "\n".join(f"- {p}" for p in legacy_paths)
     raise RuntimeError(
-        f"Unsupported legacy meta.json detected. Rename legacy files to '.meta.json' and retry:\n{listed}"
+        "Unsupported legacy meta.json detected. Preserve the legacy files before making changes. "
+        "Check whether .meta.json already exists in the same directory; if present, preserve both files "
+        "and compare their contents. Decide the authoritative metadata and recovery steps manually. "
+        "Do not blindly rename, overwrite, or delete either file; renaming alone does not validate "
+        f"or migrate its schema.\n{listed}"
     )
 
 

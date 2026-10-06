@@ -6,9 +6,11 @@ from contextlib import redirect_stderr, redirect_stdout
 from dataclasses import dataclass
 import io
 import json
+import os
 import shlex
 import shutil
 import subprocess
+import tempfile
 from typing import TYPE_CHECKING
 
 import pytest
@@ -135,6 +137,21 @@ def _native_completion(script: str, shell: str, words: list[str]) -> set[str]:
         pytest.skip(f"native {shell} is unavailable")
     assert executable is not None
     quoted = shlex.join(words)
+    if shell == "fish":
+        line = shlex.join(words[:-1]) + " " + words[-1]
+        with tempfile.TemporaryDirectory() as home:
+            completed = subprocess.run(
+                [executable, "--no-config"],
+                input="set -g fish_complete_path\n" + script + "\ncomplete -C " + shlex.quote(line) + "\n",
+                env=dict(os.environ, HOME=home, XDG_CONFIG_HOME=home, XDG_DATA_HOME=home, XDG_CACHE_HOME=home),
+                cwd=home,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=5,
+            )
+        assert completed.returncode == 0, completed.stderr
+        return {line.split("\t", 1)[0] for line in completed.stdout.splitlines()}
     if shell == "bash":
         harness = (
             f"COMP_WORDS=({quoted})\nCOMP_CWORD={len(words) - 1}\n"
@@ -207,3 +224,73 @@ def test_native_completion_handles_inline_values_flags_and_command_depth(
     assert main(["completion", shell]) == 0
     choices = _native_completion(capsys.readouterr().out, shell, words)
     assert expected <= choices if expected else choices == set()
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
+def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, shell: str) -> None:
+    import re
+
+    readonly = {
+        "scope list",
+        "scope show",
+        "active show",
+        "branch show",
+        "dependency list",
+        "dependency check",
+        "artifact list",
+        "artifact show",
+        "worktree list",
+        "worktree show",
+        "help",
+        "completion",
+        "workspace validate",
+        "workspace sync",
+        "workspace doctor",
+        "installation show",
+    }
+    output = _run(tmp_path, "completion", shell)
+    assert output.exit_code == 0
+    assert len(LEAF_PATHS) == 44 and readonly <= set(LEAF_PATHS)
+    for leaf in LEAF_PATHS:
+        if shell == "fish":
+            # Public registration lines belonging to this exact command path.
+            lines = [line for line in output.stdout.splitlines() if f'__spec_dock_path_is "{leaf}"' in line]
+            choices = set()
+            for line in lines:
+                words = shlex.split(line)
+                if "-a" in words:
+                    choices.update(words[words.index("-a") + 1].split())
+                if "-l" in words:
+                    choices.add("--" + words[words.index("-l") + 1])
+                if "-s" in words:
+                    choices.add("-" + words[words.index("-s") + 1])
+        else:
+            matched = re.search(r'"' + re.escape(leaf) + r'"\) choices="([^"]*)"', output.stdout)
+            assert matched is not None, leaf
+            choices = set(matched[1].split())
+        assert {"--json", "--project", "--help"} <= choices, (shell, leaf)
+        assert ("--yes" in choices) == (leaf not in readonly), (shell, leaf, choices)
+        assert ("-y" in choices) == (leaf not in readonly), (shell, leaf, choices)
+        assert ("--lock-timeout" in choices) == (leaf == "work start"), (shell, leaf, choices)
+
+
+@pytest.mark.parametrize("shell", ["bash", "zsh", "fish"])
+@pytest.mark.parametrize(
+    "words,required,forbidden",
+    [
+        (["scope", "list", "--"], {"--json"}, {"--yes", "--lock-timeout"}),
+        (["scope", "list", "-"], {"--json"}, {"--yes", "-y", "--lock-timeout"}),
+        (["active", "show", "--"], {"--json"}, {"--yes", "--lock-timeout"}),
+        (["work", "start", "iss-00003", "--"], {"--yes", "--lock-timeout", "--base"}, set()),
+        (["scope", "create", "initiative", "--"], {"--yes", "--title"}, {"--lock-timeout"}),
+        (["--project", "/not a repository", "scope", "list", "--"], {"--json"}, {"--yes", "--lock-timeout"}),
+        (["--project=/not/git", "scope", "list", "--"], {"--json"}, {"--yes", "--lock-timeout"}),
+    ],
+)
+def test_native_completion_only_offers_applicable_options(
+    capsys: pytest.CaptureFixture[str], shell: str, words: list[str], required: set[str], forbidden: set[str]
+) -> None:
+    assert main(["completion", shell]) == 0
+    choices = _native_completion(capsys.readouterr().out, shell, ["spec-dock", *words])
+    assert required <= choices
+    assert not forbidden & choices

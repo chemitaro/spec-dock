@@ -13,7 +13,7 @@ ID: "iss-00415"
 
 詳細: [Issue Plan Guide](../../../../../../docs/authoring/issue-plan.md)。WHAT／WHYとACは[Requirement](requirement.md)、構造・Interface・失敗時の設計判断は[Design](design.md)を正本にします。
 
-> 現在は仕様策定だけです。下記S-01〜S-09とすべてのV検証は未実施です。記載するコマンド・期待値は後続実装の手順であり、今回の実行結果ではありません。ZIP採用、source commit、candidate install、利用者環境の更新、About更新、human mergeは相互に代替する完了証拠ではありません。
+> 2026-10-06、ユーザーが本計画に沿った実装・完了とGPT 5.6 ProによるStrict Final Quality Gateを依頼しました。下表を実施状態として更新し、実結果はreport.mdへ記録します。記載するコマンド・期待値そのものは実行証拠ではありません。ZIP採用、source commit、candidate install、利用者環境の更新、About更新、human mergeは相互に代替する完了証拠ではありません。
 
 ## Planning Level
 
@@ -66,11 +66,11 @@ S-02の診断、S-03の文書、S-04の補完は責務上分離できます。�
 
 | step | 成果 | 現在 |
 |---|---|---|
-| S-01 | 基準・許可範囲・新しいbaselineの取得 | 未実施 |
-| S-02 | legacy診断と公開negative test | 未実施 |
-| S-03 | README／TARGET／Sync／AGENTS整合 | 未実施 |
-| S-04 | 三shellの候補整合とnative検査 | 未実施 |
-| S-05 | inventory／fresh wheel／fresh consumer | 未実施 |
+| S-01 | 基準・許可範囲・新しいbaselineの取得 | 完了 |
+| S-02 | legacy診断と公開negative test | 完了 |
+| S-03 | README／TARGET／Sync／AGENTS整合 | 完了 |
+| S-04 | 三shellの候補整合とnative検査 | 完了 |
+| S-05 | inventory／fresh wheel／fresh consumer | 固定候補確認中 |
 | S-06 | 現在候補の通常全体検証と配布確認 | 未実施 |
 | S-07 | 外部packageと明示consumerの別々の適用 | 未実施 |
 | S-08 | GitHub About descriptionの独立適用・確認 | 未実施 |
@@ -81,7 +81,7 @@ S-02の診断、S-03の文書、S-04の補完は責務上分離できます。�
 ## 実装step
 
 <a id="s-01"></a>
-### S-01 基準、対象、保全、既存baselineを固定する — 未実施
+### S-01 基準、対象、保全、既存baselineを固定する — 完了
 
 **前提:** 本R/D/Pの採否と後続実装の許可が明確であることです。親OPENは今回のユーザー提示観測として保持し、将来必要なlive条件はその時点で確認します。正式Issue413 Startや他worktreeの更新を開始条件に追加しません。
 
@@ -105,7 +105,7 @@ uv run pytest
 **失敗時:** branch／SHA／対象が不明なら停止します。既存テストが失敗した場合は原因・本件との関係を記録し、削除・policy skipで隠しません。fixtureのcollection/import故障は本件のRed成功ではありません。
 
 <a id="s-02"></a>
-### S-02 legacy診断を公開経路のRed→Greenで修正する — 未実施
+### S-02 legacy診断を公開経路のRed→Greenで修正する — 完了
 
 **依存:** S-01。[D-415-001](design.md#d-415-001)、V-001です。
 
@@ -122,7 +122,7 @@ uv run pytest tests/cli_runtime/test_issue413_scope_publish.py tests/cli_runtime
 **失敗時:** 先行するschema・repo・stage・OS原語の不備で止まった場合はfixtureを正し、製品guardを迂回しません。期待と異なるwriteが観測された場合は、その事実を保全して範囲・Designを再評価します。一律削除や別writer導入へ進みません。
 
 <a id="s-03"></a>
-### S-03 四つの現行文書とprovider参照を整合させる — 未実施
+### S-03 四つの現行文書とprovider参照を整合させる — 完了
 
 **依存:** S-01。[D-415-002](design.md#d-415-002)〜[D-415-005](design.md#d-415-005)、V-002〜005です。
 
@@ -140,7 +140,7 @@ git diff --check
 **失敗時:** 文法を通すためのparser拡張、旧cache復活、過去記録の改ざんでは解決しません。作成例でGitHubへの実送信が必要なfixtureになった場合は試験を止め、隔離stubへ直します。
 
 <a id="s-04"></a>
-### S-04 leaf別の補完候補を三shellで揃える — 未実施
+### S-04 leaf別の補完候補を三shellで揃える — 完了
 
 **依存:** S-01。[D-415-006](design.md#d-415-006)、V-006です。
 

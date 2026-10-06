@@ -1046,3 +1046,42 @@ def test_static_update_keeps_same_inode_edits_to_the_asset_or_verified_backup_an
         assert tree_digest(target) == before
     assert private.decode().strip() not in output.out + output.err and not output.err
     assert not tuple(installed.parent.glob(".install-*.tmp")) and not (target / ".spec-dock-installations").exists()
+
+
+@pytest.mark.parametrize("modified", [False, True])
+def test_issue415_reference_update_preserves_exact_previous_bytes_and_rejects_unknown(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], modified: bool
+) -> None:
+    import hashlib
+
+    target = uninitialized_worktree(tmp_path / "consumer")
+    assert main(["installation", "init", str(target), "--yes", "--json"]) == 0
+    capsys.readouterr()
+    old = (Path(__file__).resolve().parents[1] / "fixtures/issue415/reference-cli-before.md").read_bytes()
+    assert hashlib.sha256(old).hexdigest() == "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc"
+    relative = "spec-dock/docs/reference_cli.md"
+    installed = target / relative
+    installed.write_bytes(old + (b"\nconsumer edit\n" if modified else b""))
+    before = tree_digest(target)
+    protected = tree_digest(target, excluded_entries=frozenset({relative}))
+    backup = tmp_path / "backup"
+    code = main(["installation", "update", "--target", str(target), "--backup-dir", str(backup), "--yes", "--json"])
+    result = json.loads(capsys.readouterr().out)
+    if modified:
+        assert code == 3 and result["effects"] == []
+        assert tree_digest(target) == before and not backup.exists()
+    else:
+        assert code == 0 and result["status"] == "succeeded"
+        assert result["data"]["result"]["changed_paths"] == [relative]
+        assert result["data"]["result"]["created_paths"] == []
+        assert result["data"]["result"]["retired_paths"] == []
+        saved = backup / "static" / relative
+        assert saved.read_bytes() == old and saved.stat().st_mode & 0o777 == 0o644
+        assert (
+            installed.read_bytes()
+            == (
+                Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock/docs/reference_cli.md"
+            ).read_bytes()
+        )
+        assert installed.stat().st_mode & 0o777 == 0o644
+        assert tree_digest(target, excluded_entries=frozenset({relative})) == protected

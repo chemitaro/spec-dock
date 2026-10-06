@@ -1145,3 +1145,72 @@ def test_git_repository_lookup_failure_preserves_native_stderr_and_returncode(
     assert result["error"]["details"]["git"]["stderr"] == original_error
     assert result["error"]["details"]["git"]["returncode"] == 73
     assert not log.exists()
+
+
+@pytest.mark.parametrize("kind", ["initiative", "epic", "issue"])
+@pytest.mark.parametrize("operation", ["create", "import"])
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("json_output", [False, True])
+@pytest.mark.parametrize("selected", [False, True])
+def test_legacy_metadata_diagnostic_preserves_all_publication_inputs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    kind: str,
+    operation: str,
+    dry_run: bool,
+    json_output: bool,
+    selected: bool,
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.cli_runtime.test_issue413_active import select_fixture
+    from tests.cli_runtime.test_issue413_contract import add_scope
+
+    root, log = publication_fixture(tmp_path, monkeypatch)
+    initiative = root / "spec-dock/initiatives/init-00001-fixture"
+    parent = []
+    if kind == "epic":
+        parent = ["--parent", "init-00001"]
+    elif kind == "issue":
+        add_scope(root, "epic-00002", "epic", "init-00001", initiative)
+        parent = ["--parent", "epic-00002"]
+    if selected:
+        select_fixture(root)
+    (initiative / "meta.json").write_bytes(b"legacy private sentinel\n")
+    (initiative / "meta.json").chmod(0o640)
+    (initiative / "artifacts").mkdir(exist_ok=True)
+    (initiative / "artifacts/evidence.bin").write_bytes(b"preserved evidence")
+    before = tree_digest(root)
+    git_before = tree_digest(root / ".git")
+    command = (
+        ["scope", "create", kind, "--backend", "github"]
+        if operation == "create"
+        else ["scope", "import", "github", kind, "gh:example/repo#413"]
+    )
+    code = main([
+        "--project",
+        str(root),
+        *command,
+        *parent,
+        "--title",
+        "Legacy guard",
+        "--yes",
+        *(["--dry-run"] if dry_run else []),
+        *(["--json"] if json_output else []),
+    ])
+    output = capsys.readouterr()
+    assert code == 5
+    assert tree_digest(root) == before and tree_digest(root / ".git") == git_before
+    assert not log.exists()
+    message = output.out + output.err
+    if json_output:
+        result = json.loads(output.out)
+        assert result["status"] == "failed" and result["effects"] == []
+        assert result["error"]["code"] == "LOCAL_IO_FAILED"
+        message = result["error"]["message"]
+    assert "Unsupported legacy meta.json detected" in message
+    assert "legacy private sentinel" not in message
+    assert "Preserve" in message and "compare" in message and "manually" in message
+    assert "Check whether .meta.json already exists" in message
+    assert "renaming alone does not validate or migrate its schema" in message
+    assert "Rename legacy files" not in message
