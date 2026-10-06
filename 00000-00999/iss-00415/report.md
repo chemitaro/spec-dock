@@ -2,7 +2,7 @@
 
 ## 現在の実装状態（2026-10-06）
 
-ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。Gate v2の版選択は確認待ちで、独立した実装は継続しています。
+ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。S-01〜08は実装・検証・適用済み。Gate v2の版選択は確認待ちです。Strict Final Quality Gate、最終handoff、Issue Finishは未完了です。
 
 - `spec-dock work start iss-00415 --branch codex/iss-00415-cli-refresh-specs --json`: exit 0、同branchを再利用し直接対象を取得。active showで対象・祖先を再確認。
 - S-01: macOS 27.0.1 arm64、開始HEADの `make lint` exit 0。`uv run pytest` exit 0、1917 passed / 1 skipped / 450.76秒。生ログはIssue Workbench `implementation/baseline.log`。
@@ -57,3 +57,61 @@
 - fresh wheelとsdist経由wheel、外部non-editable console、fresh consumer、全inventory bytes、legacy診断の無副作用、README三階層作成と確認guard、selector正負、native補完を検査。製品の実GitHub変更はstubへ隔離。
 - 現在のlintはruff check/format、mypyすべてpass。workspace validateは241 Scope、findingsなし。
 - 固定commitからの独立wheel・Linux/Python 3.10全体検証と利用者環境への適用は次段階です。通常全件テストとStrict Gateも未完了です。
+
+
+## S-05〜06 固定候補と全件検証
+
+固定候補は `c50a0ee0785b29367a74ccb4688d45bfcf067130`。同commitのGit archiveから独立buildし、wheelを新しい外部venvへ非editableで依存とともに導入しました。build元を改名した後も、外部module import・help・version・三shell completionが成功しました。
+
+- wheel: `/private/tmp/specdock-issue415-hgd8psjp/dist/spec_dock-0.2.4-py3-none-any.whl`
+- SHA-256: `20a99b071028d7dd4ae9c11e7319a6f79d08c179972b6be59cc5ed27595f45e4`
+- 独立console: `/private/tmp/specdock-issue415-hgd8psjp/venv/bin/spec-dock`
+- macOS: `make lint`、`uv run pytest`、`git diff --check`すべてexit 0。全件 **1992 passed / 8 skipped / 446.70秒**。skipはLinux専用1件と未導入Fish7件。
+- 現在consumerへのdry-run: exit 0、planned_pathsは `spec-dock/docs/reference_cli.md` のみ。追加・退役なし。実適用とは区別します。
+
+Linux初回は **307 failed / 1687 passed / 6 skipped / 312.01秒**でした。多数の失敗は直接選択の書込み後照合に集中します。このコンテナの通常一時領域では、製品を使わない `os.listdir(fd)` の最小例でも、作成直後のentryを最初の再読で見落としました。tmpfsでは同じ最小例でentryが見えます。該当する製品のstore/domainは開始commitから変更していません。
+
+既存のLinux検証記録と同じtmpfs fixture・capability全除去の条件に揃えた切り分けは **115 passed / 21.90秒**。元失敗を削除せず、この条件で通常全件を再実行中です。製品修正・assertion緩和・skip追加はしていません。tmpfsでの結果を、元のコンテナ通常一時領域でも成功した証拠にはしません。
+
+生ログと結果はIssue Workbenchの `implementation/{candidate.json,candidate-wheel.log,macos-full.log,macos-results.json,consumer-dry-run.json,linux-full.log,linux-filesystem-probe.json,linux-fixture-isolation.log,linux-tmpfs-full.log}` に保存しています。
+
+
+## S-06 再検証の確定結果
+
+同じコード候補c50a0ee0のLinux/Python 3.10.22、tmpfs fixture、capability全除去で `make lint` と通常 `uv run pytest` がexit 0、**1995 passed / 5 skipped / 182.47秒**でした。5 skipはmacOS専用1件とLinux匿名stageで適用しないnamed-stage cleanup4件です。Bash/Zsh/Fishのnative検査を含みます。初回失敗とfocused passを合算していません。証拠は `implementation/linux-tmpfs-results.json` と同名full logです。
+
+## S-07 外部packageとb004 consumerへの適用
+
+本計画の実装依頼を根拠に、検証済みc50a0ee0 wheelを既存uv管理環境へ `uv tool install --reinstall` で通常再導入しexit 0。consoleは `/Users/iwasawayuuta/.local/bin/spec-dock`、実moduleは `/Users/iwasawayuuta/.local/share/uv/tools/spec-dock/lib/python3.12/site-packages/spec_dock/__init__.py` です。versionは同じ0.2.4ですが、direct_urlが以下のcandidate wheelを指すことを確認しました。PATHや他toolは変更していません。
+
+保全root: `/Volumes/990p2t/workspace/worktrees/specdock-issue415-preservation-20261006/`。
+
+- `previous/spec_dock-0.2.4-py3-none-any.whl`: hash `5c600ca9f646e1f941e4a20ff67b10b898990e8a1d54a74d3266f1833243673e`。
+- `candidate/spec_dock-0.2.4-py3-none-any.whl`: hash `20a99b071028d7dd4ae9c11e7319a6f79d08c179972b6be59cc5ed27595f45e4`。
+- `consumer-backup/static/spec-dock/docs/reference_cli.md`: CLIで旧bytesを保全。backup_verified／restore_verifiedはtrue。
+
+対象rootは `/Volumes/990p2t/offloaded/home/iwasawayuuta/.codex/worktrees/b004/spec-dock` のみ。installed CLIのdry-runを再確認してからapplyし、変更は `spec-dock/docs/reference_cli.md` のみ、追加・退役なし。前後のconsumer全file（Workbench除外）のmode・hash比較も同一結論でした。新文書はproviderとbytes一致。直接記録、metadata、成果物、workspace宣言、非対象skill/shim/template/systemを保持しました。他worktreeの更新は行っていません。
+
+実installed consoleでも公開契約のsmokeに合格しました。最初の検証harnessはmacOSの一時pathのsymlinkによりtree digestが拒否したため、physical `/private/tmp` を使って再実行しました。製品のpath検査は変更していません。証拠は `implementation/consumer-{apply,preservation,after}.json`、`installed-console-verification.json` です。復元はR-02/R-03に従い、現在状態と保全物を照合してから別の明示操作として扱います。
+
+## S-08 GitHub About適用
+
+`chemitaro/spec-dock` のdescriptionだけを対象に実施しました。ghの2回の直前GETは一致し、PATCHはPAT権限不足のHTTP 403で失敗。別GETでも未変更を確認し、PATCHを再送せず、既にchemitaroとしてログイン済みのGitHub通常UIの「Edit repository details」でDescriptionだけを入力・保存しました。credential・permission設定の変更はありません。
+
+保存後の独立live GETで、D-415-007のdescriptionと完全一致しました。topicsは `[]` のままです。Website入力・checkboxは未操作ですが、UI保存時にhomepageのAPI表現が `null` から `""` に変わりました。URLは未設定のままです。この差をbytes一致や全field不変とは報告しません。旧値・失敗・UI経路・独立GETは `implementation/about-evidence.json`、画面は `about-after.jpg` に保持しました。
+
+## S-09 受入対応と残るゲート
+
+| 受入 | 実証拠・状態 |
+|---|---|
+| AC-415-001 | 48条件のlegacy同居negative、無副作用・診断・error/exit維持。全件passに含む |
+| AC-415-002 | READMEの三階層実例、返却ID連結、yes除去対照。全件passに含む |
+| AC-415-003 | 通常selector／import refの公開境界、root実例。全件passに含む |
+| AC-415-004 | local/github/retired cache、Sync無書込み・unknown/partial。全件passに含む |
+| AC-415-005 | AGENTSの日時付き履歴、PR414実績、履歴原本のhash維持 |
+| AC-415-006 | 44 leaf×三shell生成、native三shell、parser/値処理回帰。両OSで確認 |
+| AC-415-007 | description独立GET一致。homepage空値表現差を上記のとおり開示 |
+| AC-415-008 | inventory、fresh wheel、外部console、fresh/known-old/unknown consumer、実適用と保全 |
+| AC-415-009 | c50a0ee0全lint/pytest、配布、実運用を確認。最終Strict認証は未実施 |
+
+未完了: ユーザーが求めたGPT 5.6 ProのStrict Final Quality Gate、そこで必要となる修正・再レビュー、最終handoffとIssue Finish。v2 pilotの明示選択が必要というskill規則に従い版選択を確認中であり、一般的なGate依頼だけから選択済みとは扱っていません。実装依頼と現在upstreamへの通常push許可は維持します。人間のPR mergeは別責務です。
