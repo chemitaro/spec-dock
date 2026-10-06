@@ -1,4 +1,19 @@
-# iss-00415 仕様策定・採用記録
+# iss-00415 実装・検証記録
+
+## 現在の実装状態（2026-10-06）
+
+ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。Gate v2の版選択は確認待ちで、独立した実装は継続しています。
+
+- `spec-dock work start iss-00415 --branch codex/iss-00415-cli-refresh-specs --json`: exit 0、同branchを再利用し直接対象を取得。active showで対象・祖先を再確認。
+- S-01: macOS 27.0.1 arm64、開始HEADの `make lint` exit 0。`uv run pytest` exit 0、1917 passed / 1 skipped / 450.76秒。生ログはIssue Workbench `implementation/baseline.log`。
+- S-02: 公開create/import × 3階層 × apply/dry-run × text/JSON × 直接選択あり/なしの48条件。保全・比較・手動判断の案内不足でRedを確認し、診断文言だけを変更。公開publish/import suite 139 passed / 41.15秒。tree digestでmetadata・証拠・直接記録・Gitのmode/bytes/type不変、gh呼出しなしを確認。
+- S-03: READMEの実掲載3例をstateful gh stubで実行し、返却IDの親子連結とyesなしの無副作用停止を確認。通常TARGETの正負例、rootの実import例、Sync・AGENTSの現行説明と実在リンクを確認。対象suite 38 passed / 12.44秒。provider文書のhashはS-05で統合予定、consumer未適用。
+- S-04: 全44 leaf・三shell生成候補のRedを確認し、候補選別だけを修正。三生成検査はpass。実Fish 4.0.2の7代表入力も7 passed。macOSのBash/Zshを含む対象回帰は下記のとおり。
+- 検証用Linuxコンテナ: Python 3.10.22、Bash 5.2.37、Zsh 5.9、Fish 4.0.2。製品依存やホスト設定へ追加していません。
+
+以下は仕様採用時点の履歴です。未実施という記述はその時点の観測で、現在の実装状態は上記と以降の追記を参照します。
+
+# 仕様策定・採用記録
 
 ## 結果
 
@@ -31,3 +46,14 @@
 今回はIssue作成と仕様反映までです。製品実装、製品pytest／lint／fresh wheel再認定、package更新、consumer更新、About書込み、work start/finish、PR作成・mergeは実施していません。IssueはOPEN、直接選択はemptyのままです。
 
 実装時には対象候補・wheel・tool環境・consumer絶対root・backup先・検証環境を確定します。Aboutのdescription採否と実施、互換入口廃止、global共通skill＋local情報は未決のままです。後二者は本Issueの七件に不可欠でない将来の別判断です。過去の3 passedを現在の製品検証成功へ転用しません。
+
+
+## S-04〜05 実装候補の配布確認
+
+- 全44 leaf・三shellの候補を独立したread分類表で検査。共通値のskip、parser受付、catalog分類は変更していません。
+- 新規・旧版更新の公開CLI試験で、改稿前の実blob hashを確認し、backupの旧bytes/modeと文書以外のtree不変を確認。未知の追記があればeffectsなしで停止。
+- inventoryはreference_cli.mdのcurrent hashだけを更新し、以前のcurrent `1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc`をknown-oldへ追加。既存旧hash2つ、他entry・retired集合は保持。
+- 対象回帰: help/completion、CLI契約、lock options、provider distribution、static assets、wheel、entrypointの7ファイルで `179 passed, 7 skipped in 114.12s`、exit 0。skipはホストにないFishの7件で、同7件はLinuxで実行し7 passed。
+- fresh wheelとsdist経由wheel、外部non-editable console、fresh consumer、全inventory bytes、legacy診断の無副作用、README三階層作成と確認guard、selector正負、native補完を検査。製品の実GitHub変更はstubへ隔離。
+- 現在のlintはruff check/format、mypyすべてpass。workspace validateは241 Scope、findingsなし。
+- 固定commitからの独立wheel・Linux/Python 3.10全体検証と利用者環境への適用は次段階です。通常全件テストとStrict Gateも未完了です。
