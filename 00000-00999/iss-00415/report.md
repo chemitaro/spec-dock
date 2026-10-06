@@ -2,7 +2,7 @@
 
 ## 現在の実装状態（2026-10-06）
 
-ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。S-01〜08は実装・検証・適用済み。Gate v2の版選択は確認待ちです。Strict Final Quality Gate、最終handoff、Issue Finishは未完了です。
+ユーザーが本計画の実装・完了、GPT 5.6 ProでのStrict Final Quality Gateと指摘修正・再レビューを依頼しました。ゴール登録済み。対象はb004、branch `codex/iss-00415-cli-refresh-specs`、開始HEAD `775075cbd936d1f6fc80a97e2e50659c43f85fc1`です。人間のmergeは対象外です。S-01〜08は実装・検証・適用済み。ユーザーはv2を明示選択済みです。初回StrictレビューはP1一件で不合格となり、その外部適用面を復元しました。再レビュー、最終handoff、Issue Finishは未完了です。
 
 - `spec-dock work start iss-00415 --branch codex/iss-00415-cli-refresh-specs --json`: exit 0、同branchを再利用し直接対象を取得。active showで対象・祖先を再確認。
 - S-01: macOS 27.0.1 arm64、開始HEADの `make lint` exit 0。`uv run pytest` exit 0、1917 passed / 1 skipped / 450.76秒。生ログはIssue Workbench `implementation/baseline.log`。
@@ -71,7 +71,7 @@
 
 Linux初回は **307 failed / 1687 passed / 6 skipped / 312.01秒**でした。多数の失敗は直接選択の書込み後照合に集中します。このコンテナの通常一時領域では、製品を使わない `os.listdir(fd)` の最小例でも、作成直後のentryを最初の再読で見落としました。tmpfsでは同じ最小例でentryが見えます。該当する製品のstore/domainは開始commitから変更していません。
 
-既存のLinux検証記録と同じtmpfs fixture・capability全除去の条件に揃えた切り分けは **115 passed / 21.90秒**。元失敗を削除せず、この条件で通常全件を再実行中です。製品修正・assertion緩和・skip追加はしていません。tmpfsでの結果を、元のコンテナ通常一時領域でも成功した証拠にはしません。
+既存のLinux検証記録と同じtmpfs fixture・capability全除去の条件に揃えた切り分けは **115 passed / 21.90秒**。元失敗を削除せず、この条件で通常全件を再実行しました。結果は次節に記載します。製品修正・assertion緩和・skip追加はしていません。tmpfsでの結果を、元のコンテナ通常一時領域でも成功した証拠にはしません。
 
 生ログと結果はIssue Workbenchの `implementation/{candidate.json,candidate-wheel.log,macos-full.log,macos-results.json,consumer-dry-run.json,linux-full.log,linux-filesystem-probe.json,linux-fixture-isolation.log,linux-tmpfs-full.log}` に保存しています。
 
@@ -110,8 +110,26 @@ Linux初回は **307 failed / 1687 passed / 6 skipped / 312.01秒**でした。�
 | AC-415-004 | local/github/retired cache、Sync無書込み・unknown/partial。全件passに含む |
 | AC-415-005 | AGENTSの日時付き履歴、PR414実績、履歴原本のhash維持 |
 | AC-415-006 | 44 leaf×三shell生成、native三shell、parser/値処理回帰。両OSで確認 |
-| AC-415-007 | description独立GET一致。homepage空値表現差を上記のとおり開示 |
+| AC-415-007 | description独立GET一致。初回はhomepage副次変更で未達。下記の限定復元後にhomepage=null／topics=[]を独立GETで確認 |
 | AC-415-008 | inventory、fresh wheel、外部console、fresh/known-old/unknown consumer、実適用と保全 |
 | AC-415-009 | c50a0ee0全lint/pytest、配布、実運用を確認。最終Strict認証は未実施 |
 
-未完了: ユーザーが求めたGPT 5.6 ProのStrict Final Quality Gate、そこで必要となる修正・再レビュー、最終handoffとIssue Finish。v2 pilotの明示選択が必要というskill規則に従い版選択を確認中であり、一般的なGate依頼だけから選択済みとは扱っていません。実装依頼と現在upstreamへの通常push許可は維持します。人間のPR mergeは別責務です。
+未完了: ユーザーが求めたGPT 5.6 ProのStrict Final Quality Gate、そこで必要となる修正・再レビュー、最終handoffとIssue Finish。ユーザーがv2を明示選択済みで、同一レビュアーの再判定を行います。実装依頼と現在upstreamへの通常push許可は維持します。人間のPR mergeは別責務です。
+
+
+## Strict Final Quality Gate 初回とP1対応
+
+レビュー対象は `cabe00ca76a859baf7dfad780d29a8d21abf0d43`、baseは `775075cbd936d1f6fc80a97e2e50659c43f85fc1`。ユーザーのv2指定後、GPT-5.6 Sol / Proのbrowser実選択を確認して実行しました。session `fqg-v2-5630131f-05ddcee7`、会話 `6ac509ef-2e64-83ec-8497-e8d0dddd95d7`。wrapper exit 10、status=fail、coverage_complete=true、P0=0/P1=1/P2=0/P3=0です。製品コードには追加P0/P1なしとのレビュー結果ですが、最終認証passではありません。
+
+同じSHAの独立test laneは、make lint、通常pytest（macOS 1992 passed / 8 skipped）、diff check、workspace validate、Linux/Python 3.10.22のlintと通常pytest（1995 passed / 5 skipped）の5commandすべてexit 0です。campaign配下 `test-results/manifest.json` にSHA・command・exit・生logを保存しました。
+
+唯一のP1 `FQG-415-ABOUT-HOMEPAGE-SIDE-EFFECT` は、UI保存でhomepageがnullから空文字へ変わったままS-08を完了とした点です。完全なreview/test batchを `analyze-review-findings` に従い分析し、AC-415-007違反として受け入れました。最初のfault layerは運用適用のintegrationです。Website未設定という意味の同一性を、厳密な前後不変の代替にした完了表示を訂正します。先のS-08完了表示は、その時点では誤りでした。
+
+要件・設計を緩和せず、実装完了・指摘修正の既存承認に基づき自分の副次変更だけを回復しました。環境PATとは別に既に設定済みの同じchemitaro OAuth loginがあり、GET /userで同一主体を確認。子process内で環境tokenの上書きだけを外して正規gh認証を利用し、認証設定・権限は変更していません。直前GETが自分の採用description／homepage空文字／topics=[]のままであることを確認後、一回の `PATCH repos/chemitaro/spec-dock` に `{"homepage":null}` だけを送信しexit 0。別の通常認証GETで以下を確認しました。
+
+- full_name: `chemitaro/spec-dock`
+- description: D-415-007採用文言と完全一致
+- homepage: `null`（変更前値に復元）
+- topics: `[]`（変更前値と一致）
+
+生証拠は `implementation/about-homepage-recovery.json`。現在のS-08完了はこの復元後の状態を根拠とし、途中の副次変更がなかったとは主張しません。製品runtime/tests・要求意味は変更していません。P1を閉じられるかは同一レビュアーへ再判定を求めます。campaignは Issue Workbench `chatgpt-final-quality-gate-strict-v2/issue415` に継続し、要件・設計・base・scopeは維持します。
