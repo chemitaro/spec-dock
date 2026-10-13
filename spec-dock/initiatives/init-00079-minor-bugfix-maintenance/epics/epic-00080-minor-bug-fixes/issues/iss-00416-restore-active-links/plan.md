@@ -42,7 +42,7 @@ AC-416-01〜08 を満たし、fresh wheel の外部 console で `work start` →
 6. **`active set @current`（Q3）**: 欠けたリンクの修復で `succeeded`、一致時は `unchanged` と tree 不変。catalog の説明を更新する。
 7. **warning 経路**: 実体ディレクトリ occupied で exit 0 と `ACTIVE_LINK_NOT_UPDATED` を確認する。
 8. **読み取り無書込**: `active show` がリンクの有無に関係なく同じ結果で、書込しないこと。
-9. **provider 資産の文書**: `system/README.md`、`system/active-none/README.md` を更新し、`static-inventory.json` の hash を更新する。dogfood の `spec-dock/system/` に同じ変更が必要かを確認し、承認済みの `installation update` の範囲で反映する。
+9. **provider 資産の文書**: `system/README.md`、`system/active-none/README.md`、installed skill `install_root/.agents/skills/spec-dock/SKILL.md` を更新し、`static-inventory.json` の hash を更新する。dogfood の `spec-dock/system/` に同じ変更が必要かを確認し、承認済みの `installation update` の範囲で反映する。
 10. **旧 renderer 除去**: `cli_text.render_active_show_text` / `render_active_set_text` と未使用の `ActiveViewResult` 系を、参照が無いことを確認して除去する。
 
 ## 検証
