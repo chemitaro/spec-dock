@@ -14,22 +14,63 @@ ID: "iss-00416"
 詳細: [Issue Plan Guide](../../../docs/authoring/issue-plan.md)
 
 ## Planning Level
-選んだ level、理由、risk factor、再評価条件を記述する。
+
+- selected: `standard`
+- 理由: 変更は Git 無視の派生リンクと、3コマンドの後段に限られる。リンクは正本ではなく、コードの revert だけで戻せる。
+- risk factor: 公開 JSON の effects / warnings に `active.link` と `ACTIVE_LINK_NOT_UPDATED` が加わる。`active set` の説明と結果が変わる（Q3）。旧 consumer の `active/` に書込と既知の旧生成物の削除が戻る（Q4）。
+- 再評価条件: 新しい CLI leaf を追加する、Start lock 内に書込を入れる、既知の6件以外の旧ファイルを削除する、のいずれかになった場合は `strict` に上げる。既知6件の削除は利用者決定 Q4 で採用済みで、Git 無視の派生物に限るため `standard` のままとする。
 
 ## 目標
-この Issue で達成する観測可能な成果を記述する。
+
+AC-416-01〜08 を満たし、fresh wheel の外部 console で `work start` → `spec-dock/active/issue/requirement.md` を開ける状態を確認する。
 
 ## 順序・依存
-実装順、依存、並行可能な作業を記述する。
+
+1. 利用者決定 Q1〜Q4（2026-10-13 確定済み）を前提にする。
+2. domain → infra → application → 呼び出し点 → 文書 → 旧 renderer 除去、の順。domain と infra は並行可能。
+3. 既存テストの契約変更（旧 `active/` 保全テスト、`active set` の digest テスト）は、呼び出し点の実装と同じ step で更新する。
 
 ## 実装step
-実装、tests、docs、migration の手順を記述する。
+
+`tdd` スキルで各 step を Red → Green → Refactor で進める。
+
+1. **domain `plan_links`**: Initiative / Epic / Issue 直接、未選択の4ケースのテストを先に書き、実装する。
+2. **infra `sync_active_links`**: tmp dir のテストで、作成、一致、置換、実体 occupied、`active` が symlink、target_missing、dry-run 無書込、`os.replace` 失敗時に一時リンクが残らないこと、旧生成物6件の削除（ディレクトリは不変、symlink のリンク先は不変）、未知名の不変を確認する。
+3. **application `active_links`**: chain の導出と、outcome → effect / warning の変換をテストする。
+4. **`work start`**: Issue 直接・Epic 直接で3リンクを確認する cli_runtime テスト、dry-run の `planned`、選択 publish 失敗時にリンク処理が無いこと。
+5. **`active clear` / `work finish`**: fallback リンクへの切替、`unchanged` 時の不変。`test_active_clear_preserves_legacy_manifests_projections_and_cache_bytes` を「3リンク以外は不変」に更新する。
+6. **`active set @current`（Q3）**: 欠けたリンクの修復で `succeeded`、一致時は `unchanged` と tree 不変。catalog の説明を更新する。
+7. **warning 経路**: 実体ディレクトリ occupied で exit 0 と `ACTIVE_LINK_NOT_UPDATED` を確認する。
+8. **読み取り無書込**: `active show` がリンクの有無に関係なく同じ結果で、書込しないこと。
+9. **provider 資産の文書**: `system/README.md`、`system/active-none/README.md` を更新し、`static-inventory.json` の hash を更新する。dogfood の `spec-dock/system/` に同じ変更が必要かを確認し、承認済みの `installation update` の範囲で反映する。
+10. **旧 renderer 除去**: `cli_text.render_active_show_text` / `render_active_set_text` と未使用の `ActiveViewResult` 系を、参照が無いことを確認して除去する。
 
 ## 検証
-受け入れ条件と regression を確認する方法を記述する。
+
+- `make lint`
+- `uv run pytest`
+- fresh wheel:
+  ```bash
+  uv build --wheel --out-dir /private/tmp/spec-dock-416-dist
+  uv venv /private/tmp/spec-dock-416
+  uv pip install --python /private/tmp/spec-dock-416/bin/python /private/tmp/spec-dock-416-dist/spec_dock-*.whl
+  ```
+  hermetic な一時 consumer で `work start` → `ls -l spec-dock/active` → `active clear` → `ls -l spec-dock/active` を確認する。
+- dogfood: この worktree で `active set @current`（Q3）を実行し、`spec-dock/active/issue` が本 Issue を指すことを確認する。
 
 ## rollback
-問題時の rollback または forward recovery を記述する。
+
+- コードの revert で戻す。リンクは Git 無視の派生物なので、残置しても選択や検証に影響しない。
+- data migration: N/A（永続状態を追加しない）。
+
+## security / privacy / operability
+
+- リンクは worktree 内の相対パスだけを指す。`active` 自体が symlink の場合は書かないため、worktree 外への書込経路を作らない。
+- 出力には役割名と理由だけを出し、旧ファイルの中身は読まない。
 
 ## exit / handoff
-完了条件、残余リスク、引き渡しを記述する。
+
+- AC-416-01〜08 の確認結果、lint / pytest / fresh wheel の結果、Issue 413 D-01 の閲覧側判断を上書きした旨を `report.md` に記録する。
+- merge-ready の PR を作成し、merge は人間が行う。
+- 旧生成物の削除は復元しない。
+- 残余リスク: 同じ worktree での並行操作によるリンクのずれ（Q3 で修復）、branch 切替後の dangling リンク。
