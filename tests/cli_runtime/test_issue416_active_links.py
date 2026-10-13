@@ -304,3 +304,20 @@ def test_clear_from_with_an_empty_selection_also_repairs_the_fallback(
     assert code == 0 and result["status"] == "succeeded", result
     assert link_effects(result) == [("initiative", "unchanged"), ("epic", "succeeded"), ("issue", "unchanged")]
     assert links(root) == FALLBACK
+
+
+def test_link_sync_never_waits_for_or_races_a_running_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application.project_context import resolve_context
+    from spec_dock.runtime.infra.start_lock import StartLock
+
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    before = links(root)
+    with StartLock(resolve_context(str(root), root).common_dir, timeout=0):
+        code, result = run(root, capsys, "active", "clear", "--all")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert result["data"]["selection"]["status"] == "empty"
+    assert {reason for _, reason in warning_reasons(result)} == {"start_in_progress"}
+    assert link_effects(result) == [] and links(root) == before

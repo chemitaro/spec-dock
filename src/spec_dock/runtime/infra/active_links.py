@@ -1,4 +1,4 @@
-"""Write the derived spec-dock/active role links one atomic rename at a time.
+"""Write the derived spec-dock/active role links without ever replacing an entry that is not a link.
 
 Every write and delete is anchored to the directory descriptors that were inspected, so a
 root swapped after inspection can never redirect a link write or a legacy unlink elsewhere.
@@ -121,15 +121,44 @@ def _sync_role(active_fd: int, role: Role, text: str, *, dry_run: bool) -> LinkO
         return LinkOutcome(role, "unchanged")
     if dry_run:
         return LinkOutcome(role, "planned")
-    staged = f".{role}.{secrets.token_hex(8)}.tmp"
-    os.symlink(text, staged, dir_fd=active_fd)
+    if observed is not None and not _set_aside_stale_link(active_fd, role):
+        return LinkOutcome(role, "skipped", "occupied")
     try:
-        os.replace(staged, role, src_dir_fd=active_fd, dst_dir_fd=active_fd)
-    except BaseException:
-        with suppress(OSError):
-            os.unlink(staged, dir_fd=active_fd)
-        raise
+        # symlink() never replaces an entry, so anything that appeared meanwhile is kept.
+        os.symlink(text, role, dir_fd=active_fd)
+    except FileExistsError:
+        return LinkOutcome(role, "skipped", "occupied")
     return LinkOutcome(role, "succeeded")
+
+
+def _set_aside_stale_link(active_fd: int, role: Role) -> bool:
+    """Move the entry away and discard it only if it is still a symlink; otherwise put it back.
+
+    Another writer may replace the inspected symlink at any moment, so the entry is moved
+    atomically first and verified afterwards. A non-link is restored without ever replacing
+    whatever now occupies the role name; if it cannot be restored it stays under its aside name.
+    """
+    aside = f".{role}.{secrets.token_hex(8)}.aside"
+    os.rename(role, aside, src_dir_fd=active_fd, dst_dir_fd=active_fd)
+    if stat.S_ISLNK(os.stat(aside, dir_fd=active_fd, follow_symlinks=False).st_mode):
+        os.unlink(aside, dir_fd=active_fd)
+        return True
+    with suppress(OSError):
+        os.link(aside, role, src_dir_fd=active_fd, dst_dir_fd=active_fd, follow_symlinks=False)
+        os.unlink(aside, dir_fd=active_fd)
+        return False
+    with suppress(OSError):
+        if not _exists(active_fd, role):
+            os.rename(aside, role, src_dir_fd=active_fd, dst_dir_fd=active_fd)
+    return False
+
+
+def _exists(active_fd: int, name: str) -> bool:
+    try:
+        os.stat(name, dir_fd=active_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        return False
+    return True
 
 
 def _remove_legacy(active_fd: int, *, dry_run: bool) -> tuple[LegacyOutcome, ...]:

@@ -87,11 +87,15 @@ def sync_active_links(
    - シンボリックリンクで `readlink` が一致: `unchanged`。
    - シンボリックリンクで不一致: 置き換える。
    - それ以外（実体ファイル・ディレクトリ）: `skipped("occupied")`。読まない・変更しない。
-5. 置き換え・作成は `active/.<role>.<token>.tmp` に `symlink` してから `os.replace` で `active/<role>` に移す。失敗時は一時リンクだけを `unlink` する（best effort）。
+5. 作成は `symlink(dir_fd=...)` で行い、既存 entry を置換しない（`EEXIST` は `skipped("occupied")`）。古いリンクの置換は、entry を `.<role>.<token>.aside` へ rename してから型を確かめ、symlink のときだけ削除して新しいリンクを作る。symlink 以外（確認後に別の writer が置いた実体）なら、`link` で元の名前へ戻すか、名前が空いていれば rename で戻し、戻せなければ aside 名のまま残す。実体を置換・削除しない（FQG-416-006）。
 6. `LEGACY_GENERATED` の各名前を `lstat` し、不在なら何もしない（結果に出さない）。通常ファイルまたはシンボリックリンクなら `unlink`（リンク先は辿らない）して `succeeded`。ディレクトリなどそれ以外は `skipped("not_a_file")`。中身は読まない。1 の判定で `active` が使えない場合は行わない。
 7. `dry_run=True` のときは 1〜4 の観測だけを行い、書くはずの役割を `planned`、既に一致する役割を `unchanged` として返す。
 
 役割ごとに独立した `rename` なので、3つの間の原子性は持たない。途中で失敗しても、成功した役割は戻さない。
+
+### Start lock との排他（application）
+
+`sync_selection_links` はまず lock なしで dry-run 相当の観測を行う。書込・削除が必要なときだけ、clone の Start lock を `timeout=0` で試し、保持している間に観測し直して書く。lock が使用中なら全役割 `ACTIVE_LINK_NOT_UPDATED(start_in_progress)` を返す。これで Start の checkout が検査と変更の間に入らない（FQG-416-006）。選択コマンドは Start lock を待たず（Issue 413）、変化の無い `active set` は Start lock に触れない（`test_active_set_existing_direct_resolves_exact_selectors_without_acquisition_or_remote_calls`）。`work start` のリンク同期は Start lock を解放した後にこの経路で行う。lock を取らない並行の Git 操作（`branch switch`、手動 checkout）とは排他しないため、上記 5 の退避確認で実体を保全する。
 
 ### 呼び出し（application）
 

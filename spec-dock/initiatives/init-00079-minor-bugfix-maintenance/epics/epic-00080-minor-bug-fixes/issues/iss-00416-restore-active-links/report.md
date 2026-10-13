@@ -38,6 +38,8 @@ ID: "iss-00416"
   - FQG-416-003（ignore 規則に一致する追跡ファイルを変更）: `git ls-files` による追跡確認を加えて修正。
   - FQG-416-004（P2、空選択の `clear --from` が修復しない）: AC-416-03 の未達なので修正。
   - FQG-416-005（P2、Start dry-run が checkout 前の path を使う）: 残余リスクとして記録（下記）。
+- 2回目（`a9e2ec78`、同じ会話）: fail。前回の P1 3件は closed。新しい P1 が1件。
+  - FQG-416-006（役割名の確認後に並行 Start が置いた実体をリンクで置換）: 書込が必要なときだけ Start lock を待たずに取り、その中で観測し直して書くように変更。古いリンクの置換は退避して確かめる方式にし、lock を取らない並行 writer の実体も置換・削除しないようにした。
 
 ## Residual Risks / Follow-ups
 
@@ -45,4 +47,5 @@ ID: "iss-00416"
 
 - 同じ worktree での並行操作や branch 切替の後、リンクが古くなる・dangling になることがある。`active set @current` または `active clear --all` で揃え直す。
 - 削除した旧生成物は復元しない。
+- 旧生成物6件の削除は、Start lock を取らない並行の Git 操作（`branch switch`、手動 checkout）と排他しない。その間に同名の追跡ファイルが置かれると、型だけでは区別できない。追跡確認は同期の直前に行う。
 - この worktree と他の dogfood worktree の静的投影（`spec-dock/system/`、`.agents/skills/`）は未更新。インストール済み package の更新（利用者判断）の後、`installation update` で反映する。

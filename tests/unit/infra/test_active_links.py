@@ -154,14 +154,14 @@ def test_a_failed_role_write_is_reported_without_leaving_staged_links_or_stoppin
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     specdock = _workspace(tmp_path)
-    real_replace = os.replace
+    real_symlink = os.symlink
 
-    def failing_replace(source: str, destination: str, **kwargs: int) -> None:
+    def failing_symlink(source: str, destination: str, **kwargs: int) -> None:
         if destination == "epic":
             raise PermissionError("denied")
-        real_replace(source, destination, **kwargs)  # type: ignore[arg-type]
+        real_symlink(source, destination, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(os, "replace", failing_replace)
+    monkeypatch.setattr(os, "symlink", failing_symlink)
     links, _ = sync_active_links(specdock, plan_links(CHAIN), dry_run=False)
     assert [(item.role, item.status) for item in links] == [
         ("initiative", "succeeded"),
@@ -240,3 +240,25 @@ def test_active_root_swapped_after_inspection_never_receives_writes_or_deletes_o
     sync_active_links(specdock, plan_links(CHAIN), dry_run=False)
     assert sorted(path.name for path in outside.iterdir()) == ["context-pack.md", "issue"]
     assert all((outside / name).read_bytes() == b"outside user file" for name in ("issue", "context-pack.md"))
+
+
+def test_a_file_placed_after_the_role_check_is_preserved_instead_of_replaced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock = _workspace(tmp_path)
+    sync_active_links(specdock, plan_links(()), dry_run=False)
+    issue = specdock / "active/issue"
+    real_readlink = os.readlink
+
+    def racing_readlink(name: str, **kwargs: int) -> str:
+        observed = real_readlink(name, **kwargs)  # type: ignore[arg-type]
+        if name == "issue":
+            issue.unlink()
+            issue.write_bytes(b"checked out by a concurrent writer")
+        return observed
+
+    monkeypatch.setattr(os, "readlink", racing_readlink)
+    links, _ = sync_active_links(specdock, plan_links(CHAIN), dry_run=False)
+    assert (links[2].role, links[2].status, links[2].reason) == ("issue", "skipped", "occupied")
+    assert not issue.is_symlink() and issue.read_bytes() == b"checked out by a concurrent writer"
+    assert sorted(path.name for path in (specdock / "active").iterdir()) == ["epic", "initiative", "issue"]
