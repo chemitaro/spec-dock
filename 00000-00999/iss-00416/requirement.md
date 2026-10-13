@@ -73,7 +73,7 @@ ID: "iss-00416"
 ### RQ-416-06 案内文書の整合
 
 - `system/README.md` と `system/active-none/README.md` の provider 資産は、リンクを「現在の選択の閲覧用派生物」と説明し、正本は `active show --json` と直接記録であることを維持する。
-- `active set` の catalog 説明は、同じ直接対象でリンクを修復することを含める。
+- `active set` の catalog 説明と installed skill `spec-dock` は、同じ直接対象でリンクを修復することと、リンクが正本ではないことを含める。
 - 使われていない旧テキスト renderer（`presentation/cli_text.py` の `render_active_show_text` と、それに付随する `active set <target>` の旧案内）を除去するか、現行契約に揃える。
 
 ## スコープ

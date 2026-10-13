@@ -155,6 +155,7 @@ Q1 推奨案:
 - `src/spec_dock/runtime/cli/catalog.py`（`active set` の説明、Q3）
 - `src/spec_dock/runtime/presentation/cli_text.py`、`application/contracts.py`（未使用の旧 active renderer / 型の除去）
 - `src/spec_dock/assets/spec_dock/system/{README.md,active-none/README.md}` と `static-inventory.json` の hash
+- `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`（`active set` が同じ直接対象でリンクを修復すること、Start / Clear / Finish が閲覧用リンクを同期し、リンクは正本ではないこと）
 - tests（`tests/unit/domain`、`tests/unit/infra`、`tests/cli_runtime/test_issue413_active.py` ほか）
 
 変更しない:
