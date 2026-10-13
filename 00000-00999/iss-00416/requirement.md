@@ -66,8 +66,8 @@ ID: "iss-00416"
 
 - SpecDock がリンクとして書くのは `spec-dock/active/` 直下の `initiative`、`epic`、`issue` の3つの名前だけとする。
 - その名前に既存のシンボリックリンクがあれば置き換える。実体のファイルやディレクトリがあれば変更せず、その役割を更新しなかったことを報告する。
-- 旧 writer が生成した既知の名前（`context-pack.md`、`current-runbook.json`、`current-runbook.md`、`initiative.path`、`epic.path`、`issue.path`）は、リンクを同期するときに削除する。現行は更新しないため、残すと古い内容を誤読させる。ただし通常ファイルまたはシンボリックリンクの場合だけ削除し、ディレクトリの場合は変更せずに報告する。中身は読まない。
-- 上記9つ以外の名前（利用者のファイルなど）は読まず、変更も削除もしない。
+- 旧 writer が生成した既知の名前（`context-pack.md`、`current-runbook.json`、`current-runbook.md`、`initiative.path`、`epic.path`、`issue.path`）も削除しない。現行は更新しないため、provider の README で古い生成物であることを案内する（Q4）。
+- 3つのリンク名以外（利用者のファイル、旧生成物など）は読まず、変更も削除もしない。
 - `spec-dock/active` 自体がシンボリックリンクまたはディレクトリ以外の場合は、何も書かず、何も削除せずに報告する。
 - `spec-dock/active/` 配下が Git に無視されない場合（`.gitignore` の改変など）や、配下に Git で追跡されたファイルがある場合は、worktree を dirty にしないため、何も書かず、何も削除せずに報告する。
 - 検査の後で `spec-dock/active` が別の場所への symlink に差し替えられても、書込・削除は検査したディレクトリの中だけで行い、外部に及ばない。
@@ -85,13 +85,13 @@ ID: "iss-00416"
 
 対象:
 
-- `work start`、`work finish`、`active clear` の後段と、`active set @current` でのリンク生成・更新と旧生成物の削除。
+- `work start`、`work finish`、`active clear` の後段と、`active set @current` でのリンク生成・更新。
 - リンク書込を担う infra adapter と、その呼び出し。
 - 上記の tests、provider 資産の文書、dogfood consumer での確認。
 
 対象外:
 
-- 旧 `*.path`、`context-pack.md`、`current-runbook.*` の生成の復活（削除のみ行う）。
+- 旧 `*.path`、`context-pack.md`、`current-runbook.*` の生成の復活と削除。
 - 選択モデル（1 worktree に直接対象1件、Start だけの排他、台帳・cache・journal・自動 rollback なし）の変更。
 - `branch switch` に追従したリンク更新（`branch switch` は直接記録を変えないため）。
 - Windows 対応（Issue 413 で Linux/macOS に限定済み）。
@@ -111,8 +111,8 @@ ID: "iss-00416"
 - **AC-416-01** — Issue を `work start` すると、`active/initiative`、`active/epic`、`active/issue` がそれぞれ祖先 Initiative、祖先 Epic、対象 Issue のディレクトリを相対リンクで指し、`active/issue/requirement.md` を開ける。
 - **AC-416-02** — Epic または Initiative を直接対象にすると、下位の役割は `system/active-none/<role>` を指す。
 - **AC-416-03** — `active clear` と、直接記録を削除した `work finish` のあと、3つのリンクが `system/active-none/<role>` を指す。選択が残る `unchanged` ではリンクが変わらない。選択が空の状態の `active clear` は、古いリンクを fallback へ直す。
-- **AC-416-04** — `work start`、`work finish`、`active clear`、`active set` の `--dry-run` は、リンクを書かず旧生成物も削除せず、計画を出力に含める。
-- **AC-416-05** — 旧 consumer の `active/` で、リンクを同期する操作のあと、既知の旧生成物（通常ファイル・シンボリックリンク）は削除され、その旨が effects に出る。未知の名前のファイルとディレクトリ、旧生成物と同名のディレクトリ、役割名の実体はバイト列が変わらず、変更しなかった旨が出力に出る。`active` 自体がシンボリックリンクなら何も書かず、何も削除しない。
+- **AC-416-04** — `work start`、`work finish`、`active clear`、`active set` の `--dry-run` は、リンクを書かず、計画を出力に含める。
+- **AC-416-05** — 旧 consumer の `active/` で、リンクを同期する操作のあと、既知の旧生成物、未知の名前のファイルとディレクトリ、役割名の実体のバイト列が変わらない。役割名の実体は更新されず、その旨が出力に出る。`active` 自体がシンボリックリンクなら何も書かない。
 - **AC-416-06** — リンク更新の失敗は、成功した選択の変更を取り消さず、出力に残る。
 - **AC-416-07** — `active show` などの読み取りコマンドはリンクを書かず、リンクの有無・内容で結果が変わらない。
 - **AC-416-08** — `make lint`、`uv run pytest`、fresh wheel の外部 console で上記を確認できる。
@@ -123,7 +123,7 @@ ID: "iss-00416"
 - 祖先は直接記録と Scope metadata から必要時に導出する（`worktree_observation.ancestors_for`）。
 - 旧実装（`git show 1510e37b^:src/spec_dock/runtime/infra/active_store.py`）の multifile transaction や snapshot/restore は戻さない。
 - CLI の 44 leaf 契約は変えない。
-- AC-413-36（旧 `active/` の保全）は、本 Issue で「既知の旧生成物6件は削除、それ以外は保全」に変更する（利用者決定 Q4、2026-10-13）。
+- AC-413-36（旧 `active/` の保全）は維持する。本 Issue が書き換えるのは、役割名の symlink（旧 writer が作ったものを含む）だけである。
 
 ## 利用者決定（2026-10-13）
 
@@ -132,4 +132,4 @@ ID: "iss-00416"
 | Q1 | リンク更新に失敗したときの結果 | 選択の結果で status / exit を決め、リンクの失敗は warning として報告する（exit 0）。 |
 | Q2 | 未選択時の placeholder | `system/active-none/<role>` を指すリンクを復活する（旧挙動と同じ）。 |
 | Q3 | 古い・欠けたリンクの修復手段 | 新しい leaf は追加せず、`active set @current`（同じ直接対象）でリンクだけを修復する。 |
-| Q4 | 旧 consumer に残る旧 writer の生成物 | 既知の旧生成物（6件）は削除する。それ以外は触れない。 |
+| Q4 | 旧 consumer に残る旧 writer の生成物 | 既知の旧生成物（6件）も含め、3つのリンク名以外は読まず、変更も削除もしない。README で旧 writer の古い生成物と案内する（2026-10-13 に「削除する」から変更。FQG-416-007：並行の `branch switch` が置いた追跡ファイルを名前と種類だけでは区別できず、削除すると保全条件に反するため）。 |

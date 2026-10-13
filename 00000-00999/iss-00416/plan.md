@@ -17,8 +17,8 @@ ID: "iss-00416"
 
 - selected: `standard`
 - 理由: 変更は Git 無視の派生リンクと、3コマンドの後段に限られる。リンクは正本ではなく、コードの revert だけで戻せる。
-- risk factor: 公開 JSON の effects / warnings に `active.link` と `ACTIVE_LINK_NOT_UPDATED` が加わる。`active set` の説明と結果が変わる（Q3）。旧 consumer の `active/` に書込と既知の旧生成物の削除が戻る（Q4）。
-- 再評価条件: 新しい CLI leaf を追加する、Start lock 内に書込を入れる、既知の6件以外の旧ファイルを削除する、のいずれかになった場合は `strict` に上げる。既知6件の削除は利用者決定 Q4 で採用済みで、Git 無視の派生物に限るため `standard` のままとする。
+- risk factor: 公開 JSON の effects / warnings に `active.link` と `ACTIVE_LINK_NOT_UPDATED` が加わる。`active set` の説明と結果が変わる（Q3）。旧 consumer の `active/` の役割名 symlink に書込が戻る。旧生成物は触れない（Q4）。
+- 再評価条件: 新しい CLI leaf を追加する、Start の排他時間を延ばす、役割名以外のファイルを変更・削除する、のいずれかになった場合は `strict` に上げる。
 
 ## 目標
 
@@ -35,7 +35,7 @@ AC-416-01〜08 を満たし、fresh wheel の外部 console で `work start` →
 `tdd` スキルで各 step を Red → Green → Refactor で進める。
 
 1. **domain `plan_links`**: Initiative / Epic / Issue 直接、未選択の4ケースのテストを先に書き、実装する。
-2. **infra `sync_active_links`**: tmp dir のテストで、作成、一致、置換、実体 occupied、`active` が symlink、target_missing、dry-run 無書込、`os.replace` 失敗時に一時リンクが残らないこと、旧生成物6件の削除（ディレクトリは不変、symlink のリンク先は不変）、未知名の不変を確認する。
+2. **infra `sync_active_links`**: tmp dir のテストで、作成、一致、置換、実体 occupied、`active` が symlink、target_missing、dry-run 無書込、書込失敗時に一時リンクが残らないこと、検査後の root 差し替え・役割名への並行配置で実体が保全されること、未知名・旧生成物の不変を確認する。
 3. **application `active_links`**: chain の導出と、outcome → effect / warning の変換をテストする。
 4. **`work start`**: Issue 直接・Epic 直接で3リンクを確認する cli_runtime テスト、dry-run の `planned`、選択 publish 失敗時と `unchanged` 時にリンク処理が無いこと。
 5. **`active clear` / `work finish`**: fallback リンクへの切替、選択が残る `unchanged` 時の不変、選択が空の `active clear` による修復、両者の dry-run。`active/` を無視させた fixture で、既知旧生成物の削除と他の旧状態の保全を確認する（Issue 413 の保全テストは無視されない `active/` の不変として残す）。
@@ -72,5 +72,4 @@ AC-416-01〜08 を満たし、fresh wheel の外部 console で `work start` →
 
 - AC-416-01〜08 の確認結果、lint / pytest / fresh wheel の結果、Issue 413 D-01 の閲覧側判断を上書きした旨を `report.md` に記録する。
 - merge-ready の PR を作成し、merge は人間が行う。
-- 旧生成物の削除は復元しない。
 - 残余リスク: 同じ worktree での並行操作によるリンクのずれ（Q3 で修復）、branch 切替後の dangling リンク。
