@@ -436,7 +436,7 @@
     {
       "path": "spec-dock/system/README.md",
       "source": "spec_dock/system/README.md",
-      "sha256": "1cea3a10bb15bd876509130c5fed96186393359241eddccf49f793115a49ea40",
+      "sha256": "f84f4bb3313479b2b372192c9adfae4c7feaceeffccc2ae7b479615fbaf0d4a2",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [

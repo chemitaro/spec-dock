@@ -159,16 +159,13 @@ def test_active_set_current_repairs_links_only_when_they_drifted(
     (root / "spec-dock/active/context-pack.md").write_bytes(b"stale")
     code, preview = run(root, capsys, "active", "set", "@current", "--dry-run")
     assert code == 0 and preview["status"] == "planned", preview
-    assert preview["effects"] == [
-        {"kind": "active.link", "status": "planned", "target": "epic"},
-        {"kind": "active.legacy.remove", "status": "planned", "target": "context-pack.md"},
-    ]
+    assert preview["effects"] == [{"kind": "active.link", "status": "planned", "target": "epic"}]
     assert "epic" not in links(root)
     code, result = run(root, capsys, "active", "set", "@current")
     assert code == 0 and result["status"] == "succeeded", result
     assert result["data"]["selection"]["scope_id"] == "iss-00003"
     assert links(root) == {"initiative": f"../{INITIATIVE}", "epic": f"../{EPIC}", "issue": f"../{ISSUE}"}
-    assert not (root / "spec-dock/active/context-pack.md").exists()
+    assert (root / "spec-dock/active/context-pack.md").read_bytes() == b"stale"
 
 
 def warning_reasons(result: dict[str, Any]) -> list[tuple[str, object]]:
@@ -218,7 +215,7 @@ def test_read_commands_neither_write_nor_depend_on_links(
     assert links(root) == {"issue": "../system/active-none/issue"}
 
 
-def test_clear_removes_only_known_legacy_files_and_preserves_other_old_state(
+def test_link_sync_preserves_every_old_writer_file_and_other_old_state(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
     from spec_dock.runtime.infra.tree_backup import tree_digest
@@ -226,33 +223,26 @@ def test_clear_removes_only_known_legacy_files_and_preserves_other_old_state(
     root = navigable_workspace(tmp_path / "consumer")
     active = root / "spec-dock/active"
     active.mkdir()
-    for name in ("context-pack.md", "issue.path"):
+    for name in ("context-pack.md", "current-runbook.md", "initiative.path", "epic.path", "issue.path"):
         (active / name).write_bytes(b"old generated\r\n")
     (active / "current-runbook.json").mkdir()
     (active / "current-runbook.json/preserve.bin").write_bytes(b"\x00private\xff")
     (active / "notes.md").write_bytes(b"user notes")
     for role in ("initiative", "epic", "issue"):
-        (active / role).symlink_to(f"../system/active-none/{role}")
+        (active / role).symlink_to(f"../{INITIATIVE}")
+    old = {path.name: path.read_bytes() for path in active.iterdir() if path.is_file() and not path.is_symlink()}
     work = root / "spec-dock/.work"
     work.mkdir()
     (work / "active.json").write_bytes(b'{"schema_version":2}\r\n')
     before = tree_digest(work)
     code, result = run(root, capsys, "active", "clear", "--all")
     assert code == 0 and result["status"] == "succeeded", result
-    assert [effect for effect in result["effects"] if effect["kind"] == "active.legacy.remove"] == [
-        {"kind": "active.legacy.remove", "status": "succeeded", "target": name}
-        for name in ("context-pack.md", "issue.path")
-    ]
-    assert warning_reasons(result) == [("ACTIVE_LEGACY_NOT_REMOVED", "not_a_file")]
-    assert sorted(path.name for path in active.iterdir()) == [
-        "current-runbook.json",
-        "epic",
-        "initiative",
-        "issue",
-        "notes.md",
-    ]
+    assert link_effects(result) == [("initiative", "succeeded"), ("epic", "succeeded"), ("issue", "succeeded")]
+    assert [effect["kind"] for effect in result["effects"]] == ["active.link"] * 3
+    assert result["warnings"] == []
+    assert links(root) == FALLBACK
+    assert {name: (active / name).read_bytes() for name in old} == old
     assert (active / "current-runbook.json/preserve.bin").read_bytes() == b"\x00private\xff"
-    assert (active / "notes.md").read_bytes() == b"user notes"
     assert tree_digest(work) == before
     assert "private" not in json.dumps(result)
 

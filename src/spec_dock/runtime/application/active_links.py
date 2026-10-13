@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.worktree_observation import ancestors_for
 from spec_dock.runtime.domain.active_links import ROLES, plan_links
-from spec_dock.runtime.infra.active_links import LEGACY_GENERATED, LegacyOutcome, LinkOutcome, sync_active_links
+from spec_dock.runtime.infra.active_links import LinkOutcome, sync_active_links
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect
@@ -45,7 +45,7 @@ def sync_selection_links(
         return (), tuple(_link_warning(role, f"start_lock_unavailable: {type(error).__name__}") for role in ROLES)
 
 
-_Outcomes = tuple[tuple[LinkOutcome, ...], tuple[LegacyOutcome, ...]]
+_Outcomes = tuple[LinkOutcome, ...]
 
 
 def _sync(
@@ -72,32 +72,19 @@ def _sync(
 
 
 def _writes(outcomes: _Outcomes) -> bool:
-    links, legacy = outcomes
-    return any(item.status == "planned" for item in links) or any(item.status == "planned" for item in legacy)
+    return any(item.status == "planned" for item in outcomes)
 
 
 def _report(outcomes: _Outcomes | str, *, dry_run: bool) -> tuple[tuple[Effect, ...], tuple[Diagnostic, ...]]:
     if isinstance(outcomes, str):
         return (), tuple(_link_warning(role, outcomes) for role in ROLES)
-    links, legacy = outcomes
     effects: list[Effect] = []
     warnings: list[Diagnostic] = []
-    for outcome in links:
+    for outcome in outcomes:
         if outcome.status == "skipped":
             warnings.append(_link_warning(outcome.role, outcome.reason))
         elif not (dry_run and outcome.status == "unchanged"):
             effects.append(Effect("active.link", outcome.status, outcome.role))
-    for removal in legacy:
-        if removal.status == "skipped":
-            warnings.append(
-                Diagnostic(
-                    "ACTIVE_LEGACY_NOT_REMOVED",
-                    f"{removal.name}: {removal.reason}",
-                    {"name": removal.name, "reason": removal.reason},
-                )
-            )
-        else:
-            effects.append(Effect("active.legacy.remove", removal.status, removal.name))
     return tuple(effects), tuple(warnings)
 
 
@@ -115,7 +102,7 @@ def _chain(specdock_dir: Path, views: tuple[ScopeView, ...], scope_id: str | Non
 
 def _git_unsafe_reason(context: ProjectContext, *, timeout: float) -> str | None:
     """Only untracked, ignored derived names may be written so links never dirty the worktree."""
-    paths = tuple(f"spec-dock/active/{name}" for name in (*ROLES, *LEGACY_GENERATED))
+    paths = tuple(f"spec-dock/active/{role}" for role in ROLES)
     try:
         if run_git(context.root, "ls-files", "-z", "--", "spec-dock/active", timeout=timeout):
             return "tracked"

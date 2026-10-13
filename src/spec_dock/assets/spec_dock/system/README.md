@@ -34,4 +34,4 @@ spec-dock/active/issue      -> .../issues/<Issue>
 - linkは選択の正本ではありません。選択の判定、祖先の導出、guardはlinkを読みません。現在状態は `spec-dock active show --json` とworktree自身の直接記録で確認します。
 - linkが欠けた・古い場合は、選択中なら `spec-dock active set @current`、未選択なら `spec-dock active clear --all` で揃え直せます。`branch switch` や読み取りcommandはlinkを書きません。
 - 書き換えるのは `initiative`、`epic`、`issue` の3つの名前だけです。同名の実体file/directory、`active` 自体のsymlink、Gitに無視されない `active/` には書かず、warning `ACTIVE_LINK_NOT_UPDATED` で報告します。
-- 旧writerが生成した `context-pack.md`、`current-runbook.json`、`current-runbook.md`、`{initiative,epic,issue}.path` は現行では更新されないため、linkを揃える操作で削除します（file/symlinkのみ。中身は読みません）。それ以外の名前は変更しません。
+- 旧writerが生成した `context-pack.md`、`current-runbook.json`、`current-runbook.md`、`{initiative,epic,issue}.path` が残っていることがありますが、現行writerはこれらを更新も削除もしません。内容は古い可能性があるため参照せず、不要なら手で削除してください。3つのlink名以外の名前は変更しません。
