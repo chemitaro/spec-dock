@@ -38,8 +38,8 @@ AC-416-01〜08 を満たし、fresh wheel の外部 console で `work start` →
 2. **infra `sync_active_links`**: tmp dir のテストで、作成、一致、置換、実体 occupied、`active` が symlink、target_missing、dry-run 無書込、`os.replace` 失敗時に一時リンクが残らないこと、旧生成物6件の削除（ディレクトリは不変、symlink のリンク先は不変）、未知名の不変を確認する。
 3. **application `active_links`**: chain の導出と、outcome → effect / warning の変換をテストする。
 4. **`work start`**: Issue 直接・Epic 直接で3リンクを確認する cli_runtime テスト、dry-run の `planned`、選択 publish 失敗時と `unchanged` 時にリンク処理が無いこと。
-5. **`active clear` / `work finish`**: fallback リンクへの切替、選択が残る `unchanged` 時の不変、選択が空の `active clear` による修復、両者の dry-run。`test_active_clear_preserves_legacy_manifests_projections_and_cache_bytes` を「3リンク以外は不変」に更新する。
-6. **`active set @current`（Q3）**: 欠けたリンクの修復で `succeeded`、一致時は `unchanged` と tree 不変、dry-run は `planned` で無書込。既存 `test_active_set_existing_direct_resolves_exact_selectors_without_acquisition_or_remote_calls` はリンクを事前に揃えた状態で digest 不変を確認する形に直す。catalog の説明を更新する。
+5. **`active clear` / `work finish`**: fallback リンクへの切替、選択が残る `unchanged` 時の不変、選択が空の `active clear` による修復、両者の dry-run。`active/` を無視させた fixture で、既知旧生成物の削除と他の旧状態の保全を確認する（Issue 413 の保全テストは無視されない `active/` の不変として残す）。
+6. **`active set @current`（Q3）**: 欠けたリンクの修復で `succeeded`、一致時は `unchanged` と tree 不変、dry-run は `planned` で無書込。既存 `test_active_set_existing_direct_resolves_exact_selectors_without_acquisition_or_remote_calls` は `active/` を無視しない fixture なので変更不要。catalog の説明を更新する。
 7. **warning 経路**: 実体ディレクトリ occupied で exit 0 と `ACTIVE_LINK_NOT_UPDATED` を確認する。
 8. **読み取り無書込**: `active show` がリンクの有無に関係なく同じ結果で、書込しないこと。
 9. **provider 資産の文書**: `system/README.md`、`system/active-none/README.md`、installed skill `install_root/.agents/skills/spec-dock/SKILL.md` を更新し、`static-inventory.json` の hash を更新する。この worktree の静的投影（`spec-dock/system/`、`.agents/skills/`）は、この Issue では更新しない。`installation update` は利用者環境にインストール済みの package の資産を使うため、ソースの変更は package 更新（利用者判断）の後でないと反映できない。fresh consumer で新しい資産を確認する。

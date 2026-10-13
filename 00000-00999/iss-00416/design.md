@@ -69,7 +69,7 @@ class LinkOutcome:
 class LegacyOutcome:
     name: str
     status: Literal["planned", "succeeded", "skipped"]
-    reason: str | None  # skipped のときだけ（"directory" / OSError 要約）
+    reason: str | None  # skipped のときだけ（"not_a_file" / OSError 要約）
 
 def sync_active_links(
     specdock_dir: Path, plans: tuple[LinkPlan, ...], *, dry_run: bool
@@ -78,6 +78,7 @@ def sync_active_links(
 
 手順:
 
+0. `git check-ignore --no-index` で `spec-dock/active/<role>` と旧生成物の名前が Git に無視されることを確かめる（application 側で実施）。無視されない名前があれば、何も書かず何も消さずに全役割 `skipped("not_ignored")`。リンクで worktree を dirty にして次の Start（clean 前提）を妨げないため。
 1. `spec-dock/active` を `lstat`。存在しなければ `mkdir`（mode 0o755）。シンボリックリンク・ディレクトリ以外なら全役割 `skipped("active_not_directory")`。
 2. 役割ごとに、リンク文字列を `os.path.relpath(specdock_dir / plan.target, specdock_dir / "active")` で求める（例: `../initiatives/...`、`../system/active-none/issue`）。
 3. リンク先ディレクトリが存在しなければ `skipped("target_missing")`。
@@ -87,7 +88,7 @@ def sync_active_links(
    - シンボリックリンクで不一致: 置き換える。
    - それ以外（実体ファイル・ディレクトリ）: `skipped("occupied")`。読まない・変更しない。
 5. 置き換え・作成は `active/.<role>.<token>.tmp` に `symlink` してから `os.replace` で `active/<role>` に移す。失敗時は一時リンクだけを `unlink` する（best effort）。
-6. `LEGACY_GENERATED` の各名前を `lstat` し、不在なら何もしない（結果に出さない）。通常ファイルまたはシンボリックリンクなら `unlink`（リンク先は辿らない）して `succeeded`。ディレクトリなどそれ以外は `skipped("directory")`。中身は読まない。1 の判定で `active` が使えない場合は行わない。
+6. `LEGACY_GENERATED` の各名前を `lstat` し、不在なら何もしない（結果に出さない）。通常ファイルまたはシンボリックリンクなら `unlink`（リンク先は辿らない）して `succeeded`。ディレクトリなどそれ以外は `skipped("not_a_file")`。中身は読まない。1 の判定で `active` が使えない場合は行わない。
 7. `dry_run=True` のときは 1〜4 の観測だけを行い、書くはずの役割を `planned`、既に一致する役割を `unchanged` として返す。
 
 役割ごとに独立した `rename` なので、3つの間の原子性は持たない。途中で失敗しても、成功した役割は戻さない。
@@ -146,6 +147,7 @@ Q1 推奨案:
 | リンク先が無い（`active-none` 欠落、Scope 削除） | その役割 warning |
 | `symlink` / `replace` の OSError | その役割 warning、一時リンクを消す。他の役割は続ける |
 | 祖先の導出失敗 | 全役割 warning |
+| `active/` が Git に無視されない | 全役割 warning、書込・削除なし |
 | 選択効果が失敗・unknown | リンク処理なし |
 
 永続的な状態は追加しない。リンク自体が唯一の結果であり、次の選択操作で上書きされる。
@@ -175,7 +177,7 @@ Q1 推奨案:
 
 - 移行: 不要。既存 worktree は次の `work start` / `active clear` / `work finish`、または `active set @current`（Q3）でリンクが作られる。
 - 旧 consumer: 旧 writer が作った `active/{initiative,epic,issue}` はシンボリックリンクなので置き換え対象。既知の旧生成物6件は削除する（Q4）。これは AC-413-36 の保全範囲を狭める変更であり、report に記録する。
-- 既存テスト `test_active_clear_preserves_legacy_manifests_projections_and_cache_bytes` は `active/` 全体の digest 不変を確認している（`current-runbook.json` を通常ファイル／中身ありディレクトリの2通りで置く）。新契約では、通常ファイルの場合は削除され、ディレクトリの場合は不変、`.work/` と `.agent/` の旧記録は不変、に変える。未知名のファイルを1件追加し、不変を確認する。`test_active_set_existing_direct_...` の tree digest 不変は、リンクが既に正しい場合に限定する。
+- 既存テスト `test_active_clear_preserves_legacy_manifests_projections_and_cache_bytes` の fixture は `active/` を Git に無視させないため、新契約でも `not_ignored` で何も書かず、`active/` 全体の digest 不変がそのまま成り立つ。変更せずに残す。`active/` を無視させた場合の削除と保全（既知旧生成物の削除、同名ディレクトリ・未知名・`.work/` の不変）は `tests/cli_runtime/test_issue416_active_links.py` で別に確認する。`test_active_set_existing_direct_...` も同じ理由で変更不要。リンクが既に正しい場合の `unchanged` と修復時の `succeeded` は Issue 416 のテストで確認する。
 - rollback: 削除した旧生成物は復元しない（現行が更新しない派生物のため）。このリンク機能を戻しても、リンクは Git 無視の派生物なので残置しても無害。コード revert のみで戻せる。
 
 ## testability
