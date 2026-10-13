@@ -78,8 +78,8 @@ def sync_active_links(
 
 手順:
 
-0. `git check-ignore --no-index` で `spec-dock/active/<role>` と旧生成物の名前が Git に無視されることを確かめる（application 側で実施）。無視されない名前があれば、何も書かず何も消さずに全役割 `skipped("not_ignored")`。リンクで worktree を dirty にして次の Start（clean 前提）を妨げないため。
-1. `spec-dock/active` を `lstat`。存在しなければ `mkdir`（mode 0o755）。シンボリックリンク・ディレクトリ以外なら全役割 `skipped("active_not_directory")`。
+0. `git ls-files -- spec-dock/active` が空であること（追跡ファイルがあれば `skipped("tracked")`）と、`git check-ignore --no-index` で `spec-dock/active/<role>` と旧生成物の名前が Git に無視されることを確かめる（application 側で実施）。無視されない名前があれば、何も書かず何も消さずに全役割 `skipped("not_ignored")`。リンクで worktree を dirty にして次の Start（clean 前提）を妨げないため。
+1. `spec-dock` と `spec-dock/active` を `O_DIRECTORY | O_NOFOLLOW` で開き、以降の stat・readlink・symlink・rename・unlink はすべてこの fd を起点（`dir_fd`）に行う。検査後に root が差し替えられても、書込・削除は検査したディレクトリの中に留まる（FQG-416-001）。`active` が無ければ `mkdir(dir_fd=...)` してから開く。以下は fd 上の観測として読む。`spec-dock/active` を `lstat`。存在しなければ `mkdir`（mode 0o755）。シンボリックリンク・ディレクトリ以外なら全役割 `skipped("active_not_directory")`。
 2. 役割ごとに、リンク文字列を `os.path.relpath(specdock_dir / plan.target, specdock_dir / "active")` で求める（例: `../initiatives/...`、`../system/active-none/issue`）。
 3. リンク先ディレクトリが存在しなければ `skipped("target_missing")`。
 4. `active/<role>` を `lstat`:
@@ -147,7 +147,9 @@ Q1 推奨案:
 | リンク先が無い（`active-none` 欠落、Scope 削除） | その役割 warning |
 | `symlink` / `replace` の OSError | その役割 warning、一時リンクを消す。他の役割は続ける |
 | 祖先の導出失敗 | 全役割 warning |
-| `active/` が Git に無視されない | 全役割 warning、書込・削除なし |
+| `active/` が Git に無視されない、または配下に追跡ファイルがある | 全役割 warning、書込・削除なし |
+| リンク先の観測で権限エラーなど | その役割 warning（例外として上へ伝えない） |
+| 想定外の OSError | application 層で全役割 warning に変換し、選択の結果は変えない |
 | 選択効果が失敗・unknown | リンク処理なし |
 
 永続的な状態は追加しない。リンク自体が唯一の結果であり、次の選択操作で上書きされる。
