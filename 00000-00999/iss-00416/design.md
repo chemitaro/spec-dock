@@ -111,11 +111,17 @@ def apply_links(context, plans, *, dry_run) -> tuple[tuple[Effect, ...], tuple[D
 | `work_start.start_work` | `selection.publish` が `succeeded` になり、`WorkTargetStore` と Start lock を出たあと | 新しい直接対象 |
 | `work_start.start_work`（dry-run） | planned effects の最後 | 新しい直接対象（`planned`） |
 | `direct_active.clear_direct` | 1件以上 `selection.clear` が `succeeded` のあと | 未選択（fallback） |
+| `direct_active.clear_direct` | 選択が元から空で、解除対象が無く `unchanged` になる直前 | 未選択（修復。書いたら `succeeded`） |
 | `direct_active.clear_direct`（dry-run） | planned effects の最後 | 未選択 |
 | `direct_finish` | `selection.clear` が `succeeded` のあと | 未選択 |
+| `direct_finish`（dry-run） | `selection.clear` を planned にしたときだけ、planned effects の最後 | 未選択 |
 | `direct_active.set_direct` | 同じ直接対象で `unchanged` を返す直前（Q3） | 現在の直接対象 |
+| `direct_active.set_direct`（dry-run） | 同上。書かずに `planned`、何も要らなければ `unchanged` | 現在の直接対象 |
 
-`selection.*` が `failed` / `unknown` / `not_attempted` の経路ではリンクを扱わない（effect も出さない）。
+扱わない経路: `work start` の `unchanged`（早期 return）、選択が残る `active clear` の `unchanged`、`selection.*` が `failed` / `unknown` / `not_attempted` の経路、読み取りコマンド。
+
+`work start` のリンク先は、checkout 後の候補 tip から読んだ `candidate.views` で求める。ScopeView の `path` は解決済みの絶対 path なので、`spec-dock/` 配下であることを確かめてから相対化する。
+
 
 ### 出力（presentation）
 

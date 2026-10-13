@@ -46,7 +46,8 @@ ID: "iss-00416"
 ### RQ-416-02 選択解除で fallback に戻る
 
 - `active clear` または `work finish` が直接記録を削除したとき、3つのリンクは `spec-dock/system/active-none/<role>` を指す。
-- 直接記録を削除しなかった（`unchanged` など）場合は、リンクを変更しない。
+- 直接記録を削除しなかった場合、選択が残っていればリンクを変更しない。選択が元から空なら、リンクを fallback へ揃える（未選択時の修復手段）。
+- `work start` が `unchanged`（同じ対象が選択済み）で終わった場合は、リンクを扱わない。修復は `active set @current` で行う。
 
 <a id="rq-416-03"></a>
 ### RQ-416-03 リンクは正本ではない
@@ -105,8 +106,8 @@ ID: "iss-00416"
 
 - **AC-416-01** — Issue を `work start` すると、`active/initiative`、`active/epic`、`active/issue` がそれぞれ祖先 Initiative、祖先 Epic、対象 Issue のディレクトリを相対リンクで指し、`active/issue/requirement.md` を開ける。
 - **AC-416-02** — Epic または Initiative を直接対象にすると、下位の役割は `system/active-none/<role>` を指す。
-- **AC-416-03** — `active clear` と、直接記録を削除した `work finish` のあと、3つのリンクが `system/active-none/<role>` を指す。直接記録を削除しなかった場合はリンクが変わらない。
-- **AC-416-04** — `--dry-run` はリンクを書かず、計画を出力に含める。
+- **AC-416-03** — `active clear` と、直接記録を削除した `work finish` のあと、3つのリンクが `system/active-none/<role>` を指す。選択が残る `unchanged` ではリンクが変わらない。選択が空の状態の `active clear` は、古いリンクを fallback へ直す。
+- **AC-416-04** — `work start`、`work finish`、`active clear`、`active set` の `--dry-run` は、リンクを書かず旧生成物も削除せず、計画を出力に含める。
 - **AC-416-05** — 旧 consumer の `active/` で、リンクを同期する操作のあと、既知の旧生成物（通常ファイル・シンボリックリンク）は削除され、その旨が effects に出る。未知の名前のファイルとディレクトリ、旧生成物と同名のディレクトリ、役割名の実体はバイト列が変わらず、変更しなかった旨が出力に出る。`active` 自体がシンボリックリンクなら何も書かず、何も削除しない。
 - **AC-416-06** — リンク更新の失敗は、成功した選択の変更を取り消さず、出力に残る。
 - **AC-416-07** — `active show` などの読み取りコマンドはリンクを書かず、リンクの有無・内容で結果が変わらない。
