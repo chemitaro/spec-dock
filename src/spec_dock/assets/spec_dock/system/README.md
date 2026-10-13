@@ -20,4 +20,18 @@ file tokenは、Finishやclearが捕捉済みの一件だけを安全に解除�
 
 `system/active-none/` は、直接対象が無い場合、または明示されたrecovery planning packも無い場合に読む静的fallback文書です。ここにあるREADMEや空のR/D/P/Reportは、現在の選択状態そのものではなく、通常編集の許可・禁止をfilesystem permissionで強制するものでもありません。
 
-旧consumerに `spec-dock/active/{initiative,epic,issue}` のlegacy linkが残ることはありますが、それらはCurrent writerの直接選択ではありません。現在状態は `spec-dock active show --json` とworktree自身の直接記録で確認します。
+## active link（閲覧用の派生物）
+
+人間がエディタやファイラーから資料を開けるよう、Current writerは選択を変える操作の後で、worktree自身のGit無視領域に次の相対symlinkを揃えます。
+
+```text
+spec-dock/active/initiative -> ../initiatives/<Initiative>
+spec-dock/active/epic       -> ../initiatives/<Initiative>/epics/<Epic>
+spec-dock/active/issue      -> .../issues/<Issue>
+```
+
+- `work start` は直接対象とその祖先を指します。直接対象より下位の役割と、`active clear` / 選択を解除した `work finish` の後は `system/active-none/<role>` を指します。
+- linkは選択の正本ではありません。選択の判定、祖先の導出、guardはlinkを読みません。現在状態は `spec-dock active show --json` とworktree自身の直接記録で確認します。
+- linkが欠けた・古い場合は、選択中なら `spec-dock active set @current`、未選択なら `spec-dock active clear --all` で揃え直せます。`branch switch` や読み取りcommandはlinkを書きません。
+- 書き換えるのは `initiative`、`epic`、`issue` の3つの名前だけです。同名の実体file/directory、`active` 自体のsymlink、Gitに無視されない `active/` には書かず、warning `ACTIVE_LINK_NOT_UPDATED` で報告します。
+- 旧writerが生成した `context-pack.md`、`current-runbook.json`、`current-runbook.md`、`{initiative,epic,issue}.path` は現行では更新されないため、linkを揃える操作で削除します（file/symlinkのみ。中身は読みません）。それ以外の名前は変更しません。

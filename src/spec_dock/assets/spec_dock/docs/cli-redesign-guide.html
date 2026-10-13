@@ -82,7 +82,7 @@
 <section id="lifecycle" aria-labelledby="lifecycle-title"><div class="section-label">06</div><h2 id="lifecycle-title">Start・Finish・clearの違い</h2><ol class="steps"><li><strong>Startの事前確認</strong><p>対象と依存のlive readinessを確認します。GitHub照会は短い排他の外で行います。</p></li><li><strong>短い排他の中で開始を確定</strong><p>同cloneの予約を再観測し、重複を確認してbranch作成/checkout、直接記録の公開まで行います。</p></li><li><strong>作業中の通常操作</strong><p>文書編集、Artifact、Sync、Finishに共通Start lockや編集権限制度は設けません。</p></li><li><strong>FinishでIssueを完了</strong><p>GitHub完了を確認して、捕捉した直接記録だけを解除します。branchに留まり、後から始まった別対象を消しません。</p></li></ol>
 <div class="note"><p>Gitは同じbranchの同時checkoutを防ぎます。それだけでは、別branchで同じIssueを同時Startする競合を防げません。短いStart排他は重複確認と取得の間の競合だけを防ぎます。通常のfile編集をロックする機能ではありません。</p></div>
 <p>新しいbranchのStartには<code>--base REF</code>が必要です。既存branchを再利用する場合は<code>--branch NAME</code>を明示し、baseを渡しません。既存refをresetせず、同じ妥当な対象/branchへのStartはunchangedです。</p>
-<p><code>active set</code>は現在の妥当な直接対象と同じ場合だけunchangedです。空・別対象への取得は<code>WORK_START_REQUIRED</code>で停止します。親への暗黙昇格やfocusの第二状態は作りません。</p>
+<p><code>active set</code>は現在の妥当な直接対象と同じ場合だけ選択をunchangedのまま保ち、ずれた閲覧用<code>spec-dock/active/{initiative,epic,issue}</code> linkだけを揃えます。空・別対象への取得は<code>WORK_START_REQUIRED</code>で停止します。親への暗黙昇格やfocusの第二状態は作りません。linkは選択の正本ではありません。</p>
 <p><code>active clear</code>はselectionだけを解除し、Issueを閉じたりbranchを変更したりしません。<code>scope close</code>はbackend状態だけを変えます。Finishは作業完了なので、未完了作業を引き継ぐために使いません。今回、work releaseという新コマンドは追加しません。</p>
 </section>
 <section id="walkthrough" aria-labelledby="walkthrough-title"><div class="section-label">07</div><h2 id="walkthrough-title">通常操作の流れ</h2><p>作成結果から実際のIDを読み、親を明示します。下の<code>EPIC_ID</code>、<code>ISSUE_ID</code>、<code>BASE_REF</code>は実際に返されたIDと存在するbaseへ置き換えてください。</p>
@@ -138,10 +138,10 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 <tr><td>C11</td><td><code>scope reopen</code></td><td><code>TARGET</code></td><td>対象だけをopenへ戻します。</td><td>GitHub状態、既存local互換状態</td></tr>
 <tr><td>C12</td><td><code>scope delete</code></td><td><code>TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]</code></td><td>明示したローカルsubtreeだけを保全・削除します。GitHub/branchは削除しません。</td><td>backup、明示対象</td></tr>
 <tr><td>C13</td><td><code>active show</code></td><td>共通optionのみ</td><td>一つの直接記録と現在の祖先を表示します。</td><td>読取りのみ</td></tr>
-<tr><td>C14</td><td><code>active set</code></td><td><code>TARGET</code></td><td>現在の妥当な直接対象と同じならunchangedです。空/別対象はWORK_START_REQUIREDで停止します。</td><td>変更なし</td></tr>
-<tr><td>C15</td><td><code>active clear</code></td><td><code>--from TARGET</code> または <code>--all</code></td><td>捕捉した直接記録だけを解除します。</td><td>selectionのみ</td></tr>
-<tr><td>C16</td><td><code>work start</code></td><td><code>TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]</code></td><td>live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行います。</td><td>Git、worktree局所selection</td></tr>
-<tr><td>C17</td><td><code>work finish</code></td><td><code>TARGET</code></td><td>完了確認後に捕捉selectionだけ解除し、branchに留まります。</td><td>GitHub完了、selection</td></tr>
+<tr><td>C14</td><td><code>active set</code></td><td><code>TARGET</code></td><td>現在の妥当な直接対象と同じなら選択はunchangedで、ずれた閲覧用active linkだけを揃えます。空/別対象はWORK_START_REQUIREDで停止します。</td><td>active linkのみ</td></tr>
+<tr><td>C15</td><td><code>active clear</code></td><td><code>--from TARGET</code> または <code>--all</code></td><td>捕捉した直接記録だけを解除し、未選択ならactive linkをfallbackへ揃えます。</td><td>selection、active link</td></tr>
+<tr><td>C16</td><td><code>work start</code></td><td><code>TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]</code></td><td>live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行い、排他の後でactive linkを揃えます。</td><td>Git、worktree局所selection、active link</td></tr>
+<tr><td>C17</td><td><code>work finish</code></td><td><code>TARGET</code></td><td>完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。</td><td>GitHub完了、selection、active link</td></tr>
 <tr><td>C18</td><td><code>branch show</code></td><td><code>TARGET [--name NAME]</code></td><td>現在のref/占有を観測します。対応台帳は保存しません。</td><td>読取りのみ</td></tr>
 <tr><td>C19</td><td><code>branch create</code></td><td><code>TARGET [--name NAME] --base REF</code></td><td>固定baseからbranchを作り、checkoutしません。既存refをresetしません。</td><td>Git ref</td></tr>
 <tr><td>C20</td><td><code>branch switch</code></td><td><code>TARGET [--name NAME]</code></td><td>branchへcheckoutし、selection取得/解除は行いません。</td><td>Gitのみ</td></tr>

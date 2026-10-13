@@ -69,6 +69,7 @@ ID: "iss-00416"
 - 旧 writer が生成した既知の名前（`context-pack.md`、`current-runbook.json`、`current-runbook.md`、`initiative.path`、`epic.path`、`issue.path`）は、リンクを同期するときに削除する。現行は更新しないため、残すと古い内容を誤読させる。ただし通常ファイルまたはシンボリックリンクの場合だけ削除し、ディレクトリの場合は変更せずに報告する。中身は読まない。
 - 上記9つ以外の名前（利用者のファイルなど）は読まず、変更も削除もしない。
 - `spec-dock/active` 自体がシンボリックリンクまたはディレクトリ以外の場合は、何も書かず、何も削除せずに報告する。
+- `spec-dock/active/` 配下が Git に無視されない場合（`.gitignore` の改変など）は、worktree を dirty にしないため、何も書かず、何も削除せずに報告する。
 
 <a id="rq-416-06"></a>
 ### RQ-416-06 案内文書の整合

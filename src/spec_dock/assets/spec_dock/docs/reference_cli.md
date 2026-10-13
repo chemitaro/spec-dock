@@ -25,10 +25,10 @@
 | C11 | `scope reopen` | `TARGET` | 対象だけをopenへ戻します。 | GitHub状態、既存local互換状態 |
 | C12 | `scope delete` | `TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]` | 明示したローカルsubtreeだけを保全・削除します。GitHub/branchは削除しません。 | backup、明示対象 |
 | C13 | `active show` | 共通optionのみ | 一つの直接記録と現在の祖先を表示します。 | 読取りのみ |
-| C14 | `active set` | `TARGET` | 現在の妥当な直接対象と同じならunchangedです。空/別対象はWORK_START_REQUIREDで停止します。 | 変更なし |
-| C15 | `active clear` | `--from TARGET` または `--all` | 捕捉した直接記録だけを解除します。 | selectionのみ |
-| C16 | `work start` | `TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]` | live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行います。 | Git、worktree局所selection |
-| C17 | `work finish` | `TARGET` | 完了確認後に捕捉selectionだけ解除し、branchに留まります。 | GitHub完了、selection |
+| C14 | `active set` | `TARGET` | 現在の妥当な直接対象と同じなら選択はunchangedで、ずれた閲覧用active linkだけを揃えます。空/別対象はWORK_START_REQUIREDで停止します。 | active linkのみ |
+| C15 | `active clear` | `--from TARGET` または `--all` | 捕捉した直接記録だけを解除し、未選択ならactive linkをfallbackへ揃えます。 | selection、active link |
+| C16 | `work start` | `TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]` | live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行い、排他の後でactive linkを揃えます。 | Git、worktree局所selection、active link |
+| C17 | `work finish` | `TARGET` | 完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。 | GitHub完了、selection、active link |
 | C18 | `branch show` | `TARGET [--name NAME]` | 現在のref/占有を観測します。対応台帳は保存しません。 | 読取りのみ |
 | C19 | `branch create` | `TARGET [--name NAME] --base REF` | 固定baseからbranchを作り、checkoutしません。既存refをresetしません。 | Git ref |
 | C20 | `branch switch` | `TARGET [--name NAME]` | branchへcheckoutし、selection取得/解除は行いません。 | Gitのみ |
@@ -63,7 +63,7 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 
 新規branchのStartには--base REF、既存branchの再利用には明示--branch NAMEとbase省略が必要です。GitHub照会は短いStart排他の外です。排他内で同cloneの予約を再観測し、checkoutから直接記録公開まで保持します。通常編集、Artifact、Sync、Finish、migration、installationは共通Start lockを取りません。
 
-同一direct target/branchのStartはunchangedです。別branchへ移った予約、破損/複数記録も重複検査から捨てません。active setは同じ妥当な直接対象へのno-opだけで、新規取得や親への切替は行いません。clearはselectionだけ、FinishはGitHub完了を確認してから解除します。後から始まった別対象は消さず、元branchへ戻りません。
+同一direct target/branchのStartはunchangedです。別branchへ移った予約、破損/複数記録も重複検査から捨てません。active setは同じ妥当な直接対象の確認と閲覧用active linkの修復だけで、新規取得や親への切替は行いません。active linkは選択の正本ではなく、失敗してもwarningだけで選択の結果を変えません。clearはselectionだけ、FinishはGitHub完了を確認してから解除します。後から始まった別対象は消さず、元branchへ戻りません。
 
 ## JSONと途中失敗
 
