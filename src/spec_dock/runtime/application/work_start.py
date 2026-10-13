@@ -8,6 +8,7 @@ import json
 import secrets
 from typing import TYPE_CHECKING, Literal
 
+from spec_dock.runtime.application.active_links import sync_selection_links
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_plan import (
@@ -329,12 +330,16 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 assert planned_selection.record is not None
                 planned_effects.append(Effect("selection.clear", "planned", planned_selection.record.scope_id))
             planned_effects.append(Effect("selection.publish", "planned", target.id))
+            link_effects, link_warnings = sync_selection_links(
+                context, views, target.id, dry_run=True, timeout=namespace.timeout
+            )
             return OperationResult(
                 "work start",
                 "planned",
                 StartData(scope_id, False, context.branch, branch, None),
                 0,
-                effects=tuple(planned_effects),
+                effects=(*planned_effects, *link_effects),
+                warnings=link_warnings,
             )
         with (
             DirectoryIdentity(context.root) as root_handle,
@@ -497,12 +502,16 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
                 except (OSError, ValueError) as error:
                     raise SelectionPublicationUnknown(token, error) from error
                 effects.append(Effect(phase, "succeeded", target.id))
+        link_effects, link_warnings = sync_selection_links(
+            context, candidate.views, target.id, dry_run=False, timeout=namespace.timeout
+        )
         return OperationResult(
             "work start",
             "succeeded",
             StartData(scope_id, True, context.branch, branch_after, token),
             0,
-            effects=tuple(effects),
+            effects=(*effects, *link_effects),
+            warnings=link_warnings,
         )
     except (ValueError, OSError, RuntimeError) as error:
         if isinstance(error, SelectionPublicationUnknown):

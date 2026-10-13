@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import json
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.application.active_links import sync_selection_links
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
@@ -99,8 +100,13 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
     effect_target = target.github_ref if isinstance(backend, GithubBackend) else target.id
     if namespace.dry_run:
         planned = [Effect(effect_kind, "planned", effect_target)]
+        link_warnings: tuple[Diagnostic, ...] = ()
         if clear_handle is not None:
             planned.append(Effect("selection.clear", "planned", clear_handle.token))
+            link_effects, link_warnings = sync_selection_links(
+                context, (), None, dry_run=True, timeout=namespace.timeout
+            )
+            planned.extend(link_effects)
         return OperationResult(
             "work finish",
             "planned",
@@ -113,6 +119,7 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             ),
             0,
             effects=tuple(planned),
+            warnings=link_warnings,
         )
 
     def verify_source() -> ProjectContext:
@@ -252,6 +259,14 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
                 error.details() if isinstance(error, GitProcessError) else {},
             ),
         )
+    finish_warnings: tuple[Diagnostic, ...] = ()
+    if after.status == "empty" and any(
+        effect.kind == "selection.clear" and effect.status == "succeeded" for effect in effects
+    ):
+        link_effects, finish_warnings = sync_selection_links(
+            context, (), None, dry_run=False, timeout=namespace.timeout
+        )
+        effects.extend(link_effects)
     return OperationResult(
         "work finish",
         "succeeded" if any(effect.status == "succeeded" for effect in effects) else "unchanged",
@@ -264,4 +279,5 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         ),
         0,
         effects=tuple(effects),
+        warnings=finish_warnings,
     )
