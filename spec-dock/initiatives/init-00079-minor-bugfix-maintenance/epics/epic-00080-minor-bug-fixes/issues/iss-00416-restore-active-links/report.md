@@ -30,7 +30,18 @@ ID: "iss-00416"
 - dogfood: 候補 console の `active set @current` をこの worktree で実行し、`spec-dock/active/issue` が本 Issue を指すこと、`workspace validate` が成功し追跡ファイルが変わらないことを確認した。
 - 既存のリンクを置いた状態で、インストール済み console の `workspace validate`、`workspace doctor`（`--raw` 含む）、`workspace sync`、`scope list`、`installation show` が成功し、Scope の重複が無いことを確認した。
 
+## Final Quality Gate
+
+- 1回目（`e7400e66`、GPT-6 Pro）: fail。P1 が3件、P2 が2件。
+  - FQG-416-001（検査後の root 差し替えで外部へ書込・削除）: fd 起点の操作に変更して修正。
+  - FQG-416-002（リンク先の観測エラーが選択の status / exit を変える）: 役割ごとの例外処理に入れ、application 層でも OSError を warning に変換して修正。
+  - FQG-416-003（ignore 規則に一致する追跡ファイルを変更）: `git ls-files` による追跡確認を加えて修正。
+  - FQG-416-004（P2、空選択の `clear --from` が修復しない）: AC-416-03 の未達なので修正。
+  - FQG-416-005（P2、Start dry-run が checkout 前の path を使う）: 残余リスクとして記録（下記）。
+
 ## Residual Risks / Follow-ups
+
+- `work start --dry-run` のリンク計画は、checkout 前の Scope path で評価する。候補 tip で Scope ディレクトリが移動している場合だけ、計画と本実行のリンク先がずれ得る（FQG-416-005）。本実行は候補 tip の path を使う。
 
 - 同じ worktree での並行操作や branch 切替の後、リンクが古くなる・dangling になることがある。`active set @current` または `active clear --all` で揃え直す。
 - 削除した旧生成物は復元しない。

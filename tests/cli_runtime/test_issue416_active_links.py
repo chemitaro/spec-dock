@@ -255,3 +255,52 @@ def test_clear_removes_only_known_legacy_files_and_preserves_other_old_state(
     assert (active / "notes.md").read_bytes() == b"user notes"
     assert tree_digest(work) == before
     assert "private" not in json.dumps(result)
+
+
+def test_link_target_errors_never_turn_a_completed_finish_into_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    fallback = root / "spec-dock/system/active-none"
+    fallback.chmod(0)
+    try:
+        code, result = run(root, capsys, "work", "finish", "iss-00003", "--yes")
+    finally:
+        fallback.chmod(0o755)
+    assert code == 0 and result["status"] == "succeeded", result
+    assert result["data"]["completed"] is True
+    assert ("selection.clear", "succeeded") in [(effect["kind"], effect["status"]) for effect in result["effects"]]
+    assert {code for code, _ in warning_reasons(result)} == {"ACTIVE_LINK_NOT_UPDATED"}
+
+
+def test_tracked_files_under_active_are_never_changed_even_when_ignore_rules_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    tracked = root / "spec-dock/active/context-pack.md"
+    tracked.parent.mkdir()
+    tracked.write_bytes(b"tracked by accident\n")
+    git(root, "add", "-f", "spec-dock/active/context-pack.md")
+    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "tracked")
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "iss-00003", "--base", "HEAD")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert {reason for _, reason in warning_reasons(result)} == {"tracked"}
+    assert link_effects(result) == [] and links(root) == {}
+    assert tracked.read_bytes() == b"tracked by accident\n"
+    assert git(root, "status", "--porcelain") == b""
+
+
+def test_clear_from_with_an_empty_selection_also_repairs_the_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    assert run(root, capsys, "active", "clear", "--all")[0] == 0
+    (root / "spec-dock/active/epic").unlink()
+    (root / "spec-dock/active/epic").symlink_to(f"../{EPIC}")
+    code, result = run(root, capsys, "active", "clear", "--from", "epic-00002")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert link_effects(result) == [("initiative", "unchanged"), ("epic", "succeeded"), ("issue", "unchanged")]
+    assert links(root) == FALLBACK

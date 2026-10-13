@@ -1,8 +1,14 @@
-"""Write the derived spec-dock/active role links one atomic rename at a time."""
+"""Write the derived spec-dock/active role links one atomic rename at a time.
+
+Every write and delete is anchored to the directory descriptors that were inspected, so a
+root swapped after inspection can never redirect a link write or a legacy unlink elsewhere.
+"""
 
 from __future__ import annotations
 
+from contextlib import suppress
 from dataclasses import dataclass
+import errno
 import os
 import secrets
 import stat
@@ -21,6 +27,7 @@ LEGACY_GENERATED = (
     "epic.path",
     "issue.path",
 )
+_DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0)
 
 
 @dataclass(frozen=True)
@@ -37,42 +44,100 @@ class LegacyOutcome:
     reason: str | None = None
 
 
+class _ActiveUnavailable(Exception):
+    def __init__(self, reason: str) -> None:
+        super().__init__(reason)
+        self.reason = reason
+
+
 def sync_active_links(
     specdock_dir: Path, plans: tuple[LinkPlan, ...], *, dry_run: bool
 ) -> tuple[tuple[LinkOutcome, ...], tuple[LegacyOutcome, ...]]:
-    active = specdock_dir / "active"
     try:
-        try:
-            root = active.lstat()
-        except FileNotFoundError:
-            if not dry_run:
-                active.mkdir()
-        else:
-            if not stat.S_ISDIR(root.st_mode):
-                return tuple(LinkOutcome(plan.role, "skipped", "active_not_directory") for plan in plans), ()
+        workspace_fd = os.open(specdock_dir, _DIRECTORY_FLAGS)
     except OSError as error:
         return tuple(LinkOutcome(plan.role, "skipped", _reason(error)) for plan in plans), ()
-    outcomes: list[LinkOutcome] = []
-    for plan in plans:
-        link = active / plan.role
-        text = os.path.relpath(specdock_dir / plan.target, active)
-        if not (specdock_dir / plan.target).is_dir():
-            outcomes.append(LinkOutcome(plan.role, "skipped", "target_missing"))
-            continue
+    try:
         try:
-            outcomes.append(_sync_role(plan.role, link, text, dry_run=dry_run))
-        except OSError as error:
-            outcomes.append(LinkOutcome(plan.role, "skipped", _reason(error)))
-    return tuple(outcomes), _remove_legacy(active, dry_run=dry_run)
+            active_fd = _open_active(workspace_fd, dry_run=dry_run)
+        except _ActiveUnavailable as unavailable:
+            return tuple(LinkOutcome(plan.role, "skipped", unavailable.reason) for plan in plans), ()
+        try:
+            outcomes = tuple(_sync_plan(specdock_dir, active_fd, plan, dry_run=dry_run) for plan in plans)
+            legacy = _remove_legacy(active_fd, dry_run=dry_run) if active_fd is not None else ()
+            return outcomes, legacy
+        finally:
+            if active_fd is not None:
+                os.close(active_fd)
+    finally:
+        os.close(workspace_fd)
 
 
-def _remove_legacy(active: Path, *, dry_run: bool) -> tuple[LegacyOutcome, ...]:
+def _open_active(workspace_fd: int, *, dry_run: bool) -> int | None:
+    """Open spec-dock/active without following a redirect; None means a dry-run of a missing root."""
+    try:
+        return os.open("active", _DIRECTORY_FLAGS, dir_fd=workspace_fd)
+    except FileNotFoundError:
+        pass
+    except OSError as error:
+        raise _unavailable(error) from error
+    if dry_run:
+        return None
+    try:
+        os.mkdir("active", 0o755, dir_fd=workspace_fd)
+        return os.open("active", _DIRECTORY_FLAGS, dir_fd=workspace_fd)
+    except OSError as error:
+        raise _unavailable(error) from error
+
+
+def _unavailable(error: OSError) -> _ActiveUnavailable:
+    if error.errno in (errno.ELOOP, errno.ENOTDIR, errno.EEXIST):
+        return _ActiveUnavailable("active_not_directory")
+    return _ActiveUnavailable(_reason(error))
+
+
+def _sync_plan(specdock_dir: Path, active_fd: int | None, plan: LinkPlan, *, dry_run: bool) -> LinkOutcome:
+    text = f"../{plan.target}"
+    try:
+        if not stat.S_ISDIR((specdock_dir / plan.target).stat().st_mode):
+            return LinkOutcome(plan.role, "skipped", "target_missing")
+        if active_fd is None:
+            return LinkOutcome(plan.role, "planned")
+        return _sync_role(active_fd, plan.role, text, dry_run=dry_run)
+    except (FileNotFoundError, NotADirectoryError):
+        return LinkOutcome(plan.role, "skipped", "target_missing")
+    except OSError as error:
+        return LinkOutcome(plan.role, "skipped", _reason(error))
+
+
+def _sync_role(active_fd: int, role: Role, text: str, *, dry_run: bool) -> LinkOutcome:
+    try:
+        observed = os.stat(role, dir_fd=active_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        observed = None
+    if observed is not None and not stat.S_ISLNK(observed.st_mode):
+        return LinkOutcome(role, "skipped", "occupied")
+    if observed is not None and os.readlink(role, dir_fd=active_fd) == text:
+        return LinkOutcome(role, "unchanged")
+    if dry_run:
+        return LinkOutcome(role, "planned")
+    staged = f".{role}.{secrets.token_hex(8)}.tmp"
+    os.symlink(text, staged, dir_fd=active_fd)
+    try:
+        os.replace(staged, role, src_dir_fd=active_fd, dst_dir_fd=active_fd)
+    except BaseException:
+        with suppress(OSError):
+            os.unlink(staged, dir_fd=active_fd)
+        raise
+    return LinkOutcome(role, "succeeded")
+
+
+def _remove_legacy(active_fd: int, *, dry_run: bool) -> tuple[LegacyOutcome, ...]:
     """Old writers' generated files are never updated now; unlink them without reading or following."""
     outcomes: list[LegacyOutcome] = []
     for name in LEGACY_GENERATED:
-        path = active / name
         try:
-            observed = path.lstat()
+            observed = os.stat(name, dir_fd=active_fd, follow_symlinks=False)
         except FileNotFoundError:
             continue
         except OSError as error:
@@ -85,37 +150,12 @@ def _remove_legacy(active: Path, *, dry_run: bool) -> tuple[LegacyOutcome, ...]:
             outcomes.append(LegacyOutcome(name, "planned"))
             continue
         try:
-            path.unlink()
+            os.unlink(name, dir_fd=active_fd)
         except OSError as error:
             outcomes.append(LegacyOutcome(name, "skipped", _reason(error)))
             continue
         outcomes.append(LegacyOutcome(name, "succeeded"))
     return tuple(outcomes)
-
-
-def _sync_role(role: Role, link: Path, text: str, *, dry_run: bool) -> LinkOutcome:
-    try:
-        observed = link.lstat()
-    except FileNotFoundError:
-        observed = None
-    if observed is not None and not stat.S_ISLNK(observed.st_mode):
-        return LinkOutcome(role, "skipped", "occupied")
-    if observed is not None and str(link.readlink()) == text:
-        return LinkOutcome(role, "unchanged")
-    if dry_run:
-        return LinkOutcome(role, "planned")
-    _replace_link(link, text)
-    return LinkOutcome(role, "succeeded")
-
-
-def _replace_link(link: Path, text: str) -> None:
-    staged = link.with_name(f".{link.name}.{secrets.token_hex(8)}.tmp")
-    staged.symlink_to(text)
-    try:
-        staged.replace(link)
-    except BaseException:
-        staged.unlink(missing_ok=True)
-        raise
 
 
 def _reason(error: OSError) -> str:

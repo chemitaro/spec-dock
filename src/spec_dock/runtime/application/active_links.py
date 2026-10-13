@@ -31,9 +31,14 @@ def sync_selection_links(
         chain = _chain(specdock_dir.resolve(strict=True), views, scope_id)
     except (OSError, ValueError):
         return (), tuple(_link_warning(role, "selection_unresolved") for role in ROLES)
-    if not _ignored(context, timeout=timeout):
-        return (), tuple(_link_warning(role, "not_ignored") for role in ROLES)
-    links, legacy = sync_active_links(specdock_dir, plan_links(chain), dry_run=dry_run)
+    unsafe = _git_unsafe_reason(context, timeout=timeout)
+    if unsafe is not None:
+        return (), tuple(_link_warning(role, unsafe) for role in ROLES)
+    try:
+        links, legacy = sync_active_links(specdock_dir, plan_links(chain), dry_run=dry_run)
+    except OSError as error:
+        reason = f"{type(error).__name__}: {error.strerror or error}"
+        return (), tuple(_link_warning(role, reason) for role in ROLES)
     effects: list[Effect] = []
     warnings: list[Diagnostic] = []
     for outcome in links:
@@ -67,13 +72,16 @@ def _chain(specdock_dir: Path, views: tuple[ScopeView, ...], scope_id: str | Non
     )
 
 
-def _ignored(context: ProjectContext, *, timeout: float) -> bool:
+def _git_unsafe_reason(context: ProjectContext, *, timeout: float) -> str | None:
+    """Only untracked, ignored derived names may be written so links never dirty the worktree."""
     paths = tuple(f"spec-dock/active/{name}" for name in (*ROLES, *LEGACY_GENERATED))
     try:
+        if run_git(context.root, "ls-files", "-z", "--", "spec-dock/active", timeout=timeout):
+            return "tracked"
         output = run_git(context.root, "check-ignore", "--no-index", "--", *paths, timeout=timeout, missing_ok=True)
     except (GitProcessError, OSError):
-        return False
-    return set(output.splitlines()) == {path.encode() for path in paths}
+        return "not_ignored"
+    return None if set(output.splitlines()) == {path.encode() for path in paths} else "not_ignored"
 
 
 def _link_warning(role: str, reason: str | None) -> Diagnostic:

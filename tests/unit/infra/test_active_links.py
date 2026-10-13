@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.domain.active_links import plan_links
 from spec_dock.runtime.infra.active_links import sync_active_links
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
 ISSUE = "initiatives/init-00001-a/epics/epic-00002-b/issues/iss-00003-c"
@@ -155,10 +156,10 @@ def test_a_failed_role_write_is_reported_without_leaving_staged_links_or_stoppin
     specdock = _workspace(tmp_path)
     real_replace = os.replace
 
-    def failing_replace(source: str | os.PathLike[str], destination: str | os.PathLike[str]) -> None:
-        if Path(destination).name == "epic":
+    def failing_replace(source: str, destination: str, **kwargs: int) -> None:
+        if destination == "epic":
             raise PermissionError("denied")
-        real_replace(source, destination)
+        real_replace(source, destination, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(os, "replace", failing_replace)
     links, _ = sync_active_links(specdock, plan_links(CHAIN), dry_run=False)
@@ -177,23 +178,65 @@ def test_legacy_unlink_and_active_mkdir_failures_are_reported_not_raised(
     specdock = _workspace(tmp_path)
     (specdock / "active").mkdir()
     (specdock / "active/context-pack.md").write_bytes(b"old")
-    real_unlink = Path.unlink
+    real_unlink = os.unlink
 
-    def failing_unlink(self: Path, missing_ok: bool = False) -> None:
-        if self.name == "context-pack.md":
+    def failing_unlink(name: str, **kwargs: int) -> None:
+        if name == "context-pack.md":
             raise PermissionError("denied")
-        real_unlink(self, missing_ok=missing_ok)
+        real_unlink(name, **kwargs)  # type: ignore[arg-type]
 
-    monkeypatch.setattr(Path, "unlink", failing_unlink)
+    monkeypatch.setattr(os, "unlink", failing_unlink)
     _, legacy = sync_active_links(specdock, plan_links(CHAIN), dry_run=False)
     assert [(item.name, item.status) for item in legacy] == [("context-pack.md", "skipped")]
     assert (specdock / "active/context-pack.md").read_bytes() == b"old"
 
     other = _workspace(tmp_path / "other")
 
-    def failing_mkdir(self: Path, *args: object, **kwargs: object) -> None:
+    def failing_mkdir(*args: object, **kwargs: object) -> None:
         raise PermissionError("denied")
 
-    monkeypatch.setattr(Path, "mkdir", failing_mkdir)
+    monkeypatch.setattr(os, "mkdir", failing_mkdir)
     links, legacy = sync_active_links(other, plan_links(CHAIN), dry_run=False)
     assert {item.status for item in links} == {"skipped"} and legacy == ()
+
+
+def test_unreadable_link_target_is_a_skipped_role_not_an_exception(tmp_path: Path) -> None:
+    specdock = _workspace(tmp_path)
+    fallback = specdock / "system/active-none"
+    fallback.chmod(0)
+    try:
+        links, _ = sync_active_links(specdock, plan_links(CHAIN[:2]), dry_run=False)
+    finally:
+        fallback.chmod(0o755)
+    assert [(item.role, item.status) for item in links] == [
+        ("initiative", "succeeded"),
+        ("epic", "succeeded"),
+        ("issue", "skipped"),
+    ]
+
+
+def test_active_root_swapped_after_inspection_never_receives_writes_or_deletes_outside(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    specdock = _workspace(tmp_path)
+    active = specdock / "active"
+    active.mkdir()
+    (active / "context-pack.md").write_bytes(b"old")
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    for name in ("issue", "context-pack.md"):
+        (outside / name).write_bytes(b"outside user file")
+    real_symlink = os.symlink
+    swapped: list[bool] = []
+
+    def racing_symlink(*args: object, **kwargs: object) -> None:
+        if not swapped:
+            swapped.append(True)
+            active.rename(specdock / "active-moved")
+            active.symlink_to(outside)
+        real_symlink(*args, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(os, "symlink", racing_symlink)
+    sync_active_links(specdock, plan_links(CHAIN), dry_run=False)
+    assert sorted(path.name for path in outside.iterdir()) == ["context-pack.md", "issue"]
+    assert all((outside / name).read_bytes() == b"outside user file" for name in ("issue", "context-pack.md"))

@@ -67,13 +67,14 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         _check_guards(namespace, context, views, selection, target)
         if selection.status not in ("selected", "empty"):
             raise ValueError(selection.reason or "selection is not valid")
-        if selection.record is None or (
+        if selection.record is not None and (
             target is not None and target.id not in (*selection.ancestors, selection.record.scope_id)
         ):
             return OperationResult(
                 namespace.command_path, "unchanged", ActiveData(selection.view(), selection.ancestors), 0
             )
-        selected_handles = (selection.handle,) if selection.handle is not None else ()
+        # An empty selection removes nothing but still reaches the fallback link repair below.
+        selected_handles = (selection.handle,) if selection.record is not None and selection.handle is not None else ()
     effects: list[Effect] = []
     try:
         with WorkTargetStore(context.root) as store:
