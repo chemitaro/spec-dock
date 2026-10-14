@@ -14,7 +14,7 @@ Business commands support Linux and macOS with Python 3.10+. Other operating sys
 
 - `src/spec_dock/` is provider development source. `src/spec_dock/runtime/` implements the packaged CLI; `src/spec_dock/assets/` is the provider authority for shipped static content.
 - The actual command is the non-editably installed external package in the user's tool environment. Editing source or switching a checkout branch does not update that installed package. Updating it is user/tool-environment-wide, not a runtime copy inside each consumer.
-- `spec-dock/docs`, `spec-dock/system`, `spec-dock/templates`, the root `.agents/skills`, workspace declaration and shim are static projections in one explicit consumer worktree. Installation init/update does not silently update another worktree.
+- `spec-dock/docs`, `spec-dock/system`, `spec-dock/templates`, the root `.agents/skills` and `.claude/skills` skill projections, workspace declaration and shim are static projections in one explicit consumer worktree. Both skill roots receive identical copies of one provider source because Codex discovers `.agents/skills` and Claude Code discovers `.claude/skills`. Installation init/update does not silently update another worktree.
 - `spec-dock/.agent/work-target/target-<32-hex-token>.json` is an ignored, worktree-local direct record. The opaque filename token identifies one captured record; it is not a Scope ID, GitHub issue number, UUID or operation journal entry.
 
 Choose package update, static installation/update, or lifecycle operation according to the layer that actually owns the requested outcome. Do not describe parity between layers as proof that another layer was updated.
@@ -35,8 +35,8 @@ Read help, inspect the necessary preconditions, execute the in-scope command and
 - One worktree has at most one direct target. Only Start acquires it. `active set TARGET` is an unchanged no-op only for the same valid direct target; an empty or different target requires Start. `active clear` releases the captured direct record without closing GitHub or changing branch.
 - Finish completes the fixed GitHub Scope and confirms closed(completed) before clearing only the captured selection. It stays on the branch. Parent completion requires completed descendants. Finish is not handover or proof of delivery, test, review or merge completion.
 - Branch leaves change/observe native Git refs without a branch registry. Dependency mutations use metadata through the CLI.
-- Sync observes current same-clone main/linked worktrees and their direct targets; it writes no cache, generation or projection and does not infer running Codex processes. Use `--source github` for explicit live lifecycle observations.
-- Installation changes only known static resources in one worktree. Init refuses existing destinations. Update/uninstall require verified external preservation for changes; unknown modified files require manual merge. Package updates are separate from static updates.
+- Sync observes current same-clone main/linked worktrees and their direct targets; it writes no cache, generation or projection and does not infer running agent processes. Use `--source github` for explicit live lifecycle observations.
+- Installation changes only known static resources in one worktree. Its skill files live only in the fixed SpecDock slots under `.agents/skills` and `.claude/skills`; it never manages other skills or host configuration such as `.claude/settings.json`. Init refuses existing destinations. Update/uninstall require verified external preservation for changes; unknown modified files require manual merge. Package updates are separate from static updates.
 
 ## Documents and Artifacts
 

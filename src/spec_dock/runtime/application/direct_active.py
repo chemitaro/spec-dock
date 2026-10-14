@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.application.active_links import sync_selection_links
 from spec_dock.runtime.application.scope_query import load_scope_views
 from spec_dock.runtime.application.worktree_observation import SelectionObservation, read_selection, resolve_scope
 from spec_dock.runtime.infra.work_target_store import SelectionRemovalUnknown, WorkTargetStore
@@ -24,8 +25,18 @@ def set_direct(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     selection = read_selection(context, views)
     _check_guards(namespace, context, views, selection, target)
     if selection.status == "selected" and selection.record is not None and selection.record.scope_id == target.id:
+        # Re-asserting the same direct target repairs only the derived navigation links.
+        effects, warnings = sync_selection_links(
+            context, views, target.id, dry_run=namespace.dry_run, timeout=namespace.timeout
+        )
+        statuses = {effect.status for effect in effects}
         return OperationResult(
-            namespace.command_path, "unchanged", ActiveData(selection.view(), selection.ancestors), 0
+            namespace.command_path,
+            "succeeded" if "succeeded" in statuses else "planned" if "planned" in statuses else "unchanged",
+            ActiveData(selection.view(), selection.ancestors),
+            0,
+            effects=effects,
+            warnings=warnings,
         )
     return OperationResult(
         namespace.command_path,
@@ -56,13 +67,14 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         _check_guards(namespace, context, views, selection, target)
         if selection.status not in ("selected", "empty"):
             raise ValueError(selection.reason or "selection is not valid")
-        if selection.record is None or (
+        if selection.record is not None and (
             target is not None and target.id not in (*selection.ancestors, selection.record.scope_id)
         ):
             return OperationResult(
                 namespace.command_path, "unchanged", ActiveData(selection.view(), selection.ancestors), 0
             )
-        selected_handles = (selection.handle,) if selection.handle is not None else ()
+        # An empty selection removes nothing but still reaches the fallback link repair below.
+        selected_handles = (selection.handle,) if selection.record is not None and selection.handle is not None else ()
     effects: list[Effect] = []
     try:
         with WorkTargetStore(context.root) as store:
@@ -81,12 +93,19 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 raise ValueError("invalid selection requires --all --yes and safely observed regular records")
             if namespace.dry_run:
                 observed = _observe(context, timeout=namespace.timeout)
+                planned_links, planned_warnings = sync_selection_links(
+                    context, (), None, dry_run=True, timeout=namespace.timeout
+                )
                 return OperationResult(
                     namespace.command_path,
                     "planned",
                     ActiveData(observed.view(), observed.ancestors),
                     0,
-                    effects=tuple(Effect("selection.clear", "planned", handle.token) for handle in handles),
+                    effects=(
+                        *(Effect("selection.clear", "planned", handle.token) for handle in handles),
+                        *planned_links,
+                    ),
+                    warnings=planned_warnings,
                 )
             for index, handle in enumerate(handles):
                 try:
@@ -109,6 +128,12 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                     Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", handle.token)
                 )
         observed = _observe(context, timeout=namespace.timeout)
+        link_warnings: tuple[Diagnostic, ...] = ()
+        if observed.status == "empty":
+            link_effects, link_warnings = sync_selection_links(
+                context, (), None, dry_run=False, timeout=namespace.timeout
+            )
+            effects.extend(link_effects)
     except (ValueError, OSError, RuntimeError) as error:
         if effects:
             applied = any(effect.status in ("succeeded", "unknown") for effect in effects)
@@ -127,6 +152,7 @@ def clear_direct(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         ActiveData(observed.view(), observed.ancestors),
         0,
         effects=tuple(effects),
+        warnings=link_warnings,
     )
 
 

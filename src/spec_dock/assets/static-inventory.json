@@ -4,12 +4,13 @@
     {
       "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
-      "sha256": "2dbe53d0d26f35c13ce2f027eeb4ace16a9bb95b894aeabea75cd234b92d9e37",
+      "sha256": "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18",
-        "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51"
+        "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51",
+        "2dbe53d0d26f35c13ce2f027eeb4ace16a9bb95b894aeabea75cd234b92d9e37"
       ]
     },
     {
@@ -31,13 +32,49 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
+      "sha256": "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3",
         "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538",
-        "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c"
+        "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c",
+        "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
+        "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da"
+      ]
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "sha256": "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".claude/skills/spec-dock/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock/SKILL.md",
+      "sha256": "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da"
       ]
     },
     {
@@ -125,11 +162,12 @@
     {
       "path": "spec-dock/docs/authoring/overview.md",
       "source": "spec_dock/docs/authoring/overview.md",
-      "sha256": "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
+      "sha256": "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5"
+        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
+        "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392"
       ]
     },
     {
@@ -159,12 +197,13 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac",
+      "sha256": "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
-        "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e"
+        "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e",
+        "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac"
       ]
     },
     {
@@ -251,13 +290,15 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "637bb1a1b1f95b6fed462b8cd34ba23bc0a2db95d3b85ce69053c7a400ec9d00",
+      "sha256": "ed94ca052f0ae18040d1f022fa9a6a34dbb61d25b75c4d210b20ff93e174a898",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
         "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5",
-        "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc"
+        "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc",
+        "637bb1a1b1f95b6fed462b8cd34ba23bc0a2db95d3b85ce69053c7a400ec9d00",
+        "cf5446ce3e07af629d2eeec028487b913b4467eaa8963d4e10d93d5622a7e961"
       ]
     },
     {
@@ -434,21 +475,23 @@
     {
       "path": "spec-dock/system/README.md",
       "source": "spec_dock/system/README.md",
-      "sha256": "759c504cabf3d467b28d87e8a6af33f5cddf430b8fd93f2b38598f44bb705feb",
+      "sha256": "f84f4bb3313479b2b372192c9adfae4c7feaceeffccc2ae7b479615fbaf0d4a2",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "71a7579f3d9fb0f1f5141bbf14ec96d2cd5762c5f935934a8af0604e6008fe53"
+        "71a7579f3d9fb0f1f5141bbf14ec96d2cd5762c5f935934a8af0604e6008fe53",
+        "759c504cabf3d467b28d87e8a6af33f5cddf430b8fd93f2b38598f44bb705feb"
       ]
     },
     {
       "path": "spec-dock/system/active-none/README.md",
       "source": "spec_dock/system/active-none/README.md",
-      "sha256": "067114e645ff28e1b8f1166221c7d6d6e6a40e23bab406ee63007496e29494c3",
+      "sha256": "c73edcc6b729d12a0eec91a9f196812425aec523afecac48aacc02bcf7cff923",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "aca9368da8ba736f1920dc96e9fa2a57a288386ab97533a1e47c89fd7a73f641"
+        "aca9368da8ba736f1920dc96e9fa2a57a288386ab97533a1e47c89fd7a73f641",
+        "067114e645ff28e1b8f1166221c7d6d6e6a40e23bab406ee63007496e29494c3"
       ]
     },
     {

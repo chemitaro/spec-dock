@@ -464,8 +464,8 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("--yes applies only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
         setattr(parsed, key, common.get(key, False if key in _COMMON_SWITCHES.values() else None))
-    if parsed.command_path != "work start" and parsed.lock_timeout is not None:
-        parser.error("--lock-timeout applies only to work start")
+    if parsed.command_path not in ("work start", "branch switch") and parsed.lock_timeout is not None:
+        parser.error("--lock-timeout applies only to work start and branch switch")
     parsed.non_interactive = bool(parsed.non_interactive or parsed.json)
     parsed.lock_timeout = 5.0 if parsed.lock_timeout is None else parsed.lock_timeout
     parsed.timeout = (
