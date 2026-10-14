@@ -162,6 +162,13 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
             payload = archive.read("spec_dock/assets/" + entry["source"])
             assert payload == (ROOT / "src/spec_dock/assets" / entry["source"]).read_bytes()
             assert hashlib.sha256(payload).hexdigest() == entry["sha256"]
+        assert {entry["path"] for entry in inventory["files"] if entry["path"].startswith(".claude/")} == {
+            ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
+            ".claude/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+            ".claude/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+            ".claude/skills/spec-dock/SKILL.md",
+        }
+        assert not any(name.startswith("spec_dock/assets/install_root/.claude/") for name in names)
         assert json.loads(archive.read("spec_dock/assets/spec_dock/workspace.json")) == {
             "schema_version": 3,
             "writer_protocol": "specdock.worktree-writer/v1",

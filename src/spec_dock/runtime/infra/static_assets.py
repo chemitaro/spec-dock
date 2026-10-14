@@ -53,7 +53,12 @@ def package_static_assets() -> tuple[StaticAsset, ...]:
                     "spec-dock/templates/",
                     "spec-dock/system/",
                 ))
-                or path.startswith((".agents/skills/spec-dock/", ".agents/skills/spec-dock-grill-with-docs/"))
+                or path.startswith((
+                    ".agents/skills/spec-dock/",
+                    ".agents/skills/spec-dock-grill-with-docs/",
+                    ".claude/skills/spec-dock/",
+                    ".claude/skills/spec-dock-grill-with-docs/",
+                ))
             )
             or path != relative.as_posix()
         ):

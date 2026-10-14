@@ -69,7 +69,13 @@ def test_init_places_only_static_assets_and_a_new_declaration_in_the_explicit_wo
 
 
 @pytest.mark.parametrize(
-    "conflict", ["spec-dock/workspace.json", "spec-dock/docs/README.md", ".agents/skills/spec-dock/SKILL.md"]
+    "conflict",
+    [
+        "spec-dock/workspace.json",
+        "spec-dock/docs/README.md",
+        ".agents/skills/spec-dock/SKILL.md",
+        ".claude/skills/spec-dock/SKILL.md",
+    ],
 )
 def test_init_refuses_any_existing_destination_without_publishing_other_assets(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], conflict: str
@@ -202,7 +208,9 @@ def test_init_rejects_retired_recovery_before_git_admission_or_asset_writes(
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX symlink, hardlink and FIFO fixtures")
-@pytest.mark.parametrize("shape", ["parent-symlink", "dangling", "file-symlink", "hardlink", "fifo"])
+@pytest.mark.parametrize(
+    "shape", ["parent-symlink", "claude-parent-symlink", "dangling", "file-symlink", "hardlink", "fifo"]
+)
 def test_init_refuses_unsafe_or_existing_entries_without_following_them(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], shape: str
 ) -> None:
@@ -213,6 +221,8 @@ def test_init_refuses_unsafe_or_existing_entries_without_following_them(
     private.write_text("private canary body\n", encoding="utf-8")
     if shape == "parent-symlink":
         (target / ".agents").symlink_to(outside, target_is_directory=True)
+    elif shape == "claude-parent-symlink":
+        (target / ".claude").symlink_to(outside, target_is_directory=True)
     else:
         destination = target / "spec-dock/docs/README.md"
         destination.parent.mkdir(parents=True)
@@ -591,6 +601,9 @@ def test_uninstall_preserves_workspace_specs_ignored_state_and_unknown_files(
         "spec-dock/.agent/work-target/user-selected.json",
         "spec-dock/docs/user-notes.md",
         ".agents/skills/spec-dock/user-notes.md",
+        ".claude/settings.json",
+        ".claude/skills/spec-dock/user-notes.md",
+        ".claude/skills/other-skill/SKILL.md",
     )
     for relative in protected[2:]:
         path = target / relative
@@ -614,7 +627,19 @@ def test_uninstall_preserves_workspace_specs_ignored_state_and_unknown_files(
         assert result["status"] == "planned" and data["retired_paths"] == []
         assert data["can_apply"] is True and tree_digest(target) == before and not backup.exists()
     else:
-        assert result["status"] == "succeeded" and len(data["retired_paths"]) == 84
+        assert result["status"] == "succeeded" and len(data["retired_paths"]) == 88
+        skills = [path for path in data["retired_paths"] if path.startswith((".agents/", ".claude/"))]
+        assert sorted(path.split("/", 2)[2] for path in skills) == sorted(
+            2
+            * [
+                "spec-dock-grill-with-docs/SKILL.md",
+                "spec-dock-grill-with-docs/agents/openai.yaml",
+                "spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+                "spec-dock/SKILL.md",
+            ]
+        )
+        assert {path.split("/", 1)[0] for path in skills} == {".agents", ".claude"}
+        assert (target / ".claude/skills/spec-dock-grill-with-docs/scripts").is_dir()
         assert "spec-dock/docs/README.md" in data["retired_paths"] and not owned.exists()
         assert (backup / "static/spec-dock/docs/README.md").read_bytes() == old_bytes
         assert not any((backup / "static" / relative).exists() for relative in protected)
@@ -712,7 +737,12 @@ def test_update_retains_the_backup_and_reports_uncertain_retirement_without_roll
 
 @pytest.mark.parametrize("leaf", ["update", "uninstall"])
 @pytest.mark.parametrize(
-    "relative", ["spec-dock/docs/README.md", "spec-dock/scripts/spec_dock_runtime/infra/control_store.py"]
+    "relative",
+    [
+        "spec-dock/docs/README.md",
+        ".claude/skills/spec-dock/SKILL.md",
+        "spec-dock/scripts/spec_dock_runtime/infra/control_store.py",
+    ],
 )
 def test_static_changes_refuse_unknown_current_or_retired_files_before_preservation(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], leaf: str, relative: str
@@ -736,7 +766,12 @@ def test_static_changes_refuse_unknown_current_or_retired_files_before_preservat
 
 @pytest.mark.parametrize("leaf", ["update", "uninstall"])
 @pytest.mark.parametrize(
-    "relative", ["spec-dock/docs/README.md", "spec-dock/scripts/spec_dock_runtime/infra/control_store.py"]
+    "relative",
+    [
+        "spec-dock/docs/README.md",
+        ".claude/skills/spec-dock/SKILL.md",
+        "spec-dock/scripts/spec_dock_runtime/infra/control_store.py",
+    ],
 )
 def test_static_changes_refuse_hardlinked_current_or_retired_files_without_touching_the_other_owner(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], leaf: str, relative: str
@@ -772,7 +807,12 @@ def test_static_changes_refuse_hardlinked_current_or_retired_files_without_touch
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX symbolic-link fixture")
 @pytest.mark.parametrize(
-    "relative", ["spec-dock/docs/README.md", "spec-dock/scripts/spec_dock_runtime/infra/control_store.py"]
+    "relative",
+    [
+        "spec-dock/docs/README.md",
+        ".claude/skills/spec-dock/SKILL.md",
+        "spec-dock/scripts/spec_dock_runtime/infra/control_store.py",
+    ],
 )
 def test_update_refuses_redirected_current_or_retired_files_as_a_precondition(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], relative: str
@@ -934,7 +974,7 @@ def test_static_changes_stop_if_the_observed_asset_is_replaced_with_same_bytes_d
             {"kind": "installation.change", "status": "not_attempted", "target": relative},
         ]
     else:
-        assert len(result["effects"]) == 85
+        assert len(result["effects"]) == 89
         assert all(
             effect["kind"] == "installation.retire" and effect["status"] == "not_attempted"
             for effect in result["effects"][1:]

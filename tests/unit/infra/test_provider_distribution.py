@@ -17,8 +17,20 @@ def test_provider_matches_fresh_consumer_managed_assets(installed_static_consume
     for provider, consumer in (
         ("src/spec_dock/assets/spec_dock/docs", "spec-dock/docs"),
         ("src/spec_dock/assets/install_root/.agents/skills", ".agents/skills"),
+        ("src/spec_dock/assets/install_root/.agents/skills", ".claude/skills"),
     ):
         assert _files(ROOT / provider) == _files(installed_static_consumer / consumer)
+
+
+def test_both_skill_projections_are_independent_unredirected_regular_files(installed_static_consumer: Path) -> None:
+    provider = _files(ROOT / "src/spec_dock/assets/install_root/.agents/skills")
+    assert len(provider) == 4
+    for projection in (".agents/skills", ".claude/skills"):
+        for relative in provider:
+            path = installed_static_consumer / projection / relative
+            chain = (path, *path.relative_to(installed_static_consumer).parents)
+            assert not any((installed_static_consumer / item).is_symlink() for item in chain), path
+            assert path.is_file() and path.stat().st_nlink == 1, path
 
 
 def test_provider_scripts_contain_only_the_static_entrypoint_assets() -> None:
