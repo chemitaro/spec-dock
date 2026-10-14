@@ -159,11 +159,12 @@
     {
       "path": "spec-dock/docs/authoring/overview.md",
       "source": "spec_dock/docs/authoring/overview.md",
-      "sha256": "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
+      "sha256": "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5"
+        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
+        "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392"
       ]
     },
     {

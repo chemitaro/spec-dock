@@ -38,10 +38,10 @@ Finishはbackendのcompletedを確認して、捕捉した直接記録だけを�
 
 - `src/spec_dock/` はproviderの開発sourceです。CLI実装は主に `src/spec_dock/runtime/`、配布する文書・template・skill・shimは `src/spec_dock/assets/` にあります。
 - 利用者が実行するのは、worktree外のtool環境へ通常packageとして導入した `spec-dock` です。sourceの編集やbranch切替だけでは、導入済みpackageは更新されません。package更新はその利用者のtool環境に対する更新で、consumerごとにPython runtimeをコピーする操作ではありません。
-- 各consumer worktreeに置く `spec-dock/docs`、`spec-dock/system`、`spec-dock/templates`、root `.agents/skills`、shim、workspace宣言は静的資産です。新しいconsumerはこれらを受け取りますが、Python runtimeは受け取りません。既存consumerの静的資産更新は、明示したworktree一つずつ行います。
+- 各consumer worktreeに置く `spec-dock/docs`、`spec-dock/system`、`spec-dock/templates`、root `.agents/skills` と `.claude/skills`、shim、workspace宣言は静的資産です。二つのskill rootには、同じprovider正本から同じbytesのcopyを置きます（Codexは `.agents/skills`、Claude Codeは `.claude/skills` を探索します）。installationが管理するのは各root内のSpecDock skill slotの既知fileだけで、`.claude/settings.json` などのhost設定や他のskillは変更しません。新しいconsumerはこれらを受け取りますが、Python runtimeは受け取りません。既存consumerの静的資産更新は、明示したworktree一つずつ行います。
 - `spec-dock/.agent/work-target/target-<32桁token>.json` は、そのworktreeだけのignoredな直接作業記録です。file tokenは記録実体を安全に捕捉するための識別子であり、GitHub番号から作るScope ID、UUID、operation IDではありません。
 
-このrepositoryの `spec-dock/` とroot `.agents/` はconsumer側の投影です。製品sourceや配布元を変更するときはprovider側を正本とし、consumer側はCLIによる明示更新と現物確認を別に行います。
+このrepositoryの `spec-dock/`、root `.agents/skills/` と `.claude/skills/` のSpecDock skillはconsumer側の投影です。製品sourceや配布元を変更するときはprovider側を正本とし、consumer側はCLIによる明示更新と現物確認を別に行います。
 
 ## 導入と更新
 
