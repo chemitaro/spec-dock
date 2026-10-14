@@ -29,6 +29,9 @@ ID: "iss-00418"
   - `.claude/skills` の4ファイルを作成した。
   - `.agents` 側の SKILL.md 2つと `spec-dock/docs/authoring/overview.md` を更新した。
   - ユーザーのインストール済みパッケージ、main checkout、他の linked worktree は変更していない。
+- CI 安定化（範囲外。2026-10-14 にユーザーの承認を得てこの PR に含めた）:
+  - PR #419 の最初の CI（run 38531598095）で、`test_ci_fixed_validation.py::test_ci_validator_stops_on_failed_wheel_build_without_touching_target` が失敗した。source fixture の commit 後に起動した Git の自動メンテナンス（`git maintenance run --auto --detach`）が repack を行い、テストの前後比較と競合したためである。
+  - `802fdcc6` と同じ方針で、`_source_checkout` の最初の commit より前に `maintenance.auto=false` を設定した。Trace2 で自動メンテナンスが起動しないことを確認する回帰テストを、Red → Green で追加した。
 
 ## Verification
 
