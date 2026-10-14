@@ -15,12 +15,12 @@ SpecDockはGitHub Issueに結び付いたInitiative・Epic・Issueの三階層�
 
 CLIはagent-firstで運用します。依頼または承認済み計画の範囲にある普通のlocal/Git/GitHub操作をagentが実行して結果を検証し、破壊的操作には正確な対象と明示的な削除等の許可を求めます。PR mergeは人間が行います。
 
-以下の番号は例です。実際には各作成結果から返されたIDと、存在するbaseを使います。
+以下は依頼または承認済み計画に沿った作成例です。`--json`は出力形式、`--yes`はCLI確認の省略であり、操作の認可や安全検査を置き換えません。番号は例なので、実際には各作成結果から返されたIDと、存在するbaseを使います。
 
 ```sh
-spec-dock scope create initiative --backend github --title "Platform" --json
-spec-dock scope create epic --backend github --parent init-00123 --title "Authentication" --json
-spec-dock scope create issue --backend github --parent epic-00124 --title "Refresh tokens" --json
+spec-dock scope create initiative --backend github --title "Platform" --yes --json
+spec-dock scope create epic --backend github --parent init-00123 --title "Authentication" --yes --json
+spec-dock scope create issue --backend github --parent epic-00124 --title "Refresh tokens" --yes --json
 spec-dock work start iss-00125 --base main --json
 spec-dock active show --json
 spec-dock workspace sync --source github --json

@@ -266,7 +266,12 @@ def completion_script(shell: str) -> str:
         children.setdefault(leaf, set()).update(
             name for argument in LEAF_ARGUMENTS[leaf] for name in argument.names if name.startswith("-")
         )
-        children[leaf].update((*_COMMON_SWITCHES, *_COMMON_VALUES, "--help"))
+        children[leaf].update(
+            name
+            for name in (*_COMMON_SWITCHES, *_COMMON_VALUES, "--help")
+            if (name not in {"--yes", "-y"} or leaf in MUTATING_LEAF_PATHS)
+            and (name != "--lock-timeout" or leaf == "work start")
+        )
     entries = [(key, " ".join(sorted(values))) for key, values in sorted(children.items())]
     common_values = "|".join(sorted(_COMMON_VALUES))
     paths = [path for path, _words in entries if path]
