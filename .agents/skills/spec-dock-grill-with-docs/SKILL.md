@@ -37,7 +37,7 @@ Complete this preflight twice: before external capability use and immediately be
 5. Require `artifacts/rules.md` to be a symlink that resolves to the matching Initiative, Epic, or Issue Artifact rules file inside `spec-dock/docs/rules/`.
 6. Require `spec-dock/templates/artifacts/<route>.md` to exist as a non-empty ordinary file whose resolved path remains inside the repository template tree.
 7. Read root and `artifact create --help` output and confirm the selector, route, title, and optional slug are accepted by the Current CLI.
-8. Require this skill's `agents/openai.yaml` and `scripts/finalize-artifact.py` to exist as non-empty ordinary files inside this skill directory.
+8. Resolve `<skill-dir>` as the absolute directory containing the `SKILL.md` the host loaded for this invocation, such as a project `.agents/skills/` or `.claude/skills/` projection. Require `<skill-dir>/scripts/finalize-artifact.py` to exist as a non-empty ordinary file inside it. Do not resolve the helper against the shell's current directory or substitute one from another skill root or `$HOME`; if `<skill-dir>` cannot be determined, stop. `agents/openai.yaml` is Codex invocation metadata, not a prerequisite for running this skill.
 9. Confirm both external capabilities are available and can obey this skill's read-only boundary.
 
 Do not create or repair directories, templates, rules links, active state, locks, or bootstrap files. The installed external Artifact CLI remains authoritative for collision, no-replace publication and final destination safety; it does not acquire a shared writer lock.
@@ -90,10 +90,10 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 
 5. Require exit 0, `schema_version=specdock.cli/v2`, `status=succeeded` and `data.kind=artifact`; read the exact repository-relative `data.result.artifact.path`. Require it to identify one new direct-child Markdown file under the selected Scope's `artifacts/` directory. Do not parse a text summary or invent a path. The helper accepts the canonical repository-relative form and its preserved compatibility prefix; new CLI results use the canonical form.
    If the CLI instead reports a partial or unknown publication, retain its exact returned path and effects for Partial Artifact recovery; do not finalize or repeat the creation automatically.
-6. Run the skill-local helper's read-only identity command with argument-vector execution:
+6. Run the skill-local helper's read-only identity command with argument-vector execution, using the `<skill-dir>` resolved by the preflight:
 
    ```text
-   python3 .agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py identity \
+   python3 <skill-dir>/scripts/finalize-artifact.py identity \
      --repo-root <absolute-repository-root> \
      --artifact <exact-returned-relative-path>
    ```
@@ -102,7 +102,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 7. Pass the already-finalized route sections through stdin to the helper's finalize command, with no shell interpolation:
 
    ```text
-   python3 .agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py finalize \
+   python3 <skill-dir>/scripts/finalize-artifact.py finalize \
      --repo-root <absolute-repository-root> \
      --artifact <exact-returned-relative-path> \
      --expected-device <device> \
@@ -114,7 +114,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 8. Verify that the persistent delta is exactly one new Markdown Artifact and that pre-existing Artifact entries and protected scope files are unchanged.
 9. Return the exact path, route, title, and evidence/draft authority to the operator.
 
-Protected files include canonical Requirement, Design, Plan, Report, ADR, `CONTEXT.md`, `.meta.json`, active and dependency state, generated projections, `.codex/config.toml`, and Git/GitHub state.
+Protected files include canonical Requirement, Design, Plan, Report, ADR, `CONTEXT.md`, `.meta.json`, active and dependency state, generated projections, agent host configuration (for example `.codex/config.toml` and `.claude/settings.json`), and Git/GitHub state.
 
 ## Zero-write
 
