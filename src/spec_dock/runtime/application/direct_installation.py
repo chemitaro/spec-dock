@@ -19,6 +19,7 @@ from spec_dock.runtime.infra.file_publication import (
     FileSnapshot,
     publish_file,
     read_regular_file,
+    verify_existing_parent,
 )
 from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import open_guarded_directory
@@ -87,20 +88,21 @@ def install_static_assets(namespace: argparse.Namespace, context: GitContext) ->
         observed: list[dict[str, object]] = []
         for asset in assets:
             path = context.root / asset.path
-            classification = "missing"
-            if os.path.lexists(path):
-                try:
-                    digest = hashlib.sha256(read_regular_file(path).payload).hexdigest()
-                except (OSError, ValueError):
-                    classification = "unsafe"
-                else:
-                    classification = (
-                        "current"
-                        if digest == asset.sha256
-                        else "known-old"
-                        if digest in asset.known_old_sha256
-                        else "unknown"
-                    )
+            try:
+                verify_existing_parent(path)
+                digest = hashlib.sha256(read_regular_file(path).payload).hexdigest() if os.path.lexists(path) else None
+            except (OSError, ValueError):
+                classification = "unsafe"
+            else:
+                classification = (
+                    "missing"
+                    if digest is None
+                    else "current"
+                    if digest == asset.sha256
+                    else "known-old"
+                    if digest in asset.known_old_sha256
+                    else "unknown"
+                )
             observed.append({"path": asset.path, "classification": classification})
         data["assets"] = tuple(observed)
         return OperationResult(namespace.command_path, "succeeded", FamilyData("installation", data), 0)

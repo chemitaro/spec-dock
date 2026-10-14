@@ -6,7 +6,10 @@ from pathlib import Path
 ASSETS = Path(str(files("spec_dock").joinpath("assets")))
 ROOTS = ("docs", "templates", "system", "scripts")
 SKILLS = ("spec-dock", "spec-dock-grill-with-docs")
-TOOL_DIRECTORIES = tuple(f"spec-dock/{name}" for name in ROOTS) + tuple(f".agents/skills/{name}" for name in SKILLS)
+SKILL_ROOTS = (".agents/skills", ".claude/skills")
+TOOL_DIRECTORIES = tuple(f"spec-dock/{name}" for name in ROOTS) + tuple(
+    f"{root}/{name}" for root in SKILL_ROOTS for name in SKILLS
+)
 VERSION_FILE = "spec-dock/spec-dock.version"
 IGNORE_FILE = "spec-dock/.gitignore"
 LEGACY_WORKBENCH_IGNORE = (

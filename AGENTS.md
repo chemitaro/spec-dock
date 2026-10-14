@@ -47,6 +47,7 @@ Accepted architecture and roadmap decisions are reflected in the current runtime
 - `src/spec_dock/assets/install_root/`: current provider-side authority for the two installed skills under `.agents/`.
   - `.agents/skills/spec-dock/SKILL.md`
   - `.agents/skills/spec-dock-grill-with-docs/SKILL.md`
+  - Installation projects the same bytes to `.agents/skills/<name>/` (Codex) and `.claude/skills/<name>/` (Claude Code), so consumers also receive `.claude/skills/spec-dock/SKILL.md` and `.claude/skills/spec-dock-grill-with-docs/SKILL.md`. There is no provider-side `.claude` copy; edit only the `.agents` source.
 - Legacy `src/spec_dock/assets/codex_skills/` tree was retired and removed from the current repo; use historical issue records under `spec-dock/initiatives/**` when legacy context is needed.
 - `src/spec_dock/assets/spec_dock/`: provider-side scaffold source of truth for files that are generated into managed repos.
 - `src/spec_dock/assets/spec_dock/scripts/spec-dock`: static repository shim; it does not import a checkout-local runtime.
@@ -87,7 +88,7 @@ Read it like this:
 
 - Change distribution behavior: start at `pyproject.toml`, `setup.py`, and `src/spec_dock/cli.py`; verify a fresh wheel and non-editable external environment.
 - Change static installation: start at `src/spec_dock/runtime/application/{direct_installation,direct_static_update}.py` and `src/spec_dock/runtime/infra/static_assets.py`.
-- Change the two installed skills: start at `src/spec_dock/assets/install_root/`.
+- Change the two installed skills: start at `src/spec_dock/assets/install_root/`, then update the matching `.agents/skills/...` and `.claude/skills/...` entries in `src/spec_dock/assets/static-inventory.json` together.
 - Treat `src/spec_dock/assets/install_root/` as the only current authority for the installed skills.
 - Change shipped docs/templates/system files: start at `src/spec_dock/assets/spec_dock/{docs,templates,system}/`.
 - Change runtime command entrypoints: start at `src/spec_dock/runtime/{cli,commands}/`.
