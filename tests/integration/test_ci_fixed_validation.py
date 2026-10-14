@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import shutil
 import stat
@@ -52,6 +53,8 @@ def _source_checkout(root: Path, *, broken_build: bool = False) -> str:
             encoding="utf-8",
         )
     subprocess.run(["git", "init", "-q", str(root)], check=True)
+    # Snapshot tests must not race Git's detached maintenance after fixture commits.
+    subprocess.run(["git", "-C", str(root), "config", "--local", "maintenance.auto", "false"], check=True)
     subprocess.run(["git", "-C", str(root), "add", "--all"], check=True)
     subprocess.run(
         [
@@ -71,6 +74,30 @@ def _source_checkout(root: Path, *, broken_build: bool = False) -> str:
     return subprocess.run(
         ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
     ).stdout.strip()
+
+
+def test_source_fixture_does_not_launch_automatic_git_maintenance(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    trace = (tmp_path / "git-trace.json").resolve()
+    monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", os.devnull)
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "0")
+    monkeypatch.setenv("GIT_TRACE2_EVENT", str(trace))
+    source = tmp_path / "source"
+    source.mkdir()
+
+    _source_checkout(source)
+
+    events = [json.loads(line) for line in trace.read_text(encoding="utf-8").splitlines()]
+    automatic_maintenance = [
+        event["argv"]
+        for event in events
+        if event.get("event") == "child_start"
+        and "--auto" in event["argv"]
+        and any(command in event["argv"] for command in ("maintenance", "gc"))
+    ]
+    assert automatic_maintenance == []
 
 
 def _target_checkout(root: Path, *, installed: bool = False) -> Path:

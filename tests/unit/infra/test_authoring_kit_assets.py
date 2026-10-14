@@ -52,6 +52,8 @@ S06_MANAGED_ASSET_PATHS = (*S06_CURRENT_ASSET_PATHS, S06_HISTORICAL_ASSET_PATH)
 RESERVED_SKILL_PATHS = (
     ".agents/skills/spec-dock/SKILL.md",
     ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
+    ".claude/skills/spec-dock/SKILL.md",
+    ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
 )
 
 CURRENT_ARTIFACT_TEMPLATES = (
@@ -717,6 +719,8 @@ def test_s90_retained_repository_guidelines_match_current_distribution_surface()
     assert "src/spec_dock/assets/install_root/" in content
     assert ".agents/skills/spec-dock/SKILL.md" in content
     assert ".agents/skills/spec-dock-grill-with-docs/SKILL.md" in content
+    assert ".claude/skills/spec-dock/SKILL.md" in content
+    assert ".claude/skills/spec-dock-grill-with-docs/SKILL.md" in content
 
 
 @pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))

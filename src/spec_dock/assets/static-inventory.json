@@ -4,12 +4,13 @@
     {
       "path": ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
-      "sha256": "2dbe53d0d26f35c13ce2f027eeb4ace16a9bb95b894aeabea75cd234b92d9e37",
+      "sha256": "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "9cb0fcccfb95efe0b277544ca276cee1b0015150b4189470d89ac4a1297d5c18",
-        "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51"
+        "b72d3fdca2442afeb6707ef2b4862ecc4a0735d276e42d6e1526a76fda127e51",
+        "2dbe53d0d26f35c13ce2f027eeb4ace16a9bb95b894aeabea75cd234b92d9e37"
       ]
     },
     {
@@ -31,14 +32,47 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
+      "sha256": "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "965e25292fc69eff96ee06932f3a4026b6318ce13bd72bc4e82a266d835076e3",
         "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538",
-        "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c"
+        "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c",
+        "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e"
       ]
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
+      "sha256": "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": ".claude/skills/spec-dock/SKILL.md",
+      "source": "install_root/.agents/skills/spec-dock/SKILL.md",
+      "sha256": "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
     },
     {
       "path": "spec-dock/.gitignore",
@@ -125,11 +159,12 @@
     {
       "path": "spec-dock/docs/authoring/overview.md",
       "source": "spec_dock/docs/authoring/overview.md",
-      "sha256": "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
+      "sha256": "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5"
+        "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
+        "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392"
       ]
     },
     {
