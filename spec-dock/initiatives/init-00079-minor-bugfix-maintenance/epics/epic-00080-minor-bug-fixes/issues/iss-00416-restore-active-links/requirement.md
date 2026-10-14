@@ -4,7 +4,7 @@ ID: "iss-00416"
 タイトル: "Restore Active Scope Links For Human Navigation"
 関連GitHub: ["#416"]
 状態: "draft"
-最終更新: "2026-10-13"
+最終更新: "2026-10-14"
 親: ["epic-00080", "init-00079"]
 ---
 
@@ -71,8 +71,9 @@ ID: "iss-00416"
 - `spec-dock/active` 自体がシンボリックリンクまたはディレクトリ以外の場合は、何も書かず、何も削除せずに報告する。
 - `spec-dock/active/` 配下が Git に無視されない場合（`.gitignore` の改変など）や、配下に Git で追跡されたファイルがある場合は、worktree を dirty にしないため、何も書かず、何も削除せずに報告する。
 - 検査の後で `spec-dock/active` が別の場所への symlink に差し替えられても、書込・削除は検査したディレクトリの中だけで行い、外部に及ばない。
-- 同じ clone で `work start` が実行中（Start lock 保持中）の場合、リンクの書込・削除は行わず報告する。選択コマンドは Start lock を待たない。変更が不要なときは Start lock に触れない。
+- 同じ clone で Start lock が保持されている間（`work start` または `branch switch` の実行中、RQ-416-07）は、リンクの書込・削除を行わずに報告する。選択コマンドは Start lock を待たない。変更が不要なときは Start lock に触れない。
 - 役割名の確認後に別の writer が実体を置いた場合も、その実体を置換・削除しない。
+- 次の操作と同時に実行した場合は、この保全の対象外とする（Q5）: SpecDock を経由しない操作（ターミナルでの直接の `git checkout` / `git switch`、直接記録の手作業での複製など）、および別の clone からの操作。
 
 <a id="rq-416-06"></a>
 ### RQ-416-06 案内文書の整合
@@ -80,6 +81,16 @@ ID: "iss-00416"
 - `system/README.md` と `system/active-none/README.md` の provider 資産は、リンクを「現在の選択の閲覧用派生物」と説明し、正本は `active show --json` と直接記録であることを維持する。
 - `active set` の catalog 説明と installed skill `spec-dock` は、同じ直接対象でリンクを修復することと、リンクが正本ではないことを含める。
 - 使われていない旧テキスト renderer（`presentation/cli_text.py` の `render_active_show_text` と、それに付随する `active set <target>` の旧案内）を除去するか、現行契約に揃える。
+
+<a id="rq-416-07"></a>
+### RQ-416-07 作業ツリーを書き換える SpecDock 操作の排他（Q5）
+
+- 同じ Issue・ノードを複数の worktree で選択しない排他は、SpecDock 自身が行う（Git には頼らない）。直接選択を書き込む唯一の操作である `work start` は、Start lock の中で同じ clone の全 worktree の直接記録を観測し、同じ Scope ID または同じ GitHub Issue を選んでいる worktree があれば `SCOPE_ALREADY_SELECTED` で止める。ブランチ名は比較に使わない。この挙動を維持する。
+- 同じブランチを複数の worktree で checkout しない排他は Git の機能に任せる。SpecDock の `BRANCH_IN_USE` などの事前確認は補助とする。
+- 作業ツリーのファイルを書き換える SpecDock の操作（`work start` の checkout、`branch switch` の checkout）と、リンクの書込・削除は、同じ clone の Start lock で互いに排他する。
+- `branch switch` は、checkout を行う前に Start lock を取り、checkout とその後の確認が終わるまで保持する。取得待ちは `work start` と同じ `--lock-timeout`（既定5秒、0〜300秒）で指定できる。待ち時間内に取れなければ、checkout せず `START_LOCK_BUSY`（exit 3）で止まる。
+- `branch switch --dry-run`、`branch show`、`branch create` は Start lock を取らない（作業ツリーを書き換えないため）。
+- Start lock は、Git の共通ディレクトリを読み取り専用で開き、OS の advisory lock（`flock`）をかけるだけとする。Git の設定・ref・index・ファイルを作成・変更しない。プロセスが終了すれば OS が解放し、残骸を残さない。
 
 ## スコープ
 
@@ -92,8 +103,10 @@ ID: "iss-00416"
 対象外:
 
 - 旧 `*.path`、`context-pack.md`、`current-runbook.*` の生成の復活と削除。
-- 選択モデル（1 worktree に直接対象1件、Start だけの排他、台帳・cache・journal・自動 rollback なし）の変更。
+- 選択モデル（1 worktree に直接対象1件、台帳・cache・journal・自動 rollback なし）の変更。Start lock の適用範囲だけは、RQ-416-07 のとおり `branch switch` に広げる（Q5）。
 - `branch switch` に追従したリンク更新（`branch switch` は直接記録を変えないため）。
+- 別の clone 間で同じ Issue を選択することの排他（同じ clone の worktree 間だけを対象とする。必要なら GitHub 上の宣言などを別 Issue で扱う）。
+- SpecDock を経由しない Git 操作との排他。
 - Windows 対応（Issue 413 で Linux/macOS に限定済み）。
 - 旧 writer（`writer_protocol` が旧版の worktree）の挙動。
 
@@ -102,6 +115,7 @@ ID: "iss-00416"
 - 直接記録の publish / 削除自体が失敗・unknown の場合: リンクは更新しない（`not_attempted`）。
 - `spec-dock/system/active-none/<role>` が存在しない場合: その役割のリンクは作らず報告する。
 - 対象の Scope ディレクトリが後から削除・移動された、または branch 切替で存在しなくなった場合: リンクは dangling になり得る。次に選択を変える操作、または `active set @current` で作り直される（Q3）。
+- `branch switch` が待ち時間内に Start lock を取れない場合: checkout せず、作業ツリーと直接記録を変えずに `START_LOCK_BUSY`（exit 3）で止まる。
 - 同じ worktree で `active clear` と `work start` が同時に走った場合: リンクが最終的な直接記録とずれることがある。リンクは正本ではないため、修復は次の選択操作で行う。
 - `spec-dock/active/` は `spec-dock/.gitignore` の `active/` で無視されている。worktree の clean 判定に影響しない。
 - 旧 writer がまだ動く worktree（`writer_protocol` が旧版）では、新 writer は動かない（`require_writer`）。旧 writer が再び旧生成物を書くことは本 Issue の対象外。
@@ -116,16 +130,18 @@ ID: "iss-00416"
 - **AC-416-06** — リンク更新の失敗は、成功した選択の変更を取り消さず、出力に残る。
 - **AC-416-07** — `active show` などの読み取りコマンドはリンクを書かず、リンクの有無・内容で結果が変わらない。
 - **AC-416-08** — `make lint`、`uv run pytest`、fresh wheel の外部 console で上記を確認できる。
+- **AC-416-09** — 別の process が同じ clone の Start lock を保持している間、`branch switch` は checkout せず `START_LOCK_BUSY`（exit 3）で止まり、branch・作業ツリー・直接記録が変わらない。lock が空いていれば従来どおり checkout する。`--lock-timeout` を `branch switch` に指定でき、`work start` と `branch switch` 以外への指定は exit 2 で拒否される。Start lock の取得・解放で、`.git` 配下にファイルが作られず、Git の設定も変わらない。
 
 ## 制約・前提
 
-- Issue 413 の確定事項（直接記録が唯一の正本、Start だけの短い排他、台帳・cache・永続 journal・自動 rollback・daemon を追加しない）を守る。
+- Issue 413 の確定事項（直接記録が唯一の正本、短い排他、台帳・cache・永続 journal・自動 rollback・daemon を追加しない）を守る。「排他は Start だけ」は Q5 で「作業ツリーを書き換える SpecDock 操作（Start、`branch switch`）とリンク同期」に広げる。
+- SpecDock の利用で Git の設定・環境を書き換えない（Git に lock ファイル等を作らない）。
 - 祖先は直接記録と Scope metadata から必要時に導出する（`worktree_observation.ancestors_for`）。
 - 旧実装（`git show 1510e37b^:src/spec_dock/runtime/infra/active_store.py`）の multifile transaction や snapshot/restore は戻さない。
 - CLI の 44 leaf 契約は変えない。
 - AC-413-36（旧 `active/` の保全）は維持する。本 Issue が書き換えるのは、役割名の symlink（旧 writer が作ったものを含む）だけである。
 
-## 利用者決定（2026-10-13）
+## 利用者決定（2026-10-13、Q5 は 2026-10-14）
 
 | ID | 論点 | 決定 |
 |---|---|---|
@@ -133,3 +149,4 @@ ID: "iss-00416"
 | Q2 | 未選択時の placeholder | `system/active-none/<role>` を指すリンクを復活する（旧挙動と同じ）。 |
 | Q3 | 古い・欠けたリンクの修復手段 | 新しい leaf は追加せず、`active set @current`（同じ直接対象）でリンクだけを修復する。 |
 | Q4 | 旧 consumer に残る旧 writer の生成物 | 既知の旧生成物（6件）も含め、3つのリンク名以外は読まず、変更も削除もしない。README で旧 writer の古い生成物と案内する（2026-10-13 に「削除する」から変更。FQG-416-007：並行の `branch switch` が置いた追跡ファイルを名前と種類だけでは区別できず、削除すると保全条件に反するため）。 |
+| Q5 | 同じノードの排他と、リンク同期・checkout の競合（FQG-416-008） | 同じブランチの排他は Git に任せ、同じ Issue・ノードの排他は SpecDock が行う。`branch switch` も Start lock を取り、作業ツリーを書き換える SpecDock 操作とリンク同期を同じ lock で排他する。lock は `.git` への `flock` だけで Git には書かない。`.git` 内の lock ファイル（`index.lock` など）は使わない。SpecDock を経由しない Git 操作と別 clone は契約の範囲外とする。 |

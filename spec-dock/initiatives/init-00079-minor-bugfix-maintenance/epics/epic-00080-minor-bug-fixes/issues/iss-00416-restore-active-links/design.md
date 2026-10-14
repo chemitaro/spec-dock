@@ -4,7 +4,7 @@ ID: "iss-00416"
 タイトル: "Restore Active Scope Links For Human Navigation"
 関連GitHub: ["#416"]
 状態: "draft"
-最終更新: "2026-10-13"
+最終更新: "2026-10-14"
 依存: ["requirement.md"]
 親: ["epic-00080", "init-00079"]
 ---
@@ -30,6 +30,8 @@ ID: "iss-00416"
 | `active show` などの読み取り | 書込なし | 変更なし（リンクを読まず、書かない） |
 | 旧 `active/` の旧生成物（`context-pack.md` 等6件） | 触れない | 触れない（Q4） |
 | 旧 `active/` の未知ファイル | 触れない | 触れない |
+| `branch switch`（checkout） | Start lock を取らない | Start lock を取ってから checkout し、確認まで保持する（Q5） |
+| `--lock-timeout` | `work start` だけ | `work start` と `branch switch` |
 | `cli_text.render_active_show_text` | 未使用。旧 fallback と `active set <target>` を案内 | 未使用の旧 renderer（`render_active_show_text` / `ActiveViewResult` 系）を除去 |
 
 ## 責務・Interface
@@ -85,7 +87,31 @@ def sync_active_links(
 
 ### Start lock との排他（application）
 
-`sync_selection_links` はまず lock なしで dry-run 相当の観測を行う。書込・削除が必要なときだけ、clone の Start lock を `timeout=0` で試し、保持している間に観測し直して書く。lock が使用中なら全役割 `ACTIVE_LINK_NOT_UPDATED(start_in_progress)` を返す。これで Start の checkout が検査と変更の間に入らない（FQG-416-006）。選択コマンドは Start lock を待たず（Issue 413）、変化の無い `active set` は Start lock に触れない（`test_active_set_existing_direct_resolves_exact_selectors_without_acquisition_or_remote_calls`）。`work start` のリンク同期は Start lock を解放した後にこの経路で行う。lock を取らない並行の Git 操作（`branch switch`、手動 checkout）とは排他しないため、上記 5 の退避確認で実体を保全する。
+`sync_selection_links` はまず lock なしで dry-run 相当の観測を行う。書込・削除が必要なときだけ、clone の Start lock を `timeout=0` で試し、保持している間に観測し直して書く。lock が使用中なら全役割 `ACTIVE_LINK_NOT_UPDATED(start_in_progress)` を返す。これで Start の checkout が検査と変更の間に入らない（FQG-416-006）。選択コマンドは Start lock を待たず（Issue 413）、変化の無い `active set` は Start lock に触れない（`test_active_set_existing_direct_resolves_exact_selectors_without_acquisition_or_remote_calls`）。`work start` のリンク同期は Start lock を解放した後にこの経路で行う。`branch switch` も Start lock を取るため（下記、Q5）、SpecDock の checkout とは排他される。SpecDock を経由しない Git 操作（手動 checkout）とは排他しない。上記 5 の退避確認は残すが、その競合での保全は契約の範囲外とする（RQ-416-05）。
+
+### 作業ツリーを書き換える SpecDock 操作の排他（Q5、FQG-416-008）
+
+排他の分担:
+
+| 守るもの | 担当 | 仕組み |
+|---|---|---|
+| 同じブランチを複数 worktree で checkout しない | Git | Git の checkout 拒否。SpecDock の `BRANCH_IN_USE` と `branch switch` の事前確認は補助 |
+| 同じ Issue・ノードを複数 worktree で選択しない | SpecDock | `work start` が Start lock の中で全 worktree の直接記録を観測し（`start_plan.check_inventory`）、Scope ID と GitHub Issue 番号で比較して `SCOPE_ALREADY_SELECTED`。直接記録の publish は `work_start` の1か所だけ（変更なし） |
+| checkout とリンク同期の競合 | SpecDock | 作業ツリーを書き換える SpecDock 操作とリンク同期を Start lock で排他（本節で `branch switch` を追加） |
+
+`application/branch_operations.py` の `branch switch`（`--dry-run` 以外）:
+
+1. lock の外: target・branch 名・tip・候補の読み取り、clean 確認、`capture_local_inputs` は従来どおり。
+2. `StartLock(context.common_dir, timeout=namespace.lock_timeout)` を取る。取れたら `lock.identity == context.clone_identity` を確かめる（異なれば `PRECONDITION_FAILED`）。
+3. lock の中で、他の worktree の branch 占有と clean 状態を観測し直し、以降の既存処理（fresh context、入力と選択の再確認、`unchanged` 判定、`git checkout`、checkout 後の確認、失敗時の再観測）をすべて行う。
+4. lock を解放してから結果を返す。
+5. `StartLockBusy` は checkout の前に起きるので、`Diagnostic("START_LOCK_BUSY", ...)`、exit 3、effects 空の `failed` を返す（`work start` と同じ code / exit）。
+
+`cli/options.py`: `--lock-timeout` の適用先を `{"work start", "branch switch"}` にし、それ以外は exit 2（`--lock-timeout applies only to work start and branch switch`）。既定5秒、範囲 0〜300秒は共通。
+
+`branch create` は ref だけを作り作業ツリーを書き換えないので、lock を取らない。`branch show` と `branch switch --dry-run` も取らない。
+
+Start lock の実装（`infra/start_lock.py`）は変えない。`.git` を読み取り専用で開いて `flock` するだけで、`.git` に何も書かない（既存 `tests/integration/test_issue413_native_lock.py` が確認）。`.git` 内の lock ファイル、`index.lock`、Git 設定の変更、SpecDock 専用の lock ファイル（`~/.cache` 等）は採用しない。
 
 ### 呼び出し（application）
 
@@ -142,6 +168,7 @@ Q1 推奨案:
 | リンク先の観測で権限エラーなど | その役割 warning（例外として上へ伝えない） |
 | 想定外の OSError | application 層で全役割 warning に変換し、選択の結果は変えない |
 | 選択効果が失敗・unknown | リンク処理なし |
+| `branch switch` が Start lock を取れない | checkout せず `START_LOCK_BUSY`（exit 3）、effects 空 |
 
 永続的な状態は追加しない。リンク自体が唯一の結果であり、次の選択操作で上書きされる。
 
@@ -153,7 +180,9 @@ Q1 推奨案:
 - `src/spec_dock/runtime/infra/active_links.py`（新規）
 - `src/spec_dock/runtime/application/active_links.py`（新規）
 - `src/spec_dock/runtime/application/{work_start,direct_active,direct_finish}.py`（呼び出し追加）
-- `src/spec_dock/runtime/cli/catalog.py`（`active set` の説明、Q3）
+- `src/spec_dock/runtime/cli/catalog.py`（`active set` の説明、Q3。`branch switch` の説明に Start lock、Q5）
+- `src/spec_dock/runtime/application/branch_operations.py`、`src/spec_dock/runtime/cli/options.py`（`branch switch` の Start lock と `--lock-timeout`、Q5）
+- `src/spec_dock/assets/spec_dock/docs/{reference_cli.md,cli-redesign-guide.html}`、installed skill `spec-dock` の `SKILL.md`（`branch switch` と Start lock の説明、Q5）と `static-inventory.json` の hash
 - `src/spec_dock/runtime/presentation/cli_text.py`、`application/contracts.py`（未使用の旧 active renderer / 型の除去）
 - `src/spec_dock/assets/spec_dock/system/{README.md,active-none/README.md}` と `static-inventory.json` の hash
 - `src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md`（`active set` が同じ直接対象でリンクを修復すること、Start / Clear / Finish が閲覧用リンクを同期し、リンクは正本ではないこと）
@@ -161,7 +190,7 @@ Q1 推奨案:
 
 変更しない:
 
-- `WorkTargetStore`、Start lock、直接記録の schema
+- `WorkTargetStore`、Start lock の実装（`infra/start_lock.py`）、直接記録の schema
 - `spec-dock/.gitignore`（`active/` は無視済み）
 - `active show`、`scope *`、`workspace *` の読み取り経路
 - 旧 writer と legacy reader
@@ -179,9 +208,12 @@ Q1 推奨案:
 - infra: tmp dir で 作成 / 一致 unchanged / 置換 / 実体 occupied / `active` が symlink / target_missing / dry-run 無書込 / 置換中 OSError で一時リンクが残らない / 検査後の root 差し替えで外部に書かない / 役割名に並行配置された実体を保全 / 未知名・旧生成物は不変。
 - cli_runtime: `work start`（Issue・Epic 直接）、`active clear`、`work finish`、dry-run、`active show` 無書込、旧ファイル保全、Q3 の修復、warning 時の exit 0。
 - fresh wheel: 外部 console で `work start` → `ls -l spec-dock/active` → `active clear` を確認。
+- Q5: 別 process が Start lock を保持中の `branch switch` が `START_LOCK_BUSY`（exit 3）で checkout しないこと、`--lock-timeout` の受理・拒否、lock が空いていれば従来どおり checkout すること（`tests/cli_runtime/test_issue416_active_links.py` と option テスト）。fresh wheel でも lock 保持中の `branch switch` を確認する。
 
 ## risk
 
 - Start の後段に書込が増える: lock の外で行い、Start の排他時間を延ばさない。
 - 同じ worktree での並行操作によるリンクのずれ: 正本ではないことを README と RQ-416-03 で明示し、Q3 の修復手段で回復する。
+- `branch switch` が他 worktree の Start を待つ: lock の保持は checkout と記録公開の間だけなので通常は待たない。待ちの上限は `--lock-timeout`。
+- Issue 413 の「排他は Start だけ」の拡張: 利用者決定 Q5 として requirement と report に記録する。
 - Issue 413 D-01「第二の閲覧状態を増やさない」との関係: リンクは状態として読まれないため、選択状態は増えない。この Issue で D-01 の閲覧側の判断を上書きすることを report に記録する。
