@@ -31,7 +31,7 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "72f0ad5e1ab77a61090c8dca63cdd0256e96a01a0de9dc1ee5acaf6acd5a4525",
+      "sha256": "5a2fa18146b09729e12407ce3c846394806c28ca63846a1cfbdaf5cb791f3520",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -160,7 +160,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "9c97161718b5c0d94fe1ac8699589c43ef39180efc808d9fd167be418468c26e",
+      "sha256": "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -253,7 +253,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "0d43f116527e5c7303d74bbea7cedff9bd49595d778c522d350faae6c28f89bf",
+      "sha256": "cf5446ce3e07af629d2eeec028487b913b4467eaa8963d4e10d93d5622a7e961",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [

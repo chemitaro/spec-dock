@@ -17,7 +17,7 @@
 </head>
 <body>
 <a class="skip" href="#overview">本文へ移動</a>
-<header class="hero"><div class="eyebrow">SPECDOCK / EXTERNAL CLI / DIRECT WORK TARGET</div><h1>仕様を共有し、<br>現在の作業を各worktreeで記録します。</h1><p class="lead">実行プログラムはworktree外へ導入し、GitHub番号と既存仕様を正本にします。同じcloneの並行作業は必要時に観測し、Startだけ短い排他で重複を防ぎます。</p><div class="badges"><span class="badge">外部CLI・直接対象方式</span><span class="badge">三階層・GitHub番号</span><span class="badge">単独HTML・外部依存なし</span></div><p class="meta">配布ガイド改定: 2026-10-02 / Issue #413</p></header>
+<header class="hero"><div class="eyebrow">SPECDOCK / EXTERNAL CLI / DIRECT WORK TARGET</div><h1>仕様を共有し、<br>現在の作業を各worktreeで記録します。</h1><p class="lead">実行プログラムはworktree外へ導入し、GitHub番号と既存仕様を正本にします。同じcloneの並行作業は必要時に観測し、Startとbranch switchだけ短い排他で重複と競合を防ぎます。</p><div class="badges"><span class="badge">外部CLI・直接対象方式</span><span class="badge">三階層・GitHub番号</span><span class="badge">単独HTML・外部依存なし</span></div><p class="meta">配布ガイド改定: 2026-10-02 / Issue #413</p></header>
 <div class="layout"><nav class="sidebar" aria-label="目次"><p>CONTENTS</p><a href="#overview"><span>01</span>まず理解すること</a>
 <a href="#engine"><span>02</span>実行プログラムとGitの役割</a>
 <a href="#storage"><span>03</span>何をどこへ置くか</a>
@@ -80,7 +80,7 @@
 <p>Artifact所有者の<code>@root</code>はrepository rootのArtifactに限ります。Scope作成、Start、依存対象に流用しません。Artifact create/importの保存先はJSONの<code>data.result.artifact.path</code>を使い、pathを組み立て直しません。</p>
 </section>
 <section id="lifecycle" aria-labelledby="lifecycle-title"><div class="section-label">06</div><h2 id="lifecycle-title">Start・Finish・clearの違い</h2><ol class="steps"><li><strong>Startの事前確認</strong><p>対象と依存のlive readinessを確認します。GitHub照会は短い排他の外で行います。</p></li><li><strong>短い排他の中で開始を確定</strong><p>同cloneの予約を再観測し、重複を確認してbranch作成/checkout、直接記録の公開まで行います。</p></li><li><strong>作業中の通常操作</strong><p>文書編集、Artifact、Sync、Finishに共通Start lockや編集権限制度は設けません。</p></li><li><strong>FinishでIssueを完了</strong><p>GitHub完了を確認して、捕捉した直接記録だけを解除します。branchに留まり、後から始まった別対象を消しません。</p></li></ol>
-<div class="note"><p>Gitは同じbranchの同時checkoutを防ぎます。それだけでは、別branchで同じIssueを同時Startする競合を防げません。短いStart排他は重複確認と取得の間の競合だけを防ぎます。通常のfile編集をロックする機能ではありません。</p></div>
+<div class="note"><p>Gitは同じbranchの同時checkoutを防ぎます。それだけでは、別branchで同じIssueを同時Startする競合を防げません。短いStart排他は重複確認と取得の間の競合だけを防ぎます。同じIssueの重複はbranch名ではなくScope IDとGitHub番号で判定します。<code>branch switch</code>も同じ排他の中でcheckoutし、閲覧用active linkの書込みと重ならないようにします。排他はGit共通dirへのOS flockだけで、Gitへ書込みません。SpecDockを経由しないGit操作と別cloneは対象外です。通常のfile編集をロックする機能ではありません。</p></div>
 <p>新しいbranchのStartには<code>--base REF</code>が必要です。既存branchを再利用する場合は<code>--branch NAME</code>を明示し、baseを渡しません。既存refをresetせず、同じ妥当な対象/branchへのStartはunchangedです。</p>
 <p><code>active set</code>は現在の妥当な直接対象と同じ場合だけ選択をunchangedのまま保ち、ずれた閲覧用<code>spec-dock/active/{initiative,epic,issue}</code> linkだけを揃えます。空・別対象への取得は<code>WORK_START_REQUIRED</code>で停止します。親への暗黙昇格やfocusの第二状態は作りません。linkは選択の正本ではありません。</p>
 <p><code>active clear</code>はselectionだけを解除し、Issueを閉じたりbranchを変更したりしません。<code>scope close</code>はbackend状態だけを変えます。Finishは作業完了なので、未完了作業を引き継ぐために使いません。今回、work releaseという新コマンドは追加しません。</p>
@@ -144,7 +144,7 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 <tr><td>C17</td><td><code>work finish</code></td><td><code>TARGET</code></td><td>完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。</td><td>GitHub完了、selection、active link</td></tr>
 <tr><td>C18</td><td><code>branch show</code></td><td><code>TARGET [--name NAME]</code></td><td>現在のref/占有を観測します。対応台帳は保存しません。</td><td>読取りのみ</td></tr>
 <tr><td>C19</td><td><code>branch create</code></td><td><code>TARGET [--name NAME] --base REF</code></td><td>固定baseからbranchを作り、checkoutしません。既存refをresetしません。</td><td>Git ref</td></tr>
-<tr><td>C20</td><td><code>branch switch</code></td><td><code>TARGET [--name NAME]</code></td><td>branchへcheckoutし、selection取得/解除は行いません。</td><td>Gitのみ</td></tr>
+<tr><td>C20</td><td><code>branch switch</code></td><td><code>TARGET [--name NAME]</code></td><td>同cloneのStart lock内でbranchへcheckoutし、selection取得/解除は行いません。lockを--lock-timeout内に取れなければSTART_LOCK_BUSYで止まります。</td><td>Gitのみ</td></tr>
 <tr><td>C21</td><td><code>dependency list</code></td><td><code>TARGET [--view {declared,effective}]</code></td><td>宣言/継承依存を表示します。</td><td>読取りのみ</td></tr>
 <tr><td>C22</td><td><code>dependency check</code></td><td><code>TARGET [--source {local,github}]</code></td><td>readinessと根拠を観測します。既定local、未観測GitHubはunknownです。</td><td>読取りのみ</td></tr>
 <tr><td>C23</td><td><code>dependency add</code></td><td><code>--from TARGET --to TARGET</code></td><td>fromがtoを前提とするedgeを追加します。重複はunchangedです。</td><td>metadata</td></tr>

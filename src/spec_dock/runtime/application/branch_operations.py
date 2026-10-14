@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -19,6 +20,7 @@ from spec_dock.runtime.domain.git_ref import parse_commit_oid
 from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 from spec_dock.runtime.infra.json_store import read_guarded_json
+from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
 from spec_dock.runtime.infra.work_target_store import StoredSelection, WorkTargetStore
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, EffectStatus, OperationResult, ResultStatus
 
@@ -171,85 +173,100 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
         if tip is None:
             raise LookupError("requested branch ref is missing")
         candidate = read_candidate(context, tip, target, views, timeout=namespace.timeout, proposed_token=None)
-        for entry in worktree_list(context.root, timeout=namespace.timeout):
-            if entry.branch == name and physical_identity(entry.path) != context.worktree_identity:
-                raise ValueError("requested branch is checked out in another worktree")
-        if run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
-            raise ValueError("branch switch requires a clean worktree")
+        _check_switch_target(context, name, timeout=namespace.timeout)
         source_inputs = capture_local_inputs(context, views)
         if namespace.dry_run:
             status = "planned"
             effects = (Effect("git.checkout", "planned", name),)
         else:
-            current_context = _fresh_context(context, namespace.timeout)
-            verify_local_inputs(context, source_inputs)
-            assert source_selection is not None
-            _verify_selection(context, source_selection)
-            if current_context.branch == name and current_context.head == tip:
-                verify_candidate(current_context, candidate)
-                if run_git(current_context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
-                    raise ValueError("branch switch requires a clean worktree")
+            with ExitStack() as held:
+                try:
+                    lock = held.enter_context(StartLock(context.common_dir, timeout=namespace.lock_timeout))
+                except StartLockBusy as error:
+                    return OperationResult(
+                        namespace.command_path,
+                        "failed",
+                        _data(target.id, name, tip, created=False, switched=False),
+                        3,
+                        error=Diagnostic("START_LOCK_BUSY", str(error), {}),
+                    )
+                # The checkout and its verification run under the Start lock, so no SpecDock
+                # link write or Start checkout can interleave with them.
+                lock.verify()
+                if lock.identity != context.clone_identity:
+                    raise ValueError("Git project physical identity changed")
+                _check_switch_target(context, name, timeout=namespace.timeout)
+                current_context = _fresh_context(context, namespace.timeout)
+                verify_local_inputs(context, source_inputs)
+                assert source_selection is not None
                 _verify_selection(context, source_selection)
-                return OperationResult(
-                    namespace.command_path,
-                    "unchanged",
-                    _data(target.id, name, tip, created=False, switched=False),
-                    0,
-                    effects=(Effect("git.checkout", "unchanged", name),),
-                )
-            try:
-                run_git(context.root, "checkout", name, timeout=namespace.timeout, mutation=True)
-                effects = (Effect("git.checkout", "succeeded", name),)
-                after = _fresh_context(context, namespace.timeout)
-                if after.branch != name or after.head != tip:
-                    raise ValueError("checkout differs from the fixed branch snapshot")
-                verify_candidate(after, candidate)
-                if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
-                    raise ValueError("checkout left a dirty worktree")
-                _verify_selection(after, source_selection)
-                switched = True
-            except (OSError, ValueError, RuntimeError) as error:
-                verification_error: str | None = None
-                if isinstance(error, GitProcessError) and not effects:
-                    effect_status: EffectStatus = "unknown"
-                    try:
-                        after = resolve_context(str(context.root), context.root, timeout=namespace.timeout)
-                        if (
-                            after.clone_identity != context.clone_identity
-                            or after.worktree_identity != context.worktree_identity
-                        ):
-                            raise ValueError("Git project identity changed")
-                        if after.branch == name and after.head == tip:
-                            effect_status = "succeeded"
-                            verify_candidate(after, candidate)
-                            if run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
-                                raise ValueError("checkout left a dirty worktree")
-                            _verify_selection(after, source_selection)
-                            switched = True
-                        elif after.branch == context.branch and after.head == context.head and not error.uncertain:
-                            verify_local_inputs(after, source_inputs)
-                            _verify_selection(after, source_selection)
-                            if not run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
-                                effect_status = "failed"
-                    except (OSError, ValueError, RuntimeError) as validation_error:
-                        verification_error = str(validation_error)
-                    effects = (Effect("git.checkout", effect_status, name),)
-                partial = any(effect.status in ("succeeded", "unknown") for effect in effects)
-                return OperationResult(
-                    namespace.command_path,
-                    "partial" if partial else "failed",
-                    _data(target.id, name, tip, created=False, switched=switched),
-                    6 if partial else 5,
-                    effects=effects,
-                    error=Diagnostic(
-                        "GIT_FAILED" if isinstance(error, GitProcessError) else "CHECKOUT_VERIFICATION_FAILED",
-                        str(error),
-                        {
-                            **(error.details() if isinstance(error, GitProcessError) else {}),
-                            **({"verification_error": verification_error} if verification_error is not None else {}),
-                        },
-                    ),
-                )
+                if current_context.branch == name and current_context.head == tip:
+                    verify_candidate(current_context, candidate)
+                    if run_git(current_context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                        raise ValueError("branch switch requires a clean worktree")
+                    _verify_selection(context, source_selection)
+                    return OperationResult(
+                        namespace.command_path,
+                        "unchanged",
+                        _data(target.id, name, tip, created=False, switched=False),
+                        0,
+                        effects=(Effect("git.checkout", "unchanged", name),),
+                    )
+                try:
+                    run_git(context.root, "checkout", name, timeout=namespace.timeout, mutation=True)
+                    effects = (Effect("git.checkout", "succeeded", name),)
+                    after = _fresh_context(context, namespace.timeout)
+                    if after.branch != name or after.head != tip:
+                        raise ValueError("checkout differs from the fixed branch snapshot")
+                    verify_candidate(after, candidate)
+                    if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                        raise ValueError("checkout left a dirty worktree")
+                    _verify_selection(after, source_selection)
+                    switched = True
+                except (OSError, ValueError, RuntimeError) as error:
+                    verification_error: str | None = None
+                    if isinstance(error, GitProcessError) and not effects:
+                        effect_status: EffectStatus = "unknown"
+                        try:
+                            after = resolve_context(str(context.root), context.root, timeout=namespace.timeout)
+                            if (
+                                after.clone_identity != context.clone_identity
+                                or after.worktree_identity != context.worktree_identity
+                            ):
+                                raise ValueError("Git project identity changed")
+                            if after.branch == name and after.head == tip:
+                                effect_status = "succeeded"
+                                verify_candidate(after, candidate)
+                                if run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                                    raise ValueError("checkout left a dirty worktree")
+                                _verify_selection(after, source_selection)
+                                switched = True
+                            elif after.branch == context.branch and after.head == context.head and not error.uncertain:
+                                verify_local_inputs(after, source_inputs)
+                                _verify_selection(after, source_selection)
+                                if not run_git(context.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                                    effect_status = "failed"
+                        except (OSError, ValueError, RuntimeError) as validation_error:
+                            verification_error = str(validation_error)
+                        effects = (Effect("git.checkout", effect_status, name),)
+                    partial = any(effect.status in ("succeeded", "unknown") for effect in effects)
+                    return OperationResult(
+                        namespace.command_path,
+                        "partial" if partial else "failed",
+                        _data(target.id, name, tip, created=False, switched=switched),
+                        6 if partial else 5,
+                        effects=effects,
+                        error=Diagnostic(
+                            "GIT_FAILED" if isinstance(error, GitProcessError) else "CHECKOUT_VERIFICATION_FAILED",
+                            str(error),
+                            {
+                                **(error.details() if isinstance(error, GitProcessError) else {}),
+                                **(
+                                    {"verification_error": verification_error} if verification_error is not None else {}
+                                ),
+                            },
+                        ),
+                    )
     data = _data(target.id, name, tip, created=created, switched=switched)
     if namespace.dry_run:
         data = BranchData({**data.result, "can_apply": True, "blockers": ()})
@@ -271,6 +288,14 @@ def _data(scope_id: str, name: str, tip: str | None, *, created: bool, switched:
         "switched": switched,
         "binding_persisted": False,
     })
+
+
+def _check_switch_target(context: ProjectContext, name: str, *, timeout: float) -> None:
+    for entry in worktree_list(context.root, timeout=timeout):
+        if entry.branch == name and physical_identity(entry.path) != context.worktree_identity:
+            raise ValueError("requested branch is checked out in another worktree")
+    if run_git(context.root, "status", "--porcelain", "-z", timeout=timeout):
+        raise ValueError("branch switch requires a clean worktree")
 
 
 def _fresh_context(context: ProjectContext, timeout: float) -> ProjectContext:

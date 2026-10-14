@@ -311,3 +311,34 @@ def test_link_sync_never_waits_for_or_races_a_running_start(
     assert result["data"]["selection"]["status"] == "empty"
     assert {reason for _, reason in warning_reasons(result)} == {"start_in_progress"}
     assert link_effects(result) == [] and links(root) == before
+
+
+def test_link_sync_does_not_write_while_branch_switch_holds_the_start_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application import branch_operations
+
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    git(root, "branch", "candidate")
+    (root / "spec-dock/active/epic").unlink()
+    before = links(root)
+    during: list[tuple[int, dict[str, Any]]] = []
+    real_run_git = branch_operations.run_git
+
+    def checkout_with_concurrent_repair(repo: Path, *arguments: str, **options: Any) -> bytes:
+        if arguments[:1] == ("checkout",):
+            during.append(run(root, capsys, "active", "set", "@current"))
+        return real_run_git(repo, *arguments, **options)
+
+    monkeypatch.setattr(branch_operations, "run_git", checkout_with_concurrent_repair)
+    code, result = run(root, capsys, "branch", "switch", "iss-00003", "--name", "candidate")
+    assert code == 0 and result["status"] == "succeeded", result
+    [(repair_code, repair)] = during
+    assert repair_code == 0 and repair["status"] == "unchanged", repair
+    assert {reason for _, reason in warning_reasons(repair)} == {"start_in_progress"}
+    assert links(root) == before
+    monkeypatch.setattr(branch_operations, "run_git", real_run_git)
+    code, repaired = run(root, capsys, "active", "set", "@current")
+    assert code == 0 and repaired["status"] == "succeeded", repaired
+    assert links(root)["epic"] == f"../{EPIC}"

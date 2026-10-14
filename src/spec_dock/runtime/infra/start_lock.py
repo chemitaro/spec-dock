@@ -1,4 +1,4 @@
-"""Start's only shared lock; the existing Git directory is never changed."""
+"""The clone Start lock shared by work start, branch switch and link writes; the Git directory is never changed."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class StartLock:
                 except BlockingIOError as error:
                     remaining = deadline - time.monotonic()
                     if remaining <= 0:
-                        raise StartLockBusy("another work start holds the clone lock") from error
+                        raise StartLockBusy("another work start or branch switch holds the clone Start lock") from error
                     time.sleep(min(0.05, remaining))
         except BaseException:
             directory.__exit__(None, None, None)
