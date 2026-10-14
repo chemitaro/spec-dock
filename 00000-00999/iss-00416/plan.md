@@ -4,7 +4,7 @@ ID: "iss-00416"
 タイトル: "Restore Active Scope Links For Human Navigation"
 関連GitHub: ["#416"]
 状態: "draft"
-最終更新: "2026-10-13"
+最終更新: "2026-10-14"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00080", "init-00079"]
 ---
@@ -73,3 +73,18 @@ AC-416-01〜08 を満たし、fresh wheel の外部 console で `work start` →
 - AC-416-01〜08 の確認結果、lint / pytest / fresh wheel の結果、Issue 413 D-01 の閲覧側判断を上書きした旨を `report.md` に記録する。
 - merge-ready の PR を作成し、merge は人間が行う。
 - 残余リスク: 同じ worktree での並行操作によるリンクのずれ（Q3 で修復）、branch 切替後の dangling リンク。
+
+## 追加作業（2026-10-14、利用者決定 Q5・FQG-416-008/009）
+
+既存の step 1〜10 は書き換えず、以下を追加で行う。
+
+- 背景: FQG 4回目（`7e37b754`）の P1 FQG-416-008。Start lock を取らない並行の `branch switch` が checkout で置いた追跡ファイルを、リンク同期が置き換え得る。利用者決定 Q5 で、`branch switch` も Start lock を取り、作業ツリーを書き換える SpecDock 操作とリンク同期を同じ lock で排他する。Git の環境には何も書かない。
+- 再評価: Issue 413 の「排他は Start だけ」を広げるため、`branch switch` の公開挙動（`START_LOCK_BUSY`、`--lock-timeout`）が変わる。新しい CLI leaf は追加しない。Planning Level は `standard` のままとする。
+
+11. **step 5 の記述の訂正（FQG-416-009）**: step 5 にある「既知旧生成物の削除」は、Q4 の変更（2026-10-13）で行わないことになった。実装とテストは「旧生成物を含め役割名以外は変更・削除しない」（`test_issue416_active_links.py` の保全テスト）で確定している。step 5 は当時の記録として残し、この step で置き換える。
+12. **`--lock-timeout` の適用先（Red → Green）**: `branch switch` で `--lock-timeout` を受け付け、`work start` と `branch switch` 以外では exit 2 になるテストを先に書き、`cli/options.py` を変える。
+13. **`branch switch` の Start lock（Red → Green）**: 別 process（または同じ process の別 fd）が同じ clone の Start lock を保持している間、`branch switch --lock-timeout 0` が `START_LOCK_BUSY`（exit 3、effects 空）で止まり、current branch・作業ツリー・直接記録が変わらないテストを先に書く。続けて `application/branch_operations.py` で、checkout の前に Start lock を取り、branch 占有・clean の再確認から checkout 後の確認まで lock の中で行う。lock が空いていれば従来どおり checkout する（既存の `test_issue413_branch.py` が通ること）。`--dry-run` は lock を取らない。
+14. **リンク同期との排他（Red → Green）**: `branch switch` が Start lock を保持している間、リンク同期（`active set @current` など）が書かずに `ACTIVE_LINK_NOT_UPDATED(start_in_progress)` を出すことを確認する（既存の lock 経路の確認。必要ならテストを追加）。
+15. **案内文書**: catalog の `branch switch` 説明、provider 資産の `docs/reference_cli.md`（C20 と「Start・Finishと排他」）、`docs/cli-redesign-guide.html`、installed skill `spec-dock` の `SKILL.md` に、`branch switch` も Start lock を取ること、同じノードの排他は SpecDock、同じブランチの排他は Git が担うこと、SpecDock を経由しない Git 操作と別 clone は範囲外であることを反映する。`static-inventory.json` の sha256 と `known_old_sha256` を更新する。
+16. **検証**: `make lint`、`uv run pytest` 全体、fresh wheel の外部 console で、Start lock 保持中の `branch switch` が `START_LOCK_BUSY` で止まり、解放後は成功することを確認する。`.git` 配下にファイルが増えないことも確認する。
+17. **記録と再レビュー**: `report.md` に Q5 と FQG 4回目の結果・対応を追記し、FQG の `review-response.md` を更新する。push 後、同じ会話で FQG 5回目を実行し、P0/P1 が無くなるまで繰り返す。合格後に PR を作成する（merge は人間）。
