@@ -27,7 +27,7 @@ ID: "iss-00418"
   - インベントリに `.claude/skills/` 配下の4エントリを加える。各エントリは、`.agents` 側と同じ source・sha256・mode・init_only を持つ。
   - allowlist は `.claude/skills` 配下の同名2 slot だけを追加で許可する。
   - SKILL.md はホスト中立の1種類にする。
-  - （RQ-418-08 を含める場合）`show` は欠落判定の前に親チェーンを検査する。
+  - `show` は、ファイルの有無を判定する前に親チェーンを検査する（RQ-418-08）。
 
 ```text
 src/spec_dock/assets/install_root/.agents/skills/<name>/...   （唯一の正本）
@@ -49,7 +49,7 @@ src/spec_dock/assets/install_root/.agents/skills/<name>/...   （唯一の正本
   - init は、既存の配置先の拒否と親チェーンの検査を、`.claude` 側にも同じく適用する。
   - update は、欠落を `installation.create`、既知の旧版を `installation.change`、未知の内容を事前検査での停止として扱う。
   - uninstall は `retire_file()` でファイル単位に削除し、ディレクトリは削除しない。
-- `installation show`（RQ-418-08 を含める場合）:
+- `installation show`（RQ-418-08）:
   - 各エントリについて、先に `verify_existing_parent()` を実行する。失敗（`ValueError`・`OSError`）は `unsafe` と分類する。
   - 親が安全で、ファイルがなければ `missing` とする。存在する場合の分類は既存どおりとする。
   - 状態の語彙に、ホストの種別を混ぜない。
@@ -100,8 +100,8 @@ src/spec_dock/assets/install_root/.agents/skills/<name>/...   （唯一の正本
   - `AGENTS.md`
   - テスト: `tests/unit/infra/test_provider_distribution.py`、`tests/unit/infra/test_authoring_kit_assets.py`、`tests/integration/test_issue413_assets.py`、`tests/integration/test_issue413_wheel.py`
   - 新規テストと 0.2.4 版スキルのフィクスチャ
-  - （RQ-418-08 を含める場合）`src/spec_dock/runtime/application/direct_installation.py` の show の分岐
-  - （RQ-418-09 を含める場合）dogfood の `.agents/skills/**`・`.claude/skills/**`・`spec-dock/docs/authoring/overview.md`。CLI による更新で反映する。
+  - `src/spec_dock/runtime/application/direct_installation.py` の show の分岐（RQ-418-08）
+  - dogfood（RQ-418-09）の `.agents/skills/**`・`.claude/skills/**`・`spec-dock/docs/authoring/overview.md`。CLI による更新で反映する。
 - 変更しない:
   - init / update / uninstall の処理本体
   - `package_retired_assets()`

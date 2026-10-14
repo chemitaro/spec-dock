@@ -36,8 +36,8 @@ SpecDock を導入した worktree で、Codex と Claude Code の両方が、同
   - `spec-dock` スキルは、静的投影として `.agents/skills` と `.claude/skills` の両方を説明する。
   - Codex 固有の言い回し（「running Codex processes」、保護対象としての `.codex/config.toml` だけの列挙）を一般化する。
 - RQ-418-07: wheel は、必要な source と更新済みのインベントリを含む。fresh wheel を非 editable で導入した CLI でも、RQ-418-01 と RQ-418-02 が成り立つ。
-- RQ-418-08（範囲に含めるかはユーザー判断）: `installation show` は、管理ファイルが存在しない場合も、先に親チェーンを検査する。symlink や非ディレクトリの親の下にある欠落ファイルは、`missing` ではなく `unsafe` と表示する。update 側の既存の挙動（`verify_existing_parent()` による事前検査）とそろえる。
-- RQ-418-09（範囲に含めるかはユーザー判断）: この dogfooding repo の `.claude/skills` を、候補 wheel の CLI による正規の `installation update` で作成し、コミットする。
+- RQ-418-08: `installation show` は、管理ファイルの有無を判定する前に、親チェーンを検査する。symlink や非ディレクトリの親の下にある管理ファイルは、存在してもしなくても `unsafe` と表示する。update 側の既存の挙動（`verify_existing_parent()` による事前検査）とそろえる。
+- RQ-418-09: この dogfooding repo の `.claude/skills` を、候補 wheel の CLI による正規の `installation update` で作成し、コミットする。
 
 ## スコープ
 - 対象:
@@ -46,7 +46,7 @@ SpecDock を導入した worktree で、Codex と Claude Code の両方が、同
   - 配布の説明文書（`README.md`、`src/spec_dock/assets/spec_dock/docs/authoring/overview.md`、`AGENTS.md`）
   - 回帰テスト
   - 新しい ADR
-  - RQ-418-08・RQ-418-09 は承認された場合のみ
+  - RQ-418-08（`show` の親チェーン検査）と RQ-418-09（dogfood の更新）。どちらも 2026-10-14 にユーザーが範囲に含めることを承認した。
 - 対象外:
   - `$HOME` への書き込み（`~/.claude/skills`、`~/.agents/skills`）
   - プラグインや marketplace による配布
@@ -102,8 +102,8 @@ SpecDock を導入した worktree で、Codex と Claude Code の両方が、同
   - fresh wheel を隔離環境に導入した CLI での init・update の確認
   - `spec-dock workspace validate` の findings が0件
 - AC-418-07: 候補 wheel で init した一時リポジトリで、Claude Code の新しいセッション（`claude -p`）のスキル一覧に `spec-dock` が現れる。実行できなかった場合は、その旨と理由を Report に記録する。
-- AC-418-08（RQ-418-08 を含める場合）: `.claude` が symlink の worktree で、`installation show` が `.claude` 側の管理ファイルを `unsafe` と表示する。
-- AC-418-09（RQ-418-09 を含める場合）: この worktree で、候補 CLI による `installation show` が両方の投影の8ファイルを `current` と表示する。`.claude/skills` は Git で追跡され、`.agents/skills` とバイト一致する。
+- AC-418-08: `.claude` が symlink の worktree で、`installation show` が `.claude` 側の管理ファイルを `unsafe` と表示する（リンク先にファイルがある場合も、ない場合も）。
+- AC-418-09: この worktree で、候補 CLI による `installation show` が両方の投影の8ファイルを `current` と表示する。`.claude/skills` は Git で追跡され、`.agents/skills` とバイト一致する。
 
 ## 制約・前提
 - Codex・Claude Code の探索仕様は、2026-10-14 時点の公式文書に基づく。これが変わった場合は、ADR の見直し条件に従って再評価する。

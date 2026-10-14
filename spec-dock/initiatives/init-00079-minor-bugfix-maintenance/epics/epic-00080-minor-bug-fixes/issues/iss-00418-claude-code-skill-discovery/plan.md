@@ -30,16 +30,12 @@ ID: "iss-00418"
   - 利用者データの削除を伴う移行
 
 ## 目標
-- Requirement の AC-418-01〜07 を、provider 優先の実装、テスト先行の回帰テスト、fresh wheel、Claude Code の実機確認で満たす。
-- AC-418-08・09 は、承認された場合に同じ方法で満たす。
+- Requirement の AC-418-01〜09 を、provider 優先の実装、テスト先行の回帰テスト、fresh wheel、Claude Code の実機確認で満たす。
 
 ## 順序・依存
-1. P0（ユーザーの承認）: 次の3点を確定する。承認までコードは変更しない。
-   - ADR `20261014t072234z-adr` の受理
-   - RQ-418-08（`show` の親チェーン検査）を範囲に含めるか
-   - RQ-418-09（dogfood の更新）を範囲に含めるか
+1. P0（ユーザーの承認）: 2026-10-14 に完了した。ADR `20261014t072234z-adr` の受理、RQ-418-08（`show` の親チェーン検査）と RQ-418-09（dogfood の更新）を範囲に含めることを、ユーザーが承認した。
 2. S01〜S03 は、この順に進める。インベントリの値は S03 の SKILL.md の確定後に決まるため、S02 は S03 の後でハッシュを再計算する。
-3. S04（`show`）は S01〜S03 と独立しているので、承認された場合は並行して進めてよい。
+3. S04（`show`）は S01〜S03 と独立しているので、並行して進めてよい。
 4. S05（文書）は S03 の後に行う。
 5. S06（検証）、S07（dogfood）、S08（記録と引き渡し）の順に進める。S07 は S06 の候補 wheel を使う。
 
@@ -66,17 +62,16 @@ ID: "iss-00418"
   - Design のとおり、2つの SKILL.md を中立化する。
   - `.agents` 側の sha256 を更新し、0.2.4 で配布中のハッシュを `known_old_sha256` に追加する。
   - `.claude` 側は同じ sha256 で、`known_old_sha256: []` とする。
-- S04（RQ-418-08 を含める場合）: `installation show` で、欠落判定の前に `verify_existing_parent()` を実行し、失敗を `unsafe` と分類する。
+- S04（RQ-418-08）: `installation show` で、欠落判定の前に `verify_existing_parent()` を実行し、失敗を `unsafe` と分類する。
 - S05（文書）:
   - `README.md`、`src/spec_dock/assets/spec_dock/docs/authoring/overview.md`、`AGENTS.md` に、`.claude/skills` の投影、所有の範囲、同一バイト列のコピーの扱いを記載する。
   - 文書の資産テスト（`RESERVED_SKILL_PATHS` など）を追随させる。
 - S06（検証）: 「検証」の節のとおり。
-- S07（RQ-418-09 を含める場合）:
+- S07（RQ-418-09）:
   - S06 の候補 wheel を隔離環境に導入し、その CLI でこの worktree だけに `installation update --target <this worktree> --backup-dir <未使用の /private/tmp/...> --yes` を実行する。
   - 結果を `show` とバイト比較で確認してから、管理対象のパスだけをコミットする。
   - ユーザーのインストール済みパッケージ、main checkout、他の linked worktree は更新しない。
 - S08（記録と引き渡し）:
-  - ADR の受理を frontmatter に反映する（受理された場合のみ）。
   - Report に結果を記録する。
   - コミットし、PR を作成する（Issue #418 を関連付け、自動クローズしない）。
   - CI を確認する。
@@ -114,7 +109,7 @@ ID: "iss-00418"
 
 ## exit / handoff
 - 完了の条件: 次の情報を Report に残し、PR が merge 可能な状態になっていること。マージは人間が行う。
-  - AC-418-01〜07（と、承認された AC-418-08・09）の実測の証拠
+  - AC-418-01〜09 の実測の証拠
   - 変更したパス
   - 実行したコマンドと結果（失敗とスキップを含む）
   - コミットの SHA

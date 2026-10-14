@@ -2,15 +2,15 @@
 種別: ADR（Architecture Decision Record）
 ID: "20261014t072234z-adr"
 タイトル: "Project skill projections for Codex and Claude Code"
-状態: "draft"
+状態: "accepted"
 作成者: "iwasawayuuta"
 最終更新: "2026-10-14"
 親: ["iss-00418"]
-authority: "draft"
-accepted_authority: ""
-accepted_at: ""
-accepted_by: ""
-mirror_eligible: false
+authority: "accepted"
+accepted_authority: "accepted ADR"
+accepted_at: "2026-10-14"
+accepted_by: "iwasawayuuta"
+mirror_eligible: true
 derived_from: ["20261014t071357z-research", "20261014t071419z--chatgpt-strict-claude-skill-distribution-analysis.md"]
 reflected_to: ["../requirement.md", "../design.md", "../plan.md"]
 ---
@@ -32,16 +32,7 @@ architecture / contract / migration の判断候補を記録します。明示�
 
 ## Decision
 
-- draft の間は未決。明示的な判断後に結論を記録する。
-- accepted にするときだけ、次を明示する:
-  - `状態: "accepted"`
-  - `authority: "accepted"`
-  - `accepted_authority: "accepted ADR"`
-  - `accepted_at: "2026-10-14"`
-  - `accepted_by: "<DECISION_OWNER>"`
-  - `mirror_eligible: true`
-
-### 判断候補（受理時にこの内容を Decision とする）
+2026-10-14 に、product owner（iwasawayuuta）が Option A1 を受理した。以下を決定とする。
 
 1. **正本は一つにする。** スキルの著作・保守上の正本は `src/spec_dock/assets/install_root/.agents/skills/<name>/` だけとする。provider 側に `.claude` 用のコピーは作らない。
 2. **ホストのプロジェクト探索先へ投影する。** 同じ正本を、次の2つの配置先へ同じバイト列の通常ファイルとして投影する。
