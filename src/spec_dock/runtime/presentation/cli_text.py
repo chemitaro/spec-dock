@@ -7,9 +7,6 @@ from spec_dock.runtime.presentation.contracts import CliText
 
 if TYPE_CHECKING:
     from spec_dock.runtime.application.contracts import (
-        ActiveClearResult,
-        ActiveSetResult,
-        ActiveViewResult,
         CloseNodeResult,
         CreateArtifactDocResult,
         CreateNodeResult,
@@ -347,48 +344,6 @@ def render_deps_mutation_error_text(error: MutateDepsError) -> CliText:
         stderr_lines=stderr_lines,
         warnings=[],
     )
-
-
-def render_active_show_text(result: ActiveViewResult) -> CliText:
-    def _format_entry(entry_id: str | None, entry_path: str | None) -> str:
-        if entry_id and entry_path:
-            return f"{entry_id} ({entry_path})"
-        if entry_id:
-            return entry_id
-        return "(none)"
-
-    all_none = result.initiative.id is None and result.epic.id is None and result.issue.id is None
-    if all_none:
-        stdout_lines = [
-            "spec-dock: active: (not set)",
-            "fallback: spec-dock/active/{initiative,epic,issue} -> spec-dock/system/active-none/{initiative,epic,issue}",
-            "next: spec-dock/scripts/spec-dock active set <target>",
-        ]
-    else:
-        stdout_lines = [
-            f"initiative: {_format_entry(result.initiative.id, result.initiative.path)}",
-            f"epic: {_format_entry(result.epic.id, result.epic.path)}",
-            f"issue: {_format_entry(result.issue.id, result.issue.path)}",
-        ]
-
-    return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
-
-
-def render_active_set_text(result: ActiveSetResult, *, target_display: str) -> CliText:
-    ini = result.selection.initiative_id or "(none)"
-    epic = result.selection.epic_id or "(none)"
-    issue = result.selection.issue_id or "(none)"
-    stdout_lines = [
-        f"spec-dock: ok (active set) target={target_display} initiative={ini} epic={epic} issue={issue}",
-    ]
-    if result.branch is not None:
-        stdout_lines.append(f"spec-dock: ok (active checkout) branch={result.branch.desired}")
-    return CliText(stdout_lines=stdout_lines, stderr_lines=[], warnings=list(result.warnings))
-
-
-def render_active_clear_text(result: ActiveClearResult) -> CliText:
-    del result
-    return CliText(stdout_lines=["spec-dock: ok (active clear)"], stderr_lines=[], warnings=[])
 
 
 def render_close_text(result: CloseNodeResult, *, target_display: str) -> CliText:

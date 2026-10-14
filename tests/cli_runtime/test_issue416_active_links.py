@@ -1,0 +1,344 @@
+"""Selection changes keep the human navigation links under spec-dock/active in step."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from typing import TYPE_CHECKING, Any
+
+from spec_dock.cli import main
+from tests.cli_runtime.test_issue413_contract import add_scope, make_workspace
+from tests.cli_runtime.test_issue413_finish import github_fixture
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
+
+INITIATIVE = "initiatives/init-00001-fixture"
+EPIC = f"{INITIATIVE}/epics/epic-00002-fixture"
+ISSUE = f"{EPIC}/issues/iss-00003-fixture"
+
+
+def navigable_workspace(root: Path) -> Path:
+    make_workspace(root)
+    initiative = root / "spec-dock" / INITIATIVE
+    epic = add_scope(root, "epic-00002", "epic", "init-00001", initiative)
+    add_scope(root, "iss-00003", "issue", "epic-00002", epic)
+    (root / "spec-dock/.gitignore").write_text(".agent/\n.workbench/\nactive/\n", encoding="utf-8")
+    for role in ("initiative", "epic", "issue"):
+        fallback = root / "spec-dock/system/active-none" / role
+        fallback.mkdir(parents=True)
+        (fallback / "README.md").write_text(f"# no {role}\n", encoding="utf-8")
+    git(root, "add", ".")
+    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "fixture")
+    return root
+
+
+def git(root: Path, *arguments: str) -> bytes:
+    return subprocess.run(["git", "-C", str(root), *arguments], check=True, capture_output=True).stdout
+
+
+def links(root: Path) -> dict[str, str]:
+    active = root / "spec-dock/active"
+    return {
+        role: str((active / role).readlink())
+        for role in ("initiative", "epic", "issue")
+        if (active / role).is_symlink()
+    }
+
+
+def link_effects(result: dict[str, Any]) -> list[tuple[str, str]]:
+    return [(effect["target"], effect["status"]) for effect in result["effects"] if effect["kind"] == "active.link"]
+
+
+def run(root: Path, capsys: pytest.CaptureFixture[str], *arguments: str) -> tuple[int, dict[str, Any]]:
+    code = main(["--project", str(root), *arguments, "--json"])
+    return code, json.loads(capsys.readouterr().out)
+
+
+def test_work_start_links_every_role_to_the_selected_issue_chain(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "iss-00003", "--base", "HEAD")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert links(root) == {"initiative": f"../{INITIATIVE}", "epic": f"../{EPIC}", "issue": f"../{ISSUE}"}
+    assert (root / "spec-dock/active/issue/requirement.md").read_text(encoding="utf-8") == "# Fixture\n"
+    assert link_effects(result) == [("initiative", "succeeded"), ("epic", "succeeded"), ("issue", "succeeded")]
+    assert git(root, "status", "--porcelain") == b""
+
+
+def test_work_start_dry_run_plans_links_without_writing_them(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "epic-00002", "--base", "HEAD", "--dry-run")
+    assert code == 0 and result["status"] == "planned", result
+    assert link_effects(result) == [("initiative", "planned"), ("epic", "planned"), ("issue", "planned")]
+    assert not (root / "spec-dock/active").exists()
+
+
+FALLBACK = {role: f"../system/active-none/{role}" for role in ("initiative", "epic", "issue")}
+
+
+def started(root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> str:
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "iss-00003", "--base", "HEAD")
+    assert code == 0, result
+    return str(result["data"]["branch_after"])
+
+
+def test_active_clear_points_every_role_back_to_the_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    code, preview = run(root, capsys, "active", "clear", "--all", "--dry-run")
+    assert code == 0 and link_effects(preview) == [("initiative", "planned"), ("epic", "planned"), ("issue", "planned")]
+    assert links(root)["issue"] == f"../{ISSUE}"
+    code, result = run(root, capsys, "active", "clear", "--all")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert links(root) == FALLBACK
+    assert link_effects(result) == [("initiative", "succeeded"), ("epic", "succeeded"), ("issue", "succeeded")]
+
+
+def test_clear_keeps_links_while_a_selection_remains_and_repairs_them_once_empty(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    add_scope(root, "epic-00004", "epic", "init-00001", root / "spec-dock" / INITIATIVE)
+    git(root, "add", ".")
+    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "sibling")
+    started(root, tmp_path, monkeypatch, capsys)
+    before = links(root)
+    code, result = run(root, capsys, "active", "clear", "--from", "epic-00004")
+    assert code == 0 and result["status"] == "unchanged" and links(root) == before, result
+    assert run(root, capsys, "active", "clear", "--all")[0] == 0
+    (root / "spec-dock/active/issue").unlink()
+    (root / "spec-dock/active/issue").symlink_to(f"../{ISSUE}")
+    code, result = run(root, capsys, "active", "clear", "--all")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert link_effects(result) == [("initiative", "unchanged"), ("epic", "unchanged"), ("issue", "succeeded")]
+    assert links(root) == FALLBACK
+    code, result = run(root, capsys, "active", "clear", "--all")
+    assert (
+        code == 0
+        and result["status"] == "unchanged"
+        and result["effects"]
+        == [{"kind": "active.link", "status": "unchanged", "target": role} for role in ("initiative", "epic", "issue")]
+    )
+
+
+def test_work_finish_that_clears_the_selection_restores_the_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    code, preview = run(root, capsys, "work", "finish", "iss-00003", "--dry-run")
+    assert code == 0 and preview["status"] == "planned", preview
+    assert link_effects(preview) == [("initiative", "planned"), ("epic", "planned"), ("issue", "planned")]
+    assert links(root)["issue"] == f"../{ISSUE}"
+    code, result = run(root, capsys, "work", "finish", "iss-00003", "--yes")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert links(root) == FALLBACK
+    assert link_effects(result) == [("initiative", "succeeded"), ("epic", "succeeded"), ("issue", "succeeded")]
+    assert git(root, "status", "--porcelain") == b""
+
+
+def test_active_set_current_repairs_links_only_when_they_drifted(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    code, result = run(root, capsys, "active", "set", "@current")
+    assert code == 0 and result["status"] == "unchanged", result
+    (root / "spec-dock/active/epic").unlink()
+    (root / "spec-dock/active/context-pack.md").write_bytes(b"stale")
+    code, preview = run(root, capsys, "active", "set", "@current", "--dry-run")
+    assert code == 0 and preview["status"] == "planned", preview
+    assert preview["effects"] == [{"kind": "active.link", "status": "planned", "target": "epic"}]
+    assert "epic" not in links(root)
+    code, result = run(root, capsys, "active", "set", "@current")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert result["data"]["selection"]["scope_id"] == "iss-00003"
+    assert links(root) == {"initiative": f"../{INITIATIVE}", "epic": f"../{EPIC}", "issue": f"../{ISSUE}"}
+    assert (root / "spec-dock/active/context-pack.md").read_bytes() == b"stale"
+
+
+def warning_reasons(result: dict[str, Any]) -> list[tuple[str, object]]:
+    return [(item["code"], item["details"].get("reason")) for item in result["warnings"]]
+
+
+def test_occupied_role_is_a_warning_and_the_selection_still_succeeds(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    kept = root / "spec-dock/active/issue"
+    kept.mkdir(parents=True)
+    (kept / "mine.md").write_bytes(b"mine")
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "iss-00003", "--base", "HEAD")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert warning_reasons(result) == [("ACTIVE_LINK_NOT_UPDATED", "occupied")]
+    assert link_effects(result) == [("initiative", "succeeded"), ("epic", "succeeded")]
+    assert (kept / "mine.md").read_bytes() == b"mine"
+
+
+def test_unignored_active_directory_is_never_written(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    (root / "spec-dock/.gitignore").write_text(".agent/\n.workbench/\n", encoding="utf-8")
+    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qam", "unignore")
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "iss-00003", "--base", "HEAD")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert {reason for _, reason in warning_reasons(result)} == {"not_ignored"}
+    assert link_effects(result) == [] and not (root / "spec-dock/active").exists()
+    assert git(root, "status", "--porcelain") == b""
+
+
+def test_read_commands_neither_write_nor_depend_on_links(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    code, with_links = run(root, capsys, "active", "show")
+    for role in ("initiative", "epic", "issue"):
+        (root / "spec-dock/active" / role).unlink()
+    (root / "spec-dock/active/issue").symlink_to("../system/active-none/issue")
+    code_without, without_links = run(root, capsys, "active", "show")
+    assert code == code_without == 0 and with_links == without_links
+    assert links(root) == {"issue": "../system/active-none/issue"}
+
+
+def test_link_sync_preserves_every_old_writer_file_and_other_old_state(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    root = navigable_workspace(tmp_path / "consumer")
+    active = root / "spec-dock/active"
+    active.mkdir()
+    for name in ("context-pack.md", "current-runbook.md", "initiative.path", "epic.path", "issue.path"):
+        (active / name).write_bytes(b"old generated\r\n")
+    (active / "current-runbook.json").mkdir()
+    (active / "current-runbook.json/preserve.bin").write_bytes(b"\x00private\xff")
+    (active / "notes.md").write_bytes(b"user notes")
+    for role in ("initiative", "epic", "issue"):
+        (active / role).symlink_to(f"../{INITIATIVE}")
+    old = {path.name: path.read_bytes() for path in active.iterdir() if path.is_file() and not path.is_symlink()}
+    work = root / "spec-dock/.work"
+    work.mkdir()
+    (work / "active.json").write_bytes(b'{"schema_version":2}\r\n')
+    before = tree_digest(work)
+    code, result = run(root, capsys, "active", "clear", "--all")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert link_effects(result) == [("initiative", "succeeded"), ("epic", "succeeded"), ("issue", "succeeded")]
+    assert [effect["kind"] for effect in result["effects"]] == ["active.link"] * 3
+    assert result["warnings"] == []
+    assert links(root) == FALLBACK
+    assert {name: (active / name).read_bytes() for name in old} == old
+    assert (active / "current-runbook.json/preserve.bin").read_bytes() == b"\x00private\xff"
+    assert tree_digest(work) == before
+    assert "private" not in json.dumps(result)
+
+
+def test_link_target_errors_never_turn_a_completed_finish_into_a_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    fallback = root / "spec-dock/system/active-none"
+    fallback.chmod(0)
+    try:
+        code, result = run(root, capsys, "work", "finish", "iss-00003", "--yes")
+    finally:
+        fallback.chmod(0o755)
+    assert code == 0 and result["status"] == "succeeded", result
+    assert result["data"]["completed"] is True
+    assert ("selection.clear", "succeeded") in [(effect["kind"], effect["status"]) for effect in result["effects"]]
+    assert {code for code, _ in warning_reasons(result)} == {"ACTIVE_LINK_NOT_UPDATED"}
+
+
+def test_tracked_files_under_active_are_never_changed_even_when_ignore_rules_match(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    tracked = root / "spec-dock/active/context-pack.md"
+    tracked.parent.mkdir()
+    tracked.write_bytes(b"tracked by accident\n")
+    git(root, "add", "-f", "spec-dock/active/context-pack.md")
+    git(root, "-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-qm", "tracked")
+    github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
+    code, result = run(root, capsys, "work", "start", "iss-00003", "--base", "HEAD")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert {reason for _, reason in warning_reasons(result)} == {"tracked"}
+    assert link_effects(result) == [] and links(root) == {}
+    assert tracked.read_bytes() == b"tracked by accident\n"
+    assert git(root, "status", "--porcelain") == b""
+
+
+def test_clear_from_with_an_empty_selection_also_repairs_the_fallback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    assert run(root, capsys, "active", "clear", "--all")[0] == 0
+    (root / "spec-dock/active/epic").unlink()
+    (root / "spec-dock/active/epic").symlink_to(f"../{EPIC}")
+    code, result = run(root, capsys, "active", "clear", "--from", "epic-00002")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert link_effects(result) == [("initiative", "unchanged"), ("epic", "succeeded"), ("issue", "unchanged")]
+    assert links(root) == FALLBACK
+
+
+def test_link_sync_never_waits_for_or_races_a_running_start(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application.project_context import resolve_context
+    from spec_dock.runtime.infra.start_lock import StartLock
+
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    before = links(root)
+    with StartLock(resolve_context(str(root), root).common_dir, timeout=0):
+        code, result = run(root, capsys, "active", "clear", "--all")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert result["data"]["selection"]["status"] == "empty"
+    assert {reason for _, reason in warning_reasons(result)} == {"start_in_progress"}
+    assert link_effects(result) == [] and links(root) == before
+
+
+def test_link_sync_does_not_write_while_branch_switch_holds_the_start_lock(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application import branch_operations
+
+    root = navigable_workspace(tmp_path / "consumer")
+    started(root, tmp_path, monkeypatch, capsys)
+    git(root, "branch", "candidate")
+    (root / "spec-dock/active/epic").unlink()
+    before = links(root)
+    during: list[tuple[int, dict[str, Any]]] = []
+    real_run_git = branch_operations.run_git
+
+    def checkout_with_concurrent_repair(repo: Path, *arguments: str, **options: Any) -> bytes:
+        if arguments[:1] == ("checkout",):
+            during.append(run(root, capsys, "active", "set", "@current"))
+        return real_run_git(repo, *arguments, **options)
+
+    monkeypatch.setattr(branch_operations, "run_git", checkout_with_concurrent_repair)
+    code, result = run(root, capsys, "branch", "switch", "iss-00003", "--name", "candidate")
+    assert code == 0 and result["status"] == "succeeded", result
+    [(repair_code, repair)] = during
+    assert repair_code == 0 and repair["status"] == "unchanged", repair
+    assert {reason for _, reason in warning_reasons(repair)} == {"start_in_progress"}
+    assert links(root) == before
+    monkeypatch.setattr(branch_operations, "run_git", real_run_git)
+    code, repaired = run(root, capsys, "active", "set", "@current")
+    assert code == 0 and repaired["status"] == "succeeded", repaired
+    assert links(root)["epic"] == f"../{EPIC}"
