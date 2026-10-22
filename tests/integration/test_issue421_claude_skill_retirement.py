@@ -155,7 +155,7 @@ def test_linked_claude_slots_are_left_to_the_host(
     links = {name: (target / name).readlink() for name in _link_claude(target, outside, shape)}
     outside_before = tree_digest(outside) if outside.exists() else None
 
-    def assert_links_and_agents_unchanged() -> None:
+    def assert_links_unchanged() -> None:
         assert {name: (target / name).readlink() for name in links} == links
         assert all((target / name).is_symlink() for name in links)
         assert (tree_digest(outside) if outside.exists() else None) == outside_before
@@ -163,7 +163,7 @@ def test_linked_claude_slots_are_left_to_the_host(
     code, initialized = _run(capsys, "installation", "init", str(target), "--yes")
     assert code == 0 and initialized["status"] == "succeeded", initialized["error"]
     assert not any(path.startswith(".claude") for path in initialized["data"]["result"]["created_paths"])
-    assert_links_and_agents_unchanged()
+    assert_links_unchanged()
     agents = {name: (target / name).read_bytes() for name in AGENTS_FILES}
     assert agents == {f".agents/skills/{name}": (PROVIDER / name).read_bytes() for name in SKILL_FILES}
 
@@ -178,7 +178,7 @@ def test_linked_claude_slots_are_left_to_the_host(
     )
     assert code == 0 and updated["status"] == "unchanged" and updated["effects"] == [], updated["error"]
     assert {name: (target / name).read_bytes() for name in AGENTS_FILES} == agents
-    assert_links_and_agents_unchanged()
+    assert_links_unchanged()
 
     code, removed = _run(
         capsys, "installation", "uninstall", "--target", str(target), "--backup-dir", str(tmp_path / "b2"), "--yes"
@@ -187,7 +187,7 @@ def test_linked_claude_slots_are_left_to_the_host(
     assert code == 0 and removed["status"] == "succeeded", removed["error"]
     assert set(AGENTS_FILES) <= set(retired) and not any(path.startswith(".claude") for path in retired)
     assert not any((target / name).exists() for name in AGENTS_FILES)
-    assert_links_and_agents_unchanged()
+    assert_links_unchanged()
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX symbolic-link fixtures")
