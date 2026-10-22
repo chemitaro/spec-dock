@@ -1,4 +1,4 @@
-"""One provider skill source is projected to the Codex and Claude Code project discovery roots."""
+"""The host-neutral skill source and the fixed slots that installation may manage."""
 
 from __future__ import annotations
 
@@ -12,28 +12,6 @@ from spec_dock.runtime.infra.static_assets import package_static_assets
 
 ROOT = Path(__file__).resolve().parents[3]
 SKILLS = ROOT / "src/spec_dock/assets/install_root/.agents/skills"
-SKILL_FILES = (
-    "spec-dock-grill-with-docs/SKILL.md",
-    "spec-dock-grill-with-docs/agents/openai.yaml",
-    "spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-    "spec-dock/SKILL.md",
-)
-
-
-def test_each_claude_projection_entry_mirrors_its_agents_entry() -> None:
-    assets = {asset.path: asset for asset in package_static_assets()}
-    for root in (".agents/skills", ".claude/skills"):
-        assert {path for path in assets if path.startswith(f"{root}/")} == {f"{root}/{name}" for name in SKILL_FILES}
-    for name in SKILL_FILES:
-        agents, claude = assets[f".agents/skills/{name}"], assets[f".claude/skills/{name}"]
-        assert claude.payload == agents.payload == (SKILLS / name).read_bytes()
-        assert (claude.sha256, claude.mode, claude.init_only) == (agents.sha256, agents.mode, agents.init_only)
-    inventory = json.loads((ROOT / "src/spec_dock/assets/static-inventory.json").read_bytes())
-    sources = {entry["path"]: entry["source"] for entry in inventory["files"]}
-    for name in SKILL_FILES:
-        expected = f"install_root/.agents/skills/{name}"
-        assert sources[f".claude/skills/{name}"] == sources[f".agents/skills/{name}"] == expected
-    assert not (ROOT / "src/spec_dock/assets/install_root/.claude").exists()
 
 
 def _section(content: str, heading: str) -> str:
@@ -61,27 +39,19 @@ def test_grill_skill_resolves_its_helper_from_the_loaded_skill_directory() -> No
     )
 
 
-def test_spec_dock_skill_describes_both_project_projections_without_host_specific_processes() -> None:
-    skill = (SKILLS / "spec-dock/SKILL.md").read_text(encoding="utf-8")
-    assert "the root `.agents/skills` and `.claude/skills` skill projections" in skill
-    assert "Codex discovers `.agents/skills` and Claude Code discovers `.claude/skills`" in skill
-    assert "running Codex processes" not in skill and "running agent processes" in skill
-    assert "never manages other skills or host configuration" in skill
-
-
 @pytest.mark.parametrize(
     "target",
     [
         ".claude/settings.json",
         ".claude/settings.local.json",
+        ".claude/skills/spec-dock/SKILL.md",
+        ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
         ".claude/skills/other-skill/SKILL.md",
         ".claude/skills/spec-dock-extra/SKILL.md",
         ".claude/agents/spec-dock.md",
     ],
 )
-def test_inventory_refuses_claude_targets_outside_the_two_fixed_skill_slots(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str
-) -> None:
+def test_inventory_refuses_every_claude_target(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, target: str) -> None:
     resources = tmp_path / "assets"
     resources.mkdir()
     payload = b"inert fixture\n"

@@ -30,7 +30,7 @@ from spec_dock.runtime.infra.migration_backup import (
     VerifiedBackup,
     create_verified_backup,
 )
-from spec_dock.runtime.infra.static_assets import package_retired_assets
+from spec_dock.runtime.infra.static_assets import RETIRED_SKILL_SLOTS, package_retired_assets
 from spec_dock.runtime.infra.tree_backup import copy_bytes_at, tree_digest
 from spec_dock.runtime.presentation.command_data import FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, OperationResult, RecoveryInstructions
@@ -78,6 +78,8 @@ def update_static_assets(
         asset.path: "installation.create" if inputs[asset.path] is None else "installation.change" for asset in changed
     }
     for retired_asset in package_retired_assets():
+        if _linked_host_slot(git.root, retired_asset.path):
+            continue
         path = git.root / retired_asset.path
         verify_existing_parent(path)
         if os.path.lexists(path):
@@ -256,6 +258,21 @@ def update_static_assets(
     return OperationResult(
         namespace.command_path, "succeeded", FamilyData("installation", data), 0, effects=tuple(effects)
     )
+
+
+def _linked_host_slot(root: Path, name: str) -> bool:
+    """A retired host skill slot reached through a symbolic link belongs to the host, not SpecDock."""
+    slot = next((slot for slot in RETIRED_SKILL_SLOTS if name.startswith(f"{slot}/")), None)
+    if slot is None:
+        return False
+    directory = root
+    for part in Path(slot).parts:
+        directory /= part
+        if directory.is_symlink():
+            return True
+        if not directory.is_dir():
+            return False
+    return False
 
 
 def _read_static_file(path: Path) -> FileSnapshot:

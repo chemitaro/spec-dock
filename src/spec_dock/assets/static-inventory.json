@@ -32,7 +32,7 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500",
+      "sha256": "22d8f04594a5209a8629d09ff6541628f18f4fb2bd979da05db23f8d9c4572a6",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -40,41 +40,8 @@
         "8909153bfdeaabd405b8bf04b5fb62da020a55256a92692ec9f5ffd4e6294538",
         "a11a46ce36d11be6290cea4cb30d02863d65e5a313fb205a637b6a4bc2ebb96c",
         "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
-        "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da"
-      ]
-    },
-    {
-      "path": ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
-      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md",
-      "sha256": "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9",
-      "mode": 420,
-      "init_only": false,
-      "known_old_sha256": []
-    },
-    {
-      "path": ".claude/skills/spec-dock-grill-with-docs/agents/openai.yaml",
-      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml",
-      "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
-      "mode": 420,
-      "init_only": false,
-      "known_old_sha256": []
-    },
-    {
-      "path": ".claude/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-      "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-      "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
-      "mode": 420,
-      "init_only": false,
-      "known_old_sha256": []
-    },
-    {
-      "path": ".claude/skills/spec-dock/SKILL.md",
-      "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500",
-      "mode": 420,
-      "init_only": false,
-      "known_old_sha256": [
-        "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da"
+        "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da",
+        "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500"
       ]
     },
     {
@@ -162,12 +129,13 @@
     {
       "path": "spec-dock/docs/authoring/overview.md",
       "source": "spec_dock/docs/authoring/overview.md",
-      "sha256": "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc",
+      "sha256": "8438f0cf9901406e295226f7e5d87445b29fdffc1b08ee7e6c5d1023a516cb6a",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
-        "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392"
+        "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
+        "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc"
       ]
     },
     {
@@ -817,6 +785,47 @@
     }
   ],
   "retired": [
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/SKILL.md",
+      "known_old_sha256": [
+        "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9"
+      ],
+      "source_basis": {
+        "commit": "4d25a8b4b10d798cd8f647ac373739faa6574fe3",
+        "path": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md"
+      }
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/agents/openai.yaml",
+      "known_old_sha256": [
+        "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94"
+      ],
+      "source_basis": {
+        "commit": "4d25a8b4b10d798cd8f647ac373739faa6574fe3",
+        "path": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml"
+      }
+    },
+    {
+      "path": ".claude/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
+      "known_old_sha256": [
+        "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc"
+      ],
+      "source_basis": {
+        "commit": "4d25a8b4b10d798cd8f647ac373739faa6574fe3",
+        "path": "src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py"
+      }
+    },
+    {
+      "path": ".claude/skills/spec-dock/SKILL.md",
+      "known_old_sha256": [
+        "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da",
+        "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500"
+      ],
+      "source_basis": {
+        "commit": "4d25a8b4b10d798cd8f647ac373739faa6574fe3",
+        "path": "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md"
+      }
+    },
     {
       "path": "spec-dock/scripts/spec_dock_runtime/__init__.py",
       "known_old_sha256": [
