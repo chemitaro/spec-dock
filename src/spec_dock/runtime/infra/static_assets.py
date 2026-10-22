@@ -13,6 +13,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from importlib.abc import Traversable
 
+RETIRED_SKILL_SLOTS = (".claude/skills/spec-dock", ".claude/skills/spec-dock-grill-with-docs")
+
 
 @dataclass(frozen=True)
 class StaticAsset:
@@ -53,12 +55,7 @@ def package_static_assets() -> tuple[StaticAsset, ...]:
                     "spec-dock/templates/",
                     "spec-dock/system/",
                 ))
-                or path.startswith((
-                    ".agents/skills/spec-dock/",
-                    ".agents/skills/spec-dock-grill-with-docs/",
-                    ".claude/skills/spec-dock/",
-                    ".claude/skills/spec-dock-grill-with-docs/",
-                ))
+                or path.startswith((".agents/skills/spec-dock/", ".agents/skills/spec-dock-grill-with-docs/"))
             )
             or path != relative.as_posix()
         ):
@@ -108,6 +105,7 @@ def package_retired_assets() -> tuple[RetiredStaticAsset, ...]:
         if path in current or not (
             path == "spec-dock/spec-dock.version"
             or (path.startswith("spec-dock/scripts/spec_dock_runtime/") and path.endswith(".py"))
+            or path.startswith(tuple(f"{slot}/" for slot in RETIRED_SKILL_SLOTS))
         ):
             raise ValueError("retired static inventory contains an unsafe target")
         hashes = entry["known_old_sha256"]

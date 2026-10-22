@@ -24,12 +24,12 @@ Issue の canonical `plan.md` は一つです。完成基準は選んだ一つ�
 
 ## Agent assistance
 
-provider側の正本は `src/spec_dock/assets/install_root/.agents/skills/` にある次の二つです。導入時に、明示したconsumer worktreeのroot `.agents/skills/`（Codexなどが探索）と `.claude/skills/`（Claude Codeが探索）の両方へ、同じbytesの静的資産として投影されます。consumer側のskillは実行runtimeではなく、installed external `spec-dock` の利用手順です。package更新は利用者のtool環境、skill更新はworktree単位であり、source編集や別worktreeの更新から自動伝播しません。
+provider側の正本は `src/spec_dock/assets/install_root/.agents/skills/` にある次の二つです。導入時に、明示したconsumer worktreeのroot `.agents/skills/` へ静的資産として投影されます。Claude Codeでは `.claude/skills/<name>` → `../../.agents/skills/<name>` の相対リンクで取り込みます（リンクはClaude Code側で作り、installationは管理しません）。consumer側のskillは実行runtimeではなく、installed external `spec-dock` の利用手順です。package更新は利用者のtool環境、skill更新はworktree単位であり、source編集や別worktreeの更新から自動伝播しません。
 
-- `spec-dock`（`.agents/skills/spec-dock/SKILL.md`、`.claude/skills/spec-dock/SKILL.md`）: SpecDock の scope、文書、Artifact、依存、lifecycle、worktree、managed installation をcurrent CLIで操作・執筆します。
-- `spec-dock-grill-with-docs`（`.agents/skills/spec-dock-grill-with-docs/SKILL.md`、`.claude/skills/spec-dock-grill-with-docs/SKILL.md`）: read-only grilling と domain clarification の後にscope-local evidence Artifactを作成します。
+- `spec-dock`（`.agents/skills/spec-dock/SKILL.md`）: SpecDock の scope、文書、Artifact、依存、lifecycle、worktree、managed installation をcurrent CLIで操作・執筆します。
+- `spec-dock-grill-with-docs`（`.agents/skills/spec-dock-grill-with-docs/SKILL.md`）: read-only grilling と domain clarification の後にscope-local evidence Artifactを作成します。
 
-installationが管理するのは二つのskill slot内の既知のfileだけで、`.claude/settings.json` などのhost設定や他のskillは変更・削除しません。同じpathに同じbytesのfileがあると、利用者のコピーと配布物を区別できないため、uninstallの削除対象になります。両方の投影をcommitすると、協業者やcloud上のagentにも同じskillが届きます。
+installationが管理するのは二つのskill slot内の既知のfileだけで、`.claude/settings.json` などのhost設定や他のskillは変更・削除しません。同じpathに同じbytesのfileがあると、利用者のコピーと配布物を区別できないため、uninstallの削除対象になります。以前の版が `.claude/skills/` に置いたコピーは、updateが既知のfileだけを除去します。
 
 これらは支援手順であり、canonical文書を自動採用したり、通常編集に新しい許可gateを加えたりするものではありません。
 
