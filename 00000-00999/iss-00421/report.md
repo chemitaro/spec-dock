@@ -44,10 +44,11 @@ ID: "iss-00421"
   - 候補 CLI の update（バックアップ `/private/tmp/spec-dock-iss421-dogfood-backup`）で、`.claude` の4ファイルを retire し、`.agents/skills/spec-dock/SKILL.md`・`overview.md` と範囲外の4ファイルを change した。各ファイルは provider とバイト一致する。
   - リンク置換後、候補 CLI で `installation show`（`.claude` の表示なし、`unknown` は init_only の `spec-dock/workspace.json` だけで既存の差異）、`installation update --dry-run`（効果なし）、`installation update --yes`（`unchanged`、バックアップを作らない）、`installation uninstall --dry-run`（84件、`.claude` なし）がすべて exit 0 だった。前後で `.agents` の全ファイルのハッシュは変わらなかった。
   - `workspace validate` の findings は0件（インストール済み CLI・候補 CLI の両方）。
+- PR: https://github.com/chemitaro/spec-dock/pull/422（`Refs #421`、自動クローズなし）。head `1c1eca72` で、CI validate、Commit identity、Provider CI（provider-tests、distribution parity の ubuntu / macOS）がすべて成功し、GitHub の状態は MERGEABLE / CLEAN だった（2026-10-22T11:29Z の観測）。
 
 ## Residual Risks / Follow-ups
 
-- **旧 CLI**: ユーザーのツール環境の 0.2.4（`4d25a8b4` のビルド）は `.claude` 投影を含む。リンクにした worktree（この dogfood を含む）では、その CLI の `installation show` は `.claude` 側を `unsafe` と表示し、`installation update` は親チェーンの symlink で停止する。パッケージの更新は範囲外で、マージ後に行う。
+- **旧 CLI**: ユーザーのツール環境の 0.2.4（`4d25a8b4` のビルド）は `.claude` 投影を含む。この dogfood で、その CLI の `installation show` は `.claude` 側の4ファイルを `unsafe` と表示した。`installation update --dry-run` は、新しい `.agents/skills/spec-dock/SKILL.md` を未知の内容として `PRECONDITION_FAILED`（効果0）で停止した。`.agents` が旧版のままリンクだけ作った worktree では、親チェーンの symlink で停止する（コード上の判断で、未実行）。パッケージの更新は範囲外で、マージ後に行う。
 - **他の worktree**: main checkout と他の linked worktree の `.claude` コピーは未処理である。パッケージ更新後に、各 worktree で `installation update --backup-dir ABS --yes` を実行する。
 - **Claude Code 側**: リンクの作成・削除は Claude Code 側のフックとスキル（`~/.claude`、別作業）に依存する。それがない環境では、Claude Code から SpecDock のスキルは見えない。
 - **残るゲート**: 人間による PR のマージ。マージ後の `work finish` は別の操作である。
