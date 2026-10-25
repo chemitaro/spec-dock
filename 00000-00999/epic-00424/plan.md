@@ -59,22 +59,23 @@ ID: "epic-00424"
 
 | 番号 | 題名（作成時の英語の題名 / slug） | 担当する設計の章 | 依存 | Planning Level |
 |---|---|---|---|---|
-| I-1 | Add Canonical Mode And GitHub Structure Snapshot / `canonical-mode-structure` | 1、2（構造のスナップショットを含む）、6章の I-1 の行 | なし | strict |
-| I-2 | Add Canonical Catalog And Link / `canonical-catalog-link` | 3（登録と基準を除く。Git の版とマウントの確かめを含む）、4、9、6章の I-2 の行 | I-1 | strict |
-| I-3 | Add Periodic Canonical Sync / `canonical-periodic-sync` | 5（launchd、systemd、常駐のプロセス、周期の手順7のスナップショットの更新）、3章の登録と基準と `canonical remove` | I-2 | strict |
-| I-4 | Read Scopes From GitHub In Canonical Mode / `canonical-scope-read` | 6章の I-4 の行 | I-1、I-2 | standard |
-| I-5 | Write Scopes To GitHub In Canonical Mode / `canonical-scope-write` | 6章の I-5 の行 | I-3、I-4 | strict |
-| I-6 | Accept Japanese Titles In Canonical Mode / `canonical-japanese-titles` | 7 | I-5 | standard |
-| I-7 | Add Default Branch Spec Check And Workflow / `canonical-branch-check` | 8 | I-1 | standard |
-| I-8 | Add Throwaway Canonical Migration Script / `canonical-migration-script` | 11 | I-1、I-2、I-7 | strict |
-| I-9 | Integrate Agent Rules Docs And Release / `canonical-rules-docs-release` | 10、12、testability | I-3〜I-8、I-11 | standard |
-| I-10 | Migrate Spec Dock To Canonical Storage / `spec-dock-canonical-cutover` | 移行・互換性・rollback | I-9 | strict |
-| I-11 | Regenerate Dashboard From Structure Snapshot / `canonical-dashboard` | 13 | I-3、I-4 | standard |
-| I-12 | Migrate Remaining Repositories To Canonical Storage / `canonical-repositories-cutover` | 移行・互換性・rollback（各リポジトリの切り替え）、11 | I-10 | strict |
-| I-13 | Remove Legacy Mode And Release 0.4.0 / `legacy-mode-removal` | 14 | I-12 | strict |
+| I-1（`iss-00428`、#428） | Add Canonical Mode And GitHub Structure Snapshot / `canonical-mode-structure` | 1、2（構造のスナップショットを含む）、6章の I-1 の行 | なし | strict |
+| I-2（`iss-00429`、#429） | Add Canonical Catalog And Link / `canonical-catalog-link` | 3（登録と基準を除く。Git の版とマウントの確かめを含む）、4、9、6章の I-2 の行 | I-1 | strict |
+| I-3（`iss-00430`、#430） | Add Periodic Canonical Sync / `canonical-periodic-sync` | 5（launchd、systemd、常駐のプロセス、周期の手順7のスナップショットの更新）、3章の登録と基準と `canonical remove` | I-2 | strict |
+| I-4（`iss-00431`、#431） | Read Scopes From GitHub In Canonical Mode / `canonical-scope-read` | 6章の I-4 の行 | I-1、I-2 | standard |
+| I-5（`iss-00432`、#432） | Write Scopes To GitHub In Canonical Mode / `canonical-scope-write` | 6章の I-5 の行 | I-3、I-4 | strict |
+| I-6（`iss-00433`、#433） | Accept Japanese Titles In Canonical Mode / `canonical-japanese-titles` | 7 | I-5 | standard |
+| I-7（`iss-00434`、#434） | Add Default Branch Spec Check And Workflow / `canonical-branch-check` | 8 | I-1 | standard |
+| I-8（`iss-00435`、#435） | Add Throwaway Canonical Migration Script / `canonical-migration-script` | 11 | I-1、I-2、I-7 | strict |
+| I-9（`iss-00436`、#436） | Integrate Agent Rules Docs And Release / `canonical-rules-docs-release` | 10、12、testability | I-3〜I-8、I-11 | standard |
+| I-10（`iss-00437`、#437） | Migrate Spec Dock To Canonical Storage / `spec-dock-canonical-cutover` | 移行・互換性・rollback | I-9 | strict |
+| I-11（`iss-00438`、#438） | Regenerate Dashboard From Structure Snapshot / `canonical-dashboard` | 13 | I-3、I-4 | standard |
+| I-12（`iss-00439`、#439） | Migrate Remaining Repositories To Canonical Storage / `canonical-repositories-cutover` | 移行・互換性・rollback（各リポジトリの切り替え）、11 | I-10 | strict |
+| I-13（`iss-00440`、#440） | Remove Legacy Mode / `legacy-mode-removal` | 14 | I-12 | strict |
 
 - 番号は足した順で、進める順は下の「進め方」の図のとおりである（I-11 は2026-10-25 に足した。I-9 より前に終える。I-12 と I-13 は、同じ日に、ほかのリポジトリの移行と撤去をこの Epic に入れたときに足した）。
-- 題名は、今の CLI が英数字しか受け付けないため、英語で作る（requirement.md の合意）。
+- 題名は、今の CLI が英数字しか受け付けないため、英語で作る（requirement.md の合意）。I-13 は、`0.4.0` の `.` を CLI が受け付けないため、`Remove Legacy Mode` で作った。
+- Scope は 2026-10-26 に作り、表の依存を `spec-dock dependency add` で登録した。各 Issue の要件・設計・計画は、実装担当が着手のときに、この計画書の節と `design.md` の担当の章から具体化する。
 - Planning Level は、失敗したときの影響と戻しにくさで選んだ。I-2、I-3、I-5 は利用者の仕様のファイルを書き、I-8、I-10、I-12 は GitHub に大量に書き、既定のブランチを変えるので strict にした。I-1 は、すべての Issue が使う構造のスナップショット（C10）と、次の Epic が読む形式を決めるので strict にした。I-13 は、多くのコードとテストを消し、共通の契約のテストを失う危険があるので strict にした。
 - I-10 と I-12 は、統括のエージェントが利用者の目の前で行う。ほかの Issue は、実装担当のエージェントが行う。
 
@@ -321,7 +322,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **受け入れ**：4つのリポジトリのそれぞれで、AC-19（予行演習の記録、`canonical check` と `verify` の一致、検査のワークフローの通過）と、AC-01、AC-04、AC-12 と同じことを確かめる。切り替えの後の3日間の運用で、5つのリポジトリのどれにも仕様の失われがなく、`canonical status` に未解決の異常がない。この結果を利用者に示し、撤去（I-13）に進むかどうかを確かめる。
 - **注意**：1つのリポジトリで止まったときは、そのリポジトリだけを `design.md` の「戻し方」で戻すか、直して続けるかを、利用者に判断してもらう。ほかのリポジトリの切り替えは、止まったリポジトリと独立している。
 
-### I-13 Remove Legacy Mode And Release 0.4.0
+### I-13 Remove Legacy Mode
 
 - **価値**：SpecDock が1つの仕組みだけになる。コード、テスト、文書から従来モードが消え、エージェントが2つのモードで迷わない。
 - **前提**：I-12 の後の3日間の運用で、戻す必要がないことを、利用者が確かめている。
