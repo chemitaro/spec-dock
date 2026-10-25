@@ -105,14 +105,14 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 | 契約 | 持ち主 | 使う側 | `design.md` |
 |---|---|---|---|
 | C1 構造の表し方（種類のラベル、本文の slug の印、ID の作り方）と `StructureSnapshot`、`ScopeNode`、GitHub の呼び出しの部品 | I-1 | I-4、I-5、I-6、I-8 | 2章 |
-| C2 宣言の版4とモードの判定、`dispatch()` の振り分けの入口（I-13 で、版4だけの判定に変える） | I-1 | すべて | 1章、14章 |
-| C3 カタログとリンクの場所、正しいリンクの判定、無視の3行、`CANONICAL_NOT_LINKED`、名前で Scope を探す `catalog_tree` | I-2 | I-3、I-4、I-5、I-8 | 2章、3章 |
+| C2 宣言の版4とモードの判定、`dispatch()` の振り分けの入口、`resolve_context` より前に呼ぶ表 `REPOSITORY_INDEPENDENT_HANDLERS`（I-13 で、版4だけの判定に変える） | I-1 | すべて | 1章、14章 |
+| C3 カタログとリンクの場所、正しいリンクの判定、無視の3行、`CANONICAL_NOT_LINKED`（コードの定数は I-1 が置き、I-2 が使う）、名前で Scope を探す `catalog_tree` | I-2 | I-3、I-4、I-5、I-8 | 2章、3章 |
 | C4 カタログの排他と、変更の束の形式（`origin` を含む） | I-2 | I-3（読む）、I-5（書く） | 4章 |
 | C5 canonical の中身（形式1の管理ファイル） | I-2 | I-3、I-8 | 5章 |
 | C6 カタログに対する Git の呼び出しの関数（フックと署名を外す） | I-2 | I-3、I-5 | 5章 |
 | C7 版のファイルと、検査のワークフローの見本、`specdock-ci-check.sh` | I-7 | I-8（`cut`）、I-9、I-10、I-12、I-13（0.4.0） | 8章 |
 | C8 エラーのコードと次の1手、結果の状態の規則 | 各コマンドの持ち主 | I-9（一覧の確認） | 12章 |
-| C9 状態の置き場（根、登録簿、`state.json` の形式と意味、基準）と、すぐの実行の頼み方（launchd、systemd、常駐のプロセス） | I-3 | I-2（`status` の同期の項目は I-3 が足す）、I-5（`work finish`）、I-11（`dashboard` の項目） | 5章 |
+| C9 状態の置き場（根、登録簿、`state.json` の形式と意味、基準）と、すぐの実行の頼み方（launchd、systemd、常駐のプロセス） | I-3（根の求め方 `resolve_state_root` は I-1） | I-2（`status` の同期の項目は I-3 が足す）、I-5（`work finish`）、I-11（`dashboard` の項目） | 5章 |
 | C10 構造のスナップショット（置き場、`snapshot.json` と `probe.json` の版1の形式、`ensure_fresh` と3つの新しさの段階、書き込みの反映、書けないときのメモリーの上の扱い） | I-1 | I-3（周期の手順7）、I-4、I-5、I-11、次の Epic（epic-00425） | 2章 |
 | C11 環境の判定（OS、コンテナ、git の版、systemd のユーザー、linger）と、その注入の仕方 | I-2（systemd と linger は I-3 が足す） | I-3、I-9 | 3章、5章 |
 
@@ -229,7 +229,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **価値**：既定のブランチに仕様が入ったPRを、CIで見つけられる。各プロダクトは見本を写すだけで使える。
 - **作るもの**（`design.md` 8章）：`canonical check`、ワークフローの見本、版のファイル（配布資産と、`pyproject.toml` の版と同じかを確かめる単体テスト）、`.github/scripts/specdock-ci-check.sh`、`.github/workflows/release-tag.yml`。spec-dock の `spec-dock-check.yml` を置くのと、`ci.yml` の変更は、I-10 の切り替えのPRで行う（それまでは失敗するため）。
 - **受け入れ**：
-  - 一時のリポジトリで、仕様のパス、`.canonical` の下のパス、`.meta.json`、版3の宣言、壊れた配布資産、無視の3行の欠けのそれぞれを、パスと次の1手付きで見つけ、終了コード7で終わる。正しいツリーでは通る。
+  - 一時のリポジトリで、仕様のパス、`.canonical` の下のパス、`.meta.json`、版3の宣言（`CANONICAL_NOT_MIGRATED` ではなく、失敗の1件として）、壊れた配布資産、無視の3行の欠けのそれぞれを、パスと次の1手付きで見つけ、終了コード7で終わる。`canonical check` は `REPOSITORY_INDEPENDENT_HANDLERS`（C2）に登録する。正しいツリーでは通る。
   - ネットワークと GitHub のトークンなしで動く。
   - 見本のワークフローの手順のコマンド（SpecDock を入れて `canonical check` を実行する）と、`specdock-ci-check.sh` を、一時のリポジトリで確かめる。版のタグはまだないので、入れるのは手元で作った wheel でよい。実際の GitHub での動きは、I-10 で確かめる。
   - `release-tag.yml` の判定（版が変わり、0.3.0 以上で、タグがないときだけ作る）を、判定のスクリプトの単位で確かめる。

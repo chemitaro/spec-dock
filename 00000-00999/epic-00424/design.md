@@ -156,11 +156,11 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 ### 1. モードの判定（R-A5、R-A6）
 
-- `read_workspace_declaration` は、版 3 と 4 を受け付けるように変え、モード（`legacy` か `canonical`）を返す。それ以外の版は、今と同じく `PRECONDITION_FAILED` で止める。書き込みの許可（`require_writer`）は、どちらの版でも `writer_protocol` が `specdock.worktree-writer/v1` であることを求める。
+- `read_workspace_declaration` は、版 3 と 4 を受け付けるように変える。宣言は今までどおり辞書で返し（従来の呼び出し元の `start_snapshot.py` と `direct_validation.py` を変えないため）、モード（`legacy` か `canonical`）は `workspace_mode(宣言)` と `ProjectContext.mode` で求める。それ以外の版は、今と同じく `PRECONDITION_FAILED` で止める。書き込みの許可（`require_writer`）は、どちらの版でも `writer_protocol` が `specdock.worktree-writer/v1` であることを求める。
 - `dispatch()` は、モードに応じて従来の処理か canonical の処理を呼ぶ。従来の処理の関数と、その下の `.meta.json` の読み書きは変えてはならない。canonical の処理は、新しいモジュールに置く（「変更対象」の章）。振り分けは `dispatch()` の1か所に集める。
-- `canonical` グループのコマンドは、宣言の版が3のリポジトリでは `CANONICAL_NOT_MIGRATED`（終了コード3）で止まり、「このリポジトリは移行していない」と示す。
+- `canonical` グループのコマンドは、宣言の版が3のリポジトリでは `CANONICAL_NOT_MIGRATED`（終了コード3）で止まり、「このリポジトリは移行していない」と示す。ただし `canonical check` は例外で、版3の宣言を失敗の1件として返す（8章）。
 - `workspace migrate`（宣言の `writer_protocol` を切り替える今のコマンド）は、版4では `CANONICAL_NOT_APPLICABLE` で止まる。版4の宣言を版3に書き換えてはならない。
-- **リポジトリによらないコマンド**：`canonical sync --registered` は、登録簿のカタログを順に処理するので、リポジトリの外（launchd の作業ディレクトリはホーム）から動く。`dispatch()` の `resolve_context` より前に振り分ける。
+- **リポジトリによらないコマンド**：`canonical sync --registered` は、登録簿のカタログを順に処理するので、リポジトリの外（launchd の作業ディレクトリはホーム）から動く。`dispatch()` の `resolve_context` より前に振り分ける。そのために、I-1 が `resolve_context` より前に呼ぶ表 `REPOSITORY_INDEPENDENT_HANDLERS`（名前空間と作業ディレクトリを受け取り、宣言を自分で調べるコマンドも登録できる）を作り、C2 の公開の形とする。`canonical sync --registered`（I-3）と `canonical check`（I-7）は、この表に登録する。
 - 移行前の版の SpecDock（0.2.4）は、版4の宣言を読むと止まる（今のコードの動き）。これで R-A5 の前半を満たす。
 - canonical のルートの `.spec-dock-canonical.json` の `format` が、この SpecDock が知る版（1）より大きいとき、カタログに書くすべてのコマンドと定期の同期は、書く前に止まる（R-A5 の後半。`CANONICAL_FORMAT_UNSUPPORTED`、次の1手は「SpecDock を更新する」）。
 - この章のモードの振り分けは、移行の間（0.3.0）だけのものである。撤去（14章）で、`read_workspace_declaration` は版4だけを受け付けるようになり、`dispatch()` の振り分けと従来の処理は消える。
@@ -180,7 +180,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 | 状態 | open / closed と `state_reason`（今と同じ解釈） |
 | 作業中の印 | `work start` で付け、`work finish` で外すラベル `spec-dock:in-progress` と、足すだけの担当者 |
 
-- **印の読み方**：本文を `\r?\n` で行に分け、行末の空白を除いた行が `^<!-- spec-dock:slug=([a-z0-9]+(?:-[a-z0-9]+)*) -->$` に合うものを数える。本文のどこにあってもよいが、ちょうど1つでなければならない。0個、2個以上、slug が規則に合わないときは、構造の異常として扱う。GitHub の画面で本文を編集すると改行が `\r\n` になることがあるため、こう読む。
+- **印の読み方**：本文を `\r?\n` で行に分け、行末の空白を除いた行が `^<!-- spec-dock:slug=(.*) -->$` に合うものを数える。本文のどこにあってもよいが、ちょうど1つでなければならない。0個なら `SLUG_MARKER_MISSING`、2個以上なら `SLUG_MARKER_MULTIPLE`（正しい印と規則外の印が1つずつのときも含む）、1個で slug が規則（`^[a-z0-9]+(?:-[a-z0-9]+)*$`）に合わなければ `SLUG_MARKER_INVALID` の異常とする。I-8 の移行のスクリプトは、この規則を写す。GitHub の画面で本文を編集すると改行が `\r\n` になることがあるため、こう読む。
 - **ラベル**：ないときは、作る側のコマンド（`scope create`、`scope import`、`work start`、移行のスクリプト）が作る。色と説明は固定の値を使う。
 - Scope でない Issue への blocked by は、着手の判定では「その Issue が開いていれば着手できない」と扱う。`workspace validate` は警告を出す。
 
@@ -250,7 +250,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 - **呼び出しの部品**：`infra/github_structure.py` に、新しい呼び出しの関数を作る。`gh api` の呼び出し方（`--hostname github.com --include`、標準入力からの本文）は今の `GithubIssueGateway` と同じにするが、次の点を今の分類に頼らずに扱う。
   - メソッドは GET、POST、PATCH、DELETE。本文は、数値と配列を含む JSON を送れる。
   - エンドポイントごとに「正常な状態コード」を渡す（例：親の取得は 200 と 404）。それ以外を、今と同じ分類（権限なし、拒否、接続不可）にする。
-  - **レート制限**：403 か 429 で、`retry-after` ヘッダー、`x-ratelimit-remaining: 0`、または本文の「rate limit」があれば、レート制限と判定する。読み取りは、`retry-after`（なければ `x-ratelimit-reset` までの時間。最大60秒）だけ待って、3回まで再試行する。500番台の読み取りは、1秒、2秒、4秒の間をおいて3回まで再試行する。書き込みは自動では再試行せず、`GITHUB_RATE_LIMITED` で止まる。
+  - **レート制限**：403 か 429 で、`retry-after` ヘッダー、`x-ratelimit-remaining: 0`、または本文の「rate limit」があれば、レート制限と判定する。読み取りは、要る待ち（`retry-after`、なければ `x-ratelimit-reset` までの時間）が60秒以下なら、その間だけ待って、3回まで再試行する。60秒を超えるときは、待たずに `GITHUB_RATE_LIMITED`（再開できる時刻 `retry_at` 付き）で止まる。500番台の読み取りは、1秒、2秒、4秒の間をおいて3回まで再試行する。書き込みは自動では再試行せず、`GITHUB_RATE_LIMITED` で止まる。
   - 呼び出しは1つずつ順に行う。並べて呼ばない（GitHub の二次のレート制限の指針）。
   - 1つのコマンドの中で書き込みを続けるときは、書き込みの間を1秒以上あける（公式の Best practices）。時刻と待ちは注入できるようにし、テストでは待たない。
   - 結果が分からない書き込みは、今と同じく読み直して確かめ、それでも分からなければ終了コード6で、効果（`effects`）と再開の手順（`recovery`）を返す。
@@ -295,8 +295,8 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 | 段階 | 使う場面 | 変わったかの確かめ | 全体を取り直す条件 | GitHub につながらないとき |
 |---|---|---|---|---|
-| `display` | 表示だけのコマンド（6章の表で「読む」が構造だけのもの）と `canonical status --structure` | 最後の確かめから60秒を超えていれば行う | 変化あり、`fetched_at` から30分を超えた、ファイルがない、版が違う | 今のスナップショットで続け、`warnings` に `GITHUB_SNAPSHOT_STALE`（取得の時刻）を入れる。ファイルがなければ `GITHUB_UNAVAILABLE` で止まる |
-| `decision` | GitHub に書くコマンドの判断（6章の表で「書く」に GitHub があるもの） | 必ず行う | 変化あり、`fetched_at` から5分を超えた、ファイルがない、版が違う | 書く前に `GITHUB_UNAVAILABLE` で止まる |
+| `display` | 表示だけのコマンド（6章の表で「読む」が構造だけのもの）と `canonical status --structure` | 最後の確かめから60秒を超えていれば行う | 変化あり、`fetched_at` から30分を超えた、ファイルがない、版が違う | 今のスナップショットで続け、`warnings` に `GITHUB_SNAPSHOT_STALE`（取得の時刻）を入れる。ファイルがなければ、元の失敗のコード（つながらなければ `GITHUB_UNAVAILABLE`、制限なら `GITHUB_RATE_LIMITED`、権限なら `GITHUB_ACCESS_DENIED`）で止まる |
+| `decision` | GitHub に書くコマンドの判断（6章の表で「書く」に GitHub があるもの） | 必ず行う | 変化あり、`fetched_at` から5分を超えた、ファイルがない、版が違う | 書く前に、元の失敗のコード（`GITHUB_UNAVAILABLE`、`GITHUB_RATE_LIMITED`、`GITHUB_ACCESS_DENIED` など）で止まる |
 | `cycle` | 定期の同期（5章の周期の手順7） | 周期ごとに行う | `display` と同じ | 記録だけを残し、保存と push は続ける |
 
   - `decision` では、さらに、判断に使う Issue を `GET …/issues/{n}` で読み直す。作成では親、依存の追加では両端、`work start` では対象と、その依存先のうち Scope でないもの、閉じる操作では対象である。読み直した値がスナップショットと違えば、読み直した値で判断し、スナップショットにも反映する。
@@ -304,7 +304,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 - **書き込みの反映**：SpecDock のコマンドは、GitHub への書き込みが成功するたびに、その結果（作った Issue、題名、状態、ラベル、担当者、親子、依存）をスナップショットの該当する要素に反映し、`local_writes` に記録する。全体の取り直しを書き込むときは、`fetch_started_at` より後の `local_writes` の変更を重ねてから書く（取り直しの途中の書き込みを消さないため）。それより前の `local_writes` は消す。
 - **書けないとき**：状態の置き場に書けないとき（サンドボックスの中など）は、スナップショットをプロセスのメモリーの上だけで持つ。書けないことを理由に失敗してはならない。
 - **読むだけのコマンドの契約**：表示だけのコマンドが書いてよいのは、状態の置き場の `snapshot.json` と `probe.json` だけである。リポジトリ、カタログ、`.git`、GitHub には書かない。今の CLI の「構造をキャッシュしない」方針は、利用者の方針（R-I1）に従い、canonical モードでだけ変える。従来モードは変えない。
-- **規則の部品**：`StructureSnapshot` は、スナップショットを読み込んだもので、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、上の `issues` の1要素と同じ項目を持つ。階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。`dependency add` の循環の確認も、スナップショットの上で行う。
+- **規則の部品**：`StructureSnapshot` は、スナップショットを読み込んだもので、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、上の `issues` の1要素と同じ項目を持つ。階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。`dependency add` の循環の確認も、スナップショットの上で行う。異常のために `id` が決まらない依存先は、循環の確かめに入れない。そのような依存を持つ Scope は、着手の判定で「着手できる」にしない（I-4、I-11）。
 - 費用の見込み（spec-dock、Scope 243件）：変化がない周期は、304 が3回で、主のレート制限を消費しない。全体の取り直しは GraphQL の3回で、1回あたり約4点（2026-10-26 に実測。`rateLimit.cost` で確かめる）。30分ごとの取り直しを含めても、1時間に GraphQL の数十点である（上限は1時間に5,000点）。
 
 #### 内容の置き場
@@ -436,7 +436,7 @@ spec-dock/canonical のルート
 
 #### 状態の置き場
 
-- 根は `${XDG_STATE_HOME:-$HOME/.local/state}/spec-dock/` とする（macOS でも同じ）。`canonical link` を実行したときに求めた絶対パスを、定期の実行の引数（`--state-root <絶対パス>`）に書き込む。定期の実行の環境では `XDG_STATE_HOME` が普通は設定されていないため、実行のたびに求め直してはならない。
+- 根は `${XDG_STATE_HOME:-$HOME/.local/state}/spec-dock/` とする（macOS でも同じ）。根の求め方は、構造のスナップショット（C10）の置き場にも使うので、I-1 が `infra/state_root.py` の `resolve_state_root` として作る。この関数は、明示の上書き（`--state-root` の値）を受け取り、あればそれを使う。I-3 は、登録簿、`state.json`、`--state-root` を、この上に足す。`canonical link` を実行したときに求めた絶対パスを、定期の実行の引数（`--state-root <絶対パス>`）に書き込む。定期の実行の環境では `XDG_STATE_HOME` が普通は設定されていないため、実行のたびに求め直してはならない。
 - **登録簿**：`<根>/canonical-registry.json`。中身は `{"version": 1, "scheduler": "launchd|systemd|loop", "catalogs": [{"catalog": "<実際のパス>", "main_checkout": "...", "repository": "github.com/<owner>/<repo>", "git": "<git の絶対パス>", "registered_at": "..."}]}`。`repository` は、構造のスナップショットの置き場を決めるのに使う（2章）。
   - 書くときは、同じディレクトリの一時ファイルに書いてから `rename` する。同時の書き込みは、`<根>` のディレクトリへの `flock` で防ぐ。
   - `git` には、`canonical link` を実行したときの `PATH` で見つかった git の絶対パスを記録する。定期の実行の `PATH` は狭く、macOS のプライバシーの保護の許可もプログラムごとなので、利用者がふだん使う git を使うためである（調査の記録：Apple の `/usr/bin/git` は外付けのボリュームを読めず、Homebrew の git は読めた）。
@@ -648,7 +648,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `workspace validate` | 全体とカタログ | なし | 下の検査を行う。`--ci` は `CANONICAL_NOT_APPLICABLE` で止まり、`canonical check` を案内する | I-4 |
 | `workspace doctor` | 今の項目と、`canonical status` と同じ項目 | なし | | I-4 |
 | `workspace migrate` | 宣言 | なし | `CANONICAL_NOT_APPLICABLE` で止まる | I-1 |
-| `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手として `spec-dock canonical link` を示す | I-1 |
+| `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手を、`warnings` の `CANONICAL_NOT_LINKED`（`recovery` に `spec-dock canonical link`）で示す。このコードの定数は I-1 が1か所に置き、I-2 はそれを使う | I-1 |
 | `installation show`、`update`、`uninstall` | 今と同じ | 今と同じ | 版3と版4の両方を受け付ける。版4で `--expect-current` を付けたときの選択と Scope の解決は I-4 が作る（I-1 の時点では、この組み合わせだけ `CANONICAL_NOT_IMPLEMENTED`） | I-1（`--expect-current` は I-4） |
 | `active`、`help`、`completion` の文書 | — | — | 新しいコマンドを載せる | I-9 |
 
@@ -685,7 +685,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
   4. `spec-dock/workspace.json` があり、版が4で、`writer_protocol` が既知である。
   5. 配布資産が、このパッケージの資産か、既知の古い版と一致する（今の `installation show` の判定を使う）。`spec-dock/.gitignore` に、3章の無視の3行がある。
   6. `spec-dock/system/spec-dock-version` が、動いている SpecDock の版と同じ（違えば警告）。
-- 失敗は1件ずつ、パスと次の1手を付けて返し、`CANONICAL_CHECK_FAILED`（終了コード7）で終わる。宣言の版が3なら、`CANONICAL_NOT_MIGRATED` で止まる。
+- 失敗は1件ずつ、パスと次の1手を付けて返し、`CANONICAL_CHECK_FAILED`（終了コード7）で終わる。宣言の版が3のときも、調べること4の失敗の1件（パスと次の1手付き）として返す。見つけた問題をすべて並べて CI に示すためで、1章の版3の止まり方の例外である（撤去の後も同じ）。
 
 #### ワークフロー
 
@@ -855,6 +855,9 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `GITHUB_STRUCTURE_INVALID` | 7 | 示した Issue のラベル、印、親子を直す（`scope move` など） |
 | `GITHUB_RATE_LIMITED` | 5 | 示した時刻の後に同じコマンドを実行する |
 | `GITHUB_UNAVAILABLE` | 5 | 接続と `gh auth status` を確かめる |
+| `GITHUB_ACCESS_DENIED`、`GITHUB_REQUEST_REJECTED`、`GITHUB_RESPONSE_INVALID` | 今と同じ | 今の `github_lifecycle` と同じ分類と次の1手（権限と `gh auth status`、示した GitHub の応答を確かめる） |
+| `GITHUB_EFFECT_UNKNOWN`、`GITHUB_CREATE_IDENTITY_UNKNOWN` | 6 | GitHub の今の状態を確かめてから、`recovery` の手順に従う（作成なら `scope import github`） |
+| `CANONICAL_NOT_IMPLEMENTED` | 3 | SpecDock 0.3.0 を待つ（I-1〜I-8 の途中だけ。I-9 で残っていないことを確かめる） |
 | `GITHUB_SNAPSHOT_STALE` | —（警告） | 表示は取得の時刻の時点のもの。つながったら、次の表示か定期の同期で新しくなる |
 | `SLUG_REQUIRED` | 3 | `--slug <英小文字とハイフン>` を付ける |
 
@@ -890,7 +893,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
 - **消すものの決め方**：0.4.0 の `dispatch()` から到達できないコードを消す。ファイルの一覧を正本にしない（canonical の処理が、今のモジュールの部品を使っていることがあるため）。目安として、2026-10-25 の時点で `.meta.json` を読み書きするか、それに頼る木の読み込みを使うファイルは、`src/spec_dock/runtime/` の下に34ある（代表は `infra/scope_metadata.py`、`infra/scope_tree.py`、`infra/fs_repo.py`、`infra/deps_reader.py`、`application/scope_query.py`、`application/start_snapshot.py`、`application/direct_scope_*.py`、`direct_finish.py`、`direct_dependencies.py`、`direct_migration.py`）。canonical の処理と同じファイルにある部分（`direct_worktrees.py`、`work_start.py` など）は、従来の経路だけを消す。
 - **消すもの**：
   1. `dispatch()` のモードの振り分けと、従来の処理。`.meta.json` の読み書き。
-  2. 宣言の版3の受け付け。`read_workspace_declaration` は版4だけを受け付け、版3を読むと、すべてのコマンドが `CANONICAL_NOT_MIGRATED`（12章の 0.4.0 の次の1手）で止まる。版5以上は、今と同じく `PRECONDITION_FAILED` で止まる。
+  2. 宣言の版3の受け付け。`read_workspace_declaration` は版4だけを受け付け、版3を読むと、すべてのコマンドが `CANONICAL_NOT_MIGRATED`（12章の 0.4.0 の次の1手）で止まる（`canonical check` だけは、8章のとおり失敗の1件として返す）。版5以上は、今と同じく `PRECONDITION_FAILED` で止まる。
   3. canonical モードで拒否するだけのコマンドと引数。コマンドの `workspace migrate` と `workbench copy`、引数の `workspace validate --ci`、`workspace sync --source local`、`dependency check --source local`。使われなくなるエラーのコード（`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`）も消す。コマンドの数は 53 から 51 になる。
   4. テンプレートの前付けの `タイトル:` と `親:` と、写すときにそれを除く処理（6章）。
   5. 規則の節の版3の文（10章）と、README、配布する `spec-dock/docs/`、spec-dock の `AGENTS.md` の、従来モードの記述。
@@ -1071,6 +1074,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
   - コマンドの数（44）とコマンドの一覧を確かめるテスト（`test_issue413_contract.py:160`、`test_cli_vnext_contract.py:17-65`、`test_cli_docs_vnext.py:35`）。新しいコマンドを足した数と一覧に直す。
   - 配布資産の一覧と値（`static-inventory.json` の値、資産のファイルの数）を確かめるテスト。
   - 文書の中身を確かめるテスト（新しいコマンドと規則の節を足したことによる変化）。
+  - 版3のリポジトリの `installation show` で、配布資産の `workspace.json` が版4になるため、宣言が `known-old` と示されること（I-1。配布資産の値の変化）。そのほかの版3の振る舞い（`workspace validate`、`workspace validate --ci`、`workspace doctor`、`installation update` が宣言を書き換えないこと）は変わらないことをテストで確かめ、spec-dock 自身のCIの手順 `.github/scripts/specdock-ci-validate.sh` が通ることも確かめる。
   - `installation init` が版4の宣言を書くこと（I-1）に伴い、init で作った作り物に従来のコマンドを当てるテストは、init の直後に宣言を版3に戻す準備の行だけを足してよい。確かめる中身は変えない。変えたテストは、その Issue の報告書に一覧で書く（2026-10-26 の統括の判断）。
 - **受け入れ条件との対応**：
 
