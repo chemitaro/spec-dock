@@ -32,6 +32,7 @@ ID: "epic-00424"
 - 実装の前に、リポジトリの `AGENTS.md`（提供側と利用側の区別、層の構成、テストの置き場）と、`.agents/skills/spec-dock/SKILL.md` を読むこと。
 - 2026-10-25 に、この会話を知らない別のエージェントが、この設計書を実装担当の立場で読み直した。その指摘（コマンドの抜け、`work finish` の確認の条件、移行時の無視されたファイル、書き換えの検出の穴、フック、出力の契約、GitHub の呼び出し、状態のファイルの置き場など）は、この版に反映してある。
 - 同じ日に、利用者の判断を受けて、次を足した。GitHub の構造を一括で取得して使い回す「構造のスナップショット」（2章）、今までの形のダッシュボードの作り直し（13章）、Linux の systemd のない環境（コンテナ）での定期の実行と、マウントしたチェックアウトでの止まり方（3章、5章）。
+- さらに同じ日に、利用者が、2つのモードを長く並べて維持せず、利用者の5つのリポジトリをすべて移し、従来モードのコードをこの Epic の中で撤去すると決めた（R-J1〜R-J8）。そのため、従来モードは「移行の間だけ」のものになり、14章（撤去）と、「移行・互換性・rollback」の章の全リポジトリの移行を足した。1〜13章の canonical モードの中身は変わらない。
 
 ### 用語
 
@@ -45,8 +46,10 @@ ID: "epic-00424"
 | 構造 | Scope の番号、種類、親子、依存、状態、題名。正本は GitHub Issue |
 | 内容 | 要件、設計、計画、報告、Artifact などのファイル。正本は canonical |
 | 宣言の版 | `spec-dock/workspace.json` の `schema_version`。3 は今の形（従来モード）、4 は新しい形（canonical モード） |
-| 従来モード | 宣言の版が3のリポジトリでの動き。今のコードをそのまま使う（R-A6） |
+| 従来モード | 宣言の版が3のリポジトリでの動き。移行の間だけ、今のコードをそのまま使う（R-A6）。撤去で消す |
 | canonical モード | 宣言の版が4のリポジトリでの動き。この設計書の対象 |
+| 移行の間 | SpecDock 0.3.0 を入れてから、撤去した 0.4.0 を入れるまで。0.3.0 は2つのモードを扱う |
+| 撤去 | R-J1 のすべてのリポジトリを移した後に、従来モードのコードを消し、0.4.0 を出すこと（14章） |
 | 定期の同期 | PCのユーザーごとに1つの定期の実行が、60秒ごとに `spec-dock canonical sync --registered` の1周期を動かすこと。実行の仕組みは、macOS は launchd、systemd の動く Linux は systemd のユーザーのタイマー、systemd のない Linux（コンテナなど）は常駐のプロセス |
 | 常駐のプロセス | systemd のない Linux で使う、`spec-dock canonical sync --registered --loop` のプロセス。1つの環境に1つだけ動き、60秒ごとに1周期を動かす |
 | 状態の置き場 | PCのユーザーごとの `~/.local/state/spec-dock/`。登録簿、カタログごとの同期の状態、構造のスナップショット、ログを置く。カタログが読めないときでも記録できるよう、カタログの外に置く |
@@ -66,10 +69,11 @@ ID: "epic-00424"
 - **G3 用意は1つ**：`spec-dock canonical link` が、カタログ、保護、除外、リンク、定期の同期の登録をまとめて行う。何度実行しても同じ結果になる（約束2、R-B3）。
 - **G4 保存の経路は1本**：保存、取り込み、push は、定期の同期だけが行う。SpecDock のほかのコマンドはコミットしない（約束3、R-C1、R-D1）。
 - **G5 止まって案内する**：足りないものや異常があれば、推測で直さず、次に実行するコマンドか、足す設定を示して止まる（約束5、R-B5、R-H2）。
-- **G6 移行していないリポジトリを壊さない**：宣言の版が3のリポジトリでは、新しい SpecDock でも今の動きをそのまま保つ（R-A6）。
-- **G7 すべてのコマンドが答える**：canonical モードで、今の44のコマンドと新しいコマンドのすべてが、canonical の処理か、理由と次の1手を付けた拒否のどちらかで動く。未実装のまま出してはならない。
+- **G6 移行の間、移行していないリポジトリを壊さない**：移行の間、宣言の版が3のリポジトリでは、0.3.0 でも今の動きをそのまま保つ（R-A6）。
+- **G7 すべてのコマンドが答える**：canonical モードで、今の44のコマンドと新しいコマンドのすべてが、canonical の処理か、理由と次の1手を付けた拒否のどちらかで動く。未実装のまま出してはならない。拒否するだけのものは、撤去で消す（14章）。
 - **G8 GitHub に負荷をかけない**：構造は一括で取得して使い回し、操作のたびに問い合わせない。変化の確かめは主のレート制限を消費しない条件付きの要求で行い、要求は1つずつ順に送る（R-I1〜R-I6）。
 - **G9 macOS と Linux で同じに動く**：定期の実行の仕組みだけを環境に合わせて選び、ほかの動きは同じにする（R-C7、R-C8）。
+- **G10 最後は1つの仕組みだけ**：R-J1 のすべてのリポジトリを移したら、従来モードのコードを撤去し、canonical モードだけを持つ 0.4.0 にする。撤去で、共通の契約とそのテストを失わない（R-J6、R-J7）。
 
 ## Current / Target
 
@@ -91,6 +95,22 @@ ID: "epic-00424"
 - 構造は、コマンドのたびに `.meta.json` と GitHub から読み、保存して使い回すことはしない。
 - 提供側のCI（`.github/workflows/provider-ci.yml`）は、`make lint` と `uv run pytest` を `ubuntu-latest` で、配布の確かめを `ubuntu-latest` と `macos-latest` で動かしている。
 - spec-dock のmainのチェックアウトの `spec-dock/initiatives/` には、Git で無視された `.workbench` のファイルが99個ある（2026-10-25）。これらは追跡されていないので、canonical には入らない。
+
+#### 利用者のリポジトリ（R-J1。2026-10-25 に、読むだけで調べた）
+
+| リポジトリ | mainのチェックアウト | 既定のブランチ | Scope | 作業用のworktree | 今のCIの SpecDock の手順 |
+|---|---|---|---|---|---|
+| spec-dock | `/Volumes/990p2t/workspace/tools/spec-dock` | `main` | 243（Initiative 3、Epic 24、Issue 216。依存135） | 5 | `ci.yml` が `.github/scripts/specdock-ci-validate.sh` で、ソースの wheel の `workspace validate --ci` を実行する |
+| taikyohiyou_project（退去費用プロダクト） | `/Volumes/990p2t/workspace/product/taikyohiyou_project` | `develop` | 246（4、44、198。依存284） | 0 | `ci.yml` が `pip install 'git+…/spec-dock.git@0e7dc868…'` の後に `workspace validate --ci --json` |
+| housing-lifecycle | `/Volumes/990p2t/workspace/company-os/businesses/housing-lifecycle` | `main` | 233（16、36、181。依存56） | 15（`/Volumes/990p2t/workspace/worktrees/orca/housing-lifecycle/` の下） | `ci.yml` が `pip install 'git+…/spec-dock@4d25a8b4…'`、`spec-dock --version`、`workspace validate --ci --json` |
+| input-devices | `/Volumes/990p2t/workspace/company-os/businesses/input-devices` | `main` | 17（1、3、13。依存13） | 1（`/private/tmp` の下で、Git は prunable と示す） | `ci.yml` の1つの手順が `uvx --from git+…/spec-dock@4d25a8b4… spec-dock workspace validate --ci --json` |
+| company-os | `/Volumes/990p2t/workspace/company-os` | `main` | 0（`spec-dock/initiatives/` は空） | 2 | `ci.yml` が `uv tool install git+…/spec-dock@4d25a8b4…` の後に `workspace validate --json` と `workspace doctor --json` |
+
+- どの Scope も `backend` は GitHub である。ローカルの ID は、spec-dock の `init-local-00002` と `init-local-00003` だけである。
+- 調べた時点で、作業用のworktreeのブランチに、既定のブランチにない仕様の変更（コミット済みも未コミットも）はなかった（この Epic のブランチを除く）。切り替えの時点で、もう一度調べる。
+- housing-lifecycle と input-devices は、company-os の作業ツリーの中にある別のリポジトリである。company-os は `.gitignore` の `/businesses/*` で両方を無視している。それぞれが自分の `.git` を持つので、カタログもそれぞれの mainのチェックアウトの中にでき、互いに重ならない。
+- spec-dock には、別のクローン `/Volumes/990p2t/workspace/worktrees/specdock-cleanup-planning`（ブランチ `iss-00411-retired-cli-surface-cleanup`、宣言の `writer_protocol` が古い `specdock.writer/v1`）がある。扱いは、I-10 の前に利用者に確かめる（requirement.md の未解決事項）。
+- taikyohiyou_project の `.github/scripts/resolve_staging_route.py`（67行目）は、`spec-dock/` で始まるパスを特別に扱う。`Makefile` の `spec-close` は `spec-dock work finish @current --yes --json` を呼ぶ。どちらも、切り替えの後に動きが変わらないかを I-12 で確かめる。
 
 ### Target
 
@@ -129,7 +149,8 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 ```
 
 - canonical モードでは、構造を構造のスナップショットから読み（書く判断の前には GitHub で確かめる）、内容をカタログのファイルから読む。`.meta.json` は読みも書きもしない。
-- 従来モードのコードは残し、変えない。どちらのモードで動くかは、宣言の版だけで決める。
+- 移行の間（0.3.0）は、従来モードのコードを残し、変えない。どちらのモードで動くかは、宣言の版だけで決める。
+- 撤去の後（0.4.0）は、canonical モードだけが残る。宣言は版4だけを受け付け、版3を読むと移行の方法を示して止まる（14章）。
 
 ## 責務・Interface
 
@@ -142,6 +163,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 - **リポジトリによらないコマンド**：`canonical sync --registered` は、登録簿のカタログを順に処理するので、リポジトリの外（launchd の作業ディレクトリはホーム）から動く。`dispatch()` の `resolve_context` より前に振り分ける。
 - 移行前の版の SpecDock（0.2.4）は、版4の宣言を読むと止まる（今のコードの動き）。これで R-A5 の前半を満たす。
 - canonical のルートの `.spec-dock-canonical.json` の `format` が、この SpecDock が知る版（1）より大きいとき、カタログに書くすべてのコマンドと定期の同期は、書く前に止まる（R-A5 の後半。`CANONICAL_FORMAT_UNSUPPORTED`、次の1手は「SpecDock を更新する」）。
+- この章のモードの振り分けは、移行の間（0.3.0）だけのものである。撤去（14章）で、`read_workspace_declaration` は版4だけを受け付けるようになり、`dispatch()` の振り分けと従来の処理は消える。
 
 ### 2. GitHub の構造（R-A2、R-A3、R-E1〜R-E4）
 
@@ -333,6 +355,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 8. **ツールの設定**：9章の判定を行い、足りない設定を正確な1行で `warnings` に返す。
 
 - 3〜7の途中で失敗したときは、それまでの効果を `succeeded`、残りを `not_attempted` とした `partial`（終了コード6）で返し、`recovery` に `spec-dock canonical link`（もう一度実行すれば続きから整う）を入れる。
+- **`--no-schedule`**：付けると、手順6を行わない。登録簿に載せず、定期の実行を作らず、起動もしない。手順7の基準は、この場合も記録する。予行演習（R-J3。11章）と、手で `canonical sync` を実行する確かめのための指定である。`canonical status` の `sync` は、「定期の実行なし（`--no-schedule`）」と示す。登録されていないカタログは、`canonical sync`（`--registered` なし）をそのチェックアウトで実行すれば処理される。
 
 #### SpecDock のほかのコマンドから
 
@@ -636,13 +659,13 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
      - Scope の下に、保留がない。保留があれば、待たずに `CANONICAL_SAVE_HELD` で止まり、保留の種類ごとの解き方（5章）を示す。
   4. 確かめられなければ、Issue を閉じずに `CANONICAL_SAVE_UNCONFIRMED` で止まり、`recovery` に `spec-dock canonical status` を入れる。束を書いた後なので、`partial`（終了コード6。束の書き込みを `succeeded`、Issue を閉じることを `not_attempted` とする）で返す。
 - **`workspace validate` の検査**：種類と階層の規則、本文の印と slug、ID の重複、依存の循環、Scope のディレクトリがちょうど1つあること、入れ子と GitHub の親子のずれ（警告。直し方は `scope move <ID>`）、Issue のないディレクトリ、必要な文書（`requirement.md`、`design.md`、`plan.md`、`report.md`）があること、`.meta.json` がないこと、別名ファイル（警告）、Scope でない Issue への依存（警告）。
-- **作成時のファイル**：テンプレートの配布資産は変えない（従来モードを変えないため）。canonical モードの作成では、写すときに、前付けの `タイトル:` と `親:` の行を除く。題名と親の正本を GitHub だけにするためである。見出しの題名は、作成時の題名のまま残す。正本ではない。
+- **作成時のファイル**：移行の間は、テンプレートの配布資産は変えない（従来モードを変えないため）。canonical モードの作成では、写すときに、前付けの `タイトル:` と `親:` の行を除く。題名と親の正本を GitHub だけにするためである。見出しの題名は、作成時の題名のまま残す。正本ではない。撤去（14章）で、テンプレートの前付けからこの2行を外し、写すときに除く処理を消す。
 
 ### 7. 名前（R-E1〜R-E4）
 
 - 題名は、空白を除いて空でなく、改行などの制御文字を含まず、256文字以下であればよい（GitHub の上限）。日本語を含んでよい。
 - 題名が今の規則（`^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`、`domain/ids.py:11`）に合うときは、今と同じく題名から slug を作る（小文字にして空白をハイフンに）。合わないときは、`--slug` を必須にする（R-E3。ないときは `SLUG_REQUIRED` で止まる）。slug の規則は今と同じ（`^[a-z0-9]+(?:-[a-z0-9]+)*$`）。
-- この変更は canonical モードだけに入れる。従来モードの作成は、今の規則のままとする（R-A6）。
+- この変更は canonical モードだけに入れる。移行の間、従来モードの作成は、今の規則のままとする（R-A6）。撤去の後は、これが唯一の規則になる。
 - 既定のブランチ名は、今と同じ `<ID>-<slug>`。題名を変えても、slug、ディレクトリ名、ブランチ名は変わらない（R-E2）。
 - 表示（`scope show`、`scope list`、`workspace sync`、`dependency check` など）とダッシュボード（13章）は、GitHub の題名を使う（R-E4）。
 
@@ -662,7 +685,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 
 #### ワークフロー
 
-- **見本**：配布資産 `src/spec_dock/assets/spec_dock/docs/ci/spec-dock-check.yml`（利用側では `spec-dock/docs/ci/spec-dock-check.yml`）。各プロダクトは、導入するときに、これを `.github/workflows/` に写す。
+- **見本**：配布資産 `src/spec_dock/assets/spec_dock/docs/ci/spec-dock-check.yml`（利用側では `spec-dock/docs/ci/spec-dock-check.yml`）。R-J1 の各リポジトリには、切り替えのPRで、移行のスクリプトの `cut` が、これを `.github/workflows/` に写す（`branches` には、そのリポジトリの既定のブランチを入れる。taikyohiyou_project は `develop`）。
 
   ```yaml
   name: SpecDock check
@@ -710,6 +733,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
   - Codex は、環境変数 `CODEX_SANDBOX` があるときに、`os.access(<カタログ>, W_OK)` で書けるかを判定する（確認済み）。書けなければ、上の1行を示す。
   - Claude Code の権限は、ツールの中で判定され、SpecDock のプロセスからは確かめられない。そこで、環境変数 `CLAUDECODE`（Claude Code のシェルでは `1`。2026-10-25 に確認）があるとき、または作業用のworktreeで `canonical link` と `canonical status` を実行したときは、`~/.claude/settings.json`、`<チェックアウト>/.claude/settings.json`、`<チェックアウト>/.claude/settings.local.json` を読むだけ読んで、`additionalDirectories` にカタログ（またはその親）があるかを見る。なければ、上の1行を示す。判定できないときは、判定できないと示す。
   - mainのチェックアウトの中で動くセッションには、設定は要らない（カタログが作業ディレクトリの中にある）。
+- カタログはクローンごとにあるので、R-J1 の5つのリポジトリを移すと、足す値は5つになる。どちらのツールも配列なので、1行の配列に並べればよい。`canonical status` は、そのクローンのカタログが足りないことだけを示す。使い方の文書（I-9）には、5つを並べた例を書く。
   - Claude Code の隔離セッション（`--worktree`）からの書き込みは、設定では通らない（確認済み）。読むだけにする。
 - Codex のサンドボックスの中からは、`.git` と登録簿に書けないため、カタログの作成、除外の追加、定期の実行の登録はできない。これらが要るときは、`canonical link` が `CANONICAL_SANDBOX_DENIED` で止まり、サンドボックスの外で実行するよう示す（3章）。
 - 確かめていないこと：Claude Code の1行を、`--settings` ではなくユーザーの設定ファイルに書いたときの動き。担当の Issue で、利用者の設定を変えずに、一時の `HOME` か `--settings` のファイルで確かめる。
@@ -736,24 +760,26 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 ```
 
 - SpecDock のエラーは、`recovery`（`Recovery.commands` か `RecoveryInstructions.instructions`）に、次に実行するコマンドか足す設定を必ず入れる（R-H2）。12章の表のエラーには、すべて次の1手がある。
+- 撤去（14章）で、節の最初の段落の「3 のリポジトリでは、今までどおり…」の文を消し、見出しから「（canonical モード）」を外す。
 
 ### 11. 移行のスクリプト（R-G1〜R-G6）
 
-- 置き場は `scripts/migrate-to-canonical/`（リポジトリのルート。パッケージには入れない）。`migrate.py`（標準ライブラリと、`git` と `gh` のコマンドだけを使う1つのファイル）と `README.md`（ほかのプロジェクトで使う短い手順書）を置く。利用者の個人のプロジェクトの移行が終わったら消す。
-- 作業の記録は `scripts/migrate-to-canonical/.state/<owner>-<repo>/`（Git では無視）に置く。取り消しの一覧（`undo.jsonl`）と、ID の置き換えの表（`idmap.json`）である。
+- 置き場は `scripts/migrate-to-canonical/`（spec-dock のリポジトリのルート。パッケージには入れない）。`migrate.py`（標準ライブラリと、`git` と `gh` のコマンドだけを使う1つのファイル）と `README.md`（各リポジトリの移行で使う短い手順書）を置く。撤去（14章）で消す。消した後も、版のタグ `v0.3.0` に残る。
+- 対象は R-J1 のリポジトリである。スクリプトは spec-dock にだけ置き、ほかのリポジトリには写さない。対象は `--project <対象の mainのチェックアウト>` で選ぶ。既定のブランチは、対象の `origin/HEAD` から求める（taikyohiyou_project は `develop`）。`main` を決め打ちしてはならない。
+- 作業の記録は `scripts/migrate-to-canonical/.state/<owner>-<repo>/`（Git では無視）に、リポジトリごとに置く。取り消しの一覧（`undo.jsonl`）と、ID の置き換えの表（`idmap.json`）である。
 - サブコマンド。どれも、既定では予定を表示するだけで、`--apply` を付けたときだけ書く。何度実行しても同じ結果になる。
 
 | サブコマンド | すること |
 |---|---|
-| `plan` | `.meta.json` と GitHub を読み、登録の予定と、データの異常（循環する依存、種類の規則の違反、閉じた親の下の開いた子、ID と番号の不一致、GitHub との題名の食い違い、ローカルの Scope）を一覧にする（R-G4） |
+| `plan` | `.meta.json` と GitHub を読み、登録の予定と、データの異常（循環する依存、種類の規則の違反、閉じた親の下の開いた子、ID と番号の不一致、GitHub との題名の食い違い、ローカルの Scope）を一覧にする（R-G4）。あわせて、SpecDock を呼ぶ今のCIの手順（`.github/` の下で `spec-dock` か `specdock` を含む行）と、作業用のworktreeごとの、既定のブランチにない仕様の変更の有無を一覧にする。読むだけなので、どの時点でも実行してよい |
 | `register` | ラベルの作成、種類のラベル、本文の印、sub-issue、blocked by を、足すだけで登録する。題名は変えない（GitHub の題名を正とする）。ローカルの Scope の扱い（下）で新しい Issue を作ったら、`idmap.json` に記録する。リポジトリのファイルは変えない。今の CLI での運用は壊れない（R-G3） |
 | `verify` | `.meta.json` の構造（`idmap.json` で置き換えた後）と、GitHub の構造が一致するかを比べる（AC-04） |
 | `build-canonical` | 使い捨てのクローンで `git subtree split --prefix=spec-dock/initiatives` を行い、`idmap.json` に従ってディレクトリの名前を変え、管理ファイルを足し、`.meta.json` を消すコミットを作って、`spec-dock/canonical` として push する。本物の `.git` に作業用のファイルを残さない（調査の記録） |
-| `cut` | 既定のブランチから、仕様のツリーを外すブランチを作る。宣言を版4にし、`spec-dock-check.yml` を足し、`ci.yml` の `validate --ci` を外す。PRは人がマージする |
+| `cut` | 既定のブランチから、仕様のツリーを外すブランチを作って push する。宣言を版4にし、`spec-dock-check.yml` を足す（`branches` には、そのリポジトリの既定のブランチを入れる）。今のCIの SpecDock の手順は書き換えず、一覧を示す（下の「今のCIの手順」）。PRは統括のエージェントが作り、人がマージする |
 | `move-local <チェックアウト>` | そのチェックアウトの `spec-dock/initiatives/` の下の、追跡されていないファイルと無視されたファイル（`.workbench` など）を、カタログの同じ相対パス（`idmap.json` で置き換えた後）へ移す。カタログに同じ名前があれば上書きせず、`.local-<PC名>` を付けた名前にする。移した後、空になったディレクトリを消し、`canonical link` がリンクを置けるようにする |
 | `adopt-worktree <チェックアウト>` | 移行前のブランチのチェックアウトの仕様を、canonical に取り込む（R-G5。下の方法） |
 | `undo` | `undo.jsonl` に従って、`register` が足したものを外す |
-| `export-legacy` | 戻すときに使う。既定のブランチから新しいブランチを作り、`spec-dock/initiatives` にカタログの内容を置き、GitHub の構造から `.meta.json`（schema 3）を作り直し、宣言を版3に戻し、`spec-dock-check.yml` を外す。PRは人がマージする |
+| `export-legacy` | 戻すときに使う。既定のブランチから新しいブランチを作り、`spec-dock/initiatives` にカタログの内容を置き、GitHub の構造から `.meta.json`（schema 3）を作り直し、宣言を版3に戻し、`spec-dock-check.yml` を外す。切り替えのPRで外した今のCIの手順は、そのPRの差分から手で戻す。PRは人がマージする |
 
 - **ローカルの Scope と番号の不一致**：`init-local-00002`（#39 に結び付く）と `init-local-00003`（#31 に結び付く。#31 は題名が別物で閉じている）は、`plan` が異常として示す。結び付いた Issue の題名が `.meta.json` の題名と同じなら、その番号の ID に置き換える。違えば、`register` が `.meta.json` の題名で新しい Initiative の Issue を作り、その番号の ID に置き換える。置き換えは `idmap.json` に記録し、ディレクトリの名前は `build-canonical` と `move-local` と `adopt-worktree` だけが変える。どちらにするかは `plan` の出力に書き、`--apply` の前に確かめられるようにする。
 - **速さ**：書き込みは1つずつ送り、間を1秒以上あけ、1分に80回、1時間に500回を超えない（目安の制限）。レート制限の応答では、2章の規則で待つ（書き込みでも、スクリプトは待って続けてよい。再開できるため）。spec-dock では約620回で、1.5時間ほどかかる見込み。途中で止まっても、`undo.jsonl` と GitHub の今の状態から、続きを判断して再開する（R-G2）。
@@ -765,10 +791,19 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
   4. B の `.meta.json` を M のものと比べ、構造の違い（親、依存、題名の変更）を一覧にする。これらは自動では登録しない。一覧を見て、SpecDock のコマンドで登録し直す。
   5. 無視されたファイルは `move-local` で移す。
   6. B から仕様のツリーを外すコミットを作り、既定のブランチを B に取り込めば、PRは仕様を含まずにマージできる（調査の記録で確認済み）。
+- **今のCIの手順**（R-J5）：各リポジトリの今のCIの SpecDock の手順は、形がそれぞれ違う（Current の表。spec-dock はシェルスクリプトを経由して呼ぶ）。そのため、`cut` は自動では書き換えない。`plan` と `cut` が、SpecDock を呼ぶ手順を一覧にし、統括のエージェントが、切り替えのブランチに、その手順を外すコミットを手で足す。SpecDock を入れるだけの手順（`pip install`、`uv tool install` など）も、あわせて外す。ほかの手順は変えない。切り替えのPRのCI（そのリポジトリの既存のテストと、新しい検査のワークフロー）が通ることで確かめる。
+- **0.3.0 の配布資産**：`canonical check` は、配布資産と、`spec-dock/.gitignore` の無視の3行と、版のファイルを確かめる（8章）。そのため、各リポジトリでは、切り替えより前に、`spec-dock installation update` で配布資産を 0.3.0 に上げ、通常のPRでマージしておく。従来モードのままなので、今の運用は変わらない（「移行・互換性・rollback」の組み合わせの表）。今のCIは古い SpecDock のコミットに固定して `workspace validate` を実行しているので、古い版が 0.3.0 の配布資産を知らずに失敗するおそれがある。同じPRで、CIが入れる SpecDock をタグ `v0.3.0` に上げる（0.3.0 は、版3のリポジトリを従来モードで検査する）。spec-dock は、CIがソースから wheel を作るので、この変更は要らない。
+- **予行演習**（R-J3）：各リポジトリの切り替えの前に、次の形で、切り替えと戻しの両方を通す。本物のリポジトリ、GitHub への書き込み、利用者の定期の実行と状態の置き場に触れない。
+  1. 対象の mainのチェックアウトから、内蔵のディスクの一時ディレクトリに、使い捨てのクローンを作る。GitHub の代わりに、同じ一時ディレクトリに bare のリポジトリを作り、使い捨てのクローンの `origin` にする。
+  2. 環境変数 `XDG_STATE_HOME` を一時ディレクトリにする。スクリプトの作業の記録も、一時ディレクトリに置く（`--state-dir`）。
+  3. `plan` と `verify` は、本物の GitHub を読むだけで行う（`register` は本物で済ませてある）。`build-canonical --apply` と `cut --apply` は、bare のリポジトリへ push する。
+  4. 切り替えのブランチを、使い捨てのクローンの既定のブランチに取り込み（PRのマージの代わり）、`spec-dock canonical link --no-schedule` と `spec-dock canonical sync` を実行して、仕様が読み書きでき、`canonical check` が通ることを確かめる。
+  5. `export-legacy --apply` で戻し、作られた `.meta.json` が、移行前のものと `revision` と `lifecycle` のほかは一致することを確かめる。
+  6. 結果を、その Issue の報告書に書き、一時ディレクトリを消す。
 
 ### 12. コマンドの一覧と出力の契約
 
-新しく足すコマンド（`cli/catalog.py` の `LEAF_PATHS`、`HELP_EFFECTS`、`--help` の Target/Reads/Writes/Does not の節を、今のコマンドと同じ形で書く）。コマンドの数は 44 から 53 になる。
+新しく足すコマンド（`cli/catalog.py` の `LEAF_PATHS`、`HELP_EFFECTS`、`--help` の Target/Reads/Writes/Does not の節を、今のコマンドと同じ形で書く）。コマンドの数は、0.3.0 で 44 から 53 になり、撤去（14章）で `workspace migrate` と `workbench copy` を消して 51 になる。
 
 | コマンド | 書くもの | 効果の要約（`HELP_EFFECTS`） | 担当 |
 |---|---|---|---|
@@ -787,14 +822,14 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
   - 書く前の確かめで止まるときは `failed`（効果なし）。そのために、書くコマンドは、止まる条件をすべて書く前に確かめる。
   - 書いた後に止まるときは `partial`（終了コード6）で、効果ごとに `succeeded`、`unknown`、`not_attempted` を示す。
   - `canonical sync --registered` は、カタログごとの結果を `data.catalogs` に入れる。すべて成功か変化なしなら `succeeded` か `unchanged`、1つでも失敗し、どこかで効果があれば `partial`（終了コード6）、効果がなければ `failed`（終了コード3）とする。
-- **引数**：`canonical sync` は、`--registered`、`--state-root <パス>`、`--loop`（常駐。`--registered` と一緒にだけ使える）、`--detach`（`--loop` を切り離して起動して、すぐに終わる）を受け付ける。
+- **引数**：`canonical sync` は、`--registered`、`--state-root <パス>`、`--loop`（常駐。`--registered` と一緒にだけ使える）、`--detach`（`--loop` を切り離して起動して、すぐに終わる）を受け付ける。`canonical link` は `--no-schedule`（3章）を受け付ける。
 - **JSON**：`canonical status --json` の `data` は、3章の表の項目をキーに持つ。`canonical sync --json` の `data.catalogs[]` は、`catalog`、`saved_commit`、`merged`、`pushed`、`conflicts`、`holds`、`blocking`、`skipped_reason`、`paused` を持ち、`data.repositories[]` は、`repository`、`probe`（`unchanged`、`changed`、`failed`）、`refreshed`、`dashboards_written` を持つ。
 - 構造を示すコマンドの JSON は、`data` に `snapshot`（`fetched_at`、`stale`）を持つ。
 - **エラーのコード**（どれも `recovery` に次の1手を入れる）：
 
 | コード | 終了コード | 次の1手 |
 |---|---|---|
-| `CANONICAL_NOT_MIGRATED` | 3 | 移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3） |
+| `CANONICAL_NOT_MIGRATED` | 3 | 0.3.0 では、移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3）。撤去の後の 0.4.0 では、どのコマンドも版3の宣言を読むとこれで止まり、「SpecDock 0.3.0 を入れ直し、版のタグ `v0.3.0` の `scripts/migrate-to-canonical/README.md` に従って移す」を示す |
 | `CANONICAL_NOT_APPLICABLE` | 3 | 示した代わりのコマンドを使う（`canonical check` など） |
 | `CANONICAL_UNSUPPORTED_LAYOUT` | 3 | mainのチェックアウトのある構成で使う |
 | `CANONICAL_GIT_TOO_OLD` | 3 | Git 2.38 以上を入れ、`spec-dock canonical link` をもう一度実行する（登録簿の git を入れ替えるため） |
@@ -843,6 +878,29 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 - **書き方**：ファイルごとに、同じディレクトリの一時ファイルに書いてから `rename` する。書く場所にディレクトリかシンボリックリンクがあれば、そのファイルは書かずに、`dashboard.error` に記録する。作業用のworktreeには作らない（1つのクローンの構造は1つのため）。
 - **従来モード**：作らない（今のまま。R-A6）。
 
+### 14. 撤去（R-J6〜R-J8）
+
+R-J1 のすべてのリポジトリを移した後に、従来モードのコードを消し、canonical モードだけを持つ 0.4.0 を出す。担当は I-13 である。
+
+- **時期**：I-12（残りの4つの切り替え）の後の3日間の運用で、戻す必要がないことを、利用者が確かめた後に始める。
+- **消すものの決め方**：0.4.0 の `dispatch()` から到達できないコードを消す。ファイルの一覧を正本にしない（canonical の処理が、今のモジュールの部品を使っていることがあるため）。目安として、2026-10-25 の時点で `.meta.json` を読み書きするか、それに頼る木の読み込みを使うファイルは、`src/spec_dock/runtime/` の下に34ある（代表は `infra/scope_metadata.py`、`infra/scope_tree.py`、`infra/fs_repo.py`、`infra/deps_reader.py`、`application/scope_query.py`、`application/start_snapshot.py`、`application/direct_scope_*.py`、`direct_finish.py`、`direct_dependencies.py`、`direct_migration.py`）。canonical の処理と同じファイルにある部分（`direct_worktrees.py`、`work_start.py` など）は、従来の経路だけを消す。
+- **消すもの**：
+  1. `dispatch()` のモードの振り分けと、従来の処理。`.meta.json` の読み書き。
+  2. 宣言の版3の受け付け。`read_workspace_declaration` は版4だけを受け付け、版3を読むと、すべてのコマンドが `CANONICAL_NOT_MIGRATED`（12章の 0.4.0 の次の1手）で止まる。版5以上は、今と同じく `PRECONDITION_FAILED` で止まる。
+  3. canonical モードで拒否するだけのコマンドと引数。コマンドの `workspace migrate` と `workbench copy`、引数の `workspace validate --ci`、`workspace sync --source local`、`dependency check --source local`。使われなくなるエラーのコード（`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`）も消す。コマンドの数は 53 から 51 になる。
+  4. テンプレートの前付けの `タイトル:` と `親:` と、写すときにそれを除く処理（6章）。
+  5. 規則の節の版3の文（10章）と、README、配布する `spec-dock/docs/`、spec-dock の `AGENTS.md` の、従来モードの記述。
+  6. 移行のスクリプト `scripts/migrate-to-canonical/`（版のタグ `v0.3.0` に残る）と、spec-dock の `.github/scripts/specdock-ci-validate.sh`（I-10 で `ci.yml` から外した後、使われない）。
+  7. 従来モードだけを確かめるテスト（下の「テストの扱い」）。
+- **残すもの**（R-J7）：直接の選択の記録（`spec-dock/.agent/work-target/`）、`StartLock`、Artifact の命名と作成、`OperationResult` の結果の状態と終了コードの規則、読むだけのコマンドは書かないこと、配布資産の導入と更新（`installation` のコマンド）、worktree とブランチの操作。配布資産の「既知の古い版」の判定は、利用側の配布資産を 0.4.0 に上げるのに使うので残す。
+- **テストの扱い**：
+  1. 消す前に、今のテストを、次の3つに分けた一覧を作り、I-13 の報告書に載せる。(a) 版3だけの振る舞いを確かめるもの。(b) 共通の契約を、版3の作り物（`.meta.json` のある一時のリポジトリ）を使って確かめるもの。(c) モードに関係のないもの。2026-10-25 の時点で、`.meta.json` を扱うテストのファイルは100のうち50（テスト717件）ある。
+  2. (a) は消す。(b) は、同じ契約を canonical モードの作り物（偽の `gh` と一時のカタログ）で確かめる形に書き直す。すでに canonical のテストが同じことを確かめていれば、その対応を一覧に書いてから消す。(c) は変えない。
+  3. 版3の宣言を読むと、すべてのコマンドが案内付きで止まることを確かめるテストを足す。G7 のテストは、51のコマンドが canonical の処理だけで動くことを確かめる形にする。
+- **版**：`pyproject.toml` と版のファイル（`spec-dock/system/spec-dock-version`）を 0.4.0 にする。`release-tag.yml` が、マージの後にタグ `v0.4.0` を作る。
+- **各リポジトリを 0.4.0 にそろえる**（R-J8）：0.4.0 のPRがマージされ、利用者の環境に 0.4.0 を入れた後、統括のエージェントが、R-J1 の各リポジトリで `spec-dock installation update` を行い、通常のPRを作る（5つ）。各リポジトリの検査のワークフローは、版のファイルに従って 0.4.0 を入れて動く。人がマージする。
+- **戻し方**：0.4.0 に問題があれば、利用者の環境に 0.3.0 を入れ直す。0.3.0 は canonical モードを持つので、移したリポジトリはそのまま動く。各リポジトリの配布資産を 0.4.0 に上げた後なら、版のファイルを戻すPRも作る。
+
 ## data / failure
 
 ### データの境界
@@ -890,6 +948,9 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | SSH のサーバーで linger がない | ログアウトの間、定期の同期が止まる。`canonical status` が示す | `loginctl enable-linger <ユーザー>` |
 | Git が 2.38 より古い | `canonical link` は書く前に、定期の同期はそのカタログを飛ばして、`CANONICAL_GIT_TOO_OLD` を示す | 新しい Git を入れ、`spec-dock canonical link` |
 | 定期の実行から push の認証ができない | 保存はローカルに積み、`push_auth` に記録する。`canonical status` が示す | `gh auth setup-git`（`https`）。`ssh` なら `https` と `gh` の認証に変える |
+| 移行の間に、一部のリポジトリだけが移った | 0.3.0 は、移したリポジトリを canonical モードで、移していないリポジトリを従来モードで扱う | なし |
+| 切り替えの後、撤去の前に、新しい仕組みに重大な問題が見つかった | そのリポジトリだけを、切り替える前の形に戻せる。ほかのリポジトリには影響しない | 利用者が判断し、「戻し方」に従う |
+| 撤去の後に、版3のリポジトリかクローンが見つかった | すべてのコマンドが `CANONICAL_NOT_MIGRATED` で止まる | 0.3.0 を入れ直し、版のタグ `v0.3.0` の手順書で移す |
 
 ## 変更対象
 
@@ -934,13 +995,20 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 - spec-dock の利用側の配布資産（`spec-dock/` の下）：0.3.0 の配布資産に `installation update` で上げる（I-9。従来モードのまま）。
 - `pyproject.toml`：版を 0.3.0 にする（I-9）。
 
-### 変えないもの
+### 移行の間（I-1〜I-12）、変えないもの
 
-- 従来モードの処理と、`.meta.json` の読み書きのコード（R-A6）。削除は、利用者の個人のプロジェクトの移行が終わった後の別の Epic で行う。
+- 従来モードの処理と、`.meta.json` の読み書きのコード（R-A6）。撤去（14章、I-13）で消す。
+- テンプレートの配布資産の中身（6章）。撤去で、前付けの2行を外す。
+
+### いつも変えないもの
+
 - `StartLock` と、選択の記録の形式。
-- テンプレートの配布資産の中身（6章）。
 - 利用者のツールの設定のファイル。
 - 人がPRをマージする関門。
+
+### 撤去で消すもの（I-13）
+
+14章のとおり。`dispatch()` から到達できない従来モードのコード、版3の受け付け、拒否するだけのコマンドと引数、テンプレートの前付けの2行、従来モードの文書、移行のスクリプト、`specdock-ci-validate.sh`、従来モードだけのテスト。
 
 ## 移行・互換性・rollback
 
@@ -949,27 +1017,43 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | SpecDock | 宣言の版3（移行前） | 宣言の版4（移行後） |
 |---|---|---|
 | 0.2.4（今） | 今のまま動く | 宣言を読んで止まる（R-A5） |
-| 0.3.0（この Epic） | 今のまま動く（従来モード。R-A6、AC-15） | canonical モード |
+| 0.3.0（移行の間） | 今のまま動く（従来モード。R-A6、AC-15） | canonical モード |
+| 0.4.0（撤去の後） | 移行の方法を示して止まる（`CANONICAL_NOT_MIGRATED`。14章） | canonical モード |
 
-- パッケージは PCのユーザーごとに1つで、全リポジトリが共有する。0.3.0 を入れても、移行前のリポジトリは変わらない。そのため、spec-dock の切り替えの前に 0.3.0 を入れてよい。
+- パッケージは PCのユーザーごとに1つで、全リポジトリが共有する。0.3.0 を入れても、移行前のリポジトリは変わらない。そのため、どのリポジトリの切り替えよりも前に 0.3.0 を入れてよい。
 - 0.3.0 の配布資産を移行前のリポジトリに `installation update` で入れても、従来モードは壊れない。`.gitignore` の3行は、実体のディレクトリの中の新しいファイルを無視しない（3章、確認済み）。規則の節は、版4のときだけ効く。
+- 0.4.0 は、R-J1 のすべてのリポジトリを移した後にだけ入れる。
 
-### spec-dock の切り替え
+### 全体の順序（R-J4）
 
-手順の正本は、`plan.md` の I-10 と、移行のスクリプトの `README.md` である。要点は次のとおり。
+```text
+0.3.0 を入れる ─ spec-dock の切り替え（I-10）─ 3日間の運用 ─ 残りの4つの切り替え（I-12）─ 3日間の運用 ─ 撤去と 0.4.0（I-13）
+                  │                            │
+                  └ 切り替えのPRのマージの後 ───┴ 残りの4つの準備（0.3.0 の配布資産、登録、照合、予行演習）
+```
 
-1. 0.3.0 のPRをすべてマージし、利用者の環境に 0.3.0 を入れる（従来モードで今のまま動く）。
-2. `plan`、`register --apply`、`verify` で、構造を GitHub に登録して確かめる。この間も、今の運用は止めない。
-3. 切り替えを始めたら、終わるまで、ほかのエージェントで仕様を編集しない（凍結）。凍結の後に、`register --apply` と `verify` をもう一度行う。
-4. `build-canonical --apply` と `cut --apply` で canonical を作って push し、既定のブランチから仕様を外すPRを作る。
-5. 人がPRをマージする。
-6. mainのチェックアウトで既定のブランチを取り込み、`move-local` で無視されたファイル（spec-dock では `.workbench` の99個）をカタログへ移してから、`spec-dock canonical link` を実行し、ツールの1行を足す。
-7. 各作業用のworktreeで、`adopt-worktree` と `move-local` を行い、既定のブランチを取り込んでから、`spec-dock canonical link` を実行する。
+- 残りの4つの準備は、spec-dock の切り替えのPRがマージされ、構造の表し方が本物の GitHub で確かめられた後に始める。3日間の運用と並べて進めてよい。どれも今の運用を止めない。
+- 残りの4つの本番は、3日間の運用の後に、1回の作業で、1つずつ順に行う。順は、小さく、影響の少ないものからとする：input-devices、company-os、housing-lifecycle、taikyohiyou_project（退去費用プロダクト）。
+
+### 各リポジトリの切り替え
+
+手順の正本は、`plan.md` の I-10 と I-12、移行のスクリプトの `README.md` である。1つのリポジトリについて、要点は次のとおり。
+
+1. **準備**（今の運用は止めない）：0.3.0 の配布資産に上げるPRをマージする（11章）。`plan` の結果を確かめ、異常の扱いを決めて記録する。`register --apply` と `verify` で、構造を GitHub に登録して確かめる。予行演習（11章）を通す。
+2. **凍結**：切り替えを始めたら、終わるまで、ほかのエージェントでそのリポジトリの仕様を編集しない。凍結の後に、`plan` で作業用のworktreeの仕様の変更を一覧にし、`register --apply` と `verify` をもう一度行う。
+3. `build-canonical --apply` と `cut --apply` で canonical を作って push し、既定のブランチから仕様を外すブランチを作る。今のCIの SpecDock の手順を外すコミットを足し、PRを作る（11章）。
+4. PRの検査（そのリポジトリの既存のCIと、新しい検査のワークフロー）が通ったことを確かめ、人がPRをマージする。
+5. mainのチェックアウトで既定のブランチを取り込み、`move-local` で無視されたファイル（spec-dock では `.workbench` の99個）をカタログへ移してから、`spec-dock canonical link` を実行し、ツールの1行を足す。
+6. 各作業用のworktreeで、`adopt-worktree` と `move-local` を行い、既定のブランチを取り込んでから、`spec-dock canonical link` を実行する。
+7. 凍結を解く。
+
+- **Scope のないリポジトリ**（company-os）：追跡された仕様がなく、`spec-dock/initiatives/` は空のディレクトリだけである。`register` で作るのは種類のラベルだけで、`build-canonical` は何もしない。手順5の `move-local` が空のディレクトリを消し、`canonical link` が、GitHub に canonical がない新しいリポジトリとして、最初の canonical を作る（3章の手順3）。
 
 ### 戻し方
 
 - **切り替えのPRのマージ前**：PRを閉じ、`spec-dock/canonical` を消し、`undo --apply` で GitHub への登録を外せば、元に戻る。今の運用はずっと動いている。
-- **マージの後**：`export-legacy --apply` で、カタログの内容と、GitHub から作り直した `.meta.json` と、版3の宣言を持つブランチを作り、PRで戻す。その後、各チェックアウトで `spec-dock canonical remove --yes` を行い、必要なら `undo --apply` で登録を外す。
+- **マージの後、撤去の前**：そのリポジトリだけを戻す。`export-legacy --apply` で、カタログの内容と、GitHub から作り直した `.meta.json` と、版3の宣言を持つブランチを作り、切り替えのPRで外した今のCIの手順を戻すコミットを足して、PRで戻す。その後、そのリポジトリの各チェックアウトで `spec-dock canonical remove --yes` を行い、必要なら `undo --apply` で登録を外す。0.3.0 のままでよく、ほかのリポジトリには影響しない。
+- **撤去の後**：利用者の環境に 0.3.0 を入れ直してから、上と同じ手順で戻す。移行のスクリプトは、版のタグ `v0.3.0` から取り出す。
 - 戻すかどうかは、利用者が判断する。エージェントは、戻す必要を見つけたら、止まって知らせる。
 
 ## testability
@@ -979,7 +1063,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 - **フック**：テストのリポジトリに、必ず失敗する `pre-commit`、`post-checkout`、`post-merge`、`pre-push` を置いても、同期が成功することを確かめる。`commit.gpgSign=true` を設定しても止まらないことも確かめる。
 - **環境の判定**：OS、コンテナの印、`systemctl` の結果、`loginctl` の結果、git の版は、注入できるようにする。macOS、systemd の Linux、systemd のない Linux、マウントしたチェックアウトの各場合を、どの OS の上のテストでも確かめられるようにする。提供側のCIは、`uv run pytest` を `ubuntu-latest` で動かしているので、Linux でのテストは毎回のPRで通る。
 - **常駐のプロセス**：`--loop` を、時刻と待ちを注入して数周期だけ動かし、1つだけ動くこと（2つ目が終了コード0で終わる）、`kick` ですぐに周期が動くこと、SIGTERM で周期を終えてから止まることを確かめる。
-- **従来モードの回帰（AC-15）**：版3の振る舞いを確かめるテストは、変えてはならない。変えてよいのは、次のものだけである。
+- **従来モードの回帰（AC-15）**：撤去（I-13）までの Issue では、版3の振る舞いを確かめるテストは、変えてはならない。撤去での扱いは14章の「テストの扱い」に従う。撤去までに変えてよいのは、次のものだけである。
   - コマンドの数（44）とコマンドの一覧を確かめるテスト（`test_issue413_contract.py:160`、`test_cli_vnext_contract.py:17-65`、`test_cli_docs_vnext.py:35`）。新しいコマンドを足した数と一覧に直す。
   - 配布資産の一覧と値（`static-inventory.json` の値、資産のファイルの数）を確かめるテスト。
   - 文書の中身を確かめるテスト（新しいコマンドと規則の節を足したことによる変化）。
@@ -1005,6 +1089,8 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | AC-16 | 偽の `gh` の記録で、変化のない周期と、続けて実行した `scope show` と `scope list` が、304 の確かめだけで終わり、全体の取り直しをしないこと。題名を変えた後の周期で取り直し、表示とダッシュボードに出ること。`scope create` の後の `scope show` が、取り直しなしで新しい Scope を示すこと |
 | AC-17 | 一時のカタログと偽の `gh` で、周期の後に5つのファイルが、見本と同じ形（題名と作業中の色のほか）で作られること。構造が変わらない次の周期では、ファイルの更新の時刻が変わらないこと |
 | AC-18 | 環境の判定を注入して、systemd、`loop`、マウントの各場合の動きを確かめる。実機では、systemd の Linux の仮想マシンと、systemd のないコンテナ（中でクローン）で、AC-02、AC-03、AC-13 を確かめる |
+| AC-19 | 各リポジトリの予行演習の記録（I-10、I-12 の報告書）。切り替えの後に、各リポジトリの既定のブランチで `spec-dock canonical check` が通り、`migrate.py verify` が一致を報告する。各リポジトリの切り替えのPRで、検査のワークフローが動いて通る。I-12 の後の3日間の運用で、`canonical status` に未解決の異常がない |
+| AC-20 | 0.4.0 で、14章の「消すもの」が残っていないことを、コードの検索（`.meta.json`、`schema_version` の3、`workspace migrate`、`workbench copy` など）と、版3の宣言で全コマンドが止まるテストで確かめる。撤去の前のテストの分類の一覧で、(b) のすべてに、対応する canonical のテストがある。各リポジトリの配布資産の PR で、検査のワークフローが 0.4.0 で通る |
 
 - **実機での確かめ**（自動のテストでは確かめられないもの）：macOS の launchd の登録と、外付けのボリュームでのプライバシーの保護の案内、利用者の `gh` での push、Linux の systemd のタイマーと push、コンテナの常駐のプロセス、Codex のサンドボックスの中からの `scope create` と `work finish` と `canonical link`（リンクだけのとき）、Claude Code の設定の1行。結果は、各 Issue の報告書に書く。
 - **Linux の実機**：利用者の Mac には OrbStack（2.2.5）と Docker が入っている。systemd の Linux は `orb create ubuntu:noble <名前>` の仮想マシンで、systemd のない Linux は `docker run` のコンテナで確かめる（2026-10-25 に、この方法で確かめた）。仮想マシンに git がないので `sudo apt-get install -y git` で入れる。確かめた後は、作った仮想マシン（`orb delete -f <名前>`）、コンテナ、取得したイメージを消す。利用者の `gh` の資格情報を、仮想マシンやコンテナに写してはならない。push の認証は、一時の bare のリポジトリへの push で代わりに確かめ、GitHub への push の認証は macOS で確かめる。
@@ -1026,13 +1112,23 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | リポジトリのフックや署名の設定で、定期の同期が止まる | 中 | カタログへのすべての Git の呼び出しで、フックと署名を外す |
 | エージェントが仕様を Git で扱ってしまう | 中 | 規則の節、無視の設定、定期の同期による上書きのない統合 |
 | Claude Code の設定の判定が当たらない | 低 | 判定できないことを正直に示し、文書に設定の手順を書く |
+| 同じ不具合が、移した全リポジトリに同時に当たる | 大 | spec-dock を先に移して3日間使う。撤去までは、リポジトリごとに 0.3.0 のまま戻せる |
+| 撤去で、共通の契約のテストが失われる | 中 | 消す前にテストを3つに分けた一覧を作り、共通の契約のテストを canonical のテストに書き直してから消す（14章） |
+| ほかのリポジトリの事情（既定のブランチ、CI、入れ子、多くのworktree）で切り替えが止まる | 中 | `plan` が CI の手順と作業用のworktreeを一覧にする。予行演習で、切り替えと戻しを通す。小さいものから順に移す |
+| 残りの4つの凍結が長引く | 低 | 登録、照合、予行演習を前もって済ませ、当日の GitHub への書き込みを差分だけにする |
 | Linux の一部を確かめていない | 中 | systemd のタイマーと `flock` は、Ubuntu 24.04 の仮想マシンで確かめた。残り（タイマーからの GitHub への push の認証、Landlock の中の `flock`）は、担当の Issue で、OrbStack の仮想マシンと Docker のコンテナで確かめる。確かめられないものは、報告書に未確認と書く |
 
 ## 設計の判断
 
 | 判断 | 理由 |
 |---|---|
-| 宣言の版で2つのモードを分け、従来の処理を変えない | パッケージは全リポジトリで共有され、移行の時期がずれるため（R-A6）。後で消しやすいように、振り分けを1か所にする |
+| 宣言の版で2つのモードを分け、従来の処理を変えない | パッケージは全リポジトリで共有され、リポジトリごとに切り替える時期がずれるため（R-A6）。撤去で消しやすいように、振り分けを1か所にする |
+| 従来モードを移行の間だけにし、この Epic で撤去する | 利用者が1人で、全リポジトリを自分で移せる。2つの仕組みを長く維持する費用と、エージェントが2つのモードで迷う原因をなくす（2026-10-25 の利用者の決定） |
+| 開発中は新しいコードを横に足し、撤去は最後にまとめて行う | 今のコードをその場で書き換えると、多くのコマンドが通る読み込みの経路を変えたときに、手を付けていないコマンドまで壊れ、Issue を並べて進められない。足し算なら、main がいつも動き、利用者の日常（0.2.4、0.3.0）も変わらない |
+| spec-dock を先に、残りの4つを1回の作業で | 同じ不具合が全リポジトリに当たるのを避け、dogfooding のリポジトリで先に見つける。残りをまとめるのは、凍結と準備を1回で済ませるため |
+| 撤去で、拒否するだけのコマンドと引数も消す | 2つの仕組みが並ぶ間に、すべてのコマンドが答えるため（G7）に置いたもので、撤去の後は意味がない |
+| 予行演習に `canonical link --no-schedule` を使う | 利用者の定期の実行（同じ名前のジョブ）と状態の置き場に触れずに、本物の CLI で切り替えを通すため |
+| 今のCIの手順を、スクリプトで自動では書き換えない | リポジトリごとに形が違い（シェルスクリプト経由のものもある）、自動の書き換えは壊れやすい。切り替えのPRで手で直し、そのPRのCIで確かめる |
 | 保存と同期の入口を `canonical sync` とし、`canonical` グループに集める | 用意（link）、状態（status）、保存（sync）、検査（check）、取り外し（remove）を1つのグループで見つけられるようにする。`workspace sync` とはグループで分ける |
 | 排他をカタログのディレクトリへの `flock` にする | ファイルを作らないので、Codex のサンドボックスからも取れる（確認済み） |
 | 変更の束で、コマンドの変更をすぐに1つのコミットにする | 30秒の規則で、コマンドの変更が途中で分かれないようにするため（R-D1）。`work finish` の束には保留の規則を当て、誤った削除を流さない |
@@ -1056,3 +1152,5 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 - Claude Code の1行を、ユーザーの設定ファイルに書いたときの動き（`--settings` では確認済み）。
 - GitHub の二次のレート制限の、公開されていない点数の endpoint（公式の文書は、一部の endpoint の点数を公開していない）。
 - `adopt-worktree` と `export-legacy` の、ツールでの実行（手順の元になる Git の動きは、使い捨てのリポジトリで確認済み）。
+- ほかの4つのリポジトリの、データの異常（題名の食い違い、循環、種類の規則の違反など）の数。I-8 で、`plan` を読むだけで実行して確かめる。
+- 撤去で書き直す共通の契約のテストの数（14章の (b)）。I-13 の最初に分類して確かめる。
