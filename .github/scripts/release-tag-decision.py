@@ -26,7 +26,7 @@ _RELEASE = re.compile(r"([0-9]+)\.([0-9]+)\.([0-9]+)\Z")
 
 
 def _git(repo: Path, *args: str) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=False)
+    return subprocess.run(["git", "-C", str(repo), *args], capture_output=True, text=True, check=False, timeout=60)
 
 
 def _version_at(repo: Path, commit: str) -> str | None:

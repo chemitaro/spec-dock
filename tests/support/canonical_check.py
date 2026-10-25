@@ -27,9 +27,15 @@ DECLARATION = {"schema_version": 4, "writer_protocol": "specdock.worktree-writer
 
 
 def gitignore_with_ignore_rules(payload: bytes) -> bytes:
-    """Append the canonical ignore lines that the payload lacks, keeping every existing byte."""
+    """Append the canonical ignore lines that the payload lacks, keeping every existing byte.
+
+    A payload that already names the catalog or the link in another form would hide a contract C3 mismatch,
+    so it is refused instead of overlaid.
+    """
     lines = payload.decode("utf-8").split("\n")
     missing = [line for line in SPEC_DOCK_IGNORE_LINES if line not in lines]
+    if missing and any(".canonical" in line or "initiatives" in line for line in lines):
+        raise AssertionError("the shipped .gitignore names the catalog or link without the contract C3 lines")
     if not missing:
         return payload
     prefix = payload if payload.endswith(b"\n") or not payload else payload + b"\n"

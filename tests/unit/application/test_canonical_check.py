@@ -276,3 +276,15 @@ def test_a_known_older_version_file_is_only_a_warning_and_an_unknown_one_also_fa
     outcome = _evaluate(files)
     assert _codes(outcome) == [("STATIC_ASSET_INVALID", "spec-dock/system/spec-dock-version")]
     assert [warning.details["actual"] for warning in outcome.warnings] == ["0.2.9"]
+
+
+def test_a_deeply_nested_declaration_is_one_invalid_declaration_not_a_crash() -> None:
+    files = _valid_files()
+    files["spec-dock/workspace.json"] = b"[" * 100_000
+    files["spec-dock/initiatives/README.md"] = b"spec"
+    outcome = _evaluate(files)
+    assert _codes(outcome) == [
+        ("SPEC_PATH_TRACKED", "spec-dock/initiatives/README.md"),
+        ("WORKSPACE_DECLARATION_INVALID", "spec-dock/workspace.json"),
+    ]
+    assert outcome.failures[1].details["reason"] == "invalid-json"

@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import json
-import os
-from pathlib import Path
 import shutil
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -14,6 +12,9 @@ from spec_dock import __version__
 from spec_dock.cli import main
 from spec_dock.runtime.infra.tree_backup import tree_digest
 from tests.support.canonical_check import code_repository, commit, git, stage_gitlink, use_assets_with_ignore_rules
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, Any]:
@@ -160,14 +161,14 @@ def test_it_runs_without_network_tokens_or_state_and_writes_nothing(
     root = code_repository(tmp_path / "repo", use_assets_with_ignore_rules(monkeypatch))
     _problem(root, "spec-file")
     state = tmp_path / "state"
-    empty_bin = tmp_path / "bin"
-    empty_bin.mkdir()
-    git_dir = Path(shutil.which("git") or "/usr/bin/git").parent
-    monkeypatch.setenv("PATH", f"{empty_bin}{os.pathsep}{git_dir}")
+    only_git = tmp_path / "bin"
+    only_git.mkdir()
+    (only_git / "git").symlink_to(shutil.which("git") or "/usr/bin/git")
+    monkeypatch.setenv("PATH", str(only_git))
     for name in ("GH_TOKEN", "GITHUB_TOKEN", "GH_ENTERPRISE_TOKEN"):
         monkeypatch.delenv(name, raising=False)
     monkeypatch.setenv("XDG_STATE_HOME", str(state))
-    assert shutil.which("gh") is None or Path(shutil.which("gh") or "").parent == git_dir
+    assert shutil.which("gh") is None
     before = tree_digest(root)
     code, result = _run(capsys, "--project", str(root), "canonical", "check")
     assert code == 7 and result["error"]["code"] == "CANONICAL_CHECK_FAILED"
@@ -199,13 +200,13 @@ def test_commit_selects_the_tree_to_check(
     assert result["data"]["result"]["revision"] == clean[:12]
 
 
-@pytest.mark.parametrize("case", ["unknown-commit", "no-commit-yet"])
+@pytest.mark.parametrize("case", ["unknown-commit", "not-a-commit", "no-commit-yet"])
 def test_a_missing_commit_stops_before_checking_with_a_next_step(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch, case: str
 ) -> None:
-    if case == "unknown-commit":
+    if case in ("unknown-commit", "not-a-commit"):
         root = code_repository(tmp_path / "repo", use_assets_with_ignore_rules(monkeypatch))
-        argv = ["--commit", "no-such-branch"]
+        argv = ["--commit", "no-such-branch" if case == "unknown-commit" else "HEAD^{tree}"]
     else:
         root = tmp_path / "empty"
         root.mkdir()
@@ -282,7 +283,26 @@ def test_dry_run_follows_the_read_only_planning_rule_and_writes_nothing(
     code, result = _run(capsys, "--project", str(root), "canonical", "check", "--dry-run")
     assert code == 0 and result["status"] == "planned" and result["effects"] == []
     assert result["data"]["result"]["can_apply"] is True and result["data"]["result"]["valid"] is True
+    assert tree_digest(root) == before
     _problem(root, "spec-file")
+    before = tree_digest(root)
     code, result = _run(capsys, "--project", str(root), "canonical", "check", "--dry-run")
     assert code == 7 and result["status"] == "failed" and result["data"]["result"]["can_apply"] is False
-    assert tree_digest(root) != before  # only the fixture commit changed the repository
+    assert tree_digest(root) == before
+
+
+def test_the_shipped_package_fails_only_for_the_ignore_rules_until_its_gitignore_carries_them(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.application.canonical_check import SPEC_DOCK_GITIGNORE, SPEC_DOCK_IGNORE_LINES
+    from spec_dock.runtime.infra.static_assets import package_static_assets
+
+    assets = package_static_assets()
+    shipped = next(asset for asset in assets if asset.path == SPEC_DOCK_GITIGNORE).payload.decode().splitlines()
+    root = code_repository(tmp_path / "repo", assets)
+    code, result = _run(capsys, "--project", str(root), "canonical", "check")
+    if all(line in shipped for line in SPEC_DOCK_IGNORE_LINES):
+        assert code == 0, result
+    else:
+        assert code == 7
+        assert [item["code"] for item in result["data"]["result"]["failures"]] == ["IGNORE_RULES_MISSING"]

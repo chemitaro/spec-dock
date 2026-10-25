@@ -7,10 +7,6 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: release-tag
-  cancel-in-progress: false
-
 jobs:
   tag:
     runs-on: ubuntu-latest

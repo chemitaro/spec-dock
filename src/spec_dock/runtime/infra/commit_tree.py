@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Literal
 
-from spec_dock.runtime.infra.git_process import run_git
+from spec_dock.runtime.infra.git_process import GitProcessError, run_git
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -23,17 +23,26 @@ class TreeEntry:
 
 
 def resolve_commit(root: Path, revision: str, *, timeout: float) -> str | None:
-    """Return the full commit ID a revision names, or None when it names no commit."""
-    resolved = run_git(
-        root,
-        "rev-parse",
-        "--verify",
-        "--quiet",
-        "--end-of-options",
-        f"{revision}^{{commit}}",
-        timeout=timeout,
-        missing_ok=True,
-    )
+    """Return the full commit ID a revision names, or None when it names no commit.
+
+    rev-parse --verify exits 1 for an unknown, ambiguous or non-commit name (the last one with a message);
+    other failures, such as a broken repository, still raise.
+    """
+    try:
+        resolved = run_git(
+            root,
+            "rev-parse",
+            "--verify",
+            "--quiet",
+            "--end-of-options",
+            f"{revision}^{{commit}}",
+            timeout=timeout,
+            missing_ok=True,
+        )
+    except GitProcessError as error:
+        if error.returncode == 1:
+            return None
+        raise
     return resolved.decode("ascii").strip() or None
 
 

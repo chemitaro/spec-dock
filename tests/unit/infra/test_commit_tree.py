@@ -80,3 +80,27 @@ def test_read_blob_returns_committed_bytes_not_the_working_tree(tmp_path: Path) 
     (entry,) = list_commit_tree(root, head, timeout=30)
 
     assert read_blob(root, entry.object_id, timeout=30) == b"\x00committed\r\n"
+
+
+def test_a_path_that_is_not_utf8_is_listed_with_escaped_bytes(tmp_path: Path) -> None:
+    root = _repository(tmp_path / "repo")
+    (root / "keep.txt").write_text("keep\n", encoding="utf-8")
+    _commit(root)
+    blob = _git(root, "hash-object", "-w", "--stdin", stdin=b"latin-1 name\n").strip()
+    subprocess.run(
+        [
+            b"git",
+            b"-C",
+            bytes(root),
+            b"update-index",
+            b"--add",
+            b"--cacheinfo",
+            f"100644,{blob},".encode() + b"caf\xe9.md",
+        ],
+        check=True,
+    )
+    head = _commit(root, stage=False)
+
+    paths = [entry.path for entry in list_commit_tree(root, head, timeout=30)]
+
+    assert paths == ["caf\\xe9.md", "keep.txt"]

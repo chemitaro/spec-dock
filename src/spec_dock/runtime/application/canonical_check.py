@@ -224,7 +224,7 @@ def _declaration_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], by
         return _invalid_declaration("not-regular", "the workspace declaration is not a regular file")
     try:
         declaration = json.loads(read(entry).decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         declaration = None
     if not isinstance(declaration, dict):
         return _invalid_declaration("invalid-json", "the workspace declaration is not a JSON object")

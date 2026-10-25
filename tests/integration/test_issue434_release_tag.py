@@ -92,12 +92,14 @@ def test_an_unavailable_previous_version_never_tags(tmp_path: Path, before: str)
     assert decision == {"tag": None, "version": "0.3.0", "previous": None, "reason": "before-unavailable"}
 
 
-def test_the_current_provider_version_does_not_tag_after_merge(tmp_path: Path) -> None:
+def test_the_current_provider_version_tags_only_from_0_3_0(tmp_path: Path) -> None:
+    """Before I-9 the package is below 0.3.0, so merging this change creates no tag; from 0.3.0 it would."""
     current = (PROVIDER / "pyproject.toml").read_text(encoding="utf-8")
-    version = re.search(r'^version = "([^"]+)"$', current, re.MULTILINE)
-    assert version is not None and tuple(int(part) for part in version[1].split(".")) < (0, 3, 0)
-    old, new = _history(tmp_path / "repo", current.replace(version[1], "0.2.3"), current)
-    assert _decide(tmp_path / "repo", old, new)[1]["reason"] == "below-minimum"
+    version = re.search(r'^version = "([0-9]+)\.([0-9]+)\.([0-9]+)"$', current, re.MULTILINE)
+    assert version is not None
+    released = tuple(int(part) for part in version.groups()) >= (0, 3, 0)
+    old, new = _history(tmp_path / "repo", current.replace(version[0], 'version = "0.0.1"'), current)
+    assert _decide(tmp_path / "repo", old, new)[1]["reason"] == ("create" if released else "below-minimum")
     assert _decide(tmp_path / "repo", new, new)[1]["reason"] == "version-unchanged"
 
 
