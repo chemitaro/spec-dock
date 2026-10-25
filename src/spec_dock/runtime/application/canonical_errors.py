@@ -25,6 +25,26 @@ CANONICAL_NOT_IMPLEMENTED: Final = "CANONICAL_NOT_IMPLEMENTED"
 CANONICAL_NOT_MIGRATED: Final = "CANONICAL_NOT_MIGRATED"
 CANONICAL_NOT_APPLICABLE: Final = "CANONICAL_NOT_APPLICABLE"
 CANONICAL_NOT_LINKED: Final = "CANONICAL_NOT_LINKED"
+# Catalog and link (iss-00429).
+CANONICAL_UNSUPPORTED_LAYOUT: Final = "CANONICAL_UNSUPPORTED_LAYOUT"
+CANONICAL_GIT_TOO_OLD: Final = "CANONICAL_GIT_TOO_OLD"
+CANONICAL_FOREIGN_CHECKOUT: Final = "CANONICAL_FOREIGN_CHECKOUT"
+CANONICAL_PATH_OCCUPIED: Final = "CANONICAL_PATH_OCCUPIED"
+CANONICAL_LINK_OCCUPIED: Final = "CANONICAL_LINK_OCCUPIED"
+CANONICAL_SANDBOX_DENIED: Final = "CANONICAL_SANDBOX_DENIED"
+CANONICAL_LOCK_BUSY: Final = "CANONICAL_LOCK_BUSY"
+CANONICAL_FORMAT_UNSUPPORTED: Final = "CANONICAL_FORMAT_UNSUPPORTED"
+START_LOCK_BUSY: Final = "START_LOCK_BUSY"
+OS_ACCESS_DENIED: Final = "OS_ACCESS_DENIED"
+# Warnings (no exit code of their own).
+CANONICAL_TOOL_SETTING_MISSING: Final = "CANONICAL_TOOL_SETTING_MISSING"
+CANONICAL_TOOL_SETTING_UNKNOWN: Final = "CANONICAL_TOOL_SETTING_UNKNOWN"
+CANONICAL_IGNORE_RULES_MISSING: Final = "CANONICAL_IGNORE_RULES_MISSING"
+CANONICAL_MAIN_MOVED: Final = "CANONICAL_MAIN_MOVED"
+CANONICAL_REMOTE_MISSING: Final = "CANONICAL_REMOTE_MISSING"
+CANONICAL_MAIN_NOT_MIGRATED: Final = "CANONICAL_MAIN_NOT_MIGRATED"
+CANONICAL_CHECKOUT_NOT_MIGRATED: Final = "CANONICAL_CHECKOUT_NOT_MIGRATED"
+CANONICAL_INSIDE_CATALOG: Final = "CANONICAL_INSIDE_CATALOG"
 
 NOT_IMPLEMENTED_RECOVERY: Final = (
     "Wait for SpecDock 0.3.0, which completes canonical mode for this command; "
@@ -38,6 +58,42 @@ CANONICAL_NOT_LINKED_RECOVERY: Final = "spec-dock canonical link"
 MIGRATE_NOT_APPLICABLE_RECOVERY: Final = (
     "No writer-protocol migration applies to a schema-4 workspace; nothing needs to be done."
 )
+UNSUPPORTED_LAYOUT_RECOVERY: Final = (
+    "Use a clone whose main checkout holds the .git directory; bare and separate-git-dir layouts are not supported."
+)
+GIT_TOO_OLD_RECOVERY: Final = "Install Git 2.38 or later, then run spec-dock canonical link again."
+FOREIGN_CHECKOUT_RECOVERY: Final = (
+    "Saving and syncing run on the host; in this container only read and write the spec files, "
+    "or clone the repository inside the container and run spec-dock canonical link."
+)
+SANDBOX_DENIED_RECOVERY: Final = "Run the same command outside the sandbox (in a normal terminal)."
+LOCK_BUSY_RECOVERY: Final = "Wait a moment, then run the same command again."
+FORMAT_UNSUPPORTED_RECOVERY: Final = "Update SpecDock; this catalog uses a canonical format it cannot write."
+FORMAT_MISSING_RECOVERY: Final = (
+    "Check that the root of the spec-dock/canonical branch has a valid .spec-dock-canonical.json; "
+    "SpecDock writes only a catalog that declares format 1."
+)
+PERMISSION_DENIED_RECOVERY: Final = (
+    "Check the permissions of the listed paths; inside a sandbox, run the same command in a normal terminal."
+)
+INSIDE_CATALOG_RECOVERY: Final = "Run the command from the checkout root, or add --project <checkout>."
+MAIN_NOT_MIGRATED_NEXT_STEP: Final = (
+    "Check out a migrated commit (workspace schema 4) in the main checkout, then run spec-dock canonical link there."
+)
+CHECKOUT_NOT_MIGRATED_NEXT_STEP: Final = (
+    "Base the worktree on a commit that declares workspace schema 4, then run spec-dock canonical link in it."
+)
+START_LOCK_BUSY_RECOVERY: Final = "Wait a moment, then run spec-dock canonical link again."
+LINK_AGAIN_RECOVERY: Final = "Run spec-dock canonical link again; it continues from the current state."
+INSTALLATION_UPDATE_RECOVERY: Final = "spec-dock installation update"
+MAIN_MOVED_NEXT_STEP: Final = (
+    "Git may also have reconnected the linked worktrees; run spec-dock canonical link in each linked worktree "
+    "(for a worktree that also moved, first run git worktree repair <path> in the main checkout)."
+)
+REMOTE_MISSING_NEXT_STEP: Final = (
+    "Check whether the GitHub branch spec-dock/canonical was deleted; if it was, sync stops; "
+    "follow spec-dock canonical status."
+)
 _FAILURE_EXIT_CODES: Final = frozenset({1, 2, 3, 4, 5, 7})
 
 _GITHUB_RECOVERY: Final[Mapping[str, str]] = {
@@ -50,6 +106,7 @@ _GITHUB_RECOVERY: Final[Mapping[str, str]] = {
         "Find the GitHub Issue that may have been created, then finish it with spec-dock scope import github."
     ),
 }
+GITHUB_UNAVAILABLE_RECOVERY: Final = _GITHUB_RECOVERY[GITHUB_UNAVAILABLE]
 
 
 class CanonicalCommandError(Exception):

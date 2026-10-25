@@ -157,7 +157,7 @@ def test_every_public_leaf_help_describes_the_v2_envelope_without_project_access
 ) -> None:
     from spec_dock.runtime.cli.catalog import LEAF_PATHS
 
-    assert len(LEAF_PATHS) == 44
+    assert len(LEAF_PATHS) == 46
     for leaf in LEAF_PATHS:
         assert main(["--project", str(tmp_path / "missing"), "help", *leaf.split(), "--json"]) == 0
         output = capsys.readouterr()

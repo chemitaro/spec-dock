@@ -15,3 +15,7 @@ tree.puml
 deps-issues.puml
 deps-raw.puml
 dashboard.md
+# canonical catalog and link (schema 4); a real initiatives directory stays visible
+/.canonical/
+/initiatives
+!/initiatives/

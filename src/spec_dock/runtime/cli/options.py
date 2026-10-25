@@ -105,6 +105,8 @@ def _recovery_help(leaf: str) -> str:
         return "Inspect actual declaration bytes and the retained backup before a new explicit migration; no legacy replay, resume or automatic rollback."
     if leaf == "workspace sync":
         return "No mutation to recover; inspect incomplete observations and issue a new Sync."
+    if leaf == "canonical link":
+        return "Run spec-dock canonical link again; it continues from the current state and never deletes what it did not create."
     if leaf in MUTATING_LEAF_PATHS:
         return "Inspect the target and observed effects before retrying; there is no --resume."
     return "No mutation to recover; correct the reported input or environment and rerun."
