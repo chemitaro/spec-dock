@@ -101,6 +101,12 @@ reflected_to: []
 
 ### 設計の検証（2026-10-25、macOS、codex-cli 0.163.0）
 
+- **リンクだけを無視する書き方**（Git 2.54.0、使い捨てのリポジトリ）：`.git/info/exclude` に `/spec-dock/initiatives` と `!/spec-dock/initiatives/` の2行を書くと、`spec-dock/initiatives` がシンボリックリンクのときは無視され（`git check-ignore` が1行目を示す）、実体のディレクトリのときは、中の新しいファイルが `??` として表示された（無視されない）。Git はシンボリックリンクをファイルとして扱い、末尾が `/` の規則はディレクトリにだけ当たるためと考えられる。
+- **GitHub の GraphQL での構造の読み取り**（2026-10-25、この token）：`repository.issues` の各要素で、`databaseId`、`parent { number }`、`subIssues(first: N) { totalCount nodes { number } }`、`blockedBy(first: N) { totalCount nodes { number } }` を読めた。
+- **spec-dock の無視されたファイル**：mainのチェックアウトの `spec-dock/initiatives/` の下に、Git で無視されたファイルが99個ある（`init-00079-…` に71個、`init-local-00003-…` に28個。`.workbench` の中身）。追跡されていないので、`git subtree split` の結果には入らない。
+- **結果の封筒の規則**（`src/spec_dock/runtime/presentation/envelope.py:69-95`）：`failed` は `succeeded` か `unknown` の効果を持てない。`partial` は終了コード6（適用済みか不明の効果が要る）か7でなければならない。
+- **コマンドの数のテスト**：`tests/cli_runtime/test_issue413_contract.py:160`、`tests/cli_runtime/test_cli_vnext_contract.py:64`、`tests/integration/test_cli_docs_vnext.py:35` が、`LEAF_PATHS` が44個であることを確かめている。
+- **`git merge-tree --write-tree` の出力**（Git 2.54.0）：内容の競合、手元で削除して GitHub 側で変更、GitHub 側で削除して手元で変更、の3つを同時に起こすと、終了コード1で、1行目に統合したツリー、続いて競合したファイルごとに `<モード> <オブジェクト> <段>\t<パス>`（段1は共通の祖先、段2は第1引数、段3は第2引数）、その後に `CONFLICT (content)`、`CONFLICT (modify/delete)` の説明が出た。変更と削除の競合では「Version <変更した側> of <パス> left in tree」と出て、変更した側の版がツリーに残った。
 - **Codex のサンドボックスと `flock`**：`codex sandbox -- …`（seatbelt、`~/.codex/config.toml` の workspace-write）の中で、書き込みが拒否される場所（mainの `.git` と `spec-dock/`）でも、ディレクトリを読み取りで開いて `flock(LOCK_EX|LOCK_NB)` を取れた。サンドボックスの外のプロセスが同じディレクトリに `flock` を持つ間、中からは取れず（BUSY）、逆も同じだった。外したあとは取れた。
 - **サンドボックスでの書き込みの可否の判定**：サンドボックスの中では、書けない場所への `os.access(path, W_OK)` が False を返した。環境変数 `CODEX_SANDBOX=seatbelt` が設定されていた。
 - **launchd からの push の認証**：一時的なジョブ（`launchctl bootstrap gui/<uid>`）で、Homebrew の git から `git push --dry-run` を実行すると、`~/.gitconfig` の `credential.https://github.com.helper = !/opt/homebrew/bin/gh auth git-credential`（利用者の `gh` のログイン）で認証できた。資格情報を外すと「could not read Username」で失敗したので、dry-run でも認証が要ることも確かめた。リモートには何も作られていない。launchd のジョブの `PATH` は既定で `/usr/bin:/bin:/usr/sbin:/sbin` で、`GH_TOKEN` はない。
