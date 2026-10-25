@@ -239,6 +239,9 @@ class FakeGithub:
         """
         self._faults.append(_Fault(status, dict(headers or {}), body, method, endpoint, timeout, times, apply))
 
+    def clear_faults(self) -> None:
+        self._faults.clear()
+
     # Inspection.
 
     def metered_requests(self) -> list[FakeRequest]:

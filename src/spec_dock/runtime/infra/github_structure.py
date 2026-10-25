@@ -9,10 +9,11 @@ import json
 import re
 import subprocess
 import time
-from typing import TYPE_CHECKING, Literal, Protocol, cast
+from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, cast
 from urllib.parse import quote
 
 from spec_dock.runtime.domain.canonical_structure import (
+    GITHUB_HOST,
     KIND_LABELS,
     FetchedIssue,
     IssueFacts,
@@ -25,7 +26,6 @@ if TYPE_CHECKING:
     from collections.abc import Mapping
     from pathlib import Path
 
-GITHUB_HOST = "github.com"
 _NAME = re.compile(r"^[a-z0-9_.-]+$")
 GITHUB_RATE_LIMITED = "GITHUB_RATE_LIMITED"
 GITHUB_UNAVAILABLE = "GITHUB_UNAVAILABLE"
@@ -222,6 +222,7 @@ class GithubApi:
                 cwd=str(self._cwd) if self._cwd is not None else None,
                 capture_output=True,
                 text=True,
+                encoding="utf-8",
                 check=False,
                 timeout=self._timeout,
                 input=json.dumps(payload, ensure_ascii=False) if payload is not None else None,
@@ -304,24 +305,26 @@ def _parse(raw: str, endpoint: str, *, mutation: bool) -> GithubResponse:
     return GithubResponse(int(matched.group(1)), headers, body)
 
 
-FULL_READ_QUERY = """query($owner: String!, $name: String!, $after: String) {
-  rateLimit { cost remaining resetAt }
-  repository(owner: $owner, name: $name) {
+_KIND_FILTER = ", ".join(f'"{label}"' for label in KIND_LABELS.values())
+FULL_READ_QUERY = f"""query($owner: String!, $name: String!, $after: String) {{
+  rateLimit {{ cost remaining resetAt }}
+  repository(owner: $owner, name: $name) {{
     issues(first: 100, after: $after, states: [OPEN, CLOSED],
-           labels: ["spec-dock:initiative", "spec-dock:epic", "spec-dock:issue"]) {
-      pageInfo { hasNextPage endCursor }
-      nodes {
+           labels: [{_KIND_FILTER}]) {{
+      pageInfo {{ hasNextPage endCursor }}
+      nodes {{
         number databaseId title body state stateReason updatedAt url
-        labels(first: 20) { totalCount nodes { name } }
-        assignees(first: 10) { nodes { login } }
-        parent { number repository { nameWithOwner } }
-        subIssues(first: 100) { totalCount nodes { number repository { nameWithOwner } } }
-        blockedBy(first: 100) { totalCount nodes { number title state repository { nameWithOwner } } }
-      }
-    }
-  }
-}"""
+        labels(first: 20) {{ totalCount nodes {{ name }} }}
+        assignees(first: 10) {{ nodes {{ login }} }}
+        parent {{ number repository {{ nameWithOwner }} }}
+        subIssues(first: 100) {{ totalCount nodes {{ number repository {{ nameWithOwner }} }} }}
+        blockedBy(first: 100) {{ totalCount nodes {{ number title state repository {{ nameWithOwner }} }} }}
+      }}
+    }}
+  }}
+}}"""
 REST_PAGE_SIZE = 100
+_T = TypeVar("_T")
 
 
 @dataclass(frozen=True)
@@ -331,9 +334,8 @@ class ProbeResult:
     statuses: dict[str, int]
 
 
-def _invalid(message: str, endpoint: str, *, uncertain: bool = False) -> GithubStructureError:
-    code = GITHUB_EFFECT_UNKNOWN if uncertain else GITHUB_RESPONSE_INVALID
-    return GithubStructureError(code, message, uncertain=uncertain, endpoint=endpoint)
+def _invalid(message: str, endpoint: str) -> GithubStructureError:
+    return GithubStructureError(GITHUB_RESPONSE_INVALID, message, endpoint=endpoint)
 
 
 def _dict(value: object, what: str, endpoint: str) -> dict[str, object]:
@@ -354,20 +356,34 @@ def _int(value: object, what: str, endpoint: str) -> int:
     return cast("int", value)
 
 
-def _str(value: object, what: str, endpoint: str, *, optional: bool = False) -> str | None:
-    if value is None and optional:
-        return None
+def _text(value: object, what: str, endpoint: str) -> str:
     if not isinstance(value, str):
         raise _invalid(f"GitHub {what} is not a string", endpoint)
     return value
 
 
-def _lower(value: str | None) -> str | None:
-    return value.lower() if value else None
+def _optional_text(value: object, what: str, endpoint: str) -> str | None:
+    return None if value is None else _text(value, what, endpoint)
+
+
+def _state(value: object, what: str, endpoint: str) -> str:
+    state = _text(value, what, endpoint).lower()
+    if state not in ("open", "closed"):
+        raise _invalid(f"GitHub {what} is not open or closed", endpoint)
+    return state
+
+
+def _optional_lower(value: object, what: str, endpoint: str) -> str | None:
+    text = _optional_text(value, what, endpoint)
+    return text.lower() if text else None
+
+
+def _names(value: object, key: str, what: str, endpoint: str) -> tuple[str, ...]:
+    return tuple(_text(_dict(item, what, endpoint).get(key), what, endpoint) for item in _list(value, what, endpoint))
 
 
 def _repository_of_url(value: object, endpoint: str) -> str:
-    url = _str(value, "repository_url", endpoint) or ""
+    url = _text(value, "repository_url", endpoint)
     prefix = "https://api.github.com/repos/"
     if not url.lower().startswith(prefix) or url[len(prefix) :].count("/") != 1:
         raise _invalid("GitHub repository_url is not a repository", endpoint)
@@ -403,11 +419,14 @@ class GithubStructureClient:
             page = _dict(issues.get("pageInfo"), "pageInfo", "graphql")
             if page.get("hasNextPage") is not True:
                 break
-            after = _str(page.get("endCursor"), "endCursor", "graphql")
+            after = _text(page.get("endCursor"), "endCursor", "graphql")
         self.last_graphql_cost = cost
         return tuple(fetched)
 
     def graphql(self, query: str, variables: Mapping[str, object]) -> dict[str, object]:
+        """Send one read-only GraphQL query; it is retried like any read, so mutations are refused."""
+        if query.lstrip().lower().startswith("mutation"):
+            raise ValueError("GithubStructureClient.graphql sends queries only")
         retries = 0
         while True:
             response = self.api.request(
@@ -466,10 +485,8 @@ class GithubStructureClient:
         return self._related_pages(f"{self._base}/issues/{_positive(number)}/dependencies/blocked_by")
 
     def list_labels(self, number: int) -> tuple[str, ...]:
-        names: list[str] = []
-        for item in self._pages(f"{self._base}/issues/{_positive(number)}/labels"):
-            names.append(cast("str", _str(_dict(item, "label", "labels").get("name"), "label name", "labels")))
-        return tuple(names)
+        endpoint = f"{self._base}/issues/{_positive(number)}/labels"
+        return _names(self._pages(endpoint), "name", "label", endpoint)
 
     def label_exists(self, name: str) -> bool:
         endpoint = f"{self._base}/labels/{quote(name, safe='')}"
@@ -477,7 +494,7 @@ class GithubStructureClient:
 
     def current_login(self) -> str:
         body = _dict(self.api.request("GET", "user").body, "user", "user")
-        return cast("str", _str(body.get("login"), "login", "user"))
+        return _text(body.get("login"), "login", "user")
 
     # Writes. Each is sent alone; an uncertain result is read back before it is reported as unknown.
 
@@ -522,10 +539,14 @@ class GithubStructureClient:
             matches = (title is None or observed.title == title) and (state is None or observed.state == state)
             return observed if matches else None
 
-        response = self._write("PATCH", endpoint, payload, ok=frozenset({200}), confirm=confirmed)
-        if not isinstance(response, GithubResponse):
-            return cast("IssueFacts", response)
-        return self._facts_from_rest(response.body, endpoint, number=number)
+        return self._write(
+            "PATCH",
+            endpoint,
+            payload,
+            ok=frozenset({200}),
+            decode=lambda response: self._facts_from_rest(response.body, endpoint, number=number),
+            confirm=confirmed,
+        )
 
     def add_sub_issue(self, parent: int, *, child: int, child_id: int, replace_parent: bool = False) -> None:
         self._write(
@@ -533,16 +554,22 @@ class GithubStructureClient:
             f"{self._base}/issues/{_positive(parent)}/sub_issues",
             {"sub_issue_id": _positive(child_id), "replace_parent": replace_parent},
             ok=frozenset({200, 201}),
+            decode=_done,
             confirm=lambda: self._parent_is(child, parent) or None,
         )
 
     def remove_sub_issue(self, parent: int, *, child: int, child_id: int) -> None:
+        def detached() -> bool | None:
+            self.get_issue(child)  # a 404 here means no access, not an absent relation
+            return (not self._parent_is(child, parent)) or None
+
         self._write(
             "DELETE",
             f"{self._base}/issues/{_positive(parent)}/sub_issue",
             {"sub_issue_id": _positive(child_id)},
             ok=frozenset({200}),
-            confirm=lambda: (not self._parent_is(child, parent)) or None,
+            decode=_done,
+            confirm=detached,
             absent_ok=True,
         )
 
@@ -552,6 +579,7 @@ class GithubStructureClient:
             f"{self._base}/issues/{_positive(number)}/dependencies/blocked_by",
             {"issue_id": _positive(blocker_id)},
             ok=frozenset({200, 201}),
+            decode=_done,
             confirm=lambda: self._blocked_by(number, blocker) or None,
         )
 
@@ -561,40 +589,40 @@ class GithubStructureClient:
             f"{self._base}/issues/{_positive(number)}/dependencies/blocked_by/{_positive(blocker_id)}",
             None,
             ok=frozenset({200, 204}),
+            decode=_done,
             confirm=lambda: (not self._blocked_by(number, blocker)) or None,
             absent_ok=True,
         )
 
     def create_label(self, definition: LabelDefinition) -> None:
         endpoint = f"{self._base}/labels"
-        payload = {"name": definition.name, "color": definition.color, "description": definition.description}
-        response = self._write(
+
+        def accepted(response: GithubResponse) -> bool:
+            if response.status == 422 and not _already_exists(response.body):
+                raise GithubStructureError(
+                    GITHUB_REQUEST_REJECTED, "GitHub rejected the label definition", status=422, endpoint=endpoint
+                )
+            return True
+
+        self._write(
             "POST",
             endpoint,
-            payload,
+            {"name": definition.name, "color": definition.color, "description": definition.description},
             ok=frozenset({201, 422}),
+            decode=accepted,
             confirm=lambda: self.label_exists(definition.name) or None,
         )
-        if isinstance(response, GithubResponse) and response.status == 422 and not _already_exists(response.body):
-            raise GithubStructureError(
-                GITHUB_REQUEST_REJECTED, "GitHub rejected the label definition", status=422, endpoint=endpoint
-            )
 
     def add_labels(self, number: int, labels: Sequence[str]) -> tuple[str, ...]:
         endpoint = f"{self._base}/issues/{_positive(number)}/labels"
         wanted = set(labels)
-        response = self._write(
+        return self._write(
             "POST",
             endpoint,
             {"labels": list(labels)},
             ok=frozenset({200}),
+            decode=lambda response: _names(response.body, "name", "label", endpoint),
             confirm=lambda: self._labels_if(number, lambda current: wanted <= set(current)),
-        )
-        if not isinstance(response, GithubResponse):
-            return cast("tuple[str, ...]", response)
-        return tuple(
-            cast("str", _str(_dict(item, "label", endpoint).get("name"), "label name", endpoint))
-            for item in _list(response.body, "labels", endpoint)
         )
 
     def remove_label(self, number: int, name: str) -> None:
@@ -603,6 +631,7 @@ class GithubStructureClient:
             f"{self._base}/issues/{_positive(number)}/labels/{quote(name, safe='')}",
             None,
             ok=frozenset({200}),
+            decode=_done,
             confirm=lambda: self._labels_if(number, lambda current: name not in current),
             absent_ok=True,
         )
@@ -614,6 +643,7 @@ class GithubStructureClient:
             f"{self._base}/issues/{_positive(number)}/assignees",
             {"assignees": list(logins)},
             ok=frozenset({200, 201}),
+            decode=_done,
             confirm=lambda: (wanted <= set(self.get_issue(number).assignees)) or None,
         )
 
@@ -624,14 +654,27 @@ class GithubStructureClient:
         payload: object | None,
         *,
         ok: frozenset[int],
-        confirm: Callable[[], object | None],
+        decode: Callable[[GithubResponse], _T],
+        confirm: Callable[[], _T | None],
         absent_ok: bool = False,
-    ) -> GithubResponse | object:
-        """Send one write; read back when the answer is uncertain or a removal answers 404."""
+    ) -> _T:
+        """Send one write. Read back when the answer is uncertain, unreadable, or a removal answers 404."""
         try:
             response = self.api.request(method, endpoint, payload=payload, ok=ok | ({404} if absent_ok else set()))
+            if absent_ok and response.status == 404:
+                observed = confirm()
+                if observed is None:
+                    raise GithubStructureError(
+                        GITHUB_ACCESS_DENIED,
+                        "GitHub could not find the relation to remove",
+                        status=404,
+                        endpoint=endpoint,
+                    )
+                return observed
+            return decode(response)
         except GithubStructureError as error:
-            if not error.uncertain:
+            # A 2xx write whose body cannot be read may still have applied, like a lost answer.
+            if not error.uncertain and error.code != GITHUB_RESPONSE_INVALID:
                 raise
             try:
                 observed = confirm()
@@ -647,11 +690,6 @@ class GithubStructureClient:
                     endpoint=endpoint,
                 ) from error
             return observed
-        if absent_ok and response.status == 404 and confirm() is None:
-            raise GithubStructureError(
-                GITHUB_ACCESS_DENIED, "GitHub could not find the relation to remove", status=404, endpoint=endpoint
-            )
-        return response
 
     def _parent_is(self, child: int, parent: int) -> bool:
         found = self.get_parent(child)
@@ -691,8 +729,8 @@ class GithubStructureClient:
         return RelatedIssue(
             _int(item.get("number"), "number", endpoint),
             _repository_of_url(item.get("repository_url"), endpoint),
-            _str(item.get("title"), "title", endpoint),
-            _lower(_str(item.get("state"), "state", endpoint)),
+            _text(item.get("title"), "title", endpoint),
+            _state(item.get("state"), "state", endpoint),
         )
 
     def _facts_from_rest(self, payload: object, endpoint: str, *, number: int | None) -> IssueFacts:
@@ -702,59 +740,43 @@ class GithubStructureClient:
             raise _invalid("GitHub returned a different Issue or a pull request", endpoint)
         if _repository_of_url(item.get("repository_url"), endpoint) != self.repository.slug:
             raise _invalid("GitHub returned an Issue of another repository", endpoint)
-        labels = tuple(
-            cast("str", _str(_dict(label, "label", endpoint).get("name"), "label name", endpoint))
-            for label in _list(item.get("labels"), "labels", endpoint)
-        )
-        assignees = tuple(
-            cast("str", _str(_dict(user, "assignee", endpoint).get("login"), "login", endpoint))
-            for user in _list(item.get("assignees"), "assignees", endpoint)
-        )
         return IssueFacts(
             number=found,
             database_id=_int(item.get("id"), "id", endpoint),
-            title=cast("str", _str(item.get("title"), "title", endpoint)),
-            body=_str(item.get("body"), "body", endpoint, optional=True),
-            state=cast("str", _lower(_str(item.get("state"), "state", endpoint))),
-            state_reason=_lower(_str(item.get("state_reason"), "state_reason", endpoint, optional=True)),
-            labels=labels,
-            assignees=assignees,
-            updated_at=cast("str", _str(item.get("updated_at"), "updated_at", endpoint)),
-            url=cast("str", _str(item.get("html_url"), "html_url", endpoint)),
+            title=_text(item.get("title"), "title", endpoint),
+            body=_optional_text(item.get("body"), "body", endpoint),
+            state=_state(item.get("state"), "state", endpoint),
+            state_reason=_optional_lower(item.get("state_reason"), "state_reason", endpoint),
+            labels=_names(item.get("labels"), "name", "label", endpoint),
+            assignees=_names(item.get("assignees"), "login", "assignee", endpoint),
+            updated_at=_text(item.get("updated_at"), "updated_at", endpoint),
+            url=_text(item.get("html_url"), "html_url", endpoint),
         )
 
     def _fetched_from_graphql(self, node: dict[str, object]) -> FetchedIssue:
         endpoint = "graphql"
         number = _int(node.get("number"), "number", endpoint)
         labels_block = _dict(node.get("labels"), "labels", endpoint)
-        labels = tuple(
-            cast("str", _str(_dict(item, "label", endpoint).get("name"), "label name", endpoint))
-            for item in _list(labels_block.get("nodes"), "labels", endpoint)
-        )
+        labels = _names(labels_block.get("nodes"), "name", "label", endpoint)
         if type(labels_block.get("totalCount")) is int and cast("int", labels_block["totalCount"]) > len(labels):
             labels = self.list_labels(number)
-        assignees = tuple(
-            cast("str", _str(_dict(item, "assignee", endpoint).get("login"), "login", endpoint))
-            for item in _list(_dict(node.get("assignees"), "assignees", endpoint).get("nodes"), "assignees", endpoint)
-        )
         facts = IssueFacts(
             number=number,
             database_id=_int(node.get("databaseId"), "databaseId", endpoint),
-            title=cast("str", _str(node.get("title"), "title", endpoint)),
-            body=_str(node.get("body"), "body", endpoint, optional=True),
-            state=cast("str", _lower(_str(node.get("state"), "state", endpoint))),
-            state_reason=_lower(_str(node.get("stateReason"), "stateReason", endpoint, optional=True)),
+            title=_text(node.get("title"), "title", endpoint),
+            body=_optional_text(node.get("body"), "body", endpoint),
+            state=_state(node.get("state"), "state", endpoint),
+            state_reason=_optional_lower(node.get("stateReason"), "stateReason", endpoint),
             labels=labels,
-            assignees=assignees,
-            updated_at=cast("str", _str(node.get("updatedAt"), "updatedAt", endpoint)),
-            url=cast("str", _str(node.get("url"), "url", endpoint)),
+            assignees=_names(
+                _dict(node.get("assignees"), "assignees", endpoint).get("nodes"), "login", "assignee", endpoint
+            ),
+            updated_at=_text(node.get("updatedAt"), "updatedAt", endpoint),
+            url=_text(node.get("url"), "url", endpoint),
         )
         parent = None if node.get("parent") is None else self._related_from_graphql(node.get("parent"))
         children = self._connection(node.get("subIssues"), "subIssues")
-        if children is None:
-            sub_issues = self.list_sub_issues(number)
-        else:
-            sub_issues = children
+        sub_issues = self.list_sub_issues(number) if children is None else children
         blockers = self._connection(node.get("blockedBy"), "blockedBy")
         blocked_by = self.list_blocked_by(number) if blockers is None else blockers
         return FetchedIssue(facts, parent, sub_issues, blocked_by)
@@ -771,12 +793,17 @@ class GithubStructureClient:
     def _related_from_graphql(self, value: object) -> RelatedIssue:
         item = _dict(value, "related Issue", "graphql")
         repository = _dict(item.get("repository"), "repository", "graphql")
+        state = item.get("state")
         return RelatedIssue(
             _int(item.get("number"), "number", "graphql"),
-            cast("str", _str(repository.get("nameWithOwner"), "nameWithOwner", "graphql")).lower(),
-            _str(item.get("title"), "title", "graphql", optional=True),
-            _lower(_str(item.get("state"), "state", "graphql", optional=True)),
+            _text(repository.get("nameWithOwner"), "nameWithOwner", "graphql").lower(),
+            _optional_text(item.get("title"), "title", "graphql"),
+            None if state is None else _state(state, "state", "graphql"),
         )
+
+
+def _done(_response: GithubResponse) -> bool:
+    return True
 
 
 def repository_for_checkout(root: Path, *, timeout: float) -> GithubRepository:

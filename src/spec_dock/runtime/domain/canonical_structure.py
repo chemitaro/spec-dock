@@ -26,6 +26,7 @@ ID_PREFIXES: Final[Mapping[ScopeKind, str]] = {"initiative": "init", "epic": "ep
 PARENT_KINDS: Final[Mapping[ScopeKind, ScopeKind | None]] = {"initiative": None, "epic": "initiative", "issue": "epic"}
 
 SNAPSHOT_VERSION: Final = 1
+GITHUB_HOST: Final = "github.com"
 
 KIND_LABEL_MULTIPLE = "KIND_LABEL_MULTIPLE"
 SLUG_MARKER_MISSING = "SLUG_MARKER_MISSING"
@@ -575,7 +576,7 @@ def build_snapshot(
 
 def _own_slug(repository: str) -> str:
     host, _, slug = repository.partition("/")
-    if host != "github.com" or slug.count("/") != 1:
+    if host != GITHUB_HOST or slug.count("/") != 1:
         raise ValueError("repository must be github.com/<owner>/<repo>")
     return slug
 

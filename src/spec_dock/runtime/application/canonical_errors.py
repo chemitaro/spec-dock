@@ -35,6 +35,10 @@ NOT_MIGRATED_RECOVERY: Final = (
     "in SpecDock 0.3.0 to migrate it."
 )
 CANONICAL_NOT_LINKED_RECOVERY: Final = "spec-dock canonical link"
+MIGRATE_NOT_APPLICABLE_RECOVERY: Final = (
+    "No writer-protocol migration applies to a schema-4 workspace; nothing needs to be done."
+)
+_FAILURE_EXIT_CODES: Final = frozenset({1, 2, 3, 4, 5, 7})
 
 _GITHUB_RECOVERY: Final[Mapping[str, str]] = {
     GITHUB_UNAVAILABLE: "Check the network connection and run gh auth status, then run the same command.",
@@ -60,6 +64,8 @@ class CanonicalCommandError(Exception):
         recovery: tuple[str, ...] = (),
         details: dict[str, object] | None = None,
     ) -> None:
+        if exit_code not in _FAILURE_EXIT_CODES:
+            raise ValueError("a canonical failure before writing exits with 1, 2, 3, 4, 5 or 7")
         self.code = code
         self.message = message
         self.exit_code = exit_code

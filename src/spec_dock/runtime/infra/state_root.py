@@ -24,5 +24,9 @@ def resolve_state_root(environ: Mapping[str, str] | None = None, *, override: Pa
     configured = values.get("XDG_STATE_HOME", "")
     if configured and Path(configured).is_absolute():
         return Path(configured) / "spec-dock"
-    home = values.get("HOME") or str(Path.home())
+    home = values.get("HOME")
+    if not home:
+        if environ is not None:
+            raise ValueError("HOME is required to locate the SpecDock state root")
+        home = str(Path.home())
     return Path(home) / ".local" / "state" / "spec-dock"

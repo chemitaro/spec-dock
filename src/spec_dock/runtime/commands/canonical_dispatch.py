@@ -2,21 +2,17 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+import argparse
+from collections.abc import Callable
+from pathlib import Path
 
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
+from spec_dock.runtime.application.project_context import ProjectContext
+from spec_dock.runtime.presentation.envelope import OperationResult
 
-if TYPE_CHECKING:
-    import argparse
-    from collections.abc import Callable
-    from pathlib import Path
-
-    from spec_dock.runtime.application.project_context import ProjectContext
-    from spec_dock.runtime.presentation.envelope import OperationResult
-
-    CanonicalHandler = Callable[[argparse.Namespace, ProjectContext], OperationResult[object]]
-    RepositoryIndependentHandler = Callable[[argparse.Namespace, Path], OperationResult[object] | None]
+CanonicalHandler = Callable[[argparse.Namespace, ProjectContext], OperationResult[object]]
+RepositoryIndependentHandler = Callable[[argparse.Namespace, Path], OperationResult[object] | None]
 
 # Keyed by public leaf path. Later Issues add one entry per command they implement in canonical mode.
 CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {

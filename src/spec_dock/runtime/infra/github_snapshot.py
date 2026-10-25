@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import timedelta
 import errno
 import json
+import math
 import os
 import secrets
 import time
@@ -28,6 +29,7 @@ from spec_dock.runtime.domain.canonical_structure import (
     parse_timestamp,
 )
 from spec_dock.runtime.infra.github_structure import (
+    GITHUB_RESPONSE_INVALID,
     GITHUB_UNAVAILABLE,
     SYSTEM_CLOCK,
     GithubApi,
@@ -110,6 +112,8 @@ class SnapshotStore:
     """One repository's snapshot.json and probe.json under the state root, or process memory."""
 
     def __init__(self, state_root: Path, repository: GithubRepository, *, lock_timeout: float = 10.0) -> None:
+        if not math.isfinite(lock_timeout) or not 0 <= lock_timeout <= 300:
+            raise ValueError("snapshot lock timeout must be finite and between 0 and 300 seconds")
         self.repository = repository
         self.directory = state_root / "github" / repository.host / repository.owner / repository.name
         self.lock_timeout = lock_timeout
@@ -117,15 +121,17 @@ class SnapshotStore:
 
     def load(self) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
         """Read without the lock (renames keep files whole); never raises."""
+        return _choose(*self._sources())
+
+    def _sources(
+        self,
+    ) -> tuple[StructureSnapshot | None, ProbeRecord | None, StructureSnapshot | None, ProbeRecord | None]:
         disk_snapshot = self._read(SNAPSHOT_FILE, StructureSnapshot.from_json)
         if disk_snapshot is not None and disk_snapshot.repository != self.repository.key:
             disk_snapshot = None
         disk_probe = self._read(PROBE_FILE, ProbeRecord.from_json)
         memory_snapshot, memory_probe = _MEMORY.get(str(self.directory), (None, None))
-        return (
-            _newer(disk_snapshot, memory_snapshot, lambda item: item.fetched_at),
-            _newer(disk_probe, memory_probe, lambda item: item.checked_at),
-        )
+        return disk_snapshot, disk_probe, memory_snapshot, memory_probe
 
     def commit_refresh(self, fresh: StructureSnapshot, probe: ProbeRecord) -> StructureSnapshot:
         """Write a refetch after overlaying writes reflected since it started; never replace a newer refetch."""
@@ -143,7 +149,27 @@ class SnapshotStore:
         return cast("StructureSnapshot", snapshot)
 
     def save_probe(self, probe: ProbeRecord) -> None:
-        self._update(lambda current, _probe: (current, probe))
+        """Record a check unless another process already recorded a later one."""
+
+        def change(
+            current: StructureSnapshot | None, current_probe: ProbeRecord | None
+        ) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+            if _later(current_probe, probe):
+                return current, current_probe
+            return current, probe
+
+        self._update(change)
+
+    def record_probe_error(self, error: Mapping[str, str]) -> None:
+        """Keep the latest ETags and check time; only the failure is recorded."""
+
+        def change(
+            current: StructureSnapshot | None, current_probe: ProbeRecord | None
+        ) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+            base = current_probe or ProbeRecord(None, {}, None)
+            return current, ProbeRecord(base.checked_at, base.etags, dict(error))
+
+        self._update(change)
 
     def reflect(self, changes: Sequence[StructureChange], *, command: str, at: str) -> StructureSnapshot | None:
         snapshot, _ = self._update(
@@ -160,21 +186,26 @@ class SnapshotStore:
             [StructureSnapshot | None, ProbeRecord | None], tuple[StructureSnapshot | None, ProbeRecord | None]
         ],
     ) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+        """Re-read under the lock, apply once, and write only what differs from the files."""
+        computed: tuple[StructureSnapshot | None, ProbeRecord | None] | None = None
         try:
             with self._locked() as descriptor:
-                snapshot, probe = change(*self.load())
-                if snapshot is not None:
+                disk_snapshot, disk_probe, memory_snapshot, memory_probe = self._sources()
+                computed = change(*_choose(disk_snapshot, disk_probe, memory_snapshot, memory_probe))
+                snapshot, probe = computed
+                if snapshot is not None and snapshot is not disk_snapshot:
                     _write_json(descriptor, SNAPSHOT_FILE, snapshot.to_json())
-                if probe is not None:
+                if probe is not None and probe is not disk_probe:
                     _write_json(descriptor, PROBE_FILE, probe.to_json())
         except OSError:
-            snapshot, probe = change(*self.load())
-            _MEMORY[str(self.directory)] = (snapshot, probe)
+            if computed is None:
+                computed = change(*self.load())
+            _MEMORY[str(self.directory)] = computed
             self.persisted = False
-            return snapshot, probe
+            return computed
         _MEMORY.pop(str(self.directory), None)
         self.persisted = True
-        return snapshot, probe
+        return computed
 
     def _locked(self) -> _DirectoryLock:
         return _DirectoryLock(self.directory, self.lock_timeout)
@@ -185,6 +216,25 @@ class SnapshotStore:
                 return decode(json.load(stream))
         except (OSError, ValueError, RecursionError):
             return None
+
+
+def _choose(
+    disk_snapshot: StructureSnapshot | None,
+    disk_probe: ProbeRecord | None,
+    memory_snapshot: StructureSnapshot | None,
+    memory_probe: ProbeRecord | None,
+) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+    return (
+        _newer(disk_snapshot, memory_snapshot, lambda item: item.fetched_at),
+        _newer(disk_probe, memory_probe, lambda item: item.checked_at),
+    )
+
+
+def _later(current: ProbeRecord | None, candidate: ProbeRecord) -> bool:
+    """True when the stored check is strictly later than the candidate's."""
+    if current is None or current.checked_at is None or candidate.checked_at is None:
+        return False
+    return parse_timestamp(current.checked_at) > parse_timestamp(candidate.checked_at)
 
 
 def _newer(first: _T | None, second: _T | None, key: Callable[[_T], str | None]) -> _T | None:
@@ -323,7 +373,10 @@ class StructureSnapshotService:
     def reread(self, numbers: Iterable[int], *, command: str) -> StructureSnapshot:
         """Read the Issues a write decision depends on and reflect what GitHub reports now."""
         changes = [UpsertIssue(self.client.get_issue(number)) for number in numbers]
-        reflected = self.reflect(changes, command=f"{command} (reread)")
+        try:
+            reflected = self.reflect(changes, command=f"{command} (reread)")
+        except ValueError as invalid:
+            raise GithubStructureError(GITHUB_RESPONSE_INVALID, f"GitHub Issue is malformed: {invalid}") from invalid
         if reflected is None:
             raise GithubStructureError(GITHUB_UNAVAILABLE, "no structure snapshot is available to update")
         return reflected
@@ -348,11 +401,19 @@ class StructureSnapshotService:
                 return FreshSnapshot(snapshot, False, "unchanged", False)
             started = format_timestamp(self.clock.now())
             fetched = self.client.fetch_structure()
-            fresh = build_snapshot(
-                self.repository.key, fetched, fetched_at=format_timestamp(self.clock.now()), fetch_started_at=started
-            )
+            try:
+                fresh = build_snapshot(
+                    self.repository.key,
+                    fetched,
+                    fetched_at=format_timestamp(self.clock.now()),
+                    fetch_started_at=started,
+                )
+            except ValueError as invalid:
+                raise GithubStructureError(
+                    GITHUB_RESPONSE_INVALID, f"GitHub structure is malformed: {invalid}"
+                ) from invalid
         except GithubStructureError as error:
-            return self._degrade(level, snapshot, probe, error)
+            return self._degrade(level, snapshot, error)
         written = self.store.commit_refresh(fresh, ProbeRecord(checked_at, result.etags, None))
         return FreshSnapshot(
             written,
@@ -363,15 +424,14 @@ class StructureSnapshotService:
         )
 
     def _degrade(
-        self,
-        level: FreshnessLevel,
-        snapshot: StructureSnapshot | None,
-        probe: ProbeRecord | None,
-        error: GithubStructureError,
+        self, level: FreshnessLevel, snapshot: StructureSnapshot | None, error: GithubStructureError
     ) -> FreshSnapshot:
         """Keep old ETags and the check time so the next probe still sees the change; record only the error."""
-        recorded = {"code": error.code, "message": error.message, "at": format_timestamp(self.clock.now())}
-        self.store.save_probe(ProbeRecord(probe.checked_at if probe else None, probe.etags if probe else {}, recorded))
+        self.store.record_probe_error({
+            "code": error.code,
+            "message": error.message,
+            "at": format_timestamp(self.clock.now()),
+        })
         if level == "cycle":
             return FreshSnapshot(snapshot, True, "failed", False)
         if level == "display" and snapshot is not None:

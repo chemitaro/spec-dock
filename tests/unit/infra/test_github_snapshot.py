@@ -26,7 +26,11 @@ from spec_dock.runtime.infra.state_root import resolve_state_root
 from tests.support.fake_github import FakeGithub
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
+
+    from spec_dock.runtime.domain.canonical_structure import FetchedIssue
+    from spec_dock.runtime.infra.github_structure import ProbeResult
 
 REPOSITORY = GithubRepository.parse("example/repo")
 
@@ -151,7 +155,7 @@ def test_unreachable_github_degrades_by_level(tmp_path: Path) -> None:
     assert caught.value.code == "GITHUB_UNAVAILABLE"
     cycle = service.ensure_fresh("cycle")
     assert (cycle.snapshot, cycle.stale, cycle.probe) == (None, True, "failed")
-    fake._faults.clear()
+    fake.clear_faults()
     service.ensure_fresh("display")
     fake.inject(status=403, headers={"retry-after": "600"}, body={"message": "secondary rate limit"}, times=100)
     with pytest.raises(GithubStructureError) as caught:
@@ -182,7 +186,7 @@ def test_refetch_merge_keeps_a_write_reflected_while_the_fetch_was_running(tmp_p
     client = service.client
     original = client.fetch_structure
 
-    def fetch_with_concurrent_write():
+    def fetch_with_concurrent_write() -> tuple[FetchedIssue, ...]:
         fetched = original()
         facts = replace(client.get_issue(3), title="Written during the fetch")
         fake.clock.advance(1)
@@ -326,3 +330,82 @@ def test_reread_of_a_plain_blocker_updates_external_only(tmp_path: Path) -> None
     fake.issue(plain.number).state = "closed"
     reread = service.reread([plain.number], command="work start")
     assert plain.number not in reread.issues and reread.external[plain.number].state == "closed"
+
+
+def test_a_probe_only_cycle_rewrites_probe_json_but_never_snapshot_json(tmp_path: Path) -> None:
+    fake, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    before = (store.directory / "snapshot.json").stat()
+    fake.clock.advance(61)
+    assert service.ensure_fresh("cycle").probe == "unchanged"
+    after = (store.directory / "snapshot.json").stat()
+    assert (after.st_ino, after.st_mtime_ns) == (before.st_ino, before.st_mtime_ns)
+    assert json.loads((store.directory / "probe.json").read_text())["checked_at"] == "2026-10-26T00:01:01Z"
+    for name in ("snapshot.json", "probe.json"):
+        assert stat.S_IMODE((store.directory / name).stat().st_mode) == 0o600
+
+
+def test_a_failure_record_keeps_a_newer_probe_written_by_another_process(tmp_path: Path) -> None:
+    from spec_dock.runtime.infra.github_snapshot import ProbeRecord
+
+    fake, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    newer = ProbeRecord("2026-10-26T00:05:00Z", {"spec-dock:epic": 'W/"newer"'}, None)
+    original = service.client.probe
+
+    def probe_then_fail(etags: Mapping[str, str | None]) -> ProbeResult:
+        store.save_probe(newer)
+        raise GithubStructureError("GITHUB_UNAVAILABLE", "down")
+
+    service.client.probe = probe_then_fail  # type: ignore[method-assign]
+    fake.clock.advance(61)
+    assert service.ensure_fresh("display").stale
+    recorded = json.loads((store.directory / "probe.json").read_text())
+    assert recorded["checked_at"] == "2026-10-26T00:05:00Z" and recorded["etags"]["spec-dock:epic"] == 'W/"newer"'
+    assert recorded["last_error"]["code"] == "GITHUB_UNAVAILABLE"
+    service.client.probe = original  # type: ignore[method-assign]
+    store.save_probe(ProbeRecord("2026-10-26T00:01:00Z", {}, None))
+    assert json.loads((store.directory / "probe.json").read_text())["checked_at"] == "2026-10-26T00:05:00Z"
+
+
+def test_a_failed_second_file_write_keeps_one_reflection_in_memory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.domain.canonical_structure import SetParent
+    from spec_dock.runtime.infra import github_snapshot
+
+    _, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    real = github_snapshot._write_json
+    calls: list[str] = []
+
+    def failing(directory: int, name: str, payload: object) -> None:
+        calls.append(name)
+        if name == "probe.json":
+            raise OSError("disk full")
+        real(directory, name, payload)
+
+    monkeypatch.setattr(github_snapshot, "_write_json", failing)
+    reflected = store.reflect([SetParent(3, 1)], command="scope move", at="2026-10-26T00:00:01Z")
+    assert reflected is not None and [write.command for write in reflected.local_writes] == ["scope move"]
+    assert calls == ["snapshot.json"]
+
+
+def test_malformed_github_values_degrade_like_any_github_failure(tmp_path: Path) -> None:
+    fake, service, _ = _world(tmp_path)
+    fake.issue(2).state = "merged"
+    assert service.ensure_fresh("cycle").probe == "failed"
+    with pytest.raises(GithubStructureError) as caught:
+        service.ensure_fresh("display")
+    assert caught.value.code == "GITHUB_RESPONSE_INVALID"
+
+
+def test_lock_timeout_must_be_finite_and_bounded(tmp_path: Path) -> None:
+    for invalid in (float("nan"), -1.0, 301.0):
+        with pytest.raises(ValueError):
+            SnapshotStore(tmp_path, REPOSITORY, lock_timeout=invalid)
+
+
+def test_an_explicit_environment_without_home_never_falls_back_to_the_real_home() -> None:
+    with pytest.raises(ValueError):
+        resolve_state_root({})

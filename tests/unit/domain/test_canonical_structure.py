@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 from spec_dock.runtime.domain.canonical_structure import (
     SlugMarker,
@@ -324,7 +329,7 @@ def test_json_round_trip_keeps_every_field_and_the_version_one_shape() -> None:
         lambda payload: payload["local_writes"].append({"at": "x", "command": "c", "numbers": ["1"]}),
     ],
 )
-def test_unknown_versions_and_malformed_documents_are_rejected(mutate) -> None:
+def test_unknown_versions_and_malformed_documents_are_rejected(mutate: Callable[[dict[str, Any]], object]) -> None:
     import json
 
     from spec_dock.runtime.domain.canonical_structure import SnapshotFormatError, StructureSnapshot

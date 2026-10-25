@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import subprocess
+from typing import TYPE_CHECKING
 
 import pytest
 
 from spec_dock.runtime.infra.github_structure import GithubApi, GithubStructureError
 from tests.support.fake_github import FakeGithub
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 def _api(fake: FakeGithub) -> GithubApi:
@@ -66,14 +70,14 @@ def test_json_bodies_with_numbers_and_arrays_go_through_standard_input() -> None
 
 
 def test_missing_gh_and_unparseable_output_are_unavailable_for_reads() -> None:
-    def missing(argv, **kwargs):
+    def missing(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         raise FileNotFoundError("gh")
 
     with pytest.raises(GithubStructureError) as caught:
         GithubApi(runner=missing).request("GET", "user")
     assert caught.value.code == "GITHUB_UNAVAILABLE" and not caught.value.uncertain
 
-    def garbage(argv, **kwargs):
+    def garbage(argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[str]:
         return subprocess.CompletedProcess(argv, 1, "gh: something went wrong", "")
 
     with pytest.raises(GithubStructureError) as caught:
@@ -100,7 +104,9 @@ SECONDARY = {"message": "You have exceeded a secondary rate limit."}
         (403, {}, SECONDARY, 60.0),
     ],
 )
-def test_rate_limited_reads_wait_as_documented_and_retry(status, headers, body, wait) -> None:
+def test_rate_limited_reads_wait_as_documented_and_retry(
+    status: int, headers: dict[str, str], body: object, wait: float
+) -> None:
     fake = FakeGithub()  # clock starts at 2026-10-26T00:00:00Z = 1792972800
     fake.clock.advance(600)
     fake.inject(status=status, headers=headers, body=body)
@@ -239,7 +245,7 @@ def test_graphql_states_are_normalized_like_rest() -> None:
         ([{"message": "Field 'x' doesn't exist"}], "GITHUB_REQUEST_REJECTED"),
     ],
 )
-def test_graphql_errors_fail_without_partial_data(errors, code) -> None:
+def test_graphql_errors_fail_without_partial_data(errors: list[dict[str, str]], code: str) -> None:
     fake = FakeGithub()
     fake.inject(status=200, body={"data": None, "errors": errors}, method="POST")
     with pytest.raises(GithubStructureError) as caught:
@@ -372,7 +378,7 @@ def test_uncertain_writes_are_confirmed_by_reading_back() -> None:
     assert (caught.value.code, caught.value.uncertain) == ("GITHUB_CREATE_IDENTITY_UNKNOWN", True)
 
 
-def test_repository_for_a_checkout_comes_from_the_origin_remote(tmp_path) -> None:
+def test_repository_for_a_checkout_comes_from_the_origin_remote(tmp_path: Path) -> None:
     from spec_dock.runtime.infra.github_structure import repository_for_checkout
 
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
@@ -380,3 +386,120 @@ def test_repository_for_a_checkout_comes_from_the_origin_remote(tmp_path) -> Non
         ["git", "-C", str(tmp_path), "remote", "add", "origin", "https://github.com/Example/Repo.git"], check=True
     )
     assert repository_for_checkout(tmp_path, timeout=10).key == "github.com/example/repo"
+
+
+@pytest.mark.parametrize("body", ["not json", {"unexpected": "shape"}])
+def test_a_write_answered_with_an_unreadable_body_is_confirmed_by_reading_back(body: object) -> None:
+    fake = FakeGithub()
+    issue = fake.scope("issue", slug="leaf", title="Before")
+    client = _client(fake)
+    fake.inject(status=200, body=body, method="PATCH", apply=True)
+    assert client.update_issue(issue.number, title="After").title == "After"
+    fake.inject(status=200, body=body, method="POST", endpoint="/labels", apply=True)
+    assert "spec-dock:in-progress" in client.add_labels(issue.number, ["spec-dock:in-progress"])
+    fake.inject(status=200, body=body, method="PATCH")
+    with pytest.raises(GithubStructureError) as caught:
+        client.update_issue(issue.number, title="Never applied")
+    assert (caught.value.code, caught.value.uncertain) == ("GITHUB_EFFECT_UNKNOWN", True)
+
+
+def test_removing_a_sub_issue_from_an_unreadable_issue_is_not_a_success() -> None:
+    fake = FakeGithub()
+    epic = fake.scope("epic", slug="core")
+    client = _client(fake)
+    with pytest.raises(GithubStructureError) as caught:
+        client.remove_sub_issue(epic.number, child=999, child_id=fake.issue_id(999))
+    assert caught.value.code == "GITHUB_ACCESS_DENIED"
+    leaf = fake.scope("issue", slug="leaf")
+    client.remove_sub_issue(epic.number, child=leaf.number, child_id=leaf.id)
+
+
+@pytest.mark.parametrize("kind", ["pull request", "foreign"])
+def test_issue_reads_and_writes_reject_pull_requests_and_foreign_issues(kind: str) -> None:
+    fake = FakeGithub()
+    issue = fake.scope("issue", slug="leaf")
+    client = _client(fake)
+    if kind == "pull request":
+        issue.pull_request = True
+    else:
+        issue.repository = "other/repo"
+        fake.issues["example/repo", issue.number] = issue
+    for call in (
+        lambda: client.get_issue(issue.number),
+        lambda: client.update_issue(issue.number, title="x"),
+    ):
+        with pytest.raises(GithubStructureError) as caught:
+            call()
+        assert caught.value.code in ("GITHUB_RESPONSE_INVALID", "GITHUB_EFFECT_UNKNOWN")
+
+
+def test_a_read_with_a_non_json_body_is_invalid() -> None:
+    fake = FakeGithub()
+    fake.inject(status=200, body="<html>", method="GET")
+    with pytest.raises(GithubStructureError) as caught:
+        _client(fake).current_login()
+    assert caught.value.code == "GITHUB_RESPONSE_INVALID"
+
+
+def test_graphql_on_the_client_refuses_mutations() -> None:
+    with pytest.raises(ValueError):
+        _client(FakeGithub()).graphql("mutation { addLabelsToLabelable }", {})
+
+
+def test_the_full_read_query_uses_the_shared_kind_labels() -> None:
+    from spec_dock.runtime.domain.canonical_structure import KIND_LABELS
+    from spec_dock.runtime.infra.github_structure import FULL_READ_QUERY
+
+    assert "labels: [" + ", ".join(f'"{label}"' for label in KIND_LABELS.values()) + "]" in FULL_READ_QUERY
+
+
+def test_rule_violations_from_the_fake_github_reach_the_snapshot_anomalies() -> None:
+    from spec_dock.runtime.domain.canonical_structure import build_snapshot
+
+    fake = FakeGithub()
+    plan = fake.scope("initiative", slug="plan")
+    core = fake.scope("epic", slug="core", parent=plan.number)
+    leaf = fake.scope("issue", slug="leaf", parent=core.number)
+    double = fake.scope("epic", slug="double", parent=plan.number, labels=("spec-dock:issue",))
+    missing = fake.add_issue(title="No marker", body="Body", labels=("spec-dock:epic",))
+    fake.set_parent(missing.number, plan.number)
+    twice = fake.add_issue(
+        title="Two markers",
+        body="<!-- spec-dock:slug=a -->\r\n<!-- spec-dock:slug=b -->\r\n",
+        labels=("spec-dock:issue",),
+    )
+    fake.set_parent(twice.number, core.number)
+    under_issue = fake.scope("epic", slug="under-issue", parent=leaf.number)
+    crlf = fake.add_issue(
+        title="CRLF", body="Text\r\n<!-- spec-dock:slug=crlf -->\r\nmore", labels=("spec-dock:issue",)
+    )
+    fake.set_parent(crlf.number, core.number)
+    loop_a = fake.scope("issue", slug="loop-a", parent=core.number)
+    loop_b = fake.scope("issue", slug="loop-b", parent=core.number)
+    fake.block(loop_a.number, by=loop_b.number)
+    fake.block(loop_b.number, by=loop_a.number)
+    plain = fake.add_issue(title="Plain blocker")
+    fake.block(leaf.number, by=plain.number)
+    fake.add_foreign_issue("other/repo", 5)
+    fake.add_foreign_issue("other/repo", 6)
+    fake.set_parent(crlf.number, 6, parent_repository="other/repo")
+    fake.block(leaf.number, by=5, repository="other/repo")
+    snapshot = build_snapshot(
+        "github.com/example/repo",
+        _client(fake).fetch_structure(),
+        fetched_at="2026-10-26T00:00:01Z",
+        fetch_started_at="2026-10-26T00:00:00Z",
+    )
+    codes = {(item.number, item.code) for item in snapshot.anomalies}
+    assert codes == {
+        (double.number, "KIND_LABEL_MULTIPLE"),
+        (missing.number, "SLUG_MARKER_MISSING"),
+        (twice.number, "SLUG_MARKER_MULTIPLE"),
+        (under_issue.number, "PARENT_INVALID"),
+        (loop_a.number, "DEPENDENCY_CYCLE"),
+        (loop_b.number, "DEPENDENCY_CYCLE"),
+        (crlf.number, "PARENT_FOREIGN_REPOSITORY"),
+        (leaf.number, "DEPENDENCY_FOREIGN_REPOSITORY"),
+    }
+    assert snapshot.find(f"iss-{crlf.number:05d}") is not None and snapshot.issues[crlf.number].slug == "crlf"
+    assert snapshot.issues[leaf.number].blocked_by == (plain.number,) and plain.number in snapshot.external

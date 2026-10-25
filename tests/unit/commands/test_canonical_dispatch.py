@@ -110,3 +110,24 @@ def test_schema_three_reaches_the_legacy_handler_unchanged(tmp_path: Path, monke
     monkeypatch.setattr("spec_dock.runtime.application.direct_sync.sync_workspace", legacy)
     assert _result(dispatch(_namespace("workspace sync", root, source="local", allow_invalid=False), root))[0] == 0
     assert reached == ["legacy"]
+
+
+def test_canonical_errors_accept_only_failure_exit_codes() -> None:
+    import pytest
+
+    from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
+
+    for code in (0, 6, 8):
+        with pytest.raises(ValueError):
+            CanonicalCommandError("X", "y", exit_code=code)
+    assert CanonicalCommandError("X", "y", exit_code=7, recovery=("next",)).result("scope list").exit_code == 7
+
+
+def test_handler_types_and_recovery_texts_are_importable_at_runtime() -> None:
+    from spec_dock.runtime.application import canonical_errors
+    from spec_dock.runtime.commands import canonical_dispatch
+
+    assert canonical_dispatch.CanonicalHandler is not None
+    assert canonical_dispatch.RepositoryIndependentHandler is not None
+    assert canonical_errors.MIGRATE_NOT_APPLICABLE_RECOVERY.startswith("No writer-protocol migration")
+    assert canonical_errors.CANONICAL_NOT_LINKED_RECOVERY == "spec-dock canonical link"

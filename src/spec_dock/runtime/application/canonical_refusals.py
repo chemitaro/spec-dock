@@ -4,7 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_APPLICABLE, canonical_failure
+from spec_dock.runtime.application.canonical_errors import (
+    CANONICAL_NOT_APPLICABLE,
+    MIGRATE_NOT_APPLICABLE_RECOVERY,
+    canonical_failure,
+)
 
 if TYPE_CHECKING:
     import argparse
@@ -20,6 +24,6 @@ def refuse_workspace_migrate(namespace: argparse.Namespace, context: ProjectCont
         CANONICAL_NOT_APPLICABLE,
         "workspace migrate switches schema-3 writer protocols; this workspace declares schema 4",
         3,
-        ("No writer-protocol migration applies to a schema-4 workspace; nothing needs to be done.",),
+        (MIGRATE_NOT_APPLICABLE_RECOVERY,),
         {"schema_version": context.workspace.get("schema_version")},
     )
