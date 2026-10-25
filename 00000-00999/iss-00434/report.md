@@ -27,7 +27,15 @@ Epic の I-7 として、既定のブランチの検査（契約 C7 の持ち主
 
 ## Verification
 
-（最終品質ゲートの結果は、この節の後半に書く）
+### 最終品質ゲート（2026-10-26。ChatGPT のゲートは利用者の設定で無効のため、Claude だけのゲート）
+
+- **ゲートの SHA**：`2fa9a42df653e603a2fdb95ad16a323eb2547a19`。通常の push の後、ローカルの `HEAD` と `origin/chemitaro/iss-00434-canonical-branch-check` が同じ SHA で、作業ツリーに変更がないことを確かめてから始めた。`origin/main` は `41a4c57c0` から進んでおらず（PR #443 は未マージ）、マージするものはなかった。この記録のコミットは、ゲートの後に `report.md` だけを変える。
+- `make lint`：ruff check、ruff format check、mypy のすべてが成功（終了コード0）。
+- `uv run pytest`：2318 件成功、8 件スキップ（594.83 秒、終了コード0）。実行の後も `HEAD` は同じで、作業ツリーに変更はない。
+- `.github/scripts/specdock-ci-validate.sh "$PWD" "$PWD" 2fa9a42df…`（今の CI の手順。AC-15）：成功（終了コード0）。wheel の `sha256` は `b5d1c482227097eb655206644125350e513a52eda383a3010245737513df6168`、`workspace validate --ci` は `succeeded`、`valid: true`、`snapshot_source: HEAD`、`node_count: 260`。手元の `python3` の問題のため、`PATH` の先頭に Homebrew の `python3` を置いた（下の実機の確かめと同じ）。
+- **独立レビュー**（この作業に関わっていない新しいサブエージェント2つ。規約と仕様。対象は `origin/main...2fa9a42df` の全差分）：どちらも **P0/P1 なし**。P2/P3 は、ゲートの決まりで情報として扱い、修正もレビューのやり直しもしない。中身は下の「Residual Risks / Follow-ups」に引き継ぐ。
+  - 規約：P2 1件（ST-1）、P3 7件（ST-2〜ST-8）。
+  - 仕様：P3 5件（SP-1〜SP-5）。AC-434-01〜09 は「満たす」（08 と 09 の本物の GitHub Actions は計画どおり後の Issue）、10 は「一部」（レビューの中で全体のテストを走らせていないため。上のとおりゲートで実行して成功した）。
 
 ### 自動のテストと lint
 
@@ -88,4 +96,14 @@ Epic の I-7 として、既定のブランチの検査（契約 C7 の持ち主
 - 版を上げる Issue（I-9 の 0.3.0、I-13 の 0.4.0）は、版のファイルの前の中身の SHA-256 を `known_old_sha256` に足す（C7 の決まり）。
 - I-9 への引き継ぎ：配布する `spec-dock/docs/cli-redesign-guide.html` のコマンドの一覧（「全44コマンド」、C01〜C44 の表）に、`canonical` のコマンドを足す。
 - I-13 への引き継ぎ：`infra/commit_tree.py` と `infra/committed_validation.py` の `ls-tree` の解析の重複を、撤去のときに1つにする。
+- 利用側の `spec-dock/`（この repo の dogfooding の workspace）は、計画どおり更新していない（I-9 の `installation update`、I-10）。今の利用側の `docs/README.md` と `reference_cli.md` は、新しい `static-inventory.json` でも `known-old` なので害はない。新しい2つの資産は `missing` と示される。
+- 最終品質ゲートの P2/P3（直さずに引き継ぐもの）：
+  - ST-1（P2）：`IGNORE_RULES_MISSING` の次の1手は「3行を手で足す」だが、手で足すと `.gitignore` が知らない中身になり、`STATIC_ASSET_INVALID` に変わる（`installation update` も知らない中身を拒む）。I-2 が配布資産に3行を入れた後は、`.gitignore` が `current` か `known-old` のときの次の1手を `spec-dock installation update …` にするのがよい。I-2 と I-7 のうち後から入る側か、I-9 のエラーの一覧の確かめで、設計の表と一緒に直す。
+  - SP-2（P3）：3行がそろっていて順だけが逆のときも、次の1手が「この順で足す」になる（並べ替えが要る）。ST-1 と一緒に直す。
+  - ST-5（P3）：見本の版のファイルは `0.2.4` だが、版のタグは 0.3.0 から作るので、0.2.4 のうちに見本をそのまま置くと `pipx install` が失敗する。各リポジトリへの組み込みは 0.3.0 の後（I-10、I-12）なので実害はないが、I-9 の文書に「0.3.0 以降」と書く。
+  - SP-1/ST-2（P3）：宣言を UTF-8 として読んでから解析するので、BOM 付きの `workspace.json` を `invalid-json` にする（作業ツリーの宣言の読み取りは受け付ける）。安全側の違い。`json.loads(read(entry))` にそろえる。
+  - ST-3（P3）：`ls-tree -r --full-tree` はコミットの全体を読み、資産の blob を1つずつ `cat-file` で読む。大きなリポジトリでは時間とメモリが要る（この repo で約0.7秒）。pathspec で `spec-dock` と `.agents` に絞るか、`cat-file --batch` にする余地がある。`entry_count` はツリー全体の数。
+  - ST-4（P3）：文字の出力が、警告の `details` に `path` と `next_step` があると決め打ちしている（今の警告は1種類で、どちらもある）。ST-7（P3）：`ls-tree` の出力が壊れているときの `ValueError` が `PRECONDITION_FAILED`（3）になる。SP-4（P3）：失敗が1件でもエラーの文が「1 problems」。
+  - ST-6（P3）：判定のスクリプトのコメントの「3.10 では tomli」は、runner の `python3` には当たらない（`ubuntu-latest` は 3.12 なので実害はない）。SP-3（P3）：判定のスクリプトの「判定できないとき終了コード1」のテストがない。
+  - ST-8（P3）、SP-5（P3）：`cli-redesign-guide.html` の数（I-9 に引き継ぎ済み）と、この報告書のゲートの記録（この節で記録した）。
 - 統括に判断してほしいこと：版4の宣言で `writer_protocol` が古い既知の値（`specdock.writer/v1`）のとき、Epic の「既知である」のとおり通している。書くコマンドは `require_writer` で止まる状態なので、失敗にするかどうか（`design.md` の risk）。
