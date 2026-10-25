@@ -84,7 +84,7 @@ def list_commit_tree(root: Path, commit: str, *, timeout: float) -> tuple[TreeEn
 def read_blob(root: Path, object_id: str, *, timeout: float) -> bytes
 ```
 
-- `resolve_commit` は `git rev-parse --verify --quiet --end-of-options <REV>^{commit}` で、見つからなければ `None` を返す。
+- `resolve_commit` は `git rev-parse --verify --quiet --end-of-options <REV>^{commit}` で、見つからなければ `None` を返す。`rev-parse --verify` は、知らない名前、あいまいな短い名前、コミットでないもの（`HEAD^{tree}` など。このときは標準エラーに1行出る）を終了コード1で返すので、終了コード1はすべて `None` とする。ほかの失敗（壊れたリポジトリなど）は `GitProcessError` のまま出す。
 - `list_commit_tree` は `git ls-tree -r --full-tree -z <commit>` を読む（Epic の8章）。`-r` なのでツリーは並ばず、blob とgitlink だけが並ぶ。種類は、モード `100644`/`100755` と `blob` が `regular`、`120000` が `symlink`、`160000` と `commit` が `gitlink`、それ以外が `other`。
 - `read_blob` は `git cat-file blob <id>`。どれも `infra/git_process.run_git` を使い、`.git` に書かない（`ls-tree`、`cat-file`、`rev-parse` はインデックスも lock も取らない）。
 
@@ -133,7 +133,7 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 
 #### 調べることと、失敗のコード（`data.result.failures[]` の各要素の `code`）
 
-各要素は `Diagnostic(code, message, details)` で、`details` に必ず `path`（リポジトリのルートからの相対パス）と `next_step`（次の1手の1文）を持つ。1つのパスは、最初に当たった調べることだけで報告する（1→2→3の順）。並びは、調べることの順、その中はツリーの並び（パスの順）。
+各要素は `Diagnostic(code, message, details)` で、`details` に必ず `path`（リポジトリのルートからの相対パス）と `next_step`（次の1手の1文）を持つ。1つのパスは、最初に当たった調べることだけで報告する（1→2→3の順）。並びは、調べることの順で、1〜3はツリーの並び（パスの順）、5は配布資産の照合（`static-inventory.json` の並び。パスの順）の後に、無視の3行の1件である。
 
 | 調べること | コード | パス | `details` のほかの項目 | 次の1手（`next_step`） |
 |---|---|---|---|---|
@@ -145,7 +145,7 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 | 5 | `STATIC_ASSET_INVALID` | 配布資産のパス（`init_only` を除く） | `classification`：`missing`、`unknown`、`unsafe` | `Run spec-dock installation update --target <checkout> --backup-dir <new external directory> --yes and commit the static files; a modified file needs a manual merge.` |
 | 5 | `IGNORE_RULES_MISSING` | `spec-dock/.gitignore` | `missing_lines`（足りない行）、`misordered`（`!/initiatives/` が最後の `/initiatives` より前か） | `Add these lines to spec-dock/.gitignore in this order, then commit: /.canonical/, /initiatives, !/initiatives/.` |
 
-- **調べること4**：宣言の blob を `json.loads` で読む。`project_context.workspace_mode` と同じ規則で版を判定し（整数の3か4。真偽値を除く）、`writer_protocol` が `project_context` の既知の2つの値（`specdock.worktree-writer/v1`、`specdock.writer/v1`）のどれかであることを求める（「既知」は `read_workspace_declaration` と同じ範囲）。版3は `WORKSPACE_NOT_MIGRATED` の1件だけを返す（`writer_protocol` は見ない）。
+- **調べること4**：宣言の blob を `json.loads` で読む（UTF-8 でない、JSON でない、深すぎる入れ子で `RecursionError` になる、はどれも `invalid-json`）。`project_context.workspace_mode` と同じ規則で版を判定し（整数の3か4。真偽値を除く）、`writer_protocol` が `project_context` の既知の2つの値（`specdock.worktree-writer/v1`、`specdock.writer/v1`）のどれかであることを求める（「既知」は `read_workspace_declaration` と同じ範囲）。版3は `WORKSPACE_NOT_MIGRATED` の1件だけを返す（`writer_protocol` は見ない）。
 - **調べること5（資産）**：`package_static_assets()` のうち `init_only` でないものを、パスで一覧に照らす。ない → `missing`、`regular` でない → `unsafe`、`regular` なら blob の SHA-256 を `classify_static_digest` で分類し、`current` と `known-old` は通す。`init_only`（`spec-dock/workspace.json`）は、利用者が持つ中身なので照合せず、調べること4で確かめる。消えた資産（`retired`）があっても失敗にしない（`installation update` が外すもので、壊れた資産ではない）。
 - **調べること5（無視の3行）**：`spec-dock/.gitignore` が `regular` のときだけ調べる（ない、または `regular` でないときは、資産の失敗だけを返す）。各行の末尾の空白（`\r` を含む）を除いて、`SPEC_DOCK_IGNORE_LINES` の各行と同じ行があるかを見る。あわせて、`!/initiatives/` の最後の行が、`/initiatives` の最後の行より後にあることを求める（Git は後の規則が勝つので、逆だと実体のディレクトリの中の新しいファイルを無視してしまう。Epic の3章の性質を守るため）。
 - **調べること5と6の重なり**：版のファイルも `init_only` でない配布資産なので、調べること5で照合する。中身が既知（このパッケージの版か、`known_old_sha256` の古い版）なら5は通り、動いている版と違えば6の警告だけになる。知らない中身なら、5の失敗と6の警告の両方になる。CI では、ワークフローが版のファイルの版を入れるので、6の警告は出ない（手元の別の版の SpecDock で実行したときに出る）。
@@ -196,7 +196,7 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 
 #### 版のタグ（`.github/scripts/release-tag-decision.py`、`.github/workflows/release-tag.yml`）
 
-- 判定のスクリプト（パッケージを読み込まない。標準ライブラリと `git` を使い、`pyproject.toml` の読み取りは 3.11 以上の `tomllib`、3.10 ではパッケージの依存の `tomli`。GitHub の `ubuntu-latest` の `python3` は 3.11 以上）：
+- 判定のスクリプト（`git` の呼び出しは60秒で時間切れ。パッケージを読み込まない。標準ライブラリと `git` を使い、`pyproject.toml` の読み取りは 3.11 以上の `tomllib`、3.10 ではパッケージの依存の `tomli`。GitHub の `ubuntu-latest` の `python3` は 3.11 以上）：
 
 ```text
 release-tag-decision.py --repo PATH --before SHA --after SHA
@@ -215,7 +215,7 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | `create` | 上のどれでもない | `v<版>` |
 
 - `make lint` の対象は `src/spec_dock` と `tests` なので、このスクリプトには当たらない。この Issue では、ruff（check と format）と mypy を、このスクリプトに手で当てて確かめる（`report.md`）。
-- ワークフロー：`on: push: branches: [main]`、`permissions: contents: write`、`concurrency`（同時に1つ）。`actions/checkout@v4`（`fetch-depth: 0`。前のコミットとタグを読むため）→ 判定（`github.event.before` と `github.sha` は環境変数で渡す）→ `tag` が空でないときだけ `git tag "$TAG" "$GITHUB_SHA"` と `git push origin "refs/tags/$TAG"`。軽量のタグにする（`pip install …@v<版>` に足り、署名者の設定が要らない）。リモートにすでにタグがあれば push が失敗し、上書きしない。
+- ワークフロー：`on: push: branches: [main]`、`permissions: contents: write`。`concurrency` は付けない（GitHub は同じグループの待ち中の run を新しい run で取り消すので、版を上げた push の run が消され、タグができなくなるため。同時に動いても、タグを作ると判定するのは版を上げた push の run だけである）。`actions/checkout@v4`（`fetch-depth: 0`。前のコミットとタグを読むため）→ 判定（`github.event.before` と `github.sha` は環境変数で渡す）→ `tag` が空でないときだけ `git tag "$TAG" "$GITHUB_SHA"` と `git push origin "refs/tags/$TAG"`。軽量のタグにする（`pip install …@v<版>` に足り、署名者の設定が要らない）。リモートにすでにタグがあれば push が失敗し、上書きしない。
 
 ## data / failure
 
