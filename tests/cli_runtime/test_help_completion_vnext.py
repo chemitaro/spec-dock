@@ -247,10 +247,11 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
         "workspace sync",
         "workspace doctor",
         "installation show",
+        "canonical check",
     }
     output = _run(tmp_path, "completion", shell)
     assert output.exit_code == 0
-    assert len(LEAF_PATHS) == 44 and readonly <= set(LEAF_PATHS)
+    assert len(LEAF_PATHS) == 45 and readonly <= set(LEAF_PATHS)
     for leaf in LEAF_PATHS:
         if shell == "fish":
             # Public registration lines belonging to this exact command path.

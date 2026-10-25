@@ -8,12 +8,13 @@ from importlib.resources import files
 import json
 from pathlib import PurePosixPath
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from importlib.abc import Traversable
 
 RETIRED_SKILL_SLOTS = (".claude/skills/spec-dock", ".claude/skills/spec-dock-grill-with-docs")
+StaticClassification = Literal["missing", "current", "known-old", "unknown", "unsafe"]
 
 
 @dataclass(frozen=True)
@@ -24,6 +25,15 @@ class StaticAsset:
     mode: int
     init_only: bool
     known_old_sha256: tuple[str, ...]
+
+
+def classify_static_digest(asset: StaticAsset, digest: str | None) -> StaticClassification:
+    """Classify observed bytes by SHA-256; the caller decides when a path is unsafe to read."""
+    if digest is None:
+        return "missing"
+    if digest == asset.sha256:
+        return "current"
+    return "known-old" if digest in asset.known_old_sha256 else "unknown"
 
 
 @dataclass(frozen=True)
