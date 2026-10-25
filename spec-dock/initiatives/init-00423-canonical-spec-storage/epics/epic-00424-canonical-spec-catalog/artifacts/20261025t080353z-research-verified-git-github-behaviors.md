@@ -79,6 +79,10 @@ reflected_to: []
 - sub-issue と依存（blocked by）の API は使える。両リポジトリとも、登録された親子と依存は0件（spec-dock は Issue 数件、退去費用は100件で確認）。
 - sub-issue は親1件につき100件、深さ8段まで（公式文書）。今の最大は子33件、深さ3段。
 - spec-dock は公開リポジトリで、ルールセットは0件。退去費用は非公開で、ルールセットの取得が「Upgrade to GitHub Pro or make this repository public」で拒否される。push のパスの制限は Team プランの非公開リポジトリ向け。
+- 退去費用の今のCIは、GitHub ではマージを止めていない（2026-10-25、`gh api`）。
+  - 既定のブランチ `develop` は `protected: false` で、保護されたブランチは0件。ブランチに効くルールの取得（`rules/branches/develop`）も、上と同じ文言で拒否される。
+  - 開いているPRのうち #1900、#1805、#1768 は `mergeStateStatus` が `UNSTABLE`、`mergeable` が `MERGEABLE`（GitHub の定義では「通っていない検査があるが、マージできる」）。#1900 と #1805 では、`Test and Deploy for Staging` が失敗している。
+  - 直近にマージされた40件のPRは、マージの時点で、最後のコミットのPRのワークフローがすべて成功していた（#2189、#2173 は、一度失敗した後に成功してからマージ）。失敗したPRをマージしないことは、運用で守られている。
 - Scope は spec-dock 243件、退去費用 246件。依存は135本（最大6）と284本（最大12）。種類と親子は Initiative → Epic → Issue の3段で固定（`src/spec_dock/runtime/infra/scope_tree.py` も同じ）。`lifecycle` はすべて null、`revision` はほぼ0。
 - 退去費用の GitHub Issue 751件のうち、Scope は246件。ほかに Scope でない Issue が多い。
 - `.meta.json` の題名はすべて英語。GitHub の題名と食い違うものが36件と62件あり、GitHub 側が日本語のものが24件と51件。
