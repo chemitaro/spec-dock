@@ -3,8 +3,8 @@
 ID: "epic-00424"
 タイトル: "Centralize Specs On Canonical Branch And GitHub Issues"
 関連GitHub: ["#424"]
-状態: "draft"
-最終更新: "2026-10-25"
+状態: "approved"
+最終更新: "2026-10-26"
 依存: ["requirement.md", "design.md"]
 親: ["init-00423"]
 ---
@@ -271,7 +271,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 
 - **価値**：spec-dock 自身が、新しい仕組みで動き始める。残りの4つのリポジトリより先に、本物の環境で不具合を見つける。
 - **担当**：統括のエージェントが、利用者の目の前で行う。
-- **前提**：I-9 までのPRがマージされている。利用者の環境に 0.3.0 が入っている（`spec-dock installation show` などで確かめる）。開いている仕様の変更のPRと、作業用のworktreeとその仕様の変更を一覧にしてある。spec-dock の別のクローン（`specdock-cleanup-planning`。requirement.md の未解決事項）の扱いを、利用者に確かめてある。
+- **前提**：I-9 までのPRがマージされている。利用者の環境に 0.3.0 が入っている（`spec-dock installation show` などで確かめる）。開いている仕様の変更のPRと、作業用のworktreeとその仕様の変更を一覧にしてある。spec-dock の別のクローン（`specdock-cleanup-planning`）は、利用者が放棄すると決めた（2026-10-26）。移さず、`canonical link` も実行しない。
 - **手順**（`design.md`「移行・互換性・rollback」の「各リポジトリの切り替え」）：
   1. `migrate.py plan` の結果を確かめ、異常の扱い（ローカルの Scope の置き換えなど）を決めて記録する。
   2. `register --apply` と `verify` を行う。この間、今の運用は止めない。

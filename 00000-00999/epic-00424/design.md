@@ -3,8 +3,8 @@
 ID: "epic-00424"
 タイトル: "Centralize Specs On Canonical Branch And GitHub Issues"
 関連GitHub: ["#424"]
-状態: "draft"
-最終更新: "2026-10-25"
+状態: "approved"
+最終更新: "2026-10-26"
 依存: ["requirement.md"]
 親: ["init-00423"]
 ---
@@ -109,7 +109,7 @@ ID: "epic-00424"
 - どの Scope も `backend` は GitHub である。ローカルの ID は、spec-dock の `init-local-00002` と `init-local-00003` だけである。
 - 調べた時点で、作業用のworktreeのブランチに、既定のブランチにない仕様の変更（コミット済みも未コミットも）はなかった（この Epic のブランチを除く）。切り替えの時点で、もう一度調べる。
 - housing-lifecycle と input-devices は、company-os の作業ツリーの中にある別のリポジトリである。company-os は `.gitignore` の `/businesses/*` で両方を無視している。それぞれが自分の `.git` を持つので、カタログもそれぞれの mainのチェックアウトの中にでき、互いに重ならない。
-- spec-dock には、別のクローン `/Volumes/990p2t/workspace/worktrees/specdock-cleanup-planning`（ブランチ `iss-00411-retired-cli-surface-cleanup`、宣言の `writer_protocol` が古い `specdock.writer/v1`）がある。扱いは、I-10 の前に利用者に確かめる（requirement.md の未解決事項）。
+- spec-dock には、別のクローン `/Volumes/990p2t/workspace/worktrees/specdock-cleanup-planning`（ブランチ `iss-00411-retired-cli-surface-cleanup`、宣言の `writer_protocol` が古い `specdock.writer/v1`）がある。利用者は、これを放棄すると決めた（2026-10-26）。移さず、`canonical link` も実行しない。撤去の後にこのクローンで SpecDock を使うと、0.4.0 は版3の宣言を読んで止まる。
 - taikyohiyou_project の `.github/scripts/resolve_staging_route.py`（67行目）は、`spec-dock/` で始まるパスを特別に扱う。`Makefile` の `spec-close` は `spec-dock work finish @current --yes --json` を呼ぶ。どちらも、切り替えの後に動きが変わらないかを I-12 で確かめる。
 
 ### Target

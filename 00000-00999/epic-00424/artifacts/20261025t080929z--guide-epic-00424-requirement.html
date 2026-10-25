@@ -12,7 +12,7 @@ title: 仕様の正本を1か所にする要件
 lead: Epic #424 の要件定義書を、議論と確認のために説明します。仕様の内容は spec-dock/canonical ブランチ、構造は GitHub Issue を正本にします。利用者が覚えることと設定することを最小にし、保存と同期は SpecDock の定期の仕組みに任せます。
 category: SpecDock 設計の議論資料
 audience: 判断する利用者と、新しく加わる開発者
-updated: 2026-10-25
+updated: 2026-10-26
 status: 要件確定（3回目のヒアリングを反映）
 version: 0.7
 docid: EPIC-424-REQ
@@ -29,7 +29,7 @@ tags: [SpecDock, 仕様, Git, GitHub]
 - 今までと同じ Markdown と PlantUML のダッシュボードを、GitHub の構造から、日本語の題名で作り直します。HTML のダッシュボードと、仕様の文書の CUE への移行は、次の Epic（#425）で行います。
 - macOS と Linux（デスクトップ、SSH のサーバーと仮想マシン、コンテナ）で動きます。Windows には対応しません。
 - この Epic で、利用者の5つのリポジトリをすべて新しい仕組みに移し、従来の仕組みのコードを撤去して、SpecDock を1つの仕組み（0.4.0）にします。spec-dock を先に移して3日間使い、残りの4つを1回の作業で移します。
-- 2026-10-25 の3回のヒアリングの回答で、要件が固まりました。利用者に決めていただくことは、spec-dock の別のクローンの扱いだけです（spec-dock の切り替えの前に確かめます）。
+- 2026-10-25 の3回のヒアリングの回答で、要件が固まりました。利用者に決めていただくことは、もうありません。spec-dock の別のクローンは、放棄すると決まりました（2026-10-26）。
 :::
 
 :::note この資料と正本の関係
@@ -485,7 +485,7 @@ macOS と Linux で、同じ要件を満たします（R-C7）。定期の同期
 
 | リポジトリ | 既定のブランチ | Scope の数 | 作業用のworktree | 今のCIの SpecDock の手順 |
 |---|---|---|---|---|
-| spec-dock | `main` | 243 | 5（別のクローンが1つある） | ソースから作った SpecDock で `workspace validate --ci` |
+| spec-dock | `main` | 243 | 5（別のクローンは放棄する） | ソースから作った SpecDock で `workspace validate --ci` |
 | 退去費用プロダクト（`taikyohiyou_project`） | `develop` | 246 | 0 | 固定のコミットの SpecDock で `workspace validate --ci` |
 | housing-lifecycle | `main` | 233 | 15 | 同上 |
 | input-devices | `main` | 17 | 1 | 同上 |
@@ -649,8 +649,8 @@ SpecDock のエラーの文言にも、次に実行すべきコマンドか、�
 
 :::roadmap
 - **済み** 要件の合意 — 3回のヒアリングの回答を反映し、要件を固めました {done}
-- **今** 設計の承認 — 設計の説明資料（v0.4）で、内容をご確認ください {doing}
-- **次** Issue の作成 — Epic を統括するエージェントが、13の Issue を作り、各 Issue の要件を計画書から書きます {todo}
+- **済み** 設計の承認 — 2026-10-26 に、設計 v0.4 を承認していただきました {done}
+- **今** Issue の作成 — Epic を統括するエージェントが、13の Issue を作り、各 Issue の要件を計画書から書きます {doing}
 - **その次** 実装と移行 — Issue ごとに実装し、spec-dock、残りの4つの順に切り替えて、従来の仕組みのコードを撤去します {todo}
 - **この後** 次の Epic（#425） — HTML のダッシュボードと、CUE と HTML の仕様の文書を議論します {todo}
 :::

@@ -3,8 +3,8 @@
 ID: "epic-00424"
 タイトル: "Centralize Specs On Canonical Branch And GitHub Issues"
 関連GitHub: ["#424"]
-状態: "draft"
-最終更新: "2026-10-25"
+状態: "approved"
+最終更新: "2026-10-26"
 親: ["init-00423"]
 ---
 
@@ -170,7 +170,7 @@ ID: "epic-00424"
 
   | リポジトリ（GitHub） | 既定のブランチ | Scope の数 | 作業用のworktree |
   |---|---|---|---|
-  | `chemitaro/spec-dock` | `main` | 243 | 5（このほかに、別のクローンが1つある） |
+  | `chemitaro/spec-dock` | `main` | 243 | 5（このほかの別のクローンは放棄し、移さない） |
   | `chemitaro/taikyohiyou_project`（退去費用プロダクト） | `develop` | 246 | 0 |
   | `chemitaro/housing-lifecycle` | `main` | 233 | 15 |
   | `chemitaro/input-devices` | `main` | 17 | 1 |
@@ -315,6 +315,8 @@ ID: "epic-00424"
 | 名前 | ID、slug、ブランチ名、ディレクトリ名は、英小文字とハイフン（URL にもなる）。題名（Scope の Issue の題名）は日本語に対応し、ダッシュボードには日本語で出す。今ある題名と、日本語に対応するまでに作るものは、英語のまま |
 | 移行の道具 | CLI に組み込まず、直接実行するスクリプトにする。すべてのリポジトリを移した後の撤去で消す（版のタグ v0.3.0 に残る） |
 | 切り替えの運用 | エージェントに任せる（下の「エージェントが決めたこと」） |
+| 設計の承認 | 設計 v0.4（3回目のヒアリングの反映）を承認した（2026-10-26） |
+| spec-dock の別のクローン | `/Volumes/990p2t/workspace/worktrees/specdock-cleanup-planning`（ブランチ `iss-00411-retired-cli-surface-cleanup`、古い `writer_protocol`）は放棄する。移さず、`canonical link` も実行しない（2026-10-26） |
 
 ## エージェントが決めたこと
 
@@ -346,9 +348,7 @@ ID: "epic-00424"
 
 ## 未解決事項
 
-利用者の判断が要るものは、次の1つだけである。
-
-- spec-dock の別のクローン `/Volumes/990p2t/workspace/worktrees/specdock-cleanup-planning`（ブランチ `iss-00411-retired-cli-surface-cleanup`、宣言の `writer_protocol` が古い `specdock.writer/v1`）の扱い：移すか、使い終えたものとして閉じるかを、I-10 の前に利用者に確かめる。
+利用者の判断が要るものは、今はない。spec-dock の別のクローンの扱いは、2026-10-26 に、放棄すると決めた（合意済みの判断）。
 
 要件定義の後に、設計で確かめるとしていた項目は、設計書（`design.md`）で決めた。実装と切り替えで確かめる残りは、次のとおり。
 
