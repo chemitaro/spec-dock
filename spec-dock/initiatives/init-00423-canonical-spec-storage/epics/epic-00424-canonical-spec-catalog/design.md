@@ -199,18 +199,20 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
         pageInfo { hasNextPage endCursor }
         nodes {
           number databaseId title body state stateReason updatedAt url
-          labels(first: 20) { nodes { name } }
+          labels(first: 20) { totalCount nodes { name } }
           assignees(first: 10) { nodes { login } }
-          parent { number }
-          subIssues(first: 100) { totalCount nodes { number } }
-          blockedBy(first: 100) { totalCount nodes { number title state labels(first: 20) { nodes { name } } } }
+          parent { number repository { nameWithOwner } }
+          subIssues(first: 100) { totalCount nodes { number repository { nameWithOwner } } }
+          blockedBy(first: 100) { totalCount nodes { number title state repository { nameWithOwner } } }
         }
       }
     }
   }
   ```
 
-  `subIssues.totalCount` か `blockedBy.totalCount` が100を超える Issue だけ、REST の一覧で残りを読む。spec-dock の規模（Scope 243件）では3回の呼び出しで済む。`rateLimit.cost` はログに残す。
+  `subIssues.totalCount` か `blockedBy.totalCount` が100を超える Issue だけ、REST の一覧で残りを読む。`labels.totalCount` が20を超える Issue だけ、REST の `GET …/issues/{n}/labels?per_page=100` でラベルを読み直す（種類のラベルを見落とさないため）。どの読み直しも、1つずつ順に送る。spec-dock の規模（Scope 243件）では3回の呼び出しで済む。`rateLimit.cost` はログに残す。
+  - 依存先（`blockedBy` の要素）のラベルは読まない。依存先が Scope かどうかは、その番号が `issues` に含まれるかで決める（`issues` は閉じた Scope も含む）。2026-10-26 に本物の GitHub で読むだけで測ると、依存先のラベルを読む形は1ページ104点、読まない形は4点だった（I-1 の実装担当の測定）。
+  - `parent`、`subIssues`、`blockedBy` の要素は `repository { nameWithOwner }` を持つ。別のリポジトリの Issue は、番号だけでは同じリポジトリの Issue と取り違えるため、`parent`、`sub_issues`、`blocked_by`、`blocking`、`external` のどれにも入れず、`anomalies` に `PARENT_FOREIGN_REPOSITORY` か `DEPENDENCY_FOREIGN_REPOSITORY`（相手のリポジトリと番号をメッセージに入れる）として記録する。
 - **変わったかを確かめる（REST の条件付きの要求）**：種類のラベルごとに、次の要求を、前に記録した `ETag` を `If-None-Match` に付けて送る（3回）。
 
   ```text
@@ -228,6 +230,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 | 親の取得 | `GET …/issues/{n}/parent`（親がなければ404。404 は「親なし」という正常な答えである） |
 | 子の一覧 | `GET …/issues/{n}/sub_issues?per_page=100` |
 | 依存の一覧 | `GET …/issues/{n}/dependencies/blocked_by?per_page=100` |
+| ラベルの一覧 | `GET …/issues/{n}/labels?per_page=100`（全体の読み取りでラベルが20を超えた Issue だけ） |
 | ラベルの有無 | `GET /repos/{o}/{r}/labels/{name}`（なければ404。正常な答え） |
 | 自分のログイン名 | `GET /user` |
 
@@ -283,7 +286,8 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   ```
 
   - `issues` は、種類のラベルを持つ Issue（PRを除く）を、開いたものも閉じたものもすべて含む。キーは番号の文字列。`sub_issues` は GitHub の並びのまま、`blocked_by` と `blocking` は番号の昇順。`blocking` は、`blocked_by` を逆にたどって求める。
-  - `external` は、Scope の `blocked_by` に現れる、Scope でない Issue の題名と状態である。着手の判定（今の規則どおり、開いていれば着手できない）に使う。
+  - `external` は、Scope の `blocked_by` に現れる、同じリポジトリの、Scope でない Issue の題名と状態である。着手の判定（今の規則どおり、開いていれば着手できない）に使う。
+  - 別のリポジトリの親や依存を持つ Scope（`anomalies` の `PARENT_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`）は、着手の判定で「着手できる」にしない（安全側に止める。ダッシュボードでは UNKNOWN）。
   - 本文は保存しない。slug の印だけを取り出す。種類や slug が決まらない Issue は `id` と `slug` を null にし、`anomalies` に入れる。
   - 形を変えるときは `version` を上げる。読む側は、知らない版を読んではならない（取り直す）。
 - **`probe.json`**：`{"version": 1, "checked_at": "…", "etags": {"spec-dock:initiative": "W/\"…\"", "spec-dock:epic": "…", "spec-dock:issue": "…"}, "last_error": null}`。新しい `ETag` は、全体の取り直しが成功したときだけ記録する（取り直しに失敗したら、次の確かめでも「変化あり」になるようにするため）。
@@ -301,7 +305,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 - **書けないとき**：状態の置き場に書けないとき（サンドボックスの中など）は、スナップショットをプロセスのメモリーの上だけで持つ。書けないことを理由に失敗してはならない。
 - **読むだけのコマンドの契約**：表示だけのコマンドが書いてよいのは、状態の置き場の `snapshot.json` と `probe.json` だけである。リポジトリ、カタログ、`.git`、GitHub には書かない。今の CLI の「構造をキャッシュしない」方針は、利用者の方針（R-I1）に従い、canonical モードでだけ変える。従来モードは変えない。
 - **規則の部品**：`StructureSnapshot` は、スナップショットを読み込んだもので、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、上の `issues` の1要素と同じ項目を持つ。階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。`dependency add` の循環の確認も、スナップショットの上で行う。
-- 費用の見込み（spec-dock、Scope 243件）：変化がない周期は、304 が3回で、主のレート制限を消費しない。全体の取り直しは GraphQL の3回で、1回あたり数点（`rateLimit.cost` で確かめる）。30分ごとの取り直しを含めても、1時間に GraphQL の数十点である（上限は1時間に5,000点）。
+- 費用の見込み（spec-dock、Scope 243件）：変化がない周期は、304 が3回で、主のレート制限を消費しない。全体の取り直しは GraphQL の3回で、1回あたり約4点（2026-10-26 に実測。`rateLimit.cost` で確かめる）。30分ごとの取り直しを含めても、1時間に GraphQL の数十点である（上限は1時間に5,000点）。
 
 #### 内容の置き場
 
@@ -645,7 +649,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `workspace doctor` | 今の項目と、`canonical status` と同じ項目 | なし | | I-4 |
 | `workspace migrate` | 宣言 | なし | `CANONICAL_NOT_APPLICABLE` で止まる | I-1 |
 | `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手として `spec-dock canonical link` を示す | I-1 |
-| `installation show`、`update`、`uninstall` | 今と同じ | 今と同じ | 版3と版4の両方を受け付ける | I-1 |
+| `installation show`、`update`、`uninstall` | 今と同じ | 今と同じ | 版3と版4の両方を受け付ける。版4で `--expect-current` を付けたときの選択と Scope の解決は I-4 が作る（I-1 の時点では、この組み合わせだけ `CANONICAL_NOT_IMPLEMENTED`） | I-1（`--expect-current` は I-4） |
 | `active`、`help`、`completion` の文書 | — | — | 新しいコマンドを載せる | I-9 |
 
 - **`work finish` での保存の確認**（R-C6）：
@@ -1067,6 +1071,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
   - コマンドの数（44）とコマンドの一覧を確かめるテスト（`test_issue413_contract.py:160`、`test_cli_vnext_contract.py:17-65`、`test_cli_docs_vnext.py:35`）。新しいコマンドを足した数と一覧に直す。
   - 配布資産の一覧と値（`static-inventory.json` の値、資産のファイルの数）を確かめるテスト。
   - 文書の中身を確かめるテスト（新しいコマンドと規則の節を足したことによる変化）。
+  - `installation init` が版4の宣言を書くこと（I-1）に伴い、init で作った作り物に従来のコマンドを当てるテストは、init の直後に宣言を版3に戻す準備の行だけを足してよい。確かめる中身は変えない。変えたテストは、その Issue の報告書に一覧で書く（2026-10-26 の統括の判断）。
 - **受け入れ条件との対応**：
 
 | AC | 確かめ方 |
