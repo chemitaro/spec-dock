@@ -31,6 +31,7 @@ ID: "epic-00424"
 - この設計書の「しなければならない」「してはならない」は必須の契約である。「よい」「推奨」は実装者の判断に任せる。
 - 実装の前に、リポジトリの `AGENTS.md`（提供側と利用側の区別、層の構成、テストの置き場）と、`.agents/skills/spec-dock/SKILL.md` を読むこと。
 - 2026-10-25 に、この会話を知らない別のエージェントが、この設計書を実装担当の立場で読み直した。その指摘（コマンドの抜け、`work finish` の確認の条件、移行時の無視されたファイル、書き換えの検出の穴、フック、出力の契約、GitHub の呼び出し、状態のファイルの置き場など）は、この版に反映してある。
+- 同じ日に、利用者の判断を受けて、次を足した。GitHub の構造を一括で取得して使い回す「構造のスナップショット」（2章）、今までの形のダッシュボードの作り直し（13章）、Linux の systemd のない環境（コンテナ）での定期の実行と、マウントしたチェックアウトでの止まり方（3章、5章）。
 
 ### 用語
 
@@ -46,8 +47,12 @@ ID: "epic-00424"
 | 宣言の版 | `spec-dock/workspace.json` の `schema_version`。3 は今の形（従来モード）、4 は新しい形（canonical モード） |
 | 従来モード | 宣言の版が3のリポジトリでの動き。今のコードをそのまま使う（R-A6） |
 | canonical モード | 宣言の版が4のリポジトリでの動き。この設計書の対象 |
-| 定期の同期 | PCのユーザーごとに1つの定期の実行（macOS は launchd、Linux は systemd のユーザーのタイマー）が、60秒ごとに `spec-dock canonical sync --registered` を動かすこと |
-| 状態の置き場 | PCのユーザーごとの `~/.local/state/spec-dock/`。登録簿、カタログごとの同期の状態、ログを置く。カタログが読めないときでも記録できるよう、カタログの外に置く |
+| 定期の同期 | PCのユーザーごとに1つの定期の実行が、60秒ごとに `spec-dock canonical sync --registered` の1周期を動かすこと。実行の仕組みは、macOS は launchd、systemd の動く Linux は systemd のユーザーのタイマー、systemd のない Linux（コンテナなど）は常駐のプロセス |
+| 常駐のプロセス | systemd のない Linux で使う、`spec-dock canonical sync --registered --loop` のプロセス。1つの環境に1つだけ動き、60秒ごとに1周期を動かす |
+| 状態の置き場 | PCのユーザーごとの `~/.local/state/spec-dock/`。登録簿、カタログごとの同期の状態、構造のスナップショット、ログを置く。カタログが読めないときでも記録できるよう、カタログの外に置く |
+| 構造のスナップショット | GitHub のリポジトリごとに、Scope の Issue の構造を一括で取得して保存した1つのファイル（2章）。読むコマンドとダッシュボードは、ここから読む |
+| 変わったかの確かめ | 構造のスナップショットを取り直す必要があるかを、GitHub の条件付きの要求（304 なら変化なし）で確かめること。主のレート制限を消費しない |
+| ダッシュボード | mainのチェックアウトの `spec-dock/dashboard.md` と4つの PlantUML のファイル。定期の同期が、構造のスナップショットから作り直す（13章） |
 | 登録簿 | このPCで定期の同期の対象にするカタログの一覧。状態の置き場にある |
 | 変更の束 | SpecDock のコマンドがカタログに書いた変更の一覧。定期の同期が、30秒を待たずに1つのコミットとして保存する |
 | 保留 | 定期の同期が、自動では保存しないと判断した変更（大量の削除、秘密情報らしいもの、大きすぎるファイル） |
@@ -63,6 +68,8 @@ ID: "epic-00424"
 - **G5 止まって案内する**：足りないものや異常があれば、推測で直さず、次に実行するコマンドか、足す設定を示して止まる（約束5、R-B5、R-H2）。
 - **G6 移行していないリポジトリを壊さない**：宣言の版が3のリポジトリでは、新しい SpecDock でも今の動きをそのまま保つ（R-A6）。
 - **G7 すべてのコマンドが答える**：canonical モードで、今の44のコマンドと新しいコマンドのすべてが、canonical の処理か、理由と次の1手を付けた拒否のどちらかで動く。未実装のまま出してはならない。
+- **G8 GitHub に負荷をかけない**：構造は一括で取得して使い回し、操作のたびに問い合わせない。変化の確かめは主のレート制限を消費しない条件付きの要求で行い、要求は1つずつ順に送る（R-I1〜R-I6）。
+- **G9 macOS と Linux で同じに動く**：定期の実行の仕組みだけを環境に合わせて選び、ほかの動きは同じにする（R-C7、R-C8）。
 
 ## Current / Target
 
@@ -80,7 +87,9 @@ ID: "epic-00424"
 - 宣言 `spec-dock/workspace.json` は `{"schema_version":3,"writer_protocol":"specdock.worktree-writer/v1"}`。`application/project_context.py` の `read_workspace_declaration` は、版が整数の3でなければ `ValueError` を出し、`PRECONDITION_FAILED`（終了コード3）になる。
 - CI の「CI」（`.github/workflows/ci.yml`）は、`.github/scripts/specdock-ci-validate.sh` でソースから wheel を作り、`spec-dock workspace validate --ci --json` を実行する。
 - 配布は wheel だけ。`pyproject.toml` の版は 0.2.4 で、版のタグはない。
-- `spec-dock/dashboard.md` を生成するコマンドはない。
+- `spec-dock/dashboard.md` と4つの PlantUML のファイルを生成するコマンドはない。書く部品は、コミット `ae6c94369`（2026-10-01）で削除された。描く関数（`presentation/markdown.py` の `_render_dashboard_md`、`presentation/puml.py` の `_render_tree_ready_board_puml`、`_render_deps_issues_puml`、`_render_deps_raw_puml`）は残っているが、どこからも呼ばれず、テストもない。spec-dock のmainのチェックアウトにある5つのファイルは、2026-09-21 に作られたもの（今までの形の見本）で、配布資産の `spec-dock/.gitignore` で無視されている。
+- 構造は、コマンドのたびに `.meta.json` と GitHub から読み、保存して使い回すことはしない。
+- 提供側のCI（`.github/workflows/provider-ci.yml`）は、`make lint` と `uv run pytest` を `ubuntu-latest` で、配布の確かめを `ubuntu-latest` と `macos-latest` で動かしている。
 - spec-dock のmainのチェックアウトの `spec-dock/initiatives/` には、Git で無視された `.workbench` のファイルが99個ある（2026-10-25）。これらは追跡されていないので、canonical には入らない。
 
 ### Target
@@ -102,18 +111,24 @@ PC（クローンごと）
         .runtime/                         変更の束、作成の作業場所、一時のインデックス、保留の許可（canonical でも無視）
         init-00079-…/epics/…/issues/…     仕様の内容
       initiatives -> .canonical           リンク（相対）
+      dashboard.md  tree.puml  tree-all.puml  deps-issues.puml  deps-raw.puml
+                                          ダッシュボード（定期の同期が作り直す。Git では無視）
   <作業用のworktree>/
     spec-dock/initiatives -> <main>/spec-dock/.canonical   リンク（絶対パス）
 
 PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   canonical-registry.json                 登録簿
   catalogs/<鍵>/state.json                カタログごとの同期の状態
+  github/github.com/<owner>/<repo>/
+    snapshot.json                         構造のスナップショット（リポジトリごとに1つ）
+    probe.json                            変わったかの確かめの記録（ETag）
+  runner.lock  runner.json  kick          常駐のプロセスの排他、記録、すぐの実行の合図（systemd のない Linux）
   canonical-sync.log                      ログ
   ~/Library/LaunchAgents/io.github.chemitaro.spec-dock.canonical-sync.plist   （macOS）
-  ~/.config/systemd/user/spec-dock-canonical-sync.{service,timer}            （Linux）
+  ~/.config/systemd/user/spec-dock-canonical-sync.{service,timer}            （systemd の動く Linux）
 ```
 
-- canonical モードでは、構造を GitHub から読み、内容をカタログのファイルから読む。`.meta.json` は読みも書きもしない。
+- canonical モードでは、構造を構造のスナップショットから読み（書く判断の前には GitHub で確かめる）、内容をカタログのファイルから読む。`.meta.json` は読みも書きもしない。
 - 従来モードのコードは残し、変えない。どちらのモードで動くかは、宣言の版だけで決める。
 
 ## 責務・Interface
@@ -149,30 +164,41 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 #### 使う API（調査の記録で、公式の文書と実測で確かめた）
 
-読み取りの全体は GraphQL、書き込みと一部の読み取りは REST を使う。
+全体の読み取りは GraphQL、変わったかの確かめ、書き込み、書く前の読み直しは REST を使う。全体の読み取りの結果は、構造のスナップショット（この章の後半）に保存して使い回す。
 
-- **全体を読む（GraphQL）**：種類のラベルごとに、次の形の問い合わせを、`pageInfo.hasNextPage` が偽になるまで行う（2026-10-25 に、この token で `parent`、`subIssues`、`blockedBy`、`databaseId` を読めることを確かめた）。
+- **全体を読む（GraphQL）**：3つの種類のラベルをまとめて指定した、次の問い合わせを、`pageInfo.hasNextPage` が偽になるまで行う。`labels` に複数のラベルを渡すと、どれかを持つ Issue が返る（OR。2026-10-25 に確認。空の配列は0件を返すので渡さない）。`parent`、`subIssues`、`blockedBy`、`databaseId` は、この token で読めることを確かめた。
 
   ```graphql
-  query($owner: String!, $name: String!, $label: String!, $after: String) {
+  query($owner: String!, $name: String!, $after: String) {
+    rateLimit { cost remaining resetAt }
     repository(owner: $owner, name: $name) {
-      issues(first: 100, after: $after, labels: [$label], states: [OPEN, CLOSED]) {
+      issues(first: 100, after: $after, states: [OPEN, CLOSED],
+             labels: ["spec-dock:initiative", "spec-dock:epic", "spec-dock:issue"]) {
         pageInfo { hasNextPage endCursor }
         nodes {
-          number databaseId title body state stateReason
+          number databaseId title body state stateReason updatedAt url
           labels(first: 20) { nodes { name } }
           assignees(first: 10) { nodes { login } }
           parent { number }
           subIssues(first: 100) { totalCount nodes { number } }
-          blockedBy(first: 100) { totalCount nodes { number } }
+          blockedBy(first: 100) { totalCount nodes { number title state labels(first: 20) { nodes { name } } } }
         }
       }
     }
   }
   ```
 
-  `subIssues.totalCount` か `blockedBy.totalCount` が100を超える Issue だけ、REST の一覧で残りを読む。spec-dock の規模（Scope 243件）では、3〜6回の呼び出しで済む。
-- **一部を読む（REST）**：
+  `subIssues.totalCount` か `blockedBy.totalCount` が100を超える Issue だけ、REST の一覧で残りを読む。spec-dock の規模（Scope 243件）では3回の呼び出しで済む。`rateLimit.cost` はログに残す。
+- **変わったかを確かめる（REST の条件付きの要求）**：種類のラベルごとに、次の要求を、前に記録した `ETag` を `If-None-Match` に付けて送る（3回）。
+
+  ```text
+  GET /repos/{o}/{r}/issues?labels=<種類のラベル>&state=all&sort=updated&direction=desc&per_page=1
+  ```
+
+  - 一覧の先頭は、そのラベルの Issue のうち最も最近に更新されたものなので、どれかが更新されると応答が変わる。304 なら変化なし、200 なら変化あり。
+  - 304 は、主のレート制限に数えられない（2026-10-25 に、3回続けて送っても `x-ratelimit-used` が増えないことを確かめた。公式の文書にも同じ記述がある）。
+  - `gh api --include` は、304 で終了コード1を返し、状態行 `HTTP/2.0 304 Not Modified` を出す（確認済み）。304 は、終了コードではなく状態行で判定しなければならない。
+- **一部を読む（REST）**：書く前の読み直しと、全体の読み取りで足りない部分にだけ使う。
 
 | 操作 | API |
 |---|---|
@@ -201,16 +227,59 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - エンドポイントごとに「正常な状態コード」を渡す（例：親の取得は 200 と 404）。それ以外を、今と同じ分類（権限なし、拒否、接続不可）にする。
   - **レート制限**：403 か 429 で、`retry-after` ヘッダー、`x-ratelimit-remaining: 0`、または本文の「rate limit」があれば、レート制限と判定する。読み取りは、`retry-after`（なければ `x-ratelimit-reset` までの時間。最大60秒）だけ待って、3回まで再試行する。500番台の読み取りは、1秒、2秒、4秒の間をおいて3回まで再試行する。書き込みは自動では再試行せず、`GITHUB_RATE_LIMITED` で止まる。
   - 呼び出しは1つずつ順に行う。並べて呼ばない（GitHub の二次のレート制限の指針）。
+  - 1つのコマンドの中で書き込みを続けるときは、書き込みの間を1秒以上あける（公式の Best practices）。時刻と待ちは注入できるようにし、テストでは待たない。
   - 結果が分からない書き込みは、今と同じく読み直して確かめ、それでも分からなければ終了コード6で、効果（`effects`）と再開の手順（`recovery`）を返す。
-- 大量に書く移行のスクリプトだけが、速さを抑える（11章）。
+- 大量に書く移行のスクリプトは、さらに速さを抑える（11章）。
 
-#### 構造の読み取りのモデル
+#### 構造のスナップショット（R-I1〜R-I6。契約 C10）
 
-- `StructureSnapshot` は、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、`id`、`kind`、`number`、`database_id`、`title`、`slug`、`state`、`state_reason`、`parent_id`、`blocked_by`（番号の一覧）、`assignees`、`in_progress` を持つ。
-- **全体を読む**（`read_all`）：上の GraphQL で作る。使うのは、`workspace validate`、`workspace sync`、`scope list`、`dependency list --all` だけとする。
-- **一部を読む**（`read_node`、`read_ancestors`、`read_children`、`read_blockers`）：1つの Scope と、その親のつながりや依存だけを REST で読む。`dependency add` の循環の確認は、新しい依存先から blocked by をたどる探索で行い、全体は読まない。
-- 構造をファイルに保存して使い回すこと（キャッシュ）はしない。今の CLI の方針（キャッシュを再導入しない）と、「読むだけのコマンドは書かない」契約を守るためである。
-- 階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。
+構造を、GitHub のリポジトリごとに一括で取得して1つのファイルに保存し、読むコマンド、ダッシュボード、次の Epic（epic-00425）の HTML のダッシュボードが使い回す。
+
+- **置き場**：`<状態の置き場>/github/<ホスト>/<owner>/<repo>/`（すべて小文字。例 `github/github.com/chemitaro/spec-dock/`）。`snapshot.json`（構造）と `probe.json`（変わったかの確かめの記録）を置く。同じリポジトリのクローンが同じPCに複数あっても、1つを共有する。
+- **書き方**：このディレクトリを読み取りで開いて `flock(LOCK_EX)` をかけ、その中で、一時ファイルに書いてから `rename` する。読むときは排他を取らない（`rename` なので、いつも完全なファイルが読める）。GitHub との通信は排他の外で行い、排他の中では書くだけにする。この排他は、カタログの排他（4章）とは別のものである。
+- **`snapshot.json`（版1）**：
+
+  ```json
+  {
+    "version": 1,
+    "repository": "github.com/chemitaro/spec-dock",
+    "fetched_at": "2026-10-25T12:00:00Z",
+    "fetch_started_at": "2026-10-25T11:59:58Z",
+    "issues": {
+      "424": {
+        "number": 424, "database_id": 3612345678, "id": "epic-00424", "kind": "epic",
+        "slug": "canonical-spec-catalog", "title": "仕様の正本を…", "state": "open", "state_reason": null,
+        "labels": ["spec-dock:epic"], "assignees": ["chemitaro"], "in_progress": false,
+        "parent": 423, "sub_issues": [430, 431], "blocked_by": [], "blocking": [425],
+        "updated_at": "2026-10-25T11:00:00Z", "url": "https://github.com/chemitaro/spec-dock/issues/424"
+      }
+    },
+    "external": {"17": {"number": 17, "title": "…", "state": "open"}},
+    "anomalies": [{"number": 99, "code": "SLUG_MARKER_MISSING", "message": "…"}],
+    "local_writes": [{"at": "2026-10-25T12:01:00Z", "command": "scope create", "numbers": [430]}]
+  }
+  ```
+
+  - `issues` は、種類のラベルを持つ Issue（PRを除く）を、開いたものも閉じたものもすべて含む。キーは番号の文字列。`sub_issues` は GitHub の並びのまま、`blocked_by` と `blocking` は番号の昇順。`blocking` は、`blocked_by` を逆にたどって求める。
+  - `external` は、Scope の `blocked_by` に現れる、Scope でない Issue の題名と状態である。着手の判定（今の規則どおり、開いていれば着手できない）に使う。
+  - 本文は保存しない。slug の印だけを取り出す。種類や slug が決まらない Issue は `id` と `slug` を null にし、`anomalies` に入れる。
+  - 形を変えるときは `version` を上げる。読む側は、知らない版を読んではならない（取り直す）。
+- **`probe.json`**：`{"version": 1, "checked_at": "…", "etags": {"spec-dock:initiative": "W/\"…\"", "spec-dock:epic": "…", "spec-dock:issue": "…"}, "last_error": null}`。新しい `ETag` は、全体の取り直しが成功したときだけ記録する（取り直しに失敗したら、次の確かめでも「変化あり」になるようにするため）。
+- **新しさの段階**：構造を読む部品 `ensure_fresh(repository, level)` が、次の表で、確かめと取り直しを決める。時刻は注入できるようにする。
+
+| 段階 | 使う場面 | 変わったかの確かめ | 全体を取り直す条件 | GitHub につながらないとき |
+|---|---|---|---|---|
+| `display` | 表示だけのコマンド（6章の表で「読む」が構造だけのもの）と `canonical status --structure` | 最後の確かめから60秒を超えていれば行う | 変化あり、`fetched_at` から30分を超えた、ファイルがない、版が違う | 今のスナップショットで続け、`warnings` に `GITHUB_SNAPSHOT_STALE`（取得の時刻）を入れる。ファイルがなければ `GITHUB_UNAVAILABLE` で止まる |
+| `decision` | GitHub に書くコマンドの判断（6章の表で「書く」に GitHub があるもの） | 必ず行う | 変化あり、`fetched_at` から5分を超えた、ファイルがない、版が違う | 書く前に `GITHUB_UNAVAILABLE` で止まる |
+| `cycle` | 定期の同期（5章の周期の手順7） | 周期ごとに行う | `display` と同じ | 記録だけを残し、保存と push は続ける |
+
+  - `decision` では、さらに、判断に使う Issue を `GET …/issues/{n}` で読み直す。作成では親、依存の追加では両端、`work start` では対象と、その依存先のうち Scope でないもの、閉じる操作では対象である。読み直した値がスナップショットと違えば、読み直した値で判断し、スナップショットにも反映する。
+  - 見落とす変更：先頭の Issue が変わらない変更（種類のラベルが外れて一覧から消えただけの Issue）と、Issue の更新の時刻を変えないかもしれない親子と依存の変更（未確認）は、変わったかの確かめでは見つからない。30分ごとの取り直し、SpecDock の書き込みの反映、`decision` の読み直しで補う。
+- **書き込みの反映**：SpecDock のコマンドは、GitHub への書き込みが成功するたびに、その結果（作った Issue、題名、状態、ラベル、担当者、親子、依存）をスナップショットの該当する要素に反映し、`local_writes` に記録する。全体の取り直しを書き込むときは、`fetch_started_at` より後の `local_writes` の変更を重ねてから書く（取り直しの途中の書き込みを消さないため）。それより前の `local_writes` は消す。
+- **書けないとき**：状態の置き場に書けないとき（サンドボックスの中など）は、スナップショットをプロセスのメモリーの上だけで持つ。書けないことを理由に失敗してはならない。
+- **読むだけのコマンドの契約**：表示だけのコマンドが書いてよいのは、状態の置き場の `snapshot.json` と `probe.json` だけである。リポジトリ、カタログ、`.git`、GitHub には書かない。今の CLI の「構造をキャッシュしない」方針は、利用者の方針（R-I1）に従い、canonical モードでだけ変える。従来モードは変えない。
+- **規則の部品**：`StructureSnapshot` は、スナップショットを読み込んだもので、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、上の `issues` の1要素と同じ項目を持つ。階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。`dependency add` の循環の確認も、スナップショットの上で行う。
+- 費用の見込み（spec-dock、Scope 243件）：変化がない周期は、304 が3回で、主のレート制限を消費しない。全体の取り直しは GraphQL の3回で、1回あたり数点（`rateLimit.cost` で確かめる）。30分ごとの取り直しを含めても、1時間に GraphQL の数十点である（上限は1時間に5,000点）。
 
 #### 内容の置き場
 
@@ -244,8 +313,9 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 どのチェックアウトから実行しても、次を順に行う。何度実行しても結果は同じで、行ったことを `effects` に、利用者に残る作業を `warnings` に返す。
 
-1. **前提**：宣言の版が4であること。mainのチェックアウトが見つかること。
+1. **前提**：宣言の版が4であること。mainのチェックアウトが見つかること。`git --version` が 2.38 以上であること（`merge-tree --write-tree` のため。足りなければ `CANONICAL_GIT_TOO_OLD`。Ubuntu 22.04 の標準の 2.34 などが当たる）。
 2. **先に確かめる**（書く前にすべて）：
+   - **マウントしたチェックアウトでないこと**（R-C8）：カタログの `.git` ファイルの `gitdir:` の先、または Git の登録（`<共通ディレクトリ>/worktrees/<名前>/gitdir`）が指すパスが、このプロセスから見て存在しないとき、コンテナの中（`/.dockerenv` か `/run/.containerenv` がある、または環境変数 `container`、`REMOTE_CONTAINERS`、`CODESPACES` のどれかがある）なら、`CANONICAL_FOREIGN_CHECKOUT` で止まる。ホストのフォルダーをマウントすると、コンテナの中ではパスが変わり、ここで `git worktree repair` を行うとホストの記録をコンテナのパスに書き換えてしまうためである。次の1手は「保存と同期はホストで行われる。コンテナでは仕様のファイルを読み書きするだけにするか、コンテナの中でクローンする」。コンテナの中でなければ、mainのチェックアウトの移動として、手順3の `repair` に進む。
    - `<main>/spec-dock/.canonical` に、カタログでないファイルやディレクトリがないこと（あれば `CANONICAL_PATH_OCCUPIED`）。
    - mainのチェックアウトと、実行したチェックアウトの `spec-dock/initiatives` が、ない、正しいリンク、違う先のリンクのどれかであること。実体のファイルやディレクトリなら `CANONICAL_LINK_OCCUPIED` で止まり、そのパスと、中にあるファイルの数を示す。中身を消してはならない。
    - 以下の手順で書く必要のある場所に、このプロセスが書けること（`os.access`）。書けないときは、`CANONICAL_SANDBOX_DENIED` で止まり、「サンドボックスの外（普通の端末）で `spec-dock canonical link` を実行する」と示す。カタログ、除外、登録簿がそろっていて、リンクを置くだけなら、作業用のworktreeの中にしか書かないので、Codex のサンドボックスの中でも通る。
@@ -258,7 +328,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
    - GitHub に canonical がなく、既定のブランチの HEAD のツリーに `spec-dock/initiatives` がないとき（新しいリポジトリ）は、5章の「canonical の中身」の管理ファイルだけを持つ、親のないコミットを作って push する。push が先に進まれて拒否されたら（別のPCが同時に作った）、手元で作ったブランチを捨て、GitHub のものを取得して使う。
 4. **除外の設定**：`info/exclude` に、上の3行のうち足りない行を足す。
 5. **リンク**：mainのチェックアウトと、実行したチェックアウトに、正しいリンクを置く。ないときは作り、違う先のリンクは、一時的な名前で作ってから `rename` で置き換える（`ln -s` を重ねると、リンクの先の中に余計なリンクができるため。調査の記録）。
-6. **登録簿と定期の実行**（I-3 が足す）：登録簿にカタログを足し（移動の後なら古いパスの項目を消し）、定期の実行がなければ作って動かす。作った直後に1回だけ実行させ、最大15秒、状態の置き場の記録を待つ。読めなかったとき（macOS のプライバシーの保護など）は、その原因と次の1手を `warnings` に返す。
+6. **登録簿と定期の実行**（I-3 が足す）：登録簿にカタログを足し（移動の後なら古いパスの項目を消し）、5章の「定期の実行の選び方」で選んだ仕組みがなければ作って動かす（systemd のない Linux では、常駐のプロセスを起動する）。作った直後に1回だけ実行させ、最大15秒、状態の置き場の記録を待つ。その1回では、push の認証も確かめる（5章の `push_auth`）。読めなかったとき（macOS のプライバシーの保護など）、認証できなかったとき、ログアウト中に止まる環境（linger がない）、常駐のプロセスの環境（起動し直しの1行）は、その原因と次の1手を `warnings` に返す。
 7. **基準**：カタログを作った、または基準がないときは、取得した `origin/spec-dock/canonical` を、そのカタログの基準として状態の置き場に記録する（5章）。
 8. **ツールの設定**：9章の判定を行い、足りない設定を正確な1行で `warnings` に返す。
 
@@ -267,8 +337,8 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 #### SpecDock のほかのコマンドから
 
 - `worktree create` は、`git worktree add` の後に、作ったworktreeについて `canonical link` と同じ手順（1〜8）を行う。`work start` は、選択を記録した後に、対象のチェックアウトについて同じ手順を行う（R-B4「同じ処理」）。リンクの手順の失敗は、そのコマンド自体の結果を変えず、警告と次の1手として返す。
-- そのほかの、仕様を使う canonical モードのコマンドは、リンクやカタログがない、または正しくないとき、自分では直さずに `CANONICAL_NOT_LINKED` で止まり、`recovery` に `spec-dock canonical link` を入れる（R-B5）。
-- 読むだけのコマンド（`canonical status`、`scope show`、`workspace validate` など）は、何も書かない。カタログに対する Git の呼び出しには `git --no-optional-locks` を付け、`.git` のインデックスも書かない。
+- そのほかの、仕様を使う canonical モードのコマンドは、リンクやカタログがない、または正しくないとき、自分では直さずに `CANONICAL_NOT_LINKED` で止まり、`recovery` に `spec-dock canonical link` を入れる（R-B5）。カタログの Git の登録が、手順2と同じ形でコンテナの中から見えないときは、`CANONICAL_FOREIGN_CHECKOUT` で止まる。仕様のファイルを読み書きするだけのコマンドではないので、ファイルの読み書きそのものは妨げない。
+- 読むだけのコマンド（`canonical status`、`scope show`、`workspace validate` など）は、リポジトリ、カタログ、`.git`、GitHub に何も書かない（書いてよいのは、状態の置き場の構造のスナップショットだけ。2章）。カタログに対する Git の呼び出しには `git --no-optional-locks` を付け、`.git` のインデックスも書かない。
 
 #### `spec-dock canonical status`（読むだけ。R-B7）
 
@@ -281,10 +351,13 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 | `exclude` | 無視の3行が、`info/exclude` と `spec-dock/.gitignore` にあるか |
 | `access` | このプロセスがカタログを読めるか、書けるか（`os.access`。サンドボックスの中では、書けない場所に False を返す。確認済み） |
 | `tools` | 9章の判定の結果と、足りない設定の1行 |
-| `sync` | 定期の実行の有無と状態、最後に成功した同期の時刻、最後の失敗と理由、一時停止（`paused`）の理由 |
+| `sync` | 定期の実行の仕組み（`launchd`、`systemd`、`loop`）と、その有無と状態（常駐のプロセスなら動いているか）、linger（Linux）、push の認証の結果、最後に成功した同期の時刻、最後の失敗と理由、一時停止（`paused`）の理由 |
 | `changes` | 未保存の変更の数、未pushのコミットの数と最も古い時刻、保留、別名ファイル、統合を止めているパスとその理由 |
 | `format` | canonical の形式の版と、この SpecDock が書けるか |
-| `structure` | 入れ子と GitHub の親子のずれ（`--structure` を付けたときだけ、GitHub を読む） |
+| `git` | 使う git のパスと版（2.38 以上か） |
+| `snapshot` | 構造のスナップショットの場所、取得の時刻、最後の確かめの時刻、異常の数。GitHub には問い合わせない |
+| `dashboard` | ダッシュボードの5つのファイルの有無と、最後に作り直した時刻 |
+| `structure` | 入れ子と GitHub の親子のずれ（`--structure` を付けたときだけ、`display` の新しさでスナップショットを確かめる） |
 
 - 未pushのコミットが10分を超えたら警告する（R-C6）。
 - 同期の項目は、状態の置き場の `state.json` を読む。カタログが読めないときも示せる。
@@ -293,7 +366,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 - 対象はこのクローン。`--yes` がなければ、予定だけを示して何もしない（`planned`）。
 - 次のどれかがあれば、書く前に止まる。未保存の変更か未pushのコミット（`CANONICAL_UNSAVED_CHANGES`）、カタログの中の、`.runtime/` 以外の無視されたファイル（`.workbench` など。`CANONICAL_IGNORED_FILES_PRESENT`。ファイルの一覧を示す。`git worktree remove` で消えてしまうため）。
-- 次を外す。同じクローンのすべてのチェックアウトの、正しいリンク（実体は消さない）、カタログのworktree（unlock して `git worktree remove`）、`info/exclude` の3行、登録簿の項目と状態の置き場の記録、定期の実行（ほかに登録されたカタログがないときだけ）。
+- 次を外す。同じクローンのすべてのチェックアウトの、正しいリンク（実体は消さない）、カタログのworktree（unlock して `git worktree remove`）、`info/exclude` の3行、登録簿の項目と状態の置き場のカタログの記録、mainのチェックアウトのダッシュボードの5つのファイル、定期の実行（ほかに登録されたカタログがないときだけ。常駐のプロセスなら止める）。構造のスナップショットは、同じリポジトリのほかのクローンが使っていることがあるので消さない。
 - ローカルのブランチ `spec-dock/canonical` と、GitHub のブランチは消さない。
 - AGENTS.md の「対象と結果を明示した指示が要る破壊的なコマンド」に、このコマンドを足す。
 
@@ -337,7 +410,7 @@ spec-dock/canonical のルート
 #### 状態の置き場
 
 - 根は `${XDG_STATE_HOME:-$HOME/.local/state}/spec-dock/` とする（macOS でも同じ）。`canonical link` を実行したときに求めた絶対パスを、定期の実行の引数（`--state-root <絶対パス>`）に書き込む。定期の実行の環境では `XDG_STATE_HOME` が普通は設定されていないため、実行のたびに求め直してはならない。
-- **登録簿**：`<根>/canonical-registry.json`。中身は `{"version": 1, "catalogs": [{"catalog": "<実際のパス>", "main_checkout": "...", "git": "<git の絶対パス>", "registered_at": "..."}]}`。
+- **登録簿**：`<根>/canonical-registry.json`。中身は `{"version": 1, "scheduler": "launchd|systemd|loop", "catalogs": [{"catalog": "<実際のパス>", "main_checkout": "...", "repository": "github.com/<owner>/<repo>", "git": "<git の絶対パス>", "registered_at": "..."}]}`。`repository` は、構造のスナップショットの置き場を決めるのに使う（2章）。
   - 書くときは、同じディレクトリの一時ファイルに書いてから `rename` する。同時の書き込みは、`<根>` のディレクトリへの `flock` で防ぐ。
   - `git` には、`canonical link` を実行したときの `PATH` で見つかった git の絶対パスを記録する。定期の実行の `PATH` は狭く、macOS のプライバシーの保護の許可もプログラムごとなので、利用者がふだん使う git を使うためである（調査の記録：Apple の `/usr/bin/git` は外付けのボリュームを読めず、Homebrew の git は読めた）。
 - **カタログごとの状態**：`<根>/catalogs/<鍵>/state.json`。鍵は、カタログの実際のパスの SHA-256 の先頭16文字。定期の同期と `canonical link` だけが書き、ほかのコマンドは読むだけ。カタログが読めないときや、`git clean -ffdx` でカタログの `.runtime/` が消えたときでも、記録と基準が残る。
@@ -359,12 +432,25 @@ spec-dock/canonical のルート
     "holds": [{"path": "...", "kind": "mass_delete|secret|too_large", "since": "..."}],
     "conflicts": [{"path": "...", "copy": "...", "at": "..."}],
     "blocking": [{"path": "...", "reason": "local_edit|held"}],
-    "consumed_changesets": ["<束のファイル名>"]
+    "consumed_changesets": ["<束のファイル名>"],
+    "push_auth": {"result": "ok|failed|unknown", "at": "...", "message": "..."},
+    "dashboard": {"input_hash": "<sha256>", "written_at": "...", "error": null}
   }
   ```
 
   - 書くときは、一時ファイルに書いてから `rename` する。`consumed_changesets` は直近の100件だけを残す。
+  - `push_auth` は、`canonical link` の後の最初の周期と、push が認証で失敗したときに書く。最初の周期では、送るものがなくても `git push --dry-run origin HEAD:refs/heads/spec-dock/canonical` を行い、認証できるかを確かめる（dry-run でも認証が要ることは確認済み）。失敗したら、リモートの URL が `https` なら `gh auth setup-git`、`ssh` なら「定期の実行には SSH のエージェントが渡らないことがあるので、`https` と `gh` の認証を使う」を次の1手にする。
 - **ログ**：`<根>/canonical-sync.log`。1 MiB を超えたら1世代だけ残して切り替える。ファイルの中身は書いてはならない。
+
+#### 定期の実行の選び方（R-C7）
+
+`canonical link` が、次の順に選び、登録簿の `scheduler` に記録する。一度選んだら、`canonical remove` の後か、選んだ仕組みが使えなくなったときだけ選び直す。
+
+1. macOS なら `launchd`。
+2. Linux で、`/run/systemd/system` があり、`systemctl --user is-system-running` が `running` か `degraded` を返すなら `systemd`。「Failed to connect to bus」で失敗したときは、1秒おきに5回まで試し直す（仮想マシンの起動の直後に、最初の1回だけ失敗し、数秒後には通った。確認済み）。
+3. それ以外の Linux（コンテナ、devcontainer など。systemd も cron もないことを確認済み）なら `loop`（常駐のプロセス）。
+
+3つのどれでも、1周期の中身（下の「1回の周期」）は同じである。
 
 #### 定期の実行の登録
 
@@ -380,14 +466,58 @@ macOS（launchd）：
   - `EnvironmentVariables` の `PATH`：記録した git のディレクトリを先頭に、`/usr/bin:/bin:/usr/sbin:/sbin`。
 - 登録は `launchctl bootstrap gui/<uid> <plist>`、すぐの実行は `launchctl kickstart gui/<uid>/<Label>`、解除は `launchctl bootout gui/<uid>/<Label>` で行う。launchd は、同じジョブを重ねて動かさない。
 
-Linux（systemd のユーザーのタイマー）：
+Linux（systemd のユーザーのタイマー。デスクトップ、SSH で入るサーバーと仮想マシン）：
 
-- `${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-canonical-sync.service`（`Type=oneshot`、`ExecStart=<spec-dock の絶対パス> canonical sync --registered --state-root <根の絶対パス>`、`WorkingDirectory=%h`、`Environment=PATH=…`）と、`spec-dock-canonical-sync.timer`（`OnBootSec=60`、`OnUnitActiveSec=60`、`AccuracySec=5s`）を置く。
-- `systemctl --user daemon-reload` と `systemctl --user enable --now spec-dock-canonical-sync.timer` で動かす。すぐの実行は `systemctl --user start spec-dock-canonical-sync.service` で行う。
-- 利用者がログインしていない間は動かない。それでよい（ログアウト中は編集もない）。
-- Linux での動きと push の認証は、まだ確かめていない。担当の Issue で確かめる。
+- `${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-canonical-sync.service` と `spec-dock-canonical-sync.timer` を置く。
 
-**すぐの実行の頼み方**（`work finish` などが使う）：上の `kickstart` か `systemctl --user start` を実行する。サンドボックスの中などで失敗しても、無視してよい。遅くとも60秒で次の周期が来る。
+  ```ini
+  # spec-dock-canonical-sync.service
+  [Unit]
+  Description=SpecDock canonical sync
+  [Service]
+  Type=oneshot
+  WorkingDirectory=%h
+  Environment=PATH=<記録した git のディレクトリ>:/usr/local/bin:/usr/bin:/bin
+  ExecStart=<spec-dock の絶対パス> canonical sync --registered --state-root <根の絶対パス>
+
+  # spec-dock-canonical-sync.timer
+  [Unit]
+  Description=SpecDock canonical sync timer
+  [Timer]
+  OnActiveSec=10s
+  OnUnitActiveSec=60s
+  AccuracySec=5s
+  [Install]
+  WantedBy=timers.target
+  ```
+
+  - 値の中の `%` は `%%` と書く（systemd の指定子として読まれるため。確認済み）。パスに空白などがあれば、systemd の引用の規則で書く。
+  - `OnActiveSec` は、タイマーが動き始めてから最初の実行までの時間で、`OnUnitActiveSec` は、前の実行から次の実行までの時間である。この組み合わせで動くことを確かめた（下）。
+- `systemctl --user daemon-reload` と `systemctl --user enable --now spec-dock-canonical-sync.timer` で動かす。解除は `systemctl --user disable --now spec-dock-canonical-sync.timer` の後にファイルを消し、`daemon-reload` する。
+- **linger**：`loginctl show-user <ユーザー> -p Linger --value` が `no` なら、ログアウトしている間は、ユーザーの systemd ごと止まり、同期も止まる。デスクトップならそれでよい。SSH で入るサーバーや仮想マシンでは、エージェントがログアウトの後も動くことがあるので、`canonical link` と `canonical status` が、`loginctl enable-linger <ユーザー>`（管理者の権限が要ることがある）を次の1手として示す。SpecDock は、linger を変えてはならない（環境の設定であり、セッションのない環境では変えられないことも確認済み）。
+- 2026-10-25 に、Ubuntu 24.04（systemd 255）の仮想マシンで、この形のタイマーが動くこと、`WorkingDirectory=%h` と `Environment=PATH=…` が渡ることを確かめた。タイマーからの push の認証は、担当の Issue で確かめる。
+
+Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）：
+
+- `spec-dock canonical sync --registered --loop --state-root <根の絶対パス>` が、終了の合図（SIGTERM、SIGINT）まで、60秒ごとに1周期を動かす。
+- **1つだけ動く**：起動したら、`<根>/runner.lock` を開いて `flock(LOCK_EX|LOCK_NB)` をかけ、終わるまで持つ。取れなければ、すでに動いているので、終了コード0で何もせずに終わる。`<根>/runner.json` に、プロセスの番号、起動の時刻、spec-dock の版を書く。
+- **起動**：`canonical link` の手順6が、動いていなければ、切り離して起動する（`--detach`。新しいセッションで起動し、標準入力を閉じ、出力を `<根>/canonical-sync.log` に向け、作業ディレクトリをホームにする）。起動した後、最初の周期の記録を最大15秒待つ。
+- **起動し直し**：コンテナを起動し直すと、常駐のプロセスは止まる。`canonical link` と `canonical status` は、次の1行を `warnings` に返す。SpecDock は、devcontainer やコンテナの起動の設定を書き換えない（約束4）。
+
+  ```text
+  spec-dock canonical sync --registered --loop --detach --state-root <根の絶対パス>
+  ```
+
+  devcontainer なら `postStartCommand` に、ほかのコンテナなら起動のスクリプトに足す。足さなくても、次に `spec-dock canonical link` を実行すれば動き直す。
+- **止める**：`canonical remove` は、ほかに登録されたカタログがなければ、`runner.json` のプロセスに SIGTERM を送る。常駐のプロセスは、周期の途中なら、その周期を終えてから止まる。
+- 2026-10-25 に、`ubuntu:24.04` のコンテナで、PID 1 が `sh` で、systemd も cron もないことを確かめた。
+
+**すぐの実行の頼み方**（`canonical link` の手順6、`work finish` が使う）：
+
+- `launchd`：`launchctl kickstart gui/<uid>/<Label>`。
+- `systemd`：`systemctl --user start --no-block spec-dock-canonical-sync.service`。
+- `loop`：常駐のプロセスが動いていれば、`<根>/kick` を作る。常駐のプロセスは2秒ごとにこのファイルを見て、あれば消して、すぐに1周期を動かす。動いていなければ、`--detach` で起動する。
+- どれも、サンドボックスの中などで失敗しても、無視してよい。遅くとも60秒で次の周期が来る。
 
 #### カタログに対する Git の呼び出し
 
@@ -399,7 +529,7 @@ Linux（systemd のユーザーのタイマー）：
 
 `--registered` では登録簿のすべてのカタログを、引数なしではこのクローンのカタログを、順に処理する。1つのカタログの失敗で、ほかのカタログを止めてはならない。1つのカタログについて、次の順に行う。
 
-1. **前提を確かめる**：カタログがあり、読めて、`spec-dock/canonical` にいて、マージの途中でないこと。形式の版が書ける版であること。`paused` でないこと。満たさなければ、状態に理由を書いて、このカタログを飛ばす。読めない（`Operation not permitted`）ときは、`last_error.code = "OS_ACCESS_DENIED"` と、拒否されたプログラム（spec-dock の Python と、記録した git）を記録する。
+1. **前提を確かめる**：カタログがあり、読めて、`spec-dock/canonical` にいて、マージの途中でないこと。形式の版が書ける版であること。`paused` でないこと。登録簿の git が 2.38 以上であること（足りなければ `CANONICAL_GIT_TOO_OLD`）。満たさなければ、状態に理由を書いて、このカタログを飛ばす。読めない（`Operation not permitted`）ときは、`last_error.code = "OS_ACCESS_DENIED"` と、拒否されたプログラム（spec-dock の Python と、記録した git）を記録する。
 2. **GitHub を確かめる**（排他の外）：
    - `git ls-remote --exit-code origin refs/heads/spec-dock/canonical` を行う。終了コード2（ブランチがない）で、基準があれば、`paused: "remote_deleted"` を記録して止まる。基準がなければ、push だけを行う（新しいリポジトリの作成の続き）。2以外の失敗は、接続の失敗として記録し、3と4だけを行う（コミットはローカルに積む）。
    - あれば、`git fetch --no-tags origin +refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical` を行う。
@@ -427,6 +557,7 @@ Linux（systemd のユーザーのタイマー）：
    - 別名ファイルを作ったら、状態の `conflicts` に記録する。
 5. **push**（排他の外）：L が R より進んでいれば `git push origin HEAD:refs/heads/spec-dock/canonical`（強制しない）。先に進まれて拒否されたら、2からもう一度行う。1つの周期でのやり直しは2回までとする。成功したら、基準を HEAD にする。
 6. **記録**：`head`、`remote_contains_head`（HEAD が基準の祖先か同じか）、`unpushed_since`、`consumed_changesets` などを、状態に書く。
+7. **構造とダッシュボード**（排他の外）：すべてのカタログの1〜6を終えてから、登録簿の `repository` ごとに1回、`ensure_fresh(repository, cycle)`（2章）を行う。続けて、そのリポジトリのカタログごとに、13章の条件でダッシュボードを作り直す。ここでの失敗（GitHub につながらないなど）は、1〜6の結果を変えない。`probe.json` の `last_error` と、`state.json` の `dashboard.error` に記録する。カタログが一時停止や、読めないために飛ばされていても、7は行う。
 
 #### 別名ファイルの名前
 
@@ -460,16 +591,20 @@ Linux（systemd のユーザーのタイマー）：
 
 すべてのコマンドについて、canonical モードでの動きを決める（G7）。「担当」は `plan.md` の Issue である。
 
+- 「読む」の欄の構造（対象、親、祖先、子孫、依存、全体）は、どれも構造のスナップショットから読む（2章）。「一部」「全体」は、スナップショットの中で使う範囲を示すだけで、GitHub への要求の数は変わらない。
+- 「書く」に GitHub への書き込みがあるコマンドは、`decision` の新しさでスナップショットを確かめ、判断に使う Issue を読み直してから書く。書いた結果は、すぐにスナップショットに反映する（2章）。
+- 「書く」がないコマンドは、`display` の新しさで読む。
+
 | コマンド | 読む | 書く | 今との違い | 担当 |
 |---|---|---|---|---|
 | `scope create` | 親とその祖先（一部） | Issue の作成（題名、本文の印、種類のラベル）→ 親への sub-issue → 排他の中でディレクトリの公開と変更の束 | `.meta.json` を作らない。日本語の題名を受け付ける（7章）。Issue を作った後に失敗したら、`partial`（終了コード6）と `recovery` に `scope import github <種類> <番号>` を返す | I-5 |
 | `scope import github` | Issue と親 | 足りないものだけを足す（種類のラベル、本文の印、親子、ディレクトリ）。何度実行しても同じ | `.meta.json` を作らない | I-5 |
-| `scope show`、`scope list` | `show` は一部、`list` は全体 | なし | 題名と状態を GitHub から示す（R-E4）。ディレクトリの場所も示す | I-4 |
+| `scope show`、`scope list` | `show` は一部、`list` は全体 | なし | 題名と状態をスナップショット（GitHub の構造）から示す（R-E4）。ディレクトリの場所と、スナップショットの取得の時刻も示す | I-4 |
 | `scope edit` | 対象 | `PATCH` で題名だけ | ファイルは変えない | I-5 |
 | `scope move`（新設） | 対象と新しい親（一部） | `--parent` があれば、`POST …/sub_issues` の `replace_parent: true` で付け替える。その後、排他の中でディレクトリを GitHub の親の下へ移し、変更の束を書く | `--parent` がなければ、ディレクトリを今の GitHub の親に合わせるだけ | I-5 |
 | `scope close`、`scope reopen` | 子孫か祖先（一部） | 今と同じく状態の `PATCH` | 子孫と祖先を GitHub の親子から求める | I-5 |
 | `scope delete` | 対象、子孫、依存 | 種類のラベルを外す、親から外す、`--detach-dependencies` なら依存を外す、`--backup-dir` に写してから、排他の中でディレクトリを消し、削除を変更の束に書く | Issue 自体は閉じも消しもしない | I-5 |
-| `dependency list`、`dependency check` | 対象と祖先の依存（一部）、`--all` なら全体 | なし | 入力を blocked by にする。着手の判定の規則は今と同じ | I-4 |
+| `dependency list`、`dependency check` | 対象と祖先の依存（一部） | なし（スナップショットだけ） | 入力を blocked by にする。着手の判定の規則は今と同じ。`dependency check --source github` は全体を取り直してから判定し、`--source local` は `CANONICAL_NOT_APPLICABLE` で止まる | I-4 |
 | `dependency add`、`dependency remove` | 循環の確認のための探索 | `POST` / `DELETE …/dependencies/blocked_by` | `.meta.json` を書かない | I-5 |
 | `artifact create`、`artifact import file` | 対象 | 排他の中でファイルを公開し、変更の束を書く | 置き場がカタログになる | I-5 |
 | `artifact list`、`artifact show` | 対象とカタログ | なし | 置き場がカタログになる | I-4 |
@@ -482,7 +617,7 @@ Linux（systemd のユーザーのタイマー）：
 | `worktree list`、`worktree show`、`worktree bootstrap` | 今と同じ | 今と同じ | 選択の表示で、対象の場所をカタログから求める。カタログのworktreeは「カタログ」と示す | I-4 |
 | `worktree remove` | 今と同じ | 今と同じ | カタログのworktreeを対象にしたら、`CANONICAL_CATALOG_PROTECTED` で止まる（取り外しは `canonical remove`） | I-4 |
 | `workbench copy` | なし | なし | `CANONICAL_WORKBENCH_SHARED` で止まる。どのworktreeからも同じカタログの `.workbench` が見えるので、写す必要がない、と示す | I-4 |
-| `workspace sync` | 全体 | なし | 構造を GitHub から読む。`--source local` は `CANONICAL_NOT_APPLICABLE` で止まる | I-4 |
+| `workspace sync` | 全体 | なし（スナップショットだけ） | 構造をスナップショットから読む。`--source github` を付けたときは、変わったかの確かめを待たずに全体を取り直す（今の「live GitHub を読む」の意味に合わせる）。`--source local` は `CANONICAL_NOT_APPLICABLE` で止まる。ダッシュボードは作らない（作るのは定期の同期だけ。13章） | I-4 |
 | `workspace validate` | 全体とカタログ | なし | 下の検査を行う。`--ci` は `CANONICAL_NOT_APPLICABLE` で止まり、`canonical check` を案内する | I-4 |
 | `workspace doctor` | 今の項目と、`canonical status` と同じ項目 | なし | | I-4 |
 | `workspace migrate` | 宣言 | なし | `CANONICAL_NOT_APPLICABLE` で止まる | I-1 |
@@ -509,7 +644,7 @@ Linux（systemd のユーザーのタイマー）：
 - 題名が今の規則（`^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$`、`domain/ids.py:11`）に合うときは、今と同じく題名から slug を作る（小文字にして空白をハイフンに）。合わないときは、`--slug` を必須にする（R-E3。ないときは `SLUG_REQUIRED` で止まる）。slug の規則は今と同じ（`^[a-z0-9]+(?:-[a-z0-9]+)*$`）。
 - この変更は canonical モードだけに入れる。従来モードの作成は、今の規則のままとする（R-A6）。
 - 既定のブランチ名は、今と同じ `<ID>-<slug>`。題名を変えても、slug、ディレクトリ名、ブランチ名は変わらない（R-E2）。
-- 表示（`scope show`、`scope list`、`workspace sync`、`dependency check` など）は、GitHub の題名を使う（R-E4）。`dashboard.md` の生成は復活させない。
+- 表示（`scope show`、`scope list`、`workspace sync`、`dependency check` など）とダッシュボード（13章）は、GitHub の題名を使う（R-E4）。
 
 ### 8. 既定のブランチの検査（R-F1〜R-F3）
 
@@ -556,7 +691,7 @@ Linux（systemd のユーザーのタイマー）：
 
 ### 9. ツールの設定（R-B6、R-H3）
 
-- 作業用のworktreeから仕様を読み書きするには、ツールごとに1行の設定が要る（調査の記録で確認済み）。SpecDock は、設定のファイルを書き換えてはならない（約束4）。
+- 作業用のworktreeから仕様を読み書きするには、ツールごとに1行の設定が要る（調査の記録で確認済み）。利用者が1回だけ手で足す。SpecDock は、`installation init` と `installation update` を含めて、設定のファイルを書き換えてはならない（約束4。2026-10-25 に利用者が了承。自動で書くと、利用者の設定を壊す危険と、ツールの設定の形式の変化に追従する保守が生じるため）。
 - 示す1行（`<カタログ>` は、そのクローンのカタログの絶対パス）：
   - Claude Code：ユーザーの設定 `~/.claude/settings.json` の `permissions.additionalDirectories` に `"<カタログ>"` を加える。
 
@@ -621,7 +756,7 @@ Linux（systemd のユーザーのタイマー）：
 | `export-legacy` | 戻すときに使う。既定のブランチから新しいブランチを作り、`spec-dock/initiatives` にカタログの内容を置き、GitHub の構造から `.meta.json`（schema 3）を作り直し、宣言を版3に戻し、`spec-dock-check.yml` を外す。PRは人がマージする |
 
 - **ローカルの Scope と番号の不一致**：`init-local-00002`（#39 に結び付く）と `init-local-00003`（#31 に結び付く。#31 は題名が別物で閉じている）は、`plan` が異常として示す。結び付いた Issue の題名が `.meta.json` の題名と同じなら、その番号の ID に置き換える。違えば、`register` が `.meta.json` の題名で新しい Initiative の Issue を作り、その番号の ID に置き換える。置き換えは `idmap.json` に記録し、ディレクトリの名前は `build-canonical` と `move-local` と `adopt-worktree` だけが変える。どちらにするかは `plan` の出力に書き、`--apply` の前に確かめられるようにする。
-- **速さ**：書き込みは、1分に80回、1時間に500回を超えない（目安の制限）。spec-dock では約620回で、1.5時間ほどかかる見込み。途中で止まっても、`undo.jsonl` と GitHub の今の状態から、続きを判断して再開する（R-G2）。
+- **速さ**：書き込みは1つずつ送り、間を1秒以上あけ、1分に80回、1時間に500回を超えない（目安の制限）。レート制限の応答では、2章の規則で待つ（書き込みでも、スクリプトは待って続けてよい。再開できるため）。spec-dock では約620回で、1.5時間ほどかかる見込み。途中で止まっても、`undo.jsonl` と GitHub の今の状態から、続きを判断して再開する（R-G2）。
 - **凍結の後にもう一度**：`register` と `verify` は、切り替えの前に済ませてよいが、凍結（仕様の編集の停止）の後に、もう一度 `register --apply` と `verify` を行う。その間に変わった構造を拾うためである。
 - **移行前のチェックアウトの取り込み**（`adopt-worktree`）：
   1. そのチェックアウトのブランチ B と既定のブランチの分岐点を M とする。`build-canonical` が作った canonical のコミットのうち、ツリーが `M:spec-dock/initiatives`（`idmap.json` の置き換えの後）と同じもの C を探す（subtree split のコミットは、元のコミットの `spec-dock/initiatives` と同じツリーを持つ）。
@@ -639,7 +774,7 @@ Linux（systemd のユーザーのタイマー）：
 |---|---|---|---|
 | `canonical link` | カタログ、lock、除外、リンク、登録簿、定期の実行、基準 | Find or create this clone's catalog, link this checkout, and register periodic sync. | I-2、I-3 |
 | `canonical status` | なし | Read catalog, link, access, tool settings and sync state; no changes. | I-2、I-3 |
-| `canonical sync` | カタログのコミット、push、状態 | Save, merge and push the catalog once; `--registered` processes every registered catalog. | I-3 |
+| `canonical sync` | カタログのコミット、push、状態、構造のスナップショット、ダッシュボード | Save, merge and push the catalog once; `--registered` processes every registered catalog; `--loop` keeps running as the resident runner where systemd is unavailable. | I-3（スナップショットの更新は I-1 の部品、ダッシュボードは I-11） |
 | `canonical accept` | `accepted.json` | Allow held changes to be saved by the next sync. | I-3 |
 | `canonical restore` | カタログの作業ツリー | Restore held deletions or paths from the catalog HEAD; no commit. | I-3 |
 | `canonical resume` | 状態の `paused` と基準 | Resume a paused catalog after the user decided how to treat the remote. | I-3 |
@@ -652,7 +787,9 @@ Linux（systemd のユーザーのタイマー）：
   - 書く前の確かめで止まるときは `failed`（効果なし）。そのために、書くコマンドは、止まる条件をすべて書く前に確かめる。
   - 書いた後に止まるときは `partial`（終了コード6）で、効果ごとに `succeeded`、`unknown`、`not_attempted` を示す。
   - `canonical sync --registered` は、カタログごとの結果を `data.catalogs` に入れる。すべて成功か変化なしなら `succeeded` か `unchanged`、1つでも失敗し、どこかで効果があれば `partial`（終了コード6）、効果がなければ `failed`（終了コード3）とする。
-- **JSON**：`canonical status --json` の `data` は、3章の表の項目をキーに持つ。`canonical sync --json` の `data.catalogs[]` は、`catalog`、`saved_commit`、`merged`、`pushed`、`conflicts`、`holds`、`blocking`、`skipped_reason`、`paused` を持つ。
+- **引数**：`canonical sync` は、`--registered`、`--state-root <パス>`、`--loop`（常駐。`--registered` と一緒にだけ使える）、`--detach`（`--loop` を切り離して起動して、すぐに終わる）を受け付ける。
+- **JSON**：`canonical status --json` の `data` は、3章の表の項目をキーに持つ。`canonical sync --json` の `data.catalogs[]` は、`catalog`、`saved_commit`、`merged`、`pushed`、`conflicts`、`holds`、`blocking`、`skipped_reason`、`paused` を持ち、`data.repositories[]` は、`repository`、`probe`（`unchanged`、`changed`、`failed`）、`refreshed`、`dashboards_written` を持つ。
+- 構造を示すコマンドの JSON は、`data` に `snapshot`（`fetched_at`、`stale`）を持つ。
 - **エラーのコード**（どれも `recovery` に次の1手を入れる）：
 
 | コード | 終了コード | 次の1手 |
@@ -660,6 +797,8 @@ Linux（systemd のユーザーのタイマー）：
 | `CANONICAL_NOT_MIGRATED` | 3 | 移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3） |
 | `CANONICAL_NOT_APPLICABLE` | 3 | 示した代わりのコマンドを使う（`canonical check` など） |
 | `CANONICAL_UNSUPPORTED_LAYOUT` | 3 | mainのチェックアウトのある構成で使う |
+| `CANONICAL_GIT_TOO_OLD` | 3 | Git 2.38 以上を入れ、`spec-dock canonical link` をもう一度実行する（登録簿の git を入れ替えるため） |
+| `CANONICAL_FOREIGN_CHECKOUT` | 3 | 保存と同期はホストで行われる。コンテナでは仕様のファイルを読み書きするだけにするか、コンテナの中でクローンして `spec-dock canonical link` |
 | `CANONICAL_NOT_LINKED` | 3 | `spec-dock canonical link` |
 | `CANONICAL_PATH_OCCUPIED`、`CANONICAL_LINK_OCCUPIED` | 3 | 示したパスの中身を確かめて退避してから `spec-dock canonical link`（SpecDock は消さない） |
 | `CANONICAL_SANDBOX_DENIED` | 3 | サンドボックスの外（普通の端末）で同じコマンドを実行する |
@@ -677,7 +816,32 @@ Linux（systemd のユーザーのタイマー）：
 | `GITHUB_STRUCTURE_INVALID` | 7 | 示した Issue のラベル、印、親子を直す（`scope move` など） |
 | `GITHUB_RATE_LIMITED` | 5 | 示した時刻の後に同じコマンドを実行する |
 | `GITHUB_UNAVAILABLE` | 5 | 接続と `gh auth status` を確かめる |
+| `GITHUB_SNAPSHOT_STALE` | —（警告） | 表示は取得の時刻の時点のもの。つながったら、次の表示か定期の同期で新しくなる |
 | `SLUG_REQUIRED` | 3 | `--slug <英小文字とハイフン>` を付ける |
+
+### 13. ダッシュボード（R-E5、AC-17）
+
+今までと同じ Markdown と PlantUML のダッシュボードを、canonical モードで、構造のスナップショットから作り直す。HTML のダッシュボードは、次の Epic（epic-00425）で作り、これを置き換える。
+
+- **作るファイル**：mainのチェックアウトの `spec-dock/` の、次の5つ。どれも、配布資産の `spec-dock/.gitignore` で、すでに無視されている（確認済み）。
+
+| ファイル | 中身 | 描く関数（今のコード） |
+|---|---|---|
+| `dashboard.md` | 着手できる Issue の集計と、Doing、Ready、Blocked、Unknown の一覧（終わったものは除く） | `presentation/markdown.py` の `_render_dashboard_md` |
+| `tree.puml` | Initiative、Epic、Issue の入れ子の図で、終わっていないものだけ。状態ごとの色（READY、BLOCKED、DOING、DONE、UNKNOWN） | `presentation/puml.py` の `_render_tree_ready_board_puml`（`todo_only=True`） |
+| `tree-all.puml` | 同じ図で、終わったものも含める | 同じ関数（`todo_only=False`） |
+| `deps-issues.puml` | Issue どうしの依存の図 | `_render_deps_issues_puml` |
+| `deps-raw.puml` | 宣言された依存を、祖先を含めてそのまま示す図 | `_render_deps_raw_puml` |
+
+- **形**：今までと同じにする。見本は、spec-dock のmainのチェックアウトの `spec-dock/` にある、2026-09-21 に作られた5つのファイルである（切り替えの後は、定期の同期が上書きする。I-11 の担当は、始めるときに、これを写してテストの見本にする）。違いは次の3つだけとする。
+  - 題名は、スナップショットの GitHub の題名（日本語を含む）を使う。PlantUML の文字列に入れるときは、今の関数の扱い（引用符と改行の扱い）に従う。
+  - 作業中（DOING）は、今の選択の記録ではなく、GitHub の作業中のラベル（`spec-dock:in-progress`）で決める。どのPCで作業中のものも示される。
+  - `dashboard.md` の「Observability」の行は、`.agent/index.json` の代わりに、構造のスナップショットのパスを示す。
+- **状態の決め方**：終わった（DONE）は閉じた Issue。作業中（DOING）は開いていて作業中のラベルがあるもの。止められている（BLOCKED）と着手できる（READY）は、`dependency check` と同じ着手の判定（I-4 の部品。Scope でない Issue への依存は、開いていれば止められている）で決める。不明（UNKNOWN）は、スナップショットの異常に挙がったもの。
+- **作り方**：`application/canonical_dashboard.py` に、スナップショットから、今の描く関数が受け取る辞書（`presentation/json_state.py` の `_build_state_payloads`、`_build_deps_issues_v2_payload`、`_build_deps_raw_payload` が作るものと同じ形）を作る部品を置き、描く関数をそのまま呼ぶ。描く関数は、従来モードのどこからも呼ばれていないので、直す必要が出たら直してよいが、出力の形は変えない。
+- **作り直す時**：定期の同期の周期の手順7（5章）で、カタログごとに、スナップショットの `issues` と `external` の中身の SHA-256 が、`state.json` の `dashboard.input_hash` と違うとき、または5つのファイルのどれかがないときだけ作る。構造が変わらない周期では書かない。ほかのコマンド（`workspace sync` を含む）は作らない（約束3）。
+- **書き方**：ファイルごとに、同じディレクトリの一時ファイルに書いてから `rename` する。書く場所にディレクトリかシンボリックリンクがあれば、そのファイルは書かずに、`dashboard.error` に記録する。作業用のworktreeには作らない（1つのクローンの構造は1つのため）。
+- **従来モード**：作らない（今のまま。R-A6）。
 
 ## data / failure
 
@@ -685,7 +849,10 @@ Linux（systemd のユーザーのタイマー）：
 
 | データ | 置き場 | 書くもの | 読むもの |
 |---|---|---|---|
-| 構造 | GitHub Issue | Scope を扱うコマンド、移行のスクリプト | Scope を扱うコマンド |
+| 構造 | GitHub Issue | Scope を扱うコマンド、移行のスクリプト | 構造のスナップショットの取り直し、書く前の読み直し |
+| 構造のスナップショット | `<状態の置き場>/github/<ホスト>/<owner>/<repo>/snapshot.json`、`probe.json` | 定期の同期、構造を読むコマンド（取り直しと、書き込みの反映） | 構造を読むすべてのコマンド、ダッシュボード、次の Epic の HTML のダッシュボード |
+| ダッシュボード | `<main>/spec-dock/` の5つのファイル | 定期の同期だけ | 人 |
+| 常駐のプロセスの記録 | `<状態の置き場>/runner.lock`、`runner.json`、`kick` | 常駐のプロセス、`canonical link`、`work finish`（`kick`） | `canonical status`、`canonical remove` |
 | 内容 | canonical（カタログの作業ツリー） | 人、エージェント、SpecDock のコマンド | すべて |
 | カタログのコミット | `.git` の `refs/heads/spec-dock/canonical` | 定期の同期だけ | 定期の同期、`canonical status` |
 | 変更の束、作成の作業場所、保留の許可 | `<カタログ>/.runtime/` | SpecDock のコマンド | 定期の同期 |
@@ -716,6 +883,13 @@ Linux（systemd のユーザーのタイマー）：
 | GitHub の題名の変更 | 表示が変わるだけ | なし |
 | 同じPCに同じリポジトリのクローンが複数 | クローンごとにカタログがあり、登録簿に別々に載る。互いには GitHub を通して同期する | なし |
 | 2台のPCが同時に新しいリポジトリの canonical を作る | 後から push した側が、手元のものを捨てて GitHub のものを使う | なし |
+| GitHub につながらない（構造） | 表示は今のスナップショットで続け、`GITHUB_SNAPSHOT_STALE` で取得の時刻を示す。書くコマンドは、書く前に `GITHUB_UNAVAILABLE` で止まる。定期の同期は、カタログの保存と push を続ける | 接続と `gh auth status` を確かめる |
+| GitHub の画面で親子や依存だけを変えた | 変わったかの確かめで見つからないことがあり、表示とダッシュボードに出るまで最大30分かかる。書く判断の前には、判断に使う Issue を読み直す（2章） | なし（急ぐときは `spec-dock workspace sync --source github`） |
+| コンテナ（中でクローン）を起動し直した | 常駐のプロセスが止まる。編集はファイルに残る | 起動の設定の1行か、`spec-dock canonical link` |
+| ホストのフォルダーをマウントしたコンテナ | カタログの Git の登録が見えないので、Git を使うコマンドは `CANONICAL_FOREIGN_CHECKOUT` で止まる。ホストの記録は書き換えない | ホストで同期する。コンテナでは仕様のファイルの読み書きだけにするか、中でクローンする |
+| SSH のサーバーで linger がない | ログアウトの間、定期の同期が止まる。`canonical status` が示す | `loginctl enable-linger <ユーザー>` |
+| Git が 2.38 より古い | `canonical link` は書く前に、定期の同期はそのカタログを飛ばして、`CANONICAL_GIT_TOO_OLD` を示す | 新しい Git を入れ、`spec-dock canonical link` |
+| 定期の実行から push の認証ができない | 保存はローカルに積み、`push_auth` に記録する。`canonical status` が示す | `gh auth setup-git`（`https`）。`ssh` なら `https` と `gh` の認証に変える |
 
 ## 変更対象
 
@@ -724,12 +898,15 @@ Linux（systemd のユーザーのタイマー）：
 | 置き場 | 中身 | 担当 |
 |---|---|---|
 | `src/spec_dock/runtime/domain/canonical_structure.py` | `StructureSnapshot`、`ScopeNode`、本文の印、階層と種類の規則 | I-1 |
-| `src/spec_dock/runtime/infra/github_structure.py` | 2章の GraphQL と REST の呼び出し、状態コードの扱い、レート制限 | I-1 |
+| `src/spec_dock/runtime/infra/github_structure.py` | 2章の GraphQL と REST の呼び出し、状態コードの扱い（304 を状態行で判定する）、レート制限、書き込みの間の1秒 | I-1 |
+| `src/spec_dock/runtime/infra/github_snapshot.py` | 構造のスナップショットの置き場、読み書きと排他、変わったかの確かめ、全体の取り直し、`ensure_fresh`、書き込みの反映（C10） | I-1 |
+| `src/spec_dock/runtime/infra/runtime_environment.py` | OS の判定、コンテナの判定、git の版、systemd のユーザーの判定（試し直しを含む）、linger の判定 | I-2（systemd と linger は I-3） |
+| `src/spec_dock/runtime/application/canonical_dashboard.py` | スナップショットから、描く関数の入力を作り、5つのファイルを書く（13章） | I-11 |
 | `src/spec_dock/runtime/domain/canonical_*.py`（そのほか） | 純粋な規則：リンクの正しさの判定、保存するパスの選び方（30秒、5分）、保留の判定、競合の段からの解決の計画、別名ファイルの名前、変更の束と状態のモデル | I-2、I-3 |
 | `src/spec_dock/runtime/infra/canonical_git.py` | カタログのための Git の操作（フックと署名を外す呼び出しの1つの関数、worktree、lock、repair、除外、ls-remote、fetch、一時のインデックスでの保存、merge-tree、commit-tree、ff、push） | I-2、I-3 |
 | `src/spec_dock/runtime/infra/catalog_lock.py` | カタログのディレクトリへの `flock`（`start_lock.py` と同じ作り） | I-2 |
 | `src/spec_dock/runtime/infra/catalog_tree.py` | カタログのファイルシステムを、名前で Scope のディレクトリを探してたどる | I-2 |
-| `src/spec_dock/runtime/infra/canonical_state.py`、`canonical_registry.py`、`canonical_scheduler_launchd.py`、`canonical_scheduler_systemd.py` | 状態の置き場、登録簿、定期の実行の登録、解除、すぐの実行 | I-3 |
+| `src/spec_dock/runtime/infra/canonical_state.py`、`canonical_registry.py`、`canonical_scheduler_launchd.py`、`canonical_scheduler_systemd.py`、`canonical_scheduler_loop.py` | 状態の置き場、登録簿、定期の実行の選び方、登録、解除、すぐの実行、常駐のプロセス（1つだけ動くこと、切り離しての起動、`kick`、止め方） | I-3 |
 | `src/spec_dock/runtime/application/canonical_link.py`、`canonical_status.py` | 用意と状態 | I-2（登録と同期の項目は I-3） |
 | `src/spec_dock/runtime/application/canonical_sync.py`、`canonical_hold.py`（accept、restore）、`canonical_resume.py`、`canonical_remove.py` | 同期と、その周りのコマンド | I-3 |
 | `src/spec_dock/runtime/application/canonical_check.py` | 既定のブランチの検査 | I-7 |
@@ -747,6 +924,7 @@ Linux（systemd のユーザーのタイマー）：
 - `src/spec_dock/runtime/commands/runtime_dispatch.py`：モードによる振り分けと、新しいコマンドの経路、リポジトリによらないコマンドの振り分け（I-1 で入口、各担当で経路）。
 - `src/spec_dock/runtime/cli/catalog.py`、`cli/options.py`：新しいコマンドと引数（各担当）。
 - `src/spec_dock/runtime/application/direct_worktrees.py`（`worktree create` の後のリンク。I-2）と `work_start.py`（選択の後のリンク。I-2）。
+- `src/spec_dock/runtime/presentation/markdown.py`、`puml.py`：13章の描く関数。今は呼ばれていない。直す必要が出たときだけ、出力の形を変えずに直す（I-11）。
 - `src/spec_dock/runtime/application/direct_installation.py`、`direct_static_update.py`：版4の宣言と、版3と4の受け付け（I-1）。
 - `src/spec_dock/assets/spec_dock/.gitignore`：3章の無視の3行を足す（I-2）。
 - `src/spec_dock/assets/spec_dock/workspace.json`：新しく導入するリポジトリ向けに版4にする。`init_only` のままなので、今のリポジトリは変わらない（I-1）。
@@ -796,9 +974,11 @@ Linux（systemd のユーザーのタイマー）：
 
 ## testability
 
-- テストは、今の方針どおり、外のネットワークを使わない。GitHub は、今と同じく、`PATH` の先頭に置いた偽の `gh` か、注入した実行器で置き換える（`tests/cli_runtime/test_issue413_scope_publish.py:426-463`、`tests/unit/infra/test_github_lifecycle_vnext.py:39-58`）。偽の `gh` には、GraphQL の問い合わせ、sub-issue、blocked by、ラベル、一覧のページ送り、レート制限の応答（403 と `retry-after`）を足す。
+- テストは、今の方針どおり、外のネットワークを使わない。GitHub は、今と同じく、`PATH` の先頭に置いた偽の `gh` か、注入した実行器で置き換える（`tests/cli_runtime/test_issue413_scope_publish.py:426-463`、`tests/unit/infra/test_github_lifecycle_vnext.py:39-58`）。偽の `gh` には、GraphQL の問い合わせ（複数のラベルの OR）、sub-issue、blocked by、ラベル、一覧のページ送り、レート制限の応答（403 と `retry-after`）、条件付きの要求（`If-None-Match` が今の `ETag` と同じなら、終了コード1と状態行 `HTTP/2.0 304 Not Modified` を返す。本物の `gh` と同じ）を足す。偽の `gh` は、受けた要求を記録し、テストが要求の数と種類（主のレート制限を消費するものの数）を確かめられるようにする。
 - **2台のPCの代わり**：一時ディレクトリに bare のリポジトリを作って GitHub の代わりにし、そこから2つのクローンを作る。各クローンで `canonical link` と `canonical sync` を直接呼ぶ（定期の実行は使わない。定期の実行の登録は、launchd と systemd の部分を注入できるようにして、偽物で試す）。時刻は注入できるようにし、30秒と5分の規則を待たずに試す。
 - **フック**：テストのリポジトリに、必ず失敗する `pre-commit`、`post-checkout`、`post-merge`、`pre-push` を置いても、同期が成功することを確かめる。`commit.gpgSign=true` を設定しても止まらないことも確かめる。
+- **環境の判定**：OS、コンテナの印、`systemctl` の結果、`loginctl` の結果、git の版は、注入できるようにする。macOS、systemd の Linux、systemd のない Linux、マウントしたチェックアウトの各場合を、どの OS の上のテストでも確かめられるようにする。提供側のCIは、`uv run pytest` を `ubuntu-latest` で動かしているので、Linux でのテストは毎回のPRで通る。
+- **常駐のプロセス**：`--loop` を、時刻と待ちを注入して数周期だけ動かし、1つだけ動くこと（2つ目が終了コード0で終わる）、`kick` ですぐに周期が動くこと、SIGTERM で周期を終えてから止まることを確かめる。
 - **従来モードの回帰（AC-15）**：版3の振る舞いを確かめるテストは、変えてはならない。変えてよいのは、次のものだけである。
   - コマンドの数（44）とコマンドの一覧を確かめるテスト（`test_issue413_contract.py:160`、`test_cli_vnext_contract.py:17-65`、`test_cli_docs_vnext.py:35`）。新しいコマンドを足した数と一覧に直す。
   - 配布資産の一覧と値（`static-inventory.json` の値、資産のファイルの数）を確かめるテスト。
@@ -822,8 +1002,12 @@ Linux（systemd のユーザーのタイマー）：
 | AC-13 | 未保存の変更があるとき、`work finish` が保存と push を待ち、確かめられないと Issue を閉じずに止まる。他のクローンの push を取り込んだだけの場合も、確かめられて閉じる |
 | AC-14 | 設計書を渡さない白紙のエージェントに、10章の節だけを渡して、読み書き、検索、別名ファイルの統合をさせる |
 | AC-15 | 版3の振る舞いを確かめる今のテストが、上の許された変更のほかは変更なしで通る。版3のリポジトリでの代表のコマンドの出力が、0.2.4 と同じ |
+| AC-16 | 偽の `gh` の記録で、変化のない周期と、続けて実行した `scope show` と `scope list` が、304 の確かめだけで終わり、全体の取り直しをしないこと。題名を変えた後の周期で取り直し、表示とダッシュボードに出ること。`scope create` の後の `scope show` が、取り直しなしで新しい Scope を示すこと |
+| AC-17 | 一時のカタログと偽の `gh` で、周期の後に5つのファイルが、見本と同じ形（題名と作業中の色のほか）で作られること。構造が変わらない次の周期では、ファイルの更新の時刻が変わらないこと |
+| AC-18 | 環境の判定を注入して、systemd、`loop`、マウントの各場合の動きを確かめる。実機では、systemd の Linux の仮想マシンと、systemd のないコンテナ（中でクローン）で、AC-02、AC-03、AC-13 を確かめる |
 
-- **実機での確かめ**（自動のテストでは確かめられないもの）：macOS の launchd の登録と、外付けのボリュームでのプライバシーの保護の案内、利用者の `gh` での push、Linux の systemd のタイマーと push、Codex のサンドボックスの中からの `scope create` と `work finish` と `canonical link`（リンクだけのとき）、Claude Code の設定の1行。結果は、各 Issue の報告書に書く。
+- **実機での確かめ**（自動のテストでは確かめられないもの）：macOS の launchd の登録と、外付けのボリュームでのプライバシーの保護の案内、利用者の `gh` での push、Linux の systemd のタイマーと push、コンテナの常駐のプロセス、Codex のサンドボックスの中からの `scope create` と `work finish` と `canonical link`（リンクだけのとき）、Claude Code の設定の1行。結果は、各 Issue の報告書に書く。
+- **Linux の実機**：利用者の Mac には OrbStack（2.2.5）と Docker が入っている。systemd の Linux は `orb create ubuntu:noble <名前>` の仮想マシンで、systemd のない Linux は `docker run` のコンテナで確かめる（2026-10-25 に、この方法で確かめた）。仮想マシンに git がないので `sudo apt-get install -y git` で入れる。確かめた後は、作った仮想マシン（`orb delete -f <名前>`）、コンテナ、取得したイメージを消す。利用者の `gh` の資格情報を、仮想マシンやコンテナに写してはならない。push の認証は、一時の bare のリポジトリへの push で代わりに確かめ、GitHub への push の認証は macOS で確かめる。
 
 ## risk
 
@@ -834,12 +1018,15 @@ Linux（systemd のユーザーのタイマー）：
 | canonical モードで、答えないコマンドが残る | 大 | 6章の表で全コマンドの動きと担当を決めた。I-9 で、全コマンドを版4で動かすテストを置く |
 | 移行で、無視されたファイルや未コミットの変更が失われる | 中 | `move-local` と `adopt-worktree` で作業ツリーから取り込む。`canonical link` は実体を消さない |
 | macOS のプライバシーの保護で、定期の同期が黙って動かない | 中 | `canonical link` が直後に1回実行して確かめ、状態の置き場の記録を `canonical status` が示す |
-| GitHub の構造の読み取りが遅い、制限にかかる | 中 | 全体は GraphQL の数回で読み、呼び出しは順に行う。レート制限は待って再試行する |
+| GitHub の構造の読み取りが遅い、制限にかかる | 中 | 構造のスナップショットを使い回し、変わったかの確かめは 304 で済ませる。全体は GraphQL の数回で読み、呼び出しは順に行う。レート制限は待って再試行する |
+| スナップショットが古く、誤った判断で書く | 中 | 書く判断の前には `decision` の新しさで確かめ、判断に使う Issue を読み直す。SpecDock の書き込みは、すぐに反映する。30分ごとに取り直す |
+| 常駐のプロセスが重なって動く、止まったまま気づかれない | 中 | `runner.lock` で1つだけ動かす。`canonical status` が動いているかを示し、`work finish` は止まっていれば起動する |
+| マウントしたコンテナから、ホストの Git の記録を書き換える | 大 | コンテナの中で登録が見えないときは、`repair` や `prune` の前に止まる（3章） |
 | 移行のスクリプトの書き込みが、二次のレート制限にかかる | 中 | 速さを抑え、止まっても続きから再開できるようにする |
 | リポジトリのフックや署名の設定で、定期の同期が止まる | 中 | カタログへのすべての Git の呼び出しで、フックと署名を外す |
 | エージェントが仕様を Git で扱ってしまう | 中 | 規則の節、無視の設定、定期の同期による上書きのない統合 |
 | Claude Code の設定の判定が当たらない | 低 | 判定できないことを正直に示し、文書に設定の手順を書く |
-| Linux で確かめていない | 中 | 担当の Issue で、実機（利用者の Lima の VM など）で確かめる。確かめるまで、Linux を対応と書かない |
+| Linux の一部を確かめていない | 中 | systemd のタイマーと `flock` は、Ubuntu 24.04 の仮想マシンで確かめた。残り（タイマーからの GitHub への push の認証、Landlock の中の `flock`）は、担当の Issue で、OrbStack の仮想マシンと Docker のコンテナで確かめる。確かめられないものは、報告書に未確認と書く |
 
 ## 設計の判断
 
@@ -852,16 +1039,20 @@ Linux（systemd のユーザーのタイマー）：
 | 同期の状態と基準をカタログの外に置く | カタログが読めない、消えたときでも、記録と書き換えの検出が働くようにするため |
 | 競合を段の規則だけで解く | 名前の変更などの特別な場合を作らず、どの競合も同じ規則で、消さずに残すため |
 | 構造の全体を GraphQL で読み、書き込みは REST にする | 全体の読み取りが約150回から数回になる。今の CLI も診断で GraphQL を使っている。書き込みは公式の文書で確かめた REST に揃える |
-| 構造をキャッシュしない | 今の CLI の方針と、読むだけのコマンドは書かない契約を守るため |
+| 構造を、リポジトリごとのスナップショットにして使い回す | 利用者の方針（GitHub の負荷と待ち時間を抑える。R-I1）。次の Epic の HTML のダッシュボードの入力にもなる。今の CLI の「キャッシュしない」方針は、canonical モードでだけ変える。置き場はリポジトリの外にし、読むだけのコマンドの「リポジトリに書かない」契約は守る |
+| 変わったかの確かめを、種類のラベルごとの一覧の条件付きの要求にする | 304 は主のレート制限に数えない（確認済み）。PRの更新では変化にならない。親子と依存の変更を見落とすかもしれない分は、30分ごとの取り直しと、書く前の読み直しで補う |
+| systemd のない Linux では、SpecDock 自身の常駐のプロセスを使う | コンテナには systemd も cron もない（確認済み）。`canonical link` が起動するので、用意はコマンド1つのまま。起動し直しの1行は示すだけにする（約束4） |
+| マウントしたチェックアウトでは止まる | コンテナの中から `repair` すると、ホストの記録を壊す。マウントの使い方は利用者がまだ決めていないので、安全に止まることだけを保証する |
 | 無視の設定を、`/initiatives` と `!/initiatives/` の組み合わせにする | リンクだけを無視し、実体のディレクトリの中の新しいファイルは無視しないので、移行前のリポジトリとブランチでも安全なため（確認済み） |
 | 検査のワークフローの SpecDock の版を、配布資産の版のファイルで決め、版のタグから入れる | ワークフローを書き換えずに、再現できる版を入れるため（R-F2）。PyPI には出していない |
 | ジョブの plist を `~/Library/LaunchAgents/` に、git を絶対パスで、状態の置き場を引数で | 外付けのボリュームの plist は拒否され、プライバシーの保護の許可はプログラムごとで、定期の実行の環境変数は狭いため（確認済み） |
-| `dashboard.md` の生成を復活させない | 今の CLI も生成しておらず、表示は CLI の出力で足りるため（R-E4） |
+| ダッシュボードを、今までの形で、定期の同期が作り直す | 利用者の判断（R-E5）。描く関数が残っているので、入力を作るだけで済む。作るのを定期の同期だけにして、読むだけのコマンドの契約と約束3を守る |
 
 ## 未確認の事項
 
-- Linux の systemd のユーザーのタイマーと、そこからの push の認証。
+- systemd のユーザーのタイマーからの、GitHub への push の認証（タイマーが動くことは確認済み）。
+- Linux の Codex のサンドボックス（Landlock）の中での、ディレクトリへの `flock`。
+- 親子と依存の変更で、Issue の更新の時刻が変わるか（変わるなら、変わったかの確かめで見つかる）。I-10 の切り替えで、本物の GitHub への登録のときに確かめる。
 - Claude Code の1行を、ユーザーの設定ファイルに書いたときの動き（`--settings` では確認済み）。
-- GitHub の二次のレート制限の、実際の閾値。
-- GraphQL の `issues(labels: [...])` の、ラベルが複数のときの意味（この設計では、ラベルを1つずつ問い合わせるので影響しない）。
+- GitHub の二次のレート制限の、公開されていない点数の endpoint（公式の文書は、一部の endpoint の点数を公開していない）。
 - `adopt-worktree` と `export-legacy` の、ツールでの実行（手順の元になる Git の動きは、使い捨てのリポジトリで確認済み）。

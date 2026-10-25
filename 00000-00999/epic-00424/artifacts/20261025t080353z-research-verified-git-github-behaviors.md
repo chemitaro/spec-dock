@@ -90,7 +90,7 @@ reflected_to: []
 - `init-local-00002` は #39、`init-local-00003` は #31 に結び付く。#31 は題名が別物（"Replace Wrapper Scripts With Symlink Rules"）で、完了で閉じている。そのため、その下に新しい Epic を作れない（`GitHub Scope ancestor is not open`）。
 - テンプレートの要件定義書は、作成時の題名を `タイトル:` として写す。
 - `spec-dock worktree create` は、プロジェクトの初期化（`make init`）を暗に実行しない。初期化は、別のコマンド `spec-dock worktree bootstrap` が、明示したworktreeで1回だけ実行する。
-- 今の CLI は、`spec-dock/dashboard.md` を生成しない（2026-10-25 訂正）。`render_dashboard`（`src/spec_dock/runtime/presentation/markdown.py`）はあるが、どこからも呼ばれていない。`workspace sync` は「Writes: None」の読むだけのコマンドである。spec-dock の `spec-dock/dashboard.md` は、2026-09-21 に古い版が生成したものが残っている（Git では無視）。
+- 今の CLI は、`spec-dock/dashboard.md` を生成しない（2026-10-25 訂正。止まった時期は下の「構造の一括取得、ダッシュボード、Linux」）。`render_dashboard`（`src/spec_dock/runtime/presentation/markdown.py`）はあるが、どこからも呼ばれていない。`workspace sync` は「Writes: None」の読むだけのコマンドである。spec-dock の `spec-dock/dashboard.md` は、2026-09-21 に古い版が生成したものが残っている（Git では無視）。
 - ワークスペースの宣言 `spec-dock/workspace.json` は、`schema_version: 3` と `writer_protocol` を持つ。今の CLI は、版が整数の3でないと `PRECONDITION_FAILED`（終了コード3）で止まる（`src/spec_dock/runtime/application/project_context.py`）。
 
 ### 今の排他
@@ -128,7 +128,23 @@ reflected_to: []
   - 配布は wheel だけで、`pyproject.toml` の版は 0.2.4。git の URL からの導入の手順はない。
   - CI の「CI」（`.github/workflows/ci.yml`）は、ソースから wheel を作り、`workspace validate --ci --json` を実行する。
 
+### 構造の一括取得、ダッシュボード、Linux（2026-10-25 の追加の検証）
+
+- **ダッシュボードの生成が止まった時期**：派生のファイルを書く部品（`infra/artifact_writer.py`、`render_md.py`、`render_puml.py` など）は、コミット `ae6c94369`（2026-10-01、Issue 413 の「未使用の旧入口・facade・派生保存adapterを退役」）で削除された。描く関数（`presentation/markdown.py` の `render_dashboard`、`presentation/puml.py` の `render_tree_ready_board_puml`、`render_deps_issues_puml`、`render_deps_raw_puml`、`presentation/json_state.py`）は残っているが、どのコマンドからも呼ばれていない。spec-dock のmainのチェックアウトの `spec-dock/` にある `dashboard.md`、`tree.puml`、`tree-all.puml`、`deps-issues.puml`、`deps-raw.puml` は、すべて 2026-09-21 19:27 に作られたもので、配布資産の `spec-dock/.gitignore` で無視されている。
+- **条件付きの要求**（REST、この token）：`GET /repos/chemitaro/spec-dock/issues?state=all&sort=updated&direction=desc&per_page=1` の応答の `ETag` を `If-None-Match` に付けて3回続けて送ると、3回とも `304 Not Modified` で、`x-ratelimit-used` は増えなかった（337 のまま）。`labels=<名前>` を付けた一覧でも 304 になった。公式の文書（Best practices for using the REST API）も、304 は主のレート制限に数えないとしている。
+- **`gh api` と 304**：`gh api --include` は 304 の応答で終了コード1を返し、状態行 `HTTP/2.0 304 Not Modified` を出力する。そのため、304 は終了コードではなく状態行で判定する必要がある。
+- **GraphQL のラベルの絞り込み**：`repository.issues(labels: [...])` は、ラベルのどれかを持つ Issue を返す（OR）。spec-dock で `["bug"]` は1件、`["enhancement"]` は1件、`["bug","enhancement"]` は2件だった。空の配列 `[]` は0件を返した。REST の `labels=a,b` は、両方を持つもの（AND）である。
+- **関係の変化の記録**：GraphQL の `IssueTimelineItemsItemType` に、`SUB_ISSUE_ADDED_EVENT`、`SUB_ISSUE_REMOVED_EVENT`、`PARENT_ISSUE_ADDED_EVENT`、`PARENT_ISSUE_REMOVED_EVENT`、`BLOCKED_BY_ADDED_EVENT`、`BLOCKED_BY_REMOVED_EVENT`、`BLOCKING_ADDED_EVENT`、`BLOCKING_REMOVED_EVENT` がある。親子や依存の変更で Issue の `updated_at` が変わるかは、確かめていない（本物の GitHub に書く必要があるため）。
+- **二次のレート制限**（公式文書 Rate limits for the REST API、2026-10-25）：同時の要求は100まで（REST と GraphQL の合計）。REST は1分に900点、GraphQL は1分に2,000点まで。REST の GET は1点、POST、PATCH、PUT、DELETE は5点。CPU 時間は60秒に90秒まで。中身を作る要求は、目安で1分に80回、1時間に500回まで。超えたときは、`retry-after` があればその秒数、`x-ratelimit-remaining` が0なら `x-ratelimit-reset` の時刻まで、どちらもなければ1分以上待ち、続けて失敗するなら待ちを指数的に延ばし、決めた回数で止める。Best practices は、要求を並べずに順に送り、書き込みを続けて送るときは1秒以上の間をおくよう求めている。
+- **Linux の定期の実行**（OrbStack 2.2.5 の Ubuntu 24.04.5、arm64、systemd 255。確認後に削除済み）：
+  - `~/.config/systemd/user/` に置いた `Type=oneshot` のサービスと、`OnActiveSec=5s`、`OnUnitActiveSec=10s` のタイマーを `systemctl --user enable --now` で動かすと、5秒後に1回目、その後10秒ごとに動いた。`WorkingDirectory=%h` はホーム、`Environment=PATH=/usr/bin:/bin` はそのまま渡った。ユニットのファイルの中の `%` は `%%` と書く必要がある。
+  - 仮想マシンを起動した直後の最初の `systemctl --user` は「Failed to connect to bus: No such file or directory」で失敗し、数秒後には `running` を返した。ユーザーの systemd の起動を待つ必要がある。
+  - このマシンには、ログインのセッションがなく（`loginctl list-sessions` が0件）、`Linger=yes` だった。セッションのない状態では、`loginctl enable-linger` も `disable-linger` も「No such device or address」で失敗した。linger は環境が決めるもので、SpecDock からは変えられない。
+  - Ubuntu 24.04 の git は 2.43.0 で、`merge-tree --write-tree`（2.38 以上）を使える。Ubuntu 22.04 の git は 2.34 で使えない（配布元の版の情報。この検証では確かめていない）。
+  - 権限 555 のディレクトリを読み取りで開いて `flock(LOCK_EX|LOCK_NB)` をかけると、別のプロセスからは取れなかった（BUSY）。`os.access(<その場所>, W_OK)` は False だった（Python 3.12.3）。
+- **コンテナ**（Docker 29.8.2 の `ubuntu:24.04`。確認後にイメージを削除済み）：PID 1 は `sh` で、`systemctl`、`crontab`、`git` のどれもなかった。コンテナでは、systemd にも cron にも頼れない。
+
 ## Reflection
 
 - 上の事実は、Epic の要件定義書の「背景」「制約・前提」「失敗・境界条件」と、設計書の各論の根拠として書き直す。
-- Codex のサンドボックスの中での `flock` と、launchd からの `push` の認証は、2026-10-25 に macOS で確かめた（上の「設計の検証」）。まだ確かめていないのは、Linux（systemd のユーザーのタイマーと、そこからの push）で、実装の Issue で確かめる。
+- Codex のサンドボックスの中での `flock` と、launchd からの `push` の認証は、2026-10-25 に macOS で確かめた（上の「設計の検証」）。systemd のユーザーのタイマーと、Linux での `flock` は、同じ日に Ubuntu 24.04 の仮想マシンで確かめた。まだ確かめていないのは、systemd のタイマーからの push の認証、Linux の Codex のサンドボックス（Landlock）の中での `flock`、親子や依存の変更で `updated_at` が変わるかで、実装の Issue で確かめる。
