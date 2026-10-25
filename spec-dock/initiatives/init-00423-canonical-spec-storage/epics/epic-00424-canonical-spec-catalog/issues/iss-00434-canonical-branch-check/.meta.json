@@ -1,0 +1,21 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00434",
+  "title": "Add Default Branch Spec Check And Workflow",
+  "slug": "canonical-branch-check",
+  "parent_id": "epic-00424",
+  "initiative_id": "init-00423",
+  "epic_id": "epic-00424",
+  "depends_on": [
+    "iss-00428"
+  ],
+  "backend": "github",
+  "github": {
+    "issue_number": 434,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 1
+}

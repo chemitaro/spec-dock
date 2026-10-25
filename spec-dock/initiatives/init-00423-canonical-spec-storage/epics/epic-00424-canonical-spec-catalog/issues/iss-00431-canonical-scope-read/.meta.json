@@ -1,0 +1,22 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00431",
+  "title": "Read Scopes From GitHub In Canonical Mode",
+  "slug": "canonical-scope-read",
+  "parent_id": "epic-00424",
+  "initiative_id": "init-00423",
+  "epic_id": "epic-00424",
+  "depends_on": [
+    "iss-00428",
+    "iss-00429"
+  ],
+  "backend": "github",
+  "github": {
+    "issue_number": 431,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 2
+}

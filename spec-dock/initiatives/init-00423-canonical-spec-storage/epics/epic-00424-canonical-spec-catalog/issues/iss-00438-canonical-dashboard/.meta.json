@@ -1,0 +1,22 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00438",
+  "title": "Regenerate Dashboard From Structure Snapshot",
+  "slug": "canonical-dashboard",
+  "parent_id": "epic-00424",
+  "initiative_id": "init-00423",
+  "epic_id": "epic-00424",
+  "depends_on": [
+    "iss-00430",
+    "iss-00431"
+  ],
+  "backend": "github",
+  "github": {
+    "issue_number": 438,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 2
+}
