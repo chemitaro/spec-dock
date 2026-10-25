@@ -212,7 +212,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
   `subIssues.totalCount` か `blockedBy.totalCount` が100を超える Issue だけ、REST の一覧で残りを読む。`labels.totalCount` が20を超える Issue だけ、REST の `GET …/issues/{n}/labels?per_page=100` でラベルを読み直す（種類のラベルを見落とさないため）。どの読み直しも、1つずつ順に送る。spec-dock の規模（Scope 243件）では3回の呼び出しで済む。`rateLimit.cost` はログに残す。
   - 依存先（`blockedBy` の要素）のラベルは読まない。依存先が Scope かどうかは、その番号が `issues` に含まれるかで決める（`issues` は閉じた Scope も含む）。2026-10-26 に本物の GitHub で読むだけで測ると、依存先のラベルを読む形は1ページ104点、読まない形は4点だった（I-1 の実装担当の測定）。
-  - `parent`、`subIssues`、`blockedBy` の要素は `repository { nameWithOwner }` を持つ。別のリポジトリの Issue は、番号だけでは同じリポジトリの Issue と取り違えるため、`parent`、`sub_issues`、`blocked_by`、`blocking`、`external` のどれにも入れず、`anomalies` に `PARENT_FOREIGN_REPOSITORY` か `DEPENDENCY_FOREIGN_REPOSITORY`（相手のリポジトリと番号をメッセージに入れる）として記録する。
+  - `parent`、`subIssues`、`blockedBy` の要素は `repository { nameWithOwner }` を持つ。別のリポジトリの Issue は、番号だけでは同じリポジトリの Issue と取り違えるため、`parent`、`sub_issues`、`blocked_by`、`blocking`、`external` のどれにも入れず、`anomalies` に `PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`（相手のリポジトリと番号をメッセージに入れる）として記録する。`SUB_ISSUE_FOREIGN_REPOSITORY` は、子が別のリポジトリにあることを親の側に記録するもので、完了の判定（子孫が完了しているか）で別のリポジトリの子を見落とさないために置く（I-1 で追加）。
 - **変わったかを確かめる（REST の条件付きの要求）**：種類のラベルごとに、次の要求を、前に記録した `ETag` を `If-None-Match` に付けて送る（3回）。
 
   ```text
@@ -239,7 +239,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 | 操作 | API |
 |---|---|
 | Issue の作成 | `POST /repos/{o}/{r}/issues`（`title`、`body`、`labels` の配列） |
-| 題名、状態の変更 | `PATCH …/issues/{n}`（`title`、`state`、`state_reason`） |
+| 題名、本文、状態の変更 | `PATCH …/issues/{n}`（`title`、`body`、`state`、`state_reason`）。本文を変えるのは、`scope import github` が既にある Issue に slug の印を足すときだけである。I-1 の `GithubStructureClient.update_issue` は本文を受け取らないので、最初に使う I-5 が `body` を足す（C1 の追加） |
 | 親子を付ける、付け替える | `POST …/issues/{親}/sub_issues`（本文 `{"sub_issue_id": <子の id>, "replace_parent": true/false}`） |
 | 親子を外す | `DELETE …/issues/{親}/sub_issue`（本文 `{"sub_issue_id": <子の id>}`） |
 | 依存の追加、削除 | `POST …/issues/{n}/dependencies/blocked_by`（本文 `{"issue_id": <依存先の id>}`）、`DELETE …/dependencies/blocked_by/{依存先の id}` |
@@ -253,7 +253,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - **レート制限**：403 か 429 で、`retry-after` ヘッダー、`x-ratelimit-remaining: 0`、または本文の「rate limit」があれば、レート制限と判定する。読み取りは、要る待ち（`retry-after`、なければ `x-ratelimit-reset` までの時間）が60秒以下なら、その間だけ待って、3回まで再試行する。60秒を超えるときは、待たずに `GITHUB_RATE_LIMITED`（再開できる時刻 `retry_at` 付き）で止まる。500番台の読み取りは、1秒、2秒、4秒の間をおいて3回まで再試行する。書き込みは自動では再試行せず、`GITHUB_RATE_LIMITED` で止まる。
   - 呼び出しは1つずつ順に行う。並べて呼ばない（GitHub の二次のレート制限の指針）。
   - 1つのコマンドの中で書き込みを続けるときは、書き込みの間を1秒以上あける（公式の Best practices）。時刻と待ちは注入できるようにし、テストでは待たない。
-  - 結果が分からない書き込みは、今と同じく読み直して確かめ、それでも分からなければ終了コード6で、効果（`effects`）と再開の手順（`recovery`）を返す。
+  - 結果が分からない書き込みは、今と同じく読み直して確かめ、それでも分からなければ終了コード6で、効果（`effects`）と再開の手順（`recovery`）を返す。読み直しでは、送った値をすべて比べる。I-1 の `update_issue` の読み直しは `state_reason` を比べないので、`scope close` と `scope reopen` で使う I-5 が直す。
 - 大量に書く移行のスクリプトは、さらに速さを抑える（11章）。
 
 #### 構造のスナップショット（R-I1〜R-I6。契約 C10）
@@ -287,7 +287,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
   - `issues` は、種類のラベルを持つ Issue（PRを除く）を、開いたものも閉じたものもすべて含む。キーは番号の文字列。`sub_issues` は GitHub の並びのまま、`blocked_by` と `blocking` は番号の昇順。`blocking` は、`blocked_by` を逆にたどって求める。
   - `external` は、Scope の `blocked_by` に現れる、同じリポジトリの、Scope でない Issue の題名と状態である。着手の判定（今の規則どおり、開いていれば着手できない）に使う。
-  - 別のリポジトリの親や依存を持つ Scope（`anomalies` の `PARENT_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`）は、着手の判定で「着手できる」にしない（安全側に止める。ダッシュボードでは UNKNOWN）。
+  - 別のリポジトリの親、子、依存を持つ Scope（`anomalies` の `PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`）は、着手の判定で「着手できる」にしない（安全側に止める。ダッシュボードでは UNKNOWN）。
   - 本文は保存しない。slug の印だけを取り出す。種類や slug が決まらない Issue は `id` と `slug` を null にし、`anomalies` に入れる。
   - 形を変えるときは `version` を上げる。読む側は、知らない版を読んではならない（取り直す）。
 - **`probe.json`**：`{"version": 1, "checked_at": "…", "etags": {"spec-dock:initiative": "W/\"…\"", "spec-dock:epic": "…", "spec-dock:issue": "…"}, "last_error": null}`。新しい `ETag` は、全体の取り直しが成功したときだけ記録する（取り直しに失敗したら、次の確かめでも「変化あり」になるようにするため）。
@@ -302,6 +302,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - `decision` では、さらに、判断に使う Issue を `GET …/issues/{n}` で読み直す。作成では親、依存の追加では両端、`work start` では対象と、その依存先のうち Scope でないもの、閉じる操作では対象である。読み直した値がスナップショットと違えば、読み直した値で判断し、スナップショットにも反映する。
   - 見落とす変更：先頭の Issue が変わらない変更（種類のラベルが外れて一覧から消えただけの Issue）と、Issue の更新の時刻を変えないかもしれない親子と依存の変更（未確認）は、変わったかの確かめでは見つからない。30分ごとの取り直し、SpecDock の書き込みの反映、`decision` の読み直しで補う。
 - **書き込みの反映**：SpecDock のコマンドは、GitHub への書き込みが成功するたびに、その結果（作った Issue、題名、状態、ラベル、担当者、親子、依存）をスナップショットの該当する要素に反映し、`local_writes` に記録する。全体の取り直しを書き込むときは、`fetch_started_at` より後の `local_writes` の変更を重ねてから書く（取り直しの途中の書き込みを消さないため）。それより前の `local_writes` は消す。
+  - 反映できない変更（親子や依存の相手の番号がスナップショットにない、など）は、当てずに飛ばし、スナップショットを古いものとして扱って、次の `ensure_fresh` で全体を取り直させる。GitHub への書き込みは成功しているので、コマンドの結果を失敗にせず、`GITHUB_SNAPSHOT_STALE` を警告に入れる。I-1 の `reflect` はこの場合に `ValueError` を出すので、書き込みの後に最初に使う I-5 が、この扱いに直してテストを足す（`snapshot.json` の形式の版は変えない）。
 - **書けないとき**：状態の置き場に書けないとき（サンドボックスの中など）は、スナップショットをプロセスのメモリーの上だけで持つ。書けないことを理由に失敗してはならない。
 - **読むだけのコマンドの契約**：表示だけのコマンドが書いてよいのは、状態の置き場の `snapshot.json` と `probe.json` だけである。リポジトリ、カタログ、`.git`、GitHub には書かない。今の CLI の「構造をキャッシュしない」方針は、利用者の方針（R-I1）に従い、canonical モードでだけ変える。従来モードは変えない。
 - **規則の部品**：`StructureSnapshot` は、スナップショットを読み込んだもので、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、上の `issues` の1要素と同じ項目を持つ。階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。`dependency add` の循環の確認も、スナップショットの上で行う。異常のために `id` が決まらない依存先は、循環の確かめに入れない。そのような依存を持つ Scope は、着手の判定で「着手できる」にしない（I-4、I-11）。
@@ -648,7 +649,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `workspace validate` | 全体とカタログ | なし | 下の検査を行う。`--ci` は `CANONICAL_NOT_APPLICABLE` で止まり、`canonical check` を案内する | I-4 |
 | `workspace doctor` | 今の項目と、`canonical status` と同じ項目 | なし | | I-4 |
 | `workspace migrate` | 宣言 | なし | `CANONICAL_NOT_APPLICABLE` で止まる | I-1 |
-| `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手を、`warnings` の `CANONICAL_NOT_LINKED`（`recovery` に `spec-dock canonical link`）で示す。このコードの定数は I-1 が1か所に置き、I-2 はそれを使う | I-1 |
+| `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手を、`warnings` の `CANONICAL_NOT_LINKED`（警告には `recovery` の欄がないので、`details.next_step` に `spec-dock canonical link`）で示す。このコードの定数は I-1 が1か所に置き、I-2 はそれを使う | I-1 |
 | `installation show`、`update`、`uninstall` | 今と同じ | 今と同じ | 版3と版4の両方を受け付ける。版4で `--expect-current` を付けたときの選択と Scope の解決は I-4 が作る（I-1 の時点では、この組み合わせだけ `CANONICAL_NOT_IMPLEMENTED`） | I-1（`--expect-current` は I-4） |
 | `active`、`help`、`completion` の文書 | — | — | 新しいコマンドを載せる | I-9 |
 

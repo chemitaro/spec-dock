@@ -202,6 +202,11 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `workspace validate` が、6章の検査の項目をすべて見つける。入れ子のずれは警告で、`scope move <ID>` を次の1手に示す。
   - `workspace validate --ci`、`workspace sync --source local`、`workbench copy`、カタログを対象にした `worktree remove` は、案内付きで止まる。
   - 読むだけのコマンドは、何も書かない（カタログと `.git` の変化がないことを確かめる）。
+- **I-1 から引き継ぐ直し**（I-1 の最終品質ゲートの指摘。I-1 の `report.md` の「Residual Risks / Follow-ups」）：
+  - `application/canonical_errors.github_error_result` と、`runtime_dispatch` の `except GithubStructureError` のテストを足す（`partial` の終了コード6、`failed` の5、`retry_at` の文）。
+  - `infra/github_structure.py` の `_rate_limit_wait(...) or 60.0` が待ち時間0を60秒にするので、`is None` で比べるように直し、テストを足す。
+  - `tests/unit/infra/test_github_snapshot.py` の `test_a_failed_second_file_write_keeps_one_reflection_in_memory` は、2つ目のファイルの書き込みの失敗の経路を通っていない。`commit_refresh` で `probe.json` の書き込みを失敗させ、メモリーの値、`persisted=False`、`local_writes` が1回だけであることを確かめるテストに直す。
+  - そのほかの P3 の指摘は、I-1 の `report.md` に一覧がある。触れるコードにあるものは、直してよい（C1 と C10 の公開の形は変えない）。
 
 ### I-5 Write Scopes To GitHub In Canonical Mode
 
@@ -214,6 +219,9 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `work finish` は、未保存の変更があるとき、保存と push を待つ。確かめられないと、Issue を閉じずに `partial` で止まる。Scope の下に保留があれば、`CANONICAL_SAVE_HELD` で止まる。他のクローンの push を取り込んだだけで自分が push しなかった場合も、確かめられて閉じる（AC-13）。
   - 依存の追加は、循環になるときに書く前に止まる。
   - 基点のツリーに `spec-dock/initiatives` がある `work start` は、`CANONICAL_BASE_HAS_SPECS` で止まる。
+  - `scope import github` は、印のない既にある Issue に、本文の `PATCH` で slug の印を足す（`GithubStructureClient.update_issue` に `body` を足す。`design.md` 2章の「書く」表）。印がすでにあれば本文を書かない。
+  - スナップショットにない番号に当たる変更の反映は、当てずに飛ばし、コマンドを失敗にせずに `GITHUB_SNAPSHOT_STALE` を警告に入れ、次の `ensure_fresh` が取り直す（`design.md` 2章の「書き込みの反映」）。
+  - `scope close` と `scope reopen` の結果が分からないときの読み直しが、`state_reason` も比べる。
 
 ### I-6 Accept Japanese Titles In Canonical Mode
 
