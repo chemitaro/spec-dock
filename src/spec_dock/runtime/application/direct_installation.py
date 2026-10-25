@@ -10,6 +10,7 @@ import secrets
 from typing import TYPE_CHECKING
 
 from spec_dock import __version__
+from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_LINKED, CANONICAL_NOT_LINKED_RECOVERY
 from spec_dock.runtime.application.project_context import resolve_context, resolve_git_context
 from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import load_scope_views
@@ -126,6 +127,7 @@ def install_static_assets(namespace: argparse.Namespace, context: GitContext) ->
             FamilyData("installation", data),
             0,
             effects=tuple(Effect("installation.create", "planned", asset.path) for asset in assets),
+            warnings=(_link_next_step(),),
         )
     effects: list[Effect] = []
     published: dict[str, FileSnapshot] = {}
@@ -184,7 +186,21 @@ def install_static_assets(namespace: argparse.Namespace, context: GitContext) ->
         )
     data["created_paths"] = tuple(created)
     return OperationResult(
-        namespace.command_path, "succeeded", FamilyData("installation", data), 0, effects=tuple(effects)
+        namespace.command_path,
+        "succeeded",
+        FamilyData("installation", data),
+        0,
+        effects=tuple(effects),
+        warnings=(_link_next_step(),),
+    )
+
+
+def _link_next_step() -> Diagnostic:
+    """A new installation declares schema 4; specs appear only after this clone's catalog is linked."""
+    return Diagnostic(
+        CANONICAL_NOT_LINKED,
+        "Run spec-dock canonical link to create or link this clone's canonical catalog.",
+        {"next_step": CANONICAL_NOT_LINKED_RECOVERY},
     )
 
 

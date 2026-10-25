@@ -778,10 +778,12 @@
     {
       "path": "spec-dock/workspace.json",
       "source": "spec_dock/workspace.json",
-      "sha256": "9562d15aad1bd1e1fd81623f4a1d9fedfc09440ee1f568c72fecbbefa13ea990",
+      "sha256": "a56ce60ecf47cfcbf8133145502872bf99d438bd24eb54d0272496c8666d2632",
       "mode": 420,
       "init_only": true,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "9562d15aad1bd1e1fd81623f4a1d9fedfc09440ee1f568c72fecbbefa13ea990"
+      ]
     }
   ],
   "retired": [

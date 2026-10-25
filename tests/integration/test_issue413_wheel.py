@@ -171,7 +171,7 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
         }
         assert not any(name.startswith("spec_dock/assets/install_root/.claude/") for name in names)
         assert json.loads(archive.read("spec_dock/assets/spec_dock/workspace.json")) == {
-            "schema_version": 3,
+            "schema_version": 4,
             "writer_protocol": "specdock.worktree-writer/v1",
         }
         assert (
@@ -334,7 +334,7 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     assert payload["data"]["result"]["package_version"] == expected_version and not init.stderr
     assert payload["data"]["result"]["target"] == str(initialized)
     assert json.loads((initialized / "spec-dock/workspace.json").read_bytes()) == {
-        "schema_version": 3,
+        "schema_version": 4,
         "writer_protocol": "specdock.worktree-writer/v1",
     }
     assert not (initialized / "spec-dock/scripts/spec_dock_runtime").exists()
@@ -449,6 +449,10 @@ def verify_issue415_console(console: Path, tmp_path: Path, environment: dict[str
 
     created = run(["installation", "init", str(target), "--yes", "--json"])
     assert created.returncode == 0, created.stdout + created.stderr
+    # installation init declares schema 4; the README examples below exercise legacy mode on schema 3.
+    (target / "spec-dock/workspace.json").write_text(
+        '{"schema_version":3,"writer_protocol":"specdock.worktree-writer/v1"}', encoding="utf-8"
+    )
     parent = None
     for command in readme_creation_commands():
         if parent is not None:

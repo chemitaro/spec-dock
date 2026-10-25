@@ -25,37 +25,64 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             namespace,
             failure(command, "UNSUPPORTED_PLATFORM", "business commands support Linux and macOS", 3),
         )
-    from spec_dock.runtime.application.project_context import resolve_context
+    from spec_dock.runtime.application.canonical_errors import (
+        CanonicalCommandError,
+        canonical_not_implemented,
+        canonical_not_migrated,
+        github_error_result,
+    )
+    from spec_dock.runtime.application.project_context import probe_workspace_mode, resolve_context
     from spec_dock.runtime.application.scope_expectations import check_scope_expectations
     from spec_dock.runtime.application.scope_query import list_scopes, load_scope_views
     from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+    from spec_dock.runtime.commands.canonical_dispatch import dispatch_canonical, dispatch_repository_independent
     from spec_dock.runtime.infra.git_process import GitProcessError
+    from spec_dock.runtime.infra.github_structure import GithubStructureError
 
     result: OperationResult[object]
     try:
+        independent = dispatch_repository_independent(namespace, cwd)
+        if independent is not None:
+            return _render_result(namespace, independent)
         if command.startswith("installation "):
             from spec_dock.runtime.application.direct_installation import install_static_assets, installation_context
 
-            result = install_static_assets(namespace, installation_context(namespace, cwd))
+            target = installation_context(namespace, cwd)
+            if namespace.expect_current is not None and probe_workspace_mode(target.root) == "canonical":
+                result = canonical_not_implemented(command)
+            else:
+                result = install_static_assets(namespace, target)
             return _render_result(namespace, result)
         if command == "workspace validate" and namespace.ci:
             from spec_dock.runtime.application.direct_validation import validate_committed_workspace
             from spec_dock.runtime.application.project_context import resolve_git_context
 
-            result = validate_committed_workspace(
-                namespace, resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
-            )
+            git = resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
+            if probe_workspace_mode(git.root) == "canonical":
+                result = dispatch_canonical(
+                    namespace, resolve_context(namespace.project, cwd, timeout=namespace.timeout)
+                )
+            else:
+                result = validate_committed_workspace(namespace, git)
             return _render_result(namespace, result)
         if command == "workspace doctor" and namespace.raw:
             from spec_dock.runtime.application.direct_diagnostics import diagnose_raw_workspace
             from spec_dock.runtime.application.project_context import resolve_git_context
 
-            result = diagnose_raw_workspace(
-                namespace, resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
-            )
+            git = resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
+            if probe_workspace_mode(git.root) == "canonical":
+                result = dispatch_canonical(
+                    namespace, resolve_context(namespace.project, cwd, timeout=namespace.timeout)
+                )
+            else:
+                result = diagnose_raw_workspace(namespace, git)
             return _render_result(namespace, result)
         context = resolve_context(namespace.project, cwd, timeout=namespace.timeout)
-        if command == "work start":
+        if context.mode == "canonical":
+            result = dispatch_canonical(namespace, context)
+        elif command.startswith("canonical "):
+            result = canonical_not_migrated(command)
+        elif command == "work start":
             from spec_dock.runtime.application.work_start import start_work
 
             result = start_work(namespace, context)
@@ -227,6 +254,10 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
         result = OperationResult(
             command, "failed", DiagnosticData(), 5, error=Diagnostic("GIT_FAILED", str(error), error.details())
         )
+    except CanonicalCommandError as error:
+        result = error.result(command)
+    except GithubStructureError as error:
+        result = github_error_result(command, error)
     except FileNotFoundError as error:
         result = failure(command, "LOCAL_TARGET_NOT_FOUND", str(error), 4)
     except LookupError as error:
