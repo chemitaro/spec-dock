@@ -1,0 +1,21 @@
+{
+  "schema_version": 3,
+  "type": "epic",
+  "id": "epic-00425",
+  "title": "Build Html Spec Dashboard And Cue Documents",
+  "slug": "spec-dashboard-cue",
+  "parent_id": "init-00423",
+  "initiative_id": "init-00423",
+  "epic_id": null,
+  "depends_on": [
+    "epic-00424"
+  ],
+  "backend": "github",
+  "github": {
+    "issue_number": 425,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 1
+}
