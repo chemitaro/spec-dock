@@ -1,0 +1,19 @@
+{
+  "schema_version": 3,
+  "type": "initiative",
+  "id": "init-00423",
+  "title": "Canonical Spec Storage Architecture",
+  "slug": "canonical-spec-storage",
+  "parent_id": null,
+  "initiative_id": null,
+  "epic_id": null,
+  "depends_on": [],
+  "backend": "github",
+  "github": {
+    "issue_number": 423,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 0
+}
