@@ -83,6 +83,7 @@ class ProjectContext(GitContext):
 ### 2. 振り分けの入口（C2。`commands/canonical_dispatch.py`、`commands/runtime_dispatch.py`）
 
 ```python
+# 型の別名は、後の Issue が実行時にも import できるよう、モジュールの中で定義する
 CanonicalHandler = Callable[[argparse.Namespace, ProjectContext], OperationResult[object]]
 RepositoryIndependentHandler = Callable[[argparse.Namespace, Path], OperationResult[object] | None]
 
@@ -115,7 +116,8 @@ def github_error_result(command: str, error: GithubStructureError) -> OperationR
 ```
 
 - canonical の処理は、書く前に止まるとき `CanonicalCommandError` を出してよい。`dispatch()` が `failed` の結果（`recovery` は `RecoveryInstructions`）にする。
-- コードの文字列と次の1手は、このモジュールの定数に1か所で置く。`CANONICAL_NOT_LINKED` と、その次の1手 `spec-dock canonical link`（`CANONICAL_NOT_LINKED_RECOVERY`）は I-1 が置き、I-2 はそれを使う（同じコードを二重に定義しない。統括の判断 A5）。
+- `CanonicalCommandError` の終了コードは、書く前の失敗の値（1、2、3、4、5、7）だけを受け付ける（6 は効果を持つ `partial` なので、処理が自分で結果を組み立てる）。
+- コードの文字列と次の1手は、このモジュールの定数に1か所で置く（`workspace migrate` の次の1手は `MIGRATE_NOT_APPLICABLE_RECOVERY`）。`CANONICAL_NOT_LINKED` と、その次の1手 `spec-dock canonical link`（`CANONICAL_NOT_LINKED_RECOVERY`）は I-1 が置き、I-2 はそれを使う（同じコードを二重に定義しない。統括の判断 A5）。
 - 構造の異常（スナップショットの `anomalies`）を Epic の12章の `GITHUB_STRUCTURE_INVALID`（終了コード7）に写すのは、対象の Scope とその祖先に異常があるときに止まる、構造を読むコマンド（I-4、I-5）である。この Issue は、異常の一覧（`StructureSnapshot.anomalies_for`）とコードだけを提供する。
 - `github_error_result` は、確かな失敗（`uncertain` が偽）を `failed`（終了コード5）に、結果が分からない書き込みを `partial`（終了コード6、効果 `github.write` を `unknown`）にする。後の Issue の処理は、効果の一覧を自分で組み立てるのが原則で、これは取りこぼしたときの受け皿である。
 - I-1 が使うコードと次の1手：
@@ -325,17 +327,18 @@ def repository_for_checkout(root: Path, *, timeout: float) -> GithubRepository  
 
 | 応答 | 読み取り（GET と GraphQL） | 書き込み |
 |---|---|---|
-| レート制限（403 か 429 で、`retry-after`、`x-ratelimit-remaining: 0`、本文に `rate limit`。GraphQL の `errors[].type == "RATE_LIMITED"` も） | 待ち = `retry-after` 秒、なければ `x-ratelimit-reset` までの秒、どちらもなければ60秒。待ちが60秒以下なら待って再試行（3回まで）。60秒を超えるか、3回を超えたら `GITHUB_RATE_LIMITED`（`retry_at` に時刻） | 再試行せず `GITHUB_RATE_LIMITED`（効果なし） |
+| レート制限（403 か 429 で、`retry-after`、`x-ratelimit-remaining: 0`、本文に `rate limit`。GraphQL の `errors[].type == "RATE_LIMITED"` も） | 待ち = `retry-after` 秒、なければ（`x-ratelimit-remaining: 0` のときだけ）`x-ratelimit-reset` までの秒、どちらもなければ60秒（GitHub の文書の手順）。待ちが60秒以下なら待って再試行（3回まで）。60秒を超えるか、3回を超えたら `GITHUB_RATE_LIMITED`（`retry_at` に時刻） | 再試行せず `GITHUB_RATE_LIMITED`（効果なし） |
 | 500番台 | 1秒、2秒、4秒の間をおいて3回まで再試行し、続けば `GITHUB_UNAVAILABLE` | 結果が不明（`uncertain`） |
 | 401、403、404（`ok` にないとき） | `GITHUB_ACCESS_DENIED` | 同じ |
 | 400、410、422 | `GITHUB_REQUEST_REJECTED` | 同じ |
 | `gh` がない、起動できない | `GITHUB_UNAVAILABLE` | 同じ（送っていない） |
 | 時間切れ、そのほかの OS の失敗 | `GITHUB_UNAVAILABLE` | 結果が不明 |
-| 本文が JSON でない、形が違う | `GITHUB_RESPONSE_INVALID` | 結果が不明 |
+| 本文が JSON でない、形が違う | `GITHUB_RESPONSE_INVALID` | 結果が不明（2xx の書き込みでも本文が読めなければ、読み直しで確かめる） |
 
+- `gh` の入出力は UTF-8 で読み書きする（`encoding="utf-8"`。利用者のロケールに依らず日本語の題名を扱うため）。
 - 呼び出しは同期で1つずつ行う（スレッドを使わない）。`GithubApi` の1つの実体を、1つのコマンドの中で使い回す。
 - 書き込みの前に、前の書き込みが終わってからの経過（`clock.monotonic()`）が1秒より短ければ、足りない分だけ `clock.sleep` で待つ。
-- GraphQL（`GithubStructureClient.graphql`）の `errors` があれば、レート制限なら上の扱い、`NOT_FOUND` なら `GITHUB_ACCESS_DENIED`、それ以外は `GITHUB_REQUEST_REJECTED`。`rateLimit.cost` は `GithubStructureClient.last_graphql_cost` に残す（I-3 がログに書く）。
+- `GithubStructureClient.graphql` は読み取りの問い合わせだけを送る（読み取りとして再試行するので、`mutation` は `ValueError` で拒む）。`errors` があれば、レート制限なら上の扱い、`NOT_FOUND` なら `GITHUB_ACCESS_DENIED`、それ以外は `GITHUB_REQUEST_REJECTED`。`rateLimit.cost` は `GithubStructureClient.last_graphql_cost` に残す（I-3 がログに書く）。
 
 ```python
 class GithubStructureClient:
@@ -393,7 +396,7 @@ class GithubStructureClient:
     ```
 - **確かめ**：`GET /repos/{o}/{r}/issues?labels=<種類のラベル>&state=all&sort=updated&direction=desc&per_page=1` を、ラベルごとに、記録した `ETag` があれば `If-None-Match` を付けて送る（`ok={200, 304}`）。1つでも 200 なら `changed`。応答の `ETag` を新しい値として返す（304 で `ETag` がなければ前の値）。
 - `sub_issue_id`、`issue_id`、`DELETE …/blocked_by/{id}` には、引数の `child_id`、`blocker_id`（Issue の id）を使う。番号の引数は、結果を確かめる読み直しにだけ使う。
-- **結果の確かめ**：結果が不明な書き込みは、すぐに読み直す。題名と状態は `GET issue`、親子は `GET …/parent`、依存は `GET …/blocked_by`、ラベルと担当者は `GET issue` で確かめ、望んだ状態なら成功として返す。違う、または読めなければ `GITHUB_EFFECT_UNKNOWN`（`uncertain`）。作成は確かめられないので `GITHUB_CREATE_IDENTITY_UNKNOWN`（`uncertain`）。
+- **結果の確かめ**：結果が不明な書き込み（2xx でも本文が読めないものを含む）は、すぐに読み直す。外す操作の404は、読み直して関係がなければ成功とする（`remove_sub_issue` は、子の Issue が読めることを先に確かめる。読めなければ `GITHUB_ACCESS_DENIED`）。題名と状態は `GET issue`、親子は `GET …/parent`、依存は `GET …/blocked_by`、ラベルと担当者は `GET issue` で確かめ、望んだ状態なら成功として返す。違う、または読めなければ `GITHUB_EFFECT_UNKNOWN`（`uncertain`）。作成は確かめられないので `GITHUB_CREATE_IDENTITY_UNKNOWN`（`uncertain`）。
 - その Issue 自身を返す操作（`get_issue`、`create_issue`、`update_issue`）の応答は、PRの Issue（`pull_request` がある）と、`repository_url` が別のリポジトリのものを拒む（`GITHUB_RESPONSE_INVALID`）。関係の読み取り（`get_parent`、`list_sub_issues`、`list_blocked_by`、全体の読み取りの続き）は、別のリポジトリの Issue を拒まず、`RelatedIssue.repository` に入れて返す（扱いは5章の「別のリポジトリの Issue」）。
 
 ### 7. 構造のスナップショット（C10。`infra/github_snapshot.py`、`infra/state_root.py`）
@@ -417,7 +420,8 @@ class SnapshotStore:
     directory: Path                                   # <根>/github/<host>/<owner>/<repo>
     def load(self) -> tuple[StructureSnapshot | None, ProbeRecord | None]       # 例外を出さない
     def commit_refresh(self, fresh: StructureSnapshot, probe: ProbeRecord) -> StructureSnapshot
-    def save_probe(self, probe: ProbeRecord) -> None
+    def save_probe(self, probe: ProbeRecord) -> None                    # 排他の中の記録の checked_at が新しければ書かない
+    def record_probe_error(self, error: Mapping[str, str]) -> None     # 排他の中の記録に last_error だけを重ねる
     def reflect(self, changes, *, command: str, at: str) -> StructureSnapshot | None
     persisted: bool                                   # 最後の書き込みがファイルに届いたか
 
@@ -448,9 +452,9 @@ def ensure_fresh(repository: GithubRepository, level: FreshnessLevel, *, state_r
 
 - **状態の置き場の根**（統括の判断 A6）：根の求め方の持ち主は I-1 で、登録簿、`state.json`、`--state-root` は I-3 のままである。`canonical link` が求めて定期の実行の引数に書いた値を `override` に渡すと、同じ根になる（テストで確かめる）。
 - **置き場**：`SnapshotStore.directory` に `snapshot.json` と `probe.json`。足りないディレクトリを作るとき、最後の `<repo>` のディレクトリは `0o700` にする（途中のディレクトリと、すでにある状態の置き場の根は、利用者の umask と今の権限のまま）。2つのファイルは `0o600` で作る（題名と担当者のログイン名を持つため）。
-- **書き方**：ディレクトリを読み取りで開いて `flock(LOCK_EX)` を取り（`LOCK_NB` を50ミリ秒ごとに試し、`lock_timeout` 秒まで）、その中で、同じディレクトリの一時ファイル `.<名前>.<乱数>.tmp` に書いて `fsync` し、`os.replace` で置き、ディレクトリを `fsync` する。排他の中では、今のファイルを読み直して重ねることと、書くことだけをする。読むときは排他を取らない。
+- **書き方**：ディレクトリを読み取りで開いて `flock(LOCK_EX)` を取り（`LOCK_NB` を50ミリ秒ごとに試し、`lock_timeout` 秒まで。`lock_timeout` は0〜300秒の有限の値）、その中で、今のファイルを読み直して変更を1回だけ当て、ファイルの中身と変わったものだけを、同じディレクトリの一時ファイル `.<名前>.<乱数>.tmp` に書いて `fsync` し、`os.replace` で置き、ディレクトリを `fsync` する。304 だけの確かめでは `probe.json` だけを書き、`snapshot.json` は置き換えない。読むときは排他を取らない。
 - **読み方**：`snapshot.json` と `probe.json` を読み、`from_json` が失敗したもの（壊れている、版が違う）は「ない」とする。
-- **メモリー**：書き込み（ディレクトリの作成、排他、一時ファイル、`rename`）が `OSError` で失敗したら（排他が `lock_timeout` 秒で取れないときを含む）、そのプロセスの中の表（`directory` をキーにする）に、書こうとした値を置き、`persisted` を偽にする。ファイルに書けたら、表のその要素を消す。`load` は、ファイルとメモリーのうち `fetched_at` が新しい方を返し、同じならメモリーを返す（メモリーは書けなかった後にだけあり、`reflect` は `fetched_at` を変えないため）。`probe.json` は `checked_at` で同じように選ぶ。`clear_memory()` はテスト用である。
+- **メモリー**：書き込み（ディレクトリの作成、排他、一時ファイル、`rename`）が `OSError` で失敗したら（排他が `lock_timeout` 秒で取れないときを含む）、そのプロセスの中の表（`directory` をキーにする）に、書こうとした値を置き、`persisted` を偽にする。ファイルに書けたら、表のその要素を消す（メモリーの値がファイルより新しければ、そのときにファイルへ書く）。2つ目のファイルの書き込みで失敗したときは、排他の中で計算した値をそのままメモリーに置く（変更を2回当てない）。`load` は、ファイルとメモリーのうち `fetched_at` が新しい方を返し、同じならメモリーを返す（メモリーは書けなかった後にだけあり、`reflect` は `fetched_at` を変えないため）。`probe.json` は `checked_at` で同じように選ぶ。`clear_memory()` はテスト用である。
 - **取り直しの書き込み**：`commit_refresh` は、排他の中のスナップショットの `fetch_started_at` が、書こうとする取り直しのものより新しければ、何も書かずに今のものを返す（並んで走った古い取り直しが、新しいものと `ETag` を戻さないため）。
 - **`ensure_fresh(level)` と `refresh()`**（時刻は `clock.now()`）：`load()` で今のスナップショットと確かめの記録を得てから、次の表で決める。「確かめ」は種類のラベルごとの3回の条件付きの要求、「取り直し」は GraphQL の全体の読み取り（とその続きの REST）である。取り直すときは、`ETag` を得るため、いつも先に確かめる。
 
@@ -466,6 +470,8 @@ def ensure_fresh(repository: GithubRepository, level: FreshnessLevel, *, state_r
 
   - 境は「超えた」で判定する（60秒ちょうど、30分ちょうど、5分ちょうどは、まだ超えていない）。
   - 取り直しは、始めた時刻を `fetch_started_at`、終えた時刻を `fetched_at` とし、`build_snapshot` で作り、`commit_refresh` で書く（`merge_refresh` で書き込みの反映を重ねる）。
+  - 組み立てで GitHub の値が規則外（知らない状態、同じ番号が2回など）とわかったときは、`GITHUB_RESPONSE_INVALID` の失敗として下の「失敗」と同じに扱う（`reread` も同じ）。
+  - 失敗の記録は `record_probe_error` で、排他の中の最新の `ETag` と `checked_at` を残し、`last_error` だけを書く（並んで走った別のプロセスの記録を巻き戻さない）。
   - **失敗**：`display` でスナップショットがあれば、`stale=True`、`probe="failed"`、警告 `GITHUB_SNAPSHOT_STALE`（`details.fetched_at` と `details.cause`）で返す（レート制限も同じ。統括の判断 A2）。`display` でスナップショットがないとき、`decision`、`refresh()` は、元の `GithubStructureError` をそのまま出す（コードは、つながらないなら `GITHUB_UNAVAILABLE`、制限なら `GITHUB_RATE_LIMITED`、権限なら `GITHUB_ACCESS_DENIED` など。統括の判断 A7）。`cycle` は例外を出さず、`stale=True`、`probe="failed"` で返す（スナップショットがなければ `snapshot=None`）。
 - **`reread(numbers)`**：番号ごとに `get_issue` を読み、`UpsertIssue` の変更として `reflect(command=f"{command} (reread)")` する。読み直しの結果がスナップショットと同じでも記録する（判断に使った値を、並んで走る取り直しから守るため）。Scope でない Issue を読み直すと、`external` の題名と状態だけが新しくなる（5章）。読めなければ、元の `GithubStructureError` を出す。
 - **`reflect(changes)`**：排他の中で今のスナップショットに `apply_changes` を当てて書く。スナップショットがなければ何もせず `None` を返す（書く判断の前に `ensure_fresh("decision")` があるので、ふつうは起きない）。
@@ -514,7 +520,7 @@ Epic の `design.md` 2章の形のとおり。`anomalies` は `{"number", "code"
 | `src/spec_dock/assets/spec_dock/workspace.json`、`src/spec_dock/assets/static-inventory.json` | 版4と、ハッシュ |
 | `tests/support/`（新）、`tests/unit/{domain,infra,commands}/`、`tests/cli_runtime/` | 偽の GitHub と、この Issue のテスト |
 
-変えないもの：従来の処理の関数（`application/direct_*.py`、`scope_query.py`、`start_snapshot.py`、`work_start.py` など）、`.meta.json` を読み書きするコード、`infra/github_lifecycle.py`、`domain/dependency_vnext.py`、テンプレート、利用側の `spec-dock/` の配布資産（I-9 で更新する）。
+変えないもの：従来の処理の関数（`application/direct_installation.py` を除く `application/direct_*.py`、`scope_query.py`、`start_snapshot.py`、`work_start.py` など）、`.meta.json` を読み書きするコード、`infra/github_lifecycle.py`、`domain/dependency_vnext.py`、テンプレート、利用側の `spec-dock/` の配布資産（I-9 で更新する）。
 
 ## 移行・互換性・rollback
 
