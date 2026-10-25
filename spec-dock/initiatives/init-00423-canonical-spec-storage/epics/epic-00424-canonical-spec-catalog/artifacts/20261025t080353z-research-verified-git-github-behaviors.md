@@ -47,6 +47,10 @@ reflected_to: []
 ### ツールの権限
 
 - Claude Code の隔離セッション（`--worktree`）では、リンク経由の Edit が「This path is in a different worktree」で拒否される。`additionalDirectories`、`--add-dir`、PreToolUse の許可フック、`worktree.symlinkDirectories`、`WorktreeCreate` フックのどれでも通らない。シェルの書き込みは通る。
+- Claude Code の隔離しない普通のセッションでも、作業ディレクトリの外を指すリンクの扱いは、権限モードで変わる（2026-10-25、`claude -p`、Claude Code の既定の設定は `defaultMode` と `additionalDirectories` がない状態）。
+  - `bypassPermissions` では、リンク経由の Edit が成功した。
+  - `default` と `acceptEdits` では、リンク経由の Read が「resolves through a symlink to …, which is outside the allowed working directories」で拒否され、その結果 Edit もできなかった。対話のセッションでは、許可を求められる。
+  - `acceptEdits` で、`permissions.additionalDirectories` にリンク先のディレクトリを加えると、Read と Edit が成功した。
 - Codex は `writable_roots` にカタログを加える前は `Operation not permitted`、加えた後は書ける。Codex からカタログでコミットすると、mainの `.git/worktrees/<名前>/index.lock` を作れずに失敗する。
 - 2026-10-25 時点で、`codex exec` は既定のモデル `gpt-6-astra`（`-m gpt-5.5` でも）で「ChatGPT のアカウントでは使えない」と拒否され、サンドボックスの中での `flock` は確かめられていない。
 
@@ -81,6 +85,8 @@ reflected_to: []
 - 今の CLI は題名に `^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$` しか受け付けない（日本語を拒否）。`--slug` は別に受け付ける。`work start` の既定のブランチ名は `<ID>-<slug>`。
 - `init-local-00002` は #39、`init-local-00003` は #31 に結び付く。#31 は題名が別物（"Replace Wrapper Scripts With Symlink Rules"）で、完了で閉じている。そのため、その下に新しい Epic を作れない（`GitHub Scope ancestor is not open`）。
 - テンプレートの要件定義書は、作成時の題名を `タイトル:` として写す。
+- `spec-dock worktree create` は、プロジェクトの初期化（`make init`）を暗に実行しない。初期化は、別のコマンド `spec-dock worktree bootstrap` が、明示したworktreeで1回だけ実行する。
+- ダッシュボードは、`spec-dock workspace sync` が生成する `spec-dock/dashboard.md`（Git では無視）である。ワークスペースの宣言 `spec-dock/workspace.json` は、`schema_version: 3` と `writer_protocol` を持つ。
 
 ### 今の排他
 
