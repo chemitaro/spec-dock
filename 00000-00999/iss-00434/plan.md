@@ -44,9 +44,9 @@ ID: "iss-00434"
 - **S2 コミットのツリー**：`infra/commit_tree.py`（`resolve_commit`、`list_commit_tree`、`read_blob`）。一時のリポジトリで、regular、実行可能、symlink、gitlink、UTF-8 でないパス、知らない名前を確かめる。
 - **S3 検査の判定**：`application/canonical_check.py` の `evaluate_commit_tree` と、失敗のコード、次の1手、C7 の定数。調べること1〜6を1つずつ Red → Green。
 - **S4 コマンド**：`cli/catalog.py`（一覧、引数、`--help`）、`commands/canonical_dispatch.py`（表への登録）、`check_canonical_commit`、`presentation/envelope.py`（文字の出力）。CLI のテスト（AC-434-01〜05）。新しいコマンドで落ちるコマンドの数と一覧のテストを、`design.md` の testability の表のとおりに直す。
-- **S5 配布資産**：`spec-dock/system/spec-dock-version`、`spec-dock/docs/ci/spec-dock-check.yml`、`reference_cli.md` と `docs/README.md` の数と行、`static-inventory.json`（`sha256`、`known_old_sha256`）。版のファイルと `pyproject.toml` の単体テスト、見本の中身のテスト（AC-434-06）。
+- **S5 配布資産**：`spec-dock/system/spec-dock-version`、`spec-dock/docs/ci/spec-dock-check.yml`、`reference_cli.md` と `docs/README.md` とルートの `README.md` の数と行、`static-inventory.json`（`sha256`、`known_old_sha256`）。版のファイルと `pyproject.toml` の単体テスト、見本の中身のテスト（AC-434-06）。資産が2つ増えることで落ちる資産の数のテスト（`test_issue413_assets.py` の2か所）を、`design.md` の testability の表のとおりに直す。見本の手順を取り出して実行する結合テスト（AC-434-09、`tests/integration/test_issue434_workflow_sample.py`）。
 - **S6 `specdock-ci-check.sh`**：`specdock-ci-validate.sh` を写して最後の1行を変える。結合のテスト（AC-434-07）。
-- **S7 版のタグ**：`release-tag-decision.py` と `release-tag.yml`。判定のテスト（AC-434-08）。
+- **S7 版のタグ**：`release-tag-decision.py` と `release-tag.yml`。判定のテスト（AC-434-08）。`make lint` の対象外なので、ruff（check と format）と mypy を手で当てる。
 - **S8 全体の確かめ**：`make lint`、`uv run pytest`。`git diff origin/main -- tests/` で、変えた既存のテストが testability の表のものだけであることを確かめる。
 - **S9 実機の確かめ**（AC-434-09）：手元で wheel を作り、scratchpad の一時ディレクトリに、一時の venv（または一時の `PIPX_HOME` と `PIPX_BIN_DIR` の `pipx`）で入れる。一時のリポジトリで、見本の手順と同じ形（版のファイルを読んで入れ、`spec-dock canonical check --json`）を実行し、正しいツリー（無視の3行を持つ `.gitignore` を重ねた写しから作った wheel）、仕様のパスのあるツリー、本物の配布資産だけのツリー（I-2 の前は `IGNORE_RULES_MISSING`）の結果を `report.md` に書く。`specdock-ci-check.sh` も同じ一時のリポジトリで実行する。終わったら一時ディレクトリを消す。利用者の環境（`~/.local/pipx` など）に入れない。
 - **S10 実装のレビュー**：`code-review` の観点で、規約（Standards）と仕様（Spec）を、独立した2つのサブエージェントにレビューさせる。指摘を `analyze-review-findings` で分析して直し、必要ならもう一度レビューする。
@@ -61,7 +61,7 @@ ID: "iss-00434"
 | AC-434-06 | `tests/unit/infra/test_issue434_version_file.py` |
 | AC-434-07 | `tests/integration/test_issue434_ci_check.py` |
 | AC-434-08 | `tests/integration/test_issue434_release_tag.py` |
-| AC-434-09 | S9 の実機の確かめ（`report.md`）。本物の GitHub Actions は未確認 |
+| AC-434-09 | `tests/integration/test_issue434_workflow_sample.py` と、S9 の実機の確かめ（`report.md`）。本物の GitHub Actions は未確認 |
 | AC-434-10（AC-15） | `make lint`、`uv run pytest`（変更の前の全体のテストと同じテストが、許された変更のほかは変更なしで通る）。最終の品質の関門の SHA で `.github/scripts/specdock-ci-validate.sh <worktree> <worktree> <HEAD>` も通す（今の CI を壊していないこと） |
 | negative test | コミットのないリポジトリ、知らない名前、`--expect-current`、壊れた宣言の各 `reason`、資産の `missing`/`unknown`/`unsafe`、無視の3行の欠けと逆の順、版の違い、`specdock-ci-check.sh` の引数の誤りと SHA の食い違いと汚れたソース、判定のスクリプトの各 `reason` |
 | 外部の依存を使えない場合 | 本物の GitHub Actions（見本のワークフロー、`release-tag.yml`）はこの Issue では動かせない。手元の wheel と一時のリポジトリで手順を確かめ、本物は I-10（見本）と I-9 のマージの後（`release-tag.yml` の最初のタグ）で確かめる |
@@ -74,13 +74,14 @@ ID: "iss-00434"
 
 - マージの前：ブランチを捨てるか、コミットを revert する。
 - マージの後、I-8 などが C7 を使う前：PR を `git revert` する。`canonical check` を使うものはまだなく、版3のリポジトリの動きは変わらない。`release-tag.yml` は 0.3.0 まで何もしない。
+- `release-tag.yml` が、版を上げた push で失敗したとき（I-9、I-13 のマージの後）：失敗した run を Re-run するか、そのコミットに軽量のタグを手で作って push する（`design.md` の「移行・互換性・rollback」）。
 - 後の Issue が C7 を使い始めた後：forward recovery で直す（C7 の形を変えるときは、先に Epic の `design.md` とこの `design.md` を直す）。
 
 ## exit / handoff
 
 - 完了の条件：AC-434-01〜10 をテストと実機で確かめ（AC-434-09 の本物の GitHub Actions は未確認として記録）、最終の品質の関門に合格し、`report.md` に証拠を書き、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
 - 後の Issue への引き渡し（`design.md` の「C7 の公開の形」）：
-  - I-8：`VERSION_FILE`、`WORKFLOW_SAMPLE`、`WORKFLOW_DESTINATION`、`WORKFLOW_BRANCH_LINE` を写し、`cut` で見本を写して既定のブランチの行を置き換える。`export-legacy` で外す。
+  - I-8：`CI_VERSION_FILE`、`WORKFLOW_SAMPLE`、`WORKFLOW_DESTINATION`、`WORKFLOW_BRANCH_LINE` と見本のバイト列を写し（テストでパッケージの定数と資産と比べる）、`cut` で見本を写して既定のブランチの行を置き換える。`export-legacy` で外す。
   - I-9：版を 0.3.0 にするとき、版のファイルと `known_old_sha256` を更新する。`CANONICAL_CHECK_FAILED` と失敗のコードを、エラーの一覧の確かめに入れる。`canonical check` の使い方を文書に書く。
   - I-10：`.github/workflows/spec-dock-check.yml` から `specdock-ci-check.sh` を呼び、`ci.yml` の `workspace validate --ci` の手順を外す。本物の GitHub Actions での見本の動きを確かめる。
   - I-12：各リポジトリの既定のブランチで `canonical check` を通す。

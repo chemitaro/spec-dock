@@ -57,7 +57,7 @@ spec-dock のリポジトリ（C7）
 ### 1. コマンドの一覧と引数（`cli/catalog.py`）
 
 - `LEAF_PATHS` に `"canonical check"` を足す（44 → 45。置き場は `installation uninstall` の後、`help` の前）。`MUTATING_LEAF_PATHS` には入れない（読むだけ）。
-- 引数：`--commit REV`（既定 `HEAD`）。共通の引数は今と同じ（`--project`、`--json`、`--timeout` など）。`--yes` は読むだけのコマンドなので受け付けない（今の規則）。
+- 引数：`--commit REV`（既定 `HEAD`）。共通の引数は今と同じ（`--project`、`--json`、`--timeout` など）。`--yes` は読むだけのコマンドなので受け付けない（今の規則）。`--dry-run` は受け付け、今の読むだけのコマンドの規則（`_render_result` が、終了コード0の結果を `planned` にし、`can_apply` と `blockers` を足す）に従う。何も書かない。
 - `HELP_EFFECTS["canonical check"]`：Epic の12章の文 `Check that a commit of the code tree holds no specs and has intact SpecDock files; for CI.`。
 - `HELP_PRECONDITIONS["canonical check"]`：Git のチェックアウトと、そのコミット（既定 `HEAD`）が要ること。カタログ、ネットワーク、GitHub のトークン、作業ツリーのモードは要らないこと。問題があれば終了コード7で、各パスと次の1手を返すこと。
 - `--help` の節（Target、Reads、Writes、Does not、JSON）は、`canonical check` 用の文を `_help_spec` に足す。`canonical` のグループの既定の文（`_READS_BY_ROOT` など）も足す（I-2、I-3 が同じグループのコマンドを足すときに、自分の文で上書きしてよい）。
@@ -101,16 +101,18 @@ def classify_static_digest(asset: StaticAsset, digest: str | None) -> StaticClas
 ### 5. 検査（`application/canonical_check.py`、新）
 
 ```python
+# application/canonical_errors.py（I-1 の「コードと次の1手は1か所に置く」に従い、コマンドの終わり方のコードはここ）
 CANONICAL_CHECK_FAILED: Final = "CANONICAL_CHECK_FAILED"
 
+# application/canonical_check.py
 # C7 の値（I-8 が写し、そのテストでこの定数と比べる）
-VERSION_FILE: Final = "spec-dock/system/spec-dock-version"
+CI_VERSION_FILE: Final = "spec-dock/system/spec-dock-version"
 WORKFLOW_SAMPLE: Final = "spec-dock/docs/ci/spec-dock-check.yml"
 WORKFLOW_DESTINATION: Final = ".github/workflows/spec-dock-check.yml"
 WORKFLOW_BRANCH_LINE: Final = "branches: [main]"
 
 # Epic の design.md 3章「無視の設定」の3行（spec-dock/ からの相対の形）。C3 の値で、持ち主は I-2。
-# C3 の定数が main に入ったら、I-2（後から入る側）がこの定数をそれに置き換える。
+# I-2 と I-7 のうち、後から main に入る側が、この定数を C3 の定数に置き換える。
 SPEC_DOCK_IGNORE_LINES: Final = ("/.canonical/", "/initiatives", "!/initiatives/")
 
 @dataclass(frozen=True)
@@ -125,7 +127,9 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 ```
 
 - `evaluate_commit_tree` は、ツリーの一覧と blob の読み手を受け取る、Git に触れない関数である（単体テストで、作り物のツリーで確かめる）。
-- `check_canonical_commit` は、`--expect-current` か `--expect-backend` があれば `ValueError`（`PRECONDITION_FAILED`）。`resolve_git_context(namespace.project, cwd)` で Git のルートを求め（宣言は読まない）、`resolve_commit` が `None` なら `CanonicalCommandError("PRECONDITION_FAILED", …, exit_code=3, recovery=("Pass an existing commit with --commit REV, or commit first; canonical check reads a commit tree.",))`。その後、一覧を読み、`evaluate_commit_tree` に `package_static_assets()` と `spec_dock.__version__` を渡す。
+- `CI_VERSION_FILE` は、`src/spec_dock/asset_layout.py` の `VERSION_FILE`（`spec-dock/spec-dock.version`。退けた engine pin のパスで、`static-inventory.json` の `retired` にある）とは別のものである。取り違えないよう、名前を変えてある。
+- 失敗の1件ずつのコード（下の表）は、`data.result.failures[]` の中のコードで、コマンドの終わり方のコードではないので、`canonical_check.py` に置く。I-9 が Epic の12章の表と照らすのは `CANONICAL_CHECK_FAILED` で、失敗の1件ずつのコードは、この設計書の表と照らす。
+- `check_canonical_commit` は、`--expect-current` か `--expect-backend` があれば `CanonicalCommandError("PRECONDITION_FAILED", …, recovery=("Run spec-dock canonical check without --expect-current and --expect-backend; it reads a commit tree, not a selection.",))`。`resolve_git_context(namespace.project, cwd)` で Git のルートを求め（宣言は読まない）、`resolve_commit` が `None` なら `CanonicalCommandError("PRECONDITION_FAILED", …, exit_code=3, recovery=("Pass an existing commit with --commit REV, or commit first; canonical check reads a commit tree.",))`。その後、一覧を読み、`evaluate_commit_tree` に `package_static_assets()` と `spec_dock.__version__` を渡す。
 
 #### 調べることと、失敗のコード（`data.result.failures[]` の各要素の `code`）
 
@@ -144,6 +148,7 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 - **調べること4**：宣言の blob を `json.loads` で読む。`project_context.workspace_mode` と同じ規則で版を判定し（整数の3か4。真偽値を除く）、`writer_protocol` が `project_context` の既知の2つの値（`specdock.worktree-writer/v1`、`specdock.writer/v1`）のどれかであることを求める（「既知」は `read_workspace_declaration` と同じ範囲）。版3は `WORKSPACE_NOT_MIGRATED` の1件だけを返す（`writer_protocol` は見ない）。
 - **調べること5（資産）**：`package_static_assets()` のうち `init_only` でないものを、パスで一覧に照らす。ない → `missing`、`regular` でない → `unsafe`、`regular` なら blob の SHA-256 を `classify_static_digest` で分類し、`current` と `known-old` は通す。`init_only`（`spec-dock/workspace.json`）は、利用者が持つ中身なので照合せず、調べること4で確かめる。消えた資産（`retired`）があっても失敗にしない（`installation update` が外すもので、壊れた資産ではない）。
 - **調べること5（無視の3行）**：`spec-dock/.gitignore` が `regular` のときだけ調べる（ない、または `regular` でないときは、資産の失敗だけを返す）。各行の末尾の空白（`\r` を含む）を除いて、`SPEC_DOCK_IGNORE_LINES` の各行と同じ行があるかを見る。あわせて、`!/initiatives/` の最後の行が、`/initiatives` の最後の行より後にあることを求める（Git は後の規則が勝つので、逆だと実体のディレクトリの中の新しいファイルを無視してしまう。Epic の3章の性質を守るため）。
+- **調べること5と6の重なり**：版のファイルも `init_only` でない配布資産なので、調べること5で照合する。中身が既知（このパッケージの版か、`known_old_sha256` の古い版）なら5は通り、動いている版と違えば6の警告だけになる。知らない中身なら、5の失敗と6の警告の両方になる。CI では、ワークフローが版のファイルの版を入れるので、6の警告は出ない（手元の別の版の SpecDock で実行したときに出る）。
 - **調べること6**：版のファイルが `regular` のとき、中身を UTF-8 で読み、前後の空白を除いた文字列が `spec_dock.__version__` と違えば、警告 `SPEC_DOCK_VERSION_MISMATCH`（`details`：`path`、`expected`（動いている版）、`actual`（読めなければ `null`）、`next_step`：`Run the SpecDock version named by spec-dock/system/spec-dock-version, or run spec-dock installation update and commit to record this version.`）を返す。版のファイルがない、または `regular` でないときは、調べること5の失敗だけで、警告は出さない。
 
 #### 結果
@@ -165,13 +170,13 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 ### 6. 出力（`presentation/envelope.py`）
 
 - JSON は今の v2 の封筒のまま（上の `data`）。
-- 文字の出力は、`render_text` に `canonical check` の枝を足し、1行目の後に `commit=<SHA> valid=<true|false> failures=<件数>` と、失敗ごとに `failure [<コード>] path="<パス>" next_step="<次の1手>"` を出す（数千件でも1件1行）。警告、エラー、`recovery` は今の stderr の形。ほかのコマンドの出力は変えない。
+- 文字の出力は、`render_text` に `canonical check` の枝を足し、1行目の後に `commit=<SHA> valid=<true|false> failures=<件数>` と、失敗ごとに `failure [<コード>] path="<パス>" next_step="<次の1手>"`、警告ごとに `warning [<コード>] path="<パス>" next_step="<次の1手>"` を出す（数千件でも1件1行。今の stderr の `warning [code] message` には次の1手が出ないため、R-H2 のために stdout にも出す）。エラーと `recovery` は今の stderr の形。ほかのコマンドの出力は変えない。
 
 ### 7. C7 の公開の形（I-8、I-9、I-10、I-12、I-13 が使う）
 
 #### 版のファイル
 
-- 配布資産の元：`src/spec_dock/assets/spec_dock/system/spec-dock-version`。利用側：`spec-dock/system/spec-dock-version`（定数 `VERSION_FILE`）。
+- 配布資産の元：`src/spec_dock/assets/spec_dock/system/spec-dock-version`。利用側：`spec-dock/system/spec-dock-version`（定数 `CI_VERSION_FILE`）。
 - 中身：`pyproject.toml` の `[project].version` の文字列と、改行1つ（例 `0.2.4\n`）。先頭に `v` を付けない。モード `0o644`、`init_only` は偽。
 - **版を上げる Issue（I-9 の 0.3.0、I-13 の 0.4.0）の決まり**：`pyproject.toml` の版と同時にこのファイルを書き換え、`static-inventory.json` の `sha256` を直し、前の中身の SHA-256 を `known_old_sha256` に足す。足さないと、古い版のファイルを持つリポジトリで、`installation update` が「知らない中身」として手での統合を求め、`canonical check` が `STATIC_ASSET_INVALID` を返す。単体テスト（`tests/unit/infra/test_issue434_version_file.py`）が、中身と `pyproject.toml` の版が同じことを確かめる。
 - この版のファイルは、手元の SpecDock を選ばない（今の CLI が退けた「engine pin」とは別のもの）。使うのは、検査のワークフローが入れる版と、`canonical check` の警告だけである。
@@ -180,18 +185,18 @@ def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> Operatio
 
 - 配布資産の元：`src/spec_dock/assets/spec_dock/docs/ci/spec-dock-check.yml`。利用側：`spec-dock/docs/ci/spec-dock-check.yml`（定数 `WORKFLOW_SAMPLE`）。中身は Epic の `design.md` 8章の YAML のとおり（`pull_request` と、既定のブランチへの `push`、`permissions: contents: read`、`ubuntu-latest`、`actions/checkout@v4`、`pipx install "spec-dock @ git+https://github.com/chemitaro/spec-dock@v$(cat spec-dock/system/spec-dock-version)"`、`spec-dock canonical check --json`）。
 - 既定のブランチの名前の行は、`branches: [main]`（定数 `WORKFLOW_BRANCH_LINE`）を含む行がちょうど1つである（テストで確かめる）。
-- **I-8 の `cut` の決まり**：見本のバイト列を `.github/workflows/spec-dock-check.yml`（定数 `WORKFLOW_DESTINATION`）に写し、`WORKFLOW_BRANCH_LINE` の `main` だけを、そのリポジトリの既定のブランチの名前に置き換える（taikyohiyou_project は `branches: [develop]`）。ほかのバイトは変えない。`export-legacy` はこのファイルを外す。I-8 は、写した値（4つの定数）が、このモジュールの定数と同じであることをテストで確かめる。
+- **I-8 の `cut` の決まり**：`migrate.py` は、パッケージを読み込まない1つのファイルなので（Epic の `plan.md` の「Issue をまたぐ契約」）、見本のバイト列を埋め込んで持つ。I-8 のテストは、埋め込んだバイト列が `src/spec_dock/assets/spec_dock/docs/ci/spec-dock-check.yml` とバイト単位で同じこと、写した4つの定数（`CI_VERSION_FILE`、`WORKFLOW_SAMPLE`、`WORKFLOW_DESTINATION`、`WORKFLOW_BRANCH_LINE`）がこのモジュールの定数と同じことを確かめる。`cut` は、そのバイト列を `.github/workflows/spec-dock-check.yml`（定数 `WORKFLOW_DESTINATION`）に写し、`WORKFLOW_BRANCH_LINE` の `main` だけを、そのリポジトリの既定のブランチの名前に置き換える（taikyohiyou_project は `branches: [develop]`）。ほかのバイトは変えない。名前が `^[A-Za-z][A-Za-z0-9._/-]*$` に合わない（YAML の流れの書き方で引用が要る、数として読まれる）ときは、書かずに止まる。`export-legacy` はこのファイルを外す。
 
 #### `.github/scripts/specdock-ci-check.sh`
 
 - 使い方：`specdock-ci-check.sh SOURCE_CHECKOUT TARGET_CHECKOUT EXPECTED_SOURCE_SHA`（`specdock-ci-validate.sh` と同じ）。
 - 手順：`specdock-ci-validate.sh` と同じ（SHA の形と一致、ソースが汚れていないこと、`git archive` からの wheel の作成、`--without-pip` の venv への `uv pip install`、`SpecDock CI source=<SHA> wheel_sha256=<…>` の1行）で、最後の1行だけを `"$venv_root/bin/spec-dock" --project "$target_root" canonical check --json` にする。
 - 終了コード：引数の誤りは2、SHA の食い違いと汚れたソースは3、作成と導入の失敗はそのコマンドの終了コード、それ以外は `canonical check` の終了コード（通過0、問題あり7）。
-- **I-10 の決まり**：spec-dock の `.github/workflows/spec-dock-check.yml` は、`ci.yml` と同じ準備（`actions/setup-python@v5` の 3.11、`python -m pip install uv`）の後に `bash .github/scripts/specdock-ci-check.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE" "${{ github.sha }}"` を実行する。`specdock-ci-validate.sh` は I-13 が消す。
+- **I-10 の決まり**：spec-dock の `.github/workflows/spec-dock-check.yml` は、見本と同じ `name: SpecDock check`、`on`（`pull_request` と `main` への `push`）、`permissions: contents: read`、ジョブの名前 `spec-dock-check`、`ubuntu-latest` を使う。手順は、`actions/checkout@v4`、`ci.yml` と同じ準備（`actions/setup-python@v5` の 3.11、`python -m pip install uv`）、`bash .github/scripts/specdock-ci-check.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE" "${{ github.sha }}"` である（spec-dock は、版のタグではなく、PR のコードから作った wheel で検査する。Epic の8章）。`specdock-ci-validate.sh` は I-13 が消す。
 
 #### 版のタグ（`.github/scripts/release-tag-decision.py`、`.github/workflows/release-tag.yml`）
 
-- 判定のスクリプト（標準ライブラリと `git` だけ。Python 3.10 では `tomli`、3.11 以上は `tomllib`）：
+- 判定のスクリプト（パッケージを読み込まない。標準ライブラリと `git` を使い、`pyproject.toml` の読み取りは 3.11 以上の `tomllib`、3.10 ではパッケージの依存の `tomli`。GitHub の `ubuntu-latest` の `python3` は 3.11 以上）：
 
 ```text
 release-tag-decision.py --repo PATH --before SHA --after SHA
@@ -209,6 +214,7 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | `tag-exists` | `refs/tags/v<版>` が手元にある | `null` |
 | `create` | 上のどれでもない | `v<版>` |
 
+- `make lint` の対象は `src/spec_dock` と `tests` なので、このスクリプトには当たらない。この Issue では、ruff（check と format）と mypy を、このスクリプトに手で当てて確かめる（`report.md`）。
 - ワークフロー：`on: push: branches: [main]`、`permissions: contents: write`、`concurrency`（同時に1つ）。`actions/checkout@v4`（`fetch-depth: 0`。前のコミットとタグを読むため）→ 判定（`github.event.before` と `github.sha` は環境変数で渡す）→ `tag` が空でないときだけ `git tag "$TAG" "$GITHUB_SHA"` と `git push origin "refs/tags/$TAG"`。軽量のタグにする（`pip install …@v<版>` に足り、署名者の設定が要らない）。リモートにすでにタグがあれば push が失敗し、上書きしない。
 
 ## data / failure
@@ -242,7 +248,8 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | `src/spec_dock/runtime/cli/catalog.py` | 1章 |
 | `src/spec_dock/runtime/presentation/envelope.py` | 6章の文字の出力 |
 | `src/spec_dock/assets/spec_dock/system/spec-dock-version`（新）、`src/spec_dock/assets/spec_dock/docs/ci/spec-dock-check.yml`（新） | C7 |
-| `src/spec_dock/assets/spec_dock/docs/reference_cli.md`、`docs/README.md` | コマンドの数（44 → 45）と、`canonical check` の行（見本の置き場を示す） |
+| `src/spec_dock/assets/spec_dock/docs/reference_cli.md`、`docs/README.md`、リポジトリのルートの `README.md` | コマンドの数（44 → 45）と、`canonical check` の行と、見本の置き場 |
+| `src/spec_dock/runtime/application/canonical_errors.py` | `CANONICAL_CHECK_FAILED` の定数 |
 | `src/spec_dock/assets/static-inventory.json` | 新しい2つの資産、変えた2つの文書の `sha256`、前の中身の `known_old_sha256` |
 | `.github/scripts/specdock-ci-check.sh`、`.github/scripts/release-tag-decision.py`、`.github/workflows/release-tag.yml`（新） | C7 |
 | `tests/` | 下の testability |
@@ -255,6 +262,7 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 - **版4のリポジトリ**：`canonical check` だけが動く（ほかのコマンドは I-1 のとおり `CANONICAL_NOT_IMPLEMENTED`）。
 - **I-2 との順**：I-2 が配布資産 `spec-dock/.gitignore` に無視の3行を足すまで、本物の配布資産だけのツリーは `IGNORE_RULES_MISSING` で失敗する（正しい動き）。テストは、無視の3行を持つ `.gitignore` の資産を注入して、通過を確かめる。後から入る側が、`origin/main` のマージで `SPEC_DOCK_IGNORE_LINES` を C3 の定数に置き換え、注入が要らなくなれば外す。
 - **版のタグ**：今の版は 0.2.4 なので、マージの後に `release-tag.yml` が動いても、`below-minimum`（または `version-unchanged`）でタグを作らない。最初のタグは I-9（0.3.0）のマージの後にできる。
+- **`release-tag.yml` が失敗したとき**：版を上げた push の run が失敗すると、次の push は `version-unchanged` になり、タグは自動ではできない。戻し方は、失敗した run を GitHub の画面で Re-run する（同じ `github.event.before` と `github.sha` で判定し直す）か、そのコミットに軽量のタグを手で作って push する。I-9 と I-13 は、マージの後にタグができたことを確かめる。
 - **rollback**：PR を `git revert` すれば戻る。データの移行はない。版のタグが作られた後に戻すときは、タグを残してよい（タグはそのコミットの版を指すだけ）。
 
 ## testability
@@ -269,6 +277,7 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | `tests/cli_runtime/test_issue434_canonical_check.py` | 一時のリポジトリでの CLI（AC-434-01〜05）。`resolve_context` を呼ばないこと、作業ツリーの宣言によらないこと、`--commit`、コミットのないリポジトリ、`--expect-current`、ネットワークとトークンなし、何も書かないこと、文字の出力 |
 | `tests/integration/test_issue434_ci_check.py` | `specdock-ci-check.sh`（ソースから wheel を作る。通過0、問題あり7、SHA の食い違いと汚れたソース、対象を変えないこと） |
 | `tests/integration/test_issue434_release_tag.py` | 判定のスクリプトの各 `reason`、今の `pyproject.toml`（0.2.4）でタグを作らないこと、`GITHUB_OUTPUT`、ワークフローの中身 |
+| `tests/integration/test_issue434_workflow_sample.py` | 見本の手順のコマンドを見本から取り出して実行する（Install は引数を記録する偽の `pipx`、Check は手元の wheel を入れた環境。正しいツリーで0、仕様のパスで7） |
 
 - 通過のテストは、パッケージの資産に、無視の3行を持つ `.gitignore` を重ねたもの（`tests/support/canonical_check.py` の部品）でツリーを作る。in-process のテストは `canonical_check.package_static_assets` をその部品で置き換え、`specdock-ci-check.sh` のテストは、ソースの写しの `.gitignore` と `static-inventory.json` を同じように直す（どちらも、配布資産の `.gitignore` にすでに3行があれば何もしない）。
 - 外のネットワークを使わない。`gh` を使わない。状態の置き場は `XDG_STATE_HOME` を一時ディレクトリにして、何も作られないことを確かめる。
@@ -282,6 +291,8 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | `tests/integration/test_cli_docs_vnext.py`（35行目） | コマンドの数 44 → 45 | コマンドの数 |
 | `tests/cli_runtime/test_help_completion_vnext.py`（253行目付近） | コマンドの数 44 → 45、読むだけのコマンドの一覧に `canonical check` を足す | コマンドの数と一覧 |
 | `tests/cli_runtime/test_issue428_canonical_mode.py` | 全コマンドの引数の表に `canonical check` を足す（I-1 の canonical モードのテストで、版3の振る舞いのテストではない） | コマンドの一覧 |
+| `tests/integration/test_issue413_assets.py`（626行目付近） | `installation uninstall` が外す資産の数 84 → 86（新しい2つの資産） | 配布資産の数 |
+| `tests/integration/test_issue413_assets.py`（969行目付近） | `installation uninstall` の効果の数 85 → 87（同じ理由） | 配布資産の数 |
 
 - このほかに版3の振る舞いを確かめるテストの変更が要るとわかったら、変えずに止まって統括に聞く。変えたテストと行と理由は `report.md` に一覧で書く。
 
@@ -297,7 +308,7 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | AC-434-06 | `tests/unit/infra/test_issue434_version_file.py` |
 | AC-434-07 | `tests/integration/test_issue434_ci_check.py` |
 | AC-434-08 | `tests/integration/test_issue434_release_tag.py` |
-| AC-434-09 | 実機：一時のリポジトリで、手元で作った wheel を、見本と同じ形の手順（`pipx install`、または一時の venv）で入れ、`spec-dock canonical check --json` を実行する。本物の GitHub Actions は未確認（I-10） |
+| AC-434-09 | `tests/integration/test_issue434_workflow_sample.py`。実機：一時の `PIPX_HOME` と `PIPX_BIN_DIR` の `pipx` で、一時のクローンに付けた版のタグから `spec-dock @ git+file://…@v<版>` の形で入れ、`spec-dock canonical check --json` を実行する。本物の GitHub Actions は未確認（I-10） |
 | AC-434-10 | `make lint`、`uv run pytest`。`git diff origin/main -- tests/` で、変えた既存のテストが上の表のものだけであることを確かめる |
 
 ## risk
@@ -309,5 +320,6 @@ release-tag-decision.py --repo PATH --before SHA --after SHA
 | 版を上げるときに、版のファイルの前の中身を `known_old_sha256` に足し忘れる | 中 | C7 の決まりとして書き、版のファイルと `pyproject.toml` の版の一致を単体テストで確かめる。I-9、I-13 が版を上げる |
 | 仕様のパスが数千あるツリーで、出力が長い | 低 | 1件1行の文字の出力。CI でどのパスを外すかが分かることを優先する |
 | `!/initiatives/` の順の確かめが、利用者の `.gitignore` の書き方を誤って咎める | 低 | 最後の行どうしを比べるだけにする。配布資産の `.gitignore` をそのまま使っていれば当たらない |
+| 版4で `writer_protocol` が古い既知の値（`specdock.writer/v1`）の宣言を通す。書くコマンドは `require_writer` で止まる | 低 | Epic の「既知である」のとおりにする。SpecDock のコマンドではこの宣言はできない（`installation init` は新しい値を書き、版4の `workspace migrate` は止まる）。失敗にするかは統括に報告して判断を仰ぐ |
 | 見本の `pipx install … @v<版>` が、本物の GitHub Actions で動くか | 中 | ここでは手元の wheel と同じ手順で確かめ、本物は I-10 で確かめる（未確認として残す） |
 | `release-tag.yml` が誤ってタグを作る | 中 | 判定をスクリプトに分けて単体で確かめる。0.3.0 より小さい版、変わらない版、既存のタグでは作らない。リモートにタグがあれば push が失敗し、上書きしない |
