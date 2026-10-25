@@ -27,7 +27,17 @@ Epic の I-1 として、canonical モードの土台（契約 C1、C2、C10）�
 
 ## Verification
 
-<!-- 最終品質ゲートの結果は、ゲートの SHA が決まった後に下に書く。 -->
+### 最終品質ゲート（2026-10-26）
+
+- **ゲートの SHA**：`33888954fcc59a5f443063cd6fa23be51b1889c2`（`a0281481d` に `origin/claude/epic-00424-canonical-spec-catalog`（`ed98cf861`、PR #441）をマージしたコミット。競合なし）。push 済みで、ローカルの `HEAD` と `origin/chemitaro/iss-00428-canonical-mode-structure` が同じ SHA で、作業ツリーに変更がないことを確かめてから始めた。この記録のコミットは、ゲートの後に `report.md` だけを変える。
+- `make lint`：ruff check、ruff format check、mypy のすべてが成功（終了コード0）。
+- `uv run pytest`：2227 件成功、8 件スキップ（513.81 秒、終了コード0）。実行の後も `HEAD` は同じで、作業ツリーに変更はない。
+- `.github/scripts/specdock-ci-validate.sh "$PWD" "$PWD" 33888954f…`（統括の判断 C）：成功（終了コード0）。wheel の `sha256` は `45e31c594bbbf4169e491421a0126b6b4f59fb696b5b2d147cf68b353732d5dc`、`workspace validate --ci` は `succeeded`、`valid: true`、`snapshot_source: HEAD`、`node_count: 260`。
+  - 1回目は、手元の `python3`（uv が管理する venv）が `init_fs_encoding`（`No module named 'encodings'`）で起動できず、終了コード2で止まった。この変更と関係のない手元の環境の問題である。`PATH` の先頭に Homebrew の `python3`（3.14）を置く一時の仕掛けで実行し直して成功し、仕掛けは消した。CI の `ubuntu-latest` では、PR の検査で確かめる。
+- **独立レビュー**（この会話を知らない新しいサブエージェント2つ。規約と仕様。対象はゲートの SHA）：どちらも **P0/P1 なし**。P2/P3 は、ゲートの決まりで情報として扱い、修正もレビューのやり直しもしない。中身は下の「Residual Risks / Follow-ups」に引き継ぐ。
+  - 規約：P2 2件（ST-1 2つ目のファイルの書き込みの失敗のテストが、その経路を通っていない。ST-2 `github_error_result` と dispatch の `except GithubStructureError` のテストがない）、P3 10件。
+  - 仕様：P2 2件（SP-1 スナップショットにない番号への `SetParent` / `AddBlockedBy` / `RemoveBlockedBy` の反映が `ValueError` を出す。SP-2 Epic の C1 の「書く」表に本文の PATCH がない）、P3 4件。AC は 01〜11、13〜15 が「満たす」、12 は「確かめられない」、16 は「一部」（レビューの中で `specdock-ci-validate.sh` を実行していないため。上のとおりゲートで実行して成功した）。
+  - 指摘の主張は、ソースで確かめた。SP-1 は、I-1 の中に `SetParent` などで `reflect` を呼ぶところがなく（`reread` は `UpsertIssue` だけで、これは `ValueError` を出さない）、I-5 が使い始めるときの契約の欠けである。
 
 ### 自動のテストと lint
 
@@ -62,7 +72,7 @@ Epic の I-1 として、canonical モードの土台（契約 C1、C2、C10）�
   - SP-4：読めない Issue の `remove_sub_issue` が成功になる → 子が読めることを先に確かめるよう直した。
   - そのほか（ST-6 UTF-8、ST-8 型、ST-9 `HOME`、ST-10 GraphQL は問い合わせだけ、ST-11 排他の待ち時間、ST-12 `clear_faults`、ST-13 型ヒント、ST-14 二重の定数、SP-5 型の別名、SP-6 定数、SP-8 偽の GitHub を通した異常のテスト、SP-9 足りない negative test、SP-10 設計の文）を直した。
   - 直さなかったもの（反論）：ST-7（`dependency_vnext` に `cast` で渡す）は、従来の domain のモジュールを変えない制約のための設計どおりの選択で、`design.md` に明記している。ST-15（保存形式を domain に置く）は、`design.md` の配置どおりで、純粋な関数として保つ。
-- 再レビューは、最終品質ゲートの2つの新しいサブエージェントで行う。
+- 再レビューは、最終品質ゲートの2つの新しいサブエージェントで行った（上の「最終品質ゲート」）。
 
 ### 実機の確かめ（本物の GitHub、読むだけ、2026-10-26）
 
@@ -81,5 +91,15 @@ Epic の I-1 として、canonical モードの土台（契約 C1、C2、C10）�
 - 版4のリポジトリは、0.3.0（I-9）まで、`installation` と `workspace migrate` のほかは `CANONICAL_NOT_IMPLEMENTED` で止まる（Epic の計画のとおり）。この間に `installation init` で作ったリポジトリは、使えない。
 - `read_workspace_declaration` が版4を受け付けるので、従来の処理が別の宣言（基点のコミット、`--ci` の HEAD、同じクローンのほかのworktree）を版4として読む場面がある。移行していないリポジトリには版4がなく、切り替えの途中（I-10、I-12）だけの出来事で、従来の処理はその後の `.meta.json` の確かめで止まる。
 - 親子と依存の変更で Issue の `updated_at` が変わるかは未確認（Epic の未確認の事項）。偽の GitHub の既定は「変わらない」側にしてあり、30分ごとの取り直しで補う。
-- 統括が Epic の文書（`design.md`、`plan.md`）に反映する事項：`plan.md` の「統括の判断」の1回目と2回目（A1〜A7、B、C）。
+- 統括が Epic の文書（`design.md`、`plan.md`）に反映する事項：`plan.md` の「統括の判断」の1回目と2回目（A1〜A7、B、C）。このうち PR #441 にまだない次の3点（最終品質ゲートの SP-2、SP-5、SP-6）：
+  - Epic の design.md 2章（215行、290行の付近）の異常のコードに、この Issue が足した3つ目の `SUB_ISSUE_FOREIGN_REPOSITORY`（別のリポジトリの子。読む側は「着手できる」にしない）を足す。
+  - Epic の design.md 651行の `CANONICAL_NOT_LINKED` の次の1手は、警告に `recovery` の欄がないため、実装と Issue の design.md 4章のとおり `details.next_step` と書く。
+  - Epic の design.md 2章の C1 の「書く」表に、Issue の本文の PATCH（6章の `scope import github` が既にある Issue に印を足すため）がない。`update_issue(body=…)` を誰が足すか（I-1 の追補か I-5 か）を決める。
+- 最終品質ゲートの P2/P3 で、直さずに引き継ぐもの（ゲートの決まりで情報として扱った）：
+  - SP-1（P2）：スナップショットにない番号への `SetParent`、`AddBlockedBy`、`RemoveBlockedBy` を `reflect` すると `ValueError` が出て、dispatch では `PRECONDITION_FAILED`（failed、終了コード3）になる。GitHub に書いた後の反映でこれが起きると、効果のある書き込みが「効果なし」と返る。I-1 には呼び出し元がない。I-5 が使い始める前に、扱い（当てずに飛ばして警告にする、など）を C10 の design.md 7章で決め、テストを足す。
+  - ST-1（P2）/ SP-4（P3）：`tests/unit/infra/test_github_snapshot.py` の `test_a_failed_second_file_write_keeps_one_reflection_in_memory` は、`reflect` が `probe.json` を書かないため、2つ目のファイルの失敗の経路を通っていない。`commit_refresh` で `probe.json` の書き込みを失敗させ、メモリーの値、`persisted=False`、`local_writes` が1回だけであることを確かめるテストに直す。
+  - ST-2（P2）：`application/canonical_errors.github_error_result` と、`runtime_dispatch` の `except GithubStructureError` のテストがない（partial の終了コード6、failed の5、`retry_at` の文）。I-2 以降で最初に使うときに足す。
+  - SP-3 / ST-10（P3）：`update_issue` の読み直しが `state_reason` を比べない。
+  - ST-6（P3）：`_rate_limit_wait(...) or 60.0` は待ち時間0を60秒にする（`is None` で比べる）。
+  - ST-3（相対の `HOME` を受け付ける）、ST-4（`_read` が `read_guarded_json_at` を使わない、`_DirectoryLock` と `StartLock` の重複）、ST-5（`rename` の後のディレクトリの `fsync` の失敗を書き込みの失敗として扱う）、ST-7（`ScopeView` への `cast`）、ST-8（終了コードの規則の重複）、ST-9（表にない 4xx の書き込みを「結果が不明」とする）、ST-11（ラベルの `totalCount` がないときを黙って受け付ける）、ST-12（GraphQL のエラーに `endpoint="graphql"` がない）（いずれも P3）。
 - 後の Issue への引き渡し：`plan.md` の「exit / handoff」のとおり。
