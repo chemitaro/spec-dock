@@ -82,9 +82,9 @@ ID: "iss-00434"
 - 完了の条件：AC-434-01〜10 をテストと実機で確かめ（AC-434-09 の本物の GitHub Actions は未確認として記録）、最終の品質の関門に合格し、`report.md` に証拠を書き、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
 - 後の Issue への引き渡し（`design.md` の「C7 の公開の形」）：
   - I-8：`CI_VERSION_FILE`、`WORKFLOW_SAMPLE`、`WORKFLOW_DESTINATION`、`WORKFLOW_BRANCH_LINE` と見本のバイト列を写し（テストでパッケージの定数と資産と比べる）、`cut` で見本を写して既定のブランチの行を置き換える。`export-legacy` で外す。
-  - I-9：版を 0.3.0 にするとき、版のファイルと `known_old_sha256` を更新する。`CANONICAL_CHECK_FAILED` と失敗のコードを、エラーの一覧の確かめに入れる。`canonical check` の使い方を文書に書く。
+  - I-9：版を 0.3.0 にするとき、版のファイルと `known_old_sha256` を更新する。配布する `cli-redesign-guide.html` のコマンドの一覧に `canonical` のコマンドを足す。`CANONICAL_CHECK_FAILED` と失敗のコードを、エラーの一覧の確かめに入れる。`canonical check` の使い方を文書に書く。
   - I-10：`.github/workflows/spec-dock-check.yml` から `specdock-ci-check.sh` を呼び、`ci.yml` の `workspace validate --ci` の手順を外す。本物の GitHub Actions での見本の動きを確かめる。
   - I-12：各リポジトリの既定のブランチで `canonical check` を通す。
-  - I-13：版を 0.4.0 にするとき、版のファイルと `known_old_sha256` を更新し、`release-tag.yml` が `v0.4.0` を作ったことを確かめる。`specdock-ci-validate.sh` を消す。
+  - I-13：版を 0.4.0 にするとき、版のファイルと `known_old_sha256` を更新し、`release-tag.yml` が `v0.4.0` を作ったことを確かめる。`specdock-ci-validate.sh` を消す。`infra/commit_tree.py` と `infra/committed_validation.py` の `ls-tree` の解析を1つにする。
   - I-2（後から入るとき）：`SPEC_DOCK_IGNORE_LINES` を C3 の定数に置き換える。
 - 残るリスク：本物の GitHub Actions での見本と `release-tag.yml` の動き（未確認）。I-2 が入るまで、本物の配布資産だけのツリーが `IGNORE_RULES_MISSING` で失敗すること。
