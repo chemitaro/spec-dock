@@ -37,6 +37,10 @@ Epic の I-7 として、既定のブランチの検査（契約 C7 の持ち主
   - 規約：P2 1件（ST-1）、P3 7件（ST-2〜ST-8）。
   - 仕様：P3 5件（SP-1〜SP-5）。AC-434-01〜09 は「満たす」（08 と 09 の本物の GitHub Actions は計画どおり後の Issue）、10 は「一部」（レビューの中で全体のテストを走らせていないため。上のとおりゲートで実行して成功した）。
 
+### PR の検査（PR #444）
+
+- head `27fb7110f`（ゲートの SHA に `report.md` の記録だけを足したもの）で、GitHub Actions の `Provider CI`（`provider-tests`：`make lint` と `uv run pytest` を `ubuntu-latest` で。2294 passed、32 skipped。この Issue のテストはスキップなし。配布の確かめ：`ubuntu-latest` と `macos-latest`）、`CI`（`specdock-ci-validate.sh`。push と pull_request）、`Commit identity` がすべて成功した。GitHub のマージの状態は `MERGEABLE`、`CLEAN`（2026-10-25T23:24:49Z の観測）。
+
 ### 自動のテストと lint
 
 - この Issue で足したテスト：`tests/unit/application/test_canonical_check.py`、`tests/unit/infra/test_commit_tree.py`、`tests/unit/infra/test_static_asset_classification.py`、`tests/unit/infra/test_issue434_version_file.py`、`tests/cli_runtime/test_issue434_canonical_check.py`、`tests/integration/test_issue434_ci_check.py`、`tests/integration/test_issue434_release_tag.py`、`tests/integration/test_issue434_workflow_sample.py`、`tests/unit/commands/test_canonical_dispatch.py` の1件。共通の部品 `tests/support/canonical_check.py`。
@@ -88,7 +92,7 @@ Epic の I-7 として、既定のブランチの検査（契約 C7 の持ち主
 
 - 本物の GitHub Actions での見本のワークフローの動き（版のタグからの `pipx install` と、PR への結果の表示）。I-10 で確かめる。
 - 本物の GitHub Actions での `release-tag.yml` の動き（`v0.3.0` の作成）。I-9（0.3.0）のマージの後に確かめる。
-- Linux での実行は、提供側の CI（`ubuntu-latest`）の結果で確かめる（PR の検査）。
+- Linux での実機の確かめ（見本の手順と `specdock-ci-check.sh`）。Linux の自動のテストは、PR の検査の `ubuntu-latest` で通った（上の「PR の検査」）。
 
 ## Residual Risks / Follow-ups
 
