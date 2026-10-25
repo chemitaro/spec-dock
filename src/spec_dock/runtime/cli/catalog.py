@@ -71,6 +71,7 @@ LEAF_PATHS: tuple[str, ...] = (
     "installation init",
     "installation update",
     "installation uninstall",
+    "canonical check",
     "help",
     "completion",
 )
@@ -118,6 +119,7 @@ HELP_EFFECTS: dict[str, str] = {
     "installation init": "Place package static resources and a new schema-4 workspace declaration in one Git worktree.",
     "installation update": "Update package static resources in one Git worktree after verified external preservation.",
     "installation uninstall": "Remove known package static resources from one Git worktree while preserving user work and state.",
+    "canonical check": "Check that a commit of the code tree holds no specs and has intact SpecDock files; for CI.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -227,6 +229,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "installation init": (_arg("path"),),
     "installation update": (_arg("--target"), _arg("--backup-dir")),
     "installation uninstall": (_arg("--target"), _arg("--backup-dir")),
+    "canonical check": (_arg("--commit", default="HEAD"),),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -325,6 +328,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
     "installation update": "A schema-3 or schema-4 worktree-writer workspace and known static hashes are required. Changes need a new external --backup-dir under an existing physical parent and --yes; --dry-run writes nothing. Modified or unknown files require manual merge.",
     "installation uninstall": "Use a schema-3 or schema-4 worktree-writer workspace. Remove only known static hashes after a new external --backup-dir and --yes; --dry-run writes nothing. Modified files stop before changes.",
+    "canonical check": "A Git checkout containing the commit (default HEAD); no catalog, network, GitHub token or particular workspace mode is required. Any problem in the commit tree returns exit 7 with each path and its next step.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -365,6 +369,7 @@ _READS_BY_ROOT = {
     "workbench": "Source and destination worktree bindings, Scope identity, and Workbench entry types.",
     "workspace": "Workspace declaration, current Scope structure, and explicitly requested local or remote observations.",
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
+    "canonical": "This clone's canonical catalog and checkout links, or one commit tree, as each command states.",
 }
 
 _DOES_NOT_BY_ROOT = {
@@ -378,6 +383,7 @@ _DOES_NOT_BY_ROOT = {
     "workbench": "Does not copy the root Workbench or start automatic synchronization.",
     "workspace": "Does not silently repair primary Scope data or active selection.",
     "installation": "Does not change other worktrees, Scope data, Artifacts, Workbenches, direct selections or Git metadata.",
+    "canonical": "Does not change GitHub Issues or the default branch.",
 }
 
 _JSON_DATA_BY_ROOT = {
@@ -391,6 +397,7 @@ _JSON_DATA_BY_ROOT = {
     "workbench": "Source/destination worktree IDs, Scope, conflict policy, and mutation state.",
     "workspace": "Current observations, validity, findings, declaration changes, or verified preservation results.",
     "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
+    "canonical": "The command's catalog, link, sync or check observations.",
 }
 
 
@@ -528,6 +535,12 @@ def _help_spec(leaf: str) -> HelpSpec:
         reads = "Current Scope structure, Git worktree inventory, retired record headers, and actual checkout/common-Git data for the external backup."
         json_data = "target, before_protocol, after_protocol, changed_paths, backup_path, backup_verified and restore_verified; legacy active is preserved without import."
         confirmation = "Apply requires --yes and --confirm-old-writers-stopped; the latter is a human operational confirmation, not a monitored guarantee. --dry-run needs neither."
+    elif leaf == "canonical check":
+        target = "One commit of this checkout (--commit, default HEAD); the working tree and index are not read."
+        reads = "The commit's tree listing, its workspace declaration, spec-dock/.gitignore, version file and static file blobs, and the installed package inventory."
+        does_not = "Does not read the working tree, catalog, state directory, network or GitHub, and writes nothing."
+        json_data = "commit, revision, valid, failures (code, message, details.path, details.next_step), entry_count, package_version, version_file; a version difference is a warning."
+        confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "work finish":
         reads = "Current metadata, required target and descendant lifecycle, and this worktree's captured direct record. GitHub-backed completion is confirmed completed by a live GET before clearing that record."
         does_not = "Keeps the current branch; no Start lock, automatic parent selection, child completion, commit, push, merge, or rollback. A Scope outside the active chain leaves the direct record unchanged."

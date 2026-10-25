@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Callable
 from pathlib import Path
 
+from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
 from spec_dock.runtime.application.project_context import ProjectContext
@@ -21,7 +22,9 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
 # or that inspect the declaration themselves (canonical check). A handler returns None to decline.
-REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {}
+REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
+    "canonical check": check_canonical_commit,
+}
 
 
 def dispatch_repository_independent(namespace: argparse.Namespace, cwd: Path) -> OperationResult[object] | None:

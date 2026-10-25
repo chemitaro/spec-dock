@@ -31,7 +31,7 @@ def _asset(path: str, payload: bytes, *, init_only: bool = False, old: tuple[byt
 ASSETS = (
     _asset("spec-dock/.gitignore", IGNORE, old=(OLD_IGNORE,)),
     _asset("spec-dock/docs/README.md", b"current docs\n", old=(b"old docs\n",)),
-    _asset("spec-dock/system/spec-dock-version", f"{VERSION}\n".encode()),
+    _asset("spec-dock/system/spec-dock-version", f"{VERSION}\n".encode(), old=(b"0.2.4\n",)),
     _asset("spec-dock/workspace.json", b'{"schema_version":4}\n', init_only=True),
 )
 
@@ -265,3 +265,14 @@ def test_an_unreadable_version_file_warns_with_no_actual_version() -> None:
     assert _codes(outcome) == [("STATIC_ASSET_INVALID", "spec-dock/system/spec-dock-version")]
     (warning,) = outcome.warnings
     assert warning.details["actual"] is None and outcome.version_file is None
+
+
+def test_a_known_older_version_file_is_only_a_warning_and_an_unknown_one_also_fails() -> None:
+    files = _valid_files()
+    files["spec-dock/system/spec-dock-version"] = b"0.2.4\n"
+    outcome = _evaluate(files)
+    assert outcome.failures == () and [warning.details["actual"] for warning in outcome.warnings] == ["0.2.4"]
+    files["spec-dock/system/spec-dock-version"] = b"0.2.9\n"
+    outcome = _evaluate(files)
+    assert _codes(outcome) == [("STATIC_ASSET_INVALID", "spec-dock/system/spec-dock-version")]
+    assert [warning.details["actual"] for warning in outcome.warnings] == ["0.2.9"]

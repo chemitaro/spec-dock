@@ -81,6 +81,7 @@ def _leaf_arguments(root: Path, outside: Path) -> dict[str, list[str]]:
         "workspace sync": [],
         "workspace validate": [],
         "workspace doctor": [],
+        "canonical check": [],
     }
 
 

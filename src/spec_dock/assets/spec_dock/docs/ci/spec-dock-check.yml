@@ -1,0 +1,16 @@
+name: SpecDock check
+on:
+  pull_request:
+  push:
+    branches: [main]   # 既定のブランチの名前に合わせる
+permissions:
+  contents: read
+jobs:
+  spec-dock-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install SpecDock
+        run: pipx install "spec-dock @ git+https://github.com/chemitaro/spec-dock@v$(cat spec-dock/system/spec-dock-version)"
+      - name: Check
+        run: spec-dock canonical check --json

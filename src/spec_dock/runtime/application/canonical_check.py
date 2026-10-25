@@ -7,27 +7,35 @@ import hashlib
 import json
 from typing import TYPE_CHECKING, Final
 
-from spec_dock.runtime.application.canonical_errors import NOT_MIGRATED_RECOVERY
+from spec_dock import __version__
+from spec_dock.runtime.application.canonical_errors import (
+    CANONICAL_CHECK_FAILED,
+    NOT_MIGRATED_RECOVERY,
+    CanonicalCommandError,
+)
 from spec_dock.runtime.application.project_context import (
     CANONICAL_WORKSPACE_SCHEMA,
     LEGACY_WORKSPACE_SCHEMA,
     NEW_WRITER_PROTOCOL,
     OLD_WRITER_PROTOCOL,
+    resolve_git_context,
     workspace_mode,
 )
-from spec_dock.runtime.infra.static_assets import classify_static_digest
-from spec_dock.runtime.presentation.envelope import Diagnostic
+from spec_dock.runtime.infra.commit_tree import list_commit_tree, read_blob, resolve_commit
+from spec_dock.runtime.infra.static_assets import classify_static_digest, package_static_assets
+from spec_dock.runtime.presentation.command_data import FamilyData
+from spec_dock.runtime.presentation.envelope import Diagnostic, OperationResult, RecoveryInstructions
 
 if TYPE_CHECKING:
+    import argparse
     from collections.abc import Callable, Mapping, Sequence
+    from pathlib import Path
 
     from spec_dock.runtime.infra.commit_tree import TreeEntry
     from spec_dock.runtime.infra.static_assets import StaticAsset
 
-CANONICAL_CHECK_FAILED: Final = "CANONICAL_CHECK_FAILED"
-
 # Contract C7: later Issues (the migration script's cut) copy these values and compare them in tests.
-VERSION_FILE: Final = "spec-dock/system/spec-dock-version"
+CI_VERSION_FILE: Final = "spec-dock/system/spec-dock-version"
 WORKFLOW_SAMPLE: Final = "spec-dock/docs/ci/spec-dock-check.yml"
 WORKFLOW_DESTINATION: Final = ".github/workflows/spec-dock-check.yml"
 WORKFLOW_BRANCH_LINE: Final = "branches: [main]"
@@ -60,7 +68,7 @@ _DECLARATION_NEXT_STEP: Final = (
     f'"writer_protocol": "{NEW_WRITER_PROTOCOL}"}}.'
 )
 _NEWER_SCHEMA_NEXT_STEP: Final = (
-    f"Install the SpecDock version named by {VERSION_FILE}; "
+    f"Install the SpecDock version named by {CI_VERSION_FILE}; "
     f"this SpecDock knows workspace schema {LEGACY_WORKSPACE_SCHEMA} and {CANONICAL_WORKSPACE_SCHEMA}."
 )
 _STATIC_ASSET_NEXT_STEP: Final = (
@@ -71,7 +79,7 @@ _IGNORE_RULES_NEXT_STEP: Final = (
     f"Add these lines to {SPEC_DOCK_GITIGNORE} in this order, then commit: {', '.join(SPEC_DOCK_IGNORE_LINES)}."
 )
 _VERSION_NEXT_STEP: Final = (
-    f"Run the SpecDock version named by {VERSION_FILE}, "
+    f"Run the SpecDock version named by {CI_VERSION_FILE}, "
     "or run spec-dock installation update and commit to record this version."
 )
 _SCOPE_METADATA_NEXT_STEP: Final = (
@@ -85,6 +93,64 @@ class CheckOutcome:
     failures: tuple[Diagnostic, ...]
     warnings: tuple[Diagnostic, ...]
     version_file: str | None
+
+
+def check_canonical_commit(namespace: argparse.Namespace, cwd: Path) -> OperationResult[object]:
+    """canonical check: judge the committed tree only; the working tree's declaration and mode are never read."""
+    if namespace.expect_current is not None or namespace.expect_backend is not None:
+        raise CanonicalCommandError(
+            "PRECONDITION_FAILED",
+            "canonical check reads a commit tree and cannot verify --expect-current or --expect-backend",
+            recovery=(
+                "Run spec-dock canonical check without --expect-current and --expect-backend; "
+                "it reads a commit tree, not a selection.",
+            ),
+        )
+    git = resolve_git_context(namespace.project, cwd, timeout=namespace.timeout)
+    commit = resolve_commit(git.root, namespace.commit, timeout=namespace.timeout)
+    if commit is None:
+        raise CanonicalCommandError(
+            "PRECONDITION_FAILED",
+            f"canonical check needs an existing commit: {namespace.commit}",
+            recovery=(
+                "Pass an existing commit with --commit REV, or commit first; canonical check reads a commit tree.",
+            ),
+        )
+    entries = list_commit_tree(git.root, commit, timeout=namespace.timeout)
+    outcome = evaluate_commit_tree(
+        entries,
+        lambda entry: read_blob(git.root, entry.object_id, timeout=namespace.timeout),
+        assets=package_static_assets(),
+        running_version=__version__,
+    )
+    data = FamilyData(
+        "canonical-check",
+        {
+            "commit": commit,
+            "revision": namespace.commit,
+            "valid": not outcome.failures,
+            "failures": outcome.failures,
+            "entry_count": len(entries),
+            "package_version": __version__,
+            "version_file": outcome.version_file,
+        },
+    )
+    if not outcome.failures:
+        return OperationResult(namespace.command_path, "succeeded", data, 0, warnings=outcome.warnings)
+    next_steps = tuple(dict.fromkeys(str(failure.details["next_step"]) for failure in outcome.failures))
+    return OperationResult(
+        namespace.command_path,
+        "failed",
+        data,
+        7,
+        warnings=outcome.warnings,
+        error=Diagnostic(
+            CANONICAL_CHECK_FAILED,
+            f"{len(outcome.failures)} problems in commit {commit[:12]}; each failure names its path and next step",
+            {"failure_count": len(outcome.failures), "commit": commit},
+        ),
+        recovery=RecoveryInstructions(next_steps),
+    )
 
 
 def evaluate_commit_tree(
@@ -104,7 +170,7 @@ def evaluate_commit_tree(
     ignore = _ignore_rules_failure(by_path.get(SPEC_DOCK_GITIGNORE), read)
     if ignore is not None:
         failures.append(ignore)
-    version_entry = by_path.get(VERSION_FILE)
+    version_entry = by_path.get(CI_VERSION_FILE)
     if version_entry is None or version_entry.kind != "regular":
         return CheckOutcome(tuple(failures), (), None)  # rule 5 reports the missing version file
     try:
@@ -118,7 +184,7 @@ def evaluate_commit_tree(
                 SPEC_DOCK_VERSION_MISMATCH,
                 "the committed SpecDock version differs from the running SpecDock",
                 {
-                    "path": VERSION_FILE,
+                    "path": CI_VERSION_FILE,
                     "expected": running_version,
                     "actual": version_file,
                     "next_step": _VERSION_NEXT_STEP,

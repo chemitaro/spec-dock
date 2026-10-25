@@ -58,10 +58,11 @@ def test_vnext_catalog_matches_approved_44_leaf_design() -> None:
         "installation init",
         "installation update",
         "installation uninstall",
+        "canonical check",
         "help",
         "completion",
     }
-    assert len(LEAF_PATHS) == 44
+    assert len(LEAF_PATHS) == 45
     assert set(LEAF_PATHS) == expected
 
 

@@ -1,0 +1,32 @@
+name: Release tag
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-tag
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide release tag
+        id: decide
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: python3 .github/scripts/release-tag-decision.py --repo "$GITHUB_WORKSPACE" --before "$BEFORE" --after "$GITHUB_SHA"
+      - name: Create release tag
+        if: steps.decide.outputs.tag != ''
+        env:
+          TAG: ${{ steps.decide.outputs.tag }}
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "refs/tags/$TAG"
