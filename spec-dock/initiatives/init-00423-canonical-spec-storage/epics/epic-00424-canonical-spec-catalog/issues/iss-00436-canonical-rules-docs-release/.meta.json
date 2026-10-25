@@ -1,0 +1,27 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00436",
+  "title": "Integrate Agent Rules Docs And Release",
+  "slug": "canonical-rules-docs-release",
+  "parent_id": "epic-00424",
+  "initiative_id": "init-00423",
+  "epic_id": "epic-00424",
+  "depends_on": [
+    "iss-00430",
+    "iss-00431",
+    "iss-00432",
+    "iss-00433",
+    "iss-00434",
+    "iss-00435",
+    "iss-00438"
+  ],
+  "backend": "github",
+  "github": {
+    "issue_number": 436,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 7
+}

@@ -1,0 +1,135 @@
+{
+  "declaration after update": "{\"schema_version\":3,\"writer_protocol\":\"specdock.worktree-writer/v1\"}\n",
+  "installation update": {
+    "exit_code": 0,
+    "result": {
+      "command": "installation update",
+      "data": {
+        "kind": "installation",
+        "result": {
+          "backup_path": "<WORK>/backup",
+          "backup_verified": true,
+          "changed_paths": [
+            "spec-dock/scripts/spec-dock"
+          ],
+          "created_paths": [],
+          "package_version": "<VERSION>",
+          "restore_verified": true,
+          "retired_paths": [],
+          "target": "<WORK>/consumer"
+        }
+      },
+      "effects": [
+        {
+          "kind": "backup",
+          "status": "succeeded",
+          "target": "<WORK>/backup"
+        },
+        {
+          "kind": "installation.change",
+          "status": "succeeded",
+          "target": "spec-dock/scripts/spec-dock"
+        }
+      ],
+      "error": null,
+      "exit_code": 0,
+      "recovery": null,
+      "schema_version": "specdock.cli/v2",
+      "status": "succeeded",
+      "warnings": []
+    }
+  },
+  "installation update --dry-run": {
+    "exit_code": 0,
+    "result": {
+      "command": "installation update",
+      "data": {
+        "kind": "installation",
+        "result": {
+          "backup_path": null,
+          "blockers": [],
+          "can_apply": true,
+          "changed_paths": [],
+          "created_paths": [],
+          "package_version": "<VERSION>",
+          "retired_paths": [],
+          "target": "<WORK>/consumer"
+        }
+      },
+      "effects": [],
+      "error": null,
+      "exit_code": 0,
+      "recovery": null,
+      "schema_version": "specdock.cli/v2",
+      "status": "planned",
+      "warnings": []
+    }
+  },
+  "workspace doctor": {
+    "exit_code": 0,
+    "result": {
+      "command": "workspace doctor",
+      "data": {
+        "findings": [],
+        "kind": "diagnostic",
+        "unverified": [
+          "GitHub capabilities were not requested.",
+          "GitHub Scope lifecycle was not observed by this diagnosis."
+        ]
+      },
+      "effects": [],
+      "error": null,
+      "exit_code": 0,
+      "recovery": null,
+      "schema_version": "specdock.cli/v2",
+      "status": "succeeded",
+      "warnings": []
+    }
+  },
+  "workspace validate": {
+    "exit_code": 0,
+    "result": {
+      "command": "workspace validate",
+      "data": {
+        "kind": "validation",
+        "result": {
+          "findings": [],
+          "node_count": 1,
+          "snapshot_oid": null,
+          "snapshot_source": "working-tree",
+          "valid": true
+        }
+      },
+      "effects": [],
+      "error": null,
+      "exit_code": 0,
+      "recovery": null,
+      "schema_version": "specdock.cli/v2",
+      "status": "succeeded",
+      "warnings": []
+    }
+  },
+  "workspace validate --ci": {
+    "exit_code": 0,
+    "result": {
+      "command": "workspace validate",
+      "data": {
+        "kind": "validation",
+        "result": {
+          "findings": [],
+          "node_count": 1,
+          "snapshot_oid": "<HEAD>",
+          "snapshot_source": "HEAD",
+          "valid": true
+        }
+      },
+      "effects": [],
+      "error": null,
+      "exit_code": 0,
+      "recovery": null,
+      "schema_version": "specdock.cli/v2",
+      "status": "succeeded",
+      "warnings": []
+    }
+  }
+}

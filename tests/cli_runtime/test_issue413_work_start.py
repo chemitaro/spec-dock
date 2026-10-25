@@ -1747,6 +1747,10 @@ def test_start_accepts_the_standard_rule_documents_created_by_scope_import(
     github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
     assert main(["installation", "init", str(root), "--yes", "--json"]) == 0
     capsys.readouterr()
+    # installation init declares schema 4; this legacy-mode test keeps its fixture on schema 3.
+    (root / "spec-dock/workspace.json").write_text(
+        '{"schema_version":3,"writer_protocol":"specdock.worktree-writer/v1"}', encoding="utf-8"
+    )
     for kind, number, parent in (("initiative", 1, None), ("epic", 2, "init-00001"), ("issue", 3, "epic-00002")):
         args = [
             "--project",

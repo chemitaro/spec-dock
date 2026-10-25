@@ -58,14 +58,15 @@ def test_init_places_only_static_assets_and_a_new_declaration_in_the_explicit_wo
         assert all(effect["status"] == "planned" for effect in result["effects"])
     else:
         declaration = json.loads((target / "spec-dock/workspace.json").read_bytes())
-        assert declaration == {"schema_version": 3, "writer_protocol": "specdock.worktree-writer/v1"}
+        assert declaration == {"schema_version": 4, "writer_protocol": "specdock.worktree-writer/v1"}
         assert (target / "spec-dock/templates/issue/requirement.md").is_file()
         assert (target / "spec-dock/scripts/spec-dock").is_file()
         assert (target / ".agents/skills/spec-dock/SKILL.md").is_file()
         assert (target / ".agents/skills/spec-dock-grill-with-docs/SKILL.md").is_file()
         assert "spec-dock/workspace.json" in data["created_paths"]
-        assert main(["--project", str(target), "workspace", "validate", "--json"]) == 0
-        capsys.readouterr()
+        # A fresh schema-4 workspace is routed to canonical mode, which validates from SpecDock 0.3.0.
+        assert main(["--project", str(target), "workspace", "validate", "--json"]) == 3
+        assert json.loads(capsys.readouterr().out)["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED"
 
 
 @pytest.mark.parametrize(
@@ -298,7 +299,7 @@ def test_init_in_a_linked_worktree_does_not_install_into_main_or_shared_git(
     assert main(["installation", "show", "--target", str(linked), "--json"]) == 0
     shown = json.loads(capsys.readouterr().out)["data"]["result"]
     assert (
-        shown["workspace"]["schema_version"] == 3
+        shown["workspace"]["schema_version"] == 4
         and shown["workspace"]["writer_protocol"] == "specdock.worktree-writer/v1"
     )
     assert all(asset["classification"] == "current" for asset in shown["assets"])

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Final, Literal
 
 from spec_dock.runtime.domain.writer_admission import require_workspace_write
 from spec_dock.runtime.infra.git_process import run_git
@@ -13,10 +13,16 @@ from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import read_guarded_json
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
+
     from spec_dock.runtime.domain.work_target import PhysicalIdentity
 
 NEW_WRITER_PROTOCOL = "specdock.worktree-writer/v1"
 OLD_WRITER_PROTOCOL = "specdock.writer/v1"
+LEGACY_WORKSPACE_SCHEMA: Final = 3
+CANONICAL_WORKSPACE_SCHEMA: Final = 4
+WorkspaceMode = Literal["legacy", "canonical"]
+_MODES: Final[dict[int, WorkspaceMode]] = {LEGACY_WORKSPACE_SCHEMA: "legacy", CANONICAL_WORKSPACE_SCHEMA: "canonical"}
 
 
 @dataclass(frozen=True)
@@ -32,6 +38,11 @@ class GitContext:
 @dataclass(frozen=True)
 class ProjectContext(GitContext):
     workspace: dict[str, object]
+
+    @property
+    def mode(self) -> WorkspaceMode:
+        """Schema 3 keeps the legacy behavior during migration; schema 4 is canonical mode."""
+        return workspace_mode(self.workspace)
 
     def require_writer(self) -> None:
         if self.workspace.get("writer_protocol") != NEW_WRITER_PROTOCOL:
@@ -91,11 +102,25 @@ def read_workspace_declaration(path: Path) -> dict[str, object]:
     if loaded is None or not isinstance(loaded[0], dict):
         raise ValueError("workspace declaration is missing or invalid")
     workspace = loaded[0]
-    if type(workspace.get("schema_version")) is not int or workspace.get("schema_version") != 3:
-        raise ValueError("workspace requires known schema 3")
+    workspace_mode(workspace)
     if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
         raise ValueError("workspace writer protocol is unknown")
     return workspace
+
+
+def workspace_mode(workspace: Mapping[str, object]) -> WorkspaceMode:
+    version = workspace.get("schema_version")
+    if type(version) is not int or version not in _MODES:
+        raise ValueError("workspace requires known schema 3 or 4")
+    return _MODES[version]
+
+
+def probe_workspace_mode(root: Path) -> WorkspaceMode | None:
+    """Classify a valid declaration without failing; used only where today's routes skip resolve_context."""
+    try:
+        return workspace_mode(read_workspace_declaration(root / "spec-dock/workspace.json"))
+    except (OSError, ValueError, RuntimeError, RecursionError):
+        return None
 
 
 def _git(root: Path, *args: str, allow_missing: bool = False, timeout: float = 30) -> str:
