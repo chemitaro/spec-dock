@@ -90,7 +90,8 @@ reflected_to: []
 - `init-local-00002` は #39、`init-local-00003` は #31 に結び付く。#31 は題名が別物（"Replace Wrapper Scripts With Symlink Rules"）で、完了で閉じている。そのため、その下に新しい Epic を作れない（`GitHub Scope ancestor is not open`）。
 - テンプレートの要件定義書は、作成時の題名を `タイトル:` として写す。
 - `spec-dock worktree create` は、プロジェクトの初期化（`make init`）を暗に実行しない。初期化は、別のコマンド `spec-dock worktree bootstrap` が、明示したworktreeで1回だけ実行する。
-- ダッシュボードは、`spec-dock workspace sync` が生成する `spec-dock/dashboard.md`（Git では無視）である。ワークスペースの宣言 `spec-dock/workspace.json` は、`schema_version: 3` と `writer_protocol` を持つ。
+- 今の CLI は、`spec-dock/dashboard.md` を生成しない（2026-10-25 訂正）。`render_dashboard`（`src/spec_dock/runtime/presentation/markdown.py`）はあるが、どこからも呼ばれていない。`workspace sync` は「Writes: None」の読むだけのコマンドである。spec-dock の `spec-dock/dashboard.md` は、2026-09-21 に古い版が生成したものが残っている（Git では無視）。
+- ワークスペースの宣言 `spec-dock/workspace.json` は、`schema_version: 3` と `writer_protocol` を持つ。今の CLI は、版が整数の3でないと `PRECONDITION_FAILED`（終了コード3）で止まる（`src/spec_dock/runtime/application/project_context.py`）。
 
 ### 今の排他
 
@@ -98,7 +99,30 @@ reflected_to: []
 - `create.lock` は、worktreeごとの `spec-dock/system/.runtime/create.lock` で、600秒で古いと見なす。
 - launchd の `WatchPaths` は、説明書で「変更を取りこぼすことがある」として非推奨。launchd は既定で同じジョブを10秒に1回までしか起動しない。
 
+### 設計の検証（2026-10-25、macOS、codex-cli 0.163.0）
+
+- **Codex のサンドボックスと `flock`**：`codex sandbox -- …`（seatbelt、`~/.codex/config.toml` の workspace-write）の中で、書き込みが拒否される場所（mainの `.git` と `spec-dock/`）でも、ディレクトリを読み取りで開いて `flock(LOCK_EX|LOCK_NB)` を取れた。サンドボックスの外のプロセスが同じディレクトリに `flock` を持つ間、中からは取れず（BUSY）、逆も同じだった。外したあとは取れた。
+- **サンドボックスでの書き込みの可否の判定**：サンドボックスの中では、書けない場所への `os.access(path, W_OK)` が False を返した。環境変数 `CODEX_SANDBOX=seatbelt` が設定されていた。
+- **launchd からの push の認証**：一時的なジョブ（`launchctl bootstrap gui/<uid>`）で、Homebrew の git から `git push --dry-run` を実行すると、`~/.gitconfig` の `credential.https://github.com.helper = !/opt/homebrew/bin/gh auth git-credential`（利用者の `gh` のログイン）で認証できた。資格情報を外すと「could not read Username」で失敗したので、dry-run でも認証が要ることも確かめた。リモートには何も作られていない。launchd のジョブの `PATH` は既定で `/usr/bin:/bin:/usr/sbin:/sbin` で、`GH_TOKEN` はない。
+- **launchd と外付けのボリューム（macOS のプライバシーの保護）**：launchd のジョブから外付けのボリューム `/Volumes/990p2t` を読めるかは、実行するプログラムごとに決まった。`/bin/sh`、`/usr/bin/python3`、`/usr/bin/git`（Apple の git）は「Operation not permitted」で拒否され、uv の Python（spec-dock のパッケージが使う `cpython-3.12.11`）と Homebrew の git は読めた。許可は、以前に利用者が与えたものと考えられる（推測）。
+- **launchd の設定ファイルの置き場**：外付けのボリューム（所有者の情報が無効）に置いた plist は、`launchctl bootstrap` が「5: Input/output error」で拒否した。内蔵のディスク（`/private/tmp`）に置くと受け付けた。そのため、ジョブの plist は `~/Library/LaunchAgents/` に置く。ログの出力先も内蔵のディスクにする。
+- **既存のジョブ**：利用者の `~/Library/LaunchAgents/` には、外付けのボリュームを使う自作のジョブ（nestboard、CI の VM の監視）がすでにある。
+- **GitHub の REST API**（公式文書、2026-10-25）：
+  - sub-issue：`GET /repos/{owner}/{repo}/issues/{n}/sub_issues`、`POST …/sub_issues`（本文は `sub_issue_id`。Issue の番号ではなく `id`。任意で `replace_parent`）、`DELETE …/issues/{n}/sub_issue`（本文は `sub_issue_id`）、`GET …/issues/{n}/parent`（親がなければ404）。
+  - 依存：`GET …/issues/{n}/dependencies/blocked_by`、`POST …/dependencies/blocked_by`（本文は `issue_id`。番号ではなく `id`）、`DELETE …/dependencies/blocked_by/{issue_id}`、`GET …/dependencies/blocking`。
+  - 追加と削除は、速すぎると二次のレート制限にかかると書かれている。
+  - Issue の一覧（`GET /repos/{owner}/{repo}/issues`）の各要素にも、`sub_issues_summary` と `issue_dependencies_summary` が入っている（実測）。一覧にはPRも入るので、`pull_request` のある要素を除く。
+- **今のCLIの構造**（`src/spec_dock/runtime/`、調査用のエージェントによる読み取り）：
+  - コマンドはすべて `commands/runtime_dispatch.py` の `dispatch()` を通る。コマンドの一覧は `cli/catalog.py` の `LEAF_PATHS`（44個）。
+  - GitHub は `infra/github_lifecycle.py` の `GithubIssueGateway` が `gh api`（REST）で扱い、操作は取得・作成・状態の変更だけ。ラベル、sub-issue、依存、題名の変更、一覧はない。再試行もない。
+  - `.meta.json` を読む場所と書く場所は、`infra/scope_tree.py`、`infra/scope_metadata.py`、`application/direct_scope_*.py`、`application/direct_dependencies.py`、`application/direct_finish.py`、`application/start_snapshot.py` など。
+  - 今のCLIは、リンクの `spec-dock/initiatives` を拒否する（`infra/scope_tree.py:53-57`、`application/scope_query.py:51,60-62`）。`work start` は基点のコミットのツリーから `.meta.json` を読む（`application/start_snapshot.py:92-144`）。`workspace validate --ci` は、HEAD のツリーに `spec-dock/initiatives` の実体があることを求める。
+  - Scope の作成は、`spec-dock/.agent/staging` に作ってから移す（`application/direct_scope_publish.py`）。
+  - `create.lock` を作る処理は、もうない。
+  - 配布は wheel だけで、`pyproject.toml` の版は 0.2.4。git の URL からの導入の手順はない。
+  - CI の「CI」（`.github/workflows/ci.yml`）は、ソースから wheel を作り、`workspace validate --ci --json` を実行する。
+
 ## Reflection
 
 - 上の事実は、Epic の要件定義書の「背景」「制約・前提」「失敗・境界条件」と、設計書の各論の根拠として書き直す。
-- まだ確かめていないこと（Codex のサンドボックスの中での `flock`、launchd からの `push` の認証）は、設計の検証項目にする。
+- Codex のサンドボックスの中での `flock` と、launchd からの `push` の認証は、2026-10-25 に macOS で確かめた（上の「設計の検証」）。まだ確かめていないのは、Linux（systemd のユーザーのタイマーと、そこからの push）で、実装の Issue で確かめる。
