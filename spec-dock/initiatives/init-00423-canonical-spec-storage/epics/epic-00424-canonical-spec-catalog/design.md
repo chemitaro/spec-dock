@@ -349,9 +349,9 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
    - ここまでで止まるときは、何も書いていないので、`failed`（終了コード3）で返す。
 3. **カタログ**：`git worktree list --porcelain` で、`spec-dock/canonical` をチェックアウトしているworktreeを探す。
    - 登録されたパスが `<main>/spec-dock/.canonical` で、ディレクトリがあれば、何もしない。lock されていなければ lock する。
-   - `<main>/spec-dock/.canonical` に `.git` ファイルのあるディレクトリがあるが、登録のパスが違う、または登録が壊れている（mainのチェックアウトを移動した後など）ときは、`git worktree repair <カタログ>` で直す。ディレクトリがあるときに `prune` してはならない。ほかの作業用のworktreeの `.git` も切れているが、SpecDock は直さず、警告 `CANONICAL_MAIN_MOVED`（「mainで `git worktree repair` を実行してから、各作業用のworktreeで `spec-dock canonical link`」）を返す（I-2 の統括の判断）。
-   - `spec-dock/canonical` が、`<main>/spec-dock/.canonical` ではない、存在する別のworktreeでチェックアウトされているときは、何も書かずに `CANONICAL_PATH_OCCUPIED`（そのworktreeのパス）で止まる。
-   - 登録はあるがディレクトリがない（`git clean -ffdx` の後など）ときは、`git worktree unlock`、`git worktree prune`、作成、lock の順に作り直す（調査の記録で確認済みの手順）。
+   - `<main>/spec-dock/.canonical` に `.git` ファイルのあるディレクトリがあるが、登録のパスが違う、または登録が壊れている（mainのチェックアウトを移動した後など）ときは、`git worktree repair <カタログ>` で直す。ディレクトリがあるときに `prune` してはならない。git の `repair` は、このとき、ほかの作業用のworktreeから mainへのつながりも直すことがある（`effects` とメッセージに書く）。SpecDock がほかのworktreeを直すことはせず、警告 `CANONICAL_MAIN_MOVED` を返す（I-2 の統括の判断）。
+   - `spec-dock/canonical` が、`<main>/spec-dock/.canonical` ではないパスの登録でチェックアウトされているときは、何も書かずに `CANONICAL_PATH_OCCUPIED`（その登録のパス）で止まる。そのパスが存在するときも、存在しない（登録だけが残っている）ときも同じである。
+   - 登録はあるがディレクトリがない（`git clean -ffdx` の後など）ときは、`git worktree add -f -f <カタログ> spec-dock/canonical` で同じ場所に作り直し、lock する（lock された消えたパスに作るには `--force` を2回付ける。git の文書）。`-f -f` は、`spec-dock/canonical` をチェックアウトしている登録がちょうど1つで、そのパスがカタログの場所のときだけ使う。`git worktree prune` は、クローン全体の消えた登録（外れた外付けのボリュームのworktreeなど）を選ばずに消すので、SpecDock は実行しない（I-2 の統括の判断。Git 2.54.0 で確認）。
    - 作るときは、まず `git ls-remote --exit-code origin refs/heads/spec-dock/canonical` で GitHub に canonical があるかを確かめる。終了コード2なら「ない」、0なら「ある」、それ以外は接続の失敗として止まる（`GITHUB_UNAVAILABLE`）。ある場合は、取得の対象にこのブランチが入っていない浅いクローンでは `git remote set-branches --add origin spec-dock/canonical` を行ってから `git fetch origin spec-dock/canonical` を行う。ローカルのブランチがなければ `git worktree add --track -b spec-dock/canonical <カタログ> origin/spec-dock/canonical`、あれば `git worktree add <カタログ> spec-dock/canonical` とする。最後に `git worktree lock --reason "spec-dock canonical catalog" <カタログ>` を行う。
    - GitHub に canonical がなく、既定のブランチの HEAD のツリーに `spec-dock/initiatives` がないとき（新しいリポジトリ）は、5章の「canonical の中身」の管理ファイルだけを持つ、親のないコミットを作って push する。push が先に進まれて拒否されたら（別のPCが同時に作った）、手元で作ったブランチを捨て、GitHub のものを取得して使う。
    - GitHub に canonical がなく、既定のブランチ（`origin/HEAD`、なければ mainのチェックアウトの HEAD）のツリーに `spec-dock/initiatives` があるとき（移行していない）は、何も書かずに `CANONICAL_NOT_MIGRATED` で止まり、移行の手順書を示す（I-2 の統括の判断）。
@@ -847,7 +847,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `CANONICAL_GIT_TOO_OLD` | 3 | Git 2.38 以上を入れ、`spec-dock canonical link` をもう一度実行する（登録簿の git を入れ替えるため） |
 | `CANONICAL_FOREIGN_CHECKOUT` | 3 | 保存と同期はホストで行われる。コンテナでは仕様のファイルを読み書きするだけにするか、コンテナの中でクローンして `spec-dock canonical link` |
 | `CANONICAL_NOT_LINKED` | 3 | `spec-dock canonical link` |
-| `CANONICAL_PATH_OCCUPIED`、`CANONICAL_LINK_OCCUPIED` | 3 | 示したパスの中身を確かめて退避してから `spec-dock canonical link`（SpecDock は消さない） |
+| `CANONICAL_PATH_OCCUPIED`、`CANONICAL_LINK_OCCUPIED` | 3 | 示したパスの中身を確かめて退避してから `spec-dock canonical link`（SpecDock は消さない）。`spec-dock/canonical` のworktreeの登録だけが残っているときは、確かめてから `git worktree remove` か `git worktree prune` を自分で実行し、もう一度 `spec-dock canonical link` |
 | `CANONICAL_SANDBOX_DENIED` | 3 | サンドボックスの外（普通の端末）で同じコマンドを実行する |
 | `CANONICAL_LOCK_BUSY` | 3 | しばらく待って同じコマンドを実行する |
 | `CANONICAL_FORMAT_UNSUPPORTED` | 3 | SpecDock を更新する |
@@ -869,7 +869,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `GITHUB_SNAPSHOT_STALE` | —（警告） | 表示は取得の時刻の時点のもの。つながったら、次の表示か定期の同期で新しくなる |
 | `CANONICAL_TOOL_SETTING_MISSING`、`CANONICAL_TOOL_SETTING_UNKNOWN` | —（警告） | 9章の1行を足す。判定できないときは、ツールの設定を自分で確かめる（I-2） |
 | `CANONICAL_IGNORE_RULES_MISSING` | —（警告） | 3章の無視の3行を足す（`spec-dock installation update` か `spec-dock canonical link`）（I-2） |
-| `CANONICAL_MAIN_MOVED` | —（警告） | mainで `git worktree repair` を実行してから、各作業用のworktreeで `spec-dock canonical link`（I-2） |
+| `CANONICAL_MAIN_MOVED` | —（警告） | 各作業用のworktreeで `spec-dock canonical link`（そのworktreeも動かしたなら、先にmainで `git worktree repair <パス>`）（I-2） |
 | `CANONICAL_REMOTE_MISSING` | —（警告） | GitHub の `spec-dock/canonical` が消されていないか確かめ、`spec-dock canonical status` の案内に従う（I-2） |
 | `SLUG_REQUIRED` | 3 | `--slug <英小文字とハイフン>` を付ける |
 
