@@ -152,6 +152,28 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 | ST の P3（終了の要求の後の手順7、remove の確かめの順、`scandir`、`write_atomic` の fsync、一時ファイル、未使用の引数、docstring） | P3 | 直した。push の拒否が続いたときの `ok` は 8章の表のとおりで変えない |
 | SP の AC の不足（名前の変更の競合、`held` の持ち越し、初期のコミットの作り直し、記録した実行ファイル、スナップショットが残ること） | — | テストを足した |
 
+### 最終品質ゲート1の指摘の対応（`09a229731`、2026-10-26）
+
+ゲート1は不合格（`make lint` の mypy がテストの型の誤りで失敗。レビューの P1 が2件）。全体の `uv run pytest` は通っていた（2905 passed、8 skipped）。
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| lint：テストの3つのファイルの型の誤り | 失敗 | 直した |
+| ST-1 確かめたバイト列のコミットが `.gitattributes` のフィルタを通らない（eol で毎分の空のコミット、LFS や git-crypt の平文） | P1 | `hash-object --path` でフィルタを当て、親と同じツリーならコミットしない。テストを足した |
+| SP-1 期限の切れた削除の許可が残り、後の大量の削除が保留されない | P1 | 今は削除されていない許可を周期が消す。テストを足した |
+| ST-2 `merge.verifySignatures` と `merge.autoStash` で取り込みが止まる | P2 | 早送りで無効にした。テストを足した |
+| SP-2 別の `PATH` の link がジョブの `gh` のディレクトリを書き直す | P2 | 置いてあるジョブの `PATH` の `gh` を残す。テストを足した |
+| SP-3 `canonical sync --json` の形が `data.result.catalogs` | P2 | Epic の12章のとおり `data.catalogs[]` と `data.repositories[]` にした（`CanonicalCycleData`） |
+| ST-3、SP-8 systemd の `KillMode` と launchd の `ExitTimeOut` | P2、P3 | Epic のユニットと plist の形を変えないので直さず、risk に記録して統括に報告 |
+| ST-4、SP-5 ログと移動の排他の取り合い | P3 | ログを専用の lock ファイルにした |
+| ST-5、SP-9 外したカタログの状態を周期が作り直す、remove の書き込みの確かめの順 | P3 | 周期が登録簿を読み直して飛ばす。remove は排他の前に書き込みの可否を確かめる |
+| SP-4 `--no-schedule` で main を動かすと基準が移らない | P3 | 予定のときにも状態を移す。テストを足した |
+| SP-6 直した後も `push_auth: failed` が残る | P3 | `failed` の間も毎周期 dry-run で確かめる。テストを足した |
+| SP-7 表にないコード、`run_cycle` の例外の記録 | P3 | `design.md` の14章に足した。例外はログと `data.catalogs[].error` に残す（`state.json` には書かない。壊れた周期の途中の状態を書かないため） |
+| ST-6 エディタの一時ファイル | P3 | C5（I-2）の `.gitignore` の話なので申し送る |
+| ST-7、SP-10 読めない束のログ、許可と比べる中身とコミットする中身 | P3 | ログに書く。許可と比べる blob を、コミットするバイト列から求める |
+| `--loop` と `--detach` の CLI のテスト | P3 | 足した |
+
 ## exit / handoff
 
 - **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
