@@ -44,6 +44,8 @@ class Scheduler(Protocol):
 
     def recorded_search_path(self, spec: SchedulerSpec) -> str | None: ...
 
+    def recorded_state_root(self, spec: SchedulerSpec) -> Path | None: ...
+
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome: ...
 
     def kick(self, spec: SchedulerSpec) -> None: ...
@@ -69,6 +71,24 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
     from spec_dock.runtime.infra.canonical_scheduler_loop import LoopScheduler
 
     return LoopScheduler(state_root)
+
+
+def foreign_state_root(scheduler: Scheduler, state_root: Path, home: Path) -> Path | None:
+    """The other state root whose registered catalogs the one installed job still syncs, if any.
+
+    The job of a user is one, so a link or remove from another root (another XDG_STATE_HOME) must not repoint
+    or take it away while that root still has catalogs. A root with no registry, or an empty one, is free.
+    """
+    from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec
+    from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry
+
+    recorded = scheduler.recorded_state_root(SchedulerSpec(Path("/"), state_root, Path("/"), home))
+    if recorded is None or os.path.realpath(recorded) == os.path.realpath(state_root):
+        return None
+    try:
+        return recorded if read_registry(recorded).catalogs else None
+    except (RegistryUnreadable, OSError):
+        return recorded
 
 
 def spec_dock_executable() -> Path:

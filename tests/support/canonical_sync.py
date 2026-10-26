@@ -19,10 +19,12 @@ from spec_dock.runtime.domain.canonical_sync_state import CatalogSyncState
 from spec_dock.runtime.infra import canonical_scheduling, runtime_environment
 from spec_dock.runtime.infra.canonical_scheduling import EnsureOutcome, SchedulerObservation
 from spec_dock.runtime.infra.canonical_state import read_catalog_state
+from spec_dock.runtime.infra.github_structure import GithubApi
 from tests.support.canonical_repo import bare_remote, clone, environment, git, isolate_user_state
 
 if TYPE_CHECKING:
     from collections.abc import Callable
+    import subprocess
 
     import pytest
 
@@ -67,6 +69,9 @@ class FakeScheduler:
     def recorded_executable(self, spec: SchedulerSpec) -> Path | None:
         return self.recorded
 
+    def recorded_state_root(self, spec: SchedulerSpec) -> Path | None:
+        return self.specs[-1].state_root if self.installed and self.specs else None
+
     def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
         if not self.specs:
             return None
@@ -99,6 +104,10 @@ class FakeScheduler:
         return SchedulerObservation(self.installed, self.installed)
 
 
+def _no_gh(*args: object, **kwargs: object) -> subprocess.CompletedProcess[str]:
+    raise OSError("gh api is not reachable from the tests")
+
+
 @dataclass
 class SyncPair:
     tmp_path: Path
@@ -129,6 +138,8 @@ class SyncPair:
         clock = SyncClock()
         monkeypatch.setattr(canonical_sync, "SYNC_CLOCK", clock)
         monkeypatch.setattr(canonical_sync, "hostname", lambda: "pc-test")
+        # Step 7 never reaches the real GitHub: a test that needs `gh api` installs its own fake.
+        monkeypatch.setattr(canonical_sync, "github_api_for", lambda cwd: GithubApi(runner=_no_gh, cwd=cwd))
         schedulers: dict[str, FakeScheduler] = {}
 
         def scheduler_for(kind: str, **_kwargs: object) -> FakeScheduler:

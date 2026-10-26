@@ -9,7 +9,7 @@ import subprocess
 import time
 from typing import TYPE_CHECKING, Final, Literal
 
-from spec_dock.runtime.domain.canonical_scheduler import LAUNCHD_LABEL, launchd_plist
+from spec_dock.runtime.domain.canonical_scheduler import LAUNCHD_LABEL, launchd_plist, state_root_argument
 from spec_dock.runtime.infra.canonical_scheduling import (
     EnsureOutcome,
     SchedulerError,
@@ -84,6 +84,14 @@ class LaunchdScheduler:
         return (
             Path(arguments[0]) if isinstance(arguments, list) and arguments and isinstance(arguments[0], str) else None
         )
+
+    def recorded_state_root(self, spec: SchedulerSpec) -> Path | None:
+        del spec
+        try:
+            arguments = plistlib.loads(self.plist.read_bytes()).get("ProgramArguments")
+        except (OSError, ValueError, plistlib.InvalidFileException):
+            return None
+        return state_root_argument(arguments) if isinstance(arguments, list) else None
 
     def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
         del spec

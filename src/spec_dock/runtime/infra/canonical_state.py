@@ -185,7 +185,8 @@ def move_catalog_state(root: Path, old: str, new: str) -> bool:
     if source == target or not (source / STATE_FILE).is_file() or (target / STATE_FILE).exists():
         return False
     state = _load_state(source / STATE_FILE)
-    assert state is not None
+    if state is None:  # removed in the meantime: nothing to carry
+        return False
     update_catalog_state(root, new, lambda _current: state.evolve(catalog=new))
     shutil.rmtree(source)
     return True

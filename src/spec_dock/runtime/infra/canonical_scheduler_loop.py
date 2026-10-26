@@ -171,6 +171,10 @@ class LoopScheduler:
         del spec
         return None
 
+    def recorded_state_root(self, spec: SchedulerSpec) -> Path | None:
+        del spec
+        return None  # every state root has its own runner
+
     def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
         del spec
         return None

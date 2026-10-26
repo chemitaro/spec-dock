@@ -28,7 +28,7 @@ from spec_dock.runtime.infra.git_cli import _parse_worktree_porcelain_nul, sanit
 from spec_dock.runtime.infra.git_process import GitProcessError
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Collection, Mapping, Sequence
 
     from spec_dock.runtime.application.contracts import GitWorktreeRecord
     from spec_dock.runtime.domain.canonical_sync_rules import CatalogChange, ChangeKind, ConflictEntry, Resolution
@@ -493,6 +493,17 @@ def tracked_count(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> 
     return sum(1 for item in output.stdout.split(b"\0") if item)
 
 
+def worktree_blob(catalog: Path, path: str, *, git: str = "git", timeout: float = 30.0) -> str | None:
+    """The blob `git add` would store for the regular file at `path` (filters applied), or None."""
+    target = catalog / path
+    if target.is_symlink() or not target.is_file() or _beyond_link(catalog, path):
+        return None
+    output = run_catalog_git(
+        catalog, "hash-object", f"--path={path}", "--", str(target), git=git, read_only=True, timeout=timeout
+    )
+    return _text(output)
+
+
 def blob_of(catalog: Path, path: str, *, git: str = "git", timeout: float = 30.0) -> str:
     """The blob value of the file's bytes as they are (no filters), as accepted.json records and compares it."""
     target = catalog / path
@@ -535,13 +546,16 @@ def save_commit(
     message: str,
     parent: str,
     contents: Mapping[str, bytes] | None = None,
+    deletions: Collection[str] = (),
     git: str = "git",
     timeout: float = 30.0,
 ) -> SaveResult:
     """Commit exactly `paths` on top of `parent` through a temporary index and advance the branch from `parent`.
 
     A deletion is removed from the index by its exact name (never expanded to a directory of the same name).
-    A path in `contents` is committed with exactly those bytes (the ones the hold rules checked). When the
+    A path in `contents` is committed with exactly those bytes (the ones the hold rules checked). A path in
+    `deletions` is removed even when a file has come back since (its content was never checked). `{count}` in
+    `message` becomes the number of paths actually committed. When the
     resulting tree changes any path outside the selection (Git replacing a directory by a file or the other
     way round), the selected paths involved are deferred and the rest is staged again, so nothing held or
     unselected is ever committed.
@@ -559,7 +573,7 @@ def save_commit(
             if not remaining:
                 tree = parent_tree
                 break
-            tree = _stage(catalog, parent, remaining, checked, environment, git=git, timeout=timeout)
+            tree = _stage(catalog, parent, remaining, checked, deletions, environment, git=git, timeout=timeout)
             changed = changed_paths(catalog, parent_tree, tree, git=git, timeout=timeout)
             extras = changed - set(remaining)
             if not extras:
@@ -578,7 +592,16 @@ def save_commit(
             return SaveResult(parent, (), tuple(deferred))  # nothing differs from the parent: no empty commit
         commit = _text(
             run_catalog_git(
-                catalog, "commit-tree", tree, "-p", parent, "-m", message, git=git, mutation=True, timeout=timeout
+                catalog,
+                "commit-tree",
+                tree,
+                "-p",
+                parent,
+                "-m",
+                message.replace("{count}", str(len(remaining))),
+                git=git,
+                mutation=True,
+                timeout=timeout,
             )
         )
         run_catalog_git(catalog, "update-ref", CANONICAL_REF, commit, parent, git=git, mutation=True, timeout=timeout)
@@ -594,6 +617,7 @@ def _stage(
     parent: str,
     paths: Sequence[str],
     checked: Mapping[str, bytes],
+    deletions: Collection[str],
     environment: Mapping[str, str],
     *,
     git: str,
@@ -603,14 +627,18 @@ def _stage(
     run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
     # A selected path that is now a real directory was a file Git reports deleted: remove that entry by
     # name instead of letting `git add` take in the directory's (unchecked, maybe held) files.
+    # A selected deletion stays one even when a file came back since (its content was never checked).
     gone = [
         path
         for path in paths
-        if path not in checked
-        and (
-            _beyond_link(catalog, path)
-            or not os.path.lexists(catalog / path)
-            or ((catalog / path).is_dir() and not (catalog / path).is_symlink())
+        if path in deletions
+        or (
+            path not in checked
+            and (
+                _beyond_link(catalog, path)
+                or not os.path.lexists(catalog / path)
+                or ((catalog / path).is_dir() and not (catalog / path).is_symlink())
+            )
         )
     ]
     present = [path for path in paths if path not in gone]

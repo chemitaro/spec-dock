@@ -83,6 +83,17 @@ def test_commits_unpushed_for_more_than_ten_minutes_are_warned(pair: SyncPair) -
     assert "CANONICAL_UNPUSHED_STALE" not in _codes(_status(pair))
 
 
+def test_a_job_that_stopped_recording_cycles_is_warned(pair: SyncPair) -> None:
+    pair.sync(pair.a)
+    assert "CANONICAL_SYNC_NOT_CONFIRMED" not in _codes(_status(pair))
+    pair.advance(4 * 60)
+    assert "CANONICAL_SYNC_NOT_CONFIRMED" not in _codes(_status(pair))
+    pair.advance(2 * 60)
+    result = _status(pair)
+    warning = next(item for item in result["warnings"] if item["code"] == "CANONICAL_SYNC_NOT_CONFIRMED")
+    assert warning["details"]["last_cycle_at"] == result["data"]["sync"]["last_cycle"]["finished_at"]
+
+
 def test_status_writes_nothing_and_never_contacts_the_remote_or_github(
     pair: SyncPair, monkeypatch: pytest.MonkeyPatch
 ) -> None:

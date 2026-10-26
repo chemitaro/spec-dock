@@ -299,3 +299,35 @@ def test_an_offline_link_registers_but_asks_for_no_cycle_now(pair: SyncPair) -> 
     code, result = pair.run(pair.a, "canonical", "link", "--offline")
     assert code == 0, result
     assert pair.schedulers["launchd"].calls == [("ensure", "launchd")]
+
+
+def test_a_link_from_another_state_root_never_repoints_the_job(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    assert pair.run(pair.a, "canonical", "link")[0] == 0
+    launchd = pair.schedulers["launchd"]
+    calls = list(launchd.calls)
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "other-state"))
+    code, result = pair.run(pair.b, "canonical", "link")
+    assert code == 3 and result["error"]["code"] == "CANONICAL_STATE_ROOT_MISMATCH", result
+    assert result["error"]["details"]["recorded_state_root"] == str(pair.state_root)
+    assert launchd.calls == calls and launchd.specs[-1].state_root == pair.state_root
+    assert not (tmp_path / "other-state/spec-dock/canonical-registry.json").exists()
+
+
+def test_status_and_remove_from_another_state_root_leave_the_job_alone(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    assert pair.run(pair.a, "canonical", "link")[0] == 0
+    monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "other-state"))
+    assert pair.run(pair.b, "canonical", "link", "--no-schedule")[0] == 0
+    other = tmp_path / "other-state/spec-dock"
+    git_path = shutil.which("git")
+    assert git_path is not None
+    entry = RegistryEntry(os.path.realpath(pair.catalog(pair.b)), str(pair.b), None, git_path, "2026-01-01T00:00:00Z")
+    update_registry(other, lambda registry: replace(registry.with_entry(entry), scheduler="launchd"))
+    code, result = pair.run(pair.b, "canonical", "status")
+    assert code == 0 and "CANONICAL_STATE_ROOT_MISMATCH" in _codes(result), result
+    code, result = pair.run(pair.b, "canonical", "remove", "--yes")
+    assert code == 0, result
+    assert ("remove", "launchd") not in pair.schedulers["launchd"].calls

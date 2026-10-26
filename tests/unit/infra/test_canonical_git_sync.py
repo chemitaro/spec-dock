@@ -82,6 +82,36 @@ def test_save_commit_refuses_to_move_a_branch_that_moved(catalog: Path) -> None:
         canonical_git.save_commit(catalog, ["b.md"], message="m", parent=head)
 
 
+def test_a_selected_deletion_stays_one_when_the_file_came_back_and_the_count_is_what_was_committed(
+    catalog: Path,
+) -> None:
+    head = git(catalog, "rev-parse", "HEAD")
+    (catalog / "b.md").write_text("recreated after the rules ran, never checked\n")  # b.md was seen deleted
+    (catalog / "a.md").write_text("saved\n")
+    commit = canonical_git.save_commit(
+        catalog, ["a.md", "b.md"], message="spec-dock: save {count} files (mac)", parent=head, deletions={"b.md"}
+    ).commit
+    assert git(catalog, "ls-tree", "--name-only", commit).splitlines() == [".gitignore", "a.md"]
+    assert git(catalog, "show", "-s", "--format=%s", commit) == "spec-dock: save 2 files (mac)"
+    assert (catalog / "b.md").read_text() == "recreated after the rules ran, never checked\n"
+
+
+def test_the_count_leaves_out_deferred_paths(catalog: Path) -> None:
+    import shutil
+
+    (catalog / "d").mkdir()
+    (catalog / "d/x.md").write_text("x\n")
+    git(catalog, "add", "-A")
+    git(catalog, "commit", "-qm", "dir")
+    head = git(catalog, "rev-parse", "HEAD")
+    shutil.rmtree(catalog / "d")
+    (catalog / "d").write_text("a file where the directory was\n")  # d/x.md is not selected
+    (catalog / "b.md").write_text("saved\n")
+    outcome = canonical_git.save_commit(catalog, ["b.md", "d"], message="save {count}", parent=head)
+    assert (outcome.saved, outcome.deferred) == (("b.md",), ("d",))
+    assert git(catalog, "show", "-s", "--format=%s", outcome.commit) == "save 1"
+
+
 def _branch_commit(catalog: Path, base: str, files: dict[str, str | None], message: str) -> str:
     """A commit on top of `base` made without touching the catalog work tree."""
     index = catalog / ".git/test-index"

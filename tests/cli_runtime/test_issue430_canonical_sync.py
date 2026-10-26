@@ -732,6 +732,45 @@ def test_a_cycle_that_lost_its_state_never_takes_a_rewrite(pair: SyncPair) -> No
     assert dropped not in git(pair.remote, "rev-list", "refs/heads/spec-dock/canonical").split()
 
 
+def _rewind_after_two_saves(pair: SyncPair) -> str:
+    """GitHub drops the second of two pushed saves (a force push back to the first); returns the dropped one."""
+    pair.write(pair.a, "first.md", "1\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    first = pair.remote_head()
+    pair.write(pair.a, "dropped.md", "d\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    dropped = pair.remote_head()
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", first)
+    return dropped
+
+
+def test_a_lost_state_after_mains_fetch_of_a_rewind_never_pushes_the_dropped_commit(pair: SyncPair) -> None:
+    import shutil
+
+    from spec_dock.runtime.infra.canonical_state import catalog_state_dir
+
+    dropped = _rewind_after_two_saves(pair)
+    # main's own `git fetch` moved the tracking ref onto the rewind before the cycle saw it.
+    git(pair.a, "fetch", "-q", "origin", "+refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical")
+    shutil.rmtree(catalog_state_dir(pair.state_root, os.path.realpath(pair.catalog(pair.a))))
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    assert dropped not in git(pair.remote, "rev-list", "refs/heads/spec-dock/canonical").split()
+
+
+def test_a_relink_after_remove_keeps_the_local_branch_as_baseline_and_never_pushes_a_rewind(pair: SyncPair) -> None:
+    dropped = _rewind_after_two_saves(pair)
+    code, result = pair.run(pair.a, "canonical", "remove", "--yes")
+    assert code == 0, result
+    code, result = pair.run(pair.a, "canonical", "link", "--no-schedule")
+    assert code == 0, result
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    assert dropped not in git(pair.remote, "rev-list", "refs/heads/spec-dock/canonical").split()
+
+
 def test_the_runtime_area_is_never_saved_or_taken_from_elsewhere(pair: SyncPair) -> None:
     from spec_dock.runtime.application.canonical_catalog import catalog_changes
 

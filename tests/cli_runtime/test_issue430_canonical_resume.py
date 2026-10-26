@@ -269,3 +269,31 @@ def test_accepting_a_fixed_but_unsaved_file_never_pushes_the_old_secret(pair: Sy
     pair.sync(pair.a)
     pair.sync(pair.a)
     assert pair.remote_file("leak.md") in (None, "fixed")
+
+
+def test_an_accepted_file_under_a_clean_filter_lets_a_re_adoption_finish(pair: SyncPair) -> None:
+    from pathlib import Path
+
+    common = git(pair.catalog(pair.a), "rev-parse", "--path-format=absolute", "--git-common-dir")
+    (Path(common) / "info").mkdir(exist_ok=True)
+    (Path(common) / "info/attributes").write_text("*.md text eol=lf\n")  # CRLF in the file, LF committed
+    pair.write(pair.a, "base.md", "base\n")
+    (pair.write(pair.a, "leak.md", "")).write_bytes(TOKEN.encode() + b"\r\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "accept", "leak.md")
+    pair.sync(pair.a)
+    assert pair.remote_file("leak.md") == TOKEN
+    cleaned = _remote_commit(pair, {"base.md": "base\n", ".spec-dock-canonical.json": '{"format": 1}\n'}, parent=None)
+    _force(pair, cleaned)
+    (pair.catalog(pair.a) / ".runtime/accepted.json").unlink()
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    _code, result = pair.sync(pair.a)
+    assert [hold["path"] for hold in catalog_result(result)["holds"]] == ["leak.md"]
+    assert pair.run(pair.a, "canonical", "accept", "leak.md")[0] == 0  # the user accepts it once more
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert item["holds"] == [] and item["pushed"] is True, result
+    assert pair.remote_file("leak.md") == TOKEN

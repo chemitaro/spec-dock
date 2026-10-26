@@ -75,6 +75,15 @@ class ScheduleFailed(Exception):
         self.effects = effects
 
 
+class JobServesAnotherRoot(Exception):
+    """The one installed job syncs the catalogs of another state root; a link here must not repoint it."""
+
+    def __init__(self, recorded: Path, state_root: Path) -> None:
+        super().__init__(f"the installed periodic job syncs the state root {recorded}, not {state_root}")
+        self.recorded = recorded
+        self.state_root = state_root
+
+
 @dataclass
 class SchedulePlan:
     """What steps 6 and 7 would write, decided before anything is written (for the writability check)."""
@@ -188,6 +197,9 @@ def plan_schedule(
     )
     plan.registry_change = previous != plan.entry or plan.moved_from is not None or registry.scheduler != plan.kind
     scheduler = canonical_scheduling.scheduler_for(plan.kind, state_root=state_root, environment=environment)
+    foreign = canonical_scheduling.foreign_state_root(scheduler, state_root, environment.home or Path.home())
+    if foreign is not None:
+        raise JobServesAnotherRoot(foreign, state_root)
     git_dir = Path(git).parent if Path(git).is_absolute() else Path("/usr/bin")
     spec = SchedulerSpec(
         _job_executable(scheduler, state_root, environment),
@@ -258,7 +270,9 @@ def apply_schedule(plan: SchedulePlan, *, offline: bool = False) -> tuple[list[E
             installed = _job(plan, effects)
         if (registered or installed) and not offline:  # --offline: no cycle (and its push) now
             warnings.extend(_kick_and_wait(plan))
-    except (OSError, TimeoutError, RegistryUnreadable, StateUnreadable) as error:
+    except StateUnreadable as error:  # the state of a moved main checkout, read before it moves
+        raise ScheduleFailed(CANONICAL_STATE_UNREADABLE, str(error), STATE_UNREADABLE_NEXT_STEP, effects) from error
+    except (OSError, TimeoutError, RegistryUnreadable) as error:
         raise ScheduleFailed("LOCAL_IO_FAILED", str(error), SCHEDULER_FAILED_RECOVERY, effects) from error
     warnings.extend(_standing_warnings(plan))
     return effects, warnings

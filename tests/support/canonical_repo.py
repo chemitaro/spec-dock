@@ -119,6 +119,16 @@ def isolate_user_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     for key in ("CODEX_SANDBOX", "CLAUDECODE", "container", "REMOTE_CONTAINERS", "CODESPACES"):
         monkeypatch.delenv(key, raising=False)
+    # gh then finds no credentials: its config lives under the temporary XDG_CONFIG_HOME.
+    for key in (
+        "GH_TOKEN",
+        "GITHUB_TOKEN",
+        "GH_ENTERPRISE_TOKEN",
+        "GITHUB_ENTERPRISE_TOKEN",
+        "GH_HOST",
+        "GH_CONFIG_DIR",
+    ):
+        monkeypatch.delenv(key, raising=False)
     # The identity and transport variables SpecDock passes to Git would otherwise reach the fixtures from CI.
     for key in PASSED_GIT_VARIABLES:
         monkeypatch.delenv(key, raising=False)

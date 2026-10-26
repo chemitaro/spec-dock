@@ -7,7 +7,12 @@ import shlex
 import subprocess
 from typing import TYPE_CHECKING, Literal
 
-from spec_dock.runtime.domain.canonical_scheduler import SYSTEMD_SERVICE, SYSTEMD_TIMER, systemd_units
+from spec_dock.runtime.domain.canonical_scheduler import (
+    SYSTEMD_SERVICE,
+    SYSTEMD_TIMER,
+    state_root_argument,
+    systemd_units,
+)
 from spec_dock.runtime.infra.canonical_scheduling import (
     EnsureOutcome,
     SchedulerError,
@@ -85,6 +90,20 @@ class SystemdScheduler:
                 except ValueError:
                     return None
                 return Path(words[0]) if words else None
+        return None
+
+    def recorded_state_root(self, spec: SchedulerSpec) -> Path | None:
+        del spec
+        try:
+            text = (self.unit_dir / self.service).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
+        for line in text.splitlines():
+            if line.startswith("ExecStart="):
+                try:
+                    return state_root_argument(shlex.split(line.removeprefix("ExecStart=").replace("%%", "%")))
+                except ValueError:
+                    return None
         return None
 
     def recorded_search_path(self, spec: SchedulerSpec) -> str | None:

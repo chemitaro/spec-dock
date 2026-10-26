@@ -57,7 +57,9 @@ if TYPE_CHECKING:
     from spec_dock.runtime.domain.canonical_layout import CatalogLayout
     from spec_dock.runtime.infra.runtime_environment import RuntimeEnvironment
 
-REMOVE_CYCLE_WAIT = 150.0  # longer than one catalog's fetch and push attempts
+# A cycle normally ends in seconds; one whose every network attempt times out can run longer, and remove then
+# stops with CANONICAL_LOCK_BUSY before writing anything, so the same command can simply be run again.
+REMOVE_CYCLE_WAIT = 150.0
 REMOVE_AGAIN_RECOVERY = "Check spec-dock canonical status, then run spec-dock canonical remove --yes again."
 
 
@@ -245,7 +247,10 @@ def _steps(
         kind = registry.scheduler
         scheduler = canonical_scheduling.scheduler_for(kind, state_root=root, environment=environment)
         spec = SchedulerSpec(Path("/"), root, Path("/"), environment.home or Path.home())
-        steps.append(_Step("canonical.scheduler", kind, lambda: scheduler.remove(spec), scheduler.write_paths(spec)))
+        if canonical_scheduling.foreign_state_root(scheduler, root, spec.home) is None:  # never another root's job
+            steps.append(
+                _Step("canonical.scheduler", kind, lambda: scheduler.remove(spec), scheduler.write_paths(spec))
+            )
     if registry.entry_for(catalog) is not None:
         steps.append(_Step("canonical.registry", str(registry_path(root)), lambda: _unregister(root, catalog), (root,)))
     if catalog_state_dir(root, catalog).exists():

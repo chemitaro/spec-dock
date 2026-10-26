@@ -74,6 +74,7 @@ CANONICAL_NOT_HELD: Final = "CANONICAL_NOT_HELD"  # exit 3
 CANONICAL_NOT_RESTORABLE: Final = "CANONICAL_NOT_RESTORABLE"  # exit 3
 CANONICAL_PATH_NOT_FOUND: Final = "CANONICAL_PATH_NOT_FOUND"  # exit 3
 CANONICAL_REGISTRY_UNREADABLE: Final = "CANONICAL_REGISTRY_UNREADABLE"  # exit 3
+CANONICAL_STATE_ROOT_MISMATCH: Final = "CANONICAL_STATE_ROOT_MISMATCH"  # exit 3 for link; a warning in status
 
 NOT_IMPLEMENTED_RECOVERY: Final = (
     "Wait for SpecDock 0.3.0, which completes canonical mode for this command; "
@@ -183,7 +184,14 @@ SAVE_HELD_NEXT_STEPS: Final[Mapping[str, str]] = {
 }
 ADOPT_HELD_NEXT_STEP: Final = (
     "The listed files came back from local commits that GitHub dropped; fix or remove them in the catalog "
-    "(or run spec-dock canonical accept <path>), then run spec-dock canonical resume --adopt-remote again."
+    "(or run spec-dock canonical accept <path>). Deletions (mass_delete) of files GitHub still has are "
+    "applied only after spec-dock canonical accept --deletions. Then run spec-dock canonical resume --adopt-remote "
+    "again."
+)
+RUNTIME_INCOMING_NEXT_STEP: Final = (
+    "GitHub's spec-dock/canonical carries .runtime/, which SpecDock never syncs: remove it there with plain Git "
+    "(git rm -r --cached .runtime, commit, push to spec-dock/canonical), then run "
+    "spec-dock canonical resume --adopt-remote."
 )
 UNSAVED_CHANGES_RECOVERY: Final = "Check spec-dock canonical status and wait until everything is saved and pushed."
 IGNORED_FILES_RECOVERY: Final = "Move the listed files out of the catalog, then run the same command again."
@@ -194,6 +202,10 @@ NOT_RESTORABLE_RECOVERY: Final = (
 )
 PATH_NOT_FOUND_RECOVERY: Final = "Name an existing file inside the catalog (relative to spec-dock/initiatives)."
 REGISTRY_UNREADABLE_RECOVERY: Final = "Inspect and move the listed registry aside, then run spec-dock canonical link."
+STATE_ROOT_MISMATCH_NEXT_STEP: Final = (
+    "Run the command with the state root the installed job uses (set XDG_STATE_HOME as when it was linked), "
+    "or run spec-dock canonical remove for the catalogs registered there first."
+)
 STATUS_RECOVERY: Final = "spec-dock canonical status"
 _FAILURE_EXIT_CODES: Final = frozenset({1, 2, 3, 4, 5, 7})
 

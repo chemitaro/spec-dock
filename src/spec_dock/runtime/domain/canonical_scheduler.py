@@ -8,6 +8,7 @@ import shlex
 from typing import TYPE_CHECKING, Final, Literal
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
     from pathlib import Path
 
     from spec_dock.runtime.domain.canonical_sync_state import SchedulerKind
@@ -117,3 +118,14 @@ def systemd_units(spec: SchedulerSpec) -> tuple[str, str]:
 def restart_line(state_root: Path) -> str:
     """The one line a container start script runs to bring the resident runner back."""
     return f"spec-dock canonical sync --registered --loop --detach --state-root {shlex.quote(str(state_root))}"
+
+
+def state_root_argument(arguments: Sequence[object]) -> Path | None:
+    """The `--state-root` value of an installed job's command line, or None when it has none."""
+    from itertools import pairwise
+    from pathlib import Path
+
+    for flag, value in pairwise(arguments):
+        if flag == "--state-root" and isinstance(value, str) and value:
+            return Path(value)
+    return None

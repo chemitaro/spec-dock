@@ -33,6 +33,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_REGISTRY_UNREADABLE,
     CANONICAL_REMOTE_MISSING,
     CANONICAL_SANDBOX_DENIED,
+    CANONICAL_STATE_ROOT_MISMATCH,
     CHECKOUT_NOT_MIGRATED_NEXT_STEP,
     FORMAT_MISSING_RECOVERY,
     FORMAT_UNSUPPORTED_RECOVERY,
@@ -48,9 +49,16 @@ from spec_dock.runtime.application.canonical_errors import (
     SANDBOX_DENIED_RECOVERY,
     START_LOCK_BUSY,
     START_LOCK_BUSY_RECOVERY,
+    STATE_ROOT_MISMATCH_NEXT_STEP,
     CanonicalCommandError,
 )
-from spec_dock.runtime.application.canonical_schedule import ScheduleFailed, SchedulePlan, apply_schedule, plan_schedule
+from spec_dock.runtime.application.canonical_schedule import (
+    JobServesAnotherRoot,
+    ScheduleFailed,
+    SchedulePlan,
+    apply_schedule,
+    plan_schedule,
+)
 from spec_dock.runtime.application.canonical_tools_check import tool_findings
 from spec_dock.runtime.application.project_context import probe_workspace_mode
 from spec_dock.runtime.domain.canonical_content import FORMAT_FILE, format_writable, read_format
@@ -247,6 +255,17 @@ def _plan_schedule(
         return plan_schedule(
             layout, environment, moved_from=moved_from, schedule=schedule, follow_up=follow_up, timeout=timeout
         )
+    except JobServesAnotherRoot as error:
+        raise CanonicalCommandError(
+            CANONICAL_STATE_ROOT_MISMATCH,
+            str(error),
+            recovery=(STATE_ROOT_MISMATCH_NEXT_STEP,),
+            details={
+                "recorded_state_root": str(error.recorded),
+                "state_root": str(error.state_root),
+                "next_step": STATE_ROOT_MISMATCH_NEXT_STEP,
+            },
+        ) from error
     except RegistryUnreadable as error:
         raise CanonicalCommandError(
             CANONICAL_REGISTRY_UNREADABLE,

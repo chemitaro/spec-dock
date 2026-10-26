@@ -63,6 +63,7 @@ def test_launchd_installs_once_kicks_and_removes(tmp_path: Path, spec: Scheduler
     plist = plistlib.loads((tmp_path / "agents/local.test.job.plist").read_bytes())
     assert plist["Label"] == "local.test.job" and plist["ProgramArguments"][0] == str(spec.executable)
     assert launchd.recorded_executable(spec) == spec.executable
+    assert launchd.recorded_state_root(spec) == spec.state_root
     assert not launchd.needs_change(spec) and launchd.ensure(spec) == "unchanged"
     launchd.kick(spec)
     assert ["launchctl", "kickstart", "gui/501/local.test.job"] in commands.calls
@@ -90,6 +91,7 @@ def test_systemd_writes_both_units_enables_the_timer_and_removes_them(tmp_path: 
     assert systemd.ensure(spec) == "created"
     assert (tmp_path / "units/spec-dock-canonical-sync.timer").read_text().startswith("[Unit]")
     assert systemd.recorded_executable(spec) == spec.executable
+    assert systemd.recorded_state_root(spec) == spec.state_root
     assert systemd.ensure(spec) == "unchanged"
     systemd.kick(spec)
     systemd.remove(spec)

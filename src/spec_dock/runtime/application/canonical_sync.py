@@ -41,6 +41,7 @@ from spec_dock.runtime.application.canonical_errors import (
     PUSH_AUTH_HTTPS_NEXT_STEP,
     PUSH_AUTH_SSH_NEXT_STEP,
     REGISTRY_UNREADABLE_RECOVERY,
+    RUNTIME_INCOMING_NEXT_STEP,
     STATE_UNREADABLE_NEXT_STEP,
     SYNC_BLOCKED_NEXT_STEP,
     canonical_failure,
@@ -226,10 +227,10 @@ class _Run:
             code, message, next_step, tuple(program) if isinstance(program, (list, tuple)) else None, self.ctx.stamp()
         )
 
-    def pause(self, reason: PauseReason, message: str) -> None:
+    def pause(self, reason: PauseReason, message: str, next_step: str | None = None) -> None:
         self.result.result = "paused"
         self.result.paused = reason
-        self.result.error = SyncError(reason, message, None, None, self.ctx.stamp())
+        self.result.error = SyncError(reason, message, next_step, None, self.ctx.stamp())
 
 
 def sync_catalog(entry: RegistryEntry, ctx: SyncContext, *, registered: bool = False) -> CatalogResult:
@@ -303,17 +304,17 @@ def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
 def initial_baseline(catalog: Path, *, git: str = "git") -> str | None:
     """The baseline of a catalog without one (link step 7, or a cycle whose state was lost).
 
-    The tracking ref as last fetched; without it the local HEAD, unless that is only the initial commit
-    (a new repository whose first push is still to come). Never take what this fetch would bring.
+    The local HEAD: the GitHub history this checkout already holds. The tracking ref may already show a rewrite
+    (main's `git fetch`, the fetch of a relink), and taking it would push the dropped commits back. A HEAD that
+    is not on GitHub then pauses as `remote_rewritten`, which `resume --adopt-remote` answers without losing
+    anything. When HEAD is only the initial commit (a new repository whose first push is still to come), the
+    tracking ref as last fetched, or nothing.
     """
     try:
-        tracking = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
-        if tracking is not None:
-            return tracking
         head = canonical_git.resolve_commit(catalog, "HEAD", git=git)
-        if head is None or canonical_git.is_initial_commit(catalog, head):
-            return None
-        return head
+        if head is not None and not canonical_git.is_initial_commit(catalog, head):
+            return head
+        return canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
     except (GitProcessError, OSError):
         return None
 
@@ -562,9 +563,10 @@ def _save(run: _Run) -> None:
             outcome = canonical_git.save_commit(
                 catalog,
                 paths,
-                message=f"spec-dock: save {len(paths)} files ({run.ctx.pc})",
+                message=f"spec-dock: save {{count}} files ({run.ctx.pc})",
                 parent=head,
                 contents={path: checked[path] for path in paths if path in checked},
+                deletions={path for path in paths if kinds[path].kind == "deleted"},
                 git=git,
             )
             if outcome.commit != head:  # an unchanged tree (for example after an eol filter) makes no commit
@@ -646,7 +648,11 @@ def _merge(run: _Run) -> None:
     runtime = sorted(path for path in incoming if path == ".runtime" or path.startswith(".runtime/"))
     if runtime:
         # .runtime/ is this clone's own area: never let a commit from elsewhere write into it.
-        run.pause("merge_failed", "the incoming canonical carries SpecDock's .runtime area: " + ", ".join(runtime[:5]))
+        run.pause(
+            "merge_failed",
+            "the incoming canonical carries SpecDock's .runtime area: " + ", ".join(runtime[:5]),
+            RUNTIME_INCOMING_NEXT_STEP,
+        )
         raise _Stop
     edited = {change.path for change in canonical_git.list_changes(catalog, git=git)}
     # Ignored files are user data too (merge and reset --keep would replace them without a word).
@@ -730,6 +736,10 @@ def _adopt_holds(run: _Run, remote: str, tree: str) -> bool:
             # pushed (not with the work tree, which may already hold a fix that is not saved yet).
             payload = content if content is not None else canonical_git.blob_bytes(catalog, entry.oid, git=git)
             blob = canonical_git.blob_of_bytes(catalog, payload, git=git)
+            if blob != accepted.paths[path] and canonical_git.worktree_blob(catalog, path, git=git) == entry.oid:
+                # A clean filter (eol, LFS) committed other bytes than the file holds; the file is exactly what
+                # was committed, so compare its unfiltered blob, as accept recorded it.
+                blob = canonical_git.blob_of(catalog, path, git=git)
         candidates.append(HoldCandidate(path, size, blob, content))
     held = classify_holds(
         candidates,

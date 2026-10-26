@@ -20,6 +20,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_REGISTRY_UNREADABLE,
     CANONICAL_RUNNER_STOPPED,
     CANONICAL_SAVE_HELD,
+    CANONICAL_STATE_ROOT_MISMATCH,
     CANONICAL_STATE_UNREADABLE,
     CANONICAL_SYNC_BLOCKED,
     CANONICAL_SYNC_FAILED,
@@ -31,6 +32,7 @@ from spec_dock.runtime.application.canonical_errors import (
     PRIVACY_NEXT_STEP,
     REGISTRY_UNREADABLE_RECOVERY,
     SAVE_HELD_NEXT_STEPS,
+    STATE_ROOT_MISMATCH_NEXT_STEP,
     STATE_UNREADABLE_NEXT_STEP,
     STATUS_RECOVERY,
     SYNC_BLOCKED_NEXT_STEP,
@@ -55,6 +57,14 @@ if TYPE_CHECKING:
     from spec_dock.runtime.infra.runtime_environment import RuntimeEnvironment
 
 UNPUSHED_LIMIT: Final = timedelta(minutes=10)
+CYCLE_SILENCE_LIMIT: Final = timedelta(minutes=5)  # five missed 60-second cycles
+
+
+def _silent(finished_at: str) -> bool:
+    try:
+        return _now() - parse_timestamp(finished_at) > CYCLE_SILENCE_LIMIT
+    except ValueError:
+        return False
 
 
 def _now() -> datetime:
@@ -130,10 +140,12 @@ class SyncView:
             steps.append(self.problem("sync", code, message, step, **details))
 
         if state is not None and state.paused is not None:
+            # A pause that knows its own way out (held re-adoption, an incoming .runtime/) says it first.
+            specific = state.last_error.next_step if state.last_error is not None else None
             note(
                 CANONICAL_PAUSED,
                 f"sync of this catalog is paused ({state.paused})",
-                PAUSED_NEXT_STEP,
+                specific or PAUSED_NEXT_STEP,
                 reason=state.paused,
             )
         if self.entry is None:
@@ -162,9 +174,19 @@ class SyncView:
                 cause=error.code,
                 program=list(error.program or ()),
             )
-        if self.entry is not None and (state is None or state.last_cycle is None):
+        if self.entry is not None:
             step = PRIVACY_NEXT_STEP if self.environment.system == "darwin" else SYNC_LOG_NEXT_STEP
-            note(CANONICAL_SYNC_NOT_CONFIRMED, "the periodic job has not recorded a cycle for this catalog yet", step)
+            if state is None or state.last_cycle is None:
+                note(
+                    CANONICAL_SYNC_NOT_CONFIRMED, "the periodic job has not recorded a cycle for this catalog yet", step
+                )
+            elif _silent(state.last_cycle.finished_at):
+                note(
+                    CANONICAL_SYNC_NOT_CONFIRMED,
+                    f"the periodic job has recorded no cycle since {state.last_cycle.finished_at}",
+                    step,
+                    last_cycle_at=state.last_cycle.finished_at,
+                )
         if steps:
             item.update(status="problem", next_step=steps[0])
         return item
@@ -183,6 +205,15 @@ class SyncView:
             item["job"] = {"installed": None, "active": None, "detail": str(error)}
             return
         item["job"] = {"installed": observed.installed, "active": observed.active, "detail": observed.detail}
+        foreign = canonical_scheduling.foreign_state_root(scheduler, self.state_root, spec.home)
+        if foreign is not None:
+            note(
+                CANONICAL_STATE_ROOT_MISMATCH,
+                f"the installed {kind} job syncs the state root {foreign}, not this one",
+                STATE_ROOT_MISMATCH_NEXT_STEP,
+                recorded_state_root=str(foreign),
+            )
+            return
         if kind == "loop" and not observed.active:
             line = restart_line(self.state_root)
             note(CANONICAL_RUNNER_STOPPED, "the resident sync runner is not running", line, line=line)
