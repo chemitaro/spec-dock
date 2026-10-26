@@ -80,6 +80,10 @@ def test_the_first_link_of_a_new_repository_creates_the_canonical_and_links_main
         ("git.worktree.lock", "succeeded"),
         ("git.info.exclude", "succeeded"),
         ("canonical.link", "succeeded"),
+        # iss-00430 steps 6 and 7: registry, baseline and the (fake) periodic job.
+        ("canonical.registry", "succeeded"),
+        ("canonical.baseline", "succeeded"),
+        ("canonical.scheduler", "succeeded"),
     ]
     data = result["data"]["result"]
     assert data["catalog"] == str(catalog) and data["source"] == "new" and data["catalog_state"] == "ready"

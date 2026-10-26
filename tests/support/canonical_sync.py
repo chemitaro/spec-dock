@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from spec_dock.cli import main
 from spec_dock.runtime.application import canonical_sync
+from spec_dock.runtime.domain.canonical_sync_state import CatalogSyncState
 from spec_dock.runtime.infra import canonical_scheduling, runtime_environment
 from spec_dock.runtime.infra.canonical_scheduling import EnsureOutcome, SchedulerObservation
 from spec_dock.runtime.infra.canonical_state import read_catalog_state
@@ -26,7 +27,6 @@ if TYPE_CHECKING:
     import pytest
 
     from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec
-    from spec_dock.runtime.domain.canonical_sync_state import CatalogSyncState
 
 
 class SyncClock:
@@ -56,6 +56,7 @@ class FakeScheduler:
     fail_ensure: bool = False
     on_kick: Callable[[], object] | None = None
     recorded: Path | None = None
+    simulate_run: bool = False  # a kick records a successful cycle for every registered catalog
 
     def needs_change(self, spec: SchedulerSpec) -> bool:
         return not self.installed or (self.specs[-1] != spec if self.specs else True)
@@ -81,6 +82,8 @@ class FakeScheduler:
         self.calls.append(("kick", self.kind))
         if self.on_kick is not None:
             self.on_kick()
+        elif self.simulate_run:
+            record_successful_cycle(spec.state_root)
 
     def remove(self, spec: SchedulerSpec) -> bool:
         self.calls.append(("remove", self.kind))
@@ -187,3 +190,20 @@ class SyncPair:
 def catalog_result(result: dict[str, Any]) -> dict[str, Any]:
     (item,) = result["data"]["result"]["catalogs"]
     return item
+
+
+def record_successful_cycle(state_root: Path) -> None:
+    """Stand in for a working job: every registered catalog gets an ok cycle with push_auth ok."""
+    from spec_dock.runtime.domain.canonical_structure import format_timestamp
+    from spec_dock.runtime.domain.canonical_sync_state import LastCycle, PushAuth
+    from spec_dock.runtime.infra.canonical_registry import read_registry
+    from spec_dock.runtime.infra.canonical_state import update_catalog_state
+
+    stamp = format_timestamp(canonical_sync.SYNC_CLOCK.now())
+    for entry in read_registry(state_root).catalogs:
+
+        def mutate(current: CatalogSyncState | None, catalog: str = entry.catalog) -> CatalogSyncState:
+            state = current or CatalogSyncState.new(catalog, at=stamp)
+            return state.evolve(last_cycle=LastCycle(stamp, stamp, "ok"), push_auth=PushAuth("ok", stamp))
+
+        update_catalog_state(state_root, entry.catalog, mutate)

@@ -84,12 +84,13 @@ def test_status_of_a_linked_clone_reports_every_item_and_no_problems(
     for item in ("catalog", "link", "exclude", "access", "tools", "format", "git", "changes"):
         assert data[item]["status"] == "ok", (item, data[item])
     for item, owner in (
-        ("sync", "iss-00430"),
-        ("snapshot", "iss-00430"),
         ("dashboard", "iss-00438"),
         ("structure", "iss-00431"),
     ):
         assert data[item] == {"status": "not_implemented", "next_step": None, "owner": owner}
+    # iss-00430: the (fake) periodic job ran once after link; origin is a bare path, so no snapshot applies.
+    assert data["sync"]["status"] == "ok" and data["sync"]["registered"] is True
+    assert data["snapshot"]["status"] == "unknown" and data["snapshot"]["repository"] is None
     assert data["catalog"]["locked"] and data["catalog"]["branch"] == "spec-dock/canonical"
     assert data["format"]["version"] == 1 and data["git"]["supported"]
     assert data["changes"]["unsaved"] == 0 and data["changes"]["unpushed"] == 0
@@ -101,12 +102,12 @@ def test_status_writes_nothing_anywhere(
     main_checkout, linked = linked_clone
     (main_checkout / "spec-dock/.canonical/init-00001-plan").mkdir()
     (main_checkout / "spec-dock/.canonical/init-00001-plan/plan.md").write_text("draft\n", encoding="utf-8")
-    before = tree_digest(main_checkout), tree_digest(linked), tree_digest(remote)
+    state = tmp_path / "state"  # canonical link (iss-00430 steps 6-7) wrote the registry and the baseline here
+    before = tree_digest(main_checkout), tree_digest(linked), tree_digest(remote), tree_digest(state)
     for checkout in (main_checkout, linked):
         code, result = run(capsys, checkout, "canonical", "status")
         assert code == 0 and result["data"]["changes"]["unsaved"] == 1
-    assert (tree_digest(main_checkout), tree_digest(linked), tree_digest(remote)) == before
-    assert not (tmp_path / "state").exists()
+    assert (tree_digest(main_checkout), tree_digest(linked), tree_digest(remote), tree_digest(state)) == before
 
 
 def test_status_names_the_problem_and_the_next_step_for_an_unlinked_clone(
@@ -119,7 +120,7 @@ def test_status_names_the_problem_and_the_next_step_for_an_unlinked_clone(
     assert data["catalog"]["state"] == "absent" and data["catalog"]["next_step"] == "spec-dock canonical link"
     assert data["link"]["status"] == "problem" and data["exclude"]["status"] == "problem"
     codes = {item["code"] for item in result["warnings"]}
-    assert codes == {"CANONICAL_NOT_LINKED", "CANONICAL_IGNORE_RULES_MISSING"}
+    assert codes == {"CANONICAL_NOT_LINKED", "CANONICAL_IGNORE_RULES_MISSING", "CANONICAL_SYNC_NOT_SCHEDULED"}
     assert all(item["details"]["next_step"] for item in result["warnings"])
 
 

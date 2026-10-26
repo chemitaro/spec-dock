@@ -42,6 +42,11 @@ def read_registry(root: Path) -> SyncRegistry:
         raise RegistryUnreadable(path, str(error)) from error
 
 
+def write_registry_locked(root: Path, registry: SyncRegistry) -> None:
+    """Write the registry while the caller holds directory_lock(root) (canonical link steps 6a-6b)."""
+    write_json_atomic(root, REGISTRY_FILE, registry.to_json())
+
+
 def update_registry(
     root: Path, mutate: Callable[[SyncRegistry], SyncRegistry], *, timeout: float = 10.0
 ) -> tuple[SyncRegistry, SyncRegistry]:

@@ -322,6 +322,12 @@ def _preconditions(run: _Run) -> None:
 
 
 def _git_version(git: str) -> tuple[int, int, int] | None:
+    from spec_dock.runtime.infra.runtime_environment import probe_git
+
+    return probe_git(git).version if Path(git).is_absolute() else _path_git_version(git)
+
+
+def _path_git_version(git: str) -> tuple[int, int, int] | None:
     try:
         completed = subprocess.run(
             [git, "--version"], capture_output=True, check=False, env=sanitized_git_environment(), timeout=10

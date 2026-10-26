@@ -6,7 +6,7 @@ this module so a CLI test can replace it. I-3 adds systemd-user and linger field
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import os
 from pathlib import Path
 import shutil
@@ -42,6 +42,11 @@ class RuntimeEnvironment:
     container_markers: tuple[str, ...]
     git: GitInstallation
     environ: Mapping[str, str]
+    # Filled only by detect_service_manager (canonical link step 6 and canonical status); None means unknown.
+    systemd_present: bool | None = None
+    systemd_user: bool | None = None
+    linger: bool | None = None
+    user: str | None = None
 
     @property
     def container(self) -> bool:
@@ -99,3 +104,80 @@ def _git(
     if completed.returncode != 0 or first is None:
         return GitInstallation(path, None, first)
     return GitInstallation(path, parse_git_version(first), first)
+
+
+SYSTEMD_RUNTIME_DIRECTORY: Final = "/run/systemd/system"
+BUS_RETRIES: Final = 5
+_BUS_FAILURE: Final = "Failed to connect to bus"
+
+
+def detect_service_manager(
+    environment: RuntimeEnvironment,
+    *,
+    root: Path = Path("/"),
+    runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run,
+    sleep: Callable[[float], None] | None = None,
+    timeout: float = 10.0,
+) -> RuntimeEnvironment:
+    """Add the systemd user manager and linger facts on Linux (Epic ch. 5); macOS is returned unchanged.
+
+    `systemctl --user is-system-running` counts when it prints running or degraded; "Failed to connect to
+    bus" (seen right after a VM boots) is retried once a second, five times at most.
+    """
+    if environment.system != "linux":
+        return environment
+    import getpass
+    import time
+
+    wait = sleep or time.sleep
+    user = environment.environ.get("USER") or environment.environ.get("LOGNAME")
+    if not user:
+        try:
+            user = getpass.getuser()
+        except (KeyError, OSError):
+            user = None
+    present = Path(root / SYSTEMD_RUNTIME_DIRECTORY.lstrip("/")).is_dir()
+    systemd_user: bool | None = False
+    if present:
+        systemd_user = None
+        for attempt in range(BUS_RETRIES + 1):
+            completed = _run_quietly(runner, ["systemctl", "--user", "is-system-running"], environment, timeout)
+            if completed is None:
+                break
+            state = completed.stdout.decode("utf-8", errors="replace").strip().splitlines()
+            if state and state[0] in ("running", "degraded"):
+                systemd_user = True
+                break
+            if _BUS_FAILURE not in completed.stderr.decode("utf-8", errors="replace") or attempt == BUS_RETRIES:
+                systemd_user = False
+                break
+            wait(1.0)
+    linger: bool | None = None
+    if user:
+        completed = _run_quietly(
+            runner, ["loginctl", "show-user", user, "-p", "Linger", "--value"], environment, timeout
+        )
+        value = completed.stdout.decode("utf-8", errors="replace").strip() if completed is not None else ""
+        linger = True if value == "yes" else (False if value == "no" else None)
+    return replace(environment, systemd_present=present, systemd_user=systemd_user, linger=linger, user=user)
+
+
+def _run_quietly(
+    runner: Callable[..., subprocess.CompletedProcess[bytes]],
+    argv: list[str],
+    environment: RuntimeEnvironment,
+    timeout: float,
+) -> subprocess.CompletedProcess[bytes] | None:
+    try:
+        return runner(argv, capture_output=True, check=False, env=dict(environment.environ), timeout=timeout)
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
+def probe_git(
+    path: str, *, runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run
+) -> GitInstallation:
+    """The version of one recorded git (the periodic job's), without looking at PATH."""
+    if not Path(path).is_absolute() or not os.access(path, os.X_OK):
+        return GitInstallation(path, None, None)
+    return _git({"PATH": str(Path(path).parent)}, lambda argv, **kwargs: runner([path, *argv[1:]], **kwargs), 10.0)

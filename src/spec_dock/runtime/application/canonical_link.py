@@ -30,6 +30,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_NOT_LINKED,
     CANONICAL_NOT_MIGRATED,
     CANONICAL_PATH_OCCUPIED,
+    CANONICAL_REGISTRY_UNREADABLE,
     CANONICAL_REMOTE_MISSING,
     CANONICAL_SANDBOX_DENIED,
     CHECKOUT_NOT_MIGRATED_NEXT_STEP,
@@ -42,12 +43,14 @@ from spec_dock.runtime.application.canonical_errors import (
     MAIN_NOT_MIGRATED_NEXT_STEP,
     NOT_MIGRATED_RECOVERY,
     PERMISSION_DENIED_RECOVERY,
+    REGISTRY_UNREADABLE_RECOVERY,
     REMOTE_MISSING_NEXT_STEP,
     SANDBOX_DENIED_RECOVERY,
     START_LOCK_BUSY,
     START_LOCK_BUSY_RECOVERY,
     CanonicalCommandError,
 )
+from spec_dock.runtime.application.canonical_schedule import ScheduleFailed, SchedulePlan, apply_schedule, plan_schedule
 from spec_dock.runtime.application.canonical_tools_check import tool_findings
 from spec_dock.runtime.application.project_context import probe_workspace_mode
 from spec_dock.runtime.domain.canonical_content import FORMAT_FILE, format_writable, read_format
@@ -61,6 +64,7 @@ from spec_dock.runtime.domain.canonical_layout import (
 )
 from spec_dock.runtime.infra import canonical_git, runtime_environment
 from spec_dock.runtime.infra.canonical_files import LinkOccupied, append_exclude, place_link
+from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable
 from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.github_structure import GITHUB_UNAVAILABLE
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
@@ -93,6 +97,7 @@ def run_canonical_link(namespace: argparse.Namespace, context: ProjectContext) -
         command=namespace.command_path,
         timeout=namespace.timeout,
         dry_run=namespace.dry_run,
+        schedule=not namespace.no_schedule,
     )
 
 
@@ -140,24 +145,28 @@ def link_checkout(
     command: str,
     timeout: float,
     dry_run: bool,
+    schedule: bool = True,
+    follow_up: bool = False,
 ) -> OperationResult[object]:
-    """Steps 1-5 and 8; I-3 adds a keyword `schedule: bool = True` and steps 6-7 after the links."""
+    """Steps 1-8; `schedule=False` (--no-schedule) skips step 6, and a follow-up honours an earlier --no-schedule."""
     require_git(environment)
     layout = resolve_layout(context)
     # A main checkout on an unmigrated commit keeps working in legacy mode: never put a link there.
     skip_main = not layout.is_main and probe_workspace_mode(layout.main_checkout) != "canonical"
     observation = observe_catalog(layout, environment, timeout=timeout)
     _refuse_blocked(observation, skip_main=skip_main)
-    predicted = _local_steps(observation, None, timeout=timeout, skip_main=skip_main)
+    plan = _plan_schedule(layout, observation, environment, schedule=schedule, follow_up=follow_up, timeout=timeout)
+    scheduled = _Step("canonical.schedule", str(plan.state_root), lambda: None, plan.write_paths())
+    predicted = (*_local_steps(observation, None, timeout=timeout, skip_main=skip_main), scheduled)
     # Check writability before any network call: a sandbox without network must still get the right answer.
     _refuse_unwritable(predicted, environment)
     creation = _plan_creation(layout, timeout=timeout) if observation.state == "absent" else None
     run = _Run(command, source=creation.source if creation else None)
     network = _network_steps(layout, creation, run, timeout=timeout)
     local = _local_steps(observation, creation, timeout=timeout, skip_main=skip_main)
-    _refuse_unwritable((*network, *local), environment)
+    _refuse_unwritable((*network, *local, scheduled), environment)
     if dry_run:
-        planned = tuple(Effect(step.kind, "planned", step.target) for step in (*network, *local))
+        planned = (*(Effect(step.kind, "planned", step.target) for step in (*network, *local)), *plan.planned())
         return OperationResult(
             command, "planned", FamilyData("canonical-link", _data(observation, run, changed=False)), 0, effects=planned
         )
@@ -182,6 +191,12 @@ def link_checkout(
                 exit_code=3,
                 recovery=LINK_AGAIN_RECOVERY,
             )
+        try:
+            schedule_effects, schedule_warnings = apply_schedule(plan, timeout=timeout)
+        except ScheduleFailed as failure:
+            run.effects.extend(failure.effects)
+            raise _StepFailed(failure.code, failure.message, {}, exit_code=3, recovery=failure.recovery) from failure
+        run.effects.extend(schedule_effects)
     except _StepFailed as failure:
         return _failure_result(run, failure)
     except (GitProcessError, OSError, ValueError) as error:
@@ -193,7 +208,14 @@ def link_checkout(
             if (step.kind, step.target) not in recorded
         )
         return _failure_result(run, _unexpected_failure(error))
-    warnings = _warnings(final, creation, moved=observation.moved, environment=environment, skip_main=skip_main)
+    warnings = _warnings(
+        final,
+        creation,
+        moved=observation.moved,
+        environment=environment,
+        skip_main=skip_main,
+        schedule=tuple(schedule_warnings),
+    )
     changed = any(effect.status == "succeeded" for effect in run.effects)
     status: ResultStatus = "succeeded" if changed else "unchanged"
     return OperationResult(
@@ -204,6 +226,32 @@ def link_checkout(
         effects=tuple(run.effects),
         warnings=warnings,
     )
+
+
+def _plan_schedule(
+    layout: CatalogLayout,
+    observation: CatalogObservation,
+    environment: RuntimeEnvironment,
+    *,
+    schedule: bool,
+    follow_up: bool,
+    timeout: float,
+) -> SchedulePlan:
+    """Decide steps 6-7 before writing; an unreadable registry stops here with nothing written."""
+    moved_from = None
+    if observation.moved and observation.registered is not None:
+        moved_from = os.path.realpath(observation.registered.path)
+    try:
+        return plan_schedule(
+            layout, environment, moved_from=moved_from, schedule=schedule, follow_up=follow_up, timeout=timeout
+        )
+    except RegistryUnreadable as error:
+        raise CanonicalCommandError(
+            CANONICAL_REGISTRY_UNREADABLE,
+            str(error),
+            recovery=(REGISTRY_UNREADABLE_RECOVERY,),
+            details={"path": str(error.path), "next_step": REGISTRY_UNREADABLE_RECOVERY},
+        ) from error
 
 
 def _write_locally(
@@ -636,6 +684,7 @@ def _warnings(
     moved: bool,
     environment: RuntimeEnvironment,
     skip_main: bool,
+    schedule: tuple[Diagnostic, ...] = (),
 ) -> tuple[Diagnostic, ...]:
     layout = observation.layout
     warnings: list[Diagnostic] = []
@@ -687,7 +736,7 @@ def _warnings(
             )
         )
     _item, tools = tool_findings(layout, environment)
-    return (*warnings, *tools)
+    return (*warnings, *schedule, *tools)
 
 
 def main_not_migrated_message(path: Path) -> str:
@@ -774,7 +823,9 @@ def link_after_command(
     current = environment or runtime_environment.detect_runtime_environment()
     try:
         context = resolve_context(str(checkout), checkout, timeout=timeout)
-        result = link_checkout(context, current, command="canonical link", timeout=timeout, dry_run=dry_run)
+        result = link_checkout(
+            context, current, command="canonical link", timeout=timeout, dry_run=dry_run, follow_up=True
+        )
     except CanonicalCommandError as error:
         return failed(
             error.code, error.message, error.recovery[0] if error.recovery else LINK_AGAIN_RECOVERY, error.details

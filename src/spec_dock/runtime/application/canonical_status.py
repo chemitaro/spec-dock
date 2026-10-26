@@ -1,7 +1,8 @@
 """`spec-dock canonical status`: read the catalog, links, ignore rules, access and tool settings (R-B7).
 
-It writes nothing anywhere and never contacts GitHub or the remote. Items owned by later Issues are present
-with status "not_implemented": sync and snapshot (iss-00430), dashboard (iss-00438), structure (iss-00431).
+It writes nothing anywhere and never contacts GitHub or the remote. The sync, snapshot and state.json parts
+come from canonical_status_sync (iss-00430). Items owned by later Issues are present with status
+"not_implemented": dashboard (iss-00438), structure (iss-00431).
 """
 
 from __future__ import annotations
@@ -129,33 +130,26 @@ def status_of(
     warnings.extend(tool_warnings)
     format_item = _format_item(layout, observation, problem)
     changes_item = _changes_item(layout, observation, timeout=timeout)
+    from spec_dock.runtime.application.canonical_status_sync import SyncView
+
+    view = SyncView.read(layout, environment, problem, timeout=timeout)
+    view.extend_changes(changes_item)
+    view.extend_git(git_item)
     data = CanonicalStatusData(
         catalog=catalog_item,
         link=link_item,
         exclude=exclude_item,
         access=access_item,
         tools=tools_item,
-        sync=sync_item(layout, environment),
+        sync=view.sync_item(),
         changes=changes_item,
         format=format_item,
         git=git_item,
-        snapshot=snapshot_item(layout, environment),
+        snapshot=view.snapshot_item(),
         dashboard=_not_implemented("iss-00438"),
         structure=_not_implemented("iss-00431"),
     )
     return OperationResult(command, "succeeded", data, 0, warnings=tuple(warnings))
-
-
-def sync_item(layout: CatalogLayout, environment: RuntimeEnvironment) -> dict[str, object]:
-    """The periodic sync item; iss-00430 replaces this with the registry and state.json view."""
-    del layout, environment
-    return _not_implemented("iss-00430")
-
-
-def snapshot_item(layout: CatalogLayout, environment: RuntimeEnvironment) -> dict[str, object]:
-    """The structure snapshot item; iss-00430 replaces this (it never contacts GitHub)."""
-    del layout, environment
-    return _not_implemented("iss-00430")
 
 
 def _catalog_item(layout: CatalogLayout, observation: CatalogObservation | None, problem: Problem) -> dict[str, object]:
@@ -385,8 +379,8 @@ def _changes_item(
         "conflict_files": [],
         "unpushed": None,
         "oldest_unpushed_at": None,
-        "holds": _not_implemented("iss-00430"),
-        "blocking": _not_implemented("iss-00430"),
+        "holds": [],
+        "blocking": [],
     }
     if observation is None or observation.state != "ready":
         return item
