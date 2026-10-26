@@ -103,3 +103,24 @@ requirement.md の AC-431-01〜17 を満たす。canonical モードで、Scope 
 | 12 `structure` の項目の形 | `not_checked`、`ok`/`problem`、`unavailable` の形を決めた（R-431-10、design） |
 | 13 P3 の扱いと新しいコードの申し送り | exit / handoff に書いた |
 | 14 版3のworktreeの `workspace sync` | 同じく観察し、読めなければ `unavailable` の行（R-431-09、design） |
+
+## 実装のレビューの指摘の対応（S9、2026-10-26）
+
+対象は `d5c8cc943..f3a0568a4`。規約（ST）と仕様（SP）の、独立した2つのサブエージェントが見た。根拠をソースと再現で確かめ、判断が要るもの（ST-7、ST-8）のほかを直した。統括の指示（2026-10-26）で、ST-1〜ST-6、ST-9、SP-1〜SP-6 を直した。
+
+| 指摘 | 判定 | 対応 |
+|---|---|---|
+| ST-1 / SP-1 親のある Initiative で `KeyError`（`SCOPE_NOT_FOUND` に化ける） | 妥当（high） | 入れ子の表を `SCOPE_NESTING` の1か所にし、表にない種類は飛ばす。異常は `PARENT_INVALID` で示される。テストを足した |
+| ST-2 ブランチの作成と切り替えで、書いた後の確かめの失敗が効果なしになる | 妥当 | 書いた後の確かめを囲み、効果 `succeeded` の `partial`（終了コード6、`BRANCH_VERIFICATION_FAILED` / `CHECKOUT_VERIFICATION_FAILED`。従来と同じ）。作成の後の選択の確かめも戻した。テストを足した |
+| ST-3 / SP-3 doctor が GitHub 以外の失敗で止まる | 妥当 | `ValueError`、`GitProcessError`、`OSError` も `findings` と `unverified` にする。テストを足した |
+| ST-4 `active clear` が構造なしで観察し、正しい選択を `stale` と示す | 妥当 | 観察のときに構造を読む（読めなければ従来どおり空）。テストを足した |
+| ST-5 status の docstring、`--structure` の I/O の失敗 | 妥当 | docstring を直し、`OSError`、`RuntimeError` も項目の `unavailable` にする |
+| SP-4 `--structure` に `--offline` が渡らない | 妥当 | `status_of` から `structure_item` まで渡す |
+| ST-6 / SP-5 カタログの判定の重複、`show` の2回の解決、`remove` の選択の取り込み | 妥当 | `catalog_at` の1つにし、`show` は表示した行から判定する。`remove` と `bootstrap` は取り込んだ選択で `--expect-current` を確かめる（従来の処理は、その後に自分で取り込んだ記録の変化を見る） |
+| ST-9 型と `assert` | 妥当 | 取り込んだ選択の型を `StoredSelection` にし、`assert` を明示の分岐と例外に替えた。時刻の注入は従来の sync と同じく行わない |
+| SP-2 `report.md` に変えた既存のテストの一覧がない | 妥当 | S11 で書く |
+| SP-6 テストの不足 | 妥当 | 読むだけの一覧に `worktree show`、版3のworktreeと読めないworktreeの観察、`installation update` / `uninstall` の `--expect-current`、異常ごとの検出（`KIND_LABEL_MULTIPLE`、`SLUG_MARKER_MULTIPLE`、`SLUG_MARKER_INVALID`、`DEPENDENCY_FOREIGN_REPOSITORY`）を足した |
+| ST-7 Artifact の走査が従来の写し | 判断（直さない） | 従来のモジュールを変えない制約（AC-15）のため。I-13 の撤去で canonical 側に寄せる。`report.md` の残るリスクに書く |
+| ST-8 従来の非公開の関数への依存 | 判断（直さない） | 同じ理由。canonical の経路のテストが、シグネチャの変化を検出する |
+
+全体のテスト（`f3a0568a4`）で、この Issue のコマンドが動くようになったために古くなった canonical のテストが3件失敗した（`test_issue429_canonical_status` の `structure`、`test_issue413_assets` の init の直後の `workspace validate`、`test_canonical_dispatch` の未実装の例）。期待を今の振る舞いに直した（`report.md` の一覧）。
