@@ -125,9 +125,12 @@ def _still_held(catalog: Path, hold: Hold, deleted: set[str]) -> bool:
     target = catalog / hold.path
     if hold.kind == "mass_delete":
         return hold.path in deleted
-    if not target.is_file() or target.is_symlink():
+    try:
+        if not target.is_file() or target.is_symlink():
+            return False
+        size = target.stat().st_size
+    except NotADirectoryError:
         return False
-    size = target.stat().st_size
     if hold.kind == "too_large":
         return size > MAX_FILE_BYTES
     candidate = HoldCandidate(hold.path, size, "", target.read_bytes() if size <= MAX_FILE_BYTES else None)

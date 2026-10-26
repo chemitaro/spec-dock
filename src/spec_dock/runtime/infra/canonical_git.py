@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import fnmatch
 import os
 from pathlib import Path
+import stat
 import subprocess
 import tempfile
 from typing import TYPE_CHECKING, Final, Literal, cast
@@ -193,7 +194,9 @@ def add_catalog_worktree(main: Path, catalog: Path, *, mode: AddMode, timeout: f
     run_catalog_git(main, *args, mutation=True, timeout=timeout)
 
 
-def remote_canonical(main: Path, *, timeout: float = 30.0, git: str = "git") -> Literal["present", "absent"]:
+def remote_canonical(
+    main: Path, *, timeout: float = 30.0, git: str = "git", environment: Mapping[str, str] | None = None
+) -> Literal["present", "absent"]:
     output = run_catalog_git(
         main,
         "ls-remote",
@@ -201,6 +204,7 @@ def remote_canonical(main: Path, *, timeout: float = 30.0, git: str = "git") -> 
         CANONICAL_REMOTE,
         CANONICAL_REF,
         git=git,
+        environment=environment,
         read_only=True,
         timeout=timeout,
         returncodes=frozenset({0, 2}),
@@ -233,7 +237,9 @@ def add_fetch_branch(main: Path, *, timeout: float = 30.0) -> None:
     )
 
 
-def fetch_canonical(main: Path, *, timeout: float = 30.0, git: str = "git") -> None:
+def fetch_canonical(
+    main: Path, *, timeout: float = 30.0, git: str = "git", environment: Mapping[str, str] | None = None
+) -> None:
     run_catalog_git(
         main,
         "fetch",
@@ -242,6 +248,7 @@ def fetch_canonical(main: Path, *, timeout: float = 30.0, git: str = "git") -> N
         CANONICAL_REMOTE,
         _FETCH_REFSPEC,
         git=git,
+        environment=environment,
         mutation=True,
         timeout=timeout,
     )
@@ -387,6 +394,8 @@ def unpushed(catalog: Path, *, timeout: float = 30.0) -> tuple[int, str | None] 
 
 # The periodic sync (iss-00430): save in a temporary index, merge without touching the work tree, push.
 
+# Git's English messages, so authentication failures are recognised whatever the user's locale.
+UNTRANSLATED: Final[Mapping[str, str]] = {"LC_ALL": "C"}
 PushOutcome = Literal["pushed", "up_to_date", "rejected", "auth_failed", "failed"]
 _AUTH_FAILURES: Final = (
     "Authentication failed",
@@ -434,7 +443,10 @@ def list_changes(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> t
         if record.startswith("? "):
             paths, kind = [record[2:]], "added"
         elif record.startswith("1 "):
-            paths, kind = [record.split(" ", 8)[8]], "modified"
+            fields = record.split(" ", 8)
+            # Git's own word wins: a path it reports deleted in the work tree (even "beyond a symbolic link"
+            # after a directory became a link) is a deletion, never a file read through the link.
+            paths, kind = [fields[8]], ("deleted" if fields[1][1:] == "D" else "modified")
         elif record.startswith("2 "):
             paths, kind = [record.split(" ", 9)[9], records[index]], "modified"
             index += 1
@@ -447,14 +459,31 @@ def list_changes(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> t
                 # A nested repository is not catalog content; .runtime/ is SpecDock's own area even if a
                 # .gitignore lost its line.
                 continue
+            if kind == "deleted" or _beyond_link(catalog, path):
+                changes[path] = CatalogChange(path, "deleted", None)
+                continue
             try:
                 observed = os.lstat(catalog / path)
-            except FileNotFoundError:
+            except (FileNotFoundError, NotADirectoryError):  # gone, or a parent became a file
                 changes[path] = CatalogChange(path, "deleted", None)
                 continue
             mtime = datetime.fromtimestamp(observed.st_mtime, timezone.utc)
             changes[path] = CatalogChange(path, cast("ChangeKind", kind), mtime)
     return tuple(changes[path] for path in sorted(changes))
+
+
+def _beyond_link(catalog: Path, path: str) -> bool:
+    """A parent of `path` is a symbolic link or not a directory (the path is not inside the catalog)."""
+    current = catalog
+    for part in path.split("/")[:-1]:
+        current = current / part
+        try:
+            mode = os.lstat(current).st_mode
+        except (FileNotFoundError, NotADirectoryError):
+            return True
+        if not stat.S_ISDIR(mode):
+            return True
+    return False
 
 
 def tracked_count(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> int:
@@ -526,8 +555,11 @@ def save_commit(
         )
         modes = _index_modes(catalog, environment, git=git, timeout=timeout)
         for path, payload in sorted(checked.items()):
-            if path not in paths or path not in modes:
+            if path not in paths:
                 continue
+            # A checked file that vanished before `git add` is saved as checked, never as a deletion
+            # that skipped the hold rules.
+            mode = modes.get(path, "100644")
             # --path applies the catalog's attributes (eol, clean filters such as LFS or git-crypt) as `git add` does.
             oid = _text(
                 run_catalog_git(
@@ -542,7 +574,6 @@ def save_commit(
                     timeout=timeout,
                 )
             )
-            mode = modes[path]
             run_catalog_git(
                 catalog,
                 "update-index",
@@ -729,6 +760,7 @@ def push_canonical(
         *args,
         CANONICAL_REMOTE,
         f"{source}:{CANONICAL_REF}",
+        environment=UNTRANSLATED,
         git=git,
         mutation=not dry_run,
         timeout=timeout,

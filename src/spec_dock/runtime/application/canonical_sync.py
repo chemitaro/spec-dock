@@ -390,9 +390,9 @@ def _check_remote(run: _Run) -> None:
     """Step 2 (no lock): ls-remote, fetch, and rewrite or deletion detection against the baseline (R-C5)."""
     catalog, git = run.catalog, run.git
     try:
-        presence = canonical_git.remote_canonical(catalog, git=git)
+        presence = canonical_git.remote_canonical(catalog, git=git, environment=canonical_git.UNTRANSLATED)
         if presence == "present":
-            canonical_git.fetch_canonical(catalog, git=git)
+            canonical_git.fetch_canonical(catalog, git=git, environment=canonical_git.UNTRANSLATED)
     except GitProcessError as error:
         run.offline = True
         message = error.stderr.decode("utf-8", errors="replace").strip() or "origin could not be reached"
@@ -484,7 +484,7 @@ def _covers(prefixes: Iterable[str], path: str) -> bool:
 def _savable(path: Path) -> bool:
     try:
         mode = path.lstat().st_mode
-    except FileNotFoundError:
+    except (FileNotFoundError, NotADirectoryError):
         return False
     return stat.S_ISREG(mode) or stat.S_ISLNK(mode)
 
@@ -723,7 +723,11 @@ def _adopt_holds(run: _Run, remote: str, tree: str) -> bool:
         content = None
         if entry.mode != "120000" and size <= MAX_FILE_BYTES:
             content = canonical_git.blob_bytes(catalog, entry.oid, git=git)
-        candidates.append(HoldCandidate(path, size, entry.oid, content))
+        blob = entry.oid
+        if path in accepted.paths and _savable(catalog / path):
+            # accept records the unfiltered blob of the work-tree file; compare like with like.
+            blob = canonical_git.blob_of(catalog, path, git=git)
+        candidates.append(HoldCandidate(path, size, blob, content))
     held = classify_holds(
         candidates,
         deletions=sorted(set(before) - set(after)),

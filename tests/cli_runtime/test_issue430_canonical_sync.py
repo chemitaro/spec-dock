@@ -819,3 +819,42 @@ def test_refresh_structures_runs_once_per_repository(pair: SyncPair, monkeypatch
     assert [(item.repository, item.refreshed, item.dashboards_written) for item in results] == [
         ("github.com/example/repo", True, 0)
     ]
+
+
+def test_a_directory_replaced_by_a_file_never_stops_the_other_saves(pair: SyncPair) -> None:
+    pair.write(pair.a, "topic/a.md", "a\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    import shutil
+
+    shutil.rmtree(pair.specs(pair.a) / "topic")
+    pair.write(pair.a, "topic", "now a file\n")
+    pair.write(pair.a, "other.md", "o\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert code == 0 and item["result"] == "ok" and item["pushed"], result
+    assert pair.remote_file("other.md") == "o" and pair.remote_file("topic") == "now a file"
+
+
+def test_a_directory_replaced_by_a_link_outside_is_a_deletion_and_never_stops_the_cycle(
+    pair: SyncPair, tmp_path: Path
+) -> None:
+    import shutil
+
+    pair.write(pair.a, "topic/a.md", "a\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "a.md").write_text("outside the catalog\n")
+    shutil.rmtree(pair.specs(pair.a) / "topic")
+    (pair.specs(pair.a) / "topic").symlink_to(outside)
+    pair.write(pair.a, "other.md", "o\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert code == 0 and item["result"] == "ok" and item["pushed"], result
+    assert pair.remote_file("other.md") == "o" and pair.remote_file("topic/a.md") is None

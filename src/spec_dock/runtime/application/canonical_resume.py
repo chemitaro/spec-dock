@@ -92,14 +92,13 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
             exit_code=5,
             recovery=(GITHUB_UNAVAILABLE_RECOVERY,),
         ) from error
-    # remote_deleted whose branch another PC recreated meanwhile is adopted like a rewrite.
-    wanted = "--adopt-remote" if reason == "remote_deleted" and presence == "present" else _OPTION[reason]
+    # What GitHub holds now decides, whatever the pause reason was: a remote_deleted branch another PC recreated
+    # is adopted like a rewrite, and a rewritten branch that was deleted afterwards is recreated.
+    wanted = "--adopt-remote" if presence == "present" else "--push-local"
     if given != wanted:
         raise _paused(reason, wanted)
     effects: list[Effect] = []
     if wanted == "--adopt-remote":
-        if presence == "absent":
-            raise _paused("remote_deleted", "--push-local")
         remote = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
         assert remote is not None
 
@@ -110,8 +109,6 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
         update_catalog_state(root, str(catalog), adopt)
         data["baseline"] = remote
     else:
-        if presence == "present":
-            raise _paused("remote_rewritten", "--adopt-remote")
         pushed = canonical_git.push_canonical(catalog, git=git)
         if pushed.outcome not in ("pushed", "up_to_date"):
             raise CanonicalCommandError(

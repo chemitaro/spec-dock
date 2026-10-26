@@ -230,3 +230,18 @@ def test_accepting_held_deletions_of_a_re_adoption_lets_it_finish(pair: SyncPair
     item = catalog_result(result)
     assert item["result"] == "ok" and item["pushed"] is True, result
     assert pair.remote_file("d/0.md") is None
+
+
+def test_a_rewrite_whose_branch_was_deleted_afterwards_resumes_by_push_local(pair: SyncPair) -> None:
+    pair.write(pair.a, "a.md", "a\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    _force(pair, _remote_commit(pair, {"x.md": "x\n"}, parent=None))
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")
+    code, result = pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    assert code == 3 and result["error"]["details"]["next_step"] == "spec-dock canonical resume --push-local"
+    code, result = pair.run(pair.a, "canonical", "resume", "--push-local")
+    assert code == 0 and result["data"]["result"]["pushed"] is True, result
+    assert pair.remote_file("a.md") == "a"

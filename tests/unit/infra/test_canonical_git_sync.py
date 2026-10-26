@@ -222,3 +222,8 @@ def test_checked_bytes_keep_the_mode_git_would_choose(catalog: Path) -> None:
     (catalog / "tool.sh").chmod(0o755)
     canonical_git.save_commit(catalog, ["tool.sh"], message="m", parent=head, contents={"tool.sh": b"echo\n"})
     assert git(catalog, "ls-tree", "HEAD", "tool.sh").split()[0] == "100644"
+
+
+def test_authentication_is_recognised_in_any_locale() -> None:
+    assert canonical_git.UNTRANSLATED == {"LC_ALL": "C"}
+    assert canonical_git.is_auth_failure("fatal: Authentication failed for 'https://github.com/o/r.git/'")
