@@ -93,6 +93,12 @@ def write_atomic(path: Path, payload: bytes) -> bool:
         pass
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_name(f".{path.name}.tmp-{os.getpid()}")
-    temporary.write_bytes(payload)
-    Path(temporary).replace(path)
+    try:
+        with temporary.open("wb") as stream:
+            stream.write(payload)
+            stream.flush()
+            os.fsync(stream.fileno())
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
     return True

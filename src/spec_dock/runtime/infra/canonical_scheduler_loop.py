@@ -23,9 +23,9 @@ from spec_dock.runtime.infra.canonical_scheduling import (
     EnsureOutcome,
     SchedulerError,
     SchedulerObservation,
-    spec_dock_executable,
 )
 from spec_dock.runtime.infra.canonical_state import (
+    append_log,
     kick_path,
     read_json,
     runner_lock_path,
@@ -122,7 +122,13 @@ def run_loop(
         write_json_atomic(root, runner_record_path(root).name, record.to_json())
         try:
             while not stop["requested"]:
-                cycle()
+                try:
+                    cycle()
+                except Exception as error:  # the only sync of a container: log and keep running
+                    with suppress(OSError, TimeoutError):
+                        append_log(
+                            root, f"{format_timestamp(datetime.now(timezone.utc))} runner cycle failed: {error!r}"
+                        )
                 deadline = monotonic() + interval
                 while not stop["requested"]:
                     kick = kick_path(root)
@@ -149,15 +155,8 @@ class LoopScheduler:
     def kind(self) -> Literal["loop"]:
         return "loop"
 
-    def __init__(
-        self,
-        state_root: Path,
-        *,
-        executable: Callable[[], Path] = spec_dock_executable,
-        spawn: Callable[..., int] = detach,
-    ) -> None:
+    def __init__(self, state_root: Path, *, spawn: Callable[..., int] = detach) -> None:
         self.state_root = state_root
-        self.executable = executable
         self.spawn = spawn
 
     def needs_change(self, spec: SchedulerSpec) -> bool:

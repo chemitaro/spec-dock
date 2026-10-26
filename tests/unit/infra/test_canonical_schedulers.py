@@ -158,3 +158,40 @@ def test_loop_scheduler_starts_kicks_and_stops_the_runner(tmp_path: Path, spec: 
     loop.kick(spec)
     assert len(spawned) == 2  # not running: a kick starts it
     assert loop.remove(spec) is False
+
+
+def test_launchd_retries_bootstrap_and_refuses_to_forget_a_job_it_could_not_boot_out(
+    tmp_path: Path, spec: SchedulerSpec
+) -> None:
+    class Flaky(Commands):
+        def __call__(self, argv: list[str], **kwargs: object) -> subprocess.CompletedProcess[bytes]:
+            if argv[1] == "bootstrap" and sum(call[1] == "bootstrap" for call in self.calls) == 0:
+                self.calls.append(argv)
+                return subprocess.CompletedProcess(argv, 5, b"", b"Bootstrap failed: 5: Input/output error")
+            if argv[1] == "bootout" and self.answers.get("refuse"):
+                self.calls.append(argv)
+                return subprocess.CompletedProcess(argv, 1, b"", b"Operation not permitted")
+            return super().__call__(argv, **kwargs)
+
+    commands = Flaky()
+    slept: list[float] = []
+    launchd = LaunchdScheduler(agents_dir=tmp_path / "agents", uid=501, runner=commands, sleep=slept.append)
+    assert launchd.ensure(spec) == "created" and slept == [1.0]
+    commands.answers["refuse"] = 1
+    with pytest.raises(SchedulerError, match="bootout"):
+        launchd.remove(spec)
+    assert launchd.plist.exists()
+
+
+def test_the_loop_runner_logs_a_failed_cycle_and_keeps_going(tmp_path: Path) -> None:
+    root = tmp_path / "state"
+    calls: list[int] = []
+
+    def cycle() -> None:
+        calls.append(1)
+        if len(calls) == 1:
+            raise RuntimeError("boom")
+        os.kill(os.getpid(), signal.SIGTERM)
+
+    run_loop(root, cycle=cycle, version="t", sleep=lambda _s: None, monotonic=lambda: 0.0, interval=0.0)
+    assert len(calls) == 2 and "runner cycle failed: RuntimeError('boom')" in (root / "canonical-sync.log").read_text()

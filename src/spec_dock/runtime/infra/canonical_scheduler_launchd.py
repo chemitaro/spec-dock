@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import plistlib
 import subprocess
+import time
 from typing import TYPE_CHECKING, Final, Literal
 
 from spec_dock.runtime.domain.canonical_scheduler import LAUNCHD_LABEL, launchd_plist
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec
 
 NOT_FOUND: Final = 113  # launchctl print: "Could not find service"
+BOOTSTRAP_ATTEMPTS: Final = 3
 
 
 class LaunchdScheduler:
@@ -36,7 +38,9 @@ class LaunchdScheduler:
         label: str = LAUNCHD_LABEL,
         uid: int | None = None,
         runner: Callable[..., subprocess.CompletedProcess[bytes]] = subprocess.run,
+        sleep: Callable[[float], None] = time.sleep,
     ) -> None:
+        self.sleep = sleep
         self.agents_dir = agents_dir
         self.label = label
         self.uid = os.getuid() if uid is None else uid
@@ -87,12 +91,20 @@ class LaunchdScheduler:
         loaded = self._loaded()
         if not changed and loaded is not False:
             return "unchanged"
-        if loaded:
-            self._launchctl("bootout", f"gui/{self.uid}/{self.label}")
-        completed = self._launchctl("bootstrap", f"gui/{self.uid}", str(self.plist))
-        if completed.returncode != 0:
-            raise SchedulerError(f"launchctl bootstrap failed: {completed.stderr.decode(errors='replace').strip()}")
-        return "updated" if existed else "created"
+        if loaded is not False:
+            self._bootout()  # also when `print` could not tell: bootstrapping a loaded job fails
+        for attempt in range(BOOTSTRAP_ATTEMPTS):
+            completed = self._launchctl("bootstrap", f"gui/{self.uid}", str(self.plist))
+            if completed.returncode == 0:
+                return "updated" if existed else "created"
+            if attempt < BOOTSTRAP_ATTEMPTS - 1:
+                self.sleep(1.0)  # right after a bootout launchd may still answer EIO
+        raise SchedulerError(f"launchctl bootstrap failed: {completed.stderr.decode(errors='replace').strip()}")
+
+    def _bootout(self) -> None:
+        completed = self._launchctl("bootout", f"gui/{self.uid}/{self.label}")
+        if completed.returncode not in (0, 3, NOT_FOUND):  # 3: no such process, 113: not loaded
+            raise SchedulerError(f"launchctl bootout failed: {completed.stderr.decode(errors='replace').strip()}")
 
     def kick(self, spec: SchedulerSpec) -> None:
         del spec
@@ -103,7 +115,7 @@ class LaunchdScheduler:
     def remove(self, spec: SchedulerSpec) -> bool:
         del spec
         existed = self.plist.exists() or self._loaded() is True
-        self._launchctl("bootout", f"gui/{self.uid}/{self.label}")
+        self._bootout()  # a refused bootout keeps the plist, so the same command can retry
         self.plist.unlink(missing_ok=True)
         return existed
 

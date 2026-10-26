@@ -3,7 +3,9 @@
 --adopt-remote (remote_rewritten, merge_failed) takes GitHub's canonical as the new baseline and leaves a
 one-time mark: the next cycle re-adopts the local content as one commit whose only parent is GitHub's,
 so history GitHub dropped is never pushed back (judgment R2). --push-local (remote_deleted) recreates
-GitHub's branch from the local canonical without force. The network runs outside every lock.
+GitHub's branch from the local canonical without force. When another PC already recreated it, a
+remote_deleted catalog resumes with --adopt-remote instead. The network runs under this catalog's cycle lock
+(so no cycle runs meanwhile) and never under the catalog lock.
 """
 
 from __future__ import annotations
@@ -76,10 +78,9 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
     data: dict[str, object] = {"catalog": str(catalog), "paused_before": reason, "baseline": None, "pushed": False}
     if state is None or reason is None:
         return OperationResult(namespace.command_path, "unchanged", FamilyData("canonical-resume", data), 0)
-    wanted = _OPTION[reason]
     given = "--adopt-remote" if namespace.adopt_remote else ("--push-local" if namespace.push_local else None)
-    if given != wanted:
-        raise _paused(reason, wanted)
+    if given is None:
+        raise _paused(reason, _OPTION[reason])
     try:
         presence = canonical_git.remote_canonical(catalog, git=git)
         if presence == "present":
@@ -91,6 +92,10 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
             exit_code=5,
             recovery=(GITHUB_UNAVAILABLE_RECOVERY,),
         ) from error
+    # remote_deleted whose branch another PC recreated meanwhile is adopted like a rewrite.
+    wanted = "--adopt-remote" if reason == "remote_deleted" and presence == "present" else _OPTION[reason]
+    if given != wanted:
+        raise _paused(reason, wanted)
     effects: list[Effect] = []
     if wanted == "--adopt-remote":
         if presence == "absent":

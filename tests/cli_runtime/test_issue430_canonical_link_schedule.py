@@ -59,7 +59,7 @@ def test_link_registers_the_catalog_installs_the_job_and_runs_it_once(pair: Sync
     assert "CANONICAL_SYNC_NOT_CONFIRMED" in _codes(result)  # the fake job did not run within the wait
     code, again = pair.run(pair.a, "canonical", "link")
     assert code == 0 and again["status"] == "unchanged", again
-    assert launchd.calls == [("ensure", "launchd"), ("kick", "launchd"), ("ensure", "launchd")]
+    assert launchd.calls == [("ensure", "launchd"), ("kick", "launchd")]  # the second link writes nothing
 
 
 def test_the_recorded_state_root_works_without_xdg_state_home(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -132,7 +132,7 @@ def test_a_refused_job_registration_is_partial_and_keeps_the_baseline(pair: Sync
     assert result["error"]["code"] == "CANONICAL_SCHEDULER_FAILED"
     assert result["recovery"]["instructions"] == ["Check the reported output, then run spec-dock canonical link again."]
     effects = _effects(result)
-    assert effects["canonical.scheduler"] == "failed" and effects["canonical.baseline"] == "succeeded"
+    assert effects["canonical.scheduler"] == "unknown" and effects["canonical.baseline"] == "succeeded"
     assert pair.state(pair.a) is not None
 
 
@@ -228,3 +228,34 @@ def test_a_clone_whose_github_canonical_vanished_guards_its_content(pair: SyncPa
     code, result = pair.sync(pair.a)
     assert catalog_result(result)["paused"] == "remote_deleted"
     assert git(pair.remote, "rev-parse", "--verify", "--quiet", "refs/heads/spec-dock/canonical", check=False) == ""
+
+
+def test_a_second_link_writes_nothing_even_with_a_read_only_state_root(pair: SyncPair) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    assert pair.run(pair.a, "canonical", "link")[0] == 0
+    before = tree_digest(pair.state_root)
+    for directory in [pair.state_root, *pair.state_root.rglob("*")]:
+        if directory.is_dir():
+            directory.chmod(0o555)
+    try:
+        code, result = pair.run(pair.a, "canonical", "link")
+    finally:
+        for directory in [pair.state_root, *pair.state_root.rglob("*")]:
+            if directory.is_dir():
+                directory.chmod(0o755)
+    assert code == 0 and result["status"] == "unchanged", result
+    assert tree_digest(pair.state_root) == before
+
+
+def test_a_working_recorded_job_executable_is_kept(pair: SyncPair, tmp_path: Path) -> None:
+    from tests.support.canonical_sync import FakeScheduler
+
+    installed = tmp_path / "tool/bin/spec-dock"
+    installed.parent.mkdir(parents=True)
+    installed.write_text("#!/bin/sh\n")
+    installed.chmod(0o755)
+    pair.schedulers["launchd"] = FakeScheduler("launchd", recorded=installed)
+    pair.run(pair.a, "canonical", "link")
+    (spec,) = pair.schedulers["launchd"].specs
+    assert spec.executable == installed

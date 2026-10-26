@@ -33,17 +33,22 @@ def _catalog(pair: SyncPair) -> str:
 
 
 def test_without_yes_remove_only_reports_the_plan(pair: SyncPair) -> None:
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+
+    before = tree_digest(pair.state_root), tree_digest(pair.a)
     code, result = pair.run(pair.a, "canonical", "remove")
+    assert (tree_digest(pair.state_root), tree_digest(pair.a)) == before
     assert code == 0 and result["status"] == "planned", result
     kinds = [item["kind"] for item in result["effects"]]
     assert kinds == [
         "canonical.link.remove",
         "git.worktree.remove",
         "git.info.exclude",
+        "canonical.scheduler",  # before the registry entry, so a failure can be retried by the same command
         "canonical.registry",
         "canonical.state",
-        "canonical.scheduler",
     ]
+
     assert pair.catalog(pair.a).is_dir() and read_registry(pair.state_root).catalogs
 
 
@@ -132,3 +137,11 @@ def test_a_failure_in_the_middle_is_partial_with_each_effect(pair: SyncPair, mon
     statuses = {item["kind"]: item["status"] for item in result["effects"]}
     assert statuses["git.worktree.remove"] == "succeeded" and statuses["git.info.exclude"] == "failed"
     assert statuses["canonical.registry"] == "not_attempted"
+
+
+def test_remove_keeps_the_structure_snapshot(pair: SyncPair) -> None:
+    snapshot = pair.state_root / "github/github.com/example/repo/snapshot.json"
+    snapshot.parent.mkdir(parents=True)
+    snapshot.write_text("{}")
+    assert pair.run(pair.a, "canonical", "remove", "--yes")[0] == 0
+    assert snapshot.read_text() == "{}"

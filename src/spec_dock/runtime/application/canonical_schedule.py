@@ -225,16 +225,22 @@ def apply_schedule(plan: SchedulePlan, *, timeout: float = 30.0) -> tuple[list[E
     warnings: list[Diagnostic] = []
     try:
         if not plan.schedule:
-            _baseline(plan, effects, timeout=timeout)
+            if plan.baseline_change:
+                _baseline(plan, effects, timeout=timeout)
             return effects, warnings
         assert plan.entry is not None and plan.kind is not None and plan.spec is not None
+        if not (plan.registry_change or plan.baseline_change or plan.scheduler_change):
+            # Everything is in place: write nothing (a sandbox that can only place links passes).
+            warnings.extend(_standing_warnings(plan))
+            return effects, warnings
         with directory_lock(plan.state_root, timeout=10.0):
             registered = _registry(plan, effects)
-            _baseline(plan, effects, timeout=timeout)
+            if plan.baseline_change:
+                _baseline(plan, effects, timeout=timeout)
             installed = _job(plan, effects)
         if registered or installed:
             warnings.extend(_kick_and_wait(plan))
-    except (OSError, TimeoutError, RegistryUnreadable) as error:
+    except (OSError, TimeoutError, RegistryUnreadable, StateUnreadable) as error:
         raise ScheduleFailed("LOCAL_IO_FAILED", str(error), SCHEDULER_FAILED_RECOVERY, effects) from error
     warnings.extend(_standing_warnings(plan))
     return effects, warnings
@@ -251,7 +257,6 @@ def _registry(plan: SchedulePlan, effects: list[Effect]) -> bool:
                 effects.append(Effect("canonical.state.move", "succeeded", plan.catalog))
     updated = SyncRegistry(plan.kind, updated.with_entry(plan.entry).catalogs)
     if updated == registry:
-        effects.append(Effect("canonical.registry", "unchanged", str(registry_path(plan.state_root))))
         return False
     write_registry_locked(plan.state_root, updated)
     effects.append(Effect("canonical.registry", "succeeded", str(registry_path(plan.state_root))))
@@ -301,7 +306,8 @@ def _job(plan: SchedulePlan, effects: list[Effect]) -> bool:
         )
         outcome = scheduler.ensure(plan.spec)
     except canonical_scheduling.SchedulerError as error:
-        effects.append(Effect("canonical.scheduler", "failed", plan.kind))
+        # The job file may already be written even though loading it failed.
+        effects.append(Effect("canonical.scheduler", "unknown", plan.kind))
         raise ScheduleFailed(CANONICAL_SCHEDULER_FAILED, str(error), SCHEDULER_FAILED_RECOVERY, effects) from error
     effects.append(Effect("canonical.scheduler", "unchanged" if outcome == "unchanged" else "succeeded", plan.kind))
     return outcome != "unchanged"

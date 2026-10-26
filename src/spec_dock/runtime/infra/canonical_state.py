@@ -174,7 +174,8 @@ def update_catalog_state(
     with directory_lock(directory, timeout=timeout):
         current = _load_state(directory / STATE_FILE)
         updated = mutate(current)
-        write_json_atomic(directory, STATE_FILE, updated.to_json())
+        if updated != current:  # an unchanged record is not rewritten
+            write_json_atomic(directory, STATE_FILE, updated.to_json())
         return updated
 
 

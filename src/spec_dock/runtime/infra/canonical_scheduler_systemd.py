@@ -105,7 +105,11 @@ class SystemdScheduler:
     def remove(self, spec: SchedulerSpec) -> bool:
         paths = [path for path, _payload in self._files(spec)]
         existed = any(path.exists() for path in paths)
-        self._systemctl("disable", "--now", self.timer)
+        disabled = self._systemctl("disable", "--now", self.timer)
+        if disabled.returncode != 0 and existed:
+            raise SchedulerError(
+                f"systemctl --user disable --now failed: {disabled.stderr.decode(errors='replace').strip()}"
+            )
         for path in paths:
             path.unlink(missing_ok=True)
         self._systemctl("daemon-reload")

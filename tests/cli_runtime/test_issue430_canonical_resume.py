@@ -183,3 +183,21 @@ def test_a_merge_failure_resumes_by_adoption(pair: SyncPair) -> None:
     item = catalog_result(result)
     assert item["result"] == "paused" and item["paused"] == "merge_failed"  # still not expressible: stays paused
     assert (pair.specs(pair.b) / "topic/inner.md").read_text() == "dir\n"
+
+
+def test_a_second_pc_resumes_remote_deleted_by_adopting_what_the_first_recreated(pair: SyncPair) -> None:
+    pair.write(pair.a, "keep.md", "k\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.b)
+    git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")
+    for checkout in (pair.a, pair.b):
+        _code, result = pair.sync(checkout)
+        assert catalog_result(result)["paused"] == "remote_deleted"
+    assert pair.run(pair.a, "canonical", "resume", "--push-local")[0] == 0
+    code, result = pair.run(pair.b, "canonical", "resume", "--push-local")
+    assert code == 3 and result["error"]["details"]["next_step"] == "spec-dock canonical resume --adopt-remote"
+    code, result = pair.run(pair.b, "canonical", "resume", "--adopt-remote")
+    assert code == 0, result
+    _code, result = pair.sync(pair.b)
+    assert catalog_result(result)["result"] == "ok"

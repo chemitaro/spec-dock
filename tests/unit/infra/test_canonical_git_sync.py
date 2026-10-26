@@ -199,3 +199,17 @@ def test_restore_ignored_files_and_operations_in_progress(catalog: Path) -> None
 )
 def test_push_results_are_classified(returncode: int, stdout: bytes, stderr: bytes, outcome: str) -> None:
     assert canonical_git.classify_push(returncode, stdout, stderr).outcome == outcome
+
+
+def test_save_commit_stores_the_checked_bytes_not_a_later_write(catalog: Path) -> None:
+    head = git(catalog, "rev-parse", "HEAD")
+    (catalog / "a.md").write_text("ghp_ secret written a moment later\n")
+    canonical_git.save_commit(catalog, ["a.md"], message="m", parent=head, contents={"a.md": b"checked\n"})
+    assert git(catalog, "show", "HEAD:a.md") == "checked"
+
+
+def test_the_auth_next_step_depends_on_the_remote_kind() -> None:
+    from spec_dock.runtime.application.canonical_sync import auth_next_step
+
+    assert "gh auth setup-git" in auth_next_step("https://github.com/o/r.git")
+    assert "https" in auth_next_step("git@github.com:o/r.git") and "SSH" in auth_next_step("ssh://git@github.com/o/r")

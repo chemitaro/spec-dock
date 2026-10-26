@@ -443,6 +443,8 @@ def list_changes(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> t
         else:
             continue
         for path in paths:
+            if path.endswith("/"):
+                continue  # a nested repository: never saved (its files are not catalog content)
             try:
                 observed = os.lstat(catalog / path)
             except FileNotFoundError:
@@ -461,7 +463,7 @@ def tracked_count(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> 
 
 
 def blob_of(catalog: Path, path: str, *, git: str = "git", timeout: float = 30.0) -> str:
-    """The blob value `git add` would store for the file, as accepted.json records it."""
+    """The blob value of the file's bytes as they are (no filters), as accepted.json records and compares it."""
     target = catalog / path
     if target.is_symlink():
         payload = os.fsencode(target.readlink())
@@ -475,17 +477,58 @@ def blob_of(catalog: Path, path: str, *, git: str = "git", timeout: float = 30.0
     return _text(output)
 
 
+def clear_temporary_index(catalog: Path) -> None:
+    """Drop a temporary index (and its lock) a killed cycle left; call it only under the catalog lock."""
+    for name in (TEMPORARY_INDEX, TEMPORARY_INDEX + ".lock"):
+        with contextlib.suppress(FileNotFoundError):
+            (catalog / name).unlink()
+
+
 def save_commit(
-    catalog: Path, paths: Sequence[str], *, message: str, parent: str, git: str = "git", timeout: float = 30.0
+    catalog: Path,
+    paths: Sequence[str],
+    *,
+    message: str,
+    parent: str,
+    contents: Mapping[str, bytes] | None = None,
+    git: str = "git",
+    timeout: float = 30.0,
 ) -> str:
-    """Commit exactly `paths` on top of `parent` through a temporary index and advance the branch from `parent`."""
+    """Commit exactly `paths` on top of `parent` through a temporary index and advance the branch from `parent`.
+
+    A path in `contents` is committed with exactly those bytes (the ones the hold rules checked), not with
+    whatever the file holds a moment later.
+    """
     index = _temporary_index(catalog)
     environment = {"GIT_INDEX_FILE": str(index)}
+    checked = dict(contents or {})
     try:
         run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
-        run_catalog_git(
-            catalog, "add", "-A", git=git, environment=environment, pathspecs=paths, mutation=True, timeout=timeout
-        )
+        rest = [path for path in paths if path not in checked]
+        if rest:
+            run_catalog_git(
+                catalog, "add", "-A", git=git, environment=environment, pathspecs=rest, mutation=True, timeout=timeout
+            )
+        for path, payload in sorted(checked.items()):
+            if path not in paths:
+                continue
+            oid = _text(
+                run_catalog_git(
+                    catalog, "hash-object", "-w", "--stdin", input=payload, git=git, mutation=True, timeout=timeout
+                )
+            )
+            mode = "100755" if os.access(catalog / path, os.X_OK) else "100644"
+            run_catalog_git(
+                catalog,
+                "update-index",
+                "--add",
+                "--cacheinfo",
+                f"{mode},{oid},{path}",
+                git=git,
+                environment=environment,
+                mutation=True,
+                timeout=timeout,
+            )
         tree = _text(
             run_catalog_git(catalog, "write-tree", git=git, environment=environment, mutation=True, timeout=timeout)
         )

@@ -482,3 +482,139 @@ def test_the_loop_exits_at_once_when_another_runner_holds_the_lock(pair: SyncPai
         fcntl.flock(stream, fcntl.LOCK_EX)
         code, result = pair.run(pair.a, "canonical", "sync", "--registered", "--loop")
     assert code == 0 and result["status"] == "unchanged"
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ("canonical", "sync", "--dry-run"),
+        ("canonical", "accept", "x.md", "--dry-run"),
+        ("canonical", "restore", "--dry-run"),
+        ("canonical", "resume", "--push-local", "--dry-run"),
+        ("canonical", "sync", "--offline"),
+        ("canonical", "resume", "--adopt-remote", "--offline"),
+    ],
+)
+def test_leaves_without_a_plan_refuse_dry_run_and_offline_before_anything(
+    pair: SyncPair, argv: tuple[str, ...]
+) -> None:
+    pair.write(pair.a, "dry.md", "d\n")
+    pair.advance(31)
+    head = git(pair.catalog(pair.a), "rev-parse", "HEAD")
+    code, result = pair.run(pair.a, *argv)
+    assert code == 2 and result["error"]["code"] == "USAGE_ERROR", result
+    assert git(pair.catalog(pair.a), "rev-parse", "HEAD") == head and pair.remote_file("dry.md") is None
+
+
+def test_an_offline_cycle_never_merges_a_rewrite_the_main_checkout_fetched(pair: SyncPair) -> None:
+    pair.write(pair.a, "base.md", "base\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    first = pair.remote_head()
+    rewritten = _commit_on_remote(pair, {"base.md": "rewritten\n", "other.md": "o\n"}, parent=None)
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", rewritten)
+    git(pair.a, "fetch", "-q", "origin", "+refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical")
+    git(pair.a, "remote", "set-url", "origin", str(pair.tmp_path / "unreachable.git"))
+    pair.write(pair.a, "mine.md", "m\n")
+    pair.advance(31)
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert item["error"]["code"] == "GITHUB_UNAVAILABLE" and item["merged"] is False and item["saved_commit"]
+    assert (pair.specs(pair.a) / "base.md").read_text() == "base\n" and not (pair.specs(pair.a) / "other.md").exists()
+    assert git(pair.catalog(pair.a), "merge-base", "--is-ancestor", first, "HEAD", check=False) == ""
+
+
+def test_a_paused_catalog_keeps_its_reason_across_cycles(pair: SyncPair) -> None:
+    pair.write(pair.a, "a.md", "a\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", _commit_on_remote(pair, {"x": "x"}, parent=None))
+    pair.sync(pair.a)
+    first = pair.state(pair.a)
+    assert first is not None and first.last_error is not None and "does not descend" in first.last_error.message
+    code, result = pair.sync(pair.a)
+    assert code == 3 and result["error"]["code"] == "remote_rewritten"
+    again = pair.state(pair.a)
+    assert again is not None and again.last_error == first.last_error
+
+
+def test_the_record_keeps_a_schedule_mark_written_during_the_cycle(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.infra import canonical_git
+    from spec_dock.runtime.infra.canonical_state import update_catalog_state
+
+    real = canonical_git.push_canonical
+
+    def link_meanwhile(catalog: Path, **kwargs: object) -> object:
+        update_catalog_state(pair.state_root, os.path.realpath(catalog), lambda c: c.evolve(schedule="none"))  # type: ignore[union-attr]
+        return real(catalog, **kwargs)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(canonical_git, "push_canonical", link_meanwhile)
+    pair.write(pair.a, "x.md", "x\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    state = pair.state(pair.a)
+    assert state is not None and state.schedule == "none"
+
+
+def test_a_nested_repository_or_a_stale_index_lock_never_stops_the_other_saves(pair: SyncPair) -> None:
+    nested = pair.specs(pair.a) / "vendor"
+    git(pair.tmp_path, "init", "-q", str(nested))
+    (nested / "x").write_text("x\n")
+    (pair.catalog(pair.a) / ".runtime").mkdir(exist_ok=True)
+    (pair.catalog(pair.a) / ".runtime/index.tmp.lock").write_text("")
+    pair.write(pair.a, "ok.md", "ok\n")
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert code == 0 and item["result"] == "ok" and item["pushed"], result
+    assert pair.remote_file("ok.md") == "ok" and pair.remote_file("vendor/x") is None
+
+
+def test_a_rename_against_an_edit_keeps_both_contents(pair: SyncPair) -> None:
+    pair.write(pair.a, "old.md", "line one\nline two\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.b)
+    (pair.specs(pair.a) / "old.md").rename(pair.specs(pair.a) / "new.md")
+    pair.write(pair.b, "old.md", "line one\nedited in b\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    pair.sync(pair.a)
+    _code, result = pair.sync(pair.b, pc="mac-b")
+    assert catalog_result(result)["result"] == "ok", result
+    files = {path.name: path.read_text() for path in pair.specs(pair.b).rglob("*.md") if path.name != "README.md"}
+    # Git follows the rename: the edit made in b lands in the renamed file; nothing is lost or marked.
+    assert "new.md" in files and any("edited in b" in text for text in files.values()), files
+    assert not any("<<<<<<<" in text for text in files.values())
+
+
+def test_an_incoming_change_to_a_held_file_waits_with_reason_held(pair: SyncPair) -> None:
+    pair.write(pair.a, "k.md", "v1\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.b)
+    pair.write(pair.a, "k.md", "v2\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.write(pair.b, "k.md", "ghp_" + "H" * 36 + "\n")
+    pair.advance(31)
+    _code, result = pair.sync(pair.b)
+    item = catalog_result(result)
+    assert item["blocking"] == [{"path": "k.md", "reason": "held"}] and item["merged"] is False
+
+
+def test_a_new_repository_whose_first_push_failed_is_created_by_the_cycle(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    pair = SyncPair.create(tmp_path, monkeypatch, capsys)
+    git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")
+    import shutil
+
+    from spec_dock.runtime.infra.canonical_state import catalog_state_dir
+
+    shutil.rmtree(catalog_state_dir(pair.state_root, os.path.realpath(pair.catalog(pair.a))))
+    code, result = pair.sync(pair.a)  # only the initial commit locally and no baseline: create it
+    assert code == 0 and catalog_result(result)["pushed"] is True, result
+    assert pair.remote_file(".spec-dock-canonical.json") is not None

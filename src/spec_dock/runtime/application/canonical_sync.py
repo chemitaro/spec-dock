@@ -14,6 +14,7 @@ import json
 import os
 from pathlib import Path
 import socket
+import stat
 import subprocess
 import sys
 from typing import TYPE_CHECKING, Final, Literal
@@ -255,6 +256,10 @@ def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
         if state.paused is not None:
             result.result = "paused"
             result.paused = state.paused
+            # Keep the reason recorded when the catalog paused (the rewritten SHA, Git's merge output, held paths).
+            result.error = state.last_error or SyncError(
+                state.paused, f"sync is paused ({state.paused})", None, None, started
+            )
             raise _Stop
         _preconditions(run)
         for attempt in range(PUSH_ATTEMPTS):
@@ -352,9 +357,12 @@ def _check_remote(run: _Run) -> None:
             canonical_git.fetch_canonical(catalog, git=git)
     except GitProcessError as error:
         run.offline = True
-        run.remote = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
         message = error.stderr.decode("utf-8", errors="replace").strip() or "origin could not be reached"
         run.fail(GITHUB_UNAVAILABLE, message, GITHUB_UNAVAILABLE_RECOVERY)
+        # The tracking ref is shared with the main checkout, whose own `git fetch` may have taken a rewrite:
+        # merge it only while it still descends from the baseline; otherwise just save locally.
+        tracking = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
+        run.remote = tracking if tracking is not None and _descends(run, tracking) else None
         return
     if presence == "absent":
         if run.baseline is not None:
@@ -374,19 +382,24 @@ def _check_remote(run: _Run) -> None:
         run.fail(GITHUB_UNAVAILABLE, f"fetching {CANONICAL_BRANCH} gave no commit", GITHUB_UNAVAILABLE_RECOVERY)
         run.offline = True
         return
-    if run.baseline is not None and run.baseline != remote:
-        try:
-            descends = canonical_git.is_ancestor(catalog, run.baseline, remote, git=git)
-        except GitProcessError:
-            descends = False  # the baseline commit is unknown here; never take what cannot be checked
-        if not descends:
-            run.pause(
-                "remote_rewritten",
-                f"GitHub {CANONICAL_BRANCH} ({remote}) does not descend from the last confirmed {run.baseline}",
-            )
-            raise _Stop
+    if not _descends(run, remote):
+        run.pause(
+            "remote_rewritten",
+            f"GitHub {CANONICAL_BRANCH} ({remote}) does not descend from the last confirmed {run.baseline}",
+        )
+        raise _Stop
     run.remote = remote
     run.baseline = remote
+
+
+def _descends(run: _Run, commit: str) -> bool:
+    """Does `commit` descend from the baseline? A baseline unknown to this clone counts as no."""
+    if run.baseline is None or run.baseline == commit:
+        return True
+    try:
+        return canonical_git.is_ancestor(run.catalog, run.baseline, commit, git=run.git)
+    except GitProcessError:
+        return False
 
 
 def _save_and_merge(run: _Run, *, first: bool) -> bool:
@@ -406,7 +419,8 @@ def _save_and_merge(run: _Run, *, first: bool) -> bool:
 def _read_changesets(catalog: Path, consumed: Sequence[str]) -> list[tuple[str, Changeset]]:
     directory = catalog / CHANGESETS_RELATIVE
     try:
-        names = sorted(entry.name for entry in os.scandir(directory) if entry.name.endswith(".json"))
+        with os.scandir(directory) as entries:
+            names = sorted(entry.name for entry in entries if entry.name.endswith(".json"))
     except FileNotFoundError:
         return []
     changesets = []
@@ -424,6 +438,14 @@ def _covers(prefixes: Iterable[str], path: str) -> bool:
     return any(path == prefix or path.startswith(prefix + "/") for prefix in prefixes)
 
 
+def _savable(path: Path) -> bool:
+    try:
+        mode = path.lstat().st_mode
+    except FileNotFoundError:
+        return False
+    return stat.S_ISREG(mode) or stat.S_ISLNK(mode)
+
+
 def _candidate(run: _Run, change: CatalogChange, accepted: dict[str, str]) -> HoldCandidate:
     target = run.catalog / change.path
     observed = target.lstat()
@@ -437,6 +459,7 @@ def _candidate(run: _Run, change: CatalogChange, accepted: dict[str, str]) -> Ho
 def _save(run: _Run) -> None:
     """Step 3: changesets at once (one commit each), other paths after 30 s or 5 min, holds excluded."""
     catalog, git, now = run.catalog, run.git, run.ctx.now()
+    canonical_git.clear_temporary_index(catalog)
     canonical_git.reset_index(catalog, git=git)
     changes = canonical_git.list_changes(catalog, git=git)
     changesets = _read_changesets(catalog, run.state.consumed_changesets)
@@ -460,9 +483,12 @@ def _save(run: _Run) -> None:
     selection = select_paths(remaining, pending_since=run.state.pending_since, now=now)
     to_save = {change.path for change in changes if change.path in taken} | set(selection.selected)
     kinds = {change.path: change for change in changes}
+    # Only files and symbolic links are content; a socket or FIFO in the catalog is never saved.
+    to_save = {path for path in to_save if kinds[path].kind == "deleted" or _savable(catalog / path)}
     candidates = [
         _candidate(run, kinds[path], accepted_paths) for path in sorted(to_save) if kinds[path].kind != "deleted"
     ]
+    checked = {candidate.path: candidate.content for candidate in candidates if candidate.content is not None}
     deletions = [
         change.path for change in changes if change.kind == "deleted" and not _covers(command_scope, change.path)
     ]
@@ -477,13 +503,19 @@ def _save(run: _Run) -> None:
     head = canonical_git.resolve_commit(catalog, "HEAD", git=git)
     assert head is not None
     saved: set[str] = set()
-    batches = [(name, [change.path for change in mine if change.path not in held]) for name, mine in claimed.items()]
-    batches.append(("", sorted(path for path in selection.selected if path not in held)))
+    keep = to_save - set(held)
+    batches = [(name, [change.path for change in mine if change.path in keep]) for name, mine in claimed.items()]
+    batches.append(("", sorted(path for path in selection.selected if path in keep)))
     consumed = list(run.state.consumed_changesets)
     for name, paths in batches:
         if paths:
             head = canonical_git.save_commit(
-                catalog, paths, message=f"spec-dock: save {len(paths)} files ({run.ctx.pc})", parent=head, git=git
+                catalog,
+                paths,
+                message=f"spec-dock: save {len(paths)} files ({run.ctx.pc})",
+                parent=head,
+                contents={path: checked[path] for path in paths if path in checked},
+                git=git,
             )
             run.result.saved_commit = head
             run.result.effects.append(Effect("canonical.save", "succeeded", head))
@@ -760,6 +792,7 @@ def _record(run: _Run) -> None:
             unpushed_since=unpushed,
             conflicts=tuple(item for item in base.conflicts if os.path.lexists(run.catalog / item.copy)),
             dashboard=latest.dashboard,
+            schedule=latest.schedule,  # canonical link owns it and may write it while a cycle runs
         )
 
     # When the record cannot be written the Git state is still right; the next cycle writes it again.
@@ -795,6 +828,8 @@ def run_cycle(
             failed.error = SyncError("SYNC_FAILED", f"{type(error).__name__}: {error}", None, None, ctx.stamp())
             catalogs.append(failed)
             _log(ctx, failed)
+    if stop is not None and stop():
+        return CycleResult(tuple(catalogs), ())  # terminating: skip the GitHub probe of step 7
     return CycleResult(tuple(catalogs), tuple(refresh_structures(entries, ctx)))
 
 

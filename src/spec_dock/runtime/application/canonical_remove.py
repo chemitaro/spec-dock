@@ -17,11 +17,13 @@ from spec_dock.runtime.application.canonical_catalog import observe_catalog, req
 from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_IGNORED_FILES_PRESENT,
     CANONICAL_LOCK_BUSY,
+    CANONICAL_REGISTRY_UNREADABLE,
     CANONICAL_SANDBOX_DENIED,
     CANONICAL_UNSAVED_CHANGES,
     IGNORED_FILES_RECOVERY,
     LOCK_BUSY_RECOVERY,
     PERMISSION_DENIED_RECOVERY,
+    REGISTRY_UNREADABLE_RECOVERY,
     START_LOCK_BUSY,
     STATUS_RECOVERY,
     UNSAVED_CHANGES_RECOVERY,
@@ -32,14 +34,14 @@ from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec
 from spec_dock.runtime.domain.canonical_sync_state import SyncRegistry
 from spec_dock.runtime.infra import canonical_git, canonical_scheduling, runtime_environment
 from spec_dock.runtime.infra.canonical_files import observe_link
-from spec_dock.runtime.infra.canonical_registry import read_registry, registry_path, update_registry
+from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path, update_registry
 from spec_dock.runtime.infra.canonical_state import (
     CycleBusy,
     catalog_state_dir,
     cycle_lock,
     remove_catalog_state,
 )
-from spec_dock.runtime.infra.catalog_lock import CatalogLock
+from spec_dock.runtime.infra.catalog_lock import CatalogLock, CatalogLockBusy
 from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
 from spec_dock.runtime.infra.state_root import resolve_state_root
@@ -71,69 +73,100 @@ def run_canonical_remove(namespace: argparse.Namespace, context: ProjectContext)
     layout = resolve_layout(context)
     root = resolve_state_root()
     catalog = os.path.realpath(layout.catalog)
+    apply = bool(namespace.yes) and not namespace.dry_run
     try:
-        with StartLock(layout.common_dir, timeout=5.0), cycle_lock(root, catalog, timeout=10.0):
-            return _remove(namespace, layout, environment, root, catalog)
+        with StartLock(layout.common_dir, timeout=5.0):
+            if not apply:
+                return _remove(namespace, layout, environment, root, catalog, apply=False)
+            # A running cycle finishes first and no later cycle starts while the catalog goes away.
+            with cycle_lock(root, catalog, timeout=10.0):
+                return _remove(namespace, layout, environment, root, catalog, apply=True)
     except StartLockBusy as error:
         raise CanonicalCommandError(START_LOCK_BUSY, str(error), recovery=(LOCK_BUSY_RECOVERY,)) from error
     except CycleBusy as error:
         raise CanonicalCommandError(CANONICAL_LOCK_BUSY, str(error), recovery=(LOCK_BUSY_RECOVERY,)) from error
+    except RegistryUnreadable as error:
+        raise CanonicalCommandError(
+            CANONICAL_REGISTRY_UNREADABLE,
+            str(error),
+            recovery=(REGISTRY_UNREADABLE_RECOVERY,),
+            details={"path": str(error.path), "next_step": REGISTRY_UNREADABLE_RECOVERY},
+        ) from error
 
 
 def _remove(
-    namespace: argparse.Namespace, layout: CatalogLayout, environment: RuntimeEnvironment, root: Path, catalog: str
+    namespace: argparse.Namespace,
+    layout: CatalogLayout,
+    environment: RuntimeEnvironment,
+    root: Path,
+    catalog: str,
+    *,
+    apply: bool,
 ) -> OperationResult[object]:
     timeout = namespace.timeout
     observation = observe_catalog(layout, environment, timeout=timeout)
     present = observation.state in ("ready", "repair") and Path(catalog).is_dir()
-    if present:
-        _refuse_unsaved(Path(catalog), timeout=timeout)
-    steps = _steps(layout, environment, root, catalog, present=present, timeout=timeout)
-    denied = sorted({str(path) for step in steps for path in step.writes if not _writable(path)})
-    if denied:
-        raise CanonicalCommandError(
-            CANONICAL_SANDBOX_DENIED,
-            "this process cannot write where canonical remove must write: " + ", ".join(denied),
-            recovery=(PERMISSION_DENIED_RECOVERY,),
-            details={"paths": denied, "next_step": PERMISSION_DENIED_RECOVERY},
-        )
-    data = FamilyData("canonical-remove", {"catalog": catalog, "removed": False})
-    if not namespace.yes or namespace.dry_run:
-        planned = tuple(Effect(step.kind, "planned", step.target) for step in steps)
-        return OperationResult(namespace.command_path, "planned", data, 0, effects=planned)
-    effects: list[Effect] = []
-    lock = CatalogLock(Path(catalog), timeout=10.0) if present else None
+    lock = CatalogLock(Path(catalog), timeout=10.0) if present and apply else None
     if lock is not None:
-        lock.__enter__()
+        try:
+            lock.__enter__()
+        except CatalogLockBusy as error:
+            raise CanonicalCommandError(CANONICAL_LOCK_BUSY, str(error), recovery=(LOCK_BUSY_RECOVERY,)) from error
     try:
-        for index, step in enumerate(steps):
-            try:
-                outcome = step.action()
-            except (GitProcessError, OSError, TimeoutError, canonical_scheduling.SchedulerError) as error:
-                effects.append(Effect(step.kind, "failed", step.target))
-                effects.extend(Effect(item.kind, "not_attempted", item.target) for item in steps[index + 1 :])
-                message = (
-                    error.stderr.decode(errors="replace").strip() if isinstance(error, GitProcessError) else str(error)
-                )
-                applied = any(effect.status == "succeeded" for effect in effects)
-                return OperationResult(
-                    namespace.command_path,
-                    "partial" if applied else "failed",
-                    data,
-                    6 if applied else 5,
-                    effects=tuple(effects),
-                    error=Diagnostic("CANONICAL_REMOVE_FAILED", f"{step.kind}: {message}", {"target": step.target}),
-                    recovery=RecoveryInstructions((REMOVE_AGAIN_RECOVERY,)),
-                )
-            effects.append(Effect(step.kind, "unchanged" if outcome is False else "succeeded", step.target))
+        # Checked under the catalog lock when applying, so no command can write in between.
+        if present:
+            _refuse_unsaved(Path(catalog), timeout=timeout)
+        steps = _steps(layout, environment, root, catalog, present=present, timeout=timeout)
+        denied = sorted({str(path) for step in steps for path in step.writes if not _writable(path)})
+        if denied:
+            raise CanonicalCommandError(
+                CANONICAL_SANDBOX_DENIED,
+                "this process cannot write where canonical remove must write: " + ", ".join(denied),
+                recovery=(PERMISSION_DENIED_RECOVERY,),
+                details={"paths": denied, "next_step": PERMISSION_DENIED_RECOVERY},
+            )
+        data = FamilyData("canonical-remove", {"catalog": catalog, "removed": False})
+        if not apply:
+            planned = tuple(Effect(step.kind, "planned", step.target) for step in steps)
+            return OperationResult(namespace.command_path, "planned", data, 0, effects=planned)
+        return _apply(namespace.command_path, catalog, steps)
     finally:
         if lock is not None:
             lock.__exit__(None, None, None)
+
+
+def _apply(command: str, catalog: str, steps: list[_Step]) -> OperationResult[object]:
+    effects: list[Effect] = []
+    data = FamilyData("canonical-remove", {"catalog": catalog, "removed": False})
+    for index, step in enumerate(steps):
+        try:
+            outcome = step.action()
+        except (
+            GitProcessError,
+            OSError,
+            TimeoutError,
+            canonical_scheduling.SchedulerError,
+            RegistryUnreadable,
+        ) as error:
+            effects.append(Effect(step.kind, "failed", step.target))
+            effects.extend(Effect(item.kind, "not_attempted", item.target) for item in steps[index + 1 :])
+            message = (
+                error.stderr.decode(errors="replace").strip() if isinstance(error, GitProcessError) else str(error)
+            )
+            applied = any(effect.status == "succeeded" for effect in effects)
+            return OperationResult(
+                command,
+                "partial" if applied else "failed",
+                data,
+                6 if applied else 5,
+                effects=tuple(effects),
+                error=Diagnostic("CANONICAL_REMOVE_FAILED", f"{step.kind}: {message}", {"target": step.target}),
+                recovery=RecoveryInstructions((REMOVE_AGAIN_RECOVERY,)),
+            )
+        effects.append(Effect(step.kind, "unchanged" if outcome is False else "succeeded", step.target))
     data = FamilyData("canonical-remove", {"catalog": catalog, "removed": True})
     changed = any(effect.status == "succeeded" for effect in effects)
-    return OperationResult(
-        namespace.command_path, "succeeded" if changed else "unchanged", data, 0, effects=tuple(effects)
-    )
+    return OperationResult(command, "succeeded" if changed else "unchanged", data, 0, effects=tuple(effects))
 
 
 def _refuse_unsaved(catalog: Path, *, timeout: float) -> None:
@@ -185,6 +218,13 @@ def _steps(
     if _has_exclude_lines(exclude):
         steps.append(_Step("git.info.exclude", str(exclude), lambda: _drop_exclude_lines(exclude), (exclude.parent,)))
     registry = read_registry(root)
+    others = [entry for entry in registry.catalogs if entry.catalog != catalog]
+    if registry.scheduler is not None and not others and registry.entry_for(catalog) is not None:
+        # The job goes before the registry entry, so a failure here can be retried by the same command.
+        kind = registry.scheduler
+        scheduler = canonical_scheduling.scheduler_for(kind, state_root=root, environment=environment)
+        spec = SchedulerSpec(Path("/"), root, Path("/"), environment.home or Path.home())
+        steps.append(_Step("canonical.scheduler", kind, lambda: scheduler.remove(spec), scheduler.write_paths(spec)))
     if registry.entry_for(catalog) is not None:
         steps.append(_Step("canonical.registry", str(registry_path(root)), lambda: _unregister(root, catalog), (root,)))
     if catalog_state_dir(root, catalog).exists():
@@ -196,12 +236,6 @@ def _steps(
                 (root,),
             )
         )
-    others = [entry for entry in registry.catalogs if entry.catalog != catalog]
-    if registry.scheduler is not None and not others and registry.entry_for(catalog) is not None:
-        kind = registry.scheduler
-        scheduler = canonical_scheduling.scheduler_for(kind, state_root=root, environment=environment)
-        spec = SchedulerSpec(Path("/"), root, Path("/"), environment.home or Path.home())
-        steps.append(_Step("canonical.scheduler", kind, lambda: scheduler.remove(spec), scheduler.write_paths(spec)))
     return steps
 
 
@@ -225,8 +259,11 @@ def _drop_exclude_lines(path: Path) -> None:
     lines = path.read_text(encoding="utf-8").splitlines(keepends=True)
     kept = "".join(line for line in lines if line.rstrip("\r\n") not in EXCLUDE_LINES)
     temporary = path.with_name(f".{path.name}.spec-dock-{os.getpid()}")
-    temporary.write_text(kept, encoding="utf-8")
-    Path(temporary).replace(path)
+    try:
+        temporary.write_text(kept, encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
 
 
 def _unregister(root: Path, catalog: str) -> None:
