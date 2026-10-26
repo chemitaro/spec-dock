@@ -108,6 +108,35 @@ class CanonicalWorld:
         found = next(self.catalog.rglob(f"*-{parent:05d}-*"))
         return found.relative_to(self.catalog) / _NESTING[kind] / name
 
+    def worktree(self, name: str) -> Path:
+        """A linked worktree of the clone with its own correct link."""
+        from tests.support.canonical_repo import add_worktree
+
+        path = add_worktree(self.main, self.tmp_path / name, name)
+        code, payload = self.run("canonical", "link", checkout=path)
+        assert code == 0, payload
+        return path
+
+    def select(self, scope_id: str, number: int, *, checkout: Path | None = None) -> None:
+        """Write a direct selection record as canonical `work start` (iss-00432) will."""
+        from spec_dock.runtime.application.project_context import resolve_context
+        from spec_dock.runtime.domain.work_target import WorkTarget
+        from spec_dock.runtime.infra.work_target_store import WorkTargetStore
+
+        root = checkout or self.main
+        context = resolve_context(str(root), root)
+        WorkTargetStore(root).publish(
+            WorkTarget(
+                "specdock.work-target/v1",
+                scope_id,
+                f"gh:{REPOSITORY}#{number}",
+                context.branch or "main",
+                "2026-10-26T00:00:00Z",
+                context.clone_identity,
+                context.worktree_identity,
+            )
+        )
+
     def requests(self) -> list[tuple[str, str, int]]:
         return [(item.method, item.endpoint.split("?")[0], item.status) for item in self.fake().requests]
 

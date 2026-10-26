@@ -250,7 +250,9 @@ def check_canonical_expectation(
     """--expect-current against the structure snapshot; no catalog or link is needed."""
     if namespace.expect_current is None:
         return
-    scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False)
+    scopes = load_canonical_scopes(
+        context, timeout=namespace.timeout, link=False, offline=bool(getattr(namespace, "offline", False))
+    )
     if stored is None:
         with WorkTargetStore(context.root) as store:
             stored = store.read()

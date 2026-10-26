@@ -30,6 +30,14 @@ class ActiveData:
 
 
 @dataclass(frozen=True)
+class CanonicalActiveData(ActiveData):
+    """`active show` in canonical mode: the selected Scope's place and the structure snapshot time."""
+
+    scope: dict[str, object] | None = None
+    snapshot: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
 class SyncData:
     observed_at: str
     source: str
