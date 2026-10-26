@@ -272,6 +272,19 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 
 ゲート7の `make lint` と全体の `uv run pytest` の実行は、その途中で作業ツリーを直したので、ゲートの証拠にしない。
 
+### 最終品質ゲート8（`dd603e74`、2026-10-26）：合格
+
+`make lint` は終了コード0、全体の `uv run pytest` は 2944 passed、8 skipped（終了コード0。実行の前後で HEAD と作業ツリーは同じ）。Standards と Spec のレビューは、どちらも `pass`（P0/P1 なし）。P2/P3 は直さず、文書の食い違いだけ直した。
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| Standards ST-1 巻き戻しと取り込み直しの後に GitHub でブランチが消されると、`resume --push-local` が手元の HEAD（GitHub が消した履歴を含む）をそのまま送る | P2 | 統括の判断を求める（`adopt_remote_pending` か前の理由が `remote_rewritten` のときに拒否する、または履歴のないコミットで作り直す）。報告書に書いた |
+| Standards ST-2 カタログのツリーにサブモジュール（mode 160000）があると、取り込み直しの周期が毎回 `GIT_FAILED` | P3 | 残るリスク（データは失われない） |
+| Spec SP-1 設計の `adopt_remote_pending` を戻す時点の文と、要件の編集中の持ち越しの例外 | P3 | 設計と要件を直した |
+| Spec SP-2 設計の手順の順の図が古い | P3 | 6a → 7 → 6b に直した |
+| Spec SP-3 取り込み直しの保留にも、status が通常の保留の次の1手（`restore` など）を示す | P3 | 残るリスク（`sync.next_step` は取り込み直しの1手を先に示す） |
+| Spec SP-4 新しいリポジトリで、保存の後の最初の push も失敗すると、次の周期が `remote_deleted` で止まる | P3 | 要件の文のとおり。残るリスク（`resume --push-local` で戻る） |
+
 ## exit / handoff
 
 - **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。

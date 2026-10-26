@@ -73,7 +73,7 @@ ID: "iss-00430"
 - 一時停止したカタログは、保存も push もしない。ファイルは編集でき、失われない。
 - 基準は状態の置き場に置く。カタログを `git clean -ffdx` で消して `canonical link` で作り直した後も、基準が残り、検出が働く。
 - `spec-dock canonical resume --adopt-remote`（`remote_rewritten`、`merge_failed`）は、基準を今の GitHub の canonical に置き直し、一度きりの「取り込み直し」の印を残して再開する。次の周期は、L と R を段の規則で統合した中身を、親を R だけにした1つのコミット C にし（共通の祖先がなくても統合する）、手元のブランチを C へ移してから、R からの早送りで push する。手元にしかない中身は消えず、GitHub が消した古い履歴は送らない（統括の判断 R2。Q3 の「2つの親」を置き換えた）。
-- C を push する前に、R から C への差分に保留の規則（秘密情報らしいもの、大きすぎるファイル、大量の削除）を当てる。当たったら、C を作らず push もせず、一時停止のままにし、当たったパスを `holds` に、`CANONICAL_SAVE_HELD` を `last_error` に記録する。利用者がファイルを直すか `accept` してから、もう一度 `resume --adopt-remote` する（統括の判断 R2）。
+- C を push する前に、R から C への差分に保留の規則（秘密情報らしいもの、大きすぎるファイル、大量の削除）を当てる。当たったら、C を作らず push もせず、一時停止のままにし、当たったパスを `holds` に、`CANONICAL_SAVE_HELD` を `last_error` に記録する。利用者がファイルを直すか `accept` してから、もう一度 `resume --adopt-remote` する（統括の判断 R2）。当たったパスがすべて作業ツリーで編集中（利用者が直している、消している）なら、一時停止にせず、何も push せずに `blocking` で持ち越し、その変更の保存の後に確かめ直す。
 - `spec-dock canonical resume --push-local`（`remote_deleted`）は、手元の canonical を GitHub に作り直して再開する。
 
 ### R-430-06 push と push の認証（R-C6）
