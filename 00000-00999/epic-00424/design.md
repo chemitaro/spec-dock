@@ -258,7 +258,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 #### 構造のスナップショット（R-I1〜R-I6。契約 C10）
 
-構造を、GitHub のリポジトリごとに一括で取得して1つのファイルに保存し、読むコマンド、ダッシュボード、次の Epic（epic-00425）の HTML のダッシュボードが使い回す。
+構造を、GitHub のリポジトリごとに一括で取得して1つのファイルに保存し、読むコマンド、ダッシュボード、HTML のダッシュボード（epic-00427）が使い回す。
 
 - **置き場**：`<状態の置き場>/github/<ホスト>/<owner>/<repo>/`（すべて小文字。例 `github/github.com/chemitaro/spec-dock/`）。`snapshot.json`（構造）と `probe.json`（変わったかの確かめの記録）を置く。同じリポジトリのクローンが同じPCに複数あっても、1つを共有する。
 - **書き方**：このディレクトリを読み取りで開いて `flock(LOCK_EX)` をかけ、その中で、一時ファイルに書いてから `rename` する。読むときは排他を取らない（`rename` なので、いつも完全なファイルが読める）。GitHub との通信は排他の外で行い、排他の中では書くだけにする。この排他は、カタログの排他（4章）とは別のものである。
@@ -276,6 +276,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
         "slug": "canonical-spec-catalog", "title": "仕様の正本を…", "state": "open", "state_reason": null,
         "labels": ["spec-dock:epic"], "assignees": ["chemitaro"], "in_progress": false,
         "parent": 423, "sub_issues": [430, 431], "blocked_by": [], "blocking": [425],
+        "created_at": "2026-10-25T03:00:00Z", "closed_at": null,
         "updated_at": "2026-10-25T11:00:00Z", "url": "https://github.com/chemitaro/spec-dock/issues/424"
       }
     },
@@ -289,6 +290,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - `external` は、Scope の `blocked_by` に現れる、同じリポジトリの、Scope でない Issue の題名と状態である。着手の判定（今の規則どおり、開いていれば着手できない）に使う。
   - 別のリポジトリの親、子、依存を持つ Scope（`anomalies` の `PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`）は、着手の判定で「着手できる」にしない（安全側に止める。ダッシュボードでは UNKNOWN）。
   - 本文は保存しない。slug の印だけを取り出す。種類や slug が決まらない Issue は `id` と `slug` を null にし、`anomalies` に入れる。
+  - `created_at` と `closed_at`（閉じていなければ null）は、GitHub の `createdAt` と `closedAt` である。HTML のダッシュボード（epic-00427）の時間の軸（進み具合の推移、最近の動き）に使う。全体を読む GraphQL の問い合わせに2つの項目を足すだけで、要求の数は変わらない。I-1 の版1の形に、I-11 が足す（2026-10-26 の統括の判断）。0.3.0 の前で、利用者の状態の置き場にはまだスナップショットがないので、版は上げない。読む側は、この2つがない版1のファイルを、壊れたファイルと同じく取り直す。
   - 形を変えるときは `version` を上げる。読む側は、知らない版を読んではならない（取り直す）。
 - **`probe.json`**：`{"version": 1, "checked_at": "…", "etags": {"spec-dock:initiative": "W/\"…\"", "spec-dock:epic": "…", "spec-dock:issue": "…"}, "last_error": null}`。新しい `ETag` は、全体の取り直しが成功したときだけ記録する（取り直しに失敗したら、次の確かめでも「変化あり」になるようにするため）。
 - **新しさの段階**：構造を読む部品 `ensure_fresh(repository, level)` が、次の表で、確かめと取り直しを決める。時刻は注入できるようにする。
@@ -343,9 +345,11 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 1. **前提**：宣言の版が4であること。mainのチェックアウトが見つかること。`git --version` が 2.38 以上であること（`merge-tree --write-tree` のため。足りなければ `CANONICAL_GIT_TOO_OLD`。Ubuntu 22.04 の標準の 2.34 などが当たる）。
 2. **先に確かめる**（書く前にすべて）：
    - **マウントしたチェックアウトでないこと**（R-C8）：カタログの `.git` ファイルの `gitdir:` の先、または Git の登録（`<共通ディレクトリ>/worktrees/<名前>/gitdir`）が指すパスが、このプロセスから見て存在しないとき、コンテナの中（`/.dockerenv` か `/run/.containerenv` がある、または環境変数 `container`、`REMOTE_CONTAINERS`、`CODESPACES` のどれかがある）なら、`CANONICAL_FOREIGN_CHECKOUT` で止まる。ホストのフォルダーをマウントすると、コンテナの中ではパスが変わり、ここで `git worktree repair` を行うとホストの記録をコンテナのパスに書き換えてしまうためである。次の1手は「保存と同期はホストで行われる。コンテナでは仕様のファイルを読み書きするだけにするか、コンテナの中でクローンする」。コンテナの中でなければ、mainのチェックアウトの移動として、手順3の `repair` に進む。
+   - **mainの移動の判定**：パスの文字列ではなく実体（`os.path.samefile`）で比べる。`repair` に進むのは、登録のパスか `gitdir:` の先が、このプロセスから見えないときだけである。両方が存在して別の実体なら、`CANONICAL_PATH_OCCUPIED` で止まる（別名のパスでマウントした環境で、ホストのすべてのworktreeの `.git` を書き換えないため。I-2 の統括の判断）。
    - `<main>/spec-dock/.canonical` に、カタログでないファイルやディレクトリがないこと（あれば `CANONICAL_PATH_OCCUPIED`）。
+   - **mainの宣言**：mainのチェックアウトの宣言が版4でない（mainが移行前のコミットにある、など）ときは、mainのリンクを置かず、mainの `spec-dock/initiatives` の確かめ（次の項目）も行わない。カタログの作成、除外、実行したチェックアウトのリンクは行い、警告 `CANONICAL_MAIN_NOT_MIGRATED` を返す。mainにリンクを置くと、mainの従来のコマンドが止まるためである（I-2 の統括の判断）。
    - mainのチェックアウトと、実行したチェックアウトの `spec-dock/initiatives` が、ない、正しいリンク、違う先のリンクのどれかであること。実体のファイルやディレクトリなら `CANONICAL_LINK_OCCUPIED` で止まり、そのパスと、中にあるファイルの数を示す。中身を消してはならない。
-   - 以下の手順で書く必要のある場所に、このプロセスが書けること（`os.access`）。書けないときは、`CANONICAL_SANDBOX_DENIED` で止まり、「サンドボックスの外（普通の端末）で `spec-dock canonical link` を実行する」と示す。カタログ、除外、登録簿がそろっていて、リンクを置くだけなら、作業用のworktreeの中にしか書かないので、Codex のサンドボックスの中でも通る。
+   - 以下の手順で書く必要のある場所に、このプロセスが書けること（`os.access`）。書けないときは、`CANONICAL_SANDBOX_DENIED` で止まり、「サンドボックスの外（普通の端末）で `spec-dock canonical link` を実行する」と示す。カタログ、除外、登録簿がそろっていて、リンクを置くだけなら、作業用のworktreeの中にしか書かないので、Codex のサンドボックスの中でも通る。この確かめは、`ls-remote` などのネットワークの処理より前に行う（Codex のサンドボックスは既定でネットワークがないので、`GITHUB_UNAVAILABLE` ではなく `CANONICAL_SANDBOX_DENIED` で止めるため。I-2 の統括の判断）。
    - ここまでで止まるときは、何も書いていないので、`failed`（終了コード3）で返す。
 3. **カタログ**：`git worktree list --porcelain` で、`spec-dock/canonical` をチェックアウトしているworktreeを探す。
    - 登録されたパスが `<main>/spec-dock/.canonical` で、ディレクトリがあれば、何もしない。lock されていなければ lock する。
@@ -355,7 +359,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
    - 作るときは、まず `git ls-remote --exit-code origin refs/heads/spec-dock/canonical` で GitHub に canonical があるかを確かめる。終了コード2なら「ない」、0なら「ある」、それ以外は接続の失敗として止まる（`GITHUB_UNAVAILABLE`）。ある場合は、取得の対象にこのブランチが入っていない浅いクローンでは `git remote set-branches --add origin spec-dock/canonical` を行ってから `git fetch origin spec-dock/canonical` を行う。ローカルのブランチがなければ `git worktree add --track -b spec-dock/canonical <カタログ> origin/spec-dock/canonical`、あれば `git worktree add <カタログ> spec-dock/canonical` とする。最後に `git worktree lock --reason "spec-dock canonical catalog" <カタログ>` を行う。
    - GitHub に canonical がなく、既定のブランチの HEAD のツリーに `spec-dock/initiatives` がないとき（新しいリポジトリ）は、5章の「canonical の中身」の管理ファイルだけを持つ、親のないコミットを作って push する。push が先に進まれて拒否されたら（別のPCが同時に作った）、手元で作ったブランチを捨て、GitHub のものを取得して使う。
    - GitHub に canonical がなく、既定のブランチ（`origin/HEAD`、なければ mainのチェックアウトの HEAD）のツリーに `spec-dock/initiatives` があるとき（移行していない）は、何も書かずに `CANONICAL_NOT_MIGRATED` で止まり、移行の手順書を示す（I-2 の統括の判断）。
-   - GitHub に canonical がなく、ローカルのブランチ `spec-dock/canonical` があるときは、新しい初期のコミットを作らず、ローカルのブランチからカタログを作る。そのブランチが、`canonical link` が作って push できなかった初期のコミット（親のない1つのコミットで、ツリーが5章の管理ファイルだけ）なら、新しいリポジトリのときと同じく push する（もう一度の実行で続きから整うため）。それ以外は push せず、警告 `CANONICAL_REMOTE_MISSING` を返す。GitHub で消されたときの扱いは、5章の基準と一時停止に任せる（I-2 の統括の判断）。
+   - GitHub に canonical がなく、ローカルのブランチ `spec-dock/canonical` があるときは、新しい初期のコミットを作らず、ローカルのブランチからカタログを作る。そのブランチの中身が初期のコミットだけ（親のない1つのコミットで、ツリーが5章の管理ファイルだけ。I-8 が作ったもの、初期のコミットだけの canonical が GitHub で消された後など、どう生じたかは問わない）なら、新しいリポジトリのときと同じく push する（もう一度の実行で続きから整うため）。なお、`canonical link` が新しいリポジトリで初期のコミットを作るときは、push が成功する前にローカルの参照を作らない（参照を作らずにコミットを push する）ので、push に失敗した後のもう一度の実行は、新しいリポジトリの経路で整う。それ以外は push せず、警告 `CANONICAL_REMOTE_MISSING` を返す。GitHub で消されたときの扱いは、5章の基準と一時停止に任せる（I-2 の統括の判断）。
 4. **除外の設定**：`info/exclude` に、上の3行のうち足りない行を足す。
 5. **リンク**：mainのチェックアウトと、実行したチェックアウトに、正しいリンクを置く。ないときは作り、違う先のリンクは、一時的な名前で作ってから `rename` で置き換える（`ln -s` を重ねると、リンクの先の中に余計なリンクができるため。調査の記録）。
 6. **登録簿と定期の実行**（I-3 が足す）：登録簿にカタログを足し（移動の後なら古いパスの項目を消し）、5章の「定期の実行の選び方」で選んだ仕組みがなければ作って動かす（systemd のない Linux では、常駐のプロセスを起動する）。作った直後に1回だけ実行させ、最大15秒、状態の置き場の記録を待つ。その1回では、push の認証も確かめる（5章の `push_auth`）。読めなかったとき（macOS のプライバシーの保護など）、認証できなかったとき、ログアウト中に止まる環境（linger がない）、常駐のプロセスの環境（起動し直しの1行）は、その原因と次の1手を `warnings` に返す。
@@ -370,7 +374,8 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
 - `worktree create` は、`git worktree add` の後に、作ったworktreeについて `canonical link` と同じ手順（1〜8）を行う。`work start` は、選択を記録した後に、対象のチェックアウトについて同じ手順を行う（R-B4「同じ処理」）。リンクの手順の失敗は、そのコマンド自体の結果を変えず、警告と次の1手として返す。
   - どちらも、I-2 が置く公開の関数 `link_after_command`（C3。手順1〜5と8。登録と基準は I-3 が同じ経路に足す）を、`StartLock` を持たずに呼ぶ。canonical の `worktree create` は I-2 が `CANONICAL_HANDLERS` に登録し、今の作成の関数の後に呼ぶ。canonical の `work start` は、I-5 が選択を記録して `StartLock` を放した後に呼ぶ。従来の `direct_worktrees.py` と `work_start.py` は変えない（AC-15）。`START_LOCK_BUSY` などの失敗も、呼び出し元の結果を変えず、警告（次の1手は `spec-dock canonical link`）で返す（I-2 の統括の判断）。
-- そのほかの、仕様を使う canonical モードのコマンドは、リンクやカタログがない、または正しくないとき、自分では直さずに `CANONICAL_NOT_LINKED` で止まり、`recovery` に `spec-dock canonical link` を入れる（R-B5）。カタログの Git の登録が、手順2と同じ形でコンテナの中から見えないときは、`CANONICAL_FOREIGN_CHECKOUT` で止まる。仕様のファイルを読み書きするだけのコマンドではないので、ファイルの読み書きそのものは妨げない。
+- そのほかの、仕様を使う canonical モードのコマンドは、リンクやカタログがない、または正しくないとき、自分では直さずに `CANONICAL_NOT_LINKED` で止まり、`recovery` に `spec-dock canonical link` を入れる（R-B5）。カタログの Git の登録が、手順2と同じ形でコンテナの中から見えないときは、`CANONICAL_FOREIGN_CHECKOUT` で止まる。git が 2.38 より古いときも、`CANONICAL_GIT_TOO_OLD` で止まる（カタログの観察に `git worktree list --porcelain -z` を使い、古い git では読むだけのコマンドも正しく動かないため。この前提の確かめ `require_linked` は I-2 が置き、I-4 と I-5 が使う。I-2 の統括の判断）。仕様のファイルを読み書きするだけのコマンドではないので、ファイルの読み書きそのものは妨げない。
+- **カタログの中からの実行**：エージェントが `spec-dock/initiatives/...` へ移って SpecDock を実行すると、Git はリンクの先の実際のパスでカタログのworktreeを解決し、宣言が見つからない。そこで、`dispatch()` は `resolve_context` の前に、解決したworktreeが `spec-dock/canonical` をチェックアウトしていて、ルートに `.spec-dock-canonical.json` があるときだけ、`CANONICAL_INSIDE_CATALOG`（終了コード3）で止まる。次の1手は「チェックアウトのルートで実行するか、`--project <チェックアウト>` を付ける」。版3のリポジトリにはカタログがないので、従来モードの振る舞いは変わらない（I-2 が置く。I-2 の統括の判断）。
 - 読むだけのコマンド（`canonical status`、`scope show`、`workspace validate` など）は、リポジトリ、カタログ、`.git`、GitHub に何も書かない（書いてよいのは、状態の置き場の構造のスナップショットだけ。2章）。カタログに対する Git の呼び出しには `git --no-optional-locks` を付け、`.git` のインデックスも書かない。
 
 #### `spec-dock canonical status`（読むだけ。R-B7）
@@ -557,6 +562,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 #### カタログに対する Git の呼び出し
 
 - 定期の同期、`canonical link`、`canonical restore`、`canonical remove` が、カタログに対して実行するすべての Git のコマンドに、`-c core.hooksPath=/dev/null -c commit.gpgSign=false` を付ける。`worktree add` の post-checkout、`merge --ff-only` の post-merge、push の pre-push などのフックを動かさないためと、署名の確認の待ちで定期の実行が止まらないようにするためである（R-C1。調査の記録：退去費用の `pre-commit` はカタログでも動いて失敗する）。
+  - さらに、`-c core.fsmonitor=false`（fsmonitor のフックを動かさない）と、`-c gc.auto=0 -c maintenance.auto=false`（fetch が誘発する gc が、worktree の登録を prune しないようにする。3章の「SpecDock は prune しない」を守るため）を付ける（I-2 の統括の判断）。この関数は I-2 が置き、I-3 と I-5 はそのまま使う（C6）。
 - パスを渡すときは、`--literal-pathspecs` を付け、`--pathspec-from-file=<一時ファイル> --pathspec-file-nul` で渡す。
 - この付け方は、1つの関数に集め、ほかの経路で Git を呼ばない。
 
@@ -690,7 +696,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
   1. `spec-dock/initiatives` そのものと、その下のパスがない（ファイル、リンク、gitlink を含む）。
   2. `spec-dock/.canonical` の下のパスがない。
   3. `spec-dock/` の下に `.meta.json` がない。
-  4. `spec-dock/workspace.json` があり、版が4で、`writer_protocol` が既知である。
+  4. `spec-dock/workspace.json` があり、版が4で、`writer_protocol` が `specdock.worktree-writer/v1` である（1章の `require_writer` が求める値。古い `specdock.writer/v1` は、書くコマンドが止まるので失敗にする。I-7 は「既知の値」として通したので、版4の宣言を書く I-8 が、この確かめに直してテストを足す。2026-10-26 の統括の判断）。
   5. 配布資産が、このパッケージの資産か、既知の古い版と一致する（今の `installation show` の判定を使う）。`spec-dock/.gitignore` に、3章の無視の3行がある。
   6. `spec-dock/system/spec-dock-version` が、動いている SpecDock の版と同じ（違えば警告）。
 - 失敗は1件ずつ、パスと次の1手を付けて返し、`CANONICAL_CHECK_FAILED`（終了コード7）で終わる。宣言の版が3のときも、調べること4の失敗の1件（パスと次の1手付き）として返す。見つけた問題をすべて並べて CI に示すためで、1章の版3の止まり方の例外である（撤去の後も同じ）。
@@ -743,8 +749,8 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 
 - 判定：
   - Codex は、環境変数 `CODEX_SANDBOX` があるときに、`os.access(<カタログ>, W_OK)` で書けるかを判定する（確認済み）。書けなければ、上の1行を示す。
-  - Claude Code の権限は、ツールの中で判定され、SpecDock のプロセスからは確かめられない。そこで、環境変数 `CLAUDECODE`（Claude Code のシェルでは `1`。2026-10-25 に確認）があるとき、または作業用のworktreeで `canonical link` と `canonical status` を実行したときは、`~/.claude/settings.json`、`<チェックアウト>/.claude/settings.json`、`<チェックアウト>/.claude/settings.local.json` を読むだけ読んで、`additionalDirectories` にカタログ（またはその親）があるかを見る。なければ、上の1行を示す。判定できないときは、判定できないと示す。
-  - mainのチェックアウトの中で動くセッションには、設定は要らない（カタログが作業ディレクトリの中にある）。
+  - Claude Code の権限は、ツールの中で判定され、SpecDock のプロセスからは確かめられない。そこで、作業用のworktreeで `canonical link` と `canonical status` を実行したときは、`~/.claude/settings.json`、`<チェックアウト>/.claude/settings.json`、`<チェックアウト>/.claude/settings.local.json` を読むだけ読んで、`additionalDirectories` にカタログ（またはその親）があるかを見る。なければ、上の1行を示す。判定できないときは、判定できないと示す。
+  - mainのチェックアウトの中で動くセッションには、設定は要らない（カタログが作業ディレクトリの中にある）。そのため、mainのチェックアウトでは、環境変数 `CLAUDECODE`（Claude Code のシェルでは `1`。2026-10-25 に確認）があっても判定せず、1行も示さない。`CLAUDECODE` の有無は、`tools` の項目に示すだけにする（I-2 の統括の判断）。
 - カタログはクローンごとにあるので、R-J1 の5つのリポジトリを移すと、足す値は5つになる。どちらのツールも配列なので、1行の配列に並べればよい。`canonical status` は、そのクローンのカタログが足りないことだけを示す。使い方の文書（I-9）には、5つを並べた例を書く。
   - Claude Code の隔離セッション（`--worktree`）からの書き込みは、設定では通らない（確認済み）。読むだけにする。
 - Codex のサンドボックスの中からは、`.git` と登録簿に書けないため、カタログの作成、除外の追加、定期の実行の登録はできない。これらが要るときは、`canonical link` が `CANONICAL_SANDBOX_DENIED` で止まり、サンドボックスの外で実行するよう示す（3章）。
@@ -871,11 +877,13 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `CANONICAL_IGNORE_RULES_MISSING` | —（警告） | 3章の無視の3行を足す（`spec-dock installation update` か `spec-dock canonical link`）（I-2） |
 | `CANONICAL_MAIN_MOVED` | —（警告） | 各作業用のworktreeで `spec-dock canonical link`（そのworktreeも動かしたなら、先にmainで `git worktree repair <パス>`）（I-2） |
 | `CANONICAL_REMOTE_MISSING` | —（警告） | GitHub の `spec-dock/canonical` が消されていないか確かめ、`spec-dock canonical status` の案内に従う（I-2） |
+| `CANONICAL_MAIN_NOT_MIGRATED` | —（警告） | mainのチェックアウトで移行後のコミットをチェックアウトしてから `spec-dock canonical link`（I-2。`canonical status` の `link` の項目でも示す） |
+| `CANONICAL_INSIDE_CATALOG` | 3 | チェックアウトのルートで実行するか、`--project <チェックアウト>` を付ける（I-2） |
 | `SLUG_REQUIRED` | 3 | `--slug <英小文字とハイフン>` を付ける |
 
 ### 13. ダッシュボード（R-E5、AC-17）
 
-今までと同じ Markdown と PlantUML のダッシュボードを、canonical モードで、構造のスナップショットから作り直す。HTML のダッシュボードは、次の Epic（epic-00425）で作り、これを置き換える。
+今までと同じ Markdown と PlantUML のダッシュボードを、canonical モードで、構造のスナップショットから作り直す。これは、つなぎである。HTML のダッシュボードは epic-00427（#427）で作り、その段階1を出した後に、この5つのファイルの生成を撤去する（epic-00427 の R-H1。2026-10-25 に、ダッシュボードを epic-00425 から epic-00427 に分けた）。
 
 - **作るファイル**：mainのチェックアウトの `spec-dock/` の、次の5つ。どれも、配布資産の `spec-dock/.gitignore` で、すでに無視されている（確認済み）。
 

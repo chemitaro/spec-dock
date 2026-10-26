@@ -113,7 +113,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 | C7 版のファイルと、検査のワークフローの見本、`specdock-ci-check.sh` | I-7 | I-8（`cut`）、I-9、I-10、I-12、I-13（0.4.0） | 8章 |
 | C8 エラーのコードと次の1手、結果の状態の規則 | 各コマンドの持ち主 | I-9（一覧の確認） | 12章 |
 | C9 状態の置き場（根、登録簿、`state.json` の形式と意味、基準）と、すぐの実行の頼み方（launchd、systemd、常駐のプロセス） | I-3（根の求め方 `resolve_state_root` は I-1） | I-2（`status` の同期の項目は I-3 が足す）、I-5（`work finish`）、I-11（`dashboard` の項目） | 5章 |
-| C10 構造のスナップショット（置き場、`snapshot.json` と `probe.json` の版1の形式、`ensure_fresh` と3つの新しさの段階、書き込みの反映、書けないときのメモリーの上の扱い） | I-1 | I-3（周期の手順7）、I-4、I-5、I-11、次の Epic（epic-00425） | 2章 |
+| C10 構造のスナップショット（置き場、`snapshot.json` と `probe.json` の版1の形式、`ensure_fresh` と3つの新しさの段階、書き込みの反映、書けないときのメモリーの上の扱い） | I-1（`created_at` と `closed_at` は I-11 が足す） | I-3（周期の手順7）、I-4、I-5、I-11、HTML のダッシュボードの Epic（epic-00427） | 2章 |
 | C11 環境の判定（OS、コンテナ、git の版、systemd のユーザー、linger）と、その注入の仕方 | I-2（systemd と linger は I-3 が足す） | I-3、I-9 | 3章、5章 |
 
 - I-8 の移行のスクリプトは、パッケージを読み込まない1つのファイルなので、C1、C3（無視の3行）、C5、C7 の値を写して持つ。写した値が同じであることを、I-8 のテストで、パッケージの定数と比べて確かめる。
@@ -261,6 +261,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `adopt-worktree` の後、コミットしていない変更も canonical に入り、ブランチを既定のブランチにマージしても、仕様のパスが入らない（AC-05）。構造の違いの一覧が出る。
   - `export-legacy` で作ったブランチの `.meta.json` が、移行前のものと、`revision` と `lifecycle` のほかは一致する。
   - 写した値（C1、C3 の無視の3行、C5、C7）が、パッケージの定数と同じ。
+- **I-7 から引き継ぐもの**（2026-10-26 の統括の判断）：`canonical check` の調べること4を、`writer_protocol` が `specdock.worktree-writer/v1` であることの確かめに直す（`design.md` 8章。I-7 は古い `specdock.writer/v1` も「既知の値」として通している）。版4の宣言で `specdock.writer/v1` のとき、失敗の1件（パスと次の1手付き）になるテストを足す。`migrate.py` が書く版4の宣言も、この値にする。
 - **注意**：本物の GitHub への書き込みと、本物のリポジトリへの書き込みは、この Issue では行わない。
 
 ### I-9 Integrate Agent Rules Docs And Release
@@ -274,6 +275,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 横断のシナリオのテスト：2つのクローンと偽の `gh` で、`link` → `scope create` → 編集 → `sync` → 別のクローンで見える → `work start` → `work finish` までを通す。
   - spec-dock の利用側の配布資産を、`installation update` で 0.3.0 に上げる（従来モードのまま）。
   - 版を 0.3.0 にする（`pyproject.toml` と版のファイル）。
+  - **I-7 から引き継ぐもの**（2026-10-26 の統括の判断）：配布する `spec-dock/docs/cli-redesign-guide.html` のコマンドの一覧（「全44コマンド」と C01〜C44 の表）に、`canonical` のコマンドを足す。使い方の文書に、検査のワークフローの見本は 0.3.0 以降で使うこと（版のタグは 0.3.0 から作るので、0.2.4 の版のファイルのままでは `pipx install` が失敗する）を書く。マージの後に、`release-tag.yml` が `v0.3.0` を作ったことを確かめ、報告書に書く（タグを作らない側は、#444 のマージの後の本物の run で確かめた。判定は `version-unchanged`、タグの作成は skipped）。
 - **受け入れ**：
   - AC-02、AC-07、AC-14、AC-15、AC-16、AC-18 を確かめる。AC-14 は、設計書を渡さない白紙のエージェントに規則の節だけを渡して試し、結果を報告書に書く。AC-18 は、横断のシナリオのテストを、環境の判定を注入して systemd と `loop` の両方で通し、実機では OrbStack の仮想マシンと Docker のコンテナで通す。
   - wheel を作り、外の環境に入れて、`spec-dock help` と `spec-dock canonical --help` が動く（AGENTS.md の手順）。
@@ -305,7 +307,9 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `application/canonical_dashboard.py`：スナップショットから、今の描く関数（`presentation/markdown.py`、`puml.py`）の入力の辞書を作る部品と、5つのファイルを書く部品。状態の決め方は、I-4 の着手の判定の部品を使う。
   - 定期の同期の周期の手順7に、ダッシュボードの作り直しを足す（`state.json` の `dashboard`。C9 に項目を足す）。
   - `canonical status` の `dashboard` の項目。`canonical remove` で5つのファイルを消すこと。
+  - 構造のスナップショット（C10）の `issues` の各要素に、`created_at` と `closed_at` を足す（`design.md` 2章。全体を読む GraphQL の問い合わせに `createdAt` と `closedAt` を足し、`ScopeNode` と書き込みの反映にも足す）。HTML のダッシュボード（epic-00427）の時間の軸のためで、版は1のままにする（2026-10-26 の統括の判断）。
 - **受け入れ**：
+  - 偽の `gh` の上で、全体の取り直しのスナップショットに、開いた Issue の `created_at` と、閉じた Issue の `created_at` と `closed_at` が入る。要求の数が変わらない（偽の `gh` の記録で確かめる）。この2つがない版1のファイルは、取り直す。
   - 一時のカタログと偽の `gh` で、周期の後に5つのファイルが作られ、見本と同じ形である（違いは、題名、作業中の決め方、Observability の行だけ）。日本語の題名が、PlantUML の文字列として正しく入る。
   - 作業中のラベルのある Issue が DOING、閉じた Issue が DONE、開いた依存先のある Issue が BLOCKED になる。Scope でない開いた Issue への依存も BLOCKED になる。
   - 構造が変わらない次の周期では、5つのファイルを書かない（更新の時刻が変わらない）。題名を変えた後の周期では書き直す（AC-17）。
@@ -347,6 +351,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - AC-20 のうち、パッケージについての部分。14章の「消すもの」が残っていない（コードの検索と、版3の宣言のテスト）。テストの分類の一覧で、(b) のすべてに対応する canonical のテストがある。`make lint` と `uv run pytest` が通る。
   - wheel を作り、外の環境に入れて、`spec-dock help` と `spec-dock canonical --help` が動き、`spec-dock workspace migrate` と `spec-dock workbench copy` がない。
 - **マージの後**（統括のエージェントが行う）：利用者の環境に 0.4.0 を入れる。`release-tag.yml` が `v0.4.0` を作ったことを確かめる。R-J1 の各リポジトリで `spec-dock installation update` を行い、通常のPRを作る（spec-dock の分は、この Issue のPRに含まれる）。各PRで、検査のワークフローが 0.4.0 で通ることを確かめ、人がマージする。これで AC-20 の残りの部分を確かめる。
+- **I-7 から引き継ぐもの**：`infra/commit_tree.py` と `infra/committed_validation.py` の `ls-tree` の解析の重複を、1つにする（I-7 は、従来の処理を変えない決まりのため、重ねて持った）。
 - **注意**：共通の契約（R-J7）のテストを、対応を示さずに消してはならない。消すかどうかに迷うテストは、一覧に理由を書いて残し、統括のエージェントに確かめる。
 
 ## 検証
@@ -370,4 +375,4 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 
 - **Issue の完了**：その Issue の受け入れを満たし、PRが人にマージされ、`work finish` で閉じる。報告書に、実装したこと、確かめたこと、実機の確かめの結果、残ったリスクを書く。
 - **Epic の完了**：AC-01〜AC-20 をすべて確かめる。I-10 と I-12 の後のそれぞれ3日間の運用で問題がなく、I-13 の 0.4.0 が利用者の環境に入り、R-J1 の5つのリポジトリの配布資産が 0.4.0 になっている。`design.md` の「未確認の事項」に残ったものは、別の Issue にするか、理由を付けて閉じる。この Epic の報告書に、結果と、各リポジトリの移行で分かったことをまとめる。
-- **この後**：次の Epic（epic-00425）で、HTML のダッシュボードと、仕様の文書の CUE と HTML への移行を議論する。構造のスナップショット（C10）は、その入力として、この Epic の形のまま渡す。従来モードの撤去はこの Epic で終わるので、後に残る Epic はない。
+- **この後**：HTML のダッシュボードは epic-00427 で、仕様の文書の CUE と HTML への移行は epic-00425 で扱う（2026-10-25 に、ダッシュボードを epic-00425 から epic-00427 に分けた）。構造のスナップショット（C10）は、その入力として、この Epic の形のまま渡す。従来モードの撤去はこの Epic で終わるので、後に残る Epic はない。
