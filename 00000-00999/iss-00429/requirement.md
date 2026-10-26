@@ -118,6 +118,7 @@ ID: "iss-00429"
 ### 親契約として維持する境界
 
 - 従来モード（版3）の処理と、`.meta.json` を読み書きするコード（`application/direct_worktrees.py`、`work_start.py` を含む）を変えない。版3の振る舞いを確かめるテストは、Epic の `design.md` の testability の「従来モードの回帰」に挙げたもの（コマンドの数と一覧、配布資産の一覧と値、文書の中身）のほかは変えない（AC-15）。
+  - 統括が認めた例外は1つだけ：`application/worktree_observation.observe_worktrees` が、カタログのworktree（`spec-dock/canonical` をチェックアウトし、ルートに `.spec-dock-canonical.json` があるもの）を飛ばす（`plan.md` の統括の判断 D1）。カタログのない版3のリポジトリでは、振る舞いは変わらない。
 - 読むだけのコマンドは、リポジトリ、カタログ、`.git`、GitHub に何も書かない。
 - `StartLock` と選択の記録の形式を変えない。利用者のツールの設定のファイルを書き換えない。
 - テストと実機の確かめで、利用者の `~/.local/state/spec-dock/`、`~/.claude/settings.json`、`~/.codex/config.toml`、本物の GitHub、利用者のほかのリポジトリに触れない。
@@ -163,7 +164,7 @@ Epic の `plan.md` の I-2 の「受け入れ」と、統括の判断を、テ�
 - **AC-429-15（AC-15）**：版3の宣言では、すべてのコマンドが今と同じに動く。版3の振る舞いを確かめる今のテストが、許された変更（コマンドの数と一覧、配布資産の一覧と値、文書の中身）のほかは変更なしで通る。版3の `canonical link` と `canonical status` は `CANONICAL_NOT_MIGRATED` で止まる。
 - **AC-429-16**：canonical モードの `worktree create` は、`--expect-current` があると `CANONICAL_NOT_IMPLEMENTED` で止まる。リンクの手順が失敗（`START_LOCK_BUSY` を含む）しても、`worktree create` の結果の状態と終了コードは変わらず、警告と次の1手 `spec-dock canonical link` が付く。
 - **AC-429-17**：`make lint` と `uv run pytest` が通る。
-- **AC-429-18**：mainのチェックアウトが版3の宣言のコミットにいるとき、作業用のworktreeの `canonical link` は、mainの `spec-dock/initiatives` に触れずに、カタログと除外とそのworktreeのリンクを整え、`CANONICAL_MAIN_NOT_MIGRATED` を警告する。mainの従来のコマンド（`scope list` など）は今までどおり動き、mainの `git status` に何も出ない。
+- **AC-429-18**：mainのチェックアウトが版3の宣言のコミットにいるとき、作業用のworktreeの `canonical link` は、mainの `spec-dock/initiatives` に触れずに、カタログと除外とそのworktreeのリンクを整え、`CANONICAL_MAIN_NOT_MIGRATED` を警告する。mainの従来のコマンド（`scope list`、`work start`、`workspace sync` など）は今までどおり動き（版3の作業用のworktreeでも同じ）、mainの `git status` に何も出ない。
 - **AC-429-19**：カタログのworktreeの中（`spec-dock/initiatives/…`）から実行したコマンドは `CANONICAL_INSIDE_CATALOG`（終了コード3、`--project` を含む次の1手）で止まる。宣言のないふつうの Git のリポジトリでは、今と同じ `PRECONDITION_FAILED` で止まる。
 - **AC-429-20**：mainのチェックアウトで、カタログの Git の登録と `.git` ファイルが、同じ実体の別名のパスを指すとき、`canonical link` は `repair` をせずに `unchanged` で終わり、`.git/worktrees/` が変わらない。
 

@@ -95,6 +95,13 @@ ID: "iss-00429"
 
 C6 の考え方（止まるコードを警告に使い回さない）に合わせて、`link_after_command` で、作ったworktreeの宣言が版4でないときの警告も、新しい `CANONICAL_CHECKOUT_NOT_MIGRATED` にした（この Issue の判断）。
 
+### 4回目（最終の品質の関門のレビューの後、2026-10-26。msg_278a04b83d03）
+
+- **D1**：SP-1 は案(a)。従来の `worktree_observation.observe_worktrees` に、`spec-dock/canonical` をチェックアウトし、ルートに `.spec-dock-canonical.json` がある worktree を飛ばす例外を1つだけ足す。これは「従来モードのコードを変えない（AC-15）」の、統括が認めた例外である。範囲はその1か所の条件だけ。理由：I-10 の切り替えの間と、その後の3日間は、同じクローンに版3の作業用のworktree（移行前のブランチ）が残る。案(b)では、それらの従来の `work start` と `workspace sync` が止まり、移行の段取りが成り立たない。版3の振る舞いのテストは変えない。AC-429-18 のテストに、従来の `work start --dry-run` と `workspace sync` を、mainと版3の作業用のworktreeから足す。Epic の `design.md` の「移行の間、変えないもの」への追記は、統括が行う。
+- **D2**：ST-1 の作りかけのカタログ（管理ディレクトリに `index` がない）は、`occupied` として書く前に止め、利用者が `git worktree remove --force --force` で消す次の1手を示す（案のとおり）。プロセスグループごと止める処理は入れない（新しいセッションでは SSH のパスフレーズを入力できないため）。
+- **D3**：`spec-dock/.gitignore` の `IGNORE_RULES_MISSING` の次の1手を、link、status、check で同じにする（案のとおり）。
+- **D4**：P2 と P3 の直すものと申し送るものは、案のとおり。ST-2（sparse-checkout）と ST-13（`GIT_ASKPASS`）は報告書の申し送りに書き、I-3 には足さない。ゲートのやり直しは、新しい SHA で `make lint` と全体の `uv run pytest` を通し、レビューは新しい2つのサブエージェントに、`e27ac7126` からの差分と P1 の2件が直ったことの確かめに絞って頼む。やり直しの前に `origin/main` を merge で取り込む。
+
 ### レビューの指摘の対応（文書の独立レビュー、2026-10-26）
 
 | 指摘 | 判定 | 対応 |
@@ -152,6 +159,31 @@ C6 の考え方（止まるコードを警告に使い回さない）に合わ�
 - **順の規則**：I-7 の意味（最後の否定の行が、その前の行より後ろにあること）にそろえた。マージの前のこの Issue の実装は3行すべての順を求めていたが、カタログの行の位置は Git の結果を変えないので、ゆるめても安全である。`canonical status` と `canonical link` も同じ規則で判定する（`missing_lines` が `ignore_rules_state` を使う）。
 - **`IGNORE_RULES_MISSING` の次の1手**（I-7 の `canonical check`）：`.gitignore` が配布資産の今の中身か、変更の前の中身（known-old）なら `spec-dock installation update`、利用者が変えた中身なら「配布資産の `.gitignore` を手で取り込み、3行をこの順で末尾に置いてコミット」。`installation update` は利用者が変えたファイルを上書きしないため。
 - **I-7 のテストの期待の変更**：known-old の `.gitignore` の次の1手が `installation update` を含むこと、順が違うときに「Merge the shipped …」を含むこと。足したテスト：`SPEC_DOCK_IGNORE_LINES is GITIGNORE_LINES`、配布資産そのままで `canonical check` が `IGNORE_RULES_MISSING` を出さないこと（重ねる部品 `tests/support/canonical_check.py` が何もしないこと）、domain の順の規則。
+
+### 最終の品質の関門のレビューの指摘の対応（S14、2026-10-26）
+
+対象は `e456dfc8b..e27ac7126`（`origin/main...HEAD` の全体）。規約（ST）と仕様（SP）の新しい2つのサブエージェントが、P0 なし、P1 が各1件と報告した。
+
+| 指摘 | 判定 | 対応 |
+|---|---|---|
+| ST-1 P1 時間切れの `worktree add` の作りかけを `ready` とし、再実行が成功を返す | 妥当 | 管理ディレクトリに `index` がなければ `occupied`（`unfinished`）。link は書く前に止まり、status と `require_linked` も通さない。次の1手は利用者が消す手順（統括の判断 D2）。CLI と unit のテストを足し、次の1手が効くことを使い捨てのリポジトリで確かめた |
+| SP-1 P1 版3のmainと版3の作業用のworktreeで、従来の `work start` と `workspace sync` が止まる | 妥当 | 統括の判断 D1 の例外を `observe_worktrees` に足した。AC-429-18 のテストに、リンクの前後の両方で、mainと版3の作業用のworktreeからの従来の `work start --dry-run` と `workspace sync` を足した |
+| ST-2 P2 mainの sparse-checkout をカタログが引き継ぐ | 妥当（範囲外） | 申し送る（報告書。統括の判断 D4） |
+| ST-3 P2 push の `[remote rejected]` を「先に作られた」と誤分類する | 妥当 | `[rejected]` だけを `rejected` にし、ほかは stderr を保った `GitProcessError` にした。テストを足した |
+| ST-4 P2 `submodule.recurse=true` で fetch がサブモジュールを取りに行く | 妥当 | `--no-recurse-submodules` を付けた。届かないサブモジュールのテストを足した |
+| ST-5 / SP-5 `.gitignore` の次の1手が、変えられたファイルに効かない | 妥当 | `canonical_errors.ignore_rules_next_step` を link、status、check で使う（統括の判断 D3）。テストを足した |
+| ST-6 P3 `info/exclude` がシンボリックリンクのとき、普通のファイルに置き換わる | 妥当（低い） | 申し送る |
+| ST-7 P3 `push.gpgSign` を外していない | 妥当 | C6 に `push.gpgSign=false` を足した。テストのフックの設定に `push.gpgSign=true` を足した |
+| ST-8 P3 テストが継承した `GIT_SSH_COMMAND` などで失敗する | 妥当 | `isolate_user_state` が `PASSED_GIT_VARIABLES` を消す |
+| ST-9 P3 ヘルプの「書くもの」に、fetch の refspec の追加とブランチの付け替えがない | 妥当（文書） | I-9 へ申し送る |
+| ST-10 P3 次の1手の文と関数の重複 | 一部妥当 | ふさがった場所の次の1手を `occupied_next_step` 1つにした。`_is_directory` の重複は残す |
+| ST-11 P3 git の版のメッセージの古い理由 | 妥当 | 理由を消した |
+| ST-12 P3 `CLAUDE_CONFIG_DIR` を見ない | 判断 | 申し送る |
+| ST-13 P3 `GIT_ASKPASS` を通さない | 判断（C6 のとおり） | 申し送る（統括の判断 D4） |
+| SP-2 P2 AC の一部の条件にテストがない | 妥当 | StartLock が取れずネットワークの効果もないときの `failed`（3）、形式のファイルがないときの link と status のテストを足した。link の「カタログかその親があるときは示さない」は、status と同じ関数のため足していない |
+| SP-3 P3 `catalog_changes` が読めない形式のファイルで `LOCAL_IO_FAILED` | 妥当 | `OSError` を「ない」と同じにし、`CANONICAL_FORMAT_UNSUPPORTED` にした。テストを足した |
+| SP-4 P3 status の `access` が警告なしで `problem` | 妥当 | Codex のサンドボックスでも `OS_ACCESS_DENIED` の警告を出す（`tools` の1行を指す） |
+| SP-6 P3 報告書に既存のテストの変更の一覧がない | 妥当 | `report.md` に書いた |
 
 ## 検証
 
