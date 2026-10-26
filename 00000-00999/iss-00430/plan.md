@@ -195,6 +195,20 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 | ST-9 の `$` の引用、ST-10 の表の名前 | P3 | 直した |
 | ST-6 別のリポジトリの link と remove の競合、ST-8 launchd の `kickstart` の終了コード、ST-9 の層の分け方 | P3 | 直さずに残るリスクとして報告書に書く |
 
+### 最終品質ゲート3の指摘の対応（`3d321b13a`、2026-10-26）
+
+ゲート3は不合格（Standards の P1 が1件、Spec の P0 が1件と P1 が1件）。`make lint` と全体の `uv run pytest` は通っていた（2921 passed、8 skipped）。
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| Standards ST-1、Spec SP-1 無視されたローカルのファイルが早送りで黙って上書きされる | P1、P0 | 重なりの確かめに無視されたファイルを入れ、早送りに `--no-overwrite-ignore` を付けた。テストを足した |
+| Spec SP-2 ディレクトリの名前の変更と新しいファイルの衝突で `merge_failed` から抜けられない | P1 | `merge.directoryRenames=false` で統合する。テストを足した |
+| Standards ST-2、Spec SP-3 `core.fileMode=false` で実行ビットを付けてしまう | P2 | `git add` が決めたモードを使う。テストを足した |
+| Spec SP-4 カタログが別のブランチにあるときの remove | P3 | 書く前に止まる。テストを足した |
+| Spec SP-5 systemd の `Environment=` の `$`、`refresh_structures` を直接呼ぶテスト | P3 | `$$` は `ExecStart=` の中だけにした。テストを足した |
+| Standards ST-3 端末の Ctrl-C が git の子プロセスを止める、常駐のプロセスが止める要求を各カタログに渡さない | P3 | 直さずに残るリスクとして報告書に書く（データは失われず、次の保存と統合で戻る） |
+| Standards ST-4 中断した remove が空の状態のディレクトリを残す | P3 | 直さない（害は小さい） |
+
 ## exit / handoff
 
 - **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
