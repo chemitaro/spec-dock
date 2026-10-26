@@ -36,6 +36,9 @@ class Scheduler(Protocol):
     @property
     def kind(self) -> SchedulerKind: ...
 
+    @property
+    def path_tail(self) -> str | None: ...  # the fixed end of the job's PATH; None when the job inherits PATH
+
     def needs_change(self, spec: SchedulerSpec) -> bool: ...
 
     def write_paths(self, spec: SchedulerSpec) -> tuple[Path, ...]: ...

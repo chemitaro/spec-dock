@@ -30,7 +30,7 @@ from spec_dock.runtime.application.canonical_errors import (
     SYNC_LOG_NEXT_STEP,
 )
 from spec_dock.runtime.domain.canonical_layout import git_supported
-from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec, restart_line, select_scheduler
+from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec, recorded_head, restart_line, select_scheduler
 from spec_dock.runtime.domain.canonical_structure import format_timestamp, parse_timestamp
 from spec_dock.runtime.domain.canonical_sync_state import CatalogSyncState, RegistryEntry, SyncRegistry
 from spec_dock.runtime.infra import canonical_git, canonical_scheduling, runtime_environment
@@ -215,22 +215,20 @@ def plan_schedule(
 
 
 def _gh_dir(scheduler: Scheduler, state_root: Path, environment: RuntimeEnvironment, git_dir: Path) -> Path | None:
-    """The gh directory the installed job already uses while gh is still there; else this PATH's gh."""
+    """The gh directory the installed job already uses while gh is still there; else this PATH's gh.
+
+    Only the directories before the job's fixed PATH tail are read back: a gh further down (merged /usr's
+    /bin, an apt gh beside a Homebrew one) is never mistaken for the recorded one.
+    """
     probe = SchedulerSpec(Path("/"), state_root, Path("/"), environment.home or Path.home())
     recorded = scheduler.recorded_search_path(probe)
-    if recorded:
-        beside_git = os.path.realpath(git_dir / "gh") if os.access(git_dir / "gh", os.X_OK) else None
-        for directory in filter(None, recorded.split(":")):
-            candidate = Path(directory) / "gh"
-            # The gh beside git through another name (merged /usr: /bin is /usr/bin) is not another gh.
-            if (
-                Path(directory) != git_dir
-                and os.access(candidate, os.X_OK)
-                and os.path.realpath(candidate) != beside_git
-            ):
-                return Path(directory)
-        if beside_git is not None:
-            return git_dir
+    tail = scheduler.path_tail
+    head = recorded_head(recorded, tail) if recorded and tail is not None else None
+    if head:
+        if len(head) > 1 and head[1] and os.access(Path(head[1]) / "gh", os.X_OK):
+            return Path(head[1])  # recorded apart from git, still there
+        if os.access(git_dir / "gh", os.X_OK):
+            return git_dir  # recorded beside git (search_path then lists git's directory only), or moved there
     gh = shutil.which("gh", path=environment.environ.get("PATH", ""))
     return Path(gh).parent if gh else None
 

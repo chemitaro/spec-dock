@@ -18,8 +18,8 @@ SYSTEMD_SERVICE: Final = "spec-dock-canonical-sync.service"
 SYSTEMD_TIMER: Final = "spec-dock-canonical-sync.timer"
 INTERVAL_SECONDS: Final = 60
 LOG_FILE: Final = "canonical-sync.log"
-_LAUNCHD_PATH_TAIL: Final = "/usr/bin:/bin:/usr/sbin:/sbin"
-_SYSTEMD_PATH_TAIL: Final = "/usr/local/bin:/usr/bin:/bin"
+LAUNCHD_PATH_TAIL: Final = "/usr/bin:/bin:/usr/sbin:/sbin"
+SYSTEMD_PATH_TAIL: Final = "/usr/local/bin:/usr/bin:/bin"
 
 
 @dataclass(frozen=True)
@@ -74,7 +74,7 @@ def launchd_plist(spec: SchedulerSpec, *, label: str = LAUNCHD_LABEL) -> bytes:
         "RunAtLoad": True,
         "StandardOutPath": str(spec.log),
         "StandardErrorPath": str(spec.log),
-        "EnvironmentVariables": {"PATH": spec.search_path(_LAUNCHD_PATH_TAIL)},
+        "EnvironmentVariables": {"PATH": spec.search_path(LAUNCHD_PATH_TAIL)},
     })
 
 
@@ -99,7 +99,7 @@ def systemd_units(spec: SchedulerSpec) -> tuple[str, str]:
         "[Service]\n"
         "Type=oneshot\n"
         "WorkingDirectory=%h\n"
-        f"Environment={systemd_quote('PATH=' + spec.search_path(_SYSTEMD_PATH_TAIL))}\n"
+        f"Environment={systemd_quote('PATH=' + spec.search_path(SYSTEMD_PATH_TAIL))}\n"
         f"ExecStart={command}\n"
     )
     timer = (
@@ -129,3 +129,14 @@ def state_root_argument(arguments: Sequence[object]) -> Path | None:
         if flag == "--state-root" and isinstance(value, str) and value:
             return Path(value)
     return None
+
+
+def recorded_head(search_path: str, tail: str) -> list[str] | None:
+    """The directories an installed job's PATH puts before its fixed `tail` (git, then gh when apart), or None.
+
+    None when the PATH does not end with `tail` (written by another version, or edited by hand).
+    """
+    if search_path != tail and not search_path.endswith(":" + tail):
+        return None
+    head = search_path[: len(search_path) - len(tail)].rstrip(":")
+    return head.split(":") if head else []

@@ -11,6 +11,7 @@ from spec_dock.runtime.domain.canonical_scheduler import (
     LAUNCHD_LABEL,
     SchedulerSpec,
     launchd_plist,
+    recorded_head,
     restart_line,
     select_scheduler,
     systemd_quote,
@@ -122,3 +123,17 @@ def test_an_unknown_user_manager_keeps_a_previous_systemd_choice() -> None:
     assert select_scheduler("linux", systemd_present=True, systemd_user=None, previous=None) == "loop"
     assert select_scheduler("linux", systemd_present=False, systemd_user=None, previous="systemd") == "loop"
     assert systemd_quote("/a/$HOME", command=True) == "/a/$$HOME" and systemd_quote("/a/$HOME") == "/a/$HOME"
+
+
+@pytest.mark.parametrize(
+    ("search_path", "head"),
+    [
+        ("/opt/git/bin:/usr/bin:/bin", ["/opt/git/bin"]),
+        ("/opt/git/bin:/opt/gh/bin:/usr/bin:/bin", ["/opt/git/bin", "/opt/gh/bin"]),
+        ("/usr/bin:/usr/bin:/bin", ["/usr/bin"]),  # git in /usr/bin, gh beside it
+        ("/usr/bin:/bin", []),
+        ("/opt/git/bin:/usr/local/bin:/usr/bin", None),  # another tail: written by another version
+    ],
+)
+def test_recorded_head_reads_only_what_comes_before_the_fixed_tail(search_path: str, head: list[str] | None) -> None:
+    assert recorded_head(search_path, "/usr/bin:/bin") == head

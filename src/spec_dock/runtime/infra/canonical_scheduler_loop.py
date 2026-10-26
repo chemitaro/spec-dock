@@ -155,6 +155,10 @@ class LoopScheduler:
     def kind(self) -> Literal["loop"]:
         return "loop"
 
+    @property
+    def path_tail(self) -> None:
+        return None  # the runner inherits the PATH it was started with
+
     def __init__(self, state_root: Path, *, spawn: Callable[..., int] = detach) -> None:
         self.state_root = state_root
         self.spawn = spawn

@@ -9,7 +9,12 @@ import subprocess
 import time
 from typing import TYPE_CHECKING, Final, Literal
 
-from spec_dock.runtime.domain.canonical_scheduler import LAUNCHD_LABEL, launchd_plist, state_root_argument
+from spec_dock.runtime.domain.canonical_scheduler import (
+    LAUNCHD_LABEL,
+    LAUNCHD_PATH_TAIL,
+    launchd_plist,
+    state_root_argument,
+)
 from spec_dock.runtime.infra.canonical_scheduling import (
     EnsureOutcome,
     SchedulerError,
@@ -30,6 +35,10 @@ class LaunchdScheduler:
     @property
     def kind(self) -> Literal["launchd"]:
         return "launchd"
+
+    @property
+    def path_tail(self) -> str:
+        return LAUNCHD_PATH_TAIL
 
     def __init__(
         self,

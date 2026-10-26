@@ -8,6 +8,7 @@ import subprocess
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.domain.canonical_scheduler import (
+    SYSTEMD_PATH_TAIL,
     SYSTEMD_SERVICE,
     SYSTEMD_TIMER,
     state_root_argument,
@@ -30,6 +31,10 @@ class SystemdScheduler:
     @property
     def kind(self) -> Literal["systemd"]:
         return "systemd"
+
+    @property
+    def path_tail(self) -> str:
+        return SYSTEMD_PATH_TAIL
 
     def __init__(
         self,

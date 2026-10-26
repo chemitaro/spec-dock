@@ -59,7 +59,7 @@ class FakeScheduler:
     on_kick: Callable[[], object] | None = None
     recorded: Path | None = None
     simulate_run: bool = False  # a kick records a successful cycle for every registered catalog
-    tail: str = "/usr/bin:/bin"  # the fixed end of the job's PATH
+    path_tail: str = "/usr/bin:/bin"  # the fixed end of the job's PATH
 
     def needs_change(self, spec: SchedulerSpec) -> bool:
         return not self.installed or (self.specs[-1] != spec if self.specs else True)
@@ -76,7 +76,7 @@ class FakeScheduler:
     def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
         if not self.specs:
             return None
-        return self.specs[-1].search_path(self.tail)
+        return self.specs[-1].search_path(self.path_tail)
 
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome:
         self.calls.append(("ensure", self.kind))

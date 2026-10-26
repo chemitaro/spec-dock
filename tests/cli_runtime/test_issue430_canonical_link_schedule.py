@@ -333,21 +333,23 @@ def test_status_and_remove_from_another_state_root_leave_the_job_alone(
     assert ("remove", "launchd") not in pair.schedulers["launchd"].calls
 
 
-def test_gh_beside_git_seen_again_through_an_alias_directory_changes_nothing(
+def test_a_gh_further_down_the_jobs_path_never_replaces_the_one_beside_git(
     pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     tools = tmp_path / "usr-bin"
-    tools.mkdir()
+    other = tmp_path / "other-bin"
+    for directory in (tools, other):
+        directory.mkdir()
+        (directory / "gh").write_text(f"#!/bin/sh\n# {directory.name}\nexit 0\n")
+        (directory / "gh").chmod(0o755)
     git_path = shutil.which("git")
     assert git_path is not None
     (tools / "git").symlink_to(git_path)
-    (tools / "gh").write_text("#!/bin/sh\nexit 0\n")
-    (tools / "gh").chmod(0o755)
     alias = tmp_path / "bin"
-    alias.symlink_to(tools)  # merged /usr: /bin is /usr/bin, so the job's PATH tail shows the same gh again
+    alias.symlink_to(tools)  # merged /usr: /bin is /usr/bin, so the tail shows the same gh again
     monkeypatch.setenv("PATH", f"{tools}:{os.environ['PATH']}")
     launchd = pair.schedulers.setdefault("launchd", FakeScheduler("launchd"))
-    launchd.tail = f"{alias}:/usr/bin:/bin"
+    launchd.path_tail = f"{alias}:{other}"  # and a different gh after it (an apt gh beside a Homebrew one)
     assert pair.run(pair.a, "canonical", "link")[0] == 0
     code, again = pair.run(pair.a, "canonical", "link")
     assert code == 0 and again["status"] == "unchanged", again
