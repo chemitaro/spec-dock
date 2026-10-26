@@ -49,7 +49,9 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
 
             target = installation_context(namespace, cwd)
             if namespace.expect_current is not None and probe_workspace_mode(target.root) == "canonical":
-                result = canonical_not_implemented(command)
+                from spec_dock.runtime.application.canonical_worktrees import install_with_expectation
+
+                result = install_with_expectation(namespace, target)
             else:
                 result = install_static_assets(namespace, target)
             return _render_result(namespace, result)

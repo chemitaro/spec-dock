@@ -194,7 +194,7 @@ def test_worktree_create_dry_run_plans_the_link(
     assert not (tmp_path / "trees").exists()
 
 
-def test_worktree_create_with_expect_current_is_not_implemented(
+def test_worktree_create_with_an_unverifiable_expect_current_creates_nothing(
     capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path
 ) -> None:
     code, result = run(
@@ -211,7 +211,8 @@ def test_worktree_create_with_expect_current_is_not_implemented(
         str(tmp_path / "trees"),
         "--yes",
     )
-    assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED"
+    # iss-00431 resolves --expect-current from the structure snapshot; this clone has no GitHub origin.
+    assert code == 3 and result["error"]["code"] == "PRECONDITION_FAILED"
     assert not (tmp_path / "trees").exists()
 
 

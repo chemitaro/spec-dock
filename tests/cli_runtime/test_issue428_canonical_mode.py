@@ -231,14 +231,16 @@ def test_schema_four_with_the_old_writer_protocol_cannot_update(
     "command",
     [["installation", "show"], ["installation", "update", "--dry-run"], ["installation", "uninstall", "--dry-run"]],
 )
-def test_expect_current_on_a_schema_four_installation_is_not_implemented(
+def test_expect_current_on_a_schema_four_installation_is_checked_before_any_write(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], command: list[str]
 ) -> None:
     target = _uninitialized(tmp_path / "fresh")
     assert _run(capsys, "installation", "init", str(target), "--yes")[0] == 0
     before = tree_digest(target)
     code, result = _run(capsys, *command, "--target", str(target), "--expect-current", "init-00001")
-    assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED"
+    # iss-00431 checks the expectation against the structure snapshot; this target has no GitHub origin.
+    assert code == 5 and result["status"] == "failed" and result["effects"] == []
+    assert result["error"]["code"] == "GIT_FAILED"
     assert tree_digest(target) == before
 
 

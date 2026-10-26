@@ -21,7 +21,14 @@ from spec_dock.runtime.application.canonical_scope_read import (
     show_scope,
 )
 from spec_dock.runtime.application.canonical_status import run_canonical_status
-from spec_dock.runtime.application.canonical_worktrees import create_worktree_and_link
+from spec_dock.runtime.application.canonical_worktrees import (
+    bootstrap_worktree,
+    create_worktree_and_link,
+    list_worktrees,
+    refuse_workbench_copy,
+    remove_worktree,
+    show_worktree,
+)
 from spec_dock.runtime.application.project_context import ProjectContext
 from spec_dock.runtime.presentation.envelope import OperationResult
 
@@ -46,6 +53,11 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "branch show": branch_operation,
     "branch create": branch_operation,
     "branch switch": branch_operation,
+    "worktree list": list_worktrees,
+    "worktree show": show_worktree,
+    "worktree remove": remove_worktree,
+    "worktree bootstrap": bootstrap_worktree,
+    "workbench copy": refuse_workbench_copy,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
