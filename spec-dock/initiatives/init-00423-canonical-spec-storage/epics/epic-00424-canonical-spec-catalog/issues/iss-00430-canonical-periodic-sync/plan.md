@@ -289,7 +289,7 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 
 Provider CI（ubuntu-latest）の `provider-tests` が6件失敗した（2914 passed、32 skipped）。どれも2回目の `canonical link` が `unchanged` でなく、ジョブを書き直していた。原因：git と gh が同じ `/usr/bin` にあり、`/bin` が `/usr/bin` への別名（merged /usr）の環境では、2回目の link がジョブの PATH の後ろの `/bin/gh` を「記録した別の gh」と取り違え、gh のディレクトリが `/bin` に変わっていた。実機の systemd でも、毎回のリンクがユニットを書き直す不具合だった。macOS の手元では、gh が git と同じ `/opt/homebrew/bin` にあり `/bin/gh` がないため現れなかった。
 
-対応（`0e2571f0b`）：`_gh_dir` は、git のディレクトリの gh と実体（realpath）が同じものを別の gh として扱わない。別名のディレクトリを PATH の後ろに持つ偽のスケジューラーのテストを足した（直す前は失敗した）。コードを変えたので、最終品質ゲートをやり直した（ゲート9）。
+対応（`0e2571f0b`、後に `a6d81cc84` で置き換えた。下のゲート9の表）：`_gh_dir` は、git のディレクトリの gh と実体（realpath）が同じものを別の gh として扱わない。今のコードには realpath の比較はなく、仕組みの固定の後ろの前の部分だけを読む。別名のディレクトリを PATH の後ろに持つ偽のスケジューラーのテストを足した（直す前は失敗した）。コードを変えたので、最終品質ゲートをやり直した（ゲート9）。
 
 ### 最終品質ゲート9の指摘の対応（`0e2571f0b`、2026-10-26）
 
@@ -302,6 +302,17 @@ Provider CI（ubuntu-latest）の `provider-tests` が6件失敗した（2914 pa
 | Spec SP-2 設計の「記録した `PATH`」の文が新しい規則を書いていない | P3 | 設計を直した |
 | Spec SP-1 報告書のゲートの証拠が古い | P3 | ゲートに合格した後に直す |
 | Spec SP-3 登録はあるがジョブのないときの最初の gh の場所が、別名で1回だけ書き直されうる | P3 | ST-2 の直しで、記録した PATH のないときは今の PATH の gh のまま。残っても1回の書き直しで、データは失われない |
+
+### 最終品質ゲート10（`a6d81cc84`、2026-10-26）：合格
+
+`make lint` は終了コード0、全体の `uv run pytest` は 2950 passed、8 skipped（終了コード0。実行の前後で HEAD と作業ツリーは同じ）。Standards と Spec のレビューは、どちらも `pass`（P0/P1 なし）。PR #452 の CI（CI、Provider CI、Commit identity）は、この SHA ですべて success。P3 は直さず、文書の食い違いだけ直した。
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| Spec SP-1 CI の節が、取り下げた realpath の比較を今もあるように読める | P3 | 置き換えたことを書いた |
+| Spec SP-2 設計に、gh がどこにもないときは今の `PATH` の gh にする（gh を足すための1回の書き直し）ことがない | P3 | 設計に書いた |
+| Standards ST-1 テストの `FakeScheduler("loop")` も記録した PATH と `path_tail` を返し、本物の loop と違う | P3 | 残るリスク（テストの偽物の差。loop の本物は None を返す） |
+| Standards ST-2 本物の launchd と systemd の後ろとファイルの形で `_gh_dir` を通すテストがない | P3 | 残るリスク（レビューの一時の確かめで28の場合が安定することを確かめた） |
 
 ## exit / handoff
 

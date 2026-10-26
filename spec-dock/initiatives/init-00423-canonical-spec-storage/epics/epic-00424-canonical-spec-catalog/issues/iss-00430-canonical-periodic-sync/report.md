@@ -55,11 +55,12 @@ Epic の I-3 として、カタログの保存、統合、push を60秒ごとに
 
 ### 最終品質ゲート
 
-- 合格した SHA：`dd603e7456e7e1eb8aa565859ab94d97a593e867`（ゲート8、2026-10-26）。その後のコミットは、この Issue の文書だけ（ゲートはやり直していない）。
+- 合格した SHA：`a6d81cc84528b7549c78d1d210cef5d2073a8b19`（ゲート10、2026-10-26）。その後のコミットは、この Issue の文書だけ（ゲートはやり直していない）。
 - `make lint`：終了コード0（ruff check、ruff format check、mypy がすべて pass）。
-- `uv run pytest`：2944 passed、8 skipped、終了コード0（約14分。実行の前後で HEAD と作業ツリーは同じ）。
-- レビュー：新しく起こした Standards と Spec のレビューのエージェント（Claude のみ。ChatGPT は使わない）が、`origin/main...dd603e74` の差分と、この Issue と Epic の文書をもとにレビューし、どちらも `pass`（P0/P1 なし）。
-- それまでの経過：ゲート1（`09a229731`）〜7（`9fd6666e2`）は不合格で、指摘の P0/P1 を直し、そのたびに新しいレビューでやり直した。各ゲートの指摘と対応は `plan.md` の「最終品質ゲートNの指摘の対応」の表のとおり。ゲート7の lint とテストは、実行の途中で作業ツリーを直したので証拠にしていない。
+- `uv run pytest`：2950 passed、8 skipped、終了コード0（約14分。実行の前後で HEAD と作業ツリーは同じ）。
+- レビュー：新しく起こした Standards と Spec のレビューのエージェント（Claude のみ。ChatGPT は使わない）が、`origin/main...a6d81cc84` の差分（主に前の合格からの差分）と、この Issue と Epic の文書をもとにレビューし、どちらも `pass`（P0/P1 なし）。
+- PR #452 の CI：`a6d81cc84` で CI、Provider CI（ubuntu-latest のテスト、macOS と Ubuntu の配布の一致）、Commit identity がすべて success。GitHub のマージの状態は READY（観測できる Actions と Commit Status の範囲。外部の CheckRun は数えていない）。
+- それまでの経過：ゲート1（`09a229731`）〜7（`9fd6666e2`）は不合格で、指摘の P0/P1 を直し、そのたびに新しいレビューでやり直した。ゲート8（`dd603e74`）は合格したが、PR の Provider CI が ubuntu-latest で6件失敗した（2回目の `canonical link` がジョブを書き直す。merged /usr の `/bin/gh` を記録した gh と取り違えていた）。直した `0e2571f0b` のゲート9は、足したテストが本物の `/usr/bin` に頼る P1 で不合格になり、`a6d81cc84` で根本から直してゲート10に合格した。各ゲートの指摘と対応は `plan.md` の表のとおり。ゲート7と9の lint とテストは、実行の途中で作業ツリーを直したので証拠にしていない。
 
 ### 変えた既存のテスト（`git diff origin/main -- tests/`。AC-15）
 
@@ -98,6 +99,7 @@ Epic の I-3 として、カタログの保存、統合、push を60秒ごとに
   - 予行演習の `canonical link --no-schedule` も、手順7の基準を、そのときの `XDG_STATE_HOME`（既定は利用者の状態の置き場）に記録する（Epic の決めたとおり）。予行演習で状態の置き場に触れないなら、`XDG_STATE_HOME` を一時ディレクトリにして実行する必要がある。
 - 受け入れた結果（最終品質ゲート6 SP-1）：基準のない周期（状態の置き場を消した、根が違う）や、`--no-schedule` から通常の `canonical link` への切り替えのとき、手元に未pushのコミットがあると、GitHub が書き換えられていなくても `remote_rewritten` で止まる。`resume --adopt-remote` で何も失わずに再開する（GitHub が落とした履歴を push し直すより安全な側）。
 - **統括の判断を求める（最終品質ゲート8 Standards ST-1、P2）**：GitHub が手元の HEAD の祖先へ巻き戻し、`resume --adopt-remote` の取り込み直しが保留の修正を待っている間に、GitHub でブランチが消されて `remote_deleted` になると、案内どおりの `resume --push-local` が手元の HEAD をそのまま送り、GitHub が消した履歴（秘密情報のコミットを含みうる）が戻る。案：`adopt_remote_pending` か前の理由が `remote_rewritten` のときは `--push-local` を拒否する、または履歴を持たないコミットで作り直す。書き換えの後に削除された場合の `--push-local`（印なし）は、今のテストが意図した動作として固定している。
+- 直さずに残るもの（最終品質ゲート10）：テストの `FakeScheduler("loop")` は本物の loop と違い、記録した PATH と `path_tail` を返す（ST-1）。本物の launchd と systemd の後ろとファイルの形で gh の場所の読み戻しを通すテストはない（ST-2。レビューの一時の確かめで、空白や `%`、`$` を含む名前も含めて28の場合が安定した）。
 - 直さずに残るもの（最終品質ゲート8）：カタログのツリーにサブモジュールがあると取り込み直しの周期が毎回 `GIT_FAILED`（ST-2）。取り込み直しの保留にも、status の `changes.holds` が通常の保留の次の1手を示す（SP-3）。新しいリポジトリで保存の後の最初の push も失敗すると、次の周期が `remote_deleted` で止まり、`resume --push-local` で戻す（SP-4）。
 - 直さずに残るもの（最終品質ゲート7）：カタログの排他で飛ばされ続けた周期にも、`CANONICAL_SYNC_NOT_CONFIRMED` がプライバシーの案内を示す（ST-2）。SIGKILL で止まった loop の `runner.json` が残り、`canonical status` がちょうど `runner.lock` を持った瞬間の `remove` が、再利用された PID に SIGTERM を送りうる狭い競合（ST-3）。毎周期の `git reset -q` は、カタログで手でステージした内容を捨てる（ST-4。設計どおり。カタログで手で Git を使わないことは I-9 へ）。
 - 残るリスク（`design.md` の risk）：登録済みのカタログに `--no-schedule` を付けても登録は外れない（SP-10）。launchd の `ExitTimeOut` を超える周期の SIGKILL（次の周期が一時のインデックスと lock を消す）。開発用の venv の `spec-dock` が最初の登録でジョブの実行ファイルになりうる。
