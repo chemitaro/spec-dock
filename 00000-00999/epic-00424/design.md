@@ -212,7 +212,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
   `subIssues.totalCount` か `blockedBy.totalCount` が100を超える Issue だけ、REST の一覧で残りを読む。`labels.totalCount` が20を超える Issue だけ、REST の `GET …/issues/{n}/labels?per_page=100` でラベルを読み直す（種類のラベルを見落とさないため）。どの読み直しも、1つずつ順に送る。spec-dock の規模（Scope 243件）では3回の呼び出しで済む。`rateLimit.cost` はログに残す。
   - 依存先（`blockedBy` の要素）のラベルは読まない。依存先が Scope かどうかは、その番号が `issues` に含まれるかで決める（`issues` は閉じた Scope も含む）。2026-10-26 に本物の GitHub で読むだけで測ると、依存先のラベルを読む形は1ページ104点、読まない形は4点だった（I-1 の実装担当の測定）。
-  - `parent`、`subIssues`、`blockedBy` の要素は `repository { nameWithOwner }` を持つ。別のリポジトリの Issue は、番号だけでは同じリポジトリの Issue と取り違えるため、`parent`、`sub_issues`、`blocked_by`、`blocking`、`external` のどれにも入れず、`anomalies` に `PARENT_FOREIGN_REPOSITORY` か `DEPENDENCY_FOREIGN_REPOSITORY`（相手のリポジトリと番号をメッセージに入れる）として記録する。
+  - `parent`、`subIssues`、`blockedBy` の要素は `repository { nameWithOwner }` を持つ。別のリポジトリの Issue は、番号だけでは同じリポジトリの Issue と取り違えるため、`parent`、`sub_issues`、`blocked_by`、`blocking`、`external` のどれにも入れず、`anomalies` に `PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`（相手のリポジトリと番号をメッセージに入れる）として記録する。`SUB_ISSUE_FOREIGN_REPOSITORY` は、子が別のリポジトリにあることを親の側に記録するもので、完了の判定（子孫が完了しているか）で別のリポジトリの子を見落とさないために置く（I-1 で追加）。
 - **変わったかを確かめる（REST の条件付きの要求）**：種類のラベルごとに、次の要求を、前に記録した `ETag` を `If-None-Match` に付けて送る（3回）。
 
   ```text
@@ -239,7 +239,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 | 操作 | API |
 |---|---|
 | Issue の作成 | `POST /repos/{o}/{r}/issues`（`title`、`body`、`labels` の配列） |
-| 題名、状態の変更 | `PATCH …/issues/{n}`（`title`、`state`、`state_reason`） |
+| 題名、本文、状態の変更 | `PATCH …/issues/{n}`（`title`、`body`、`state`、`state_reason`）。本文を変えるのは、`scope import github` が既にある Issue に slug の印を足すときだけである。I-1 の `GithubStructureClient.update_issue` は本文を受け取らないので、最初に使う I-5 が `body` を足す（C1 の追加） |
 | 親子を付ける、付け替える | `POST …/issues/{親}/sub_issues`（本文 `{"sub_issue_id": <子の id>, "replace_parent": true/false}`） |
 | 親子を外す | `DELETE …/issues/{親}/sub_issue`（本文 `{"sub_issue_id": <子の id>}`） |
 | 依存の追加、削除 | `POST …/issues/{n}/dependencies/blocked_by`（本文 `{"issue_id": <依存先の id>}`）、`DELETE …/dependencies/blocked_by/{依存先の id}` |
@@ -253,7 +253,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - **レート制限**：403 か 429 で、`retry-after` ヘッダー、`x-ratelimit-remaining: 0`、または本文の「rate limit」があれば、レート制限と判定する。読み取りは、要る待ち（`retry-after`、なければ `x-ratelimit-reset` までの時間）が60秒以下なら、その間だけ待って、3回まで再試行する。60秒を超えるときは、待たずに `GITHUB_RATE_LIMITED`（再開できる時刻 `retry_at` 付き）で止まる。500番台の読み取りは、1秒、2秒、4秒の間をおいて3回まで再試行する。書き込みは自動では再試行せず、`GITHUB_RATE_LIMITED` で止まる。
   - 呼び出しは1つずつ順に行う。並べて呼ばない（GitHub の二次のレート制限の指針）。
   - 1つのコマンドの中で書き込みを続けるときは、書き込みの間を1秒以上あける（公式の Best practices）。時刻と待ちは注入できるようにし、テストでは待たない。
-  - 結果が分からない書き込みは、今と同じく読み直して確かめ、それでも分からなければ終了コード6で、効果（`effects`）と再開の手順（`recovery`）を返す。
+  - 結果が分からない書き込みは、今と同じく読み直して確かめ、それでも分からなければ終了コード6で、効果（`effects`）と再開の手順（`recovery`）を返す。読み直しでは、送った値をすべて比べる。I-1 の `update_issue` の読み直しは `state_reason` を比べないので、`scope close` と `scope reopen` で使う I-5 が直す。
 - 大量に書く移行のスクリプトは、さらに速さを抑える（11章）。
 
 #### 構造のスナップショット（R-I1〜R-I6。契約 C10）
@@ -287,7 +287,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 
   - `issues` は、種類のラベルを持つ Issue（PRを除く）を、開いたものも閉じたものもすべて含む。キーは番号の文字列。`sub_issues` は GitHub の並びのまま、`blocked_by` と `blocking` は番号の昇順。`blocking` は、`blocked_by` を逆にたどって求める。
   - `external` は、Scope の `blocked_by` に現れる、同じリポジトリの、Scope でない Issue の題名と状態である。着手の判定（今の規則どおり、開いていれば着手できない）に使う。
-  - 別のリポジトリの親や依存を持つ Scope（`anomalies` の `PARENT_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`）は、着手の判定で「着手できる」にしない（安全側に止める。ダッシュボードでは UNKNOWN）。
+  - 別のリポジトリの親、子、依存を持つ Scope（`anomalies` の `PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`DEPENDENCY_FOREIGN_REPOSITORY`）は、着手の判定で「着手できる」にしない（安全側に止める。ダッシュボードでは UNKNOWN）。
   - 本文は保存しない。slug の印だけを取り出す。種類や slug が決まらない Issue は `id` と `slug` を null にし、`anomalies` に入れる。
   - 形を変えるときは `version` を上げる。読む側は、知らない版を読んではならない（取り直す）。
 - **`probe.json`**：`{"version": 1, "checked_at": "…", "etags": {"spec-dock:initiative": "W/\"…\"", "spec-dock:epic": "…", "spec-dock:issue": "…"}, "last_error": null}`。新しい `ETag` は、全体の取り直しが成功したときだけ記録する（取り直しに失敗したら、次の確かめでも「変化あり」になるようにするため）。
@@ -302,6 +302,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - `decision` では、さらに、判断に使う Issue を `GET …/issues/{n}` で読み直す。作成では親、依存の追加では両端、`work start` では対象と、その依存先のうち Scope でないもの、閉じる操作では対象である。読み直した値がスナップショットと違えば、読み直した値で判断し、スナップショットにも反映する。
   - 見落とす変更：先頭の Issue が変わらない変更（種類のラベルが外れて一覧から消えただけの Issue）と、Issue の更新の時刻を変えないかもしれない親子と依存の変更（未確認）は、変わったかの確かめでは見つからない。30分ごとの取り直し、SpecDock の書き込みの反映、`decision` の読み直しで補う。
 - **書き込みの反映**：SpecDock のコマンドは、GitHub への書き込みが成功するたびに、その結果（作った Issue、題名、状態、ラベル、担当者、親子、依存）をスナップショットの該当する要素に反映し、`local_writes` に記録する。全体の取り直しを書き込むときは、`fetch_started_at` より後の `local_writes` の変更を重ねてから書く（取り直しの途中の書き込みを消さないため）。それより前の `local_writes` は消す。
+  - 反映できない変更（親子や依存の相手の番号がスナップショットにない、など）は、当てずに飛ばし、スナップショットを古いものとして扱って、次の `ensure_fresh` で全体を取り直させる。GitHub への書き込みは成功しているので、コマンドの結果を失敗にせず、`GITHUB_SNAPSHOT_STALE` を警告に入れる。I-1 の `reflect` はこの場合に `ValueError` を出すので、書き込みの後に最初に使う I-5 が、この扱いに直してテストを足す（`snapshot.json` の形式の版は変えない）。
 - **書けないとき**：状態の置き場に書けないとき（サンドボックスの中など）は、スナップショットをプロセスのメモリーの上だけで持つ。書けないことを理由に失敗してはならない。
 - **読むだけのコマンドの契約**：表示だけのコマンドが書いてよいのは、状態の置き場の `snapshot.json` と `probe.json` だけである。リポジトリ、カタログ、`.git`、GitHub には書かない。今の CLI の「構造をキャッシュしない」方針は、利用者の方針（R-I1）に従い、canonical モードでだけ変える。従来モードは変えない。
 - **規則の部品**：`StructureSnapshot` は、スナップショットを読み込んだもので、Scope の一覧と、`id → ScopeNode` の対応と、異常の一覧を持つ。`ScopeNode` は、上の `issues` の1要素と同じ項目を持つ。階層、種類、循環の規則は、今の `domain/dependency_vnext.py` と `infra/scope_tree.py` の規則をそのまま使い、入力を `.meta.json` から `StructureSnapshot` に変える。`dependency add` の循環の確認も、スナップショットの上で行う。異常のために `id` が決まらない依存先は、循環の確かめに入れない。そのような依存を持つ Scope は、着手の判定で「着手できる」にしない（I-4、I-11）。
@@ -348,22 +349,27 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
    - ここまでで止まるときは、何も書いていないので、`failed`（終了コード3）で返す。
 3. **カタログ**：`git worktree list --porcelain` で、`spec-dock/canonical` をチェックアウトしているworktreeを探す。
    - 登録されたパスが `<main>/spec-dock/.canonical` で、ディレクトリがあれば、何もしない。lock されていなければ lock する。
-   - `<main>/spec-dock/.canonical` に `.git` ファイルのあるディレクトリがあるが、登録のパスが違う、または登録が壊れている（mainのチェックアウトを移動した後など）ときは、`git worktree repair <カタログ>` で直す。ディレクトリがあるときに `prune` してはならない。
-   - 登録はあるがディレクトリがない（`git clean -ffdx` の後など）ときは、`git worktree unlock`、`git worktree prune`、作成、lock の順に作り直す（調査の記録で確認済みの手順）。
+   - `<main>/spec-dock/.canonical` に `.git` ファイルのあるディレクトリがあるが、登録のパスが違う、または登録が壊れている（mainのチェックアウトを移動した後など）ときは、`git worktree repair <カタログ>` で直す。ディレクトリがあるときに `prune` してはならない。git の `repair` は、このとき、ほかの作業用のworktreeから mainへのつながりも直すことがある（`effects` とメッセージに書く）。SpecDock がほかのworktreeを直すことはせず、警告 `CANONICAL_MAIN_MOVED` を返す（I-2 の統括の判断）。
+   - `spec-dock/canonical` が、`<main>/spec-dock/.canonical` ではないパスの登録でチェックアウトされているときは、何も書かずに `CANONICAL_PATH_OCCUPIED`（その登録のパス）で止まる。そのパスが存在するときも、存在しない（登録だけが残っている）ときも同じである。
+   - 登録はあるがディレクトリがない（`git clean -ffdx` の後など）ときは、`git worktree add -f -f <カタログ> spec-dock/canonical` で同じ場所に作り直し、lock する（lock された消えたパスに作るには `--force` を2回付ける。git の文書）。`-f -f` は、`spec-dock/canonical` をチェックアウトしている登録がちょうど1つで、そのパスがカタログの場所のときだけ使う。`git worktree prune` は、クローン全体の消えた登録（外れた外付けのボリュームのworktreeなど）を選ばずに消すので、SpecDock は実行しない（I-2 の統括の判断。Git 2.54.0 で確認）。
    - 作るときは、まず `git ls-remote --exit-code origin refs/heads/spec-dock/canonical` で GitHub に canonical があるかを確かめる。終了コード2なら「ない」、0なら「ある」、それ以外は接続の失敗として止まる（`GITHUB_UNAVAILABLE`）。ある場合は、取得の対象にこのブランチが入っていない浅いクローンでは `git remote set-branches --add origin spec-dock/canonical` を行ってから `git fetch origin spec-dock/canonical` を行う。ローカルのブランチがなければ `git worktree add --track -b spec-dock/canonical <カタログ> origin/spec-dock/canonical`、あれば `git worktree add <カタログ> spec-dock/canonical` とする。最後に `git worktree lock --reason "spec-dock canonical catalog" <カタログ>` を行う。
    - GitHub に canonical がなく、既定のブランチの HEAD のツリーに `spec-dock/initiatives` がないとき（新しいリポジトリ）は、5章の「canonical の中身」の管理ファイルだけを持つ、親のないコミットを作って push する。push が先に進まれて拒否されたら（別のPCが同時に作った）、手元で作ったブランチを捨て、GitHub のものを取得して使う。
+   - GitHub に canonical がなく、既定のブランチ（`origin/HEAD`、なければ mainのチェックアウトの HEAD）のツリーに `spec-dock/initiatives` があるとき（移行していない）は、何も書かずに `CANONICAL_NOT_MIGRATED` で止まり、移行の手順書を示す（I-2 の統括の判断）。
+   - GitHub に canonical がなく、ローカルのブランチ `spec-dock/canonical` があるときは、新しい初期のコミットを作らず、ローカルのブランチからカタログを作る。そのブランチが、`canonical link` が作って push できなかった初期のコミット（親のない1つのコミットで、ツリーが5章の管理ファイルだけ）なら、新しいリポジトリのときと同じく push する（もう一度の実行で続きから整うため）。それ以外は push せず、警告 `CANONICAL_REMOTE_MISSING` を返す。GitHub で消されたときの扱いは、5章の基準と一時停止に任せる（I-2 の統括の判断）。
 4. **除外の設定**：`info/exclude` に、上の3行のうち足りない行を足す。
 5. **リンク**：mainのチェックアウトと、実行したチェックアウトに、正しいリンクを置く。ないときは作り、違う先のリンクは、一時的な名前で作ってから `rename` で置き換える（`ln -s` を重ねると、リンクの先の中に余計なリンクができるため。調査の記録）。
 6. **登録簿と定期の実行**（I-3 が足す）：登録簿にカタログを足し（移動の後なら古いパスの項目を消し）、5章の「定期の実行の選び方」で選んだ仕組みがなければ作って動かす（systemd のない Linux では、常駐のプロセスを起動する）。作った直後に1回だけ実行させ、最大15秒、状態の置き場の記録を待つ。その1回では、push の認証も確かめる（5章の `push_auth`）。読めなかったとき（macOS のプライバシーの保護など）、認証できなかったとき、ログアウト中に止まる環境（linger がない）、常駐のプロセスの環境（起動し直しの1行）は、その原因と次の1手を `warnings` に返す。
 7. **基準**：カタログを作った、または基準がないときは、取得した `origin/spec-dock/canonical` を、そのカタログの基準として状態の置き場に記録する（5章）。
 8. **ツールの設定**：9章の判定を行い、足りない設定を正確な1行で `warnings` に返す。
 
+- 書く手順（3〜5）は、クローンの `StartLock` の中で行う（同じクローンの2つのチェックアウトの同時の `canonical link` を防ぐ）。ネットワークの処理（`ls-remote`、`fetch`、初期の push）は排他の外で行う。取れなければ `START_LOCK_BUSY`（終了コード3）で止まる（I-2 の統括の判断）。
 - 3〜7の途中で失敗したときは、それまでの効果を `succeeded`、残りを `not_attempted` とした `partial`（終了コード6）で返し、`recovery` に `spec-dock canonical link`（もう一度実行すれば続きから整う）を入れる。
 - **`--no-schedule`**：付けると、手順6を行わない。登録簿に載せず、定期の実行を作らず、起動もしない。手順7の基準は、この場合も記録する。予行演習（R-J3。11章）と、手で `canonical sync` を実行する確かめのための指定である。`canonical status` の `sync` は、「定期の実行なし（`--no-schedule`）」と示す。登録されていないカタログは、`canonical sync`（`--registered` なし）をそのチェックアウトで実行すれば処理される。
 
 #### SpecDock のほかのコマンドから
 
 - `worktree create` は、`git worktree add` の後に、作ったworktreeについて `canonical link` と同じ手順（1〜8）を行う。`work start` は、選択を記録した後に、対象のチェックアウトについて同じ手順を行う（R-B4「同じ処理」）。リンクの手順の失敗は、そのコマンド自体の結果を変えず、警告と次の1手として返す。
+  - どちらも、I-2 が置く公開の関数 `link_after_command`（C3。手順1〜5と8。登録と基準は I-3 が同じ経路に足す）を、`StartLock` を持たずに呼ぶ。canonical の `worktree create` は I-2 が `CANONICAL_HANDLERS` に登録し、今の作成の関数の後に呼ぶ。canonical の `work start` は、I-5 が選択を記録して `StartLock` を放した後に呼ぶ。従来の `direct_worktrees.py` と `work_start.py` は変えない（AC-15）。`START_LOCK_BUSY` などの失敗も、呼び出し元の結果を変えず、警告（次の1手は `spec-dock canonical link`）で返す（I-2 の統括の判断）。
 - そのほかの、仕様を使う canonical モードのコマンドは、リンクやカタログがない、または正しくないとき、自分では直さずに `CANONICAL_NOT_LINKED` で止まり、`recovery` に `spec-dock canonical link` を入れる（R-B5）。カタログの Git の登録が、手順2と同じ形でコンテナの中から見えないときは、`CANONICAL_FOREIGN_CHECKOUT` で止まる。仕様のファイルを読み書きするだけのコマンドではないので、ファイルの読み書きそのものは妨げない。
 - 読むだけのコマンド（`canonical status`、`scope show`、`workspace validate` など）は、リポジトリ、カタログ、`.git`、GitHub に何も書かない（書いてよいのは、状態の置き場の構造のスナップショットだけ。2章）。カタログに対する Git の呼び出しには `git --no-optional-locks` を付け、`.git` のインデックスも書かない。
 
@@ -386,6 +392,8 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 | `dashboard` | ダッシュボードの5つのファイルの有無と、最後に作り直した時刻 |
 | `structure` | 入れ子と GitHub の親子のずれ（`--structure` を付けたときだけ、`display` の新しさでスナップショットを確かめる） |
 
+- 読むだけの診断なので、問題があっても `succeeded`（終了コード0）で返し、問題ごとに `warnings`（`details.next_step` に次の1手）と、各項目の状態と次の1手で示す。mainのチェックアウトが見つからない構成だけは `CANONICAL_UNSUPPORTED_LAYOUT` で `failed` にする。宣言が版3のときは `CANONICAL_NOT_MIGRATED`（1章）。
+- 項目の担当：`catalog`、`link`、`exclude`、`access`、`tools`、`format`、`git`（今の `PATH` の git）、`changes`（未保存の変更の数、未pushのコミット、別名ファイル）は I-2。`sync`、`snapshot`、`changes` のうち `state.json` を読む部分（保留、統合を止めているパス）と、`git` の定期の実行が使う git は I-3。`dashboard` は I-11。`structure` と `--structure` は I-4。まだ足していない項目も `data` のキーとして置き、状態を「未対応」の値にする（I-2 の統括の判断）。
 - 未pushのコミットが10分を超えたら警告する（R-C6）。
 - 同期の項目は、状態の置き場の `state.json` を読む。カタログが読めないときも示せる。
 
@@ -640,7 +648,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `branch show`、`branch create`、`branch switch` | 対象（一部） | 今と同じブランチの操作 | 既定のブランチ名 `<ID>-<slug>` を GitHub の印から求める | I-4 |
 | `work start` | 対象と祖先と、それらの依存（一部） | 今と同じブランチの作成と選択の記録 → リンク（3章）→ 作業中の印（ラベルと担当者。失敗は警告だけ） | 基点のコミットのツリーから `.meta.json` を読まない。基点のコミットのツリーに `spec-dock/initiatives` があるとき（移行前のコミット）は、`CANONICAL_BASE_HAS_SPECS` で止まる | I-5（着手の判定の部品は I-4、リンクは I-2） |
 | `work finish` | 対象と子孫（一部） | 仕様の保存の確認（下）→ 今と同じく Issue を閉じる → 作業中のラベルを外す（失敗は警告だけ）→ 選択の解除 | 保存を確かめてから閉じる | I-5 |
-| `worktree create` | 今と同じ | 今と同じ → リンク（3章） | | I-2 |
+| `worktree create` | 今と同じ | 今と同じ → リンク（3章） | `--expect-current` を付けたときの選択の解決は I-4 が作る（それまでは、この組み合わせだけ `CANONICAL_NOT_IMPLEMENTED`） | I-2（`--expect-current` は I-4） |
 | `worktree list`、`worktree show`、`worktree bootstrap` | 今と同じ | 今と同じ | 選択の表示で、対象の場所をカタログから求める。カタログのworktreeは「カタログ」と示す | I-4 |
 | `worktree remove` | 今と同じ | 今と同じ | カタログのworktreeを対象にしたら、`CANONICAL_CATALOG_PROTECTED` で止まる（取り外しは `canonical remove`） | I-4 |
 | `workbench copy` | なし | なし | `CANONICAL_WORKBENCH_SHARED` で止まる。どのworktreeからも同じカタログの `.workbench` が見えるので、写す必要がない、と示す | I-4 |
@@ -648,7 +656,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `workspace validate` | 全体とカタログ | なし | 下の検査を行う。`--ci` は `CANONICAL_NOT_APPLICABLE` で止まり、`canonical check` を案内する | I-4 |
 | `workspace doctor` | 今の項目と、`canonical status` と同じ項目 | なし | | I-4 |
 | `workspace migrate` | 宣言 | なし | `CANONICAL_NOT_APPLICABLE` で止まる | I-1 |
-| `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手を、`warnings` の `CANONICAL_NOT_LINKED`（`recovery` に `spec-dock canonical link`）で示す。このコードの定数は I-1 が1か所に置き、I-2 はそれを使う | I-1 |
+| `installation init` | 今と同じ | 版4の宣言と配布資産 | 次の1手を、`warnings` の `CANONICAL_NOT_LINKED`（警告には `recovery` の欄がないので、`details.next_step` に `spec-dock canonical link`）で示す。このコードの定数は I-1 が1か所に置き、I-2 はそれを使う | I-1 |
 | `installation show`、`update`、`uninstall` | 今と同じ | 今と同じ | 版3と版4の両方を受け付ける。版4で `--expect-current` を付けたときの選択と Scope の解決は I-4 が作る（I-1 の時点では、この組み合わせだけ `CANONICAL_NOT_IMPLEMENTED`） | I-1（`--expect-current` は I-4） |
 | `active`、`help`、`completion` の文書 | — | — | 新しいコマンドを載せる | I-9 |
 
@@ -833,13 +841,13 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 
 | コード | 終了コード | 次の1手 |
 |---|---|---|
-| `CANONICAL_NOT_MIGRATED` | 3 | 0.3.0 では、移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3）。撤去の後の 0.4.0 では、どのコマンドも版3の宣言を読むとこれで止まり、「SpecDock 0.3.0 を入れ直し、版のタグ `v0.3.0` の `scripts/migrate-to-canonical/README.md` に従って移す」を示す |
+| `CANONICAL_NOT_MIGRATED` | 3 | 0.3.0 では、移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3のとき。`canonical link` では、GitHub に canonical がなく既定のブランチに仕様があるときも）。撤去の後の 0.4.0 では、どのコマンドも版3の宣言を読むとこれで止まり、「SpecDock 0.3.0 を入れ直し、版のタグ `v0.3.0` の `scripts/migrate-to-canonical/README.md` に従って移す」を示す |
 | `CANONICAL_NOT_APPLICABLE` | 3 | 示した代わりのコマンドを使う（`canonical check` など） |
 | `CANONICAL_UNSUPPORTED_LAYOUT` | 3 | mainのチェックアウトのある構成で使う |
 | `CANONICAL_GIT_TOO_OLD` | 3 | Git 2.38 以上を入れ、`spec-dock canonical link` をもう一度実行する（登録簿の git を入れ替えるため） |
 | `CANONICAL_FOREIGN_CHECKOUT` | 3 | 保存と同期はホストで行われる。コンテナでは仕様のファイルを読み書きするだけにするか、コンテナの中でクローンして `spec-dock canonical link` |
 | `CANONICAL_NOT_LINKED` | 3 | `spec-dock canonical link` |
-| `CANONICAL_PATH_OCCUPIED`、`CANONICAL_LINK_OCCUPIED` | 3 | 示したパスの中身を確かめて退避してから `spec-dock canonical link`（SpecDock は消さない） |
+| `CANONICAL_PATH_OCCUPIED`、`CANONICAL_LINK_OCCUPIED` | 3 | 示したパスの中身を確かめて退避してから `spec-dock canonical link`（SpecDock は消さない）。`spec-dock/canonical` のworktreeの登録だけが残っているときは、確かめてから `git worktree remove` か `git worktree prune` を自分で実行し、もう一度 `spec-dock canonical link` |
 | `CANONICAL_SANDBOX_DENIED` | 3 | サンドボックスの外（普通の端末）で同じコマンドを実行する |
 | `CANONICAL_LOCK_BUSY` | 3 | しばらく待って同じコマンドを実行する |
 | `CANONICAL_FORMAT_UNSUPPORTED` | 3 | SpecDock を更新する |
@@ -859,6 +867,10 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `GITHUB_EFFECT_UNKNOWN`、`GITHUB_CREATE_IDENTITY_UNKNOWN` | 6 | GitHub の今の状態を確かめてから、`recovery` の手順に従う（作成なら `scope import github`） |
 | `CANONICAL_NOT_IMPLEMENTED` | 3 | SpecDock 0.3.0 を待つ（I-1〜I-8 の途中だけ。I-9 で残っていないことを確かめる） |
 | `GITHUB_SNAPSHOT_STALE` | —（警告） | 表示は取得の時刻の時点のもの。つながったら、次の表示か定期の同期で新しくなる |
+| `CANONICAL_TOOL_SETTING_MISSING`、`CANONICAL_TOOL_SETTING_UNKNOWN` | —（警告） | 9章の1行を足す。判定できないときは、ツールの設定を自分で確かめる（I-2） |
+| `CANONICAL_IGNORE_RULES_MISSING` | —（警告） | 3章の無視の3行を足す（`spec-dock installation update` か `spec-dock canonical link`）（I-2） |
+| `CANONICAL_MAIN_MOVED` | —（警告） | 各作業用のworktreeで `spec-dock canonical link`（そのworktreeも動かしたなら、先にmainで `git worktree repair <パス>`）（I-2） |
+| `CANONICAL_REMOTE_MISSING` | —（警告） | GitHub の `spec-dock/canonical` が消されていないか確かめ、`spec-dock canonical status` の案内に従う（I-2） |
 | `SLUG_REQUIRED` | 3 | `--slug <英小文字とハイフン>` を付ける |
 
 ### 13. ダッシュボード（R-E5、AC-17）
@@ -991,7 +1003,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
 - `src/spec_dock/runtime/application/project_context.py`：版3と4の受け付けと、モードの判定（I-1）。
 - `src/spec_dock/runtime/commands/runtime_dispatch.py`：モードによる振り分けと、新しいコマンドの経路、リポジトリによらないコマンドの振り分け（I-1 で入口、各担当で経路）。
 - `src/spec_dock/runtime/cli/catalog.py`、`cli/options.py`：新しいコマンドと引数（各担当）。
-- `src/spec_dock/runtime/application/direct_worktrees.py`（`worktree create` の後のリンク。I-2）と `work_start.py`（選択の後のリンク。I-2）。
+- `worktree create` と `work start` の後のリンクは、従来の `direct_worktrees.py` と `work_start.py` を変えずに、canonical の処理から I-2 の `link_after_command` を呼んで行う（`worktree create` は I-2、`work start` は I-5。3章）。
 - `src/spec_dock/runtime/presentation/markdown.py`、`puml.py`：13章の描く関数。今は呼ばれていない。直す必要が出たときだけ、出力の形を変えずに直す（I-11）。
 - `src/spec_dock/runtime/application/direct_installation.py`、`direct_static_update.py`：版4の宣言と、版3と4の受け付け（I-1）。
 - `src/spec_dock/assets/spec_dock/.gitignore`：3章の無視の3行を足す（I-2）。
