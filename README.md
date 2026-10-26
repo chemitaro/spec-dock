@@ -6,7 +6,7 @@ SpecDockはGitHub Issueに結び付いたInitiative・Epic・Issueの三階層�
 
 ## 入口
 
-- [現行CLIの全45コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
+- [現行CLIの全47コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
 - [日本語のオフライン説明資料](src/spec_dock/assets/spec_dock/docs/cli-redesign-guide.html)
 - [導入・移行・保全](src/spec_dock/assets/spec_dock/docs/migration.md)
 - [文書作成ガイド](src/spec_dock/assets/spec_dock/docs/authoring/overview.md)

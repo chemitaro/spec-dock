@@ -77,7 +77,16 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             else:
                 result = diagnose_raw_workspace(namespace, git)
             return _render_result(namespace, result)
-        context = resolve_context(namespace.project, cwd, timeout=namespace.timeout)
+        try:
+            context = resolve_context(namespace.project, cwd, timeout=namespace.timeout)
+        except ValueError:
+            from spec_dock.runtime.application.canonical_catalog import inside_catalog, inside_catalog_error
+
+            # Only on this failure path: a catalog worktree has no declaration; name the next step.
+            catalog = inside_catalog(namespace.project, cwd, timeout=namespace.timeout)
+            if catalog is not None:
+                raise inside_catalog_error(catalog) from None
+            raise
         if context.mode == "canonical":
             result = dispatch_canonical(namespace, context)
         elif command.startswith("canonical "):

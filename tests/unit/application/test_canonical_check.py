@@ -213,7 +213,8 @@ def test_a_known_old_gitignore_without_the_three_lines_is_one_failure() -> None:
     failure = outcome.failures[0]
     assert failure.details["missing_lines"] == ["/.canonical/", "/initiatives", "!/initiatives/"]
     assert failure.details["misordered"] is False
-    assert "/.canonical/, /initiatives, !/initiatives/" in str(failure.details["next_step"])
+    # A known older shipped file is replaced by installation update; a hand edit would make it unknown.
+    assert "spec-dock installation update" in str(failure.details["next_step"])
 
 
 def test_the_negation_must_follow_the_link_rule_or_real_spec_directories_would_be_ignored() -> None:
@@ -226,6 +227,11 @@ def test_the_negation_must_follow_the_link_rule_or_real_spec_directories_would_b
     ]
     assert outcome.failures[1].details["missing_lines"] == []
     assert outcome.failures[1].details["misordered"] is True
+    next_step = str(outcome.failures[1].details["next_step"])
+    assert (
+        "Merge the shipped spec-dock/.gitignore" in next_step
+        and "/.canonical/, /initiatives, !/initiatives/" in next_step
+    )
 
 
 def test_line_endings_and_trailing_spaces_do_not_hide_the_three_lines() -> None:
@@ -288,3 +294,10 @@ def test_a_deeply_nested_declaration_is_one_invalid_declaration_not_a_crash() ->
         ("WORKSPACE_DECLARATION_INVALID", "spec-dock/workspace.json"),
     ]
     assert outcome.failures[1].details["reason"] == "invalid-json"
+
+
+def test_the_check_uses_the_c3_ignore_lines_of_canonical_link() -> None:
+    from spec_dock.runtime.application.canonical_check import SPEC_DOCK_IGNORE_LINES
+    from spec_dock.runtime.domain.canonical_layout import GITIGNORE_LINES
+
+    assert SPEC_DOCK_IGNORE_LINES is GITIGNORE_LINES

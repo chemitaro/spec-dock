@@ -306,3 +306,20 @@ def test_the_shipped_package_fails_only_for_the_ignore_rules_until_its_gitignore
     else:
         assert code == 7
         assert [item["code"] for item in result["data"]["result"]["failures"]] == ["IGNORE_RULES_MISSING"]
+
+
+def test_the_shipped_assets_pass_without_overlaying_the_ignore_rules(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    from spec_dock.runtime.infra.static_assets import package_static_assets
+    from tests.support.canonical_check import assets_with_ignore_rules, gitignore_with_ignore_rules
+
+    shipped = package_static_assets()
+    gitignore = next(asset for asset in shipped if asset.path == "spec-dock/.gitignore")
+    assert gitignore_with_ignore_rules(gitignore.payload) == gitignore.payload
+    assert assets_with_ignore_rules() == shipped
+    root = code_repository(tmp_path / "repo", shipped)
+    code = main(["--project", str(root), "canonical", "check", "--json"])
+    result = json.loads(capsys.readouterr().out)
+    assert "IGNORE_RULES_MISSING" not in [item["code"] for item in result["data"]["result"]["failures"]]
+    assert code == 0, result

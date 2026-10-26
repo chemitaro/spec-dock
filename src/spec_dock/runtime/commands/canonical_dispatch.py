@@ -8,7 +8,10 @@ from pathlib import Path
 
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
+from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
+from spec_dock.runtime.application.canonical_status import run_canonical_status
+from spec_dock.runtime.application.canonical_worktrees import create_worktree_and_link
 from spec_dock.runtime.application.project_context import ProjectContext
 from spec_dock.runtime.presentation.envelope import OperationResult
 
@@ -18,6 +21,9 @@ RepositoryIndependentHandler = Callable[[argparse.Namespace, Path], OperationRes
 # Keyed by public leaf path. Later Issues add one entry per command they implement in canonical mode.
 CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "workspace migrate": refuse_workspace_migrate,
+    "canonical link": run_canonical_link,
+    "canonical status": run_canonical_status,
+    "worktree create": create_worktree_and_link,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

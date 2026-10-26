@@ -1,8 +1,7 @@
 """Fixtures for canonical check: committed code trees and the package assets with the canonical ignore rules.
 
-Until I-2 adds the three ignore lines to the shipped spec-dock/.gitignore (contract C3), a tree made only of
-package assets fails rule 5. The helpers below overlay a .gitignore that carries the lines, which is what the
-package ships once I-2 merges; they change nothing when the shipped file already has them.
+I-2 ships the three ignore lines in spec-dock/.gitignore (contract C3), so the helpers below change nothing for the
+current package; they overlay the lines only on a package whose .gitignore lacks them.
 """
 
 from __future__ import annotations
@@ -43,7 +42,7 @@ def gitignore_with_ignore_rules(payload: bytes) -> bytes:
 
 
 def assets_with_ignore_rules() -> tuple[StaticAsset, ...]:
-    """The package assets, with the shipped .gitignore as I-2 will ship it (its current bytes become known-old)."""
+    """The package assets with a .gitignore that carries the ignore lines (bytes without them become known-old)."""
     result = []
     for asset in package_static_assets():
         if asset.path == SPEC_DOCK_GITIGNORE:

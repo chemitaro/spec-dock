@@ -12,6 +12,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_CHECK_FAILED,
     NOT_MIGRATED_RECOVERY,
     CanonicalCommandError,
+    ignore_rules_next_step,
 )
 from spec_dock.runtime.application.project_context import (
     CANONICAL_WORKSPACE_SCHEMA,
@@ -21,6 +22,7 @@ from spec_dock.runtime.application.project_context import (
     resolve_git_context,
     workspace_mode,
 )
+from spec_dock.runtime.domain.canonical_layout import GITIGNORE_LINES, GITIGNORE_PATH, ignore_rules_state
 from spec_dock.runtime.infra.commit_tree import list_commit_tree, read_blob, resolve_commit
 from spec_dock.runtime.infra.static_assets import classify_static_digest, package_static_assets
 from spec_dock.runtime.presentation.command_data import FamilyData
@@ -41,10 +43,9 @@ WORKFLOW_DESTINATION: Final = ".github/workflows/spec-dock-check.yml"
 WORKFLOW_BRANCH_LINE: Final = "branches: [main]"
 
 WORKSPACE_DECLARATION: Final = "spec-dock/workspace.json"
-SPEC_DOCK_GITIGNORE: Final = "spec-dock/.gitignore"
-# Epic design.md chapter 3 "無視の設定", relative to spec-dock/. This is contract C3, owned by I-2; whichever of
-# I-2 and I-7 merges later replaces this copy with I-2's constant.
-SPEC_DOCK_IGNORE_LINES: Final = ("/.canonical/", "/initiatives", "!/initiatives/")
+SPEC_DOCK_GITIGNORE: Final = GITIGNORE_PATH
+# Epic design.md chapter 3 "無視の設定", relative to spec-dock/: contract C3's constant and rule (iss-00429).
+SPEC_DOCK_IGNORE_LINES: Final = GITIGNORE_LINES
 SPEC_ROOT: Final = "spec-dock/initiatives"
 CATALOG_ROOT: Final = "spec-dock/.canonical"
 SPEC_PATH_TRACKED: Final = "SPEC_PATH_TRACKED"
@@ -74,9 +75,6 @@ _NEWER_SCHEMA_NEXT_STEP: Final = (
 _STATIC_ASSET_NEXT_STEP: Final = (
     "Run spec-dock installation update --target <checkout> --backup-dir <new external directory> --yes "
     "and commit the static files; a modified file needs a manual merge."
-)
-_IGNORE_RULES_NEXT_STEP: Final = (
-    f"Add these lines to {SPEC_DOCK_GITIGNORE} in this order, then commit: {', '.join(SPEC_DOCK_IGNORE_LINES)}."
 )
 _VERSION_NEXT_STEP: Final = (
     f"Run the SpecDock version named by {CI_VERSION_FILE}, "
@@ -167,7 +165,7 @@ def evaluate_commit_tree(
     if declaration is not None:
         failures.append(declaration)
     failures.extend(_asset_failures(assets, by_path, read))
-    ignore = _ignore_rules_failure(by_path.get(SPEC_DOCK_GITIGNORE), read)
+    ignore = _ignore_rules_failure(by_path.get(SPEC_DOCK_GITIGNORE), read, assets)
     if ignore is not None:
         failures.append(ignore)
     version_entry = by_path.get(CI_VERSION_FILE)
@@ -285,28 +283,24 @@ def _asset_failures(
     return tuple(failures)
 
 
-def _ignore_rules_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], bytes]) -> Diagnostic | None:
+def _ignore_rules_failure(
+    entry: TreeEntry | None, read: Callable[[TreeEntry], bytes], assets: Sequence[StaticAsset]
+) -> Diagnostic | None:
     """Rule 5: the three ignore lines exist and the negation follows the link rule (Git's last match wins)."""
     if entry is None or entry.kind != "regular":
         return None  # the static-asset rule already reports this path
-    lines = [line.rstrip() for line in read(entry).decode("utf-8", errors="replace").split("\n")]
-    missing = [line for line in SPEC_DOCK_IGNORE_LINES if line not in lines]
-    link, negation = SPEC_DOCK_IGNORE_LINES[1:]
-    misordered = not missing and _last_index(lines, negation) < _last_index(lines, link)
+    payload = read(entry)
+    missing, misordered = ignore_rules_state(payload.decode("utf-8", errors="replace"), SPEC_DOCK_IGNORE_LINES)
     if not missing and not misordered:
         return None
     return _failure(
         IGNORE_RULES_MISSING,
         SPEC_DOCK_GITIGNORE,
         "the canonical ignore rules are missing or out of order",
-        _IGNORE_RULES_NEXT_STEP,
-        missing_lines=missing,
+        ignore_rules_next_step(assets, payload),
+        missing_lines=list(missing),
         misordered=misordered,
     )
-
-
-def _last_index(lines: Sequence[str], value: str) -> int:
-    return len(lines) - 1 - lines[::-1].index(value)
 
 
 def _within(path: str, root: str) -> bool:

@@ -7,7 +7,13 @@ import json
 import re
 from typing import Generic, Literal, TypeVar, cast
 
-from spec_dock.runtime.presentation.command_data import ActiveData, DiagnosticData, FamilyData, SyncData
+from spec_dock.runtime.presentation.command_data import (
+    ActiveData,
+    CanonicalStatusData,
+    DiagnosticData,
+    FamilyData,
+    SyncData,
+)
 
 ResultStatus = Literal["succeeded", "unchanged", "planned", "failed", "partial"]
 EffectStatus = Literal["planned", "succeeded", "unchanged", "failed", "not_attempted", "unknown"]
@@ -203,7 +209,7 @@ def render_text(
             for label, items in (("failure", failures), ("warning", result.warnings))
             for item in items
         )
-    elif isinstance(result.data, (ActiveData, FamilyData)) or (
+    elif isinstance(result.data, (ActiveData, FamilyData, CanonicalStatusData)) or (
         isinstance(result.data, DiagnosticData) and (result.data.findings or result.data.unverified)
     ):
         stdout_lines.extend(json.dumps(_redact(asdict(result.data)), ensure_ascii=False, indent=2).splitlines())

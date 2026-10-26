@@ -39,3 +39,22 @@ class SyncData:
     counts: tuple[dict[str, object], ...]
     findings: tuple[Diagnostic, ...] = ()
     kind: str = "sync"
+
+
+@dataclass(frozen=True)
+class CanonicalStatusData:
+    """One object per `canonical status` item; each carries status and next_step (Epic design ch. 3)."""
+
+    catalog: dict[str, object]
+    link: dict[str, object]
+    exclude: dict[str, object]
+    access: dict[str, object]
+    tools: dict[str, object]
+    sync: dict[str, object]
+    changes: dict[str, object]
+    format: dict[str, object]
+    git: dict[str, object]
+    snapshot: dict[str, object]
+    dashboard: dict[str, object]
+    structure: dict[str, object]
+    kind: str = "canonical-status"

@@ -67,6 +67,8 @@ LEAF_PATHS: tuple[str, ...] = (
     "workspace validate",
     "workspace doctor",
     "workspace migrate",
+    "canonical link",
+    "canonical status",
     "installation show",
     "installation init",
     "installation update",
@@ -115,6 +117,8 @@ HELP_EFFECTS: dict[str, str] = {
     "workspace validate": "Validate working-tree structure; --ci checks a fixed HEAD without installation or execution state. No changes.",
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
     "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
+    "canonical link": "Find or create this clone's catalog, lock it, add the ignore rules and link the main checkout and this checkout.",
+    "canonical status": "Read catalog, link, ignore rules, access and tool settings; no changes.",
     "installation show": "Read the package version and static resources in one Git worktree; no changes.",
     "installation init": "Place package static resources and a new schema-4 workspace declaration in one Git worktree.",
     "installation update": "Update package static resources in one Git worktree after verified external preservation.",
@@ -225,6 +229,8 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--backup-dir"),
         _flag("--confirm-old-writers-stopped"),
     ),
+    "canonical link": (),
+    "canonical status": (),
     "installation show": (_arg("--target"),),
     "installation init": (_arg("path"),),
     "installation update": (_arg("--target"), _arg("--backup-dir")),
@@ -267,6 +273,7 @@ MUTATING_LEAF_PATHS = frozenset({
     "worktree bootstrap",
     "workbench copy",
     "workspace migrate",
+    "canonical link",
     "installation init",
     "installation update",
     "installation uninstall",
@@ -324,6 +331,8 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "workspace validate": "Readable schema-3 metadata and regular requirement.md/design.md/plan.md/report.md files are required for each Scope; document bodies are not judged. --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
     "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
+    "canonical link": "A schema-4 workspace in a clone with a main checkout and Git 2.38 or later. Stops before writing when the catalog path, a link path or the spec-dock/canonical checkout is occupied, when the checkout looks mounted from another machine, or when this process cannot write where it must.",
+    "canonical status": "A schema-4 workspace in a clone with a main checkout; it never contacts GitHub or the remote.",
     "installation show": "The selected target must be one exact Git worktree root; no workspace or control record is required.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
     "installation update": "A schema-3 or schema-4 worktree-writer workspace and known static hashes are required. Changes need a new external --backup-dir under an existing physical parent and --yes; --dry-run writes nothing. Modified or unknown files require manual merge.",
@@ -529,6 +538,18 @@ def _help_spec(leaf: str) -> HelpSpec:
         reads = "Current workspace metadata and this worktree's direct record; safe file information in --raw mode, retired records only with --legacy, and GitHub only with explicit fixed probe arguments."
         does_not = "Does not execute the retired engine, repair control, resume journals, acquire a Start lock, or write any project state."
         json_data = "findings and unverified observations; unsafe, unknown or incomplete evidence returns exit 7."
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf == "canonical link":
+        does_not = "Does not commit or push spec changes, prune worktrees, delete files or rewrite tool settings."
+        target = "This clone's catalog at <main checkout>/spec-dock/.canonical and the links of the main checkout and this checkout."
+        reads = "Git worktree inventory, the catalog, the links, info/exclude, spec-dock/.gitignore, tool settings files, and origin only when the catalog must be created."
+        writes = "The catalog worktree and its lock, info/exclude, and the spec-dock/initiatives links; when GitHub has no canonical yet, one parentless commit with the format-1 files is pushed."
+        confirmation = "No final confirmation is required; --dry-run reports the plan without writing."
+    elif leaf == "canonical status":
+        target = "This clone's catalog and the links of the main checkout and this checkout."
+        reads = "Git worktree inventory and catalog status with --no-optional-locks, the links, ignore rules and tool settings files; never GitHub or the remote."
+        does_not = "Does not write the repository, the catalog, .git, the state root or GitHub."
+        json_data = "catalog, link, exclude, access, tools, sync, changes, format, git, snapshot, dashboard, structure; each has status and next_step."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "workspace migrate":
         target = "Only this worktree's spec-dock/workspace.json declaration."

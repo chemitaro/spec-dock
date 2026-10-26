@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.application.project_context import OLD_WRITER_PROTOCOL, resolve_context
 from spec_dock.runtime.application.scope_query import show_scope
+from spec_dock.runtime.domain.canonical_content import FORMAT_FILE
+from spec_dock.runtime.domain.canonical_layout import CANONICAL_BRANCH
 from spec_dock.runtime.domain.selectors import ActiveScopeSelector, parse_scope_selector
 from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.work_target_store import WorkTargetStore
@@ -147,6 +149,10 @@ def observe_worktrees(context: ProjectContext, *, timeout: float = 30) -> tuple[
                 raise ValueError(entry.inventory_error)
             if entry.bare:
                 raise ValueError("bare repository is not a working tree")
+            # The one canonical-mode exception (iss-00429, coordinator decision D1): a clone's catalog worktree has
+            # no workspace declaration and selects nothing, so it is not observed.
+            if entry.branch == CANONICAL_BRANCH and (entry.path / FORMAT_FILE).is_file():
+                continue
             other = resolve_context(str(entry.path), context.root, timeout=timeout)
             identity = other.worktree_identity
             if other.clone_identity != context.clone_identity:

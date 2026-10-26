@@ -32,7 +32,7 @@ def test_command_reference_covers_all_public_leaves() -> None:
     reference = (DOCS / "reference_cli.md").read_text()
     for leaf in LEAF_PATHS:
         assert f"`{leaf}`" in reference, leaf
-    assert len(LEAF_PATHS) == 45
+    assert len(LEAF_PATHS) == 47
 
 
 def test_current_docs_do_not_instruct_removed_commands() -> None:
