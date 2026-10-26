@@ -225,6 +225,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - スナップショットにない番号に当たる変更の反映は、当てずに飛ばし、コマンドを失敗にせずに `GITHUB_SNAPSHOT_STALE` を警告に入れ、次の `ensure_fresh` が取り直す（`design.md` 2章の「書き込みの反映」）。
   - `scope close` と `scope reopen` の結果が分からないときの読み直しが、`state_reason` も比べる。
   - canonical の `work start` は、選択を記録して `StartLock` を放した後に、I-2 の `link_after_command` を呼ぶ。リンクの失敗は `work start` の結果を変えず、警告で返す（`design.md` 3章「SpecDock のほかのコマンドから」）。
+- **I-4 から引き継ぐもの**（2026-10-26 の統括の判断。I-4 の `report.md`）：ブランチの操作が失敗した後の再観察を、従来の `branch_operations` の形にそろえる。`--expect-current` の確かめと従来の処理の取り込みの間の競合を直す。canonical の `worktree remove` が、正しいリンク（`spec-dock/initiatives`）を無視されたファイルとして数え、いつも `--discard-ignored` を要するので、SpecDock が置いたリンクは数えないように直す。
 
 ### I-6 Accept Japanese Titles In Canonical Mode
 
@@ -280,6 +281,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - **I-2 から引き継ぐもの**（2026-10-26 の統括の判断。I-2 の報告書）：
     - 実機の確かめ（利用者の設定は変えず、一時の `HOME` か `--settings` のファイルで行う）：Codex の `writable_roots` の1行が効くこと、Claude Code のユーザー設定のファイルに書いた1行での動き、Git 2.38 ちょうどでの動き、Linux の Landlock のサンドボックスでの判定。利用者の本物の設定での確かめは、I-10 で、利用者が1行を足すときに行う。
     - 小さな直し：ツールの設定の判定で、Claude Code の `CLAUDE_CONFIG_DIR` を見る（ST-12）。ヘルプの「書くもの」に、fetch の refspec の追加と、ローカルのブランチの付け替えを足す（ST-9）。
+    - I-4 と I-8 から：I-4 の新しいコード（`design.md` 12章）を、`help` と参照の文書に書く。`dependency check` と `workspace sync` の `--source` の既定の意味、`--offline`、`canonical status --structure` を文書に書く。`migrate.py undo` が、作業の記録がないときに何もせずに終了コード0で終わるので、次の1手を付けて止まるように直す（I-8 の ST-1。I-10 の前に要る）。
     - 使い方の文書の制約：main が sparse-checkout だと、カタログがその設定を引き継ぎ、仕様が見えない（ST-2）。カタログに対する Git の呼び出しは `GIT_ASKPASS` を通さないので、askpass で HTTPS の認証をしている環境では、push と fetch が失敗しうる（ST-13）。
 - **受け入れ**：
   - AC-02、AC-07、AC-14、AC-15、AC-16、AC-18 を確かめる。AC-14 は、設計書を渡さない白紙のエージェントに規則の節だけを渡して試し、結果を報告書に書く。AC-18 は、横断のシナリオのテストを、環境の判定を注入して systemd と `loop` の両方で通し、実機では OrbStack の仮想マシンと Docker のコンテナで通す。
@@ -339,6 +341,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   5. ツールの設定の値が、5つのカタログ（spec-dock を含む）になったことを、利用者に1行で示す。
   6. 凍結を解き、3日間の運用に入る。
 - **受け入れ**：4つのリポジトリのそれぞれで、AC-19（予行演習の記録、`canonical check` と `verify` の一致、検査のワークフローの通過）と、AC-01、AC-04、AC-12 と同じことを確かめる。切り替えの後の3日間の運用で、5つのリポジトリのどれにも仕様の失われがなく、`canonical status` に未解決の異常がない。この結果を利用者に示し、撤去（I-13）に進むかどうかを確かめる。
+- **準備で利用者と決めること**（I-8 の `plan` で分かった）：Orca の repo の一覧にある `/Volumes/990p2t/workspace/company-os/businesses/housing-lifecycle/products/taikyohiyou_project` は、taikyohiyou の2つ目のクローンで、worktree 1つに仕様の変更が9件ある。同じ GitHub のリポジトリかを確かめ、変更を `adopt-worktree` で取り込むか、捨てるかを、利用者と決める。
 - **注意**：1つのリポジトリで止まったときは、そのリポジトリだけを `design.md` の「戻し方」で戻すか、直して続けるかを、利用者に判断してもらう。ほかのリポジトリの切り替えは、止まったリポジトリと独立している。
 
 ### I-13 Remove Legacy Mode
@@ -356,6 +359,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - AC-20 のうち、パッケージについての部分。14章の「消すもの」が残っていない（コードの検索と、版3の宣言のテスト）。テストの分類の一覧で、(b) のすべてに対応する canonical のテストがある。`make lint` と `uv run pytest` が通る。
   - wheel を作り、外の環境に入れて、`spec-dock help` と `spec-dock canonical --help` が動き、`spec-dock workspace migrate` と `spec-dock workbench copy` がない。
 - **マージの後**（統括のエージェントが行う）：利用者の環境に 0.4.0 を入れる。`release-tag.yml` が `v0.4.0` を作ったことを確かめる。R-J1 の各リポジトリで `spec-dock installation update` を行い、通常のPRを作る（spec-dock の分は、この Issue のPRに含まれる）。各PRで、検査のワークフローが 0.4.0 で通ることを確かめ、人がマージする。これで AC-20 の残りの部分を確かめる。
+- **I-8 から引き継ぐもの**：移行のスクリプトを消すときに、`scripts/static_analysis/run.sh` の `TARGETS` から `scripts/migrate-to-canonical` も外す。
 - **I-7 から引き継ぐもの**：`infra/commit_tree.py` と `infra/committed_validation.py` の `ls-tree` の解析の重複を、1つにする（I-7 は、従来の処理を変えない決まりのため、重ねて持った）。
 - **注意**：共通の契約（R-J7）のテストを、対応を示さずに消してはならない。消すかどうかに迷うテストは、一覧に理由を書いて残し、統括のエージェントに確かめる。
 
