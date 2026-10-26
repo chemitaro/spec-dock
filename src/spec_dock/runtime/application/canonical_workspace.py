@@ -18,7 +18,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CanonicalCommandError,
 )
 from spec_dock.runtime.application.canonical_scope_read import resolve_source
-from spec_dock.runtime.application.canonical_scopes import load_canonical_scopes
+from spec_dock.runtime.application.canonical_scopes import SCOPE_NESTING, load_canonical_scopes
 from spec_dock.runtime.application.canonical_worktrees import is_catalog
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_expectations import check_scope_expectations
@@ -38,7 +38,6 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
 
 REQUIRED_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
-_NESTING: Final = {"epic": "epics", "issue": "issues"}
 
 SCOPE_DIRECTORY_SLUG_MISMATCH: Final = "SCOPE_DIRECTORY_SLUG_MISMATCH"
 SCOPE_DIRECTORY_DUPLICATE: Final = "SCOPE_DIRECTORY_DUPLICATE"
@@ -70,9 +69,10 @@ def misplaced_scopes(scopes: CanonicalScopes) -> tuple[dict[str, object], ...]:
             expected = PurePosixPath(name)
         else:
             parent = scopes.directories.get(view.parent_id)
-            if parent is None:
-                continue
-            expected = parent.relative / _NESTING[view.kind] / name
+            nested = SCOPE_NESTING.get(view.kind)
+            if parent is None or nested is None:
+                continue  # an Initiative with a parent is already the PARENT_INVALID anomaly
+            expected = parent.relative / nested / name
         if directory.relative != expected:
             next_step = f"spec-dock scope move {view.id}"
             found.append({
@@ -391,10 +391,21 @@ def diagnose_workspace(namespace: argparse.Namespace, context: ProjectContext) -
         require_linked(context, timeout=namespace.timeout)
     except CanonicalCommandError as error:
         findings += (Diagnostic(error.code, error.message, dict(error.details)),)
+    except (GitProcessError, OSError) as error:
+        findings += (
+            Diagnostic("GIT_FAILED" if isinstance(error, GitProcessError) else "LOCAL_IO_FAILED", str(error), {}),
+        )
+    scopes: CanonicalScopes | None
     try:
         scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, offline=namespace.offline)
-    except GithubStructureError as error:
-        findings += (Diagnostic(error.code, error.message, {"endpoint": error.endpoint, "retry_at": error.retry_at}),)
+    except (GithubStructureError, ValueError, GitProcessError, OSError) as error:
+        if isinstance(error, GithubStructureError):
+            finding = Diagnostic(error.code, error.message, {"endpoint": error.endpoint, "retry_at": error.retry_at})
+        else:
+            finding = Diagnostic(
+                "GIT_FAILED" if isinstance(error, GitProcessError) else "PRECONDITION_FAILED", str(error), {}
+            )
+        findings += (finding,)
         unverified += ("The GitHub structure could not be read.",)
         if namespace.expect_current:
             raise ValueError("--expect-current cannot be verified without the GitHub structure") from error
@@ -450,16 +461,22 @@ def diagnose_workspace(namespace: argparse.Namespace, context: ProjectContext) -
     )
 
 
-def structure_item(context: ProjectContext, *, timeout: float) -> tuple[dict[str, object], tuple[Diagnostic, ...]]:
+def structure_item(
+    context: ProjectContext, *, timeout: float, offline: bool = False
+) -> tuple[dict[str, object], tuple[Diagnostic, ...]]:
     """`canonical status --structure`: nesting drift at display freshness; failures stay inside the item."""
     try:
-        scopes = load_canonical_scopes(context, timeout=timeout, link=True)
+        scopes = load_canonical_scopes(context, timeout=timeout, link=True, offline=offline)
     except CanonicalCommandError as error:
         return _unavailable(error.code, error.message, error.recovery[0] if error.recovery else None), ()
     except GithubStructureError as error:
         return _unavailable(error.code, error.message, "Check the network connection and run gh auth status."), ()
     except (ValueError, GitProcessError) as error:
         return _unavailable("PRECONDITION_FAILED", str(error), "Check that origin points at the GitHub repository."), ()
+    except (OSError, RuntimeError) as error:
+        return _unavailable(
+            "LOCAL_IO_FAILED", str(error), "Check that the state root and the catalog are readable."
+        ), ()
     misplaced = misplaced_scopes(scopes)
     warnings = tuple(
         Diagnostic(

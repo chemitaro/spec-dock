@@ -47,7 +47,8 @@ if TYPE_CHECKING:
     ServiceFactory = Callable[[GithubRepository, Path, float], StructureSnapshotService]
 
 OFFLINE_MESSAGE: Final = "offline mode cannot fetch required GitHub state"
-_NESTING: Final[Mapping[str, str]] = {"epic": "epics", "issue": "issues"}
+# The catalog directory that holds a Scope kind under its parent's directory (Epic design ch. 2).
+SCOPE_NESTING: Final[Mapping[str, str]] = {"epic": "epics", "issue": "issues"}
 
 
 def default_service(repository: GithubRepository, root: Path, timeout: float) -> StructureSnapshotService:
@@ -195,28 +196,28 @@ def build_views(
     link = root / LINK_RELATIVE
     relatives: dict[str, PurePosixPath] = {}
 
-    def relative(node: ScopeNode) -> PurePosixPath:
-        assert node.id is not None
-        if node.id in relatives:
-            return relatives[node.id]
-        found = directories.get(node.id)
+    def relative(node: ScopeNode, scope_id: str) -> PurePosixPath:
+        if scope_id in relatives:
+            return relatives[scope_id]
+        found = directories.get(scope_id)
         if found is not None:
             result = found.relative
         else:
-            name = PurePosixPath(f"{node.id}-{node.slug}")
+            name = PurePosixPath(f"{scope_id}-{node.slug}")
             parent = snapshot.issues.get(node.parent) if node.parent is not None else None
-            nested = _NESTING.get(node.kind or "")
+            nested = SCOPE_NESTING.get(node.kind or "")
             if parent is not None and parent.id is not None and nested is not None:
-                relatives[node.id] = name  # a parent cycle ends here
-                result = relative(parent) / nested / name
+                relatives[scope_id] = name  # a parent cycle ends here
+                result = relative(parent, parent.id) / nested / name
             else:
                 result = name
-        relatives[node.id] = result
+        relatives[scope_id] = result
         return result
 
     views: list[ScopeView] = []
     for node in snapshot.scopes:
-        assert node.id is not None and node.kind is not None
+        if node.id is None or node.kind is None:
+            continue  # `scopes` holds only decided Scopes; anomalies are reported elsewhere
         parent = snapshot.issues.get(node.parent) if node.parent is not None else None
         views.append(
             ScopeView(
@@ -225,7 +226,7 @@ def build_views(
                 title=node.title,
                 parent_id=parent.id if parent is not None else None,
                 backend=GithubBackend(node.number, repository.owner, repository.name),
-                path=link / relative(node),
+                path=link / relative(node, node.id),
                 revision=0,
                 status=StatusObservation(
                     observe_github_state(node.state, node.state_reason),

@@ -72,3 +72,43 @@ def test_branch_switch_refuses_a_branch_with_specs(world: CanonicalWorld) -> Non
     assert payload["recovery"]["instructions"]
     assert (git(world.main, "rev-parse", "HEAD"), git(world.main, "branch", "--show-current")) == before
     assert (world.main / "spec-dock/initiatives").is_symlink()
+
+
+def test_a_failed_check_after_creating_the_branch_is_partial(
+    world: CanonicalWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.application import canonical_branches
+
+    real = canonical_branches._branch_tip
+    calls: list[str] = []
+
+    def moved(context: object, name: str, timeout: float) -> str | None:
+        calls.append(name)
+        tip = real(context, name, timeout)  # type: ignore[arg-type]
+        return "0" * 40 if tip is not None else None
+
+    monkeypatch.setattr(canonical_branches, "_branch_tip", moved)
+    code, payload = world.run("branch", "create", "init-00001", "--base", "HEAD", "--yes")
+    assert (code, payload["status"]) == (6, "partial"), payload
+    assert [(item["kind"], item["status"]) for item in payload["effects"]] == [("git.branch.create", "succeeded")]
+    assert payload["error"]["code"] == "BRANCH_VERIFICATION_FAILED"
+
+
+def test_a_failed_check_after_switching_is_partial(world: CanonicalWorld, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock.runtime.application import canonical_branches
+
+    git(world.main, "branch", "init-00001-plan")
+    real = canonical_branches._verify_selection
+    calls: list[int] = []
+
+    def changed_after_checkout(context: object, expected: object) -> None:
+        calls.append(1)
+        if len(calls) > 1:
+            raise ValueError("direct selection changed during the Git branch operation")
+        real(context, expected)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(canonical_branches, "_verify_selection", changed_after_checkout)
+    code, payload = world.run("branch", "switch", "init-00001", "--yes")
+    assert (code, payload["status"]) == (6, "partial"), payload
+    assert [(item["kind"], item["status"]) for item in payload["effects"]] == [("git.checkout", "succeeded")]
+    assert payload["error"]["code"] == "CHECKOUT_VERIFICATION_FAILED"

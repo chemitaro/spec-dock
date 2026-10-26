@@ -26,6 +26,8 @@ from spec_dock.runtime.domain.artifacts import (
 from spec_dock.runtime.domain.canonical_layout import LINK_RELATIVE
 from spec_dock.runtime.domain.canonical_readiness import evaluate_readiness
 from spec_dock.runtime.domain.dependency_vnext import dependency_listing
+from spec_dock.runtime.infra.git_process import GitProcessError
+from spec_dock.runtime.infra.github_structure import GithubStructureError
 from spec_dock.runtime.infra.json_store import open_guarded_directory
 from spec_dock.runtime.infra.work_target_store import SelectionRemovalUnknown, WorkTargetStore
 from spec_dock.runtime.presentation.command_data import ActiveData, CanonicalActiveData, DiagnosticData, FamilyData
@@ -279,7 +281,7 @@ def clear_active(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 namespace.command_path, "unchanged", ActiveData(selection.view(), selection.ancestors), 0
             )
         selected_handles = (selection.handle,) if selection.record is not None and selection.handle is not None else ()
-    views = scopes.views if scopes is not None else ()
+    views = scopes.views if scopes is not None else _views_for_observation(context, namespace)
     effects: list[Effect] = []
     try:
         with WorkTargetStore(context.root) as store:
@@ -361,6 +363,14 @@ def clear_active(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     )
 
 
+def _views_for_observation(context: ProjectContext, namespace: argparse.Namespace) -> tuple[ScopeView, ...]:
+    """Views to report the selection after clearing; without the structure the observation stays empty or stale."""
+    try:
+        return load_canonical_scopes(context, timeout=namespace.timeout, link=False, offline=namespace.offline).views
+    except (GithubStructureError, GitProcessError, ValueError, OSError):
+        return ()
+
+
 def _observe(context: ProjectContext, views: tuple[ScopeView, ...]) -> SelectionObservation:
     with WorkTargetStore(context.root) as store:
         observed = store.read()
@@ -409,7 +419,8 @@ def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> Op
         return query_root(replace_namespace(namespace, expect_current=None), context)
     scopes.require_directory(target.id)
     directory = scopes.directories[target.id]
-    assert scopes.catalog is not None
+    if scopes.catalog is None:
+        raise RuntimeError("the catalog was not resolved for an Artifact read")
     items = catalog_artifacts(
         scopes.catalog.catalog / directory.relative.as_posix(),
         (LINK_RELATIVE / directory.relative).as_posix(),

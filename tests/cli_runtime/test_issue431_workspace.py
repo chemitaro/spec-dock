@@ -153,3 +153,66 @@ def test_status_structure_reports_nesting_drift(world: CanonicalWorld) -> None:
     assert [entry["scope_id"] for entry in item["misplaced"]] == ["epic-00004"]
     assert item["snapshot"]["fetched_at"]
     assert any(warning["code"] == "SCOPE_DIRECTORY_MISPLACED" for warning in payload["warnings"])
+
+
+def test_an_initiative_with_a_parent_is_a_finding_not_a_crash(world: CanonicalWorld) -> None:
+    world.scope("initiative", 4, "nested", parent=1, directory=False)
+    world.directory("initiative", 4, "nested")
+    code, payload = world.run("workspace", "validate")
+    assert (code, payload["error"]["code"]) == (7, "WORKSPACE_VALIDATION_FAILED")
+    assert "PARENT_INVALID" in codes(payload["data"]["result"]["findings"])
+    code, payload = world.run("canonical", "status", "--structure")
+    assert code == 0, payload
+    assert payload["data"]["structure"]["status"] in ("ok", "problem")
+    assert world.run("workspace", "doctor")[0] == 7
+
+
+def test_each_snapshot_anomaly_is_a_validate_finding(world: CanonicalWorld) -> None:
+    def broken(fake: Any) -> None:
+        fake.add_issue(
+            4, title="two kinds", labels=["spec-dock:issue", "spec-dock:epic"], body="<!-- spec-dock:slug=two -->"
+        )
+        fake.add_issue(
+            5,
+            title="two markers",
+            labels=["spec-dock:issue"],
+            body="<!-- spec-dock:slug=a -->\n<!-- spec-dock:slug=b -->",
+        )
+        fake.add_issue(6, title="bad marker", labels=["spec-dock:issue"], body="<!-- spec-dock:slug=Bad_Slug -->")
+        fake.add_foreign_issue("other/repo", 9)
+        fake.block(3, by=9, repository="other/repo")
+
+    world.edit(broken)
+    code, payload = world.run("workspace", "validate")
+    assert code == 7
+    assert {
+        "KIND_LABEL_MULTIPLE",
+        "SLUG_MARKER_MULTIPLE",
+        "SLUG_MARKER_INVALID",
+        "DEPENDENCY_FOREIGN_REPOSITORY",
+    } <= codes(payload["data"]["result"]["findings"])
+
+
+def test_doctor_reports_an_unreadable_structure_as_a_finding(world: CanonicalWorld) -> None:
+    code, payload = world.run("workspace", "doctor", "--offline")
+    assert code == 7, payload
+    assert payload["data"]["canonical"] is not None
+    assert "PRECONDITION_FAILED" in codes(payload["data"]["findings"])
+
+
+def test_sync_observes_a_schema_three_worktree_and_an_unreadable_one(world: CanonicalWorld) -> None:
+    import json
+
+    from tests.support.canonical_repo import add_worktree
+
+    legacy = add_worktree(world.main, world.tmp_path / "legacy", "legacy")
+    (legacy / "spec-dock/workspace.json").write_text(
+        json.dumps({"schema_version": 3, "writer_protocol": "specdock.worktree-writer/v1"}), encoding="utf-8"
+    )
+    broken = add_worktree(world.main, world.tmp_path / "broken", "broken")
+    (broken / "spec-dock/workspace.json").write_text("{", encoding="utf-8")
+    code, payload = world.run("workspace", "sync")
+    rows = {row["path"]: row for row in payload["data"]["worktrees"]}
+    assert rows[str(legacy)]["selection"]["status"] == "empty"
+    assert [item["code"] for item in rows[str(broken)]["findings"]] == ["WORKTREE_SELECTION_UNAVAILABLE"]
+    assert (code, payload["status"]) == (7, "partial")

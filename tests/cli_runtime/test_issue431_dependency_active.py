@@ -134,3 +134,11 @@ def test_artifacts_are_listed_from_the_catalog_in_main_and_linked_worktrees(worl
         code, payload = world.run("artifact", "show", item["id"], "--scope", "iss-00003", checkout=checkout)
         assert code == 0, payload
         assert payload["data"]["result"]["artifact"]["path"] == item["path"]
+
+
+def test_active_clear_dry_run_reports_the_valid_selection(world: CanonicalWorld) -> None:
+    world.select("iss-00003", 3)
+    code, payload = world.run("active", "clear", "--all", "--dry-run")
+    assert code == 0, payload
+    assert payload["data"]["selection"]["status"] == "selected"
+    assert payload["data"]["ancestors"] == ["init-00001", "epic-00002"]

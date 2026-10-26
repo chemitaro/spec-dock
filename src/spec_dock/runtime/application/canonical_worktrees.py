@@ -32,6 +32,7 @@ from spec_dock.runtime.application.direct_worktrees import (
 )
 from spec_dock.runtime.domain.canonical_content import FORMAT_FILE
 from spec_dock.runtime.domain.canonical_layout import CANONICAL_BRANCH
+from spec_dock.runtime.infra.work_target_store import WorkTargetStore
 from spec_dock.runtime.presentation.command_data import FamilyData
 
 if TYPE_CHECKING:
@@ -39,12 +40,17 @@ if TYPE_CHECKING:
 
     from spec_dock.runtime.application.contracts import GitWorktreeRecord
     from spec_dock.runtime.application.project_context import GitContext, ProjectContext
+    from spec_dock.runtime.infra.work_target_store import StoredSelection
     from spec_dock.runtime.presentation.envelope import OperationResult
 
 
 def is_catalog(entry: GitWorktreeRecord) -> bool:
     """The same test as the legacy observation exception (iss-00429 D1)."""
-    return entry.branch == CANONICAL_BRANCH and (entry.path / FORMAT_FILE).is_file()
+    return catalog_at(entry.path, entry.branch)
+
+
+def catalog_at(path: Path, branch: object) -> bool:
+    return branch == CANONICAL_BRANCH and (path / FORMAT_FILE).is_file()
 
 
 def create_worktree_and_link(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
@@ -66,7 +72,7 @@ def list_worktrees(namespace: argparse.Namespace, context: ProjectContext) -> Op
     if not isinstance(result.data, FamilyData):
         return result
     items = tuple(
-        {**item, "catalog": item["branch"] == CANONICAL_BRANCH and (Path(str(item["path"])) / FORMAT_FILE).is_file()}
+        {**item, "catalog": catalog_at(Path(str(item["path"])), item["branch"])}
         for item in result.data.result["items"]  # type: ignore[attr-defined]
     )
     return replace(result, data=FamilyData(result.data.kind, {**result.data.result, "items": items}))
@@ -77,19 +83,20 @@ def show_worktree(namespace: argparse.Namespace, context: ProjectContext) -> Ope
     result = show_native_worktree(replace_namespace(namespace, expect_current=None), context)
     if not isinstance(result.data, FamilyData):
         return result
-    entry = resolve_native_target(namespace.worktree_ref, context, timeout=namespace.timeout)
-    return replace(result, data=FamilyData(result.data.kind, {**result.data.result, "catalog": is_catalog(entry)}))
+    shown = result.data.result
+    catalog = catalog_at(Path(str(shown["path"])), shown["branch"])
+    return replace(result, data=FamilyData(result.data.kind, {**shown, "catalog": catalog}))
 
 
 def remove_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     _refuse_catalog(namespace, context)
-    check_canonical_expectation(context, namespace)
+    check_canonical_expectation(context, namespace, stored=_captured_selection(namespace, context))
     return remove_native_worktree(replace_namespace(namespace, expect_current=None), context)
 
 
 def bootstrap_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     _refuse_catalog(namespace, context)
-    check_canonical_expectation(context, namespace)
+    check_canonical_expectation(context, namespace, stored=_captured_selection(namespace, context))
     return bootstrap_native_worktree(replace_namespace(namespace, expect_current=None), context)
 
 
@@ -111,6 +118,14 @@ def install_with_expectation(namespace: argparse.Namespace, target: GitContext) 
     project = resolve_context(str(target.root), target.root, timeout=namespace.timeout)
     check_canonical_expectation(project, namespace)
     return install_static_assets(replace_namespace(namespace, expect_current=None), target)
+
+
+def _captured_selection(namespace: argparse.Namespace, context: ProjectContext) -> StoredSelection | None:
+    """The record the expectation is checked on; the legacy step re-reads it and stops if it changed since."""
+    if namespace.expect_current is None:
+        return None
+    with WorkTargetStore(context.root) as store:
+        return store.read()
 
 
 def _refuse_catalog(namespace: argparse.Namespace, context: ProjectContext) -> None:

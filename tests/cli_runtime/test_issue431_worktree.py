@@ -76,9 +76,15 @@ def test_worktree_create_with_expect_current(world: CanonicalWorld) -> None:
     assert (trees / "right/spec-dock/initiatives").is_symlink()
 
 
-def test_installation_show_with_expect_current(world: CanonicalWorld) -> None:
+@pytest.mark.parametrize(
+    "leaf",
+    [["installation", "show"], ["installation", "update", "--dry-run"], ["installation", "uninstall", "--dry-run"]],
+)
+def test_installation_with_expect_current(world: CanonicalWorld, leaf: list[str]) -> None:
     world.select("init-00001", 1)
-    code, payload = world.run("installation", "show", "--expect-current", "init-00001")
-    assert code == 0, payload
-    code, payload = world.run("installation", "show", "--expect-current", "init-00002")
+    code, payload = world.run(*leaf, "--expect-current", "init-00001")
+    assert (code, payload["error"]) == (0, None), payload
+    assert payload["status"] in ("succeeded", "planned")
+    code, payload = world.run(*leaf, "--expect-current", "init-00002")
     assert (code, payload["error"]["code"]) == (3, "PRECONDITION_FAILED")
+    assert payload["error"]["message"] == "direct target does not match --expect-current"

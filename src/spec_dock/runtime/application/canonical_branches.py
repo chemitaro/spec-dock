@@ -37,6 +37,7 @@ if TYPE_CHECKING:
     import argparse
 
     from spec_dock.runtime.application.project_context import ProjectContext
+    from spec_dock.runtime.infra.work_target_store import StoredSelection
 
 
 def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
@@ -77,18 +78,42 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
         refuse_specs_at(context, base, timeout=namespace.timeout)
         if namespace.dry_run:
             return _planned(namespace, target.id, name, base, "git.branch.create", warnings)
-        assert source_selection is not None
+        captured = _require_captured(source_selection)
         _fresh_context(context, namespace.timeout)
-        _verify_selection(context, source_selection)
+        _verify_selection(context, captured)
         try:
             run_git(context.root, "branch", name, base, timeout=namespace.timeout, mutation=True)
         except GitProcessError as error:
             created = _branch_tip(context, name, namespace.timeout)
             status: EffectStatus = "succeeded" if created == base else "unknown" if error.uncertain else "failed"
-            return _incomplete(namespace, target.id, name, created, "git.branch.create", status, error, switched=False)
-        created_tip = _branch_tip(context, name, namespace.timeout)
-        if created_tip != base:
-            raise ValueError("created branch differs from the fixed base commit")
+            return _incomplete(
+                namespace,
+                target.id,
+                name,
+                created,
+                "git.branch.create",
+                status,
+                error,
+                switched=False,
+                warnings=warnings,
+            )
+        try:
+            _fresh_context(context, namespace.timeout)
+            if _branch_tip(context, name, namespace.timeout) != base:
+                raise ValueError("created branch differs from the fixed base commit")
+            _verify_selection(context, captured)
+        except (OSError, ValueError, RuntimeError) as error:
+            return _incomplete(
+                namespace,
+                target.id,
+                name,
+                base,
+                "git.branch.create",
+                "succeeded",
+                error,
+                switched=False,
+                warnings=warnings,
+            )
         return OperationResult(
             namespace.command_path,
             "succeeded",
@@ -105,8 +130,7 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
         _check_switch_target(context, name, timeout=namespace.timeout)
         if namespace.dry_run:
             return _planned(namespace, target.id, name, tip, "git.checkout", warnings)
-        assert source_selection is not None
-        return _switch(namespace, context, target.id, name, tip, source_selection, warnings)
+        return _switch(namespace, context, target.id, name, tip, _require_captured(source_selection), warnings)
     return OperationResult(
         namespace.command_path,
         "succeeded",
@@ -134,7 +158,7 @@ def _switch(
     scope_id: str,
     name: str,
     tip: str,
-    source_selection: object,
+    source_selection: StoredSelection,
     warnings: tuple[Diagnostic, ...],
 ) -> OperationResult[object]:
     with ExitStack() as held:
@@ -153,7 +177,7 @@ def _switch(
             raise ValueError("Git project physical identity changed")
         _check_switch_target(context, name, timeout=namespace.timeout)
         current = _fresh_context(context, namespace.timeout)
-        _verify_selection(context, source_selection)  # type: ignore[arg-type]
+        _verify_selection(context, source_selection)
         if current.branch == name and current.head == tip:
             return OperationResult(
                 namespace.command_path,
@@ -169,11 +193,18 @@ def _switch(
             after = _fresh_context(context, namespace.timeout)
             moved = after.branch == name and after.head == tip
             status: EffectStatus = "succeeded" if moved else "unknown" if error.uncertain else "failed"
-            return _incomplete(namespace, scope_id, name, tip, "git.checkout", status, error, switched=moved)
-        after = _fresh_context(context, namespace.timeout)
-        if after.branch != name or after.head != tip:
-            raise ValueError("checkout differs from the fixed branch snapshot")
-        _verify_selection(after, source_selection)  # type: ignore[arg-type]
+            return _incomplete(
+                namespace, scope_id, name, tip, "git.checkout", status, error, switched=moved, warnings=warnings
+            )
+        try:
+            after = _fresh_context(context, namespace.timeout)
+            if after.branch != name or after.head != tip:
+                raise ValueError("checkout differs from the fixed branch snapshot")
+            _verify_selection(after, source_selection)
+        except (OSError, ValueError, RuntimeError) as error:
+            return _incomplete(
+                namespace, scope_id, name, tip, "git.checkout", "succeeded", error, switched=True, warnings=warnings
+            )
     return OperationResult(
         namespace.command_path,
         "succeeded",
@@ -217,16 +248,30 @@ def _incomplete(
     tip: str | None,
     effect: str,
     status: EffectStatus,
-    error: GitProcessError,
+    error: Exception,
     *,
     switched: bool,
+    warnings: tuple[Diagnostic, ...],
 ) -> OperationResult[object]:
+    """A Git failure or a failed check after the write; an applied or uncertain effect makes it partial (exit 6)."""
     partial = status != "failed"
+    if isinstance(error, GitProcessError):
+        diagnostic = Diagnostic("GIT_FAILED", str(error), error.details())
+    else:
+        code = "BRANCH_VERIFICATION_FAILED" if effect == "git.branch.create" else "CHECKOUT_VERIFICATION_FAILED"
+        diagnostic = Diagnostic(code, str(error), {})
     return OperationResult(
         namespace.command_path,
         "partial" if partial else "failed",
         _data(scope_id, name, tip, created=effect == "git.branch.create" and tip is not None, switched=switched),
         6 if partial else 5,
         effects=(Effect(effect, status, name),),
-        error=Diagnostic("GIT_FAILED", str(error), error.details()),
+        error=diagnostic,
+        warnings=warnings,
     )
+
+
+def _require_captured(selection: StoredSelection | None) -> StoredSelection:
+    if selection is None:
+        raise RuntimeError("the direct selection was not captured before a Git branch mutation")
+    return selection

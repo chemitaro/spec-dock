@@ -26,6 +26,7 @@ READING = [
     ["artifact", "show", "<artifact>", "--scope", "iss-00003"],
     ["branch", "show", "iss-00003"],
     ["worktree", "list"],
+    ["worktree", "show", "<main>"],
     ["workspace", "sync"],
     ["workspace", "sync", "--source", "github"],
     ["workspace", "validate"],
@@ -50,7 +51,8 @@ def test_reading_commands_change_no_catalog_git_checkout_or_github(
     before = (tree_digest(catalog), tree_digest(dot_git), git(world.main, "status", "--porcelain", "--ignored"))
     for argv in READING:
         world.age_probe()
-        code, payload = world.run(*(artifact if item == "<artifact>" else item for item in argv))
+        values = {"<artifact>": artifact, "<main>": str(world.main)}
+        code, payload = world.run(*(values.get(item, item) for item in argv))
         assert code == 0, (argv, payload)
         after = (tree_digest(catalog), tree_digest(dot_git), git(world.main, "status", "--porcelain", "--ignored"))
         assert after == before, argv
