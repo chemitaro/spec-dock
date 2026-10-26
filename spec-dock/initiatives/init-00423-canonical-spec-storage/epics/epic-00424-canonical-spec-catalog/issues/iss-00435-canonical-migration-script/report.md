@@ -57,9 +57,31 @@ ID: "iss-00435"
 - 受け入れのテスト：`tests/integration/migration/`（`test_migrate_plan.py`、`test_migrate_register.py`、`test_migrate_canonical.py`、`test_migrate_checkouts.py`）と `tests/unit/infra/test_migration_contract_copies.py`。外のネットワークは使わない（偽の `gh`、一時ディレクトリの bare の `origin`、`XDG_STATE_HOME` と作業の記録は一時ディレクトリ）。
 - AC との対応：AC-435-01（全サブコマンドの `--apply` なし）、02（`develop` の `cut`）、03（Scope なし）、04（bare にだけ push）、06（止めて再開、`undo`）、07（注入した時計で1秒、80回/分、500回/時、`retry-after`）、08（ローカルの Scope、番号の不一致、題名）、09（canonical のツリーの一致と2回目）、10（`move-local` とその後の `canonical link`）、11（`adopt-worktree`、両方で変えたときの別名ファイルと停止、取り込み済みの再実行）、12（`export-legacy` と従来モードの `workspace validate`、`scope show`、日本語の題名）、13（写した値）、14（`canonical check`）、16（`plan` の観測）、17（足すだけ）、18（止まる条件）、19（`cut` の宣言のバイト列と、切った後の `canonical check`）、20（README）。
 
+### 最終品質ゲート（2026-10-26。合格）
+
+- 対象：`bd0ea7385dbbd6ea5ad38c212e7848eaf85372f2`（`origin/main` の `2e16d3f06` をマージした後、通常の push で `origin/chemitaro/iss-00435-canonical-migration-script` に送ったもの）。ChatGPT のゲートは利用者の設定で無効なので、Claude だけのゲートで行った。
+- `make lint`：終了コード0（ruff check、ruff format check、mypy がすべて pass。対象に `scripts/migrate-to-canonical` を含む）。
+- `uv run pytest`（全体）：終了コード0、2626 passed、8 skipped（681秒）。
+- 独立レビュー（この作業に関わっていない新しいサブエージェント2つ、`origin/main...bd0ea7385` の全差分）：
+  - Standards：P1 なし。P2 1件、P3 6件（下の「Residual Risks」に引き継ぐ）。
+  - Spec：P1 なし。P3 5件（同上）。AC-435-01〜20 と統括の判断 Q1〜Q7 の実装とテストの対応を確認し、AC-15（従来モードのコードと版3のテストを変えていない）を確認した。
+- それより前の実装のレビュー（`d5c8cc943...d0a7c3c6c`）の指摘 ST-1（P1、成功後の `adopt-worktree` の再実行が canonical を削除として push する）ほかは、`dd39acc41` で直した（`plan.md` の対応の表）。
+
 ## Residual Risks / Follow-ups
 
 - 予行演習と本番の実行は I-10、I-12 で行う。この Issue では、本物の GitHub とリポジトリに書いていない。`build-canonical` の `git subtree split` の時間（spec-dock は約2000コミット）は未確認（予行演習で測る）。
 - `adopt-worktree` は、canonical とブランチの両方で変えたファイルや、git が中身を統合したファイルがあると、push の後に何も消さずに止まる（統括の判断 Q2 の条件）。README に手で外す手順を書いた。ブランチで変えていないファイル（分岐点と同じ中身）は「一致」として扱う解釈にした（`plan.md` の統括の判断 Q2 の注）。統括の確認を求める。
 - CIの行の一覧は文字の一致なので、手順でない行も出る（上）。外す手順は統括が選ぶ。
+- 最終品質ゲートの P2/P3（ゲートの決まりで情報として扱い、直していない）：
+  - Standards ST-1（P2）：作業の記録（`undo.jsonl`、`idmap.json`）が見つからないと、`undo` は何もせずに0で終わり、`export-legacy` はローカルの Scope の元の `.meta.json` を誤った番号に当てうる。版のタグ `v0.3.0` を別のチェックアウトで使うときに起きうる。対策の案：記録がないときに止まる。README で、リポジトリの外の固定の `--state-dir` を使うよう指示する。I-10 の前に直すかは統括の判断。
+  - Standards ST-2（P3）：push の前に「書いた」印を立てるので、push が拒否されても3になる。`adopt-worktree` の中身の不一致による停止は、再実行でも毎回3になる。
+  - Standards ST-3（P3）：想定外の例外（記録の最後の行の破損、GitHub の返答の形の違いなど）は traceback と終了コード1になる。
+  - Standards ST-4（P3）：使い捨てのクローンからの push に C6 のフックを外す設定を付けていない（全体の設定の pre-push フックや `push.gpgSign` が働く）。
+  - Standards ST-5（P3）：作業ツリーのファイルを Git の変換なしでハッシュするので、clean フィルタや `core.fileMode=false` では不一致になる（今の対象の APFS では起きにくい）。
+  - Standards ST-6 / Spec SP-3（P3）：`build-canonical` の後に仕様が変わると、`cut` が「もう一度 build-canonical」と示すが、`build-canonical` は違う canonical があるので止まる。回復は GitHub の `spec-dock/canonical` を手で消すこと（README に書くとよい）。
+  - Standards ST-7（P3）：`plan` の作業用のworktreeの一覧で、名前の変更の元の名前が壊れて表示され、数が多く出る（表示だけ）。
+  - Spec SP-1（P3）：`.meta.json` の slug が C1 の規則に合わないと、`register --apply` がラベルを作った後に traceback で止まる。手元の4クローンでは規則外の slug はなかった（housing-lifecycle は読んでいない）。対策の案：止める異常 `META_INVALID` にする。
+  - Spec SP-2（P3）：ラベルの定義の作成は、書く前の意図を記録しない（ほかの人が作った定義を `undo` で消さないための意図的な形）。結果の分からない作成では、`undo` がその定義を残す（安全側）。要件の文言との差。
+  - Spec SP-4（P3）：テストのない分岐：`adopt-worktree` の「分岐点と同じ中身は一致」、`export-legacy` の移行後に作った Scope の13キー、push の3回の拒否。
+  - Spec SP-5（P3）：README の予行演習5番に、「移行前からの題名の食い違いも差分に出る」ことを書いていない（`export-legacy` は GitHub の題名を使うため、spec-dock は35件、taikyohiyou は62件の `.meta.json` が変わる）。
 - I-13 への申し送り：`scripts/migrate-to-canonical/` と、`scripts/static_analysis/run.sh` の対象の行を消す。
