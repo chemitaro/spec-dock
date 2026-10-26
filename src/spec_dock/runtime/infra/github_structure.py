@@ -523,21 +523,28 @@ class GithubStructureClient:
         number: int,
         *,
         title: str | None = None,
+        body: str | None = None,
         state: Literal["open", "closed"] | None = None,
         state_reason: Literal["completed", "not_planned", "reopened"] | None = None,
     ) -> IssueFacts:
         payload = {
             key: value
-            for key, value in (("title", title), ("state", state), ("state_reason", state_reason))
+            for key, value in (("title", title), ("body", body), ("state", state), ("state_reason", state_reason))
             if value is not None
         }
         if not payload:
-            raise ValueError("an Issue update needs a title or state")
+            raise ValueError("an Issue update needs a title, body or state")
         endpoint = f"{self._base}/issues/{_positive(number)}"
 
         def confirmed() -> IssueFacts | None:
+            # Every sent value must be visible; GitHub UI edits may turn the body's line breaks into CRLF.
             observed = self.get_issue(number)
-            matches = (title is None or observed.title == title) and (state is None or observed.state == state)
+            matches = (
+                (title is None or observed.title == title)
+                and (body is None or _lines(observed.body) == _lines(body))
+                and (state is None or observed.state == state)
+                and (state_reason is None or observed.state_reason == state_reason)
+            )
             return observed if matches else None
 
         return self._write(
@@ -801,6 +808,10 @@ class GithubStructureClient:
             _optional_text(item.get("title"), "title", "graphql"),
             None if state is None else _state(state, "state", "graphql"),
         )
+
+
+def _lines(text: str | None) -> str:
+    return (text or "").replace("\r\n", "\n")
 
 
 def _done(_response: GithubResponse) -> bool:

@@ -464,3 +464,35 @@ def test_dependency_violations_preview_a_new_edge_on_the_snapshot() -> None:
     assert {item.code for item in dependency_violations(snapshot, 3, 2)} == {"DEPENDENCY_INVALID"}
     assert {item.code for item in dependency_violations(snapshot, 3, 3)} == {"DEPENDENCY_INVALID"}
     assert snapshot.issues[3].blocked_by == (4,)
+
+
+def test_lenient_reflection_skips_changes_whose_numbers_are_not_in_the_snapshot() -> None:
+    from spec_dock.runtime.domain.canonical_structure import (
+        AddBlockedBy,
+        ExternalIssue,
+        RemoveBlockedBy,
+        SetParent,
+        UpsertIssue,
+        apply_changes_lenient,
+    )
+
+    unknown = [
+        SetParent(99, 1),
+        SetParent(3, 98),
+        AddBlockedBy(97, 3),
+        AddBlockedBy(3, 96),
+        RemoveBlockedBy(95, 3),
+    ]
+    known = [
+        UpsertIssue(_scope(20, "issue", "fresh").facts),
+        SetParent(20, 2),
+        AddBlockedBy(3, 94, ExternalIssue(94, "Plain", "open")),
+        SetParent(5, None),
+    ]
+    snapshot, skipped = apply_changes_lenient(
+        _relations(), [*unknown, *known], at="2026-10-26T00:20:00Z", command="dependency add"
+    )
+    assert skipped == tuple(unknown)
+    assert snapshot.issues[20].parent == 2 and 94 in snapshot.issues[3].blocked_by and snapshot.external[94].title
+    assert snapshot.issues[5].parent is None
+    assert [(item.command, item.numbers) for item in snapshot.local_writes] == [("dependency add", (2, 3, 5, 20, 94))]

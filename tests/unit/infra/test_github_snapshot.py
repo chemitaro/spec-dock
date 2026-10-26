@@ -418,3 +418,33 @@ def test_lock_timeout_must_be_finite_and_bounded(tmp_path: Path) -> None:
 def test_an_explicit_environment_without_home_never_falls_back_to_the_real_home() -> None:
     with pytest.raises(ValueError):
         resolve_state_root({})
+
+
+def test_a_reflection_naming_an_unknown_number_is_skipped_and_forces_the_next_refetch(tmp_path: Path) -> None:
+    from spec_dock.runtime.domain.canonical_structure import AddBlockedBy, SetParent
+
+    fake, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    reflection = service.reflect_writes([AddBlockedBy(3, 77), SetParent(3, 1)], command="dependency add")
+    assert reflection.skipped == (AddBlockedBy(3, 77),)
+    assert reflection.snapshot is not None and reflection.snapshot.issues[3].parent == 1
+    probe = json.loads((store.directory / "probe.json").read_text(encoding="utf-8"))
+    assert probe["checked_at"] is None and probe["etags"] == {
+        "spec-dock:initiative": None,
+        "spec-dock:epic": None,
+        "spec-dock:issue": None,
+    }
+    assert service.reflect([AddBlockedBy(3, 76)], command="dependency add") is not None
+    before = len(fake.graphql_requests())
+    fresh = service.ensure_fresh("display")
+    assert fresh.refreshed and len(fake.graphql_requests()) == before + 1
+
+
+def test_a_complete_reflection_keeps_the_probe_record(tmp_path: Path) -> None:
+    from spec_dock.runtime.domain.canonical_structure import SetParent
+
+    _fake, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    before = (store.directory / "probe.json").read_bytes()
+    assert service.reflect_writes([SetParent(3, 1)], command="scope move").skipped == ()
+    assert (store.directory / "probe.json").read_bytes() == before
