@@ -55,6 +55,9 @@ canonical sync（--registered を含む）
 | `application/canonical_remove.py`（I-3） | ダッシュボードの5つのふつうのファイルを消す手順を足す |
 | `application/canonical_errors.py` | `CANONICAL_DASHBOARD_OCCUPIED`、`CANONICAL_DASHBOARD_FAILED` と次の1手 |
 | `presentation/puml.py` | `_issue_ready_board_state` に、項目の `board_state` を使う分岐を足す（下） |
+| `presentation/markdown.py` | 公開の入口 `render_dashboard_nodes_md(index_nodes)`（`_render_dashboard_md` を `active=None` で呼ぶだけ。従来の関数は変えない） |
+| `infra/canonical_files.py`（I-2） | `replace_text_file(directory, name, text)`（調べたディレクトリの記述子に固定し、ランダムな名前の一時ファイルを `O_EXCL`、`O_NOFOLLOW` で作り、fsync、rename、ディレクトリの fsync。ディレクトリかシンボリックリンクがあれば `FileOccupied`）と `is_regular_file`（`lstat`）。`place_link` と同じ形 |
+| `infra/canonical_registry.py`（I-3） | `is_unregistered(root, catalog)`（読める登録簿にカタログがないときだけ真）。I-3 の `sync_catalog` の同じ判定もこれを使う |
 | `cli/catalog.py` | `canonical sync` と `canonical remove` のヘルプの「Writes」に、ダッシュボードを足す（`HELP_EFFECTS` の要約は変えない） |
 | `tests/support/fake_github.py` | 偽の Issue に `created_at` と `closed_at` を持たせ、REST と GraphQL（問い合わせが求めたときだけ）で返す |
 
@@ -131,7 +134,7 @@ def refresh_dashboard(entry: RegistryEntry, snapshot: StructureSnapshot | None, 
   4. `read_catalog_state` が None なら `skipped="no_state"`（手順1〜6が基準とともに作る記録を、ここで基準なしに作らない）。`dashboard.input_hash` と `input_hash(snapshot, snapshot_path=…)` を比べ、書くファイルを決める（違えば5つ、同じならふつうのファイルとしてないものだけ）。スナップショットがなければ書かずに `CANONICAL_DASHBOARD_FAILED`。
   5. `main/spec-dock` を `lstat` し、ディレクトリ（リンクでない）でなければ `CANONICAL_DASHBOARD_FAILED`。ファイルごとに、`lstat` でディレクトリかシンボリックリンクなら飛ばして `CANONICAL_DASHBOARD_OCCUPIED` の `paths` に足す。ほかは `.<名前>.spec-dock-<pid>` に書いて `os.replace`（失敗すれば一時ファイルを消し、`CANONICAL_DASHBOARD_FAILED`）。
   6. `update_catalog_state` で `dashboard = {"input_hash": <今の SHA-256>, "written_at": <書いたら now、でなければ前の値>, "error": <あれば>}` を書く（今の記録の `dashboard` だけを置き換える）。スナップショットがないときと、`CANONICAL_DASHBOARD_FAILED` のときの `input_hash` は前の値のまま（次の周期で5つを書き直す）。
-- 例外：`OSError`、`TimeoutError`、`StateUnreadable` は、`refresh_structures` の中で受け止め、そのカタログの `dashboards_written` に数えない。同期の結果は変えない。
+- 例外：カタログごとの呼び出しの例外は、種類を問わず `refresh_structures` の中で受け止めて同期のログに残し、そのカタログの `dashboards_written` に数えない。同期の結果は変えない。`state.json` が読んだ後に消えたときは、作り直さずに `skipped="no_state"` にする。
 
 ### `refresh_structures` の変更
 
@@ -171,7 +174,7 @@ def refresh_structures(entries, ctx, *, registered: bool = False) -> list[Reposi
 ## 変更対象
 
 - 変える：上の「置き場」の表のもの。I-3 のテストのうち、`dashboards_written` が0であることを前提にしたもの（`tests/cli_runtime/test_issue430_canonical_sync.py` の2つ）と、`dashboard` が `not_implemented` であることを確かめるもの（あれば）を、canonical のテストとして直す。
-- 変えない：従来モードの処理、`.meta.json` の読み書き、`presentation/json_state.py`、`presentation/markdown.py`、版3のテスト、I-4 の着手の判定の規則、`snapshot.json` の版、配布資産。
+- 変えない：従来モードの処理、`.meta.json` の読み書き、`presentation/json_state.py`、`presentation/markdown.py` の従来の関数（公開の入口を1つ足すだけ）、版3のテスト、I-4 の着手の判定の規則、`snapshot.json` の版、配布資産。
 
 ## 移行・互換性・rollback
 
