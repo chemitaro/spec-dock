@@ -78,6 +78,14 @@ def run_canonical_remove(namespace: argparse.Namespace, context: ProjectContext)
         with StartLock(layout.common_dir, timeout=5.0):
             if not apply:
                 return _remove(namespace, layout, environment, root, catalog, apply=False)
+            # Taking the cycle lock creates its file: check that the state root is writable first.
+            if not _writable(catalog_state_dir(root, catalog)):
+                raise CanonicalCommandError(
+                    CANONICAL_SANDBOX_DENIED,
+                    f"this process cannot write the state root {root}",
+                    recovery=(PERMISSION_DENIED_RECOVERY,),
+                    details={"paths": [str(root)], "next_step": PERMISSION_DENIED_RECOVERY},
+                )
             # A running cycle finishes first and no later cycle starts while the catalog goes away.
             with cycle_lock(root, catalog, timeout=10.0):
                 return _remove(namespace, layout, environment, root, catalog, apply=True)

@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 import os
 import shutil
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import pytest
 
@@ -150,7 +150,7 @@ def test_a_refused_job_registration_is_partial_and_keeps_the_baseline(pair: Sync
 def test_linux_chooses_systemd_or_the_loop_and_says_what_the_user_must_add(
     pair: SyncPair, monkeypatch: pytest.MonkeyPatch, facts: dict[str, object], kind: str, warning: str
 ) -> None:
-    linux = replace(environment(), system="linux", **facts)
+    linux = replace(environment(), system="linux", **cast("dict[str, Any]", facts))
     monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: linux)
     code, result = pair.run(pair.a, "canonical", "link")
     assert code == 0 and read_registry(pair.state_root).scheduler == kind
@@ -259,3 +259,37 @@ def test_a_working_recorded_job_executable_is_kept(pair: SyncPair, tmp_path: Pat
     pair.run(pair.a, "canonical", "link")
     (spec,) = pair.schedulers["launchd"].specs
     assert spec.executable == installed
+
+
+def test_a_link_from_another_path_keeps_the_jobs_gh_directory(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tools = tmp_path / "tools/bin"
+    tools.mkdir(parents=True)
+    (tools / "gh").write_text("#!/bin/sh\n")
+    (tools / "gh").chmod(0o755)
+    monkeypatch.setenv("PATH", f"{tools}{os.pathsep}{os.environ['PATH']}")
+    linked = replace(environment(), environ=dict(os.environ))
+    monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: linked)
+    pair.run(pair.a, "canonical", "link")
+    (spec,) = pair.schedulers["launchd"].specs
+    assert spec.gh_dir == tools
+    other = replace(environment(), environ={**os.environ, "PATH": "/usr/bin:/bin"})
+    monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: other)
+    code, result = pair.run(pair.a, "canonical", "link")
+    assert code == 0 and result["status"] == "unchanged", result
+    assert pair.schedulers["launchd"].calls == [("ensure", "launchd"), ("kick", "launchd")]
+
+
+def test_a_no_schedule_link_still_moves_the_baseline_of_a_moved_main(pair: SyncPair, tmp_path: Path) -> None:
+    pair.run(pair.a, "canonical", "link", "--no-schedule")
+    before = pair.state(pair.a)
+    assert before is not None
+    moved = tmp_path / "moved"
+    shutil.move(str(pair.a), moved)
+    code, result = pair.run(moved, "canonical", "link", "--no-schedule")
+    assert code == 0, result
+    from spec_dock.runtime.infra.canonical_state import read_catalog_state
+
+    after = read_catalog_state(pair.state_root, os.path.realpath(moved / "spec-dock/.canonical"))
+    assert after is not None and after.last_seen_remote == before.last_seen_remote

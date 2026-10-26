@@ -87,6 +87,23 @@ class SystemdScheduler:
                 return Path(words[0]) if words else None
         return None
 
+    def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
+        del spec
+        try:
+            text = (self.unit_dir / self.service).read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            return None
+        for line in text.splitlines():
+            if line.startswith("Environment="):
+                try:
+                    words = shlex.split(line.removeprefix("Environment=").replace("%%", "%"))
+                except ValueError:
+                    return None
+                for word in words:
+                    if word.startswith("PATH="):
+                        return word.removeprefix("PATH=")
+        return None
+
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome:
         existed = (self.unit_dir / self.service).exists()
         changed = False

@@ -203,7 +203,8 @@ def append_log(root: Path, line: str, *, limit: int = LOG_LIMIT) -> None:
     """Append one line; above `limit` bytes the log keeps one older generation (`.1`). Never write file contents."""
     root.mkdir(parents=True, exist_ok=True)
     log = root / LOG_FILE
-    with directory_lock(root, timeout=10.0):
+    # Its own lock file: never the state-root directory lock that canonical link holds across steps 6a-6b.
+    with file_lock(root / f"{LOG_FILE}.lock", timeout=10.0):
         with suppress(FileNotFoundError):
             if log.stat().st_size >= limit:
                 Path(log).replace(root / f"{LOG_FILE}.1")

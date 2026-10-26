@@ -171,6 +171,10 @@ class LoopScheduler:
         del spec
         return None
 
+    def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
+        del spec
+        return None
+
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome:
         if runner_running(self.state_root):
             return "unchanged"

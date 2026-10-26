@@ -80,3 +80,12 @@ class CanonicalStatusData:
     dashboard: dict[str, object]
     structure: dict[str, object]
     kind: str = "canonical-status"
+
+
+@dataclass(frozen=True)
+class CanonicalCycleData:
+    """`canonical sync`: one object per catalog and per repository of step 7 (Epic design ch. 12)."""
+
+    catalogs: list[dict[str, object]]
+    repositories: list[dict[str, object]]
+    kind: str = "canonical-sync"

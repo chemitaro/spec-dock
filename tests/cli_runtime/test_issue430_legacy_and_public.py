@@ -66,7 +66,7 @@ def test_registered_sync_reads_only_the_registry_and_never_a_schema_three_reposi
     before = tree_digest(checkout)
     monkeypatch.chdir(checkout)
     code, result = _run(capsys, "canonical", "sync", "--registered")
-    assert code == 0 and result["status"] == "unchanged" and result["data"]["result"]["catalogs"] == []
+    assert code == 0 and result["status"] == "unchanged" and result["data"]["catalogs"] == []
     assert tree_digest(checkout) == before
 
 

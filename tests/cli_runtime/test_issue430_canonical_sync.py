@@ -382,7 +382,7 @@ def test_an_unchanged_structure_costs_only_the_304_probes_and_github_failures_ch
 ) -> None:
     fake = _structure(pair, monkeypatch)
     code, result = pair.sync(pair.a)
-    (repository,) = result["data"]["result"]["repositories"]
+    (repository,) = result["data"]["repositories"]
     assert repository == {
         "repository": "github.com/example/repo",
         "probe": "changed",
@@ -394,7 +394,7 @@ def test_an_unchanged_structure_costs_only_the_304_probes_and_github_failures_ch
     pair.advance(31)
     code, result = pair.sync(pair.a)
     assert code == 0 and catalog_result(result)["pushed"] is True
-    assert result["data"]["result"]["repositories"][0]["probe"] == "unchanged"
+    assert result["data"]["repositories"][0]["probe"] == "unchanged"
     requests = fake.requests[start:]  # type: ignore[attr-defined]
     assert requests and all(request.status == 304 and request.method == "GET" for request in requests)
     fake.inject(status=502, times=10)  # type: ignore[attr-defined]
@@ -402,7 +402,7 @@ def test_an_unchanged_structure_costs_only_the_304_probes_and_github_failures_ch
     pair.advance(31)
     code, result = pair.sync(pair.a)
     assert code == 0 and catalog_result(result)["pushed"] is True and pair.remote_file("y.md") == "y"
-    assert result["data"]["result"]["repositories"][0]["probe"] == "failed"
+    assert result["data"]["repositories"][0]["probe"] == "failed"
 
 
 def test_registered_sync_processes_every_catalog_and_reports_one_failure_as_partial(
@@ -416,7 +416,7 @@ def test_registered_sync_processes_every_catalog_and_reports_one_failure_as_part
     pair.advance(31)
     # Clone a sees the deletion first and pauses; clone b also pauses: nothing is pushed back.
     code, result = pair.run(pair.a, "canonical", "sync", "--registered")
-    catalogs = result["data"]["result"]["catalogs"]
+    catalogs = result["data"]["catalogs"]
     assert [item["paused"] for item in catalogs] == ["remote_deleted", "remote_deleted"]
     assert code == 3 and result["status"] == "failed"
     assert set(catalogs[0]) == {
@@ -432,12 +432,12 @@ def test_registered_sync_processes_every_catalog_and_reports_one_failure_as_part
         "paused",
         "error",
     }
-    assert len(result["data"]["result"]["repositories"]) == 1  # step 7 runs once even though both paused
+    assert len(result["data"]["repositories"]) == 1  # step 7 runs once even though both paused
     pair.run(pair.b, "canonical", "resume", "--push-local")
     pair.write(pair.b, "c.md", "c\n")
     pair.advance(31)
     code, result = pair.run(pair.a, "canonical", "sync", "--registered")
-    results = {item["catalog"]: item for item in result["data"]["result"]["catalogs"]}
+    results = {item["catalog"]: item for item in result["data"]["catalogs"]}
     assert code == 6 and result["status"] == "partial", result
     assert results[os.path.realpath(pair.catalog(pair.a))]["result"] == "paused"
     assert results[os.path.realpath(pair.catalog(pair.b))]["pushed"] is True
@@ -462,15 +462,15 @@ def test_a_termination_request_ends_registered_sync_after_the_current_catalog(
     real = canonical_sync.sync_catalog
     seen: list[str] = []
 
-    def first_then_term(entry: object, ctx: object) -> object:
+    def first_then_term(entry: object, ctx: object, **kwargs: bool) -> object:
         seen.append(entry.catalog)  # type: ignore[attr-defined]
-        outcome = real(entry, ctx)  # type: ignore[arg-type]
+        outcome = real(entry, ctx, **kwargs)  # type: ignore[arg-type]
         os.kill(os.getpid(), signal.SIGTERM)
         return outcome
 
     monkeypatch.setattr(canonical_sync, "sync_catalog", first_then_term)
     code, result = pair.run(pair.a, "canonical", "sync", "--registered")
-    assert code == 0 and len(seen) == 1 and len(result["data"]["result"]["catalogs"]) == 1
+    assert code == 0 and len(seen) == 1 and len(result["data"]["catalogs"]) == 1
     assert signal.getsignal(signal.SIGTERM) is signal.SIG_DFL
 
 
@@ -618,3 +618,72 @@ def test_a_new_repository_whose_first_push_failed_is_created_by_the_cycle(
     code, result = pair.sync(pair.a)  # only the initial commit locally and no baseline: create it
     assert code == 0 and catalog_result(result)["pushed"] is True, result
     assert pair.remote_file(".spec-dock-canonical.json") is not None
+
+
+def test_an_eol_attribute_never_makes_empty_commits_every_cycle(pair: SyncPair) -> None:
+    pair.write(pair.a, ".gitattributes", "* text eol=lf\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    (pair.specs(pair.a) / "doc.md").write_bytes(b"line\r\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    head = git(pair.catalog(pair.a), "rev-parse", "HEAD")
+    assert git(pair.catalog(pair.a), "status", "--porcelain") == ""
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and result["status"] == "unchanged" and git(pair.catalog(pair.a), "rev-parse", "HEAD") == head
+
+
+def test_a_user_requiring_signed_merges_still_receives_changes(pair: SyncPair) -> None:
+    git(pair.b, "config", "merge.verifySignatures", "true")
+    git(pair.b, "config", "merge.autoStash", "true")
+    pair.write(pair.a, "from-a.md", "a\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    _code, result = pair.sync(pair.b)
+    assert catalog_result(result)["merged"] is True and (pair.specs(pair.b) / "from-a.md").exists()
+    assert git(pair.b, "stash", "list") == ""
+
+
+def test_a_failed_push_auth_is_probed_again_until_it_works(pair: SyncPair) -> None:
+    from spec_dock.runtime.domain.canonical_sync_state import PushAuth
+    from spec_dock.runtime.infra.canonical_state import update_catalog_state
+
+    catalog = os.path.realpath(pair.catalog(pair.a))
+    update_catalog_state(
+        pair.state_root,
+        catalog,
+        lambda c: c.evolve(push_auth=PushAuth("failed", "2026-10-26T00:00:00Z", "x")),  # type: ignore[union-attr]
+    )
+    pair.sync(pair.a)
+    state = pair.state(pair.a)
+    assert state is not None and state.push_auth is not None and state.push_auth.result == "ok"
+
+
+def test_a_registered_cycle_skips_a_catalog_removed_meanwhile(pair: SyncPair) -> None:
+    from spec_dock.runtime.application.canonical_sync import SyncContext, sync_catalog
+    from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry
+    from spec_dock.runtime.infra.canonical_state import catalog_state_dir
+
+    catalog = os.path.realpath(pair.catalog(pair.a))
+    state_file = catalog_state_dir(pair.state_root, catalog) / "state.json"
+    before = state_file.read_bytes()
+    stale = RegistryEntry(catalog, str(pair.a), None, "git", "2026-10-26T00:00:00Z")  # no longer in the registry
+    result = sync_catalog(stale, SyncContext(pair.state_root), registered=True)
+    assert result.result == "skipped" and result.skipped_reason == "unregistered"
+    assert state_file.read_bytes() == before
+
+
+def test_detach_starts_one_runner_and_reports_it(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock.runtime.infra import canonical_scheduler_loop
+
+    started: list[Path] = []
+
+    def detach(root: Path, **_kwargs: object) -> int:
+        started.append(root)
+        return 4321
+
+    monkeypatch.setattr(canonical_scheduler_loop, "detach", detach)
+    code, result = pair.run(pair.a, "canonical", "sync", "--registered", "--loop", "--detach")
+    assert code == 0 and result["status"] == "succeeded" and result["data"]["result"]["pid"] == 4321
+    assert started == [pair.state_root]

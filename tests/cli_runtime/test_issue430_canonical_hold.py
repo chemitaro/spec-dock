@@ -112,3 +112,16 @@ def test_accept_of_a_missing_path_writes_nothing(pair: SyncPair) -> None:
     code, result = pair.run(pair.a, "canonical", "accept", "nope.md")
     assert code == 3 and result["error"]["code"] == "CANONICAL_PATH_NOT_FOUND"
     assert not (pair.catalog(pair.a) / ".runtime/accepted.json").exists()
+
+
+def test_an_expired_deletion_accept_never_lets_a_later_mass_delete_through(pair: SyncPair) -> None:
+    _seed(pair)
+    _delete(pair)
+    remote_before = pair.remote_head()
+    assert pair.run(pair.a, "canonical", "accept", "--deletions")[0] == 0
+    assert pair.run(pair.a, "canonical", "restore")[0] == 0  # the user changed their mind
+    pair.sync(pair.a)
+    _delete(pair)  # the same 25 files are deleted again later
+    pair.advance(31)
+    _code, result = pair.sync(pair.a)
+    assert len(catalog_result(result)["holds"]) == 25 and pair.remote_head() == remote_before

@@ -85,6 +85,15 @@ class LaunchdScheduler:
             Path(arguments[0]) if isinstance(arguments, list) and arguments and isinstance(arguments[0], str) else None
         )
 
+    def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
+        del spec
+        try:
+            variables = plistlib.loads(self.plist.read_bytes()).get("EnvironmentVariables")
+        except (OSError, ValueError, plistlib.InvalidFileException):
+            return None
+        value = variables.get("PATH") if isinstance(variables, dict) else None
+        return value if isinstance(value, str) else None
+
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome:
         existed = self.plist.exists()
         changed = write_atomic(self.plist, launchd_plist(spec, label=self.label))

@@ -98,7 +98,7 @@ class SchedulePlan:
 
     def write_paths(self) -> tuple[Path, ...]:
         paths: list[Path] = []
-        if self.registry_change or self.baseline_change:
+        if self.registry_change or self.baseline_change or self.moved_from is not None:
             paths.append(self.state_root)
         if self.scheduler_change:
             paths.extend(self.scheduler_paths)
@@ -151,6 +151,8 @@ def plan_schedule(
     catalog = os.path.realpath(layout.catalog)
     wanted = _schedule_wanted(state_root, catalog, schedule=schedule, follow_up=follow_up)
     plan = SchedulePlan(state_root, catalog, layout.main_checkout, wanted, environment)
+    if moved_from is not None and moved_from != catalog and catalog_state_dir(state_root, moved_from).exists():
+        plan.moved_from = moved_from  # the baseline moves with a moved main checkout, scheduled or not
     try:
         state = read_catalog_state(state_root, catalog)
     except StateUnreadable:
@@ -177,7 +179,8 @@ def plan_schedule(
     plan.entry = RegistryEntry(
         catalog, str(layout.main_checkout), repository, git, previous.registered_at if previous else stamp
     )
-    plan.moved_from = moved_from if moved_from is not None and registry.entry_for(moved_from) is not None else None
+    if plan.moved_from is None and moved_from is not None and registry.entry_for(moved_from) is not None:
+        plan.moved_from = moved_from
     plan.kind = select_scheduler(
         environment.system,
         systemd_present=environment.systemd_present,
@@ -186,18 +189,32 @@ def plan_schedule(
     )
     plan.registry_change = previous != plan.entry or plan.moved_from is not None or registry.scheduler != plan.kind
     scheduler = canonical_scheduling.scheduler_for(plan.kind, state_root=state_root, environment=environment)
-    gh = shutil.which("gh", path=environment.environ.get("PATH", ""))
+    git_dir = Path(git).parent if Path(git).is_absolute() else Path("/usr/bin")
     spec = SchedulerSpec(
         _job_executable(scheduler, state_root, environment),
         state_root,
-        Path(git).parent if Path(git).is_absolute() else Path("/usr/bin"),
+        git_dir,
         environment.home or Path.home(),
-        Path(gh).parent if gh else None,
+        _gh_dir(scheduler, state_root, environment, git_dir),
     )
     plan.spec = spec
     plan.scheduler_change = scheduler.needs_change(spec) or (registry.scheduler not in (None, plan.kind))
     plan.scheduler_paths = scheduler.write_paths(spec)
     return plan
+
+
+def _gh_dir(scheduler: Scheduler, state_root: Path, environment: RuntimeEnvironment, git_dir: Path) -> Path | None:
+    """The gh directory the installed job already uses while gh is still there; else this PATH's gh."""
+    probe = SchedulerSpec(Path("/"), state_root, Path("/"), environment.home or Path.home())
+    recorded = scheduler.recorded_search_path(probe)
+    if recorded:
+        for directory in recorded.split(":"):
+            if directory and Path(directory) != git_dir and os.access(Path(directory) / "gh", os.X_OK):
+                return Path(directory)
+        if os.access(git_dir / "gh", os.X_OK):
+            return git_dir
+    gh = shutil.which("gh", path=environment.environ.get("PATH", ""))
+    return Path(gh).parent if gh else None
 
 
 def _job_executable(scheduler: Scheduler, state_root: Path, environment: RuntimeEnvironment) -> Path:
@@ -225,7 +242,9 @@ def apply_schedule(plan: SchedulePlan, *, timeout: float = 30.0) -> tuple[list[E
     warnings: list[Diagnostic] = []
     try:
         if not plan.schedule:
-            if plan.baseline_change:
+            if plan.moved_from is not None:
+                _move_state(plan, effects)
+            if plan.baseline_change or plan.moved_from is not None:
                 _baseline(plan, effects, timeout=timeout)
             return effects, warnings
         assert plan.entry is not None and plan.kind is not None and plan.spec is not None
@@ -252,15 +271,20 @@ def _registry(plan: SchedulePlan, effects: list[Effect]) -> bool:
     updated = registry
     if plan.moved_from is not None:
         updated = updated.without(plan.moved_from)
-        with cycle_lock(plan.state_root, plan.moved_from, timeout=10.0):
-            if move_catalog_state(plan.state_root, plan.moved_from, plan.catalog):
-                effects.append(Effect("canonical.state.move", "succeeded", plan.catalog))
+        _move_state(plan, effects)
     updated = SyncRegistry(plan.kind, updated.with_entry(plan.entry).catalogs)
     if updated == registry:
         return False
     write_registry_locked(plan.state_root, updated)
     effects.append(Effect("canonical.registry", "succeeded", str(registry_path(plan.state_root))))
     return registry.entry_for(plan.catalog) != plan.entry
+
+
+def _move_state(plan: SchedulePlan, effects: list[Effect]) -> None:
+    assert plan.moved_from is not None
+    with cycle_lock(plan.state_root, plan.moved_from, timeout=10.0):
+        if move_catalog_state(plan.state_root, plan.moved_from, plan.catalog):
+            effects.append(Effect("canonical.state.move", "succeeded", plan.catalog))
 
 
 def _baseline(plan: SchedulePlan, effects: list[Effect], *, timeout: float) -> None:

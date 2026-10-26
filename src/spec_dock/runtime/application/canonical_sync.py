@@ -100,7 +100,7 @@ from spec_dock.runtime.infra.github_structure import (
     GithubStructureError,
 )
 from spec_dock.runtime.infra.state_root import resolve_state_root
-from spec_dock.runtime.presentation.command_data import FamilyData
+from spec_dock.runtime.presentation.command_data import CanonicalCycleData, FamilyData
 from spec_dock.runtime.presentation.envelope import Effect, OperationResult
 
 if TYPE_CHECKING:
@@ -231,13 +231,26 @@ class _Run:
         self.result.error = SyncError(reason, message, None, None, self.ctx.stamp())
 
 
-def sync_catalog(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
-    """One catalog's cycle (Epic ch. 5 steps 1-6); a second concurrent cycle of it is skipped (judgment Q4)."""
+def sync_catalog(entry: RegistryEntry, ctx: SyncContext, *, registered: bool = False) -> CatalogResult:
+    """One catalog's cycle (Epic ch. 5 steps 1-6); a second concurrent cycle of it is skipped (judgment Q4).
+
+    A registered cycle re-reads the registry under the cycle lock: a catalog `canonical remove` just took
+    away is skipped instead of getting its state back.
+    """
     try:
         with cycle_lock(ctx.state_root, entry.catalog):
+            if registered and _unregistered(ctx.state_root, entry.catalog):
+                return CatalogResult(entry.catalog, "skipped", skipped_reason="unregistered")
             return _cycle(entry, ctx)
     except CycleBusy:
         return CatalogResult(entry.catalog, "skipped", skipped_reason="cycle_busy")
+
+
+def _unregistered(root: Path, catalog: str) -> bool:
+    try:
+        return read_registry(root).entry_for(catalog) is None
+    except RegistryUnreadable:
+        return False
 
 
 def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
@@ -416,7 +429,7 @@ def _save_and_merge(run: _Run, *, first: bool) -> bool:
     return True
 
 
-def _read_changesets(catalog: Path, consumed: Sequence[str]) -> list[tuple[str, Changeset]]:
+def _read_changesets(catalog: Path, consumed: Sequence[str], log: Callable[[str], None]) -> list[tuple[str, Changeset]]:
     directory = catalog / CHANGESETS_RELATIVE
     try:
         with os.scandir(directory) as entries:
@@ -429,8 +442,10 @@ def _read_changesets(catalog: Path, consumed: Sequence[str]) -> list[tuple[str, 
             continue
         try:
             changesets.append((name, Changeset.from_json(json.loads((directory / name).read_text(encoding="utf-8")))))
-        except (OSError, ValueError):
-            continue  # left in place; its paths fall back to the 30-second rule
+        except (OSError, ValueError) as error:
+            # Left in place; its paths fall back to the 30-second rule.
+            log(f"unreadable changeset {directory / name}: {error}")
+            continue
     return changesets
 
 
@@ -449,10 +464,17 @@ def _savable(path: Path) -> bool:
 def _candidate(run: _Run, change: CatalogChange, accepted: dict[str, str]) -> HoldCandidate:
     target = run.catalog / change.path
     observed = target.lstat()
-    blob = canonical_git.blob_of(run.catalog, change.path, git=run.git) if change.path in accepted else ""
     content = None
     if not target.is_symlink() and observed.st_size <= MAX_FILE_BYTES:
         content = target.read_bytes()
+    blob = ""
+    if change.path in accepted:
+        # Compare the accepted value with the very bytes that will be committed.
+        blob = (
+            canonical_git.blob_of_bytes(run.catalog, content, git=run.git)
+            if content is not None
+            else canonical_git.blob_of(run.catalog, change.path, git=run.git)
+        )
     return HoldCandidate(change.path, observed.st_size, blob, content)
 
 
@@ -462,7 +484,7 @@ def _save(run: _Run) -> None:
     canonical_git.clear_temporary_index(catalog)
     canonical_git.reset_index(catalog, git=git)
     changes = canonical_git.list_changes(catalog, git=git)
-    changesets = _read_changesets(catalog, run.state.consumed_changesets)
+    changesets = _read_changesets(catalog, run.state.consumed_changesets, lambda line: _log_line(run.ctx, line))
     try:
         accepted = read_accepted(catalog)
     except StateUnreadable:
@@ -509,7 +531,7 @@ def _save(run: _Run) -> None:
     consumed = list(run.state.consumed_changesets)
     for name, paths in batches:
         if paths:
-            head = canonical_git.save_commit(
+            committed = canonical_git.save_commit(
                 catalog,
                 paths,
                 message=f"spec-dock: save {len(paths)} files ({run.ctx.pc})",
@@ -517,8 +539,10 @@ def _save(run: _Run) -> None:
                 contents={path: checked[path] for path in paths if path in checked},
                 git=git,
             )
-            run.result.saved_commit = head
-            run.result.effects.append(Effect("canonical.save", "succeeded", head))
+            if committed != head:  # an unchanged tree (for example after an eol filter) makes no commit
+                head = committed
+                run.result.saved_commit = head
+                run.result.effects.append(Effect("canonical.save", "succeeded", head))
             saved.update(paths)
         if name:
             consumed.append(name)
@@ -529,14 +553,16 @@ def _save(run: _Run) -> None:
     holds = tuple(Hold(path, kind, previous.get((path, kind), stamp)) for path, kind in sorted(held.items()))
     run.result.holds = list(holds)
     run.state = run.state.evolve(pending_since=pending, holds=holds, consumed_changesets=tuple(consumed))
-    if accepted is not None and saved & (set(accepted_paths) | set(accepted_deletions)):
-        write_accepted(
-            catalog,
-            AcceptedChanges(
-                {path: blob for path, blob in accepted_paths.items() if path not in saved},
-                tuple(path for path in accepted_deletions if path not in saved),
-            ),
+    if accepted is not None:
+        # A saved path is done; an accepted deletion that is no longer deleted (restored, recreated) has expired,
+        # so a later mass delete of the same files is held again.
+        deleted_now = {change.path for change in changes if change.kind == "deleted"}
+        kept = AcceptedChanges(
+            {path: blob for path, blob in accepted_paths.items() if path not in saved},
+            tuple(path for path in accepted_deletions if path not in saved and path in deleted_now),
         )
+        if kept != accepted:
+            write_accepted(catalog, kept)
 
 
 def _overlaps(changed: Iterable[str], local: Iterable[str]) -> list[str]:
@@ -733,7 +759,8 @@ def auth_next_step(url: str | None) -> str:
 def _check_push_auth(run: _Run) -> None:
     """The first cycle after link checks authentication with a dry-run push even when nothing is sent (Q5)."""
     auth = run.state.push_auth
-    if run.offline or run.result.result in ("paused", "skipped") or (auth is not None and auth.result != "unknown"):
+    # Probe while unknown (the first cycle after link) and while failed, so a fixed credential shows up.
+    if run.offline or run.result.result in ("paused", "skipped") or (auth is not None and auth.result == "ok"):
         return
     probe = canonical_git.push_canonical(run.catalog, dry_run=True, git=run.git)
     if probe.outcome in ("pushed", "up_to_date", "rejected"):
@@ -800,6 +827,11 @@ def _record(run: _Run) -> None:
         run.state = update_catalog_state(run.ctx.state_root, run.entry.catalog, mutate)
 
 
+def _log_line(ctx: SyncContext, line: str) -> None:
+    with suppress(OSError, TimeoutError):
+        append_log(ctx.state_root, f"{ctx.stamp()} {line}")
+
+
 def _log(ctx: SyncContext, result: CatalogResult) -> None:
     code = result.error.code if result.error else "-"
     line = (
@@ -811,7 +843,11 @@ def _log(ctx: SyncContext, result: CatalogResult) -> None:
 
 
 def run_cycle(
-    entries: Sequence[RegistryEntry], ctx: SyncContext, *, stop: Callable[[], bool] | None = None
+    entries: Sequence[RegistryEntry],
+    ctx: SyncContext,
+    *,
+    stop: Callable[[], bool] | None = None,
+    registered: bool = False,
 ) -> CycleResult:
     """Every catalog in order (one failure never stops another), then step 7 once per repository.
 
@@ -822,7 +858,7 @@ def run_cycle(
         if stop is not None and stop():
             break
         try:
-            catalogs.append(sync_catalog(entry, ctx))
+            catalogs.append(sync_catalog(entry, ctx, registered=registered))
         except Exception as error:  # a defect in one catalog's cycle must not stop the others
             failed = CatalogResult(entry.catalog, "error")
             failed.error = SyncError("SYNC_FAILED", f"{type(error).__name__}: {error}", None, None, ctx.stamp())
@@ -865,12 +901,8 @@ def cycle_operation_result(command: str, cycle: CycleResult) -> OperationResult[
     """succeeded or unchanged when every catalog is ok or skipped; otherwise partial with effects, else failed (Q7)."""
     effects = tuple(effect for item in cycle.catalogs for effect in item.effects)
     failed = any(item.result in ("paused", "error") for item in cycle.catalogs)
-    data = FamilyData(
-        "canonical-sync",
-        {
-            "catalogs": [item.to_json() for item in cycle.catalogs],
-            "repositories": [item.to_json() for item in cycle.repositories],
-        },
+    data = CanonicalCycleData(
+        [item.to_json() for item in cycle.catalogs], [item.to_json() for item in cycle.repositories]
     )
     if not failed:
         return OperationResult(command, "succeeded" if effects else "unchanged", data, 0, effects=effects)
@@ -919,7 +951,7 @@ def run_registered_sync(namespace: argparse.Namespace, cwd: Path) -> OperationRe
     except RegistryUnreadable as error:
         return registry_unreadable_result(command, error)
     with deferred_termination() as stop:
-        cycle = run_cycle(entries, SyncContext(root), stop=stop)
+        cycle = run_cycle(entries, SyncContext(root), stop=stop, registered=True)
     return cycle_operation_result(command, cycle)
 
 
@@ -931,7 +963,7 @@ def run_cycle_once(root: Path) -> CycleResult | None:
         with suppress(OSError, TimeoutError):
             append_log(root, f"registry unreadable: {error}")
         return None
-    return run_cycle(entries, SyncContext(root))
+    return run_cycle(entries, SyncContext(root), registered=True)
 
 
 def run_canonical_sync(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:

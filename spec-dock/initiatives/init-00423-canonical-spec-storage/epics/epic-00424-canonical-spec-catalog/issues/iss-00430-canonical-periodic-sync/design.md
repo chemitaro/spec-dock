@@ -132,6 +132,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 
 - **launchd**（`LaunchdScheduler(label, agents_dir, uid, runner, sleep)`。`bootstrap` は1秒おきに3回まで試す。`bootout` の拒否（読み込まれていない以外の失敗）は `SchedulerError` にし、plist を消さない。`print` で分からないときも、`bootstrap` の前に `bootout` を試す。既定は `LAUNCHD_LABEL`、`~/Library/LaunchAgents`、`os.getuid()`）：`ensure` は、plist のバイトが同じで、`launchctl print gui/<uid>/<label>` が「ない」（終了コード113）でなければ `unchanged`（サンドボックスの中で `print` が失敗しても、書かない）。違えば、一時ファイルと `rename` で plist を書き、読み込まれていれば `bootout` し、`bootstrap gui/<uid> <plist>`。`kick` は `kickstart gui/<uid>/<label>`（`-k` を付けない）。`remove` は `bootout`（ないときの失敗は無視）と plist の削除。実機の確かめは、`label` と `agents_dir` を引数で渡す（統括の判断 Q8）。
 - **systemd**（`SystemdScheduler(unit_dir, service, timer, runner)`。既定は `${XDG_CONFIG_HOME:-~/.config}/systemd/user`）：`ensure` は、2つのファイルが同じで `systemctl --user is-active <timer>` が `active` なら `unchanged`。違えば書いて `daemon-reload`、続けて `enable --now <timer>`。`kick` は `start --no-block <service>`。`remove` は `disable --now <timer>`、ファイルの削除、`daemon-reload`。
+- **記録した `PATH`**：`recorded_search_path(spec)` は、置いてあるジョブの `PATH` を返す。手順6は、その中に今も `gh` があるディレクトリがあれば、それを `gh_dir` にする（ほかの `PATH` の `canonical link` で、ジョブを書き直さないため）。
 - **記録した実行ファイル**：`recorded_executable(spec)`（読むだけ）は、置いてあるジョブの実行ファイル（plist の `ProgramArguments[0]`、ユニットの `ExecStart` の最初の語）を返す。手順6は、それが今もあって実行できるなら、`spec.executable` をそれにしてから `needs_change` を確かめる（エージェントの `PATH` や開発用の venv の `spec-dock` で、ジョブを書き換えないため）。
 - **loop**（`LoopScheduler(state_root, executable, spawn)`）：`running()` は `runner.lock` を `LOCK_EX|LOCK_NB` で取れるか（取れたらすぐ放す。ファイルがなければ動いていない。ファイルを作らない）。常駐のプロセスの側は、起動のときに `runner.lock` を0.2秒おきに5回まで試す（`running()` の一瞬の確かめと重なって、起動したばかりのものが終わらないため）。`ensure` は動いていれば `unchanged`、いなければ `detach` で `created`。`kick` は動いていれば `kick` を作り、いなければ `detach`。`remove` は、動いていれば `runner.json` の `pid` に SIGTERM（`runner.lock` が取れない間だけ送る。番号の使い回しの誤送信を防ぐ）。
 - **`detach`**：`[executable, "canonical", "sync", "--registered", "--loop", "--state-root", 根]` を、`start_new_session=True`、標準入力と出力を `DEVNULL`、作業ディレクトリをホームにして起動し、待たない。ログは周期が `append_log` で書く（ログの切り替えの後も、新しいファイルに書くため）。
@@ -193,6 +194,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 7. **記録**（Epic 手順6）：`update_catalog_state` で、`head`、`last_seen_remote`、`remote_contains_head`（HEAD が基準の祖先か同じ）、`unpushed_since`（含まれなくなった最初の時刻。含まれたら null）、`pending_since`、`holds`、`blocking`、`conflicts`、`consumed_changesets`、`last_cycle`、`last_success_at`（`ok` のとき）、`last_error`（`ok` のとき null）を書く。ログに1行書く。
 
 - 保存の対象は、普通のファイルとシンボリックリンクだけである。入れ子のリポジトリ（`git status` の `sub/`）やソケットは保存せず、ほかのパスの保存を止めない。保留の規則で確かめた中身は、そのバイト列のままコミットする（確かめた後に書き換えられても、確かめていない中身を保存しない。レビュー② SP-9）。周期の初めに、殺された周期が残した一時のインデックスとその lock を消す（カタログの排他の中なので安全）。
+- 確かめたバイト列は `hash-object -w --stdin --path=<パス>` で書く（カタログの `.gitattributes` の eol や clean フィルタが `git add` と同じに効く）。書いたツリーが親と同じならコミットを作らない（eol の変換などで、毎周期の空のコミットを作らないため）。早送りには `-c merge.verifySignatures=false -c merge.autoStash=false` を足す（利用者の設定で取り込みが止まらず、共有の stash に何も積まないため）。許可した削除のうち、今は削除されていないもの（戻した、作り直した）は、周期が許可から消す（後の同じ大量の削除を、もう一度保留するため）。`push_auth` が `failed` の間は、毎周期 dry-run で確かめ直す。`--registered` の周期は、`cycle.lock` を取った後に登録簿を読み直し、外されたカタログを `skipped`（`unregistered`）にする。ログは専用の lock ファイルで排他し、`<根>` のディレクトリの排他は使わない（`canonical link` の手順6a〜6bとの取り合いを避けるため）。
 - 一時停止の間の周期は、止まったときの `last_error` を消さない。手で実行した `canonical sync` は、止まった理由を `error.code` にして返す。周期の記録は、`canonical link` が持つ `schedule` を、書く直前に読み直した値のまま残す。
 - 結果：`ok`（エラーなし）、`skipped`、`paused`、`error`。出来事ごとの扱いは次の表のとおり（`ok` のときだけ `last_error` を null にし、`last_success_at` を進める）。
 
@@ -284,6 +286,9 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 | `CANONICAL_REGISTRY_UNREADABLE` | 3 | 登録簿が壊れている、知らない版 | 示したファイルを確かめ、退避してから `spec-dock canonical link` |
 | `CANONICAL_STATE_UNREADABLE` | —（`last_error` と status の警告） | `state.json` が壊れている、知らない版 | 示したファイルを確かめ、退避してから `spec-dock canonical link` |
 | `CANONICAL_GIT_IN_PROGRESS` | —（`last_error`） | カタログで merge などの途中 | `git -C <カタログ> merge --abort` などで途中の操作を終える |
+| `GIT_FAILED`、`LOCAL_IO_FAILED` | —（`last_error`）／5（コマンド） | 周期やコマンドの中の、予期しない Git の失敗とファイルの読み書きの失敗 | `spec-dock canonical status` とログ（`<根>/canonical-sync.log`）を確かめる |
+| `SYNC_FAILED` | —（`data.catalogs[].error`） | 1つのカタログの周期の中の予期しない例外（ほかのカタログは続ける） | ログを確かめる |
+| `CANONICAL_REMOVE_FAILED` | 6（partial）／5 | `canonical remove --yes` の途中の失敗 | `spec-dock canonical status` で確かめてから `spec-dock canonical remove --yes` |
 | 既存：`CANONICAL_NOT_LINKED`、`CANONICAL_GIT_TOO_OLD`、`CANONICAL_FORMAT_UNSUPPORTED`、`OS_ACCESS_DENIED`、`GITHUB_UNAVAILABLE`、`CANONICAL_LOCK_BUSY`、`CANONICAL_UNSAVED_CHANGES`、`CANONICAL_IGNORED_FILES_PRESENT`、`CANONICAL_SANDBOX_DENIED`、`START_LOCK_BUSY` | Epic の12章 | 周期の `last_error`、`resume`、`remove`、手順6 | Epic の12章のとおり |
 
 ### 15. コマンドの一覧と引数（`cli/catalog.py`）
@@ -410,6 +415,8 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 | `kick` や `detach` の誤送信（番号の使い回し） | 低 | `runner.lock` が取れない間だけ SIGTERM を送る |
 | 人やエージェントがカタログで手で `git commit` した変更 | 中 | 保留の規則を通らずに push される（手で行ったコミットは利用者の意思とみなす）。文書（I-9）で、カタログで Git を使わないよう書く |
 | 開発用の venv や worktree の下の `spec-dock` がジョブの実行ファイルになる | 低 | 最初の登録のときだけ。記録したものが使える間は書き換えない。報告書に残す |
+| systemd の既定の `KillMode=control-group` では、停止の SIGTERM が子の git にも届く（`--registered` の周期の遅延は Python のプロセスにしか効かない）。launchd も `ExitTimeOut` の既定 20 秒で SIGKILL する | 低 | Epic の5章のユニットと plist の形を変えないので、`KillMode` と `ExitTimeOut` は足さない（統括に報告）。途中で止まった早送りは、未保存の編集を上書きしない。次の保存と統合で、どちらの版も残る形に戻る |
+| エディタの一時ファイル（Emacs の `.#…`、vim の `.swp`）が、30秒を超えると保存される | 低 | canonical の中身（C5、I-2）の `.gitignore` に既定の規則がない。C5 の持ち主と I-9 の文書に申し送る |
 | 登録済みのカタログに `--no-schedule` を付けても、登録は外れない | 低 | 印は付くが、ジョブはそのカタログを処理し続ける。外すのは `canonical remove`。報告書に残す |
 | launchd の `bootout` の後、`ExitTimeOut` を超える周期が SIGKILL される | 低 | 周期は SIGTERM でカタログの区切りまで止まらない。殺されても、一時のインデックスと lock は次の周期が消す。作業ツリーの途中の反映は、次の保存が直す |
 | 並行の Issue（I-4、I-8）との衝突 | 低 | 共有のファイルは `origin/main` の merge で解く |

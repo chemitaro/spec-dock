@@ -67,6 +67,11 @@ class FakeScheduler:
     def recorded_executable(self, spec: SchedulerSpec) -> Path | None:
         return self.recorded
 
+    def recorded_search_path(self, spec: SchedulerSpec) -> str | None:
+        if not self.specs:
+            return None
+        return self.specs[-1].search_path("/usr/bin:/bin")
+
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome:
         self.calls.append(("ensure", self.kind))
         if self.fail_ensure:
@@ -188,7 +193,7 @@ class SyncPair:
 
 
 def catalog_result(result: dict[str, Any]) -> dict[str, Any]:
-    (item,) = result["data"]["result"]["catalogs"]
+    (item,) = result["data"]["catalogs"]
     return item
 
 

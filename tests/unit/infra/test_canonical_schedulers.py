@@ -153,7 +153,12 @@ def test_the_loop_runner_waits_60_seconds_between_cycles_checking_every_2_second
 def test_loop_scheduler_starts_kicks_and_stops_the_runner(tmp_path: Path, spec: SchedulerSpec) -> None:
     root = spec.state_root
     spawned: list[Path] = []
-    loop = LoopScheduler(root, spawn=lambda state_root, **kwargs: spawned.append(kwargs["executable"]) or 1)
+
+    def spawn(state_root: Path, **kwargs: Path) -> int:
+        spawned.append(kwargs["executable"])
+        return 1
+
+    loop = LoopScheduler(root, spawn=spawn)
     assert loop.ensure(spec) == "created" and spawned == [spec.executable]
     loop.kick(spec)
     assert len(spawned) == 2  # not running: a kick starts it

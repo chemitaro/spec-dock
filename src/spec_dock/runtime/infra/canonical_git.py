@@ -484,6 +484,12 @@ def clear_temporary_index(catalog: Path) -> None:
             (catalog / name).unlink()
 
 
+def blob_of_bytes(catalog: Path, payload: bytes, *, git: str = "git", timeout: float = 30.0) -> str:
+    """The unfiltered blob value of `payload` (as blob_of computes for a file)."""
+    output = run_catalog_git(catalog, "hash-object", "--stdin", input=payload, git=git, read_only=True, timeout=timeout)
+    return _text(output)
+
+
 def save_commit(
     catalog: Path,
     paths: Sequence[str],
@@ -512,9 +518,18 @@ def save_commit(
         for path, payload in sorted(checked.items()):
             if path not in paths:
                 continue
+            # --path applies the catalog's attributes (eol, clean filters such as LFS or git-crypt) as `git add` does.
             oid = _text(
                 run_catalog_git(
-                    catalog, "hash-object", "-w", "--stdin", input=payload, git=git, mutation=True, timeout=timeout
+                    catalog,
+                    "hash-object",
+                    "-w",
+                    "--stdin",
+                    f"--path={path}",
+                    input=payload,
+                    git=git,
+                    mutation=True,
+                    timeout=timeout,
                 )
             )
             mode = "100755" if os.access(catalog / path, os.X_OK) else "100644"
@@ -532,6 +547,11 @@ def save_commit(
         tree = _text(
             run_catalog_git(catalog, "write-tree", git=git, environment=environment, mutation=True, timeout=timeout)
         )
+        parent_tree = _text(
+            run_catalog_git(catalog, "rev-parse", f"{parent}^{{tree}}", git=git, read_only=True, timeout=timeout)
+        )
+        if tree == parent_tree:
+            return parent  # nothing differs from the parent: never make an empty commit
         commit = _text(
             run_catalog_git(
                 catalog, "commit-tree", tree, "-p", parent, "-m", message, git=git, mutation=True, timeout=timeout
@@ -648,9 +668,15 @@ def changed_paths(catalog: Path, before: str, after: str, *, git: str = "git", t
     return frozenset(os.fsdecode(item) for item in output.stdout.split(b"\0") if item)
 
 
+# A user's merge.verifySignatures or merge.autoStash must not block or stash the catalog's fast-forward.
+_MERGE_CONFIG: Final = ("-c", "merge.verifySignatures=false", "-c", "merge.autoStash=false")
+
+
 def fast_forward(catalog: Path, target: str, *, git: str = "git", timeout: float = 30.0) -> None:
     """Advance HEAD and the work tree; Git refuses (and changes nothing) when a local edit would be overwritten."""
-    run_catalog_git(catalog, "merge", "--ff-only", "--no-edit", target, git=git, mutation=True, timeout=timeout)
+    run_catalog_git(
+        catalog, *_MERGE_CONFIG, "merge", "--ff-only", "--no-edit", target, git=git, mutation=True, timeout=timeout
+    )
 
 
 @dataclass(frozen=True)

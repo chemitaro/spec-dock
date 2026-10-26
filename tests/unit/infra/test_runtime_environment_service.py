@@ -11,15 +11,17 @@ from tests.support.canonical_repo import environment
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from spec_dock.runtime.infra.runtime_environment import RuntimeEnvironment
+
 
 def _completed(stdout: str = "", stderr: str = "", code: int = 0) -> subprocess.CompletedProcess[bytes]:
     return subprocess.CompletedProcess([], code, stdout.encode(), stderr.encode())
 
 
-def _linux(**changes: object):  # type: ignore[no-untyped-def]
+def _linux() -> RuntimeEnvironment:
     from dataclasses import replace
 
-    return replace(environment(environ={"USER": "dev", "PATH": "/usr/bin"}), system="linux", **changes)
+    return replace(environment(environ={"USER": "dev", "PATH": "/usr/bin"}), system="linux")
 
 
 def _root(tmp_path: Path, *, systemd: bool) -> Path:
