@@ -219,10 +219,17 @@ def _gh_dir(scheduler: Scheduler, state_root: Path, environment: RuntimeEnvironm
     probe = SchedulerSpec(Path("/"), state_root, Path("/"), environment.home or Path.home())
     recorded = scheduler.recorded_search_path(probe)
     if recorded:
-        for directory in recorded.split(":"):
-            if directory and Path(directory) != git_dir and os.access(Path(directory) / "gh", os.X_OK):
+        beside_git = os.path.realpath(git_dir / "gh") if os.access(git_dir / "gh", os.X_OK) else None
+        for directory in filter(None, recorded.split(":")):
+            candidate = Path(directory) / "gh"
+            # The gh beside git through another name (merged /usr: /bin is /usr/bin) is not another gh.
+            if (
+                Path(directory) != git_dir
+                and os.access(candidate, os.X_OK)
+                and os.path.realpath(candidate) != beside_git
+            ):
                 return Path(directory)
-        if os.access(git_dir / "gh", os.X_OK):
+        if beside_git is not None:
             return git_dir
     gh = shutil.which("gh", path=environment.environ.get("PATH", ""))
     return Path(gh).parent if gh else None

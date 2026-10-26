@@ -14,7 +14,7 @@ from spec_dock.runtime.infra import runtime_environment
 from spec_dock.runtime.infra.canonical_registry import read_registry, update_registry
 from spec_dock.runtime.infra.canonical_state import update_catalog_state
 from tests.support.canonical_repo import environment, git
-from tests.support.canonical_sync import SyncPair, catalog_result
+from tests.support.canonical_sync import FakeScheduler, SyncPair, catalog_result
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -331,3 +331,24 @@ def test_status_and_remove_from_another_state_root_leave_the_job_alone(
     code, result = pair.run(pair.b, "canonical", "remove", "--yes")
     assert code == 0, result
     assert ("remove", "launchd") not in pair.schedulers["launchd"].calls
+
+
+def test_gh_beside_git_seen_again_through_an_alias_directory_changes_nothing(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    tools = tmp_path / "usr-bin"
+    tools.mkdir()
+    git_path = shutil.which("git")
+    assert git_path is not None
+    (tools / "git").symlink_to(git_path)
+    (tools / "gh").write_text("#!/bin/sh\nexit 0\n")
+    (tools / "gh").chmod(0o755)
+    alias = tmp_path / "bin"
+    alias.symlink_to(tools)  # merged /usr: /bin is /usr/bin, so the job's PATH tail shows the same gh again
+    monkeypatch.setenv("PATH", f"{tools}:{os.environ['PATH']}")
+    launchd = pair.schedulers.setdefault("launchd", FakeScheduler("launchd"))
+    launchd.tail = f"{alias}:/usr/bin:/bin"
+    assert pair.run(pair.a, "canonical", "link")[0] == 0
+    code, again = pair.run(pair.a, "canonical", "link")
+    assert code == 0 and again["status"] == "unchanged", again
+    assert launchd.specs[-1].gh_dir == tools
