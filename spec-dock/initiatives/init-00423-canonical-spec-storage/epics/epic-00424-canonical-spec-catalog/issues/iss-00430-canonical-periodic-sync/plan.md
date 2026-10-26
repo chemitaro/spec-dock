@@ -4,7 +4,7 @@ ID: "iss-00430"
 タイトル: "Add Periodic Canonical Sync"
 関連GitHub: ["#430"]
 状態: "draft"
-最終更新: "2026-10-25"
+最終更新: "2026-10-26"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00424", "init-00423"]
 ---
@@ -14,22 +14,124 @@ ID: "iss-00430"
 詳細: [Issue Plan Guide](../../../../../../docs/authoring/issue-plan.md)
 
 ## Planning Level
-選んだ level、理由、risk factor、再評価条件を記述する。
+
+- **選んだ level**：strict（Epic の `plan.md` の指定）。
+- **理由**：定期の同期は、利用者の仕様のファイルを、人の操作なしにコミットし、統合し、push する唯一の経路である。誤りは、複数のPCにまたがる仕様の喪失になり、気づきにくく、戻しにくい。状態の置き場の形式（C9）と、I-5、I-11 が使う公開の形を、ここで固定する。
+- **risk factor**：作業ツリーへの書き込み（早送り、`restore`）、GitHub への push、利用者の環境のジョブ（launchd、systemd、常駐のプロセス）、並行の Issue（I-4、I-8）との共有のファイル。
+- **critical にしない理由**：保存の経路は、作業ツリーを消す操作を、HEAD との差と編集中のファイルとの重なりを確かめた後にしか行わず、push は強制しない。迷う場面（競合の表せない形、書き換え、削除、保留）は一時停止か保留で止まるので、利用者の判断なしに戻せないデータの喪失は起きない設計である。I-10 の前は、利用者の環境に登録もジョブもない。
+- **再評価の条件**：秘密情報を扱う範囲が広がる、強制の push や履歴の書き換えが要る、利用者のツールの設定を変える必要が出たときは、critical への引き上げを統括に相談する。
 
 ## 目標
-この Issue で達成する観測可能な成果を記述する。
+
+`requirement.md` の AC-430-01〜21 を満たし、PR をマージできる状態（CI が通っている）で止まる。I-5 と I-11 が、`design.md` の「公開の形」を変えずに使える。
 
 ## 順序・依存
-実装順、依存、並行可能な作業を記述する。
+
+- 起点：`origin/main` の `d5c8cc943`（I-1、I-2、I-7 が入っている）。
+- 実装の順は、純粋な規則 → 状態の置き場 → Git の操作 → 1つのカタログの周期 → コマンドの入口 → `canonical link` の手順6・7 → 定期の実行 → accept、restore、resume、remove → status → RST-1 → 配布資産と一覧のテスト、である。各 step を Red → Green → Refactor で進め、区切りでコミットする。
+- 並行：I-4（`iss-00431`）と I-8（`iss-00435`）が別の worktree で進む。`cli/catalog.py`、`commands/canonical_dispatch.py`、コマンドの数と一覧のテスト、`static-inventory.json`、`docs/reference_cli.md` で衝突しうる。先に `main` に入った方を、`origin/main` の merge で取り込む（rebase しない）。コマンドの数は、`main` の今の数に、この Issue の5つを足して直す。
+- 最終の品質の関門の前に、`origin/main` をこのブランチに merge する。
 
 ## 実装step
-実装、tests、docs、migration の手順を記述する。
+
+| step | 内容 | 確かめるAC |
+|---|---|---|
+| S1 | `domain/canonical_sync_rules.py`：`select_paths`、`classify_holds`、`SECRET_PATTERNS`、`resolve_conflicts`、`conflict_copy_name`、`pc_name` を、テストを先に書いて作る | AC-430-01（名前と段）、13、14 |
+| S2 | `domain/canonical_sync_state.py`（`CatalogSyncState`、`SyncRegistry`、`AcceptedChanges`、`RunnerRecord`、`state_key`、`holds_under`）と `domain/canonical_scheduler.py`（`select_scheduler`、plist、ユニット、引用、起動し直しの1行） | AC-430-09（選び方）、20 |
+| S3 | `infra/canonical_state.py`、`infra/canonical_registry.py`：一時ファイルと `rename`、短い排他、`cycle.lock`、ログの切り替え、壊れたファイルの扱い | AC-430-07、20 |
+| S4 | `infra/canonical_git.py` に同期の操作を足す（一時のインデックスの保存、`merge-tree`、解決、`commit-tree`、早送り、push と dry-run、祖先、差分、`restore`、無視されたファイル、途中の操作）。一時の bare のリポジトリで確かめる | AC-430-01、05、06 |
+| S5 | `application/canonical_sync.py`：`sync_catalog`、`run_cycle`、`refresh_structures`。保存、保留、統合、持ち越し、書き換えと削除の検出、push、記録 | AC-430-01〜06、10、11、13、19 |
+| S6 | `cli/catalog.py`、`cli/options.py`、`commands/canonical_dispatch.py`：`canonical sync`（`--registered` はリポジトリによらない振り分け）と、accept、restore、resume、remove の入口、引数の誤り、ヘルプ。コマンドの数と一覧のテストを52に直す | AC-430-18、19 |
+| S7 | `infra/runtime_environment.py` の C11 の追加と `detect_service_manager`。`infra/canonical_scheduling.py` と3つの実装（launchd、systemd、loop）、`run_loop`、`detach`、`spec_dock_executable` | AC-430-09 |
+| S8 | `application/canonical_schedule.py` と `canonical_link.py` の手順6・7、`--no-schedule`、移動の扱い、警告、`request_sync_now` | AC-430-07、12、16、20 |
+| S9 | `application/canonical_hold.py`（accept、restore）、`canonical_resume.py`、`canonical_remove.py` | AC-430-02、03、08、14 |
+| S10 | `canonical_status.py` の `sync`、`snapshot`、`changes`、`git`、未pushの警告 | AC-430-11、12、15 |
+| S11 | RST-1（`canonical_catalog.py` の作りかけの観察と次の1手） | AC-430-17 |
+| S12 | 配布資産 `docs/reference_cli.md`（C46 の更新と C48〜C52）、`static-inventory.json`、版3の回帰のテスト（新しいコマンドが `CANONICAL_NOT_MIGRATED`） | AC-430-18 |
+| S13 | 独立レビュー②（`code-review` の Standards と Spec）と、その指摘の分析と修正 | すべて |
+| S14 | 実機の確かめ（macOS の launchd、OrbStack の Ubuntu、Docker）と後片付け | AC-430-21 |
+| S15 | `origin/main` の merge、最終の品質の関門（push した SHA で `make lint`、`uv run pytest`、新しい2つのサブエージェントのレビュー）、`report.md`、PR、CI | すべて |
+
+- 各 step のテストは、`design.md` の testability の表の置き場に書く。テストは外のネットワークを使わない（偽の `gh`、bare のリポジトリ、一時の `XDG_STATE_HOME`、偽の定期の実行）。
+- 実装の途中で、Epic の契約（C1〜C11）や Issue の分け方を変える必要が見つかったら、推測で埋めずに Orca の `ask` で統括に聞く。
 
 ## 検証
-受け入れ条件と regression を確認する方法を記述する。
+
+- **毎回**：変えた範囲のテストを、step ごとに走らせる。全体の `uv run pytest` と `make lint` は、最終の品質の関門で、push した SHA で1回走らせる（統括の依頼の「トークンの節約」。Epic の「毎回 `make lint` と `uv run pytest` を通す」は、PR ごとに関門で満たす）。
+- **negative test**：要件の「失敗・境界条件」の各行に、少なくとも1つのテストを置く（カタログがない、読めない、途中の操作、形式、git の版、origin につながらない、`gh` につながらない、排他、周期の重なり、表せない競合、push の拒否、認証の失敗、ジョブの登録の失敗、常駐のプロセスの停止、壊れた `state.json` と登録簿、サンドボックスの代わりの書けない場所）。
+- **従来モードの回帰（AC-15）**：`git diff origin/main -- tests/` で、変えた既存のテストが、許された区分（コマンドの数と一覧、配布資産の値、文書の中身）と canonical モードのテストだけであることを確かめ、報告書に一覧で書く。従来のソース（`direct_*.py`、`work_start.py`、`worktree_observation.py` など）に差分がないことを確かめる。
+- **書かないことの確かめ**：`canonical status` の前後で、リポジトリ、カタログ、`.git`、状態の置き場の `tree_digest` が同じであること。
+- **実機**：`design.md` の testability の「実機の確かめ」。結果と未確認のものを報告書に書く。
 
 ## rollback
-問題時の rollback または forward recovery を記述する。
+
+- マージの前：ブランチを捨てるか、コミットを revert する。
+- マージの後で、I-10 の前：PR を `git revert` する。利用者の環境には、登録簿もジョブもない（テストと実機の確かめは一時の置き場で行う）。
+- I-5、I-11 がこの部品を使った後：forward recovery で、この部品を直す PR を作る。公開の形を変える必要は、Epic の `design.md` とこの `design.md` を先に直す。
+- 実機の確かめで作ったもの（一時のリポジトリ、テスト用のジョブ、plist、仮想マシン、コンテナ、イメージ）は、確かめた後に消す。
+- **migration**：N/A。状態の置き場の形式は版1で始まり、利用者の環境にはまだ何もない（0.3.0 の前）。
+
+## security / privacy / operability
+
+- **security**：秘密情報らしいファイルを保存しない（保留）。ログにファイルの中身を書かない。資格情報を仮想マシンやコンテナに写さない。push は強制しない。
+- **privacy**：macOS のプライバシーの保護の許可を、SpecDock は変えない。案内だけを示す。
+- **operability**：`canonical status` が、定期の実行の有無、最後の成功と失敗、一時停止、保留、未pushを示す。ログは 1 MiB で切り替える。
+- **observability**：`canonical sync --json` の `data.catalogs[]` と `data.repositories[]`、`state.json`、ログ。
+
+## 統括の判断（2026-10-26、Orca の `ask` の答え）
+
+この答えを Epic の文書より優先する正本とする。新しいコード（Q6、Q1）の Epic の12章への追記は、統括が後で行う。
+
+- **Q1**：`canonical restore <パス>` は、`state.json` の `holds` にあるパスだけを対象にし、ほかは何も書かずに `CANONICAL_NOT_HELD`（終了コード3）で止まる。パスなしは、保留中の削除をすべて HEAD から戻す。
+- **Q2**：大量の削除は、その周期で選んだ削除ではなく、今の作業ツリーにある、`origin: command` の束にない削除のすべてで数え、閾値を超えたらすべてを保留する（止まる側）。
+- **Q3**：`resume --adopt-remote` の後で共通の祖先がないときは、`merge-tree --allow-unrelated-histories` で L と R を統合する（同じパスは段の規則で R を元の名前、L を別名ファイル。何も消さない）。`--allow-unrelated-histories` は、resume が `state.json` に残す一度きりの印があるときだけ使い、ほかは `merge_failed` で一時停止のまま。「親を L と R の2つにする」は R2 で置き換えた。
+- **Q4**：同じカタログの周期の重なりを、`<根>/catalogs/<鍵>/cycle.lock` への `flock(LOCK_EX|LOCK_NB)` で防ぎ、取れなければ `skipped` でそのカタログを飛ばす（カタログの排他とは別）。
+- **Q5**：`state.json` の `push_auth` がないか `result` が `unknown` のとき、その周期で `push --dry-run` を行う。`canonical link` の手順7で `state.json` を作るときは、`push_auth` を `unknown` にする。
+- **Q6**：新しいコード（`design.md` の14章）を、この Issue の `design.md` に、名前、終了コード、次の1手の表で書く。status の一時停止と保留は、既存の `CANONICAL_PAUSED` と `CANONICAL_SAVE_HELD` を警告として使う。
+- **Q7**：`canonical sync --registered` のカタログの結果を `ok`、`skipped`、`paused`、`error` に分け、`paused` と `error` を失敗とする（`skipped` は失敗にしない）。
+- **Q8**：実機の launchd は、`canonical link --no-schedule` で用意し、別の名前（`local.specdock.test.iss-00430`）のジョブを、内蔵のディスクの一時ディレクトリの plist から、名前と置き場所を引数で注入したスケジューラーの部品を呼ぶ小さな Python の駆動で bootstrap する。`ProgramArguments` は本物の `spec-dock canonical sync --registered --state-root <一時>`。終わったら `bootout` と削除。
+- **Q9**（修正）：GitHub に新しいリポジトリやブランチを作らない。実際の push は一時の bare のリポジトリにだけ行う。利用者の `gh` の認証が launchd のジョブの中まで届くことは、そのテスト用のジョブの中で、本物の URL（`https://github.com/chemitaro/spec-dock.git`）への、存在しない一時の参照名（例 `refs/heads/tmp/iss-00430-dry-run`）の `git push --dry-run` だけで確かめる。本物の URL を origin にしたカタログで `canonical sync` を動かしてはならない。
+- **Q10**：C11 の systemd と linger は、`detect_runtime_environment()` には足さず、`RuntimeEnvironment` に既定 None の項目を足し、`canonical link` の手順6と `canonical status` だけが呼ぶ `detect_service_manager(environment)` で埋める（注入できる）。
+
+### 2回目（文書の独立レビュー①の後、2026-10-26）
+
+- **R1**：`canonical link --no-schedule` は、`state.json` に `"schedule": "none"` を記録し、`link_after_command` はその印があれば手順6を行わない。`--no-schedule` なしの `canonical link` は印を消して登録する。`state.json` の版は1のまま。
+- **R2**：`resume --adopt-remote` の後は、L と R を統合した、親が R だけのコミット C を作り、`reset --keep` で手元のブランチを移し、push は R からの早送りにする。GitHub が消した古い履歴は送らない。Q3 の「2つの親」は、これで置き換える。さらに、C を push する前に、R から C への差分に保留の規則（秘密情報らしいもの、大きすぎるファイル、大量の削除）を当て、当たったら push せずに保留（一時停止のまま）にする（L で変えたファイルが R で消されていると、「変更が残る」規則で戻ってくるため）。テストを足す。
+- **R3**：Epic の「戻し方」の順を、「`export-legacy --apply` で戻すブランチを作って push した後、戻す PR をマージする前（各チェックアウトがまだ版4のうち）に、各クローンで `canonical remove --yes`」にする（案A）。I-3 のコードは変えない。ほかのPCのクローンも、戻す PR を取り込む前に remove する必要がある。Epic の「戻し方」の直しは統括が行い、I-3 の報告書にこの順を書く。
+- そのほかのレビューの指摘（restore の取り直し、基準のないクローン、手順の順 6a→7→6b→6c、古い仕組みのジョブの外し方、登録簿の git と実行ファイルを書き換えないこと、ジョブの `PATH` の `gh`、`merge-tree` の `path~<名前>` の検出、remove と移動の `cycle.lock`）は、案のとおりでよい（同じ答え）。
+
+### 文書の独立レビュー①の指摘の対応（2026-10-26）
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| 1 基準のないクローンが消された canonical を作り直す | blocker | 手順7で手元の HEAD を基準にし、周期は手元が初期のコミットだけのときにだけ作る（AC-430-24） |
+| 2 restore が作り直したファイルを上書きする | blocker | 排他の中で取り直し、今も当たる保留だけを戻す（AC-430-26） |
+| 3 手順6と7の順 | major | 6a→7→6b→6c、`<根>` の排他を 6a から 6b まで持つ |
+| 4 `--no-schedule` の持続 | major | R1（AC-430-25） |
+| 5 取り込み直しが古い履歴を送る | major | R2（AC-430-22） |
+| 6 remove と移動と周期の並行 | major | `cycle.lock` を取ってから（AC-430-28） |
+| 7 選び直しで古いジョブが残る | major | 選び直す前に前の仕組みを外す（AC-430-25） |
+| 8 周期の結果の分け方 | major | `design.md` 8章の表 |
+| 9 表せない競合 | major | 解決後のツリーのパスを L、R、別名ファイルと比べて `merge_failed`（AC-430-22） |
+| 10 受け入れ条件の抜け | major | AC-430-22〜28 を足し、AC-430-15 の確かめ方を書いた |
+| 11 実機の launchd が空の登録簿を読む | major | 駆動で一時の登録簿に載せる |
+| 12 環境で git と実行ファイルが入れ替わる | major | 記録したものが使える間は書き換えない |
+| 13 版3との書き分け | minor | AC-430-18 を書き分けた。戻し方は R3。版3の回帰は新しいテスト `test_issue430_legacy.py` で確かめる |
+| 14 実機の範囲 | minor | AC-13 は I-5、systemd から GitHub への push の認証は未確認として残す（要件の制約） |
+| 15 常駐のプロセスの起動とログ | minor | 起動の試し直し、出力を `DEVNULL` に |
+| 16 途中で止められたとき | minor | 失敗の表を直し、`--registered` の1回の実行も SIGTERM を周期の終わりまで遅らせる |
+| 17 同時の link のジョブの登録 | minor | 3と同じ |
+| 18 ジョブの `PATH` の `gh` | minor | `gh` のディレクトリを足す |
+| 19 シグネチャと番号 | minor | 直した |
+| 20 plan の判断の記録 | minor | 「検証」と「Planning Level」に書いた |
+| 21 残るリスク | minor | `design.md` の risk に足した。予行演習の手順7が状態の置き場に書くのは Epic の決めたとおり（`--no-schedule` でも基準を記録する）で、報告書で統括に伝える |
 
 ## exit / handoff
-完了条件、残余リスク、引き渡しを記述する。
+
+- **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
+- **後の Issue への引き渡し**：
+  - I-5：`request_sync_now`、`read_catalog_state`、`CatalogSyncState`（`last_cycle.finished_at`、`remote_contains_head`、`holds`）、`holds_under`、`origin: finish` の束の扱い（`design.md` 13章）。
+  - I-11：`refresh_structures` の中の手順7の拡張の場所、`RepositoryResult.dashboards_written`、`update_catalog_state` と `state.json` の `dashboard`、`canonical remove` にダッシュボードの5つのファイルを足すこと。
+  - I-9：`docs/canonical.md` の「同期が止まったとき」（`resume` の2つの引数）、AGENTS.md の破壊的なコマンドへの `canonical remove`、新しいコードの一覧の確認。
+  - 統括：`design.md` の14章のコードの Epic の12章への追記、`state.json` の3つの追加の項目（`adopt_remote_pending`、`schedule`、`last_error.at`）とジョブの `PATH` の `gh` の Epic の5章への追記、R2 と R3 の Epic の文書への反映。
+- **残るリスク**：`report.md` に書く（実機で確かめられなかったもの、Linux の Codex のサンドボックスでの `flock` など）。
