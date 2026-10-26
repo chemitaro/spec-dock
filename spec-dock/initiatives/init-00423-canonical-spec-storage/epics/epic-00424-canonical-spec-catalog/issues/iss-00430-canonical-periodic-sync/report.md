@@ -41,12 +41,25 @@ Epic の I-3 として、カタログの保存、統合、push を60秒ごとに
 - **2段目**（統括の指示）：セッションの間、`PATH` の先頭に、呼ばれたら必ず失敗して呼ばれたことを記録する `launchctl`、`systemctl`、`loginctl` の偽物を置き、1度でも呼ばれたらセッションを失敗にする。本物のスケジューラーの単体のテストは、コマンドの実行器を注入して作る。
 - 実機の確かめ（別の名前のジョブ）は、この防ぎの外で、明示して行った（下）。
 
+### 起きたこと：テストの1つが手順7で本物の `gh api` を呼んでいた（最終品質ゲート6 Standards ST-4）
+
+- 私が足した `test_an_ssh_origin_refusing_the_key_is_recorded_as_push_auth_failed` は、origin を `git@github.com:example/repo.git` にしていたため、周期の手順7（構造のスナップショット）が本物の `gh api` を `example/repo` に向けて呼んでいた（テストは外に出ない、という決まりに反する。書き込みはなく、読み取りの要求だけ）。
+- 防ぎ：`SyncPair` は手順7の `gh api` を既定で失敗させ（必要なテストは自分の偽物を置く）、`isolate_user_state` は `GH_TOKEN`、`GITHUB_TOKEN`、`GH_HOST` などを外す（`gh` の設定は一時の `XDG_CONFIG_HOME` の下になる）。
+
 ## Verification
 
 ### テスト
 
 - この Issue のテスト：`tests/cli_runtime/test_issue430_*.py`（同期、保留、再開、取り外し、手順6と7、status、版3と公開の部品）、`tests/unit/domain/test_canonical_sync_rules.py`、`test_canonical_sync_state.py`、`test_canonical_scheduler.py`、`tests/unit/infra/test_canonical_state.py`、`test_canonical_git_sync.py`、`test_canonical_schedulers.py`、`test_runtime_environment_service.py`。AC と置き場の対応は `design.md` の testability の表のとおり。
 - 最終品質ゲートの `make lint` と全体の `uv run pytest` は、下の「最終品質ゲート」に書く。
+
+### 最終品質ゲート
+
+- 合格した SHA：`dd603e7456e7e1eb8aa565859ab94d97a593e867`（ゲート8、2026-10-26）。その後のコミットは、この Issue の文書だけ（ゲートはやり直していない）。
+- `make lint`：終了コード0（ruff check、ruff format check、mypy がすべて pass）。
+- `uv run pytest`：2944 passed、8 skipped、終了コード0（約14分。実行の前後で HEAD と作業ツリーは同じ）。
+- レビュー：新しく起こした Standards と Spec のレビューのエージェント（Claude のみ。ChatGPT は使わない）が、`origin/main...dd603e74` の差分と、この Issue と Epic の文書をもとにレビューし、どちらも `pass`（P0/P1 なし）。
+- それまでの経過：ゲート1（`09a229731`）〜7（`9fd6666e2`）は不合格で、指摘の P0/P1 を直し、そのたびに新しいレビューでやり直した。各ゲートの指摘と対応は `plan.md` の「最終品質ゲートNの指摘の対応」の表のとおり。ゲート7の lint とテストは、実行の途中で作業ツリーを直したので証拠にしていない。
 
 ### 変えた既存のテスト（`git diff origin/main -- tests/`。AC-15）
 
@@ -84,5 +97,7 @@ Epic の I-3 として、カタログの保存、統合、push を60秒ごとに
   - **R3 の戻し方の順**：「`export-legacy --apply` で戻すブランチを作って push した後、戻す PR をマージする前（各チェックアウトがまだ版4のうち）に、各クローンで `spec-dock canonical remove --yes`」。ほかのPCのクローンも、戻す PR を取り込む前に remove する必要がある（版3のチェックアウトでは canonical のコマンドが止まるため）。
   - 予行演習の `canonical link --no-schedule` も、手順7の基準を、そのときの `XDG_STATE_HOME`（既定は利用者の状態の置き場）に記録する（Epic の決めたとおり）。予行演習で状態の置き場に触れないなら、`XDG_STATE_HOME` を一時ディレクトリにして実行する必要がある。
 - 受け入れた結果（最終品質ゲート6 SP-1）：基準のない周期（状態の置き場を消した、根が違う）や、`--no-schedule` から通常の `canonical link` への切り替えのとき、手元に未pushのコミットがあると、GitHub が書き換えられていなくても `remote_rewritten` で止まる。`resume --adopt-remote` で何も失わずに再開する（GitHub が落とした履歴を push し直すより安全な側）。
+- **統括の判断を求める（最終品質ゲート8 Standards ST-1、P2）**：GitHub が手元の HEAD の祖先へ巻き戻し、`resume --adopt-remote` の取り込み直しが保留の修正を待っている間に、GitHub でブランチが消されて `remote_deleted` になると、案内どおりの `resume --push-local` が手元の HEAD をそのまま送り、GitHub が消した履歴（秘密情報のコミットを含みうる）が戻る。案：`adopt_remote_pending` か前の理由が `remote_rewritten` のときは `--push-local` を拒否する、または履歴を持たないコミットで作り直す。書き換えの後に削除された場合の `--push-local`（印なし）は、今のテストが意図した動作として固定している。
+- 直さずに残るもの（最終品質ゲート8）：カタログのツリーにサブモジュールがあると取り込み直しの周期が毎回 `GIT_FAILED`（ST-2）。取り込み直しの保留にも、status の `changes.holds` が通常の保留の次の1手を示す（SP-3）。新しいリポジトリで保存の後の最初の push も失敗すると、次の周期が `remote_deleted` で止まり、`resume --push-local` で戻す（SP-4）。
 - 直さずに残るもの（最終品質ゲート7）：カタログの排他で飛ばされ続けた周期にも、`CANONICAL_SYNC_NOT_CONFIRMED` がプライバシーの案内を示す（ST-2）。SIGKILL で止まった loop の `runner.json` が残り、`canonical status` がちょうど `runner.lock` を持った瞬間の `remove` が、再利用された PID に SIGTERM を送りうる狭い競合（ST-3）。毎周期の `git reset -q` は、カタログで手でステージした内容を捨てる（ST-4。設計どおり。カタログで手で Git を使わないことは I-9 へ）。
 - 残るリスク（`design.md` の risk）：登録済みのカタログに `--no-schedule` を付けても登録は外れない（SP-10）。launchd の `ExitTimeOut` を超える周期の SIGKILL（次の周期が一時のインデックスと lock を消す）。開発用の venv の `spec-dock` が最初の登録でジョブの実行ファイルになりうる。

@@ -35,7 +35,7 @@ ID: "iss-00430"
 
 ```text
 spec-dock canonical link [--no-schedule]
-  手順1〜5（I-2） → 手順6a 登録簿 → 6b ジョブ → 7 基準 → 6c すぐの実行と15秒の待ち → 手順8（I-2）
+  手順1〜5（I-2） → 手順6a 登録簿 → 7 基準 → 6b ジョブ → 6c すぐの実行と15秒の待ち → 手順8（I-2）
 
 launchd / systemd timer / loop runner（60秒ごと）
   spec-dock canonical sync --registered --state-root <根>
@@ -82,7 +82,7 @@ spec-dock canonical accept|restore|resume|remove|status
 - **鍵**：`state_key(catalog) = sha256(os.fsencode(realpath(catalog))).hexdigest()[:16]`。
 - **`<根>/canonical-registry.json`**（`SyncRegistry`）：`{"version": 1, "scheduler": "launchd"|"systemd"|"loop"|null, "catalogs": [{"catalog", "main_checkout", "repository"|null, "git", "registered_at"}]}`。`catalog` は実際のパス。`repository` は `github.com/<owner>/<repo>`（`repository_for_checkout` で決まらないときは null。手順7でそのカタログを飛ばす）。書くときは `<根>` のディレクトリを読み取りで開いて `flock(LOCK_EX)`（10秒まで）。知らない版、壊れた JSON は `RegistryUnreadable` で、書き換えない。
 - **`<根>/catalogs/<鍵>/state.json`**（`CatalogSyncState`）：Epic の 5章の項目に、次の3つを足す（C9 の持ち主として決める。版は1のまま）。
-  - `adopt_remote_pending: bool`（既定 false）：`resume --adopt-remote` が残す一度きりの「取り込み直し」の印（統括の判断 R2）。次の周期が、R を親にした1つのコミットで取り込み直し、push した後に false に戻す。
+  - `adopt_remote_pending: bool`（既定 false）：`resume --adopt-remote` が残す一度きりの「取り込み直し」の印（統括の判断 R2）。次の周期が、R を親にした1つのコミットで取り込み直し、手元のブランチをそのコミットへ移した（または R へ早送りした、L と R が同じだった）ときに false に戻す。印が残る間は push しない。
   - `schedule: "none" | null`：`canonical link --no-schedule` の印（統括の判断 R1）。`link_after_command` は、この印があれば手順6を行わない。`--no-schedule` なしの `canonical link` が null に戻す。
   - `last_error.at`：失敗の時刻。
   - `push_auth` がないか `result` が `unknown` なら、その周期で `push --dry-run` を行う（統括の判断 Q5）。
@@ -189,7 +189,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
    - R がない、または `is_ancestor(R, L)` なら何もしない。
    - `is_ancestor(L, R)` なら、`changed_paths(L, R)` と、作業ツリーの変更（未保存と保留）が重なる（同じパスか、一方が他方の下）か確かめる。重なれば `blocking` に記録（保留にあるパスは `held`、ほかは `local_edit`）して取り込まない。重ならなければ `fast_forward(R)`。それでも失敗したら、`blocking` に Git の出力を `last_error`（`CANONICAL_SYNC_BLOCKED`）として残す。
    - 分岐していれば `merge_tree(L, R, allow_unrelated=state.adopt_remote_pending)`。0ならそのツリー、1なら `resolve_conflicts` → `write_resolution`。2以上、解決の書き込みの失敗、表せない競合（3の「表せない競合」）なら `paused: "merge_failed"` と Git の出力。`commit_merge`（親は L と R、メッセージ `spec-dock: merge (<PC名>)`）の後、上と同じ重なりの確かめをしてから `fast_forward(<その統合のコミット>)`。別名ファイルを `conflicts` に足す。
-   - **取り込み直し**（`adopt_remote_pending`。統括の判断 R2）：L が R の祖先でなければ、上の統合のツリーで、親を R だけにしたコミット C（メッセージ `spec-dock: adopt remote (<PC名>)`）を作る。R から C への差分（追加と変更のファイルの中身、削除の数）に `classify_holds` を当て、当たれば C を作らずに `paused: "remote_rewritten"` に戻し、`holds` と `last_error`（`CANONICAL_SAVE_HELD`）を書く。ただし、当たったパスがすべて作業ツリーで編集中（利用者が直している、消している）なら、一時停止にせず、`blocking`（`held`）に記録して何も push せずに持ち越す（その変更が保存された後の周期で、もう一度確かめる）。当たらなければ、重なりの確かめの後に `reset --keep C` で手元のブランチと作業ツリーを C へ移す（Git が編集中のファイルとの衝突を拒否したら、何もせずに `blocking`）。push は R からの早送りになる。push が成功したら `adopt_remote_pending` を false に戻す。L が R の祖先なら、ふつうの早送りで、印を戻す。
+   - **取り込み直し**（`adopt_remote_pending`。統括の判断 R2）：L が R の祖先でなければ、上の統合のツリーで、親を R だけにしたコミット C（メッセージ `spec-dock: adopt remote (<PC名>)`）を作る。R から C への差分（追加と変更のファイルの中身、削除の数）に `classify_holds` を当て、当たれば C を作らずに `paused: "remote_rewritten"` に戻し、`holds` と `last_error`（`CANONICAL_SAVE_HELD`）を書く。ただし、当たったパスがすべて作業ツリーで編集中（利用者が直している、消している）なら、一時停止にせず、`blocking`（`held`）に記録して何も push せずに持ち越す（その変更が保存された後の周期で、もう一度確かめる）。当たらなければ、重なりの確かめの後に `reset --keep C` で手元のブランチと作業ツリーを C へ移す（Git が編集中のファイルとの衝突を拒否したら、何もせずに `blocking`）。`reset --keep C` が成功したら `adopt_remote_pending` を false に戻し、同じ周期の push は R からの早送りになる。L が R の祖先なら、ふつうの早送りで、印を戻す。
    - `conflicts` から、別名ファイルがもうないものを消す。
 6. **push**（Epic 手順5。排他の外）：取り込み直しの印（`adopt_remote_pending`）が残っている間（保留を直している途中、編集中のファイルに当たった統合）は push しない（L に GitHub が消した履歴が残っているため。統括の判断 R2、最終品質ゲート7 ST-1）。そうでなく、L が R より進んでいれば（R がないときを含む）`push_canonical`。`rejected` なら手順3（取得）からやり直す（2回まで）。`pushed` なら基準を HEAD に、`push_auth` を `ok` に。`auth_failed` なら `push_auth` を `failed` にし、URL の種類の次の1手を書く。送らなかった周期で `push_auth` が未記録か `unknown` なら `push_canonical(dry_run=True)` を行い、`ok`（成功か `rejected`）、`failed`（認証）、`unknown`（そのほか）を書く。
 7. **記録**（Epic 手順6）：`update_catalog_state` で、`head`、`last_seen_remote`、`remote_contains_head`（HEAD が基準の祖先か同じ）、`unpushed_since`（含まれなくなった最初の時刻。含まれたら null）、`pending_since`、`holds`、`blocking`、`conflicts`、`consumed_changesets`、`last_cycle`、`last_success_at`（`ok` のとき）、`last_error`（`ok` のとき null）を書く。ログに1行書く。
