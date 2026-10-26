@@ -38,6 +38,7 @@ Epic の I-4 として、canonical モードで Scope とその周りを読む�
 - **Standards**：P0、P1 なし。P2 が3件（ST-1 checkout の失敗の後の再観察が従来より弱い、ST-2 作成の失敗の後の `_branch_tip` の例外で効果が消える、ST-3 `--expect-current` の確かめと従来の処理の取り込みの間の時間と docstring のずれ）、P3 が5件（ST-4 `@root` の `--expect-current` がリンクを求める、ST-5 取り直したときも `source` が `cache`、ST-6 異常のある Scope のディレクトリを `SCOPE_ISSUE_MISSING` と示しうる・`os.walk` の読めないディレクトリ、ST-7 checkout の後のきれいさの確かめがない、ST-8 `clear_active` の写しと `replace_namespace` の置き場）。ゲートの決まりで直さず、下の「Residual Risks」に引き継ぐ。
 - **Spec**：P0 なし。P1 が1件（SP-1 ゲートの SHA で `report.md` が空）。計画では報告書をゲートの後に書く順（S11）だったための指摘で、この報告書を書いた文書だけのコミットで解決し、同じレビュアーに解決を確かめてもらった（下の「SP-1 の確かめ」）。P2 が1件（SP-2 版3の `dependency check` を `--source` なしで動かした JSON を直接比べるテストがない。値は `parse_vnext` の中で `local` に戻し、`--help` の出力は `origin/main` と同じ md5 であることをレビュアーが確かめた）、P3 が4件（SP-3 origin がないときの終了コードがコマンドで違う、SP-4 は ST-3 と同じ、SP-5 一部の異常のコードを CLI で個別に作っていない、SP-6 祖先のディレクトリがないときの `active set` のテストが弱い）。AC-431-01〜14、16 は「満たす」、15 は「実装は満たす。証跡は SP-1」、17 はゲートの実行で満たす。
 - コードはゲートの SHA から変えていないので、lint と全体のテストはやり直していない（文書だけの変更。統括の指示）。
+- **SP-1 の確かめ**：同じ Spec のレビュアーが、`fbaaf94aa`（`f35b08963` からの差分は `report.md` だけ）で SP-1 を「解決」と判定した。その時に指摘された RP-1（P2。この報告書の残るリスクの1文がソースと食い違う）は、文書の記述を直した。
 
 ### 変えた既存のテスト（`git diff origin/main...HEAD -- tests/`。AC-15）
 
@@ -80,7 +81,7 @@ Epic の I-4 として、canonical モードで Scope とその周りを読む�
 
 - **従来の部品への依存**（ST-7、ST-8。判断で直さない）：canonical の処理は、従来のモジュールの非公開の関数（`branch_operations` の `_capture_selection` など、`direct_diagnostics` の `_github_request` など、`scope_query._sort_key`、`direct_artifact._view`）を使い、Artifact の走査は従来の `list_artifacts` の写しである。従来のモジュールを変えない制約（AC-15）のためで、I-13 の撤去で canonical 側に寄せる。
 - **`worktree remove` と無視されたファイル**：canonical モードのworktreeには、いつも無視されたリンク `spec-dock/initiatives` があるので、`worktree remove` には `--discard-ignored` が要る（従来の `spec-dock/active/` のリンクと同じ扱い。リンクを消すだけで、カタログの中身は消えない）。I-9 の文書に書くか、リンクを数えない扱いにするかは、統括の判断に任せる。
-- **`worktree remove --expect-current` の選択**：canonical 側が取り込んだ記録で確かめ、従来の処理がその後に自分で取り込んだ記録の変化を見る。2回の読み取りの間の変化は、従来の処理の確かめで止まるが、間の時間はわずかに残る。
+- **`worktree remove` / `bootstrap` / `create` の `--expect-current` の選択**：canonical 側が取り込んだ記録で期待を確かめた後、従来の処理（`expect_current=None`）が記録を取り込み直す。2回の読み取りの間に選択が変わっても検出しない（わずかな時間の競合として残る）。`canonical_worktrees._captured_selection` の docstring の「従来の処理が変化を見て止まる」はこの動きと合っていない（ゲートの ST-3 / SP-4。コードは変えていない）。
 - **`display` の古さ**：表示は最大30分古い構造を示しうる（Epic の設計どおり）。`--source github` で取り直せる。
 - **I-9 への申し送り**：`plan.md` の「exit / handoff」のとおり（`--source` と `--offline` の意味、`canonical status --structure`、Epic の12章にない新しいコード）。
 - **I-5、I-11 への引き渡し**：`plan.md` の「exit / handoff」のとおり。
