@@ -364,7 +364,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 4. **除外の設定**：`info/exclude` に、上の3行のうち足りない行を足す。
 5. **リンク**：mainのチェックアウトと、実行したチェックアウトに、正しいリンクを置く。ないときは作り、違う先のリンクは、一時的な名前で作ってから `rename` で置き換える（`ln -s` を重ねると、リンクの先の中に余計なリンクができるため。調査の記録）。
 6. **登録簿と定期の実行**（I-3 が足す。実際の順は、6a 登録簿、7 基準、6b ジョブの作成とすぐの実行、6c 記録の確かめ。6b がジョブをすぐに動かすので、先に基準を記録する。ジョブの `PATH` には、git のディレクトリと標準の場所に加え、`gh` のディレクトリも入れる。I-3 の統括の判断）：登録簿にカタログを足し（移動の後なら古いパスの項目を消し）、5章の「定期の実行の選び方」で選んだ仕組みがなければ作って動かす（systemd のない Linux では、常駐のプロセスを起動する）。作った直後に1回だけ実行させ、最大15秒、状態の置き場の記録を待つ。その1回では、push の認証も確かめる（5章の `push_auth`）。読めなかったとき（macOS のプライバシーの保護など）、認証できなかったとき、ログアウト中に止まる環境（linger がない）、常駐のプロセスの環境（起動し直しの1行）は、その原因と次の1手を `warnings` に返す。
-7. **基準**：カタログを作った、または基準がないときは、取得した `origin/spec-dock/canonical` を、そのカタログの基準として状態の置き場に記録する（5章）。
+7. **基準**：カタログを作った、または基準がないときは、取得した `origin/spec-dock/canonical` を、そのカタログの基準として状態の置き場に記録する（5章）。追跡の参照がなく、ローカルに `spec-dock/canonical` があるとき（GitHub で消された後など）は、手元の HEAD を基準にする。手元に未pushのコミットがあると、次の周期は `remote_rewritten` で一時停止し、`resume --adopt-remote` で戻る（I-3 の統括の判断）。
 8. **ツールの設定**：9章の判定を行い、足りない設定を正確な1行で `warnings` に返す。
 
 - 書く手順（3〜5）は、クローンの `StartLock` の中で行う（同じクローンの2つのチェックアウトの同時の `canonical link` を防ぐ）。ネットワークの処理（`ls-remote`、`fetch`、初期の push）は排他の外で行う。取れなければ `START_LOCK_BUSY`（終了コード3）で止まる（I-2 の統括の判断）。
@@ -475,11 +475,14 @@ spec-dock/canonical のルート
     "blocking": [{"path": "...", "reason": "local_edit|held"}],
     "consumed_changesets": ["<束のファイル名>"],
     "push_auth": {"result": "ok|failed|unknown", "at": "...", "message": "..."},
+    "schedule": "none",
+    "adopt_remote_pending": null,
     "dashboard": {"input_hash": "<sha256>", "written_at": "...", "error": null}
   }
   ```
 
   - 書くときは、一時ファイルに書いてから `rename` する。`consumed_changesets` は直近の100件だけを残す。
+  - `schedule` は、`--no-schedule` の印である（3章。ないときは定期の実行あり）。`adopt_remote_pending` は、`resume --adopt-remote` の後の取り込み直しの途中の記録である（下の「一時停止と再開」。途中でなければ null）。`last_error` は、最後の失敗のコード、次の1手、時刻（`at`）を持つ（I-3 の統括の判断）。
   - `push_auth` は、`canonical link` の後の最初の周期と、push が認証で失敗したときに書く。「最初の周期」は、`state.json` に `push_auth` がないか、`result` が `unknown` の周期とし、`canonical link` の手順7が `state.json` を作るときは `unknown` を書く（I-3 の統括の判断）。最初の周期では、送るものがなくても `git push --dry-run origin HEAD:refs/heads/spec-dock/canonical` を行い、認証できるかを確かめる（dry-run でも認証が要ることは確認済み）。失敗したら、リモートの URL が `https` なら `gh auth setup-git`、`ssh` なら「定期の実行には SSH のエージェントが渡らないことがあるので、`https` と `gh` の認証を使う」を次の1手にする。
 - **ログ**：`<根>/canonical-sync.log`。1 MiB を超えたら1世代だけ残して切り替える。ファイルの中身は書いてはならない。
 
@@ -891,7 +894,12 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `CANONICAL_REMOTE_MISSING` | —（警告） | GitHub の `spec-dock/canonical` が消されていないか確かめ、`spec-dock canonical status` の案内に従う（I-2） |
 | `CANONICAL_MAIN_NOT_MIGRATED` | —（警告） | mainのチェックアウトで移行後のコミットをチェックアウトしてから `spec-dock canonical link`（I-2。`canonical status` の `link` の項目でも示す） |
 | `CANONICAL_INSIDE_CATALOG` | 3 | チェックアウトのルートで実行するか、`--project <チェックアウト>` を付ける（I-2） |
-| `CANONICAL_NOT_HELD` | 3 | `spec-dock canonical status` で保留のパスを確かめ、そのパスを指定する（I-3） |
+| `CANONICAL_NOT_HELD`、`CANONICAL_NOT_RESTORABLE`、`CANONICAL_PATH_NOT_FOUND`、`CANONICAL_REGISTRY_UNREADABLE` | 3 | I-3 の `iss-00430-canonical-periodic-sync/design.md` 14章の表の次の1手（I-3） |
+| `CANONICAL_STATE_ROOT_MISMATCH` | 3（`link`）／警告（`status`） | そのジョブの状態の置き場（リンクしたときの `XDG_STATE_HOME`）でコマンドを実行するか、そこに登録したカタログを先に `spec-dock canonical remove` する（I-3） |
+| `CANONICAL_SCHEDULER_FAILED`、`CANONICAL_REMOVE_FAILED` | 6（partial） | I-3 の design.md 14章の表の次の1手（I-3） |
+| `CANONICAL_SYNC_NOT_SCHEDULED`、`CANONICAL_SYNC_NOT_CONFIRMED`、`CANONICAL_PUSH_AUTH_FAILED`、`CANONICAL_LINGER_DISABLED`、`CANONICAL_RUNNER_RESTART`、`CANONICAL_RUNNER_STOPPED`、`CANONICAL_UNPUSHED_STALE`、`CANONICAL_SYNC_BLOCKED`、`CANONICAL_SYNC_FAILED` | —（警告） | I-3 の design.md 14章の表の次の1手。`canonical status` の `sync` の項目での順も、同じ設計書のとおり（I-3） |
+| `CANONICAL_STATE_UNREADABLE`、`CANONICAL_GIT_IN_PROGRESS`、`SYNC_FAILED` | —（`state.json` の `last_error`、`data.catalogs[].error`） | I-3 の design.md 14章の表の次の1手（I-3） |
+- `CANONICAL_PAUSED` は、`resume` の引数の誤りでは終了コード3、`canonical status` では警告として使う。`CANONICAL_SAVE_HELD` も、`canonical status` では警告として使う（`work finish` の終了コード3は I-5）。
 | `DEPENDENCY_NOT_IN_SNAPSHOT`、`READINESS_UNKNOWN`、`DEPENDENCY_NOT_SCOPE`、`SCOPE_DIRECTORY_SLUG_MISMATCH`、`SCOPE_DIRECTORY_DUPLICATE`、`SCOPE_DIRECTORY_MISSING`、`SCOPE_DIRECTORY_MISPLACED`、`SCOPE_ISSUE_MISSING`、`SCOPE_DOCUMENT_MISSING`、`SCOPE_METADATA_PRESENT`、`CANONICAL_CONFLICT_COPY` | —（`workspace validate` の findings と、読むコマンドの警告） | I-4 の `iss-00431-canonical-scope-read/design.md` の表の次の1手（I-4） |
 | `SLUG_REQUIRED` | 3 | `--slug <英小文字とハイフン>` を付ける |
 
