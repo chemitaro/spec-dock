@@ -460,6 +460,17 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("worktree reference requires an absolute path; registered aliases were retired")
     if parsed.command_path == "active clear" and bool(parsed.from_target) == bool(parsed.all):
         parser.error("active clear requires exactly one of --from or --all")
+    if parsed.command_path == "canonical sync":
+        if parsed.loop and not parsed.registered:
+            parser.error("--loop applies only with --registered")
+        if parsed.detach and not parsed.loop:
+            parser.error("--detach applies only with --loop")
+        if parsed.state_root is not None and not Path(parsed.state_root).is_absolute():
+            parser.error("--state-root requires an absolute path")
+    if parsed.command_path == "canonical resume" and parsed.adopt_remote and parsed.push_local:
+        parser.error("canonical resume takes one of --adopt-remote or --push-local")
+    if parsed.command_path == "canonical accept" and not parsed.paths and not parsed.deletions:
+        parser.error("canonical accept requires paths or --deletions")
     if parsed.command_path == "branch create" and not parsed.base:
         parser.error("branch create requires --base")
     if parsed.command_path not in MUTATING_LEAF_PATHS and common.get("yes"):

@@ -84,6 +84,11 @@ def _leaf_arguments(root: Path, outside: Path) -> dict[str, list[str]]:
         "canonical link": [],
         "canonical status": [],
         "canonical check": [],
+        "canonical sync": [],
+        "canonical accept": ["--deletions"],
+        "canonical restore": [],
+        "canonical resume": ["--adopt-remote"],
+        "canonical remove": [],
     }
 
 

@@ -401,6 +401,16 @@ _IN_PROGRESS: Final = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-
 TEMPORARY_INDEX: Final = ".runtime/index.tmp"
 
 
+def _temporary_index(catalog: Path) -> Path:
+    """`<catalog>/.runtime/index.tmp`; the ignored .runtime directory is created without following links."""
+    from pathlib import PurePosixPath
+
+    from spec_dock.runtime.infra.catalog_runtime import runtime_directory
+
+    runtime_directory(catalog, PurePosixPath(".runtime"))
+    return catalog / TEMPORARY_INDEX
+
+
 def reset_index(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> None:
     """Align the real index with HEAD (someone's `git add` must not stop the sync); the work tree is untouched."""
     run_catalog_git(catalog, "reset", "-q", git=git, mutation=True, timeout=timeout)
@@ -469,7 +479,7 @@ def save_commit(
     catalog: Path, paths: Sequence[str], *, message: str, parent: str, git: str = "git", timeout: float = 30.0
 ) -> str:
     """Commit exactly `paths` on top of `parent` through a temporary index and advance the branch from `parent`."""
-    index = catalog / TEMPORARY_INDEX
+    index = _temporary_index(catalog)
     environment = {"GIT_INDEX_FILE": str(index)}
     try:
         run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
@@ -552,7 +562,7 @@ def write_resolution(
     catalog: Path, tree: str, resolution: Resolution, *, git: str = "git", timeout: float = 30.0
 ) -> str:
     """Apply a stage-only resolution to a merged tree in a temporary index and return the resolved tree."""
-    index = catalog / TEMPORARY_INDEX
+    index = _temporary_index(catalog)
     environment = {"GIT_INDEX_FILE": str(index)}
     records = [f"{entry.mode} {entry.oid}\t{entry.path}" for entry in resolution.updates]
     records += [f"0 {'0' * 40}\t{path}" for path in resolution.removals]
@@ -682,3 +692,41 @@ def ignored_files(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> 
 def operation_in_progress(admin_dir: Path) -> str | None:
     """The name of an unfinished Git operation in a worktree's administrative directory, if any."""
     return next((name for name in _IN_PROGRESS if os.path.lexists(admin_dir / name)), None)
+
+
+@dataclass(frozen=True)
+class TreeEntry:
+    mode: str
+    oid: str
+    size: int | None
+
+
+def tree_entries(catalog: Path, tree: str, *, git: str = "git", timeout: float = 30.0) -> dict[str, TreeEntry]:
+    """Every file of a tree with its mode, blob and size (`ls-tree -r -l`)."""
+    output = run_catalog_git(catalog, "ls-tree", "-r", "-l", "-z", tree, git=git, read_only=True, timeout=timeout)
+    entries: dict[str, TreeEntry] = {}
+    for record in output.stdout.split(b"\0"):
+        if not record:
+            continue
+        meta, _, name = record.partition(b"\t")
+        mode, _kind, oid, size = os.fsdecode(meta).split(maxsplit=3)
+        entries[os.fsdecode(name)] = TreeEntry(mode, oid, None if size == "-" else int(size))
+    return entries
+
+
+def blob_bytes(catalog: Path, oid: str, *, git: str = "git", timeout: float = 30.0) -> bytes:
+    return run_catalog_git(catalog, "cat-file", "blob", oid, git=git, read_only=True, timeout=timeout).stdout
+
+
+def commit_on(catalog: Path, tree: str, parent: str, *, message: str, git: str = "git", timeout: float = 30.0) -> str:
+    """A commit of `tree` whose only parent is `parent` (re-adopting on top of GitHub's canonical)."""
+    return _text(
+        run_catalog_git(
+            catalog, "commit-tree", tree, "-p", parent, "-m", message, git=git, mutation=True, timeout=timeout
+        )
+    )
+
+
+def reset_keep(catalog: Path, target: str, *, git: str = "git", timeout: float = 30.0) -> None:
+    """Move the branch and work tree to `target`; Git refuses (changing nothing) when a local edit would be lost."""
+    run_catalog_git(catalog, "reset", "-q", "--keep", target, git=git, mutation=True, timeout=timeout)

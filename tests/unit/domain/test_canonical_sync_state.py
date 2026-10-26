@@ -38,7 +38,8 @@ EPIC_STATE = {
     "consumed_changesets": ["20261025T115900Z-0123456789abcdef.json"],
     "push_auth": {"result": "ok", "at": "2026-10-25T12:00:00Z", "message": None},
     "dashboard": {"input_hash": "c" * 64, "written_at": "2026-10-25T12:00:00Z", "error": None},
-    "allow_unrelated_once": False,
+    "adopt_remote_pending": False,
+    "schedule": None,
 }
 
 
@@ -78,6 +79,7 @@ def test_an_error_keeps_its_program_and_time() -> None:
         {"holds": [{"path": "x", "kind": "odd", "since": "2026-10-25T11:00:00Z"}]},
         {"head": 7},
         {"pending_since": []},
+        {"schedule": "daily"},
     ],
 )
 def test_an_unknown_version_or_malformed_state_is_refused(change: dict[str, object]) -> None:

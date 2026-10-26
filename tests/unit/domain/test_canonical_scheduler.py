@@ -103,3 +103,15 @@ def test_the_restart_line_starts_a_detached_runner_with_the_recorded_root() -> N
     assert restart_line(Path("/s/spec dock")) == (
         "spec-dock canonical sync --registered --loop --detach --state-root '/s/spec dock'"
     )
+
+
+def test_the_job_path_adds_the_gh_directory_after_git() -> None:
+    spec = SchedulerSpec(SPEC.executable, SPEC.state_root, Path("/usr/bin"), SPEC.home, gh_dir=Path("/opt/gh/bin"))
+    plist = plistlib.loads(launchd_plist(spec))
+    assert plist["EnvironmentVariables"] == {"PATH": "/usr/bin:/opt/gh/bin:/usr/bin:/bin:/usr/sbin:/sbin"}
+    service, _timer = systemd_units(spec)
+    assert "Environment=PATH=/usr/bin:/opt/gh/bin:/usr/local/bin:/usr/bin:/bin\n" in service
+    same = SchedulerSpec(
+        SPEC.executable, SPEC.state_root, Path("/opt/homebrew/bin"), SPEC.home, Path("/opt/homebrew/bin")
+    )
+    assert plistlib.loads(launchd_plist(same))["EnvironmentVariables"]["PATH"].count("/opt/homebrew/bin") == 1

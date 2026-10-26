@@ -11,6 +11,7 @@ from spec_dock.runtime.application.canonical_errors import canonical_not_impleme
 from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
 from spec_dock.runtime.application.canonical_status import run_canonical_status
+from spec_dock.runtime.application.canonical_sync import run_canonical_sync, run_registered_sync
 from spec_dock.runtime.application.canonical_worktrees import create_worktree_and_link
 from spec_dock.runtime.application.project_context import ProjectContext
 from spec_dock.runtime.presentation.envelope import OperationResult
@@ -24,12 +25,14 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "canonical link": run_canonical_link,
     "canonical status": run_canonical_status,
     "worktree create": create_worktree_and_link,
+    "canonical sync": run_canonical_sync,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
 # or that inspect the declaration themselves (canonical check). A handler returns None to decline.
 REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
     "canonical check": check_canonical_commit,
+    "canonical sync": run_registered_sync,
 }
 
 

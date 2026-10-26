@@ -74,6 +74,11 @@ LEAF_PATHS: tuple[str, ...] = (
     "installation update",
     "installation uninstall",
     "canonical check",
+    "canonical sync",
+    "canonical accept",
+    "canonical restore",
+    "canonical resume",
+    "canonical remove",
     "help",
     "completion",
 )
@@ -117,13 +122,18 @@ HELP_EFFECTS: dict[str, str] = {
     "workspace validate": "Validate working-tree structure; --ci checks a fixed HEAD without installation or execution state. No changes.",
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
     "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
-    "canonical link": "Find or create this clone's catalog, lock it, add the ignore rules and link the main checkout and this checkout.",
+    "canonical link": "Find or create this clone's catalog, link this checkout, and register periodic sync.",
     "canonical status": "Read catalog, link, ignore rules, access and tool settings; no changes.",
     "installation show": "Read the package version and static resources in one Git worktree; no changes.",
     "installation init": "Place package static resources and a new schema-4 workspace declaration in one Git worktree.",
     "installation update": "Update package static resources in one Git worktree after verified external preservation.",
     "installation uninstall": "Remove known package static resources from one Git worktree while preserving user work and state.",
     "canonical check": "Check that a commit of the code tree holds no specs and has intact SpecDock files; for CI.",
+    "canonical sync": "Save, merge and push the catalog once; `--registered` processes every registered catalog; `--loop` keeps running as the resident runner where systemd is unavailable.",
+    "canonical accept": "Allow held changes to be saved by the next sync.",
+    "canonical restore": "Restore held deletions or paths from the catalog HEAD; no commit.",
+    "canonical resume": "Resume a paused catalog after the user decided how to treat the remote.",
+    "canonical remove": "Remove this clone's catalog, links and sync registration after confirming nothing is unsaved.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -229,13 +239,18 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--backup-dir"),
         _flag("--confirm-old-writers-stopped"),
     ),
-    "canonical link": (),
+    "canonical link": (_flag("--no-schedule"),),
     "canonical status": (),
     "installation show": (_arg("--target"),),
     "installation init": (_arg("path"),),
     "installation update": (_arg("--target"), _arg("--backup-dir")),
     "installation uninstall": (_arg("--target"), _arg("--backup-dir")),
     "canonical check": (_arg("--commit", default="HEAD"),),
+    "canonical sync": (_flag("--registered"), _arg("--state-root"), _flag("--loop"), _flag("--detach")),
+    "canonical accept": (_arg("paths", nargs="*"), _flag("--deletions")),
+    "canonical restore": (_arg("paths", nargs="*"),),
+    "canonical resume": (_flag("--adopt-remote"), _flag("--push-local")),
+    "canonical remove": (),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -274,6 +289,11 @@ MUTATING_LEAF_PATHS = frozenset({
     "workbench copy",
     "workspace migrate",
     "canonical link",
+    "canonical sync",
+    "canonical accept",
+    "canonical restore",
+    "canonical resume",
+    "canonical remove",
     "installation init",
     "installation update",
     "installation uninstall",
@@ -331,13 +351,18 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "workspace validate": "Readable schema-3 metadata and regular requirement.md/design.md/plan.md/report.md files are required for each Scope; document bodies are not judged. --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
     "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
-    "canonical link": "A schema-4 workspace in a clone with a main checkout and Git 2.38 or later. Stops before writing when the catalog path, a link path or the spec-dock/canonical checkout is occupied, when the checkout looks mounted from another machine, or when this process cannot write where it must.",
+    "canonical link": "A schema-4 workspace in a clone with a main checkout and Git 2.38 or later. Stops before writing when the catalog path, a link path or the spec-dock/canonical checkout is occupied, when the checkout looks mounted from another machine, or when this process cannot write where it must (including the state root and the periodic job). --no-schedule records the baseline but registers no periodic job.",
     "canonical status": "A schema-4 workspace in a clone with a main checkout; it never contacts GitHub or the remote.",
     "installation show": "The selected target must be one exact Git worktree root; no workspace or control record is required.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
     "installation update": "A schema-3 or schema-4 worktree-writer workspace and known static hashes are required. Changes need a new external --backup-dir under an existing physical parent and --yes; --dry-run writes nothing. Modified or unknown files require manual merge.",
     "installation uninstall": "Use a schema-3 or schema-4 worktree-writer workspace. Remove only known static hashes after a new external --backup-dir and --yes; --dry-run writes nothing. Modified files stop before changes.",
     "canonical check": "A Git checkout containing the commit (default HEAD); no catalog, network, GitHub token or particular workspace mode is required. Any problem in the commit tree returns exit 7 with each path and its next step.",
+    "canonical sync": "Without --registered: a schema-4 checkout whose catalog is linked. --registered needs no project and reads the registry of --state-root (default ${XDG_STATE_HOME:-~/.local/state}/spec-dock). --loop needs --registered and --detach needs --loop.",
+    "canonical accept": "A linked schema-4 checkout; name existing catalog files (relative to spec-dock/initiatives) or --deletions for the held deletions.",
+    "canonical restore": "A linked schema-4 checkout; every named path must be held (changes.holds) and exist in the catalog HEAD. Without paths, every held deletion is restored.",
+    "canonical resume": "A linked schema-4 checkout whose catalog is paused; --adopt-remote for remote_rewritten or merge_failed, --push-local for remote_deleted.",
+    "canonical remove": "A schema-4 checkout of a clone with a main checkout; stops before writing on unsaved or unpushed changes or on ignored files other than .runtime/ in the catalog. Without --yes it only reports the plan.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -346,6 +371,7 @@ if set(HELP_PRECONDITIONS) != set(LEAF_PATHS):
 
 
 _CONFIRMATION_LEAVES = frozenset({
+    "canonical remove",
     "scope close",
     "scope reopen",
     "scope delete",
@@ -556,6 +582,45 @@ def _help_spec(leaf: str) -> HelpSpec:
         reads = "Current Scope structure, Git worktree inventory, retired record headers, and actual checkout/common-Git data for the external backup."
         json_data = "target, before_protocol, after_protocol, changed_paths, backup_path, backup_verified and restore_verified; legacy active is preserved without import."
         confirmation = "Apply requires --yes and --confirm-old-writers-stopped; the latter is a human operational confirmation, not a monitored guarantee. --dry-run needs neither."
+    elif leaf == "canonical sync":
+        target = "This clone's catalog, or with --registered every catalog in the registry of the state root."
+        reads = "The registry and each catalog's state.json, the catalog work tree and changesets, origin's spec-dock/canonical, and the GitHub structure probe (conditional requests)."
+        writes = "Catalog commits (save and merge, never forced), the push to origin, state.json and the sync log in the state root, and the structure snapshot."
+        does_not = "Does not force-push, rebase, leave conflict markers, or save held changes (mass deletions, secrets, files over 10 MiB)."
+        json_data = "catalogs[] (catalog, result, saved_commit, merged, pushed, conflicts, holds, blocking, skipped_reason, paused, error) and repositories[] (repository, probe, refreshed, dashboards_written)."
+        confirmation = "No final confirmation is required; the periodic job runs this leaf."
+    elif leaf == "canonical accept":
+        target = "Held paths of this clone's catalog."
+        reads = "The catalog files named and the held deletions in state.json."
+        writes = "Only <catalog>/.runtime/accepted.json; nothing is committed."
+        does_not = "Does not commit, push or change state.json; a changed file is judged again."
+        json_data = "accepted paths with their blob values and accepted deletions."
+        confirmation = "No final confirmation is required; the user names what to allow."
+    elif leaf == "canonical restore":
+        target = "Held paths of this clone's catalog."
+        reads = "The holds in state.json and the catalog HEAD."
+        writes = (
+            "The named held files (or every held deletion) in the catalog work tree, from HEAD; nothing is committed."
+        )
+        does_not = "Does not touch a path that is not held, delete a file HEAD lacks, commit or push."
+        json_data = "restored paths."
+        confirmation = "No final confirmation is required; only held paths are restored."
+    elif leaf == "canonical resume":
+        target = "This clone's paused catalog."
+        reads = "The pause reason in state.json and origin's spec-dock/canonical."
+        writes = (
+            "state.json (pause cleared, baseline set); --push-local also pushes the local canonical to recreate it."
+        )
+        does_not = "Does not force-push or delete local commits; local-only commits are merged by the next sync."
+        json_data = "catalog, paused_before, baseline, pushed."
+        confirmation = "No final confirmation is required; the option names the user's decision."
+    elif leaf == "canonical remove":
+        target = "This clone's catalog, the links of its checkouts and its sync registration."
+        reads = "The catalog status and ignored files, Git worktree inventory, info/exclude, the registry and the periodic job."
+        writes = "Removes correct links, the catalog worktree, the three info/exclude lines, the registry entry and state, and the periodic job when no other catalog is registered."
+        does_not = "Does not delete the local or GitHub spec-dock/canonical branch, the structure snapshot or a real directory at a link path."
+        json_data = "removed effects; without --yes the planned effects."
+        confirmation = "Apply requires --yes; without it (or with --dry-run) only the plan is reported."
     elif leaf == "canonical check":
         target = "One commit of this checkout (--commit, default HEAD); the working tree and index are not read."
         reads = "The commit's tree listing, its workspace declaration, spec-dock/.gitignore, version file and static file blobs, and the installed package inventory."

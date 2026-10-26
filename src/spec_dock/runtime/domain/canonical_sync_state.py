@@ -215,7 +215,8 @@ class CatalogSyncState:
     consumed_changesets: tuple[str, ...] = ()
     push_auth: PushAuth | None = None
     dashboard: Mapping[str, object] | None = None  # iss-00438 owns its meaning; kept as read
-    allow_unrelated_once: bool = False
+    adopt_remote_pending: bool = False  # resume --adopt-remote: re-adopt on top of R with R as the only parent
+    schedule: Literal["none"] | None = None  # canonical link --no-schedule: link_after_command skips step 6
 
     @classmethod
     def new(cls, catalog: str, *, at: str) -> CatalogSyncState:
@@ -244,7 +245,8 @@ class CatalogSyncState:
             "consumed_changesets": list(self.consumed_changesets[-CONSUMED_CHANGESETS_KEPT:]),
             "push_auth": self.push_auth.to_json() if self.push_auth else None,
             "dashboard": dict(self.dashboard) if self.dashboard is not None else None,
-            "allow_unrelated_once": self.allow_unrelated_once,
+            "adopt_remote_pending": self.adopt_remote_pending,
+            "schedule": self.schedule,
         }
 
     @classmethod
@@ -260,11 +262,14 @@ class CatalogSyncState:
         contains = payload.get("remote_contains_head")
         if contains is not None and not isinstance(contains, bool):
             raise StateFormatError("remote_contains_head must be a boolean")
-        allow = payload.get("allow_unrelated_once", False)
+        allow = payload.get("adopt_remote_pending", False)
         if not isinstance(allow, bool):
-            raise StateFormatError("allow_unrelated_once must be a boolean")
+            raise StateFormatError("adopt_remote_pending must be a boolean")
         dashboard = payload.get("dashboard")
         paused = payload.get("paused")
+        schedule = payload.get("schedule")
+        if schedule not in (None, "none"):
+            raise StateFormatError('schedule must be "none" or null')
         return cls(
             catalog=_text(payload.get("catalog"), "catalog"),
             updated_at=_text(payload.get("updated_at"), "updated_at"),
@@ -285,7 +290,8 @@ class CatalogSyncState:
             ),
             push_auth=cast("PushAuth | None", optional("push_auth", PushAuth.from_json)),
             dashboard=None if dashboard is None else _object(dashboard, "dashboard"),
-            allow_unrelated_once=allow,
+            adopt_remote_pending=allow,
+            schedule=cast("Literal['none'] | None", schedule),
         )
 
 

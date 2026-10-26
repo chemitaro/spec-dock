@@ -29,6 +29,13 @@ class SchedulerSpec:
     state_root: Path
     git_dir: Path
     home: Path
+    gh_dir: Path | None = None  # the gh found at link time, so step 7 finds gh in the job's narrow PATH
+
+    def search_path(self, tail: str) -> str:
+        directories = [str(self.git_dir)]
+        if self.gh_dir is not None and self.gh_dir != self.git_dir:
+            directories.append(str(self.gh_dir))
+        return ":".join([*directories, tail])
 
     @property
     def log(self) -> Path:
@@ -64,7 +71,7 @@ def launchd_plist(spec: SchedulerSpec, *, label: str = LAUNCHD_LABEL) -> bytes:
         "RunAtLoad": True,
         "StandardOutPath": str(spec.log),
         "StandardErrorPath": str(spec.log),
-        "EnvironmentVariables": {"PATH": f"{spec.git_dir}:{_LAUNCHD_PATH_TAIL}"},
+        "EnvironmentVariables": {"PATH": spec.search_path(_LAUNCHD_PATH_TAIL)},
     })
 
 
@@ -84,7 +91,7 @@ def systemd_units(spec: SchedulerSpec) -> tuple[str, str]:
         "[Service]\n"
         "Type=oneshot\n"
         "WorkingDirectory=%h\n"
-        f"Environment={systemd_quote(f'PATH={spec.git_dir}:{_SYSTEMD_PATH_TAIL}')}\n"
+        f"Environment={systemd_quote('PATH=' + spec.search_path(_SYSTEMD_PATH_TAIL))}\n"
         f"ExecStart={command}\n"
     )
     timer = (

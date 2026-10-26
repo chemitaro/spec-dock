@@ -50,6 +50,27 @@ CANONICAL_REMOTE_MISSING: Final = "CANONICAL_REMOTE_MISSING"
 CANONICAL_MAIN_NOT_MIGRATED: Final = "CANONICAL_MAIN_NOT_MIGRATED"
 CANONICAL_CHECKOUT_NOT_MIGRATED: Final = "CANONICAL_CHECKOUT_NOT_MIGRATED"
 CANONICAL_INSIDE_CATALOG: Final = "CANONICAL_INSIDE_CATALOG"
+# Periodic sync (iss-00430). Warnings unless noted.
+CANONICAL_SYNC_NOT_SCHEDULED: Final = "CANONICAL_SYNC_NOT_SCHEDULED"
+CANONICAL_SYNC_NOT_CONFIRMED: Final = "CANONICAL_SYNC_NOT_CONFIRMED"
+CANONICAL_PUSH_AUTH_FAILED: Final = "CANONICAL_PUSH_AUTH_FAILED"
+CANONICAL_LINGER_DISABLED: Final = "CANONICAL_LINGER_DISABLED"
+CANONICAL_RUNNER_RESTART: Final = "CANONICAL_RUNNER_RESTART"
+CANONICAL_RUNNER_STOPPED: Final = "CANONICAL_RUNNER_STOPPED"
+CANONICAL_UNPUSHED_STALE: Final = "CANONICAL_UNPUSHED_STALE"
+CANONICAL_SYNC_BLOCKED: Final = "CANONICAL_SYNC_BLOCKED"
+CANONICAL_SYNC_FAILED: Final = "CANONICAL_SYNC_FAILED"
+CANONICAL_STATE_UNREADABLE: Final = "CANONICAL_STATE_UNREADABLE"
+CANONICAL_GIT_IN_PROGRESS: Final = "CANONICAL_GIT_IN_PROGRESS"
+CANONICAL_PAUSED: Final = "CANONICAL_PAUSED"  # exit 3 for a resume with the wrong option
+CANONICAL_SAVE_HELD: Final = "CANONICAL_SAVE_HELD"
+CANONICAL_UNSAVED_CHANGES: Final = "CANONICAL_UNSAVED_CHANGES"  # exit 3
+CANONICAL_IGNORED_FILES_PRESENT: Final = "CANONICAL_IGNORED_FILES_PRESENT"  # exit 3
+CANONICAL_SCHEDULER_FAILED: Final = "CANONICAL_SCHEDULER_FAILED"  # partial, exit 6
+CANONICAL_NOT_HELD: Final = "CANONICAL_NOT_HELD"  # exit 3
+CANONICAL_NOT_RESTORABLE: Final = "CANONICAL_NOT_RESTORABLE"  # exit 3
+CANONICAL_PATH_NOT_FOUND: Final = "CANONICAL_PATH_NOT_FOUND"  # exit 3
+CANONICAL_REGISTRY_UNREADABLE: Final = "CANONICAL_REGISTRY_UNREADABLE"  # exit 3
 
 NOT_IMPLEMENTED_RECOVERY: Final = (
     "Wait for SpecDock 0.3.0, which completes canonical mode for this command; "
@@ -113,6 +134,57 @@ REMOTE_MISSING_NEXT_STEP: Final = (
     "Check whether the GitHub branch spec-dock/canonical was deleted; if it was, sync stops; "
     "follow spec-dock canonical status."
 )
+SYNC_NOT_SCHEDULED_NEXT_STEP: Final = (
+    "Run spec-dock canonical link (without --no-schedule) to register this catalog for periodic sync."
+)
+PRIVACY_NEXT_STEP: Final = (
+    "In System Settings > Privacy & Security, allow Full Disk Access (or Removable Volumes) for the listed "
+    "programs (the spec-dock Python and git), then check spec-dock canonical status."
+)
+SYNC_LOG_NEXT_STEP: Final = "Check <state root>/canonical-sync.log, then spec-dock canonical status."
+PUSH_AUTH_HTTPS_NEXT_STEP: Final = "Run gh auth setup-git so the periodic job can push over HTTPS."
+PUSH_AUTH_SSH_NEXT_STEP: Final = (
+    "The periodic job may not get an SSH agent; switch origin to https and use gh authentication (gh auth setup-git)."
+)
+LINGER_NEXT_STEP: Final = (
+    "Run loginctl enable-linger {user} (it may need administrator rights) so sync keeps running after logout."
+)
+UNPUSHED_STALE_NEXT_STEP: Final = (
+    "Check the network and gh auth status, then look at the sync item of spec-dock canonical status."
+)
+SYNC_BLOCKED_NEXT_STEP: Final = (
+    "Finish editing the listed files; they are saved within 5 minutes and then merged. "
+    "A held file needs the next step of changes.holds."
+)
+STATE_UNREADABLE_NEXT_STEP: Final = "Inspect and move the listed file aside, then run spec-dock canonical link."
+GIT_IN_PROGRESS_NEXT_STEP: Final = (
+    "Finish the unfinished Git operation in the catalog (for example git -C <catalog> merge --abort)."
+)
+PAUSED_NEXT_STEP: Final = (
+    "Read the pause reason in spec-dock canonical status, follow 'When sync stops' in the SpecDock docs, then run "
+    "spec-dock canonical resume --adopt-remote (remote_rewritten, merge_failed) or --push-local (remote_deleted)."
+)
+SAVE_HELD_NEXT_STEPS: Final[Mapping[str, str]] = {
+    "mass_delete": "If the deletions are intended, run spec-dock canonical accept --deletions; "
+    "if not, run spec-dock canonical restore.",
+    "secret": "Remove the secret from the file (the hold lifts by itself), or run spec-dock canonical accept <path> "
+    "for a false positive.",
+    "too_large": "Make the file 10 MiB or smaller, or run spec-dock canonical accept <path>.",
+}
+ADOPT_HELD_NEXT_STEP: Final = (
+    "The listed files came back from local commits that GitHub dropped; fix or remove them in the catalog "
+    "(or run spec-dock canonical accept <path>), then run spec-dock canonical resume --adopt-remote again."
+)
+UNSAVED_CHANGES_RECOVERY: Final = "Check spec-dock canonical status and wait until everything is saved and pushed."
+IGNORED_FILES_RECOVERY: Final = "Move the listed files out of the catalog, then run the same command again."
+SCHEDULER_FAILED_RECOVERY: Final = "Check the reported output, then run spec-dock canonical link again."
+NOT_HELD_RECOVERY: Final = "Name paths listed in changes.holds of spec-dock canonical status."
+NOT_RESTORABLE_RECOVERY: Final = (
+    "HEAD has no version of this file; fix or delete it yourself, or run spec-dock canonical accept <path> to save it."
+)
+PATH_NOT_FOUND_RECOVERY: Final = "Name an existing file inside the catalog (relative to spec-dock/initiatives)."
+REGISTRY_UNREADABLE_RECOVERY: Final = "Inspect and move the listed registry aside, then run spec-dock canonical link."
+STATUS_RECOVERY: Final = "spec-dock canonical status"
 _FAILURE_EXIT_CODES: Final = frozenset({1, 2, 3, 4, 5, 7})
 
 _GITHUB_RECOVERY: Final[Mapping[str, str]] = {
