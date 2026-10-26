@@ -121,4 +121,4 @@ def test_an_unknown_user_manager_keeps_a_previous_systemd_choice() -> None:
     assert select_scheduler("linux", systemd_present=True, systemd_user=None, previous="systemd") == "systemd"
     assert select_scheduler("linux", systemd_present=True, systemd_user=None, previous=None) == "loop"
     assert select_scheduler("linux", systemd_present=False, systemd_user=None, previous="systemd") == "loop"
-    assert systemd_quote("/a/$HOME") == "/a/$$HOME"
+    assert systemd_quote("/a/$HOME", command=True) == "/a/$$HOME" and systemd_quote("/a/$HOME") == "/a/$HOME"

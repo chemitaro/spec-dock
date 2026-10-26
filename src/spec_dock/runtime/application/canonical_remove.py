@@ -17,6 +17,7 @@ from spec_dock.runtime.application.canonical_catalog import observe_catalog, req
 from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_IGNORED_FILES_PRESENT,
     CANONICAL_LOCK_BUSY,
+    CANONICAL_PATH_OCCUPIED,
     CANONICAL_REGISTRY_UNREADABLE,
     CANONICAL_SANDBOX_DENIED,
     CANONICAL_UNSAVED_CHANGES,
@@ -113,6 +114,14 @@ def _remove(
 ) -> OperationResult[object]:
     timeout = namespace.timeout
     observation = observe_catalog(layout, environment, timeout=timeout)
+    if observation.state in ("occupied", "elsewhere", "foreign"):
+        # Not a catalog this command can check for unsaved work: stop before taking anything away.
+        raise CanonicalCommandError(
+            CANONICAL_PATH_OCCUPIED,
+            observation.detail or f"{layout.catalog} is not this clone's catalog in a removable state",
+            recovery=(STATUS_RECOVERY,),
+            details={"catalog_state": observation.state, "next_step": STATUS_RECOVERY},
+        )
     present = observation.state in ("ready", "repair") and Path(catalog).is_dir()
     lock = CatalogLock(Path(catalog), timeout=10.0) if present and apply else None
     if lock is not None:

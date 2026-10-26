@@ -77,16 +77,21 @@ def launchd_plist(spec: SchedulerSpec, *, label: str = LAUNCHD_LABEL) -> bytes:
     })
 
 
-def systemd_quote(value: str) -> str:
-    """Escape specifiers (%) and variables ($), and quote a value that holds whitespace, quotes or backslashes."""
-    escaped = value.replace("%", "%%").replace("$", "$$")
+def systemd_quote(value: str, *, command: bool = False) -> str:
+    """Escape specifiers (%), in a command line also variables ($), and quote whitespace, quotes or backslashes.
+
+    systemd expands $VAR only in ExecStart=; in Environment= a `$` is an ordinary character.
+    """
+    escaped = value.replace("%", "%%")
+    if command:
+        escaped = escaped.replace("$", "$$")
     if any(character.isspace() or character in "\"'\\" for character in escaped):
         return '"' + escaped.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return escaped
 
 
 def systemd_units(spec: SchedulerSpec) -> tuple[str, str]:
-    command = " ".join(systemd_quote(argument) for argument in spec.arguments())
+    command = " ".join(systemd_quote(argument, command=True) for argument in spec.arguments())
     service = (
         "[Unit]\n"
         "Description=SpecDock canonical sync\n"

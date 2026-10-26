@@ -764,3 +764,58 @@ def test_an_unexpected_failure_is_recorded_in_the_state(pair: SyncPair, monkeypa
     state = pair.state(pair.a)
     assert state is not None and state.last_error is not None and state.last_error.code == "SYNC_FAILED"
     assert state.last_cycle is not None and state.last_cycle.result == "error"
+
+
+def test_an_incoming_file_never_replaces_an_ignored_local_file(pair: SyncPair) -> None:
+    pair.write(pair.a, "s.md", "s\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.b)
+    scratch = pair.specs(pair.b) / "init-00001-x/.workbench/notes.md"
+    scratch.parent.mkdir(parents=True)
+    scratch.write_text("MY LOCAL SCRATCH\n")
+    forced = _commit_on_remote(pair, {"init-00001-x/.workbench/notes.md": "from other pc\n"}, parent=pair.remote_head())
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", forced)
+    _code, result = pair.sync(pair.b)
+    item = catalog_result(result)
+    assert item["merged"] is False and item["blocking"][0]["path"] == "init-00001-x/.workbench/notes.md", result
+    assert scratch.read_text() == "MY LOCAL SCRATCH\n"
+
+
+def test_a_new_file_in_a_directory_renamed_elsewhere_is_kept_without_pausing(pair: SyncPair) -> None:
+    pair.write(pair.a, "init-00001-x/requirement.md", "r\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.b)
+    (pair.specs(pair.a) / "init-00001-x").rename(pair.specs(pair.a) / "init-00001-y")
+    pair.write(pair.b, "init-00001-x/new.md", "new in b\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    pair.sync(pair.a)
+    _code, result = pair.sync(pair.b)
+    item = catalog_result(result)
+    assert item["result"] == "ok" and item["merged"] and item["pushed"], result
+    found = list(pair.specs(pair.b).rglob("new.md"))
+    assert found and found[0].read_text() == "new in b\n"
+    assert (pair.specs(pair.b) / "init-00001-y/requirement.md").exists()
+
+
+def test_refresh_structures_runs_once_per_repository(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock.runtime.application.canonical_sync import SyncContext, refresh_structures
+    from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry
+    from spec_dock.runtime.infra.github_snapshot import clear_memory
+    from spec_dock.runtime.infra.github_structure import GithubApi
+    from tests.support.fake_github import FakeGithub
+
+    fake = FakeGithub("example/repo")
+    clear_memory()
+    entries = [
+        RegistryEntry("/x/one", str(pair.a), "github.com/example/repo", "git", "2026-10-26T00:00:00Z"),
+        RegistryEntry("/x/two", str(pair.b), "github.com/example/repo", "git", "2026-10-26T00:00:00Z"),
+        RegistryEntry("/x/three", str(pair.b), None, "git", "2026-10-26T00:00:00Z"),
+    ]
+    ctx = SyncContext(pair.state_root, github_api=lambda cwd: GithubApi(runner=fake, clock=fake.clock))
+    results = refresh_structures(entries, ctx)
+    assert [(item.repository, item.refreshed, item.dashboards_written) for item in results] == [
+        ("github.com/example/repo", True, 0)
+    ]

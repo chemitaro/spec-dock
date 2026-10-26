@@ -512,13 +512,21 @@ def save_commit(
     checked = dict(contents or {})
     try:
         run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
-        rest = [path for path in paths if path not in checked]
-        if rest:
-            run_catalog_git(
-                catalog, "add", "-A", git=git, environment=environment, pathspecs=rest, mutation=True, timeout=timeout
-            )
+        # `git add` decides every mode (core.fileMode, symbolic links) and applies the attributes; checked files
+        # then get exactly the checked bytes at the mode Git chose.
+        run_catalog_git(
+            catalog,
+            "add",
+            "-A",
+            git=git,
+            environment=environment,
+            pathspecs=list(paths),
+            mutation=True,
+            timeout=timeout,
+        )
+        modes = _index_modes(catalog, environment, git=git, timeout=timeout)
         for path, payload in sorted(checked.items()):
-            if path not in paths:
+            if path not in paths or path not in modes:
                 continue
             # --path applies the catalog's attributes (eol, clean filters such as LFS or git-crypt) as `git add` does.
             oid = _text(
@@ -534,7 +542,7 @@ def save_commit(
                     timeout=timeout,
                 )
             )
-            mode = "100755" if os.access(catalog / path, os.X_OK) else "100644"
+            mode = modes[path]
             run_catalog_git(
                 catalog,
                 "update-index",
@@ -567,6 +575,18 @@ def save_commit(
     return commit
 
 
+def _index_modes(catalog: Path, environment: Mapping[str, str], *, git: str, timeout: float) -> dict[str, str]:
+    output = run_catalog_git(
+        catalog, "ls-files", "-s", "-z", git=git, environment=environment, read_only=True, timeout=timeout
+    )
+    modes: dict[str, str] = {}
+    for record in output.stdout.split(b"\0"):
+        if record:
+            meta, _, name = record.partition(b"\t")
+            modes[os.fsdecode(name)] = os.fsdecode(meta).split(" ", 1)[0]
+    return modes
+
+
 def is_ancestor(catalog: Path, ancestor: str, descendant: str, *, git: str = "git", timeout: float = 30.0) -> bool:
     """`merge-base --is-ancestor`; a missing object raises GitProcessError (the caller pauses on it)."""
     output = run_catalog_git(
@@ -597,7 +617,8 @@ def merge_tree(
     """Merge without touching the work tree: 0 clean, 1 conflicts (with stage records), 2 or more failed."""
     from spec_dock.runtime.domain.canonical_sync_rules import ConflictEntry
 
-    args = ["merge-tree", "--write-tree", "-z"]
+    # A new file in a directory the other side renamed stays where it was written (no invented path to pause on).
+    args = ["-c", "merge.directoryRenames=false", "merge-tree", "--write-tree", "-z"]
     if allow_unrelated:
         args.append("--allow-unrelated-histories")
     output = run_catalog_git(
@@ -677,7 +698,16 @@ _MERGE_CONFIG: Final = ("-c", "merge.verifySignatures=false", "-c", "merge.autoS
 def fast_forward(catalog: Path, target: str, *, git: str = "git", timeout: float = 30.0) -> None:
     """Advance HEAD and the work tree; Git refuses (and changes nothing) when a local edit would be overwritten."""
     run_catalog_git(
-        catalog, *_MERGE_CONFIG, "merge", "--ff-only", "--no-edit", target, git=git, mutation=True, timeout=timeout
+        catalog,
+        *_MERGE_CONFIG,
+        "merge",
+        "--ff-only",
+        "--no-edit",
+        "--no-overwrite-ignore",  # an ignored local file (a .workbench note) is never replaced silently
+        target,
+        git=git,
+        mutation=True,
+        timeout=timeout,
     )
 
 

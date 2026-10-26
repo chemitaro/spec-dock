@@ -145,3 +145,10 @@ def test_remove_keeps_the_structure_snapshot(pair: SyncPair) -> None:
     snapshot.write_text("{}")
     assert pair.run(pair.a, "canonical", "remove", "--yes")[0] == 0
     assert snapshot.read_text() == "{}"
+
+
+def test_remove_stops_when_the_catalog_is_on_another_branch(pair: SyncPair) -> None:
+    git(pair.catalog(pair.a), "switch", "-q", "-c", "elsewhere")
+    code, result = pair.run(pair.a, "canonical", "remove", "--yes")
+    assert code == 3 and result["error"]["code"] == "CANONICAL_PATH_OCCUPIED" and result["effects"] == []
+    assert read_registry(pair.state_root).catalogs

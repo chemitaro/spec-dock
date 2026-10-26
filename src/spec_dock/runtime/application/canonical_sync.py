@@ -648,6 +648,8 @@ def _merge(run: _Run) -> None:
         run.pause("merge_failed", "the incoming canonical carries SpecDock's .runtime area: " + ", ".join(runtime[:5]))
         raise _Stop
     edited = {change.path for change in canonical_git.list_changes(catalog, git=git)}
+    # Ignored files are user data too (merge and reset --keep would replace them without a word).
+    edited |= set(canonical_git.ignored_files(catalog, git=git))
     blocked = _overlaps(incoming, edited)
     if blocked:
         run.state = run.state.evolve(

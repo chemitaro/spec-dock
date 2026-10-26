@@ -213,3 +213,12 @@ def test_the_auth_next_step_depends_on_the_remote_kind() -> None:
 
     assert "gh auth setup-git" in auth_next_step("https://github.com/o/r.git")
     assert "https" in auth_next_step("git@github.com:o/r.git") and "SSH" in auth_next_step("ssh://git@github.com/o/r")
+
+
+def test_checked_bytes_keep_the_mode_git_would_choose(catalog: Path) -> None:
+    git(catalog, "config", "core.fileMode", "false")
+    head = git(catalog, "rev-parse", "HEAD")
+    (catalog / "tool.sh").write_text("echo\n")
+    (catalog / "tool.sh").chmod(0o755)
+    canonical_git.save_commit(catalog, ["tool.sh"], message="m", parent=head, contents={"tool.sh": b"echo\n"})
+    assert git(catalog, "ls-tree", "HEAD", "tool.sh").split()[0] == "100644"
