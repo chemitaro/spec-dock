@@ -281,6 +281,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - **I-2 から引き継ぐもの**（2026-10-26 の統括の判断。I-2 の報告書）：
     - 実機の確かめ（利用者の設定は変えず、一時の `HOME` か `--settings` のファイルで行う）：Codex の `writable_roots` の1行が効くこと、Claude Code のユーザー設定のファイルに書いた1行での動き、Git 2.38 ちょうどでの動き、Linux の Landlock のサンドボックスでの判定。利用者の本物の設定での確かめは、I-10 で、利用者が1行を足すときに行う。
     - 小さな直し：ツールの設定の判定で、Claude Code の `CLAUDE_CONFIG_DIR` を見る（ST-12）。ヘルプの「書くもの」に、fetch の refspec の追加と、ローカルのブランチの付け替えを足す（ST-9）。
+    - I-3 から（2026-10-26 の統括の判断。I-3 の `report.md`）：取り込み直しの途中（`adopt_remote_pending`）は `resume --push-local` を拒み、次の1手を示す（GitHub で消した履歴を送り直さないため。ゲート8 ST-1）。systemd の止め方の設定（`KillMode`、`TimeoutStopSec`）が要るかを、実機の確かめ（AC-18）で見る。文書に書くこと：登録済みのカタログへの `--no-schedule` は登録を外さない（外すのは `canonical remove`）、予行演習では `XDG_STATE_HOME` を必ず一時ディレクトリにする（`--no-schedule` でも基準を書くため。`migrate.py` の README にも書く）、`merge_failed` の2回目の `resume`、カタログで手で Git を使わないこと。
     - I-4 と I-8 から：I-4 の新しいコード（`design.md` 12章）を、`help` と参照の文書に書く。`dependency check` と `workspace sync` の `--source` の既定の意味、`--offline`、`canonical status --structure` を文書に書く。`migrate.py undo` が、作業の記録がないときに何もせずに終了コード0で終わるので、次の1手を付けて止まるように直す（I-8 の ST-1。I-10 の前に要る）。
     - 使い方の文書の制約：main が sparse-checkout だと、カタログがその設定を引き継ぎ、仕様が見えない（ST-2）。カタログに対する Git の呼び出しは `GIT_ASKPASS` を通さないので、askpass で HTTPS の認証をしている環境では、push と fetch が失敗しうる（ST-13）。
 - **受け入れ**：
