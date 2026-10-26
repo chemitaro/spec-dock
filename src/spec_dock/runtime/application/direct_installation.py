@@ -25,7 +25,7 @@ from spec_dock.runtime.infra.file_publication import (
 from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import open_guarded_directory
 from spec_dock.runtime.infra.legacy_reader import inspect_json_file
-from spec_dock.runtime.infra.static_assets import package_static_assets
+from spec_dock.runtime.infra.static_assets import classify_static_digest, package_static_assets
 from spec_dock.runtime.presentation.command_data import FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, OperationResult, RecoveryInstructions
 
@@ -95,15 +95,7 @@ def install_static_assets(namespace: argparse.Namespace, context: GitContext) ->
             except (OSError, ValueError):
                 classification = "unsafe"
             else:
-                classification = (
-                    "missing"
-                    if digest is None
-                    else "current"
-                    if digest == asset.sha256
-                    else "known-old"
-                    if digest in asset.known_old_sha256
-                    else "unknown"
-                )
+                classification = classify_static_digest(asset, digest)
             observed.append({"path": asset.path, "classification": classification})
         data["assets"] = tuple(observed)
         return OperationResult(namespace.command_path, "succeeded", FamilyData("installation", data), 0)

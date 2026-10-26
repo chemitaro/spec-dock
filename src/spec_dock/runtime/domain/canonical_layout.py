@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from itertools import pairwise
 from pathlib import Path, PurePosixPath
 import re
 from typing import TYPE_CHECKING, Final, Literal
@@ -79,17 +78,25 @@ def link_state(observed: LinkObservation, *, expected_text: str, catalog: Path |
     return "wrong_link"
 
 
-def missing_lines(text: str | None, lines: Sequence[str]) -> tuple[str, ...]:
-    """The rule lines that are not in effect: all of them unless each is present and the last copies are in order.
+def ignore_rules_state(text: str | None, lines: Sequence[str]) -> tuple[tuple[str, ...], bool]:
+    """(lines absent from the text, whether the negation fails to follow the rule it re-includes).
 
-    Git applies the last matching pattern, so `!/spec-dock/initiatives/` must come after `/spec-dock/initiatives`;
-    a block with a line missing or out of order is reported (and repaired) as a whole.
+    Git applies the last matching pattern, so the last line (`!/…/initiatives/`) must come after the line before it
+    (`/…/initiatives`); otherwise a real initiatives directory is ignored too. The other line's place does not matter.
     """
     stripped = [line.rstrip() for line in (text or "").splitlines()]
-    last = [max((index for index, line in enumerate(stripped) if line == rule), default=-1) for rule in lines]
-    if all(index >= 0 for index in last) and all(a < b for a, b in pairwise(last)):
-        return ()
-    return tuple(lines)
+    absent = tuple(rule for rule in lines if rule not in stripped)
+    if absent:
+        return absent, False
+    rule, negation = lines[-2], lines[-1]
+    last = {value: max(index for index, line in enumerate(stripped) if line == value) for value in (rule, negation)}
+    return (), last[negation] < last[rule]
+
+
+def missing_lines(text: str | None, lines: Sequence[str]) -> tuple[str, ...]:
+    """The rule lines not in effect: none when all are present in an effective order, else all of them."""
+    absent, misordered = ignore_rules_state(text, lines)
+    return tuple(lines) if absent or misordered else ()
 
 
 def append_lines(text: str | None, lines: Sequence[str]) -> str:

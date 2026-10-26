@@ -37,7 +37,7 @@ Epic の記述と違う点、Epic で決まっていなかった点は、統括�
 ### Target
 
 ```text
-cli/catalog.py                    LEAF_PATHS に canonical link、canonical status（46個）
+cli/catalog.py                    LEAF_PATHS に canonical link、canonical status（I-7 の canonical check を含めて47個）
 commands/canonical_dispatch.py    CANONICAL_HANDLERS に canonical link、canonical status、worktree create
 application/
   canonical_catalog.py            resolve_layout、observe_catalog、require_linked、catalog_changes（C3、C4）
@@ -82,7 +82,7 @@ GITIGNORE_LINES: Final = ("/.canonical/", "/initiatives", "!/initiatives/")     
 MINIMUM_GIT_VERSION: Final = (2, 38, 0)
 ```
 
-- I-7（`canonical check` の無視の3行の確かめ）と I-8（移行のスクリプトが写す値）は、`GITIGNORE_LINES` と `EXCLUDE_LINES` を使う（I-8 は写した値をこの定数と比べる）。
+- I-7（`canonical check` の無視の3行の確かめ）と I-8（移行のスクリプトが写す値）は、`GITIGNORE_LINES` と `EXCLUDE_LINES` を使う（I-8 は写した値をこの定数と比べる）。I-7 は先にマージされたので、この Issue のマージで `application/canonical_check.py` の `SPEC_DOCK_IGNORE_LINES` を `GITIGNORE_LINES` そのものにし、行があるかと順の判定も `ignore_rules_state` にそろえた（統括の指示 msg_8f0e0917a295）。
 
 型と関数：
 
@@ -106,6 +106,7 @@ class LinkObservation:
     path: Path; kind: LinkKind; text: str | None; resolved: Path | None; entries: int | None
 
 def link_state(observed: LinkObservation, *, expected_text: str, catalog: Path | None) -> LinkState
+def ignore_rules_state(text: str | None, lines: Sequence[str]) -> tuple[tuple[str, ...], bool]  # (ない行, 順が違うか)
 def missing_lines(text: str | None, lines: Sequence[str]) -> tuple[str, ...]
 def append_lines(text: str | None, lines: Sequence[str]) -> str
 def parse_git_version(reported: str) -> tuple[int, int, int] | None
@@ -114,7 +115,7 @@ def git_supported(version: tuple[int, int, int] | None) -> bool
 
 - **正しいリンク**（`link_state` が `correct`）：`kind == "symlink"`、`text == expected_text`、`resolved` が `catalog`（カタログの実際のパス。カタログがなければ `None` で、`correct` にならない）と同じ。`kind` が `directory`、`file`、`other` なら `occupied`（`entries` はディレクトリの中の、リンクをたどらずに数えたファイルとディレクトリの数）。そのほかのシンボリックリンク（値が違う、先がない）は `wrong_link`。
 - `canonical link` が書き直すのは、値（`text`）が期待と違うリンクと、ないリンクだけである。値が同じでカタログがまだないリンクは書き直さず、カタログを作った後に `correct` になる。
-- `missing_lines` は、各行の末尾の空白と `\r` を除いて、行が完全に同じかで比べる。3行のどれかがないか、最後に現れる位置が順になっていない（Git は最後に当たった規則を使うので、`!/spec-dock/initiatives/` が `/spec-dock/initiatives` より後でなければ、実体のディレクトリの新しいファイルまで無視される）ときは、3行すべてを返す。`append_lines` は、そのとき、末尾に改行がなければ足してから、1行の注記 `# spec-dock canonical catalog and link (added by spec-dock canonical link)` と3行を、正しい順のまとまりとして足す（前にある一部の行は、そのまま残す）。
+- `ignore_rules_state` は、各行の末尾の空白と `\r` を除いて、行が完全に同じかで比べ、ない行と、順が違うかを返す。順の規則は、最後の否定の行（`!/spec-dock/initiatives/`）が最後に現れる位置が、その前の行（`/spec-dock/initiatives`）が最後に現れる位置より後ろにあることだけである（Git は最後に当たった規則を使うので、そうでなければ実体のディレクトリの新しいファイルまで無視される）。カタログの行（`/spec-dock/.canonical/`）の位置は問わない（I-7 の `canonical check` と同じ意味。マージの前の実装は3行すべての順を求めていた）。`missing_lines` は、ない行があるか順が違うときに3行すべてを返す。`append_lines` は、そのとき、末尾に改行がなければ足してから、1行の注記 `# spec-dock canonical catalog and link (added by spec-dock canonical link)` と3行を、正しい順のまとまりとして足す（前にある一部の行は、そのまま残す）。
 - `parse_git_version` は `git version 2.54.0`、`git version 2.39.5 (Apple Git-154)`、`git version 2.38` を受け付ける。読めなければ `None`（`git_supported` は偽）。
 
 ### 2. canonical の中身（C5。`domain/canonical_content.py`）
@@ -517,13 +518,13 @@ class CanonicalStatusData:        # presentation/command_data.py
 
 ### 12. コマンドの一覧と出力（`cli/catalog.py`、`cli/options.py`、`presentation/`）
 
-- `LEAF_PATHS` の `workspace migrate` の後に、`canonical link`、`canonical status` を足す（46個）。引数は、どちらも共通の引数だけ（`--no-schedule` は I-3、`--structure` は I-4 が足す）。`canonical link` を `MUTATING_LEAF_PATHS` に入れる（`--dry-run` と `--yes` を受け付ける。確認は求めない）。
+- `LEAF_PATHS` の `workspace migrate` の後に、`canonical link`、`canonical status` を足す（I-7 の `canonical check` を含めて47個）。引数は、どちらも共通の引数だけ（`--no-schedule` は I-3、`--structure` は I-4 が足す）。`canonical link` を `MUTATING_LEAF_PATHS` に入れる（`--dry-run` と `--yes` を受け付ける。確認は求めない）。
 - `HELP_EFFECTS`：
   - `canonical link`：`Find or create this clone's catalog, lock it, add the ignore rules and link the main checkout and this checkout.`（I-3 が Epic の12章の文に直す）
   - `canonical status`：`Read catalog, link, ignore rules, access and tool settings; no changes.`
 - `HELP_PRECONDITIONS`、`_READS_BY_ROOT["canonical"]`、`_DOES_NOT_BY_ROOT["canonical"]`、`_JSON_DATA_BY_ROOT["canonical"]` と、`_help_spec` の2つのコマンドの個別の文、`cli/options.py` の `_recovery_help`（`canonical link` は「もう一度 `spec-dock canonical link` を実行すれば続きから整う」）を書く。
 - `presentation/command_data.py` に `CanonicalStatusData` を足し、`render_text` は `FamilyData` と同じく JSON の形で示す。
-- 配布資産の `docs/reference_cli.md` に `C45 canonical link`、`C46 canonical status` の行を足し、全体の数を46にする。`docs/README.md` と、リポジトリの `README.md` の「44」を「46」にする。
+- 配布資産の `docs/reference_cli.md` に `C46 canonical link`、`C47 canonical status` の行を足し（`C45` は I-7 の `canonical check`）、全体の数を47にする。`docs/README.md` と、リポジトリの `README.md` の数を「47」にする。
 
 ### 13. エラーと警告のコード（C8 の一部。`application/canonical_errors.py` に足す）
 
@@ -593,7 +594,7 @@ class CanonicalStatusData:        # presentation/command_data.py
 | `src/spec_dock/runtime/cli/catalog.py`、`cli/options.py` | 12章 |
 | `src/spec_dock/runtime/presentation/command_data.py`、`envelope.py` | `CanonicalStatusData` と文字の出力 |
 | `src/spec_dock/assets/spec_dock/.gitignore`、`docs/reference_cli.md`、`docs/README.md`、`static-inventory.json` | 無視の3行、2つのコマンドの行と数、`sha256` と `known_old_sha256`（変更の前の中身を足す） |
-| `README.md` | コマンドの数（46） |
+| `README.md` | コマンドの数（47） |
 | `tests/`（新と、許された変更） | testability |
 
 変えないもの：従来の処理（`application/direct_worktrees.py`、`work_start.py`、`direct_*.py`、`scope_query.py`、`start_snapshot.py` など）、`.meta.json` を読み書きするコード、`infra/start_lock.py`、`infra/git_process.py`、`infra/git_cli.py`、I-1 の部品の公開の形、テンプレート、利用側の `spec-dock/` の配布資産（I-9、I-10）。
@@ -639,10 +640,10 @@ git(root, *args)                                            # GIT_ を除いた�
 
 | テスト | 変えること | 区分 |
 |---|---|---|
-| `tests/cli_runtime/test_cli_vnext_contract.py::test_vnext_catalog_matches_approved_44_leaf_design` | 数を46に、一覧に2つを足す（名前も合わせる） | コマンドの数と一覧 |
-| `tests/cli_runtime/test_issue413_contract.py::test_every_public_leaf_help_describes_the_v2_envelope_without_project_access` | 数を46に | コマンドの数 |
-| `tests/integration/test_cli_docs_vnext.py::test_command_reference_covers_all_public_leaves` | 数を46に | コマンドの数（文書） |
-| `tests/cli_runtime/test_help_completion_vnext.py`（補完のテスト） | 数を46に（読むだけのコマンドの集合に `canonical status` を足す） | コマンドの数と一覧 |
+| `tests/cli_runtime/test_cli_vnext_contract.py::test_vnext_catalog_matches_approved_44_leaf_design` | 数を47に、一覧に2つを足す（名前も `..._47_leaf_design` に合わせる） | コマンドの数と一覧 |
+| `tests/cli_runtime/test_issue413_contract.py::test_every_public_leaf_help_describes_the_v2_envelope_without_project_access` | 数を47に | コマンドの数 |
+| `tests/integration/test_cli_docs_vnext.py::test_command_reference_covers_all_public_leaves` | 数を47に | コマンドの数（文書） |
+| `tests/cli_runtime/test_help_completion_vnext.py`（補完のテスト） | 数を47に（読むだけのコマンドの集合に `canonical status` を足す） | コマンドの数と一覧 |
 | `tests/cli_runtime/test_issue428_canonical_mode.py::test_every_command_without_a_canonical_handler_stops_without_writing` | `_leaf_arguments` に2つのコマンドを足す（`CANONICAL_HANDLERS` にあるので飛ばされる） | canonical モードのテスト（版3の振る舞いではない） |
 
 - このほかに、版3の振る舞いを確かめる既存のテストは変えない。最終の品質の関門で `git diff origin/main -- tests/` を一覧にし、報告書に書く。

@@ -197,6 +197,18 @@ def render_text(
         )
         for blocker in cast("tuple[Diagnostic, ...]", result.data.result["blockers"]):
             stdout_lines.append(f"blocker [{blocker.code}] {_text_escape(blocker.message)}")
+    elif result.command == "canonical check" and isinstance(result.data, FamilyData):
+        failures = cast("tuple[Diagnostic, ...]", result.data.result["failures"])
+        stdout_lines.append(
+            f"commit={_field_text(result.data.result['commit'])} "
+            f"valid={str(result.data.result['valid']).lower()} failures={len(failures)}"
+        )
+        stdout_lines.extend(
+            f'{label} [{item.code}] path="{_field_text(item.details["path"])}" '
+            f'next_step="{_field_text(item.details["next_step"])}"'
+            for label, items in (("failure", failures), ("warning", result.warnings))
+            for item in items
+        )
     elif isinstance(result.data, (ActiveData, FamilyData, CanonicalStatusData)) or (
         isinstance(result.data, DiagnosticData) and (result.data.findings or result.data.unverified)
     ):

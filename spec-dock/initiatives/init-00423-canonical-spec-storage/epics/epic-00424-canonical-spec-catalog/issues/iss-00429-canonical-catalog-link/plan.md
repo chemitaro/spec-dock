@@ -50,7 +50,7 @@ ID: "iss-00429"
 - **S7 `canonical link`**（`application/canonical_link.py`、`CANONICAL_HANDLERS` への登録）：新しいリポジトリ、2つ目のクローン、作業用のworktree、2回目の `unchanged`、`--dry-run`、`git clean -ffdx` の後、移動の後（`repair`、`CANONICAL_MAIN_MOVED`、prune しない）、移行前のコミット、ふさがった場所とリンク、`elsewhere`、マウント（コンテナの印）、git 2.37、書けない場所（`CANONICAL_SANDBOX_DENIED` と、リンクだけのとき）、既定のブランチに仕様がある、4a と 4b、同時の作成（push の拒否）、浅いクローン、GitHub につながらない、書いた後の失敗の `partial`、StartLock が取れない、フックと署名、ツールの設定の警告、`.gitignore` の欠けの警告。
 - **S8 ほかのコマンドから**（`link_after_command`、`application/canonical_worktrees.py`）：`worktree create` の後のリンク、`--dry-run`、`--expect-current` の `CANONICAL_NOT_IMPLEMENTED`、リンクの失敗と `START_LOCK_BUSY` の警告（結果の状態が変わらない）、版3の宣言のworktree。
 - **S9 `canonical status`**：12の項目のキー、各状態と次の1手、警告、読むだけ（`tree_digest`）、git が古いとき、ツールの設定、`CODEX_SANDBOX` と書けないカタログ。
-- **S10 コマンドの一覧と配布資産**：`cli/catalog.py`（46個、効果、前提、読むもの、書くもの、JSON）、`cli/options.py` の `_recovery_help`、`presentation`、配布資産の `.gitignore`、`docs/reference_cli.md`、`docs/README.md`、`README.md`、`static-inventory.json`（`sha256` と、変更の前の中身を `known_old_sha256` に）。コマンドの数のテスト（`design.md` の testability の表の5件）を直す。無視の3行の効き目のテスト（AC-429-04）。
+- **S10 コマンドの一覧と配布資産**：`cli/catalog.py`（46個。I-7 のマージの後は47個、効果、前提、読むもの、書くもの、JSON）、`cli/options.py` の `_recovery_help`、`presentation`、配布資産の `.gitignore`、`docs/reference_cli.md`、`docs/README.md`、`README.md`、`static-inventory.json`（`sha256` と、変更の前の中身を `known_old_sha256` に）。コマンドの数のテスト（`design.md` の testability の表の5件）を直す。無視の3行の効き目のテスト（AC-429-04）。
 - **S11 全体の確かめ**：`make lint`、`uv run pytest`。`git diff origin/main -- tests/` で変えた既存のテストを一覧にし、testability の表のほかにないことを確かめる。
 - **S12 実機の確かめ**（`design.md` の testability の「実機の確かめ」）：macOS の外付けのボリューム、Codex のサンドボックス、Claude Code の1行（一時の `HOME` か一時の設定のファイル。利用者の設定は変えない）、OrbStack の Linux の仮想マシン（Git 2.43。この Issue のテストもそこで動かす）、Docker のコンテナ（ホストと別のパスにマウントする）。結果と「未確認」を報告書に書き、作った一時のものを消す。
 - **S13 実装のレビュー**：`code-review` の観点で、規約と仕様を、独立した2つのサブエージェントにレビューさせ、指摘を `analyze-review-findings` で分析して直す。
@@ -141,6 +141,17 @@ C6 の考え方（止まるコードを警告に使い回さない）に合わ�
 | SP-4 テストのない経路 | 妥当 | 版3と宣言のない基点、4a の拒否の後の付け替え、例外の警告のテストを足した。あわせて、GitHub にあるのに手元に初期のコミットだけのブランチが残る場合も付け替えるようにした（同じ規則の、見落としていた行） |
 | SP-6 `registration_matches` を文字列で比べる | 妥当 | 実体で比べる |
 | SP-8 `cli-redesign-guide.html` の「44」 | 範囲外 | I-9 へ申し送る（報告書） |
+
+### main の取り込み（S14 の前、2026-10-26）
+
+統括の指示（msg_8f0e0917a295 の1〜3）に従い、最終の品質の関門の前に `origin/main`（`e456dfc8b`。I-7 の #444 と Epic の文書の #443 を含む）を merge で取り込んだ（rebase しない）。
+
+- **コマンドの番号と数**：`reference_cli.md` は `C45 canonical check`（I-7）、`C46 canonical link`、`C47 canonical status` とし、公開のコマンドは47個。`README.md`、`docs/README.md`、コマンドの数のテスト（`..._47_leaf_design` など）を47にした。
+- **衝突の解き方**：`canonical_errors.py` と `presentation/envelope.py` は両方の追加を残した。`cli/catalog.py` の `_READS_BY_ROOT`、`_DOES_NOT_BY_ROOT`、`_JSON_DATA_BY_ROOT` の `canonical` は I-7 の文にし、`canonical link` の「しないこと」は `_help_spec` で個別に足した。`static-inventory.json` は統合した中身の `sha256` を計算し直し、`origin/main` の中身の `sha256` を `known_old_sha256` に足した。
+- **C3 の統一**：`application/canonical_check.py` の `SPEC_DOCK_IGNORE_LINES` を `GITIGNORE_LINES` そのものにした。行があるかと順の判定は domain の `ignore_rules_state` 1つにし、I-7 の `_last_index` を消した。
+- **順の規則**：I-7 の意味（最後の否定の行が、その前の行より後ろにあること）にそろえた。マージの前のこの Issue の実装は3行すべての順を求めていたが、カタログの行の位置は Git の結果を変えないので、ゆるめても安全である。`canonical status` と `canonical link` も同じ規則で判定する（`missing_lines` が `ignore_rules_state` を使う）。
+- **`IGNORE_RULES_MISSING` の次の1手**（I-7 の `canonical check`）：`.gitignore` が配布資産の今の中身か、変更の前の中身（known-old）なら `spec-dock installation update`、利用者が変えた中身なら「配布資産の `.gitignore` を手で取り込み、3行をこの順で末尾に置いてコミット」。`installation update` は利用者が変えたファイルを上書きしないため。
+- **I-7 のテストの期待の変更**：known-old の `.gitignore` の次の1手が `installation update` を含むこと、順が違うときに「Merge the shipped …」を含むこと。足したテスト：`SPEC_DOCK_IGNORE_LINES is GITIGNORE_LINES`、配布資産そのままで `canonical check` が `IGNORE_RULES_MISSING` を出さないこと（重ねる部品 `tests/support/canonical_check.py` が何もしないこと）、domain の順の規則。
 
 ## 検証
 

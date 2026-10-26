@@ -83,6 +83,7 @@ def _leaf_arguments(root: Path, outside: Path) -> dict[str, list[str]]:
         "workspace doctor": [],
         "canonical link": [],
         "canonical status": [],
+        "canonical check": [],
     }
 
 

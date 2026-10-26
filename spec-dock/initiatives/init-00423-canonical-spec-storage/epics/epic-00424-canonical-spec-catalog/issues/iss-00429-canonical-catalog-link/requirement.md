@@ -106,7 +106,7 @@ ID: "iss-00429"
 - 純粋な規則（場所、正しいリンクの判定、無視の行、git の版、変更の束、canonical の中身、ツールの設定の1行と判定）。
 - エラーと警告のコード（`application/canonical_errors.py` に足す）。
 - 配布資産 `spec-dock/.gitignore` の3行、`docs/reference_cli.md` の2つのコマンドの行、`static-inventory.json`。
-- コマンドの数と一覧を確かめるテストの更新（44 から 46）。
+- コマンドの数と一覧を確かめるテストの更新（44 から 46。I-7 の `canonical check` を取り込んだ後は47）。
 
 ### 対象外
 

@@ -131,3 +131,21 @@ def test_handler_types_and_recovery_texts_are_importable_at_runtime() -> None:
     assert canonical_dispatch.RepositoryIndependentHandler is not None
     assert canonical_errors.MIGRATE_NOT_APPLICABLE_RECOVERY.startswith("No writer-protocol migration")
     assert canonical_errors.CANONICAL_NOT_LINKED_RECOVERY == "spec-dock canonical link"
+
+
+def test_canonical_check_is_answered_before_resolve_context_even_in_a_schema_three_repository(
+    tmp_path: Path,
+) -> None:
+    from spec_dock.runtime.application.canonical_check import check_canonical_commit
+    from spec_dock.runtime.commands.canonical_dispatch import REPOSITORY_INDEPENDENT_HANDLERS
+
+    assert REPOSITORY_INDEPENDENT_HANDLERS["canonical check"] is check_canonical_commit
+    root = _repository(tmp_path / "legacy", 3)
+    subprocess.run(["git", "-C", str(root), "add", "--all"], check=True)
+    subprocess.run(
+        ["git", "-C", str(root), "-c", "user.name=F", "-c", "user.email=f@example.invalid", "commit", "-qm", "f"],
+        check=True,
+    )
+    code, result = _result(dispatch(_namespace("canonical check", root, commit="HEAD"), root))
+    assert code == 7 and result["error"]["code"] == "CANONICAL_CHECK_FAILED"
+    assert "WORKSPACE_NOT_MIGRATED" in [item["code"] for item in result["data"]["result"]["failures"]]

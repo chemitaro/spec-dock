@@ -14,7 +14,7 @@ from spec_dock.runtime.cli.legacy import LegacyCommandError
 from spec_dock.runtime.cli.options import explicit_help, parse_vnext
 
 
-def test_vnext_catalog_matches_approved_46_leaf_design() -> None:
+def test_vnext_catalog_matches_approved_47_leaf_design() -> None:
     expected = {
         "scope create initiative",
         "scope create epic",
@@ -60,10 +60,11 @@ def test_vnext_catalog_matches_approved_46_leaf_design() -> None:
         "installation init",
         "installation update",
         "installation uninstall",
+        "canonical check",
         "help",
         "completion",
     }
-    assert len(LEAF_PATHS) == 46
+    assert len(LEAF_PATHS) == 47
     assert set(LEAF_PATHS) == expected
 
 

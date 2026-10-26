@@ -57,12 +57,13 @@
     {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
-      "sha256": "ad4d272fcf50fb584344a97d71a6413aeea8481fef71145cda6cf2f4692dc2a3",
+      "sha256": "501b2fe8b693de757ee275f373e675dd0e2c048cce88496a924a3aa54e16fd46",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "aadfdce1f6e61af65e95d3cd39efb3fd87b7cd83a3a3272356ef7cd68b21ba4e",
-        "ddbd3e6cb3b216f4217eed6057ed8fdf7221760c18649f7ca997335e8304b353"
+        "ddbd3e6cb3b216f4217eed6057ed8fdf7221760c18649f7ca997335e8304b353",
+        "92f2c560e2d51a76595927f6de26564e451415ae08d645aada399a0e8f10fa5b"
       ]
     },
     {
@@ -166,6 +167,14 @@
       "known_old_sha256": []
     },
     {
+      "path": "spec-dock/docs/ci/spec-dock-check.yml",
+      "source": "spec_dock/docs/ci/spec-dock-check.yml",
+      "sha256": "715ba5868ad31ea235acbfbcadbccb6f0d67a98062b9fd6a2bde5c516419cc70",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
       "sha256": "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1",
@@ -261,7 +270,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "bc035b5c7f1d8d7a715d9264a3208f52aa1cc4523e3863ace5ac9d080bc3276a",
+      "sha256": "01f305db844c770cfc625d9463b8d6f7f7a174f06d932f98a350a52e5d7ac0cb",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -270,7 +279,8 @@
         "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc",
         "637bb1a1b1f95b6fed462b8cd34ba23bc0a2db95d3b85ce69053c7a400ec9d00",
         "cf5446ce3e07af629d2eeec028487b913b4467eaa8963d4e10d93d5622a7e961",
-        "ed94ca052f0ae18040d1f022fa9a6a34dbb61d25b75c4d210b20ff93e174a898"
+        "ed94ca052f0ae18040d1f022fa9a6a34dbb61d25b75c4d210b20ff93e174a898",
+        "7b9b8b2daf812f91cfac77d528d888a35b8736eac57cb3afe6c25c0b6fe5bf30"
       ]
     },
     {
@@ -588,6 +598,14 @@
       "path": "spec-dock/system/active-none/issue/requirement.md",
       "source": "spec_dock/system/active-none/issue/requirement.md",
       "sha256": "29647fe4824fcde37c2aa92d6e3fbaa5ff9400b16803434f91cca4cc953a15d6",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/system/spec-dock-version",
+      "source": "spec_dock/system/spec-dock-version",
+      "sha256": "1725bfa6524c5265e7c171cf06568417d39b947fff49c242f03859479c82334b",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": []

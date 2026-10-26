@@ -13,6 +13,7 @@ from spec_dock.runtime.domain.canonical_layout import (
     LinkObservation,
     append_lines,
     git_supported,
+    ignore_rules_state,
     link_state,
     missing_lines,
     parse_git_version,
@@ -98,8 +99,19 @@ def test_a_partial_block_is_completed_with_the_whole_block_in_order() -> None:
 def test_lines_present_in_the_wrong_order_count_as_missing() -> None:
     reversed_order = "!/spec-dock/initiatives/\n/spec-dock/initiatives\n/spec-dock/.canonical/\n"
     assert missing_lines(reversed_order, EXCLUDE_LINES) == EXCLUDE_LINES
+    assert ignore_rules_state(reversed_order, EXCLUDE_LINES) == ((), True)
     later_user_line = "/spec-dock/.canonical/\n/spec-dock/initiatives\n!/spec-dock/initiatives/\n*.log\n"
     assert missing_lines(later_user_line, EXCLUDE_LINES) == ()
+
+
+def test_only_the_negation_must_follow_the_rule_it_re_includes() -> None:
+    catalog_last = "/spec-dock/initiatives\n!/spec-dock/initiatives/\n/spec-dock/.canonical/\n"
+    assert ignore_rules_state(catalog_last, EXCLUDE_LINES) == ((), False)
+    assert missing_lines(catalog_last, EXCLUDE_LINES) == ()
+    assert ignore_rules_state("/spec-dock/initiatives\n", EXCLUDE_LINES) == (
+        ("/spec-dock/.canonical/", "!/spec-dock/initiatives/"),
+        False,
+    )
 
 
 @pytest.mark.parametrize(
