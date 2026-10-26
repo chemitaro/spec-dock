@@ -9,8 +9,11 @@ from pathlib import Path
 from spec_dock.runtime.application.canonical_branches import branch_operation
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
+from spec_dock.runtime.application.canonical_hold import run_canonical_accept, run_canonical_restore
 from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
+from spec_dock.runtime.application.canonical_remove import run_canonical_remove
+from spec_dock.runtime.application.canonical_resume import run_canonical_resume
 from spec_dock.runtime.application.canonical_scope_read import (
     clear_active,
     list_scope,
@@ -21,6 +24,7 @@ from spec_dock.runtime.application.canonical_scope_read import (
     show_scope,
 )
 from spec_dock.runtime.application.canonical_status import run_canonical_status
+from spec_dock.runtime.application.canonical_sync import run_canonical_sync, run_registered_sync
 from spec_dock.runtime.application.canonical_workspace import (
     diagnose_workspace,
     sync_workspace,
@@ -46,6 +50,11 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "canonical link": run_canonical_link,
     "canonical status": run_canonical_status,
     "worktree create": create_worktree_and_link,
+    "canonical sync": run_canonical_sync,
+    "canonical accept": run_canonical_accept,
+    "canonical restore": run_canonical_restore,
+    "canonical resume": run_canonical_resume,
+    "canonical remove": run_canonical_remove,
     "scope show": show_scope,
     "scope list": list_scope,
     "dependency list": query_dependencies,
@@ -72,6 +81,7 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
 # or that inspect the declaration themselves (canonical check). A handler returns None to decline.
 REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
     "canonical check": check_canonical_commit,
+    "canonical sync": run_registered_sync,
 }
 
 

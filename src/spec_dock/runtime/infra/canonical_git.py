@@ -6,13 +6,15 @@ run_catalog_git; never call Git for the catalog another way.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 import fnmatch
 import os
 from pathlib import Path
+import stat
 import subprocess
 import tempfile
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Final, Literal, cast
 
 from spec_dock.runtime.domain.canonical_content import CANONICAL_ROOT_FILES, INITIAL_COMMIT_MESSAGE
 from spec_dock.runtime.domain.canonical_layout import (
@@ -26,9 +28,10 @@ from spec_dock.runtime.infra.git_cli import _parse_worktree_porcelain_nul, sanit
 from spec_dock.runtime.infra.git_process import GitProcessError
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Collection, Mapping, Sequence
 
     from spec_dock.runtime.application.contracts import GitWorktreeRecord
+    from spec_dock.runtime.domain.canonical_sync_rules import CatalogChange, ChangeKind, ConflictEntry, Resolution
 
 # Hooks, signing, fsmonitor hooks and automatic gc/maintenance (whose worktree prune SpecDock never runs) are off.
 HOOKLESS_CONFIG: Final = (
@@ -191,13 +194,17 @@ def add_catalog_worktree(main: Path, catalog: Path, *, mode: AddMode, timeout: f
     run_catalog_git(main, *args, mutation=True, timeout=timeout)
 
 
-def remote_canonical(main: Path, *, timeout: float = 30.0) -> Literal["present", "absent"]:
+def remote_canonical(
+    main: Path, *, timeout: float = 30.0, git: str = "git", environment: Mapping[str, str] | None = None
+) -> Literal["present", "absent"]:
     output = run_catalog_git(
         main,
         "ls-remote",
         "--exit-code",
         CANONICAL_REMOTE,
         CANONICAL_REF,
+        git=git,
+        environment=environment,
         read_only=True,
         timeout=timeout,
         returncodes=frozenset({0, 2}),
@@ -230,7 +237,9 @@ def add_fetch_branch(main: Path, *, timeout: float = 30.0) -> None:
     )
 
 
-def fetch_canonical(main: Path, *, timeout: float = 30.0) -> None:
+def fetch_canonical(
+    main: Path, *, timeout: float = 30.0, git: str = "git", environment: Mapping[str, str] | None = None
+) -> None:
     run_catalog_git(
         main,
         "fetch",
@@ -238,12 +247,14 @@ def fetch_canonical(main: Path, *, timeout: float = 30.0) -> None:
         "--no-recurse-submodules",  # the main checkout's submodules are not the catalog's business
         CANONICAL_REMOTE,
         _FETCH_REFSPEC,
+        git=git,
+        environment=environment,
         mutation=True,
         timeout=timeout,
     )
 
 
-def resolve_commit(main: Path, ref: str, *, timeout: float = 30.0) -> str | None:
+def resolve_commit(main: Path, ref: str, *, timeout: float = 30.0, git: str = "git") -> str | None:
     output = run_catalog_git(
         main,
         "rev-parse",
@@ -251,6 +262,7 @@ def resolve_commit(main: Path, ref: str, *, timeout: float = 30.0) -> str | None
         "--quiet",
         "--end-of-options",
         f"{ref}^{{commit}}",
+        git=git,
         read_only=True,
         timeout=timeout,
         returncodes=frozenset({0, 1}),
@@ -378,3 +390,576 @@ def unpushed(catalog: Path, *, timeout: float = 30.0) -> tuple[int, str | None] 
         return 0, None
     dates = _text(run_catalog_git(catalog, "log", "--reverse", "--format=%cI", span, read_only=True, timeout=timeout))
     return count, dates.splitlines()[0] if dates else None
+
+
+# The periodic sync (iss-00430): save in a temporary index, merge without touching the work tree, push.
+
+# Git's English messages, so authentication failures are recognised whatever the user's locale.
+UNTRANSLATED: Final[Mapping[str, str]] = {"LC_ALL": "C"}
+PushOutcome = Literal["pushed", "up_to_date", "rejected", "auth_failed", "failed"]
+_AUTH_FAILURES: Final = (
+    "Authentication failed",
+    "could not read Username",
+    "could not read Password",
+    "terminal prompts disabled",
+    "Permission denied (publickey)",
+    "The requested URL returned error: 403",
+    "The requested URL returned error: 401",
+)
+_IN_PROGRESS: Final = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "index.lock")
+TEMPORARY_INDEX: Final = ".runtime/index.tmp"
+
+
+def _temporary_index(catalog: Path) -> Path:
+    """`<catalog>/.runtime/index.tmp`; the ignored .runtime directory is created without following links."""
+    from pathlib import PurePosixPath
+
+    from spec_dock.runtime.infra.catalog_runtime import runtime_directory
+
+    runtime_directory(catalog, PurePosixPath(".runtime"))
+    return catalog / TEMPORARY_INDEX
+
+
+def reset_index(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> None:
+    """Align the real index with HEAD (someone's `git add` must not stop the sync); the work tree is untouched."""
+    run_catalog_git(catalog, "reset", "-q", git=git, mutation=True, timeout=timeout)
+
+
+def list_changes(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> tuple[CatalogChange, ...]:
+    """Unsaved catalog paths (work tree against HEAD after reset_index), with their modification time."""
+    from datetime import datetime, timezone
+
+    from spec_dock.runtime.domain.canonical_sync_rules import CatalogChange
+
+    output = run_catalog_git(
+        catalog, "status", "--porcelain=v2", "-z", "--untracked-files=all", "--no-renames", git=git, timeout=timeout
+    )
+    records = os.fsdecode(output.stdout).split("\0")
+    changes: dict[str, CatalogChange] = {}
+    index = 0
+    while index < len(records):
+        record = records[index]
+        index += 1
+        if record.startswith("? "):
+            paths, kind = [record[2:]], "added"
+        elif record.startswith("1 "):
+            fields = record.split(" ", 8)
+            # Git's own word wins: a path it reports deleted in the work tree (even "beyond a symbolic link"
+            # after a directory became a link) is a deletion, never a file read through the link.
+            paths, kind = [fields[8]], ("deleted" if fields[1][1:] == "D" else "modified")
+        elif record.startswith("2 "):
+            paths, kind = [record.split(" ", 9)[9], records[index]], "modified"
+            index += 1
+        elif record.startswith("u "):
+            paths, kind = [record.split(" ", 10)[10]], "modified"
+        else:
+            continue
+        for path in paths:
+            if path.endswith("/") or path == ".runtime" or path.startswith(".runtime/"):
+                # A nested repository is not catalog content; .runtime/ is SpecDock's own area even if a
+                # .gitignore lost its line.
+                continue
+            if kind == "deleted" or _beyond_link(catalog, path):
+                changes[path] = CatalogChange(path, "deleted", None)
+                continue
+            try:
+                observed = os.lstat(catalog / path)
+            except (FileNotFoundError, NotADirectoryError):  # gone, or a parent became a file
+                changes[path] = CatalogChange(path, "deleted", None)
+                continue
+            mtime = datetime.fromtimestamp(observed.st_mtime, timezone.utc)
+            changes[path] = CatalogChange(path, cast("ChangeKind", kind), mtime)
+    return tuple(changes[path] for path in sorted(changes))
+
+
+def _beyond_link(catalog: Path, path: str) -> bool:
+    """A parent of `path` is a symbolic link or not a directory (the path is not inside the catalog)."""
+    current = catalog
+    for part in path.split("/")[:-1]:
+        current = current / part
+        try:
+            mode = os.lstat(current).st_mode
+        except (FileNotFoundError, NotADirectoryError):
+            return True
+        if not stat.S_ISDIR(mode):
+            return True
+    return False
+
+
+def tracked_count(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> int:
+    output = run_catalog_git(
+        catalog, "ls-tree", "-r", "-z", "--name-only", "HEAD", git=git, read_only=True, timeout=timeout
+    )
+    return sum(1 for item in output.stdout.split(b"\0") if item)
+
+
+def worktree_blob(catalog: Path, path: str, *, git: str = "git", timeout: float = 30.0) -> str | None:
+    """The blob `git add` would store for the regular file at `path` (filters applied), or None."""
+    target = catalog / path
+    if target.is_symlink() or not target.is_file() or _beyond_link(catalog, path):
+        return None
+    output = run_catalog_git(
+        catalog, "hash-object", f"--path={path}", "--", str(target), git=git, read_only=True, timeout=timeout
+    )
+    return _text(output)
+
+
+def blob_of(catalog: Path, path: str, *, git: str = "git", timeout: float = 30.0) -> str:
+    """The blob value of the file's bytes as they are (no filters), as accepted.json records and compares it."""
+    target = catalog / path
+    if target.is_symlink():
+        payload = os.fsencode(target.readlink())
+        output = run_catalog_git(
+            catalog, "hash-object", "--stdin", input=payload, git=git, read_only=True, timeout=timeout
+        )
+    else:
+        output = run_catalog_git(
+            catalog, "hash-object", "--no-filters", "--", str(target), git=git, read_only=True, timeout=timeout
+        )
+    return _text(output)
+
+
+def clear_temporary_index(catalog: Path) -> None:
+    """Drop a temporary index (and its lock) a killed cycle left; call it only under the catalog lock."""
+    for name in (TEMPORARY_INDEX, TEMPORARY_INDEX + ".lock"):
+        with contextlib.suppress(FileNotFoundError):
+            (catalog / name).unlink()
+
+
+def blob_of_bytes(catalog: Path, payload: bytes, *, git: str = "git", timeout: float = 30.0) -> str:
+    """The unfiltered blob value of `payload` (as blob_of computes for a file)."""
+    output = run_catalog_git(catalog, "hash-object", "--stdin", input=payload, git=git, read_only=True, timeout=timeout)
+    return _text(output)
+
+
+@dataclass(frozen=True)
+class SaveResult:
+    commit: str  # the parent itself when nothing was committed
+    saved: tuple[str, ...]
+    deferred: tuple[str, ...]  # would have changed paths outside the selection (a directory/file swap)
+
+
+def save_commit(
+    catalog: Path,
+    paths: Sequence[str],
+    *,
+    message: str,
+    parent: str,
+    contents: Mapping[str, bytes] | None = None,
+    deletions: Collection[str] = (),
+    git: str = "git",
+    timeout: float = 30.0,
+) -> SaveResult:
+    """Commit exactly `paths` on top of `parent` through a temporary index and advance the branch from `parent`.
+
+    A deletion is removed from the index by its exact name (never expanded to a directory of the same name).
+    A path in `contents` is committed with exactly those bytes (the ones the hold rules checked). A path in
+    `deletions` is removed even when a file has come back since (its content was never checked). `{count}` in
+    `message` becomes the number of paths actually committed. When the
+    resulting tree changes any path outside the selection (Git replacing a directory by a file or the other
+    way round), the selected paths involved are deferred and the rest is staged again, so nothing held or
+    unselected is ever committed.
+    """
+    index = _temporary_index(catalog)
+    environment = {"GIT_INDEX_FILE": str(index)}
+    checked = dict(contents or {})
+    remaining = list(dict.fromkeys(paths))
+    deferred: list[str] = []
+    try:
+        tree = parent_tree = _text(
+            run_catalog_git(catalog, "rev-parse", f"{parent}^{{tree}}", git=git, read_only=True, timeout=timeout)
+        )
+        for _attempt in range(3):
+            if not remaining:
+                tree = parent_tree
+                break
+            tree = _stage(catalog, parent, remaining, checked, deletions, environment, git=git, timeout=timeout)
+            changed = changed_paths(catalog, parent_tree, tree, git=git, timeout=timeout)
+            extras = changed - set(remaining)
+            if not extras:
+                break
+            drop = [
+                path
+                for path in remaining
+                if any(extra.startswith(path + "/") or path.startswith(extra + "/") for extra in extras)
+            ]
+            deferred.extend(drop or remaining)
+            remaining = [path for path in remaining if path not in drop] if drop else []
+        else:
+            deferred.extend(remaining)
+            remaining, tree = [], parent_tree
+        if tree == parent_tree:
+            return SaveResult(parent, (), tuple(deferred))  # nothing differs from the parent: no empty commit
+        commit = _text(
+            run_catalog_git(
+                catalog,
+                "commit-tree",
+                tree,
+                "-p",
+                parent,
+                "-m",
+                message.replace("{count}", str(len(remaining))),
+                git=git,
+                mutation=True,
+                timeout=timeout,
+            )
+        )
+        run_catalog_git(catalog, "update-ref", CANONICAL_REF, commit, parent, git=git, mutation=True, timeout=timeout)
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            index.unlink()
+    reset_index(catalog, git=git, timeout=timeout)
+    return SaveResult(commit, tuple(remaining), tuple(deferred))
+
+
+def _stage(
+    catalog: Path,
+    parent: str,
+    paths: Sequence[str],
+    checked: Mapping[str, bytes],
+    deletions: Collection[str],
+    environment: Mapping[str, str],
+    *,
+    git: str,
+    timeout: float,
+) -> str:
+    """Load `parent` into the temporary index, apply exactly `paths`, and write the tree."""
+    run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
+    # A selected path that is now a real directory was a file Git reports deleted: remove that entry by
+    # name instead of letting `git add` take in the directory's (unchecked, maybe held) files.
+    # A selected deletion stays one even when a file came back since (its content was never checked).
+    gone = [
+        path
+        for path in paths
+        if path in deletions
+        or (
+            path not in checked
+            and (
+                _beyond_link(catalog, path)
+                or not os.path.lexists(catalog / path)
+                or ((catalog / path).is_dir() and not (catalog / path).is_symlink())
+            )
+        )
+    ]
+    present = [path for path in paths if path not in gone]
+    if gone:
+        payload = b"".join(os.fsencode(path) + b"\0" for path in gone)
+        run_catalog_git(
+            catalog,
+            "update-index",
+            "-z",
+            "--force-remove",
+            "--stdin",
+            git=git,
+            environment=environment,
+            input=payload,
+            mutation=True,
+            timeout=timeout,
+        )
+    if present:
+        # `git add` decides every mode (core.fileMode, symbolic links) and applies the attributes; checked
+        # files then get exactly the checked bytes at the mode Git chose.
+        run_catalog_git(
+            catalog, "add", "-A", git=git, environment=environment, pathspecs=present, mutation=True, timeout=timeout
+        )
+    modes = _index_modes(catalog, environment, git=git, timeout=timeout)
+    for path, payload in sorted(checked.items()):
+        if path not in present:
+            continue
+        # A checked file that vanished before `git add` is saved as checked, never as a deletion
+        # that skipped the hold rules.
+        mode = modes.get(path, "100644")
+        # --path applies the catalog's attributes (eol, clean filters such as LFS or git-crypt) as `git add` does.
+        oid = _text(
+            run_catalog_git(
+                catalog,
+                "hash-object",
+                "-w",
+                "--stdin",
+                f"--path={path}",
+                input=payload,
+                git=git,
+                mutation=True,
+                timeout=timeout,
+            )
+        )
+        run_catalog_git(
+            catalog,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            f"{mode},{oid},{path}",
+            git=git,
+            environment=environment,
+            mutation=True,
+            timeout=timeout,
+        )
+    return _text(
+        run_catalog_git(catalog, "write-tree", git=git, environment=environment, mutation=True, timeout=timeout)
+    )
+
+
+def _index_modes(catalog: Path, environment: Mapping[str, str], *, git: str, timeout: float) -> dict[str, str]:
+    output = run_catalog_git(
+        catalog, "ls-files", "-s", "-z", git=git, environment=environment, read_only=True, timeout=timeout
+    )
+    modes: dict[str, str] = {}
+    for record in output.stdout.split(b"\0"):
+        if record:
+            meta, _, name = record.partition(b"\t")
+            modes[os.fsdecode(name)] = os.fsdecode(meta).split(" ", 1)[0]
+    return modes
+
+
+def is_ancestor(catalog: Path, ancestor: str, descendant: str, *, git: str = "git", timeout: float = 30.0) -> bool:
+    """`merge-base --is-ancestor`; a missing object raises GitProcessError (the caller pauses on it)."""
+    output = run_catalog_git(
+        catalog,
+        "merge-base",
+        "--is-ancestor",
+        ancestor,
+        descendant,
+        git=git,
+        read_only=True,
+        timeout=timeout,
+        returncodes=frozenset({0, 1}),
+    )
+    return output.returncode == 0
+
+
+@dataclass(frozen=True)
+class MergeTreeResult:
+    code: int
+    tree: str | None
+    entries: tuple[ConflictEntry, ...]
+    message: str
+
+
+def merge_tree(
+    catalog: Path, left: str, right: str, *, allow_unrelated: bool = False, git: str = "git", timeout: float = 30.0
+) -> MergeTreeResult:
+    """Merge without touching the work tree: 0 clean, 1 conflicts (with stage records), 2 or more failed."""
+    from spec_dock.runtime.domain.canonical_sync_rules import ConflictEntry
+
+    # A new file in a directory the other side renamed stays where it was written (no invented path to pause on).
+    args = ["-c", "merge.directoryRenames=false", "merge-tree", "--write-tree", "-z"]
+    if allow_unrelated:
+        args.append("--allow-unrelated-histories")
+    output = run_catalog_git(
+        catalog, *args, left, right, git=git, read_only=True, timeout=timeout, returncodes=frozenset(range(256))
+    )
+    if output.returncode not in (0, 1):
+        return MergeTreeResult(output.returncode, None, (), os.fsdecode(output.stderr).strip())
+    parts = os.fsdecode(output.stdout).split("\0")
+    tree, entries = parts[0], []
+    for part in parts[1:]:
+        if not part:
+            break
+        meta, _, path = part.partition("\t")
+        mode, oid, stage = meta.split(" ")
+        entries.append(ConflictEntry(mode, oid, int(stage), path))
+    return MergeTreeResult(output.returncode, tree, tuple(entries), os.fsdecode(output.stderr).strip())
+
+
+def tree_paths(catalog: Path, tree: str, *, git: str = "git", timeout: float = 30.0) -> frozenset[str]:
+    output = run_catalog_git(
+        catalog, "ls-tree", "-r", "-z", "--name-only", tree, git=git, read_only=True, timeout=timeout
+    )
+    return frozenset(os.fsdecode(item) for item in output.stdout.split(b"\0") if item)
+
+
+def write_resolution(
+    catalog: Path, tree: str, resolution: Resolution, *, git: str = "git", timeout: float = 30.0
+) -> str:
+    """Apply a stage-only resolution to a merged tree in a temporary index and return the resolved tree."""
+    index = _temporary_index(catalog)
+    environment = {"GIT_INDEX_FILE": str(index)}
+    records = [f"{entry.mode} {entry.oid}\t{entry.path}" for entry in resolution.updates]
+    records += [f"0 {'0' * 40}\t{path}" for path in resolution.removals]
+    try:
+        run_catalog_git(catalog, "read-tree", tree, git=git, environment=environment, mutation=True, timeout=timeout)
+        if records:
+            payload = b"".join(os.fsencode(record) + b"\0" for record in records)
+            run_catalog_git(
+                catalog,
+                "update-index",
+                "-z",
+                "--index-info",
+                git=git,
+                environment=environment,
+                input=payload,
+                mutation=True,
+                timeout=timeout,
+            )
+        return _text(
+            run_catalog_git(catalog, "write-tree", git=git, environment=environment, mutation=True, timeout=timeout)
+        )
+    finally:
+        with contextlib.suppress(FileNotFoundError):
+            index.unlink()
+
+
+def commit_merge(
+    catalog: Path, tree: str, left: str, right: str, *, message: str, git: str = "git", timeout: float = 30.0
+) -> str:
+    output = run_catalog_git(
+        catalog, "commit-tree", tree, "-p", left, "-p", right, "-m", message, git=git, mutation=True, timeout=timeout
+    )
+    return _text(output)
+
+
+def changed_paths(catalog: Path, before: str, after: str, *, git: str = "git", timeout: float = 30.0) -> frozenset[str]:
+    output = run_catalog_git(
+        catalog, "diff", "--name-only", "-z", "--no-renames", before, after, git=git, read_only=True, timeout=timeout
+    )
+    return frozenset(os.fsdecode(item) for item in output.stdout.split(b"\0") if item)
+
+
+# A user's merge.verifySignatures or merge.autoStash must not block or stash the catalog's fast-forward.
+_MERGE_CONFIG: Final = ("-c", "merge.verifySignatures=false", "-c", "merge.autoStash=false")
+
+
+def fast_forward(catalog: Path, target: str, *, git: str = "git", timeout: float = 30.0) -> None:
+    """Advance HEAD and the work tree; Git refuses (and changes nothing) when a local edit would be overwritten."""
+    run_catalog_git(
+        catalog,
+        *_MERGE_CONFIG,
+        "merge",
+        "--ff-only",
+        "--no-edit",
+        "--no-overwrite-ignore",  # an ignored local file (a .workbench note) is never replaced silently
+        target,
+        git=git,
+        mutation=True,
+        timeout=timeout,
+    )
+
+
+@dataclass(frozen=True)
+class PushResult:
+    outcome: PushOutcome
+    message: str
+
+
+def push_canonical(
+    catalog: Path, *, dry_run: bool = False, source: str = "HEAD", git: str = "git", timeout: float = 60.0
+) -> PushResult:
+    """Push `source` to origin's spec-dock/canonical without force; classify rejection and authentication failure."""
+    args = ["push", "--porcelain"]
+    if dry_run:
+        args.append("--dry-run")
+    output = run_catalog_git(
+        catalog,
+        *args,
+        CANONICAL_REMOTE,
+        f"{source}:{CANONICAL_REF}",
+        environment=UNTRANSLATED,
+        git=git,
+        mutation=not dry_run,
+        timeout=timeout,
+        returncodes=frozenset(range(256)),
+    )
+    return classify_push(output.returncode, output.stdout, output.stderr)
+
+
+def is_auth_failure(stderr: str) -> bool:
+    """Git's own words for a credential or SSH key that origin refused."""
+    return any(marker in stderr for marker in _AUTH_FAILURES)
+
+
+def classify_push(returncode: int, stdout: bytes, stderr: bytes) -> PushResult:
+    text = os.fsdecode(stderr).strip()
+    rows = [line.split("\t") for line in os.fsdecode(stdout).splitlines() if "\t" in line]
+    flags = [row[0] for row in rows]
+    if returncode == 0 and flags and all(flag == "=" for flag in flags):
+        return PushResult("up_to_date", text)
+    if returncode == 0 and flags and all(flag in ("*", "=", " ", "+") for flag in flags):
+        return PushResult("pushed", text)
+    if is_auth_failure(text):
+        return PushResult("auth_failed", text)
+    refused = [row[2] if len(row) > 2 else "" for row in rows if row[0] == "!"]
+    if refused and all(summary.startswith("[rejected]") for summary in refused):
+        return PushResult("rejected", text)
+    return PushResult("failed", text or os.fsdecode(stdout).strip())
+
+
+def push_url(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> str | None:
+    output = run_catalog_git(
+        catalog,
+        "remote",
+        "get-url",
+        "--push",
+        CANONICAL_REMOTE,
+        git=git,
+        read_only=True,
+        timeout=timeout,
+        returncodes=frozenset({0, 1, 2, 128}),
+    )
+    return _text(output) or None if output.returncode == 0 else None
+
+
+def restore_from_head(catalog: Path, paths: Sequence[str], *, git: str = "git", timeout: float = 30.0) -> None:
+    """Bring `paths` back from HEAD into the work tree only; the index is not touched and nothing is committed."""
+    run_catalog_git(
+        catalog, "restore", "--source=HEAD", "--worktree", git=git, pathspecs=paths, mutation=True, timeout=timeout
+    )
+
+
+def ignored_files(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> tuple[str, ...]:
+    """Ignored files a worktree removal would delete, except the catalog's own .runtime area."""
+    output = run_catalog_git(
+        catalog,
+        "ls-files",
+        "-z",
+        "--others",
+        "--ignored",
+        "--exclude-standard",
+        git=git,
+        read_only=True,
+        timeout=timeout,
+    )
+    paths = (os.fsdecode(item) for item in output.stdout.split(b"\0") if item)
+    return tuple(sorted(path for path in paths if path != ".runtime" and not path.startswith(".runtime/")))
+
+
+def operation_in_progress(admin_dir: Path) -> str | None:
+    """The name of an unfinished Git operation in a worktree's administrative directory, if any."""
+    return next((name for name in _IN_PROGRESS if os.path.lexists(admin_dir / name)), None)
+
+
+@dataclass(frozen=True)
+class TreeEntry:
+    mode: str
+    oid: str
+    size: int | None
+
+
+def tree_entries(catalog: Path, tree: str, *, git: str = "git", timeout: float = 30.0) -> dict[str, TreeEntry]:
+    """Every file of a tree with its mode, blob and size (`ls-tree -r -l`)."""
+    output = run_catalog_git(catalog, "ls-tree", "-r", "-l", "-z", tree, git=git, read_only=True, timeout=timeout)
+    entries: dict[str, TreeEntry] = {}
+    for record in output.stdout.split(b"\0"):
+        if not record:
+            continue
+        meta, _, name = record.partition(b"\t")
+        mode, _kind, oid, size = os.fsdecode(meta).split(maxsplit=3)
+        entries[os.fsdecode(name)] = TreeEntry(mode, oid, None if size == "-" else int(size))
+    return entries
+
+
+def blob_bytes(catalog: Path, oid: str, *, git: str = "git", timeout: float = 30.0) -> bytes:
+    return run_catalog_git(catalog, "cat-file", "blob", oid, git=git, read_only=True, timeout=timeout).stdout
+
+
+def commit_on(catalog: Path, tree: str, parent: str, *, message: str, git: str = "git", timeout: float = 30.0) -> str:
+    """A commit of `tree` whose only parent is `parent` (re-adopting on top of GitHub's canonical)."""
+    return _text(
+        run_catalog_git(
+            catalog, "commit-tree", tree, "-p", parent, "-m", message, git=git, mutation=True, timeout=timeout
+        )
+    )
+
+
+def reset_keep(catalog: Path, target: str, *, git: str = "git", timeout: float = 30.0) -> None:
+    """Move the branch and work tree to `target`; Git refuses (changing nothing) when a local edit would be lost."""
+    run_catalog_git(catalog, "reset", "-q", "--keep", target, git=git, mutation=True, timeout=timeout)
