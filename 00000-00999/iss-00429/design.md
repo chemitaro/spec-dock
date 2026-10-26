@@ -114,7 +114,7 @@ def git_supported(version: tuple[int, int, int] | None) -> bool
 
 - **正しいリンク**（`link_state` が `correct`）：`kind == "symlink"`、`text == expected_text`、`resolved` が `catalog`（カタログの実際のパス。カタログがなければ `None` で、`correct` にならない）と同じ。`kind` が `directory`、`file`、`other` なら `occupied`（`entries` はディレクトリの中の、リンクをたどらずに数えたファイルとディレクトリの数）。そのほかのシンボリックリンク（値が違う、先がない）は `wrong_link`。
 - `canonical link` が書き直すのは、値（`text`）が期待と違うリンクと、ないリンクだけである。値が同じでカタログがまだないリンクは書き直さず、カタログを作った後に `correct` になる。
-- `missing_lines` は、各行の末尾の空白と `\r` を除いて、行が完全に同じかで比べる。`append_lines` は、末尾に改行がなければ足してから、足りない行を足す。3行がすべてないときだけ、前に1行の注記 `# spec-dock canonical catalog and link (added by spec-dock canonical link)` を置く。
+- `missing_lines` は、各行の末尾の空白と `\r` を除いて、行が完全に同じかで比べる。3行のどれかがないか、最後に現れる位置が順になっていない（Git は最後に当たった規則を使うので、`!/spec-dock/initiatives/` が `/spec-dock/initiatives` より後でなければ、実体のディレクトリの新しいファイルまで無視される）ときは、3行すべてを返す。`append_lines` は、そのとき、末尾に改行がなければ足してから、1行の注記 `# spec-dock canonical catalog and link (added by spec-dock canonical link)` と3行を、正しい順のまとまりとして足す（前にある一部の行は、そのまま残す）。
 - `parse_git_version` は `git version 2.54.0`、`git version 2.39.5 (Apple Git-154)`、`git version 2.38` を受け付ける。読めなければ `None`（`git_supported` は偽）。
 
 ### 2. canonical の中身（C5。`domain/canonical_content.py`）
@@ -224,7 +224,7 @@ def run_catalog_git(cwd: Path, *args: str, git: str = "git", read_only: bool = F
 - 呼ぶ形：`<git> -C <cwd> <HOOKLESS_CONFIG> [--no-optional-locks] [--literal-pathspecs] <args…> [--pathspec-from-file=<一時ファイル> --pathspec-file-nul]`。Epic の2つの設定に、fsmonitor のフックと、fetch などが誘発する自動の gc とメンテナンス（`git worktree prune` を含む）を止める3つを足す（統括の判断 C5。SpecDock は prune しないため）。
   - `read_only=True` で `--no-optional-locks` を付ける（読むだけのコマンドと観察で使う）。
   - `pathspecs` があれば、`--literal-pathspecs` を付け、パスを NUL で区切った一時ファイル（システムの一時ディレクトリ。終わったら消す）を `--pathspec-from-file` で渡す（`add`、`reset` など、その引数を受け付けるサブコマンドだけで使う。I-3）。
-- 環境変数は、今の `sanitized_git_environment()`（`GIT_` で始まるものを除く）に、`GIT_TERMINAL_PROMPT=0` と、`environment`（I-3 の `GIT_INDEX_FILE` など。明示したものだけ）を重ねる。資格情報の入力を端末で待たないためである。
+- 環境変数は、今の `sanitized_git_environment()`（`GIT_` で始まるものを除く）に、`GIT_TERMINAL_PROMPT=0`、作者と SSH の変数（`PASSED_GIT_VARIABLES`：`GIT_AUTHOR_NAME`、`GIT_AUTHOR_EMAIL`、`GIT_COMMITTER_NAME`、`GIT_COMMITTER_EMAIL`、`GIT_SSH`、`GIT_SSH_COMMAND`、`GIT_SSH_VARIANT`。リポジトリを差し替えず、CI やコンテナではこれだけで作者を渡すことがあるため）、`environment`（I-3 の `GIT_INDEX_FILE` など。明示したものだけ）を重ねる。HTTPS の資格情報の入力を端末で待たないためである。SSH のパスフレーズの入力は止めない（端末のない実行では、ssh 自身がすぐに失敗する）。
 - `returncodes` にない終了コードは、今の `infra/git_process.GitProcessError`（`argv`、`stderr`、`stdout`、`returncode`、時間切れ）として出す。`mutation=True` の時間切れと、シグナルによる終了は `uncertain`。
 - この Issue の後、カタログに対する Git は、この関数のほかから呼んではならない（I-3、I-5 も使う）。この Issue が足す操作：
 
@@ -243,9 +243,9 @@ def run_catalog_git(cwd: Path, *args: str, git: str = "git", read_only: bool = F
 | `resolve_commit(main, ref)` | `rev-parse --verify --quiet <ref>^{commit}`（読むだけ） | なければ `None` |
 | `tree_has_path(main, rev, path)` | `ls-tree --name-only <rev> -- <path>`（読むだけ、`pathspecs` なし。`--literal-pathspecs`） | |
 | `is_initial_commit(main, oid)` | `rev-list --parents -n 1`、`ls-tree -z`、`hash-object --stdin`（読むだけ） | 親がなく、ツリーの中身が `CANONICAL_ROOT_FILES`（モード 100644）とちょうど同じ |
-| `create_initial_commit(main)` | `hash-object -w --stdin`、`mktree`、`commit-tree -m "spec-dock: create canonical"` | 参照は作らない。作者は利用者の Git の設定のとおり |
+| `create_initial_commit(main)` | `hash-object -w --stdin`、`mktree`、`commit-tree -m "spec-dock: create canonical"` | 参照は作らない。作者は利用者の Git の設定（か、上の作者の環境変数）のとおり |
 | `push_initial(main, oid)` | `push --porcelain origin <oid>:refs/heads/spec-dock/canonical`（強制しない） | `*` と `=` は `"pushed"`、`!` は `"rejected"`（終了コード1） |
-| `reset_branch(main, oid, *, expected)` | `update-ref refs/heads/spec-dock/canonical <oid> <expected>` | 4a の拒否の後だけ。ブランチがまだ `expected`（手元の初期のコミット）のときだけ動かす |
+| `reset_branch(main, oid, *, expected)` | `update-ref refs/heads/spec-dock/canonical <oid> <expected>` | 手元のブランチが初期のコミットだけで、GitHub のものを使うときだけ。ブランチがまだ `expected`（手元の初期のコミット）のときだけ動かす |
 | `catalog_change_summary(catalog)` | `status --porcelain=v2 -z --untracked-files=all` と `ls-files -z --cached --others --exclude-standard`（読むだけ） | 未保存の数と、追跡しているか未保存の、名前が `*.conflict-*` のパス（同期が保存した別名ファイルも示すため） |
 | `unpushed(catalog)` | `rev-list --count`、`log --reverse --format=%cI`（`origin/spec-dock/canonical..HEAD`、読むだけ） | 取得の参照がなければ `None` |
 
@@ -399,12 +399,15 @@ def main_not_migrated_warning(layout: CatalogLayout) -> Diagnostic
    3. 書き込みの場所に、このプロセスが書けるか（`os.access(<場所、なければ存在する最も近い親>, W_OK)`）。**ネットワークを使う前に**確かめる（統括の判断 C8）。カタログを作るときの場所は、作り方によらず `<共通ディレクトリ>`、`<共通ディレクトリ>/worktrees`、`<main>/spec-dock` である。ほかに、lock と repair は管理ディレクトリ（repair はカタログも）、除外は `<共通ディレクトリ>/info`、リンクは各 `<チェックアウト>/spec-dock`。カタログと除外がそろっていてリンクを置くだけなら、`<チェックアウト>/spec-dock` だけである。書けない場所があれば `CANONICAL_SANDBOX_DENIED`（`details.paths`。次の1手は、`CODEX_SANDBOX` があれば「サンドボックスの外で同じコマンド」、なければ「示したパスの権限を確かめる。サンドボックスの中なら普通の端末で」）。
    4. `absent` なら、作り方を決める（下の「作るとき」）。ここで `ls-remote` を行う（読むだけのネットワーク。接続の失敗は `GITHUB_UNAVAILABLE`、終了コード5）。新しいリポジトリで、既定のブランチのツリーに `spec-dock/initiatives` があれば `CANONICAL_NOT_MIGRATED`。作り方が決まったら、3をもう一度確かめる（場所は3の範囲に入る）。
    5. `--dry-run` なら、ここで、行う予定を `planned` の効果で返す（何もしないなら効果なしの `planned`）。
-3. **ネットワークの手順**（排他の外）：作るときだけ。初期のコミットの push（`canonical.remote.create`。拒否は `unchanged`）、取り込み（`git.fetch`。明示の refspec なので、取得の対象の設定によらず `origin/spec-dock/canonical` ができる）。
+3. **ネットワークの手順**（排他の外）：作るときだけ。初期のコミットの作成（`git.commit.create`。手元だけの手順として分け、作者がないなどの失敗を `GIT_FAILED` と「Git の作者を設定する」次の1手にする）、その push（`canonical.remote.create`。拒否は `unchanged`）、取り込み（`git.fetch`。明示の refspec なので、取得の対象の設定によらず `origin/spec-dock/canonical` ができる）。ネットワークの失敗の次の1手は、`gh auth status` ではなく「接続と、origin に対する Git の資格情報（GitHub の HTTPS なら `gh auth setup-git`）を確かめて、もう一度 `spec-dock canonical link`」である。
 4. **書く手順**（クローンの `StartLock` の中。既定の5秒で取れなければ `START_LOCK_BUSY`、終了コード3。統括の判断 A10）。ネットワークの手順も、書くカタログ、除外、リンクの手順もないときは、StartLock を取らない（何もしない実行を、ほかの `work start` で止めないため）。StartLock の中で、もう一度 `observe_catalog` をして（ネットワークなし）、2.1 と 2.2 を確かめ直し、次を行う。
    1. カタログ：表の「`canonical link` がすること」。`absent` では、取得の対象に `spec-dock/canonical` がなければ `git.remote.set-branches`（確かめ直してから1行だけ足す）、4a の拒否の後なら `git.branch.reset`、続けて `git.worktree.add`、`git.worktree.lock`。何もしなければ `canonical.catalog` を `unchanged`。
    2. 除外：`info/exclude` に足りない行を足す（`git.info.exclude`）。`info/` がなければ作る。一時ファイルに書いてから `rename` し、もとの権限を保つ。
-   3. リンク：リンクを置くチェックアウトの順に、値が期待と違うか、ないリンクを置く（`canonical.link`、対象はリンクのパス）。ないときは `os.symlink`（置き換えない）。違う先のリンクは、同じディレクトリに一時の名前でリンクを作り、置き換える前にその場所がまだシンボリックリンクであることを確かめてから `os.rename` で置き換える（`ln -s` を重ねない）。すべて `spec-dock` のディレクトリを `O_NOFOLLOW` で開いた記述子に対して行う。
+   3. リンク（置き換えの直前の確かめと `rename` のあいだに、ふつうのファイルが現れれば置き換わる、ごく短い隙間が残る。SpecDock も Git も、その名前でファイルを作らないので受け入れる）：リンクを置くチェックアウトの順に、値が期待と違うか、ないリンクを置く（`canonical.link`、対象はリンクのパス）。ないときは `os.symlink`（置き換えない）。違う先のリンクは、同じディレクトリに一時の名前でリンクを作り、置き換える前にその場所がまだシンボリックリンクであることを確かめてから `os.rename` で置き換える（`ln -s` を重ねない）。すべて `spec-dock` のディレクトリを `O_NOFOLLOW` で開いた記述子に対して行う。
    4. 最後に、カタログとリンクを観察し直し、カタログが `ready` でないか、置いたリンクが `correct` でなければ `CANONICAL_NOT_LINKED` の失敗として扱う。
+   - StartLock の中で観察し直したとき、最初の観察の後にカタログが消えていて（`absent`）、作り方の計画がなければ、何もせずに `CANONICAL_NOT_LINKED`（残りは `not_attempted`）で止まる。
+   - 手順の間の観察（観察し直し、最後の確かめ）で `GitProcessError`、`OSError`、`ValueError` が起きたときも、それまでの効果を示した `partial`（効果がなければ `failed`）で返す。効果を隠した失敗にしない。
+   - 何もしなかった手順（取得の対象がすでにある、付け替えが要らない）は `unchanged` とする。
    - 書くときに `PermissionError`、または Git の「Operation not permitted」「Permission denied」で拒否されたら（`os.access` が許しても拒否する Linux の Landlock など）、`CANONICAL_SANDBOX_DENIED`（次の1手は権限の確かめと普通の端末）とする。
 8. **ツールの設定**（10章）と、警告：`CANONICAL_TOOL_SETTING_MISSING`、`CANONICAL_TOOL_SETTING_UNKNOWN`、このチェックアウトの `spec-dock/.gitignore` に無視の3行が足りなければ `CANONICAL_IGNORE_RULES_MISSING`（次の1手は `spec-dock installation update`）、`moved` なら `CANONICAL_MAIN_MOVED`、4b なら `CANONICAL_REMOTE_MISSING`、mainのリンクを置かなかったら `CANONICAL_MAIN_NOT_MIGRATED`、カタログの形式が書けなければ `CANONICAL_FORMAT_UNSUPPORTED`（警告。カタログは作る。形式のファイルがないか読めないときの次の1手は「canonical のルートの `.spec-dock-canonical.json` を確かめる」）。
 
@@ -412,7 +415,7 @@ def main_not_migrated_warning(layout: CatalogLayout) -> Diagnostic
 
 | GitHub（`ls-remote`） | ローカルのブランチ | すること |
 |---|---|---|
-| ある | — | `fetch`。StartLock の中で、取得の対象に入っていなければ `set-branches --add`。ローカルのブランチがなければ `add --track -b`、あれば `add`（ローカル） |
+| ある | — | `fetch`。StartLock の中で、取得の対象に入っていなければ `set-branches --add`。ローカルのブランチがなければ `add --track -b`、あれば `add`（ローカル）。ローカルのブランチの中身が初期のコミットだけで GitHub のものと違えば、先に GitHub のものへ付け替える（`git.branch.reset`。中身がないので失うものはない） |
 | ない | 中身が初期のコミットだけ（`is_initial_commit`。どう生じたかは問わない。統括の判断 C2） | 4a：そのコミットを push。`fetch`。push できたら `add`（ローカル）。拒否されたら（別のPCが先に作った）、ローカルのブランチを、元の値（手元の初期のコミット）を確かめてから `origin/spec-dock/canonical` に付け替えて（`update-ref`）、`add`（ローカル）。取得の対象は「ある」の行と同じに足す |
 | ない | 中身のあるブランチ | 4b：push しない。`add`（ローカル）。警告 `CANONICAL_REMOTE_MISSING`（GitHub の削除の扱いは I-3 の基準と一時停止） |
 | ない | ない | 既定のブランチ（`refs/remotes/origin/HEAD`、なければmainのチェックアウトの HEAD）のツリーに `spec-dock/initiatives` があれば、書く前に `CANONICAL_NOT_MIGRATED`（GitHub に canonical がなく、既定のブランチに仕様があること。次の1手は移行の手順書）。なければ、新しいリポジトリとして、初期のコミットを作って push し、`fetch` する。push が拒否されたら（`unchanged`）、GitHub のものを使う。どちらも、StartLock の中で取得の対象を確かめて足してから `add --track -b`（`--single-branch` のクローンでも追跡を設定できるように） |
@@ -435,6 +438,8 @@ def link_after_command(checkout: Path, *, environment: RuntimeEnvironment | None
 ```
 
 - `checkout` について `resolve_context` をして、`link_checkout` と同じ手順を行う。**呼ぶ側は StartLock を持ってはならない**（この関数が StartLock を取るため。呼ぶ側が持っていると、5秒待って `START_LOCK_BUSY` になり、リンクは置かれない）。canonical の `work start`（I-5）は、選択を記録して StartLock を放した後に呼ぶ（統括の判断 A1）。
+- 対象のチェックアウトの宣言が版4と読めない（版3、宣言がない、壊れている）ときは、`resolve_context` の前に `probe_workspace_mode` で見て、何もせずに警告 `CANONICAL_CHECKOUT_NOT_MIGRATED` を返す。チェックアウトがなく `dry_run` でもないときは、警告 `CANONICAL_NOT_LINKED` を返す。
+- 警告の `details.next_step` が `spec-dock canonical link` を含まないとき（接続、権限、構成の失敗など）は、末尾に「続けて `<チェックアウト>` で `spec-dock canonical link`」を足す（呼ぶ側のコマンドをもう一度実行させない）。
 - 失敗は、呼ぶ側の結果を変えずに返す：`link_checkout` が `failed` か `partial` を返したとき、または `CanonicalCommandError`、`GitProcessError`、`OSError`、`ValueError`、`RuntimeError` を出したとき（宣言がない、構成が違う、など）は、そのコード（`START_LOCK_BUSY` を含む）を警告のコードにした `Diagnostic`（`details.next_step` に、その失敗の次の1手。どれも `spec-dock canonical link` を含む。`details.effects` にすべての効果）を返す。`effects` には、`succeeded`、`unchanged`（`dry_run` では `planned`）の効果だけを入れる（呼ぶ側の `succeeded` の結果を壊さないため）。対象のチェックアウトの宣言が版4でなければ、何もせずに警告 `CANONICAL_CHECKOUT_NOT_MIGRATED` を返す（止まるコードの `CANONICAL_NOT_MIGRATED` を警告に使い回さない。統括の判断 C6 の考え方）。チェックアウトがなく `dry_run` なら、`canonical.link` の `planned` の効果だけを返す。
 - **canonical モードの `worktree create`**（`create_worktree_and_link`。`CANONICAL_HANDLERS["worktree create"]`）：
   1. `--expect-current` があれば、`CANONICAL_NOT_IMPLEMENTED` で止まる（従来の確かめは `.meta.json` を読むため。選択の解決は I-4。統括の判断 A2）。
@@ -479,7 +484,7 @@ class CanonicalStatusData:        # presentation/command_data.py
 
 | 項目 | I-2 の中身 |
 |---|---|
-| `catalog` | `path`、`state`（観察の状態）、`exists`、`branch`、`head`、`locked`、`registered_path`、`registration_matches`。`ready` で lock されていれば `ok` |
+| `catalog` | `path`、`state`（観察の状態）、`exists`、`branch`、`head`、`locked`、`registered_path`、`registration_matches`（実体で比べる）。`ready` で lock されていれば `ok` |
 | `link` | `links`（`[{checkout, path, expected, actual, state, entries}]`）。すべて `correct` なら `ok`。作業用のworktreeから見て、mainの宣言が版4でなければ、mainのリンクは `CANONICAL_MAIN_NOT_MIGRATED` の問題とする |
 | `exclude` | `info_exclude`（`{path, missing}`）、`gitignore`（このチェックアウトの `spec-dock/.gitignore` の `{path, missing}`） |
 | `access` | `readable`、`writable`（`os.access(<カタログ>, R_OK \| X_OK)`、`W_OK`）。カタログがなければ `unknown` |
@@ -573,6 +578,7 @@ class CanonicalStatusData:        # presentation/command_data.py
 | StartLock が取れない | `START_LOCK_BUSY`（3）。ネットワークの手順の効果があれば `partial` |
 | `link_after_command` の失敗 | 呼ぶ側の結果を変えず、警告と次の1手 |
 | `canonical status` の観察の Git の失敗 | 該当の項目を `unknown` にして続ける |
+| `canonical status` の観察の権限の失敗（mainの `spec-dock` が読めないなど） | `access` を `OS_ACCESS_DENIED` の問題にし、ほかの項目は `unknown` にして続ける（`succeeded`） |
 
 ## 変更対象
 
