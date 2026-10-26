@@ -83,14 +83,13 @@ def test_status_of_a_linked_clone_reports_every_item_and_no_problems(
     assert set(data) == ITEMS | {"kind"} and data["kind"] == "canonical-status"
     for item in ("catalog", "link", "exclude", "access", "tools", "format", "git", "changes"):
         assert data[item]["status"] == "ok", (item, data[item])
-    for item, owner in (
-        ("dashboard", "iss-00438"),
-        ("structure", "iss-00431"),
-    ):
+    for item, owner in (("dashboard", "iss-00438"),):
         assert data[item] == {"status": "not_implemented", "next_step": None, "owner": owner}
     # iss-00430: the (fake) periodic job ran once after link; origin is a bare path, so no snapshot applies.
     assert data["sync"]["status"] == "ok" and data["sync"]["registered"] is True
     assert data["snapshot"]["status"] == "unknown" and data["snapshot"]["repository"] is None
+    # iss-00431: structure reads GitHub only with --structure.
+    assert data["structure"] == {"status": "not_checked", "next_step": None}
     assert data["catalog"]["locked"] and data["catalog"]["branch"] == "spec-dock/canonical"
     assert data["format"]["version"] == 1 and data["git"]["supported"]
     assert data["changes"]["unsaved"] == 0 and data["changes"]["unpushed"] == 0

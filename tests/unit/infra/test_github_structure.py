@@ -263,6 +263,18 @@ def test_graphql_rate_limit_errors_wait_and_retry() -> None:
     assert fake.clock.sleeps == [60.0]
 
 
+def test_a_graphql_rate_limit_with_a_zero_wait_does_not_wait_a_minute() -> None:
+    fake = FakeGithub()
+    fake.scope("issue", slug="leaf")
+    fake.inject(
+        status=200,
+        headers={"retry-after": "0"},
+        body={"data": None, "errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]},
+    )
+    assert len(_client(fake).fetch_structure()) == 1
+    assert fake.clock.sleeps == [0.0]
+
+
 def test_probe_sends_three_conditional_requests_and_reports_changes() -> None:
     fake = FakeGithub()
     epic = fake.scope("epic", slug="core")

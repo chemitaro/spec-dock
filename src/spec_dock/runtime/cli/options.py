@@ -59,6 +59,9 @@ _COMMON_VALUES = {
 }
 
 
+SOURCE_LEAVES = frozenset({"dependency check", "workspace sync"})
+
+
 class _StrictParser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("allow_abbrev", False)
@@ -479,6 +482,10 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("canonical accept requires paths or --deletions")
     if parsed.command_path == "branch create" and not parsed.base:
         parser.error("branch create requires --base")
+    if parsed.command_path in SOURCE_LEAVES:
+        # Legacy handlers keep receiving `local` by default; canonical mode refuses only an explicit `local`.
+        parsed.source_explicit = parsed.source is not None
+        parsed.source = parsed.source or "local"
     if parsed.command_path not in MUTATING_LEAF_PATHS and common.get("yes"):
         parser.error("--yes applies only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):

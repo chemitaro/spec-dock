@@ -398,6 +398,9 @@ class FakeGithub:
         assert isinstance(query, str) and isinstance(variables, dict)
         if f"{variables.get('owner')}/{variables.get('name')}".lower() != self.repository:
             return 200, {"data": {"repository": None}, "errors": [{"type": "NOT_FOUND", "message": "missing"}]}, {}
+        aliases = re.findall(r"(\w+):\s*issue\(number:\s*(\d+)\)", query)
+        if aliases and "issues(" not in query:
+            return self._graphql_numbers(aliases)
         filter_match = re.search(r"issues\(([^)]*)\)", query)
         assert filter_match is not None, "fake GraphQL expects repository.issues(...)"
         arguments = filter_match.group(1)
@@ -429,6 +432,22 @@ class FakeGithub:
             },
         }
         return 200, {"data": data}, {}
+
+    def _graphql_numbers(self, aliases: list[tuple[str, str]]) -> tuple[int, object, dict[str, str]]:
+        """Aliased `issue(number: N)` fields; a missing number or a pull request answers null with an error."""
+        repository: dict[str, object] = {}
+        errors: list[dict[str, object]] = []
+        for alias, number in aliases:
+            issue = self._local(int(number))
+            if issue is None or issue.pull_request:
+                repository[alias] = None
+                errors.append({"type": "NOT_FOUND", "path": ["repository", alias], "message": "Could not resolve"})
+            else:
+                repository[alias] = self._graphql_node(issue)
+        body: dict[str, object] = {"data": {"repository": repository}}
+        if errors:
+            body["errors"] = errors
+        return 200, body, {}
 
     def _graphql_reference(self, reference: list[Any]) -> dict[str, object]:
         issue = self.issues[reference[0], reference[1]]
@@ -520,6 +539,13 @@ class FakeGithub:
         if len(rest) == 2 and rest[0] == "labels" and method == "GET":
             label_body = self.labels.get(rest[1])
             return (200, label_body, {}) if label_body is not None else (404, {"message": "Not Found"}, {})
+        if len(rest) == 2 and rest[0] == "labels" and method == "DELETE":
+            if self.labels.pop(rest[1], None) is None:
+                return 404, {"message": "Not Found"}, {}
+            for labelled in self.issues.values():
+                if rest[1] in labelled.labels:
+                    labelled.labels.remove(rest[1])
+            return 204, None, {}
         if len(rest) < 2 or rest[0] != "issues" or not rest[1].isdigit():
             return 404, {"message": "Not Found"}, {}
         found = self._local(int(rest[1]))
@@ -531,7 +557,7 @@ class FakeGithub:
             return 200, self._rest_issue(issue), {}
         if not tail and method == "PATCH":
             assert isinstance(payload, dict)
-            for key in ("title", "state", "state_reason"):
+            for key in ("title", "body", "state", "state_reason"):
                 if key in payload:
                     setattr(issue, key, payload[key])
             if payload.get("state") == "open":
