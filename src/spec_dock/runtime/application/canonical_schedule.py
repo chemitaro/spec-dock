@@ -301,7 +301,7 @@ def _move_state(plan: SchedulePlan, effects: list[Effect]) -> None:
 
 
 def _baseline(plan: SchedulePlan, effects: list[Effect]) -> None:
-    """Step 7: record origin/spec-dock/canonical, or the local HEAD when GitHub has none, as the baseline."""
+    """Step 7: record the baseline of a catalog without one (`initial_baseline`: the local HEAD, or the tracking ref)."""
     catalog = Path(plan.catalog)
     target = str(catalog_state_dir(plan.state_root, plan.catalog))
     marker = None if plan.schedule else "none"
@@ -312,7 +312,7 @@ def _baseline(plan: SchedulePlan, effects: list[Effect]) -> None:
         state = current or CatalogSyncState.new(plan.catalog, at=stamp)
         baseline = state.last_seen_remote
         if baseline is None:
-            # GitHub has no canonical: the local HEAD guards the content so the first cycle never recreates it.
+            # The local HEAD: the first cycle never recreates a canonical GitHub deleted, nor pushes back a rewind.
             from spec_dock.runtime.application.canonical_sync import initial_baseline
 
             baseline = initial_baseline(catalog)

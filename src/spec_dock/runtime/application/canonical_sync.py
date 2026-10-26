@@ -778,6 +778,10 @@ def _push(run: _Run, *, last: bool) -> bool:
     catalog, git, remote = run.catalog, run.git, run.remote
     local = canonical_git.resolve_commit(catalog, "HEAD", git=git)
     assert local is not None
+    if run.state.adopt_remote_pending:
+        # The re-adoption has not made its commit on R yet (held paths being fixed, a blocked merge): L may
+        # still carry the history GitHub dropped, so nothing is pushed until it has (judgment R2).
+        return False
     if remote is not None and (local == remote or not canonical_git.is_ancestor(catalog, remote, local, git=git)):
         return False  # nothing ahead of GitHub, or not yet merged (a blocked merge waits for the next cycle)
     run.push_tried = True

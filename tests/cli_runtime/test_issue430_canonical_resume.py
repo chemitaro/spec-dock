@@ -297,3 +297,31 @@ def test_an_accepted_file_under_a_clean_filter_lets_a_re_adoption_finish(pair: S
     item = catalog_result(result)
     assert item["holds"] == [] and item["pushed"] is True, result
     assert pair.remote_file("leak.md") == TOKEN
+
+
+def test_a_re_adoption_waiting_for_a_held_fix_never_pushes_the_rewound_history(pair: SyncPair) -> None:
+    pair.write(pair.a, "safe.md", "safe\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    before = pair.remote_head()
+    pair.write(pair.a, "secret.md", TOKEN + "\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "accept", "secret.md")
+    pair.sync(pair.a)
+    dropped = pair.remote_head()
+    assert dropped != before
+    _force(pair, before)  # GitHub rewinds to an ancestor of the local HEAD, dropping the secret
+    pair.advance(61)
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    assert pair.run(pair.a, "canonical", "resume", "--adopt-remote")[0] == 0
+    (pair.specs(pair.a) / "secret.md").unlink()  # the fix, not saved yet within 30 seconds
+    pair.advance(5)
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["pushed"] is False and pair.remote_head() == before, result
+    pair.advance(31)
+    pair.sync(pair.a)
+    _code, result = pair.sync(pair.a)
+    assert pair.remote_file("secret.md") is None and pair.remote_file("safe.md") == "safe"
+    assert dropped not in _history(pair)

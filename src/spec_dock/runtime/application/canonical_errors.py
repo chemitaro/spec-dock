@@ -189,8 +189,8 @@ ADOPT_HELD_NEXT_STEP: Final = (
     "again."
 )
 RUNTIME_INCOMING_NEXT_STEP: Final = (
-    "GitHub's spec-dock/canonical carries .runtime/, which SpecDock never syncs: remove it there with plain Git "
-    "(git rm -r --cached .runtime, commit, push to spec-dock/canonical), then run "
+    "GitHub's spec-dock/canonical carries .runtime/, which SpecDock never syncs: in a separate clone with "
+    "spec-dock/canonical checked out (not in the catalog), run git rm -r --cached .runtime, commit and push, then run "
     "spec-dock canonical resume --adopt-remote."
 )
 UNSAVED_CHANGES_RECOVERY: Final = "Check spec-dock canonical status and wait until everything is saved and pushed."
