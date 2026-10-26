@@ -171,10 +171,14 @@ def test_an_unusable_declaration_names_its_reason_and_next_step(
     assert str(outcome.failures[0].details["next_step"]).startswith(next_step)
 
 
-def test_the_old_known_writer_protocol_is_accepted_like_the_declaration_reader() -> None:
+def test_the_old_writer_protocol_fails_because_writing_commands_require_the_worktree_writer() -> None:
     files = _valid_files()
     files["spec-dock/workspace.json"] = b'{"schema_version": 4, "writer_protocol": "specdock.writer/v1"}'
-    assert _evaluate(files).failures == ()
+    outcome = _evaluate(files)
+    assert _codes(outcome) == [("WORKSPACE_DECLARATION_INVALID", "spec-dock/workspace.json")]
+    assert outcome.failures[0].details["reason"] == "unknown-writer-protocol"
+    assert "specdock.worktree-writer/v1" in outcome.failures[0].message
+    assert str(outcome.failures[0].details["next_step"]).startswith("Commit spec-dock/workspace.json as")
 
 
 @pytest.mark.parametrize(

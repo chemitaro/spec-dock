@@ -18,7 +18,6 @@ from spec_dock.runtime.application.project_context import (
     CANONICAL_WORKSPACE_SCHEMA,
     LEGACY_WORKSPACE_SCHEMA,
     NEW_WRITER_PROTOCOL,
-    OLD_WRITER_PROTOCOL,
     resolve_git_context,
     workspace_mode,
 )
@@ -215,7 +214,7 @@ def _path_failures(entries: Sequence[TreeEntry]) -> tuple[Diagnostic, ...]:
 
 
 def _declaration_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], bytes]) -> Diagnostic | None:
-    """Rule 4: schema 4 with a writer protocol the declaration reader knows; schema 3 is one failure."""
+    """Rule 4: schema 4 with the worktree-writer protocol; schema 3 is one failure."""
     if entry is None:
         return _invalid_declaration("missing", "the workspace declaration is not committed")
     if entry.kind != "regular":
@@ -244,9 +243,10 @@ def _declaration_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], by
             NOT_MIGRATED_RECOVERY,
             schema_version=version,
         )
-    if declaration.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
+    if declaration.get("writer_protocol") != NEW_WRITER_PROTOCOL:
+        # The old specdock.writer/v1 fails too: require_writer stops every writing command on it.
         return _invalid_declaration(
-            "unknown-writer-protocol", "the workspace declaration has an unknown writer_protocol"
+            "unknown-writer-protocol", f"the workspace declaration's writer_protocol is not {NEW_WRITER_PROTOCOL}"
         )
     return None
 

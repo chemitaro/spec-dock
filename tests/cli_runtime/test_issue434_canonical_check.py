@@ -60,6 +60,10 @@ def _problem(root: Path, problem: str) -> None:
         (root / "spec-dock/workspace.json").write_text(
             json.dumps({"schema_version": 3, "writer_protocol": "specdock.worktree-writer/v1"}), encoding="utf-8"
         )
+    elif problem == "old-writer-protocol":
+        (root / "spec-dock/workspace.json").write_text(
+            json.dumps({"schema_version": 4, "writer_protocol": "specdock.writer/v1"}), encoding="utf-8"
+        )
     elif problem == "asset-modified":
         (root / "spec-dock/docs/README.md").write_text("edited\n", encoding="utf-8")
     elif problem == "asset-deleted":
@@ -84,6 +88,7 @@ def _problem(root: Path, problem: str) -> None:
         ("catalog-gitlink", [("CATALOG_PATH_TRACKED", "spec-dock/.canonical")]),
         ("scope-metadata", [("SCOPE_METADATA_TRACKED", "spec-dock/artifacts/.meta.json")]),
         ("schema-3", [("WORKSPACE_NOT_MIGRATED", "spec-dock/workspace.json")]),
+        ("old-writer-protocol", [("WORKSPACE_DECLARATION_INVALID", "spec-dock/workspace.json")]),
         ("asset-modified", [("STATIC_ASSET_INVALID", "spec-dock/docs/README.md")]),
         ("asset-deleted", [("STATIC_ASSET_INVALID", "spec-dock/docs/README.md")]),
         ("asset-symlink", [("STATIC_ASSET_INVALID", "spec-dock/docs/README.md")]),
