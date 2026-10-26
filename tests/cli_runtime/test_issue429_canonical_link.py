@@ -73,6 +73,7 @@ def test_the_first_link_of_a_new_repository_creates_the_canonical_and_links_main
     assert code == 0 and result["status"] == "succeeded", result
     catalog = main_checkout / "spec-dock/.canonical"
     assert effects(result) == [
+        ("git.commit.create", "succeeded"),
         ("canonical.remote.create", "succeeded"),
         ("git.fetch", "succeeded"),
         ("git.worktree.add", "succeeded"),
@@ -730,3 +731,196 @@ def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
     assert git(main_checkout, "status", "--porcelain") == ""
     code, listed = run(capsys, main_checkout, "scope", "list")
     assert code == 0 and [item["id"] for item in listed["data"]["result"]["items"]] == ["init-00001"]
+
+
+def test_a_failed_observation_after_pushing_is_partial_with_the_applied_effects(
+    capsys: pytest.CaptureFixture[str], remote: Path, main_checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.application import canonical_link
+    from spec_dock.runtime.infra.git_process import GitProcessError
+
+    real = canonical_link.observe_catalog
+    calls = {"n": 0}
+
+    def failing(*args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise GitProcessError(("git", "worktree", "list"), b"simulated timeout", None, timed_out=True)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(canonical_link, "observe_catalog", failing)
+    code, result = link(capsys, main_checkout)
+    assert code == 6 and result["status"] == "partial", result
+    statuses = dict(effects(result))
+    assert statuses["canonical.remote.create"] == "succeeded" and statuses["git.fetch"] == "succeeded"
+    assert statuses["git.worktree.add"] == "not_attempted"
+    assert git(remote, "rev-parse", "--verify", "refs/heads/spec-dock/canonical")
+
+
+def test_a_missing_git_identity_is_not_reported_as_a_network_failure(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path
+) -> None:
+    git(main_checkout, "config", "--unset", "user.name")
+    git(main_checkout, "config", "--unset", "user.email")
+    git(main_checkout, "config", "user.useConfigOnly", "true")
+    code, result = link(capsys, main_checkout)
+    assert code == 5 and result["error"]["code"] == "GIT_FAILED", result
+    assert "user.name" in result["recovery"]["instructions"][0]
+    assert dict(effects(result))["git.commit.create"] == "failed"
+
+
+def test_identity_from_the_environment_creates_the_initial_commit(
+    capsys: pytest.CaptureFixture[str], remote: Path, main_checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    git(main_checkout, "config", "--unset", "user.name")
+    git(main_checkout, "config", "--unset", "user.email")
+    git(main_checkout, "config", "user.useConfigOnly", "true")
+    for key in ("GIT_AUTHOR_NAME", "GIT_COMMITTER_NAME"):
+        monkeypatch.setenv(key, "CI")
+    for key in ("GIT_AUTHOR_EMAIL", "GIT_COMMITTER_EMAIL"):
+        monkeypatch.setenv(key, "ci@example.invalid")
+    code, result = link(capsys, main_checkout)
+    assert code == 0, result
+    assert git(remote, "log", "-1", "--format=%an", "refs/heads/spec-dock/canonical") == "CI"
+
+
+def test_a_catalog_removed_before_the_start_lock_is_not_reported_as_created(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.application import canonical_link
+
+    assert link(capsys, main_checkout)[0] == 0
+    (main_checkout / "spec-dock/initiatives").unlink()
+    real = canonical_link.observe_catalog
+    calls = {"n": 0}
+
+    def racing(*args: Any, **kwargs: Any) -> Any:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            git(main_checkout, "worktree", "remove", "-f", "-f", str(main_checkout / "spec-dock/.canonical"))
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(canonical_link, "observe_catalog", racing)
+    code, result = link(capsys, main_checkout)
+    assert code == 3 and result["status"] == "failed" and result["error"]["code"] == "CANONICAL_NOT_LINKED", result
+    assert {status for _kind, status in effects(result)} == {"not_attempted"}
+    assert not os.path.lexists(main_checkout / "spec-dock/initiatives")
+
+
+def test_an_already_covered_fetch_refspec_is_reported_unchanged(
+    capsys: pytest.CaptureFixture[str],
+    remote: Path,
+    main_checkout: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert link(capsys, main_checkout)[0] == 0
+    single = clone(remote, tmp_path / "single-race", "--single-branch", "--branch", "main")
+    real = canonical_git.fetch_covers_canonical
+    calls = {"n": 0}
+
+    def covered_later(*args: Any, **kwargs: Any) -> bool:
+        calls["n"] += 1
+        if calls["n"] == 2:
+            canonical_git.add_fetch_branch(single)
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(canonical_git, "fetch_covers_canonical", covered_later)
+    code, result = link(capsys, single)
+    assert code == 0, result
+    assert ("git.remote.set-branches", "unchanged") in effects(result)
+    fetch = git(single, "config", "--get-all", "remote.origin.fetch").splitlines()
+    assert fetch.count("+refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical") == 1
+
+
+def test_a_stale_initial_branch_gives_way_to_the_canonical_on_github(
+    capsys: pytest.CaptureFixture[str], remote: Path, main_checkout: Path, tmp_path: Path
+) -> None:
+    other = clone(remote, tmp_path / "other")
+    git(other, "config", "user.name", "Other PC")
+    stale = canonical_git.create_initial_commit(other)
+    git(other, "branch", "spec-dock/canonical", stale)
+    assert link(capsys, main_checkout)[0] == 0
+    first = git(remote, "rev-parse", "refs/heads/spec-dock/canonical")
+    assert first != stale
+    code, result = link(capsys, other)
+    assert code == 0, result
+    assert ("git.branch.reset", "succeeded") in effects(result)
+    assert git(other / "spec-dock/.canonical", "rev-parse", "HEAD") == first
+
+
+def test_a_rejected_push_of_an_unpushed_initial_branch_uses_the_canonical_pushed_first(
+    capsys: pytest.CaptureFixture[str],
+    remote: Path,
+    main_checkout: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    other = clone(remote, tmp_path / "other")
+    git(other, "config", "user.name", "Other PC")
+    stale = canonical_git.create_initial_commit(other)
+    git(other, "branch", "spec-dock/canonical", stale)
+    assert link(capsys, main_checkout)[0] == 0
+    first = git(remote, "rev-parse", "refs/heads/spec-dock/canonical")
+    monkeypatch.setattr(canonical_git, "remote_canonical", lambda *args, **kwargs: "absent")
+    code, result = link(capsys, other)
+    assert code == 0, result
+    assert ("canonical.remote.create", "unchanged") in effects(result)
+    assert ("git.branch.reset", "succeeded") in effects(result)
+    assert git(other, "rev-parse", "refs/heads/spec-dock/canonical") == first
+    assert git(other / "spec-dock/.canonical", "rev-parse", "HEAD") == first
+
+
+def test_an_offline_link_after_worktree_create_names_canonical_link_as_the_next_step(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path
+) -> None:
+    git(main_checkout, "remote", "set-url", "origin", str(tmp_path / "missing.git"))
+    code, result = run(
+        capsys,
+        main_checkout,
+        "worktree",
+        "create",
+        "feature",
+        "--base",
+        "HEAD",
+        "--root",
+        str(tmp_path / "trees"),
+        "--yes",
+    )
+    assert code == 0 and result["status"] == "succeeded", result
+    (warning,) = [item for item in result["warnings"] if item["code"] == "GITHUB_UNAVAILABLE"]
+    assert "spec-dock canonical link" in warning["details"]["next_step"]
+    assert "gh auth status" not in warning["details"]["next_step"]
+
+
+@pytest.mark.parametrize("declaration", ["schema-3", "none"])
+def test_worktree_create_from_an_unmigrated_base_warns_and_does_not_link(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path, declaration: str
+) -> None:
+    assert link(capsys, main_checkout)[0] == 0
+    git(main_checkout, "switch", "-q", "-c", "old-base")
+    if declaration == "schema-3":
+        (main_checkout / "spec-dock/workspace.json").write_text(
+            '{"schema_version":3,"writer_protocol":"specdock.worktree-writer/v1"}\n', encoding="utf-8"
+        )
+    else:
+        (main_checkout / "spec-dock/workspace.json").unlink()
+    git(main_checkout, "commit", "-qam", "old base")
+    base = git(main_checkout, "rev-parse", "HEAD")
+    git(main_checkout, "switch", "-q", "main")
+    code, result = run(
+        capsys,
+        main_checkout,
+        "worktree",
+        "create",
+        "feature",
+        "--base",
+        base,
+        "--root",
+        str(tmp_path / "trees"),
+        "--yes",
+    )
+    assert code == 0 and result["status"] == "succeeded", result
+    assert [item["code"] for item in result["warnings"]] == ["CANONICAL_CHECKOUT_NOT_MIGRATED"]
+    assert result["data"]["result"]["canonical_link"]["state"] == "skipped"
+    assert not os.path.lexists(tmp_path / "trees/feature/spec-dock/initiatives")

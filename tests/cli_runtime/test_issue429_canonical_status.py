@@ -326,3 +326,33 @@ def test_the_write_check_comes_before_any_network_call(
     finally:
         (fresh / ".git").chmod(0o755)
     assert code == 3 and result["error"]["code"] == "CANONICAL_SANDBOX_DENIED"
+
+
+@needs_permissions
+def test_a_denied_main_spec_dock_is_an_access_problem_not_a_crash(
+    capsys: pytest.CaptureFixture[str], linked_clone: tuple[Path, Path]
+) -> None:
+    main_checkout, linked = linked_clone
+    (main_checkout / "spec-dock").chmod(0o000)
+    try:
+        code, result = run(capsys, linked, "canonical", "status")
+    finally:
+        (main_checkout / "spec-dock").chmod(0o755)
+    assert code == 0 and result["status"] == "succeeded", result
+    assert result["data"]["access"]["status"] == "problem"
+    assert "OS_ACCESS_DENIED" in [item["code"] for item in result["warnings"]]
+
+
+def test_a_registration_through_an_alias_matches_by_identity(
+    capsys: pytest.CaptureFixture[str], linked_clone: tuple[Path, Path], tmp_path: Path
+) -> None:
+    from spec_dock.runtime.infra import canonical_git
+
+    main_checkout, _linked = linked_clone
+    alias = tmp_path / "alias"
+    alias.symlink_to(main_checkout, target_is_directory=True)
+    admin = canonical_git.read_gitdir(main_checkout / "spec-dock/.canonical")
+    assert admin is not None
+    (admin / "gitdir").write_text(str(alias / "spec-dock/.canonical/.git") + "\n", encoding="utf-8")
+    _code, result = run(capsys, main_checkout, "canonical", "status")
+    assert result["data"]["catalog"]["status"] == "ok" and result["data"]["catalog"]["registration_matches"] is True

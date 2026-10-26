@@ -69,7 +69,9 @@ def place_link(spec_dock_dir: Path, name: str, text: str) -> Literal["created", 
         temporary = f".{name}.{secrets.token_hex(8)}.tmp"
         os.symlink(text, temporary, dir_fd=directory_fd)
         try:
-            # Re-check right before the rename: a real directory or file that appeared stays untouched.
+            # Re-check right before the rename. A directory that appears after this check makes rename fail
+            # (EISDIR), so it stays; a regular file created in the remaining instant would be replaced. Nothing
+            # SpecDock or Git writes creates a file named spec-dock/initiatives, so that window is accepted.
             if not _is_symlink_at(directory_fd, name):
                 raise LinkOccupied(f"{spec_dock_dir / name} is not a symbolic link")
             os.rename(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
@@ -91,22 +93,28 @@ def _is_symlink_at(directory_fd: int, name: str) -> bool:
 
 
 def read_text_file(path: Path) -> str | None:
+    """Text for rule matching; bytes that are not UTF-8 stay distinguishable (surrogateescape)."""
     try:
-        return path.read_bytes().decode("utf-8", errors="replace")
+        return path.read_bytes().decode("utf-8", errors="surrogateescape")
     except (FileNotFoundError, NotADirectoryError):
         return None
 
 
 def append_exclude(common_dir: Path, lines: Sequence[str]) -> tuple[str, ...]:
-    """Append the missing lines to <common>/info/exclude atomically, keeping its mode; returns the added lines."""
+    """Append the rule block to <common>/info/exclude when it is not in effect, keeping existing bytes and mode."""
     info = common_dir / "info"
     with suppress(FileExistsError):
         Path(info).mkdir(mode=0o755)
     exclude = info / "exclude"
-    current = read_text_file(exclude)
-    missing = missing_lines(current, lines)
+    try:
+        current = exclude.read_bytes()
+    except FileNotFoundError:
+        current = None
+    text = current.decode("utf-8", errors="surrogateescape") if current is not None else None
+    missing = missing_lines(text, lines)
     if not missing:
         return ()
+    updated = append_lines(text, lines).encode("utf-8", errors="surrogateescape")
     try:
         mode = stat.S_IMODE(exclude.stat().st_mode)
     except FileNotFoundError:
@@ -115,7 +123,7 @@ def append_exclude(common_dir: Path, lines: Sequence[str]) -> tuple[str, ...]:
     descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_CLOEXEC", 0), 0o600)
     try:
         with os.fdopen(descriptor, "wb") as stream:
-            stream.write(append_lines(current, lines).encode("utf-8"))
+            stream.write(updated)
             stream.flush()
             os.fsync(stream.fileno())
         Path(temporary).chmod(mode)

@@ -22,6 +22,11 @@ _DIRECTORY_FLAGS = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW | getattr(os, "O
 
 def runtime_directory(catalog: Path, relative: PurePosixPath) -> Path:
     """Create `catalog/relative` component by component, refusing any symbolic link on the way."""
+    os.close(_open_runtime_directory(catalog, relative))
+    return catalog / relative
+
+
+def _open_runtime_directory(catalog: Path, relative: PurePosixPath) -> int:
     current = os.open(catalog, _DIRECTORY_FLAGS)
     try:
         for part in relative.parts:
@@ -30,17 +35,20 @@ def runtime_directory(catalog: Path, relative: PurePosixPath) -> Path:
             following = os.open(part, _DIRECTORY_FLAGS, dir_fd=current)
             os.close(current)
             current = following
-    finally:
+    except BaseException:
         os.close(current)
-    return catalog / relative
+        raise
+    return current
 
 
 def write_changeset(catalog: Path, changeset: Changeset, *, token: str | None = None) -> Path:
-    """Place one changeset with a temporary file and rename; call it while holding the catalog lock."""
-    directory = runtime_directory(catalog, CHANGESETS_RELATIVE)
+    """Place one changeset with a temporary file and rename; call it while holding the catalog lock.
+
+    Every write goes through the descriptor of the verified `.runtime/changesets` directory.
+    """
     payload = (json.dumps(changeset.to_json(), ensure_ascii=False, sort_keys=True) + "\n").encode("utf-8")
     created = parse_timestamp(changeset.created_at)
-    directory_fd = os.open(directory, _DIRECTORY_FLAGS)
+    directory_fd = _open_runtime_directory(catalog, CHANGESETS_RELATIVE)
     try:
         name = changeset_filename(created, token or secrets.token_hex(8))
         while _exists(directory_fd, name):
@@ -62,7 +70,7 @@ def write_changeset(catalog: Path, changeset: Changeset, *, token: str | None = 
         os.fsync(directory_fd)
     finally:
         os.close(directory_fd)
-    return directory / name
+    return catalog / CHANGESETS_RELATIVE / name
 
 
 def _exists(directory_fd: int, name: str) -> bool:

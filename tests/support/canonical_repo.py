@@ -33,9 +33,12 @@ def git(root: Path, *args: str, check: bool = True, input: bytes | None = None) 
 
 
 def _clean_environment() -> dict[str, str]:
+    """The fixtures' own Git calls read neither inherited GIT_* overrides nor the system configuration."""
     import os
 
-    return {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment["GIT_CONFIG_NOSYSTEM"] = "1"
+    return environment
 
 
 def configure(root: Path) -> None:
@@ -104,10 +107,14 @@ def environment(
 
 
 def isolate_user_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Point HOME and XDG_STATE_HOME at a temporary directory and drop tool-session markers."""
+    """Point HOME, XDG_CONFIG_HOME and XDG_STATE_HOME at a temporary directory and drop tool-session markers.
+
+    The user's ~/.gitconfig (global hooks, signing, excludes) and tool settings are then never read.
+    """
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     monkeypatch.setenv("HOME", str(home))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     for key in ("CODEX_SANDBOX", "CLAUDECODE", "container", "REMOTE_CONTAINERS", "CODESPACES"):
         monkeypatch.delenv(key, raising=False)

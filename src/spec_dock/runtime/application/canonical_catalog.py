@@ -7,7 +7,7 @@ every canonical command that uses the specs; catalog_changes is the only way a c
 from __future__ import annotations
 
 from contextlib import contextmanager
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import os
 from pathlib import Path
@@ -83,9 +83,6 @@ class LinkView:
     state: LinkState
     expected: str
 
-    def __iter__(self) -> Iterator[object]:
-        return iter((self.checkout, self.observed, self.state, self.expected))
-
 
 @dataclass(frozen=True)
 class CatalogObservation:
@@ -114,8 +111,8 @@ def observe_catalog(layout: CatalogLayout, environment: RuntimeEnvironment, *, t
         if record.branch == CANONICAL_BRANCH
     )
     catalog = layout.catalog
-    fields = _catalog_fields(layout, records, environment)
-    catalog_real = Path(os.path.realpath(catalog)) if fields["state"] in ("ready", "repair", "foreign") else None
+    facts = _catalog_facts(layout, records, environment)
+    catalog_real = Path(os.path.realpath(catalog)) if facts.state in ("ready", "repair", "foreign") else None
     links = []
     for checkout in layout.checkouts:
         observed = observe_link(layout.link_path(checkout))
@@ -125,80 +122,90 @@ def observe_catalog(layout: CatalogLayout, environment: RuntimeEnvironment, *, t
         )
     return CatalogObservation(
         layout=layout,
+        state=facts.state,
+        registered=facts.registered,
+        locked=facts.locked,
+        moved=facts.moved,
+        gitdir=facts.gitdir,
+        entries=facts.entries,
         links=tuple(links),
         exclude_missing=missing_lines(read_text_file(layout.common_dir / "info/exclude"), EXCLUDE_LINES),
         gitignore_missing=missing_lines(read_text_file(layout.checkout / "spec-dock/.gitignore"), GITIGNORE_LINES),
-        **fields,  # type: ignore[arg-type]
+        detail=facts.detail,
+        registered_exists=facts.registered_exists,
+        off_branch=facts.off_branch,
     )
 
 
-def _catalog_fields(
+@dataclass(frozen=True)
+class _CatalogFacts:
+    state: CatalogState
+    registered: GitWorktreeRecord | None = None
+    locked: bool = False
+    moved: bool = False
+    gitdir: Path | None = None
+    entries: int | None = None
+    detail: str | None = None
+    registered_exists: bool | None = None
+    off_branch: str | None = None
+
+
+def _catalog_facts(
     layout: CatalogLayout, records: tuple[GitWorktreeRecord, ...], environment: RuntimeEnvironment
-) -> dict[str, object]:
+) -> _CatalogFacts:
     catalog = layout.catalog
-    base: dict[str, object] = {"registered": None, "locked": False, "moved": False, "gitdir": None, "entries": None}
     kind = _entry_kind(catalog)
     if kind == "absent":
         if not records:
-            return {**base, "state": "absent"}
+            return _CatalogFacts("absent")
         if len(records) == 1 and _same_place(records[0].path, catalog):
-            return {**base, "state": "readd", "registered": records[0], "locked": records[0].locked}
+            return _CatalogFacts("readd", registered=records[0], locked=records[0].locked)
         other = next((record for record in records if not _same_place(record.path, catalog)), records[0])
-        return _elsewhere(base, other)
+        return _elsewhere(_CatalogFacts("absent"), other)
     if kind != "directory":
-        return {**base, "state": "occupied", "detail": f"{catalog} is not a directory"}
+        return _CatalogFacts("occupied", detail=f"{catalog} is not a directory")
     gitdir = canonical_git.read_gitdir(catalog)
     admin = layout.common_dir / "worktrees" / gitdir.name if gitdir is not None else None
     if gitdir is None or admin is None or not (admin / "HEAD").is_file():
-        return {
-            **base,
-            "state": "occupied",
-            "entries": count_entries(catalog),
-            "detail": f"{catalog} is not this clone's catalog",
-        }
+        return _CatalogFacts(
+            "occupied", entries=count_entries(catalog), detail=f"{catalog} is not this clone's catalog"
+        )
     gitdir_visible = gitdir.exists()
-    gitdir_ok = gitdir_visible and Path(gitdir).samefile(admin)
+    gitdir_ok = gitdir_visible and gitdir.samefile(admin)
     if gitdir_visible and not gitdir_ok:
-        return {
-            **base,
-            "state": "occupied",
-            "entries": count_entries(catalog),
-            "detail": f"{catalog} belongs to another repository ({gitdir})",
-        }
+        return _CatalogFacts(
+            "occupied", entries=count_entries(catalog), detail=f"{catalog} belongs to another repository ({gitdir})"
+        )
     branch = canonical_git.admin_branch(admin)
     if branch != CANONICAL_BRANCH:
-        return {
-            **base,
-            "state": "occupied",
-            "gitdir": gitdir,
-            "off_branch": branch or "a detached HEAD",
-            "detail": f"the catalog has {branch or 'a detached HEAD'} checked out instead of {CANONICAL_BRANCH}",
-        }
+        where = branch or "a detached HEAD"
+        return _CatalogFacts(
+            "occupied",
+            gitdir=gitdir,
+            off_branch=where,
+            detail=f"the catalog has {where} checked out instead of {CANONICAL_BRANCH}",
+        )
     registered_path = canonical_git.admin_worktree_path(admin)
     registered = next((record for record in records if record.path == registered_path), None)
-    fields = {**base, "registered": registered, "locked": (admin / "locked").exists(), "gitdir": gitdir}
+    facts = _CatalogFacts("ready", registered=registered, locked=(admin / "locked").exists(), gitdir=gitdir)
     others = tuple(record for record in records if record.path != registered_path)
     if others:
-        return _elsewhere(fields, others[0])
+        return _elsewhere(facts, others[0])
     registered_visible = registered_path is not None and registered_path.exists()
     same_registration = registered_path is not None and registered_visible and registered_path.samefile(catalog)
     if same_registration and gitdir_ok:
-        return {**fields, "state": "ready"}
+        return facts
     if registered_visible and not same_registration:
-        return {
-            **fields,
-            "state": "occupied",
-            "entries": count_entries(catalog),
-            "detail": f"the catalog's Git registration points to another existing directory ({registered_path})",
-        }
+        return replace(
+            facts,
+            state="occupied",
+            entries=count_entries(catalog),
+            detail=f"the catalog's Git registration points to another existing directory ({registered_path})",
+        )
     # Some recorded path is not visible from this process: a moved main checkout, or a mount elsewhere.
     if environment.container:
-        return {
-            **fields,
-            "state": "foreign",
-            "detail": f"the catalog's Git registration is not visible here ({gitdir})",
-        }
-    return {**fields, "state": "repair", "moved": not registered_visible}
+        return replace(facts, state="foreign", detail=f"the catalog's Git registration is not visible here ({gitdir})")
+    return replace(facts, state="repair", moved=not registered_visible)
 
 
 def _entry_kind(path: Path) -> str:
@@ -217,14 +224,14 @@ def _same_place(registered: Path, catalog: Path) -> bool:
     return registered.name == catalog.name and os.path.realpath(registered.parent) == os.path.realpath(catalog.parent)
 
 
-def _elsewhere(fields: dict[str, object], other: GitWorktreeRecord) -> dict[str, object]:
-    return {
-        **fields,
-        "state": "elsewhere",
-        "registered": other,
-        "registered_exists": os.path.lexists(other.path),
-        "detail": f"spec-dock/canonical is checked out at {other.path}",
-    }
+def _elsewhere(facts: _CatalogFacts, other: GitWorktreeRecord) -> _CatalogFacts:
+    return replace(
+        facts,
+        state="elsewhere",
+        registered=other,
+        registered_exists=os.path.lexists(other.path),
+        detail=f"spec-dock/canonical is checked out at {other.path}",
+    )
 
 
 def inside_catalog(project: str | None, cwd: Path, *, timeout: float) -> Path | None:

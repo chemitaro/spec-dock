@@ -70,8 +70,8 @@ def test_the_ignore_lines_have_a_repository_root_and_a_spec_dock_form() -> None:
 
 
 def test_missing_lines_ignore_trailing_whitespace_and_carriage_returns() -> None:
-    text = "# local\r\n/spec-dock/.canonical/  \r\n!/spec-dock/initiatives/\n"
-    assert missing_lines(text, EXCLUDE_LINES) == ("/spec-dock/initiatives",)
+    text = "# local\r\n/spec-dock/.canonical/  \r\n/spec-dock/initiatives\r\n!/spec-dock/initiatives/\n"
+    assert missing_lines(text, EXCLUDE_LINES) == ()
     assert missing_lines(None, EXCLUDE_LINES) == EXCLUDE_LINES
 
 
@@ -84,11 +84,22 @@ def test_appending_all_three_lines_adds_a_note_and_keeps_existing_content() -> N
     assert append_lines(None, EXCLUDE_LINES).startswith("# spec-dock canonical")
 
 
-def test_appending_only_a_missing_line_adds_no_note_and_is_idempotent() -> None:
+def test_a_partial_block_is_completed_with_the_whole_block_in_order() -> None:
     partial = "/spec-dock/.canonical/\n!/spec-dock/initiatives/\n"
+    assert missing_lines(partial, EXCLUDE_LINES) == EXCLUDE_LINES
     appended = append_lines(partial, EXCLUDE_LINES)
-    assert appended == partial + "/spec-dock/initiatives\n"
+    assert appended.startswith(partial) and appended.endswith(
+        "/spec-dock/.canonical/\n/spec-dock/initiatives\n!/spec-dock/initiatives/\n"
+    )
+    assert missing_lines(appended, EXCLUDE_LINES) == ()
     assert append_lines(appended, EXCLUDE_LINES) == appended
+
+
+def test_lines_present_in_the_wrong_order_count_as_missing() -> None:
+    reversed_order = "!/spec-dock/initiatives/\n/spec-dock/initiatives\n/spec-dock/.canonical/\n"
+    assert missing_lines(reversed_order, EXCLUDE_LINES) == EXCLUDE_LINES
+    later_user_line = "/spec-dock/.canonical/\n/spec-dock/initiatives\n!/spec-dock/initiatives/\n*.log\n"
+    assert missing_lines(later_user_line, EXCLUDE_LINES) == ()
 
 
 @pytest.mark.parametrize(

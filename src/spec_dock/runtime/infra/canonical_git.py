@@ -43,6 +43,16 @@ HOOKLESS_CONFIG: Final = (
     "-c",
     "maintenance.auto=false",
 )
+# Identity and transport settings do not redirect the repository; CI and containers often carry them only here.
+PASSED_GIT_VARIABLES: Final = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_SSH_VARIANT",
+)
 AddMode = Literal["track", "local", "readd"]
 _FETCH_REFSPEC: Final = f"+{CANONICAL_REF}:{CANONICAL_TRACKING_REF}"
 
@@ -69,7 +79,8 @@ def run_catalog_git(
     """Run `git -C cwd -c core.hooksPath=/dev/null -c commit.gpgSign=false [...] args`.
 
     read_only adds --no-optional-locks; pathspecs go through --literal-pathspecs and a NUL file.
-    Inherited GIT_* variables are dropped; GIT_TERMINAL_PROMPT=0 keeps credential prompts off the terminal.
+    Inherited GIT_* variables are dropped except the identity and SSH ones (PASSED_GIT_VARIABLES);
+    GIT_TERMINAL_PROMPT=0 keeps HTTPS credential prompts off the terminal.
     """
     options = [*HOOKLESS_CONFIG]
     if read_only:
@@ -78,6 +89,7 @@ def run_catalog_git(
         options.append("--literal-pathspecs")
     env = sanitized_git_environment()
     env["GIT_TERMINAL_PROMPT"] = "0"
+    env.update({key: os.environ[key] for key in PASSED_GIT_VARIABLES if key in os.environ})
     env.update(environment or {})
     spec_file: str | None = None
     try:

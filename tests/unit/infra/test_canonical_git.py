@@ -11,7 +11,15 @@ import pytest
 from spec_dock.runtime.domain.canonical_content import CANONICAL_ROOT_FILES
 from spec_dock.runtime.infra import canonical_git as cg
 from spec_dock.runtime.infra.git_process import GitProcessError
-from tests.support.canonical_repo import bare_remote, clone, git
+from tests.support.canonical_repo import bare_remote, clone, git, isolate_user_state
+
+
+@pytest.fixture
+def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    return isolate_user_state(monkeypatch, tmp_path)
+
+
+pytestmark = pytest.mark.usefixtures("isolated")
 
 
 def _recording_git(tmp_path: Path, *, exit_code: int = 0) -> tuple[Path, Path]:
@@ -58,6 +66,33 @@ def test_every_call_disables_hooks_and_signing_and_drops_inherited_git_variables
         "status",
     ]
     assert call["env"] == {"GIT_TERMINAL_PROMPT": "0"}
+
+
+def test_identity_and_ssh_variables_pass_while_repository_overrides_are_dropped(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    script, log = _recording_git(tmp_path)
+    for key, value in {
+        "GIT_AUTHOR_NAME": "CI",
+        "GIT_AUTHOR_EMAIL": "ci@example.invalid",
+        "GIT_COMMITTER_NAME": "CI",
+        "GIT_COMMITTER_EMAIL": "ci@example.invalid",
+        "GIT_SSH_COMMAND": "ssh -i key",
+        "GIT_WORK_TREE": "/elsewhere",
+        "GIT_INDEX_FILE": "/elsewhere/index",
+        "GIT_CONFIG_PARAMETERS": "'core.hooksPath'='/x'",
+    }.items():
+        monkeypatch.setenv(key, value)
+    cg.run_catalog_git(tmp_path, "commit-tree", git=str(script))
+    (call,) = _calls(log)
+    assert call["env"] == {
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_AUTHOR_NAME": "CI",
+        "GIT_AUTHOR_EMAIL": "ci@example.invalid",
+        "GIT_COMMITTER_NAME": "CI",
+        "GIT_COMMITTER_EMAIL": "ci@example.invalid",
+        "GIT_SSH_COMMAND": "ssh -i key",
+    }
 
 
 def test_read_only_calls_take_no_optional_locks_and_explicit_variables_pass(tmp_path: Path) -> None:

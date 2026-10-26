@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import stat
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.canonical_errors import (
@@ -40,7 +41,7 @@ def tool_findings(
         "section": CODEX_SECTION,
         "line": None,
     }
-    if environment.codex_sandbox and not layout.is_main and catalog.is_dir():
+    if environment.codex_sandbox and not layout.is_main and _is_directory(catalog):
         writable = os.access(catalog, os.W_OK)
         codex["writable"] = writable
         if not writable:
@@ -112,6 +113,13 @@ def tool_findings(
         "claude_code": claude,
     }
     return item, tuple(warnings)
+
+
+def _is_directory(path: Path) -> bool:
+    try:
+        return stat.S_ISDIR(path.stat().st_mode)
+    except OSError:
+        return False
 
 
 def _claude_settings(checkout: Path, home: Path | None) -> list[tuple[Path, object]]:

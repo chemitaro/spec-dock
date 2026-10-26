@@ -33,9 +33,10 @@ from spec_dock.runtime.application.canonical_errors import (
     CHECKOUT_NOT_MIGRATED_NEXT_STEP,
     FORMAT_MISSING_RECOVERY,
     FORMAT_UNSUPPORTED_RECOVERY,
-    GITHUB_UNAVAILABLE_RECOVERY,
+    GIT_IDENTITY_RECOVERY,
     INSTALLATION_UPDATE_RECOVERY,
     LINK_AGAIN_RECOVERY,
+    LINK_NETWORK_RECOVERY,
     MAIN_MOVED_NEXT_STEP,
     MAIN_NOT_MIGRATED_NEXT_STEP,
     NOT_MIGRATED_RECOVERY,
@@ -99,6 +100,7 @@ class _Creation:
     add_fetch_branch: bool
     push_local: str | None  # 4a: the unpushed initial commit on the local branch
     remote_missing: bool  # 4b: a local branch with content and nothing on GitHub
+    stale_initial: str | None = None  # a local branch holding only an initial commit that GitHub may supersede
 
 
 @dataclass(frozen=True)
@@ -115,6 +117,7 @@ class _Run:
     effects: list[Effect] = field(default_factory=list)
     source: Source | None = None
     pushed: bool | None = None
+    initial: str | None = None
     exclude_added: tuple[str, ...] = ()
 
 
@@ -147,10 +150,10 @@ def link_checkout(
     # Check writability before any network call: a sandbox without network must still get the right answer.
     _refuse_unwritable(predicted, environment)
     creation = _plan_creation(layout, timeout=timeout) if observation.state == "absent" else None
-    network = _network_steps(layout, creation, timeout=timeout)
+    run = _Run(command, source=creation.source if creation else None)
+    network = _network_steps(layout, creation, run, timeout=timeout)
     local = _local_steps(observation, creation, timeout=timeout, skip_main=skip_main)
     _refuse_unwritable((*network, *local), environment)
-    run = _Run(command, source=creation.source if creation else None)
     if dry_run:
         planned = tuple(Effect(step.kind, "planned", step.target) for step in (*network, *local))
         return OperationResult(
@@ -179,6 +182,15 @@ def link_checkout(
             )
     except _StepFailed as failure:
         return _failure_result(run, failure)
+    except (GitProcessError, OSError, ValueError) as error:
+        # An observation between the steps failed: report what was applied instead of hiding it.
+        recorded = {(effect.kind, effect.target) for effect in run.effects}
+        run.effects.extend(
+            Effect(step.kind, "not_attempted", step.target)
+            for step in local
+            if (step.kind, step.target) not in recorded
+        )
+        return _failure_result(run, _unexpected_failure(error))
     warnings = _warnings(final, creation, moved=observation.moved, environment=environment, skip_main=skip_main)
     changed = any(effect.status == "succeeded" for effect in run.effects)
     status: ResultStatus = "succeeded" if changed else "unchanged"
@@ -213,6 +225,16 @@ def _write_locally(
                 raise _StepFailed(
                     error.code, error.message, error.details, exit_code=error.exit_code, recovery=error.recovery[0]
                 ) from error
+            if current.state == "absent" and creation is None:
+                # The catalog vanished after the first observation; creating it needs a fresh plan.
+                run.effects.extend(Effect(step.kind, "not_attempted", step.target) for step in local)
+                raise _StepFailed(
+                    CANONICAL_NOT_LINKED,
+                    "the catalog disappeared while linking",
+                    {"catalog": str(layout.catalog)},
+                    exit_code=3,
+                    recovery=LINK_AGAIN_RECOVERY,
+                )
             steps = _local_steps(current, creation, timeout=timeout, pushed=run.pushed, skip_main=skip_main)
             for index, step in enumerate(steps):
                 _execute(run, step, remaining=steps[index + 1 :])
@@ -311,16 +333,18 @@ def _plan_creation(layout: CatalogLayout, *, timeout: float) -> _Creation:
             GITHUB_UNAVAILABLE,
             "could not ask origin whether spec-dock/canonical exists",
             exit_code=5,
-            recovery=(GITHUB_UNAVAILABLE_RECOVERY,),
+            recovery=(LINK_NETWORK_RECOVERY,),
             details=error.details(),
         ) from error
     add_fetch_branch = not canonical_git.fetch_covers_canonical(main, timeout=timeout)
-    if remote == "present":
-        return _Creation("remote", add_fetch_branch, None, remote_missing=False)
     local = canonical_git.resolve_commit(main, CANONICAL_REF, timeout=timeout)
+    initial = local if local is not None and canonical_git.is_initial_commit(main, local, timeout=timeout) else None
+    if remote == "present":
+        # A local branch with only an unpushed initial commit holds nothing; GitHub's canonical replaces it.
+        return _Creation("remote", add_fetch_branch, None, remote_missing=False, stale_initial=initial)
     if local is not None:
-        if canonical_git.is_initial_commit(main, local, timeout=timeout):
-            return _Creation("new", add_fetch_branch, local, remote_missing=False)
+        if initial is not None:
+            return _Creation("new", add_fetch_branch, local, remote_missing=False, stale_initial=initial)
         return _Creation("local", False, None, remote_missing=True)
     default = canonical_git.resolve_commit(main, "refs/remotes/origin/HEAD", timeout=timeout) or "HEAD"
     has_head = canonical_git.resolve_commit(main, default, timeout=timeout) is not None
@@ -335,7 +359,9 @@ def _plan_creation(layout: CatalogLayout, *, timeout: float) -> _Creation:
     return _Creation("new", add_fetch_branch, None, remote_missing=False)
 
 
-def _network_steps(layout: CatalogLayout, creation: _Creation | None, *, timeout: float) -> tuple[_Step, ...]:
+def _network_steps(
+    layout: CatalogLayout, creation: _Creation | None, run: _Run, *, timeout: float
+) -> tuple[_Step, ...]:
     """Network work outside the Start lock: the initial push and the fetch of origin/spec-dock/canonical."""
     if creation is None or creation.source == "local":
         return ()
@@ -343,12 +369,22 @@ def _network_steps(layout: CatalogLayout, creation: _Creation | None, *, timeout
     tracking = "origin/" + CANONICAL_BRANCH
     steps: list[_Step] = []
     if creation.source == "new":
+        if creation.push_local is None:
 
-        def create() -> bool:
-            oid = creation.push_local or canonical_git.create_initial_commit(main, timeout=timeout)
+            def create() -> str:
+                run.initial = canonical_git.create_initial_commit(main, timeout=timeout)
+                return run.initial
+
+            # A local step kept apart from the push, so an identity problem is not reported as a network one.
+            steps.append(_Step("git.commit.create", CANONICAL_BRANCH, create, (common,)))
+
+        def push() -> bool:
+            oid = creation.push_local or run.initial
+            if oid is None:
+                raise ValueError("no initial canonical commit to push")
             return canonical_git.push_initial(main, oid, timeout=timeout) == "pushed"
 
-        steps.append(_Step("canonical.remote.create", tracking, create, (common,)))
+        steps.append(_Step("canonical.remote.create", tracking, push, (common,)))
     steps.append(_Step("git.fetch", tracking, lambda: canonical_git.fetch_canonical(main, timeout=timeout), (common,)))
     return tuple(steps)
 
@@ -402,8 +438,9 @@ def _local_steps(
                     (common,),
                 )
             )
-        if creation.push_local is not None and pushed is False:
-            initial = creation.push_local
+        stale = creation.stale_initial
+        if stale is not None and (creation.source == "remote" or pushed is False):
+            initial = stale
             steps.append(
                 _Step(
                     "git.branch.reset",
@@ -442,21 +479,26 @@ def _local_steps(
     return tuple(steps)
 
 
-def _add_fetch_branch_once(main: Path, *, timeout: float) -> None:
+def _add_fetch_branch_once(main: Path, *, timeout: float) -> bool:
     """set-branches --add does not deduplicate, so re-check coverage under the lock first."""
-    if not canonical_git.fetch_covers_canonical(main, timeout=timeout):
-        canonical_git.add_fetch_branch(main, timeout=timeout)
+    if canonical_git.fetch_covers_canonical(main, timeout=timeout):
+        return False
+    canonical_git.add_fetch_branch(main, timeout=timeout)
+    return True
 
 
 def _placer(path: Path, text: str) -> Callable[[], object]:
     return lambda: place_link(path.parent, path.name, text)
 
 
-def _reset_to_tracking(main: Path, *, expected: str, timeout: float) -> None:
+def _reset_to_tracking(main: Path, *, expected: str, timeout: float) -> bool:
     tracking = canonical_git.resolve_commit(main, CANONICAL_TRACKING_REF, timeout=timeout)
     if tracking is None:
         raise ValueError("origin/spec-dock/canonical was not fetched")
+    if tracking == expected:
+        return False
     canonical_git.reset_branch(main, tracking, expected=expected, timeout=timeout)
+    return True
 
 
 def _add_absent(main: Path, catalog: Path, *, mode: Literal["local"] | None, timeout: float) -> None:
@@ -490,14 +532,7 @@ def _execute(run: _Run, step: _Step, *, remaining: tuple[_Step, ...]) -> None:
                 recovery=PERMISSION_DENIED_RECOVERY,
             ) from error
         if isinstance(error, GitProcessError):
-            network = step.kind in _NETWORK_KINDS
-            raise _StepFailed(
-                GITHUB_UNAVAILABLE if network else "GIT_FAILED",
-                str(error).strip() or f"{step.kind} failed",
-                error.details(),
-                exit_code=5,
-                recovery=GITHUB_UNAVAILABLE_RECOVERY if network else LINK_AGAIN_RECOVERY,
-            ) from error
+            raise _git_failure(error, network=step.kind in _NETWORK_KINDS, kind=step.kind) from error
         if isinstance(error, LinkOccupied):
             raise _StepFailed(
                 CANONICAL_LINK_OCCUPIED, str(error), {"path": step.target}, exit_code=3, recovery=LINK_AGAIN_RECOVERY
@@ -511,6 +546,9 @@ def _execute(run: _Run, step: _Step, *, remaining: tuple[_Step, ...]) -> None:
         if not outcome:
             run.source = "remote"
         return
+    if step.kind in ("git.remote.set-branches", "git.branch.reset") and outcome is False:
+        run.effects.append(Effect(step.kind, "unchanged", step.target))
+        return
     if step.kind == "git.info.exclude":
         run.exclude_added = tuple(outcome) if isinstance(outcome, tuple) else ()
         run.effects.append(Effect(step.kind, "succeeded" if run.exclude_added else "unchanged", step.target))
@@ -519,6 +557,33 @@ def _execute(run: _Run, step: _Step, *, remaining: tuple[_Step, ...]) -> None:
         run.effects.append(Effect(step.kind, "unchanged", step.target))
         return
     run.effects.append(Effect(step.kind, "succeeded", step.target))
+
+
+def _git_failure(error: GitProcessError, *, network: bool, kind: str) -> _StepFailed:
+    stderr = error.stderr.decode("utf-8", errors="replace")
+    if "Author identity unknown" in stderr or "Please tell me who you are" in stderr:
+        recovery = GIT_IDENTITY_RECOVERY
+    else:
+        recovery = LINK_NETWORK_RECOVERY if network else LINK_AGAIN_RECOVERY
+    return _StepFailed(
+        GITHUB_UNAVAILABLE if network else "GIT_FAILED",
+        stderr.strip() or f"{kind} failed",
+        error.details(),
+        exit_code=5,
+        recovery=recovery,
+    )
+
+
+def _unexpected_failure(error: Exception) -> _StepFailed:
+    """An observation between the steps failed after something may have been written."""
+    if _permission_denied(error):
+        details = error.details() if isinstance(error, GitProcessError) else {}
+        return _StepFailed(
+            CANONICAL_SANDBOX_DENIED, str(error).strip(), details, exit_code=3, recovery=PERMISSION_DENIED_RECOVERY
+        )
+    if isinstance(error, GitProcessError):
+        return _git_failure(error, network=False, kind="observation")
+    return _StepFailed("LOCAL_IO_FAILED", str(error), {}, exit_code=5, recovery=LINK_AGAIN_RECOVERY)
 
 
 def _permission_denied(error: Exception) -> bool:
@@ -625,12 +690,15 @@ def _warnings(
     return (*warnings, *tools)
 
 
+def main_not_migrated_message(path: Path) -> str:
+    return f"the main checkout does not declare workspace schema 4, so {path} was left untouched"
+
+
 def main_not_migrated_warning(layout: CatalogLayout) -> Diagnostic:
     path = layout.link_path(layout.main_checkout)
     return Diagnostic(
         CANONICAL_MAIN_NOT_MIGRATED,
-        f"the main checkout does not declare workspace schema 4, so {path} was left untouched; "
-        f"next: {MAIN_NOT_MIGRATED_NEXT_STEP}",
+        f"{main_not_migrated_message(path)}; next: {MAIN_NOT_MIGRATED_NEXT_STEP}",
         {"item": "link", "path": str(path), "next_step": MAIN_NOT_MIGRATED_NEXT_STEP},
     )
 
@@ -682,48 +750,46 @@ def link_after_command(
     from spec_dock.runtime.application.project_context import resolve_context
 
     link_path = checkout / LINK_RELATIVE
+
+    def failed(code: str, message: str, step: str, details: dict[str, object]) -> LinkFollowUp:
+        # Every follow-up step ends in linking this checkout, never in re-running the caller's command.
+        if "spec-dock canonical link" not in step:
+            step = f"{step} Then run spec-dock canonical link in {checkout}."
+        warning = Diagnostic(code, f"{message}; next: {step}", {**details, "next_step": step})
+        return LinkFollowUp((), (warning,), {"path": str(link_path), "state": "failed"})
+
     if not os.path.lexists(checkout):
-        planned = (Effect("canonical.link", "planned", str(link_path)),) if dry_run else ()
-        return LinkFollowUp(planned, (), {"path": str(link_path), "state": "planned" if dry_run else "absent"})
+        if dry_run:
+            return LinkFollowUp(
+                (Effect("canonical.link", "planned", str(link_path)),), (), {"path": str(link_path), "state": "planned"}
+            )
+        return failed(CANONICAL_NOT_LINKED, f"{checkout} does not exist", LINK_AGAIN_RECOVERY, {"path": str(checkout)})
+    if probe_workspace_mode(checkout) != "canonical":
+        warning = Diagnostic(
+            CANONICAL_CHECKOUT_NOT_MIGRATED,
+            f"{checkout} does not declare workspace schema 4, so it was not linked; next: {CHECKOUT_NOT_MIGRATED_NEXT_STEP}",
+            {"path": str(checkout), "next_step": CHECKOUT_NOT_MIGRATED_NEXT_STEP},
+        )
+        return LinkFollowUp((), (warning,), {"path": str(link_path), "state": "skipped"})
     current = environment or runtime_environment.detect_runtime_environment()
     try:
         context = resolve_context(str(checkout), checkout, timeout=timeout)
-        if context.mode != "canonical":
-            warning = Diagnostic(
-                CANONICAL_CHECKOUT_NOT_MIGRATED,
-                f"{checkout} declares workspace schema 3, so it was not linked; next: {CHECKOUT_NOT_MIGRATED_NEXT_STEP}",
-                {"path": str(checkout), "next_step": CHECKOUT_NOT_MIGRATED_NEXT_STEP},
-            )
-            return LinkFollowUp((), (warning,), {"path": str(link_path), "state": "skipped"})
         result = link_checkout(context, current, command="canonical link", timeout=timeout, dry_run=dry_run)
     except CanonicalCommandError as error:
-        step = error.recovery[0] if error.recovery else LINK_AGAIN_RECOVERY
-        warning = Diagnostic(error.code, f"{error.message}; next: {step}", {**error.details, "next_step": step})
-        return LinkFollowUp((), (warning,), {"path": str(link_path), "state": "failed"})
-    except (GitProcessError, OSError, ValueError, RuntimeError) as error:
-        warning = Diagnostic(
-            "GIT_FAILED" if isinstance(error, GitProcessError) else "LOCAL_IO_FAILED",
-            f"{error}; next: {LINK_AGAIN_RECOVERY}",
-            {"next_step": LINK_AGAIN_RECOVERY},
+        return failed(
+            error.code, error.message, error.recovery[0] if error.recovery else LINK_AGAIN_RECOVERY, error.details
         )
-        return LinkFollowUp((), (warning,), {"path": str(link_path), "state": "failed"})
+    except (GitProcessError, OSError, ValueError, RuntimeError) as error:
+        code = "GIT_FAILED" if isinstance(error, GitProcessError) else "LOCAL_IO_FAILED"
+        return failed(code, str(error), LINK_AGAIN_RECOVERY, {})
     if result.status in ("failed", "partial"):
         assert result.error is not None
         recovery = result.recovery
         step = recovery.instructions[0] if isinstance(recovery, RecoveryInstructions) else LINK_AGAIN_RECOVERY
-        warning = Diagnostic(
-            result.error.code,
-            f"{result.error.message}; next: {step}",
-            {
-                **result.error.details,
-                "next_step": step,
-                "effects": [
-                    {"kind": item.kind, "status": item.status, "target": item.target} for item in result.effects
-                ],
-            },
-        )
+        effects = [{"kind": item.kind, "status": item.status, "target": item.target} for item in result.effects]
+        follow = failed(result.error.code, result.error.message, step, {**result.error.details, "effects": effects})
         kept = tuple(effect for effect in result.effects if effect.status in ("succeeded", "unchanged"))
-        return LinkFollowUp(kept, (warning,), {"path": str(link_path), "state": "failed"})
+        return LinkFollowUp(kept, follow.warnings, follow.link)
     return LinkFollowUp(
         result.effects, result.warnings, {"path": str(link_path), "state": "planned" if dry_run else "correct"}
     )

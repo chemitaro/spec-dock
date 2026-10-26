@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+import stat
+from typing import TYPE_CHECKING, Protocol
 
 from spec_dock.runtime.application.canonical_catalog import CatalogObservation, observe_catalog, resolve_layout
 from spec_dock.runtime.application.canonical_errors import (
@@ -17,6 +18,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_GIT_TOO_OLD,
     CANONICAL_IGNORE_RULES_MISSING,
     CANONICAL_LINK_OCCUPIED,
+    CANONICAL_MAIN_NOT_MIGRATED,
     CANONICAL_NOT_LINKED,
     CANONICAL_NOT_LINKED_RECOVERY,
     CANONICAL_PATH_OCCUPIED,
@@ -31,7 +33,7 @@ from spec_dock.runtime.application.canonical_errors import (
 from spec_dock.runtime.application.canonical_link import (
     elsewhere_next_step,
     link_occupied_next_step,
-    main_not_migrated_warning,
+    main_not_migrated_message,
 )
 from spec_dock.runtime.application.canonical_tools_check import tool_findings
 from spec_dock.runtime.application.project_context import probe_workspace_mode
@@ -48,6 +50,13 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.domain.canonical_layout import CatalogLayout
     from spec_dock.runtime.infra.runtime_environment import RuntimeEnvironment
+
+
+class Problem(Protocol):
+    """Record one problem as a warning and return its next step."""
+
+    def __call__(self, item: str, code: str, message: str, next_step: str, **details: object) -> str: ...
+
 
 _CONFLICT_NEXT_STEP = "Merge each conflict copy's contents into its original file, then delete the copy."
 
@@ -87,16 +96,30 @@ def status_of(
             "git", CANONICAL_GIT_TOO_OLD, "Git 2.38 or later is required", GIT_TOO_OLD_RECOVERY
         )
     observation: CatalogObservation | None = None
+    inspect_error: OSError | None = None
     if git.supported:
         try:
             observation = observe_catalog(layout, environment, timeout=timeout)
         except GitProcessError:
             observation = None
+        except OSError as error:
+            # Report the denied path as the access problem and keep reporting the other items.
+            inspect_error = error
     catalog_item = _catalog_item(layout, observation, problem)
     main_migrated = layout.is_main or probe_workspace_mode(layout.main_checkout) == "canonical"
     link_item = _link_item(observation, problem, main_migrated=main_migrated)
     exclude_item = _exclude_item(layout, observation, problem)
     access_item = _access_item(layout, observation, problem, sandboxed=environment.codex_sandbox and not layout.is_main)
+    if inspect_error is not None:
+        denied = inspect_error.filename or layout.catalog
+        access_item["status"] = "problem"
+        access_item["next_step"] = problem(
+            "access",
+            OS_ACCESS_DENIED,
+            f"this process cannot inspect {denied}: {inspect_error.strerror or inspect_error}",
+            f"Check the permissions of {denied}.",
+            path=str(denied),
+        )
     tools_item, tool_warnings = tool_findings(layout, environment)
     warnings.extend(tool_warnings)
     format_item = _format_item(layout, observation, problem)
@@ -130,14 +153,14 @@ def snapshot_item(layout: CatalogLayout, environment: RuntimeEnvironment) -> dic
     return _not_implemented("iss-00430")
 
 
-def _catalog_item(layout: CatalogLayout, observation: CatalogObservation | None, problem) -> dict[str, object]:  # type: ignore[no-untyped-def]
+def _catalog_item(layout: CatalogLayout, observation: CatalogObservation | None, problem: Problem) -> dict[str, object]:
     catalog = layout.catalog
     item: dict[str, object] = {
         "status": "unknown",
         "next_step": None,
         "path": str(catalog),
         "state": None,
-        "exists": catalog.is_dir(),
+        "exists": _is_directory(catalog),
         "branch": None,
         "head": None,
         "locked": None,
@@ -153,7 +176,7 @@ def _catalog_item(layout: CatalogLayout, observation: CatalogObservation | None,
         head=registered.head if registered is not None else None,
         locked=observation.locked,
         registered_path=str(registered.path) if registered is not None else None,
-        registration_matches=registered is not None and registered.path == catalog,
+        registration_matches=registered is not None and _same_entry(registered.path, catalog),
     )
     state = observation.state
     if state == "ready" and observation.locked:
@@ -188,7 +211,22 @@ def _catalog_item(layout: CatalogLayout, observation: CatalogObservation | None,
     return item
 
 
-def _link_item(observation: CatalogObservation | None, problem, *, main_migrated: bool) -> dict[str, object]:  # type: ignore[no-untyped-def]
+def _is_directory(path: Path) -> bool:
+    """pathlib raises PermissionError for EACCES; a status report treats an unreadable path as not there."""
+    try:
+        return stat.S_ISDIR(path.stat().st_mode)
+    except OSError:
+        return False
+
+
+def _same_entry(left: Path, right: Path) -> bool:
+    try:
+        return left.samefile(right)
+    except OSError:
+        return False
+
+
+def _link_item(observation: CatalogObservation | None, problem: Problem, *, main_migrated: bool) -> dict[str, object]:
     if observation is None:
         return {"status": "unknown", "next_step": None, "links": []}
     links = [
@@ -209,9 +247,12 @@ def _link_item(observation: CatalogObservation | None, problem, *, main_migrated
         item["status"] = "problem"
         path = view.observed.path
         if not main_migrated and view.checkout == observation.layout.main_checkout:
-            warning = main_not_migrated_warning(observation.layout)
             next_step = problem(
-                "link", warning.code, warning.message.split("; next:")[0], MAIN_NOT_MIGRATED_NEXT_STEP, path=str(path)
+                "link",
+                CANONICAL_MAIN_NOT_MIGRATED,
+                main_not_migrated_message(path),
+                MAIN_NOT_MIGRATED_NEXT_STEP,
+                path=str(path),
             )
         elif view.state == "occupied":
             step = link_occupied_next_step(path)
@@ -234,7 +275,7 @@ def _link_item(observation: CatalogObservation | None, problem, *, main_migrated
     return item
 
 
-def _exclude_item(layout: CatalogLayout, observation: CatalogObservation | None, problem) -> dict[str, object]:  # type: ignore[no-untyped-def]
+def _exclude_item(layout: CatalogLayout, observation: CatalogObservation | None, problem: Problem) -> dict[str, object]:
     exclude_path = layout.common_dir / "info/exclude"
     gitignore_path = layout.checkout / "spec-dock/.gitignore"
     if observation is None:
@@ -271,10 +312,10 @@ def _exclude_item(layout: CatalogLayout, observation: CatalogObservation | None,
 
 
 def _access_item(
-    layout: CatalogLayout, observation: CatalogObservation | None, problem, *, sandboxed: bool
-) -> dict[str, object]:  # type: ignore[no-untyped-def]
+    layout: CatalogLayout, observation: CatalogObservation | None, problem: Problem, *, sandboxed: bool
+) -> dict[str, object]:
     catalog = layout.catalog
-    if observation is None or observation.state not in ("ready", "repair") or not catalog.is_dir():
+    if observation is None or observation.state not in ("ready", "repair") or not _is_directory(catalog):
         return {"status": "unknown", "next_step": None, "readable": None, "writable": None}
     readable = os.access(catalog, os.R_OK | os.X_OK)
     writable = os.access(catalog, os.W_OK)
@@ -294,7 +335,7 @@ def _access_item(
     return item
 
 
-def _format_item(layout: CatalogLayout, observation: CatalogObservation | None, problem) -> dict[str, object]:  # type: ignore[no-untyped-def]
+def _format_item(layout: CatalogLayout, observation: CatalogObservation | None, problem: Problem) -> dict[str, object]:
     if observation is None or observation.state not in ("ready", "repair"):
         return {
             "status": "unknown",

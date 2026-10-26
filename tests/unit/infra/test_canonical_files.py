@@ -120,14 +120,22 @@ def test_exclude_lines_are_appended_once_and_keep_the_file_mode(tmp_path: Path) 
     assert all(line in first.splitlines() for line in EXCLUDE_LINES)
     exclude.write_text("*.log\n/spec-dock/.canonical/\n", encoding="utf-8")
     exclude.chmod(0o640)
-    assert append_exclude(common, EXCLUDE_LINES) == ("/spec-dock/initiatives", "!/spec-dock/initiatives/")
-    assert (
-        exclude.read_text(encoding="utf-8")
-        == "*.log\n/spec-dock/.canonical/\n/spec-dock/initiatives\n!/spec-dock/initiatives/\n"
+    assert append_exclude(common, EXCLUDE_LINES) == EXCLUDE_LINES
+    assert exclude.read_text(encoding="utf-8").endswith(
+        "/spec-dock/.canonical/\n/spec-dock/initiatives\n!/spec-dock/initiatives/\n"
     )
     assert exclude.stat().st_mode & 0o777 == 0o640
     assert append_exclude(common, EXCLUDE_LINES) == ()
     assert sorted(entry.name for entry in (common / "info").iterdir()) == ["exclude"]
+
+
+def test_exclude_bytes_that_are_not_utf8_are_kept_as_they_were(tmp_path: Path) -> None:
+    common = tmp_path / ".git"
+    (common / "info").mkdir(parents=True)
+    original = b"# caf\xe9 latin-1 comment\n/build/\n"
+    (common / "info/exclude").write_bytes(original)
+    append_exclude(common, EXCLUDE_LINES)
+    assert (common / "info/exclude").read_bytes().startswith(original)
 
 
 def test_reading_a_missing_text_file_gives_none(tmp_path: Path) -> None:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path, PurePosixPath
 import re
 from typing import TYPE_CHECKING, Final, Literal
@@ -79,19 +80,26 @@ def link_state(observed: LinkObservation, *, expected_text: str, catalog: Path |
 
 
 def missing_lines(text: str | None, lines: Sequence[str]) -> tuple[str, ...]:
-    present = {line.rstrip() for line in (text or "").splitlines()}
-    return tuple(line for line in lines if line not in present)
+    """The rule lines that are not in effect: all of them unless each is present and the last copies are in order.
+
+    Git applies the last matching pattern, so `!/spec-dock/initiatives/` must come after `/spec-dock/initiatives`;
+    a block with a line missing or out of order is reported (and repaired) as a whole.
+    """
+    stripped = [line.rstrip() for line in (text or "").splitlines()]
+    last = [max((index for index, line in enumerate(stripped) if line == rule), default=-1) for rule in lines]
+    if all(index >= 0 for index in last) and all(a < b for a, b in pairwise(last)):
+        return ()
+    return tuple(lines)
 
 
 def append_lines(text: str | None, lines: Sequence[str]) -> str:
+    """Append the whole block in order when it is not in effect; earlier partial copies stay untouched."""
     current = text or ""
+    if not missing_lines(current, lines):
+        return current
     if current and not current.endswith("\n"):
         current += "\n"
-    missing = missing_lines(current, lines)
-    if not missing:
-        return current
-    note = (EXCLUDE_NOTE,) if len(missing) == len(lines) else ()
-    return current + "".join(f"{line}\n" for line in (*note, *missing))
+    return current + "".join(f"{line}\n" for line in (EXCLUDE_NOTE, *lines))
 
 
 def parse_git_version(reported: str) -> tuple[int, int, int] | None:

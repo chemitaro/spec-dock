@@ -8,7 +8,16 @@ import pytest
 
 from spec_dock.runtime.domain.canonical_layout import EXCLUDE_LINES, GITIGNORE_LINES
 from spec_dock.runtime.infra.canonical_files import append_exclude
-from tests.support.canonical_repo import SHIPPED_GITIGNORE, configure, git
+from tests.support.canonical_repo import SHIPPED_GITIGNORE, configure, git, isolate_user_state
+
+
+@pytest.fixture
+def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    return isolate_user_state(monkeypatch, tmp_path)
+
+
+pytestmark = pytest.mark.usefixtures("isolated")
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -57,3 +66,20 @@ def test_a_symlinked_initiatives_and_the_catalog_are_ignored(tmp_path: Path, shi
     git(root, "add", "-A")
     tracked = git(root, "ls-files").splitlines()
     assert not any(path.startswith(("spec-dock/initiatives", "spec-dock/.canonical")) for path in tracked)
+
+
+def test_completing_a_partial_exclude_keeps_new_spec_files_visible(tmp_path: Path) -> None:
+    root = tmp_path / "partial"
+    root.mkdir()
+    git(root, "init", "-q", "-b", "main")
+    configure(root)
+    (root / ".git/info").mkdir(exist_ok=True)
+    (root / ".git/info/exclude").write_text("/spec-dock/.canonical/\n!/spec-dock/initiatives/\n", encoding="utf-8")
+    append_exclude(root / ".git", EXCLUDE_LINES)
+    spec = root / "spec-dock/initiatives/init-00001-plan/plan.md"
+    spec.parent.mkdir(parents=True)
+    spec.write_text("plan\n", encoding="utf-8")
+    assert (
+        "?? spec-dock/initiatives/init-00001-plan/plan.md"
+        in git(root, "status", "--porcelain", "--untracked-files=all").splitlines()
+    )

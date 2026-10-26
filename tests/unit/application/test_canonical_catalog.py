@@ -19,7 +19,16 @@ from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.infra import canonical_git as cg
 from spec_dock.runtime.infra.catalog_lock import CatalogLock
 from spec_dock.runtime.infra.tree_backup import tree_digest
-from tests.support.canonical_repo import add_worktree, bare_remote, clone, environment, git
+from tests.support.canonical_repo import add_worktree, bare_remote, clone, environment, git, isolate_user_state
+
+
+@pytest.fixture
+def isolated(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    return isolate_user_state(monkeypatch, tmp_path)
+
+
+pytestmark = pytest.mark.usefixtures("isolated")
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -67,14 +76,14 @@ def test_no_catalog_and_no_registration_is_absent(main: Path) -> None:
     observed = _observe(main)
     assert observed.state == "absent" and observed.registered is None
     assert observed.exclude_missing == ("/spec-dock/.canonical/", "/spec-dock/initiatives", "!/spec-dock/initiatives/")
-    assert [(state, expected) for _path, _obs, state, expected in observed.links] == [("absent", ".canonical")]
+    assert [(view.state, view.expected) for view in observed.links] == [("absent", ".canonical")]
 
 
 def test_a_locked_registered_catalog_with_its_link_is_ready(main: Path) -> None:
     _catalog(main)
     observed = _observe(main)
     assert (observed.state, observed.locked, observed.moved) == ("ready", True, False)
-    assert [state for _path, _obs, state, _expected in observed.links] == ["correct"]
+    assert [view.state for view in observed.links] == ["correct"]
 
 
 def test_an_unlocked_catalog_is_still_ready_but_reports_the_lock(main: Path) -> None:
@@ -87,7 +96,7 @@ def test_a_cleaned_catalog_with_its_registration_left_is_re_addable(main: Path) 
     shutil.rmtree(catalog)
     observed = _observe(main)
     assert observed.state == "readd" and observed.registered is not None and observed.registered.path == catalog
-    assert [state for _path, _obs, state, _expected in observed.links] == ["wrong_link"]
+    assert [view.state for view in observed.links] == ["wrong_link"]
 
 
 def test_a_moved_main_checkout_needs_repair_or_is_foreign_in_a_container(main: Path, tmp_path: Path) -> None:

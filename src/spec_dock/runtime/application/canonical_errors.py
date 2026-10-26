@@ -85,6 +85,13 @@ CHECKOUT_NOT_MIGRATED_NEXT_STEP: Final = (
 )
 START_LOCK_BUSY_RECOVERY: Final = "Wait a moment, then run spec-dock canonical link again."
 LINK_AGAIN_RECOVERY: Final = "Run spec-dock canonical link again; it continues from the current state."
+LINK_NETWORK_RECOVERY: Final = (
+    "Check the network connection and the Git credentials for origin (for GitHub over HTTPS, gh auth setup-git), "
+    "then run spec-dock canonical link again."
+)
+GIT_IDENTITY_RECOVERY: Final = (
+    "Set the Git identity (git config user.name and user.email), then run spec-dock canonical link again."
+)
 INSTALLATION_UPDATE_RECOVERY: Final = "spec-dock installation update"
 MAIN_MOVED_NEXT_STEP: Final = (
     "Git may also have reconnected the linked worktrees; run spec-dock canonical link in each linked worktree "
