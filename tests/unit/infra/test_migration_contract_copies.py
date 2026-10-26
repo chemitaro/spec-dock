@@ -13,7 +13,7 @@ from spec_dock.runtime.application import canonical_check
 from spec_dock.runtime.application.project_context import NEW_WRITER_PROTOCOL
 from spec_dock.runtime.domain import canonical_content, canonical_layout, canonical_structure
 from spec_dock.runtime.domain.ids import INPUT_SLUG_KEBAB_RE
-from spec_dock.runtime.infra.canonical_git import HOOKLESS_CONFIG
+from spec_dock.runtime.infra.canonical_git import HOOKLESS_CONFIG, PASSED_GIT_VARIABLES
 from tests.support.migration_repo import ROOT, SCRIPT, migrate_module
 
 ASSETS = ROOT / "src/spec_dock/assets"
@@ -104,8 +104,9 @@ def test_c5_canonical_root_files() -> None:
     assert module.RUNTIME_DIRECTORY == canonical_content.RUNTIME_DIRECTORY
 
 
-def test_c6_hookless_git_settings() -> None:
+def test_c6_hookless_git_settings_and_passed_variables() -> None:
     assert migrate_module().HOOKLESS_CONFIG == HOOKLESS_CONFIG
+    assert migrate_module().PASSED_GIT_VARIABLES == PASSED_GIT_VARIABLES
 
 
 def test_c7_version_file_workflow_sample_and_branch_rule() -> None:

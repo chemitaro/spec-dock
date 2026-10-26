@@ -215,3 +215,32 @@ def test_undo_finds_an_issue_whose_creation_was_never_recorded(tmp_path: Path, m
     code, result = legacy.run("undo", apply=True)
     assert code == 0, result
     assert orphan.state == "closed" and orphan.state_reason == "not_planned" and orphan.labels == []
+
+
+def test_a_label_someone_else_created_meanwhile_is_never_deleted_by_undo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    fake.inject(
+        status=422,
+        body={"message": "Validation Failed", "errors": [{"code": "already_exists"}]},
+        method="POST",
+        endpoint="repos/example/repo/labels",
+        apply=True,
+    )
+    assert legacy.run("register", apply=True)[0] == 0
+    first = next(r for r in fake.writes() if r.endpoint == "repos/example/repo/labels")
+    assert first.status == 422
+    assert legacy.run("undo", apply=True)[0] == 0
+    assert set(fake.labels) == {first.payload["name"]}  # type: ignore[index]
+
+
+def test_graphql_rate_limits_are_waited_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    legacy.github.inject(
+        status=200, body={"errors": [{"type": "RATE_LIMITED", "message": "rate limited"}]}, endpoint="graphql"
+    )
+    code, _ = legacy.run("plan")
+    assert code == 0
+    assert 60.0 in legacy.clock.sleeps

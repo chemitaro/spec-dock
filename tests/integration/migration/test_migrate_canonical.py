@@ -153,3 +153,35 @@ def test_cut_refuses_without_static_files_canonical_or_after_spec_changes(
     code, result = legacy.run("cut", apply=True)
     assert code == 2 and "0.3.0" in result["error"]
     assert refs(legacy.remote) == before | {"refs/heads/main": refs(legacy.remote)["refs/heads/main"]}
+
+
+def test_build_canonical_refuses_structure_anomalies_found_in_metadata_alone(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from tests.support.migration_repo import ISSUE4, meta
+
+    legacy = build_legacy(tmp_path, monkeypatch)
+    assert legacy.run("register", apply=True)[0] == 0
+    legacy.commit_to_origin(
+        {
+            f"{ISSUE4}/.meta.json": meta(
+                "issue", "iss-00004", "Delta", "delta", 4, parent="init-00001", depends_on=("iss-00003",)
+            )
+        },
+        "broken after register",
+    )
+    before = refs(legacy.remote)
+    code, result = legacy.run("build-canonical", apply=True)
+    assert code == 2
+    assert {"KIND_RULE", "DEPENDENCY_CYCLE"} <= {item["code"] for item in result["anomalies"]}
+    assert refs(legacy.remote) == before
+
+
+def test_git_environment_overrides_do_not_redirect_the_script(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    assert legacy.run("register", apply=True)[0] == 0
+    monkeypatch.setenv("GIT_DIR", str(tmp_path / "elsewhere.git"))
+    monkeypatch.setenv("GIT_INDEX_FILE", str(tmp_path / "foreign-index"))
+    code, result = legacy.run("build-canonical", apply=True)
+    assert code == 0, result
+    assert not (tmp_path / "foreign-index").exists()

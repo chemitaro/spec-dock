@@ -150,6 +150,10 @@ def test_adopt_worktree_moves_branch_specs_into_canonical_and_the_branch_merges_
     git(feature, "merge", "-q", "--no-edit", f"origin/{legacy.default_branch}")
     git(legacy.main, "merge", "-q", "--no-edit", "feature")
     assert git(legacy.main, "ls-tree", "-r", "--name-only", "HEAD", "--", "spec-dock/initiatives") == ""
+    canonical_before_rerun = refs(legacy.remote)["refs/heads/spec-dock/canonical"]
+    code, again = legacy.run("adopt-worktree", str(feature), apply=True)
+    assert code == 0 and "already adopted" in "\n".join(again["messages"])
+    assert refs(legacy.remote)["refs/heads/spec-dock/canonical"] == canonical_before_rerun
     record = json.loads((legacy.records / "adopt/feature.json").read_text())
     assert "iss-00004: title 'Delta' -> 'Delta v2'" in record["structure_differences"]
 
@@ -173,10 +177,34 @@ def test_both_sides_changing_one_file_keeps_canonical_and_stops_before_removing(
     tree = git(legacy.remote, "ls-tree", "-r", "--name-only", "spec-dock/canonical", "--", gamma)
     copies = [line for line in tree.splitlines() if ".conflict-box-" in line]
     assert len(copies) == 1 and copies[0].endswith(".md")
+    import subprocess
+
+    def blob(path: str) -> bytes:
+        return subprocess.run(
+            ["git", "-C", str(legacy.remote), "cat-file", "blob", f"spec-dock/canonical:{path}"],
+            check=True,
+            capture_output=True,
+        ).stdout
+
+    assert blob(f"{gamma}/plan.md") == b"# canonical side\n"  # first come keeps the name
+    assert blob(copies[0]) == b"# Gamma plan on the branch\n"
     assert git(feature, "status", "--porcelain") == status  # nothing removed, nothing committed
     pushed = refs(legacy.remote)["refs/heads/spec-dock/canonical"]
     code, _again = legacy.run("adopt-worktree", str(feature), "--pc-name", "box", apply=True)
     assert code == 3 and refs(legacy.remote)["refs/heads/spec-dock/canonical"] == pushed  # already adopted: no push
+
+
+def test_a_missing_tracked_spec_file_is_refused_instead_of_adopted_as_a_deletion(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = _migrated(tmp_path, monkeypatch)
+    feature = _feature(legacy, tmp_path)
+    _merge_cut(legacy)
+    (feature / ISSUE4 / "design.md").unlink()
+    before = refs(legacy.remote)
+    code, result = legacy.run("adopt-worktree", str(feature), apply=True)
+    assert code == 2 and "missing from the working tree" in result["error"]
+    assert refs(legacy.remote) == before
 
 
 def test_an_unchanged_worktree_only_drops_the_spec_tree(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -242,3 +270,23 @@ def test_export_legacy_rebuilds_schema_three_metadata_that_legacy_commands_read(
     assert spec_dock_main(["--project", str(checkout), "scope", "show", "iss-00004", "--json"]) == 0
     shown = json.loads(capsys.readouterr().out)
     assert "デルタ" in json.dumps(shown, ensure_ascii=False)
+
+
+def test_adopt_worktree_waits_for_the_cutover_merge(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = _migrated(tmp_path, monkeypatch)
+    feature = _feature(legacy, tmp_path)
+    head = git(feature, "rev-parse", "HEAD")
+    code, result = legacy.run("adopt-worktree", str(feature), apply=True)
+    assert code == 2 and "cutover PR is not merged" in result["error"]
+    assert git(feature, "rev-parse", "HEAD") == head
+
+
+def test_export_legacy_stops_on_a_stale_default_branch(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = _migrated(tmp_path, monkeypatch)
+    _merge_cut(legacy)
+    legacy.commit_to_origin({"README.md": b"later\n"}, "later")
+    git(legacy.main, "update-ref", f"refs/remotes/origin/{legacy.default_branch}", "HEAD")
+    before = refs(legacy.remote)
+    code, result = legacy.run("export-legacy", apply=True)
+    assert code == 2 and any("fetch origin" in step for step in result["next_steps"])
+    assert refs(legacy.remote) == before

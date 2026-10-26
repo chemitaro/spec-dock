@@ -6,8 +6,8 @@ the v0.3.0 tag keeps working after the package drops legacy mode. Every subcomma
 `--apply` is given, can be run again with the same result, and records what it wrote under
 `<state dir>/<owner>-<repo>/` (undo.jsonl, idmap.json, build.json). See README.md beside this file.
 
-Exit codes: 0 ok, 1 problems found by a read-only run, 2 refused before writing, 3 stopped after writing
-(run the same command again to continue).
+Exit codes: 0 ok, 1 problems found by a read-only run, 2 refused before writing (usage errors too), 3 stopped after
+writing (follow the printed next step; usually the same command continues).
 """
 
 from __future__ import annotations
@@ -104,6 +104,17 @@ HOOKLESS_CONFIG: tuple[str, ...] = (
     "gc.auto=0",
     "-c",
     "maintenance.auto=false",
+)
+
+# Inherited GIT_* variables are dropped except identity and SSH transport (infra/canonical_git.py).
+PASSED_GIT_VARIABLES: tuple[str, ...] = (
+    "GIT_AUTHOR_NAME",
+    "GIT_AUTHOR_EMAIL",
+    "GIT_COMMITTER_NAME",
+    "GIT_COMMITTER_EMAIL",
+    "GIT_SSH",
+    "GIT_SSH_COMMAND",
+    "GIT_SSH_VARIANT",
 )
 
 # C7: the version file and the check workflow sample (application/canonical_check.py and its asset).
@@ -405,7 +416,8 @@ def run_git(
     if read_only:
         argv.append("--no-optional-locks")
     argv += list(args)
-    environment = dict(os.environ)
+    environment = {key: value for key, value in os.environ.items() if not key.startswith("GIT_")}
+    environment.update({key: os.environ[key] for key in PASSED_GIT_VARIABLES if key in os.environ})
     environment["GIT_TERMINAL_PROMPT"] = "0"
     environment.update(env or {})
     completed = subprocess.run(argv, input=input, capture_output=True, env=environment, check=False)
@@ -653,6 +665,11 @@ def remote_ref(target: Target, ref: str) -> str | None:
 
 def commit_date(cwd: Path, commit: str) -> str:
     return git_text(cwd, "show", "-s", "--format=%cI", commit)
+
+
+def committer(cwd: Path, commit: str) -> Identity:
+    name, email = git_text(cwd, "show", "-s", "--format=%cn%x00%ce", commit).split("\0")
+    return Identity(name, email)
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -910,8 +927,14 @@ class Github:
             )
 
     def graphql(self, query: str, variables: Mapping[str, object]) -> dict[str, Any]:
-        response = self.read("graphql", method="POST", payload={"query": query, "variables": dict(variables)})
-        body = response.body if isinstance(response.body, dict) else {}
+        for attempt in range(4):
+            response = self.read("graphql", method="POST", payload={"query": query, "variables": dict(variables)})
+            body = response.body if isinstance(response.body, dict) else {}
+            if not any(item.get("type") == "RATE_LIMITED" for item in body.get("errors") or []):
+                break
+            if attempt == 3:
+                raise GithubError("GitHub GraphQL rate limit; retry later")
+            self.clock.sleep(READ_RETRY_LIMIT)
         errors = [item for item in body.get("errors") or [] if item.get("type") != "NOT_FOUND"]
         if errors or not isinstance(body.get("data"), dict):
             raise GithubError(f"GraphQL error: {errors or body}")
@@ -1133,11 +1156,7 @@ class Analysis:
 
 def analyze(gh: Github, scopes: list[Scope], problems: list[dict[str, Any]], state: State) -> Analysis:
     problems = list(problems)
-    by_id: dict[str, Scope] = {}
-    for scope in scopes:
-        if scope.id in by_id:
-            problems.append(anomaly("DUPLICATE_ID", f"{scope.id} appears more than once", scope=scope.id))
-        by_id[scope.id] = scope
+    by_id = {scope.id: scope for scope in scopes}
     wanted = {scope.number for scope in scopes if scope.number is not None}
     wanted |= {entry["number"] for entry in state.idmap.values() if isinstance(entry.get("number"), int)}
     facts = fetch_numbers(gh, wanted)
@@ -1177,18 +1196,6 @@ def analyze(gh: Github, scopes: list[Scope], problems: list[dict[str, Any]], sta
             continue
         numbers[scope.id] = scope.number
         new_ids[scope.id] = scope.id
-        matched = GITHUB_ID_RE.fullmatch(scope.id)
-        if matched is None:
-            problems.append(anomaly("META_INVALID", f"{scope.id} is not a Scope ID", scope=scope.id))
-        elif scope.number is None or int(matched.group(2)) != scope.number:
-            problems.append(
-                anomaly(
-                    "ID_NUMBER_MISMATCH",
-                    f"{scope.id} is linked to Issue #{scope.number}",
-                    scope=scope.id,
-                    number=scope.number,
-                )
-            )
         if scope.number is not None and scope.number not in facts:
             problems.append(
                 anomaly(
@@ -1197,36 +1204,9 @@ def analyze(gh: Github, scopes: list[Scope], problems: list[dict[str, Any]], sta
                     scope=scope.id,
                 )
             )
-    seen: dict[int, str] = {}
+    problems.extend(metadata_problems(scopes, numbers))
     for scope in scopes:
-        number = numbers.get(scope.id)
-        if number is None:
-            continue
-        if number in seen:
-            problems.append(
-                anomaly("DUPLICATE_NUMBER", f"{seen[number]} and {scope.id} use Issue #{number}", number=number)
-            )
-        seen[number] = scope.id
-    for scope in scopes:
-        expected_parent = PARENT_KINDS[scope.kind]
         parent = by_id.get(scope.parent_id) if scope.parent_id else None
-        if scope.parent_id and parent is None:
-            problems.append(
-                anomaly("PARENT_MISSING", f"{scope.id}: parent {scope.parent_id} is not a Scope", scope=scope.id)
-            )
-        elif expected_parent is None and scope.parent_id:
-            problems.append(anomaly("KIND_RULE", f"{scope.id}: an Initiative has no parent", scope=scope.id))
-        elif expected_parent is not None and (parent is None or parent.kind != expected_parent):
-            problems.append(
-                anomaly(
-                    "KIND_RULE", f"{scope.id}: the parent of a {scope.kind} must be a {expected_parent}", scope=scope.id
-                )
-            )
-        for dependency in scope.depends_on:
-            if dependency not in by_id:
-                problems.append(
-                    anomaly("DEPENDENCY_MISSING", f"{scope.id}: dependency {dependency} is not a Scope", scope=scope.id)
-                )
         own_number = numbers.get(scope.id)
         own = facts.get(own_number) if own_number is not None else None
         if own is None:
@@ -1267,8 +1247,6 @@ def analyze(gh: Github, scopes: list[Scope], problems: list[dict[str, Any]], sta
             problems.append(
                 anomaly("CLOSED_PARENT_OPEN_CHILD", f"{scope.id} is open under closed {parent.id}", scope=scope.id)  # type: ignore[union-attr]
             )
-    for cycle in _cycles(by_id):
-        problems.append(anomaly("DEPENDENCY_CYCLE", " -> ".join(cycle), scopes=cycle))
     known = {n for n in numbers.values() if n is not None}
     for number in sorted(set(labeled) - known):
         problems.append(
@@ -1279,6 +1257,63 @@ def analyze(gh: Github, scopes: list[Scope], problems: list[dict[str, Any]], sta
             )
         )
     return Analysis(scopes, problems, facts, labeled, numbers, new_ids, local_plan)
+
+
+def metadata_problems(scopes: Sequence[Scope], numbers: Mapping[str, int | None]) -> list[dict[str, Any]]:
+    """Anomalies visible in .meta.json alone (numbers: Scope ID -> Issue number after the ID map)."""
+    problems: list[dict[str, Any]] = []
+    by_id: dict[str, Scope] = {}
+    for scope in scopes:
+        if scope.id in by_id:
+            problems.append(anomaly("DUPLICATE_ID", f"{scope.id} appears more than once", scope=scope.id))
+        by_id[scope.id] = scope
+        if scope.local:
+            continue
+        matched = GITHUB_ID_RE.fullmatch(scope.id)
+        if matched is None:
+            problems.append(anomaly("META_INVALID", f"{scope.id} is not a Scope ID", scope=scope.id))
+        elif scope.number is None or int(matched.group(2)) != scope.number:
+            problems.append(
+                anomaly(
+                    "ID_NUMBER_MISMATCH",
+                    f"{scope.id} is linked to Issue #{scope.number}",
+                    scope=scope.id,
+                    number=scope.number,
+                )
+            )
+    seen: dict[int, str] = {}
+    for scope in scopes:
+        number = numbers.get(scope.id)
+        if number is None:
+            continue
+        if number in seen:
+            problems.append(
+                anomaly("DUPLICATE_NUMBER", f"{seen[number]} and {scope.id} use Issue #{number}", number=number)
+            )
+        seen[number] = scope.id
+    for scope in scopes:
+        expected_parent = PARENT_KINDS[scope.kind]
+        parent = by_id.get(scope.parent_id) if scope.parent_id else None
+        if scope.parent_id and parent is None:
+            problems.append(
+                anomaly("PARENT_MISSING", f"{scope.id}: parent {scope.parent_id} is not a Scope", scope=scope.id)
+            )
+        elif expected_parent is None and scope.parent_id:
+            problems.append(anomaly("KIND_RULE", f"{scope.id}: an Initiative has no parent", scope=scope.id))
+        elif expected_parent is not None and (parent is None or parent.kind != expected_parent):
+            problems.append(
+                anomaly(
+                    "KIND_RULE", f"{scope.id}: the parent of a {scope.kind} must be a {expected_parent}", scope=scope.id
+                )
+            )
+        for dependency in scope.depends_on:
+            if dependency not in by_id:
+                problems.append(
+                    anomaly("DEPENDENCY_MISSING", f"{scope.id}: dependency {dependency} is not a Scope", scope=scope.id)
+                )
+    for cycle in _cycles(by_id):
+        problems.append(anomaly("DEPENDENCY_CYCLE", " -> ".join(cycle), scopes=cycle))
+    return problems
 
 
 def _cycles(by_id: Mapping[str, Scope]) -> list[list[str]]:
@@ -1428,19 +1463,17 @@ class Registrar:
             name = operation.target or ""
             definition = next(item for item in LABEL_DEFINITIONS if item[0] == name)
 
-            def send() -> Any:
-                try:
-                    return gh.write(
-                        "POST",
-                        f"{gh.prefix}/labels",
-                        {"name": name, "color": definition[1], "description": definition[2]},
-                    )
-                except GithubError as error:
-                    if error.status == 422 and label_exists(gh, name):
-                        return None
-                    raise
-
-            self._write("label.create", {"name": name}, send, lambda: label_exists(gh, name))
+            # Only a definition this run certainly created is recorded, so undo never deletes someone else's label.
+            try:
+                gh.write(
+                    "POST", f"{gh.prefix}/labels", {"name": name, "color": definition[1], "description": definition[2]}
+                )
+            except GithubError as error:
+                if error.status == 422 and label_exists(gh, name):
+                    return
+                raise
+            self.wrote += 1
+            self._record("done", "label.create", name=name)
             return
         scope = next(s for s in self.analysis.scopes if s.id == operation.scope)
         if operation.op == "issue.create":
@@ -1653,6 +1686,11 @@ class Context:
     report: Report
     runner: Callable[..., Any] | None
     clock: Any
+    wrote: bool = False  # this run changed the repository, its .git or origin
+    githubs: list[Github] = field(default_factory=list)
+
+    def has_written(self) -> bool:
+        return self.wrote or any(gh.write_count for gh in self.githubs)
 
     def target(self) -> Target:
         target = resolve_target(self.args.project, self.args.repo, self.args.state_dir)
@@ -1661,7 +1699,9 @@ class Context:
         return target
 
     def github(self, target: Target) -> Github:
-        return Github(target.owner, target.name, runner=self.runner, clock=self.clock)
+        gh = Github(target.owner, target.name, runner=self.runner, clock=self.clock)
+        self.githubs.append(gh)
+        return gh
 
 
 def _summarize(report: Report, analysis: Analysis) -> None:
@@ -1997,6 +2037,14 @@ class Workspace:
         self.repo = self.root / "repo"
 
     def __enter__(self) -> Workspace:
+        try:
+            self._prepare()
+        except BaseException:
+            shutil.rmtree(self.root, ignore_errors=True)
+            raise
+        return self
+
+    def _prepare(self) -> None:
         run_git(
             None,
             "clone",
@@ -2017,7 +2065,6 @@ class Workspace:
             "source",
             f"+{self.target.default_ref}:refs/heads/migrate-source",
         )
-        return self
 
     def __exit__(self, *exc: object) -> None:
         shutil.rmtree(self.root, ignore_errors=True)
@@ -2072,15 +2119,13 @@ def command_build_canonical(context: Context) -> int:
         report.say(f"{SPEC_ROOT} has no tracked file in origin/{target.default_branch}; nothing to build")
         report.step("After the cutover merge, move-local and spec-dock canonical link create the first canonical")
         return EXIT_OK
-    blocking = [item for item in problems if item["blocking"]]
-    ids = [scope.id for scope in scopes]
-    for scope in scopes:
-        matched = GITHUB_ID_RE.fullmatch(scope.id)
-        if matched and int(matched.group(2)) != scope.number:
-            blocking.append(anomaly("ID_NUMBER_MISMATCH", f"{scope.id} is linked to Issue #{scope.number}"))
-    blocking.extend(
-        anomaly("DUPLICATE_ID", f"{i} appears more than once") for i in sorted({i for i in ids if ids.count(i) > 1})
-    )
+    numbers = {
+        scope.id: (state.idmap[scope.id]["number"] if scope.id in state.idmap else None)
+        if scope.local
+        else scope.number
+        for scope in scopes
+    }
+    blocking = [item for item in [*problems, *metadata_problems(scopes, numbers)] if item["blocking"]]
     if blocking:
         report.anomalies.extend(blocking)
         raise Refused("blocking anomalies in .meta.json", "Run plan and fix them first")
@@ -2120,8 +2165,8 @@ def command_build_canonical(context: Context) -> int:
             tree,
             [split],
             CANONICAL_COMMIT_MESSAGE,
-            target.identity,
-            commit_date(target.project, source),
+            committer(workspace.repo, split),  # same inputs give the same commit after unrelated default-branch PRs
+            commit_date(workspace.repo, split),
         )
         report.data.update({
             "split_commit": split,
@@ -2136,6 +2181,7 @@ def command_build_canonical(context: Context) -> int:
             report.say("would push it to origin " + CANONICAL_BRANCH if current is None else "origin already has it")
             report.step("build-canonical --apply")
             return EXIT_OK
+        context.wrote = True
         outcome = workspace.push(commit, CANONICAL_REF)
         if outcome == "rejected":
             raise Refused("origin rejected the canonical branch push", "Inspect origin spec-dock/canonical")
@@ -2228,6 +2274,7 @@ def command_cut(context: Context) -> int:
         if not context.args.apply:
             report.step("cut --apply")
             return EXIT_OK
+        context.wrote = True
         outcome = workspace.push(commit, f"refs/heads/{branch}")
         if outcome == "rejected":
             raise Refused(f"origin rejected {branch}")
@@ -2367,12 +2414,30 @@ def command_move_local(context: Context) -> int:
     if needs_catalog and (catalog.exists() or catalog.is_symlink()):
         raise Refused(f"{catalog} exists but is not the catalog worktree")
     if needs_catalog and context.args.apply:
+        context.wrote = True
         try:
             create_catalog(target)
         except GitError as error:
             raise Refused(f"could not create the catalog: {error}") from error
         report.say(f"created the catalog {catalog}")
     elif needs_catalog:
+        remote = remote_ref(target, CANONICAL_REF)
+        if remote is None:
+            raise Refused("origin has no spec-dock/canonical to hold the files", "build-canonical --apply first")
+        local = resolve_commit(target.project, CANONICAL_REF)
+        if local is not None and local != remote:
+            known = resolve_commit(target.project, remote) is not None
+            ahead = (
+                known
+                and run_git(
+                    target.project, "merge-base", "--is-ancestor", local, remote, read_only=True, ok=(0, 1)
+                ).returncode
+                == 0
+            )
+            if not ahead:
+                report.warn(
+                    f"the local {CANONICAL_BRANCH} must be contained in origin's; --apply checks it after fetching"
+                )
         report.say(f"would create the catalog {catalog}; names are checked against it once it exists")
     moves = plan_moves()
     report.data["moves"] = [{"from": str(a), "to": str(b)} for a, b in moves]
@@ -2384,6 +2449,7 @@ def command_move_local(context: Context) -> int:
         report.step("move-local --apply")
         return EXIT_OK
     moved = 0
+    context.wrote = True
     try:
         for source, destination in moves:
             if destination.exists() or destination.is_symlink():
@@ -2555,6 +2621,7 @@ def _adopt_into_canonical(
             report.say(f"conflict: canonical keeps {item['path']}; this branch's version goes to {item['copy']}")
         if not context.args.apply:
             return y_commit, conflicts
+        context.wrote = True
         outcome = workspace.push(y_commit, CANONICAL_REF)
         if outcome != "rejected":
             report.say(f"origin {CANONICAL_BRANCH}: {outcome}")
@@ -2573,10 +2640,25 @@ def command_adopt_worktree(context: Context) -> int:
         raise Refused(f"{checkout} is not on a branch")
     if not _git_version((2, 40)):
         raise Refused("adopt-worktree needs git 2.40 or newer (merge-tree --merge-base)")
+    if tree_oid(target.project, f"{target.default_ref}:{SPEC_ROOT}") is not None:
+        raise Refused(
+            f"origin/{target.default_branch} still has {SPEC_ROOT}; the cutover PR is not merged",
+            "Merge the cutover PR and fetch origin first",
+        )
     head = resolve_commit(checkout, "HEAD")
     base = git_text(checkout, "merge-base", "HEAD", target.default_ref, ok=(0, 1))
     if not head or not base:
         raise Refused(f"{branch} has no merge base with origin/{target.default_branch}")
+
+    def listed(*options: str) -> list[str]:
+        output = run_git(checkout, "ls-files", "-z", *options, "--", SPEC_ROOT, read_only=True).stdout
+        return [p.decode("utf-8", "surrogateescape") for p in output.split(b"\0") if p]
+
+    if not run_git(checkout, "ls-tree", "HEAD", "--", SPEC_ROOT, read_only=True).stdout and not listed():
+        # A finished adoption: an empty tree here would read as deleting every canonical file.
+        report.say(f"{branch} no longer tracks {SPEC_ROOT}; it is already adopted")
+        report.step("Merge the default branch into this branch, then run spec-dock canonical link")
+        return EXIT_OK
     base_tree = tree_oid(checkout, f"{base}:{SPEC_ROOT}")
     if base_tree is None:
         raise Refused(f"the merge base {base} has no {SPEC_ROOT}; this branch already left legacy storage")
@@ -2586,10 +2668,12 @@ def command_adopt_worktree(context: Context) -> int:
     if staged.returncode != 0:
         raise Refused("the checkout has staged changes outside spec-dock/initiatives", "Commit or unstage them first")
 
-    def listed(*options: str) -> list[str]:
-        output = run_git(checkout, "ls-files", "-z", *options, "--", SPEC_ROOT, read_only=True).stdout
-        return [p.decode("utf-8", "surrogateescape") for p in output.split(b"\0") if p]
-
+    missing = [p for p in listed() if not ((checkout / p).is_symlink() or (checkout / p).is_file())]
+    if missing:
+        raise Refused(
+            f"tracked spec files are missing from the working tree (sparse checkout or unstaged deletions): {missing[:10]}",
+            "Restore them, or stage the deletions with git rm, then run adopt-worktree again",
+        )
     present = [
         p
         for p in dict.fromkeys([*listed(), *listed("--others", "--exclude-standard")])
@@ -2598,6 +2682,7 @@ def command_adopt_worktree(context: Context) -> int:
     renames = state.renames()
     with Workspace(target) as workspace:
         repo = workspace.repo
+        # The branch may exist only in this checkout's clone; its objects back the merge-base trees read below.
         run_git(repo, "fetch", "--quiet", "--no-tags", str(checkout), f"+{head}:refs/heads/adopt-branch")
         full = _worktree_entries(repo, checkout, present)
         relative = [TreeEntry(e.mode, e.kind, e.oid, e.path.removeprefix(SPEC_ROOT + "/")) for e in full]
@@ -2673,6 +2758,7 @@ def command_adopt_worktree(context: Context) -> int:
         "checkout": str(checkout),
         "canonical_commit": expected_commit,
         "structure_differences": differences,
+        "metadata": {path: payload.decode("utf-8", "replace") for path, payload in meta_payloads},
     }
     _write_json(state.directory / "adopt" / f"{branch.replace('/', '-')}.json", record)
     after = Stopped if expected_commit is not None else Refused
@@ -2681,6 +2767,7 @@ def command_adopt_worktree(context: Context) -> int:
             f"these files differ from canonical, so nothing was removed: {mismatched}",
             "Compare them with the catalog, then remove spec-dock/initiatives from the branch by hand (README)",
         )
+    context.wrote = True
     run_git(checkout, "rm", "-r", "-q", "--cached", "--", SPEC_ROOT)
     commit = run_git(checkout, "commit", "-q", "-m", CUT_COMMIT_MESSAGE, ok=(0, 1))
     if commit.returncode != 0:
@@ -2691,8 +2778,17 @@ def command_adopt_worktree(context: Context) -> int:
         )
     if run_git(checkout, "ls-tree", "HEAD", "--", SPEC_ROOT, read_only=True).stdout:
         raise Stopped(f"HEAD still has {SPEC_ROOT}; nothing was removed from the working tree", "Inspect the branch")
+    hashed = {entry.path: entry.oid for entry in full}
     for path in deletions:
-        (checkout / path).unlink()
+        absolute = checkout / path
+        current = (
+            git_text(None, "hash-object", "--stdin", input=os.fsencode(str(absolute.readlink())))
+            if absolute.is_symlink()
+            else git_text(None, "hash-object", "--no-filters", str(absolute))
+        )
+        if current != hashed[path]:
+            raise Stopped(f"{path} changed during adopt-worktree; it and the files after it were kept", "Run again")
+        absolute.unlink()
     root = checkout / SPEC_ROOT
     for directory in sorted((p for p in root.rglob("*") if p.is_dir()), key=lambda p: len(p.parts), reverse=True):
         with contextlib.suppress(OSError):
@@ -2883,6 +2979,7 @@ def command_export_legacy(context: Context) -> int:
         if not context.args.apply:
             report.step("export-legacy --apply")
             return EXIT_OK
+        context.wrote = True
         outcome = workspace.push(commit, f"refs/heads/{branch}")
         if outcome == "rejected":
             raise Refused(f"origin rejected {branch}")
@@ -2954,12 +3051,12 @@ def main(
     try:
         code = COMMANDS[args.command](context)
     except MigrationError as failure:
-        code = failure.exit_code
+        code = EXIT_STOPPED if context.has_written() else failure.exit_code
         error = failure.message
         if failure.next_step:
             report.step(failure.next_step)
     except (GitError, GithubError) as failure:
-        code = EXIT_STOPPED if args.apply else EXIT_REFUSED
+        code = EXIT_STOPPED if context.has_written() else EXIT_REFUSED
         error = str(failure)
         report.step("Inspect the error, then run the same command again")
     emit(report, code, args.json, error, stdout or sys.stdout)

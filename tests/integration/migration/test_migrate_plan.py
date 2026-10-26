@@ -5,13 +5,13 @@ from __future__ import annotations
 import subprocess
 from typing import TYPE_CHECKING
 
-import pytest
-
 from tests.support.canonical_repo import add_worktree, git
-from tests.support.migration_repo import ISSUE3, Legacy, build_legacy, meta, snapshot, write_files
+from tests.support.migration_repo import ISSUE3, build_legacy, meta, snapshot, write_files
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    import pytest
 
 
 def _codes(result: dict) -> list[str]:
@@ -116,30 +116,50 @@ def test_plan_shows_ci_lines_worktrees_local_files_and_a_head_warning(
     assert any("HEAD" in warning for warning in result["warnings"])
 
 
-@pytest.mark.parametrize("command", ["plan", "verify", "register", "undo", "build-canonical", "cut", "export-legacy"])
-def test_no_subcommand_writes_without_apply(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str) -> None:
-    legacy = build_legacy(tmp_path, monkeypatch)
-    before = snapshot(legacy)
-    legacy.run(command)
-    assert snapshot(legacy) == before
-    assert legacy.github.writes() == []
-
-
-def test_move_local_and_adopt_write_nothing_without_apply(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_every_subcommand_reaches_its_plan_and_writes_nothing_without_apply(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     legacy = build_legacy(tmp_path, monkeypatch)
     feature = add_worktree(legacy.main, tmp_path / "feature", "feature")
     write_files(feature, {f"{ISSUE3}/plan.md": b"# edited\n"})
     write_files(legacy.main, {f"{ISSUE3}/.workbench/note.md": b"ignored\n"})
-    before = snapshot(legacy)
-    feature_status = git(feature, "status", "--porcelain", "--ignored")
-    legacy.run("move-local", str(legacy.main))
-    legacy.run("adopt-worktree", str(feature))
-    assert snapshot(legacy) == before
-    assert git(feature, "status", "--porcelain", "--ignored") == feature_status
 
+    def dry(command: str, *args: str, expected: int = 0) -> dict:
+        before = (
+            snapshot(legacy),
+            git(feature, "status", "--porcelain", "--ignored"),
+            git(feature, "rev-parse", "HEAD"),
+        )
+        code, result = legacy.run(command, *args)
+        assert code == expected, (command, result)
+        after = (
+            snapshot(legacy),
+            git(feature, "status", "--porcelain", "--ignored"),
+            git(feature, "rev-parse", "HEAD"),
+        )
+        assert after == before, command
+        return result
 
-def _target_error(legacy: Legacy, *argv: str) -> tuple[int, dict]:
-    return legacy.run(*argv)
+    dry("plan")
+    dry("verify", expected=1)
+    assert dry("register")["data"]["operations"]
+    assert legacy.run("register", apply=True)[0] == 0
+    writes = len(legacy.github.writes())
+    assert any(line.startswith("would undo") for line in dry("undo")["messages"])
+    assert dry("build-canonical")["data"]["canonical_commit"]
+    assert legacy.run("build-canonical", apply=True)[0] == 0
+    assert dry("cut")["data"]["commit"]
+    assert legacy.run("cut", apply=True)[0] == 0
+    git(legacy.main, "fetch", "-q", "origin")
+    git(legacy.main, "merge", "-q", "--ff-only", "origin/spec-dock/migrate-to-canonical")
+    git(legacy.main, "push", "-q", "origin", "HEAD:main")
+    git(legacy.main, "fetch", "-q", "origin")
+    moves = dry("move-local", str(legacy.main))["data"]
+    assert moves["create_catalog"] is True and moves["moves"]
+    adopt = dry("adopt-worktree", str(feature))["data"]
+    assert adopt["canonical_commit"] and f"{ISSUE3}/plan.md" in adopt["delete"]
+    assert dry("export-legacy")["data"]["scopes"] == 7
+    assert len(legacy.github.writes()) == writes
 
 
 def test_a_missing_origin_head_stops_with_the_set_head_step(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

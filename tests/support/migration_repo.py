@@ -286,7 +286,9 @@ def snapshot(legacy: Legacy) -> dict[str, Any]:
     """Everything a read-only run must leave unchanged."""
     status = git(legacy.main, "status", "--porcelain", "--ignored", "--untracked-files=all")
     files = (
-        sorted(str(p.relative_to(legacy.root)) for p in legacy.records.rglob("*")) if legacy.records.exists() else []
+        sorted((str(p.relative_to(legacy.root)), p.read_bytes()) for p in legacy.records.rglob("*") if p.is_file())
+        if legacy.records.exists()
+        else []
     )
     return {
         "refs": refs(legacy.main),
