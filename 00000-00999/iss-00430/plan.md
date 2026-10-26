@@ -255,6 +255,23 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 | Spec SP-2 `--offline` の link でも最初の周期が動く | P3 | 設計に書いた（`--offline` はこのコマンドの通信だけを止める） |
 | Standards ST-5 `REMOVE_CYCLE_WAIT` の説明 | P3 | 説明を実際に合わせた（値は150秒のまま。待ちきれなければ何も書かずに `CANONICAL_LOCK_BUSY`） |
 
+### 最終品質ゲート7の指摘の対応（`9fd6666e2`、2026-10-26）
+
+ゲート7は不合格（Standards の P1 が1件。Spec は合格で P3 が4件）。
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| Standards ST-1 `resume --adopt-remote` の後、保留のパスを直している途中の周期（`_adopt_holds` が待つ、編集中のファイルに当たる）で、GitHub が祖先へ巻き戻した後の L を早送りで push し、消した秘密情報の履歴が戻る | P1 | `adopt_remote_pending` が残っている間は push しない（取り込み直しのコミットを R の上に作るまで待つ）。祖先への巻き戻しと未保存の削除のテストを足した（直す前は失敗した） |
+| Spec SP-2 `_baseline` の説明が古い | P3 | 説明を直した |
+| Spec SP-3 `.runtime` の次の1手で、どこで `git rm` するかがない | P3 | 「カタログではなく、spec-dock/canonical を取り出した別のクローンで」と書いた |
+| Spec SP-1 Epic 3章の手順7が古い基準の規則のまま | P3 | 統括への引き渡しに足した |
+| Spec SP-4 報告書の残るリスクと最終品質ゲートの節 | P3 | 報告書に書いた |
+| Standards ST-2 lock で飛ばされ続けた周期にも、プライバシーの案内が出る | P3 | 直さずに残るリスクとして報告書に書く |
+| Standards ST-3 loop の `remove` が古い PID に SIGTERM を送る狭い競合 | P3 | 同上 |
+| Standards ST-4 毎周期の `git reset -q` が、カタログで手でステージした内容を捨てる | P3（判断） | 設計どおり（カタログで手で Git を使わないことを I-9 に申し送り済み）。報告書に書く |
+
+ゲート7の `make lint` と全体の `uv run pytest` の実行は、その途中で作業ツリーを直したので、ゲートの証拠にしない。
+
 ## exit / handoff
 
 - **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
@@ -262,5 +279,5 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
   - I-5：`request_sync_now`、`read_catalog_state`、`CatalogSyncState`（`last_cycle.finished_at`、`remote_contains_head`、`holds`）、`holds_under`、`origin: finish` の束の扱い（`design.md` 13章）。
   - I-11：`refresh_structures` の中の手順7の拡張の場所、`RepositoryResult.dashboards_written`、`update_catalog_state` と `state.json` の `dashboard`、`canonical remove` にダッシュボードの5つのファイルを足すこと。
   - I-9：`docs/canonical.md` の「同期が止まったとき」（`resume` の2つの引数）、AGENTS.md の破壊的なコマンドへの `canonical remove`、新しいコードの一覧の確認。
-  - 統括：`design.md` の14章のコードの Epic の12章への追記、`state.json` の3つの追加の項目（`adopt_remote_pending`、`schedule`、`last_error.at`）とジョブの `PATH` の `gh` の Epic の5章への追記、R2 と R3 の Epic の文書への反映。
+  - 統括：Epic 3章の手順7の基準を「手元の HEAD（初期のコミットだけなら取得した `origin/spec-dock/canonical`）」に直すこと（最終品質ゲート6 SP-1。C9 の持ち主のこの Issue で変えた。ゲート7 Spec SP-1）、`design.md` の14章のコードの Epic の12章への追記、`state.json` の3つの追加の項目（`adopt_remote_pending`、`schedule`、`last_error.at`）とジョブの `PATH` の `gh` の Epic の5章への追記、R2 と R3 の Epic の文書への反映。
 - **残るリスク**：`report.md` に書く（実機で確かめられなかったもの、Linux の Codex のサンドボックスでの `flock` など）。
