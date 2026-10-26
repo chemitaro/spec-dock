@@ -3,8 +3,7 @@
 It writes nothing in the repository, the catalog, .git, the state root or GitHub and never contacts the
 remote. Only with --structure does it read GitHub's structure at display freshness, which may refresh the
 structure snapshot (iss-00431). The sync, snapshot and state.json parts come from canonical_status_sync
-(iss-00430). The dashboard item is "not_implemented" (iss-00438); without --structure, `structure` is
-"not_checked".
+(iss-00430), and so does the dashboard item (iss-00438); without --structure, `structure` is "not_checked".
 """
 
 from __future__ import annotations
@@ -67,10 +66,6 @@ class Problem(Protocol):
 
 
 _CONFLICT_NEXT_STEP = "Merge each conflict copy's contents into its original file, then delete the copy."
-
-
-def _not_implemented(owner: str) -> dict[str, object]:
-    return {"status": "not_implemented", "next_step": None, "owner": owner}
 
 
 def run_canonical_status(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
@@ -161,7 +156,7 @@ def status_of(
         format=format_item,
         git=git_item,
         snapshot=view.snapshot_item(),
-        dashboard=_not_implemented("iss-00438"),
+        dashboard=view.dashboard_item(),
         structure=_structure_item(context, timeout=timeout, offline=offline, warnings=warnings)
         if structure
         else _NOT_CHECKED,

@@ -165,6 +165,8 @@ class IssueFacts:
     assignees: tuple[str, ...]
     updated_at: str
     url: str
+    created_at: str
+    closed_at: str | None
 
 
 @dataclass(frozen=True)
@@ -204,6 +206,8 @@ class ScopeNode:
     blocking: tuple[int, ...]
     updated_at: str
     url: str
+    created_at: str  # iss-00438: GitHub createdAt and closedAt, for epic-00427's time axis
+    closed_at: str | None
 
 
 @dataclass(frozen=True)
@@ -314,6 +318,8 @@ _NODE_KEYS: Final = frozenset({
     "blocking",
     "updated_at",
     "url",
+    "created_at",
+    "closed_at",
 })
 
 
@@ -349,6 +355,13 @@ def _numbers(value: object, what: str) -> tuple[int, ...]:
 def _texts(value: object, what: str) -> tuple[str, ...]:
     _require(isinstance(value, list), f"{what} must be a list")
     return tuple(cast("str", _text(item, what)) for item in cast("list[object]", value))
+
+
+def _time(value: object, what: str, *, optional: bool = False) -> str:
+    text = _text(value, what, optional=optional)
+    if text is not None:
+        parse_timestamp(text)
+    return cast("str", text)
 
 
 def _snapshot_from_json(payload: object) -> StructureSnapshot:
@@ -445,6 +458,8 @@ def _node_from_json(raw: object) -> ScopeNode:
         blocking=_numbers(item["blocking"], "blocking"),
         updated_at=cast("str", _text(item["updated_at"], "updated_at")),
         url=cast("str", _text(item["url"], "url")),
+        created_at=_time(item["created_at"], "created_at"),
+        closed_at=_time(item["closed_at"], "closed_at", optional=True),
     )
 
 
@@ -467,6 +482,8 @@ def _node_json(node: ScopeNode) -> dict[str, object]:
         "blocking": list(node.blocking),
         "updated_at": node.updated_at,
         "url": node.url,
+        "created_at": node.created_at,
+        "closed_at": node.closed_at,
     }
 
 
@@ -516,6 +533,8 @@ def _node_from_facts(
         blocking=(),
         updated_at=facts.updated_at,
         url=facts.url,
+        created_at=facts.created_at,
+        closed_at=facts.closed_at,
     )
     return node, tuple(anomalies)
 

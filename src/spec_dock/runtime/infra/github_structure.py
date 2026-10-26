@@ -313,7 +313,7 @@ FULL_READ_QUERY = f"""query($owner: String!, $name: String!, $after: String) {{
            labels: [{_KIND_FILTER}]) {{
       pageInfo {{ hasNextPage endCursor }}
       nodes {{
-        number databaseId title body state stateReason updatedAt url
+        number databaseId title body state stateReason updatedAt createdAt closedAt url
         labels(first: 20) {{ totalCount nodes {{ name }} }}
         assignees(first: 10) {{ nodes {{ login }} }}
         parent {{ number repository {{ nameWithOwner }} }}
@@ -752,6 +752,8 @@ class GithubStructureClient:
             assignees=_names(item.get("assignees"), "login", "assignee", endpoint),
             updated_at=_text(item.get("updated_at"), "updated_at", endpoint),
             url=_text(item.get("html_url"), "html_url", endpoint),
+            created_at=_text(item.get("created_at"), "created_at", endpoint),
+            closed_at=_optional_text(item.get("closed_at"), "closed_at", endpoint),
         )
 
     def _fetched_from_graphql(self, node: dict[str, object]) -> FetchedIssue:
@@ -774,6 +776,8 @@ class GithubStructureClient:
             ),
             updated_at=_text(node.get("updatedAt"), "updatedAt", endpoint),
             url=_text(node.get("url"), "url", endpoint),
+            created_at=_text(node.get("createdAt"), "createdAt", endpoint),
+            closed_at=_optional_text(node.get("closedAt"), "closedAt", endpoint),
         )
         parent = None if node.get("parent") is None else self._related_from_graphql(node.get("parent"))
         children = self._connection(node.get("subIssues"), "subIssues")

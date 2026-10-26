@@ -11,9 +11,10 @@ from dataclasses import dataclass
 from datetime import timedelta
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING, Final, cast
 
 from spec_dock.runtime.application.canonical_errors import (
+    CANONICAL_DASHBOARD_OCCUPIED,
     CANONICAL_LINGER_DISABLED,
     CANONICAL_PAUSED,
     CANONICAL_PUSH_AUTH_FAILED,
@@ -27,6 +28,9 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_SYNC_NOT_CONFIRMED,
     CANONICAL_SYNC_NOT_SCHEDULED,
     CANONICAL_UNPUSHED_STALE,
+    DASHBOARD_FAILED_NEXT_STEP,
+    DASHBOARD_MISSING_NEXT_STEP,
+    DASHBOARD_OCCUPIED_NEXT_STEP,
     LINGER_NEXT_STEP,
     PAUSED_NEXT_STEP,
     PRIVACY_NEXT_STEP,
@@ -229,14 +233,49 @@ class SyncView:
         except (GitProcessError, OSError):
             return None
 
+    def _repository(self) -> str | None:
+        from spec_dock.runtime.application.canonical_sync import repository_of
+
+        repository = self.entry.repository if self.entry is not None else None
+        return repository or repository_of(self.layout.main_checkout, timeout=self.timeout)
+
+    def dashboard_item(self) -> dict[str, object]:
+        """The five files of the main checkout and state.json `dashboard` (iss-00438); nothing is written."""
+        from spec_dock.runtime.application.canonical_dashboard import dashboard_directory, is_regular_file
+        from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES
+
+        directory = dashboard_directory(self.layout.main_checkout)
+        files = {name: is_regular_file(directory / name) for name in DASHBOARD_FILES}
+        recorded = dict(self.state.dashboard) if self.state is not None and self.state.dashboard else {}
+        raw_error = recorded.get("error")
+        error = cast("dict[str, object]", raw_error) if isinstance(raw_error, dict) else None
+        item: dict[str, object] = {
+            "status": "ok",
+            "next_step": None,
+            "directory": str(directory),
+            "files": files,
+            "written_at": recorded.get("written_at"),
+            "error": error,
+        }
+        if error is not None:
+            code = str(error.get("code"))
+            step = DASHBOARD_OCCUPIED_NEXT_STEP if code == CANONICAL_DASHBOARD_OCCUPIED else DASHBOARD_FAILED_NEXT_STEP
+            item["status"] = "problem"
+            item["next_step"] = self.problem(
+                "dashboard", code, str(error.get("message")), step, paths=error.get("paths") or []
+            )
+        elif self._repository() is None:
+            item["status"] = "not_applicable"
+        elif not all(files.values()):
+            item.update(status="missing", next_step=DASHBOARD_MISSING_NEXT_STEP)
+        return item
+
     def snapshot_item(self) -> dict[str, object]:
         """Where the structure snapshot is and how fresh; read from the state root only."""
-        from spec_dock.runtime.application.canonical_sync import repository_of
         from spec_dock.runtime.infra.github_snapshot import SnapshotStore
         from spec_dock.runtime.infra.github_structure import GithubRepository
 
-        repository = self.entry.repository if self.entry is not None else None
-        repository = repository or repository_of(self.layout.main_checkout, timeout=self.timeout)
+        repository = self._repository()
         item: dict[str, object] = {
             "status": "unknown",
             "next_step": None,

@@ -129,6 +129,8 @@ def _facts(number: int, *labels: str, body: str | None = None, state: str = "ope
         assignees=(),
         updated_at=f"2026-10-25T00:00:{number % 60:02d}Z",
         url=f"https://github.com/example/repo/issues/{number}",
+        created_at=f"2026-10-24T00:00:{number % 60:02d}Z",
+        closed_at=None if state == "open" else "2026-10-25T01:00:00Z",
     )
 
 
@@ -201,6 +203,8 @@ def test_valid_structure_builds_ids_relations_external_and_reverse_edges() -> No
         "blocking": [],
         "updated_at": "2026-10-25T00:00:03Z",
         "url": "https://github.com/example/repo/issues/3",
+        "created_at": "2026-10-24T00:00:03Z",
+        "closed_at": None,
     }
     assert snapshot.to_json()["external"] == {"4": {"number": 4, "title": "Vendor fix", "state": "open"}}
 
