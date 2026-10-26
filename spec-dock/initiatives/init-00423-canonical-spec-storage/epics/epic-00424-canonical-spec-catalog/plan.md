@@ -150,7 +150,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `infra/canonical_git.py` のうち、Git の呼び出しの関数（C6）、worktree、lock、repair、除外、ls-remote、fetch、新しいリポジトリでの初期の canonical の作成（2台の同時の作成を含む）。
   - `infra/catalog_lock.py` と、変更の束を書く部品（4章）。`.runtime/` と、作成の作業場所。
   - `infra/catalog_tree.py`：名前で Scope のディレクトリを探す。リンクは「正しいリンク」だけを受け付ける。
-  - `worktree create` と `work start` の後のリンク（3章「SpecDock のほかのコマンドから」。登録は I-3 の後に同じ経路で効く）。
+  - `worktree create` と `work start` の後のリンク（3章「SpecDock のほかのコマンドから」。登録は I-3 の後に同じ経路で効く）。公開の関数 `link_after_command` と、それを呼ぶ canonical の `worktree create` を作る。canonical の `work start` からの呼び出しは I-5 が足す。従来の `direct_worktrees.py` と `work_start.py` は変えない。
   - ツールの設定の判定と、示す1行（9章）。サンドボックスの中での書き込みの可否の確かめと `CANONICAL_SANDBOX_DENIED`。
   - `infra/runtime_environment.py`（C11）：OS、コンテナの印、git の版の判定。注入できるようにする。`canonical link` の前提の `CANONICAL_GIT_TOO_OLD` と、マウントしたチェックアウトの `CANONICAL_FOREIGN_CHECKOUT`（3章の手順2。`repair` と `prune` の前に止まる）。
   - 配布資産 `spec-dock/.gitignore` への無視の3行の追加と、`static-inventory.json` の更新。
@@ -202,6 +202,12 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `workspace validate` が、6章の検査の項目をすべて見つける。入れ子のずれは警告で、`scope move <ID>` を次の1手に示す。
   - `workspace validate --ci`、`workspace sync --source local`、`workbench copy`、カタログを対象にした `worktree remove` は、案内付きで止まる。
   - 読むだけのコマンドは、何も書かない（カタログと `.git` の変化がないことを確かめる）。
+- **I-1 から引き継ぐ直し**（I-1 の最終品質ゲートの指摘。I-1 の `report.md` の「Residual Risks / Follow-ups」）：
+  - `application/canonical_errors.github_error_result` と、`runtime_dispatch` の `except GithubStructureError` のテストを足す（`partial` の終了コード6、`failed` の5、`retry_at` の文）。
+  - `infra/github_structure.py` の `_rate_limit_wait(...) or 60.0` が待ち時間0を60秒にするので、`is None` で比べるように直し、テストを足す。
+  - `tests/unit/infra/test_github_snapshot.py` の `test_a_failed_second_file_write_keeps_one_reflection_in_memory` は、2つ目のファイルの書き込みの失敗の経路を通っていない。`commit_refresh` で `probe.json` の書き込みを失敗させ、メモリーの値、`persisted=False`、`local_writes` が1回だけであることを確かめるテストに直す。
+  - そのほかの P3 の指摘は、I-1 の `report.md` に一覧がある。触れるコードにあるものは、直してよい（C1 と C10 の公開の形は変えない）。
+- **I-2 から引き継ぐもの**（I-2 の統括の判断）：canonical モードの `worktree create --expect-current` の選択の解決（I-2 の時点では `CANONICAL_NOT_IMPLEMENTED`）。`canonical status` の `structure` の項目と `--structure`（`display` の新しさでスナップショットを確かめ、入れ子と GitHub の親子のずれを示す）。
 
 ### I-5 Write Scopes To GitHub In Canonical Mode
 
@@ -214,6 +220,10 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `work finish` は、未保存の変更があるとき、保存と push を待つ。確かめられないと、Issue を閉じずに `partial` で止まる。Scope の下に保留があれば、`CANONICAL_SAVE_HELD` で止まる。他のクローンの push を取り込んだだけで自分が push しなかった場合も、確かめられて閉じる（AC-13）。
   - 依存の追加は、循環になるときに書く前に止まる。
   - 基点のツリーに `spec-dock/initiatives` がある `work start` は、`CANONICAL_BASE_HAS_SPECS` で止まる。
+  - `scope import github` は、印のない既にある Issue に、本文の `PATCH` で slug の印を足す（`GithubStructureClient.update_issue` に `body` を足す。`design.md` 2章の「書く」表）。印がすでにあれば本文を書かない。
+  - スナップショットにない番号に当たる変更の反映は、当てずに飛ばし、コマンドを失敗にせずに `GITHUB_SNAPSHOT_STALE` を警告に入れ、次の `ensure_fresh` が取り直す（`design.md` 2章の「書き込みの反映」）。
+  - `scope close` と `scope reopen` の結果が分からないときの読み直しが、`state_reason` も比べる。
+  - canonical の `work start` は、選択を記録して `StartLock` を放した後に、I-2 の `link_after_command` を呼ぶ。リンクの失敗は `work start` の結果を変えず、警告で返す（`design.md` 3章「SpecDock のほかのコマンドから」）。
 
 ### I-6 Accept Japanese Titles In Canonical Mode
 
