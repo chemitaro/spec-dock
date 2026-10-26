@@ -189,6 +189,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 構造が変わっていないとき、1周期が送る GitHub への要求は、304 の確かめだけである（AC-16 の一部）。GitHub につながらなくても、カタログの保存と push の結果は変わらない。
   - 最初の周期で `push --dry-run` を行い、認証の失敗を `push_auth` に記録して、`canonical status` が次の1手を示す。
   - `canonical link --no-schedule` は、登録簿に載せず、定期の実行を作らず、起動もしない（偽の launchd、systemd、常駐のプロセスに、何も届かないことを確かめる）。基準は記録し、そのチェックアウトでの `canonical sync` が、そのカタログを処理する。
+- **I-2 から引き継ぐもの**（2026-10-26 の統括の判断）：別の `canonical link` がカタログを作っている最中に、もう1つの `canonical link` や `canonical status` が、作りかけのカタログに「消す」次の1手を示す（I-2 の報告書の RST-1。P2）。作成中を見分け、「しばらく待って同じコマンドを実行する」を先に示すように直す（`design.md` 3章の「作りかけのカタログ」）。
 - **実機の確かめ**：macOS の launchd（外付けのボリュームと内蔵のディスクの両方、利用者の `gh` での push、プライバシーの保護の案内。テスト用の別の名前のジョブと、別の状態の置き場で行う）。Linux の systemd のタイマー（OrbStack の Ubuntu の仮想マシン。一時の bare のリポジトリを相手に、AC-02、AC-03、AC-13 の代わりを確かめる）。systemd のないコンテナ（Docker。中でクローンした一時のリポジトリで、常駐のプロセスと、起動し直しの後の `canonical link`）。確かめられなかったことは、報告書と `design.md` の「未確認の事項」に残す。
 
 ### I-4 Read Scopes From GitHub In Canonical Mode
@@ -276,6 +277,10 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - spec-dock の利用側の配布資産を、`installation update` で 0.3.0 に上げる（従来モードのまま）。
   - 版を 0.3.0 にする（`pyproject.toml` と版のファイル）。
   - **I-7 から引き継ぐもの**（2026-10-26 の統括の判断）：配布する `spec-dock/docs/cli-redesign-guide.html` のコマンドの一覧（「全44コマンド」と C01〜C44 の表）に、`canonical` のコマンドを足す。使い方の文書に、検査のワークフローの見本は 0.3.0 以降で使うこと（版のタグは 0.3.0 から作るので、0.2.4 の版のファイルのままでは `pipx install` が失敗する）を書く。マージの後に、`release-tag.yml` が `v0.3.0` を作ったことを確かめ、報告書に書く（タグを作らない側は、#444 のマージの後の本物の run で確かめた。判定は `version-unchanged`、タグの作成は skipped）。
+  - **I-2 から引き継ぐもの**（2026-10-26 の統括の判断。I-2 の報告書）：
+    - 実機の確かめ（利用者の設定は変えず、一時の `HOME` か `--settings` のファイルで行う）：Codex の `writable_roots` の1行が効くこと、Claude Code のユーザー設定のファイルに書いた1行での動き、Git 2.38 ちょうどでの動き、Linux の Landlock のサンドボックスでの判定。利用者の本物の設定での確かめは、I-10 で、利用者が1行を足すときに行う。
+    - 小さな直し：ツールの設定の判定で、Claude Code の `CLAUDE_CONFIG_DIR` を見る（ST-12）。ヘルプの「書くもの」に、fetch の refspec の追加と、ローカルのブランチの付け替えを足す（ST-9）。
+    - 使い方の文書の制約：main が sparse-checkout だと、カタログがその設定を引き継ぎ、仕様が見えない（ST-2）。カタログに対する Git の呼び出しは `GIT_ASKPASS` を通さないので、askpass で HTTPS の認証をしている環境では、push と fetch が失敗しうる（ST-13）。
 - **受け入れ**：
   - AC-02、AC-07、AC-14、AC-15、AC-16、AC-18 を確かめる。AC-14 は、設計書を渡さない白紙のエージェントに規則の節だけを渡して試し、結果を報告書に書く。AC-18 は、横断のシナリオのテストを、環境の判定を注入して systemd と `loop` の両方で通し、実機では OrbStack の仮想マシンと Docker のコンテナで通す。
   - wheel を作り、外の環境に入れて、`spec-dock help` と `spec-dock canonical --help` が動く（AGENTS.md の手順）。
