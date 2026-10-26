@@ -245,3 +245,27 @@ def test_a_rewrite_whose_branch_was_deleted_afterwards_resumes_by_push_local(pai
     code, result = pair.run(pair.a, "canonical", "resume", "--push-local")
     assert code == 0 and result["data"]["result"]["pushed"] is True, result
     assert pair.remote_file("a.md") == "a"
+
+
+def test_accepting_a_fixed_but_unsaved_file_never_pushes_the_old_secret(pair: SyncPair) -> None:
+    pair.write(pair.a, "base.md", "base\n")
+    pair.write(pair.a, "leak.md", TOKEN + "\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "accept", "leak.md")
+    pair.sync(pair.a)
+    cleaned = _remote_commit(pair, {"base.md": "base\n", ".spec-dock-canonical.json": '{"format": 1}\n'}, parent=None)
+    _force(pair, cleaned)
+    (pair.catalog(pair.a) / ".runtime/accepted.json").unlink()
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    pair.sync(pair.a)  # held: the secret would come back
+    pair.write(pair.a, "leak.md", "fixed\n")
+    pair.run(pair.a, "canonical", "accept", "leak.md")  # accepts the fixed, not yet saved content
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    pair.sync(pair.a)
+    assert TOKEN not in (pair.remote_file("leak.md") or "")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.a)
+    assert pair.remote_file("leak.md") in (None, "fixed")

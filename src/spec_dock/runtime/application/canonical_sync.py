@@ -559,7 +559,7 @@ def _save(run: _Run) -> None:
     consumed = list(run.state.consumed_changesets)
     for name, paths in batches:
         if paths:
-            committed = canonical_git.save_commit(
+            outcome = canonical_git.save_commit(
                 catalog,
                 paths,
                 message=f"spec-dock: save {len(paths)} files ({run.ctx.pc})",
@@ -567,11 +567,12 @@ def _save(run: _Run) -> None:
                 contents={path: checked[path] for path in paths if path in checked},
                 git=git,
             )
-            if committed != head:  # an unchanged tree (for example after an eol filter) makes no commit
-                head = committed
+            if outcome.commit != head:  # an unchanged tree (for example after an eol filter) makes no commit
+                head = outcome.commit
                 run.result.saved_commit = head
                 run.result.effects.append(Effect("canonical.save", "succeeded", head))
-            saved.update(paths)
+            # Deferred paths (a directory/file swap waiting for its other side) stay pending.
+            saved.update(path for path in paths if path not in outcome.deferred)
         if name:
             consumed.append(name)
             (catalog / CHANGESETS_RELATIVE / name).unlink(missing_ok=True)
@@ -724,9 +725,11 @@ def _adopt_holds(run: _Run, remote: str, tree: str) -> bool:
         if entry.mode != "120000" and size <= MAX_FILE_BYTES:
             content = canonical_git.blob_bytes(catalog, entry.oid, git=git)
         blob = entry.oid
-        if path in accepted.paths and _savable(catalog / path):
-            # accept records the unfiltered blob of the work-tree file; compare like with like.
-            blob = canonical_git.blob_of(catalog, path, git=git)
+        if path in accepted.paths:
+            # accept records the unfiltered blob of the file's bytes: compare it with the bytes that would be
+            # pushed (not with the work tree, which may already hold a fix that is not saved yet).
+            payload = content if content is not None else canonical_git.blob_bytes(catalog, entry.oid, git=git)
+            blob = canonical_git.blob_of_bytes(catalog, payload, git=git)
         candidates.append(HoldCandidate(path, size, blob, content))
     held = classify_holds(
         candidates,

@@ -57,6 +57,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.domain.canonical_layout import CatalogLayout
     from spec_dock.runtime.infra.runtime_environment import RuntimeEnvironment
 
+REMOVE_CYCLE_WAIT = 150.0  # longer than one catalog's fetch and push attempts
 REMOVE_AGAIN_RECOVERY = "Check spec-dock canonical status, then run spec-dock canonical remove --yes again."
 
 
@@ -88,7 +89,7 @@ def run_canonical_remove(namespace: argparse.Namespace, context: ProjectContext)
                     details={"paths": [str(root)], "next_step": PERMISSION_DENIED_RECOVERY},
                 )
             # A running cycle finishes first and no later cycle starts while the catalog goes away.
-            with cycle_lock(root, catalog, timeout=10.0):
+            with cycle_lock(root, catalog, timeout=REMOVE_CYCLE_WAIT):
                 return _remove(namespace, layout, environment, root, catalog, apply=True)
     except StartLockBusy as error:
         raise CanonicalCommandError(START_LOCK_BUSY, str(error), recovery=(LOCK_BUSY_RECOVERY,)) from error
@@ -190,7 +191,10 @@ def _refuse_unsaved(catalog: Path, *, timeout: float) -> None:
     summary = canonical_git.catalog_change_summary(catalog, timeout=timeout)
     unpushed = canonical_git.unpushed(catalog, timeout=timeout)
     head = canonical_git.resolve_commit(catalog, "HEAD", timeout=timeout)
-    count = unpushed[0] if unpushed is not None else (1 if head is not None else 0)
+    if unpushed is not None:
+        count = unpushed[0]
+    else:  # never fetched: only content beyond the initial commit is at stake
+        count = 1 if head is not None and not canonical_git.is_initial_commit(catalog, head) else 0
     if summary.unsaved or count:
         raise CanonicalCommandError(
             CANONICAL_UNSAVED_CHANGES,

@@ -858,3 +858,35 @@ def test_a_directory_replaced_by_a_link_outside_is_a_deletion_and_never_stops_th
     item = catalog_result(result)
     assert code == 0 and item["result"] == "ok" and item["pushed"], result
     assert pair.remote_file("other.md") == "o" and pair.remote_file("topic/a.md") is None
+
+
+def test_a_file_replaced_by_a_directory_never_pushes_a_held_secret_inside_it(pair: SyncPair) -> None:
+    pair.write(pair.a, "topic", "a file\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    (pair.specs(pair.a) / "topic").unlink()
+    pair.write(pair.a, "topic/secret.md", "ghp_" + "S" * 36 + "\n")
+    pair.write(pair.a, "topic/ok.md", "fine\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert [hold["path"] for hold in item["holds"]] == ["topic/secret.md"]
+    assert pair.remote_file("topic/secret.md") is None and pair.remote_file("topic/ok.md") == "fine"
+
+
+def test_a_directory_replaced_by_a_file_never_pushes_held_deletions(pair: SyncPair) -> None:
+    import shutil
+
+    for index in range(25):
+        pair.write(pair.a, f"topic/{index}.md", f"{index}\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    shutil.rmtree(pair.specs(pair.a) / "topic")
+    pair.write(pair.a, "topic", "now a file\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert len(item["holds"]) == 25 and item["pushed"] is False
+    assert pair.remote_file("topic/0.md") == "0"

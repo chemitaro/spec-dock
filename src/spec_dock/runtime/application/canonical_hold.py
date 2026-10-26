@@ -120,11 +120,24 @@ def run_canonical_accept(namespace: argparse.Namespace, context: ProjectContext)
     return OperationResult(namespace.command_path, "succeeded" if changed else "unchanged", data, 0, effects=(effect,))
 
 
+def _parents_are_directories(catalog: Path, path: str) -> bool:
+    current = catalog
+    for part in path.split("/")[:-1]:
+        current = current / part
+        if current.is_symlink() or (os.path.lexists(current) and not current.is_dir()):
+            return False
+    return True
+
+
 def _still_held(catalog: Path, hold: Hold, deleted: set[str]) -> bool:
     """Is the hold still true of the work tree now? (never restore over a recreated or fixed file)"""
     target = catalog / hold.path
     if hold.kind == "mass_delete":
-        return hold.path in deleted
+        # Restoring must create the file without removing anything: nothing at the path itself, and every
+        # parent absent or a real directory (git restore would unlink a new file or directory in the way).
+        return hold.path in deleted and not os.path.lexists(target) and _parents_are_directories(catalog, hold.path)
+    if not _parents_are_directories(catalog, hold.path):
+        return False
     try:
         if not target.is_file() or target.is_symlink():
             return False
@@ -164,7 +177,11 @@ def run_canonical_restore(namespace: argparse.Namespace, context: ProjectContext
                     )
                 targets.append(path)
         else:
-            targets = sorted(path for path, hold in holds.items() if hold.kind == "mass_delete" and path in deleted)
+            targets = sorted(
+                path
+                for path, hold in holds.items()
+                if hold.kind == "mass_delete" and _still_held(catalog, hold, deleted)
+            )
         in_head = canonical_git.tree_paths(catalog, "HEAD")
         missing = [path for path in targets if path not in in_head]
         if missing:

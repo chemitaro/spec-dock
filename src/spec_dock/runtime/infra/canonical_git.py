@@ -521,6 +521,13 @@ def blob_of_bytes(catalog: Path, payload: bytes, *, git: str = "git", timeout: f
     return _text(output)
 
 
+@dataclass(frozen=True)
+class SaveResult:
+    commit: str  # the parent itself when nothing was committed
+    saved: tuple[str, ...]
+    deferred: tuple[str, ...]  # would have changed paths outside the selection (a directory/file swap)
+
+
 def save_commit(
     catalog: Path,
     paths: Sequence[str],
@@ -530,69 +537,45 @@ def save_commit(
     contents: Mapping[str, bytes] | None = None,
     git: str = "git",
     timeout: float = 30.0,
-) -> str:
+) -> SaveResult:
     """Commit exactly `paths` on top of `parent` through a temporary index and advance the branch from `parent`.
 
-    A path in `contents` is committed with exactly those bytes (the ones the hold rules checked), not with
-    whatever the file holds a moment later.
+    A deletion is removed from the index by its exact name (never expanded to a directory of the same name).
+    A path in `contents` is committed with exactly those bytes (the ones the hold rules checked). When the
+    resulting tree changes any path outside the selection (Git replacing a directory by a file or the other
+    way round), the selected paths involved are deferred and the rest is staged again, so nothing held or
+    unselected is ever committed.
     """
     index = _temporary_index(catalog)
     environment = {"GIT_INDEX_FILE": str(index)}
     checked = dict(contents or {})
+    remaining = list(dict.fromkeys(paths))
+    deferred: list[str] = []
     try:
-        run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
-        # `git add` decides every mode (core.fileMode, symbolic links) and applies the attributes; checked files
-        # then get exactly the checked bytes at the mode Git chose.
-        run_catalog_git(
-            catalog,
-            "add",
-            "-A",
-            git=git,
-            environment=environment,
-            pathspecs=list(paths),
-            mutation=True,
-            timeout=timeout,
-        )
-        modes = _index_modes(catalog, environment, git=git, timeout=timeout)
-        for path, payload in sorted(checked.items()):
-            if path not in paths:
-                continue
-            # A checked file that vanished before `git add` is saved as checked, never as a deletion
-            # that skipped the hold rules.
-            mode = modes.get(path, "100644")
-            # --path applies the catalog's attributes (eol, clean filters such as LFS or git-crypt) as `git add` does.
-            oid = _text(
-                run_catalog_git(
-                    catalog,
-                    "hash-object",
-                    "-w",
-                    "--stdin",
-                    f"--path={path}",
-                    input=payload,
-                    git=git,
-                    mutation=True,
-                    timeout=timeout,
-                )
-            )
-            run_catalog_git(
-                catalog,
-                "update-index",
-                "--add",
-                "--cacheinfo",
-                f"{mode},{oid},{path}",
-                git=git,
-                environment=environment,
-                mutation=True,
-                timeout=timeout,
-            )
-        tree = _text(
-            run_catalog_git(catalog, "write-tree", git=git, environment=environment, mutation=True, timeout=timeout)
-        )
-        parent_tree = _text(
+        tree = parent_tree = _text(
             run_catalog_git(catalog, "rev-parse", f"{parent}^{{tree}}", git=git, read_only=True, timeout=timeout)
         )
+        for _attempt in range(3):
+            if not remaining:
+                tree = parent_tree
+                break
+            tree = _stage(catalog, parent, remaining, checked, environment, git=git, timeout=timeout)
+            changed = changed_paths(catalog, parent_tree, tree, git=git, timeout=timeout)
+            extras = changed - set(remaining)
+            if not extras:
+                break
+            drop = [
+                path
+                for path in remaining
+                if any(extra.startswith(path + "/") or path.startswith(extra + "/") for extra in extras)
+            ]
+            deferred.extend(drop or remaining)
+            remaining = [path for path in remaining if path not in drop] if drop else []
+        else:
+            deferred.extend(remaining)
+            remaining, tree = [], parent_tree
         if tree == parent_tree:
-            return parent  # nothing differs from the parent: never make an empty commit
+            return SaveResult(parent, (), tuple(deferred))  # nothing differs from the parent: no empty commit
         commit = _text(
             run_catalog_git(
                 catalog, "commit-tree", tree, "-p", parent, "-m", message, git=git, mutation=True, timeout=timeout
@@ -603,7 +586,89 @@ def save_commit(
         with contextlib.suppress(FileNotFoundError):
             index.unlink()
     reset_index(catalog, git=git, timeout=timeout)
-    return commit
+    return SaveResult(commit, tuple(remaining), tuple(deferred))
+
+
+def _stage(
+    catalog: Path,
+    parent: str,
+    paths: Sequence[str],
+    checked: Mapping[str, bytes],
+    environment: Mapping[str, str],
+    *,
+    git: str,
+    timeout: float,
+) -> str:
+    """Load `parent` into the temporary index, apply exactly `paths`, and write the tree."""
+    run_catalog_git(catalog, "read-tree", parent, git=git, environment=environment, mutation=True, timeout=timeout)
+    # A selected path that is now a real directory was a file Git reports deleted: remove that entry by
+    # name instead of letting `git add` take in the directory's (unchecked, maybe held) files.
+    gone = [
+        path
+        for path in paths
+        if path not in checked
+        and (
+            _beyond_link(catalog, path)
+            or not os.path.lexists(catalog / path)
+            or ((catalog / path).is_dir() and not (catalog / path).is_symlink())
+        )
+    ]
+    present = [path for path in paths if path not in gone]
+    if gone:
+        payload = b"".join(os.fsencode(path) + b"\0" for path in gone)
+        run_catalog_git(
+            catalog,
+            "update-index",
+            "-z",
+            "--force-remove",
+            "--stdin",
+            git=git,
+            environment=environment,
+            input=payload,
+            mutation=True,
+            timeout=timeout,
+        )
+    if present:
+        # `git add` decides every mode (core.fileMode, symbolic links) and applies the attributes; checked
+        # files then get exactly the checked bytes at the mode Git chose.
+        run_catalog_git(
+            catalog, "add", "-A", git=git, environment=environment, pathspecs=present, mutation=True, timeout=timeout
+        )
+    modes = _index_modes(catalog, environment, git=git, timeout=timeout)
+    for path, payload in sorted(checked.items()):
+        if path not in present:
+            continue
+        # A checked file that vanished before `git add` is saved as checked, never as a deletion
+        # that skipped the hold rules.
+        mode = modes.get(path, "100644")
+        # --path applies the catalog's attributes (eol, clean filters such as LFS or git-crypt) as `git add` does.
+        oid = _text(
+            run_catalog_git(
+                catalog,
+                "hash-object",
+                "-w",
+                "--stdin",
+                f"--path={path}",
+                input=payload,
+                git=git,
+                mutation=True,
+                timeout=timeout,
+            )
+        )
+        run_catalog_git(
+            catalog,
+            "update-index",
+            "--add",
+            "--cacheinfo",
+            f"{mode},{oid},{path}",
+            git=git,
+            environment=environment,
+            mutation=True,
+            timeout=timeout,
+        )
+    return _text(
+        run_catalog_git(catalog, "write-tree", git=git, environment=environment, mutation=True, timeout=timeout)
+    )
 
 
 def _index_modes(catalog: Path, environment: Mapping[str, str], *, git: str, timeout: float) -> dict[str, str]:

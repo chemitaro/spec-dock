@@ -152,3 +152,14 @@ def test_remove_stops_when_the_catalog_is_on_another_branch(pair: SyncPair) -> N
     code, result = pair.run(pair.a, "canonical", "remove", "--yes")
     assert code == 3 and result["error"]["code"] == "CANONICAL_PATH_OCCUPIED" and result["effects"] == []
     assert read_registry(pair.state_root).catalogs
+
+
+def test_a_catalog_that_never_reached_github_can_be_removed_when_it_holds_only_the_initial_commit(
+    pair: SyncPair,
+) -> None:
+    catalog = pair.catalog(pair.a)
+    git(catalog, "update-ref", "-d", "refs/remotes/origin/spec-dock/canonical")
+    initial = git(catalog, "rev-list", "--max-parents=0", "HEAD")
+    git(catalog, "reset", "-q", "--hard", initial)
+    code, result = pair.run(pair.a, "canonical", "remove", "--yes")
+    assert code == 0 and result["status"] == "succeeded", result

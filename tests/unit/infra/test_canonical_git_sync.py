@@ -62,7 +62,9 @@ def test_save_commit_commits_only_the_given_paths_and_keeps_the_rest_unsaved(cat
     (catalog / "a.md").write_text("saved\n")
     (catalog / "b.md").unlink()
     (catalog / "later.md").write_text("later\n")
-    commit = canonical_git.save_commit(catalog, ["a.md", "b.md"], message="spec-dock: save 2 files (mac)", parent=head)
+    commit = canonical_git.save_commit(
+        catalog, ["a.md", "b.md"], message="spec-dock: save 2 files (mac)", parent=head
+    ).commit
     assert git(catalog, "rev-parse", "HEAD") == commit
     assert git(catalog, "show", "-s", "--format=%P %s", commit) == f"{head} spec-dock: save 2 files (mac)"
     assert git(catalog, "show", "HEAD:a.md") == "saved"

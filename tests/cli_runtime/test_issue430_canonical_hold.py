@@ -130,3 +130,15 @@ def test_an_expired_deletion_accept_never_lets_a_later_mass_delete_through(pair:
 def test_restore_of_a_path_outside_the_catalog_is_not_held(pair: SyncPair) -> None:
     code, result = pair.run(pair.a, "canonical", "restore", "../outside.md")
     assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_HELD"
+
+
+def test_restore_never_removes_a_new_file_or_directory_in_the_way(pair: SyncPair) -> None:
+    import shutil
+
+    _seed(pair)
+    _delete(pair)
+    shutil.rmtree(pair.specs(pair.a) / "d", ignore_errors=True)
+    pair.write(pair.a, "d", "a new file where the directory was\n")
+    code, result = pair.run(pair.a, "canonical", "restore")
+    assert code == 0 and result["data"]["result"]["restored"] == [], result
+    assert (pair.specs(pair.a) / "d").read_text() == "a new file where the directory was\n"
