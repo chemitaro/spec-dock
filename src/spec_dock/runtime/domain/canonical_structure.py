@@ -357,11 +357,14 @@ def _texts(value: object, what: str) -> tuple[str, ...]:
     return tuple(cast("str", _text(item, what)) for item in cast("list[object]", value))
 
 
-def _time(value: object, what: str, *, optional: bool = False) -> str:
-    text = _text(value, what, optional=optional)
-    if text is not None:
-        parse_timestamp(text)
-    return cast("str", text)
+def _time(value: object, what: str) -> str:
+    text = cast("str", _text(value, what))
+    parse_timestamp(text)
+    return text
+
+
+def _optional_time(value: object, what: str) -> str | None:
+    return None if value is None else _time(value, what)
 
 
 def _snapshot_from_json(payload: object) -> StructureSnapshot:
@@ -459,7 +462,7 @@ def _node_from_json(raw: object) -> ScopeNode:
         updated_at=cast("str", _text(item["updated_at"], "updated_at")),
         url=cast("str", _text(item["url"], "url")),
         created_at=_time(item["created_at"], "created_at"),
-        closed_at=_time(item["closed_at"], "closed_at", optional=True),
+        closed_at=_optional_time(item["closed_at"], "closed_at"),
     )
 
 

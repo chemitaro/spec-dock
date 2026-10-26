@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from spec_dock.runtime.application.canonical_dashboard import is_regular_file
 from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES
+from spec_dock.runtime.infra.canonical_files import is_regular_file
 from tests.support.canonical_repo import add_worktree
 from tests.support.canonical_sync import SyncPair, catalog_result
 
@@ -110,7 +110,8 @@ def test_an_unchanged_structure_writes_nothing_and_a_title_change_rewrites(
     code, result = pair.sync(pair.a)
     assert code == 0 and _repository(result)["dashboards_written"] == 1
     assert "- `iss-00003` 題名を変えた" in (_directory(pair.a) / "dashboard.md").read_text(encoding="utf-8")
-    assert all(_stamps(pair.a)[name] != before[name] for name in ("dashboard.md",))
+    after = _stamps(pair.a)
+    assert all(after[name][0] != before[name][0] for name in DASHBOARD_FILES)  # all five are redrawn
 
 
 def test_only_a_missing_file_is_written_when_the_structure_is_unchanged(
@@ -272,3 +273,91 @@ def test_remove_plans_and_deletes_only_the_regular_dashboard_files(
     assert not any(Path(path).exists() for path in files)
     assert (_directory(pair.a) / "tree.puml").is_dir() and (_directory(pair.a) / "deps-raw.puml").is_symlink()
     assert target.read_text(encoding="utf-8") == "keep\n"
+
+
+def _refresh(pair: SyncPair, main: Path, snapshot: object, *, registered: bool = False) -> Any:
+    from spec_dock.runtime.application.canonical_dashboard import refresh_dashboard
+    from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry
+
+    entry = RegistryEntry(
+        os.path.realpath(pair.catalog(pair.a)), str(main), "github.com/example/repo", "git", "2026-10-26T00:00:00Z"
+    )
+    return refresh_dashboard(
+        entry,
+        snapshot,  # type: ignore[arg-type]
+        snapshot_path=Path("/s.json"),
+        state_root=pair.state_root,
+        now="2026-10-26T00:00:00Z",
+        registered=registered,
+    )
+
+
+def _stored_snapshot(pair: SyncPair) -> Any:
+    from spec_dock.runtime.infra.github_snapshot import SnapshotStore
+    from spec_dock.runtime.infra.github_structure import GithubRepository
+
+    snapshot, _ = SnapshotStore(pair.state_root, GithubRepository.parse("example/repo")).load()
+    assert snapshot is not None
+    return snapshot
+
+
+def test_a_busy_cycle_lock_a_removed_registration_or_no_state_skip_without_touching_state(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.infra.canonical_state import catalog_state_dir, cycle_lock
+
+    _fake_structure(monkeypatch)
+    pair.sync(pair.a)
+    snapshot = _stored_snapshot(pair)
+    for name in DASHBOARD_FILES:
+        (_directory(pair.a) / name).unlink()
+    state = pair.state(pair.a)
+    with cycle_lock(pair.state_root, os.path.realpath(pair.catalog(pair.a))):
+        assert _refresh(pair, pair.a, snapshot).skipped == "cycle_busy"
+    assert _refresh(pair, pair.a, snapshot, registered=True).skipped == "unregistered"  # --no-schedule link
+    assert pair.state(pair.a) == state and _stamps(pair.a) == {}
+    (catalog_state_dir(pair.state_root, os.path.realpath(pair.catalog(pair.a))) / "state.json").unlink()
+    assert _refresh(pair, pair.a, snapshot).skipped == "no_state"
+    assert pair.state(pair.a) is None and _stamps(pair.a) == {}
+
+
+def test_a_failed_write_keeps_the_old_hash_so_the_next_cycle_redraws_all_five(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.application import canonical_dashboard
+
+    _fake_structure(monkeypatch)
+    pair.sync(pair.a)
+    snapshot = _stored_snapshot(pair)
+    old_hash = _dashboard_state(pair, pair.a)["input_hash"]  # type: ignore[index]
+    original = canonical_dashboard.replace_text_file
+
+    def failing(directory: Path, name: str, text: str) -> None:
+        if name == "tree.puml":
+            raise OSError(28, "No space left on device")
+        original(directory, name, text)
+
+    monkeypatch.setattr(canonical_dashboard, "replace_text_file", failing)
+    outcome = _refresh(pair, pair.a, snapshot)  # a new snapshot path changes the hash: all five are wanted
+    error = _dashboard_state(pair, pair.a)["error"]  # type: ignore[index]
+    assert error["code"] == "CANONICAL_DASHBOARD_FAILED" and error["paths"] == [str(_directory(pair.a) / "tree.puml")]
+    assert "tree.puml" not in outcome.written and _dashboard_state(pair, pair.a)["input_hash"] == old_hash  # type: ignore[index]
+    monkeypatch.setattr(canonical_dashboard, "replace_text_file", original)
+    assert sorted(_refresh(pair, pair.a, snapshot).written) == sorted(DASHBOARD_FILES)
+    assert _dashboard_state(pair, pair.a)["error"] is None  # type: ignore[index]
+
+
+def test_workspace_sync_draws_no_dashboard_in_either_mode(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.cli import main
+    from tests.cli_runtime.test_issue413_dependency import dependency_workspace
+
+    _fake_structure(monkeypatch)
+    pair.run(pair.a, "workspace", "sync")  # the bare-path origin stops it early; it never draws either way
+    assert _stamps(pair.a) == {}
+    (tmp_path / "legacy").mkdir()
+    legacy, _parent, _child = dependency_workspace(tmp_path / "legacy")
+    capsys.readouterr()
+    assert main(["--project", str(legacy), "workspace", "sync", "--json"]) == 0
+    assert not any((legacy / "spec-dock" / name).exists() for name in DASHBOARD_FILES)

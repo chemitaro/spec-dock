@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.canonical_catalog import observe_catalog, require_git, resolve_layout
-from spec_dock.runtime.application.canonical_dashboard import dashboard_directory, is_regular_file
+from spec_dock.runtime.application.canonical_dashboard import dashboard_directory
 from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_IGNORED_FILES_PRESENT,
     CANONICAL_LOCK_BUSY,
@@ -36,7 +36,7 @@ from spec_dock.runtime.domain.canonical_layout import EXCLUDE_LINES, LINK_RELATI
 from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec
 from spec_dock.runtime.domain.canonical_sync_state import SyncRegistry
 from spec_dock.runtime.infra import canonical_git, canonical_scheduling, runtime_environment
-from spec_dock.runtime.infra.canonical_files import observe_link
+from spec_dock.runtime.infra.canonical_files import is_regular_file, observe_link
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path, update_registry
 from spec_dock.runtime.infra.canonical_state import (
     CycleBusy,

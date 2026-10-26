@@ -92,6 +92,61 @@ def _is_symlink_at(directory_fd: int, name: str) -> bool:
         return False
 
 
+class FileOccupied(FileExistsError):
+    """A directory or symbolic link is where SpecDock writes a generated file; it is never replaced."""
+
+
+def is_regular_file(path: Path) -> bool:
+    """A regular file at `path` itself; a symbolic link to one does not count."""
+    try:
+        return stat.S_ISREG(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
+def replace_text_file(directory: Path, name: str, text: str) -> None:
+    """Atomically replace `directory/name` with `text`, anchored to the inspected directory descriptor.
+
+    The temporary file is created exclusively without following links, synced and renamed; a directory or
+    symbolic link at `name` raises FileOccupied and stays as it is.
+    """
+    directory_fd = os.open(directory, _DIRECTORY_FLAGS)
+    try:
+        if _occupied_at(directory_fd, name):
+            raise FileOccupied(f"{directory / name} is a directory or symbolic link")
+        temporary = f".{name}.{secrets.token_hex(8)}.tmp"
+        descriptor = os.open(
+            temporary,
+            os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW | getattr(os, "O_CLOEXEC", 0),
+            0o644,
+            dir_fd=directory_fd,
+        )
+        try:
+            with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
+                stream.write(text)
+                stream.flush()
+                os.fsync(stream.fileno())
+            # A directory that appears after this check makes the rename fail; it stays.
+            if _occupied_at(directory_fd, name):
+                raise FileOccupied(f"{directory / name} is a directory or symbolic link")
+            os.rename(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
+        except BaseException:
+            with suppress(OSError):
+                os.unlink(temporary, dir_fd=directory_fd)
+            raise
+        os.fsync(directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def _occupied_at(directory_fd: int, name: str) -> bool:
+    try:
+        mode = os.stat(name, dir_fd=directory_fd, follow_symlinks=False).st_mode
+    except FileNotFoundError:
+        return False
+    return stat.S_ISDIR(mode) or stat.S_ISLNK(mode)
+
+
 def read_text_file(path: Path) -> str | None:
     """Text for rule matching; bytes that are not UTF-8 stay distinguishable (surrogateescape)."""
     try:

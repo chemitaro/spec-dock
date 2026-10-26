@@ -108,6 +108,11 @@ def _render_dashboard_md(
     return "\n".join(lines)
 
 
+def render_dashboard_nodes_md(index_nodes: dict[str, object], *, top_limit: int = _DASHBOARD_TOP_LIMIT) -> str:
+    """dashboard.md from index nodes that carry their own board_state (canonical mode, iss-00438)."""
+    return _render_dashboard_md(index_nodes, active=None, top_limit=top_limit)
+
+
 def _render_deps_disabled_dashboard_md(*, error: str | None) -> str:
     err = _deps_disabled_error_text(error)
     lines: list[str] = []

@@ -78,7 +78,7 @@ from spec_dock.runtime.domain.canonical_sync_state import (
     SyncError,
 )
 from spec_dock.runtime.infra import canonical_git
-from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry
+from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, is_unregistered, read_registry
 from spec_dock.runtime.infra.canonical_state import (
     CycleBusy,
     StateUnreadable,
@@ -242,18 +242,11 @@ def sync_catalog(entry: RegistryEntry, ctx: SyncContext, *, registered: bool = F
     """
     try:
         with cycle_lock(ctx.state_root, entry.catalog):
-            if registered and _unregistered(ctx.state_root, entry.catalog):
+            if registered and is_unregistered(ctx.state_root, entry.catalog):
                 return CatalogResult(entry.catalog, "skipped", skipped_reason="unregistered")
             return _cycle(entry, ctx)
     except CycleBusy:
         return CatalogResult(entry.catalog, "skipped", skipped_reason="cycle_busy")
-
-
-def _unregistered(root: Path, catalog: str) -> bool:
-    try:
-        return read_registry(root).entry_for(catalog) is None
-    except RegistryUnreadable:
-        return False
 
 
 def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
@@ -961,8 +954,11 @@ def refresh_structures(
             probe = "failed" if fresh.probe == "failed" else ("changed" if fresh.probe == "changed" else "unchanged")
             refreshed = fresh.refreshed
         written = 0
-        with suppress(ValueError):
+        try:
             path = SnapshotStore(ctx.state_root, GithubRepository.parse(entry.repository)).directory / SNAPSHOT_FILE
+        except ValueError:  # not a GitHub repository key: there is no snapshot to draw from
+            path = None
+        if path is not None:
             same = [item for item in entries if item.repository == entry.repository]
             written = _refresh_dashboards(same, snapshot, path, ctx, registered=registered)
         results.append(RepositoryResult(entry.repository, probe, refreshed, written))
@@ -991,7 +987,7 @@ def _refresh_dashboards(
                 now=ctx.stamp(),
                 registered=registered,
             )
-        except (OSError, TimeoutError, StateUnreadable) as error:
+        except Exception as error:  # a dashboard failure never changes the sync result (Epic ch. 5 step 7)
             _log_line(ctx, f"dashboard catalog={entry.catalog} error={type(error).__name__}: {error}")
             continue
         written += bool(outcome.written)

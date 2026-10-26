@@ -241,8 +241,9 @@ class SyncView:
 
     def dashboard_item(self) -> dict[str, object]:
         """The five files of the main checkout and state.json `dashboard` (iss-00438); nothing is written."""
-        from spec_dock.runtime.application.canonical_dashboard import dashboard_directory, is_regular_file
+        from spec_dock.runtime.application.canonical_dashboard import dashboard_directory
         from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES
+        from spec_dock.runtime.infra.canonical_files import is_regular_file
 
         directory = dashboard_directory(self.layout.main_checkout)
         files = {name: is_regular_file(directory / name) for name in DASHBOARD_FILES}

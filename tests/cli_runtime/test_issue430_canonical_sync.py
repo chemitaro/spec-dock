@@ -387,7 +387,7 @@ def test_an_unchanged_structure_costs_only_the_304_probes_and_github_failures_ch
         "repository": "github.com/example/repo",
         "probe": "changed",
         "refreshed": True,
-        "dashboards_written": 0,
+        "dashboards_written": 1,  # iss-00438: the first cycle draws the main checkout's dashboard
     }
     start = len(fake.requests)  # type: ignore[attr-defined]
     pair.write(pair.a, "x.md", "x\n")

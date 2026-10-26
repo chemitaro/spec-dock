@@ -8,7 +8,6 @@ state.json `dashboard.error` and never change the sync result.
 
 from __future__ import annotations
 
-from contextlib import suppress
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -18,9 +17,10 @@ from typing import TYPE_CHECKING
 from spec_dock.runtime.application.canonical_errors import CANONICAL_DASHBOARD_FAILED, CANONICAL_DASHBOARD_OCCUPIED
 from spec_dock.runtime.application.project_context import probe_workspace_mode
 from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES, dashboard_inputs, input_hash
-from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry
+from spec_dock.runtime.infra.canonical_files import FileOccupied, is_regular_file, replace_text_file
+from spec_dock.runtime.infra.canonical_registry import is_unregistered
 from spec_dock.runtime.infra.canonical_state import CycleBusy, cycle_lock, read_catalog_state, update_catalog_state
-from spec_dock.runtime.presentation.markdown import _render_dashboard_md
+from spec_dock.runtime.presentation.markdown import render_dashboard_nodes_md
 from spec_dock.runtime.presentation.puml import (
     render_deps_issues_puml,
     render_deps_raw_puml,
@@ -51,7 +51,7 @@ def dashboard_directory(main_checkout: Path) -> Path:
 def render_dashboard_files(snapshot: StructureSnapshot, *, snapshot_path: Path) -> dict[str, str]:
     """The five files in DASHBOARD_FILES order, drawn by the unchanged legacy renderers."""
     inputs = dashboard_inputs(snapshot)
-    markdown = _render_dashboard_md(inputs.index_nodes, active=None).replace(
+    markdown = render_dashboard_nodes_md(inputs.index_nodes).replace(
         _LEGACY_INDEX_LINE, f"- snapshot: `{snapshot_path}`", 1
     )
     drawn = {
@@ -62,13 +62,6 @@ def render_dashboard_files(snapshot: StructureSnapshot, *, snapshot_path: Path) 
         "deps-raw.puml": render_deps_raw_puml(inputs.deps_raw),
     }
     return {name: drawn[name] if drawn[name].endswith("\n") else drawn[name] + "\n" for name in DASHBOARD_FILES}
-
-
-def is_regular_file(path: Path) -> bool:
-    try:
-        return stat.S_ISREG(os.lstat(path).st_mode)
-    except OSError:
-        return False
 
 
 def refresh_dashboard(
@@ -83,7 +76,7 @@ def refresh_dashboard(
     """Step 7 for one catalog: redraw what changed under its cycle lock and record the result in state.json."""
     try:
         with cycle_lock(state_root, entry.catalog):
-            if registered and _unregistered(state_root, entry.catalog):
+            if registered and is_unregistered(state_root, entry.catalog):
                 return DashboardOutcome(skipped="unregistered")
             main = Path(entry.main_checkout)
             if not (main / ".git").is_dir():  # a linked worktree: one clone has one structure (Epic ch. 13)
@@ -93,13 +86,6 @@ def refresh_dashboard(
             return _redraw(entry, snapshot, main, snapshot_path=snapshot_path, state_root=state_root, now=now)
     except CycleBusy:
         return DashboardOutcome(skipped="cycle_busy")
-
-
-def _unregistered(root: Path, catalog: str) -> bool:
-    try:
-        return read_registry(root).entry_for(catalog) is None
-    except RegistryUnreadable:
-        return False
 
 
 def _error(code: str, message: str, now: str, paths: list[str]) -> dict[str, object]:
@@ -144,10 +130,19 @@ def _redraw(
     }
 
     def mutate(current: CatalogSyncState | None) -> CatalogSyncState:
-        return (current or previous).evolve(dashboard=dashboard)
+        if current is None:
+            raise _StateGone
+        return current.evolve(dashboard=dashboard)
 
-    update_catalog_state(state_root, entry.catalog, mutate)
+    try:
+        update_catalog_state(state_root, entry.catalog, mutate)
+    except _StateGone:  # removed meanwhile: never recreate it without the baseline of steps 1-6
+        return DashboardOutcome(tuple(written), error, skipped="no_state")
     return DashboardOutcome(tuple(written), error)
+
+
+class _StateGone(Exception):
+    """state.json disappeared between the read and the update."""
 
 
 def _write(
@@ -167,21 +162,13 @@ def _write(
     for name in wanted:
         path = directory / name
         try:
-            mode = os.lstat(path).st_mode
-        except FileNotFoundError:
-            mode = None
-        except OSError as error:
-            failed.append(str(path))
-            reasons.append(f"{path}: {error.strerror or error}")
-            continue
-        if mode is not None and (stat.S_ISDIR(mode) or stat.S_ISLNK(mode)):
+            replace_text_file(directory, name, files[name])
+        except FileOccupied:
             occupied.append(str(path))
             continue
-        try:
-            _replace(path, files[name])
-        except OSError as error:
+        except (OSError, ValueError) as error:  # ValueError: text the UTF-8 codec cannot encode
             failed.append(str(path))
-            reasons.append(f"{path}: {error.strerror or error}")
+            reasons.append(f"{path}: {getattr(error, 'strerror', None) or error}")
             continue
         written.append(name)
     if failed:
@@ -190,17 +177,3 @@ def _write(
         message = "a directory or symbolic link is where a dashboard file goes: " + ", ".join(occupied)
         return written, _error(CANONICAL_DASHBOARD_OCCUPIED, message, now, occupied)
     return written, None
-
-
-def _replace(path: Path, text: str) -> None:
-    temporary = path.with_name(f".{path.name}.spec-dock-{os.getpid()}")
-    with suppress(FileNotFoundError):
-        temporary.unlink()  # a leftover of an interrupted cycle of this process id
-    try:
-        descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o644)
-        with os.fdopen(descriptor, "w", encoding="utf-8") as stream:
-            stream.write(text)
-        Path(temporary).replace(path)
-    finally:
-        with suppress(FileNotFoundError):
-            temporary.unlink()
