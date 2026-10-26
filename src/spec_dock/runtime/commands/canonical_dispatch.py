@@ -6,6 +6,7 @@ import argparse
 from collections.abc import Callable
 from pathlib import Path
 
+from spec_dock.runtime.application.canonical_branches import branch_operation
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_link import run_canonical_link
@@ -42,6 +43,9 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "active clear": clear_active,
     "artifact list": query_artifact,
     "artifact show": query_artifact,
+    "branch show": branch_operation,
+    "branch create": branch_operation,
+    "branch switch": branch_operation,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
