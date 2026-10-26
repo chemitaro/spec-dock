@@ -14,7 +14,9 @@ from typing import TYPE_CHECKING, Literal
 from spec_dock.runtime.application.canonical_catalog import (
     CatalogObservation,
     foreign_error,
+    gitignore_next_step,
     observe_catalog,
+    occupied_next_step,
     require_git,
     resolve_layout,
 )
@@ -34,7 +36,6 @@ from spec_dock.runtime.application.canonical_errors import (
     FORMAT_MISSING_RECOVERY,
     FORMAT_UNSUPPORTED_RECOVERY,
     GIT_IDENTITY_RECOVERY,
-    INSTALLATION_UPDATE_RECOVERY,
     LINK_AGAIN_RECOVERY,
     LINK_NETWORK_RECOVERY,
     MAIN_MOVED_NEXT_STEP,
@@ -55,6 +56,7 @@ from spec_dock.runtime.domain.canonical_layout import (
     CANONICAL_REF,
     CANONICAL_TRACKING_REF,
     EXCLUDE_LINES,
+    GITIGNORE_PATH,
     LINK_RELATIVE,
 )
 from spec_dock.runtime.infra import canonical_git, runtime_environment
@@ -263,10 +265,7 @@ def _refuse_blocked(observation: CatalogObservation, *, skip_main: bool = False)
     if observation.state == "foreign":
         raise foreign_error(observation)
     if observation.state == "occupied":
-        if observation.off_branch is not None:
-            step = f"Switch the catalog back with git -C {catalog} switch spec-dock/canonical, then run spec-dock canonical link."
-        else:
-            step = f"Inspect {catalog} and move its contents aside, then run spec-dock canonical link; SpecDock does not delete it."
+        step = occupied_next_step(observation)
         raise CanonicalCommandError(
             CANONICAL_PATH_OCCUPIED,
             observation.detail or f"{catalog} holds something that is not this clone's catalog",
@@ -673,16 +672,17 @@ def _warnings(
             )
         )
     if observation.gitignore_missing:
-        path = layout.checkout / "spec-dock/.gitignore"
+        path = layout.checkout / GITIGNORE_PATH
+        step = gitignore_next_step(layout)
         warnings.append(
             Diagnostic(
                 CANONICAL_IGNORE_RULES_MISSING,
-                f"{path} lacks {', '.join(observation.gitignore_missing)}; run {INSTALLATION_UPDATE_RECOVERY}",
+                f"{path} lacks {', '.join(observation.gitignore_missing)}. {step}",
                 {
                     "item": "exclude",
                     "path": str(path),
                     "missing": list(observation.gitignore_missing),
-                    "next_step": INSTALLATION_UPDATE_RECOVERY,
+                    "next_step": step,
                 },
             )
         )

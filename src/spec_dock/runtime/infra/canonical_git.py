@@ -37,6 +37,8 @@ HOOKLESS_CONFIG: Final = (
     "-c",
     "commit.gpgSign=false",
     "-c",
+    "push.gpgSign=false",
+    "-c",
     "core.fsmonitor=false",
     "-c",
     "gc.auto=0",
@@ -229,7 +231,16 @@ def add_fetch_branch(main: Path, *, timeout: float = 30.0) -> None:
 
 
 def fetch_canonical(main: Path, *, timeout: float = 30.0) -> None:
-    run_catalog_git(main, "fetch", "--no-tags", CANONICAL_REMOTE, _FETCH_REFSPEC, mutation=True, timeout=timeout)
+    run_catalog_git(
+        main,
+        "fetch",
+        "--no-tags",
+        "--no-recurse-submodules",  # the main checkout's submodules are not the catalog's business
+        CANONICAL_REMOTE,
+        _FETCH_REFSPEC,
+        mutation=True,
+        timeout=timeout,
+    )
 
 
 def resolve_commit(main: Path, ref: str, *, timeout: float = 30.0) -> str | None:
@@ -301,10 +312,13 @@ def push_initial(main: Path, oid: str, *, timeout: float = 30.0) -> Literal["pus
         timeout=timeout,
         returncodes=frozenset({0, 1}),
     )
-    flags = [line.split("\t", 1)[0] for line in os.fsdecode(output.stdout).splitlines() if "\t" in line]
+    rows = [line.split("\t") for line in os.fsdecode(output.stdout).splitlines() if "\t" in line]
+    flags = [row[0] for row in rows]
     if output.returncode == 0 and flags and all(flag in ("*", "=", " ", "+") for flag in flags):
         return "pushed"
-    if output.returncode == 1 and "!" in flags:
+    # Only [rejected] means the ref exists already; [remote rejected] is the server refusing it (a ruleset, a name).
+    refused = [row[2] if len(row) > 2 else "" for row in rows if row[0] == "!"]
+    if output.returncode == 1 and refused and all(summary.startswith("[rejected]") for summary in refused):
         return "rejected"
     raise GitProcessError(
         ("git", "push", CANONICAL_REMOTE, f"{oid}:{CANONICAL_REF}"),

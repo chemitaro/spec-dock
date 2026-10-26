@@ -515,6 +515,7 @@ def _hostile_hooks(checkout: Path) -> None:
         hook.chmod(0o755)
     git(checkout, "config", "core.hooksPath", str(hooks))
     git(checkout, "config", "commit.gpgSign", "true")
+    git(checkout, "config", "push.gpgSign", "true")
     git(checkout, "config", "gpg.program", "/nonexistent-gpg")
 
 
@@ -588,6 +589,21 @@ def test_a_start_lock_held_elsewhere_stops_canonical_link(
     assert ("git.worktree.add", "not_attempted") in effects(result)
 
 
+def test_a_start_lock_held_elsewhere_without_network_effects_fails(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path
+) -> None:
+    from spec_dock.runtime.infra.start_lock import StartLock
+
+    assert link(capsys, main_checkout)[0] == 0
+    git(main_checkout, "worktree", "unlock", str(main_checkout / "spec-dock/.canonical"))
+    with StartLock(main_checkout / ".git", timeout=0):
+        code, result = link(capsys, main_checkout)
+    assert code == 3 and result["status"] == "failed", result
+    assert result["error"]["code"] == "START_LOCK_BUSY"
+    assert ("git.worktree.lock", "not_attempted") in effects(result)
+    assert not any(status in ("succeeded", "unknown") for _kind, status in effects(result))
+
+
 def test_a_complete_link_does_not_wait_for_the_start_lock(
     capsys: pytest.CaptureFixture[str], main_checkout: Path
 ) -> None:
@@ -659,6 +675,26 @@ def test_a_registration_pointing_at_another_existing_directory_stops(
     assert tree_digest(main_checkout / ".git/worktrees") == before
 
 
+def test_an_unfinished_catalog_checkout_stops_instead_of_passing_as_ready(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path
+) -> None:
+    # What a timed-out git worktree add leaves: Git's own "initializing" lock and no index yet.
+    assert link(capsys, main_checkout)[0] == 0
+    catalog = main_checkout / "spec-dock/.canonical"
+    admin = canonical_git.read_gitdir(catalog)
+    assert admin is not None
+    (admin / "index").unlink()
+    (admin / "locked").write_text("initializing", encoding="utf-8")
+    before = tree_digest(main_checkout / ".git/worktrees")
+    code, result = link(capsys, main_checkout)
+    assert code == 3 and result["error"]["code"] == "CANONICAL_PATH_OCCUPIED" and result["effects"] == []
+    assert f"worktree remove --force --force {catalog}" in result["recovery"]["instructions"][0]
+    assert tree_digest(main_checkout / ".git/worktrees") == before
+    code, status = run(capsys, main_checkout, "canonical", "status")
+    assert code == 0 and status["data"]["catalog"]["status"] == "problem"
+    assert "worktree remove --force --force" in status["data"]["catalog"]["next_step"]
+
+
 def test_a_catalog_on_another_branch_names_the_switch_back(
     capsys: pytest.CaptureFixture[str], main_checkout: Path
 ) -> None:
@@ -686,9 +722,19 @@ def test_a_single_branch_clone_of_a_new_repository_creates_the_canonical(
     assert fetch.count("+refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical") == 1
 
 
+def _legacy_commands_work(capsys: pytest.CaptureFixture[str], checkout: Path) -> None:
+    code, started = run(capsys, checkout, "work", "start", "init-00001", "--base", "HEAD", "--dry-run")
+    assert code == 0 and started["status"] == "planned", started
+    code, synced = run(capsys, checkout, "workspace", "sync")
+    assert code == 0 and synced["status"] in ("succeeded", "unchanged"), synced
+
+
 def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
-    capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path
+    capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from tests.cli_runtime.test_issue413_finish import github_fixture
+
+    github_fixture(tmp_path, monkeypatch, {"1": "open"})
     linked = add_worktree(main_checkout, tmp_path / "linked", "feature")
     git(main_checkout, "checkout", "-q", "-b", "legacy")
     (main_checkout / "spec-dock/workspace.json").write_text(
@@ -718,7 +764,9 @@ def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
         (scope / name).write_text("# Fixture\n", encoding="utf-8")
     git(main_checkout, "add", "-A")
     git(main_checkout, "commit", "-qm", "legacy specs")
+    legacy_worktree = add_worktree(main_checkout, tmp_path / "legacy-worktree", "legacy-work")
     legacy_before = tree_digest(main_checkout / "spec-dock/initiatives")
+    _legacy_commands_work(capsys, main_checkout)
     code, result = link(capsys, linked)
     assert code == 0, result
     assert [item["code"] for item in result["warnings"]].count("CANONICAL_MAIN_NOT_MIGRATED") == 1
@@ -731,6 +779,9 @@ def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
     assert git(main_checkout, "status", "--porcelain") == ""
     code, listed = run(capsys, main_checkout, "scope", "list")
     assert code == 0 and [item["id"] for item in listed["data"]["result"]["items"]] == ["init-00001"]
+    # The legacy commands that observe every worktree pass over the catalog (coordinator decision D1).
+    _legacy_commands_work(capsys, main_checkout)
+    _legacy_commands_work(capsys, legacy_worktree)
 
 
 def test_a_failed_observation_after_pushing_is_partial_with_the_applied_effects(

@@ -31,6 +31,7 @@ from spec_dock.runtime.application.canonical_errors import (
     LOCK_BUSY_RECOVERY,
     UNSUPPORTED_LAYOUT_RECOVERY,
     CanonicalCommandError,
+    ignore_rules_next_step,
 )
 from spec_dock.runtime.domain.canonical_changeset import Changeset, normalize_catalog_path
 from spec_dock.runtime.domain.canonical_content import FORMAT_FILE, format_writable, read_format
@@ -38,6 +39,7 @@ from spec_dock.runtime.domain.canonical_layout import (
     CANONICAL_BRANCH,
     EXCLUDE_LINES,
     GITIGNORE_LINES,
+    GITIGNORE_PATH,
     CatalogLayout,
     LinkObservation,
     LinkState,
@@ -50,6 +52,7 @@ from spec_dock.runtime.infra.canonical_files import count_entries, observe_link,
 from spec_dock.runtime.infra.catalog_lock import CatalogLock, CatalogLockBusy
 from spec_dock.runtime.infra.catalog_runtime import staging_directory, write_changeset
 from spec_dock.runtime.infra.catalog_tree import CatalogTree
+from spec_dock.runtime.infra.static_assets import package_static_assets
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterator
@@ -99,6 +102,7 @@ class CatalogObservation:
     detail: str | None = None
     registered_exists: bool | None = None
     off_branch: str | None = None
+    unfinished: bool = False
 
     def link_for(self, checkout: Path) -> LinkView:
         return next(view for view in self.links if view.checkout == checkout)
@@ -130,10 +134,11 @@ def observe_catalog(layout: CatalogLayout, environment: RuntimeEnvironment, *, t
         entries=facts.entries,
         links=tuple(links),
         exclude_missing=missing_lines(read_text_file(layout.common_dir / "info/exclude"), EXCLUDE_LINES),
-        gitignore_missing=missing_lines(read_text_file(layout.checkout / "spec-dock/.gitignore"), GITIGNORE_LINES),
+        gitignore_missing=missing_lines(read_text_file(layout.checkout / GITIGNORE_PATH), GITIGNORE_LINES),
         detail=facts.detail,
         registered_exists=facts.registered_exists,
         off_branch=facts.off_branch,
+        unfinished=facts.unfinished,
     )
 
 
@@ -148,6 +153,7 @@ class _CatalogFacts:
     detail: str | None = None
     registered_exists: bool | None = None
     off_branch: str | None = None
+    unfinished: bool = False
 
 
 def _catalog_facts(
@@ -175,6 +181,15 @@ def _catalog_facts(
     if gitdir_visible and not gitdir_ok:
         return _CatalogFacts(
             "occupied", entries=count_entries(catalog), detail=f"{catalog} belongs to another repository ({gitdir})"
+        )
+    if not (admin / "index").is_file():
+        # A git worktree add that timed out (its checkout child may still run) has written no index yet.
+        return _CatalogFacts(
+            "occupied",
+            gitdir=gitdir,
+            entries=count_entries(catalog),
+            unfinished=True,
+            detail=f"Git did not finish creating the catalog {catalog} (it has no index yet)",
         )
     branch = canonical_git.admin_branch(admin)
     if branch != CANONICAL_BRANCH:
@@ -285,7 +300,7 @@ def require_git(environment: RuntimeEnvironment) -> None:
         found = environment.git.reported or "no git on PATH"
         raise CanonicalCommandError(
             CANONICAL_GIT_TOO_OLD,
-            f"canonical mode needs Git 2.38 or later for merge-tree --write-tree; found {found}",
+            f"canonical mode needs Git 2.38 or later; found {found}",
             recovery=(GIT_TOO_OLD_RECOVERY,),
             details={"git": environment.git.path, "version": environment.git.reported},
         )
@@ -298,6 +313,29 @@ def foreign_error(observation: CatalogObservation) -> CanonicalCommandError:
         recovery=(FOREIGN_CHECKOUT_RECOVERY,),
         details={"catalog": str(observation.layout.catalog), "gitdir": str(observation.gitdir)},
     )
+
+
+def gitignore_next_step(layout: CatalogLayout) -> str:
+    """The next step for this checkout's spec-dock/.gitignore lacking the ignore rules (as canonical check gives)."""
+    try:
+        payload: bytes | None = (layout.checkout / GITIGNORE_PATH).read_bytes()
+    except (FileNotFoundError, NotADirectoryError):
+        payload = None
+    return ignore_rules_next_step(package_static_assets(), payload)
+
+
+def occupied_next_step(observation: CatalogObservation) -> str:
+    """The next step for an occupied catalog place; SpecDock never deletes what is there."""
+    catalog = observation.layout.catalog
+    if observation.unfinished:
+        return (
+            f"Make sure no git process still works in {catalog} and that it holds nothing you need, then run "
+            f"git -C {observation.layout.main_checkout} worktree remove --force --force {catalog} "
+            "and spec-dock canonical link."
+        )
+    if observation.off_branch is not None:
+        return f"Switch the catalog back with git -C {catalog} switch spec-dock/canonical, then run spec-dock canonical link."
+    return f"Inspect {catalog} and move its contents aside, then run spec-dock canonical link; SpecDock does not delete it."
 
 
 def require_linked(
@@ -362,7 +400,7 @@ def catalog_changes(
     try:
         try:
             version = read_format((catalog / FORMAT_FILE).read_bytes())
-        except FileNotFoundError:
+        except OSError:  # missing or unreadable, as canonical link and status treat it
             version = None
         if not format_writable(version):
             raise CanonicalCommandError(

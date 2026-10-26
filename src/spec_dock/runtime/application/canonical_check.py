@@ -12,6 +12,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_CHECK_FAILED,
     NOT_MIGRATED_RECOVERY,
     CanonicalCommandError,
+    ignore_rules_next_step,
 )
 from spec_dock.runtime.application.project_context import (
     CANONICAL_WORKSPACE_SCHEMA,
@@ -21,7 +22,7 @@ from spec_dock.runtime.application.project_context import (
     resolve_git_context,
     workspace_mode,
 )
-from spec_dock.runtime.domain.canonical_layout import GITIGNORE_LINES, ignore_rules_state
+from spec_dock.runtime.domain.canonical_layout import GITIGNORE_LINES, GITIGNORE_PATH, ignore_rules_state
 from spec_dock.runtime.infra.commit_tree import list_commit_tree, read_blob, resolve_commit
 from spec_dock.runtime.infra.static_assets import classify_static_digest, package_static_assets
 from spec_dock.runtime.presentation.command_data import FamilyData
@@ -42,7 +43,7 @@ WORKFLOW_DESTINATION: Final = ".github/workflows/spec-dock-check.yml"
 WORKFLOW_BRANCH_LINE: Final = "branches: [main]"
 
 WORKSPACE_DECLARATION: Final = "spec-dock/workspace.json"
-SPEC_DOCK_GITIGNORE: Final = "spec-dock/.gitignore"
+SPEC_DOCK_GITIGNORE: Final = GITIGNORE_PATH
 # Epic design.md chapter 3 "無視の設定", relative to spec-dock/: contract C3's constant and rule (iss-00429).
 SPEC_DOCK_IGNORE_LINES: Final = GITIGNORE_LINES
 SPEC_ROOT: Final = "spec-dock/initiatives"
@@ -74,14 +75,6 @@ _NEWER_SCHEMA_NEXT_STEP: Final = (
 _STATIC_ASSET_NEXT_STEP: Final = (
     "Run spec-dock installation update --target <checkout> --backup-dir <new external directory> --yes "
     "and commit the static files; a modified file needs a manual merge."
-)
-_IGNORE_RULES_UPDATE_NEXT_STEP: Final = (
-    "Run spec-dock installation update --target <checkout> --backup-dir <new external directory> --yes "
-    f"and commit {SPEC_DOCK_GITIGNORE}; the shipped file carries the canonical ignore rules."
-)
-_IGNORE_RULES_MERGE_NEXT_STEP: Final = (
-    f"Merge the shipped {SPEC_DOCK_GITIGNORE} into this modified copy so it ends with these lines in this order, "
-    f"then commit: {', '.join(SPEC_DOCK_IGNORE_LINES)}."
 )
 _VERSION_NEXT_STEP: Final = (
     f"Run the SpecDock version named by {CI_VERSION_FILE}, "
@@ -300,17 +293,11 @@ def _ignore_rules_failure(
     missing, misordered = ignore_rules_state(payload.decode("utf-8", errors="replace"), SPEC_DOCK_IGNORE_LINES)
     if not missing and not misordered:
         return None
-    # A shipped or known older file is replaced by installation update; editing it by hand makes it unknown.
-    asset = next((item for item in assets if item.path == SPEC_DOCK_GITIGNORE), None)
-    shipped = asset is not None and classify_static_digest(asset, hashlib.sha256(payload).hexdigest()) in (
-        "current",
-        "known-old",
-    )
     return _failure(
         IGNORE_RULES_MISSING,
         SPEC_DOCK_GITIGNORE,
         "the canonical ignore rules are missing or out of order",
-        _IGNORE_RULES_UPDATE_NEXT_STEP if shipped else _IGNORE_RULES_MERGE_NEXT_STEP,
+        ignore_rules_next_step(assets, payload),
         missing_lines=list(missing),
         misordered=misordered,
     )

@@ -210,7 +210,7 @@ def catalog_changes(catalog: Path, *, command: str, origin: ChangesetOrigin = "c
 ### 4. カタログに対する Git の呼び出し（C6。`infra/canonical_git.py`）
 
 ```python
-HOOKLESS_CONFIG: Final = ("-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false",
+HOOKLESS_CONFIG: Final = ("-c", "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false", "-c", "push.gpgSign=false",
                            "-c", "core.fsmonitor=false", "-c", "gc.auto=0", "-c", "maintenance.auto=false")
 
 @dataclass(frozen=True)
@@ -240,12 +240,12 @@ def run_catalog_git(cwd: Path, *args: str, git: str = "git", read_only: bool = F
 | `remote_canonical(main)` | `ls-remote --exit-code origin refs/heads/spec-dock/canonical` | 0 は `"present"`、2 は `"absent"`、ほかは `GitProcessError` |
 | `fetch_covers_canonical(main)` | `config --get-all remote.origin.fetch`（読むだけ） | 取得の対象の左辺（`+` を除く）が `refs/heads/spec-dock/canonical` に当たるか（`*` を1つまで） |
 | `add_fetch_branch(main)` | `remote set-branches --add origin spec-dock/canonical` | 浅いクローンなど。重複を除かないので、呼ぶ側が StartLock の中で `fetch_covers_canonical` を確かめ直してから呼ぶ |
-| `fetch_canonical(main)` | `fetch --no-tags origin +refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical` | I-3 の周期と同じ形 |
+| `fetch_canonical(main)` | `fetch --no-tags --no-recurse-submodules origin +refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical` | I-3 の周期と同じ形。mainのサブモジュールは取りに行かない（`submodule.recurse=true` でも。ST-4） |
 | `resolve_commit(main, ref)` | `rev-parse --verify --quiet <ref>^{commit}`（読むだけ） | なければ `None` |
 | `tree_has_path(main, rev, path)` | `ls-tree --name-only <rev> -- <path>`（読むだけ、`pathspecs` なし。`--literal-pathspecs`） | |
 | `is_initial_commit(main, oid)` | `rev-list --parents -n 1`、`ls-tree -z`、`hash-object --stdin`（読むだけ） | 親がなく、ツリーの中身が `CANONICAL_ROOT_FILES`（モード 100644）とちょうど同じ |
 | `create_initial_commit(main)` | `hash-object -w --stdin`、`mktree`、`commit-tree -m "spec-dock: create canonical"` | 参照は作らない。作者は利用者の Git の設定（か、上の作者の環境変数）のとおり |
-| `push_initial(main, oid)` | `push --porcelain origin <oid>:refs/heads/spec-dock/canonical`（強制しない） | `*` と `=` は `"pushed"`、`!` は `"rejected"`（終了コード1） |
+| `push_initial(main, oid)` | `push --porcelain origin <oid>:refs/heads/spec-dock/canonical`（強制しない） | `*` と `=` は `"pushed"`、`!` の行の要約がすべて `[rejected]`（すでにある）なら `"rejected"`（終了コード1）。`[remote rejected]`（サーバーが名前や規則で拒否した）は `GitProcessError`（stderr を保つ。ST-3） |
 | `reset_branch(main, oid, *, expected)` | `update-ref refs/heads/spec-dock/canonical <oid> <expected>` | 手元のブランチが初期のコミットだけで、GitHub のものを使うときだけ。ブランチがまだ `expected`（手元の初期のコミット）のときだけ動かす |
 | `catalog_change_summary(catalog)` | `status --porcelain=v2 -z --untracked-files=all` と `ls-files -z --cached --others --exclude-standard`（読むだけ） | 未保存の数と、追跡しているか未保存の、名前が `*.conflict-*` のパス（同期が保存した別名ファイルも示すため） |
 | `unpushed(catalog)` | `rev-list --count`、`log --reverse --format=%cI`（`origin/spec-dock/canonical..HEAD`、読むだけ） | 取得の参照がなければ `None` |
@@ -307,6 +307,7 @@ class CatalogObservation:
     detail: str | None                            # 止まる理由の説明（パスを含む）
     registered_exists: bool | None                # elsewhere のとき、登録のパスが存在するか
     off_branch: str | None                        # カタログが spec-dock/canonical 以外にいるとき、その名前
+    unfinished: bool                              # 管理ディレクトリに index がない（作りかけ）
     def link_for(self, checkout: Path) -> LinkView
 
 def observe_catalog(layout: CatalogLayout, environment: RuntimeEnvironment, *, timeout: float) -> CatalogObservation
@@ -322,6 +323,7 @@ def observe_catalog(layout: CatalogLayout, environment: RuntimeEnvironment, *, t
 | ない | 登録が、ほかのパス（存在するかどうかによらない） | `elsewhere` | 止まる（`CANONICAL_PATH_OCCUPIED`） |
 | ファイル、シンボリックリンク、`.git` ファイルのないディレクトリ、gitdir の名前の管理ディレクトリ（HEAD のあるもの）が今の共通ディレクトリにない | — | `occupied` | 止まる（`CANONICAL_PATH_OCCUPIED`）。中身を消さない |
 | `.git` の gitdir の先が存在し、今の管理ディレクトリと別の実体（別のリポジトリのworktree） | — | `occupied` | 止まる |
+| 管理ディレクトリに `index` がない（時間切れで止めた `git worktree add` の作りかけ。子の checkout がまだ書いていることもある） | — | `occupied`（`unfinished`） | 止まる。次の1手は「git がそこで動いていないことと、要るものがないことを確かめてから `git -C <main> worktree remove --force --force <カタログ>`、その後 `spec-dock canonical link`」。消す操作は利用者が行う（最終の品質の関門の ST-1。統括の判断 D2） |
 | 管理ディレクトリの HEAD が `spec-dock/canonical` でない（別のブランチ、detached） | — | `occupied`（`off_branch`） | 止まる。次の1手は `git -C <カタログ> switch spec-dock/canonical` |
 | 管理ディレクトリはあるが、`spec-dock/canonical` がほかのパスの登録でもチェックアウトされている | — | `elsewhere` | 止まる |
 | 登録のパスと gitdir の先が、どちらも存在し、カタログと管理ディレクトリと同じ実体（`samefile`。文字列は別名でもよい） | — | `ready` | lock されていなければ lock |
@@ -410,7 +412,7 @@ def main_not_migrated_warning(layout: CatalogLayout) -> Diagnostic
    - 手順の間の観察（観察し直し、最後の確かめ）で `GitProcessError`、`OSError`、`ValueError` が起きたときも、それまでの効果を示した `partial`（効果がなければ `failed`）で返す。効果を隠した失敗にしない。
    - 何もしなかった手順（取得の対象がすでにある、付け替えが要らない）は `unchanged` とする。
    - 書くときに `PermissionError`、または Git の「Operation not permitted」「Permission denied」で拒否されたら（`os.access` が許しても拒否する Linux の Landlock など）、`CANONICAL_SANDBOX_DENIED`（次の1手は権限の確かめと普通の端末）とする。
-8. **ツールの設定**（10章）と、警告：`CANONICAL_TOOL_SETTING_MISSING`、`CANONICAL_TOOL_SETTING_UNKNOWN`、このチェックアウトの `spec-dock/.gitignore` に無視の3行が足りなければ `CANONICAL_IGNORE_RULES_MISSING`（次の1手は `spec-dock installation update`）、`moved` なら `CANONICAL_MAIN_MOVED`、4b なら `CANONICAL_REMOTE_MISSING`、mainのリンクを置かなかったら `CANONICAL_MAIN_NOT_MIGRATED`、カタログの形式が書けなければ `CANONICAL_FORMAT_UNSUPPORTED`（警告。カタログは作る。形式のファイルがないか読めないときの次の1手は「canonical のルートの `.spec-dock-canonical.json` を確かめる」）。
+8. **ツールの設定**（10章）と、警告：`CANONICAL_TOOL_SETTING_MISSING`、`CANONICAL_TOOL_SETTING_UNKNOWN`、このチェックアウトの `spec-dock/.gitignore` に無視の3行が足りなければ `CANONICAL_IGNORE_RULES_MISSING`（`.gitignore` の次の1手は、中身が配布資産の今か変更の前（known-old）のもの、またはファイルがないなら `installation update`、利用者が変えた中身なら「配布資産の `.gitignore` を取り込み、3行をこの順で末尾に置いてコミット」（`installation update` は変えられたファイルを上書きしない。I-7 の `canonical check` と同じ関数 `canonical_errors.ignore_rules_next_step`。最終の品質の関門の ST-5 / SP-5））、`moved` なら `CANONICAL_MAIN_MOVED`、4b なら `CANONICAL_REMOTE_MISSING`、mainのリンクを置かなかったら `CANONICAL_MAIN_NOT_MIGRATED`、カタログの形式が書けなければ `CANONICAL_FORMAT_UNSUPPORTED`（警告。カタログは作る。形式のファイルがないか読めないときの次の1手は「canonical のルートの `.spec-dock-canonical.json` を確かめる」）。
 
 **作るとき**（`absent`。統括の判断 A3、A4）：
 
@@ -508,8 +510,9 @@ class CanonicalStatusData:        # presentation/command_data.py
 | mainの宣言が版4でない（作業用のworktreeから） | `CANONICAL_MAIN_NOT_MIGRATED` | mainで移行後のコミットをチェックアウトしてから `spec-dock canonical link` |
 | `foreign` | `CANONICAL_FOREIGN_CHECKOUT` | 13章の次の1手 |
 | `info/exclude` に行が足りない | `CANONICAL_IGNORE_RULES_MISSING` | `spec-dock canonical link` |
-| `spec-dock/.gitignore` に行が足りない | `CANONICAL_IGNORE_RULES_MISSING` | `spec-dock installation update` |
+| `spec-dock/.gitignore` に行が足りない | `CANONICAL_IGNORE_RULES_MISSING` | 配布資産の今か変更の前の中身、またはファイルがないなら `installation update`、利用者が変えた中身なら手での取り込み（8章の手順8） |
 | 読めない、書けない（サンドボックスの外） | `OS_ACCESS_DENIED` | カタログの権限を確かめる |
+| 書けない（作業用のworktreeの Codex のサンドボックス） | `OS_ACCESS_DENIED` | `tools` の項目が示す1行（`data.tools.codex.line`）を Codex の設定に足す（SP-4） |
 | ツールの設定 | `CANONICAL_TOOL_SETTING_MISSING`、`CANONICAL_TOOL_SETTING_UNKNOWN` | 10章の1行 |
 | 形式 | `CANONICAL_FORMAT_UNSUPPORTED` | 形式が新しければ SpecDock を更新する。形式のファイルがないか読めなければ、canonical のルートを確かめる |
 | git が古い、ない | `CANONICAL_GIT_TOO_OLD` | Git 2.38 以上を入れ、`spec-dock canonical link` |
@@ -544,7 +547,7 @@ class CanonicalStatusData:        # presentation/command_data.py
 | `START_LOCK_BUSY` | エラー（`canonical link`）、警告（`link_after_command`） | 3 | クローンの StartLock が取れない | `Wait a moment, then run spec-dock canonical link again.` |
 | `CANONICAL_TOOL_SETTING_MISSING` | 警告 | — | ツールの1行が足りない | 10章の1行（ファイル、節、行） |
 | `CANONICAL_TOOL_SETTING_UNKNOWN` | 警告 | — | Claude Code の設定を判定できない | `Check that <file> lists the catalog in permissions.additionalDirectories.` |
-| `CANONICAL_IGNORE_RULES_MISSING` | 警告、問題 | — | 無視の3行が足りない | `info/exclude`：`spec-dock canonical link`、`.gitignore`：`spec-dock installation update` |
+| `CANONICAL_IGNORE_RULES_MISSING` | 警告、問題 | — | 無視の3行が足りない | `info/exclude`：`spec-dock canonical link`、`.gitignore`：中身が配布資産のものかないなら `installation update`、利用者が変えたものなら手での取り込み |
 | `CANONICAL_MAIN_MOVED` | 警告 | — | mainの移動を `repair` で直した | `Git may also have reconnected the linked worktrees; run spec-dock canonical link in each linked worktree (for a worktree that also moved, first run git worktree repair <path> in the main checkout).` |
 | `CANONICAL_MAIN_NOT_MIGRATED` | 警告、問題 | — | 作業用のworktreeから実行し、mainの宣言が版4でない（統括の判断 C6） | `Check out a migrated commit (workspace schema 4) in the main checkout, then run spec-dock canonical link there.` |
 | `CANONICAL_CHECKOUT_NOT_MIGRATED` | 警告 | — | `link_after_command` の対象のworktreeの宣言が版4でない | `Base the worktree on a commit that declares workspace schema 4, then run spec-dock canonical link in it.` |
@@ -602,6 +605,7 @@ class CanonicalStatusData:        # presentation/command_data.py
 ## 移行・互換性・rollback
 
 - **版3のリポジトリ**：`canonical link` と `canonical status` は、I-1 の振り分けで `CANONICAL_NOT_MIGRATED` になる。`worktree create` は今の処理のまま（`CANONICAL_HANDLERS` は版4でだけ使う）。配布資産の `.gitignore` の3行は、実体の `spec-dock/initiatives/` の中の新しいファイルを無視しない（Epic の3章、確認済み）ので、`installation update` で入れても従来モードは壊れない。版3の利用側の `.gitignore` は、`known_old_sha256` に前の中身があるので、`installation show` で `known-old`、`installation update` で新しい中身になる。
+- **従来のコードの、統括が認めた1つの例外**（統括の判断 D1。AC-15）：`application/worktree_observation.observe_worktrees` は、Git の一覧で `spec-dock/canonical` をチェックアウトし、ルートに `.spec-dock-canonical.json` がある worktree（カタログ。C1 の `inside_catalog` と同じ条件）を飛ばす。宣言のないカタログが `unavailable` になり、版3のコミットにいるmainや、版3の作業用のworktreeで、従来の `work start` と `workspace sync` が止まるのを防ぐため（I-10 の切り替えの間と、その後も版3のworktreeが残る）。カタログのない版3のリポジトリでは、振る舞いは変わらない。
 - **版4のリポジトリ**：この Issue の後、`canonical link`、`canonical status`、`worktree create`、`installation`、`workspace migrate` のほかは、まだ `CANONICAL_NOT_IMPLEMENTED` で止まる。版4のリポジトリは、I-10 まで本物には存在しない。
 - **rollback**：PRを `git revert` すれば戻る。版3のリポジトリでは、カタログもリンクも作られない。テストのカタログは一時ディレクトリにある。後の Issue（I-3、I-4、I-5）がマージされた後は、部品を使っているので、forward recovery（この部品を直す PR）にする。
 
@@ -612,7 +616,7 @@ class CanonicalStatusData:        # presentation/command_data.py
 | 置き場 | 中身 |
 |---|---|
 | `tests/unit/domain/test_canonical_layout.py`、`test_canonical_content.py`、`test_canonical_changeset.py`、`test_canonical_tools.py` | 純粋な規則 |
-| `tests/unit/infra/test_canonical_git.py` | C6 の関数（引数の形、環境、`--no-optional-locks`、`pathspecs`、終了コード、時間切れ）、各操作。フック（必ず失敗する `post-checkout`、`pre-push`）と `commit.gpgSign=true` |
+| `tests/unit/infra/test_canonical_git.py` | C6 の関数（引数の形、環境、`--no-optional-locks`、`pathspecs`、終了コード、時間切れ）、各操作。フック（必ず失敗する `post-checkout`、`pre-push`）と `commit.gpgSign=true`、`push.gpgSign=true`、サーバーの `[remote rejected]`、届かないサブモジュールと `submodule.recurse=true` |
 | `tests/unit/infra/test_catalog_lock.py`、`test_catalog_runtime.py`、`test_catalog_tree.py`、`test_runtime_environment.py`、`test_canonical_files.py` | 排他（別のプロセスで持つ）、変更の束の原子的な書き込み、名前で探す、環境の判定（印、git の版の注入）、リンクと除外 |
 | `tests/unit/application/test_canonical_catalog.py` | `resolve_layout`、`observe_catalog` の状態の表、`require_linked`、`catalog_changes` |
 | `tests/cli_runtime/test_issue429_canonical_link.py` | AC-429-01〜05、07〜13、16、18〜20 の CLI のテスト |

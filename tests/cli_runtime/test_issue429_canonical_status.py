@@ -145,10 +145,25 @@ def test_a_missing_gitignore_rule_points_to_installation_update(
     code, result = run(capsys, checkout, "canonical", "link")
     assert code == 0
     (warning,) = [item for item in result["warnings"] if item["code"] == "CANONICAL_IGNORE_RULES_MISSING"]
-    assert warning["details"]["next_step"] == "spec-dock installation update"
+    assert "spec-dock installation update" in warning["details"]["next_step"]
     code, status = run(capsys, checkout, "canonical", "status")
     assert status["data"]["exclude"]["gitignore"]["missing"] == ["/.canonical/", "/initiatives", "!/initiatives/"]
     assert status["data"]["exclude"]["info_exclude"]["missing"] == []
+    assert "spec-dock installation update" in status["data"]["exclude"]["next_step"]
+
+
+def test_a_modified_gitignore_without_the_rules_points_to_a_manual_merge(
+    capsys: pytest.CaptureFixture[str], tmp_path: Path
+) -> None:
+    # installation update does not overwrite a modified file, so the same next step as canonical check is shown.
+    remote = bare_remote(tmp_path / "modified.git", gitignore=False, files={"spec-dock/.gitignore": b"*.log\n"})
+    checkout = clone(remote, tmp_path / "modified")
+    code, result = run(capsys, checkout, "canonical", "link")
+    assert code == 0
+    (warning,) = [item for item in result["warnings"] if item["code"] == "CANONICAL_IGNORE_RULES_MISSING"]
+    assert "Merge the shipped spec-dock/.gitignore" in warning["details"]["next_step"]
+    code, status = run(capsys, checkout, "canonical", "status")
+    assert "Merge the shipped spec-dock/.gitignore" in status["data"]["exclude"]["next_step"]
 
 
 def test_the_text_output_shows_each_next_step(capsys: pytest.CaptureFixture[str], remote: Path, tmp_path: Path) -> None:
@@ -180,6 +195,9 @@ def test_in_a_codex_sandbox_status_shows_the_exact_writable_roots_line(
     assert warning["code"] == "CANONICAL_TOOL_SETTING_MISSING" and line in warning["message"]
     assert warning["details"]["section"] == "[sandbox_workspace_write]"
     assert result["data"]["access"]["writable"] is False
+    # Every problem item has its warning (design ch. 10); the access one points at the tools line.
+    (access,) = [item for item in result["warnings"] if item["details"].get("item") == "access"]
+    assert access["code"] == "OS_ACCESS_DENIED" and "tools item" in access["details"]["next_step"]
 
 
 @needs_permissions
@@ -287,6 +305,20 @@ def test_a_newer_canonical_format_is_reported(
     assert [item["code"] for item in result["warnings"]] == ["CANONICAL_FORMAT_UNSUPPORTED"]
     code, linked_result = run(capsys, main_checkout, "canonical", "link")
     assert code == 0 and [item["code"] for item in linked_result["warnings"]] == ["CANONICAL_FORMAT_UNSUPPORTED"]
+
+
+def test_a_missing_canonical_format_file_is_reported_by_status_and_link(
+    capsys: pytest.CaptureFixture[str], linked_clone: tuple[Path, Path]
+) -> None:
+    main_checkout, _linked = linked_clone
+    (main_checkout / "spec-dock/.canonical/.spec-dock-canonical.json").unlink()
+    code, result = run(capsys, main_checkout, "canonical", "status")
+    assert code == 0 and result["data"]["format"]["status"] == "problem"
+    assert result["data"]["format"]["version"] is None and result["data"]["format"]["writable"] is False
+    assert [item["code"] for item in result["warnings"]] == ["CANONICAL_FORMAT_UNSUPPORTED"]
+    code, linked_result = run(capsys, main_checkout, "canonical", "link")
+    assert code == 0 and [item["code"] for item in linked_result["warnings"]] == ["CANONICAL_FORMAT_UNSUPPORTED"]
+    assert linked_result["warnings"][0]["details"]["next_step"] == result["warnings"][0]["details"]["next_step"]
 
 
 def test_an_old_git_is_reported_without_failing(

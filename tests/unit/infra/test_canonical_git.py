@@ -58,6 +58,8 @@ def test_every_call_disables_hooks_and_signing_and_drops_inherited_git_variables
         "-c",
         "commit.gpgSign=false",
         "-c",
+        "push.gpgSign=false",
+        "-c",
         "core.fsmonitor=false",
         "-c",
         "gc.auto=0",
@@ -189,6 +191,28 @@ def test_an_identical_initial_commit_from_the_same_identity_counts_as_pushed(rep
     first = cg.create_initial_commit(repo)
     assert cg.push_initial(repo, first) == "pushed"
     assert cg.push_initial(repo, first) == "pushed"
+
+
+def test_a_ref_the_remote_refuses_is_a_failure_not_a_canonical_created_first(repo: Path) -> None:
+    # A branch named spec-dock on GitHub makes spec-dock/canonical impossible ([remote rejected], not [rejected]).
+    git(repo, "push", "-q", "origin", "HEAD:refs/heads/spec-dock")
+    with pytest.raises(GitProcessError) as raised:
+        cg.push_initial(repo, cg.create_initial_commit(repo))
+    assert b"spec-dock" in raised.value.stderr + (raised.value.stdout or b"")
+
+
+def test_fetching_the_canonical_does_not_recurse_into_submodules(repo: Path, tmp_path: Path) -> None:
+    library = tmp_path / "library"
+    git(tmp_path, "init", "-q", "-b", "main", str(library))
+    git(library, "-c", "user.name=F", "-c", "user.email=f@example.invalid", "commit", "-q", "--allow-empty", "-m", "x")
+    git(repo, "-c", "protocol.file.allow=always", "submodule", "add", "-q", str(library), "library")
+    git(repo, "commit", "-qm", "submodule")
+    git(repo / "library", "remote", "set-url", "origin", str(tmp_path / "unreachable"))
+    git(repo, "config", "submodule.recurse", "true")
+    oid = cg.create_initial_commit(repo)
+    cg.push_initial(repo, oid)
+    cg.fetch_canonical(repo)
+    assert cg.resolve_commit(repo, "refs/remotes/origin/spec-dock/canonical") == oid
 
 
 def test_fetch_coverage_follows_the_configured_refspecs(repo: Path, tmp_path: Path) -> None:

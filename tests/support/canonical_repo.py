@@ -12,6 +12,7 @@ from pathlib import Path
 import subprocess
 from typing import TYPE_CHECKING
 
+from spec_dock.runtime.infra.canonical_git import PASSED_GIT_VARIABLES
 from spec_dock.runtime.infra.runtime_environment import GitInstallation, RuntimeEnvironment
 
 if TYPE_CHECKING:
@@ -117,5 +118,8 @@ def isolate_user_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
     for key in ("CODEX_SANDBOX", "CLAUDECODE", "container", "REMOTE_CONTAINERS", "CODESPACES"):
+        monkeypatch.delenv(key, raising=False)
+    # The identity and transport variables SpecDock passes to Git would otherwise reach the fixtures from CI.
+    for key in PASSED_GIT_VARIABLES:
         monkeypatch.delenv(key, raising=False)
     return home

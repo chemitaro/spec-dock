@@ -21,6 +21,7 @@ CATALOG_LOCK_REASON: Final = "spec-dock canonical catalog"
 # Ignore only a symlinked spec-dock/initiatives; a real directory's new files stay visible (Epic design ch. 3).
 EXCLUDE_LINES: Final = ("/spec-dock/.canonical/", "/spec-dock/initiatives", "!/spec-dock/initiatives/")
 GITIGNORE_LINES: Final = ("/.canonical/", "/initiatives", "!/initiatives/")
+GITIGNORE_PATH: Final = "spec-dock/.gitignore"  # where GITIGNORE_LINES apply, from the checkout root
 EXCLUDE_NOTE: Final = "# spec-dock canonical catalog and link (added by spec-dock canonical link)"
 MINIMUM_GIT_VERSION: Final = (2, 38, 0)
 

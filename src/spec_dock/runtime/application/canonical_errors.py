@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import hashlib
 from typing import TYPE_CHECKING, Final
 
+from spec_dock.runtime.domain.canonical_layout import GITIGNORE_LINES, GITIGNORE_PATH
 from spec_dock.runtime.infra.github_structure import (
     GITHUB_ACCESS_DENIED,
     GITHUB_CREATE_IDENTITY_UNKNOWN,
@@ -13,13 +15,15 @@ from spec_dock.runtime.infra.github_structure import (
     GITHUB_RESPONSE_INVALID,
     GITHUB_UNAVAILABLE,
 )
+from spec_dock.runtime.infra.static_assets import classify_static_digest
 from spec_dock.runtime.presentation.command_data import DiagnosticData
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, OperationResult, RecoveryInstructions
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Mapping, Sequence
 
     from spec_dock.runtime.infra.github_structure import GithubStructureError
+    from spec_dock.runtime.infra.static_assets import StaticAsset
 
 CANONICAL_NOT_IMPLEMENTED: Final = "CANONICAL_NOT_IMPLEMENTED"
 CANONICAL_NOT_MIGRATED: Final = "CANONICAL_NOT_MIGRATED"
@@ -93,7 +97,14 @@ LINK_NETWORK_RECOVERY: Final = (
 GIT_IDENTITY_RECOVERY: Final = (
     "Set the Git identity (git config user.name and user.email), then run spec-dock canonical link again."
 )
-INSTALLATION_UPDATE_RECOVERY: Final = "spec-dock installation update"
+IGNORE_RULES_UPDATE_NEXT_STEP: Final = (
+    "Run spec-dock installation update --target <checkout> --backup-dir <new external directory> --yes "
+    f"and commit {GITIGNORE_PATH}; the shipped file carries the canonical ignore rules."
+)
+IGNORE_RULES_MERGE_NEXT_STEP: Final = (
+    f"Merge the shipped {GITIGNORE_PATH} into this modified copy so it ends with these lines in this order, "
+    f"then commit: {', '.join(GITIGNORE_LINES)}."
+)
 MAIN_MOVED_NEXT_STEP: Final = (
     "Git may also have reconnected the linked worktrees; run spec-dock canonical link in each linked worktree "
     "(for a worktree that also moved, first run git worktree repair <path> in the main checkout)."
@@ -205,3 +216,12 @@ def github_error_result(command: str, error: GithubStructureError) -> OperationR
     return OperationResult(
         command, "failed", DiagnosticData(), 5, error=diagnostic, recovery=RecoveryInstructions((recovery,))
     )
+
+
+def ignore_rules_next_step(assets: Sequence[StaticAsset], payload: bytes | None) -> str:
+    """installation update replaces a missing or shipped (current or older) file; it never overwrites a modified one."""
+    asset = next((item for item in assets if item.path == GITIGNORE_PATH), None)
+    digest = None if payload is None else hashlib.sha256(payload).hexdigest()
+    if asset is not None and classify_static_digest(asset, digest) in ("missing", "current", "known-old"):
+        return IGNORE_RULES_UPDATE_NEXT_STEP
+    return IGNORE_RULES_MERGE_NEXT_STEP

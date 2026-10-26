@@ -11,7 +11,13 @@ from pathlib import Path
 import stat
 from typing import TYPE_CHECKING, Protocol
 
-from spec_dock.runtime.application.canonical_catalog import CatalogObservation, observe_catalog, resolve_layout
+from spec_dock.runtime.application.canonical_catalog import (
+    CatalogObservation,
+    gitignore_next_step,
+    observe_catalog,
+    occupied_next_step,
+    resolve_layout,
+)
 from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_FOREIGN_CHECKOUT,
     CANONICAL_FORMAT_UNSUPPORTED,
@@ -26,7 +32,6 @@ from spec_dock.runtime.application.canonical_errors import (
     FORMAT_MISSING_RECOVERY,
     FORMAT_UNSUPPORTED_RECOVERY,
     GIT_TOO_OLD_RECOVERY,
-    INSTALLATION_UPDATE_RECOVERY,
     MAIN_NOT_MIGRATED_NEXT_STEP,
     OS_ACCESS_DENIED,
 )
@@ -38,7 +43,7 @@ from spec_dock.runtime.application.canonical_link import (
 from spec_dock.runtime.application.canonical_tools_check import tool_findings
 from spec_dock.runtime.application.project_context import probe_workspace_mode
 from spec_dock.runtime.domain.canonical_content import CANONICAL_FORMAT, FORMAT_FILE, format_writable, read_format
-from spec_dock.runtime.domain.canonical_layout import MINIMUM_GIT_VERSION
+from spec_dock.runtime.domain.canonical_layout import GITIGNORE_PATH, MINIMUM_GIT_VERSION
 from spec_dock.runtime.infra import canonical_git, runtime_environment
 from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.presentation.command_data import CanonicalStatusData
@@ -195,10 +200,8 @@ def _catalog_item(layout: CatalogLayout, observation: CatalogObservation | None,
         if state == "elsewhere":
             registered_path = registered.path if registered is not None else None
             step = elsewhere_next_step(registered_path, exists=bool(observation.registered_exists))
-        elif observation.off_branch is not None:
-            step = f"Switch the catalog back with git -C {catalog} switch spec-dock/canonical, then run spec-dock canonical link."
         else:
-            step = f"Inspect {catalog} and move its contents aside, then run spec-dock canonical link; SpecDock does not delete it."
+            step = occupied_next_step(observation)
         item["next_step"] = problem("catalog", CANONICAL_PATH_OCCUPIED, message, step, path=str(catalog))
     else:
         reasons = {
@@ -277,7 +280,7 @@ def _link_item(observation: CatalogObservation | None, problem: Problem, *, main
 
 def _exclude_item(layout: CatalogLayout, observation: CatalogObservation | None, problem: Problem) -> dict[str, object]:
     exclude_path = layout.common_dir / "info/exclude"
-    gitignore_path = layout.checkout / "spec-dock/.gitignore"
+    gitignore_path = layout.checkout / GITIGNORE_PATH
     if observation is None:
         return {
             "status": "unknown",
@@ -305,7 +308,7 @@ def _exclude_item(layout: CatalogLayout, observation: CatalogObservation | None,
             "exclude",
             CANONICAL_IGNORE_RULES_MISSING,
             f"{gitignore_path} lacks {', '.join(observation.gitignore_missing)}",
-            INSTALLATION_UPDATE_RECOVERY,
+            gitignore_next_step(layout),
         )
         item["next_step"] = item["next_step"] or step
     return item
@@ -331,7 +334,12 @@ def _access_item(
         )
     elif not writable:
         item["status"] = "problem"
-        item["next_step"] = "See the tools item for the one setting line."
+        item["next_step"] = problem(
+            "access",
+            OS_ACCESS_DENIED,
+            f"this sandbox cannot write {catalog}",
+            "Add the one setting line shown by the tools item (data.tools.codex.line) to the Codex configuration.",
+        )
     return item
 
 

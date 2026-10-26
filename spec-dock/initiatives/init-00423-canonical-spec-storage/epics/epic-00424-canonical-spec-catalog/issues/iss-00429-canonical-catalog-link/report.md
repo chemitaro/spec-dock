@@ -21,6 +21,7 @@ Epic の I-2 として、`spec-dock canonical link` と `spec-dock canonical sta
 - **ほかのコマンドから**：canonical モードの `worktree create` が、今の作成の処理の後にリンクの手順を行う。同じ手順を `link_after_command` として公開した（I-5 の `work start` が使う）。リンクの失敗は、呼ぶ側の結果を変えずに警告と次の1手で返す。
 - **後の Issue の部品**：`require_linked`（`CANONICAL_NOT_LINKED`、`CANONICAL_FOREIGN_CHECKOUT`）、名前で Scope を探す `CatalogTree`、カタログの排他 `CatalogLock` と書く部品 `catalog_changes`（変更の束の版1）、canonical の中身 `CANONICAL_ROOT_FILES`、カタログに対する Git の1つの関数 `run_catalog_git`（フック、署名、fsmonitor、自動の gc を外す）、環境の判定 `RuntimeEnvironment`。
 - **統括の判断で足したもの**：`spec-dock/initiatives/` の中から実行したときの `CANONICAL_INSIDE_CATALOG`、mainが版3のときにmainのリンクを置かない `CANONICAL_MAIN_NOT_MIGRATED`、移動の判定を実体で比べること（`plan.md` の「統括の判断」）。
+- **従来のコードの1つの例外**（統括の判断 D1）：従来の `observe_worktrees` が、カタログのworktreeを飛ばす。版3のコミットにいるmainや版3の作業用のworktreeで、カタログがあっても従来の `work start` と `workspace sync` が動く。カタログのない版3のリポジトリでは、振る舞いは変わらない。
 - **配布資産**：`spec-dock/.gitignore` に無視の3行（`/.canonical/`、`/initiatives`、`!/initiatives/`）、`docs/reference_cli.md` に2つのコマンドの行（`C46 canonical link`、`C47 canonical status`。公開のコマンドは47個）、`static-inventory.json` の `sha256` と、変更の前の中身を `known_old_sha256` に足した。利用側の `spec-dock/` は変えていない（I-9、I-10）。
 - **main の取り込み**（統括の指示 msg_8f0e0917a295）：`origin/main`（`e456dfc8b`。I-7 の #444 と Epic の文書の #443）を merge で取り込んだ。I-7 の `canonical check` の無視の3行を C3 の定数 `GITIGNORE_LINES` そのものにし、行と順の判定を domain の `ignore_rules_state` 1つにそろえた。順の規則は I-7 の意味（否定の行がその前の行より後ろ）にゆるめた。`IGNORE_RULES_MISSING` の次の1手は、配布資産の今か変更の前の中身なら `installation update`、利用者が変えた中身なら手での取り込みにした（`plan.md` の「main の取り込み」）。
 - 実現しなかったこと：なし（I-2 の範囲で）。手順6と7、`--no-schedule`、同期の項目は計画どおり I-3 の担当である。
@@ -48,4 +49,9 @@ Epic の I-2 として、`spec-dock canonical link` と `spec-dock canonical sta
 - Linux の Codex のサンドボックス（Landlock）では `os.access` が拒否を返さないおそれがある。その場合も、書くときの拒否を `CANONICAL_SANDBOX_DENIED` と次の1手で示すようにした。
 - I-3 への引き渡し：`plan.md` の「exit / handoff」のとおり（手順6と7、`schedule` の引数、`sync_item` と `snapshot_item` の置き換え、10分の未pushの警告）。
 - I-9 への申し送り：`worktree create` のヘルプと参照の文書に、canonical モードでリンクを置くことを書く。配布資産の `docs/cli-redesign-guide.html`（と利用側の写し）の「全44コマンド」と一覧が、47個（I-7 の `canonical check` と、この Issue の2つ）に追いついていない。
-- `canonical link` と `canonical status` の `IGNORE_RULES_MISSING`（`spec-dock/.gitignore`）の次の1手は、設計どおり常に `installation update` である。I-7 の `canonical check` は、利用者が変えた `.gitignore` に手での取り込みを示す。そろえるかは I-9 の文書の整理で判断できる（この Issue の設計の範囲外のため変えていない）。
+- 最終の品質の関門のレビューからの申し送り（統括の判断 D4。`plan.md` の対応の表）：
+  - ST-2：mainが sparse-checkout だと、`git worktree add` がその設定をカタログに写し、仕様の一部が見えない（status も気づかない）。共有の設定を書き換えずに直す方法の検討が要る。
+  - ST-6：`info/exclude` がシンボリックリンクのとき、追記がリンクを普通のファイルに置き換える（リンクの先の中身は残る）。
+  - ST-9（I-9）：`canonical link` のヘルプと参照の文書の「書くもの」に、`.git/config` への取得の対象の追加（`remote set-branches`）と、手元のブランチの付け替え（`update-ref`）がない。
+  - ST-12：Claude Code の設定の判定が `CLAUDE_CONFIG_DIR` を見ないので、そこに設定を置く利用者には誤った `CANONICAL_TOOL_SETTING_MISSING` が出る。
+  - ST-13：C6 は `GIT_ASKPASS` を通さないので、askpass で HTTPS の認証をしている端末（VS Code など）では、カタログの push と fetch が失敗しうる（C6 のとおりの動き。I-9 の文書の制約として扱うかは統括が決める）。

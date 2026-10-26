@@ -162,7 +162,7 @@ def test_require_linked_returns_the_catalog_tree_through_a_correct_link(main: Pa
     assert linked.catalog == catalog and linked.tree.require("init-00007").path == catalog / "init-00007-plan"
 
 
-@pytest.mark.parametrize("damage", ["no-link", "wrong-link", "no-catalog"])
+@pytest.mark.parametrize("damage", ["no-link", "wrong-link", "no-catalog", "unfinished-checkout"])
 def test_require_linked_refuses_without_writing(main: Path, damage: str) -> None:
     catalog = _catalog(main)
     link = main / "spec-dock/initiatives"
@@ -171,6 +171,10 @@ def test_require_linked_refuses_without_writing(main: Path, damage: str) -> None
     elif damage == "wrong-link":
         link.unlink()
         link.symlink_to(str(catalog))
+    elif damage == "unfinished-checkout":
+        admin = cg.read_gitdir(catalog)
+        assert admin is not None
+        (admin / "index").unlink()  # a timed-out git worktree add: a sync must not see every file as deleted
     else:
         shutil.rmtree(catalog)
     before = tree_digest(main)
@@ -222,13 +226,17 @@ def test_catalog_changes_records_what_was_written_before_an_error(main: Path) ->
     assert nothing.written is None
 
 
-@pytest.mark.parametrize("payload", [b'{"format": 2}\n', b"broken", None])
-def test_catalog_changes_refuses_an_unknown_format_before_writing(main: Path, payload: bytes | None) -> None:
+@pytest.mark.parametrize("payload", [b'{"format": 2}\n', b"broken", None, "directory"])
+def test_catalog_changes_refuses_an_unknown_format_before_writing(main: Path, payload: bytes | str | None) -> None:
     catalog = _catalog(main)
     marker = catalog / ".spec-dock-canonical.json"
     if payload is None:
         marker.unlink()
+    elif payload == "directory":
+        marker.unlink()
+        marker.mkdir()  # unreadable as a file (IsADirectoryError), like a permission failure
     else:
+        assert isinstance(payload, bytes)
         marker.write_bytes(payload)
     with pytest.raises(CanonicalCommandError) as raised, catalog_changes(catalog, command="scope create") as changes:
         changes.add("init-00001-plan")
