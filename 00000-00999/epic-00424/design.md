@@ -356,6 +356,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
    - `<main>/spec-dock/.canonical` に `.git` ファイルのあるディレクトリがあるが、登録のパスが違う、または登録が壊れている（mainのチェックアウトを移動した後など）ときは、`git worktree repair <カタログ>` で直す。ディレクトリがあるときに `prune` してはならない。git の `repair` は、このとき、ほかの作業用のworktreeから mainへのつながりも直すことがある（`effects` とメッセージに書く）。SpecDock がほかのworktreeを直すことはせず、警告 `CANONICAL_MAIN_MOVED` を返す（I-2 の統括の判断）。
    - `spec-dock/canonical` が、`<main>/spec-dock/.canonical` ではないパスの登録でチェックアウトされているときは、何も書かずに `CANONICAL_PATH_OCCUPIED`（その登録のパス）で止まる。そのパスが存在するときも、存在しない（登録だけが残っている）ときも同じである。
    - 登録はあるがディレクトリがない（`git clean -ffdx` の後など）ときは、`git worktree add -f -f <カタログ> spec-dock/canonical` で同じ場所に作り直し、lock する（lock された消えたパスに作るには `--force` を2回付ける。git の文書）。`-f -f` は、`spec-dock/canonical` をチェックアウトしている登録がちょうど1つで、そのパスがカタログの場所のときだけ使う。`git worktree prune` は、クローン全体の消えた登録（外れた外付けのボリュームのworktreeなど）を選ばずに消すので、SpecDock は実行しない（I-2 の統括の判断。Git 2.54.0 で確認）。
+   - **作りかけのカタログ**：`<共通ディレクトリ>/worktrees/<名前>/` に `index` がないカタログは、`git worktree add` が途中で止まったもの（時間切れで止めても、git の子プロセスが書き続けることがある）として扱う。完成したカタログと判定してはならない（同期が大量の削除を保存するおそれがあるため）。`canonical link` は書く前に、`canonical status` と `require_linked` も、`CANONICAL_PATH_OCCUPIED` で止まる。次の1手は「そこで git が動いていないことと、要るものがないことを確かめてから、`git -C <main> worktree remove --force --force <カタログ>`。その後で `spec-dock canonical link`」とし、消す操作は利用者が行う（I-2 の統括の判断）。別の `canonical link` が作っている最中（`index.lock` があるなど）は、先に「しばらく待って同じコマンドを実行する」を示す（I-3 が直す。I-2 の報告書の RST-1）。
    - 作るときは、まず `git ls-remote --exit-code origin refs/heads/spec-dock/canonical` で GitHub に canonical があるかを確かめる。終了コード2なら「ない」、0なら「ある」、それ以外は接続の失敗として止まる（`GITHUB_UNAVAILABLE`）。ある場合は、取得の対象にこのブランチが入っていない浅いクローンでは `git remote set-branches --add origin spec-dock/canonical` を行ってから `git fetch origin spec-dock/canonical` を行う。ローカルのブランチがなければ `git worktree add --track -b spec-dock/canonical <カタログ> origin/spec-dock/canonical`、あれば `git worktree add <カタログ> spec-dock/canonical` とする。最後に `git worktree lock --reason "spec-dock canonical catalog" <カタログ>` を行う。
    - GitHub に canonical がなく、既定のブランチの HEAD のツリーに `spec-dock/initiatives` がないとき（新しいリポジトリ）は、5章の「canonical の中身」の管理ファイルだけを持つ、親のないコミットを作って push する。push が先に進まれて拒否されたら（別のPCが同時に作った）、手元で作ったブランチを捨て、GitHub のものを取得して使う。
    - GitHub に canonical がなく、既定のブランチ（`origin/HEAD`、なければ mainのチェックアウトの HEAD）のツリーに `spec-dock/initiatives` があるとき（移行していない）は、何も書かずに `CANONICAL_NOT_MIGRATED` で止まり、移行の手順書を示す（I-2 の統括の判断）。
@@ -562,7 +563,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 #### カタログに対する Git の呼び出し
 
 - 定期の同期、`canonical link`、`canonical restore`、`canonical remove` が、カタログに対して実行するすべての Git のコマンドに、`-c core.hooksPath=/dev/null -c commit.gpgSign=false` を付ける。`worktree add` の post-checkout、`merge --ff-only` の post-merge、push の pre-push などのフックを動かさないためと、署名の確認の待ちで定期の実行が止まらないようにするためである（R-C1。調査の記録：退去費用の `pre-commit` はカタログでも動いて失敗する）。
-  - さらに、`-c core.fsmonitor=false`（fsmonitor のフックを動かさない）と、`-c gc.auto=0 -c maintenance.auto=false`（fetch が誘発する gc が、worktree の登録を prune しないようにする。3章の「SpecDock は prune しない」を守るため）を付ける（I-2 の統括の判断）。この関数は I-2 が置き、I-3 と I-5 はそのまま使う（C6）。
+  - さらに、`-c core.fsmonitor=false`（fsmonitor のフックを動かさない）と、`-c gc.auto=0 -c maintenance.auto=false`（fetch が誘発する gc が、worktree の登録を prune しないようにする。3章の「SpecDock は prune しない」を守るため）を付ける（I-2 の統括の判断）。push の署名も外す（`-c push.gpgSign=false`）。fetch には `--no-recurse-submodules` を付ける（I-2 の最終品質ゲートの指摘）。この関数は I-2 が置き、I-3 と I-5 はそのまま使う（C6）。
 - パスを渡すときは、`--literal-pathspecs` を付け、`--pathspec-from-file=<一時ファイル> --pathspec-file-nul` で渡す。
 - この付け方は、1つの関数に集め、ほかの経路で Git を呼ばない。
 
@@ -1025,6 +1026,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
 ### 移行の間（I-1〜I-12）、変えないもの
 
 - 従来モードの処理と、`.meta.json` の読み書きのコード（R-A6）。撤去（14章、I-13）で消す。
+  - 例外（I-2 の統括の判断。この1か所だけ）：従来の `application/worktree_observation.observe_worktrees` は、`spec-dock/canonical` をチェックアウトし、ルートに `.spec-dock-canonical.json` がある worktree（カタログ）を観測から外す。切り替えの間とその後の運用で、同じクローンに版3の worktree が残っていても、従来の `work start` と `workspace sync` がカタログの宣言のなさで止まらないようにするためである。カタログのない版3のリポジトリでは、振る舞いは変わらない。
 - テンプレートの配布資産の中身（6章）。撤去で、前付けの2行を外す。
 
 ### いつも変えないもの
