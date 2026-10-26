@@ -1,7 +1,9 @@
 """`spec-dock canonical status`: read the catalog, links, ignore rules, access and tool settings (R-B7).
 
-It writes nothing anywhere and never contacts GitHub or the remote. Items owned by later Issues are present
-with status "not_implemented": sync and snapshot (iss-00430), dashboard (iss-00438), structure (iss-00431).
+It writes nothing in the repository, the catalog, .git or GitHub and never contacts the remote. Only with
+--structure does it read GitHub's structure at display freshness, which may refresh the structure snapshot. Items owned by later Issues are present
+with status "not_implemented": sync and snapshot (iss-00430), dashboard (iss-00438). `structure` reads GitHub
+only with --structure (iss-00431); otherwise it is "not_checked".
 """
 
 from __future__ import annotations
@@ -72,11 +74,24 @@ def _not_implemented(owner: str) -> dict[str, object]:
 
 def run_canonical_status(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     environment = runtime_environment.detect_runtime_environment()
-    return status_of(context, environment, command=namespace.command_path, timeout=namespace.timeout)
+    return status_of(
+        context,
+        environment,
+        command=namespace.command_path,
+        timeout=namespace.timeout,
+        structure=bool(getattr(namespace, "structure", False)),
+        offline=bool(getattr(namespace, "offline", False)),
+    )
 
 
 def status_of(
-    context: ProjectContext, environment: RuntimeEnvironment, *, command: str, timeout: float
+    context: ProjectContext,
+    environment: RuntimeEnvironment,
+    *,
+    command: str,
+    timeout: float,
+    structure: bool = False,
+    offline: bool = False,
 ) -> OperationResult[object]:
     layout = resolve_layout(context)
     warnings: list[Diagnostic] = []
@@ -141,9 +156,25 @@ def status_of(
         git=git_item,
         snapshot=snapshot_item(layout, environment),
         dashboard=_not_implemented("iss-00438"),
-        structure=_not_implemented("iss-00431"),
+        structure=_structure_item(context, timeout=timeout, offline=offline, warnings=warnings)
+        if structure
+        else _NOT_CHECKED,
     )
     return OperationResult(command, "succeeded", data, 0, warnings=tuple(warnings))
+
+
+_NOT_CHECKED: dict[str, object] = {"status": "not_checked", "next_step": None}
+
+
+def _structure_item(
+    context: ProjectContext, *, timeout: float, offline: bool, warnings: list[Diagnostic]
+) -> dict[str, object]:
+    """Only with --structure: the snapshot at display freshness and nesting drift (iss-00431)."""
+    from spec_dock.runtime.application.canonical_workspace import structure_item
+
+    item, found = structure_item(context, timeout=timeout, offline=offline)
+    warnings.extend(found)
+    return item
 
 
 def sync_item(layout: CatalogLayout, environment: RuntimeEnvironment) -> dict[str, object]:

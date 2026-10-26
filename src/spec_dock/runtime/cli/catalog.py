@@ -187,7 +187,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "branch create": (_arg("target"), _arg("--name"), _arg("--base")),
     "branch switch": (_arg("target"), _arg("--name")),
     "dependency list": (_arg("target"), _arg("--view", choices=("declared", "effective"))),
-    "dependency check": (_arg("target"), _arg("--source", choices=("local", "github"), default="local")),
+    "dependency check": (_arg("target"), _arg("--source", choices=("local", "github"))),
     "dependency add": (_required("--from", dest="from_target"), _required("--to", dest="to_target")),
     "dependency remove": (
         _required("--from", dest="from_target"),
@@ -213,7 +213,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _required("--to-worktree"),
         _arg("--on-conflict", choices=("error", "overwrite"), default="error"),
     ),
-    "workspace sync": (_arg("--source", choices=("local", "github"), default="local"), _flag("--allow-invalid")),
+    "workspace sync": (_arg("--source", choices=("local", "github")), _flag("--allow-invalid")),
     "workspace validate": (_flag("--require-nodes"), _flag("--ci")),
     "workspace doctor": (
         _flag("--raw"),
@@ -230,7 +230,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _flag("--confirm-old-writers-stopped"),
     ),
     "canonical link": (),
-    "canonical status": (),
+    "canonical status": (_flag("--structure"),),
     "installation show": (_arg("--target"),),
     "installation init": (_arg("path"),),
     "installation update": (_arg("--target"), _arg("--backup-dir")),
@@ -547,8 +547,8 @@ def _help_spec(leaf: str) -> HelpSpec:
         confirmation = "No final confirmation is required; --dry-run reports the plan without writing."
     elif leaf == "canonical status":
         target = "This clone's catalog and the links of the main checkout and this checkout."
-        reads = "Git worktree inventory and catalog status with --no-optional-locks, the links, ignore rules and tool settings files; never GitHub or the remote."
-        does_not = "Does not write the repository, the catalog, .git, the state root or GitHub."
+        reads = "Git worktree inventory and catalog status with --no-optional-locks, the links, ignore rules and tool settings files; GitHub's structure snapshot only with --structure, never the remote."
+        does_not = "Does not write the repository, the catalog, .git or GitHub; --structure may refresh only the structure snapshot in the state root."
         json_data = "catalog, link, exclude, access, tools, sync, changes, format, git, snapshot, dashboard, structure; each has status and next_step."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "workspace migrate":

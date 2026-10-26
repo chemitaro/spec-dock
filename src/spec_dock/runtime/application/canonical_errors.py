@@ -50,6 +50,9 @@ CANONICAL_REMOTE_MISSING: Final = "CANONICAL_REMOTE_MISSING"
 CANONICAL_MAIN_NOT_MIGRATED: Final = "CANONICAL_MAIN_NOT_MIGRATED"
 CANONICAL_CHECKOUT_NOT_MIGRATED: Final = "CANONICAL_CHECKOUT_NOT_MIGRATED"
 CANONICAL_INSIDE_CATALOG: Final = "CANONICAL_INSIDE_CATALOG"
+CANONICAL_BASE_HAS_SPECS: Final = "CANONICAL_BASE_HAS_SPECS"
+CANONICAL_CATALOG_PROTECTED: Final = "CANONICAL_CATALOG_PROTECTED"
+CANONICAL_WORKBENCH_SHARED: Final = "CANONICAL_WORKBENCH_SHARED"
 
 NOT_IMPLEMENTED_RECOVERY: Final = (
     "Wait for SpecDock 0.3.0, which completes canonical mode for this command; "
@@ -88,6 +91,12 @@ MAIN_NOT_MIGRATED_NEXT_STEP: Final = (
 CHECKOUT_NOT_MIGRATED_NEXT_STEP: Final = (
     "Base the worktree on a commit that declares workspace schema 4, then run spec-dock canonical link in it."
 )
+BASE_HAS_SPECS_RECOVERY: Final = "Use a commit made after the switch to canonical storage as the base."
+CATALOG_PROTECTED_RECOVERY: Final = "To detach this clone's catalog, run spec-dock canonical remove."
+WORKBENCH_SHARED_RECOVERY: Final = (
+    "Nothing to do: every worktree of this clone sees the same catalog, including each Scope's .workbench."
+)
+CHECK_INSTEAD_RECOVERY: Final = "Run spec-dock canonical check to check a commit in CI."
 START_LOCK_BUSY_RECOVERY: Final = "Wait a moment, then run spec-dock canonical link again."
 LINK_AGAIN_RECOVERY: Final = "Run spec-dock canonical link again; it continues from the current state."
 LINK_NETWORK_RECOVERY: Final = (

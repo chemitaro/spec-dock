@@ -87,9 +87,10 @@ def test_status_of_a_linked_clone_reports_every_item_and_no_problems(
         ("sync", "iss-00430"),
         ("snapshot", "iss-00430"),
         ("dashboard", "iss-00438"),
-        ("structure", "iss-00431"),
     ):
         assert data[item] == {"status": "not_implemented", "next_step": None, "owner": owner}
+    # iss-00431: structure reads GitHub only with --structure.
+    assert data["structure"] == {"status": "not_checked", "next_step": None}
     assert data["catalog"]["locked"] and data["catalog"]["branch"] == "spec-dock/canonical"
     assert data["format"]["version"] == 1 and data["git"]["supported"]
     assert data["changes"]["unsaved"] == 0 and data["changes"]["unpushed"] == 0

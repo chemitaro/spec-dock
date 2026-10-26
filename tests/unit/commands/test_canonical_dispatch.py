@@ -95,7 +95,7 @@ def test_schema_four_runs_registered_canonical_handlers_with_the_mode(
 
     monkeypatch.setitem(canonical_dispatch.CANONICAL_HANDLERS, "scope list", handler)
     assert _result(dispatch(_namespace("scope list", root), root))[0] == 0 and seen == ["canonical"]
-    code, result = _result(dispatch(_namespace("scope show", root, target="init-00001"), root))
+    code, result = _result(dispatch(_namespace("scope close", root, target="init-00001"), root))
     assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED"
 
 

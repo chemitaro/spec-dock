@@ -64,9 +64,9 @@ def test_init_places_only_static_assets_and_a_new_declaration_in_the_explicit_wo
         assert (target / ".agents/skills/spec-dock/SKILL.md").is_file()
         assert (target / ".agents/skills/spec-dock-grill-with-docs/SKILL.md").is_file()
         assert "spec-dock/workspace.json" in data["created_paths"]
-        # A fresh schema-4 workspace is routed to canonical mode, which validates from SpecDock 0.3.0.
+        # A fresh schema-4 workspace is routed to canonical mode, which validates once the catalog is linked.
         assert main(["--project", str(target), "workspace", "validate", "--json"]) == 3
-        assert json.loads(capsys.readouterr().out)["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED"
+        assert json.loads(capsys.readouterr().out)["error"]["code"] == "CANONICAL_NOT_LINKED"
 
 
 @pytest.mark.parametrize(
