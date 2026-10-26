@@ -374,8 +374,12 @@ def test_a_failed_second_file_write_keeps_one_reflection_in_memory(
     from spec_dock.runtime.domain.canonical_structure import SetParent
     from spec_dock.runtime.infra import github_snapshot
 
-    _, service, store = _world(tmp_path)
+    fake, service, store = _world(tmp_path)
+    other = fake.scope("initiative", slug="other", title="別の計画")
     service.ensure_fresh("display")
+    store.reflect([SetParent(3, 1)], command="scope move", at="2026-10-26T01:00:00Z")
+    fake.issue(other.number).title = "改名した計画"
+    fake.touch(other.number)
     real = github_snapshot._write_json
     calls: list[str] = []
 
@@ -386,9 +390,14 @@ def test_a_failed_second_file_write_keeps_one_reflection_in_memory(
         real(directory, name, payload)
 
     monkeypatch.setattr(github_snapshot, "_write_json", failing)
-    reflected = store.reflect([SetParent(3, 1)], command="scope move", at="2026-10-26T00:00:01Z")
-    assert reflected is not None and [write.command for write in reflected.local_writes] == ["scope move"]
-    assert calls == ["snapshot.json"]
+    refreshed = service.refresh()
+    assert calls == ["snapshot.json", "probe.json"]
+    assert store.persisted is False
+    in_memory, probe = store.load()
+    assert in_memory is not None and probe is not None
+    assert in_memory == refreshed.snapshot and in_memory.issues[other.number].title == "改名した計画"
+    assert [write.command for write in in_memory.local_writes] == ["scope move"]
+    assert in_memory.issues[3].parent == 1
 
 
 def test_malformed_github_values_degrade_like_any_github_failure(tmp_path: Path) -> None:

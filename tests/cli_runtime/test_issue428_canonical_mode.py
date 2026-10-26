@@ -115,7 +115,7 @@ def test_every_command_without_a_canonical_handler_stops_without_writing(
 
 def test_text_output_shows_the_next_step(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     root = canonical_workspace(tmp_path / "consumer")
-    assert main(["--project", str(root), "scope", "list"]) == 3
+    assert main(["--project", str(root), "scope", "close", "init-00001", "--yes"]) == 3
     stderr = capsys.readouterr().err
     assert "error [CANONICAL_NOT_IMPLEMENTED]" in stderr and "recovery: Wait for SpecDock 0.3.0" in stderr
 

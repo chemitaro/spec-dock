@@ -187,7 +187,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "branch create": (_arg("target"), _arg("--name"), _arg("--base")),
     "branch switch": (_arg("target"), _arg("--name")),
     "dependency list": (_arg("target"), _arg("--view", choices=("declared", "effective"))),
-    "dependency check": (_arg("target"), _arg("--source", choices=("local", "github"), default="local")),
+    "dependency check": (_arg("target"), _arg("--source", choices=("local", "github"))),
     "dependency add": (_required("--from", dest="from_target"), _required("--to", dest="to_target")),
     "dependency remove": (
         _required("--from", dest="from_target"),
@@ -213,7 +213,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _required("--to-worktree"),
         _arg("--on-conflict", choices=("error", "overwrite"), default="error"),
     ),
-    "workspace sync": (_arg("--source", choices=("local", "github"), default="local"), _flag("--allow-invalid")),
+    "workspace sync": (_arg("--source", choices=("local", "github")), _flag("--allow-invalid")),
     "workspace validate": (_flag("--require-nodes"), _flag("--ci")),
     "workspace doctor": (
         _flag("--raw"),

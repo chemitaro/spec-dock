@@ -10,6 +10,7 @@ from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
+from spec_dock.runtime.application.canonical_scope_read import list_scope, show_scope
 from spec_dock.runtime.application.canonical_status import run_canonical_status
 from spec_dock.runtime.application.canonical_worktrees import create_worktree_and_link
 from spec_dock.runtime.application.project_context import ProjectContext
@@ -24,6 +25,8 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "canonical link": run_canonical_link,
     "canonical status": run_canonical_status,
     "worktree create": create_worktree_and_link,
+    "scope show": show_scope,
+    "scope list": list_scope,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

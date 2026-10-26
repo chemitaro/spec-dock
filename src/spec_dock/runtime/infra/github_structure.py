@@ -440,7 +440,8 @@ class GithubStructureClient:
                 {item.get("type") for item in errors if isinstance(item, dict)} if isinstance(errors, list) else set()
             )
             if "RATE_LIMITED" in types:
-                wait = _rate_limit_wait(GithubResponse(429, response.headers, body), self.api.clock.now()) or 60.0
+                limited = _rate_limit_wait(GithubResponse(429, response.headers, body), self.api.clock.now())
+                wait = 60.0 if limited is None else limited
                 if wait > MAX_RATE_LIMIT_WAIT or retries >= READ_RETRIES:
                     retry_at = format_timestamp(self.api.clock.now() + timedelta(seconds=wait))
                     raise GithubStructureError(
