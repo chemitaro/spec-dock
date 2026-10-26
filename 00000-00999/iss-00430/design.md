@@ -187,7 +187,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
    - R がない、または `is_ancestor(R, L)` なら何もしない。
    - `is_ancestor(L, R)` なら、`changed_paths(L, R)` と、作業ツリーの変更（未保存と保留）が重なる（同じパスか、一方が他方の下）か確かめる。重なれば `blocking` に記録（保留にあるパスは `held`、ほかは `local_edit`）して取り込まない。重ならなければ `fast_forward(R)`。それでも失敗したら、`blocking` に Git の出力を `last_error`（`CANONICAL_SYNC_BLOCKED`）として残す。
    - 分岐していれば `merge_tree(L, R, allow_unrelated=state.adopt_remote_pending)`。0ならそのツリー、1なら `resolve_conflicts` → `write_resolution`。2以上、解決の書き込みの失敗、表せない競合（3の「表せない競合」）なら `paused: "merge_failed"` と Git の出力。`commit_merge`（親は L と R、メッセージ `spec-dock: merge (<PC名>)`）の後、上と同じ重なりの確かめをしてから `fast_forward(<その統合のコミット>)`。別名ファイルを `conflicts` に足す。
-   - **取り込み直し**（`adopt_remote_pending`。統括の判断 R2）：L が R の祖先でなければ、上の統合のツリーで、親を R だけにしたコミット C（メッセージ `spec-dock: adopt remote (<PC名>)`）を作る。R から C への差分（追加と変更のファイルの中身、削除の数）に `classify_holds` を当て、当たれば C を作らずに `paused`（元の理由）に戻し、`holds` と `last_error`（`CANONICAL_SAVE_HELD`）を書く。当たらなければ、重なりの確かめの後に `reset --keep C` で手元のブランチと作業ツリーを C へ移す（Git が編集中のファイルとの衝突を拒否したら、何もせずに `blocking`）。push は R からの早送りになる。push が成功したら `adopt_remote_pending` を false に戻す。L が R の祖先なら、ふつうの早送りで、印を戻す。
+   - **取り込み直し**（`adopt_remote_pending`。統括の判断 R2）：L が R の祖先でなければ、上の統合のツリーで、親を R だけにしたコミット C（メッセージ `spec-dock: adopt remote (<PC名>)`）を作る。R から C への差分（追加と変更のファイルの中身、削除の数）に `classify_holds` を当て、当たれば C を作らずに `paused: "remote_rewritten"` に戻し、`holds` と `last_error`（`CANONICAL_SAVE_HELD`）を書く。ただし、当たったパスがすべて作業ツリーで編集中（利用者が直している、消している）なら、一時停止にせず、`blocking`（`held`）に記録して何も push せずに持ち越す（その変更が保存された後の周期で、もう一度確かめる）。当たらなければ、重なりの確かめの後に `reset --keep C` で手元のブランチと作業ツリーを C へ移す（Git が編集中のファイルとの衝突を拒否したら、何もせずに `blocking`）。push は R からの早送りになる。push が成功したら `adopt_remote_pending` を false に戻す。L が R の祖先なら、ふつうの早送りで、印を戻す。
    - `conflicts` から、別名ファイルがもうないものを消す。
 6. **push**（Epic 手順5。排他の外）：L が R より進んでいれば（R がないときを含む）`push_canonical`。`rejected` なら手順3（取得）からやり直す（2回まで）。`pushed` なら基準を HEAD に、`push_auth` を `ok` に。`auth_failed` なら `push_auth` を `failed` にし、URL の種類の次の1手を書く。送らなかった周期で `push_auth` が未記録か `unknown` なら `push_canonical(dry_run=True)` を行い、`ok`（成功か `rejected`）、`failed`（認証）、`unknown`（そのほか）を書く。
 7. **記録**（Epic 手順6）：`update_catalog_state` で、`head`、`last_seen_remote`、`remote_contains_head`（HEAD が基準の祖先か同じ）、`unpushed_since`（含まれなくなった最初の時刻。含まれたら null）、`pending_since`、`holds`、`blocking`、`conflicts`、`consumed_changesets`、`last_cycle`、`last_success_at`（`ok` のとき）、`last_error`（`ok` のとき null）を書く。ログに1行書く。
@@ -224,7 +224,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 
 - **予定**（書く前。`_refuse_unwritable` の確かめに入れる）：`plan_schedule(layout, environment, state_root, *, schedule) -> SchedulePlan`。登録簿の項目が今の値（カタログ、mainのチェックアウト、`repository`、git）と違う、または移動の古い項目がある → `canonical.registry` を書く（`<根>`）。`scheduler.needs_change(spec)` → `canonical.scheduler` を書く（`write_paths`）。基準がない → `canonical.baseline` を書く（`<根>/catalogs/<鍵>`）。`schedule=False` では、基準だけ。
 - **順**：手順5のリンクの後に、6a 登録簿 → 7 基準 → 6b ジョブ（`ensure`）→ 6c すぐの実行と待ち。ジョブを作ると最初の周期がすぐに動く（launchd の `RunAtLoad`、loop の起動）ので、基準を先に記録する（Epic の手順6と7の中身は同じ）。6b が失敗しても、基準は残る。6a から 6b までは `<根>` の排他を持ち、同時の `canonical link` がジョブの登録を競わないようにする。8（ツールの設定）は I-2 のまま最後。
-- **6a**：`update_registry`。`observation.moved` のときは、登録のパス（動かす前のカタログのパス）の項目を消し、その状態のディレクトリを、`cycle.lock` を取ってから新しい鍵へ移す（新しい鍵の状態がないときだけ）。`scheduler` は `select_scheduler(..., previous=登録簿の scheduler)`。`repository` は `repository_for_checkout(main, timeout=…)`（失敗は null）。`git` は、登録簿に記録した git が今もあり 2.38 以上ならそのまま、そうでなければ今の `PATH` の git にする。
+- **6a**：`update_registry`。`observation.moved` のときは、登録のパス（動かす前のカタログのパス）の項目を消し、その状態のディレクトリを、`cycle.lock` を取ってから新しい鍵へ移す（新しい鍵の状態がないときだけ）。`scheduler` は `select_scheduler(..., previous=登録簿の scheduler)`。`repository` は、登録簿に記録した値があればそれ、なければ（null を含む）`repository_for_checkout(main, timeout=…)`（失敗は null）。`git` は、登録簿に記録した git が今もあり 2.38 以上ならそのまま、そうでなければ今の `PATH` の git にする。
 - **6b**：`scheduler_for(kind).ensure(spec)`。選び直したとき（登録簿の `scheduler` があり、今の選択と違う）は、先に前の仕組みの `remove` を行う。失敗は `CANONICAL_SCHEDULER_FAILED`（`partial`、終了コード6、`recovery` は `spec-dock canonical link`）。
 - **7**：`update_catalog_state` で、`state.json` がなければ作り（`push_auth: {"result": "unknown"}`）、`last_seen_remote` がなければ、`refs/remotes/origin/spec-dock/canonical` の値を、それもなく手元の canonical があれば手元の HEAD を書く（GitHub で消された canonical を、最初の周期が作り直さないため）。`--no-schedule` なら `schedule: "none"` を、そうでなければ null を書く。
 - `link_after_command` は、`state.json` に `schedule: "none"` があれば手順6を行わない（手順7は行う。統括の判断 R1）。
@@ -347,6 +347,11 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 - 時刻は `canonical_sync.SYNC_CLOCK`（`now()`、`sleep()`）を差し替え、PC名は `canonical_sync.hostname` を差し替える。ファイルの `mtime` は実時刻なので、時刻を進めて30秒と5分を試す。
 - 定期の実行は `canonical_scheduling.scheduler_for` を差し替える。spec-dock の実行ファイルは `canonical_scheduling.spec_dock_executable` を差し替える。`FIRST_RUN_WAIT` は0にするか、偽の `kick` で記録を作る。
 - GitHub は I-1 の `tests/support/fake_github.py`（`install_fake_gh`）。`repository_for_checkout` は、origin が bare のパスなので、テストで差し替える。
+
+### テストの安全策（`tests/conftest.py`）
+
+- `canonical link` は手順6で定期の実行を登録するので、どのテストも本物の launchd、systemd、切り離した常駐のプロセスに触れてはならない。`tests/conftest.py` が、セッションの単位で（`monkeypatch` の外で）`canonical_scheduling.scheduler_for`、`spec_dock_executable`、`runtime_environment.detect_service_manager`、`canonical_schedule.FIRST_RUN_WAIT` を偽物に替え、さらにテストごとに記録する偽物を置く。テストの中の `monkeypatch.undo()` の後も偽物に戻る（実装の途中に、既存のテストの `undo()` が差し替えを戻し、本番の名前のジョブが一時的に読み込まれたため。報告書）。
+- 本物の `LaunchdScheduler` と `SystemdScheduler` は、コマンドの実行器を注入して、単体のテストで直接作る。
 
 ### 受け入れ条件との対応
 
