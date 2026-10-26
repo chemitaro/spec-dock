@@ -54,7 +54,9 @@ def select_scheduler(
 ) -> SchedulerKind:
     """launchd on macOS; a usable systemd user manager on Linux; otherwise the resident loop. Keep a usable choice."""
     systemd = bool(systemd_present) and bool(systemd_user)
-    usable = {"launchd": system == "darwin", "systemd": system == "linux" and systemd, "loop": system == "linux"}
+    # An unknown user manager (None: its bus was unreachable) keeps a previous systemd choice.
+    keeps_systemd = bool(systemd_present) and systemd_user is not False
+    usable = {"launchd": system == "darwin", "systemd": system == "linux" and keeps_systemd, "loop": system == "linux"}
     if previous is not None and usable[previous]:
         return previous
     if system == "darwin":
@@ -76,8 +78,8 @@ def launchd_plist(spec: SchedulerSpec, *, label: str = LAUNCHD_LABEL) -> bytes:
 
 
 def systemd_quote(value: str) -> str:
-    """Escape systemd specifiers (%) and quote a value that holds whitespace, quotes or backslashes."""
-    escaped = value.replace("%", "%%")
+    """Escape specifiers (%) and variables ($), and quote a value that holds whitespace, quotes or backslashes."""
+    escaped = value.replace("%", "%%").replace("$", "$$")
     if any(character.isspace() or character in "\"'\\" for character in escaped):
         return '"' + escaped.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return escaped

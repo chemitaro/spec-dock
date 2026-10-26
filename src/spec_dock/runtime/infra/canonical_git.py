@@ -397,7 +397,7 @@ _AUTH_FAILURES: Final = (
     "The requested URL returned error: 403",
     "The requested URL returned error: 401",
 )
-_IN_PROGRESS: Final = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply")
+_IN_PROGRESS: Final = ("MERGE_HEAD", "CHERRY_PICK_HEAD", "REVERT_HEAD", "rebase-merge", "rebase-apply", "index.lock")
 TEMPORARY_INDEX: Final = ".runtime/index.tmp"
 
 
@@ -443,8 +443,10 @@ def list_changes(catalog: Path, *, git: str = "git", timeout: float = 30.0) -> t
         else:
             continue
         for path in paths:
-            if path.endswith("/"):
-                continue  # a nested repository: never saved (its files are not catalog content)
+            if path.endswith("/") or path == ".runtime" or path.startswith(".runtime/"):
+                # A nested repository is not catalog content; .runtime/ is SpecDock's own area even if a
+                # .gitignore lost its line.
+                continue
             try:
                 observed = os.lstat(catalog / path)
             except FileNotFoundError:
@@ -685,8 +687,10 @@ class PushResult:
     message: str
 
 
-def push_canonical(catalog: Path, *, dry_run: bool = False, git: str = "git", timeout: float = 60.0) -> PushResult:
-    """Push HEAD to origin's spec-dock/canonical without force; classify rejection and authentication failure."""
+def push_canonical(
+    catalog: Path, *, dry_run: bool = False, source: str = "HEAD", git: str = "git", timeout: float = 60.0
+) -> PushResult:
+    """Push `source` to origin's spec-dock/canonical without force; classify rejection and authentication failure."""
     args = ["push", "--porcelain"]
     if dry_run:
         args.append("--dry-run")
@@ -694,13 +698,18 @@ def push_canonical(catalog: Path, *, dry_run: bool = False, git: str = "git", ti
         catalog,
         *args,
         CANONICAL_REMOTE,
-        f"HEAD:{CANONICAL_REF}",
+        f"{source}:{CANONICAL_REF}",
         git=git,
         mutation=not dry_run,
         timeout=timeout,
         returncodes=frozenset(range(256)),
     )
     return classify_push(output.returncode, output.stdout, output.stderr)
+
+
+def is_auth_failure(stderr: str) -> bool:
+    """Git's own words for a credential or SSH key that origin refused."""
+    return any(marker in stderr for marker in _AUTH_FAILURES)
 
 
 def classify_push(returncode: int, stdout: bytes, stderr: bytes) -> PushResult:
@@ -711,7 +720,7 @@ def classify_push(returncode: int, stdout: bytes, stderr: bytes) -> PushResult:
         return PushResult("up_to_date", text)
     if returncode == 0 and flags and all(flag in ("*", "=", " ", "+") for flag in flags):
         return PushResult("pushed", text)
-    if any(marker in text for marker in _AUTH_FAILURES):
+    if is_auth_failure(text):
         return PushResult("auth_failed", text)
     refused = [row[2] if len(row) > 2 else "" for row in rows if row[0] == "!"]
     if refused and all(summary.startswith("[rejected]") for summary in refused):

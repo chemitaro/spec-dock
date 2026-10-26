@@ -29,7 +29,7 @@ from spec_dock.runtime.application.canonical_errors import (
     STATE_UNREADABLE_NEXT_STEP,
     SYNC_LOG_NEXT_STEP,
 )
-from spec_dock.runtime.domain.canonical_layout import CANONICAL_TRACKING_REF, git_supported
+from spec_dock.runtime.domain.canonical_layout import git_supported
 from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec, restart_line, select_scheduler
 from spec_dock.runtime.domain.canonical_structure import format_timestamp, parse_timestamp
 from spec_dock.runtime.domain.canonical_sync_state import CatalogSyncState, RegistryEntry, SyncRegistry
@@ -49,7 +49,6 @@ from spec_dock.runtime.infra.canonical_state import (
     read_catalog_state,
     update_catalog_state,
 )
-from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.state_root import resolve_state_root
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect
 
@@ -236,7 +235,7 @@ def _now() -> datetime:
     return canonical_sync.SYNC_CLOCK.now()
 
 
-def apply_schedule(plan: SchedulePlan, *, timeout: float = 30.0) -> tuple[list[Effect], list[Diagnostic]]:
+def apply_schedule(plan: SchedulePlan, *, offline: bool = False) -> tuple[list[Effect], list[Diagnostic]]:
     """Run 6a -> 7 -> 6b -> 6c; a failure raises ScheduleFailed carrying the effects so far."""
     effects: list[Effect] = []
     warnings: list[Diagnostic] = []
@@ -245,7 +244,7 @@ def apply_schedule(plan: SchedulePlan, *, timeout: float = 30.0) -> tuple[list[E
             if plan.moved_from is not None:
                 _move_state(plan, effects)
             if plan.baseline_change or plan.moved_from is not None:
-                _baseline(plan, effects, timeout=timeout)
+                _baseline(plan, effects)
             return effects, warnings
         assert plan.entry is not None and plan.kind is not None and plan.spec is not None
         if not (plan.registry_change or plan.baseline_change or plan.scheduler_change):
@@ -255,9 +254,9 @@ def apply_schedule(plan: SchedulePlan, *, timeout: float = 30.0) -> tuple[list[E
         with directory_lock(plan.state_root, timeout=10.0):
             registered = _registry(plan, effects)
             if plan.baseline_change:
-                _baseline(plan, effects, timeout=timeout)
+                _baseline(plan, effects)
             installed = _job(plan, effects)
-        if registered or installed:
+        if (registered or installed) and not offline:  # --offline: no cycle (and its push) now
             warnings.extend(_kick_and_wait(plan))
     except (OSError, TimeoutError, RegistryUnreadable, StateUnreadable) as error:
         raise ScheduleFailed("LOCAL_IO_FAILED", str(error), SCHEDULER_FAILED_RECOVERY, effects) from error
@@ -287,7 +286,7 @@ def _move_state(plan: SchedulePlan, effects: list[Effect]) -> None:
             effects.append(Effect("canonical.state.move", "succeeded", plan.catalog))
 
 
-def _baseline(plan: SchedulePlan, effects: list[Effect], *, timeout: float) -> None:
+def _baseline(plan: SchedulePlan, effects: list[Effect]) -> None:
     """Step 7: record origin/spec-dock/canonical, or the local HEAD when GitHub has none, as the baseline."""
     catalog = Path(plan.catalog)
     target = str(catalog_state_dir(plan.state_root, plan.catalog))
@@ -299,13 +298,10 @@ def _baseline(plan: SchedulePlan, effects: list[Effect], *, timeout: float) -> N
         state = current or CatalogSyncState.new(plan.catalog, at=stamp)
         baseline = state.last_seen_remote
         if baseline is None:
-            try:
-                baseline = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, timeout=timeout)
-                if baseline is None:
-                    # GitHub has no canonical: guard the local content so the first cycle never recreates it.
-                    baseline = canonical_git.resolve_commit(catalog, "HEAD", timeout=timeout)
-            except GitProcessError:
-                baseline = None
+            # GitHub has no canonical: the local HEAD guards the content so the first cycle never recreates it.
+            from spec_dock.runtime.application.canonical_sync import initial_baseline
+
+            baseline = initial_baseline(catalog)
         updated = state.evolve(last_seen_remote=baseline, schedule=marker)
         changed["value"] = current is None or updated != current
         return updated.evolve(updated_at=stamp) if changed["value"] else updated

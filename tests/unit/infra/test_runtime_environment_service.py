@@ -70,7 +70,7 @@ def test_the_bus_is_given_up_after_five_retries(tmp_path: Path) -> None:
         return _completed("", "", 1)
 
     found = detect_service_manager(_linux(), root=_root(tmp_path, systemd=True), runner=runner, sleep=slept.append)
-    assert found.systemd_user is False and found.linger is None and len(slept) == 5
+    assert found.systemd_user is None and found.linger is None and len(slept) == 5  # unknown, not "no systemd"
 
 
 def test_no_systemd_directory_means_the_loop_runner(tmp_path: Path) -> None:

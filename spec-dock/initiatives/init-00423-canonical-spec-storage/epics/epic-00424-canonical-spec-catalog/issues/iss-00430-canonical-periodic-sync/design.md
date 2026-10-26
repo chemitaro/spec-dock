@@ -143,6 +143,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 ### 6. C11 の追加（`infra/runtime_environment.py`）
 
 - `RuntimeEnvironment` に `systemd_present: bool | None = None`、`systemd_user: bool | None = None`、`linger: bool | None = None`、`user: str | None = None` を足す（既定 None。I-2 の生成とテストの部品はそのまま動く）。
+- 「Failed to connect to bus」が試し直しの後も続くときは、`systemd_user` を False ではなく None（不明）にする。`select_scheduler` は、不明の間は前に選んだ `systemd` を保つ（サンドボックスや `su` でバスに届かないだけで、仕組みを選び直さない）。`systemd_quote` は `$` も `$$` にする。
 - `detect_service_manager(environment, *, root=Path("/"), runner=subprocess.run, sleep=time.sleep) -> RuntimeEnvironment`：Linux のときだけ、`/run/systemd/system` の有無、`systemctl --user is-system-running`（出力の1行目が `running` か `degraded` なら真。標準エラーに `Failed to connect to bus` があれば、1秒おきに5回まで試し直す）、`loginctl show-user <user> -p Linger --value`（`yes` なら真、`no` なら偽、失敗なら None）を埋めて返す。macOS では何もしない。`detect_runtime_environment` は呼ばない（統括の判断 Q10）。
 
 ### 7. 同期の Git の操作（`infra/canonical_git.py` に足す。すべて `run_catalog_git` を通す）
@@ -195,6 +196,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 
 - 保存の対象は、普通のファイルとシンボリックリンクだけである。入れ子のリポジトリ（`git status` の `sub/`）やソケットは保存せず、ほかのパスの保存を止めない。保留の規則で確かめた中身は、そのバイト列のままコミットする（確かめた後に書き換えられても、確かめていない中身を保存しない。レビュー② SP-9）。周期の初めに、殺された周期が残した一時のインデックスとその lock を消す（カタログの排他の中なので安全）。
 - 確かめたバイト列は `hash-object -w --stdin --path=<パス>` で書く（カタログの `.gitattributes` の eol や clean フィルタが `git add` と同じに効く）。書いたツリーが親と同じならコミットを作らない（eol の変換などで、毎周期の空のコミットを作らないため）。早送りには `-c merge.verifySignatures=false -c merge.autoStash=false` を足す（利用者の設定で取り込みが止まらず、共有の stash に何も積まないため）。許可した削除のうち、今は削除されていないもの（戻した、作り直した）は、周期が許可から消す（後の同じ大量の削除を、もう一度保留するため）。`push_auth` が `failed` の間は、毎周期 dry-run で確かめ直す。`--registered` の周期は、`cycle.lock` を取った後に登録簿を読み直し、外されたカタログを `skipped`（`unregistered`）にする。ログは専用の lock ファイルで排他し、`<根>` のディレクトリの排他は使わない（`canonical link` の手順6a〜6bとの取り合いを避けるため）。
+- `ls-remote` と `fetch` の失敗が認証の失敗（SSH の鍵、非公開の https）なら、接続の失敗ではなく `push_auth: failed` と `CANONICAL_PUSH_AUTH_FAILED`（URL の種類の次の1手）にし、保存はローカルに積む。`state.json` のない周期（状態の置き場を消した、根が違う）は、手順7と同じ規則（取得する前の追跡の参照、なければ初期のコミットでない手元の HEAD）で基準を決めてから確かめる。`.runtime/` は、カタログの `.gitignore` の行がなくても保存せず、取り込むコミットが `.runtime/` に触れていれば `merge_failed` で止まる。取り込み直しの間（`adopt_remote_pending`）は、許可した削除を消さない（R の側の削除は作業ツリーに現れないため）。予期しない例外も `last_error`（`SYNC_FAILED`）に記録する。push は確かめた SHA を送る。管理ディレクトリの `index.lock` は途中の操作として扱う。
 - 一時停止の間の周期は、止まったときの `last_error` を消さない。手で実行した `canonical sync` は、止まった理由を `error.code` にして返す。周期の記録は、`canonical link` が持つ `schedule` を、書く直前に読み直した値のまま残す。
 - 結果：`ok`（エラーなし）、`skipped`、`paused`、`error`。出来事ごとの扱いは次の表のとおり（`ok` のときだけ `last_error` を null にし、`last_success_at` を進める）。
 
@@ -231,6 +233,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 - **6a**：`update_registry`。`observation.moved` のときは、登録のパス（動かす前のカタログのパス）の項目を消し、その状態のディレクトリを、`cycle.lock` を取ってから新しい鍵へ移す（新しい鍵の状態がないときだけ）。`scheduler` は `select_scheduler(..., previous=登録簿の scheduler)`。`repository` は、登録簿に記録した値があればそれ、なければ（null を含む）`repository_for_checkout(main, timeout=…)`（失敗は null）。`git` は、登録簿に記録した git が今もあり 2.38 以上ならそのまま、そうでなければ今の `PATH` の git にする。
 - **6b**：`scheduler_for(kind).ensure(spec)`。選び直したとき（登録簿の `scheduler` があり、今の選択と違う）は、先に前の仕組みの `remove` を行う。失敗は `CANONICAL_SCHEDULER_FAILED`（`partial`、終了コード6、`recovery` は `spec-dock canonical link`）。
 - **7**：`update_catalog_state` で、`state.json` がなければ作り（`push_auth: {"result": "unknown"}`）、`last_seen_remote` がなければ、`refs/remotes/origin/spec-dock/canonical` の値を、それもなく手元の canonical があれば手元の HEAD を書く（GitHub で消された canonical を、最初の周期が作り直さないため）。`--no-schedule` なら `schedule: "none"` を、そうでなければ null を書く。
+- `canonical link --offline` は、手順6のすぐの実行を頼まない（周期の push を起こさない）。
 - `link_after_command` は、`state.json` に `schedule: "none"` があれば手順6を行わない（手順7は行う。統括の判断 R1）。
 - **6c**：6a か 6b で何かを書いたときだけ、`kick` して、`FIRST_RUN_WAIT = 15秒` まで0.25秒ごとに `state.json` を読み、`last_cycle.finished_at` が頼んだ時刻以後になるのを待つ。`kick` の失敗は警告に変える。
 - **警告**：記録が見えない → `CANONICAL_SYNC_NOT_CONFIRMED`（macOS では、プライバシーとセキュリティで、spec-dock の Python と git に、フルディスクアクセスかリムーバブルボリュームへのアクセスを許可する次の1手）。`last_error.code == OS_ACCESS_DENIED` → `OS_ACCESS_DENIED`（同じ案内と `program`）。`push_auth.result == failed` → `CANONICAL_PUSH_AUTH_FAILED`。`systemd` で `linger` が偽 → `CANONICAL_LINGER_DISABLED`。`loop` → `CANONICAL_RUNNER_RESTART`（起動し直しの1行）。
@@ -337,7 +340,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 
 ## 変更対象
 
-- **足す**：「責務・Interface」の1の表のファイルと、テスト（`tests/unit/domain/test_canonical_sync_rules.py`、`test_canonical_sync_state.py`、`test_canonical_scheduler.py`、`tests/unit/infra/test_canonical_state.py`、`test_canonical_registry.py`、`test_canonical_schedulers.py`、`test_canonical_git_sync.py`、`test_runtime_environment_service.py`、`tests/cli_runtime/test_issue430_canonical_sync.py`、`test_issue430_canonical_hold.py`、`test_issue430_canonical_resume.py`、`test_issue430_canonical_remove.py`、`test_issue430_canonical_link_schedule.py`、`test_issue430_canonical_status.py`、`test_issue430_canonical_loop.py`、`tests/support/canonical_sync.py`（偽の定期の実行、注入した時刻、2つのクローン））。
+- **足す**：「責務・Interface」の1の表のファイルと、テスト（`tests/unit/domain/test_canonical_sync_rules.py`、`test_canonical_sync_state.py`、`test_canonical_scheduler.py`、`tests/unit/infra/test_canonical_state.py`（登録簿を含む）、`test_canonical_schedulers.py`、`test_canonical_git_sync.py`、`test_runtime_environment_service.py`、`tests/cli_runtime/test_issue430_canonical_sync.py`、`test_issue430_canonical_hold.py`、`test_issue430_canonical_resume.py`、`test_issue430_canonical_remove.py`、`test_issue430_canonical_link_schedule.py`、`test_issue430_canonical_status.py`、`test_issue430_legacy_and_public.py`、`tests/support/canonical_sync.py`（偽の定期の実行、注入した時刻、2つのクローン））。
 - **変える**：`canonical_link.py`（`schedule`、手順6・7）、`canonical_status.py`（同期の項目）、`canonical_catalog.py`（RST-1）、`canonical_errors.py`（コード）、`canonical_dispatch.py`（5つの処理と `canonical sync --registered`）、`cli/catalog.py`、`cli/options.py`、`runtime_environment.py`（C11）、`canonical_git.py`（足すだけ）、配布資産 `docs/reference_cli.md` と `static-inventory.json`、コマンドの数と一覧のテスト（47 → 52）、`test_issue428_canonical_mode.py` の `_leaf_arguments`（canonical モードのテスト）。
 - **変えない**：従来モードの処理と `.meta.json` のコード、版3の振る舞いのテスト、C4・C5・C6・C10 の部品（`run_catalog_git`、`CatalogLock`、`Changeset`、`ensure_fresh` など）、`StartLock`、選択の記録、利用者のツールの設定、利用側の `spec-dock/`。
 
@@ -373,7 +376,7 @@ def scheduler_for(kind: SchedulerKind, *, state_root: Path, environment: Runtime
 | AC-430-06 | `test_issue430_canonical_sync.py`：テストが `CatalogLock` を持つ、本当のインデックスの `git add` |
 | AC-430-07 | `test_issue430_canonical_link_schedule.py`：`FakeScheduler` の `spec.state_root` と、`XDG_STATE_HOME` を消した `sync --registered` |
 | AC-430-08 | `test_issue430_canonical_remove.py` |
-| AC-430-09 | `test_issue430_canonical_loop.py`、`test_runtime_environment_service.py`、`test_canonical_scheduler.py` |
+| AC-430-09 | `tests/unit/infra/test_canonical_schedulers.py`（常駐のプロセス）、`test_runtime_environment_service.py`、`test_canonical_scheduler.py`、`test_issue430_canonical_sync.py`（`--loop`、`--detach`） |
 | AC-430-10 | `test_issue430_canonical_sync.py`：偽の `gh` の要求の記録、`gh` の失敗 |
 | AC-430-11 | `test_issue430_canonical_sync.py`：dry-run が bare のリポジトリに届くこと（`push_auth` が `ok`）と、認証の失敗（`push_canonical` の結果を `auth_failed` に差し替える）。`test_canonical_git_sync.py`：標準エラーからの認証の失敗の判定 |
 | AC-430-12 | `test_issue430_canonical_link_schedule.py` |

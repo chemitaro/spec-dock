@@ -115,3 +115,10 @@ def test_the_job_path_adds_the_gh_directory_after_git() -> None:
         SPEC.executable, SPEC.state_root, Path("/opt/homebrew/bin"), SPEC.home, Path("/opt/homebrew/bin")
     )
     assert plistlib.loads(launchd_plist(same))["EnvironmentVariables"]["PATH"].count("/opt/homebrew/bin") == 1
+
+
+def test_an_unknown_user_manager_keeps_a_previous_systemd_choice() -> None:
+    assert select_scheduler("linux", systemd_present=True, systemd_user=None, previous="systemd") == "systemd"
+    assert select_scheduler("linux", systemd_present=True, systemd_user=None, previous=None) == "loop"
+    assert select_scheduler("linux", systemd_present=False, systemd_user=None, previous="systemd") == "loop"
+    assert systemd_quote("/a/$HOME") == "/a/$$HOME"

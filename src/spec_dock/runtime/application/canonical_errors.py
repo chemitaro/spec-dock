@@ -167,7 +167,8 @@ SYNC_BLOCKED_NEXT_STEP: Final = (
 )
 STATE_UNREADABLE_NEXT_STEP: Final = "Inspect and move the listed file aside, then run spec-dock canonical link."
 GIT_IN_PROGRESS_NEXT_STEP: Final = (
-    "Finish the unfinished Git operation in the catalog (for example git -C <catalog> merge --abort)."
+    "Finish the unfinished Git operation in the catalog (for example git -C <catalog> merge --abort). "
+    "For index.lock: if no git process works in the catalog, delete that file."
 )
 PAUSED_NEXT_STEP: Final = (
     "Read the pause reason in spec-dock canonical status, follow 'When sync stops' in the SpecDock docs, then run "

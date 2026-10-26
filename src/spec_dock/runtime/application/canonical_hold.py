@@ -147,7 +147,10 @@ def run_canonical_restore(namespace: argparse.Namespace, context: ProjectContext
         if namespace.paths:
             targets = []
             for raw in namespace.paths:
-                path = _relative(raw, catalog, context.root)
+                try:
+                    path = _relative(raw, catalog, context.root)
+                except ValueError:
+                    path = raw  # outside the catalog: certainly not held
                 hold = holds.get(path)
                 if hold is None or not _still_held(catalog, hold, deleted):
                     raise CanonicalCommandError(

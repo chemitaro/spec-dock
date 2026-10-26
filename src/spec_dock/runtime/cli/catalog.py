@@ -123,7 +123,7 @@ HELP_EFFECTS: dict[str, str] = {
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
     "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
     "canonical link": "Find or create this clone's catalog, link this checkout, and register periodic sync.",
-    "canonical status": "Read catalog, link, ignore rules, access and tool settings; no changes.",
+    "canonical status": "Read catalog, link, access, tool settings and sync state; no changes.",
     "installation show": "Read the package version and static resources in one Git worktree; no changes.",
     "installation init": "Place package static resources and a new schema-4 workspace declaration in one Git worktree.",
     "installation update": "Update package static resources in one Git worktree after verified external preservation.",

@@ -213,6 +213,7 @@ class _Run:
     baseline: str | None = None
     changes: tuple[CatalogChange, ...] = ()
     held: dict[str, str] = field(default_factory=dict)
+    push_tried: bool = False
 
     @property
     def git(self) -> str:
@@ -257,7 +258,9 @@ def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
     started = ctx.stamp()
     result = CatalogResult(entry.catalog)
     try:
-        state = read_catalog_state(ctx.state_root, entry.catalog) or CatalogSyncState.new(entry.catalog, at=started)
+        state = read_catalog_state(ctx.state_root, entry.catalog) or CatalogSyncState.new(
+            entry.catalog, at=started
+        ).evolve(last_seen_remote=initial_baseline(Path(entry.catalog), git=entry.git))
     except StateUnreadable as error:
         # Never overwrite a state file this SpecDock cannot read: its baseline guards against rewrites.
         result.result = "error"
@@ -288,9 +291,31 @@ def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
         _git_error(run, error)
     except OSError as error:
         _os_error(run, error)
+    except Exception as error:  # a defect must still show in state.json and canonical status
+        run.fail(
+            "SYNC_FAILED", f"{type(error).__name__}: {error}", "Check spec-dock canonical status and the sync log."
+        )
     _record(run)
     _log(ctx, result)
     return result
+
+
+def initial_baseline(catalog: Path, *, git: str = "git") -> str | None:
+    """The baseline of a catalog without one (link step 7, or a cycle whose state was lost).
+
+    The tracking ref as last fetched; without it the local HEAD, unless that is only the initial commit
+    (a new repository whose first push is still to come). Never take what this fetch would bring.
+    """
+    try:
+        tracking = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
+        if tracking is not None:
+            return tracking
+        head = canonical_git.resolve_commit(catalog, "HEAD", git=git)
+        if head is None or canonical_git.is_initial_commit(catalog, head):
+            return None
+        return head
+    except (GitProcessError, OSError):
+        return None
 
 
 def _program(run: _Run) -> list[str]:
@@ -371,7 +396,10 @@ def _check_remote(run: _Run) -> None:
     except GitProcessError as error:
         run.offline = True
         message = error.stderr.decode("utf-8", errors="replace").strip() or "origin could not be reached"
-        run.fail(GITHUB_UNAVAILABLE, message, GITHUB_UNAVAILABLE_RECOVERY)
+        if canonical_git.is_auth_failure(message):
+            _auth_failed(run, message)  # SSH and private HTTPS remotes ask for credentials already here
+        else:
+            run.fail(GITHUB_UNAVAILABLE, message, GITHUB_UNAVAILABLE_RECOVERY)
         # The tracking ref is shared with the main checkout, whose own `git fetch` may have taken a rewrite:
         # merge it only while it still descends from the baseline; otherwise just save locally.
         tracking = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
@@ -557,9 +585,10 @@ def _save(run: _Run) -> None:
         # A saved path is done; an accepted deletion that is no longer deleted (restored, recreated) has expired,
         # so a later mass delete of the same files is held again.
         deleted_now = {change.path for change in changes if change.kind == "deleted"}
+        adopting = run.state.adopt_remote_pending  # re-adoption deletions are R-side, never in this work tree
         kept = AcceptedChanges(
             {path: blob for path, blob in accepted_paths.items() if path not in saved},
-            tuple(path for path in accepted_deletions if path not in saved and path in deleted_now),
+            tuple(path for path in accepted_deletions if path not in saved and (adopting or path in deleted_now)),
         )
         if kept != accepted:
             write_accepted(catalog, kept)
@@ -612,8 +641,14 @@ def _merge(run: _Run) -> None:
                 canonical_git.commit_merge(catalog, tree, local, remote, message=message, git=git),
                 "fast-forward",
             )
+    incoming = canonical_git.changed_paths(catalog, local, target, git=git)
+    runtime = sorted(path for path in incoming if path == ".runtime" or path.startswith(".runtime/"))
+    if runtime:
+        # .runtime/ is this clone's own area: never let a commit from elsewhere write into it.
+        run.pause("merge_failed", "the incoming canonical carries SpecDock's .runtime area: " + ", ".join(runtime[:5]))
+        raise _Stop
     edited = {change.path for change in canonical_git.list_changes(catalog, git=git)}
-    blocked = _overlaps(canonical_git.changed_paths(catalog, local, target, git=git), edited)
+    blocked = _overlaps(incoming, edited)
     if blocked:
         run.state = run.state.evolve(
             blocking=tuple(Blocking(path, "held" if path in run.held else "local_edit") for path in blocked)
@@ -726,7 +761,8 @@ def _push(run: _Run, *, last: bool) -> bool:
     assert local is not None
     if remote is not None and (local == remote or not canonical_git.is_ancestor(catalog, remote, local, git=git)):
         return False  # nothing ahead of GitHub, or not yet merged (a blocked merge waits for the next cycle)
-    pushed = canonical_git.push_canonical(catalog, git=git)
+    run.push_tried = True
+    pushed = canonical_git.push_canonical(catalog, source=local, git=git)
     if pushed.outcome in ("pushed", "up_to_date"):
         run.baseline = local
         run.remote = local
@@ -760,7 +796,9 @@ def _check_push_auth(run: _Run) -> None:
     """The first cycle after link checks authentication with a dry-run push even when nothing is sent (Q5)."""
     auth = run.state.push_auth
     # Probe while unknown (the first cycle after link) and while failed, so a fixed credential shows up.
-    if run.offline or run.result.result in ("paused", "skipped") or (auth is not None and auth.result == "ok"):
+    if run.push_tried or run.offline or run.result.result in ("paused", "skipped"):
+        return
+    if auth is not None and auth.result == "ok":
         return
     probe = canonical_git.push_canonical(run.catalog, dry_run=True, git=run.git)
     if probe.outcome in ("pushed", "up_to_date", "rejected"):

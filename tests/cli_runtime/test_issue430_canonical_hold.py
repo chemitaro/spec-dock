@@ -125,3 +125,8 @@ def test_an_expired_deletion_accept_never_lets_a_later_mass_delete_through(pair:
     pair.advance(31)
     _code, result = pair.sync(pair.a)
     assert len(catalog_result(result)["holds"]) == 25 and pair.remote_head() == remote_before
+
+
+def test_restore_of_a_path_outside_the_catalog_is_not_held(pair: SyncPair) -> None:
+    code, result = pair.run(pair.a, "canonical", "restore", "../outside.md")
+    assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_HELD"

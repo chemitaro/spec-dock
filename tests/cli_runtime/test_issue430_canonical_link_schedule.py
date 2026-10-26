@@ -293,3 +293,9 @@ def test_a_no_schedule_link_still_moves_the_baseline_of_a_moved_main(pair: SyncP
 
     after = read_catalog_state(pair.state_root, os.path.realpath(moved / "spec-dock/.canonical"))
     assert after is not None and after.last_seen_remote == before.last_seen_remote
+
+
+def test_an_offline_link_registers_but_asks_for_no_cycle_now(pair: SyncPair) -> None:
+    code, result = pair.run(pair.a, "canonical", "link", "--offline")
+    assert code == 0, result
+    assert pair.schedulers["launchd"].calls == [("ensure", "launchd")]

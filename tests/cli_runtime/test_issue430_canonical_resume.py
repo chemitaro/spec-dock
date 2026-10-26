@@ -201,3 +201,32 @@ def test_a_second_pc_resumes_remote_deleted_by_adopting_what_the_first_recreated
     assert code == 0, result
     _code, result = pair.sync(pair.b)
     assert catalog_result(result)["result"] == "ok"
+
+
+def test_accepting_held_deletions_of_a_re_adoption_lets_it_finish(pair: SyncPair) -> None:
+    for index in range(25):
+        pair.write(pair.a, f"d/{index}.md", f"{index}\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    old = pair.remote_head()
+    for index in range(25):
+        (pair.specs(pair.a) / f"d/{index}.md").unlink()
+    pair.sync(pair.a)
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "accept", "--deletions")
+    pair.sync(pair.a)
+    assert pair.remote_file("d/0.md") is None
+    _force(pair, old)  # GitHub goes back to the commit that still had the 25 files
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert item["paused"] == "remote_rewritten" and {hold["kind"] for hold in item["holds"]} == {"mass_delete"}
+    code, result = pair.run(pair.a, "canonical", "accept", "--deletions")
+    assert code == 0 and len(result["data"]["result"]["deletions"]) == 25
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert item["result"] == "ok" and item["pushed"] is True, result
+    assert pair.remote_file("d/0.md") is None

@@ -348,11 +348,11 @@ def test_a_rejected_push_is_retried_from_the_fetch_twice(pair: SyncPair, monkeyp
     real = canonical_git.push_canonical
     calls: list[bool] = []
 
-    def flaky(catalog: Path, *, dry_run: bool = False, git: str = "git", timeout: float = 60.0) -> object:
+    def flaky(catalog: Path, *, dry_run: bool = False, **kwargs: object) -> object:
         calls.append(dry_run)
         if not dry_run and len([item for item in calls if not item]) <= 2:
             return canonical_git.PushResult("rejected", "fetch first")
-        return real(catalog, dry_run=dry_run, git=git, timeout=timeout)
+        return real(catalog, dry_run=dry_run, **kwargs)  # type: ignore[arg-type]
 
     monkeypatch.setattr(canonical_git, "push_canonical", flaky)
     pair.write(pair.a, "retry.md", "r\n")
@@ -609,7 +609,9 @@ def test_a_new_repository_whose_first_push_failed_is_created_by_the_cycle(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     pair = SyncPair.create(tmp_path, monkeypatch, capsys)
+    # As if the first push never happened: GitHub and the local tracking ref have no canonical yet.
     git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")
+    git(pair.a, "update-ref", "-d", "refs/remotes/origin/spec-dock/canonical")
     import shutil
 
     from spec_dock.runtime.infra.canonical_state import catalog_state_dir
@@ -687,3 +689,78 @@ def test_detach_starts_one_runner_and_reports_it(pair: SyncPair, monkeypatch: py
     code, result = pair.run(pair.a, "canonical", "sync", "--registered", "--loop", "--detach")
     assert code == 0 and result["status"] == "succeeded" and result["data"]["result"]["pid"] == 4321
     assert started == [pair.state_root]
+
+
+def test_an_ssh_origin_refusing_the_key_is_recorded_as_push_auth_failed(pair: SyncPair, tmp_path: Path) -> None:
+    fake_ssh = tmp_path / "fake-ssh"
+    fake_ssh.write_text("#!/bin/sh\necho 'git@github.com: Permission denied (publickey).' >&2\nexit 255\n")
+    fake_ssh.chmod(0o755)
+    git(pair.a, "config", "core.sshCommand", str(fake_ssh))
+    git(pair.a, "remote", "set-url", "origin", "git@github.com:example/repo.git")
+    pair.write(pair.a, "x.md", "x\n")
+    pair.advance(31)
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert item["error"]["code"] == "CANONICAL_PUSH_AUTH_FAILED" and item["saved_commit"], result
+    assert "https" in item["error"]["next_step"] and "gh auth setup-git" in item["error"]["next_step"]
+    state = pair.state(pair.a)
+    assert state is not None and state.push_auth is not None and state.push_auth.result == "failed"
+
+
+def test_a_cycle_that_lost_its_state_never_takes_a_rewrite(pair: SyncPair) -> None:
+    import shutil
+
+    from spec_dock.runtime.infra.canonical_state import catalog_state_dir
+
+    pair.write(pair.a, "first.md", "1\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    first = pair.remote_head()
+    pair.write(pair.a, "dropped.md", "d\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    dropped = pair.remote_head()
+    git(
+        pair.remote,
+        "update-ref",
+        "refs/heads/spec-dock/canonical",
+        _commit_on_remote(pair, {"n.md": "n"}, parent=first),
+    )
+    shutil.rmtree(catalog_state_dir(pair.state_root, os.path.realpath(pair.catalog(pair.a))))
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    assert dropped not in git(pair.remote, "rev-list", "refs/heads/spec-dock/canonical").split()
+
+
+def test_the_runtime_area_is_never_saved_or_taken_from_elsewhere(pair: SyncPair) -> None:
+    from spec_dock.runtime.application.canonical_catalog import catalog_changes
+
+    catalog = pair.catalog(pair.a).resolve()
+    (catalog / ".gitignore").write_text("**/.workbench/*\n")  # someone dropped the .runtime/ line
+    with catalog_changes(catalog, command="scope edit") as changes:
+        (catalog / "e.md").write_text("e\n")
+        changes.add("e.md")
+    pair.advance(31)
+    pair.sync(pair.a)
+    tree = git(pair.remote, "ls-tree", "-r", "--name-only", "refs/heads/spec-dock/canonical").split()
+    assert "e.md" in tree and not any(path.startswith(".runtime") for path in tree)
+    pair.sync(pair.b)
+    with_runtime = _commit_on_remote(pair, {".runtime/accepted.json": "{}"}, parent=pair.remote_head())
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", with_runtime)
+    _code, result = pair.sync(pair.b)
+    assert catalog_result(result)["paused"] == "merge_failed"
+
+
+def test_an_unexpected_failure_is_recorded_in_the_state(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock.runtime.application import canonical_sync
+
+    def broken(*_args: object, **_kwargs: object) -> object:
+        raise ValueError("unexpected")
+
+    monkeypatch.setattr(canonical_sync, "classify_holds", broken)
+    pair.write(pair.a, "x.md", "x\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    state = pair.state(pair.a)
+    assert state is not None and state.last_error is not None and state.last_error.code == "SYNC_FAILED"
+    assert state.last_cycle is not None and state.last_cycle.result == "error"

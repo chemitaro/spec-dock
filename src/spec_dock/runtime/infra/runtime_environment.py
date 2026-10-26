@@ -148,9 +148,11 @@ def detect_service_manager(
             if state and state[0] in ("running", "degraded"):
                 systemd_user = True
                 break
-            if _BUS_FAILURE not in completed.stderr.decode("utf-8", errors="replace") or attempt == BUS_RETRIES:
+            if _BUS_FAILURE not in completed.stderr.decode("utf-8", errors="replace"):
                 systemd_user = False
                 break
+            if attempt == BUS_RETRIES:
+                break  # still no bus: unknown (a sandbox, su, no XDG_RUNTIME_DIR), not "no systemd"
             wait(1.0)
     linger: bool | None = None
     if user:

@@ -98,6 +98,7 @@ def run_canonical_link(namespace: argparse.Namespace, context: ProjectContext) -
         timeout=namespace.timeout,
         dry_run=namespace.dry_run,
         schedule=not namespace.no_schedule,
+        offline=namespace.offline,
     )
 
 
@@ -147,6 +148,7 @@ def link_checkout(
     dry_run: bool,
     schedule: bool = True,
     follow_up: bool = False,
+    offline: bool = False,
 ) -> OperationResult[object]:
     """Steps 1-8; `schedule=False` (--no-schedule) skips step 6, and a follow-up honours an earlier --no-schedule."""
     require_git(environment)
@@ -192,7 +194,7 @@ def link_checkout(
                 recovery=LINK_AGAIN_RECOVERY,
             )
         try:
-            schedule_effects, schedule_warnings = apply_schedule(plan, timeout=timeout)
+            schedule_effects, schedule_warnings = apply_schedule(plan, offline=offline)
         except ScheduleFailed as failure:
             run.effects.extend(failure.effects)
             raise _StepFailed(failure.code, failure.message, {}, exit_code=3, recovery=failure.recovery) from failure
