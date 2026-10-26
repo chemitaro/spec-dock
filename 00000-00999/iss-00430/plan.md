@@ -237,6 +237,24 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 | Standards ST-2 `merge_failed` を直した後に2回の resume が要ることがある | P2 | 直さずに残る（I-9 の「同期が止まったとき」に、待ってからもう一度 `resume` することを書く） |
 | Standards ST-4、ST-5、ST-6 | P3 | 直さずに残るリスクとして報告書に書く（ST-6 の `--detach` の CLI のテストは足してある） |
 
+### 最終品質ゲート6の指摘の対応（`40beddba3`、2026-10-26）
+
+ゲート6は不合格（Spec の P1 が1件、Standards の P1 が1件）。`make lint` と全体の `uv run pytest`（2935 passed、8 skipped。実行の後も HEAD と作業ツリーは同じ）は通っていた。
+
+| 指摘 | 重さ | 対応 |
+|---|---|---|
+| Spec SP-1 基準のないとき（remove の後のリンクし直し、状態を失った周期とmainの `git fetch`）に、書き換えの後の追跡の参照を基準にして、GitHub が落とした履歴を push し直す | P1 | `initial_baseline` を、手元の HEAD（初期のコミットだけなら追跡の参照）にした。要求と設計を直し、2つの道のテストを足した（直す前は失敗した） |
+| Standards ST-1 別の状態の置き場からの `canonical link` が、1つだけのジョブの `--state-root` を黙って付け替える | P1 | ジョブが記録した根を読み、違って登録があれば何も書く前に `CANONICAL_STATE_ROOT_MISMATCH` で止める。remove はジョブを外さず、status は警告を示す。テストを足した |
+| Standards ST-2 周期の記録が止まっても status が警告しない | P2 | 最後の周期が5分より古ければ `CANONICAL_SYNC_NOT_CONFIRMED` を示す。テストを足した |
+| Standards ST-3 選んだ削除が保存の前に作り直されると、確かめていない中身が入る | P2 | 選んだ削除は名前で外す（`save_commit(deletions=...)`）。テストを足した |
+| Standards ST-4 SSH の origin のテストが手順7で本物の `gh api` を呼ぶ | P2 | `SyncPair` は手順7の `gh api` を既定で失敗させ、`isolate_user_state` は `GH_TOKEN` などを外す |
+| Spec SP-3 保存のメッセージの件数が、持ち越したパスを含む | P3 | 実際にコミットした件数にした。テストを足した |
+| Spec SP-4 clean の filter のあるファイルを許可しても、取り込み直しが保留のまま | P3 | 作業ツリーのファイルがコミットする中身と同じときは、filter なしの値で比べる。テストを足した（直す前は失敗した） |
+| Standards ST-6 移動の状態が読めないとき `LOCAL_IO_FAILED`、`move_catalog_state` の assert | P3 | `CANONICAL_STATE_UNREADABLE` にし、assert をやめた |
+| Standards ST-7 `.runtime` の `merge_failed` と、取り込み直しの大量の削除の次の1手 | P3 | 専用の次の1手を足し、status は一時停止の次の1手にそれを使う |
+| Spec SP-2 `--offline` の link でも最初の周期が動く | P3 | 設計に書いた（`--offline` はこのコマンドの通信だけを止める） |
+| Standards ST-5 `REMOVE_CYCLE_WAIT` の説明 | P3 | 説明を実際に合わせた（値は150秒のまま。待ちきれなければ何も書かずに `CANONICAL_LOCK_BUSY`） |
+
 ## exit / handoff
 
 - **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
