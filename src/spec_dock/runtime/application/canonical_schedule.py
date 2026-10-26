@@ -170,7 +170,9 @@ def plan_schedule(
     git = _recorded_git(previous, environment)
     from spec_dock.runtime.application.canonical_sync import repository_of
 
-    repository = previous.repository if previous is not None else repository_of(layout.main_checkout, timeout=timeout)
+    repository = (previous.repository if previous is not None else None) or repository_of(
+        layout.main_checkout, timeout=timeout
+    )
     stamp = format_timestamp(_now())
     plan.entry = RegistryEntry(
         catalog, str(layout.main_checkout), repository, git, previous.registered_at if previous else stamp

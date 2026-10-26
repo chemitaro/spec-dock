@@ -103,6 +103,7 @@ class CatalogObservation:
     registered_exists: bool | None = None
     off_branch: str | None = None
     unfinished: bool = False
+    in_progress: bool = False  # unfinished, and Git still holds the catalog index lock (another link is creating it)
 
     def link_for(self, checkout: Path) -> LinkView:
         return next(view for view in self.links if view.checkout == checkout)
@@ -139,6 +140,7 @@ def observe_catalog(layout: CatalogLayout, environment: RuntimeEnvironment, *, t
         registered_exists=facts.registered_exists,
         off_branch=facts.off_branch,
         unfinished=facts.unfinished,
+        in_progress=facts.in_progress,
     )
 
 
@@ -154,6 +156,7 @@ class _CatalogFacts:
     registered_exists: bool | None = None
     off_branch: str | None = None
     unfinished: bool = False
+    in_progress: bool = False
 
 
 def _catalog_facts(
@@ -189,6 +192,7 @@ def _catalog_facts(
             gitdir=gitdir,
             entries=count_entries(catalog),
             unfinished=True,
+            in_progress=(admin / "index.lock").exists(),
             detail=f"Git did not finish creating the catalog {catalog} (it has no index yet)",
         )
     branch = canonical_git.admin_branch(admin)
@@ -327,6 +331,14 @@ def gitignore_next_step(layout: CatalogLayout) -> str:
 def occupied_next_step(observation: CatalogObservation) -> str:
     """The next step for an occupied catalog place; SpecDock never deletes what is there."""
     catalog = observation.layout.catalog
+    if observation.in_progress:
+        # Another canonical link (or git) is still checking the catalog out: never suggest deleting it first.
+        return (
+            f"Another spec-dock canonical link or git is still creating the catalog {catalog}; wait a moment and run "
+            "the same command again. If it stays unfinished and no git process works there, run "
+            f"git -C {observation.layout.main_checkout} worktree remove --force --force {catalog} "
+            "and spec-dock canonical link."
+        )
     if observation.unfinished:
         return (
             f"Make sure no git process still works in {catalog} and that it holds nothing you need, then run "

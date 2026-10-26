@@ -8,8 +8,11 @@ from pathlib import Path
 
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
+from spec_dock.runtime.application.canonical_hold import run_canonical_accept, run_canonical_restore
 from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
+from spec_dock.runtime.application.canonical_remove import run_canonical_remove
+from spec_dock.runtime.application.canonical_resume import run_canonical_resume
 from spec_dock.runtime.application.canonical_status import run_canonical_status
 from spec_dock.runtime.application.canonical_sync import run_canonical_sync, run_registered_sync
 from spec_dock.runtime.application.canonical_worktrees import create_worktree_and_link
@@ -26,6 +29,10 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "canonical status": run_canonical_status,
     "worktree create": create_worktree_and_link,
     "canonical sync": run_canonical_sync,
+    "canonical accept": run_canonical_accept,
+    "canonical restore": run_canonical_restore,
+    "canonical resume": run_canonical_resume,
+    "canonical remove": run_canonical_remove,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

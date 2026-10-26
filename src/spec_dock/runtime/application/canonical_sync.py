@@ -121,12 +121,17 @@ def hostname() -> str:
     return socket.gethostname()
 
 
+def github_api_for(cwd: Path) -> GithubApi:
+    """The serial `gh api` caller of step 7; tests replace it."""
+    return GithubApi(cwd=cwd)
+
+
 @dataclass(frozen=True)
 class SyncContext:
     state_root: Path
     clock: GithubClock = field(default_factory=lambda: SYNC_CLOCK)
     pc: str = field(default_factory=lambda: pc_name(hostname()))
-    github_api: Callable[[Path], GithubApi] = field(default=lambda cwd: GithubApi(cwd=cwd))
+    github_api: Callable[[Path], GithubApi] = field(default=lambda cwd: github_api_for(cwd))
 
     def now(self) -> datetime:
         return self.clock.now()
@@ -536,7 +541,9 @@ def _merge(run: _Run) -> None:
         tree, copies = _merged_tree(run, local, remote, unrelated=adopt)
         if adopt:
             if _adopt_holds(run, remote, tree):
-                raise _Stop
+                if run.result.result == "paused":
+                    raise _Stop
+                return  # the held paths are being fixed: wait for their save, push nothing
             target = canonical_git.commit_on(
                 catalog, tree, remote, message=f"spec-dock: adopt remote ({run.ctx.pc})", git=git
             )
@@ -631,6 +638,12 @@ def _adopt_holds(run: _Run, remote: str, tree: str) -> bool:
     )
     if not held:
         return False
+    pending = {change.path for change in canonical_git.list_changes(catalog, git=git)}
+    if set(held) <= pending:
+        # The user is already changing every held path (for example deleting it): wait for that save.
+        run.state = run.state.evolve(blocking=tuple(Blocking(path, "held") for path in sorted(held)))
+        run.result.blocking = list(run.state.blocking)
+        return True
     stamp = run.ctx.stamp()
     holds = tuple(Hold(path, kind, stamp) for path, kind in sorted(held.items()))
     run.state = run.state.evolve(holds=holds)

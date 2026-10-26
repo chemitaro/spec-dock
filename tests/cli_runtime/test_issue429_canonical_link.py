@@ -979,3 +979,23 @@ def test_worktree_create_from_an_unmigrated_base_warns_and_does_not_link(
     assert [item["code"] for item in result["warnings"]] == ["CANONICAL_CHECKOUT_NOT_MIGRATED"]
     assert result["data"]["result"]["canonical_link"]["state"] == "skipped"
     assert not os.path.lexists(tmp_path / "trees/feature/spec-dock/initiatives")
+
+
+def test_a_catalog_still_being_created_says_wait_before_anything_else(
+    capsys: pytest.CaptureFixture[str], main_checkout: Path
+) -> None:
+    # iss-00430 (RST-1 of iss-00429): another link is checking the catalog out; Git holds its index lock.
+    assert link(capsys, main_checkout)[0] == 0
+    catalog = main_checkout / "spec-dock/.canonical"
+    admin = canonical_git.read_gitdir(catalog)
+    assert admin is not None
+    (admin / "index").rename(admin / "index.lock")
+    before = tree_digest(main_checkout / ".git/worktrees"), tree_digest(catalog)
+    code, result = link(capsys, main_checkout)
+    assert code == 3 and result["error"]["code"] == "CANONICAL_PATH_OCCUPIED" and result["effects"] == []
+    step = result["recovery"]["instructions"][0]
+    assert step.startswith("Another spec-dock canonical link or git is still creating the catalog")
+    assert step.index("wait a moment") < step.index("worktree remove --force --force")
+    code, status = run(capsys, main_checkout, "canonical", "status")
+    assert status["data"]["catalog"]["next_step"].startswith("Another spec-dock canonical link")
+    assert (tree_digest(main_checkout / ".git/worktrees"), tree_digest(catalog)) == before

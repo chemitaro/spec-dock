@@ -1,0 +1,185 @@
+"""Pauses and `canonical resume` (iss-00430, AC-430-03, -22): rewrite, deletion, re-adoption without old history."""
+
+from __future__ import annotations
+
+import os
+import subprocess
+from typing import TYPE_CHECKING
+
+import pytest
+
+from tests.support.canonical_repo import git
+from tests.support.canonical_sync import SyncPair, catalog_result
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+TOKEN = "ghp_" + "K" * 36
+
+
+@pytest.fixture
+def pair(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> SyncPair:
+    return SyncPair.create(tmp_path, monkeypatch, capsys)
+
+
+def _remote_commit(pair: SyncPair, files: dict[str, str], *, parent: str | None) -> str:
+    index = pair.tmp_path / "remote-index"
+    environment = {**os.environ, "GIT_INDEX_FILE": str(index), "GIT_DIR": str(pair.remote)}
+    for key in ("AUTHOR", "COMMITTER"):
+        environment[f"GIT_{key}_NAME"] = "elsewhere"
+        environment[f"GIT_{key}_EMAIL"] = "elsewhere@example.invalid"
+
+    def run(*args: str, data: bytes | None = None) -> str:
+        return (
+            subprocess
+            .run(["git", *args], check=True, capture_output=True, env=environment, input=data)
+            .stdout.decode()
+            .strip()
+        )
+
+    run("read-tree", parent) if parent else run("read-tree", "--empty")
+    for path, text in files.items():
+        oid = run("hash-object", "-w", "--stdin", data=text.encode())
+        run("update-index", "--add", "--cacheinfo", f"100644,{oid},{path}")
+    tree = run("write-tree")
+    index.unlink()
+    return run("commit-tree", tree, *(("-p", parent) if parent else ()), "-m", "elsewhere")
+
+
+def _force(pair: SyncPair, commit: str) -> None:
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", commit)
+
+
+def _history(pair: SyncPair) -> set[str]:
+    return set(git(pair.remote, "rev-list", "refs/heads/spec-dock/canonical").split())
+
+
+def test_adopting_a_rewritten_remote_keeps_local_content_and_never_pushes_the_dropped_history(pair: SyncPair) -> None:
+    pair.write(pair.a, "base.md", "base\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    first = pair.remote_head()
+    pair.write(pair.a, "dropped.md", "a commit GitHub will drop\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    dropped = pair.remote_head()
+    rewritten = _remote_commit(pair, {"theirs.md": "after the rewrite\n"}, parent=first)
+    _force(pair, rewritten)
+    pair.write(pair.a, "mine.md", "local only\n")
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    code, result = pair.run(pair.a, "canonical", "resume")
+    assert code == 3 and result["error"]["code"] == "CANONICAL_PAUSED"
+    assert result["error"]["details"]["next_step"] == "spec-dock canonical resume --adopt-remote"
+    code, result = pair.run(pair.a, "canonical", "resume", "--push-local")
+    assert code == 3 and result["error"]["code"] == "CANONICAL_PAUSED"
+    code, result = pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    assert code == 0 and result["data"]["result"]["baseline"] == rewritten, result
+    code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert code == 0 and item["merged"] and item["pushed"], result
+    head = pair.remote_head()
+    assert git(pair.remote, "show", "-s", "--format=%P", head) == rewritten  # one parent: GitHub's
+    assert dropped not in _history(pair)
+    for path, text in (
+        ("base.md", "base"),
+        ("dropped.md", "a commit GitHub will drop"),
+        ("theirs.md", "after the rewrite"),
+        ("mine.md", "local only"),
+    ):
+        assert pair.remote_file(path) == text
+    state = pair.state(pair.a)
+    assert state is not None and state.paused is None and state.adopt_remote_pending is False
+
+
+def test_adopting_an_unrelated_history_keeps_both_versions_of_a_file(pair: SyncPair) -> None:
+    pair.write(pair.a, "doc.md", "local\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    _force(
+        pair, _remote_commit(pair, {"doc.md": "remote\n", ".spec-dock-canonical.json": '{"format": 1}\n'}, parent=None)
+    )
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    _code, result = pair.sync(pair.a, pc="mac-a")
+    item = catalog_result(result)
+    assert item["pushed"] and item["conflicts"][0]["path"] == "doc.md"
+    assert pair.remote_file("doc.md") == "remote" and pair.remote_file(item["conflicts"][0]["copy"]) == "local"
+
+
+def test_adopting_stays_paused_when_the_rewrite_removed_a_secret_that_would_come_back(pair: SyncPair) -> None:
+    pair.write(pair.a, "base.md", "base\n")
+    pair.write(pair.a, "leak.md", TOKEN + "\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "accept", "leak.md")
+    pair.sync(pair.a)
+    leaked = pair.remote_head()
+    assert pair.remote_file("leak.md") == TOKEN
+    cleaned = _remote_commit(pair, {"base.md": "base\n", ".spec-dock-canonical.json": '{"format": 1}\n'}, parent=None)
+    _force(pair, cleaned)
+    (pair.catalog(pair.a) / ".runtime/accepted.json").unlink()
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    _code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert item["result"] == "paused" and item["error"]["code"] == "CANONICAL_SAVE_HELD", result
+    assert [hold["path"] for hold in item["holds"]] == ["leak.md"]
+    assert pair.remote_head() == cleaned and leaked not in _history(pair)
+    (pair.specs(pair.a) / "leak.md").unlink()
+    pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    pair.sync(pair.a)
+    pair.advance(31)
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["pushed"] is True and pair.remote_file("leak.md") is None
+    assert leaked not in _history(pair)
+
+
+def test_push_local_recreates_a_deleted_remote_branch(pair: SyncPair) -> None:
+    pair.write(pair.a, "keep.md", "k\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_deleted"
+    code, result = pair.run(pair.a, "canonical", "resume", "--adopt-remote")
+    assert code == 3 and result["error"]["details"]["next_step"] == "spec-dock canonical resume --push-local"
+    code, result = pair.run(pair.a, "canonical", "resume", "--push-local")
+    assert code == 0 and result["data"]["result"]["pushed"] is True, result
+    assert pair.remote_file("keep.md") == "k"
+    code, result = pair.sync(pair.a)
+    assert code == 0 and catalog_result(result)["result"] == "ok"
+
+
+def test_the_baseline_survives_git_clean_and_still_detects_a_rewrite(pair: SyncPair) -> None:
+    pair.write(pair.a, "a.md", "a\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    git(pair.a, "clean", "-ffdx", "-q")
+    assert not pair.catalog(pair.a).exists()
+    code, result = pair.run(pair.a, "canonical", "link", "--no-schedule")
+    assert code == 0, result
+    _force(pair, _remote_commit(pair, {"x.md": "x\n"}, parent=None))
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_rewritten"
+
+
+def test_a_merge_failure_resumes_by_adoption(pair: SyncPair) -> None:
+    pair.write(pair.a, "seed.md", "s\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.sync(pair.b)
+    pair.write(pair.a, "topic", "file\n")
+    pair.write(pair.b, "topic/inner.md", "dir\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    _code, result = pair.sync(pair.b)
+    assert catalog_result(result)["paused"] == "merge_failed"
+    code, result = pair.run(pair.b, "canonical", "resume", "--adopt-remote")
+    assert code == 0, result
+    _code, result = pair.sync(pair.b)
+    item = catalog_result(result)
+    assert item["result"] == "paused" and item["paused"] == "merge_failed"  # still not expressible: stays paused
+    assert (pair.specs(pair.b) / "topic/inner.md").read_text() == "dir\n"

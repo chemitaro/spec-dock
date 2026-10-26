@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 from typing import TYPE_CHECKING
 
@@ -359,3 +360,125 @@ def test_a_rejected_push_is_retried_from_the_fetch_twice(pair: SyncPair, monkeyp
     code, result = pair.sync(pair.a)
     assert code == 0 and catalog_result(result)["pushed"] is True
     assert calls.count(False) == 3 and pair.remote_file("retry.md") == "r"
+
+
+def _structure(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> object:
+    from spec_dock.runtime.application import canonical_sync
+    from spec_dock.runtime.infra.github_snapshot import clear_memory
+    from spec_dock.runtime.infra.github_structure import GithubApi
+    from tests.support.fake_github import FakeGithub
+
+    fake = FakeGithub("example/repo")
+    initiative = fake.scope("initiative", slug="plan", title="計画")
+    fake.scope("epic", slug="core", parent=initiative.number)
+    clear_memory()
+    monkeypatch.setattr(canonical_sync, "repository_of", lambda *_a, **_k: "github.com/example/repo")
+    monkeypatch.setattr(canonical_sync, "github_api_for", lambda cwd: GithubApi(runner=fake, clock=fake.clock))
+    return fake
+
+
+def test_an_unchanged_structure_costs_only_the_304_probes_and_github_failures_change_nothing(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fake = _structure(pair, monkeypatch)
+    code, result = pair.sync(pair.a)
+    (repository,) = result["data"]["result"]["repositories"]
+    assert repository == {
+        "repository": "github.com/example/repo",
+        "probe": "changed",
+        "refreshed": True,
+        "dashboards_written": 0,
+    }
+    start = len(fake.requests)  # type: ignore[attr-defined]
+    pair.write(pair.a, "x.md", "x\n")
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and catalog_result(result)["pushed"] is True
+    assert result["data"]["result"]["repositories"][0]["probe"] == "unchanged"
+    requests = fake.requests[start:]  # type: ignore[attr-defined]
+    assert requests and all(request.status == 304 and request.method == "GET" for request in requests)
+    fake.inject(status=502, times=10)  # type: ignore[attr-defined]
+    pair.write(pair.a, "y.md", "y\n")
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and catalog_result(result)["pushed"] is True and pair.remote_file("y.md") == "y"
+    assert result["data"]["result"]["repositories"][0]["probe"] == "failed"
+
+
+def test_registered_sync_processes_every_catalog_and_reports_one_failure_as_partial(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _structure(pair, monkeypatch)
+    for checkout in (pair.a, pair.b):
+        assert pair.run(checkout, "canonical", "link")[0] == 0
+    git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")
+    pair.write(pair.b, "b.md", "b\n")
+    pair.advance(31)
+    # Clone a sees the deletion first and pauses; clone b also pauses: nothing is pushed back.
+    code, result = pair.run(pair.a, "canonical", "sync", "--registered")
+    catalogs = result["data"]["result"]["catalogs"]
+    assert [item["paused"] for item in catalogs] == ["remote_deleted", "remote_deleted"]
+    assert code == 3 and result["status"] == "failed"
+    assert set(catalogs[0]) == {
+        "catalog",
+        "result",
+        "saved_commit",
+        "merged",
+        "pushed",
+        "conflicts",
+        "holds",
+        "blocking",
+        "skipped_reason",
+        "paused",
+        "error",
+    }
+    assert len(result["data"]["result"]["repositories"]) == 1  # step 7 runs once even though both paused
+    pair.run(pair.b, "canonical", "resume", "--push-local")
+    pair.write(pair.b, "c.md", "c\n")
+    pair.advance(31)
+    code, result = pair.run(pair.a, "canonical", "sync", "--registered")
+    results = {item["catalog"]: item for item in result["data"]["result"]["catalogs"]}
+    assert code == 6 and result["status"] == "partial", result
+    assert results[os.path.realpath(pair.catalog(pair.a))]["result"] == "paused"
+    assert results[os.path.realpath(pair.catalog(pair.b))]["pushed"] is True
+
+
+def test_a_broken_registry_stops_registered_sync_without_processing(pair: SyncPair) -> None:
+    pair.state_root.mkdir(parents=True, exist_ok=True)
+    (pair.state_root / "canonical-registry.json").write_text('{"version": 7}')
+    code, result = pair.run(pair.a, "canonical", "sync", "--registered")
+    assert code == 3 and result["error"]["code"] == "CANONICAL_REGISTRY_UNREADABLE"
+
+
+def test_a_termination_request_ends_registered_sync_after_the_current_catalog(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import signal
+
+    from spec_dock.runtime.application import canonical_sync
+
+    for checkout in (pair.a, pair.b):
+        pair.run(checkout, "canonical", "link")
+    real = canonical_sync.sync_catalog
+    seen: list[str] = []
+
+    def first_then_term(entry: object, ctx: object) -> object:
+        seen.append(entry.catalog)  # type: ignore[attr-defined]
+        outcome = real(entry, ctx)  # type: ignore[arg-type]
+        os.kill(os.getpid(), signal.SIGTERM)
+        return outcome
+
+    monkeypatch.setattr(canonical_sync, "sync_catalog", first_then_term)
+    code, result = pair.run(pair.a, "canonical", "sync", "--registered")
+    assert code == 0 and len(seen) == 1 and len(result["data"]["result"]["catalogs"]) == 1
+    assert signal.getsignal(signal.SIGTERM) is signal.SIG_DFL
+
+
+def test_the_loop_exits_at_once_when_another_runner_holds_the_lock(pair: SyncPair) -> None:
+    import fcntl
+
+    pair.state_root.mkdir(parents=True, exist_ok=True)
+    with (pair.state_root / "runner.lock").open("w") as stream:
+        fcntl.flock(stream, fcntl.LOCK_EX)
+        code, result = pair.run(pair.a, "canonical", "sync", "--registered", "--loop")
+    assert code == 0 and result["status"] == "unchanged"
