@@ -57,7 +57,7 @@ def show_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
-    result = {
+    result: dict[str, object] = {
         "scope": scopes.payload(scope),
         "github_ref": scope.github_ref,
         "changed": False,
@@ -83,7 +83,7 @@ def list_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         resolve_scope(context, scopes.views, namespace.parent, selection=selection).id if namespace.parent else None
     )
     listed = list_scopes(scopes.views, kind=namespace.kind, parent_id=parent, state=namespace.state)
-    result = {
+    result: dict[str, object] = {
         "items": [scopes.payload(scope) for scope in listed.items],
         "unknown_filtered_count": 0,
         "snapshot": scopes.snapshot_payload(),
@@ -93,7 +93,7 @@ def list_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     )
 
 
-def _source(namespace: argparse.Namespace) -> tuple[bool, bool]:
+def resolve_source(namespace: argparse.Namespace) -> tuple[bool, bool]:
     """(refresh, offline): `--source github` refetches; an explicit `--source local` does not apply."""
     if getattr(namespace, "source_explicit", False) and namespace.source == "local":
         raise CanonicalCommandError(
@@ -128,7 +128,9 @@ def _external(scopes: CanonicalScopes, chain: tuple[str, ...]) -> list[dict[str,
 
 
 def query_dependencies(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    refresh, offline = _source(namespace) if namespace.command_path == "dependency check" else (False, namespace.offline)
+    refresh, offline = (
+        resolve_source(namespace) if namespace.command_path == "dependency check" else (False, namespace.offline)
+    )
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, refresh=refresh, offline=offline)
     selection = read_selection(context, scopes.views)
     target = resolve_scope(context, scopes.views, namespace.target, selection=selection)
@@ -211,7 +213,9 @@ def show_active(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         if observation.status == "selected" and observation.record is not None
         else None
     )
-    data = CanonicalActiveData(observation.view(), observation.ancestors, scope=selected, snapshot=scopes.snapshot_payload())
+    data = CanonicalActiveData(
+        observation.view(), observation.ancestors, scope=selected, snapshot=scopes.snapshot_payload()
+    )
     return OperationResult(namespace.command_path, "succeeded", data, 0, warnings=scopes.warnings())
 
 
@@ -251,7 +255,11 @@ def clear_active(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     context.require_writer()
     selected_handles = None
     scopes: CanonicalScopes | None = None
-    if namespace.from_target is not None or namespace.expect_current is not None or namespace.expect_backend is not None:
+    if (
+        namespace.from_target is not None
+        or namespace.expect_current is not None
+        or namespace.expect_backend is not None
+    ):
         scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, offline=namespace.offline)
         selection = read_selection(context, scopes.views)
         target = (
@@ -382,7 +390,11 @@ def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> Op
         return query_root(namespace, context)
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
     selection = read_selection(context, scopes.views)
-    target = None if namespace.scope == "@root" else resolve_scope(context, scopes.views, namespace.scope, selection=selection)
+    target = (
+        None
+        if namespace.scope == "@root"
+        else resolve_scope(context, scopes.views, namespace.scope, selection=selection)
+    )
     check_scope_expectations(
         context,
         scopes.views,

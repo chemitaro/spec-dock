@@ -14,11 +14,11 @@ from pathlib import Path, PurePosixPath
 from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.application.canonical_catalog import require_linked
+from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
 from spec_dock.runtime.application.scope_query import ScopeView, _sort_key
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.domain.canonical_layout import LINK_RELATIVE
 from spec_dock.runtime.domain.lifecycle import GithubBackend, StatusObservation, observe_github_state
-from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
 from spec_dock.runtime.infra.catalog_tree import ScopeDirectoryAmbiguous
 from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.github_snapshot import (
@@ -260,4 +260,3 @@ def check_canonical_expectation(
     expected = resolve_scope(context, scopes.views, namespace.expect_current, selection=selected).id
     if selected.status != "selected" or selected.record is None or selected.record.scope_id != expected:
         raise ValueError("direct target does not match --expect-current")
-

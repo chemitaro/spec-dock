@@ -230,7 +230,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _flag("--confirm-old-writers-stopped"),
     ),
     "canonical link": (),
-    "canonical status": (),
+    "canonical status": (_flag("--structure"),),
     "installation show": (_arg("--target"),),
     "installation init": (_arg("path"),),
     "installation update": (_arg("--target"), _arg("--backup-dir")),
@@ -547,8 +547,8 @@ def _help_spec(leaf: str) -> HelpSpec:
         confirmation = "No final confirmation is required; --dry-run reports the plan without writing."
     elif leaf == "canonical status":
         target = "This clone's catalog and the links of the main checkout and this checkout."
-        reads = "Git worktree inventory and catalog status with --no-optional-locks, the links, ignore rules and tool settings files; never GitHub or the remote."
-        does_not = "Does not write the repository, the catalog, .git, the state root or GitHub."
+        reads = "Git worktree inventory and catalog status with --no-optional-locks, the links, ignore rules and tool settings files; GitHub's structure snapshot only with --structure, never the remote."
+        does_not = "Does not write the repository, the catalog, .git or GitHub; --structure may refresh only the structure snapshot in the state root."
         json_data = "catalog, link, exclude, access, tools, sync, changes, format, git, snapshot, dashboard, structure; each has status and next_step."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "workspace migrate":

@@ -118,9 +118,7 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
 
 def refuse_specs_at(context: ProjectContext, commit: str, *, timeout: float) -> None:
     """Stop before writing when the commit's tree tracks spec-dock/initiatives (a pre-migration commit)."""
-    listed = run_git(
-        context.root, "ls-tree", "--name-only", commit, "--", LINK_RELATIVE.as_posix(), timeout=timeout
-    )
+    listed = run_git(context.root, "ls-tree", "--name-only", commit, "--", LINK_RELATIVE.as_posix(), timeout=timeout)
     if listed.strip():
         raise CanonicalCommandError(
             CANONICAL_BASE_HAS_SPECS,

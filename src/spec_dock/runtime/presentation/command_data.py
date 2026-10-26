@@ -23,6 +23,13 @@ class DiagnosticData:
 
 
 @dataclass(frozen=True)
+class CanonicalDiagnosticData(DiagnosticData):
+    """`workspace doctor` in canonical mode: today's findings plus the `canonical status` items."""
+
+    canonical: dict[str, object] | None = None
+
+
+@dataclass(frozen=True)
 class ActiveData:
     selection: dict[str, object]
     ancestors: tuple[str, ...]
@@ -47,6 +54,13 @@ class SyncData:
     counts: tuple[dict[str, object], ...]
     findings: tuple[Diagnostic, ...] = ()
     kind: str = "sync"
+
+
+@dataclass(frozen=True)
+class CanonicalSyncData(SyncData):
+    """`workspace sync` in canonical mode; source is `snapshot` or `github`."""
+
+    snapshot: dict[str, object] | None = None
 
 
 @dataclass(frozen=True)

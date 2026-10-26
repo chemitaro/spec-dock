@@ -21,6 +21,11 @@ from spec_dock.runtime.application.canonical_scope_read import (
     show_scope,
 )
 from spec_dock.runtime.application.canonical_status import run_canonical_status
+from spec_dock.runtime.application.canonical_workspace import (
+    diagnose_workspace,
+    sync_workspace,
+    validate_workspace,
+)
 from spec_dock.runtime.application.canonical_worktrees import (
     bootstrap_worktree,
     create_worktree_and_link,
@@ -58,6 +63,9 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "worktree remove": remove_worktree,
     "worktree bootstrap": bootstrap_worktree,
     "workbench copy": refuse_workbench_copy,
+    "workspace sync": sync_workspace,
+    "workspace validate": validate_workspace,
+    "workspace doctor": diagnose_workspace,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

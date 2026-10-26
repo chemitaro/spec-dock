@@ -49,7 +49,13 @@ class CanonicalWorld:
         monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: environment())
         github_snapshot.clear_memory()
         checkout = clone(bare_remote(tmp_path / "remote.git"), tmp_path / "main")
-        world = cls(tmp_path, capsys, checkout, install_fake_gh(tmp_path, monkeypatch, FakeGithub(REPOSITORY)), tmp_path / "state")
+        world = cls(
+            tmp_path,
+            capsys,
+            checkout,
+            install_fake_gh(tmp_path, monkeypatch, FakeGithub(REPOSITORY)),
+            tmp_path / "state",
+        )
         code, payload = world.run("canonical", "link")
         assert code == 0, payload
         git(checkout, "remote", "set-url", "origin", f"https://github.com/{REPOSITORY}.git")

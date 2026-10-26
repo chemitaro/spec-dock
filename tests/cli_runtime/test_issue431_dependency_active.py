@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import TYPE_CHECKING
 
 import pytest
@@ -53,7 +52,13 @@ def test_dependency_check_reports_blockers_and_readiness(world: CanonicalWorld) 
 def test_dependency_check_source_github_refetches(world: CanonicalWorld) -> None:
     world.run("dependency", "check", "iss-00003")
     before = len(world.fake().graphql_requests())
-    world.edit(lambda fake: (setattr(fake.issue(4), "state", "closed"), setattr(fake.issue(4), "state_reason", "completed")))
+
+    def close(fake: object) -> None:
+        issue = fake.issue(4)  # type: ignore[attr-defined]
+        issue.state, issue.state_reason = "closed", "completed"
+        fake.touch(4)  # type: ignore[attr-defined]
+
+    world.edit(close)
     code, payload = world.run("dependency", "check", "iss-00003", "--source", "github")
     assert code == 0, payload
     assert len(world.fake().graphql_requests()) > before
@@ -89,14 +94,14 @@ def test_active_set_in_a_linked_worktree_points_links_through_the_catalog(world:
     code, payload = world.run("active", "set", "iss-00003", "--yes", checkout=linked)
     assert code == 0, payload
     issue = linked / "spec-dock/active/issue"
-    assert os.readlink(issue) == "../initiatives/init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf"
+    assert str(issue.readlink()) == "../initiatives/init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf"
     assert (issue / "requirement.md").is_file()
-    assert os.readlink(linked / "spec-dock/active/initiative") == "../initiatives/init-00001-plan"
+    assert str((linked / "spec-dock/active/initiative").readlink()) == "../initiatives/init-00001-plan"
     for role in ("initiative", "epic", "issue"):
         (linked / "spec-dock/system/active-none" / role).mkdir(parents=True)
     code, payload = world.run("active", "clear", "--all", "--yes", checkout=linked)
     assert code == 0, payload
-    assert os.readlink(issue) == "../system/active-none/issue"
+    assert str(issue.readlink()) == "../system/active-none/issue"
 
 
 def test_active_set_with_a_missing_ancestor_directory_writes_no_link(world: CanonicalWorld) -> None:
@@ -105,9 +110,8 @@ def test_active_set_with_a_missing_ancestor_directory_writes_no_link(world: Cano
     epic.rename(world.catalog / "moved-away")
     code, payload = world.run("active", "set", "iss-00003", "--yes")
     assert (code, payload["error"]["code"]) == (4, "LOCAL_TARGET_NOT_FOUND")
-    assert not (world.main / "spec-dock/active/issue").is_symlink() or "iss-00003" not in os.readlink(
-        world.main / "spec-dock/active/issue"
-    )
+    issue = world.main / "spec-dock/active/issue"
+    assert not issue.is_symlink() or "iss-00003" not in str(issue.readlink())
 
 
 def test_active_set_of_another_scope_requires_work_start(world: CanonicalWorld) -> None:

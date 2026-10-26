@@ -94,7 +94,7 @@ def bootstrap_worktree(namespace: argparse.Namespace, context: ProjectContext) -
 
 
 def refuse_workbench_copy(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    del context
+    del namespace, context
     raise CanonicalCommandError(
         CANONICAL_WORKBENCH_SHARED,
         "every worktree of this clone reads the same catalog, so each Scope's .workbench is already shared",

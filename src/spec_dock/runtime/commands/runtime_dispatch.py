@@ -27,7 +27,6 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
         )
     from spec_dock.runtime.application.canonical_errors import (
         CanonicalCommandError,
-        canonical_not_implemented,
         canonical_not_migrated,
         github_error_result,
     )

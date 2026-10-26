@@ -11,6 +11,7 @@ from spec_dock.cli import main
 from spec_dock.runtime.application.canonical_errors import github_error_result
 from spec_dock.runtime.commands import canonical_dispatch
 from spec_dock.runtime.infra.github_structure import GithubStructureError
+from spec_dock.runtime.presentation.envelope import RecoveryInstructions
 from tests.support.canonical_repo import bare_remote, clone, isolate_user_state
 
 if TYPE_CHECKING:
@@ -18,10 +19,13 @@ if TYPE_CHECKING:
 
 
 def test_a_certain_failure_is_failed_with_exit_five_and_the_network_next_step() -> None:
-    result = github_error_result("scope show", GithubStructureError("GITHUB_UNAVAILABLE", "offline", endpoint="graphql"))
+    result = github_error_result(
+        "scope show", GithubStructureError("GITHUB_UNAVAILABLE", "offline", endpoint="graphql")
+    )
     assert (result.status, result.exit_code, result.effects) == ("failed", 5, ())
     assert result.error is not None and result.error.code == "GITHUB_UNAVAILABLE"
-    assert result.recovery is not None and "gh auth status" in result.recovery.instructions[0]
+    assert isinstance(result.recovery, RecoveryInstructions)
+    assert "gh auth status" in result.recovery.instructions[0]
 
 
 def test_an_uncertain_write_is_partial_with_exit_six_and_an_unknown_effect() -> None:
@@ -38,7 +42,7 @@ def test_a_rate_limit_names_the_retry_time() -> None:
     result = github_error_result("scope list", error)
     assert result.exit_code == 5 and result.error is not None
     assert result.error.details["retry_at"] == "2026-10-26T01:00:00Z"
-    assert result.recovery is not None
+    assert isinstance(result.recovery, RecoveryInstructions)
     assert result.recovery.instructions == ("Run the same command after 2026-10-26T01:00:00Z.",)
 
 

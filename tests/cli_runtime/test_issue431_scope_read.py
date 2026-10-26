@@ -25,7 +25,12 @@ def test_scope_show_reports_github_title_state_directory_and_snapshot_time(world
     code, payload = world.run("scope", "show", "iss-00003")
     assert code == 0, payload
     scope = payload["data"]["result"]["scope"]
-    assert (scope["id"], scope["kind"], scope["title"], scope["parent_id"]) == ("iss-00003", "issue", "葉", "epic-00002")
+    assert (scope["id"], scope["kind"], scope["title"], scope["parent_id"]) == (
+        "iss-00003",
+        "issue",
+        "葉",
+        "epic-00002",
+    )
     assert scope["status"]["state"] == "completed" and scope["state_reason"] == "completed"
     assert scope["path"] == "spec-dock/initiatives/init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf"
     assert (scope["number"], scope["github_ref"], scope["directory_found"]) == (3, "gh:example/repo#3", True)

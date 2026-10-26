@@ -115,7 +115,9 @@ def test_in_progress_is_doing_but_still_ready() -> None:
 
 
 def test_a_blocked_scope_in_progress_is_doing_and_not_ready() -> None:
-    result = evaluate_readiness(tree(node(4, "issue", parent=2), issue={"in_progress": True, "blocked_by": (4,)}), "iss-00003")
+    result = evaluate_readiness(
+        tree(node(4, "issue", parent=2), issue={"in_progress": True, "blocked_by": (4,)}), "iss-00003"
+    )
     assert (result.state, result.ready) == ("DOING", False)
 
 
@@ -158,7 +160,7 @@ def test_a_dependency_whose_id_is_undecided_reports_its_anomaly() -> None:
 def test_unknown_outranks_doing_and_done_outranks_unknown() -> None:
     anomaly = (StructureAnomaly(3, "DEPENDENCY_FOREIGN_REPOSITORY", "x"),)
     assert evaluate_readiness(tree(issue={"in_progress": True}, anomalies=anomaly), "iss-00003").state == "UNKNOWN"
-    closed = {"state": "closed", "state_reason": "completed"}
+    closed: dict[str, object] = {"state": "closed", "state_reason": "completed"}
     assert evaluate_readiness(tree(issue=closed, anomalies=anomaly), "iss-00003").state == "DONE"
 
 
