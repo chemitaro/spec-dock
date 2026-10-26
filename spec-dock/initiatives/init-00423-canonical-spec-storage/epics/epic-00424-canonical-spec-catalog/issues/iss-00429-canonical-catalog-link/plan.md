@@ -167,7 +167,7 @@ C6 の考え方（止まるコードを警告に使い回さない）に合わ�
 | 指摘 | 判定 | 対応 |
 |---|---|---|
 | ST-1 P1 時間切れの `worktree add` の作りかけを `ready` とし、再実行が成功を返す | 妥当 | 管理ディレクトリに `index` がなければ `occupied`（`unfinished`）。link は書く前に止まり、status と `require_linked` も通さない。次の1手は利用者が消す手順（統括の判断 D2）。CLI と unit のテストを足し、次の1手が効くことを使い捨てのリポジトリで確かめた |
-| SP-1 P1 版3のmainと版3の作業用のworktreeで、従来の `work start` と `workspace sync` が止まる | 妥当 | 統括の判断 D1 の例外を `observe_worktrees` に足した。AC-429-18 のテストに、リンクの前後の両方で、mainと版3の作業用のworktreeからの従来の `work start --dry-run` と `workspace sync` を足した |
+| SP-1 P1 版3のmainと版3の作業用のworktreeで、従来の `work start` と `workspace sync` が止まる | 妥当 | 統括の判断 D1 の例外を `observe_worktrees` に足した。AC-429-18 のテストに、従来の `work start --dry-run` と `workspace sync` を足した（リンクの前はmainから、リンクの後はmainと版3の作業用のworktreeの両方から） |
 | ST-2 P2 mainの sparse-checkout をカタログが引き継ぐ | 妥当（範囲外） | 申し送る（報告書。統括の判断 D4） |
 | ST-3 P2 push の `[remote rejected]` を「先に作られた」と誤分類する | 妥当 | `[rejected]` だけを `rejected` にし、ほかは stderr を保った `GitProcessError` にした。テストを足した |
 | ST-4 P2 `submodule.recurse=true` で fetch がサブモジュールを取りに行く | 妥当 | `--no-recurse-submodules` を付けた。届かないサブモジュールのテストを足した |
