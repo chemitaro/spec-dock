@@ -285,6 +285,12 @@ Standards（ST）と Spec（SP）の2つのサブエージェントのレビュ�
 | Spec SP-3 取り込み直しの保留にも、status が通常の保留の次の1手（`restore` など）を示す | P3 | 残るリスク（`sync.next_step` は取り込み直しの1手を先に示す） |
 | Spec SP-4 新しいリポジトリで、保存の後の最初の push も失敗すると、次の周期が `remote_deleted` で止まる | P3 | 要件の文のとおり。残るリスク（`resume --push-local` で戻る） |
 
+### PR #452 の Provider CI の失敗の対応（`6f9fc2835`、2026-10-26）
+
+Provider CI（ubuntu-latest）の `provider-tests` が6件失敗した（2914 passed、32 skipped）。どれも2回目の `canonical link` が `unchanged` でなく、ジョブを書き直していた。原因：git と gh が同じ `/usr/bin` にあり、`/bin` が `/usr/bin` への別名（merged /usr）の環境では、2回目の link がジョブの PATH の後ろの `/bin/gh` を「記録した別の gh」と取り違え、gh のディレクトリが `/bin` に変わっていた。実機の systemd でも、毎回のリンクがユニットを書き直す不具合だった。macOS の手元では、gh が git と同じ `/opt/homebrew/bin` にあり `/bin/gh` がないため現れなかった。
+
+対応：`_gh_dir` は、git のディレクトリの gh と実体（realpath）が同じものを別の gh として扱わない。別名のディレクトリを PATH の後ろに持つ偽のスケジューラーのテストを足した（直す前は失敗した）。コードを変えたので、最終品質ゲートをやり直す（ゲート9）。
+
 ## exit / handoff
 
 - **完了の条件**：AC-430-01〜20 をテストで確かめ、AC-430-21 の実機の結果（または未確認）を報告書に書き、最終の品質の関門に合格し、PR がマージできる状態（CI が通っている）で止まる。マージは人が行い、`work finish` は統括の指示で行う。
