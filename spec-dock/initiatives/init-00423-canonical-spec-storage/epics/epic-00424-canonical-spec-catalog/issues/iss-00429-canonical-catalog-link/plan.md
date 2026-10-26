@@ -119,6 +119,29 @@ C6 の考え方（止まるコードを警告に使い回さない）に合わ�
 | F-18 文書どうしの整合 | 一部妥当 | 章の参照と手順の番号を直した。`reference_cli.md` の C45、C46 は末尾に置く（C 番号を振り直さないため。反論）。統括の判断を `plan.md` に置くのは I-1 と同じ形で、`design.md` から参照する（反論）。「未対応」の項目も `next_step: null` を持つ（実装のとおり）。`worktree create` のヘルプの記述は I-9 へ申し送る |
 | F-19 実機の注意 | 妥当 | S12 に、別のパスでのマウントと、仮想マシンの Git 2.43 でのテストを入れた。2.38 は手元にないので未確認と書く |
 
+### 実装のレビューの指摘の対応（S13、2026-10-26）
+
+対象は `41a4c57c0..aac99f1d5`。規約（ST）と仕様（SP）の独立した2つのサブエージェントが、どちらも high なしと報告した。
+
+| 指摘 | 判定 | 対応 |
+|---|---|---|
+| ST-1 / SP-2 書いた後の Git や OS の例外で、効果が消える | 妥当 | 手順の間の観察の例外も `partial` にする。再観察の失敗を注入するテストを足した |
+| ST-2 初期のコミットの作成の失敗をネットワークの失敗に分類する | 妥当 | `git.commit.create` を分け、作者がないときは `GIT_FAILED` と「Git の作者を設定する」を示す。作者と SSH の変数を通す（`PASSED_GIT_VARIABLES`）。テストを足した |
+| ST-3 除外の行を足すと順が壊れ、実体のディレクトリの新しいファイルまで無視される | 妥当（安全） | 順になっていなければ3行をまとまりで足す。`canonical status` も順を見る。テストを足した |
+| ST-4 UTF-8 でない `info/exclude` を壊す | 妥当 | バイト列のまま保って追記する |
+| ST-5 置き換えの直前の確かめと `rename` の隙間 | 妥当（低い） | 隙間をコメントと `design.md` に正しく書いた（交換の `rename` は使わない） |
+| ST-6 / SP-7 消えたカタログを作ったと報告する、何もしない手順を `succeeded` にする | 妥当 | 計画がなければ止まる。何もしない手順は `unchanged` |
+| ST-7 / SP-5 `canonical status` が権限の失敗で落ちる | 妥当 | 原因は pathlib の `is_dir()` が EACCES で例外を出すこと。`access` の問題として示して続ける |
+| ST-8 テストが利用者の Git の設定に依存する | 妥当 | 新しいテストのすべてで `HOME` と `XDG_CONFIG_HOME` を一時に、部品の Git の呼び出しは `GIT_CONFIG_NOSYSTEM=1` |
+| ST-9 変更の束をパスで開き直す | 妥当（低い） | 確かめた記述子で書く |
+| ST-10 型の注釈の抑止 | 妥当 | `Problem` の Protocol と、観察の結果の dataclass にした |
+| ST-11 保守性 | 一部妥当 | 次の1手の文の重複と、文の分割をやめた。`LinkView.__iter__` を消した。`git_cli` の非公開の関数の import は、`git_cli` を変えない制約と前例（`github_remote`）のため残す。`CatalogLock` と `StartLock` の重複は、`StartLock` を変えない制約のため残す（反論） |
+| SP-1 `link_after_command` の次の1手に `spec-dock canonical link` がない | 妥当 | 末尾に足す。ネットワークの次の1手を `canonical link` 用の文にした。テストを足した |
+| SP-3 宣言のないworktreeが `LOCAL_IO_FAILED` | 妥当 | 先に `probe_workspace_mode` で見て `CANONICAL_CHECKOUT_NOT_MIGRATED`。テストを足した |
+| SP-4 テストのない経路 | 妥当 | 版3と宣言のない基点、4a の拒否の後の付け替え、例外の警告のテストを足した。あわせて、GitHub にあるのに手元に初期のコミットだけのブランチが残る場合も付け替えるようにした（同じ規則の、見落としていた行） |
+| SP-6 `registration_matches` を文字列で比べる | 妥当 | 実体で比べる |
+| SP-8 `cli-redesign-guide.html` の「44」 | 範囲外 | I-9 へ申し送る（報告書） |
+
 ## 検証
 
 | 対象 | 方法 |
