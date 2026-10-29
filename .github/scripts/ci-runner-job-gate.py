@@ -33,7 +33,13 @@ def _type(value: object) -> object:
     return value.get("type") if isinstance(value, dict) else None
 
 
-def decide(repository: str, event_name: str | None, environment_repository: str | None, payload: object) -> str | None:
+def decide(
+    repository: str,
+    event_name: str | None,
+    environment_repository: str | None,
+    payload: object,
+    ref: str | None,
+) -> str | None:
     """Return None when the job may run, otherwise the reason it must not."""
     if environment_repository != repository:
         return "the job does not belong to the expected repository"
@@ -56,6 +62,10 @@ def decide(repository: str, event_name: str | None, environment_repository: str 
         return "the pull request author and the triggering user must be human users"
     if pull_request.get("author_association") not in TRUSTED_ASSOCIATIONS:
         return "the pull request author is not an owner, member or collaborator"
+    # A payload left by an earlier job names another pull request than the ref the runner set for this one.
+    number = pull_request.get("number")
+    if not isinstance(number, int) or isinstance(number, bool) or ref != f"refs/pull/{number}/merge":
+        return "the event payload does not belong to this job"
     return None
 
 
@@ -68,13 +78,19 @@ def route(mode: str, refusal: str | None) -> dict[str, object]:
 
 
 def _current_refusal(repository: str, event_path: str | None) -> str | None:
-    payload: object = None
-    if event_path:
-        try:
-            payload = json.loads(Path(event_path).read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            payload = None
-    return decide(repository, os.environ.get("GITHUB_EVENT_NAME"), os.environ.get("GITHUB_REPOSITORY"), payload)
+    if not event_path:
+        return "the job names no event file"
+    try:
+        payload: object = json.loads(Path(event_path).read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return "the event file could not be read"
+    return decide(
+        repository,
+        os.environ.get("GITHUB_EVENT_NAME"),
+        os.environ.get("GITHUB_REPOSITORY"),
+        payload,
+        os.environ.get("GITHUB_REF"),
+    )
 
 
 def _runner_event_path() -> Path:

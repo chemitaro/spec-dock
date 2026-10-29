@@ -17,6 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           sparse-checkout: .github/scripts
+          persist-credentials: false
       - name: Choose runners
         id: route
         env:
@@ -25,10 +26,12 @@ jobs:
 
   provider-tests:
     needs: route
-    # Run even when route fails: the job then falls back to the GitHub-hosted runner and fails in its first step,
-    # so a routing failure fails this check instead of skipping it or leaving it unreported.
+    # Run even when route fails, so a routing failure fails this check in its first step instead of skipping it or
+    # leaving it unreported. Without route's output the job falls back to the GitHub-hosted runner; in the rare case
+    # that route fails after writing it, the job waits for the runner route chose.
     if: ${{ !cancelled() }}
     runs-on: ${{ needs.route.outputs.runners && fromJSON(needs.route.outputs.runners)['ubuntu-latest'] || 'ubuntu-latest' }}
+    timeout-minutes: 30
     steps:
       - name: Stop when route did not choose the runners
         if: needs.route.result != 'success'
@@ -55,6 +58,7 @@ jobs:
     needs: route
     if: ${{ !cancelled() }}
     runs-on: ${{ needs.route.outputs.runners && fromJSON(needs.route.outputs.runners)[matrix.os] || matrix.os }}
+    timeout-minutes: 30
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
