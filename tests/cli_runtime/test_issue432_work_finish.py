@@ -177,7 +177,7 @@ def test_a_push_from_another_clone_taken_in_is_confirmed(world: WriteWorld, tmp_
     _run_cycle_on_kick(world)
     code, payload = world.write("work", "finish", "iss-00003")
     assert code == 0, payload
-    assert [item["kind"] for item in payload["effects"]][0] == "github.issue.close"
+    assert payload["effects"][0]["kind"] == "github.issue.close"
     assert (world.find("iss-00003") / "report.md").read_text(encoding="utf-8") == "# from other\n"
     assert world.fake().issue(3).state == "closed"
 
