@@ -15,7 +15,7 @@ from __future__ import annotations
 import argparse
 import contextlib
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 import json
 import os
 from pathlib import Path, PurePosixPath
@@ -49,12 +49,7 @@ LABEL_DEFINITIONS: tuple[tuple[str, str, str], ...] = (
 ID_PREFIXES: dict[str, str] = {"initiative": "init", "epic": "epic", "issue": "iss"}
 PARENT_KINDS: dict[str, str | None] = {"initiative": None, "epic": "initiative", "issue": "epic"}
 ID_WIDTH = 5
-SLUG_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_LINE_BREAK = re.compile(r"\r?\n")
-_MARKER_LINE = re.compile(r"^<!-- spec-dock:slug=(.*) -->$")
-SLUG_MARKER_MISSING = "SLUG_MARKER_MISSING"
-SLUG_MARKER_MULTIPLE = "SLUG_MARKER_MULTIPLE"
-SLUG_MARKER_INVALID = "SLUG_MARKER_INVALID"
+CANONICAL_ID_RE = re.compile(r"^(init|epic|iss)-(?:[0-9]{5}|[1-9][0-9]{5,})$")
 
 # C2: the shipped schema-4 declaration and the writer protocol require_writer accepts.
 NEW_WRITER_PROTOCOL = "specdock.worktree-writer/v1"
@@ -70,6 +65,8 @@ LINK_RELATIVE = "spec-dock/initiatives"
 CATALOG_LOCK_REASON = "spec-dock canonical catalog"
 GITIGNORE_PATH = "spec-dock/.gitignore"
 GITIGNORE_LINES: tuple[str, ...] = ("/.canonical/", "/initiatives", "!/initiatives/")
+# Scope directories live at <catalog>/<bucket>/<ID>/; the bucket is the number's thousand range (I-16).
+BUCKET_SIZE = 1000
 
 # C5: the canonical branch root files, format 1 (domain/canonical_content.py).
 FORMAT_FILE = ".spec-dock-canonical.json"
@@ -142,6 +139,14 @@ jobs:
         run: spec-dock canonical check --json
 """
 
+# Legacy mode: the title rule and slug derivation (domain/ids.py), and the child-layer rule links that Scope
+# creation puts in an Initiative and an Epic (application/scope_scaffold.py).
+LEGACY_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
+LEGACY_CHILD_RULES: dict[str, tuple[str, str]] = {
+    "initiative": ("epics", "spec-dock/docs/rules/initiative/epics.md"),
+    "epic": ("issues", "spec-dock/docs/rules/epic/issues.md"),
+}
+
 # Script-only values.
 SPEC_ROOT = LINK_RELATIVE
 META_FILE = ".meta.json"
@@ -188,6 +193,7 @@ WRITES_PER_HOUR = 500
 READ_RETRY_LIMIT = 60.0
 WRITE_RETRY_LIMIT = 3600.0
 NUMBER_BATCH = 50
+CLOCK_ALLOWANCE = timedelta(minutes=5)
 EXIT_OK, EXIT_PROBLEMS, EXIT_REFUSED, EXIT_STOPPED = 0, 1, 2, 3
 
 BLOCKING_CODES = frozenset({
@@ -204,44 +210,36 @@ BLOCKING_CODES = frozenset({
 
 
 # ---------------------------------------------------------------------------------------------------------------
-# Copied rules (C1, C3) and naming.
+# Copied rules (C1, C3, legacy) and naming.
 # ---------------------------------------------------------------------------------------------------------------
-
-
-def read_slug_marker(body: str | None) -> tuple[str | None, str | None]:
-    """(slug, anomaly): exactly one marker line anywhere in the body; GitHub UI edits may use CRLF."""
-    values = [
-        matched.group(1)
-        for line in _LINE_BREAK.split(body or "")
-        if (matched := _MARKER_LINE.fullmatch(line.rstrip())) is not None
-    ]
-    if not values:
-        return None, SLUG_MARKER_MISSING
-    if len(values) > 1:
-        return None, SLUG_MARKER_MULTIPLE
-    if SLUG_RE.fullmatch(values[0]) is None:
-        return None, SLUG_MARKER_INVALID
-    return values[0], None
-
-
-def format_slug_marker(slug: str) -> str:
-    if SLUG_RE.fullmatch(slug) is None:
-        raise ValueError("slug must use lowercase letters, digits and single hyphens")
-    return f"<!-- spec-dock:slug={slug} -->"
-
-
-def append_slug_marker(body: str, slug: str) -> str:
-    marker = format_slug_marker(slug)
-    if read_slug_marker(body)[1] != SLUG_MARKER_MISSING:
-        raise ValueError("Issue body already has a slug marker")
-    text = body.rstrip("\r\n")
-    return f"{text}\n\n{marker}\n" if text else f"{marker}\n"
 
 
 def scope_id(kind: str, number: int) -> str:
     if number <= 0:
         raise ValueError("GitHub Issue number must be positive")
     return f"{ID_PREFIXES[kind]}-{number:0{ID_WIDTH}d}"
+
+
+def scope_bucket(number: int) -> str:
+    """The thousand range of a number, both ends as wide as the ID's number: 00000-00999, 100000-100999."""
+    if number < 1:
+        raise ValueError("GitHub Issue number must be positive")
+    width = max(ID_WIDTH, len(str(number)))
+    lower = number - number % BUCKET_SIZE
+    return f"{lower:0{width}d}-{lower + BUCKET_SIZE - 1:0{width}d}"
+
+
+def scope_relative(value: str) -> str:
+    """`<bucket>/<ID>`: where a Scope directory lives in the catalog."""
+    if CANONICAL_ID_RE.fullmatch(value) is None:
+        raise ValueError(f"not a Scope ID: {value!r}")
+    return f"{scope_bucket(int(value.rsplit('-', 1)[1]))}/{value}"
+
+
+def legacy_slug(title: str) -> str:
+    """The legacy slug a title gives (lowercase, spaces to hyphens), or `untitled` outside the legacy title rule."""
+    text = title.strip()
+    return text.lower().replace(" ", "-") if LEGACY_TITLE_RE.fullmatch(text) else "untitled"
 
 
 def ignore_rules_effective(text: str | None) -> bool:
@@ -851,10 +849,18 @@ class Github:
         self.clock = clock or SystemClock()
         self.write_times: list[float] = []
         self.write_count = 0
+        self._login: str | None = None
 
     @property
     def prefix(self) -> str:
         return f"repos/{self.owner}/{self.name}"
+
+    def login(self) -> str:
+        """The account gh acts as (GET /user), read once."""
+        if self._login is None:
+            body = self.read("user").body
+            self._login = str(body.get("login") or "") if isinstance(body, dict) else ""
+        return self._login
 
     def _call(self, method: str, endpoint: str, payload: object = None) -> Response:
         argv = ["gh", "api", "--hostname", "github.com", "--include", "--method", method, endpoint]
@@ -1012,13 +1018,14 @@ class Facts:
     number: int
     database_id: int
     title: str
-    body: str
     state: str
     labels: list[str]
     parent: int | None
     parent_foreign: str | None
     blocked_by: list[int]
     blocked_foreign: list[str]
+    author: str = ""
+    created_at: str = ""
 
     @property
     def kind_labels(self) -> list[str]:
@@ -1026,7 +1033,7 @@ class Facts:
 
 
 _ISSUE_FIELDS = (
-    "number databaseId title body state stateReason "
+    "number databaseId title state stateReason author { login } createdAt "
     "labels(first: 20) { totalCount nodes { name } } "
     "parent { number repository { nameWithOwner } } "
     "blockedBy(first: 100) { totalCount nodes { number state title repository { nameWithOwner } } }"
@@ -1068,13 +1075,14 @@ def _facts(gh: Github, node: Mapping[str, Any]) -> Facts:
         number=number,
         database_id=int(node["databaseId"]),
         title=str(node.get("title") or ""),
-        body=str(node.get("body") or ""),
         state=str(node.get("state") or "").lower(),
         labels=labels,
         parent=parent,
         parent_foreign=parent_foreign,
         blocked_by=sorted(n for repo, n in references if repo == own),
         blocked_foreign=[f"{repo}#{n}" for repo, n in references if repo != own],
+        author=str((node.get("author") or {}).get("login") or ""),
+        created_at=str(node.get("createdAt") or ""),
     )
 
 
@@ -1224,15 +1232,6 @@ def analyze(gh: Github, scopes: list[Scope], problems: list[dict[str, Any]], sta
             problems.append(
                 anomaly("KIND_LABEL_CONFLICT", f"{scope.id}: #{own.number} has {own.kind_labels}", scope=scope.id)
             )
-        slug, marker_problem = read_slug_marker(own.body)
-        if marker_problem in (SLUG_MARKER_MULTIPLE, SLUG_MARKER_INVALID) or (slug is not None and slug != scope.slug):
-            problems.append(
-                anomaly(
-                    "SLUG_MARKER_CONFLICT",
-                    f"{scope.id}: #{own.number} has {marker_problem or 'slug ' + repr(slug)}, expected {scope.slug!r}",
-                    scope=scope.id,
-                )
-            )
         parent_number = numbers.get(parent.id) if parent is not None else None
         if own.parent_foreign or (own.parent is not None and own.parent != parent_number):
             problems.append(
@@ -1375,13 +1374,9 @@ def registration_plan(gh: Github, analysis: Analysis) -> list[Operation]:
         own = analysis.facts.get(number) if number else None
         label = KIND_LABELS[scope.kind]
         if own is None:
-            continue  # created later in this run with its label and marker
+            continue  # created later in this run with its label
         if label not in own.labels and (scope.id, "KIND_LABEL_CONFLICT") not in conflicts:
             plan.append(Operation("issue.label", scope.id, number, label, f"label #{number} {label}"))
-        if read_slug_marker(own.body)[1] == SLUG_MARKER_MISSING:
-            plan.append(
-                Operation("issue.marker", scope.id, number, scope.slug, f"add slug marker {scope.slug} to #{number}")
-            )
     for scope in ordered:
         if not scope.parent_id or scope.parent_id not in by_id:
             continue
@@ -1488,18 +1483,6 @@ class Registrar:
                 lambda: gh.write("POST", f"{gh.prefix}/issues/{number}/labels", {"labels": [label]}),
                 lambda: label in self._issue(number).get("labels_names", []),
             )
-        elif operation.op == "issue.marker":
-            current = self._issue(number)
-            before = str(current.get("body") or "")
-            if read_slug_marker(before)[1] != SLUG_MARKER_MISSING:
-                return
-            after = append_slug_marker(before, scope.slug)
-            self._write(
-                "issue.marker",
-                {"number": number, "before": before, "after": after},
-                lambda: gh.write("PATCH", f"{gh.prefix}/issues/{number}", {"body": after}),
-                lambda: read_slug_marker(str(self._issue(number).get("body") or ""))[0] == scope.slug,
-            )
         elif operation.op == "sub_issue":
             parent = self._number(operation.target or "")
             child_id = self._database_id(number)
@@ -1552,32 +1535,40 @@ class Registrar:
             for item in _rest_pages(self.gh, f"{self.gh.prefix}/issues/{number}/dependencies/blocked_by")
         ]
 
-    def _find_created(self, scope: Scope) -> Facts | None:
-        """An Issue an earlier run created but could not record: same kind label, slug marker and title, unused."""
+    def _pending_creation(self, scope: Scope) -> dict[str, Any] | None:
+        """The oldest creation intent for this Scope without a recorded outcome (a run stopped after sending it)."""
+        records = self.state.undo_records()
+        finished = {record.get("ref") for record in records if record.get("phase") == "done"}
+        pending = [
+            record
+            for record in records
+            if record.get("phase") == "intent"
+            and record.get("op") == "issue.create"
+            and record.get("local_id") == scope.id
+            and record["seq"] not in finished
+        ]
+        return pending[0] if pending else None
+
+    def _find_created(self, scope: Scope, since: str) -> Facts | None:
+        """The Issue a creation intent made: same kind label and title, created by this gh user at or after it."""
         used = {n for n in self.analysis.numbers.values() if n is not None}
-        label = KIND_LABELS[scope.kind]
-        for facts in fetch_labeled(self.gh).values():
-            if facts.number in used or label not in facts.labels or facts.title != scope.title:
-                continue
-            if read_slug_marker(facts.body)[0] == scope.slug:
-                return facts
-        return None
+        found = created_issues(self.gh, KIND_LABELS[scope.kind], scope.title, since, exclude=used)
+        if len(found) > 1:
+            raise _ambiguous_creation(found, self.wrote > 0, "register --apply")
+        return found[0] if found else None
 
     def _create(self, scope: Scope) -> None:
         label = KIND_LABELS[scope.kind]
-        found = self._find_created(scope)
+        pending = self._pending_creation(scope)
+        found = self._find_created(scope, pending["at"]) if pending is not None else None
+        details = {"local_id": scope.id, "title": scope.title, "label": label}
         if found is None:
-            details = {"local_id": scope.id, "title": scope.title, "slug": scope.slug, "label": label}
             intent = self._record("intent", "issue.create", **details)
             try:
-                response = self.gh.write(
-                    "POST",
-                    f"{self.gh.prefix}/issues",
-                    {"title": scope.title, "body": format_slug_marker(scope.slug) + "\n", "labels": [label]},
-                )
+                response = self.gh.write("POST", f"{self.gh.prefix}/issues", {"title": scope.title, "labels": [label]})
                 number, database_id = int(response.body["number"]), int(response.body["id"])
             except GithubError as error:
-                found = self._find_created(scope) if error.unknown else None
+                found = self._find_created(scope, intent["at"]) if error.unknown else None
                 if found is None:
                     raise
                 number, database_id = found.number, found.database_id
@@ -1585,21 +1576,15 @@ class Registrar:
             self._record("done", "issue.create", ref=intent["seq"], number=number, database_id=database_id, **details)
         else:
             number, database_id = found.number, found.database_id
-            if not any(
-                record.get("op") == "issue.create" and record.get("number") == number
-                for record in self.state.undo_records()
-            ):
-                self._record(
-                    "done",
-                    "issue.create",
-                    number=number,
-                    database_id=database_id,
-                    local_id=scope.id,
-                    title=scope.title,
-                    slug=scope.slug,
-                    label=label,
-                    recovered=True,
-                )
+            self._record(
+                "done",
+                "issue.create",
+                ref=pending["seq"],  # type: ignore[index]
+                number=number,
+                database_id=database_id,
+                recovered=True,
+                **details,
+            )
         new_id = scope_id(scope.kind, number)
         self.ids[number] = database_id
         self.analysis.numbers[scope.id] = number
@@ -1848,9 +1833,6 @@ def command_verify(context: Context) -> int:
             continue
         if own.kind_labels != [KIND_LABELS[scope.kind]]:
             mismatches.append(f"{scope.id}: #{number} kind labels {own.kind_labels}")
-        slug, problem = read_slug_marker(own.body)
-        if slug != scope.slug:
-            mismatches.append(f"{scope.id}: #{number} slug marker {problem or slug!r}, expected {scope.slug!r}")
         parent = analysis.numbers.get(scope.parent_id) if scope.parent_id in by_id else None
         if own.parent_foreign or own.parent != parent:
             mismatches.append(f"{scope.id}: #{number} parent {own.parent_foreign or own.parent}, expected {parent}")
@@ -1973,17 +1955,6 @@ def _undo_action(gh: Github, record: Mapping[str, Any]) -> tuple[str, list[Step]
         return f"remove {record['label']} from #{number}", [
             ("DELETE", f"{prefix}/issues/{number}/labels/{record['label']}", None, (200, 204, 404))
         ]
-    if op == "issue.marker":
-        body = str(gh.read(f"{prefix}/issues/{number}").body.get("body") or "")
-        if read_slug_marker(body)[1] == SLUG_MARKER_MISSING:
-            return None
-        if body == record.get("after"):
-            restored = str(record.get("before") or "")
-        else:
-            restored = _remove_marker(body)
-        return f"remove the slug marker from #{number}", [
-            ("PATCH", f"{prefix}/issues/{number}", {"body": restored}, (200,))
-        ]
     if op == "sub_issue":
         child, parent = record["child"], record["parent"]
         response = gh.read(f"{prefix}/issues/{child}/parent", ok=(200, 404))
@@ -2005,24 +1976,51 @@ def _undo_action(gh: Github, record: Mapping[str, Any]) -> tuple[str, list[Step]
 
 
 def _created_without_record(gh: Github, record: Mapping[str, Any]) -> int | None:
-    """An Issue an interrupted register created: same kind label, slug marker and title (as register finds it)."""
-    for facts in fetch_labeled(gh).values():
-        same = record["label"] in facts.labels and facts.title == record.get("title")
-        if same and read_slug_marker(facts.body)[0] == record.get("slug") and facts.state == "open":
-            return facts.number
-    return None
+    """The open Issue an interrupted register created, found as register finds it."""
+    found = [
+        facts
+        for facts in created_issues(gh, record["label"], str(record.get("title") or ""), str(record.get("at") or ""))
+        if facts.state == "open"
+    ]
+    if len(found) > 1:
+        raise _ambiguous_creation(found, False, "undo --apply")
+    return found[0].number if found else None
 
 
-def _remove_marker(body: str) -> str:
-    lines = _LINE_BREAK.split(body)
-    kept: list[str] = []
-    for line in lines:
-        if _MARKER_LINE.fullmatch(line.rstrip()) is not None:
-            if kept and kept[-1] == "":
-                kept.pop()
-            continue
-        kept.append(line)
-    return "\n".join(kept)
+def created_issues(gh: Github, label: str, title: str, since: str, *, exclude: Iterable[int] = ()) -> list[Facts]:
+    """Issues with the kind label and title that the current gh user created since the intent (Epic ch. 11)."""
+    login = gh.login()
+    skipped = set(exclude)
+    return [
+        facts
+        for number, facts in sorted(fetch_labeled(gh).items())
+        if number not in skipped
+        and label in facts.labels
+        and facts.title == title
+        and facts.author == login
+        and _not_before(facts.created_at, since)
+    ]
+
+
+def _not_before(moment: str, since: str) -> bool:
+    """`moment` is no earlier than `since` less the allowance for the local and GitHub clocks."""
+    try:
+        return _parse_time(moment) >= _parse_time(since) - CLOCK_ALLOWANCE
+    except ValueError:
+        return False
+
+
+def _parse_time(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00")).astimezone(timezone.utc)
+
+
+def _ambiguous_creation(found: Sequence[Facts], wrote: bool, command: str) -> MigrationError:
+    numbers = ", ".join(f"#{facts.number}" for facts in found)
+    return (Stopped if wrote else Refused)(
+        f"{len(found)} Issues match the interrupted creation ({numbers}); none is used and none is created",
+        f"Keep one of {numbers}: remove the kind label from the others (or close them as not planned), "
+        f"then run the same {command} again",
+    )
 
 
 # --- throwaway clones ------------------------------------------------------------------------------------------
@@ -2909,10 +2907,8 @@ def command_export_legacy(context: Context) -> int:
                     f"{scope_key}: {'no directory' if not places else 'several directories'} in canonical; skipped"
                 )
                 continue
-            slug, problem = read_slug_marker(facts.body)
-            if slug is None:
-                report.warn(f"{scope_key}: slug marker {problem}; skipped")
-                continue
+            known_base = base_by_number.get(number)
+            slug = known_base.slug if known_base is not None else legacy_slug(facts.title)
             parent_key = ids.get(facts.parent) if facts.parent else None
             grandparent = labeled[facts.parent].parent if facts.parent in labeled else None
             grand = ids.get(grandparent) if grandparent is not None else None

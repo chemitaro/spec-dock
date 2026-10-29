@@ -73,6 +73,8 @@ class FakeIssue:
     updated_at: str = ""
     pull_request: bool = False
     repository: str = ""
+    author: str = ""
+    created_at: str = ""
 
 
 @dataclass
@@ -138,6 +140,8 @@ class FakeGithub:
         assignees: Iterable[str] = (),
         pull_request: bool = False,
         repository: str | None = None,
+        author: str | None = None,
+        created_at: datetime | None = None,
     ) -> FakeIssue:
         owner = (repository or self.repository).lower()
         if number is None:
@@ -157,6 +161,8 @@ class FakeGithub:
             assignees=list(assignees),
             pull_request=pull_request,
             repository=owner,
+            author=self.login if author is None else author,
+            created_at=_timestamp(self.clock.now() if created_at is None else created_at),
         )
         for name in issue.labels:
             self.labels.setdefault(name, {"name": name, "color": "ededed", "description": ""})
@@ -385,6 +391,8 @@ class FakeGithub:
             "labels": [{"name": name} for name in issue.labels],
             "assignees": [{"login": login} for login in issue.assignees],
             "updated_at": issue.updated_at,
+            "created_at": issue.created_at,
+            "user": {"login": issue.author},
             "html_url": f"https://github.com/{issue.repository}/issues/{issue.number}",
             "repository_url": f"https://api.github.com/repos/{issue.repository}",
         }
@@ -468,6 +476,8 @@ class FakeGithub:
             "state": issue.state.upper(),
             "stateReason": issue.state_reason.upper() if issue.state_reason else None,
             "updatedAt": issue.updated_at,
+            "createdAt": issue.created_at,
+            "author": {"login": issue.author},
             "url": f"https://github.com/{issue.repository}/issues/{issue.number}",
             "labels": {
                 "totalCount": len(issue.labels),

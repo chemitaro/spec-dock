@@ -40,7 +40,6 @@ def test_plan_lists_local_scopes_with_their_replacement_and_no_blocking_anomaly(
         "label.create": 3,
         "issue.create": 1,
         "issue.label": 6,
-        "issue.marker": 6,
         "sub_issue": 4,
         "blocked_by": 1,
     }
