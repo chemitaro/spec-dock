@@ -29,7 +29,7 @@ requirement.md の AC-432-01〜19 を満たす。canonical モードで、Scope 
 - 前提：I-1〜I-4、I-7、I-8 が `main` にある（`cee4c896b`）。2026-10-29 の方針の変更で、I-14（`iss-00455`、PR #459）と I-16（`iss-00460`、PR #461）も `main` にあり、`a23d7d175` を merge で取り込んだ（`34ef6426d`）。
 - 並行：I-11（`iss-00438`）が別のworktreeで進む。`cli/catalog.py`、`commands/canonical_dispatch.py`、コマンドの一覧のテストで衝突しうる。先に `main` に入った方を、`origin/main` のマージで取り込む（rebase しない）。
 - この Issue の中の順：S1（C1 と C10 の追加）→ S2（書く側の共通の部品）→ S2b（新しい方針への適合）→ S3〜S8（コマンド。S3 の後は互いに独立）→ S9（I-4 から引き継ぐ直し）→ S10（全体）。
-- 進み具合（2026-10-29 の再開の時点）：S0、S1 はコミット済み（`1490d3834`、`d44047b78`）。S2〜S5 は前の担当の未コミットの変更を WIP でコミットした（`370fa63d5`）。slug、本文の印、入れ子、ディレクトリの移動を前提にしているので、S2b で直す。
+- 再開の前提：S2〜S5 の前の担当の版は、slug、本文の印、入れ子、ディレクトリの移動を前提にしているので、S2b で直す（コミットの対応は `report.md`）。
 
 ## 実装step
 
@@ -74,7 +74,7 @@ requirement.md の AC-432-01〜19 を満たす。canonical モードで、Scope 
 
 - **完了**：AC-432-01〜19 を満たし、最終品質ゲートに通り、PR がマージできる状態。マージの後に統括の指示で `work finish`。
 - **I-9 への申し送り**：`scope move` の文書（`help`、参照の文書、使い方。GitHub の親だけを付け替える）、新しいコード（`SCOPE_IN_PROGRESS`、`CANONICAL_PROGRESS_MARK_FAILED`、`CANONICAL_TITLE_IGNORED`、`DESCENDANT_STATUS_UNKNOWN`）の Epic の12章と文書への追記、選択を持つworktreeの `worktree remove` には今と同じく `--discard-ignored` が要ること、`SCOPE_IN_PROGRESS` でエージェントが利用者に確かめる規則（統括の判断 Q1）、`work finish` が最大180秒待つこと、`worktree remove` がリンクだけなら `--discard-ignored` なしで消すこと。
-- **統括へ**：Epic の6章の `--save-timeout` の記述の直し（統括の判断 Q2）、Epic の7章と I-5 の節の「`scope import github` の `--title` は `CANONICAL_NOT_APPLICABLE`」と統括の判断（2026-10-29、警告で進む）との違い、Epic の6章の「作成時に `discussions/rules.md` を置く」と配布資産（元の規則のファイルがない）との違い、Epic の12章への新しいコードの追記と、`CANONICAL_SAVE_UNCONFIRMED`（束を書いていないときの3）と `CANONICAL_SAVE_HELD`（待つ間に現れたときの6）の終了コードの違い、`scope delete` の順（バックアップ → 選択 → ディレクトリ → GitHub。やり直せるようにするため）、`--expect-current` の残る窓（Q3）。
+- **統括へ**：Epic の6章の `--save-timeout` の記述の直し（統括の判断 Q2）、Epic の7章と I-5 の節の「`scope import github` の `--title` は `CANONICAL_NOT_APPLICABLE`」と統括の判断（2026-10-29、警告で進む）との違い、Epic の `plan.md` の I-5「変わる」の「区切りの場所がシンボリックリンクかファイルなら書く前に止まる」に対し、`scope create` では Issue の番号が作るまで分からないので、作った後の失敗（`partial` と、示したパスを退避してから `scope import github` の案内）になること、Epic の12章への新しいコードの追記と、`CANONICAL_SAVE_UNCONFIRMED`（束を書いていないときの3）と `CANONICAL_SAVE_HELD`（待つ間に現れたときの6）の終了コードの違い、`scope delete` の順（バックアップ → 選択 → ディレクトリ → GitHub。やり直せるようにするため）、`--expect-current` の残る窓（Q3）。
 - 残るリスクは `report.md` に書く。
 
 ## 統括の判断（2026-10-26、Orca の `ask` の答え）
@@ -82,7 +82,7 @@ requirement.md の AC-432-01〜19 を満たす。canonical モードで、Scope 
 統括は、この答えを Epic の文書より優先する正本とする。この Issue は Epic の文書を変えない。
 
 - **Q1 `work start` と作業中の印（DOING）**：止めずに警告 `SCOPE_IN_PROGRESS` を返して進める。同じクローンの二重の選択は従来どおり `SCOPE_ALREADY_SELECTED` で止まる。`BLOCKED`、`UNKNOWN`、`DONE` は `READINESS_NOT_SATISFIED` で止まる。警告の `details` に、作業中の印を付けた担当者（`assignees`）と、分かれば印を付けた時刻を入れ、次の1手は「別のPCで作業中でないか利用者に確かめる。古い印なら `spec-dock work finish` か GitHub でラベルを外す」とする。エージェントがこの警告で利用者に確かめることは、I-9 の規則の節に書く。
-- **Q2 `work finish` の `--save-timeout`**：足さず、180秒の固定にする。テストでは待ち時間を注入する。理由：`work finish` の引数の解析は版3と共有で、足すと版3の `--help` に使えない引数が出る。従来モードの表面を変えないほうを選ぶ。Epic の5章の `--save-timeout` の記述は、統括が直す。
+- **Q2 `work finish` の `--save-timeout`**：足さず、180秒の固定にする。テストでは待ち時間を注入する。理由：`work finish` の引数の解析は版3と共有で、足すと版3の `--help` に使えない引数が出る。従来モードの表面を変えないほうを選ぶ。Epic の5章の `--save-timeout` の記述は、統括が直す（統括の答えの引用。記述は今の Epic の `design.md` では6章の「`work finish` での保存の確認」にある）。
 - **Q3 `--expect-current` の競合（I-4 の ST-3）**：`worktree remove` と `worktree bootstrap` は、従来の内側の関数（`_remove_captured_worktree`、`_bootstrap_captured_target`）を、canonical で取り込んで確かめた同じ記録で呼ぶ。`worktree create` と `installation` の `--expect-current` は、従来の処理を呼ぶ直前に記録を読み直して一致を確かめ、docstring を実際の保証に直し、残る狭い窓を `report.md` に書く。従来のコードは変えない。
 - **Q4 `worktree remove` とリンク**：無視されたものが正しいリンクだけなら、`--discard-ignored` なしで消す。ほかが1つでもあれば従来どおり求める。確かめから `git worktree remove` までの短い窓は、従来の `--discard-ignored` と同じ種類として `report.md` に書く。
 - **参考の2つ**：`scope delete` は、バックアップを GitHub への書き込みより先に行う。`scope import github` の `--title` は、印も `--slug` もないときの slug の材料にだけ使い、GitHub の題名は変えない。
@@ -114,10 +114,10 @@ requirement.md の AC-432-01〜19 を満たす。canonical モードで、Scope 
 | D-2 読み直しが親子と依存を新しくしない | `scope move` は `get_parent`、依存は `list_blocked_by` を読み直し、`scope delete` は全体を取り直す（R-432-01、design の表、AC-432-02） |
 | D-3 ディレクトリがないと保存の確かめを飛ばす | 飛ばさない。消えた場所は束の `deletions` に入れて待つ（R-432-12、design、AC-432-13） |
 | D-4 待った後に古い値で閉じる | 閉じる前に `decision` と読み直しで確かめ直す（R-432-12、design、AC-432-13） |
-| D-5 ラベルを外した後の失敗でやり直せない | 順をバックアップ → 選択 → ディレクトリ → GitHub にし、同じコマンドで続きから整う（R-432-08、design、AC-432-10） |
+| D-5 ラベルを外した後の失敗でやり直せない | 順をバックアップ → 選択 → ディレクトリ → GitHub にし、同じコマンドで続きから整う（R-432-08、design、AC-432-10）。今の順も同じ |
 | D-6 取り込みの次の1手が実行できない | 次の1手を直した（R-432-04、design） |
 | D-7 別のリポジトリの子を完了の判定で見落とす | `DESCENDANT_STATUS_UNKNOWN` で止まる（R-432-07、design、AC-432-07） |
-| D-8 移動の後の `spec-dock/active/` | このチェックアウトは直し、ほかは警告（R-432-06、design、AC-432-09） |
+| D-8 移動の後の `spec-dock/active/` | このチェックアウトは直し、ほかは警告（R-432-06、design、AC-432-09）。2026-10-29 の方針の変更の後も、祖先の役のリンクのために残した（2026-10-29 のレビューの D-4） |
 | D-9 `CANONICAL_SAVE_UNCONFIRMED` は新しくない | 「新」を外し、Epic との終了コードの違いと理由を書いた（design、exit / handoff） |
 | D-10 待つ条件が弱い | 毎回の読むだけの `status` と HEAD の一致、`finished_at` は待ち始めの秒より後（R-432-12、design） |
 | D-11 パスの渡し方 | `pathspecs=` を使う（design） |
@@ -128,6 +128,30 @@ requirement.md の AC-432-01〜19 を満たす。canonical モードで、Scope 
 | D-16 `worktree remove` の包みと `discard_ignored` | 包みを写す、`replace_namespace` で渡す、選択を持つworktreeは今と同じ（R-432-13、design） |
 | D-17 従来のモジュールの差分の確かめ方 | `git diff --name-only` を置き場の表と比べる（plan、AC-432-16） |
 | D-18 `@root` と `work start` のリンク | `@root` はリンクを求めない。`work start` はリンクを条件にせず、作れなければ `active` を飛ばして警告（R-432-02、R-432-11、design） |
-| D-19 入れ子のずれた子孫 | 書く前に止まり `scope move` を示す（R-432-08、design、AC-432-10） |
+| D-19 入れ子のずれた子孫 | 書く前に止まり `scope move` を示す（R-432-08、design、AC-432-10）。2026-10-29 の方針の変更で廃止（上の表） |
 | D-20 AC の前提と `HELP_EFFECTS` の文 | AC-432-03 に時刻の前提、AC-432-15 に Epic の文（requirement） |
 | D-21 この節がない | この節を足した |
+
+## 文書のレビューの指摘の対応（再開の後、2026-10-29）
+
+この会話を知らない新しいサブエージェント1つ（opus/high）。P0 0、P1 3、P2 6、P3 8。`analyze-review-findings` で分析し、すべて根拠を確かめて妥当と判断した。新しく統括の判断が要るものはなかった（D-15 は「統括へ」に足した）。
+
+| 指摘 | 対応 |
+|---|---|
+| D-1 `discussions/rules.md` を置かない理由が事実と違う | 元のファイルは実在した。Epic のとおり置く（design、R-432-03、AC-432-01） |
+| D-2 AC-432-10 の削除の順が設計と逆 | AC を設計の順に直した |
+| D-3 周期の新しさの条件が同じ秒の周期を数えない | `last_cycle.started_at` が待ち始めの秒以上、とし、時計の注入の範囲を書いた（design） |
+| D-4 移動の後の `spec-dock/active/` の祖先のリンク | このチェックアウトは整え、ほかは警告（R-432-06、design、AC-432-09） |
+| D-5 子孫の付け替えで、古い名前の未保存の変更を待たずに閉じる | `work finish` は子孫の付け替えでも止まる（R-432-12、R-432-17、design、AC-432-19） |
+| D-6 `scope move` の `--help` と出力の形 | design に Reads、Writes、Does not、前提、`data` の鍵を書いた |
+| D-7 3つの受け入れが AC にない | AC-432-05、12、18 に足した |
+| D-8 AC-432-02 の古い状態の結果が2通り | 場面ごとの結果を書いた |
+| D-9 `DESCENDANT_STATUS_UNKNOWN` の扱い | `PRECONDITION_FAILED` のメッセージの頭、とそろえた |
+| D-10 Q2 の章の番号 | 注記を付けた |
+| D-11 S0 の表の古い参照 | 廃止と今の扱いを書き足した |
+| D-12 `KindChange` の形 | 名前のタプルと書いた |
+| D-13 `branch_names_scope` を使うか | 使わない理由を書いた（design） |
+| D-14 `scope delete` の排他の失敗の場面 | 表の行を分けた |
+| D-15 区切りの確かめが作った後になる違い | 「統括へ」に足した |
+| D-16 時間切れの終了コードの前提 | 2つの場合を AC-432-13 に書いた |
+| D-17 進み具合を plan に置いた | 前提だけを残し、コミットの対応は `report.md` に移す |

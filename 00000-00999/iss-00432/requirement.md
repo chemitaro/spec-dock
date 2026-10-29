@@ -79,11 +79,12 @@ canonical モードで、Scope の作成、取り込み、題名の変更、親�
 - 新しいコマンド `spec-dock scope move <target> --parent <parent>` を足す（コマンドの数は52から53）。`--parent` は必須で、ないときは引数の解析の使い方の誤り（終了コード2）で止まる。
 - 親の種類の規則、対象自身や子孫を親にしないこと、新しい親とその祖先が開いていることを確かめ、対象と新しい親を読み直してから、`POST …/sub_issues` の `replace_parent: true` で付け替える。すでにその親なら書かずに `unchanged`。Initiative は親を持たないので止まる。
 - カタログには書かない（ディレクトリは平らなので動かない）。リンクとカタログを求めない。
+- `spec-dock/active/` には祖先の役のリンクもあるので、付け替えると古くなりうる。このチェックアウトの選択が対象かその子孫なら、付け替えの後に `spec-dock/active/` のリンクを今と同じく整える（効果 `active.link`）。ほかのworktreeの選択が対象かその子孫なら、警告 `ACTIVE_LINK_NOT_UPDATED`（次の1手「そのworktreeで `spec-dock active set <ID>`」）を返す。リンクの失敗は結果を変えない。
 - 版3のリポジトリでは、`CANONICAL_NOT_MIGRATED`（終了コード3）で止まる。
 
 ### R-432-07 完了と再開（`scope close`、`scope reopen`）
 
-- 状態の規則は今と同じ：`scope close` は、`--reason completed` のとき子孫がすべて `completed` であること、対象の状態が分かること、閉じた理由が違わないこと。加えて、`--reason completed` のとき、対象か子孫に別のリポジトリの子（`SUB_ISSUE_FOREIGN_REPOSITORY`）か、異常のために ID が決まらない子（種類のラベルが2つ以上）があれば、完了を確かめられないので、書く前に `DESCENDANT_STATUS_UNKNOWN` で止まる（`work finish` も同じ）。`scope reopen` は、祖先がすべて開いていること。子孫と祖先は、GitHub の親子（スナップショット）から求める。対象は読み直す。
+- 状態の規則は今と同じ：`scope close` は、`--reason completed` のとき子孫がすべて `completed` であること、対象の状態が分かること、閉じた理由が違わないこと。加えて、`--reason completed` のとき、対象か子孫に別のリポジトリの子（`SUB_ISSUE_FOREIGN_REPOSITORY`）か、異常のために ID が決まらない子（種類のラベルが2つ以上）があれば、完了を確かめられないので、書く前に `PRECONDITION_FAILED`（終了コード3。メッセージは `DESCENDANT_STATUS_UNKNOWN:` で始まる）で止まる（`work finish` も同じ）。`scope reopen` は、祖先がすべて開いていること。子孫と祖先は、GitHub の親子（スナップショット）から求める。対象は読み直す。
 - 今と同じく状態を `PATCH` する（`close` は `state: closed` と `state_reason: completed|not_planned`、`reopen` は `state: open`）。結果が分からないときの読み直しは、`state_reason` も比べる。`--yes` のない非対話の実行は、今と同じく止まる。
 
 ### R-432-08 削除（`scope delete`）
@@ -117,7 +118,7 @@ canonical モードで、Scope の作成、取り込み、題名の変更、親�
 
 ### R-432-12 作業の終了（`work finish`）
 
-- 引数は今と同じ（`--yes` が必須）。対象の状態の規則は今と同じ（状態が分からなければ止まる、`not-planned` は再開が要る、子孫がすべて `completed`）。対象に `SCOPE_KIND_CHANGED` があれば、書く前に止まる。
+- 引数は今と同じ（`--yes` が必須）。対象の状態の規則は今と同じ（状態が分からなければ止まる、`not-planned` は再開が要る、子孫がすべて `completed`）。対象か子孫に `SCOPE_KIND_CHANGED` があれば、書く前に止まる（子孫の仕様が古い名前のディレクトリにあり、今の ID の場所を確かめても保存を確かめたことにならないため）。
 - 確かめる場所は、対象と子孫のそれぞれの `<区切り>/<ID>/` である（平らなので1つの木にまとまっていない。ディレクトリがなくても、その場所を確かめる）。
 - Issue を閉じる前に、その場所の仕様の変更が GitHub の canonical に届いたことを確かめる（Epic の6章、R-C6）：
   1. その場所の下に保留（`state.json` の `holds`）があれば、書く前に `CANONICAL_SAVE_HELD`（終了コード3）で止まり、保留の種類ごとの解き方を示す。同期が一時停止しているときは、確かめられないので、書く前に `CANONICAL_SAVE_UNCONFIRMED` で止まる。
@@ -152,7 +153,7 @@ canonical モードで、Scope の作成、取り込み、題名の変更、親�
 
 ### R-432-17 種類の付け替え（`SCOPE_KIND_CHANGED`。Epic の2章「種類の決め方と付け替え」）
 
-- 書くコマンド（`scope create`、`scope import github`、`scope edit`、`scope move`、`scope close`、`scope reopen`、`dependency add`、`dependency remove`、`artifact create`、`artifact import file`）、`work start`（対象か祖先）、`work finish` は、対象、親、新しい親、依存の端のどれかの番号に、同じ番号で GitHub と違う種類のディレクトリがカタログにあるとき（I-14 の `kind_changes`）、書く前に `SCOPE_KIND_CHANGED`（終了コード3、`recovery` に I-14 の次の1手）で止まる。古い ID で指定したときも、同じコードで止まる（I-14 の `resolve_canonical_scope`）。
+- 書くコマンド（`scope create`、`scope import github`、`scope edit`、`scope move`、`scope close`、`scope reopen`、`dependency add`、`dependency remove`、`artifact create`、`artifact import file`）、`work start`（対象か祖先）、`work finish`（対象か子孫）は、対象、親、新しい親、依存の端のどれかの番号に、同じ番号で GitHub と違う種類のディレクトリがカタログにあるとき（I-14 の `kind_changes`）、書く前に `SCOPE_KIND_CHANGED`（終了コード3、`recovery` に I-14 の次の1手）で止まる。古い ID で指定したときも、同じコードで止まる（I-14 の `resolve_canonical_scope`）。
 - カタログが見えないコマンド（リンクを求めないコマンドでリンクがないとき）は、付け替えを見つけられないので止めない（I-14 の `kind_changes` が空になる。I-14 と同じ扱い）。
 - `scope delete` は止めない（R-432-08）。
 
@@ -181,7 +182,8 @@ canonical モードで、Scope の作成、取り込み、題名の変更、親�
 | 題名が規則に合わない | `PRECONDITION_FAILED`（3）。書かない |
 | 関わる Scope に `SCOPE_KIND_CHANGED`（`scope delete` のほか） | `SCOPE_KIND_CHANGED`（3）。書かない |
 | 区切りの場所がシンボリックリンクかファイル | 書く前に止まる（`scope create` で番号が決まった後に見つかれば、作った後の失敗） |
-| カタログの排他が取れない（GitHub に書いた後） | `partial`（6）。`recovery` に、続きから整うコマンド（`scope import github`、`scope delete`） |
+| カタログの排他が取れない（`scope create` と `scope import github`。GitHub に書いた後） | `partial`（6）。`recovery` に `scope import github`（続きから整う） |
+| カタログの排他が取れない（`scope delete`。バックアップの後、GitHub に書く前） | `partial`（6。バックアップと選択の解除の効果）。同じ `scope delete` を新しい `--backup-dir` で実行すれば続きから整う |
 | Issue を作った後の失敗 | `partial`（6）と `scope import github` の案内 |
 | Issue を作ったか分からない | `partial`（6）、`GITHUB_CREATE_IDENTITY_UNKNOWN`。作られた Issue を探して `scope import github` |
 | 書き込みの結果が分からず、読み直しでも分からない | `partial`（6）、`GITHUB_EFFECT_UNKNOWN`。同じ書き込みを重ねない |
@@ -202,24 +204,24 @@ canonical モードで、Scope の作成、取り込み、題名の変更、親�
 テストは、外のネットワークを使わない（偽の `gh`、一時ディレクトリの bare のリポジトリ、`XDG_STATE_HOME` を一時ディレクトリに）。
 
 - **AC-432-01**（書く順と束）：偽の `gh` と一時のカタログで、`scope create`（3つの種類）、`scope import github`、`scope edit`、`scope move`、`scope close`、`scope reopen`、`scope delete`、`dependency add`、`dependency remove`、`artifact create`、`artifact import file` が、`design.md` の順に GitHub に書き（偽の `gh` の記録の書き込みの順と本文で確かめる。`sub_issue_id` と `issue_id` は番号ではなく Issue の id。Issue の作成と更新の本文に `body` がない）、カタログに書くものは、カタログの排他の中で書いて、`origin: command` の変更の束を残す（束の `paths` と `deletions` で確かめる）。Scope のディレクトリは、種類と親を問わず `<カタログ>/<区切り>/<ID>/` にでき、`.meta.json` を作らない。作った文書の前付けに `タイトル:` と `親:` の行がなく、「詳細:」のリンクが `../../../docs/…`、`artifacts/rules.md` と `discussions/rules.md` が `../../../../docs/rules/…` を指し、リンクを通して開ける。
-- **AC-432-02**（書く前の確かめ）：各書くコマンドが、書く前に変わったかの確かめ（条件付きの要求）を行い、判断に使う Issue を `GET` で読み直す（偽の `gh` の記録で確かめる）。偽の `gh` を接続できないようにすると、書き込みの要求もカタログの変化もなく、`GITHUB_UNAVAILABLE`（5）で止まる。`--offline` は `PRECONDITION_FAILED`（3）で止まる。スナップショットにない古い状態（GitHub だけで閉じた親、GitHub の画面だけで変えた親や依存）は、読み直しで見つかり、書く前に止まるか、読み直した値で正しく書く。
+- **AC-432-02**（書く前の確かめ）：各書くコマンドが、書く前に変わったかの確かめ（条件付きの要求）を行い、判断に使う Issue を `GET` で読み直す（偽の `gh` の記録で確かめる）。偽の `gh` を接続できないようにすると、書き込みの要求もカタログの変化もなく、`GITHUB_UNAVAILABLE`（5）で止まる。`--offline` は `PRECONDITION_FAILED`（3）で止まる。スナップショットにない古い状態は、読み直しで見つかり、場面ごとに次のとおりになる：(a) GitHub だけで閉じた親への `scope create` は `PRECONDITION_FAILED` で書き込みがない。(b) GitHub だけで足した同じ依存の `dependency add` は書かずに `unchanged`。(c) GitHub だけで親を付け替えた Scope への、その親への `scope move` は書かずに `unchanged`。(d) GitHub だけで閉じた対象の `scope close` は書かずに `unchanged`。
 - **AC-432-03**（すぐの反映。AC-16 の一部）：変わったかの確かめの間隔（60秒）の中で、`scope create` の後の `scope show` が、偽の `gh` に GraphQL の全体の読み取りを送らずに、新しい Scope を示す。`scope edit`、`dependency add` の後の表示も、取り直しなしで新しい値を示す。
 - **AC-432-04**（作成の後の失敗）：Issue を作った後の sub-issue の失敗と、カタログの排他の失敗で、`scope create` が `partial`（6）と、`recovery` に `scope import github <種類> <番号>` を返す。その案内のとおりの `scope import github` が、Issue を重ねて作らずに完了させる（偽の `gh` の Issue の数で確かめる）。Issue を作る要求の応答を失わせると、`GITHUB_CREATE_IDENTITY_UNKNOWN` の `partial` になる。
-- **AC-432-05**（取り込み）：既にある Issue の `scope import github` が、ラベル、親、`<区切り>/<ID>/` を足し、本文を書かない。`--title` の値は使われず（GitHub の題名が残る）、`CANONICAL_TITLE_IGNORED` の警告が出る。`--slug` は `CANONICAL_NOT_APPLICABLE` で何も書かない。Scope でない子を持つ Issue の取り込みで、`GITHUB_SNAPSHOT_STALE` の警告が出ない。2回目は書き込みの要求なしで `unchanged`。止まる条件（別の種類、違う親、同じ番号で別の種類のディレクトリ）で、何も書かない。
+- **AC-432-05**（取り込み）：既にある Issue の `scope import github` が、ラベル、親、`<区切り>/<ID>/` を足し、本文を書かない。`--title` の値は使われず（GitHub の題名が残る）、`CANONICAL_TITLE_IGNORED` の警告が出る。`--slug` は `CANONICAL_NOT_APPLICABLE` で何も書かない。GitHub の題名が規則に合わない（改行を含む）Issue の取り込みは `PRECONDITION_FAILED` で何も書かない。Scope でない子を持つ Issue の取り込みで、`GITHUB_SNAPSHOT_STALE` の警告が出ない。2回目は書き込みの要求なしで `unchanged`。止まる条件（別の種類、違う親、同じ番号で別の種類のディレクトリ）で、何も書かない。
 - **AC-432-06**（反映できない変更）：スナップショットにない番号に当たる変更の反映が、例外を出さずに飛ばされ、コマンドが成功のまま `GITHUB_SNAPSHOT_STALE` を警告に入れ、次の `display` の読み取りが全体を取り直す（単体と CLI のテスト）。
 - **AC-432-07**（閉じると開く）：`scope close` が子孫の未完了と、別のリポジトリの子で止まり、`completed` と `not-planned` を `state_reason` で書く。結果が分からないときの読み直しが `state_reason` を比べ、違えば `GITHUB_EFFECT_UNKNOWN` の `partial` になる（単体のテスト）。`scope reopen` が閉じた祖先で止まる。
 - **AC-432-08**（依存）：`dependency add` が、循環になるとき書く前に止まり、偽の `gh` に書き込みがない。正しい追加と削除が blocked by に反映され、`dependency remove --missing-ok` がないときは書かずに `unchanged`。0埋めしない ID（`--from iss-5 --to iss-6`）でも同じ Scope に決まる。
-- **AC-432-09**（移動）：`scope move <ID> --parent <親>` が `replace_parent: true` で付け替え、カタログ（作業ツリーと `.runtime/changesets/`）を変えない。同じ親なら `unchanged`。`--parent` なしは使い方の誤り（2）。版3では `CANONICAL_NOT_MIGRATED`。
-- **AC-432-10**（削除）：`scope delete --recursive` が、子孫のそれぞれの `<区切り>/<ID>/`（別の区切りにあるものを含む）を写してから、依存を外し、親から外し、種類のラベルを外し、それぞれのディレクトリを消し、空になった区切りを消し、削除を束に書く。Issue は閉じない。止まる条件（`--backup-dir` なし、`--recursive`、`--clear-active`、`--detach-dependencies`）で何も書かない。一部のディレクトリを消した後や GitHub の書き込みの途中で止めた後、同じ `scope delete` で完了する。`SCOPE_KIND_CHANGED` のある Scope の削除が止まらず、古い種類のディレクトリも写して消す。
+- **AC-432-09**（移動）：`scope move <ID> --parent <親>` が `replace_parent: true` で付け替え、カタログ（作業ツリーと `.runtime/changesets/`）を変えない。このチェックアウトで選んだ Scope を付け替えると、`spec-dock/active/epic` が新しい親のディレクトリを開く。ほかのworktreeが選んでいれば `ACTIVE_LINK_NOT_UPDATED` の警告が出る。同じ親なら `unchanged`。`--parent` なしは使い方の誤り（2）。版3では `CANONICAL_NOT_MIGRATED`。
+- **AC-432-10**（削除）：`scope delete --recursive` が、子孫のそれぞれの `<区切り>/<ID>/`（別の区切りにあるものを含む）を写し、（`--clear-active` なら選択を外し）それぞれのディレクトリと空になった区切りを消して削除を束に書き、その後に依存を外し、親から外し、種類のラベルを外す（効果の順と、偽の `gh` の書き込みの記録で確かめる）。Issue は閉じない。止まる条件（`--backup-dir` なし、`--recursive`、`--clear-active`、`--detach-dependencies`）で何も書かない。一部のディレクトリを消した後や GitHub の書き込みの途中で止めた後、同じ `scope delete` で完了する。`SCOPE_KIND_CHANGED` のある Scope の削除が止まらず、古い種類のディレクトリも写して消す。
 - **AC-432-11**（Artifact）：`artifact create` と `artifact import file` が、mainのチェックアウトと作業用のworktreeの両方で、カタログの `<区切り>/<ID>/artifacts/` に公開し、束を書き、場所を `spec-dock/initiatives/<区切り>/<ID>/artifacts/…` で示す。`@root` は今と同じく `spec-dock/artifacts/` に書き、束を書かない。
-- **AC-432-12**（作業の開始）：`work start` が、新しいブランチ（既定の名前 `<ID>`）と既存のブランチで、今と同じ効果（ブランチ、チェックアウト、選択の記録、`spec-dock/active/` のリンク）に加えて、作業中のラベルと担当者を付け、作業用のworktreeでもリンクが整う。基点に `spec-dock/initiatives` があると `CANONICAL_BASE_HAS_SPECS` で止まり、参照、HEAD、選択を変えない。`BLOCKED`、`UNKNOWN`、作業中の印があって前提が未完了の Scope は `READINESS_NOT_SATISFIED` で止まる。前提が満たされた `DOING` は `SCOPE_IN_PROGRESS` の警告（担当者を含む）で進む。印を付ける要求を失敗させても、結果は `succeeded` で、警告に失敗した書き込みが入る。リンクのないチェックアウトでも、`work start` がリンクを作って進む。
-- **AC-432-13**（作業の終了。AC-13）：未保存の変更があるとき、`work finish` が `origin: finish` の束を書き、同期の周期を待ち、push が確かめられてから Issue を閉じ、作業中のラベルを外し、選択を外す。Epic の `work finish` は、別の区切りにある子孫の `<区切り>/<ID>/` の未保存の変更も待つ。同期が来ない（時刻を注入して180秒を過ぎる）と、Issue を閉じずに `CANONICAL_SAVE_UNCONFIRMED`（6）で止まる。その場所の下に保留があると `CANONICAL_SAVE_HELD` で止まる。Scope のディレクトリを手で消した未保存の削除も、保存を待ってから閉じる。待つ間に GitHub で対象が閉じられたり子が開き直されたりしたら、閉じる前の確かめ直しで止まる。もう1つのクローンの push を取り込んだだけで自分は push しなかった場合も、確かめられて閉じる。
+- **AC-432-12**（作業の開始）：`work start` が、新しいブランチ（既定の名前 `<ID>`）と既存のブランチで、今と同じ効果（ブランチ、チェックアウト、選択の記録、`spec-dock/active/` のリンク）に加えて、作業中のラベルと担当者を付け、作業用のworktreeでもリンクが整う。基点に `spec-dock/initiatives` があると `CANONICAL_BASE_HAS_SPECS` で止まり、参照、HEAD、選択を変えない。`BLOCKED`、`UNKNOWN`、作業中の印があって前提が未完了の Scope は `READINESS_NOT_SATISFIED` で止まる。前提が満たされた `DOING` は `SCOPE_IN_PROGRESS` の警告（担当者を含む）で進む。印を付ける要求を失敗させても、結果は `succeeded` で、警告に失敗した書き込みが入る。リンクのないチェックアウトでも、`work start` がリンクを作って進む。リンクの場所を塞いで `link_after_command` を失敗させても、`work start` は `succeeded` のまま、警告と次の1手（`spec-dock canonical link`）を返す。
+- **AC-432-13**（作業の終了。AC-13）：未保存の変更があるとき、`work finish` が `origin: finish` の束を書き、同期の周期を待ち、push が確かめられてから Issue を閉じ、作業中のラベルを外し、選択を外す。Epic の `work finish` は、別の区切りにある子孫の `<区切り>/<ID>/` の未保存の変更も待つ。同期が来ない（時刻を注入して180秒を過ぎる）と、Issue を閉じずに `CANONICAL_SAVE_UNCONFIRMED` で止まる（未保存の変更があって束を書いた後は `partial` の6、未保存の変更がなく束を書いていないときは `failed` の3）。その場所の下に保留があると `CANONICAL_SAVE_HELD` で止まる。Scope のディレクトリを手で消した未保存の削除も、保存を待ってから閉じる。待つ間に GitHub で対象が閉じられたり子が開き直されたりしたら、閉じる前の確かめ直しで止まる。もう1つのクローンの push を取り込んだだけで自分は push しなかった場合も、確かめられて閉じる。
 - **AC-432-14**（I-4 から引き継ぐ直し）：`branch create` と `branch switch` の Git の失敗とチェックアウトの後の確かめの失敗で、効果の判定が従来と同じになる（項目ごとのテスト）。`worktree remove` と `worktree bootstrap` が、確かめた記録で従来の内側の処理を呼び、その後に選択が変わると書く前に止まる。`worktree create --expect-current` は、従来の処理の直前の読み直しで不一致なら止まる。無視されたものが正しいリンクだけの作業用のworktreeが、`--discard-ignored` なしで消え、カタログは残る。ほかの無視されたファイルがあれば、今と同じく止まる。
 - **AC-432-15**（答えないコマンドを残さない）：版4のリポジトリで、すべての公開のコマンドが `CANONICAL_NOT_IMPLEMENTED` 以外で答える（コマンドの一覧のテスト）。`scope move` が `help`、`completion`、`--help` の Target/Reads/Writes/Does not の節に出て、効果の要約が Epic の12章の文（「Change a Scope parent in GitHub; the flat catalog directory does not move.」）である。
 - **AC-432-16**（AC-15）：版3の振る舞いを確かめる今のテストが、Epic の `design.md` の testability の「従来モードの回帰」で許された変更（コマンドの数と一覧、配布資産の一覧と値、文書の中身）のほかは、変更なしで通る。I-1〜I-4、I-14、I-16 の canonical のテストのうち、この Issue のコマンドが `CANONICAL_NOT_IMPLEMENTED` になることを確かめていたものは、canonical のテストとして直し、`report.md` に一覧で書く。`git diff --name-only origin/main -- src/` に、`design.md` の「置き場」の表のほかのファイルがない（従来のモジュールに差分がない）。
 - **AC-432-17**：`make lint` と `uv run pytest` が通る。
-- **AC-432-18**（題名。AC-09）：日本語の題名だけで `scope create issue` が成功し、ディレクトリが `<カタログ>/<区切り>/<ID>/`、`work start` の既定のブランチ名が `<ID>` で、`scope show` と `workspace sync` に日本語の題名が出る。空白だけ、改行を含む、257文字の題名は、`scope create` と `scope edit` で何も書かずに `PRECONDITION_FAILED` になり、256文字はとおる。従来モードの作成の題名の規則のテストは変更なしで通る。
-- **AC-432-19**（種類の付け替え）：偽の `gh` で種類のラベルを付け替え、カタログに古い種類のディレクトリを置くと、R-432-17 の書くコマンドと `work start`（祖先の付け替えを含む）と `work finish` が `SCOPE_KIND_CHANGED`（3）で止まり、GitHub への書き込みもカタログの変化もない。ディレクトリとブランチの名前は変わらない。古い ID での指定も同じコードで止まる。
+- **AC-432-18**（題名。AC-09）：日本語の題名だけで `scope create issue` が成功し、ディレクトリが `<カタログ>/<区切り>/<ID>/`、`work start` の既定のブランチ名が `<ID>` で、`scope show` と `workspace sync` に日本語の題名が出る。空白だけ、改行を含む、257文字の題名は、`scope create` と `scope edit` で何も書かずに `PRECONDITION_FAILED` になり、256文字はとおる。`scope create` に `--slug` を付けると `CANONICAL_NOT_APPLICABLE`（3）で書き込みがない。従来モードの作成の題名の規則のテストは変更なしで通る。
+- **AC-432-19**（種類の付け替え）：偽の `gh` で種類のラベルを付け替え、カタログに古い種類のディレクトリを置くと、R-432-17 の書くコマンドと `work start`（祖先の付け替えを含む）と `work finish`（子孫の付け替えを含む）が `SCOPE_KIND_CHANGED`（3）で止まり、GitHub への書き込みもカタログの変化もない。ディレクトリとブランチの名前は変わらない。古い ID での指定も同じコードで止まる。
 
 ## 制約・前提
 
