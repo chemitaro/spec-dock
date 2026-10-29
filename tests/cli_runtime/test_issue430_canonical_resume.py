@@ -325,3 +325,31 @@ def test_a_re_adoption_waiting_for_a_held_fix_never_pushes_the_rewound_history(p
     _code, result = pair.sync(pair.a)
     assert pair.remote_file("secret.md") is None and pair.remote_file("safe.md") == "safe"
     assert dropped not in _history(pair)
+
+
+def test_push_local_is_refused_while_a_re_adoption_is_pending(pair: SyncPair) -> None:
+    """iss-00436 (I-3 gate 8 ST-1): a branch deleted mid re-adoption is never recreated from the dropped history."""
+    pair.write(pair.a, "safe.md", "safe\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    before = pair.remote_head()
+    pair.write(pair.a, "secret.md", TOKEN + "\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    pair.run(pair.a, "canonical", "accept", "secret.md")
+    pair.sync(pair.a)
+    _force(pair, before)
+    pair.advance(61)
+    pair.sync(pair.a)
+    assert pair.run(pair.a, "canonical", "resume", "--adopt-remote")[0] == 0
+    git(pair.remote, "update-ref", "-d", "refs/heads/spec-dock/canonical")  # GitHub deletes it meanwhile
+    pair.advance(61)
+    _code, result = pair.sync(pair.a)
+    assert catalog_result(result)["paused"] == "remote_deleted", result
+    code, result = pair.run(pair.a, "canonical", "resume", "--push-local")
+    assert (code, result["status"], result["error"]["code"]) == (3, "failed", "CANONICAL_PAUSED"), result
+    assert result["error"]["details"]["adopt_remote_pending"] is True
+    assert result["effects"] == [] and result["recovery"]
+    assert git(pair.remote, "branch", "--list", "spec-dock/canonical") == ""
+    state = pair.state(pair.a)
+    assert state is not None and state.paused == "remote_deleted" and state.adopt_remote_pending is True

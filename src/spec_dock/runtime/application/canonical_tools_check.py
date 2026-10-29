@@ -13,11 +13,11 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_TOOL_SETTING_UNKNOWN,
 )
 from spec_dock.runtime.domain.canonical_tools import (
-    CLAUDE_USER_SETTINGS_FILE,
     CODEX_CONFIG_FILE,
     CODEX_SECTION,
     claude_allows,
     claude_setting_line,
+    claude_user_settings,
     codex_setting_line,
 )
 from spec_dock.runtime.presentation.envelope import Diagnostic
@@ -62,16 +62,17 @@ def tool_findings(
                     },
                 )
             )
+    user_settings, user_settings_file = claude_user_settings(environment.environ, environment.home)
     claude: dict[str, object] = {
         "session": environment.claude_code,
         "needed": not layout.is_main,
         "configured": None,
         "sources": [],
-        "file": CLAUDE_USER_SETTINGS_FILE,
+        "file": user_settings_file,
         "line": None,
     }
     if not layout.is_main:
-        payloads = _claude_settings(layout.checkout, environment.home)
+        payloads = _claude_settings(layout.checkout, user_settings)
         claude["sources"] = [str(source) for source, _payload in payloads]
         configured = claude_allows(
             payloads,
@@ -87,18 +88,18 @@ def tool_findings(
                 Diagnostic(
                     CANONICAL_TOOL_SETTING_MISSING,
                     "Claude Code reads the specs of this linked worktree only through an additional directory; "
-                    f"add this to {CLAUDE_USER_SETTINGS_FILE}: {line}",
+                    f"add this to {user_settings_file}: {line}",
                     {
                         "item": "tools",
                         "tool": "claude_code",
-                        "file": CLAUDE_USER_SETTINGS_FILE,
+                        "file": user_settings_file,
                         "line": line,
                         "next_step": line,
                     },
                 )
             )
         elif configured is None:
-            step = f"Check that {CLAUDE_USER_SETTINGS_FILE} lists {catalog} in permissions.additionalDirectories."
+            step = f"Check that {user_settings_file} lists {catalog} in permissions.additionalDirectories."
             warnings.append(
                 Diagnostic(
                     CANONICAL_TOOL_SETTING_UNKNOWN,
@@ -122,8 +123,8 @@ def _is_directory(path: Path) -> bool:
         return False
 
 
-def _claude_settings(checkout: Path, home: Path | None) -> list[tuple[Path, object]]:
-    sources = [home / ".claude/settings.json"] if home is not None else []
+def _claude_settings(checkout: Path, user_settings: Path | None) -> list[tuple[Path, object]]:
+    sources = [user_settings] if user_settings is not None else []
     sources += [checkout / ".claude/settings.json", checkout / ".claude/settings.local.json"]
     payloads: list[tuple[Path, object]] = []
     for source in sources:

@@ -117,7 +117,7 @@ def isolate_user_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("HOME", str(home))
     monkeypatch.setenv("XDG_CONFIG_HOME", str(home / ".config"))
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "state"))
-    for key in ("CODEX_SANDBOX", "CLAUDECODE", "container", "REMOTE_CONTAINERS", "CODESPACES"):
+    for key in ("CODEX_SANDBOX", "CLAUDECODE", "CLAUDE_CONFIG_DIR", "container", "REMOTE_CONTAINERS", "CODESPACES"):
         monkeypatch.delenv(key, raising=False)
     # gh then finds no credentials: its config lives under the temporary XDG_CONFIG_HOME.
     for key in (

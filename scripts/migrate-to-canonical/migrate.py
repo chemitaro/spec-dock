@@ -2557,6 +2557,13 @@ def command_undo(context: Context) -> int:
     report = context.report
     target = context.target()
     state = State(target.state_dir, target.repository)
+    record_path = state.directory / "undo.jsonl"
+    if not record_path.is_file():
+        # A wrong or missing --state-dir would otherwise look like "nothing to undo" (iss-00436, I-8 ST-1).
+        raise Refused(
+            f"no work record at {record_path}",
+            "Pass the same --state-dir that register used (default scripts/migrate-to-canonical/.state/)",
+        )
     gh = context.github(target)
     records = state.undo_records()
     undone = {record["ref"] for record in records if record.get("phase") == "undone"}
