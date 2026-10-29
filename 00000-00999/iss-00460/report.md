@@ -43,11 +43,11 @@ canonical のカタログの Scope のディレクトリを、番号の千ごと
 | AC-460-01 | `test_canonical_layout_buckets.py`（9つの例、0と負の数、種類によらないこと、`scope_relative` の例と ID でない値、`is_bucket_name` の12通り） | 通過 |
 | AC-460-02 | `test_issue460_bucket_dirs.py`（`scope show/list` の `path`、`active set` のリンク、`artifact list` のパス、平らな残りを場所にしないこと）、直した `test_issue431_*` | 通過 |
 | AC-460-03 | `test_catalog_tree.py`（4つの理由と `expected`、隠し・リンク・ファイルの無視、大文字）、`test_issue460_bucket_dirs.py`（`workspace validate` と `canonical status --structure` の外れ、`MISSING` の `path`、同じ区切りの中の付け替えが1件） | 通過 |
-| AC-460-04 | `test_issue460_bucket_dirs.py`（読む入口24通りの parametrize と、`active set`、`active clear --from`、`branch create`、`branch switch`、`worktree create --expect-current`）。名前の照合（`00000-00999/iss-7/` は Scope のディレクトリでない）。`iss-000454` も同じ | 通過 |
+| AC-460-04 | `test_issue460_bucket_dirs.py`（読む入口23通りの parametrize と、`active set`、`active clear --from`、`branch create`、`branch switch`、`worktree create --expect-current`）。名前の照合（`00000-00999/iss-7/` は Scope のディレクトリでない）。`iss-000454` も同じ | 通過 |
 | AC-460-05 | `test_canonical_layout_buckets.py`（`SCOPE_TO_SPEC_DOCK` の正規化）、`test_issue460_bucket_dirs.py`（mainのチェックアウトと作業用のworktreeで、Markdown のリンクとシンボリックリンクが `spec-dock/docs/…` を開く）。`git diff 95bbb7a1c..HEAD -- src/spec_dock/assets` は空（テンプレートは変えていない） | 通過 |
 | AC-460-06 | Epic の3文書を「直下」「`<カタログ>/<ID>/`」「`initiatives/<ID>`」で検索した。残るのは、区切りそのものの説明（用語の「区切り」の行、R-A3 と合意済みの判断の理由、内容の置き場の `root` の説明）、移行前の置き場（11章の平らにする写しの元のパス）、`plan.md` の I-14 の節のマージの時点の記録（節の初めにそう書いた）、I-16 の節の受け入れの文だけである | 通過 |
 | AC-460-07 | `test_canonical_layout_buckets.py`、`test_catalog_tree.py` が `design.md` の公開の形（`scope_bucket`、`scope_relative`、`is_bucket_name`、`SCOPE_TO_SPEC_DOCK`、`MisplacedDirectory.expected`）を直接使う | 通過 |
-| AC-460-08 | 下の「最終品質ゲート」の `make lint` と `uv run pytest` の全体。変えたテストは上の一覧のとおりすべて canonical モードのもの | 下の節 |
+| AC-460-08 | 下の「最終品質ゲート」の `make lint` と `uv run pytest` の全体。変えたテストは上の一覧のとおりすべて canonical モードのもの | 通過 |
 
 - 場所の組み立ての取り残し：`grep -rnE "/ ?(node|view|target|scope)\.id\b|/ ?scope_id\b|catalog ?/ ?f?\"" src/spec_dock/runtime/application/canonical_* src/spec_dock/runtime/infra/catalog_tree.py src/spec_dock/runtime/infra/canonical_* src/spec_dock/runtime/domain/canonical_*` の結果は、`catalog_tree.py` の `bucket / scope_id`（区切りを `scope_relative` から求めた後）と、`canonical_hold.py` の `.runtime/accepted.json` だけで、`<ID>` をカタログに直接つなぐ箇所は残っていない。
 - 実装の途中の確かめ：canonical の範囲（`tests/cli_runtime/test_issue429*`〜`test_issue455*`、`tests/unit/application/test_canonical*`、`tests/unit/infra`、`tests/unit/domain`、`tests/integration/github`）で、テストを直した後に 1426 件が通った（直す前に走らせた回の12件の失敗は、どれも直したテストで、直した後に通った）。`make lint` は通った。
@@ -59,7 +59,13 @@ canonical のカタログの Scope のディレクトリを、番号の千ごと
 
 ### 最終品質ゲート（Claude だけのゲート。ChatGPT のゲートは利用者の設定で無効）
 
-（ゲートの後に書く）
+- **対象**：通常の push で GitHub に送った `e60f069f1f885fd1837e86b37e2e546a19433332`（`origin/main` = `95bbb7a1c` からの全差分 `origin/main...HEAD`）。作業ツリーはきれいな状態で固定した。
+- **静的解析**：`make lint`（ruff check、ruff format --check、mypy）→ 終了コード0（3つとも pass）。
+- **全体のテスト**：`uv run pytest -q -p no:cacheprovider` → 終了コード0、3057 passed、8 skipped（909秒）。実行の前後で HEAD が同じ SHA であることを確かめた。
+- **独立したレビュー**：この作業に関わっていない新しいサブエージェント2つ（`code-review` の Standards と Spec、opus/high。範囲 `95bbb7a1c..e60f069f1`）。結果は契約の検証（`validate-review.py`）で有効、どちらも `pass`、P0/P1/P2 は0件。
+  - Standards：指摘0件。
+  - Spec：P3 が1件（この `report.md` の AC-460-04 の行が、入口の parametrize を「24通り」と書いていたが、実際は23通り）。止める指摘ではない。この節を書くコミットで23通りに直した。
+- **結果**：合格。止める指摘がなく、lint と全体のテストが同じ SHA で通った。この節を書いたコミットは、ゲートの対象の上の、`report.md` だけの変更である。
 
 ### 未確認
 
