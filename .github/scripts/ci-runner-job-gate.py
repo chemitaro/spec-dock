@@ -1,8 +1,9 @@
-"""Keep the SpecDock self-hosted runner to trusted same-repository pull requests (iss-00454).
+"""Keep the SpecDock self-hosted runners to trusted same-repository pull requests (iss-00454, iss-00463).
 
-`route` runs in a GitHub-hosted job and chooses the runner for each Provider CI job. It sends a job to the
-self-hosted runner only when the repository variable SPEC_DOCK_CI_RUNNER is `local` and the pull request passes
-the same check the runner applies itself; every other case keeps the GitHub-hosted runner.
+`route` runs in a GitHub-hosted job and chooses the runner for each Provider CI job. Each system has its own repository
+variable: SPEC_DOCK_CI_RUNNER for the Linux jobs and SPEC_DOCK_CI_MACOS_RUNNER for the macOS job. A job goes to its
+self-hosted runner only when its variable is `local` and the pull request passes the same check the runner applies
+itself; every other case keeps the GitHub-hosted runner.
 
 `admit` is the runner's ACTIONS_RUNNER_HOOK_JOB_STARTED hook, called from a copy installed outside the job
 workspace. It reads the event payload the runner wrote at the fixed place under the runner account's home and refuses
@@ -20,8 +21,11 @@ import pwd
 import sys
 
 TRUSTED_ASSOCIATIONS = frozenset({"OWNER", "MEMBER", "COLLABORATOR"})
-LOCAL_LINUX_LABELS = ("self-hosted", "Linux", "ARM64", "spec-dock-ci")
-HOSTED_RUNNERS = ("ubuntu-latest", "macos-latest")
+# Each hosted runner name used by Provider CI, the repository variable that moves it, and its self-hosted labels.
+LOCAL_RUNNERS = {
+    "ubuntu-latest": ("SPEC_DOCK_CI_RUNNER", ("self-hosted", "Linux", "ARM64", "spec-dock-ci")),
+    "macos-latest": ("SPEC_DOCK_CI_MACOS_RUNNER", ("self-hosted", "macOS", "ARM64", "spec-dock-ci-macos")),
+}
 RUNNER_MODES = frozenset({"hosted", "local"})
 
 
@@ -69,11 +73,11 @@ def decide(
     return None
 
 
-def route(mode: str, refusal: str | None) -> dict[str, object]:
+def route(modes: dict[str, str], refusal: str | None) -> dict[str, object]:
     """Map each hosted runner name used by Provider CI to the runner its job should use."""
-    runners: dict[str, object] = {name: name for name in HOSTED_RUNNERS}
-    if mode == "local" and refusal is None:
-        runners["ubuntu-latest"] = list(LOCAL_LINUX_LABELS)
+    runners: dict[str, object] = {}
+    for name, (_, labels) in LOCAL_RUNNERS.items():
+        runners[name] = list(labels) if modes[name] == "local" and refusal is None else name
     return runners
 
 
@@ -112,19 +116,21 @@ def _admit(repository: str, event_path: Path) -> int:
 
 
 def _route(repository: str) -> int:
-    mode = os.environ.get("SPEC_DOCK_CI_RUNNER") or "hosted"
-    if mode not in RUNNER_MODES:
-        print(f"SPEC_DOCK_CI_RUNNER must be unset, hosted or local, not {mode!r}", file=sys.stderr)
-        return 2
+    modes = {}
+    for name, (variable, _) in LOCAL_RUNNERS.items():
+        modes[name] = os.environ.get(variable) or "hosted"
+        if modes[name] not in RUNNER_MODES:
+            print(f"{variable} must be unset, hosted or local, not {modes[name]!r}", file=sys.stderr)
+            return 2
     refusal = _current_refusal(repository, os.environ.get("GITHUB_EVENT_PATH"))
-    runners = route(mode, refusal)
+    runners = route(modes, refusal)
     line = f"runners={json.dumps(runners, separators=(',', ':'))}"
     output_path = os.environ.get("GITHUB_OUTPUT")
     if output_path:
         with Path(output_path).open("a", encoding="utf-8") as output:
             output.write(line + "\n")
     print(line)
-    if mode == "local" and refusal is not None:
+    if "local" in modes.values() and refusal is not None:
         print(f"Kept GitHub-hosted runners: {refusal}")
     return 0
 

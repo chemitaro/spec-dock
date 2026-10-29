@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import subprocess
 from typing import TYPE_CHECKING
+
+import pytest
 
 from tests.support.canonical_check import provider_root
 
@@ -122,8 +125,9 @@ def _prepare_registration(tmp_path: Path, script: str) -> Path:
     bin_dir.mkdir()
     # The stub sudo drops "-u USER" and runs the rest, recording only its own arguments.
     _stub(bin_dir / "sudo", f'echo "sudo $*" >> "{log}"\n[ "$1" = -u ] && shift 2\nexec "$@"\n')
-    for tool in ("systemctl", "launchctl"):
-        _stub(bin_dir / tool, f'echo "{tool} $*" >> "{log}"\n')
+    _stub(bin_dir / "systemctl", f'echo "systemctl $*" >> "{log}"\n')
+    # launchd reports no loaded service, so the script has to bootstrap it.
+    _stub(bin_dir / "launchctl", f'echo "launchctl $*" >> "{log}"\n[ "$1" != print ]\n')
     root = tmp_path / "opt"
     root.mkdir()
     home = tmp_path / "home"
@@ -160,24 +164,43 @@ def _register(tmp_path: Path, copy: Path, stdin: str) -> tuple[subprocess.Comple
     return completed, log.read_text(encoding="utf-8") if log.exists() else ""
 
 
-def test_register_runner_passes_the_token_only_through_a_pipe(tmp_path: Path) -> None:
-    completed, log = _register(tmp_path, _prepare_registration(tmp_path, "register-runner.sh"), TOKEN + "\n")
+# Each registration script and the line that starts one registered runner's service.
+REGISTRATIONS = [
+    ("register-runner.sh", "systemctl enable --now"),
+    ("macos/register-runner.sh", "launchctl bootstrap system"),
+]
+
+
+def _users(copy: Path) -> list[str]:
+    settings = copy.parent / "settings.sh"
+    return subprocess.run(
+        ["/bin/sh", "-c", f'. "{settings}"; echo $RUNNER_USERS'], capture_output=True, text=True, check=True
+    ).stdout.split()
+
+
+@pytest.mark.parametrize(("script", "start"), REGISTRATIONS)
+def test_register_runner_passes_the_token_only_through_a_pipe(tmp_path: Path, script: str, start: str) -> None:
+    copy = _prepare_registration(tmp_path, script)
+    completed, log = _register(tmp_path, copy, TOKEN + "\n")
     assert completed.returncode == 0, completed.stderr
-    assert log.count("token=set") == 2 and log.count("systemctl enable --now") == 2
+    users = len(_users(copy))
+    assert log.count("token=set") == users and log.count(start) == users
     assert TOKEN not in log + completed.stdout + completed.stderr
 
 
-def test_register_runner_can_run_again_without_registering_twice(tmp_path: Path) -> None:
-    copy = _prepare_registration(tmp_path, "register-runner.sh")
+@pytest.mark.parametrize(("script", "start"), REGISTRATIONS)
+def test_register_runner_can_run_again_without_registering_twice(tmp_path: Path, script: str, start: str) -> None:
+    copy = _prepare_registration(tmp_path, script)
     assert _register(tmp_path, copy, TOKEN + "\n")[0].returncode == 0
     # The runners exist now, so a second run needs no token and only makes sure the services run.
     again, log = _register(tmp_path, copy, "")
     assert again.returncode == 0, again.stderr
-    assert "config.sh" not in log and log.count("systemctl enable --now") == 2
+    assert "config.sh" not in log and log.count(start) == len(_users(copy))
 
 
-def test_register_runner_refuses_to_register_without_a_token(tmp_path: Path) -> None:
-    completed, log = _register(tmp_path, _prepare_registration(tmp_path, "register-runner.sh"), "")
+@pytest.mark.parametrize(("script", "start"), REGISTRATIONS)
+def test_register_runner_refuses_to_register_without_a_token(tmp_path: Path, script: str, start: str) -> None:
+    completed, log = _register(tmp_path, _prepare_registration(tmp_path, script), "")
     assert completed.returncode == 1 and "no registration token" in completed.stderr and "config.sh" not in log
 
 
@@ -214,3 +237,57 @@ def test_a_failed_lima_download_leaves_nothing_behind(tmp_path: Path) -> None:
     completed, _ = _host_install(tmp_path, RUNNER / "host-install.sh", "lima")
     assert completed.returncode != 0
     assert not (tmp_path / "home/Library/Application Support/spec-dock-ci-vm/lima").exists()
+
+
+MACOS = RUNNER / "macos"
+
+
+def test_the_macos_vm_agent_keeps_tart_running_with_softnet_on_its_path(tmp_path: Path) -> None:
+    completed, log = _host_install(tmp_path, MACOS / "host-install.sh", "agent")
+    assert completed.returncode == 0, completed.stderr
+    plist = (tmp_path / "home/Library/LaunchAgents/com.chemitaro.spec-dock-ci-macos-vm.plist").read_text(
+        encoding="utf-8"
+    )
+    assert "<key>KeepAlive</key><true/>" in plist and "<key>RunAtLoad</key><true/>" in plist
+    assert "<string>/usr/local/libexec/spec-dock-ci-macos-vm:/usr/bin:/bin:/usr/sbin:/sbin</string>" in plist
+    app = tmp_path / "home/Library/Application Support/spec-dock-ci-macos-vm"
+    assert (app / "host-run-macos-vm.sh").is_file() and (app / "settings.sh").is_file()
+    assert "launchctl bootstrap gui/" in log
+
+
+def test_a_failed_tools_download_leaves_nothing_behind(tmp_path: Path) -> None:
+    completed, log = _host_install(tmp_path, MACOS / "host-install.sh", "tools")
+    assert completed.returncode != 0 and "curl" in log
+    assert not (tmp_path / "home/Library/Application Support/spec-dock-ci-macos-vm").exists()
+
+
+def test_the_macos_vm_starts_only_behind_softnet_and_shares_nothing_with_the_mac() -> None:
+    run = (MACOS / "host-run-macos-vm.sh").read_text(encoding="utf-8")
+    command = run[run.index("exec ") :]
+    assert '--net-softnet --net-softnet-block="$SOFTNET_BLOCK"' in command and "--no-graphics" in command
+    assert run.index('[ ! -u "$softnet" ]') < run.index("exec ")
+    settings = (MACOS / "settings.sh").read_text(encoding="utf-8")
+    assert (
+        'SOFTNET_BLOCK="out @host"\n' in settings and "IMAGE=ghcr.io/cirruslabs/macos-tahoe-vanilla@sha256:" in settings
+    )
+    for name in ("host-install.sh", "host-run-macos-vm.sh", "host-ssh.sh"):
+        commands = [line for line in (MACOS / name).read_text(encoding="utf-8").splitlines() if "#" not in line[:2]]
+        assert not any("--dir" in line or "--net-bridged" in line for line in commands)
+        # The Mac side never runs sudo itself; host-install.sh only prints the one softnet step for the user.
+        assert not any(re.match(r"\s*sudo ", line) for line in commands)
+    ssh = (MACOS / "host-ssh.sh").read_text(encoding="utf-8")
+    assert "-F /dev/null" in ssh and "IdentityAgent=none" in ssh and "ForwardAgent=no" in ssh
+
+
+def test_the_macos_guest_keeps_the_runner_user_away_from_admin_and_root() -> None:
+    setup = (MACOS / "guest-setup.sh").read_text(encoding="utf-8")
+    for line in ("PasswordAuthentication no", "KbdInteractiveAuthentication no", "AllowUsers $ADMIN_USER"):
+        assert f"\n{line}\n" in setup
+    assert "rm -f /etc/kcpassword" in setup and "launchctl disable system/com.apple.screensharing" in setup
+    assert setup.index('dscl . -passwd "/Users/$ADMIN_USER"') < setup.index("sysadminctl -addUser")
+    assert "must not belong to an administrative group" in setup
+    assert not re.search(r"sysadminctl -addUser[^\n]*-admin\b", setup)
+    assert 'pkgutil --check-signature "$tmp/python/' in setup and '"$archive" "$RUNNER_SHA256"' in setup
+    assert '"$uv_wheel" "$UV_WHEEL_SHA256"' in setup and "-I -m pip" in setup
+    assert setup.rstrip().splitlines()[-2].startswith("check_root_tree /opt/spec-dock-ci ")
+    assert "\numask 022\n" in setup and "svc.sh install" not in setup

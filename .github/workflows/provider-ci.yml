@@ -7,8 +7,9 @@ permissions:
   contents: read
 
 jobs:
-  # Chooses the runner for the jobs below. Only a trusted same-repository pull request goes to the
-  # self-hosted runner, and only while the repository variable SPEC_DOCK_CI_RUNNER is `local`.
+  # Chooses the runner for the jobs below. Only a trusted same-repository pull request goes to a self-hosted runner:
+  # the Linux jobs while the repository variable SPEC_DOCK_CI_RUNNER is `local`, the macOS job while
+  # SPEC_DOCK_CI_MACOS_RUNNER is `local`.
   route:
     runs-on: ubuntu-latest
     outputs:
@@ -22,6 +23,7 @@ jobs:
         id: route
         env:
           SPEC_DOCK_CI_RUNNER: ${{ vars.SPEC_DOCK_CI_RUNNER }}
+          SPEC_DOCK_CI_MACOS_RUNNER: ${{ vars.SPEC_DOCK_CI_MACOS_RUNNER }}
         run: python3 .github/scripts/ci-runner-job-gate.py route --repository chemitaro/spec-dock
 
   provider-tests:

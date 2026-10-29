@@ -306,7 +306,11 @@ def test_guest_setup_keeps_its_files_to_root_and_checks_the_rules_before_install
 
 
 RUNNER_HOME_REFERENCE = re.compile(r"\$dir\b|\$RUNNER_HOME|/home/")
-ALLOWED_HOME_COMMAND = re.compile(r'^\s*(dir=|ExecStart=|WorkingDirectory=)|--home-dir "\$RUNNER_HOME/\$user"')
+# Naming the runner's files in the unit or LaunchDaemon root writes, and creating the account's home, are allowed.
+ALLOWED_HOME_COMMAND = re.compile(
+    r"^\s*(dir=|ExecStart=|WorkingDirectory=|<key>(ProgramArguments|WorkingDirectory|HOME)</key>)"
+    r'|(--home-dir|-home) "\$RUNNER_HOME/\$user"'
+)
 AS_RUNNER_USER = 'sudo -u "$user"'
 
 
@@ -409,3 +413,11 @@ def test_every_place_that_names_the_repository_names_the_same_one() -> None:
     assert f"route --repository {REPOSITORY}" in (WORKFLOWS / "provider-ci.yml").read_text(encoding="utf-8")
     needrestart_unit = "actions\\.runner\\." + REPOSITORY.replace("/", "-") + "\\."
     assert needrestart_unit in (RUNNER / "guest-setup.sh").read_text(encoding="utf-8")
+
+
+@pytest.mark.parametrize("script", ["guest-setup.sh", "macos/guest-setup.sh"])
+def test_root_uses_runner_files_only_through_the_runner_user_on_either_system(script: str) -> None:
+    setup = (RUNNER / script).read_text(encoding="utf-8")
+    assert root_lines_touching_runner_files(setup) == []
+    root_extractions = [line for line in setup.splitlines() if "tar -x" in line and 'sudo -u "$user"' not in line]
+    assert root_extractions and all("--no-same-owner" in line for line in root_extractions)
