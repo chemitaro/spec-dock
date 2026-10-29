@@ -137,7 +137,7 @@ def validate_canonical_title(value: str, *, field: str) -> str
 
 - 書いた結果の反映（`reflect`）：Issue の作成、題名、状態の変更は、返った Issue で `UpsertIssue`。ラベルと担当者は、知っている Issue に、返った値を重ねた `UpsertIssue`。親子は `SetParent`、依存は `AddBlockedBy`（Scope でない相手は `ExternalIssue` を付ける）と `RemoveBlockedBy`。
 - 取り込みでは、読み直した親（`get_parent`）、子（`list_sub_issues`）、依存（`list_blocked_by`）も `SetParent` と `AddBlockedBy` で反映する。子は、スナップショットにある Scope だけを `SetParent` にする（Scope でない子は表さないものなので、飛ばしても古いと扱わない）。別のリポジトリの相手は、スナップショットの全体の読み取りと同じく表さない。
-- 種類の付け替え：上の表の番号を、`reread` の後に `session.require_kind_unchanged(...)` で確かめる。取り込みの対象は、種類のラベルを足す前なので `kind_changes` に入らない。そこで、`catalog.tree.directories()` の中に、同じ番号で取り込む種類と違う `<ID>` があれば `SCOPE_KIND_CHANGED`（I-14 の `kind_change_error` に `KindChange(番号, 取り込む ID, 名前)` を渡す）とする。
+- 種類の付け替え：上の表の番号を、`reread` の後に `session.require_kind_unchanged(...)` で確かめる。取り込みの対象は、種類のラベルを足す前なので `kind_changes` に入らない。そこで、`catalog.tree.directories()` の中に、同じ番号で取り込む種類と違う `<ID>` があれば `SCOPE_KIND_CHANGED`（I-14 の `kind_change_error` に `KindChange(番号, 取り込む ID, (同じ番号で違う種類の名前…))`（名前は昇順のタプル）を渡す）とする。
 
 ### 各コマンドの止まる条件（書く前）
 
@@ -147,7 +147,7 @@ def validate_canonical_title(value: str, *, field: str) -> str
 | `scope import github` | `--slug`。別のリポジトリ、PR。種類のラベルが別の種類か2つ以上。GitHub の題名が規則に合わない。GitHub の親が `--parent` と違う（次の1手「`--parent` を GitHub の親にして取り込み、その後で必要なら `spec-dock scope move <ID> --parent <親>`、または GitHub で親を直してから取り込む」）。Initiative に親がある。親の種類、親かその祖先が閉じている。同じ番号で別の種類のディレクトリ、親か祖先の付け替え（`SCOPE_KIND_CHANGED`）。区切りの場所がシンボリックリンクかファイル |
 | `scope edit` | 題名の規則。対象の付け替え |
 | `scope move` | Initiative（親を持たない）。親の種類の規則。対象自身か子孫を親にする。新しい親かその祖先が閉じている。対象か新しい親とその祖先の付け替え |
-| `scope close`、`reopen` | 今の `plan_close`、`plan_reopen` の規則（子孫と祖先はスナップショットの親子から求める。対象は読み直した値）。`close --reason completed` は、対象か子孫に `SUB_ISSUE_FOREIGN_REPOSITORY` があるか、子に ID の決まらない Scope があれば `DESCENDANT_STATUS_UNKNOWN`（`PRECONDITION_FAILED`）。対象の付け替え |
+| `scope close`、`reopen` | 今の `plan_close`、`plan_reopen` の規則（子孫と祖先はスナップショットの親子から求める。対象は読み直した値）。`close --reason completed` は、対象か子孫に `SUB_ISSUE_FOREIGN_REPOSITORY` があるか、子に ID の決まらない Scope（種類のラベルが2つ以上）があれば `PRECONDITION_FAILED`（`DESCENDANT_STATUS_UNKNOWN:`）。対象の付け替え。Epic の「子が付け替えの異常で ID を決められない」は、ID が決まらない子（種類のラベルが2つ以上）と読んだ。付け替えた子（ID は今の種類で決まる）は、`work finish` では止め（保存の確かめの場所が違うため）、`scope close` では今の状態で判定する |
 | `scope delete` | 今の規則（`--backup-dir`、`RECURSIVE_REQUIRED`、`CLEAR_ACTIVE_REQUIRED`、`DETACH_DEPENDENCIES_REQUIRED`、選択が観察できない）。バックアップの先が消すディレクトリかカタログか Git のメタデータと重なる |
 | `dependency add` | 両端が Scope に決まらない。両端の付け替え。`dependency_violations` が循環か規則の違反を返す（`PRECONDITION_FAILED`。メッセージに違反のコードと相手） |
 | `dependency remove` | 両端が Scope に決まらない。両端の付け替え。辺がなく `--missing-ok` がない（`SCOPE_NOT_FOUND`、今と同じ文） |
@@ -162,13 +162,16 @@ def validate_canonical_title(value: str, *, field: str) -> str
 - テンプレートは、このチェックアウトの `spec-dock/templates/<種類>/` から、従来の `_replacements` の置き換えで写し、次の2つを行う（`domain/canonical_scaffold.py` の純粋な関数）。
   - 前付け（先頭の `---` から次の `---` まで）の `タイトル:` と `親:` で始まる行を除く（`strip_structure_front_matter`）。見出しの題名は残す。
   - 本文の Markdown のリンクの先のうち、`(../` を繰り返した後に `docs/` が続くもの（従来の入れ子の深さで `spec-dock/docs/…` を指すもの）を、`SCOPE_TO_SPEC_DOCK / "docs/…"`（`../../../docs/…`）に書き換える（`rebase_spec_dock_links`）。ほかのリンクは変えない。
-- 規則のリンク：従来の `_rules_scaffold_specs` の組のうち、`artifacts/rules.md` だけを、`_create_relative_symlink_at` で、カタログの実際のパスから mainのチェックアウトの `spec-dock/docs/rules/<種類>/artifacts.md` への相対のリンクとして置く（`<main>/spec-dock/.canonical/<区切り>/<ID>/artifacts/rules.md` から `../../../../docs/rules/…`。リンク `spec-dock/initiatives` を通しても同じ深さで開く）。移行前の `epics/rules.md` と `issues/rules.md` は置かない。Epic の6章が挙げる `discussions/rules.md` は、配布資産に元の規則のファイル（`docs/rules/*/discussions.md`）がなく、従来の作成も置かないので、置かない（報告書で統括に伝える）。
+- 規則のリンク：`artifacts/rules.md` と `discussions/rules.md` を、`_create_relative_symlink_at` で、カタログの実際のパスから mainのチェックアウトの `spec-dock/docs/rules/<種類>/artifacts.md` と `discussions.md` への相対のリンクとして置く（`<main>/spec-dock/.canonical/<区切り>/<ID>/artifacts/rules.md` から `../../../../docs/rules/…`。リンク `spec-dock/initiatives` を通しても同じ深さで開く）。`artifacts/rules.md` の組は従来の `_rules_scaffold_specs` から取り、`discussions/rules.md` の組（従来の作成は置かない）は canonical の側で足す（`canonical_rules_links`）。元のファイルがなければ、書く前に止まる（従来の `_precheck_pre_github_create_rules_sources` と同じく `FileNotFoundError`）。移行前の `epics/rules.md` と `issues/rules.md` は置かない。
 - 公開の後に、ディレクトリのカタログの中の相対パス（`<区切り>/<ID>`）を、束の `paths` に入れる。
 
 ### `scope move`
 
-- 対象（`target`）と新しい親（`--parent`、必須）を `resolve` で解く。読み直しの後、`ancestors_for` で、対象自身か子孫を親にしないことを確かめる。すでにその親なら `unchanged`。
-- `add_sub_issue(親, child=対象, child_id=対象の id, replace_parent=True)`。反映は `SetParent`。カタログとリンクを求めず、何も書かない（`open_write_session(link=False)`）。
+- 対象（`target`）と新しい親（`--parent`、必須。`LEAF_ARGUMENTS` は `_required("--parent")`）を `resolve` で解く。読み直しの後、`ancestors_for` で、対象自身か子孫を親にしないことを確かめる。すでにその親なら `unchanged`。
+- `add_sub_issue(親, child=対象, child_id=対象の id, replace_parent=True)`。反映は `SetParent`。カタログとリンクを求めず、カタログに何も書かない（`open_write_session(link=False)`）。
+- 付け替えの後、このチェックアウトの選択（`read_selection`）が対象かその子孫なら、`sync_selection_links` で `spec-dock/active/` を整える（効果 `active.link`。失敗は警告）。ほかのworktreeの選択は、I-4 の `workspace sync` と同じ観察（カタログのworktreeを除く）で見て、対象かその子孫なら警告 `ACTIVE_LINK_NOT_UPDATED`（`details`：`path`、`scope_id`、`next_step`「In <path>, run spec-dock active set <ID>.」）を返す。観察できないときは、警告を足さずに結果を変えない。
+- `--help`：Reads「The GitHub structure snapshot checked at decision freshness and the target and new parent Issues and parents read again.」、Writes「The GitHub parent of the Scope (sub-issue with replace_parent); this checkout's spec-dock/active links when it selects the Scope or a descendant.」、Does not「Does not write the catalog, move directories, edit documents, close or reopen Issues, or change selection or branches.」。`HELP_PRECONDITIONS`「A schema-4 checkout; --parent is required and must be the right kind and open, and not the Scope or one of its descendants.」。`HELP_EFFECTS` は Epic の12章の文。
+- JSON の `data`：`scope`（今の Scope の出力）、`github_ref`、`changed`、`parent_before`、`parent_after`（ID か null）、`snapshot`。`--dry-run` は `can_apply` と `blockers` を足す。
 
 ### `scope delete` の書き方
 
@@ -183,7 +186,7 @@ def validate_canonical_title(value: str, *, field: str) -> str
 - 従来の `work_start.start_work` の流れを、canonical の部品で写す。従来の純粋な部品（`plan_start`、`plan_selection`、`check_inventory`、`check_branch_occupancy`、`_verify_inventory`、`_check_private_state`、`_resolve_bound_context`）はそのまま呼ぶ。
 - 置き換えるもの：
   - 対象と在庫：`.meta.json` の代わりに、`decision` のスナップショットの `views`。他のworktreeの選択の観察は、I-4 の `workspace sync` と同じく、カタログのworktreeを除き、`read_selection(other, views)` で行い、従来の `WorktreeSelection` の形で返す。
-  - 既定のブランチ名：`target.id`（`<ID>`）。`--branch` の既存のブランチはそのまま使う。
+  - 既定のブランチ名：`target.id`（`<ID>`）。`--branch` の既存のブランチはそのまま使う。従来の `work start` はブランチ名と ID を照らさない（名前の形だけを確かめる）ので、I-14 の `branch_names_scope` は使わず、移行前の `<ID>-<名前>` を含む任意の名前を今と同じく受け付ける。
   - 基点の照合：`read_candidate` と `verify_candidate`（`.meta.json`）の代わりに、I-4 の `refuse_specs_at(context, tip)`（`CANONICAL_BASE_HAS_SPECS`）。チェックアウトの後も、HEAD が固定した先頭であることで同じコミットを確かめる。
   - 種類の付け替え：`scopes.require_kind_unchanged(*scopes.lineage(target.id))`（I-14）。
   - 着手の判定：`evaluate_readiness`。`ready`（ブロッカーも判定できない理由もない）が真のときだけ進み、`plan_start` には `ReadinessResult(target, ready=True, blockers=(), stale=False)` を渡す。`ready` が真で状態が `DOING` なら警告 `SCOPE_IN_PROGRESS`（`details`：`scope_id`、`number`、`assignees`、`labeled_at: null`、`next_step`）。`ready` が偽なら、状態を問わず（作業中の印があっても）`READINESS_NOT_SATISFIED`（`details`：`state`、`blockers`、`unknown`）。
@@ -194,11 +197,11 @@ def validate_canonical_title(value: str, *, field: str) -> str
 
 ### `work finish`（`application/canonical_work.finish_work`）
 
-- 書く前：`--yes`、`require_linked`、`decision` の確かめと対象の読み直し、対象の付け替え、今の状態の規則と `DESCENDANT_STATUS_UNKNOWN`、選択の観察（従来と同じ `clear_handle` の決め方）。確かめる場所は、対象と子孫（スナップショットの親子）のそれぞれの `scope_relative(ID)` で、ディレクトリがなくても確かめを飛ばさない。`state.json` を読み、どれかの場所の下の保留（`holds_under`）があれば `CANONICAL_SAVE_HELD`（3）、`paused` なら `CANONICAL_SAVE_UNCONFIRMED`（3）。`state.json` が読めなければ `CANONICAL_SAVE_UNCONFIRMED`（3、`next_step` は `spec-dock canonical status`）。
+- 書く前：`--yes`、`require_linked`、`decision` の確かめと対象の読み直し、対象と子孫の付け替え（`require_kind_unchanged(対象, *子孫)`）、今の状態の規則と `DESCENDANT_STATUS_UNKNOWN`、選択の観察（従来と同じ `clear_handle` の決め方）。確かめる場所は、対象と子孫（スナップショットの親子）のそれぞれの `scope_relative(ID)` で、ディレクトリがなくても確かめを飛ばさない。`state.json` を読み、どれかの場所の下の保留（`holds_under`）があれば `CANONICAL_SAVE_HELD`（3）、`paused` なら `CANONICAL_SAVE_UNCONFIRMED`（3）。`state.json` が読めなければ `CANONICAL_SAVE_UNCONFIRMED`（3、`next_step` は `spec-dock canonical status`）。
 - 保存の確かめ（`confirm_saved`。時計、待ち、間隔は注入できる。既定は180秒、2秒）：
   1. カタログの排他の中で `run_catalog_git(catalog, "status", "--porcelain=v1", "-z", "--untracked-files=all", read_only=True, pathspecs=[<場所>…])`（C6 の渡し方）。変更があれば、`catalog_changes(origin="finish")` の束（`paths` は今ある場所、消えた場所は `deletions`）を書き、束のファイル名を覚える。
   2. 待ち始めの時刻（秒に切り捨て）を記録し、`request_sync_now(resolve_state_root())`。
-  3. `read_catalog_state` を間隔ごとに読み、条件（requirement.md の R-432-12 の4）をすべて満たせば終わる。毎回、上の読むだけの `status` で場所の未保存の変更がないことと、`rev-parse HEAD`（読むだけ）が `state.json` の `head` と同じことも確かめる。`last_cycle.finished_at` は、待ち始めの時刻（秒に切り捨て）より後を求める（同じ秒に終わった前の周期を数えないため。束を書いたときは、`consumed_changesets` が、その後の周期であることも保証する）。保留が現れたら `CANONICAL_SAVE_HELD`、`paused` になったら `CANONICAL_SAVE_UNCONFIRMED` で、待たずに止まる。
+  3. `read_catalog_state` を間隔ごとに読み、条件（requirement.md の R-432-12 の4）をすべて満たせば終わる。毎回、上の読むだけの `status` で場所の未保存の変更がないことと、`rev-parse HEAD`（読むだけ）が `state.json` の `head` と同じことも確かめる。周期の新しさは、`last_cycle.started_at` が待ち始めの時刻（秒に切り捨て）以上であることで求める（`state.json` の時刻は秒の精度なので、頼んだ周期が同じ秒の中で終わっても数えられるようにする。同じ秒に始まった前の周期を数えても、保存の保証は、束を書いたときの `consumed_changesets`、毎回の未保存の変更がないことと HEAD の一致と `remote_contains_head` が受け持つ）。待ち始めの時刻は、同期の側と同じ実際の時刻で取る。時間切れの判定と待ちの間隔だけを注入できるようにする（`canonical_work.SAVE_CLOCK`。テストは、時間切れを確かめるときだけ、待ちのたびに進む時計に替える）。保留が現れたら `CANONICAL_SAVE_HELD`、`paused` になったら `CANONICAL_SAVE_UNCONFIRMED` で、待たずに止まる。
   4. 時間切れは `CANONICAL_SAVE_UNCONFIRMED`。束を書いていれば `partial`（6。`catalog.changeset` が `succeeded`、`github.issue.close` と以後が `not_attempted`）、書いていなければ `failed`（3）。`recovery` は `spec-dock canonical status`。
 - 確かめた後：`ensure_fresh(decision)` と対象の読み直しをもう一度行い、状態の規則を確かめ直す。止まるときは、束を書いていれば `partial`（6、`recovery` に `spec-dock work finish <ID> --yes`）、書いていなければ `failed`。続けて、対象が `completed` でなければ `update_issue(state="closed", state_reason="completed")`。作業中のラベルがあれば `remove_label`（失敗は警告 `CANONICAL_PROGRESS_MARK_FAILED`）。選択を外し、今と同じく `spec-dock/active/` を戻す。結果の形は従来の `FinishData`。
 
@@ -228,7 +231,7 @@ def validate_canonical_title(value: str, *, field: str) -> str
 | `SCOPE_KIND_CHANGED` | 3 | I-14 の `SCOPE_KIND_CHANGED_RECOVERY` |
 | `CANONICAL_PATH_OCCUPIED` | 3 | 区切りの場所のシンボリックリンクかファイルを確かめて退避する（既存のコード） |
 | `CANONICAL_SAVE_HELD` | 3（待つ間に現れ、束を書いた後は `partial` の6。Epic の12章は3だけを挙げる。同じ結果の規則による） | 保留の種類ごとの解き方（I-3 の `SAVE_HELD_NEXT_STEPS`） |
-| `DESCENDANT_STATUS_UNKNOWN`（新。`PRECONDITION_FAILED` の文） | 3 | 別のリポジトリの子か、異常のある子を、GitHub で確かめて直す（`workspace validate`） |
+| `PRECONDITION_FAILED`（メッセージが `DESCENDANT_STATUS_UNKNOWN:` で始まる。新しい結果のコードは作らない。従来の `RECURSIVE_REQUIRED` などと同じ形） | 3 | 別のリポジトリの子か、異常のある子を、GitHub で確かめて直す（`workspace validate`） |
 | `ACTIVE_LINK_NOT_UPDATED` | 警告 | そのworktreeで `spec-dock active set <ID>`（今あるコード） |
 | `CANONICAL_SAVE_UNCONFIRMED` | 6（束を書いた後）、3（書いていない。Epic の12章は6だけを挙げるが、効果のない結果は `failed` という結果の規則に従う） | `spec-dock canonical status` |
 | `CANONICAL_BASE_HAS_SPECS` | 3 | 切り替えの後のコミットを基点にする（I-4 の定数） |
