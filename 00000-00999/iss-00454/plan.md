@@ -37,7 +37,7 @@ Requirement の AC-454-01〜11 を満たす。変数が未設定の間は今と�
 ## 実装step
 
 1. `ci-runner-job-gate.py` に `route` と `admit` を置き、判定を `decide` の1か所にする。
-2. `provider-ci.yml` に `route` のジョブを足し、2つのジョブを `needs: route`、`if: ${{ !cancelled() }}`、`runs-on: fromJSON(...)` にする。名前は変えない。`permissions: contents: read` を足す。
+2. `provider-ci.yml` に `route` のジョブを足し、2つのジョブを `needs: route`、`if: ${{ !cancelled() }}`、`runs-on` を `route` の出力（出力がなければ GitHub のランナー）にし、最初の手順で `route` の失敗を失敗にする。名前は変えない。`permissions: contents: read` を足す。
 3. `.github/runner/` に VM、nftables、VM の中の設定、登録、フック、Mac の側の導入を置く。
 4. テスト：振り分けと判定の正と負、ワークフローの文面、VM の設定の文面、掃除のフックの正と負。
 5. 文書：`docs/ci.md` の表と、`docs/ci-local-runner.md`（構成、導入、確かめ、切り戻し、作り直し、撤去）。
