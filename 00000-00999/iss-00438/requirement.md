@@ -4,7 +4,7 @@ ID: "iss-00438"
 タイトル: "Regenerate Dashboard From Structure Snapshot"
 関連GitHub: ["#438"]
 状態: "draft"
-最終更新: "2026-10-26"
+最終更新: "2026-10-29"
 親: ["epic-00424", "init-00423"]
 ---
 
@@ -22,6 +22,7 @@ ID: "iss-00438"
 - 依存：I-3（`iss-00430`）、I-4（`iss-00431`）。Planning Level：standard（理由は `plan.md`）。
 - この Issue は、C9（I-3）と C10（I-1）と、着手の判定の部品（I-4 の `domain/canonical_readiness.py`）を、変えずに使う。C10 の `issues` の各要素に `created_at` と `closed_at` を足すのは、Epic の `plan.md` の I-11 の節と `design.md` 2章が、この Issue に割り当てたものである（版は1のまま）。
 - Epic の文書で決まっていなかった点は、統括の判断（2026-10-26。`plan.md` の「統括の判断」）を正本とする。
+- 2026-10-29 の方針の変更（I-14 `iss-00455`、I-16 `iss-00460`）：slug と本文の印はなくなり、種類のラベルの付いた Issue はすべて `<種類>-<番号5桁>` の ID を持つ。題名は GitHub の題名だけを正とし、言語を問わない。ダッシュボードは ID と題名とスナップショットの `parent` だけを使い、カタログのディレクトリ（`<区切り>/<ID>/`）には頼らないので、この Issue の要件と受け入れ条件は変わらない。
 
 ## 背景
 
