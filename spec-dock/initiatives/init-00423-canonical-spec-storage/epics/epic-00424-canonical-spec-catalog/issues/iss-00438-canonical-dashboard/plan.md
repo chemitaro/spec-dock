@@ -4,7 +4,7 @@ ID: "iss-00438"
 タイトル: "Regenerate Dashboard From Structure Snapshot"
 関連GitHub: ["#438"]
 状態: "draft"
-最終更新: "2026-10-26"
+最終更新: "2026-10-29"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00424", "init-00423"]
 ---
@@ -26,7 +26,7 @@ requirement.md の AC-438-01〜11 を満たし、PR をマージできる状態�
 
 ## 順序・依存
 
-- 前提：I-1〜I-4、I-7、I-8 が `main` にある（`cee4c896b`）。
+- 前提：I-1〜I-4、I-7、I-8 が `main` にある（`cee4c896b`）。2026-10-29 に、I-14（PR #459）と I-16（PR #461）を含む `origin/main`（`a23d7d175`）をマージで取り込んだ（`bf9442a62`）。
 - 並行：I-5（`iss-00432`）が別のworktreeで進む。`domain/canonical_structure.py`（`ScopeNode`、`IssueFacts`）、`infra/github_structure.py`、`application/canonical_status.py`、`cli/catalog.py`、`tests/support/fake_github.py` で衝突しうる。先に `main` に入った方を、`origin/main` のマージで取り込む（rebase しない）。
 - この Issue の中の順：S1（C10）→ S2（入力の辞書と描く関数）→ S3（書く部品と手順7）→ S4（status と remove）→ S5（全体）。S2 は S1 の `ScopeNode` に依存しない部分から始めてよい。
 
@@ -91,3 +91,7 @@ requirement.md の AC-438-01〜11 を満たし、PR をマージできる状態�
   3. 手順7のダッシュボードは、カタログごとに `cycle.lock` を取り（取れなければ今回は飛ばす）、`--registered` のときは登録簿から外れたカタログを飛ばす。mainのチェックアウトの宣言が canonical でないときと、作業用のworktreeでは書かない。
   4. 構造の SHA-256 が変われば5つを書き直し、同じなら欠けたものだけを書く。
   5. Observability の行は、構造のスナップショットの絶対パスでよい（Git で無視されるファイルなので、コミットされない）。
+- **2026-10-29（方針の変更。Epic の `plan.md` の I-11 の節と再開の依頼）**：slug、本文の印、入れ子の置き場がなくなり、置き場は `<区切り>/<ID>/` になった。上の1〜5は、どれも slug とディレクトリに頼らないので、新しい方針と食い違わず、そのまま正とする。変わったのは次の2つである。
+  - 全体を読む問い合わせから `body` が外れた（I-14）。取り込みでは `createdAt` と `closedAt` だけを残した。テストの `fake.scope(slug=…)` の引数を外した。
+  - 印のない、種類のラベルの付いた Issue も ID を持ち、ダッシュボードに出る。種類の付け替えは、GitHub の今の種類と ID で示す。見本との比べ合わせの期待値は変わらない。
+  - 再開の時点で S0〜S4 は済んでおり（`c9ebdf34b`）、S5 から続ける。

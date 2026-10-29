@@ -4,7 +4,7 @@ ID: "iss-00438"
 タイトル: "Regenerate Dashboard From Structure Snapshot"
 関連GitHub: ["#438"]
 状態: "draft"
-最終更新: "2026-10-26"
+最終更新: "2026-10-29"
 依存: ["requirement.md"]
 親: ["epic-00424", "init-00423"]
 ---
@@ -86,7 +86,7 @@ def input_hash(snapshot: StructureSnapshot, *, snapshot_path: str = "") -> str
 ```
 
 - 対象：`snapshot.scopes`（`id` の決まった Scope）。状態は `evaluate_all(snapshot)`（I-4）の `ScopeReadiness.state`。
-- 親子：`parent` の番号の先が、期待する種類（`PARENT_KINDS`）の Scope のときだけ、その子とする（従来の `children` と同じく、入れ子に入らない Scope は木に出ない）。並びは `deps_node_sort_key`。
+- 親子：`parent` の番号の先が、期待する種類（`PARENT_KINDS`）の Scope のときだけ、その子とする（従来の `children` と同じく、入れ子に入らない Scope は木に出ない）。並びは `deps_node_sort_key`。カタログのディレクトリの場所は使わない。種類のラベルを付け替えた Scope は、GitHub の今の種類と ID で示す（`SCOPE_KIND_CHANGED` は、カタログを見る `workspace validate` と `canonical status --structure` が示す。2026-10-29、Epic の `plan.md` の I-11 の節）。
 - 止めているもの（`blockers_top`）：`ScopeReadiness.blockers` のうち `role` が `self` でないものの、Scope の ID を `deps_node_sort_key` の順に、続けて Scope でない Issue を番号の順に `#<番号>` で並べ、重複を除いて先頭の5件（従来の `_BLOCKERS_TOP_LIMIT`）にする。
 - `index_nodes`（Issue だけ）：`{"type": "issue", "title", "status": "done" | "open", "board_state": <状態>, "deps": {"ready", "blockers_top"}}`。`_render_dashboard_md` は `status == "done"` を除くので、DONE の Issue は一覧に出ない（従来どおり）。
 - `tree`：`{"tree": [initiative{id, title, epics: [epic{id, title, issues: [issue{id, title, status, board_state, deps}]}]}]}`。`tree.puml` と `tree-all.puml` は、従来どおり、同じ木を `todo_only=True` と `False` で描く。
