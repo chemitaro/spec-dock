@@ -29,7 +29,7 @@ from spec_dock.runtime.application.canonical_scope_read import (
 )
 from spec_dock.runtime.application.canonical_status import run_canonical_status
 from spec_dock.runtime.application.canonical_sync import run_canonical_sync, run_registered_sync
-from spec_dock.runtime.application.canonical_work import start_work
+from spec_dock.runtime.application.canonical_work import finish_work, start_work
 from spec_dock.runtime.application.canonical_workspace import (
     diagnose_workspace,
     sync_workspace,
@@ -96,6 +96,7 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "artifact create": create_artifact,
     "artifact import file": create_artifact,
     "work start": start_work,
+    "work finish": finish_work,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

@@ -9,18 +9,31 @@ changes the result. The legacy module stays unchanged (AC-15); its private helpe
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
+import os
 import secrets
 from typing import TYPE_CHECKING, Literal
 
 from spec_dock.runtime.application.active_links import sync_selection_links
 from spec_dock.runtime.application.canonical_branches import refuse_specs_at
-from spec_dock.runtime.application.canonical_catalog import require_linked
-from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
+from spec_dock.runtime.application.canonical_catalog import catalog_changes, require_linked
+from spec_dock.runtime.application.canonical_errors import (
+    CANONICAL_SAVE_HELD,
+    CANONICAL_SAVE_UNCONFIRMED,
+    SAVE_HELD_NEXT_STEPS,
+    SAVE_UNCONFIRMED_NEXT_STEP,
+    CanonicalCommandError,
+)
 from spec_dock.runtime.application.canonical_link import link_after_command
+from spec_dock.runtime.application.canonical_schedule import request_sync_now
 from spec_dock.runtime.application.canonical_scopes import build_canonical_scopes
-from spec_dock.runtime.application.canonical_writes import WriteFailed, open_write_session
+from spec_dock.runtime.application.canonical_writes import (
+    CATALOG_LOCK_TIMEOUT,
+    WriteFailed,
+    check_expectations as check_write_expectations,
+    open_write_session,
+)
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.start_plan import (
     StartLiveObservations,
@@ -48,18 +61,22 @@ from spec_dock.runtime.application.worktree_observation import (
     read_selection,
 )
 from spec_dock.runtime.domain.canonical_content import FORMAT_FILE
-from spec_dock.runtime.domain.canonical_layout import CANONICAL_BRANCH
+from spec_dock.runtime.domain.canonical_layout import CANONICAL_BRANCH, scope_relative
 from spec_dock.runtime.domain.canonical_readiness import evaluate_readiness
-from spec_dock.runtime.domain.canonical_structure import IN_PROGRESS_LABEL, UpsertIssue
+from spec_dock.runtime.domain.canonical_structure import IN_PROGRESS_LABEL, UpsertIssue, parse_timestamp
+from spec_dock.runtime.domain.canonical_sync_state import holds_under
 from spec_dock.runtime.domain.dependency_vnext import ReadinessResult
 from spec_dock.runtime.domain.git_ref import parse_commit_oid
 from spec_dock.runtime.domain.work_target import WorkTarget
+from spec_dock.runtime.infra.canonical_git import run_catalog_git
+from spec_dock.runtime.infra.canonical_state import StateUnreadable, read_catalog_state
 from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
-from spec_dock.runtime.infra.github_structure import GithubStructureError
+from spec_dock.runtime.infra.github_structure import SYSTEM_CLOCK, GithubStructureError
 from spec_dock.runtime.infra.identity import DirectoryIdentity
 from spec_dock.runtime.infra.json_store import require_directory_publication_support
 from spec_dock.runtime.infra.start_lock import StartLock, StartLockBusy
+from spec_dock.runtime.infra.state_root import resolve_state_root
 from spec_dock.runtime.infra.work_target_store import (
     SelectionPublicationUnknown,
     SelectionRemovalUnknown,
@@ -70,12 +87,16 @@ from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, Operatio
 
 if TYPE_CHECKING:
     import argparse
+    from pathlib import Path
 
     from spec_dock.runtime.application.canonical_writes import WriteSession
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.canonical_readiness import ScopeReadiness
+    from spec_dock.runtime.domain.canonical_sync_state import CatalogSyncState
+    from spec_dock.runtime.infra.github_structure import GithubClock
     from spec_dock.runtime.infra.identity import PhysicalIdentity
+    from spec_dock.runtime.infra.work_target_store import SelectionHandle
     from spec_dock.runtime.presentation.envelope import ResultStatus
 
 SCOPE_IN_PROGRESS = "SCOPE_IN_PROGRESS"
@@ -633,3 +654,353 @@ def _mark_in_progress(session: WriteSession, scope_id: str, effects: list[Effect
         )
         return
     effects.extend(session.effects[before:])
+
+
+# work finish waits for the periodic sync to save and push the Scope's catalog places (Epic design ch. 6).
+SAVE_TIMEOUT = 180.0
+SAVE_INTERVAL = 2.0
+# Tests replace it to reach the timeout without waiting; the cycle's own timestamps stay real time.
+SAVE_CLOCK: GithubClock = SYSTEM_CLOCK
+
+
+@dataclass(frozen=True)
+class FinishData:
+    scope_id: str
+    completed: bool
+    branch_before: str | None
+    branch_after: str | None
+    selection_token: str | None
+    kind: str = "work-finish"
+
+
+class _SaveStopped(Exception):
+    """The save could not be confirmed; `error` is what the result reports."""
+
+    def __init__(self, error: CanonicalCommandError) -> None:
+        super().__init__(error.message)
+        self.error = error
+
+
+def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
+    """Confirm the Scope's catalog places reached GitHub's canonical, then close it and release the selection."""
+    context.require_writer()
+    if not namespace.yes and not namespace.dry_run:
+        raise ValueError("work finish requires --yes")
+    session = open_write_session(context, namespace, link=True)
+    assert session.catalog is not None
+    catalog = session.catalog.catalog
+    captured = session.selection()
+    if captured.status in ("invalid", "unavailable"):
+        raise ValueError(f"direct selection is {captured.status}: {captured.reason or 'cannot be safely observed'}")
+    target = session.resolve(namespace.target, captured)
+    check_write_expectations(session, namespace, captured, target)
+    observed_state, descendants = _finish_rules(session, target.id)
+    clear_handle = (
+        captured.handle
+        if captured.status == "selected"
+        and captured.record is not None
+        and captured.record.scope_id in {target.id, *descendants}
+        else None
+    )
+    places = tuple(scope_relative(scope_id).as_posix() for scope_id in (target.id, *descendants))
+    state_root = resolve_state_root()
+    _require_saveable(_read_sync_state(state_root, catalog), places)
+    reference = target.github_ref
+    if namespace.dry_run:
+        planned = [Effect("github.issue.close", "planned" if observed_state != "completed" else "unchanged", reference)]
+        if clear_handle is not None:
+            planned.append(Effect("selection.clear", "planned", clear_handle.token))
+        return OperationResult(
+            "work finish",
+            "planned",
+            FinishData(target.id, observed_state == "completed", context.branch, context.branch, None),
+            0,
+            effects=tuple(planned),
+            warnings=tuple(session.warnings),
+        )
+    effects: list[Effect] = []
+    warnings: list[Diagnostic] = list(session.warnings)
+    wrote_changeset = False
+    try:
+        with catalog_changes(catalog, command="work finish", origin="finish", timeout=CATALOG_LOCK_TIMEOUT) as changes:
+            for place in sorted(_unsaved_places(catalog, places, timeout=namespace.timeout)):
+                if os.path.lexists(catalog / place):
+                    changes.add(place)
+                else:
+                    changes.delete(place)
+        if changes.written is not None:
+            wrote_changeset = True
+            effects.append(Effect("catalog.changeset", "succeeded", changes.written.name))
+        _wait_saved(
+            state_root,
+            catalog,
+            places,
+            changes.written.name if changes.written is not None else None,
+            timeout=namespace.timeout,
+        )
+        # Confirm again on what GitHub reports now: another PC may have closed it or reopened a child meanwhile.
+        session = open_write_session(context, namespace, link=True)
+        observed_state, descendants = _finish_rules(session, target.id)
+    except (_SaveStopped, CanonicalCommandError, GithubStructureError, ValueError, LookupError, OSError) as error:
+        stopped = error.error if isinstance(error, _SaveStopped) else error
+        if not wrote_changeset:
+            raise stopped from error
+        effects.append(Effect("github.issue.close", "not_attempted", reference))
+        if clear_handle is not None:
+            effects.append(Effect("selection.clear", "not_attempted", clear_handle.token))
+        code = getattr(stopped, "code", "PRECONDITION_FAILED")
+        recovery = (
+            getattr(stopped, "recovery", ())
+            if isinstance(stopped, CanonicalCommandError) and code != "SCOPE_KIND_CHANGED"
+            else ()
+        ) or (f"Run spec-dock work finish {target.id} --yes again once the reason is fixed.",)
+        return OperationResult(
+            "work finish",
+            "partial",
+            FinishData(target.id, False, context.branch, context.branch, None),
+            6,
+            effects=tuple(effects),
+            warnings=tuple(warnings),
+            error=Diagnostic(code, str(getattr(stopped, "message", stopped)), dict(getattr(stopped, "details", {}))),
+            recovery=RecoveryInstructions(tuple(recovery)),
+        )
+    return _close_and_release(session, context, namespace, target.id, observed_state, clear_handle, effects, warnings)
+
+
+def _finish_rules(session: WriteSession, scope_id: str) -> tuple[str, tuple[str, ...]]:
+    """The legacy finish rules on GitHub's state after a reread; descendants come from the GitHub parents."""
+    from spec_dock.runtime.application.canonical_scope_change import require_known_descendants
+
+    scopes = session.scopes
+    descendants = tuple(view.id for view in scopes.views if scope_id in scopes.lineage(view.id)[1:])
+    session.require_kind_unchanged(scope_id, *descendants)
+    session.reread([session.node(scope_id).number])
+    require_known_descendants(session, scope_id)
+    observed = session.scopes.view(scope_id).status.state
+    if observed == "unknown":
+        raise ValueError("SCOPE_STATUS_UNKNOWN")
+    if observed == "not-planned":
+        raise ValueError("TERMINAL_REASON_CONFLICT: reopen is required")
+    for child in descendants:
+        if session.scopes.view(child).status.state != "completed":
+            raise ValueError("DESCENDANT_NOT_COMPLETED")
+    return observed, descendants
+
+
+def _read_sync_state(state_root: Path, catalog: Path) -> CatalogSyncState | None:
+    try:
+        return read_catalog_state(state_root, str(catalog))
+    except StateUnreadable as error:
+        raise CanonicalCommandError(
+            CANONICAL_SAVE_UNCONFIRMED,
+            f"the sync state cannot be read: {error}",
+            recovery=(SAVE_UNCONFIRMED_NEXT_STEP,),
+        ) from error
+
+
+def _require_saveable(state: CatalogSyncState | None, places: tuple[str, ...]) -> None:
+    """Stop on a hold under the Scope (the sync will not save it) or a paused catalog (it saves nothing)."""
+    if state is None:
+        return  # no cycle has run yet; the wait decides
+    holds = [hold for place in places for hold in holds_under(state, place)]
+    if holds:
+        steps = tuple(dict.fromkeys(SAVE_HELD_NEXT_STEPS.get(hold.kind, SAVE_UNCONFIRMED_NEXT_STEP) for hold in holds))
+        raise CanonicalCommandError(
+            CANONICAL_SAVE_HELD,
+            "the sync holds changes under this Scope: " + ", ".join(f"{hold.path} ({hold.kind})" for hold in holds),
+            recovery=steps,
+            details={"holds": [hold.to_json() for hold in holds]},
+        )
+    if state.paused is not None:
+        raise CanonicalCommandError(
+            CANONICAL_SAVE_UNCONFIRMED,
+            f"the catalog sync is paused ({state.paused}); nothing can be saved until it resumes",
+            recovery=(SAVE_UNCONFIRMED_NEXT_STEP,),
+            details={"paused": state.paused},
+        )
+
+
+def _unsaved_places(catalog: Path, places: tuple[str, ...], *, timeout: float) -> set[str]:
+    """The places with uncommitted catalog changes (deletions included), read without writing .git."""
+    output = run_catalog_git(
+        catalog,
+        "status",
+        "--porcelain=v1",
+        "-z",
+        "--untracked-files=all",
+        "--",
+        *(f":(literal){place}" for place in places),  # status has no --pathspec-from-file
+        read_only=True,
+        timeout=timeout,
+    ).stdout
+    entries = output.split(b"\0")
+    dirty: set[str] = set()
+    index = 0
+    while index < len(entries):
+        entry = entries[index].decode("utf-8", "surrogateescape")
+        index += 1
+        if len(entry) < 4:
+            continue
+        if entry[0] in "RC":
+            index += 1  # the rename source follows
+        path = entry[3:]
+        dirty.update(place for place in places if path == place or path.startswith(place + "/"))
+    return dirty
+
+
+def _wait_saved(
+    state_root: Path, catalog: Path, places: tuple[str, ...], changeset: str | None, *, timeout: float
+) -> None:
+    """Ask for a cycle now, then wait until it saved and pushed every place (or stop without closing)."""
+    started = datetime.now(timezone.utc).replace(microsecond=0)
+    request_sync_now(state_root)
+    deadline = SAVE_CLOCK.monotonic() + SAVE_TIMEOUT
+    while True:
+        try:
+            state = _read_sync_state(state_root, catalog)
+            _require_saveable(state, places)
+        except CanonicalCommandError as error:
+            raise _SaveStopped(error) from error
+        if state is not None and _saved(state, catalog, places, changeset, started, timeout=timeout):
+            return
+        if SAVE_CLOCK.monotonic() >= deadline:
+            raise _SaveStopped(
+                CanonicalCommandError(
+                    CANONICAL_SAVE_UNCONFIRMED,
+                    f"the save of {', '.join(places)} was not confirmed within {int(SAVE_TIMEOUT)} seconds",
+                    recovery=(SAVE_UNCONFIRMED_NEXT_STEP,),
+                    details={"places": list(places), "changeset": changeset},
+                )
+            )
+        SAVE_CLOCK.sleep(SAVE_INTERVAL)
+
+
+def _saved(
+    state: CatalogSyncState,
+    catalog: Path,
+    places: tuple[str, ...],
+    changeset: str | None,
+    started: datetime,
+    *,
+    timeout: float,
+) -> bool:
+    if changeset is not None and changeset not in state.consumed_changesets:
+        return False
+    if state.last_cycle is None or parse_timestamp(state.last_cycle.started_at) < started:
+        return False
+    if state.remote_contains_head is not True or state.head is None:
+        return False
+    head = run_catalog_git(catalog, "rev-parse", "HEAD", read_only=True, timeout=timeout).stdout.decode().strip()
+    return head == state.head and not _unsaved_places(catalog, places, timeout=timeout)
+
+
+def _close_and_release(
+    session: WriteSession,
+    context: ProjectContext,
+    namespace: argparse.Namespace,
+    scope_id: str,
+    observed_state: str,
+    clear_handle: SelectionHandle | None,
+    effects: list[Effect],
+    warnings: list[Diagnostic],
+) -> OperationResult[object]:
+    node = session.node(scope_id)
+    reference = session.scopes.view(scope_id).github_ref
+    completed = observed_state == "completed"
+    try:
+        if completed:
+            effects.append(Effect("github.issue.close", "unchanged", reference))
+        else:
+            session.write(
+                "github.issue.close",
+                reference,
+                lambda: session.client.update_issue(node.number, state="closed", state_reason="completed"),
+                lambda facts: [UpsertIssue(facts)],
+            )
+            effects.append(session.effects[-1])
+            completed = True
+    except WriteFailed as error:
+        effects.append(session.effects[-1])
+        if clear_handle is not None:
+            effects.append(Effect("selection.clear", "not_attempted", clear_handle.token))
+        diagnostic = Diagnostic(error.cause.code, error.cause.message, {})
+        applied = any(effect.status in ("succeeded", "unknown") for effect in effects)
+        return OperationResult(
+            "work finish",
+            "partial" if applied else "failed",
+            FinishData(scope_id, False, context.branch, context.branch, None),
+            6 if applied else 5,
+            effects=tuple(effects),
+            warnings=tuple(warnings),
+            error=diagnostic,
+            recovery=RecoveryInstructions((
+                f"Inspect {reference} on GitHub, then run spec-dock work finish {scope_id} --yes again.",
+            )),
+        )
+    _unmark_in_progress(session, scope_id, effects, warnings)
+    token: str | None = None
+    if clear_handle is not None:
+        with WorkTargetStore(context.root) as store:
+            outcome = store.remove_observed(clear_handle)
+        if outcome == "conflict":
+            effects.append(Effect("selection.clear", "failed", clear_handle.token))
+            return OperationResult(
+                "work finish",
+                "partial",
+                FinishData(scope_id, True, context.branch, context.branch, clear_handle.token),
+                6,
+                effects=tuple(effects),
+                warnings=tuple(warnings),
+                error=Diagnostic("WORK_FINISH_INCOMPLETE", "captured selection changed", {}),
+            )
+        effects.append(
+            Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", clear_handle.token)
+        )
+        if outcome == "removed":
+            link_effects, link_warnings = sync_selection_links(
+                context, (), None, dry_run=False, timeout=namespace.timeout
+            )
+            effects.extend(link_effects)
+            warnings.extend(link_warnings)
+    else:
+        after = session.selection()
+        token = after.handle.token if after.status == "selected" and after.handle else None
+    return OperationResult(
+        "work finish",
+        "succeeded" if any(effect.status == "succeeded" for effect in effects) else "unchanged",
+        FinishData(scope_id, completed, context.branch, context.branch, token),
+        0,
+        effects=tuple(effects),
+        warnings=tuple(warnings),
+    )
+
+
+def _unmark_in_progress(
+    session: WriteSession, scope_id: str, effects: list[Effect], warnings: list[Diagnostic]
+) -> None:
+    node = session.node(scope_id)
+    if IN_PROGRESS_LABEL not in node.labels:
+        return
+    facts = session.known_facts(node.number)
+    try:
+        session.write(
+            "github.issue.label",
+            scope_id,
+            lambda: session.client.remove_label(node.number, IN_PROGRESS_LABEL),
+            lambda _: [
+                UpsertIssue(replace(facts, labels=tuple(label for label in facts.labels if label != IN_PROGRESS_LABEL)))
+            ],
+        )
+        effects.append(session.effects[-1])
+    except WriteFailed as error:
+        warnings.append(
+            Diagnostic(
+                CANONICAL_PROGRESS_MARK_FAILED,
+                f"the in-progress label of {scope_id} was not removed: {error}",
+                {
+                    "scope_id": scope_id,
+                    "writes": [{"kind": "github.issue.label", "status": session.effects[-1].status}],
+                    "next_step": "Remove the spec-dock:in-progress label on GitHub; the Scope is already completed.",
+                },
+            )
+        )

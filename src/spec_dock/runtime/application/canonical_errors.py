@@ -67,6 +67,10 @@ CANONICAL_STATE_UNREADABLE: Final = "CANONICAL_STATE_UNREADABLE"
 CANONICAL_GIT_IN_PROGRESS: Final = "CANONICAL_GIT_IN_PROGRESS"
 CANONICAL_PAUSED: Final = "CANONICAL_PAUSED"  # exit 3 for a resume with the wrong option
 CANONICAL_SAVE_HELD: Final = "CANONICAL_SAVE_HELD"
+CANONICAL_SAVE_UNCONFIRMED: Final = "CANONICAL_SAVE_UNCONFIRMED"  # work finish (iss-00432): 6 after a changeset, else 3
+SAVE_UNCONFIRMED_NEXT_STEP: Final = (
+    "Run spec-dock canonical status to see why the save was not confirmed, then run spec-dock work finish again."
+)
 CANONICAL_UNSAVED_CHANGES: Final = "CANONICAL_UNSAVED_CHANGES"  # exit 3
 CANONICAL_IGNORED_FILES_PRESENT: Final = "CANONICAL_IGNORED_FILES_PRESENT"  # exit 3
 CANONICAL_SCHEDULER_FAILED: Final = "CANONICAL_SCHEDULER_FAILED"  # partial, exit 6
