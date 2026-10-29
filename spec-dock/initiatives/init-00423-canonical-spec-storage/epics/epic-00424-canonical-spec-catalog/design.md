@@ -189,7 +189,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
   - 止めるもの（終了コード3。書く前に止まる）：その Scope を対象、親、新しい親、依存の端のどれかにする、書くコマンド（`scope create`、`scope import github`、`scope edit`、`scope move`、`scope close`、`scope reopen`、`dependency add`、`dependency remove`、`artifact create`、`artifact import file`）、`work start`（対象か祖先）、`work finish`、`branch create`、`branch switch`、`active set`、`worktree create --expect-current`。
   - 警告にするもの：読むコマンド（`scope show`、`scope list`、`dependency list`、`dependency check`、`artifact list`、`artifact show`、`active show`、`branch show`、`worktree list`、`worktree show`、`workspace sync`）。`workspace validate` と `canonical status --structure` は error の異常として示す。
   - `scope delete` だけは止めない。今の ID（`epic-00454`）を受け取り、ふつうの削除（種類のラベルと親子を外し、依存は `--detach-dependencies` で外す）を行い、カタログからは、同じ番号の古い種類のディレクトリ（`iss-00454/`）を、写してから消す。
-  - 次の1手は「GitHub の種類のラベルを元に戻す。種類を変えるのが意図なら、新しい種類で Issue を作り直し（`spec-dock scope create`）、古いディレクトリの内容を新しい `<ID>/`（区切りは番号だけで決まるので、古いディレクトリと同じ区切りの中）に移し、古い Scope を、今の ID で `spec-dock scope delete`」である。名前を変えるコマンドは作らない。
+  - 次の1手は「GitHub の種類のラベルを元に戻す。種類を変えるのが意図なら、新しい種類で Issue を作り直し（`spec-dock scope create`）、古いディレクトリの内容を新しい `<ID>/`（新しい番号の区切りの下。`scope create` が作る）に移し、古い Scope を、今の ID で `spec-dock scope delete`」である。名前を変えるコマンドは作らない。
 - **ラベル**：ないときは、作る側のコマンド（`scope create`、`scope import`、`work start`、移行のスクリプト）が作る。色と説明は固定の値を使う。
 - Scope でない Issue への blocked by は、着手の判定では「その Issue が開いていれば着手できない」と扱う。`workspace validate` は警告を出す。
 
@@ -322,7 +322,7 @@ PCのユーザーごと（状態の置き場 ~/.local/state/spec-dock/）
 #### 内容の置き場
 
 - Scope のディレクトリは、種類と親を問わず、カタログの、番号の千ごとの区切りの下の `<ID>/` に置く（`<カタログ>/<区切り>/<ID>/`。例 `<カタログ>/00000-00999/epic-00424/`、`<カタログ>/00000-00999/iss-00454/`、`<カタログ>/02000-02999/iss-02114/`、`<カタログ>/100000-100999/iss-100454/`）。入れ子にしない。親子と依存は GitHub だけにあり、ディレクトリの位置には表さない。GitHub で親を付け替えても、ディレクトリは動かない（R-A3）。
-- **区切り**：番号 `n` の区切りの名前は、下端 `n - n % 1000` と上端 `下端 + 999` を `-` でつないだもので、下端と上端は ID の番号と同じ幅（`max(5, 番号の桁数)`）で0埋めする（1〜999 は `00000-00999`、1000 は `01000-01999`、99999 は `99000-99999`、100000 は `100000-100999`）。種類は区切りに使わない。区切りは番号だけで決まり、種類のラベルを付け替えても、親を付け替えても変わらない。1つの区切りに入るのは最大1,000件である（1つのディレクトリに何千もの Scope が並ばないようにするため。2026-10-29 の利用者の決定）。計算は `domain/canonical_layout.py` の `scope_bucket(number)` と `scope_relative(scope_id)` の1か所に置く（I-16。移行のスクリプトは写して持ち、テストで比べる）。
+- **区切り**：番号 `n` の区切りの名前は、下端 `n - n % 1000` と上端 `下端 + 999` を `-` でつないだもので、下端と上端は ID の番号と同じ幅（`max(5, 番号の桁数)`）で0埋めする（1〜999 は `00000-00999`、1000 は `01000-01999`、99999 は `99000-99999`、100000 は `100000-100999`）。種類は区切りに使わない。区切りは番号だけで決まり、種類のラベルを付け替えても、親を付け替えても変わらない。番号ごとに Scope は1つなので、区切りに入る Scope のディレクトリは最大1,000件である（種類の付け替えの異常で古い名前のディレクトリが残る間を除く。1つのディレクトリに何千もの Scope が並ばないようにするため。2026-10-29 の利用者の決定）。計算は `domain/canonical_layout.py` の `scope_bucket(number)` と `scope_relative(scope_id)` の1か所に置く（I-16。移行のスクリプトは写して持ち、テストで比べる）。
 - コマンドは、Scope のディレクトリを `<カタログ>/<区切り>/<ID>` で直接求める（`infra/catalog_tree.py`。`git ls-files` は使わない。未保存の新しい Scope も見えるようにするため）。名前を探して回らない。
 - `workspace validate` と `canonical status --structure` は、次の異常を報告する。
   - `SCOPE_DIRECTORY_MISSING`（error）：スナップショットにある Scope の `<区切り>/<ID>/` がない。
@@ -925,7 +925,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `CANONICAL_SCHEDULER_FAILED`、`CANONICAL_REMOVE_FAILED` | 6（partial） | I-3 の design.md 14章の表の次の1手（I-3） |
 | `CANONICAL_SYNC_NOT_SCHEDULED`、`CANONICAL_SYNC_NOT_CONFIRMED`、`CANONICAL_PUSH_AUTH_FAILED`、`CANONICAL_LINGER_DISABLED`、`CANONICAL_RUNNER_RESTART`、`CANONICAL_RUNNER_STOPPED`、`CANONICAL_UNPUSHED_STALE`、`CANONICAL_SYNC_BLOCKED`、`CANONICAL_SYNC_FAILED` | —（警告） | I-3 の design.md 14章の表の次の1手。`canonical status` の `sync` の項目での順も、同じ設計書のとおり（I-3） |
 | `CANONICAL_STATE_UNREADABLE`、`CANONICAL_GIT_IN_PROGRESS`、`SYNC_FAILED` | —（`state.json` の `last_error`、`data.catalogs[].error`） | I-3 の design.md 14章の表の次の1手（I-3） |
-| `DEPENDENCY_NOT_IN_SNAPSHOT`、`READINESS_UNKNOWN`、`DEPENDENCY_NOT_SCOPE`、`SCOPE_DIRECTORY_MISSING`、`SCOPE_DIRECTORY_MISPLACED`（意味は2章「内容の置き場」。I-14 が直し、I-16 が区切りの形にする）、`SCOPE_ISSUE_MISSING`、`SCOPE_DOCUMENT_MISSING`、`SCOPE_METADATA_PRESENT`、`CANONICAL_CONFLICT_COPY` | —（`workspace validate` の findings と、読むコマンドの警告） | I-4 の `iss-00431-canonical-scope-read/design.md` の表の次の1手（I-4） |
+| `DEPENDENCY_NOT_IN_SNAPSHOT`、`READINESS_UNKNOWN`、`DEPENDENCY_NOT_SCOPE`、`SCOPE_DIRECTORY_MISSING`、`SCOPE_DIRECTORY_MISPLACED`（意味は2章「内容の置き場」。I-14 が直し、I-16 が区切りの形にする。`SCOPE_DIRECTORY_MISSING`、`SCOPE_ISSUE_MISSING`、`SCOPE_DIRECTORY_MISPLACED` の次の1手の文は、I-14 の `iss-00455-canonical-flat-ids/design.md` と I-16 の `iss-00460-canonical-bucket-dirs/design.md` の `canonical_workspace` の節）、`SCOPE_ISSUE_MISSING`、`SCOPE_DOCUMENT_MISSING`、`SCOPE_METADATA_PRESENT`、`CANONICAL_CONFLICT_COPY` | —（`workspace validate` の findings と、読むコマンドの警告） | I-4 の `iss-00431-canonical-scope-read/design.md` の表の次の1手（I-4） |
 | `SCOPE_KIND_CHANGED` | 3（2章「種類の決め方と付け替え」の止めるもの）／—（`workspace validate` の findings と、読むコマンドの警告） | GitHub の種類のラベルを元に戻す。種類を変えるのが意図なら、新しい種類で Issue を作り直し、古いディレクトリの内容を新しい `<ID>/` に移し、古い Scope を今の ID で `spec-dock scope delete`（判定と表示は I-14、書くコマンドでの停止と `scope delete` の扱いは I-5） |
 
 - `CANONICAL_PAUSED` は、`resume` の引数の誤りでは終了コード3、`canonical status` では警告として使う。`CANONICAL_SAVE_HELD` も、`canonical status` では警告として使う（`work finish` の終了コード3は I-5）。

@@ -20,7 +20,7 @@ canonical のカタログの Scope が、番号の千ごとの区切り（`<下�
 
 - 材料：2026-10-29 の利用者の決定（区切りの決まりと0埋めの決まり。下の「背景」）、Epic の `design.md` の2章（表し方の「番号・ID」、内容の置き場）、3章、6章の「作成時のファイル」と `active set` の行、11章（平らにする写しの写し先）、12章（`SCOPE_DIRECTORY_*` の行）、「設計の判断」、Epic の `plan.md` の「I-16 Bucket Canonical Catalog By Thousand」の節（この Issue で足す）。
 - 依存：なし（直す I-14 の `iss-00455` はマージ済み）。I-5（`iss-00432`）と I-11（`iss-00438`）はこの Issue を待ち、I-15（`iss-00456`）は同じ決まりで並べて進む。Planning Level：standard（理由は `plan.md`）。
-- この Issue は、契約 C3（カタログの置き場と `catalog_tree`）の持ち主として、置き場を区切りの形にする。区切りの計算の公開の形は、I-5、I-15 が使うので、`design.md` の「責務・Interface」に早めに書く。
+- 契約 C3（持ち主は I-2）の中身のうち、カタログの置き場の形と `catalog_tree` を、Epic の契約の表の注記（平らにするのは I-14、区切りは I-16）のとおり、この Issue が区切りの形に直す。区切りの計算の公開の形は、I-5、I-15 が使うので、`design.md` の「責務・Interface」に早めに書く。
 
 ## 背景
 
@@ -43,7 +43,7 @@ canonical のカタログの Scope が、番号の千ごとの区切り（`<下�
 - 番号 `n`（1以上の整数）の区切りの名前は、下端 `n - n % 1000` と上端 `下端 + 999` を、`-` でつないだものである。下端と上端は、ID の番号と同じ幅（`max(5, 番号の桁数)`）で0埋めする。
   - 例：1 → `00000-00999`、454 → `00000-00999`、999 → `00000-00999`、1000 → `01000-01999`、2114 → `02000-02999`、99999 → `99000-99999`、100000 → `100000-100999`、100454 → `100000-100999`、1000000 → `1000000-1000999`。
 - 種類は区切りに使わない（`init-00454`、`epic-00454`、`iss-00454` は同じ `00000-00999` に入る）。そのため、GitHub で種類のラベルを付け替えても、古い種類と新しい種類のディレクトリは同じ区切りの中に並ぶ。
-- 1つの区切りに入る Scope は最大1,000件である（番号ごとに ID は1つ）。
+- 番号ごとに Scope は1つなので、区切りに入る Scope のディレクトリは最大1,000件である（種類の付け替えの異常で、古い名前のディレクトリが残る間を除く）。
 - 0以下の番号には区切りがない（計算の部品は失敗する）。
 
 ### R-460-02 Scope のディレクトリは `<カタログ>/<区切り>/<ID>/`（C3）
@@ -58,18 +58,18 @@ canonical のカタログの Scope が、番号の千ごとの区切り（`<下�
   - `SCOPE_DIRECTORY_MISSING`（error）：スナップショットにある Scope の `<区切り>/<ID>/` がない。`details.path` は `<区切り>/<ID>`。
   - `SCOPE_ISSUE_MISSING`（error）：正しい区切りの下の `<ID>/` に当たる Scope の Issue が、スナップショットにない。
   - `SCOPE_KIND_CHANGED`（error）：正しい区切りの下の `<ID>/` の番号の Scope が、GitHub では別の種類である。番号ごとに1件で、同じ番号の `MISSING` と `ISSUE_MISSING` を重ねない（I-14 のまま）。
-  - `SCOPE_DIRECTORY_MISPLACED`（warning）：正しい区切りの下にない、Scope のディレクトリらしいもの。次の5つの場合で、`details.reason` で分ける。
+  - `SCOPE_DIRECTORY_MISPLACED`（warning）：正しい区切りの下にない、Scope のディレクトリらしいもの。次の4つの理由（`bucket` は2つの場合を持つ）で、`details.reason` で分ける。
     - `root`：カタログの直下の、ID の形で始まる名前（`init-`、`epic-`、`iss-` と数字。大文字と小文字を区別しない）のディレクトリ。I-14 の平らな `iss-00454/` も、移行前の `iss-00454-foo/` も含む。
     - `bucket`：カタログの直下の、区切りの形（数字-数字）なのに、正しい区切りの名前でないディレクトリ（`0-999/`、`00000-00998/` など）。また、正しい区切りの下にあるが、番号の区切りが違う `<ID>/`（`00000-00999/iss-01454/`）。
     - `name`：正しい区切りの下の、ID の形で始まるのに名前が ID そのものでないディレクトリ（`00000-00999/iss-00454-foo/`、`00000-00999/ISS-00454/`、`00000-00999/iss-454/`）。
     - `nested`：正しい区切りの下の `<ID>/` のすぐ下の `epics/` か `issues/`（入れ子の残り）。
-  - 名前が ID と決まるもの（`root` の `iss-00454/`、`bucket` の `00000-00999/iss-01454/`）は、`details.expected` に正しい場所（`00000-00999/iss-00454`、`01000-01999/iss-01454`）を示す。ほかは `details.expected` が null である。次の1手は「中身を `spec-dock/initiatives/<区切り>/<ID>/` に移し、空になったディレクトリを消す」。
+  - 名前が ID と決まるもの（`root` の `iss-00454/`、`bucket` の `00000-00999/iss-01454/`）は、`details.expected` に正しい場所（`00000-00999/iss-00454`、`01000-01999/iss-01454`）を示す。ほかは `details.expected` が null である。次の1手は、どの理由でも1つの文で「中の Scope の内容を、それぞれの番号の `spec-dock/initiatives/<区切り>/<ID>/` に移し、空になったディレクトリを消す」とする（区切りの名前の誤りのディレクトリは、中に複数の `<ID>/` を持ちうるため、「それぞれの」と書く）。
   - Scope の中の `artifacts/`、`discussions/` などの下と、区切りの中の ID の形でない名前（`00000-00999/notes/`）は調べない。
 - 異常の並び、`structure` の項目の形（`anomalies`、最初の異常の次の1手）、`workspace validate` の findings と warnings への振り分けは、I-14 のままである。
 
 ### R-460-04 ID の入力は0埋めしなくてよい
 
-- canonical モードで Scope の ID を受け取るすべての入口（コマンドの対象、`--scope`、`--parent`、`--from`、`--expect-current` などの選択子）は、前後の空白を除き、小文字にし、番号を ID の形に直してから扱う。`iss-454`、`ISS-454`、`iss-0454`、`iss-000454` は、どれも `iss-00454` を指す。`iss-100000` はそのまま。
+- canonical モードで Scope の ID を受け取るすべての入口（canonical モードの処理が Scope の選択子を受け取る引数のすべて：対象（`scope show`、`dependency list`、`dependency check`、`active set`、`branch show`、`branch create`、`branch switch`）、`scope list --parent`、`artifact list --scope`、`artifact show --scope`、`active clear --from`、`--expect-current`（`scope show`、`scope list`、`dependency list`、`dependency check`、`active show`、`artifact list`、`branch show`、`workspace validate`、`workspace sync`、`workspace doctor`、`worktree create`、`worktree list`、`worktree show`、`installation show`）。同じ部品 `check_canonical_expectation` を通る `worktree bootstrap`、`worktree remove`、`installation update`、`installation uninstall` の `--expect-current` は、`worktree list`、`worktree show`、`installation show` で代表して確かめる）は、前後の空白を除き、小文字にし、番号を ID の形に直してから扱う。`iss-454`、`ISS-454`、`iss-0454`、`iss-000454` は、どれも `iss-00454` を指す。`iss-100000` はそのまま。
 - 表示と出力（`--json` の `id`、`scope_id`、`path`、ブランチの既定の名前、メッセージ）は、いつも0埋めの形である。
 - 直す処理は、従来モードと共有の選択子の解析（`domain/selectors.py` の `parse_scope_selector`。変えない）の1か所に置く（すでにこの規則で直している）。canonical モードのコマンドは、ID の入力をすべてここに通す。この Issue は、通っていない入口がないことをテストで確かめる。
 - 名前（カタログのディレクトリ名、区切りの名前、ブランチ名）を ID として読むところは、I-14 のとおり厳密な正規表現 `^(init|epic|iss)-(?:[0-9]{5}|[1-9][0-9]{5,})$` だけを受け付ける（`iss-454/` は Scope のディレクトリではない）。
@@ -127,9 +127,9 @@ canonical のカタログの Scope が、番号の千ごとの区切り（`<下�
 - **AC-460-01**（R-460-01、R-460-07）：区切りの計算の関数が、R-460-01 の9つの例を返し、種類によらず同じ区切りを返す。0と負の番号で `ValueError`。相対の場所の関数が `iss-00454` に `00000-00999/iss-00454`、`iss-100454` に `100000-100999/iss-100454` を返し、ID の形でない値（`iss-454`、`iss-000454`）で `ValueError`。
 - **AC-460-02**（R-460-02、失敗・境界条件）：一時のカタログ（偽の `gh`、一時の bare の origin、一時の `XDG_STATE_HOME`）で、`scope show --json` と `scope list --json` の `path` が `spec-dock/initiatives/00000-00999/<ID>`、`active set` のリンクの先が `../initiatives/00000-00999/<ID>`、`artifact list` が `<カタログ>/00000-00999/<ID>/artifacts` を読み `spec-dock/initiatives/00000-00999/<ID>/artifacts/…` を示す。カタログの直下に平らな `<ID>/` だけがある Scope は `path` が null で、そのディレクトリを場所として使わない。
 - **AC-460-03**（R-460-03、失敗・境界条件）：`workspace validate` と `canonical status --structure` が、区切りの形で4つの異常を見つける。`MISSING` の `details.path` が `<区切り>/<ID>`。`MISPLACED` が `root`、`bucket`（区切りの名前の誤りと区切りの違う ID）、`name`、`nested` の4つの理由で出て、ID の決まるものに `details.expected` がある。`00000-00999/iss-00454/` と GitHub の epic で `SCOPE_KIND_CHANGED` が1件だけ出る。正しく置いた Scope には異常が出ない。隠し、リンク、ファイルは無視する。
-- **AC-460-04**（R-460-04）：一時のカタログで、`iss-454` などの0埋めしない ID を、canonical モードの ID の入口（`scope show`、`scope list --parent`、`dependency list`、`dependency check`、`artifact list`、`artifact show`、`active set`、`branch show`、`branch create`、`worktree create --expect-current`、読むコマンドの `--expect-current`）に渡すと、`iss-00454` として扱い、出力の ID とパスとブランチの既定の名前が0埋めの形である。`iss-000454` も同じ。名前の照合（カタログのディレクトリ `00000-00999/iss-454/`、ブランチ名の照合の部品）は0埋めしない形を受け付けない。
-- **AC-460-05**（R-460-05）：深さの定数が `../../..` で、`spec-dock/initiatives/<区切り>/<ID>` に足すと `spec-dock` になる。一時のリポジトリで、`<カタログ>/<区切り>/<ID>/` に置いた `../../../docs/…` のリンクと `artifacts/` に置いた `../../../../docs/…` のシンボリックリンクが、mainのチェックアウトとリンクを通した作業用のworktreeの両方から、`spec-dock/docs/…` を開く。テンプレートの配布資産は変わらない。
-- **AC-460-06**（R-460-06）：Epic の `requirement.md`、`design.md`、`plan.md` の置き場の記述が区切りの形で、カタログの「直下の `<ID>/`」を置き場として書いた箇所が残っていない（検索で確かめる）。`plan.md` に I-16 の節、一覧の行、順序の図の位置がある。契約の表の持ち主と使う側は変わっていない。
+- **AC-460-04**（R-460-04）：一時のカタログで、`iss-454` などの0埋めしない ID を、R-460-04 に列挙した入口のそれぞれに渡すと、`iss-00454` として扱い、出力の ID とパスとブランチの既定の名前が0埋めの形である。`iss-000454` も同じ。名前の照合（カタログのディレクトリ `00000-00999/iss-454/`、ブランチ名の照合の部品）は0埋めしない形を受け付けない。
+- **AC-460-05**（R-460-05）：深さの定数が `../../..` で、`spec-dock/initiatives/<区切り>/<ID>` に足して `os.path.normpath` で畳むと `spec-dock` になる。一時のリポジトリの mainのチェックアウトとリンクを通した作業用のworktreeのそれぞれで、`<区切り>/<ID>/` からの Markdown のリンク `../../../docs/…` は、字面で畳むと、そのチェックアウトの `spec-dock/docs/…` を開く。`artifacts/` に置いた `../../../../docs/…` のシンボリックリンクは、カタログの実際の場所から解決し、mainのチェックアウトの `spec-dock/docs/…` を開く。テンプレートの配布資産は変わらない。
+- **AC-460-06**（R-460-06）：Epic の `requirement.md`、`design.md`、`plan.md` の置き場の記述が区切りの形で、カタログの「直下の `<ID>/`」を置き場として書いた箇所が残っていない（検索で確かめる。`plan.md` の I-14 の節の、マージの時点の記録は除き、その節にそう書く）。`plan.md` に I-16 の節、一覧の行、順序の図の位置がある。契約の表の持ち主と使う側は変わっていない。
 - **AC-460-07**（R-460-07）：`design.md` の「責務・Interface」に書いた公開の形が実装にあり、テストがその形を直接使う。
 - **AC-460-08**（Epic の AC-15）：版3の振る舞いを確かめるテストが変更なしで通る（この Issue で変えるテストは canonical モードのものだけで、`report.md` に一覧で書く）。`make lint` と `uv run pytest` が通る。
 

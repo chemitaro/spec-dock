@@ -51,7 +51,7 @@ ID: "iss-00460"
 | AC-460-03 | 単体（`test_catalog_tree.py`）と CLI（`workspace validate`、`canonical status --structure`）：4つの理由の外れ、`expected`、`MISSING` の `path`、付け替えが1件、正しく置いた Scope に異常がないこと、隠し・リンク・ファイルの無視 |
 | AC-460-04 | CLI：入口ごとに `iss-454`（と `iss-000454`）を渡し、0埋めの ID とパスとブランチの名前が出ること。単体：名前の照合（`CatalogTree`、`branch_names_scope`）が `iss-454` を受け付けないこと（I-14 のテストのまま） |
 | AC-460-05 | 単体：`SCOPE_TO_SPEC_DOCK` の正規化。CLI の部品（一時のリポジトリ）：mainのチェックアウトと作業用のworktreeで、相対リンクとシンボリックリンクが `spec-dock/docs/…` を開く。テンプレートの配布資産の差分がないこと（`git diff --stat`） |
-| AC-460-06 | Epic の3つの文書の検索（「直下の `<ID>/`」「`<カタログ>/<ID>/`」「`initiatives/<ID>`」が置き場の記述として残らない）と、`plan.md` の I-16 の節。文書のレビュー（手順4） |
+| AC-460-06 | Epic の3つの文書を「直下」「`<カタログ>/<ID>/`」「`initiatives/<ID>`」で検索し、当たったものを1件ずつ、区切りそのものの説明、移行前の置き場、I-14 の節のマージの時点の記録のどれかに分け、どれでもないものが0件であること。`plan.md` の I-16 の節。文書の独立レビュー（統括の手順4） |
 | AC-460-07 | 単体のテストが `design.md` の公開の形を直接使う |
 | AC-460-08 | `make lint`、`uv run pytest` の全体。変えたテストがすべて canonical モードのもの（`report.md` の一覧） |
 
@@ -74,7 +74,8 @@ ID: "iss-00460"
 
 - **完了の条件**：AC-460-01〜08 を満たし、最終品質ゲート（同じ SHA で `make lint` と `uv run pytest` の全体、独立した2つのレビュー）に合格し、PR の CI が通り、マージできる状態の PR がある。マージは人が行い、`work finish` は統括の指示の後。
 - **引き渡し**：
-  - I-5：`scope_relative`（作成、削除、`work finish` の保存の確認、`holds_under` に渡す接頭辞）、`SCOPE_TO_SPEC_DOCK`（作成時の相対リンクとシンボリックリンクの深さ）、`CatalogTree.find`、新しい ID の入口は `parse_scope_selector` を通すこと。`KindChange.directories` は名前のままで、場所は `scope_relative(名前)`。
+  - I-5：`scope_relative`（作成、削除、`work finish` の保存の確認、`holds_under` に渡す接頭辞）、`SCOPE_TO_SPEC_DOCK`（作成時の相対リンクとシンボリックリンクの深さ）、`CatalogTree.find`、新しい ID の入口は `parse_scope_selector` を通すこと、区切りのディレクトリの作成・止まる条件・空になったときの削除（`design.md` の「ID の入力」の節の後の項目）。`KindChange.directories` は名前のままで、場所は `scope_relative(名前)`。
   - I-11：場所を使わないので、変えるものはない（テストの部品の取り込みだけ）。
-  - I-15：`scope_bucket` の本体を写し、マージの後にパッケージの関数と比べるテストを足す。平らにする写しの写し先は `<区切り>/<ID>/`、深さは `SCOPE_TO_SPEC_DOCK`。
+  - I-15：`scope_bucket` の本体を写し、この Issue のマージの後にパッケージの関数と比べるテストを足す（I-15 のマージはこの Issue の後。Epic の `plan.md`）。平らにする写しの写し先は `<区切り>/<ID>/`、深さは `SCOPE_TO_SPEC_DOCK`。
+  - 統括：依存の記録 `iss-00456`（I-15）→ `iss-00460` と、`iss-00436`（I-9）→ `iss-00460` の追加（`spec-dock dependency add`。ほかの Issue のメタデータなので、この Issue では書かない）。
 - **残るリスク**：`report.md` に書く。
