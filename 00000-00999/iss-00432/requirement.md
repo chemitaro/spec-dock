@@ -124,7 +124,7 @@ canonical モードで、Scope の作成、取り込み、題名の変更、親�
   1. その場所の下に保留（`state.json` の `holds`）があれば、書く前に `CANONICAL_SAVE_HELD`（終了コード3）で止まり、保留の種類ごとの解き方を示す。同期が一時停止しているときは、確かめられないので、書く前に `CANONICAL_SAVE_UNCONFIRMED` で止まる。
   2. カタログの排他の中で、その場所の下の未保存の変更（削除を含む）を集め（`.git` に書かない読み方）、あれば `origin: finish` の変更の束を書く。ディレクトリがないことを理由に、確かめを飛ばさない。
   3. 定期の実行に、すぐの実行を頼む（I-3 の `request_sync_now`。失敗してよい）。
-  4. 状態の置き場の `state.json` を2秒ごとに読み、180秒まで（統括の判断 Q2：引数で変えない固定の値）、次のすべてを待つ：書いた束が `consumed_changesets` にある（束がなければこの条件はない）、`last_cycle.finished_at` が待ち始めた時刻より後、その場所の下に未保存の変更がない（毎回、読むだけで確かめる）、`state.json` の `head` がカタログの今の HEAD と同じで `remote_contains_head` が真、その場所の下に保留がない。待つ間に保留が現れたら、待たずに `CANONICAL_SAVE_HELD` で止まる。
+  4. 状態の置き場の `state.json` を2秒ごとに読み、180秒まで（統括の判断 Q2：引数で変えない固定の値）、次のすべてを待つ：書いた束が `consumed_changesets` にある（束がなければこの条件はない）、`last_cycle.started_at` が待ち始めの時刻（秒に切り捨て）以上（`state.json` の時刻は秒の精度のため。design.md の `work finish`）、その場所の下に未保存の変更がない（毎回、読むだけで確かめる）、`state.json` の `head` がカタログの今の HEAD と同じで `remote_contains_head` が真、その場所の下に保留がない。待つ間に保留が現れたら、待たずに `CANONICAL_SAVE_HELD` で止まる。
   5. 確かめられなければ、Issue を閉じずに `CANONICAL_SAVE_UNCONFIRMED` で止まり、`recovery` に `spec-dock canonical status` を入れる。束を書いた後なら `partial`（終了コード6。束を `succeeded`、Issue を閉じることを `not_attempted`）、書いていなければ `failed`（終了コード3）とする。
 - 他のクローンの push を取り込んだだけで、自分は push しなかった場合も、`remote_contains_head` で確かめられて閉じる（AC-13）。
 - 確かめた後、閉じる前に、`ensure_fresh(decision)` と対象の読み直しをもう一度行い、状態の規則を確かめ直す（待つ間に他の人が閉じたり、子が開き直されたりしても、古い値で書かないため）。ここで止まるときは、束を書いていれば `partial`（6）で、`recovery` に `spec-dock work finish <ID> --yes` を入れる。
