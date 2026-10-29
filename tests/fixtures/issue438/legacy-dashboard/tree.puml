@@ -1,0 +1,23 @@
+@startuml
+left to right direction
+skinparam shadowing false
+
+legend right
+|= State |= Color |
+| READY |<#D5E8D4> |
+| BLOCKED |<#F8CECC> |
+| DOING |<#DAE8FC> |
+| DONE |<#E3E3E3> |
+| UNKNOWN |<#EEEEEE> |
+endlegend
+
+  package "init-local-00003\nArchitecture Maintenance and Hardening" as Ninit_local_00003 {
+    package "epic-00158\nAgent Workflow PDCA Hardening" as Nepic_00158 {
+      rectangle "iss-00215\n[READY]" as Niss_00215 #D5E8D4
+    }
+    package "epic-00224\nDynamic Workflow Resource Allocation" as Nepic_00224 {
+      rectangle "iss-00250\n[READY]" as Niss_00250 #D5E8D4
+    }
+  }
+
+@enduml

@@ -27,6 +27,14 @@ def registry_path(root: Path) -> Path:
     return root / REGISTRY_FILE
 
 
+def is_unregistered(root: Path, catalog: str) -> bool:
+    """True only when a readable registry lacks the catalog; an unreadable one is not proof of removal."""
+    try:
+        return read_registry(root).entry_for(catalog) is None
+    except RegistryUnreadable:
+        return False
+
+
 def read_registry(root: Path) -> SyncRegistry:
     """The registry, or an empty one when the file does not exist."""
     path = registry_path(root)

@@ -35,6 +35,8 @@ def node(number: int, kind: str, *, parent: int | None = None, **changes: object
         blocking=(),
         updated_at="2026-10-26T00:00:00Z",
         url=f"https://github.com/o/r/issues/{number}",
+        created_at="2026-10-25T00:00:00Z",
+        closed_at=None,
     )
     return replace(base, **changes)  # type: ignore[arg-type]
 

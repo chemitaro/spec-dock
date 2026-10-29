@@ -3,10 +3,38 @@ name: Provider CI
 on:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  provider-tests:
+  # Chooses the runner for the jobs below. Only a trusted same-repository pull request goes to the
+  # self-hosted runner, and only while the repository variable SPEC_DOCK_CI_RUNNER is `local`.
+  route:
     runs-on: ubuntu-latest
+    outputs:
+      runners: ${{ steps.route.outputs.runners }}
     steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+      - name: Choose runners
+        id: route
+        env:
+          SPEC_DOCK_CI_RUNNER: ${{ vars.SPEC_DOCK_CI_RUNNER }}
+        run: python3 .github/scripts/ci-runner-job-gate.py route --repository chemitaro/spec-dock
+
+  provider-tests:
+    needs: route
+    # Run even when route fails: the job then falls back to the GitHub-hosted runner and fails in its first step,
+    # so a routing failure fails this check instead of skipping it or leaving it unreported.
+    if: ${{ !cancelled() }}
+    runs-on: ${{ needs.route.outputs.runners && fromJSON(needs.route.outputs.runners)['ubuntu-latest'] || 'ubuntu-latest' }}
+    steps:
+      - name: Stop when route did not choose the runners
+        if: needs.route.result != 'success'
+        run: |
+          echo "route failed, so this check fails instead of being skipped; see the route job" >&2
+          exit 1
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -24,11 +52,18 @@ jobs:
 
   provider-distribution-parity:
     name: Provider distribution parity (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
+    needs: route
+    if: ${{ !cancelled() }}
+    runs-on: ${{ needs.route.outputs.runners && fromJSON(needs.route.outputs.runners)[matrix.os] || matrix.os }}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
     steps:
+      - name: Stop when route did not choose the runners
+        if: needs.route.result != 'success'
+        run: |
+          echo "route failed, so this check fails instead of being skipped; see the route job" >&2
+          exit 1
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
