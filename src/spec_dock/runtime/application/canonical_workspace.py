@@ -26,6 +26,7 @@ from spec_dock.runtime.application.canonical_scopes import (
 from spec_dock.runtime.application.canonical_worktrees import is_catalog
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.worktree_observation import SelectionObservation, read_selection
+from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.canonical_structure import SCOPE_KIND_CHANGED, parse_scope_id
 from spec_dock.runtime.infra.canonical_git import catalog_change_summary
 from spec_dock.runtime.infra.git_cli import worktree_list
@@ -40,6 +41,7 @@ if TYPE_CHECKING:
 
     from spec_dock.runtime.application.canonical_scopes import CanonicalScopes
     from spec_dock.runtime.application.project_context import ProjectContext
+    from spec_dock.runtime.infra.catalog_tree import MisplacedDirectory
 
 REQUIRED_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
 
@@ -50,9 +52,12 @@ SCOPE_DOCUMENT_MISSING: Final = "SCOPE_DOCUMENT_MISSING"
 SCOPE_METADATA_PRESENT: Final = "SCOPE_METADATA_PRESENT"
 CANONICAL_CONFLICT_COPY: Final = "CANONICAL_CONFLICT_COPY"
 DEPENDENCY_NOT_SCOPE: Final = "DEPENDENCY_NOT_SCOPE"
-MISPLACED_NEXT_STEP: Final = "Move its contents into <catalog>/<ID>/ and delete the emptied directory."
+MISPLACED_NEXT_STEP: Final = (
+    "Move the Scope contents it holds into spec-dock/initiatives/<bucket>/<ID>/ for each ID (the bucket is the ID "
+    "number's thousand range, e.g. 00000-00999/iss-00454) and delete the emptied directory."
+)
 DIRECTORY_MISSING_NEXT_STEP: Final = (
-    "Create spec-dock/initiatives/{scope_id}/ with the Scope documents, or put back the directory that was moved "
+    "Create spec-dock/initiatives/{path}/ with the Scope documents, or put back the directory that was moved "
     "or renamed."
 )
 ISSUE_MISSING_NEXT_STEP: Final = (
@@ -69,7 +74,7 @@ class StructureReport:
 
 @dataclass(frozen=True)
 class DirectoryReport:
-    """How catalog `<ID>/` directories match GitHub (Epic design ch. 2): three errors and one warning code."""
+    """How catalog `<bucket>/<ID>/` directories match GitHub (Epic design ch. 2): three errors and one warning code."""
 
     errors: tuple[Diagnostic, ...]
     warnings: tuple[Diagnostic, ...]
@@ -89,15 +94,12 @@ def directory_anomalies(scopes: CanonicalScopes) -> DirectoryReport:
     for node in scopes.snapshot.scopes:
         scope_id = str(node.id)
         if scope_id not in scopes.directories and node.number not in changed:
+            path = scope_relative(scope_id).as_posix()
             errors.append(
                 Diagnostic(
                     SCOPE_DIRECTORY_MISSING,
-                    f"{scope_id} has no directory {scope_id}/ in the catalog",
-                    {
-                        "scope_id": scope_id,
-                        "path": scope_id,
-                        "next_step": DIRECTORY_MISSING_NEXT_STEP.format(scope_id=scope_id),
-                    },
+                    f"{scope_id} has no directory {path}/ in the catalog",
+                    {"scope_id": scope_id, "path": path, "next_step": DIRECTORY_MISSING_NEXT_STEP.format(path=path)},
                 )
             )
     for item in catalog.tree.directories():
@@ -117,14 +119,29 @@ def directory_anomalies(scopes: CanonicalScopes) -> DirectoryReport:
     warnings = tuple(
         Diagnostic(
             SCOPE_DIRECTORY_MISPLACED,
-            f"{item.relative} is not a Scope directory <ID>/ at the catalog root"
-            if item.reason == "name"
-            else f"{item.relative} is left from the nested layout inside a Scope directory",
-            {"path": item.relative.as_posix(), "reason": item.reason, "next_step": MISPLACED_NEXT_STEP},
+            _misplaced_message(item),
+            {
+                "path": item.relative.as_posix(),
+                "reason": item.reason,
+                "expected": None if item.expected is None else item.expected.as_posix(),
+                "next_step": MISPLACED_NEXT_STEP,
+            },
         )
         for item in catalog.tree.misplaced()
     )
     return DirectoryReport(tuple(errors), warnings)
+
+
+def _misplaced_message(item: MisplacedDirectory) -> str:
+    if item.reason == "root":
+        return f"{item.relative} is at the catalog root; Scope directories live under their number's bucket"
+    if item.reason == "bucket":
+        if item.expected is None:
+            return f"{item.relative} is not a bucket of its numbers"
+        return f"{item.relative} is in another number's bucket; it belongs in {item.expected}"
+    if item.reason == "name":
+        return f"{item.relative} is not a Scope directory <ID>/ in its bucket"
+    return f"{item.relative} is left from the nested layout inside a Scope directory"
 
 
 def inspect_canonical_structure(scopes: CanonicalScopes, *, timeout: float) -> StructureReport:

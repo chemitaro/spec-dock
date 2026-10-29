@@ -37,7 +37,7 @@ def test_validate_finds_every_error_item(world: CanonicalWorld) -> None:
     world.scope("issue", 4, parent=2, directory=False)
     world.scope("issue", 5, parent=2, documents=("requirement.md",))
     world.directory("issue", 7)
-    (world.catalog / "init-00001/.meta.json").write_text("{}", encoding="utf-8")
+    (world.catalog / "00000-00999/init-00001/.meta.json").write_text("{}", encoding="utf-8")
 
     def cycle(fake: Any) -> None:
         fake.scope("issue", number=9, parent=2)
@@ -62,9 +62,9 @@ def test_validate_finds_every_error_item(world: CanonicalWorld) -> None:
     by_code = {item["code"]: item["details"] for item in findings}
     assert (by_code["SCOPE_DIRECTORY_MISSING"]["scope_id"], by_code["SCOPE_DIRECTORY_MISSING"]["path"]) == (
         "iss-00004",
-        "iss-00004",
+        "00000-00999/iss-00004",
     )
-    assert by_code["SCOPE_ISSUE_MISSING"]["path"] == "iss-00007"
+    assert by_code["SCOPE_ISSUE_MISSING"]["path"] == "00000-00999/iss-00007"
     assert all(by_code[code]["next_step"] for code in ("SCOPE_DIRECTORY_MISSING", "SCOPE_ISSUE_MISSING"))
 
 
@@ -76,10 +76,10 @@ def test_validate_finds_kind_and_parent_errors(world: CanonicalWorld) -> None:
 
 
 def test_validate_warns_about_misplaced_names_conflicts_and_non_scope_dependencies(world: CanonicalWorld) -> None:
-    (world.catalog / "iss-00003-leaf").mkdir()
-    (world.catalog / "init-00001/epics").mkdir()
-    (world.catalog / "epic-00002/discussions/iss-00008-topic").mkdir(parents=True)
-    (world.catalog / "iss-00003/requirement.conflict-20261026.md").write_text("x", encoding="utf-8")
+    (world.catalog / "00000-00999/iss-00003-leaf").mkdir()
+    (world.catalog / "00000-00999/init-00001/epics").mkdir()
+    (world.catalog / "00000-00999/epic-00002/discussions/iss-00008-topic").mkdir(parents=True)
+    (world.catalog / "00000-00999/iss-00003/requirement.conflict-20261026.md").write_text("x", encoding="utf-8")
 
     def external(fake: Any) -> None:
         fake.add_issue(17, title="Upstream")
@@ -95,10 +95,13 @@ def test_validate_warns_about_misplaced_names_conflicts_and_non_scope_dependenci
     }
     misplaced = [item["details"] for item in payload["warnings"] if item["code"] == "SCOPE_DIRECTORY_MISPLACED"]
     assert [(item["path"], item["reason"]) for item in misplaced] == [
-        ("init-00001/epics", "nested"),
-        ("iss-00003-leaf", "name"),
+        ("00000-00999/init-00001/epics", "nested"),
+        ("00000-00999/iss-00003-leaf", "name"),
     ]
-    assert misplaced[0]["next_step"] == "Move its contents into <catalog>/<ID>/ and delete the emptied directory."
+    assert misplaced[0]["next_step"] == (
+        "Move the Scope contents it holds into spec-dock/initiatives/<bucket>/<ID>/ for each ID (the bucket is the "
+        "ID number's thousand range, e.g. 00000-00999/iss-00454) and delete the emptied directory."
+    )
 
 
 def test_validate_ci_points_at_canonical_check(world: CanonicalWorld) -> None:
@@ -154,7 +157,7 @@ def test_status_structure_is_not_checked_without_the_flag(world: CanonicalWorld)
 def test_status_structure_reports_the_four_directory_anomalies(world: CanonicalWorld) -> None:
     world.scope("issue", 4, parent=2, directory=False)
     world.directory("issue", 7)
-    (world.catalog / "iss-00003-leaf").mkdir()
+    (world.catalog / "00000-00999/iss-00003-leaf").mkdir()
     world.edit(lambda fake: fake.scope("epic", number=8, parent=1))
     world.directory("issue", 8)
     code, payload = world.run("canonical", "status", "--structure")

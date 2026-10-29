@@ -1,7 +1,7 @@
 """A linked canonical clone with Scope directories and a fake GitHub on PATH (iss-00431 CLI tests).
 
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "Plan")                 # GitHub Issue #1 with its catalog directory init-00001/
+    world.scope("initiative", 1, "Plan")                 # GitHub Issue #1 with its catalog directory 00000-00999/init-00001/
     code, payload = world.run("scope", "show", "init-00001")
 
 The clone's origin points at a temporary bare repository while `canonical link` runs; afterwards its URL is
@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from spec_dock.cli import main
+from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.infra import github_snapshot, runtime_environment
 from tests.support.canonical_repo import bare_remote, clone, environment, git, isolate_user_state
 from tests.support.fake_github import FakeGithub, install_fake_gh
@@ -106,8 +107,8 @@ class CanonicalWorld:
 
     @staticmethod
     def relative(kind: str, number: int) -> Path:
-        """A Scope directory's place in the catalog: always the ID at the root (Epic design ch. 2)."""
-        return Path(f"{_PREFIX[kind]}-{number:05d}")
+        """A Scope directory's place in the catalog: its number's bucket, then the ID (Epic design ch. 2)."""
+        return Path(scope_relative(f"{_PREFIX[kind]}-{number:05d}"))
 
     def worktree(self, name: str) -> Path:
         """A linked worktree of the clone with its own correct link."""

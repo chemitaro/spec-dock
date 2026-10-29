@@ -1,4 +1,4 @@
-"""Flat `<catalog>/<ID>/` directories and GitHub kind-label changes in canonical mode (iss-00455).
+"""Flat `<catalog>/<bucket>/<ID>/` directories and GitHub kind-label changes in canonical mode (iss-00455, iss-00460).
 
 GitHub moves #454 from `spec-dock:issue` to `spec-dock:epic`, so its ID becomes `epic-00454` while the catalog
 keeps `iss-00454/`. SpecDock renames nothing: checks report SCOPE_KIND_CHANGED once, reading commands warn,
@@ -67,8 +67,8 @@ def test_validate_reports_one_kind_change_and_no_missing_pair(world: CanonicalWo
 
 
 def test_both_old_and_new_directories_still_give_one_kind_change(world: CanonicalWorld) -> None:
-    (world.catalog / "epic-00454").mkdir()
-    (world.catalog / "init-00454").mkdir()
+    (world.catalog / "00000-00999/epic-00454").mkdir()
+    (world.catalog / "00000-00999/init-00454").mkdir()
     code, payload = world.run("workspace", "validate")
     assert code == 7
     findings = [item for item in payload["data"]["result"]["findings"] if item["code"] == "SCOPE_KIND_CHANGED"]
@@ -168,7 +168,7 @@ def test_branch_create_and_switch_stop_before_any_git_write(world: CanonicalWorl
 
 
 def test_active_set_stops_for_a_re_kinded_target(world: CanonicalWorld) -> None:
-    (world.catalog / "epic-00454").mkdir()
+    (world.catalog / "00000-00999/epic-00454").mkdir()
     world.select("epic-00454", 454)
     code, payload = world.run("active", "set", "epic-00454", "--yes")
     assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
@@ -190,7 +190,7 @@ def test_active_set_stops_when_an_ancestor_changed_kind(world: CanonicalWorld) -
 
 
 def test_worktree_create_with_expect_current_stops(world: CanonicalWorld) -> None:
-    (world.catalog / "epic-00454").mkdir()
+    (world.catalog / "00000-00999/epic-00454").mkdir()
     world.select("epic-00454", 454)
     trees = world.tmp_path / "trees"
     catalog = tree_digest(world.catalog.resolve())
@@ -220,7 +220,7 @@ def test_an_old_id_in_expect_current_of_a_check_is_a_kind_change(world: Canonica
 def test_an_unreadable_scope_directory_keeps_the_structure_item_unavailable(world: CanonicalWorld) -> None:
     import os
 
-    locked = world.catalog / "iss-00003"
+    locked = world.catalog / "00000-00999/iss-00003"
     locked.chmod(0)
     try:
         if os.access(locked, os.X_OK):

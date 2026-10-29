@@ -84,7 +84,7 @@ def test_active_show_reports_the_selected_scope_place(world: CanonicalWorld) -> 
     assert code == 0, payload
     data = payload["data"]
     assert data["selection"]["status"] == "selected" and data["ancestors"] == ["init-00001", "epic-00002"]
-    assert data["scope"]["path"] == "spec-dock/initiatives/iss-00003"
+    assert data["scope"]["path"] == "spec-dock/initiatives/00000-00999/iss-00003"
     assert data["snapshot"]["fetched_at"]
 
 
@@ -94,10 +94,10 @@ def test_active_set_in_a_linked_worktree_points_links_through_the_catalog(world:
     code, payload = world.run("active", "set", "iss-00003", "--yes", checkout=linked)
     assert code == 0, payload
     issue = linked / "spec-dock/active/issue"
-    assert str(issue.readlink()) == "../initiatives/iss-00003"
+    assert str(issue.readlink()) == "../initiatives/00000-00999/iss-00003"
     assert (issue / "requirement.md").is_file()
-    assert str((linked / "spec-dock/active/initiative").readlink()) == "../initiatives/init-00001"
-    assert str((linked / "spec-dock/active/epic").readlink()) == "../initiatives/epic-00002"
+    assert str((linked / "spec-dock/active/initiative").readlink()) == "../initiatives/00000-00999/init-00001"
+    assert str((linked / "spec-dock/active/epic").readlink()) == "../initiatives/00000-00999/epic-00002"
     for role in ("initiative", "epic", "issue"):
         (linked / "spec-dock/system/active-none" / role).mkdir(parents=True)
     code, payload = world.run("active", "clear", "--all", "--yes", checkout=linked)
@@ -107,7 +107,7 @@ def test_active_set_in_a_linked_worktree_points_links_through_the_catalog(world:
 
 def test_active_set_with_a_missing_ancestor_directory_writes_no_link(world: CanonicalWorld) -> None:
     world.select("iss-00003", 3)
-    epic = world.catalog / "epic-00002"
+    epic = world.catalog / "00000-00999/epic-00002"
     epic.rename(world.catalog / "moved-away")
     code, payload = world.run("active", "set", "iss-00003", "--yes")
     assert (code, payload["error"]["code"]) == (4, "LOCAL_TARGET_NOT_FOUND")
@@ -122,7 +122,7 @@ def test_active_set_of_another_scope_requires_work_start(world: CanonicalWorld) 
 
 
 def test_artifacts_are_listed_from_the_catalog_in_main_and_linked_worktrees(world: CanonicalWorld) -> None:
-    artifacts = world.catalog / "iss-00003/artifacts"
+    artifacts = world.catalog / "00000-00999/iss-00003/artifacts"
     artifacts.mkdir()
     (artifacts / "20261026t000000z-note.md").write_text("# note\n", encoding="utf-8")
     linked = world.worktree("feature")
@@ -130,7 +130,7 @@ def test_artifacts_are_listed_from_the_catalog_in_main_and_linked_worktrees(worl
         code, payload = world.run("artifact", "list", "--scope", "iss-00003", checkout=checkout)
         assert code == 0, payload
         [item] = payload["data"]["result"]["items"]
-        assert item["path"] == "spec-dock/initiatives/iss-00003/artifacts/20261026t000000z-note.md"
+        assert item["path"] == "spec-dock/initiatives/00000-00999/iss-00003/artifacts/20261026t000000z-note.md"
         code, payload = world.run("artifact", "show", item["id"], "--scope", "iss-00003", checkout=checkout)
         assert code == 0, payload
         assert payload["data"]["result"]["artifact"]["path"] == item["path"]

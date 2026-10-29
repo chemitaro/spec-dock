@@ -32,7 +32,7 @@ def test_scope_show_reports_github_title_state_directory_and_snapshot_time(world
         "epic-00002",
     )
     assert scope["status"]["state"] == "completed" and scope["state_reason"] == "completed"
-    assert scope["path"] == "spec-dock/initiatives/iss-00003"
+    assert scope["path"] == "spec-dock/initiatives/00000-00999/iss-00003"
     assert (scope["number"], scope["github_ref"], scope["directory_found"]) == (3, "gh:example/repo#3", True)
     snapshot = payload["data"]["result"]["snapshot"]
     assert snapshot["fetched_at"] and snapshot["stale"] is False
@@ -132,10 +132,11 @@ def test_offline_without_a_snapshot_is_a_precondition_failure(world: CanonicalWo
 
 def test_a_leftover_named_or_nested_directory_is_never_a_scope_place(world: CanonicalWorld) -> None:
     world.scope("issue", 4, parent=2, directory=False)
-    (world.catalog / "iss-00004-old").mkdir()
-    (world.catalog / "epic-00002/issues/iss-00004").mkdir(parents=True)
+    (world.catalog / "00000-00999/iss-00004-old").mkdir()
+    (world.catalog / "00000-00999/epic-00002/issues/iss-00004").mkdir(parents=True)
+    (world.catalog / "iss-00004").mkdir()  # the flat place before buckets (iss-00460)
     code, payload = world.run("scope", "list")
     assert code == 0, payload
     paths = {item["id"]: item["path"] for item in payload["data"]["result"]["items"]}
-    assert paths["iss-00004"] is None and paths["epic-00002"] == "spec-dock/initiatives/epic-00002"
-    assert all(path is None or path.count("/") == 2 for path in paths.values())
+    assert paths["iss-00004"] is None and paths["epic-00002"] == "spec-dock/initiatives/00000-00999/epic-00002"
+    assert all(path is None or path.count("/") == 3 for path in paths.values())
