@@ -211,7 +211,9 @@ def test_the_vm_shares_nothing_with_the_mac_and_blocks_the_mac_and_private_netwo
     for network in ("10.0.0.0/8", "100.64.0.0/10", "169.254.0.0/16", "172.16.0.0/12", "192.168.0.0/16"):
         assert network in rules
     assert "meta nfproto ipv6 counter reject" in rules
-    assert rules.index("192.168.5.3 meta l4proto { tcp, udp } th dport 53 accept") < rules.index("@blocked_ipv4 counter reject")
+    assert rules.index("192.168.5.3 meta l4proto { tcp, udp } th dport 53 accept") < rules.index(
+        "@blocked_ipv4 counter reject"
+    )
 
 
 def test_the_runner_hooks_gate_each_job_and_runner_users_get_no_administrative_group() -> None:
