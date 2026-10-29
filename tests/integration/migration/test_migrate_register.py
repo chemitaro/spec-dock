@@ -313,3 +313,32 @@ def test_graphql_rate_limits_are_waited_out(tmp_path: Path, monkeypatch: pytest.
     code, _ = legacy.run("plan")
     assert code == 0
     assert 60.0 in legacy.clock.sleeps
+
+
+def test_undo_does_not_count_an_issue_already_recorded_for_another_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    recorded = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    orphan = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    legacy.records.mkdir(parents=True, exist_ok=True)
+    base = {"op": "issue.create", "title": "Architecture", "label": "spec-dock:initiative"}
+    lines = [
+        {"seq": 1, "at": "2026-10-26T00:00:00Z", "phase": "intent", "local_id": "init-local-00007", **base},
+        {
+            "seq": 2,
+            "at": "2026-10-26T00:00:00Z",
+            "phase": "done",
+            "ref": 1,
+            "local_id": "init-local-00007",
+            "number": recorded.number,
+            "database_id": recorded.id,
+            **base,
+        },
+        {"seq": 3, "at": "2026-10-26T00:00:00Z", "phase": "intent", "local_id": "init-local-00008", **base},
+    ]
+    (legacy.records / "undo.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
+    code, result = legacy.run("undo", apply=True)
+    assert code == 0, result
+    assert orphan.state == "closed" and recorded.state == "closed"  # each closed once, by its own record

@@ -1005,6 +1005,7 @@ class _Span:
 
 _URL = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
 _FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_BLANK_LINE = re.compile(r"\n[ \t]*\n")
 _CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.DOTALL)
 _INLINE_LINK = re.compile(r"\]\(\s*(?:<([^>\n]+)>|([^\s()<>]+))")
 _REFERENCE_LINK = re.compile(r"^ {0,3}\[[^\]\n]+\]:[ \t]*(?:<([^>\n]+)>|(\S+))", re.MULTILINE)
@@ -1022,10 +1023,7 @@ def _code_ranges(text: str) -> list[tuple[int, int]]:
         matched = _FENCE.match(line)
         if fence is None and matched:
             fence, fence_start = matched.group(1), position
-            ranges.extend(
-                (prose_start + m.start(), prose_start + m.end())
-                for m in _CODE_SPAN.finditer(text[prose_start:position])
-            )
+            ranges.extend(_span_ranges(text, prose_start, position))
         elif fence is not None and matched and matched.group(1)[0] == fence[0] and len(matched.group(1)) >= len(fence):
             ranges.append((fence_start, position + len(line)))
             fence = None
@@ -1034,7 +1032,19 @@ def _code_ranges(text: str) -> list[tuple[int, int]]:
     if fence is not None:
         ranges.append((fence_start, len(text)))
     else:
-        ranges.extend((prose_start + m.start(), prose_start + m.end()) for m in _CODE_SPAN.finditer(text[prose_start:]))
+        ranges.extend(_span_ranges(text, prose_start, len(text)))
+    return ranges
+
+
+def _span_ranges(text: str, start: int, end: int) -> list[tuple[int, int]]:
+    """Code spans between start and end; a span never crosses a blank line, so a lone backtick stays text."""
+    ranges: list[tuple[int, int]] = []
+    paragraph = start
+    for gap in [*_BLANK_LINE.finditer(text, start, end), None]:
+        stop = gap.start() if gap is not None else end
+        ranges.extend((paragraph + m.start(), paragraph + m.end()) for m in _CODE_SPAN.finditer(text[paragraph:stop]))
+        if gap is not None:
+            paragraph = gap.end()
     return ranges
 
 
@@ -2532,11 +2542,18 @@ def command_undo(context: Context) -> int:
             key = record.get("ref") or record["seq"]
             latest[key] = record
     pending = [(seq, record) for seq, record in sorted(latest.items(), reverse=True) if seq not in undone]
+    recorded = {
+        record["number"]
+        for record in records
+        if record.get("op") == "issue.create"
+        and record.get("phase") == "done"
+        and isinstance(record.get("number"), int)
+    }
     wrote = 0
     for seq, record in pending:
         op = record["op"]
         try:
-            action = _undo_action(gh, record)
+            action = _undo_action(gh, record, recorded)
         except GithubError as error:
             raise (Stopped if wrote else Refused)(f"GitHub read failed: {error}", "Run undo again") from error
         if action is None:
@@ -2567,7 +2584,8 @@ def command_undo(context: Context) -> int:
 Step = tuple[str, str, object, tuple[int, ...]]
 
 
-def _undo_action(gh: Github, record: Mapping[str, Any]) -> tuple[str, list[Step]] | None:
+def _undo_action(gh: Github, record: Mapping[str, Any], recorded: Iterable[int]) -> tuple[str, list[Step]] | None:
+    """recorded: Issues another creation record already names; an unrecorded creation is never one of them."""
     op = record["op"]
     prefix = gh.prefix
     if op == "label.create":
@@ -2578,7 +2596,7 @@ def _undo_action(gh: Github, record: Mapping[str, Any]) -> tuple[str, list[Step]
     if op == "issue.create":
         number = record.get("number")
         if not isinstance(number, int):
-            number = _created_without_record(gh, record)
+            number = _created_without_record(gh, record, recorded)
             if number is None:
                 return None
         issue = gh.read(f"{prefix}/issues/{number}").body
@@ -2622,12 +2640,11 @@ def _undo_action(gh: Github, record: Mapping[str, Any]) -> tuple[str, list[Step]
     return None
 
 
-def _created_without_record(gh: Github, record: Mapping[str, Any]) -> int | None:
+def _created_without_record(gh: Github, record: Mapping[str, Any], recorded: Iterable[int]) -> int | None:
     """The open Issue an interrupted register created, found as register finds it."""
+    title, since = str(record.get("title") or ""), str(record.get("at") or "")
     found = [
-        facts
-        for facts in created_issues(gh, record["label"], str(record.get("title") or ""), str(record.get("at") or ""))
-        if facts.state == "open"
+        facts for facts in created_issues(gh, record["label"], title, since, exclude=recorded) if facts.state == "open"
     ]
     if len(found) > 1:
         raise _ambiguous_creation(found, False, "undo --apply")

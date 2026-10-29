@@ -491,3 +491,11 @@ def test_export_legacy_stops_before_writing_when_the_catalog_cannot_nest_back(
         assert code == 2, result
         assert expected in {item["code"] for item in result["anomalies"]}
     assert refs(legacy.remote) == before
+
+
+def test_a_lone_backtick_does_not_hide_links_in_later_paragraphs() -> None:
+    module = migrate_module()
+    text = "Press the ` key.\n\n[epic](../../requirement.md) and `code`\n"
+    payload, links = _rewrite(module, text.encode(), f"{ISSUE}/plan.md", "00000-00999/iss-00003/plan.md")
+    assert payload.decode() == "Press the ` key.\n\n[epic](../epic-00002/requirement.md) and `code`\n"
+    assert [link.text for link in links] == ["../../requirement.md"]
