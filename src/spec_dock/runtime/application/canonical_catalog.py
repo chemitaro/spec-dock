@@ -393,6 +393,21 @@ class CatalogChanges:
         return staging_directory(self.catalog)
 
 
+def require_writable_format(catalog: Path) -> None:
+    """Stop before any write when the catalog's canonical format is missing or newer than this SpecDock writes."""
+    try:
+        version = read_format((catalog / FORMAT_FILE).read_bytes())
+    except OSError:  # missing or unreadable, as canonical link and status treat it
+        version = None
+    if not format_writable(version):
+        raise CanonicalCommandError(
+            CANONICAL_FORMAT_UNSUPPORTED,
+            f"the catalog declares canonical format {version!r}; this SpecDock writes format 1",
+            recovery=(FORMAT_MISSING_RECOVERY if version is None else FORMAT_UNSUPPORTED_RECOVERY,),
+            details={"catalog": str(catalog), "format": version},
+        )
+
+
 @contextmanager
 def catalog_changes(
     catalog: Path,
@@ -410,17 +425,7 @@ def catalog_changes(
             CANONICAL_LOCK_BUSY, str(error), recovery=(LOCK_BUSY_RECOVERY,), details={"catalog": str(catalog)}
         ) from error
     try:
-        try:
-            version = read_format((catalog / FORMAT_FILE).read_bytes())
-        except OSError:  # missing or unreadable, as canonical link and status treat it
-            version = None
-        if not format_writable(version):
-            raise CanonicalCommandError(
-                CANONICAL_FORMAT_UNSUPPORTED,
-                f"the catalog declares canonical format {version!r}; this SpecDock writes format 1",
-                recovery=(FORMAT_MISSING_RECOVERY if version is None else FORMAT_UNSUPPORTED_RECOVERY,),
-                details={"catalog": str(catalog), "format": version},
-            )
+        require_writable_format(catalog)
         changes = CatalogChanges(catalog)
         try:
             yield changes

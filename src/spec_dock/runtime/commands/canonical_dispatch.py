@@ -14,6 +14,8 @@ from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
 from spec_dock.runtime.application.canonical_remove import run_canonical_remove
 from spec_dock.runtime.application.canonical_resume import run_canonical_resume
+from spec_dock.runtime.application.canonical_scope_change import delete_scope, edit_scope, lifecycle_scope, move_scope
+from spec_dock.runtime.application.canonical_scope_create import create_scope, import_scope
 from spec_dock.runtime.application.canonical_scope_read import (
     clear_active,
     list_scope,
@@ -75,6 +77,17 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "workspace sync": sync_workspace,
     "workspace validate": validate_workspace,
     "workspace doctor": diagnose_workspace,
+    "scope create initiative": create_scope,
+    "scope create epic": create_scope,
+    "scope create issue": create_scope,
+    "scope import github initiative": import_scope,
+    "scope import github epic": import_scope,
+    "scope import github issue": import_scope,
+    "scope edit": edit_scope,
+    "scope move": move_scope,
+    "scope close": lifecycle_scope,
+    "scope reopen": lifecycle_scope,
+    "scope delete": delete_scope,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

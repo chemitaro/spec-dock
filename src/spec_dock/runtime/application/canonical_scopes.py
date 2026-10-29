@@ -171,6 +171,13 @@ def load_canonical_scopes(
         )
     else:
         fresh = service.refresh() if refresh else service.ensure_fresh("display")
+    return assemble_canonical_scopes(context, repository, fresh, catalog)
+
+
+def assemble_canonical_scopes(
+    context: ProjectContext, repository: GithubRepository, fresh: FreshSnapshot, catalog: LinkedCatalog | None
+) -> CanonicalScopes:
+    """Scope views and catalog directories for an already checked snapshot (reading and writing sides alike)."""
     snapshot = fresh.require()
     directories: dict[str, ScopeDirectory] = {}
     ambiguous: dict[str, tuple[ScopeDirectory, ...]] = {}
