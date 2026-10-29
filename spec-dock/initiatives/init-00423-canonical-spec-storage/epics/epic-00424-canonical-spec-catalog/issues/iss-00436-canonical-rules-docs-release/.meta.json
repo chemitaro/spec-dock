@@ -11,10 +11,11 @@
     "iss-00430",
     "iss-00431",
     "iss-00432",
-    "iss-00433",
     "iss-00434",
     "iss-00435",
-    "iss-00438"
+    "iss-00438",
+    "iss-00456",
+    "iss-00460"
   ],
   "backend": "github",
   "github": {
@@ -23,5 +24,5 @@
     "repo_name": "spec-dock"
   },
   "lifecycle": null,
-  "revision": 7
+  "revision": 10
 }

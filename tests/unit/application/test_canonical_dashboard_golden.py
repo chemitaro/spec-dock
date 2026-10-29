@@ -49,7 +49,7 @@ def _sample_world() -> FakeGithub:
             indent, scope, title = package.groups()
             kind = "initiative" if len(indent) == 2 else "epic"
             parent = None if kind == "initiative" else parents[2]
-            fake.scope(kind, slug=f"s{_number(scope)}", title=title, number=_number(scope), parent=parent)
+            fake.scope(kind, title=title, number=_number(scope), parent=parent)
             parents[len(indent)] = _number(scope)
             continue
         rectangle = _RECTANGLE.match(line)
@@ -58,7 +58,6 @@ def _sample_world() -> FakeGithub:
             done = state == "DONE"
             fake.scope(
                 "issue",
-                slug=f"s{_number(scope)}",
                 title=titles.get(scope, f"Done {scope}"),
                 number=_number(scope),
                 parent=parents[4],
@@ -93,9 +92,9 @@ def test_the_five_files_equal_the_samples_except_the_observability_line(tmp_path
 
 def test_japanese_and_quoted_titles_are_escaped_as_plantuml_strings(tmp_path: Path) -> None:
     fake = FakeGithub("example/repo")
-    initiative = fake.scope("initiative", slug="plan", title='仕様の "正本" を集める')
-    epic = fake.scope("epic", slug="core", title="ダッシュボード\\作り直し", parent=initiative.number)
-    fake.scope("issue", slug="leaf", title="日本語の題名", parent=epic.number, labels=("spec-dock:in-progress",))
+    initiative = fake.scope("initiative", title='仕様の "正本" を集める')
+    epic = fake.scope("epic", title="ダッシュボード\\作り直し", parent=initiative.number)
+    fake.scope("issue", title="日本語の題名", parent=epic.number, labels=("spec-dock:in-progress",))
     drawn = _drawn(fake, tmp_path)
     assert 'package "init-00001\\n仕様の \\"正本\\" を集める" as Ninit_00001 {' in drawn["tree.puml"]
     assert 'package "epic-00002\\nダッシュボード\\\\作り直し" as Nepic_00002 {' in drawn["tree-all.puml"]

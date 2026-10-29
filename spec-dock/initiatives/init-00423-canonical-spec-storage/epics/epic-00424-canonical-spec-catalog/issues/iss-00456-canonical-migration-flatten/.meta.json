@@ -1,0 +1,22 @@
+{
+  "schema_version": 3,
+  "type": "issue",
+  "id": "iss-00456",
+  "title": "Flatten Specs In Canonical Migration Script",
+  "slug": "canonical-migration-flatten",
+  "parent_id": "epic-00424",
+  "initiative_id": "init-00423",
+  "epic_id": "epic-00424",
+  "depends_on": [
+    "iss-00455",
+    "iss-00460"
+  ],
+  "backend": "github",
+  "github": {
+    "issue_number": 456,
+    "repo_owner": "chemitaro",
+    "repo_name": "spec-dock"
+  },
+  "lifecycle": null,
+  "revision": 2
+}

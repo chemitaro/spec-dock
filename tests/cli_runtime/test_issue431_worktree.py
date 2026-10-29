@@ -17,8 +17,8 @@ if TYPE_CHECKING:
 @pytest.fixture
 def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CanonicalWorld:
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "plan")
-    world.scope("initiative", 2, "other")
+    world.scope("initiative", 1, "Plan")
+    world.scope("initiative", 2, "Other")
     return world
 
 

@@ -1,4 +1,4 @@
-"""Canonical structure representation: labels, slug markers, IDs and the structure snapshot."""
+"""Canonical structure representation: labels, IDs, kind changes and the structure snapshot."""
 
 from __future__ import annotations
 
@@ -8,61 +8,6 @@ import pytest
 
 if TYPE_CHECKING:
     from collections.abc import Callable
-
-from spec_dock.runtime.domain.canonical_structure import (
-    SlugMarker,
-    append_slug_marker,
-    format_slug_marker,
-    read_slug_marker,
-)
-
-
-@pytest.mark.parametrize(
-    "body",
-    [
-        "Plan text.\n\n<!-- spec-dock:slug=core-api -->\n",
-        "Plan text.\r\n\r\n<!-- spec-dock:slug=core-api -->\r\n",
-        "<!-- spec-dock:slug=core-api -->\nEdited later in the GitHub UI.\n",
-        "Intro\r\n<!-- spec-dock:slug=core-api -->   \r\nOutro",
-    ],
-)
-def test_one_marker_anywhere_in_the_body_gives_the_slug(body: str) -> None:
-    assert read_slug_marker(body) == SlugMarker("core-api", None)
-
-
-@pytest.mark.parametrize(
-    ("body", "code"),
-    [
-        (None, "SLUG_MARKER_MISSING"),
-        ("", "SLUG_MARKER_MISSING"),
-        ("No marker here.", "SLUG_MARKER_MISSING"),
-        ("  <!-- spec-dock:slug=core-api -->", "SLUG_MARKER_MISSING"),
-        ("Inline <!-- spec-dock:slug=core-api --> text", "SLUG_MARKER_MISSING"),
-        ("<!-- spec-dock:slug=a -->\n<!-- spec-dock:slug=b -->", "SLUG_MARKER_MULTIPLE"),
-        ("<!-- spec-dock:slug=a -->\r\n<!-- spec-dock:slug=a -->", "SLUG_MARKER_MULTIPLE"),
-        ("<!-- spec-dock:slug=Core_API -->", "SLUG_MARKER_INVALID"),
-        ("<!-- spec-dock:slug= -->", "SLUG_MARKER_INVALID"),
-        ("<!-- spec-dock:slug=trailing- -->", "SLUG_MARKER_INVALID"),
-    ],
-)
-def test_marker_anomalies_are_reported_without_a_slug(body: str | None, code: str) -> None:
-    assert read_slug_marker(body) == SlugMarker(None, code)
-
-
-def test_append_places_one_marker_at_the_end_and_round_trips() -> None:
-    assert format_slug_marker("core-api") == "<!-- spec-dock:slug=core-api -->"
-    assert append_slug_marker("Plan text.\n\n", "core-api") == "Plan text.\n\n<!-- spec-dock:slug=core-api -->\n"
-    assert append_slug_marker("", "core-api") == "<!-- spec-dock:slug=core-api -->\n"
-    assert read_slug_marker(append_slug_marker("Body", "core-api")).slug == "core-api"
-
-
-@pytest.mark.parametrize(
-    ("body", "slug"),
-    [("<!-- spec-dock:slug=old -->", "core-api"), ("Body", "Not_Valid"), ("Body", "")],
-)
-def test_append_refuses_an_existing_marker_or_an_invalid_slug(body: str, slug: str) -> None:
-    with pytest.raises(ValueError):
-        append_slug_marker(body, slug)
 
 
 def test_kind_labels_and_label_definitions_are_fixed_values() -> None:
@@ -103,11 +48,38 @@ def test_scope_ids_use_the_padded_issue_number() -> None:
     assert scope_id("initiative", 423) == "init-00423"
     assert scope_id("epic", 424) == "epic-00424"
     assert scope_id("issue", 123456) == "iss-123456"
+    assert scope_id("issue", 1) == "iss-00001"
+    assert scope_id("issue", 99999) == "iss-99999"
+    assert scope_id("issue", 100000) == "iss-100000"
     assert parse_scope_id("iss-00428") == ("issue", 428)
-    assert parse_scope_id("EPIC-00424") == ("epic", 424)
-    for invalid in ("init-local-00002", "adr-00001", "iss-", "428", "iss-0000x"):
-        with pytest.raises(ValueError):
-            parse_scope_id(invalid)
+    assert parse_scope_id(" EPIC-00424 ") == ("epic", 424)
+    assert parse_scope_id("iss-100000") == ("issue", 100000)
+    assert parse_scope_id("iss-123456") == ("issue", 123456)
+
+
+@pytest.mark.parametrize(
+    "invalid",
+    [
+        "init-local-00002",
+        "adr-00001",
+        "iss-",
+        "428",
+        "iss-0000x",
+        "iss-454",
+        "iss-0454",
+        "iss-000454",
+        "iss-00000",
+        "iss-00454-foo",
+        "issue-00454",
+    ],
+)
+def test_names_outside_the_epic_id_pattern_are_not_ids(invalid: str) -> None:
+    from spec_dock.runtime.domain.canonical_structure import parse_scope_id
+    from spec_dock.runtime.domain.ids import CANONICAL_ID_RE
+
+    with pytest.raises(ValueError):
+        parse_scope_id(invalid)
+    assert CANONICAL_ID_RE.pattern == r"^(init|epic|iss)-(?:[0-9]{5}|[1-9][0-9]{5,})$"
 
 
 REPOSITORY = "github.com/example/repo"
@@ -115,14 +87,13 @@ FETCHED_AT = "2026-10-26T00:10:00Z"
 STARTED_AT = "2026-10-26T00:09:58Z"
 
 
-def _facts(number: int, *labels: str, body: str | None = None, state: str = "open", reason: str | None = None):
+def _facts(number: int, *labels: str, state: str = "open", reason: str | None = None):
     from spec_dock.runtime.domain.canonical_structure import IssueFacts
 
     return IssueFacts(
         number=number,
         database_id=1_000_000 + number * 7,
         title=f"Title {number}",
-        body=body,
         state=state,
         state_reason=reason,
         labels=labels,
@@ -140,15 +111,13 @@ def _ref(number: int, repository: str = "example/repo", *, title: str | None = N
     return RelatedIssue(number, repository, title, state)
 
 
-def _scope(number: int, kind: str, slug: str | None, *, parent=None, children=(), blocked_by=(), extra=(), **facts):
+def _scope(number: int, kind: str, *, parent=None, children=(), blocked_by=(), extra=(), **facts):
+    """A fetched Scope Issue; its body is never read, so none is modelled."""
     from spec_dock.runtime.domain.canonical_structure import FetchedIssue
 
-    body = facts.pop("body", None)
-    if body is None and slug is not None:
-        body = f"Body {number}\n\n<!-- spec-dock:slug={slug} -->\n"
     labels = (f"spec-dock:{kind}", *extra) if kind else extra
     return FetchedIssue(
-        _facts(number, *labels, body=body, **facts),
+        _facts(number, *labels, **facts),
         parent,
         tuple(children),
         tuple(blocked_by),
@@ -161,24 +130,35 @@ def _build(*issues):
     return build_snapshot(REPOSITORY, issues, fetched_at=FETCHED_AT, fetch_started_at=STARTED_AT)
 
 
+def test_a_kind_label_alone_gives_the_id_and_no_body_or_slug_is_kept() -> None:
+    import dataclasses
+
+    from spec_dock.runtime.domain.canonical_structure import IssueFacts, ScopeNode
+
+    snapshot = _build(_scope(1, "initiative"), _scope(100000, "issue", parent=_ref(1)))
+    assert [node.id for node in snapshot.scopes] == ["init-00001", "iss-100000"]
+    assert "body" not in {field.name for field in dataclasses.fields(IssueFacts)}
+    assert "slug" not in {field.name for field in dataclasses.fields(ScopeNode)}
+    assert all("slug" not in item and "body" not in item for item in snapshot.to_json()["issues"].values())
+
+
 def test_valid_structure_builds_ids_relations_external_and_reverse_edges() -> None:
     snapshot = _build(
-        _scope(1, "initiative", "plan", children=[_ref(2)]),
-        _scope(2, "epic", "core", parent=_ref(1), children=[_ref(5), _ref(3)]),
+        _scope(1, "initiative", children=[_ref(2)]),
+        _scope(2, "epic", parent=_ref(1), children=[_ref(5), _ref(3)]),
         _scope(
             3,
             "issue",
-            "first-step",
             parent=_ref(2),
             blocked_by=[_ref(5), _ref(4, title="Vendor fix", state="OPEN")],
             extra=("spec-dock:in-progress", "bug"),
         ),
-        _scope(5, "issue", "second-step", parent=_ref(2), state="closed", reason="completed"),
+        _scope(5, "issue", parent=_ref(2), state="closed", reason="completed"),
     )
     assert snapshot.anomalies == ()
     assert [node.id for node in snapshot.scopes] == ["init-00001", "epic-00002", "iss-00003", "iss-00005"]
     epic = snapshot.issues[2]
-    assert epic.sub_issues == (5, 3) and epic.parent == 1 and epic.kind == "epic" and epic.slug == "core"
+    assert epic.sub_issues == (5, 3) and epic.parent == 1 and epic.kind == "epic"
     third = snapshot.find("iss-00003")
     assert third is not None and third.blocked_by == (4, 5) and third.in_progress is True
     assert third.labels == ("bug", "spec-dock:in-progress", "spec-dock:issue")
@@ -190,7 +170,6 @@ def test_valid_structure_builds_ids_relations_external_and_reverse_edges() -> No
         "database_id": 1_000_021,
         "id": "iss-00003",
         "kind": "issue",
-        "slug": "first-step",
         "title": "Title 3",
         "state": "open",
         "state_reason": None,
@@ -215,43 +194,38 @@ def _codes(snapshot) -> set[tuple[int, str]]:
 
 def test_rule_violations_are_anomalies_and_undetermined_scopes_have_no_id() -> None:
     snapshot = _build(
-        _scope(1, "initiative", "plan"),
-        _scope(2, "epic", "core", parent=_ref(1)),
-        _scope(3, "issue", "leaf", parent=_ref(2)),
-        _scope(10, "epic", "double", parent=_ref(1), extra=("spec-dock:issue",)),
-        _scope(11, "epic", None, parent=_ref(1), body="No marker"),
-        _scope(12, "epic", None, parent=_ref(1), body="<!-- spec-dock:slug=a -->\n<!-- spec-dock:slug=b -->"),
-        _scope(13, "epic", "under-issue", parent=_ref(3)),
-        _scope(14, "issue", "orphan"),
-        _scope(15, "initiative", "nested", parent=_ref(1)),
-        _scope(16, "issue", "under-plain", parent=_ref(99)),
+        _scope(1, "initiative"),
+        _scope(2, "epic", parent=_ref(1)),
+        _scope(3, "issue", parent=_ref(2)),
+        _scope(10, "epic", parent=_ref(1), extra=("spec-dock:issue",)),
+        _scope(13, "epic", parent=_ref(3)),
+        _scope(14, "issue"),
+        _scope(15, "initiative", parent=_ref(1)),
+        _scope(16, "issue", parent=_ref(99)),
     )
     assert _codes(snapshot) == {
         (10, "KIND_LABEL_MULTIPLE"),
-        (11, "SLUG_MARKER_MISSING"),
-        (12, "SLUG_MARKER_MULTIPLE"),
         (13, "PARENT_INVALID"),
         (14, "PARENT_MISSING"),
         (15, "PARENT_INVALID"),
         (16, "PARENT_INVALID"),
     }
-    assert (snapshot.issues[10].kind, snapshot.issues[10].id, snapshot.issues[10].slug) == (None, None, None)
-    assert (snapshot.issues[11].kind, snapshot.issues[11].id, snapshot.issues[11].slug) == ("epic", None, None)
-    assert snapshot.issues[12].id is None and snapshot.issues[13].id == "epic-00013"
+    assert (snapshot.issues[10].kind, snapshot.issues[10].id) == (None, None)
+    assert snapshot.issues[13].id == "epic-00013"
     assert all(anomaly.message for anomaly in snapshot.anomalies)
     assert snapshot.anomalies_for(14)[0].code == "PARENT_MISSING"
 
 
 def test_dependency_rules_report_invalid_edges_and_every_cycle_member() -> None:
     snapshot = _build(
-        _scope(1, "initiative", "plan"),
-        _scope(2, "epic", "core", parent=_ref(1), blocked_by=[_ref(3)]),
-        _scope(3, "issue", "child", parent=_ref(2)),
-        _scope(4, "issue", "self", parent=_ref(2), blocked_by=[_ref(4)]),
-        _scope(5, "epic", "other", parent=_ref(1)),
-        _scope(6, "issue", "loop-a", parent=_ref(5), blocked_by=[_ref(7)]),
-        _scope(7, "issue", "loop-b", parent=_ref(5), blocked_by=[_ref(6)]),
-        _scope(8, "issue", "fine", parent=_ref(5), blocked_by=[_ref(3)]),
+        _scope(1, "initiative"),
+        _scope(2, "epic", parent=_ref(1), blocked_by=[_ref(3)]),
+        _scope(3, "issue", parent=_ref(2)),
+        _scope(4, "issue", parent=_ref(2), blocked_by=[_ref(4)]),
+        _scope(5, "epic", parent=_ref(1)),
+        _scope(6, "issue", parent=_ref(5), blocked_by=[_ref(7)]),
+        _scope(7, "issue", parent=_ref(5), blocked_by=[_ref(6)]),
+        _scope(8, "issue", parent=_ref(5), blocked_by=[_ref(3)]),
     )
     assert _codes(snapshot) == {
         (2, "DEPENDENCY_INVALID"),
@@ -264,11 +238,11 @@ def test_dependency_rules_report_invalid_edges_and_every_cycle_member() -> None:
 
 def test_inherited_dependency_cycle_through_a_parent_is_reported() -> None:
     snapshot = _build(
-        _scope(1, "initiative", "plan"),
-        _scope(2, "epic", "first", parent=_ref(1), blocked_by=[_ref(3)]),
-        _scope(3, "epic", "second", parent=_ref(1)),
-        _scope(4, "issue", "first-leaf", parent=_ref(2)),
-        _scope(5, "issue", "second-leaf", parent=_ref(3), blocked_by=[_ref(4)]),
+        _scope(1, "initiative"),
+        _scope(2, "epic", parent=_ref(1), blocked_by=[_ref(3)]),
+        _scope(3, "epic", parent=_ref(1)),
+        _scope(4, "issue", parent=_ref(2)),
+        _scope(5, "issue", parent=_ref(3), blocked_by=[_ref(4)]),
     )
     assert {code for _, code in _codes(snapshot)} == {"DEPENDENCY_CYCLE"}
     assert {number for number, _ in _codes(snapshot)} == {3, 4, 5}
@@ -276,9 +250,9 @@ def test_inherited_dependency_cycle_through_a_parent_is_reported() -> None:
 
 def test_foreign_relations_stay_out_of_every_relation_and_become_anomalies() -> None:
     snapshot = _build(
-        _scope(1, "initiative", "plan", children=[_ref(2), _ref(9, "other/repo")]),
-        _scope(2, "epic", "core", parent=_ref(1), blocked_by=[_ref(4, "other/repo", title="Away", state="OPEN")]),
-        _scope(3, "issue", "moved", parent=_ref(7, "other/repo")),
+        _scope(1, "initiative", children=[_ref(2), _ref(9, "other/repo")]),
+        _scope(2, "epic", parent=_ref(1), blocked_by=[_ref(4, "other/repo", title="Away", state="OPEN")]),
+        _scope(3, "issue", parent=_ref(7, "other/repo")),
     )
     assert _codes(snapshot) == {
         (1, "SUB_ISSUE_FOREIGN_REPOSITORY"),
@@ -295,10 +269,10 @@ def test_foreign_relations_stay_out_of_every_relation_and_become_anomalies() -> 
 
 def _sample():
     return _build(
-        _scope(1, "initiative", "plan"),
-        _scope(2, "epic", "core", parent=_ref(1), children=[_ref(3)]),
-        _scope(3, "issue", "leaf", parent=_ref(2), blocked_by=[_ref(4, title="Plain", state="CLOSED")]),
-        _scope(9, "issue", None, parent=_ref(2), body="no marker"),
+        _scope(1, "initiative"),
+        _scope(2, "epic", parent=_ref(1), children=[_ref(3)]),
+        _scope(3, "issue", parent=_ref(2), blocked_by=[_ref(4, title="Plain", state="CLOSED")]),
+        _scope(9, "issue", parent=_ref(2), extra=("spec-dock:epic",)),
     )
 
 
@@ -313,7 +287,7 @@ def test_json_round_trip_keeps_every_field_and_the_version_one_shape() -> None:
     assert (payload["fetched_at"], payload["fetch_started_at"]) == (FETCHED_AT, STARTED_AT)
     assert list(payload["issues"]) == ["1", "2", "3", "9"]
     assert payload["anomalies"] == [
-        {"number": 9, "code": "SLUG_MARKER_MISSING", "message": payload["anomalies"][0]["message"]}
+        {"number": 9, "code": "KIND_LABEL_MULTIPLE", "message": payload["anomalies"][0]["message"]}
     ]
     assert payload["local_writes"] == []
     assert StructureSnapshot.from_json(payload) == snapshot
@@ -327,6 +301,10 @@ def test_json_round_trip_keeps_every_field_and_the_version_one_shape() -> None:
         lambda payload: payload.pop("external"),
         lambda payload: payload["issues"]["3"].pop("blocking"),
         lambda payload: payload["issues"]["3"].update(number="3"),
+        lambda payload: payload["issues"]["3"].update(slug="leaf"),
+        lambda payload: payload["issues"]["3"].update(id=None),
+        lambda payload: payload["issues"]["3"].update(id="epic-00003"),
+        lambda payload: payload["issues"]["9"].update(id="iss-00009"),
         lambda payload: payload["issues"]["3"].update(state="merged"),
         lambda payload: payload["issues"].update({"4": payload["issues"].pop("3")}),
         lambda payload: payload["anomalies"].append({"number": 1}),
@@ -348,19 +326,19 @@ def test_unknown_versions_and_malformed_documents_are_rejected(mutate: Callable[
 
 def _relations():
     return _build(
-        _scope(1, "initiative", "plan", children=[_ref(2), _ref(6)]),
-        _scope(2, "epic", "core", parent=_ref(1), children=[_ref(3)]),
-        _scope(3, "issue", "leaf", parent=_ref(2), blocked_by=[_ref(4, title="Plain", state="OPEN")]),
-        _scope(5, "issue", "after", parent=_ref(2), blocked_by=[_ref(3)]),
-        _scope(6, "epic", "spare", parent=_ref(1)),
-        _scope(8, "issue", "moved", parent=_ref(7, "other/repo")),
+        _scope(1, "initiative", children=[_ref(2), _ref(6)]),
+        _scope(2, "epic", parent=_ref(1), children=[_ref(3)]),
+        _scope(3, "issue", parent=_ref(2), blocked_by=[_ref(4, title="Plain", state="OPEN")]),
+        _scope(5, "issue", parent=_ref(2), blocked_by=[_ref(3)]),
+        _scope(6, "epic", parent=_ref(1)),
+        _scope(8, "issue", parent=_ref(7, "other/repo")),
     )
 
 
 def test_created_scope_and_parent_link_are_reflected_and_recorded() -> None:
     from spec_dock.runtime.domain.canonical_structure import SetParent, UpsertIssue, apply_changes
 
-    created = _scope(20, "epic", "new-epic").facts
+    created = _scope(20, "epic").facts
     snapshot = apply_changes(_relations(), [UpsertIssue(created)], at="2026-10-26T00:20:00Z", command="scope create")
     assert snapshot.find("epic-00020") is not None and (20, "PARENT_MISSING") in _codes(snapshot)
     snapshot = apply_changes(snapshot, [SetParent(20, 1)], at="2026-10-26T00:20:01Z", command="scope create")
@@ -378,17 +356,17 @@ def test_title_change_keeps_relations_and_kind_removal_turns_a_blocker_external(
     from spec_dock.runtime.domain.canonical_structure import UpsertIssue, apply_changes
 
     base = _relations()
-    facts = _scope(3, "issue", "leaf").facts
+    facts = _scope(3, "issue").facts
     renamed = apply_changes(
         base, [UpsertIssue(replace(facts, title="日本語の題名"))], at=FETCHED_AT, command="scope edit"
     )
     node = renamed.issues[3]
-    assert (node.title, node.parent, node.blocked_by, node.blocking, node.slug) == (
+    assert (node.id, node.title, node.parent, node.blocked_by, node.blocking) == (
+        "iss-00003",
         "日本語の題名",
         2,
         (4,),
         (5,),
-        "leaf",
     )
     removed = apply_changes(
         base, [UpsertIssue(replace(facts, labels=("bug",), state="closed"))], at=FETCHED_AT, command="scope delete"
@@ -427,27 +405,27 @@ def test_refresh_merge_keeps_writes_reflected_after_the_fetch_started() -> None:
 
     old = _relations()
     current = apply_changes(
-        old, [UpsertIssue(_scope(9, "issue", "gone").facts)], at="2026-10-26T00:05:00Z", command="scope create"
+        old, [UpsertIssue(_scope(9, "issue").facts)], at="2026-10-26T00:05:00Z", command="scope create"
     )
     current = apply_changes(
         current,
-        [UpsertIssue(replace(_scope(3, "issue", "leaf").facts, title="Renamed during fetch"))],
+        [UpsertIssue(replace(_scope(3, "issue").facts, title="Renamed during fetch"))],
         at="2026-10-26T00:09:58Z",
         command="scope edit",
     )
     current = apply_changes(
         current,
-        [UpsertIssue(_scope(20, "issue", "created-during-fetch").facts)],
+        [UpsertIssue(_scope(20, "issue").facts)],
         at="2026-10-26T00:09:59Z",
         command="scope create",
     )
     fresh = build_snapshot(
         REPOSITORY,
         [
-            _scope(1, "initiative", "plan"),
-            _scope(2, "epic", "core", parent=_ref(1), children=[_ref(3)]),
-            _scope(3, "issue", "leaf", parent=_ref(2)),
-            _scope(9, "issue", "gone", parent=_ref(2)),
+            _scope(1, "initiative"),
+            _scope(2, "epic", parent=_ref(1), children=[_ref(3)]),
+            _scope(3, "issue", parent=_ref(2)),
+            _scope(9, "issue", parent=_ref(2)),
         ],
         fetched_at=FETCHED_AT,
         fetch_started_at=STARTED_AT,
@@ -468,3 +446,61 @@ def test_dependency_violations_preview_a_new_edge_on_the_snapshot() -> None:
     assert {item.code for item in dependency_violations(snapshot, 3, 2)} == {"DEPENDENCY_INVALID"}
     assert {item.code for item in dependency_violations(snapshot, 3, 3)} == {"DEPENDENCY_INVALID"}
     assert snapshot.issues[3].blocked_by == (4,)
+
+
+def _kinds():
+    return _build(
+        _scope(1, "initiative"),
+        _scope(2, "epic", parent=_ref(1)),
+        _scope(454, "epic", parent=_ref(1)),
+        _scope(455, "issue", parent=_ref(2)),
+        _scope(456, "issue", parent=_ref(2), extra=("spec-dock:epic",)),
+    )
+
+
+def test_a_catalog_name_whose_number_github_now_gives_another_kind_is_a_kind_change() -> None:
+    from spec_dock.runtime.domain.canonical_structure import SCOPE_KIND_CHANGED, KindChange, kind_changes
+
+    names = ["init-00001", "epic-00002", "iss-00454", "init-00454", "iss-00455", "iss-00456", "iss-00999", "notes"]
+    assert SCOPE_KIND_CHANGED == "SCOPE_KIND_CHANGED"
+    assert kind_changes(_kinds(), names) == {454: KindChange(454, "epic-00454", ("init-00454", "iss-00454"))}
+    assert kind_changes(_kinds(), ["epic-00454", "iss-00454"])[454].directories == ("iss-00454",)
+    assert kind_changes(_kinds(), ["epic-00454", "iss-00455-old", "iss-000455"]) == {}
+
+
+def test_an_old_id_resolves_to_the_scope_github_now_gives_that_number() -> None:
+    from spec_dock.runtime.domain.canonical_structure import renamed_scope
+
+    snapshot = _kinds()
+    found = renamed_scope(snapshot, "iss-00454")
+    assert found is not None and found.id == "epic-00454"
+    assert renamed_scope(snapshot, " ISS-00454 ") is found
+    for unchanged in ("epic-00454", "iss-00455", "iss-00456", "epic-00456", "iss-00999", "iss-454", "@current"):
+        assert renamed_scope(snapshot, unchanged) is None
+
+
+@pytest.mark.parametrize(
+    ("branch", "expected"),
+    [
+        ("iss-00454", True),
+        ("iss-00454-foo", True),
+        ("chemitaro/iss-00454-foo", True),
+        ("team/a/iss-00454", True),
+        ("iss-004541", False),
+        ("iss-00454foo", False),
+        ("epic-00454", False),
+        ("iss-00454/foo", False),
+        ("x-iss-00454", False),
+    ],
+)
+def test_a_branch_names_a_scope_by_its_last_segment(branch: str, expected: bool) -> None:
+    from spec_dock.runtime.domain.canonical_structure import branch_names_scope
+
+    assert branch_names_scope(branch, "iss-00454") is expected
+
+
+def test_branch_matching_needs_a_canonical_id() -> None:
+    from spec_dock.runtime.domain.canonical_structure import branch_names_scope
+
+    with pytest.raises(ValueError):
+        branch_names_scope("iss-454", "iss-454")

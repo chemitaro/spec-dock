@@ -10,6 +10,8 @@ ID_RE = re.compile(r"^(?P<prefix>init|epic|iss|adr)(?:-(?P<local>local))?-(?P<nu
 NUM_RE = re.compile(r"^[0-9]+$")
 INPUT_TITLE_RE = re.compile(r"^[A-Za-z0-9]+(?: [A-Za-z0-9]+)*$")
 INPUT_SLUG_KEBAB_RE = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
+# Canonical-mode Scope IDs (Epic design ch. 2): five digits zero-padded, longer numbers never start with 0.
+CANONICAL_ID_RE = re.compile(r"^(init|epic|iss)-(?:[0-9]{5}|[1-9][0-9]{5,})$")
 
 
 def validate_lowercase(value: str, *, field: str) -> str:

@@ -1,14 +1,13 @@
-"""GitHub structure representation for canonical mode: labels, slug markers, IDs and the structure snapshot."""
+"""GitHub structure representation for canonical mode: labels, IDs, kind changes and the structure snapshot."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-import re
 from typing import TYPE_CHECKING, Final, Literal, cast
 
 from spec_dock.runtime.domain.dependency_vnext import dependency_listing, validate_dependency_graph
-from spec_dock.runtime.domain.ids import INPUT_SLUG_KEBAB_RE, format_id
+from spec_dock.runtime.domain.ids import CANONICAL_ID_RE, format_id
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping, Sequence
@@ -29,9 +28,7 @@ SNAPSHOT_VERSION: Final = 1
 GITHUB_HOST: Final = "github.com"
 
 KIND_LABEL_MULTIPLE = "KIND_LABEL_MULTIPLE"
-SLUG_MARKER_MISSING = "SLUG_MARKER_MISSING"
-SLUG_MARKER_MULTIPLE = "SLUG_MARKER_MULTIPLE"
-SLUG_MARKER_INVALID = "SLUG_MARKER_INVALID"
+SCOPE_KIND_CHANGED: Final = "SCOPE_KIND_CHANGED"
 PARENT_FOREIGN_REPOSITORY = "PARENT_FOREIGN_REPOSITORY"
 SUB_ISSUE_FOREIGN_REPOSITORY = "SUB_ISSUE_FOREIGN_REPOSITORY"
 DEPENDENCY_FOREIGN_REPOSITORY = "DEPENDENCY_FOREIGN_REPOSITORY"
@@ -40,12 +37,7 @@ PARENT_INVALID = "PARENT_INVALID"
 DEPENDENCY_INVALID = "DEPENDENCY_INVALID"
 DEPENDENCY_CYCLE = "DEPENDENCY_CYCLE"
 # Element anomalies travel with one Issue's facts; structure anomalies are recomputed from the whole snapshot.
-FACT_ANOMALY_CODES: Final = frozenset({
-    KIND_LABEL_MULTIPLE,
-    SLUG_MARKER_MISSING,
-    SLUG_MARKER_MULTIPLE,
-    SLUG_MARKER_INVALID,
-})
+FACT_ANOMALY_CODES: Final = frozenset({KIND_LABEL_MULTIPLE})
 RELATION_ANOMALY_CODES: Final = frozenset({
     PARENT_FOREIGN_REPOSITORY,
     SUB_ISSUE_FOREIGN_REPOSITORY,
@@ -53,9 +45,6 @@ RELATION_ANOMALY_CODES: Final = frozenset({
 })
 ELEMENT_ANOMALY_CODES: Final = FACT_ANOMALY_CODES | RELATION_ANOMALY_CODES
 _DEPENDENCY_CODES: Final = frozenset({DEPENDENCY_INVALID, DEPENDENCY_CYCLE})
-
-_LINE_BREAK = re.compile(r"\r?\n")
-_MARKER_LINE = re.compile(r"^<!-- spec-dock:slug=(.*) -->$")
 
 
 @dataclass(frozen=True)
@@ -73,7 +62,6 @@ LABEL_DEFINITIONS: Final = (
 )
 _KINDS_BY_LABEL: Final[Mapping[str, ScopeKind]] = {label: kind for kind, label in KIND_LABELS.items()}
 _KINDS_BY_PREFIX: Final[Mapping[str, ScopeKind]] = {prefix: kind for kind, prefix in ID_PREFIXES.items()}
-_SCOPE_ID = re.compile(r"^(init|epic|iss)-([0-9]+)$")
 
 
 def kind_from_labels(labels: Iterable[str]) -> tuple[ScopeKind | None, str | None]:
@@ -92,47 +80,20 @@ def scope_id(kind: ScopeKind, number: int) -> str:
 
 def parse_scope_id(value: str) -> tuple[ScopeKind, int]:
     """Parse a GitHub-numbered Scope ID; local IDs do not exist in canonical mode."""
-    matched = _SCOPE_ID.fullmatch(value.strip().lower())
-    if matched is None or int(matched.group(2)) <= 0:
+    text = value.strip().lower()
+    matched = CANONICAL_ID_RE.fullmatch(text)
+    number = int(text.partition("-")[2]) if matched is not None else 0
+    if matched is None or number <= 0:
         raise ValueError(f"not a canonical Scope ID: {value!r}")
-    return _KINDS_BY_PREFIX[matched.group(1)], int(matched.group(2))
+    return _KINDS_BY_PREFIX[matched.group(1)], number
 
 
-@dataclass(frozen=True)
-class SlugMarker:
-    slug: str | None
-    anomaly: str | None
-
-
-def read_slug_marker(body: str | None) -> SlugMarker:
-    """Find exactly one marker line anywhere in the body; GitHub UI edits may use CRLF."""
-    values = [
-        matched.group(1)
-        for line in _LINE_BREAK.split(body or "")
-        if (matched := _MARKER_LINE.fullmatch(line.rstrip())) is not None
-    ]
-    if not values:
-        return SlugMarker(None, SLUG_MARKER_MISSING)
-    if len(values) > 1:
-        return SlugMarker(None, SLUG_MARKER_MULTIPLE)
-    if INPUT_SLUG_KEBAB_RE.fullmatch(values[0]) is None:
-        return SlugMarker(None, SLUG_MARKER_INVALID)
-    return SlugMarker(values[0], None)
-
-
-def format_slug_marker(slug: str) -> str:
-    if INPUT_SLUG_KEBAB_RE.fullmatch(slug) is None:
-        raise ValueError("slug must use lowercase letters, digits and single hyphens")
-    return f"<!-- spec-dock:slug={slug} -->"
-
-
-def append_slug_marker(body: str, slug: str) -> str:
-    """Place the creation-time marker at the end of a body that has none yet."""
-    marker = format_slug_marker(slug)
-    if read_slug_marker(body).anomaly != SLUG_MARKER_MISSING:
-        raise ValueError("Issue body already has a slug marker")
-    text = body.rstrip("\r\n")
-    return f"{text}\n\n{marker}\n" if text else f"{marker}\n"
+def branch_names_scope(branch: str, scope_id: str) -> bool:
+    """A branch belongs to a Scope when its last segment is the ID or starts with `<ID>-` (Epic design ch. 7)."""
+    if CANONICAL_ID_RE.fullmatch(scope_id) is None:
+        raise ValueError(f"not a canonical Scope ID: {scope_id!r}")
+    name = branch.rpartition("/")[2]
+    return name == scope_id or name.startswith(f"{scope_id}-")
 
 
 def format_timestamp(value: datetime) -> str:
@@ -153,12 +114,11 @@ IssueState = Literal["open", "closed"]
 
 @dataclass(frozen=True)
 class IssueFacts:
-    """One Issue as GitHub reports it; the body is used only to read the slug marker."""
+    """One Issue as GitHub reports it; SpecDock keeps nothing in the body, so it is never read."""
 
     number: int
     database_id: int
     title: str
-    body: str | None
     state: str
     state_reason: str | None
     labels: tuple[str, ...]
@@ -193,7 +153,6 @@ class ScopeNode:
     database_id: int
     id: str | None
     kind: ScopeKind | None
-    slug: str | None
     title: str
     state: IssueState
     state_reason: str | None
@@ -229,6 +188,15 @@ class LocalWrite:
     at: str
     command: str
     numbers: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class KindChange:
+    """GitHub moved this number to another kind; `directories` are its catalog names of the old kinds."""
+
+    number: int
+    current_id: str
+    directories: tuple[str, ...]
 
 
 class SnapshotFormatError(ValueError):
@@ -305,7 +273,6 @@ _NODE_KEYS: Final = frozenset({
     "database_id",
     "id",
     "kind",
-    "slug",
     "title",
     "state",
     "state_reason",
@@ -433,22 +400,14 @@ def _node_from_json(raw: object) -> ScopeNode:
     kind = item["kind"]
     _require(kind is None or kind in KIND_LABELS, "kind is unknown")
     scope = _text(item["id"], "id", optional=True)
-    slug = _text(item["slug"], "slug", optional=True)
-    if scope is not None or slug is not None:
-        _require(
-            kind is not None
-            and scope == scope_id(cast("ScopeKind", kind), number)
-            and slug is not None
-            and INPUT_SLUG_KEBAB_RE.fullmatch(slug) is not None,
-            "id and slug do not match the kind and number",
-        )
+    expected = None if kind is None else scope_id(cast("ScopeKind", kind), number)
+    _require(scope == expected, "id does not match the kind and number")
     _require(isinstance(item["in_progress"], bool), "in_progress must be a boolean")
     return ScopeNode(
         number=number,
         database_id=cast("int", _integer(item["database_id"], "database_id")),
         id=scope,
         kind=cast("ScopeKind | None", kind),
-        slug=slug,
         title=cast("str", _text(item["title"], "title")),
         state=_state_value(item["state"]),
         state_reason=_text(item["state_reason"], "state_reason", optional=True),
@@ -472,7 +431,6 @@ def _node_json(node: ScopeNode) -> dict[str, object]:
         "database_id": node.database_id,
         "id": node.id,
         "kind": node.kind,
-        "slug": node.slug,
         "title": node.title,
         "state": node.state,
         "state_reason": node.state_reason,
@@ -513,17 +471,12 @@ def _node_from_facts(
     anomalies: list[StructureAnomaly] = []
     if kind_anomaly is not None:
         anomalies.append(_anomaly(number, kind_anomaly, f"#{number} has more than one spec-dock kind label; keep one"))
-    marker = read_slug_marker(facts.body)
-    if marker.anomaly is not None:
-        anomalies.append(_anomaly(number, marker.anomaly, _MARKER_MESSAGES[marker.anomaly].format(number=number)))
-    identified = kind is not None and marker.slug is not None
     labels = tuple(sorted(set(facts.labels)))
     node = ScopeNode(
         number=number,
         database_id=facts.database_id,
-        id=scope_id(kind, number) if identified and kind is not None else None,
+        id=None if kind is None else scope_id(kind, number),
         kind=kind,
-        slug=marker.slug if identified else None,
         title=facts.title,
         state=_state(facts.state),
         state_reason=facts.state_reason.lower() if facts.state_reason else None,
@@ -540,13 +493,6 @@ def _node_from_facts(
         closed_at=facts.closed_at,
     )
     return node, tuple(anomalies)
-
-
-_MARKER_MESSAGES: Final = {
-    SLUG_MARKER_MISSING: "#{number} has no '<!-- spec-dock:slug=SLUG -->' line in its body",
-    SLUG_MARKER_MULTIPLE: "#{number} has more than one slug marker line; keep exactly one",
-    SLUG_MARKER_INVALID: "#{number} has a slug marker whose slug is not lowercase letters, digits and hyphens",
-}
 
 
 def build_snapshot(
@@ -920,6 +866,38 @@ def merge_refresh(current: StructureSnapshot | None, fresh: StructureSnapshot) -
         if number in current.external:
             external[number] = current.external[number]
     return _finish(fresh.repository, fresh.fetched_at, fresh.fetch_started_at, issues, external, element, recent)
+
+
+def kind_changes(snapshot: StructureSnapshot, directory_ids: Iterable[str]) -> Mapping[int, KindChange]:
+    """Compare catalog `<ID>` names with the kind GitHub now gives the same number (Epic design ch. 2).
+
+    A number whose Issue is missing, or whose kind is undecided (KIND_LABEL_MULTIPLE), is not a kind change.
+    """
+    found: dict[int, list[str]] = {}
+    for name in directory_ids:
+        try:
+            _, number = parse_scope_id(name)
+        except ValueError:
+            continue
+        node = snapshot.issues.get(number)
+        if node is not None and node.id is not None and node.id != name:
+            found.setdefault(number, []).append(name)
+    return {
+        number: KindChange(number, cast("str", snapshot.issues[number].id), tuple(sorted(names)))
+        for number, names in sorted(found.items())
+    }
+
+
+def renamed_scope(snapshot: StructureSnapshot, scope_id: str) -> ScopeNode | None:
+    """The Scope now holding this ID's number under another kind; it decides an old ID from the snapshot alone."""
+    try:
+        _, number = parse_scope_id(scope_id)
+    except ValueError:
+        return None
+    node = snapshot.issues.get(number)
+    if node is None or node.id is None or node.id == scope_id.strip().lower():
+        return None
+    return node
 
 
 def dependency_violations(snapshot: StructureSnapshot, number: int, blocker: int) -> tuple[StructureAnomaly, ...]:

@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 @pytest.fixture
 def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CanonicalWorld:
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "plan", title="計画")
-    world.scope("epic", 2, "core", parent=1, title="中心")
-    world.scope("issue", 3, "leaf", parent=2, title="葉", state="closed", state_reason="completed")
+    world.scope("initiative", 1, title="計画")
+    world.scope("epic", 2, parent=1, title="中心")
+    world.scope("issue", 3, parent=2, title="葉", state="closed", state_reason="completed")
     return world
 
 
@@ -32,7 +32,7 @@ def test_scope_show_reports_github_title_state_directory_and_snapshot_time(world
         "epic-00002",
     )
     assert scope["status"]["state"] == "completed" and scope["state_reason"] == "completed"
-    assert scope["path"] == "spec-dock/initiatives/init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf"
+    assert scope["path"] == "spec-dock/initiatives/00000-00999/iss-00003"
     assert (scope["number"], scope["github_ref"], scope["directory_found"]) == (3, "gh:example/repo#3", True)
     snapshot = payload["data"]["result"]["snapshot"]
     assert snapshot["fetched_at"] and snapshot["stale"] is False
@@ -76,7 +76,7 @@ def test_unchanged_structure_reads_only_conditional_checks(world: CanonicalWorld
 
 
 def test_a_scope_without_a_directory_shows_a_null_path(world: CanonicalWorld) -> None:
-    world.scope("issue", 4, "orphan", parent=2, directory=False)
+    world.scope("issue", 4, parent=2, directory=False)
     code, payload = world.run("scope", "show", "iss-00004")
     assert code == 0
     assert payload["data"]["result"]["scope"]["path"] is None
@@ -130,9 +130,13 @@ def test_offline_without_a_snapshot_is_a_precondition_failure(world: CanonicalWo
     assert world.requests() == []
 
 
-def test_a_duplicated_directory_does_not_stop_listing(world: CanonicalWorld) -> None:
-    world.directory("issue", 3, "copy", parent=2)
+def test_a_leftover_named_or_nested_directory_is_never_a_scope_place(world: CanonicalWorld) -> None:
+    world.scope("issue", 4, parent=2, directory=False)
+    (world.catalog / "00000-00999/iss-00004-old").mkdir()
+    (world.catalog / "00000-00999/epic-00002/issues/iss-00004").mkdir(parents=True)
+    (world.catalog / "iss-00004").mkdir()  # the flat place before buckets (iss-00460)
     code, payload = world.run("scope", "list")
     assert code == 0, payload
     paths = {item["id"]: item["path"] for item in payload["data"]["result"]["items"]}
-    assert paths["iss-00003"] is None and paths["epic-00002"] is not None
+    assert paths["iss-00004"] is None and paths["epic-00002"] == "spec-dock/initiatives/00000-00999/epic-00002"
+    assert all(path is None or path.count("/") == 3 for path in paths.values())

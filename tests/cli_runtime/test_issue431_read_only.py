@@ -39,10 +39,10 @@ def test_reading_commands_change_no_catalog_git_checkout_or_github(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "plan")
-    world.scope("epic", 2, "core", parent=1)
-    world.scope("issue", 3, "leaf", parent=2)
-    artifacts = world.catalog / "init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf/artifacts"
+    world.scope("initiative", 1, "Plan")
+    world.scope("epic", 2, "Core", parent=1)
+    world.scope("issue", 3, "Leaf", parent=2)
+    artifacts = world.catalog / "00000-00999/iss-00003/artifacts"
     artifacts.mkdir()
     (artifacts / "20261026t000000z-note.md").write_text("# note\n", encoding="utf-8")
     world.select("iss-00003", 3)

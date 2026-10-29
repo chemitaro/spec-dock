@@ -27,7 +27,7 @@ def _body(stdout: str) -> object:
 
 def test_conditional_list_returns_304_with_exit_one_until_the_top_issue_changes() -> None:
     fake = FakeGithub()
-    epic = fake.scope("epic", slug="core")
+    epic = fake.scope("epic", title="core")
     endpoint = "repos/example/repo/issues?labels=spec-dock%3Aepic&state=all&sort=updated&direction=desc&per_page=1"
     first = fake([*GH, "GET", endpoint])
     etag = first.stdout.split("ETag: ", 1)[1].split("\r\n", 1)[0]
@@ -44,7 +44,7 @@ def test_conditional_list_returns_304_with_exit_one_until_the_top_issue_changes(
 def test_graphql_filters_labels_with_or_and_pages_with_cursors() -> None:
     fake = FakeGithub()
     for number in range(1, 6):
-        fake.scope("issue" if number % 2 else "epic", slug=f"s{number}")
+        fake.scope("issue" if number % 2 else "epic", title=f"s{number}")
     fake.add_issue(title="Plain")
     fake.add_issue(labels=("spec-dock:issue",), pull_request=True)
     query = 'query { repository(owner: $owner, name: $name) { issues(first: 2, after: $after, labels: ["spec-dock:epic", "spec-dock:issue"]) { nodes { number } } } }'
@@ -63,8 +63,8 @@ def test_graphql_filters_labels_with_or_and_pages_with_cursors() -> None:
 
 def test_relation_writes_take_issue_ids_and_reject_numbers() -> None:
     fake = FakeGithub()
-    parent = fake.scope("epic", slug="core")
-    child = fake.scope("issue", slug="leaf")
+    parent = fake.scope("epic", title="core")
+    child = fake.scope("issue", title="leaf")
     assert child.id != child.number
     by_number = fake(
         [*GH, "POST", f"repos/example/repo/issues/{parent.number}/sub_issues", "--input", "-"],
@@ -87,7 +87,7 @@ def test_injected_rate_limit_and_timeout_are_recorded() -> None:
     limited = fake([*GH, "GET", "user"])
     assert _status(limited.stdout) == 403 and "retry-after: 7" in limited.stdout
     assert _status(fake([*GH, "GET", "user"]).stdout) == 200
-    issue = fake.scope("issue", slug="leaf")
+    issue = fake.scope("issue", title="leaf")
     try:
         fake([*GH, "PATCH", f"repos/example/repo/issues/{issue.number}", "--input", "-"], input='{"title":"x"}')
     except subprocess.TimeoutExpired:
@@ -99,7 +99,7 @@ def test_injected_rate_limit_and_timeout_are_recorded() -> None:
 
 def test_path_executable_persists_the_model_and_requests(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf", title="Before")
+    issue = fake.scope("issue", title="Before")
     handle = install_fake_gh(tmp_path, monkeypatch, fake)
     completed = subprocess.run(
         [

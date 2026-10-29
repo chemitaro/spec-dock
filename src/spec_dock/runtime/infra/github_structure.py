@@ -313,7 +313,7 @@ FULL_READ_QUERY = f"""query($owner: String!, $name: String!, $after: String) {{
            labels: [{_KIND_FILTER}]) {{
       pageInfo {{ hasNextPage endCursor }}
       nodes {{
-        number databaseId title body state stateReason updatedAt createdAt closedAt url
+        number databaseId title state stateReason updatedAt createdAt closedAt url
         labels(first: 20) {{ totalCount nodes {{ name }} }}
         assignees(first: 10) {{ nodes {{ login }} }}
         parent {{ number repository {{ nameWithOwner }} }}
@@ -499,13 +499,14 @@ class GithubStructureClient:
 
     # Writes. Each is sent alone; an uncertain result is read back before it is reported as unknown.
 
-    def create_issue(self, *, title: str, body: str, labels: Sequence[str]) -> IssueFacts:
+    def create_issue(self, *, title: str, labels: Sequence[str]) -> IssueFacts:
+        """Create a Scope Issue with its title and labels only; SpecDock keeps nothing in the body."""
         if not title.strip():
             raise ValueError("GitHub Issue title must be nonempty")
         endpoint = f"{self._base}/issues"
         try:
             response = self.api.request(
-                "POST", endpoint, payload={"title": title, "body": body, "labels": list(labels)}, ok=frozenset({201})
+                "POST", endpoint, payload={"title": title, "labels": list(labels)}, ok=frozenset({201})
             )
             return self._facts_from_rest(response.body, endpoint, number=None)
         except GithubStructureError as error:
@@ -745,7 +746,6 @@ class GithubStructureClient:
             number=found,
             database_id=_int(item.get("id"), "id", endpoint),
             title=_text(item.get("title"), "title", endpoint),
-            body=_optional_text(item.get("body"), "body", endpoint),
             state=_state(item.get("state"), "state", endpoint),
             state_reason=_optional_lower(item.get("state_reason"), "state_reason", endpoint),
             labels=_names(item.get("labels"), "name", "label", endpoint),
@@ -767,7 +767,6 @@ class GithubStructureClient:
             number=number,
             database_id=_int(node.get("databaseId"), "databaseId", endpoint),
             title=_text(node.get("title"), "title", endpoint),
-            body=_optional_text(node.get("body"), "body", endpoint),
             state=_state(node.get("state"), "state", endpoint),
             state_reason=_optional_lower(node.get("stateReason"), "stateReason", endpoint),
             labels=labels,

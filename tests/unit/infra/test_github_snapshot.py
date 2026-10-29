@@ -37,9 +37,9 @@ REPOSITORY = GithubRepository.parse("example/repo")
 
 def _world(tmp_path: Path) -> tuple[FakeGithub, StructureSnapshotService, SnapshotStore]:
     fake = FakeGithub()
-    initiative = fake.scope("initiative", slug="plan", title="計画")
-    epic = fake.scope("epic", slug="core", parent=initiative.number)
-    fake.scope("issue", slug="leaf", parent=epic.number)
+    initiative = fake.scope("initiative", title="計画")
+    epic = fake.scope("epic", title="core", parent=initiative.number)
+    fake.scope("issue", title="leaf", parent=epic.number)
     clear_memory()
     store = SnapshotStore(tmp_path / "state", REPOSITORY)
     client = GithubStructureClient(REPOSITORY, GithubApi(runner=fake, clock=fake.clock))
@@ -176,6 +176,25 @@ def test_unreadable_or_unknown_snapshot_versions_are_refetched(tmp_path: Path, c
     assert fresh.refreshed and len(fake.graphql_requests()) == 2
 
 
+def test_a_version_one_snapshot_that_still_carries_slug_is_refetched(tmp_path: Path) -> None:
+    """The slug field was dropped without a version bump (iss-00455); an old file is not read but refetched."""
+    import json
+
+    fake, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    path = store.directory / "snapshot.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    assert payload["version"] == 1 and all("slug" not in item for item in payload["issues"].values())
+    for item in payload["issues"].values():
+        item["slug"] = "old-name"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    clear_memory()
+    fresh = service.ensure_fresh("display")
+    assert fresh.refreshed and len(fake.graphql_requests()) == 2
+    rewritten = json.loads(path.read_text(encoding="utf-8"))
+    assert rewritten["version"] == 1 and all("slug" not in item for item in rewritten["issues"].values())
+
+
 def test_refetch_merge_keeps_a_write_reflected_while_the_fetch_was_running(tmp_path: Path) -> None:
     from dataclasses import replace
 
@@ -255,7 +274,7 @@ def test_a_busy_directory_lock_falls_back_to_memory(tmp_path: Path) -> None:
 
 def test_module_entry_uses_the_xdg_state_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     fake = FakeGithub()
-    fake.scope("initiative", slug="plan")
+    fake.scope("initiative", title="plan")
     monkeypatch.setenv("XDG_STATE_HOME", str(tmp_path / "xdg"))
     fresh = ensure_fresh(REPOSITORY, "display", api=GithubApi(runner=fake, clock=fake.clock))
     assert fresh.require().find("init-00001") is not None
@@ -375,7 +394,7 @@ def test_a_failed_second_file_write_keeps_one_reflection_in_memory(
     from spec_dock.runtime.infra import github_snapshot
 
     fake, service, store = _world(tmp_path)
-    other = fake.scope("initiative", slug="other", title="別の計画")
+    other = fake.scope("initiative", title="別の計画")
     service.ensure_fresh("display")
     store.reflect([SetParent(3, 1)], command="scope move", at="2026-10-26T01:00:00Z")
     fake.issue(other.number).title = "改名した計画"
@@ -423,7 +442,7 @@ def test_an_explicit_environment_without_home_never_falls_back_to_the_real_home(
 def test_a_full_read_records_when_each_issue_was_created_and_closed(tmp_path: Path) -> None:
     """iss-00438: created_at and closed_at (epic-00427's time axis) cost no extra request."""
     fake, service, store = _world(tmp_path)
-    fake.scope("issue", slug="done", parent=2, state="closed", state_reason="completed")
+    fake.scope("issue", parent=2, state="closed", state_reason="completed")
     fresh = service.ensure_fresh("display")
     open_issue, closed_issue = fresh.require().issues[3], fresh.require().issues[4]
     assert (open_issue.created_at, open_issue.closed_at) == (fake.issue(3).created_at, None)

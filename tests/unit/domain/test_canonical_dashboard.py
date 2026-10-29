@@ -23,7 +23,6 @@ def node(number: int, kind: str, *, parent: int | None = None, **changes: object
         database_id=1000 + number,
         id=f"{_PREFIX[kind]}-{number:05d}",
         kind=kind,  # type: ignore[arg-type]
-        slug=f"s{number}",
         title=f"Scope {number}",
         state="open",
         state_reason=None,
