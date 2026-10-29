@@ -206,6 +206,11 @@ STATE_ROOT_MISMATCH_NEXT_STEP: Final = (
     "Run the command with the state root the installed job uses (set XDG_STATE_HOME as when it was linked), "
     "or run spec-dock canonical remove for the catalogs registered there first."
 )
+SCOPE_KIND_CHANGED_RECOVERY: Final = (
+    "Restore the GitHub kind label. If the new kind is intended, create the Scope again with that kind "
+    "(spec-dock scope create), move the old directory's contents into the new <ID>/, then run "
+    "spec-dock scope delete <current ID>."
+)
 STATUS_RECOVERY: Final = "spec-dock canonical status"
 _FAILURE_EXIT_CODES: Final = frozenset({1, 2, 3, 4, 5, 7})
 

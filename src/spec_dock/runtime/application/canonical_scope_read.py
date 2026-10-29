@@ -11,9 +11,13 @@ from typing import TYPE_CHECKING, Final
 from spec_dock.runtime.application.active_links import sync_selection_links
 from spec_dock.runtime.application.artifact_query import ArtifactCatalogEntry
 from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_APPLICABLE, CanonicalCommandError
-from spec_dock.runtime.application.canonical_scopes import OFFLINE_MESSAGE, load_canonical_scopes
+from spec_dock.runtime.application.canonical_scopes import (
+    OFFLINE_MESSAGE,
+    check_canonical_scope_expectations,
+    load_canonical_scopes,
+    resolve_canonical_scope,
+)
 from spec_dock.runtime.application.direct_artifact import _view
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import list_scopes
 from spec_dock.runtime.application.worktree_observation import ancestors_for, read_selection, resolve_scope
 from spec_dock.runtime.domain.artifacts import (
@@ -50,10 +54,10 @@ SOURCE_LOCAL_RECOVERY: Final = (
 def show_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
     selection = read_selection(context, scopes.views)
-    scope = resolve_scope(context, scopes.views, namespace.target, selection=selection)
-    check_scope_expectations(
+    scope = resolve_canonical_scope(context, scopes, namespace.target, selection=selection)
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         selection,
         target=scope,
         expected_current=namespace.expect_current,
@@ -73,16 +77,16 @@ def show_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
 def list_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
     selection = read_selection(context, scopes.views)
-    check_scope_expectations(
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         selection,
         target=None,
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
     parent = (
-        resolve_scope(context, scopes.views, namespace.parent, selection=selection).id if namespace.parent else None
+        resolve_canonical_scope(context, scopes, namespace.parent, selection=selection).id if namespace.parent else None
     )
     listed = list_scopes(scopes.views, kind=namespace.kind, parent_id=parent, state=namespace.state)
     result: dict[str, object] = {
@@ -135,10 +139,10 @@ def query_dependencies(namespace: argparse.Namespace, context: ProjectContext) -
     )
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, refresh=refresh, offline=offline)
     selection = read_selection(context, scopes.views)
-    target = resolve_scope(context, scopes.views, namespace.target, selection=selection)
-    check_scope_expectations(
+    target = resolve_canonical_scope(context, scopes, namespace.target, selection=selection)
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         selection,
         target=target,
         expected_current=namespace.expect_current,
@@ -202,9 +206,9 @@ def query_dependencies(namespace: argparse.Namespace, context: ProjectContext) -
 def show_active(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
     observation = read_selection(context, scopes.views)
-    check_scope_expectations(
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         observation,
         target=None,
         expected_current=namespace.expect_current,
@@ -225,7 +229,8 @@ def set_active(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     """Keep the same direct selection and repair its links; links never dangle (every chain directory exists)."""
     context.require_writer()
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
-    target = resolve_scope(context, scopes.views, namespace.target)
+    target = resolve_canonical_scope(context, scopes, namespace.target)
+    scopes.require_kind_unchanged(*scopes.lineage(target.id))
     selection = read_selection(context, scopes.views)
     _check_guards(namespace, context, scopes, selection, target)
     if selection.status != "selected" or selection.record is None or selection.record.scope_id != target.id:
@@ -265,7 +270,7 @@ def clear_active(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, offline=namespace.offline)
         selection = read_selection(context, scopes.views)
         target = (
-            resolve_scope(context, scopes.views, namespace.from_target)
+            resolve_canonical_scope(context, scopes, namespace.from_target)
             if namespace.from_target is not None
             else resolve_scope(context, scopes.views, selection.record.scope_id)
             if selection.record is not None
@@ -387,7 +392,7 @@ def _check_guards(
     if namespace.expect_backend is not None and (target is None or target.backend.kind != namespace.expect_backend):
         raise ValueError("target backend does not match --expect-backend")
     if namespace.expect_current is not None:
-        expected = resolve_scope(context, scopes.views, namespace.expect_current).id
+        expected = resolve_canonical_scope(context, scopes, namespace.expect_current).id
         if selection.status != "selected" or selection.record is None or selection.record.scope_id != expected:
             raise ValueError("direct target does not match --expect-current")
 
@@ -403,11 +408,11 @@ def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> Op
     target = (
         None
         if namespace.scope == "@root"
-        else resolve_scope(context, scopes.views, namespace.scope, selection=selection)
+        else resolve_canonical_scope(context, scopes, namespace.scope, selection=selection)
     )
-    check_scope_expectations(
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         selection,
         target=target,
         expected_current=namespace.expect_current,
@@ -419,13 +424,7 @@ def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> Op
         return query_root(replace_namespace(namespace, expect_current=None), context)
     scopes.require_directory(target.id)
     directory = scopes.directories[target.id]
-    if scopes.catalog is None:
-        raise RuntimeError("the catalog was not resolved for an Artifact read")
-    items = catalog_artifacts(
-        scopes.catalog.catalog / directory.relative.as_posix(),
-        (LINK_RELATIVE / directory.relative).as_posix(),
-        target.id,
-    )
+    items = catalog_artifacts(directory.path, (LINK_RELATIVE / directory.relative).as_posix(), target.id)
     if namespace.command_path == "artifact list":
         data = FamilyData(
             "artifact-list",

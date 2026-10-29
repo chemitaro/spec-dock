@@ -9,7 +9,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 import os
-from pathlib import Path, PurePosixPath
+from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.application.canonical_errors import (
@@ -18,11 +18,11 @@ from spec_dock.runtime.application.canonical_errors import (
     CanonicalCommandError,
 )
 from spec_dock.runtime.application.canonical_scope_read import resolve_source
-from spec_dock.runtime.application.canonical_scopes import SCOPE_NESTING, load_canonical_scopes
+from spec_dock.runtime.application.canonical_scopes import check_canonical_scope_expectations, load_canonical_scopes
 from spec_dock.runtime.application.canonical_worktrees import is_catalog
 from spec_dock.runtime.application.project_context import resolve_context
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.worktree_observation import SelectionObservation, read_selection
+from spec_dock.runtime.domain.canonical_structure import SCOPE_KIND_CHANGED, parse_scope_id
 from spec_dock.runtime.infra.canonical_git import catalog_change_summary
 from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.git_process import GitProcessError
@@ -39,8 +39,6 @@ if TYPE_CHECKING:
 
 REQUIRED_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
 
-SCOPE_DIRECTORY_SLUG_MISMATCH: Final = "SCOPE_DIRECTORY_SLUG_MISMATCH"
-SCOPE_DIRECTORY_DUPLICATE: Final = "SCOPE_DIRECTORY_DUPLICATE"
 SCOPE_DIRECTORY_MISSING: Final = "SCOPE_DIRECTORY_MISSING"
 SCOPE_DIRECTORY_MISPLACED: Final = "SCOPE_DIRECTORY_MISPLACED"
 SCOPE_ISSUE_MISSING: Final = "SCOPE_ISSUE_MISSING"
@@ -48,40 +46,81 @@ SCOPE_DOCUMENT_MISSING: Final = "SCOPE_DOCUMENT_MISSING"
 SCOPE_METADATA_PRESENT: Final = "SCOPE_METADATA_PRESENT"
 CANONICAL_CONFLICT_COPY: Final = "CANONICAL_CONFLICT_COPY"
 DEPENDENCY_NOT_SCOPE: Final = "DEPENDENCY_NOT_SCOPE"
+MISPLACED_NEXT_STEP: Final = "Move its contents into <catalog>/<ID>/ and delete the emptied directory."
+DIRECTORY_MISSING_NEXT_STEP: Final = (
+    "Create spec-dock/initiatives/{scope_id}/ with the Scope documents, or put back the directory that was moved "
+    "or renamed."
+)
+ISSUE_MISSING_NEXT_STEP: Final = (
+    "Check GitHub Issue #{number} and its spec-dock kind label; if the Scope is gone, move the directory's contents "
+    "out of the catalog and delete it."
+)
 
 
 @dataclass(frozen=True)
 class StructureReport:
     errors: tuple[Diagnostic, ...]
     warnings: tuple[Diagnostic, ...]
-    misplaced: tuple[dict[str, object], ...]
 
 
-def misplaced_scopes(scopes: CanonicalScopes) -> tuple[dict[str, object], ...]:
-    """Directories not nested under their GitHub parent's directory; a parent without a directory is skipped."""
-    found: list[dict[str, object]] = []
-    for view in scopes.views:
-        directory = scopes.directories.get(view.id)
-        if directory is None:
-            continue
-        name = directory.relative.name
-        if view.parent_id is None:
-            expected = PurePosixPath(name)
-        else:
-            parent = scopes.directories.get(view.parent_id)
-            nested = SCOPE_NESTING.get(view.kind)
-            if parent is None or nested is None:
-                continue  # an Initiative with a parent is already the PARENT_INVALID anomaly
-            expected = parent.relative / nested / name
-        if directory.relative != expected:
-            next_step = f"spec-dock scope move {view.id}"
-            found.append({
-                "scope_id": view.id,
-                "path": directory.relative.as_posix(),
-                "expected": expected.as_posix(),
-                "next_step": next_step,
-            })
-    return tuple(found)
+@dataclass(frozen=True)
+class DirectoryReport:
+    """How catalog `<ID>/` directories match GitHub (Epic design ch. 2): three errors and one warning code."""
+
+    errors: tuple[Diagnostic, ...]
+    warnings: tuple[Diagnostic, ...]
+
+
+def directory_anomalies(scopes: CanonicalScopes) -> DirectoryReport:
+    """SCOPE_KIND_CHANGED once per number, never also MISSING or ISSUE_MISSING for it; nothing without a catalog."""
+    catalog = scopes.catalog
+    if catalog is None:
+        return DirectoryReport((), ())
+    changed = scopes.kind_changes
+    errors: list[Diagnostic] = [
+        Diagnostic(item.code, item.message, dict(item.details))
+        for item in scopes.kind_change_warnings()
+        if item.code == SCOPE_KIND_CHANGED
+    ]
+    for node in scopes.snapshot.scopes:
+        scope_id = str(node.id)
+        if scope_id not in scopes.directories and node.number not in changed:
+            errors.append(
+                Diagnostic(
+                    SCOPE_DIRECTORY_MISSING,
+                    f"{scope_id} has no directory {scope_id}/ in the catalog",
+                    {
+                        "scope_id": scope_id,
+                        "path": scope_id,
+                        "next_step": DIRECTORY_MISSING_NEXT_STEP.format(scope_id=scope_id),
+                    },
+                )
+            )
+    for item in catalog.tree.directories():
+        number = parse_scope_id(item.scope_id)[1]
+        if number not in scopes.snapshot.issues:
+            errors.append(
+                Diagnostic(
+                    SCOPE_ISSUE_MISSING,
+                    f"{item.relative} has no Scope Issue in GitHub",
+                    {
+                        "scope_id": item.scope_id,
+                        "path": item.relative.as_posix(),
+                        "next_step": ISSUE_MISSING_NEXT_STEP.format(number=number),
+                    },
+                )
+            )
+    warnings = tuple(
+        Diagnostic(
+            SCOPE_DIRECTORY_MISPLACED,
+            f"{item.relative} is not a Scope directory <ID>/ at the catalog root"
+            if item.reason == "name"
+            else f"{item.relative} is left from the nested layout inside a Scope directory",
+            {"path": item.relative.as_posix(), "reason": item.reason, "next_step": MISPLACED_NEXT_STEP},
+        )
+        for item in catalog.tree.misplaced()
+    )
+    return DirectoryReport(tuple(errors), warnings)
 
 
 def inspect_canonical_structure(scopes: CanonicalScopes, *, timeout: float) -> StructureReport:
@@ -101,42 +140,16 @@ def inspect_canonical_structure(scopes: CanonicalScopes, *, timeout: float) -> S
                         {"scope_id": view.id, "number": number, "state": external.state},
                     )
                 )
-    misplaced: tuple[dict[str, object], ...] = ()
     catalog = scopes.catalog
     if catalog is not None:
-        known = {view.id for view in scopes.views}
+        directories = directory_anomalies(scopes)
+        errors.extend(directories.errors)
+        warnings.extend(directories.warnings)
         for view in scopes.views:
-            if view.id in scopes.ambiguous:
-                errors.append(
-                    Diagnostic(
-                        SCOPE_DIRECTORY_DUPLICATE,
-                        f"{view.id} has more than one directory in the catalog",
-                        {
-                            "scope_id": view.id,
-                            "paths": [item.relative.as_posix() for item in scopes.ambiguous[view.id]],
-                        },
-                    )
-                )
-                continue
             directory = scopes.directories.get(view.id)
             if directory is None:
-                errors.append(
-                    Diagnostic(
-                        SCOPE_DIRECTORY_MISSING, f"{view.id} has no directory in the catalog", {"scope_id": view.id}
-                    )
-                )
                 continue
-            slug = scopes.node(view.id).slug
-            if directory.relative.name != f"{view.id}-{slug}":
-                errors.append(
-                    Diagnostic(
-                        SCOPE_DIRECTORY_SLUG_MISMATCH,
-                        f"{directory.relative} does not match the GitHub slug {slug!r} of {view.id}",
-                        {"scope_id": view.id, "path": directory.relative.as_posix(), "slug": slug},
-                    )
-                )
-            real = catalog.catalog / directory.relative.as_posix()
-            missing = [name for name in REQUIRED_DOCUMENTS if not (real / name).is_file()]
+            missing = [name for name in REQUIRED_DOCUMENTS if not (directory.path / name).is_file()]
             if missing:
                 errors.append(
                     Diagnostic(
@@ -145,27 +158,9 @@ def inspect_canonical_structure(scopes: CanonicalScopes, *, timeout: float) -> S
                         {"scope_id": view.id, "path": directory.relative.as_posix(), "missing": missing},
                     )
                 )
-        for item in catalog.tree.directories():
-            if item.scope_id not in known:
-                errors.append(
-                    Diagnostic(
-                        SCOPE_ISSUE_MISSING,
-                        f"{item.relative} has no Scope Issue in GitHub",
-                        {"scope_id": item.scope_id, "path": item.relative.as_posix()},
-                    )
-                )
         errors.extend(
             Diagnostic(SCOPE_METADATA_PRESENT, f"{path} is a legacy .meta.json in the catalog", {"path": path})
             for path in _metadata_files(catalog.catalog)
-        )
-        misplaced = misplaced_scopes(scopes)
-        warnings.extend(
-            Diagnostic(
-                SCOPE_DIRECTORY_MISPLACED,
-                f"{item['scope_id']} is at {item['path']}; GitHub places it at {item['expected']}",
-                dict(item),
-            )
-            for item in misplaced
         )
         warnings.extend(
             Diagnostic(
@@ -175,7 +170,7 @@ def inspect_canonical_structure(scopes: CanonicalScopes, *, timeout: float) -> S
             )
             for path in catalog_change_summary(catalog.catalog, timeout=timeout).conflict_files
         )
-    return StructureReport(tuple(errors), tuple(warnings), misplaced)
+    return StructureReport(tuple(errors), tuple(warnings))
 
 
 def _metadata_files(catalog: Path) -> list[str]:
@@ -200,9 +195,9 @@ def validate_workspace(namespace: argparse.Namespace, context: ProjectContext) -
     findings = report.errors
     if findings and namespace.expect_current:
         raise ValueError("--expect-current cannot be verified from invalid workspace structure")
-    check_scope_expectations(
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         read_selection(context, scopes.views) if namespace.expect_current else None,
         target=None,
         expected_current=namespace.expect_current,
@@ -226,7 +221,7 @@ def validate_workspace(namespace: argparse.Namespace, context: ProjectContext) -
             },
         ),
         0 if valid else 7,
-        warnings=(*scopes.warnings(), *report.warnings),
+        warnings=(*scopes.snapshot_warnings(), *report.warnings),
         error=None
         if valid
         else Diagnostic("WORKSPACE_VALIDATION_FAILED", "workspace structure is invalid or incomplete", {}),
@@ -278,9 +273,9 @@ def sync_workspace(namespace: argparse.Namespace, context: ProjectContext) -> Op
     refresh, offline = resolve_source(namespace)
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, refresh=refresh, offline=offline)
     if namespace.expect_current is not None or namespace.expect_backend is not None:
-        check_scope_expectations(
+        check_canonical_scope_expectations(
             context,
-            scopes.views,
+            scopes,
             read_selection(context, scopes.views),
             target=None,
             expected_current=namespace.expect_current,
@@ -413,13 +408,13 @@ def diagnose_workspace(namespace: argparse.Namespace, context: ProjectContext) -
     if scopes is not None:
         report = inspect_canonical_structure(scopes, timeout=namespace.timeout)
         findings += report.errors
-        warnings += (*scopes.warnings(), *report.warnings)
+        warnings += (*scopes.snapshot_warnings(), *report.warnings)
         if report.errors and namespace.expect_current:
             raise ValueError("--expect-current cannot be verified from invalid workspace structure")
         selection = read_selection(context, scopes.views)
-        check_scope_expectations(
+        check_canonical_scope_expectations(
             context,
-            scopes.views,
+            scopes,
             selection,
             target=None,
             expected_current=namespace.expect_current,
@@ -464,7 +459,7 @@ def diagnose_workspace(namespace: argparse.Namespace, context: ProjectContext) -
 def structure_item(
     context: ProjectContext, *, timeout: float, offline: bool = False
 ) -> tuple[dict[str, object], tuple[Diagnostic, ...]]:
-    """`canonical status --structure`: nesting drift at display freshness; failures stay inside the item."""
+    """`canonical status --structure`: the four directory anomalies at display freshness; failures stay inside."""
     try:
         scopes = load_canonical_scopes(context, timeout=timeout, link=True, offline=offline)
     except CanonicalCommandError as error:
@@ -477,22 +472,20 @@ def structure_item(
         return _unavailable(
             "LOCAL_IO_FAILED", str(error), "Check that the state root and the catalog are readable."
         ), ()
-    misplaced = misplaced_scopes(scopes)
-    warnings = tuple(
-        Diagnostic(
-            SCOPE_DIRECTORY_MISPLACED,
-            f"{item['scope_id']} is at {item['path']}; GitHub places it at {item['expected']}; next: {item['next_step']}",
-            {"item": "structure", **item},
-        )
-        for item in misplaced
-    )
-    item: dict[str, object] = {
-        "status": "problem" if misplaced else "ok",
-        "next_step": misplaced[0]["next_step"] if misplaced else None,
+    report = directory_anomalies(scopes)
+    found = (*(("error", item) for item in report.errors), *(("warning", item) for item in report.warnings))
+    next_steps = [item.details["next_step"] for _, item in found if "next_step" in item.details]
+    entry: dict[str, object] = {
+        "status": "problem" if found else "ok",
+        "next_step": next_steps[0] if next_steps else None,
         "snapshot": scopes.snapshot_payload(),
-        "misplaced": list(misplaced),
+        "anomalies": [
+            {"code": item.code, "severity": severity, "message": item.message, "details": dict(item.details)}
+            for severity, item in found
+        ],
     }
-    return item, (*scopes.warnings(), *warnings)
+    warnings = tuple(Diagnostic(item.code, item.message, {"item": "structure", **item.details}) for _, item in found)
+    return entry, (*scopes.snapshot_warnings(), *warnings)
 
 
 def _unavailable(code: str, message: str, next_step: str | None) -> dict[str, object]:

@@ -23,7 +23,6 @@ def node(number: int, kind: str, *, parent: int | None = None, **changes: object
         database_id=1000 + number,
         id=f"{_PREFIX[kind]}-{number:05d}",
         kind=kind,  # type: ignore[arg-type]
-        slug=f"s{number}",
         title=f"Scope {number}",
         state="open",
         state_reason=None,
@@ -134,7 +133,7 @@ def test_a_closed_scope_is_done_whatever_the_reason(reason: str) -> None:
         (3, "DEPENDENCY_FOREIGN_REPOSITORY"),
         (3, "SUB_ISSUE_FOREIGN_REPOSITORY"),
         (2, "PARENT_FOREIGN_REPOSITORY"),
-        (1, "SLUG_MARKER_MISSING"),
+        (1, "KIND_LABEL_MULTIPLE"),
     ],
 )
 def test_an_anomaly_on_the_scope_or_an_ancestor_is_unknown(number: int, code: str) -> None:
@@ -150,11 +149,11 @@ def test_a_dependency_missing_from_the_snapshot_is_unknown() -> None:
 
 
 def test_a_dependency_whose_id_is_undecided_reports_its_anomaly() -> None:
-    broken = replace(node(4, "issue", parent=2), id=None, kind=None, slug=None)
-    anomaly = StructureAnomaly(4, "SLUG_MARKER_MISSING", "no marker")
+    broken = replace(node(4, "issue", parent=2), id=None, kind=None)
+    anomaly = StructureAnomaly(4, "KIND_LABEL_MULTIPLE", "two kinds")
     result = evaluate_readiness(tree(broken, issue={"blocked_by": (4,)}, anomalies=(anomaly,)), "iss-00003")
     assert result.state == "UNKNOWN"
-    assert [(item.number, item.scope_id, item.code) for item in result.unknown] == [(4, None, "SLUG_MARKER_MISSING")]
+    assert [(item.number, item.scope_id, item.code) for item in result.unknown] == [(4, None, "KIND_LABEL_MULTIPLE")]
 
 
 def test_unknown_outranks_doing_and_done_outranks_unknown() -> None:

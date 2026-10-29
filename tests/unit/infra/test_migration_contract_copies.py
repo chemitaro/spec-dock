@@ -17,16 +17,6 @@ from spec_dock.runtime.infra.canonical_git import HOOKLESS_CONFIG, PASSED_GIT_VA
 from tests.support.migration_repo import ROOT, SCRIPT, migrate_module
 
 ASSETS = ROOT / "src/spec_dock/assets"
-BODIES = (
-    None,
-    "",
-    "text\n\n<!-- spec-dock:slug=good-one -->\n",
-    "a\r\n<!-- spec-dock:slug=crlf -->   \r\nb",
-    "<!-- spec-dock:slug=one -->\n<!-- spec-dock:slug=two -->",
-    "<!-- spec-dock:slug=Bad_Slug -->",
-    "<!-- spec-dock:slug=x -->\n<!-- spec-dock:slug=Bad -->",
-    "  <!-- spec-dock:slug=indented -->",
-)
 
 
 def test_c1_kind_labels_definitions_ids_and_slug_rule() -> None:
@@ -42,20 +32,6 @@ def test_c1_kind_labels_definitions_ids_and_slug_rule() -> None:
     for kind in ("initiative", "epic", "issue"):
         for number in (1, 39, 424, 123456):
             assert module.scope_id(kind, number) == canonical_structure.scope_id(kind, number)
-
-
-@pytest.mark.parametrize("body", BODIES)
-def test_c1_marker_reading_matches_the_package(body: str | None) -> None:
-    module = migrate_module()
-    expected = canonical_structure.read_slug_marker(body)
-    assert module.read_slug_marker(body) == (expected.slug, expected.anomaly)
-
-
-@pytest.mark.parametrize("body", ["", "Body.", "Body.\r\n\r\n", "line\n"])
-def test_c1_marker_writing_matches_the_package(body: str) -> None:
-    module = migrate_module()
-    assert module.format_slug_marker("my-slug") == canonical_structure.format_slug_marker("my-slug")
-    assert module.append_slug_marker(body, "my-slug") == canonical_structure.append_slug_marker(body, "my-slug")
 
 
 def test_c2_declaration_bytes_and_writer_protocol() -> None:

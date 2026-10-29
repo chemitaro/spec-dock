@@ -369,8 +369,8 @@ def _structure(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> object:
     from tests.support.fake_github import FakeGithub
 
     fake = FakeGithub("example/repo")
-    initiative = fake.scope("initiative", slug="plan", title="計画")
-    fake.scope("epic", slug="core", parent=initiative.number)
+    initiative = fake.scope("initiative", title="計画")
+    fake.scope("epic", title="core", parent=initiative.number)
     clear_memory()
     monkeypatch.setattr(canonical_sync, "repository_of", lambda *_a, **_k: "github.com/example/repo")
     monkeypatch.setattr(canonical_sync, "github_api_for", lambda cwd: GithubApi(runner=fake, clock=fake.clock))
