@@ -305,6 +305,7 @@ def sync_workspace(namespace: argparse.Namespace, context: ProjectContext) -> Op
         )
     rows = _observe_rows(context, scopes, timeout=namespace.timeout)
     states: dict[tuple[str, str | None], str] = {(view.id, view.github_ref): view.status.state for view in scopes.views}
+    titles = {view.id: view.title for view in scopes.views}
     for row in rows:
         record = row.selection.record
         if record is not None and row.selection.status in ("selected", "stale", "unavailable"):
@@ -359,7 +360,8 @@ def sync_workspace(namespace: argparse.Namespace, context: ProjectContext) -> Op
             for row in rows
         ),
         tuple(
-            {"scope_id": scope_id, "github_ref": github_ref, "lifecycle": state}
+            # The GitHub title, in any language (AC-09, iss-00432); None for a selection of an unknown Scope.
+            {"scope_id": scope_id, "github_ref": github_ref, "lifecycle": state, "title": titles.get(scope_id)}
             for (scope_id, github_ref), state in states.items()
         ),
         tuple(

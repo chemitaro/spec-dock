@@ -41,6 +41,7 @@ LEAF_PATHS: tuple[str, ...] = (
     "scope close",
     "scope reopen",
     "scope delete",
+    "scope move",
     "active show",
     "active set",
     "active clear",
@@ -96,6 +97,7 @@ HELP_EFFECTS: dict[str, str] = {
     "scope close": "Complete or cancel one Scope in its backend; active selection stays set.",
     "scope reopen": "Reopen one Scope in its backend; active selection stays set.",
     "scope delete": "Delete local Scope-owned files; GitHub and branches remain.",
+    "scope move": "Change a Scope parent in GitHub; the flat catalog directory does not move.",
     "active show": "Read this worktree's active selection; no changes.",
     "active set": "Keep the same valid direct selection unchanged and repair only its spec-dock/active navigation links; acquiring another selection requires work start.",
     "active clear": "Remove only observed local direct records and point spec-dock/active links at the fallback when none remains; never promote an ancestor.",
@@ -182,6 +184,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _flag("--detach-dependencies"),
         _arg("--backup-dir"),
     ),
+    "scope move": (_arg("target"), _required("--parent")),
     "active show": (),
     "active set": (_arg("target"),),
     "active clear": (_arg("--from", dest="from_target"), _flag("--all")),
@@ -273,6 +276,7 @@ MUTATING_LEAF_PATHS = frozenset({
     "scope close",
     "scope reopen",
     "scope delete",
+    "scope move",
     "active set",
     "active clear",
     "work start",
@@ -325,6 +329,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
     "scope delete": "Require --backup-dir ABS for a new real backup; descendants require --recursive, incoming edges require --detach-dependencies, and a selected descendant requires --clear-active.",
+    "scope move": "A schema-4 checkout; --parent is required and must be the right kind and open, and not the Scope or one of its descendants.",
     "active show": "The selected worktree must have readable active-selection state.",
     "active set": "Only the same valid direct target is accepted; its selection stays unchanged. Use work start to acquire a selection.",
     "active clear": "--from requires a valid current chain; --all --yes permits discarding observed corrupt regular records. Unknown entries are preserved; ancestors are never promoted.",
@@ -585,7 +590,7 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "canonical sync":
         target = "This clone's catalog, or with --registered every catalog in the registry of the state root."
         reads = "The registry and each catalog's state.json, the catalog work tree and changesets, origin's spec-dock/canonical, and the GitHub structure probe (conditional requests)."
-        writes = "Catalog commits (save and merge, never forced), the push to origin, state.json and the sync log in the state root, and the structure snapshot."
+        writes = "Catalog commits (save and merge, never forced), the push to origin, state.json and the sync log in the state root, the structure snapshot, and the five dashboard files of each main checkout when the structure changed or a file is missing."
         does_not = "Does not force-push, rebase, leave conflict markers, or save held changes (mass deletions, secrets, files over 10 MiB)."
         json_data = "catalogs[] (catalog, result, saved_commit, merged, pushed, conflicts, holds, blocking, skipped_reason, paused, error) and repositories[] (repository, probe, refreshed, dashboards_written)."
         confirmation = "No final confirmation is required; the periodic job runs this leaf."
@@ -617,7 +622,7 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "canonical remove":
         target = "This clone's catalog, the links of its checkouts and its sync registration."
         reads = "The catalog status and ignored files, Git worktree inventory, info/exclude, the registry and the periodic job."
-        writes = "Removes correct links, the catalog worktree, the three info/exclude lines, the registry entry and state, and the periodic job when no other catalog is registered."
+        writes = "Removes correct links, the catalog worktree, the dashboard files of the main checkout, the three info/exclude lines, the registry entry and state, and the periodic job when no other catalog is registered."
         does_not = "Does not delete the local or GitHub spec-dock/canonical branch, the structure snapshot or a real directory at a link path."
         json_data = "removed effects; without --yes the planned effects."
         confirmation = "Apply requires --yes; without it (or with --dry-run) only the plan is reported."
@@ -654,6 +659,23 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not modify documents, GitHub state, direct selection or checkout, or acquire a Start lock."
         json_data = "scope, github_ref, changed; dry-run adds can_apply and blockers."
         confirmation = "No final confirmation is required for a local title edit."
+    elif leaf == "scope move":
+        reads = (
+            "The GitHub structure snapshot checked at decision freshness and the target and new parent Issues"
+            " and parents read again."
+        )
+        writes = (
+            "The GitHub parent of the Scope (sub-issue with replace_parent); this checkout's spec-dock/active"
+            " links when it selects the Scope or a descendant."
+        )
+        does_not = (
+            "Does not write the catalog, move directories, edit documents, close or reopen Issues, or change"
+            " selection or branches."
+        )
+        json_data = (
+            "scope, github_ref, changed, parent_before, parent_after, snapshot; dry-run adds can_apply and blockers."
+        )
+        confirmation = "No final confirmation is required for this leaf."
     elif leaf == "scope delete":
         reads = "Current Scope subtree, incoming dependency metadata, and this worktree's captured direct selection."
         json_data = "removed_ids, changed_paths, remaining_paths, backup_path; dry-run adds can_apply and blockers."

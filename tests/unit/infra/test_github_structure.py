@@ -504,3 +504,16 @@ def test_rule_violations_from_the_fake_github_reach_the_snapshot_anomalies() -> 
     assert snapshot.issues[unmarked.number].id == f"epic-{unmarked.number:05d}"
     assert snapshot.issues[old_marker.number].id == f"iss-{old_marker.number:05d}"
     assert snapshot.issues[leaf.number].blocked_by == (plain.number,) and plain.number in snapshot.external
+
+
+def test_an_unanswered_close_is_confirmed_only_when_the_state_reason_also_matches() -> None:
+    fake = FakeGithub()
+    issue = fake.scope("issue", title="leaf", state="closed", state_reason="not_planned")
+    client = _client(fake)
+    fake.inject(timeout=True, method="PATCH")
+    with pytest.raises(GithubStructureError) as caught:
+        client.update_issue(issue.number, state="closed", state_reason="completed")
+    assert (caught.value.code, caught.value.uncertain) == ("GITHUB_EFFECT_UNKNOWN", True)
+    fake.inject(timeout=True, method="PATCH", apply=True)
+    closed = client.update_issue(issue.number, state="closed", state_reason="completed")
+    assert (closed.state, closed.state_reason) == ("closed", "completed")

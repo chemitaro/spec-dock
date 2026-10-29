@@ -100,6 +100,8 @@ def _facts(number: int, *labels: str, state: str = "open", reason: str | None = 
         assignees=(),
         updated_at=f"2026-10-25T00:00:{number % 60:02d}Z",
         url=f"https://github.com/example/repo/issues/{number}",
+        created_at=f"2026-10-24T00:00:{number % 60:02d}Z",
+        closed_at=None if state == "open" else "2026-10-25T01:00:00Z",
     )
 
 
@@ -180,6 +182,8 @@ def test_valid_structure_builds_ids_relations_external_and_reverse_edges() -> No
         "blocking": [],
         "updated_at": "2026-10-25T00:00:03Z",
         "url": "https://github.com/example/repo/issues/3",
+        "created_at": "2026-10-24T00:00:03Z",
+        "closed_at": None,
     }
     assert snapshot.to_json()["external"] == {"4": {"number": 4, "title": "Vendor fix", "state": "open"}}
 
@@ -442,6 +446,39 @@ def test_dependency_violations_preview_a_new_edge_on_the_snapshot() -> None:
     assert {item.code for item in dependency_violations(snapshot, 3, 2)} == {"DEPENDENCY_INVALID"}
     assert {item.code for item in dependency_violations(snapshot, 3, 3)} == {"DEPENDENCY_INVALID"}
     assert snapshot.issues[3].blocked_by == (4,)
+
+
+def test_lenient_reflection_skips_changes_whose_numbers_are_not_in_the_snapshot() -> None:
+    from spec_dock.runtime.domain.canonical_structure import (
+        AddBlockedBy,
+        ExternalIssue,
+        RemoveBlockedBy,
+        SetParent,
+        StructureChange,
+        UpsertIssue,
+        apply_changes_lenient,
+    )
+
+    unknown: list[StructureChange] = [
+        SetParent(99, 1),
+        SetParent(3, 98),
+        AddBlockedBy(97, 3),
+        AddBlockedBy(3, 96),
+        RemoveBlockedBy(95, 3),
+    ]
+    known: list[StructureChange] = [
+        UpsertIssue(_scope(20, "issue").facts),
+        SetParent(20, 2),
+        AddBlockedBy(3, 94, ExternalIssue(94, "Plain", "open")),
+        SetParent(5, None),
+    ]
+    snapshot, skipped = apply_changes_lenient(
+        _relations(), [*unknown, *known], at="2026-10-26T00:20:00Z", command="dependency add"
+    )
+    assert skipped == tuple(unknown)
+    assert snapshot.issues[20].parent == 2 and 94 in snapshot.issues[3].blocked_by and snapshot.external[94].title
+    assert snapshot.issues[5].parent is None
+    assert [(item.command, item.numbers) for item in snapshot.local_writes] == [("dependency add", (2, 3, 5, 20, 94))]
 
 
 def _kinds():

@@ -22,7 +22,7 @@ from spec_dock.runtime.domain.canonical_structure import (
     SnapshotFormatError,
     StructureSnapshot,
     UpsertIssue,
-    apply_changes,
+    apply_changes_lenient,
     build_snapshot,
     format_timestamp,
     merge_refresh,
@@ -65,6 +65,14 @@ _MEMORY: dict[str, tuple[StructureSnapshot | None, ProbeRecord | None]] = {}
 def clear_memory() -> None:
     """Forget in-process snapshots; for tests that simulate a new process."""
     _MEMORY.clear()
+
+
+@dataclass(frozen=True)
+class Reflection:
+    """A write reflection: the resulting snapshot and the changes it could not apply (they mark it stale)."""
+
+    snapshot: StructureSnapshot | None
+    skipped: tuple[StructureChange, ...]
 
 
 @dataclass(frozen=True)
@@ -172,13 +180,27 @@ class SnapshotStore:
         self._update(change)
 
     def reflect(self, changes: Sequence[StructureChange], *, command: str, at: str) -> StructureSnapshot | None:
-        snapshot, _ = self._update(
-            lambda current, probe: (
-                apply_changes(current, changes, at=at, command=command) if current is not None else None,
-                probe,
-            )
-        )
-        return snapshot
+        return self.reflect_writes(changes, command=command, at=at).snapshot
+
+    def reflect_writes(self, changes: Sequence[StructureChange], *, command: str, at: str) -> Reflection:
+        """Apply what fits; when a change is skipped, clear the check record so every level refetches next."""
+        skipped: tuple[StructureChange, ...] = ()
+
+        def change(
+            current: StructureSnapshot | None, current_probe: ProbeRecord | None
+        ) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+            nonlocal skipped
+            if current is None:
+                skipped = tuple(changes)
+                return None, current_probe
+            applied, skipped = apply_changes_lenient(current, changes, at=at, command=command)
+            if not skipped:
+                return applied, current_probe
+            error = current_probe.last_error if current_probe is not None else None
+            return applied, ProbeRecord(None, {}, error)
+
+        snapshot, _ = self._update(change)
+        return Reflection(snapshot, skipped)
 
     def _update(
         self,
@@ -382,7 +404,10 @@ class StructureSnapshotService:
         return reflected
 
     def reflect(self, changes: Sequence[StructureChange], *, command: str) -> StructureSnapshot | None:
-        return self.store.reflect(changes, command=command, at=format_timestamp(self.clock.now()))
+        return self.reflect_writes(changes, command=command).snapshot
+
+    def reflect_writes(self, changes: Sequence[StructureChange], *, command: str) -> Reflection:
+        return self.store.reflect_writes(changes, command=command, at=format_timestamp(self.clock.now()))
 
     def _probe_and_fetch(
         self,

@@ -6,14 +6,18 @@ import argparse
 from collections.abc import Callable
 from pathlib import Path
 
+from spec_dock.runtime.application.canonical_artifact_write import create_artifact
 from spec_dock.runtime.application.canonical_branches import branch_operation
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
+from spec_dock.runtime.application.canonical_dependency_write import mutate_dependency
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_hold import run_canonical_accept, run_canonical_restore
 from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
 from spec_dock.runtime.application.canonical_remove import run_canonical_remove
 from spec_dock.runtime.application.canonical_resume import run_canonical_resume
+from spec_dock.runtime.application.canonical_scope_change import delete_scope, edit_scope, lifecycle_scope, move_scope
+from spec_dock.runtime.application.canonical_scope_create import create_scope, import_scope
 from spec_dock.runtime.application.canonical_scope_read import (
     clear_active,
     list_scope,
@@ -25,6 +29,7 @@ from spec_dock.runtime.application.canonical_scope_read import (
 )
 from spec_dock.runtime.application.canonical_status import run_canonical_status
 from spec_dock.runtime.application.canonical_sync import run_canonical_sync, run_registered_sync
+from spec_dock.runtime.application.canonical_work import finish_work, start_work
 from spec_dock.runtime.application.canonical_workspace import (
     diagnose_workspace,
     sync_workspace,
@@ -75,6 +80,23 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "workspace sync": sync_workspace,
     "workspace validate": validate_workspace,
     "workspace doctor": diagnose_workspace,
+    "scope create initiative": create_scope,
+    "scope create epic": create_scope,
+    "scope create issue": create_scope,
+    "scope import github initiative": import_scope,
+    "scope import github epic": import_scope,
+    "scope import github issue": import_scope,
+    "scope edit": edit_scope,
+    "scope move": move_scope,
+    "scope close": lifecycle_scope,
+    "scope reopen": lifecycle_scope,
+    "scope delete": delete_scope,
+    "dependency add": mutate_dependency,
+    "dependency remove": mutate_dependency,
+    "artifact create": create_artifact,
+    "artifact import file": create_artifact,
+    "work start": start_work,
+    "work finish": finish_work,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)

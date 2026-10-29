@@ -2,8 +2,8 @@
 
 Every stop condition is checked before writing, under the clone Start lock and this catalog's cycle lock
 (a running cycle finishes first and no later cycle starts): unsaved or unpushed changes, and ignored files
-other than .runtime/ that a worktree removal would delete. Without --yes only the plan is returned. Branches
-(local and GitHub) and the structure snapshot stay; the dashboard files are iss-00438's.
+other than .runtime/ that a worktree removal would delete. Without --yes only the plan is returned. The
+dashboard files of the main checkout go (iss-00438); branches (local and GitHub) and the structure snapshot stay.
 """
 
 from __future__ import annotations
@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.canonical_catalog import observe_catalog, require_git, resolve_layout
+from spec_dock.runtime.application.canonical_dashboard import dashboard_directory
 from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_IGNORED_FILES_PRESENT,
     CANONICAL_LOCK_BUSY,
@@ -30,11 +31,12 @@ from spec_dock.runtime.application.canonical_errors import (
     UNSAVED_CHANGES_RECOVERY,
     CanonicalCommandError,
 )
+from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES
 from spec_dock.runtime.domain.canonical_layout import EXCLUDE_LINES, LINK_RELATIVE, link_state
 from spec_dock.runtime.domain.canonical_scheduler import SchedulerSpec
 from spec_dock.runtime.domain.canonical_sync_state import SyncRegistry
 from spec_dock.runtime.infra import canonical_git, canonical_scheduling, runtime_environment
-from spec_dock.runtime.infra.canonical_files import observe_link
+from spec_dock.runtime.infra.canonical_files import is_regular_file, observe_link
 from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry, registry_path, update_registry
 from spec_dock.runtime.infra.canonical_state import (
     CycleBusy,
@@ -237,6 +239,11 @@ def _steps(
                 (layout.common_dir / "worktrees", Path(catalog).parent),
             )
         )
+    dashboard = dashboard_directory(main)
+    for name in DASHBOARD_FILES:  # only regular files: a directory or link there is not SpecDock's (iss-00438)
+        path = dashboard / name
+        if is_regular_file(path):
+            steps.append(_Step("canonical.dashboard.remove", str(path), path.unlink, (dashboard,)))
     exclude = layout.common_dir / "info/exclude"
     if _has_exclude_lines(exclude):
         steps.append(_Step("git.info.exclude", str(exclude), lambda: _drop_exclude_lines(exclude), (exclude.parent,)))

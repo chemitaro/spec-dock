@@ -125,6 +125,8 @@ class IssueFacts:
     assignees: tuple[str, ...]
     updated_at: str
     url: str
+    created_at: str
+    closed_at: str | None
 
 
 @dataclass(frozen=True)
@@ -163,6 +165,8 @@ class ScopeNode:
     blocking: tuple[int, ...]
     updated_at: str
     url: str
+    created_at: str  # iss-00438: GitHub createdAt and closedAt, for epic-00427's time axis
+    closed_at: str | None
 
 
 @dataclass(frozen=True)
@@ -281,6 +285,8 @@ _NODE_KEYS: Final = frozenset({
     "blocking",
     "updated_at",
     "url",
+    "created_at",
+    "closed_at",
 })
 
 
@@ -316,6 +322,16 @@ def _numbers(value: object, what: str) -> tuple[int, ...]:
 def _texts(value: object, what: str) -> tuple[str, ...]:
     _require(isinstance(value, list), f"{what} must be a list")
     return tuple(cast("str", _text(item, what)) for item in cast("list[object]", value))
+
+
+def _time(value: object, what: str) -> str:
+    text = cast("str", _text(value, what))
+    parse_timestamp(text)
+    return text
+
+
+def _optional_time(value: object, what: str) -> str | None:
+    return None if value is None else _time(value, what)
 
 
 def _snapshot_from_json(payload: object) -> StructureSnapshot:
@@ -404,6 +420,8 @@ def _node_from_json(raw: object) -> ScopeNode:
         blocking=_numbers(item["blocking"], "blocking"),
         updated_at=cast("str", _text(item["updated_at"], "updated_at")),
         url=cast("str", _text(item["url"], "url")),
+        created_at=_time(item["created_at"], "created_at"),
+        closed_at=_optional_time(item["closed_at"], "closed_at"),
     )
 
 
@@ -425,6 +443,8 @@ def _node_json(node: ScopeNode) -> dict[str, object]:
         "blocking": list(node.blocking),
         "updated_at": node.updated_at,
         "url": node.url,
+        "created_at": node.created_at,
+        "closed_at": node.closed_at,
     }
 
 
@@ -469,6 +489,8 @@ def _node_from_facts(
         blocking=(),
         updated_at=facts.updated_at,
         url=facts.url,
+        created_at=facts.created_at,
+        closed_at=facts.closed_at,
     )
     return node, tuple(anomalies)
 
@@ -742,12 +764,39 @@ def apply_changes(
     snapshot: StructureSnapshot, changes: Sequence[StructureChange], *, at: str, command: str
 ) -> StructureSnapshot:
     """Reflect confirmed GitHub writes immediately and record them as local writes."""
+    return _apply(snapshot, changes, at=at, command=command, lenient=False)[0]
+
+
+def apply_changes_lenient(
+    snapshot: StructureSnapshot, changes: Sequence[StructureChange], *, at: str, command: str
+) -> tuple[StructureSnapshot, tuple[StructureChange, ...]]:
+    """Reflect what fits; a change naming a number this snapshot lacks is skipped and returned (Epic ch. 2)."""
+    return _apply(snapshot, changes, at=at, command=command, lenient=True)
+
+
+def _applicable(issues: Mapping[int, ScopeNode], change: StructureChange) -> bool:
+    if isinstance(change, UpsertIssue):
+        return True
+    if isinstance(change, SetParent):
+        return change.child in issues and (change.parent is None or change.parent in issues)
+    if isinstance(change, AddBlockedBy):
+        return change.number in issues and (change.blocker in issues or change.external is not None)
+    return change.number in issues
+
+
+def _apply(
+    snapshot: StructureSnapshot, changes: Sequence[StructureChange], *, at: str, command: str, lenient: bool
+) -> tuple[StructureSnapshot, tuple[StructureChange, ...]]:
     parse_timestamp(at)
     issues = dict(snapshot.issues)
     external = dict(snapshot.external)
     element = {number: element_anomalies(snapshot, number) for number in issues}
     touched: set[int] = set()
+    skipped: list[StructureChange] = []
     for change in changes:
+        if lenient and not _applicable(issues, change):
+            skipped.append(change)
+            continue
         if isinstance(change, UpsertIssue):
             _upsert(issues, external, element, change.facts)
             touched.add(change.facts.number)
@@ -766,9 +815,10 @@ def apply_changes(
             )
             touched.update((change.number, change.blocker))
     writes = (*snapshot.local_writes, LocalWrite(at, command, tuple(sorted(touched))))
-    return _finish(
+    finished = _finish(
         snapshot.repository, snapshot.fetched_at, snapshot.fetch_started_at, issues, external, element, writes
     )
+    return finished, tuple(skipped)
 
 
 def _node_for_change(issues: Mapping[int, ScopeNode], number: int) -> ScopeNode:

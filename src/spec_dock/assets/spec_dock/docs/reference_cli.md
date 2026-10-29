@@ -70,6 +70,7 @@
 | C50 | `canonical restore` | `[PATH...]` | 保留中のパス（パスなしは保留中の削除）を、カタログのHEADの内容に戻します。commitしません。 | カタログの作業ツリー |
 | C51 | `canonical resume` | `--adopt-remote` \| `--push-local` | 一時停止したカタログの同期を、利用者が決めた扱いで再開します。 | 状態の置き場、`--push-local` はpush |
 | C52 | `canonical remove` | `[--yes]` | 未保存と未pushがないことを確かめてから、このcloneのリンク、カタログ、除外、定期の同期の登録を外します。ブランチは消しません。 | リンク、カタログ、`info/exclude`、状態の置き場、定期の実行 |
+| C53 | `scope move` | `TARGET --parent TARGET` | schema4で、ScopeのGitHubの親だけを付け替えます（sub-issueの`replace_parent`）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば`spec-dock/active`のリンクを整えます。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | GitHubの親子、active link |
 
 ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象ではありません。通常操作はworkspaceの新writer宣言を検証します。help/version/completion、raw doctor、installation show/init、CI validateは各leafの限定的なcontextを使います。
 

@@ -246,8 +246,10 @@ def _sync_text(data: SyncData) -> list[str]:
     counts = {str(row["scope_id"]): row for row in data.counts}
     for scope in data.scopes:
         count = counts[str(scope["scope_id"])]
+        # Only canonical mode reports titles (iss-00432); the legacy line stays as it was.
+        title = f' title="{_text_escape(str(scope["title"]))}"' if scope.get("title") is not None else ""
         lines.append(
-            f"scope_id={scope['scope_id']} github_ref={_field_text(scope['github_ref'])} lifecycle={scope['lifecycle']} "
+            f"scope_id={scope['scope_id']}{title} github_ref={_field_text(scope['github_ref'])} lifecycle={scope['lifecycle']} "
             f"direct_selected_count={count['direct_selected_count']} "
             f"descendant_selected_count={count['descendant_selected_count']} complete={str(count['complete']).lower()}"
         )
