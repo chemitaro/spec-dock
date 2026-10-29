@@ -11,6 +11,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -18,15 +19,16 @@ import pytest
 
 from spec_dock.cli import main
 from spec_dock.runtime.application import canonical_scopes, canonical_work, canonical_writes
-from spec_dock.runtime.infra import github_snapshot, github_structure, runtime_environment
+from spec_dock.runtime.infra import canonical_scheduling, github_snapshot, github_structure, runtime_environment
 from spec_dock.runtime.infra.github_structure import GithubRepository
 from tests.support.canonical_repo import bare_remote, clone, environment, git, isolate_user_state
 from tests.support.canonical_scopes import REPOSITORY
 from tests.support.canonical_writes import WriteClock, seeded_files
 from tests.support.fake_github import FakeGithub, install_fake_gh
 
+from tests.support.canonical_sync import FakeScheduler
+
 if TYPE_CHECKING:
-    from tests.support.canonical_sync import FakeScheduler
     from tests.support.fake_github import FakeGhExecutable
 
 ENVIRONMENTS = {
@@ -50,14 +52,28 @@ class _Clock:
 
 
 class Clones:
-    def __init__(self, tmp_path: Path, capsys: pytest.CaptureFixture[str], gh: FakeGhExecutable) -> None:
+    """Two PCs: each clone runs with its own XDG_STATE_HOME (registry, state.json, structure snapshot)."""
+
+    def __init__(
+        self,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str],
+        gh: FakeGhExecutable,
+    ) -> None:
+        self.tmp_path = tmp_path
+        self.monkeypatch = monkeypatch
         self.capsys = capsys
         self.gh = gh
         self.remote = bare_remote(tmp_path / "remote.git", files=seeded_files())
         self.a = clone(self.remote, tmp_path / "a")
         self.b = clone(self.remote, tmp_path / "b")
+        self.a_worktrees: list[Path] = []
 
     def run(self, checkout: Path, *argv: str) -> tuple[int, dict[str, Any]]:
+        pc = "a" if checkout in (self.a, *self.a_worktrees) else "b"
+        self.monkeypatch.setenv("XDG_STATE_HOME", str(self.tmp_path / f"state-{pc}"))
+        github_snapshot.clear_memory()  # a process of that PC holds no snapshot of the other
         self.capsys.readouterr()
         code = main(["--project", str(checkout), *argv, "--json"])
         return code, json.loads(self.capsys.readouterr().out)
@@ -83,12 +99,20 @@ def test_link_create_edit_sync_start_and_finish_across_two_clones(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
-    periodic_jobs: dict[str, FakeScheduler],
     kind: str,
 ) -> None:
     isolate_user_state(monkeypatch, tmp_path)
+    jobs: dict[str, FakeScheduler] = {}  # one periodic job per PC (state root), as on two machines
+
+    def scheduler_for(chosen: str, **_kwargs: object) -> FakeScheduler:
+        return jobs.setdefault(f"{chosen}@{os.environ['XDG_STATE_HOME']}", FakeScheduler(chosen, simulate_run=True))
+
+    monkeypatch.setattr(canonical_scheduling, "scheduler_for", scheduler_for)
     linux = replace(environment(), system="linux", **ENVIRONMENTS[kind])
-    monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: linux)
+    # Built per call so each PC's XDG_STATE_HOME reaches the registration as well.
+    monkeypatch.setattr(
+        runtime_environment, "detect_runtime_environment", lambda *a, **k: replace(linux, environ=dict(os.environ))
+    )
     github_snapshot.clear_memory()
     monkeypatch.setattr(canonical_writes, "WRITE_CLOCK", WriteClock())
     save_clock = _Clock()
@@ -96,13 +120,12 @@ def test_link_create_edit_sync_start_and_finish_across_two_clones(
     repository = GithubRepository.parse(REPOSITORY)
     for module in (github_structure, canonical_writes, canonical_scopes):
         monkeypatch.setattr(module, "repository_for_checkout", lambda root, *, timeout: repository)
-    clones = Clones(tmp_path, capsys, install_fake_gh(tmp_path, monkeypatch, FakeGithub(REPOSITORY)))
+    clones = Clones(tmp_path, monkeypatch, capsys, install_fake_gh(tmp_path, monkeypatch, FakeGithub(REPOSITORY)))
     a, b = clones.a, clones.b
 
     # A: link (registers the injected periodic job), then create a Scope chain with Japanese titles.
-    linked = clones.ok(a, "canonical", "link")
-    assert ("ensure", kind) in periodic_jobs[kind].calls, linked
-    assert set(periodic_jobs) == {kind}
+    clones.ok(a, "canonical", "link")
+    assert [job.calls[0] for job in jobs.values()] == [("ensure", kind)]
     init = clones.ok(a, "scope", "create", "initiative", "--backend", "github", "--title", "仕様の集約", "--yes")
     init_id = init["data"]["result"]["scope"]["id"]
     epic_id = clones.ok(
@@ -120,11 +143,18 @@ def test_link_create_edit_sync_start_and_finish_across_two_clones(
 
     # A: edit the Issue's design like any file; the next sync saves and pushes it.
     (clones.specs(a) / relative / "design.md").write_text("# 設計\n\nA が書いた\n", encoding="utf-8")
+    sibling = tmp_path / "a-sibling"
+    clones.a_worktrees.append(sibling)
+    clones.ok(a, "worktree", "create", "a-sibling", "--base", "origin/main", "--root", str(tmp_path), "--yes")
+    # AC-02 on one PC: another worktree reads the edit through its own link before any save.
+    assert "A が書いた" in (clones.specs(sibling) / relative / "design.md").read_text(encoding="utf-8")
+    assert git(a / "spec-dock/.canonical", "status", "--porcelain")  # still unsaved
     synced = clones.ok(a, "canonical", "sync")
     assert synced["data"]["catalogs"][0]["pushed"] is True, synced
 
     # B: link and sync; A's Scope and edit are readable, and the title comes from GitHub.
     clones.ok(b, "canonical", "link")
+    job_b = jobs[f"{kind}@{tmp_path / 'state-b'}"]
     clones.ok(b, "canonical", "sync")
     assert "A が書いた" in (clones.specs(b) / relative / "design.md").read_text(encoding="utf-8")
     reads = clones.full_reads()
@@ -144,11 +174,11 @@ def test_link_create_edit_sync_start_and_finish_across_two_clones(
         code, payload = clones.run(b, "canonical", "sync")
         assert code == 0, payload
 
-    periodic_jobs[kind].on_kick = kick
-    periodic_jobs[kind].simulate_run = False
+    job_b.on_kick = kick
+    job_b.simulate_run = False
     finished = clones.ok(b, "work", "finish", issue_id, "--yes")
     assert finished["data"]["completed"] is True, finished
-    assert periodic_jobs[kind].calls[-1] == ("kick", kind)  # finish asked the job for a cycle now
+    assert job_b.calls[-1] == ("kick", kind)  # finish asked the job for a cycle now
     pushed = git(clones.remote, "show", f"spec-dock/canonical:{relative.as_posix()}/plan.md")
     assert "B が仕上げた" in pushed
     closed = clones.fake().issue(number)

@@ -13,6 +13,7 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_TOOL_SETTING_UNKNOWN,
 )
 from spec_dock.runtime.domain.canonical_tools import (
+    CLAUDE_CONFIG_DIR,
     CODEX_CONFIG_FILE,
     CODEX_SECTION,
     claude_allows,
@@ -73,6 +74,8 @@ def tool_findings(
     }
     if not layout.is_main:
         payloads = _claude_settings(layout.checkout, user_settings)
+        if user_settings is None and environment.environ.get(CLAUDE_CONFIG_DIR):
+            payloads.insert(0, (Path(user_settings_file), None))  # a relative CLAUDE_CONFIG_DIR cannot be read
         claude["sources"] = [str(source) for source, _payload in payloads]
         configured = claude_allows(
             payloads,

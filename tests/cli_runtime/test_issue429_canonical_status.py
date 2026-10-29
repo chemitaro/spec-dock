@@ -303,6 +303,20 @@ def test_claude_config_dir_moves_the_user_settings_file(
     assert result["data"]["tools"]["claude_code"]["sources"][0] == str(settings)
 
 
+def test_a_relative_claude_config_dir_cannot_be_judged(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    linked_clone: tuple[Path, Path],
+    isolated: Path,
+) -> None:
+    """iss-00436: a relative or ~ CLAUDE_CONFIG_DIR names no place this process can read."""
+    _main, linked = linked_clone
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "~/claude-config")
+    _code, result = run(capsys, linked, "canonical", "status")
+    assert result["data"]["tools"]["claude_code"]["configured"] is None
+    assert [item["code"] for item in result["warnings"]] == ["CANONICAL_TOOL_SETTING_UNKNOWN"]
+
+
 def test_unreadable_claude_code_settings_cannot_be_judged(
     capsys: pytest.CaptureFixture[str], linked_clone: tuple[Path, Path], isolated: Path
 ) -> None:
