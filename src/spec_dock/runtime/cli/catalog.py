@@ -41,6 +41,7 @@ LEAF_PATHS: tuple[str, ...] = (
     "scope close",
     "scope reopen",
     "scope delete",
+    "scope move",
     "active show",
     "active set",
     "active clear",
@@ -96,6 +97,7 @@ HELP_EFFECTS: dict[str, str] = {
     "scope close": "Complete or cancel one Scope in its backend; active selection stays set.",
     "scope reopen": "Reopen one Scope in its backend; active selection stays set.",
     "scope delete": "Delete local Scope-owned files; GitHub and branches remain.",
+    "scope move": "Change a Scope parent in GitHub; the flat catalog directory does not move.",
     "active show": "Read this worktree's active selection; no changes.",
     "active set": "Keep the same valid direct selection unchanged and repair only its spec-dock/active navigation links; acquiring another selection requires work start.",
     "active clear": "Remove only observed local direct records and point spec-dock/active links at the fallback when none remains; never promote an ancestor.",
@@ -182,6 +184,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _flag("--detach-dependencies"),
         _arg("--backup-dir"),
     ),
+    "scope move": (_arg("target"), _required("--parent")),
     "active show": (),
     "active set": (_arg("target"),),
     "active clear": (_arg("--from", dest="from_target"), _flag("--all")),
@@ -273,6 +276,7 @@ MUTATING_LEAF_PATHS = frozenset({
     "scope close",
     "scope reopen",
     "scope delete",
+    "scope move",
     "active set",
     "active clear",
     "work start",
@@ -325,6 +329,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
     "scope delete": "Require --backup-dir ABS for a new real backup; descendants require --recursive, incoming edges require --detach-dependencies, and a selected descendant requires --clear-active.",
+    "scope move": "A schema-4 checkout; --parent is required and must be the right kind and open, and not the Scope or one of its descendants.",
     "active show": "The selected worktree must have readable active-selection state.",
     "active set": "Only the same valid direct target is accepted; its selection stays unchanged. Use work start to acquire a selection.",
     "active clear": "--from requires a valid current chain; --all --yes permits discarding observed corrupt regular records. Unknown entries are preserved; ancestors are never promoted.",
@@ -654,6 +659,23 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not modify documents, GitHub state, direct selection or checkout, or acquire a Start lock."
         json_data = "scope, github_ref, changed; dry-run adds can_apply and blockers."
         confirmation = "No final confirmation is required for a local title edit."
+    elif leaf == "scope move":
+        reads = (
+            "The GitHub structure snapshot checked at decision freshness and the target and new parent Issues"
+            " and parents read again."
+        )
+        writes = (
+            "The GitHub parent of the Scope (sub-issue with replace_parent); this checkout's spec-dock/active"
+            " links when it selects the Scope or a descendant."
+        )
+        does_not = (
+            "Does not write the catalog, move directories, edit documents, close or reopen Issues, or change"
+            " selection or branches."
+        )
+        json_data = (
+            "scope, github_ref, changed, parent_before, parent_after, snapshot; dry-run adds can_apply and blockers."
+        )
+        confirmation = "No final confirmation is required for this leaf."
     elif leaf == "scope delete":
         reads = "Current Scope subtree, incoming dependency metadata, and this worktree's captured direct selection."
         json_data = "removed_ids, changed_paths, remaining_paths, backup_path; dry-run adds can_apply and blockers."

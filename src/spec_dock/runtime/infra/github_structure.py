@@ -537,8 +537,13 @@ class GithubStructureClient:
         endpoint = f"{self._base}/issues/{_positive(number)}"
 
         def confirmed() -> IssueFacts | None:
+            # Every sent value must be visible, the state reason included (a close may differ only there).
             observed = self.get_issue(number)
-            matches = (title is None or observed.title == title) and (state is None or observed.state == state)
+            matches = (
+                (title is None or observed.title == title)
+                and (state is None or observed.state == state)
+                and (state_reason is None or observed.state_reason == state_reason)
+            )
             return observed if matches else None
 
         return self._write(
