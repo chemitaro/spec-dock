@@ -1,4 +1,4 @@
-"""Catalog file operations for canonical Scope writes: template copies and directory moves without replacement.
+"""Catalog file operations for canonical Scope writes: template copies and the number buckets.
 
 Paths are real catalog paths (never through a checkout's spec-dock/initiatives link); every component is opened
 without following links, as the legacy publication adapters do.
@@ -6,13 +6,13 @@ without following links, as the legacy publication adapters do.
 
 from __future__ import annotations
 
+import errno
 import os
 import stat
 from typing import TYPE_CHECKING
 
-from spec_dock.runtime.domain.canonical_scaffold import strip_structure_front_matter
-from spec_dock.runtime.infra.direct_json import _create_guarded_directory
-from spec_dock.runtime.infra.json_store import _rename_no_replace_at, open_guarded_directory
+from spec_dock.runtime.domain.canonical_scaffold import rebase_spec_dock_links, strip_structure_front_matter
+from spec_dock.runtime.infra.json_store import open_guarded_directory
 from spec_dock.runtime.infra.template_scaffolder import (
     _open_parent_at,
     _preflight_no_collision_at,
@@ -25,8 +25,17 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
+class BucketOccupied(ValueError):
+    """The bucket's place holds a symlink or a file, which the catalog never treats as a bucket."""
+
+    def __init__(self, path: Path) -> None:
+        super().__init__(f"{path} is not a real directory; a number bucket must be one")
+        self.path = path
+
+
 def copy_scope_template_at(src_dir: Path, dest_dir: Path, dest_fd: int, replacements: dict[str, str]) -> list[Path]:
-    """Copy a Scope template through a held directory descriptor, rendered and without title/parent lines."""
+    """Copy a Scope template through a held directory descriptor, rendered, without title/parent lines and
+    with its spec-dock/docs links at the flat Scope depth."""
     if not src_dir.is_dir():
         raise RuntimeError(f"Missing template directory: {src_dir}")
     template_files = _template_files(src_dir)
@@ -41,7 +50,8 @@ def copy_scope_template_at(src_dir: Path, dest_dir: Path, dest_fd: int, replacem
         except UnicodeDecodeError:
             payload, mode = source_bytes, source_mode
         else:
-            payload = strip_structure_front_matter(render_text(text, replacements)).encode("utf-8")
+            rendered = rebase_spec_dock_links(strip_structure_front_matter(render_text(text, replacements)))
+            payload = rendered.encode("utf-8")
             mode = source_mode if payload == source_bytes else 0o666
         parent_fd = _open_parent_at(dest_fd, relative.parts[:-1], create=True)
         assert parent_fd is not None
@@ -57,19 +67,40 @@ def copy_scope_template_at(src_dir: Path, dest_dir: Path, dest_fd: int, replacem
     return created
 
 
-def move_directory(source: Path, target: Path) -> None:
-    """Rename `source` to `target` without replacing anything; missing parents of `target` are created."""
-    source_fd = open_guarded_directory(source.parent)
+def prepare_bucket(catalog: Path, bucket: str) -> bool:
+    """Make sure `<catalog>/<bucket>` is a real directory; True when it was created now."""
+    catalog_fd = open_guarded_directory(catalog)
     try:
-        observed = os.stat(source.name, dir_fd=source_fd, follow_symlinks=False)
-        if not stat.S_ISDIR(observed.st_mode):
-            raise ValueError(f"{source} is not a directory")
-        target_fd = _create_guarded_directory(target.parent)
         try:
-            _rename_no_replace_at(source_fd, source.name, target_fd, target.name)
-            os.fsync(target_fd)
-        finally:
-            os.close(target_fd)
-        os.fsync(source_fd)
+            os.mkdir(bucket, dir_fd=catalog_fd)
+        except FileExistsError:
+            observed = os.stat(bucket, dir_fd=catalog_fd, follow_symlinks=False)
+            if not stat.S_ISDIR(observed.st_mode):
+                raise BucketOccupied(catalog / bucket) from None
+            return False
+        os.fsync(catalog_fd)
+        return True
     finally:
-        os.close(source_fd)
+        os.close(catalog_fd)
+
+
+def remove_empty_bucket(catalog: Path, bucket: str) -> bool:
+    """Remove `<catalog>/<bucket>` when it is an empty real directory; True when it was removed now."""
+    catalog_fd = open_guarded_directory(catalog)
+    try:
+        try:
+            observed = os.stat(bucket, dir_fd=catalog_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            return False
+        if not stat.S_ISDIR(observed.st_mode):
+            return False
+        try:
+            os.rmdir(bucket, dir_fd=catalog_fd)
+        except OSError as error:
+            if error.errno in (errno.ENOTEMPTY, errno.EEXIST):
+                return False
+            raise
+        os.fsync(catalog_fd)
+        return True
+    finally:
+        os.close(catalog_fd)

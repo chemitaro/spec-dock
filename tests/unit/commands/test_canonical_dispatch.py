@@ -95,6 +95,8 @@ def test_schema_four_runs_registered_canonical_handlers_with_the_mode(
 
     monkeypatch.setitem(canonical_dispatch.CANONICAL_HANDLERS, "scope list", handler)
     assert _result(dispatch(_namespace("scope list", root), root))[0] == 0 and seen == ["canonical"]
+    # iss-00432 registered every command; an unregistered one still falls back to CANONICAL_NOT_IMPLEMENTED.
+    monkeypatch.delitem(canonical_dispatch.CANONICAL_HANDLERS, "scope close")
     code, result = _result(dispatch(_namespace("scope close", root, target="init-00001"), root))
     assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED"
 

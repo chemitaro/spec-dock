@@ -1,9 +1,9 @@
 """Canonical-mode `scope edit`, `scope move`, `scope close`, `scope reopen` and `scope delete` (iss-00432).
 
-Titles, states and parents change on GitHub after a `decision` check and a reread of the target; directories
-follow the GitHub parent in the catalog under the catalog lock. `scope delete` takes the Scope out of the
-structure (kind labels, parent, incoming dependencies) and removes its directory after a verified backup; the
-Issue itself is never closed or deleted.
+Titles, states and parents change on GitHub after a `decision` check and a reread of the target; the flat
+catalog directories never move. `scope delete` takes the Scope out of the structure (kind labels, parent,
+incoming dependencies) and removes each `<bucket>/<ID>/` after a verified backup; the Issue itself is never
+closed or deleted.
 """
 
 from __future__ import annotations
@@ -16,9 +16,9 @@ import stat
 from typing import TYPE_CHECKING, cast
 
 from spec_dock.runtime.application.canonical_scope_create import require_open_chain
-from spec_dock.runtime.application.canonical_scopes import SCOPE_NESTING
 from spec_dock.runtime.application.canonical_writes import (
     LOCAL_FAILURES,
+    WRITE_FAILURES,
     WriteFailed,
     check_expectations,
     confirmed_interactively,
@@ -29,6 +29,7 @@ from spec_dock.runtime.application.canonical_writes import (
 )
 from spec_dock.runtime.application.scope_completion_plan import plan_close, plan_reopen
 from spec_dock.runtime.application.worktree_observation import ancestors_for
+from spec_dock.runtime.domain.canonical_scaffold import validate_canonical_title
 from spec_dock.runtime.domain.canonical_structure import (
     KIND_LABELS,
     PARENT_KINDS,
@@ -37,7 +38,7 @@ from spec_dock.runtime.domain.canonical_structure import (
     SetParent,
     UpsertIssue,
 )
-from spec_dock.runtime.infra.canonical_scaffold import move_directory
+from spec_dock.runtime.infra.canonical_scaffold import remove_empty_bucket
 from spec_dock.runtime.infra.direct_json import _create_guarded_directory
 from spec_dock.runtime.infra.json_store import open_guarded_directory, read_guarded_json_bytes
 from spec_dock.runtime.infra.tree_backup import copy_bytes_at, copy_tree_at, tree_digest, verify_backup_root
@@ -52,20 +53,18 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.canonical_writes import WriteSession
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_completion_plan import CompletionReason
-    from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.lifecycle import ObservedState
 
 
 def edit_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     """Change only the GitHub title; catalog files keep their creation-time headings."""
     context.require_writer()
-    title = namespace.title.strip()
-    if not title:
-        raise ValueError("Scope title must not be empty")
+    title = validate_canonical_title(namespace.title, field="--title")
     session = open_write_session(context, namespace, link=False)
     selection = session.selection()
     target = session.resolve(namespace.target, selection)
     check_expectations(session, namespace, selection, target)
+    session.require_kind_unchanged(target.id)
     number = session.node(target.id).number
     session.reread([number])
     if session.node(target.id).title == title:
@@ -74,8 +73,12 @@ def edit_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             return planned(namespace.command_path, _dry(data), (), session.warnings)
         return session.result("unchanged", data)
     if namespace.dry_run:
-        return planned(namespace.command_path, _dry(_scope_data(session, target.id, changed=False)),
-                       (("github.issue.title", target.id),), session.warnings)
+        return planned(
+            namespace.command_path,
+            _dry(_scope_data(session, target.id, changed=False)),
+            (("github.issue.title", target.id),),
+            session.warnings,
+        )
     try:
         session.write(
             "github.issue.title",
@@ -103,6 +106,7 @@ def lifecycle_scope(namespace: argparse.Namespace, context: ProjectContext) -> O
     selection = session.selection()
     target = session.resolve(namespace.target, selection)
     check_expectations(session, namespace, selection, target)
+    session.require_kind_unchanged(target.id)
     number = session.node(target.id).number
     session.reread([number])
     views = session.scopes.views
@@ -133,13 +137,15 @@ def lifecycle_scope(namespace: argparse.Namespace, context: ProjectContext) -> O
         session.write(
             kind,
             reference,
-            lambda: session.client.update_issue(
-                number,
-                state="closed",
-                state_reason="completed" if reason == "completed" else "not_planned",
-            )
-            if close
-            else session.client.update_issue(number, state="open"),
+            lambda: (
+                session.client.update_issue(
+                    number,
+                    state="closed",
+                    state_reason="completed" if reason == "completed" else "not_planned",
+                )
+                if close
+                else session.client.update_issue(number, state="open")
+            ),
             lambda facts: [UpsertIssue(facts)],
         )
     except WriteFailed as error:
@@ -155,101 +161,58 @@ def lifecycle_scope(namespace: argparse.Namespace, context: ProjectContext) -> O
 
 
 def move_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    """Re-parent on GitHub (with --parent), then move the directory under the GitHub parent's directory."""
+    """Change only the GitHub parent (replace_parent); the flat catalog directory stays where it is."""
     context.require_writer()
-    session = open_write_session(context, namespace, link=True)
-    assert session.catalog is not None
+    session = open_write_session(context, namespace, link=False)
     selection = session.selection()
     target = session.resolve(namespace.target, selection)
     check_expectations(session, namespace, selection, target)
-    numbers = [session.node(target.id).number]
-    new_parent: ScopeView | None = None
-    if namespace.parent is not None:
-        required = PARENT_KINDS[target.kind]
-        if required is None:
-            raise ValueError("initiative cannot have a parent")
-        new_parent = session.resolve(namespace.parent, selection)
-        if new_parent.kind != required:
-            raise ValueError(f"{target.kind} parent must be a {required}")
-        if new_parent.id == target.id or target.id in {view.id for view in ancestors_for(session.scopes.views, new_parent)}:
-            raise ValueError("a Scope cannot move below itself or its descendants")
-        numbers.append(session.node(new_parent.id).number)
-    session.reread(numbers)
-    for number in numbers:
-        session.reread_parent(number)
-    target = session.scopes.view(target.id)
-    if new_parent is not None:
-        if target.id in {view.id for view in ancestors_for(session.scopes.views, session.scopes.view(new_parent.id))}:
-            raise ValueError("a Scope cannot move below itself or its descendants")
-        require_open_chain(session, new_parent.id)
-    source = session.scopes.directory(target.id)
-    if source is None:
-        raise FileNotFoundError(f"{target.id} has no directory in the catalog")
-    parent_id = new_parent.id if new_parent is not None else target.parent_id
-    if target.kind != "initiative" and parent_id is None:
-        raise ValueError(f"{target.id} has no GitHub parent; give --parent")
-    expected = source.relative.name if parent_id is None else None
-    if parent_id is not None:
-        parent_directory = session.scopes.directory(parent_id)
-        if parent_directory is None:
-            raise FileNotFoundError(f"{parent_id} has no directory in the catalog")
-        expected = (parent_directory.relative / SCOPE_NESTING[target.kind] / source.relative.name).as_posix()
-    assert expected is not None
-    destination = PurePosixPath(expected)
-    if destination != source.relative and os.path.lexists(session.catalog.catalog / destination):
-        raise ValueError(f"{destination} already exists in the catalog")
-    reparent = new_parent is not None and target.parent_id != new_parent.id
-    steps: list[tuple[str, str | None]] = []
-    if reparent:
-        steps.append(("github.sub-issue.add", new_parent.id if new_parent else None))
-    if destination != source.relative:
-        steps.append(("catalog.move", destination.as_posix()))
-
-    def data(changed: bool) -> FamilyData:
-        base = _scope_data(session, target.id, changed=changed)
-        return FamilyData(
-            "scope", {**base.result, "moved_from": source.relative.as_posix(), "moved_to": destination.as_posix()}
-        )
-
+    required = PARENT_KINDS[target.kind]
+    if required is None:
+        raise ValueError("an initiative has no parent to change")
+    new_parent = session.resolve(namespace.parent, selection)
+    if new_parent.kind != required:
+        raise ValueError(f"{target.kind} parent must be a {required}")
+    child_number, parent_number = session.node(target.id).number, session.node(new_parent.id).number
+    session.reread([child_number, parent_number])
+    session.reread_parent(child_number)
+    session.reread_parent(parent_number)
+    session.require_kind_unchanged(target.id, *session.scopes.lineage(new_parent.id))
+    parent_view = session.scopes.view(new_parent.id)
+    if new_parent.id == target.id or target.id in {
+        view.id for view in ancestors_for(session.scopes.views, parent_view)
+    }:
+        raise ValueError("a Scope cannot move below itself or its descendants")
+    require_open_chain(session, new_parent.id)
+    changed = session.scopes.view(target.id).parent_id != new_parent.id
+    steps: list[tuple[str, str | None]] = [("github.sub-issue.add", new_parent.id)] if changed else []
     if namespace.dry_run:
-        return planned(namespace.command_path, _dry(data(False)), steps, session.warnings)
-    if not steps:
-        return session.result("unchanged", data(False))
-    try:
-        if reparent:
-            assert new_parent is not None
-            child = session.node(target.id)
-            parent_number = session.node(new_parent.id).number
-            session.write(
-                "github.sub-issue.add",
-                new_parent.id,
-                lambda: session.client.add_sub_issue(
-                    parent_number, child=child.number, child_id=child.database_id, replace_parent=True
-                ),
-                lambda _: [SetParent(child.number, parent_number)],
-            )
-        if destination != source.relative:
-            with session.catalog_changes() as changes:
-                move_directory(session.catalog.catalog / source.relative, session.catalog.catalog / destination)
-                changes.add(destination)
-                changes.delete(source.relative)
-            session.effects.append(Effect("catalog.move", "succeeded", destination.as_posix()))
-            session.reload_catalog()
-            _follow_moved_selections(session, target.id, namespace.timeout)
-    except (WriteFailed, *LOCAL_FAILURES) as error:
-        remaining = [step for step in steps if step[0] not in {effect.kind for effect in session.effects}]
-        return session.incomplete(
-            data(False),
-            error,
-            pending=remaining,
-            recovery=(f"Run spec-dock scope move {target.id}; it moves the directory to the GitHub parent.",),
-            code="SCOPE_MOVE_INCOMPLETE",
+        return planned(
+            namespace.command_path, _dry(_scope_data(session, target.id, changed=False)), steps, session.warnings
         )
-    return session.result("succeeded", data(True))
+    if not changed:
+        return session.result("unchanged", _scope_data(session, target.id, changed=False))
+    child = session.node(target.id)
+    try:
+        session.write(
+            "github.sub-issue.add",
+            new_parent.id,
+            lambda: session.client.add_sub_issue(
+                parent_number, child=child.number, child_id=child.database_id, replace_parent=True
+            ),
+            lambda _: [SetParent(child.number, parent_number)],
+        )
+    except WriteFailed as error:
+        return session.incomplete(
+            _scope_data(session, target.id, changed=False),
+            error,
+            recovery=(f"Inspect the GitHub parent of {target.github_ref} before a new explicit move.",),
+        )
+    return session.result("succeeded", _scope_data(session, target.id, changed=True))
 
 
 def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    """Back up, then detach on GitHub (dependencies, parent, kind labels), then remove the directory."""
+    """Back up, then remove each flat directory, then detach on GitHub (dependencies, parent, kind labels)."""
     context.require_writer()
     empty = FamilyData("deletion", {"removed_ids": (), "changed_paths": (), "remaining_paths": (), "backup_path": None})
     if needs_confirmation(namespace):
@@ -271,7 +234,8 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     target = session.resolve(namespace.target, selection)
     check_expectations(session, namespace, selection, target)
     views = session.scopes.views
-    descendants = tuple(view for view in views if target.id in {parent.id for parent in ancestors_for(views, view)})
+    # The unchecked GitHub parent chain: a kind change may break the checked chain, and delete must still work.
+    descendants = tuple(view for view in views if target.id in session.scopes.lineage(view.id)[1:])
     if descendants and not namespace.recursive:
         raise ValueError("RECURSIVE_REQUIRED")
     deleted_ids = (target.id, *(view.id for view in descendants))
@@ -290,21 +254,13 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     )
     if incoming and not namespace.detach_dependencies:
         raise ValueError("DETACH_DEPENDENCIES_REQUIRED")
-    source = session.scopes.directory(target.id)
-    for view in descendants:
-        found = session.scopes.directory(view.id)
-        if source is not None and found is not None and not found.relative.is_relative_to(source.relative):
-            raise ValueError(
-                f"{view.id} lies outside {source.relative}; run spec-dock scope move {view.id} first, "
-                "so its directory is backed up and removed with the subtree"
-            )
-    # A rerun after a stopped GitHub step finds the directory already gone and only finishes the GitHub steps.
-    relative = source.relative if source is not None else None
-    root = linked.catalog / relative if relative is not None else None
-    if root is not None and (
-        backup.is_relative_to(root) or root.is_relative_to(backup) or backup.is_relative_to(context.common_dir)
+    # A rerun after a stopped step finds some directories already gone and only finishes the rest.
+    relatives = _deleted_directories(session, deleted_ids)
+    roots = {relative: linked.catalog / relative for relative in relatives}
+    if any(backup.is_relative_to(root) or root.is_relative_to(backup) for root in roots.values()) or any(
+        backup.is_relative_to(path) for path in (linked.catalog, context.common_dir)
     ):
-        raise ValueError("backup must not overlap the deleted subtree or Git metadata")
+        raise ValueError("backup must not overlap the catalog, the deleted directories or Git metadata")
     record_path = (
         context.root / "spec-dock/.agent/work-target" / selection.handle.basename
         if clear and selection.handle is not None
@@ -320,19 +276,19 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         ):
             raise ValueError("captured selection changed before backup")
         record_bytes = loaded[1]
-    expected_entries = (
-        {path.relative_to(root).as_posix(): path.lstat() for path in (root, *root.rglob("*"))} if root else {}
-    )
-    expected = tree_digest(root) if root is not None else None
+    expected_entries = {
+        relative: {path.relative_to(root).as_posix(): path.lstat() for path in (root, *root.rglob("*"))}
+        for relative, root in roots.items()
+    }
+    expected = {relative: tree_digest(root) for relative, root in roots.items()}
     parent_number = session.node(target.id).parent
-    shown = relative.as_posix() if relative is not None else target.id
+    shown = [relative.as_posix() for relative in relatives]
     steps: list[tuple[str, str | None]] = []
-    if root is not None:
+    if relatives:
         steps.append(("backup", str(backup)))
     if clear and selection.handle is not None:
         steps.append(("selection.clear", selection.handle.token))
-    if relative is not None:
-        steps.append(("scope.delete", shown))
+    steps.extend(("scope.delete", path) for path in shown)
     steps.extend(("dependency-edge", f"{scope_id}->{_id_of(session, blocker)}") for scope_id, blocker in incoming)
     if parent_number is not None:
         steps.append(("github.sub-issue.remove", target.id))
@@ -352,25 +308,25 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     if namespace.dry_run:
         return planned(
             namespace.command_path,
-            FamilyData("deletion", {**data((), [], [shown]).result, "can_apply": True, "blockers": ()}),
+            FamilyData("deletion", {**data((), [], shown).result, "can_apply": True, "blockers": ()}),
             steps,
             session.warnings,
         )
     if not confirmed_interactively(
         namespace,
         (
-            f"Target: {target.id}; subtree: {root or 'none (already removed)'}",
+            f"Target: {target.id}; directories: {', '.join(shown) or 'none (already removed)'}",
             f"Backup: {backup}; removed Scopes: {', '.join(deleted_ids)}",
             f"Incoming dependencies detached: {', '.join(scope_id for scope_id, _ in incoming) or 'none'}",
             f"Clear captured direct selection: {'yes' if clear else 'no'}",
         ),
     ):
-        return declined(namespace.command_path, data((), [], [shown]))
+        return declined(namespace.command_path, data((), [], shown))
     changed: list[str] = []
     try:
-        if root is not None and relative is not None and expected is not None:
+        if relatives:
             try:
-                _write_backup(backup, relative, root, expected, record_path, record_bytes, context.root)
+                _write_backup(backup, roots, expected, record_path, record_bytes, context.root)
             except LOCAL_FAILURES:
                 session.effects.append(
                     Effect("backup", "unknown" if os.path.lexists(backup) else "failed", str(backup))
@@ -390,31 +346,26 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
             session.effects.append(
                 Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", selection.handle.token)
             )
-        if root is not None and relative is not None:
+        if relatives:
             with session.catalog_changes() as changes:
-                if tree_digest(root) != expected:
-                    raise ValueError("delete subtree changed after the backup")
-                try:
-                    remove_tree(root, expected_entries=expected_entries)
-                except TreeRemovalIncomplete as error:
-                    if error.applied:
-                        changes.delete(relative)
-                        session.effects.append(Effect("scope.delete", "unknown", shown))
-                    raise error.cause from error
-                changes.delete(relative)
-            changed.append(shown)
-            session.effects.append(Effect("scope.delete", "succeeded", shown))
+                for relative, root in roots.items():
+                    if tree_digest(root) != expected[relative]:
+                        raise ValueError(f"{relative} changed after the backup")
+                for relative, root in roots.items():
+                    try:
+                        remove_tree(root, expected_entries=expected_entries[relative])
+                    except TreeRemovalIncomplete as error:
+                        if error.applied:
+                            changes.delete(relative)
+                            session.effects.append(Effect("scope.delete", "unknown", relative.as_posix()))
+                        raise error.cause from error
+                    changes.delete(relative)
+                    changed.append(relative.as_posix())
+                    session.effects.append(Effect("scope.delete", "succeeded", relative.as_posix()))
+                for bucket in sorted({relative.parent.as_posix() for relative in relatives}):
+                    remove_empty_bucket(linked.catalog, bucket)
         for scope_id, blocker in incoming:
-            number = session.node(scope_id).number
-            blocker_id = session.scopes.snapshot.issues[blocker].database_id
-            session.write(
-                "dependency-edge",
-                f"{scope_id}->{_id_of(session, blocker)}",
-                lambda number=number, blocker=blocker, blocker_id=blocker_id: session.client.remove_blocked_by(
-                    number, blocker=blocker, blocker_id=blocker_id
-                ),
-                lambda _, number=number, blocker=blocker: [RemoveBlockedBy(number, blocker)],
-            )
+            _detach_dependency(session, scope_id, blocker)
         node = session.node(target.id)
         if parent_number is not None:
             session.write(
@@ -424,32 +375,63 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 lambda _: [SetParent(node.number, None)],
             )
         for scope_id in reversed(deleted_ids):
-            removed = session.node(scope_id)
-            kind_label = KIND_LABELS[removed.kind] if removed.kind else None
-            if kind_label is None:
-                continue
-            facts = session.known_facts(removed.number)
-            session.write(
-                "github.issue.label",
-                scope_id,
-                lambda removed=removed, kind_label=kind_label: session.client.remove_label(removed.number, kind_label),
-                lambda _, facts=facts, kind_label=kind_label: [
-                    UpsertIssue(replace(facts, labels=tuple(label for label in facts.labels if label != kind_label)))
-                ],
-            )
-    except (WriteFailed, *LOCAL_FAILURES) as error:
-        remaining = [step for step in steps if step[0] not in {effect.kind for effect in session.effects}]
+            _remove_kind_label(session, scope_id)
+    except WRITE_FAILURES as error:
+        done = {(effect.kind, effect.target) for effect in session.effects}
         return session.incomplete(
-            data((), changed, [] if changed else [shown]),
+            data((), changed, [path for path in shown if path not in changed]),
             error,
-            pending=remaining,
+            pending=[step for step in steps if step not in done],
             code="SCOPE_DELETE_INCOMPLETE",
             recovery=(
                 f"Inspect the retained backup and GitHub, then run the same spec-dock scope delete {target.id} with a "
-                "new --backup-dir; it skips what is already done and finishes the GitHub steps.",
+                "new --backup-dir; it skips what is already done and finishes the rest.",
             ),
         )
     return session.result("succeeded", data(deleted_ids, changed, []))
+
+
+def _detach_dependency(session: WriteSession, scope_id: str, blocker: int) -> None:
+    number = session.node(scope_id).number
+    blocker_id = session.scopes.snapshot.issues[blocker].database_id
+    session.write(
+        "dependency-edge",
+        f"{scope_id}->{_id_of(session, blocker)}",
+        lambda: session.client.remove_blocked_by(number, blocker=blocker, blocker_id=blocker_id),
+        lambda _: [RemoveBlockedBy(number, blocker)],
+    )
+
+
+def _remove_kind_label(session: WriteSession, scope_id: str) -> None:
+    """The Issue stops being a Scope; it is never closed or deleted."""
+    removed = session.node(scope_id)
+    if removed.kind is None:
+        return
+    kind_label = KIND_LABELS[removed.kind]
+    facts = session.known_facts(removed.number)
+    session.write(
+        "github.issue.label",
+        scope_id,
+        lambda: session.client.remove_label(removed.number, kind_label),
+        lambda _: [UpsertIssue(replace(facts, labels=tuple(label for label in facts.labels if label != kind_label)))],
+    )
+
+
+def _deleted_directories(session: WriteSession, deleted_ids: tuple[str, ...]) -> tuple[PurePosixPath, ...]:
+    """Each deleted Scope's `<bucket>/<ID>/` and its number's old-kind directories, as far as they still exist."""
+    linked = session.catalog
+    assert linked is not None
+    found: list[PurePosixPath] = []
+    for scope_id in deleted_ids:
+        directory = linked.tree.find(scope_id)
+        if directory is not None:
+            found.append(directory.relative)
+        change = session.scopes.kind_changes.get(session.node(scope_id).number)
+        for name in change.directories if change is not None else ():
+            old = linked.tree.find(name)
+            if old is not None:
+                found.append(old.relative)
+    return tuple(dict.fromkeys(found))
 
 
 def require_known_descendants(session: WriteSession, scope_id: str) -> None:
@@ -474,32 +456,6 @@ def require_known_descendants(session: WriteSession, scope_id: str) -> None:
             pending.append(child)
 
 
-def _follow_moved_selections(session: WriteSession, moved: str, timeout: float) -> None:
-    """Point this checkout's active links at the new place; warn for other worktrees selecting the moved range."""
-    from spec_dock.runtime.application.active_links import sync_selection_links
-    from spec_dock.runtime.application.canonical_workspace import _observe_rows
-
-    views = session.scopes.views
-    moved_ids = {moved} | {view.id for view in views if moved in {item.id for item in ancestors_for(views, view)}}
-    for row in _observe_rows(session.context, session.scopes, timeout=timeout):
-        record = row.selection.record
-        if record is None or record.scope_id not in moved_ids:
-            continue
-        if Path(row.path).resolve() == session.context.root.resolve():
-            effects, warnings = sync_selection_links(session.context, views, record.scope_id, dry_run=False, timeout=timeout)
-            session.effects.extend(effects)
-            session.warnings.extend(warnings)
-        else:
-            step = f"In {row.path}, run spec-dock active set {record.scope_id}."
-            session.warnings.append(
-                Diagnostic(
-                    "ACTIVE_LINK_NOT_UPDATED",
-                    f"{row.path} selects {record.scope_id}, whose directory moved; next: {step}",
-                    {"path": row.path, "scope_id": record.scope_id, "next_step": step},
-                )
-            )
-
-
 def _backup_destination(value: str | None) -> Path:
     if value is None:
         raise ValueError("Scope deletion requires --backup-dir ABS")
@@ -522,14 +478,13 @@ def _backup_destination(value: str | None) -> Path:
 
 def _write_backup(
     backup: Path,
-    relative: PurePosixPath,
-    root: Path,
-    expected: str,
+    roots: dict[PurePosixPath, Path],
+    expected: dict[PurePosixPath, str],
     record_path: Path | None,
     record_bytes: bytes | None,
     checkout: Path,
 ) -> None:
-    """Copy the subtree (and the cleared selection record) to the new backup directory and verify it."""
+    """Copy each directory to `<backup>/<bucket>/<name>` (and the cleared selection record) and verify it."""
     parent_fd = _create_guarded_directory(backup.parent)
     try:
         os.mkdir(backup.name, mode=0o700, dir_fd=parent_fd)
@@ -537,8 +492,9 @@ def _write_backup(
         os.close(parent_fd)
     backup_fd = open_guarded_directory(backup)
     try:
-        copy_tree_at(backup_fd, Path(relative), root)
-        verify_backup_root(backup, backup_fd)
+        for relative, root in roots.items():
+            copy_tree_at(backup_fd, Path(relative), root)
+            verify_backup_root(backup, backup_fd)
         if record_path is not None and record_bytes is not None:
             copy_bytes_at(
                 backup_fd, record_path.relative_to(checkout), record_bytes, stat.S_IMODE(record_path.stat().st_mode)
@@ -546,8 +502,9 @@ def _write_backup(
             verify_backup_root(backup, backup_fd)
     finally:
         os.close(backup_fd)
-    if tree_digest(backup / relative) != expected:
-        raise ValueError("backup content verification failed")
+    for relative in roots:
+        if tree_digest(backup / relative) != expected[relative]:
+            raise ValueError(f"backup content verification failed for {relative}")
 
 
 def _id_of(session: WriteSession, number: int) -> str:

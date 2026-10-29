@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
 import sys
-from typing import TYPE_CHECKING, TypeVar
+from typing import TYPE_CHECKING, Literal, TypeVar
 
 from spec_dock.runtime.application.canonical_catalog import (
     LinkedCatalog,
@@ -19,10 +19,14 @@ from spec_dock.runtime.application.canonical_catalog import (
     require_linked,
     require_writable_format,
 )
-from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
-from spec_dock.runtime.application.canonical_scopes import OFFLINE_MESSAGE, build_canonical_scopes
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
-from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_APPLICABLE, CanonicalCommandError
+from spec_dock.runtime.application.canonical_scopes import (
+    OFFLINE_MESSAGE,
+    build_canonical_scopes,
+    check_canonical_scope_expectations,
+    resolve_canonical_scope,
+)
+from spec_dock.runtime.application.worktree_observation import read_selection
 from spec_dock.runtime.domain.canonical_structure import (
     LABEL_DEFINITIONS,
     AddBlockedBy,
@@ -47,17 +51,16 @@ from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, Operatio
 if TYPE_CHECKING:
     import argparse
     from collections.abc import Callable, Iterable, Sequence
-    from pathlib import Path
-
     from contextlib import AbstractContextManager
+    from pathlib import Path
 
     from spec_dock.runtime.application.canonical_catalog import CatalogChanges
     from spec_dock.runtime.application.canonical_scopes import CanonicalScopes
-    from spec_dock.runtime.domain.canonical_changeset import ChangesetOrigin
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.application.worktree_observation import SelectionObservation
-    from spec_dock.runtime.domain.canonical_structure import IssueFacts, ScopeNode, StructureChange
+    from spec_dock.runtime.domain.canonical_changeset import ChangesetOrigin
+    from spec_dock.runtime.domain.canonical_structure import IssueFacts, LabelDefinition, ScopeNode, StructureChange
     from spec_dock.runtime.infra.github_snapshot import FreshnessLevel
     from spec_dock.runtime.infra.github_structure import GithubClock, GithubRepository
     from spec_dock.runtime.presentation.envelope import EffectStatus, ResultStatus
@@ -97,6 +100,10 @@ class WriteFailed(Exception):
         self.cause = cause
 
 
+# Everything a command catches after its first write: a GitHub write that failed and the local failures.
+WRITE_FAILURES: tuple[type[Exception], ...] = (WriteFailed, *LOCAL_FAILURES)
+
+
 @dataclass
 class WriteSession:
     context: ProjectContext
@@ -117,7 +124,11 @@ class WriteSession:
         return read_selection(self.context, self.scopes.views)
 
     def resolve(self, selector: str, selection: SelectionObservation) -> ScopeView:
-        return resolve_scope(self.context, self.scopes.views, selector, selection=selection)
+        """An ID in any accepted form (`iss-5`, `ISS-00005`), a role or a GitHub ref; an old ID is SCOPE_KIND_CHANGED."""
+        return resolve_canonical_scope(self.context, self.scopes, selector, selection=selection)
+
+    def require_kind_unchanged(self, *scope_ids: str) -> None:
+        self.scopes.require_kind_unchanged(*scope_ids)
 
     def node(self, scope_id: str) -> ScopeNode:
         return self.scopes.node(scope_id)
@@ -143,15 +154,13 @@ class WriteSession:
     def reread_blockers(self, number: int) -> None:
         """Replace the snapshot's blocked-by edges of `number` with GitHub's current same-repository ones."""
         current = {
-            item.number: item
-            for item in self.client.list_blocked_by(number)
-            if item.repository == self.repository.slug
+            item.number: item for item in self.client.list_blocked_by(number) if item.repository == self.repository.slug
         }
         known = set(self.scopes.snapshot.issues[number].blocked_by) if number in self.scopes.snapshot.issues else set()
         changes: list[StructureChange] = [RemoveBlockedBy(number, blocker) for blocker in sorted(known - set(current))]
         for blocker in sorted(set(current) - known):
             item = current[blocker]
-            state = "closed" if item.state == "closed" else "open"
+            state: Literal["open", "closed"] = "closed" if item.state == "closed" else "open"
             changes.append(AddBlockedBy(number, blocker, ExternalIssue(blocker, item.title or "", state)))
         if changes:
             self.reflect(changes, command=f"{self.command} (reread)")
@@ -210,8 +219,10 @@ class WriteSession:
         for name in names:
             if name in carried or self.client.label_exists(name):
                 continue
-            definition = definitions[name]
-            self.write("github.label.create", name, lambda definition=definition: self.client.create_label(definition))
+            self._create_label(definitions[name])
+
+    def _create_label(self, definition: LabelDefinition) -> None:
+        self.write("github.label.create", definition.name, lambda: self.client.create_label(definition))
 
     def result(
         self, status: ResultStatus, data: object, *, effects: Sequence[Effect] | None = None
@@ -306,14 +317,25 @@ def open_write_session(
 def check_expectations(
     session: WriteSession, namespace: argparse.Namespace, selection: SelectionObservation, target: ScopeView | None
 ) -> None:
-    check_scope_expectations(
+    check_canonical_scope_expectations(
         session.context,
-        session.scopes.views,
+        session.scopes,
         selection,
         target=target,
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
+
+
+def refuse_slug(namespace: argparse.Namespace) -> None:
+    """Canonical IDs and directory names come from the Issue number; a slug has no place (Epic design ch. 7)."""
+    if getattr(namespace, "slug", None) is not None:
+        raise CanonicalCommandError(
+            CANONICAL_NOT_APPLICABLE,
+            "--slug does not apply in canonical mode: the ID and directory name come from the GitHub Issue number",
+            recovery=("Run the same command without --slug.",),
+            details={"argument": "--slug"},
+        )
 
 
 def needs_confirmation(namespace: argparse.Namespace) -> bool:
@@ -341,7 +363,9 @@ def declined(command: str, data: object) -> OperationResult[object]:
     )
 
 
-def planned(command: str, data: object, effects: Sequence[tuple[str, str | None]], warnings=()) -> OperationResult[object]:
+def planned(
+    command: str, data: object, effects: Sequence[tuple[str, str | None]], warnings=()
+) -> OperationResult[object]:
     status: EffectStatus = "planned"
     return OperationResult(
         command,

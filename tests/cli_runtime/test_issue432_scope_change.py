@@ -69,8 +69,6 @@ def test_close_stops_on_a_child_in_another_repository(
     world = _world(tmp_path, monkeypatch, capsys)
     world.edit(lambda fake: fake.add_foreign_issue("other/repo", 9))
     world.edit(lambda fake: fake.set_foreign_child(2, "other/repo", 9))
-    world.edit(lambda fake: fake.touch(2))
-    world.age_probe()
     code, payload = world.write("scope", "close", "iss-00003")
     assert code == 0, payload
     writes = len(world.writes())
@@ -79,13 +77,13 @@ def test_close_stops_on_a_child_in_another_repository(
     assert len(world.writes()) == writes
 
 
-def test_move_reparents_on_github_and_moves_the_directory_with_one_changeset(
+def test_move_reparents_only_on_github_and_leaves_the_catalog_alone(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
     world.scope("epic", 4, "spare", parent=1)
-    world.select("iss-00003", 3)
-    code, payload = world.run("scope", "move", "iss-00003", "--parent", "epic-00004")
+    before = sorted(path.relative_to(world.catalog).as_posix() for path in world.catalog.rglob("*"))
+    code, payload = world.run("scope", "move", "iss-3", "--parent", "EPIC-4")
     assert code == 0, payload
     assert world.writes() == [
         (
@@ -95,45 +93,39 @@ def test_move_reparents_on_github_and_moves_the_directory_with_one_changeset(
         )
     ]
     assert world.fake().issue(3).parent == ["example/repo", 4]
-    moved = world.find("iss-00003")
-    assert moved.relative_to(world.catalog).as_posix() == "init-00001-plan/epics/epic-00004-spare/issues/iss-00003-leaf"
-    (changeset,) = world.changesets()
-    assert changeset["paths"] == ["init-00001-plan/epics/epic-00004-spare/issues/iss-00003-leaf"]
-    assert changeset["deletions"] == ["init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf"]
-    issue_link = world.main / "spec-dock/active/issue"
-    assert issue_link.resolve() == moved.resolve()
-    code, payload = world.run("scope", "move", "iss-00003")
+    assert payload["data"]["result"]["scope"]["parent_id"] == "epic-00004"
+    assert sorted(path.relative_to(world.catalog).as_posix() for path in world.catalog.rglob("*")) == before
+    assert world.changesets() == []
+    graphql = len(world.fake().graphql_requests())
+    assert world.run("scope", "show", "iss-00003")[1]["data"]["result"]["scope"]["parent_id"] == "epic-00004"
+    assert len(world.fake().graphql_requests()) == graphql
+    code, payload = world.run("scope", "move", "iss-00003", "--parent", "epic-00004")
     assert (code, payload["status"]) == (0, "unchanged")
 
 
-def test_move_without_parent_follows_a_parent_changed_only_on_github(
+def test_move_needs_parent_and_stops_before_writing_on_wrong_kinds_cycles_and_kind_changes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
-    world.scope("epic", 4, "spare", parent=1)
-    assert world.run("scope", "show", "iss-00003")[0] == 0
-    world.edit(lambda fake: fake.set_parent(3, 4))  # the GitHub UI; the change check cannot see it
     code, payload = world.run("scope", "move", "iss-00003")
-    assert code == 0, payload
-    assert world.writes() == []
-    assert world.find("iss-00003").parent.parent.name == "epic-00004-spare"
-
-
-def test_move_stops_before_writing_on_wrong_kinds_and_cycles(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    world = _world(tmp_path, monkeypatch, capsys)
+    assert (code, payload["error"]["code"]) == (2, "USAGE_ERROR") and "--parent" in payload["error"]["message"]
     for argv in (("iss-00003", "--parent", "init-00001"), ("init-00001", "--parent", "epic-00002")):
         code, payload = world.run("scope", "move", *argv)
         assert (code, payload["error"]["code"]) == (3, "PRECONDITION_FAILED")
+    world.scope("epic", 4, "spare", parent=1)
+    world.edit(lambda fake: setattr(fake.issue(4), "labels", ["spec-dock:initiative"]))
+    world.directory("initiative", 4)
+    code, payload = world.run("scope", "move", "iss-00003", "--parent", "epic-00004")
+    assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
     assert world.writes() == [] and world.changesets() == []
 
 
-def test_delete_backs_up_removes_the_directory_then_detaches_on_github(
+def test_delete_backs_up_and_removes_each_flat_directory_then_detaches_on_github(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
     world.scope("epic", 4, "spare", parent=1)
+    world.scope("issue", 1234, "far", parent=2)
     world.edit(lambda fake: fake.block(4, by=3))
     backup = tmp_path / "backup"
     code, payload = world.write("scope", "delete", "epic-00002", "--backup-dir", str(backup))
@@ -142,25 +134,32 @@ def test_delete_backs_up_removes_the_directory_then_detaches_on_github(
     assert (code, payload["error"]["message"]) == (3, "DETACH_DEPENDENCIES_REQUIRED")
     assert world.writes() == [] and not backup.exists()
     code, payload = world.write(
-        "scope", "delete", "epic-00002", "--backup-dir", str(backup), "--recursive", "--detach-dependencies"
+        "scope", "delete", "epic-2", "--backup-dir", str(backup), "--recursive", "--detach-dependencies"
     )
     assert code == 0, payload
-    assert [effect["kind"] for effect in payload["effects"]] == [
-        "backup",
-        "scope.delete",
+    assert [(effect["kind"], effect["target"]) for effect in payload["effects"]][:4] == [
+        ("backup", str(backup)),
+        ("scope.delete", "00000-00999/epic-00002"),
+        ("scope.delete", "00000-00999/iss-00003"),
+        ("scope.delete", "01000-01999/iss-01234"),
+    ]
+    assert [effect["kind"] for effect in payload["effects"]][4:] == [
         "dependency-edge",
         "github.sub-issue.remove",
         "github.issue.label",
         "github.issue.label",
+        "github.issue.label",
     ]
-    assert (backup / "init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf/plan.md").is_file()
-    assert not (world.catalog / "init-00001-plan/epics/epic-00002-core").exists()
+    for relative in ("00000-00999/epic-00002", "00000-00999/iss-00003", "01000-01999/iss-01234"):
+        assert (backup / relative / "plan.md").is_file() and not (world.catalog / relative).exists()
+    assert (world.catalog / "00000-00999/epic-00004").is_dir() and not (world.catalog / "01000-01999").exists()
     (changeset,) = world.changesets()
-    assert changeset["deletions"] == ["init-00001-plan/epics/epic-00002-core"] and changeset["paths"] == []
+    assert changeset["paths"] == []
+    assert changeset["deletions"] == ["00000-00999/epic-00002", "00000-00999/iss-00003", "01000-01999/iss-01234"]
     fake = world.fake()
     assert fake.issue(2).state == "open" and fake.issue(2).labels == [] and fake.issue(3).labels == []
     assert fake.issue(2).parent is None and fake.issue(4).blocked_by == []
-    assert payload["data"]["result"]["removed_ids"] == ["epic-00002", "iss-00003"]
+    assert payload["data"]["result"]["removed_ids"] == ["epic-00002", "iss-00003", "iss-01234"]
 
 
 def test_a_delete_stopped_on_github_finishes_when_run_again(
@@ -183,14 +182,36 @@ def test_a_delete_stopped_on_github_finishes_when_run_again(
     assert world.fake().issue(3).labels == [] and not (tmp_path / "b2").exists()
 
 
-def test_delete_stops_when_a_descendant_directory_lies_elsewhere(
+def test_a_delete_with_some_directories_already_gone_removes_only_the_rest(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
-    leaf = world.find("iss-00003")
-    leaf.rename(world.catalog / "init-00001-plan" / leaf.name)
-    code, payload = world.write(
-        "scope", "delete", "epic-00002", "--backup-dir", str(tmp_path / "b"), "--recursive"
-    )
-    assert code == 3 and "spec-dock scope move iss-00003" in payload["error"]["message"]
+    import shutil
+
+    shutil.rmtree(world.find("iss-00003"))
+    backup = tmp_path / "b"
+    code, payload = world.write("scope", "delete", "epic-00002", "--backup-dir", str(backup), "--recursive")
+    assert code == 0, payload
+    assert [(item["kind"], item["target"]) for item in payload["effects"] if item["kind"] == "scope.delete"] == [
+        ("scope.delete", "00000-00999/epic-00002")
+    ]
+    assert (backup / "00000-00999/epic-00002/plan.md").is_file() and not (backup / "00000-00999/iss-00003").exists()
+    assert world.fake().issue(3).labels == []
+
+
+def test_delete_of_a_kind_changed_scope_backs_up_and_removes_the_old_kind_directory(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    world.edit(lambda fake: setattr(fake.issue(3), "labels", ["spec-dock:epic"]))
+    code, payload = world.run("scope", "edit", "epic-00003", "--title", "X")
+    assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
+    code, payload = world.run("scope", "close", "iss-00003", "--yes")
+    assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
     assert world.writes() == []
+    backup = tmp_path / "b"
+    code, payload = world.write("scope", "delete", "epic-00003", "--backup-dir", str(backup))
+    assert code == 0, payload
+    assert (backup / "00000-00999/iss-00003/plan.md").is_file()
+    assert not (world.catalog / "00000-00999/iss-00003").exists()
+    assert world.fake().issue(3).labels == []

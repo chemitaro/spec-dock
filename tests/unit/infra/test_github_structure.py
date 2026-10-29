@@ -508,7 +508,7 @@ def test_rule_violations_from_the_fake_github_reach_the_snapshot_anomalies() -> 
 
 def test_an_unanswered_close_is_confirmed_only_when_the_state_reason_also_matches() -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf", state="closed", state_reason="not_planned")
+    issue = fake.scope("issue", title="leaf", state="closed", state_reason="not_planned")
     client = _client(fake)
     fake.inject(timeout=True, method="PATCH")
     with pytest.raises(GithubStructureError) as caught:
@@ -517,20 +517,3 @@ def test_an_unanswered_close_is_confirmed_only_when_the_state_reason_also_matche
     fake.inject(timeout=True, method="PATCH", apply=True)
     closed = client.update_issue(issue.number, state="closed", state_reason="completed")
     assert (closed.state, closed.state_reason) == ("closed", "completed")
-
-
-def test_the_body_is_sent_and_an_unanswered_body_edit_is_compared_with_normalized_line_breaks() -> None:
-    fake = FakeGithub()
-    issue = fake.add_issue(title="Plain", body="Text\r\n")
-    client = _client(fake)
-    marked = "Text\n\n<!-- spec-dock:slug=plain -->\n"
-    updated = client.update_issue(issue.number, body=marked)
-    assert fake.writes()[-1].payload == {"body": marked} and updated.body == marked
-    fake.issue(issue.number).body = "Text\r\n"
-    fake.inject(timeout=True, method="PATCH")
-    with pytest.raises(GithubStructureError) as caught:
-        client.update_issue(issue.number, body=marked)
-    assert caught.value.code == "GITHUB_EFFECT_UNKNOWN"
-    fake.inject(timeout=True, method="PATCH")
-    fake.issue(issue.number).body = marked.replace("\n", "\r\n")
-    assert client.update_issue(issue.number, body=marked).body == marked.replace("\n", "\r\n")

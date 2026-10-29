@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from spec_dock.runtime.application import canonical_writes
+from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.infra import github_snapshot, runtime_environment
 from tests.support.canonical_repo import bare_remote, clone, environment, git, isolate_user_state
 from tests.support.canonical_scopes import REPOSITORY, CanonicalWorld
@@ -98,5 +99,7 @@ class WriteWorld(CanonicalWorld):
         return [(item.method, item.endpoint, item.payload) for item in self.fake().writes()]
 
     def find(self, scope_id: str) -> Path:
-        (found,) = list(self.catalog.rglob(f"{scope_id}-*"))
+        """The flat Scope directory <catalog>/<bucket>/<ID>/ (it must exist)."""
+        found = self.catalog / scope_relative(scope_id)
+        assert found.is_dir(), found
         return found

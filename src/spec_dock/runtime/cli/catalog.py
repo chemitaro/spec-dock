@@ -184,7 +184,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _flag("--detach-dependencies"),
         _arg("--backup-dir"),
     ),
-    "scope move": (_arg("target"), _arg("--parent")),
+    "scope move": (_arg("target"), _required("--parent")),
     "active show": (),
     "active set": (_arg("target"),),
     "active clear": (_arg("--from", dest="from_target"), _flag("--all")),
@@ -662,7 +662,9 @@ def _help_spec(leaf: str) -> HelpSpec:
     elif leaf == "scope move":
         reads = "The GitHub structure snapshot checked at decision freshness, the target and new parent Issues read again, and the catalog directories."
         writes = "With --parent, the GitHub parent (sub-issue with replace_parent); then the Scope directory moves under its GitHub parent's directory in the catalog, recorded in one changeset."
-        does_not = "Does not edit documents, close or reopen Issues, change selection or branches, or commit in the catalog."
+        does_not = (
+            "Does not edit documents, close or reopen Issues, change selection or branches, or commit in the catalog."
+        )
         json_data = "scope, github_ref, changed, moved_from, moved_to, snapshot; dry-run adds can_apply and blockers."
         confirmation = "No final confirmation is required for this leaf."
     elif leaf == "scope delete":

@@ -450,18 +450,19 @@ def test_lenient_reflection_skips_changes_whose_numbers_are_not_in_the_snapshot(
         ExternalIssue,
         RemoveBlockedBy,
         SetParent,
+        StructureChange,
         UpsertIssue,
         apply_changes_lenient,
     )
 
-    unknown = [
+    unknown: list[StructureChange] = [
         SetParent(99, 1),
         SetParent(3, 98),
         AddBlockedBy(97, 3),
         AddBlockedBy(3, 96),
         RemoveBlockedBy(95, 3),
     ]
-    known = [
+    known: list[StructureChange] = [
         UpsertIssue(_scope(20, "issue").facts),
         SetParent(20, 2),
         AddBlockedBy(3, 94, ExternalIssue(94, "Plain", "open")),
