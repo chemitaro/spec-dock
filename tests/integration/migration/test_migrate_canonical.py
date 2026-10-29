@@ -241,7 +241,10 @@ def test_history_commits_drop_what_cannot_be_flattened_and_stay_flat(
     assert code == 0, result
     history = result["data"]["history"]
     assert history["commits"] == 3 and history["dropped_commits"] == 1
-    assert history["dropped_paths"] == {"FLATTEN_NESTED_FILE": 1, "FLATTEN_SCOPE_UNMAPPED": 1}  # .meta.json is never kept
+    assert history["dropped_paths"] == {
+        "FLATTEN_NESTED_FILE": 1,
+        "FLATTEN_SCOPE_UNMAPPED": 1,
+    }  # .meta.json is never kept
     assert history["examples"]["FLATTEN_SCOPE_UNMAPPED"] == ["init-local-00009-dropped"]
     commits = _commits(legacy.remote, "spec-dock/canonical")
     assert len(commits) == 4
@@ -271,3 +274,30 @@ def test_a_tip_that_cannot_be_flattened_stops_plan_and_build_canonical(
     assert code == 2 and "cannot be flattened" in result["error"]
     assert "FLATTEN_NESTED_FILE" in {item["code"] for item in result["anomalies"]}
     assert refs(legacy.remote) == before
+
+
+def test_verify_checks_the_flat_layout_of_origins_canonical(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    assert legacy.run("register", apply=True)[0] == 0
+    assert legacy.run("build-canonical", apply=True)[0] == 0
+    code, result = legacy.run("verify")
+    assert code == 0, result
+    assert result["data"]["canonical_layout"] == [] and result["data"]["canonical_meta_json"] == []
+    other = clone(legacy.remote, tmp_path / "canonical-editor", "--branch", "spec-dock/canonical")
+    git(other, "mv", "00000-00999/iss-00004", "iss-00004")
+    write_files(other, {"00000-00999/epic-00002/issues/iss-00009/x.md": b"x\n", "01000-01999/iss-00003/y.md": b"y\n"})
+    write_files(other, {"00000-00999/iss-00003/.meta.json": b"{}\n"})
+    git(other, "add", "-A")
+    git(other, "commit", "-qm", "misplaced")
+    git(other, "push", "-q", "origin", "HEAD:spec-dock/canonical")
+    code, result = legacy.run("verify")
+    assert code == 1
+    mismatches = "\n".join(result["data"]["mismatches"])
+    for text in (
+        "iss-00004/requirement.md in canonical is not",
+        "00000-00999/epic-00002/issues in canonical is a nested leftover",
+        "01000-01999/iss-00003 in canonical is not",
+        "iss-00004: canonical has no 00000-00999/iss-00004/",
+        "the canonical branch has .meta.json",
+    ):
+        assert text in mismatches, (text, mismatches)

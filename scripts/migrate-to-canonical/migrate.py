@@ -2454,9 +2454,22 @@ def command_verify(context: Context) -> int:
             report.warn(f"{scope.id}: title differs (.meta.json {scope.title!r}, GitHub {own.title!r}); GitHub is kept")
     known = {n for n in analysis.numbers.values() if n is not None}
     mismatches.extend(f"#{n} has a kind label but no .meta.json" for n in sorted(set(analysis.labeled) - known))
-    report.data["canonical_meta_json"] = _canonical_meta(target)
-    if isinstance(report.data["canonical_meta_json"], list) and report.data["canonical_meta_json"]:
-        mismatches.append(f"the canonical branch has .meta.json: {report.data['canonical_meta_json'][:5]}")
+    paths = _canonical_paths(target)
+    if paths is None:
+        report.data["canonical_meta_json"] = "not checked (no spec-dock/canonical on origin and no local catalog)"
+    else:
+        metas = [path for path in paths if PurePosixPath(path).name == META_FILE]
+        report.data["canonical_meta_json"] = metas
+        if metas:
+            mismatches.append(f"the canonical branch has .meta.json: {metas[:5]}")
+        registered = {
+            scope_id(scope.kind, number)
+            for scope in analysis.scopes
+            if (number := analysis.numbers.get(scope.id)) is not None
+        }
+        layout = canonical_layout_problems(paths, registered)
+        report.data["canonical_layout"] = layout
+        mismatches.extend(layout)
     report.data["mismatches"] = mismatches
     for item in mismatches:
         report.say(f"mismatch: {item}")
@@ -2467,14 +2480,41 @@ def command_verify(context: Context) -> int:
     return EXIT_OK
 
 
-def _canonical_meta(target: Target) -> list[str] | str:
-    if resolve_commit(target.project, CANONICAL_TRACKING_REF):
-        entries = list_tree(target.project, CANONICAL_TRACKING_REF)
-        return [e.path for e in entries if PurePosixPath(e.path).name == META_FILE]
+def _canonical_paths(target: Target) -> list[str] | None:
+    """Files of origin's canonical (read in a throwaway clone), else of the local catalog; None when neither exists."""
+    if remote_ref(target, CANONICAL_REF) is not None:
+        with Workspace(target) as workspace:
+            commit = workspace.fetch_canonical()
+            return [entry.path for entry in list_tree(workspace.repo, commit)] if commit else []
     catalog = target.project / CATALOG_RELATIVE
-    if catalog.is_dir():
-        return [str(p.relative_to(catalog)) for p in catalog.rglob(META_FILE) if ".git" not in p.parts]
-    return "not checked (no local canonical branch or catalog)"
+    if not catalog.is_dir():
+        return None
+    return sorted(
+        path.relative_to(catalog).as_posix()
+        for path in catalog.rglob("*")
+        if (path.is_file() or path.is_symlink())
+        and path.relative_to(catalog).parts[0] not in (".git", RUNTIME_DIRECTORY)
+    )
+
+
+def canonical_layout_problems(paths: Iterable[str], expected: Iterable[str]) -> list[str]:
+    """Paths outside <bucket>/<ID>/ (or nested epics/, issues/) and expected Scopes without their directory."""
+    problems: dict[str, str] = {}
+    present: set[str] = set()
+    for path in paths:
+        if path in CANONICAL_ROOT_FILES:
+            continue
+        parts = path.split("/")
+        place = "/".join(parts[:2])
+        if len(parts) < 3 or CANONICAL_ID_RE.fullmatch(parts[1]) is None or scope_relative(parts[1]) != place:
+            problems.setdefault(place, f"{place} in canonical is not a Scope's <bucket>/<ID>/")
+        elif parts[2] in NESTED_DIRECTORIES and len(parts) > 3:
+            problems.setdefault(f"{place}/{parts[2]}", f"{place}/{parts[2]} in canonical is a nested leftover")
+        else:
+            present.add(parts[1])
+    for scope in sorted(set(expected) - present):
+        problems.setdefault(scope, f"{scope}: canonical has no {scope_relative(scope)}/")
+    return list(problems.values())
 
 
 def command_undo(context: Context) -> int:

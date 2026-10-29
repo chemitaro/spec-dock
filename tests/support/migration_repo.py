@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 import importlib.util
 import io
 import json
-import os
 from pathlib import Path
 import posixpath
 import subprocess
@@ -215,7 +214,7 @@ def linked_specs() -> dict[str, bytes | Symlink]:
         "# Gamma design\n\n"
         "詳細: [Design Guide](../../../../../../docs/authoring/design.md)\n\n"
         "- [Epic requirement](../../requirement.md#scope)\n"
-        "- [Epic note](../../artifacts/note.md)\n"
+        "- [Epic note](../../artifacts/20261029t000000z--note.md)\n"
         "- [siblings](../)\n"
         "- [Delta](../iss-00004-delta/requirement.md)\n"
         "- [Proto epic](../../../../../init-local-00002-proto/epics/epic-00005-under-proto/design.md)\n"
@@ -223,11 +222,11 @@ def linked_specs() -> dict[str, bytes | Symlink]:
         "- [Own plan](plan.md)\n\n"
         "```text\n[example](../../requirement.md)\n```\n"
     ).encode()
-    files[f"{EPIC}/artifacts/note.md"] = (
+    files[f"{EPIC}/artifacts/20261029t000000z--note.md"] = (
         b"[issues](../issues) [rules](../issues/rules.md) [initiative](../../../requirement.md)\n"
     )
     files[f"{ISSUE3}/discussions/iss-00099-topic/notes.md"] = b"[plan](../../plan.md)\n"
-    files[f"{ISSUE3}/artifacts/guide.html"] = (
+    files[f"{ISSUE3}/artifacts/20261029t000001z--guide.html"] = (
         b'<a href="../../../requirement.md">Epic</a> <img src=\'../plan.md\'> <a href="#top">top</a>\n'
     )
     return files
@@ -313,7 +312,7 @@ def write_files(root: Path, files: Mapping[str, bytes | Symlink | None]) -> None
         if isinstance(payload, Symlink):
             if target.is_symlink() or target.exists():
                 target.unlink()
-            os.symlink(str(payload), target)
+            Path(target).symlink_to(str(payload))
         else:
             target.write_bytes(payload)
 
@@ -341,6 +340,9 @@ def build_legacy(
         check=True,
         env=_clean_environment(),
     )
+    for setting in (("receive.autogc", "false"), ("gc.auto", "0")):
+        # A background gc after a push may repack objects a later local clone of origin is copying.
+        git(remote, "config", *setting)
     seed = root / "seed"
     subprocess.run(
         ["git", "init", "-q", f"--initial-branch={default_branch}", str(seed)], check=True, env=_clean_environment()
