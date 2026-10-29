@@ -50,7 +50,7 @@ canonical では、Scope のディレクトリは `spec-dock/initiatives/<区切
 
 ## 予行演習（各リポジトリの切り替えの前に必ず行う）
 
-本物のリポジトリ、GitHub への書き込み、利用者の定期の実行と状態の置き場には触れません。
+本物のリポジトリ、GitHub への書き込み、利用者の定期の実行と状態の置き場には触れません。`export XDG_STATE_HOME=$T/state` は必ず行います（`canonical link --no-schedule` でも、書き換えの検出の基準を状態の置き場に書くため。行わないと利用者の `~/.local/state/spec-dock/` に書かれます）。
 
 ```sh
 T=$(mktemp -d /private/tmp/specdock-rehearsal.XXXXXX)     # 内蔵のディスクの一時ディレクトリ

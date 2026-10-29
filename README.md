@@ -6,7 +6,8 @@ SpecDockはGitHub Issueに結び付いたInitiative・Epic・Issueの三階層�
 
 ## 入口
 
-- [現行CLIの全47コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
+- [現行CLIの全53コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
+- [canonical モードの使い方](src/spec_dock/assets/spec_dock/docs/canonical.md)（導入先では `spec-dock/docs/canonical.md`）
 - [日本語のオフライン説明資料](src/spec_dock/assets/spec_dock/docs/cli-redesign-guide.html)
 - [導入・移行・保全](src/spec_dock/assets/spec_dock/docs/migration.md)
 - [文書作成ガイド](src/spec_dock/assets/spec_dock/docs/authoring/overview.md)
@@ -31,6 +32,14 @@ Startはlive readiness確認、branch作成またはcheckout、worktree自身の
 
 Finishはbackendのcompletedを確認して、捕捉した直接記録だけを解除します。GitHub Issueは完了理由でclosedとなり、branchには留まります。commit、test、review、push、PR、mergeは別途確認します。`active clear` は選択だけ、`scope close` は完了状態だけを変えます。`active set` は同じ妥当な直接対象へのunchangedだけを許し、空/別対象の取得はStartへ戻します。
 
+
+## 2つのモード（0.3.0）
+
+`spec-dock/workspace.json` の `schema_version` が 3 のリポジトリは従来モードで、仕様もコードと一緒にコミットします。4 のリポジトリは canonical モードで、Scope の構造（作成、親子、依存、状態、題名、種類）を GitHub Issue に、中身を `spec-dock/canonical` ブランチに置きます。仕様はどのチェックアウトからも `spec-dock/initiatives/<区切り>/<ID>/`（例 `spec-dock/initiatives/00000-00999/iss-00454/`）に見え、保存と共有は定期の同期が自動で行います。コードのブランチには仕様を入れません。
+
+- 用意はクローンごとに `spec-dock canonical link` の1回です。状態は `spec-dock canonical status` で確かめます。
+- 作業用のworktreeで Claude Code と Codex を使うには、ツールごとに1行の設定を利用者が1回だけ足します（SpecDock は書き換えません）。1行と確かめ方、同期が止まったとき、Linux とコンテナの制約、エラーと次の1手は、配布する `spec-dock/docs/canonical.md`（[この repository の正本](src/spec_dock/assets/spec_dock/docs/canonical.md)）にあります。
+- 版3から4への移行は `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ行います。
 
 ## 実行package・配布資産・worktree状態の境界
 

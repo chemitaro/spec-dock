@@ -2,10 +2,11 @@
 
 ## Current
 
-通常packageの外部CLIを使い、仕様は各Scopeのcanonical filesから読みます。
+通常packageの外部CLIを使い、仕様は各Scopeのcanonical filesから読みます。`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリ（canonical モード）では、Scope の構造は GitHub Issue に、中身は `spec-dock/initiatives/<区切り>/<ID>/`（`spec-dock/canonical` ブランチのカタログへのリンク）にあり、保存と共有は自動です。詳しくは[canonical モードの使い方](canonical.md)を見てください。
 
 - [導入・移行・保全](migration.md)
 - [CLI参照](reference_cli.md)
+- [canonical モードの使い方](canonical.md)
 - [人間向け説明HTML](cli-redesign-guide.html)
 - [命名参照](reference_naming.md)
 - [依存関係管理参照](reference_deps.md)
