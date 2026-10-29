@@ -58,7 +58,7 @@ LEGACY_CHILD_RULES = {"initiative": ("epics", "spec-dock/docs/rules/initiative/e
                       "epic": ("issues", "spec-dock/docs/rules/epic/issues.md")}
 ```
 
-- 消す：`SLUG_RE`、`_LINE_BREAK`、`_MARKER_LINE`、`SLUG_MARKER_*`、`read_slug_marker`、`format_slug_marker`、`append_slug_marker`、`_remove_marker`、`rename_path`、`State.renames`（ID の置き換えは `idmap.json` から直接求める）。
+- 消す：`SLUG_RE`、`_LINE_BREAK`、`_MARKER_LINE`、`SLUG_MARKER_*`、`read_slug_marker`、`format_slug_marker`、`append_slug_marker`、`_remove_marker`、`rename_path`（ディレクトリの場所は `idmap.json` と写しの対応から求める。`State.renames` は、`export-legacy` が依存の ID を置き換えるのに使うので残す）。
 
 ### 平らにする写し
 
