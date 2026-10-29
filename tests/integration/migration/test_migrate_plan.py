@@ -272,7 +272,14 @@ def test_the_readme_covers_preparation_rehearsal_cutover_rollback_and_scopeless_
     ):
         assert f"`{command}" in readme
     assert "idmap.json" in readme and "--no-schedule" in readme
-    for text in ("## 平らにする写し", "<区切り>/<ID>/", "unrewritable", "data.history", "untitled", "SCOPE_KIND_CHANGED"):
+    for text in (
+        "## 平らにする写し",
+        "<区切り>/<ID>/",
+        "unrewritable",
+        "data.history",
+        "untitled",
+        "SCOPE_KIND_CHANGED",
+    ):
         assert text in readme
     assert "slug の印" not in readme and "spec-dock:slug" not in readme
     assert (SCRIPT.parent / ".gitignore").read_text() == "/.state/\n"
