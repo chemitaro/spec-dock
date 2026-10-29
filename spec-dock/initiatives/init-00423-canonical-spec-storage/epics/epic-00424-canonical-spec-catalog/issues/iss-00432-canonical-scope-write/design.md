@@ -132,7 +132,7 @@ def validate_canonical_title(value: str, *, field: str) -> str
 | `scope delete` | 全体を取り直す（`refresh`。生き残る Scope からの依存と子孫を漏れなく見つけるため） | 確かめない（止めない） | `backup` → `selection.clear`（`--clear-active`）→ `scope.delete`（排他の中で各ディレクトリと空になった区切りを消し、束を書く）→ `dependency-edge`（生き残る Scope からの blocked by を外す。`--detach-dependencies`）→ `github.sub-issue.remove`（対象を親から）→ `github.issue.label`（削除する各 Scope の種類のラベルを外す。子孫から） |
 | `dependency add`、`remove` | 両端と `list_blocked_by`（`--from`） | 両端 | `dependency-edge`（`POST`／`DELETE …/dependencies/blocked_by`） |
 | `artifact create`、`import file` | なし（`display`） | 対象（`@root` は除く） | `artifact`（排他の中で公開し、束を書く） |
-| `work start` | 対象、対象と祖先の Scope でない依存先 | 対象と祖先（`lineage`） | `git.branch.create` → `git.checkout` → `selection.clear`（置き換えのとき）→ `selection.publish` → リンク（`link_after_command` の効果）→ `active.link` → `github.label.create`、`github.issue.label`（作業中）、`github.issue.assignee`（印。失敗は警告だけ） |
+| `work start` | 対象と祖先の依存の一覧（`list_blocked_by`。GitHub の画面だけで足した依存は変わったかの確かめで見えないことがあるため）、対象、対象と祖先の Scope でない依存先 | 対象と祖先（`lineage`） | `git.branch.create` → `git.checkout` → `selection.clear`（置き換えのとき）→ `selection.publish` → リンク（`link_after_command` の効果）→ `active.link` → `github.label.create`、`github.issue.label`（作業中）、`github.issue.assignee`（印。失敗は警告だけ） |
 | `work finish` | 対象 | 対象 | `catalog.changeset`（`origin: finish`。未保存の変更があるとき）→ 保存の確かめ → `github.issue.close` → `github.issue.label`（作業中を外す。失敗は警告だけ）→ `selection.clear` → `active.link` |
 
 - 書いた結果の反映（`reflect`）：Issue の作成、題名、状態の変更は、返った Issue で `UpsertIssue`。ラベルと担当者は、知っている Issue に、返った値を重ねた `UpsertIssue`。親子は `SetParent`、依存は `AddBlockedBy`（Scope でない相手は `ExternalIssue` を付ける）と `RemoveBlockedBy`。
