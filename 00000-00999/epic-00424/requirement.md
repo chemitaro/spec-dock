@@ -278,7 +278,7 @@ ID: "epic-00424"
 
 ## 制約・前提
 
-- Linux と macOS、Python 3.10 以上。Windows には対応しない。Linux では、systemd があってもなくても動く（R-C7）。Git は `merge-tree --write-tree` が使える版（2.38 以上）が要る。手元は 2.54.0、Ubuntu 24.04 は 2.43.0。
+- Linux と macOS、Python 3.10 以上。Windows には対応しない。Linux では、systemd があってもなくても動く（R-C7）。Git は `merge-tree --write-tree` が使える版（2.38 以上）が要る（`canonical link` と定期の同期。移行のスクリプトの下限は別で 2.31 以上、`adopt-worktree` は 2.40 以上。`design.md` 11章）。手元は 2.54.0、Ubuntu 24.04 は 2.43.0。
 - GitHub の個人アカウント。Issue types は使えない。GitHub の必須の検査（ブランチの保護、ルールセット）は使わない。
 - GitHub の二次のレート制限（公式の文書、2026-10-25）：同時の要求は100まで、REST は1分に900点（GET は1点、書き込みは5点）、GraphQL は1分に2,000点、中身を作る要求は目安で1分に80回、1時間に500回。条件付きの要求の 304 は、主のレート制限に数えない。
 - 人がPRをマージする関門を残す。エージェントは、マージできる状態のPRで止まる。
