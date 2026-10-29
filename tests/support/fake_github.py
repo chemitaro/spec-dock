@@ -72,6 +72,8 @@ class FakeIssue:
     blocked_by: list[list[Any]] = field(default_factory=list)
     updated_at: str = ""
     pull_request: bool = False
+    created_at: str = ""
+    closed_at: str | None = None
     repository: str = ""
 
 
@@ -162,6 +164,8 @@ class FakeGithub:
             self.labels.setdefault(name, {"name": name, "color": "ededed", "description": ""})
         self.issues[owner, number] = issue
         self._touch(issue)
+        issue.created_at = issue.updated_at
+        issue.closed_at = issue.updated_at if state == "closed" else None
         return issue
 
     def scope(
@@ -385,6 +389,8 @@ class FakeGithub:
             "labels": [{"name": name} for name in issue.labels],
             "assignees": [{"login": login} for login in issue.assignees],
             "updated_at": issue.updated_at,
+            "created_at": issue.created_at,
+            "closed_at": issue.closed_at,
             "html_url": f"https://github.com/{issue.repository}/issues/{issue.number}",
             "repository_url": f"https://api.github.com/repos/{issue.repository}",
         }
@@ -468,6 +474,8 @@ class FakeGithub:
             "state": issue.state.upper(),
             "stateReason": issue.state_reason.upper() if issue.state_reason else None,
             "updatedAt": issue.updated_at,
+            "createdAt": issue.created_at,
+            "closedAt": issue.closed_at,
             "url": f"https://github.com/{issue.repository}/issues/{issue.number}",
             "labels": {
                 "totalCount": len(issue.labels),
@@ -563,6 +571,8 @@ class FakeGithub:
             if payload.get("state") == "open":
                 issue.state_reason = "reopened"
             self._touch(issue)
+            if "state" in payload:
+                issue.closed_at = issue.updated_at if issue.state == "closed" else None
             return 200, self._rest_issue(issue), {}
         if tail == ["parent"] and method == "GET":
             if issue.parent is None:

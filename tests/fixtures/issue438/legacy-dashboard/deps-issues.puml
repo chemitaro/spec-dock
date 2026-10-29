@@ -1,0 +1,19 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+
+legend right
+|= State |= Color |
+| doing |<#DAE8FC> |
+| ready |<#D5E8D4> |
+| blocked |<#F8CECC> |
+| done |<#E3E3E3> |
+| unknown |<#EEEEEE> |
+| blocking edge | solid |
+endlegend
+
+rectangle "iss-00215\nissue\nReady" as Niss_00215 #D5E8D4
+rectangle "iss-00250\nissue\nReady" as Niss_00250 #D5E8D4
+
+@enduml

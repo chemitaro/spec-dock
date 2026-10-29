@@ -1,0 +1,281 @@
+@startuml
+left to right direction
+skinparam shadowing false
+
+legend right
+|= State |= Color |
+| READY |<#D5E8D4> |
+| BLOCKED |<#F8CECC> |
+| DOING |<#DAE8FC> |
+| DONE |<#E3E3E3> |
+| UNKNOWN |<#EEEEEE> |
+endlegend
+
+  package "init-00079\nminor bugfix maintenance" as Ninit_00079 {
+    package "epic-00080\nminor bug fixes" as Nepic_00080 {
+      rectangle "iss-00028\n[DONE]" as Niss_00028 #E3E3E3
+      rectangle "iss-00082\n[DONE]" as Niss_00082 #E3E3E3
+      rectangle "iss-00084\n[DONE]" as Niss_00084 #E3E3E3
+      rectangle "iss-00149\n[DONE]" as Niss_00149 #E3E3E3
+      rectangle "iss-00157\n[DONE]" as Niss_00157 #E3E3E3
+      rectangle "iss-00160\n[DONE]" as Niss_00160 #E3E3E3
+      rectangle "iss-00342\n[DONE]" as Niss_00342 #E3E3E3
+    }
+  }
+
+  package "init-local-00002\nPrototype Feature Expansion" as Ninit_local_00002 {
+    package "epic-00048\nAgent facing interface hardening and host adapter scaffolding" as Nepic_00048 {
+      rectangle "iss-00049\n[DONE]" as Niss_00049 #E3E3E3
+      rectangle "iss-00050\n[DONE]" as Niss_00050 #E3E3E3
+      rectangle "iss-00051\n[DONE]" as Niss_00051 #E3E3E3
+      rectangle "iss-00052\n[DONE]" as Niss_00052 #E3E3E3
+    }
+    package "epic-00054\nGitHub lifecycle command expansion" as Nepic_00054 {
+      rectangle "iss-00055\n[DONE]" as Niss_00055 #E3E3E3
+      rectangle "iss-00056\n[DONE]" as Niss_00056 #E3E3E3
+      rectangle "iss-00088\n[DONE]" as Niss_00088 #E3E3E3
+      rectangle "iss-00096\n[DONE]" as Niss_00096 #E3E3E3
+      rectangle "iss-00147\n[DONE]" as Niss_00147 #E3E3E3
+    }
+    package "epic-00074\nMulti host agent and config asset expansion" as Nepic_00074 {
+      rectangle "iss-00075\n[DONE]" as Niss_00075 #E3E3E3
+    }
+    package "epic-00107\nWorktree Provisioning" as Nepic_00107 {
+      rectangle "iss-00003\n[DONE]" as Niss_00003 #E3E3E3
+      rectangle "iss-00005\n[DONE]" as Niss_00005 #E3E3E3
+      rectangle "iss-00108\n[DONE]" as Niss_00108 #E3E3E3
+      rectangle "iss-00109\n[DONE]" as Niss_00109 #E3E3E3
+      rectangle "iss-00110\n[DONE]" as Niss_00110 #E3E3E3
+      rectangle "iss-00130\n[DONE]" as Niss_00130 #E3E3E3
+      rectangle "iss-00137\n[DONE]" as Niss_00137 #E3E3E3
+      rectangle "iss-00143\n[DONE]" as Niss_00143 #E3E3E3
+      rectangle "iss-00153\n[DONE]" as Niss_00153 #E3E3E3
+      rectangle "iss-00225\n[DONE]" as Niss_00225 #E3E3E3
+    }
+    package "epic-00343\nWorkbench Shell And Explicit File Artifact Import" as Nepic_00343 {
+      rectangle "iss-00344\n[DONE]" as Niss_00344 #E3E3E3
+      rectangle "iss-00345\n[DONE]" as Niss_00345 #E3E3E3
+      rectangle "iss-00346\n[DONE]" as Niss_00346 #E3E3E3
+    }
+  }
+
+  package "init-local-00003\nArchitecture Maintenance and Hardening" as Ninit_local_00003 {
+    package "epic-00001\nMultilayer Specification Foundation" as Nepic_00001 {
+      rectangle "iss-00007\n[DONE]" as Niss_00007 #E3E3E3
+    }
+    package "epic-00023\nRuntime Cli Modularization" as Nepic_00023 {
+      rectangle "iss-00024\n[DONE]" as Niss_00024 #E3E3E3
+      rectangle "iss-00025\n[DONE]" as Niss_00025 #E3E3E3
+    }
+    package "epic-00033\nGitHub backed identity and ADR mirror workflow" as Nepic_00033 {
+      rectangle "iss-00014\n[DONE]" as Niss_00014 #E3E3E3
+      rectangle "iss-00019\n[DONE]" as Niss_00019 #E3E3E3
+      rectangle "iss-00034\n[DONE]" as Niss_00034 #E3E3E3
+      rectangle "iss-00035\n[DONE]" as Niss_00035 #E3E3E3
+      rectangle "iss-00036\n[DONE]" as Niss_00036 #E3E3E3
+      rectangle "iss-00037\n[DONE]" as Niss_00037 #E3E3E3
+      rectangle "iss-00038\n[DONE]" as Niss_00038 #E3E3E3
+      rectangle "iss-00040\n[DONE]" as Niss_00040 #E3E3E3
+      rectangle "iss-00141\n[DONE]" as Niss_00141 #E3E3E3
+      rectangle "iss-00188\n[DONE]" as Niss_00188 #E3E3E3
+    }
+    package "epic-00059\nDependency metadata unification and command mutation" as Nepic_00059 {
+      rectangle "iss-00009\n[DONE]" as Niss_00009 #E3E3E3
+      rectangle "iss-00010\n[DONE]" as Niss_00010 #E3E3E3
+      rectangle "iss-00012\n[DONE]" as Niss_00012 #E3E3E3
+      rectangle "iss-00058\n[DONE]" as Niss_00058 #E3E3E3
+      rectangle "iss-00060\n[DONE]" as Niss_00060 #E3E3E3
+      rectangle "iss-00061\n[DONE]" as Niss_00061 #E3E3E3
+      rectangle "iss-00062\n[DONE]" as Niss_00062 #E3E3E3
+      rectangle "iss-00063\n[DONE]" as Niss_00063 #E3E3E3
+      rectangle "iss-00064\n[DONE]" as Niss_00064 #E3E3E3
+      rectangle "iss-00065\n[DONE]" as Niss_00065 #E3E3E3
+      rectangle "iss-00192\n[DONE]" as Niss_00192 #E3E3E3
+      rectangle "iss-00193\n[DONE]" as Niss_00193 #E3E3E3
+      rectangle "iss-00198\n[DONE]" as Niss_00198 #E3E3E3
+      rectangle "iss-00199\n[DONE]" as Niss_00199 #E3E3E3
+      rectangle "iss-00200\n[DONE]" as Niss_00200 #E3E3E3
+      rectangle "iss-00201\n[DONE]" as Niss_00201 #E3E3E3
+      rectangle "iss-00202\n[DONE]" as Niss_00202 #E3E3E3
+      rectangle "iss-00203\n[DONE]" as Niss_00203 #E3E3E3
+      rectangle "iss-00207\n[DONE]" as Niss_00207 #E3E3E3
+      rectangle "iss-00209\n[DONE]" as Niss_00209 #E3E3E3
+      rectangle "iss-00235\n[DONE]" as Niss_00235 #E3E3E3
+    }
+    package "epic-00067\nInstalled layout aligned asset source structure for agent tooling" as Nepic_00067 {
+      rectangle "iss-00068\n[DONE]" as Niss_00068 #E3E3E3
+      rectangle "iss-00069\n[DONE]" as Niss_00069 #E3E3E3
+      rectangle "iss-00070\n[DONE]" as Niss_00070 #E3E3E3
+      rectangle "iss-00071\n[DONE]" as Niss_00071 #E3E3E3
+      rectangle "iss-00072\n[DONE]" as Niss_00072 #E3E3E3
+      rectangle "iss-00098\n[DONE]" as Niss_00098 #E3E3E3
+      rectangle "iss-00100\n[DONE]" as Niss_00100 #E3E3E3
+      rectangle "iss-00102\n[DONE]" as Niss_00102 #E3E3E3
+      rectangle "iss-00103\n[DONE]" as Niss_00103 #E3E3E3
+      rectangle "iss-00105\n[DONE]" as Niss_00105 #E3E3E3
+      rectangle "iss-00134\n[DONE]" as Niss_00134 #E3E3E3
+      rectangle "iss-00142\n[DONE]" as Niss_00142 #E3E3E3
+      rectangle "iss-00151\n[DONE]" as Niss_00151 #E3E3E3
+      rectangle "iss-00170\n[DONE]" as Niss_00170 #E3E3E3
+      rectangle "iss-00174\n[DONE]" as Niss_00174 #E3E3E3
+      rectangle "iss-00176\n[DONE]" as Niss_00176 #E3E3E3
+      rectangle "iss-00178\n[DONE]" as Niss_00178 #E3E3E3
+      rectangle "iss-00180\n[DONE]" as Niss_00180 #E3E3E3
+      rectangle "iss-00182\n[DONE]" as Niss_00182 #E3E3E3
+      rectangle "iss-00246\n[DONE]" as Niss_00246 #E3E3E3
+    }
+    package "epic-00077\nLegacy hidden workspace coexistence and migration" as Nepic_00077 {
+      rectangle "iss-00078\n[DONE]" as Niss_00078 #E3E3E3
+    }
+    package "epic-00090\nGithub Default Sync Contract" as Nepic_00090 {
+      rectangle "iss-00091\n[DONE]" as Niss_00091 #E3E3E3
+      rectangle "iss-00093\n[DONE]" as Niss_00093 #E3E3E3
+    }
+    package "epic-00112\nDelegated Authoring Architecture for Spec Workflow" as Nepic_00112 {
+      rectangle "iss-00113\n[DONE]" as Niss_00113 #E3E3E3
+      rectangle "iss-00114\n[DONE]" as Niss_00114 #E3E3E3
+      rectangle "iss-00115\n[DONE]" as Niss_00115 #E3E3E3
+      rectangle "iss-00116\n[DONE]" as Niss_00116 #E3E3E3
+      rectangle "iss-00117\n[DONE]" as Niss_00117 #E3E3E3
+      rectangle "iss-00118\n[DONE]" as Niss_00118 #E3E3E3
+      rectangle "iss-00120\n[DONE]" as Niss_00120 #E3E3E3
+      rectangle "iss-00121\n[DONE]" as Niss_00121 #E3E3E3
+      rectangle "iss-00122\n[DONE]" as Niss_00122 #E3E3E3
+      rectangle "iss-00123\n[DONE]" as Niss_00123 #E3E3E3
+      rectangle "iss-00124\n[DONE]" as Niss_00124 #E3E3E3
+      rectangle "iss-00125\n[DONE]" as Niss_00125 #E3E3E3
+      rectangle "iss-00126\n[DONE]" as Niss_00126 #E3E3E3
+      rectangle "iss-00127\n[DONE]" as Niss_00127 #E3E3E3
+      rectangle "iss-00131\n[DONE]" as Niss_00131 #E3E3E3
+      rectangle "iss-00138\n[DONE]" as Niss_00138 #E3E3E3
+    }
+    package "epic-00158\nAgent Workflow PDCA Hardening" as Nepic_00158 {
+      rectangle "iss-00016\n[DONE]" as Niss_00016 #E3E3E3
+      rectangle "iss-00021\n[DONE]" as Niss_00021 #E3E3E3
+      rectangle "iss-00155\n[DONE]" as Niss_00155 #E3E3E3
+      rectangle "iss-00156\n[DONE]" as Niss_00156 #E3E3E3
+      rectangle "iss-00159\n[DONE]" as Niss_00159 #E3E3E3
+      rectangle "iss-00162\n[DONE]" as Niss_00162 #E3E3E3
+      rectangle "iss-00163\n[DONE]" as Niss_00163 #E3E3E3
+      rectangle "iss-00164\n[DONE]" as Niss_00164 #E3E3E3
+      rectangle "iss-00165\n[DONE]" as Niss_00165 #E3E3E3
+      rectangle "iss-00166\n[DONE]" as Niss_00166 #E3E3E3
+      rectangle "iss-00167\n[DONE]" as Niss_00167 #E3E3E3
+      rectangle "iss-00171\n[DONE]" as Niss_00171 #E3E3E3
+      rectangle "iss-00184\n[DONE]" as Niss_00184 #E3E3E3
+      rectangle "iss-00186\n[DONE]" as Niss_00186 #E3E3E3
+      rectangle "iss-00187\n[DONE]" as Niss_00187 #E3E3E3
+      rectangle "iss-00191\n[DONE]" as Niss_00191 #E3E3E3
+      rectangle "iss-00196\n[DONE]" as Niss_00196 #E3E3E3
+      rectangle "iss-00197\n[DONE]" as Niss_00197 #E3E3E3
+      rectangle "iss-00210\n[DONE]" as Niss_00210 #E3E3E3
+      rectangle "iss-00211\n[DONE]" as Niss_00211 #E3E3E3
+      rectangle "iss-00214\n[DONE]" as Niss_00214 #E3E3E3
+      rectangle "iss-00215\n[READY]" as Niss_00215 #D5E8D4
+      rectangle "iss-00218\n[DONE]" as Niss_00218 #E3E3E3
+      rectangle "iss-00219\n[DONE]" as Niss_00219 #E3E3E3
+      rectangle "iss-00222\n[DONE]" as Niss_00222 #E3E3E3
+      rectangle "iss-00313\n[DONE]" as Niss_00313 #E3E3E3
+    }
+    package "epic-00224\nDynamic Workflow Resource Allocation" as Nepic_00224 {
+      rectangle "iss-00226\n[DONE]" as Niss_00226 #E3E3E3
+      rectangle "iss-00227\n[DONE]" as Niss_00227 #E3E3E3
+      rectangle "iss-00228\n[DONE]" as Niss_00228 #E3E3E3
+      rectangle "iss-00229\n[DONE]" as Niss_00229 #E3E3E3
+      rectangle "iss-00230\n[DONE]" as Niss_00230 #E3E3E3
+      rectangle "iss-00231\n[DONE]" as Niss_00231 #E3E3E3
+      rectangle "iss-00232\n[DONE]" as Niss_00232 #E3E3E3
+      rectangle "iss-00233\n[DONE]" as Niss_00233 #E3E3E3
+      rectangle "iss-00237\n[DONE]" as Niss_00237 #E3E3E3
+      rectangle "iss-00238\n[DONE]" as Niss_00238 #E3E3E3
+      rectangle "iss-00239\n[DONE]" as Niss_00239 #E3E3E3
+      rectangle "iss-00241\n[DONE]" as Niss_00241 #E3E3E3
+      rectangle "iss-00244\n[DONE]" as Niss_00244 #E3E3E3
+      rectangle "iss-00247\n[DONE]" as Niss_00247 #E3E3E3
+      rectangle "iss-00250\n[READY]" as Niss_00250 #D5E8D4
+      rectangle "iss-00251\n[DONE]" as Niss_00251 #E3E3E3
+      rectangle "iss-00252\n[DONE]" as Niss_00252 #E3E3E3
+      rectangle "iss-00253\n[DONE]" as Niss_00253 #E3E3E3
+      rectangle "iss-00254\n[DONE]" as Niss_00254 #E3E3E3
+      rectangle "iss-00255\n[DONE]" as Niss_00255 #E3E3E3
+      rectangle "iss-00257\n[DONE]" as Niss_00257 #E3E3E3
+    }
+    package "epic-00259\nArtifacts Directory Future Only Adoption" as Nepic_00259 {
+      rectangle "iss-00262\n[DONE]" as Niss_00262 #E3E3E3
+      rectangle "iss-00263\n[DONE]" as Niss_00263 #E3E3E3
+      rectangle "iss-00264\n[DONE]" as Niss_00264 #E3E3E3
+      rectangle "iss-00265\n[DONE]" as Niss_00265 #E3E3E3
+      rectangle "iss-00266\n[DONE]" as Niss_00266 #E3E3E3
+      rectangle "iss-00267\n[DONE]" as Niss_00267 #E3E3E3
+      rectangle "iss-00268\n[DONE]" as Niss_00268 #E3E3E3
+    }
+    package "epic-00270\nUpstream Planning Governance And Templates" as Nepic_00270 {
+      rectangle "iss-00271\n[DONE]" as Niss_00271 #E3E3E3
+      rectangle "iss-00272\n[DONE]" as Niss_00272 #E3E3E3
+      rectangle "iss-00273\n[DONE]" as Niss_00273 #E3E3E3
+      rectangle "iss-00274\n[DONE]" as Niss_00274 #E3E3E3
+      rectangle "iss-00275\n[DONE]" as Niss_00275 #E3E3E3
+      rectangle "iss-00276\n[DONE]" as Niss_00276 #E3E3E3
+    }
+    package "epic-00283\nChatGPT Zip Authoring Pack Automation" as Nepic_00283 {
+      rectangle "iss-00284\n[DONE]" as Niss_00284 #E3E3E3
+      rectangle "iss-00285\n[DONE]" as Niss_00285 #E3E3E3
+      rectangle "iss-00286\n[DONE]" as Niss_00286 #E3E3E3
+      rectangle "iss-00287\n[DONE]" as Niss_00287 #E3E3E3
+      rectangle "iss-00288\n[DONE]" as Niss_00288 #E3E3E3
+      rectangle "iss-00289\n[DONE]" as Niss_00289 #E3E3E3
+      rectangle "iss-00290\n[DONE]" as Niss_00290 #E3E3E3
+      rectangle "iss-00291\n[DONE]" as Niss_00291 #E3E3E3
+      rectangle "iss-00292\n[DONE]" as Niss_00292 #E3E3E3
+      rectangle "iss-00293\n[DONE]" as Niss_00293 #E3E3E3
+    }
+    package "epic-00295\nChatGPT Authoring Pack Installed Runtime" as Nepic_00295 {
+      rectangle "iss-00296\n[DONE]" as Niss_00296 #E3E3E3
+      rectangle "iss-00297\n[DONE]" as Niss_00297 #E3E3E3
+      rectangle "iss-00298\n[DONE]" as Niss_00298 #E3E3E3
+      rectangle "iss-00299\n[DONE]" as Niss_00299 #E3E3E3
+      rectangle "iss-00300\n[DONE]" as Niss_00300 #E3E3E3
+      rectangle "iss-00301\n[DONE]" as Niss_00301 #E3E3E3
+      rectangle "iss-00302\n[DONE]" as Niss_00302 #E3E3E3
+      rectangle "iss-00303\n[DONE]" as Niss_00303 #E3E3E3
+      rectangle "iss-00304\n[DONE]" as Niss_00304 #E3E3E3
+      rectangle "iss-00305\n[DONE]" as Niss_00305 #E3E3E3
+      rectangle "iss-00306\n[DONE]" as Niss_00306 #E3E3E3
+      rectangle "iss-00307\n[DONE]" as Niss_00307 #E3E3E3
+      rectangle "iss-00309\n[DONE]" as Niss_00309 #E3E3E3
+      rectangle "iss-00314\n[DONE]" as Niss_00314 #E3E3E3
+    }
+    package "epic-00312\nExperimental Local Workbench And Worktree Handoff" as Nepic_00312 {
+      rectangle "iss-00315\n[DONE]" as Niss_00315 #E3E3E3
+      rectangle "iss-00316\n[DONE]" as Niss_00316 #E3E3E3
+      rectangle "iss-00317\n[DONE]" as Niss_00317 #E3E3E3
+      rectangle "iss-00318\n[DONE]" as Niss_00318 #E3E3E3
+      rectangle "iss-00319\n[DONE]" as Niss_00319 #E3E3E3
+    }
+    package "epic-00356\nSpecDock Core Simplification and External Intelligence Boundary" as Nepic_00356 {
+      rectangle "iss-00357\n[DONE]" as Niss_00357 #E3E3E3
+      rectangle "iss-00358\n[DONE]" as Niss_00358 #E3E3E3
+      rectangle "iss-00359\n[DONE]" as Niss_00359 #E3E3E3
+      rectangle "iss-00360\n[DONE]" as Niss_00360 #E3E3E3
+      rectangle "iss-00387\n[DONE]" as Niss_00387 #E3E3E3
+    }
+    package "epic-00365\nSpecDock Structural Integrity Rearchitecture and Regression Baseline Recovery" as Nepic_00365 {
+      rectangle "iss-00368\n[DONE]" as Niss_00368 #E3E3E3
+      rectangle "iss-00369\n[DONE]" as Niss_00369 #E3E3E3
+      rectangle "iss-00370\n[DONE]" as Niss_00370 #E3E3E3
+      rectangle "iss-00371\n[DONE]" as Niss_00371 #E3E3E3
+      rectangle "iss-00372\n[DONE]" as Niss_00372 #E3E3E3
+      rectangle "iss-00382\n[DONE]" as Niss_00382 #E3E3E3
+    }
+    package "epic-00384\nProvider Test Strategy Simplification and Execution Cost Reduction" as Nepic_00384 {
+      rectangle "iss-00388\n[DONE]" as Niss_00388 #E3E3E3
+      rectangle "iss-00389\n[DONE]" as Niss_00389 #E3E3E3
+      rectangle "iss-00390\n[DONE]" as Niss_00390 #E3E3E3
+      rectangle "iss-00392\n[DONE]" as Niss_00392 #E3E3E3
+      rectangle "iss-00395\n[DONE]" as Niss_00395 #E3E3E3
+      rectangle "iss-00396\n[DONE]" as Niss_00396 #E3E3E3
+      rectangle "iss-00405\n[DONE]" as Niss_00405 #E3E3E3
+    }
+  }
+
+@enduml

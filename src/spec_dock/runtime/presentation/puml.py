@@ -6,6 +6,7 @@ from typing import Any
 from spec_dock.runtime.domain.ids import deps_node_sort_key
 
 _TREE_BOARD_BLOCKERS_LABEL_LIMIT = 3
+_BOARD_STATES = ("READY", "BLOCKED", "DOING", "DONE", "UNKNOWN")
 
 
 def _deps_sort_key(node_id: str) -> tuple[int, int, str] | tuple[int, str]:
@@ -42,6 +43,10 @@ def _issue_ready_board_state(
         if isinstance(raw_blockers_top, list):
             blockers_top = [str(dep_id) for dep_id in raw_blockers_top if isinstance(dep_id, str)]
 
+    # canonical mode decides the state from the structure snapshot, where several Issues can be DOING (iss-00438)
+    board_state = issue_item.get("board_state")
+    if isinstance(board_state, str) and board_state in _BOARD_STATES:
+        return (board_state, [] if board_state in ("DONE", "READY") else blockers_top)
     if status == "done":
         return ("DONE", [])
     if issue_id == active_issue_id:
