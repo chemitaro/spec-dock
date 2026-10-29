@@ -11,6 +11,7 @@ import pytest
 
 from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES
 from spec_dock.runtime.infra.canonical_files import is_regular_file
+from spec_dock.runtime.infra.canonical_state import read_catalog_state
 from tests.support.canonical_repo import add_worktree
 from tests.support.canonical_sync import SyncPair, catalog_result
 
@@ -275,13 +276,14 @@ def test_remove_plans_and_deletes_only_the_regular_dashboard_files(
     assert target.read_text(encoding="utf-8") == "keep\n"
 
 
-def _refresh(pair: SyncPair, main: Path, snapshot: object, *, registered: bool = False) -> Any:
+def _refresh(
+    pair: SyncPair, main: Path, snapshot: object, *, registered: bool = False, catalog: str | None = None
+) -> Any:
     from spec_dock.runtime.application.canonical_dashboard import refresh_dashboard
     from spec_dock.runtime.domain.canonical_sync_state import RegistryEntry
 
-    entry = RegistryEntry(
-        os.path.realpath(pair.catalog(pair.a)), str(main), "github.com/example/repo", "git", "2026-10-26T00:00:00Z"
-    )
+    catalog = catalog or os.path.realpath(pair.catalog(pair.a))
+    entry = RegistryEntry(catalog, str(main), "github.com/example/repo", "git", "2026-10-26T00:00:00Z")
     return refresh_dashboard(
         entry,
         snapshot,  # type: ignore[arg-type]
@@ -319,6 +321,33 @@ def test_a_busy_cycle_lock_a_removed_registration_or_no_state_skip_without_touch
     (catalog_state_dir(pair.state_root, os.path.realpath(pair.catalog(pair.a))) / "state.json").unlink()
     assert _refresh(pair, pair.a, snapshot).skipped == "no_state"
     assert pair.state(pair.a) is None and _stamps(pair.a) == {}
+
+
+@pytest.mark.parametrize("replacement", ["missing", "file", "link"])
+def test_a_main_spec_dock_that_is_not_a_directory_is_recorded_as_failed(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, replacement: str
+) -> None:
+    """R-438-04: without its declaration the main checkout is not legacy; the cycle records the failure."""
+    _fake_structure(monkeypatch)
+    pair.sync(pair.a)
+    snapshot = _stored_snapshot(pair)
+    catalog = os.path.realpath(pair.catalog(pair.a))  # before a link at spec-dock/ would redirect it
+    directory = _directory(pair.a)
+    moved = directory.with_name("spec-dock.moved")
+    directory.rename(moved)
+    for name in DASHBOARD_FILES:
+        (moved / name).unlink()
+    if replacement == "file":
+        directory.write_text("x\n", encoding="utf-8")
+    elif replacement == "link":
+        directory.symlink_to(moved, target_is_directory=True)
+    outcome = _refresh(pair, pair.a, snapshot, catalog=catalog)
+    state = read_catalog_state(pair.state_root, catalog)
+    assert state is not None and state.dashboard is not None
+    error: Any = state.dashboard["error"]
+    assert outcome.skipped is None and not outcome.written
+    assert error["code"] == "CANONICAL_DASHBOARD_FAILED" and error["paths"] == [str(directory)]
+    assert not any((moved / name).exists() for name in DASHBOARD_FILES)
 
 
 def test_a_failed_write_keeps_the_old_hash_so_the_next_cycle_redraws_all_five(

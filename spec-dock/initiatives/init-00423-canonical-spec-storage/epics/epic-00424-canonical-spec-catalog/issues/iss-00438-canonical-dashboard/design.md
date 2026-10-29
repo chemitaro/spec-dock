@@ -130,9 +130,9 @@ def refresh_dashboard(entry: RegistryEntry, snapshot: StructureSnapshot | None, 
 - `refresh_dashboard` の順：
   1. `cycle_lock(state_root, catalog)`（待たない）。取れなければ `skipped="cycle_busy"`。
   2. `registered` なら登録簿を読み直し、カタログがなければ `skipped="unregistered"`。
-  3. `main_checkout/.git` がディレクトリでなければ `skipped="not_main"`。`probe_workspace_mode(main)` が `canonical` でなければ `skipped="legacy_mode"`。
+  3. `main_checkout/.git` がディレクトリでなければ `skipped="not_main"`。`main/spec-dock` が（リンクでない）ディレクトリで、`probe_workspace_mode(main)` が `canonical` でなければ `skipped="legacy_mode"`。`spec-dock/` がない、ディレクトリでない、リンクのときは、宣言を読めないので従来モードとは見なさず、手順5で `CANONICAL_DASHBOARD_FAILED` を記録する（R-438-04。最終品質ゲート1の SP の P2）。
   4. `read_catalog_state` が None なら `skipped="no_state"`（手順1〜6が基準とともに作る記録を、ここで基準なしに作らない）。`dashboard.input_hash` と `input_hash(snapshot, snapshot_path=…)` を比べ、書くファイルを決める（違えば5つ、同じならふつうのファイルとしてないものだけ）。スナップショットがなければ書かずに `CANONICAL_DASHBOARD_FAILED`。
-  5. `main/spec-dock` を `lstat` し、ディレクトリ（リンクでない）でなければ `CANONICAL_DASHBOARD_FAILED`。ファイルごとに、`lstat` でディレクトリかシンボリックリンクなら飛ばして `CANONICAL_DASHBOARD_OCCUPIED` の `paths` に足す。ほかは `.<名前>.spec-dock-<pid>` に書いて `os.replace`（失敗すれば一時ファイルを消し、`CANONICAL_DASHBOARD_FAILED`）。
+  5. `main/spec-dock` を `lstat` し、ディレクトリ（リンクでない）でなければ `CANONICAL_DASHBOARD_FAILED`。ファイルごとに、`lstat` でディレクトリかシンボリックリンクなら飛ばして `CANONICAL_DASHBOARD_OCCUPIED` の `paths` に足す。ほかは `replace_text_file` で、ディレクトリの記述子に固定したうえで、ランダムな名前の一時ファイル `.<名前>.<16桁の16進>.tmp` を `O_EXCL | O_NOFOLLOW` で作り、fsync してから rename し、ディレクトリも fsync する（失敗すれば一時ファイルを消し、`CANONICAL_DASHBOARD_FAILED`）。
   6. `update_catalog_state` で `dashboard = {"input_hash": <今の SHA-256>, "written_at": <書いたら now、でなければ前の値>, "error": <あれば>}` を書く（今の記録の `dashboard` だけを置き換える）。スナップショットがないときと、`CANONICAL_DASHBOARD_FAILED` のときの `input_hash` は前の値のまま（次の周期で5つを書き直す）。
 - 例外：カタログごとの呼び出しの例外は、種類を問わず `refresh_structures` の中で受け止めて同期のログに残し、そのカタログの `dashboards_written` に数えない。同期の結果は変えない。`state.json` が読んだ後に消えたときは、作り直さずに `skipped="no_state"` にする。
 
@@ -185,7 +185,7 @@ def refresh_structures(entries, ctx, *, registered: bool = False) -> list[Reposi
 
 - **単体**：`tests/unit/domain/test_canonical_dashboard.py`（`dashboard_inputs` の状態、親子、ブロッカー、deps-issues と deps-raw の規則、`input_hash`）。`tests/unit/presentation/test_dashboard_board_state.py`（`board_state` の分岐と、従来の入力で出力が変わらないこと）。`tests/unit/domain/test_canonical_structure.py` と `tests/unit/infra/test_github_structure.py`、`test_github_snapshot.py`（時刻の項目、要求の数、古い形の取り直し）。
 - **見本との比較**：`tests/unit/application/test_canonical_dashboard_golden.py`。見本の `tree-all.puml` と `dashboard.md` から Scope の ID、題名、状態を読み、偽の `gh` に同じ構造を作り、全体の取り直しのスナップショットから描いた5つを、見本と比べる（ローカルの ID の置き換えと、Observability の行のほかは一致）。
-- **周期**：`tests/cli_runtime/test_issue438_canonical_dashboard.py`。I-3 の `SyncPair` と偽の `gh` で、作成、書かない周期、題名の変更、欠けたファイル、ディレクトリとシンボリックリンク、作業用のworktree、版3の main、スナップショットなし、`canonical status`、`canonical remove`。
+- **周期**：`tests/cli_runtime/test_issue438_canonical_dashboard.py`。I-3 の `SyncPair` と偽の `gh` で、作成、書かない周期、題名の変更、欠けたファイル、ディレクトリとシンボリックリンク、作業用のworktree、版3の main、main の `spec-dock/` がない・ファイル・リンク、スナップショットなし、`canonical status`、`canonical remove`。
 - **従来モード**：`tests/unit/presentation/` の今のテストと、版3のテストを変えずに通す。
 
 ## risk

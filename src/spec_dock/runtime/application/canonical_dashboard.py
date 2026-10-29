@@ -81,7 +81,8 @@ def refresh_dashboard(
             main = Path(entry.main_checkout)
             if not (main / ".git").is_dir():  # a linked worktree: one clone has one structure (Epic ch. 13)
                 return DashboardOutcome(skipped="not_main")
-            if probe_workspace_mode(main) != "canonical":
+            # Only a readable spec-dock/ directory can declare legacy mode; without one, _write records the failure.
+            if _is_directory(dashboard_directory(main)) and probe_workspace_mode(main) != "canonical":
                 return DashboardOutcome(skipped="legacy_mode")
             return _redraw(entry, snapshot, main, snapshot_path=snapshot_path, state_root=state_root, now=now)
     except CycleBusy:
@@ -141,6 +142,13 @@ def _redraw(
     return DashboardOutcome(tuple(written), error)
 
 
+def _is_directory(path: Path) -> bool:
+    try:
+        return stat.S_ISDIR(os.lstat(path).st_mode)
+    except OSError:
+        return False
+
+
 class _StateGone(Exception):
     """state.json disappeared between the read and the update."""
 
@@ -148,11 +156,7 @@ class _StateGone(Exception):
 def _write(
     directory: Path, files: Mapping[str, str], wanted: list[str], now: str
 ) -> tuple[list[str], dict[str, object] | None]:
-    try:
-        is_directory = stat.S_ISDIR(os.lstat(directory).st_mode)
-    except OSError:
-        is_directory = False
-    if not is_directory:
+    if not _is_directory(directory):
         message = f"{directory} is not a directory of the main checkout"
         return [], _error(CANONICAL_DASHBOARD_FAILED, message, now, [str(directory)])
     written: list[str] = []
