@@ -63,6 +63,16 @@ ChatGPT を使うゲートは利用者の設定で無効なので、Claude だ�
   - レビューの範囲は `a23d7d175..f24058b20`（`origin/main...HEAD` の全差分）。Standards：pass、指摘0。Spec：pass、P2 が1件（`register` が作成の結果を `undo.jsonl` に記録した後、`idmap.json` を保存する前に止まると、再実行で同じ Issue をもう一度作る。I-8 の版は印で毎回見つけ直していたので、この経路は退行）。
   - 対応：P2 は止める指摘ではないが、I-10 の本番の登録で重複の Issue を作るおそれがあり、直すのが小さいので直した（`Registrar._recorded_creation`。`undo.jsonl` に取り消されていない作成の結果があれば、その番号を使い、`idmap.json` を補う）。テスト `test_a_creation_recorded_before_the_id_map_was_saved_is_used_again` を足した。新しい SHA でゲートをやり直す。
 
+- **2回目（`f13ba3ce18c363cca3b9da9252100132539eff0d`）**
+  - `make lint`：終了コード0（すべて pass）。`uv run pytest`（全体）：終了コード0、3099 passed、8 skipped（16分28秒）。
+  - レビューは、トークンの節約の指示どおり、前のゲートの SHA からの差分 `f24058b20..f13ba3ce1` と、前の指摘が直ったことの確かめに絞った（全体の差分は1回目で2つのレビューを通っているため）。新しい2つのレビュアーに頼んだ。Standards：pass、P3 が1件（`undo` の後に `register` を再実行したとき、取り消した作成を使い直さない分岐を守るテストがない）。最初の結果は必須の項目が欠けて形式の検査に落ちたので、同じレビュアーに書き直してもらった。Spec：pass、指摘0。前の P2 が閉じたことを確かめた。
+  - P3 は止める指摘ではないので、直さずに残した（下の Residual）。
+- **統括からの追加の依頼（2026-10-30）：git の最低の版**。iss-00454 の担当が、仮想マシン（Ubuntu の git 2.43）で、README の「git 2.38 以上」では足りない可能性に気づいた。スクリプトの git だけの手順（`build-canonical`、`cut`、`move-local`、`adopt-worktree`）を小さな従来のリポジトリに通す確かめを、コンテナで行った（Docker。資格情報を渡さず、終わった後にコンテナと、取得した4つのイメージを消した）。
+  - 見つかったこと：git 2.34.1（Ubuntu 22.04）と 2.39.5（Debian 12）の `git subtree` は `--quiet` を知らず（`-q` だけ）、`build-canonical` が止まった。git 2.43.0（Ubuntu 24.04）の `git subtree split` は、作業ツリーに接頭辞のディレクトリがあることを求め、使い捨てのクローン（`--no-checkout`）で `'spec-dock/initiatives' does not exist` で止まった。手元の 2.54.0（macOS）では、どちらも起きなかった。
+  - 直したこと：`subtree split` に `-q` を使い、使い捨てのクローンに空の `spec-dock/initiatives` を作ってから実行する。スクリプトの始め（`Context.target`）に、git 2.31 以上（`rev-parse --path-format=absolute`）の確かめを足し、古ければ何もせずに止まる。`adopt-worktree` の 2.40 以上の確かめは今のまま。README の前提の行を、確かめた版と分かれ目に直した。
+  - 直した後：2.34.1、2.39.5、2.43.0、2.54.0 のすべてで `build-canonical`、`cut`、`move-local` が通った。`adopt-worktree` は 2.43.0 と 2.54.0 で通り、2.34.1 と 2.39.5 では「git 2.40 or newer」の案内付きで止まった。テスト：`test_build_canonical_works_with_the_git_subtree_of_older_distributions`（古い `git subtree` の2つの振る舞いをまねる偽の `git`）、`test_a_git_older_than_the_script_needs_is_refused_before_anything_runs`。
+  - 未確認：本物の git 2.30（Debian 11）は、パッケージの置き場の 404 で入れられず、確かめていない（2.31 より古い版で止まることは、偽の `git` のテストだけで確かめた）。2.31〜2.33 の版も確かめていない。
+
 ### 本物の spec-dock での読むだけの `plan`（2026-10-29）
 
 - 本物の main のチェックアウト（`/Volumes/990p2t/workspace/tools/spec-dock`、`origin/main` = `95bbb7a1c`）に、このブランチの `migrate.py plan`（`--apply` なし、作業の記録は一時ディレクトリ）を、本物の GitHub を読むだけで実行した。終了コード0、約10秒。
@@ -88,4 +98,5 @@ ChatGPT を使うゲートは利用者の設定で無効なので、Claude だ�
 - **`build-canonical` の時間**：spec-dock で約215秒。I-10 の凍結の時間の見積もりに入れる。
 - **仕様のツリーの外から中を指すリンク**：`docs/issue-plans/iss-00413-external-cli-state/artifacts/source-basis.md` などは、`cut` の後に切れる。この Issue の範囲の外（写すのは仕様のツリーの中だけ）なので、I-10 に引き渡す。
 - **Epic の文書**：Epic の `design.md` 11章の、書き換えるリンクの種類に HTML を足すこと（統括が次の Epic の文書の直しで行う）と、区切りの決まり（I-16）。
+- **`undo` の後の再登録のテスト（gate 2 の Standards の P3）**：`undo --apply` の後の `register --apply` が、取り消した作成を使い直さないことは、コードと2つのレビューで確かめたが、それを守るテストはない。I-10 の前に足すとよい。
 - **作成者の名前**：見つけ直しは `gh` の利用者の名前と Issue の作成者を比べるので、GitHub App のトークンでは使えない（README に書いた）。

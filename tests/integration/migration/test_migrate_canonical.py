@@ -301,3 +301,53 @@ def test_verify_checks_the_flat_layout_of_origins_canonical(tmp_path: Path, monk
         "the canonical branch has .meta.json",
     ):
         assert text in mismatches, (text, mismatches)
+
+
+def _old_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, version: str) -> None:
+    """A git on PATH that reports `version` and splits like git-subtree of Ubuntu 22.04 to 24.04."""
+    import os
+    import shutil
+    import sys
+
+    real = shutil.which("git")
+    folder = tmp_path / "old-git"
+    folder.mkdir()
+    wrapper = folder / "git"
+    wrapper.write_text(
+        f"#!{sys.executable}\n"
+        "import os, subprocess, sys\n"
+        "args = sys.argv[1:]\n"
+        f"if args and args[-1] == '--version':\n    print('git version {version}'); sys.exit(0)\n"
+        "if 'subtree' in args:\n"
+        "    if '--quiet' in args:\n        print('error: unknown option `quiet', file=sys.stderr); sys.exit(129)\n"
+        "    cwd = args[args.index('-C') + 1] if '-C' in args else '.'\n"
+        "    prefix = next((a.split('=', 1)[1] for a in args if a.startswith('--prefix=')), None)\n"
+        "    if prefix and not os.path.exists(os.path.join(cwd, prefix)):\n"
+        "        print(f\"fatal: '{prefix}' does not exist; use 'git subtree add'\", file=sys.stderr); sys.exit(1)\n"
+        f"sys.exit(subprocess.call([{real!r}, *args]))\n"
+    )
+    wrapper.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{folder}{os.pathsep}{os.environ['PATH']}")
+
+
+def test_build_canonical_works_with_the_git_subtree_of_older_distributions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    assert legacy.run("register", apply=True)[0] == 0
+    _old_git(tmp_path, monkeypatch, "2.34.1")
+    code, result = legacy.run("build-canonical", apply=True)
+    assert code == 0, result
+    _flat_tree(legacy.remote, "spec-dock/canonical")
+
+
+def test_a_git_older_than_the_script_needs_is_refused_before_anything_runs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    _old_git(tmp_path, monkeypatch, "2.30.2")
+    before = refs(legacy.remote)
+    for command in ("plan", "build-canonical"):
+        code, result = legacy.run(command)
+        assert code == 2 and "git 2.31 or newer" in result["error"], result
+    assert legacy.github.requests == [] and refs(legacy.remote) == before

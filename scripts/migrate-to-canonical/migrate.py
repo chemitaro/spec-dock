@@ -197,6 +197,8 @@ READ_RETRY_LIMIT = 60.0
 WRITE_RETRY_LIMIT = 3600.0
 NUMBER_BATCH = 50
 CLOCK_ALLOWANCE = timedelta(minutes=5)
+MINIMUM_GIT = (2, 31)  # rev-parse --path-format=absolute; checked on 2.34.1, 2.39.5, 2.43.0 and 2.54.0
+ADOPT_GIT = (2, 40)  # merge-tree --write-tree --merge-base
 EXIT_OK, EXIT_PROBLEMS, EXIT_REFUSED, EXIT_STOPPED = 0, 1, 2, 3
 
 BLOCKING_CODES = frozenset({
@@ -2284,6 +2286,11 @@ class Context:
         return self.wrote or any(gh.write_count for gh in self.githubs)
 
     def target(self) -> Target:
+        if not _git_version(MINIMUM_GIT):
+            raise Refused(
+                f"migrate.py needs git {MINIMUM_GIT[0]}.{MINIMUM_GIT[1]} or newer (rev-parse --path-format)",
+                "Install a newer Git (README), then run again",
+            )
         target = resolve_target(self.args.project, self.args.repo, self.args.state_dir)
         self.report.repository = target.repository
         self.report.default_branch = target.default_branch
@@ -2829,9 +2836,10 @@ def command_build_canonical(context: Context) -> int:
                 f"{len(tip.problems)} paths of {SPEC_ROOT} cannot be flattened; nothing was pushed",
                 "Fix them with the schema-3 SpecDock commands (README), merge, and run plan again",
             )
-        split = git_text(
-            repo, "subtree", "split", "--quiet", f"--prefix={SPEC_ROOT}", "migrate-source", read_only=False
-        )
+        # git-subtree of git 2.39 and older knows only -q, and that of 2.43 (Ubuntu 24.04) wants the prefix in the
+        # work tree even for a split; this clone has no checkout, so an empty directory stands in for it.
+        (repo / SPEC_ROOT).mkdir(parents=True, exist_ok=True)
+        split = git_text(repo, "subtree", "split", "-q", f"--prefix={SPEC_ROOT}", "migrate-source", read_only=False)
         split = split.splitlines()[-1].strip()
         history = rewrite_history(repo, split, flattener, workspace.root)
         report.data["history"] = history.as_data()
@@ -3381,8 +3389,8 @@ def command_adopt_worktree(context: Context) -> int:
     branch = git_text(checkout, "symbolic-ref", "--quiet", "--short", "HEAD", ok=(0, 1))
     if not branch:
         raise Refused(f"{checkout} is not on a branch")
-    if not _git_version((2, 40)):
-        raise Refused("adopt-worktree needs git 2.40 or newer (merge-tree --merge-base)")
+    if not _git_version(ADOPT_GIT):
+        raise Refused(f"adopt-worktree needs git {ADOPT_GIT[0]}.{ADOPT_GIT[1]} or newer (merge-tree --merge-base)")
     if tree_oid(target.project, f"{target.default_ref}:{SPEC_ROOT}") is not None:
         raise Refused(
             f"origin/{target.default_branch} still has {SPEC_ROOT}; the cutover PR is not merged",
