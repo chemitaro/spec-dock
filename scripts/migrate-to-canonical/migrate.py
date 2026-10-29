@@ -16,9 +16,11 @@ import argparse
 import contextlib
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
+import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import posixpath
 import re
 import shutil
 import socket
@@ -27,6 +29,7 @@ import sys
 import tempfile
 import time
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote, unquote
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping, Sequence
@@ -729,20 +732,6 @@ def _iso(value: datetime) -> str:
     return value.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def rename_path(path: str, renames: Mapping[str, str]) -> str:
-    """Replace a leading `<old id>-` in each path component with `<new id>-`."""
-    if not renames:
-        return path
-    parts = []
-    for part in path.split("/"):
-        for old, new in renames.items():
-            if part.startswith(f"{old}-"):
-                part = new + part[len(old) :]
-                break
-        parts.append(part)
-    return "/".join(parts)
-
-
 # ---------------------------------------------------------------------------------------------------------------
 # Schema-3 metadata.
 # ---------------------------------------------------------------------------------------------------------------
@@ -818,6 +807,594 @@ def parse_scopes(files: Iterable[tuple[str, bytes]]) -> tuple[list[Scope], list[
             )
         )
     return scopes, problems
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Flattening (Epic design ch. 11): nested Scope directories to <bucket>/<ID>/ and back, keeping relative links.
+# ---------------------------------------------------------------------------------------------------------------
+
+NESTED_DIRECTORIES: tuple[str, ...] = ("epics", "issues")
+CHILD_RULE_FILES = frozenset(f"{name}/rules.md" for name in NESTED_DIRECTORIES)
+DROPPED = "dropped"  # not copied: .meta.json, epics/rules.md, issues/rules.md
+FLATTEN_NESTED_FILE = "FLATTEN_NESTED_FILE"
+FLATTEN_OUTSIDE_SCOPE = "FLATTEN_OUTSIDE_SCOPE"
+FLATTEN_SCOPE_UNMAPPED = "FLATTEN_SCOPE_UNMAPPED"
+FLATTEN_DUPLICATE_ID = "FLATTEN_DUPLICATE_ID"
+CATALOG_PATH_OUTSIDE_SCOPE = "CATALOG_PATH_OUTSIDE_SCOPE"
+MARKDOWN_SUFFIXES = (".md",)
+HTML_SUFFIXES = (".html", ".htm")
+
+
+@dataclass(frozen=True)
+class Layout:
+    """Scope directories of one nested tree (paths relative to spec-dock/initiatives) and their catalog places."""
+
+    places: dict[str, str]  # Scope directory -> scope_relative(new ID), or a pending place for plan
+    unmapped: dict[str, dict[str, Any]]  # Scope directory -> FLATTEN_SCOPE_UNMAPPED / FLATTEN_DUPLICATE_ID
+    pending: dict[str, str]  # Scope directory -> local ID still to be created by register (plan only)
+
+
+def _identity(payload: bytes) -> tuple[Any, Any, Any] | None:
+    """(type, id, github.issue_number) of a .meta.json; nothing else is read, so old history files work too."""
+    try:
+        raw = json.loads(payload.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    github = raw.get("github")
+    return raw.get("type"), raw.get("id"), github.get("issue_number") if isinstance(github, dict) else None
+
+
+def _place_of(identity: tuple[Any, Any, Any] | None, idmap: Mapping[str, Mapping[str, Any]]) -> str | None:
+    if identity is None:
+        return None
+    kind, value, number = identity
+    if not isinstance(value, str):
+        return None
+    if LOCAL_ID_RE.fullmatch(value):
+        entry = idmap.get(value) or {}
+        if isinstance(entry.get("relative"), str):
+            return entry["relative"]
+        new = entry.get("id")
+        return scope_relative(new) if isinstance(new, str) and CANONICAL_ID_RE.fullmatch(new) else None
+    if kind not in ID_PREFIXES or CANONICAL_ID_RE.fullmatch(value) is None:
+        return None
+    if not value.startswith(f"{ID_PREFIXES[kind]}-") or type(number) is not int or number != int(value.split("-")[1]):
+        return None
+    return scope_relative(value)
+
+
+def nested_layout(metas: Mapping[str, bytes], idmap: Mapping[str, Mapping[str, Any]]) -> Layout:
+    """A Scope directory has .meta.json and sits at the root or right under a Scope's epics/ or issues/."""
+
+    def is_scope(directory: str) -> bool:
+        if directory not in metas:
+            return False
+        parts = directory.split("/")
+        if len(parts) == 1:
+            return True
+        return len(parts) >= 3 and parts[-2] in NESTED_DIRECTORIES and is_scope("/".join(parts[:-2]))
+
+    unmapped: dict[str, dict[str, Any]] = {}
+    pending: dict[str, str] = {}
+    by_place: dict[str, list[str]] = {}
+    for directory in sorted(d for d in metas if is_scope(d)):
+        identity = _identity(metas[directory])
+        place = _place_of(identity, idmap)
+        if place is None:
+            value = identity[1] if identity is not None else None
+            unmapped[directory] = anomaly(
+                FLATTEN_SCOPE_UNMAPPED,
+                f"{directory}: its .meta.json gives no Scope ID (id {value!r}; a local ID needs register first)",
+                path=directory,
+            )
+            continue
+        by_place.setdefault(place, []).append(directory)
+        if not place.split("/", 1)[0][:1].isdigit():
+            pending[directory] = str(identity[1])  # type: ignore[index]
+    places: dict[str, str] = {}
+    for place, directories in by_place.items():
+        if len(directories) == 1:
+            places[directories[0]] = place
+            continue
+        for directory in directories:
+            pending.pop(directory, None)
+            unmapped[directory] = anomaly(
+                FLATTEN_DUPLICATE_ID, f"{', '.join(directories)} all become {place}", path=directory
+            )
+    return Layout(places, unmapped, pending)
+
+
+class FlatMap:
+    """Nested -> flat paths relative to spec-dock/initiatives."""
+
+    def __init__(self, layout: Layout) -> None:
+        self.layout = layout
+        self._scopes = set(layout.places) | set(layout.unmapped)
+
+    def _scope(self, path: str, *, include_self: bool) -> tuple[str | None, str]:
+        parts = path.split("/") if path else []
+        for size in range(len(parts) if include_self else len(parts) - 1, 0, -1):
+            directory = "/".join(parts[:size])
+            if directory in self._scopes:
+                return directory, "/".join(parts[size:])
+        return None, path
+
+    def file(self, path: str) -> str | dict[str, Any]:
+        """Where a file goes, DROPPED, or the anomaly that keeps it from being flattened."""
+        if PurePosixPath(path).name == META_FILE:
+            return DROPPED
+        scope, rest = self._scope(path, include_self=False)
+        if scope is None:
+            return anomaly(FLATTEN_OUTSIDE_SCOPE, f"{path} is in no Scope directory", path=path)
+        if scope in self.layout.unmapped:
+            return self.layout.unmapped[scope]
+        if rest in CHILD_RULE_FILES:
+            return DROPPED
+        if rest.split("/", 1)[0] in NESTED_DIRECTORIES:
+            return anomaly(
+                FLATTEN_NESTED_FILE, f"{path} is under {scope}'s child layer but in no child Scope", path=path
+            )
+        return f"{self.layout.places[scope]}/{rest}"
+
+    def dropped_rule(self, path: str) -> bool:
+        scope, rest = self._scope(path, include_self=False)
+        return scope in self.layout.places and rest in CHILD_RULE_FILES
+
+    def place(self, path: str) -> str | None:
+        """Where a path (file or directory) is after flattening; a vanished epics/ or issues/ is its Scope."""
+        if path in ("", "."):
+            return ""
+        scope, rest = self._scope(path, include_self=True)
+        if scope is None or scope not in self.layout.places:
+            return None
+        base = self.layout.places[scope]
+        if not rest or rest in NESTED_DIRECTORIES:
+            return base
+        if rest.split("/", 1)[0] in NESTED_DIRECTORIES:
+            return None
+        return f"{base}/{rest}"
+
+
+class NestMap:
+    """Flat -> nested paths relative to spec-dock/initiatives (export-legacy); nested maps an ID to its directory."""
+
+    def __init__(self, nested: Mapping[str, str]) -> None:
+        self.nested = nested
+
+    def _split(self, path: str) -> tuple[str, str] | None:
+        parts = path.split("/")
+        if len(parts) < 2 or parts[1] not in self.nested or scope_relative(parts[1]) != f"{parts[0]}/{parts[1]}":
+            return None
+        return self.nested[parts[1]], "/".join(parts[2:])
+
+    def file(self, path: str) -> str | dict[str, Any]:
+        found = self._split(path)
+        if found is None or not found[1]:
+            return anomaly(CATALOG_PATH_OUTSIDE_SCOPE, f"{path} is not inside a Scope's <bucket>/<ID>/", path=path)
+        return f"{found[0]}/{found[1]}"
+
+    def dropped_rule(self, path: str) -> bool:  # noqa: ARG002 - the flat catalog drops nothing
+        return False
+
+    def place(self, path: str) -> str | None:
+        if path in ("", "."):
+            return ""
+        found = self._split(path)
+        if found is None:
+            return None
+        return f"{found[0]}/{found[1]}" if found[1] else found[0]
+
+
+@dataclass(frozen=True)
+class Link:
+    file: str  # the file's new path, relative to the repository
+    text: str  # the link as written
+    rewritten: str | None  # the new text, or None when it stays
+    before: str  # what it opened at the old path (repository-relative)
+    after: str | None  # what it should open at the new path; None when the target has no place
+
+
+@dataclass(frozen=True)
+class _Span:
+    start: int
+    end: int
+    value: str
+
+
+_URL = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*:")
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_CODE_SPAN = re.compile(r"(?<!`)(`+)(?!`).*?(?<!`)\1(?!`)", re.DOTALL)
+_INLINE_LINK = re.compile(r"\]\(\s*(?:<([^>\n]+)>|([^\s()<>]+))")
+_REFERENCE_LINK = re.compile(r"^ {0,3}\[[^\]\n]+\]:[ \t]*(?:<([^>\n]+)>|(\S+))", re.MULTILINE)
+_HTML_LINK = re.compile(r"""\b(?:href|src)\s*=\s*(?:"([^"\n]*)"|'([^'\n]*)')""", re.IGNORECASE)
+
+
+def _code_ranges(text: str) -> list[tuple[int, int]]:
+    """Fenced blocks and code spans of a Markdown text, which hold no links."""
+    ranges: list[tuple[int, int]] = []
+    position = 0
+    fence: str | None = None
+    fence_start = 0
+    prose_start = 0
+    for line in text.splitlines(keepends=True):
+        matched = _FENCE.match(line)
+        if fence is None and matched:
+            fence, fence_start = matched.group(1), position
+            ranges.extend(
+                (prose_start + m.start(), prose_start + m.end())
+                for m in _CODE_SPAN.finditer(text[prose_start:position])
+            )
+        elif fence is not None and matched and matched.group(1)[0] == fence[0] and len(matched.group(1)) >= len(fence):
+            ranges.append((fence_start, position + len(line)))
+            fence = None
+            prose_start = position + len(line)
+        position += len(line)
+    if fence is not None:
+        ranges.append((fence_start, len(text)))
+    else:
+        ranges.extend((prose_start + m.start(), prose_start + m.end()) for m in _CODE_SPAN.finditer(text[prose_start:]))
+    return ranges
+
+
+def find_links(payload: bytes, kind: str) -> tuple[str, list[_Span]] | None:
+    """The decoded text and the link targets in it; None when the payload is not UTF-8."""
+    try:
+        text = payload.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+    if kind == "symlink":
+        return text, [_Span(0, len(text), text)]
+    patterns = (_INLINE_LINK, _REFERENCE_LINK) if kind == "markdown" else (_HTML_LINK,)
+    code = _code_ranges(text) if kind == "markdown" else []
+    spans: list[_Span] = []
+    for pattern in patterns:
+        for matched in pattern.finditer(text):
+            group = 1 if matched.group(1) is not None else 2
+            start, end = matched.span(group)
+            if any(low <= start < high for low, high in code):
+                continue
+            spans.append(_Span(start, end, matched.group(group)))
+    return text, sorted(spans, key=lambda span: span.start)
+
+
+def _relative_parts(value: str) -> tuple[str, str] | None:
+    """(path, suffix) of a relative link; None for URLs, anchors, absolute paths and empty paths."""
+    stripped = value.strip()
+    if not stripped or _URL.match(stripped) or stripped.startswith(("#", "/")):
+        return None
+    cut = min((index for index in (stripped.find("#"), stripped.find("?")) if index >= 0), default=len(stripped))
+    path, suffix = stripped[:cut], stripped[cut:]
+    return (path, suffix) if path else None
+
+
+def _resolve(directory: str, path: str) -> str | None:
+    joined = posixpath.normpath(posixpath.join(directory, unquote(path)))
+    return None if joined == ".." or joined.startswith("../") else joined
+
+
+def link_target(mapping: FlatMap | NestMap, symlinks: Mapping[str, bytes]) -> Callable[[str], str | None]:
+    """Repository path at the old place -> repository path at the new place (None: no place for it)."""
+
+    def target(path: str, depth: int = 0) -> str | None:
+        if path != SPEC_ROOT and not path.startswith(f"{SPEC_ROOT}/"):
+            return path
+        inner = path[len(SPEC_ROOT) + 1 :]
+        if mapping.dropped_rule(inner):
+            content = symlinks.get(inner)
+            final = _resolve(posixpath.dirname(path), content.decode("utf-8", "replace")) if content else None
+            return target(final, depth + 1) if final is not None and depth < 8 else None
+        place = mapping.place(inner)
+        return None if place is None else (f"{SPEC_ROOT}/{place}" if place else SPEC_ROOT)
+
+    return target
+
+
+def plan_links(
+    spans: Sequence[_Span], old: str, target: Callable[[str], str | None]
+) -> list[tuple[str, str | None, str | None]]:
+    """(text, before, after) per span; before is None for URLs, anchors and paths outside the repository."""
+    planned = []
+    for span in spans:
+        parts = _relative_parts(span.value)
+        before = _resolve(posixpath.dirname(old), parts[0]) if parts else None
+        planned.append((span.value, before, target(before) if before is not None else None))
+    return planned
+
+
+def rewrite_links(
+    payload: bytes, *, kind: str, old: str, new: str, target: Callable[[str], str | None]
+) -> tuple[bytes, list[Link]]:
+    found = find_links(payload, kind)
+    if found is None:
+        return payload, []
+    text, spans = found
+    rewritten, links = apply_links(text, spans, plan_links(spans, old, target), new=new)
+    return (payload if rewritten is None else rewritten.encode("utf-8")), links
+
+
+def apply_links(
+    text: str, spans: Sequence[_Span], planned: Sequence[tuple[str, str | None, str | None]], *, new: str
+) -> tuple[str | None, list[Link]]:
+    """The text with each link that would open another target at `new` rewritten; None when nothing changes."""
+    directory = posixpath.dirname(new)
+    pieces: list[str] = []
+    links: list[Link] = []
+    cursor = 0
+    for span, (value, before, after) in zip(spans, planned, strict=True):
+        if before is None:
+            continue
+        path, suffix = _relative_parts(value)  # type: ignore[misc]
+        rewritten = None
+        if after is not None and _resolve(directory, path) != after:
+            rewritten = posixpath.relpath(after, directory)
+            if path.endswith("/") and not rewritten.endswith("/"):
+                rewritten += "/"
+            if "%" in path:
+                rewritten = quote(rewritten, safe="/._-~")
+            rewritten += suffix
+            pieces.append(text[cursor : span.start])
+            pieces.append(text[span.start : span.end].replace(value.strip(), rewritten, 1))
+            cursor = span.end
+        links.append(Link(new, value, rewritten, before, after))
+    if cursor == 0:
+        return None, links
+    pieces.append(text[cursor:])
+    return "".join(pieces), links
+
+
+class PathSet:
+    """Files and their parent directories, repository-relative."""
+
+    def __init__(self, files: Iterable[str]) -> None:
+        self.items: set[str] = set()
+        for path in files:
+            self.items.add(path)
+            parent = posixpath.dirname(path)
+            while parent and parent not in self.items:
+                self.items.add(parent)
+                parent = posixpath.dirname(parent)
+
+    def __contains__(self, path: object) -> bool:
+        return path in self.items
+
+
+@dataclass
+class LinkReport:
+    rewritten: int = 0
+    unrewritable: list[dict[str, str]] = field(default_factory=list)
+    broken_before: list[dict[str, str]] = field(default_factory=list)
+
+    def as_data(self) -> dict[str, Any]:
+        return {
+            "rewritten": self.rewritten,
+            "unrewritable": self.unrewritable,
+            "broken_before": self.broken_before,
+        }
+
+
+def link_report(links: Iterable[Link], before: PathSet, after: PathSet) -> LinkReport:
+    """Links that opened before but not after are unrewritable; links already broken are listed apart."""
+    report = LinkReport()
+    for link in links:
+        if link.rewritten is not None:
+            report.rewritten += 1
+        item = {"file": link.file, "text": link.text, "target": link.before}
+        if link.before not in before:
+            report.broken_before.append(item)
+        elif link.after is None or link.after not in after:
+            report.unrewritable.append(item)
+    return report
+
+
+def linkable(path: str, mode: str) -> str | None:
+    """The link kind a tree entry may hold."""
+    if mode == "120000":
+        return "symlink"
+    if path.endswith(MARKDOWN_SUFFIXES):
+        return "markdown"
+    if path.endswith(HTML_SUFFIXES):
+        return "html"
+    return None
+
+
+@dataclass
+class Flattened:
+    entries: list[TreeEntry]  # paths relative to spec-dock/initiatives after flattening
+    problems: list[dict[str, Any]]  # what cannot be flattened (a strict caller stops on them)
+    dropped: dict[str, int]  # paths left out, by anomaly code
+    links: list[Link]
+    layout: Layout
+    moved: dict[str, TreeEntry | None] = field(default_factory=dict)  # source path -> flattened entry (None: dropped)
+
+
+class TreeFlattener:
+    """Flattens nested spec trees read from one repository, remembering parsed and rewritten blobs.
+
+    With a scratch directory (a throwaway clone) rewritten blobs are written; without one (the real repository)
+    nothing is written and their object ids are computed in memory.
+    """
+
+    def __init__(self, repo: Path, idmap: Mapping[str, Mapping[str, Any]], scratch: Path | None) -> None:
+        self.repo = repo
+        self.idmap = idmap
+        self.scratch = scratch
+        self._small: dict[str, bytes] = {}  # .meta.json and symlink payloads
+        self._parsed: dict[tuple[str, str], tuple[str, list[_Span]] | None] = {}
+        self._results: dict[tuple[Any, ...], tuple[str | None, list[Link]]] = {}
+        self._format: str | None = None
+
+    def _object_id(self, payload: bytes) -> str:
+        if self._format is None:
+            self._format = git_text(self.repo, "rev-parse", "--show-object-format", ok=(0, 128)) or "sha1"
+        digest = hashlib.sha256 if self._format == "sha256" else hashlib.sha1
+        return digest(b"blob %d\0" % len(payload) + payload).hexdigest()
+
+    def _write(self, payloads: Sequence[bytes]) -> list[str]:
+        if not payloads:
+            return []
+        if self.scratch is None:
+            return [self._object_id(payload) for payload in payloads]
+        folder = Path(tempfile.mkdtemp(prefix="blobs-", dir=self.scratch))
+        try:
+            paths = []
+            for index, payload in enumerate(payloads):
+                path = folder / str(index)
+                path.write_bytes(payload)
+                paths.append(path)
+            output = git_text(
+                self.repo,
+                "hash-object",
+                "-w",
+                "--no-filters",
+                "--stdin-paths",
+                input="".join(f"{path}\n" for path in paths).encode(),
+                read_only=False,
+            )
+            return output.splitlines()
+        finally:
+            shutil.rmtree(folder, ignore_errors=True)
+
+    def _read(self, entries: Sequence[TreeEntry]) -> None:
+        small = [e.oid for e in entries if (e.mode == "120000" or e.path.endswith(f"/{META_FILE}"))]
+        documents: list[tuple[str, str]] = []
+        for entry in entries:
+            kind = linkable(entry.path, entry.mode)
+            if kind is not None and kind != "symlink":
+                documents.append((entry.oid, kind))
+        wanted = [oid for oid in small if oid not in self._small]
+        wanted += [oid for oid, kind in documents if (oid, kind) not in self._parsed]
+        blobs = read_blobs(self.repo, wanted)
+        for oid in small:
+            if oid in blobs:
+                self._small[oid] = blobs[oid]
+        for oid, kind in documents:
+            if (oid, kind) not in self._parsed:
+                found = find_links(blobs[oid], kind)
+                self._parsed[oid, kind] = found if found is not None and found[1] else None
+
+    def flatten(self, entries: Sequence[TreeEntry], *, strict: bool) -> Flattened:
+        self._read(entries)
+        metas = {
+            str(PurePosixPath(e.path).parent): self._small[e.oid]
+            for e in entries
+            if PurePosixPath(e.path).name == META_FILE and "/" in e.path
+        }
+        layout = nested_layout(metas, self.idmap)
+        mapping = FlatMap(layout)
+        target = link_target(mapping, {e.path: self._small[e.oid] for e in entries if e.mode == "120000"})
+        result: list[TreeEntry] = []
+        problems: dict[tuple[str, str], dict[str, Any]] = {}
+        dropped: dict[str, int] = {}
+        links: list[Link] = []
+        pending: list[tuple[int, bytes, tuple[Any, ...]]] = []
+        sources: list[str] = []
+        moved: dict[str, TreeEntry | None] = {}
+        for entry in entries:
+            place = mapping.file(entry.path)
+            if place == DROPPED:
+                moved[entry.path] = None
+                continue
+            if isinstance(place, dict):
+                problems.setdefault((place["code"], str(place.get("path"))), place)
+                dropped[place["code"]] = dropped.get(place["code"], 0) + 1
+                continue
+            oid = entry.oid
+            kind = linkable(entry.path, entry.mode)
+            parsed = None
+            if kind == "symlink":
+                parsed = find_links(self._small[entry.oid], kind)
+            elif kind is not None:
+                parsed = self._parsed[entry.oid, kind]
+            if parsed is not None:
+                text, spans = parsed
+                old, new = f"{SPEC_ROOT}/{entry.path}", f"{SPEC_ROOT}/{place}"
+                planned = plan_links(spans, old, target)
+                key = (entry.oid, kind, old, new, tuple(item[2] for item in planned))
+                if key not in self._results:
+                    rewritten, file_links = apply_links(text, spans, planned, new=new)
+                    self._results[key] = (None, file_links)
+                    if rewritten is not None:
+                        pending.append((len(result), rewritten.encode("utf-8"), key))
+                cached_oid, file_links = self._results[key]
+                oid = cached_oid or oid
+                links.extend(file_links)
+            result.append(TreeEntry(entry.mode, entry.kind, oid, place))
+            sources.append(entry.path)
+        for (index, _, key), written in zip(pending, self._write([item[1] for item in pending]), strict=True):
+            self._results[key] = (written, self._results[key][1])
+            old_entry = result[index]
+            result[index] = TreeEntry(old_entry.mode, old_entry.kind, written, old_entry.path)
+        moved.update(zip(sources, result, strict=True))
+        found = list(problems.values())
+        return Flattened(result, found if strict else [], {} if strict else dropped, links, layout, moved)
+
+
+def flattened_links(source: Sequence[TreeEntry], flat: Flattened, prefix: str = SPEC_ROOT) -> LinkReport:
+    """Link report of one flattening: source holds the whole repository tree at the old place."""
+    before = PathSet(e.path for e in source)
+    outside = (e.path for e in source if e.path != prefix and not e.path.startswith(f"{prefix}/"))
+    after = PathSet([*outside, *(f"{prefix}/{e.path}" for e in flat.entries)])
+    return link_report(flat.links, before, after)
+
+
+def write_commit(repo: Path, raw: bytes, tree: str, parents: Sequence[str]) -> str:
+    """A copy of a commit with another tree and parents; author, committer, dates and message stay."""
+    header, _, message = raw.partition(b"\n\n")
+    kept: list[bytes] = []
+    skipping = False
+    for line in header.split(b"\n"):
+        if line.startswith(b" ") and skipping:
+            continue
+        skipping = line.split(b" ", 1)[0] in (b"tree", b"parent", b"gpgsig", b"gpgsig-sha256", b"mergetag")
+        if not skipping:
+            kept.append(line)
+    lines = [b"tree " + tree.encode(), *(b"parent " + parent.encode() for parent in parents), *kept]
+    payload = b"\n".join(lines) + b"\n\n" + message
+    return git_text(repo, "hash-object", "-t", "commit", "-w", "--stdin", input=payload, read_only=False)
+
+
+@dataclass
+class History:
+    tip: str
+    commits: int = 0
+    dropped_commits: int = 0
+    dropped: dict[str, int] = field(default_factory=dict)
+    examples: dict[str, list[str]] = field(default_factory=dict)
+
+    def as_data(self) -> dict[str, Any]:
+        return {
+            "commits": self.commits,
+            "dropped_commits": self.dropped_commits,
+            "dropped_paths": self.dropped,
+            "examples": self.examples,
+        }
+
+
+def rewrite_history(repo: Path, tip: str, flattener: TreeFlattener, scratch: Path) -> History:
+    """Flatten every commit of a subtree split; paths that cannot be flattened leave that commit only."""
+    order = [
+        line.split() for line in git_text(repo, "rev-list", "--reverse", "--topo-order", "--parents", tip).splitlines()
+    ]
+    raws = read_blobs(repo, [line[0] for line in order])
+    mapped: dict[str, str] = {}
+    history = History(tip="")
+    for oid, *parents in order:
+        flat = flattener.flatten(list_tree(repo, oid), strict=False)
+        tree = write_tree(repo, flat.entries, scratch)
+        mapped[oid] = write_commit(repo, raws[oid], tree, [mapped[parent] for parent in parents])
+        history.commits += 1
+        if flat.dropped:
+            history.dropped_commits += 1
+            for code, count in flat.dropped.items():
+                history.dropped[code] = history.dropped.get(code, 0) + count
+        for item in [*flat.layout.unmapped.values()]:
+            examples = history.examples.setdefault(item["code"], [])
+            if len(examples) < 5 and item["path"] not in examples:
+                examples.append(item["path"])
+    history.tip = mapped[tip]
+    return history
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -1710,6 +2287,21 @@ def _analysis(context: Context, target: Target, state: State, commit: str) -> tu
     return gh, analysis
 
 
+def _report_flattening(report: Report, flat: Flattened, links: LinkReport) -> None:
+    report.data["flatten"] = {
+        "problems": flat.problems,
+        "pending": flat.layout.pending,
+        "links": links.as_data(),
+    }
+    report.say(
+        f"flatten: {len(flat.entries)} files, {len(flat.problems)} paths cannot be flattened, "
+        f"{links.rewritten} links rewritten, {len(links.unrewritable)} unrewritable, "
+        f"{len(links.broken_before)} already broken"
+    )
+    for item in links.unrewritable:
+        report.warn(f"link {item['text']!r} in {item['file']} will not open {item['target']} after flattening")
+
+
 def command_plan(context: Context) -> int:
     report = context.report
     target = context.target()
@@ -1718,6 +2310,18 @@ def command_plan(context: Context) -> int:
     report.data["source_commit"] = commit
     gh, analysis = _analysis(context, target, state, commit)
     _summarize(report, analysis)
+    planned_ids = {
+        old: {"id": entry["id"]} if entry.get("id") else {"relative": f"pending/{old}"}
+        for old, entry in analysis.local_plan.items()
+    }
+    flat = Flattened([], [], {}, [], Layout({}, {}, {}))
+    links = LinkReport()
+    if tree_oid(target.project, f"{commit}:{SPEC_ROOT}") is not None:
+        flattener = TreeFlattener(target.project, planned_ids, scratch=None)  # reads only; writes no object
+        flat = flattener.flatten(list_tree(target.project, f"{commit}:{SPEC_ROOT}"), strict=True)
+        links = flattened_links(list_tree(target.project, commit), flat)
+    _report_flattening(report, flat, links)
+    report.anomalies.extend(flat.problems)
     try:
         operations = registration_plan(gh, analysis) if not analysis.blocking else []
     except GithubError as error:
@@ -1765,6 +2369,9 @@ def command_plan(context: Context) -> int:
         report.warn(f"the main checkout HEAD {head} differs from origin/{target.default_branch}")
     if analysis.blocking:
         report.step("Fix the blocking anomalies with the schema-3 SpecDock commands, merge, and run plan again")
+        return EXIT_PROBLEMS
+    if flat.problems:
+        report.step("Move or remove the paths that cannot be flattened (README), merge, and run plan again")
         return EXIT_PROBLEMS
     report.step("register --apply, then verify")
     return EXIT_OK
@@ -2132,47 +2739,52 @@ def command_build_canonical(context: Context) -> int:
         raise Refused(f"local Scopes without an ID map entry: {unmapped}", "register --apply")
     if run_git(None, "subtree", "-h", ok=(0, 1, 129)).returncode not in (0, 129):
         raise Refused("git subtree is not available", "Install a Git that ships git-subtree")
-    renames = state.renames()
     current = remote_ref(target, CANONICAL_REF)
     with Workspace(target) as workspace:
+        repo = workspace.repo
+        flattener = TreeFlattener(repo, state.idmap, workspace.root)
+        whole = list_tree(repo, "migrate-source")
+        tip = flattener.flatten(list_tree(repo, f"migrate-source:{SPEC_ROOT}"), strict=True)
+        links = flattened_links(whole, tip)
+        _report_flattening(report, tip, links)
+        if tip.problems:
+            report.anomalies.extend(tip.problems)
+            raise Refused(
+                f"{len(tip.problems)} paths of {SPEC_ROOT} cannot be flattened; nothing was pushed",
+                "Fix them with the schema-3 SpecDock commands (README), merge, and run plan again",
+            )
         split = git_text(
-            workspace.repo, "subtree", "split", "--quiet", f"--prefix={SPEC_ROOT}", "migrate-source", read_only=False
+            repo, "subtree", "split", "--quiet", f"--prefix={SPEC_ROOT}", "migrate-source", read_only=False
         )
         split = split.splitlines()[-1].strip()
-        entries = []
-        for entry in list_tree(workspace.repo, split):
-            if PurePosixPath(entry.path).name == META_FILE:
-                continue
-            entries.append(TreeEntry(entry.mode, entry.kind, entry.oid, rename_path(entry.path, renames)))
-        expected = sorted(
-            (rename_path(e.path, renames), e.mode, e.oid)
-            for e in list_tree(target.project, f"{source}:{SPEC_ROOT}")
-            if PurePosixPath(e.path).name != META_FILE
+        history = rewrite_history(repo, split, flattener, workspace.root)
+        report.data["history"] = history.as_data()
+        report.say(
+            f"history: {history.commits} commits rewritten; {history.dropped_commits} left out paths that cannot be "
+            f"flattened {history.dropped} (they stay in the default branch history)"
         )
-        if sorted((e.path, e.mode, e.oid) for e in entries) != expected:
-            raise Refused("the split tree does not match the source spec tree; nothing was pushed")
-        roots = {e.path for e in entries if "/" not in e.path}
-        clash = roots & set(CANONICAL_ROOT_FILES)
-        if clash:
-            raise Refused(f"{SPEC_ROOT} already has canonical root files: {sorted(clash)}")
+        expected = write_tree(repo, tip.entries, workspace.root)
+        if tree_oid(repo, history.tip) != expected:
+            raise Refused("the rewritten history does not end in the flattened spec tree; nothing was pushed")
+        entries = [*tip.entries]
         for name, payload in CANONICAL_ROOT_FILES.items():
-            entries.append(TreeEntry("100644", "blob", hash_blob(workspace.repo, payload), name))
-        tree = write_tree(workspace.repo, entries, workspace.root)
+            entries.append(TreeEntry("100644", "blob", hash_blob(repo, payload), name))
+        tree = write_tree(repo, entries, workspace.root)
         commit = commit_tree(
-            workspace.repo,
+            repo,
             tree,
-            [split],
+            [history.tip],
             CANONICAL_COMMIT_MESSAGE,
-            committer(workspace.repo, split),  # same inputs give the same commit after unrelated default-branch PRs
-            commit_date(workspace.repo, split),
+            committer(repo, split),  # same inputs give the same commit after unrelated default-branch PRs
+            commit_date(repo, split),
         )
         report.data.update({
             "split_commit": split,
+            "flat_commit": history.tip,
             "canonical_commit": commit,
             "files": len(entries),
-            "renames": renames,
         })
-        report.say(f"canonical commit {commit} ({len(entries)} files) on top of split {split}")
+        report.say(f"canonical commit {commit} ({len(entries)} files) on top of the flattened history {history.tip}")
         if current is not None and current != commit:
             raise _existing_ref_refusal(CANONICAL_REF, current, commit)
         if not context.args.apply:
@@ -2396,16 +3008,16 @@ def command_move_local(context: Context) -> int:
     )
     catalog = target.project / CATALOG_RELATIVE
     tag = f"local-{pc_name(context.args.pc_name)}"
-    renames = state.renames()
+    placements = _place_local_files(target, state, checkout, files) if files else []
 
-    def plan_moves() -> list[tuple[Path, Path]]:
+    def plan_moves() -> list[tuple[Path, Path, bytes | None]]:
         planned: set[Path] = set()
-        moves: list[tuple[Path, Path]] = []
-        for path in files:
-            destination = catalog / rename_path(path.relative_to(root).as_posix(), renames)
+        moves: list[tuple[Path, Path, bytes | None]] = []
+        for path, place, content in placements:
+            destination = catalog / place
             destination = _free_name(destination.parent, destination.name, tag, planned)
             planned.add(destination)
-            moves.append((path, destination))
+            moves.append((path, destination, content))
         return moves
 
     needs_catalog = bool(files) and not _catalog_registered(target)
@@ -2438,10 +3050,10 @@ def command_move_local(context: Context) -> int:
                 )
         report.say(f"would create the catalog {catalog}; names are checked against it once it exists")
     moves = plan_moves()
-    report.data["moves"] = [{"from": str(a), "to": str(b)} for a, b in moves]
+    report.data["moves"] = [{"from": str(a), "to": str(b), "links_rewritten": c is not None} for a, b, c in moves]
     report.data["directories"] = [str(d) for d in [*directories, root]]
     report.data["create_catalog"] = needs_catalog
-    for source, destination in moves:
+    for source, destination, _content in moves:
         report.say(f"{'move' if context.args.apply else 'would move'} {source} -> {destination}")
     if not context.args.apply:
         report.step("move-local --apply")
@@ -2449,10 +3061,19 @@ def command_move_local(context: Context) -> int:
     moved = 0
     context.wrote = True
     try:
-        for source, destination in moves:
+        for source, destination, content in moves:
             if destination.exists() or destination.is_symlink():
                 raise Stopped(f"{destination} appeared while moving; nothing is overwritten", "Run move-local again")
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if content is not None:  # its relative links follow the new depth
+                if source.is_symlink():
+                    destination.symlink_to(os.fsdecode(content))
+                else:
+                    destination.write_bytes(content)
+                    shutil.copymode(source, destination)
+                source.unlink()
+                moved += 1
+                continue
             try:
                 source.rename(destination)
             except OSError:
@@ -2472,6 +3093,58 @@ def command_move_local(context: Context) -> int:
         raise Stopped(f"{root} is not empty after moving", "Inspect it and run move-local again")
     report.step(f"spec-dock --project {checkout} canonical link")
     return EXIT_OK
+
+
+def _place_local_files(
+    target: Target, state: State, checkout: Path, files: Sequence[Path]
+) -> list[tuple[Path, str, bytes | None]]:
+    """(file, catalog path, rewritten content or None) for each file; refuses before writing if one has no place."""
+    commit = legacy_commit(target, state)
+    entries = tracked_spec_files(target.project, commit) if commit else []
+    wanted = [e for e in entries if e.mode == "120000" or PurePosixPath(e.path).name == META_FILE]
+    blobs = read_blobs(target.project, [e.oid for e in wanted])
+    metas = {str(PurePosixPath(e.path).parent): blobs[e.oid] for e in wanted if e.path.endswith(f"/{META_FILE}")}
+    branch = git_text(checkout, "symbolic-ref", "--quiet", "--short", "HEAD", ok=(0, 1))
+    record = state.directory / "adopt" / f"{branch.replace('/', '-')}.json"
+    if branch and record.exists():
+        for path, text in (json.loads(record.read_text(encoding="utf-8")).get("metadata") or {}).items():
+            directory, payload = str(PurePosixPath(path).parent), str(text).encode("utf-8")
+            if directory in metas and _identity(metas[directory]) != _identity(payload):
+                raise Refused(
+                    f"{directory}: the cutover commit and the adopt-worktree record of {branch} name different Scopes",
+                    "Inspect both .meta.json versions; fix the record or move the files by hand (README)",
+                )
+            metas[directory] = payload
+    flat = FlatMap(nested_layout(metas, state.idmap))
+    target_of = link_target(flat, {e.path: blobs[e.oid] for e in wanted if e.mode == "120000"})
+    root = checkout / SPEC_ROOT
+    placements: list[tuple[Path, str, bytes | None]] = []
+    problems: list[dict[str, Any]] = []
+    for path in files:
+        relative = path.relative_to(root).as_posix()
+        place = flat.file(relative)
+        if isinstance(place, dict):
+            problems.append(place)
+            continue
+        if place == DROPPED:
+            problems.append(anomaly(FLATTEN_NESTED_FILE, f"{relative} has no place in the catalog", path=relative))
+            continue
+        kind = linkable(relative, "120000" if path.is_symlink() else "100644")
+        content = None
+        if kind is not None:
+            payload = os.fsencode(str(path.readlink())) if kind == "symlink" else path.read_bytes()
+            rewritten, _ = rewrite_links(
+                payload, kind=kind, old=f"{SPEC_ROOT}/{relative}", new=f"{SPEC_ROOT}/{place}", target=target_of
+            )
+            content = rewritten if rewritten != payload else None
+        placements.append((path, place, content))
+    if problems:
+        raise Refused(
+            f"{len(problems)} files have no place in the flat catalog; nothing was moved: "
+            + ", ".join(str(item.get("path")) for item in problems[:10]),
+            "Move them into a Scope directory or delete them, then run move-local again",
+        )
+    return placements
 
 
 # --- adopt-worktree ----------------------------------------------------------------------------------------------
@@ -2581,11 +3254,14 @@ def _adopt_into_canonical(
     workspace: Workspace,
     adopted: list[TreeEntry],
     base: str,
-    base_tree: str,
+    flat_base_tree: str,
     branch: str,
-    renames: Mapping[str, str],
 ) -> tuple[str, list[dict[str, str]]]:
-    """Merge the checkout's specs into canonical and push; returns the commit that must be on origin."""
+    """Merge the checkout's flattened specs into canonical and push; returns the commit that must be on origin.
+
+    The merge base C is the canonical commit whose tree is the flattened merge-base spec tree (build-canonical
+    flattened every commit the same way).
+    """
     repo, report = workspace.repo, context.report
     date = commit_date(repo, base)
     pc = pc_name(context.args.pc_name)
@@ -2593,18 +3269,11 @@ def _adopt_into_canonical(
         canonical = workspace.fetch_canonical()
         if canonical is None:
             raise Refused("origin has no spec-dock/canonical", "build-canonical --apply")
-        found = _find_tree_commit(repo, "refs/heads/canonical", base_tree)
+        found = _find_tree_commit(repo, "refs/heads/canonical", flat_base_tree)
         if found is None:
-            raise Refused(f"no canonical commit has the spec tree of the merge base {base}")
-        renamed_base = [
-            TreeEntry(e.mode, e.kind, e.oid, rename_path(e.path, renames))
-            for e in list_tree(repo, found)
-            if PurePosixPath(e.path).name != META_FILE
-        ]
+            raise Refused(f"no canonical commit has the flattened spec tree of the merge base {base}")
         identity = target.identity
-        base_commit = commit_tree(
-            repo, write_tree(repo, renamed_base, workspace.root), [found], "spec-dock: adoption base", identity, date
-        )
+        base_commit = found
         x_commit = commit_tree(
             repo, write_tree(repo, adopted, workspace.root), [found], f"spec-dock: adopt {branch}", identity, date
         )
@@ -2677,7 +3346,6 @@ def command_adopt_worktree(context: Context) -> int:
         for p in dict.fromkeys([*listed(), *listed("--others", "--exclude-standard")])
         if (checkout / p).is_symlink() or (checkout / p).is_file()
     ]
-    renames = state.renames()
     with Workspace(target) as workspace:
         repo = workspace.repo
         # The branch may exist only in this checkout's clone; its objects back the merge-base trees read below.
@@ -2700,14 +3368,25 @@ def command_adopt_worktree(context: Context) -> int:
         conflicts: list[dict[str, str]] = []
         final: dict[str, TreeEntry] = {}
         expected_commit = None
+        flattener = TreeFlattener(repo, state.idmap, workspace.root)
+        flat = flattener.flatten(relative, strict=True)
+        if flat.problems:
+            report.anomalies.extend(flat.problems)
+            raise Refused(
+                f"{len(flat.problems)} spec paths of {branch} cannot be flattened; nothing was written",
+                "Move or remove them on the branch (README), then run adopt-worktree again",
+            )
+        moved = flat.moved
         if changed:
-            adopted = [
-                TreeEntry(e.mode, e.kind, e.oid, rename_path(e.path, renames))
-                for e in relative
-                if PurePosixPath(e.path).name != META_FILE
-            ]
+            flat_base = flattener.flatten(list_tree(repo, f"{base}:{SPEC_ROOT}"), strict=False)
             expected_commit, conflicts = _adopt_into_canonical(
-                context, target, workspace, adopted, base, base_tree, branch, renames
+                context,
+                target,
+                workspace,
+                flat.entries,
+                base,
+                write_tree(repo, flat_base.entries, workspace.root),
+                branch,
             )
             final = {e.path: e for e in list_tree(repo, expected_commit)}
         else:
@@ -2715,10 +3394,11 @@ def command_adopt_worktree(context: Context) -> int:
         deletions, mismatched = [], []
         for entry in full:
             inner = entry.path.removeprefix(SPEC_ROOT + "/")
-            in_canonical = final.get(rename_path(inner, renames))
+            copied = moved.get(inner)  # the flattened entry: links rewritten, so compared by that content
+            in_canonical = final.get(copied.path) if copied is not None else None
             at_base = base_entries.get(inner)
-            if PurePosixPath(inner).name == META_FILE or (
-                (in_canonical and (in_canonical.mode, in_canonical.oid) == (entry.mode, entry.oid))
+            if copied is None or (
+                (in_canonical and (in_canonical.mode, in_canonical.oid) == (copied.mode, copied.oid))
                 or (at_base and (at_base.mode, at_base.oid) == (entry.mode, entry.oid))
             ):
                 deletions.append(entry.path)
@@ -2804,20 +3484,98 @@ def command_adopt_worktree(context: Context) -> int:
 # --- export-legacy -----------------------------------------------------------------------------------------------
 
 
-def _scope_directories(entries: Iterable[TreeEntry]) -> dict[str, list[str]]:
+@dataclass
+class Nesting:
+    """Where each GitHub Scope goes back to in the nested layout, and why some cannot (export-legacy)."""
+
+    nested: dict[str, str]  # Scope ID -> nested directory relative to spec-dock/initiatives
+    ids: dict[int, str]  # Issue number -> Scope ID
+    kinds: dict[int, str]
+    anomalies: list[dict[str, Any]]
+
+
+def nest_plan(entries: Iterable[TreeEntry], labeled: Mapping[int, Facts], slugs: Mapping[int, str]) -> Nesting:
+    """GitHub parents give the nested path; slugs are the pre-cutover ones, else legacy_slug of the title."""
+    anomalies: dict[tuple[str, str], dict[str, Any]] = {}
+
+    def problem(code: str, key: str, message: str, **details: Any) -> None:
+        anomalies.setdefault((code, key), anomaly(code, message, **details))
+
+    ids: dict[int, str] = {}
+    kinds: dict[int, str] = {}
+    for number, facts in sorted(labeled.items()):
+        if len(facts.kind_labels) == 1:
+            kinds[number] = next(k for k, label in KIND_LABELS.items() if label == facts.kind_labels[0])
+            ids[number] = scope_id(kinds[number], number)
+        else:
+            problem("KIND_LABEL_MULTIPLE", f"#{number}", f"#{number} has {facts.kind_labels}", number=number)
     directories: set[str] = set()
     for entry in entries:
-        parent = PurePosixPath(entry.path).parent
-        while str(parent) != ".":
-            directories.add(str(parent))
-            parent = parent.parent
-    found: dict[str, list[str]] = {}
-    for directory in directories:
-        name = PurePosixPath(directory).name
-        matched = re.match(r"^((?:init|epic|iss)-[0-9]+)-", name)
-        if matched:
-            found.setdefault(matched.group(1), []).append(directory)
-    return found
+        parts = entry.path.split("/")
+        if len(parts) < 3:
+            problem(
+                CATALOG_PATH_OUTSIDE_SCOPE, entry.path, f"{entry.path} is not inside a <bucket>/<ID>/", path=entry.path
+            )
+            continue
+        place = f"{parts[0]}/{parts[1]}"
+        if CANONICAL_ID_RE.fullmatch(parts[1]) is None or scope_relative(parts[1]) != place:
+            problem("SCOPE_DIRECTORY_MISPLACED", place, f"{place} is not <bucket>/<ID> of its number", path=place)
+        elif parts[2] in NESTED_DIRECTORIES and len(parts) > 3:
+            leftover = f"{place}/{parts[2]}"
+            problem("SCOPE_DIRECTORY_MISPLACED", leftover, f"{leftover} is a nested leftover", path=leftover)
+        else:
+            directories.add(parts[1])
+    changed: set[str] = set()  # current IDs whose number has a directory of another kind
+    for name in sorted(directories):
+        number = int(name.split("-")[1])
+        current = ids.get(number)
+        if current is None and number not in labeled:
+            problem("SCOPE_ISSUE_MISSING", name, f"{name}/ has no Scope Issue on GitHub", scope=name)
+        elif current is not None and current != name:
+            problem("SCOPE_KIND_CHANGED", name, f"{name}/ is {current} on GitHub", scope=name, current=current)
+            changed.add(current)
+    nested: dict[str, str] = {}
+
+    def place_of(number: int) -> str | None:
+        scope = ids[number]
+        if scope in nested:
+            return nested[scope]
+        if scope not in directories:
+            if scope not in changed:
+                problem("SCOPE_DIRECTORY_MISSING", scope, f"{scope} has no {scope_relative(scope)}/", scope=scope)
+            return None
+        facts, kind = labeled[number], kinds[number]
+        name = f"{scope}-{slugs.get(number) or legacy_slug(facts.title)}"
+        expected = PARENT_KINDS[kind]
+        if expected is None:
+            if facts.parent is not None or facts.parent_foreign:
+                problem("KIND_RULE", scope, f"{scope}: an Initiative has the parent #{facts.parent}", scope=scope)
+                return None
+            nested[scope] = name
+            return name
+        if facts.parent_foreign:
+            problem(
+                "PARENT_CONFLICT",
+                scope,
+                f"{scope}: its parent {facts.parent_foreign} is in another repository",
+                scope=scope,
+            )
+            return None
+        if facts.parent is None or facts.parent not in ids:
+            problem("PARENT_MISSING", scope, f"{scope}: a {kind} needs a {expected} parent on GitHub", scope=scope)
+            return None
+        if kinds[facts.parent] != expected:
+            problem("KIND_RULE", scope, f"{scope}: the parent of a {kind} must be a {expected}", scope=scope)
+            return None
+        parent = place_of(facts.parent)
+        if parent is None:
+            return None
+        nested[scope] = f"{parent}/{NESTED_DIRECTORIES[0] if kind == 'epic' else NESTED_DIRECTORIES[1]}/{name}"
+        return nested[scope]
+
+    for number in sorted(ids):
+        place_of(number)
+    return Nesting(nested, ids, kinds, list(anomalies.values()))
 
 
 def _meta_payload(base: Scope | None, values: dict[str, Any], base_depends: list[str] | None) -> bytes:
@@ -2882,33 +3640,28 @@ def command_export_legacy(context: Context) -> int:
         canonical = workspace.fetch_canonical()
         if canonical is None:
             raise Refused("origin has no spec-dock/canonical")
+        repo = workspace.repo
         catalog_entries = [
             e
-            for e in list_tree(workspace.repo, canonical)
+            for e in list_tree(repo, canonical)
             if e.path not in CANONICAL_ROOT_FILES
             and not e.path.startswith(RUNTIME_DIRECTORY + "/")
             and PurePosixPath(e.path).name != META_FILE
         ]
-        directories = _scope_directories(catalog_entries)
-        kinds: dict[int, str] = {}
-        ids: dict[int, str] = {}
-        for number, facts in labeled.items():
-            if len(facts.kind_labels) == 1:
-                kind = next(k for k, label in KIND_LABELS.items() if label == facts.kind_labels[0])
-                kinds[number] = kind
-                ids[number] = scope_id(kind, number)
+        slugs = {number: scope.slug for number, scope in base_by_number.items() if scope.slug}
+        nesting = nest_plan(catalog_entries, labeled, slugs)
+        if nesting.anomalies:
+            report.anomalies.extend(nesting.anomalies)
+            raise Refused(
+                f"{len(nesting.anomalies)} problems keep the catalog from nesting back; nothing was written",
+                "Fix them on GitHub or in the catalog (README), then run export-legacy again",
+            )
+        ids, kinds = nesting.ids, nesting.kinds
+        spec_files, links = _nest_files(repo, catalog_entries, nesting)
         metas: list[TreeEntry] = []
         for number in sorted(ids):
             facts = labeled[number]
             scope_key = ids[number]
-            places = directories.get(scope_key, [])
-            if len(places) != 1:
-                report.warn(
-                    f"{scope_key}: {'no directory' if not places else 'several directories'} in canonical; skipped"
-                )
-                continue
-            known_base = base_by_number.get(number)
-            slug = known_base.slug if known_base is not None else legacy_slug(facts.title)
             parent_key = ids.get(facts.parent) if facts.parent else None
             grandparent = labeled[facts.parent].parent if facts.parent in labeled else None
             grand = ids.get(grandparent) if grandparent is not None else None
@@ -2917,7 +3670,7 @@ def command_export_legacy(context: Context) -> int:
                 "type": kind,
                 "id": scope_key,
                 "title": facts.title,
-                "slug": slug,
+                "slug": nesting.nested[scope_key].rsplit("/", 1)[-1][len(scope_key) + 1 :],
                 "parent_id": parent_key,
                 "initiative_id": parent_key if kind == "epic" else grand if kind == "issue" else None,
                 "epic_id": parent_key if kind == "issue" else None,
@@ -2932,21 +3685,11 @@ def command_export_legacy(context: Context) -> int:
             values["github"] = github
             base_depends = [rename_id(d, renames) for d in base.depends_on] if base is not None else None
             payload = _meta_payload(base, values, base_depends)
-            directory = places[0]
-            expected_parent = None
-            if parent_key and len(directories.get(parent_key, [])) == 1:
-                expected_parent = f"{directories[parent_key][0]}/{'epics' if kind == 'epic' else 'issues'}"
-            actual_parent = str(PurePosixPath(directory).parent)
-            if (kind == "initiative" and actual_parent != ".") or (
-                expected_parent and actual_parent != expected_parent
-            ):
-                report.warn(f"{scope_key}: directory {directory} does not follow the GitHub parent")
             metas.append(
-                TreeEntry("100644", "blob", hash_blob(workspace.repo, payload), f"{SPEC_ROOT}/{directory}/{META_FILE}")
+                TreeEntry(
+                    "100644", "blob", hash_blob(repo, payload), f"{SPEC_ROOT}/{nesting.nested[scope_key]}/{META_FILE}"
+                )
             )
-        known = set(ids.values())
-        for scope_key in sorted(set(directories) - known):
-            report.warn(f"{scope_key}: a directory in canonical has no GitHub Scope")
         entries = [
             e
             for e in list_tree(workspace.repo, source)
@@ -2962,7 +3705,18 @@ def command_export_legacy(context: Context) -> int:
                 "spec-dock/workspace.json",
             )
         )
-        entries.extend(TreeEntry(e.mode, e.kind, e.oid, f"{SPEC_ROOT}/{e.path}") for e in catalog_entries)
+        outside = [e.path for e in entries]
+        before = PathSet([*outside, *(f"{SPEC_ROOT}/{e.path}" for e in catalog_entries)])
+        after = PathSet([*outside, *(e.path for e in spec_files)])
+        report_links = link_report(links, before, after)
+        report.data["links"] = report_links.as_data()
+        report.say(
+            f"links: {report_links.rewritten} rewritten back, {len(report_links.unrewritable)} unrewritable, "
+            f"{len(report_links.broken_before)} already broken"
+        )
+        for item in report_links.unrewritable:
+            report.warn(f"link {item['text']!r} in {item['file']} will not open {item['target']} after nesting")
+        entries.extend(spec_files)
         entries.extend(metas)
         tree = write_tree(workspace.repo, entries, workspace.root)
         commit = commit_tree(
@@ -2983,6 +3737,40 @@ def command_export_legacy(context: Context) -> int:
     report.step(f"Add a commit restoring the CI SpecDock steps removed by the cutover PR to {branch} and open the PR")
     report.step("After the merge, run spec-dock canonical remove --yes in each checkout; undo --apply if needed")
     return EXIT_OK
+
+
+def _nest_files(
+    repo: Path, catalog_entries: Sequence[TreeEntry], nesting: Nesting
+) -> tuple[list[TreeEntry], list[Link]]:
+    """Catalog files at their nested paths with links rewritten back, plus the child-layer rule links."""
+    mapping = NestMap(nesting.nested)
+    target = link_target(mapping, {})
+    blobs = read_blobs(repo, [e.oid for e in catalog_entries if linkable(e.path, e.mode)])
+    files: list[TreeEntry] = []
+    links: list[Link] = []
+    for entry in catalog_entries:
+        place = mapping.file(entry.path)
+        assert isinstance(place, str)  # nest_plan refused everything else
+        oid = entry.oid
+        kind = linkable(entry.path, entry.mode)
+        if kind is not None:
+            payload, file_links = rewrite_links(
+                blobs[entry.oid], kind=kind, old=f"{SPEC_ROOT}/{entry.path}", new=f"{SPEC_ROOT}/{place}", target=target
+            )
+            links.extend(file_links)
+            if payload != blobs[entry.oid]:
+                oid = hash_blob(repo, payload)
+        files.append(TreeEntry(entry.mode, entry.kind, oid, f"{SPEC_ROOT}/{place}"))
+    taken = {e.path for e in files}
+    for number, scope in sorted(nesting.ids.items()):
+        rule = LEGACY_CHILD_RULES.get(nesting.kinds[number])
+        if rule is None:
+            continue
+        path = f"{SPEC_ROOT}/{nesting.nested[scope]}/{rule[0]}/rules.md"
+        if path not in taken:
+            relative = posixpath.relpath(rule[1], posixpath.dirname(path))
+            files.append(TreeEntry("120000", "blob", hash_blob(repo, relative.encode()), path))
+    return files, links
 
 
 def rename_id(value: str, renames: Mapping[str, str]) -> str:

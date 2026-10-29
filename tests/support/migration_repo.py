@@ -10,7 +10,9 @@ from dataclasses import dataclass, field
 import importlib.util
 import io
 import json
+import os
 from pathlib import Path
+import posixpath
 import subprocess
 import sys
 from typing import TYPE_CHECKING, Any
@@ -104,6 +106,26 @@ ISSUE4 = f"{EPIC}/issues/iss-00004-delta"
 LOCAL2 = "spec-dock/initiatives/init-local-00002-proto"
 LOCAL2_EPIC = f"{LOCAL2}/epics/epic-00005-under-proto"
 LOCAL3 = "spec-dock/initiatives/init-local-00003-architecture"
+# Where register and build-canonical put each fixture Scope (#40 is the Issue register creates for LOCAL3).
+FLAT = {
+    INIT: "00000-00999/init-00001",
+    EPIC: "00000-00999/epic-00002",
+    ISSUE3: "00000-00999/iss-00003",
+    ISSUE4: "00000-00999/iss-00004",
+    LOCAL2: "00000-00999/init-00039",
+    LOCAL2_EPIC: "00000-00999/epic-00005",
+    LOCAL3: "00000-00999/init-00040",
+}
+
+
+class Symlink(str):
+    """A file content written as a symbolic link with this target."""
+
+
+def flat_path(path: str) -> str:
+    """The catalog path of a nested fixture path (spec-dock/initiatives/... -> <bucket>/<ID>/...)."""
+    scope = max((s for s in FLAT if path == s or path.startswith(f"{s}/")), key=len)
+    return FLAT[scope] + path[len(scope) :]
 
 
 REQUIRED_DOCUMENTS = ("requirement.md", "design.md", "plan.md", "report.md")
@@ -162,6 +184,55 @@ def _legacy_specs() -> dict[str, bytes]:
     }
 
 
+SCOPE_KINDS = {
+    INIT: "initiative",
+    EPIC: "epic",
+    ISSUE3: "issue",
+    ISSUE4: "issue",
+    LOCAL2: "initiative",
+    LOCAL2_EPIC: "epic",
+    LOCAL3: "initiative",
+}
+LINKED_EXTRA: dict[str, bytes] = {"docs/guide.md": b"# Repository guide\n"}
+
+
+def linked_specs() -> dict[str, bytes | Symlink]:
+    """legacy_specs with the relative links a real spec tree has: rule symlinks, Markdown and HTML links."""
+    files: dict[str, bytes | Symlink] = dict(legacy_specs())
+
+    def link(path: str, target: str) -> None:
+        files[path] = Symlink(posixpath.relpath(target, posixpath.dirname(path)))
+
+    rules = "spec-dock/docs/rules"
+    for scope, kind in SCOPE_KINDS.items():
+        link(f"{scope}/artifacts/rules.md", f"{rules}/{kind}/artifacts.md")
+        link(f"{scope}/discussions/rules.md", f"{rules}/{kind}/discussions.md")
+    for scope in (INIT, LOCAL2):
+        link(f"{scope}/epics/rules.md", f"{rules}/initiative/epics.md")
+    for scope in (EPIC, LOCAL2_EPIC):
+        link(f"{scope}/issues/rules.md", f"{rules}/epic/issues.md")
+    files[f"{ISSUE3}/design.md"] = (
+        "# Gamma design\n\n"
+        "詳細: [Design Guide](../../../../../../docs/authoring/design.md)\n\n"
+        "- [Epic requirement](../../requirement.md#scope)\n"
+        "- [Epic note](../../artifacts/note.md)\n"
+        "- [siblings](../)\n"
+        "- [Delta](../iss-00004-delta/requirement.md)\n"
+        "- [Proto epic](../../../../../init-local-00002-proto/epics/epic-00005-under-proto/design.md)\n"
+        "- [Repository guide](../../../../../../../docs/guide.md)\n"
+        "- [Own plan](plan.md)\n\n"
+        "```text\n[example](../../requirement.md)\n```\n"
+    ).encode()
+    files[f"{EPIC}/artifacts/note.md"] = (
+        b"[issues](../issues) [rules](../issues/rules.md) [initiative](../../../requirement.md)\n"
+    )
+    files[f"{ISSUE3}/discussions/iss-00099-topic/notes.md"] = b"[plan](../../plan.md)\n"
+    files[f"{ISSUE3}/artifacts/guide.html"] = (
+        b'<a href="../../../requirement.md">Epic</a> <img src=\'../plan.md\'> <a href="#top">top</a>\n'
+    )
+    return files
+
+
 def static_files(declaration: bytes = LEGACY_DECLARATION) -> dict[str, bytes]:
     files = {asset.path: asset.payload for asset in package_static_assets()}
     files["spec-dock/workspace.json"] = declaration
@@ -217,7 +288,7 @@ class Legacy:
     def remote_refs(self) -> dict[str, str]:
         return refs(self.remote)
 
-    def commit_to_origin(self, files: Mapping[str, bytes | None], message: str) -> str:
+    def commit_to_origin(self, files: Mapping[str, bytes | Symlink | None], message: str) -> str:
         """Commit on origin's default branch through a separate clone, then fetch it into the main checkout."""
         other = self.root / f"pusher-{len(self.outputs)}-{message.replace(' ', '-')}"
         if not other.exists():
@@ -231,7 +302,7 @@ class Legacy:
         return git(other, "rev-parse", "HEAD")
 
 
-def write_files(root: Path, files: Mapping[str, bytes | None]) -> None:
+def write_files(root: Path, files: Mapping[str, bytes | Symlink | None]) -> None:
     for relative, payload in files.items():
         target = root / relative
         if payload is None:
@@ -239,7 +310,12 @@ def write_files(root: Path, files: Mapping[str, bytes | None]) -> None:
                 target.unlink()
             continue
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(payload)
+        if isinstance(payload, Symlink):
+            if target.is_symlink() or target.exists():
+                target.unlink()
+            os.symlink(str(payload), target)
+        else:
+            target.write_bytes(payload)
 
 
 def refs(repository: Path) -> dict[str, str]:
@@ -252,7 +328,7 @@ def build_legacy(
     monkeypatch: pytest.MonkeyPatch,
     *,
     default_branch: str = "main",
-    specs: Mapping[str, bytes] | None = None,
+    specs: Mapping[str, bytes | Symlink] | None = None,
     declaration: bytes = LEGACY_DECLARATION,
     extra: Mapping[str, bytes] | None = None,
 ) -> Legacy:
@@ -270,7 +346,7 @@ def build_legacy(
         ["git", "init", "-q", f"--initial-branch={default_branch}", str(seed)], check=True, env=_clean_environment()
     )
     configure(seed)
-    files = {**static_files(declaration), ".github/workflows/ci.yml": CI_WORKFLOW}
+    files: dict[str, bytes | Symlink] = {**static_files(declaration), ".github/workflows/ci.yml": CI_WORKFLOW}
     files.update(legacy_specs() if specs is None else specs)
     files.update(extra or {})
     write_files(seed, files)
@@ -280,6 +356,30 @@ def build_legacy(
     main = clone(remote, root / "main")
     clock = FakeClock()
     return Legacy(root, remote, main, legacy_github(clock), clock, root / "migrate-state", default_branch)
+
+
+def migrated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **options: Any) -> Legacy:
+    """register, build-canonical and cut applied against the bare origin."""
+    from spec_dock.runtime.infra import runtime_environment
+    from tests.support.canonical_repo import environment
+
+    legacy = build_legacy(tmp_path, monkeypatch, **options)
+    monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: environment())
+    for command in ("register", "build-canonical", "cut"):
+        code, result = legacy.run(command, apply=True)
+        assert code == 0, (command, result)
+    return legacy
+
+
+CUT = "spec-dock/migrate-to-canonical"
+
+
+def merge_cut(legacy: Legacy) -> None:
+    """The human PR merge: origin's default branch takes the cut branch."""
+    git(legacy.main, "fetch", "-q", "origin")
+    git(legacy.main, "merge", "-q", "--ff-only", f"origin/{CUT}")
+    git(legacy.main, "push", "-q", "origin", f"HEAD:{legacy.default_branch}")
+    git(legacy.main, "fetch", "-q", "origin")
 
 
 def snapshot(legacy: Legacy) -> dict[str, Any]:
