@@ -145,17 +145,17 @@ def link_report(links: Iterable[Link], before: PathSet, after: PathSet) -> LinkR
 @dataclass
 class Flattened:
     entries: list[TreeEntry]          # 写した後（パスは spec-dock/initiatives からの相対）
-    problems: list[dict[str, Any]]    # 平らにできないもの（strict なら止める）
+    problems: list[dict[str, Any]]    # 平らにできないもの（落とした。先端を写す呼び手は止める）
     dropped: Counter[str]             # 履歴で落としたパスの数（異常のコードごと）
     links: list[Link]
 
 class TreeFlattener:
     """1つのリポジトリ（作業用のクローン）の中で、ツリーの写しと blob の書き込みを、覚えながら行う。"""
     def __init__(self, repo: Path, idmap: Mapping[str, Mapping[str, Any]], scratch: Path | None) -> None
-    def flatten(self, entries: Sequence[TreeEntry], *, strict: bool) -> Flattened
+    def flatten(self, entries: Sequence[TreeEntry]) -> Flattened
 ```
 
-- `flatten` は、`.meta.json` の blob を読んで `nested_layout` を作り、各項目を `FlatMap.file` で写し、`.md`、`.html`、`.htm` とシンボリックリンクの中身を `rewrite_links` で書き換える。`scratch` があるとき（使い捨てのクローンの中）だけ、変わった中身を `git hash-object -w --no-filters --stdin-paths` でまとめて書き、項目の oid にする。`scratch` が None のとき（`plan`、本物のリポジトリを読むとき）は、何も書かず、変わった項目の oid は `git hash-object --stdin`（`-w` なし）と同じ値をメモリーの上で求める（`blob <長さ>\0` の SHA-1。リポジトリが SHA-256 なら None にして、比べ合わせに使わない）。`strict=False` のとき、平らにできない項目は落として `dropped` に数える。`strict=True` のときも同じ結果を作り、`problems` に入れる（呼ぶ側が止める）。
+- `flatten` は、`.meta.json` の blob を読んで `nested_layout` を作り、各項目を `FlatMap.file` で写し、`.md`、`.html`、`.htm` とシンボリックリンクの中身を `rewrite_links` で書き換える。`scratch` があるとき（使い捨てのクローンの中）だけ、変わった中身を `git hash-object -w --no-filters --stdin-paths` でまとめて書き、項目の oid にする。`scratch` が None のとき（`plan`、本物のリポジトリを読むとき）は、何も書かず、変わった項目の oid は `git hash-object --stdin`（`-w` なし）と同じ値をメモリーの上で求める（`blob <長さ>\0` の SHA-1。リポジトリが SHA-256 なら None にして、比べ合わせに使わない）。平らにできない項目は、いつも落として `dropped` に数え、`problems` に入れる。先端と作業の状態を写す呼び手（`plan`、`build-canonical` の手順1、`adopt-worktree`）は `problems` で止まり、履歴のコミットを写す呼び手は落としたまま使う。
 
 ### サブコマンドの変更
 
@@ -165,15 +165,15 @@ class TreeFlattener:
 - `verify`：印の照合を消し、`_canonical_layout(target, analysis)` を足す。origin の canonical（`ls-remote` であれば、使い捨てのクローン `Workspace.fetch_canonical` に取って読む。手元の追跡の参照は古いことがあるので使わない。origin になければ手元のカタログの作業ツリー。どちらもなければ今のとおり「確かめていない」）の、管理ファイルと `.runtime/` のほかの各パスが `<区切り>/<ID>/…`（区切りと ID が合い、`<ID>/` のすぐ下に `epics/`・`issues/` がない）であること、`.meta.json` の各 Scope の `scope_relative(新しい ID)` があることを確かめ、違いを不一致にする。
 - `undo`：`issue.marker` の取り消しを消す（古い記録の `issue.marker` は、ほかの未知の操作と同じく飛ばす）。`_created_without_record` は `_find_created` と同じ条件（基準はその予定の時刻の5分前）と、今のとおり開いている Issue だけで探し、2件以上なら止まる。
 - `build-canonical`：
-  1. 先端の仕様のツリーを `TreeFlattener.flatten(strict=True)` で写し、`problems` があれば `Refused`（何も push しない）。リンクの一覧（`link_report`）を出す。
-  2. 作業用のクローンで subtree split を行い、`git rev-list --reverse --topo-order --parents` の順に、各コミットのツリーを `flatten(strict=False)` で写し、元のコミットの生のヘッダーから `tree` と `parent` を差し替え、`gpgsig`、`gpgsig-sha256`、`mergetag` を外して、`git hash-object -t commit -w --stdin` で書く。親は作り直した親に置き換える。
+  1. 先端の仕様のツリーを `TreeFlattener.flatten` で写し、`problems` があれば `Refused`（何も push しない）。リンクの一覧（`link_report`）を出す。
+  2. 作業用のクローンで subtree split を行い、`git rev-list --reverse --topo-order --parents` の順に、各コミットのツリーを `flatten` で写し、元のコミットの生のヘッダーから `tree` と `parent` を差し替え、`gpgsig`、`gpgsig-sha256`、`mergetag` を外して、`git hash-object -t commit -w --stdin` で書く。親は作り直した親に置き換える。
   3. 作り直した先端のツリーが、手順1の写しと同じことを確かめる（違えば `Refused`）。その上に管理ファイルを足すコミットを作る（作成者と日時は今のとおり split の先端から）。
   4. `data.history` に、コミットの数、落としたコミットの数、落としたパスの数（コードごと）と例（コードごとに5つまで）を出す。`build.json` の項目は今のまま。
   - 手順1も、使い捨てのクローンの中で行う（本物の `.git` に書かない）。
 - `move-local`：Scope の候補を、切り替え前のコミット（`legacy_commit`）の `.meta.json` と、そのチェックアウトのブランチの作業の記録 `adopt/<ブランチ>.json` の `metadata` だけから集めて `nested_layout` を作る（同じディレクトリで2つの出所の ID が違えば `Refused`）。各ファイルを `FlatMap.file` で写し、異常か `dropped` があれば、何も移さずに `Refused`。`.md`、`.html`、`.htm` とシンボリックリンクは書き換えた中身で写し先に作り、元を消す（ほかは今のとおり `rename`）。
 - `adopt-worktree`：
-  1. `flatten(M の仕様のツリー, strict=False)` のツリーを書き、それを持つ canonical のコミットを C とする（なければ `Refused`）。
-  2. 作業の状態の項目（今のとおり）を `flatten(strict=True)` で写し、`problems` があれば `Refused`。写したツリーで X（親は C）を作り、C を merge base として3者マージする（今のとおり）。
+  1. `flatten(M の仕様のツリー)` のツリーを書き、それを持つ canonical のコミットを C とする（なければ `Refused`）。
+  2. 作業の状態の項目（今のとおり）を `flatten` で写し、`problems` があれば `Refused`。写したツリーで X（親は C）を作り、C を merge base として3者マージする（今のとおり）。
   3. 消す前の一致：作業の状態の各ファイルについて、写した後の項目（パスと mode と oid）が、push した canonical の同じパスと同じか、分岐点の同じパスの元の項目と同じなら一致。`.meta.json` と捨てる `rules.md` は一致として消す。消す直前の「途中で変わっていないか」の確かめは、今のとおり元の oid で行う（両方を持つ）。
 - `export-legacy`（今の `_scope_directories` の `<ID>-` の名前による探し方は消し、`nest_plan` に置き換える）：
   1. canonical の先端のツリー（管理ファイル、`.runtime/`、`.meta.json` を除く）と、GitHub の種類のラベルの付いた Issue を読む。
