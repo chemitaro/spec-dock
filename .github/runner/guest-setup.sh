@@ -17,7 +17,10 @@ done
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y --no-install-recommends ca-certificates curl git gzip make nftables python3 tar
+apt-get install -y --no-install-recommends ca-certificates curl gzip make nftables python3 software-properties-common tar
+# Same Git source as the GitHub-hosted Ubuntu image: Ubuntu's 2.43 git-subtree cannot split without a work tree.
+add-apt-repository -y ppa:git-core/ppa
+apt-get install -y --no-install-recommends git
 
 install -m 644 "$here/nftables.conf" /etc/nftables.conf
 nft -c -f /etc/nftables.conf
@@ -44,6 +47,22 @@ if [ ! -f "$dist/bin/installdependencies.sh" ]; then
 fi
 "$dist/bin/installdependencies.sh"
 
+# A root-owned tool cache at the hosted path: setup-python finds this Python, and jobs cannot change it.
+python_archive=/var/cache/spec-dock-ci/python-$PYTHON_VERSION-linux-24.04-arm64.tar.gz
+if [ ! -f "$python_archive" ]; then
+  curl -fsSL -o "$python_archive.part" "$PYTHON_URL"
+  mv "$python_archive.part" "$python_archive"
+fi
+echo "$PYTHON_SHA256  $python_archive" | sha256sum -c -
+if [ ! -f "$TOOL_CACHE/Python/$PYTHON_VERSION/arm64.complete" ]; then
+  source_dir=$(mktemp -d)
+  tar -xzf "$python_archive" -C "$source_dir" --no-same-owner
+  (cd "$source_dir" && AGENT_TOOLSDIRECTORY=$TOOL_CACHE sh ./setup.sh)
+  rm -rf -- "${source_dir:?}"
+fi
+PIP_ROOT_USER_ACTION=ignore "$TOOL_CACHE/Python/$PYTHON_VERSION/arm64/bin/python3" -m pip install \
+  --disable-pip-version-check --no-warn-script-location "uv==$UV_VERSION"
+
 n=0
 for user in $RUNNER_USERS; do
   n=$((n + 1))
@@ -58,7 +77,7 @@ for user in $RUNNER_USERS; do
     sudo -u "$user" tar -xzf "$archive" -C "$dir"
   fi
   for hook in ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/spec-dock-ci/job-started.sh \
-    ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/opt/spec-dock-ci/job-completed.sh; do
+    ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/opt/spec-dock-ci/job-completed.sh AGENT_TOOLSDIRECTORY=$TOOL_CACHE; do
     sudo -u "$user" touch "$dir/.env"
     grep -q -x -F "$hook" "$dir/.env" || echo "$hook" | sudo -u "$user" tee -a "$dir/.env" >/dev/null
   done

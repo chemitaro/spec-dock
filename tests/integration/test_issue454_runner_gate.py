@@ -225,6 +225,11 @@ def test_the_runner_hooks_gate_each_job_and_runner_users_get_no_administrative_g
     assert "ACTIONS_RUNNER_HOOK_JOB_STARTED=/opt/spec-dock-ci/job-started.sh" in setup
     assert "ACTIONS_RUNNER_HOOK_JOB_COMPLETED=/opt/spec-dock-ci/job-completed.sh" in setup
     assert 'echo "$RUNNER_SHA256  $archive" | sha256sum -c -' in setup
+    # setup-python builds look for libpython under the hosted tool cache, which root owns here (iss-00454).
+    assert 'echo "$PYTHON_SHA256  $python_archive" | sha256sum -c -' in setup
+    assert "AGENT_TOOLSDIRECTORY=$TOOL_CACHE" in setup and "TOOL_CACHE=/opt/hostedtoolcache" in (
+        RUNNER / "settings.sh"
+    ).read_text(encoding="utf-8")
     assert "must not belong to an administrative group" in setup and "usermod" not in setup
     register = (RUNNER / "register-runner.sh").read_text(encoding="utf-8")
     # sudo records the environment it passes, so the token travels through a pipe instead (iss-00454 RQ-454-06).

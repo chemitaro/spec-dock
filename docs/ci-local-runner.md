@@ -24,6 +24,7 @@ VMはMacのファイルを共有せず（Limaの `plain: true`、mountなし、�
 | LaunchAgentのログ | `~/Library/Application Support/spec-dock-ci-vm/ensure-vm.log`、`ensure-vm.err` |
 | ランナー | VMの中の `spec-dock-runner-1`・`-2` 利用者。名前 `spec-dock-ci-1`・`-2`、ラベル `self-hosted, Linux, ARM64, spec-dock-ci`。systemdで常駐 |
 | フック | VMの中の `/opt/spec-dock-ci/`（[.github/runner/](../.github/runner/) からコピー） |
+| ツール | VMの中の `/opt/hostedtoolcache`（rootの持ち物）にPython 3.11とuvを置き、ランナーの `AGENT_TOOLSDIRECTORY` で指す。setup-pythonのPythonは、GitHubのランナーと同じこの場所でしか `libpython` を見つけられないため。gitは、GitHubのUbuntuのイメージと同じく `ppa:git-core/ppa` から入れる（Ubuntu 24.04の2.43の `git subtree` は、作業ツリーのないクローンで split できない） |
 
 退去費用のVM `ci-shadow`、そのLima、そのLaunchAgentとは別のものです。互いに変更しません。
 
