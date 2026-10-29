@@ -36,8 +36,17 @@ if [ ! -f "$archive" ]; then
   mv "$archive.part" "$archive"
 fi
 echo "$RUNNER_SHA256  $archive" | sha256sum -c -
+# Root runs nothing from a runner user's copy: the dependency installer comes from a root-owned extraction.
+dist=/opt/spec-dock-ci/runner-dist-$RUNNER_VERSION
+if [ ! -f "$dist/bin/installdependencies.sh" ]; then
+  install -d -m 755 "$dist"
+  tar -xzf "$archive" -C "$dist" --no-same-owner
+fi
+"$dist/bin/installdependencies.sh"
 
+n=0
 for user in $RUNNER_USERS; do
+  n=$((n + 1))
   id -u "$user" >/dev/null 2>&1 || useradd --create-home --shell /bin/bash --user-group "$user"
   if id -nG "$user" | tr ' ' '\n' | grep -q -x -E 'sudo|admin|adm|wheel|docker|lxd|incus-admin'; then
     echo "$user must not belong to an administrative group" >&2
@@ -53,8 +62,27 @@ for user in $RUNNER_USERS; do
     sudo -u "$user" touch "$dir/.env"
     grep -q -x -F "$hook" "$dir/.env" || echo "$hook" | sudo -u "$user" tee -a "$dir/.env" >/dev/null
   done
+  # Root writes the unit itself instead of running svc.sh, whose template the runner user could change.
+  unit=/etc/systemd/system/actions.runner.$(echo "$SPEC_DOCK_REPOSITORY" | tr / -).$RUNNER_LABEL-$n.service
+  cat > "$unit" <<UNIT
+[Unit]
+Description=GitHub Actions Runner ($RUNNER_LABEL-$n)
+After=network-online.target
+
+[Service]
+ExecStart=$dir/bin/runsvc.sh
+User=$user
+WorkingDirectory=$dir
+KillMode=process
+KillSignal=SIGTERM
+TimeoutStopSec=5min
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+  chmod 644 "$unit"
 done
-"/home/${RUNNER_USERS%% *}/actions-runner/bin/installdependencies.sh"
+systemctl daemon-reload
 
 install -d -m 755 /etc/needrestart/conf.d
 printf '%s\n' '$nrconf{override_rc}{qr(^actions\.runner\.chemitaro-spec-dock\.spec-dock-ci-\d+\.service$)} = 0;' \

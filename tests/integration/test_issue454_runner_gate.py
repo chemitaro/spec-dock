@@ -236,6 +236,16 @@ def test_the_runner_hooks_gate_each_job_and_runner_users_get_no_administrative_g
     )
 
 
+def test_root_runs_nothing_a_runner_user_can_change() -> None:
+    setup = (RUNNER / "guest-setup.sh").read_text(encoding="utf-8")
+    register = (RUNNER / "register-runner.sh").read_text(encoding="utf-8")
+    assert '"$dist/bin/installdependencies.sh"' in setup and "dist=/opt/spec-dock-ci/runner-dist-" in setup
+    # No command line of the root script starts a script under a runner user's home (only the unit names one).
+    assert not re.search(r'^\s*"?(\$dir|/home)/.*\.sh', setup, flags=re.MULTILINE)
+    assert "User=$user" in setup and "ExecStart=$dir/bin/runsvc.sh" in setup
+    assert "svc.sh install" not in setup + register and "systemctl enable --now" in register
+
+
 def _work(tmp_path: Path) -> Path:
     work = tmp_path / "home/actions-runner/_work"
     for name in ("_tool/Python", "_actions/actions", "_temp/x", "spec-dock/spec-dock/src", "_PipelineMapping/x"):

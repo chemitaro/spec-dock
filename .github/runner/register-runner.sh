@@ -18,6 +18,5 @@ for user in $RUNNER_USERS; do
     'IFS= read -r ACTIONS_RUNNER_INPUT_TOKEN && export ACTIONS_RUNNER_INPUT_TOKEN &&
       exec ./config.sh --unattended --url "$1" --name "$2" --labels "$3" --work _work --replace' \
     sh "https://github.com/$SPEC_DOCK_REPOSITORY" "spec-dock-ci-$n" "$RUNNER_LABEL"
-  ./svc.sh install "$user"
-  ./svc.sh start
+  systemctl enable --now "actions.runner.$(echo "$SPEC_DOCK_REPOSITORY" | tr / -).$RUNNER_LABEL-$n.service"
 done
