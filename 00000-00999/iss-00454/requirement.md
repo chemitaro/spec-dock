@@ -68,12 +68,11 @@ spec-dock の GitHub Actions のジョブを、GitHub がホストするラン�
 - D5：VM は常に起動しておく。Mac の LaunchAgent が止まった VM を起こし、VM の中では systemd でランナーを常駐させる。ジョブの後に作業場所を消すフックを置く。
 - D6：Lima の正式版（2.2.1）と、VM の中の nftables で Mac への接続を止める。
 - 追加：切り替えの前後で、`provider-tests` と Linux の配布の確かめの時間を測り、GitHub の時間と並べて報告書に書く。遅くても、方針どおり手元で動かす。
-- D7（2026-10-29、未回答の間は推奨案）：段階2（macOS の VM）はこの Issue では作らず、別の Issue にする。macOS の配布の確かめは GitHub に残す。
-- D8（2026-10-29、未回答の間は推奨案）：1つの VM の中に、別々の利用者のランナーを2つ置く。1つの PR の2つの手元のジョブが並んで動く。
+- D7（利用者、2026-10-29。統括を通して確認）：段階2（macOS の VM）はこの Issue では作らない。macOS の配布の確かめは GitHub に残す。段階2の Issue は統括が後で作り、この Issue の報告書に、段階2で要ること（F9）を申し送る。
+- D8（利用者、2026-10-29。統括を通して確認）：1つの VM（CPU 6、メモリ 8GiB）の中に、別々の sudo なしの利用者のランナーを2つ置く。1つの PR の2つの手元のジョブが並んで動く。
+- D9（利用者、2026-10-29。統括を通して確認）：利用者の環境を変える手順 S1〜S7 を承認した。S1・S2・S3・S5 は実装担当が行う。ランナーの登録（S4）、fork の PR の承認の設定（S6）、変数の切り替え（S7）は、実装担当が示したコマンドを利用者が実行し、結果を確かめてから次へ進む。S6 は変える前の値を報告書に残す。
 
 ## 観測可能な要件
-
-D7・D8 の回答が推奨案と違えば、印（D7、D8）を付けた項目を直す。
 
 - RQ-454-01：変数 `SPEC_DOCK_CI_RUNNER` が未設定か `hosted` のとき、Provider CI の今のジョブはすべて今と同じ GitHub のランナーで動き、チェックの名前は変わらない。振り分けのチェック `route` が1つ増える。
 - RQ-454-02：変数が `local` で、PR が同じリポジトリの、作者と送り手が人（`User`）、作者の関係が `OWNER`・`MEMBER`・`COLLABORATOR` の PR のとき、`provider-tests` と `Provider distribution parity (ubuntu-latest)` は手元のランナーで動く。そのジョブのログに、開始前のフックが許可した記録が残る。`Provider distribution parity (macos-latest)`（D7）、`validate`、`check`、`release-tag` は GitHub のランナーで動く。
