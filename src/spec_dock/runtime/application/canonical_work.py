@@ -76,6 +76,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.canonical_readiness import ScopeReadiness
     from spec_dock.runtime.infra.identity import PhysicalIdentity
+    from spec_dock.runtime.presentation.envelope import ResultStatus
 
 SCOPE_IN_PROGRESS = "SCOPE_IN_PROGRESS"
 CANONICAL_PROGRESS_MARK_FAILED = "CANONICAL_PROGRESS_MARK_FAILED"
@@ -476,7 +477,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         # Outside the Start lock: the follow-ups never change the selection result (Epic design ch. 3).
         _follow_up_links(session, context, target.id, effects, warnings, timeout=namespace.timeout)
         _mark_in_progress(session, target.id, effects, warnings)
-        status = "succeeded" if any(effect.status == "succeeded" for effect in effects) else "unchanged"
+        status: ResultStatus = "succeeded" if any(effect.status == "succeeded" for effect in effects) else "unchanged"
         return OperationResult(
             "work start",
             status,
