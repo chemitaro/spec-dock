@@ -46,9 +46,15 @@ canonical モード（宣言の版4）で、Scope を書くコマンドがすべ
 - wheel（`uv build --wheel`）を一時の venv に入れ、外の console で、一時の bare とクローン、偽の `gh`、一時の `XDG_STATE_HOME` と `HOME` で動かした（`canonical link --no-schedule`。利用者の GitHub、状態の置き場、定期の実行に触れない）。`scope create`（日本語の題名だけで initiative、epic、issue。置き場は `spec-dock/initiatives/00000-00999/iss-00003`）、`--slug` の `CANONICAL_NOT_APPLICABLE`、`scope move --parent`、`--parent` なしの使い方の誤り（2）、`scope edit`（日本語）、`dependency add` の後の `work start` の `READINESS_NOT_SATISFIED`、`dependency remove`、`artifact create`、`work start`（ブランチ `iss-00003`、`spec-dock/active/issue` が `../initiatives/00000-00999/iss-00003`）、`workspace sync` が、期待どおりに動いた。この確かめで `workspace sync` に題名が出ないことが分かり、上のとおり足した（足した後は CLI のテストで確かめ、外の console では再確認していない）。
 - **未確認**：外の console での `work finish`（構造のリポジトリを決める `origin` を GitHub の URL にすると、同期の push が本物の GitHub に向かうため、外では行わなかった。CLI のテストで、bare のリモートへの push と1周期で確かめた）。Linux の実機、Codex のサンドボックスの中からの書くコマンド（Epic の計画は I-9、I-10 に置く）。本物の GitHub での書き込み（I-10）。
 
+### 実装のレビュー（独立レビュー②、`f5047b09b`）
+
+- 規約と仕様を、この作業に関わっていない新しいサブエージェント2つ（opus/high、`code-review`）で見た。どちらも P0/P1 なし。規約は P2 3件・P3 1件、仕様は P3 5件。`analyze-review-findings` で6つのまとまりに分け、すべて根拠を確かめて直した：`work finish` の書いた後の Git の失敗と閉じた後の選択の失敗を `partial` に、`scope create` のラベル作成の失敗を Issue 作成の失敗として案内しない、`reread_parent` が Scope でない親を「Scope の親なし」として反映する、案内の `--title` を `shlex.quote` で引用、区切りの場所の退避の手順を案内の先頭に、`scope edit/close/reopen` の題名・付け替え・古い ID のテスト（`test_issue432_titles_and_kinds.py`）。
+
 ### 最終品質ゲート
 
-（下に追記する）
+- **Gate 1**（`dfb86e1f9b763db5d022f8ce3889fed103c5c4e6`、push 済み）：`make lint` は合格（ruff check、ruff format check、mypy。終了コード0）。`uv run pytest` は 3229 passed、8 skipped（終了コード0、17分07秒）。全差分（`origin/main...dfb86e1f9`）のレビュー：この作業に関わっていない新しいサブエージェント2つ（opus/high）。規約は P0/P1 なし、P2 1件（`work finish` の後、作業中のラベルを外した反映が閉じる前の Issue の値を使い、スナップショットで対象が open に戻る）、P3 1件（読み直しでだけ見える種類の付け替えが `SCOPE_NOT_FOUND` になる）。仕様は P0/P1 なし、P2 2件（AC-432-06 の CLI の証拠、AC-432-14 の `worktree bootstrap` の証拠）、P3 1件（R-432-12 の文が `finished_at` のまま）。ゲートの決まりでは合格だが、規約の P2 は完了した Scope を `scope show` が open と示す実際の不具合なので、5件とも直して Gate 2 を行った。
+- **Gate 2**（`e86f003a1f7c5fdc2b7ab4b382443f035dadac46`、push 済み。直しの `015aa07c8` と、`origin/main`（PR #464、移行のスクリプト）の merge を含む）：`make lint` は合格（終了コード0）。`uv run pytest` は 3276 passed、8 skipped（終了コード0、17分18秒）。レビューは、新しいサブエージェント2つ（opus/high）に、Gate 1 の SHA からの差分と前の指摘の確かめに絞って頼んだ（全差分は Gate 1 で2つのレビューを通っているため）。規約、仕様とも指摘なし。前の5件がすべて直ったことを確かめた。**合格**。
+- Gate 2 の後に、`origin/main` の PR #465（Epic の文書だけ）を merge した。コードに触れないので、ゲートはやり直していない（依頼文の決まりと統括の連絡）。Epic の文書と、この Issue の文書・実装に食い違いがないことを確かめた。
 
 ### 変えた既存のテスト（AC-432-16）
 
@@ -76,5 +82,5 @@ canonical モード（宣言の版4）で、Scope を書くコマンドがすべ
 
 ### 統括に判断・対応してほしいこと
 
-- Epic の文書の直し（統括が後で行うとした項目）：7章と I-5 の節の「`scope import github` の `--title` は `CANONICAL_NOT_APPLICABLE`」と統括の判断 Q5（使わず `CANONICAL_TITLE_IGNORED`）、6章の `work finish` の `--save-timeout`（Q2 で180秒の固定）、12章への新しいコード（`CANONICAL_SAVE_UNCONFIRMED` の終了コード3と6、`CANONICAL_TITLE_IGNORED`、`SCOPE_IN_PROGRESS`、`CANONICAL_PROGRESS_MARK_FAILED`）の追記、I-5 の「変わる」の「区切りの場所の確かめは書く前」に対し、`scope create` では作った後の失敗になること（Issue の番号は作るまで分からない。`partial` と「退避してから `scope import github`」の案内）。
+- Epic の文書の残り（PR #465 で `--title`、180秒、`SCOPE_IN_PROGRESS`、`CANONICAL_TITLE_IGNORED` は直った）：12章の `CANONICAL_SAVE_UNCONFIRMED` は終了コード6だけだが、束を書いていないときは `failed` の3になること。12章に `CANONICAL_PROGRESS_MARK_FAILED`（警告）がないこと。I-5 の「変わる」の「区切りの場所の確かめは書く前」に対し、`scope create` では作った後の失敗になること（Issue の番号は作るまで分からない。`partial` と「退避してから `scope import github`」の案内）。6章の「作成時のファイル」の `discussions/rules.md` は、配布資産の `docs/rules/<種類>/discussions.md` へのリンクとして置いた（従来の作成は置かない）。
 - I-9 への申し送り：`scope move` の文書（GitHub の親だけ）、新しいコードの文書、`SCOPE_IN_PROGRESS` でエージェントが利用者に確かめる規則、`work finish` が最大180秒待つこと、`worktree remove` がリンクだけなら `--discard-ignored` なしで消すこと、`workspace sync` が題名を示すこと、dogfooding の `spec-dock/docs/reference_cli.md` の更新（配布資産は更新済み）。
