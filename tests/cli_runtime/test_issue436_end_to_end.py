@@ -30,7 +30,7 @@ from tests.support.fake_github import FakeGithub, install_fake_gh
 if TYPE_CHECKING:
     from tests.support.fake_github import FakeGhExecutable
 
-ENVIRONMENTS = {
+ENVIRONMENTS: dict[str, dict[str, Any]] = {
     "systemd": {"systemd_present": True, "systemd_user": True, "linger": True},
     "loop": {"systemd_present": False, "systemd_user": False, "linger": None},
 }
