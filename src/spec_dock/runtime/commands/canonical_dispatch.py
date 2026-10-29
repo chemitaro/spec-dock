@@ -6,8 +6,10 @@ import argparse
 from collections.abc import Callable
 from pathlib import Path
 
+from spec_dock.runtime.application.canonical_artifact_write import create_artifact
 from spec_dock.runtime.application.canonical_branches import branch_operation
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
+from spec_dock.runtime.application.canonical_dependency_write import mutate_dependency
 from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_hold import run_canonical_accept, run_canonical_restore
 from spec_dock.runtime.application.canonical_link import run_canonical_link
@@ -88,6 +90,10 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "scope close": lifecycle_scope,
     "scope reopen": lifecycle_scope,
     "scope delete": delete_scope,
+    "dependency add": mutate_dependency,
+    "dependency remove": mutate_dependency,
+    "artifact create": create_artifact,
+    "artifact import file": create_artifact,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
