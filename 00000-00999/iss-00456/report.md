@@ -73,6 +73,11 @@ ChatGPT を使うゲートは利用者の設定で無効なので、Claude だ�
   - 直した後：2.34.1、2.39.5、2.43.0、2.54.0 のすべてで `build-canonical`、`cut`、`move-local` が通った。`adopt-worktree` は 2.43.0 と 2.54.0 で通り、2.34.1 と 2.39.5 では「git 2.40 or newer」の案内付きで止まった。テスト：`test_build_canonical_works_with_the_git_subtree_of_older_distributions`（古い `git subtree` の2つの振る舞いをまねる偽の `git`）、`test_a_git_older_than_the_script_needs_is_refused_before_anything_runs`。
   - 未確認：本物の git 2.30（Debian 11）は、パッケージの置き場の 404 で入れられず、確かめていない（2.31 より古い版で止まることは、偽の `git` のテストだけで確かめた）。2.31〜2.33 の版も確かめていない。
 
+- **3回目（`0a9d1d1c761c7b722ab11b785b0f04de50ebf869`。合格）**
+  - `make lint`：終了コード0（ruff check、ruff format check、mypy すべて pass）。`uv run pytest`（全体）：終了コード0、3101 passed、8 skipped（15分37秒）。
+  - レビューは、前のゲートの SHA からの差分 `f13ba3ce1..0a9d1d1c7`（git の版の修正）に絞り、新しい2つのレビュアーに頼んだ。Standards：pass、指摘0。Spec：pass、指摘0。
+  - 止める指摘がなく、lint と全体のテストが同じ SHA で通ったので、合格とした。この後のコミットは、この報告書へのゲートの結果の記録だけである。
+
 ### 本物の spec-dock での読むだけの `plan`（2026-10-29）
 
 - 本物の main のチェックアウト（`/Volumes/990p2t/workspace/tools/spec-dock`、`origin/main` = `95bbb7a1c`）に、このブランチの `migrate.py plan`（`--apply` なし、作業の記録は一時ディレクトリ）を、本物の GitHub を読むだけで実行した。終了コード0、約10秒。
