@@ -57,7 +57,7 @@ ID: "iss-00455"
 | AC-455-05 | `test_issue431_branch.py`（既定の名前 `<ID>`、移行前の `<ID>-<名前>` の `--name`）、`test_canonical_structure.py`（`branch_names_scope` の9通り） | 通過 |
 | AC-455-06 | `test_issue455_flat_ids.py`（止める4つのコマンドと `--dry-run`、読むコマンド12通りの警告、古い ID の3つの綴りと `--expect-current`、カタログが見えないとき） | 通過 |
 | AC-455-07 | `test_issue455_flat_ids.py::test_the_reading_side_public_shapes_used_by_later_issues` ほか単体のテスト。消す名前の一覧の検索が `src/spec_dock/runtime/` で0件（下）。`CANONICAL_FORMAT == 1` | 通過 |
-| AC-455-08 | 全体のテスト、`make lint`（下の最終品質ゲート） | 下を参照 |
+| AC-455-08 | `make lint` と `uv run pytest` の全体を同じ SHA `147b9c8d4` で実行（下の「最終品質ゲート」）。変えたテストはすべて canonical モードのもの（上の一覧） | 通過 |
 
 - 消す名前の検索：`grep -rnE 'SLUG_MARKER|SlugMarker|read_slug_marker|format_slug_marker|append_slug_marker|_MARKER_LINE|_MARKER_MESSAGES|SCOPE_DIRECTORY_NAME|ScopeDirectoryAmbiguous|duplicates\(|SCOPE_NESTING|misplaced_scopes|SLUG_MISMATCH|DIRECTORY_DUPLICATE|\.ambiguous' src/spec_dock/runtime/` は0件。
 - 実装の途中の確かめ：`5e6b50371` で `uv run pytest` が 2986 passed、8 skipped（終了コード0）。
@@ -65,7 +65,18 @@ ID: "iss-00455"
 ### 独立したレビュー
 
 - 文書（手順4）：新しいサブエージェント1つが、3つの文書を Epic と照らした。P0/P1 は0件、P2 が10件、P3 が6件。すべて根拠があり、文書の訂正（古い ID の扱いの理由、選択子の正規化、`--expect-current` の経路、次の1手、大文字と小文字、`CanonicalScopes` の組み立て、観測の欄と前提、失敗・境界条件の検証、偽の `gh` の範囲、根拠の章、`details` の鍵、Issue の判断の明記、消す名前の一覧、rollback の条件）と、実装への反映（`build_canonical_scopes`、`refuse_old_ids`、`check_canonical_scope_expectations`、`find` の完全一致、`worktree list/show` の警告）で直した。統括に聞く判断はなかった。
-- 実装（手順6、`c8b1e338d..5e6b50371`）：Standards と Spec の新しいサブエージェント2つ（`code-review`）。どちらも pass、P0/P1 は0件、P2 が計3件：`canonical status --structure` で読めない Scope のディレクトリの `OSError` が項目の外に漏れる、`workspace validate/doctor --expect-current` の古い ID が `PRECONDITION_FAILED` になる、application 層の公開の形を直接使うテストがない。3件とも直し、テストを足した（`d4c2f3714`）。
+- 実装（手順6、`c8b1e338d..5e6b50371`）：Standards と Spec の新しいサブエージェント2つ（`code-review`）。どちらも pass、P0/P1 は0件、P2 が計3件：`canonical status --structure` で読めない Scope のディレクトリの `OSError` が項目の外に漏れる、`workspace validate/doctor --expect-current` の古い ID が `PRECONDITION_FAILED` になる、application 層の公開の形を直接使うテストがない。3件とも直し、テストを足した（`d4c2f3715`）。
+
+### 最終品質ゲート（Claude だけのゲート。ChatGPT のゲートは利用者の設定で無効）
+
+- **対象**：通常の push で GitHub に送った `147b9c8d45d9cc649128649bfe46b98c222ab628`（`origin/main` = `c8b1e338d` からの全差分 `origin/main...HEAD`）。作業ツリーはきれいな状態で固定した。
+- **静的解析**：`make lint`（ruff check、ruff format --check、mypy）→ 終了コード0（3つとも pass）。
+- **全体のテスト**：`uv run pytest` → 終了コード0、2990 passed、8 skipped（846秒）。
+- **独立したレビュー**：この作業に関わっていない新しいサブエージェント2つ（`code-review` の Standards と Spec。範囲 `c8b1e338d..147b9c8d4`）。結果は契約の検証（`validate-review.py`）で有効、どちらも `pass`、P0/P1/P2 は0件。
+  - Standards：P3 が1件（`report.md` が修正のコミットを存在しない短い SHA `d4c2f3714` で書いていた）。
+  - Spec：P3 が1件（同じ SHA の誤記と、AC-455-08 の行が、まだなかったこの節を参照していた）。
+  - 対応：止める指摘ではない（P3）。この節を足し、SHA を `d4c2f3715` に直した。直したのは `report.md` だけで、ゲートの対象のコードとテストは変えていない。
+- **結果**：合格。止める指摘がなく、lint と全体のテストが同じ SHA で通った。この節を書いたコミットは、ゲートの対象の上の、`report.md` だけの変更である。
 
 ### 未確認
 
