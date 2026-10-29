@@ -18,7 +18,11 @@ from spec_dock.runtime.application.canonical_errors import (
     CanonicalCommandError,
 )
 from spec_dock.runtime.application.canonical_scope_read import resolve_source
-from spec_dock.runtime.application.canonical_scopes import check_canonical_scope_expectations, load_canonical_scopes
+from spec_dock.runtime.application.canonical_scopes import (
+    check_canonical_scope_expectations,
+    load_canonical_scopes,
+    refuse_old_ids,
+)
 from spec_dock.runtime.application.canonical_worktrees import is_catalog
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.worktree_observation import SelectionObservation, read_selection
@@ -193,6 +197,7 @@ def validate_workspace(namespace: argparse.Namespace, context: ProjectContext) -
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
     report = inspect_canonical_structure(scopes, timeout=namespace.timeout)
     findings = report.errors
+    refuse_old_ids(scopes, namespace.expect_current)  # an old ID is SCOPE_KIND_CHANGED, not a structure failure
     if findings and namespace.expect_current:
         raise ValueError("--expect-current cannot be verified from invalid workspace structure")
     check_canonical_scope_expectations(
@@ -409,6 +414,7 @@ def diagnose_workspace(namespace: argparse.Namespace, context: ProjectContext) -
         report = inspect_canonical_structure(scopes, timeout=namespace.timeout)
         findings += report.errors
         warnings += (*scopes.snapshot_warnings(), *report.warnings)
+        refuse_old_ids(scopes, namespace.expect_current)
         if report.errors and namespace.expect_current:
             raise ValueError("--expect-current cannot be verified from invalid workspace structure")
         selection = read_selection(context, scopes.views)
@@ -472,7 +478,12 @@ def structure_item(
         return _unavailable(
             "LOCAL_IO_FAILED", str(error), "Check that the state root and the catalog are readable."
         ), ()
-    report = directory_anomalies(scopes)
+    try:
+        report = directory_anomalies(scopes)
+    except OSError as error:  # an unreadable Scope directory stays inside this item
+        return _unavailable(
+            "LOCAL_IO_FAILED", str(error), "Check that the state root and the catalog are readable."
+        ), scopes.snapshot_warnings()
     found = (*(("error", item) for item in report.errors), *(("warning", item) for item in report.warnings))
     next_steps = [item.details["next_step"] for _, item in found if "next_step" in item.details]
     entry: dict[str, object] = {

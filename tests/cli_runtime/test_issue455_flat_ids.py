@@ -207,3 +207,78 @@ def test_status_structure_shows_the_kind_change_as_its_first_anomaly(world: Cano
     item = payload["data"]["structure"]
     assert [entry["code"] for entry in item["anomalies"]] == ["SCOPE_KIND_CHANGED"]
     assert item["next_step"] == RECOVERY
+
+
+@pytest.mark.parametrize("leaf", [["workspace", "validate"], ["workspace", "doctor"]])
+def test_an_old_id_in_expect_current_of_a_check_is_a_kind_change(world: CanonicalWorld, leaf: list[str]) -> None:
+    """The structure findings must not hide the old ID behind PRECONDITION_FAILED."""
+    code, payload = world.run(*leaf, "--expect-current", "iss-00454")
+    assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
+    assert payload["error"]["details"]["current_id"] == "epic-00454"
+
+
+def test_an_unreadable_scope_directory_keeps_the_structure_item_unavailable(world: CanonicalWorld) -> None:
+    import os
+
+    locked = world.catalog / "iss-00003"
+    locked.chmod(0)
+    try:
+        if os.access(locked, os.X_OK):
+            pytest.skip("this user can read a mode-000 directory")
+        code, payload = world.run("canonical", "status", "--structure")
+    finally:
+        locked.chmod(0o755)
+    assert code == 0, payload
+    item = payload["data"]["structure"]
+    assert (item["status"], item["code"]) == ("unavailable", "LOCAL_IO_FAILED")
+    assert payload["data"]["catalog"]["status"]  # the other items are still reported
+
+
+def test_the_reading_side_public_shapes_used_by_later_issues(world: CanonicalWorld) -> None:
+    """The interface I-5, I-11 and I-15 call directly (iss-00455 design, 責務・Interface)."""
+    from spec_dock.runtime.application import canonical_errors, canonical_scopes, canonical_workspace
+    from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
+    from spec_dock.runtime.application.project_context import resolve_context
+
+    context = resolve_context(str(world.main), world.main)
+    scopes = canonical_scopes.load_canonical_scopes(context, timeout=30, link=True)
+    rebuilt = canonical_scopes.build_canonical_scopes(context, scopes.repository, scopes.fresh, scopes.catalog)
+    assert (rebuilt.views, rebuilt.directories, rebuilt.kind_changes) == (
+        scopes.views,
+        scopes.directories,
+        scopes.kind_changes,
+    )
+    assert set(scopes.kind_changes) == {454}
+    assert scopes.lineage("iss-00003") == ("iss-00003", "epic-00002", "init-00001")
+    assert scopes.lineage("epic-00454") == ("epic-00454", "init-00001")
+    assert scopes.lineage("iss-00454") == ()
+    scopes.require_kind_unchanged("iss-00003", "epic-00002")
+    expected = {
+        "scope_id": "epic-00454",
+        "number": 454,
+        "current_id": "epic-00454",
+        "directories": ["iss-00454"],
+        "next_step": canonical_errors.SCOPE_KIND_CHANGED_RECOVERY,
+    }
+    with pytest.raises(CanonicalCommandError) as stopped:
+        scopes.require_kind_unchanged("iss-00003", "epic-00454")
+    assert (stopped.value.code, stopped.value.exit_code, stopped.value.details) == ("SCOPE_KIND_CHANGED", 3, expected)
+    assert stopped.value.recovery == (canonical_errors.SCOPE_KIND_CHANGED_RECOVERY,)
+    [warning] = scopes.kind_change_warnings()
+    assert (warning.code, warning.details) == ("SCOPE_KIND_CHANGED", expected)
+    assert scopes.warnings() == (*scopes.snapshot_warnings(), warning)
+    error = canonical_scopes.kind_change_error(scopes.kind_changes[454], requested="iss-00454")
+    assert error.details == {**expected, "requested": "iss-00454"}
+    for spelling in ("iss-00454", "iss-454"):
+        with pytest.raises(CanonicalCommandError) as old:
+            canonical_scopes.resolve_canonical_scope(context, scopes, spelling)
+        assert old.value.details == {**expected, "requested": "iss-00454"}
+    canonical_scopes.refuse_old_ids(scopes, None, "@current", "gh:example/repo#454", "epic-00454", "not an id")
+    assert canonical_scopes.resolve_canonical_scope(context, scopes, "epic-00454").id == "epic-00454"
+    with pytest.raises(CanonicalCommandError):
+        canonical_scopes.check_canonical_scope_expectations(
+            context, scopes, None, target=None, expected_current="iss-00454", expected_backend=None
+        )
+    report = canonical_workspace.directory_anomalies(scopes)
+    assert isinstance(report, canonical_workspace.DirectoryReport)
+    assert [item.code for item in report.errors] == ["SCOPE_KIND_CHANGED"] and report.warnings == ()
