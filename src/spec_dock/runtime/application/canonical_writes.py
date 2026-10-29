@@ -144,12 +144,16 @@ class WriteSession:
             self.reflect(changes, command=f"{self.command} (reread)")
 
     def reread_parent(self, number: int) -> None:
-        """Decide on the parent GitHub reports now; a non-Scope or foreign parent is left as the snapshot has it."""
+        """Decide on the parent GitHub reports now; a non-Scope or foreign parent counts as no Scope parent."""
         parent = self.client.get_parent(number)
-        if parent is None:
-            self.reflect([SetParent(number, None)], command=f"{self.command} (reread)")
-        elif parent.repository == self.repository.slug and parent.number in self.scopes.snapshot.issues:
+        if (
+            parent is not None
+            and parent.repository == self.repository.slug
+            and parent.number in self.scopes.snapshot.issues
+        ):
             self.reflect([SetParent(number, parent.number)], command=f"{self.command} (reread)")
+        else:  # no parent, or one that is no Scope here: either way not the snapshot's Scope parent any more
+            self.reflect([SetParent(number, None)], command=f"{self.command} (reread)")
 
     def reread_blockers(self, number: int) -> None:
         """Replace the snapshot's blocked-by edges of `number` with GitHub's current same-repository ones."""

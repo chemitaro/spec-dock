@@ -13,6 +13,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import os
 from pathlib import Path
+import shlex
 from typing import TYPE_CHECKING, cast
 
 from spec_dock.runtime.application.canonical_errors import CANONICAL_PATH_OCCUPIED, CanonicalCommandError
@@ -116,6 +117,14 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     label = KIND_LABELS[kind]
     try:
         session.ensure_labels([label])
+    except WriteFailed as error:  # no Issue was requested yet
+        return session.incomplete(
+            preview,
+            error,
+            pending=steps,
+            recovery=(f"Check the {label} label on GitHub, then run the same spec-dock scope create again.",),
+        )
+    try:
         created = session.write(
             "github-create",
             ref_repository,
@@ -150,8 +159,9 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         _publish(session, kind, scope_id, title, created.number, parent)
     except WRITE_FAILURES as error:
         remaining = [step for step in steps if step[0] not in {effect.kind for effect in session.effects}]
+        first = error.recovery if isinstance(error, CanonicalCommandError) else ()
         return session.incomplete(
-            data, error, pending=remaining, recovery=(resume,), code="SCOPE_PUBLICATION_INCOMPLETE"
+            data, error, pending=remaining, recovery=(*first, resume), code="SCOPE_PUBLICATION_INCOMPLETE"
         )
     return session.result("succeeded", _scope_data(session, scope_id, ref))
 
@@ -447,7 +457,7 @@ def _publish(
 
 def _import_command(kind: ScopeKind, number: str, parent: ScopeView | None, title: str) -> str:
     parent_option = f" --parent {parent.id}" if parent is not None else ""
-    return f"spec-dock scope import github {kind} {number}{parent_option} --title '{title}'"
+    return f"spec-dock scope import github {kind} {number}{parent_option} --title {shlex.quote(title)}"
 
 
 def _scope_data(session: WriteSession, scope_id: str, ref: str, *, changed: bool = True) -> FamilyData:

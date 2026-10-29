@@ -182,7 +182,7 @@ def test_a_failure_after_the_issue_exists_is_partial_and_scope_import_completes_
         ("scaffold", "not_attempted"),
     ]
     (step,) = payload["recovery"]["instructions"]
-    assert "spec-dock scope import github epic 2 --parent init-00001 --title 'Core'" in step
+    assert "spec-dock scope import github epic 2 --parent init-00001 --title Core" in step
     assert world.changesets() == []
     code, payload = world.run("scope", "import", "github", "epic", "2", "--parent", "init-00001", "--title", "Core")
     assert code == 0, payload
@@ -220,7 +220,7 @@ def test_a_busy_catalog_lock_after_the_github_writes_is_partial(
         code, payload = _create(world, "epic", "Core", "--parent", "init-00001")
     assert (code, payload["status"], payload["error"]["code"]) == (6, "partial", "CANONICAL_LOCK_BUSY")
     assert payload["effects"][-1] == {"kind": "scaffold", "status": "failed", "target": "epic-00002"}
-    assert "scope import github epic 2 --parent init-00001" in payload["recovery"]["instructions"][0]
+    assert "scope import github epic 2 --parent init-00001" in payload["recovery"]["instructions"][-1]
 
 
 def _import(world: WriteWorld, kind: str, number: int, *extra: str) -> tuple[int, dict[str, Any]]:
@@ -318,3 +318,41 @@ def test_a_symlink_in_the_bucket_place_stops_import_before_writing(
     code, payload = _import(world, "epic", 1500, "--parent", "init-00001", "--title", "Later")
     assert (code, payload["error"]["code"]) == (3, "CANONICAL_PATH_OCCUPIED")
     assert world.writes() == [] and list(elsewhere.iterdir()) == []
+
+
+def test_a_lost_label_creation_answer_never_points_at_a_created_issue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    world.edit(lambda fake: fake.inject(timeout=True, method="POST", endpoint="repos/example/repo/labels", times=5))
+    code, payload = _create(world, "epic", "Core", "--parent", "init-00001")
+    assert (code, payload["status"]) == (6, "partial")
+    assert [(item["kind"], item["status"]) for item in payload["effects"]][:2] == [
+        ("github.label.create", "unknown"),
+        ("github-create", "not_attempted"),
+    ]
+    assert "may have created the Issue" not in " ".join((payload.get("recovery") or {}).get("instructions", []))
+    assert [issue for issue in world.fake().issues.values() if issue.number == 2] == []
+
+
+def test_the_recovery_command_quotes_any_title(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    world.edit(lambda fake: fake.inject(status=422, body={"message": "no"}, method="POST", endpoint="/sub_issues"))
+    code, payload = _create(world, "epic", "Don't break", "--parent", "init-00001")
+    assert code == 6
+    (step,) = payload["recovery"]["instructions"]
+    assert "--title 'Don'\"'\"'t break'" in step
+
+
+def test_an_occupied_bucket_after_the_issue_exists_shows_how_to_clear_it_first(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    world.edit(lambda fake: fake.add_issue(999, title="Spacer"))
+    (world.catalog / "01000-01999").write_text("not a bucket\n", encoding="utf-8")
+    code, payload = _create(world, "epic", "Later", "--parent", "init-00001")
+    assert (code, payload["status"], payload["error"]["code"]) == (6, "partial", "CANONICAL_PATH_OCCUPIED")
+    steps = payload["recovery"]["instructions"]
+    assert "move it away" in steps[0] and "scope import github epic 1000" in steps[-1]

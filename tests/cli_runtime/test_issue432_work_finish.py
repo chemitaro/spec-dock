@@ -188,3 +188,48 @@ def test_a_kind_change_of_a_descendant_stops_finish(world: WriteWorld) -> None:
     code, payload = world.write("work", "finish", "epic-00002")
     assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
     assert world.writes() == [] and world.changesets() == []
+
+
+def test_a_git_failure_after_the_changeset_is_partial_with_the_changeset(
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.infra.git_process import GitProcessError
+
+    world.select("iss-00003", 3)
+    (world.find("iss-00003") / "plan.md").write_text("# plan\n\nunsaved\n", encoding="utf-8")
+    original = canonical_work.run_catalog_git
+
+    def failing(cwd, *args, **kwargs):
+        if args[:1] == ("rev-parse",):
+            raise GitProcessError(("git", *args), b"injected", 128)
+        return original(cwd, *args, **kwargs)
+
+    monkeypatch.setattr(canonical_work, "run_catalog_git", failing)
+    _run_cycle_on_kick(world)
+    code, payload = world.write("work", "finish", "iss-00003")
+    assert (code, payload["status"]) == (6, "partial"), payload
+    assert payload["effects"][0] == {
+        "kind": "catalog.changeset",
+        "status": "succeeded",
+        "target": payload["effects"][0]["target"],
+    }
+    assert world.fake().issue(3).state == "open"
+
+
+def test_a_selection_failure_after_closing_keeps_the_close_in_a_partial_result(
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.infra.work_target_store import SelectionRemovalUnknown, WorkTargetStore
+
+    world.select("iss-00003", 3)
+
+    def unknown(self, handle):
+        raise SelectionRemovalUnknown(handle.token, OSError("lost"))
+
+    monkeypatch.setattr(WorkTargetStore, "remove_observed", unknown)
+    _run_cycle_on_kick(world)
+    code, payload = world.write("work", "finish", "iss-00003")
+    assert (code, payload["status"]) == (6, "partial"), payload
+    kinds = [(item["kind"], item["status"]) for item in payload["effects"]]
+    assert ("github.issue.close", "succeeded") in kinds and ("selection.clear", "unknown") in kinds
+    assert world.fake().issue(3).state == "closed"

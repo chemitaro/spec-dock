@@ -32,6 +32,7 @@ from spec_dock.runtime.application.canonical_writes import (
     CATALOG_LOCK_TIMEOUT,
     WriteFailed,
     check_expectations as check_write_expectations,
+    diagnostic_for,
     open_write_session,
 )
 from spec_dock.runtime.application.project_context import resolve_context
@@ -97,7 +98,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.infra.github_structure import GithubClock
     from spec_dock.runtime.infra.identity import PhysicalIdentity
     from spec_dock.runtime.infra.work_target_store import SelectionHandle
-    from spec_dock.runtime.presentation.envelope import ResultStatus
+    from spec_dock.runtime.presentation.envelope import EffectStatus, ResultStatus
 
 SCOPE_IN_PROGRESS = "SCOPE_IN_PROGRESS"
 CANONICAL_PROGRESS_MARK_FAILED = "CANONICAL_PROGRESS_MARK_FAILED"
@@ -741,14 +742,23 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         # Confirm again on what GitHub reports now: another PC may have closed it or reopened a child meanwhile.
         session = open_write_session(context, namespace, link=True)
         observed_state, descendants = _finish_rules(session, target.id)
-    except (_SaveStopped, CanonicalCommandError, GithubStructureError, ValueError, LookupError, OSError) as error:
+    except (
+        _SaveStopped,
+        CanonicalCommandError,
+        GithubStructureError,
+        ValueError,
+        LookupError,
+        OSError,
+        RuntimeError,
+    ) as error:
         stopped = error.error if isinstance(error, _SaveStopped) else error
         if not wrote_changeset:
             raise stopped from error
         effects.append(Effect("github.issue.close", "not_attempted", reference))
         if clear_handle is not None:
             effects.append(Effect("selection.clear", "not_attempted", clear_handle.token))
-        code = getattr(stopped, "code", "PRECONDITION_FAILED")
+        diagnostic = diagnostic_for(stopped, "PRECONDITION_FAILED")
+        code = diagnostic.code
         recovery = (
             getattr(stopped, "recovery", ())
             if isinstance(stopped, CanonicalCommandError) and code != "SCOPE_KIND_CHANGED"
@@ -761,7 +771,7 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             6,
             effects=tuple(effects),
             warnings=tuple(warnings),
-            error=Diagnostic(code, str(getattr(stopped, "message", stopped)), dict(getattr(stopped, "details", {}))),
+            error=diagnostic,
             recovery=RecoveryInstructions(tuple(recovery)),
         )
     return _close_and_release(session, context, namespace, target.id, observed_state, clear_handle, effects, warnings)
@@ -940,8 +950,26 @@ def _close_and_release(
     _unmark_in_progress(session, scope_id, effects, warnings)
     token: str | None = None
     if clear_handle is not None:
-        with WorkTargetStore(context.root) as store:
-            outcome = store.remove_observed(clear_handle)
+        try:
+            with WorkTargetStore(context.root) as store:
+                outcome = store.remove_observed(clear_handle)
+        except (SelectionRemovalUnknown, OSError, ValueError, RuntimeError) as error:
+            # The Issue is already closed: report it with the selection effect, as the legacy finish does.
+            status: EffectStatus = "unknown" if isinstance(error, SelectionRemovalUnknown) else "failed"
+            effects.append(Effect("selection.clear", status, clear_handle.token))
+            return OperationResult(
+                "work finish",
+                "partial",
+                FinishData(scope_id, True, context.branch, context.branch, None),
+                6,
+                effects=tuple(effects),
+                warnings=tuple(warnings),
+                error=Diagnostic("WORK_FINISH_INCOMPLETE", str(error), {}),
+                recovery=RecoveryInstructions((
+                    "The Scope is completed; check spec-dock active show and clear the selection with "
+                    "spec-dock active clear if it remains.",
+                )),
+            )
         if outcome == "conflict":
             effects.append(Effect("selection.clear", "failed", clear_handle.token))
             return OperationResult(

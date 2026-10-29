@@ -243,3 +243,16 @@ def test_delete_of_a_kind_changed_scope_backs_up_and_removes_the_old_kind_direct
     assert (backup / "00000-00999/iss-00003/plan.md").is_file()
     assert not (world.catalog / "00000-00999/iss-00003").exists()
     assert world.fake().issue(3).labels == []
+
+
+def test_move_decides_on_a_parent_changed_to_a_plain_issue_only_on_github(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    assert world.run("scope", "show", "iss-00003")[0] == 0
+    world.edit(lambda fake: fake.add_issue(9, title="Plain"))
+    world.edit(lambda fake: fake.set_parent(3, 9))  # the GitHub UI; the change check cannot see it
+    code, payload = world.run("scope", "move", "iss-00003", "--parent", "epic-00002")
+    assert (code, payload["status"]) == (0, "succeeded"), payload
+    assert world.writes()[-1][1] == "repos/example/repo/issues/2/sub_issues"
+    assert world.fake().issue(3).parent == ["example/repo", 2]

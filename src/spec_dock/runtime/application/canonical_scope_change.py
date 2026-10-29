@@ -65,9 +65,9 @@ def edit_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     selection = session.selection()
     target = session.resolve(namespace.target, selection)
     check_expectations(session, namespace, selection, target)
-    session.require_kind_unchanged(target.id)
     number = session.node(target.id).number
     session.reread([number])
+    session.require_kind_unchanged(target.id)
     if session.node(target.id).title == title:
         data = _scope_data(session, target.id, changed=False)
         if namespace.dry_run:
@@ -107,9 +107,9 @@ def lifecycle_scope(namespace: argparse.Namespace, context: ProjectContext) -> O
     selection = session.selection()
     target = session.resolve(namespace.target, selection)
     check_expectations(session, namespace, selection, target)
-    session.require_kind_unchanged(target.id)
     number = session.node(target.id).number
     session.reread([number])
+    session.require_kind_unchanged(target.id)
     views = session.scopes.views
     states: dict[str, ObservedState] = {view.id: view.status.state for view in views}
     if close and reason == "completed":
