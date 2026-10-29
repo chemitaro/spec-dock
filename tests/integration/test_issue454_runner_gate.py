@@ -227,7 +227,13 @@ def test_the_runner_hooks_gate_each_job_and_runner_users_get_no_administrative_g
     assert 'echo "$RUNNER_SHA256  $archive" | sha256sum -c -' in setup
     assert "must not belong to an administrative group" in setup and "usermod" not in setup
     register = (RUNNER / "register-runner.sh").read_text(encoding="utf-8")
-    assert "--preserve-env=ACTIONS_RUNNER_INPUT_TOKEN" in register and "--token" not in register
+    # sudo records the environment it passes, so the token travels through a pipe instead (iss-00454 RQ-454-06).
+    assert "IFS= read -r ACTIONS_RUNNER_INPUT_TOKEN" in register and "printf '%s\\n' \"$token\" | sudo -u" in register
+    assert (
+        "--preserve-env" not in register
+        and "--token" not in register
+        and "export ACTIONS_RUNNER_INPUT_TOKEN\n" not in register
+    )
 
 
 def _work(tmp_path: Path) -> Path:
