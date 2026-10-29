@@ -192,3 +192,29 @@ def test_create_reads_the_record_again_before_the_legacy_step(
     assert (code, payload["error"]["code"]) == (3, "PRECONDITION_FAILED")
     assert "changed after --expect-current" in payload["error"]["message"]
     assert git(world.main, "worktree", "list", "--porcelain") == before
+
+
+def test_bootstrap_runs_the_legacy_step_on_the_checked_record(
+    world: CanonicalWorld, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.application import canonical_worktrees
+    from spec_dock.runtime.infra.work_target_store import WorkTargetStore
+
+    linked = world.worktree("wt")
+    (linked / "Makefile").write_text("init:\n\t@true\n", encoding="utf-8")
+    world.select("init-00001", 1)
+    code, payload = world.run("worktree", "bootstrap", str(linked), "--dry-run", "--expect-current", "init-1")
+    assert (code, payload["status"]) == (0, "planned"), payload
+    original = canonical_worktrees._bootstrap_captured_target
+
+    def changed_first(namespace, context, entry, captured, held):
+        with WorkTargetStore(context.root) as store:
+            current = store.read()
+            assert current.handle is not None
+            store.remove_observed(current.handle)  # the selection changes after the expectation was checked
+        return original(namespace, context, entry, captured, held)
+
+    monkeypatch.setattr(canonical_worktrees, "_bootstrap_captured_target", changed_first)
+    code, payload = world.run("worktree", "bootstrap", str(linked), "--dry-run", "--expect-current", "init-00001")
+    assert (code, payload["status"]) == (3, "failed"), payload
+    assert "selection changed" in payload["error"]["message"] and payload["effects"] == []

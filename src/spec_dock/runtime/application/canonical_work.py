@@ -268,7 +268,8 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         selection_now = session.selection()
         target = session.resolve(namespace.target, selection_now)
         scope_id = target.id
-        session.require_kind_unchanged(*session.scopes.lineage(target.id))
+        chain = session.scopes.lineage(target.id)
+        session.require_kind_unchanged(*chain)
         expected_current = (
             session.resolve(namespace.expect_current, selection_now).id if namespace.expect_current else None
         )
@@ -276,6 +277,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         for member in session.scopes.lineage(target.id):
             session.reread_blockers(session.node(member).number)
         session.reread([session.node(target.id).number, *_external_blockers(session, target.id)])
+        session.require_kind_unchanged(*chain)  # a kind change only the reread saw
         target = session.scopes.view(target.id)
         readiness = evaluate_readiness(session.scopes.snapshot, target.id)
         if not readiness.ready:
@@ -785,6 +787,7 @@ def _finish_rules(session: WriteSession, scope_id: str) -> tuple[str, tuple[str,
     descendants = tuple(view.id for view in scopes.views if scope_id in scopes.lineage(view.id)[1:])
     session.require_kind_unchanged(scope_id, *descendants)
     session.reread([session.node(scope_id).number])
+    session.require_kind_unchanged(scope_id, *descendants)  # a kind change only the reread saw
     require_known_descendants(session, scope_id)
     observed = session.scopes.view(scope_id).status.state
     if observed == "unknown":
@@ -921,12 +924,13 @@ def _close_and_release(
         if completed:
             effects.append(Effect("github.issue.close", "unchanged", reference))
         else:
-            session.write(
+            closed = session.write(
                 "github.issue.close",
                 reference,
                 lambda: session.client.update_issue(node.number, state="closed", state_reason="completed"),
                 lambda facts: [UpsertIssue(facts)],
             )
+            session.facts[node.number] = closed  # later reflections (the label removal) build on the closed Issue
             effects.append(session.effects[-1])
             completed = True
     except WriteFailed as error:

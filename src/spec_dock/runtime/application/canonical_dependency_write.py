@@ -36,6 +36,7 @@ def mutate_dependency(namespace: argparse.Namespace, context: ProjectContext) ->
     number, blocker = session.node(source.id).number, session.node(destination.id).number
     session.reread([number, blocker])
     session.reread_blockers(number)
+    session.require_kind_unchanged(source.id, destination.id)  # a kind change only the reread saw
     present = blocker in session.node(source.id).blocked_by
     if remove:
         changed = present

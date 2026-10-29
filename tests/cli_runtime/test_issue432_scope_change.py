@@ -256,3 +256,26 @@ def test_move_decides_on_a_parent_changed_to_a_plain_issue_only_on_github(
     assert (code, payload["status"]) == (0, "succeeded"), payload
     assert world.writes()[-1][1] == "repos/example/repo/issues/2/sub_issues"
     assert world.fake().issue(3).parent == ["example/repo", 2]
+
+
+def test_a_skipped_reflection_keeps_success_warns_once_and_refetches_on_the_next_read(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    from spec_dock.runtime.domain.canonical_structure import SetParent
+    from spec_dock.runtime.infra.github_snapshot import StructureSnapshotService
+
+    world = _world(tmp_path, monkeypatch, capsys)
+    original = StructureSnapshotService.reflect_writes
+
+    def with_an_unknown_number(self, changes, *, command):
+        return original(self, [*changes, SetParent(99999, None)], command=command)
+
+    monkeypatch.setattr(StructureSnapshotService, "reflect_writes", with_an_unknown_number)
+    code, payload = world.run("scope", "edit", "iss-00003", "--title", "Renamed")
+    assert (code, payload["status"]) == (0, "succeeded"), payload
+    assert [item["code"] for item in payload["warnings"]] == ["GITHUB_SNAPSHOT_STALE"]
+    monkeypatch.setattr(StructureSnapshotService, "reflect_writes", original)
+    graphql = len(world.fake().graphql_requests())
+    code, shown = world.run("scope", "show", "iss-00003")
+    assert code == 0 and shown["data"]["result"]["scope"]["title"] == "Renamed"
+    assert len(world.fake().graphql_requests()) == graphql + 1

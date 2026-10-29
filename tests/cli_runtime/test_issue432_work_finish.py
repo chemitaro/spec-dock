@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING
 
@@ -128,6 +129,13 @@ def test_no_cycle_within_the_wait_keeps_the_issue_open(world: WriteWorld) -> Non
     for path in (world.catalog / ".runtime/changesets").glob("*.json"):
         path.unlink()
     git(world.catalog, "checkout", "--", ".")
+
+    def older_cycle(current: CatalogSyncState | None) -> CatalogSyncState:
+        assert current is not None and current.last_cycle is not None
+        old = "2026-01-01T00:00:00Z"
+        return current.evolve(last_cycle=replace(current.last_cycle, started_at=old, finished_at=old))
+
+    update_catalog_state(resolve_state_root(), str(world.catalog.resolve()), older_cycle)
     code, payload = world.write("work", "finish", "iss-00003")
     assert (code, payload["status"], payload["error"]["code"]) == (3, "failed", "CANONICAL_SAVE_UNCONFIRMED")
     assert world.fake().issue(3).state == "open"
@@ -233,3 +241,14 @@ def test_a_selection_failure_after_closing_keeps_the_close_in_a_partial_result(
     kinds = [(item["kind"], item["status"]) for item in payload["effects"]]
     assert ("github.issue.close", "succeeded") in kinds and ("selection.clear", "unknown") in kinds
     assert world.fake().issue(3).state == "closed"
+
+
+def test_after_finish_the_snapshot_shows_the_scope_closed_without_a_refetch(world: WriteWorld) -> None:
+    world.select("iss-00003", 3)
+    _run_cycle_on_kick(world)
+    code, payload = world.write("work", "finish", "iss-00003")
+    assert code == 0, payload
+    graphql = len(world.fake().graphql_requests())
+    code, shown = world.run("scope", "show", "iss-00003")
+    assert code == 0 and shown["data"]["result"]["scope"]["status"]["state"] == "completed", shown
+    assert len(world.fake().graphql_requests()) == graphql
