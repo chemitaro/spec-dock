@@ -73,7 +73,7 @@ ID: "epic-00424"
 | I-12（`iss-00439`、#439） | Migrate Remaining Repositories To Canonical Storage / `canonical-repositories-cutover` | 移行・互換性・rollback（各リポジトリの切り替え）、11 | I-10 | strict |
 | I-13（`iss-00440`、#440） | Remove Legacy Mode / `legacy-mode-removal` | 14 | I-12 | strict |
 | I-14（`iss-00455`、#455） | Flatten Canonical Catalog And Drop Slugs / `canonical-flat-ids` | 2（表し方、種類の付け替え、スナップショット、内容の置き場）、3章の `structure`、6章の `branch` と `workspace validate`、7（ID とブランチ名）、12章の `SCOPE_KIND_CHANGED` | なし（直す I-1、I-2、I-4 はマージ済み） | strict |
-| I-15（`iss-00456`、#456） | Flatten Specs In Canonical Migration Script / `canonical-migration-flatten` | 11（作った Issue の見つけ直し、平らにする写し、戻すときの入れ子と slug） | I-14 | strict |
+| I-15（`iss-00456`、#456） | Flatten Specs In Canonical Migration Script / `canonical-migration-flatten` | 11（作った Issue の見つけ直し、平らにする写し、戻すときの入れ子と slug） | I-14（マージは I-16 の後） | strict |
 | I-16（`iss-00460`、#460） | Bucket Canonical Catalog By Thousand / `canonical-bucket-dirs` | 2（表し方の「番号・ID」の入力、内容の置き場の区切り）、3章の `structure`、6章の `active set` の行と「作成時のファイル」の深さ、11章の写し先、12章の `SCOPE_DIRECTORY_*` | なし（直す I-14 はマージ済み） | standard |
 
 - 番号は足した順で、進める順は下の「進め方」の図のとおりである（I-11 は2026-10-25 に足した。I-9 より前に終える。I-12 と I-13 は、同じ日に、ほかのリポジトリの移行と撤去をこの Epic に入れたときに足した）。
@@ -101,7 +101,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - I-8 は、canonical の中身（C5、I-2）と、検査のワークフローと版のファイル（C7、I-7）を使うので、両方の後に始める。
 - I-14 は、マージ済みの I-1、I-2、I-4 のコードを、平らな置き場と `<種類>-<番号5桁>` の ID に直す。止まっている I-5 と I-11 の再開の前提なので、最初に進める。
 - I-15 は、I-14 の ID の規則と種類の判定の定数を写して使うので、I-14 の後に始める。`scripts/` だけを変えるので、I-5 と I-11 と並べてよい。I-10 の前に終える。区切りの計算（I-16 の `scope_bucket`）は、I-16 の `design.md` の公開の形を写して並べて進め、I-16 のマージの後に、パッケージの関数と比べるテストを足す。
-- I-16 は、I-14 の置き場の部品（`catalog_tree`、`canonical_scopes`、`canonical_workspace`）を区切りの形に直す。I-5 と I-11 の再開の前提なので、先に進める。
+- I-16 は、I-14 の置き場の部品（`catalog_tree`、`canonical_scopes`、`canonical_workspace`）を区切りの形に直す。I-5 と I-11 の再開の前提なので、先に進める。I-15 の作業は I-16 と並べて進めてよいが、I-15 のマージは I-16 のマージの後にする（I-15 の受け入れの、パッケージの `scope_bucket` と比べるテストを足すため。依存の記録 `iss-00456` → `iss-00460` と、I-9 の `iss-00436` → `iss-00460` の追加は、統括が `spec-dock dependency add` で行う）。
 - I-5 は、カタログの排他と変更の束（I-2）、同期の状態と、すぐの実行の頼み方（I-3）、読む側の部品（I-4）、平らな置き場と `SCOPE_KIND_CHANGED` の判定（I-14）、区切りの置き場と相対リンクの深さ（I-16）を使う。
 - I-11 は、周期の手順7（I-3）と、着手の判定の部品（I-4）と、`slug` を外したスナップショット（I-14）を使う。I-5 と並べて進めてよい。
 - I-9 は、I-3〜I-5、I-7、I-8、I-11、I-14〜I-16 のすべての後に始める。
@@ -242,7 +242,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **I-4 から引き継ぐもの**（2026-10-26 の統括の判断。I-4 の `report.md`）：ブランチの操作が失敗した後の再観察を、従来の `branch_operations` の形にそろえる。`--expect-current` の確かめと従来の処理の取り込みの間の競合を直す。canonical の `worktree remove` が、正しいリンク（`spec-dock/initiatives`）を無視されたファイルとして数え、いつも `--discard-ignored` を要するので、SpecDock が置いたリンクは数えないように直す。
 - **2026-10-29 の方針の変更で、止まっている作業から変えること**（worktree `iss-00432-canonical-scope-write` を読んで洗い出した。コミット2つ（`1490d3834` 文書、`d44047b78` S1）と、S2〜S5 の未コミットの変更がある）：
   - 要らなくなる：`canonical_scope_create.py` の slug の印の付け足しと読み取り、`SLUG_MARKER_MISSING` の判定、印や `--slug` やディレクトリの slug の食い違いで止まる条件、取り込みの手順 `github.issue.body`（印を足す本文の `PATCH`）、`resolve_input_title_and_slug` で slug を作る処理、作り直しの案内の `--slug`、`update_issue` の `body`（使い道が印だけだった）。`scope move` のディレクトリの移動（`move_directory`、`_follow_moved_selections`、`--parent` なしの使い方、警告 `SCOPE_MOVE_INCOMPLETE`）と、`infra/canonical_scaffold.move_directory` とそのテスト。`_publish` が `SCOPE_NESTING`（`epics/`、`issues/`）で置き場を決める処理。`scope delete` の「入れ子のずれた子孫で止まる」条件。Issue の文書の、slug、ディレクトリの移動、入れ子の節。
-  - 変わる：`scope create` と `scope import github` の置き場（`<カタログ>/<区切り>/<ID>/`）と引数（上の受け入れ）、作成の失敗の案内（`scope import github <種類> <番号> [--parent …]`）、`scope delete --recursive`（子孫を1つずつ写して消す）、`scope move` の `HELP_EFFECTS` と Writes の文（ディレクトリを移すことを書かない）、`work finish` の子孫の確かめ、テンプレートの相対リンクの深さ（`../../../docs/…`）。新しい ID の入口（`--parent`、`dependency add/remove` の両端など）は `parse_scope_selector` を通し、0埋めしない入力を受け付ける（I-16）。
+  - 変わる：`scope create` と `scope import github` の置き場（`<カタログ>/<区切り>/<ID>/`）と引数（上の受け入れ）、作成の失敗の案内（`scope import github <種類> <番号> [--parent …]`）、`scope delete --recursive`（子孫を1つずつ写して消す）、`scope move` の `HELP_EFFECTS` と Writes の文（ディレクトリを移すことを書かない）、`work finish` の子孫の確かめ、テンプレートの相対リンクの深さ（`../../../docs/…`）。新しい ID の入口（`--parent`、`dependency add/remove` の両端など）は `parse_scope_selector` を通し、0埋めしない入力を受け付ける（I-16）。作成では、区切りのディレクトリがなければ実際のディレクトリとして作り、区切りの名前の場所にシンボリックリンクかファイルがあれば書く前に止まる。削除で空になった区切りは消す（Git は空のディレクトリを保存しないので、残しても次の同期の後のクローンにはなく、検査の異常にもならない。消すほうが手元と他のクローンがそろう）。
   - 足す：`SCOPE_KIND_CHANGED` での停止（I-14 の部品を使う）、子が付け替えの異常で ID を決められないときに、子孫の状態を不明として扱うこと、I-6 から移した題名の検査。
   - そのまま使える：S1 の `apply_changes_lenient`、`reflect_writes`、`state_reason` の比べ方、`canonical_writes.py`（書く側の共通の部品）、`require_writable_format`、`assemble_canonical_scopes`、`strip_structure_front_matter`、`copy_scope_template_at`、`edit`、`close`、`reopen`、`delete` のバックアップと GitHub への書き込みの順、dispatch への登録。
 - **止まっている作業の再開のしかた**：I-14 と I-16 のマージを待つ。再開の前に、未コミットの変更を、その worktree で WIP のコミットにして残す。main を取り込み（`canonical_structure.py`、`fake_github.py`、`canonical_scopes.py` で衝突する見込み。この Epic の文書の PR で、`iss-00432` の `.meta.json` の依存に I-14 を足したので、そこも衝突しうる。main の側を取る）、上の「要らなくなる」ものを捨て、「変わる」と「足す」ものを入れてから、S6 以降に進む。Issue の `requirement.md`、`design.md`、`plan.md` も、先に新しい方針に直す。
@@ -445,7 +445,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `move-local` と `adopt-worktree` が、平らにした位置へ移し、`adopt-worktree` が分岐点に当たるコミット C を見つける。
   - `export-legacy` で作ったブランチで、入れ子と slug が11章の規則どおりになり（切り替えの後に作った日本語の題名の Scope は `untitled`）、リンクが元の深さに戻り、従来モードの `workspace validate` が通る（統括の判断）。親のない Epic、Issue のない `<ID>/`、異常のある Scope があると、`--apply` の前に一覧にして止まり、何も書かない。`.meta.json` が、移行前のものと `revision` と `lifecycle` のほかは一致する。
   - 写した値（C1 の ID の正規表現と種類のラベル、C3 の無視の3行、C5、C7）が、パッケージの定数と同じ。区切りの計算の写しが、I-16 のマージの後に、パッケージの `scope_bucket` と同じ値を返す（1、999、1000、99999、100000、1000000 など）。
-- **依存**：I-14（区切りは I-16 の公開の形を写して並べて進める）。**Planning Level**：strict（GitHub に大量に書き、全リポジトリの仕様を写すため）。
+- **依存**：I-14。マージは I-16 のマージの後（区切りは I-16 の公開の形を写して並べて進め、I-16 のマージの後に比べるテストを足す）。**Planning Level**：strict（GitHub に大量に書き、全リポジトリの仕様を写すため）。
 - **注意**：本物の GitHub と、本物のリポジトリには書かない（I-8 と同じ）。
 
 ### I-16 Bucket Canonical Catalog By Thousand

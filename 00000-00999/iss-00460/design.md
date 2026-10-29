@@ -118,14 +118,15 @@ class CatalogTree:
   - `bucket`：`f"{path} is not a bucket of its numbers"`（区切りの名前の誤り）、`f"{path} is in another number's bucket"`（区切りの違う ID）
   - `name`：`f"{path} is not a Scope directory <ID>/ in its bucket"`
   - `nested`：今のまま。
-- `MISPLACED_NEXT_STEP = "Move its contents into spec-dock/initiatives/<bucket>/<ID>/ (the bucket is the ID number's thousand range, e.g. 00000-00999/iss-00454) and delete the emptied directory."`
+- `MISPLACED_NEXT_STEP = "Move the Scope contents it holds into spec-dock/initiatives/<bucket>/<ID>/ for each ID (the bucket is the ID number's thousand range, e.g. 00000-00999/iss-00454) and delete the emptied directory."`（区切りの名前の誤りのディレクトリは中に複数の `<ID>/` を持ちうるので、「それぞれの ID」の文にする）
 - 並び、`DirectoryReport`、`inspect_canonical_structure`、`structure_item` の形は I-14 のまま。
 
 ### ID の入力（変えるコードはない）
 
 - canonical モードの ID の入口は、すべて `resolve_canonical_scope`、`check_canonical_scope_expectations`、`check_canonical_expectation`、`refuse_old_ids`（I-14）を通り、そこで `parse_scope_selector` が `iss-454`、`ISS-454`、`iss-000454` を `iss-00454` に直す。`gh:OWNER/REPO#N` と `@current` などの役は今のまま。
 - この Issue は、それぞれの入口に0埋めしない ID を渡すテストを足し、通っていない入口がないことを確かめる（AC-460-04）。通っていない入口が見つかったときは、その入口で `parse_scope_selector` を使うように直す（新しい正規化の関数は作らない）。
-- I-5 が足す ID の入口（`--parent`、`dependency add/remove` の両端、`scope import github` の後の表示など）も、同じく `parse_scope_selector`（または `resolve_canonical_scope`）を通す。I-5 の設計への引き渡しとして `report.md` に書く。
+- I-5 が足す ID の入口（`--parent`、`dependency add/remove` の両端など）も、同じく `parse_scope_selector`（または `resolve_canonical_scope`）を通す。I-5 の設計への引き渡しとして `report.md` に書く。
+- 区切りのディレクトリそのものの扱い（I-5 への引き渡し。Epic の `plan.md` の I-5 の「変わる」にも書いた）：作成では、区切りがなければ実際のディレクトリとして作る。区切りの名前の場所にシンボリックリンクかファイルがあれば、書く前に止まる（読む側は、それを区切りとして扱わない）。削除で空になった区切りは消す（Git は空のディレクトリを保存しないので、残しても他のクローンにはなく、検査の異常にもならないが、手元とそろえるため）。
 - 名前を ID として読む部品（`parse_scope_id`、`CatalogTree`、`kind_changes`、`branch_names_scope`、`scope_relative`）は、I-14 のとおり厳密な形だけを受け付ける。
 
 ## data / failure
@@ -144,7 +145,7 @@ class CatalogTree:
 
 ## 変更対象
 
-- 変えるコード：`domain/canonical_layout.py`（足すだけ）、`infra/catalog_tree.py`、`application/canonical_scopes.py`、`application/canonical_workspace.py`、`application/canonical_status.py`（説明の文だけ）。`SCOPE_KIND_CHANGED_RECOVERY`（`application/canonical_errors.py`）の「新しい `<ID>/`」は、古いディレクトリと同じ区切りの中なので、文を変えない。
+- 変えるコード：`domain/canonical_layout.py`（足すだけ）、`infra/catalog_tree.py`、`application/canonical_scopes.py`、`application/canonical_workspace.py`、`application/canonical_status.py`（説明の文だけ）。`SCOPE_KIND_CHANGED_RECOVERY`（`application/canonical_errors.py`）の「新しい `<ID>/`」は、`scope create` が新しい番号の `<区切り>/<ID>/` を作り、そこへ移すという意味なので、区切りがあっても正しく、文を変えない。
 - 変えるテスト（すべて canonical モードのもの）：`tests/support/canonical_scopes.py`（`CanonicalWorld.relative(kind, number)` が `<区切り>/<ID>` を返す。`directory` はそこに作る）、`tests/unit/infra/test_catalog_tree.py`、置き場のパスを直書きしている `tests/cli_runtime/test_issue431_*.py`、`test_issue455_flat_ids.py`、`test_issue430_canonical_status.py`、`tests/unit/application/test_canonical_catalog.py` など（実装の後に検索して確かめ、`report.md` に一覧で書く）。
 - 足すテスト：`tests/unit/domain/test_canonical_layout_buckets.py`（区切りの計算、相対の場所、`is_bucket_name`、深さの定数）、`tests/cli_runtime/test_issue460_bucket_dirs.py`（区切りの置き場、外れ、0埋めしない入力、深さの実際のリンク）。
 - 変えない：`domain/selectors.py`、`domain/ids.py`、`domain/canonical_structure.py`（C1。`KindChange.directories` は名前のまま）、スナップショット（C10）、I-3 と I-7 の本体、テンプレートの配布資産、従来モードの処理とテスト。
@@ -159,7 +160,7 @@ class CatalogTree:
 ## testability
 
 - 単体：`scope_bucket` の9つの例と0・負の数、種類によらないこと、`scope_relative` の例と ID でない値、`is_bucket_name` の真偽、`SCOPE_TO_SPEC_DOCK` の正規化（`LINK_RELATIVE / scope_relative(id) / SCOPE_TO_SPEC_DOCK` が `spec-dock`）、`CatalogTree` の区切りの下だけの判定と `misplaced` の4つの理由と `expected`（隠し、リンク、ファイル、大文字、区切りの違う ID、区切りの名前の誤り、I-14 の平らな残り）。
-- CLI（偽の `gh`、一時の bare の origin、一時の `XDG_STATE_HOME`、`tests/conftest.py` の偽物の中）：区切りの置き場での `scope show/list` の `path`、`active set` のリンクの先、`artifact list` のパス、平らな残りを場所にしないこと、`workspace validate` と `canonical status --structure` の異常、0埋めしない入力の各入口、深さのリンクが mainのチェックアウトと作業用のworktreeから開くこと。
+- CLI（偽の `gh`、一時の bare の origin、一時の `XDG_STATE_HOME`、`tests/conftest.py` の偽物の中）：区切りの置き場での `scope show/list` の `path`、`active set` のリンクの先、`artifact list` のパス、平らな残りを場所にしないこと、`workspace validate` と `canonical status --structure` の異常、0埋めしない入力の各入口（`requirement.md` の R-460-04 の列挙を parametrize する）、深さのリンク（Markdown のリンクは字面で畳んでそのチェックアウトの `spec-dock/docs/…`、シンボリックリンクはカタログの実際の場所から mainの `spec-dock/docs/…`）。
 - 回帰：版3のテスト（`tests/` の canonical でないもの）を変えずに全体を通す。I-14 の付け替えのテスト（`test_issue455_flat_ids.py`）を区切りの置き場で通す。
 
 ## risk
