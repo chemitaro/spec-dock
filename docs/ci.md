@@ -6,11 +6,14 @@ CIは、変更をGitHubへ送ったときに実行する自動検証です。Spe
 
 | 表示名 | 実行環境・対象 | 確認すること |
 |---|---|---|
-| `provider-tests` | Ubuntu、PRのマージ候補 | `make lint` と通常の全pytest。baseとの統合を含む実装の回帰 |
-| `Provider distribution parity (ubuntu-latest)` | Linux、PRのheadそのもの | wheelの内容、新規インストール、外部console、静的資産、実Gitを使う主要操作 |
+| `provider-tests` | Ubuntu（変数が `local` なら手元のLinux ARM64 VM）、PRのマージ候補 | `make lint` と通常の全pytest。baseとの統合を含む実装の回帰 |
+| `Provider distribution parity (ubuntu-latest)` | Linux（変数が `local` なら手元のLinux ARM64 VM）、PRのheadそのもの | wheelの内容、新規インストール、外部console、静的資産、実Gitを使う主要操作 |
 | `Provider distribution parity (macos-latest)` | macOS、PRのheadそのもの | 同じ配布・実consoleの検査をmacOSの実ファイルシステムとOS機能で確認 |
+| `route`（Provider CI） | Ubuntu、PR | 二つの重いジョブを動かすランナーを選ぶ |
 | `validate` | Ubuntu、pushとPR | 候補sourceから作ったwheelでdogfoodの仕様データを検証 |
 | `check`（Commit identity） | Ubuntu、pushとPR | 新しいコミットの著者・コミッター情報を検証 |
+
+Provider CIの `route` ジョブ（GitHubのランナー）が、二つの重いジョブを動かすランナーを選びます。リポジトリの変数 `SPEC_DOCK_CI_RUNNER` が `local` で、同じリポジトリの信頼する人のPRのときだけ手元のランナーを使います。それ以外は上の表のGitHubのランナーです。構成、安全の仕組み、切り戻しは [手元のMac miniのランナー](ci-local-runner.md) を見てください。
 
 `validate` と `check` はpushとPRの両イベントで実行されるため、同名の結果が二つ表示されることがあります。配布チェックは [.github/workflows/provider-ci.yml](../.github/workflows/provider-ci.yml)、仕様検証は [ci.yml](../.github/workflows/ci.yml)、著者検証は [commit-identity.yml](../.github/workflows/commit-identity.yml) が正本です。
 
