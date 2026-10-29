@@ -54,6 +54,12 @@ def test_canonical_group_commands_stop_in_a_schema_three_repository(tmp_path: Pa
     assert "migrate-to-canonical" in " ".join(result["recovery"]["instructions"])
 
 
+def test_scope_move_stops_in_a_schema_three_repository(tmp_path: Path) -> None:
+    root = _repository(tmp_path / "legacy", 3)
+    code, result = _result(dispatch(_namespace("scope move", root, target="iss-00002", parent="epic-00001"), root))
+    assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_MIGRATED" and result["effects"] == []
+
+
 def test_entries_before_resolve_context_run_first_and_may_decline(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

@@ -45,6 +45,7 @@ def test_an_epic_is_created_on_github_then_published_in_the_flat_catalog_with_on
         ".workbench",
         "artifacts",
         "design.md",
+        "discussions",
         "plan.md",
         "report.md",
         "requirement.md",
@@ -60,6 +61,13 @@ def test_an_epic_is_created_on_github_then_published_in_the_flat_catalog_with_on
     assert rules.is_symlink() and rules.readlink().as_posix() == "../../../../docs/rules/epic/artifacts.md"
     assert (linked / "artifacts/rules.md").read_bytes() == (
         world.main / "spec-dock/docs/rules/epic/artifacts.md"
+    ).read_bytes()
+    discussions = directory / "discussions/rules.md"
+    assert (
+        discussions.is_symlink() and discussions.readlink().as_posix() == "../../../../docs/rules/epic/discussions.md"
+    )
+    assert (linked / "discussions/rules.md").read_bytes() == (
+        world.main / "spec-dock/docs/rules/epic/discussions.md"
     ).read_bytes()
     assert not list(world.catalog.rglob(".meta.json"))
     (changeset,) = world.changesets()

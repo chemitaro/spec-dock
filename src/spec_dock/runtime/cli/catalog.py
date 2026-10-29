@@ -97,7 +97,7 @@ HELP_EFFECTS: dict[str, str] = {
     "scope close": "Complete or cancel one Scope in its backend; active selection stays set.",
     "scope reopen": "Reopen one Scope in its backend; active selection stays set.",
     "scope delete": "Delete local Scope-owned files; GitHub and branches remain.",
-    "scope move": "Change or re-align a Scope parent in GitHub and move its directory to match.",
+    "scope move": "Change a Scope parent in GitHub; the flat catalog directory does not move.",
     "active show": "Read this worktree's active selection; no changes.",
     "active set": "Keep the same valid direct selection unchanged and repair only its spec-dock/active navigation links; acquiring another selection requires work start.",
     "active clear": "Remove only observed local direct records and point spec-dock/active links at the fallback when none remains; never promote an ancestor.",
@@ -329,7 +329,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
     "scope delete": "Require --backup-dir ABS for a new real backup; descendants require --recursive, incoming edges require --detach-dependencies, and a selected descendant requires --clear-active.",
-    "scope move": "A schema-4 checkout with a correct catalog link; --parent must be the right kind and open, and the Scope and parent directories must exist in the catalog.",
+    "scope move": "A schema-4 checkout; --parent is required and must be the right kind and open, and not the Scope or one of its descendants.",
     "active show": "The selected worktree must have readable active-selection state.",
     "active set": "Only the same valid direct target is accepted; its selection stays unchanged. Use work start to acquire a selection.",
     "active clear": "--from requires a valid current chain; --all --yes permits discarding observed corrupt regular records. Unknown entries are preserved; ancestors are never promoted.",
@@ -660,12 +660,21 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = "scope, github_ref, changed; dry-run adds can_apply and blockers."
         confirmation = "No final confirmation is required for a local title edit."
     elif leaf == "scope move":
-        reads = "The GitHub structure snapshot checked at decision freshness, the target and new parent Issues read again, and the catalog directories."
-        writes = "With --parent, the GitHub parent (sub-issue with replace_parent); then the Scope directory moves under its GitHub parent's directory in the catalog, recorded in one changeset."
-        does_not = (
-            "Does not edit documents, close or reopen Issues, change selection or branches, or commit in the catalog."
+        reads = (
+            "The GitHub structure snapshot checked at decision freshness and the target and new parent Issues"
+            " and parents read again."
         )
-        json_data = "scope, github_ref, changed, moved_from, moved_to, snapshot; dry-run adds can_apply and blockers."
+        writes = (
+            "The GitHub parent of the Scope (sub-issue with replace_parent); this checkout's spec-dock/active"
+            " links when it selects the Scope or a descendant."
+        )
+        does_not = (
+            "Does not write the catalog, move directories, edit documents, close or reopen Issues, or change"
+            " selection or branches."
+        )
+        json_data = (
+            "scope, github_ref, changed, parent_before, parent_after, snapshot; dry-run adds can_apply and blockers."
+        )
         confirmation = "No final confirmation is required for this leaf."
     elif leaf == "scope delete":
         reads = "Current Scope subtree, incoming dependency metadata, and this worktree's captured direct selection."

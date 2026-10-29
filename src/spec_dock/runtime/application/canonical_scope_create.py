@@ -365,6 +365,19 @@ def _with_labels(facts: IssueFacts, labels: tuple[str, ...]) -> IssueFacts:
 def _check_scaffold_sources(session: WriteSession, kind: ScopeKind) -> None:
     _scaffold_file_paths(session.context.root / "spec-dock/templates" / kind, session.context.root)
     _precheck_pre_github_create_rules_sources(kind=kind, specdock_dir=_main_spec_dock(session))
+    discussions = _main_spec_dock(session) / "docs/rules" / kind / "discussions.md"
+    if not discussions.is_file():
+        raise FileNotFoundError(f"Missing rules source: {discussions}")
+
+
+def canonical_rules_links(kind: ScopeKind, destination: Path, specdock_dir: Path) -> list[tuple[Path, Path]]:
+    """The Artifact and discussion rules links; the catalog has no child-layer rules (epics/, issues/)."""
+    artifacts = [
+        (link, target)
+        for link, target in _rules_scaffold_specs(kind=kind, dest_dir=destination, specdock_dir=specdock_dir)
+        if link.parent.name == "artifacts"
+    ]
+    return [*artifacts, (destination / "discussions/rules.md", specdock_dir / "docs/rules" / kind / "discussions.md")]
 
 
 def _main_spec_dock(session: WriteSession) -> Path:
@@ -395,14 +408,7 @@ def _publish(
         today=datetime.now(timezone.utc).date().isoformat(),
     )
     templates = session.context.root / "spec-dock/templates" / kind
-    # The catalog has no child-layer rules (epics/, issues/); only the Artifact rules link stays.
-    rules = [
-        (link, target)
-        for link, target in _rules_scaffold_specs(
-            kind=kind, dest_dir=destination, specdock_dir=_main_spec_dock(session)
-        )
-        if link.parent.name == "artifacts"
-    ]
+    rules = canonical_rules_links(kind, destination, _main_spec_dock(session))
 
     def populate(descriptor: int) -> None:
         copy_scope_template_at(templates, destination, descriptor, replacements)

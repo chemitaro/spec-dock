@@ -40,6 +40,7 @@ from spec_dock.runtime.domain.canonical_structure import (
 )
 from spec_dock.runtime.infra.canonical_scaffold import remove_empty_bucket
 from spec_dock.runtime.infra.direct_json import _create_guarded_directory
+from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.json_store import open_guarded_directory, read_guarded_json_bytes
 from spec_dock.runtime.infra.tree_backup import copy_bytes_at, copy_tree_at, tree_digest, verify_backup_root
 from spec_dock.runtime.infra.tree_removal import TreeRemovalIncomplete, remove_tree
@@ -184,14 +185,19 @@ def move_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
     }:
         raise ValueError("a Scope cannot move below itself or its descendants")
     require_open_chain(session, new_parent.id)
-    changed = session.scopes.view(target.id).parent_id != new_parent.id
+    before = session.scopes.view(target.id).parent_id
+    changed = before != new_parent.id
+
+    def data(changed: bool) -> FamilyData:
+        base = _scope_data(session, target.id, changed=changed)
+        after = session.scopes.view(target.id).parent_id
+        return FamilyData("scope", {**base.result, "parent_before": before, "parent_after": after})
+
     steps: list[tuple[str, str | None]] = [("github.sub-issue.add", new_parent.id)] if changed else []
     if namespace.dry_run:
-        return planned(
-            namespace.command_path, _dry(_scope_data(session, target.id, changed=False)), steps, session.warnings
-        )
+        return planned(namespace.command_path, _dry(data(False)), steps, session.warnings)
     if not changed:
-        return session.result("unchanged", _scope_data(session, target.id, changed=False))
+        return session.result("unchanged", data(False))
     child = session.node(target.id)
     try:
         session.write(
@@ -204,11 +210,45 @@ def move_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         )
     except WriteFailed as error:
         return session.incomplete(
-            _scope_data(session, target.id, changed=False),
+            data(False),
             error,
             recovery=(f"Inspect the GitHub parent of {target.github_ref} before a new explicit move.",),
         )
-    return session.result("succeeded", _scope_data(session, target.id, changed=True))
+    _follow_moved_selections(session, target.id, namespace.timeout)
+    return session.result("succeeded", data(True))
+
+
+def _follow_moved_selections(session: WriteSession, moved: str, timeout: float) -> None:
+    """spec-dock/active also links the ancestors: align this checkout, warn for other worktrees (never fails)."""
+    from spec_dock.runtime.application.active_links import sync_selection_links
+    from spec_dock.runtime.application.canonical_workspace import _observe_rows
+
+    scopes = session.scopes
+    moved_ids = {moved} | {view.id for view in scopes.views if moved in scopes.lineage(view.id)[1:]}
+    try:
+        rows = _observe_rows(session.context, scopes, timeout=timeout)
+    except (OSError, ValueError, RuntimeError, GitProcessError):
+        return
+    own = session.context.root.resolve()
+    for row in rows:
+        record = row.selection.record
+        if record is None or record.scope_id not in moved_ids:
+            continue
+        if Path(row.path).resolve() == own:
+            effects, warnings = sync_selection_links(
+                session.context, scopes.views, record.scope_id, dry_run=False, timeout=timeout
+            )
+            session.effects.extend(effects)
+            session.warnings.extend(warnings)
+            continue
+        step = f"In {row.path}, run spec-dock active set {record.scope_id}."
+        session.warnings.append(
+            Diagnostic(
+                "ACTIVE_LINK_NOT_UPDATED",
+                f"{row.path} selects {record.scope_id}, whose GitHub parent chain changed; next: {step}",
+                {"path": row.path, "scope_id": record.scope_id, "next_step": step},
+            )
+        )
 
 
 def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:

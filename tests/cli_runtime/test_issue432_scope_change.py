@@ -103,6 +103,34 @@ def test_move_reparents_only_on_github_and_leaves_the_catalog_alone(
     assert (code, payload["status"]) == (0, "unchanged")
 
 
+def test_move_of_a_selected_scope_points_active_links_at_the_new_parent_and_warns_other_worktrees(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    world.scope("epic", 4, "spare", parent=1)
+    world.scope("issue", 5, "other leaf", parent=2)
+    world.select("iss-00003", 3)
+    assert world.run("active", "set", "iss-00003")[0] == 0
+    elsewhere = world.worktree("elsewhere")
+    world.select("iss-00005", 5, checkout=elsewhere)
+    code, payload = world.run("scope", "move", "iss-00003", "--parent", "epic-00004")
+    assert code == 0, payload
+    epic_link = world.main / "spec-dock/active/epic"
+    assert epic_link.resolve() == (world.catalog / "00000-00999/epic-00004").resolve()
+    assert "active.link" in [item["kind"] for item in payload["effects"]]
+    assert [item["code"] for item in payload["warnings"]] == []
+    code, payload = world.run("scope", "move", "epic-00002", "--parent", "init-00001")
+    assert (code, payload["status"]) == (0, "unchanged")
+    world.scope("initiative", 6, "another")
+    code, payload = world.run("scope", "move", "epic-00002", "--parent", "init-00006")
+    assert code == 0, payload
+    (warning,) = payload["warnings"]
+    assert warning["code"] == "ACTIVE_LINK_NOT_UPDATED" and warning["details"]["scope_id"] == "iss-00005"
+    assert "spec-dock active set iss-00005" in warning["details"]["next_step"]
+    assert payload["data"]["result"]["parent_before"] == "init-00001"
+    assert payload["data"]["result"]["parent_after"] == "init-00006"
+
+
 def test_move_needs_parent_and_stops_before_writing_on_wrong_kinds_cycles_and_kind_changes(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
