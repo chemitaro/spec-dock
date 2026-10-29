@@ -123,7 +123,7 @@ def test_the_snapshot_item_reads_the_stored_snapshot(pair: SyncPair, monkeypatch
     from tests.support.fake_github import FakeGithub
 
     fake = FakeGithub("example/repo")
-    fake.scope("initiative", slug="plan", title="計画")
+    fake.scope("initiative", title="計画")
     clear_memory()
     monkeypatch.setattr(canonical_sync, "repository_of", lambda *_a, **_k: "github.com/example/repo")
     monkeypatch.setattr(canonical_sync, "github_api_for", lambda cwd: GithubApi(runner=fake, clock=fake.clock))
