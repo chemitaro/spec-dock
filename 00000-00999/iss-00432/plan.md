@@ -4,7 +4,7 @@ ID: "iss-00432"
 タイトル: "Write Scopes To GitHub In Canonical Mode"
 関連GitHub: ["#432"]
 状態: "draft"
-最終更新: "2026-10-26"
+最終更新: "2026-10-29"
 依存: ["requirement.md", "design.md"]
 親: ["epic-00424", "init-00423"]
 ---
@@ -17,18 +17,19 @@ ID: "iss-00432"
 
 - **strict**（Epic の計画の選択のまま）。
 - 理由：利用者の仕様のファイル（カタログ）と GitHub の構造に書く。誤ると、Issue の重複、親子や依存の取り違え、仕様の消失、保存されていない変更での Issue の完了が起きる。GitHub の書き込みは自動で巻き戻せない。
-- risk factor：書き込みの結果が分からないときの扱い、書く前の確かめの抜け、`work finish` の保存の確かめ、従来の部品の写し（`work start`、Artifact）、従来モードを変えない制約（AC-15）、並行の I-11 との共有ファイルの衝突。
-- 再評価の条件：C1〜C11 と I-4 の部品の公開の形を、Epic が I-5 に任せた追加のほかに変える必要が出たとき、従来のモジュールを変える必要が出たとき、Epic の文書で決まっていない判断が出たときは、統括に聞く。
+- risk factor：書き込みの結果が分からないときの扱い、書く前の確かめの抜け、`work finish` の保存の確かめ、従来の部品の写し（`work start`、Artifact）、従来モードを変えない制約（AC-15）、種類の付け替えの見落とし、平らな置き場の削除のやり直し、並行の I-11 との共有ファイルの衝突。
+- 再評価の条件：C1〜C11 と I-4、I-14、I-16 の部品の公開の形を、Epic が I-5 に任せた追加のほかに変える必要が出たとき、従来のモジュールを変える必要が出たとき、Epic の文書で決まっていない判断が出たときは、統括に聞く。
 
 ## 目標
 
-requirement.md の AC-432-01〜17 を満たす。canonical モードで、Scope を書くコマンドがすべて動き、`CANONICAL_NOT_IMPLEMENTED` で止まるコマンドがなくなる。
+requirement.md の AC-432-01〜19 を満たす。canonical モードで、Scope を書くコマンドがすべて動き、`CANONICAL_NOT_IMPLEMENTED` で止まるコマンドがなくなる。
 
 ## 順序・依存
 
-- 前提：I-1〜I-4、I-7、I-8 が `main` にある（`cee4c896b`）。
+- 前提：I-1〜I-4、I-7、I-8 が `main` にある（`cee4c896b`）。2026-10-29 の方針の変更で、I-14（`iss-00455`、PR #459）と I-16（`iss-00460`、PR #461）も `main` にあり、`a23d7d175` を merge で取り込んだ（`34ef6426d`）。
 - 並行：I-11（`iss-00438`）が別のworktreeで進む。`cli/catalog.py`、`commands/canonical_dispatch.py`、コマンドの一覧のテストで衝突しうる。先に `main` に入った方を、`origin/main` のマージで取り込む（rebase しない）。
-- この Issue の中の順：S1（C1 と C10 の追加）→ S2（書く側の共通の部品）→ S3〜S8（コマンド。S3 の後は互いに独立）→ S9（I-4 から引き継ぐ直し）→ S10（全体）。
+- この Issue の中の順：S1（C1 と C10 の追加）→ S2（書く側の共通の部品）→ S2b（新しい方針への適合）→ S3〜S8（コマンド。S3 の後は互いに独立）→ S9（I-4 から引き継ぐ直し）→ S10（全体）。
+- 進み具合（2026-10-29 の再開の時点）：S0、S1 はコミット済み（`1490d3834`、`d44047b78`）。S2〜S5 は前の担当の未コミットの変更を WIP でコミットした（`370fa63d5`）。slug、本文の印、入れ子、ディレクトリの移動を前提にしているので、S2b で直す。
 
 ## 実装step
 
@@ -37,14 +38,15 @@ requirement.md の AC-432-01〜17 を満たす。canonical モードで、Scope 
 - **S0 文書**：requirement、design、plan を書き、この会話を知らないサブエージェントにレビューさせ、指摘を分析して直す（下の「文書のレビューの指摘の対応」）。
 - **S1 C1 と C10 の追加**（AC-432-06、07 の単体）：`update_issue(body=…)` と読み直しの比べ方、`apply_changes_lenient`、`SnapshotStore.reflect` の飛ばしと古い扱い、`reflect_writes`。
 - **S2 書く側の共通の部品**（AC-432-02、03 の土台）：`application/canonical_writes.py`、`assemble_canonical_scopes`、`require_writable_format`、`domain/canonical_scaffold.py`、`infra/canonical_scaffold.py`、新しいコード。CLI のテストの部品（書き込みの時計、束の読み取り）を `tests/support/canonical_writes.py` に置く。
-- **S3 作成と取り込み**（AC-432-01、03、04、05）：`scope create`（3つの種類）、`scope import github`。
-- **S4 題名、移動、完了、再開**（AC-432-01、07、09）：`scope edit`、`scope move`（`cli/catalog.py` の葉、配布資産の `reference_cli.md` と `static-inventory.json`、版3の振り分けを含む）、`scope close`、`scope reopen`。
-- **S5 削除**（AC-432-10）：`scope delete`。
+- **S2b 新しい方針への適合**（2026-10-29）：Epic の `plan.md` の I-5 の「2026-10-29 の方針の変更で、止まっている作業から変えること」のとおり、要らなくなったもの（slug の印、`--slug` の受け入れ、`SCOPE_NESTING`、`move_directory`、`_follow_moved_selections`、`update_issue` の `body`）を捨て、置き場を `scope_relative`、入力の解き方を `resolve_canonical_scope` にし、題名の規則（AC-432-18）と `SCOPE_KIND_CHANGED`（AC-432-19）を足す。テストの部品を I-14 と I-16 の形（`CanonicalWorld.directory`/`relative`）に合わせる。
+- **S3 作成と取り込み**（AC-432-01、03、04、05、18）：`scope create`（3つの種類）、`scope import github`。
+- **S4 題名、移動、完了、再開**（AC-432-01、07、09、18）：`scope edit`、`scope move`（GitHub の親だけ。`cli/catalog.py` の葉（`--parent` は必須）、配布資産の `reference_cli.md` と `static-inventory.json`、版3の振り分けを含む）、`scope close`、`scope reopen`。
+- **S5 削除**（AC-432-10）：`scope delete`（子孫のそれぞれの `<区切り>/<ID>/`、古い種類のディレクトリ、空になった区切り、やり直し）。
 - **S6 依存と Artifact**（AC-432-08、11）：`dependency add`、`dependency remove`、`artifact create`、`artifact import file`。
-- **S7 作業の開始**（AC-432-12）：`work start`。
-- **S8 作業の終了**（AC-432-13）：`work finish`。
+- **S7 作業の開始**（AC-432-12、19）：`work start`（既定のブランチ名 `<ID>`、対象と祖先の付け替え）。
+- **S8 作業の終了**（AC-432-13、19）：`work finish`（対象と子孫のそれぞれの `<区切り>/<ID>/`）。
 - **S9 I-4 から引き継ぐ直し**（AC-432-14）：ブランチの再観察、`--expect-current`、`worktree remove` とリンク。
-- **S10 全体**（AC-432-15〜17）：`CANONICAL_NOT_IMPLEMENTED` が残らないことのテスト、`make lint`、`uv run pytest`。`git diff origin/main -- tests/` で変えた既存のテストを一覧にし、許された区分のほかにないことを確かめる。従来のモジュールに差分がないことを確かめる。
+- **S10 全体**（AC-432-15〜17、19）：`CANONICAL_NOT_IMPLEMENTED` が残らないことのテスト、`make lint`、`uv run pytest`。`git diff origin/main -- tests/` で変えた既存のテストを一覧にし、許された区分のほかにないことを確かめる。従来のモジュールに差分がないことを確かめる。
 - **S11 実装のレビュー**：`code-review` の観点で、規約と仕様を、独立した2つのサブエージェントにレビューさせ、指摘を `analyze-review-findings` で分析して直す。
 - **S12 最終品質ゲート**：`origin/main` をマージし、すべてをコミットして通常の push をし、その SHA で `make lint` と `uv run pytest`、新しい2つのサブエージェントのレビュー（規約と仕様）。指摘を直したら、新しい SHA でやり直す（2回目以降のレビューは、前のゲートの SHA からの差分と、前の指摘の確かめに絞る）。
 - **S13 実機の確かめ、報告、PR**：`design.md` の testability の実機の確かめ、`report.md`、`github-pr-creator` で PR、`github-pr-checks` で CI。マージはしない。`work finish` は実行しない。
@@ -53,14 +55,14 @@ requirement.md の AC-432-01〜17 を満たす。canonical モードで、Scope 
 
 | AC | 確かめ方 |
 |---|---|
-| AC-432-01〜05、07〜12、14、15 | `tests/cli_runtime/test_issue432_*.py`。一時の bare とクローン、`canonical link`、偽の `gh`（書き込みの順、本文、id、条件付きの要求、読み直しを記録で）、一時の状態の置き場、変更の束の JSON |
+| AC-432-01〜05、07〜12、14、15、18、19 | `tests/cli_runtime/test_issue432_*.py`。一時の bare とクローン、`canonical link`、偽の `gh`（書き込みの順、本文、id、条件付きの要求、読み直しを記録で）、一時の状態の置き場、変更の束の JSON |
 | AC-432-06 | `tests/unit/domain/test_canonical_structure.py` と `tests/unit/infra/test_github_snapshot.py` に足すテストと、CLI のテスト（相手がスナップショットにない依存の追加） |
 | AC-432-07 の読み直し | `tests/unit/infra/test_github_structure.py` に足すテスト（応答を失わせた `PATCH` と、違う `state_reason`） |
 | AC-432-13 | `tests/cli_runtime/test_issue432_work_finish.py`。bare のリモート、偽のスケジューラーの `on_kick` での1周期、注入した時計 |
 | AC-432-16 | 版3の振る舞いのテストが変更なしで通る。版3の `scope move` のテスト。`git diff --name-only origin/main -- src/` が、`design.md` の「置き場」の表のファイルだけである |
 | AC-432-17 | `make lint`、`uv run pytest` |
 
-- 主な negative test：GitHub につながらない（書き込みとカタログの変化がない）、`--offline`、スナップショットにない古い状態が読み直しで見つかる、リンクなし、形式の版、作成の後の sub-issue の失敗、作成の応答の消失、カタログの排他が取れない、循環、違う親の取り込み、基点に仕様、`BLOCKED`、`UNKNOWN`、`DOING`、印の失敗、保留、時間切れ、一時停止、`--expect-current` の後の選択の変化、無視されたファイル。
+- 主な negative test：GitHub につながらない（書き込みとカタログの変化がない）、`--offline`、スナップショットにない古い状態が読み直しで見つかる、リンクなし、形式の版、作成の後の sub-issue の失敗、作成の応答の消失、カタログの排他が取れない、循環、違う親の取り込み、基点に仕様、`BLOCKED`、`UNKNOWN`、`DOING`、印の失敗、保留、時間切れ、一時停止、`--expect-current` の後の選択の変化、無視されたファイル、`--slug`、規則に合わない題名、種類の付け替え（対象、親、祖先、依存の端、古い ID）、区切りの場所のシンボリックリンク、削除の途中で止めた後のやり直し。
 - 外部依存：本物の GitHub は使わない（偽の `gh`）。実機の確かめは、wheel を入れた一時の venv と、一時の bare とクローンと偽の `gh` で行う（`design.md` の testability）。
 - security / privacy / operability：新しい秘密情報の扱いはない。`gh` の資格情報は、今と同じく `gh` に任せる。`work finish` は最大180秒待つ（端末に、待っていることを示す必要はない。JSON の結果で示す）。
 
@@ -70,10 +72,9 @@ requirement.md の AC-432-01〜17 を満たす。canonical モードで、Scope 
 
 ## exit / handoff
 
-- **完了**：AC-432-01〜17 を満たし、最終品質ゲートに通り、PR がマージできる状態。マージの後に統括の指示で `work finish`。
-- **I-6 への引き渡し**：題名と slug の規則を入れる場所（`canonical_scope_create` の `resolve_input_title_and_slug` の呼び出しと、`canonical_scope_change.edit_scope` の題名の確かめ）。
-- **I-9 への申し送り**：`scope move` の文書（`help`、参照の文書、使い方）、新しいコード（`SCOPE_IN_PROGRESS`、`CANONICAL_PROGRESS_MARK_FAILED`、`SCOPE_MOVE_INCOMPLETE`、`DESCENDANT_STATUS_UNKNOWN`）の Epic の12章と文書への追記、選択を持つworktreeの `worktree remove` には今と同じく `--discard-ignored` が要ること、`SCOPE_IN_PROGRESS` でエージェントが利用者に確かめる規則（統括の判断 Q1）、`work finish` が最大180秒待つこと、`worktree remove` がリンクだけなら `--discard-ignored` なしで消すこと。
-- **統括へ**：Epic の5章の `--save-timeout` の記述の直し（統括の判断 Q2）、Epic の12章への新しいコードの追記と、`CANONICAL_SAVE_UNCONFIRMED`（束を書いていないときの3）と `CANONICAL_SAVE_HELD`（待つ間に現れたときの6）の終了コードの違い、`scope delete` の順（バックアップ → 選択 → ディレクトリ → GitHub。やり直せるようにするため）、`--expect-current` の残る窓（Q3）。
+- **完了**：AC-432-01〜19 を満たし、最終品質ゲートに通り、PR がマージできる状態。マージの後に統括の指示で `work finish`。
+- **I-9 への申し送り**：`scope move` の文書（`help`、参照の文書、使い方。GitHub の親だけを付け替える）、新しいコード（`SCOPE_IN_PROGRESS`、`CANONICAL_PROGRESS_MARK_FAILED`、`CANONICAL_TITLE_IGNORED`、`DESCENDANT_STATUS_UNKNOWN`）の Epic の12章と文書への追記、選択を持つworktreeの `worktree remove` には今と同じく `--discard-ignored` が要ること、`SCOPE_IN_PROGRESS` でエージェントが利用者に確かめる規則（統括の判断 Q1）、`work finish` が最大180秒待つこと、`worktree remove` がリンクだけなら `--discard-ignored` なしで消すこと。
+- **統括へ**：Epic の6章の `--save-timeout` の記述の直し（統括の判断 Q2）、Epic の7章と I-5 の節の「`scope import github` の `--title` は `CANONICAL_NOT_APPLICABLE`」と統括の判断（2026-10-29、警告で進む）との違い、Epic の6章の「作成時に `discussions/rules.md` を置く」と配布資産（元の規則のファイルがない）との違い、Epic の12章への新しいコードの追記と、`CANONICAL_SAVE_UNCONFIRMED`（束を書いていないときの3）と `CANONICAL_SAVE_HELD`（待つ間に現れたときの6）の終了コードの違い、`scope delete` の順（バックアップ → 選択 → ディレクトリ → GitHub。やり直せるようにするため）、`--expect-current` の残る窓（Q3）。
 - 残るリスクは `report.md` に書く。
 
 ## 統括の判断（2026-10-26、Orca の `ask` の答え）
@@ -85,6 +86,23 @@ requirement.md の AC-432-01〜17 を満たす。canonical モードで、Scope 
 - **Q3 `--expect-current` の競合（I-4 の ST-3）**：`worktree remove` と `worktree bootstrap` は、従来の内側の関数（`_remove_captured_worktree`、`_bootstrap_captured_target`）を、canonical で取り込んで確かめた同じ記録で呼ぶ。`worktree create` と `installation` の `--expect-current` は、従来の処理を呼ぶ直前に記録を読み直して一致を確かめ、docstring を実際の保証に直し、残る狭い窓を `report.md` に書く。従来のコードは変えない。
 - **Q4 `worktree remove` とリンク**：無視されたものが正しいリンクだけなら、`--discard-ignored` なしで消す。ほかが1つでもあれば従来どおり求める。確かめから `git worktree remove` までの短い窓は、従来の `--discard-ignored` と同じ種類として `report.md` に書く。
 - **参考の2つ**：`scope delete` は、バックアップを GitHub への書き込みより先に行う。`scope import github` の `--title` は、印も `--slug` もないときの slug の材料にだけ使い、GitHub の題名は変えない。
+
+## 統括の判断（2026-10-29、方針の変更と再開）
+
+- **方針**：カタログは `<カタログ>/<区切り>/<ID>/` の平らな置き場。slug は廃止。ID、ディレクトリ名、既定のブランチ名は `<種類>-<番号5桁>`（5桁を超えたら桁が増える）。入力は0埋めしない形も受け付ける。題名は GitHub の題名だけを正とし、どの言語でもよい（再開の依頼）。
+- **`scope move`**：ディレクトリを動かさず、GitHub の親だけを付け替える。`--parent` は必須（再開の依頼）。
+- **I-6 の吸収**：題名の検査（空白を除いて空でない、制御文字を含まない、256文字以下）はこの Issue が入れる。canonical の `scope create` と `scope import github` は `--slug` を `CANONICAL_NOT_APPLICABLE` で拒む（再開の依頼）。
+- **`SCOPE_KIND_CHANGED`**：書くコマンドと `work start` は、この対象で止まる（I-14 の部品を使う）。`scope delete` だけは止めない（再開の依頼）。
+- **Q5 `scope import github` の `--title`**（2026-10-29、Orca の `ask` の答え）：共有の引数の解析は変えず、`--title` は必須のまま（版3の `--help` と振る舞いは変わらない）。canonical では値を使わず、GitHub の今の題名で進め、警告 `CANONICAL_TITLE_IGNORED`（`details` に渡された値と GitHub の題名、次の1手「題名を変えるなら `spec-dock scope edit`」）を返す。理由：題名は GitHub だけを正とする方針で、日本語の題名を一字一句そろえて打たせるのは負担が大きい。Epic の `design.md` 7章と `plan.md` の I-5 の「`--title` は `CANONICAL_NOT_APPLICABLE`」との違いは、報告書に書く（Epic の文書は統括が後で直す）。
+
+### 2026-10-26 の判断と新しい方針の食い違い（新しい方針を正とする）
+
+| 2026-10-26 の判断 | 食い違い | 今の扱い |
+|---|---|---|
+| 参考：`scope import github` の `--title` は slug の材料にだけ使う | slug がなくなった | Q5（値を使わず警告） |
+| Q4 などの記述の「入れ子の位置」 | 置き場が平らになった | 場所は `scope_relative(ID)` |
+| 文書のレビューの D-8（移動の後の `spec-dock/active/`）と D-19（入れ子のずれた子孫で止まる） | `scope move` がディレクトリを動かさず、子孫が1つの木にまとまらない | どちらも要らない。`scope delete` は子孫のそれぞれの `<区切り>/<ID>/` を写して消す |
+| Q1〜Q3 と `scope delete` の順 | なし | そのまま使う |
 
 ## 文書のレビューの指摘の対応（S0、2026-10-26）
 
