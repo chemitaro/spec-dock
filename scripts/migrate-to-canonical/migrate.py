@@ -1327,8 +1327,8 @@ class TreeFlattener:
             old_entry = result[index]
             result[index] = TreeEntry(old_entry.mode, old_entry.kind, written, old_entry.path)
         moved.update(zip(sources, result, strict=True))
-        found = list(problems.values())
-        return Flattened(result, found if strict else [], {} if strict else dropped, links, layout, moved)
+        # A strict caller stops on the problems; a history commit simply goes without those paths.
+        return Flattened(result, list(problems.values()), dropped, links, layout, moved)
 
 
 def flattened_links(source: Sequence[TreeEntry], flat: Flattened, prefix: str = SPEC_ROOT) -> LinkReport:
@@ -1389,7 +1389,7 @@ def rewrite_history(repo: Path, tip: str, flattener: TreeFlattener, scratch: Pat
             history.dropped_commits += 1
             for code, count in flat.dropped.items():
                 history.dropped[code] = history.dropped.get(code, 0) + count
-        for item in [*flat.layout.unmapped.values()]:
+        for item in flat.problems:
             examples = history.examples.setdefault(item["code"], [])
             if len(examples) < 5 and item["path"] not in examples:
                 examples.append(item["path"])
