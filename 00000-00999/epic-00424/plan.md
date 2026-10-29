@@ -4,7 +4,7 @@ ID: "epic-00424"
 タイトル: "Centralize Specs On Canonical Branch And GitHub Issues"
 関連GitHub: ["#424"]
 状態: "approved"
-最終更新: "2026-10-26"
+最終更新: "2026-10-29"
 依存: ["requirement.md", "design.md"]
 親: ["init-00423"]
 ---
@@ -19,7 +19,7 @@ ID: "epic-00424"
 
 `requirement.md` の受け入れ条件 AC-01〜AC-20 を満たす。具体的には、次の順に進める。
 
-1. 2つのモードを扱う SpecDock 0.3.0 を作る（I-1〜I-9、I-11）。
+1. 2つのモードを扱う SpecDock 0.3.0 を作る（I-1〜I-5、I-7〜I-9、I-11、I-14、I-15。I-6 は I-5 に移して閉じた）。
 2. spec-dock を canonical モードに切り替えて、3日間使う（I-10）。
 3. 利用者の残りの4つのリポジトリを、1回の作業で切り替える（I-12）。
 4. 従来モードのコードを撤去した 0.4.0 を出し、5つのリポジトリをそろえる（I-13）。
@@ -57,24 +57,27 @@ ID: "epic-00424"
 
 ### Issue の一覧
 
-| 番号 | 題名（作成時の英語の題名 / slug） | 担当する設計の章 | 依存 | Planning Level |
+| 番号 | 題名（作成時の英語の題名 / 従来モードの slug） | 担当する設計の章 | 依存 | Planning Level |
 |---|---|---|---|---|
 | I-1（`iss-00428`、#428） | Add Canonical Mode And GitHub Structure Snapshot / `canonical-mode-structure` | 1、2（構造のスナップショットを含む）、6章の I-1 の行 | なし | strict |
 | I-2（`iss-00429`、#429） | Add Canonical Catalog And Link / `canonical-catalog-link` | 3（登録と基準を除く。Git の版とマウントの確かめを含む）、4、9、6章の I-2 の行 | I-1 | strict |
 | I-3（`iss-00430`、#430） | Add Periodic Canonical Sync / `canonical-periodic-sync` | 5（launchd、systemd、常駐のプロセス、周期の手順7のスナップショットの更新）、3章の登録と基準と `canonical remove` | I-2 | strict |
 | I-4（`iss-00431`、#431） | Read Scopes From GitHub In Canonical Mode / `canonical-scope-read` | 6章の I-4 の行 | I-1、I-2 | standard |
-| I-5（`iss-00432`、#432） | Write Scopes To GitHub In Canonical Mode / `canonical-scope-write` | 6章の I-5 の行 | I-3、I-4 | strict |
-| I-6（`iss-00433`、#433） | Accept Japanese Titles In Canonical Mode / `canonical-japanese-titles` | 7 | I-5 | standard |
+| I-5（`iss-00432`、#432） | Write Scopes To GitHub In Canonical Mode / `canonical-scope-write` | 6章の I-5 の行、7章（I-6 から移した題名の検査） | I-3、I-4、I-14 | strict |
+| I-6（`iss-00433`、#433） | Accept Japanese Titles In Canonical Mode / `canonical-japanese-titles` | —（2026-10-29 に not planned で閉じた。中身は I-5 へ） | — | — |
 | I-7（`iss-00434`、#434） | Add Default Branch Spec Check And Workflow / `canonical-branch-check` | 8 | I-1 | standard |
 | I-8（`iss-00435`、#435） | Add Throwaway Canonical Migration Script / `canonical-migration-script` | 11 | I-1、I-2、I-7 | strict |
-| I-9（`iss-00436`、#436） | Integrate Agent Rules Docs And Release / `canonical-rules-docs-release` | 10、12、testability | I-3〜I-8、I-11 | standard |
+| I-9（`iss-00436`、#436） | Integrate Agent Rules Docs And Release / `canonical-rules-docs-release` | 10、12、testability | I-3〜I-5、I-7、I-8、I-11、I-15 | standard |
 | I-10（`iss-00437`、#437） | Migrate Spec Dock To Canonical Storage / `spec-dock-canonical-cutover` | 移行・互換性・rollback | I-9 | strict |
-| I-11（`iss-00438`、#438） | Regenerate Dashboard From Structure Snapshot / `canonical-dashboard` | 13 | I-3、I-4 | standard |
+| I-11（`iss-00438`、#438） | Regenerate Dashboard From Structure Snapshot / `canonical-dashboard` | 13 | I-3、I-4、I-14 | standard |
 | I-12（`iss-00439`、#439） | Migrate Remaining Repositories To Canonical Storage / `canonical-repositories-cutover` | 移行・互換性・rollback（各リポジトリの切り替え）、11 | I-10 | strict |
 | I-13（`iss-00440`、#440） | Remove Legacy Mode / `legacy-mode-removal` | 14 | I-12 | strict |
+| I-14（`iss-00455`、#455） | Flatten Canonical Catalog And Drop Slugs / `canonical-flat-ids` | 2（表し方、種類の付け替え、スナップショット、内容の置き場）、3章の `structure`、6章の `branch` と `workspace validate`、7（ID とブランチ名）、12章の `SCOPE_KIND_CHANGED` | なし（直す I-1、I-2、I-4 はマージ済み） | strict |
+| I-15（`iss-00456`、#456） | Flatten Specs In Canonical Migration Script / `canonical-migration-flatten` | 11（作った Issue の見つけ直し、平らにする写し、戻すときの入れ子と slug） | I-14 | strict |
 
 - 番号は足した順で、進める順は下の「進め方」の図のとおりである（I-11 は2026-10-25 に足した。I-9 より前に終える。I-12 と I-13 は、同じ日に、ほかのリポジトリの移行と撤去をこの Epic に入れたときに足した）。
-- 題名は、今の CLI が英数字しか受け付けないため、英語で作る（requirement.md の合意）。I-13 は、`0.4.0` の `.` を CLI が受け付けないため、`Remove Legacy Mode` で作った。
+- I-14 と I-15 は、2026-10-29 に、利用者が置き場を平らにし、slug を廃止すると決めたときに足した（マージ済みのコードの直し）。同じ日に、I-6 の中身（題名の検査）を I-5 に移し、I-6 を not planned で閉じた（`design.md` の「設計の判断」の最後の行）。
+- 題名は、今の CLI が英数字しか受け付けないため、英語で作る（requirement.md の合意）。spec-dock のリポジトリは、I-10 まで従来モードなので、表の slug は従来モードのディレクトリ名である。I-13 は、`0.4.0` の `.` を CLI が受け付けないため、`Remove Legacy Mode` で作った。
 - Scope は 2026-10-26 に作り、表の依存を `spec-dock dependency add` で登録した。各 Issue の要件・設計・計画は、実装担当が着手のときに、この計画書の節と `design.md` の担当の章から具体化する。
 - Planning Level は、失敗したときの影響と戻しにくさで選んだ。I-2、I-3、I-5 は利用者の仕様のファイルを書き、I-8、I-10、I-12 は GitHub に大量に書き、既定のブランチを変えるので strict にした。I-1 は、すべての Issue が使う構造のスナップショット（C10）と、次の Epic が読む形式を決めるので strict にした。I-13 は、多くのコードとテストを消し、共通の契約のテストを失う危険があるので strict にした。
 - I-10 と I-12 は、統括のエージェントが利用者の目の前で行う。ほかの Issue は、実装担当のエージェントが行う。
@@ -83,17 +86,23 @@ ID: "epic-00424"
 
 ```text
 I-1 ─┬─ I-2 ─┬─ I-3 ─┐
-     │       └─ I-4 ─┴─┬─ I-5 ── I-6 ─┐
-     │                 └─ I-11 ───────┤
-     ├─ I-7 ──────────────────────────┼─ I-9 ── I-10 ── I-12 ── I-13
-     └─ (I-2 と I-7 の後) I-8 ─────────┘
+     │       └─ I-4 ─┴─────────┬─ I-5 ───┐
+     │                         ├─ I-11 ──┤
+     │   I-14 ─────────────────┼─────────┤   （I-14 は依存なし。I-5、I-11、I-15 が待つ）
+     │                         └─ I-15 ──┤
+     ├─ I-7 ─────────────────────────────┼─ I-9 ── I-10 ── I-12 ── I-13
+     └─ (I-2 と I-7 の後) I-8 ────────────┘
 ```
+
+- 図の I-5、I-11、I-15 は、I-14 の後に始める（表の依存）。I-1〜I-4、I-7、I-8 は 2026-10-29 の時点でマージ済みである。
 
 - I-1 の後は、I-2 と I-7 を並べて進めてよい。I-2 の後は、I-3 と I-4 を並べてよい。
 - I-8 は、canonical の中身（C5、I-2）と、検査のワークフローと版のファイル（C7、I-7）を使うので、両方の後に始める。
-- I-5 は、カタログの排他と変更の束（I-2）、同期の状態と、すぐの実行の頼み方（I-3）、読む側の部品（I-4）を使う。
-- I-11 は、周期の手順7（I-3）と、着手の判定の部品（I-4）を使うので、両方の後に始める。I-5 と並べて進めてよい。
-- I-9 は、I-3〜I-8 と I-11 のすべての後に始める。
+- I-14 は、マージ済みの I-1、I-2、I-4 のコードを、平らな置き場と `<種類>-<番号5桁>` の ID に直す。止まっている I-5 と I-11 の再開の前提なので、最初に進める。
+- I-15 は、I-14 の ID の規則と種類の判定の定数を写して使うので、I-14 の後に始める。`scripts/` だけを変えるので、I-5 と I-11 と並べてよい。I-10 の前に終える。
+- I-5 は、カタログの排他と変更の束（I-2）、同期の状態と、すぐの実行の頼み方（I-3）、読む側の部品（I-4）、平らな置き場と `SCOPE_KIND_CHANGED` の判定（I-14）を使う。
+- I-11 は、周期の手順7（I-3）と、着手の判定の部品（I-4）と、`slug` を外したスナップショット（I-14）を使う。I-5 と並べて進めてよい。
+- I-9 は、I-3〜I-5、I-7、I-8、I-11、I-14、I-15 のすべての後に始める。
 - I-9 で全体をつないで確かめ、版を 0.3.0 にする。I-10 は、0.3.0 を利用者の環境に入れた後に行う。
 - I-12 の準備（各リポジトリの 0.3.0 の配布資産、登録、照合、予行演習）は、I-10 の切り替えのPRのマージの後に始め、I-10 の3日間の運用と並べて進めてよい。本番の切り替えは、3日間の運用の後に行う。
 - I-13 は、I-12 の後の3日間の運用で、戻す必要がないことを利用者が確かめた後に始める。
@@ -104,19 +113,19 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 
 | 契約 | 持ち主 | 使う側 | `design.md` |
 |---|---|---|---|
-| C1 構造の表し方（種類のラベル、本文の slug の印、ID の作り方）と `StructureSnapshot`、`ScopeNode`、GitHub の呼び出しの部品 | I-1 | I-4、I-5、I-6、I-8 | 2章 |
+| C1 構造の表し方（種類のラベル、ID の作り方 `<種類>-<番号5桁>`、種類の付け替えの判定 `SCOPE_KIND_CHANGED`）と `StructureSnapshot`、`ScopeNode`、GitHub の呼び出しの部品 | I-1（slug の印を外し、付け替えの判定を足すのは I-14） | I-4、I-5、I-8、I-11、I-15 | 2章 |
 | C2 宣言の版4とモードの判定、`dispatch()` の振り分けの入口、`resolve_context` より前に呼ぶ表 `REPOSITORY_INDEPENDENT_HANDLERS`（I-13 で、版4だけの判定に変える） | I-1 | すべて | 1章、14章 |
-| C3 カタログとリンクの場所、正しいリンクの判定、無視の3行、`CANONICAL_NOT_LINKED`（コードの定数は I-1 が置き、I-2 が使う）、名前で Scope を探す `catalog_tree` | I-2 | I-3、I-4、I-5、I-8 | 2章、3章 |
+| C3 カタログとリンクの場所、正しいリンクの判定、無視の3行、`CANONICAL_NOT_LINKED`（コードの定数は I-1 が置き、I-2 が使う）、カタログの直下の `<ID>/` を求める `catalog_tree`（平らにするのは I-14） | I-2 | I-3、I-4、I-5、I-8、I-15 | 2章、3章 |
 | C4 カタログの排他と、変更の束の形式（`origin` を含む） | I-2 | I-3（読む）、I-5（書く） | 4章 |
 | C5 canonical の中身（形式1の管理ファイル） | I-2 | I-3、I-8 | 5章 |
 | C6 カタログに対する Git の呼び出しの関数（フックと署名を外す） | I-2 | I-3、I-5 | 5章 |
 | C7 版のファイルと、検査のワークフローの見本、`specdock-ci-check.sh` | I-7 | I-8（`cut`）、I-9、I-10、I-12、I-13（0.4.0） | 8章 |
 | C8 エラーのコードと次の1手、結果の状態の規則 | 各コマンドの持ち主 | I-9（一覧の確認） | 12章 |
 | C9 状態の置き場（根、登録簿、`state.json` の形式と意味、基準）と、すぐの実行の頼み方（launchd、systemd、常駐のプロセス） | I-3（根の求め方 `resolve_state_root` は I-1） | I-2（`status` の同期の項目は I-3 が足す）、I-5（`work finish`）、I-11（`dashboard` の項目） | 5章 |
-| C10 構造のスナップショット（置き場、`snapshot.json` と `probe.json` の版1の形式、`ensure_fresh` と3つの新しさの段階、書き込みの反映、書けないときのメモリーの上の扱い） | I-1（`created_at` と `closed_at` は I-11 が足す） | I-3（周期の手順7）、I-4、I-5、I-11、HTML のダッシュボードの Epic（epic-00427） | 2章 |
+| C10 構造のスナップショット（置き場、`snapshot.json` と `probe.json` の版1の形式、`ensure_fresh` と3つの新しさの段階、書き込みの反映、書けないときのメモリーの上の扱い） | I-1（`created_at` と `closed_at` は I-11 が足し、`slug` は I-14 が外す） | I-3（周期の手順7）、I-4、I-5、I-11、HTML のダッシュボードの Epic（epic-00427） | 2章 |
 | C11 環境の判定（OS、コンテナ、git の版、systemd のユーザー、linger）と、その注入の仕方 | I-2（systemd と linger は I-3 が足す） | I-3、I-9 | 3章、5章 |
 
-- I-8 の移行のスクリプトは、パッケージを読み込まない1つのファイルなので、C1、C3（無視の3行）、C5、C7 の値を写して持つ。写した値が同じであることを、I-8 のテストで、パッケージの定数と比べて確かめる。
+- I-8 の移行のスクリプトは、パッケージを読み込まない1つのファイルなので、C1（ID の正規表現と種類のラベル）、C3（無視の3行）、C5、C7 の値を写して持つ。slug の印の写しは I-15 が消す。写した値が同じであることを、I-8 と I-15 のテストで、パッケージの定数と比べて確かめる。
 
 ## 実装step
 
@@ -200,7 +209,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 偽の `gh` と一時のカタログで、各コマンドが GitHub の題名と状態と、ディレクトリの場所と、スナップショットの取得の時刻を示す（R-E4）。
   - 構造が変わっていないとき、`scope show` と `scope list` を続けて実行しても、304 の確かめのほかに GitHub への要求を送らない（AC-16 の一部）。GitHub につながらないときは、古いスナップショットで示し、`GITHUB_SNAPSHOT_STALE` を警告に入れる。
   - 作業用のworktreeで、`active set` の後の `spec-dock/active/` のリンクが、その Scope のディレクトリを開く。
-  - `workspace validate` が、6章の検査の項目をすべて見つける。入れ子のずれは警告で、`scope move <ID>` を次の1手に示す。
+  - `workspace validate` が、6章の検査の項目をすべて見つける（2026-10-29 の方針の変更の前の項目。入れ子のずれと slug の照合は、I-14 が2章の4つの異常に直す）。
   - `workspace validate --ci`、`workspace sync --source local`、`workbench copy`、カタログを対象にした `worktree remove` は、案内付きで止まる。
   - 読むだけのコマンドは、何も書かない（カタログと `.git` の変化がないことを確かめる）。
 - **I-1 から引き継ぐ直し**（I-1 の最終品質ゲートの指摘。I-1 の `report.md` の「Residual Risks / Follow-ups」）：
@@ -208,33 +217,37 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - `infra/github_structure.py` の `_rate_limit_wait(...) or 60.0` が待ち時間0を60秒にするので、`is None` で比べるように直し、テストを足す。
   - `tests/unit/infra/test_github_snapshot.py` の `test_a_failed_second_file_write_keeps_one_reflection_in_memory` は、2つ目のファイルの書き込みの失敗の経路を通っていない。`commit_refresh` で `probe.json` の書き込みを失敗させ、メモリーの値、`persisted=False`、`local_writes` が1回だけであることを確かめるテストに直す。
   - そのほかの P3 の指摘は、I-1 の `report.md` に一覧がある。触れるコードにあるものは、直してよい（C1 と C10 の公開の形は変えない）。
-- **I-2 から引き継ぐもの**（I-2 の統括の判断）：canonical モードの `worktree create --expect-current` の選択の解決（I-2 の時点では `CANONICAL_NOT_IMPLEMENTED`）。`canonical status` の `structure` の項目と `--structure`（`display` の新しさでスナップショットを確かめ、入れ子と GitHub の親子のずれを示す）。
+- **I-2 から引き継ぐもの**（I-2 の統括の判断）：canonical モードの `worktree create --expect-current` の選択の解決（I-2 の時点では `CANONICAL_NOT_IMPLEMENTED`）。`canonical status` の `structure` の項目と `--structure`（`display` の新しさでスナップショットを確かめ、Scope のディレクトリと GitHub の対応の異常を示す。中身を平らな置き場に合わせるのは I-14）。
 
 ### I-5 Write Scopes To GitHub In Canonical Mode
 
-- **価値**：canonical モードで、Scope の作成、取り込み、題名の変更、親の変更、完了、削除、依存の変更、Artifact の作成、作業の開始と終了ができる。
-- **作るもの**（`design.md` 6章の I-5 の行）：`scope create`、`scope import github`、`scope edit`、`scope move`（新設）、`scope close`、`scope reopen`、`scope delete`、`dependency add`、`dependency remove`、`artifact create`、`artifact import file`、`work start`（作業中の印と、移行前の基点の拒否）、`work finish`（保存の確認）。作成時に、前付けの `タイトル:` と `親:` の行を除く。
+- **価値**：canonical モードで、Scope の作成、取り込み、題名の変更、親の変更、完了、削除、依存の変更、Artifact の作成、作業の開始と終了ができる。日本語の題名だけで Scope を作れる（I-6 から移した）。
+- **作るもの**（`design.md` 6章の I-5 の行と7章）：`scope create`、`scope import github`、`scope edit`、`scope move`（新設。GitHub の親だけを付け替え、`--parent` は必須）、`scope close`、`scope reopen`、`scope delete`、`dependency add`、`dependency remove`、`artifact create`、`artifact import file`、`work start`（作業中の印、移行前の基点の拒否、既定のブランチ名 `<ID>`）、`work finish`（保存の確認）。作成時に、前付けの `タイトル:` と `親:` の行を除き、「詳細:」の相対リンクと `artifacts/rules.md`、`discussions/rules.md` を `<カタログ>/<ID>/` からの深さで作る。題名の検査（7章。空でない、制御文字を含まない、256文字以下、どの言語でもよい）を、canonical モードの `scope create`、`scope import github`、`scope edit` に入れる。
 - **受け入れ**：
-  - 偽の `gh` で、各コマンドが `design.md` の順に GitHub に書き、カタログには排他の中で書いて変更の束を残す。
+  - 偽の `gh` で、各コマンドが `design.md` の順に GitHub に書き、カタログには排他の中で書いて変更の束を残す。Scope のディレクトリは、種類と親を問わず `<カタログ>/<ID>/` に作る。Issue の本文には何も書かない。
   - 書く前に `ensure_fresh(decision)` で確かめ、判断に使う Issue を読み直す。GitHub につながらなければ、書く前に止まる。書いた結果は、すぐにスナップショットに反映され、次の `scope show` が取り直しなしで示す（AC-16 の一部）。
   - Issue を作った後に失敗したとき、`partial`（終了コード6）と `scope import` の案内を返し、`scope import` で完了できる。
-  - `work finish` は、未保存の変更があるとき、保存と push を待つ。確かめられないと、Issue を閉じずに `partial` で止まる。Scope の下に保留があれば、`CANONICAL_SAVE_HELD` で止まる。他のクローンの push を取り込んだだけで自分が push しなかった場合も、確かめられて閉じる（AC-13）。
+  - 日本語の題名だけで作った Scope のディレクトリが `<カタログ>/<ID>/`、`work start` の既定のブランチ名が `<ID>` で、`scope show` と `workspace sync` に日本語の題名が出る（AC-09）。canonical モードの `scope create` と `scope import github` の `--slug`、`scope import github` の `--title` は、`CANONICAL_NOT_APPLICABLE` で止まる。従来モードの題名と slug の規則は変わらない。
+  - `scope move <ID> --parent <親>` は、GitHub の親だけを付け替え、カタログに書かない。`--parent` がなければ使い方の誤りで止まる。
+  - `scope delete` は、子孫も消すとき、子孫のそれぞれの `<ID>/` を写してから消す。途中で止まった後の再実行で、一部が消えた状態から続けられる。
+  - `design.md` 2章の「止めるもの」の書くコマンドと `work start`、`work finish` は、関わる Scope に `SCOPE_KIND_CHANGED` があるとき、書く前に終了コード3で止まる（判定の部品は I-14）。`scope delete` だけは止まらず、今の ID で、同じ番号の古い種類のディレクトリを写してから消す。
+  - `work finish` は、未保存の変更があるとき、保存と push を待つ。確かめられないと、Issue を閉じずに `partial` で止まる。Scope の下に保留があれば、`CANONICAL_SAVE_HELD` で止まる。他のクローンの push を取り込んだだけで自分が push しなかった場合も、確かめられて閉じる（AC-13）。Epic と Initiative では、子孫のそれぞれの `<ID>/` を見る（平らなので、1つの木の下にまとまっていない）。
   - 依存の追加は、循環になるときに書く前に止まる。
   - 基点のツリーに `spec-dock/initiatives` がある `work start` は、`CANONICAL_BASE_HAS_SPECS` で止まる。
-  - `scope import github` は、印のない既にある Issue に、本文の `PATCH` で slug の印を足す（`GithubStructureClient.update_issue` に `body` を足す。`design.md` 2章の「書く」表）。印がすでにあれば本文を書かない。
   - スナップショットにない番号に当たる変更の反映は、当てずに飛ばし、コマンドを失敗にせずに `GITHUB_SNAPSHOT_STALE` を警告に入れ、次の `ensure_fresh` が取り直す（`design.md` 2章の「書き込みの反映」）。
   - `scope close` と `scope reopen` の結果が分からないときの読み直しが、`state_reason` も比べる。
   - canonical の `work start` は、選択を記録して `StartLock` を放した後に、I-2 の `link_after_command` を呼ぶ。リンクの失敗は `work start` の結果を変えず、警告で返す（`design.md` 3章「SpecDock のほかのコマンドから」）。
 - **I-4 から引き継ぐもの**（2026-10-26 の統括の判断。I-4 の `report.md`）：ブランチの操作が失敗した後の再観察を、従来の `branch_operations` の形にそろえる。`--expect-current` の確かめと従来の処理の取り込みの間の競合を直す。canonical の `worktree remove` が、正しいリンク（`spec-dock/initiatives`）を無視されたファイルとして数え、いつも `--discard-ignored` を要するので、SpecDock が置いたリンクは数えないように直す。
+- **2026-10-29 の方針の変更で、止まっている作業から変えること**（worktree `iss-00432-canonical-scope-write` を読んで洗い出した。コミット2つ（`1490d3834` 文書、`d44047b78` S1）と、S2〜S5 の未コミットの変更がある）：
+  - 要らなくなる：`canonical_scope_create.py` の slug の印の付け足しと読み取り、`SLUG_MARKER_MISSING` の判定、印や `--slug` やディレクトリの slug の食い違いで止まる条件、取り込みの手順 `github.issue.body`（印を足す本文の `PATCH`）、`resolve_input_title_and_slug` で slug を作る処理、作り直しの案内の `--slug`、`update_issue` の `body`（使い道が印だけだった）。`scope move` のディレクトリの移動（`move_directory`、`_follow_moved_selections`、`--parent` なしの使い方、警告 `SCOPE_MOVE_INCOMPLETE`）と、`infra/canonical_scaffold.move_directory` とそのテスト。`_publish` が `SCOPE_NESTING`（`epics/`、`issues/`）で置き場を決める処理。`scope delete` の「入れ子のずれた子孫で止まる」条件。Issue の文書の、slug、ディレクトリの移動、入れ子の節。
+  - 変わる：`scope create` と `scope import github` の置き場（`<カタログ>/<ID>/`）と引数（上の受け入れ）、作成の失敗の案内（`scope import github <種類> <番号> [--parent …]`）、`scope delete --recursive`（子孫を1つずつ写して消す）、`scope move` の `HELP_EFFECTS` と Writes の文（ディレクトリを移すことを書かない）、`work finish` の子孫の確かめ、テンプレートの相対リンクの深さ。
+  - 足す：`SCOPE_KIND_CHANGED` での停止（I-14 の部品を使う）、子が付け替えの異常で ID を決められないときに、子孫の状態を不明として扱うこと、I-6 から移した題名の検査。
+  - そのまま使える：S1 の `apply_changes_lenient`、`reflect_writes`、`state_reason` の比べ方、`canonical_writes.py`（書く側の共通の部品）、`require_writable_format`、`assemble_canonical_scopes`、`strip_structure_front_matter`、`copy_scope_template_at`、`edit`、`close`、`reopen`、`delete` のバックアップと GitHub への書き込みの順、dispatch への登録。
+- **止まっている作業の再開のしかた**：I-14 のマージを待つ。再開の前に、未コミットの変更を、その worktree で WIP のコミットにして残す。main を取り込み（`canonical_structure.py`、`fake_github.py`、`canonical_scopes.py` で衝突する見込み。この Epic の文書の PR で、`iss-00432` の `.meta.json` の依存に I-14 を足したので、そこも衝突しうる。main の側を取る）、上の「要らなくなる」ものを捨て、「変わる」と「足す」ものを入れてから、S6 以降に進む。Issue の `requirement.md`、`design.md`、`plan.md` も、先に新しい方針に直す。
 
 ### I-6 Accept Japanese Titles In Canonical Mode
 
-- **価値**：日本語の題名で Scope を作れる。識別は英語の slug のまま。
-- **作るもの**：`design.md` 7章の題名と slug の規則を、canonical モードの `scope create` と `scope import` と `scope edit` に入れる。
-- **受け入れ**：
-  - 日本語の題名と `--slug` で作った Scope のディレクトリとブランチが英語で、`scope show` と `workspace sync` に日本語の題名が出る（AC-09）。
-  - 日本語の題名で `--slug` がないときは、`SLUG_REQUIRED` で止まる。
-  - 従来モードの題名の規則は変わらない。
+- **2026-10-29 に not planned で閉じた**。slug の廃止で、中身が「題名の検査」だけになり、それを作るコマンド（`scope create`、`scope import github`、`scope edit`）は I-5 が作るので、I-5 に移した（統括の判断。理由は Issue の `report.md` にも書いた）。AC-09 は I-5 で確かめる。
 
 ### I-7 Add Default Branch Spec Check And Workflow
 
@@ -265,6 +278,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 写した値（C1、C3 の無視の3行、C5、C7）が、パッケージの定数と同じ。
 - **I-7 から引き継ぐもの**（2026-10-26 の統括の判断）：`canonical check` の調べること4を、`writer_protocol` が `specdock.worktree-writer/v1` であることの確かめに直す（`design.md` 8章。I-7 は古い `specdock.writer/v1` も「既知の値」として通している）。版4の宣言で `specdock.writer/v1` のとき、失敗の1件（パスと次の1手付き）になるテストを足す。`migrate.py` が書く版4の宣言も、この値にする。
 - **注意**：本物の GitHub への書き込みと、本物のリポジトリへの書き込みは、この Issue では行わない。
+- **2026-10-29 の方針の変更**：slug の印の登録と照合、入れ子のままの写し（`rename_path`）、印での見つけ直し、`export-legacy` の入れ子の照らし合わせは、I-15 が平らな置き場に合わせて直す。
 
 ### I-9 Integrate Agent Rules Docs And Release
 
@@ -275,6 +289,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - エラーのコードと次の1手の一覧（12章）が、実装と一致するかを確かめる。
   - 版4で、53のすべてのコマンドが、canonical の処理か案内付きの拒否で動き、`CANONICAL_NOT_IMPLEMENTED` が残っていないことを確かめるテスト（G7）。
   - 横断のシナリオのテスト：2つのクローンと偽の `gh` で、`link` → `scope create` → 編集 → `sync` → 別のクローンで見える → `work start` → `work finish` までを通す。
+  - 平らな置き場と ID（2026-10-29 の方針の変更）を、規則の節（10章）、使い方の文書、`reference_cli.md`、`help` に書く：Scope のディレクトリは `spec-dock/initiatives/<ID>/`、親と子は `scope show <ID> --json` で確かめること、既定のブランチ名は `<ID>`、canonical モードに `--slug` がないこと、`SCOPE_KIND_CHANGED` とその次の1手、`scope move` は GitHub の親だけを付け替えること。
   - spec-dock の利用側の配布資産を、`installation update` で 0.3.0 に上げる（従来モードのまま）。
   - 版を 0.3.0 にする（`pyproject.toml` と版のファイル）。
   - **I-7 から引き継ぐもの**（2026-10-26 の統括の判断）：配布する `spec-dock/docs/cli-redesign-guide.html` のコマンドの一覧（「全44コマンド」と C01〜C44 の表）に、`canonical` のコマンドを足す。使い方の文書に、検査のワークフローの見本は 0.3.0 以降で使うこと（版のタグは 0.3.0 から作るので、0.2.4 の版のファイルのままでは `pipx install` が失敗する）を書く。マージの後に、`release-tag.yml` が `v0.3.0` を作ったことを確かめ、報告書に書く（タグを作らない側は、#444 のマージの後の本物の run で確かめた。判定は `version-unchanged`、タグの作成は skipped）。
@@ -296,12 +311,12 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **手順**（`design.md`「移行・互換性・rollback」の「各リポジトリの切り替え」）：
   1. `migrate.py plan` の結果を確かめ、異常の扱い（ローカルの Scope の置き換えなど）を決めて記録する。
   2. `register --apply` と `verify` を行う。この間、今の運用は止めない。
-  3. 予行演習（`design.md` 11章）を通し、結果を報告書に書く。
+  3. 予行演習（`design.md` 11章）を通し、結果を報告書に書く。`plan` と `build-canonical` が示す、平らにする写しで書き換えられないリンクが0件であることを確かめる（I-15）。
   4. 切り替えを始めることを利用者に知らせ、ほかのエージェントで仕様を編集しないようにしてもらう（凍結）。凍結の後に、`register --apply` と `verify` をもう一度行う。
   5. `build-canonical --apply` と `cut --apply` で、canonical を push し、既定のブランチから仕様を外すブランチを作る。そのブランチに、`ci.yml` の `validate --ci` の手順を外すコミットを足し、PRを作る。PRには、`spec-dock-check.yml` の追加、`ci.yml` の手順の削除、宣言の版4が入る。
   6. PRの検査が通ったことを確かめ、マージできる状態で止める。人がマージする。
   7. mainのチェックアウトで既定のブランチを取り込み、`move-local` で無視されたファイル（`.workbench` の99個など）をカタログへ移し、`spec-dock canonical link` を実行する。示されたツールの1行を利用者に伝える。定期の同期が動いていることを `canonical status` で確かめる。最初の周期で、mainのチェックアウトの古いダッシュボード（2026-09-21 のもの）が、日本語の題名の新しいものに置き換わることを確かめる（AC-17）。
-  8. 各作業用のworktreeで、`adopt-worktree` と `move-local` を行い、既定のブランチを取り込んでから、`spec-dock canonical link` を実行する。`adopt-worktree` が示した構造の違いは、SpecDock のコマンドで登録し直す。
+  8. 各作業用のworktreeで、`adopt-worktree` と `move-local` を行い、既定のブランチを取り込んでから、`spec-dock canonical link` を実行する。`adopt-worktree` が示した構造の違いは、SpecDock のコマンドで登録し直す。移行前に作った `<ID>-<slug>` のブランチは、名前を変えずにそのまま使える（`design.md` 7章）。
   9. 切り替えの終わりを利用者に知らせ、凍結を解く。3日間の運用に入る。
 - **受け入れ**：AC-01、AC-04、AC-05、AC-12（実際の GitHub でのPRの検査）、AC-16 と AC-17（実際の GitHub で）、AC-19 の spec-dock の分を確かめる。切り替えの後、3日間の通常の運用で、仕様の失われがなく、`canonical status` に未解決の異常がない。この3日間の結果が、I-12 の本番を始める条件になる。
 - **ついでに確かめること**：`register --apply` で親子と依存を登録するとき、登録の前後で、その Issue の `updated_at` と、変わったかの確かめの応答（304 か 200 か）を記録する。親子と依存の変更で更新の時刻が変わるなら、`design.md` の「未確認の事項」から外し、30分ごとの取り直しを見直す提案を、この Epic の報告書に書く。
@@ -323,6 +338,10 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 構造が変わらない次の周期では、5つのファイルを書かない（更新の時刻が変わらない）。題名を変えた後の周期では書き直す（AC-17）。
   - 書く場所にディレクトリかシンボリックリンクがあると、そのファイルを書かずに `dashboard.error` に記録する。作業用のworktreeには書かない。従来モードでは作らない。
 - **注意**：描く関数は、従来モードからは呼ばれていない。直すときも、出力の形を変えてはならない。
+- **2026-10-29 の方針の変更**（worktree `iss-00438-canonical-dashboard` を読んで確かめた。コミット3つ、最後は `c9ebdf34b`、push 済み、未コミットなし、S0〜S4 まで）：ダッシュボードの部品は、slug にもディレクトリにも頼っていない（親子はスナップショットの `parent` から作る）ので、要らなくなる実装はない。変わるのは次の2つで、足すものはない。
+  - `ScopeNode` と `_NODE_KEYS` への `created_at` と `closed_at` の追加が、I-14 の `slug` の削除と衝突する。I-14 のマージの後に main を取り込んで解き、テストの偽の `gh` の `scope(slug=…)` の引数を外す。
+  - 印のない、種類のラベルの付いた Issue も ID を持つようになり、ダッシュボードに出る。見本との比べ合わせの期待値は変わらない。種類のラベルの付け替えは、ダッシュボードでは GitHub の今の種類と ID で示す（`SCOPE_KIND_CHANGED` は、カタログを見る `workspace validate` と `canonical status --structure` が示す）。
+- **止まっている作業の再開のしかた**：I-14 のマージを待ち、main を取り込んで上の衝突を解き、S5（`make lint` と全テスト）から再開する。
 
 ### I-12 Migrate Remaining Repositories To Canonical Storage
 
@@ -333,7 +352,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   1. 各リポジトリで、`spec-dock installation update` で配布資産を 0.3.0 に上げ、同じPRで、今のCIが入れる SpecDock の固定の版をタグ `v0.3.0` に上げる（`design.md` 11章）。PRの検査が通ったことを確かめ、人がマージする（従来モードのまま）。
   2. 各リポジトリで `migrate.py plan --project <mainのチェックアウト>` を実行し、異常、SpecDock を呼ぶCIの手順、作業用のworktreeとその仕様の変更を確かめ、異常の扱いを決めて報告書に書く。
   3. 各リポジトリで `register --apply` と `verify` を行う（4つで合わせて数時間の見込み。spec-dock の約620回で1.5時間が目安）。
-  4. 各リポジトリで、予行演習（`design.md` 11章）を通し、結果を報告書に書く。taikyohiyou_project の `resolve_staging_route.py` と `Makefile` の `spec-close` が、切り替えの後も動くことを、予行演習のクローンで確かめる。
+  4. 各リポジトリで、予行演習（`design.md` 11章）を通し、結果を報告書に書く。平らにする写しで書き換えられないリンクが0件であることを確かめる（I-15）。taikyohiyou_project の `resolve_staging_route.py` と `Makefile` の `spec-close` が、切り替えの後も動くことを、予行演習のクローンで確かめる。
 - **本番**（I-10 の3日間の運用で問題がなかった後。1回の作業）：
   1. 4つのリポジトリの凍結を、利用者に頼む。凍結の後に、各リポジトリで `plan`、`register --apply`、`verify` をもう一度行う。
   2. 1つずつ順に、`design.md` の「各リポジトリの切り替え」の手順3〜7を行う。切り替えのブランチには、`plan` が示した今のCIの SpecDock の手順を外すコミットを足し、PRを作る。PRの検査（そのリポジトリの既存のCIと、新しい検査のワークフロー）が通ったことを確かめ、人がマージする。
@@ -355,6 +374,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 14章の「消すもの」1〜6（モードの振り分けと従来の処理、版3の受け付け、拒否するだけのコマンドと引数、テンプレートの前付けの2行、従来モードの文書、移行のスクリプトと `specdock-ci-validate.sh`）。消すものは、`dispatch()` から到達できるかで決める。
   - 版3の宣言で、すべてのコマンドが `CANONICAL_NOT_MIGRATED`（0.4.0 の次の1手）で止まるテスト。G7 のテストを、51のコマンドで canonical の処理だけで動く形にする。
   - `cli/catalog.py` のコマンドの一覧と数（51）、文書の中身のテストの更新。
+  - 平らな置き場に合わせて、テンプレートの「詳細:」の相対リンクの深さを `<ID>/` の深さに直し、作成時に書き換える処理を消す。`epics/rules.md` と `issues/rules.md` を作る配布資産、`--slug` の引数、`domain/ids.py` の slug の規則（`INPUT_SLUG_KEBAB_RE`、`validate_slug`、英数字だけの題名の規則）など、従来モードだけが使う名前の規則を消す（2026-10-29 の方針の変更）。
   - 版を 0.4.0 にする（`pyproject.toml` と版のファイル）。spec-dock の利用側の配布資産を、`installation update` で 0.4.0 に上げる。
 - **受け入れ**：
   - AC-20 のうち、パッケージについての部分。14章の「消すもの」が残っていない（コードの検索と、版3の宣言のテスト）。テストの分類の一覧で、(b) のすべてに対応する canonical のテストがある。`make lint` と `uv run pytest` が通る。
@@ -364,10 +384,72 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **I-7 から引き継ぐもの**：`infra/commit_tree.py` と `infra/committed_validation.py` の `ls-tree` の解析の重複を、1つにする（I-7 は、従来の処理を変えない決まりのため、重ねて持った）。
 - **注意**：共通の契約（R-J7）のテストを、対応を示さずに消してはならない。消すかどうかに迷うテストは、一覧に理由を書いて残し、統括のエージェントに確かめる。
 
+### I-14 Flatten Canonical Catalog And Drop Slugs
+
+- **価値**：マージ済みの canonical モードのコードが、平らな置き場と `<種類>-<番号5桁>` の ID で動く。止まっている I-5 と I-11 を再開できる。2026-10-29 の方針の変更（`design.md` の「設計の判断」の最後の行）で足した。
+- **担当する設計**：2章（表し方の「番号・ID」、種類の決め方と付け替え、スナップショットの `slug` と本文、内容の置き場）、3章の `canonical status` の `structure`、6章の `branch` と `workspace validate`、7章の ID とブランチ名、12章の `SCOPE_KIND_CHANGED`。
+- **作るもの**（2026-10-29 に、マージ済みのコードを読んで洗い出した。パスは `src/spec_dock/runtime/` から）：
+
+| ファイル | 関数・定数 | 直し |
+|---|---|---|
+| `domain/canonical_structure.py` | `SLUG_MARKER_MISSING`、`SLUG_MARKER_MULTIPLE`、`SLUG_MARKER_INVALID`、`_MARKER_LINE`、`_MARKER_MESSAGES`、`SlugMarker`、`read_slug_marker`、`format_slug_marker`、`append_slug_marker` | 消す。`FACT_ANOMALY_CODES` は `KIND_LABEL_MULTIPLE` だけになる |
+| 同上 | `_node_from_facts` | ID を、種類のラベルと番号だけで決める（印がないと `id` を null にする今の動きをやめる） |
+| 同上 | `ScopeNode.slug`、`_NODE_KEYS`、`_node_json`、`_node_from_json`、`IssueFacts.body` | `slug` と本文を外す。`SNAPSHOT_VERSION` は1のまま。`slug` を持つ古いファイルは、鍵の集合が違うので取り直しになる（今の仕組みのまま） |
+| 同上（または `domain/` の新しい1か所） | 種類の付け替えの判定 | カタログの直下の `<ID>/` の名前と、スナップショットの同じ番号の種類を比べて `SCOPE_KIND_CHANGED` を返す部品。I-5 の書くコマンドと `work start` が使えるように、1か所に置く |
+| `domain/ids.py` | ID の正規表現 | canonical の ID の検査に、2章の正規表現（5桁は0で埋め、6桁以上は先頭が0でない）を使う。`format_id` は今のまま |
+| `infra/github_structure.py` | `FULL_READ_QUERY`、`_facts_from_rest` | 本文（`body`）を読まない |
+| `infra/catalog_tree.py` | `SCOPE_DIRECTORY_NAME`、`CatalogTree._walk`、`find`、`require`、`ScopeDirectoryAmbiguous`、`duplicates` | 直下の `<ID>/` を直接求める。入れ子をたどって `<ID>-<slug>` を探す処理と、重複の扱いを消す。ID の形で始まるのに名前が ID でないもの、直下でないものを、置き場の外れとして返す。`INPUT_SLUG_KEBAB_RE` を使わない |
+| `application/canonical_scopes.py` | `SCOPE_NESTING`、`build_views` の中の `relative()`、`load_canonical_scopes`、`CanonicalScopes.require_directory`、`directory` | `SCOPE_NESTING` と入れ子のパスの組み立てを消し、いつも `LINK_RELATIVE / <ID>` にする。付け替えの異常の Scope で止まる経路を足す |
+| `application/canonical_workspace.py` | `SCOPE_DIRECTORY_SLUG_MISMATCH`、`SCOPE_DIRECTORY_DUPLICATE`、`SCOPE_DIRECTORY_MISPLACED`、`misplaced_scopes`、`inspect_canonical_structure`、`structure_item` | slug の照合と重複を消し、2章の4つの異常（`SCOPE_DIRECTORY_MISSING`、`SCOPE_ISSUE_MISSING`、`SCOPE_KIND_CHANGED`、`SCOPE_DIRECTORY_MISPLACED`）にする。同じ番号で MISSING と ISSUE_MISSING を重ねない |
+| `application/canonical_status.py` | `_structure_item` と説明の文 | 「入れ子のずれ」を、上の異常に直す |
+| `application/canonical_branches.py` | `branch_operation`（既定のブランチ名 `f"{target.id}-{slug}"`）とモジュールの説明 | 既定のブランチ名を `<ID>` にする。`SCOPE_KIND_CHANGED` の対象では止まる |
+| `domain/canonical_content.py` | `CANONICAL_FORMAT` | 1のまま（まだ作られたカタログがない）。変えないことを確かめるだけ |
+
+  テスト：`tests/unit/domain/test_canonical_structure.py`、`tests/unit/infra/test_github_structure.py`、`tests/unit/infra/test_github_snapshot.py`、`tests/unit/domain/test_canonical_readiness.py`、`tests/unit/infra/test_catalog_tree.py`、`tests/support/fake_github.py`（`scope(slug=…)` が本文に印を付ける）、`tests/support/canonical_scopes.py`（`relative()` と `_NESTING`）、`tests/cli_runtime/test_issue431_*.py`（workspace、branch、dependency_active、scope_read、read_only）、`test_issue430_canonical_status.py`、`test_issue430_canonical_sync.py`、`test_issue429_canonical_link.py`。`tests/unit/infra/test_migration_contract_copies.py` からは slug の印の写しの比べ合わせを外す（`migrate.py` の写し自体は I-15 が消す）。I-3（同期）と I-7（`canonical check`）の本体は直さない（読んで確かめた）。
+- **受け入れ**：
+  - 偽の `gh` で、本文に印のない、種類のラベル付きの Issue が ID を持つ。スナップショットに `slug` と本文がなく、全体を読む GraphQL の問い合わせに `body` がない。`slug` を持つ古い `snapshot.json` は取り直す。`version` は1のまま。
+  - 番号が5桁未満なら0で埋まり、6桁以上ならそのまま（`iss-100000`）。2章の正規表現に合わない名前（`iss-000454` など）は ID として扱わない。
+  - 一時のカタログで、`scope show`、`scope list`、`active set`、`artifact list` が `<カタログ>/<ID>/` を示し、開く。入れ子のパスを作らない。`scope show --json` が ID、題名、親の ID、パスを返す。
+  - `workspace validate` と `canonical status --structure` が、2章の4つの異常を見つけ、`SCOPE_DIRECTORY_SLUG_MISMATCH` と `SCOPE_DIRECTORY_DUPLICATE` を出さない。`iss-00454/` があり GitHub では epic のとき、`SCOPE_KIND_CHANGED` を1件だけ出す。
+  - `branch create` の既定の名前が `<ID>`。ブランチ名と ID を照らすところで、`iss-00454` と `iss-00454-foo`（`<所有者>/iss-00454-foo` も）を `iss-00454` のブランチとして受け付け、`iss-004541` は受け付けない。
+  - 対象が `SCOPE_KIND_CHANGED` のとき、`branch create`、`branch switch`、`active set`、`worktree create --expect-current` が終了コード3で止まり、`design.md` 2章の警告にするコマンドは警告を出す。古い ID（`iss-00454`）で指定しても、`SCOPE_NOT_FOUND` ではなく `SCOPE_KIND_CHANGED` になり、今の ID を示す。
+  - 従来モードの回帰（AC-15）が通る。`make lint` と `uv run pytest` が通る。
+- **依存**：なし（直す I-1、I-2、I-4 はマージ済み）。**Planning Level**：strict（すべての canonical のコマンドが通る部品を変えるため）。
+- **注意**：止まっている I-5 と I-11 の worktree には触れない。canonical モードの `--slug` の拒否は、`scope create` と `scope import github` の canonical の処理を作る I-5 が行う（今は `CANONICAL_NOT_IMPLEMENTED` のため）。
+
+### I-15 Flatten Specs In Canonical Migration Script
+
+- **価値**：移行のスクリプトが、平らな canonical を作り、仕様の中のリンクを切らずに移し、必要なら従来の形に戻せる。I-10 と I-12 の前提。2026-10-29 の方針の変更で足した。
+- **担当する設計**：11章（`register`、`verify`、`undo`、作った Issue の見つけ直し、平らにする写し、戻すときの入れ子と slug）。
+- **作るもの**（2026-10-29 に、`scripts/migrate-to-canonical/migrate.py` を読んで洗い出した）：
+
+| 関数・定数 | 直し |
+|---|---|
+| `SLUG_RE`、`_MARKER_LINE`、`SLUG_MARKER_*`、`read_slug_marker`、`format_slug_marker`、`append_slug_marker`（C1 の写し） | 消す。ID の正規表現と種類のラベルの写しは、I-14 の後の定数に合わせる |
+| `analyze` の `SLUG_MARKER_CONFLICT`、`registration_plan` と `Registrar` の `issue.marker`、`command_verify` の印の照合、`command_undo` と `_undo_action` と `_remove_marker` | 消す（本文を変えない） |
+| `Registrar._find_created`、`_create`、`_created_without_record` | 印を使わない見つけ直し（11章）に変える。作る前に予定を `undo.jsonl` に記録する |
+| `rename_path`、`State.renames` | 平らにする写しのパスの対応にする（Scope ごとに `<ID>/`。名前が変わらない番号の Scope も対象になる） |
+| `command_build_canonical`、`command_move_local`、`_adopt_into_canonical`、`command_adopt_worktree` | 平らにする写しとリンクの書き換えを使う。`build-canonical` は subtree split の各コミットに同じ写しを当てる |
+| `command_export_legacy`、`_scope_directories` | GitHub の親子で入れ子に戻し、slug を11章の規則で決め、リンクを逆に書き換え、`epics/rules.md` と `issues/rules.md` を置き直す |
+| `README.md` | 本文の印の説明を消し、平らにする写しと、書き換えられないリンクの一覧の見方を書く |
+
+  テスト：`tests/unit/infra/test_migration_contract_copies.py`、`tests/integration/migration/test_migrate_register.py`、`test_migrate_plan.py`、`test_migrate_canonical.py`、`test_migrate_checkouts.py`、`tests/support/migration_repo.py`（入れ子の定数）。
+- **受け入れ**：
+  - `register --apply` が Issue の本文を変えない（偽の `gh` の記録）。`verify` と `undo` に印の項目がない。
+  - 一時のリポジトリと偽の `gh` で、`register --apply` を Issue の作成の直後で止めて再実行すると、条件に合う1件を拾い、重複して作らない。条件に合う Issue が2件以上なら、番号の一覧を付けて止まる。
+  - `build-canonical` の結果の、どのコミットのツリーも平らで（Scope のディレクトリは直下の `<ID>/` だけ、`epics/` と `issues/` がない）、`.meta.json` がない。ファイルの中身は、リンクの書き換えのほかは元と一致する。
+  - 入れ子の Initiative、Epic、Issue に、相対のシンボリックリンク（`artifacts/rules.md`、`discussions/rules.md`、`epics/rules.md`、`issues/rules.md`）と、Markdown の相対リンク（「詳細:」の `spec-dock/docs` へのリンク、`../requirement.md`、`../../artifacts/…`、`../issues`、リポジトリのルートの `docs/` へのリンク）と、`discussions/` の下の ID の形の名前のディレクトリ（Scope ではない）を置いた一時のリポジトリで、写した後に、どのリンクも11章の規則どおりの先を開く。書き換えられないリンクを置くと、`plan` と `build-canonical` が一覧にする。
+  - 予行演習（本物の spec-dock を内蔵のディスクの一時ディレクトリに写したクローン、bare の origin、一時の `XDG_STATE_HOME`）で、書き換えられないリンクが0件である（2026-10-29 の統括の判断。spec-dock には相対のシンボリックリンクが291個、深さに依る相対リンクを持つ Markdown が164個ある）。本物のリポジトリと GitHub には書かない。
+  - `move-local` と `adopt-worktree` が、平らにした位置へ移し、`adopt-worktree` が分岐点に当たるコミット C を見つける。
+  - `export-legacy` で作ったブランチで、入れ子と slug が11章の規則どおりになり（切り替えの後に作った日本語の題名の Scope は `untitled`）、リンクが元の深さに戻り、従来モードの `workspace validate` が通る（統括の判断）。親のない Epic、Issue のない `<ID>/`、異常のある Scope があると、`--apply` の前に一覧にして止まり、何も書かない。`.meta.json` が、移行前のものと `revision` と `lifecycle` のほかは一致する。
+  - 写した値（C1 の ID の正規表現と種類のラベル、C3 の無視の3行、C5、C7）が、パッケージの定数と同じ。
+- **依存**：I-14。**Planning Level**：strict（GitHub に大量に書き、全リポジトリの仕様を写すため）。
+- **注意**：本物の GitHub と、本物のリポジトリには書かない（I-8 と同じ）。
+
 ## 検証
 
 - **毎回**：各 Issue のPRで、`make lint` と `uv run pytest` を通す。従来モードの回帰（AC-15）は、I-13 より前のすべての Issue で確かめる。
-- **契約の確認**：使う側の Issue は、持ち主の Issue が作った契約を、テストで直接使う（写しを作らない）。I-8 だけは、写した値をパッケージの定数と比べる。
+- **契約の確認**：使う側の Issue は、持ち主の Issue が作った契約を、テストで直接使う（写しを作らない）。I-8 と I-15 だけは、写した値をパッケージの定数と比べる。
 - **横断の確認**：I-9 の横断のシナリオのテストと、全コマンドのテストと、受け入れ条件ごとの確かめ（`design.md` の testability の表）。
 - **Linux**：提供側のCIは `uv run pytest` を `ubuntu-latest` で動かすので、すべてのテストは毎回 Linux でも通る。環境に依る部分（定期の実行の仕組み、コンテナ、linger、git の版）は、環境の判定を注入したテストで、どの OS の上でもすべての場合を確かめる。
 - **実機の確認**：I-2、I-3、I-9、I-10 の報告書に、macOS（外付けのボリュームを含む）、Linux（OrbStack の仮想マシンと Docker のコンテナ）、Codex のサンドボックス、Claude Code での結果を書く。確かめられなかったことは「未確認」と書き、対応したとは書かない。
@@ -376,7 +458,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 
 ## rollback
 
-- **I-1〜I-9、I-11**：どれも、PRを `git revert` すれば戻る。宣言の版が3の spec-dock では、canonical の処理は動かないので、利用者の運用への影響はない。
+- **I-1〜I-9、I-11、I-14、I-15**：どれも、PRを `git revert` すれば戻る。宣言の版が3の spec-dock では、canonical の処理は動かないので、利用者の運用への影響はない。
 - **I-10、I-12**：`design.md` の「戻し方」に従い、リポジトリごとに戻す。切り替えのPRのマージ前なら、PRを閉じ、canonical を消し、`undo --apply` で登録を外す。マージの後なら、`export-legacy --apply` で戻すPRを作り（外した今のCIの手順も戻す）、そのリポジトリの各チェックアウトで `canonical remove --yes` を行う。0.3.0 のままでよく、ほかのリポジトリには影響しない。戻すかどうかは、利用者が判断する。
 - **I-13**：マージの前なら、PRを閉じる。マージの後なら、PRを `git revert` するか、利用者の環境に 0.3.0 を入れ直す（0.3.0 は canonical モードを持つので、移したリポジトリはそのまま動く）。撤去の後にリポジトリを従来の形に戻すときは、0.3.0 を入れ直し、版のタグ `v0.3.0` の移行のスクリプトで、上と同じ手順で戻す。
 - 戻した後は、何が起きたかを、この Epic の報告書に書く。
