@@ -10,7 +10,7 @@ SpecDockは公開リポジトリです。forkのPRはワークフローを書き
 2. ランナーの開始前フック `/opt/spec-dock-ci/job-started.sh` が、同じ条件を満たさないジョブを最初のステップの前に失敗させます。判定はランナーが決まった場所に書いたイベントだけを読むので、信頼しないPRがワークフローを書き換えても外せません。
 3. リポジトリの設定で、外部の人のforkのPRのワークフローは承認が必要です（`all_external_contributors`）。
 
-VMはMacのファイルを共有せず（Limaの `plain: true`、mountなし、ポート転送なし）、ランナーの利用者はsudoできません。VMの中のnftablesが、Mac（`192.168.5.2`）、LAN、Tailscale、リンクローカル、IPv6への新しい接続を拒否します。VMにMacの `gh` の認証、SSHの秘密鍵、キーチェーンを入れません。VMの中の資格情報は、ランナー自身の登録情報だけです。
+VMはMacのファイルを共有せず（Limaの `plain: true`、mountなし、ポート転送なし、guest agentなし）、ランナーの利用者はsudoできません。VMの中のnftablesが、Mac（`192.168.5.2`。plainモードではDNSの53番だけを許可）、LAN、Tailscale、リンクローカル、IPv6への新しい接続を拒否します。VMにMacの `gh` の認証、SSHの秘密鍵、キーチェーンを入れません。VMの中の資格情報は、ランナー自身の登録情報だけです。
 
 信頼する作者のPRのコードは、ランナーの利用者として、VMの中のランナーの設定（フックを指す `.env` を含む）を変えられ、その変更は後のジョブにも残ります。権限を与える人を信頼する運用が前提です。手元のジョブのログの `Set up runner` に `SpecDock runner admitted a same-repository pull request job` が毎回出ることを確かめ、出ない場合や疑わしい場合は変数を `hosted` に戻し、VMを作り直します。VMにはdockerなどのcontainerの実行環境を入れません。
 
@@ -43,9 +43,10 @@ sh .github/runner/host-install.sh lima
 mkdir -p "$LIMA_HOME"
 limactl create --name spec-dock-ci .github/runner/spec-dock-ci.lima.yaml
 limactl start spec-dock-ci
-limactl shell spec-dock-ci -- sh -c 'rm -rf ~/spec-dock-runner && mkdir -m 700 ~/spec-dock-runner'
+limactl shell spec-dock-ci -- mkdir -p -m 700 spec-dock-runner
 limactl copy .github/runner/*.sh .github/runner/nftables.conf .github/scripts/ci-runner-job-gate.py spec-dock-ci:spec-dock-runner/
-limactl shell spec-dock-ci -- sh -c 'chmod 644 ~/spec-dock-runner/* && sudo sh ~/spec-dock-runner/guest-setup.sh'
+limactl shell spec-dock-ci -- sh -c 'chmod 644 ~/spec-dock-runner/*'
+limactl shell spec-dock-ci -- sudo sh spec-dock-runner/guest-setup.sh
 ```
 
 ファイルはLimaの利用者のホーム（ランナーの利用者が書けない場所）に置きます。`guest-setup.sh` は、置き場所が他の人に書けると実行を拒否します。登録の後に `guest-setup.sh` をやり直した場合は、`sudo systemctl restart 'actions.runner.chemitaro-spec-dock.*'` でランナーを読み直させます。
