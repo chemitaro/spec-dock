@@ -59,6 +59,8 @@ Mac mini
 | `job-started.sh` / `job-completed.sh` | ジョブの前の判定（`python3 -I` で、利用者の site-packages や `PYTHONPATH` を読まない）と、後の作業場所の掃除（`_tool` だけを残す） | ランナーの `.env` の `ACTIONS_RUNNER_HOOK_JOB_*` |
 | `host-install.sh` / `host-ensure-vm.sh` | Mac の側の Lima の導入（SHA256SUMS で確かめる）と LaunchAgent | `lima`、`agent` |
 
+VM のツールは GitHub のランナーにそろえる：setup-python の Python は `/opt/hostedtoolcache` の下でしか `libpython` を見つけられない（RPATH）ので、root の持ち物のその場所に Python 3.11 と uv を置き、ランナーの `AGENT_TOOLSDIRECTORY` で指す（ジョブは書き換えられない）。git は `ppa:git-core/ppa` から入れる。
+
 不変条件：VM に docker、podman、containerd を入れない（ジョブの手順の前に PR の指定で container を動かす経路を作らない）。nftables の拒否の規則は counter を持ち、確かめで増えたことを観測できる。
 
 ラベル `spec-dock-ci` は、このリポジトリのランナーだけに付ける。退去費用の `ci-shadow` のラベルとは重ならない。
