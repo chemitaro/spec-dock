@@ -186,10 +186,18 @@ def test_provider_ci_runs_its_checks_where_route_says_and_never_names_the_runner
     assert "SPEC_DOCK_CI_RUNNER: ${{ vars.SPEC_DOCK_CI_RUNNER }}" in jobs["route"]
     assert "ci-runner-job-gate.py route --repository chemitaro/spec-dock" in jobs["route"]
     assert "runners: ${{ steps.route.outputs.runners }}" in jobs["route"]
-    assert "runs-on: ${{ fromJSON(needs.route.outputs.runners)['ubuntu-latest'] }}" in jobs["provider-tests"]
-    assert "runs-on: ${{ fromJSON(needs.route.outputs.runners)[matrix.os] }}" in jobs["provider-distribution-parity"]
+    # Without route's output, fromJSON('') would stop GitHub from creating the job at all (seen in run 40878463664),
+    # so each job falls back to its hosted runner and fails in its first step instead.
+    tests_runner = "${{ needs.route.outputs.runners && fromJSON(needs.route.outputs.runners)['ubuntu-latest'] || 'ubuntu-latest' }}"
+    parity_runner = (
+        "${{ needs.route.outputs.runners && fromJSON(needs.route.outputs.runners)[matrix.os] || matrix.os }}"
+    )
+    assert f"runs-on: {tests_runner}" in jobs["provider-tests"]
+    assert f"runs-on: {parity_runner}" in jobs["provider-distribution-parity"]
     for name in ("provider-tests", "provider-distribution-parity"):
         assert "needs: route\n" in jobs[name] and "if: ${{ !cancelled() }}\n" in jobs[name]
+        first_step = jobs[name].split("    steps:\n", 1)[1].split("\n      - ", 1)[0]
+        assert "if: needs.route.result != 'success'" in first_step and "exit 1" in first_step
     parity = jobs["provider-distribution-parity"]
     assert "name: Provider distribution parity (${{ matrix.os }})" in parity
     assert "os: [ubuntu-latest, macos-latest]" in parity

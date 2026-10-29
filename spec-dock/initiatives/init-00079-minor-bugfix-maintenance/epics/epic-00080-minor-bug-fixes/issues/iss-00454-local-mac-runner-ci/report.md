@@ -27,14 +27,14 @@ ID: "iss-00454"
 | 01 | テストは通過。実機は、変数が未設定の run（40853980916、40859634671、40874540057）で `route` を含むすべてのジョブが `GitHub Actions` のランナーで成功。不正な値の run は（S7 の後に記入） | `tests/integration/test_issue454_runner_gate.py` |
 | 02 | 変数を `local`（12:44:33Z、利用者）にした後の run 40877741196（`e92ceb99`）で、`Provider distribution parity (ubuntu-latest)` が `spec-dock-ci-1`、`provider-tests` が `spec-dock-ci-2` で成功。`route`・macOS の配布・`validate`・`check` は GitHub のランナーで成功。両方の手元のジョブのログに `A job started hook has been configured by the self-hosted runner administrator` と `SpecDock runner admitted a same-repository pull request job` がある。VM の中の両方の `.env` にフックの2行がある | run 40877741196 のジョブ 123460877440・123460877546 |
 | 03 | テストで、fork・bot・外の人・別のリポジトリ・`pull_request` 以外・読めないイベント・別の場所のイベントのファイルを拒否。VM に置いたフックを `spec-dock-runner-1` として実行し、同じリポジトリ＝許可（0）、fork＝拒否（1）、別の場所のファイル＝拒否（1）、push＝拒否（1）。実際の fork の PR は作れないので**未確認** | VM での実行（2026-10-29T10:2x Z） |
-| 04 | ランナーの利用者として `sudo -n true` は失敗。`192.168.5.2:9222`（Mac の Chrome のデバッグの口）、`192.168.5.2:5432`、`192.168.0.43:6768`（Mac の LAN の IP の Orca）、`100.85.74.8:8766`（Mac の Tailscale の IP）、`169.254.169.254:80`、`192.168.5.2:22` の6つはすべて接続できず、拒否の規則の counter がちょうど6増えた。IPv6 は VM にアドレスも経路もなく、リテラルの宛先にも届かない。`https://github.com`・`https://pypi.org` は 200。`limactl list --json` で plain=true、mounts・portForwards なし、containerd は system・user とも false。`lima-guestagent` はプロセス・実行ファイル・unit とも無い。docker・containerd・podman・nerdctl は無い | VM での実行 |
+| 04 | ランナーの利用者として `sudo -n true` は失敗。`192.168.5.2:9222`（Mac の Chrome のデバッグの口）、`192.168.5.2:5432`、`192.168.0.43:6768`（Mac の LAN の IP の Orca）、`100.85.74.8:8766`（Mac の Tailscale の IP）、`169.254.169.254:80`、`192.168.5.2:22` の6つはすべて接続できず、拒否の規則の counter がちょうど6増えた。IPv6 は VM にグローバルのアドレスも経路もなく、リテラルの宛先（`[2606:4700:4700::1111]:80`）にも届かない（AC の文面の「規則の counter が増える」ではなく、経路がないことで満たした。規則は経路ができたときの守りとして残る）。`https://github.com`・`https://pypi.org` は 200。`limactl list --json` で plain=true、mounts・portForwards なし、containerd は system・user とも false。`lima-guestagent` はプロセス・実行ファイル・unit とも無い。docker・containerd・podman・nerdctl は無い | VM での実行 |
 | 05 | VM に `gh` の hosts.yml・`.netrc`・`.git-credentials` は無い。秘密鍵は VM 自身の sshd のホスト鍵だけ。差分にトークンの形の文字列は無い。**登録のトークンの件**（下の Notes）を直した後、`_diag`・journal・`/var/log` にトークンの値は無い | VM での検索 |
 | 06 | テストで `_tool` だけが残り、想定外の `RUNNER_TEMP` では何も消さない。VM で掃除のフックを実行し、作業場所が空になった。run 40877741196 の後、両方のランナーの `_work` は `_tool` だけで、ログに `SpecDock runner removed the job files under …/_work` がある | 同じ run |
 | 07 | ジョブの無いときに `limactl stop`（10:42:41Z）→ LaunchAgent が62秒後に起動 → 2つのランナーが `Connected to GitHub`・`Listening for Jobs`、nftables も起動時に読み込み | `ensure-vm.log`、VM の journal |
 | 08 | 手順書にある。リハーサルは（S7 の後に記入） | `docs/ci-local-runner.md` |
 | 09 | 前（09:41:33Z）と後で、退去費用の LaunchAgent の plist、専用の `limactl`、`ci_vm_host_watch.py` の SHA256 と、`ci-shadow/lima.yaml` の更新時刻が同じ | |
 | 10 | 利用者（統括を通して）が `all_external_contributors` を確かめた | |
-| 11 | 最終品質ゲート（下）。時間の表は（S7 の後に記入） | |
+| 11 | 最終品質ゲート（下）。時間の表は上 | |
 
 手元で最初に動かした run 40875990010（`cfd6fed8`）は、振り分けとフックは正しく働いたが、VM の環境の違いで2つのジョブが失敗した。①setup-python の Python は RPATH が `/opt/hostedtoolcache/Python/3.11.18/arm64/lib` に固定で、ランナーの `_work/_tool` では `libpython3.11.so.1.0` が見つからず、環境を空にして動かすテストと `uv build` が失敗した。②Ubuntu 24.04 の git 2.43 の `git subtree split` は、作業ツリーのないクローンでは prefix がないとして止まり、移行のテストが失敗した（Mac の git 2.54 では通ることを同じ手順で確かめた）。root の持ち物の `/opt/hostedtoolcache` に Python 3.11.18（SHA256 を確認）と uv 0.13.6 を置いて `AGENT_TOOLSDIRECTORY` で指し、git を `ppa:git-core/ppa` の 2.56.0 にして直した（`e92ceb99`）。
 
@@ -51,14 +51,21 @@ GitHub のランナーでの時間（この PR、run 40859634671）：`route` 5�
 
 - 1回目（`0c26a77e`）：`make lint` 通過、`uv run pytest` 2993 passed・8 skipped。Spec（opus/xhigh）P1 1件（P-1：root がランナーの利用者の書ける `installdependencies.sh` を実行）、P2 3件、P3 3件。Standards（sonnet/high）P0/P1 なし、P2 2件、P3 9件。
 - P-1 と、同じ原因の P-2・T-1 を直した（`640781c8`：root の持ち物の展開から依存を導入、unit を root の文面で書き `svc.sh` を使わない）。VM に反映し、2つのランナーが新しい unit で `Listening for Jobs`。
-- 2回目（`640781c8`）：Spec の再レビューで P-1・P-2 は fixed、新しい P0/P1 なし。`make lint` と `uv run pytest` は（記入）。
+- 2回目（`640781c8`）：Spec の再レビューで P-1・P-2 は fixed、新しい P0/P1 なし（P2 1件、P3 2件）。`make lint` 通過、`uv run pytest` 2994 passed・8 skipped。
+- 手元の run で見つかった VM の環境の違いを直した（`e92ceb99`。Python の置き場所と git の版）。
+- 3回目（`a7c80b3c`、前のゲートからの差分）：`make lint` 通過、`uv run pytest` 2994 passed・8 skipped。Spec（opus/xhigh）新しい P0/P1 なし（P2 2件、P3 4件）。Standards（sonnet/high、`0c26a77e` からの差分のコード）新しい P0/P1 なし（P3 5件）。R-1（`/opt/hostedtoolcache` の権限が root の umask に依存）は、VM で `/opt/hostedtoolcache` と `/opt/spec-dock-ci` に group・other の書ける項目と root 以外の持ち物が0、root の umask が 0022 であることを確かめた。
+- その後のコミットは report.md だけ。
+- 切り戻しのリハーサルで、変数が不正なときにチェックが出ないことが分かった（下の AC-454-01・08 の記録）。`provider-ci.yml` を直した（`route` の出力がなければ GitHub のランナーに戻り、最初の手順で失敗する）。
 
 ## Residual Risks / Follow-ups
 
 - 信頼する作者の PR のコード（とその依存）は、ランナーの利用者として `.env` やランナーの本体を書き換え、開始前のフックを外せる（P-4）。差し替えたフックが同じ許可の行を出せば、ログでの検知も効かない。前提は信頼する作者を信頼すること。疑わしいときは変数を `hosted` に戻し、VM を作り直す。作り直しの周期は決めていない。
 - x86_64 の Linux での確かめが、変数が `local` の間はなくなる（D1、受け入れたリスク）。
 - 段階2（D7）で要ること：tart（FSL-1.1、OpenAI 著作）と softnet（root の SUID、sudo のパスワードが1回）、softnet の既定で VM から届く Mac の側の口（bridge の gateway）を止める設定、数十GB のイメージ、Apple の使用許諾（1台で2つまで）、sudo できない利用者でのランナー、macOS とランナーの更新の保守、Linux の VM と合わせたメモリ（16GB 前後）。
-- 申し送り（ゲートの P2/P3、未対応）：T-2 nftables.conf を置く前に検証する（構文エラーのファイルが残ると次の起動で遮断なし）／P-3 手順書の curl の判定（curl 8 は「Couldn't connect」としか出さないので、counter で判定する形に直す。IPv6 は github.com に AAAA が無いので、リテラルで試す）／Q-1 テストで `--no-same-owner` と `svc.sh` 不使用をより強く確かめる／Q-2 root が `.env` を grep で読む（FIFO で止められる）／T-3 壊れたキャッシュの再取得／T-4・P-6 登録と導入の再実行・作り直しの手順／T-5 `host-install.sh` の途中失敗／T-6 launchd の終了で hostagent が巻き込まれないか（実機では VM は動き続けている）／T-7 event.json とジョブの突き合わせ／T-8 シェルの振る舞いのテスト／T-9 読めないイベントの理由の文／T-10 `route` の checkout の `persist-credentials: false` と `timeout-minutes`／T-11 リポジトリ名の直書き／P-5 route のテストの追加／P-7 DNS で LAN や tailnet の名前を引ける（接続は拒否）。
+- 申し送り（3回目のゲート、未対応）：R-1・U-5 `guest-setup.sh` に `umask 022` と権限の検査を足す（今の VM は安全を確認済み）／R-2 root の `python3 -m pip` に `-I`／R-3・U-2 root が信頼する PyPI（uv をハッシュで固定しない）と PPA。PPA の git が apt の自動更新から外れるかの確認／R-4 手元の uv は 0.13.6 のまま（更新の手順が要る）／U-1 `mktemp` の後始末の trap／U-3 `.env` や unit を変えた後のランナーの再起動と、値を変えたときの重複行／U-4 テストの正規表現の範囲。
+- 申し送り（1・2回目のゲートの P2/P3、未対応）：T-2 nftables.conf を置く前に検証する（構文エラーのファイルが残ると次の起動で遮断なし）／P-3 手順書の curl の判定（curl 8 は「Couldn't connect」としか出さないので、counter で判定する形に直す。IPv6 は github.com に AAAA が無いので、リテラルで試す）／Q-1 テストで `--no-same-owner` と `svc.sh` 不使用をより強く確かめる／Q-2 root が `.env` を grep で読む（FIFO で止められる）／T-3 壊れたキャッシュの再取得／T-4・P-6 登録と導入の再実行・作り直しの手順／T-5 `host-install.sh` の途中失敗／T-6 launchd の終了で hostagent が巻き込まれないか（実機では VM は動き続けている）／T-7 event.json とジョブの突き合わせ／T-8 シェルの振る舞いのテスト／T-9 読めないイベントの理由の文／T-10 `route` の checkout の `persist-credentials: false` と `timeout-minutes`／T-11 リポジトリ名の直書き／P-5 route のテストの追加／P-7 DNS で LAN や tailnet の名前を引ける（接続は拒否）。
+- 範囲外の既存の問題（報告だけ）：`scripts/migrate-to-canonical/README.md` は「git 2.38 以上」としているが、git 2.43 の `git subtree split` は、作業ツリーのないクローン（`build-canonical` の使い捨てのクローン）で prefix がないとして止まる（VM で再現、git 2.54 と 2.56 では通る）。必要な版の下限が、書いてあるより高い可能性がある。
+- 07 の証拠は、unit を root の文面に書き換える前の VM の再起動である。書き換えた後は、ランナーの再起動（12:35Z、12:57Z）で2つとも `Listening for Jobs` に戻ることを確かめたが、VM そのものの再起動はしていない。
 - Lima 2.3 が正式版になったら `hostLoopback: false` を足す。
 - Lima のイメージのキャッシュが `~/Library/Caches/lima/` に残る（約3.5GiB の変換済みの raw）。
 
