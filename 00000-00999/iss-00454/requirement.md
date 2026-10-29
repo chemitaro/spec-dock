@@ -102,7 +102,7 @@ spec-dock の GitHub Actions のジョブを、GitHub がホストするラン�
 
 ## 受け入れ条件
 
-- AC-454-01（RQ-454-01、04）：振り分けのテストで、未設定・空・`hosted` はすべて GitHub、未知の値は失敗（終了コード2、出力なし）になる。ワークフローのテストで、2つのジョブが振り分けの結果に依存し、振り分けが失敗しても実行される（スキップされない）形で、チェックの名前が変わらない。変数が未設定の状態で、この Issue の PR の CI が GitHub のランナーで通る。マージの前に変数を未知の値にした run で、`provider-tests` と2つの配布の確かめが失敗（conclusion が failure）になる。
+- AC-454-01（RQ-454-01、04）：振り分けのテストで、未設定・空・`hosted` はすべて GitHub、未知の値は失敗（終了コード2、出力なし）になる。ワークフローのテストで、2つのジョブが振り分けの結果に依存し、振り分けが失敗しても実行される（スキップされない）形で、チェックの名前が変わらない。変数が未設定の状態で、この Issue の PR の CI が GitHub のランナーで通る。マージの前に変数を未知の値にした run で、`provider-tests` と2つの配布の確かめが作られて成功しない（conclusion が failure。matrix の fail-fast で取り消された配布の確かめは cancelled でもよい。どちらも成功ではなく、素通りしない）。
 - AC-454-02（RQ-454-02）：変数を `local` にした後、この Issue の PR の `provider-tests` と `Provider distribution parity (ubuntu-latest)` のジョブのランナーの名前が `spec-dock-ci-1` か `spec-dock-ci-2`（D8）で、すべてのチェックが成功する。両方のランナーのジョブのログに `SpecDock runner admitted a same-repository pull request job` が出る。
 - AC-454-03（RQ-454-03）：テストで、fork、bot、外の人、別のリポジトリ、`pull_request` 以外のイベント、読めないイベント、別の場所のイベントのファイルを、フックが拒否し、振り分けが GitHub に残す。VM の中に置いたフックを、ランナーの利用者として、fork の PR のイベントで実行すると失敗し、同じリポジトリの PR のイベントで成功する。実際の fork の PR での確かめは、作れなければ「未確認」と書く。
 - AC-454-04（RQ-454-05）：VM に共有の mount とポート転送がなく、guest agent と container の実行環境（docker など）が動いていない。VM の中でランナーの利用者として、`sudo -n true` が失敗し、Mac が待ち受けている口（VM から見た Mac、Mac の LAN の IP、Mac の Tailscale の IP）、リンクローカル、IPv6 への接続が、VM の拒否の規則で拒否され（規則の数え上げが増える）、`https://github.com` に届く。
