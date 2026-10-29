@@ -8,7 +8,8 @@
   "initiative_id": "init-00423",
   "epic_id": "epic-00424",
   "depends_on": [
-    "iss-00455"
+    "iss-00455",
+    "iss-00460"
   ],
   "backend": "github",
   "github": {
@@ -17,5 +18,5 @@
     "repo_name": "spec-dock"
   },
   "lifecycle": null,
-  "revision": 1
+  "revision": 2
 }

@@ -42,7 +42,7 @@ def test_reading_commands_change_no_catalog_git_checkout_or_github(
     world.scope("initiative", 1, "Plan")
     world.scope("epic", 2, "Core", parent=1)
     world.scope("issue", 3, "Leaf", parent=2)
-    artifacts = world.catalog / "iss-00003/artifacts"
+    artifacts = world.catalog / "00000-00999/iss-00003/artifacts"
     artifacts.mkdir()
     (artifacts / "20261026t000000z-note.md").write_text("# note\n", encoding="utf-8")
     world.select("iss-00003", 3)
