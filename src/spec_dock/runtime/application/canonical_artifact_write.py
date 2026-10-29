@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.infra.file_publication import FileSnapshot
+    from spec_dock.runtime.presentation.envelope import EffectStatus
 
 
 def create_artifact(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
@@ -185,7 +186,9 @@ def _publish_scope_artifact(
             published = error.confirmed
         uncertain = isinstance(error, FilePublicationIncomplete) and not published
         partial = published or uncertain
-        status = "succeeded" if published else "unknown" if uncertain else "failed" if attempted else "not_attempted"
+        status: EffectStatus = (
+            "succeeded" if published else "unknown" if uncertain else "failed" if attempted else "not_attempted"
+        )
         return OperationResult(
             namespace.command_path,
             "partial" if partial else "failed",
