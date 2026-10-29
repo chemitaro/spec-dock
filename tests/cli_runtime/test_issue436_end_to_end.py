@@ -23,10 +23,9 @@ from spec_dock.runtime.infra import canonical_scheduling, github_snapshot, githu
 from spec_dock.runtime.infra.github_structure import GithubRepository
 from tests.support.canonical_repo import bare_remote, clone, environment, git, isolate_user_state
 from tests.support.canonical_scopes import REPOSITORY
+from tests.support.canonical_sync import FakeScheduler
 from tests.support.canonical_writes import WriteClock, seeded_files
 from tests.support.fake_github import FakeGithub, install_fake_gh
-
-from tests.support.canonical_sync import FakeScheduler
 
 if TYPE_CHECKING:
     from tests.support.fake_github import FakeGhExecutable
