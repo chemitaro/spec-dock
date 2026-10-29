@@ -229,7 +229,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 偽の `gh` で、各コマンドが `design.md` の順に GitHub に書き、カタログには排他の中で書いて変更の束を残す。Scope のディレクトリは、種類と親を問わず `<カタログ>/<区切り>/<ID>/`（I-16 の `scope_relative`）に作る。Issue の本文には何も書かない。
   - 書く前に `ensure_fresh(decision)` で確かめ、判断に使う Issue を読み直す。GitHub につながらなければ、書く前に止まる。書いた結果は、すぐにスナップショットに反映され、次の `scope show` が取り直しなしで示す（AC-16 の一部）。
   - Issue を作った後に失敗したとき、`partial`（終了コード6）と `scope import` の案内を返し、`scope import` で完了できる。
-  - 日本語の題名だけで作った Scope のディレクトリが `<カタログ>/<区切り>/<ID>/`、`work start` の既定のブランチ名が `<ID>` で、`scope show` と `workspace sync` に日本語の題名が出る（AC-09）。canonical モードの `scope create` と `scope import github` の `--slug`、`scope import github` の `--title` は、`CANONICAL_NOT_APPLICABLE` で止まる。従来モードの題名と slug の規則は変わらない。
+  - 日本語の題名だけで作った Scope のディレクトリが `<カタログ>/<区切り>/<ID>/`、`work start` の既定のブランチ名が `<ID>` で、`scope show` と `workspace sync` に日本語の題名が出る（AC-09）。canonical モードの `scope create` と `scope import github` の `--slug` は、`CANONICAL_NOT_APPLICABLE` で止まる。`scope import github` の `--title` は拒まず、値を使わずに GitHub の題名で進め、警告 `CANONICAL_TITLE_IGNORED` を返す（iss-00432 の統括の判断、2026-10-29）。従来モードの題名と slug の規則は変わらない。
   - `scope move <ID> --parent <親>` は、GitHub の親だけを付け替え、カタログに書かない。`--parent` がなければ使い方の誤りで止まる。
   - `scope delete` は、子孫も消すとき、子孫のそれぞれの `<区切り>/<ID>/` を写してから消す。途中で止まった後の再実行で、一部が消えた状態から続けられる。
   - `design.md` 2章の「止めるもの」の書くコマンドと `work start`、`work finish` は、関わる Scope に `SCOPE_KIND_CHANGED` があるとき、書く前に終了コード3で止まる（判定の部品は I-14）。`scope delete` だけは止まらず、今の ID で、同じ番号の古い種類のディレクトリを写してから消す。
@@ -239,6 +239,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - スナップショットにない番号に当たる変更の反映は、当てずに飛ばし、コマンドを失敗にせずに `GITHUB_SNAPSHOT_STALE` を警告に入れ、次の `ensure_fresh` が取り直す（`design.md` 2章の「書き込みの反映」）。
   - `scope close` と `scope reopen` の結果が分からないときの読み直しが、`state_reason` も比べる。
   - canonical の `work start` は、選択を記録して `StartLock` を放した後に、I-2 の `link_after_command` を呼ぶ。リンクの失敗は `work start` の結果を変えず、警告で返す（`design.md` 3章「SpecDock のほかのコマンドから」）。
+- **統括の判断で直した点**（iss-00432 の統括の判断）：`work start` は、対象に作業中の印があっても止めず、警告 `SCOPE_IN_PROGRESS` で進める（2026-10-26）。`work finish` の保存の待ちは180秒の固定で、`--save-timeout` は作らない（同）。
 - **I-4 から引き継ぐもの**（2026-10-26 の統括の判断。I-4 の `report.md`）：ブランチの操作が失敗した後の再観察を、従来の `branch_operations` の形にそろえる。`--expect-current` の確かめと従来の処理の取り込みの間の競合を直す。canonical の `worktree remove` が、正しいリンク（`spec-dock/initiatives`）を無視されたファイルとして数え、いつも `--discard-ignored` を要するので、SpecDock が置いたリンクは数えないように直す。
 - **2026-10-29 の方針の変更で、止まっている作業から変えること**（worktree `iss-00432-canonical-scope-write` を読んで洗い出した。コミット2つ（`1490d3834` 文書、`d44047b78` S1）と、S2〜S5 の未コミットの変更がある）：
   - 要らなくなる：`canonical_scope_create.py` の slug の印の付け足しと読み取り、`SLUG_MARKER_MISSING` の判定、印や `--slug` やディレクトリの slug の食い違いで止まる条件、取り込みの手順 `github.issue.body`（印を足す本文の `PATCH`）、`resolve_input_title_and_slug` で slug を作る処理、作り直しの案内の `--slug`、`update_issue` の `body`（使い道が印だけだった）。`scope move` のディレクトリの移動（`move_directory`、`_follow_moved_selections`、`--parent` なしの使い方、警告 `SCOPE_MOVE_INCOMPLETE`）と、`infra/canonical_scaffold.move_directory` とそのテスト。`_publish` が `SCOPE_NESTING`（`epics/`、`issues/`）で置き場を決める処理。`scope delete` の「入れ子のずれた子孫で止まる」条件。Issue の文書の、slug、ディレクトリの移動、入れ子の節。
@@ -301,6 +302,8 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
     - I-3 から（2026-10-26 の統括の判断。I-3 の `report.md`）：取り込み直しの途中（`adopt_remote_pending`）は `resume --push-local` を拒み、次の1手を示す（GitHub で消した履歴を送り直さないため。ゲート8 ST-1）。systemd の止め方の設定（`KillMode`、`TimeoutStopSec`）が要るかを、実機の確かめ（AC-18）で見る。文書に書くこと：登録済みのカタログへの `--no-schedule` は登録を外さない（外すのは `canonical remove`）、予行演習では `XDG_STATE_HOME` を必ず一時ディレクトリにする（`--no-schedule` でも基準を書くため。`migrate.py` の README にも書く）、`merge_failed` の2回目の `resume`、カタログで手で Git を使わないこと。
     - I-4 と I-8 から：I-4 の新しいコード（`design.md` 12章）を、`help` と参照の文書に書く。`dependency check` と `workspace sync` の `--source` の既定の意味、`--offline`、`canonical status --structure` を文書に書く。`migrate.py undo` が、作業の記録がないときに何もせずに終了コード0で終わるので、次の1手を付けて止まるように直す（I-8 の ST-1。I-10 の前に要る）。
     - 使い方の文書の制約：main が sparse-checkout だと、カタログがその設定を引き継ぎ、仕様が見えない（ST-2）。カタログに対する Git の呼び出しは `GIT_ASKPASS` を通さないので、askpass で HTTPS の認証をしている環境では、push と fetch が失敗しうる（ST-13）。
+  - **I-15（iss-00456）から引き継ぐもの**：`undo --apply` の後の `register --apply` が、取り消した作成を使い直さないことを守るテストを足す（iss-00456 の最終品質ゲート 2 の Standards の P3。コードと2つのレビューでは確かめたが、テストがない。I-10 の前に要る）。
+  - **I-5（iss-00432）から引き継ぐもの**：新しいコード（`SCOPE_IN_PROGRESS`、`CANONICAL_PROGRESS_MARK_FAILED`、`CANONICAL_TITLE_IGNORED`、`DESCENDANT_STATUS_UNKNOWN`）の `help` と参照の文書への追記、`SCOPE_IN_PROGRESS` でエージェントが利用者に確かめる規則（規則の節）、`work finish` が最大180秒待つこと。ダッシュボードの警告（`CANONICAL_DASHBOARD_OCCUPIED`、`CANONICAL_DASHBOARD_FAILED`）の次の1手も文書に書く（I-11）。
 - **受け入れ**：
   - AC-02、AC-07、AC-14、AC-15、AC-16、AC-18 を確かめる。AC-14 は、設計書を渡さない白紙のエージェントに規則の節だけを渡して試し、結果を報告書に書く。AC-18 は、横断のシナリオのテストを、環境の判定を注入して systemd と `loop` の両方で通し、実機では OrbStack の仮想マシンと Docker のコンテナで通す。
   - wheel を作り、外の環境に入れて、`spec-dock help` と `spec-dock canonical --help` が動く（AGENTS.md の手順）。
@@ -322,6 +325,11 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   9. 切り替えの終わりを利用者に知らせ、凍結を解く。3日間の運用に入る。
 - **受け入れ**：AC-01、AC-04、AC-05、AC-12（実際の GitHub でのPRの検査）、AC-16 と AC-17（実際の GitHub で）、AC-19 の spec-dock の分を確かめる。切り替えの後、3日間の通常の運用で、仕様の失われがなく、`canonical status` に未解決の異常がない。この3日間の結果が、I-12 の本番を始める条件になる。
 - **ついでに確かめること**：`register --apply` で親子と依存を登録するとき、登録の前後で、その Issue の `updated_at` と、変わったかの確かめの応答（304 か 200 か）を記録する。親子と依存の変更で更新の時刻が変わるなら、`design.md` の「未確認の事項」から外し、30分ごとの取り直しを見直す提案を、この Epic の報告書に書く。
+- **I-15（iss-00456）と I-11（iss-00438）から引き継ぐもの**：
+  - 仕様のツリーの外から中を指すリンク（`docs/issue-plans/iss-00413-external-cli-state/artifacts/source-basis.md` など）は、`cut` の後に切れる（移行のスクリプトは仕様のツリーの中だけを写す）。切り替えのPRで一覧にして直す。
+  - 本物の GitHub での確かめ（予行演習の GitHub は偽物）：`register`、`verify`、作った Issue の見つけ直し（作成者と作成の時刻の値の形）。GitHub App のトークンでは見つけ直しが使えない（README に書いた）。
+  - 本物の git 2.30 と、2.31〜2.33 でのスクリプトの確かめ（2.30 は Debian 11 のパッケージの置き場の 404 で入れられず、確かめていない。I-12 の各リポジトリの準備でも、そのリポジトリで使う git の版を確かめる）。
+  - AC-17（ダッシュボード）の実機の確かめ：本物の mainのチェックアウトで、最初の周期が2026-09-21 の5つのファイルを日本語の題名のものに置き換えること。I-16 の後の CLI での `workspace validate` の確かめ。
 - **注意**：GitHub への書き込みと、既定のブランチを変えるPRは、利用者の目の前で行う。止まったら、`design.md` の戻し方に従い、利用者に判断を求める。
 
 ### I-11 Regenerate Dashboard From Structure Snapshot
@@ -364,6 +372,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   6. 凍結を解き、3日間の運用に入る。
 - **受け入れ**：4つのリポジトリのそれぞれで、AC-19（予行演習の記録、`canonical check` と `verify` の一致、検査のワークフローの通過）と、AC-01、AC-04、AC-12 と同じことを確かめる。切り替えの後の3日間の運用で、5つのリポジトリのどれにも仕様の失われがなく、`canonical status` に未解決の異常がない。この結果を利用者に示し、撤去（I-13）に進むかどうかを確かめる。
 - **準備で利用者と決めること**（I-8 の `plan` で分かった）：Orca の repo の一覧にある `/Volumes/990p2t/workspace/company-os/businesses/housing-lifecycle/products/taikyohiyou_project` は、taikyohiyou の2つ目のクローンで、worktree 1つに仕様の変更が9件ある。同じ GitHub のリポジトリかを確かめ、変更を `adopt-worktree` で取り込むか、捨てるかを、利用者と決める。
+- **I-15（iss-00456）から引き継ぐもの**：本物の git 2.30 と、本物の GitHub での `register`（I-10 の引き継ぎと同じ）を、各リポジトリの準備で確かめる。仕様のツリーの外から中を指すリンクが、各リポジトリにあれば、切り替えのPRで一覧にして直す。
 - **注意**：1つのリポジトリで止まったときは、そのリポジトリだけを `design.md` の「戻し方」で戻すか、直して続けるかを、利用者に判断してもらう。ほかのリポジトリの切り替えは、止まったリポジトリと独立している。
 
 ### I-13 Remove Legacy Mode
@@ -439,6 +448,8 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **受け入れ**：
   - `register --apply` が Issue の本文を変えない（偽の `gh` の記録）。`verify` と `undo` に印の項目がない。
   - 一時のリポジトリと偽の `gh` で、`register --apply` を Issue の作成の直後で止めて再実行すると、条件に合う1件を拾い、重複して作らない。条件に合う Issue が2件以上なら、番号の一覧を付けて止まる。
+  - 古いコミットで平らにできないパス（ローカルの ID、重なる ID、仮置きの `epics/` の下）は、そのコミットからだけ落とし、件数とパスの種類を出力に出す。先端と `adopt-worktree` の状態に平らにできないものがあれば、一覧にして止まる（iss-00456 の統括の判断、2026-10-29）。
+  - HTML（`.html`、`.htm`）の相対の `href` と `src` も、Markdown と同じ規則で書き換え、書き換えられないものは同じ一覧に入れる。予行演習の0件にも含める（同）。
   - `build-canonical` の結果の、どのコミットのツリーも平らで（Scope のディレクトリは区切りの下の `<ID>/` だけ、`epics/` と `issues/` がない）、`.meta.json` がない。ファイルの中身は、リンクの書き換えのほかは元と一致する。
   - 入れ子の Initiative、Epic、Issue に、相対のシンボリックリンク（`artifacts/rules.md`、`discussions/rules.md`、`epics/rules.md`、`issues/rules.md`）と、Markdown の相対リンク（「詳細:」の `spec-dock/docs` へのリンク、`../requirement.md`、`../../artifacts/…`、`../issues`、リポジトリのルートの `docs/` へのリンク）と、`discussions/` の下の ID の形の名前のディレクトリ（Scope ではない）を置いた一時のリポジトリで、写した後に、どのリンクも11章の規則どおりの先を開く。書き換えられないリンクを置くと、`plan` と `build-canonical` が一覧にする。
   - 予行演習（本物の spec-dock を内蔵のディスクの一時ディレクトリに写したクローン、bare の origin、一時の `XDG_STATE_HOME`）で、書き換えられないリンクが0件である（2026-10-29 の統括の判断。spec-dock には相対のシンボリックリンクが291個、深さに依る相対リンクを持つ Markdown が164個ある）。本物のリポジトリと GitHub には書かない。
