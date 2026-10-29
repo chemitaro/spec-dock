@@ -40,7 +40,6 @@ def test_plan_lists_local_scopes_with_their_replacement_and_no_blocking_anomaly(
         "label.create": 3,
         "issue.create": 1,
         "issue.label": 6,
-        "issue.marker": 6,
         "sub_issue": 4,
         "blocked_by": 1,
     }
@@ -273,4 +272,14 @@ def test_the_readme_covers_preparation_rehearsal_cutover_rollback_and_scopeless_
     ):
         assert f"`{command}" in readme
     assert "idmap.json" in readme and "--no-schedule" in readme
+    for text in (
+        "## 平らにする写し",
+        "<区切り>/<ID>/",
+        "unrewritable",
+        "data.history",
+        "untitled",
+        "SCOPE_KIND_CHANGED",
+    ):
+        assert text in readme
+    assert "slug の印" not in readme and "spec-dock:slug" not in readme
     assert (SCRIPT.parent / ".gitignore").read_text() == "/.state/\n"
