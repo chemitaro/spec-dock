@@ -75,6 +75,7 @@ class FakeIssue:
     created_at: str = ""
     closed_at: str | None = None
     repository: str = ""
+    author: str = ""
 
 
 @dataclass
@@ -140,6 +141,8 @@ class FakeGithub:
         assignees: Iterable[str] = (),
         pull_request: bool = False,
         repository: str | None = None,
+        author: str | None = None,
+        created_at: datetime | None = None,
     ) -> FakeIssue:
         owner = (repository or self.repository).lower()
         if number is None:
@@ -159,12 +162,13 @@ class FakeGithub:
             assignees=list(assignees),
             pull_request=pull_request,
             repository=owner,
+            author=self.login if author is None else author,
         )
         for name in issue.labels:
             self.labels.setdefault(name, {"name": name, "color": "ededed", "description": ""})
         self.issues[owner, number] = issue
         self._touch(issue)
-        issue.created_at = issue.updated_at
+        issue.created_at = issue.updated_at if created_at is None else _timestamp(created_at)
         issue.closed_at = issue.updated_at if state == "closed" else None
         return issue
 
@@ -391,6 +395,7 @@ class FakeGithub:
             "updated_at": issue.updated_at,
             "created_at": issue.created_at,
             "closed_at": issue.closed_at,
+            "user": {"login": issue.author},
             "html_url": f"https://github.com/{issue.repository}/issues/{issue.number}",
             "repository_url": f"https://api.github.com/repos/{issue.repository}",
         }
@@ -476,6 +481,7 @@ class FakeGithub:
             "updatedAt": issue.updated_at,
             "createdAt": issue.created_at,
             "closedAt": issue.closed_at,
+            "author": {"login": issue.author},
             "url": f"https://github.com/{issue.repository}/issues/{issue.number}",
             "labels": {
                 "totalCount": len(issue.labels),

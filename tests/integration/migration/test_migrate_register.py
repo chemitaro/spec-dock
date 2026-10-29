@@ -1,4 +1,4 @@
-"""migrate.py register, verify and undo against the fake GitHub (AC-435-06, 07, 08, 17)."""
+"""migrate.py register, verify and undo against the fake GitHub (AC-435-06, 07, 08, 17, AC-456-01, 02)."""
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ if TYPE_CHECKING:
     import pytest
 
     from tests.support.fake_github import FakeGithub
+    from tests.support.migration_repo import Legacy
 
 
 def _model(fake: FakeGithub) -> dict:
@@ -48,9 +49,12 @@ def test_register_adds_structure_maps_local_scopes_and_verify_matches(
     assert fake.labels["spec-dock:epic"]["color"] == "1d76db"
     created = fake.issue(40)
     assert created.title == "Architecture" and created.labels == ["spec-dock:initiative"]
-    assert "<!-- spec-dock:slug=architecture -->" in created.body
+    assert created.body == ""
     assert fake.issue(31).labels == [] and fake.issue(31).state == "closed"  # the unrelated Issue stays untouched
-    assert fake.issue(3).body == "Gamma body.\n\n<!-- spec-dock:slug=gamma -->\n"
+    assert fake.issue(3).body == "Gamma body."  # register never writes a body
+    assert not [r for r in fake.writes() if r.method == "PATCH"]
+    creation = next(r for r in fake.writes() if r.endpoint == "repos/example/repo/issues")
+    assert creation.payload == {"title": "Architecture", "labels": ["spec-dock:initiative"]}
     assert fake.issue(3).parent == ["example/repo", 2]
     assert fake.issue(5).parent == ["example/repo", 39]
     assert fake.issue(3).blocked_by == [["example/repo", 4]]
@@ -129,7 +133,13 @@ def test_a_lost_create_answer_is_recovered_without_a_second_issue(
 def test_register_paces_writes_and_waits_out_a_rate_limit(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     legacy = build_legacy(tmp_path, monkeypatch)
     fake = legacy.github
-    fake.inject(status=403, headers={"retry-after": "30"}, body={"message": "secondary rate limit"}, method="PATCH")
+    fake.inject(
+        status=403,
+        headers={"retry-after": "30"},
+        body={"message": "secondary rate limit"},
+        method="POST",
+        endpoint="repos/example/repo/issues/1/labels",
+    )
     code, result = legacy.run("register", apply=True)
     assert code == 0, result
     writes = list(fake.writes())
@@ -166,13 +176,14 @@ def test_register_skips_conflicting_github_structure_and_verify_reports_it(
     legacy = build_legacy(tmp_path, monkeypatch)
     fake = legacy.github
     fake.issue(4).labels = ["spec-dock:epic"]
-    fake.issue(4).body = "<!-- spec-dock:slug=other -->\n"
+    fake.issue(4).body = "<!-- spec-dock:slug=other -->\n"  # an old marker is only text now
     fake.add_issue(70, title="Elsewhere")
     fake.set_parent(3, 70)
     code, result = legacy.run("register", apply=True)
     assert code == 0, result
     codes = {item["code"] for item in result["anomalies"]}
-    assert {"KIND_LABEL_CONFLICT", "SLUG_MARKER_CONFLICT", "PARENT_CONFLICT"} <= codes
+    assert {"KIND_LABEL_CONFLICT", "PARENT_CONFLICT"} <= codes
+    assert "SLUG_MARKER_CONFLICT" not in codes
     assert fake.issue(4).labels == ["spec-dock:epic"]
     assert fake.issue(4).body == "<!-- spec-dock:slug=other -->\n"
     assert fake.issue(3).parent == ["example/repo", 70]
@@ -195,26 +206,84 @@ def test_blocking_anomalies_stop_register_before_any_write(tmp_path: Path, monke
     assert {"ID_NUMBER_MISMATCH", "DUPLICATE_NUMBER"} <= {item["code"] for item in result["anomalies"]}
 
 
-def test_undo_finds_an_issue_whose_creation_was_never_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    legacy = build_legacy(tmp_path, monkeypatch)
-    legacy.records.mkdir(parents=True)
+def _creation_intent(legacy: Legacy, at: str = "2026-10-26T00:00:00Z") -> None:
+    """undo.jsonl as left by a register stopped right after it sent the Issue creation."""
+    legacy.records.mkdir(parents=True, exist_ok=True)
     intent = {
         "seq": 1,
-        "at": "2026-10-26T00:00:00Z",
+        "at": at,
         "phase": "intent",
         "op": "issue.create",
         "local_id": "init-local-00003",
         "title": "Architecture",
-        "slug": "architecture",
         "label": "spec-dock:initiative",
     }
     (legacy.records / "undo.jsonl").write_text(json.dumps(intent) + "\n")
-    orphan = legacy.github.add_issue(
-        title="Architecture", body="<!-- spec-dock:slug=architecture -->\n", labels=["spec-dock:initiative"]
-    )
+
+
+def _issue_creations(fake: FakeGithub) -> list:
+    return [r for r in fake.writes() if r.method == "POST" and r.endpoint == "repos/example/repo/issues"]
+
+
+def test_undo_finds_an_issue_whose_creation_was_never_recorded(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    _creation_intent(legacy)
+    orphan = legacy.github.add_issue(title="Architecture", labels=["spec-dock:initiative"])
     code, result = legacy.run("undo", apply=True)
     assert code == 0, result
     assert orphan.state == "closed" and orphan.state_reason == "not_planned" and orphan.labels == []
+
+
+def test_a_register_stopped_after_the_creation_picks_that_issue_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    _creation_intent(legacy, at="2026-10-26T00:03:00Z")  # the local clock ran three minutes ahead of GitHub
+    orphan = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    code, result = legacy.run("register", apply=True)
+    assert code == 0, result
+    assert _issue_creations(fake) == []
+    idmap = json.loads((legacy.records / "idmap.json").read_text())["entries"]
+    assert idmap["init-local-00003"] == {"id": f"init-{orphan.number:05d}", "number": orphan.number, "how": "created"}
+    assert legacy.run("verify")[0] == 0
+
+
+def test_two_matching_issues_stop_register_with_their_numbers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    _creation_intent(legacy)
+    first = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    second = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    code, result = legacy.run("register", apply=True)
+    assert code in (2, 3) and result["status"] in ("refused", "stopped")
+    assert f"#{first.number}" in result["error"] and f"#{second.number}" in result["error"]
+    assert any("register --apply" in step for step in result["next_steps"])
+    assert _issue_creations(fake) == []
+    code, result = legacy.run("undo", apply=True)
+    assert code in (2, 3) and f"#{first.number}" in result["error"]
+    assert first.state == "open" and second.state == "open"
+
+
+def test_issues_by_someone_else_or_from_before_the_intent_are_not_picked_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import datetime, timezone
+
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    _creation_intent(legacy, at="2026-10-26T00:10:00Z")
+    stranger = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"], author="someone-else")
+    older = fake.add_issue(
+        title="Architecture",
+        labels=["spec-dock:initiative"],
+        created_at=datetime(2026, 10, 26, 0, 4, 59, tzinfo=timezone.utc),  # beyond the five-minute allowance
+    )
+    code, result = legacy.run("register", apply=True)
+    assert code == 0, result
+    assert len(_issue_creations(fake)) == 1
+    number = json.loads((legacy.records / "idmap.json").read_text())["entries"]["init-local-00003"]["number"]
+    assert number not in (stranger.number, older.number)
 
 
 def test_a_label_someone_else_created_meanwhile_is_never_deleted_by_undo(
@@ -244,3 +313,66 @@ def test_graphql_rate_limits_are_waited_out(tmp_path: Path, monkeypatch: pytest.
     code, _ = legacy.run("plan")
     assert code == 0
     assert 60.0 in legacy.clock.sleeps
+
+
+def test_undo_does_not_count_an_issue_already_recorded_for_another_creation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    recorded = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    orphan = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    legacy.records.mkdir(parents=True, exist_ok=True)
+    base = {"op": "issue.create", "title": "Architecture", "label": "spec-dock:initiative"}
+    lines = [
+        {"seq": 1, "at": "2026-10-26T00:00:00Z", "phase": "intent", "local_id": "init-local-00007", **base},
+        {
+            "seq": 2,
+            "at": "2026-10-26T00:00:00Z",
+            "phase": "done",
+            "ref": 1,
+            "local_id": "init-local-00007",
+            "number": recorded.number,
+            "database_id": recorded.id,
+            **base,
+        },
+        {"seq": 3, "at": "2026-10-26T00:00:00Z", "phase": "intent", "local_id": "init-local-00008", **base},
+    ]
+    (legacy.records / "undo.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
+    code, result = legacy.run("undo", apply=True)
+    assert code == 0, result
+    assert orphan.state == "closed" and recorded.state == "closed"  # each closed once, by its own record
+
+
+def test_a_creation_recorded_before_the_id_map_was_saved_is_used_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    created = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    legacy.records.mkdir(parents=True, exist_ok=True)
+    base = {
+        "op": "issue.create",
+        "local_id": "init-local-00003",
+        "title": "Architecture",
+        "label": "spec-dock:initiative",
+    }
+    lines = [
+        {"seq": 1, "at": "2026-10-26T00:00:00Z", "phase": "intent", **base},
+        {
+            "seq": 2,
+            "at": "2026-10-26T00:00:00Z",
+            "phase": "done",
+            "ref": 1,
+            "number": created.number,
+            "database_id": created.id,
+            **base,
+        },
+    ]
+    (legacy.records / "undo.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
+    code, result = legacy.run("register", apply=True)
+    assert code == 0, result
+    assert _issue_creations(fake) == []
+    idmap = json.loads((legacy.records / "idmap.json").read_text())["entries"]
+    assert idmap["init-local-00003"]["number"] == created.number
+    assert legacy.run("verify")[0] == 0

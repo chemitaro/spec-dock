@@ -1,4 +1,4 @@
-"""migrate.py move-local, adopt-worktree and export-legacy on real checkouts (AC-435-03, 04, 10, 11, 12)."""
+"""migrate.py move-local, adopt-worktree and export-legacy on real checkouts (AC-435-03, 04, 10, 11, 12, AC-456-06, 07)."""
 
 from __future__ import annotations
 
@@ -6,8 +6,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from spec_dock.cli import main as spec_dock_main
-from spec_dock.runtime.infra import runtime_environment
-from tests.support.canonical_repo import add_worktree, clone, environment, git
+from tests.support.canonical_repo import add_worktree, clone, git
 from tests.support.migration_repo import (
     EPIC,
     INIT,
@@ -15,8 +14,10 @@ from tests.support.migration_repo import (
     ISSUE4,
     LOCAL2,
     Legacy,
-    build_legacy,
+    flat_path,
     legacy_specs,
+    merge_cut,
+    migrated,
     refs,
     write_files,
 )
@@ -26,24 +27,8 @@ if TYPE_CHECKING:
 
     import pytest
 
-CUT = "spec-dock/migrate-to-canonical"
-
-
-def _migrated(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, **options: Any) -> Legacy:
-    legacy = build_legacy(tmp_path, monkeypatch, **options)
-    monkeypatch.setattr(runtime_environment, "detect_runtime_environment", lambda *a, **k: environment())
-    for command in ("register", "build-canonical", "cut"):
-        code, result = legacy.run(command, apply=True)
-        assert code == 0, (command, result)
-    return legacy
-
-
-def _merge_cut(legacy: Legacy) -> None:
-    """The human PR merge: origin's default branch takes the cut branch."""
-    git(legacy.main, "fetch", "-q", "origin")
-    git(legacy.main, "merge", "-q", "--ff-only", f"origin/{CUT}")
-    git(legacy.main, "push", "-q", "origin", f"HEAD:{legacy.default_branch}")
-    git(legacy.main, "fetch", "-q", "origin")
+_migrated = migrated
+_merge_cut = merge_cut
 
 
 def _link(capsys: pytest.CaptureFixture[str], checkout: Path) -> tuple[int, dict[str, Any]]:
@@ -69,12 +54,12 @@ def test_move_local_moves_ignored_and_untracked_files_into_a_new_catalog_that_li
     code, result = legacy.run("move-local", str(legacy.main), "--pc-name", "Test.PC.local", apply=True)
     assert code == 0, result
     catalog = legacy.main / "spec-dock/.canonical"
-    gamma = catalog / ISSUE3.removeprefix("spec-dock/initiatives/")
+    gamma = catalog / flat_path(ISSUE3)
     assert (gamma / ".workbench/note.md").read_bytes() == b"ignored note\n"
     assert (gamma / "draft.md").read_bytes() == b"untracked draft\n"
     assert (gamma / "plan.md").read_bytes() == b"# Gamma plan\n"
     assert (gamma / "plan.local-test.md").read_bytes() == b"# my local plan\n"
-    assert (catalog / "init-00039-proto/extra.md").read_bytes() == b"local extra\n"
+    assert (catalog / flat_path(f"{LOCAL2}/extra.md")).read_bytes() == b"local extra\n"
     assert not (legacy.main / "spec-dock/initiatives").exists()
     worktrees = git(legacy.main, "worktree", "list", "--porcelain")
     assert f"worktree {catalog}" in worktrees and "locked spec-dock canonical catalog" in worktrees
@@ -84,7 +69,7 @@ def test_move_local_moves_ignored_and_untracked_files_into_a_new_catalog_that_li
     assert linked["status"] == "succeeded"
     assert ("catalog.create", "succeeded") not in [(e["kind"], e["status"]) for e in linked["effects"]]
     assert (legacy.main / "spec-dock/initiatives").is_symlink()
-    assert (legacy.main / "spec-dock/initiatives" / ISSUE3.removeprefix("spec-dock/initiatives/") / "draft.md").exists()
+    assert (legacy.main / "spec-dock/initiatives" / flat_path(ISSUE3) / "draft.md").exists()
 
 
 def test_move_local_refuses_tracked_specs_and_metadata(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,9 +112,7 @@ def test_adopt_worktree_moves_branch_specs_into_canonical_and_the_branch_merges_
     assert "iss-00004: title 'Delta' -> 'Delta v2'" in preview["data"]["structure_differences"]
     code, result = legacy.run("adopt-worktree", str(feature), apply=True)
     assert code == 0, result
-    gamma = ISSUE3.removeprefix("spec-dock/initiatives/")
-    delta = ISSUE4.removeprefix("spec-dock/initiatives/")
-    beta = EPIC.removeprefix("spec-dock/initiatives/")
+    gamma, delta, beta = flat_path(ISSUE3), flat_path(ISSUE4), flat_path(EPIC)
 
     def canonical(path: str) -> bytes:
         import subprocess
@@ -165,7 +148,7 @@ def test_both_sides_changing_one_file_keeps_canonical_and_stops_before_removing(
     feature = _feature(legacy, tmp_path)
     _merge_cut(legacy)
     other = clone(legacy.remote, tmp_path / "canonical-editor", "--branch", "spec-dock/canonical")
-    write_files(other, {f"{ISSUE3.removeprefix('spec-dock/initiatives/')}/plan.md": b"# canonical side\n"})
+    write_files(other, {f"{flat_path(ISSUE3)}/plan.md": b"# canonical side\n"})
     git(other, "commit", "-qam", "canonical edit")
     git(other, "push", "-q", "origin", "HEAD:spec-dock/canonical")
     code, preview = legacy.run("adopt-worktree", str(feature), "--pc-name", "box")
@@ -173,7 +156,7 @@ def test_both_sides_changing_one_file_keeps_canonical_and_stops_before_removing(
     status = git(feature, "status", "--porcelain")
     code, result = legacy.run("adopt-worktree", str(feature), "--pc-name", "box", apply=True)
     assert code == 3 and result["status"] == "stopped"
-    gamma = ISSUE3.removeprefix("spec-dock/initiatives/")
+    gamma = flat_path(ISSUE3)
     tree = git(legacy.remote, "ls-tree", "-r", "--name-only", "spec-dock/canonical", "--", gamma)
     copies = [line for line in tree.splitlines() if ".conflict-box-" in line]
     assert len(copies) == 1 and copies[0].endswith(".md")
