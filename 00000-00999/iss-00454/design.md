@@ -54,8 +54,8 @@ Mac mini
 | `provider-ci.yml` | 振り分けの結果でランナーを選ぶ。リポジトリ名は `chemitaro/spec-dock` に固定（fork の側の変数では手元に行かない） | ジョブの名前は今と同じ |
 | `.github/runner/spec-dock-ci.lima.yaml` | VM の形（plain、mount なし、SSH の鍵を読まない、image の digest を固定） | `limactl create` |
 | `.github/runner/nftables.conf` | 外向きの接続の制限（root だけが変更できる） | `/etc/nftables.conf` |
-| `.github/runner/guest-setup.sh` | VM の中の root の準備（パッケージ、nftables、利用者、ランナーの tar の SHA256 の確かめ、フック、needrestart）。何度実行してもよい。置き場所とファイルが root か実行者の持ち物で、ほかの人が書けないときだけ動く | Lima の利用者のホームから `sudo sh ~/spec-dock-runner/guest-setup.sh` |
-| `.github/runner/register-runner.sh` | 登録のトークンを標準入力から読み、`ACTIONS_RUNNER_INPUT_TOKEN` で `config.sh` に渡す。systemd に登録 | 標準入力1行 |
+| `.github/runner/guest-setup.sh` | VM の中の root の準備（パッケージ、nftables、利用者、ランナーの tar の SHA256 の確かめ、フック、needrestart）。何度実行してもよい。置き場所とファイルが root か実行者の持ち物で、ほかの人が書けないときだけ動く。root は、ランナーの利用者が書けるファイルを実行も利用もしない（依存の導入は root の持ち物の `/opt/spec-dock-ci/runner-dist-<版>` から、systemd の unit は root が自分の文面で書き、`svc.sh` とそのひな形を使わない） | Lima の利用者のホームから `sudo sh ~/spec-dock-runner/guest-setup.sh` |
+| `.github/runner/register-runner.sh` | 登録のトークンを標準入力から読み、pipe でランナーの利用者のシェルに渡し、そこで `ACTIONS_RUNNER_INPUT_TOKEN` にして `config.sh` を動かす（sudo の記録に値が出ない）。guest-setup が書いた unit を `systemctl enable --now` | 標準入力1行 |
 | `job-started.sh` / `job-completed.sh` | ジョブの前の判定（`python3 -I` で、利用者の site-packages や `PYTHONPATH` を読まない）と、後の作業場所の掃除（`_tool` だけを残す） | ランナーの `.env` の `ACTIONS_RUNNER_HOOK_JOB_*` |
 | `host-install.sh` / `host-ensure-vm.sh` | Mac の側の Lima の導入（SHA256SUMS で確かめる）と LaunchAgent | `lima`、`agent` |
 
