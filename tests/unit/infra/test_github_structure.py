@@ -20,7 +20,7 @@ def _api(fake: FakeGithub) -> GithubApi:
 
 def test_status_comes_from_the_status_line_so_304_with_exit_one_is_an_answer() -> None:
     fake = FakeGithub()
-    fake.scope("epic", slug="core")
+    fake.scope("epic", title="core")
     api = _api(fake)
     endpoint = "repos/example/repo/issues?labels=spec-dock%3Aepic&state=all&sort=updated&direction=desc&per_page=1"
     first = api.request("GET", endpoint, ok=frozenset({200, 304}))
@@ -50,15 +50,15 @@ def test_unexpected_client_errors_keep_the_current_classification(status: int, c
 
 def test_expected_404_is_a_normal_answer() -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf")
+    issue = fake.scope("issue", title="leaf")
     response = _api(fake).request("GET", f"repos/example/repo/issues/{issue.number}/parent", ok=frozenset({200, 404}))
     assert response.status == 404
 
 
 def test_json_bodies_with_numbers_and_arrays_go_through_standard_input() -> None:
     fake = FakeGithub()
-    parent = fake.scope("epic", slug="core")
-    child = fake.scope("issue", slug="leaf")
+    parent = fake.scope("epic", title="core")
+    child = fake.scope("issue", title="leaf")
     _api(fake).request(
         "POST",
         f"repos/example/repo/issues/{parent.number}/sub_issues",
@@ -130,7 +130,7 @@ def test_reads_stop_when_the_wait_exceeds_sixty_seconds_or_after_three_retries()
 
 def test_rate_limited_writes_stop_at_once_without_an_uncertain_effect() -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf", title="Before")
+    issue = fake.scope("issue", title="Before")
     fake.inject(status=403, headers={"retry-after": "5"}, body=SECONDARY, method="PATCH")
     with pytest.raises(GithubStructureError) as caught:
         _api(fake).request("PATCH", f"repos/example/repo/issues/{issue.number}", payload={"title": "After"})
@@ -157,7 +157,7 @@ def test_server_errors_retry_reads_with_backoff_and_mark_writes_uncertain() -> N
 
 def test_writes_in_one_command_are_at_least_one_second_apart() -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf")
+    issue = fake.scope("issue", title="leaf")
     api = _api(fake)
     endpoint = f"repos/example/repo/issues/{issue.number}"
     api.request("PATCH", endpoint, payload={"title": "one"})
@@ -190,7 +190,7 @@ def test_repository_names_are_lowercase_and_validated() -> None:
 def test_full_read_pages_through_all_kind_labelled_issues_with_one_query_per_page() -> None:
     fake = FakeGithub()
     for number in range(1, 206):
-        fake.scope(("initiative", "epic", "issue")[number % 3], slug=f"s{number}")
+        fake.scope(("initiative", "epic", "issue")[number % 3], title=f"s{number}")
     fake.add_issue(title="Not a Scope")
     fetched = _client(fake).fetch_structure()
     assert [issue.facts.number for issue in fetched] == list(range(1, 206))
@@ -208,8 +208,8 @@ def test_full_read_pages_through_all_kind_labelled_issues_with_one_query_per_pag
 
 def test_full_read_completes_overflowing_relations_and_labels_with_serial_rest_reads() -> None:
     fake = FakeGithub(relation_limit=2, label_limit=2)
-    epic = fake.scope("epic", slug="core", labels=("a", "b"))
-    children = [fake.scope("issue", slug=f"c{index}", parent=epic.number) for index in range(3)]
+    epic = fake.scope("epic", title="core", labels=("a", "b"))
+    children = [fake.scope("issue", title=f"c{index}", parent=epic.number) for index in range(3)]
     plain = [fake.add_issue(title=f"Plain {index}", state="closed") for index in range(3)]
     for blocker in plain:
         fake.block(children[0].number, by=blocker.number)
@@ -233,7 +233,7 @@ def test_full_read_completes_overflowing_relations_and_labels_with_serial_rest_r
 
 def test_graphql_states_are_normalized_like_rest() -> None:
     fake = FakeGithub()
-    fake.scope("issue", slug="dropped", state="closed", state_reason="not_planned")
+    fake.scope("issue", title="dropped", state="closed", state_reason="not_planned")
     (issue,) = _client(fake).fetch_structure()
     assert (issue.facts.state, issue.facts.state_reason) == ("closed", "not_planned")
 
@@ -255,7 +255,7 @@ def test_graphql_errors_fail_without_partial_data(errors: list[dict[str, str]], 
 
 def test_graphql_rate_limit_errors_wait_and_retry() -> None:
     fake = FakeGithub()
-    fake.scope("issue", slug="leaf")
+    fake.scope("issue", title="leaf")
     fake.inject(
         status=200, body={"data": None, "errors": [{"type": "RATE_LIMITED", "message": "API rate limit exceeded"}]}
     )
@@ -265,7 +265,7 @@ def test_graphql_rate_limit_errors_wait_and_retry() -> None:
 
 def test_a_graphql_rate_limit_with_a_zero_wait_does_not_wait_a_minute() -> None:
     fake = FakeGithub()
-    fake.scope("issue", slug="leaf")
+    fake.scope("issue", title="leaf")
     fake.inject(
         status=200,
         headers={"retry-after": "0"},
@@ -277,7 +277,7 @@ def test_a_graphql_rate_limit_with_a_zero_wait_does_not_wait_a_minute() -> None:
 
 def test_probe_sends_three_conditional_requests_and_reports_changes() -> None:
     fake = FakeGithub()
-    epic = fake.scope("epic", slug="core")
+    epic = fake.scope("epic", title="core")
     client = _client(fake)
     first = client.probe({})
     assert first.changed is True and set(first.etags) == {"spec-dock:initiative", "spec-dock:epic", "spec-dock:issue"}
@@ -298,9 +298,9 @@ def test_probe_sends_three_conditional_requests_and_reports_changes() -> None:
 
 def test_relation_writes_send_issue_ids_not_numbers() -> None:
     fake = FakeGithub()
-    epic = fake.scope("epic", slug="core")
-    other = fake.scope("epic", slug="spare")
-    leaf = fake.scope("issue", slug="leaf")
+    epic = fake.scope("epic", title="core")
+    other = fake.scope("epic", title="spare")
+    leaf = fake.scope("issue", title="leaf")
     blocker = fake.add_issue(title="Vendor")
     client = _client(fake)
     client.add_sub_issue(epic.number, child=leaf.number, child_id=leaf.id)
@@ -333,15 +333,9 @@ def test_issue_label_and_assignee_writes_return_or_confirm_github_state() -> Non
 
     fake = FakeGithub()
     client = _client(fake)
-    created = client.create_issue(
-        title="計画", body="Body\n\n<!-- spec-dock:slug=plan -->\n", labels=["spec-dock:initiative"]
-    )
+    created = client.create_issue(title="計画", labels=["spec-dock:initiative"])
     assert created.labels == ("spec-dock:initiative",) and created.title == "計画"
-    assert fake.writes()[0].payload == {
-        "title": "計画",
-        "body": "Body\n\n<!-- spec-dock:slug=plan -->\n",
-        "labels": ["spec-dock:initiative"],
-    }
+    assert fake.writes()[0].payload == {"title": "計画", "labels": ["spec-dock:initiative"]}
     renamed = client.update_issue(created.number, title="Plan")
     assert renamed.title == "Plan" and fake.writes()[-1].payload == {"title": "Plan"}
     closed = client.update_issue(created.number, state="closed", state_reason="completed")
@@ -359,8 +353,8 @@ def test_issue_label_and_assignee_writes_return_or_confirm_github_state() -> Non
 
 def test_parent_404_means_no_parent_and_other_reads_keep_their_meaning() -> None:
     fake = FakeGithub()
-    epic = fake.scope("epic", slug="core")
-    leaf = fake.scope("issue", slug="leaf", parent=epic.number)
+    epic = fake.scope("epic", title="core")
+    leaf = fake.scope("issue", title="leaf", parent=epic.number)
     client = _client(fake)
     assert client.get_parent(epic.number) is None
     parent = client.get_parent(leaf.number)
@@ -372,8 +366,8 @@ def test_parent_404_means_no_parent_and_other_reads_keep_their_meaning() -> None
 
 def test_uncertain_writes_are_confirmed_by_reading_back() -> None:
     fake = FakeGithub()
-    epic = fake.scope("epic", slug="core")
-    leaf = fake.scope("issue", slug="leaf", title="Before")
+    epic = fake.scope("epic", title="core")
+    leaf = fake.scope("issue", title="Before")
     client = _client(fake)
     fake.inject(status=502, body={"message": "lost"}, method="POST", endpoint="sub_issues", apply=True)
     client.add_sub_issue(epic.number, child=leaf.number, child_id=leaf.id)
@@ -386,7 +380,7 @@ def test_uncertain_writes_are_confirmed_by_reading_back() -> None:
     assert client.update_issue(leaf.number, title="After").title == "After"
     fake.inject(status=502, body={"message": "lost"}, method="POST", endpoint="repos/example/repo/issues")
     with pytest.raises(GithubStructureError) as caught:
-        client.create_issue(title="New", body="", labels=[])
+        client.create_issue(title="New", labels=[])
     assert (caught.value.code, caught.value.uncertain) == ("GITHUB_CREATE_IDENTITY_UNKNOWN", True)
 
 
@@ -403,7 +397,7 @@ def test_repository_for_a_checkout_comes_from_the_origin_remote(tmp_path: Path) 
 @pytest.mark.parametrize("body", ["not json", {"unexpected": "shape"}])
 def test_a_write_answered_with_an_unreadable_body_is_confirmed_by_reading_back(body: object) -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf", title="Before")
+    issue = fake.scope("issue", title="Before")
     client = _client(fake)
     fake.inject(status=200, body=body, method="PATCH", apply=True)
     assert client.update_issue(issue.number, title="After").title == "After"
@@ -417,19 +411,19 @@ def test_a_write_answered_with_an_unreadable_body_is_confirmed_by_reading_back(b
 
 def test_removing_a_sub_issue_from_an_unreadable_issue_is_not_a_success() -> None:
     fake = FakeGithub()
-    epic = fake.scope("epic", slug="core")
+    epic = fake.scope("epic", title="core")
     client = _client(fake)
     with pytest.raises(GithubStructureError) as caught:
         client.remove_sub_issue(epic.number, child=999, child_id=fake.issue_id(999))
     assert caught.value.code == "GITHUB_ACCESS_DENIED"
-    leaf = fake.scope("issue", slug="leaf")
+    leaf = fake.scope("issue", title="leaf")
     client.remove_sub_issue(epic.number, child=leaf.number, child_id=leaf.id)
 
 
 @pytest.mark.parametrize("kind", ["pull request", "foreign"])
 def test_issue_reads_and_writes_reject_pull_requests_and_foreign_issues(kind: str) -> None:
     fake = FakeGithub()
-    issue = fake.scope("issue", slug="leaf")
+    issue = fake.scope("issue", title="leaf")
     client = _client(fake)
     if kind == "pull request":
         issue.pull_request = True
@@ -463,38 +457,34 @@ def test_the_full_read_query_uses_the_shared_kind_labels() -> None:
     from spec_dock.runtime.infra.github_structure import FULL_READ_QUERY
 
     assert "labels: [" + ", ".join(f'"{label}"' for label in KIND_LABELS.values()) + "]" in FULL_READ_QUERY
+    assert "body" not in FULL_READ_QUERY.split()
 
 
 def test_rule_violations_from_the_fake_github_reach_the_snapshot_anomalies() -> None:
     from spec_dock.runtime.domain.canonical_structure import build_snapshot
 
     fake = FakeGithub()
-    plan = fake.scope("initiative", slug="plan")
-    core = fake.scope("epic", slug="core", parent=plan.number)
-    leaf = fake.scope("issue", slug="leaf", parent=core.number)
-    double = fake.scope("epic", slug="double", parent=plan.number, labels=("spec-dock:issue",))
-    missing = fake.add_issue(title="No marker", body="Body", labels=("spec-dock:epic",))
-    fake.set_parent(missing.number, plan.number)
-    twice = fake.add_issue(
-        title="Two markers",
-        body="<!-- spec-dock:slug=a -->\r\n<!-- spec-dock:slug=b -->\r\n",
-        labels=("spec-dock:issue",),
+    plan = fake.scope("initiative", title="plan")
+    core = fake.scope("epic", title="core", parent=plan.number)
+    leaf = fake.scope("issue", title="leaf", parent=core.number)
+    double = fake.scope("epic", title="double", parent=plan.number, labels=("spec-dock:issue",))
+    unmarked = fake.add_issue(title="No marker", body="Body", labels=("spec-dock:epic",))
+    fake.set_parent(unmarked.number, plan.number)
+    old_marker = fake.add_issue(
+        title="Old marker", body="Text\r\n<!-- spec-dock:slug=old -->\r\nmore", labels=("spec-dock:issue",)
     )
-    fake.set_parent(twice.number, core.number)
-    under_issue = fake.scope("epic", slug="under-issue", parent=leaf.number)
-    crlf = fake.add_issue(
-        title="CRLF", body="Text\r\n<!-- spec-dock:slug=crlf -->\r\nmore", labels=("spec-dock:issue",)
-    )
-    fake.set_parent(crlf.number, core.number)
-    loop_a = fake.scope("issue", slug="loop-a", parent=core.number)
-    loop_b = fake.scope("issue", slug="loop-b", parent=core.number)
+    fake.set_parent(old_marker.number, core.number)
+    under_issue = fake.scope("epic", title="under-issue", parent=leaf.number)
+    moved = fake.scope("issue", title="moved", parent=core.number)
+    loop_a = fake.scope("issue", title="loop-a", parent=core.number)
+    loop_b = fake.scope("issue", title="loop-b", parent=core.number)
     fake.block(loop_a.number, by=loop_b.number)
     fake.block(loop_b.number, by=loop_a.number)
     plain = fake.add_issue(title="Plain blocker")
     fake.block(leaf.number, by=plain.number)
     fake.add_foreign_issue("other/repo", 5)
     fake.add_foreign_issue("other/repo", 6)
-    fake.set_parent(crlf.number, 6, parent_repository="other/repo")
+    fake.set_parent(moved.number, 6, parent_repository="other/repo")
     fake.block(leaf.number, by=5, repository="other/repo")
     snapshot = build_snapshot(
         "github.com/example/repo",
@@ -505,15 +495,14 @@ def test_rule_violations_from_the_fake_github_reach_the_snapshot_anomalies() -> 
     codes = {(item.number, item.code) for item in snapshot.anomalies}
     assert codes == {
         (double.number, "KIND_LABEL_MULTIPLE"),
-        (missing.number, "SLUG_MARKER_MISSING"),
-        (twice.number, "SLUG_MARKER_MULTIPLE"),
         (under_issue.number, "PARENT_INVALID"),
         (loop_a.number, "DEPENDENCY_CYCLE"),
         (loop_b.number, "DEPENDENCY_CYCLE"),
-        (crlf.number, "PARENT_FOREIGN_REPOSITORY"),
+        (moved.number, "PARENT_FOREIGN_REPOSITORY"),
         (leaf.number, "DEPENDENCY_FOREIGN_REPOSITORY"),
     }
-    assert snapshot.find(f"iss-{crlf.number:05d}") is not None and snapshot.issues[crlf.number].slug == "crlf"
+    assert snapshot.issues[unmarked.number].id == f"epic-{unmarked.number:05d}"
+    assert snapshot.issues[old_marker.number].id == f"iss-{old_marker.number:05d}"
     assert snapshot.issues[leaf.number].blocked_by == (plain.number,) and plain.number in snapshot.external
 
 

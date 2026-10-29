@@ -168,7 +168,6 @@ class FakeGithub:
         self,
         kind: str,
         *,
-        slug: str,
         title: str | None = None,
         number: int | None = None,
         parent: int | None = None,
@@ -177,11 +176,12 @@ class FakeGithub:
         labels: Iterable[str] = (),
         body: str = "Scope body.",
     ) -> FakeIssue:
-        """Add a Scope Issue with one kind label and a trailing slug marker."""
+        """Add a Scope Issue with one kind label; SpecDock never reads the body, so it carries no marker."""
+        number = self._next_number if number is None else number
         issue = self.add_issue(
             number,
-            title=title or slug.replace("-", " ").title(),
-            body=f"{body}\n\n<!-- spec-dock:slug={slug} -->\n",
+            title=title or f"Scope {number}",
+            body=body,
             labels=(KIND_LABELS[kind], *labels),
             state=state,
             state_reason=state_reason,

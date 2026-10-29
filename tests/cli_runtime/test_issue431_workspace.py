@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 @pytest.fixture
 def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CanonicalWorld:
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "plan")
-    world.scope("epic", 2, "core", parent=1)
-    world.scope("issue", 3, "leaf", parent=2)
+    world.scope("initiative", 1, "Plan")
+    world.scope("epic", 2, "Core", parent=1)
+    world.scope("issue", 3, "Leaf", parent=2)
     return world
 
 
@@ -34,51 +34,52 @@ def test_a_consistent_workspace_is_valid(world: CanonicalWorld) -> None:
 
 
 def test_validate_finds_every_error_item(world: CanonicalWorld) -> None:
-    world.scope("issue", 4, "nodir", parent=2, directory=False)
-    world.scope("issue", 5, "thin", parent=2, documents=("requirement.md",))
-    world.edit(lambda fake: fake.add_issue(6, title="no marker", labels=["spec-dock:issue"]))
-    world.directory("issue", 7, "stray", parent=2)
-    world.directory("issue", 3, "copy", parent=2)
-    world.scope("issue", 8, "named", parent=2, directory=False)
-    world.directory("issue", 8, "other-name", parent=2)
-    (world.catalog / "init-00001-plan/.meta.json").write_text("{}", encoding="utf-8")
+    world.scope("issue", 4, parent=2, directory=False)
+    world.scope("issue", 5, parent=2, documents=("requirement.md",))
+    world.directory("issue", 7)
+    (world.catalog / "00000-00999/init-00001/.meta.json").write_text("{}", encoding="utf-8")
 
     def cycle(fake: Any) -> None:
-        fake.scope("issue", slug="a", number=9, parent=2)
-        fake.scope("issue", slug="b", number=10, parent=2)
+        fake.scope("issue", number=9, parent=2)
+        fake.scope("issue", number=10, parent=2)
         fake.block(9, by=10)
         fake.block(10, by=9)
 
     world.edit(cycle)
-    world.directory("issue", 9, "a", parent=2)
-    world.directory("issue", 10, "b", parent=2)
+    world.directory("issue", 9)
+    world.directory("issue", 10)
     code, payload = world.run("workspace", "validate")
     assert (code, payload["error"]["code"]) == (7, "WORKSPACE_VALIDATION_FAILED")
-    found = codes(payload["data"]["result"]["findings"])
+    findings = payload["data"]["result"]["findings"]
     assert {
         "SCOPE_DIRECTORY_MISSING",
         "SCOPE_DOCUMENT_MISSING",
-        "SLUG_MARKER_MISSING",
         "SCOPE_ISSUE_MISSING",
-        "SCOPE_DIRECTORY_DUPLICATE",
-        "SCOPE_DIRECTORY_SLUG_MISMATCH",
         "SCOPE_METADATA_PRESENT",
         "DEPENDENCY_CYCLE",
-    } <= found
+    } <= codes(findings)
+    assert not {"SCOPE_DIRECTORY_SLUG_MISMATCH", "SCOPE_DIRECTORY_DUPLICATE"} & codes(findings)
+    by_code = {item["code"]: item["details"] for item in findings}
+    assert (by_code["SCOPE_DIRECTORY_MISSING"]["scope_id"], by_code["SCOPE_DIRECTORY_MISSING"]["path"]) == (
+        "iss-00004",
+        "00000-00999/iss-00004",
+    )
+    assert by_code["SCOPE_ISSUE_MISSING"]["path"] == "00000-00999/iss-00007"
+    assert all(by_code[code]["next_step"] for code in ("SCOPE_DIRECTORY_MISSING", "SCOPE_ISSUE_MISSING"))
 
 
 def test_validate_finds_kind_and_parent_errors(world: CanonicalWorld) -> None:
-    world.scope("issue", 4, "orphan")  # an Issue directly under no Epic
+    world.scope("issue", 4, "Orphan")  # an Issue directly under no Epic
     code, payload = world.run("workspace", "validate")
     assert code == 7
     assert codes(payload["data"]["result"]["findings"]) & {"PARENT_MISSING", "PARENT_INVALID"}
 
 
-def test_validate_warns_about_drift_conflicts_and_non_scope_dependencies(world: CanonicalWorld) -> None:
-    world.scope("epic", 4, "moved", parent=1, directory=False)
-    world.directory("epic", 4, "moved")  # at the catalog root instead of under init-00001
-    leaf = world.catalog / "init-00001-plan/epics/epic-00002-core/issues/iss-00003-leaf"
-    (leaf / "requirement.conflict-20261026.md").write_text("x", encoding="utf-8")
+def test_validate_warns_about_misplaced_names_conflicts_and_non_scope_dependencies(world: CanonicalWorld) -> None:
+    (world.catalog / "00000-00999/iss-00003-leaf").mkdir()
+    (world.catalog / "00000-00999/init-00001/epics").mkdir()
+    (world.catalog / "00000-00999/epic-00002/discussions/iss-00008-topic").mkdir(parents=True)
+    (world.catalog / "00000-00999/iss-00003/requirement.conflict-20261026.md").write_text("x", encoding="utf-8")
 
     def external(fake: Any) -> None:
         fake.add_issue(17, title="Upstream")
@@ -87,10 +88,20 @@ def test_validate_warns_about_drift_conflicts_and_non_scope_dependencies(world: 
     world.edit(external)
     code, payload = world.run("workspace", "validate")
     assert code == 0, payload
-    warnings = {item["code"]: item for item in payload["warnings"]}
-    assert set(warnings) == {"SCOPE_DIRECTORY_MISPLACED", "CANONICAL_CONFLICT_COPY", "DEPENDENCY_NOT_SCOPE"}
-    assert warnings["SCOPE_DIRECTORY_MISPLACED"]["details"]["next_step"] == "spec-dock scope move epic-00004"
-    assert warnings["SCOPE_DIRECTORY_MISPLACED"]["details"]["expected"] == "init-00001-plan/epics/epic-00004-moved"
+    assert {item["code"] for item in payload["warnings"]} == {
+        "SCOPE_DIRECTORY_MISPLACED",
+        "CANONICAL_CONFLICT_COPY",
+        "DEPENDENCY_NOT_SCOPE",
+    }
+    misplaced = [item["details"] for item in payload["warnings"] if item["code"] == "SCOPE_DIRECTORY_MISPLACED"]
+    assert [(item["path"], item["reason"]) for item in misplaced] == [
+        ("00000-00999/init-00001/epics", "nested"),
+        ("00000-00999/iss-00003-leaf", "name"),
+    ]
+    assert misplaced[0]["next_step"] == (
+        "Move the Scope contents it holds into spec-dock/initiatives/<bucket>/<ID>/ for each ID (the bucket is the "
+        "ID number's thousand range, e.g. 00000-00999/iss-00454) and delete the emptied directory."
+    )
 
 
 def test_validate_ci_points_at_canonical_check(world: CanonicalWorld) -> None:
@@ -143,21 +154,38 @@ def test_status_structure_is_not_checked_without_the_flag(world: CanonicalWorld)
     assert world.requests() == []
 
 
-def test_status_structure_reports_nesting_drift(world: CanonicalWorld) -> None:
-    world.scope("epic", 4, "moved", parent=1, directory=False)
-    world.directory("epic", 4, "moved")
+def test_status_structure_reports_the_four_directory_anomalies(world: CanonicalWorld) -> None:
+    world.scope("issue", 4, parent=2, directory=False)
+    world.directory("issue", 7)
+    (world.catalog / "00000-00999/iss-00003-leaf").mkdir()
+    world.edit(lambda fake: fake.scope("epic", number=8, parent=1))
+    world.directory("issue", 8)
     code, payload = world.run("canonical", "status", "--structure")
     assert code == 0, payload
     item = payload["data"]["structure"]
-    assert item["status"] == "problem" and item["next_step"] == "spec-dock scope move epic-00004"
-    assert [entry["scope_id"] for entry in item["misplaced"]] == ["epic-00004"]
-    assert item["snapshot"]["fetched_at"]
-    assert any(warning["code"] == "SCOPE_DIRECTORY_MISPLACED" for warning in payload["warnings"])
+    assert item["status"] == "problem" and item["snapshot"]["fetched_at"]
+    assert [(entry["code"], entry["severity"]) for entry in item["anomalies"]] == [
+        ("SCOPE_KIND_CHANGED", "error"),
+        ("SCOPE_DIRECTORY_MISSING", "error"),
+        ("SCOPE_ISSUE_MISSING", "error"),
+        ("SCOPE_DIRECTORY_MISPLACED", "warning"),
+    ]
+    assert item["next_step"] == item["anomalies"][0]["details"]["next_step"]
+    assert item["anomalies"][0]["details"]["current_id"] == "epic-00008"
+    structure = [warning for warning in payload["warnings"] if warning["details"].get("item") == "structure"]
+    assert [warning["code"] for warning in structure] == [entry["code"] for entry in item["anomalies"]]
+    assert "misplaced" not in item
+
+
+def test_status_structure_is_ok_for_a_flat_consistent_catalog(world: CanonicalWorld) -> None:
+    code, payload = world.run("canonical", "status", "--structure")
+    assert code == 0, payload
+    item = payload["data"]["structure"]
+    assert (item["status"], item["next_step"], item["anomalies"]) == ("ok", None, [])
 
 
 def test_an_initiative_with_a_parent_is_a_finding_not_a_crash(world: CanonicalWorld) -> None:
-    world.scope("initiative", 4, "nested", parent=1, directory=False)
-    world.directory("initiative", 4, "nested")
+    world.scope("initiative", 4, parent=1)
     code, payload = world.run("workspace", "validate")
     assert (code, payload["error"]["code"]) == (7, "WORKSPACE_VALIDATION_FAILED")
     assert "PARENT_INVALID" in codes(payload["data"]["result"]["findings"])
@@ -169,28 +197,16 @@ def test_an_initiative_with_a_parent_is_a_finding_not_a_crash(world: CanonicalWo
 
 def test_each_snapshot_anomaly_is_a_validate_finding(world: CanonicalWorld) -> None:
     def broken(fake: Any) -> None:
-        fake.add_issue(
-            4, title="two kinds", labels=["spec-dock:issue", "spec-dock:epic"], body="<!-- spec-dock:slug=two -->"
-        )
-        fake.add_issue(
-            5,
-            title="two markers",
-            labels=["spec-dock:issue"],
-            body="<!-- spec-dock:slug=a -->\n<!-- spec-dock:slug=b -->",
-        )
-        fake.add_issue(6, title="bad marker", labels=["spec-dock:issue"], body="<!-- spec-dock:slug=Bad_Slug -->")
+        fake.add_issue(4, title="two kinds", labels=["spec-dock:issue", "spec-dock:epic"])
         fake.add_foreign_issue("other/repo", 9)
         fake.block(3, by=9, repository="other/repo")
 
     world.edit(broken)
     code, payload = world.run("workspace", "validate")
     assert code == 7
-    assert {
-        "KIND_LABEL_MULTIPLE",
-        "SLUG_MARKER_MULTIPLE",
-        "SLUG_MARKER_INVALID",
-        "DEPENDENCY_FOREIGN_REPOSITORY",
-    } <= codes(payload["data"]["result"]["findings"])
+    found = codes(payload["data"]["result"]["findings"])
+    assert {"KIND_LABEL_MULTIPLE", "DEPENDENCY_FOREIGN_REPOSITORY"} <= found
+    assert not {code for code in found if code.startswith("SLUG_")}
 
 
 def test_doctor_reports_an_unreadable_structure_as_a_finding(world: CanonicalWorld) -> None:

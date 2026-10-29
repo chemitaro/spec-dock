@@ -157,9 +157,9 @@ def test_observation_writes_nothing(main: Path, tmp_path: Path) -> None:
 
 def test_require_linked_returns_the_catalog_tree_through_a_correct_link(main: Path) -> None:
     catalog = _catalog(main)
-    (catalog / "init-00007-plan").mkdir()
+    (catalog / "00000-00999/init-00007").mkdir(parents=True)
     linked = require_linked(resolve_context(str(main), main), environment=environment())
-    assert linked.catalog == catalog and linked.tree.require("init-00007").path == catalog / "init-00007-plan"
+    assert linked.catalog == catalog and linked.tree.require("init-00007").path == catalog / "00000-00999/init-00007"
 
 
 @pytest.mark.parametrize("damage", ["no-link", "wrong-link", "no-catalog", "unfinished-checkout"])

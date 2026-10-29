@@ -20,7 +20,7 @@ from spec_dock.runtime.application.canonical_catalog import (
     require_writable_format,
 )
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
-from spec_dock.runtime.application.canonical_scopes import OFFLINE_MESSAGE, assemble_canonical_scopes
+from spec_dock.runtime.application.canonical_scopes import OFFLINE_MESSAGE, build_canonical_scopes
 from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.domain.canonical_structure import (
@@ -161,7 +161,7 @@ class WriteSession:
         if reflection.skipped and not any(item.code == GITHUB_SNAPSHOT_STALE for item in self.warnings):
             self.warnings.append(Diagnostic(GITHUB_SNAPSHOT_STALE, SNAPSHOT_STALE_MESSAGE, {}))
         if reflection.snapshot is not None:
-            self.scopes = assemble_canonical_scopes(
+            self.scopes = build_canonical_scopes(
                 self.context,
                 self.repository,
                 replace(self.scopes.fresh, snapshot=reflection.snapshot),
@@ -177,7 +177,7 @@ class WriteSession:
         """See directories created or moved by this command."""
         if self.catalog is not None:
             self.catalog = LinkedCatalog(self.catalog.layout, self.catalog.catalog, CatalogTree(self.catalog.catalog))
-            self.scopes = assemble_canonical_scopes(self.context, self.repository, self.scopes.fresh, self.catalog)
+            self.scopes = build_canonical_scopes(self.context, self.repository, self.scopes.fresh, self.catalog)
 
     def write(
         self,
@@ -299,7 +299,7 @@ def open_write_session(
     repository = repository_for_checkout(context.root, timeout=namespace.timeout)
     service = (service_factory or writing_service)(repository, context.root, namespace.timeout)
     fresh = service.refresh() if refresh else service.ensure_fresh(level)
-    scopes = assemble_canonical_scopes(context, repository, fresh, catalog)
+    scopes = build_canonical_scopes(context, repository, fresh, catalog)
     return WriteSession(context, namespace.command_path, repository, service, catalog, scopes)
 
 

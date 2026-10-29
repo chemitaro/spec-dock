@@ -1,6 +1,7 @@
 """Canonical-mode `branch show/create/switch` (iss-00431).
 
-The default name is `<ID>-<slug>` with the slug from the GitHub body marker. Create and switch keep today's
+The default name is the Scope ID itself (`iss-00454`; Epic design ch. 7). Create and switch stop with
+SCOPE_KIND_CHANGED when GitHub moved the target to another kind; show only warns. Create and switch keep today's
 Git steps (existing refs are never reset; switching needs a clean worktree, holds the clone Start lock and keeps
 the selection record). Instead of today's `.meta.json` check of the commit, a commit whose tree still tracks
 `spec-dock/initiatives` is refused: checking it out would replace this checkout's catalog link.
@@ -24,9 +25,12 @@ from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_BASE_HAS_SPECS,
     CanonicalCommandError,
 )
-from spec_dock.runtime.application.canonical_scopes import load_canonical_scopes
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
-from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+from spec_dock.runtime.application.canonical_scopes import (
+    check_canonical_scope_expectations,
+    load_canonical_scopes,
+    resolve_canonical_scope,
+)
+from spec_dock.runtime.application.worktree_observation import read_selection
 from spec_dock.runtime.domain.canonical_layout import LINK_RELATIVE
 from spec_dock.runtime.domain.git_ref import parse_commit_oid
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
@@ -44,16 +48,18 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=False, offline=namespace.offline)
     source_selection = _capture_selection(context) if namespace.command_path != "branch show" else None
     selection = read_selection(context, scopes.views, stored=source_selection)
-    target = resolve_scope(context, scopes.views, namespace.target, selection=selection)
-    check_scope_expectations(
+    target = resolve_canonical_scope(context, scopes, namespace.target, selection=selection)
+    check_canonical_scope_expectations(
         context,
-        scopes.views,
+        scopes,
         selection,
         target=target,
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
-    name = getattr(namespace, "name", None) or f"{target.id}-{scopes.node(target.id).slug}"
+    if namespace.command_path != "branch show":
+        scopes.require_kind_unchanged(target.id)
+    name = getattr(namespace, "name", None) or target.id
     if not name.isascii():
         raise ValueError("branch name must be ASCII")
     checked = run_git(context.root, "check-ref-format", "--branch", name, timeout=namespace.timeout)

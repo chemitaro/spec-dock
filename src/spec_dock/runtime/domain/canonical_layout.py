@@ -7,6 +7,8 @@ from pathlib import Path, PurePosixPath
 import re
 from typing import TYPE_CHECKING, Final, Literal
 
+from spec_dock.runtime.domain.canonical_structure import parse_scope_id, scope_id as canonical_scope_id
+
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
@@ -24,6 +26,12 @@ GITIGNORE_LINES: Final = ("/.canonical/", "/initiatives", "!/initiatives/")
 GITIGNORE_PATH: Final = "spec-dock/.gitignore"  # where GITIGNORE_LINES apply, from the checkout root
 EXCLUDE_NOTE: Final = "# spec-dock canonical catalog and link (added by spec-dock canonical link)"
 MINIMUM_GIT_VERSION: Final = (2, 38, 0)
+# A Scope directory is <catalog>/<bucket>/<ID>/: the bucket is its number's thousand range, never its kind
+# (Epic design ch. 2, iss-00460).
+BUCKET_SIZE: Final = 1000
+BUCKET_NAME_SHAPE: Final = re.compile(r"^[0-9]+-[0-9]+$")  # shaped like a bucket; is_bucket_name decides
+# From a Scope directory back to spec-dock/ through the spec-dock/initiatives link (bucket, ID, initiatives).
+SCOPE_TO_SPEC_DOCK: Final = PurePosixPath("../../..")
 
 LinkKind = Literal["absent", "symlink", "directory", "file", "other"]
 LinkState = Literal["absent", "correct", "wrong_link", "occupied"]
@@ -120,3 +128,28 @@ def parse_git_version(reported: str) -> tuple[int, int, int] | None:
 
 def git_supported(version: tuple[int, int, int] | None) -> bool:
     return version is not None and version >= MINIMUM_GIT_VERSION
+
+
+def scope_bucket(number: int) -> str:
+    """The bucket of a Scope number: its thousand range, both ends as wide as the ID number (`00000-00999`)."""
+    if number < 1:
+        raise ValueError("GitHub Issue number must be positive")
+    width = max(5, len(str(number)))
+    lower = number - number % BUCKET_SIZE
+    return f"{lower:0{width}d}-{lower + BUCKET_SIZE - 1:0{width}d}"
+
+
+def scope_relative(scope_id: str) -> PurePosixPath:
+    """A Scope directory relative to the catalog, `<bucket>/<ID>`; only an exact canonical ID has one."""
+    kind, number = parse_scope_id(scope_id)
+    if canonical_scope_id(kind, number) != scope_id:
+        raise ValueError(f"not an exact canonical Scope ID: {scope_id!r}")
+    return PurePosixPath(scope_bucket(number), scope_id)
+
+
+def is_bucket_name(name: str) -> bool:
+    """Exactly the name some number's bucket has (`0-999` and `00000-00998` are not)."""
+    if BUCKET_NAME_SHAPE.fullmatch(name) is None:
+        return False
+    lower = int(name.partition("-")[0])
+    return lower % BUCKET_SIZE == 0 and name == scope_bucket(max(lower, 1))

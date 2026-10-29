@@ -1,7 +1,7 @@
 """A linked canonical clone with Scope directories and a fake GitHub on PATH (iss-00431 CLI tests).
 
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "plan")                 # GitHub Issue #1 with its catalog directory
+    world.scope("initiative", 1, "Plan")                 # GitHub Issue #1 with its catalog directory 00000-00999/init-00001/
     code, payload = world.run("scope", "show", "init-00001")
 
 The clone's origin points at a temporary bare repository while `canonical link` runs; afterwards its URL is
@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from spec_dock.cli import main
+from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.infra import github_snapshot, runtime_environment
 from tests.support.canonical_repo import bare_remote, clone, environment, git, isolate_user_state
 from tests.support.fake_github import FakeGithub, install_fake_gh
@@ -29,7 +30,6 @@ if TYPE_CHECKING:
 
 REPOSITORY = "example/repo"
 DOCUMENTS = ("requirement.md", "design.md", "plan.md", "report.md")
-_NESTING = {"epic": "epics", "issue": "issues"}
 _PREFIX = {"initiative": "init", "epic": "epic", "issue": "iss"}
 
 
@@ -83,36 +83,32 @@ class CanonicalWorld:
         self,
         kind: str,
         number: int,
-        slug: str,
+        title: str | None = None,
         *,
         parent: int | None = None,
-        title: str | None = None,
         directory: bool = True,
         documents: tuple[str, ...] = DOCUMENTS,
         **options: Any,
     ) -> FakeIssue:
+        """A Scope Issue on the fake GitHub and, unless `directory` is false, its flat `<catalog>/<ID>/`."""
         fake = self.gh.load()
-        issue = fake.scope(kind, slug=slug, title=title, number=number, parent=parent, **options)
+        issue = fake.scope(kind, title=title, number=number, parent=parent, **options)
         self.gh.save(fake)
         if directory:
-            self.directory(kind, number, slug, parent=parent, documents=documents)
+            self.directory(kind, number, documents=documents)
         return issue
 
-    def directory(
-        self, kind: str, number: int, slug: str, *, parent: int | None = None, documents: tuple[str, ...] = DOCUMENTS
-    ) -> Path:
-        path = self.catalog / self.relative(kind, number, slug, parent=parent)
+    def directory(self, kind: str, number: int, *, documents: tuple[str, ...] = DOCUMENTS) -> Path:
+        path = self.catalog / self.relative(kind, number)
         path.mkdir(parents=True, exist_ok=True)
         for name in documents:
             (path / name).write_text(f"# {name}\n", encoding="utf-8")
         return path
 
-    def relative(self, kind: str, number: int, slug: str, *, parent: int | None = None) -> Path:
-        name = f"{_PREFIX[kind]}-{number:05d}-{slug}"
-        if parent is None:
-            return Path(name)
-        found = next(self.catalog.rglob(f"*-{parent:05d}-*"))
-        return found.relative_to(self.catalog) / _NESTING[kind] / name
+    @staticmethod
+    def relative(kind: str, number: int) -> Path:
+        """A Scope directory's place in the catalog: its number's bucket, then the ID (Epic design ch. 2)."""
+        return Path(scope_relative(f"{_PREFIX[kind]}-{number:05d}"))
 
     def worktree(self, name: str) -> Path:
         """A linked worktree of the clone with its own correct link."""

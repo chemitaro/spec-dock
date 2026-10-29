@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 @pytest.fixture
 def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CanonicalWorld:
     world = CanonicalWorld.create(tmp_path, monkeypatch, capsys)
-    world.scope("initiative", 1, "plan", title="日本語の計画")
+    world.scope("initiative", 1, title="日本語の計画")
     return world
 
 
@@ -32,10 +32,10 @@ def _branch_with_specs(world: CanonicalWorld) -> str:
     return git(world.main, "rev-parse", "legacy-specs")
 
 
-def test_branch_show_uses_the_id_and_github_slug(world: CanonicalWorld) -> None:
+def test_branch_show_names_the_branch_by_the_id_alone(world: CanonicalWorld) -> None:
     code, payload = world.run("branch", "show", "init-00001")
     assert code == 0, payload
-    assert payload["data"]["result"]["name"] == "init-00001-plan"
+    assert payload["data"]["result"]["name"] == "init-00001"
     assert payload["data"]["result"]["tip"] is None
 
 
@@ -44,24 +44,32 @@ def test_branch_create_makes_the_branch_at_the_base(world: CanonicalWorld) -> No
     code, payload = world.run("branch", "create", "init-00001", "--base", "HEAD", "--yes")
     assert code == 0, payload
     assert payload["data"]["result"]["created"] is True
-    assert git(world.main, "rev-parse", "init-00001-plan") == head
+    assert git(world.main, "rev-parse", "init-00001") == head
 
 
 def test_branch_create_refuses_a_base_with_specs(world: CanonicalWorld) -> None:
     _branch_with_specs(world)
     code, payload = world.run("branch", "create", "init-00001", "--base", "legacy-specs", "--yes")
     assert (code, payload["error"]["code"]) == (3, "CANONICAL_BASE_HAS_SPECS")
-    assert git(world.main, "rev-parse", "--verify", "--quiet", "init-00001-plan", check=False) == ""
+    assert git(world.main, "rev-parse", "--verify", "--quiet", "init-00001", check=False) == ""
 
 
 def test_branch_switch_checks_out_and_keeps_the_selection(world: CanonicalWorld) -> None:
-    git(world.main, "branch", "init-00001-plan")
+    git(world.main, "branch", "init-00001")
     world.select("init-00001", 1)
     code, payload = world.run("branch", "switch", "init-00001", "--yes")
     assert code == 0, payload
     assert payload["data"]["result"]["switched"] is True
-    assert git(world.main, "branch", "--show-current") == "init-00001-plan"
+    assert git(world.main, "branch", "--show-current") == "init-00001"
     assert world.run("active", "show")[1]["data"]["selection"]["scope_id"] == "init-00001"
+
+
+def test_a_pre_migration_id_name_branch_is_used_when_named(world: CanonicalWorld) -> None:
+    git(world.main, "branch", "init-00001-plan")
+    world.select("init-00001", 1)
+    code, payload = world.run("branch", "switch", "init-00001", "--name", "init-00001-plan", "--yes")
+    assert code == 0, payload
+    assert git(world.main, "branch", "--show-current") == "init-00001-plan"
 
 
 def test_branch_switch_refuses_a_branch_with_specs(world: CanonicalWorld) -> None:
@@ -97,7 +105,7 @@ def test_a_failed_check_after_creating_the_branch_is_partial(
 def test_a_failed_check_after_switching_is_partial(world: CanonicalWorld, monkeypatch: pytest.MonkeyPatch) -> None:
     from spec_dock.runtime.application import canonical_branches
 
-    git(world.main, "branch", "init-00001-plan")
+    git(world.main, "branch", "init-00001")
     real = canonical_branches._verify_selection
     calls: list[int] = []
 
