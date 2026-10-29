@@ -57,6 +57,19 @@ class StoredSelection:
     observed_handles: tuple[SelectionHandle, ...] = ()
 
 
+def _list_fresh(directory_fd: int) -> list[str]:
+    """List through a new descriptor of the held directory (iss-00436).
+
+    Listing the held descriptor again would reuse its directory stream; on btrfs a stream once read to its end
+    shows no entry added later, so a just-published record would look absent.
+    """
+    fresh = os.open(".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)
+    try:
+        return os.listdir(fresh)  # noqa: PTH208 - owned descriptor, not a redirected path
+    finally:
+        os.close(fresh)
+
+
 class WorkTargetStore:
     def __init__(self, root: Path, *, root_handle: DirectoryIdentity | None = None) -> None:
         self.root = root
@@ -141,7 +154,7 @@ class WorkTargetStore:
         problems: list[str] = []
         try:
             self._verify_directory(directory_fd)
-            entries = os.listdir(directory_fd)  # noqa: PTH208 - owned descriptor, not a redirected path
+            entries = _list_fresh(directory_fd)
             for name in entries:
                 if not _NAME.fullmatch(name):
                     problems.append(f"unrecognized work target entry: {name}")

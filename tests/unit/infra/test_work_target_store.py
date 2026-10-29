@@ -176,3 +176,36 @@ def test_non_rfc3339_record_is_invalid_instead_of_selected(tmp_path: Path, times
         path.write_bytes(before)
         assert store.read().status == "invalid"
         assert path.read_bytes() == before
+
+
+def test_publish_confirms_its_record_where_a_drained_directory_stream_hides_new_entries(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """iss-00436: on btrfs, listing a directory fd that was already read to its end shows no new entry.
+
+    The stand-in reproduces that: a descriptor once listed lists nothing until it is closed.
+    """
+    real_listdir, real_close = os.listdir, os.close
+    drained: set[int] = set()
+
+    def listdir(path: object = ".") -> list[str]:
+        if isinstance(path, int):
+            if path in drained:
+                return []
+            drained.add(path)
+        return real_listdir(path)  # type: ignore[call-overload,no-any-return]
+
+    def close(fd: int) -> None:
+        drained.discard(fd)
+        real_close(fd)
+
+    monkeypatch.setattr(os, "listdir", listdir)
+    monkeypatch.setattr(os, "close", close)
+    (tmp_path / "spec-dock").mkdir()
+    with WorkTargetStore(tmp_path) as store:
+        assert store.read().status == "empty"
+        handle = store.publish(_record())
+        observation = store.read()
+        assert observation.status == "selected" and observation.handle == handle
+        assert store.remove_observed(handle) == "removed"
+        assert store.read().status == "empty"
