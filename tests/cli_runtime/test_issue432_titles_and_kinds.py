@@ -73,3 +73,19 @@ def test_the_current_id_of_a_kind_changed_scope_also_stops(world: WriteWorld) ->
     assert (code, payload["error"]["code"]) == (3, "SCOPE_KIND_CHANGED")
     assert payload["error"]["details"]["current_id"] == "epic-00003"
     assert world.writes() == []
+
+
+def test_a_japanese_only_title_shows_in_scope_show_and_workspace_sync(world: WriteWorld) -> None:
+    code, payload = world.write(
+        "scope", "create", "issue", "--backend", "github", "--parent", "epic-00002", "--title", "日本語だけの題名"
+    )
+    assert code == 0, payload
+    assert world.run("scope", "show", "iss-00005")[1]["data"]["result"]["scope"]["title"] == "日本語だけの題名"
+    code, synced = world.run("workspace", "sync")
+    assert code == 0, synced
+    titles = {item["scope_id"]: item["title"] for item in synced["data"]["scopes"]}
+    assert titles["iss-00005"] == "日本語だけの題名" and titles["epic-00002"] == "core"
+    from spec_dock.cli import main
+
+    assert main(["--project", str(world.main), "workspace", "sync"]) == 0
+    assert 'scope_id=iss-00005 title="日本語だけの題名"' in world.capsys.readouterr().out
