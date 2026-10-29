@@ -53,6 +53,16 @@ ID: "iss-00456"
 - 偽の GitHub の変更の影響：その変更の後に全体のテストを流し、3004 passed、8 skipped（`99a437adc` の作業中の状態。偽の GitHub を使うほかのテストの結果は変わらない）。
 - AC-456-10 の変えたファイル（`git diff --name-only origin/main...HEAD`）：`scripts/migrate-to-canonical/{README.md,migrate.py}`、この Issue の `requirement.md`、`design.md`、`plan.md`、`report.md`、`tests/integration/migration/` の5つ、`tests/support/{fake_github.py,migration_repo.py}`、`tests/unit/infra/test_migration_contract_copies.py`。`src/` と従来モードのテストは変えていない。
 
+### 最終品質ゲート
+
+ChatGPT を使うゲートは利用者の設定で無効なので、Claude だけのゲート（lint、全体のテスト、新しい2つのレビュアーの Standards と Spec）を、push した同じ SHA で行った。
+
+- **1回目（`f24058b202ddd958e0e7dae2c37412842ec5ce02`。I-16 の PR #461 を含む `origin/main` をマージした後）**
+  - `make lint`：終了コード0（ruff check、ruff format check、mypy すべて pass）。
+  - `uv run pytest`（全体）：終了コード0、3098 passed、8 skipped（16分30秒）。
+  - レビューの範囲は `a23d7d175..f24058b20`（`origin/main...HEAD` の全差分）。Standards：pass、指摘0。Spec：pass、P2 が1件（`register` が作成の結果を `undo.jsonl` に記録した後、`idmap.json` を保存する前に止まると、再実行で同じ Issue をもう一度作る。I-8 の版は印で毎回見つけ直していたので、この経路は退行）。
+  - 対応：P2 は止める指摘ではないが、I-10 の本番の登録で重複の Issue を作るおそれがあり、直すのが小さいので直した（`Registrar._recorded_creation`。`undo.jsonl` に取り消されていない作成の結果があれば、その番号を使い、`idmap.json` を補う）。テスト `test_a_creation_recorded_before_the_id_map_was_saved_is_used_again` を足した。新しい SHA でゲートをやり直す。
+
 ### 本物の spec-dock での読むだけの `plan`（2026-10-29）
 
 - 本物の main のチェックアウト（`/Volumes/990p2t/workspace/tools/spec-dock`、`origin/main` = `95bbb7a1c`）に、このブランチの `migrate.py plan`（`--apply` なし、作業の記録は一時ディレクトリ）を、本物の GitHub を読むだけで実行した。終了コード0、約10秒。

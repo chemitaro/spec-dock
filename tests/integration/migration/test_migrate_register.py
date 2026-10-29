@@ -342,3 +342,37 @@ def test_undo_does_not_count_an_issue_already_recorded_for_another_creation(
     code, result = legacy.run("undo", apply=True)
     assert code == 0, result
     assert orphan.state == "closed" and recorded.state == "closed"  # each closed once, by its own record
+
+
+def test_a_creation_recorded_before_the_id_map_was_saved_is_used_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    legacy = build_legacy(tmp_path, monkeypatch)
+    fake = legacy.github
+    created = fake.add_issue(title="Architecture", labels=["spec-dock:initiative"])
+    legacy.records.mkdir(parents=True, exist_ok=True)
+    base = {
+        "op": "issue.create",
+        "local_id": "init-local-00003",
+        "title": "Architecture",
+        "label": "spec-dock:initiative",
+    }
+    lines = [
+        {"seq": 1, "at": "2026-10-26T00:00:00Z", "phase": "intent", **base},
+        {
+            "seq": 2,
+            "at": "2026-10-26T00:00:00Z",
+            "phase": "done",
+            "ref": 1,
+            "number": created.number,
+            "database_id": created.id,
+            **base,
+        },
+    ]
+    (legacy.records / "undo.jsonl").write_text("".join(json.dumps(line) + "\n" for line in lines))
+    code, result = legacy.run("register", apply=True)
+    assert code == 0, result
+    assert _issue_creations(fake) == []
+    idmap = json.loads((legacy.records / "idmap.json").read_text())["entries"]
+    assert idmap["init-local-00003"]["number"] == created.number
+    assert legacy.run("verify")[0] == 0

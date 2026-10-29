@@ -2136,6 +2136,21 @@ class Registrar:
         ]
         return pending[0] if pending else None
 
+    def _recorded_creation(self, scope: Scope) -> dict[str, Any] | None:
+        """A creation whose outcome undo.jsonl holds but idmap.json may lack (a run stopped between the two)."""
+        records = self.state.undo_records()
+        undone = {record.get("ref") for record in records if record.get("phase") == "undone"}
+        done = [
+            record
+            for record in records
+            if record.get("phase") == "done"
+            and record.get("op") == "issue.create"
+            and record.get("local_id") == scope.id
+            and isinstance(record.get("number"), int)
+            and (record.get("ref") or record["seq"]) not in undone
+        ]
+        return done[-1] if done else None
+
     def _find_created(self, scope: Scope, since: str) -> Facts | None:
         """The Issue a creation intent made: same kind label and title, created by this gh user at or after it."""
         used = {n for n in self.analysis.numbers.values() if n is not None}
@@ -2146,10 +2161,14 @@ class Registrar:
 
     def _create(self, scope: Scope) -> None:
         label = KIND_LABELS[scope.kind]
-        pending = self._pending_creation(scope)
-        found = self._find_created(scope, pending["at"]) if pending is not None else None
         details = {"local_id": scope.id, "title": scope.title, "label": label}
-        if found is None:
+        recorded = self._recorded_creation(scope)
+        pending = self._pending_creation(scope) if recorded is None else None
+        found = self._find_created(scope, pending["at"]) if pending is not None else None
+        if recorded is not None:
+            number = int(recorded["number"])
+            database_id = int(recorded.get("database_id") or self._database_id(number))
+        elif found is None:
             intent = self._record("intent", "issue.create", **details)
             try:
                 response = self.gh.write("POST", f"{self.gh.prefix}/issues", {"title": scope.title, "labels": [label]})
