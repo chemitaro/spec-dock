@@ -56,6 +56,7 @@ def _leaf_arguments(root: Path, outside: Path) -> dict[str, list[str]]:
         "scope close": ["init-00001", "--yes"],
         "scope reopen": ["init-00001", "--yes"],
         "scope delete": ["init-00001", "--yes"],
+        "scope move": ["iss-00002", "--parent", "epic-00001"],
         "active show": [],
         "active set": ["init-00001", "--yes"],
         "active clear": ["--all", "--yes"],
@@ -118,7 +119,11 @@ def test_every_command_without_a_canonical_handler_stops_without_writing(
         assert (tree_digest(root), tree_digest(outside)) == before, leaf
 
 
-def test_text_output_shows_the_next_step(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_text_output_shows_the_next_step(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # iss-00432 registered every command; an unregistered one still renders its next step as text.
+    monkeypatch.delitem(CANONICAL_HANDLERS, "scope close")
     root = canonical_workspace(tmp_path / "consumer")
     assert main(["--project", str(root), "scope", "close", "init-00001", "--yes"]) == 3
     stderr = capsys.readouterr().err

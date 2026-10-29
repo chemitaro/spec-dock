@@ -90,8 +90,7 @@ def branch_operation(namespace: argparse.Namespace, context: ProjectContext) -> 
         try:
             run_git(context.root, "branch", name, base, timeout=namespace.timeout, mutation=True)
         except GitProcessError as error:
-            created = _branch_tip(context, name, namespace.timeout)
-            status: EffectStatus = "succeeded" if created == base else "unknown" if error.uncertain else "failed"
+            status, created = _observe_create_failure(context, name, base, error, captured, namespace.timeout)
             return _incomplete(
                 namespace,
                 target.id,
@@ -185,6 +184,8 @@ def _switch(
         current = _fresh_context(context, namespace.timeout)
         _verify_selection(context, source_selection)
         if current.branch == name and current.head == tip:
+            if run_git(current.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                raise ValueError("branch switch requires a clean worktree")
             return OperationResult(
                 namespace.command_path,
                 "unchanged",
@@ -196,16 +197,27 @@ def _switch(
         try:
             run_git(context.root, "checkout", name, timeout=namespace.timeout, mutation=True)
         except GitProcessError as error:
-            after = _fresh_context(context, namespace.timeout)
-            moved = after.branch == name and after.head == tip
-            status: EffectStatus = "succeeded" if moved else "unknown" if error.uncertain else "failed"
+            status, moved, verification_error = _observe_switch_failure(
+                context, name, tip, error, source_selection, namespace.timeout
+            )
             return _incomplete(
-                namespace, scope_id, name, tip, "git.checkout", status, error, switched=moved, warnings=warnings
+                namespace,
+                scope_id,
+                name,
+                tip,
+                "git.checkout",
+                status,
+                error,
+                switched=moved,
+                warnings=warnings,
+                verification_error=verification_error,
             )
         try:
             after = _fresh_context(context, namespace.timeout)
             if after.branch != name or after.head != tip:
                 raise ValueError("checkout differs from the fixed branch snapshot")
+            if run_git(after.root, "status", "--porcelain", "-z", timeout=namespace.timeout):
+                raise ValueError("checkout left a dirty worktree")
             _verify_selection(after, source_selection)
         except (OSError, ValueError, RuntimeError) as error:
             return _incomplete(
@@ -219,6 +231,58 @@ def _switch(
         effects=(Effect("git.checkout", "succeeded", name),),
         warnings=warnings,
     )
+
+
+def _observe_create_failure(
+    context: ProjectContext,
+    name: str,
+    base: str,
+    error: GitProcessError,
+    captured: StoredSelection,
+    timeout: float,
+) -> tuple[EffectStatus, str | None]:
+    """The legacy `branch_operations` reading after a failed `git branch`; a failed reread leaves it unknown."""
+    status: EffectStatus = "unknown"
+    created: str | None = None
+    try:
+        after = _fresh_context(context, timeout)
+        created = _branch_tip(after, name, timeout)
+        if created is not None:
+            if created == base:
+                status = "succeeded"
+        elif not error.uncertain:
+            status = "failed"
+        _verify_selection(after, captured)
+    except (OSError, ValueError, RuntimeError):
+        pass
+    return status, created
+
+
+def _observe_switch_failure(
+    context: ProjectContext,
+    name: str,
+    tip: str,
+    error: GitProcessError,
+    captured: StoredSelection,
+    timeout: float,
+) -> tuple[EffectStatus, bool, str | None]:
+    """The legacy reading after a failed `git checkout`: on the target, or certainly back where it was."""
+    status: EffectStatus = "unknown"
+    switched = False
+    try:
+        after = _fresh_context(context, timeout)
+        if after.branch == name and after.head == tip:
+            status, switched = "succeeded", True
+            if run_git(after.root, "status", "--porcelain", "-z", timeout=timeout):
+                raise ValueError("checkout left a dirty worktree")
+            _verify_selection(after, captured)
+        elif after.branch == context.branch and after.head == context.head and not error.uncertain:
+            _verify_selection(after, captured)
+            if not run_git(after.root, "status", "--porcelain", "-z", timeout=timeout):
+                status = "failed"
+    except (OSError, ValueError, RuntimeError) as verification:
+        return status, switched, str(verification)
+    return status, switched, None
 
 
 def _branch_tip(context: ProjectContext, name: str, timeout: float) -> str | None:
@@ -258,11 +322,15 @@ def _incomplete(
     *,
     switched: bool,
     warnings: tuple[Diagnostic, ...],
+    verification_error: str | None = None,
 ) -> OperationResult[object]:
     """A Git failure or a failed check after the write; an applied or uncertain effect makes it partial (exit 6)."""
     partial = status != "failed"
     if isinstance(error, GitProcessError):
-        diagnostic = Diagnostic("GIT_FAILED", str(error), error.details())
+        details = error.details()
+        if verification_error is not None:
+            details = {**details, "verification_error": verification_error}
+        diagnostic = Diagnostic("GIT_FAILED", str(error), details)
     else:
         code = "BRANCH_VERIFICATION_FAILED" if effect == "git.branch.create" else "CHECKOUT_VERIFICATION_FAILED"
         diagnostic = Diagnostic(code, str(error), {})

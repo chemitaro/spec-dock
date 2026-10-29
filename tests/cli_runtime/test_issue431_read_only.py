@@ -59,7 +59,8 @@ def test_reading_commands_change_no_catalog_git_checkout_or_github(
     assert world.fake().writes() == []
 
 
-def test_only_the_writing_commands_of_issue_432_lack_a_canonical_handler() -> None:
+def test_every_public_command_has_a_canonical_handler() -> None:
+    """iss-00432 (AC-432-15): no public command answers CANONICAL_NOT_IMPLEMENTED in a schema-4 repository."""
     unhandled = {
         leaf
         for leaf in LEAF_PATHS
@@ -68,21 +69,4 @@ def test_only_the_writing_commands_of_issue_432_lack_a_canonical_handler() -> No
         and not leaf.startswith("installation ")
         and leaf not in ("help", "completion")
     }
-    assert unhandled == {
-        "scope create initiative",
-        "scope create epic",
-        "scope create issue",
-        "scope import github initiative",
-        "scope import github epic",
-        "scope import github issue",
-        "scope edit",
-        "scope close",
-        "scope reopen",
-        "scope delete",
-        "dependency add",
-        "dependency remove",
-        "artifact create",
-        "artifact import file",
-        "work start",
-        "work finish",
-    }
+    assert unhandled == set()
