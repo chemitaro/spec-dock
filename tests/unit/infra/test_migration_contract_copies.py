@@ -56,6 +56,21 @@ def test_c3_buckets_follow_the_number_rule(number: int, bucket: str) -> None:
     assert module.scope_relative(module.scope_id("issue", number)) == f"{bucket}/{module.scope_id('issue', number)}"
 
 
+def test_c3_bucket_copy_matches_the_package_layout() -> None:
+    module = migrate_module()
+    assert module.BUCKET_SIZE == canonical_layout.BUCKET_SIZE
+    for number in (1, 454, 999, 1000, 2114, 99999, 100000, 100454, 1000000):
+        assert module.scope_bucket(number) == canonical_layout.scope_bucket(number)
+        for kind in ("initiative", "epic", "issue"):
+            scope = module.scope_id(kind, number)
+            assert module.scope_relative(scope) == str(canonical_layout.scope_relative(scope))
+    for value in ("iss-454", "iss-000454", "iss-00454-foo"):
+        with pytest.raises(ValueError):
+            module.scope_relative(value)
+        with pytest.raises(ValueError):
+            canonical_layout.scope_relative(value)
+
+
 def test_c3_bucket_inputs_outside_the_rule_are_refused() -> None:
     module = migrate_module()
     for number in (0, -1):

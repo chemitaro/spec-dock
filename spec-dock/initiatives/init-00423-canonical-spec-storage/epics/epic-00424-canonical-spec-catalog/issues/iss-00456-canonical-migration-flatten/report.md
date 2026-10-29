@@ -39,11 +39,17 @@ ID: "iss-00456"
 | AC-456-04 | `test_migrate_flatten.py`：単位のテスト（パスの対応、R-456-04 の各種のリンク、コードの中、HTML、捨てる `rules.md`）と、`test_every_link_of_a_linked_tree_opens_through_the_flat_catalog`（`canonical link` の後に `spec-dock/initiatives` を通して、独立の確かめ方ですべてのリンクを開く）、`test_unrewritable_links_are_listed_by_plan_and_build_canonical` |
 | AC-456-06 | `test_migrate_checkouts.py`（平らな位置への移動と取り込み）、`test_move_local_rewrites_moved_links_and_refuses_files_without_a_place`、`test_adopt_worktree_removes_files_whose_links_were_rewritten_and_refuses_unflattenable_specs` |
 | AC-456-07 | `test_export_legacy_nests_back_with_the_original_links_and_new_scope_slugs`（`untitled` と題名からの slug、リンクの字面の往復、従来モードの `workspace validate`）、`test_export_legacy_stops_before_writing_when_the_catalog_cannot_nest_back`（3つの場合、`--apply` なしでも終了コード2）、`test_export_legacy_rebuilds_schema_three_metadata_that_legacy_commands_read` |
-| AC-456-08 | `test_migration_contract_copies.py`（`CANONICAL_ID_RE`、区切りの値の例、従来の題名と slug、`rules.md` の先）。区切りをパッケージの `scope_bucket` と比べるテストは、I-16 のマージの後に足す（未確認） |
+| AC-456-08 | `test_migration_contract_copies.py`（`CANONICAL_ID_RE`、区切りの値の例、従来の題名と slug、`rules.md` の先）。I-16（PR #461）のマージの後に `origin/main` をマージし（`198975142`）、`test_c3_bucket_copy_matches_the_package_layout` で、1、454、999、1000、2114、99999、100000、100454、1000000 の `scope_bucket` と `scope_relative`、`BUCKET_SIZE` がパッケージ（`domain/canonical_layout.py`）と同じことを確かめた |
 | AC-456-09 | `test_verify_checks_the_flat_layout_of_origins_canonical` |
 | AC-456-11 | `test_plan_before_register_places_local_scopes_by_the_plan_and_writes_nothing`（参照、作業ツリー、`git count-objects -v` が変わらない） |
 
-- `uv run pytest -q tests/integration/migration tests/unit/infra/test_migration_contract_copies.py`：94 passed（`77febaf25`）。
+- `uv run pytest -q tests/integration/migration tests/unit/infra/test_migration_contract_copies.py`：94 passed（`77febaf25`）、レビューの指摘を直した後に 96 passed。
+
+### 実装のレビュー（手順6、`d00b47c83`）
+
+- 規約（Standards）：pass。P2 が1件（対のない `` ` `` で、コードの範囲が段落をまたぎ、後の段落のリンクが黙って書き換えから漏れる）。
+- 仕様（Spec）：pass（最初の結果は必須の項目 `overall_correctness` が欠けて形式の検査に落ちたので、同じレビュアーに書き直してもらった）。P2 が1件（上と同じ）、P3 が1件（`undo` の見つけ直しが、ほかの作成の記録にある Issue を候補から除かない）。
+- 対応：どちらも根拠が正しいので直した。コードの範囲を空行ごとに区切り（`_span_ranges`）、`undo` は `undo.jsonl` の作成の結果の記録にある番号を除く。テスト `test_a_lone_backtick_does_not_hide_links_in_later_paragraphs` と `test_undo_does_not_count_an_issue_already_recorded_for_another_creation` を足した。
 - 偽の GitHub の変更の影響：その変更の後に全体のテストを流し、3004 passed、8 skipped（`99a437adc` の作業中の状態。偽の GitHub を使うほかのテストの結果は変わらない）。
 - AC-456-10 の変えたファイル（`git diff --name-only origin/main...HEAD`）：`scripts/migrate-to-canonical/{README.md,migrate.py}`、この Issue の `requirement.md`、`design.md`、`plan.md`、`report.md`、`tests/integration/migration/` の5つ、`tests/support/{fake_github.py,migration_repo.py}`、`tests/unit/infra/test_migration_contract_copies.py`。`src/` と従来モードのテストは変えていない。
 
@@ -66,7 +72,7 @@ ID: "iss-00456"
 
 ## Residual Risks / Follow-ups
 
-- **I-16 との比べ合わせ（未確認）**：区切りの計算は I-16 の `design.md`（`60ea01ccb`）の値で写し、値の例でだけ確かめた。I-16 のマージの後に `origin/main` を取り込み、パッケージの `scope_bucket`、`scope_relative`、`BUCKET_SIZE` と比べるテストを足す（plan の S9）。
+- **予行演習と I-16**：予行演習（`d00b47c` の前の版のスクリプト）のカタログは I-16 の前の CLI で開いた。`canonical link` と `canonical check` はカタログの中の置き場を調べないので、結果は変わらない見込みだが、I-16 の後の CLI での `workspace validate`（canonical）での確かめは未確認（I-10 の予行演習で確かめる）。
 - **予行演習の GitHub は偽物**：本物の `register` は I-10 で行う。`plan` は本物の GitHub を読むだけで確かめた。本物の GitHub の上での `register`、`verify`、作った Issue の見つけ直し（作成者と作成の時刻の値の形）は未確認。
 - **履歴で落ちるもの**：spec-dock の canonical の履歴では、725コミットから平らにできないパスが落ちる。元のリポジトリの既定のブランチの履歴に残る（統括の判断 Q2）。
 - **`build-canonical` の時間**：spec-dock で約215秒。I-10 の凍結の時間の見積もりに入れる。
