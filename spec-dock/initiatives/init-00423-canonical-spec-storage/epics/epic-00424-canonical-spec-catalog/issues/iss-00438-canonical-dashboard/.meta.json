@@ -10,7 +10,8 @@
   "depends_on": [
     "iss-00430",
     "iss-00431",
-    "iss-00455"
+    "iss-00455",
+    "iss-00460"
   ],
   "backend": "github",
   "github": {
@@ -19,5 +20,5 @@
     "repo_name": "spec-dock"
   },
   "lifecycle": null,
-  "revision": 3
+  "revision": 4
 }

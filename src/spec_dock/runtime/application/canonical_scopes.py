@@ -1,10 +1,10 @@
 """Shared reading side of canonical-mode commands: the structure snapshot as legacy-shaped Scope views.
 
 Structure (titles, kinds, states, parents, dependencies) comes from the structure snapshot at display freshness
-(C10); a Scope's directory is always `<catalog>/<ID>` (C3). Views carry `.meta.json`-free values in the legacy
+(C10); a Scope's directory is always `<catalog>/<bucket>/<ID>` (C3). Views carry `.meta.json`-free values in the legacy
 `ScopeView` shape so the unchanged legacy helpers (selection, expectations, listing, navigation links, Artifact
 listing) work on them. A view's path goes through this checkout's `spec-dock/initiatives` link and is never
-resolved, so paths relative to `spec-dock/` stay `initiatives/<ID>`.
+resolved, so paths relative to `spec-dock/` stay `initiatives/<bucket>/<ID>`.
 
 A GitHub kind-label change moves a number to another ID while its catalog directory keeps the old name; such a
 Scope is SCOPE_KIND_CHANGED (Epic design ch. 2): reads warn, branch and selection writes stop, and an old ID
@@ -21,7 +21,7 @@ from spec_dock.runtime.application.canonical_errors import SCOPE_KIND_CHANGED_RE
 from spec_dock.runtime.application.scope_expectations import check_scope_expectations
 from spec_dock.runtime.application.scope_query import ScopeView, _sort_key
 from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
-from spec_dock.runtime.domain.canonical_layout import LINK_RELATIVE
+from spec_dock.runtime.domain.canonical_layout import LINK_RELATIVE, scope_relative
 from spec_dock.runtime.domain.canonical_structure import (
     SCOPE_KIND_CHANGED,
     KindChange,
@@ -314,7 +314,7 @@ def build_canonical_scopes(
 def build_views(
     root: Path, repository: GithubRepository, fresh: FreshSnapshot, snapshot: StructureSnapshot
 ) -> tuple[ScopeView, ...]:
-    """Every Scope's path is `<root>/spec-dock/initiatives/<ID>`, whether or not its directory exists yet."""
+    """Every Scope's path is `<root>/spec-dock/initiatives/<bucket>/<ID>`, whether or not its directory exists yet."""
     link = root / LINK_RELATIVE
     views: list[ScopeView] = []
     for node in snapshot.scopes:
@@ -328,7 +328,7 @@ def build_views(
                 title=node.title,
                 parent_id=parent.id if parent is not None else None,
                 backend=GithubBackend(node.number, repository.owner, repository.name),
-                path=link / node.id,
+                path=link / scope_relative(node.id),
                 revision=0,
                 status=StatusObservation(
                     observe_github_state(node.state, node.state_reason),
