@@ -43,6 +43,8 @@ ID: "iss-00432"
 | `application/canonical_catalog.py`（I-2 のもの） | 形式の版の確かめを `require_writable_format(catalog)` として切り出し、`catalog_changes` もそれを使う（振る舞いは同じ） |
 | `application/canonical_branches.py`（I-4 のもの） | R-432-13 の再観察 |
 | `application/canonical_worktrees.py`（I-4 のもの） | R-432-13 の `--expect-current` とリンク |
+| `application/canonical_workspace.py`（I-4 のもの） | `workspace sync` の `scopes` の各要素に GitHub の題名 `title` を足す（AC-09。鍵を足すだけ） |
+| `presentation/envelope.py` | `workspace sync` の文字の出力で、`title` の鍵があるときだけ `title="…"` を出す（従来モードの出力は鍵がないので変わらない） |
 | `application/canonical_errors.py` | 新しいコードと次の1手 |
 | `infra/github_structure.py`（I-1） | `update_issue` の読み直しで `state_reason` も比べる。本文の引数を持たない（R-432-14） |
 | `domain/canonical_structure.py`、`infra/github_snapshot.py`（I-1） | 反映できない変更を飛ばして古いものとして扱う（R-432-14） |
