@@ -467,3 +467,44 @@ def test_a_complete_reflection_keeps_the_probe_record(tmp_path: Path) -> None:
     before = (store.directory / "probe.json").read_bytes()
     assert service.reflect_writes([SetParent(3, 1)], command="scope move").skipped == ()
     assert (store.directory / "probe.json").read_bytes() == before
+
+
+def test_a_full_read_records_when_each_issue_was_created_and_closed(tmp_path: Path) -> None:
+    """iss-00438: created_at and closed_at (epic-00427's time axis) cost no extra request."""
+    fake, service, store = _world(tmp_path)
+    fake.scope("issue", parent=2, state="closed", state_reason="completed")
+    fresh = service.ensure_fresh("display")
+    open_issue, closed_issue = fresh.require().issues[3], fresh.require().issues[4]
+    assert (open_issue.created_at, open_issue.closed_at) == (fake.issue(3).created_at, None)
+    assert closed_issue.created_at == fake.issue(4).created_at and closed_issue.closed_at == fake.issue(4).closed_at
+    assert closed_issue.closed_at is not None
+    stored = json.loads((store.directory / "snapshot.json").read_text(encoding="utf-8"))
+    assert stored["issues"]["4"]["created_at"] == closed_issue.created_at
+    assert stored["issues"]["4"]["closed_at"] == closed_issue.closed_at
+    assert stored["issues"]["3"]["closed_at"] is None
+    assert len(fake.graphql_requests()) == 1 and len(fake.requests) == 4
+    query = fake.graphql_requests()[0].payload["query"]  # type: ignore[index]
+    assert "createdAt" in query and "closedAt" in query
+
+
+def test_a_version_one_snapshot_without_the_time_fields_is_refetched(tmp_path: Path) -> None:
+    fake, service, store = _world(tmp_path)
+    service.ensure_fresh("display")
+    path = store.directory / "snapshot.json"
+    document = json.loads(path.read_text(encoding="utf-8"))
+    for item in document["issues"].values():
+        del item["created_at"], item["closed_at"]
+    path.write_text(json.dumps(document), encoding="utf-8")
+    clear_memory()
+    fresh = service.ensure_fresh("display")
+    assert fresh.refreshed and len(fake.graphql_requests()) == 2
+    assert "created_at" in json.loads(path.read_text(encoding="utf-8"))["issues"]["1"]
+
+
+def test_reread_and_reflection_carry_the_time_fields(tmp_path: Path) -> None:
+    fake, service, _ = _world(tmp_path)
+    service.ensure_fresh("display")
+    fake.issue(3).state, fake.issue(3).closed_at = "closed", "2026-10-26T05:00:00Z"
+    reread = service.reread([3], command="scope close")
+    assert reread.issues[3].created_at == fake.issue(3).created_at
+    assert reread.issues[3].closed_at == "2026-10-26T05:00:00Z"

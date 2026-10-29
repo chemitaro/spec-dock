@@ -1,0 +1,29 @@
+@startuml
+left to right direction
+skinparam shadowing false
+skinparam linetype ortho
+skinparam packageStyle rectangle
+skinparam package {
+  BackgroundColor #FFFFFF
+  BorderColor #9CA3AF
+  FontColor #111827
+}
+skinparam rectangle {
+  RoundCorner 6
+}
+
+legend right
+|= Kind / State |= Color |
+| issue doing |<#DAE8FC> |
+| issue ready |<#D5E8D4> |
+| issue blocked |<#F8CECC> |
+| issue done |<#E3E3E3> |
+| issue unknown |<#EEEEEE> |
+| high-level open |<#FFFFFF> |
+| high-level done |<#E3E3E3> |
+| high-level unknown |<#EEEEEE> |
+| raw direct dependencies; not readiness authority | |
+endlegend
+
+note "No raw direct dependencies to render" as Empty
+@enduml

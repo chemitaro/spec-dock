@@ -78,7 +78,7 @@ from spec_dock.runtime.domain.canonical_sync_state import (
     SyncError,
 )
 from spec_dock.runtime.infra import canonical_git
-from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, read_registry
+from spec_dock.runtime.infra.canonical_registry import RegistryUnreadable, is_unregistered, read_registry
 from spec_dock.runtime.infra.canonical_state import (
     CycleBusy,
     StateUnreadable,
@@ -110,6 +110,7 @@ if TYPE_CHECKING:
     from datetime import datetime
 
     from spec_dock.runtime.application.project_context import ProjectContext
+    from spec_dock.runtime.domain.canonical_structure import StructureSnapshot
     from spec_dock.runtime.infra.github_structure import GithubClock
 
 PUSH_ATTEMPTS: Final = 3  # the first push and at most two retries after a rejection (Epic ch. 5 step 5)
@@ -175,7 +176,7 @@ class CatalogResult:
 
 @dataclass(frozen=True)
 class RepositoryResult:
-    """Step 7 for one repository; iss-00438 adds the dashboards it wrote."""
+    """Step 7 for one repository: the probe, the refetch and how many catalogs got dashboard files."""
 
     repository: str
     probe: ProbeLabel
@@ -241,18 +242,11 @@ def sync_catalog(entry: RegistryEntry, ctx: SyncContext, *, registered: bool = F
     """
     try:
         with cycle_lock(ctx.state_root, entry.catalog):
-            if registered and _unregistered(ctx.state_root, entry.catalog):
+            if registered and is_unregistered(ctx.state_root, entry.catalog):
                 return CatalogResult(entry.catalog, "skipped", skipped_reason="unregistered")
             return _cycle(entry, ctx)
     except CycleBusy:
         return CatalogResult(entry.catalog, "skipped", skipped_reason="cycle_busy")
-
-
-def _unregistered(root: Path, catalog: str) -> bool:
-    try:
-        return read_registry(root).entry_for(catalog) is None
-    except RegistryUnreadable:
-        return False
 
 
 def _cycle(entry: RegistryEntry, ctx: SyncContext) -> CatalogResult:
@@ -927,15 +921,18 @@ def run_cycle(
             _log(ctx, failed)
     if stop is not None and stop():
         return CycleResult(tuple(catalogs), ())  # terminating: skip the GitHub probe of step 7
-    return CycleResult(tuple(catalogs), tuple(refresh_structures(entries, ctx)))
+    return CycleResult(tuple(catalogs), tuple(refresh_structures(entries, ctx, registered=registered)))
 
 
-def refresh_structures(entries: Sequence[RegistryEntry], ctx: SyncContext) -> list[RepositoryResult]:
-    """Step 7: ensure_fresh(repository, "cycle") once per repository after every catalog, even paused ones.
+def refresh_structures(
+    entries: Sequence[RegistryEntry], ctx: SyncContext, *, registered: bool = False
+) -> list[RepositoryResult]:
+    """Step 7: ensure_fresh(repository, "cycle") once per repository after every catalog, even paused ones,
+    then the dashboard of each of its catalogs (iss-00438).
 
-    Its failures stay in probe.json and never change steps 1-6. iss-00438 adds the dashboards here.
+    Its failures stay in probe.json and state.json and never change steps 1-6.
     """
-    from spec_dock.runtime.infra.github_snapshot import ensure_fresh
+    from spec_dock.runtime.infra.github_snapshot import SNAPSHOT_FILE, SnapshotStore, ensure_fresh
 
     results: list[RepositoryResult] = []
     seen: set[str] = set()
@@ -943,19 +940,58 @@ def refresh_structures(entries: Sequence[RegistryEntry], ctx: SyncContext) -> li
         if entry.repository is None or entry.repository in seen:
             continue
         seen.add(entry.repository)
+        snapshot = None
         try:
             repository = GithubRepository.parse(entry.repository)
             fresh = ensure_fresh(
                 repository, "cycle", state_root=ctx.state_root, api=ctx.github_api(Path(entry.main_checkout))
             )
         except (GithubStructureError, OSError, ValueError, TimeoutError):
-            results.append(RepositoryResult(entry.repository, "failed", False))
-            continue
-        probe: ProbeLabel = (
-            "failed" if fresh.probe == "failed" else ("changed" if fresh.probe == "changed" else "unchanged")
-        )
-        results.append(RepositoryResult(entry.repository, probe, fresh.refreshed))
+            probe: ProbeLabel = "failed"
+            refreshed = False
+        else:
+            snapshot = fresh.snapshot
+            probe = "failed" if fresh.probe == "failed" else ("changed" if fresh.probe == "changed" else "unchanged")
+            refreshed = fresh.refreshed
+        written = 0
+        try:
+            path = SnapshotStore(ctx.state_root, GithubRepository.parse(entry.repository)).directory / SNAPSHOT_FILE
+        except ValueError:  # not a GitHub repository key: there is no snapshot to draw from
+            path = None
+        if path is not None:
+            same = [item for item in entries if item.repository == entry.repository]
+            written = _refresh_dashboards(same, snapshot, path, ctx, registered=registered)
+        results.append(RepositoryResult(entry.repository, probe, refreshed, written))
     return results
+
+
+def _refresh_dashboards(
+    entries: Sequence[RegistryEntry],
+    snapshot: StructureSnapshot | None,
+    snapshot_path: Path,
+    ctx: SyncContext,
+    *,
+    registered: bool,
+) -> int:
+    """The catalogs of one repository whose dashboard got at least one file; failures are only recorded."""
+    from spec_dock.runtime.application.canonical_dashboard import refresh_dashboard
+
+    written = 0
+    for entry in entries:
+        try:
+            outcome = refresh_dashboard(
+                entry,
+                snapshot,
+                snapshot_path=snapshot_path,
+                state_root=ctx.state_root,
+                now=ctx.stamp(),
+                registered=registered,
+            )
+        except Exception as error:  # a dashboard failure never changes the sync result (Epic ch. 5 step 7)
+            _log_line(ctx, f"dashboard catalog={entry.catalog} error={type(error).__name__}: {error}")
+            continue
+        written += bool(outcome.written)
+    return written
 
 
 def cycle_operation_result(command: str, cycle: CycleResult) -> OperationResult[object]:

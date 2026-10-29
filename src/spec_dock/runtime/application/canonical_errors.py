@@ -79,6 +79,8 @@ CANONICAL_NOT_RESTORABLE: Final = "CANONICAL_NOT_RESTORABLE"  # exit 3
 CANONICAL_PATH_NOT_FOUND: Final = "CANONICAL_PATH_NOT_FOUND"  # exit 3
 CANONICAL_REGISTRY_UNREADABLE: Final = "CANONICAL_REGISTRY_UNREADABLE"  # exit 3
 CANONICAL_STATE_ROOT_MISMATCH: Final = "CANONICAL_STATE_ROOT_MISMATCH"  # exit 3 for link; a warning in status
+CANONICAL_DASHBOARD_OCCUPIED: Final = "CANONICAL_DASHBOARD_OCCUPIED"  # state.json dashboard.error; a status warning
+CANONICAL_DASHBOARD_FAILED: Final = "CANONICAL_DASHBOARD_FAILED"  # state.json dashboard.error; a status warning
 
 NOT_IMPLEMENTED_RECOVERY: Final = (
     "Wait for SpecDock 0.3.0, which completes canonical mode for this command; "
@@ -154,6 +156,11 @@ SYNC_NOT_SCHEDULED_NEXT_STEP: Final = (
 PRIVACY_NEXT_STEP: Final = (
     "In System Settings > Privacy & Security, allow Full Disk Access (or Removable Volumes) for the listed "
     "programs (the spec-dock Python and git), then check spec-dock canonical status."
+)
+DASHBOARD_OCCUPIED_NEXT_STEP: Final = "Move the listed paths away; the next sync writes the dashboard there."
+DASHBOARD_FAILED_NEXT_STEP: Final = "Check the snapshot and sync items of spec-dock canonical status."
+DASHBOARD_MISSING_NEXT_STEP: Final = (
+    "The next periodic sync writes the dashboard; check the sync item of spec-dock canonical status."
 )
 SYNC_LOG_NEXT_STEP: Final = "Check <state root>/canonical-sync.log, then spec-dock canonical status."
 PUSH_AUTH_HTTPS_NEXT_STEP: Final = "Run gh auth setup-git so the periodic job can push over HTTPS."
