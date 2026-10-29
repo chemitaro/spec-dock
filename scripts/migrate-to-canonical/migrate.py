@@ -1202,7 +1202,7 @@ def linkable(path: str, mode: str) -> str | None:
 @dataclass
 class Flattened:
     entries: list[TreeEntry]  # paths relative to spec-dock/initiatives after flattening
-    problems: list[dict[str, Any]]  # what cannot be flattened (a strict caller stops on them)
+    problems: list[dict[str, Any]]  # what cannot be flattened (left out; a caller flattening a tip stops)
     dropped: dict[str, int]  # paths left out, by anomaly code
     links: list[Link]
     layout: Layout
@@ -1274,7 +1274,8 @@ class TreeFlattener:
                 found = find_links(blobs[oid], kind)
                 self._parsed[oid, kind] = found if found is not None and found[1] else None
 
-    def flatten(self, entries: Sequence[TreeEntry], *, strict: bool) -> Flattened:
+    def flatten(self, entries: Sequence[TreeEntry]) -> Flattened:
+        """Paths that cannot be flattened are left out and listed; callers flattening a tip stop on them."""
         self._read(entries)
         metas = {
             str(PurePosixPath(e.path).parent): self._small[e.oid]
@@ -1327,7 +1328,6 @@ class TreeFlattener:
             old_entry = result[index]
             result[index] = TreeEntry(old_entry.mode, old_entry.kind, written, old_entry.path)
         moved.update(zip(sources, result, strict=True))
-        # A strict caller stops on the problems; a history commit simply goes without those paths.
         return Flattened(result, list(problems.values()), dropped, links, layout, moved)
 
 
@@ -1381,7 +1381,7 @@ def rewrite_history(repo: Path, tip: str, flattener: TreeFlattener, scratch: Pat
     mapped: dict[str, str] = {}
     history = History(tip="")
     for oid, *parents in order:
-        flat = flattener.flatten(list_tree(repo, oid), strict=False)
+        flat = flattener.flatten(list_tree(repo, oid))
         tree = write_tree(repo, flat.entries, scratch)
         mapped[oid] = write_commit(repo, raws[oid], tree, [mapped[parent] for parent in parents])
         history.commits += 1
@@ -2318,7 +2318,7 @@ def command_plan(context: Context) -> int:
     links = LinkReport()
     if tree_oid(target.project, f"{commit}:{SPEC_ROOT}") is not None:
         flattener = TreeFlattener(target.project, planned_ids, scratch=None)  # reads only; writes no object
-        flat = flattener.flatten(list_tree(target.project, f"{commit}:{SPEC_ROOT}"), strict=True)
+        flat = flattener.flatten(list_tree(target.project, f"{commit}:{SPEC_ROOT}"))
         links = flattened_links(list_tree(target.project, commit), flat)
     _report_flattening(report, flat, links)
     report.anomalies.extend(flat.problems)
@@ -2784,7 +2784,7 @@ def command_build_canonical(context: Context) -> int:
         repo = workspace.repo
         flattener = TreeFlattener(repo, state.idmap, workspace.root)
         whole = list_tree(repo, "migrate-source")
-        tip = flattener.flatten(list_tree(repo, f"migrate-source:{SPEC_ROOT}"), strict=True)
+        tip = flattener.flatten(list_tree(repo, f"migrate-source:{SPEC_ROOT}"))
         links = flattened_links(whole, tip)
         _report_flattening(report, tip, links)
         if tip.problems:
@@ -3409,7 +3409,7 @@ def command_adopt_worktree(context: Context) -> int:
         final: dict[str, TreeEntry] = {}
         expected_commit = None
         flattener = TreeFlattener(repo, state.idmap, workspace.root)
-        flat = flattener.flatten(relative, strict=True)
+        flat = flattener.flatten(relative)
         if flat.problems:
             report.anomalies.extend(flat.problems)
             raise Refused(
@@ -3418,7 +3418,7 @@ def command_adopt_worktree(context: Context) -> int:
             )
         moved = flat.moved
         if changed:
-            flat_base = flattener.flatten(list_tree(repo, f"{base}:{SPEC_ROOT}"), strict=False)
+            flat_base = flattener.flatten(list_tree(repo, f"{base}:{SPEC_ROOT}"))
             expected_commit, conflicts = _adopt_into_canonical(
                 context,
                 target,
