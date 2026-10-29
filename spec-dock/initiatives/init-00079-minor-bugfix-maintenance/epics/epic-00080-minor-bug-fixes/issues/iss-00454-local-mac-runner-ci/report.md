@@ -25,16 +25,25 @@ ID: "iss-00454"
 | AC | 結果 | 証拠 |
 |---|---|---|
 | 01 | テストは通過。実機は、変数が未設定の run（40853980916、40859634671、40874540057）で `route` を含むすべてのジョブが `GitHub Actions` のランナーで成功。不正な値の run は（S7 の後に記入） | `tests/integration/test_issue454_runner_gate.py` |
-| 02 | （S7 の後に記入） | |
+| 02 | 変数を `local`（12:44:33Z、利用者）にした後の run 40877741196（`e92ceb99`）で、`Provider distribution parity (ubuntu-latest)` が `spec-dock-ci-1`、`provider-tests` が `spec-dock-ci-2` で成功。`route`・macOS の配布・`validate`・`check` は GitHub のランナーで成功。両方の手元のジョブのログに `A job started hook has been configured by the self-hosted runner administrator` と `SpecDock runner admitted a same-repository pull request job` がある。VM の中の両方の `.env` にフックの2行がある | run 40877741196 のジョブ 123460877440・123460877546 |
 | 03 | テストで、fork・bot・外の人・別のリポジトリ・`pull_request` 以外・読めないイベント・別の場所のイベントのファイルを拒否。VM に置いたフックを `spec-dock-runner-1` として実行し、同じリポジトリ＝許可（0）、fork＝拒否（1）、別の場所のファイル＝拒否（1）、push＝拒否（1）。実際の fork の PR は作れないので**未確認** | VM での実行（2026-10-29T10:2x Z） |
 | 04 | ランナーの利用者として `sudo -n true` は失敗。`192.168.5.2:9222`（Mac の Chrome のデバッグの口）、`192.168.5.2:5432`、`192.168.0.43:6768`（Mac の LAN の IP の Orca）、`100.85.74.8:8766`（Mac の Tailscale の IP）、`169.254.169.254:80`、`192.168.5.2:22` の6つはすべて接続できず、拒否の規則の counter がちょうど6増えた。IPv6 は VM にアドレスも経路もなく、リテラルの宛先にも届かない。`https://github.com`・`https://pypi.org` は 200。`limactl list --json` で plain=true、mounts・portForwards なし、containerd は system・user とも false。`lima-guestagent` はプロセス・実行ファイル・unit とも無い。docker・containerd・podman・nerdctl は無い | VM での実行 |
 | 05 | VM に `gh` の hosts.yml・`.netrc`・`.git-credentials` は無い。秘密鍵は VM 自身の sshd のホスト鍵だけ。差分にトークンの形の文字列は無い。**登録のトークンの件**（下の Notes）を直した後、`_diag`・journal・`/var/log` にトークンの値は無い | VM での検索 |
-| 06 | テストで `_tool` だけが残り、想定外の `RUNNER_TEMP` では何も消さない。VM で掃除のフックを実行し、作業場所が空になった。実際のジョブの後は（S7 の後に記入） | |
+| 06 | テストで `_tool` だけが残り、想定外の `RUNNER_TEMP` では何も消さない。VM で掃除のフックを実行し、作業場所が空になった。run 40877741196 の後、両方のランナーの `_work` は `_tool` だけで、ログに `SpecDock runner removed the job files under …/_work` がある | 同じ run |
 | 07 | ジョブの無いときに `limactl stop`（10:42:41Z）→ LaunchAgent が62秒後に起動 → 2つのランナーが `Connected to GitHub`・`Listening for Jobs`、nftables も起動時に読み込み | `ensure-vm.log`、VM の journal |
 | 08 | 手順書にある。リハーサルは（S7 の後に記入） | `docs/ci-local-runner.md` |
 | 09 | 前（09:41:33Z）と後で、退去費用の LaunchAgent の plist、専用の `limactl`、`ci_vm_host_watch.py` の SHA256 と、`ci-shadow/lima.yaml` の更新時刻が同じ | |
 | 10 | 利用者（統括を通して）が `all_external_contributors` を確かめた | |
 | 11 | 最終品質ゲート（下）。時間の表は（S7 の後に記入） | |
+
+手元で最初に動かした run 40875990010（`cfd6fed8`）は、振り分けとフックは正しく働いたが、VM の環境の違いで2つのジョブが失敗した。①setup-python の Python は RPATH が `/opt/hostedtoolcache/Python/3.11.18/arm64/lib` に固定で、ランナーの `_work/_tool` では `libpython3.11.so.1.0` が見つからず、環境を空にして動かすテストと `uv build` が失敗した。②Ubuntu 24.04 の git 2.43 の `git subtree split` は、作業ツリーのないクローンでは prefix がないとして止まり、移行のテストが失敗した（Mac の git 2.54 では通ることを同じ手順で確かめた）。root の持ち物の `/opt/hostedtoolcache` に Python 3.11.18（SHA256 を確認）と uv 0.13.6 を置いて `AGENT_TOOLSDIRECTORY` で指し、git を `ppa:git-core/ppa` の 2.56.0 にして直した（`e92ceb99`）。
+
+| ジョブ | GitHub（この PR、run 40859634671） | 手元（run 40877741196） |
+|---|---|---|
+| `provider-tests` | 475秒 | 210秒 |
+| `Provider distribution parity (ubuntu-latest)` | 114秒 | 61秒 |
+| `Provider distribution parity (macos-latest)` | 169秒 | 209秒（GitHub のまま） |
+| `route` | 5秒 | 5秒（GitHub のまま） |
 
 GitHub のランナーでの時間（この PR、run 40859634671）：`route` 5秒、`provider-tests` 475秒、Linux の配布 114秒、macOS の配布 169秒。直近8回の他の PR：`provider-tests` 250〜454秒、Linux の配布 69〜119秒。
 
