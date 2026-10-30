@@ -903,19 +903,20 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 | `CANONICAL_UNSAVED_CHANGES` | 3 | `spec-dock canonical status` で確かめ、保存を待つ |
 | `CANONICAL_IGNORED_FILES_PRESENT` | 3 | 示したファイルを退避してから同じコマンドを実行する |
 | `CANONICAL_SAVE_HELD` | 3 | 保留の種類ごとの解き方（`canonical accept`、`canonical restore`、中身の修正） |
-| `CANONICAL_SAVE_UNCONFIRMED` | 6（partial） | `spec-dock canonical status` |
+| `CANONICAL_SAVE_UNCONFIRMED` | 3（変更の束を書く前に止まったとき）／6（partial。束を書いた後。I-5 の実装に合わせた。iss-00436） | `spec-dock canonical status` |
 | `CANONICAL_PAUSED` | 3 | `spec-dock canonical status` で理由を見て、文書の「同期が止まったとき」に従う |
 | `CANONICAL_BASE_HAS_SPECS` | 3 | 切り替えの後のコミットを基点にする |
 | `CANONICAL_CATALOG_PROTECTED` | 3 | 取り外すなら `spec-dock canonical remove` |
 | `CANONICAL_WORKBENCH_SHARED` | 3 | 何もしなくてよい（どのworktreeからも見える） |
 | `CANONICAL_CHECK_FAILED` | 7 | 失敗ごとに示したパスを、既定のブランチから外す |
-| `GITHUB_STRUCTURE_INVALID` | 7 | 示した Issue のラベルと親子を直す（`scope move` など） |
+| `KIND_LABEL_MULTIPLE`、`PARENT_MISSING`、`PARENT_INVALID`、`PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`DEPENDENCY_CYCLE`、`DEPENDENCY_INVALID`、`DEPENDENCY_FOREIGN_REPOSITORY` | 3（書くコマンド）／—（構造の異常、`workspace validate` の findings） | 示した Issue のラベルと親子を直す（`scope move` など）。この表の最初の版の `GITHUB_STRUCTURE_INVALID` は runtime になく、実装はこれらの構造の異常のコードを返す（iss-00436） |
 | `GITHUB_RATE_LIMITED` | 5 | 示した時刻の後に同じコマンドを実行する |
 | `GITHUB_UNAVAILABLE` | 5 | 接続と `gh auth status` を確かめる |
 | `GITHUB_ACCESS_DENIED`、`GITHUB_REQUEST_REJECTED`、`GITHUB_RESPONSE_INVALID` | 今と同じ | 今の `github_lifecycle` と同じ分類と次の1手（権限と `gh auth status`、示した GitHub の応答を確かめる） |
 | `GITHUB_EFFECT_UNKNOWN`、`GITHUB_CREATE_IDENTITY_UNKNOWN` | 6 | GitHub の今の状態を確かめてから、`recovery` の手順に従う（作成なら `scope import github`） |
-| `CANONICAL_NOT_IMPLEMENTED` | 3 | SpecDock 0.3.0 を待つ（I-1〜I-8 の途中だけ。I-9 で残っていないことを確かめる） |
+| `CANONICAL_NOT_IMPLEMENTED` | 3 | SpecDock 0.3.0 を待つ（I-1〜I-8 の途中だけ。0.3.0 では返さない。I-9 で経路と定数を消した。iss-00436） |
 | `GITHUB_SNAPSHOT_STALE` | —（警告） | 表示は取得の時刻の時点のもの。つながったら、次の表示か定期の同期で新しくなる |
+| `CANONICAL_PROGRESS_MARK_FAILED` | —（`work start` と `work finish` の警告） | 作業中の印（ラベル `spec-dock:in-progress` と担当者）の付け外しが終わらなかった。GitHub でラベルと担当者を確かめて付け外す（I-5。iss-00436 で表に足した） |
 | `SCOPE_IN_PROGRESS` | —（`work start` の警告） | 別のPCで作業中でないか利用者に確かめる。古い印なら `spec-dock work finish` か GitHub でラベルを外す。`details` は `scope_id`、`number`、`assignees`（I-5。iss-00432 の統括の判断、2026-10-26） |
 | `CANONICAL_TITLE_IGNORED` | —（`scope import github` の警告） | 題名を変えるなら `spec-dock scope edit <ID> --title <題名>`。`--title` の値は使わず GitHub の題名で進めた（I-5。iss-00432 の統括の判断、2026-10-29） |
 | `CANONICAL_DASHBOARD_OCCUPIED` | —（警告。`state.json` の `dashboard.error` と `canonical status` の `dashboard`） | 示したパスを退避する。次の同期が書く（書く場所にディレクトリかシンボリックリンクがあった。I-11。iss-00438 の統括の判断、2026-10-26） |

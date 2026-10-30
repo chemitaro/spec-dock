@@ -19,6 +19,26 @@ Business commands support Linux and macOS with Python 3.10+. Other operating sys
 
 Choose package update, static installation/update, or lifecycle operation according to the layer that actually owns the requested outcome. Do not describe parity between layers as proof that another layer was updated.
 
+## 仕様の扱い（canonical モード）
+
+`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。3 のリポジトリでは、今までどおり、仕様もコードと一緒にコミットする。
+
+- 仕様は `spec-dock/initiatives/` にある。普通のファイルとして読み書きする。
+- 仕様は Git で扱わない（`git add`、`commit`、`stash`、`reset`、`checkout`、`clean` を仕様に使わない）。保存と共有は、1〜2分のうちに自動で行われる。
+- 仕様が見えない、またはリンクの異常を示されたときは、`spec-dock canonical link` を実行する。サンドボックスの中で拒否されたら、利用者に、普通の端末での実行を頼む。
+- 読み書きを拒否されたときは、`spec-dock canonical status` が示す1行の設定を、利用者に伝える。自分でツールの設定を変えない。
+- 検索では、パスを明示する（`rg 語 spec-dock/initiatives/`、コードと一緒なら `rg 語 . spec-dock/initiatives/`）。
+- Scope のディレクトリは `spec-dock/initiatives/<区切り>/<ID>/`（区切りは番号の千ごとの範囲。例 `spec-dock/initiatives/00000-00999/iss-00454/`）に平らに並ぶ。場所は `spec-dock scope show <ID> --json` の `path` で確かめる。親、子、依存は、ディレクトリの位置ではなく `spec-dock scope show <ID> --json` で確かめる。
+- ID は `<種類>-<番号5桁>` で、コマンドの入力は0埋めしなくてよい（`iss-454` は `iss-00454`）。slug はなく、`scope create` と `scope import github` に `--slug` を付けない。題名は GitHub の題名が正本で、どの言語でもよい。既定のブランチ名は `<ID>`。
+- 構造（作成、親子、依存、状態、題名、種類）は、SpecDock のコマンドだけで変える。Scope のディレクトリの名前を変えたり、別のディレクトリの下へ動かしたりしない。親の付け替えは `spec-dock scope move <ID> --parent <親>`（GitHub の親だけが変わり、ディレクトリは動かない）。
+- `SCOPE_KIND_CHANGED` で止まったら、種類のラベルを戻すか作り直すかを利用者に確かめ、`recovery` の手順に従う。`work start` が警告 `SCOPE_IN_PROGRESS` を返したら、別のPCで作業中でないかを利用者に確かめる。
+- `*.conflict-*` のファイルがあれば、中身を元のファイルに統合してから、そのファイルを消す。
+- Claude Code の隔離セッション（`--worktree`）では、仕様を読むだけにする。
+- 作業を終えるときは `spec-dock work finish` を使う。保存が確かめられるまで（最大180秒）待つ。確かめられずに止まったら、`spec-dock canonical status` を見る。
+- リンクを消すときは `rm spec-dock/initiatives` と書く。末尾に `/` を付けない。mainのチェックアウトで `git clean -ff` を使わない。
+
+利用者向けの用意、ツールの設定の1行、同期が止まったときの扱いは `spec-dock/docs/canonical.md` にある。
+
 ## Resolve the context and target
 
 1. Bind one repository/worktree, using its exact absolute root with `--project` when needed.
@@ -47,7 +67,7 @@ Author canonical Requirement, Design, Plan, Report and accepted ADR when request
 
 ## Destructive boundary
 
-Require an exact target and destructive result in the request or approved plan for `scope delete`, `installation uninstall` and `worktree remove`. Understand project-owned `make init` effects before executing bootstrap. Once authorized, execute and verify rather than returning the command for manual entry. Reconfirm only if the actual scope materially exceeds the authorization. Keep any repository human PR merge gate.
+Require an exact target and destructive result in the request or approved plan for `scope delete`, `installation uninstall`, `worktree remove` and `canonical remove`. Understand project-owned `make init` effects before executing bootstrap. Once authorized, execute and verify rather than returning the command for manual entry. Reconfirm only if the actual scope materially exceeds the authorization. Keep any repository human PR merge gate.
 
 ## Failure and protected data
 

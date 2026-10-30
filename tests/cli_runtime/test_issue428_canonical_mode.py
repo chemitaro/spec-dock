@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from spec_dock.cli import main
-from spec_dock.runtime.cli.catalog import LEAF_PATHS
-from spec_dock.runtime.commands.canonical_dispatch import CANONICAL_HANDLERS, REPOSITORY_INDEPENDENT_HANDLERS
 from spec_dock.runtime.infra.tree_backup import tree_digest
 
 if TYPE_CHECKING:
@@ -40,94 +38,27 @@ def _run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, Any]:
     return code, json.loads(capsys.readouterr().out)
 
 
-def _leaf_arguments(root: Path, outside: Path) -> dict[str, list[str]]:
-    source = str(outside / "evidence.txt")
-    other = str(outside / "other-worktree")
-    return {
-        "scope create initiative": ["--backend", "github", "--title", "Plan", "--yes"],
-        "scope create epic": ["--backend", "github", "--parent", "init-00001", "--title", "Core", "--yes"],
-        "scope create issue": ["--backend", "github", "--parent", "epic-00002", "--title", "Leaf", "--yes"],
-        "scope import github initiative": ["gh:example/repo#1", "--title", "Plan", "--yes"],
-        "scope import github epic": ["gh:example/repo#2", "--parent", "init-00001", "--title", "Core", "--yes"],
-        "scope import github issue": ["gh:example/repo#3", "--parent", "epic-00002", "--title", "Leaf", "--yes"],
-        "scope list": [],
-        "scope show": ["init-00001"],
-        "scope edit": ["init-00001", "--title", "Renamed", "--yes"],
-        "scope close": ["init-00001", "--yes"],
-        "scope reopen": ["init-00001", "--yes"],
-        "scope delete": ["init-00001", "--yes"],
-        "scope move": ["iss-00002", "--parent", "epic-00001"],
-        "active show": [],
-        "active set": ["init-00001", "--yes"],
-        "active clear": ["--all", "--yes"],
-        "work start": ["init-00001", "--base", "HEAD", "--yes"],
-        "work finish": ["init-00001", "--yes"],
-        "branch show": ["init-00001"],
-        "branch create": ["init-00001", "--base", "HEAD", "--yes"],
-        "branch switch": ["init-00001", "--yes"],
-        "dependency list": ["init-00001"],
-        "dependency check": ["init-00001"],
-        "dependency add": ["--from", "iss-00003", "--to", "iss-00004", "--yes"],
-        "dependency remove": ["--from", "iss-00003", "--to", "iss-00004", "--yes"],
-        "artifact create": ["--scope", "init-00001", "--type", "blank", "--title", "Note", "--yes"],
-        "artifact import file": [source, "--scope", "init-00001", "--yes"],
-        "artifact list": ["--scope", "init-00001"],
-        "artifact show": ["20261026t000000z-note", "--scope", "init-00001"],
-        "worktree create": ["feature", "--base", "HEAD", "--root", str(outside), "--yes"],
-        "worktree list": [],
-        "worktree show": [str(root)],
-        "worktree remove": [other, "--yes"],
-        "worktree bootstrap": [other, "--yes"],
-        "workbench copy": ["--scope", "init-00001", "--to-worktree", other, "--yes"],
-        "workspace sync": [],
-        "workspace validate": [],
-        "workspace doctor": [],
-        "canonical link": [],
-        "canonical status": [],
-        "canonical check": [],
-        "canonical sync": [],
-        "canonical accept": ["--deletions"],
-        "canonical restore": [],
-        "canonical resume": ["--adopt-remote"],
-        "canonical remove": [],
-    }
-
-
-def test_every_command_without_a_canonical_handler_stops_without_writing(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root = canonical_workspace(tmp_path / "consumer")
-    outside = tmp_path / "outside"
-    outside.mkdir()
-    (outside / "evidence.txt").write_text("evidence\n", encoding="utf-8")
-    arguments = _leaf_arguments(root, outside)
-    excluded = {"help", "completion", "workspace migrate"} | {
-        leaf for leaf in LEAF_PATHS if leaf.startswith("installation ")
-    }
-    assert set(arguments) == set(LEAF_PATHS) - excluded
-    variants = [(leaf, extra) for leaf, extra in arguments.items()]
-    variants += [("workspace validate", ["--ci"]), ("workspace doctor", ["--raw"])]
-    before = tree_digest(root), tree_digest(outside)
-    for leaf, extra in variants:
-        if leaf in CANONICAL_HANDLERS or leaf in REPOSITORY_INDEPENDENT_HANDLERS:
-            continue
-        code, result = _run(capsys, "--project", str(root), *leaf.split(), *extra)
-        assert code == 3, (leaf, result)
-        assert result["status"] == "failed" and result["effects"] == []
-        assert result["error"]["code"] == "CANONICAL_NOT_IMPLEMENTED", (leaf, result)
-        assert "SpecDock 0.3.0" in result["recovery"]["instructions"][0]
-        assert (tree_digest(root), tree_digest(outside)) == before, leaf
-
-
 def test_text_output_shows_the_next_step(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    # iss-00432 registered every command; an unregistered one still renders its next step as text.
-    monkeypatch.delitem(CANONICAL_HANDLERS, "scope close")
+    # iss-00436 removed CANONICAL_NOT_IMPLEMENTED; a canonical refusal still renders its next step as text.
     root = canonical_workspace(tmp_path / "consumer")
-    assert main(["--project", str(root), "scope", "close", "init-00001", "--yes"]) == 3
+    assert (
+        main([
+            "--project",
+            str(root),
+            "workspace",
+            "migrate",
+            "--to-schema",
+            "3",
+            "--to-writer-protocol",
+            "specdock.worktree-writer/v1",
+            "--dry-run",
+        ])
+        == 3
+    )
     stderr = capsys.readouterr().err
-    assert "error [CANONICAL_NOT_IMPLEMENTED]" in stderr and "recovery: Wait for SpecDock 0.3.0" in stderr
+    assert "error [CANONICAL_NOT_APPLICABLE]" in stderr and "recovery: " in stderr
 
 
 @pytest.mark.parametrize(

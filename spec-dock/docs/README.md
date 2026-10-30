@@ -4,7 +4,8 @@ SpecDockは通常のPython packageとしてworktree外へ導入した `spec-dock
 
 ## Current
 
-- [全44 leafのCLI参照](reference_cli.md)
+- [全53 leafのCLI参照](reference_cli.md)
+- [canonical モードの使い方（宣言の版4。仕様をGitHub Issueと `spec-dock/canonical` ブランチに置く形）](canonical.md)
 - [日本語の人間向け説明HTML（オフライン）](cli-redesign-guide.html)
 - [導入・移行・保全](migration.md)
 - [命名](reference_naming.md)・[依存](reference_deps.md)・[GitHub](reference_github.md)・[状態の観測](reference_sync.md)・[worktree](reference_worktree.md)

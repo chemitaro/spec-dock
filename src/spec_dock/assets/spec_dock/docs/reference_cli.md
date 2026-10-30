@@ -1,6 +1,6 @@
 # CLI参照（Current）
 
-通常packageの外部 `spec-dock` が公開52 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
+通常packageの外部 `spec-dock` が公開53 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
 
 | 用途 | 入力 | 境界 |
 |---|---|---|
@@ -10,6 +10,8 @@
 
 新規ScopeはGitHub番号が正本です。Requirement・Design・Planが一次仕様、Artifactは証拠、Workbenchは一時作業です。Syncはその時点の観測で、派生状態を保存しません。
 
+宣言の版4（canonical モード）では、Scope のディレクトリは `spec-dock/initiatives/<区切り>/<ID>/`（区切りは番号の千ごとの範囲。例 `00000-00999/iss-00454/`）に平らに並びます。ID は `<種類>-<番号5桁>` で、入力は0埋めしなくてよく（`iss-454`）、slug はありません（`--slug` は `CANONICAL_NOT_APPLICABLE`、`scope import github` の `--title` は使わずに GitHub の題名で進め `CANONICAL_TITLE_IGNORED` を警告します）。題名は GitHub の題名が正本、親子と依存は GitHub だけにあり、場所と親子は `scope show <ID> --json` で確かめます。`work start` の既定のbranch名は `<ID>` です。canonical モードの用意、ツールの設定、エラーのコードと次の1手の一覧は[canonical モードの使い方](canonical.md)にあります。
+
 業務コマンドの対応OSはLinuxとmacOS、Pythonは3.10以上です。その他のOSではproject解決やGit/GitHub・file操作より前に `UNSUPPORTED_PLATFORM` / exit3 / effects=[]を返します。help・version・completionはこの業務判定やOS固有の依存を読み込まず利用できます。
 
 ## 全コマンド
@@ -18,12 +20,12 @@
 
 | ID | Command / leaf | 引数・固有option | 対象と効果 | 主な副作用 |
 |---|---|---|---|---|
-| C01 | `scope create initiative` | `--backend github --title TITLE [--slug SLUG]` | GitHubで番号を発行してInitiativeを作ります。 | GitHub作成、ローカルScope |
-| C02 | `scope create epic` | `--backend github --parent TARGET --title TITLE [--slug SLUG]` | 明示したInitiativeの下にEpicを作ります。 | GitHub作成、ローカルScope |
-| C03 | `scope create issue` | `--backend github --parent TARGET --title TITLE [--slug SLUG]` | 明示したEpicの下にIssueを作ります。 | GitHub作成、ローカルScope |
-| C04 | `scope import github initiative` | `GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存Issueを確認してInitiativeへ取り込みます。 | GitHub読取り、ローカルScope |
-| C05 | `scope import github epic` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存IssueをEpicへ取り込みます。 | GitHub読取り、ローカルScope |
-| C06 | `scope import github issue` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]` | 既存IssueをIssue Scopeへ取り込みます。 | GitHub読取り、ローカルScope |
+| C01 | `scope create initiative` | `--backend github --title TITLE [--slug SLUG]`（schema4では`--slug`は使えません） | GitHubで番号を発行してInitiativeを作ります。 | GitHub作成、ローカルScope |
+| C02 | `scope create epic` | `--backend github --parent TARGET --title TITLE [--slug SLUG]`（schema4では`--slug`は使えません） | 明示したInitiativeの下にEpicを作ります。 | GitHub作成、ローカルScope |
+| C03 | `scope create issue` | `--backend github --parent TARGET --title TITLE [--slug SLUG]`（schema4では`--slug`は使えません） | 明示したEpicの下にIssueを作ります。 | GitHub作成、ローカルScope |
+| C04 | `scope import github initiative` | `GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]`（schema4では`--slug`は使えず、`--title`はGitHubの題名で置き換わります） | 既存Issueを確認してInitiativeへ取り込みます。 | GitHub読取り、ローカルScope |
+| C05 | `scope import github epic` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]`（schema4は同上） | 既存IssueをEpicへ取り込みます。 | GitHub読取り、ローカルScope |
+| C06 | `scope import github issue` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]`（schema4は同上） | 既存IssueをIssue Scopeへ取り込みます。 | GitHub読取り、ローカルScope |
 | C07 | `scope list` | `[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]` | 現在treeのScopeを表示します。 | 読取りのみ |
 | C08 | `scope show` | `TARGET` | metadata、親子、未観測を含む状態を表示します。 | 読取りのみ |
 | C09 | `scope edit` | `TARGET --title TITLE` | titleだけを変更し、ID/linkageを保ちます。 | metadata |
@@ -33,8 +35,8 @@
 | C13 | `active show` | 共通optionのみ | 一つの直接記録と現在の祖先を表示します。 | 読取りのみ |
 | C14 | `active set` | `TARGET` | 現在の妥当な直接対象と同じなら選択はunchangedで、ずれた閲覧用active linkだけを揃えます。空/別対象はWORK_START_REQUIREDで停止します。 | active linkのみ |
 | C15 | `active clear` | `--from TARGET` または `--all` | 捕捉した直接記録だけを解除し、未選択ならactive linkをfallbackへ揃えます。 | selection、active link |
-| C16 | `work start` | `TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]` | live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行い、排他の後でactive linkを揃えます。 | Git、worktree局所selection、active link |
-| C17 | `work finish` | `TARGET` | 完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。 | GitHub完了、selection、active link |
+| C16 | `work start` | `TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]` | live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行い、排他の後でactive linkを揃えます。schema4の既定branch名は`<ID>`で、作業中の印を付け、別のPCの印があれば警告`SCOPE_IN_PROGRESS`を返します。 | Git、worktree局所selection、active link |
+| C17 | `work finish` | `TARGET` | 完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。schema4では閉じる前に仕様の保存とpushを最大180秒待ち、確かめられなければ`CANONICAL_SAVE_UNCONFIRMED`で閉じずに止まります。 | GitHub完了、selection、active link |
 | C18 | `branch show` | `TARGET [--name NAME]` | 現在のref/占有を観測します。対応台帳は保存しません。 | 読取りのみ |
 | C19 | `branch create` | `TARGET [--name NAME] --base REF` | 固定baseからbranchを作り、checkoutしません。既存refをresetしません。 | Git ref |
 | C20 | `branch switch` | `TARGET [--name NAME]` | 同cloneのStart lock内でbranchへcheckoutし、selection取得/解除は行いません。lockを--lock-timeout内に取れなければSTART_LOCK_BUSYで止まります。 | Gitのみ |

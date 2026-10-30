@@ -376,3 +376,36 @@ def test_a_creation_recorded_before_the_id_map_was_saved_is_used_again(
     idmap = json.loads((legacy.records / "idmap.json").read_text())["entries"]
     assert idmap["init-local-00003"]["number"] == created.number
     assert legacy.run("verify")[0] == 0
+
+
+def test_undo_without_a_work_record_stops_before_reading_github(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """iss-00436 (I-8 ST-1): a wrong or missing --state-dir must not look like "nothing to undo"."""
+    legacy = build_legacy(tmp_path, monkeypatch)
+    for apply in (False, True):
+        code, result = legacy.run("undo", apply=apply)
+        assert (code, result["status"]) == (2, "refused"), result
+        assert "undo.jsonl" in result["error"]
+        assert any("--state-dir" in step for step in result["next_steps"])
+    assert legacy.github.writes() == []
+    assert not (legacy.records / "undo.jsonl").exists()
+
+
+def test_register_after_undo_creates_a_new_issue_instead_of_the_undone_one(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """iss-00436 (I-15 gate 2 P3): the closed, unlabelled Issue undo left behind is never reused."""
+    legacy = build_legacy(tmp_path, monkeypatch)
+    assert legacy.run("register", apply=True)[0] == 0
+    undone = json.loads((legacy.records / "idmap.json").read_text())["entries"]["init-local-00003"]["number"]
+    assert legacy.run("undo", apply=True)[0] == 0
+    legacy.clock.advance(600)
+    code, result = legacy.run("register", apply=True)
+    assert code == 0, result
+    entry = json.loads((legacy.records / "idmap.json").read_text())["entries"]["init-local-00003"]
+    assert entry["how"] == "created" and entry["number"] != undone
+    assert len(_issue_creations(legacy.github)) == 2
+    assert legacy.github.issue(entry["number"]).labels == ["spec-dock:initiative"]
+    assert legacy.github.issue(undone).state == "closed"
+    assert legacy.run("verify")[0] == 0

@@ -10,7 +10,6 @@ from spec_dock.runtime.application.canonical_artifact_write import create_artifa
 from spec_dock.runtime.application.canonical_branches import branch_operation
 from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_dependency_write import mutate_dependency
-from spec_dock.runtime.application.canonical_errors import canonical_not_implemented
 from spec_dock.runtime.application.canonical_hold import run_canonical_accept, run_canonical_restore
 from spec_dock.runtime.application.canonical_link import run_canonical_link
 from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
@@ -49,7 +48,7 @@ from spec_dock.runtime.presentation.envelope import OperationResult
 CanonicalHandler = Callable[[argparse.Namespace, ProjectContext], OperationResult[object]]
 RepositoryIndependentHandler = Callable[[argparse.Namespace, Path], OperationResult[object] | None]
 
-# Keyed by public leaf path. Later Issues add one entry per command they implement in canonical mode.
+# Keyed by public leaf path: every leaf that dispatch() does not route before the mode branch (Epic G7, iss-00436).
 CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "workspace migrate": refuse_workspace_migrate,
     "canonical link": run_canonical_link,
@@ -113,7 +112,4 @@ def dispatch_repository_independent(namespace: argparse.Namespace, cwd: Path) ->
 
 
 def dispatch_canonical(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    handler = CANONICAL_HANDLERS.get(namespace.command_path)
-    if handler is None:
-        return canonical_not_implemented(namespace.command_path)
-    return handler(namespace, context)
+    return CANONICAL_HANDLERS[namespace.command_path](namespace, context)

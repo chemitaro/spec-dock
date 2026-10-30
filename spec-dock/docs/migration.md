@@ -8,6 +8,10 @@ package managerでレビュー・通常試験が済んだwheelをworktree外へ�
 
 `spec-dock/scripts/spec-dock` はPATH上の外部consoleへ引数と終了値を渡すshimです。Git共有controlやcheckout内Pythonを探しません。旧branchの古いshimが戻っても外部 `spec-dock` は直接使えます。外部consoleがなければ導入/PATH確認へ戻り、自動installや旧engineへのfallbackはしません。
 
+## canonical モードへの移行
+
+宣言の版3（従来モード）から版4（canonical モード）への移行は、spec-dock のリポジトリの `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ行います。移行の前に `installation update` で配布資産を 0.3.0 に上げます（従来モードのまま動きます）。移行の後の使い方、ツールの設定の1行、同期が止まったときの扱いは[canonical モードの使い方](canonical.md)にあります。`installation init` は版4の宣言を置くので、新規導入のリポジトリは canonical モードで始まり、`spec-dock canonical link` が要ります。
+
 ## 新規導入
 
 ```sh

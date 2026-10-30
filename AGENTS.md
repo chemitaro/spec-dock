@@ -10,9 +10,29 @@
 - Codex agents operate SpecDock through the installed external `spec-dock` package or its thin repository shim, which delegates through PATH. Inspect the verified candidate's current leaf help. Do not run the retired repository-local implementation as a fallback. When a user requests a SpecDock outcome or approves a plan that requires one, execute the in-scope commands and verify their results.
 - The [Issue 413 requirement](docs/issue-plans/iss-00413-external-cli-state/requirement.md) and [implementation report](docs/issue-plans/iss-00413-external-cli-state/implementation-report.md) retain the dated 2026-10-03 rollout observations. PR #414 merged on 2026-10-04 at `0e7dc86841cb48d011270a1a2165cb6406ac0cea`; merge does not establish installation in any tool environment or worktree. Verify the external package, static assets in one explicit target, and its direct selection separately. Do not infer other-worktree migration, formal Issue 413 Start, or package publication from that historical handoff or merge.
 - Treat the request or approved plan as authorization for the command's ordinary documented local, Git, and GitHub side effects. Inspect current root and leaf help, resolve exact targets, and preserve the CLI's fail-closed boundaries.
-- Require an exact target and explicit destructive outcome in the request or approved plan before running `scope delete`, `installation uninstall`, or `worktree remove`. Once authorized, execute and verify them rather than handing them back for manual entry.
+- Require an exact target and explicit destructive outcome in the request or approved plan before running `scope delete`, `installation uninstall`, `worktree remove`, or `canonical remove`. Once authorized, execute and verify them rather than handing them back for manual entry.
 - Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
 - Keep the repository's human PR merge gate. That gate does not make `scope create/import`, Artifact creation, `work start/finish`, `scope close/reopen`, `workspace sync`, `installation update`, or other ordinary SpecDock operations human-only.
+
+## 仕様の扱い（canonical モード）
+
+`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。3 のリポジトリでは、今までどおり、仕様もコードと一緒にコミットする。
+
+- 仕様は `spec-dock/initiatives/` にある。普通のファイルとして読み書きする。
+- 仕様は Git で扱わない（`git add`、`commit`、`stash`、`reset`、`checkout`、`clean` を仕様に使わない）。保存と共有は、1〜2分のうちに自動で行われる。
+- 仕様が見えない、またはリンクの異常を示されたときは、`spec-dock canonical link` を実行する。サンドボックスの中で拒否されたら、利用者に、普通の端末での実行を頼む。
+- 読み書きを拒否されたときは、`spec-dock canonical status` が示す1行の設定を、利用者に伝える。自分でツールの設定を変えない。
+- 検索では、パスを明示する（`rg 語 spec-dock/initiatives/`、コードと一緒なら `rg 語 . spec-dock/initiatives/`）。
+- Scope のディレクトリは `spec-dock/initiatives/<区切り>/<ID>/`（区切りは番号の千ごとの範囲。例 `spec-dock/initiatives/00000-00999/iss-00454/`）に平らに並ぶ。場所は `spec-dock scope show <ID> --json` の `path` で確かめる。親、子、依存は、ディレクトリの位置ではなく `spec-dock scope show <ID> --json` で確かめる。
+- ID は `<種類>-<番号5桁>` で、コマンドの入力は0埋めしなくてよい（`iss-454` は `iss-00454`）。slug はなく、`scope create` と `scope import github` に `--slug` を付けない。題名は GitHub の題名が正本で、どの言語でもよい。既定のブランチ名は `<ID>`。
+- 構造（作成、親子、依存、状態、題名、種類）は、SpecDock のコマンドだけで変える。Scope のディレクトリの名前を変えたり、別のディレクトリの下へ動かしたりしない。親の付け替えは `spec-dock scope move <ID> --parent <親>`（GitHub の親だけが変わり、ディレクトリは動かない）。
+- `SCOPE_KIND_CHANGED` で止まったら、種類のラベルを戻すか作り直すかを利用者に確かめ、`recovery` の手順に従う。`work start` が警告 `SCOPE_IN_PROGRESS` を返したら、別のPCで作業中でないかを利用者に確かめる。
+- `*.conflict-*` のファイルがあれば、中身を元のファイルに統合してから、そのファイルを消す。
+- Claude Code の隔離セッション（`--worktree`）では、仕様を読むだけにする。
+- 作業を終えるときは `spec-dock work finish` を使う。保存が確かめられるまで（最大180秒）待つ。確かめられずに止まったら、`spec-dock canonical status` を見る。
+- リンクを消すときは `rm spec-dock/initiatives` と書く。末尾に `/` を付けない。mainのチェックアウトで `git clean -ff` を使わない。
+
+利用者向けの用意、ツールの設定の1行、同期が止まったときの扱いは `spec-dock/docs/canonical.md` にある。
 
 ## Dogfooding Warning
 

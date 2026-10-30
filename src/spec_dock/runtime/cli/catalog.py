@@ -317,12 +317,12 @@ class HelpSpec:
 
 
 HELP_PRECONDITIONS: dict[str, str] = {
-    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository.",
-    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository.",
-    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository.",
-    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported.",
-    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve.",
-    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve.",
+    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE.",
+    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE.",
+    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE.",
+    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
+    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
+    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
     "scope list": "The selected project must contain a readable Scope tree.",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
     "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
@@ -333,8 +333,8 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "active show": "The selected worktree must have readable active-selection state.",
     "active set": "Only the same valid direct target is accepted; its selection stays unchanged. Use work start to acquire a selection.",
     "active clear": "--from requires a valid current chain; --all --yes permits discarding observed corrupt regular records. Unknown entries are preserved; ancestors are never promoted.",
-    "work start": "The Scope must be ready, its dependencies satisfied, and branch base resolvable.",
-    "work finish": "The explicit Scope must resolve and its completion guards must pass. A Scope outside the active chain can be completed without changing the current selection.",
+    "work start": "The Scope must be ready, its dependencies satisfied, and branch base resolvable. Schema 4: the default branch name is <ID> (IDs may be given without zero padding, e.g. iss-454); an in-progress mark from another PC only warns SCOPE_IN_PROGRESS (ask the user); SCOPE_KIND_CHANGED and a base commit holding spec-dock/initiatives (CANONICAL_BASE_HAS_SPECS) stop.",
+    "work finish": "The explicit Scope must resolve and its completion guards must pass. A Scope outside the active chain can be completed without changing the current selection. Schema 4: unsaved specs of the Scope and its descendants are saved and pushed first, waiting up to 180 seconds; unconfirmed, the Issue stays open with CANONICAL_SAVE_UNCONFIRMED, and held changes stop with CANONICAL_SAVE_HELD.",
     "branch show": "The Scope must resolve; the candidate Git ref may be absent.",
     "branch create": "The Scope must resolve, Git base must exist, and branch ownership must be free.",
     "branch switch": "The existing branch must contain the target and ancestors; the worktree must be clean; the clone Start lock must be free within --lock-timeout, else START_LOCK_BUSY.",
@@ -574,7 +574,7 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not commit or push spec changes, prune worktrees, delete files or rewrite tool settings."
         target = "This clone's catalog at <main checkout>/spec-dock/.canonical and the links of the main checkout and this checkout."
         reads = "Git worktree inventory, the catalog, the links, info/exclude, spec-dock/.gitignore, tool settings files, and origin only when the catalog must be created."
-        writes = "The catalog worktree and its lock, info/exclude, and the spec-dock/initiatives links; when GitHub has no canonical yet, one parentless commit with the format-1 files is pushed."
+        writes = "The catalog worktree and its lock, info/exclude, the fetch refspec of origin (git remote set-branches --add origin spec-dock/canonical), the local spec-dock/canonical branch (update-ref to the fetched commit), the spec-dock/initiatives links, and, unless --no-schedule, the registry, the periodic job and its first run; the baseline in the state root always. When GitHub has no canonical yet, one parentless commit with the format-1 files is pushed."
         confirmation = "No final confirmation is required; --dry-run reports the plan without writing."
     elif leaf == "canonical status":
         target = "This clone's catalog and the links of the main checkout and this checkout."

@@ -277,6 +277,46 @@ def test_claude_code_settings_listing_the_catalog_or_a_parent_are_enough(
     assert settings.read_bytes() == before
 
 
+def test_claude_config_dir_moves_the_user_settings_file(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    linked_clone: tuple[Path, Path],
+    isolated: Path,
+) -> None:
+    """iss-00436 (I-2 ST-12): Claude Code reads its user settings from $CLAUDE_CONFIG_DIR when it is set."""
+    main_checkout, linked = linked_clone
+    config = isolated / "claude-config"
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", str(config))
+    ignored = isolated / ".claude/settings.json"  # the default place no longer counts
+    ignored.parent.mkdir(parents=True)
+    ignored.write_text(json.dumps({"permissions": {"additionalDirectories": [str(main_checkout)]}}), encoding="utf-8")
+    _code, result = run(capsys, linked, "canonical", "status")
+    claude = result["data"]["tools"]["claude_code"]
+    assert claude["configured"] is False and claude["file"] == str(config / "settings.json")
+    (warning,) = [item for item in result["warnings"] if item["details"].get("tool") == "claude_code"]
+    assert warning["details"]["file"] == str(config / "settings.json") and str(config) in warning["message"]
+    settings = config / "settings.json"
+    config.mkdir()
+    settings.write_text(json.dumps({"permissions": {"additionalDirectories": [str(main_checkout)]}}), encoding="utf-8")
+    _code, result = run(capsys, linked, "canonical", "status")
+    assert result["data"]["tools"]["claude_code"]["configured"] is True and result["warnings"] == []
+    assert result["data"]["tools"]["claude_code"]["sources"][0] == str(settings)
+
+
+def test_a_relative_claude_config_dir_cannot_be_judged(
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+    linked_clone: tuple[Path, Path],
+    isolated: Path,
+) -> None:
+    """iss-00436: a relative or ~ CLAUDE_CONFIG_DIR names no place this process can read."""
+    _main, linked = linked_clone
+    monkeypatch.setenv("CLAUDE_CONFIG_DIR", "~/claude-config")
+    _code, result = run(capsys, linked, "canonical", "status")
+    assert result["data"]["tools"]["claude_code"]["configured"] is None
+    assert [item["code"] for item in result["warnings"]] == ["CANONICAL_TOOL_SETTING_UNKNOWN"]
+
+
 def test_unreadable_claude_code_settings_cannot_be_judged(
     capsys: pytest.CaptureFixture[str], linked_clone: tuple[Path, Path], isolated: Path
 ) -> None:

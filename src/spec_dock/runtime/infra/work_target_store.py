@@ -139,9 +139,13 @@ class WorkTargetStore:
         handles: list[SelectionHandle] = []
         records: list[WorkTarget] = []
         problems: list[str] = []
+        listing = -1
         try:
             self._verify_directory(directory_fd)
-            entries = os.listdir(directory_fd)  # noqa: PTH208 - owned descriptor, not a redirected path
+            # List through a new descriptor of the held directory, closed only after the files are read: on btrfs a
+            # descriptor shows no entry added after it was opened, so a just-published record would look absent.
+            listing = os.open(".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)
+            entries = os.listdir(listing)  # noqa: PTH208 - owned descriptor, not a redirected path
             for name in entries:
                 if not _NAME.fullmatch(name):
                     problems.append(f"unrecognized work target entry: {name}")
@@ -161,6 +165,9 @@ class WorkTargetStore:
             return StoredSelection("selected", records[0], handles[0], observed_handles=tuple(handles))
         except (OSError, ValueError) as error:
             return StoredSelection("unavailable", reason=str(error))
+        finally:
+            if listing != -1:
+                os.close(listing)
 
     def publish(self, record: WorkTarget, *, token: str | None = None) -> SelectionHandle:
         token = secrets.token_hex(16) if token is None else token

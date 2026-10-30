@@ -25,7 +25,6 @@ if TYPE_CHECKING:
     from spec_dock.runtime.infra.github_structure import GithubStructureError
     from spec_dock.runtime.infra.static_assets import StaticAsset
 
-CANONICAL_NOT_IMPLEMENTED: Final = "CANONICAL_NOT_IMPLEMENTED"
 CANONICAL_NOT_MIGRATED: Final = "CANONICAL_NOT_MIGRATED"
 CANONICAL_NOT_APPLICABLE: Final = "CANONICAL_NOT_APPLICABLE"
 CANONICAL_NOT_LINKED: Final = "CANONICAL_NOT_LINKED"
@@ -82,10 +81,6 @@ CANONICAL_STATE_ROOT_MISMATCH: Final = "CANONICAL_STATE_ROOT_MISMATCH"  # exit 3
 CANONICAL_DASHBOARD_OCCUPIED: Final = "CANONICAL_DASHBOARD_OCCUPIED"  # state.json dashboard.error; a status warning
 CANONICAL_DASHBOARD_FAILED: Final = "CANONICAL_DASHBOARD_FAILED"  # state.json dashboard.error; a status warning
 
-NOT_IMPLEMENTED_RECOVERY: Final = (
-    "Wait for SpecDock 0.3.0, which completes canonical mode for this command; "
-    "this repository declares workspace schema 4."
-)
 NOT_MIGRATED_RECOVERY: Final = (
     "This repository is not migrated (workspace schema 3); follow scripts/migrate-to-canonical/README.md "
     "in SpecDock 0.3.0 to migrate it."
@@ -278,16 +273,6 @@ def canonical_failure(
         exit_code,
         error=Diagnostic(code, message, details or {}),
         recovery=RecoveryInstructions(recovery) if recovery else None,
-    )
-
-
-def canonical_not_implemented(command: str) -> OperationResult[DiagnosticData]:
-    return canonical_failure(
-        command,
-        CANONICAL_NOT_IMPLEMENTED,
-        f"{command} has no canonical-mode implementation in this SpecDock build",
-        3,
-        (NOT_IMPLEMENTED_RECOVERY,),
     )
 
 

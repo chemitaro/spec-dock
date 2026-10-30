@@ -8,11 +8,24 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Mapping, Sequence
 
 CODEX_CONFIG_FILE: Final = "~/.codex/config.toml"
 CODEX_SECTION: Final = "[sandbox_workspace_write]"
 CLAUDE_USER_SETTINGS_FILE: Final = "~/.claude/settings.json"
+CLAUDE_CONFIG_DIR: Final = "CLAUDE_CONFIG_DIR"
+
+
+def claude_user_settings(environ: Mapping[str, str], home: Path | None) -> tuple[Path | None, str]:
+    """Claude Code's user settings file and how to name it: $CLAUDE_CONFIG_DIR/settings.json when set, else ~/.claude.
+
+    The path is None when it cannot be found (no absolute HOME, or a relative or ~ CLAUDE_CONFIG_DIR).
+    """
+    config = environ.get(CLAUDE_CONFIG_DIR, "")
+    if config:
+        path = Path(config) / "settings.json"
+        return (path if path.is_absolute() else None), str(path)
+    return (home / ".claude/settings.json" if home is not None else None), CLAUDE_USER_SETTINGS_FILE
 
 
 def codex_setting_line(catalog: Path) -> str:

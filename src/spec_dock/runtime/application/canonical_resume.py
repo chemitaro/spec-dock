@@ -4,7 +4,8 @@
 one-time mark: the next cycle re-adopts the local content as one commit whose only parent is GitHub's,
 so history GitHub dropped is never pushed back (judgment R2). --push-local (remote_deleted) recreates
 GitHub's branch from the local canonical without force. When another PC already recreated it, a
-remote_deleted catalog resumes with --adopt-remote instead. The network runs under this catalog's cycle lock
+remote_deleted catalog resumes with --adopt-remote instead; while a re-adoption is still pending, --push-local is
+refused (the local HEAD still holds the dropped history). The network runs under this catalog's cycle lock
 (so no cycle runs meanwhile) and never under the catalog lock.
 """
 
@@ -56,6 +57,29 @@ def _paused(reason: str, step: str) -> CanonicalCommandError:
     )
 
 
+def _re_adoption_pending(reason: str) -> CanonicalCommandError:
+    """The local HEAD still holds the history GitHub dropped; recreating the branch from it would bring it back."""
+    return CanonicalCommandError(
+        CANONICAL_PAUSED,
+        f"this catalog is paused ({reason}) in the middle of re-adopting GitHub's history; "
+        "--push-local would push back the history GitHub dropped",
+        recovery=(
+            "Check spec-dock/canonical on GitHub from another PC; once it is back, run spec-dock canonical resume "
+            "--adopt-remote. Ask the user before recreating it from this PC.",
+        ),
+        details={
+            "paused": reason,
+            "adopt_remote_pending": True,
+            "next_step": "spec-dock canonical resume --adopt-remote",
+        },
+    )
+
+
+def _refusal(reason: str, step: str, *, pending: bool) -> CanonicalCommandError:
+    """Name the next step; while a re-adoption is pending, never point at --push-local (it is refused)."""
+    return _re_adoption_pending(reason) if pending and step == "--push-local" else _paused(reason, step)
+
+
 def run_canonical_resume(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     environment = runtime_environment.detect_runtime_environment()
     linked = require_linked(context, environment=environment, timeout=namespace.timeout)
@@ -80,7 +104,7 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
         return OperationResult(namespace.command_path, "unchanged", FamilyData("canonical-resume", data), 0)
     given = "--adopt-remote" if namespace.adopt_remote else ("--push-local" if namespace.push_local else None)
     if given is None:
-        raise _paused(reason, _OPTION[reason])
+        raise _refusal(reason, _OPTION[reason], pending=state.adopt_remote_pending)
     try:
         presence = canonical_git.remote_canonical(catalog, git=git)
         if presence == "present":
@@ -95,8 +119,8 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
     # What GitHub holds now decides, whatever the pause reason was: a remote_deleted branch another PC recreated
     # is adopted like a rewrite, and a rewritten branch that was deleted afterwards is recreated.
     wanted = "--adopt-remote" if presence == "present" else "--push-local"
-    if given != wanted:
-        raise _paused(reason, wanted)
+    if given != wanted or (wanted == "--push-local" and state.adopt_remote_pending):
+        raise _refusal(reason, wanted, pending=state.adopt_remote_pending)
     effects: list[Effect] = []
     if wanted == "--adopt-remote":
         remote = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
