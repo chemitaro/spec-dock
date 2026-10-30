@@ -1327,17 +1327,8 @@ S09_RUNTIME_COUPLING: dict[str, tuple[str, ...]] = {
 }
 S09_CONTRACT_CONSUMER = "epic-00356-authoring-integration"
 S09_CONTRACT_VERSION = "s09-2026-08-11"
-S09_ISSUE_ROOT = (
-    REPO_ROOT
-    / "spec-dock"
-    / "initiatives"
-    / "init-local-00003-architecture-maintenance-and-hardening"
-    / "epics"
-    / "epic-00356-specdock-core-simplification-and-external-intelligence-boundary"
-    / "issues"
-    / "iss-00358-simplify-authoring-kit-and-document-contracts"
-)
-S09_DESIGN_PATH = S09_ISSUE_ROOT / "design.md"
+# The canonical cutover moved specs off main, so the §12 section of iss-00358 design.md is kept as a fixture.
+S09_DESIGN_PATH = Path(__file__).resolve().parent / "fixtures/iss-00358-design-section-12.md"
 S09_DESIGN_CONTRACT_TOKENS = (
     "scope_files = [requirement.md, design.md, plan.md, report.md]",
     f"contract_version = {S09_CONTRACT_VERSION}",

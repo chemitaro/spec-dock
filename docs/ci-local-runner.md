@@ -1,6 +1,6 @@
 # 手元のMac miniのランナー
 
-Provider CIの重いジョブ（`provider-tests` と `Provider distribution parity (ubuntu-latest)`）は、利用者のMac miniの上のLinux VMで動かせます。切り替えはリポジトリの変数 `SPEC_DOCK_CI_RUNNER` で行い、未設定か `hosted` ならGitHubのランナー、`local` なら手元のランナーです。macOSの配布チェック、`validate`、`check`、`release-tag` は常にGitHubのランナーで動きます。仕様は [iss-00454](../spec-dock/initiatives/init-00079-minor-bugfix-maintenance/epics/epic-00080-minor-bug-fixes/issues/iss-00454-local-mac-runner-ci/requirement.md) が正本です。
+Provider CIの重いジョブ（`provider-tests` と `Provider distribution parity (ubuntu-latest)`）は、利用者のMac miniの上のLinux VMで動かせます。切り替えはリポジトリの変数 `SPEC_DOCK_CI_RUNNER` で行い、未設定か `hosted` ならGitHubのランナー、`local` なら手元のランナーです。macOSの配布チェック、`validate`、`check`、`release-tag` は常にGitHubのランナーで動きます。仕様は [iss-00454](https://github.com/chemitaro/spec-dock/issues/454) が正本です。
 
 ## 安全の仕組み
 

@@ -10,12 +10,12 @@ CIは、変更をGitHubへ送ったときに実行する自動検証です。Spe
 | `Provider distribution parity (ubuntu-latest)` | Linux（変数が `local` なら手元のLinux ARM64 VM）、PRのheadそのもの | wheelの内容、新規インストール、外部console、静的資産、実Gitを使う主要操作 |
 | `Provider distribution parity (macos-latest)` | macOS、PRのheadそのもの | 同じ配布・実consoleの検査をmacOSの実ファイルシステムとOS機能で確認 |
 | `route`（Provider CI） | Ubuntu、PR | 二つの重いジョブを動かすランナーを選ぶ |
-| `validate` | Ubuntu、pushとPR | 候補sourceから作ったwheelでdogfoodの仕様データを検証 |
+| `spec-dock-check`（SpecDock check） | Ubuntu、pushとPR | 候補sourceから作ったwheelで `canonical check`（既定のブランチに仕様が戻っていないこと） |
 | `check`（Commit identity） | Ubuntu、pushとPR | 新しいコミットの著者・コミッター情報を検証 |
 
 Provider CIの `route` ジョブ（GitHubのランナー）が、二つの重いジョブを動かすランナーを選びます。リポジトリの変数 `SPEC_DOCK_CI_RUNNER` が `local` で、同じリポジトリの信頼する人のPRのときだけ手元のランナーを使います。それ以外は上の表のGitHubのランナーです。構成、安全の仕組み、切り戻しは [手元のMac miniのランナー](ci-local-runner.md) を見てください。
 
-`validate` と `check` はpushとPRの両イベントで実行されるため、同名の結果が二つ表示されることがあります。配布チェックは [.github/workflows/provider-ci.yml](../.github/workflows/provider-ci.yml)、仕様検証は [ci.yml](../.github/workflows/ci.yml)、著者検証は [commit-identity.yml](../.github/workflows/commit-identity.yml) が正本です。
+`spec-dock-check` と `check` はpushとPRの両イベントで実行されるため、同名の結果が二つ表示されることがあります。配布チェックは [.github/workflows/provider-ci.yml](../.github/workflows/provider-ci.yml)、仕様の検査は [spec-dock-check.yml](../.github/workflows/spec-dock-check.yml)、著者検証は [commit-identity.yml](../.github/workflows/commit-identity.yml) が正本です。
 
 ## macOSとLinuxでインストールを試す理由
 

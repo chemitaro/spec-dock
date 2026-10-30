@@ -204,7 +204,7 @@ def test_provider_ci_runs_its_checks_where_route_says_and_never_names_the_runner
     assert "make lint" in jobs["provider-tests"] and "uv run pytest\n" in jobs["provider-tests"]
 
 
-@pytest.mark.parametrize("name", ["ci.yml", "commit-identity.yml", "release-tag.yml"])
+@pytest.mark.parametrize("name", ["spec-dock-check.yml", "commit-identity.yml", "release-tag.yml"])
 def test_short_and_writing_workflows_stay_on_github_hosted_runners(name: str) -> None:
     workflow = (WORKFLOWS / name).read_text(encoding="utf-8")
     assert re.findall(r"runs-on: (.+)", workflow) == ["ubuntu-latest"]
