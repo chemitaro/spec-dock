@@ -52,9 +52,16 @@ canonical モードの全体をつないで確かめ、エージェント向け�
   - **Docker（python:3.12-slim、git 2.47.3、systemd なし、中でクローン）**：`canonical link` が常駐のプロセスを選び（`CANONICAL_RUNNER_RESTART` と起動し直しの1行）、AC-02 は作成の直後2秒、編集は常駐のプロセスだけで60秒、AC-13 は3秒、AC-03 は別名ファイル1つ、マーカー0。`docker restart` の後は常駐のプロセスがなく、`canonical status` が `CANONICAL_RUNNER_STOPPED`、`canonical link` で戻った。
   - **マウントしたチェックアウト**（macOS の一時のクローンをコンテナにマウント）：`canonical link` が終了コード3の `CANONICAL_FOREIGN_CHECKOUT`、効果なし、次の1手付きで止まり、ホストの `.git/worktrees` のダイジェストは変わらなかった。
   - **Git 2.38.0 ちょうど**（kernel.org の 2.38.0 をコンテナの中でソースから作った）：link、作成、同期、AC-02（32秒）、AC-13（6秒）、AC-03 が通った。
+  - **btrfs の不具合の Red**：`tests/unit/infra/test_work_target_store.py` の `test_publish_confirms_its_record_where_a_drained_directory_stream_hides_new_entries` は、直しの前（保持した記述子に `os.listdir` を2回呼ぶコード）に `SelectionPublicationUnknown: published work target is not the sole valid selection` で落ち、直しの後に通った（`b1629847f` に同じコミットで入れたが、実行は直しの前に行った）。
   - **btrfs の不具合**：仮想マシンとそのコンテナで `work start` が `partial`（`SELECTION_PUBLICATION_UNKNOWN`）になり、最小の再現（btrfs では読み切った記述子の2回目の `listdir` が `[]`、tmpfs では `['x']`）で原因を特定した。直した wheel で、同じ仮想マシンで `succeeded`（終了コード0）を確かめた。
   - 片付け：仮想マシンは `orb delete -f` で消した。コンテナ4つ（`specdock-i436-loop`、`-mount`、`-git238`×2）は `docker rm -f` で消し、取得したイメージ（`python:3.12-slim`、`alpine:3.17`。どちらも始める前にはなかった）は `docker rmi` で消した。手元の CI の Lima の仮想マシン、`ci-shadow`、利用者のコンテナには触れていない。利用者の `gh` の資格情報は、どの仮想マシンとコンテナにも入れていない。
 - **白紙のエージェントの試行**（AC-14。この会話を知らない新しいサブエージェント、sonnet/medium、規則の節だけを渡し、macOS の一時の世界で実行）：(1) `spec-dock scope show iss-3 --json` で場所を確かめて `design.md` に追記、(2) `rg -l "B finished" spec-dock/initiatives/` でパスを明示して検索、(3) 別名ファイルの中身を `report.md` に統合して別名ファイルを `rm`、(4) 親を `scope show --json` の `parent_id`（`epic-00002`）で確かめた、(5) 終わりは `spec-dock work finish`（最大180秒待ち、止まったら `canonical status`）と答えた。Git の操作もディレクトリの名前の変更もしなかった。合格。エージェントが分からなかったと挙げた点：`work finish` に Scope の引数が要るか（`--help` を見ていない）、別名ファイルの統合の形の決まり。最初の起動は、規則の本文を埋め込み忘れたので、何も書く前に止めて起動し直した。
+
+### 実装のレビュー②（`code-review`、範囲 `ea3d3c9ee..b9ea415bd`）
+
+- Standards（新しいサブエージェント、opus/high）：pass。P3 が1件（ST：取り込み直しの途中の `remote_deleted` で、引数なしと `--adopt-remote` の `resume` が、拒まれる `--push-local` を案内する）。
+- Spec（新しいサブエージェント、opus/high）：pass。P2 が1件（上と同じ指摘）、P3 が1件（AC-436-11 が計画の完了条件になく、Red の証拠が報告書にない）。
+- 対応：`analyze-review-findings` で、どれも根拠ありと判断して直した。`resume` は、取り込み直しの途中で案内が `--push-local` になる経路でも、同じ拒否の案内（`--adopt-remote`、作り直すかは利用者に確かめる）を返す（`_refusal`。テストに引数なしと `--adopt-remote` の確かめを足した）。計画の目標と完了条件を AC-436-01〜11 にし、上に Red の記録を足した。
 
 ### 最終品質ゲート
 
