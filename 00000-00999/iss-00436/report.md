@@ -65,7 +65,14 @@ canonical モードの全体をつないで確かめ、エージェント向け�
 
 ### 最終品質ゲート
 
-（下に記録する）
+ChatGPT の Strict のゲートは利用者の設定で無効なので、Claude だけのゲート（同じ SHA で lint、全テスト、新しいサブエージェント2つのレビュー）を行った。
+
+- **ゲート1**（push した `5af27673528161877f6931d0ab4117e6f9a9dd34`）：
+  - `make lint`：終了コード0（ruff check、ruff format check、mypy すべて pass）。
+  - `uv run pytest -q -p no:cacheprovider`：終了コード1。3293 passed、8 skipped、2 failed（`tests/cli_runtime/test_issue413_active.py::test_clear_from_preserves_replacement_after_target_resolution`、`tests/cli_runtime/test_issue413_finish.py::test_finish_resolves_dynamic_target_and_handle_from_one_observation`）。原因は btrfs の直し（`b1629847f`）：列挙の直後に新しい記述子を閉じたため、選択のディレクトリの記述子が閉じる時に記録を差し替える版3のテストで、ファイルを読む前に差し替えが起きた。版3のテストは変えず、新しい記述子を `read()` の終わりまで開いておく形に直した（版3の2つのテストと btrfs のテストが通る。直した wheel で、OrbStack の btrfs の上のコンテナの `work start` が `succeeded` を確かめ直した）。
+  - Standards（この作業に関わっていない新しいサブエージェント、opus/high、`code-review` の観点、範囲 `ea3d3c9ee..5af276735`）：pass、指摘0。
+  - Spec（同じく新しいサブエージェント、opus/high。基準は Issue と Epic の受け入れ条件、C1〜C11、AC-15）：pass、P3 が1件（配布する HTML の「詳細へ進む」に「44 leaf」が残る）。ゲートを止める指摘ではないが、新しい SHA でやり直すので直した（「53 leaf」、`static-inventory.json`、利用側の写し、テストで「44 leaf」がないことも確かめる）。
+  - 判定：全テストが落ちたので不合格。直して新しい SHA でやり直す。
 
 ## Residual Risks / Follow-ups
 
