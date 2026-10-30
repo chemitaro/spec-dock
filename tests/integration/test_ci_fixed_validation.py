@@ -17,12 +17,14 @@ SCRIPT = Path(__file__).resolve().parents[2] / ".github/scripts/specdock-ci-vali
 PACKAGE = Path(__file__).resolve().parents[2] / "src/spec_dock"
 PYPROJECT = Path(__file__).resolve().parents[2] / "pyproject.toml"
 PROVIDER = Path(__file__).resolve().parents[2]
-WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/ci.yml"
+WORKFLOW = Path(__file__).resolve().parents[2] / ".github/workflows/spec-dock-check.yml"
 
 
 def test_ci_workflow_uses_verified_read_only_wheel_validator() -> None:
+    # Since the canonical cutover, spec-dock checks itself with specdock-ci-check.sh; ci.yml is gone.
     workflow = WORKFLOW.read_text(encoding="utf-8")
-    assert workflow.count("bash .github/scripts/specdock-ci-validate.sh") == 1
+    assert not (PROVIDER / ".github/workflows/ci.yml").exists()
+    assert workflow.count("bash .github/scripts/specdock-ci-check.sh") == 1
     assert "${{ github.sha }}" in workflow
     for forbidden in ("spec-dock sync", "spec-dock/scripts/spec-dock", "workspace sync"):
         assert forbidden not in workflow

@@ -2,7 +2,7 @@ name: SpecDock check
 on:
   pull_request:
   push:
-    branches: [main]   # 既定のブランチの名前に合わせる
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -10,7 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Install SpecDock
-        run: pipx install "spec-dock @ git+https://github.com/chemitaro/spec-dock@v$(cat spec-dock/system/spec-dock-version)"
-      - name: Check
-        run: spec-dock canonical check --json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install wheel build and install tooling
+        run: python -m pip install uv
+      # spec-dock checks itself with a wheel built from this checkout, not a released version.
+      - name: Check with verified source wheel
+        run: bash .github/scripts/specdock-ci-check.sh "$GITHUB_WORKSPACE" "$GITHUB_WORKSPACE" "${{ github.sha }}"
