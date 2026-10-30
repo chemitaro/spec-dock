@@ -99,6 +99,10 @@ ID: "iss-00436"
 - `pyproject.toml` の版と、配布資産の版のファイル（`spec-dock/system/spec-dock-version`）を 0.3.0 にする（`uv.lock` の自分の版も）。版のファイルの前の中身の SHA-256 を `static-inventory.json` の `known_old_sha256` に足す（C7）。変えた配布資産の `sha256` と前の値を同じく更新する。
 - この worktree の利用側の `spec-dock/` を、0.3.0 の候補の wheel の `installation update` で上げる。宣言は版3のまま（従来モード）。
 
+### R-436-09 btrfs での選択の記録の確かめ（実機の確かめで見つけた不具合。2026-10-30 の統括の判断 A）
+
+- `work start` は、選択の記録を書いた直後の確かめで、btrfs の Linux（OrbStack の仮想マシンとそのコンテナ）でも記録を見つけ、`succeeded` を返す。原因は、`infra/work_target_store.py` が使い回したディレクトリの記述子を2回列挙していたことで、btrfs では読み切った記述子に新しい項目が出ない。この部品は従来モードの `work start` と共有で、直しは振る舞いの契約を変えず、btrfs の上でだけ誤った `partial` を `succeeded` にする（ext4 と APFS の出力は変わらない）。AC-15 の例外として、理由と影響を報告書に書く。
+
 ## スコープ
 
 - 対象：上の R-436-01〜08。提供側の `src/spec_dock/`、`tests/`、`scripts/migrate-to-canonical/`、`AGENTS.md`、`README.md`、`pyproject.toml`、`uv.lock`、この worktree の `spec-dock/` の配布資産（`installation update` が書くもの）、この Issue の Scope のディレクトリ、Epic の `design.md` の12章の表（実装と合わせる直しだけ）。
@@ -123,7 +127,7 @@ ID: "iss-00436"
 - **AC-436-05**（R-436-05、Epic の G7）：runtime のソースに `CANONICAL_NOT_IMPLEMENTED` がない。`LEAF_PATHS` の53のどれもが、canonical の表、リポジトリによらない表、またはモードによらない経路（`installation`、`help`、`completion`）に入ることをテストで確かめる。版4のリンク済みのクローンと偽の `gh` で、53のコマンドのそれぞれを1回実行し、どれも例外で落ちず、JSON の結果を返し、`CANONICAL_NOT_IMPLEMENTED` を返さず、canonical モードのコード（`CANONICAL_*`、`GITHUB_*`、`SCOPE_KIND_CHANGED`）の失敗なら `recovery` があることを確かめる。
 - **AC-436-06**（R-436-06、Epic の AC-02、AC-13、AC-16、AC-18 の自動の部分）：横断のシナリオのテストが、systemd と `loop` の注入の両方で通る。A の `worktree create` のworktreeから、保存の前に A の編集が読める。B で `canonical sync` の後に A の Scope のファイルが読める。B の新しいスナップショットの後の `scope show` と `scope list` が全体の取り直しをしない。`work finish` が B の編集を push してから Issue を閉じる。
 - **AC-436-07**（R-436-07）：`CLAUDE_CONFIG_DIR` の下の設定の1行を判定に使い、示す場所もそれになるテストと、相対の `CLAUDE_CONFIG_DIR` が `CANONICAL_TOOL_SETTING_UNKNOWN` になるテスト。`adopt_remote_pending` のときの `resume --push-local` が何も push せずに止まるテスト。作業の記録のない `undo`（`--apply` の有無）が終了コード2で止まるテスト。`undo --apply` の後の `register --apply` が新しい Issue を作るテスト。
-- **AC-436-08**（R-436-08）：`pyproject.toml`、版のファイル、`uv.lock` が 0.3.0 で、版のファイルの一致のテスト（I-7）が通る。wheel を作り、外の一時の環境に入れて、`spec-dock --version` が 0.3.0、`spec-dock help` と `spec-dock canonical --help` が動く。この worktree の `spec-dock/` の `installation show` が、`spec-dock/workspace.json` を `known-old`（版3の宣言。Epic の testability の許した変化）と、ほかの配布資産をすべて `current` と示し、宣言が版3のままで、`spec-dock workspace validate` と `.github/scripts/specdock-ci-validate.sh` が通る。
+- **AC-436-08**（R-436-08）：`pyproject.toml`、版のファイル、`uv.lock` が 0.3.0 で、版のファイルの一致のテスト（I-7）が通る。wheel を作り、外の一時の環境に入れて、`spec-dock --version` が 0.3.0、`spec-dock help` と `spec-dock canonical --help` が動く。この worktree の `spec-dock/` の `installation show` が、`spec-dock/workspace.json`（`init_only` の宣言。dogfood の宣言は 0.2.4 のときから配布物と違うバイト列で `unknown`、新しく作った版3の作り物では `known-old` になりうる。どちらも Epic の testability の許した分類）のほかの配布資産をすべて `current` と示し、宣言が版3のままで、`spec-dock workspace validate` と `.github/scripts/specdock-ci-validate.sh` が通る。
 - **AC-436-09**（Epic の AC-15）：`make lint` と `uv run pytest` の全体が通る。版3の振る舞いのテストを、Epic の testability の「従来モードの回帰」の許された変更のほかに変えていないことを、`git diff ea3d3c9ee` で確かめ、変えたテストを報告書に一覧で書く（canonical モードのテストを変えたもの、例えば `CANONICAL_NOT_IMPLEMENTED` の暫定の経路のテストは、別の区分で書く）。版3の作り物のリポジトリで、0.2.4（`ea3d3c9ee` から作った wheel）と 0.3.0 の候補の代表のコマンド（`scope list`、`scope show`、`dependency check`、`workspace validate`、`workspace validate --ci`、`workspace doctor`、`workspace sync`、`installation show`、`work start --dry-run`、`--help` のいくつか）の出力を比べ、差が、先に決めた許す差（`package_version` などの版の値、配布資産の分類、`help` の文）だけであることを確かめ、結果を報告書に書く。
 - **AC-436-10**（Epic の AC-18、AC-07 の実機）：実機で次を確かめ、結果と確かめられなかったことを報告書に書く。
   - 確かめられないもの（資格情報が要るもの、利用者の設定を変えないとできないもの）は「未確認」と理由を書く。
@@ -132,6 +136,8 @@ ID: "iss-00436"
   - Linux の Codex のサンドボックス（Landlock）での `canonical status` の判定と `flock`（仮想マシンに Codex を入れ、一時の `CODEX_HOME` の `codex sandbox` で。資格情報は入れない）。
   - macOS：外の console（0.3.0 の候補の wheel）での `work finish`（一時の `HOME`、`XDG_STATE_HOME`、PATH の偽の `gh`、`--no-schedule` のリンクと、待ちの間に別のプロセスで回す `canonical sync`。カタログのworktreeだけの設定で push を一時の bare のリポジトリに向け、利用者の launchd と本物の GitHub に触れない）。Codex のサンドボックスでの `canonical status` の1行と `writable_roots` の効き目（一時の `CODEX_HOME` と `codex sandbox`）。Claude Code の1行を、一時の `CLAUDE_CONFIG_DIR` のユーザーの設定ファイルに書いたときの SpecDock の判定。Claude Code 自身がその1行で書けるかは、利用者の資格情報を写さずには確かめられないので、`--settings` のファイルで確かめ、ユーザーの設定ファイルでの動きは I-10 に残す。
   - 作った仮想マシン、コンテナ、イメージ、一時ディレクトリを消したこと。資格情報を写していないこと。
+
+- **AC-436-11**（R-436-09）：読み切った記述子では新しい項目を返さない偽の列挙で `WorkTargetStore.publish` が `SelectionPublicationUnknown` にならないテスト（直しの前に落ちることを確かめる）。btrfs の実機（OrbStack の仮想マシン）で `work start` が `succeeded` を返す。版3の既存のテストは変えない。
 
 ## 制約・前提
 

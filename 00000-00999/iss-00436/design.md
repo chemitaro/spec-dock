@@ -97,6 +97,11 @@ ID: "iss-00436"
 - 版の文字列 `0.2.4` を固定で比べているテストのうち、「今の版」を意味するもの（版のファイルの一致など）は、`pyproject.toml` から読む今の形のままで通る。過去の版を意味するもの（`0.2.4` の利用側の写し、`release-tag` の判定の例）は変えない。
 - 利用側の更新：0.3.0 の候補の wheel を一時の環境に入れ、その console で `installation update --target <この worktree> --dry-run` → `--backup-dir <新しい一時ディレクトリ> --yes` を行う。
 
+### btrfs での選択の記録の確かめ（R-436-09）
+
+- `WorkTargetStore.read()` は、保持したディレクトリの記述子から `os.open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW, dir_fd=…)` で毎回新しい記述子を開いて列挙し、閉じる（`_list_fresh`）。保持した記述子と identity の確かめ（`_verify_directory`）は今のまま。
+- テストは `tests/unit/infra/test_work_target_store.py` に、一度列挙した記述子は閉じるまで空を返す偽の `os.listdir` を使うものを足す。
+
 ## data / failure
 
 - 新しいデータはない。`canonical.md` は配布資産で、`installation update` が知っている中身なら置き換える。
