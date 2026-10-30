@@ -11,7 +11,9 @@ ID: "iss-00470"
 詳細: [Requirement Guide](../../../docs/authoring/requirement.md)
 
 ## 目的
-この Issue が実現する end-to-end の価値を記述する。
+canonical モードで、worktree の作成から work finish までの一連の操作が動くことを確かめるための、仮の Issue である（手動の動作確認、2026-10-30）。
+
+E2E-MARKER: manual-e2e-20261030-t6
 
 ## 背景
 問題、関係者、親 scope から継承する理由を記述する。
