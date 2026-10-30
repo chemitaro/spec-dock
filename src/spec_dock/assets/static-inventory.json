@@ -187,14 +187,15 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "b07b2520bfbebb8b55a2eedea5d5c602ad486bf6333645c9ff93d34c4af0447a",
+      "sha256": "75df3f3743a1edabc7ad9c9888f193d8e1d77043f3cd3efbcefc0c158d89efa9",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
         "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e",
         "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac",
-        "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1"
+        "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1",
+        "b07b2520bfbebb8b55a2eedea5d5c602ad486bf6333645c9ff93d34c4af0447a"
       ]
     },
     {

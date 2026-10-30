@@ -57,19 +57,6 @@ class StoredSelection:
     observed_handles: tuple[SelectionHandle, ...] = ()
 
 
-def _list_fresh(directory_fd: int) -> list[str]:
-    """List through a new descriptor of the held directory (iss-00436).
-
-    Listing the held descriptor again would reuse its directory stream; on btrfs a stream once read to its end
-    shows no entry added later, so a just-published record would look absent.
-    """
-    fresh = os.open(".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)
-    try:
-        return os.listdir(fresh)  # noqa: PTH208 - owned descriptor, not a redirected path
-    finally:
-        os.close(fresh)
-
-
 class WorkTargetStore:
     def __init__(self, root: Path, *, root_handle: DirectoryIdentity | None = None) -> None:
         self.root = root
@@ -152,9 +139,13 @@ class WorkTargetStore:
         handles: list[SelectionHandle] = []
         records: list[WorkTarget] = []
         problems: list[str] = []
+        listing = -1
         try:
             self._verify_directory(directory_fd)
-            entries = _list_fresh(directory_fd)
+            # List through a new descriptor of the held directory, closed only after the files are read: on btrfs a
+            # descriptor shows no entry added after it was opened, so a just-published record would look absent.
+            listing = os.open(".", os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory_fd)
+            entries = os.listdir(listing)  # noqa: PTH208 - owned descriptor, not a redirected path
             for name in entries:
                 if not _NAME.fullmatch(name):
                     problems.append(f"unrecognized work target entry: {name}")
@@ -174,6 +165,9 @@ class WorkTargetStore:
             return StoredSelection("selected", records[0], handles[0], observed_handles=tuple(handles))
         except (OSError, ValueError) as error:
             return StoredSelection("unavailable", reason=str(error))
+        finally:
+            if listing != -1:
+                os.close(listing)
 
     def publish(self, record: WorkTarget, *, token: str | None = None) -> SelectionHandle:
         token = secrets.token_hex(16) if token is None else token

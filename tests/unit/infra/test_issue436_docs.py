@@ -130,7 +130,7 @@ def test_the_reference_and_the_html_guide_list_all_53_commands() -> None:
     assert {leaf for _, leaf in rows} == set(LEAF_PATHS)
     assert "公開53 leaf" in reference and "全53 leaf" in (DOCS / "README.md").read_text(encoding="utf-8")
     html = (DOCS / "cli-redesign-guide.html").read_text(encoding="utf-8")
-    assert "全53コマンド" in html and "全44コマンド" not in html
+    assert "全53コマンド" in html and "全44コマンド" not in html and "44 leaf" not in html
     listed = set(re.findall(r"<td><code>([a-z][a-z ]+?)</code>", html))
     assert set(LEAF_PATHS) <= listed
 

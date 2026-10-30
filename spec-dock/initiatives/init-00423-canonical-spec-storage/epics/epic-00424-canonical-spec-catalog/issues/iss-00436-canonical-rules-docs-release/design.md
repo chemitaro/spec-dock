@@ -99,7 +99,7 @@ ID: "iss-00436"
 
 ### btrfs での選択の記録の確かめ（R-436-09）
 
-- `WorkTargetStore.read()` は、保持したディレクトリの記述子から `os.open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW, dir_fd=…)` で毎回新しい記述子を開いて列挙し、閉じる（`_list_fresh`）。保持した記述子と identity の確かめ（`_verify_directory`）は今のまま。
+- `WorkTargetStore.read()` は、保持したディレクトリの記述子から `os.open(".", O_RDONLY | O_DIRECTORY | O_NOFOLLOW, dir_fd=…)` で毎回新しい記述子を開いて列挙し、その `read()` でファイルを読み終えた後に閉じる（列挙の直後に閉じると、選択のディレクトリの記述子が閉じる時の差し替えを確かめる版3のテスト `test_issue413_active.py`、`test_issue413_finish.py` の時点がずれるため。btrfs では、記述子を開いた後に足された項目はその記述子で見えないので、`lseek` で巻き戻すのでは直らない）。保持した記述子と identity の確かめ（`_verify_directory`）は今のまま。
 - テストは `tests/unit/infra/test_work_target_store.py` に、一度列挙した記述子は閉じるまで空を返す偽の `os.listdir` を使うものを足す。
 
 ## data / failure
