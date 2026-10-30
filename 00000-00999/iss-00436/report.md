@@ -73,6 +73,12 @@ ChatGPT の Strict のゲートは利用者の設定で無効なので、Claude 
   - Standards（この作業に関わっていない新しいサブエージェント、opus/high、`code-review` の観点、範囲 `ea3d3c9ee..5af276735`）：pass、指摘0。
   - Spec（同じく新しいサブエージェント、opus/high。基準は Issue と Epic の受け入れ条件、C1〜C11、AC-15）：pass、P3 が1件（配布する HTML の「詳細へ進む」に「44 leaf」が残る）。ゲートを止める指摘ではないが、新しい SHA でやり直すので直した（「53 leaf」、`static-inventory.json`、利用側の写し、テストで「44 leaf」がないことも確かめる）。
   - 判定：全テストが落ちたので不合格。直して新しい SHA でやり直す。
+- **ゲート2**（push した `a22ce8d3ccfaaeb1277740134c1880e08a7ac919`）：
+  - `make lint`：終了コード0（ruff check、ruff format check、mypy すべて pass）。
+  - `uv run pytest -q -p no:cacheprovider`：終了コード0。3295 passed、8 skipped、0 failed（17分15秒）。
+  - レビューは、トークンの節約の指示どおり、前のゲートの SHA からの差分 `5af276735..a22ce8d3c` と、前の指摘（全テストの2つの失敗、Spec の P3）が閉じたことの確かめに絞った。全体の差分 `ea3d3c9ee..5af276735` はゲート1で2つのレビューを通っているため。この作業に関わっていない新しいサブエージェント2つ（opus/high）に頼んだ。
+  - Standards：pass、指摘0。Spec：pass、指摘0（`validate-review.py` で両方とも status pass、valid）。
+  - 判定：**合格**（止める指摘なし、lint と全テストが同じ SHA で通った）。この記録のコミットは、ゲートの SHA の後の報告書だけの変更である。
 
 ## Residual Risks / Follow-ups
 
