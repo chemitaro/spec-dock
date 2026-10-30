@@ -14,6 +14,7 @@ ID: "iss-00470"
 canonical モードで、worktree の作成から work finish までの一連の操作が動くことを確かめるための、仮の Issue である（手動の動作確認、2026-10-30）。
 
 E2E-MARKER: manual-e2e-20261030-t6
+E2E-MARKER2: manual-e2e-20261030-t8-unsaved-before-finish
 
 ## 背景
 問題、関係者、親 scope から継承する理由を記述する。
