@@ -21,7 +21,7 @@ ID: "iss-00436"
 
 ## 目標
 
-- `requirement.md` の AC-436-01〜10 を満たし、0.3.0 の PR をマージできる状態にする。
+- `requirement.md` の AC-436-01〜11 を満たし、0.3.0 の PR をマージできる状態にする。
 - モデルと推論：実装は opus/medium（統括の指定）。独立のレビューのサブエージェントは opus/high、白紙のエージェントの試行は sonnet/medium（統括の指定）。
 
 ## 順序・依存
@@ -73,5 +73,5 @@ ID: "iss-00436"
 
 ## exit / handoff
 
-- 完了：AC-436-01〜10 を満たし、最終品質ゲートが同じ SHA で合格し、PR の CI が通り、マージできる状態。`work finish` は統括の指示の後。
+- 完了：AC-436-01〜11 を満たし、最終品質ゲートが同じ SHA で合格し、PR の CI が通り、マージできる状態。`work finish` は統括の指示の後。
 - 統括に渡すこと：PR の URL、最終の SHA、ゲートの結果、`report.md` のパス、未確認の事項、I-10 への申し送り、Epic の9章（`CLAUDE_CONFIG_DIR`）の直しの提案。マージの後の `release-tag.yml` の `v0.3.0` の確かめは、この Issue の `report.md` に「マージの後に統括が確かめる」と書き、統括が確かめて Epic の `report.md`（か I-10 の報告書）に結果を書く。

@@ -346,6 +346,10 @@ def test_push_local_is_refused_while_a_re_adoption_is_pending(pair: SyncPair) ->
     pair.advance(61)
     _code, result = pair.sync(pair.a)
     assert catalog_result(result)["paused"] == "remote_deleted", result
+    for flags in ([], ["--adopt-remote"]):  # no other answer points back at the refused --push-local
+        code, result = pair.run(pair.a, "canonical", "resume", *flags)
+        assert code == 3 and result["error"]["details"].get("adopt_remote_pending") is True, (flags, result)
+        assert result["error"]["details"]["next_step"] == "spec-dock canonical resume --adopt-remote"
     code, result = pair.run(pair.a, "canonical", "resume", "--push-local")
     assert (code, result["status"], result["error"]["code"]) == (3, "failed", "CANONICAL_PAUSED"), result
     assert result["error"]["details"]["adopt_remote_pending"] is True

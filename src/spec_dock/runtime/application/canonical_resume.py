@@ -75,6 +75,11 @@ def _re_adoption_pending(reason: str) -> CanonicalCommandError:
     )
 
 
+def _refusal(reason: str, step: str, *, pending: bool) -> CanonicalCommandError:
+    """Name the next step; while a re-adoption is pending, never point at --push-local (it is refused)."""
+    return _re_adoption_pending(reason) if pending and step == "--push-local" else _paused(reason, step)
+
+
 def run_canonical_resume(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     environment = runtime_environment.detect_runtime_environment()
     linked = require_linked(context, environment=environment, timeout=namespace.timeout)
@@ -99,7 +104,7 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
         return OperationResult(namespace.command_path, "unchanged", FamilyData("canonical-resume", data), 0)
     given = "--adopt-remote" if namespace.adopt_remote else ("--push-local" if namespace.push_local else None)
     if given is None:
-        raise _paused(reason, _OPTION[reason])
+        raise _refusal(reason, _OPTION[reason], pending=state.adopt_remote_pending)
     try:
         presence = canonical_git.remote_canonical(catalog, git=git)
         if presence == "present":
@@ -114,10 +119,8 @@ def _resume(namespace: argparse.Namespace, catalog: Path, root: Path, git: str) 
     # What GitHub holds now decides, whatever the pause reason was: a remote_deleted branch another PC recreated
     # is adopted like a rewrite, and a rewritten branch that was deleted afterwards is recreated.
     wanted = "--adopt-remote" if presence == "present" else "--push-local"
-    if given != wanted:
-        raise _paused(reason, wanted)
-    if wanted == "--push-local" and state.adopt_remote_pending:
-        raise _re_adoption_pending(reason)
+    if given != wanted or (wanted == "--push-local" and state.adopt_remote_pending):
+        raise _refusal(reason, wanted, pending=state.adopt_remote_pending)
     effects: list[Effect] = []
     if wanted == "--adopt-remote":
         remote = canonical_git.resolve_commit(catalog, CANONICAL_TRACKING_REF, git=git)
