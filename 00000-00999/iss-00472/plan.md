@@ -22,7 +22,7 @@ ID: "iss-00472"
 
 ## 目標
 
-この Issue の `requirement.md` の AC-01〜AC-10 を満たし、I-2（検査）、I-3（雛形の配置）、I-5（描画）が、この型の上で始められる状態にする。
+この Issue の `requirement.md` の AC-01〜AC-12 を満たし、I-2（検査）、I-3（雛形の配置）、I-5（描画）が、この型の上で始められる状態にする。
 
 ## 順序・依存
 
@@ -37,8 +37,8 @@ ID: "iss-00472"
 1. **テストの補助**：`tests/support/cue.py`（`cue` を PATH から探し、なければ入れ方を示して失敗する。K1 の並べ方で評価し、終了の状態、JSON、誤りの文を返す。CUE の文字列の書き方に変える関数）。`cue` がないときの失敗のテスト（AC-09 の後半）。
 2. **版の置き場**：`runtime/infra/cue_schemas.py` の `schema_directory` と `shipped_schemas`、そのテスト（AC-08 の後半）。
 3. **共通の項目**：`cue/v1/base.cue`。形の誤りのテスト（`schema`、`assurance`、種類のタグ。AC-06 の一部）。
-4. **3つの文書の項目**：`requirement_type.cue`、`design_type.cue`、`plan_type.cue`。番号のキーの形、種類ごとの違い、`execution` の形、レベルの表のテスト（AC-02、AC-06 の残り）。
-5. **つながりの規則**：`rules.cue`。規則 × レベル × 種類の表のテスト（AC-01）、`execution-reference` のテスト（AC-03）。
+4. **3つの文書の項目**：`requirement_type.cue`、`design_type.cue`、`plan_type.cue`。番号のキーの形、種類ごとの違い、`execution` の形、レベルの表のテスト（AC-02、AC-06 の残り）。項目を足せることのテスト（AC-11）。
+5. **つながりの規則**：`rules.cue`。規則 × レベル × 種類の表のテスト（AC-01）と指摘の形のテスト（AC-12）、`execution-reference` のテスト（AC-03）。
 6. **リポジトリの型**：テストの中の型の見本で、制約と規則が加わることのテスト（AC-04）。
 7. **雛形**：3つの種類 × 3つのファイル（`tests/fixtures/cue/v1/templates/<種類>/`）。印を置き換えて、4つのレベルで通るテスト（AC-05）。
 8. **見本の固定**：`tests/fixtures/cue/v1/samples/` の見本と `expected.json`。一致のテスト（AC-07）。期待の結果は、規則の表と照らして、手で読んで確かめてから置く。
@@ -61,6 +61,8 @@ ID: "iss-00472"
 | AC-07 | `tests/unit/cue/test_schema_v1_golden.py` |
 | AC-08 | `tests/integration/test_cue_schema_wheel.py`、`tests/unit/infra/test_cue_schemas.py` |
 | AC-09 | `tests/integration/test_provider_ci_cue.py`、`tests/unit/cue/test_cue_required.py`。PR の CI の `provider-tests` のログで、`cue version v0.17.1` と checksum の `OK` を読む |
+| AC-11 | `tests/unit/cue/test_schema_v1_flexibility.py` |
+| AC-12 | `tests/unit/cue/test_schema_v1_rules.py`（指摘の形） |
 | AC-10 | `make lint`、全テスト。`git diff --stat origin/main -- tests/` に、既存のファイルの変更がないこと。`git diff origin/main -- src/spec_dock/assets spec-dock/templates` が空であること |
 
 - 回帰：全テストを、この worktree で、`cue` を PATH に足して流す。
@@ -75,9 +77,9 @@ ID: "iss-00472"
 
 ## exit / handoff
 
-- 終わりの条件：AC-01〜AC-10、レビューと品質ゲートの合格、`report.md`、マージできる PR。
+- 終わりの条件：AC-01〜AC-12、レビューと品質ゲートの合格、`report.md`、マージできる PR。
 - I-2 へ：評価の並べ方（`-c` なし）、`cue_schemas` の2つの関数、指摘の `id` と、ファイルの対応、`_rank` の既定、形の誤りの文の見本。`schema`・`assurance` が別のファイルにある場合の扱い。子の ID が本当の子かを比べるか。
-- I-3 へ：雛形の置き場（`tests/fixtures/cue/v1/templates/<種類>/` から配布資産へ移す）、印の位置と、理由の文字列の書き方（`tests/support/cue.py` の関数を見本にできる）。
+- I-3 へ：雛形の置き場（`tests/fixtures/cue/v1/templates/<種類>/` から配布資産へ移す）、理由が空白だけのときは型が誤りにするので、`--assurance-reason` で先に止めること、印の位置と、理由の文字列の書き方（`tests/support/cue.py` の関数を見本にできる）。
 - I-5 へ：項目の一覧（描く順番の材料）、`after` の輪を v1 では見つけないこと。
 - I-6 へ：項目の一覧、レベルの表、規則の表、リポジトリの型の決まり（`_specdock` を使わない、規則の名前を重ねない）。
 

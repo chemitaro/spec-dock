@@ -196,7 +196,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
 ### 6. リポジトリの型（K6、R-B6）
 
 - リポジトリの型は、`package spec` の `.cue` で、SpecDock の型のファイルと Scope のファイルの間に並べる（K1）。
-- 使ってよいもの：公開の項目（上の一覧）と `_rank`。トップレベルの `if _rank >= <段階> {...}` も使える（`_rank` が読めないときの既定 0 のため、循環の誤りにならない）。規則を足すときは、`findings: "<名前>": [...]` に足す。名前は、SpecDock の規則と重ねない（重ねると、一覧が衝突して評価が誤りになる）。
+- 使ってよいもの：公開の項目（上の一覧）と `_rank`（読むだけ。書くと、`assurance.level` と違う値は誤りになる）。トップレベルの `if _rank >= <段階> {...}` も使える（`_rank` が読めないときの既定 0 のため、循環の誤りにならない）。規則を足すときは、`findings: "<名前>": [...]` に足す。名前は、SpecDock の規則と重ねない（重ねると、一覧が衝突して評価が誤りになる）。
 - SpecDock の型の中の計算に使う隠した項目は、`_specdock` の下にまとめる。リポジトリの型は、これを使わない（版の中で、名前を変えることがある）。
 
 ### 7. 雛形の中身（K4 の中身）
@@ -211,8 +211,9 @@ cue export --out json -t kind=<initiative|epic|issue> \
 
 - この Issue は、ファイルを書く製品の処理を作らない。型は、評価の入力を読むだけである。
 - 保証レベルが読めないとき：`_rank: *{light: 0, ...}[assurance.level] | 0`。既定の 0 がないと、トップレベルの `if _rank >= ...` が「cycle with field: _rank」という誤りの文を出し、`level` がないことを隠す（2026-10-31 に、`cue` 0.17.1 で確かめた）。既定があっても、`level` がない・値が違うことは、`assurance.level` の誤りとして評価を失敗させる。
+- `_rank` の書き換えを防ぐ：既定の選択肢があると、文書が `_rank: 0` と書けば 0 が選ばれ、レベルを変えずに検査が弱まる。隠した照合の項目 `_specdock: rank: {light: 0, ...}[assurance.level] & _rank` を置き、`level` と違う値は衝突の誤りにする（`level` が読めないときは、この項目は具体的にならず、ほかの誤りの文を増やさない。2026-10-31 に確かめた）。
 - 状態の値の誤り：`status: *"todo" | (string & =~"^(todo|doing|done|dropped)$")` で、誤りの文を2行にする（選択肢で書くと4行）。
-- 種類のタグがないとき：`kind` が具体的でなく、評価が失敗する（SpecDock の誤りなので、文は CUE のままでよい）。
+- 種類のタグがないとき：種類で切り替える条件は、`kind` を直接読まず、`_specdock: issue: *(kind == "issue") | true` を読む。タグがないと、比べた結果が読めないので既定に落ち、トップレベルの `if` が循環や「unresolved disjunction」の誤りを出さず、`kind: incomplete value ...` の誤りだけが出る（2026-10-31 に確かめた）。3つ以外の値のときも、`kind` の衝突の誤りが出る（ほかの誤りが続くことはある）。
 - リポジトリの型との衝突：CUE の衝突の誤りで、両方のファイルの位置が出る。
 - `cue` がないとき（テスト）：`tests/support/cue.py` が、入れ方（`GOBIN="$PWD/.workbench/bin" go install cuelang.org/go/cmd/cue@v0.17.1` と PATH）を示して `pytest.fail` する。飛ばさない。
 
@@ -247,6 +248,8 @@ cue export --out json -t kind=<initiative|epic|issue> \
 | AC-07 | `tests/fixtures/cue/v1/samples/<名前>/` の見本と、期待の結果 `expected.json` |
 | AC-08 | `uv build` で wheel と sdist を作り、sdist から wheel を作り、中身を比べる。`cue_schemas` の関数のテスト |
 | AC-09 | ワークフローの文面のテスト（手順の順番、版、2つの checksum、`sha256sum -c`、`GITHUB_PATH`）。PATH を空にして、補助が失敗することを確かめる |
+| AC-11 | 各項目と、トップレベル、`assurance`、`execution` に、型にない項目を足した見本。番号の構造に形の違うキーを足した見本 |
+| AC-12 | AC-01 の違反の見本で出たすべての指摘の `id`、`message`、`hint` と、`hint` のファイルの名前、一覧の並び |
 | AC-10 | `make lint`、`uv run pytest`（PATH に `.workbench/bin` を足す）。`git diff --stat origin/main -- tests/` が、足したファイルだけであること |
 
 ## risk
