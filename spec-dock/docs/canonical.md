@@ -2,6 +2,8 @@
 
 SpecDock 0.3.0 から、仕様の置き場を2つの形から選べます。`spec-dock/workspace.json` の `schema_version` が 3 のリポジトリは従来モードで、仕様もコードと一緒にコミットします（今までと同じ）。4 のリポジトリは canonical モードで、仕様の構造（作成、親子、依存、状態、題名、種類）を GitHub Issue に、中身を `spec-dock/canonical` ブランチに置き、コードのブランチには仕様を入れません。版3から4への移行は、spec-dock のリポジトリの `scripts/migrate-to-canonical/README.md` の手順で一度だけ行います。
 
+SpecDock 0.4.0 から、canonical モードで新しく作る Scope は CUE の Scope（`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`）です。書き方と検査は [CUE Authoring Guide](authoring/cue.md) にあります。
+
 エージェントが守る規則は、配布するスキル（`.agents/skills/spec-dock/SKILL.md`）の「仕様の扱い（canonical モード）」の節にあります。この文書は、利用者が用意と困ったときの扱いを知るためのものです。
 
 ## モードと置き場
@@ -187,7 +189,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `ASSURANCE_NOT_WRITTEN` | 警告（`scope import github`） | 既にある Scope の文書は書き換えない。CUE の Scope で変えるなら `requirement.cue` の `assurance` を直す（Markdown の Scope は保証レベルを持たない） |
 | `CANONICAL_TITLE_IGNORED` | 警告（`scope import github`） | 題名を変えるなら `spec-dock scope edit <ID> --title <題名>` |
 | `SCOPE_IN_PROGRESS` | 警告（`work start`） | 別のPCで作業中でないか利用者に確かめる。古い印なら `spec-dock work finish` か GitHub でラベルを外す |
-| `SCOPE_CHECK_FAILED` | 7（`scope check`）／3（`work finish`。何も書かない）／警告（既に完了の Scope の `work finish`） | 誤りごとに示したファイルと `hint` のとおりに直し、`spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` |
+| `SCOPE_CHECK_FAILED` | 7（`scope check`）／3（`work finish`。何も書かない）／6（partial。保存を待つ間に別のPCで開き直された CUE の Scope の `work finish`。保存の束は書いたが、Issue は閉じない）／警告（既に完了の Scope の `work finish`） | 誤りごとに示したファイルと `hint` のとおりに直し、`spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` |
 | `SCOPE_FORMAT_CONFLICT` | 7（`scope check`、`workspace validate`） | `requirement.md` と `requirement.cue` の片方を外し、Scope の形式を1つにする |
 | `CUE_NOT_FOUND`、`CUE_VERSION_UNSUPPORTED` | 3（`scope check`、CUE の Scope の `work finish`） | `cue` v0.17.1 以上を PATH に入れる（例 `go install cuelang.org/go/cmd/cue@v0.17.1`）。Markdown の Scope には要らない |
 | `CUE_TIMEOUT`、`CUE_FAILED` | 5（同上） | `--timeout` を延ばして同じコマンドを実行する。`cue version` が動くか確かめ、動かなければ入れ直す |
@@ -202,7 +204,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `DEPENDENCY_CYCLE`、`DEPENDENCY_INVALID`、`DEPENDENCY_FOREIGN_REPOSITORY` | 3（`dependency add`）／警告（構造の異常） | 循環や別のリポジトリへの依存を GitHub で外す（`spec-dock dependency remove`） |
 | `PARENT_MISSING`、`PARENT_INVALID`、`PARENT_FOREIGN_REPOSITORY`、`SUB_ISSUE_FOREIGN_REPOSITORY`、`KIND_LABEL_MULTIPLE` | 3（書くコマンド）／警告（構造の異常、`workspace validate`） | 示した Issue のラベルと親子を GitHub で直す（`spec-dock scope move <ID> --parent <親>` など） |
 | `DESCENDANT_STATUS_UNKNOWN` | 3（`scope close` など） | 子の Issue（別のリポジトリの sub-issue や、ID を決められない子）を GitHub で確かめて直す |
-| `SCOPE_KIND_CHANGED` | 3（書くコマンド、`work start`、`branch`）／警告（読むコマンド、`workspace validate`） | GitHub の種類のラベルを元に戻す。種類を変えるのが意図なら、新しい種類で Issue を作り直し、古いディレクトリの中身を新しい `<区切り>/<ID>/` に移し、古い Scope を今の ID で `spec-dock scope delete` |
+| `SCOPE_KIND_CHANGED` | 3（書くコマンド、`work start`、`branch`）／警告（読むコマンド、`workspace validate`） | GitHub の種類のラベルを元に戻す。種類を変えるのが意図なら、`spec-dock scope create <新しい種類> --assurance <値> --assurance-reason <理由>` で作り直す（新しい Scope は CUE の Scope）。古い `requirement.md`、`design.md`、`plan.md` の中身は、新しい `requirement.cue`、`design.cue`、`plan.cue` に書き写す（`.md` をそのまま移すと `SCOPE_FORMAT_CONFLICT`）。`artifacts/`、`discussions/` などほかのファイルは新しい `<区切り>/<ID>/` に移し、`report.md` は新しいものに統合する。最後に古い Scope を今の ID で `spec-dock scope delete <今の ID>` |
 | `SCOPE_DIRECTORY_MISSING` | 警告（`workspace validate`） | その Scope の `<区切り>/<ID>/` を作る（`spec-dock scope import github <種類> <番号>`）か、別のクローンの保存を待つ |
 | `SCOPE_ISSUE_MISSING` | 警告（同上） | 示した `<ID>/` の Issue を GitHub で確かめる。要らなければ中身を確かめてからディレクトリを消す |
 | `SCOPE_DIRECTORY_MISPLACED` | 警告（同上） | 中身を `<区切り>/<ID>/`（`details.expected`）に移し、空になったディレクトリを消す |
