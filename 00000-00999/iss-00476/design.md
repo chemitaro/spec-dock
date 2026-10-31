@@ -37,7 +37,7 @@ class ScopeRenderSource:
     title: str | None      # GitHub の題名。None なら ID だけを題名にする
     directory: Path        # Scope のディレクトリ（実のパスでもリンクでもよい）
     repository_root: Path  # リポジトリの根（spec-dock/cue/*.cue を読む）
-    shown: str | None = None  # 誤りの文に出す Scope の道筋。None なら directory を repository_root からの相対で
+    shown: str | None = None  # 誤りの文に出す Scope の道筋。None なら directory を repository_root からの相対で、相対にできなければ directory の道筋そのもの
 
 @dataclass(frozen=True)
 class RenderedScope:
@@ -71,7 +71,7 @@ def wrap_page(markdown: str, *, title: str, design_system_base: str, vendor_base
 
 **Markdown の並び**（R-04）。節の見出しは `##`、項目の見出しは `###`。
 
-1. 前付け：`title: <ID> <題名>`、`lead`、`category: CUE の仕様`、`status: 保証レベル <level>`（読めなければ `保証レベル 未確定`）。前付けの値は1行にし、改行と前後の引用符を除く。
+1. 前付け：`title: <ID> <題名>`、`lead`、`category: CUE の仕様`、`status: 保証レベル <level>`（読めなければ `保証レベル 未確定`）。前付けの値は1行にし、前後の引用符を除く。`ds.js` は `title` を、表紙では Markdown（`mdInline`。生の HTML を通す）として、帯と足元と `document.title` では文字として使うので、どちらの解釈でも同じに見えて、HTML にも強調にもならないように、`title` の中の `\`、`` ` ``、`*`、`_`、`[`、`]`、`<`、`>`、`&`、`~`、`|` を、見た目の近い全角の文字（`＼`、`｀`、`＊`、`＿`、`［`、`］`、`＜`、`＞`、`＆`、`～`、`｜`）に置き換える。題名の正確な文字は、本文の初め（`## 検査の結果` の前）に「題名：<題名>」として、文章でない値の規則で逃がして示す。`lead` と `status` は、SpecDock が作る文と、型が形を決めた値（`schema`、`level`）だけを持つ。
 2. `## 検査の結果`：形の誤り（コード、ファイル、項目、文、直し方）を1件ずつ。続けて `findings` の規則の名前の順に、規則ごとに `### <規則の名前>` と、指摘（番号のリンク、文、直し方）を1件ずつ。誤りも指摘もなければ「誤りと指摘はありません。」。
 3. `## 保証レベル`：`level` と `reason`（Markdown）。
 4. `## 要件`：任意の節（`purpose` 目的、`background` 背景、`includes` 含めるもの、`excludes` 含めないもの、`constraints` 制約、`decisions` 決めたこと、`questions` 未解決のこと）を `###` で。続けて要件を番号の順に `### R-xx <題名>`、文章、`acceptance`（受け入れ）、つながり。
@@ -84,18 +84,18 @@ def wrap_page(markdown: str, *, title: str, design_system_base: str, vendor_base
 
 **番号の並び**：`<頭>-<数>` は、数の大きさの順（同じ数なら文字の順）。セッションとレビューと規則の名前は、文字の順。
 
-**アンカーとリンク**（R-05）：項目の見出しは、Markdown の見出しではなく、HTML の `<h3 id="<番号>">` で書く（`ds.js` は、`id` を持つ見出しの `id` を変えず、目次に入れる）。`id` は番号そのもの（`R-01`、`F-01`、`D-01`、`S-01`、`T-01`）と、切り分けは `slice-<子の ID>`。番号はキーの正規表現で形が決まっているので、`id` に安全である。リンクは `[R-01](#R-01)`。逆向きの索引（要件 → 設計、手順、テスト、切り分け）は、評価の JSON から Python で作る。存在しない番号は、リンクにせず「`<番号>`（ない番号）」と出す。取り下げた手順も、状態を添えて出す。
+**アンカーとリンク**（R-05）：項目の見出しは、Markdown の見出しではなく、HTML の `<h3 id="<番号>">` で書く（`ds.js` は、`id` を持つ見出しの `id` を変えず、目次に入れる）。番号でない `id` の指摘（`rollback`、`execution.reviews.<名前>`、リポジトリの型の規則の `id`）は、リンクにも「ない番号」にもせず、文字として出す。番号の形（`<英字>-<数字>`）で、ページにない `id` だけを「ない番号」とする。`id` は番号そのもの（`R-01`、`F-01`、`D-01`、`S-01`、`T-01`）と、切り分けは `slice-<子の ID>`。番号はキーの正規表現で形が決まっているので、`id` に安全である。リンクは `[R-01](#R-01)`。逆向きの索引（要件 → 設計、手順、テスト、切り分け）は、評価の JSON から Python で作る。存在しない番号は、リンクにせず「`<番号>`（ない番号）」と出す。取り下げた手順も、状態を添えて出す。
 
 **逃がし**（R-08）：
 
 | 置き場 | 値 | 扱い |
 |---|---|---|
-| Markdown の地の文、表、リスト | 文章でない値 | 改行と連続の空白を1つの空白にし、ASCII の記号をすべてバックスラッシュで逃がす（CommonMark の逃がし。`marked` は `<`、`>`、`&` を文字として出す） |
+| Markdown の地の文、表、リスト | 文章でない値 | 行に分けて各行の前後の空白を除き、1つの空白でつないで1行にし、ASCII の記号をすべてバックスラッシュで逃がす（CommonMark の逃がし。`marked` は `<`、`>`、`&` を文字として出す） |
 | HTML の見出し `<h3>` の中 | 番号と題名 | HTML の特殊な文字を実体参照にする（HTML のブロックの中は Markdown にならないため） |
 | ブロック | 文章の項目（`#Text`） | そのまま Markdown として置く。リストの中では、続く行を字下げする |
-| 符号のブロック | その他の項目 | JSON（`ensure_ascii=False`、`sort_keys=True`、字下げ 2）。`<` を `<` にする（JSON として同じ値）。囲いは、中の最も長いバッククォートの並びより長くする |
+| 符号のブロック | その他の項目 | JSON（`ensure_ascii=False`、`sort_keys=True`、字下げ 2）。文字 `<` を、6文字の逃がし `\u003c`（バックスラッシュ、`u003c`）にする（JSON として同じ値）。囲いは、中の最も長いバッククォートの並びより長くする |
 
-最後に Markdown の全体で、`</script`（大文字小文字を問わない）を `<\/script` に変える（`ds.js` は読むときに戻す）。`<!--` は `<!\--` に変える（`<!--` と `<script` が続くと、HTML の解析が `</script>` を区切りと見なくなるため）。このため、文章の項目の HTML のコメントは、コメントにならず、文字として見える。
+最後に Markdown の全体で、`</script`（大文字小文字を問わない）を `<\/script` に変える（`ds.js` は読むときに戻す）。さらに、Markdown に `<!--` と、`<script` に空白、`/`、`>` のどれかが続く並び（大文字小文字を問わない）の両方があるときだけ、`<!--` を `<!\--` に変える（`<!--` の後に `<script` が来ると、HTML の解析が `</script>` を区切りと見なくなるため。片方だけなら、区切りは壊れない）。このときだけ、文章の項目の HTML のコメントは文字として見え、符号の中の `<!--` は `<!\--` と見える。
 
 **HTML の形**（R-03）：
 
@@ -122,6 +122,9 @@ def wrap_page(markdown: str, *, title: str, design_system_base: str, vendor_base
 
 - `scope check` と同じに Scope を解き（`load_canonical_scopes`、`resolve_canonical_scope`、`check_canonical_scope_expectations`、`require_directory`）、`ScopeRenderSource` を作って `render_scope` を呼ぶ。`design_system_base` は `(<チェックアウトの根>/spec-dock/design-system).as_uri() + "/"`、`vendor_base` は `None`。
 - 結果：`FamilyData("scope-render", {scope_id, kind, path, format, complete, valid, errors, design_system_base, vendor_base, html, snapshot})`、終了コード 0。
+  - `errors` は `RenderedScope.errors`（ページに載せた誤り。つながりの指摘と説明資料の検査を含まない）。
+  - `valid` は、`report.errors` から `EXPLANATION_*` を除いたものが空のとき真（形の誤りも、つながりの指摘もない）。説明資料の検査は、`valid` にも影響しない（`scope check` の `valid` とは、説明資料の扱いだけが違う）。
+  - `--json` の封筒は、ほかの葉と同じく共通の秘匿化（`_redact`。トークンや URL の利用者情報を `[redacted]` にする）を通す。`data.result.html` は、その秘匿化の後の値である。テキストの出力と関数の返り値は、秘匿化しない HTML である（描画の結果を、そのまま見せるため）。そのため、秘匿化に当たる文字を含む仕様では、`--json` の `html` だけが、その部分で違う。
 - 警告：`complete=False` なら `SCOPE_RENDER_INCOMPLETE`。`<根>/spec-dock/design-system/ds.js` がなければ `DESIGN_SYSTEM_MISSING`（`installation update` の案内）。スコープの読み込みの警告（`scopes.warnings()`）も続ける。
 - テキストの出力（`presentation/envelope.py` の `render_text`）：`scope render` で `html` を持つ結果は、標準出力に HTML だけを出す（1行目の `spec-dock: succeeded (...)` を出さない）。警告は今のとおり標準エラーに出す。失敗のときは、今の失敗の出力のままにする。
 - schema 3 のリポジトリでは、`scope check` と同じく `CANONICAL_NOT_MIGRATED` で止まる（`runtime_dispatch.py`）。
