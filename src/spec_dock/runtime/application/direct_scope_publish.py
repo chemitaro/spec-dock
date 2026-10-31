@@ -73,7 +73,7 @@ def _refuse_assurance(namespace: argparse.Namespace) -> None:
                 "Run the same command without --assurance and --assurance-reason, or migrate the repository to "
                 "canonical mode first.",
             ),
-            details={"arguments": given},
+            details={"argument": given[0]},
         )
 
 

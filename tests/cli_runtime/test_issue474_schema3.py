@@ -43,6 +43,7 @@ def test_the_assurance_arguments_stop_schema_3_before_any_effect(
     payload = json.loads(capsys.readouterr().out)
     assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_MIGRATED"), payload
     assert "canonical mode" in payload["error"]["message"]
+    assert payload["error"]["details"] == {"argument": assurance[0]}
     assert payload["recovery"]["instructions"]
     assert not log.exists() and tree_digest(root) == before
 

@@ -86,7 +86,7 @@
 <p><code>active clear</code>はselectionだけを解除し、Issueを閉じたりbranchを変更したりしません。<code>scope close</code>はbackend状態だけを変えます。Finishは作業完了なので、未完了作業を引き継ぐために使いません。今回、work releaseという新コマンドは追加しません。</p>
 </section>
 <section id="walkthrough" aria-labelledby="walkthrough-title"><div class="section-label">07</div><h2 id="walkthrough-title">通常操作の流れ</h2><p>作成結果から実際のIDを読み、親を明示します。下の<code>EPIC_ID</code>、<code>ISSUE_ID</code>、<code>BASE_REF</code>は実際に返されたIDと存在するbaseへ置き換えてください。</p>
-<pre><code>spec-dock scope create issue --backend github --parent EPIC_ID --title "変更の目的" --assurance standard --assurance-reason "失敗の影響と戻しやすさ" --json
+<pre><code>spec-dock scope create issue --backend github --parent EPIC_ID --title "変更の目的" --json
 spec-dock scope show ISSUE_ID --json
 spec-dock work start ISSUE_ID --base BASE_REF --json
 spec-dock active show --json
