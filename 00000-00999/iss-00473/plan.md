@@ -40,7 +40,7 @@ ID: "iss-00473"
 5. **`scope show` の `assurance`**：`canonical_scope_read.py`。CLI のテスト（AC-01）。
 6. **`workspace validate`・`doctor`**：`canonical_workspace.py`。CLI のテスト（AC-12）。
 7. **`work finish`**：`canonical_work.py` の `_check_before_finish`。CLI のテスト（`WriteWorld`）：誤りで止まり何も書かない、dry-run、直して閉じる、警告付きで閉じる、既に閉じた Scope、Markdown の Scope と `cue` なし（AC-09〜AC-11）。
-8. **葉の数と参照の文書**：配布資産 `docs/reference_cli.md`（C54）、`docs/README.md`、`docs/cli-redesign-guide.html` と、その dogfood の写し、`static-inventory.json` の `sha256`。葉の数を固定した既存のテストの期待を 54 にする（AC-15、AC-16）。
+8. **葉の数と参照の文書**：配布資産 `docs/reference_cli.md`（C54）、`docs/README.md`、`docs/cli-redesign-guide.html`（表の C54 の行も）、`docs/canonical.md`（エラーの表）と、その dogfood の写し、`static-inventory.json` の `sha256`。葉の数を固定した既存のテストの期待を 54 にする（AC-15、AC-16）。
 9. **全体の確かめ**：`make lint`、`PATH="$PWD/.workbench/bin:$PATH" uv run pytest`。カタログへのリンクがある worktree では `tests/unit/infra/test_authoring_kit_assets.py` の12件が、この Issue と関係なく落ちる（既知）。全体のテストは、リンクのない clean な clone（この PR の HEAD を clone し、`cue` を PATH に足す）で通す（AC-16）。
 10. **レビューと品質ゲート**：`spec-review`（opus / xhigh）で3つの文書。`code-review`（opus / high）、指摘は `analyze-review-findings`。`final-quality-gate`（opus / xhigh、sonnet / high）。合格の証拠を `report.md` に書く。
 11. **報告と PR**：`report.md`、`main` への PR（`Refs #473`、`Refs #425`）、`github-pr-checks` で CI を確かめる。マージは人が行い、`work finish` は統括の指示を待つ。
@@ -77,7 +77,7 @@ ID: "iss-00473"
 
 - 終わりの条件：AC-01〜AC-16、仕様のレビューとコードのレビュー、最終品質ゲートの合格、`report.md`、マージできる PR。
 - I-3 へ：作った直後の Scope を `scope check` で確かめるときの期待（Issue と Initiative は `EXPLANATION_SKELETON` の警告だけ、Epic は誤り）。`read_assurance` と `scope_format` を使える。
-- I-5 へ：`cue_tool.locate_cue` と `CueTool.export`、`check_scope_documents` の評価の並べ方（`scope_check.py` の中の関数として切り出してある K1 の並べ方）、`findings` の扱い。
+- I-5 へ：`cue_tool.locate_cue` と `CueTool.export`、K1 の並べ方の公開の関数 `scope_check.k1_files`、評価の JSON の全体 `ScopeCheckReport.evaluation`、`findings` の扱い。
 - I-6 へ：`scope check` の使い方、誤りのコードの表（K3）、`work finish` の止まり方、`scope show` の `assurance`、`cue` の最低の版。
 - epic-00427 へ：K3（誤りのコードと `details` の鍵）、`scope show` の `assurance`。
 - 残るリスク：祖先のディレクトリの `cue.mod` の影響（未確認）。`cue` の新しい版での誤りの文の形の変化。

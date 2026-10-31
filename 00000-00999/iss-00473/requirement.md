@@ -59,7 +59,7 @@ CUE で書いた Scope の要件・設計・計画と説明資料を、SpecDock 
 
 - **RQ-13 閉じる前の検査**：`work finish` は、閉じる Scope が CUE の Scope なら、GitHub の状態を読み直した後、保存の確かめ、カタログの変更、GitHub への書き込みの前に、`scope check` と同じ検査をする。誤りがあれば、何も書かずに止まり（`SCOPE_CHECK_FAILED`、exit 3）、誤りの一覧と、直した後に実行するコマンドを示す。警告は、結果の警告として示し、止めない。
 - **RQ-14 検査しない場合**：Markdown の Scope、ディレクトリがない Scope では、検査しない（今と同じに動く）。子孫は検査し直さない。
-- **RQ-15 既に閉じた Scope**：GitHub で既に完了の Scope の `work finish`（選択を外すだけ）では、検査の誤りで止めず、同じ一覧を警告（`SCOPE_CHECK_FAILED`）として示し、選択を外す。
+- **RQ-15 既に閉じた Scope**：GitHub で既に完了の Scope の `work finish`（選択を外すだけ）では、検査の誤りで止めず、同じ一覧を警告（`SCOPE_CHECK_FAILED`）として示し、選択を外す。ただし、保存を待つ間に Scope が開き直されたら（2回目の読み直しで完了でない）、検査の誤りで止まり、Issue を閉じない。
 - **RQ-16 dry-run**：`--dry-run` でも同じ検査をし、誤りがあれば同じに止まる。
 - **RQ-17 道具の失敗**：CUE の Scope で `cue` がない・古い・時間切れなどのときは、`scope check` と同じコードで、何も書かずに止まる。既に閉じた Scope では、止めずに警告にする。
 
@@ -142,7 +142,7 @@ CUE で書いた Scope の要件・設計・計画と説明資料を、SpecDock 
 - **AC-08（RQ-02、RQ-03）**：Markdown の Scope の `scope check` が、`cue` が PATH になくても、exit 0、`format: "markdown"`、`checked: false` を返す。`requirement.md` と `requirement.cue` の両方がある Scope で、`SCOPE_FORMAT_CONFLICT` の誤りになる。
 - **AC-09（Epic AC-16、RQ-13、RQ-16）**：CUE の Scope で、検査に誤りが残っていると、`work finish` が `SCOPE_CHECK_FAILED`（exit 3）で止まり、誤りの一覧と次の手順を示し、カタログの変更集、GitHub への書き込み、選択の解除を何もしない。`--dry-run` でも同じに止まる。誤りを直すと、`work finish` が閉じて選択を外す。説明資料の警告（Issue の雛形のまま）だけなら、警告を示して閉じる。
 - **AC-10（Epic AC-16 の後半、AC-12、RQ-14、RQ-22）**：Markdown の Scope の `work finish` が、`cue` が PATH になくても、今と同じに閉じる。既存の `work finish` の回帰のテスト（`tests/cli_runtime/test_issue432_work_finish.py` ほか）が、変えずに通る。
-- **AC-11（RQ-15、RQ-17）**：GitHub で既に完了の CUE の Scope に、誤りが残っている、または `cue` がないとき、`work finish` が止まらず、`SCOPE_CHECK_FAILED` などの警告を示して、選択を外す。
+- **AC-11（RQ-15、RQ-17）**：GitHub で既に完了の CUE の Scope に、誤りが残っている、または `cue` がないとき、`work finish` が止まらず、`SCOPE_CHECK_FAILED` などの警告を示して、選択を外す。保存を待つ間に開き直された Scope では、`SCOPE_CHECK_FAILED` の `partial`（exit 6）で止まり、Issue は開いたままである。
 - **AC-12（Epic AC-12 の後半、RQ-20）**：Markdown の Scope と CUE の Scope が並ぶカタログで、`workspace validate` と `workspace doctor` が、CUE の Scope を文書の欠落の誤りにしない。CUE の Scope で `plan.cue` がなければ `SCOPE_DOCUMENT_MISSING`（`missing` に `plan.cue`）になる。両方の `requirement` がある Scope は `SCOPE_FORMAT_CONFLICT` になる。どちらも、`cue` が PATH になくても動く。
 - **AC-13（Epic AC-17、RQ-08）**：説明資料がない、雛形のまま（印が残る）、の2つが、Epic では誤り、Initiative と Issue では警告になる。Markdown を書く場所がない、2つある、前付けに `title` がない、デザインシステムの CSS を読む指定がない、JS を読む指定がない、のそれぞれが、どの種類でも `EXPLANATION_INVALID` の誤りになる。I-4 の雛形 `spec-dock/design-system/explanation-skeleton.html` は「雛形のまま」だけになり、印を消すと何も出ない。
 - **AC-14（RQ-21）**：schema 3 のリポジトリで、`scope check` が `CANONICAL_NOT_MIGRATED` で止まる。

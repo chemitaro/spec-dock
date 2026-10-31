@@ -64,7 +64,7 @@ def parse_cue_errors(stderr: str, *, cwd: Path) -> tuple[CueError, ...]: ...
 
 - `locate_cue`：`shutil.which("cue")` で探す。ない → `CUE_NOT_FOUND`（exit 3）。`[cue, "version"]` の1行目を `^cue version v(\d+)\.(\d+)\.(\d+)` で読み、`MINIMUM_CUE_VERSION` 未満、または読めない → `CUE_VERSION_UNSUPPORTED`（exit 3。見つけた版を示す）。`version` の時間切れ・起動の失敗は `CUE_TIMEOUT`・`CUE_FAILED`（exit 5）。
 - `export`：`[executable, "export", "--out", "json", *("-t", f"{k}={v}"), *("-e", expression), *map(str, files)]` を、`shell=False`、`cwd`、`capture_output`、`text`、`timeout` で呼ぶ。時間切れ → `CUE_TIMEOUT`、`OSError` → `CUE_FAILED`。終了の状態は呼ぶ側が判断する。
-- `parse_cue_errors`：`cue` の誤りの文は、行頭の行が1件の誤り（`<項目の道筋>: <文>:` か `<文>:`）、字下げした行が位置（`<相対パス>:<行>:<列>`）である。道筋は、識別子、引用符の文字列、`[数字]` を `.` でつないだ形として読む。位置のパスは `cwd` からの相対で出るので、`cwd` を基に絶対パスへ直す。読めない行は、直前の誤りの文に足す。
+- `parse_cue_errors`：`cue` の誤りの文は、行頭の行が1件の誤り（`<項目の道筋>: <文>:` か `<文>:`）、字下げした行が位置（`<相対パス>:<行>:<列>`）である。道筋は、識別子、引用符の文字列、数字を `.` でつないだ形として読む。道筋の形でない行頭の行は、道筋 `None` の誤りにする。位置のパスは `cwd` からの相対で出るので、`cwd` を基に絶対パスへ直す。字下げした行で位置の形でないものは、直前の誤りの文に足す。
 - この部品は、`cue` の誤りの文の意味（どれが重複か）を判断しない（application が判断する）。
 
 ### 2. 説明資料の形（`runtime/domain/explanation_shape.py`）
@@ -106,7 +106,7 @@ class AssuranceReading:
     problem: Diagnostic | None
     def payload(self) -> dict[str, object]: ...   # {level, reason, source, problem: {code, message} | None}
 
-def read_assurance(directory: Path | None, *, timeout: float) -> AssuranceReading: ...   # 例外を出さない
+def read_assurance(directory: Path | None, *, timeout: float, tool: CueTool | None = None) -> AssuranceReading: ...   # 例外を出さない
 
 @dataclass(frozen=True)
 class ScopeCheckReport:
@@ -119,6 +119,9 @@ class ScopeCheckReport:
     findings: dict[str, list[dict[str, str]]] | None   # 評価が通ったときの findings の全体
     cue_version: str | None
     cue_output: str | None         # 評価の誤りの文の全体（評価が失敗したとき）
+    evaluation: dict | None        # 評価が通ったときの JSON の全体（I-5 の描画が使う）
+
+def k1_files(types: Path, repository_root: Path, scope: Path) -> list[Path]: ...   # K1 の並べ方
 
 def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_root: Path,
                           timeout: float) -> ScopeCheckReport: ...
@@ -127,7 +130,7 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 - `scope_format`：`requirement.cue` が通常のファイルなら `cue`、さらに `requirement.md` もあれば `conflict`、どちらもなければ `markdown`。
 - `read_assurance`（`scope show` と検査が共有。型を使わない）：
   1. ディレクトリがない、形式が `markdown` → `unset`。`conflict` → `unreadable`（`SCOPE_FORMAT_CONFLICT`）。
-  2. `locate_cue` の失敗 → `unreadable`（そのコード）。
+  2. `locate_cue` の失敗 → `unreadable`（そのコード）。`tool` を渡されたら、`locate_cue` を呼ばずにそれを使う（検査の中で、`cue version` を2度呼ばない）。
   3. `cue export --out json -e assurance requirement.cue`（`cwd` は Scope のディレクトリ）。失敗のうち、誤りが `reference "assurance" not found` だけなら `ASSURANCE_UNREADABLE`、ほかは `CUE_INVALID`（最初の誤りの文）。
   4. 値が `{level, reason}` で、`level` が4つの値のどれか、`reason` が文字列で `str.strip()` 後に空でない（Python の空白の判定。I-1 の `#Text` と同じ範囲）→ `cue`。そうでなければ `ASSURANCE_UNREADABLE`。
 - `check_scope_documents` の手順：
@@ -138,10 +141,10 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
      - 誤りの文があり、`reference "schema" not found` だけなら、`CUE_INVALID`（`field: schema`、`requirement.cue` に `schema: "specdock/v1"` を書くよう示す）。ほかの誤りなら、それを `CUE_INVALID` に変える。どちらも評価に進まない（説明資料の検査は行う）。
      - 値が文字列で `^specdock/v[1-9][0-9]*$` に合わない → `CUE_INVALID`（`field: schema`）。評価に進まない。
      - 形は合うが `cue_schemas.schema_directory` が `None` → `CanonicalCommandError(CUE_SCHEMA_UNSUPPORTED, exit_code=3)`。`details.shipped` と `recovery` に、持っている版（`shipped_schemas()`）と、SpecDock を上げる次の手順を示す。
-  5. K1 の評価：`files = sorted(<型のディレクトリ>/*.cue) + sorted(<repository_root>/spec-dock/cue/*.cue（通常のファイルだけ）) + Scope の3つ（あるものだけ）`、`tags = {"kind": kind}`、`cwd` は Scope の実のディレクトリ。パスは、すべて `resolve()` した実のパスで渡す（`cue` の出す相対パスを、確実に元のファイルに戻すため）。
+  5. K1 の評価：`k1_files(types, repository_root, scope)` = `sorted(<型のディレクトリ>/*.cue) + sorted(<repository_root>/spec-dock/cue/*.cue（通常のファイルだけ）) + Scope の3つ（あるものだけ）`、`tags = {"kind": kind}`、`cwd` は Scope の実のディレクトリ。パスは、すべて `resolve()` した実のパスで渡す（`cue` の出す相対パスを、確実に元のファイルに戻すため）。`k1_files` は公開の関数で、I-5 の描画が同じ並べ方を使う。
   6. 終了の状態が 0 以外：`parse_cue_errors` の結果を `CUE_INVALID` に変える。重複の扱い：道筋の最初の部分が `_` で始まるもの、文に `error in call to` を含むもの、文が `N errors in empty disjunction` のものは「派生」とし、派生でない誤りが1つでもあれば派生を捨てる。同じ（道筋、文）は1つにする。
-  7. 終了の状態が 0：JSON を読み、`findings` の空でない規則の指摘を、規則の名前の順、指摘の並びのとおりに `SPEC_FINDINGS` に変える。JSON が読めない、`findings` が辞書でない → `CanonicalCommandError(CUE_FAILED, exit_code=5)`。
-  8. 保証レベル：`read_assurance` を呼ぶ。`source` が `cue` でないとき、評価が通っていれば必ず、評価が失敗していれば `problem.code` が `ASSURANCE_UNREADABLE` で、かつ道筋が `assurance` で始まる `CUE_INVALID` がないときだけ、`ASSURANCE_UNREADABLE` の誤りを足す（同じ原因を2度示さない）。
+  7. 終了の状態が 0：JSON を読み、全体を `evaluation` に持つ。`findings` の空でない規則の指摘を、規則の名前の順、指摘の並びのとおりに `SPEC_FINDINGS` に変える。JSON が読めない、オブジェクトでない、`findings` が辞書でない → `CanonicalCommandError(CUE_FAILED, exit_code=5)`。
+  8. 保証レベル：手順2の `tool` を渡して `read_assurance` を呼ぶ。読み取りが道具の失敗（`CUE_NOT_FOUND`、`CUE_VERSION_UNSUPPORTED`、`CUE_TIMEOUT`、`CUE_FAILED`）なら、文書の誤りにせず、そのコードで止める（`CanonicalCommandError`。exit と次の手順は「止まる失敗」の表のとおり）。それ以外で`source` が `cue` でないとき、評価が通っていれば必ず、評価が失敗していれば `problem.code` が `ASSURANCE_UNREADABLE` で、かつ道筋が `assurance` で始まる `CUE_INVALID` がないときだけ、`ASSURANCE_UNREADABLE` の誤りを足す（同じ原因を2度示さない）。
   9. 説明資料：`explanation.html` を読み、`inspect_explanation` の結果を、`EXPLANATION_MISSING`、`EXPLANATION_SKELETON`（Epic は誤り、ほかは警告）、`EXPLANATION_INVALID`（誤り。問題ごとに1件）に変える。読めない（`OSError`、UTF-8 でない）は `EXPLANATION_INVALID`。
 - 示すファイルの道筋（`details.file`）：Scope のファイルは `shown`（`spec-dock/initiatives/<区切り>/<ID>`）の下の名前、リポジトリの型は `spec-dock/cue/<名前>`、SpecDock の型は `<spec_dock package>/cue/v1/<名前>`。
 
@@ -181,11 +184,12 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 ### 6. `work finish`（`canonical_work.finish_work`）
 
 - `_finish_rules`（GitHub の読み直し）の直後、`_require_saveable` の前に `_check_before_finish(session, target, observed_state, timeout)` を呼ぶ。dry-run の枝より前なので、dry-run でも同じに働く。
-- `_check_before_finish`：
+- `_check_before_finish(...) -> (警告, 開いている Scope に当てる拒否 | None)`：
   - Scope のディレクトリがない、形式が `markdown` → 何もしない（空の警告）。
   - 検査の誤りがある、または道具の失敗（`CanonicalCommandError`）：
     - `observed_state != "completed"` → `CanonicalCommandError("SCOPE_CHECK_FAILED", exit_code=3, details={"scope_id", "errors": [{code, message, details}...]}, recovery=(<直して scope check、もう一度 work finish>,))` を投げる。道具の失敗はそのコードのまま投げる。この時点では何も書いていない（カタログの変更集も、GitHub も、選択も）。
-    - `observed_state == "completed"` → 止めずに、同じ内容を警告（`SCOPE_CHECK_FAILED`、または道具の失敗のコード）にして返す。
+    - `observed_state == "completed"` → 止めずに、同じ内容を警告（`SCOPE_CHECK_FAILED`、または道具の失敗のコード）にして返し、拒否（`CanonicalCommandError`）も返す。
+  - 保存を待った後の2回目の `_finish_rules` で `observed_state` が完了でなくなっていたら（別の PC が開き直した）、返された拒否を投げる。このときは変更集を書いた後なので、今の `work finish` の扱いのとおり `partial`（exit 6、`github.issue.close` は `not_attempted`）になり、Issue は閉じない。誤りの残る Scope を閉じない（R-B7）ため（仕様のレビューの P2。2026-10-31）。
   - 警告（説明資料）→ 結果の警告に足す。
 - 「既に閉じた Scope では止めない」理由（2026-10-31 統括の決定）：GitHub で既に完了の Scope の `work finish` は、選択を外すだけである。閉じた後に型の版やリポジトリの型が変わって誤りになった Scope で、選択を外せなくなるのを避ける。R-B7 の目的は「誤りの残る Scope を閉じないこと」で、既に閉じた Scope には当たらない。
 - 子孫は検査しない（今の `work finish` は、子孫が完了でなければ止まるので、子孫は既に閉じている）。
@@ -201,7 +205,7 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 ## data / failure
 
 - **書くもの**：ない。`scope check`、`scope show` は読むだけ（GitHub の構造の写しの更新は、今の読むコマンドと同じ）。`work finish` は、検査で止まるときは何も書かない。
-- **`cue` の子のプロセス**：引数の並びで呼び、シェルを通さない。環境は親のものを引き継ぐ。時間の上限は `--timeout`（既定30秒）を1回の呼び出しごとに使う（`version`、`schema`、`assurance`、評価の最大4回）。
+- **`cue` の子のプロセス**：引数の並びで呼び、シェルを通さない。環境は親のものを引き継ぐ。時間の上限は `--timeout`（既定30秒）を1回の呼び出しごとに使う（`version`、`schema`、評価、`assurance` の最大4回。`scope show` は `version` と `assurance` の2回）。
 - **誤りの文の解析に失敗**：位置が読めない行は文に足す。1件も読めなければ、全体を1件の `CUE_INVALID`（道筋 `null`）にする。
 - **リポジトリの型のディレクトリが読めない**：`OSError` は `LOCAL_IO_FAILED`（今の dispatch の扱い）。
 - **カタログのファイルの経路**：`spec-dock/initiatives` はカタログへのリンクなので、`cue` には実のパスを渡し、示す道筋はチェックアウトからの道筋にする。
@@ -217,8 +221,8 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 - 変えるもの：
   - `runtime/application/canonical_work.py`（`_check_before_finish`）、`canonical_scope_read.py`（`assurance`）、`canonical_workspace.py`（形式ごとの文書）
   - `runtime/cli/catalog.py`、`runtime/commands/canonical_dispatch.py`、`runtime/commands/runtime_dispatch.py`、`runtime/presentation/envelope.py`
-  - 配布資産と dogfood の写し（同じバイト）：`docs/reference_cli.md`（C54 の行と「公開54 leaf」）、`docs/README.md`（「全54 leaf」）、`docs/cli-redesign-guide.html`（「54 leaf」「全54コマンド」）。`static-inventory.json` の3つの `sha256` を新しい値にし、古い値を `known_old_sha256` に足す。
-  - 葉の数（53）を固定した既存のテスト：`tests/integration/test_cli_docs_vnext.py`、`tests/cli_runtime/test_help_completion_vnext.py`、`test_cli_vnext_contract.py`、`test_issue413_contract.py`、`test_issue436_every_command.py`、`tests/unit/infra/test_issue436_docs.py`（数と、読むだけの葉の一覧）
+  - 配布資産と dogfood の写し（同じバイト）：`docs/reference_cli.md`（C54 の行と「公開54 leaf」）、`docs/README.md`（「全54 leaf」）、`docs/cli-redesign-guide.html`（「54 leaf」「全54コマンド」と、表の C54 の行）、`docs/canonical.md`（「エラーと次の1手」の表に `SCOPE_CHECK_FAILED`、`SCOPE_FORMAT_CONFLICT`、`CUE_*` の行を足し、`SCOPE_DOCUMENT_MISSING` の次の1手に CUE の Scope の文書の組を足す。既存のテストが、`application/canonical_*.py` の `SCOPE_` の定数を、この表に求めるため）。`static-inventory.json` の4つの `sha256` を新しい値にし、古い値を `known_old_sha256` に足す。
+  - 葉の数（53）を固定した既存のテスト：`tests/integration/test_cli_docs_vnext.py`、`tests/cli_runtime/test_help_completion_vnext.py`、`test_cli_vnext_contract.py`、`test_issue413_contract.py`、`test_issue436_every_command.py`（数と、全部の葉を1回ずつ流す一覧への `scope check` の追加）、`tests/unit/infra/test_issue436_docs.py`（数と、読むだけの葉の一覧）
 - 変えないもの：`src/spec_dock/cue/`、`runtime/infra/cue_schemas.py`、`tests/support/cue.py`、`spec-dock/templates/<種類>/`、`src/spec_dock/assets/spec_dock/templates/`、`design-system/`、スキル、schema 3 の処理、`.github/workflows/`。
 
 ## 移行・互換性・rollback
@@ -255,7 +259,7 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 - **`cue` の誤りの文の形が版で変わる**：解析は、行頭と字下げの2つの形だけに依る。読めない形でも、文の全体を1件の誤りとして示す（情報を落とさない）。最低の版を v0.17.1 に固定し、それより新しい版の文の形の変化は、解析のテストを足して扱う。
 - **重複の誤りを捨てすぎる**：派生の判定は、派生でない誤りが1つでもあるときだけ働く。誤りの文の全体（`cue_output`）も返す。
 - **`work finish` を誤って止める**：Markdown の Scope、ディレクトリがない Scope、既に閉じた Scope では止めない。止めるときは、誤りの一覧と次の手順を示す。
-- **`cue` の起動の回数と時間**：1回の検査で最大4回。大きな Scope で遅ければ、I-7 で `schema` と `assurance` の読み取りをまとめる。
+- **`cue` の起動の回数と時間**：1回の検査で最大4回（`cue version` は1回だけ）。大きな Scope で遅ければ、I-7 で `schema` と `assurance` の読み取りをまとめる。
 - **祖先のディレクトリの `cue.mod`**：`cue` は、作業のディレクトリの祖先の `cue.mod` を見ることがある。型は外部のモジュールを使わないので、評価の結果は変わらない見込み（未確認として報告に書く）。
 - **葉の数の文書の更新**：配布資産の3つのファイルを変えるので、dogfood の写しと inventory の `sha256` を同じコミットでそろえる。
 
