@@ -189,7 +189,7 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
   - 検査の誤りがある、または道具の失敗（`CanonicalCommandError`）：
     - `observed_state != "completed"` → `CanonicalCommandError("SCOPE_CHECK_FAILED", exit_code=3, details={"scope_id", "errors": [{code, message, details}...]}, recovery=(<直して scope check、もう一度 work finish>,))` を投げる。道具の失敗はそのコードのまま投げる。この時点では何も書いていない（カタログの変更集も、GitHub も、選択も）。
     - `observed_state == "completed"` → 止めずに、同じ内容を警告（`SCOPE_CHECK_FAILED`、または道具の失敗のコード）にして返し、拒否（`CanonicalCommandError`）も返す。
-  - 保存を待った後の2回目の `_finish_rules` で `observed_state` が完了でなくなっていたら（別の PC が開き直した）、返された拒否を投げる。このときは変更集を書いた後なので、今の `work finish` の扱いのとおり `partial`（exit 6、`github.issue.close` は `not_attempted`）になり、Issue は閉じない。誤りの残る Scope を閉じない（R-B7）ため（仕様のレビューの P2。2026-10-31）。
+  - 保存を待った後の2回目の `_finish_rules` で `observed_state` が完了でなくなっていたら（別の PC が開き直した）、返された拒否（検査の誤りなら `SCOPE_CHECK_FAILED`、道具の失敗ならそのコード）を投げる。今の `work finish` の扱いのとおり、変更集を書いた後なら `partial`（exit 6、`github.issue.close` は `not_attempted`）、書いていなければ `failed`（exit 3）になる。どちらでも Issue は閉じない。誤りの残る Scope を閉じない（R-B7）ため（仕様のレビューの P2。2026-10-31）。
   - 警告（説明資料）→ 結果の警告に足す。
 - 「既に閉じた Scope では止めない」理由（2026-10-31 統括の決定）：GitHub で既に完了の Scope の `work finish` は、選択を外すだけである。閉じた後に型の版やリポジトリの型が変わって誤りになった Scope で、選択を外せなくなるのを避ける。R-B7 の目的は「誤りの残る Scope を閉じないこと」で、既に閉じた Scope には当たらない。
 - 子孫は検査しない（今の `work finish` は、子孫が完了でなければ止まるので、子孫は既に閉じている）。
@@ -230,7 +230,7 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 - 移行：N/A（データを持たない。CUE の Scope は I-3 まで作られない）。
 - 互換：Markdown の Scope の `work finish`、`scope show`（`assurance` の鍵が増えるだけ）、`workspace validate`・`doctor` の結果は変わらない。新しい葉は、既存の葉の文法を変えない。
 - `cue` のない環境：Markdown の Scope の操作は今までどおり。`scope check` は Markdown の Scope では `cue` を求めない。
-- 配布資産：`reference_cli.md` などの3つのファイルが変わる。利用者のリポジトリは `installation update` で受け取る（`known_old_sha256` で、手を加えていない古い写しを置き換えられる）。
+- 配布資産：`reference_cli.md`、`README.md`、`cli-redesign-guide.html`、`canonical.md` の4つのファイルが変わる。利用者のリポジトリは `installation update` で受け取る（`known_old_sha256` で、手を加えていない古い写しを置き換えられる）。
 - rollback：この PR を戻す。戻した後も、データの戻しは要らない。
 
 ## testability
@@ -261,7 +261,7 @@ def check_scope_documents(directory: Path, *, kind: str, shown: str, repository_
 - **`work finish` を誤って止める**：Markdown の Scope、ディレクトリがない Scope、既に閉じた Scope では止めない。止めるときは、誤りの一覧と次の手順を示す。
 - **`cue` の起動の回数と時間**：1回の検査で最大4回（`cue version` は1回だけ）。大きな Scope で遅ければ、I-7 で `schema` と `assurance` の読み取りをまとめる。
 - **祖先のディレクトリの `cue.mod`**：`cue` は、作業のディレクトリの祖先の `cue.mod` を見ることがある。型は外部のモジュールを使わないので、評価の結果は変わらない見込み（未確認として報告に書く）。
-- **葉の数の文書の更新**：配布資産の3つのファイルを変えるので、dogfood の写しと inventory の `sha256` を同じコミットでそろえる。
+- **葉の数の文書の更新**：配布資産の4つのファイルを変えるので、dogfood の写しと inventory の `sha256` を同じコミットでそろえる。
 
 ## 決めたこと
 
