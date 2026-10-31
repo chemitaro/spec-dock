@@ -90,7 +90,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
   | `rollback-missing` | 戻し方がない | 3（critical） |
   | `execution-reference` | 手順が存在しないセッションを指す、レビューが存在しない手順を指す | 0（`execution` があるときだけ。R-D4） |
 
-- **種類ごとの違い**：Epic と Initiative の計画は、手順の代わりに、子の Scope への切り分け（子の ID と、その子に任せる要件）を持てる。子の保証レベルは書かない（R-C4）。種類ごとの必須の項目は、`if kind == "epic" {...}` で切り替える。
+- **種類ごとの違い**：Epic と Initiative の計画は、手順とテストの代わりに、子の Scope への切り分け `slices: [=~"^(epic|iss)-[0-9]{5}$"]: {covers!: [...string], ...}`（子の ID と、その子に任せる要件）を持つ。子の保証レベルは書かない（R-C4）。種類ごとの必須の項目は、`if kind == "epic" {...}` で切り替える。規則は、R-B3 の表の後の注のとおりに読み替える。Epic と Initiative では、`requirement-without-step`、`requirement-without-test`、`failure-without-test` は、`slices` の `covers` に入っていれば満たす。`orphan-step` は、`covers` が空の切り分けに当てはめる。`requirement-without-design` は、Issue と同じに当てはめる。
 - **文章の項目**：説明の文章を持つ項目は、Markdown を書いてよい。描画のときに、Markdown として描く（契約 K5）。
 
 ### 3. 検査のコマンド（契約 K3、R-B4、R-B7、R-E4）
@@ -103,22 +103,27 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
   5. `explanation.html` の形を検査する（契約 K4。雛形のままなら、Epic では誤り、ほかは警告）。
 - 結果の JSON は、今の CLI の共通の封筒（`specdock.cli/v2`）に従う。誤りは `CUE_INVALID`、`SPEC_FINDINGS`、`EXPLANATION_INVALID` などの番号で示す（名前は I-2 で決める）。
 - Markdown の Scope では、「CUE の Scope ではない」と示して、成功で終わる（R-H1）。両方があれば、誤りで止まる。
-- `work finish` は、閉じる前（保存の確かめより前、何かを書く前）に、対象の Scope と、一緒に閉じる子孫のうちの CUE の Scope を、同じ検査にかける。誤りがあれば、何も書かずに止まり、誤りと、直した後のコマンドを示す（R-B7）。
+- `work finish` は、閉じる前（保存の確かめより前、何かを書く前）に、閉じる Scope だけを、同じ検査にかける（子孫は、今の `work finish` のとおり、既に閉じていなければ止まるので、検査し直さない）。誤りがあれば、何も書かずに止まり、誤りと、直した後のコマンドを示す（R-B7）。
+- `workspace validate` と `workspace doctor`（`canonical_workspace.py` の `REQUIRED_DOCUMENTS`）は、Scope の形式ごとに必須のファイルの組を変える。Markdown の Scope は今の4つ（`requirement.md`、`design.md`、`plan.md`、`report.md`）、CUE の Scope は5つ（`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`）。`requirement.md` と `requirement.cue` の両方がある Scope は誤りにする。形式は、`requirement.cue` があるかで決める。CUE の評価は行わない（`cue` がなくても動く）。
 - `scope show <ID> --json` は、`assurance`（`level`、`reason`、`source`）を返す。`source` は `cue`、`unset`（Markdown の Scope）、`unreadable`（読めない）のどれかである（R-C6）。読むのは `requirement.cue` だけで、型は使わない。
 
 ### 4. 作るときの一式と、保証レベル（契約 K4、R-A5、R-C3）
 
 - `scope create <種類>` と `scope import github` に、`--assurance <値>` と `--assurance-reason <文>` を足し、必須にする。どちらかがなければ、GitHub にも何も書かずに止まる（引数の段階で止める）。
-- 雛形は、今と同じ `spec-dock/templates/<種類>/` から作る。雛形の CUE には、`{{ASSURANCE_LEVEL}}` と `{{ASSURANCE_REASON}}` の置き換えの印を置く。理由の文は、CUE の文字列として正しくなるように、置き換えの前に CUE の文字列の書き方に変える（引用符や改行）。
+- 雛形は、新しい場所 `spec-dock/templates/cue/<種類>/` に置き、新しい CLI はそこだけから作る。今の `spec-dock/templates/<種類>/` の `.md` の雛形は、前の版の CLI のために、I-7 まで残す（前の版の CLI は、雛形のディレクトリのファイルをすべて写すので、同じ場所に CUE の雛形を置くと、置き換えられない印の残る Scope ができる）。`templates/cue/<種類>/` がないとき（新しい版の CLI と、上げていない配布資産）、新しい CLI は、GitHub に何も書かずに止まり、`installation update` を示す（R-H3）。雛形の CUE には、`{{ASSURANCE_LEVEL}}` と `{{ASSURANCE_REASON}}` の置き換えの印を置く。理由の文は、CUE の文字列として正しくなるように、置き換えの前に CUE の文字列の書き方に変える（引用符や改行）。
 - 今の `scope import github` が、既にディレクトリがある Scope を補うときは、雛形を足さず、保証レベルも書かない（今の「足りないものだけを足す」動きを守る）。
 - 説明資料の雛形 `explanation.html` は、Markdown を書く場所と、共有のデザインシステムを読み込む数行だけを持つ（下の契約 K5）。
 
 ### 5. 描画と、デザインシステム（契約 K5、R-E1、R-F1、R-F2）
 
 - **デザインシステム**：今の japanese-explanatory-html のデザインシステム（`ds.css`、`ds.js`、`marked`）を、SpecDock の配布資産として、リポジトリの `spec-dock/design-system/` に置く。利用者のスキルから写して、SpecDock が持つ。
-- **薄い説明資料**：Scope の `explanation.html` は、Markdown と、`../../../design-system/` からデザインシステムを読む指定だけを持つ。カタログは、どのPCでも main のチェックアウトの `spec-dock/.canonical/` にあり、`spec-dock/initiatives/` から開いても同じ深さなので、この相対の道筋は、どちらから開いても `spec-dock/design-system/` に届く。1つの Scope に約 300KB のデザインシステムを写さずに済み、デザインシステムを上げても、Scope のファイルは変わらない。
+- **薄い説明資料の形**：Scope の `explanation.html` は、次の3つだけを持つ。検査（K3）は、この形を確かめる。
+  - `<script type="text/markdown" id="ds-source">` がちょうど1つあり、中の Markdown の先頭に `title` を持つ前付けがある。
+  - `../../../design-system/ds.css` と `../../../design-system/ds.js` を読む指定がある（`marked` は `ds.js` が読む）。
+  - 雛形の Markdown には、印 `<!-- spec-dock:explanation-skeleton -->` を置く。この印が残っていれば「雛形のまま」と判定する。書き換えた人は、印を消す。
+- **相対の道筋**：説明資料は、`../../../design-system/` からデザインシステムを読む。カタログは、どのPCでも main のチェックアウトの `spec-dock/.canonical/` にあり、`spec-dock/initiatives/` から開いても同じ深さなので、この相対の道筋は、どちらから開いても `spec-dock/design-system/` に届く。1つの Scope に約 300KB のデザインシステムを写さずに済み、デザインシステムを上げても、Scope のファイルは変わらない。
 - **図の部品**：`@plantuml/core`（約 10.6MB）と highlight.js は、版を固定して Python のパッケージにだけ同梱し、リポジトリには置かない。`ds.js` は、部品の読み込み先を、ページが示す手元の場所（ダッシュボードのサーバー）、CDN の順に試す。ファイルを単独で開いたときは、CDN から読む。
-- **CUE の描画**：SpecDock の Python の部品が、契約 K1 で評価した JSON を、決まった並びの Markdown に変え、同じデザインシステムの薄い HTML に包む。要件ごとに、それを満たす設計、手順、テストを、番号のリンクで結ぶ。`findings` も、ページの初めに示す。入口は、Python の関数（`render_scope_html(<Scope>) -> str`）と、確かめ用の `spec-dock scope render <ID>`（標準出力に HTML）の2つにする。ダッシュボードのサーバー（epic-00427）は、関数を呼ぶ。
+- **CUE の描画**：SpecDock の Python の部品が、契約 K1 で評価した JSON を、決まった並びの Markdown に変え、同じデザインシステムの薄い HTML に包む。要件ごとに、それを満たす設計、手順、テストを、番号のリンクで結ぶ。`findings` も、ページの初めに示す。入口は、Python の関数（`render_scope_html(<Scope>, *, design_system_base: str, vendor_base: str | None) -> str`）と、確かめ用の `spec-dock scope render <ID>`（標準出力に HTML）の2つにする。`design_system_base` はデザインシステムを読む URL の頭、`vendor_base` は図の部品を読む URL の頭（`None` なら CDN）である。ダッシュボードのサーバー（epic-00427）は、自分が配る URL を渡す。`scope render` の既定は、そのチェックアウトの `spec-dock/design-system/` を指す `file:` の URL と、`vendor_base` なし（CDN）である。
 - 報告と ADR の Markdown も、同じ薄い HTML に包めば描ける（epic-00427 が使う）。
 
 ### 6. 型の版と、リポジトリの型（契約 K6、R-B5、R-B6）
@@ -140,10 +145,10 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
 ## 変更対象
 
 - **提供側**（`src/spec_dock/`）
-  - `assets/spec_dock/templates/{initiative,epic,issue}/`：CUE の雛形と `explanation.html` に替える。`report.md` は残す。
+  - `assets/spec_dock/templates/cue/{initiative,epic,issue}/`：CUE の雛形、`explanation.html`、`report.md`（新しい配布資産）。今の `templates/{initiative,epic,issue}/` は I-7 で外す。
   - `assets/spec_dock/design-system/`：デザインシステム（新しい配布資産）。`assets/static-inventory.json` に足す。
   - パッケージの `cue/v1/`：型。パッケージの図の部品（配布資産ではなく、パッケージの中のファイル）。
-  - `runtime/application/`：`canonical_scope_create.py`（必須の引数、置き換え）、`canonical_scope_read.py`（`assurance`）、`canonical_work.py`（`work finish` の検査）、新しい検査と描画の部品。
+  - `runtime/application/`：`canonical_scope_create.py`（必須の引数、置き換え）、`canonical_scope_read.py`（`assurance`）、`canonical_work.py`（`work finish` の検査）、`canonical_workspace.py`（形式ごとの必須のファイル）、新しい検査と描画の部品。
   - `runtime/infra/`：`cue` を呼ぶ部品。
   - `runtime/cli/`：`scope check`、`scope render`、`--assurance`、`--assurance-reason`。
   - `assets/spec_dock/docs/authoring/`：CUE の書き方、説明資料の書き方、Issue Plan Guide と overview の Planning Level の記述を保証レベルに直す。
@@ -154,6 +159,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
 
 - 既存の Markdown の Scope は移さない。SpecDock は、ファイルの拡張子で CUE の Scope と Markdown の Scope を見分ける（R-H1、R-H2）。
 - `scope create` と `scope import github` の新しい必須の引数は、配られる CLI の契約の変更である。呼んでいるスクリプトやスキル（`spec-dock` スキル、利用者の `coordinate` などの手順）は、引数を足す必要がある。版を上げるときの文書に書く。
+- 配布資産を変える PR は、dogfood の写し（`spec-dock/` の下）も同じ PR で更新する。spec-dock の検査のワークフロー（`canonical check` の規則5）と、写しの一致のテスト（`tests/unit/infra/test_authoring_kit_assets.py`）が、それを求めるためである。新しい雛形は `templates/cue/` にあるので、写しを先に入れても、前の版の CLI の動きは変わらない。
 - 配布資産（雛形、デザインシステム、ガイド、スキル）は、`installation update` で入る。spec-dock リポジトリで、承認された導入の手順として行う（R-J1）。ほかのリポジトリは、利用者の判断で行う。
 - 戻すときは、前の版の SpecDock を入れ直し、配布資産を戻す。それまでに作った CUE の Scope のファイルは、カタログに残る。前の版は CUE の Scope を知らないので、それらの Scope に `work start` などはできるが、検査はされない。戻すかどうかは利用者が決める。
 
@@ -163,9 +169,10 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
 - 検査のコマンド（I-2）：`cue` を実際に呼ぶ統合テストと、`cue` がない、古い、時間切れの場合の偽の `cue`。`work finish` の止まり方（AC-16）。インターネットを使わないこと（AC-05）。
 - 作るとき（I-3）：必須の引数、置き換え、引用符や改行を含む理由、GitHub に書く前に止まること（AC-01、AC-02）。
 - 描画（I-4、I-5）：手元から部品を配ったときに、ネットワークを止めたブラウザーで図が描けること（AC-10）。雛形の説明資料のブラウザーでの検査（AC-11）。CUE の描画の結果（AC-09）。
-- 共存：Markdown と CUE の Scope が並ぶ見本のリポジトリでの回帰（AC-12）。
+- 共存：Markdown と CUE の Scope が並ぶ見本のリポジトリでの回帰と、`workspace validate`・`doctor`（AC-12）。前の版の CLI の雛形の読み方が、新しい配布資産で変わらないこと、新しい CLI が古い配布資産で止まること（AC-18）。
+- 説明資料の検査（I-2）：雛形のまま、ない、形を壊した、の3つ（AC-17）。
 - ガイド（I-6）：白紙のエージェントでの試行（AC-13）。
-- `cue` を CI で使うため、Provider CI に `cue` の導入の手順を足す。版を固定する。
+- `cue` を CI で使うため、I-1 で、Provider CI に `cue` の導入の手順を足す。版を固定し、取得したファイルの checksum を確かめる。`cue` を要するテストは、`cue` がないときに飛ばさず、失敗にする（受け入れの証拠を CI で確かめるため）。
 
 ## risk
 

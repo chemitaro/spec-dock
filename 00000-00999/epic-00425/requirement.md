@@ -77,6 +77,8 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
   | 失敗の条件ごとに、確かめるテストがある | 任意 | 任意 | 必須 | 必須 |
   | 戻し方（ロールバック）を定義している | 任意 | 任意 | 任意 | 必須 |
 
+  Epic と Initiative の計画は、自分では実装の手順とテストを持たず、子の Scope への切り分けを持つ。そのため、Epic と Initiative では、「手順がある」「テストがある」「失敗の条件ごとのテストがある」は、その要件を任せた子への切り分けがあることで満たす。「どの要件にも結び付かない手順」は、どの要件も任されていない切り分けに読み替える。設計の検査は、Issue と同じに行う。
+
 - **R-B4 検査のコマンド**：SpecDock の1つのコマンドで、1つの Scope の CUE の文書を検査できる。インターネットにつながっていなくても動く。結果は、誤りごとに、ファイル、項目、直し方を示す。JSON でも出せる。
 - **R-B5 型を磨き続ける**：型は一度決めて終わりにせず、使って、レビューして、直すことを繰り返す。型を変えても、前の型で書いた Scope が壊れないように、CUE の文書は、どの版の型に従うかを持つ。SpecDock は、その版の型で検査する。
 - **R-B6 型を重ねられる**：利用者のリポジトリは、SpecDock の型の上に、自分の制約を足せる（例：特定の項目を必須にする）。SpecDock の型は変えずに足す。
@@ -120,7 +122,8 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
 ### H. 既存の文書との共存
 
 - **R-H1 既存の文書はそのまま**：既存の Scope の Markdown の要件・設計・計画は、移さずに残す。SpecDock の既存のコマンドは、Markdown の Scope でも今と同じに動く。保証レベルは「未設定」として扱い、今までどおり `plan.md` の文章で扱う。
-- **R-H2 同じリポジトリに両方ある**：1つのリポジトリに、Markdown の Scope と CUE の Scope が並んでいても、検査、表示、`work start`、`work finish` が正しく動く。
+- **R-H2 同じリポジトリに両方ある**：1つのリポジトリに、Markdown の Scope と CUE の Scope が並んでいても、検査、表示、`workspace validate`、`workspace doctor`、`work start`、`work finish` が正しく動く。
+- **R-H3 版の食い違い**：新しい版の SpecDock を入れたが、リポジトリの配布資産をまだ上げていないとき、`scope create` と `scope import github` は、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、今までどおり Markdown の Scope を作る。
 
 ### I. ガイドとスキル
 
@@ -188,11 +191,13 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
 - **AC-09**：CUE を HTML に描く部品が、インターネットなしで、1つの Scope の要件・設計・計画を HTML に描く。ダッシュボードのサーバーから呼べる形の、文書化された入口を持つ。
 - **AC-10**：同梱した図の部品を手元から配ったとき、インターネットのない状態で、説明資料の PlantUML の図が描ける。
 - **AC-11**：新しい Scope の `explanation.html` が、ブラウザーでの描画の検査に通る。
-- **AC-12**：Markdown の Scope と CUE の Scope が並ぶリポジトリで、今の回帰テストがすべて通る。
+- **AC-12**：Markdown の Scope と CUE の Scope が並ぶリポジトリで、今の回帰テストがすべて通る。同じリポジトリで、`workspace validate` と `workspace doctor` が、CUE の Scope を文書の欠落の誤りにしない。
 - **AC-13**：設計書を渡されていない新しいエージェントが、`spec-dock` スキルとガイドだけを頼りに、CUE の要件・設計・計画を書き、検査に通し、計画を更新できる（白紙のエージェントでの試行で確かめる）。
 - **AC-14**：spec-dock リポジトリで、少なくとも1つの実際の Issue を、CUE の仕様で作ってから閉じるまで回した記録がある（R-J1）。
 - **AC-15**：`make lint` と `uv run pytest` が通る。
 - **AC-16**：CUE の Scope で、検査に誤りが残っていると、`work finish` は終わらずに誤りを示す。直すと終わる。Markdown の Scope では、今と同じに終わる。
+- **AC-17**：説明資料がない Scope と、雛形のままの説明資料を持つ Scope を、検査が知らせる。雛形のままのとき、Epic では誤り、Initiative と Issue では警告になる。形を壊した説明資料（Markdown を書く場所がない、デザインシステムを読む指定がない）は誤りになる。
+- **AC-18**：新しい版の SpecDock で、配布資産を上げていないリポジトリに `scope create` を実行すると、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、Markdown の Scope を作る。
 
 ## 制約・前提
 
