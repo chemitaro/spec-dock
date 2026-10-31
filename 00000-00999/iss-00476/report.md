@@ -35,7 +35,7 @@ ID: "iss-00476"
 ## Residual Risks / Follow-ups
 
 - **未確認**：ブラウザーでの描画は目で確かめていない（DOM の確かめだけ）。スマートフォンの幅、図の部品を手元から配った描画（`vendor_base` を渡した場合）は確かめていない。図は描画のページに出ないので、影響は小さい。
-- **未確認**：PR の CI（Provider CI）の結果は、PR を作った後に確かめる。
+- PR #484（https://github.com/chemitaro/spec-dock/pull/484）の CI：head `df015b6d2` で、観測できた Actions と Commit Status がすべて成功、GitHub の状態は OPEN・MERGEABLE・CLEAN（2026-10-31T14:31Z の観測）。外部の CheckRun は観測の対象外。
 - P3（情報のみ、直していない）：
   - FQG-001：文章の項目の各行の行末の空白を削るので、行末の2つの空白による強制改行が失われる。
   - FQG-002：schema 3 のリポジトリで `scope render` が `CANONICAL_NOT_MIGRATED` で止まることのテストがない（実装は `scope check` と同じ道を通る）。
