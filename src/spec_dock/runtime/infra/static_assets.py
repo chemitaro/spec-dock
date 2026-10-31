@@ -61,6 +61,7 @@ def package_static_assets() -> tuple[StaticAsset, ...]:
                     "spec-dock/scripts/spec-dock",
                 )
                 or path.startswith((
+                    "spec-dock/design-system/",
                     "spec-dock/docs/",
                     "spec-dock/templates/",
                     "spec-dock/system/",
