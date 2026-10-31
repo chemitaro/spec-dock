@@ -90,7 +90,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
   | `rollback-missing` | 戻し方がない | 3（critical） |
   | `execution-reference` | 手順が存在しないセッションを指す、レビューが存在しない手順を指す | 0（`execution` があるときだけ。R-D4） |
 
-- **種類ごとの違い**：Epic と Initiative の計画は、手順とテストの代わりに、子の Scope への切り分け `slices: [=~"^(epic|iss)-[0-9]{5}$"]: {covers!: [...string], ...}`（子の ID と、その子に任せる要件）を持つ。子の保証レベルは書かない（R-C4）。種類ごとの必須の項目は、`if kind == "epic" {...}` で切り替える。規則は、R-B3 の表の後の注のとおりに読み替える。Epic と Initiative では、`requirement-without-step`、`requirement-without-test`、`failure-without-test` は、`slices` の `covers` に入っていれば満たす。`orphan-step` は、`covers` が空の切り分けに当てはめる。`requirement-without-design` は、Issue と同じに当てはめる。
+- **種類ごとの違い**：Epic と Initiative の計画は、手順とテストの代わりに、子の Scope への切り分け `slices: [=~"^(epic|iss)-[0-9]{5,}$"]: {covers!: [...string], ...}`（子の ID と、その子に任せる要件）を持つ。子の保証レベルは書かない（R-C4）。種類ごとの必須の項目は、`if kind == "epic" {...}` で切り替える。規則は、R-B3 の表の後の注のとおりに読み替える。Epic と Initiative では、`requirement-without-step`、`requirement-without-test`、`failure-without-test` は、`slices` の `covers` に入っていれば満たす。`orphan-step` は、`covers` が空の切り分けに当てはめる。`requirement-without-design` は、Issue と同じに当てはめる。
 - **文章の項目**：説明の文章を持つ項目は、Markdown を書いてよい。描画のときに、Markdown として描く（契約 K5）。
 
 ### 3. 検査のコマンド（契約 K3、R-B4、R-B7、R-E4）
@@ -100,17 +100,17 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
   2. `requirement.cue` だけを評価して、`schema` を読む。
   3. 契約 K1 のとおりに評価し、`cue` の誤りを、ファイル、位置、項目の道筋に分けて示す。
   4. `findings` を読み、規則ごとに、番号、文、直し方を示す。
-  5. `explanation.html` の形を検査する（契約 K4。雛形のままなら、Epic では誤り、ほかは警告）。
+  5. `explanation.html` の形を検査する（契約 K5 の「薄い説明資料の形」。ない、または雛形のままなら、Epic では誤り、ほかは警告。形を壊していれば誤り）。
 - 結果の JSON は、今の CLI の共通の封筒（`specdock.cli/v2`）に従う。誤りは `CUE_INVALID`、`SPEC_FINDINGS`、`EXPLANATION_INVALID` などの番号で示す（名前は I-2 で決める）。
 - Markdown の Scope では、「CUE の Scope ではない」と示して、成功で終わる（R-H1）。両方があれば、誤りで止まる。
 - `work finish` は、閉じる前（保存の確かめより前、何かを書く前）に、閉じる Scope だけを、同じ検査にかける（子孫は、今の `work finish` のとおり、既に閉じていなければ止まるので、検査し直さない）。誤りがあれば、何も書かずに止まり、誤りと、直した後のコマンドを示す（R-B7）。
-- `workspace validate` と `workspace doctor`（`canonical_workspace.py` の `REQUIRED_DOCUMENTS`）は、Scope の形式ごとに必須のファイルの組を変える。Markdown の Scope は今の4つ（`requirement.md`、`design.md`、`plan.md`、`report.md`）、CUE の Scope は5つ（`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`）。`requirement.md` と `requirement.cue` の両方がある Scope は誤りにする。形式は、`requirement.cue` があるかで決める。CUE の評価は行わない（`cue` がなくても動く）。
+- `workspace validate` と `workspace doctor`（`canonical_workspace.py` の `REQUIRED_DOCUMENTS`）は、Scope の形式ごとに必須のファイルの組を変える。Markdown の Scope は今の4つ（`requirement.md`、`design.md`、`plan.md`、`report.md`）、CUE の Scope は4つ（`requirement.cue`、`design.cue`、`plan.cue`、`report.md`）。`explanation.html` は、ここでは判定せず、`scope check` と `work finish` だけが判定する（判定を1か所にそろえるため）。`requirement.md` と `requirement.cue` の両方がある Scope は誤りにする。形式は、`requirement.cue` があるかで決める。CUE の評価は行わない（`cue` がなくても動く）。
 - `scope show <ID> --json` は、`assurance`（`level`、`reason`、`source`）を返す。`source` は `cue`、`unset`（Markdown の Scope）、`unreadable`（読めない）のどれかである（R-C6）。読むのは `requirement.cue` だけで、型は使わない。
 
 ### 4. 作るときの一式と、保証レベル（契約 K4、R-A5、R-C3）
 
 - `scope create <種類>` と `scope import github` に、`--assurance <値>` と `--assurance-reason <文>` を足し、必須にする。どちらかがなければ、GitHub にも何も書かずに止まる（引数の段階で止める）。
-- 雛形は、新しい場所 `spec-dock/templates/cue/<種類>/` に置き、新しい CLI はそこだけから作る。今の `spec-dock/templates/<種類>/` の `.md` の雛形は、前の版の CLI のために、I-7 まで残す（前の版の CLI は、雛形のディレクトリのファイルをすべて写すので、同じ場所に CUE の雛形を置くと、置き換えられない印の残る Scope ができる）。`templates/cue/<種類>/` がないとき（新しい版の CLI と、上げていない配布資産）、新しい CLI は、GitHub に何も書かずに止まり、`installation update` を示す（R-H3）。雛形の CUE には、`{{ASSURANCE_LEVEL}}` と `{{ASSURANCE_REASON}}` の置き換えの印を置く。理由の文は、CUE の文字列として正しくなるように、置き換えの前に CUE の文字列の書き方に変える（引用符や改行）。
+- 雛形は、新しい場所 `spec-dock/templates/cue/<種類>/` に置き、新しい CLI はそこだけから作る。今の `spec-dock/templates/<種類>/` の `.md` の雛形は、前の版の CLI のために、I-7 まで残す（I-7 の後は、前の版の CLI は雛形がないので、GitHub に書く前に止まる。安全な側の止まり方である）（前の版の CLI は、雛形のディレクトリのファイルをすべて写すので、同じ場所に CUE の雛形を置くと、置き換えられない印の残る Scope ができる）。`templates/cue/<種類>/` がないとき（新しい版の CLI と、上げていない配布資産）、新しい CLI は、GitHub に何も書かずに止まり、`installation update` を示す（R-H3）。雛形の CUE には、`{{ASSURANCE_LEVEL}}` と `{{ASSURANCE_REASON}}` の置き換えの印を置く。理由の文は、CUE の文字列として正しくなるように、置き換えの前に CUE の文字列の書き方に変える（引用符や改行）。
 - 今の `scope import github` が、既にディレクトリがある Scope を補うときは、雛形を足さず、保証レベルも書かない（今の「足りないものだけを足す」動きを守る）。
 - 説明資料の雛形 `explanation.html` は、Markdown を書く場所と、共有のデザインシステムを読み込む数行だけを持つ（下の契約 K5）。
 

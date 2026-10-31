@@ -123,7 +123,7 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
 
 - **R-H1 既存の文書はそのまま**：既存の Scope の Markdown の要件・設計・計画は、移さずに残す。SpecDock の既存のコマンドは、Markdown の Scope でも今と同じに動く。保証レベルは「未設定」として扱い、今までどおり `plan.md` の文章で扱う。
 - **R-H2 同じリポジトリに両方ある**：1つのリポジトリに、Markdown の Scope と CUE の Scope が並んでいても、検査、表示、`workspace validate`、`workspace doctor`、`work start`、`work finish` が正しく動く。
-- **R-H3 版の食い違い**：新しい版の SpecDock を入れたが、リポジトリの配布資産をまだ上げていないとき、`scope create` と `scope import github` は、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、今までどおり Markdown の Scope を作る。
+- **R-H3 版の食い違い**：新しい版の SpecDock を入れたが、リポジトリの配布資産をまだ上げていないとき、`scope create` と `scope import github` は、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、`.md` の雛形を外す I-7（計画書）までは、今までどおり Markdown の Scope を作る。I-7 の後は、GitHub に何も書かずに止まる。
 
 ### I. ガイドとスキル
 
@@ -197,7 +197,7 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
 - **AC-15**：`make lint` と `uv run pytest` が通る。
 - **AC-16**：CUE の Scope で、検査に誤りが残っていると、`work finish` は終わらずに誤りを示す。直すと終わる。Markdown の Scope では、今と同じに終わる。
 - **AC-17**：説明資料がない Scope と、雛形のままの説明資料を持つ Scope を、検査が知らせる。雛形のままのとき、Epic では誤り、Initiative と Issue では警告になる。形を壊した説明資料（Markdown を書く場所がない、デザインシステムを読む指定がない）は誤りになる。
-- **AC-18**：新しい版の SpecDock で、配布資産を上げていないリポジトリに `scope create` を実行すると、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、Markdown の Scope を作る。
+- **AC-18**：新しい版の SpecDock で、配布資産を上げていないリポジトリに `scope create` を実行すると、GitHub に何も書かずに止まり、`installation update` を示す。`.md` の雛形を外す前は、前の版の SpecDock が、新しい配布資産を入れたリポジトリでも、Markdown の Scope を作る。
 
 ## 制約・前提
 

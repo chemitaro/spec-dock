@@ -164,7 +164,7 @@ I-4 ─────────┼──────────┘    │
 
 - **価値**：1つの Scope の CUE の要件・設計・計画を、人が読める HTML に、その場で描ける。ダッシュボード（epic-00427）が呼べる。
 - **作るもの**：
-  - `application/`：`render_scope_html(<Scope>) -> str`（K1 の評価の JSON を、決まった並びの Markdown にし、K5 の薄い HTML に包む）。要件ごとに、設計、手順、テストを番号のリンクで結ぶ。`findings` をページの初めに示す。手順の状態を見せる。
+  - `application/`：`render_scope_html(<Scope>, *, design_system_base: str, vendor_base: str | None) -> str`（`design.md` の責務・Interface 5。K1 の評価の JSON を、決まった並びの Markdown にし、K5 の薄い HTML に包む）。要件ごとに、設計、手順、テストを番号のリンクで結ぶ。`findings` をページの初めに示す。手順の状態を見せる。
   - `runtime/cli/`：`scope render <ID>`（標準出力）。
 - **受け入れ**：
   - AC-09。
