@@ -48,6 +48,12 @@ ID: "iss-00475"
 - 証拠：`.workbench/final-quality-gate/iss-00475-g1/`（`campaign.json`、`attempts/01/review.json` と `review.check.json`、`attempts/01/tests/manifest.json` と `manifest.check.json`、`closure.md`）。
 - ChatGPT の補助の道筋：なし（無効）。
 
+### PR と CI
+
+- PR：https://github.com/chemitaro/spec-dock/pull/479（base `main`、head `12dc01d2f1d071c7d4d21ee50ccae0662445af47`、`Refs #475`、`Refs #425`）。
+- CI（2026-10-31T10:05Z の観測、Actions と Commit Status）：SpecDock check（run 41190750860）、Provider CI（41190750875）、Commit identity（41190750862、41190728571）すべて success。GitHub の状態は OPEN、非 draft、MERGEABLE、CLEAN。外部の CheckRun は観測の範囲外。
+- マージは人が行う。`spec-dock work finish` は、マージの後に統括の指示で行う（未実行）。
+
 ## 未確認
 
 - Linux の Chrome での、ブラウザー検査の道具の動き（macOS でだけ確かめた）。
