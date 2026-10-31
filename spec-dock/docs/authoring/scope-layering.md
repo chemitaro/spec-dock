@@ -31,7 +31,7 @@ CUE の Scope では、保証レベル（`requirement.cue` の `assurance`）を
 - 親の `plan.cue` は、子の Scope への切り分け（`slices`）に子の ID と任せる要件（`covers`）を書き、子の保証レベルは書きません。値は子の `requirement.cue` だけにあります。
 - Epic と Initiative の `plan.cue` は、実装の手順とテストを持たず、`slices` を持ちます。つながりの規則は、その要件を任せた子への切り分けで満たします。
 
-詳しくは [CUE Authoring Guide](cue.md) にあります。Markdown の Scope では、上の「親 scope を再定義しない」のとおり、Issue の Planning Level を親に求めません。
+詳しくは [CUE Authoring Guide](cue.md) にあり、人向けの説明資料（`explanation.html`）の書き方は [Explanation Guide](explanation.md) にあります。Markdown の Scope では、上の「親 scope を再定義しない」のとおり、Issue の Planning Level を親に求めません。
 
 ## 文書との対応
 

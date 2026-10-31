@@ -154,7 +154,7 @@ spec-dock scope show iss-00123 --json    # data.result.assurance に保証レベ
 spec-dock scope render iss-00123 > /tmp/iss-00123.html   # 要件・設計・計画を HTML に描く（標準出力）
 ```
 
-- 全コマンドに共通の引数（`--json`、`--offline`、`--timeout <秒>`、`--project <チェックアウト>`）は、葉の `--help` の一覧には出ませんが、使えます（[CLI 参照](../reference_cli.md)）。
+- 全コマンドに共通の引数（`--json`、`--offline`、`--timeout <秒>`、`--project <チェックアウト>` など）は、葉の `--help`（例 `spec-dock scope check --help`）の一覧の「common options」に、その葉で使えるものだけが出ます（変えるコマンドの `--yes` など。[CLI 参照](../reference_cli.md)）。
 - `scope check` は、Scope の種類を GitHub の構造（定期の同期が取るスナップショット）から読みます。CUE の評価は手元だけで行い、インターネットは要りません。GitHub に問い合わせられないときや、`--offline` のときは、保存したスナップショットを使い、警告 `GITHUB_SNAPSHOT_STALE` を出します。この警告は、スナップショットが新しいかで出たり出なかったりし、検査の結果（誤りと指摘）は変えません。テキストの要約の `warnings=N` は検査の警告（説明資料など）の数で、この警告は数えません。
 - `scope check` は、`cue` の確かめ、`schema` の読み取り、評価、指摘の読み取り、説明資料の形の検査を行います。誤りがあれば終了コード7（`SCOPE_CHECK_FAILED`）で、誤りごとにファイル、行、項目、直し方を示します。警告だけなら成功です。Markdown の Scope では、検査をせずに成功します（「CUE の Scope ではない」）。
 - `work finish` は、閉じる前（何かを書く前）に、閉じる Scope を同じく検査します。誤りがあれば何も書かずに止まります（終了コード3、`SCOPE_CHECK_FAILED`）。直して `spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` を実行します。保存を待つ間に別のPCで開き直された場合は、終了コード6（partial）で止まります。Markdown の Scope は、今までどおり閉じます。

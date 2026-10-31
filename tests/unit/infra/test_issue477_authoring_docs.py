@@ -47,6 +47,8 @@ PREVIOUS_SHA256 = {
     "spec-dock/system/spec-dock-version": "d915cc95d6ca",
     "spec-dock/templates/README.md": "3ec4263314f2",
 }
+# The bytes of cue.md as iss-00477 first shipped it (7f3cf7d3c); iss-00487 rewrote it.
+CUE_GUIDE_FIRST_SHA256 = "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e"
 CUE_MODULES = (canonical_scope_create, scope_check, canonical_scope_check, scope_render, cue_tool)
 
 
@@ -120,6 +122,21 @@ def test_every_public_code_of_the_cue_parts_has_a_documented_next_step() -> None
     assert [code for code in codes if not documented[code][-1]] == []
 
 
+def test_the_cue_guide_code_table_matches_the_codes_the_check_returns() -> None:
+    rows = _table(_section(_read(CUE_GUIDE), "## 検査と表示"))
+    codes = _public_codes(scope_check) | _public_codes(canonical_scope_check)
+    assert set(rows) == codes
+    assert [code for code, cells in rows.items() if not cells[-1]] == []
+    for code, (exit_code, _step) in scope_check._TOOL_STEPS.items():
+        assert rows[code][1].startswith(f"止まる（{exit_code}）"), (code, rows[code])
+
+
+def test_the_cue_guide_says_leaf_help_lists_the_common_options() -> None:
+    section = _section(_read(CUE_GUIDE), "## 検査と表示")
+    assert "一覧には出ません" not in section
+    assert "葉の `--help`" in section and "common options" in section
+
+
 def test_the_canonical_table_binds_the_assurance_rows() -> None:
     rows = _table(_section(_read(DOCS / "canonical.md"), "## エラーと次の1手"))
     required = rows["ASSURANCE_REQUIRED"]
@@ -174,6 +191,13 @@ def test_the_existing_guides_point_cue_scopes_to_the_assurance_level(name: str) 
     section = _section(text, "## 保証レベル（CUE の Scope）") if name != "overview.md" else text
     assert "保証レベル" in section and "(cue.md)" in section and "Markdown の Scope" in section
     assert "requirement.cue" in section
+
+
+@pytest.mark.parametrize("name", ["issue-plan.md", "scope-layering.md"])
+def test_the_layer_guides_link_both_cue_guides_like_the_overview(name: str) -> None:
+    section = _section(_read(AUTHORING / name), "## 保証レベル（CUE の Scope）")
+    assert "(cue.md)" in section and "(explanation.md)" in section
+    assert (ROOT / "spec-dock/docs/authoring" / name).read_bytes() == (AUTHORING / name).read_bytes()
 
 
 def test_the_overview_links_both_new_guides_and_keeps_the_planning_level_for_markdown() -> None:
@@ -254,7 +278,9 @@ def test_the_inventory_ships_the_new_guides_and_accepts_the_previous_bytes() -> 
     for name in ("cue.md", "explanation.md"):
         entry = entries[f"spec-dock/docs/authoring/{name}"]
         data = (AUTHORING / name).read_bytes()
-        assert entry["sha256"] == hashlib.sha256(data).hexdigest() and entry["known_old_sha256"] == []
+        # iss-00487 rewrote cue.md after it first shipped; only those first bytes are its known old version.
+        known_old = [CUE_GUIDE_FIRST_SHA256] if name == "cue.md" else []
+        assert entry["sha256"] == hashlib.sha256(data).hexdigest() and entry["known_old_sha256"] == known_old
         assert (ROOT / "spec-dock/docs/authoring" / name).read_bytes() == data
     for path, previous in PREVIOUS_SHA256.items():
         entry = entries[path]
