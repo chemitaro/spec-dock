@@ -1,0 +1,58 @@
+{
+  "schema_version": "specdock.diagram-vendor/v1",
+  "packages": [
+    {
+      "name": "@highlightjs/cdn-assets",
+      "version": "11.11.1",
+      "license": "BSD-3-Clause",
+      "directory": "highlightjs/11.11.1",
+      "npm_tarball": "https://registry.npmjs.org/@highlightjs/cdn-assets/-/cdn-assets-11.11.1.tgz",
+      "npm_integrity": "sha512-VEPdHzwelZ12hEX18BHduqxMZGolcUsrbeokHYxOUIm8X2+M7nx5QPtPeQgRxR9XjhdLv4/7DD5BWOlSrJ3k7Q=="
+    },
+    {
+      "name": "@plantuml/core",
+      "version": "1.2026.6",
+      "license": "MIT",
+      "directory": "plantuml/1.2026.6",
+      "npm_tarball": "https://registry.npmjs.org/@plantuml/core/-/core-1.2026.6.tgz",
+      "npm_integrity": "sha512-e+s8jtAKT6kb7yvOCXv0exXOp7FvyKYDcpv+aQrThwXUQgdTGP+fb9hPZQr7jbeEMuUHbxjH1HYLwNZZxw3hJg=="
+    }
+  ],
+  "files": [
+    {
+      "path": "highlightjs/11.11.1/LICENSE",
+      "content_type": "text/plain; charset=utf-8",
+      "sha256": "6c081431591d9df696c82dc598fe1423765b8a299b200ed00b281afd0f64c490"
+    },
+    {
+      "path": "highlightjs/11.11.1/highlight.min.js",
+      "content_type": "text/javascript; charset=utf-8",
+      "sha256": "c4a399dd6f488bc97a3546e3476747b3e714c99c57b9473154c6fb8d259b9381"
+    },
+    {
+      "path": "plantuml/1.2026.6/LICENSE",
+      "content_type": "text/plain; charset=utf-8",
+      "sha256": "b0475db7325c48eede0eee5e44aea92dad28c755aed4484a6cdde99cedea9446"
+    },
+    {
+      "path": "plantuml/1.2026.6/emoji.js",
+      "content_type": "text/javascript; charset=utf-8",
+      "sha256": "e3b97a103b48bb00a6d77cf0667f3a0fda0a3799cfbc5e22494fcde024a18e49"
+    },
+    {
+      "path": "plantuml/1.2026.6/openiconic.js",
+      "content_type": "text/javascript; charset=utf-8",
+      "sha256": "b34a6d7c0315ad4c1d780bcfe92e7bfa89abbd4fa20ae419e3409f1cc4f56c52"
+    },
+    {
+      "path": "plantuml/1.2026.6/plantuml.js",
+      "content_type": "text/javascript; charset=utf-8",
+      "sha256": "87b8c74c1b9520ee659f4d2c8de16ae19c9f21365856a53d0766a8fa602b24d8"
+    },
+    {
+      "path": "plantuml/1.2026.6/viz-global.js",
+      "content_type": "text/javascript; charset=utf-8",
+      "sha256": "fc6ca2de83dd4e3fca967d5214122777890a5cd1ab101115a1f716fc84e6dc5e"
+    }
+  ]
+}
