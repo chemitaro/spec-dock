@@ -66,7 +66,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
 共通の定義：
 
 - `#Text`：空白だけでない文字列。Markdown を書いてよい（描画で Markdown として描く。K5）。空白は Python の `str.isspace()` と同じ範囲（全角の空白 U+3000、NBSP などの Unicode の区切りも空白）。RE2 の `\S` は ASCII の空白しか除かないので、`[^\s\p{Z}\x{0B}\x{1C}-\x{1F}\x{85}]` を使う（コードのレビューの指摘。2026-10-31）。
-- `#Title`：空白だけでない、1行の文字列（改行を含まない）。空白の範囲は `#Text` と同じ。
+- `#Title`：空白だけでない、1行の文字列。空白の範囲は `#Text` と同じ。1行は Python の `str.splitlines()` と同じに読み、LF のほか、CR だけ、`\v`、`\f`、U+001C〜U+001E、U+0085、U+2028、U+2029 も改行とする（CommonMark も CR だけで行を終える。最終品質ゲートの FQG-001。2026-10-31）。
 - 番号の形：`R-` `F-` `D-` `S-` `T-` の後に2桁以上の数字（`R-01`、`R-123`）。切り分けのキーは `^(epic|iss)-[0-9]{5,}$`（K2）。
 - 参照（`satisfies`、`realizes`、`verifies`、`covers`、`after`、`session`）は、ただの文字列で受け、先があるかは `findings` で調べる（K2）。
 
