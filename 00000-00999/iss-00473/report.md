@@ -69,6 +69,12 @@ Q1〜Q8 は `design.md` の「決めたこと」のとおり。Q7 は統括の�
 - ChatGPT のレーンは使っていない（スキルが無効）。
 - 記録：worktree の `.workbench/final-quality-gate/iss-00473-fqg1/closure.md`。
 
+### PR と CI
+
+- PR：https://github.com/chemitaro/spec-dock/pull/483（`chemitaro/iss-00473` → `main`、head `79688170ff27e81fe77e1edad2f551d2d8f08514`、`Refs #473`、`Refs #425`）。
+- CI（2026-10-31T12:45Z の観測）：Provider CI（run 41201674344）、SpecDock check（run 41201674360）、Commit identity（run 41201674388、41201647154）がすべて success。GitHub は OPEN、MERGEABLE、CLEAN。観測は base リポジトリの Actions と Commit Status に限る（外部の CheckRun は対象外）。
+- マージは人が行う。`spec-dock work finish` は、マージの後に統括の指示で行う。
+
 ### 既知の問題
 
 - カタログへのリンクがある worktree では、`tests/unit/infra/test_authoring_kit_assets.py` の12件が、この Issue と関係なく落ちる（I-1・I-4 と同じ）。このため、全体のテストはリンクのない clean な clone で通した。
