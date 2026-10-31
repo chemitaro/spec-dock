@@ -104,6 +104,8 @@ where = ["src"]
 [tool.setuptools.package-data]
 spec_dock = [
   "assets/**/*",
+  # The CUE spec type versions (cue/v1/, ...) are package files, not static assets (iss-00472).
+  "cue/**/*.cue",
   # `assets/**/*` does not match dotfiles like `.gitignore` in Python's glob semantics.
   "assets/**/.gitignore",
   # Hidden subtrees under install_root must be included explicitly.

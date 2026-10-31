@@ -15,6 +15,11 @@ from typing import Any
 import pytest
 
 PINNED_CUE_VERSION = "v0.17.1"
+# SHA-256 of the release archives Provider CI installs (github.com/cue-lang/cue/releases, published 2026-07-16).
+CUE_RELEASE_SHA256 = {
+    "linux_amd64": "a39b0c97695069d95d276d99be0f5dbabb081d801bfdc9ba49b76efaf94e2369",
+    "linux_arm64": "0d729be30d52c952ca38fc9dcb692caa09d8463fa0b64df5781312779183fbcd",
+}
 SCOPE_FILES = ("requirement.cue", "design.cue", "plan.cue")
 V1 = Path(__file__).resolve().parents[2] / "src/spec_dock/cue/v1"
 _INSTALL = (
