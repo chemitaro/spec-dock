@@ -3,7 +3,7 @@
 ID: "epic-00425"
 タイトル: "Switch Spec Documents To CUE And HTML Explanations"
 関連GitHub: ["#425"]
-状態: "draft"
+状態: "approved"
 最終更新: "2026-10-31"
 依存: ["requirement.md", "design.md"]
 親: ["init-00423"]
@@ -53,13 +53,13 @@ ID: "epic-00425"
 
 | 番号 | 題名（作成時の英語の題名） | 担当する契約 | 依存 | Planning Level |
 |---|---|---|---|---|
-| I-1 | Define CUE Spec Schema V1 | K1、K2、K6 の型の版 | なし | strict |
-| I-2 | Add Scope Check With CUE | K3（`scope check`、`work finish`、`scope show`、`workspace validate`・`doctor`、説明資料の形の検査）、K1 の評価の呼び出し | I-1 | strict |
-| I-3 | Scaffold CUE Scopes With Assurance | K4 | I-1、I-2、I-4 | strict |
-| I-4 | Ship Explanation Design System | K5 のデザインシステム、薄い説明資料、図の部品 | なし | standard |
-| I-5 | Render CUE Specs As HTML | K5 の CUE の描画 | I-2、I-4 | standard |
-| I-6 | Document CUE Authoring And Release | ガイド、スキル、版 | I-1〜I-5 | standard |
-| I-7 | Adopt CUE Specs In Spec Dock | dogfooding（R-J1） | I-6 | standard |
+| I-1（`iss-00472`、#472） | Define CUE Spec Schema V1 | K1、K2、K6 の型の版 | なし | strict |
+| I-2（`iss-00473`、#473） | Add Scope Check With CUE | K3（`scope check`、`work finish`、`scope show`、`workspace validate`・`doctor`、説明資料の形の検査）、K1 の評価の呼び出し | I-1 | strict |
+| I-3（`iss-00474`、#474） | Scaffold CUE Scopes With Assurance | K4 | I-1、I-2、I-4 | strict |
+| I-4（`iss-00475`、#475） | Ship Explanation Design System | K5 のデザインシステム、薄い説明資料、図の部品 | なし | standard |
+| I-5（`iss-00476`、#476） | Render CUE Specs As HTML | K5 の CUE の描画 | I-2、I-4 | standard |
+| I-6（`iss-00477`、#477） | Document CUE Authoring And Release | ガイド、スキル、版 | I-1〜I-5 | standard |
+| I-7（`iss-00478`、#478） | Adopt CUE Specs In Spec Dock | dogfooding（R-J1） | I-6 | standard |
 
 - Planning Level は、失敗したときの影響と戻しにくさで選んだ。
   - I-1 は、すべての CUE の Scope が従う型で、出した版は変えられない（K6）ので strict にした。
@@ -67,6 +67,7 @@ ID: "epic-00425"
   - I-3 は、`scope create` の必須の引数という、配られる CLI の契約を変え、GitHub に書く前の止め方を誤ると、半端な Issue が残るので strict にした。
   - I-4、I-5、I-6 は、読むだけの描画と文書で、戻しやすいので standard にした。
   - I-7 は、本物のカタログと GitHub に書くが、新しい Scope を作るだけで既存の Scope に触れず、戻しやすいので standard にした。
+- Issue は 2026-10-31 に作り、表の依存を `spec-dock dependency add` で登録した。
 - この Epic の Issue は、Markdown の Scope なので、Planning Level を今までどおり `plan.md` の文章で扱う（R-H1）。
 
 ### 進め方

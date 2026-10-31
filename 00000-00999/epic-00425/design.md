@@ -3,7 +3,7 @@
 ID: "epic-00425"
 タイトル: "Switch Spec Documents To CUE And HTML Explanations"
 関連GitHub: ["#425"]
-状態: "draft"
+状態: "approved"
 最終更新: "2026-10-31"
 依存: ["requirement.md"]
 親: ["init-00423"]
