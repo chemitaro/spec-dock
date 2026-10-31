@@ -32,7 +32,7 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "66f2cdf90516f628dc5e3da0b0b8ddfc2b7dfd3cb4173833beaf131f5bf605ab",
+      "sha256": "dc2ef101d896dad3d679b1ba79526459d64724b0b40ca52df81a12b7c6169780",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -42,7 +42,8 @@
         "e40af5e35d0db0b6026eb5c697995ab910118cd1344d521b323f6a12080a5a2e",
         "f8086263d985edec295fe9757b7ef7beb83993b03be2cfa87e5a8813bc9235da",
         "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500",
-        "22d8f04594a5209a8629d09ff6541628f18f4fb2bd979da05db23f8d9c4572a6"
+        "22d8f04594a5209a8629d09ff6541628f18f4fb2bd979da05db23f8d9c4572a6",
+        "66f2cdf90516f628dc5e3da0b0b8ddfc2b7dfd3cb4173833beaf131f5bf605ab"
       ]
     },
     {
@@ -119,6 +120,14 @@
       "known_old_sha256": []
     },
     {
+      "path": "spec-dock/docs/authoring/cue.md",
+      "source": "spec_dock/docs/authoring/cue.md",
+      "sha256": "f38fb5f5b386346c4a9786c45b5e2a5699da7d89c3365caa015bd26cbea86de5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
       "path": "spec-dock/docs/authoring/design.md",
       "source": "spec_dock/docs/authoring/design.md",
       "sha256": "216332356e46faf7b07f95779ff3be5cae2cac43acdf9abdf3c83e79064a504f",
@@ -127,12 +136,22 @@
       "known_old_sha256": []
     },
     {
-      "path": "spec-dock/docs/authoring/historical.md",
-      "source": "spec_dock/docs/authoring/historical.md",
-      "sha256": "0074ff1c57c39130a0ceee7d1aa5d858a9b22c1f7fd4e699d9bf268fdd75b7c3",
+      "path": "spec-dock/docs/authoring/explanation.md",
+      "source": "spec_dock/docs/authoring/explanation.md",
+      "sha256": "13a39ff8e980131713c6b1aca95fc0baf2c77128bc24f974bc2b299268fc36f1",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/docs/authoring/historical.md",
+      "source": "spec_dock/docs/authoring/historical.md",
+      "sha256": "2a701a171e8355c762b6062d7464aeddb92ce220fdaaa9e501dc171f56b389e5",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": [
+        "0074ff1c57c39130a0ceee7d1aa5d858a9b22c1f7fd4e699d9bf268fdd75b7c3"
+      ]
     },
     {
       "path": "spec-dock/docs/authoring/issue-plan-levels/critical.md",
@@ -169,21 +188,24 @@
     {
       "path": "spec-dock/docs/authoring/issue-plan.md",
       "source": "spec_dock/docs/authoring/issue-plan.md",
-      "sha256": "4b4d6ac04307fb960dccc8d7e7a9392a76cce08237b55c268a7f7efeaeb1ca27",
+      "sha256": "d367d709e9b587e9705d4a967a0ec991bdffffd9df7d234def95797bba07e916",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "4b4d6ac04307fb960dccc8d7e7a9392a76cce08237b55c268a7f7efeaeb1ca27"
+      ]
     },
     {
       "path": "spec-dock/docs/authoring/overview.md",
       "source": "spec_dock/docs/authoring/overview.md",
-      "sha256": "8438f0cf9901406e295226f7e5d87445b29fdffc1b08ee7e6c5d1023a516cb6a",
+      "sha256": "b6e9942fd2c59bed61fa1359602fe2d25f920b0a72462a9298a6123bcb9f8d1d",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "500d75c6918d57cc035cf9dd3d466e053e21c6f2f7c2d87e6983d3d301f2b4f5",
         "6c0e0c080b02c51a16bc8427f6131127b7831ae40176a01498d74dd307a4a392",
-        "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc"
+        "e56f056e3105860030f41f8ccf331e7dc7703621c6f594f20e19f724d6a7c8fc",
+        "8438f0cf9901406e295226f7e5d87445b29fdffc1b08ee7e6c5d1023a516cb6a"
       ]
     },
     {
@@ -205,21 +227,24 @@
     {
       "path": "spec-dock/docs/authoring/scope-layering.md",
       "source": "spec_dock/docs/authoring/scope-layering.md",
-      "sha256": "0be56200566b2fa5f6e6bb84c82c7c876e8585d397de74c5773fc5c91a20e724",
+      "sha256": "acc12dcae73c3e6a69a6cccb898c2c413ffa4c0e0c4930ddd0d4b13fa5dc84e8",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "0be56200566b2fa5f6e6bb84c82c7c876e8585d397de74c5773fc5c91a20e724"
+      ]
     },
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "ac31d512666ef64baa74a06923856b6d4d91e257032dfec8b958c8c11724afdb",
+      "sha256": "160af12587aaf9202f305d893f6feac4e91f5dfe73c39606f6f8fb4fb3924003",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "275bf1dc3a27303e04e82141ec31f49eaa7a599fc83eeb13c28e741ab29afd3b",
         "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09",
-        "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd"
+        "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd",
+        "ac31d512666ef64baa74a06923856b6d4d91e257032dfec8b958c8c11724afdb"
       ]
     },
     {
@@ -321,13 +346,14 @@
     {
       "path": "spec-dock/docs/migration.md",
       "source": "spec_dock/docs/migration.md",
-      "sha256": "1b17e1b38284d81a331a4cc8a2bf1e79ce9a83226c219d13814a37ac88e1a7e9",
+      "sha256": "c4409e39c3a420fdd8576eb450aea9ed7ba6d9c14b0771774c4cc22928fb055a",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "01a555dd739b794d1498431b30970a484d326c767f56f3f7f51e4c023d8a94e5",
         "d0da61a3ab362b168f784efe59c5a47781571d3fdefb86b862fe822b2060055c",
-        "fbfee85c564b0718a9c0c6b0a92e8ef30b6781e98f2ac903a84a84de587be112"
+        "fbfee85c564b0718a9c0c6b0a92e8ef30b6781e98f2ac903a84a84de587be112",
+        "1b17e1b38284d81a331a4cc8a2bf1e79ce9a83226c219d13814a37ac88e1a7e9"
       ]
     },
     {
@@ -675,22 +701,24 @@
     {
       "path": "spec-dock/system/spec-dock-version",
       "source": "spec_dock/system/spec-dock-version",
-      "sha256": "d915cc95d6ca8f47ae297713ed46d4e5c5d99ddd29fc3c61e263bdf305f2b5b0",
+      "sha256": "40b8eb4000a913a7791090535f291d3d369874162a89ef3c9e3d4e887a1b9e79",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "1725bfa6524c5265e7c171cf06568417d39b947fff49c242f03859479c82334b"
+        "1725bfa6524c5265e7c171cf06568417d39b947fff49c242f03859479c82334b",
+        "d915cc95d6ca8f47ae297713ed46d4e5c5d99ddd29fc3c61e263bdf305f2b5b0"
       ]
     },
     {
       "path": "spec-dock/templates/README.md",
       "source": "spec_dock/templates/README.md",
-      "sha256": "3ec4263314f2a31fb4042799cf993f2a31098d1cc27c9db7e651e123103d3d5e",
+      "sha256": "76656d7ed9bcd54acc57d27c90c44878ee000fe15be6220217af4f5a8712f444",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "d7202728624c4632646c4b077155699e5342484b15de11fa936566541045c1e2",
-        "5ee4beb40099fb1a872742a9384eaa801562f4ccabc9ee2b10f08ce7167f163b"
+        "5ee4beb40099fb1a872742a9384eaa801562f4ccabc9ee2b10f08ce7167f163b",
+        "3ec4263314f2a31fb4042799cf993f2a31098d1cc27c9db7e651e123103d3d5e"
       ]
     },
     {

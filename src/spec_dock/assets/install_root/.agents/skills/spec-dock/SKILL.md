@@ -39,6 +39,17 @@ Choose package update, static installation/update, or lifecycle operation accord
 
 利用者向けの用意、ツールの設定の1行、同期が止まったときの扱いは `spec-dock/docs/canonical.md` にある。
 
+## CUE の Scope と説明資料
+
+canonical モード（`schema_version` が 4）の SpecDock 0.4.0 から、新しい Scope は CUE の Scope である。版3のリポジトリでは今までどおり Markdown の Scope を作り、`--assurance` を付けると `CANONICAL_NOT_MIGRATED` で止まる。
+
+- `scope create` と `scope import github` には、`--assurance <light|standard|strict|critical>` と、空白だけでない `--assurance-reason <理由>` を必ず付ける（ないと `ASSURANCE_REQUIRED`）。レベルは失敗したときの影響と回復の難しさで選び、親の計画の切り分けで決めた値を使う。
+- 正本は `requirement.cue`、`design.cue`、`plan.cue`（`requirement.cue` があれば CUE の Scope）。保証レベルは `requirement.cue` の `assurance` だけに書き、途中で書き換えてよい。人向けの説明は `explanation.html` の Markdown に書き、雛形の印の行を消す。
+- 書いたら `spec-dock scope check <ID>` で、誤りと指摘がなくなるまで直す（`cue` v0.17.1 以上が要る）。`spec-dock scope render <ID>` で HTML に描ける。
+- 作業しながら `plan.cue` の手順の `status`（`todo`、`doing`、`done`、`dropped`）を直接書き換え、`scope check` で確かめる。専用のコマンドはない。
+- `work finish` は CUE の Scope を検査し、誤りが残れば何も書かずに `SCOPE_CHECK_FAILED` で止まる。直してから、もう一度 `work finish` を実行する。
+- 詳しくは `spec-dock/docs/authoring/cue.md`（型、番号、規則、保証レベル、コード）と `spec-dock/docs/authoring/explanation.md`（説明資料）を読む。Markdown の Scope は今までどおり `spec-dock/docs/authoring/overview.md` から書く。
+
 ## Resolve the context and target
 
 1. Bind one repository/worktree, using its exact absolute root with `--project` when needed.

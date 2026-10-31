@@ -1,6 +1,6 @@
 # Authoring Kit 概要
 
-このガイドは、Initiative / Epic / Issue の仕様を Markdown で書き始めるための入口です。特定の agent、model、provider、review 手順を前提にしません。必要な支援や手順は、利用するプロジェクトの状況に合わせて選んでください。
+このガイドは、Initiative / Epic / Issue の仕様を Markdown で書き始めるための入口です。CUE の Scope は、下の「CUE の Scope と保証レベル」から始めます。特定の agent、model、provider、review 手順を前提にしません。必要な支援や手順は、利用するプロジェクトの状況に合わせて選んでください。
 
 各 scope は `requirement.md`、`design.md`、`plan.md`、`report.md` を一組として持ちます。文書は役割ごとに分け、長く残る判断は適切な正本へ記録します。
 
@@ -13,9 +13,18 @@
 - [Scope Layering Guide](scope-layering.md): Initiative / Epic / Issue の責務と、親子間で再定義しない境界を確認する。
 - [Artifact Guide](artifacts.md): Current の evidence と、durable な内容の反映先を確認する。
 
+## CUE の Scope と保証レベル
+
+canonical モード（宣言の版4）の SpecDock 0.4.0 から、新しく作る Scope は CUE の Scope です。要件・設計・計画を `requirement.cue`、`design.cue`、`plan.cue` に書き、人向けの説明を `explanation.html` に書きます。CUE の Scope では、Planning Level が保証レベル（`requirement.cue` の `assurance`）になりました。保証レベルは作るときに必須で、型の必須の項目と、`spec-dock scope check` の検査を変えます。
+
+- [CUE Authoring Guide](cue.md): 型、番号、つながりの規則、保証レベル、計画の台帳、実行の割り当て、検査のしかた。
+- [Explanation Guide](explanation.md): 説明資料の置き場、薄い形、検査。
+
+既存の Markdown の Scope は、そのまま残り、下の Guide と Planning Level の書き方で扱います。保証レベルは、過去の Assurance（`.assurance.json`）とは別のものです。
+
 ## Planning Level
 
-Issue の canonical `plan.md` は一つです。完成基準は選んだ一つの Guide を参照します。
+Markdown の Scope の Planning Level です（CUE の Scope は上の保証レベル）。Issue の canonical `plan.md` は一つです。完成基準は選んだ一つの Guide を参照します。
 
 - [light Completion Guide](issue-plan-levels/light.md)
 - [standard Completion Guide](issue-plan-levels/standard.md)
