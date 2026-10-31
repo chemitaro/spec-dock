@@ -20,7 +20,8 @@ ID: "iss-00472"
 - **雛形**：3つの種類 × 3つのファイルを `tests/fixtures/cue/v1/templates/<種類>/` に置いた（I-3 が配布資産へ移す。`design.md` の Q2）。印 `{{ASSURANCE_LEVEL}}`、`{{ASSURANCE_REASON}}` は二重引用符の中にある。
 - **見本の固定**：`tests/fixtures/cue/v1/samples/` に8つの見本（3つの種類、4つのレベル、形の誤りの2つ）と `expected.json`。
 - **CI**：Provider CI の `provider-tests` に「Install pinned cue」を足した（v0.17.1、Linux amd64・arm64 の SHA-256 を確かめてから展開し、PATH に足す。ほかの環境では失敗）。`cue` を要するテストは、`cue` がないと入れ方を示して失敗する。
-- **コミット**：`94d217e`、`bbf0cf9`、`bb3ec0d`、`681a24e`、`16ef1ec`（`origin/main` `1c064f9e` から。64 ファイル、追加だけ。既存のファイルの変更は `pyproject.toml` と `provider-ci.yml` だけ）。
+- **コミット**：`94d217e`、`bbf0cf9`、`bb3ec0d`、`681a24e`、`16ef1ec`、`f4b18f5`（`origin/main` `1c064f9e` から。最後の SHA は `f4b18f57730b278332bc874af9fd770266944ea5`。既存のファイルの変更は `pyproject.toml` と `provider-ci.yml` だけ）。
+- **ゲートの P3 の手当て**（統括の判断(1)、2026-10-31）：FQG-001 は、`#Title` が Python の `str.splitlines()` と同じ改行の文字（CR だけ、`\v`、`\f`、U+001C〜U+001E、U+0085、U+2028、U+2029 を含む）を拒むようにした。FQG-002 は、取り下げた手順が存在しない番号・手順・セッションを指す3つの場合を、規則の表のテストに足した（実装は前から調べていた。調べないように変えるとテストが12件落ちることを確かめた）。`f4b18f5`。
 - **Epic の文書の直し**（統括が行った）：K1 から `-c` を外した（`cue` 0.17.1 の `export` にはない）。K2 の `execution-reference` の出る条件に、`session` だけを書いた場合を足した。
 - **実現していないこと**：配布資産としての雛形、`cue` を呼ぶ製品の部品、`scope check` などは、計画どおり I-2・I-3 以降。
 
@@ -46,12 +47,11 @@ ID: "iss-00472"
 - コードのレビュー（`code-review`、code-reviewer opus / high、standards と spec の2人）：どちらも合格。standards の P2 1件（RE2 の `\S` が全角の空白を空白と見ない）を直した（`16ef1ec`）。spec は指摘なし。
 - 最終品質ゲート（`final-quality-gate`、キャンペーン `iss-00472-gate-1`、1回目）：合格の commit `16ef1ec`。主 opus / xhigh：pass、coverage complete、P3 2件。2人目 sonnet / high：pass、指摘なし。test lane：`make lint` 0、全テスト 0。記録は Workbench の `final-quality-gate/iss-00472-gate-1/closure.md`。
 - PR #480 の CI（head `16ef1ec`、2026-10-31T10:12Z）：Provider CI（run 41191221155：`route`、`provider-tests`、配布の確かめ ubuntu・macos）、SpecDock check（41191221215）、Commit identity（41191221201、41191192918）がすべて成功。`provider-tests` は GitHub の `ubuntu-latest` で、pytest 3681 passed、32 skipped（手元の macOS では 3705 passed、8 skipped。合計は同じ 3713 で、違いは既存の、OS による skip。新しいテストに skip はない）。GitHub のマージの状態は OPEN、非下書き、MERGEABLE、CLEAN（`github-pr-checks` の observer：`OBSERVED_CI_PASS`、`READY`）。
-- ゲートの P3（参考情報、直していない）：FQG-001 `#Title` が単独の CR を通す。FQG-002 取り下げた手順の参照も調べること（Q3）をテストが確かめていない（実装は調べている）。
+- ゲートの P3 の FQG-001・FQG-002 は、統括の判断で、この PR で直した（`f4b18f5`）。統括の指示どおり、`16ef1ec` からの差分を、新しいレビュアー1人（code-reviewer opus / high、standards と spec）で確かめ、pass（指摘なし）。`f4b18f5` で `make lint` 0、全テスト 3732 passed、8 skipped（リンクのない clone）。PR #480 の CI（`f4b18f5`、2026-10-31T10:29Z）：Provider CI（run 41192162795、`provider-tests` で `cue_v0.17.1_linux_amd64.tar.gz: OK`、`cue version v0.17.1`、3708 passed、32 skipped）、SpecDock check、Commit identity がすべて成功。observer は `OBSERVED_CI_PASS`、`READY`。記録は Workbench の `followup-f4b18f5/`。
 
 ## Residual Risks / Follow-ups
 
-- **v1 を出す前に直すかの判断（統括）**：ゲートの P3 の FQG-001（単独の CR）は、版を出した後（I-6）に締めると互換を壊すので、出す前に直すなら I-2〜I-6 のどこかで行う。FQG-002 はテストの追加だけで、いつでも足せる。
-- **既存の環境の問題（この Issue の外）**：canonical のリンクのある worktree では、`tests/unit/infra/test_authoring_kit_assets.py` のリンクのテスト12件が、`spec-dock/initiatives` のリンクを辿って main のチェックアウトの `spec-dock/docs` を指すため失敗する。リンクのない clone と CI では通る。ほかの Issue の担当も、手元の全テストで同じ失敗を見る。
+- **既存の環境の問題（この Issue の外。統括が別の Issue で扱う）**：canonical のリンクのある worktree では、`tests/unit/infra/test_authoring_kit_assets.py` のリンクのテスト12件が、`spec-dock/initiatives` のリンクを辿って main のチェックアウトの `spec-dock/docs` を指すため失敗する。リンクのない clone と CI では通る。ほかの Issue の担当も、手元の全テストで同じ失敗を見る。
 - **wheel のテストの残り物**：手元で `uv build` を木の中で流すと、`src/spec_dock.egg-info/SOURCES.txt` が残り、パッケージのデータの設定にないファイルも wheel に入る。新しいテストは、ビルドの入力を写した場所で作るので影響を受けないが、既存の `tests/integration/test_issue413_wheel.py` は木の中で作る。
 - **`uv build` のビルド用の依存**：wheel のテストは、既存のテストと同じく、`setuptools` などのビルド用の依存を uv のキャッシュか PyPI から取る。
 - **I-2 への引き渡し**：評価は `cue export --out json -t kind=<種類>`（`-c` なし）。`schema_directory` と `shipped_schemas`。指摘の `id` の頭とファイルの対応（R・F は `requirement.cue`、D は `design.cue`、ほかは `plan.cue`）。`schema` と `assurance` を `requirement.cue` 以外に書いても型は気づかないので、`scope show` が `requirement.cue` だけを読むことと合わせて扱いを決める。切り分けの子の ID が本当に子かは型では調べない。
