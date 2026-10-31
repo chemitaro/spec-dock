@@ -61,6 +61,12 @@ schema 4（canonical モード）の `scope create` と `scope import github` �
 - 記録：worktree の `.workbench/final-quality-gate/iss-00474-i3/`（`campaign.json`、`attempts/0{1,2}/`、`closure.md`）。
 - ChatGPT のレーン：使っていない（無効）。
 
+### PR の CI（`github-pr-checks`、2026-10-31T15:28Z）
+
+- PR #485、head `1cb672e26`、base `411261e59`。観測：Actions と Commit Status（外部の CheckRun は対象外）。
+- Provider CI（run 41214002076）、SpecDock check（41214002349）、Commit identity（41214002221、push 41213962340）：すべて success。
+- GitHub：OPEN、draft でない、MERGEABLE、CLEAN。
+
 ### それまでの確かめ
 
 - 仕様のレビュー（spec-review、opus / xhigh、第1回）：pass（P0 0、P1 0、P2 1、P3 6）。P2（U+FEFF を含む理由で `cue` が読めない）と P3 のうち5つを設計と実装に取り込んだ（`design.md` の「決めたこと」）。
