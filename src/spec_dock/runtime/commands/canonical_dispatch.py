@@ -16,6 +16,7 @@ from spec_dock.runtime.application.canonical_refusals import refuse_workspace_mi
 from spec_dock.runtime.application.canonical_remove import run_canonical_remove
 from spec_dock.runtime.application.canonical_resume import run_canonical_resume
 from spec_dock.runtime.application.canonical_scope_change import delete_scope, edit_scope, lifecycle_scope, move_scope
+from spec_dock.runtime.application.canonical_scope_check import check_scope
 from spec_dock.runtime.application.canonical_scope_create import create_scope, import_scope
 from spec_dock.runtime.application.canonical_scope_read import (
     clear_active,
@@ -60,6 +61,7 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "canonical resume": run_canonical_resume,
     "canonical remove": run_canonical_remove,
     "scope show": show_scope,
+    "scope check": check_scope,
     "scope list": list_scope,
     "dependency list": query_dependencies,
     "dependency check": query_dependencies,

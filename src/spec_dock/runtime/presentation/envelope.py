@@ -209,6 +209,8 @@ def render_text(
             for label, items in (("failure", failures), ("warning", result.warnings))
             for item in items
         )
+    elif result.command == "scope check" and isinstance(result.data, FamilyData):
+        stdout_lines.extend(_scope_check_text(result.data.result))
     elif isinstance(result.data, (ActiveData, FamilyData, CanonicalStatusData)) or (
         isinstance(result.data, DiagnosticData) and (result.data.findings or result.data.unverified)
     ):
@@ -258,6 +260,30 @@ def _sync_text(data: SyncData) -> list[str]:
         f"details={json.dumps(_redact(finding.details), ensure_ascii=False)}"
         for finding in data.findings
     )
+    return lines
+
+
+def _scope_check_text(result: dict[str, object]) -> list[str]:
+    """One summary line, then each error and warning with its place and hint (iss-00473, K3)."""
+    errors = cast("tuple[Diagnostic, ...]", result["errors"])
+    warnings = cast("tuple[Diagnostic, ...]", result["warnings"])
+    lines = [
+        f"scope_id={_field_text(result['scope_id'])} format={_field_text(result['format'])} "
+        f"checked={str(result['checked']).lower()} valid={str(result['valid']).lower()} "
+        f"errors={len(errors)} warnings={len(warnings)}"
+    ]
+    for label, items in (("error", errors), ("warning", warnings)):
+        for item in items:
+            place = f'file="{_field_text(item.details.get("file"))}"'
+            if item.details.get("line") is not None:
+                place += f" line={item.details['line']}"
+            if item.details.get("field") is not None:
+                place += f' field="{_field_text(item.details["field"])}"'
+            if item.details.get("rule") is not None:
+                place += f' rule="{_field_text(item.details["rule"])}"'
+            lines.append(f"{label} [{item.code}] {place} {_text_escape(item.message)}")
+            if item.details.get("hint"):
+                lines.append(f"  hint: {_text_escape(str(item.details['hint']))}")
     return lines
 
 

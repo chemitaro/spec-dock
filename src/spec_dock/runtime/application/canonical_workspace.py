@@ -25,6 +25,12 @@ from spec_dock.runtime.application.canonical_scopes import (
 )
 from spec_dock.runtime.application.canonical_worktrees import is_catalog
 from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.scope_check import (
+    CUE_DOCUMENTS,
+    MARKDOWN_DOCUMENTS,
+    SCOPE_FORMAT_CONFLICT,
+    scope_format,
+)
 from spec_dock.runtime.application.worktree_observation import SelectionObservation, read_selection
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.canonical_structure import SCOPE_KIND_CHANGED, parse_scope_id
@@ -43,7 +49,8 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.infra.catalog_tree import MisplacedDirectory
 
-REQUIRED_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
+# A Markdown Scope's documents; a CUE Scope (requirement.cue) needs CUE_DOCUMENTS instead (iss-00473).
+REQUIRED_DOCUMENTS: Final = MARKDOWN_DOCUMENTS
 
 SCOPE_DIRECTORY_MISSING: Final = "SCOPE_DIRECTORY_MISSING"
 SCOPE_DIRECTORY_MISPLACED: Final = "SCOPE_DIRECTORY_MISPLACED"
@@ -170,7 +177,18 @@ def inspect_canonical_structure(scopes: CanonicalScopes, *, timeout: float) -> S
             directory = scopes.directories.get(view.id)
             if directory is None:
                 continue
-            missing = [name for name in REQUIRED_DOCUMENTS if not (directory.path / name).is_file()]
+            found = scope_format(directory.path)
+            if found == "conflict":
+                errors.append(
+                    Diagnostic(
+                        SCOPE_FORMAT_CONFLICT,
+                        f"{view.id} has both requirement.md and requirement.cue; keep one format",
+                        {"scope_id": view.id, "path": directory.relative.as_posix()},
+                    )
+                )
+                continue
+            required = CUE_DOCUMENTS if found == "cue" else REQUIRED_DOCUMENTS
+            missing = [name for name in required if not (directory.path / name).is_file()]
             if missing:
                 errors.append(
                     Diagnostic(

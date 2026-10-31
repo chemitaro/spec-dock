@@ -123,14 +123,14 @@ def test_the_error_table_matches_the_runtime_codes_and_names_a_next_step() -> No
     assert "CANONICAL_NOT_IMPLEMENTED" not in documented
 
 
-def test_the_reference_and_the_html_guide_list_all_53_commands() -> None:
+def test_the_reference_and_the_html_guide_list_all_54_commands() -> None:
     reference = (DOCS / "reference_cli.md").read_text(encoding="utf-8")
     rows = re.findall(r"^\| C(\d\d) \| `([^`]+)` \|", reference, re.MULTILINE)
-    assert [int(number) for number, _ in rows] == list(range(1, 54))
+    assert [int(number) for number, _ in rows] == list(range(1, 55))
     assert {leaf for _, leaf in rows} == set(LEAF_PATHS)
-    assert "公開53 leaf" in reference and "全53 leaf" in (DOCS / "README.md").read_text(encoding="utf-8")
+    assert "公開54 leaf" in reference and "全54 leaf" in (DOCS / "README.md").read_text(encoding="utf-8")
     html = (DOCS / "cli-redesign-guide.html").read_text(encoding="utf-8")
-    assert "全53コマンド" in html and "全44コマンド" not in html and "44 leaf" not in html
+    assert "全54コマンド" in html and "全44コマンド" not in html and "44 leaf" not in html
     listed = set(re.findall(r"<td><code>([a-z][a-z ]+?)</code>", html))
     assert set(LEAF_PATHS) <= listed
 

@@ -37,6 +37,7 @@ LEAF_PATHS: tuple[str, ...] = (
     "scope import github issue",
     "scope list",
     "scope show",
+    "scope check",
     "scope edit",
     "scope close",
     "scope reopen",
@@ -93,6 +94,7 @@ HELP_EFFECTS: dict[str, str] = {
     "scope import github issue": "Read a GitHub Issue and create linked Issue files.",
     "scope list": "Read Scope metadata; no changes.",
     "scope show": "Read one Scope and its observed status; no changes.",
+    "scope check": "Check one CUE Scope's documents and explanation offline; no changes.",
     "scope edit": "Change the selected Scope title in local metadata.",
     "scope close": "Complete or cancel one Scope in its backend; active selection stays set.",
     "scope reopen": "Reopen one Scope in its backend; active selection stays set.",
@@ -174,6 +176,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     ),
     "scope list": (_arg("--kind", choices=KINDS), _arg("--parent"), _arg("--state", choices=STATES)),
     "scope show": (_arg("target"),),
+    "scope check": (_arg("target"),),
     "scope edit": (_arg("target"), _required("--title")),
     "scope close": (_arg("target"), _arg("--reason", choices=("completed", "not-planned"), default="completed")),
     "scope reopen": (_arg("target"),),
@@ -325,6 +328,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
     "scope list": "The selected project must contain a readable Scope tree.",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
+    "scope check": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory. A CUE Scope (requirement.cue) needs cue v0.17.1 or later on PATH (CUE_NOT_FOUND, CUE_VERSION_UNSUPPORTED) and a type version this SpecDock ships (CUE_SCHEMA_UNSUPPORTED); a Markdown Scope succeeds with checked=false and needs no cue.",
     "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
@@ -534,7 +538,21 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not save derived state, acquire a Start lock, repair selections, or inspect Codex processes."
         json_version = "specdock.cli/v2"
         json_data = "observed_at, source, complete, worktrees, scopes, counts, findings; process_state=not_observed."
-    if leaf in ("scope list", "scope show"):
+    if leaf == "scope check":
+        reads = (
+            "The Scope's requirement.cue, design.cue, plan.cue and explanation.html, the shipped type of its schema,"
+            " the checkout's spec-dock/cue/*.cue, and the structure snapshot for its kind (stale when GitHub cannot"
+            " be read; --offline sends nothing)."
+        )
+        does_not = "Does not write the catalog, the checkout or GitHub, and does not change selection or branches."
+        json_data = (
+            "kind=scope-check: scope_id, kind, path, format (cue|markdown|conflict), checked, valid, schema,"
+            " assurance {level, reason, source, problem}, errors and warnings (code, message, details.file,"
+            " details.hint; CUE_INVALID adds line, column, field, cue_message, positions; SPEC_FINDINGS adds rule"
+            " and id), findings, cue {version}, cue_output, snapshot. Errors exit 7 with SCOPE_CHECK_FAILED."
+        )
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf in ("scope list", "scope show"):
         reads = "Current metadata and this worktree's direct record for dynamic selectors; unobserved GitHub lifecycle is unknown."
         does_not = (
             "Does not contact GitHub, read a retired status cache, modify metadata or selection, or change Git refs."
