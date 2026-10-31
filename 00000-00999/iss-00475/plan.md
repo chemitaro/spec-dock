@@ -20,7 +20,7 @@ ID: "iss-00475"
 
 ## 目標
 
-要件定義書の AC-01〜AC-08 を満たす。
+要件定義書の AC-01〜AC-08（AC-05b を含む）を満たす。
 
 ## 順序・依存
 
@@ -38,15 +38,15 @@ ID: "iss-00475"
 
 - **S-01 図の部品**：`.workbench/` の新しい空のディレクトリに、npm の tarball（`@plantuml/core` 1.2026.6、`@highlightjs/cdn-assets` 11.11.1）を取り、integrity を npm の値と照らす。展開だけを行い、中のスクリプトを実行しない。design の 4 のファイルを `src/spec_dock/assets/vendor/` に写し、`manifest.json` を書く。
 - **S-02 入口**（AC-04）：Red：一覧と目録の一致、SHA-256、利用許諾、目録にない道筋と `..`、中身を変えた部品、目録の壊れのテスト。Green：`runtime/infra/diagram_vendor.py`。
-- **S-03 デザインシステム**（AC-01、AC-03）：Red：5つのファイルが目録にあり、dogfood と一致し、`ds.css` と `vendor/` が元と一致する（元の SHA-256 を固定値で持ち、元があればバイトでも比べる）。`ds.js` の版の定数が部品の目録と一致する。`installation init` で置かれる。Green：写し、`ds.js` の直し（design の 2）、`static_assets.py` の許す場所、`static-inventory.json`、`spec-dock/design-system/` の写し。
+- **S-03 デザインシステム**（AC-01、AC-03）：Red：5つのファイルが目録にあり、dogfood と一致し、`ds.css` と `vendor/` が、写した時の元の SHA-256（固定値）と一致する。`ds.js` の版の定数が部品の目録と一致する。`installation init` で置かれる。Green：写し、`ds.js` の直し（design の 2）、`static_assets.py` の許す場所、`static-inventory.json`、`spec-dock/design-system/` の写し。
 - **S-04 雛形**（AC-02）：Red：R-02 の4条件のテスト（HTML を解析する）。Green：`explanation-skeleton.html`（元の `document-skeleton.md` に倣った節と、PlantUML の図1つ）。
 - **S-05 wheel**（AC-04）：作った wheel に部品と目録が入るテストを足す（新しいテストとして足し、今のテストは変えない）。
-- **S-06 ブラウザーの検査の道具**（AC-05〜AC-07）：`tests/browser/explanation-check.mjs` と、使い方の `tests/browser/README.md`。5つの場面を手元で通し、結果を報告書に書く。
+- **S-06 ブラウザーの検査の道具**（AC-05、AC-05b、AC-06、AC-07）：`tests/browser/explanation-check.mjs` と、使い方の `tests/browser/README.md`。6つの場面を手元で通し、結果を報告書に書く。
 
 ## 検証
 
 - 通常の経路：`uv run pytest`（全体）、`make lint`。
-- ブラウザー（手元、外へのネットワークを止める）：`node tests/browser/explanation-check.mjs`（5つの場面）。spec-dock の dogfood の写しを使い、実際の `spec-dock/initiatives/` と `spec-dock/.canonical/` の深さで開く場面を含む。
+- ブラウザー（手元、外へのネットワークを止める）：`node tests/browser/explanation-check.mjs`（6つの場面）。spec-dock の dogfood の写しを使い、実際の `spec-dock/initiatives/` と `spec-dock/.canonical/` の深さで開く場面を含む。
 - negative test：目録にない道筋、`..`、中身を変えた部品、目録の壊れ（pytest）。`meta` も CDN もない、`marked` がない（ブラウザー）。
 - 外の依存を使えないときの確かめ：Chrome や Node.js がない環境では、ブラウザーの検査は行えない。そのときは報告書に「未確認」と書き、pytest の静的な検査だけを証拠にする。
 - 回帰：今のテストを変えずに通す。`spec-dock/templates/<種類>/` が変わっていないことを `git diff` で確かめる。

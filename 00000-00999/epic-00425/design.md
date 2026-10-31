@@ -37,12 +37,13 @@ ID: "epic-00425"
 1つの Scope の CUE の文書は、すべて `package spec` に属し、SpecDock が次のファイルを1つの評価（CUE の instance）にまとめる。
 
 ```text
-cue export -c --out json -t kind=<種類> \
+cue export --out json -t kind=<種類> \
   <パッケージ>/cue/<型の版>/*.cue      # SpecDock が配る型（R-B1）
   <リポジトリ>/spec-dock/cue/*.cue      # リポジトリが足す型（任意。R-B6）
   <Scope>/requirement.cue <Scope>/design.cue <Scope>/plan.cue
 ```
 
+- `cue` 0.17.1 の `export` には `-c` がない。`export` は、もともと具体的な値でなければ失敗するので、`-c` は要らない（2026-10-31、I-1 で確認）。
 - 同じ package のファイルは、ディレクトリが違っても、ファイルを並べて渡せば1つにまとまる（`cue` 0.17.1 で確認。2026-10-31）。そのため、Scope のファイルは `import` を書かない。型は SpecDock が足す。
 - Scope の種類（Initiative、Epic、Issue）は、構造の正本である GitHub から取り、タグ `-t kind=` で渡す。種類を CUE に書き写さない（二重管理をしないため）。
 - 型の版は、`requirement.cue` の `schema`（例 `"specdock/v1"`）で決める。SpecDock は、まず `requirement.cue` だけを評価して `schema` を読み、その版の型のディレクトリを選ぶ。
@@ -88,7 +89,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
   | `orphan-step` | どの要件にも結び付かない手順 | 2（strict） |
   | `failure-without-test` | 失敗の条件に、確かめるテストがない | 2 |
   | `rollback-missing` | 戻し方がない | 3（critical） |
-  | `execution-reference` | 手順が存在しないセッションを指す、レビューが存在しない手順を指す | 0（`execution` があるときだけ。R-D4） |
+  | `execution-reference` | 手順が存在しないセッションを指す、レビューが存在しない手順を指す | 0（`execution` があるか、手順に `session` を書いたときだけ。R-D4） |
 
 - **種類ごとの違い**：Epic と Initiative の計画は、手順とテストの代わりに、子の Scope への切り分け `slices: [=~"^(epic|iss)-[0-9]{5,}$"]: {covers!: [...string], ...}`（子の ID と、その子に任せる要件）を持つ。子の保証レベルは書かない（R-C4）。種類ごとの必須の項目は、`if kind == "epic" {...}` で切り替える。規則は、R-B3 の表の後の注のとおりに読み替える。Epic と Initiative では、`requirement-without-step`、`requirement-without-test`、`failure-without-test` は、`slices` の `covers` に入っていれば満たす。`orphan-step` は、`covers` が空の切り分けに当てはめる。`requirement-without-design` は、Issue と同じに当てはめる。
 - **文章の項目**：説明の文章を持つ項目は、Markdown を書いてよい。描画のときに、Markdown として描く（契約 K5）。

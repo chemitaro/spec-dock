@@ -64,6 +64,7 @@ ID: "iss-00475"
    };
    ```
 
+   - `meta` を読む時：部品を読み込む時（起動の後、`DOMContentLoaded` の後）に読む。そのため `meta` は `<head>` のどこに置いてもよい（I-5 には、`ds.js` の `<script>` より前に置くよう勧める）。
    - 候補の並び：`<meta name="ds-vendor-base" content="URL">` があれば、`content` を文書の URL から解決し、末尾に `/` を足した場所の下の `local`、その次に `cdn`。`meta` がなければ `cdn` だけ。
    - PlantUML は、候補ごとに `viz-global.js` を読み、`plantuml.js` を `import()` する。失敗したら次の候補へ進む。すべて失敗したら、各候補の理由をまとめた誤りにする（図の位置に出る。元の動き）。
    - highlight.js は、候補ごとに `highlight.min.js` を読む。すべて失敗したら、元と同じく色なしで表示する。
@@ -88,7 +89,7 @@ ID: "iss-00475"
 title: …
 ---
 <!-- spec-dock:explanation-skeleton -->
-…（元の document-skeleton.md に倣った節。PlantUML の図を1つ含む）
+…（元の document-skeleton.md に倣った節。PlantUML の図を1つと、言語を付けたコードの囲みを1つ含む）
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
@@ -158,13 +159,14 @@ assets/vendor/
 
   | 場面 | 開き方 | 部品 | 期待 |
   |---|---|---|---|
-  | `canonical-file` | `file:` で `.canonical/…` | CDN の代わりに同梱を返す | 合格、`vendor.plantuml = "cdn"` |
+  | `canonical-file` | `file:` で `.canonical/…` | CDN の代わりに同梱を返す | 合格、`vendor.plantuml = "cdn"`、`vendor.hljs = "cdn"` |
   | `initiatives-file` | `file:` で `initiatives/…` | 同上 | 合格 |
-  | `local-http` | 道具のサーバーで、`meta` を足した写し | `/vendor/` から同梱を配る。CDN は止める | 合格、`vendor.plantuml = "local"` |
+  | `local-http` | 道具のサーバーで、`meta`（`content="/vendor/"`）を `ds.js` の前に足した写し | `/vendor/` から同梱を配る。CDN は止める | 合格、`vendor.plantuml = "local"`、`vendor.hljs = "local"` |
+| `local-fallback` | 道具のサーバーで、部品のない場所を示す `meta` を足した写し | CDN の代わりに同梱を返す | 合格、`vendor.plantuml = "cdn"` |
   | `offline-standalone` | `file:` で `.canonical/…` | すべて止める | 本文は準備を終え、図は誤り1つ、捕まえていない誤りなし |
   | `missing-marked` | `vendor/marked.umd.js` を消した木 | すべて止める | `ready` が偽、知らせが出る |
 
-- 合格の判定（`canonical-file`、`initiatives-file`、`local-http`、`--file`）：`__dsState.ready` と `__plantumlDocumentState.completed` が真、捕まえていない誤りがない、`.ds-unknown` がない、Markdown の `plantuml` の囲みの数と、`expected`、`rendered`、図ごとに1つの SVG の数が一致し、`errors` が空、390px の幅で `scrollWidth <= innerWidth`。
+- 合格の判定（`canonical-file`、`initiatives-file`、`local-http`、`local-fallback`、`--file`）：`__dsState.ready` と `__plantumlDocumentState.completed` が真、捕まえていない誤りがない、`.ds-unknown` がない、Markdown の `plantuml` の囲みの数と、`expected`、`rendered`、図ごとに1つの SVG の数が一致し、`errors` が空、390px の幅で `scrollWidth <= innerWidth`。
 - `--file <道筋>` で、手元の任意の説明資料を同じ判定にかけられる（`--cdn-from-package` で CDN の代わりに同梱を返す）。結果は、場面ごとの JSON と、最後の行 `VALIDATED` または `FAILED`。
 
 ## data / failure
@@ -188,17 +190,17 @@ assets/vendor/
 ## testability
 
 - pytest（ネットワークなし）：
-  - 静的資産：5つが目録にあり、提供側と dogfood の写しがバイト一致し、`ds.css` と `vendor/` がスキルの元とバイト一致する（元がない環境では、目録の SHA-256 で確かめる。下の risk）。`installation init` で5つが置かれる。
+  - 静的資産：5つが目録にあり、提供側と dogfood の写しがバイト一致し、`ds.css` と `vendor/` の SHA-256 が、写した時の元（スキルの版 1.0.0）の値（テストに固定値で書く）と一致する。利用者の PC のスキルは読まない（hermetic に保つ。元との一致は、写した時に一度確かめ、報告書に残す）。`installation init` で5つが置かれる。
   - 雛形の形（R-02 の4条件）を、HTML を解析して確かめる。
   - `ds.js`：`PLANTUML_VERSION`、`HLJS_VERSION` が目録の版と一致し、`ds-vendor-base`、`vendor/marked.umd.js` を参照する。
   - 入口：一覧と目録の一致、SHA-256、利用許諾、目録にない道筋、`..`、中身を変えた部品（資源の読み取りを差し替えて確かめる）。
   - wheel：今の wheel のテストと同じく、作った wheel に `spec_dock/assets/vendor/manifest.json` と部品があることを確かめる。
-- ブラウザー（手元で任意）：`node tests/browser/explanation-check.mjs` の5つの場面（AC-05、AC-06、AC-07）。結果を報告書に残す。
+- ブラウザー（手元で任意）：`node tests/browser/explanation-check.mjs` の6つの場面（AC-05、AC-05b、AC-06、AC-07）。結果を報告書に残す。
 
 ## risk
 
-- **スキルの元が CI にない**：`~/.agents/skills/...` は、利用者の PC にだけある。元とのバイト一致のテストは、元がないときは、写した時の SHA-256（テストに書く）と比べる形にし、飛ばさない。
-- **`@plantuml/core` が新しく、`emoji.js` などの読み方が版で変わる**：版を固定し、上げるときは検査の道具の5つの場面を通す。
+- **スキルの元が CI にない、別に進む**：`~/.agents/skills/...` は、利用者の PC にだけあり、別に更新される。テストは写した時の SHA-256 の固定値と比べ、元を読まない（SpecDock の側を正とする。Epic の設計書の risk）。
+- **`@plantuml/core` が新しく、`emoji.js` などの読み方が版で変わる**：版を固定し、上げるときは検査の道具の6つの場面を通す。
 - **リポジトリが約 10.5MB 重くなる**：Epic の設計書で受け入れ済み。利用者のリポジトリには入らない。
 - **CDP の `Fetch` が `file:` の要求を扱わない**：`file:` は止めずに通すので、判定に影響しない。外への要求は、`host-resolver-rules` でも止める（二重）。
 - **`ds.js` の派生が元から離れる**：直した4か所を冒頭の注に書き、元の版を上げるときは、その4か所を当て直す。
