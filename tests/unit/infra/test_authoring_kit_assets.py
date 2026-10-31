@@ -679,6 +679,8 @@ def test_authoring_overview_navigation_links_to_all_current_guides() -> None:
     expected_links = {
         *OVERVIEW_LINK_TARGETS,
         *(f"issue-plan-levels/{level}.md" for level in PLANNING_LEVELS),
+        "cue.md",  # iss-00477: the CUE and explanation guides for CUE Scopes
+        "explanation.md",
     }
 
     assert links == expected_links
@@ -894,6 +896,8 @@ def test_template_readme_navigation_catalogs_exact_scope_docs_and_current_artifa
         "../docs/authoring/issue-plan.md",
         "../docs/authoring/report.md",
         "../docs/authoring/artifacts.md",
+        "../docs/authoring/cue.md",  # iss-00477: the CUE Scope templates section
+        "../docs/authoring/explanation.md",
     }
     for relative_path in links:
         assert (TEMPLATES_ROOT / relative_path).is_file(), f"broken template catalog link: {relative_path}"

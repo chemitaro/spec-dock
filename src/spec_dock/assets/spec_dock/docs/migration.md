@@ -12,6 +12,20 @@ package managerでレビュー・通常試験が済んだwheelをworktree外へ�
 
 宣言の版3（従来モード）から版4（canonical モード）への移行は、spec-dock のリポジトリの `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ行います。移行の前に `installation update` で配布資産を 0.3.0 に上げます（従来モードのまま動きます）。移行の後の使い方、ツールの設定の1行、同期が止まったときの扱いは[canonical モードの使い方](canonical.md)にあります。`installation init` は版4の宣言を置くので、新規導入のリポジトリは canonical モードで始まり、`spec-dock canonical link` が要ります。
 
+## 0.4.0 への更新
+
+0.4.0 は、canonical モード（宣言の版4）のリポジトリで、新しく作る Scope の要件・設計・計画を CUE で書く版です。版3のリポジトリの動きは変わりません。
+
+- パッケージを 0.4.0 に上げた後、各リポジトリで `spec-dock installation update` を実行して配布資産を上げます。新しい雛形 `spec-dock/templates/cue/<種類>/`、デザインシステム `spec-dock/design-system/`、ガイド `spec-dock/docs/authoring/cue.md` と `explanation.md`、スキルが入ります。上げる前の配布資産のままだと、`scope create` と `scope import github` は GitHub に何も書かずに `SCOPE_TEMPLATES_OUTDATED` で止まります。
+- CLI の契約の変更（版4だけ）：
+  - `spec-dock scope create` と `spec-dock scope import github` に、`--assurance <light|standard|strict|critical>` と `--assurance-reason <理由>` が必須になりました。ないと何も読まず何も書かずに `ASSURANCE_REQUIRED`（終了コード2）で止まります。これらを呼ぶスクリプトや手順に、2つの引数を足します。版3のリポジトリで付けると `CANONICAL_NOT_MIGRATED` で止まります。
+  - 新しい Scope は CUE の Scope（`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`）です。既存の Markdown の Scope は移さず、そのまま動きます。
+  - 公開の葉が2つ増えて55になりました：`spec-dock scope check <ID>`（CUE の Scope を検査する）と `spec-dock scope render <ID>`（要件・設計・計画を HTML に描く）。
+  - `spec-dock scope show --json` は、`data.result.assurance`（`level`、`reason`、`source`）を返します。
+  - CUE の Scope の `spec-dock work finish` は、閉じる前に `scope check` と同じ検査を行い、誤りが残れば何も書かずに `SCOPE_CHECK_FAILED` で止まります。
+- 道具：CUE の Scope の検査には `cue` v0.17.1 以上が PATH に要ります（例 `go install cuelang.org/go/cmd/cue@v0.17.1`）。ないと `CUE_NOT_FOUND` で止まります。Markdown の Scope と版3のリポジトリには要りません。
+- 書き方は [CUE Authoring Guide](authoring/cue.md) と [Explanation Guide](authoring/explanation.md)、エラーと次の1手は [canonical モードの使い方](canonical.md) にあります。
+
 ## 新規導入
 
 ```sh

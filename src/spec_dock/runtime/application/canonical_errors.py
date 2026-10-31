@@ -214,7 +214,10 @@ STATE_ROOT_MISMATCH_NEXT_STEP: Final = (
 )
 SCOPE_KIND_CHANGED_RECOVERY: Final = (
     "Restore the GitHub kind label. If the new kind is intended, create the Scope again with that kind "
-    "(spec-dock scope create), move the old directory's contents into the new <ID>/, then run "
+    "(spec-dock scope create <kind> --assurance <level> --assurance-reason <reason>); the new Scope is a CUE Scope. "
+    "Write the old requirement.md, design.md and plan.md into the new requirement.cue, design.cue and plan.cue "
+    "instead of moving them (both formats in one Scope stop with SCOPE_FORMAT_CONFLICT), move the other files "
+    "(artifacts/, discussions/) into the new <ID>/ and merge report.md, then run "
     "spec-dock scope delete <current ID>."
 )
 STATUS_RECOVERY: Final = "spec-dock canonical status"

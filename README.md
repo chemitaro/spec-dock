@@ -6,7 +6,7 @@ SpecDockはGitHub Issueに結び付いたInitiative・Epic・Issueの三階層�
 
 ## 入口
 
-- [現行CLIの全53コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
+- [現行CLIの全55コマンド](src/spec_dock/assets/spec_dock/docs/reference_cli.md)
 - [canonical モードの使い方](src/spec_dock/assets/spec_dock/docs/canonical.md)（導入先では `spec-dock/docs/canonical.md`）
 - [日本語のオフライン説明資料](src/spec_dock/assets/spec_dock/docs/cli-redesign-guide.html)
 - [導入・移行・保全](src/spec_dock/assets/spec_dock/docs/migration.md)
@@ -40,6 +40,10 @@ Finishはbackendのcompletedを確認して、捕捉した直接記録だけを�
 - 用意はクローンごとに `spec-dock canonical link` の1回です。状態は `spec-dock canonical status` で確かめます。
 - 作業用のworktreeで Claude Code と Codex を使うには、ツールごとに1行の設定を利用者が1回だけ足します（SpecDock は書き換えません）。1行と確かめ方、同期が止まったとき、Linux とコンテナの制約、エラーと次の1手は、配布する `spec-dock/docs/canonical.md`（[この repository の正本](src/spec_dock/assets/spec_dock/docs/canonical.md)）にあります。
 - 版3から4への移行は `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ行います。
+
+## CUE の仕様（0.4.0）
+
+0.4.0 から、canonical モードのリポジトリで新しく作る Scope は、要件・設計・計画を CUE（`requirement.cue`、`design.cue`、`plan.cue`）で書き、`spec-dock scope check` で検査します。`scope create` と `scope import github` には `--assurance` と `--assurance-reason` が必須で、CUE の Scope の検査には `cue` v0.17.1 以上が要ります。変更の一覧は[0.4.0 への更新](src/spec_dock/assets/spec_dock/docs/migration.md)、書き方は[CUE Authoring Guide](src/spec_dock/assets/spec_dock/docs/authoring/cue.md)にあります。
 
 ## 実行package・配布資産・worktree状態の境界
 
