@@ -244,7 +244,8 @@ def test_the_release_notes_list_the_contract_changes_for_canonical_mode() -> Non
     readme = _read(ROOT / "README.md")
     assert "全55コマンド" in readme and "全53コマンド" not in readme
     assert "src/spec_dock/assets/spec_dock/docs/migration.md" in _section(readme, "## CUE の仕様（0.4.0）")
-    assert "`cue`" in _section(readme, "## CUE の仕様（0.4.0）") and "canonical モード" in readme
+    cue_section = _section(readme, "## CUE の仕様（0.4.0）")
+    assert "`cue`" in cue_section and "canonical モード" in cue_section
 
 
 def test_the_inventory_ships_the_new_guides_and_accepts_the_previous_bytes() -> None:

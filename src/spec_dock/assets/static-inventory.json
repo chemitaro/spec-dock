@@ -122,7 +122,7 @@
     {
       "path": "spec-dock/docs/authoring/cue.md",
       "source": "spec_dock/docs/authoring/cue.md",
-      "sha256": "e5000a4773148d5ae49e54d06ac10c75c1c7249abaedea64ee06ddf555a009f5",
+      "sha256": "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": []

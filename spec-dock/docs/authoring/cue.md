@@ -135,8 +135,8 @@ steps: "S-01": {title: "...", realizes: ["R-01"], session: "impl"}
 ```cue
 package spec
 
-// standard 以上では、すべての Issue の計画に execution を求める
-if _rank >= 1 {
+// standard 以上の Issue では、計画に execution を求める（kind で絞らないと Epic と Initiative にも効く）
+if kind == "issue" && _rank >= 1 {
 	execution!: _
 }
 // 規則を足す
