@@ -12,22 +12,24 @@ ID: "iss-00481"
 詳細: [Issue Plan Guide](../../../docs/authoring/issue-plan.md)
 
 ## Planning Level
-選んだ level、理由、risk factor、再評価条件を記述する。
+light。テストだけの小さな直しで、すぐ戻せる。
 
 ## 目標
-この Issue で達成する観測可能な成果を記述する。
+この worktree で12件が通り、全体の lint とテストが通る。
 
 ## 順序・依存
-実装順、依存、並行可能な作業を記述する。
+Red の確認（済）→ 補助関数の追加と置き換え → Green → レビュー → 最終ゲート → PR。
 
 ## 実装step
-実装、tests、docs、migration の手順を記述する。
+1. `_lexical_resolve` を追加する。
+2. 3箇所の `resolve()` を置き換える。
+3. 同形の `resolve()` が `tests/` に残っていないか探す（調査済み: 他は `__file__` 基準か tmp_path）。
 
 ## 検証
-受け入れ条件と regression を確認する方法を記述する。
+`uv run pytest tests/unit/infra/test_authoring_kit_assets.py`、その後 `make lint` と `uv run pytest`。
 
 ## rollback
-問題時の rollback または forward recovery を記述する。
+コミットを revert する。
 
 ## exit / handoff
-完了条件、残余リスク、引き渡しを記述する。
+PR をマージ可能な状態で止める。`work finish` は実行しない。

@@ -12,25 +12,26 @@ ID: "iss-00481"
 詳細: [Design Guide](../../../docs/authoring/design.md)
 
 ## 設計目標
-Requirement を満たす構造と責務を記述する。
+リンク解決を、ファイルシステムのリンクをたどらない、道筋の上だけの計算にする。
 
 ## Current / Target
-変更前の状態と実現する状態を記述する。
+- Current: `(node_path.parent / link).resolve()` が、`initiatives` のリンクをたどって main 側へ移る。
+- Target: `os.path.normpath` で `..` を畳み、`scaffold_root` 配下の道筋と比べる。
 
 ## 責務・Interface
-責務境界、interface、親契約との関係を記述する。
+テスト内の小さな補助関数 `_lexical_resolve(path: Path) -> Path`（`Path(os.path.normpath(path))`）を足し、該当箇所で `.resolve()` の代わりに使う。
 
 ## data / failure
-データ、失敗、回復時の扱いを記述する。
+畳んだ道筋は `scaffold_root/docs/authoring/<ガイド>` になる。ここは実在の場所なので `is_file()` で存在を確かめられる。行き先が違えば比較で、無ければ `is_file()` で失敗する。
 
 ## 変更対象
-変更する要素と変更しない要素を記述する。
+`test_authoring_kit_assets.py` の、旧入れ子の置き場に基づく3箇所（`_relative_link_violations`、RDP ガイドのテスト、report ガイドのテスト）。ほかの `resolve()`（`__file__` の親や tmp_path の正規化）は、旧入れ子の置き場ではないので変えない。
 
 ## 移行・互換性・rollback
-移行、互換性、戻し方を記述する。
+テストのみ。コミットを戻せば元に戻る。
 
 ## testability
-設計を検証できる観測点と方法を記述する。
+修正前に12件が落ち、修正後に通ることで確かめる。
 
 ## risk
-実装前に扱うリスクを記述する。
+`..` を畳む結果が実際のリンクの行き先と異なる場合があるが、ここでは雛形を置く場所の道筋の意味を確かめたいので、意図に合う。

@@ -11,22 +11,25 @@ ID: "iss-00481"
 詳細: [Requirement Guide](../../../docs/authoring/requirement.md)
 
 ## 目的
-この Issue が実現する end-to-end の価値を記述する。
+リンク付きの worktree でも `tests/unit/infra/test_authoring_kit_assets.py` が、CI や clean な checkout と同じ結果になる。
 
 ## 背景
-問題、関係者、親 scope から継承する理由を記述する。
+作業用 worktree では `spec-dock/initiatives` が catalog（main チェックアウトの `spec-dock/.canonical`）への絶対パスのリンクである（epic-00424 R-B2）。雛形リンクのテストは、旧入れ子の置き場の上で `Path.resolve()` を使うため、リンクをたどって main 側へ移り、12件が落ちる。epic-00425 の #472、#475 の担当も同じ失敗を報告した。
 
 ## 観測可能な要件
-利用者または外部から確認できる振る舞いを記述する。
+- 雛形の相対リンクが、雛形を置く場所から見て配布ガイドを指すことを、リンクの有無に関わらず確かめる。
+- この worktree でも、clean な checkout でも、同じ結果になる。
 
 ## スコープ
-変更対象、対象外、親契約として維持する境界を記述する。
+- 対象: `tests/` 内の、旧入れ子の置き場の上で `resolve()` する検証。
+- 対象外: 製品コード、雛形、ガイド。テストの意図（リンクの行き先の一致）は弱めない。
 
 ## 失敗・境界条件
-想定する失敗、例外、境界条件を記述する。
+- リンクの行き先のファイルが無い、またはガイドと別を指すときは、これまでどおり失敗する。
 
 ## 受け入れ条件
-この Issue の完了を観測できる条件を記述する。
+- 修正前、この worktree で12件が落ちる。修正後に通る。
+- `make lint` と `uv run pytest`（全体）が、この worktree で通る。
 
 ## 制約・前提
-守る制約と前提を記述する。
+- 編集は `tests/` とこの Issue の Scope のディレクトリだけ。
