@@ -17,7 +17,18 @@ from typing import TYPE_CHECKING, Final, Literal
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
 from spec_dock.runtime.domain.explanation_shape import inspect_explanation
 from spec_dock.runtime.infra.cue_schemas import schema_directory, shipped_schemas
-from spec_dock.runtime.infra.cue_tool import CUE_FAILED, REINSTALL_STEP, CueToolError, locate_cue, parse_cue_errors
+from spec_dock.runtime.infra.cue_tool import (
+    CUE_FAILED,
+    CUE_INSTALL_STEP,
+    CUE_NOT_FOUND,
+    CUE_TIMEOUT,
+    CUE_VERSION_UNSUPPORTED,
+    REINSTALL_STEP,
+    TIMEOUT_STEP,
+    CueToolError,
+    locate_cue,
+    parse_cue_errors,
+)
 from spec_dock.runtime.presentation.envelope import Diagnostic
 
 if TYPE_CHECKING:
@@ -41,6 +52,13 @@ EXPLANATION_SKELETON: Final = "EXPLANATION_SKELETON"
 EXPLANATION_INVALID: Final = "EXPLANATION_INVALID"
 CUE_SCHEMA_UNSUPPORTED: Final = "CUE_SCHEMA_UNSUPPORTED"
 
+# A tool failure while reading the level stops the check like any other `cue` failure: (exit code, next step).
+_TOOL_STEPS: Final = {
+    CUE_NOT_FOUND: (3, CUE_INSTALL_STEP),
+    CUE_VERSION_UNSUPPORTED: (3, CUE_INSTALL_STEP),
+    CUE_TIMEOUT: (5, TIMEOUT_STEP),
+    CUE_FAILED: (5, REINSTALL_STEP),
+}
 _SCHEMA_SHAPE = re.compile(r"specdock/v[1-9][0-9]*")
 _SCHEMA_STEP = 'Write schema: "specdock/v1" in requirement.cue (the type version is read from that file only).'
 _ASSURANCE_STEP = (
@@ -126,6 +144,7 @@ class ScopeCheckReport:
     findings: dict[str, list[dict[str, str]]] | None
     cue_version: str | None
     cue_output: str | None
+    evaluation: dict[str, object] | None = None  # the whole K1 evaluation when it succeeded (for I-5's renderer)
 
 
 @dataclass(frozen=True)
@@ -185,22 +204,29 @@ def check_scope_documents(
     schema, schema_errors, types = _read_schema(tool, scope, shown, repository_root, timeout)
     errors += schema_errors
     findings: dict[str, list[dict[str, str]]] | None = None
+    evaluation: dict[str, object] | None = None
     cue_output: str | None = None
     checked = types is not None
     shape_errors: list[Diagnostic] = []
     if types is not None:
         places = _Places(scope, shown, repository_root.resolve(), types.resolve())
-        files = [*sorted(types.resolve().glob("*.cue")), *_repository_types(repository_root)]
-        files += [scope / name for name in SCOPE_FILES if (scope / name).is_file()]
-        run = _export(tool, files, cwd=scope, timeout=timeout, tags={"kind": kind})
+        run = _export(tool, k1_files(types, repository_root, scope), cwd=scope, timeout=timeout, tags={"kind": kind})
         if run.returncode != 0:
             cue_output = run.stderr
             shape_errors = _shape_errors(parse_cue_errors(run.stderr, cwd=scope), run.stderr, places)
             errors += shape_errors
         else:
-            findings = _findings(run.stdout)
+            evaluation = _evaluation(run.stdout)
+            findings = _findings(evaluation)
             errors += _finding_errors(findings, shown)
     assurance = read_assurance(directory, timeout=timeout, tool=tool)
+    if assurance.problem is not None and assurance.problem.code in _TOOL_STEPS:
+        code = assurance.problem.code
+        raise _stopped(
+            CueToolError(
+                code, assurance.problem.message, exit_code=_TOOL_STEPS[code][0], next_step=_TOOL_STEPS[code][1]
+            )
+        )
     if assurance.problem is not None and _report_assurance(assurance, findings is not None, shape_errors):
         errors.append(
             Diagnostic(
@@ -212,8 +238,27 @@ def check_scope_documents(
     explanation_errors, explanation_warnings = _explanation(directory, kind, shown)
     errors += explanation_errors
     return ScopeCheckReport(
-        found, checked, schema, assurance, tuple(errors), explanation_warnings, findings, tool.version, cue_output
+        found,
+        checked,
+        schema,
+        assurance,
+        tuple(errors),
+        explanation_warnings,
+        findings,
+        tool.version,
+        cue_output,
+        evaluation,
     )
+
+
+def k1_files(types: Path, repository_root: Path, scope: Path) -> list[Path]:
+    """Contract K1's file order: the shipped type, the repository's types, then the Scope's existing files.
+
+    Every path is resolved, so the positions `cue` prints map back to these files.
+    """
+    scope = scope.resolve()
+    files = [*sorted(types.resolve().glob("*.cue")), *_repository_types(repository_root)]
+    return files + [scope / name for name in SCOPE_FILES if (scope / name).is_file()]
 
 
 def _tool(timeout: float) -> CueTool:
@@ -348,14 +393,22 @@ def _shape_error(error: CueError, places: _Places) -> Diagnostic:
     )
 
 
-def _findings(stdout: str) -> dict[str, list[dict[str, str]]]:
+def _evaluation(stdout: str) -> dict[str, object]:
     try:
         value = json.loads(stdout)
     except ValueError as error:
         raise _stopped(
             CueToolError(CUE_FAILED, "cue printed output that is not JSON", exit_code=5, next_step=REINSTALL_STEP)
         ) from error
-    findings = value.get("findings") if isinstance(value, dict) else None
+    if not isinstance(value, dict):
+        raise _stopped(
+            CueToolError(CUE_FAILED, "the evaluation is not a JSON object", exit_code=5, next_step=REINSTALL_STEP)
+        )
+    return value
+
+
+def _findings(value: dict[str, object]) -> dict[str, list[dict[str, str]]]:
+    findings = value.get("findings")
     if not isinstance(findings, dict) or not all(isinstance(items, list) for items in findings.values()):
         raise _stopped(
             CueToolError(CUE_FAILED, "the evaluation has no findings map", exit_code=5, next_step=REINSTALL_STEP)

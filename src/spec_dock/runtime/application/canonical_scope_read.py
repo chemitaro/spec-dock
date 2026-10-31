@@ -18,6 +18,7 @@ from spec_dock.runtime.application.canonical_scopes import (
     resolve_canonical_scope,
 )
 from spec_dock.runtime.application.direct_artifact import _view
+from spec_dock.runtime.application.scope_check import read_assurance
 from spec_dock.runtime.application.scope_query import list_scopes
 from spec_dock.runtime.application.worktree_observation import ancestors_for, read_selection, resolve_scope
 from spec_dock.runtime.domain.artifacts import (
@@ -69,6 +70,11 @@ def show_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
         "changed": False,
         "snapshot": scopes.snapshot_payload(),
     }
+    directory = scopes.directory(scope.id)
+    # The assurance level of requirement.cue alone (R-C6); an unreadable one never fails the read.
+    result["assurance"] = read_assurance(
+        directory.path if directory is not None else None, timeout=namespace.timeout
+    ).payload()
     return OperationResult(
         namespace.command_path, "succeeded", FamilyData("scope", result), 0, warnings=scopes.warnings()
     )

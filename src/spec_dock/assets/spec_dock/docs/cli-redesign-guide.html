@@ -27,7 +27,7 @@
 <a href="#walkthrough"><span>07</span>通常操作の流れ</a>
 <a href="#failure"><span>08</span>途中失敗を正直に扱う</a>
 <a href="#migration"><span>09</span>導入・移行・静的資産更新</a>
-<a href="#catalog"><span>10</span>全53コマンドを確認する</a>
+<a href="#catalog"><span>10</span>全54コマンドを確認する</a>
 <a href="#safety"><span>11</span>この方式が保証する範囲</a>
 <a href="#sources"><span>12</span>詳細へ進む</a></nav>
 <main><details class="mobile-nav"><summary>目次を開く</summary><nav aria-label="モバイル目次"><a href="#overview"><span>01</span>まず理解すること</a>
@@ -39,7 +39,7 @@
 <a href="#walkthrough"><span>07</span>通常操作の流れ</a>
 <a href="#failure"><span>08</span>途中失敗を正直に扱う</a>
 <a href="#migration"><span>09</span>導入・移行・静的資産更新</a>
-<a href="#catalog"><span>10</span>全53コマンドを確認する</a>
+<a href="#catalog"><span>10</span>全54コマンドを確認する</a>
 <a href="#safety"><span>11</span>この方式が保証する範囲</a>
 <a href="#sources"><span>12</span>詳細へ進む</a></nav></details>
 <section id="overview" aria-labelledby="overview-title"><div class="section-label">01</div><h2 id="overview-title">まず理解すること</h2><p class="intro">SpecDockは、GitHub Issueに結び付いた仕様をInitiative・Epic・Issueの三階層で扱うCLIです。実行プログラムは通常のPython packageとしてworktree外に導入し、各作業場には仕様と最小限の作業記録を置きます。</p>
@@ -124,8 +124,8 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 <p>uninstallは正確な対象とtool資産削除の明示許可がある場合だけ使います。既知static filesを保全して削除し、workspace、ignore規則、仕様、Artifact、Workbench、直接記録、未知file、directoryを残します。schema3未満、未知protocol、旧writer停止未確認は適用対象にしません。</p>
 <p>詳しい条件は<a href="migration.md">導入・移行・保全</a>で確認できます。旧engineの実行、Git controlの更新、journal replay、全worktree一括書換えを移行手順に戻しません。</p>
 </section>
-<section id="catalog" aria-labelledby="catalog-title"><div class="section-label">10</div><h2 id="catalog-title">全53コマンドを確認する</h2><p>C45〜C53 と <code>scope move</code> は、宣言の版4（canonical モード。仕様の構造を GitHub Issue に、中身を <code>spec-dock/canonical</code> ブランチに置く形）のためのコマンドです。使い方、ツールの設定の1行、エラーと次の1手は<a href="canonical.md">canonical モードの使い方</a>にあります。</p><p><code>--project ABS</code>は正確なworktree root、<code>--json</code>は<code>specdock.cli/v2</code>のenvelopeです。必要な変更確認は<code>--yes</code>、保全先は新しい<code>--backup-dir ABS</code>で指定します。optional表記でもapplyで必須になる条件があるため、現在helpと結果を読みます。</p>
-<div class="table-scroll wide" tabindex="0" aria-label="全53コマンド。左右にスクロールできます。"><table><thead><tr><th scope="col">ID</th><th scope="col">コマンド</th><th scope="col">引数・固有option</th><th scope="col">対象と効果</th><th scope="col">副作用</th></tr></thead><tbody><tr><td>C01</td><td><code>scope create initiative</code></td><td><code>--backend github --title TITLE [--slug SLUG]</code></td><td>GitHubで番号を発行してInitiativeを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
+<section id="catalog" aria-labelledby="catalog-title"><div class="section-label">10</div><h2 id="catalog-title">全54コマンドを確認する</h2><p>C45〜C54（<code>scope move</code>、<code>scope check</code> を含む）は、宣言の版4（canonical モード。仕様の構造を GitHub Issue に、中身を <code>spec-dock/canonical</code> ブランチに置く形）のためのコマンドです。使い方、ツールの設定の1行、エラーと次の1手は<a href="canonical.md">canonical モードの使い方</a>にあります。</p><p><code>--project ABS</code>は正確なworktree root、<code>--json</code>は<code>specdock.cli/v2</code>のenvelopeです。必要な変更確認は<code>--yes</code>、保全先は新しい<code>--backup-dir ABS</code>で指定します。optional表記でもapplyで必須になる条件があるため、現在helpと結果を読みます。</p>
+<div class="table-scroll wide" tabindex="0" aria-label="全54コマンド。左右にスクロールできます。"><table><thead><tr><th scope="col">ID</th><th scope="col">コマンド</th><th scope="col">引数・固有option</th><th scope="col">対象と効果</th><th scope="col">副作用</th></tr></thead><tbody><tr><td>C01</td><td><code>scope create initiative</code></td><td><code>--backend github --title TITLE [--slug SLUG]</code></td><td>GitHubで番号を発行してInitiativeを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
 <tr><td>C02</td><td><code>scope create epic</code></td><td><code>--backend github --parent TARGET --title TITLE [--slug SLUG]</code></td><td>明示したInitiativeの下にEpicを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
 <tr><td>C03</td><td><code>scope create issue</code></td><td><code>--backend github --parent TARGET --title TITLE [--slug SLUG]</code></td><td>明示したEpicの下にIssueを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
 <tr><td>C04</td><td><code>scope import github initiative</code></td><td><code>GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]</code></td><td>既存Issueを確認してInitiativeへ取り込みます。</td><td>GitHub読取り、ローカルScope</td></tr>
@@ -177,14 +177,15 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 <tr><td>C50</td><td><code>canonical restore</code></td><td><code>[PATH...]</code></td><td>保留中のパス（パスなしは保留中の削除）を、カタログのHEADの内容に戻します。commitしません。</td><td>カタログの作業ツリー</td></tr>
 <tr><td>C51</td><td><code>canonical resume</code></td><td><code>--adopt-remote</code> | <code>--push-local</code></td><td>一時停止したカタログの同期を、利用者が決めた扱いで再開します。</td><td>状態の置き場、<code>--push-local</code> はpush</td></tr>
 <tr><td>C52</td><td><code>canonical remove</code></td><td><code>[--yes]</code></td><td>未保存と未pushがないことを確かめてから、このcloneのリンク、カタログ、除外、定期の同期の登録を外します。ブランチは消しません。</td><td>リンク、カタログ、<code>info/exclude</code>、状態の置き場、定期の実行</td></tr>
-<tr><td>C53</td><td><code>scope move</code></td><td><code>TARGET --parent TARGET</code></td><td>schema4で、ScopeのGitHubの親だけを付け替えます（sub-issueの<code>replace_parent</code>）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば<code>spec-dock/active</code>のリンクを整えます。schema3では<code>CANONICAL_NOT_MIGRATED</code>で止まります。</td><td>GitHubの親子、active link</td></tr></tbody></table></div>
+<tr><td>C53</td><td><code>scope move</code></td><td><code>TARGET --parent TARGET</code></td><td>schema4で、ScopeのGitHubの親だけを付け替えます（sub-issueの<code>replace_parent</code>）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば<code>spec-dock/active</code>のリンクを整えます。schema3では<code>CANONICAL_NOT_MIGRATED</code>で止まります。</td><td>GitHubの親子、active link</td></tr>
+<tr><td>C54</td><td><code>scope check</code></td><td><code>TARGET</code></td><td>schema4で、1つのScopeの仕様をインターネットなしで検査します。CUEのScopeは型と一緒に<code>cue</code>（v0.17.1以上）で評価し、形の誤り、つながりの指摘、説明資料の形を、ファイルと直し方つきで示します。誤りがあれば終了コード7。MarkdownのScopeは<code>checked=false</code>で成功します。</td><td>読取りのみ</td></tr></tbody></table></div>
 <p>worktree createはroot/NAMEとworktree/NAME branchを作ります。project-owned <code>make init</code>はbootstrapで別に一回実行します。workbench copyも一回のcopyで、常時同期ではありません。worktree removeはnative Gitのguardを守り、branchを残します。</p>
 </section>
 <section id="safety" aria-labelledby="safety-title"><div class="section-label">11</div><h2 id="safety-title">この方式が保証する範囲</h2><p>協調して新CLIを使う同じphysical cloneのStartを直列化します。旧writer、任意の手編集、別clone、別PC、複数ホストの共有filesystemを完全に封鎖する仕組みではありません。未対応のOS/FS原語は成功と装わず停止します。</p>
 <p>main worktreeは制御拠点ではありません。読み取れない作業場、stale、破損、複数記録は診断に残します。Startの重複確認が完全でなければGit変更前に停止します。別branchへ移った直接記録も予約として捨てません。</p>
 <p>既存の仕様・ID・GitHub linkage・成果物を保全します。破壊的操作には正確な対象と削除等の明示的な許可が必要です。PR mergeは人間が行います。Finishの成功だけを、実装・テスト・Strict review・mergeの合格証拠にしません。</p>
 </section>
-<section id="sources" aria-labelledby="sources-title"><div class="section-label">12</div><h2 id="sources-title">詳細へ進む</h2><ul><li><a href="reference_cli.md">CLI参照</a>：53 leafと引数、JSON、Start/Finish。</li><li><a href="reference_worktree.md">worktree参照</a>：native Git一覧、作成、bootstrap、削除。</li><li><a href="reference_sync.md">状態の観測と検証</a>：Sync、working tree/CI validate、doctor。</li><li><a href="reference_github.md">GitHub参照</a>：番号、ref、完了とunknown。</li><li><a href="reference_deps.md">依存参照</a>：宣言/継承、readiness。</li><li><a href="reference_naming.md">命名と識別子</a>：既存ID、branch、捕捉token。</li><li><a href="authoring/overview.md">文書作成ガイド</a>：Requirement、Design、Plan、Report、Artifactの役割。</li><li><a href="README.md">文書の入口</a>：CurrentとHistoricalを区別して読む。</li></ul>
+<section id="sources" aria-labelledby="sources-title"><div class="section-label">12</div><h2 id="sources-title">詳細へ進む</h2><ul><li><a href="reference_cli.md">CLI参照</a>：54 leafと引数、JSON、Start/Finish。</li><li><a href="reference_worktree.md">worktree参照</a>：native Git一覧、作成、bootstrap、削除。</li><li><a href="reference_sync.md">状態の観測と検証</a>：Sync、working tree/CI validate、doctor。</li><li><a href="reference_github.md">GitHub参照</a>：番号、ref、完了とunknown。</li><li><a href="reference_deps.md">依存参照</a>：宣言/継承、readiness。</li><li><a href="reference_naming.md">命名と識別子</a>：既存ID、branch、捕捉token。</li><li><a href="authoring/overview.md">文書作成ガイド</a>：Requirement、Design、Plan、Report、Artifactの役割。</li><li><a href="README.md">文書の入口</a>：CurrentとHistoricalを区別して読む。</li></ul>
 <p>本書はpackageに同梱する日本語の操作ガイドです。外部script・font・通信を使わない単独HTMLとして開けます。既存の会話、古いengine/controlの操作説明、Historical資料を新CLIのauthorityにしません。</p>
 </section>
 <footer class="footer"><p>SpecDock / <a href="#overview">本文の先頭へ</a></p></footer>

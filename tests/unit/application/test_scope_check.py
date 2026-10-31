@@ -333,3 +333,47 @@ class TestReadAssurance:
         assert read_assurance(scope, timeout=30).problem.code == "CUE_NOT_FOUND"  # type: ignore[union-attr]
         (scope / "requirement.md").write_text("# r\n", encoding="utf-8")
         assert read_assurance(scope, timeout=30).problem.code == "SCOPE_FORMAT_CONFLICT"  # type: ignore[union-attr]
+
+
+def test_the_report_keeps_the_whole_evaluation_and_the_k1_file_order(tmp_path: Path) -> None:
+    from spec_dock.runtime.application.scope_check import k1_files
+    from spec_dock.runtime.infra.cue_schemas import schema_directory
+
+    scope = place_sample(tmp_path / "scope", "issue-strict-complete")
+    report = check(scope)
+    assert report.evaluation is not None and report.evaluation["steps"]["S-01"]["status"] == "done"
+    repository = tmp_path / "repo"
+    (repository / "spec-dock/cue").mkdir(parents=True)
+    (repository / "spec-dock/cue/b.cue").write_text("package spec\n", encoding="utf-8")
+    (repository / "spec-dock/cue/a.cue").write_text("package spec\n", encoding="utf-8")
+    types = schema_directory("specdock/v1")
+    assert types is not None
+    files = k1_files(types, repository, scope)
+    assert [path.name for path in files] == [
+        "base.cue",
+        "design_type.cue",
+        "plan_type.cue",
+        "requirement_type.cue",
+        "rules.cue",
+        "a.cue",
+        "b.cue",
+        "requirement.cue",
+        "design.cue",
+        "plan.cue",
+    ]
+    assert all(path.is_absolute() for path in files)
+
+
+def test_a_tool_failure_while_reading_the_level_stops_instead_of_blaming_the_document(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from spec_dock.runtime.application import scope_check
+    from spec_dock.runtime.application.scope_check import AssuranceReading
+    from spec_dock.runtime.presentation.envelope import Diagnostic
+
+    scope = place_sample(tmp_path / "scope", "issue-strict-complete")
+    timed_out = AssuranceReading(None, None, "unreadable", Diagnostic("CUE_TIMEOUT", "cue did not finish", {}))
+    monkeypatch.setattr(scope_check, "read_assurance", lambda *args, **kwargs: timed_out)
+    with pytest.raises(CanonicalCommandError) as raised:
+        check(scope)
+    assert (raised.value.code, raised.value.exit_code) == ("CUE_TIMEOUT", 5)

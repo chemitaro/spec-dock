@@ -27,6 +27,7 @@ from spec_dock.runtime.application.canonical_errors import (
 )
 from spec_dock.runtime.application.canonical_link import link_after_command
 from spec_dock.runtime.application.canonical_schedule import request_sync_now
+from spec_dock.runtime.application.canonical_scope_check import SCOPE_CHECK_FAILED
 from spec_dock.runtime.application.canonical_scopes import build_canonical_scopes
 from spec_dock.runtime.application.canonical_writes import (
     CATALOG_LOCK_TIMEOUT,
@@ -36,6 +37,7 @@ from spec_dock.runtime.application.canonical_writes import (
     open_write_session,
 )
 from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.scope_check import check_scope_documents, scope_format
 from spec_dock.runtime.application.start_plan import (
     StartLiveObservations,
     StartLocalSnapshot,
@@ -698,6 +700,7 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
     target = session.resolve(namespace.target, captured)
     check_write_expectations(session, namespace, captured, target)
     observed_state, descendants = _finish_rules(session, target.id)
+    check_warnings, refusal = _check_before_finish(context, session, target, observed_state, timeout=namespace.timeout)
     clear_handle = (
         captured.handle
         if captured.status == "selected"
@@ -719,10 +722,10 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             FinishData(target.id, observed_state == "completed", context.branch, context.branch, None),
             0,
             effects=tuple(planned),
-            warnings=tuple(session.warnings),
+            warnings=(*session.warnings, *check_warnings),
         )
     effects: list[Effect] = []
-    warnings: list[Diagnostic] = list(session.warnings)
+    warnings: list[Diagnostic] = [*session.warnings, *check_warnings]
     wrote_changeset = False
     try:
         with catalog_changes(catalog, command="work finish", origin="finish", timeout=CATALOG_LOCK_TIMEOUT) as changes:
@@ -744,6 +747,8 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
         # Confirm again on what GitHub reports now: another PC may have closed it or reopened a child meanwhile.
         session = open_write_session(context, namespace, link=True)
         observed_state, descendants = _finish_rules(session, target.id)
+        if refusal is not None and observed_state != "completed":
+            raise refusal  # completed at the first read, reopened since: the check's errors stop it again
     except (
         _SaveStopped,
         CanonicalCommandError,
@@ -777,6 +782,51 @@ def finish_work(namespace: argparse.Namespace, context: ProjectContext) -> Opera
             recovery=RecoveryInstructions(tuple(recovery)),
         )
     return _close_and_release(session, context, namespace, target.id, observed_state, clear_handle, effects, warnings)
+
+
+def _check_before_finish(
+    context: ProjectContext, session: WriteSession, target: ScopeView, observed_state: str, *, timeout: float
+) -> tuple[tuple[Diagnostic, ...], CanonicalCommandError | None]:
+    """The `scope check` of the Scope being closed, before anything is written (R-B7, iss-00473).
+
+    Returns the warnings to show and the refusal that applies while the Scope is open. A Markdown Scope or one
+    without a directory is not checked. Errors or an unusable `cue` stop an open Scope here; a Scope GitHub
+    already completed only has its selection released, so they become warnings: a type change after closing
+    must not keep the selection from being released. The caller applies the refusal again if a later read
+    finds the Scope open (another PC reopened it while finish waited for the save).
+    """
+    directory = session.scopes.directory(target.id)
+    if directory is None or scope_format(directory.path) == "markdown":
+        return (), None
+    completed = observed_state == "completed"
+    shown = target.path.relative_to(context.root).as_posix()
+    try:
+        report = check_scope_documents(
+            directory.path, kind=target.kind, shown=shown, repository_root=context.root, timeout=timeout
+        )
+    except CanonicalCommandError as error:
+        if not completed:
+            raise
+        return (Diagnostic(error.code, error.message, {"scope_id": target.id, **error.details}),), error
+    if not report.errors:
+        return report.warnings, None
+    errors = [{"code": item.code, "message": item.message, "details": dict(item.details)} for item in report.errors]
+    first = report.errors[0]
+    message = f"{target.id} has {len(report.errors)} spec check error(s); first: [{first.code}] {first.message}"
+    refusal = CanonicalCommandError(
+        SCOPE_CHECK_FAILED,
+        message,
+        recovery=(
+            f"Fix the errors (each names its file and a hint), confirm with spec-dock scope check {target.id}, "
+            f"then run spec-dock work finish {target.id} --yes again.",
+        ),
+        details={"scope_id": target.id, "errors": errors},
+    )
+    if not completed:
+        raise refusal
+    return (Diagnostic(SCOPE_CHECK_FAILED, message, {"scope_id": target.id, "errors": errors}), *report.warnings), (
+        refusal
+    )
 
 
 def _finish_rules(session: WriteSession, scope_id: str) -> tuple[str, tuple[str, ...]]:

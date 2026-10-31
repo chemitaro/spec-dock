@@ -1,6 +1,6 @@
 # CLI参照（Current）
 
-通常packageの外部 `spec-dock` が公開53 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
+通常packageの外部 `spec-dock` が公開54 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
 
 | 用途 | 入力 | 境界 |
 |---|---|---|
@@ -73,6 +73,7 @@
 | C51 | `canonical resume` | `--adopt-remote` \| `--push-local` | 一時停止したカタログの同期を、利用者が決めた扱いで再開します。 | 状態の置き場、`--push-local` はpush |
 | C52 | `canonical remove` | `[--yes]` | 未保存と未pushがないことを確かめてから、このcloneのリンク、カタログ、除外、定期の同期の登録を外します。ブランチは消しません。 | リンク、カタログ、`info/exclude`、状態の置き場、定期の実行 |
 | C53 | `scope move` | `TARGET --parent TARGET` | schema4で、ScopeのGitHubの親だけを付け替えます（sub-issueの`replace_parent`）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば`spec-dock/active`のリンクを整えます。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | GitHubの親子、active link |
+| C54 | `scope check` | `TARGET` | schema4で、1つのScopeの仕様をインターネットなしで検査します。CUEのScope（`requirement.cue`）は、型・リポジトリの型（`spec-dock/cue/*.cue`）と一緒に`cue`（v0.17.1以上）で評価し、形の誤り（`CUE_INVALID`）、つながりの指摘（`SPEC_FINDINGS`）、保証レベルの置き場、説明資料の形を、ファイルと直し方つきで示します。誤りがあれば終了コード7（`SCOPE_CHECK_FAILED`）。MarkdownのScopeは`checked=false`で成功します。`work finish`も閉じる前に同じ検査をします。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | 読取りのみ |
 
 ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象ではありません。通常操作はworkspaceの新writer宣言を検証します。help/version/completion、raw doctor、installation show/init、CI validateは各leafの限定的なcontextを使います。
 

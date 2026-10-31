@@ -183,6 +183,11 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `CANONICAL_DASHBOARD_FAILED` | 警告（同上） | `spec-dock canonical status` の `snapshot` と `sync` を確かめる |
 | `CANONICAL_TITLE_IGNORED` | 警告（`scope import github`） | 題名を変えるなら `spec-dock scope edit <ID> --title <題名>` |
 | `SCOPE_IN_PROGRESS` | 警告（`work start`） | 別のPCで作業中でないか利用者に確かめる。古い印なら `spec-dock work finish` か GitHub でラベルを外す |
+| `SCOPE_CHECK_FAILED` | 7（`scope check`）／3（`work finish`。何も書かない）／警告（既に完了の Scope の `work finish`） | 誤りごとに示したファイルと `hint` のとおりに直し、`spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` |
+| `SCOPE_FORMAT_CONFLICT` | 7（`scope check`、`workspace validate`） | `requirement.md` と `requirement.cue` の片方を外し、Scope の形式を1つにする |
+| `CUE_NOT_FOUND`、`CUE_VERSION_UNSUPPORTED` | 3（`scope check`、CUE の Scope の `work finish`） | `cue` v0.17.1 以上を PATH に入れる（例 `go install cuelang.org/go/cmd/cue@v0.17.1`）。Markdown の Scope には要らない |
+| `CUE_TIMEOUT`、`CUE_FAILED` | 5（同上） | `--timeout` を延ばして同じコマンドを実行する。`cue version` が動くか確かめ、動かなければ入れ直す |
+| `CUE_SCHEMA_UNSUPPORTED` | 3（同上） | `requirement.cue` の `schema` の版を持つ SpecDock に上げる（持っている版を示す） |
 | `CANONICAL_PROGRESS_MARK_FAILED` | 警告（`work start`、`work finish`） | GitHub で `spec-dock:in-progress` のラベルと担当者を確かめ、付け外す |
 | `READINESS_NOT_SATISFIED` | 3（`work start`） | `spec-dock dependency check <ID>` で止めているものを確かめ、前提を完了させる |
 | `READINESS_UNKNOWN`、`DEPENDENCY_NOT_IN_SNAPSHOT` | 警告（読むコマンド、`dependency check`） | `spec-dock workspace sync --source github` で取り直す。続くなら示した依存先を GitHub で確かめる |
