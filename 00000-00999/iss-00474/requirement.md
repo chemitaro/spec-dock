@@ -21,20 +21,20 @@ canonical モード（宣言の版4）の `scope create` と `scope import githu
   - I-1（#472）：型 `src/spec_dock/cue/v1/` と、雛形の見本 `tests/fixtures/cue/v1/templates/<種類>/`（置き換えの印 `{{ASSURANCE_LEVEL}}`、`{{ASSURANCE_REASON}}` を含む）。
   - I-2（#473）：`scope check`、`scope show` の `assurance`、`work finish` の検査、`workspace validate`・`doctor` の形式ごとの文書の組。
   - I-4（#475）：配布資産 `spec-dock/design-system/` と、薄い説明資料の雛形 `explanation-skeleton.html`。
-- 今の canonical の `scope create` は、`spec-dock/templates/<種類>/` の `.md` の4つを写す。保証レベルを知らない。
+- 今の canonical の `scope create` は、`spec-dock/templates/<種類>/` の `.md` の4つと `.workbench/README.md` を写す。保証レベルを知らない。
 - 今の `spec-dock/templates/<種類>/` は、前の版の CLI が使うので、I-7 まで変えない（Epic の design の K4）。
 
 ## 観測可能な要件
 
 - **R-01 保証レベルの指定を必須にする**：schema 4 の `scope create <種類>` と `scope import github <種類>` は、`--assurance`（`light`、`standard`、`strict`、`critical` のどれか）と `--assurance-reason`（空白だけでない文）の両方を求める。どちらかがない、または理由が空白だけのとき、GitHub に何も問い合わせず、何も書かずに `ASSURANCE_REQUIRED`（exit 2）で止まる。4つ以外の値は、引数の解析で止まる（`USAGE_ERROR`、exit 2）。`--dry-run` でも同じに止まる。
-- **R-02 CUE の一式を作る**：schema 4 の `scope create` は、新しい Scope のディレクトリに、`spec-dock/templates/cue/<種類>/` の5つのファイルを置く。今と同じ規則のリンク（`artifacts/rules.md`、`discussions/rules.md`）も置く。`.md` の要件・設計・計画は置かない。
-- **R-03 保証レベルを書き込む**：作った `requirement.cue` の `assurance.level` と `assurance.reason` は、指定した値と理由（前後の空白を除いたもの）である。理由に引用符、改行、タブ、バックスラッシュ、`\(`、制御文字が含まれても、CUE の文字列として正しく、`cue` で読むと元の文に戻る。
+- **R-02 CUE の一式を作る**：schema 4 の `scope create` は、新しい Scope のディレクトリに、`spec-dock/templates/cue/<種類>/` の5つのファイルと、今と同じ `.workbench/README.md` を置く。今と同じ規則のリンク（`artifacts/rules.md`、`discussions/rules.md`）も置く。`.md` の要件・設計・計画は置かない。
+- **R-03 保証レベルを書き込む**：作った `requirement.cue` の `assurance.level` と `assurance.reason` は、指定した値と理由（前後の空白を除いたもの）である。理由に引用符、改行、タブ、バックスラッシュ、`\(`、制御文字、U+FEFF が含まれても、CUE の文字列として正しく、`cue` で読むと元の文に戻る。
 - **R-04 `scope import github` の一式**：Scope のディレクトリがないとき、R-02、R-03 と同じ一式を置く。既にディレクトリがあるとき、雛形を足さず、既存のファイルを書き換えず、警告 `ASSURANCE_NOT_WRITTEN` を出す（今の「足りないものだけを足す」動きを守る）。
 - **R-05 配布資産が古いときに止まる**：`spec-dock/templates/cue/<種類>/` がない、5つのファイルのどれかがない、または `requirement.cue` に置き換えの印の片方がないとき、`scope create` と（ディレクトリを作る）`scope import github` は、GitHub に何も書かずに `SCOPE_TEMPLATES_OUTDATED`（exit 3）で止まり、次の手順に `spec-dock installation update` を示す。
 - **R-06 途中で止まったときの復旧**：`scope create` が GitHub の Issue を作った後に止まったとき、示す `scope import github` の復旧のコマンドは、`--assurance` と `--assurance-reason` を含み、そのまま実行できる（シェルの引用付き）。
 - **R-07 schema 3 は今のまま**：schema 3 の `scope create`・`scope import github` は、2つの引数なしで今と同じに動く。2つの引数のどちらかを付けたときは、何も書かずに `CANONICAL_NOT_MIGRATED`（exit 3）で止まる（黙って捨てて `.md` の Scope を作らない）。
 - **R-08 作った直後の Scope が検査に通る**：作った直後の CUE の Scope は、`scope check` で、雛形の説明資料の指摘（Initiative と Issue は警告 `EXPLANATION_SKELETON`、Epic は誤り）だけを示す。`scope show --json` は、インターネットなしで、`assurance` の `level`、`reason`、`source: "cue"` を返す。
-- **R-09 配布資産**：提供側 `src/spec_dock/assets/spec_dock/templates/cue/{initiative,epic,issue}/` に5つのファイルを置き、`static-inventory.json` に足し、dogfood の写し `spec-dock/templates/cue/` を同じ PR で足す。`explanation.html` は `spec-dock/design-system/explanation-skeleton.html` のバイト一致の写しである。`requirement.cue`、`design.cue`、`plan.cue` は、I-1 の見本を移したものである（見本は消し、I-1 のテストは移した先を読む）。今の `spec-dock/templates/<種類>/` は変えない。
+- **R-09 配布資産**：提供側 `src/spec_dock/assets/spec_dock/templates/cue/{initiative,epic,issue}/` に5つのファイルと `.workbench/README.md`（今の `templates/<種類>/.workbench/README.md` のバイト一致の写し）を置き、`static-inventory.json` に足し、dogfood の写し `spec-dock/templates/cue/` を同じ PR で足す。`explanation.html` は `spec-dock/design-system/explanation-skeleton.html` のバイト一致の写しである。`requirement.cue`、`design.cue`、`plan.cue` は、I-1 の見本を移したものである（見本は消し、I-1 のテストは移した先を読む）。今の `spec-dock/templates/<種類>/` は変えない。
 - **R-10 使い方の文書**：`spec-dock help scope create <種類>`、`scope import github <種類>` と、配布資産の `docs/canonical.md` の「エラーと次の1手」、`docs/reference_cli.md`、`docs/cli-redesign-guide.html` の C01〜C06 が、新しい引数とコードを示す。
 
 ## スコープ
@@ -53,7 +53,7 @@ canonical モード（宣言の版4）の `scope create` と `scope import githu
 - 書き方のガイド、`spec-dock` スキル、`templates/README.md`（I-6）。
 - 今の `.md` の雛形 `templates/<種類>/` を外すこと（I-7）。
 - schema 3 で CUE の Scope を作ること（iss-00473 の Q6）。
-- `scope create` から `cue` を呼ぶこと（下の D の決定）。
+- `scope create` から `cue` を呼ぶこと（「制約・前提」の Q5）。
 
 ## 失敗・境界条件
 
@@ -76,10 +76,10 @@ canonical モード（宣言の版4）の `scope create` と `scope import githu
 - **AC-04**（Epic AC-02、R-08）：作った直後の Scope で、`scope check --json` の誤りと警告が、説明資料の雛形の指摘だけ（Issue・Initiative は警告、Epic は誤り）であり、`scope show --json --offline` が `assurance = {level, reason, source: "cue", problem: null}` を返す。
 - **AC-05**（R-04、F-06）：ディレクトリがない Issue の `scope import github` が AC-01 と同じ一式を作る。既にディレクトリがある Scope の `scope import github` は、ファイルを足さず、書き換えず、警告 `ASSURANCE_NOT_WRITTEN` を出す。
 - **AC-06**（Epic AC-18 の前半、R-05、F-03）：`templates/cue/<種類>/` がないチェックアウト、ファイルが1つ欠けたチェックアウト、印が欠けたチェックアウトで、`scope create` と `scope import github` が `SCOPE_TEMPLATES_OUTDATED`（exit 3）で止まり、`recovery` に `spec-dock installation update` を含み、GitHub に書き込みの要求が届かない。
-- **AC-07**（Epic AC-18 の後半）：新しい配布資産でも、`templates/<種類>/` の中身（前の版の CLI がすべてを写す場所）は、今の `.md` の4つのままで、`templates/cue/` はその外にある。schema 3 の `scope create`（今も `templates/<種類>/` を写す）が、新しい配布資産で、今と同じ `.md` の Scope を作る。
-- **AC-08**（R-06、F-05）：Issue を作った後に止まった `scope create` の `recovery` の `scope import github` のコマンドが、2つの引数を含み、それをそのまま実行すると Scope ができる。
+- **AC-07**（Epic AC-18 の後半）：新しい配布資産でも、`templates/<種類>/` の中身（前の版の CLI がすべてを写す場所）は、今の `.md` の4つと `.workbench/README.md` のままで、`templates/cue/` はその外にある。schema 3 の `scope create`（今も `templates/<種類>/` を写す）が、新しい配布資産で、今と同じ `.md` の Scope を作る。
+- **AC-08**（R-06、F-05）：Issue を作った後に止まった `scope create` の `recovery` の `scope import github` のコマンドが、2つの引数を含み、それをそのまま実行すると Scope ができる。`-` で始まる理由でも同じ。
 - **AC-09**（R-07、F-07）：schema 3 で2つの引数を付けた `scope create` と `scope import github` が `CANONICAL_NOT_MIGRATED` で止まり、何も書かない。付けなければ、今の schema 3 の回帰のテストが変更なしで通る。
-- **AC-10**（R-09）：配布資産の `templates/cue/<種類>/` の5つのファイルが、`static-inventory.json` にあり、dogfood の写しとバイト一致する。`explanation.html` は `design-system/explanation-skeleton.html` とバイト一致する。作った Scope の `explanation.html` も、雛形とバイト一致する。`installation init` が、新しい15のファイルを置く。
+- **AC-10**（R-09）：配布資産の `templates/cue/<種類>/` の5つのファイルが、`static-inventory.json` にあり、dogfood の写しとバイト一致する。`explanation.html` は `design-system/explanation-skeleton.html` とバイト一致する。作った Scope の `explanation.html` も、雛形とバイト一致する。`installation init` が、新しい18のファイルを置く。
 - **AC-11**（R-10）：`help scope create issue` と `help scope import github issue` が、2つの引数を示す。`canonical.md` の表に `ASSURANCE_REQUIRED`、`SCOPE_TEMPLATES_OUTDATED`、`ASSURANCE_NOT_WRITTEN` の行がある（既存の表の検査のテストが通る）。
 - **AC-12**（Epic AC-12、AC-15）：`make lint` と `uv run pytest`（`cue` を PATH に置いて）が通る。既存のテストの変更は、下の「制約・前提」の範囲に限る。
 

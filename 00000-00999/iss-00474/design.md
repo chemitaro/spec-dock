@@ -24,7 +24,7 @@ ID: "iss-00474"
 |---|---|---|
 | schema 4 の `scope create`・`import` の引数 | `--title`、`--parent`、`--backend` | 加えて `--assurance LEVEL`、`--assurance-reason TEXT`（canonical の処理で必須） |
 | 写す雛形 | `spec-dock/templates/<種類>/`（`.md` の4つ） | `spec-dock/templates/cue/<種類>/`（5つ） |
-| 作られる文書 | `requirement.md`、`design.md`、`plan.md`、`report.md` | `requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` |
+| 作られる文書 | `requirement.md`、`design.md`、`plan.md`、`report.md`、`.workbench/README.md` | `requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`、`.workbench/README.md`（今と同じ） |
 | 雛形がないとき | `RuntimeError` → `LOCAL_IO_FAILED`（exit 5） | `SCOPE_TEMPLATES_OUTDATED`（exit 3、`installation update`） |
 | 雛形の CUE の見本 | `tests/fixtures/cue/v1/templates/`（テストだけ） | 配布資産 `templates/cue/`（見本は消す） |
 | schema 3 | `.md` を作る | 同じ。2つの引数を付けたら `CANONICAL_NOT_MIGRATED` |
@@ -49,7 +49,7 @@ def assurance_replacements(assurance: Assurance) -> dict[str, str]: ...      # {
 ```
 
 - `parse_assurance`：`level` が `None` → 誤り（`--assurance is required`）。`ASSURANCE_LEVELS` にない → 誤り（引数の解析が先に止めるので、直接の呼び出しの守り）。`reason` が `None`、または `reason.strip()` が空 → 誤り（`--assurance-reason must not be blank`）。`reason.strip()` を UTF-8 にできない（サロゲート）→ 誤り。返す `reason` は `strip()` したもの。空白の判定は Python の `str.strip()` で、I-1 の `#Text` と I-2 の `read_assurance` と同じ範囲（全角の空白も空白）。
-- `cue_string_body`：`json.dumps(text, ensure_ascii=False)` の両端の引用符を除いたもの。JSON の文字列の書き方（`\"`、`\\`、`\n`、`\t`、`\uXXXX` など）は、CUE の二重引用符の文字列でも同じ意味になる。`\` を `\\` にするので、`\(`（CUE の文字列の埋め込み）は文字のまま残る（`cue` v0.17.1 で、引用符、改行、タブ、バックスラッシュ、`\(`、NUL、BEL、DEL、ESC、U+2028、絵文字を確かめた。2026-10-31）。
+- `cue_string_body`：`json.dumps(text, ensure_ascii=False)` の両端の引用符を除き、U+FEFF を `\ufeff` に変えたもの（`cue` はファイルの先頭以外の BOM を `illegal byte order mark` として拒む。仕様のレビューの P2）。JSON の文字列の書き方（`\"`、`\\`、`\n`、`\t`、`\uXXXX` など）は、CUE の二重引用符の文字列でも同じ意味になる。`\` を `\\` にするので、`\(`（CUE の文字列の埋め込み）は文字のまま残る（`cue` v0.17.1 で、引用符、改行、タブ、バックスラッシュ、`\(`、NUL、BEL、DEL、ESC、U+2028、絵文字を確かめた。2026-10-31）。
 - `scope_check.LEVELS` は、この定数を使う（同じ値を2か所に持たない）。
 
 ### 2. 引数（`runtime/cli/catalog.py`）
@@ -74,8 +74,8 @@ def cue_template_directory(root: Path, kind: ScopeKind) -> Path: ...   # root / 
 - `create_scope`：`refuse_slug` の直後、確認・`open_write_session`（GitHub とカタログを読む前）の前に `_require_assurance`。`import_scope` も `refuse_slug` の直後（`parse_github_ref` より前）。どちらも `--dry-run` の前なので、予行でも止まる。`recovery`：「`--assurance <light|standard|strict|critical> --assurance-reason <text>` を付けて同じコマンドを実行する」。`details`：`{"argument": "--assurance" | "--assurance-reason"}`。
 - `_check_scaffold_sources(session, kind)`：今の規則のソースの確かめに加えて、`cue_template_directory` が実のディレクトリで、`CUE_TEMPLATE_FILES` がすべて通常のファイルで、`requirement.cue` が `LEVEL_MARKER` と `REASON_MARKER` を含むことを確かめる。欠けていれば `CanonicalCommandError(SCOPE_TEMPLATES_OUTDATED, exit_code=3, recovery=("Run spec-dock installation update to install the CUE Scope templates, then run the same command again.",), details={"path": <チェックアウトからの道筋>, "missing": [...]})`。呼ぶ位置は今のまま（create はラベルと Issue の作成より前、import は既存のディレクトリがないときだけ、ラベルより前）。
 - `_publish(..., assurance)`：`templates = cue_template_directory(...)`。`copy_scope_template_at(templates, destination, descriptor, replacements, final_replacements=assurance_replacements(assurance))`。
-- `import_scope`：`existing is not None` のとき、`ASSURANCE_NOT_WRITTEN` の警告（`details`：`{scope_id, next_step: "Edit assurance in requirement.cue of the existing Scope if it should change."}`）を `session.warnings` に足す。Markdown の Scope でも CUE の Scope でも同じ（どちらも書き換えない）。
-- `_import_command(kind, number, parent, title, assurance)`：`--assurance <level> --assurance-reason <shlex.quote(reason)>` を足す。
+- `import_scope`：`existing is not None` のとき、`ASSURANCE_NOT_WRITTEN` の警告（`details`：`{scope_id, next_step: "The existing Scope keeps its documents; in a CUE Scope, change assurance in requirement.cue if needed. A Markdown Scope has no assurance level."}`）を `session.warnings` に足す。Markdown の Scope でも CUE の Scope でも同じ（どちらも書き換えない）。
+- `_import_command(kind, number, parent, title, assurance)`：`--assurance <level>` と `--assurance-reason=<shlex.quote(reason)>`（`=` の形。`-` で始まる理由も1つの値として渡すため）を足す。
 
 ### 4. 雛形の写し（`runtime/infra/canonical_scaffold.copy_scope_template_at`）
 
@@ -88,17 +88,18 @@ def cue_template_directory(root: Path, kind: ScopeKind) -> Path: ...   # root / 
 
 ### 6. 配布資産
 
-- `src/spec_dock/assets/spec_dock/templates/cue/{initiative,epic,issue}/`：
+- `src/spec_dock/assets/spec_dock/templates/cue/{initiative,epic,issue}/`（種類ごとに6つ）：
   - `requirement.cue`、`design.cue`、`plan.cue`：`tests/fixtures/cue/v1/templates/<種類>/` のバイトのまま移す（`git mv`）。
   - `explanation.html`：`src/spec_dock/assets/spec_dock/design-system/explanation-skeleton.html` のバイト一致の写し。
+  - `.workbench/README.md`：今の `templates/<種類>/.workbench/README.md` のバイト一致の写し（今の Scope と同じく作業の場所の説明を置く。仕様のレビューの P3）。雛形の確かめ（`CUE_TEMPLATE_FILES`）には含めない。
   - `report.md`：今の `templates/<種類>/report.md` を元に、`依存` を `["requirement.cue", "design.cue", "plan.cue"]` にし、ガイドへのリンクを `templates/cue/<種類>/` からの相対（`../../../docs/authoring/report.md`）にしたもの。front matter の `タイトル`・`親` の行は、作るときに今の規則で消える。
-- `static-inventory.json`：15のファイルを、`mode: 420`、`init_only: false`、`known_old_sha256: []` で足す。変えた文書（`docs/canonical.md`、`docs/reference_cli.md`、`docs/cli-redesign-guide.html`）は、新しい `sha256` にし、古い値を `known_old_sha256` に足す。
+- `static-inventory.json`：18のファイルを、`mode: 420`、`init_only: false`、`known_old_sha256: []` で足す。変えた文書（`docs/canonical.md`、`docs/reference_cli.md`、`docs/cli-redesign-guide.html`）は、新しい `sha256` にし、古い値を `known_old_sha256` に足す。
 - dogfood の写し：`spec-dock/templates/cue/` と、変えた3つの文書を、提供側とバイト一致にする。
-- `tests/unit/cue/test_schema_v1_templates.py` は、移した先を読む。ファイルの一覧の確かめは、3つの CUE の文書が含まれることに変える。`_fill` は runtime の `assurance_replacements` を使い、テストの補助 `cue_string_body` と同じ結果になることも確かめる。
+- `tests/unit/cue/test_schema_v1_templates.py` は、移した先を読む。ファイルの一覧の確かめは、3つの CUE の文書が含まれることに変える。`_fill` は runtime の `assurance_replacements` を使う。テストの補助 `cue_string_body` とは、文字列ではなく、`cue` で読んだ値が同じになること（どちらも元の理由に戻ること）を確かめる。
 
 ### 7. 文書（配布資産）
 
-- `docs/canonical.md` の「エラーと次の1手」に3行：`ASSURANCE_REQUIRED`（2、`scope create`・`scope import github`、GitHub に何も書かない）→「`--assurance` と `--assurance-reason` を付けて同じコマンドを実行する」。`SCOPE_TEMPLATES_OUTDATED`（3、同上）→「`spec-dock installation update` で配布資産を上げてから同じコマンドを実行する」。`ASSURANCE_NOT_WRITTEN`（警告、`scope import github`）→「既にある Scope は書き換えない。変えるなら `requirement.cue` の `assurance` を直す」。冒頭の slug の行の近くに、保証レベルの必須の1文を足す。
+- `docs/canonical.md` の「エラーと次の1手」に3行：`ASSURANCE_REQUIRED`（2、`scope create`・`scope import github`、GitHub に何も書かない）→「`--assurance` と `--assurance-reason` を付けて同じコマンドを実行する」。`SCOPE_TEMPLATES_OUTDATED`（3、同上）→「`spec-dock installation update` で配布資産を上げてから同じコマンドを実行する」。`ASSURANCE_NOT_WRITTEN`（警告、`scope import github`）→「既にある Scope は書き換えない。CUE の Scope で変えるなら `requirement.cue` の `assurance` を直す（Markdown の Scope は保証レベルを持たない）」。冒頭の slug の行の近くに、保証レベルの必須の1文を足す。
 - `docs/reference_cli.md` と `docs/cli-redesign-guide.html` の C01〜C06 の引数の欄に `--assurance LEVEL --assurance-reason TEXT`（schema4 で必須）を足す。
 
 ## data / failure
@@ -111,7 +112,7 @@ def cue_template_directory(root: Path, kind: ScopeKind) -> Path: ...   # root / 
 
 ## 変更対象
 
-- 足すもの：`runtime/domain/assurance.py`、`assets/spec_dock/templates/cue/**`（15）と dogfood の写し、テスト（`tests/unit/domain/test_assurance.py`、`tests/cli_runtime/test_issue474_scope_create.py`、`tests/cli_runtime/test_issue474_schema3.py`、`tests/unit/infra/test_issue474_cue_templates.py`）。
+- 足すもの：`runtime/domain/assurance.py`、`assets/spec_dock/templates/cue/**`（18）と dogfood の写し、テスト（`tests/unit/domain/test_assurance.py`、`tests/cli_runtime/test_issue474_scope_create.py`、`tests/cli_runtime/test_issue474_schema3.py`、`tests/unit/infra/test_issue474_cue_templates.py`）。
 - 変えるもの：`canonical_scope_create.py`、`canonical_scaffold.py`（infra）、`direct_scope_publish.py`、`cli/catalog.py`、`scope_check.py`（定数を使うだけ）、`static-inventory.json`、配布資産の3つの文書と dogfood の写し、既存のテスト（`requirement.md` の「制約・前提」の範囲）。
 - 移すもの：`tests/fixtures/cue/v1/templates/**` → `assets/spec_dock/templates/cue/**`。
 - 変えないもの：`templates/<種類>/`、`design-system/`、`src/spec_dock/cue/`、`scope_check` の検査の中身、`work finish`、`scope show`、スキル、ガイド、`templates/README.md`、`.github/workflows/`。
@@ -134,9 +135,9 @@ def cue_template_directory(root: Path, kind: ScopeKind) -> Path: ...   # root / 
 | AC-05 | 偽の GitHub に Issue を置き `scope import github`。既存のディレクトリ（`world.scope(...)`）で import、警告とファイルの不変 |
 | AC-06 | 種のファイルから `templates/cue/` を外す・1つ欠く・印を欠く。`fake.writes()` が空 |
 | AC-07 | 提供側の `templates/<種類>/` のファイルの一覧。schema 3 の既存の作成のテスト |
-| AC-08 | 親への `sub_issues` を失敗させた `scope create` の `recovery` を `shlex.split` して、そのまま実行 |
+| AC-08 | 親への `sub_issues` を失敗させた `scope create` の `recovery` を `shlex.split` して、そのまま実行。`-` で始まる理由でも |
 | AC-09 | schema 3 の世界（`tests/cli_runtime/test_issue413_scope_publish.py` の補助）で2つの引数を付ける |
-| AC-10 | 目録・写し・スケルトンのバイトの比較、`installation init` の `created_paths` |
+| AC-10 | 目録・写し・スケルトンのバイトの比較、`installation init` の `created_paths`、作った Scope の `explanation.html` と雛形のバイトの比較（`test_issue474_scope_create.py`） |
 | AC-11 | `help` の出力、`test_issue436_docs.py` の表の検査 |
 | AC-12 | `make lint`、`PATH=.workbench/bin:$PATH uv run pytest`、`git diff --stat origin/main -- tests/` |
 
@@ -159,3 +160,4 @@ def cue_template_directory(root: Path, kind: ScopeKind) -> Path: ...   # root / 
 - **Q6 `report.md`**：今の `.md` の report を元に、依存を CUE の3つにした新しいファイルにする。`templates/README.md` とガイドは I-6。
 - **AC-12 の読み方**：`requirement.md` の「制約・前提」のとおり（統括の決定）。
 - **理由の前後の空白**（この Issue で決めた）：題名と同じく、前後の空白を除いて書く。
+- **仕様のレビュー（第1回、合格）の P2・P3 の取り込み**：U+FEFF の逃がし、`.workbench/README.md` の写し、作った説明資料のバイト一致のテスト、`ASSURANCE_NOT_WRITTEN` の次の手順の文、`-` で始まる理由の復旧のコマンド、テストの補助との比べ方。`SCOPE_KIND_CHANGED` の復旧の文（作り直すと CUE の Scope になる）は、この Issue の変更対象の外なので、報告の残るリスクに書く。
