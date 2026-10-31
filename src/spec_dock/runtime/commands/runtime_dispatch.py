@@ -90,7 +90,7 @@ def dispatch(namespace: argparse.Namespace, cwd: Path) -> tuple[int, str, str]:
             raise
         if context.mode == "canonical":
             result = dispatch_canonical(namespace, context)
-        elif command.startswith("canonical ") or command in ("scope move", "scope check"):
+        elif command.startswith("canonical ") or command in ("scope move", "scope check", "scope render"):
             result = canonical_not_migrated(command)
         elif command == "work start":
             from spec_dock.runtime.application.work_start import start_work

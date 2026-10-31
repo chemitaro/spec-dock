@@ -27,6 +27,7 @@ from spec_dock.runtime.application.canonical_scope_read import (
     show_active,
     show_scope,
 )
+from spec_dock.runtime.application.canonical_scope_render import render_scope_command
 from spec_dock.runtime.application.canonical_status import run_canonical_status
 from spec_dock.runtime.application.canonical_sync import run_canonical_sync, run_registered_sync
 from spec_dock.runtime.application.canonical_work import finish_work, start_work
@@ -62,6 +63,7 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "canonical remove": run_canonical_remove,
     "scope show": show_scope,
     "scope check": check_scope,
+    "scope render": render_scope_command,
     "scope list": list_scope,
     "dependency list": query_dependencies,
     "dependency check": query_dependencies,
