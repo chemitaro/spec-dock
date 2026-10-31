@@ -41,7 +41,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
   <Scope>/requirement.cue <Scope>/design.cue <Scope>/plan.cue
 ```
 
-- `cue` 0.17.1 の `export` に `-c` はない（`unknown shorthand flag: 'c'`、2026-10-31 に確認）。`export` は、もともと具体的な値だけを出し、具体的でなければ失敗するので、`-c` なしで K1 の意図どおりになる。Epic の `design.md` の K1 の行の直しを、統括に頼む（「統括に確かめること」の Q1）。
+- `cue` 0.17.1 の `export` に `-c` はない（`unknown shorthand flag: 'c'`、2026-10-31 に確認）。`export` は、もともと具体的な値だけを出し、具体的でなければ失敗するので、`-c` なしで K1 の意図どおりになる。統括が、Epic の `design.md` の K1 を直した（「決めたこと」の Q1）。
 - この Issue は、製品の中で `cue` を呼ぶ部品を作らない（I-2）。テストは、上のとおりに `cue` を呼ぶテスト用の補助（`tests/support/cue.py`）を使う。
 - 型のファイルの名前は、Scope のファイルの名前と重ならないようにする（誤りの文の位置で見分けやすくするため）。
 
@@ -183,14 +183,14 @@ cue export --out json -t kind=<initiative|epic|issue> \
 | `rollback-missing` | 3 | 手順が1つ以上あり、`rollback` がない | 切り分けが1つ以上あり、`rollback` がない |
 | `execution-reference` | 0 | 手順の `session` が `execution.sessions` にない。レビューの `after` が手順にない | 切り分けの `session` が `execution.sessions` にない。レビューの `after` が切り分けにない |
 
-- 出す段階以上のレベルでは、規則の一覧が、違反がなくても空の並びとして出る（どの規則で調べたかが分かる）。段階より低いレベルでは、その規則の名前が出ない。`execution-reference` は、`execution` があるか、`session` を書いた作業の単位があるときに出る（Q4）。
+- 出す段階以上のレベルでは、規則の一覧が、違反がなくても空の並びとして出る（どの規則で調べたかが分かる）。段階より低いレベルでは、その規則の名前が出ない。`execution-reference` は、`execution` があるか、`session` を書いた作業の単位があるときに出る（「決めたこと」の Q4）。
 - Epic と Initiative で要件がどの `covers` にもないと、`requirement-without-step`（段階0）と `requirement-without-test`（段階1）の両方に出る（R-B3 の注の読み替えのとおり）。
-- 取り下げた手順（`dropped`）は、要件を満たすものとして数えず、`orphan-step` の対象にもしない。参照（`realizes`、`after`、`session`）は、取り下げた手順も調べる（Q3）。
+- 取り下げた手順（`dropped`）は、要件を満たすものとして数えず、`orphan-step` の対象にもしない。参照（`realizes`、`after`、`session`）は、取り下げた手順も調べる（「決めたこと」の Q3）。
 - 指摘の形（RQ-11）：
   - `id`：問題のある項目の番号（`R-01`、`F-01`、`D-01`、`S-01`、`T-01`、子の ID）。レビューは `execution.reviews.<名前>`、`rollback-missing` は `rollback`。番号の頭で、どのファイルの項目かが分かる（R、F は `requirement.cue`、D は `design.cue`、ほかは `plan.cue`）。
   - `message`：何が問題か。参照の先と、項目の道筋を含める（例「design."D-01".satisfies の "R-09" は、requirements と failures にない番号です」）。
   - `hint`：直すファイルと項目（例「requirement.cue に "R-09" を足すか、design.cue の design."D-01".satisfies から外す」）。
-  - 文は日本語にする（仕様の文書と、そのガイドに合わせる。Q6）。
+  - 文は日本語にする（「決めたこと」の Q6）。
   - 一覧は `id` の順に並べる（同じ入力から同じ結果。I-5 の決まった並びの助けにもなる）。
 
 ### 6. リポジトリの型（K6、R-B6）
@@ -205,7 +205,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
   - `package spec`、型の版（`requirement.cue` だけに `schema: "specdock/v1"`）。
   - `assurance: {level: "{{ASSURANCE_LEVEL}}", reason: "{{ASSURANCE_REASON}}"}`（`requirement.cue`）。印は、CUE の二重引用符の文字列の中に置く。置き換える側（I-3）は、理由を、二重引用符の文字列の中身の書き方に変えてから入れる（`\` を `\\`、`"` を `\"`、改行を `\n`、ほかの制御文字を `\u` の形に）。`\(`（CUE の文字列の埋め込み）も、`\` を変えることで、文字のまま入る。
   - 番号の構造（`requirements: {}` など）と、書き方の例の注（書き換える項目と、レベルで必須になる項目）。例は注にして、値を置かない（値を置くと、雛形のままで指摘が出るため）。
-- 置き場は Q2（推奨は、テストの見本の置き場 `tests/fixtures/cue/v1/templates/<種類>/`。I-3 が配布資産 `templates/cue/<種類>/` に移す）。
+- 置き場は、テストの見本の置き場 `tests/fixtures/cue/v1/templates/<種類>/`（「決めたこと」の Q2）。I-3 が配布資産 `templates/cue/<種類>/` に移す。
 
 ## data / failure
 
@@ -223,7 +223,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
   - `src/spec_dock/runtime/infra/cue_schemas.py`
   - `pyproject.toml`（パッケージのデータ）
   - `.github/workflows/provider-ci.yml`（`provider-tests` のジョブに、`cue` の導入の手順を1つ）
-  - 雛形の CUE（9つ。置き場は Q2）
+  - 雛形の CUE（9つ。`tests/fixtures/cue/v1/templates/<種類>/`）
   - テスト：`tests/support/cue.py`、`tests/unit/cue/`（型の規則、レベル、`execution`、リポジトリの型、雛形、形の誤り、見本の固定、`cue` がないときの失敗）、`tests/unit/infra/test_cue_schemas.py`、`tests/integration/test_cue_schema_wheel.py`、`tests/integration/test_provider_ci_cue.py`、見本の `tests/fixtures/cue/v1/`
 - 変えないもの：既存のテストのファイル、`spec-dock/templates/<種類>/` の `.md` の雛形、`static-inventory.json`、dogfood の写し（`spec-dock/` の下。この Issue は配布資産を変えない）、ランタイムの既存のコマンド、`setup.py`。
 
@@ -258,17 +258,15 @@ cue export --out json -t kind=<initiative|epic|issue> \
 - **子の ID が、本当にその親の子かを調べない**：型は GitHub の構造を知らない。I-2 の検査で比べるかは I-2 で決める（引き渡し）。
 - **`schema` と `assurance` を、`requirement.cue` 以外のファイルに書いても、型は気づかない**：CUE は、ファイルの区別なく1つにまとめるため。I-2 の `scope show` は `requirement.cue` だけを読むので、I-2 で、別のファイルにあれば知らせるかを決める（引き渡し）。
 
-## 統括に確かめること
+## 決めたこと
 
-推奨を先に書く。返事で決まったら、この節を「決めたこと」に直す。
+統括に確かめ、2026-10-31 に、すべて推奨のとおりに決まった（Q1、Q4 は、統括が Epic の `design.md` も直した）。
 
-- **Q1（K1 の直し）**：`cue export -c` は 0.17.1 で失敗する。K1 を `cue export --out json -t kind=<種類> ...` に直してよいか（推奨：直す。意味は同じ）。Epic の `design.md` の直しは統括が行う。
-- **Q2（雛形の置き場）**：I-1 の雛形の CUE の中身を、どこに置くか。
-  - 推奨：テストの見本として `tests/fixtures/cue/v1/templates/<種類>/` に置き、I-3 が配布資産の `src/spec_dock/assets/spec_dock/templates/cue/<種類>/` に移す（配布資産、`static-inventory.json`、dogfood の写しは、K4 の持ち主の I-3 だけが変える）。
-  - 別案：I-1 が、配布資産の置き場に3つの CUE だけを置き、在庫と写しも足す（I-3 の「`templates/cue/<種類>/` がなければ止まる」の判定が、一式がそろう前に満たされてしまう）。
-- **Q3（取り下げた手順）**：`dropped` の手順を、要件を満たす手順として数えない、でよいか（推奨：数えない）。
-- **Q4（`execution-reference` の出る条件）**：K2 は「`execution` があるときだけ」。`execution` を書かずに手順に `session` だけを書いた場合も、この規則で知らせてよいか（推奨：知らせる。書き忘れの見落としを防ぐ）。
-- **Q5（種類ごとの違い）**：Epic と Initiative の `steps`・`tests`、Issue の `slices` を、形の誤りにしてよいか（推奨：誤りにする。読み替えの規則が、どちらを数えるかで迷わないため）。
-- **Q6（指摘の文の言葉）**：`findings` の `message` と `hint` を日本語にしてよいか（推奨：日本語。CLI の誤りの文は英語だが、仕様の文書とガイドは日本語のため）。
-- **Q7（`rollback-missing` の出る条件）**：手順か切り分けが1つ以上あるときだけ出す、でよいか（推奨：その条件。作った直後の critical の Scope が、指摘なしで通るため。I-3 の受け入れ「作った直後は説明資料の警告だけ」と合う）。
-- **Q8（項目の一覧と、レベルの表）**：3と4の節のとおりでよいか。
+- **Q1（K1 の直し）**：`cue export -c` は 0.17.1 で失敗するので、K1 を `cue export --out json -t kind=<種類> ...` にした（`export` は、もともと具体的な値を求めるので、意味は同じ）。
+- **Q2（雛形の置き場）**：I-1 の雛形の CUE は、テストの見本として `tests/fixtures/cue/v1/templates/<種類>/` に置く。I-3 が、配布資産の `src/spec_dock/assets/spec_dock/templates/cue/<種類>/` に移し、`static-inventory.json` と dogfood の写しも I-3 が足す（K4 の持ち主が配布資産を変える。一式がそろう前に、I-3 の「`templates/cue/<種類>/` がなければ止まる」の判定が満たされないように）。
+- **Q3（取り下げた手順）**：`dropped` の手順は、要件を満たす手順として数えない。
+- **Q4（`execution-reference` の出る条件）**：`execution` があるときに加えて、`execution` がなくても、`session` を書いた作業の単位があれば出す（書き忘れの見落としを防ぐ）。
+- **Q5（種類ごとの違い）**：Epic と Initiative の `steps`・`tests`、Issue の `slices` は、直し方を示す形の誤りにする（読み替えの規則が、どちらを数えるかで迷わないため）。
+- **Q6（指摘の文の言葉）**：`findings` の `message` と `hint` は日本語にする（仕様の文書とガイドに合わせる）。
+- **Q7（`rollback-missing` の出る条件）**：手順か切り分けが1つ以上あるときだけ出す（作った直後の critical の Scope が、指摘なしで通る。I-3 の受け入れ「作った直後は説明資料の警告だけ」と合う）。
+- **Q8（項目の一覧と、レベルの表）**：3と4の節のとおり。
