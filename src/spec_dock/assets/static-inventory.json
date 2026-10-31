@@ -56,6 +56,46 @@
       ]
     },
     {
+      "path": "spec-dock/design-system/ds.css",
+      "source": "spec_dock/design-system/ds.css",
+      "sha256": "b6fb9e3ea931e3593ad93d61b0ace454287e93a4502680cb0755811302ff2d24",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/design-system/ds.js",
+      "source": "spec_dock/design-system/ds.js",
+      "sha256": "62fdbae5e67ed6b033c09c5dcb2fc8dea7cadad4c024cb4a0b9f16e93dc3698f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/design-system/explanation-skeleton.html",
+      "source": "spec_dock/design-system/explanation-skeleton.html",
+      "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/design-system/vendor/marked.LICENSE.md",
+      "source": "spec_dock/design-system/vendor/marked.LICENSE.md",
+      "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/design-system/vendor/marked.umd.js",
+      "source": "spec_dock/design-system/vendor/marked.umd.js",
+      "sha256": "21568877a938d2c4e7d74e27f18e60da96bb73a68809610ca39216e1efebae62",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
       "sha256": "b26c1072fcf0305586fab8a6b4741aa3197b006fbcd71f173c83d25c7d5db459",
