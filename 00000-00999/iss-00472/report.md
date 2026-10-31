@@ -36,7 +36,7 @@ ID: "iss-00472"
 | AC-06 | 通過。共通の項目、番号のキー、各項目、種類のタグ、`_rank` の書き換え、Unicode の空白だけの値が、項目の道筋を含み `cycle` を含まない誤りになる | `tests/unit/cue/test_schema_v1_shape_errors.py` |
 | AC-07 | 通過。8つの見本の結果が `expected.json` と一致（期待の結果は、規則の表と照らして手で確かめてから置いた） | `tests/unit/cue/test_schema_v1_golden.py` |
 | AC-08 | 通過。ビルドの入力だけを写した場所から作った wheel、sdist からの wheel、インストールした wheel で確かめた | `tests/integration/test_cue_schema_wheel.py`、`tests/unit/infra/test_cue_schemas.py` |
-| AC-09 | 通過（手元）。ワークフローの文面のテスト、`cue` がないときの失敗のテスト。手順の台本を手元で流し、amd64・arm64 の正しい実行ファイルが出ること、ほかの環境で止まること、書き換えた取得物で `sha256sum -c` が失敗することを確かめた。PR の CI での実行は「PR」の節 | `tests/integration/test_provider_ci_cue.py`、`tests/unit/cue/test_cue_required.py` |
+| AC-09 | 通過。ワークフローの文面のテスト、`cue` がないときの失敗のテスト。手順の台本を手元で流し、amd64・arm64 の正しい実行ファイルが出ること、ほかの環境で止まること、書き換えた取得物で `sha256sum -c` が失敗することを確かめた。PR #480 の CI（GitHub の Linux amd64 のランナー）で、`cue_v0.17.1_linux_amd64.tar.gz: OK`、`cue version v0.17.1` の後に全テストが通った | `tests/integration/test_provider_ci_cue.py`、`tests/unit/cue/test_cue_required.py` |
 | AC-10 | 通過。`make lint` 通過。全テスト 3705 passed、8 skipped（canonical のリンクのない clone、`16ef1ec`）。既存のテストのファイルと `.md` の雛形は変えていない（`git diff --diff-filter=M` は `pyproject.toml` と `provider-ci.yml` だけ） | 最終品質ゲートの test lane |
 | AC-11 | 通過。各項目、`assurance`、トップレベル、`execution` に足した項目がそのまま出る。番号の形でないキーは誤り | `tests/unit/cue/test_schema_v1_flexibility.py` |
 | AC-12 | 通過。すべての指摘が `id`、`message`、`hint` を持ち、`hint` が直すファイルを名指し、`id` の順に並ぶ | `test_schema_v1_rules.py` |
@@ -45,6 +45,7 @@ ID: "iss-00472"
 - 仕様のレビュー（`spec-review`、spec-reviewer opus / xhigh）：1回目で合格（P0・P1 なし、P2 3件、P3 2件）。合格の後に、P2・P3 を文書で手当てした（AC-01 の文言、AC-11・AC-12 の追加、種類のタグと `_rank` の書き換えの扱い。記録は Workbench の `spec-review/iss-00472/review-response.md`）。
 - コードのレビュー（`code-review`、code-reviewer opus / high、standards と spec の2人）：どちらも合格。standards の P2 1件（RE2 の `\S` が全角の空白を空白と見ない）を直した（`16ef1ec`）。spec は指摘なし。
 - 最終品質ゲート（`final-quality-gate`、キャンペーン `iss-00472-gate-1`、1回目）：合格の commit `16ef1ec`。主 opus / xhigh：pass、coverage complete、P3 2件。2人目 sonnet / high：pass、指摘なし。test lane：`make lint` 0、全テスト 0。記録は Workbench の `final-quality-gate/iss-00472-gate-1/closure.md`。
+- PR #480 の CI（head `16ef1ec`、2026-10-31T10:12Z）：Provider CI（run 41191221155：`route`、`provider-tests`、配布の確かめ ubuntu・macos）、SpecDock check（41191221215）、Commit identity（41191221201、41191192918）がすべて成功。`provider-tests` は GitHub の `ubuntu-latest` で、pytest 3681 passed、32 skipped（手元の macOS では 3705 passed、8 skipped。合計は同じ 3713 で、違いは既存の、OS による skip。新しいテストに skip はない）。GitHub のマージの状態は OPEN、非下書き、MERGEABLE、CLEAN（`github-pr-checks` の observer：`OBSERVED_CI_PASS`、`READY`）。
 - ゲートの P3（参考情報、直していない）：FQG-001 `#Title` が単独の CR を通す。FQG-002 取り下げた手順の参照も調べること（Q3）をテストが確かめていない（実装は調べている）。
 
 ## Residual Risks / Follow-ups
@@ -57,4 +58,4 @@ ID: "iss-00472"
 - **I-3 への引き渡し**：雛形を `tests/fixtures/cue/v1/templates/<種類>/` から配布資産へ移す（テストの道筋も変える）。理由は、`tests/support/cue.py` の `cue_string_body` と同じ書き方で、二重引用符の中に入れる。理由が空白だけ（Unicode の空白を含む）なら型が誤りにするので、`--assurance-reason` で先に止める。
 - **I-5 への引き渡し**：`after` の輪は v1 では見つけない。描画は輪があっても止まらないようにする。
 - **I-6 への引き渡し**：項目の一覧、レベルの表、規則の表、リポジトリの型の決まり（`_rank` は読むだけ、`_specdock` を使わない、規則の名前を重ねない）、`findings` の文は日本語。
-- **未確認**：PR の CI（GitHub の Linux の amd64 のランナーと、自前の Linux arm64 のランナー）で、取得、checksum、`cue version`、全テストが通ること（PR の作成の後に確かめる）。
+- **未確認**：自前の Linux arm64 のランナーでの `cue` の導入（今回の PR の CI では、`route` が GitHub のランナーを選んだ。arm64 の取得物の checksum と、arm64 の実行ファイルであることは、手元で確かめた）。外部の CheckRun（observer の範囲の外）。
