@@ -162,7 +162,7 @@ assets/vendor/
   | `canonical-file` | `file:` で `.canonical/…` | CDN の代わりに同梱を返す | 合格、`vendor.plantuml = "cdn"`、`vendor.hljs = "cdn"` |
   | `initiatives-file` | `file:` で `initiatives/…` | 同上 | 合格 |
   | `local-http` | 道具のサーバーで、`meta`（`content="/vendor/"`）を `ds.js` の前に足した写し | `/vendor/` から同梱を配る。CDN は止める | 合格、`vendor.plantuml = "local"`、`vendor.hljs = "local"` |
-| `local-fallback` | 道具のサーバーで、部品のない場所を示す `meta` を足した写し | CDN の代わりに同梱を返す | 合格、`vendor.plantuml = "cdn"` |
+  | `local-fallback` | 道具のサーバーで、部品のない場所を示す `meta` を足した写し | CDN の代わりに同梱を返す | 合格、`vendor.plantuml = "cdn"` |
   | `offline-standalone` | `file:` で `.canonical/…` | すべて止める | 本文は準備を終え、図は誤り1つ、捕まえていない誤りなし |
   | `missing-marked` | `vendor/marked.umd.js` を消した木 | すべて止める | `ready` が偽、知らせが出る |
 

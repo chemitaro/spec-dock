@@ -39,7 +39,7 @@ ID: "iss-00475"
 - **S-01 図の部品**：`.workbench/` の新しい空のディレクトリに、npm の tarball（`@plantuml/core` 1.2026.6、`@highlightjs/cdn-assets` 11.11.1）を取り、integrity を npm の値と照らす。展開だけを行い、中のスクリプトを実行しない。design の 4 のファイルを `src/spec_dock/assets/vendor/` に写し、`manifest.json` を書く。
 - **S-02 入口**（AC-04）：Red：一覧と目録の一致、SHA-256、利用許諾、目録にない道筋と `..`、中身を変えた部品、目録の壊れのテスト。Green：`runtime/infra/diagram_vendor.py`。
 - **S-03 デザインシステム**（AC-01、AC-03）：Red：5つのファイルが目録にあり、dogfood と一致し、`ds.css` と `vendor/` が、写した時の元の SHA-256（固定値）と一致する。`ds.js` の版の定数が部品の目録と一致する。`installation init` で置かれる。Green：写し、`ds.js` の直し（design の 2）、`static_assets.py` の許す場所、`static-inventory.json`、`spec-dock/design-system/` の写し。
-- **S-04 雛形**（AC-02）：Red：R-02 の4条件のテスト（HTML を解析する）。Green：`explanation-skeleton.html`（元の `document-skeleton.md` に倣った節と、PlantUML の図1つ）。
+- **S-04 雛形**（AC-02）：Red：R-02 の4条件のテスト（HTML を解析する）。Green：`explanation-skeleton.html`（元の `document-skeleton.md` に倣った節と、PlantUML の図1つと、言語を付けたコードの囲み1つ）。
 - **S-05 wheel**（AC-04）：作った wheel に部品と目録が入るテストを足す（新しいテストとして足し、今のテストは変えない）。
 - **S-06 ブラウザーの検査の道具**（AC-05、AC-05b、AC-06、AC-07）：`tests/browser/explanation-check.mjs` と、使い方の `tests/browser/README.md`。6つの場面を手元で通し、結果を報告書に書く。
 
