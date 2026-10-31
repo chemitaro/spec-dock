@@ -60,7 +60,7 @@ schema!: "specdock/v1"
 kind:    "initiative" | "epic" | "issue" @tag(kind)
 assurance: {
 	level!:  "light" | "standard" | "strict" | "critical"
-	reason!: string & !=""
+	reason!: string & =~"\\S"   // 空白だけでない文字列
 }
 
 // 番号を持つ項目は、番号をキーにした構造で持つ（順番は order や after で表す）
@@ -88,7 +88,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
   | `requirement-without-test` | 要件を確かめるテストがない | 1 |
   | `orphan-step` | どの要件にも結び付かない手順 | 2（strict） |
   | `failure-without-test` | 失敗の条件に、確かめるテストがない | 2 |
-  | `rollback-missing` | 戻し方がない | 3（critical） |
+  | `rollback-missing` | 戻し方がない（手順か切り分けが1つ以上あるときだけ） | 3（critical） |
   | `execution-reference` | 手順が存在しないセッションを指す、レビューが存在しない手順を指す | 0（`execution` があるか、手順に `session` を書いたときだけ。R-D4） |
 
 - **種類ごとの違い**：Epic と Initiative の計画は、手順とテストの代わりに、子の Scope への切り分け `slices: [=~"^(epic|iss)-[0-9]{5,}$"]: {covers!: [...string], ...}`（子の ID と、その子に任せる要件）を持つ。子の保証レベルは書かない（R-C4）。種類ごとの必須の項目は、`if kind == "epic" {...}` で切り替える。規則は、R-B3 の表の後の注のとおりに読み替える。Epic と Initiative では、`requirement-without-step`、`requirement-without-test`、`failure-without-test` は、`slices` の `covers` に入っていれば満たす。`orphan-step` は、`covers` が空の切り分けに当てはめる。`requirement-without-design` は、Issue と同じに当てはめる。
