@@ -44,8 +44,9 @@ _specdock: {
 // Unicode separators (\p{Z}, such as U+3000) and \v, U+001C-U+001F and U+0085.
 #Text: string & =~"[^\\s\\p{Z}\\x{0B}\\x{1C}-\\x{1F}\\x{85}]"
 
-// One line of text that is not blank.
-#Title: string & =~"^[^\\n]*[^\\s\\p{Z}\\x{0B}\\x{1C}-\\x{1F}\\x{85}][^\\n]*$"
+// One line of text that is not blank. "One line" follows Python's str.splitlines(): no LF, CR, \v, \f,
+// U+001C-U+001E, U+0085, U+2028 or U+2029 (CommonMark also ends a line at a lone CR).
+#Title: string & =~"^[^\\n\\r\\x{0B}\\x{0C}\\x{1C}-\\x{1E}\\x{85}\\x{2028}\\x{2029}]*[^\\s\\p{Z}\\x{0B}\\x{1C}-\\x{1F}\\x{85}][^\\n\\r\\x{0B}\\x{0C}\\x{1C}-\\x{1E}\\x{85}\\x{2028}\\x{2029}]*$"
 
 // Connection findings, one list per rule. A rule that applies at this level always has a list, empty
 // when nothing is wrong; a rule below its stage has no entry. Repository types may add rules.

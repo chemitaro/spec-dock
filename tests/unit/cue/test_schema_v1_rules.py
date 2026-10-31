@@ -195,6 +195,28 @@ ISSUE_CASES = [
         _set(("plan", "steps", "S-03"), {"title": "掃除する", "realizes": []}),
         {"orphan-step": ["S-03"]},
     ),
+    # A dropped step counts for nothing, but its references are still checked (design.md Q3).
+    Case(
+        "dropped-step-realizes-unknown",
+        _set(("plan", "steps", "S-03"), {"title": "やめた案", "realizes": ["R-09"], "status": "dropped"}),
+        {"unknown-reference": ["S-03"]},
+    ),
+    Case(
+        "dropped-step-after-unknown",
+        _set(
+            ("plan", "steps", "S-03"),
+            {"title": "やめた案", "realizes": ["R-01"], "after": ["S-09"], "status": "dropped"},
+        ),
+        {"unknown-reference": ["S-03"]},
+    ),
+    Case(
+        "dropped-step-session-unknown",
+        _set(
+            ("plan", "steps", "S-03"),
+            {"title": "やめた案", "realizes": ["R-01"], "session": "gone", "status": "dropped"},
+        ),
+        {"execution-reference": ["S-03"]},
+    ),
     Case(
         "dropped-step-with-no-requirement",
         _set(("plan", "steps", "S-03"), {"title": "掃除する", "realizes": [], "status": "dropped"}),

@@ -179,3 +179,20 @@ def test_text_with_a_visible_character_among_unicode_spaces_is_not_blank(tmp_pat
         requirements={"R-01": {"title": text}},
     )
     assert evaluate(write_scope(tmp_path, requirement), "issue").ok
+
+
+# A title is one line: no character that Python's str.splitlines() breaks on (CommonMark also ends a line at a
+# lone CR), not only LF (final quality gate FQG-001, iss-00472).
+LINE_BREAKS = ["\n", "\r", "\r\n", "\v", "\f", "\x1c", "\x1d", "\x1e", "\x85", " ", " "]
+
+
+@pytest.mark.parametrize("brk", LINE_BREAKS, ids=lambda brk: f"U+{ord(brk[0]):04X}")
+def test_a_title_with_any_line_break_is_not_one_line(tmp_path: Path, brk: str) -> None:
+    title = f"一行目{brk}二行目"
+    assert len(title.splitlines()) == 2
+    _assert_fails_naming(tmp_path, _requirement(requirements={"R-01": {"title": title}}), 'requirements."R-01".title')
+
+
+def test_a_title_may_hold_tabs_and_inner_spaces(tmp_path: Path) -> None:
+    requirement = _requirement(requirements={"R-01": {"title": "保存\tできる　（速い）"}})
+    assert evaluate(write_scope(tmp_path, requirement), "issue").ok
