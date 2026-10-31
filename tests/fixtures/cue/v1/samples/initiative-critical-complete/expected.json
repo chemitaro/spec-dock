@@ -1,0 +1,92 @@
+{
+  "kind": "initiative",
+  "level": "critical",
+  "export": {
+    "schema": "specdock/v1",
+    "kind": "initiative",
+    "assurance": {
+      "level": "critical",
+      "reason": "利用者の記録の保存の仕組みを入れ替える"
+    },
+    "findings": {
+      "unknown-reference": [],
+      "requirement-without-step": [],
+      "requirement-without-design": [],
+      "requirement-without-test": [],
+      "orphan-step": [],
+      "failure-without-test": [],
+      "rollback-missing": [],
+      "execution-reference": []
+    },
+    "requirements": {
+      "R-01": {
+        "title": "記録を新しい保存先に移せる",
+        "acceptance": [
+          "移した記録がすべて読める"
+        ]
+      },
+      "R-02": {
+        "title": "古い保存先を止められる",
+        "acceptance": [
+          "古い保存先に書かれない"
+        ]
+      }
+    },
+    "failures": {
+      "F-01": {
+        "title": "移す途中で止まったら、古い保存先を使い続ける",
+        "impact": "記録が2か所に分かれる",
+        "recovery": "移し直す"
+      }
+    },
+    "design": {
+      "D-01": {
+        "title": "移す仕組み",
+        "satisfies": [
+          "R-01",
+          "F-01"
+        ]
+      },
+      "D-02": {
+        "title": "止める仕組み",
+        "satisfies": [
+          "R-02"
+        ]
+      }
+    },
+    "rollback": "新しい保存先への書き込みを止め、古い保存先に戻す",
+    "slices": {
+      "epic-00021": {
+        "covers": [
+          "R-01",
+          "F-01"
+        ],
+        "session": "coord"
+      },
+      "epic-00022": {
+        "covers": [
+          "R-02"
+        ],
+        "after": [
+          "epic-00021"
+        ],
+        "session": "coord"
+      }
+    },
+    "steps": {},
+    "tests": {},
+    "execution": {
+      "sessions": {
+        "coord": {
+          "model": "opus",
+          "effort": "high"
+        }
+      },
+      "reviews": {
+        "gate": {
+          "after": "epic-00022"
+        }
+      }
+    }
+  }
+}

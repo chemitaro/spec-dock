@@ -1,0 +1,7 @@
+{
+  "kind": "epic",
+  "level": "light",
+  "error_paths": [
+    "steps.\"S-01\""
+  ]
+}

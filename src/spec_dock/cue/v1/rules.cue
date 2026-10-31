@@ -9,29 +9,35 @@ package spec
 import "list"
 
 _specdock: {
+	// The maps of the other kind are read as empty, so a field written for the wrong kind reports its
+	// own shape error once instead of again through every rule.
+	ownSteps: [if _specdock.issue {steps}, {}][0]
+	ownTests: [if _specdock.issue {tests}, {}][0]
+	ownSlices: [if !_specdock.issue {slices}, {}][0]
+
 	requirementIDs: [for k, _ in requirements {k}]
 	failureIDs: [for k, _ in failures {k}]
 	targets: list.Concat([requirementIDs, failureIDs])
-	stepIDs: [for k, _ in steps {k}]
-	sliceIDs: [for k, _ in slices {k}]
+	stepIDs: [for k, _ in _specdock.ownSteps {k}]
+	sliceIDs: [for k, _ in _specdock.ownSlices {k}]
 	unitIDs: list.Concat([stepIDs, sliceIDs])
 
 	// Numbers that a live work unit realizes or covers.
 	realized: list.Concat([
-		[for _, s in steps if s.status != "dropped" for r in s.realizes {r}],
-		[for _, s in slices for r in s.covers {r}],
+		[for _, s in _specdock.ownSteps if s.status != "dropped" for r in s.realizes {r}],
+		[for _, s in _specdock.ownSlices for r in s.covers {r}],
 	])
 	designed: [for _, d in design for r in d.satisfies {r}]
 	// Numbers verified: an Issue's tests, or what an Epic or Initiative hands to a child.
 	verified: list.Concat([
-		[for _, t in tests for r in t.verifies {r}],
-		[for _, s in slices for r in s.covers {r}],
+		[for _, t in _specdock.ownTests for r in t.verifies {r}],
+		[for _, s in _specdock.ownSlices for r in s.covers {r}],
 	])
 
 	sessionNames: [if execution != _|_ if execution.sessions != _|_ for name, _ in execution.sessions {name}]
 	sessionUsers: list.Concat([
-		[for k, s in steps if s.session != _|_ {id: k, session: s.session}],
-		[for k, s in slices if s.session != _|_ {id: k, session: s.session}],
+		[for k, s in _specdock.ownSteps if s.session != _|_ {id: k, session: s.session}],
+		[for k, s in _specdock.ownSlices if s.session != _|_ {id: k, session: s.session}],
 	])
 	usesExecution: execution != _|_ || len(sessionUsers) > 0
 
@@ -56,27 +62,27 @@ findings: {
 			message: "design.\"\(k)\".satisfies の \"\(r)\" は、requirements と failures にない番号です"
 			hint:    "requirement.cue に \"\(r)\" を足すか、design.cue の design.\"\(k)\".satisfies から外す"
 		}],
-		[for k, s in steps for r in s.realizes if !list.Contains(_specdock.targets, r) {
+		[for k, s in _specdock.ownSteps for r in s.realizes if !list.Contains(_specdock.targets, r) {
 			id:      k
 			message: "steps.\"\(k)\".realizes の \"\(r)\" は、requirements と failures にない番号です"
 			hint:    "requirement.cue に \"\(r)\" を足すか、plan.cue の steps.\"\(k)\".realizes から外す"
 		}],
-		[for k, s in steps if s.after != _|_ for r in s.after if !list.Contains(_specdock.stepIDs, r) {
+		[for k, s in _specdock.ownSteps if s.after != _|_ for r in s.after if !list.Contains(_specdock.stepIDs, r) {
 			id:      k
 			message: "steps.\"\(k)\".after の \"\(r)\" は、steps にない手順です"
 			hint:    "plan.cue の steps に \"\(r)\" を足すか、steps.\"\(k)\".after から外す"
 		}],
-		[for k, t in tests for r in t.verifies if !list.Contains(_specdock.targets, r) {
+		[for k, t in _specdock.ownTests for r in t.verifies if !list.Contains(_specdock.targets, r) {
 			id:      k
 			message: "tests.\"\(k)\".verifies の \"\(r)\" は、requirements と failures にない番号です"
 			hint:    "requirement.cue に \"\(r)\" を足すか、plan.cue の tests.\"\(k)\".verifies から外す"
 		}],
-		[for k, s in slices for r in s.covers if !list.Contains(_specdock.targets, r) {
+		[for k, s in _specdock.ownSlices for r in s.covers if !list.Contains(_specdock.targets, r) {
 			id:      k
 			message: "slices.\"\(k)\".covers の \"\(r)\" は、requirements と failures にない番号です"
 			hint:    "requirement.cue に \"\(r)\" を足すか、plan.cue の slices.\"\(k)\".covers から外す"
 		}],
-		[for k, s in slices if s.after != _|_ for r in s.after if !list.Contains(_specdock.sliceIDs, r) {
+		[for k, s in _specdock.ownSlices if s.after != _|_ for r in s.after if !list.Contains(_specdock.sliceIDs, r) {
 			id:      k
 			message: "slices.\"\(k)\".after の \"\(r)\" は、slices にない切り分けです"
 			hint:    "plan.cue の slices に \"\(r)\" を足すか、slices.\"\(k)\".after から外す"
@@ -115,12 +121,12 @@ findings: {
 
 	if _rank >= 2 {
 		"orphan-step": list.Sort(list.Concat([
-			[for k, s in steps if s.status != "dropped" if len(s.realizes) == 0 {
+			[for k, s in _specdock.ownSteps if s.status != "dropped" if len(s.realizes) == 0 {
 				id:      k
 				message: "\(k) は、どの要件にも結び付いていません"
 				hint:    "plan.cue の steps.\"\(k)\".realizes に、この手順が満たす要件の番号を書く（要らない手順なら status を \"dropped\" にする）"
 			}],
-			[for k, s in slices if len(s.covers) == 0 {
+			[for k, s in _specdock.ownSlices if len(s.covers) == 0 {
 				id:      k
 				message: "\(k) は、どの要件も任されていません"
 				hint:    "plan.cue の slices.\"\(k)\".covers に、この子に任せる要件の番号を書く"

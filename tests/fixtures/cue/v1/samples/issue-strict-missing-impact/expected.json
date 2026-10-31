@@ -1,0 +1,8 @@
+{
+  "kind": "issue",
+  "level": "strict",
+  "error_paths": [
+    "failures.\"F-01\".impact",
+    "failures.\"F-01\".recovery"
+  ]
+}

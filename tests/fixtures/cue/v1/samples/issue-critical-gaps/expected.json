@@ -1,0 +1,135 @@
+{
+  "kind": "issue",
+  "level": "critical",
+  "export": {
+    "schema": "specdock/v1",
+    "kind": "issue",
+    "assurance": {
+      "level": "critical",
+      "reason": "利用者のデータを消す処理で、戻せない"
+    },
+    "findings": {
+      "unknown-reference": [],
+      "requirement-without-step": [],
+      "requirement-without-design": [],
+      "requirement-without-test": [],
+      "orphan-step": [
+        {
+          "id": "S-03",
+          "message": "S-03 は、どの要件にも結び付いていません",
+          "hint": "plan.cue の steps.\"S-03\".realizes に、この手順が満たす要件の番号を書く（要らない手順なら status を \"dropped\" にする）"
+        }
+      ],
+      "failure-without-test": [
+        {
+          "id": "F-02",
+          "message": "F-02 を確かめるテストがありません",
+          "hint": "plan.cue の tests に、verifies に \"F-02\" を含む項目を足す"
+        }
+      ],
+      "rollback-missing": [
+        {
+          "id": "rollback",
+          "message": "戻し方（rollback）がありません",
+          "hint": "plan.cue に rollback を書く"
+        }
+      ],
+      "execution-reference": [
+        {
+          "id": "S-01",
+          "message": "S-01 の session \"impl\" は、execution.sessions にありません",
+          "hint": "plan.cue の execution.sessions に \"impl\" を足すか、steps.\"S-01\".session を直す"
+        },
+        {
+          "id": "S-02",
+          "message": "S-02 の session \"impl\" は、execution.sessions にありません",
+          "hint": "plan.cue の execution.sessions に \"impl\" を足すか、steps.\"S-02\".session を直す"
+        },
+        {
+          "id": "execution.reviews.security",
+          "message": "レビュー security の after \"S-04\" は、steps にありません",
+          "hint": "plan.cue の execution.reviews.security.after を、steps にある番号にする"
+        }
+      ]
+    },
+    "requirements": {
+      "R-01": {
+        "title": "古い記録を消せる",
+        "acceptance": [
+          "消した記録は、どの画面にも出ない"
+        ]
+      }
+    },
+    "failures": {
+      "F-01": {
+        "title": "消す前に、写しを取る",
+        "impact": "写しがないと戻せない",
+        "recovery": "写しから戻す"
+      },
+      "F-02": {
+        "title": "途中で止まったら、消した分を報告する",
+        "impact": "どこまで消えたか分からない",
+        "recovery": "報告をもとに、写しから戻す"
+      }
+    },
+    "design": {
+      "D-01": {
+        "title": "消す部品",
+        "satisfies": [
+          "R-01",
+          "F-01",
+          "F-02"
+        ]
+      }
+    },
+    "steps": {
+      "S-01": {
+        "title": "写しを取る",
+        "realizes": [
+          "F-01"
+        ],
+        "status": "todo",
+        "session": "impl"
+      },
+      "S-02": {
+        "title": "消す",
+        "realizes": [
+          "R-01"
+        ],
+        "status": "todo",
+        "after": [
+          "S-01"
+        ],
+        "session": "impl"
+      },
+      "S-03": {
+        "title": "準備",
+        "realizes": [],
+        "status": "todo"
+      }
+    },
+    "tests": {
+      "T-01": {
+        "title": "消せる",
+        "verifies": [
+          "R-01"
+        ]
+      },
+      "T-02": {
+        "title": "写しがある",
+        "verifies": [
+          "F-01"
+        ]
+      }
+    },
+    "slices": {},
+    "execution": {
+      "reviews": {
+        "security": {
+          "role": "安全のレビュー",
+          "after": "S-04"
+        }
+      }
+    }
+  }
+}

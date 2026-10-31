@@ -1,0 +1,98 @@
+{
+  "kind": "issue",
+  "level": "standard",
+  "export": {
+    "schema": "specdock/v1",
+    "kind": "issue",
+    "assurance": {
+      "level": "standard",
+      "reason": "通常の機能の追加"
+    },
+    "findings": {
+      "unknown-reference": [
+        {
+          "id": "D-01",
+          "message": "design.\"D-01\".satisfies の \"R-03\" は、requirements と failures にない番号です",
+          "hint": "requirement.cue に \"R-03\" を足すか、design.cue の design.\"D-01\".satisfies から外す"
+        }
+      ],
+      "requirement-without-step": [],
+      "requirement-without-design": [
+        {
+          "id": "R-02",
+          "message": "R-02 を満たす設計がありません",
+          "hint": "design.cue の design に、satisfies に \"R-02\" を含む項目を足す"
+        }
+      ],
+      "requirement-without-test": [
+        {
+          "id": "R-02",
+          "message": "R-02 を確かめるテストがありません",
+          "hint": "plan.cue の tests に、verifies に \"R-02\" を含む項目を足す"
+        }
+      ]
+    },
+    "requirements": {
+      "R-01": {
+        "title": "値を保存できる",
+        "text": "保存した値は、**次に開いたとき**にも読める。",
+        "acceptance": [
+          "保存した値を、開き直した後に読める"
+        ]
+      },
+      "R-02": {
+        "title": "値を消せる",
+        "acceptance": [
+          "消した値は読めない"
+        ]
+      }
+    },
+    "failures": {
+      "F-01": {
+        "title": "壊れた入力は保存しない"
+      }
+    },
+    "design": {
+      "D-01": {
+        "title": "保存の部品",
+        "satisfies": [
+          "R-01",
+          "R-03"
+        ]
+      }
+    },
+    "steps": {
+      "S-01": {
+        "title": "保存を作る",
+        "realizes": [
+          "R-01"
+        ],
+        "status": "done"
+      },
+      "S-02": {
+        "title": "削除を作る",
+        "realizes": [
+          "R-02"
+        ],
+        "status": "doing",
+        "after": [
+          "S-01"
+        ]
+      },
+      "S-03": {
+        "title": "掃除する",
+        "realizes": [],
+        "status": "todo"
+      }
+    },
+    "tests": {
+      "T-01": {
+        "title": "保存できる",
+        "verifies": [
+          "R-01"
+        ]
+      }
+    },
+    "slices": {}
+  }
+}

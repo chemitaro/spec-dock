@@ -72,6 +72,7 @@ def evaluate(scope: Path, kind: str | None, *, overlay: Path | None = None, sche
 
     `kind=None` leaves the tag out, which SpecDock never does; tests use it to see that error.
     """
+    scope = scope.resolve()
     command = [cue_executable(), "export", "--out", "json"]
     if kind is not None:
         command += ["-t", f"kind={kind}"]

@@ -1,0 +1,127 @@
+{
+  "kind": "issue",
+  "level": "strict",
+  "export": {
+    "exit": "PR がマージできる状態",
+    "steps": {
+      "S-01": {
+        "title": "書き出しを作る",
+        "realizes": [
+          "R-01"
+        ],
+        "status": "done",
+        "session": "impl"
+      },
+      "S-02": {
+        "title": "上書きを止める",
+        "realizes": [
+          "F-01"
+        ],
+        "status": "doing",
+        "after": [
+          "S-01"
+        ],
+        "session": "impl"
+      },
+      "S-03": {
+        "title": "古い案",
+        "realizes": [],
+        "status": "dropped"
+      }
+    },
+    "tests": {
+      "T-01": {
+        "title": "書き出して読み込める",
+        "verifies": [
+          "R-01"
+        ]
+      },
+      "T-02": {
+        "title": "既にあるときは止まる",
+        "verifies": [
+          "F-01"
+        ]
+      }
+    },
+    "verification": "`uv run pytest`",
+    "current": "設定を書き出す方法がない",
+    "schema": "specdock/v1",
+    "kind": "issue",
+    "assurance": {
+      "level": "strict",
+      "reason": "公開の CLI の契約を変える"
+    },
+    "findings": {
+      "unknown-reference": [],
+      "requirement-without-step": [],
+      "requirement-without-design": [],
+      "requirement-without-test": [],
+      "orphan-step": [],
+      "failure-without-test": [],
+      "execution-reference": []
+    },
+    "purpose": "設定を書き出せる",
+    "background": "利用者が、設定を別の PC に移したい",
+    "includes": [
+      "書き出しのコマンド"
+    ],
+    "excludes": [
+      "読み込み"
+    ],
+    "constraints": [
+      "Python 3.10 以上"
+    ],
+    "failures": {
+      "F-01": {
+        "title": "書き出し先がすでにあるときは、何も書かずに止まる",
+        "impact": "利用者のファイルを上書きしない",
+        "recovery": "別の場所を指定して、もう一度実行する"
+      }
+    },
+    "requirements": {
+      "R-01": {
+        "title": "設定を JSON に書き出せる",
+        "acceptance": [
+          "書き出した JSON を、そのまま読み込める"
+        ]
+      }
+    },
+    "slices": {},
+    "execution": {
+      "sessions": {
+        "impl": {
+          "task": "仕様化と実装",
+          "model": "opus",
+          "effort": "high",
+          "rationale": "strict の Issue"
+        }
+      },
+      "reviews": {
+        "code": {
+          "role": "コードのレビュー",
+          "after": "S-02",
+          "model": "opus",
+          "effort": "high"
+        }
+      }
+    },
+    "target": "`export` のコマンドが、設定を JSON に書き出す",
+    "design": {
+      "D-01": {
+        "title": "書き出しの部品",
+        "satisfies": [
+          "R-01"
+        ]
+      },
+      "D-02": {
+        "title": "書き出し先の確かめ",
+        "satisfies": [
+          "F-01"
+        ]
+      }
+    },
+    "risks": [
+      "JSON の形を後から変えにくい"
+    ]
+  }
+}
