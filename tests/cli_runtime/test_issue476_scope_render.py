@@ -98,7 +98,7 @@ def test_an_evaluation_failure_succeeds_with_the_check_results_and_a_warning(wor
     plan.write_text(plan.read_text(encoding="utf-8").replace('status: "doing"', 'status: "nope"'), encoding="utf-8")
     code, out, err = text_run(world, "scope", "render", "iss-3")
     assert code == 0
-    assert "warning [SCOPE_RENDER_INCOMPLETE]" in err
+    assert "warning [SCOPE_RENDER_INCOMPLETE]" in err and "spec-dock scope check iss-00003" in err
     assert "CUE\\_INVALID" in out and "## 要件" not in out
     code, payload = world.run("scope", "render", "iss-3")
     result = payload["data"]["result"]
@@ -135,3 +135,4 @@ def test_a_checkout_without_the_design_system_warns(world: CanonicalWorld) -> No
     code, out, err = text_run(world, "scope", "render", "iss-3")
     assert code == 0 and out.startswith("<!doctype html>")
     assert "warning [DESIGN_SYSTEM_MISSING]" in err
+    assert "spec-dock installation update" in err

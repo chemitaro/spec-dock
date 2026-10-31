@@ -129,3 +129,18 @@ def test_a_cue_problem_stops_with_the_scope_check_code(
     with pytest.raises(CanonicalCommandError) as raised:
         render_scope_html(scope, design_system_base="/ds/", vendor_base=None)
     assert (raised.value.code, raised.value.exit_code) == (code, exit_code)
+
+
+def test_the_level_is_read_from_requirement_cue_alone(tmp_path: Path) -> None:
+    scope = source(tmp_path, "issue-light-minimal")
+    requirement = scope.directory / "requirement.cue"
+    text = requirement.read_text(encoding="utf-8")
+    start = text.index("assurance:")
+    end = text.index("}", start) + 1
+    requirement.write_text(text[:start] + text[end:], encoding="utf-8")
+    plan = scope.directory / "plan.cue"
+    plan.write_text(plan.read_text(encoding="utf-8") + "\n" + text[start:end] + "\n", encoding="utf-8")
+    rendered = render_scope(scope, design_system_base="/ds/", vendor_base=None)
+    assert rendered.complete
+    assert "ASSURANCE\\_UNREADABLE" in rendered.html
+    assert "status: 保証レベル 未確定" in rendered.html and "読めません" in rendered.html

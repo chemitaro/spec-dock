@@ -195,3 +195,11 @@ def test_an_id_that_is_not_a_number_is_plain_text() -> None:
     }
     text = markdown(value)
     assert "- rollback：m" in text and "Q\\-07（ない番号）" in text
+
+
+def test_a_backtick_line_with_a_backtick_info_is_not_a_fence() -> None:
+    value = evaluation("issue-light-minimal")
+    value["purpose"] = "```a`b``` は行の中の符号"
+    text = markdown(value)
+    assert "```a`b``` は行の中の符号\n\n" in text
+    assert text.count("```") == 2  # nothing was appended to close it

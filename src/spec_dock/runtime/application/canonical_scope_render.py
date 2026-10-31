@@ -59,7 +59,8 @@ def render_scope_command(namespace: argparse.Namespace, context: ProjectContext)
         warnings.append(
             Diagnostic(
                 SCOPE_RENDER_INCOMPLETE,
-                f"{scope.id} cannot be evaluated; the page shows only its check results",
+                f"{scope.id} cannot be evaluated; the page shows only its check results."
+                f" Fix the errors, then run spec-dock scope check {scope.id}",
                 {"scope_id": scope.id, "next_step": f"Fix the errors, then run spec-dock scope check {scope.id}."},
             )
         )
@@ -67,7 +68,8 @@ def render_scope_command(namespace: argparse.Namespace, context: ProjectContext)
         warnings.append(
             Diagnostic(
                 DESIGN_SYSTEM_MISSING,
-                "this checkout has no spec-dock/design-system/ds.js; the page cannot be drawn in a browser",
+                "this checkout has no spec-dock/design-system/ds.js; the page cannot be drawn in a browser."
+                " Run spec-dock installation update in this checkout",
                 {"path": "spec-dock/design-system", "next_step": "Run spec-dock installation update in this checkout."},
             )
         )

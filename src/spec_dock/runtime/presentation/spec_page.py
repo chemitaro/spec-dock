@@ -114,6 +114,8 @@ def _text_block(value: object) -> str:
             continue
         mark = match.group(1)
         if fence is None:
+            if mark[0] == "`" and "`" in match.group(2):
+                continue  # CommonMark: a backtick info string with a backtick is a paragraph, not a fence
             fence = mark
         elif mark[0] == fence[0] and len(mark) >= len(fence) and not match.group(2).strip():
             fence = None

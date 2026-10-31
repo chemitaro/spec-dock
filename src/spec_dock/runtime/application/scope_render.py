@@ -87,10 +87,9 @@ def render_scope(
         error for error in report.errors if error.code != SPEC_FINDINGS and not error.code.startswith("EXPLANATION_")
     )
     evaluation = report.evaluation
-    assurance = evaluation.get("assurance") if evaluation is not None else None
-    if not isinstance(assurance, dict):
-        reading = report.assurance
-        assurance = {"level": reading.level, "reason": reading.reason} if reading.source == "cue" else None
+    # The level is read from requirement.cue alone, as scope show and scope check read it (K3, R-C2).
+    reading = report.assurance
+    assurance = {"level": reading.level, "reason": reading.reason} if reading.source == "cue" else None
     title = page_title(source.scope_id, source.title)
     markdown = spec_markdown(
         scope_id=source.scope_id, title=source.title, evaluation=evaluation, assurance=assurance, errors=errors
