@@ -199,7 +199,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `SCOPE_DIRECTORY_MISSING` | 警告（`workspace validate`） | その Scope の `<区切り>/<ID>/` を作る（`spec-dock scope import github <種類> <番号>`）か、別のクローンの保存を待つ |
 | `SCOPE_ISSUE_MISSING` | 警告（同上） | 示した `<ID>/` の Issue を GitHub で確かめる。要らなければ中身を確かめてからディレクトリを消す |
 | `SCOPE_DIRECTORY_MISPLACED` | 警告（同上） | 中身を `<区切り>/<ID>/`（`details.expected`）に移し、空になったディレクトリを消す |
-| `SCOPE_DOCUMENT_MISSING` | 警告（同上） | 示した文書（`requirement.md`、`design.md`、`plan.md`、`report.md`）を足す |
+| `SCOPE_DOCUMENT_MISSING` | 警告（同上） | 示した文書を足す（Markdown の Scope は `requirement.md`、`design.md`、`plan.md`、`report.md`、CUE の Scope は `requirement.cue`、`design.cue`、`plan.cue`、`report.md`） |
 | `SCOPE_METADATA_PRESENT` | 警告（同上） | カタログの `.meta.json` を消す（canonical モードでは使わない） |
 | `GITHUB_SNAPSHOT_STALE` | 警告 | 表示は取得の時刻の時点のもの。つながったら、次の表示か定期の同期で新しくなる |
 | `GITHUB_RATE_LIMITED` | 5 | 示した時刻の後に同じコマンドを実行する |

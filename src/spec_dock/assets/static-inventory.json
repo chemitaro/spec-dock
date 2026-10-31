@@ -212,7 +212,7 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "8e9a79fa2478be206226790351be4179a3525492bfdf17f0d84362dd675e9ad1",
+      "sha256": "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
