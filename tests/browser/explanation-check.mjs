@@ -201,6 +201,8 @@ async function launchChrome(chromePath, profile) {
     }
     await sleep(50);
   }
+  child.kill("SIGKILL");
+  await Promise.race([new Promise(r => child.once("exit", r)), sleep(5_000)]);
   throw new CheckError("Chrome DevTools did not start");
 }
 

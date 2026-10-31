@@ -87,7 +87,10 @@ def read_diagram_vendor_file(path: str) -> bytes | None:
     resource = _vendor_root()
     for part in path.split("/"):
         resource = resource.joinpath(part)
-    payload = resource.read_bytes()
+    try:
+        payload = resource.read_bytes()
+    except OSError as error:
+        raise DiagramVendorError(f"bundled diagram part is missing or unreadable: {path}") from error
     if hashlib.sha256(payload).hexdigest() != entry.sha256:
         raise DiagramVendorError(f"bundled diagram part does not match its manifest: {path}")
     return payload

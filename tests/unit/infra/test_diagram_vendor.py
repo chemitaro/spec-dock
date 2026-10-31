@@ -98,6 +98,12 @@ def test_tampered_part_is_an_error(vendor_copy: Path) -> None:
     assert read_diagram_vendor_file("highlightjs/11.11.1/highlight.min.js") is not None
 
 
+def test_missing_listed_part_is_an_error(vendor_copy: Path) -> None:
+    (vendor_copy / "plantuml/1.2026.6/emoji.js").unlink()
+    with pytest.raises(DiagramVendorError):
+        read_diagram_vendor_file("plantuml/1.2026.6/emoji.js")
+
+
 @pytest.mark.parametrize(
     "mutate",
     [
