@@ -20,12 +20,12 @@
 
 | ID | Command / leaf | 引数・固有option | 対象と効果 | 主な副作用 |
 |---|---|---|---|---|
-| C01 | `scope create initiative` | `--backend github --title TITLE [--slug SLUG]`（schema4では`--slug`は使えません） | GitHubで番号を発行してInitiativeを作ります。 | GitHub作成、ローカルScope |
-| C02 | `scope create epic` | `--backend github --parent TARGET --title TITLE [--slug SLUG]`（schema4では`--slug`は使えません） | 明示したInitiativeの下にEpicを作ります。 | GitHub作成、ローカルScope |
-| C03 | `scope create issue` | `--backend github --parent TARGET --title TITLE [--slug SLUG]`（schema4では`--slug`は使えません） | 明示したEpicの下にIssueを作ります。 | GitHub作成、ローカルScope |
-| C04 | `scope import github initiative` | `GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]`（schema4では`--slug`は使えず、`--title`はGitHubの題名で置き換わります） | 既存Issueを確認してInitiativeへ取り込みます。 | GitHub読取り、ローカルScope |
-| C05 | `scope import github epic` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]`（schema4は同上） | 既存IssueをEpicへ取り込みます。 | GitHub読取り、ローカルScope |
-| C06 | `scope import github issue` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO]`（schema4は同上） | 既存IssueをIssue Scopeへ取り込みます。 | GitHub読取り、ローカルScope |
+| C01 | `scope create initiative` | `--backend github --title TITLE [--slug SLUG]` `[--assurance LEVEL --assurance-reason TEXT]`（schema4では`--slug`は使えず、`--assurance`と`--assurance-reason`が必須です） | GitHubで番号を発行してInitiativeを作ります。 | GitHub作成、ローカルScope |
+| C02 | `scope create epic` | `--backend github --parent TARGET --title TITLE [--slug SLUG]` `[--assurance LEVEL --assurance-reason TEXT]`（schema4では`--slug`は使えず、`--assurance`と`--assurance-reason`が必須です） | 明示したInitiativeの下にEpicを作ります。 | GitHub作成、ローカルScope |
+| C03 | `scope create issue` | `--backend github --parent TARGET --title TITLE [--slug SLUG]` `[--assurance LEVEL --assurance-reason TEXT]`（schema4では`--slug`は使えず、`--assurance`と`--assurance-reason`が必須です） | 明示したEpicの下にIssueを作ります。 | GitHub作成、ローカルScope |
+| C04 | `scope import github initiative` | `GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO] [--assurance LEVEL --assurance-reason TEXT]`（schema4では`--slug`は使えず、`--title`はGitHubの題名で置き換わり、`--assurance`と`--assurance-reason`が必須です） | 既存Issueを確認してInitiativeへ取り込みます。 | GitHub読取り、ローカルScope |
+| C05 | `scope import github epic` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO] [--assurance LEVEL --assurance-reason TEXT]`（schema4は同上） | 既存IssueをEpicへ取り込みます。 | GitHub読取り、ローカルScope |
+| C06 | `scope import github issue` | `GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO] [--assurance LEVEL --assurance-reason TEXT]`（schema4は同上） | 既存IssueをIssue Scopeへ取り込みます。 | GitHub読取り、ローカルScope |
 | C07 | `scope list` | `[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]` | 現在treeのScopeを表示します。 | 読取りのみ |
 | C08 | `scope show` | `TARGET` | metadata、親子、未観測を含む状態を表示します。 | 読取りのみ |
 | C09 | `scope edit` | `TARGET --title TITLE` | titleだけを変更し、ID/linkageを保ちます。 | metadata |

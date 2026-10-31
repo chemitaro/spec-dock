@@ -125,13 +125,55 @@ def test_link_create_edit_sync_start_and_finish_across_two_clones(
     # A: link (registers the injected periodic job), then create a Scope chain with Japanese titles.
     clones.ok(a, "canonical", "link")
     assert [job.calls[0] for job in jobs.values()] == [("ensure", kind)]
-    init = clones.ok(a, "scope", "create", "initiative", "--backend", "github", "--title", "仕様の集約", "--yes")
+    init = clones.ok(
+        a,
+        "scope",
+        "create",
+        "initiative",
+        "--backend",
+        "github",
+        "--title",
+        "仕様の集約",
+        "--yes",
+        "--assurance",
+        "standard",
+        "--assurance-reason",
+        "既定の理由",
+    )
     init_id = init["data"]["result"]["scope"]["id"]
     epic_id = clones.ok(
-        a, "scope", "create", "epic", "--backend", "github", "--parent", init_id, "--title", "カタログ", "--yes"
+        a,
+        "scope",
+        "create",
+        "epic",
+        "--backend",
+        "github",
+        "--parent",
+        init_id,
+        "--title",
+        "カタログ",
+        "--yes",
+        "--assurance",
+        "standard",
+        "--assurance-reason",
+        "既定の理由",
     )["data"]["result"]["scope"]["id"]
     issue = clones.ok(
-        a, "scope", "create", "issue", "--backend", "github", "--parent", epic_id, "--title", "横断の確かめ", "--yes"
+        a,
+        "scope",
+        "create",
+        "issue",
+        "--backend",
+        "github",
+        "--parent",
+        epic_id,
+        "--title",
+        "横断の確かめ",
+        "--yes",
+        "--assurance",
+        "standard",
+        "--assurance-reason",
+        "既定の理由",
     )
     issue_id = issue["data"]["result"]["scope"]["id"]
     number = int(issue_id.split("-")[1])

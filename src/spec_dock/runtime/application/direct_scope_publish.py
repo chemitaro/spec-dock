@@ -9,6 +9,7 @@ import secrets
 import sys
 from typing import TYPE_CHECKING, cast
 
+from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_MIGRATED, CanonicalCommandError
 from spec_dock.runtime.application.github_scope_scaffold import build_github_scope_scaffold
 from spec_dock.runtime.application.project_context import resolve_context
 from spec_dock.runtime.application.scope_ancestors import _parent_records, _require_open_ancestors
@@ -53,7 +54,31 @@ def import_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     return _publish_scope(namespace, context, create=False)
 
 
+def _refuse_assurance(namespace: argparse.Namespace) -> None:
+    """Schema 3 writes Markdown Scopes only; dropping the arguments silently would look like a written level."""
+    given = [
+        name
+        for name, value in (
+            ("--assurance", getattr(namespace, "assurance", None)),
+            ("--assurance-reason", getattr(namespace, "assurance_reason", None)),
+        )
+        if value is not None
+    ]
+    if given:
+        raise CanonicalCommandError(
+            CANONICAL_NOT_MIGRATED,
+            "--assurance and --assurance-reason apply only in canonical mode (schema 4); "
+            "this repository creates Markdown Scopes, which have no assurance level",
+            recovery=(
+                "Run the same command without --assurance and --assurance-reason, or migrate the repository to "
+                "canonical mode first.",
+            ),
+            details={"arguments": given},
+        )
+
+
 def _publish_scope(namespace: argparse.Namespace, context: ProjectContext, *, create: bool) -> OperationResult[object]:
+    _refuse_assurance(namespace)
     context.require_writer()
     if namespace.offline:
         raise ValueError("GitHub Scope publication requires an online repository")

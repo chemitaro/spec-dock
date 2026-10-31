@@ -10,6 +10,7 @@ SpecDock 0.3.0 から、仕様の置き場を2つの形から選べます。`spe
 - Scope のディレクトリは、種類と親を問わず `spec-dock/initiatives/<区切り>/<ID>/` に平らに並びます。入れ子にしません。
   - ID は `<種類>-<番号5桁>`（`init-00423`、`epic-00424`、`iss-00454`）。5桁を超えた番号はそのまま（`iss-100454`）。
   - `<区切り>` は番号の千ごとの範囲で、`<下端>-<上端>` を ID の番号と同じ幅で0埋めします（1〜999 は `00000-00999`、1000 は `01000-01999`、100000 は `100000-100999`）。例：`spec-dock/initiatives/00000-00999/iss-00454/`、`spec-dock/initiatives/02000-02999/iss-02114/`。区切りは番号だけで決まり、親や種類を変えても動きません。
+  - 保証レベルの指定が必須です。canonical モードの `scope create` と `scope import github` には `--assurance <light|standard|strict|critical>` と `--assurance-reason <理由>` を付けます。新しい Scope は `spec-dock/templates/cue/<種類>/` から、`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` の一式で作られ、指定は `requirement.cue` の `assurance` だけに書かれます。
   - slug はありません。canonical モードの `scope create` と `scope import github` に `--slug` を付けると `CANONICAL_NOT_APPLICABLE` で止まります。`scope import github` の `--title` は受け付けますが使わず、GitHub の題名で進めます（違えば警告 `CANONICAL_TITLE_IGNORED`）。
   - コマンドの入力は0埋めしなくてよい（`iss-454` は `iss-00454`）。表示と出力は0埋めの形です。
 - 題名は GitHub の題名が正本です。日本語を含むどの言語でもよく、空でなく、制御文字を含まず、256文字以下です。題名を変えても、ID、ディレクトリ名、ブランチ名は変わりません。
@@ -181,6 +182,9 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `CANONICAL_CONFLICT_COPY` | 警告（`workspace validate`） | 別名ファイルの中身を元のファイルに統合し、別名ファイルを消す |
 | `CANONICAL_DASHBOARD_OCCUPIED` | 警告（`status` の `dashboard`） | 示したパスを退避する。次の同期が書く |
 | `CANONICAL_DASHBOARD_FAILED` | 警告（同上） | `spec-dock canonical status` の `snapshot` と `sync` を確かめる |
+| `ASSURANCE_REQUIRED` | 2（`scope create`、`scope import github`。何も読まず、何も書かない） | `--assurance <値>`（`light`、`standard`、`strict`、`critical` のどれか）と、空白だけでない `--assurance-reason <理由>` を付けて同じコマンドを実行する |
+| `SCOPE_TEMPLATES_OUTDATED` | 3（同上。GitHub に何も書かない） | `spec-dock installation update` で配布資産を上げ、`spec-dock/templates/cue/<種類>/` を入れてから同じコマンドを実行する |
+| `ASSURANCE_NOT_WRITTEN` | 警告（`scope import github`） | 既にある Scope の文書は書き換えない。CUE の Scope で変えるなら `requirement.cue` の `assurance` を直す（Markdown の Scope は保証レベルを持たない） |
 | `CANONICAL_TITLE_IGNORED` | 警告（`scope import github`） | 題名を変えるなら `spec-dock scope edit <ID> --title <題名>` |
 | `SCOPE_IN_PROGRESS` | 警告（`work start`） | 別のPCで作業中でないか利用者に確かめる。古い印なら `spec-dock work finish` か GitHub でラベルを外す |
 | `SCOPE_CHECK_FAILED` | 7（`scope check`）／3（`work finish`。何も書かない）／警告（既に完了の Scope の `work finish`） | 誤りごとに示したファイルと `hint` のとおりに直し、`spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` |

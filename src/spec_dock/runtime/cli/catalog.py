@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from spec_dock.runtime.domain.assurance import ASSURANCE_LEVELS
+
 
 @dataclass(frozen=True)
 class ArgumentSpec:
@@ -145,27 +147,44 @@ if set(HELP_EFFECTS) != set(LEAF_PATHS):
     raise RuntimeError("help effects do not match the public CLI leaves")
 
 
+# Optional to the parser so schema-3 calls stay as they are; canonical mode requires both (iss-00474, Q1).
+_ASSURANCE_ARGUMENTS = (_arg("--assurance", choices=ASSURANCE_LEVELS), _arg("--assurance-reason"))
+
 LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
-    "scope create initiative": (_required("--backend", choices=("github",)), _required("--title"), _arg("--slug")),
+    "scope create initiative": (
+        _required("--backend", choices=("github",)),
+        _required("--title"),
+        _arg("--slug"),
+        *_ASSURANCE_ARGUMENTS,
+    ),
     "scope create epic": (
         _required("--backend", choices=("github",)),
         _required("--parent"),
         _required("--title"),
         _arg("--slug"),
+        *_ASSURANCE_ARGUMENTS,
     ),
     "scope create issue": (
         _required("--backend", choices=("github",)),
         _required("--parent"),
         _required("--title"),
         _arg("--slug"),
+        *_ASSURANCE_ARGUMENTS,
     ),
-    "scope import github initiative": (_arg("github_ref"), _required("--title"), _arg("--slug"), _arg("--github-repo")),
+    "scope import github initiative": (
+        _arg("github_ref"),
+        _required("--title"),
+        _arg("--slug"),
+        _arg("--github-repo"),
+        *_ASSURANCE_ARGUMENTS,
+    ),
     "scope import github epic": (
         _arg("github_ref"),
         _required("--parent"),
         _required("--title"),
         _arg("--slug"),
         _arg("--github-repo"),
+        *_ASSURANCE_ARGUMENTS,
     ),
     "scope import github issue": (
         _arg("github_ref"),
@@ -173,6 +192,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _required("--title"),
         _arg("--slug"),
         _arg("--github-repo"),
+        *_ASSURANCE_ARGUMENTS,
     ),
     "scope list": (_arg("--kind", choices=KINDS), _arg("--parent"), _arg("--state", choices=STATES)),
     "scope show": (_arg("target"),),
@@ -320,12 +340,12 @@ class HelpSpec:
 
 
 HELP_PRECONDITIONS: dict[str, str] = {
-    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE.",
-    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE.",
-    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE.",
-    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
-    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
-    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ).",
+    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE. Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
+    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE. Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
+    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE. Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
+    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
+    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
+    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
     "scope list": "The selected project must contain a readable Scope tree.",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
     "scope check": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory. A CUE Scope (requirement.cue) needs cue v0.17.1 or later on PATH (CUE_NOT_FOUND, CUE_VERSION_UNSUPPORTED) and a type version this SpecDock ships (CUE_SCHEMA_UNSUPPORTED); a Markdown Scope succeeds with checked=false and needs no cue.",
@@ -486,6 +506,8 @@ def _example(leaf: str) -> str:
                 words.append("<scope-id>")
         elif argument.options.get("required"):
             words.extend((name, placeholders.get(name, f"<{name.lstrip('-')}>")))
+    if leaf.startswith(("scope create ", "scope import github ")):
+        words.extend(("--assurance", "standard", "--assurance-reason", "'<reason>'"))
     if leaf in {"work start", "branch create"}:
         words.extend(("--base", "HEAD"))
     if leaf == "worktree create":

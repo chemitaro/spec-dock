@@ -15,6 +15,7 @@ import re
 from typing import TYPE_CHECKING, Final, Literal
 
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
+from spec_dock.runtime.domain.assurance import ASSURANCE_LEVELS
 from spec_dock.runtime.domain.explanation_shape import inspect_explanation
 from spec_dock.runtime.infra.cue_schemas import schema_directory, shipped_schemas
 from spec_dock.runtime.infra.cue_tool import (
@@ -40,7 +41,7 @@ ScopeFormat = Literal["markdown", "cue", "conflict"]
 MARKDOWN_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
 CUE_DOCUMENTS: Final = ("requirement.cue", "design.cue", "plan.cue", "report.md")
 SCOPE_FILES: Final = ("requirement.cue", "design.cue", "plan.cue")
-LEVELS: Final = ("light", "standard", "strict", "critical")
+LEVELS: Final = ASSURANCE_LEVELS
 REPOSITORY_TYPES: Final = Path("spec-dock/cue")
 TYPE_SHOWN: Final = "<spec_dock>/cue"
 

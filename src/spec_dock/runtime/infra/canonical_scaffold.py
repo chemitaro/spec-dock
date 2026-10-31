@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import errno
 import os
+import re
 import stat
 from typing import TYPE_CHECKING
 
@@ -22,6 +23,7 @@ from spec_dock.runtime.infra.template_scaffolder import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Mapping
     from pathlib import Path
 
 
@@ -33,9 +35,20 @@ class BucketOccupied(ValueError):
         self.path = path
 
 
-def copy_scope_template_at(src_dir: Path, dest_dir: Path, dest_fd: int, replacements: dict[str, str]) -> list[Path]:
+def copy_scope_template_at(
+    src_dir: Path,
+    dest_dir: Path,
+    dest_fd: int,
+    replacements: dict[str, str],
+    *,
+    final_replacements: Mapping[str, str] | None = None,
+) -> list[Path]:
     """Copy a Scope template through a held directory descriptor, rendered, without title/parent lines and
-    with its spec-dock/docs links at the flat Scope depth."""
+    with its spec-dock/docs links at the flat Scope depth.
+
+    `final_replacements` fill their markers last, in one pass, so their values (a user's assurance reason) are
+    never rewritten by another replacement, the front matter rule or the link rebasing.
+    """
     if not src_dir.is_dir():
         raise RuntimeError(f"Missing template directory: {src_dir}")
     template_files = _template_files(src_dir)
@@ -51,6 +64,7 @@ def copy_scope_template_at(src_dir: Path, dest_dir: Path, dest_fd: int, replacem
             payload, mode = source_bytes, source_mode
         else:
             rendered = rebase_spec_dock_links(strip_structure_front_matter(render_text(text, replacements)))
+            rendered = _replace_once(rendered, final_replacements or {})
             payload = rendered.encode("utf-8")
             mode = source_mode if payload == source_bytes else 0o666
         parent_fd = _open_parent_at(dest_fd, relative.parts[:-1], create=True)
@@ -65,6 +79,13 @@ def copy_scope_template_at(src_dir: Path, dest_dir: Path, dest_fd: int, replacem
             os.close(parent_fd)
         created.append(dest_dir / relative)
     return created
+
+
+def _replace_once(text: str, replacements: Mapping[str, str]) -> str:
+    if not replacements:
+        return text
+    pattern = re.compile("|".join(re.escape(marker) for marker in sorted(replacements, key=len, reverse=True)))
+    return pattern.sub(lambda match: replacements[match.group(0)], text)
 
 
 def prepare_bucket(catalog: Path, bucket: str) -> bool:

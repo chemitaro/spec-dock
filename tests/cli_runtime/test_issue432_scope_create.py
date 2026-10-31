@@ -8,6 +8,9 @@ import pytest
 
 from tests.support.canonical_writes import WriteWorld
 
+# iss-00474: schema-4 creation requires an assurance level and reason and writes the CUE Scope set.
+ASSURANCE = ("--assurance", "standard", "--assurance-reason", "既定の理由")
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -23,7 +26,7 @@ def test_an_epic_is_created_on_github_then_published_in_the_flat_catalog_with_on
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
     code, payload = world.write(
-        "scope", "create", "epic", "--backend", "github", "--parent", "init-1", "--title", "  中核の作業  "
+        "scope", "create", "epic", "--backend", "github", "--parent", "init-1", "--title", "  中核の作業  ", *ASSURANCE
     )
     assert code == 0, payload
     fake = world.fake()
@@ -44,17 +47,17 @@ def test_an_epic_is_created_on_github_then_published_in_the_flat_catalog_with_on
     assert sorted(path.name for path in directory.iterdir()) == [
         ".workbench",
         "artifacts",
-        "design.md",
+        "design.cue",
         "discussions",
-        "plan.md",
+        "explanation.html",
+        "plan.cue",
         "report.md",
-        "requirement.md",
+        "requirement.cue",
     ]
-    requirement = (directory / "requirement.md").read_text(encoding="utf-8")
-    front = requirement.split("---")[1]
+    report = (directory / "report.md").read_text(encoding="utf-8")
+    front = report.split("---")[1]
     assert 'ID: "epic-00002"' in front and "タイトル" not in front and "親:" not in front
-    assert "# epic-00002 中核の作業" in requirement
-    assert "](../../../docs/authoring/requirement.md)" in requirement
+    assert "](../../../docs/authoring/report.md)" in report
     linked = world.main / "spec-dock/initiatives/00000-00999/epic-00002"
     assert (linked / "../../../docs/authoring").resolve() == (world.main / "spec-dock/docs/authoring").resolve()
     rules = directory / "artifacts/rules.md"
@@ -86,7 +89,7 @@ def test_an_epic_is_created_on_github_then_published_in_the_flat_catalog_with_on
 
 
 def _create(world: WriteWorld, kind: str, title: str, *extra: str) -> tuple[int, dict[str, Any]]:
-    return world.write("scope", "create", kind, "--backend", "github", "--title", title, *extra)
+    return world.write("scope", "create", kind, "--backend", "github", "--title", title, *extra, *ASSURANCE)
 
 
 def test_an_initiative_and_an_issue_sit_flat_in_their_number_buckets(
@@ -96,13 +99,13 @@ def test_an_initiative_and_an_issue_sit_flat_in_their_number_buckets(
     world.scope("epic", 2, "core", parent=1)
     code, payload = _create(world, "initiative", "Next Plan")
     assert code == 0, payload
-    assert (world.catalog / "00000-00999/init-00003/requirement.md").is_file()
+    assert (world.catalog / "00000-00999/init-00003/requirement.cue").is_file()
     assert world.fake().issue(3).parent is None
     world.edit(lambda fake: fake.add_issue(1999, title="Spacer"))  # the next Issue gets number 2000
     code, payload = _create(world, "issue", "Leaf Task", "--parent", "EPIC-2")
     assert code == 0, payload
     leaf = world.catalog / "02000-02999/iss-02000"
-    front = (leaf / "plan.md").read_text(encoding="utf-8").split("---")[1]
+    front = (leaf / "report.md").read_text(encoding="utf-8").split("---")[1]
     assert 'ID: "iss-02000"' in front and "親:" not in front
     assert world.fake().issue(2000).parent == ["example/repo", 2]
     assert sorted(item["paths"] for item in world.changesets()) == [
@@ -146,6 +149,7 @@ def test_unreachable_github_offline_and_a_missing_link_stop_before_writing(
         "Core",
         "--yes",
         "--offline",
+        *ASSURANCE,
     )
     assert (code, payload["error"]["code"]) == (3, "PRECONDITION_FAILED")
     (world.main / "spec-dock/initiatives").unlink()
@@ -159,7 +163,7 @@ def test_confirmation_and_dry_run_write_nothing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
-    argv = ("scope", "create", "epic", "--backend", "github", "--parent", "init-00001", "--title", "Core")
+    argv = ("scope", "create", "epic", "--backend", "github", "--parent", "init-00001", "--title", "Core", *ASSURANCE)
     code, payload = world.run(*argv)
     assert (code, payload["error"]["code"]) == (3, "CONFIRMATION_REQUIRED")
     code, payload = world.run(*argv, "--dry-run")
@@ -184,7 +188,9 @@ def test_a_failure_after_the_issue_exists_is_partial_and_scope_import_completes_
     (step,) = payload["recovery"]["instructions"]
     assert "spec-dock scope import github epic 2 --parent init-00001 --title Core" in step
     assert world.changesets() == []
-    code, payload = world.run("scope", "import", "github", "epic", "2", "--parent", "init-00001", "--title", "Core")
+    code, payload = world.run(
+        "scope", "import", "github", "epic", "2", "--parent", "init-00001", "--title", "Core", *ASSURANCE
+    )
     assert code == 0, payload
     assert [item["kind"] for item in payload["effects"]] == ["github.sub-issue.add", "scaffold"]
     assert payload["warnings"] == []
@@ -192,7 +198,16 @@ def test_a_failure_after_the_issue_exists_is_partial_and_scope_import_completes_
     assert len([issue for issue in fake.issues.values() if issue.repository == "example/repo"]) == 2
     assert fake.issue(2).parent == ["example/repo", 1] and world.find("epic-00002").is_dir()
     code, payload = world.run(
-        "scope", "import", "github", "epic", "gh:example/repo#2", "--parent", "init-00001", "--title", "Core"
+        "scope",
+        "import",
+        "github",
+        "epic",
+        "gh:example/repo#2",
+        "--parent",
+        "init-00001",
+        "--title",
+        "Core",
+        *ASSURANCE,
     )
     assert (code, payload["status"], payload["effects"]) == (0, "unchanged", [])
 
@@ -224,7 +239,7 @@ def test_a_busy_catalog_lock_after_the_github_writes_is_partial(
 
 
 def _import(world: WriteWorld, kind: str, number: int, *extra: str) -> tuple[int, dict[str, Any]]:
-    return world.run("scope", "import", "github", kind, f"gh:example/repo#{number}", *extra)
+    return world.run("scope", "import", "github", kind, f"gh:example/repo#{number}", *extra, *ASSURANCE)
 
 
 def test_import_adds_the_kind_label_parent_and_directory_and_never_writes_the_body(
@@ -248,7 +263,7 @@ def test_import_adds_the_kind_label_parent_and_directory_and_never_writes_the_bo
     assert (warning["details"]["given"], warning["details"]["github_title"]) == ("Something Else", "既存の作業")
     assert "spec-dock scope edit" in warning["details"]["next_step"]
     assert world.find("epic-00005").relative_to(world.catalog).as_posix() == "00000-00999/epic-00005"
-    assert "# epic-00005 既存の作業" in (world.find("epic-00005") / "plan.md").read_text("utf-8")
+    assert 'ID: "epic-00005"' in (world.find("epic-00005") / "report.md").read_text("utf-8")
     graphql = len(world.fake().graphql_requests())
     code, shown = world.run("dependency", "list", "epic-00005")
     assert code == 0 and shown["data"]["result"]["external"][0]["number"] == 6
@@ -277,7 +292,18 @@ def test_import_stops_on_a_slug_another_kind_a_different_parent_or_an_old_kind_d
         assert message in payload["error"]["message"]
     assert world.writes() == [] and world.changesets() == []
     code, payload = world.write(
-        "scope", "create", "epic", "--backend", "github", "--parent", "init-00001", "--title", "X", "--slug", "x"
+        "scope",
+        "create",
+        "epic",
+        "--backend",
+        "github",
+        "--parent",
+        "init-00001",
+        "--title",
+        "X",
+        "--slug",
+        "x",
+        *ASSURANCE,
     )
     assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_APPLICABLE")
     assert world.writes() == []

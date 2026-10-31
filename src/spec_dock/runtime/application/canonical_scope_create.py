@@ -5,6 +5,10 @@ Scope directory is then published at `<catalog>/<bucket>/<ID>/` from the templat
 title and parent lines, under the catalog lock with one changeset. No `.meta.json` is written. A failure after
 the Issue exists is partial, and `scope import github` completes it: it adds only what is missing, so running it
 again changes nothing.
+
+Since iss-00474 (epic-00425 contract K4) the template is the CUE set under `spec-dock/templates/cue/<kind>/`, and
+both commands require `--assurance` and `--assurance-reason`, checked before anything is read or written; the
+level and reason are written into the new `requirement.cue` only.
 """
 
 from __future__ import annotations
@@ -14,7 +18,7 @@ from datetime import datetime, timezone
 import os
 from pathlib import Path
 import shlex
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Final, cast
 
 from spec_dock.runtime.application.canonical_errors import CANONICAL_PATH_OCCUPIED, CanonicalCommandError
 from spec_dock.runtime.application.canonical_scopes import kind_change_error
@@ -36,6 +40,13 @@ from spec_dock.runtime.application.scope_scaffold import (
     _replacements,
     _rules_scaffold_specs,
     _scaffold_file_paths,
+)
+from spec_dock.runtime.domain.assurance import (
+    LEVEL_MARKER,
+    REASON_MARKER,
+    Assurance,
+    assurance_replacements,
+    parse_assurance,
 )
 from spec_dock.runtime.domain.canonical_layout import scope_bucket, scope_relative
 from spec_dock.runtime.domain.canonical_scaffold import validate_canonical_title
@@ -71,11 +82,22 @@ if TYPE_CHECKING:
 
 CANONICAL_TITLE_IGNORED = "CANONICAL_TITLE_IGNORED"
 TITLE_IGNORED_NEXT_STEP = "To change the title, run spec-dock scope edit <ID> --title <title>."
+ASSURANCE_REQUIRED: Final = "ASSURANCE_REQUIRED"  # exit 2, before anything is read or written
+ASSURANCE_NOT_WRITTEN: Final = "ASSURANCE_NOT_WRITTEN"  # warning: import kept an existing Scope directory
+SCOPE_TEMPLATES_OUTDATED: Final = "SCOPE_TEMPLATES_OUTDATED"  # exit 3, before any GitHub write
+ASSURANCE_NOT_WRITTEN_NEXT_STEP: Final = (
+    "The existing Scope keeps its documents; in a CUE Scope, change assurance in requirement.cue if needed. "
+    "A Markdown Scope has no assurance level."
+)
+CUE_TEMPLATES: Final = Path("spec-dock/templates/cue")
+# The documents a CUE Scope template must hold; other files in the directory (.workbench/README.md) are copied too.
+CUE_TEMPLATE_FILES: Final = ("requirement.cue", "design.cue", "plan.cue", "explanation.html", "report.md")
 
 
 def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     context.require_writer()
     refuse_slug(namespace)
+    assurance = _require_assurance(namespace)
     if needs_confirmation(namespace):
         return OperationResult(
             namespace.command_path,
@@ -135,7 +157,7 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         recovery = (
             (
                 "GitHub may have created the Issue but its number is unknown: find it in the repository, "
-                f"then run {_import_command(kind, '<number>', parent, title)}.",
+                f"then run {_import_command(kind, '<number>', parent, title, assurance)}.",
             )
             if error.cause.uncertain
             else ()
@@ -144,7 +166,9 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     session.facts[created.number] = created
     ref = f"gh:{ref_repository}#{created.number}"
     scope_id = canonical_scope_id(kind, created.number)
-    resume = f"Run {_import_command(kind, str(created.number), parent, title)}; it adds only what is missing."
+    resume = (
+        f"Run {_import_command(kind, str(created.number), parent, title, assurance)}; it adds only what is missing."
+    )
     data = FamilyData("scope", {"scope": None, "github_ref": ref, "title": title, "changed": True})
     try:
         if parent is not None:
@@ -156,7 +180,7 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 ),
                 lambda _: [SetParent(created.number, session.node(parent.id).number)],
             )
-        _publish(session, kind, scope_id, title, created.number, parent)
+        _publish(session, kind, scope_id, title, created.number, parent, assurance)
     except WRITE_FAILURES as error:
         remaining = [step for step in steps if step[0] not in {effect.kind for effect in session.effects}]
         first = error.recovery if isinstance(error, CanonicalCommandError) else ()
@@ -169,6 +193,7 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
 def import_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     context.require_writer()
     refuse_slug(namespace)
+    assurance = _require_assurance(namespace)
     kind = cast("ScopeKind", namespace.command_path.rsplit(" ", 1)[-1])
     if namespace.github_repo is not None or not namespace.github_ref.strip().isdigit():
         parse_github_ref(namespace.github_ref, repo_hint=namespace.github_repo)  # its shape, before reading GitHub
@@ -215,6 +240,14 @@ def import_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         _check_bucket(session, number)
         require_directory_publication_support()
     _warn_title_ignored(session, namespace.title, facts.title)
+    if existing is not None:
+        session.warnings.append(
+            Diagnostic(
+                ASSURANCE_NOT_WRITTEN,
+                f"{scope_id} already has its directory; --assurance and --assurance-reason were not written",
+                {"scope_id": scope_id, "next_step": ASSURANCE_NOT_WRITTEN_NEXT_STEP},
+            )
+        )
     steps: list[tuple[str, str | None]] = []
     if labelled is None:
         steps.append(("github.issue.label", label))
@@ -251,7 +284,7 @@ def import_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 lambda _: [SetParent(number, session.node(parent.id).number)],
             )
         if existing is None:
-            _publish(session, kind, scope_id, facts.title, number, parent)
+            _publish(session, kind, scope_id, facts.title, number, parent, assurance)
     except WRITE_FAILURES as error:
         remaining = [step for step in steps if step[0] not in {effect.kind for effect in session.effects}]
         return session.incomplete(
@@ -372,8 +405,64 @@ def _with_labels(facts: IssueFacts, labels: tuple[str, ...]) -> IssueFacts:
     return replace(facts, labels=tuple(labels))
 
 
+def _require_assurance(namespace: argparse.Namespace) -> Assurance:
+    """Both assurance arguments, checked before anything is read or written (epic-00425 R-C3, contract K4)."""
+    try:
+        return parse_assurance(getattr(namespace, "assurance", None), getattr(namespace, "assurance_reason", None))
+    except ValueError as error:
+        message, argument = error.args
+        raise CanonicalCommandError(
+            ASSURANCE_REQUIRED,
+            message,
+            exit_code=2,
+            recovery=(
+                "Run the same command with --assurance <light|standard|strict|critical> "
+                "--assurance-reason <why this level>; choose the level by the impact of a failure and how hard "
+                "recovery is.",
+            ),
+            details={"argument": argument},
+        ) from None
+
+
+def cue_template_directory(root: Path, kind: ScopeKind) -> Path:
+    return root / CUE_TEMPLATES / kind
+
+
+def _check_cue_templates(root: Path, kind: ScopeKind) -> None:
+    """The checkout's CUE template set is complete; older static assets stop here, before any GitHub write."""
+    directory = cue_template_directory(root, kind)
+    missing: list[str] = []
+    if directory.is_symlink() or not directory.is_dir():
+        missing = list(CUE_TEMPLATE_FILES)
+    else:
+        missing = [name for name in CUE_TEMPLATE_FILES if not _regular_file(directory / name)]
+        if "requirement.cue" not in missing:
+            try:
+                text = (directory / "requirement.cue").read_text(encoding="utf-8")
+            except (OSError, UnicodeDecodeError):
+                missing.append("requirement.cue")
+            else:
+                missing += [marker for marker in (LEVEL_MARKER, REASON_MARKER) if marker not in text]
+    if missing:
+        shown = (CUE_TEMPLATES / kind).as_posix()
+        raise CanonicalCommandError(
+            SCOPE_TEMPLATES_OUTDATED,
+            f"{shown} is missing or incomplete ({', '.join(missing)}); the static assets are older than this CLI",
+            recovery=(
+                "Run spec-dock installation update to install the CUE Scope templates, then run the same "
+                "command again.",
+            ),
+            details={"path": shown, "missing": missing},
+        )
+
+
+def _regular_file(path: Path) -> bool:
+    return path.is_file() and not path.is_symlink()
+
+
 def _check_scaffold_sources(session: WriteSession, kind: ScopeKind) -> None:
-    _scaffold_file_paths(session.context.root / "spec-dock/templates" / kind, session.context.root)
+    _check_cue_templates(session.context.root, kind)
+    _scaffold_file_paths(cue_template_directory(session.context.root, kind), session.context.root)
     _precheck_pre_github_create_rules_sources(kind=kind, specdock_dir=_main_spec_dock(session))
     discussions = _main_spec_dock(session) / "docs/rules" / kind / "discussions.md"
     if not discussions.is_file():
@@ -402,6 +491,7 @@ def _publish(
     title: str,
     number: int,
     parent: ScopeView | None,
+    assurance: Assurance,
 ) -> None:
     """Publish `<catalog>/<bucket>/<ID>/` once under the catalog lock and record it in one changeset."""
     linked = session.catalog
@@ -417,11 +507,12 @@ def _publish(
         github_issue_number=number,
         today=datetime.now(timezone.utc).date().isoformat(),
     )
-    templates = session.context.root / "spec-dock/templates" / kind
+    templates = cue_template_directory(session.context.root, kind)
     rules = canonical_rules_links(kind, destination, _main_spec_dock(session))
+    final = assurance_replacements(assurance)
 
     def populate(descriptor: int) -> None:
-        copy_scope_template_at(templates, destination, descriptor, replacements)
+        copy_scope_template_at(templates, destination, descriptor, replacements, final_replacements=final)
         for link, target in rules:
             _create_relative_symlink_at(descriptor, node_dir=destination, link_path=link, target_path=target)
 
@@ -455,9 +546,13 @@ def _publish(
     session.reload_catalog()
 
 
-def _import_command(kind: ScopeKind, number: str, parent: ScopeView | None, title: str) -> str:
+def _import_command(kind: ScopeKind, number: str, parent: ScopeView | None, title: str, assurance: Assurance) -> str:
     parent_option = f" --parent {parent.id}" if parent is not None else ""
-    return f"spec-dock scope import github {kind} {number}{parent_option} --title {shlex.quote(title)}"
+    # `--assurance-reason=` keeps a reason starting with "-" one value for the parser.
+    return (
+        f"spec-dock scope import github {kind} {number}{parent_option} --title {shlex.quote(title)} "
+        f"--assurance {assurance.level} {shlex.quote('--assurance-reason=' + assurance.reason)}"
+    )
 
 
 def _scope_data(session: WriteSession, scope_id: str, ref: str, *, changed: bool = True) -> FamilyData:
