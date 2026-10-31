@@ -91,7 +91,10 @@ assurance: {
 | `rollback-missing` | 戻し方（`rollback`）がない（手順か切り分けがあるときだけ） | critical |
 | `execution-reference` | 手順が存在しないセッションを指す、レビューが存在しない手順を指す | どの段階でも（`execution` か手順の `session` を書いたときだけ） |
 
+- 規則の「要件」は `requirements`（`R-` の番号）だけです。失敗の条件（`F-` の番号）は、`unknown-reference` の参照の先になるほかは、strict からの `failure-without-test` だけが調べます。standard 以下では、失敗の条件に設計や手順がなくても指摘になりません。
 - `status` が `dropped` の手順は、要件を満たしたと数えません。参照の先は調べます。
+- 形の誤りがある間は、評価が通らないので、つながりの指摘は出ません。形の誤りを直すと、指摘が初めて出ることがあります（保証レベルを上げた直後は、たいてい2回に分かれます）。
+- 規則は、つながりの抜けだけを見ます。要件が1つもない文書も、誤りなしで通ります。雛形のままで検査に通っても、書き終えたことにはなりません。
 - **Epic と Initiative**：手順とテストの代わりに `slices` を持ちます。`requirement-without-step`、`requirement-without-test`、`failure-without-test` は、その番号を `covers` に含む切り分けがあれば満たします。`orphan-step` は、`covers` が空の切り分けに当てはまります。`requirement-without-design` は Issue と同じです。
 - 切り分けのキーが GitHub の本当の子かは、型では調べません。
 
@@ -101,6 +104,9 @@ assurance: {
 
 - `status`：`todo`（既定）、`doing`、`done`、`dropped`。始めたら `doing`、終えたら `done`、やめたら消さずに `dropped` にします。
 - `after`：先に済ませる手順の番号です。並びは番号の順です。
+- 作業中に新しい要件や失敗の条件が見つかったら、手順だけでなく `requirement.cue` に番号を足し、それを満たす設計、手順、テストを足します（保証レベルが求めるつながりを検査が示します）。
+- `dropped` にした理由は、その手順の `text` に書きます。専用の項目はありません。
+- 計画を書き換えても、説明資料は自動では変わりません。人に伝えるべき変更なら、説明資料も直します。
 - 書き換えたら `spec-dock scope check <ID>` で確かめます。ダッシュボードは、この構造から進み具合を描きます。
 - Epic と Initiative の `slices` も、`after` と `session` を持てます。子の進み具合は、子の Scope の `plan.cue` と GitHub の状態で見ます。
 
@@ -148,6 +154,8 @@ spec-dock scope show iss-00123 --json    # data.result.assurance に保証レベ
 spec-dock scope render iss-00123 > /tmp/iss-00123.html   # 要件・設計・計画を HTML に描く（標準出力）
 ```
 
+- 全コマンドに共通の引数（`--json`、`--offline`、`--timeout <秒>`、`--project <チェックアウト>`）は、葉の `--help` の一覧には出ませんが、使えます（[CLI 参照](../reference_cli.md)）。
+- `scope check` は、Scope の種類を GitHub の構造（定期の同期が取るスナップショット）から読みます。CUE の評価は手元だけで行い、インターネットは要りません。GitHub に問い合わせられないときや、`--offline` のときは、保存したスナップショットを使い、警告 `GITHUB_SNAPSHOT_STALE` を出します。この警告は、スナップショットが新しいかで出たり出なかったりし、検査の結果（誤りと指摘）は変えません。テキストの要約の `warnings=N` は検査の警告（説明資料など）の数で、この警告は数えません。
 - `scope check` は、`cue` の確かめ、`schema` の読み取り、評価、指摘の読み取り、説明資料の形の検査を行います。誤りがあれば終了コード7（`SCOPE_CHECK_FAILED`）で、誤りごとにファイル、行、項目、直し方を示します。警告だけなら成功です。Markdown の Scope では、検査をせずに成功します（「CUE の Scope ではない」）。
 - `work finish` は、閉じる前（何かを書く前）に、閉じる Scope を同じく検査します。誤りがあれば何も書かずに止まります（終了コード3、`SCOPE_CHECK_FAILED`）。直して `spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` を実行します。保存を待つ間に別のPCで開き直された場合は、終了コード6（partial）で止まります。Markdown の Scope は、今までどおり閉じます。
 - `scope render` は、評価できないときは検査の結果だけを描き、警告 `SCOPE_RENDER_INCOMPLETE` を返します。Markdown の Scope は `SCOPE_NOT_CUE` で止まります。
@@ -157,7 +165,7 @@ spec-dock scope render iss-00123 > /tmp/iss-00123.html   # 要件・設計・計
 
 | コード | 重さ | 意味と次の1手 |
 |---|---|---|
-| `CUE_INVALID` | 誤り | 形の誤り。示したファイル、行、項目を直す |
+| `CUE_INVALID` | 誤り | 形の誤り。`field` の項目を Scope の CUE のファイルで直す。`file` が SpecDock の型（`<spec_dock>/cue/v1/…`）を指すことがあるが、型は直さず、型が求める項目を Scope に書く |
 | `SPEC_FINDINGS` | 誤り | つながりの指摘。`details.rule` の規則と `hint` のとおりに直す |
 | `ASSURANCE_UNREADABLE` | 誤り | `requirement.cue` の `assurance` が読めない。`level` と `reason` を直す |
 | `SCOPE_FORMAT_CONFLICT` | 誤り | `requirement.md` と `requirement.cue` の両方がある。片方を外す |
@@ -180,12 +188,12 @@ spec-dock scope render iss-00123 > /tmp/iss-00123.html   # 要件・設計・計
 
 ## 書く順番
 
-1. 親の計画を読み、任された要件（親の `slices` の `covers`）と保証レベルを確かめる。
+1. 親の計画を読み、任された要件（親の `slices` の `covers`）と保証レベルを確かめる。親が Markdown の Scope なら `slices` はないので、任された範囲は親の `plan.md`（とその Issue 本文）で確かめる。保証レベルは、作るときに決めて、子の `requirement.cue` の `assurance` が正本になる。
 2. `spec-dock scope create issue --backend github --parent <Epic> --title <題名> --assurance <値> --assurance-reason <理由> --yes`（作る前に `spec-dock scope create issue --help` を読む）。
 3. `requirement.cue` に要件と失敗の条件を書く。番号を振る。
 4. `design.cue` に設計の単位を書き、`satisfies` で要件を指す。
 5. `plan.cue` に手順とテストを書き、`realizes`、`verifies` で指す。
-6. `spec-dock scope check <ID>` で、誤りと指摘がなくなるまで直す。
+6. `spec-dock scope check <ID>` で、誤りと指摘がなくなるまで直す（要件を書かなくても通るので、通ったことだけで終えない）。
 7. `explanation.html` を書き換え、印の行を消す（[Explanation Guide](explanation.md)）。
 8. 作業しながら、手順の `status` を更新し、`scope check` で確かめる。
 9. 終えるときは `spec-dock work finish <ID> --yes`。

@@ -15,7 +15,8 @@
 2. `<link rel="stylesheet" href="../../../design-system/ds.css">` と `<script src="../../../design-system/ds.js"></script>` の2つの読み込みがある。
 3. 書き換えた後は、雛形の印 `<!-- spec-dock:explanation-skeleton -->` が残っていない。
 
-- 書き換えるのは `ds-source` の中の Markdown だけです。ほかの行は雛形のままにします。
+- 書き換えるのは `ds-source` の中の Markdown だけです。ほかの行は雛形のままにします。`<head>` の `<title>説明資料</title>` も残してかまいません。描くときに、前付けの `title` がページの題名になります。
+- 印の行の次にある案内のコメント（「雛形から書き換えたら…」）は、印と一緒に消してかまいません。
 - 相対の道筋 `../../../design-system/` は、`spec-dock/initiatives/<区切り>/<ID>/` からも、カタログ（`spec-dock/.canonical/<区切り>/<ID>/`）からも、`spec-dock/design-system/` に届きます。Scope のファイルにデザインシステムを写しません。
 - 前付けには、`title` のほか、`lead`（1〜2文の要約）、`category`、`audience`、`status` を書けます。
 
