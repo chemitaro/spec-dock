@@ -15,7 +15,7 @@ ID: "iss-00474"
 
 - **選んだ level**：strict（Epic の plan.md の表のとおり）。
 - **理由**：配られる CLI の契約（schema 4 の `scope create`・`import` の必須の引数）を変える。GitHub に書く前の止め方を誤ると、半端な Issue が本物の GitHub に残り、利用者の手で直すことになる。
-- **risk factor**：公開の CLI の契約、配布資産（15の新しいファイルと3つの文書）、既存のテストの書き換え、schema 3 との共存。
+- **risk factor**：公開の CLI の契約、配布資産（18の新しいファイルと3つの文書）、既存のテストの書き換え、schema 3 との共存。
 - **再評価の条件**：GitHub に書いた後に戻せない変更（Issue の本文の書き込みなど）や、既存の Scope のデータの書き換えが要るとわかったら、critical に上げる。該当しない（作るのは新しい Scope だけで、既存のデータに触れない）。
 - **security / privacy / operability**：理由の文は利用者の入力で、カタログのファイルに入る。シェルや `cue` に渡さない（Q5）。CUE の文字列として逃がすので、文書の構造を壊さない（AC-03）。秘密を扱わない。観測は、今のエラーの封筒と `effects`。
 
@@ -38,10 +38,10 @@ ID: "iss-00474"
 各 step は、`tdd` のとおり、受け入れ条件のテストを先に書き（Red）、通し（Green）、整える（Refactor）。
 
 - **S-01 雛形を配布資産に移す**（AC-10、AC-07）
-  - Red：`tests/unit/infra/test_issue474_cue_templates.py`：提供側に15のファイルがある、`explanation.html` がスケルトンとバイト一致、目録にあり `sha256` が合う、dogfood の写しとバイト一致、`templates/<種類>/` は `.md` の4つのまま、`report.md` の依存が CUE の3つ。
-  - Green：`git mv` で見本を移し、`explanation.html` と `report.md` を作り、目録と dogfood の写しを足す。`test_schema_v1_templates.py` の読む場所を変える。`test_issue413_assets.py` の数を直す（92→107、93→108）。
+  - Red：`tests/unit/infra/test_issue474_cue_templates.py`：提供側に18のファイルがある、`explanation.html` がスケルトンとバイト一致、目録にあり `sha256` が合う、dogfood の写しとバイト一致、`templates/<種類>/` は `.md` の4つと `.workbench/README.md` のまま、`report.md` の依存が CUE の3つ。
+  - Green：`git mv` で見本を移し、`explanation.html` と `report.md` を作り、目録と dogfood の写しを足す。`test_schema_v1_templates.py` の読む場所を変える。`test_issue413_assets.py` の数を直す（92→110、93→111）。
 - **S-02 domain の保証レベル**（AC-03 の単体）
-  - Red：`tests/unit/domain/test_assurance.py`：`parse_assurance` の欠け・空白・全角の空白・サロゲート・前後の空白、`cue_string_body` の本物の `cue` での往復（引用符、改行、タブ、バックスラッシュ、`\(`、制御文字、U+2028）、`assurance_replacements`。
+  - Red：`tests/unit/domain/test_assurance.py`：`parse_assurance` の欠け・空白・全角の空白・サロゲート・前後の空白、`cue_string_body` の本物の `cue` での往復（引用符、改行、タブ、バックスラッシュ、`\(`、制御文字、U+2028、U+FEFF）、`assurance_replacements`。
   - Green：`runtime/domain/assurance.py`。`scope_check.LEVELS` を置き換える。
 - **S-03 canonical の作成**（AC-01、AC-02、AC-03、AC-04、AC-06、AC-08）
   - Red：`tests/cli_runtime/test_issue474_scope_create.py`。
@@ -63,7 +63,7 @@ ID: "iss-00474"
 
 | AC | テスト |
 |---|---|
-| AC-01、AC-04、AC-08 | `tests/cli_runtime/test_issue474_scope_create.py`（本物の `cue`） |
+| AC-01、AC-04、AC-08、AC-10（作った説明資料） | `tests/cli_runtime/test_issue474_scope_create.py`（本物の `cue`） |
 | AC-02、AC-03、AC-05、AC-06 | 同上と `tests/unit/domain/test_assurance.py` |
 | AC-07、AC-10 | `tests/unit/infra/test_issue474_cue_templates.py`、`tests/integration/test_issue413_assets.py`、schema 3 の既存の作成のテスト |
 | AC-09 | `tests/cli_runtime/test_issue474_schema3.py` と、schema 3 の既存のテスト（変更なし） |
