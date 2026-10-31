@@ -180,7 +180,7 @@ I-4 ─────────┼──────────┘    │
 - **作るもの**：
   - `docs/authoring/`：CUE の書き方（型、番号、つながり、保証レベルの選び方と書き換え、計画の台帳、`execution`、リポジトリの型）、説明資料の書き方。Issue Plan Guide、overview、scope-layering の Planning Level の記述を、保証レベルに直す（Markdown の Scope では今の書き方が残ることも書く）。過去の「Assurance」との区別。
   - `spec-dock` スキル：短い整理と、ガイドへのリンク。`scope create` の新しい必須の引数。
-  - 版を上げる（番号は I-6 で決める）。上げるときの文書に、CLI の契約の変更を書く。
+  - 版を 0.4.0 に上げる（2026-11-01 に利用者が決めた。撤去の版は epic-00424 で 0.5.0 に変えた）。上げるときの文書に、CLI の契約の変更（`scope check`、`scope render`、`scope create`・`scope import github` の `--assurance` と `--assurance-reason` の必須化）を書く。
 - **受け入れ**：
   - AC-13（白紙のエージェントでの試行）、AC-12、AC-15。
 
