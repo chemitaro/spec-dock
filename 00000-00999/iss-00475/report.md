@@ -34,13 +34,19 @@ ID: "iss-00475"
   - dogfood の写し（`--design-system spec-dock/design-system`）でも6場面合格。
   - 否定の確かめ：内蔵形式の Epic の説明資料を、CDN の代わりなしで検査すると `FAILED`（図2つが描けない）になり、道具が素通しでないことを確かめた。
   - 検査の後に Chrome のプロセスが残っていないことを確かめた。
-- **pytest と lint**：最終品質ゲートの節を見る。
+- **pytest と lint**：最終品質ゲートの節を見る。変更の途中では、作業用 worktree で全体を1回実行し、資産数を固定で数える既存テスト2件の失敗を見つけて直した。
 - **仕様のレビュー**：spec-review（opus / high）第1回 合格（P2 4件を反映）、第2回 合格（P3 2件を反映）。
 - **コードのレビュー**：code-review（opus / high、規約と仕様の2人）、どちらも合格。P3 2件（Chrome の起動待ちの時間切れで Chrome が残る、欠けた部品で `OSError` が漏れる）を `7a0a919d0` で直した。
 
 ### 最終品質ゲート
 
-（ゲートの結果をここに書く）
+合格（campaign `iss-00475-g1`、attempt 01、合格のコミット `12dc01d2f1d071c7d4d21ee50ccae0662445af47`）。
+
+- レビュー：quality-gate-reviewer（opus / high、1人）、観点は functional-correctness、requirements-closure、test-adequacy。合格、網羅完了、P0 0・P1 0・P2 0・P3 0。
+- `make lint`：exit 0（ruff check、ruff format check、mypy すべて合格）。
+- `uv run pytest`：exit 0、3331 passed、8 skipped（19分17秒）。canonical のリンクのない、同じ SHA の detach した clean な worktree で実行した（リンクのある作業用 worktree での12件の環境起因の失敗は、Residual Risks を見る）。
+- 証拠：`.workbench/final-quality-gate/iss-00475-g1/`（`campaign.json`、`attempts/01/review.json` と `review.check.json`、`attempts/01/tests/manifest.json` と `manifest.check.json`、`closure.md`）。
+- ChatGPT の補助の道筋：なし（無効）。
 
 ## 未確認
 
