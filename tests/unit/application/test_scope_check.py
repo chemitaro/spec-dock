@@ -377,3 +377,19 @@ def test_a_tool_failure_while_reading_the_level_stops_instead_of_blaming_the_doc
     with pytest.raises(CanonicalCommandError) as raised:
         check(scope)
     assert (raised.value.code, raised.value.exit_code) == ("CUE_TIMEOUT", 5)
+
+
+def test_a_field_only_the_type_locates_is_fixed_in_the_scope_documents_not_the_type(tmp_path: Path) -> None:
+    report = check(place_sample(tmp_path / "scope", "issue-strict-missing-impact"))
+    hint = report.errors[0].details["hint"]
+    assert 'failures."F-01".impact' in hint and "Scope" in hint
+    assert not hint.startswith("Fix failures") and "do not edit" in hint
+
+
+def test_a_requirement_that_cannot_be_read_keeps_the_whole_cue_text(tmp_path: Path) -> None:
+    scope = place_sample(tmp_path / "scope", "issue-strict-complete")
+    requirement = scope / "requirement.cue"
+    requirement.write_text(requirement.read_text(encoding="utf-8") + "\nbroken: {\n", encoding="utf-8")
+    report = check(scope)
+    assert codes(report.errors) == ["CUE_INVALID"]
+    assert report.cue_output and "expected" in report.cue_output

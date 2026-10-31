@@ -32,7 +32,9 @@ from spec_dock.runtime.infra.cue_tool import (
 from spec_dock.runtime.presentation.envelope import Diagnostic
 
 if TYPE_CHECKING:
-    from spec_dock.runtime.infra.cue_tool import CueError, CuePosition, CueTool
+    from collections.abc import Mapping
+
+    from spec_dock.runtime.infra.cue_tool import CueError, CuePosition, CueRun, CueTool
 
 ScopeFormat = Literal["markdown", "cue", "conflict"]
 MARKDOWN_DOCUMENTS: Final = ("requirement.md", "design.md", "plan.md", "report.md")
@@ -201,11 +203,11 @@ def check_scope_documents(
         for name in SCOPE_FILES[1:]
         if not (scope / name).is_file()
     ]
-    schema, schema_errors, types = _read_schema(tool, scope, shown, repository_root, timeout)
+    schema, schema_errors, types, schema_output = _read_schema(tool, scope, shown, repository_root, timeout)
     errors += schema_errors
     findings: dict[str, list[dict[str, str]]] | None = None
     evaluation: dict[str, object] | None = None
-    cue_output: str | None = None
+    cue_output: str | None = schema_output
     checked = types is not None
     shape_errors: list[Diagnostic] = []
     if types is not None:
@@ -278,25 +280,36 @@ def _stopped(error: CueToolError) -> CanonicalCommandError:
     )
 
 
-def _export(tool: CueTool, files: list[Path], *, cwd: Path, timeout: float, **options: object):  # type: ignore[no-untyped-def]
+def _export(
+    tool: CueTool,
+    files: list[Path],
+    *,
+    cwd: Path,
+    timeout: float,
+    tags: Mapping[str, str] | None = None,
+    expression: str | None = None,
+) -> CueRun:
     try:
-        return tool.export(files, cwd=cwd, timeout=timeout, **options)  # type: ignore[arg-type]
+        return tool.export(files, cwd=cwd, timeout=timeout, tags=tags, expression=expression)
     except CueToolError as error:
         raise _stopped(error) from error
 
 
 def _read_schema(
     tool: CueTool, scope: Path, shown: str, repository_root: Path, timeout: float
-) -> tuple[str | None, list[Diagnostic], Path | None]:
-    """The type version from requirement.cue alone: (value, errors, type directory or None to skip evaluation)."""
+) -> tuple[str | None, list[Diagnostic], Path | None, str | None]:
+    """The type version from requirement.cue alone.
+
+    Returns (value, errors, type directory or None to skip evaluation, the cue error text when the read failed).
+    """
     requirement = scope / "requirement.cue"
     run = _export(tool, [requirement], cwd=scope, timeout=timeout, expression="schema")
     places = _Places(scope, shown, repository_root.resolve(), scope)
     if run.returncode != 0:
         errors = parse_cue_errors(run.stderr, cwd=scope)
         if errors and all(_not_found(error, "schema") for error in errors):
-            return None, [_schema_error(shown, "requirement.cue has no schema")], None
-        return None, _shape_errors(errors, run.stderr, places), None
+            return None, [_schema_error(shown, "requirement.cue has no schema")], None, run.stderr
+        return None, _shape_errors(errors, run.stderr, places), None, run.stderr
     try:
         value = json.loads(run.stdout)
     except ValueError as error:
@@ -304,7 +317,12 @@ def _read_schema(
             CueToolError(CUE_FAILED, "cue printed output that is not JSON", exit_code=5, next_step=REINSTALL_STEP)
         ) from error
     if not isinstance(value, str) or _SCHEMA_SHAPE.fullmatch(value) is None:
-        return None, [_schema_error(shown, f"schema must be a type version such as specdock/v1, not {value!r}")], None
+        return (
+            None,
+            [_schema_error(shown, f"schema must be a type version such as specdock/v1, not {value!r}")],
+            None,
+            None,
+        )
     types = schema_directory(value)
     if types is None:
         shipped = list(shipped_schemas())
@@ -315,7 +333,7 @@ def _read_schema(
             recovery=(step,),
             details={"schema": value, "shipped": shipped, "next_step": step},
         )
-    return value, [], types
+    return value, [], types, None
 
 
 def _schema_error(shown: str, message: str) -> Diagnostic:
@@ -374,7 +392,15 @@ def _shape_error(error: CueError, places: _Places) -> Diagnostic:
     at: CuePosition | None = min(error.positions, key=lambda item: places.rank(item.file), default=None)
     file = places.show(at.file) if at is not None else None
     field = error.path
-    where = f"{field} in {file}" if field and file else field or file or "the CUE documents"
+    if at is not None and places.rank(at.file) == 2:
+        # Only the shipped type locates it (a required field is missing, say): the fix is in the Scope's documents.
+        hint = (
+            f"Write or fix {field or 'the field'} in the Scope's CUE documents ({places.shown}/*.cue) so that it"
+            f" meets the spec type; do not edit the SpecDock type at {file} (see cue_message)."
+        )
+    else:
+        where = f"{field} in {file}" if field and file else field or file or "the CUE documents"
+        hint = f"Fix {where} to match the spec type; see cue_message and positions."
     message = f"{field}: {error.message}" if field else error.message
     return Diagnostic(
         CUE_INVALID,
@@ -388,7 +414,7 @@ def _shape_error(error: CueError, places: _Places) -> Diagnostic:
             "positions": [
                 {"file": places.show(item.file), "line": item.line, "column": item.column} for item in error.positions
             ],
-            "hint": f"Fix {where} to match the spec type; see cue_message and positions.",
+            "hint": hint,
         },
     )
 
