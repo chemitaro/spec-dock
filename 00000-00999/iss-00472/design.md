@@ -214,6 +214,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
 - `_rank` の書き換えを防ぐ：既定の選択肢があると、文書が `_rank: 0` と書けば 0 が選ばれ、レベルを変えずに検査が弱まる。隠した照合の項目 `_specdock: rank: {light: 0, ...}[assurance.level] & _rank` を置き、`level` と違う値は衝突の誤りにする（`level` が読めないときは、この項目は具体的にならず、ほかの誤りの文を増やさない。2026-10-31 に確かめた）。
 - 状態の値の誤り：`status: *"todo" | (string & =~"^(todo|doing|done|dropped)$")` で、誤りの文を2行にする（選択肢で書くと4行）。
 - 種類のタグがないとき：種類で切り替える条件は、`kind` を直接読まず、`_specdock: issue: *(kind == "issue") | true` を読む。タグがないと、比べた結果が読めないので既定に落ち、トップレベルの `if` が循環や「unresolved disjunction」の誤りを出さず、`kind: incomplete value ...` の誤りだけが出る（2026-10-31 に確かめた）。3つ以外の値のときも、`kind` の衝突の誤りが出る（ほかの誤りが続くことはある）。
+- 種類に合わない構造に書いたとき：規則の計算は、その種類の構造だけを読む（`_specdock.ownSteps`、`ownTests`、`ownSlices`。ほかの種類の構造は空として読む）。そのため、Epic に `steps` を書いた誤りは、`steps."S-01"` の1つの誤りの文だけになり、規則の計算から同じ誤りが重ねて出ない（2026-10-31 に確かめた）。
 - リポジトリの型との衝突：CUE の衝突の誤りで、両方のファイルの位置が出る。
 - `cue` がないとき（テスト）：`tests/support/cue.py` が、入れ方（`GOBIN="$PWD/.workbench/bin" go install cuelang.org/go/cmd/cue@v0.17.1` と PATH）を示して `pytest.fail` する。飛ばさない。
 
@@ -225,7 +226,7 @@ cue export --out json -t kind=<initiative|epic|issue> \
   - `pyproject.toml`（パッケージのデータ）
   - `.github/workflows/provider-ci.yml`（`provider-tests` のジョブに、`cue` の導入の手順を1つ）
   - 雛形の CUE（9つ。`tests/fixtures/cue/v1/templates/<種類>/`）
-  - テスト：`tests/support/cue.py`、`tests/unit/cue/`（型の規則、レベル、`execution`、リポジトリの型、雛形、形の誤り、見本の固定、`cue` がないときの失敗）、`tests/unit/infra/test_cue_schemas.py`、`tests/integration/test_cue_schema_wheel.py`、`tests/integration/test_provider_ci_cue.py`、見本の `tests/fixtures/cue/v1/`
+  - テスト：`tests/support/cue.py`（K1 の並べ方の評価、CUE の文字列の書き方、固定した版と checksum。ワークフローと同じ値を持つ）、`tests/unit/cue/`（共通の項目、形の誤り、レベル、規則と指摘の形、`execution`、項目を足せること、リポジトリの型、雛形、見本の固定、`cue` がないときの失敗）、`tests/unit/infra/test_cue_schemas.py`、`tests/integration/test_cue_schema_wheel.py`（ビルドの入力だけを一時ディレクトリに写してビルドする。手元の残りの `*.egg-info/SOURCES.txt` が、パッケージのデータの設定にないファイルを wheel に入れてしまうため）、`tests/integration/test_provider_ci_cue.py`、見本 `tests/fixtures/cue/v1/samples/<名前>/`（3つのファイルと `expected.json`）
 - 変えないもの：既存のテストのファイル、`spec-dock/templates/<種類>/` の `.md` の雛形、`static-inventory.json`、dogfood の写し（`spec-dock/` の下。この Issue は配布資産を変えない）、ランタイムの既存のコマンド、`setup.py`。
 
 ## 移行・互換性・rollback
