@@ -45,6 +45,12 @@ ID: "iss-00477"
 - 記録：worktree の `.workbench/final-quality-gate/iss-00477-g1/`（`campaign.json`、`attempts/01/`、`closure.md`）。ChatGPT のレーンは使っていない（無効）。
 - それより前に、`c4ba92ceb` での全体のテストで `test_issue413_assets.py` の34件が落ちた。テストの途中でガイドを書き換え、目録と一時的に食い違ったためで、同じファイルは前後と合格のコミットで通っている。
 
+### PR と CI
+
+- PR：https://github.com/chemitaro/spec-dock/pull/486（`chemitaro/iss-00477` → `main`、head `dc0fd9d72da6a5ad2e2a339c8d5e20d04e5bd976`、`Refs #477`、`Refs #425`）。
+- CI（`github-pr-checks`、2026-10-31T17:22Z の観測、Actions と Commit Status）：Provider CI（run 41223248366）、SpecDock check（41223248428）、Commit identity（41223248454、push 41223208135）がすべて success。GitHub は OPEN、非 draft、MERGEABLE、CLEAN（`OBSERVED_CI_PASS`、`READY`）。外部の CheckRun は観測の範囲外。
+- マージは人が行う。`spec-dock work finish` は、マージの後に統括の指示で行う（未実行）。
+
 ### それまでの確かめ
 
 - 仕様のレビュー（spec-reviewer opus / high）：第1回 fail（P1 1、P2 4、P3 1。既存テストの RECOVERY、known_old_sha256、版3の境界、自動のタグ、試行の環境、delete の ID）→ 統括の判断を得て直した。第2回 pass（P3 1。文言を直した）。記録は worktree の `.workbench/spec-review/iss-00477/`。
