@@ -98,7 +98,7 @@
     {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
-      "sha256": "8d4bb7d515758d23ba05ce3a50a72f34394577887d6455ba5a16e571af186083",
+      "sha256": "46df3129e70a6b3d13b7d7bcdef984eae95539c395050232bc3e1f8ecc30aa28",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -106,7 +106,8 @@
         "ddbd3e6cb3b216f4217eed6057ed8fdf7221760c18649f7ca997335e8304b353",
         "92f2c560e2d51a76595927f6de26564e451415ae08d645aada399a0e8f10fa5b",
         "501b2fe8b693de757ee275f373e675dd0e2c048cce88496a924a3aa54e16fd46",
-        "b26c1072fcf0305586fab8a6b4741aa3197b006fbcd71f173c83d25c7d5db459"
+        "b26c1072fcf0305586fab8a6b4741aa3197b006fbcd71f173c83d25c7d5db459",
+        "8d4bb7d515758d23ba05ce3a50a72f34394577887d6455ba5a16e571af186083"
       ]
     },
     {
@@ -212,11 +213,12 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09",
+      "sha256": "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "275bf1dc3a27303e04e82141ec31f49eaa7a599fc83eeb13c28e741ab29afd3b"
+        "275bf1dc3a27303e04e82141ec31f49eaa7a599fc83eeb13c28e741ab29afd3b",
+        "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09"
       ]
     },
     {
@@ -230,7 +232,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "d73995cc82ebefc65e5b9dcc7a1f2c5d3056a9f7ee641871ad49817e44693ade",
+      "sha256": "ac9c3296cd371f25e5ee885f9db2af39961f8fe4edb76205b8fb9dd9e38d6c3f",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -239,7 +241,8 @@
         "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac",
         "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1",
         "b07b2520bfbebb8b55a2eedea5d5c602ad486bf6333645c9ff93d34c4af0447a",
-        "75df3f3743a1edabc7ad9c9888f193d8e1d77043f3cd3efbcefc0c158d89efa9"
+        "75df3f3743a1edabc7ad9c9888f193d8e1d77043f3cd3efbcefc0c158d89efa9",
+        "d73995cc82ebefc65e5b9dcc7a1f2c5d3056a9f7ee641871ad49817e44693ade"
       ]
     },
     {
@@ -328,7 +331,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "132d05d34b6ec06c80819c3e3eff8adc43d1b4d3e5d7ed7f8d47a7a821ccf69a",
+      "sha256": "01c3f1398648c5bf3fefd3353655b283f0d337eb5665e55427adab9f1d4db6c1",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -342,7 +345,8 @@
         "01f305db844c770cfc625d9463b8d6f7f7a174f06d932f98a350a52e5d7ac0cb",
         "75d30325c313a8d4f4b2d663dc6157023d66be5d6d09583bd9f2934e631d98fe",
         "8bfb40e9bac83fff5982a0a8f38ee154c7bfd60d1cf45f681f017178568c2655",
-        "912bfa3c8278b2b0ec59a56d1758a3f2a8561301376f5f188bcfd6196b309d94"
+        "912bfa3c8278b2b0ec59a56d1758a3f2a8561301376f5f188bcfd6196b309d94",
+        "132d05d34b6ec06c80819c3e3eff8adc43d1b4d3e5d7ed7f8d47a7a821ccf69a"
       ]
     },
     {

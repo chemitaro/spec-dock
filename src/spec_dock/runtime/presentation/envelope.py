@@ -184,6 +184,15 @@ def render_json_v2(result: OperationResult[object]) -> str:
 def render_text(
     result: OperationResult[object], *, native_git: bool = False, dependency_view: str | None = None
 ) -> tuple[str, str]:
+    if (
+        result.command == "scope render"
+        and result.status == "succeeded"
+        and isinstance(result.data, FamilyData)
+        and isinstance(result.data.result.get("html"), str)
+    ):
+        # The page alone on standard output (iss-00476), so it can be redirected to a file and opened.
+        warnings = "".join(f"warning [{item.code}] {_text_escape(item.message)}\n" for item in result.warnings)
+        return str(result.data.result["html"]), warnings
     stdout_lines = [f"spec-dock: {result.status} ({result.command})"]
     if isinstance(result.data, SyncData):
         stdout_lines.extend(_sync_text(result.data))

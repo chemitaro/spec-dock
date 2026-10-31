@@ -234,6 +234,7 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
         "scope list",
         "scope show",
         "scope check",
+        "scope render",
         "active show",
         "branch show",
         "dependency list",
@@ -253,7 +254,7 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
     }
     output = _run(tmp_path, "completion", shell)
     assert output.exit_code == 0
-    assert len(LEAF_PATHS) == 54 and readonly <= set(LEAF_PATHS)
+    assert len(LEAF_PATHS) == 55 and readonly <= set(LEAF_PATHS)
     for leaf in LEAF_PATHS:
         if shell == "fish":
             # Public registration lines belonging to this exact command path.

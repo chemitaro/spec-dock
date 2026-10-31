@@ -1,6 +1,6 @@
 """Every public command answers in canonical mode (iss-00436, Epic G7): a canonical handling or a guided refusal.
 
-One linked schema-4 clone with the fake GitHub runs all 54 leaves once. GitHub is the fake on PATH, the catalog
+One linked schema-4 clone with the fake GitHub runs all 55 leaves once. GitHub is the fake on PATH, the catalog
 pushes to the temporary bare remote and the save wait of `work finish` runs on an injected clock.
 """
 
@@ -63,7 +63,7 @@ def test_every_leaf_has_a_route_in_canonical_mode() -> None:
         and path not in REPOSITORY_INDEPENDENT_HANDLERS
         and path not in MODE_INDEPENDENT
     ]
-    assert len(LEAF_PATHS) == 54
+    assert len(LEAF_PATHS) == 55
     assert unrouted == []
     assert set(CANONICAL_HANDLERS) <= set(LEAF_PATHS)
 
@@ -113,6 +113,7 @@ def _argv(world: WriteWorld, tmp_path: Path) -> list[tuple[str, list[str]]]:
         ("scope list", []),
         ("scope show", ["iss-3"]),
         ("scope check", ["iss-3"]),
+        ("scope render", ["iss-3"]),
         ("scope edit", ["iss-3", "--title", "葉を直す", "--yes"]),
         ("scope close", ["iss-12", "--yes"]),
         ("scope reopen", ["iss-12", "--yes"]),
