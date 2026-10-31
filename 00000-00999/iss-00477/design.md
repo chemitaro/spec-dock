@@ -71,17 +71,20 @@ ID: "iss-00477"
 ### D-06 `canonical.md` と復旧の文（R-06）
 
 - `SCOPE_CHECK_FAILED` の行の終了コードに「6（partial。保存を待つ間に開き直された CUE の Scope の `work finish`。束を書いた後）」を足す。
-- `SCOPE_KIND_CHANGED` の行と `SCOPE_KIND_CHANGED_RECOVERY` を、次の手順に直す：種類のラベルを戻す。種類を変えるのが意図なら、`spec-dock scope create <新しい種類> --assurance <値> --assurance-reason <理由>` で作り直す（新しい Scope は CUE の Scope）。古い Markdown の要件・設計・計画は、新しい `requirement.cue`、`design.cue`、`plan.cue` に書き写し、`requirement.md` などをそのまま移さない（並ぶと `SCOPE_FORMAT_CONFLICT`）。`artifacts/`、`discussions/` などのほかのファイルは移す。古い Scope を `spec-dock scope delete` する。
+- `SCOPE_KIND_CHANGED` の行と `SCOPE_KIND_CHANGED_RECOVERY` を、次の手順に直す：種類のラベルを戻す。種類を変えるのが意図なら、`spec-dock scope create <新しい種類> --assurance <値> --assurance-reason <理由>` で作り直す（新しい Scope は CUE の Scope）。古い Markdown の要件・設計・計画は、新しい `requirement.cue`、`design.cue`、`plan.cue` に書き写し、`requirement.md` などをそのまま移さない（並ぶと `SCOPE_FORMAT_CONFLICT`）。`artifacts/`、`discussions/` などのほかのファイルは移す。古い Scope を今の ID で `spec-dock scope delete <current ID>` する（古い ID の指定は `SCOPE_KIND_CHANGED` で止まる）。
+- 既存の `tests/cli_runtime/test_issue455_flat_ids.py` の定数 `RECOVERY` の文字列を、新しい文に置き換える（統括の許可。比べ方は変えない）。
 - 冒頭に、0.4.0 から新しい Scope は CUE の Scope になり、書き方は `authoring/cue.md` にある、と1文足す。
 - 新しいテスト：CUE の部品のモジュール（`canonical_scope_create.py`、`scope_check.py`、`canonical_scope_check.py`、`scope_render.py`、`infra/cue_tool.py`）の公開のコードの定数が、`canonical.md` の表か `cue.md` のコードの表にあり、次の1手が空でない。`canonical.md` の表にある `ASSURANCE_*` の行を名指して確かめる。
 
 ### D-07 版（R-07）
 
 - `pyproject.toml` の `version = "0.4.0"`、`uv lock` で `uv.lock` の自分の版だけを変える。
-- `system/spec-dock-version` を `0.4.0`（提供側と写し）。目録の `sha256` を新しくし、`0.3.0\n` の値を `known_old_sha256` に足す。
+- `system/spec-dock-version` を `0.4.0`（提供側と写し）。
+- 目録：この Issue で書き換えるすべての既存の配布資産（ガイド4本、`canonical.md`、`migration.md`、`templates/README.md`、スキル、`spec-dock-version`）について、`sha256` を新しくし、`d53b24d64` のバイトの `sha256` を `known_old_sha256` に足す（重なりは足さない）。新しい2つのガイドは `known_old_sha256` を空にして足す。目録は小さな台本で書き換え、手で `sha256` を写さない。
+- 版3との境界：スキル、`migration.md`、`README.md`、`cue.md` は、CUE の Scope、2つの必須の引数、`cue` の必須、`scope check`・`scope render` が canonical モード（版4）のものだと書き、版3では Markdown の Scope のままで、2つの引数を付けると `CANONICAL_NOT_MIGRATED` で止まると書く。
 - `migration.md` に `## 0.4.0 への更新` を足す。
 - ルートの `README.md`：「全53コマンド」を「全55コマンド」、`## 2つのモード（0.3.0）` の後に、0.4.0 の CUE の Scope と `cue` の必須を1段落と、`migration.md` の節へのリンク。
-- 新しいテスト：3つの版の一致と、`migration.md` の節の語。
+- 新しいテスト：3つの版の一致と、`migration.md` の節の語。版4の条件の語（F-07）。書き換えた配布資産の `d53b24d64` の `sha256` が `known_old_sha256` にあること（F-08。前の版の `sha256` は、テストの中に固定の値として持つ。CI の浅い clone では Git の履歴を読めないため）。
 
 ### D-08 つないだ統合テスト（R-08）
 
@@ -90,7 +93,11 @@ ID: "iss-00477"
 ### D-09 白紙のエージェントでの試行（R-09）
 
 - 候補の wheel を、この worktree の外の一時の場所に作り、一時の venv に入れる。
-- 試行のための一時のリポジトリ（schema 4、偽の `gh`、カタログのリンク）を、テストの補助（`WriteWorld` と同じ組み立て）を使う小さな台本で作る。台本は `.workbench/` に置き、コミットしない。
+- 試行のための一時のリポジトリを、テストの補助を使う小さな台本で作る（台本は `.workbench/` に置き、コミットしない）。台本は `pytest.MonkeyPatch` を単独で使って `WriteWorld` と同じ組み立て（schema 4、本物の Git のカタログとリンク、ファイルに状態を持つ偽の `gh` の実行ファイル）を行い、さらに次を置く。
+  - 提供側の `spec-dock/docs/`、`spec-dock/design-system/`、`spec-dock/templates/`、`.agents/skills/spec-dock/` を、一時のリポジトリの同じ場所に写す（エージェントが読むのは、利用側に配られるものと同じ文書）。
+  - 環境のファイル `env.sh`：`PATH`（偽の `gh` の場所、候補の venv の `bin`、`cue` の場所）、`HOME`、`XDG_CONFIG_HOME`、`XDG_STATE_HOME`（一時の場所）、`GH_TOKEN` などを外す。プロセスの外から使えるように、monkeypatch の代わりにこのファイルで渡す。
+  - 試行に使う Issue（Epic の子）を、偽の GitHub の上に、台本が `scope create` で作っておく（エージェントが作ってもよいが、作り方は試行の対象に含める）。
+- 渡す前に、`source env.sh` の後で候補の `spec-dock scope show`、`scope check` が動き、本物の GitHub に届かない（`GH_TOKEN` なし、偽の `gh` が先）ことを確かめる。組めなければ、試行の前に台本を直し、組み立ての手順を `report.md` に残す。
 - サブエージェント（opus / medium、新しいもの）に渡すのは、一時のリポジトリの道筋、候補の `spec-dock` の道筋、`cue` の道筋、「`.agents/skills/spec-dock/SKILL.md` と `spec-dock/docs/authoring/` だけを読む」という指示、作業（ある Issue の CUE の要件・設計・計画を書き、`scope check` に通し、手順を `doing`・`done` に更新し、もう一度通す）だけ。この会話、Epic・Issue の設計書、提供側のソースは渡さず、読まないよう指示する。
 - 結果（迷った点）で、ガイドを直す。直したら、テストを流し直す。
 
@@ -105,12 +112,12 @@ ID: "iss-00477"
 - 提供側：`src/spec_dock/assets/spec_dock/docs/authoring/{cue,explanation}.md`（新しい）、`overview.md`、`issue-plan.md`、`scope-layering.md`、`historical.md`、`docs/canonical.md`、`docs/migration.md`、`templates/README.md`、`system/spec-dock-version`、`assets/static-inventory.json`、`assets/install_root/.agents/skills/spec-dock/SKILL.md`、`runtime/application/canonical_errors.py`（文だけ）。
 - dogfood の写し：`spec-dock/docs/...`、`spec-dock/templates/README.md`、`spec-dock/system/spec-dock-version`、`.agents/skills/spec-dock/SKILL.md`。
 - `pyproject.toml`、`uv.lock`、`README.md`。
-- テスト：`tests/unit/infra/test_issue477_authoring_docs.py`（新しい）、`tests/cli_runtime/test_issue477_mixed_repository.py`（新しい）、既存の `test_authoring_kit_assets.py`（リンクの集合の期待2か所）、`tests/integration/test_issue413_assets.py`（資産の数）。
+- テスト：`tests/unit/infra/test_issue477_authoring_docs.py`（新しい）、`tests/cli_runtime/test_issue477_mixed_repository.py`（新しい）、既存の `test_authoring_kit_assets.py`（リンクの集合の期待2か所）、`tests/integration/test_issue413_assets.py`（資産の数）、`tests/cli_runtime/test_issue455_flat_ids.py`（定数 `RECOVERY` の文字列）。
 - 変えないもの：型、検査、作成、描画の振る舞い。今の `.md` の雛形。`AGENTS.md`。
 
 ## 移行・互換性・rollback
 
-- 文書と版だけの変更で、PR を戻せば元に戻る。版のタグはマージの後に統括が作るので、この PR はタグを作らない（`release-tag.yml` が 0.4.0 への上げで動くかは、マージの後に統括が確かめる）。
+- 文書と版だけの変更である。この PR のマージで、`release-tag.yml` が `v0.4.0` のタグを自動で作る（ワークフローは変えない。統括の確認、2026-11-01）。マージの前なら PR を戻せる。マージの後に問題が出たら、タグは残し、0.4.1 で直す（forward recovery）。
 - 配布資産の更新は、利用者が `installation update` で取り込む。新しい2つのガイドは、目録に足すので、`installation update` で入る。
 
 ## testability

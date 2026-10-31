@@ -14,7 +14,7 @@ ID: "iss-00477"
 ## Planning Level
 
 - **standard**（Epic の計画書で決めた値）。
-- 理由：文書と版の変更で、振る舞いを変えるランタイムの変更は復旧の文だけ。PR を戻せば元に戻る。版のタグはマージの後に統括が作る。
+- 理由：文書と版の変更で、振る舞いを変えるランタイムの変更は復旧の文だけ。マージの前なら PR を戻せ、マージの後は 0.4.1 で直せる。
 - risk factor：ガイドが型・ランタイムとずれること、既存のテストの縛り、共有のファイル（目録、資産の数、`canonical.md`）での衝突。
 - 再評価の条件：型、検査、作成、描画の振る舞いを変える必要が出たら、統括に聞く。
 
@@ -34,8 +34,8 @@ ID: "iss-00477"
 - **S-01 文書の縛りのテスト（Red）**：`tests/unit/infra/test_issue477_authoring_docs.py` に AC-01〜AC-07 のテストを書き、落ちることを確かめる。
 - **S-02 新しいガイド**：`cue.md`（見本を含む）、`explanation.md`。目録と写し。AC-01、AC-02 を Green にする。
 - **S-03 既存のガイド、雛形の一覧、スキル**：`overview.md`、`issue-plan.md`、`scope-layering.md`、`historical.md`、`templates/README.md`、スキル。既存のテストのリンクの集合の期待を直す。AC-03〜AC-05。
-- **S-04 canonical.md と復旧の文**：表の2行、冒頭の1文、`SCOPE_KIND_CHANGED_RECOVERY`。AC-06。
-- **S-05 版**：`pyproject.toml`、`uv.lock`、`spec-dock-version`、目録、`migration.md`、`README.md`、資産の数。AC-07。
+- **S-04 canonical.md と復旧の文**：表の2行、冒頭の1文、`SCOPE_KIND_CHANGED_RECOVERY`、既存のテストの定数 `RECOVERY`。AC-06。
+- **S-05 版**：`pyproject.toml`、`uv.lock`、`spec-dock-version`、目録（書き換えた既存の配布資産の `known_old_sha256` を含む。台本で書き換える）、`migration.md`、`README.md`、資産の数。AC-07。
 - **S-06 つないだ統合テスト**：`tests/cli_runtime/test_issue477_mixed_repository.py`。AC-08。
 - **S-07 白紙のエージェントでの試行**：設計 D-09 のとおり。結果でガイドを直し、`report.md` に書く。AC-09。
 - **S-08 全体の確かめ**：`make lint`、`PATH="$PWD/.workbench/bin:$PATH" uv run pytest`。カタログのリンクのある worktree では、既知の12件（`test_authoring_kit_assets.py` のリンクを辿るテスト）が環境で落ちるので、全体はリンクのない clean な clone で流す（I-2〜I-5 と同じ）。AC-10。
@@ -43,15 +43,16 @@ ID: "iss-00477"
 ## 検証
 
 - 受け入れ条件：S-01 と S-06 のテスト、S-07 の記録。
-- regression：既存のテストの全体。変えた既存のテストは、リンクの集合の期待と資産の数だけ。
+- regression：既存のテストの全体。変えた既存のテストは、リンクの集合の期待、資産の数、`test_issue455_flat_ids.py` の定数 `RECOVERY` の文字列だけ。
 - negative：ガイドの記述を型・ランタイムと照らすテストは、名前を1つ変えると落ちることを手で確かめる。
 - レビュー：`spec-review`（opus / high）、`code-review`（opus / high）、`final-quality-gate`（opus / high、1人）。
 
 ## rollback
 
-- PR を戻す。版のタグは作っていないので、戻すのは PR だけ。マージの後にタグを作った後で問題が出たら、0.4.1 で直す（forward recovery）。
+- マージの前：PR を戻す（閉じる）。
+- マージの後：`release-tag.yml` が `v0.4.0` を自動で作るので、PR だけを戻す状態はない。問題が出たら、タグは消さずに、0.4.1 で直す（forward recovery）。
 
 ## exit / handoff
 
 - PR をマージできる状態で止める。`spec-dock work finish` はしない。
-- 統括へ：版のタグの作成、I-7 での `installation update` と `.md` の雛形の撤去、利用者の手順（`coordinate` など）の `--assurance` の追加。
+- 統括へ：マージで `v0.4.0` が自動で作られたことの確かめ、I-7 での `installation update` と `.md` の雛形の撤去、利用者の手順（`coordinate` など）の `--assurance` の追加。
