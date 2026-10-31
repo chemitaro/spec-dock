@@ -1,4 +1,5 @@
 from collections.abc import Mapping
+import os
 from pathlib import Path
 import re
 from typing import TypedDict, cast
@@ -509,6 +510,15 @@ def _projection_violations(
     return tuple(violations)
 
 
+def _lexical_resolve(path: Path) -> Path:
+    """Fold `..` on the path alone, without following filesystem links.
+
+    Linked worktrees expose `initiatives` as a link to the catalog, so `Path.resolve()`
+    on the legacy nested node location would jump to another checkout.
+    """
+    return Path(os.path.normpath(path))
+
+
 def _relative_link_violations(manifest: tuple[str, ...], scaffold_root: Path) -> tuple[str, ...]:
     violations: list[str] = []
     for relative_path in manifest:
@@ -526,7 +536,7 @@ def _relative_link_violations(manifest: tuple[str, ...], scaffold_root: Path) ->
             link_base = asset_path.parent
 
         for target in _relative_markdown_links(content):
-            if not (link_base / target).resolve().is_file():
+            if not _lexical_resolve(link_base / target).is_file():
                 violations.append(f"broken relative link: {relative_path} -> {target}")
     return tuple(violations)
 
@@ -990,8 +1000,8 @@ def test_template_rdp_guide_link_resolves_from_rendered_node_location(
         assert _relative_markdown_links(content) == (expected_link,)
 
         node_path = scaffold_root.joinpath(*scope_contract["node_parts"], f"{document}.md")
-        resolved_link = (node_path.parent / expected_link).resolve()
-        expected_target = (scaffold_root / "docs" / "authoring" / guide).resolve()
+        resolved_link = _lexical_resolve(node_path.parent / expected_link)
+        expected_target = _lexical_resolve(scaffold_root / "docs" / "authoring" / guide)
         assert resolved_link == expected_target
         assert resolved_link.is_file()
 
@@ -1102,8 +1112,8 @@ def test_report_guide_link_resolves_from_rendered_node_location(scope: str) -> N
         assert _relative_markdown_links(content) == (expected_link,)
 
         node_path = scaffold_root.joinpath(*scope_contract["node_parts"], "report.md")
-        resolved_link = (node_path.parent / expected_link).resolve()
-        expected_target = (scaffold_root / "docs" / "authoring" / "report.md").resolve()
+        resolved_link = _lexical_resolve(node_path.parent / expected_link)
+        expected_target = _lexical_resolve(scaffold_root / "docs" / "authoring" / "report.md")
         assert resolved_link == expected_target
         assert resolved_link.is_file()
 
