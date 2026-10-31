@@ -111,7 +111,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
 ### 4. 作るときの一式と、保証レベル（契約 K4、R-A5、R-C3）
 
 - `scope create <種類>` と `scope import github` に、`--assurance <値>` と `--assurance-reason <文>` を足し、必須にする。どちらかがなければ、GitHub にも何も書かずに止まる（引数の段階で止める）。
-- 雛形は、新しい場所 `spec-dock/templates/cue/<種類>/` に置き、新しい CLI はそこだけから作る。今の `spec-dock/templates/<種類>/` の `.md` の雛形は、前の版の CLI のために、I-7 まで残す（I-7 の後は、前の版の CLI は雛形がないので、GitHub に書く前に止まる。安全な側の止まり方である）（前の版の CLI は、雛形のディレクトリのファイルをすべて写すので、同じ場所に CUE の雛形を置くと、置き換えられない印の残る Scope ができる）。`templates/cue/<種類>/` がないとき（新しい版の CLI と、上げていない配布資産）、新しい CLI は、GitHub に何も書かずに止まり、`installation update` を示す（R-H3）。雛形の CUE には、`{{ASSURANCE_LEVEL}}` と `{{ASSURANCE_REASON}}` の置き換えの印を置く。理由の文は、CUE の文字列として正しくなるように、置き換えの前に CUE の文字列の書き方に変える（引用符や改行）。
+- 雛形は、新しい場所 `spec-dock/templates/cue/<種類>/` に置き、新しい CLI はそこだけから作る。今の `spec-dock/templates/<種類>/` の `.md` の雛形は、前の版の CLI と、版3のリポジトリの `scope create`（従来モード）のために、epic-00424 の I-13（0.5.0）まで残す（I-13 の後は、前の版の CLI は雛形がないので、GitHub に書く前に止まる。安全な側の止まり方である）（前の版の CLI は、雛形のディレクトリのファイルをすべて写すので、同じ場所に CUE の雛形を置くと、置き換えられない印の残る Scope ができる）。`templates/cue/<種類>/` がないとき（新しい版の CLI と、上げていない配布資産）、新しい CLI は、GitHub に何も書かずに止まり、`installation update` を示す（R-H3）。雛形の CUE には、`{{ASSURANCE_LEVEL}}` と `{{ASSURANCE_REASON}}` の置き換えの印を置く。理由の文は、CUE の文字列として正しくなるように、置き換えの前に CUE の文字列の書き方に変える（引用符や改行）。
 - 今の `scope import github` が、既にディレクトリがある Scope を補うときは、雛形を足さず、保証レベルも書かない（今の「足りないものだけを足す」動きを守る）。
 - 説明資料の雛形 `explanation.html` は、Markdown を書く場所と、共有のデザインシステムを読み込む数行だけを持つ（下の契約 K5）。
 
@@ -148,7 +148,7 @@ findings: [rule=string]: [...{id: string, message: string, hint?: string}]
 ## 変更対象
 
 - **提供側**（`src/spec_dock/`）
-  - `assets/spec_dock/templates/cue/{initiative,epic,issue}/`：CUE の雛形、`explanation.html`、`report.md`（新しい配布資産）。今の `templates/{initiative,epic,issue}/` は I-7 で外す。
+  - `assets/spec_dock/templates/cue/{initiative,epic,issue}/`：CUE の雛形、`explanation.html`、`report.md`（新しい配布資産）。今の `templates/{initiative,epic,issue}/` は epic-00424 の I-13 で外す（2026-11-01 に I-7 から移した）。
   - `assets/spec_dock/design-system/`：デザインシステム（新しい配布資産）。`assets/static-inventory.json` に足す。
   - パッケージの `cue/v1/`：型。パッケージの図の部品（配布資産ではなく、パッケージの中のファイル）。
   - `runtime/application/`：`canonical_scope_create.py`（必須の引数、置き換え）、`canonical_scope_read.py`（`assurance`）、`canonical_work.py`（`work finish` の検査）、`canonical_workspace.py`（形式ごとの必須のファイル）、新しい検査と描画の部品。

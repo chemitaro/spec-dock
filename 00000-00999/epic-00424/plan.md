@@ -386,6 +386,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
   - 版3の宣言で、すべてのコマンドが `CANONICAL_NOT_MIGRATED`（0.5.0 の次の1手）で止まるテスト。G7 のテストを、51のコマンドで canonical の処理だけで動く形にする。
   - `cli/catalog.py` のコマンドの一覧と数（51）、文書の中身のテストの更新。
   - 平らな置き場に合わせて、テンプレートの「詳細:」の相対リンクの深さを `<区切り>/<ID>/` の深さ（`../../../docs/…`）に直し、作成時に書き換える処理を消す。`epics/rules.md` と `issues/rules.md` を作る配布資産、`--slug` の引数、`domain/ids.py` の slug の規則（`INPUT_SLUG_KEBAB_RE`、`validate_slug`、英数字だけの題名の規則）など、従来モードだけが使う名前の規則を消す（2026-10-29 の方針の変更）。
+  - 今の `.md` の雛形 `templates/{initiative,epic,issue}/`（提供側と dogfood の写し）を外す。版4の `scope create` は `templates/cue/` だけを使う（2026-11-01 に epic-00425 の I-7 から移した）。
   - 版を 0.5.0 にする（`pyproject.toml` と版のファイル）。spec-dock の利用側の配布資産を、`installation update` で 0.5.0 に上げる。
 - **受け入れ**：
   - AC-20 のうち、パッケージについての部分。14章の「消すもの」が残っていない（コードの検索と、版3の宣言のテスト）。テストの分類の一覧で、(b) のすべてに対応する canonical のテストがある。`make lint` と `uv run pytest` が通る。

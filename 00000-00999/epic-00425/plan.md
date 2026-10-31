@@ -38,7 +38,7 @@ ID: "epic-00425"
 - Issue ごとに、作業用の worktree とブランチを1つ使い、PRを1つ作る。`spec-dock work start <ID>` で始め、`spec-dock work finish` で終える。
 - この Epic とその Issue の仕様は、今までどおり Markdown で書く（`requirement.md` の対象外）。最初に、その Issue の `requirement.md`、`design.md`、`plan.md` を、この計画書の節から書く。Epic の目的、Issue の分け方、契約は変えない。変える必要を見つけたら、止まって Epic の文書の変更を提案する。
 - `cue` は、テストと手元の確かめのために、版を固定して入れる。利用者の環境（Homebrew など）に入れるときは、統括に頼む。
-- 配布資産を変える PR は、dogfood の写し（`spec-dock/` の下）も同じ PR で更新する（`design.md` の「移行・互換性・rollback」）。新しい雛形は `spec-dock/templates/cue/` に置き、今の `spec-dock/templates/<種類>/` の `.md` の雛形は I-7 まで変えない。
+- 配布資産を変える PR は、dogfood の写し（`spec-dock/` の下）も同じ PR で更新する（`design.md` の「移行・互換性・rollback」）。新しい雛形は `spec-dock/templates/cue/` に置き、今の `spec-dock/templates/<種類>/` の `.md` の雛形は変えない（外すのは epic-00424 の I-13）。
 - テストは、外のネットワークを使わない。GitHub は偽の `gh` で置き換える。ブラウザーの検査も、ネットワークを止めて行う。
 - 毎回、`make lint` と `uv run pytest` を通す。Markdown の Scope の回帰（AC-12）を壊してはならない。
 - してはならないこと：
@@ -139,7 +139,7 @@ I-4 ─────────┼──────────┘    │
 - **価値**：`scope create` と `scope import github` で、保証レベルと理由を指定して、5つのファイルの一式を持つ Scope を作れる。
 - **作るもの**：
   - `canonical_scope_create.py`：`--assurance`、`--assurance-reason` を必須にし、引数の段階で止める。理由を CUE の文字列に変えて置き換える。
-  - 配布資産の雛形 `spec-dock/templates/cue/<種類>/`：3つの種類の `requirement.cue`、`design.cue`、`plan.cue`（I-1 の中身）、`explanation.html`（I-4 の薄い形）、`report.md`。`static-inventory.json` に足し、dogfood の写しを同じ PR で足す。今の `.md` の雛形は変えない（外すのは I-7）。
+  - 配布資産の雛形 `spec-dock/templates/cue/<種類>/`：3つの種類の `requirement.cue`、`design.cue`、`plan.cue`（I-1 の中身）、`explanation.html`（I-4 の薄い形）、`report.md`。`static-inventory.json` に足し、dogfood の写しを同じ PR で足す。今の `.md` の雛形は変えない（外すのは epic-00424 の I-13）。
   - `templates/cue/<種類>/` がないとき、GitHub に書く前に止まり、`installation update` を示す。
 - **受け入れ**：
   - AC-01。作った直後の Scope が、`scope check` で、雛形の説明資料の警告（Epic では誤り）だけを示す。
@@ -188,7 +188,8 @@ I-4 ─────────┼──────────┘    │
 
 - **価値**：spec-dock リポジトリで、新しい Scope を CUE で作り、実用に耐えるかを確かめる。
 - **作るもの**：
-  - 利用者の承認を得て、新しい版を利用者の環境に入れ、spec-dock の配布資産を `installation update` で上げる（PR）。同じ PR で、今の `.md` の雛形 `spec-dock/templates/<種類>/` を外す（提供側も）。`cue` の導入は、利用者に頼む。
+  - 利用者の承認を得て、新しい版と `cue` を利用者の環境に入れ、spec-dock の配布資産を `installation update` で上げる（差分があるときだけ PR にする）。
+  - 今の `.md` の雛形 `spec-dock/templates/<種類>/` は外さない。0.4.0 でも版3のリポジトリの `scope create` が使うので、epic-00424 の I-13 で外す（2026-11-01 に利用者が決めた）。
   - 実際の Issue を1つ以上、CUE の仕様で作ってから閉じるまで回す。見つかった問題を、型とガイドの改善の Issue として返す。
 - **受け入れ**：
   - AC-14。

@@ -123,7 +123,7 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
 
 - **R-H1 既存の文書はそのまま**：既存の Scope の Markdown の要件・設計・計画は、移さずに残す。SpecDock の既存のコマンドは、Markdown の Scope でも今と同じに動く。保証レベルは「未設定」として扱い、今までどおり `plan.md` の文章で扱う。
 - **R-H2 同じリポジトリに両方ある**：1つのリポジトリに、Markdown の Scope と CUE の Scope が並んでいても、検査、表示、`workspace validate`、`workspace doctor`、`work start`、`work finish` が正しく動く。
-- **R-H3 版の食い違い**：新しい版の SpecDock を入れたが、リポジトリの配布資産をまだ上げていないとき、`scope create` と `scope import github` は、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、`.md` の雛形を外す I-7（計画書）までは、今までどおり Markdown の Scope を作る。I-7 の後は、GitHub に何も書かずに止まる。
+- **R-H3 版の食い違い**：新しい版の SpecDock を入れたが、リポジトリの配布資産をまだ上げていないとき、`scope create` と `scope import github` は、GitHub に何も書かずに止まり、`installation update` を示す。前の版の SpecDock は、新しい配布資産を入れたリポジトリでも、`.md` の雛形を外す epic-00424 の I-13（0.5.0）までは、今までどおり Markdown の Scope を作る。I-13 の後は、GitHub に何も書かずに止まる。
 
 ### I. ガイドとスキル
 
@@ -237,6 +237,7 @@ SpecDock の Initiative、Epic、Issue の要件・設計・計画を、エー�
 | 実行の割り当て | 作るセッションは続け、レビューは独立させる。推論はセッションごとに `plan.cue` の `execution` に書く |
 | モデルと推論の対応表 | SpecDock には置かない。利用者の policy が、SpecDock の保証レベルを読む |
 | 図の描き方 | SpecDock が `@plantuml/core` と highlight.js を同梱し、ダッシュボードのサーバーが配る。単独のファイルは CDN を予備にする |
+| `.md` の雛形を外す時期 | I-7 ではなく、epic-00424 の I-13（従来モードの撤去、0.5.0）で外す。0.4.0 でも、版3のリポジトリの `scope create` が `.md` の雛形を使い、epic-00424 は従来モードのコードを I-13 だけが消すと決めているため（2026-11-01） |
 
 ## エージェントが決めたこと
 

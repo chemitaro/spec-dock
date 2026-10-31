@@ -320,6 +320,7 @@ ID: "epic-00424"
 | 切り替えの運用 | エージェントに任せる（下の「エージェントが決めたこと」） |
 | 設計の承認 | 設計 v0.4（3回目のヒアリングの反映）を承認した（2026-10-26） |
 | spec-dock の別のクローン | `/Volumes/990p2t/workspace/worktrees/specdock-cleanup-planning`（ブランチ `iss-00411-retired-cli-surface-cleanup`、古い `writer_protocol`）は放棄する。移さず、`canonical link` も実行しない（2026-10-26） |
+| `.md` の雛形 | `templates/{initiative,epic,issue}/` の `.md` の雛形は、撤去（I-13）で外す（2026-11-01 に利用者が決めた。もとは epic-00425 の I-7 で外す計画だった） |
 | 撤去の版の番号 | 撤去の版は 0.5.0 にする。0.4.0 は、epic-00425 の CUE の文書の版（`scope create` の必須の引数という、互換のない変更を含む）に使う（2026-11-01 に利用者が決めた。もとは撤去を 0.4.0 としていた） |
 
 ## エージェントが決めたこと

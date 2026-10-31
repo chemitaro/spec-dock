@@ -974,7 +974,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
   1. `dispatch()` のモードの振り分けと、従来の処理。`.meta.json` の読み書き。
   2. 宣言の版3の受け付け。`read_workspace_declaration` は版4だけを受け付け、版3を読むと、すべてのコマンドが `CANONICAL_NOT_MIGRATED`（12章の 0.5.0 の次の1手）で止まる（`canonical check` だけは、8章のとおり失敗の1件として返す）。版5以上は、今と同じく `PRECONDITION_FAILED` で止まる。
   3. canonical モードで拒否するだけのコマンドと引数。コマンドの `workspace migrate` と `workbench copy`、引数の `workspace validate --ci`、`workspace sync --source local`、`dependency check --source local`。`scope create` と `scope import github` の `--slug`。使われなくなるエラーのコード（`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`）も消す。コマンドの数は 53 から 51 になる。
-  4. テンプレートの前付けの `タイトル:` と `親:` と、写すときにそれを除く処理（6章）。テンプレートの「詳細:」の相対リンクは `<区切り>/<ID>/` からの深さ（`../../../docs/…`）に直し、写すときに書き換える処理を消す。`epics/rules.md` と `issues/rules.md` を作る配布資産と、従来モードだけが使う名前の規則（`domain/ids.py` の slug の規則と英数字だけの題名の規則）を消す。
+  4. テンプレートの前付けの `タイトル:` と `親:` と、写すときにそれを除く処理（6章）。テンプレートの「詳細:」の相対リンクは `<区切り>/<ID>/` からの深さ（`../../../docs/…`）に直し、写すときに書き換える処理を消す。`epics/rules.md` と `issues/rules.md` を作る配布資産と、従来モードだけが使う名前の規則（`domain/ids.py` の slug の規則と英数字だけの題名の規則）を消す。`.md` の雛形 `templates/{initiative,epic,issue}/` も消す（版4は epic-00425 の `templates/cue/` だけを使う。2026-11-01 に epic-00425 の I-7 から移した）。
   5. 規則の節の版3の文（10章）と、README、配布する `spec-dock/docs/`、spec-dock の `AGENTS.md` の、従来モードの記述。
   6. 移行のスクリプト `scripts/migrate-to-canonical/`（版のタグ `v0.3.0` に残る）と、spec-dock の `.github/scripts/specdock-ci-validate.sh`（I-10 で `ci.yml` から外した後、使われない）。
   7. 従来モードだけを確かめるテスト（下の「テストの扱い」）。
