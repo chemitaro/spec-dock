@@ -40,6 +40,7 @@ LEAF_PATHS: tuple[str, ...] = (
     "scope list",
     "scope show",
     "scope check",
+    "scope render",
     "scope edit",
     "scope close",
     "scope reopen",
@@ -97,6 +98,7 @@ HELP_EFFECTS: dict[str, str] = {
     "scope list": "Read Scope metadata; no changes.",
     "scope show": "Read one Scope and its observed status; no changes.",
     "scope check": "Check one CUE Scope's documents and explanation offline; no changes.",
+    "scope render": "Draw one CUE Scope's requirement, design and plan as HTML on standard output; no changes.",
     "scope edit": "Change the selected Scope title in local metadata.",
     "scope close": "Complete or cancel one Scope in its backend; active selection stays set.",
     "scope reopen": "Reopen one Scope in its backend; active selection stays set.",
@@ -197,6 +199,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "scope list": (_arg("--kind", choices=KINDS), _arg("--parent"), _arg("--state", choices=STATES)),
     "scope show": (_arg("target"),),
     "scope check": (_arg("target"),),
+    "scope render": (_arg("target"),),
     "scope edit": (_arg("target"), _required("--title")),
     "scope close": (_arg("target"), _arg("--reason", choices=("completed", "not-planned"), default="completed")),
     "scope reopen": (_arg("target"),),
@@ -349,6 +352,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope list": "The selected project must contain a readable Scope tree.",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
     "scope check": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory. A CUE Scope (requirement.cue) needs cue v0.17.1 or later on PATH (CUE_NOT_FOUND, CUE_VERSION_UNSUPPORTED) and a type version this SpecDock ships (CUE_SCHEMA_UNSUPPORTED); a Markdown Scope succeeds with checked=false and needs no cue.",
+    "scope render": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory and be a CUE Scope (a Markdown Scope stops with SCOPE_NOT_CUE). Needs cue v0.17.1 or later on PATH and a type version this SpecDock ships, like scope check. The page loads the checkout's spec-dock/design-system/ through a file: URL (warning DESIGN_SYSTEM_MISSING when it is absent) and diagram parts from the CDN.",
     "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
@@ -572,6 +576,22 @@ def _help_spec(leaf: str) -> HelpSpec:
             " assurance {level, reason, source, problem}, errors and warnings (code, message, details.file,"
             " details.hint; CUE_INVALID adds line, column, field, cue_message, positions; SPEC_FINDINGS adds rule"
             " and id), findings, cue {version}, cue_output, snapshot. Errors exit 7 with SCOPE_CHECK_FAILED."
+        )
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf == "scope render":
+        reads = (
+            "The Scope's requirement.cue, design.cue and plan.cue (evaluated as scope check does), the shipped type"
+            " of its schema, the checkout's spec-dock/cue/*.cue, and the structure snapshot for its kind and title."
+        )
+        does_not = (
+            "Does not write a file, the catalog, the checkout or GitHub, and does not draw explanation.html,"
+            " report.md or a Markdown Scope."
+        )
+        json_data = (
+            "kind=scope-render: scope_id, kind, path, format (cue|conflict), complete, valid, errors (shown on the"
+            " page; findings are drawn from the evaluation), design_system_base, vendor_base (null: CDN), html,"
+            " snapshot. Text output is the HTML alone. A failed evaluation still succeeds with a page of check"
+            " results and warning SCOPE_RENDER_INCOMPLETE; a Markdown Scope exits 7 with SCOPE_NOT_CUE."
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf in ("scope list", "scope show"):
