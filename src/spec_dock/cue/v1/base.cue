@@ -40,10 +40,12 @@ _specdock: {
 }
 
 // Text that is not blank. Text fields may hold Markdown; renderers draw it as Markdown (contract K5).
-#Text: string & =~"\\S"
+// "Blank" follows Python's str.isspace(): RE2's \s covers only ASCII, so the class also excludes the
+// Unicode separators (\p{Z}, such as U+3000) and \v, U+001C-U+001F and U+0085.
+#Text: string & =~"[^\\s\\p{Z}\\x{0B}\\x{1C}-\\x{1F}\\x{85}]"
 
 // One line of text that is not blank.
-#Title: string & =~"^[^\\n]*\\S[^\\n]*$"
+#Title: string & =~"^[^\\n]*[^\\s\\p{Z}\\x{0B}\\x{1C}-\\x{1F}\\x{85}][^\\n]*$"
 
 // Connection findings, one list per rule. A rule that applies at this level always has a list, empty
 // when nothing is wrong; a rule below its stage has no entry. Repository types may add rules.

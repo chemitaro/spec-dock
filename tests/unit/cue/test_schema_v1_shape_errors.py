@@ -155,3 +155,27 @@ def test_a_field_of_the_other_kind_says_where_the_work_belongs(
 ) -> None:
     result = evaluate(write_scope(tmp_path, _requirement(), plan=document(**fields)), kind)
     assert not result.ok and "plan.cue" in result.stderr and advice in result.stderr, result.stderr
+
+
+# Python's str.isspace() blanks beyond ASCII; RE2's \S alone would let them through (code review, iss-00472).
+UNICODE_BLANKS = ["　", " ", "\v", "\x1c", "\x85", " ", " ", " ", " ", " 　 "]
+
+
+@pytest.mark.parametrize("blank", UNICODE_BLANKS)
+def test_a_reason_or_title_of_unicode_spaces_only_is_blank(tmp_path: Path, blank: str) -> None:
+    assert blank.strip() == ""
+    reason = document(schema="specdock/v1", assurance={"level": "strict", "reason": blank})
+    _assert_fails_naming(tmp_path / "reason", reason, "assurance.reason")
+    title = _requirement(requirements={"R-01": {"title": blank}})
+    _assert_fails_naming(tmp_path / "title", title, 'requirements."R-01".title')
+
+
+@pytest.mark.parametrize("text", ["　理由　", "x ", "​"])
+def test_text_with_a_visible_character_among_unicode_spaces_is_not_blank(tmp_path: Path, text: str) -> None:
+    assert text.strip() != ""
+    requirement = document(
+        schema="specdock/v1",
+        assurance={"level": "light", "reason": text},
+        requirements={"R-01": {"title": text}},
+    )
+    assert evaluate(write_scope(tmp_path, requirement), "issue").ok
