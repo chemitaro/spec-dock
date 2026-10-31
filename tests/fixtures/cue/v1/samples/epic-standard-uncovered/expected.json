@@ -1,0 +1,84 @@
+{
+  "kind": "epic",
+  "level": "standard",
+  "export": {
+    "schema": "specdock/v1",
+    "kind": "epic",
+    "assurance": {
+      "level": "standard",
+      "reason": "複数の Issue に分かれる通常の機能"
+    },
+    "findings": {
+      "unknown-reference": [],
+      "requirement-without-step": [
+        {
+          "id": "R-03",
+          "message": "R-03 を任せた子の Scope がありません",
+          "hint": "plan.cue の slices に、covers に \"R-03\" を含む項目を足す"
+        }
+      ],
+      "requirement-without-design": [
+        {
+          "id": "R-03",
+          "message": "R-03 を満たす設計がありません",
+          "hint": "design.cue の design に、satisfies に \"R-03\" を含む項目を足す"
+        }
+      ],
+      "requirement-without-test": [
+        {
+          "id": "R-03",
+          "message": "R-03 を確かめる子の Scope がありません",
+          "hint": "plan.cue の slices に、covers に \"R-03\" を含む項目を足す"
+        }
+      ]
+    },
+    "requirements": {
+      "R-01": {
+        "title": "書き出せる",
+        "acceptance": [
+          "書き出せる"
+        ]
+      },
+      "R-02": {
+        "title": "読み込める",
+        "acceptance": [
+          "読み込める"
+        ]
+      },
+      "R-03": {
+        "title": "移せる",
+        "acceptance": [
+          "別の PC で使える"
+        ]
+      }
+    },
+    "failures": {},
+    "design": {
+      "D-01": {
+        "title": "形式の契約",
+        "satisfies": [
+          "R-01",
+          "R-02"
+        ]
+      }
+    },
+    "steps": {},
+    "tests": {},
+    "slices": {
+      "iss-00011": {
+        "covers": [
+          "R-01"
+        ],
+        "text": "書き出しを作る"
+      },
+      "iss-00012": {
+        "covers": [
+          "R-02"
+        ],
+        "after": [
+          "iss-00011"
+        ]
+      }
+    }
+  }
+}

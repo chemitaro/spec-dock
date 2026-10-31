@@ -1,0 +1,35 @@
+{
+  "kind": "issue",
+  "level": "light",
+  "export": {
+    "schema": "specdock/v1",
+    "kind": "issue",
+    "assurance": {
+      "level": "light",
+      "reason": "表示の文言だけを直す。すぐに戻せる"
+    },
+    "findings": {
+      "unknown-reference": [],
+      "requirement-without-step": []
+    },
+    "purpose": "ヘルプの誤字を直す",
+    "requirements": {
+      "R-01": {
+        "title": "ヘルプの誤字がない"
+      }
+    },
+    "failures": {},
+    "design": {},
+    "steps": {
+      "S-01": {
+        "title": "誤字を直す",
+        "realizes": [
+          "R-01"
+        ],
+        "status": "done"
+      }
+    },
+    "tests": {},
+    "slices": {}
+  }
+}

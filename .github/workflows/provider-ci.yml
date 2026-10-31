@@ -47,6 +47,27 @@ jobs:
           python -m pip install uv
       - name: Run provider static analysis
         run: make lint
+      # The CUE spec type tests need the real cue and fail without it (iss-00472). The release archive is
+      # pinned by version and SHA-256; tests/support/cue.py holds the same values.
+      - name: Install pinned cue
+        env:
+          CUE_VERSION: v0.17.1
+          CUE_SHA256_LINUX_AMD64: a39b0c97695069d95d276d99be0f5dbabb081d801bfdc9ba49b76efaf94e2369
+          CUE_SHA256_LINUX_ARM64: 0d729be30d52c952ca38fc9dcb692caa09d8463fa0b64df5781312779183fbcd
+        run: |
+          case "$RUNNER_OS/$RUNNER_ARCH" in
+            Linux/X64) platform=linux_amd64; sha256="$CUE_SHA256_LINUX_AMD64" ;;
+            Linux/ARM64) platform=linux_arm64; sha256="$CUE_SHA256_LINUX_ARM64" ;;
+            *) echo "no pinned cue for $RUNNER_OS/$RUNNER_ARCH" >&2; exit 1 ;;
+          esac
+          archive="$RUNNER_TEMP/cue_${CUE_VERSION}_${platform}.tar.gz"
+          curl -fsSL --retry 3 -o "$archive" \
+            "https://github.com/cue-lang/cue/releases/download/${CUE_VERSION}/cue_${CUE_VERSION}_${platform}.tar.gz"
+          echo "$sha256  $archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/cue-bin"
+          tar -xzf "$archive" -C "$RUNNER_TEMP/cue-bin" cue
+          echo "$RUNNER_TEMP/cue-bin" >> "$GITHUB_PATH"
+          "$RUNNER_TEMP/cue-bin/cue" version
       - name: Run provider pytest suite
         run: uv run pytest
 
