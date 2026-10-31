@@ -5,6 +5,8 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import zipfile
 
 import pytest
 
@@ -79,3 +81,14 @@ def test_the_inventory_lists_every_cue_template_with_its_digest_and_the_dogfood_
 
 def test_the_cue_examples_no_longer_live_among_the_test_fixtures() -> None:
     assert not (ROOT / "tests/fixtures/cue/v1/templates").exists()
+
+
+def test_a_fresh_wheel_carries_every_cue_template_including_the_hidden_workbench(tmp_path: Path) -> None:
+    wheel_dir = tmp_path / "wheel"
+    subprocess.run(["uv", "build", "--wheel", "--out-dir", str(wheel_dir)], cwd=ROOT, check=True, capture_output=True)
+    (wheel,) = wheel_dir.glob("*.whl")
+    with zipfile.ZipFile(wheel) as archive:
+        for kind in KINDS:
+            for name in CUE_FILES:
+                packaged = f"spec_dock/assets/spec_dock/templates/cue/{kind}/{name}"
+                assert archive.read(packaged) == (PROVIDER / "templates/cue" / kind / name).read_bytes(), packaged

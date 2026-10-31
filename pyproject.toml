@@ -115,6 +115,9 @@ spec_dock = [
   "assets/spec_dock/templates/initiative/.workbench/README.md",
   "assets/spec_dock/templates/epic/.workbench/README.md",
   "assets/spec_dock/templates/issue/.workbench/README.md",
+  "assets/spec_dock/templates/cue/initiative/.workbench/README.md",
+  "assets/spec_dock/templates/cue/epic/.workbench/README.md",
+  "assets/spec_dock/templates/cue/issue/.workbench/README.md",
 ]
 
 [tool.setuptools.exclude-package-data]
