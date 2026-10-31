@@ -213,12 +213,13 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd",
+      "sha256": "ac31d512666ef64baa74a06923856b6d4d91e257032dfec8b958c8c11724afdb",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "275bf1dc3a27303e04e82141ec31f49eaa7a599fc83eeb13c28e741ab29afd3b",
-        "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09"
+        "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09",
+        "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd"
       ]
     },
     {
@@ -232,7 +233,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "ac9c3296cd371f25e5ee885f9db2af39961f8fe4edb76205b8fb9dd9e38d6c3f",
+      "sha256": "0ce735804cd49de202a8be2e731f81a04b1279e1aaa344397e83a15f0a23161d",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -242,7 +243,8 @@
         "d53e28ebc787e9e8f8dd64d04f399ee696bd78779eab5f2376c2beb25c8d65d1",
         "b07b2520bfbebb8b55a2eedea5d5c602ad486bf6333645c9ff93d34c4af0447a",
         "75df3f3743a1edabc7ad9c9888f193d8e1d77043f3cd3efbcefc0c158d89efa9",
-        "d73995cc82ebefc65e5b9dcc7a1f2c5d3056a9f7ee641871ad49817e44693ade"
+        "d73995cc82ebefc65e5b9dcc7a1f2c5d3056a9f7ee641871ad49817e44693ade",
+        "ac9c3296cd371f25e5ee885f9db2af39961f8fe4edb76205b8fb9dd9e38d6c3f"
       ]
     },
     {
@@ -331,7 +333,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "1f99ff8e0734455689509cce26d2aec7efade9dd3172aa36034a03938f1b5d41",
+      "sha256": "a195de0b32574113896f1ee5d09cc7c65ee7e252a512a945f11d811e641a976f",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -347,7 +349,8 @@
         "8bfb40e9bac83fff5982a0a8f38ee154c7bfd60d1cf45f681f017178568c2655",
         "912bfa3c8278b2b0ec59a56d1758a3f2a8561301376f5f188bcfd6196b309d94",
         "132d05d34b6ec06c80819c3e3eff8adc43d1b4d3e5d7ed7f8d47a7a821ccf69a",
-        "01c3f1398648c5bf3fefd3353655b283f0d337eb5665e55427adab9f1d4db6c1"
+        "01c3f1398648c5bf3fefd3353655b283f0d337eb5665e55427adab9f1d4db6c1",
+        "1f99ff8e0734455689509cce26d2aec7efade9dd3172aa36034a03938f1b5d41"
       ]
     },
     {
@@ -734,6 +737,150 @@
       "path": "spec-dock/templates/artifacts/research.md",
       "source": "spec_dock/templates/artifacts/research.md",
       "sha256": "5e92d1ba03ce1a5747b0c6444cd04541910c573a33589ed7c001ef31236ef2fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/epic/.workbench/README.md",
+      "source": "spec_dock/templates/cue/epic/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/epic/design.cue",
+      "source": "spec_dock/templates/cue/epic/design.cue",
+      "sha256": "c9a7844aea57387062a47e9cccf2fd06b48a4c8afc7ed3b05dc46097ac730fd4",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/epic/explanation.html",
+      "source": "spec_dock/templates/cue/epic/explanation.html",
+      "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/epic/plan.cue",
+      "source": "spec_dock/templates/cue/epic/plan.cue",
+      "sha256": "9faaa0013e92c012825ee794f2fec44eb496e7f42a5aaf460d0f58070331086e",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/epic/report.md",
+      "source": "spec_dock/templates/cue/epic/report.md",
+      "sha256": "7efe1dd09a4295799f218a86eb78c5ccef4356083af8a93c923cda228526e8c0",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/epic/requirement.cue",
+      "source": "spec_dock/templates/cue/epic/requirement.cue",
+      "sha256": "c46151fb4f39d9688663894e1407122d5301bf7c54582fc9e9b2cdf6009ca2b1",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/initiative/.workbench/README.md",
+      "source": "spec_dock/templates/cue/initiative/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/initiative/design.cue",
+      "source": "spec_dock/templates/cue/initiative/design.cue",
+      "sha256": "831dc197cfb3be713bacf40ebe4a341139e5ae9d0c5d1352ebe7ae2d6a393a63",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/initiative/explanation.html",
+      "source": "spec_dock/templates/cue/initiative/explanation.html",
+      "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/initiative/plan.cue",
+      "source": "spec_dock/templates/cue/initiative/plan.cue",
+      "sha256": "4d2eadbe15fec852af9f10fa508bd8ef53ecdb49b6f6e21031c20d746210f177",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/initiative/report.md",
+      "source": "spec_dock/templates/cue/initiative/report.md",
+      "sha256": "b06fa2aeef9eaa9752cb9e027af3104a533948d3f00479efe50cb0ca0858b60f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/initiative/requirement.cue",
+      "source": "spec_dock/templates/cue/initiative/requirement.cue",
+      "sha256": "ed48a6363279d69dccf355296f6ed4dbb88fbe01031e40854ebe473124581e04",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/issue/.workbench/README.md",
+      "source": "spec_dock/templates/cue/issue/.workbench/README.md",
+      "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/issue/design.cue",
+      "source": "spec_dock/templates/cue/issue/design.cue",
+      "sha256": "23bdb8f35a2341e9fed027ea4c5f2e763ca7614cda0d5e2a8a2e5897223be53f",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/issue/explanation.html",
+      "source": "spec_dock/templates/cue/issue/explanation.html",
+      "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/issue/plan.cue",
+      "source": "spec_dock/templates/cue/issue/plan.cue",
+      "sha256": "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/issue/report.md",
+      "source": "spec_dock/templates/cue/issue/report.md",
+      "sha256": "b2c0b4b9ef4ba45c3f53f548baa4052db5b2936771a60bd64f0de79551bd0cad",
+      "mode": 420,
+      "init_only": false,
+      "known_old_sha256": []
+    },
+    {
+      "path": "spec-dock/templates/cue/issue/requirement.cue",
+      "source": "spec_dock/templates/cue/issue/requirement.cue",
+      "sha256": "6749fe7bcbc1354ed8ce6b7f5be61833edf99805d2ec503f806cb3ea30d47a23",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": []

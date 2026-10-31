@@ -624,8 +624,8 @@ def test_uninstall_preserves_workspace_specs_ignored_state_and_unknown_files(
         assert data["can_apply"] is True and tree_digest(target) == before and not backup.exists()
     else:
         assert (
-            result["status"] == "succeeded" and len(data["retired_paths"]) == 92
-        )  # iss-00436 added docs/canonical.md; iss-00475 added design-system (5)
+            result["status"] == "succeeded" and len(data["retired_paths"]) == 110
+        )  # iss-00436 added docs/canonical.md; iss-00475 added design-system (5); iss-00474 added templates/cue (18)
         skills = [path for path in data["retired_paths"] if path.startswith((".agents/", ".claude/"))]
         assert skills == [
             ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
@@ -968,7 +968,9 @@ def test_static_changes_stop_if_the_observed_asset_is_replaced_with_same_bytes_d
             {"kind": "installation.change", "status": "not_attempted", "target": relative},
         ]
     else:
-        assert len(result["effects"]) == 93  # iss-00436 added docs/canonical.md; iss-00475 added design-system (5)
+        assert (
+            len(result["effects"]) == 111
+        )  # iss-00436 docs/canonical.md; iss-00475 design-system (5); iss-00474 templates/cue (18)
         assert all(
             effect["kind"] == "installation.retire" and effect["status"] == "not_attempted"
             for effect in result["effects"][1:]

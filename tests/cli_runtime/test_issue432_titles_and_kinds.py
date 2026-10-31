@@ -39,7 +39,19 @@ def test_edit_accepts_256_characters_in_any_language(world: WriteWorld) -> None:
 def test_an_import_of_an_issue_whose_github_title_breaks_the_rule_writes_nothing(world: WriteWorld) -> None:
     world.edit(lambda fake: fake.add_issue(9, title="line\nbreak"))
     code, payload = world.run(
-        "scope", "import", "github", "issue", "9", "--parent", "epic-00002", "--title", "anything"
+        "scope",
+        "import",
+        "github",
+        "issue",
+        "9",
+        "--parent",
+        "epic-00002",
+        "--title",
+        "anything",
+        "--assurance",
+        "standard",
+        "--assurance-reason",
+        "既定の理由",
     )
     assert (code, payload["error"]["code"]) == (3, "PRECONDITION_FAILED")
     assert "fix the title on GitHub" in payload["error"]["message"] and world.writes() == []
@@ -51,7 +63,22 @@ def test_an_import_of_an_issue_whose_github_title_breaks_the_rule_writes_nothing
         ("scope", "edit", "iss-00003", "--title", "New"),
         ("scope", "close", "iss-00003", "--yes"),
         ("scope", "reopen", "iss-00004", "--yes"),
-        ("scope", "create", "issue", "--backend", "github", "--parent", "epic-00002", "--title", "X", "--yes"),
+        (
+            "scope",
+            "create",
+            "issue",
+            "--backend",
+            "github",
+            "--parent",
+            "epic-00002",
+            "--title",
+            "X",
+            "--yes",
+            "--assurance",
+            "standard",
+            "--assurance-reason",
+            "既定の理由",
+        ),
         ("dependency", "add", "--from", "iss-00004", "--to", "iss-00003"),
     ],
 )
@@ -77,7 +104,19 @@ def test_the_current_id_of_a_kind_changed_scope_also_stops(world: WriteWorld) ->
 
 def test_a_japanese_only_title_shows_in_scope_show_and_workspace_sync(world: WriteWorld) -> None:
     code, payload = world.write(
-        "scope", "create", "issue", "--backend", "github", "--parent", "epic-00002", "--title", "日本語だけの題名"
+        "scope",
+        "create",
+        "issue",
+        "--backend",
+        "github",
+        "--parent",
+        "epic-00002",
+        "--title",
+        "日本語だけの題名",
+        "--assurance",
+        "standard",
+        "--assurance-reason",
+        "既定の理由",
     )
     assert code == 0, payload
     assert world.run("scope", "show", "iss-00005")[1]["data"]["result"]["scope"]["title"] == "日本語だけの題名"
