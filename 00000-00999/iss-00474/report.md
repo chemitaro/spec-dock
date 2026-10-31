@@ -18,7 +18,8 @@ schema 4（canonical モード）の `scope create` と `scope import github` �
   - `c3c083532` feat(spec-dock): 必須の保証レベルを指定してCUE Scopeを作成・取り込み
   - `2f4baf4c2` test: cueテンプレートのwheel収録を検証する（`pyproject.toml` の package-data の3行を含む）
   - `8a80a7b4a` fix(spec-dock): assurance拒否エラーの詳細形式を修正（コードのレビューの P3 2件）
-  - 最終品質ゲートの合格のコミット：`8a80a7b4a`（下の Verification）
+  - `1cb672e26` Merge origin/main（411261e59、I-5 #484 の `scope render`）。統括の指示（2026-10-31）。rebase ではない。衝突は `docs/cli-redesign-guide.html`（提供側と写し）と `static-inventory.json`。main の側を取り、この Issue の C01〜C06 の欄の変更だけをかけ直し、目録の18のファイルと3つの文書の `sha256` を作り直した（`known_old_sha256` には main の値だけを足す）。
+  - 最終品質ゲートの合格のコミット：`1cb672e26`（下の Verification）
 - **runtime**
   - `runtime/domain/assurance.py`（新しい）：`ASSURANCE_LEVELS`、`parse_assurance`（欠け・空白・全角の空白・UTF-8 にできない文字を拒む。前後の空白を除く）、`cue_string_body`（JSON の書き方に U+FEFF の逃がしを足す）、`assurance_replacements`。`scope_check.LEVELS` はこの定数を使う。
   - `runtime/cli/catalog.py`：6つの葉に `--assurance`（4つの値）と `--assurance-reason` を足した（argparse では任意）。help の前提と例に、2つの引数と3つのコードを書いた。
@@ -47,13 +48,16 @@ schema 4（canonical モード）の `scope create` と `scope import github` �
 
 ## Verification
 
-### 最終品質ゲート（`final-quality-gate`、campaign `iss-00474-i3`、attempt 01）
+### 最終品質ゲート（`final-quality-gate`、campaign `iss-00474-i3`）：合格
 
-- 候補：`8a80a7b4a26bde89fc74d5ccbe5f6fa14800c12f`（clean）。観点：functional-correctness、requirements-closure、test-adequacy。
-- 主のレビュアー（quality-gate-reviewer、opus / xhigh）：pass。P0 0、P1 0、P2 0、P3 1。網羅は完全。
-  - P3（FQG-01、情報のみ）：`canonical.md` の表の `ASSURANCE_REQUIRED` と `ASSURANCE_NOT_WRITTEN` の行を、テストが縛っていない（既存の表の検査は `SCOPE_` などの接頭辞のコードだけを集める）。成果物は揃っている。ゲートの規則により直していない。
-- 2人目のレビュアー（quality-gate-reviewer、sonnet / high）：pass。指摘なし。網羅は完全。
-- テストの側：TEST_LANE_RESULT
+- 合格のコミット：`1cb672e266635ba32a9420200841889c832291f2`（clean。attempt 02）。観点：functional-correctness、requirements-closure、test-adequacy。
+- attempt 01（`8a80a7b4a`）：主・2人目ともに pass。テストの側は、I-5 が main に入ったため統括の指示で止め、マージした後の SHA でやり直した。
+- attempt 02（`1cb672e26`）の結果：
+  - 主のレビュアー（quality-gate-reviewer、opus / xhigh）：pass。P0 0、P1 0、P2 0、P3 1。網羅は完全。
+    - P3（FQG-01、情報のみ）：`canonical.md` の表の `ASSURANCE_REQUIRED` と `ASSURANCE_NOT_WRITTEN` の行を、テストが縛っていない（既存の表の検査は `SCOPE_` などの接頭辞のコードだけを集める）。成果物は揃っている。ゲートの規則により直していない。
+  - 2人目のレビュアー（quality-gate-reviewer、sonnet / high）：pass。指摘なし。網羅は完全。マージの解消（写しのバイト一致、目録の sha256 と known_old_sha256 の積み方、C55 との共存）も確かめた。
+- テストの側（同じ SHA）：`make lint` exit 0（ruff check、ruff format check、mypy が pass）。`env PATH="<worktree>/.workbench/bin:$PATH" uv run pytest -p no:cacheprovider` exit 0（4004 passed、8 skipped、21分07秒）。`cue` は v0.17.1 を worktree の無視されている `.workbench/bin` に入れて使った。
+- 記録：worktree の `.workbench/final-quality-gate/iss-00474-i3/`（`campaign.json`、`attempts/0{1,2}/`、`closure.md`）。
 - ChatGPT のレーン：使っていない（無効）。
 
 ### それまでの確かめ
