@@ -20,6 +20,7 @@ schema 4（canonical モード）の `scope create` と `scope import github` �
   - `8a80a7b4a` fix(spec-dock): assurance拒否エラーの詳細形式を修正（コードのレビューの P3 2件）
   - `1cb672e26` Merge origin/main（411261e59、I-5 #484 の `scope render`）。統括の指示（2026-10-31）。rebase ではない。衝突は `docs/cli-redesign-guide.html`（提供側と写し）と `static-inventory.json`。main の側を取り、この Issue の C01〜C06 の欄の変更だけをかけ直し、目録の18のファイルと3つの文書の `sha256` を作り直した（`known_old_sha256` には main の値だけを足す）。
   - 最終品質ゲートの合格のコミット：`1cb672e26`（下の Verification）
+- **PR**：https://github.com/chemitaro/spec-dock/pull/485（base `main`、head `1cb672e26`）。マージは人が行う。`spec-dock work finish` は、マージの後に統括の指示で行う。
 - **runtime**
   - `runtime/domain/assurance.py`（新しい）：`ASSURANCE_LEVELS`、`parse_assurance`（欠け・空白・全角の空白・UTF-8 にできない文字を拒む。前後の空白を除く）、`cue_string_body`（JSON の書き方に U+FEFF の逃がしを足す）、`assurance_replacements`。`scope_check.LEVELS` はこの定数を使う。
   - `runtime/cli/catalog.py`：6つの葉に `--assurance`（4つの値）と `--assurance-reason` を足した（argparse では任意）。help の前提と例に、2つの引数と3つのコードを書いた。
