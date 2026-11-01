@@ -9,52 +9,40 @@
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: CUE の検査の文と、描画の持ち運び（iss-00489）
+lead: CUE の仕様を書く人が、scope check の誤りから直し方をすぐ読み取れ、scope render の HTML を別の PC でも読めるようにする変更です。
 category: 説明資料
-audience: 本日チームに加わった新メンバー
-status: 下書き
+audience: SpecDock で CUE の仕様を書く人
+status: 実装中
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- 既定値のある項目（手順の `status` など）の打ち間違いが、1件の分かりやすい誤りになること。
+- `CUE_INVALID` の直し方（`hint`）が日本語になること。
+- light でテストのない Issue に、警告 `SPEC_NO_TESTS` が出ること。
+- `scope render --design-system inline` で、どの PC でも崩れない HTML を作れること。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+iss-00487 で初めて CUE の仕様で Issue を回したとき、`status: "doin"` の打ち間違いに、既定値 `todo` との衝突と、許す値の外という2件の誤りが出て、1件目が紛らわしかった。ほかにも、`hint` の言語の混在、雛形の `status` の位置、light のテストの欠け、描いた HTML の持ち運びの5点が提案された。
 
-## 全体の構成
+## 変わること
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+| 対象 | 前 | 後 |
+|---|---|---|
+| 既定値のある列挙の誤り | 2件（衝突と範囲外） | 範囲外の1件。衝突の行は `details.cue_related` に残る |
+| `CUE_INVALID` の `hint` | 英語 | 日本語 |
+| Issue の雛形の手順の例 | 複数行 | 1手順1行、`title`、`realizes`、`status` の順 |
+| light でテストがない Issue | 何も出ない | 警告 `SPEC_NO_TESTS`（検査は成功） |
+| `scope render` | `file:` の道筋だけ | `--design-system inline` で埋め込みも選べる（既定は今のまま） |
 
-```plantuml id=overview
-@startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
-@enduml
-```
+## 確かめ方
 
-## 確認方法
+`spec-dock scope check <ID>` で誤りと警告を見る。`spec-dock scope render <ID> --design-system inline > page.html` の `page.html` を、別の場所に写して開く。
 
-読者が手元で確かめられる手順を書きます。
-
-```sh
-spec-dock active show --json
-```
 </script>
 <script src="../../../design-system/ds.js"></script>
 </head>
