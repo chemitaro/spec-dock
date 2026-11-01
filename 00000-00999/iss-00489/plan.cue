@@ -6,13 +6,13 @@ goal: "5つの提案を実装し、マージできる PR で止める。"
 
 steps: {
 	"S-01": {title: "CUE の仕様を書き、`scope check` と仕様のレビューを通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "done", session: "impl"}
-	"S-02": {title: "選言の誤りをまとめる（テスト先行）", realizes: ["R-01"], status: "doing", after: ["S-01"], session: "impl"}
-	"S-03": {title: "`CUE_INVALID` の `hint` を日本語にする（テスト先行）", realizes: ["R-02"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-04": {title: "Issue の雛形の手順の例、写し、目録、置き換えのテスト", realizes: ["R-03"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-05": {title: "警告 `SPEC_NO_TESTS`（テスト先行）", realizes: ["R-04"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-06": {title: "`scope render --design-system inline`（テスト先行）とブラウザーでの確かめ", realizes: ["R-05", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-07": {title: "`cue.md`、`reference_cli.md`、`canonical.md`、写し、目録", realizes: ["R-04", "R-05"], status: "todo", after: ["S-05", "S-06"], session: "impl"}
-	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI、`report.md`", realizes: ["F-02"], status: "todo", after: ["S-02", "S-03", "S-04", "S-07"], session: "impl"}
+	"S-02": {title: "選言の誤りをまとめる（テスト先行）", realizes: ["R-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "`CUE_INVALID` の `hint` を日本語にする（テスト先行）", realizes: ["R-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-04": {title: "Issue の雛形の手順の例、写し、目録、置き換えのテスト", realizes: ["R-03"], status: "done", after: ["S-01"], session: "impl"}
+	"S-05": {title: "警告 `SPEC_NO_TESTS`（テスト先行）", realizes: ["R-04"], status: "done", after: ["S-01"], session: "impl"}
+	"S-06": {title: "`scope render --design-system inline`（テスト先行）とブラウザーでの確かめ", realizes: ["R-05", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-07": {title: "`cue.md`、`reference_cli.md`、`canonical.md`、写し、目録", realizes: ["R-04", "R-05"], status: "done", after: ["S-05", "S-06"], session: "impl"}
+	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI、`report.md`", realizes: ["F-02"], status: "doing", after: ["S-02", "S-03", "S-04", "S-07"], session: "impl"}
 }
 
 tests: {
