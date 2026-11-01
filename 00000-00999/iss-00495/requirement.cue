@@ -26,12 +26,14 @@ background: "`migrate.py` は仕様のツリーの中のリンクだけを書き
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
 	"R-01": {
-		title: "戻すときにツリーの外のリンクが切れない"
-		text:  "`export-legacy` が、ツリーの外から平らな置き場を指すリンクを入れ子のパスに戻すか、戻すべきリンクの一覧を示す。少なくとも README の「戻し方」に、この手順を書く。"
+		title: "戻すときにツリーの外のリンクを手で戻す手順が分かる"
+		text:  "README の「戻し方」に、`migrate.py` が仕様のツリーの外（`content/`、`docs/` など）から仕様を指すリンクを書き換えないこと、切り替えでは切り替え前のコミットの `.meta.json` から新旧のパスの対応を作って手で直したこと（input-devices 17件 #20、housing-lifecycle 316件 #240、taikyohiyou 4件 #2228）、`export-legacy` で戻すときもツリーの外のリンクは入れ子に戻らず同じように手で戻す必要があることを書く。"
+		acceptance: ["README の「戻し方」の節に、ツリーの外のリンクが書き換えられないことと、手で戻す手順が書かれている"]
 	}
 	"R-02": {
-		title: "小さな穴を README に書くか直す"
-		text:  "Scope が0件の `verify`、500件の上限の待ち（表示を出す）、前から切れたリンクの扱いを、直すか README に書く。"
+		title: "小さな穴を README に書く"
+		text:  "Scope が0件の `verify` が `no commit with schema-3 metadata was found`（exit 2）で終わること（比べるものがないだけで異常ではない）、書き込みは1時間に500件（`WRITES_PER_HOUR`）までで、達すると表示なしに最大1時間待つこと（止まったのではない）、往復で前から切れたリンクの書き方が変わることがあることを、README の共通の決まりか本番の節に書く。"
+		acceptance: ["README に3つの穴がそれぞれ書かれ、テストが要る語の存在を確かめる"]
 	}
 }
 
@@ -46,6 +48,6 @@ failures: {
 }
 
 // 制約・前提、合意した判断、未解決事項（任意）。
-// constraints: ["..."]
-// decisions: ["..."]
+constraints: ["コードは直さない（道具は 0.5.0 の撤去で消すため）。編集は README、`tests/`、この Scope のディレクトリだけ"]
+decisions: ["利用者の決定（2026-11-01）：R-01 の元の案「`export-legacy` が戻すか一覧を示す」は、コードを直さない範囲（README だけ）に合わせて「README に手で戻す手順を書く」に直した。理由は report.md"]
 // questions: ["..."]
