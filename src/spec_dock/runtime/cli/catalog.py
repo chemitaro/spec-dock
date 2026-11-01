@@ -574,8 +574,10 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = (
             "kind=scope-check: scope_id, kind, path, format (cue|markdown|conflict), checked, valid, schema,"
             " assurance {level, reason, source, problem}, errors and warnings (code, message, details.file,"
-            " details.hint; CUE_INVALID adds line, column, field, cue_message, positions; SPEC_FINDINGS adds rule"
-            " and id), findings, cue {version}, cue_output, snapshot. Errors exit 7 with SCOPE_CHECK_FAILED."
+            " details.hint; CUE_INVALID adds line, column, field, cue_message, positions and, when a clash with a"
+            " default was folded into it, cue_related; SPEC_FINDINGS adds rule and id; warning SPEC_NO_TESTS marks a"
+            " light Issue without tests), findings, cue {version}, cue_output, snapshot. Errors exit 7 with"
+            " SCOPE_CHECK_FAILED."
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "scope render":
