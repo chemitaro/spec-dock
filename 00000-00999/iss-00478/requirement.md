@@ -11,7 +11,7 @@ ID: "iss-00478"
 詳細: [Requirement Guide](../../../docs/authoring/requirement.md)
 
 ## 目的
-この Issue が実現する end-to-end の価値を記述する。
+spec-dock リポジトリで、新しい Scope を CUE で作り、実用に耐えるかを確かめる（Epic の plan.md の I-7、R-J1、AC-14）。
 
 ## 背景
 問題、関係者、親 scope から継承する理由を記述する。
@@ -26,7 +26,7 @@ ID: "iss-00478"
 想定する失敗、例外、境界条件を記述する。
 
 ## 受け入れ条件
-この Issue の完了を観測できる条件を記述する。
+- AC-14：実際の Issue を1つ以上、CUE の仕様で作ってから閉じるまで回した記録が、Epic の `report.md` にある。
 
 ## 制約・前提
 守る制約と前提を記述する。
