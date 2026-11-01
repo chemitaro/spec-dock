@@ -74,6 +74,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - 保存（カタログのコミット）、取り込み、push は、定期の実行が60秒ごとに自動で行います。最後の変更から30秒たったファイルを保存するので、1〜2分のうちに別のクローンから見えます。同じPCのほかのworktreeからは、保存の前にも見えます。
 - 仕様を Git で扱いません（`git add`、`commit`、`stash`、`reset`、`checkout`、`clean`）。カタログ（`spec-dock/.canonical`）でも手で Git を使いません。手で行ったコミットは削除の保留の規則を通らず、毎周期の `git reset` は手でステージした内容を捨てます。
 - 2台で同じファイルを変えたときは、先に保存された版が元の名前に、もう一方が `<名前>.conflict-<PC名>-<時刻>.<拡張子>` に残ります。中身を元のファイルに統合してから、別名のファイルを消します。
+- OS が作る不要なファイル（`.DS_Store`、`._*`、`Icon\r`、`Thumbs.db`、`ehthumbs.db`、`ehthumbs_vista.db`、`desktop.ini`、`.directory`。名前で見分け、大文字と小文字は問わない）は、カタログに置かれても保存しません。未保存にも数えないので、`work finish` の保存の確かめも止めません。前の版が保存してしまったものは `spec-dock canonical status` の `changes.junk_files` に出ます。カタログから消すと、次の周期が削除を保存します（大量の削除の保留には数えません）。保存しないファイルが残ったカタログは、`canonical remove` が `CANONICAL_IGNORED_FILES_PRESENT` で止まるので、消すか移してから実行し直します。
 - 保留：秘密情報らしい中身、大きすぎるファイル、大量の削除（20件を超えるなど）は保存せずに止めます。`spec-dock canonical status` の `changes.holds` で確かめ、保存してよければ `spec-dock canonical accept <パス>`（削除は `--deletions`）、戻すなら `spec-dock canonical restore [<パス>]` を実行します。中身を直せば次の周期で保存されます。
 - `spec-dock work finish` は、対象と子孫の `<区切り>/<ID>/` の未保存の変更を束にして、定期の実行にすぐの周期を頼み、保存と push が確かめられるまで最大180秒待ってから Issue を閉じます。確かめられなければ閉じずに `CANONICAL_SAVE_UNCONFIRMED` で止まります。保留があれば `CANONICAL_SAVE_HELD` で止まります。
 - `work start` が警告 `SCOPE_IN_PROGRESS` を返したら、別のPCで作業中でないかを利用者に確かめます。古い印なら、そのPCで `spec-dock work finish` するか、GitHub で `spec-dock:in-progress` のラベルを外します。

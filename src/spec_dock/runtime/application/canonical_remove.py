@@ -206,11 +206,12 @@ def _refuse_unsaved(catalog: Path, *, timeout: float) -> None:
             recovery=(UNSAVED_CHANGES_RECOVERY,),
             details={"unsaved": summary.unsaved, "unpushed": count, "next_step": STATUS_RECOVERY},
         )
-    ignored = canonical_git.ignored_files(catalog, timeout=timeout)
+    # OS junk files are never saved (iss-00493), yet removing the catalog would delete them as well.
+    ignored = tuple(sorted({*canonical_git.ignored_files(catalog, timeout=timeout), *summary.local_junk}))
     if ignored:
         raise CanonicalCommandError(
             CANONICAL_IGNORED_FILES_PRESENT,
-            f"the catalog holds ignored files that removing it would delete: {', '.join(ignored[:10])}",
+            f"the catalog holds ignored or OS files that removing it would delete: {', '.join(ignored[:10])}",
             recovery=(IGNORED_FILES_RECOVERY,),
             details={"paths": list(ignored), "next_step": IGNORED_FILES_RECOVERY},
         )

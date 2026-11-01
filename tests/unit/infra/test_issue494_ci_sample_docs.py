@@ -45,7 +45,7 @@ def test_the_inventory_accepts_the_previous_bytes() -> None:
         e["path"]: e for e in json.loads((ROOT / "src/spec_dock/assets/static-inventory.json").read_text())["files"]
     }
     previous = {
-        "spec-dock/docs/canonical.md": "4ee1612fa7f5ccdfc51fbd3167f280ce6dd49283cf1e89a31bdb93fbd9689f2e",
+        "spec-dock/docs/canonical.md": "dc8215fb6a6aeb9617969aee53c91ebc4928e2cd3198535ec16de13f272dacf8",
         "spec-dock/docs/ci/spec-dock-check.yml": "715ba5868ad31ea235acbfbcadbccb6f0d67a98062b9fd6a2bde5c516419cc70",
     }
     for path, digest in previous.items():

@@ -67,6 +67,10 @@ class Problem(Protocol):
 
 
 _CONFLICT_NEXT_STEP = "Merge each conflict copy's contents into its original file, then delete the copy."
+_JUNK_NEXT_STEP = (
+    "Delete each file in changes.junk_files (OS files such as .DS_Store) from the catalog; "
+    "the sync saves the deletions and never saves such files again."
+)
 
 
 def run_canonical_status(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
@@ -404,6 +408,7 @@ def _changes_item(
         "next_step": None,
         "unsaved": None,
         "conflict_files": [],
+        "junk_files": [],
         "unpushed": None,
         "oldest_unpushed_at": None,
         "holds": [],
@@ -421,9 +426,12 @@ def _changes_item(
         status="ok",
         unsaved=summary.unsaved,
         conflict_files=list(summary.conflict_files),
+        junk_files=list(summary.junk_files),
         unpushed=unpushed[0] if unpushed is not None else None,
         oldest_unpushed_at=unpushed[1] if unpushed is not None else None,
     )
     if summary.conflict_files:
         item.update(status="problem", next_step=_CONFLICT_NEXT_STEP)
+    elif summary.junk_files:
+        item.update(status="problem", next_step=_JUNK_NEXT_STEP)
     return item

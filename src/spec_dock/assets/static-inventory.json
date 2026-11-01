@@ -242,7 +242,7 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "758f2e8314f127b13bdc3e4cede56c758ee82fefa702ac2889735d7fe74f357c",
+      "sha256": "a7d54206fb0da46b74b25ff0e1b75c366270d88ac0cd5d8a92ac7416967d763f",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -251,7 +251,8 @@
         "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09",
         "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd",
         "ac31d512666ef64baa74a06923856b6d4d91e257032dfec8b958c8c11724afdb",
-        "4ee1612fa7f5ccdfc51fbd3167f280ce6dd49283cf1e89a31bdb93fbd9689f2e"
+        "4ee1612fa7f5ccdfc51fbd3167f280ce6dd49283cf1e89a31bdb93fbd9689f2e",
+        "dc8215fb6a6aeb9617969aee53c91ebc4928e2cd3198535ec16de13f272dacf8"
       ]
     },
     {

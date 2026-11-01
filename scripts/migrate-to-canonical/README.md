@@ -17,6 +17,9 @@ python3 $M <サブコマンド> --project <対象の mainのチェックアウ�
 - スクリプトは `fetch` しません。書く前に、手元の `origin/<既定のブランチ>` が GitHub と同じか確かめ、違えば止まります（`git -C <project> fetch origin` をしてから、もう一度）。
 - 作業の記録は `scripts/migrate-to-canonical/.state/<owner>-<repo>/`（Git では無視）に置きます。`--state-dir` で置き場を変えられます。`undo.jsonl`（GitHub に足したものの一覧）、`idmap.json`（ローカルの ID の置き換え）、`build.json`（canonical を作った記録）、`adopt/`（取り込んだブランチの構造の違い）です。消すと `undo` ができなくなるので、移行が終わるまで消さないでください。
 - 終了コード：0 問題なし、1 読むだけで問題を見つけた（`plan` の止める異常、`verify` の不一致）、2 書く前に止まった（引数の誤りも2）、3 書いた後に止まった（同じコマンドをもう一度実行すると続きから進みます）。
+- Scope が0件のリポジトリでは、`verify` が `no commit with schema-3 metadata was found`（終了コード2）で終わります。比べるものがないだけで、異常ではありません。
+- GitHub への書き込みは1時間に500件まで（`WRITES_PER_HOUR`）です。達すると、表示なしに最大1時間待ちます。止まったのではないので、そのまま待ちます（待っている間にコマンドを重ねて実行しません）。
+- 往復（`build-canonical` と `export-legacy`）で、前から切れたリンクの書き方が変わることがあります。どちらも存在しない先を指すので、開く先は変わりません。
 
 | サブコマンド | すること |
 |---|---|
@@ -97,8 +100,14 @@ R="--project $T/work --repo <owner>/<repo> --state-dir $T/records"
 - **撤去（0.5.0）の後**：利用者の環境に 0.3.0 を入れ直し、版のタグ `v0.3.0` のこのスクリプトで、上と同じ手順で戻す。
 - 戻すかどうかは利用者が判断します。
 
+### ツリーの外のリンク
+
+- `migrate.py` が書き換えるのは、仕様のツリーの中のリンクだけです。ツリーの外（`content/`、`docs/` など）から仕様を指すリンクは書き換えません。
+- I-12（#439）の切り替えでは、ツリーの外のリンクが切れました（input-devices 17件、housing-lifecycle 316件、taikyohiyou 4件）。切り替え前のコミットの `.meta.json` から新旧のパスの対応を作り、手で直しました（input-devices#20、housing-lifecycle#240、taikyohiyou#2228）。
+- `export-legacy` で戻すときも、ツリーの外のリンクは入れ子に戻りません。同じように、`.meta.json`（または `<区切り>/<ID>/` と入れ子のパスの対応）から対応を作り、手で戻してください。
+
 ### 入れ子への戻し方（`export-legacy`）
 
 - 入れ子のパスは GitHub の親子で作ります：Initiative は `<ID>-<slug>/`、Epic は `<親>/epics/<ID>-<slug>/`、Issue は `<親>/issues/<ID>-<slug>/`。slug は切り替え前の `.meta.json` の値です。切り替えの後に作った Scope は、題名が英数字と1つの空白だけ（`Add Refresh Token`）なら題名から（`add-refresh-token`）、ほかは `untitled` です。各 Initiative に `epics/rules.md`、各 Epic に `issues/rules.md` を置き直します。
 - 次のものがあると、`--apply` がなくても、何も書かずに終了コード2で止まり、異常の一覧を示します。GitHub かカタログで直してから、もう一度実行します：親のない Epic と Issue（`PARENT_MISSING`）、親の種類が規則に合わない Scope（`KIND_RULE`）、外のリポジトリの親（`PARENT_CONFLICT`）、種類のラベルが2つ以上の Issue（`KIND_LABEL_MULTIPLE`）、`<区切り>/<ID>/` のない Scope（`SCOPE_DIRECTORY_MISSING`）、Issue のない `<ID>/`（`SCOPE_ISSUE_MISSING`）、種類の付け替え（`SCOPE_KIND_CHANGED`）、区切りの外れや `<ID>/` の下の `epics/`・`issues/`（`SCOPE_DIRECTORY_MISPLACED`）、`<区切り>/<ID>/` の外のファイル（`CATALOG_PATH_OUTSIDE_SCOPE`）。
-- リンクは平らにする写しの逆に戻ります。字面が元に戻らないのは、正規化していない元の文字列（`./a/../b` など）、捨てた `rules.md` へのリンク（`spec-dock/docs/rules/…` を指したまま）、`epics/`・`issues/` のディレクトリへのリンク（親の Scope のディレクトリを指したまま）の3種類だけで、どれも同じ先を開きます。
+- リンクは平らにする写しの逆に戻ります。字面が元に戻らないのは、正規化していない元の文字列（`./a/../b` など）、捨てた `rules.md` へのリンク（`spec-dock/docs/rules/…` を指したまま）、`epics/`・`issues/` のディレクトリへのリンク（親の Scope のディレクトリを指したまま）の3種類だけで、どれも同じ先を開きます。前から切れていたリンクは、書き方が変わることがあります（どちらも存在しない先を指します）。
