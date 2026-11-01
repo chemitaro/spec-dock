@@ -31,7 +31,9 @@ PROVIDER = {
 def test_the_version_is_0_4_1_in_every_place() -> None:
     project = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text("utf-8"), re.M)
     assert project is not None and project.group(1) == "0.4.1"
-    locked = re.search(r'\[\[package\]\]\nname = "spec-dock"\nversion = "([^"]+)"', (ROOT / "uv.lock").read_text("utf-8"))
+    locked = re.search(
+        r'\[\[package\]\]\nname = "spec-dock"\nversion = "([^"]+)"', (ROOT / "uv.lock").read_text("utf-8")
+    )
     assert locked is not None and locked.group(1) == "0.4.1"
     for path in PROVIDER.values():
         assert path.exists()
@@ -49,7 +51,8 @@ def test_the_migration_notes_describe_0_4_1_and_the_dogfood_copy_matches() -> No
 
 def test_the_inventory_accepts_the_0_4_0_bytes() -> None:
     entries = {
-        item["path"]: item for item in json.loads((ROOT / "src/spec_dock/assets/static-inventory.json").read_text("utf-8"))["files"]
+        item["path"]: item
+        for item in json.loads((ROOT / "src/spec_dock/assets/static-inventory.json").read_text("utf-8"))["files"]
     }
     for relative, previous in PREVIOUS.items():
         entry = entries[relative]
@@ -68,7 +71,9 @@ def test_installation_update_upgrades_a_0_4_0_consumer(tmp_path: Path, capsys: p
     for relative, previous in PREVIOUS.items():
         (target / relative).write_bytes(previous.read_bytes())
     backup = tmp_path / "backup"
-    code, applied = _run(capsys, "installation", "update", "--target", str(target), "--backup-dir", str(backup), "--yes")
+    code, applied = _run(
+        capsys, "installation", "update", "--target", str(target), "--backup-dir", str(backup), "--yes"
+    )
     assert (code, applied["status"]) == (0, "succeeded"), applied["error"]
     assert sorted(applied["data"]["result"]["changed_paths"]) == sorted(PREVIOUS)
     for relative, path in PROVIDER.items():
