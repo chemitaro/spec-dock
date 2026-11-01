@@ -25,6 +25,7 @@ I-1〜I-6 の実装と 0.4.0 の公開、I-7 の spec-dock での導入まで終
 | I-3 #474 `--assurance` 付きの雛形 | #485 | `d53b24d64` |
 | I-6 #477 文書、スキル、0.4.0 | #486 | `7f3cf7d3c`（タグ `v0.4.0`） |
 | I-7 の試しの Issue #487 | #488 | `c43aadd5b` |
+| 試しの改善の Issue #489 | #490 | `98ec261ea` |
 
 ### I-7 spec-dock での導入（AC-14）
 
@@ -72,7 +73,9 @@ I-1〜I-6 の実装と 0.4.0 の公開、I-7 の spec-dock での導入まで終
 
 ## Residual Risks / Follow-ups
 
-- 試しの改善の提案（`iss-00487/report.md`。優先度順）：(高) 既定値のある列挙の誤りの文の整理、(中) `CUE_INVALID` の `hint` の日本語化、(中) 雛形の手順の例で `status` を前に置く、(低) light でテストが1つもないことの情報、(低) `scope render` のデザインシステムの埋め込み・相対の道筋。利用者の承認で、Issue #489（iss-00489、CUE・standard）にまとめた（2026-11-01）。Epic は #489 を終えてから閉じる。
+- 試しの改善の提案（`iss-00487/report.md`。優先度順）：(高) 既定値のある列挙の誤りの文の整理、(中) `CUE_INVALID` の `hint` の日本語化、(中) 雛形の手順の例で `status` を前に置く、(低) light でテストが1つもないことの情報、(低) `scope render` のデザインシステムの埋め込み・相対の道筋。利用者の承認で、Issue #489（iss-00489、CUE・standard）にまとめ、PR #490（`98ec261ea`）で直した（2026-11-01）。誤りの1件へのまとめ（`details.cue_related`）、`CUE_INVALID` の `hint` の日本語化、Issue の `plan.cue` の雛形の並び（Epic・Initiative の `plan.cue` には手順がないので変えていない）、light でテストがない Issue の警告 `SPEC_NO_TESTS`（K3 の形は変えない）、`scope render --design-system inline` と `render_scope_html` の既定値つきの `embed_design_system`（K5 に引数を足しただけ）。標準出力に出すので、相対の道筋は足していない。
+- #489 の最終品質ゲートの P3（Issue にしていない）：制約のない列挙をまとめないことのテスト、`CUE_INVALID` 以外の `hint` の日本語化。
+- #488 と #490 の変更は、まだ版を出していない（利用者の環境は 0.4.0）。次の版で届く。
 - AC-18 の後半は間接の証拠だけ（上の表）。`.md` の雛形を外す epic-00424 の I-13 で、この条件は役目を終える。
 - AC-10・AC-11 のブラウザーでの検査は手元で任意で、CI では回帰を拾わない。本物の配り手（ダッシュボードのサーバー）からの確かめは epic-00427 に残る。
 - #487 の FQG-001（P3）：`-y` を help 用に argparse へ登録したため、`-yy` が誤りでなく受理になる（`--yes` の効果は付かない。安全側）。
