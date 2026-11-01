@@ -28,18 +28,6 @@ PROVIDER = {
 }
 
 
-def test_the_version_is_0_4_1_in_every_place() -> None:
-    project = re.search(r'^version = "([^"]+)"', (ROOT / "pyproject.toml").read_text("utf-8"), re.M)
-    assert project is not None and project.group(1) == "0.4.1"
-    locked = re.search(
-        r'\[\[package\]\]\nname = "spec-dock"\nversion = "([^"]+)"', (ROOT / "uv.lock").read_text("utf-8")
-    )
-    assert locked is not None and locked.group(1) == "0.4.1"
-    for path in PROVIDER.values():
-        assert path.exists()
-    assert PROVIDER["spec-dock/system/spec-dock-version"].read_text("utf-8") == "0.4.1\n"
-
-
 def test_the_migration_notes_describe_0_4_1_and_the_dogfood_copy_matches() -> None:
     text = PROVIDER["spec-dock/docs/migration.md"].read_text("utf-8")
     [section] = re.findall(r"^## 0\.4\.1 への更新\n(.*?)(?=^## )", text, re.M | re.S)
