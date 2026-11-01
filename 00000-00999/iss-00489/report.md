@@ -35,13 +35,16 @@ iss-00487 の「CUE の仕様の試し」の改善の提案5つを実装した�
 - コードのレビュー（code-review、code-reviewer opus / high、2人、`c43aadd5b..ccb8f5aa4`）：standards 合格（P3 1：help の JSON 説明に `cue_related` がない → `e673b46b6` で直した）、spec 合格（指摘0）。
 - 実ブラウザー（T-11）：`--design-system inline` で描いた iss-00489 の HTML を、`node tests/browser/explanation-check.mjs --file <page> --cdn-from-package`（ネットワークを遮断した headless Chrome）で開き、`VALIDATED`（`ready: true`、例外0、390px で横にはみ出さない）。HTML の `file:` は仕様の本文の中だけ。
 - `ccb8f5aa4` で `uv run pytest`（全体）：4047 passed、8 skipped（21分51秒）。
-- 最終品質ゲート：（下に追記）
+- 最終品質ゲート（final-quality-gate、quality-gate-reviewer opus / high、1人、campaign `iss-00489-fqg-1`、attempt 01、`e673b46b6`）：
+  - レビューの側：合格。P0/P1 0、網羅は完全、P3 1（FQG-001：全枝が `conflicting values` の選言（制約のない列挙）をまとめないことを確かめるテストがない。実装は条件で守っている。ゲートの規則で直していない）。
+  - テストの側：合格。`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（4047 passed、8 skipped、21分33秒）。証拠は worktree の `.workbench/final-quality-gate/iss-00489-fqg-1/`（`closure.md`、`attempts/01/`）。
 
 ## Residual Risks / Follow-ups
 
 - `cue` の誤りの文の形（`N errors in empty disjunction`、`conflicting values`）が将来の版で変わると、まとめが効かなくなる。そのときは今と同じ2件に戻るだけで、誤りは失われない。
 - 埋め込んだ HTML は約 400KB。図の部品（PlantUML、highlight.js）は埋め込まず、今までどおり CDN から読むので、オフラインでは図が描けない（本文とスタイルは描ける）。
 - `CUE_INVALID` 以外のコード（`EXPLANATION_*`、`SCOPE_DOCUMENT_MISSING`、`ASSURANCE_UNREADABLE` など）の `hint` は英語のまま（範囲の外）。揃えるなら別の Issue。
+- FQG-001（P3）：制約のない列挙の選言の誤りがまとめられないことを確かめるテストを足すとよい（今の実装は守っている）。
 - 未確認：`--design-system inline` の HTML を、実際に別の PC に写して開くこと（同じ PC の、デザインシステムの道筋を持たないページとして確かめた）。
 
 ## CUE の仕様で書いて気づいたこと

@@ -12,7 +12,7 @@ steps: {
 	"S-05": {title: "警告 `SPEC_NO_TESTS`（テスト先行）", realizes: ["R-04"], status: "done", after: ["S-01"], session: "impl"}
 	"S-06": {title: "`scope render --design-system inline`（テスト先行）とブラウザーでの確かめ", realizes: ["R-05", "F-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-07": {title: "`cue.md`、`reference_cli.md`、`canonical.md`、写し、目録", realizes: ["R-04", "R-05"], status: "done", after: ["S-05", "S-06"], session: "impl"}
-	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI、`report.md`", realizes: ["F-02"], status: "doing", after: ["S-02", "S-03", "S-04", "S-07"], session: "impl"}
+	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI、`report.md`", realizes: ["F-02"], status: "done", after: ["S-02", "S-03", "S-04", "S-07"], session: "impl"}
 }
 
 tests: {
