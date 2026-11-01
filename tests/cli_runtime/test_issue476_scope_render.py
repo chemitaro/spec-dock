@@ -136,3 +136,36 @@ def test_a_checkout_without_the_design_system_warns(world: CanonicalWorld) -> No
     assert code == 0 and out.startswith("<!doctype html>")
     assert "warning [DESIGN_SYSTEM_MISSING]" in err
     assert "spec-dock installation update" in err
+
+
+def test_inline_embeds_the_design_system_and_reports_no_base(world: CanonicalWorld) -> None:
+    """iss-00489 R-05: the page needs no file outside itself; the default stays the file: link."""
+    give_design_system(world)
+    code, out, err = text_run(world, "scope", "render", "iss-3", "--design-system", "inline")
+    assert code == 0, err
+    assert "file:" not in out and "ds.css" not in out and "<style>\n" in out
+    assert out.count('<script src="data:text/javascript;base64,') == 2
+    assert '<h3 id="R-01">' in out
+    code, payload = world.run("scope", "render", "iss-3", "--design-system", "inline")
+    result = payload["data"]["result"]
+    assert (code, result["design_system"], result["design_system_base"], result["html"]) == (0, "inline", None, out)
+    code, payload = world.run("scope", "render", "iss-3")
+    result = payload["data"]["result"]
+    assert (result["design_system"], result["design_system_base"]) == (
+        "file",
+        design_system(world).resolve().as_uri() + "/",
+    )
+
+
+def test_inline_without_the_design_system_stops_without_a_page(world: CanonicalWorld) -> None:
+    """iss-00489 F-01: nothing half-drawn; the next step is installation update."""
+    if design_system(world).exists():
+        shutil.rmtree(design_system(world))
+    code, out, err = text_run(world, "scope", "render", "iss-3", "--design-system", "inline")
+    assert code == 3 and "<!doctype" not in out and "<html" not in out
+    assert "error [DESIGN_SYSTEM_MISSING]" in err and "spec-dock installation update" in err
+
+
+def test_an_unknown_design_system_mode_is_a_usage_error(world: CanonicalWorld) -> None:
+    code, out, _ = text_run(world, "scope", "render", "iss-3", "--design-system", "relative")
+    assert code != 0 and "<!doctype" not in out

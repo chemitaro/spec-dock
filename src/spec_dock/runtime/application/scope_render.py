@@ -11,6 +11,10 @@ Entry for hosts such as the dashboard server (epic-00427)::
         vendor_base="/vendor/",                # URL head of the bundled diagram parts, or None for the CDN
     )
 
+`embed_design_system=<the spec-dock/design-system directory>` (iss-00489) carries ds.css, ds.js and
+vendor/marked.umd.js inside the page instead of linking them, so the page keeps its style on another machine;
+it stops with DESIGN_SYSTEM_MISSING (exit 3) when one of them cannot be read. The default None keeps the links.
+
 The Scope is evaluated once by I-2's check (contract K1; `cue` v0.17.1 or later on PATH, no network), and the
 evaluation is laid out by `presentation.spec_page` in the thin explanation shape. Nothing is written.
 
@@ -24,21 +28,22 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
+from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
 from spec_dock.runtime.application.scope_check import SPEC_FINDINGS, check_scope_documents
-from spec_dock.runtime.presentation.spec_page import page_title, spec_markdown, wrap_page
+from spec_dock.runtime.presentation.spec_page import EmbeddedDesignSystem, page_title, spec_markdown, wrap_page
 
 if TYPE_CHECKING:
-    from pathlib import Path
-
     from spec_dock.runtime.application.scope_check import ScopeCheckReport
     from spec_dock.runtime.presentation.envelope import Diagnostic
 
 SCOPE_NOT_CUE: Final = "SCOPE_NOT_CUE"
 SCOPE_RENDER_INCOMPLETE: Final = "SCOPE_RENDER_INCOMPLETE"
 DESIGN_SYSTEM_MISSING: Final = "DESIGN_SYSTEM_MISSING"
+EMBEDDED_FILES: Final = ("ds.css", "vendor/marked.umd.js", "ds.js")
+_INSTALL_STEP: Final = "Run spec-dock installation update in this checkout."
 _NOT_CUE_STEP: Final = (
     "Read requirement.md, design.md and plan.md directly; scope render draws only CUE Scopes (requirement.cue)."
 )
@@ -65,9 +70,15 @@ class RenderedScope:
 
 
 def render_scope(
-    source: ScopeRenderSource, *, design_system_base: str, vendor_base: str | None, timeout: float = 30.0
+    source: ScopeRenderSource,
+    *,
+    design_system_base: str,
+    vendor_base: str | None,
+    timeout: float = 30.0,
+    embed_design_system: Path | None = None,
 ) -> RenderedScope:
     """Evaluate and draw one Scope; see the module docstring for the stops."""
+    embedded = None if embed_design_system is None else read_design_system(embed_design_system)
     report = check_scope_documents(
         source.directory,
         kind=source.kind,
@@ -94,15 +105,44 @@ def render_scope(
     markdown = spec_markdown(
         scope_id=source.scope_id, title=source.title, evaluation=evaluation, assurance=assurance, errors=errors
     )
-    page = wrap_page(markdown, title=title, design_system_base=design_system_base, vendor_base=vendor_base)
+    page = wrap_page(
+        markdown, title=title, design_system_base=design_system_base, vendor_base=vendor_base, embedded=embedded
+    )
     return RenderedScope(page, report, evaluation is not None, errors)
 
 
 def render_scope_html(
-    source: ScopeRenderSource, *, design_system_base: str, vendor_base: str | None, timeout: float = 30.0
+    source: ScopeRenderSource,
+    *,
+    design_system_base: str,
+    vendor_base: str | None,
+    timeout: float = 30.0,
+    embed_design_system: Path | None = None,
 ) -> str:
     """The HTML of one CUE Scope (the documented entry of contract K5); see the module docstring."""
-    return render_scope(source, design_system_base=design_system_base, vendor_base=vendor_base, timeout=timeout).html
+    return render_scope(
+        source,
+        design_system_base=design_system_base,
+        vendor_base=vendor_base,
+        timeout=timeout,
+        embed_design_system=embed_design_system,
+    ).html
+
+
+def read_design_system(directory: Path) -> EmbeddedDesignSystem:
+    """ds.css, marked and ds.js of `directory`, or DESIGN_SYSTEM_MISSING (exit 3) before anything is evaluated."""
+    try:
+        css, marked, script = (Path(directory, name).read_bytes() for name in EMBEDDED_FILES)
+        text = css.decode("utf-8")
+    except (OSError, UnicodeDecodeError) as error:
+        raise CanonicalCommandError(
+            DESIGN_SYSTEM_MISSING,
+            f"the design system cannot be embedded from {directory}: {error}",
+            exit_code=3,
+            recovery=(_INSTALL_STEP,),
+            details={"path": os.fspath(directory), "next_step": _INSTALL_STEP},
+        ) from error
+    return EmbeddedDesignSystem(text, (marked, script))
 
 
 def _shown(source: ScopeRenderSource) -> str:

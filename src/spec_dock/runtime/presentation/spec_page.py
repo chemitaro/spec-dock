@@ -11,6 +11,8 @@ the Markdown: `</script` becomes `<\\/script` (ds.js turns it back) and `<!--` b
 
 from __future__ import annotations
 
+import base64
+from dataclasses import dataclass
 import html
 import json
 import re
@@ -446,8 +448,27 @@ def _join(base: str, name: str) -> str:
     return f"{base}{name}" if not base or base.endswith("/") else f"{base}/{name}"
 
 
-def wrap_page(markdown: str, *, title: str, design_system_base: str, vendor_base: str | None) -> str:
-    """The thin explanation shape of contract K5 around `markdown` (already script-safe)."""
+@dataclass(frozen=True)
+class EmbeddedDesignSystem:
+    """The design system carried inside a page (iss-00489): ds.css, then marked and ds.js in loading order."""
+
+    css: str
+    scripts: tuple[bytes, ...]
+
+
+def wrap_page(
+    markdown: str,
+    *,
+    title: str,
+    design_system_base: str,
+    vendor_base: str | None,
+    embedded: EmbeddedDesignSystem | None = None,
+) -> str:
+    """The thin explanation shape of contract K5 around `markdown` (already script-safe).
+
+    With `embedded`, the page links nothing: the CSS goes into `<style>` and each script into a base64 `data:`
+    URL, so no script text can end the element early. `design_system_base` is then unused.
+    """
     attribute: Callable[[str], str] = lambda value: html.escape(value, quote=True)  # noqa: E731
     head = [
         "<!doctype html>",
@@ -461,13 +482,30 @@ def wrap_page(markdown: str, *, title: str, design_system_base: str, vendor_base
         head.append(f'<meta name="ds-vendor-base" content="{attribute(vendor_base)}">')
     head += [
         f"<title>{html.escape(_one_line(title))}</title>",
-        f'<link rel="stylesheet" href="{attribute(_join(design_system_base, "ds.css"))}">',
+        *(
+            [f"<style>\n{_style_safe(embedded.css)}</style>"]
+            if embedded is not None
+            else [f'<link rel="stylesheet" href="{attribute(_join(design_system_base, "ds.css"))}">']
+        ),
         '<script type="text/markdown" id="ds-source">',
         _script_safe(markdown).rstrip("\n"),
         "</script>",
-        f'<script src="{attribute(_join(design_system_base, "ds.js"))}"></script>',
+        *(
+            [f'<script src="data:text/javascript;base64,{_base64(script)}"></script>' for script in embedded.scripts]
+            if embedded is not None
+            else [f'<script src="{attribute(_join(design_system_base, "ds.js"))}"></script>']
+        ),
         "</head>",
         "<body></body>",
         "</html>",
     ]
     return "\n".join(head) + "\n"
+
+
+def _style_safe(css: str) -> str:
+    """Nothing in the CSS may end `<style>`; `\\/` is `/` in a CSS string or comment."""
+    return re.sub(r"</(style)", r"<\\/\1", css, flags=re.IGNORECASE)
+
+
+def _base64(data: bytes) -> str:
+    return base64.b64encode(data).decode("ascii")

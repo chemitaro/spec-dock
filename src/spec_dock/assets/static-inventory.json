@@ -122,10 +122,11 @@
     {
       "path": "spec-dock/docs/authoring/cue.md",
       "source": "spec_dock/docs/authoring/cue.md",
-      "sha256": "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28",
+      "sha256": "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28",
         "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e"
       ]
     },
@@ -241,10 +242,11 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "160af12587aaf9202f305d893f6feac4e91f5dfe73c39606f6f8fb4fb3924003",
+      "sha256": "4ee1612fa7f5ccdfc51fbd3167f280ce6dd49283cf1e89a31bdb93fbd9689f2e",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "160af12587aaf9202f305d893f6feac4e91f5dfe73c39606f6f8fb4fb3924003",
         "275bf1dc3a27303e04e82141ec31f49eaa7a599fc83eeb13c28e741ab29afd3b",
         "bbbe669349d2623173420b83ce8cd6b4ddf96d8fbff3b70005fc9f7fb189cc09",
         "4246d71f507b6d511bf98323226e32d1d231b341fa250db74f37f108fa567cfd",
@@ -363,10 +365,11 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "a195de0b32574113896f1ee5d09cc7c65ee7e252a512a945f11d811e641a976f",
+      "sha256": "279df0ac949a3e969d45d525df8510f676808ebeffb2f8253e2fd660e5bb907d",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "a195de0b32574113896f1ee5d09cc7c65ee7e252a512a945f11d811e641a976f",
         "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
         "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5",
         "1ee708029bae2fa92eb2c2bd9fe79e9885fc11815b535bf8e1be344b6d3689dc",
@@ -896,10 +899,12 @@
     {
       "path": "spec-dock/templates/cue/issue/plan.cue",
       "source": "spec_dock/templates/cue/issue/plan.cue",
-      "sha256": "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034",
+      "sha256": "274a58e86c6420363df98d2ff0722867a881c8730ef516dc6958c4cfbb11912a",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "08b4c2fd41459117329ac84713218c6bb0b22521ff6252388e3b4fe34d89d034"
+      ]
     },
     {
       "path": "spec-dock/templates/cue/issue/report.md",

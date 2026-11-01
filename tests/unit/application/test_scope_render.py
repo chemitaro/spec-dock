@@ -144,3 +144,51 @@ def test_the_level_is_read_from_requirement_cue_alone(tmp_path: Path) -> None:
     assert rendered.complete
     assert "ASSURANCE\\_UNREADABLE" in rendered.html
     assert "status: 保証レベル 未確定" in rendered.html and "読めません" in rendered.html
+
+
+class TestEmbeddedDesignSystem:
+    """iss-00489 R-05/F-01: the design system can be carried inside the page; the default keeps the links."""
+
+    @staticmethod
+    def design_system() -> Path:
+        from tests.support.cue_scopes import SKELETON
+
+        return SKELETON.parent
+
+    @pytest.mark.usefixtures("no_network")
+    def test_the_default_is_the_page_it_was(self, tmp_path: Path) -> None:
+        scope = source(tmp_path, "issue-strict-complete")
+        linked = render_scope_html(scope, design_system_base="/ds/", vendor_base=None)
+        assert render_scope_html(scope, design_system_base="/ds/", vendor_base=None, embed_design_system=None) == linked
+        assert '<link rel="stylesheet" href="/ds/ds.css">' in linked and '<script src="/ds/ds.js">' in linked
+
+    @pytest.mark.usefixtures("no_network")
+    def test_an_embedded_page_carries_the_three_files_and_no_path(self, tmp_path: Path) -> None:
+        import base64
+
+        ds = self.design_system()
+        page = render_scope_html(
+            source(tmp_path, "issue-strict-complete"),
+            design_system_base="file:///nowhere/",
+            vendor_base=None,
+            embed_design_system=ds,
+        )
+        assert "file:" not in page and "ds.css" not in page and "ds.js" not in page
+        assert f"<style>\n{(ds / 'ds.css').read_text(encoding='utf-8')}" in page
+        scripts = re.findall(r'<script src="data:text/javascript;base64,([A-Za-z0-9+/=]+)"></script>', page)
+        decoded = [base64.b64decode(item) for item in scripts]
+        # marked comes first, so ds.js finds window.marked and never asks for vendor/marked.umd.js.
+        assert decoded == [(ds / "vendor/marked.umd.js").read_bytes(), (ds / "ds.js").read_bytes()]
+        assert page.index('id="ds-source"') < page.index("data:text/javascript")
+        assert '<h3 id="R-01">' in page and "<title>iss-00003 書き出し &lt;b&gt;</title>" in page
+
+    def test_a_missing_design_system_stops_without_a_page(self, tmp_path: Path) -> None:
+        with pytest.raises(CanonicalCommandError) as raised:
+            render_scope_html(
+                source(tmp_path, "issue-strict-complete"),
+                design_system_base="/ds/",
+                vendor_base=None,
+                embed_design_system=tmp_path / "absent",
+            )
+        assert (raised.value.code, raised.value.exit_code) == ("DESIGN_SYSTEM_MISSING", 3)
+        assert "installation update" in " ".join(raised.value.recovery)

@@ -78,7 +78,7 @@ assurance: {
 
 ## つながりの規則
 
-形の誤り（必須の項目がない、値の形が違う）は CUE の評価の誤り（`CUE_INVALID`）になります。番号のつながりの抜けは、規則ごとの指摘（`SPEC_FINDINGS`）になります。指摘は、番号、文、直すファイルを名指す `hint` を持ちます。
+形の誤り（必須の項目がない、値の形が違う）は CUE の評価の誤り（`CUE_INVALID`）になります。番号のつながりの抜けは、規則ごとの指摘（`SPEC_FINDINGS`）になります。どちらも、直す項目やファイルを名指す日本語の `hint` を持ちます（`CUE_INVALID` の `cue_message` は `cue` の原文のままです）。既定値のある項目（手順の `status` など）に許されない値を書くと、許す値を示す1件の `CUE_INVALID` になり、既定値との衝突の行（`conflicting values`）は、その `details.cue_related` に残ります。
 
 | 規則 | 内容 | 出る段階 |
 |---|---|---|
@@ -152,13 +152,14 @@ spec-dock scope check iss-00123          # 1つの Scope を検査する（何�
 spec-dock scope check iss-00123 --json   # 結果を JSON で
 spec-dock scope show iss-00123 --json    # data.result.assurance に保証レベル
 spec-dock scope render iss-00123 > /tmp/iss-00123.html   # 要件・設計・計画を HTML に描く（標準出力）
+spec-dock scope render iss-00123 --design-system inline > page.html   # デザインシステムを埋め込む（別の PC でも崩れない）
 ```
 
 - 全コマンドに共通の引数（`--json`、`--offline`、`--timeout <秒>`、`--project <チェックアウト>` など）は、葉の `--help`（例 `spec-dock scope check --help`）の一覧の「common options」に、その葉で使えるものだけが出ます（変えるコマンドの `--yes` など。[CLI 参照](../reference_cli.md)）。
 - `scope check` は、Scope の種類を GitHub の構造（定期の同期が取るスナップショット）から読みます。CUE の評価は手元だけで行い、インターネットは要りません。GitHub に問い合わせられないときや、`--offline` のときは、保存したスナップショットを使い、警告 `GITHUB_SNAPSHOT_STALE` を出します。この警告は、スナップショットが新しいかで出たり出なかったりし、検査の結果（誤りと指摘）は変えません。テキストの要約の `warnings=N` は検査の警告（説明資料など）の数で、この警告は数えません。
 - `scope check` は、`cue` の確かめ、`schema` の読み取り、評価、指摘の読み取り、説明資料の形の検査を行います。誤りがあれば終了コード7（`SCOPE_CHECK_FAILED`）で、誤りごとにファイル、行、項目、直し方を示します。警告だけなら成功です。Markdown の Scope では、検査をせずに成功します（「CUE の Scope ではない」）。
 - `work finish` は、閉じる前（何かを書く前）に、閉じる Scope を同じく検査します。誤りがあれば何も書かずに止まります（終了コード3、`SCOPE_CHECK_FAILED`）。直して `spec-dock scope check <ID>` で確かめてから、もう一度 `spec-dock work finish <ID> --yes` を実行します。保存を待つ間に別のPCで開き直された場合は、終了コード6（partial）で止まります。Markdown の Scope は、今までどおり閉じます。
-- `scope render` は、評価できないときは検査の結果だけを描き、警告 `SCOPE_RENDER_INCOMPLETE` を返します。Markdown の Scope は `SCOPE_NOT_CUE` で止まります。
+- `scope render` は、評価できないときは検査の結果だけを描き、警告 `SCOPE_RENDER_INCOMPLETE` を返します。Markdown の Scope は `SCOPE_NOT_CUE` で止まります。既定の HTML は、そのチェックアウトの `spec-dock/design-system/` を `file:` の道筋で読むので、手元で見る用です。別の PC に渡すときは `--design-system inline` を付けると、`ds.css`、`ds.js`、`marked` を HTML に埋め込みます（約 400KB。図の部品は今までどおり CDN から読みます）。デザインシステムがなければ `DESIGN_SYSTEM_MISSING` で止まります（終了コード3）。
 - `workspace validate` と `workspace doctor` は、CUE の Scope には `requirement.cue`、`design.cue`、`plan.cue`、`report.md` を求めます。`cue` は呼びません。
 
 `scope check` の結果のコード（`--json` の `data.result` の誤りと警告、`error.code`）：
@@ -167,6 +168,7 @@ spec-dock scope render iss-00123 > /tmp/iss-00123.html   # 要件・設計・計
 |---|---|---|
 | `CUE_INVALID` | 誤り | 形の誤り。`field` の項目を Scope の CUE のファイルで直す。`file` が SpecDock の型（`<spec_dock>/cue/v1/…`）を指すことがあるが、型は直さず、型が求める項目を Scope に書く |
 | `SPEC_FINDINGS` | 誤り | つながりの指摘。`details.rule` の規則と `hint` のとおりに直す |
+| `SPEC_NO_TESTS` | 警告 | light の Issue に、テストが1つもない（standard 以上では `requirement-without-test` が誤りとして示す）。確かめることがあれば `plan.cue` の `tests` に書く |
 | `ASSURANCE_UNREADABLE` | 誤り | `requirement.cue` の `assurance` が読めない。`level` と `reason` を直す |
 | `SCOPE_FORMAT_CONFLICT` | 誤り | `requirement.md` と `requirement.cue` の両方がある。片方を外す |
 | `SCOPE_DOCUMENT_MISSING` | 誤り | 3つの CUE のファイルのどれかがない。足す |
