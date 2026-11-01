@@ -12,7 +12,16 @@ ID: "iss-00493"
 
 ## Outcome
 
-（実装の後に書く）
+OS が作る不要なファイル（`.DS_Store`、`._*`、`Icon\r`、`Thumbs.db`、`ehthumbs.db`、`ehthumbs_vista.db`、`desktop.ini`、`.directory`）を、カタログの同期が新しく保存しないようにした。カタログの `.gitignore` は変えず、同期の規則（`canonical_sync_rules.is_os_junk`）で除くので、パッケージを更新するだけで、既存の5つのカタログにも効く（カタログには何も書かない）。
+
+- 同期の保存（`canonical_sync._save`）：まだツリーにない不要なファイルを候補から外す。ツリーにあるものの変更と削除は保存する。
+- 未保存の数（`canonical_git.catalog_change_summary`）と `work finish` の確かめ（`canonical_work._unsaved_places`）：未追跡の不要なファイルを数えない。
+- `canonical status`：`changes.junk_files` と、消し方の次の1手。
+- 大量の削除の保留（`classify_holds`）：不要なファイルの削除を数えない。
+- `canonical remove`：残った不要なファイルを `CANONICAL_IGNORED_FILES_PRESENT` で名指して止まる。
+- 配布の文書 `spec-dock/docs/canonical.md`（提供側と dogfood）と `static-inventory.json`。
+
+実装のコミット：`f9bdded67`（`feat(canonical): OS由来の不要ファイルを同期対象から除外`）。
 
 ## 要件を足した理由
 
@@ -31,7 +40,13 @@ ID: "iss-00493"
 
 ## Verification
 
-（実装の後に書く）
+- TDD：T-01〜T-06 を先に書き、意図した理由で赤になることを確かめてから実装した（T-04 は `CANONICAL_SAVE_UNCONFIRMED`、T-06 は `git worktree remove` の途中の失敗で赤）。
+- コードのレビュー（code-review、code-reviewer opus/high、規約と仕様の2人、`627a48075..f9bdded67`）：どちらも合格、指摘なし。
+- 最終品質ゲート（final-quality-gate、キャンペーン `iss-00493-fqg-1`、quality-gate-reviewer opus/high 1人、試行1回）：`f9bdded67` で合格。
+  - 審査役の枠：pass、観点（functional-correctness、requirements-closure、test-adequacy）すべて complete、P0〜P3 なし。
+  - テストの枠：`make lint` exit 0（ruff check、ruff format、mypy が合格）、`uv run pytest` exit 0（4083 passed、8 skipped）。
+  - 証拠：Workbench の `.workbench/final-quality-gate/iss-00493-fqg-1/closure.md`、`attempts/01/review.json`、`attempts/01/tests/manifest.json` と各 `.check.json`。
+- ChatGPT を使うレビューは無効のため使っていない（統括の指示）。
 
 ## Residual Risks / Follow-ups
 
