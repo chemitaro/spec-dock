@@ -1,6 +1,6 @@
 # canonical への移行のスクリプト
 
-宣言の版3（従来モード）のリポジトリを、仕様の構造を GitHub Issue に、内容を `spec-dock/canonical` ブランチに置く形（宣言の版4、canonical モード）へ、一度だけ移すための使い捨ての道具です。対象は利用者の5つのリポジトリ（spec-dock、taikyohiyou_project、housing-lifecycle、input-devices、company-os）だけです。SpecDock の撤去（0.4.0）で消しますが、版のタグ `v0.3.0` に残ります。
+宣言の版3（従来モード）のリポジトリを、仕様の構造を GitHub Issue に、内容を `spec-dock/canonical` ブランチに置く形（宣言の版4、canonical モード）へ、一度だけ移すための使い捨ての道具です。対象は利用者の5つのリポジトリ（spec-dock、taikyohiyou_project、housing-lifecycle、input-devices、company-os）だけです。SpecDock の撤去（0.5.0）で消しますが、版のタグ `v0.3.0` に残ります。
 
 - 設計の正本：Epic `epic-00424` の `design.md` の11章、「移行・互換性・rollback」と、Issue `iss-00435`（I-8）と `iss-00456`（I-15、平らにする写し）の `design.md`。
 - 使うもの：Python 3.10 以上、git 2.31 以上と `git subtree`（`adopt-worktree` は 2.40 以上。2026-10-29 に、git 2.34.1（Ubuntu 22.04）、2.39.5（Debian 12）、2.43.0（Ubuntu 24.04）、2.54.0（macOS）で `build-canonical`、`cut`、`move-local` を確かめ、`adopt-worktree` は 2.43.0 と 2.54.0 で確かめた。2.40 より古いと案内付きで止まる。どの版でも、スクリプトは始めに版を確かめ、2.31 より古ければ何もせずに止まる。Debian と Ubuntu の `git` の包みは `git subtree` を含む。SpecDock 本体の `canonical link` などは git 2.38 以上が要る）、`gh`（利用者自身のアカウントでログイン済み。作った Issue の見つけ直しで作成者の名前を比べるので、GitHub App のトークンでは使わない）。SpecDock のパッケージは読み込みません。
@@ -94,7 +94,7 @@ R="--project $T/work --repo <owner>/<repo> --state-dir $T/records"
 
 - **切り替えのPRのマージ前**：PRを閉じ、GitHub の `spec-dock/canonical` と `spec-dock/migrate-to-canonical` を消し、必要なら `python3 $M undo --project <main> --apply` で登録を外す。
 - **マージの後、撤去の前**：`python3 $M export-legacy --project <main> --apply` でブランチ `spec-dock/export-legacy` を作り（下の「入れ子への戻し方」）、切り替えのPRで外した今のCIの手順を戻すコミットを足して、PRで戻す。マージの後、各チェックアウトで `spec-dock canonical remove --yes` を行い、必要なら `undo --apply`。SpecDock は 0.3.0 のままでよく、ほかのリポジトリには影響しません。
-- **撤去（0.4.0）の後**：利用者の環境に 0.3.0 を入れ直し、版のタグ `v0.3.0` のこのスクリプトで、上と同じ手順で戻す。
+- **撤去（0.5.0）の後**：利用者の環境に 0.3.0 を入れ直し、版のタグ `v0.3.0` のこのスクリプトで、上と同じ手順で戻す。
 - 戻すかどうかは利用者が判断します。
 
 ### 入れ子への戻し方（`export-legacy`）

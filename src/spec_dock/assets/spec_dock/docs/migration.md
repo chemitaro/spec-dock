@@ -26,6 +26,19 @@ package managerでレビュー・通常試験が済んだwheelをworktree外へ�
 - 道具：CUE の Scope の検査には `cue` v0.17.1 以上が PATH に要ります（例 `go install cuelang.org/go/cmd/cue@v0.17.1`）。ないと `CUE_NOT_FOUND` で止まります。Markdown の Scope と版3のリポジトリには要りません。
 - 書き方は [CUE Authoring Guide](authoring/cue.md) と [Explanation Guide](authoring/explanation.md)、エラーと次の1手は [canonical モードの使い方](canonical.md) にあります。
 
+## 0.4.1 への更新
+
+0.4.1 は、0.4.0 の後に入れた CUE の書き方と検査の改善を届ける版です。動きの変更は小さく、版3のリポジトリには影響しません。
+
+- パッケージを 0.4.1 に上げた後、各リポジトリで `spec-dock installation update` を実行して配布資産を上げます。0.4.0 の配布資産のままでも動きますが、ガイド（`authoring/cue.md`、`issue-plan.md`、`scope-layering.md`）、`canonical.md`、`reference_cli.md`、Issue の `plan.cue` の雛形が新しくなります。
+- 主な改善：
+  - 個別のコマンドの `--help` に、共通の引数が出ます。
+  - 既定値のある列挙（手順の `status` など）に許されない値を書いたときの `CUE_INVALID` が1件にまとまり、`hint` が日本語になりました。
+  - Issue の `plan.cue` の雛形は、1手順を1行にし、`status` を `title` と `realizes` のすぐ後に置きます。
+- CLI の契約の変更（版4だけ）：
+  - `spec-dock scope check`：`CUE_INVALID` に、既定値との衝突の行を残す `details.cue_related` が付きます。保証レベルが light でテストが1つもない Issue には、警告 `SPEC_NO_TESTS` が付きます（誤りではありません）。
+  - `spec-dock scope render` に `--design-system <file|inline>` が付きました（既定は `file`）。`inline` は `ds.css`、`ds.js`、`marked` を HTML に埋め込み、デザインシステムがなければ `DESIGN_SYSTEM_MISSING`（終了コード3）で止まります。Python の入口 `render_scope_html` には `embed_design_system` が付きました。
+
 ## 新規導入
 
 ```sh
