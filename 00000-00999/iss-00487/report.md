@@ -29,7 +29,7 @@ epic-00425 の I-6（iss-00477）のレビューで残った3つの直しを行�
 - コードのレビュー（code-review、code-reviewer sonnet / high、`7f3cf7d3c..155d144d8`、axis both）：合格。指摘0。
 - 最終品質ゲート（final-quality-gate、quality-gate-reviewer opus / high、1人、campaign `iss-00487-fqg-1`、attempt 01、`155d144d8`）：
   - レビューの側：合格。P0/P1 0、網羅は完全、P3 1（FQG-001。下の Residual Risks）。
-  - テストの側：GATE_TEST_LANE_RESULT
+  - テストの側：合格。`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（4029 passed、8 skipped、21分17秒）。証拠は worktree の `.workbench/final-quality-gate/iss-00487-fqg-1/`（`closure.md`、`attempts/01/`）。
 - 先に同じコミットで `uv run pytest -x`：4029 passed、8 skipped（21分39秒）。
 
 ## Residual Risks / Follow-ups

@@ -11,7 +11,7 @@ steps: {
 	"S-04": {title: "葉の `--help` に共通の引数を出す", realizes: ["R-03", "F-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-05": {title: "`cue.md` の共通の引数の説明を実態に合わせる", realizes: ["R-04"], status: "done", after: ["S-04"], session: "impl"}
 	"S-06": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["F-02"], status: "doing", after: ["S-02", "S-03", "S-05"], session: "impl"}
-	"S-07": {title: "`report.md` に結果と試しの記録を書く", realizes: ["R-05"], after: ["S-06"], session: "impl"}
+	"S-07": {title: "`report.md` に結果と試しの記録を書く", realizes: ["R-05"], status: "doing", after: ["S-06"], session: "impl"}
 }
 
 tests: {
