@@ -20,7 +20,7 @@ epic-00425 の I-6（iss-00477）のレビューで残った3つの直しを行�
 - **R-04**：`cue.md` の「葉の `--help` の一覧には出ませんが、使えます」を、「common options」に出るという説明に直した。
 - **R-05**：下の「CUE の仕様の試し」。
 
-コミット：`155d144d8`（`feat(cli): ヘルプにコマンド別の共通オプションを表示`）。PR：（下の Verification）。
+コミット：`155d144d8`（`feat(cli): ヘルプにコマンド別の共通オプションを表示`）。PR：https://github.com/chemitaro/spec-dock/pull/488（head `155d144d8`、マージできる状態で停止。`work finish` はマージの後に統括が行う）。
 
 ## Verification
 
@@ -31,6 +31,7 @@ epic-00425 の I-6（iss-00477）のレビューで残った3つの直しを行�
   - レビューの側：合格。P0/P1 0、網羅は完全、P3 1（FQG-001。下の Residual Risks）。
   - テストの側：合格。`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（4029 passed、8 skipped、21分17秒）。証拠は worktree の `.workbench/final-quality-gate/iss-00487-fqg-1/`（`closure.md`、`attempts/01/`）。
 - 先に同じコミットで `uv run pytest -x`：4029 passed、8 skipped（21分39秒）。
+- PR #488 の CI（github-pr-checks、2026-11-01T00:25:55Z）：`OBSERVED_CI_PASS`、終了コード0。Provider CI、SpecDock check、Commit identity がすべて success。merge_readiness は READY（OPEN、非 draft、MERGEABLE、CLEAN）。観測の範囲は Actions と Commit Status。
 
 ## Residual Risks / Follow-ups
 
