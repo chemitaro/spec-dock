@@ -929,3 +929,72 @@ def test_a_directory_replaced_by_a_file_never_pushes_held_deletions(pair: SyncPa
     item = catalog_result(result)
     assert len(item["holds"]) == 25 and item["pushed"] is False
     assert pair.remote_file("topic/0.md") == "0"
+
+
+JUNK = ("init-00001-x/.DS_Store", "init-00001-x/Thumbs.db", "init-00001-x/._requirement.md", ".DS_Store")
+
+
+def test_os_junk_files_are_never_saved_nor_counted_as_unsaved(pair: SyncPair) -> None:
+    # iss-00493: Finder's .DS_Store and other OS files stay in the catalog but never reach spec-dock/canonical.
+    pair.write(pair.a, "init-00001-x/requirement.md", "r\n")
+    for path in JUNK:
+        pair.write(pair.a, path, "os\n")
+    pair.sync(pair.a)
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and catalog_result(result)["pushed"] is True, result
+    pair.advance(301)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and result["status"] == "unchanged", result
+    tree = git(pair.remote, "ls-tree", "-r", "--name-only", "refs/heads/spec-dock/canonical").split("\n")
+    assert "init-00001-x/requirement.md" in tree and not set(JUNK) & set(tree)
+    assert all((pair.specs(pair.a) / path).read_text() == "os\n" for path in JUNK)
+    state = pair.state(pair.a)
+    assert state is not None and not set(JUNK) & set(state.pending_since)
+    _code, status = pair.run(pair.a, "canonical", "status")
+    assert status["data"]["changes"]["unsaved"] == 0, status["data"]["changes"]
+
+
+def _commit_junk_from_an_old_version(pair: SyncPair, paths: list[str]) -> None:
+    """An older SpecDock saved and pushed OS junk files; this clone takes them in."""
+    forced = _commit_on_remote(pair, dict.fromkeys(paths, "os\n"), parent=pair.remote_head())
+    git(pair.remote, "update-ref", "refs/heads/spec-dock/canonical", forced)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and catalog_result(result)["merged"] is True, result
+
+
+def test_status_points_out_saved_os_junk_and_its_deletion_is_saved(pair: SyncPair) -> None:
+    pair.write(pair.a, "init-00001-x/requirement.md", "r\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    _commit_junk_from_an_old_version(pair, ["init-00001-x/.DS_Store"])
+    _code, status = pair.run(pair.a, "canonical", "status")
+    changes = status["data"]["changes"]
+    assert changes["junk_files"] == ["init-00001-x/.DS_Store"] and changes["status"] == "problem", changes
+    assert "Delete" in changes["next_step"] and changes["unsaved"] == 0
+    (pair.specs(pair.a) / "init-00001-x/.DS_Store").unlink()
+    pair.sync(pair.a)
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    assert code == 0 and catalog_result(result)["pushed"] is True, result
+    assert pair.remote_file("init-00001-x/.DS_Store") is None
+    _code, status = pair.run(pair.a, "canonical", "status")
+    changes = status["data"]["changes"]
+    assert changes["junk_files"] == [] and changes["status"] == "ok" and changes["next_step"] is None, changes
+
+
+def test_deleting_25_saved_os_junk_files_is_saved_without_a_hold(pair: SyncPair) -> None:
+    pair.write(pair.a, "plan.md", "p\n")
+    pair.advance(31)
+    pair.sync(pair.a)
+    junk = [f"00000-00999/iss-{index:05d}/.DS_Store" for index in range(25)]
+    _commit_junk_from_an_old_version(pair, junk)
+    for path in junk:
+        (pair.specs(pair.a) / path).unlink()
+    pair.sync(pair.a)
+    pair.advance(31)
+    code, result = pair.sync(pair.a)
+    item = catalog_result(result)
+    assert code == 0 and item["holds"] == [] and item["pushed"] is True, result
+    tree = git(pair.remote, "ls-tree", "-r", "--name-only", "refs/heads/spec-dock/canonical").split("\n")
+    assert not set(junk) & set(tree) and "plan.md" in tree

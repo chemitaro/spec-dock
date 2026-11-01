@@ -35,6 +35,28 @@ SECRET_PATTERNS: Final = tuple(
     )
 )
 
+# Files an OS or its file manager writes by itself (iss-00493); compared by file name, ignoring case.
+OS_JUNK_NAMES: Final = frozenset(
+    name.casefold()
+    for name in (
+        ".DS_Store",  # macOS Finder view settings
+        "Icon\r",  # macOS custom folder icon
+        "Thumbs.db",  # Windows thumbnail caches
+        "ehthumbs.db",
+        "ehthumbs_vista.db",
+        "desktop.ini",  # Windows folder settings
+        ".directory",  # KDE Dolphin view settings
+    )
+)
+OS_JUNK_PREFIX: Final = "._"  # macOS AppleDouble files on volumes without extended attributes
+
+
+def is_os_junk(path: str) -> bool:
+    """A file the sync never adds to the canonical tree: its name, at any depth, is a known OS file."""
+    name = path.rpartition("/")[2]
+    return name.startswith(OS_JUNK_PREFIX) or name.casefold() in OS_JUNK_NAMES
+
+
 _PC_INVALID = re.compile(r"[^a-z0-9-]+")
 _PC_DASHES = re.compile(r"-{2,}")
 PC_NAME_MAX: Final = 32
@@ -141,7 +163,8 @@ def classify_holds(
         elif candidate.content is not None and is_secret(candidate.content):
             held[candidate.path] = "secret"
     allowed = set(accepted_deletions)
-    counted = sorted({path for path in deletions if path not in allowed})
+    # Deleting an OS junk file loses no spec content (iss-00493): it never counts toward a mass delete.
+    counted = sorted({path for path in deletions if path not in allowed and not is_os_junk(path)})
     count = len(counted)
     if count >= MASS_DELETE_COUNT or (count >= MASS_DELETE_MIN and count >= MASS_DELETE_RATIO * tracked_count):
         held.update(dict.fromkeys(counted, "mass_delete"))

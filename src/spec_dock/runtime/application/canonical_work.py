@@ -67,6 +67,7 @@ from spec_dock.runtime.domain.canonical_content import FORMAT_FILE
 from spec_dock.runtime.domain.canonical_layout import CANONICAL_BRANCH, scope_relative
 from spec_dock.runtime.domain.canonical_readiness import evaluate_readiness
 from spec_dock.runtime.domain.canonical_structure import IN_PROGRESS_LABEL, UpsertIssue, parse_timestamp
+from spec_dock.runtime.domain.canonical_sync_rules import is_os_junk
 from spec_dock.runtime.domain.canonical_sync_state import holds_under
 from spec_dock.runtime.domain.dependency_vnext import ReadinessResult
 from spec_dock.runtime.domain.git_ref import parse_commit_oid
@@ -884,7 +885,7 @@ def _require_saveable(state: CatalogSyncState | None, places: tuple[str, ...]) -
 
 
 def _unsaved_places(catalog: Path, places: tuple[str, ...], *, timeout: float) -> set[str]:
-    """The places with uncommitted catalog changes (deletions included), read without writing .git."""
+    """The places with changes the sync will save (deletions included), read without writing .git."""
     output = run_catalog_git(
         catalog,
         "status",
@@ -907,6 +908,8 @@ def _unsaved_places(catalog: Path, places: tuple[str, ...], *, timeout: float) -
         if entry[0] in "RC":
             index += 1  # the rename source follows
         path = entry[3:]
+        if entry.startswith("?? ") and is_os_junk(path):
+            continue  # the sync never saves an untracked OS junk file (iss-00493)
         dirty.update(place for place in places if path == place or path.startswith(place + "/"))
     return dirty
 
