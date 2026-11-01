@@ -28,3 +28,9 @@ ID: "iss-00494"
 ## Residual Risks / Follow-ups
 
 - なし。版の番号は変えていない（0.4.2 は別の Issue）。
+
+## 取り込み後の確認
+
+- main（PR #499、`02661ae1a`）を `git merge origin/main` で取り込み、`static-inventory.json` の衝突を解いた。canonical.md の前の版は main の `dc8215fb…` なので、`known_old_sha256` に足し、テストの期待も直した。
+- 最終の SHA `d5d1161891308cd1d78a9eab70f43e51d3325574`（PR #500）。`make lint` 通過、`uv run pytest` 全体で 4089 passed / 8 skipped。PR の CI は観測した範囲で PASS、GitHub は MERGEABLE / CLEAN。
+- 品質ゲートの合格は取り込み前のコミット `5c26f5ac7`。取り込みは衝突の解消とハッシュの更新だけで、再ゲートはしていない。
