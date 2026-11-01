@@ -283,3 +283,21 @@ def test_the_readme_covers_preparation_rehearsal_cutover_rollback_and_scopeless_
         assert text in readme
     assert "slug の印" not in readme and "spec-dock:slug" not in readme
     assert (SCRIPT.parent / ".gitignore").read_text() == "/.state/\n"
+
+
+def test_the_readme_documents_the_gaps_found_in_the_i12_cutover() -> None:
+    from tests.support.migration_repo import SCRIPT
+
+    readme = (SCRIPT.parent / "README.md").read_text(encoding="utf-8")
+    rollback = readme.split("## 戻し方", 1)[1].split("\n## ", 1)[0]
+    # R-01: links from outside the spec tree are not rewritten and must be restored by hand.
+    for text in ("ツリーの外", "content/", ".meta.json", "手で"):
+        assert text in rollback
+    # R-02: scopeless verify, the hourly write limit and links that were broken before.
+    for text in (
+        "no commit with schema-3 metadata was found",
+        "WRITES_PER_HOUR",
+        "1時間に500件",
+        "前から切れた",
+    ):
+        assert text in readme
