@@ -14,6 +14,7 @@ from spec_dock.runtime.domain.canonical_sync_rules import (
     IndexEntry,
     classify_holds,
     conflict_copy_name,
+    is_os_junk,
     pc_name,
     resolve_conflicts,
     select_paths,
@@ -199,6 +200,14 @@ def test_accepted_deletions_are_neither_counted_nor_held() -> None:
     assert partly == dict.fromkeys(deleted[2:], "mass_delete")
 
 
+def test_deleting_os_junk_files_is_never_a_mass_delete() -> None:
+    junk = [f"00000-00999/iss-{index:05d}/.DS_Store" for index in range(25)]
+    assert classify_holds([], deletions=junk, tracked_count=100, accepted_paths={}, accepted_deletions=()) == {}
+    specs = [f"d{index}.md" for index in range(25)]
+    mixed = classify_holds([], deletions=junk + specs, tracked_count=100, accepted_paths={}, accepted_deletions=())
+    assert mixed == dict.fromkeys(specs, "mass_delete")
+
+
 def _entry(stage: int, path: str, oid: str, mode: str = "100644") -> ConflictEntry:
     return ConflictEntry(mode, oid, stage, path)
 
@@ -238,3 +247,47 @@ def test_two_conflicts_in_one_directory_never_share_a_copy_name() -> None:
 def test_a_path_only_in_the_base_stage_is_removed() -> None:
     resolution = resolve_conflicts([_entry(1, "gone.md", "base")], pc="mac", now=NOW, taken=frozenset())
     assert resolution.updates == () and resolution.removals == ("gone.md",)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".DS_Store",
+        "00000-00999/iss-00001/.DS_Store",
+        "a/b/.ds_store",
+        "._requirement.md",
+        "a/._x",
+        "Icon\r",
+        "a/Thumbs.db",
+        "THUMBS.DB",
+        "ehthumbs.db",
+        "ehthumbs_vista.db",
+        "a/desktop.ini",
+        "Desktop.ini",
+        ".directory",
+    ],
+)
+def test_os_junk_files_are_recognised_by_name_at_any_depth(path: str) -> None:
+    assert is_os_junk(path)
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        "requirement.md",
+        ".DS_Store/notes.md",
+        ".DS_Store.md",
+        "notes.DS_Store",
+        "x._y.md",
+        "Icon",
+        "Icon.png",
+        "thumbs.db.md",
+        "desktop.ini.bak",
+        ".directory.md",
+        "a/.directory/plan.md",
+        ".workbench/README.md",
+        ".gitignore",
+    ],
+)
+def test_spec_files_with_similar_names_are_not_os_junk(path: str) -> None:
+    assert not is_os_junk(path)

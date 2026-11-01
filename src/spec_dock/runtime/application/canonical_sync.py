@@ -60,6 +60,7 @@ from spec_dock.runtime.domain.canonical_sync_rules import (
     CatalogChange,
     HoldCandidate,
     classify_holds,
+    is_os_junk,
     pc_name,
     resolve_conflicts,
     select_paths,
@@ -506,7 +507,13 @@ def _save(run: _Run) -> None:
     catalog, git, now = run.catalog, run.git, run.ctx.now()
     canonical_git.clear_temporary_index(catalog)
     canonical_git.reset_index(catalog, git=git)
-    changes = canonical_git.list_changes(catalog, git=git)
+    # An OS junk file the tree does not hold yet (Finder's .DS_Store) is never saved (iss-00493); one already
+    # in the tree is still saved when it changes or is deleted, so the user can remove it.
+    changes = tuple(
+        change
+        for change in canonical_git.list_changes(catalog, git=git)
+        if not (change.kind == "added" and is_os_junk(change.path))
+    )
     changesets = _read_changesets(catalog, run.state.consumed_changesets, lambda line: _log_line(run.ctx, line))
     try:
         accepted = read_accepted(catalog)

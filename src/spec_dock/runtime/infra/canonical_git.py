@@ -348,22 +348,30 @@ def reset_branch(main: Path, oid: str, *, expected: str, timeout: float = 30.0) 
 
 @dataclass(frozen=True)
 class CatalogChangeSummary:
-    unsaved: int
+    unsaved: int  # changes the sync will save; untracked OS junk is left out (iss-00493)
     conflict_files: tuple[str, ...]
+    local_junk: tuple[str, ...] = ()  # untracked OS junk files, which the sync never saves
+    junk_files: tuple[str, ...] = ()  # OS junk files the tree already holds (saved by an older version)
 
 
 def catalog_change_summary(catalog: Path, *, timeout: float = 30.0) -> CatalogChangeSummary:
-    """Unsaved paths from status, and conflict copies among every tracked or untracked catalog file."""
+    """Unsaved paths from status, conflict copies among every tracked or untracked file, and OS junk files."""
+    from spec_dock.runtime.domain.canonical_sync_rules import is_os_junk
+
     status = run_catalog_git(
         catalog, "status", "--porcelain=v2", "-z", "--untracked-files=all", read_only=True, timeout=timeout
     )
     unsaved = 0
+    local_junk: list[str] = []
     skip = False
     for record in os.fsdecode(status.stdout).split("\0"):
         if skip:
             skip = False
             continue
         if not record or record.startswith("#"):
+            continue
+        if record.startswith("? ") and is_os_junk(record[2:]):
+            local_junk.append(record[2:])
             continue
         unsaved += 1
         skip = record.startswith("2 ")  # a rename's source path follows as its own record
@@ -377,7 +385,9 @@ def catalog_change_summary(catalog: Path, *, timeout: float = 30.0) -> CatalogCh
             if path and fnmatch.fnmatchcase(Path(path).name, "*.conflict-*")
         })
     )
-    return CatalogChangeSummary(unsaved, conflicts)
+    tracked = run_catalog_git(catalog, "ls-files", "-z", "--cached", read_only=True, timeout=timeout)
+    junk = tuple(sorted({path for path in os.fsdecode(tracked.stdout).split("\0") if path and is_os_junk(path)}))
+    return CatalogChangeSummary(unsaved, conflicts, tuple(sorted(local_junk)), junk)
 
 
 def unpushed(catalog: Path, *, timeout: float = 30.0) -> tuple[int, str | None] | None:

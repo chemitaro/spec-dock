@@ -52,7 +52,7 @@ def test_without_yes_remove_only_reports_the_plan(pair: SyncPair) -> None:
     assert pair.catalog(pair.a).is_dir() and read_registry(pair.state_root).catalogs
 
 
-@pytest.mark.parametrize("problem", ["unsaved", "unpushed", "ignored"])
+@pytest.mark.parametrize("problem", ["unsaved", "unpushed", "ignored", "junk"])
 def test_remove_stops_before_writing_on_unsaved_unpushed_or_ignored_files(pair: SyncPair, problem: str) -> None:
     catalog = pair.catalog(pair.a)
     if problem == "unsaved":
@@ -64,6 +64,10 @@ def test_remove_stops_before_writing_on_unsaved_unpushed_or_ignored_files(pair: 
         pair.advance(31)
         pair.sync(pair.a)
         expected = "CANONICAL_UNSAVED_CHANGES"
+    elif problem == "junk":
+        # iss-00493: the sync never saves it, so it is not unsaved, but removing the catalog would delete it.
+        pair.write(pair.a, "sub/.DS_Store", "finder\n")
+        expected = "CANONICAL_IGNORED_FILES_PRESENT"
     else:
         (catalog / "plan.workbench").mkdir()
         (catalog / ".gitignore").write_text((catalog / ".gitignore").read_text() + "*.workbench/\n")
@@ -78,6 +82,8 @@ def test_remove_stops_before_writing_on_unsaved_unpushed_or_ignored_files(pair: 
     assert catalog.is_dir() and (pair.a / "spec-dock/initiatives").is_symlink()
     if problem == "ignored":
         assert result["error"]["details"]["paths"] == ["plan.workbench/notes.txt"]
+    if problem == "junk":
+        assert result["error"]["details"]["paths"] == ["sub/.DS_Store"]
 
 
 def test_remove_takes_away_links_catalog_exclude_registry_state_and_the_job(pair: SyncPair, tmp_path: Path) -> None:

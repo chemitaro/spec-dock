@@ -103,6 +103,24 @@ def test_finish_saves_waits_for_the_push_then_closes_unmarks_and_releases(world:
     assert payload["data"]["completed"] is True
 
 
+def test_an_os_junk_file_in_the_scope_neither_stops_finish_nor_is_pushed(world: WriteWorld) -> None:
+    # iss-00493: Finder writes .DS_Store into a Scope folder it shows; the save is still confirmed.
+    world.select("iss-00003", 3)
+    (world.find("iss-00003") / ".DS_Store").write_bytes(b"\0\0\0\1Bud1")
+    _run_cycle_on_kick(world)
+    code, payload = world.write("work", "finish", "iss-3")
+    assert code == 0 and payload["data"]["completed"] is True, payload
+    assert not git(
+        world.tmp_path / "remote.git",
+        "ls-tree",
+        "-r",
+        "--name-only",
+        "spec-dock/canonical",
+        "00000-00999/iss-00003/.DS_Store",
+    )
+    assert (world.find("iss-00003") / ".DS_Store").exists()
+
+
 def test_a_deleted_directory_is_saved_before_closing(world: WriteWorld) -> None:
     import shutil
 
