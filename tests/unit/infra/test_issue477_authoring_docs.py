@@ -31,7 +31,7 @@ CUE_GUIDE = AUTHORING / "cue.md"
 EXPLANATION_GUIDE = AUTHORING / "explanation.md"
 SKILL = ASSETS / "install_root/.agents/skills/spec-dock/SKILL.md"
 RULES = ROOT / "src/spec_dock/cue/v1/rules.cue"
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 STAGES = {0: "light から", 1: "standard から", 2: "strict から", 3: "critical"}
 EVERY_STAGE = "どの段階でも"
 # The bytes of every static asset this Issue rewrites, as of d53b24d64 (0.3.0 assets). A consumer holding them
@@ -244,7 +244,7 @@ def test_the_skill_carries_the_cue_section_for_canonical_mode() -> None:
     assert (ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes() == SKILL.read_bytes()
 
 
-def test_the_version_is_0_4_1_everywhere() -> None:
+def test_the_version_is_0_4_2_everywhere() -> None:
     project = re.search(r'^\[project\]\nname = "spec-dock"\nversion = "([^"]+)"', _read(ROOT / "pyproject.toml"), re.M)
     assert project is not None and project.group(1) == VERSION
     locked = re.search(r'\[\[package\]\]\nname = "spec-dock"\nversion = "([^"]+)"', _read(ROOT / "uv.lock"))
