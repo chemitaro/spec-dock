@@ -40,6 +40,7 @@ def render_scope_command(namespace: argparse.Namespace, context: ProjectContext)
     shown_path = scopes.require_directory(scope.id)
     shown = shown_path.relative_to(context.root).as_posix()
     design_system = context.root / "spec-dock" / "design-system"
+    inline = namespace.design_system == "inline"
     design_system_base = design_system.resolve().as_uri() + "/"
     rendered = render_scope(
         ScopeRenderSource(
@@ -53,6 +54,7 @@ def render_scope_command(namespace: argparse.Namespace, context: ProjectContext)
         design_system_base=design_system_base,
         vendor_base=None,
         timeout=namespace.timeout,
+        embed_design_system=design_system if inline else None,
     )
     warnings: list[Diagnostic] = list(scopes.warnings())
     if not rendered.complete:
@@ -81,7 +83,8 @@ def render_scope_command(namespace: argparse.Namespace, context: ProjectContext)
         "complete": rendered.complete,
         "valid": not [error for error in rendered.report.errors if not error.code.startswith("EXPLANATION_")],
         "errors": rendered.errors,
-        "design_system_base": design_system_base,
+        "design_system": namespace.design_system,
+        "design_system_base": None if inline else design_system_base,
         "vendor_base": None,
         "html": rendered.html,
         "snapshot": scopes.snapshot_payload(),

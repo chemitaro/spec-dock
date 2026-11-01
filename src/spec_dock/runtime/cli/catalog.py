@@ -199,7 +199,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "scope list": (_arg("--kind", choices=KINDS), _arg("--parent"), _arg("--state", choices=STATES)),
     "scope show": (_arg("target"),),
     "scope check": (_arg("target"),),
-    "scope render": (_arg("target"),),
+    "scope render": (_arg("target"), _arg("--design-system", choices=("file", "inline"), default="file")),
     "scope edit": (_arg("target"), _required("--title")),
     "scope close": (_arg("target"), _arg("--reason", choices=("completed", "not-planned"), default="completed")),
     "scope reopen": (_arg("target"),),
@@ -352,7 +352,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "scope list": "The selected project must contain a readable Scope tree.",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
     "scope check": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory. A CUE Scope (requirement.cue) needs cue v0.17.1 or later on PATH (CUE_NOT_FOUND, CUE_VERSION_UNSUPPORTED) and a type version this SpecDock ships (CUE_SCHEMA_UNSUPPORTED); a Markdown Scope succeeds with checked=false and needs no cue.",
-    "scope render": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory and be a CUE Scope (a Markdown Scope stops with SCOPE_NOT_CUE). Needs cue v0.17.1 or later on PATH and a type version this SpecDock ships, like scope check. The page loads the checkout's spec-dock/design-system/ through a file: URL (warning DESIGN_SYSTEM_MISSING when it is absent) and diagram parts from the CDN.",
+    "scope render": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory and be a CUE Scope (a Markdown Scope stops with SCOPE_NOT_CUE). Needs cue v0.17.1 or later on PATH and a type version this SpecDock ships, like scope check. The page loads the checkout's spec-dock/design-system/ through a file: URL (warning DESIGN_SYSTEM_MISSING when it is absent) and diagram parts from the CDN. --design-system inline carries ds.css, ds.js and marked inside the page instead, so it keeps its style on another machine (about 400KB; DESIGN_SYSTEM_MISSING stops with exit 3 when they are absent).",
     "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
     "scope close": "The Scope must resolve; its backend and expected state guards must match.",
     "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
@@ -574,8 +574,10 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = (
             "kind=scope-check: scope_id, kind, path, format (cue|markdown|conflict), checked, valid, schema,"
             " assurance {level, reason, source, problem}, errors and warnings (code, message, details.file,"
-            " details.hint; CUE_INVALID adds line, column, field, cue_message, positions; SPEC_FINDINGS adds rule"
-            " and id), findings, cue {version}, cue_output, snapshot. Errors exit 7 with SCOPE_CHECK_FAILED."
+            " details.hint; CUE_INVALID adds line, column, field, cue_message, positions and, when a clash with a"
+            " default was folded into it, cue_related; SPEC_FINDINGS adds rule and id; warning SPEC_NO_TESTS marks a"
+            " light Issue without tests), findings, cue {version}, cue_output, snapshot. Errors exit 7 with"
+            " SCOPE_CHECK_FAILED."
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "scope render":
@@ -589,7 +591,8 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         json_data = (
             "kind=scope-render: scope_id, kind, path, format (cue|conflict), complete, valid, errors (shown on the"
-            " page; findings are drawn from the evaluation), design_system_base, vendor_base (null: CDN), html,"
+            " page; findings are drawn from the evaluation), design_system (file|inline), design_system_base"
+            " (null when inline), vendor_base (null: CDN), html,"
             " snapshot. Text output is the HTML alone. A failed evaluation still succeeds with a page of check"
             " results and warning SCOPE_RENDER_INCOMPLETE; a Markdown Scope exits 7 with SCOPE_NOT_CUE."
         )

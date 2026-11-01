@@ -83,7 +83,8 @@ def test_shape_errors_and_findings_fail_with_exit_7_and_name_file_field_and_fix(
     code, payload = world.run("scope", "check", "iss-00003")
     assert (code, payload["status"], payload["error"]["code"]) == (7, "failed", "SCOPE_CHECK_FAILED")
     errors = payload["data"]["result"]["errors"]
-    assert {item["code"] for item in errors} == {"CUE_INVALID"}
+    assert [item["code"] for item in errors] == ["CUE_INVALID"]  # the clash with the default is folded (iss-00489)
+    assert errors[0]["details"]["cue_related"] == ['conflicting values "todo" and "nope"']
     assert {item["details"]["file"] for item in errors} == {f"{SHOWN}/plan.cue"}
     assert {item["details"]["field"] for item in errors} == {'steps."S-02".status'}
     assert all(item["details"]["line"] == 5 and item["details"]["hint"] for item in errors)

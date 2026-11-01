@@ -105,12 +105,38 @@ def test_an_error_in_a_scope_file_points_at_that_file(tmp_path: Path) -> None:
     plan = scope / "plan.cue"
     plan.write_text(plan.read_text(encoding="utf-8").replace('status: "doing"', 'status: "nope"'), encoding="utf-8")
     report = check(scope)
-    assert codes(report.errors) == ["CUE_INVALID", "CUE_INVALID"]
-    fields = {item.details["field"] for item in report.errors}
-    assert fields == {'steps."S-02".status'}
-    assert {item.details["file"] for item in report.errors} == {f"{SHOWN}/plan.cue"}
-    assert all(item.details["line"] == 5 for item in report.errors)
-    assert "nope" in str(report.cue_output)
+    # iss-00489 R-01: the clash with the default "todo" is folded into the one error that names the allowed values.
+    assert codes(report.errors) == ["CUE_INVALID"]
+    [error] = report.errors
+    assert error.details["field"] == 'steps."S-02".status'
+    assert (error.details["file"], error.details["line"]) == (f"{SHOWN}/plan.cue", 5)
+    assert "out of bound" in error.details["cue_message"] and "conflicting" not in error.details["cue_message"]
+    assert error.details["cue_related"] == ['conflicting values "todo" and "nope"']
+    assert "nope" in str(report.cue_output) and "conflicting values" in str(report.cue_output)
+
+
+def test_a_defaulted_enum_of_a_repository_type_is_one_error_too(tmp_path: Path) -> None:
+    repository = tmp_path / "repo"
+    (repository / "spec-dock/cue").mkdir(parents=True)
+    (repository / "spec-dock/cue/team.cue").write_text(
+        'package spec\n\nsteps: [string]: {priority: *"low" | (string & =~"^(low|high)$")}\n', encoding="utf-8"
+    )
+    scope = place_sample(tmp_path / "scope", "issue-strict-complete")
+    plan = scope / "plan.cue"
+    plan.write_text(
+        plan.read_text(encoding="utf-8").replace('status: "doing"', 'status: "doing", priority: "hgh"'), "utf-8"
+    )
+    report = check(scope, repository=repository)
+    [error] = report.errors
+    assert (error.code, error.details["field"]) == ("CUE_INVALID", 'steps."S-02".priority')
+    assert "out of bound" in error.details["cue_message"]
+    assert error.details["cue_related"] == ['conflicting values "low" and "hgh"']
+
+
+def test_an_error_outside_a_disjunction_has_no_related_lines(tmp_path: Path) -> None:
+    report = check(place_sample(tmp_path / "scope", "issue-strict-missing-impact"))
+    assert [item.details["field"] for item in report.errors] == ['failures."F-01".impact', 'failures."F-01".recovery']
+    assert not any("cue_related" in item.details for item in report.errors)
 
 
 def test_findings_name_the_rule_the_number_the_file_and_the_fix(tmp_path: Path) -> None:
@@ -382,8 +408,39 @@ def test_a_tool_failure_while_reading_the_level_stops_instead_of_blaming_the_doc
 def test_a_field_only_the_type_locates_is_fixed_in_the_scope_documents_not_the_type(tmp_path: Path) -> None:
     report = check(place_sample(tmp_path / "scope", "issue-strict-missing-impact"))
     hint = report.errors[0].details["hint"]
-    assert 'failures."F-01".impact' in hint and "Scope" in hint
-    assert not hint.startswith("Fix failures") and "do not edit" in hint
+    assert 'failures."F-01".impact' in hint and f"{SHOWN}/*.cue" in hint
+    # iss-00489 R-02: the same three points in Japanese — the field, the Scope's documents, and leave the type alone.
+    assert "Scope の CUE の文書" in hint and "SpecDock の型" in hint and "直さない" in hint
+
+
+_ENGLISH_SENTENCE = re.compile(r"\b(?:Fix|Write|do not edit|see cue_message|to match|so that)\b")
+_KANA = re.compile(r"[\u3040-\u30ff]")
+
+
+def _japanese_hints(report: Any) -> list[str]:
+    hints = [item.details["hint"] for item in report.errors if item.code == "CUE_INVALID"]
+    assert hints
+    for hint in hints:
+        assert _KANA.search(hint) and not _ENGLISH_SENTENCE.search(hint), hint
+    return hints
+
+
+def test_every_cue_invalid_hint_is_japanese(tmp_path: Path) -> None:
+    scope = place_sample(tmp_path / "evaluation", "issue-strict-complete")
+    plan = scope / "plan.cue"
+    plan.write_text(plan.read_text(encoding="utf-8").replace('status: "doing"', 'status: "nope"'), encoding="utf-8")
+    [hint] = _japanese_hints(check(scope))
+    assert 'steps."S-02".status' in hint and f"{SHOWN}/plan.cue" in hint
+    _japanese_hints(check(place_sample(tmp_path / "type-only", "issue-strict-missing-impact")))
+    scope = place_sample(tmp_path / "schema", "issue-strict-complete")
+    requirement = scope / "requirement.cue"
+    requirement.write_text(requirement.read_text(encoding="utf-8").replace('schema: "specdock/v1"', ""), "utf-8")
+    [hint] = _japanese_hints(check(scope))
+    assert 'schema: "specdock/v1"' in hint and "requirement.cue" in hint
+    scope = place_sample(tmp_path / "syntax", "issue-strict-complete")
+    plan = scope / "plan.cue"
+    plan.write_text(plan.read_text(encoding="utf-8") + "\nbroken: {\n", encoding="utf-8")
+    _japanese_hints(check(scope))
 
 
 def test_a_requirement_that_cannot_be_read_keeps_the_whole_cue_text(tmp_path: Path) -> None:
@@ -393,3 +450,43 @@ def test_a_requirement_that_cannot_be_read_keeps_the_whole_cue_text(tmp_path: Pa
     report = check(scope)
     assert codes(report.errors) == ["CUE_INVALID"]
     assert report.cue_output and "expected" in report.cue_output
+
+
+class TestNoTests:
+    """iss-00489 R-04: a light Issue without a test is told so by a warning; the K3 shape is unchanged."""
+
+    def test_a_light_issue_without_tests_passes_with_one_warning(self, tmp_path: Path) -> None:
+        report = check(place_sample(tmp_path / "scope", "issue-light-minimal"))
+        assert report.errors == ()
+        [warning] = [item for item in report.warnings if item.code == "SPEC_NO_TESTS"]
+        assert warning.details["file"] == f"{SHOWN}/plan.cue"
+        assert "tests" in warning.details["hint"] and re.search(r"[぀-ヿ]", warning.details["hint"])
+
+    def test_a_light_issue_with_a_test_has_no_warning(self, tmp_path: Path) -> None:
+        scope = place_sample(tmp_path / "scope", "issue-light-minimal")
+        with (scope / "plan.cue").open("a", encoding="utf-8") as plan:
+            plan.write('\ntests: "T-01": {title: "誤字がない", verifies: ["R-01"]}\n')
+        report = check(scope)
+        assert report.errors == () and "SPEC_NO_TESTS" not in codes(report.warnings)
+
+    def test_standard_or_higher_reports_the_rule_instead(self, tmp_path: Path) -> None:
+        scope = place_sample(tmp_path / "scope", "issue-light-minimal")
+        requirement = scope / "requirement.cue"
+        text = requirement.read_text(encoding="utf-8").replace('"light"', '"standard"')
+        requirement.write_text(text + 'requirements: "R-01": acceptance: ["誤字がない"]\n', "utf-8")
+        report = check(scope)
+        assert "SPEC_NO_TESTS" not in codes(report.warnings)
+        assert ("requirement-without-test", "R-01") in {
+            (item.details.get("rule"), item.details.get("id")) for item in report.errors
+        }
+
+    def test_an_epic_has_no_tests_to_warn_about(self, tmp_path: Path) -> None:
+        report = check(place_sample(tmp_path / "scope", "epic-light-with-steps"), "epic")
+        assert "SPEC_NO_TESTS" not in codes(report.warnings)
+
+    def test_a_failed_evaluation_has_no_warning(self, tmp_path: Path) -> None:
+        scope = place_sample(tmp_path / "scope", "issue-light-minimal")
+        plan = scope / "plan.cue"
+        plan.write_text(plan.read_text(encoding="utf-8").replace('"done"', '"nope"'), encoding="utf-8")
+        report = check(scope)
+        assert report.errors and "SPEC_NO_TESTS" not in codes(report.warnings)

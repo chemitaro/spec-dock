@@ -54,6 +54,7 @@ EXPLANATION_MISSING: Final = "EXPLANATION_MISSING"
 EXPLANATION_SKELETON: Final = "EXPLANATION_SKELETON"
 EXPLANATION_INVALID: Final = "EXPLANATION_INVALID"
 CUE_SCHEMA_UNSUPPORTED: Final = "CUE_SCHEMA_UNSUPPORTED"
+SPEC_NO_TESTS: Final = "SPEC_NO_TESTS"
 
 # A tool failure while reading the level stops the check like any other `cue` failure: (exit code, next step).
 _TOOL_STEPS: Final = {
@@ -63,7 +64,8 @@ _TOOL_STEPS: Final = {
     CUE_FAILED: (5, REINSTALL_STEP),
 }
 _SCHEMA_SHAPE = re.compile(r"specdock/v[1-9][0-9]*")
-_SCHEMA_STEP = 'Write schema: "specdock/v1" in requirement.cue (the type version is read from that file only).'
+# CUE_INVALID hints are Japanese like the type's finding hints (iss-00489 R-02); cue_message keeps cue's own text.
+_SCHEMA_STEP = 'requirement.cue に schema: "specdock/v1" を書く（型の版は、このファイルだけから読む）。'
 _ASSURANCE_STEP = (
     'Write assurance: {level: "<light|standard|strict|critical>", reason: "<why>"} in requirement.cue; '
     "the assurance level is read from that file only."
@@ -240,13 +242,14 @@ def check_scope_documents(
         )
     explanation_errors, explanation_warnings = _explanation(directory, kind, shown)
     errors += explanation_errors
+    warnings = (*_no_tests(evaluation, kind, assurance, shown), *explanation_warnings)
     return ScopeCheckReport(
         found,
         checked,
         schema,
         assurance,
         tuple(errors),
-        explanation_warnings,
+        warnings,
         findings,
         tool.version,
         cue_output,
@@ -372,15 +375,43 @@ def _derived(error: CueError) -> bool:
 def _shape_errors(errors: tuple[CueError, ...], stderr: str, places: _Places) -> list[Diagnostic]:
     if not errors:
         errors = ((_whole(stderr)),)
+    disjunctions: set[str | None] = {
+        error.path for error in errors if error.path and _EMPTY_DISJUNCTION.fullmatch(error.message)
+    }
     primary = [error for error in errors if not _derived(error)] or list(errors)
+    folded, related = _folded_clashes(primary, disjunctions)
     seen: set[tuple[str | None, str]] = set()
     found: list[Diagnostic] = []
     for error in primary:
-        if (error.path, error.message) in seen:
+        if (error.path, error.message) in seen or (error.path, error.message) in folded:
             continue
         seen.add((error.path, error.message))
-        found.append(_shape_error(error, places))
+        found.append(_shape_error(error, places, related.pop(error.path, None)))
     return found
+
+
+_EMPTY_DISJUNCTION: Final = re.compile(r"\d+ errors in empty disjunction")
+_CLASH: Final = "conflicting values "
+
+
+def _folded_clashes(
+    primary: list[CueError], disjunctions: set[str | None]
+) -> tuple[set[tuple[str | None, str]], dict[str | None, list[str]]]:
+    """For a field whose disjunction failed (`*"todo" | =~"..."`), the clash with a value such as the default is
+    folded into the field's other error (out of bound, say), which names what is allowed (iss-00489 R-01).
+
+    Returns the (path, message) pairs not shown on their own, and the clash messages by path. A field whose
+    branches all clash (an enum without a constraint) is left as it is.
+    """
+    folded: set[tuple[str | None, str]] = set()
+    kept: dict[str | None, list[str]] = {}
+    for path in disjunctions:
+        mine = [error for error in primary if error.path == path]
+        clashes = list(dict.fromkeys(error.message for error in mine if error.message.startswith(_CLASH)))
+        if clashes and any(not error.message.startswith(_CLASH) for error in mine):
+            folded.update((path, message) for message in clashes)
+            kept[path] = clashes
+    return folded, kept
 
 
 def _whole(stderr: str) -> CueError:
@@ -389,35 +420,36 @@ def _whole(stderr: str) -> CueError:
     return CueError(None, stderr.strip() or "cue failed without a message", ())
 
 
-def _shape_error(error: CueError, places: _Places) -> Diagnostic:
+def _shape_error(error: CueError, places: _Places, related: list[str] | None = None) -> Diagnostic:
     at: CuePosition | None = min(error.positions, key=lambda item: places.rank(item.file), default=None)
     file = places.show(at.file) if at is not None else None
     field = error.path
     if at is not None and places.rank(at.file) == 2:
         # Only the shipped type locates it (a required field is missing, say): the fix is in the Scope's documents.
         hint = (
-            f"Write or fix {field or 'the field'} in the Scope's CUE documents ({places.shown}/*.cue) so that it"
-            f" meets the spec type; do not edit the SpecDock type at {file} (see cue_message)."
+            f"Scope の CUE の文書（{places.shown}/*.cue）に {field or '型が求める項目'} を書くか直して、仕様の型に合わせる。"
+            f"SpecDock の型（{file}）は直さない（誤りの原文は cue_message にある）。"
         )
+    elif field or file:
+        where = f"{file} の {field}" if field and file else field or file
+        hint = f"{where} を、仕様の型に合うように直す。誤りの原文は cue_message と positions にある。"
     else:
-        where = f"{field} in {file}" if field and file else field or file or "the CUE documents"
-        hint = f"Fix {where} to match the spec type; see cue_message and positions."
+        hint = "Scope の CUE の文書の誤りを、仕様の型に合うように直す。誤りの原文は cue_message にある。"
     message = f"{field}: {error.message}" if field else error.message
-    return Diagnostic(
-        CUE_INVALID,
-        message,
-        {
-            "file": file,
-            "line": at.line if at is not None else None,
-            "column": at.column if at is not None else None,
-            "field": field,
-            "cue_message": error.message,
-            "positions": [
-                {"file": places.show(item.file), "line": item.line, "column": item.column} for item in error.positions
-            ],
-            "hint": hint,
-        },
-    )
+    details: dict[str, object] = {
+        "file": file,
+        "line": at.line if at is not None else None,
+        "column": at.column if at is not None else None,
+        "field": field,
+        "cue_message": error.message,
+        "positions": [
+            {"file": places.show(item.file), "line": item.line, "column": item.column} for item in error.positions
+        ],
+        "hint": hint,
+    }
+    if related:
+        details["cue_related"] = related
+    return Diagnostic(CUE_INVALID, message, details)
 
 
 def _evaluation(stdout: str) -> dict[str, object]:
@@ -477,6 +509,24 @@ def _finding_errors(findings: dict[str, list[dict[str, str]]], shown: str) -> li
                 )
             )
     return errors
+
+
+def _no_tests(
+    evaluation: dict[str, object] | None, kind: str, assurance: AssuranceReading, shown: str
+) -> tuple[Diagnostic, ...]:
+    """A light Issue with no test at all (iss-00489 R-04); standard and above report requirement-without-test."""
+    if evaluation is None or kind != "issue" or assurance.level != "light" or evaluation.get("tests"):
+        return ()
+    return (
+        Diagnostic(
+            SPEC_NO_TESTS,
+            "the light Issue has no test",
+            {
+                "file": f"{shown}/plan.cue",
+                "hint": "light ではテストは任意だが、1つもない。確かめることがあれば plan.cue の tests に書く。",
+            },
+        ),
+    )
 
 
 def _report_assurance(reading: AssuranceReading, evaluated: bool, shape_errors: list[Diagnostic]) -> bool:

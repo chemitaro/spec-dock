@@ -49,6 +49,8 @@ PREVIOUS_SHA256 = {
 }
 # The bytes of cue.md as iss-00477 first shipped it (7f3cf7d3c); iss-00487 rewrote it.
 CUE_GUIDE_FIRST_SHA256 = "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e"
+# The bytes of cue.md as iss-00487 shipped it (155d144d8); iss-00489 rewrote it again.
+CUE_GUIDE_ISS487_SHA256 = "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28"
 CUE_MODULES = (canonical_scope_create, scope_check, canonical_scope_check, scope_render, cue_tool)
 
 
@@ -278,8 +280,8 @@ def test_the_inventory_ships_the_new_guides_and_accepts_the_previous_bytes() -> 
     for name in ("cue.md", "explanation.md"):
         entry = entries[f"spec-dock/docs/authoring/{name}"]
         data = (AUTHORING / name).read_bytes()
-        # iss-00487 rewrote cue.md after it first shipped; only those first bytes are its known old version.
-        known_old = [CUE_GUIDE_FIRST_SHA256] if name == "cue.md" else []
+        # iss-00487 and iss-00489 rewrote cue.md after it first shipped; those earlier bytes are its known old versions.
+        known_old = [CUE_GUIDE_ISS487_SHA256, CUE_GUIDE_FIRST_SHA256] if name == "cue.md" else []
         assert entry["sha256"] == hashlib.sha256(data).hexdigest() and entry["known_old_sha256"] == known_old
         assert (ROOT / "spec-dock/docs/authoring" / name).read_bytes() == data
     for path, previous in PREVIOUS_SHA256.items():
