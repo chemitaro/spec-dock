@@ -44,7 +44,9 @@ def test_the_workflow_sample_installs_the_pinned_version_and_runs_the_check() ->
     sample = (ASSETS / "docs/ci/spec-dock-check.yml").read_text(encoding="utf-8")
     assert WORKFLOW_DESTINATION == ".github/workflows/spec-dock-check.yml"
     assert WORKFLOW_BRANCH_LINE == "branches: [main]"
-    assert sample.startswith("name: SpecDock check\non:\n  pull_request:\n  push:\n")
+    # iss-00494 puts explanatory comments before the workflow; the structure starts at the first non-comment line.
+    structure = "\n".join(line for line in sample.splitlines() if not line.startswith("#")) + "\n"
+    assert structure.startswith("name: SpecDock check\non:\n  pull_request:\n  push:\n")
     branch_lines = [line for line in sample.splitlines() if WORKFLOW_BRANCH_LINE in line]
     assert len(branch_lines) == 1 and re.fullmatch(r"    branches: \[main\]\s+#.*", branch_lines[0])
     assert "permissions:\n  contents: read\n" in sample
