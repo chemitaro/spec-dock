@@ -47,6 +47,8 @@ OS が作る不要なファイル（`.DS_Store`、`._*`、`Icon\r`、`Thumbs.db`
   - テストの枠：`make lint` exit 0（ruff check、ruff format、mypy が合格）、`uv run pytest` exit 0（4083 passed、8 skipped）。
   - 証拠：Workbench の `.workbench/final-quality-gate/iss-00493-fqg-1/closure.md`、`attempts/01/review.json`、`attempts/01/tests/manifest.json` と各 `.check.json`。
 - ChatGPT を使うレビューは無効のため使っていない（統括の指示）。
+- `main`（#498、移行の README とテストだけ）を取り込んだ（`f94068728`、衝突なし）。
+- PR：https://github.com/chemitaro/spec-dock/pull/499（head `f94068728`）。CI（Provider CI、SpecDock check、Commit identity）は合格、GitHub の状態は MERGEABLE・CLEAN（2026-11-01T14:10Z の観測）。マージと `work finish` は統括が行う。
 
 ## Residual Risks / Follow-ups
 
