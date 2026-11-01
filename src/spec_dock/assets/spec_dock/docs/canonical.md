@@ -127,6 +127,12 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - ワークフローの見本は `spec-dock/docs/ci/spec-dock-check.yml` です。`spec-dock/system/spec-dock-version` の版のタグ（`v0.3.0` など）の SpecDock を入れて `canonical check` を実行します。版のタグは 0.3.0 から作るので、見本は 0.3.0 以降の配布資産で使います（0.2.4 の版のファイルのままでは入れる段階で失敗します）。
 - 検査は PR をきっかけに動き、結果を PR に表示します。人は通過を確かめてからマージします。
 
+## CI の費用と、見本の合わせ方
+
+- 見本は、PR と既定のブランチへの push のたびに、ホストの runner（`ubuntu-latest`）で動きます。ホストの runner は動いた時間に費用がかかるので、頻繁に push するリポジトリでは費用が増えます。
+- 見本は出発点です。リポジトリの決まりに合わせて、起動の条件（`on`）と `runs-on` を変えてかまいません。たとえば、手動の起動だけ（`on` を `workflow_dispatch` だけ）にする、自前の runner のラベルに `runs-on` を替える、CI を置かない、のどれでもかまいません。`canonical check` の動きと結果は、起動のしかたに関わりません。
+- CI を手動の起動だけにする、または置かないときは、push の前の hook で同じ検査を回すと、既定のブランチへ入る前に気づけます。たとえば `.githooks/pre-push` に `spec-dock canonical check --json` を書き、`git config core.hooksPath .githooks` で有効にします。終了コードが 0 でなければ push は止まります。
+
 ## エラーと次の1手
 
 どのエラーも、JSON の `recovery`（警告は `details.next_step`）に次の1手を入れます。終了コードの「警告」は、結果の状態を変えずに `warnings` に出るものです。
