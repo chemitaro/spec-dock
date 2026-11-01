@@ -39,6 +39,18 @@ package managerでレビュー・通常試験が済んだwheelをworktree外へ�
   - `spec-dock scope check`：`CUE_INVALID` に、既定値との衝突の行を残す `details.cue_related` が付きます。保証レベルが light でテストが1つもない Issue には、警告 `SPEC_NO_TESTS` が付きます（誤りではありません）。
   - `spec-dock scope render` に `--design-system <file|inline>` が付きました（既定は `file`）。`inline` は `ds.css`、`ds.js`、`marked` を HTML に埋め込み、デザインシステムがなければ `DESIGN_SYSTEM_MISSING`（終了コード3）で止まります。Python の入口 `render_scope_html` には `embed_design_system` が付きました。
 
+## 0.4.2 への更新
+
+0.4.2 は、0.4.1 の後に入れた canonical の同期と CI の見本の改善を届ける版です。動きの変更は小さく、版3のリポジトリには影響しません。
+
+- パッケージを 0.4.2 に上げた後、各リポジトリで `spec-dock installation update` を実行して配布資産を上げます。0.4.1 の配布資産のままでも動きますが、`canonical.md`（「CI の費用と、見本の合わせ方」の節と、不要ファイルの説明）と CI の見本 `ci/spec-dock-check.yml`（費用と合わせ方の注記）が新しくなります。
+- 主な改善：
+  - OS が作る不要なファイル（`.DS_Store`、`._*` など）を、canonical の同期で保存しません。不要ファイルの削除は、大量削除の保留に数えません。
+  - CI の見本に、費用と合わせ方の注記が付きました。
+- CLI の契約の変更（版4だけ）：
+  - `spec-dock canonical status` の `changes` に `junk_files` が付きます。前の版が保存してしまった不要ファイルの一覧で、カタログから消すと次の周期が削除を保存します。
+  - `spec-dock canonical remove` は、保存しないファイルがカタログに残っていると、何も消さずに `CANONICAL_IGNORED_FILES_PRESENT`（終了コード3）で止まります。示されたファイルを消すか移してから、もう一度実行します。
+
 ## 新規導入
 
 ```sh
