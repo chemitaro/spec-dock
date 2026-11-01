@@ -26,7 +26,7 @@ iss-00487 の「CUE の仕様の試し」の改善の提案5つを実装した�
 - 依頼の「3つの種類すべて」の雛形の `status`：Epic と Initiative の `plan.cue` は手順（`steps`）と `status` を持たない（型が `slices` だけを許し、`steps` を書くと誤り）。Issue の雛形だけを変えた。
 - 提案5は「埋め込み」だけを足し、「相対の道筋」は足していない。`scope render` は標準出力に出すので、出力の場所が分からず、相対の道筋を決められないため。
 
-コミット：`ccb8f5aa4`（実装）、`e673b46b6`（help の JSON 説明。コードのレビューの P3 への対応）。
+コミット：`ccb8f5aa4`（実装）、`e673b46b6`（help の JSON 説明。コードのレビューの P3 への対応）。PR：https://github.com/chemitaro/spec-dock/pull/490（head `e673b46b6`、マージできる状態で停止。`work finish` はマージの後に統括が行う）。
 
 ## Verification
 
@@ -35,6 +35,7 @@ iss-00487 の「CUE の仕様の試し」の改善の提案5つを実装した�
 - コードのレビュー（code-review、code-reviewer opus / high、2人、`c43aadd5b..ccb8f5aa4`）：standards 合格（P3 1：help の JSON 説明に `cue_related` がない → `e673b46b6` で直した）、spec 合格（指摘0）。
 - 実ブラウザー（T-11）：`--design-system inline` で描いた iss-00489 の HTML を、`node tests/browser/explanation-check.mjs --file <page> --cdn-from-package`（ネットワークを遮断した headless Chrome）で開き、`VALIDATED`（`ready: true`、例外0、390px で横にはみ出さない）。HTML の `file:` は仕様の本文の中だけ。
 - `ccb8f5aa4` で `uv run pytest`（全体）：4047 passed、8 skipped（21分51秒）。
+- PR #490 の CI（github-pr-checks、2026-11-01T02:53:47Z）：`OBSERVED_CI_PASS`、終了コード0。SpecDock check、Commit identity、Provider CI がすべて success。merge_readiness は READY。観測の範囲は Actions と Commit Status。
 - 最終品質ゲート（final-quality-gate、quality-gate-reviewer opus / high、1人、campaign `iss-00489-fqg-1`、attempt 01、`e673b46b6`）：
   - レビューの側：合格。P0/P1 0、網羅は完全、P3 1（FQG-001：全枝が `conflicting values` の選言（制約のない列挙）をまとめないことを確かめるテストがない。実装は条件で守っている。ゲートの規則で直していない）。
   - テストの側：合格。`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（4047 passed、8 skipped、21分33秒）。証拠は worktree の `.workbench/final-quality-gate/iss-00489-fqg-1/`（`closure.md`、`attempts/01/`）。
