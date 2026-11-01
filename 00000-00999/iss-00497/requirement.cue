@@ -26,8 +26,16 @@ background: "I-12 の準備で、input-devices、company-os、housing-lifecycle 
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
 	"R-01": {
-		title: "雛形がルートの `.workbench/` の無視に隠されない"
-		text:  "雛形の置き場を無視されない名前に変える、`spec-dock/.gitignore` に `!` の行を足す、または `installation update` が無視されたファイルを警告する、のどれかで、利用側のコミットから漏れなくなる。"
+		title: "雛形の README がルートの `.workbench/` の無視に隠されない"
+		text:  "利用側のルートの `.gitignore` が `.workbench/` を無視していても、`spec-dock/templates/cue/{epic,initiative,issue}/.workbench/README.md` が `git add -f` なしにコミットの対象になる。方法は、`spec-dock/.gitignore` に `!**/.workbench/` を足す案を採る（置き場の名前の変更と `installation update` の警告は採らない。理由は design.cue）。"
+	}
+	"R-02": {
+		title: "README 以外の `.workbench/` の中身は、今までどおり無視される"
+		text:  "雛形の `.workbench/` の下にある README 以外のファイルは、ルートに `.workbench/` の無視がある場合も、ない場合も、無視されたままである。"
+	}
+	"R-03": {
+		title: "0.4.2 の配布資産を持つ利用側が `installation update` で上がる"
+		text:  "0.4.2 が配布した `spec-dock/.gitignore` のバイトを既知の古い版として扱い、手作業の統合なしに新しい版へ更新できる。このリポジトリ（dogfood）の写しも同じ内容で、ルートの `.workbench/` があっても README が対象になる。"
 	}
 }
 

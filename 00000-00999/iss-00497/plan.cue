@@ -1,36 +1,18 @@
 package spec
 
 // 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
 
-// 目標（任意）。
-// goal: "..."
+goal: "雛形の README を、ルートの `.workbench/` の無視の下でもコミットできるようにする"
 
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "失敗するテストを書く（Git の挙動、古いバイトからの更新、dogfood の写し）", realizes: ["R-01", "R-02", "R-03"], status: "todo"}
+	"S-02": {title: "`.gitignore` に `!**/.workbench/` を足し、インベントリと dogfood の写しを更新する", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-01"]}
+	"S-03": {title: "レビュー、全体のテストと lint、PR", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-02"]}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "ルートに `.workbench/` がある一時のリポジトリで、README が追跡の対象になり、ほかのファイルは無視される", verifies: ["R-01", "R-02"]}
+	"T-02": {title: "0.4.2 のバイトの利用側が `installation update` で上がり、dogfood の写しが提供側と一致する", verifies: ["R-03"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
-
-// 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+verification: "`uv run pytest` と `make lint`。dogfood で `git check-ignore -v` が README を無視と判定しない。"

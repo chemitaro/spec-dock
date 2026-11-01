@@ -1,36 +1,32 @@
 package spec
 
 // 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
 
-// 目標（任意）。
-// goal: "..."
+goal: "`installation update`（と `--dry-run`）が、写しを外してリンクのない枠ごとに `CLAUDE_SKILL_LINK_MISSING` を出し、置き方を示す。"
 
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "警告のテストを先に書く（Red）", realizes: ["R-01"], status: "todo", session: "impl"}
+	"S-02": {title: "警告を作る関数と、planned・succeeded・partial の結果への取り付け", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-03": {title: "葉の help に1文を足す", realizes: ["R-01"], status: "todo", after: ["S-02"], session: "impl"}
+	"S-04": {title: "コードのレビュー、最終品質ゲート、PR", realizes: ["R-01"], status: "todo", after: ["S-03"], session: "impl"}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "写しがあってリンクのない一時のリポジトリで、`installation update --dry-run --json` の `warnings` に、枠ごとの `CLAUDE_SKILL_LINK_MISSING`（`slot`、`link_target`、`commands`）が出る", verifies: ["R-01"]}
+	"T-02": {title: "適用（`--yes`）の結果にも同じ警告が出て、テキストの出力では標準エラーに `warning [CLAUDE_SKILL_LINK_MISSING]` の行が出る。示したコマンドを実行すると、リンクが置ける", verifies: ["R-01"]}
+	"T-03": {title: "枠がリンク（壊れたリンクを含む）、写しがない、2回目の更新、`uninstall` では、警告が出ない", verifies: ["R-01"]}
+	"T-04": {title: "片方の枠だけに写しがあるときは、その枠の1件だけが出る", verifies: ["R-01"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+verification: "`uv run pytest tests/integration/test_issue496_claude_skill_link_warning.py`、`make lint`、`uv run pytest`（全体）。"
+rollback:     "PR を戻す。警告を足すだけで、ファイルの扱いは変えないので、戻しても利用者のファイルに影響しない。"
+exit:         "T-01〜T-04 が通り、`scope check` に誤りがなく、PR がマージできる状態。"
 
-// 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+execution: {
+	sessions: impl: {task: "仕様化と実装", model: "opus", effort: "medium", rationale: "standard の保証レベルで、仕様が決まっていて案内を足すだけ（統括の指定）"}
+	reviews: {
+		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		code: {role: "コードのレビュー", after: "S-03", model: "opus", effort: "high"}
+		gate: {role: "最終品質ゲート", after: "S-04", model: "opus", effort: "high"}
+	}
+}
