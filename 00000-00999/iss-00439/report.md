@@ -14,7 +14,19 @@ ID: "iss-00439"
 
 ## Outcome
 
-（本番の切り替えの後に書く。2026-11-01 時点で、準備の手順1〜4が済んだ。）
+2026-11-01、4つのリポジトリを canonical モード（宣言の版4）に切り替えた。どれも、main（taikyohiyou は develop）のチェックアウトで `canonical status` のすべての項目が ok、`verify` が一致（`.meta.json` がなく、すべて `<区切り>/<ID>/`）、`workspace validate` が成功。`canonical link` が示すツールの1行は、どのリポジトリでも要らなかった。
+
+| リポジトリ | 切り替えの PR（マージ） | `spec-dock/canonical` | 切り替えの PR で足したこと |
+|---|---|---|---|
+| input-devices | #19（`1daf2e3`） | `7d4999b`（15コミット） | `ci.yml` を消す、`AGENTS.md` |
+| company-os | #2（`ac64d77`） | `8778f2a`（`canonical link` が最初の canonical を作成） | `ci.yml` を消す、`integrations/spec-dock/contract.md` |
+| housing-lifecycle | #239（`887315a`） | `9ed86d4`（411コミット） | 判断 S72 に合わせ、`spec-dock-check.yml` を手動の起動だけに、`ci.yml` を消す、`.githooks/pre-push` を `canonical check` に、`AGENTS.md`・`README.md` |
+| taikyohiyou | #2228（`7f579cf`） | `4504a42`（2896コミット） | `spec-dock-check.yml`（ホストの runner）を消し、`ci.yml`（VM の runner、費用の見張りが `validate` を名前で参照）の検査を `canonical check` に、`AGENTS.md` ほか、ツリーの外のリンク4件 |
+
+- 仕様のツリーの外から古い入れ子のパスを指すリンクは、`migrate.py` が書き換えないので、切り替えで切れた（input-devices 17、housing-lifecycle 316、taikyohiyou 4）。切り替え前のコミットの `.meta.json` から新旧の対応を作って書き換え、input-devices#20（`6100bb7`）、housing-lifecycle#240（`3fd5e98`）、taikyohiyou は #2228 の中で直した。書き換えた先は、すべて main のチェックアウトからカタログを通して開けることを確かめた。
+- `move-local`：taikyohiyou だけ、追跡外のファイル19件（`.workbench/` 18件と `.DS_Store`）をカタログへ移した。`.DS_Store` が canonical に保存されたので、消して保存し直した（`4b15af0`）。ほかの3つは移すものがなかった。
+- 作業用の worktree：利用者の決定で、3つのリポジトリの23個（すべてマージ済み、清潔、仕様の変更なし）を `orca worktree rm` で片付けた。`adopt-worktree` は使わなかった。
+- taikyohiyou の staging の検査（run 41296565967）：1回目は `release_command`（alembic）でデータベースへの接続が切れて失敗（`asyncpg ConnectionDoesNotExistError`、接続の段階）。2回目（失敗したジョブだけの再実行）は、許可の記録が1回目のままで `deployment_binding_mismatch`（仕組みの上で必ず止まる）。3回目（すべてのジョブ）で成功。
 
 ## Verification
 
@@ -61,4 +73,6 @@ PR をすべて人がマージした：input-devices#18（`773f81e48`）、compa
 ## Residual Risks / Follow-ups
 
 - `migrate.py`：Scope が0件のリポジトリで `verify` が失敗で終わる。500件の待ちに表示がない。往復で、前から切れたリンクの書き方が変わる。いずれも移行を止めない。
+- `migrate.py`：仕様のツリーの外から仕様を指すリンクを書き換えない（今回は手で直した）。`cut` が足す `spec-dock-check.yml` は、PR と push で、ホストの runner（`ubuntu-latest`）で動くので、費用の決まりのあるリポジトリでは手で合わせる必要があった。
+- SpecDock：カタログが `.DS_Store` を保存する（利用者の全体の除外が効いていない）。
 - SpecDock：`installation update` は `.claude/skills/spec-dock*` の写しを外すが、`.agents/skills` への相対リンクを作らない。ルートの `.gitignore` の `.workbench/` で、雛形の `templates/cue/*/.workbench/README.md` がコミットから漏れる。
