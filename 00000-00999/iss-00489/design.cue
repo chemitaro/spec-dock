@@ -25,6 +25,7 @@ design: {
 			- 評価の誤り：「<ファイル> の <項目> を、仕様の型に合うように直す。誤りの原文は cue_message と positions にある。」
 			- 型だけが場所を示す誤り：「Scope の CUE の文書（<Scope>/*.cue）に <項目> を書くか直して、仕様の型に合わせる。SpecDock の型（<ファイル>）は直さない（誤りの原文は cue_message にある）。」
 			- `schema`：「requirement.cue に schema: \"specdock/v1\" を書く（型の版は、このファイルだけから読む）。」
+			- 項目もファイルも分からない誤り（文法の誤りなど）：「Scope の CUE の文書の誤りを、仕様の型に合うように直す。誤りの原文は cue_message にある。」
 			"""
 		satisfies: ["R-02"]
 	}
@@ -52,12 +53,12 @@ design: {
 	}
 	"D-06": {
 		title: "ガイドと参照"
-		text:  "`cue.md` に `SPEC_NO_TESTS` の行と `--design-system inline` を、`reference_cli.md` の `scope render` に引数を書き、dogfood の写しと目録を直す。"
+		text:  "`cue.md` に `SPEC_NO_TESTS` の行と `--design-system inline` を、`reference_cli.md` の `scope render` に引数を、`canonical.md` の「エラーと次の1手」の `DESIGN_SYSTEM_MISSING` に `--design-system inline` のときの誤り（終了コード3）を書き、dogfood の写しと目録を直す。"
 		satisfies: ["R-04", "R-05"]
 	}
 	"D-07": {
 		title: "回帰の確かめ"
-		text:  "今の回帰テストを保ち、件数が変わる `status: \"nope\"` のテストだけを、新しい件数（1件）と `cue_related` を確かめる形に書き換える（意図は強める）。"
+		text:  "今の回帰テストを保つ。書き換えるのは2つだけ：件数が変わる `status: \"nope\"` のテスト（単体と CLI）を、新しい件数（1件）と `cue_related` を確かめる形に、英語の `do not edit` を確かめる型だけの場所のテストを、同じ意図（項目と Scope の文書を名指し、型を直さないと書く）の日本語の確かめに。どちらも意図を弱めない。"
 		satisfies: ["F-02"]
 	}
 }

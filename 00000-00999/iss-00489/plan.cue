@@ -5,13 +5,13 @@ package spec
 goal: "5つの提案を実装し、マージできる PR で止める。"
 
 steps: {
-	"S-01": {title: "CUE の仕様を書き、`scope check` と仕様のレビューを通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "doing", session: "impl"}
-	"S-02": {title: "選言の誤りをまとめる（テスト先行）", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-01": {title: "CUE の仕様を書き、`scope check` と仕様のレビューを通す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "done", session: "impl"}
+	"S-02": {title: "選言の誤りをまとめる（テスト先行）", realizes: ["R-01"], status: "doing", after: ["S-01"], session: "impl"}
 	"S-03": {title: "`CUE_INVALID` の `hint` を日本語にする（テスト先行）", realizes: ["R-02"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-04": {title: "Issue の雛形の手順の例、写し、目録、置き換えのテスト", realizes: ["R-03"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-05": {title: "警告 `SPEC_NO_TESTS`（テスト先行）", realizes: ["R-04"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-06": {title: "`scope render --design-system inline`（テスト先行）とブラウザーでの確かめ", realizes: ["R-05", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-07": {title: "`cue.md`、`reference_cli.md`、写し、目録", realizes: ["R-04", "R-05"], status: "todo", after: ["S-05", "S-06"], session: "impl"}
+	"S-07": {title: "`cue.md`、`reference_cli.md`、`canonical.md`、写し、目録", realizes: ["R-04", "R-05"], status: "todo", after: ["S-05", "S-06"], session: "impl"}
 	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI、`report.md`", realizes: ["F-02"], status: "todo", after: ["S-02", "S-03", "S-04", "S-07"], session: "impl"}
 }
 
@@ -19,8 +19,8 @@ tests: {
 	"T-01": {title: "`status: \"doin\"` で `CUE_INVALID` が1件、out of bound を含み、`cue_related` に衝突の行がある", verifies: ["R-01"]}
 	"T-02": {title: "リポジトリの型の既定値つき列挙の項目でも1件になる", verifies: ["R-01"]}
 	"T-03": {title: "必須の項目がない誤りの件数と中身が今と同じ（`cue_related` がない）", verifies: ["R-01", "F-02"]}
-	"T-04": {title: "どの `CUE_INVALID` の `hint` も日本語で、英語の文がない（評価、型だけの場所、`schema`）", verifies: ["R-02"]}
-	"T-05": {title: "雛形の例の並び、例を外した Scope の検査、写しと目録のハッシュ", verifies: ["R-03"]}
+	"T-04": {title: "どの `CUE_INVALID` の `hint` も日本語で、英語の文がない（評価、型だけの場所、`schema`、項目のない文法の誤り）", verifies: ["R-02"]}
+	"T-05": {title: "雛形の例の並び、例の行が型 `#Step` に合うこと、写しと目録のハッシュ", verifies: ["R-03"]}
 	"T-06": {title: "今の版の雛形を持つ利用側の `installation update` が新しい版に置き換える", verifies: ["R-03"]}
 	"T-07": {title: "light の Issue でテストがないと警告 `SPEC_NO_TESTS`、ほかの場合は出ない", verifies: ["R-04"]}
 	"T-08": {title: "`cue.md` の表のコードが検査のコードと一対一に合う（`SPEC_NO_TESTS` を含む）", verifies: ["R-04"]}

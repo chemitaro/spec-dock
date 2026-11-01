@@ -27,7 +27,7 @@ includes: [
 	"`scope check` の `CUE_INVALID` の組み立て（`src/spec_dock/runtime/application/scope_check.py`）",
 	"配布する CUE の雛形 `templates/cue/issue/plan.cue` と dogfood の写し、`static-inventory.json`",
 	"`scope render` の引数と、描画の入口（契約 K5）への既定値つきのキーワード引数",
-	"`cue.md`、`reference_cli.md` の該当の記述と、その dogfood の写し、目録のハッシュ",
+	"`cue.md`、`reference_cli.md`、`canonical.md` の該当の記述と、その dogfood の写し、目録のハッシュ",
 ]
 
 excludes: [
@@ -69,7 +69,7 @@ requirements: {
 			"""
 		acceptance: [
 			"配布する雛形の手順の例の行で、`title:`、`realizes:`、`status:` がこの順に並ぶ",
-			"雛形から作った Scope の `plan.cue` で、例のコメントを外すと `scope check` が誤りなく通る",
+			"雛形の手順の例の行（`//` を外した中身）を、型 `specdock/v1` の `#Step` と一緒に `cue` で評価すると誤りがない",
 			"dogfood の写しが配布する雛形とバイトで一致し、目録の `sha256` が合い、`known_old_sha256` に今の版のハッシュがある",
 			"今の版の雛形を持つ利用側で `installation update` を実行すると、新しい版に置き換わる",
 		]
