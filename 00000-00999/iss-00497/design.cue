@@ -19,7 +19,7 @@ design: {
 	}
 }
 
-compatibility: "利用側の見た目の変化は、`.workbench/` の無視の下でも雛形の README が追跡の対象になることだけ。バイトが変わるので `installation update` が更新を提案する。版は上げず、0.5.0 の「更新」の節に書く内容は report.md に残す。"
+compatibility: "`spec-dock/` の下の雛形以外の `.workbench/README.md` も同じ規則で追跡の対象になる（従来の意図どおり）。利用側の見た目の変化は、`.workbench/` の無視の下でも雛形の README が追跡の対象になることだけ。バイトが変わるので `installation update` が更新を提案する。版は上げず、0.5.0 の「更新」の節に書く内容は report.md に残す。"
 risks: [
 	"採らなかった案：置き場の名前を変える案は、`scope create` の雛形の写し方と既存の利用側の README に響く。`installation update` の警告は、利用者が `git add -f` する手間を残し、問題の原因を直さない。",
 	"`!**/.workbench/` は `spec-dock/` の下のすべての `.workbench/` を戻すが、中身は `**/.workbench/*` で無視されたままなので、README 以外は追跡されない。",
