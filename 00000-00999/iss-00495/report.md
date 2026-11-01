@@ -16,4 +16,11 @@ ID: "iss-00495"
 
 ## Verification
 
+- 仕様レビュー（opus/medium）：2周で P0〜P3 なし。
+- コードレビュー（sonnet/high）：P0〜P3 なし。
+- 最終品質ゲート（opus/high）：コミット 2fb140a1b、レビュー pass（P0/P1/P2/P3 = 0）。`make lint` と `uv run pytest`（4052 passed, 8 skipped）が同じコミットで成功。
+- 追加のテスト：`tests/integration/migration/test_migrate_plan.py::test_the_readme_documents_the_gaps_found_in_the_i12_cutover`。
+
 ## Residual Risks / Follow-ups
+
+- コードは直していない（道具は 0.5.0 の撤去で消える）。ツリーの外のリンクの手での戻しは、README の手順に従う。
