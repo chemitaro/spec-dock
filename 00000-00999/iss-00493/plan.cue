@@ -17,7 +17,7 @@ tests: {
 	"T-02": {title: "カタログに `.DS_Store`、`Thumbs.db`、`._x.md` と普通のファイルを置いて同期を2回実行すると、GitHub のツリーに普通のファイルだけが入り、`canonical status` の `unsaved` が 0（`tests/cli_runtime/test_issue430_canonical_sync.py`）", verifies: ["R-01", "R-03"]}
 	"T-03": {title: "ツリーに `.DS_Store` があるとき `canonical status` の `changes` が `problem` で `junk_files` と次の1手を示し、消して同期すると削除が保存されて指摘が消える（`tests/cli_runtime/test_issue429_canonical_status.py`）", verifies: ["R-02"]}
 	"T-04": {title: "Scope の場所に未追跡の `.DS_Store` だけがあるとき、`_unsaved_places` が未保存と見ない（`tests/cli_runtime/` の work finish のテスト）", verifies: ["R-03"]}
-	"T-05": {title: "保存済みの不要なファイルの削除25件は `classify_holds` で保留にならない（単体）。ほかのファイルの削除25件は今までどおり保留になる", verifies: ["R-04"]}
+	"T-05": {title: "保存済みの不要なファイルの削除25件は `classify_holds` で保留にならない（単体）。ほかのファイルの削除25件は今までどおり保留になる。同期で、保存済みの `.DS_Store` 25件を消すと保留にならず削除が push される（`tests/cli_runtime/test_issue430_canonical_sync.py`）", verifies: ["R-04"]}
 	"T-06": {title: "未追跡の `.DS_Store` が残るカタログで `canonical remove` が `CANONICAL_IGNORED_FILES_PRESENT` でパスを名指し、何も消さない", verifies: ["F-01"]}
 	"T-07": {title: "提供側の文書と dogfood の写しが同じで、`static-inventory.json` の sha256 が合う（既存の配布資産のテスト）", verifies: ["R-01", "R-02"]}
 }
