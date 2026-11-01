@@ -360,7 +360,7 @@ I-1 ─┬─ I-2 ─┬─ I-3 ─┐
 - **担当**：統括のエージェントが、利用者の目の前で行う。
 - **対象**（`requirement.md` R-J1、`design.md` Current の「利用者のリポジトリ」）：input-devices、company-os、housing-lifecycle、taikyohiyou_project（退去費用プロダクト）。本番はこの順に行う。
 - **準備**（I-10 の切り替えのPRのマージの後に始め、I-10 の後の運用と並べてよい。どれも今の運用を止めない）：
-  1. 各リポジトリで、`spec-dock installation update` で配布資産を 0.3.0 に上げ、同じPRで、今のCIが入れる SpecDock の固定の版をタグ `v0.3.0` に上げる（`design.md` 11章）。PRの検査が通ったことを確かめ、人がマージする（従来モードのまま）。
+  1. 各リポジトリで、`spec-dock installation update` で配布資産を 0.4.1 に上げ、同じPRで、今のCIが入れる SpecDock の固定の版をタグ `v0.4.1` に上げる（`design.md` 11章）。もとは 0.3.0 だったが、2026-11-01 に利用者が、先に 0.4.1 を出してそれを入れると決めた（0.4.x も版3のリポジトリを従来モードで扱い、`.md` の雛形を残す）。PRの検査が通ったことを確かめ、人がマージする（従来モードのまま）。
   2. 各リポジトリで `migrate.py plan --project <mainのチェックアウト>` を実行し、異常、SpecDock を呼ぶCIの手順、作業用のworktreeとその仕様の変更を確かめ、異常の扱いを決めて報告書に書く。
   3. 各リポジトリで `register --apply` と `verify` を行う（4つで合わせて数時間の見込み。spec-dock の約620回で1.5時間が目安）。
   4. 各リポジトリで、予行演習（`design.md` 11章）を通し、結果を報告書に書く。平らにする写しで書き換えられないリンクが0件であることを確かめる（I-15）。taikyohiyou_project の `resolve_staging_route.py` と `Makefile` の `spec-close` が、切り替えの後も動くことを、予行演習のクローンで確かめる。

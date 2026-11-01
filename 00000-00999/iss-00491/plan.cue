@@ -14,13 +14,18 @@ package spec
 // すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
 // strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "版を 0.4.1 にする", realizes: ["R-01"], status: "todo"}
+	"S-02": {title: "migration.md に節を足す", realizes: ["R-02"], status: "todo"}
+	"S-03": {title: "在庫とテストを直す", realizes: ["R-03"], status: "todo", after: ["S-01", "S-02"]}
+	"S-04": {title: "README を直す", realizes: ["R-04"], status: "todo"}
 }
 
 // テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
 // standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "版の値が 0.4.1 でそろう", verifies: ["R-01"]}
+	"T-02": {title: "0.4.0 の配布資産が installation update で上がる", verifies: ["R-03"]}
+	"T-03": {title: "migration.md の節に要点が入る", verifies: ["R-02"]}
 }
 
 // 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。

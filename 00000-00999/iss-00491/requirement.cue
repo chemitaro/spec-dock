@@ -25,11 +25,22 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "版が 0.4.1 になる"
+		text:  "`pyproject.toml`、`uv.lock`、配布する版のファイル `system/spec-dock-version` とその dogfood の写しが 0.4.1 になる。"
+	}
+	"R-02": {
+		title: "上げるときの文書が 0.4.1 の変更を説明する"
+		text:  "`migration.md` に「## 0.4.1 への更新」の節があり、#488 と #490 の要点、`installation update`、CLI の契約の変更を述べる。"
+	}
+	"R-03": {
+		title: "0.4.0 の配布資産を持つリポジトリが `installation update` で上がる"
+		text:  "`static-inventory.json` が今のバイトのハッシュと、0.4.0 のバイトを既知の古い版として持つ。"
+	}
+	"R-04": {
+		title: "撤去の版の古い記述が直る"
+		text:  "移行の道具の README の「撤去（0.4.0）の後」が、撤去の版 0.5.0 に合う。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
