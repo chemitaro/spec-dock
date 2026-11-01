@@ -57,6 +57,54 @@ _COMMON_VALUES = {
     "--timeout": "timeout",
     "--color": "color",
 }
+_NO_OFFLINE_LEAVES = frozenset({"canonical sync", "canonical resume"})
+_LOCK_TIMEOUT_LEAVES = frozenset({"work start", "branch switch"})
+# Shown under each leaf's `common options`; parse_vnext strips these before argparse, so they only describe.
+_COMMON_HELP: tuple[tuple[tuple[str, ...], str | None, str], ...] = (
+    (("--json",), None, "print one JSON envelope (implies --non-interactive)"),
+    (("--non-interactive",), None, "never prompt"),
+    (("--yes", "-y"), None, "skip the CLI confirmation; guards still apply"),
+    (("--dry-run",), None, "plan only; change nothing"),
+    (("--offline",), None, "do not contact GitHub; use saved observations"),
+    (("--project",), "ROOT", "the exact worktree root to use"),
+    (("--expect-current",), "TARGET", "stop unless the direct selection is TARGET"),
+    (("--expect-backend",), "{github,local}", "stop unless the target Scope's backend matches"),
+    (("--lock-timeout",), "SECONDS", "wait up to SECONDS for the Start lock (default 5)"),
+    (("--timeout",), "SECONDS", "time limit for external calls"),
+    (("--color",), "{auto,always,never}", "text color mode"),
+)
+
+
+def accepts_common_option(leaf: str, name: str) -> bool:
+    """Whether `leaf` accepts the common option `name`; parse_vnext refuses the others."""
+    if name in ("--yes", "-y"):
+        return leaf in MUTATING_LEAF_PATHS
+    if name == "--dry-run":
+        return leaf not in _NO_PLAN_LEAVES
+    if name == "--offline":
+        return leaf not in _NO_OFFLINE_LEAVES
+    if name == "--lock-timeout":
+        return leaf in _LOCK_TIMEOUT_LEAVES
+    return name in _COMMON_SWITCHES or name in _COMMON_VALUES
+
+
+def _default_timeout(leaf: str) -> float:
+    return 300.0 if leaf == "worktree bootstrap" else 30.0
+
+
+def _add_common_help(parser: argparse.ArgumentParser, leaf: str) -> None:
+    group = parser.add_argument_group("common options")
+    for names, metavar, text in _COMMON_HELP:
+        if not accepts_common_option(leaf, names[0]):
+            continue
+        options: dict[str, Any] = {"dest": f"_common_{names[0][2:].replace('-', '_')}", "default": argparse.SUPPRESS}
+        if metavar is None:
+            options["action"] = "store_true"
+        else:
+            options["metavar"] = metavar
+        if names[0] == "--timeout":
+            text += f" (default {_default_timeout(leaf):g})"
+        group.add_argument(*names, help=text, **options)
 
 
 SOURCE_LEAVES = frozenset({"dependency check", "workspace sync"})
@@ -232,6 +280,7 @@ def build_vnext_parser() -> argparse.ArgumentParser:
         parents[parts].set_defaults(command_path=leaf)
         for argument in LEAF_ARGUMENTS[leaf]:
             parents[parts].add_argument(*argument.names, **argument.options)
+        _add_common_help(parents[parts], leaf)
         help_spec = HELP_SPECS[leaf]
         sections = (
             ("Target", help_spec.target),
@@ -471,10 +520,10 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
             parser.error("--detach applies only with --loop")
         if parsed.state_root is not None and not Path(parsed.state_root).is_absolute():
             parser.error("--state-root requires an absolute path")
-    if parsed.command_path in _NO_PLAN_LEAVES and common.get("dry_run"):
+    if not accepts_common_option(parsed.command_path, "--dry-run") and common.get("dry_run"):
         # These leaves have no planning mode; refusing is safer than silently saving, pushing or restoring.
         parser.error(f"{parsed.command_path} has no --dry-run; spec-dock canonical status shows the current state")
-    if parsed.command_path in ("canonical sync", "canonical resume") and common.get("offline"):
+    if not accepts_common_option(parsed.command_path, "--offline") and common.get("offline"):
         parser.error(f"{parsed.command_path} needs origin; it has no --offline mode")
     if parsed.command_path == "canonical resume" and parsed.adopt_remote and parsed.push_local:
         parser.error("canonical resume takes one of --adopt-remote or --push-local")
@@ -486,17 +535,15 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         # Legacy handlers keep receiving `local` by default; canonical mode refuses only an explicit `local`.
         parsed.source_explicit = parsed.source is not None
         parsed.source = parsed.source or "local"
-    if parsed.command_path not in MUTATING_LEAF_PATHS and common.get("yes"):
+    if not accepts_common_option(parsed.command_path, "--yes") and common.get("yes"):
         parser.error("--yes applies only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):
         setattr(parsed, key, common.get(key, False if key in _COMMON_SWITCHES.values() else None))
-    if parsed.command_path not in ("work start", "branch switch") and parsed.lock_timeout is not None:
+    if not accepts_common_option(parsed.command_path, "--lock-timeout") and parsed.lock_timeout is not None:
         parser.error("--lock-timeout applies only to work start and branch switch")
     parsed.non_interactive = bool(parsed.non_interactive or parsed.json)
     parsed.lock_timeout = 5.0 if parsed.lock_timeout is None else parsed.lock_timeout
-    parsed.timeout = (
-        (300.0 if parsed.command_path == "worktree bootstrap" else 30.0) if parsed.timeout is None else parsed.timeout
-    )
+    parsed.timeout = _default_timeout(parsed.command_path) if parsed.timeout is None else parsed.timeout
     return parsed
 
 

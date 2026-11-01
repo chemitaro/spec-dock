@@ -298,3 +298,55 @@ def test_native_completion_only_offers_applicable_options(
     choices = _native_completion(capsys.readouterr().out, shell, ["spec-dock", *words])
     assert required <= choices
     assert not forbidden & choices
+
+
+def _common_options(text: str) -> set[str]:
+    """The option names listed under the leaf help's `common options` group."""
+    section = text.split("\ncommon options:\n", 1)[1].split("\n\n", 1)[0]
+    names: set[str] = set()
+    for line in section.splitlines():
+        if line.startswith("  -"):
+            invocation = line.strip().split("  ", 1)[0]
+            names.update(part.split()[0] for part in invocation.split(", "))
+    return names
+
+
+def test_a_leaf_help_lists_the_common_options_it_accepts(tmp_path: Path) -> None:
+    text = json.loads(_run(tmp_path, "help", "scope", "create", "issue", "--json").stdout)["data"]["text"]
+    assert {"--json", "--offline", "--timeout", "--yes", "-y", "--dry-run", "--project"} <= _common_options(text)
+    read_only = json.loads(_run(tmp_path, "help", "scope", "check", "--json").stdout)["data"]["text"]
+    assert "--yes" not in _common_options(read_only) and "--json" in _common_options(read_only)
+
+
+_COMMON_SAMPLES = {
+    "--json": [],
+    "--non-interactive": [],
+    "--yes": [],
+    "-y": [],
+    "--dry-run": [],
+    "--offline": [],
+    "--project": ["/absolute/project"],
+    "--expect-current": ["iss-00001"],
+    "--expect-backend": ["github"],
+    "--lock-timeout": ["1"],
+    "--timeout": ["1"],
+    "--color": ["never"],
+}
+
+
+def _accepts(words: list[str]) -> bool:
+    try:
+        with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+            parse_vnext(words)
+    except SystemExit:
+        return False
+    return True
+
+
+def test_every_leaf_help_lists_exactly_the_common_options_its_parse_accepts(tmp_path: Path) -> None:
+    for leaf in LEAF_PATHS:
+        text = json.loads(_run(tmp_path, "help", *leaf.split(), "--json").stdout)["data"]["text"]
+        example = shlex.split(HELP_SPECS[leaf].examples)[1:]
+        bare = [word for word in example if word not in _COMMON_SAMPLES]
+        accepted = {name for name, value in _COMMON_SAMPLES.items() if _accepts([*bare, name, *value])}
+        assert _common_options(text) == accepted, leaf

@@ -30,7 +30,7 @@ CUE の Scope では、Planning Level が保証レベル（Assurance Level）に
 - 途中で書き換えてよく、`spec-dock scope show <ID> --json` の `assurance` で読めます。
 - 計画は `plan.cue` の手順（`steps`）とテスト（`tests`）で、作業しながら `status` を更新する台帳です。
 
-詳しくは [CUE Authoring Guide](cue.md) にあります。Markdown の Scope では、下の Planning Level の書き方が残ります。
+詳しくは [CUE Authoring Guide](cue.md) にあり、人向けの説明資料（`explanation.html`）の書き方は [Explanation Guide](explanation.md) にあります。Markdown の Scope では、下の Planning Level の書き方が残ります。
 
 ## Planning Levelの選び方
 

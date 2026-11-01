@@ -122,10 +122,12 @@
     {
       "path": "spec-dock/docs/authoring/cue.md",
       "source": "spec_dock/docs/authoring/cue.md",
-      "sha256": "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e",
+      "sha256": "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e"
+      ]
     },
     {
       "path": "spec-dock/docs/authoring/design.md",
@@ -188,11 +190,12 @@
     {
       "path": "spec-dock/docs/authoring/issue-plan.md",
       "source": "spec_dock/docs/authoring/issue-plan.md",
-      "sha256": "d367d709e9b587e9705d4a967a0ec991bdffffd9df7d234def95797bba07e916",
+      "sha256": "cc5ed1eeb3f5abcaf49b825a76d55283bd1aac321e6c7648a706b6107341d2bf",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "4b4d6ac04307fb960dccc8d7e7a9392a76cce08237b55c268a7f7efeaeb1ca27"
+        "4b4d6ac04307fb960dccc8d7e7a9392a76cce08237b55c268a7f7efeaeb1ca27",
+        "d367d709e9b587e9705d4a967a0ec991bdffffd9df7d234def95797bba07e916"
       ]
     },
     {
@@ -227,11 +230,12 @@
     {
       "path": "spec-dock/docs/authoring/scope-layering.md",
       "source": "spec_dock/docs/authoring/scope-layering.md",
-      "sha256": "acc12dcae73c3e6a69a6cccb898c2c413ffa4c0e0c4930ddd0d4b13fa5dc84e8",
+      "sha256": "536cbe99fecc47240fcb9fe1916f4d41b451ac12f8238815d4bd6f57b7ed70ac",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "0be56200566b2fa5f6e6bb84c82c7c876e8585d397de74c5773fc5c91a20e724"
+        "0be56200566b2fa5f6e6bb84c82c7c876e8585d397de74c5773fc5c91a20e724",
+        "acc12dcae73c3e6a69a6cccb898c2c413ffa4c0e0c4930ddd0d4b13fa5dc84e8"
       ]
     },
     {
