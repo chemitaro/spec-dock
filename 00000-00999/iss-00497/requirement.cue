@@ -15,8 +15,8 @@ assurance: {
 }
 
 // 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "配布する雛形 `spec-dock/templates/cue/{epic,initiative,issue}/.workbench/README.md` が、利用側のルートの `.gitignore` の `.workbench/` に隠されて、コミットから漏れないようにする。"
+background: "I-12 の準備で、input-devices、company-os、housing-lifecycle の `installation update` が置いたこの3つのファイルが、ルートの `.gitignore` の `.workbench/` で無視され、`git add -f` で足す必要があった（spec-dock のリポジトリでも同じ扱い）。コミットされないと、ほかのクローンの `scope create` の雛形が欠ける。"
 
 // 対象と対象外（任意）。
 // includes: ["..."]
@@ -25,11 +25,10 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "雛形がルートの `.workbench/` の無視に隠されない"
+		text:  "雛形の置き場を無視されない名前に変える、`spec-dock/.gitignore` に `!` の行を足す、または `installation update` が無視されたファイルを警告する、のどれかで、利用側のコミットから漏れなくなる。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。

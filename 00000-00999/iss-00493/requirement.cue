@@ -15,8 +15,8 @@ assurance: {
 }
 
 // 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "macOS の `.DS_Store` などの OS が作る不要なファイルを、カタログの同期が `spec-dock/canonical` に保存しないようにする。"
+background: "2026-11-01 の I-12（#439）で、taikyohiyou の `move-local` が移した `spec-dock/initiatives/init-01808-…/.DS_Store` を、定期の同期が保存して GitHub に push した（`d0a643a`。手で消して `4b15af0` で保存し直した）。移行の前は、利用者の Git の全体の除外で無視されていた。カタログの Git の呼び出しは設定を切り離して動くため、全体の除外が効かないと考えられる（未確認）。"
 
 // 対象と対象外（任意）。
 // includes: ["..."]
@@ -25,11 +25,16 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "OS の不要なファイルを保存しない"
+		text:  "カタログで `.DS_Store`（ほかに `Thumbs.db` など、決めた一覧）ができても、同期はそれを保存せず、push もしない。"
+		acceptance: ["カタログに `.DS_Store` を置いて同期を2回実行しても、`spec-dock/canonical` のツリーに `.DS_Store` が入らないことがテストで観測できる"]
+	}
+	"R-02": {
+		title: "すでに保存された不要なファイルの扱いが分かる"
+		text:  "`canonical status` か `canonical check` が、カタログのツリーにある OS の不要なファイルを示し、消し方を案内する。"
+		acceptance: ["ツリーに `.DS_Store` を持つカタログで、指摘と次の1手が出ることがテストで観測できる"]
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。

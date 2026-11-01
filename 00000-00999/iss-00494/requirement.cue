@@ -15,8 +15,8 @@ assurance: {
 }
 
 // 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "`canonical check` の CI の見本（`spec-dock/docs/ci/spec-dock-check.yml`）と案内に、ホストの runner の費用と、リポジトリの決まりに合わせて起動の条件と runner を変えてよいことを書く。"
+background: "I-12（#439）で、`migrate.py cut` が見本どおり PR と push で `ubuntu-latest` に動く `spec-dock-check.yml` を足した。housing-lifecycle（判断 S72：CI は手動の起動だけ、push の前は pre-push hook）と taikyohiyou（手元の VM の runner への振り分け、費用の見張りが `ci.yml` を名前で参照）では、そのままでは決まりに反するので、手で合わせた。"
 
 // 対象と対象外（任意）。
 // includes: ["..."]
@@ -25,11 +25,10 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "見本と案内が費用と合わせ方を述べる"
+		text:  "見本の注記と `spec-dock/docs/canonical.md`（または CI の案内）が、ホストの runner の費用、起動の条件と runner を変えてよいこと、push の前の hook で同じ `spec-dock canonical check --json` を回す形を述べる。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
