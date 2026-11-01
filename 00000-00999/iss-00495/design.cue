@@ -14,12 +14,12 @@ design: {
 	}
 	"D-02": {
 		title:     "共通の決まりへの3つの注意"
-		text:      "「共通の決まり」の終了コードの後に、Scope が0件の `verify`（exit 2、異常ではない）、`WRITES_PER_HOUR`（500件、表示なしに最大1時間待つ）、往復で前から切れたリンクの書き方が変わることを箇条書きで足す。"
+		text:      "「共通の決まり」の終了コードの後に、Scope が0件の `verify`（exit 2、異常ではない）、`WRITES_PER_HOUR`（500件、表示なしに最大1時間待つ）、往復で前から切れたリンクの書き方が変わること（開く先はどちらも存在しない）を箇条書きで足す。あわせて、「入れ子への戻し方」の「字面が元に戻らないのは…3種類だけ」の文に、前から切れたリンクは書き方が変わりうる旨を一言足し、README の中で記述が食い違わないようにする。"
 		satisfies: ["R-02"]
 	}
 	"D-03": {
 		title:     "README の語を縛るテスト"
-		text:      "既存の README のテスト（`tests/integration/migration/test_migrate_plan.py`）に近い形で、要る語（`WRITES_PER_HOUR`、`no commit with schema-3 metadata was found`、ツリーの外のリンク）が README にあることを確かめるテストを足す。"
+		text:      "既存の README のテスト（`tests/integration/migration/test_migrate_plan.py`）に近い形で、要る語（`WRITES_PER_HOUR`、`no commit with schema-3 metadata was found`、ツリーの外のリンク、前から切れたリンク）が README にあることを確かめるテストを足す。"
 		satisfies: ["R-01", "R-02"]
 	}
 }
