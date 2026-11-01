@@ -14,7 +14,7 @@ design: {
 	}
 	"D-02": {
 		title:     "canonical.md に費用と pre-push の形を足す"
-		text:      "「既定のブランチの検査」に節を足し、見本の動きが既定であること、費用と合わせ方、push の前の hook（例 `.githooks/pre-push`）で同じ `spec-dock canonical check --json` を回す形を述べる。配布資産と dogfood の写しを同じ内容にし、static-inventory.json のハッシュを更新して前の版を known_old_sha256 に足す。"
+		text:      "「既定のブランチの検査」に節を足し、見本の動きが既定であること、費用と合わせ方、push の前の hook（例 `.githooks/pre-push`）で同じ `spec-dock canonical check --json` を回す形を述べる。配布資産と dogfood の写しを同じ内容にし、scripts/migrate-to-canonical/migrate.py の WORKFLOW_SAMPLE_BYTES（見本のバイトの写し。テストが一致を縛る）にも同じ注記を足し、static-inventory.json のハッシュを更新して前の版を known_old_sha256 に足す。"
 		satisfies: ["R-01"]
 	}
 }

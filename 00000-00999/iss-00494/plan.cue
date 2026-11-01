@@ -3,9 +3,9 @@ package spec
 goal: "見本と案内に費用と合わせ方を書き、既存のテストと配布資産の整合を保つ"
 
 steps: {
-	"S-01": {title: "文書テストを先に書く（Red）", realizes: ["R-01"], status: "todo"}
-	"S-02": {title: "見本に注記を足し、canonical.md に節を足す。dogfood の写しも直す", realizes: ["R-01"], status: "todo", after: ["S-01"]}
-	"S-03": {title: "static-inventory.json のハッシュと known_old_sha256 を更新する", realizes: ["R-01"], status: "todo", after: ["S-02"]}
+	"S-01": {title: "文書テストを先に書く（Red）", realizes: ["R-01"], status: "done"}
+	"S-02": {title: "見本に注記を足し、canonical.md に節を足す。dogfood の写しと migrate.py の WORKFLOW_SAMPLE_BYTES も直す", realizes: ["R-01"], status: "done", after: ["S-01"]}
+	"S-03": {title: "static-inventory.json のハッシュと known_old_sha256 を更新する", realizes: ["R-01"], status: "done", after: ["S-02"]}
 }
 
 tests: {
