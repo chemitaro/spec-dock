@@ -35,19 +35,37 @@ requirements: {
 		text:  "`canonical status` か `canonical check` が、カタログのツリーにある OS の不要なファイルを示し、消し方を案内する。"
 		acceptance: ["ツリーに `.DS_Store` を持つカタログで、指摘と次の1手が出ることがテストで観測できる"]
 	}
+	"R-03": {
+		title: "OS の不要なファイルを未保存と数えない"
+		text:  "保存しない OS の不要なファイルが残っていても、`canonical status` の未保存の数に入らず、`work finish` の保存の確かめを止めない（Finder が Scope のフォルダーに `.DS_Store` を作るたびに、終了が `CANONICAL_SAVE_UNCONFIRMED` で止まらない）。"
+		acceptance: [
+			"カタログに `.DS_Store` だけがあるとき、`canonical status` の `changes.unsaved` が 0 であることがテストで観測できる",
+			"Scope のディレクトリに `.DS_Store` だけがあるとき、`work finish` の保存の確かめが、その場所を未保存と見ないことがテストで観測できる",
+		]
+	}
+	"R-04": {
+		title: "すでに保存された不要なファイルの削除は、大量の削除の保留に数えない"
+		text:  "R-02 の案内に従って OS の不要なファイルをまとめて消しても、大量の削除の保留（`mass_delete`）にならず、次の同期が削除を保存する。"
+		acceptance: ["保存済みの `.DS_Store` を25個消しても保留にならず、削除が保存されることがテストで観測できる"]
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
 // title は必須。impact（起きたときの影響）と recovery（回復のしかた）は strict 以上で必須。
 failures: {
-	// "F-01": {
-	// 	title:    "〜のときは、何も書かずに止まる"
-	// 	impact:   "〜"
-	// 	recovery: "〜"
-	// }
+	"F-01": {
+		title:    "保存しない不要なファイルが残るカタログは、`canonical remove` が何も消さずに止まる"
+		text:     "保存しないファイルは未保存と数えないので、`git worktree remove` が失敗する前に、消してしまうファイルとして名指して止まる。"
+		impact:   "止まらないと、リンクや登録を消した後で `git worktree remove` が失敗し、中途の状態が残る"
+		recovery: "示したファイルを消すかカタログの外へ移し、同じコマンドをもう一度実行する"
+	}
 }
 
 // 制約・前提、合意した判断、未解決事項（任意）。
-// constraints: ["..."]
-// decisions: ["..."]
-// questions: ["..."]
+constraints: [
+	"利用者の5つの既存のカタログ（spec-dock、input-devices、company-os、housing-lifecycle、taikyohiyou_project）でも、パッケージを更新するだけで効く（カタログのファイルを書き換える手順を要さない）",
+	"カタログのルートのファイル（形式1の `CANONICAL_ROOT_FILES`）は変えない",
+]
+decisions: [
+	"R-03、R-04、F-01 は、実装担当が設計の中で見つけて足した（同期の規則で除外すると、未保存の数、`work finish`、`canonical remove`、削除の保留に影響が及ぶため）。理由は report.md にある",
+]
