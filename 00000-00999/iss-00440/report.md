@@ -568,6 +568,13 @@ ID: "iss-00440"
 | `tests/integration/test_cli_docs_vnext.py::test_documented_scope_selector_boundary_is_readonly` | rewritten | `tests/cli_runtime/test_issue440_g5_docs_examples.py::test_documented_scope_selector_boundary_is_readonly` | 通る | CanonicalWorld: same 3 valid / 2 invalid selectors (exit 0 / 3), effects [], files unchanged. Legacy asserted no GitHub call at all; canonical reads fetch the structure snapshot, so the test asserts no GitHub writes instead. |
 | `tests/integration/test_cli_docs_vnext.py::test_root_import_example_includes_repository_and_executes` | rewritten | `tests/cli_runtime/test_issue440_g5_docs_examples.py::test_root_import_example_includes_repository_and_executes` | 通らない | WriteWorld: the guide import line runs (epic-00124), and with the label/parent already in place writes nothing to GitHub. Dropped the legacy-doc phrase assertion "新規`--backend local`作成はできません". Base fails for the same asset-seeding reason as |
 
+### PR と CI
+
+- PR：https://github.com/chemitaro/spec-dock/pull/505（base `main`、head `chemitaro/iss-00440`、`Refs #440`・`Refs #424`）。
+- 1回目の CI（head `055d2d2f6`）：Provider CI の「Provider distribution parity」が失敗（`ERROR: file or directory not found: tests/integration/test_issue413_e2e.py`。この PR で消したテストを `.github/workflows/provider-ci.yml` のステップが指していた）。ほかの SpecDock check と Commit identity は成功。
+- 直し：コミット `73d0ebefd`（`ci: CIからIssue 413のE2Eテストを除外する`）。消したファイルの参照だけをステップから外した。ローカルで、そのステップのテストとワークフローを確かめるテスト（`test_provider_distribution.py`、`test_cli_entrypoint_vnext.py`、`test_issue413_wheel.py`、`test_issue413_assets.py`、`test_provider_ci_cue.py`、`test_issue454_runner_gate.py`）が 139 passed。最終品質ゲートの合格は `055d2d2f6` で、`73d0ebefd` は CI の設定だけを変える（runtime・テスト・資産は変わらない）。
+- 2回目の CI（head `73d0ebefde1e59cd3c5539d8b96d461261f7ea55`、2026-11-02T08:21:09Z）：SpecDock check（run 41411013109）、Commit identity（41411013051、push 41411006242）、Provider CI（41411013081：route、distribution parity ubuntu・macos、provider-tests）がすべて success。GitHub は OPEN・draft でない・MERGEABLE・CLEAN。観測は Actions と Commit Status に限る（外部の CheckRun は数えていない）。
+
 ## Residual Risks / Follow-ups
 
 ### 後続の候補（統括が Issue にする）
