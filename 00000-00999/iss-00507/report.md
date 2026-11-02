@@ -39,7 +39,7 @@ ID: "iss-00507"
 - テスト先行：足した4件が直す前に、今の誤った報告（`selection.clear not_attempted`、`scope.delete not_attempted`、`failed`・終了コード5）で落ち、直した後に通ることを確かめた。
 - コードのレビュー（code-reviewer opus/high、axis both、範囲 `3156ac15c..c21a5aef4`）：pass、指摘なし。記録：`.workbench/code-review/iss-00507/round-1.json`。
 - 最終品質ゲート（campaign `iss-00507-fqg-1`、`c21a5aef428760af5bddcf3dd7c490cf9ac72852`）：合格（1回目）。レビューの道（quality-gate-reviewer opus/high、1人、観点 functional-correctness・requirements-closure・test-adequacy）は pass、P0〜P3 0、網羅は完全。テストの道は `make lint` 終了コード0（ruff check、ruff format check、mypy pass）、`uv run pytest` 終了コード0（3262 passed、7 skipped、1718秒）。ChatGPT の補助の道はなし（無効）。記録：`.workbench/final-quality-gate/iss-00507-fqg-1/closure.md`。
-- PR：https://github.com/chemitaro/spec-dock/pull/521（head `c21a5aef4`）。CI の結果は下に追記する。マージと `spec-dock work finish` は統括が行う。
+- PR：https://github.com/chemitaro/spec-dock/pull/521（head `c21a5aef4`）。CI（Provider CI 41446978276、SpecDock check 41446977940、Commit identity 41446977979／41446936042）はすべて success、GitHub は MERGEABLE・CLEAN（2026-11-02T12:58:05Z の観測。外部の CheckRun は観測の対象外）。マージと `spec-dock work finish` は統括が行う。
 
 ## Residual Risks / Follow-ups
 
