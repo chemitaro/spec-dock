@@ -20,7 +20,9 @@ design: {
 			`namespace.discard_ignored` が偽のとき、無視されたものがあれば、`ignored_allowed` が与えられていて真を返す場合だけ続ける。最初の判定（今の「ignored worktree content requires --discard-ignored ...」）と `verify_target` の判定（今の「ignored worktree content changed before removal」）の両方で、同じ判定を使う。
 			`verify_target(locked=False)` は unlock の後、`git worktree remove` の直前に呼ばれるので、判定は unlock の後に行われる。
 			`canonical_worktrees.remove_worktree` は `discard_ignored` を書き換えず、`_only_ignored_is_the_link` を出力を受け取る形にして `ignored_allowed` に渡す。リンクが正しいかの確かめ（`resolve_layout` と `link_state`）も、毎回行う。
-			例外の文言とその扱い（`ValueError`、unlock の前なら failed・終了コード3、unlock の後なら partial・終了コード6、`WORKTREE_REMOVE_FAILED`）は変えない。
+			canonical が `_remove_captured_worktree` の前に行っていた `git ls-files --others --ignored ...` の1回は残す。bare の main を対象にしたとき、この呼び出しが Git の失敗（`GIT_FAILED`・終了コード5）で止まる今の順序を変えないためで、結果は `discard_ignored` の判断には使わない（既存のテスト `test_remove_rejects_the_bare_main_of_a_clone_from_a_valid_linked_project` が固定している）。
+			例外の文言とその扱いは変えない：try の外（最初の判定と最初の `verify_target`）の `ValueError` は `PRECONDITION_FAILED`・failed・終了コード3・effects 空、try の中（unlock の前の確かめ、unlock の後の確かめ）は `WORKTREE_REMOVE_FAILED`、unlock が成功していれば partial・終了コード6。
+			既存のテスト `test_issue432_branch_followups.py::test_remove_runs_the_legacy_step_on_the_checked_record` は `_remove_captured_worktree` を位置引数5つの関数に差し替えているので、キーワード引数を受け取れるように直す（テストの差し替えの形の直しで、確かめる中身は変えない）。
 			"""
 		satisfies: ["R-01", "R-02", "R-03"]
 	}
@@ -34,7 +36,7 @@ design: {
 	}
 }
 
-compatibility: "公開の契約は変わらない。止まる場合は、既存のエラー（`WORKTREE_REMOVE_FAILED`）、終了コード、effects のまま。今まで消していた「判定の後にできた無視されたファイル」を消さずに止まることだけが、動きの変化（誤って進んでいた操作を止める直し）。`migration.md` の 0.5.1 の節に書くなら「`worktree remove` は、判定の後にできた無視されたファイルがあると、`--discard-ignored` なしでは消さずに止まる（コード、終了コード、JSON は変わらない）」。"
+compatibility: "公開のコマンド、引数、エラーのコード、終了コード、JSON の形は変わらない。動きの変化は、epic-00512 の constraints の「誤って書き込みや受け付けに進んでいた操作を止める直し」に当たる：今まで終了コード0で消していた「判定の後にできた無視されたファイル」がある場面で、`--discard-ignored` なしでは消さずに止まる（書き込みの前なら `PRECONDITION_FAILED`・終了コード3、unlock の後なら `WORKTREE_REMOVE_FAILED`・partial・終了コード6）。#513 は `migration.md` の 0.5.1 の節にこの1点を載せる。Epic の constraints の例外の一覧には #508 がないので、統括に報告して Epic 側で足してもらう。"
 risks: [
 	"F-01 の残りの時間は閉じない（D-02）",
 	"`_remove_captured_worktree` は canonical のほかからは呼ばれない（従来モードは撤去済み）が、引数は既定値付きで足し、呼び出し元の今の動きを変えない",

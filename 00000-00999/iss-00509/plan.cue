@@ -5,9 +5,9 @@ package spec
 goal: "`finalize-artifact.py` が版4の `spec-dock/initiatives` のリンクを通る Artifact を仕上げ、配布資産として更新で上がる。"
 
 steps: {
-	"S-01": {title: "リンク経路のテストを先に書く（Red）", realizes: ["R-01", "F-01"], status: "todo", session: "light"}
-	"S-02": {title: "`_open_parent` を直す（Green）", realizes: ["R-01", "F-01"], status: "todo", after: ["S-01"], session: "light"}
-	"S-03": {title: "インベントリと dogfood の写しを合わせ、更新のテストを書く", realizes: ["R-02"], status: "todo", after: ["S-02"], session: "light"}
+	"S-01": {title: "リンク経路のテストを先に書く（Red）", realizes: ["R-01", "F-01"], status: "done", session: "light"}
+	"S-02": {title: "`_open_parent` を直す（Green）", realizes: ["R-01", "F-01"], status: "done", after: ["S-01"], session: "light"}
+	"S-03": {title: "インベントリと dogfood の写しを合わせ、更新のテストを書く", realizes: ["R-02"], status: "done", after: ["S-02"], session: "light"}
 }
 
 tests: {

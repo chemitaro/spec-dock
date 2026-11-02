@@ -37,7 +37,7 @@ requirements: {
 	}
 	"R-03": {
 		title: "リンクだけのときの今の動きと公開の契約を変えない"
-		text:  "無視されたものが正しい `spec-dock/initiatives` のリンクだけなら、今までどおり `--discard-ignored` なしで消せる。`--discard-ignored` を付けたときの動きも変えない。止まるときのエラーのコード、終了コード、effects、JSON の形は、既存の止まり方（`WORKTREE_REMOVE_FAILED`、unlock の後なら partial の終了コード6、前なら failed の終了コード3）のままにする。"
+		text:  "無視されたものが正しい `spec-dock/initiatives` のリンクだけなら、今までどおり `--discard-ignored` なしで消せる。`--discard-ignored` を付けたときの動きも変えない。止まるときのエラーのコード、終了コード、effects、JSON の形は、既存の止まり方のままにする：書き込みの前（最初の判定と、try の外の最初の確かめ）で止まれば `PRECONDITION_FAILED`・failed・終了コード3・effects 空、unlock の後で止まれば `WORKTREE_REMOVE_FAILED`・partial・終了コード6（unlock succeeded、remove not_attempted）。bare の main を対象にしたときの拒否（Git の失敗、`GIT_FAILED`・終了コード5）も変えない。"
 		acceptance: ["リンクだけの worktree が、ロックあり（`--unlock`）とロックなしの両方で `--discard-ignored` なしに消えることが観測できる", "既存の `tests/cli_runtime/test_issue440_g3_worktree_remove.py` が変えずに通る"]
 	}
 }
