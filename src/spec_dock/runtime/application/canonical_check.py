@@ -212,6 +212,19 @@ def _path_failures(entries: Sequence[TreeEntry]) -> tuple[Diagnostic, ...]:
     return tuple(failure for group in found for failure in group)
 
 
+class _DuplicateMember(ValueError):
+    """A JSON object repeated a key; the business commands refuse such a declaration too."""
+
+
+def _unique_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise _DuplicateMember(key)
+        result[key] = value
+    return result
+
+
 def _declaration_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], bytes]) -> Diagnostic | None:
     """Rule 4: schema 4 with the worktree-writer protocol; schema 3 is one failure."""
     if entry is None:
@@ -219,7 +232,9 @@ def _declaration_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], by
     if entry.kind != "regular":
         return _invalid_declaration("not-regular", "the workspace declaration is not a regular file")
     try:
-        declaration = json.loads(read(entry).decode("utf-8"))
+        declaration = json.loads(read(entry).decode("utf-8"), object_pairs_hook=_unique_members)
+    except _DuplicateMember:
+        return _invalid_declaration("duplicate-member", "the workspace declaration repeats a member")
     except (UnicodeDecodeError, json.JSONDecodeError, RecursionError):
         declaration = None
     if not isinstance(declaration, dict):

@@ -132,6 +132,24 @@ def test_a_schema_three_declaration_is_one_failure_and_the_other_rules_still_run
         (b"\xff\xfe", "regular", "invalid-json", "Commit spec-dock/workspace.json as"),
         (b"[4]", "regular", "invalid-json", "Commit spec-dock/workspace.json as"),
         (
+            b'{"schema_version": 4, "schema_version": 4, "writer_protocol": "specdock.worktree-writer/v1"}',
+            "regular",
+            "duplicate-member",
+            "Commit spec-dock/workspace.json as",
+        ),
+        (
+            b'{"schema_version": 3, "writer_protocol": "x", "writer_protocol": "y"}',
+            "regular",
+            "duplicate-member",
+            "Commit spec-dock/workspace.json as",
+        ),
+        (
+            b'{"schema_version": 4, "writer_protocol": "specdock.worktree-writer/v1", "x": {"a": 1, "a": 2}}',
+            "regular",
+            "duplicate-member",
+            "Commit spec-dock/workspace.json as",
+        ),
+        (
             b'{"schema_version": true, "writer_protocol": "specdock.worktree-writer/v1"}',
             "regular",
             "unknown-schema",

@@ -4,7 +4,7 @@
 
 - `scope create {initiative,epic,issue} --backend github` は GitHub Issue を新規作成して Scope に対応付けます。
 - `scope import github {initiative,epic,issue}` は既存 Issue を確認して Scope に取り込みます。
-- 既存local backendのScopeは保全互換として読み取り・lifecycle操作を維持し、ローカルmetadataが状態の正本です。新規`--backend local`作成はできません。GitHub backendでは対応するIssueが状態の正本です。
+- Scopeの状態の正本は、対応するGitHub Issueです。ローカルのmetadataや別のbackendはありません（0.5.0で外しました）。
 - `scope close TARGET` と `scope reopen TARGET` は状態を変更します。選択やブランチは変更しません。
 - `work start TARGET` は依存を確認し、ブランチを作成または切り替えて対象を選択します。`work finish TARGET` は対象を完了し、completedを確認して捕捉した直接選択だけを解除します。
 
