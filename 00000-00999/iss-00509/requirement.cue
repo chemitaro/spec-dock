@@ -29,16 +29,19 @@ requirements: {
 		title: "リンクを通る Artifact を仕上げられる"
 		text:  "`spec-dock/initiatives` がカタログへのリンクのとき、そのリンクだけは安全な経路として扱い、ほかのリンクは今までどおり拒む。"
 	}
+	"R-02": {
+		title: "0.5.0 の配布資産が更新で上がる"
+		text:  "直した `finalize-artifact.py` は配布資産なので、0.5.0 のバイトを既知の古い版として足し、0.5.0 の配布資産を持つリポジトリが `installation update` で上がる。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
 // title は必須。impact（起きたときの影響）と recovery（回復のしかた）は strict 以上で必須。
 failures: {
-	// "F-01": {
-	// 	title:    "〜のときは、何も書かずに止まる"
-	// 	impact:   "〜"
-	// 	recovery: "〜"
-	// }
+	"F-01": {
+		title: "安全でない経路は、何も書かずに止まる"
+		text:  "`spec-dock/initiatives` がカタログ以外を指すリンク、カタログの外へ出るリンク、`initiatives` の下のリンク、Artifact 自体のリンクは、今までどおり終了コード1で拒み、何も書かない。"
+	}
 }
 
 // 制約・前提、合意した判断、未解決事項（任意）。

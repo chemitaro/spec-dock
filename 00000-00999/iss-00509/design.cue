@@ -2,22 +2,22 @@ package spec
 
 // 設計（Issue）。型 specdock/v1。
 
-// 設計目標、今の状態と、この Issue の後の状態（任意）。
-// goals: ["..."]
-// current: "..."
-// target:  "..."
+goals: ["リンクの許可を `spec-dock/initiatives` の1か所に限り、ほかの経路の検査は変えない。"]
+current: "`_open_parent` が、すべての要素を `O_NOFOLLOW` で開くので、版4のリンクを通れず「unsafe directory component 'initiatives'」で止まる。"
+target:  "`spec-dock/initiatives` が、実ディレクトリ `spec-dock/.canonical` を指すリンクのときだけ、そのリンク先を開いて進む。"
 
-// 設計の単位（責務、interface、data など）。番号（D-01、…）をキーにする。
-// title と satisfies（満たす要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、それを満たす設計が要る。
 design: {
-	// "D-01": {
-	// 	title:     "〜の部品"
-	// 	text:      "責務と interface"
-	// 	satisfies: ["R-01"]
-	// }
+	"D-01": {
+		title:     "カタログへのリンクだけを許す経路の検査"
+		text:      "`finalize-artifact.py` の `_open_parent` で、先頭が `spec-dock`、2番目が `initiatives` の要素だけを特別に扱う。要素がリンクのとき `readlink` で読み、絶対パスにして（相対なら `spec-dock` の下からの相対）正規化し、末尾が `spec-dock/.canonical` で、その実体が `lstat` でリンクでない実ディレクトリのときだけ、そのパスを `O_NOFOLLOW` で開いて進む。それ以外のリンク（別の行き先、カタログの外、リンクのカタログ）は今までの誤りで止める。ほかの要素は今までどおりすべて `O_NOFOLLOW`。`_require_parent_still_bound` は同じ `_open_parent` を通るので、device と inode の再確認は変わらない。コマンド、引数、出力、終了コードは変えない。"
+		satisfies: ["R-01", "F-01"]
+	}
+	"D-02": {
+		title:     "配布資産の更新"
+		text:      "提供側 `src/spec_dock/assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py` を直し、`static-inventory.json` の今のハッシュを更新して、0.5.0 のバイトを既知の古い版に足す。dogfood の写し `.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py` は、提供側のバイトを写す。"
+		satisfies: ["R-02"]
+	}
 }
 
-// 移行・互換性、リスク（任意）。
-// compatibility: "..."
-// risks: ["..."]
+compatibility: "引数と出力は変わらない。以前は拒んでいた版4のリンク経路が通るだけで、ほかは同じ。版は上げない（0.5.1 は #513）。"
+risks: ["リンクの行き先の検査が甘いと、カタログの外へ書ける。行き先を `spec-dock/.canonical` に限り、リンクでない実ディレクトリを求める。"]
