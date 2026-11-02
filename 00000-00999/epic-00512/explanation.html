@@ -4,56 +4,81 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="light dark">
-<title>説明資料</title>
+<title>0.5.1 の計画</title>
 <link rel="stylesheet" href="../../../design-system/ds.css">
 <!-- ▼ 説明資料の本文（Markdown）。編集するのはこのブロックだけです。 -->
 <script type="text/markdown" id="ds-source">
 ---
-title: この Scope の説明資料（題名を書き換えます）
-lead: この資料で理解できることを、初めて読む人にも分かるように1〜2文で書きます。
+title: canonical の処理を固め、0.5.1 を5つのリポジトリに配る
+lead: 0.5.0 で従来モードを外したときに見つかった canonical の処理の不足を直し、0.5.1 として5つのリポジトリにそろえ、移行のために残したものを片付ける計画です。
 category: 説明資料
 audience: 本日チームに加わった新メンバー
-status: 下書き
+status: 計画
 ---
-
-<!-- spec-dock:explanation-skeleton -->
-<!-- 雛形から書き換えたら、上の印の行を消します。印が残っていると、検査は「雛形のまま」と判定します。 -->
 
 ## この資料で分かること
 
 :::summary
-- 読み終えたときに理解できていることを、1文ずつ書きます。
-- 背景、仕組み、失敗時の動き、確認方法のうち、特に伝えたい点を選びます。
-- 短い Scope なら、1〜2項目でかまいません。
+- なぜこの Epic があるのか（0.5.0 の撤去で、canonical の処理の弱い所が見えたこと）。
+- 8つの子の Issue を、どの順で進めるか。
+- 失敗したときに、どう戻すか。
 :::
 
 ## 背景と目的
 
-なぜこの Scope に取り組むのか、どの問題を解決するのかを具体的に説明します。
+SpecDock 0.5.0（epic-00424 の I-13、#440）は、従来モード（宣言の版3、`.meta.json`）を外し、canonical モードだけにしました。そのとき、従来の処理を確かめていたテストを canonical の処理に書き直したところ、canonical の処理が従来より弱い所が8つ見つかりました。たとえば、`worktree remove --unlock` が、許可なしに無視されたファイルを消しうること、`scope close` が端末での確認の後に選択を読み直さないことです。従来のテストは撤去で消えたので、今は誰も守っていません。
 
-## 全体の構成
+この Epic は、それらを直した 0.5.1 を、spec-dock、input-devices、company-os、housing-lifecycle、taikyohiyou_project の5つのリポジトリに配ります。最後に、移行のために残した控えと、版3のまま残した worktree を、利用者が決めたとおりに片付けます。
 
-構成要素の役割と関係を説明します。図は、理解を大きく助ける場合だけ入れます。
+## 進める順番
 
-```plantuml id=overview
+```plantuml id=waves
 @startuml
-title 全体の構成
-top to bottom direction
-actor "利用者" as User
-component "説明対象の仕組み" as System
-database "データ" as Data
-User -> System : 操作する
-System -> Data : 読み書きする
-System --> User : 結果を返す
+title 子の Issue の順番
+left to right direction
+rectangle "第1波" {
+  (#508 unlock の後の判定) as A
+  (#509 grill の経路) as B
+  (#510 宣言と観測) as C
+}
+rectangle "第2波" {
+  (#506 確認の後の読み直し) as D
+  (#507 途中の失敗の報告) as E
+}
+(#511 文書とテスト) as F
+(#513 0.5.1 と配布) as G
+(#514 控えの片付け) as H
+A --> D
+A --> E
+B --> F
+C --> F
+D --> F
+E --> F
+F --> G
+G --> H : 1〜2週間の利用の後
 @enduml
 ```
 
+- **#508 を最初にします**。利用者のファイルを消すおそれがあるからです。
+- **#506 と #507** は、GitHub への書き込みと報告の正しさに関わります。直す場所が近いので、並べて進め、ぶつかったら後のほうが main を取り込みます。
+- **#511** は、ほかの直しが変えた文書も含めて整えるので、最後の直しにします。
+- **#513** で 0.5.1 を出し、統括が利用者の環境に入れて、4つのリポジトリに配布の PR を作ります。
+- **#514** は、配ってから1〜2週間、問題がないことを確かめてから、一覧を利用者に示し、許可されたものだけを消します。
+
+## 失敗したときの戻し方
+
+| 起きたこと | 戻し方 |
+|---|---|
+| 直しが、ほかのコマンドを壊した | 配る前なら PR を閉じるか `git revert`。配った後なら、パッケージを 0.5.0 に戻し、配布の PR を `git revert` |
+| 一部のリポジトリだけ 0.5.1 になった | 各リポジトリの CI は版のファイルに従うので、残りを配るか、配った分を戻す |
+| 控えを消した後に、移行の前に戻す必要が出た | 版のタグ `v0.4.2` の移行の道具と、GitHub の `spec-dock/canonical` の履歴から作り直す |
+
 ## 確認方法
 
-読者が手元で確かめられる手順を書きます。
-
 ```sh
-spec-dock active show --json
+spec-dock scope show epic-00512 --json
+spec-dock scope check epic-00512
+spec-dock canonical status --json
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>

@@ -15,8 +15,8 @@ assurance: {
 }
 
 // 目的と背景（任意）。
-// purpose:    "この Issue が実現する価値"
-// background: "解く問題と、関係者"
+purpose:    "SpecDock 0.5.1 を出し、5つのリポジトリの配布資産を 0.5.1 にそろえる。"
+background: "epic-00512 の直し（#506〜#511）を、1回のリリースで届ける。手順は #501（0.4.2）と #440（0.5.0）と同じ。配布の PR で、利用者のリポジトリの古い記述（input-devices の `README.md` の `4d25a8b` の固定、company-os の `contract.md` の 0.2.4）も直す。"
 
 // 対象と対象外（任意）。
 // includes: ["..."]
@@ -25,11 +25,22 @@ assurance: {
 // 観測できる要件。番号（R-01、R-02、…）をキーにする。
 // title は必須。acceptance（観測できる受け入れの条件）は standard 以上で必須。
 requirements: {
-	// "R-01": {
-	// 	title: "利用者が〜できる"
-	// 	text:  "詳しい説明"
-	// 	acceptance: ["〜が観測できる"]
-	// }
+	"R-01": {
+		title: "版が 0.5.1 になる"
+		text:  "`pyproject.toml`、`uv.lock`、版のファイル `system/spec-dock-version` とその dogfood の写しが 0.5.1 になる。"
+	}
+	"R-02": {
+		title: "上げるときの文書が 0.5.1 の変更を説明する"
+		text:  "`migration.md` に「## 0.5.1 への更新」の節があり、#506〜#511 の要点と、契約の変更（あれば）を述べる。"
+	}
+	"R-03": {
+		title: "0.5.0 の配布資産を持つリポジトリが `installation update` で上がる"
+		text:  "`static-inventory.json` が、変えた配布資産の今のハッシュと、0.5.0 のバイトを既知の古い版として持つ。"
+	}
+	"R-04": {
+		title: "5つのリポジトリが 0.5.1 にそろう（マージの後に統括が行う）"
+		text:  "利用者の環境に 0.5.1 を入れ、4つのリポジトリで `installation update` の PR を作り、`canonical check` と検査のワークフローを通す。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。

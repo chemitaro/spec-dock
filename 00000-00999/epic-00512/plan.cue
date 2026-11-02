@@ -1,33 +1,73 @@
 package spec
 
 // 計画（Epic）。型 specdock/v1。
-// Epic の計画は、子の Scope への切り分けを持つ。実装の手順とテストは子の Scope が持つので、
-// steps と tests は書かない。
 
-// 目標（任意）。
-// goal: "..."
+goal: "canonical の処理の不足を直した 0.5.1 を5つのリポジトリに配り、移行の控えを片付ける。"
 
-// 子の Scope への切り分け。子の ID（iss-00001 など）をキーにする。covers（子に任せる要件・失敗の条件の番号）が必須。
-// すべての要件を、いずれかの子に任せる。standard 以上では、それが「確かめるテストがある」にも当たり、
-// strict 以上では、すべての失敗の条件を任せ、どの子にも、任せる番号を書く。
-// 子の題名は GitHub に、子の保証レベルは子の requirement.cue にあるので、ここには書かない。
 slices: {
-	// "iss-00001": {
-	// 	covers: ["R-01", "F-01"]
-	// 	text:   "この Issue に任せること"
-	// 	after: ["iss-00002"]
-	// 	session: "coord"
-	// }
+	"iss-00508": {
+		covers:  ["R-03", "F-01"]
+		text:    "第1波。利用者のファイルを許可なく消すおそれがあるので、最初に直す。"
+		session: "std"
+	}
+	"iss-00509": {
+		covers:  ["R-04"]
+		text:    "第1波。#508 と並べる（直す場所が重ならない）。"
+		session: "light"
+	}
+	"iss-00510": {
+		covers:  ["R-05"]
+		text:    "第1波。#508 と並べる（直す場所が重ならない）。"
+		session: "light"
+	}
+	"iss-00506": {
+		covers:  ["R-01", "F-01"]
+		text:    "第2波。#507 と並べる。"
+		after:   ["iss-00508"]
+		session: "std"
+	}
+	"iss-00507": {
+		covers:  ["R-02", "F-01"]
+		text:    "第2波。#506 と並べる。ぶつかったら、後にマージするほうが main を取り込む。"
+		after:   ["iss-00508"]
+		session: "std"
+	}
+	"iss-00511": {
+		covers:  ["R-06"]
+		text:    "第3波。ほかの直しが変えた文書も含めて整えるので、#506、#507、#509、#510 の後に行う。"
+		after:   ["iss-00506", "iss-00507", "iss-00509", "iss-00510"]
+		session: "light"
+	}
+	"iss-00513": {
+		covers:  ["R-07", "F-02"]
+		text:    "第4波。版を 0.5.1 にする PR は担当が作る。マージの後の導入と4つのリポジトリへの配布は統括が行う。"
+		after:   ["iss-00511"]
+		session: "light"
+	}
+	"iss-00514": {
+		covers:  ["R-08", "F-03"]
+		text:    "第5波。0.5.1 を配ってから1〜2週間の通常の利用の後、統括が一覧を作り、利用者の許可の後に片付ける。"
+		after:   ["iss-00513"]
+		session: "coord"
+	}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、切り分けがあれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+verification: "各 Issue の PR で `make lint` と `uv run pytest`（全体）と CI を通す。standard の Issue は、仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）を通す。light の Issue は、仕様のレビュー opus/medium、コードのレビュー sonnet/high、最終品質ゲート opus/high（1人）。配布の後、5つのリポジトリで `canonical status` と検査のワークフローを確かめる。"
+rollback: "マージの前なら PR を閉じる。マージの後で配る前なら `git revert`。配った後なら、パッケージを 0.5.0 に戻し、各リポジトリの配布の PR を `git revert` する。片付け（#514）は戻せないので、利用者の許可を条件にする。"
+exit: "#506〜#511 と #513 と #514 が閉じ、5つのリポジトリが 0.5.1 で `canonical status` が ok、控えの扱いが #514 の report.md に記録され、この Epic の report.md に結果をまとめた。"
 
-// 実行の割り当て（任意）。切り分けの session は、ここのセッションの名前を指す。
-// レビューの after は、どの切り分けの後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: coord: {task: "統括", model: "...", effort: "...", rationale: "..."}
-// 	reviews: gate: {role: "最終の確かめ", after: "iss-00001", model: "...", effort: "..."}
-// }
+execution: {
+	sessions: {
+		coord: {task: "統括（計画、配布、片付け、利用者への報告）", model: "opus", effort: "high", rationale: "policy §5 統括役"}
+		std: {task: "standard の Issue の実装（Orca の worker）", model: "opus", effort: "medium", rationale: "policy §4 standard の実装"}
+		light: {task: "light の Issue の実装（Orca の worker）", model: "sonnet", effort: "medium", rationale: "policy §4 light の実装"}
+	}
+	reviews: {
+		"std-spec": {role: "standard の Issue の仕様のレビュー", after: "iss-00508", model: "opus", effort: "high"}
+		"std-code": {role: "standard の Issue のコードのレビュー", after: "iss-00508", model: "opus", effort: "high"}
+		"std-gate": {role: "standard の Issue の最終品質ゲート", after: "iss-00508", model: "opus", effort: "high"}
+		"light-spec": {role: "light の Issue の仕様のレビュー", after: "iss-00509", model: "opus", effort: "medium"}
+		"light-code": {role: "light の Issue のコードのレビュー", after: "iss-00509", model: "sonnet", effort: "high"}
+		"light-gate": {role: "light の Issue の最終品質ゲート", after: "iss-00509", model: "opus", effort: "high"}
+	}
+}
