@@ -33,6 +33,10 @@ requirements: {
 		title: "撤去の不在と雛形のバイトを確かめるテストを足す"
 		text:  "配布する文書の全体で、外したコマンドと引数（`workspace migrate`、`workbench copy`、`--ci`、`--source local`、`.meta.json` の作成）が案内されていないことを確かめる。作った CUE の `report.md` のバイトを 0.4.2 の出力と比べる。"
 	}
+	"R-03": {
+		title: "`canonical check` も、重複したキーの宣言を拒む"
+		text:  "#510（PR #517）は、重複したキーを持つ版4の宣言を、業務のコマンドで `PRECONDITION_FAILED` にした。`canonical check`（`application/canonical_check.py` の `_declaration_failure`）は、まだ重複を拒まない（#510 の最終品質ゲートの P3）。同じ扱いにそろえ、`canonical check` の失敗の1件として返す。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
