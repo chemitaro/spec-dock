@@ -12,7 +12,7 @@ steps: {
 
 tests: {
 	"T-01": {title: "カタログへのリンクを通る Artifact を、identity と finalize で仕上げられる", verifies: ["R-01"]}
-	"T-02": {title: "別の行き先、相対の脱出、リンクのカタログ、initiatives の下のリンク、Artifact のリンクは拒み、何も書かない", verifies: ["F-01"]}
+	"T-02": {title: "別の行き先、別のクローンのカタログ、名前だけが同じディレクトリ、`.git` のない worktree、リンクのカタログ、initiatives の下のリンク、Artifact のリンクは拒み、何も書かない", verifies: ["F-01"]}
 	"T-03": {title: "0.5.0 の配布資産を持つリポジトリが `installation update` で上がり、`installation show` がすべて current になる", verifies: ["R-02"]}
 }
 

@@ -33,6 +33,10 @@ requirements: {
 		title: "Codex のサンドボックスの中でカタログの排他が効く"
 		text:  "Linux の Codex のサンドボックス（Landlock）の中で、カタログのディレクトリへの `flock` が効き、仕様の読み書きができる。効かなければ、`canonical status` が示す1行の設定で回避できるかを確かめる。"
 	}
+	"R-03": {
+		title: "Codex の1行の設定が、実際の Codex のセッションで効く"
+		text:  "`canonical status` が示す Codex の1行（`writable_roots = [\"<カタログ>\"]`）を `~/.codex/config.toml` に足すと、main のチェックアウトの外の worktree で動く実際の Codex のセッションが、カタログの仕様を読み書きできる（macOS と Linux）。epic-00424 の AC-07 で、表示と文書は確かめたが、実際のセッションでは確かめていない（`iss-00436/report.md` の「未確認」）。設定の形が権限のプロファイルに移っていれば、`canonical status` の案内の直しを別の Issue にする。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。

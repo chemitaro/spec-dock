@@ -4,12 +4,12 @@ package spec
 
 goals: ["リンクの許可を `spec-dock/initiatives` の1か所に限り、ほかの経路の検査は変えない。"]
 current: "`_open_parent` が、すべての要素を `O_NOFOLLOW` で開くので、版4のリンクを通れず「unsafe directory component 'initiatives'」で止まる。"
-target:  "`spec-dock/initiatives` が、実ディレクトリ `spec-dock/.canonical` を指すリンクのときだけ、そのリンク先を開いて進む。"
+target:  "`spec-dock/initiatives` が、そのクローンの実ディレクトリ `spec-dock/.canonical` を指すリンクのときだけ、そのリンク先を開いて進む。"
 
 design: {
 	"D-01": {
 		title:     "カタログへのリンクだけを許す経路の検査"
-		text:      "`finalize-artifact.py` の `_open_parent` で、先頭が `spec-dock`、2番目が `initiatives` の要素だけを特別に扱う。要素がリンクのとき `readlink` で読み、絶対パスにして（相対なら `spec-dock` の下からの相対）正規化し、末尾が `spec-dock/.canonical` で、その実体が `lstat` でリンクでない実ディレクトリのときだけ、そのパスを `O_NOFOLLOW` で開いて進む。それ以外のリンク（別の行き先、カタログの外、リンクのカタログ）は今までの誤りで止める。ほかの要素は今までどおりすべて `O_NOFOLLOW`。`_require_parent_still_bound` は同じ `_open_parent` を通るので、device と inode の再確認は変わらない。コマンド、引数、出力、終了コードは変えない。"
+		text:      "`finalize-artifact.py` の `_open_parent` で、先頭が `spec-dock`、2番目が `initiatives` の要素だけを特別に扱う。「そのクローンのカタログ」は、`--repo-root` の `.git` から求めた main チェックアウトの `spec-dock/.canonical` とする（`.git` がディレクトリなら root 自身、`gitdir: <main>/.git/worktrees/<名前>` のファイルならその main。どちらでもなければ、リンクは拒む）。要素がリンクのとき、`readlink` した行き先（相対なら `spec-dock` の下からの相対）の `realpath` が、そのカタログの `realpath` と等しく、カタログ自体が `lstat` でリンクでない実ディレクトリのときだけ、その `realpath` を `O_NOFOLLOW` で開いて進む。別のクローンのカタログ、名前だけが `.canonical` のディレクトリ、行き先の途中にリンクを含み実体がずれるものは、今までの誤りで止める。ほかの要素は今までどおりすべて `O_NOFOLLOW`。`_require_parent_still_bound` は同じ `_open_parent` を通るので、device と inode の再確認は変わらない。コマンド、引数、出力、終了コードは変えない。"
 		satisfies: ["R-01", "F-01"]
 	}
 	"D-02": {
@@ -20,4 +20,4 @@ design: {
 }
 
 compatibility: "引数と出力は変わらない。以前は拒んでいた版4のリンク経路が通るだけで、ほかは同じ。版は上げない（0.5.1 は #513）。"
-risks: ["リンクの行き先の検査が甘いと、カタログの外へ書ける。行き先を `spec-dock/.canonical` に限り、リンクでない実ディレクトリを求める。"]
+risks: ["リンクの行き先の検査が甘いと、カタログの外へ書ける。行き先を、そのクローンの main チェックアウトの `spec-dock/.canonical`（リンクでない実ディレクトリ）に限る。"]
