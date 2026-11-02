@@ -8,7 +8,7 @@ steps: {
 	"S-01": {title: "3つの場面の失敗を注入するテストを書き、今のコードで落ちることを確かめる（Red）", realizes: ["R-01", "R-02"], status: "done", session: "impl"}
 	"S-02": {title: "`canonical_scope_change.py` の `selection.clear` の記録と `attempted` の判定を直す（Green）", realizes: ["R-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-03": {title: "`canonical_artifact_write.py` で `artifacts/` を作った後の失敗を partial にし、既存のテストのコメントを直す（Green）", realizes: ["R-02"], status: "done", after: ["S-01"], session: "impl"}
-	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02"], status: "doing", after: ["S-02", "S-03"], session: "impl"}
+	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02"], status: "done", after: ["S-02", "S-03"], session: "impl"}
 }
 
 tests: {

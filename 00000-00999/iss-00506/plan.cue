@@ -8,7 +8,7 @@ steps: {
 	"S-01": {title: "確認の間に選択を変える close／reopen のテストと、origin を変える create のテスト（確認の間、POST の後）を書き、落ちることを確かめる（Red）", realizes: ["R-01", "R-02"], status: "done", session: "impl"}
 	"S-02": {title: "`selection_unchanged` と `lifecycle_scope` の読み直しを足す（Green）", realizes: ["R-01", "F-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-03": {title: "`WriteSession.require_same_repository` と `RepositoryChanged` を足し、`create_scope` の確認の後・POST の前・POST の後に呼ぶ（Green）", realizes: ["R-02", "F-01"], status: "done", after: ["S-01"], session: "impl"}
-	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02"], status: "doing", after: ["S-02", "S-03"], session: "impl"}
+	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02"], status: "done", after: ["S-02", "S-03"], session: "impl"}
 }
 
 tests: {
