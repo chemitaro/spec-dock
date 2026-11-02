@@ -25,6 +25,7 @@ from spec_dock.runtime.application.canonical_scopes import kind_change_error
 from spec_dock.runtime.application.canonical_writes import (
     LOCAL_FAILURES,
     WRITE_FAILURES,
+    RepositoryChanged,
     WriteFailed,
     check_expectations,
     confirmed_interactively,
@@ -64,6 +65,7 @@ from spec_dock.runtime.domain.canonical_structure import (
 from spec_dock.runtime.domain.selectors import parse_github_ref
 from spec_dock.runtime.infra.canonical_scaffold import BucketOccupied, copy_scope_template_at, prepare_bucket
 from spec_dock.runtime.infra.directory_publication import DirectoryPublicationIncomplete, publish_directory
+from spec_dock.runtime.infra.git_process import GitProcessError
 from spec_dock.runtime.infra.json_store import require_directory_publication_support
 from spec_dock.runtime.presentation.command_data import DiagnosticData, FamilyData
 from spec_dock.runtime.presentation.envelope import Diagnostic, Effect, OperationResult
@@ -134,6 +136,8 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
         ),
     ):
         return declined(namespace.command_path, preview)
+    # The answer (or the time since the session opened) may have let origin move (iss-00506).
+    session.require_same_repository(namespace.timeout)
     label = KIND_LABELS[kind]
     try:
         session.ensure_labels([label])
@@ -144,6 +148,12 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
             pending=steps,
             recovery=(f"Check the {label} label on GitHub, then run the same spec-dock scope create again.",),
         )
+    try:
+        session.require_same_repository(namespace.timeout)
+    except (ValueError, GitProcessError) as error:
+        if not session.effects:  # nothing written yet: the plain precondition failure
+            raise
+        return session.incomplete(preview, error, pending=steps, recovery=getattr(error, "recovery", ()))
     try:
         created = session.write(
             "github-create",
@@ -169,6 +179,7 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
     )
     data = FamilyData("scope", {"scope": None, "github_ref": ref, "title": title, "changed": True})
     try:
+        session.require_same_repository(namespace.timeout)
         if parent is not None:
             session.write(
                 "github.sub-issue.add",
@@ -178,10 +189,11 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 ),
                 lambda _: [SetParent(created.number, session.node(parent.id).number)],
             )
+            session.require_same_repository(namespace.timeout)
         _publish(session, kind, scope_id, title, created.number, parent, assurance)
     except WRITE_FAILURES as error:
         remaining = [step for step in steps if step[0] not in {effect.kind for effect in session.effects}]
-        first = error.recovery if isinstance(error, CanonicalCommandError) else ()
+        first = error.recovery if isinstance(error, (CanonicalCommandError, RepositoryChanged)) else ()
         return session.incomplete(
             data, error, pending=remaining, recovery=(*first, resume), code="SCOPE_PUBLICATION_INCOMPLETE"
         )

@@ -100,6 +100,14 @@ class WriteFailed(Exception):
         self.cause = cause
 
 
+class RepositoryChanged(ValueError):
+    """`origin` names another repository than the one the command confirmed; nothing further is written."""
+
+    def __init__(self, confirmed: str) -> None:
+        super().__init__("GitHub repository changed during Scope creation")
+        self.recovery = (f"Set origin back to the confirmed repository {confirmed} before a new explicit operation.",)
+
+
 # Everything a command catches after its first write: a GitHub write that failed and the local failures.
 WRITE_FAILURES: tuple[type[Exception], ...] = (WriteFailed, *LOCAL_FAILURES)
 
@@ -126,6 +134,12 @@ class WriteSession:
     def resolve(self, selector: str, selection: SelectionObservation) -> ScopeView:
         """An ID in any accepted form (`iss-5`, `ISS-00005`), a role or a GitHub ref; an old ID is SCOPE_KIND_CHANGED."""
         return resolve_canonical_scope(self.context, self.scopes, selector, selection=selection)
+
+    def require_same_repository(self, timeout: float) -> None:
+        """Reread `origin`; another repository than the one this session confirmed stops the command (iss-00506)."""
+        current = repository_for_checkout(self.context.root, timeout=timeout)
+        if current.slug != self.repository.slug:
+            raise RepositoryChanged(self.repository.slug)
 
     def require_kind_unchanged(self, *scope_ids: str) -> None:
         self.scopes.require_kind_unchanged(*scope_ids)
@@ -329,6 +343,11 @@ def check_expectations(
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
+
+
+def selection_unchanged(before: SelectionObservation, after: SelectionObservation) -> bool:
+    """The same direct record observed twice: the same status, record and record file (iss-00506)."""
+    return (before.status, before.record, before.handle) == (after.status, after.record, after.handle)
 
 
 def needs_confirmation(namespace: argparse.Namespace) -> bool:
