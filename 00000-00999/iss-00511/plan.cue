@@ -5,11 +5,11 @@ package spec
 goal: "0.5.0 の後に残った文書とテストの不足を直し、PR を作る。"
 
 steps: {
-	"S-01": {title: "仕様（design/plan）を書き、レビューを通す", realizes: ["R-01", "R-02", "R-03"], status: "doing", session: "light"}
-	"S-02": {title: "README の数のテストと文書・package-data を直す（Red → Green）", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "light"}
-	"S-03": {title: "撤去の不在のテストと、report.md のバイトのテストを足す", realizes: ["R-02"], status: "todo", after: ["S-02"], session: "light"}
-	"S-04": {title: "`canonical check` の重複キーを拒む（Red → Green）", realizes: ["R-03"], status: "todo", after: ["S-01"], session: "light"}
-	"S-05": {title: "`static-inventory.json` と dogfood の写しをそろえる", realizes: ["R-01", "R-02"], status: "todo", after: ["S-02", "S-03"], session: "light"}
+	"S-01": {title: "仕様（design/plan）を書き、レビューを通す", realizes: ["R-01", "R-02", "R-03"], status: "done", session: "light"}
+	"S-02": {title: "README の数のテストと文書・package-data を直す（Red → Green）", realizes: ["R-01"], status: "done", after: ["S-01"], session: "light"}
+	"S-03": {title: "撤去の不在のテストと、report.md のバイトのテストを足す", realizes: ["R-02"], status: "done", after: ["S-02"], session: "light"}
+	"S-04": {title: "`canonical check` の重複キーを拒む（Red → Green）", realizes: ["R-03"], status: "done", after: ["S-01"], session: "light"}
+	"S-05": {title: "`static-inventory.json` と dogfood の写しをそろえる", realizes: ["R-01", "R-02"], status: "done", after: ["S-02", "S-03"], session: "light"}
 	"S-06": {title: "コードのレビュー、最終品質ゲート、PR", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-04", "S-05"], session: "light"}
 }
 
