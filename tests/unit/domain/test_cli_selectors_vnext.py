@@ -4,15 +4,10 @@ import pytest
 
 from spec_dock.runtime.domain.selectors import (
     ActiveScopeSelector,
-    ArtifactRootSelector,
     GithubScopeSelector,
     ScopeIdSelector,
-    WorktreeIdSelector,
-    WorktreePathSelector,
-    parse_artifact_selector,
     parse_github_ref,
     parse_scope_selector,
-    parse_worktree_selector,
 )
 
 
@@ -54,25 +49,3 @@ def test_import_ref_requires_exact_github_issue_identity() -> None:
 def test_import_ref_rejects_bare_or_foreign_or_non_issue(value: str, hint: str | None) -> None:
     with pytest.raises(ValueError):
         parse_github_ref(value, repo_hint=hint)
-
-
-def test_artifact_root_is_available_only_to_artifact_selector() -> None:
-    assert parse_artifact_selector("@root") == ArtifactRootSelector()
-    with pytest.raises(ValueError):
-        parse_scope_selector("@root")
-
-
-def test_worktree_selector_requires_registered_shape() -> None:
-    assert parse_worktree_selector("wt:planning-1") == WorktreeIdSelector("planning-1")
-    assert parse_worktree_selector("/tmp/worktrees/planning") == WorktreePathSelector("/tmp/worktrees/planning")
-    for bad in ("../planning", "/tmp/../private", "wt:../../x", "", "file:///tmp/planning"):
-        with pytest.raises(ValueError):
-            parse_worktree_selector(bad)
-
-
-def test_absolute_worktree_path_preserves_significant_whitespace() -> None:
-    assert parse_worktree_selector("/tmp/planning ") == WorktreePathSelector("/tmp/planning ")
-    with pytest.raises(ValueError):
-        parse_worktree_selector(" wt:planning-1")
-    with pytest.raises(ValueError):
-        parse_worktree_selector("planning-1 ")

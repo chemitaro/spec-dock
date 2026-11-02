@@ -37,19 +37,6 @@ def _run(tmp_path: Path, *args: str) -> _ConsoleOutput:
     return _ConsoleOutput(code, stdout.getvalue(), stderr.getvalue())
 
 
-def test_public_migration_help_does_not_advertise_retired_journal_options(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    before = tuple(tmp_path.iterdir())
-    assert main(["--project", str(tmp_path / "missing"), "help", "workspace", "migrate", "--json"]) == 0
-    result = json.loads(capsys.readouterr().out)
-    assert result["data"]["kind"] == "utility" and result["effects"] == []
-    text = result["data"]["text"]
-    assert "--backup-dir" in text and "--confirm-old-writers-stopped" in text
-    assert "--resume" not in text and "--rollback" not in text
-    assert tuple(tmp_path.iterdir()) == before
-
-
 def test_help_uses_catalog_and_does_not_require_project(tmp_path: Path) -> None:
     root = _run(tmp_path, "help")
     assert root.exit_code == 0
@@ -78,19 +65,13 @@ def test_each_leaf_has_specific_preconditions_and_example(tmp_path: Path) -> Non
         assert parsed.command_path == leaf, leaf
 
 
-def test_help_explains_supported_finish_and_migration_modes(tmp_path: Path) -> None:
+def test_help_explains_supported_finish_modes(tmp_path: Path) -> None:
     finish = json.loads(_run(tmp_path, "help", "work", "finish", "--json").stdout)["data"]["text"]
     assert "outside the active chain" in finish
     assert "An active Scope must resolve" not in finish
-    assert "confirmed completed" in finish and "captured direct record" in finish
+    assert "Completion is confirmed by a live GET" in finish and "captured direct record" in finish
     assert "current branch" in finish and "no Start lock" in finish
     assert "selected subtree" not in finish and "canonical branch" not in finish and "derived state" not in finish
-
-    migrate = json.loads(_run(tmp_path, "help", "workspace", "migrate", "--json").stdout)["data"]["text"]
-    assert "--dry-run" in migrate
-    assert "--to-writer-protocol" in migrate and "--confirm-old-writers-stopped" in migrate
-    assert "--mapping-file" not in migrate and "--resume OPERATION_ID" not in migrate
-    assert "restore verification" in migrate and "human operational confirmation" in migrate
 
 
 def test_completions_include_every_catalog_leaf_without_writing_files(tmp_path: Path) -> None:
@@ -118,17 +99,6 @@ def test_native_completion_keeps_leaf_options_after_scope_operands(
     script = capsys.readouterr().out
     choices = _native_completion(script, shell, ["spec-dock", "scope", "show", "gh:example/repo#1", ""])
     assert {"--expect-current", "--expect-backend", "--json"} <= choices
-
-
-@pytest.mark.parametrize("shell", ["bash", "zsh"])
-def test_native_migration_completion_omits_retired_journal_options(
-    capsys: pytest.CaptureFixture[str], shell: str
-) -> None:
-    assert main(["completion", shell]) == 0
-    script = capsys.readouterr().out
-    choices = _native_completion(script, shell, ["spec-dock", "workspace", "migrate", ""])
-    assert {"--to-schema", "--to-writer-protocol", "--backup-dir"} <= choices
-    assert not {"--resume", "--rollback"} & choices
 
 
 def _native_completion(script: str, shell: str, words: list[str]) -> set[str]:
@@ -254,7 +224,7 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
     }
     output = _run(tmp_path, "completion", shell)
     assert output.exit_code == 0
-    assert len(LEAF_PATHS) == 55 and readonly <= set(LEAF_PATHS)
+    assert len(LEAF_PATHS) == 53 and readonly <= set(LEAF_PATHS)
     for leaf in LEAF_PATHS:
         if shell == "fish":
             # Public registration lines belonging to this exact command path.

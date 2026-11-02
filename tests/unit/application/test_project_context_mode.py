@@ -1,4 +1,4 @@
-"""Workspace declaration versions 3 and 4 select the legacy or the canonical mode."""
+"""Only a schema-4 workspace declaration is admitted; schema 3 is reported as not migrated."""
 
 from __future__ import annotations
 
@@ -8,9 +8,9 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spec_dock.runtime.application.project_context import (
-    probe_workspace_mode,
+    WorkspaceNotMigrated,
+    declares_schema_4,
     read_workspace_declaration,
-    workspace_mode,
 )
 
 if TYPE_CHECKING:
@@ -27,14 +27,14 @@ def _declare(root: Path, payload: object) -> Path:
     return path
 
 
-@pytest.mark.parametrize(("version", "mode"), [(3, "legacy"), (4, "canonical")])
 @pytest.mark.parametrize("protocol", [NEW, OLD])
-def test_versions_three_and_four_select_a_mode(tmp_path: Path, version: int, mode: str, protocol: str) -> None:
-    declaration = read_workspace_declaration(
-        _declare(tmp_path, {"schema_version": version, "writer_protocol": protocol})
-    )
-    assert workspace_mode(declaration) == mode
-    assert probe_workspace_mode(tmp_path) == mode
+def test_schema_four_is_admitted_and_schema_three_is_not_migrated(tmp_path: Path, protocol: str) -> None:
+    declaration = read_workspace_declaration(_declare(tmp_path, {"schema_version": 4, "writer_protocol": protocol}))
+    assert declaration["schema_version"] == 4
+    assert declares_schema_4(tmp_path) is True
+    with pytest.raises(WorkspaceNotMigrated):
+        read_workspace_declaration(_declare(tmp_path, {"schema_version": 3, "writer_protocol": protocol}))
+    assert declares_schema_4(tmp_path) is False
 
 
 @pytest.mark.parametrize(
@@ -52,20 +52,15 @@ def test_versions_three_and_four_select_a_mode(tmp_path: Path, version: int, mod
 def test_other_declarations_are_refused_and_never_probe_as_a_mode(tmp_path: Path, payload: object) -> None:
     with pytest.raises(ValueError):
         read_workspace_declaration(_declare(tmp_path, payload))
-    assert probe_workspace_mode(tmp_path) is None
+    assert declares_schema_4(tmp_path) is False
 
 
 def test_probe_never_raises_for_missing_or_broken_files(tmp_path: Path) -> None:
-    assert probe_workspace_mode(tmp_path) is None
+    assert declares_schema_4(tmp_path) is False
     path = tmp_path / "spec-dock/workspace.json"
     path.parent.mkdir()
     path.write_bytes(b"{broken")
-    assert probe_workspace_mode(tmp_path) is None
+    assert declares_schema_4(tmp_path) is False
     path.unlink()
     path.mkdir()
-    assert probe_workspace_mode(tmp_path) is None
-
-
-def test_mode_of_a_mapping_requires_a_known_version() -> None:
-    with pytest.raises(ValueError):
-        workspace_mode({"schema_version": 5})
+    assert declares_schema_4(tmp_path) is False

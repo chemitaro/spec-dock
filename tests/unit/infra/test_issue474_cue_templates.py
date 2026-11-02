@@ -1,4 +1,4 @@
-"""iss-00474 AC-07/AC-10: the CUE Scope templates ship under templates/cue/<kind>/ beside the unchanged .md ones."""
+"""iss-00474 AC-07/AC-10: the CUE Scope templates ship under templates/cue/<kind>/; the Markdown set is gone (iss-00440)."""
 
 from __future__ import annotations
 
@@ -23,7 +23,6 @@ CUE_FILES = (
     "report.md",
     "requirement.cue",
 )
-MARKDOWN_FILES = (".workbench/README.md", "design.md", "plan.md", "report.md", "requirement.md")
 
 
 def _files(directory: Path) -> list[str]:
@@ -31,10 +30,10 @@ def _files(directory: Path) -> list[str]:
 
 
 @pytest.mark.parametrize("kind", KINDS)
-def test_each_kind_ships_the_cue_set_and_keeps_the_markdown_set(kind: str) -> None:
+def test_each_kind_ships_the_cue_set_and_no_markdown_set(kind: str) -> None:
     assert _files(PROVIDER / "templates/cue" / kind) == sorted(CUE_FILES)
-    # The previous CLI copies everything under templates/<kind>/; it must still find only the .md set there.
-    assert _files(PROVIDER / "templates" / kind) == sorted(MARKDOWN_FILES)
+    # The Markdown Scope templates (templates/<kind>/) were removed with legacy mode in 0.5.0.
+    assert not (PROVIDER / "templates" / kind).exists()
 
 
 @pytest.mark.parametrize("kind", KINDS)
@@ -42,7 +41,7 @@ def test_the_explanation_and_workbench_are_byte_copies(kind: str) -> None:
     directory = PROVIDER / "templates/cue" / kind
     skeleton = PROVIDER / "design-system/explanation-skeleton.html"
     assert (directory / "explanation.html").read_bytes() == skeleton.read_bytes()
-    workbench = PROVIDER / "templates" / kind / ".workbench/README.md"
+    workbench = PROVIDER / "templates/root/.workbench/README.md"
     assert (directory / ".workbench/README.md").read_bytes() == workbench.read_bytes()
 
 
@@ -50,6 +49,8 @@ def test_the_explanation_and_workbench_are_byte_copies(kind: str) -> None:
 def test_the_report_depends_on_the_cue_documents(kind: str) -> None:
     report = (PROVIDER / "templates/cue" / kind / "report.md").read_text(encoding="utf-8")
     assert '依存: ["requirement.cue", "design.cue", "plan.cue"]' in report
+    # Title and parents come from GitHub, so the report no longer repeats them in its front matter.
+    assert "\nタイトル:" not in report and "\n親:" not in report
     assert "requirement.md" not in report
     assert "](../../../docs/authoring/report.md)" in report
     assert (PROVIDER / "templates/cue" / kind / "../../../docs/authoring/report.md").resolve().is_file()
