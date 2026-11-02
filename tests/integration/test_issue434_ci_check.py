@@ -33,7 +33,7 @@ def test_the_check_script_hardens_the_source_before_building() -> None:
     for line in (
         "set -euo pipefail",
         'if [[ ! "$expected_sha" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then',
-        "actual_sha=\"$(git -C \"$source_root\" rev-parse --verify 'HEAD^{commit}')\"",
+        'actual_sha="$(git -C "$source_root" rev-parse --verify \'HEAD^{commit}\')"',  # noqa: RUF027 -- Git syntax
         'if [[ -n "$(git -C "$source_root" status --porcelain --untracked-files=all)" ]]; then',
         'git -C "$source_root" archive "$actual_sha" src/spec_dock pyproject.toml README.md setup.py | tar -x -C "$build_root"',
         "unset PYTHONPATH PYTHONHOME PYTHONUSERBASE PYTHONSTARTUP",

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+
 @pytest.mark.parametrize("title", ["Leaf", "  日本語の題名  ", "x" * 256, "Emoji 🚀 ok"])
 def test_a_canonical_title_is_any_language_up_to_256_characters(title: str) -> None:
     from spec_dock.runtime.domain.canonical_scaffold import validate_canonical_title

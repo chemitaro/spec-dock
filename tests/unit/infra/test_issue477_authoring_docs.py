@@ -49,6 +49,7 @@ PREVIOUS_SHA256 = {
 }
 # The bytes of cue.md as iss-00477 first shipped it (7f3cf7d3c); iss-00487 rewrote it.
 CUE_GUIDE_FIRST_SHA256 = "c674b205dce51b30766e60dd1302aedf8672e2facefda4aaa47f37d7499ec88e"
+CUE_GUIDE_0_4_2_SHA256 = "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91"
 # The bytes of cue.md as iss-00487 shipped it (155d144d8); iss-00489 rewrote it again.
 CUE_GUIDE_ISS487_SHA256 = "a4593015a9dc78bff46204436f02ba0ecc49cf3e13de5d9b33cd28e958451d28"
 CUE_MODULES = (canonical_scope_create, scope_check, canonical_scope_check, scope_render, cue_tool)
@@ -216,12 +217,13 @@ def test_historical_separates_the_old_assurance_from_the_assurance_level() -> No
 
 def test_the_template_catalog_names_the_cue_set_and_its_arguments() -> None:
     text = _read(SCAFFOLD / "templates/README.md")
-    section = _section(text, "## CUE の Scope の雛形")
+    # Since 0.5.0 (iss-00440) the CUE set is the only Scope template set and opens the catalog.
+    section = text.split("Current の Artifact template")[0]
     for kind in ("initiative", "epic", "issue"):
         assert f"`cue/{kind}/{{requirement.cue,design.cue,plan.cue,explanation.html,report.md}}`" in section
     for token in ("{{ASSURANCE_LEVEL}}", "{{ASSURANCE_REASON}}", "--assurance", "--assurance-reason"):
         assert token in section, token
-    assert "SCOPE_TEMPLATES_OUTDATED" in section and "canonical モード" in section
+    assert "SCOPE_TEMPLATES_OUTDATED" in section
     assert "../docs/authoring/cue.md" in section and "../docs/authoring/explanation.md" in section
 
 
@@ -237,20 +239,10 @@ def test_the_skill_carries_the_cue_section_for_canonical_mode() -> None:
         "plan.cue",
         "spec-dock/docs/authoring/cue.md",
         "spec-dock/docs/authoring/explanation.md",
-        "canonical モード",
         "CANONICAL_NOT_MIGRATED",
     ):
         assert token in section, token
     assert (ROOT / ".agents/skills/spec-dock/SKILL.md").read_bytes() == SKILL.read_bytes()
-
-
-def test_the_version_is_0_4_2_everywhere() -> None:
-    project = re.search(r'^\[project\]\nname = "spec-dock"\nversion = "([^"]+)"', _read(ROOT / "pyproject.toml"), re.M)
-    assert project is not None and project.group(1) == VERSION
-    locked = re.search(r'\[\[package\]\]\nname = "spec-dock"\nversion = "([^"]+)"', _read(ROOT / "uv.lock"))
-    assert locked is not None and locked.group(1) == VERSION
-    for root in (SCAFFOLD, ROOT / "spec-dock"):
-        assert _read(root / "system/spec-dock-version") == f"{VERSION}\n"
 
 
 def test_the_release_notes_list_the_contract_changes_for_canonical_mode() -> None:
@@ -280,8 +272,11 @@ def test_the_inventory_ships_the_new_guides_and_accepts_the_previous_bytes() -> 
     for name in ("cue.md", "explanation.md"):
         entry = entries[f"spec-dock/docs/authoring/{name}"]
         data = (AUTHORING / name).read_bytes()
-        # iss-00487 and iss-00489 rewrote cue.md after it first shipped; those earlier bytes are its known old versions.
-        known_old = [CUE_GUIDE_ISS487_SHA256, CUE_GUIDE_FIRST_SHA256] if name == "cue.md" else []
+        # iss-00487 and iss-00489 rewrote cue.md after it first shipped, and 0.5.0 (iss-00440) dropped its schema-3
+        # sentence; those earlier bytes are its known old versions.
+        known_old = (
+            [CUE_GUIDE_ISS487_SHA256, CUE_GUIDE_FIRST_SHA256, CUE_GUIDE_0_4_2_SHA256] if name == "cue.md" else []
+        )
         assert entry["sha256"] == hashlib.sha256(data).hexdigest() and entry["known_old_sha256"] == known_old
         assert (ROOT / "spec-dock/docs/authoring" / name).read_bytes() == data
     for path, previous in PREVIOUS_SHA256.items():

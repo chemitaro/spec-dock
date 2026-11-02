@@ -8,12 +8,11 @@ import re
 ROOT = Path(__file__).resolve().parents[3]
 SKILL = ROOT / "src/spec_dock/assets/install_root/.agents/skills/spec-dock/SKILL.md"
 AGENTS = ROOT / "AGENTS.md"
-HEADING = "## 仕様の扱い（canonical モード）"
+HEADING = "## 仕様の扱い"  # 0.5.0 removed "（canonical モード）" (Epic design ch. 10)
 
 # One phrase per item of the Epic design ch. 10 section and of the items iss-00436 adds (R-436-01).
 REQUIRED = (
     "`schema_version` が 4",
-    "3 のリポジトリでは、今までどおり",
     "`spec-dock/initiatives/`",
     "`git add`",
     "`stash`",
@@ -63,6 +62,7 @@ def test_the_skill_and_agents_md_carry_the_same_rules_section() -> None:
     assert len(_items(skill)) >= 13  # the 11 items of ch. 10 and the two iss-00436 adds
     for phrase in REQUIRED:
         assert phrase in skill, phrase
+    assert "3 のリポジトリでは" not in skill and "3 のリポジトリでは" not in agents  # removed in 0.5.0 (Epic ch. 10)
 
 
 def test_canonical_remove_needs_an_exact_destructive_instruction_in_both() -> None:

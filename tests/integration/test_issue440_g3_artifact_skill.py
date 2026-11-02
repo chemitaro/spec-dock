@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock.cli import main
 from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.support.canonical_writes import WriteWorld
 from tests.support.legacy_contracts_g3 import make_world
 
 if TYPE_CHECKING:
@@ -37,6 +38,7 @@ def test_cli_research_artifact_can_be_finalized_without_recreating_its_identity(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = make_world(tmp_path, monkeypatch, capsys, write=True)
+    assert isinstance(world, WriteWorld)
     world.scope("epic", 2, "Fixture", parent=1)
     world.scope("issue", 3, "Fixture", parent=2)
     root = world.main

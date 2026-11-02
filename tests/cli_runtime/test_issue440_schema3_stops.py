@@ -193,7 +193,8 @@ def test_other_unknown_declarations_stay_precondition_failures(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], schema: object
 ) -> None:
     root = unmigrated_repository(tmp_path / "consumer", schema=schema)  # type: ignore[arg-type]
-    for leaf, extra in (("scope list", []), ("workspace validate", []), ("active show", [])):
+    leaves: tuple[tuple[str, list[str]], ...] = (("scope list", []), ("workspace validate", []), ("active show", []))
+    for leaf, extra in leaves:
         code, result = _run(capsys, root, leaf, extra)
         assert code == 3 and result["error"]["code"] == "PRECONDITION_FAILED", (leaf, result)
         assert "schema 4" in result["error"]["message"]

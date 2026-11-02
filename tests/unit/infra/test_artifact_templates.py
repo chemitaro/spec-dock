@@ -234,7 +234,8 @@ def test_relative_links_in_artifact_guide_resolve_when_present(root: Path) -> No
 def test_templates_readme_explains_template_guide_usage() -> None:
     readme = _read_asset(PROVIDER_ASSET_ROOT, "templates/README.md")
 
-    assert "各テンプレートは対応する Guide を参照して記入する" in readme
+    for guide in ("[CUE Authoring Guide](../docs/authoring/cue.md)", "[Report Guide](../docs/authoring/report.md)"):
+        assert guide in readme
 
 
 def test_current_initiative_and_epic_artifact_rules_keep_historical_types_non_creatable() -> None:

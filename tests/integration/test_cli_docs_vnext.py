@@ -5,7 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 import re
 import shlex
-import sys
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "src/spec_dock/assets/spec_dock"
@@ -47,7 +46,6 @@ def test_offline_explanation_is_shipped_and_linked() -> None:
     assert "reference_cli.md" in (DOCS / "README.md").read_text()
 
 
-# TODO(iss-00440): remove after all groups migrate (imported by tests/integration/test_issue413_wheel.py)
 def readme_creation_commands() -> list[list[str]]:
     commands = [
         shlex.split(line)[1:]
@@ -56,33 +54,6 @@ def readme_creation_commands() -> list[list[str]]:
     ]
     assert [command[2] for command in commands] == ["initiative", "epic", "issue"]
     return commands
-
-
-# TODO(iss-00440): remove after all groups migrate (imported by tests/integration/test_issue413_wheel.py)
-def sequential_github_stub(executable: Path, log: Path) -> None:
-    """A stateful external gh boundary: only created numbers can be read."""
-    executable.write_text(
-        f"#!{sys.executable}\n"
-        "import json,sys\nfrom pathlib import Path\n"
-        f"log=Path({str(log)!r})\n"
-        "argv=sys.argv[1:]; method=argv[argv.index('--method')+1]; endpoint=argv[argv.index('--method')+2]\n"
-        "assert argv[:5]==['api','--hostname','github.com','--include','--method']\n"
-        "rows=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []\n"
-        "created=[row['number'] for row in rows if row['method']=='POST']\n"
-        "if method=='POST':\n"
-        " assert endpoint=='repos/example/repo/issues'\n"
-        " payload=json.load(sys.stdin); number=501+len(created); title=payload['title']; status=201\n"
-        "else:\n"
-        " assert method=='GET'; number=int(endpoint.rsplit('/',1)[-1])\n"
-        " assert endpoint==f'repos/example/repo/issues/{number}' and number in created\n"
-        " title='Created parent'; status=200\n"
-        "with log.open('a') as stream: stream.write(json.dumps(dict(method=method,number=number))+'\\n')\n"
-        "response=dict(number=number,repository_url='https://api.github.com/repos/example/repo',\n"
-        " html_url=f'https://github.com/example/repo/issues/{number}',title=title,state='open',\n"
-        " state_reason=None,updated_at='2026-10-06T00:00:00Z')\n"
-        "print(f'HTTP/2.0 {status} OK\\n\\n'+json.dumps(response))\n"
-    )
-    executable.chmod(0o755)
 
 
 def test_current_operating_links_and_sync_examples_follow_observation_contract() -> None:
