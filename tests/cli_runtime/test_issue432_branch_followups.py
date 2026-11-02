@@ -154,12 +154,12 @@ def test_remove_runs_the_legacy_step_on_the_checked_record(
     world.select("init-00001", 1)
     original = canonical_worktrees._remove_captured_worktree
 
-    def changed_first(namespace, context, entry, captured, held):
+    def changed_first(namespace, context, entry, captured, held, **options):
         with WorkTargetStore(context.root) as store:
             current = store.read()
             assert current.handle is not None
             store.remove_observed(current.handle)  # the selection changes after the expectation was checked
-        return original(namespace, context, entry, captured, held)
+        return original(namespace, context, entry, captured, held, **options)
 
     monkeypatch.setattr(canonical_worktrees, "_remove_captured_worktree", changed_first)
     code, payload = world.run("worktree", "remove", str(linked), "--yes", "--expect-current", "init-1")
