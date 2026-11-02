@@ -5,10 +5,10 @@ package spec
 goal: "`installation update`（と `--dry-run`）が、写しを外してリンクのない枠ごとに `CLAUDE_SKILL_LINK_MISSING` を出し、置き方を示す。"
 
 steps: {
-	"S-01": {title: "警告のテストを先に書く（Red）", realizes: ["R-01"], status: "doing", session: "impl"}
-	"S-02": {title: "警告を作る関数と、planned・succeeded・partial の結果への取り付け", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "葉の help に1文を足す", realizes: ["R-01"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "コードのレビュー、最終品質ゲート、PR", realizes: ["R-01"], status: "todo", after: ["S-03"], session: "impl"}
+	"S-01": {title: "警告のテストを先に書く（Red）", realizes: ["R-01"], status: "done", session: "impl"}
+	"S-02": {title: "警告を作る関数と、planned・succeeded・partial の結果への取り付け", realizes: ["R-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "葉の help に1文を足す", realizes: ["R-01"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "コードのレビュー、最終品質ゲート、PR", realizes: ["R-01"], status: "doing", after: ["S-03"], session: "impl"}
 }
 
 tests: {
