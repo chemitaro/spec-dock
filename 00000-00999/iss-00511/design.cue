@@ -14,7 +14,7 @@ design: {
 	}
 	"D-02": {
 		title:     "撤去した案内の不在のテスト"
-		text:      "`tests/unit/infra/test_issue511_removed_guidance.py` を足す。`src/spec_dock/assets/` の下の配布する文書とスキル（`*.md`、`*.html`、`SKILL.md`）を全部読み、禁止の語（`spec-dock workspace migrate`、`workbench copy`、`--ci`、`--source local`、`.meta.json` を作る案内）が無いことを確かめる。歴史として残す記述は許す範囲を表にする：`docs/migration.md` の「0.5.0 への更新」の節と、0.4.x への更新の節（撤去前の手順を歴史として書く）。表に無い箇所での出現は失敗にし、表の各項目が実在する（古い許可が残らない）ことも確かめる。`--ci` は `--cia` のような語の一部に当たらないよう、語の境界で数える。"
+		text:      "`tests/unit/infra/test_issue511_removed_guidance.py` を足す。`src/spec_dock/assets/` の下の配布する文書とスキル（`*.md`、`*.html`）を全部読み、禁止の語を語の境界つきで数える：`spec-dock workspace migrate`、`workbench copy`、`--ci`、`--source local`、`.meta.json`。許可は（語, 文書）の表で決め、表の外の出現を失敗にする。今の出現に合わせた表：`workspace migrate`・`--source local` は migration.md の「0.5.0 への更新」の節だけ。`workbench copy`・`--ci` は同じ節と canonical.md の撤去の注記（121〜122行）だけ。`.meta.json` は「あってはならないものとして検出・説明する」文書（canonical.md、reference_cli.md、cli-redesign-guide.html、migration.md）だけで、それ以外の文書とスキルでは0件、かつどの文書にも `.meta.json` を作る・書く・写す指示の文型（作成する、書く、写す）を含まない。表の各項目には、その文書にその語が1回以上あることを確かめ、古い許可が残らないようにする。0.4.x の節は禁止の語を含まないので表に入れない。"
 		satisfies: ["R-02"]
 	}
 	"D-03": {
@@ -34,5 +34,5 @@ design: {
 	}
 }
 
-compatibility: "R-03 は契約の変更：重複したキーを持つ版4の宣言が、`canonical check` で失敗（`WORKSPACE_DECLARATION_INVALID`、`details.reason=duplicate-member`）になる。#513 が `migration.md` の 0.5.1 の節に載せる。そのほかの契約は変えない。版は上げず、`migration.md` に節を足さない。"
+compatibility: "R-03 は契約の変更：重複したキー（入れ子を含む）を持つ宣言が（版3の宣言でも、`WORKSPACE_NOT_MIGRATED` ではなく同じ失敗の1件になる。hook が版を読む前に働くため。業務コマンドの読み方と同じ）、`canonical check` で失敗（`WORKSPACE_DECLARATION_INVALID`、`details.reason=duplicate-member`）になる。#513 が `migration.md` の 0.5.1 の節に載せる。そのほかの契約は変えない。版は上げず、`migration.md` に節を足さない。"
 risks: ["文書の禁止語のテストが、許可の表の外の正当な説明にも当たる。→ 許可の表を明示し、当たったら表か文書を直す", "fixture が 0.4.2 の出力と食い違う。→ `git show v0.4.2:` の雛形から手順で再現し、手順を test の docstring に残す"]
