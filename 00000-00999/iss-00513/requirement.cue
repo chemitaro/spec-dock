@@ -41,6 +41,10 @@ requirements: {
 		title: "5つのリポジトリが 0.5.1 にそろう（マージの後に統括が行う）"
 		text:  "利用者の環境に 0.5.1 を入れ、4つのリポジトリで `installation update` の PR を作り、`canonical check` と検査のワークフローを通す。"
 	}
+	"R-05": {
+		title: "利用者のリポジトリの古い記述を直す（マージの後に統括が行う）"
+		text:  "配布の PR で、input-devices の `README.md` の SpecDock の `4d25a8b` の固定と、company-os の `contract.md` の 0.2.4・`4d25a8b` の記述を、今の版の決まり（版のファイルに従う）に直す。"
+	}
 }
 
 // 失敗・境界の条件。番号（F-01、…）をキーにする。
