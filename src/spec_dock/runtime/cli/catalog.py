@@ -619,7 +619,11 @@ def _help_spec(leaf: str) -> HelpSpec:
         if leaf == "installation init":
             writes = "Only previously absent package-owned static files and a new workspace declaration; conflicts stop before changes."
         elif leaf == "installation update":
-            writes = "Preserve and restore-check changed static bytes, add missing package assets, replace known old files and retire known legacy files only in this worktree."
+            writes = (
+                "Preserve and restore-check changed static bytes, add missing package assets, replace known old files and"
+                " retire known legacy files only in this worktree. A retired .claude/skills slot without a link warns"
+                " CLAUDE_SKILL_LINK_MISSING with how to place it; the link is never created."
+            )
         elif leaf == "installation uninstall":
             writes = "Preserve and restore-check known static bytes before removing only those files. Keep workspace declaration, ignore rules, user work, state and directories."
     elif leaf == "workspace validate":

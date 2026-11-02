@@ -6,6 +6,7 @@ import errno
 import os
 from pathlib import Path
 import secrets
+import shlex
 import sys
 import tempfile
 from typing import TYPE_CHECKING
@@ -143,6 +144,7 @@ def update_static_assets(
                 *(Effect(kinds[asset.path], "planned", asset.path) for asset in changed),
                 *(Effect("installation.retire", "planned", name) for name in retired),
             ),
+            warnings=_missing_skill_links(git.root, retired, uninstall=uninstall),
         )
     assert backup is not None
     try:
@@ -251,13 +253,48 @@ def update_static_assets(
         data["changed_paths"] = tuple(applied)
         data["created_paths"] = tuple(created)
         data["retired_paths"] = tuple(removed)
-        return _incomplete(namespace, data, effects, error)
+        return _incomplete(
+            namespace, data, effects, error, warnings=_missing_skill_links(git.root, removed, uninstall=uninstall)
+        )
     data["changed_paths"] = tuple(applied)
     data["created_paths"] = tuple(created)
     data["retired_paths"] = tuple(removed)
     return OperationResult(
-        namespace.command_path, "succeeded", FamilyData("installation", data), 0, effects=tuple(effects)
+        namespace.command_path,
+        "succeeded",
+        FamilyData("installation", data),
+        0,
+        effects=tuple(effects),
+        warnings=_missing_skill_links(git.root, removed, uninstall=uninstall),
     )
+
+
+def _missing_skill_links(root: Path, retired: list[str], *, uninstall: bool) -> tuple[Diagnostic, ...]:
+    """One warning per retired `.claude/skills` slot: Claude Code no longer sees that skill without its link.
+
+    Uninstall also removes the `.agents/skills` targets, so a link would have nothing to reach.
+    """
+    if uninstall:
+        return ()
+    warnings: list[Diagnostic] = []
+    for slot in RETIRED_SKILL_SLOTS:
+        if not any(name.startswith(f"{slot}/") for name in retired):
+            continue
+        link_target = f"../../.agents/skills/{Path(slot).name}"
+        command = (
+            f"cd {shlex.quote(str(root))} && find {slot} -mindepth 1 -depth -type d -empty -delete"
+            f" && rmdir {slot} && ln -s {link_target} {slot}"
+        )
+        warnings.append(
+            Diagnostic(
+                "CLAUDE_SKILL_LINK_MISSING",
+                f"{slot}: the retired copy leaves no link to {link_target}, so Claude Code cannot see this skill;"
+                f" SpecDock does not create the link. After the update, run sync-project-skills in Claude Code"
+                f" or: {command}",
+                {"slot": slot, "link_target": link_target, "command": command},
+            )
+        )
+    return tuple(warnings)
 
 
 def _linked_host_slot(root: Path, name: str) -> bool:
@@ -303,7 +340,12 @@ def _backup_destination(value: str | None, context: ProjectContext, roots: tuple
 
 
 def _incomplete(
-    namespace: argparse.Namespace, data: dict[str, object], effects: list[Effect], error: BaseException
+    namespace: argparse.Namespace,
+    data: dict[str, object],
+    effects: list[Effect],
+    error: BaseException,
+    *,
+    warnings: tuple[Diagnostic, ...] = (),
 ) -> OperationResult[object]:
     native = error
     while native.__cause__ is not None:
@@ -315,6 +357,7 @@ def _incomplete(
         FamilyData("installation", data),
         6,
         effects=tuple(effects),
+        warnings=warnings,
         error=Diagnostic(
             "INSTALLATION_INCOMPLETE", "static update stopped; inspect the preserved backup and actual paths", details
         ),
