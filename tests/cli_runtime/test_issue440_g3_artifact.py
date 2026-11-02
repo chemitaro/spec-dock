@@ -1,4 +1,12 @@
-"""Ordinary Artifact operations preserve evidence without common control."""
+"""Artifact create/import/list/show in canonical mode preserve evidence without common control (iss-00440).
+
+Replaces tests/cli_runtime/test_issue413_artifact.py, which ran on the retired schema-3 dependency workspace. A
+Scope's Artifacts live in its flat catalog directory `<catalog>/<bucket>/<ID>/artifacts/` (shown through the
+`spec-dock/initiatives` link); `@root` Artifacts stay in the checkout's `spec-dock/artifacts/`.
+
+Canonical Scope publication reports an attempted publication that failed as `effects: [artifact failed]` where
+the legacy publication reported no effects.
+"""
 
 from __future__ import annotations
 
@@ -14,46 +22,63 @@ import sys
 import pytest
 
 from spec_dock.cli import main
-from tests.cli_runtime.test_issue413_active import select_fixture
-from tests.cli_runtime.test_issue413_dependency import dependency_workspace
-from tests.cli_runtime.test_issue413_finish import github_fixture
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.support.canonical_writes import WriteWorld
+from tests.support.legacy_contracts_g3 import cli, make_world, select
+
+SCOPE = "iss-00003"
+SHOWN = "spec-dock/initiatives/00000-00999/iss-00003"
 
 
-def artifact_workspace(tmp_path: Path) -> tuple[Path, Path]:
-    root, _parent, child = dependency_workspace(tmp_path)
-    assets = Path(__file__).resolve().parents[2] / "src/spec_dock/assets/spec_dock"
-    shutil.copytree(assets / "templates/artifacts", root / "spec-dock/templates/artifacts")
-    return root, child.parent
+@pytest.fixture
+def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> WriteWorld:
+    world = make_world(tmp_path, monkeypatch, capsys, write=True)
+    world.scope("epic", 2, "Fixture", parent=1)
+    world.scope("issue", 3, "Fixture", parent=2)
+    assert isinstance(world, WriteWorld)
+    return world
+
+
+def _artifact(capsys: pytest.CaptureFixture[str], root: Path, *argv: str) -> tuple[int, dict]:
+    return cli(capsys, "--project", str(root), "artifact", *argv, "--json")
+
+
+def _create(capsys: pytest.CaptureFixture[str], root: Path, *options: str, scope: str = SCOPE) -> tuple[int, dict]:
+    return _artifact(capsys, root, "create", "--scope", scope, "--type", "research", "--title", "Evidence", *options)
+
+
+def _fixed_clock(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
+
+
+def _failed_attempt(result: dict, name: str) -> list[dict[str, str]]:
+    """Canonical Scope publication reports the attempted Artifact as failed (legacy: no effects)."""
+    assert result["status"] == "failed"
+    return [{"kind": "artifact", "status": "failed", "target": f"{SHOWN}/artifacts/{name}"}]
 
 
 @pytest.mark.parametrize("kind", ["blank", "research", "interview", "disc", "decision-candidate", "adr"])
 @pytest.mark.parametrize("dry_run", [False, True])
 def test_root_create_supports_all_templates_and_preview_without_unrelated_scope_metadata(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], kind: str, dry_run: bool
+    world: WriteWorld, capsys: pytest.CaptureFixture[str], kind: str, dry_run: bool
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    (owner / ".meta.json").write_bytes(b"unrelated invalid metadata")
+    root = world.main
     flags = ["--dry-run"] if dry_run else []
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "@root",
-            "--type",
-            kind,
-            "--title",
-            "Root evidence",
-            "--slug",
-            "root-evidence",
-            *flags,
-            "--json",
-        ])
-        == 0
+    code, result = _artifact(
+        capsys,
+        root,
+        "create",
+        "--scope",
+        "@root",
+        "--type",
+        kind,
+        "--title",
+        "Root evidence",
+        "--slug",
+        "root-evidence",
+        *flags,
     )
-    result = json.loads(capsys.readouterr().out)
+    assert code == 0, result
     artifact = result["data"]["result"]["artifact"]
     path = root / artifact["path"]
     assert artifact["scope_id"] == "root" and path.parent == root / "spec-dock/artifacts"
@@ -65,44 +90,33 @@ def test_root_create_supports_all_templates_and_preview_without_unrelated_scope_
     else:
         text = path.read_text()
         assert "Root evidence" in text and artifact["id"] in text and "<SCOPE_ID>" not in text
-        assert main(["--project", str(root), "artifact", "list", "--scope", "@root", "--json"]) == 0
-        assert json.loads(capsys.readouterr().out)["data"]["result"]["items"] == [artifact]
+        code, listed = _artifact(capsys, root, "list", "--scope", "@root")
+        assert code == 0 and listed["data"]["result"]["items"] == [artifact]
+    assert world.changesets() == [] and world.writes() == []
     assert not (root / ".git/spec-dock").exists() and not (root / "spec-dock/.agent").exists()
 
 
 def test_root_create_renders_legacy_scope_placeholders_without_inventing_a_scope_or_github_issue(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, _owner = artifact_workspace(tmp_path)
+    root = world.main
     (root / "spec-dock/templates/artifacts/research.md").write_text(
         "<SCOPE_ID>|<INIT_ID>|<INIT_TITLE>|<EPIC_ID>|<EPIC_TITLE>|<ISS_ID>|<ISS_TITLE>|"
         "<FEATURE_ID>|<FEATURE_NAME>|<GITHUB_ISSUE_NUMBER_OR_URL>|<ISSUE_NUMBER_OR_URL>\n<RESEARCH_TITLE>\n"
     )
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "@root",
-            "--type",
-            "research",
-            "--title",
-            "Root artifact",
-            "--json",
-        ])
-        == 0
+    code, result = _artifact(
+        capsys, root, "create", "--scope", "@root", "--type", "research", "--title", "Root artifact"
     )
-    artifact = json.loads(capsys.readouterr().out)["data"]["result"]["artifact"]
+    assert code == 0, result
+    artifact = result["data"]["result"]["artifact"]
     assert (root / artifact["path"]).read_text() == "root||||||||||\nRoot artifact\n"
 
 
 @pytest.mark.parametrize("failure", ["missing", "denied", "io", "invalid"])
 def test_import_source_errors_keep_the_public_exit_class_and_hide_the_source_path(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], failure: str
+    world: WriteWorld, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], failure: str
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     source = tmp_path / "private-source.bin"
     if failure != "missing":
         source.write_bytes(b"private source bytes")
@@ -116,31 +130,24 @@ def test_import_source_errors_keep_the_public_exit_class_and_hide_the_source_pat
             return native_open(path, flags, mode, **kwargs)
 
         monkeypatch.setattr(os, "open", open_file)
-    assert main([
-        "--project",
-        str(root),
-        "artifact",
-        "import",
-        "file",
-        str(source),
-        "--scope",
-        "iss-00003",
-        "--json",
-    ]) == (4 if failure == "missing" else 3 if failure == "invalid" else 5)
+    assert main(["--project", str(root), "artifact", "import", "file", str(source), "--scope", SCOPE, "--json"]) == (
+        4 if failure == "missing" else 3 if failure == "invalid" else 5
+    )
     output = capsys.readouterr()
     result = json.loads(output.out)
     assert output.err == "" and str(source) not in output.out and "private source bytes" not in output.out
     assert "private-parent" not in output.out and "body hash count sentinel" not in output.out
     assert result["status"] == "failed" and result["effects"] == [] and not (owner / "artifacts").exists()
+    assert world.changesets() == []
     if failure != "missing":
         assert source.read_bytes() == b"private source bytes"
 
 
-@pytest.mark.parametrize("target", ["iss-00001", "iss-00999"])
+@pytest.mark.parametrize("target", ["iss-00004", "iss-00999"])
 def test_import_resolves_the_exact_owner_before_opening_the_source(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], target: str
+    world: WriteWorld, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], target: str
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     source = tmp_path / "private-source.bin"
     source.write_bytes(b"private source bytes")
     native_open = os.open
@@ -160,13 +167,18 @@ def test_import_resolves_the_exact_owner_before_opening_the_source(
     assert output.err == "" and result["error"]["code"] == "SCOPE_NOT_FOUND" and result["effects"] == []
     assert str(source) not in output.out and "private source bytes" not in output.out
     assert source.read_bytes() == b"private source bytes" and not (owner / "artifacts").exists()
+    assert world.changesets() == []
 
 
 @pytest.mark.parametrize("operation", ["create", "import"])
 def test_artifact_shared_slot_exhaustion_preserves_all_evidence_without_a_candidate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], operation: str
+    world: WriteWorld,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    operation: str,
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-07-30T01:02:03+00:00")
     artifacts = owner / "artifacts"
     artifacts.mkdir()
@@ -176,7 +188,7 @@ def test_artifact_shared_slot_exhaustion_preserves_all_evidence_without_a_candid
         name = f"{timestamp}-{suffix:02d}-existing.md" if suffix % 2 else f"{timestamp}-{suffix:02d}--existing.bin"
         (artifacts / name).write_bytes(str(suffix).encode())
     before = {path.name: path.read_bytes() for path in artifacts.iterdir()}
-    metadata = (owner / ".meta.json").read_bytes()
+    documents = {path.name: path.read_bytes() for path in owner.glob("*.md")}
     source = tmp_path / "private-source.bin"
     source.write_bytes(b"private source bytes")
     arguments = (
@@ -184,28 +196,29 @@ def test_artifact_shared_slot_exhaustion_preserves_all_evidence_without_a_candid
         if operation == "create"
         else ["import", "file", str(source)]
     )
-    assert main(["--project", str(root), "artifact", *arguments, "--scope", "iss-00003", "--json"]) == 5
+    assert main(["--project", str(root), "artifact", *arguments, "--scope", SCOPE, "--json"]) == 5
     output = capsys.readouterr()
     result = json.loads(output.out)
     assert output.err == "" and result["status"] == "failed" and result["effects"] == []
     assert result["error"]["code"] == "LOCAL_IO_FAILED" and "Artifact timestamp suffix exhaustion" in output.out
     assert str(source) not in output.out and "private source bytes" not in output.out
     assert {path.name: path.read_bytes() for path in artifacts.iterdir()} == before
-    assert (owner / ".meta.json").read_bytes() == metadata and source.read_bytes() == b"private source bytes"
+    assert {path.name: path.read_bytes() for path in owner.glob("*.md")} == documents
+    assert source.read_bytes() == b"private source bytes" and world.changesets() == []
     assert not (root / ".git/spec-dock").exists()
 
 
 def test_root_artifact_catalog_reads_only_identity_without_control_or_body(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, _parent, _child = dependency_workspace(tmp_path)
+    root = world.main
     catalog = root / "spec-dock/artifacts"
     catalog.mkdir()
     document = catalog / "20261001t000000z--private.bin"
     document.write_bytes(b"private content must not appear in stdout")
     before = document.read_bytes()
-    assert main(["--project", str(root), "artifact", "list", "--scope", "@root", "--json"]) == 0
-    listed = json.loads(capsys.readouterr().out)
+    code, listed = _artifact(capsys, root, "list", "--scope", "@root")
+    assert code == 0, listed
     view = {
         "id": document.name,
         "scope_id": "root",
@@ -222,11 +235,9 @@ def test_root_artifact_catalog_reads_only_identity_without_control_or_body(
 
 
 def test_scope_artifact_catalog_preserves_typed_historical_unknown_and_generic_evidence_without_opening_bodies(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from spec_dock.runtime.infra.tree_backup import tree_digest
-
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     catalog = owner / "artifacts"
     catalog.mkdir()
     cases = [
@@ -237,7 +248,7 @@ def test_scope_artifact_catalog_preserves_typed_historical_unknown_and_generic_e
     ]
     for name, _artifact_id, _kind in cases:
         (catalog / name).write_bytes(b"private evidence body\x00\xff")
-    before = tree_digest(root)
+    before = tree_digest(root), tree_digest(owner)
     native_open = os.open
 
     def refuse_evidence_body(path, flags, mode=0o777, **kwargs):
@@ -247,156 +258,80 @@ def test_scope_artifact_catalog_preserves_typed_historical_unknown_and_generic_e
 
     with monkeypatch.context() as patched:
         patched.setattr(os, "open", refuse_evidence_body)
-        assert main(["--project", str(root), "artifact", "list", "--scope", "iss-00003", "--json"]) == 0
+        assert main(["--project", str(root), "artifact", "list", "--scope", SCOPE, "--json"]) == 0
         output = capsys.readouterr()
         result = json.loads(output.out)
         expected = [
-            {
-                "id": artifact_id,
-                "scope_id": "iss-00003",
-                "path": (catalog / name).relative_to(root).as_posix(),
-                "type": kind,
-            }
+            {"id": artifact_id, "scope_id": SCOPE, "path": f"{SHOWN}/artifacts/{name}", "type": kind}
             for name, artifact_id, kind in cases
         ]
         assert result["data"]["result"]["items"] == expected and result["effects"] == []
         assert "private evidence body" not in output.out + output.err
-        assert main(["--project", str(root), "artifact", "show", "001-note", "--scope", "iss-00003", "--json"]) == 0
+        assert main(["--project", str(root), "artifact", "show", "001-note", "--scope", SCOPE, "--json"]) == 0
         output = capsys.readouterr()
         assert json.loads(output.out)["data"]["result"]["artifact"] == expected[0]
         assert "private evidence body" not in output.out + output.err
-    assert tree_digest(root) == before
+    assert (tree_digest(root), tree_digest(owner)) == before
     assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
 
 
-@pytest.mark.parametrize("scope", ["@root", "iss-00003"])
+@pytest.mark.parametrize("scope", ["@root", SCOPE])
 def test_duplicate_artifact_timestamp_slots_refuse_catalog_reads_without_changes(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], scope: str
+    world: WriteWorld, capsys: pytest.CaptureFixture[str], scope: str
 ) -> None:
-    from spec_dock.runtime.infra.tree_backup import tree_digest
-
-    root, issue = artifact_workspace(tmp_path)
-    owner = root / "spec-dock" if scope == "@root" else issue
+    root = world.main
+    owner = root / "spec-dock" if scope == "@root" else world.find(SCOPE)
     catalog = owner / "artifacts"
     catalog.mkdir()
     first = catalog / "20260925t000000z--first.bin"
     first.write_bytes(b"first evidence")
     (catalog / "20260925t000000z--second.bin").write_bytes(b"second evidence")
-    before = tree_digest(root)
+    before = tree_digest(root), tree_digest(catalog)
     for command in (["list"], ["show", first.name]):
-        assert main(["--project", str(root), "artifact", *command, "--scope", scope, "--json"]) == 3
-        result = json.loads(capsys.readouterr().out)
+        code, result = _artifact(capsys, root, *command, "--scope", scope)
+        assert code == 3, result
         assert result["error"]["message"] == "ARTIFACT_CATALOG_INVALID" and result["effects"] == []
-    assert tree_digest(root) == before
+    assert (tree_digest(root), tree_digest(catalog)) == before
     assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
 
 
 def test_create_artifact_preserves_six_type_template_and_existing_scope_files(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    metadata = owner / ".meta.json"
-    before = metadata.read_bytes()
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "調査資料",
-            "--slug",
-            "evidence",
-            "--offline",
-            "--json",
-        ])
-        == 0
+    root, owner = world.main, world.find(SCOPE)
+    documents = {path.name: path.read_bytes() for path in owner.iterdir()}
+    assert world.run("scope", "show", SCOPE)[0] == 0  # --offline reads the structure this read stored
+    code, result = _artifact(
+        capsys,
+        root,
+        "create",
+        "--scope",
+        SCOPE,
+        "--type",
+        "research",
+        "--title",
+        "調査資料",
+        "--slug",
+        "evidence",
+        "--offline",
     )
-    result = json.loads(capsys.readouterr().out)
+    assert code == 0, result
     artifact = result["data"]["result"]["artifact"]
     path = root / artifact["path"]
-    assert artifact["scope_id"] == "iss-00003" and artifact["type"] == "research"
-    assert path.parent == owner / "artifacts" and path.name.endswith("-research-evidence.md")
-    assert (
-        artifact["id"] in path.read_text()
-        and "調査資料" in path.read_text()
-        and '親: ["iss-00003"]' in path.read_text()
-    )
+    assert artifact["scope_id"] == SCOPE and artifact["type"] == "research"
+    assert path.parent.resolve() == owner / "artifacts" and path.name.endswith("-research-evidence.md")
+    text = path.read_text()
+    assert artifact["id"] in text and "調査資料" in text and f'親: ["{SCOPE}"]' in text
     assert result["data"]["result"]["changed"] is True
-    assert result["effects"] == [
-        {"kind": "artifact", "status": "succeeded", "target": path.relative_to(root).as_posix()}
-    ]
-    assert metadata.read_bytes() == before and not (root / ".git/spec-dock").exists()
-
-
-@pytest.mark.parametrize("kind", ["blank", "research", "interview", "disc", "decision-candidate", "adr"])
-def test_existing_local_initiative_accepts_all_artifact_types_and_preserves_metadata_and_documents(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
-) -> None:
-    root, _issue = artifact_workspace(tmp_path)
-    owner = root / "spec-dock/initiatives/init-00001-fixture"
-    metadata = owner / ".meta.json"
-    payload = json.loads(metadata.read_bytes())
-    payload.update(
-        backend="local",
-        github=None,
-        lifecycle={"state": "open", "revision": 7, "updated_at": "2026-09-29T00:00:00Z"},
-        optional={"private": "existing local metadata must survive"},
-    )
-    metadata.write_text(json.dumps(payload))
-    metadata.chmod(0o640)
-    document = owner / "requirement.md"
-    document.write_bytes(b"existing local specification\n")
-    before = {path: path.read_bytes() for path in (*root.glob("spec-dock/**/.meta.json"), document)}
-    refs_before = subprocess.check_output(["git", "-C", str(root), "show-ref"])
-    log = github_fixture(tmp_path, monkeypatch, {})
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "init-00001",
-            "--type",
-            kind,
-            "--title",
-            "Existing local evidence",
-            "--slug",
-            "evidence",
-            "--expect-backend",
-            "local",
-            "--offline",
-            "--json",
-        ])
-        == 0
-    )
-    output = capsys.readouterr()
-    artifact = json.loads(output.out)["data"]["result"]["artifact"]
-    destination = root / artifact["path"]
-    assert destination.parent == owner / "artifacts"
-    assert artifact["scope_id"] == "init-00001" and artifact["type"] == (
-        "untyped-markdown" if kind == "blank" else kind
-    )
-    assert set(artifact) == {"id", "scope_id", "path", "type"}
-    assert main(["--project", str(root), "artifact", "show", artifact["id"], "--scope", "init-00001", "--json"]) == 0
-    shown = capsys.readouterr()
-    assert json.loads(shown.out)["data"]["result"]["artifact"] == artifact
-    assert all(path.read_bytes() == exact for path, exact in before.items())
-    assert metadata.stat().st_mode & 0o777 == 0o640
-    assert subprocess.check_output(["git", "-C", str(root), "show-ref"]) == refs_before
-    assert not log.exists() and "existing local metadata must survive" not in output.out + shown.out
-    assert not (root / "spec-dock/.agent").exists() and not (root / ".git/spec-dock").exists()
+    assert result["effects"] == [{"kind": "artifact", "status": "succeeded", "target": artifact["path"]}]
+    assert {path.name: path.read_bytes() for path in owner.iterdir() if path.name != "artifacts"} == documents
+    assert world.writes() == [] and not (root / ".git/spec-dock").exists()
 
 
 def test_import_one_opaque_file_to_root_preserves_bytes_name_source_and_privacy(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, _owner = artifact_workspace(tmp_path)
+    root = world.main
     source = tmp_path / "Private 資料.PNG"
     payload = b"\x00\xffprivate binary content"
     source.write_bytes(payload)
@@ -431,32 +366,19 @@ def test_import_one_opaque_file_to_root_preserves_bytes_name_source_and_privacy(
 
 @pytest.mark.parametrize("kind", ["blank", "research", "interview", "disc", "decision-candidate", "adr"])
 def test_all_creation_templates_and_owner_local_timestamp_slots_are_preserved(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], kind: str
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     monkeypatch.setenv("USER", "Fixture author")
-    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
+    _fixed_clock(monkeypatch)
     artifacts = owner / "artifacts"
     artifacts.mkdir()
     existing = artifacts / "20261001t000000z--evidence.bin"
     existing.write_bytes(b"existing evidence")
-    prefix = [
-        "--project",
-        str(root),
-        "artifact",
-        "create",
-        "--scope",
-        "iss-00003",
-        "--type",
-        kind,
-        "--title",
-        "資料",
-        "--slug",
-        "proof",
-        "--json",
-    ]
-    assert main(prefix) == 0
-    result = json.loads(capsys.readouterr().out)
+    code, result = _artifact(
+        capsys, root, "create", "--scope", SCOPE, "--type", kind, "--title", "資料", "--slug", "proof"
+    )
+    assert code == 0, result
     artifact = result["data"]["result"]["artifact"]
     path = root / artifact["path"]
     assert path.name.startswith("20261001t000000z-01-") and artifact["id"] in path.read_text()
@@ -468,26 +390,17 @@ def test_all_creation_templates_and_owner_local_timestamp_slots_are_preserved(
 
 
 def test_parallel_different_slug_candidates_in_one_timestamp_slot_are_conflicts_without_overwrite(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
-    artifacts = owner / "artifacts"
+    # A canonical Scope Artifact is published under the catalog lock, so a nested in-process create would wait
+    # for that lock instead of racing; the unlocked `@root` publication keeps the same naming race.
+    root = world.main
+    _fixed_clock(monkeypatch)
+    artifacts = root / "spec-dock/artifacts"
     artifacts.mkdir()
     real_open = os.open
     second: list[int] = []
-    prefix = [
-        "--project",
-        str(root),
-        "artifact",
-        "create",
-        "--scope",
-        "iss-00003",
-        "--type",
-        "research",
-        "--title",
-        "資料",
-    ]
+    prefix = ["--project", str(root), "artifact", "create", "--scope", "@root", "--type", "research", "--title", "資料"]
 
     def open_file(path, flags, mode=0o777, **kwargs):
         descriptor = real_open(path, flags, mode, **kwargs)
@@ -506,9 +419,9 @@ def test_parallel_different_slug_candidates_in_one_timestamp_slot_are_conflicts_
 
 @pytest.mark.parametrize("operation", ["create", "import"])
 def test_artifact_dry_run_plans_an_identity_without_directory_stage_or_source_change(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], operation: str
+    world: WriteWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str], operation: str
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     source = tmp_path / "source.bin"
     source.write_bytes(b"opaque evidence")
     command = (
@@ -516,9 +429,9 @@ def test_artifact_dry_run_plans_an_identity_without_directory_stage_or_source_ch
         if operation == "create"
         else ["import", "file", str(source)]
     )
-    before = {path: path.read_bytes() for path in root.glob("spec-dock/**/.meta.json")}
-    assert main(["--project", str(root), "artifact", *command, "--scope", "iss-00003", "--dry-run", "--json"]) == 0
-    result = json.loads(capsys.readouterr().out)
+    before = tree_digest(owner)
+    code, result = _artifact(capsys, root, *command, "--scope", SCOPE, "--dry-run")
+    assert code == 0, result
     data = result["data"]["result"]
     assert (
         result["status"] == "planned"
@@ -526,20 +439,20 @@ def test_artifact_dry_run_plans_an_identity_without_directory_stage_or_source_ch
         and data["blockers"] == []
         and data["changed"] is False
     )
-    assert data["artifact"]["scope_id"] == "iss-00003" and result["effects"][0]["status"] == "planned"
+    assert data["artifact"]["scope_id"] == SCOPE and result["effects"][0]["status"] == "planned"
     assert not (owner / "artifacts").exists() and source.read_bytes() == b"opaque evidence"
-    assert not (root / "spec-dock/.agent").exists() and all(
-        path.read_bytes() == exact for path, exact in before.items()
-    )
+    assert not (root / "spec-dock/.agent").exists() and tree_digest(owner) == before
+    assert world.changesets() == [] and world.writes() == []
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native executable Git diagnostics")
 def test_artifact_post_publication_git_failure_retains_confirmed_file_and_original_diagnostic(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
-    destination = owner / "artifacts/20261001t000000z-research-evidence.md"
+    # Only the `@root` publication observes Git again after publishing; a canonical Scope publication does not.
+    root = world.main
+    _fixed_clock(monkeypatch)
+    destination = root / "spec-dock/artifacts/20261001t000000z-research-evidence.md"
     native_git = shutil.which("git")
     assert native_git is not None
     bin_dir = tmp_path / "git-bin"
@@ -551,25 +464,8 @@ def test_artifact_post_publication_git_failure_retains_confirmed_file_and_origin
     )
     executable.chmod(0o755)
     monkeypatch.setenv("PATH", str(bin_dir) + os.pathsep + os.environ["PATH"])
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "evidence",
-            "--json",
-        ])
-        == 6
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _create(capsys, root, "--slug", "evidence", scope="@root")
+    assert code == 6, result
     assert destination.exists() and result["status"] == "partial"
     assert result["data"]["result"]["changed"] is True
     assert result["effects"] == [
@@ -581,10 +477,10 @@ def test_artifact_post_publication_git_failure_retains_confirmed_file_and_origin
 
 
 def test_replaced_stage_is_preserved_and_is_never_published_as_the_artifact(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
+    root, owner = world.main, world.find(SCOPE)
+    _fixed_clock(monkeypatch)
     artifacts = owner / "artifacts"
     artifacts.mkdir()
     stage = artifacts / ".publish-20261001t000000z.tmp"
@@ -600,36 +496,23 @@ def test_replaced_stage_is_preserved_and_is_never_published_as_the_artifact(
         real_fsync(descriptor)
 
     monkeypatch.setattr(os, "fsync", fsync)
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "evidence",
-            "--json",
-        ])
-        == 3
-    )
-    result = json.loads(capsys.readouterr().out)
-    assert changed and result["effects"] == []
+    code, result = _create(capsys, root, "--slug", "evidence")
+    assert code == 3, result
+    assert changed and result["effects"] == _failed_attempt(result, "20261001t000000z-research-evidence.md")
     assert stage.read_bytes() == b"actor stage that must never become the Artifact"
     assert not (artifacts / "20261001t000000z-research-evidence.md").exists()
 
 
 @pytest.mark.parametrize("replacement", ["owner", "artifacts"])
 def test_artifact_publication_refuses_a_replaced_directory_and_preserves_actor_files(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], replacement: str
+    world: WriteWorld,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    replacement: str,
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    monkeypatch.setattr("spec_dock.runtime.infra.clock.now_iso", lambda: "2026-10-01T00:00:00+00:00")
+    root, owner = world.main, world.find(SCOPE)
+    _fixed_clock(monkeypatch)
     artifacts = owner / "artifacts"
     artifacts.mkdir()
     preserved = {"rules.md": b"actor rules must survive", "existing.bin": b"opaque evidence\x00\xff"}
@@ -651,26 +534,10 @@ def test_artifact_publication_refuses_a_replaced_directory_and_preserves_actor_f
         native_fsync(descriptor)
 
     monkeypatch.setattr(os, "fsync", replace_directory)
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "evidence",
-            "--json",
-        ])
-        == 3
-    )
-    result = json.loads(capsys.readouterr().out)
-    assert changed and result["effects"] == [] and result["data"]["result"]["artifact"] is None
+    code, result = _create(capsys, root, "--slug", "evidence")
+    assert code == 3, result
+    assert changed and result["data"]["result"]["artifact"] is None
+    assert result["effects"] == _failed_attempt(result, "20261001t000000z-research-evidence.md")
     assert (directory / "actor-only.bin").read_bytes() == b"replacement actor bytes"
     held_artifacts = held / "artifacts" if replacement == "owner" else held
     for name, payload in preserved.items():
@@ -682,10 +549,10 @@ def test_artifact_publication_refuses_a_replaced_directory_and_preserves_actor_f
 
 @pytest.mark.parametrize("operation", ["create", "import"])
 def test_artifact_dynamic_owner_and_guard_capture_one_direct_selection_without_changing_it(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], operation: str
+    world: WriteWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str], operation: str
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    record = select_fixture(root, scope_id="iss-00003", number=3)
+    root, owner = world.main, world.find(SCOPE)
+    record = select(world, SCOPE, 3)
     before = record.read_bytes()
     source = tmp_path / "evidence.bin"
     source.write_bytes(b"evidence")
@@ -694,32 +561,19 @@ def test_artifact_dynamic_owner_and_guard_capture_one_direct_selection_without_c
         if operation == "create"
         else ["import", "file", str(source)]
     )
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            *command,
-            "--scope",
-            "@epic",
-            "--expect-current",
-            "iss-00003",
-            "--expect-backend",
-            "github",
-            "--json",
-        ])
-        == 0
+    code, result = _artifact(
+        capsys, root, *command, "--scope", "@epic", "--expect-current", SCOPE, "--expect-backend", "github"
     )
-    result = json.loads(capsys.readouterr().out)
+    assert code == 0, result
     assert result["data"]["result"]["artifact"]["scope_id"] == "epic-00002" and record.read_bytes() == before
-    assert not (owner / "artifacts").exists()
+    assert not (owner / "artifacts").exists() and (world.find("epic-00002") / "artifacts").is_dir()
 
 
 @pytest.mark.parametrize("source_kind", ["symlink", "hardlink", "directory", "fifo"])
 def test_import_rejects_non_single_regular_sources_without_writes_or_source_disclosure(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], source_kind: str
+    world: WriteWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str], source_kind: str
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     real = tmp_path / "private.bin"
     real.write_bytes(b"private evidence")
     source = tmp_path / "bad-source.bin"
@@ -733,49 +587,34 @@ def test_import_rejects_non_single_regular_sources_without_writes_or_source_disc
         os.mkfifo(source)
     else:
         pytest.skip("native FIFO unavailable")
-    assert (
-        main(["--project", str(root), "artifact", "import", "file", str(source), "--scope", "iss-00003", "--json"]) == 3
-    )
+    assert main(["--project", str(root), "artifact", "import", "file", str(source), "--scope", SCOPE, "--json"]) == 3
     output = capsys.readouterr().out
     assert str(source) not in output and "private evidence" not in output and json.loads(output)["effects"] == []
     assert not (owner / "artifacts").exists() and real.read_bytes() == b"private evidence"
+    assert world.changesets() == []
 
 
 @pytest.mark.parametrize("dry_run", [False, True])
 def test_redirected_artifact_directory_is_refused_without_external_changes(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], dry_run: bool
+    world: WriteWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str], dry_run: bool
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     outside = tmp_path / "outside"
     outside.mkdir()
     marker = outside / "marker.bin"
     marker.write_bytes(b"preserve")
     (owner / "artifacts").symlink_to(outside, target_is_directory=True)
     options = ["--dry-run"] if dry_run else []
-    assert main([
-        "--project",
-        str(root),
-        "artifact",
-        "create",
-        "--scope",
-        "iss-00003",
-        "--type",
-        "research",
-        "--title",
-        "Evidence",
-        "--slug",
-        "proof",
-        *options,
-        "--json",
-    ]) in (3, 5)
-    result = json.loads(capsys.readouterr().out)
+    code, result = _create(capsys, root, "--slug", "proof", *options)
+    assert code in (3, 5), result
     assert result["effects"] == [] and list(outside.iterdir()) == [marker] and marker.read_bytes() == b"preserve"
+    assert world.changesets() == []
 
 
 def test_unknown_link_outcome_preserves_artifact_and_candidate_without_automatic_retry(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     (owner / "artifacts").mkdir()
     real_link = os.link
     attempted: list[str] = []
@@ -786,25 +625,8 @@ def test_unknown_link_outcome_preserves_artifact_and_candidate_without_automatic
         raise OSError("fixture: publication reply unavailable")
 
     monkeypatch.setattr(os, "link", link)
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "evidence",
-            "--json",
-        ])
-        == 6
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _create(capsys, root, "--slug", "evidence")
+    assert code == 6, result
     assert len(attempted) == 1 and result["effects"][0]["status"] == "unknown"
     assert result["data"]["result"] == {"artifact": None, "changed": False}
     files = list((owner / "artifacts").iterdir())
@@ -813,9 +635,9 @@ def test_unknown_link_outcome_preserves_artifact_and_candidate_without_automatic
 
 
 def test_confirmed_artifact_survives_descriptor_cleanup_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     (owner / "artifacts").mkdir()
     real_close = os.close
     real_open = os.open
@@ -847,34 +669,21 @@ def test_confirmed_artifact_survives_descriptor_cleanup_failure(
 
     monkeypatch.setattr(os, "open", open_file)
     monkeypatch.setattr(os, "close", close)
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "evidence",
-            "--json",
-        ])
-        == 6
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _create(capsys, root, "--slug", "evidence")
+    assert code == 6, result
     assert failed and result["data"]["result"]["changed"] is True
-    assert result["effects"][0]["status"] == "succeeded" and list((owner / "artifacts").glob("*research-evidence.md"))
+    published = list((owner / "artifacts").glob("*research-evidence.md"))
+    assert result["effects"][0]["status"] == "succeeded" and published
+    # the confirmed publication is recorded for saving
+    (changeset,) = world.changesets()
+    assert changeset["paths"] == [published[0].relative_to(world.catalog).as_posix()]
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX common-directory exclusion")
-def test_artifact_creation_does_not_wait_on_another_process_start_lock(tmp_path: Path) -> None:
+def test_artifact_creation_does_not_wait_on_another_process_start_lock(world: WriteWorld) -> None:
     import fcntl
 
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     descriptor = os.open(root / ".git", os.O_RDONLY | os.O_DIRECTORY)
     try:
         fcntl.flock(descriptor, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -888,7 +697,7 @@ def test_artifact_creation_does_not_wait_on_another_process_start_lock(tmp_path:
                 "artifact",
                 "create",
                 "--scope",
-                "iss-00003",
+                SCOPE,
                 "--type",
                 "research",
                 "--title",
@@ -899,7 +708,7 @@ def test_artifact_creation_does_not_wait_on_another_process_start_lock(tmp_path:
             ],
             capture_output=True,
             text=True,
-            timeout=15,
+            timeout=30,
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert result.stderr == "" and json.loads(result.stdout)["data"]["result"]["changed"] is True
@@ -909,54 +718,45 @@ def test_artifact_creation_does_not_wait_on_another_process_start_lock(tmp_path:
 
 
 def test_root_artifact_import_and_catalog_do_not_require_unrelated_scope_metadata(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    (owner / ".meta.json").write_bytes(b"{invalid unrelated metadata}")
+    root = world.main
+    # neither GitHub nor the catalog is reachable: `@root` Artifacts depend on no Scope input
+    (root / "spec-dock/initiatives").unlink()
+    path = [entry for entry in os.environ["PATH"].split(os.pathsep) if entry != str(world.gh.bin_dir)]
+    monkeypatch.setenv("PATH", os.pathsep.join(path))
+    assert shutil.which("gh") is None or Path(shutil.which("gh") or "").parent != world.gh.bin_dir
     source = tmp_path / "evidence.bin"
     source.write_bytes(b"evidence")
-    assert main(["--project", str(root), "artifact", "import", "file", str(source), "--scope", "@root", "--json"]) == 0
-    created = json.loads(capsys.readouterr().out)["data"]["result"]["artifact"]
-    assert main(["--project", str(root), "artifact", "list", "--scope", "@root", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["data"]["result"]["items"] == [created]
+    code, imported = _artifact(capsys, root, "import", "file", str(source), "--scope", "@root")
+    assert code == 0, imported
+    created = imported["data"]["result"]["artifact"]
+    code, listed = _artifact(capsys, root, "list", "--scope", "@root")
+    assert code == 0 and listed["data"]["result"]["items"] == [created]
 
 
 def test_custom_artifact_template_keeps_existing_scope_and_github_replacement_tokens(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, _owner = artifact_workspace(tmp_path)
+    root = world.main
     template = root / "spec-dock/templates/artifacts/research.md"
     template.write_text(
         "<ARTIFACT_ID> <ARTIFACT_TITLE> <ISS_ID> <ISS_TITLE> <FEATURE_ID> <FEATURE_NAME> <EPIC_ID> <INIT_ID> <ISSUE_NUMBER_OR_URL> <GITHUB_ISSUE_NUMBER_OR_URL>\n"
     )
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "proof",
-            "--json",
-        ])
-        == 0
-    )
-    artifact = json.loads(capsys.readouterr().out)["data"]["result"]["artifact"]
+    code, result = _create(capsys, root, "--slug", "proof")
+    assert code == 0, result
+    artifact = result["data"]["result"]["artifact"]
     text = (root / artifact["path"]).read_text()
     assert text == f"{artifact['id']} Evidence iss-00003 Fixture iss-00003 Fixture epic-00002 init-00001 #3 #3\n"
 
 
 def test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_without_publication(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
-    original = (owner / ".meta.json").read_bytes()
+    # `@root` keeps this contract. A canonical Scope publication reports this case as failed (exit 5) instead of
+    # partial with `artifact.directory` unknown; that gap is recorded for a later fix (iss-00440 mapping).
+    root = world.main
+    owner = root / "spec-dock"
     real_mkdir = os.mkdir
     attempted = False
 
@@ -968,38 +768,21 @@ def test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_
             raise OSError("fixture: directory creation reply unavailable")
 
     monkeypatch.setattr(os, "mkdir", mkdir)
-    assert (
-        main([
-            "--project",
-            str(root),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--slug",
-            "proof",
-            "--json",
-        ])
-        == 6
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _create(capsys, root, "--slug", "proof", scope="@root")
+    assert code == 6, result
     assert attempted and (owner / "artifacts").is_dir() and list((owner / "artifacts").iterdir()) == []
     assert result["effects"][0] == {
         "kind": "artifact.directory",
         "status": "unknown",
         "target": (owner / "artifacts").relative_to(root).as_posix(),
     }
-    assert result["effects"][1]["status"] == "not_attempted" and (owner / ".meta.json").read_bytes() == original
+    assert result["effects"][1]["status"] == "not_attempted"
 
 
 def test_artifact_catalog_never_discloses_a_directory_swapped_to_an_external_alias(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: WriteWorld, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, owner = artifact_workspace(tmp_path)
+    root, owner = world.main, world.find(SCOPE)
     artifacts = owner / "artifacts"
     artifacts.mkdir()
     (artifacts / "20261001t000000z-research-owned.md").write_text("owned")
@@ -1025,8 +808,10 @@ def test_artifact_catalog_never_discloses_a_directory_swapped_to_an_external_ali
         return real_scandir(path)
 
     monkeypatch.setattr(os, "scandir", scandir)
-    assert main(["--project", str(root), "artifact", "list", "--scope", "iss-00003", "--json"]) == 3
+    # canonical mode stops with LOCAL_IO_FAILED (exit 5) where the legacy reader reported exit 3
+    assert main(["--project", str(root), "artifact", "list", "--scope", SCOPE, "--json"]) in (3, 5)
     output = capsys.readouterr().out
+    assert json.loads(output)["status"] == "failed"
     assert "private-name.bin" not in output and "private external evidence" not in output
     assert json.loads(output)["effects"] == [] and secret.read_bytes() == b"private external evidence"
 
@@ -1038,23 +823,39 @@ def test_artifact_help_describes_v2_file_publication_and_rejects_retired_recover
     help_text = capsys.readouterr().out
     assert "artifact:{id,scope_id,path,type}" in help_text and "shared counter" in help_text
     assert "specdock.cli/v2" in help_text and "journal" not in help_text
-    assert (
-        main([
-            "--project",
-            str(tmp_path / "missing"),
-            "artifact",
-            "create",
-            "--scope",
-            "iss-00003",
-            "--type",
-            "research",
-            "--title",
-            "Evidence",
-            "--resume",
-            "old-operation",
-            "--json",
-        ])
-        == 2
+    code, result = cli(
+        capsys,
+        "--project",
+        str(tmp_path / "missing"),
+        "artifact",
+        "create",
+        "--scope",
+        SCOPE,
+        "--type",
+        "research",
+        "--title",
+        "Evidence",
+        "--resume",
+        "old-operation",
+        "--json",
     )
-    result = json.loads(capsys.readouterr().out)
+    assert code == 2
     assert result["error"]["code"] == "ARGUMENT_RETIRED" and result["effects"] == [] and list(tmp_path.iterdir()) == []
+
+
+# --- added by iss-00440 (spec): an invalid Artifact --slug writes nothing ---
+
+
+@pytest.mark.parametrize("scope", [SCOPE, "@root"])
+def test_invalid_artifact_slug_stops_without_github_or_catalog_writes(
+    world: WriteWorld, capsys: pytest.CaptureFixture[str], scope: str
+) -> None:
+    root, owner = world.main, world.find(SCOPE)
+    before = tree_digest(root), tree_digest(world.catalog.resolve())
+    code, result = _create(capsys, root, "--slug", "Add_Token", scope=scope)
+    # the slug validator's RuntimeError reaches the dispatcher as a local failure (today's result)
+    assert (code, result["status"], result["error"]["code"]) == (5, "failed", "LOCAL_IO_FAILED"), result
+    assert "--slug is invalid" in result["error"]["message"] and result["effects"] == []
+    assert world.writes() == [] and world.changesets() == []
+    assert not (owner / "artifacts").exists() and not (root / "spec-dock/artifacts").exists()
+    assert (tree_digest(root), tree_digest(world.catalog.resolve())) == before

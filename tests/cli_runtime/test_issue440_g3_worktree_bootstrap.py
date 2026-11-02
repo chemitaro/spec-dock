@@ -1,4 +1,8 @@
-"""Run one explicitly selected project's init hook without bootstrap receipts."""
+"""`worktree bootstrap` in canonical mode runs one explicit project's init hook without receipts (iss-00440).
+
+Replaces tests/cli_runtime/test_issue413_worktree_bootstrap.py and the bootstrap round trip of
+tests/cli_runtime/test_worktree_commands_vnext.py, which ran on the retired schema-3 committed workspace.
+"""
 
 from __future__ import annotations
 
@@ -16,21 +20,36 @@ from typing import TYPE_CHECKING
 import pytest
 
 from spec_dock.cli import main
-from tests.cli_runtime.test_issue413_active import select_fixture
-from tests.cli_runtime.test_issue413_contract import add_scope
-from tests.cli_runtime.test_issue413_worktree_remove import linked_workspace
+from spec_dock.runtime.infra.tree_backup import tree_digest
+from tests.support.legacy_contracts_g3 import cli, linked_worktree, make_world, select
 
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from tests.support.canonical_scopes import CanonicalWorld
+
+
+@pytest.fixture
+def world(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CanonicalWorld:
+    return make_world(tmp_path, monkeypatch, capsys)
+
+
+@pytest.fixture
+def pair(world: CanonicalWorld, tmp_path: Path) -> tuple[Path, Path]:
+    return world.main, linked_worktree(world, tmp_path / "linked", "parallel")
+
+
+def _bootstrap(capsys: pytest.CaptureFixture[str], project: Path, target: Path, *options: str) -> tuple[int, dict]:
+    return cli(capsys, "--project", str(project), "worktree", "bootstrap", str(target), *options, "--json")
+
 
 def test_bootstrap_runs_make_init_only_in_the_explicit_native_worktree(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@printf 'one run\\n' >> bootstrap-ran\n", encoding="utf-8")
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 0
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 0, result
     assert (other / "bootstrap-ran").read_bytes() == b"one run\n" and not (root / "bootstrap-ran").exists()
     assert result["data"]["result"]["path"] == str(other) and result["data"]["result"]["changed"] is True
     assert result["data"]["result"]["observed"]["started"] is True
@@ -42,9 +61,13 @@ def test_bootstrap_runs_make_init_only_in_the_explicit_native_worktree(
 
 @pytest.mark.parametrize("unsafe", ["missing", "symlink", "directory", "hardlink"])
 def test_bootstrap_requires_a_project_owned_regular_makefile_before_execution(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], unsafe: str
+    pair: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    unsafe: str,
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     outside = tmp_path / "outside.make"
     outside.write_text("init:\n\t@touch trap-ran\n", encoding="utf-8")
     makefile = other / "Makefile"
@@ -63,32 +86,38 @@ def test_bootstrap_requires_a_project_owned_regular_makefile_before_execution(
         return native_popen(argv, *args, **kwargs)
 
     monkeypatch.setattr(subprocess, "Popen", popen)
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 3
-    assert json.loads(capsys.readouterr().out)["effects"] == [] and make_calls == []
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 3, result
+    assert result["effects"] == [] and make_calls == []
     assert outside.read_text(encoding="utf-8") == "init:\n\t@touch trap-ran\n"
     assert not (other / "trap-ran").exists()
 
 
 @pytest.mark.parametrize("inherited", ["MAKEFILES", "MAKEFLAGS", "MFLAGS"])
 def test_bootstrap_uses_the_explicit_project_without_inherited_make_injection(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], inherited: str
+    pair: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    inherited: str,
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
     trap = tmp_path / "outside-trap"
     outside = tmp_path / "injected.make"
     outside.write_text(f"INJECTED := $(shell touch '{trap}')\n", encoding="utf-8")
     monkeypatch.setenv(inherited, str(outside) if inherited == "MAKEFILES" else "-n")
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["effects"][0]["status"] == "succeeded"
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 0, result
+    assert result["effects"][0]["status"] == "succeeded"
     assert (other / "bootstrap-ran").exists() and not trap.exists()
 
 
 @pytest.mark.parametrize("mode", ["dry", "offline", "unconfirmed", "dry-offline"])
 def test_bootstrap_does_not_evaluate_make_for_preview_offline_or_missing_confirmation(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], mode: str
+    pair: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], mode: str
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text(
         "TRAP := $(shell touch trap-ran)\ninit:\n\t@touch bootstrap-ran\n", encoding="utf-8"
     )
@@ -108,10 +137,8 @@ def test_bootstrap_does_not_evaluate_make_for_preview_offline_or_missing_confirm
         "dry-offline": ["--dry-run", "--offline"],
     }[mode]
     dry_run = mode in ("dry", "dry-offline")
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), *flags, "--json"]) == (
-        0 if dry_run else 3
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, *flags)
+    assert code == (0 if dry_run else 3), result
     assert calls == [] and not (other / "trap-ran").exists() and not (other / "bootstrap-ran").exists()
     assert not (root / ".git/spec-dock").exists() and not (other / "spec-dock/.agent").exists()
     if dry_run:
@@ -123,16 +150,14 @@ def test_bootstrap_does_not_evaluate_make_for_preview_offline_or_missing_confirm
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX process-group termination")
 def test_bootstrap_timeout_keeps_applied_project_files_and_stops_its_child_group(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text(
         "init:\n\t@printf 'partial effect' > before-timeout\n\t@sleep 0.5; touch after-timeout\n", encoding="utf-8"
     )
-    assert (
-        main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--timeout", "0.1", "--json"]) == 6
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes", "--timeout", "0.1")
+    assert code == 6, result
     assert (other / "before-timeout").read_bytes() == b"partial effect"
     assert result["data"]["result"]["observed"]["started"] is True
     assert result["data"]["result"]["observed"]["timed_out"] is True
@@ -143,9 +168,9 @@ def test_bootstrap_timeout_keeps_applied_project_files_and_stops_its_child_group
 
 
 def test_bootstrap_failure_omits_hook_output_and_only_runs_again_for_a_new_explicit_request(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     makefile = other / "Makefile"
     secret = "unlabelled-hook-secret"
     makefile.write_text(
@@ -158,53 +183,45 @@ def test_bootstrap_failure_omits_hook_output_and_only_runs_again_for_a_new_expli
     assert result["effects"] == [{"kind": "worktree-bootstrap", "status": "unknown", "target": str(other)}]
     assert (other / "run-count").read_bytes() == b"first run\n"
     makefile.write_text("init:\n\t@printf 'second run\\n' >> run-count\n", encoding="utf-8")
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "succeeded"
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 0 and result["status"] == "succeeded", result
     assert (other / "run-count").read_bytes() == b"first run\nsecond run\n"
     assert not (root / ".git/spec-dock").exists()
 
 
 def test_bootstrap_preserves_a_source_selection_change_and_does_not_run_the_hook(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    world: CanonicalWorld, pair: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    from spec_dock.runtime.application import canonical_worktrees
+
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
-    record = select_fixture(root)
-    native_run = subprocess.run
+    record = select(world)
+    original = canonical_worktrees._bootstrap_captured_target
     cleared = False
 
-    def run(argv, *args, **kwargs):
+    def changed_first(namespace, context, entry, captured, held):
         nonlocal cleared
-        result = native_run(argv, *args, **kwargs)
-        if not cleared and tuple(argv[:5]) == ("git", "-C", str(root), "worktree", "list"):
-            cleared = True
-            record.unlink()
-        return result
+        cleared = True
+        record.unlink()  # the selection changes after --expect-current was checked on the captured record
+        return original(namespace, context, entry, captured, held)
 
-    monkeypatch.setattr(subprocess, "run", run)
-    assert (
-        main([
-            "--project",
-            str(root),
-            "worktree",
-            "bootstrap",
-            str(other),
-            "--expect-current",
-            "gh:example/repo#1",
-            "--yes",
-            "--json",
-        ])
-        == 3
-    )
-    assert json.loads(capsys.readouterr().out)["effects"] == []
+    monkeypatch.setattr(canonical_worktrees, "_bootstrap_captured_target", changed_first)
+    code, result = _bootstrap(capsys, root, other, "--expect-current", "gh:example/repo#1", "--yes")
+    assert code == 3, result
+    assert result["effects"] == []
     assert cleared and not record.exists() and not (other / "bootstrap-ran").exists()
 
 
 @pytest.mark.parametrize("fault", ["replacement", "close"])
 def test_bootstrap_keeps_completed_effects_after_target_identity_or_cleanup_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], fault: str
+    pair: tuple[Path, Path],
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+    fault: str,
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
     parked = tmp_path / "parked"
     initial = other.stat()
@@ -221,7 +238,7 @@ def test_bootstrap_keeps_completed_effects_after_target_identity_or_cleanup_fail
             finished = True
             if fault == "replacement":
                 other.rename(parked)
-                shutil.copytree(parked, other)
+                shutil.copytree(parked, other, symlinks=True)
                 injected = True
         return result
 
@@ -235,8 +252,8 @@ def test_bootstrap_keeps_completed_effects_after_target_identity_or_cleanup_fail
 
     monkeypatch.setattr(subprocess.Popen, "wait", wait)
     monkeypatch.setattr(os, "close", close)
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 6
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 6, result
     assert finished and injected and result["data"]["result"]["changed"] is True
     assert result["effects"] == [{"kind": "worktree-bootstrap", "status": "succeeded", "target": str(other)}]
     assert (other / "bootstrap-ran").exists()
@@ -246,9 +263,9 @@ def test_bootstrap_keeps_completed_effects_after_target_identity_or_cleanup_fail
 
 @pytest.mark.parametrize("change", ["content", "priority"])
 def test_bootstrap_preserves_a_changed_makefile_before_execution(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], change: str
+    pair: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], change: str
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     makefile = other / "Makefile"
     makefile.write_text("init:\n\t@touch original-ran\n", encoding="utf-8")
     actor_file = makefile if change == "content" else other / "GNUmakefile"
@@ -268,41 +285,44 @@ def test_bootstrap_preserves_a_changed_makefile_before_execution(
         return result
 
     monkeypatch.setattr(subprocess, "run", run)
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 3
-    assert json.loads(capsys.readouterr().out)["effects"] == [] and changed
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 3, result
+    assert result["effects"] == [] and changed
     assert actor_file.read_bytes() == actor_bytes and not (other / "actor-ran").exists()
     assert not (other / "original-ran").exists()
 
 
 @pytest.mark.parametrize("project", ["main", "linked"])
 def test_bootstrap_allows_a_main_or_current_native_worktree(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], project: str
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str], project: str
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (root / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
     source = root if project == "main" else other
-    assert main(["--project", str(source), "worktree", "bootstrap", str(root), "--yes", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "succeeded" and (root / "bootstrap-ran").exists()
+    code, result = _bootstrap(capsys, source, root, "--yes")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert (root / "bootstrap-ran").exists()
     assert not (other / "bootstrap-ran").exists()
 
 
 def test_bootstrap_can_initialize_a_native_target_without_a_workspace_declaration(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "spec-dock/workspace.json").unlink()
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 0
-    assert json.loads(capsys.readouterr().out)["status"] == "succeeded" and (other / "bootstrap-ran").exists()
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 0 and result["status"] == "succeeded", result
+    assert (other / "bootstrap-ran").exists()
 
 
 @pytest.mark.parametrize("guard", ["matching-current", "other-current", "backend"])
 def test_bootstrap_checks_canonical_source_guards_and_preserves_the_direct_record(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], guard: str
+    world: CanonicalWorld, pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str], guard: str
 ) -> None:
-    root, other = linked_workspace(tmp_path)
-    add_scope(root, "epic-00002", "epic", "init-00001", root / "spec-dock/initiatives/init-00001-fixture")
-    record = select_fixture(root)
+    root, other = pair
+    world.scope("epic", 2, "Second", parent=1)
+    record = select(world)
     original = record.read_bytes()
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
     flags = (
@@ -311,19 +331,17 @@ def test_bootstrap_checks_canonical_source_guards_and_preserves_the_direct_recor
         else ["--expect-current", "gh:example/repo#1" if guard == "matching-current" else "gh:example/repo#2"]
     )
     matches = guard == "matching-current"
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", *flags, "--json"]) == (
-        0 if matches else 3
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes", *flags)
+    assert code == (0 if matches else 3), result
     assert record.read_bytes() == original and (other / "bootstrap-ran").exists() is matches
     if not matches:
         assert result["effects"] == []
 
 
 def test_bootstrap_reports_a_process_start_failure_without_an_unknown_hook_effect(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
     native_popen = subprocess.Popen
     calls = 0
@@ -336,8 +354,8 @@ def test_bootstrap_reports_a_process_start_failure_without_an_unknown_hook_effec
         return native_popen(argv, *args, **kwargs)
 
     monkeypatch.setattr(subprocess, "Popen", popen)
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 5
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 5, result
     assert calls == 1 and result["data"]["result"]["observed"]["started"] is False
     assert result["effects"] == [{"kind": "worktree-bootstrap", "status": "failed", "target": str(other)}]
     assert not (other / "bootstrap-ran").exists() and result["recovery"] is None
@@ -345,9 +363,9 @@ def test_bootstrap_reports_a_process_start_failure_without_an_unknown_hook_effec
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX process signal")
 def test_bootstrap_reports_a_native_signal_as_an_unknown_hook_outcome(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@sleep 5\n", encoding="utf-8")
     native_popen = subprocess.Popen
     calls = 0
@@ -361,16 +379,18 @@ def test_bootstrap_reports_a_native_signal_as_an_unknown_hook_outcome(
         return process
 
     monkeypatch.setattr(subprocess, "Popen", popen)
-    assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 6
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes")
+    assert code == 6, result
     assert calls == 1 and result["data"]["result"]["observed"]["returncode"] == -signal.SIGTERM
     assert result["data"]["result"]["observed"]["timed_out"] is False
     assert result["effects"] == [{"kind": "worktree-bootstrap", "status": "unknown", "target": str(other)}]
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX Start exclusion in another process")
-def test_bootstrap_runs_while_start_exclusion_is_held(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    root, other = linked_workspace(tmp_path)
+def test_bootstrap_runs_while_start_exclusion_is_held(
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
+) -> None:
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@touch bootstrap-ran\n", encoding="utf-8")
     holder = subprocess.Popen(
         [
@@ -387,8 +407,9 @@ def test_bootstrap_runs_while_start_exclusion_is_held(tmp_path: Path, capsys: py
     )
     try:
         assert holder.stdout is not None and holder.stdout.readline() == "ready\n"
-        assert main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--json"]) == 0
-        assert json.loads(capsys.readouterr().out)["status"] == "succeeded" and (other / "bootstrap-ran").exists()
+        code, result = _bootstrap(capsys, root, other, "--yes")
+        assert code == 0 and result["status"] == "succeeded", result
+        assert (other / "bootstrap-ran").exists()
     finally:
         holder.communicate("\n", timeout=10)
     assert holder.returncode == 0
@@ -396,9 +417,9 @@ def test_bootstrap_runs_while_start_exclusion_is_held(tmp_path: Path, capsys: py
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX termination response failure")
 def test_bootstrap_keeps_a_started_hook_unknown_when_process_termination_reports_io_failure(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     (other / "Makefile").write_text("init:\n\t@touch before-timeout\n\t@sleep 5\n", encoding="utf-8")
     native_killpg = os.killpg
     calls = 0
@@ -412,10 +433,8 @@ def test_bootstrap_keeps_a_started_hook_unknown_when_process_termination_reports
     monkeypatch.setattr(os, "killpg", killpg)
     # The CLI timeout also bounds native Git preflight. Allow process startup
     # while keeping this deadline below the hook's five-second sleep.
-    assert (
-        main(["--project", str(root), "worktree", "bootstrap", str(other), "--yes", "--timeout", "2.0", "--json"]) == 6
-    )
-    result = json.loads(capsys.readouterr().out)
+    code, result = _bootstrap(capsys, root, other, "--yes", "--timeout", "2.0")
+    assert code == 6, result
     assert calls == 1 and (other / "before-timeout").exists()
     assert result["data"]["result"]["observed"]["started"] is True
     assert result["data"]["result"]["observed"]["timed_out"] is True
@@ -423,9 +442,9 @@ def test_bootstrap_keeps_a_started_hook_unknown_when_process_termination_reports
 
 
 def test_successful_bootstrap_omits_large_and_secret_hook_output_from_both_streams(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    pair: tuple[Path, Path], capsys: pytest.CaptureFixture[str]
 ) -> None:
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     script = (
         'import sys; print("hook-secret-413"); print("x" * 100000); '
         'print("error-secret-413", file=sys.stderr); print("e" * 100000, file=sys.stderr)'
@@ -449,20 +468,59 @@ def test_successful_bootstrap_omits_large_and_secret_hook_output_from_both_strea
 
 @pytest.mark.parametrize("exists", [False, True])
 def test_bootstrap_rejects_a_missing_or_non_native_target_without_running_a_hook(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], exists: bool
+    pair: tuple[Path, Path], tmp_path: Path, capsys: pytest.CaptureFixture[str], exists: bool
 ) -> None:
-    from spec_dock.runtime.infra.tree_backup import tree_digest
-
-    root, other = linked_workspace(tmp_path)
+    root, other = pair
     target = tmp_path / "not-a-worktree"
     if exists:
         target.mkdir()
         (target / "Makefile").write_text("init:\n\t@touch trap-ran\n", encoding="utf-8")
-    before = tree_digest(tmp_path)
+    before = tree_digest(root), tree_digest(other), sorted(path.name for path in tmp_path.iterdir())
     assert main(["--project", str(root), "worktree", "bootstrap", str(target), "--yes", "--json"]) == 4
     output = capsys.readouterr()
     result = json.loads(output.out)
     assert result["status"] == "failed" and result["effects"] == [] and not output.err
-    assert tree_digest(tmp_path) == before
+    assert (tree_digest(root), tree_digest(other), sorted(path.name for path in tmp_path.iterdir())) == before
     assert not (target / "trap-ran").exists() and not (other / "bootstrap-ran").exists()
     assert not (root / ".git/spec-dock").exists()
+
+
+# --- from tests/cli_runtime/test_worktree_commands_vnext.py ---
+
+
+def test_worktree_bootstrap_is_explicit_and_preview_or_offline_never_runs_make(
+    world: CanonicalWorld, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    root = world.main
+    target = tmp_path / "trees/planning"
+    code, created = cli(
+        capsys,
+        "--project",
+        str(root),
+        "worktree",
+        "create",
+        "planning",
+        "--base",
+        "HEAD",
+        "--root",
+        str(target.parent),
+        "--json",
+    )
+    assert code == 0, created
+    (target / "Makefile").write_text("init:\n\t@printf 'one run\\n' >> bootstrap-ran\n", encoding="utf-8")
+    command = ["--project", str(root), "worktree", "bootstrap", str(target), "--json"]
+    before = tree_digest(root)
+    target_before = tree_digest(target)
+    code, preview = cli(capsys, *command, "--dry-run")
+    assert code == 0, preview
+    assert preview["status"] == "planned" and preview["data"]["result"]["can_apply"] is True
+    code, refused = cli(capsys, *command, "--offline", "--yes")
+    assert code == 3 and refused["effects"] == []
+    assert tree_digest(root) == before and tree_digest(target) == target_before
+    assert not (target / "bootstrap-ran").exists()
+    code, result = cli(capsys, *command, "--yes")
+    assert code == 0, result
+    assert result["data"]["result"]["observed"]["started"] is True
+    assert result["data"]["result"]["observed"]["returncode"] == 0
+    assert (target / "bootstrap-ran").read_bytes() == b"one run\n" and not (root / "bootstrap-ran").exists()
+    assert not (root / ".git/spec-dock").exists() and not (target / "spec-dock/.agent").exists()
