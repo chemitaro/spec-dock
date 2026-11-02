@@ -31,7 +31,7 @@ Do not use active scope as a selector. A missing selector, multiple selectors, a
 Complete this preflight twice: before external capability use and immediately before the write.
 
 1. Resolve the repository root without changing Git state.
-2. Find one canonical target whose `.meta.json` ID and kind match the explicit selector.
+2. Resolve the explicit selector with `spec-dock scope show <selector> --json` and use the returned `id`, `kind` and `path` as the one canonical target.
 3. Resolve the target's real path and require it to remain under the repository's canonical `spec-dock/initiatives/` tree.
 4. Require the target directory and its `artifacts/` child to exist as ordinary directories, not symlinks.
 5. Require `artifacts/rules.md` to be a symlink that resolves to the matching Initiative, Epic, or Issue Artifact rules file inside `spec-dock/docs/rules/`.
@@ -114,7 +114,7 @@ Use the Current route template. The Artifact is evidence or a draft candidate, n
 8. Verify that the persistent delta is exactly one new Markdown Artifact and that pre-existing Artifact entries and protected scope files are unchanged.
 9. Return the exact path, route, title, and evidence/draft authority to the operator.
 
-Protected files include canonical Requirement, Design, Plan, Report, ADR, `CONTEXT.md`, `.meta.json`, active and dependency state, generated projections, agent host configuration (for example `.codex/config.toml` and `.claude/settings.json`), and Git/GitHub state.
+Protected files include canonical Requirement, Design, Plan, Report, ADR, `CONTEXT.md`, the GitHub Scope structure (kind labels, parents and dependencies), active and dependency state, generated projections, agent host configuration (for example `.codex/config.toml` and `.claude/settings.json`), and Git/GitHub state.
 
 ## Zero-write
 

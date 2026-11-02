@@ -19,11 +19,6 @@
 
 ## linked worktree 間の扱い
 
-- tracked `README.md` は root / node とも通常の Git checkout で別 worktree に現れます。
-- その他の ignored Workbench file は自動 copy / sync されません。
-- Initiative、Epic、Issue の対応する node-scoped ignored payload は、必要な場合だけ full ID を指定して manual one-shot helper を実行します。
-
-`./spec-dock/scripts/spec-dock workbench copy --scope <full-id> --to-worktree <linked-worktree>`
-
-- root `.workbench/` の ignored payload はこの helper の対象外です。root で durable に残す一 file は generic Artifact import を使ってください。
+- Initiative、Epic、Issue の `.workbench/` は、カタログ（`spec-dock/initiatives/` の先）の Scope の中にあり、同じ clone のどの worktree からも同じものが見えます。写す必要はありません。
+- root `.workbench/` は worktree ごとです。tracked `README.md` は通常の Git checkout で別 worktree に現れますが、その他の ignored file は自動 copy / sync されません。root で durable に残す一 file は generic Artifact import を使ってください。
 - automatic hook、watch、sync、copy-back はありません。
