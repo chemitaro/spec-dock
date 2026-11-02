@@ -1,23 +1,20 @@
 package spec
 
-// 設計（Issue）。型 specdock/v1。
+goals: ["親を `completed` で閉じる判定を1か所にまとめ、`scope close` と `work finish` で同じにする"]
+current: "`plan_close`（scope_completion_plan.py）と `_finish_rules`（canonical_work.py）が、それぞれ子孫の状態が `completed` でなければ `DESCENDANT_NOT_COMPLETED` で止める。"
+target: "子孫の状態が `completed` か `not-planned` なら通し、`open` か `unknown` が1つでもあれば止める。"
 
-// 設計目標、今の状態と、この Issue の後の状態（任意）。
-// goals: ["..."]
-// current: "..."
-// target:  "..."
-
-// 設計の単位（責務、interface、data など）。番号（D-01、…）をキーにする。
-// title と satisfies（満たす要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、それを満たす設計が要る。
 design: {
-	// "D-01": {
-	// 	title:     "〜の部品"
-	// 	text:      "責務と interface"
-	// 	satisfies: ["R-01"]
-	// }
+	"D-01": {
+		title:     "子孫の判定の部品"
+		text:      "`scope_completion_plan.py` に `require_descendants_settled(statuses)` 相当の関数を1つ置く。子孫の状態が `completed`、`not-planned` 以外（`open`、`unknown`）なら `ValueError(\"DESCENDANT_NOT_COMPLETED\")`。`plan_close`（reason が completed のとき）と `canonical_work._finish_rules` の両方がこれを呼ぶ。エラーのコードと終了コードは変えない。"
+		satisfies: ["R-01"]
+	}
+	"D-02": {
+		title:     "文書の更新"
+		text:      "`src/spec_dock/assets/spec_dock/docs/reference_cli.md` の C10 に、不採用の子孫は止めず、開いている・状態不明の子孫は `DESCENDANT_NOT_COMPLETED` で止まると書く。dogfood の写し（`spec-dock/docs/`）と `static-inventory.json` のハッシュを揃え、0.5.0 のバイトを既知の古い版に足す。SKILL.md の 'Parent completion requires completed descendants' も直す。"
+		satisfies: ["R-02"]
+	}
 }
 
-// 移行・互換性、リスク（任意）。
-// compatibility: "..."
-// risks: ["..."]
+compatibility: "エラーのコード・終了コード・JSON の形は変えない。止まる条件が狭まるだけ（不採用の子孫を許す）。"
