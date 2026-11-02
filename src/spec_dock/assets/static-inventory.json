@@ -25,10 +25,12 @@
     {
       "path": ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
       "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py",
-      "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
+      "sha256": "5c044f4fe0bb146e843b081d1396ea5ccbfc7ff7ac2c572fade5febf4eb58361",
       "mode": 420,
       "init_only": false,
-      "known_old_sha256": []
+      "known_old_sha256": [
+        "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc"
+      ]
     },
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
