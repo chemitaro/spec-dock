@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
@@ -10,7 +11,7 @@ from typing import TYPE_CHECKING, Final
 from spec_dock.runtime.domain.writer_admission import require_workspace_write
 from spec_dock.runtime.infra.git_process import run_git
 from spec_dock.runtime.infra.identity import DirectoryIdentity
-from spec_dock.runtime.infra.json_store import read_guarded_json
+from spec_dock.runtime.infra.json_store import read_guarded_json_bytes
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
@@ -74,9 +75,7 @@ def resolve_observed_context(project: str, cwd: Path, *, timeout: float = 30) ->
     try:
         workspace = read_workspace_declaration(path)
     except WorkspaceNotMigrated:
-        loaded = read_guarded_json(path)
-        assert loaded is not None and isinstance(loaded[0], dict)
-        workspace = loaded[0]
+        workspace = _read_declaration_object(path)
         if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
             raise ValueError("workspace writer protocol is unknown") from None
     git = _read_git_context(root, common, timeout=timeout)
@@ -119,14 +118,31 @@ def _read_git_context(root: Path, common: Path, *, timeout: float) -> GitContext
 
 
 def read_workspace_declaration(path: Path) -> dict[str, object]:
-    loaded = read_guarded_json(path)
-    if loaded is None or not isinstance(loaded[0], dict):
-        raise ValueError("workspace declaration is missing or invalid")
-    workspace = loaded[0]
+    workspace = _read_declaration_object(path)
     _require_schema_4(workspace)
     if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
         raise ValueError("workspace writer protocol is unknown")
     return workspace
+
+
+def _read_declaration_object(path: Path) -> dict[str, object]:
+    """Read the declaration as one unambiguous JSON object; a file that vanished or repeats a member is refused."""
+    loaded = read_guarded_json_bytes(path)
+    if loaded is None:
+        raise ValueError("workspace declaration is missing or invalid")
+    payload = json.loads(loaded[1], object_pairs_hook=_unique_members)
+    if not isinstance(payload, dict):
+        raise ValueError("workspace declaration is missing or invalid")
+    return payload
+
+
+def _unique_members(pairs: list[tuple[str, object]]) -> dict[str, object]:
+    result: dict[str, object] = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("workspace declaration has a duplicate member")
+        result[key] = value
+    return result
 
 
 def _require_schema_4(workspace: Mapping[str, object]) -> None:
