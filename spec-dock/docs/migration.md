@@ -84,7 +84,7 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - 確認と実行の間の変化（何も書かずに止まる）：
   - `scope close` と `scope reopen` は、端末での確認の後に直接の選択が変わっていれば、何も書かずに `PRECONDITION_FAILED`（終了コード3）で止まります。
   - `scope create` は、確認の後に `origin` が変わっていれば止まります。何も書いていなければ `PRECONDITION_FAILED`（終了コード3）、種類のラベルを作った後なら `CANONICAL_WRITE_INCOMPLETE`（`partial`、終了コード6）、Issue を作った後なら `SCOPE_PUBLICATION_INCOMPLETE`（`partial`、終了コード6）です。
-  - `worktree remove --unlock` は、unlock の後に無視されたファイルが見つかれば、`--discard-ignored` なしでは何も消さずに止まります（`PRECONDITION_FAILED`、終了コード3。unlock の後なら `WORKTREE_REMOVE_FAILED`、`partial`、終了コード6）。
+  - `worktree remove` は、無視されたものが `spec-dock/initiatives` のリンクだけかを、削除の直前（`--unlock` なら unlock の後）まで繰り返し確かめます。確かめの後に無視されたファイルができていれば、`--discard-ignored` なしでは何も消さずに止まります。止まる時点で終了コードが違います：最初の判定では `PRECONDITION_FAILED`（終了コード3）、unlock の前の確かめでは `WORKTREE_REMOVE_FAILED`（`failed`、終了コード3）、unlock の後では `WORKTREE_REMOVE_FAILED`（`partial`、終了コード6）です。
 - 部分失敗の返し方：
   - `artifact create` と `artifact import file` は、`artifacts/` を作った後の失敗を `ARTIFACT_PUBLICATION_INCOMPLETE`（`partial`、終了コード6）で返します。`effects` に `artifact.directory` が付き、作ったディレクトリは残ります。
   - `scope delete` は、途中で失敗したときの `effects` を起きたとおりに返します（例：`selection.clear` が succeeded、`scope.delete` が unknown）。
