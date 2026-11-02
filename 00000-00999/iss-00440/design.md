@@ -88,6 +88,14 @@ dispatch(namespace, cwd):
 - `scope_payload` と、`active show`、`scope show`、`scope list` の従来の処理、`BUSINESS_NOT_CONNECTED` の分岐は消す（表にないコマンドは解析で止まるので、表の引き当ては `KeyError` にならない。G7 のテストで表と `LEAF_PATHS` の一致を確かめる）。
 - `diagnose_raw_workspace`（`application/direct_diagnostics.py`）は、宣言が読めないときだけ呼ばれるので、`known` は常に偽になる。版3を前提にした `--expect-current` の分岐（`load_scope_views` を使う）を消し、`--expect-current` と `--expect-backend` は今と同じ `ValueError` の文で止める。返す findings（`WORKSPACE_FILE_OBSERVED`、`WORKSPACE_DECLARATION_UNVERIFIED`、`--legacy` の観測、GitHub の確かめ）は今のまま。
 
+### ほかの worktree の観測（統括の判断、2026-11-02）
+
+- `resolve_observed_context(project, cwd, *, timeout)`（`project_context.py`。足す）：ほかの worktree の Git の識別（clone と worktree の物理の識別、HEAD、ブランチ）と宣言を返す。`resolve_context` と違い、版3の宣言も受け付ける。読むのは宣言だけで、`.meta.json` や仕様は読まない。`writer_protocol` の確かめは今のまま。
+- 使うのは、ほかの worktree を観測する2か所だけ：`canonical_work.canonical_worktree_rows`（`work start` の重複選択と枝の占有の確かめ）と `canonical_workspace._observe_rows`（`workspace sync` の worktree の一覧）。その worktree の直接の選択の記録は、`WorkTargetStore` と `read_selection` で今と同じく読む（R-J7 の直接の選択）。
+- 根拠：spec-dock のクローンには、利用者が残すと決めた版3の linked worktree が2つある（`local-macos-vm-ci`、`schema1-preserving-migration-20261004`）。版3の worktree を `unavailable` にすると、`check_inventory` が拒否し、同じクローンのすべての `work start` が止まる。ほかの4つのリポジトリには版3の worktree はない。
+- 版3の worktree の中で実行したコマンドは、`resolve_context` で `WorkspaceNotMigrated` になり、`CANONICAL_NOT_MIGRATED` で止まる（R-440-01）。
+- テスト：`tests/cli_runtime/test_issue431_workspace.py::test_sync_observes_a_schema_three_worktree_and_an_unreadable_one`（版3の worktree は観測でき、読めないものは `unavailable`。0.4.2 の意図を保つ）と、`test_a_schema_three_sibling_keeps_its_selection_observed_and_stops_its_own_commands`（版3の worktree の選択が `selected` に見え、同じ Scope の `work start` が `SCOPE_ALREADY_SELECTED`、その worktree の中の `scope list` が `CANONICAL_NOT_MIGRATED`）。
+
 ### `commands/canonical_dispatch.py`
 
 - `CANONICAL_HANDLERS` から `workspace migrate` と `workbench copy` の行を消す。`refuse_workspace_migrate`（`canonical_refusals.py`。ファイルごと消す）と `refuse_workbench_copy`（`canonical_worktrees.py`）を消す。

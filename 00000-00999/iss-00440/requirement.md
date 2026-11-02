@@ -131,6 +131,7 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
 ## 失敗・境界条件
 
 - 版3の宣言を持つ worktree が、版4の宣言を持つクローンの中にあっても、その worktree のコマンドは版3として止まる（宣言は worktree ごとに読む）。
+- ほかの worktree からの観測（`workspace sync` の worktree の一覧、`work start` の重複選択の確かめ）では、版3の worktree も、Git の識別と直接の選択の記録だけを読んで、0.4.2 と同じく `empty` や `selected` として扱う（その worktree の `.meta.json` や仕様は読まない）。版3の worktree が残っていても、同じクローンの版4の worktree の `work start` は止まらず、同じ Scope の重複選択は今と同じく `SCOPE_ALREADY_SELECTED` で止まる（統括の判断、2026-11-02。spec-dock のクローンには、利用者が残すと決めた版3の linked worktree が2つある）。
 - 版3の宣言でも、`--project` の誤り、Git の外、`UNSUPPORTED_PLATFORM` は、今と同じコードで先に止まる（宣言を読む前の確かめ）。
 - `installation init` の宛先に版3の宣言があるときは、`CANONICAL_NOT_MIGRATED` で止まり、何も置かない。宣言がない宛先は今と同じ。
 - 0.4.2 の配布資産を 0.5.0 に上げる前に、0.5.0 のパッケージで `scope create` を行うと、雛形の `report.md` の前付けに `タイトル:` と `親:` の行が残る（雛形の内容のまま。正本ではない）。`installation update` で 0.5.0 の雛形になる。`cue/` の雛形がないときは今と同じく `SCOPE_TEMPLATES_OUTDATED` で止まる。
