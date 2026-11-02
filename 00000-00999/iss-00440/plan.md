@@ -46,11 +46,11 @@ ID: "iss-00440"
 6. **雛形と名前の規則**（テスト先行）：
    - Red：配布資産の一覧のテスト（雛形の12ファイルと `epics.md`、`issues.md` がない、CUE の `report.md` に前付けの2行がない）、canonical の作成のファイルの見本のテストが変わらないこと。
    - Green：配布資産の削除、`templates/cue/*/report.md` の2行の削除、`copy_scope_template_at` と `domain/canonical_scaffold.py` の除去と書き換えの削除、`scope_scaffold.py` と `canonical_scope_create.py` の `epics.md`・`issues.md` の削除、`domain/ids.py` の slug と題名の規則の削除。
-7. **文書**：README、配布する `spec-dock/docs/`、配布するスキル、`AGENTS.md`、`templates/README.md`、`cli-redesign-guide.html` から従来モードの記述を消す。`migration.md` に「## 0.5.0 への更新」の節（撤去の内容、#496、#497、上げる手順、戻し方）を足す。文書の中身のテストを直す。Epic の `design.md` と `plan.md` の戻し方とコマンドの数を直す（R-440-09、R-440-02）。
+7. **文書**：README、配布する `spec-dock/docs/`、配布するスキル、`AGENTS.md`、`templates/README.md`、雛形の `.workbench/README.md`、`cli-redesign-guide.html` から従来モードの記述を消す。規則の節は Epic の10章の撤去の指示のとおりにする。`migration.md` に「## 0.5.0 への更新」の節（撤去の内容、#496、#497、上げる手順、版3のリポジトリの移し方と手順書の読み替え）を足し、版の節でない節を直す。文書の中身のテストを直す。Epic の `requirement.md`、`design.md`、`plan.md` の撤去の後の戻し先と、コマンドの数を直す（R-440-09、R-440-02）。
 8. **移行のスクリプトと従来のCIの手順**：`scripts/migrate-to-canonical/` と `.github/scripts/specdock-ci-validate.sh` を消し、`run.sh` の `TARGETS` から外す。`tests/unit/test_static_analysis_script.py` など関係するテストを直す。
 9. **版と配布資産の一覧**（テスト先行）：
    - Red：`tests/integration/test_issue440_release_0_5_0.py`（版、`migration.md` の節、`static-inventory.json` の既知の古い版、0.4.2 の配布資産からの `installation update`）。0.4.2 のバイトを `tests/fixtures/issue440/` に置く。
-   - Green：`pyproject.toml`、`uv.lock`、版のファイルを 0.5.0 にし、`static-inventory.json` を直す。`test_issue501_release_0_4_2.py` を消す（0.4.1 のときと同じ扱い）。
+   - Green：`pyproject.toml`、`uv.lock`、版のファイルを 0.5.0 にし、`static-inventory.json` と退役の許可（`infra/static_assets.py`）を直す。`test_issue501_release_0_4_2.py` からは、前例（`5a7552b67`）と同じく版の置き場の確かめ（`test_the_version_is_0_4_2_in_every_place`）だけを消し、更新の経路のテストは残す。
 10. **dogfood**：wheel を作って一時の venv に入れ、その `spec-dock installation update --target <この worktree> --backup-dir <一時> --yes` で spec-dock の配布資産を 0.5.0 に上げる。差分が、提供側の資産と同じバイトであることを確かめてコミットする（利用者の uv の tool の環境は変えない）。
 11. **確かめ**：`make lint`、`uv run pytest`（全体）、wheel の確かめ（AC-440-09）、コードの検索（AC-440-03）。`report.md` を書く。
 12. **レビュー**：コードのレビュー（`code-review`）、最終品質ゲート（`final-quality-gate`）。指摘を直し、合格の証拠を `report.md` に書く。

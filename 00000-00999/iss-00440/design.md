@@ -25,7 +25,7 @@ ID: "iss-00440"
 
 | 部分 | Current（`caaeebe45`、0.4.2 の後） | Target（0.5.0） |
 |---|---|---|
-| 宣言の受け付け | `read_workspace_declaration` が版3と4を受け付け、`workspace_mode` と `ProjectContext.mode` で `legacy` か `canonical` を返す。`probe_workspace_mode` が `installation` と `workspace validate --ci`、`workspace doctor --raw`、`canonical status` で使われる | 版4だけを受け付ける。版3は `WorkspaceNotMigrated`（`ValueError` の子）。モードの型と関数はない。`canonical status` の「main は移行済みか」は `declares_schema_4(root)` で判定する |
+| 宣言の受け付け | `read_workspace_declaration` が版3と4を受け付け、`workspace_mode` と `ProjectContext.mode` で `legacy` か `canonical` を返す。`probe_workspace_mode` が `dispatch()`（`installation`、`workspace validate --ci`、`workspace doctor --raw`）、`canonical_status.py:130`、`canonical_link.py:165,837`、`canonical_dashboard.py:85` で、`workspace_mode` と `LEGACY_WORKSPACE_SCHEMA` が `canonical_check.py` で使われる | 版4だけを受け付ける。版3は `WorkspaceNotMigrated`（`ValueError` の子）。モードの型と関数はない。「その checkout の宣言は受け付けられる版4か」は `declares_schema_4(root)` の1つで判定する（`canonical_status`、`canonical_link`、`canonical_dashboard` の4か所。どれも今の `probe_workspace_mode(...) == "canonical"` と同じ真偽になる）。`canonical check` は宣言の版の整数を直接比べる |
 | `dispatch()` | プラットフォーム → リポジトリによらない表 → `installation` → `workspace validate --ci` → `workspace doctor --raw` → `resolve_context` → `mode` で canonical の表か、30余りの `elif` の従来の処理 | プラットフォーム → リポジトリによらない表 → `installation`（版3なら止める）→ `workspace doctor --raw`（宣言が読めないときだけ生の観測）→ `resolve_context`（版3なら止める）→ `CANONICAL_HANDLERS` |
 | コマンド | 55（`help` と `completion` を含む。`workspace migrate`、`workbench copy` は canonical では拒否するだけ） | 53 |
 | 引数 | `--slug`（scope の作成と取り込み）、`workspace validate --ci`、`--source local`（`workspace sync`、`dependency check`）は canonical では `CANONICAL_NOT_APPLICABLE` | ない（引数の誤り） |
@@ -42,8 +42,8 @@ ID: "iss-00440"
 ### `application/project_context.py`（C2）
 
 ```python
-WORKSPACE_SCHEMA: Final = 4            # CANONICAL_WORKSPACE_SCHEMA を改名しない。下の互換の名前は置かない
-NOT_MIGRATED_SCHEMA: Final = 3
+CANONICAL_WORKSPACE_SCHEMA: Final = 4      # 今の名前のまま
+NOT_MIGRATED_WORKSPACE_SCHEMA: Final = 3   # 版3を見分けて止めるためだけの名前（受け付けない）
 
 class WorkspaceNotMigrated(ValueError):
     """The declaration is schema 3: this SpecDock no longer reads unmigrated repositories."""
@@ -58,7 +58,9 @@ def require_migrated(root: Path) -> None: ...
     # root の宣言が版3なら WorkspaceNotMigrated。宣言がない、壊れているなら何もしない（installation と doctor --raw 用）
 ```
 
-- `CANONICAL_WORKSPACE_SCHEMA` は今の名前のまま残す（`direct_installation.py`、`canonical_check.py` が使う）。`LEGACY_WORKSPACE_SCHEMA`、`WorkspaceMode`、`_MODES`、`workspace_mode`、`probe_workspace_mode`、`ProjectContext.mode` は消す。
+- `CANONICAL_WORKSPACE_SCHEMA` は今の名前のまま残す（`canonical_check.py` が使う）。`LEGACY_WORKSPACE_SCHEMA`、`WorkspaceMode`、`_MODES`、`workspace_mode`、`probe_workspace_mode`、`ProjectContext.mode` は消す。版3を表す名前は、止めるための `NOT_MIGRATED_WORKSPACE_SCHEMA` だけにする（R-440-03 の「版3を受け付けるコードがない」は、版3を受け付ける定数と分岐がないことを指す）。
+- `canonical_check.py`：`workspace_mode` の代わりに、版が整数の3なら今の `WORKSPACE_NOT_MIGRATED` の失敗（次の1手は `NOT_MIGRATED_RECOVERY`）、整数の4なら次の確かめ、そのほかは今の `unknown-schema` の失敗にする。新しい版の次の1手の文は「this SpecDock knows workspace schema 4 only.」にする（「schema 3 and 4」を残さない）。
+- `canonical_dashboard.py:85` の、main の宣言が版4でないときにダッシュボードを書かない判定は残す（`declares_schema_4` に置き換える。`canonical sync --registered` は、登録簿の checkout の宣言をこの判定でだけ読み、版3で止まらない）。
 - `OLD_WRITER_PROTOCOL`（`specdock.writer/v1`）は、版4の読み取りで今と同じく受け付け、書くコマンドの `require_writer` が今と同じく止める（I-8 の引き継ぎで、`canonical check` は失敗の1件にする。変えない）。
 
 ### `commands/runtime_dispatch.py`（C2）
@@ -111,19 +113,20 @@ dispatch(namespace, cwd):
 
 ### `domain/ids.py`
 
-- 消す：`INPUT_TITLE_RE`、`INPUT_SLUG_KEBAB_RE`、`validate_slug`、`validate_input_title`、`validate_input_slug_kebab`、`derive_input_slug_from_title`、`resolve_input_title_and_slug`、そのほか到達の判定で使われないもの（`normalize_id_input`、`resolve_id_input` など）。
-- 残す：`CANONICAL_ID_RE`、`DEFAULT_ID_WIDTH`、`format_id`、`parse_id` など、canonical の処理と `domain/selectors.py`、Artifact の命名が使うもの。
+- 消す：`INPUT_TITLE_RE`、`validate_slug`、`validate_input_title`、`derive_input_slug_from_title`、`resolve_input_title_and_slug`、そのほか到達の判定で使われないもの（`normalize_id_input`、`resolve_id_input`、`validate_lowercase`、`find_existing_id_by_num` など）。
+- 残す：`CANONICAL_ID_RE`、`DEFAULT_ID_WIDTH`、`format_id`、`parse_id`、`slugify`、Artifact の `--slug` を確かめる `INPUT_SLUG_KEBAB_RE` と `validate_input_slug_kebab`（`direct_artifact.py` と `canonical_artifact_write.py` が使う。R-J7）。不正な Artifact の `--slug`（`Add_Token`）が `PRECONDITION_FAILED` 相当で止まり何も書かないことを、canonical の `artifact create` のテストで確かめる（今はない）。
 
 ### 配布資産と `static-inventory.json`
 
-- 外す：`spec_dock/templates/{initiative,epic,issue}/{requirement,design,plan,report}.md`（12）、`spec_dock/docs/rules/initiative/epics.md`、`spec_dock/docs/rules/epic/issues.md`。`files` から消し、`retired` に `{"path", "known_old_sha256": [0.4.2 のバイト（と、あれば `files` にあった既知の古い版）], "source_basis": {"commit": "caaeebe45…", "path": …}}` を足す。`installation update` は、`retired` の既知のバイトのファイルを退避して消し、変えられたファイルは手で合わせるよう止める（今の仕組み。`direct_static_update.py` を変えない）。
+- 外す：`spec_dock/templates/{initiative,epic,issue}/{requirement,design,plan,report}.md` と `…/.workbench/README.md`（15）、`spec_dock/docs/rules/initiative/epics.md`、`spec_dock/docs/rules/epic/issues.md`。`files` から消し、`retired` に `{"path", "known_old_sha256": [0.4.2 のバイト（と、`files` にあった既知の古い版）], "source_basis": {"commit": "caaeebe459726647fdebb9461843a3b120557fa4", "path": …}}` を足す。`installation update` は、`retired` の既知のバイトのファイルを退避して消し、変えられたファイルは `legacy static resource is modified or unknown; merge manually` で止める（今の `direct_static_update.py` の仕組み。変えない）。
+- 退役してよい場所の許可（`infra/static_assets.py` の `package_retired_assets`）に、`RETIRED_LEGACY_SCAFFOLD_PATHS`（上の17のパスを名前で並べた `frozenset`）を足す。接頭辞では許さない（`spec-dock/templates/` の下の利用者のファイルや、ほかの雛形を消せる形にしない）。`tests/unit/infra/test_issue421_claude_skill_retirement.py` の「許可の外は止まる」のテストに、`spec-dock/templates/cue/issue/report.md` と `spec-dock/templates/issue/notes.md` が止まることを足す。
 - 変える（`sha256` を 0.5.0 のバイトにし、`known_old_sha256` に 0.4.2 のバイトを足す）：版のファイル、`docs/migration.md`、`docs/canonical.md`、`docs/guide.md`、`docs/reference_*.md`、`docs/README.md`、`docs/cli-redesign-guide.html`、`docs/authoring/` と `docs/rules/` のうち従来モードの記述を消したもの、`templates/README.md`、`templates/cue/*/report.md`、`.agents/skills/spec-dock*/SKILL.md` など、実際に変えたすべて。どれを変えたかは差分から機械的に求め、テストで「`files` の各項目の `sha256` が今のバイトと一致し、0.4.2 から変えた項目は 0.4.2 のバイトを `known_old_sha256` に持つ」を確かめる（0.4.2 のバイトは `git show v0.4.2:<パス>` から作ったテストの見本で持つ）。
 - `workspace.json`（`init_only`）は変えない。
 
 ### 文書（R-440-05）
 
-- 規則の節（10章）と `AGENTS.md`、`.agents/skills/spec-dock/SKILL.md`：「`schema_version` が 4 のリポジトリでは…。3 のリポジトリでは、今までどおり…」の前置きを、「SpecDock 0.5.0 は版4（canonical モード）だけを扱う。版3の宣言を見たら `CANONICAL_NOT_MIGRATED` で止まる（移す方法は `spec-dock/docs/migration.md`）」の形にする。「CUE の Scope と説明資料」の節の版3の文と、「Markdown の Scope は今までどおり」の文を直す（Markdown の既存の Scope は読めるので、その書き方の案内は残す）。
-- `migration.md`：「## 0.5.0 への更新」の節を、今の最初の版の節の前に足す（0.4.2 の節と同じ並び）。過去の版の節は変えない。
+- 規則の節（10章）と `AGENTS.md`、`.agents/skills/spec-dock/SKILL.md`：Epic の10章の撤去の指示のとおり、見出しを「## 仕様の扱い」にし（「（canonical モード）」を外す）、最初の段落の「3 のリポジトリでは、今までどおり、仕様もコードと一緒にコミットする。」の文を消す。「`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。」の文は残す（版4のリポジトリにだけ当てはまる規則であることは変わらない）。規則の節に版3の動きの文は足さない。SKILL.md の「CUE の Scope と説明資料」の節の版3の文（「版3のリポジトリでは今までどおり Markdown の Scope を作り…」）を消す。既存の Markdown の Scope は読めて `scope check` が `checked=false` で通るので、「Markdown の Scope は今までどおり `spec-dock/docs/authoring/overview.md` から書く」の案内は、既存の Markdown の Scope を直すときの案内として残す。
+- `migration.md`：「## 0.5.0 への更新」の節を「## 0.4.2 への更新」の節の後に足す（版の節は古い順に並んでいる）。版の節（0.4.0〜0.4.2）は変えない。版の節でない節は、「## schema3の旧writerから移行」（`workspace migrate` の手順）を消し、「## canonical モードへの移行」を「0.5.0 は版4だけを扱う。版3のリポジトリは、0.4.2 を入れ直し、`v0.4.2` の手順書に従って移す（手順書の 0.3.0 は 0.4.2 と読み替える）」の形に直し、ほかの節（「外部CLI」「新規導入」「static資産の更新・削除」「途中で停止した場合」）からも版3の文を消す。文書のテストは、0.5.0 の節の中身と、版の節でない節に `workspace migrate`、`workbench copy`、`schema 3`／版3で動く旨の文がないことを確かめる。
 - README、`guide.md`、`canonical.md`、`reference_cli.md`、`reference_naming.md`、`reference_worktree.md`、`reference_sync.md`、`reference_deps.md`、`reference_github.md`、`authoring/`、`rules/`、`cli-redesign-guide.html`、`templates/README.md`：版3の動き、`.meta.json` の作成、入れ子の置き場、slug、`workspace migrate`、`workbench copy`、`--ci`、`--source local`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED` の記述を消すか、canonical の今の動きに書き直す。どの文書をどう変えたかは `report.md` に一覧で書く。
 
 ### 到達の判定の方法（D3）
@@ -131,7 +134,9 @@ dispatch(namespace, cwd):
 1. `dispatch()` から従来の分岐を消した状態で、`src/spec_dock` のすべての `import`（関数の中を含む）のグラフを `spec_dock.cli`、`spec_dock.shim_vnext`、`spec_dock.asset_layout`、`spec_dock` から辿り、届かないモジュールを消す。
 2. `vulture`（0.5.0 の作業のときの版。`uvx vulture src/spec_dock --min-confidence 60 --exclude src/spec_dock/assets`）の「unused function / class / method / import / property」を見て、本当に使われていないものを消す。テストだけが使うものも消す（そのテストは (a) か、消すコードだけを確かめる (c) として消す）。
 3. 1と2を、何も見つからなくなるまで繰り返す。
-4. 判定から外すもの：名前で呼ばれるもの（`html.parser.HTMLParser` の `handle_*` など）、配布する資産の中のスクリプト（`assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact`）、`dataclass` のフィールド（vulture の「unused variable / attribute」は見ない。クラスごと消すときはフィールドも消える）。外したものは `report.md` に書く。
+4. 判定から外すもの：名前で呼ばれるもの（`html.parser.HTMLParser` の `handle_*` など）、配布する資産の中のスクリプト（`assets/install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact`）、`dataclass` のフィールド（vulture の「unused variable / attribute」は見ない。クラスごと消すときはフィールドも消える）、従来モードと関係のない canonical の側の部品（後の機能のために置いた `infra/diagram_vendor.py`（epic-00425 の K5）、文書にした Python の入口 `scope_render.render_scope_html`、テストの差し込み口 `github_snapshot.clear_memory`、canonical の規則の部品 `canonical_structure.branch_names_scope` と `canonical_sync.registered_entries`）。外したものは `report.md` に書く。
+   - vulture は名前で判定するので、同じ名前の関数がほかにあると見落とす（`work_start.start_work` と `canonical_work.start_work`、`direct_diagnostics.diagnose_workspace` と `canonical_workspace.diagnose_workspace` など）。そのため、モジュールごとの名前の参照（`from M import N`、`M.N`、モジュールの中の参照）を辿る判定も、何も見つからなくなるまで繰り返す。
+   - 関数が呼ばれていても、canonical の呼び出し元が決まった引数だけを渡すために通らない分岐（従来の `.meta.json` の木を読む分岐）は、関数の中を読んで消す。2026-11-02 の試しで見つかったもの：`direct_artifact.query_artifact` と `mutate_artifact`、`artifact_query.list_artifacts` と `show_artifact`（canonical は `@root` だけを渡すので、`@root` だけの形にする）、`direct_worktrees` の `--expect-current` の確かめと `direct_installation.install_static_assets` の `--expect-current` の分岐（canonical はいつも `expect_current=None` で呼ぶ）。これで `scope_query.load_scope_views`、`infra/scope_tree.py`、`application/start_snapshot.py`（`LocalInput` は `start_plan.py` に移す）も届かなくなる。
 5. 2026-11-02 の試し（従来の分岐を消した写しで1を1回）では、次のモジュールが届かなくなる。最終の一覧は `report.md` に書く。
    - 従来の処理：`application/direct_{active,dependencies,finish,migration,scope_delete,scope_edit,scope_lifecycle,scope_publish,sync,validation,workbench}.py`、`application/github_scope_scaffold.py`、`application/scope_ancestors.py`、`infra/{fs_repo,scope_metadata,committed_validation,workbench_publication}.py`。
    - 撤去の前から届かない古いモジュール：`application/{artifact_preflight,github_issue_targets,ports,repo_context,status_context,validate_tree}.py`、`domain/{active,deps,discussion_docs,status,tree,validation}.py`、`infra/{binary_artifact_publisher,deps_reader,diagram_vendor,fs_cli,git_helper,github_cli}.py`、`presentation/cli_text.py`。これらは、`.meta.json` を読む（`fs_cli`、`deps_reader`、`validation`、`artifact_preflight`）か、それらだけが使うもので、AC-20 のコードの検索に残るので、14章の到達の規則で消す。
@@ -151,14 +156,14 @@ dispatch(namespace, cwd):
 - 宣言の読み取り：`read_guarded_json` の後、`schema_version` が整数の 4 なら受け付ける。整数の 3 なら `WorkspaceNotMigrated`。そのほか（ない、整数でない、5以上）は今と同じ `ValueError("workspace requires known schema 3 or 4")` の代わりに `ValueError("workspace requires known schema 4")`。`writer_protocol` の確かめは今のまま（4の後）。
 - `require_migrated` は、宣言がない、読めない、壊れている、版が3でないときは何もしない（後の処理が今と同じ扱いをする）。
 - 版3で止まるときは、どのコマンドも、宣言の読み取りのほかに何も読まない（スナップショット、カタログ、GitHub、`--expect-current` の選択の記録を読まない）。`effects` は空、`warnings` は空。
-- `--dry-run` は止まる結果に `can_apply: false` と `blockers` を足す（`_render_result` の今の規則。`DiagnosticData` は `FamilyData` でないので変わらない）。
+- `--dry-run` を付けても、版3で止まる結果は `--dry-run` のないときと同じである（`status` は `failed`、`data` は空の `DiagnosticData`）。`_render_result` は `FamilyData` にだけ `can_apply` と `blockers` を足すので、`DiagnosticData` の結果には足さない（今の規則のまま）。
 - 0.4.2 の配布資産から 0.5.0 への `installation update`：`retired` の既知のバイトのファイルは退避して消す。利用者が変えた `.md` の雛形や `epics.md` は、`installation update` が今の規則（知らない変更は止まる）で扱う。
 
 ## 変更対象
 
 - 変える：`commands/runtime_dispatch.py`、`commands/canonical_dispatch.py`、`application/project_context.py`、`application/canonical_errors.py`、`application/canonical_status.py`、`application/canonical_scope_create.py`、`application/canonical_scope_read.py`、`application/canonical_writes.py`、`application/canonical_workspace.py`、`application/canonical_worktrees.py`、`application/direct_installation.py`、`application/direct_diagnostics.py`、`application/scope_scaffold.py`、`infra/canonical_scaffold.py`、`domain/canonical_scaffold.py`、`domain/ids.py`、`cli/catalog.py`、`cli/options.py`、到達の判定で従来の経路だけを消すファイル。
 - 消す：到達の判定で届かないモジュール（上の5）、`application/canonical_refusals.py`、配布資産の14ファイル、`scripts/migrate-to-canonical/`、`.github/scripts/specdock-ci-validate.sh`、(a) のテストと移行のスクリプトのテスト、消すコードだけを確かめるテスト。
-- 足す：版3で全コマンドが止まるテスト、G7 の53のコマンドのテスト（今の `test_issue436_every_command.py` を直す）、0.5.0 の版と 0.4.2 からの更新のテスト（`test_issue501_release_0_4_2.py` の形。0.4.2 の版のテストは、0.4.1 のときと同じく消す）、(b) の書き直し。
+- 足す：版3で全コマンドが止まるテスト、G7 の53のコマンドのテスト（今の `test_issue436_every_command.py` を直す）、0.5.0 の版と 0.4.2 からの更新のテスト（`test_issue501_release_0_4_2.py` の形）、(b) の書き直し。`test_issue501_release_0_4_2.py` からは、前例（コミット `5a7552b67`。0.4.1 の版の置き場の確かめだけを消した）と同じく `test_the_version_is_0_4_2_in_every_place` だけを消し、0.4.1 のバイトからの更新の経路のテスト（モードに関係のない (c)）は残す。
 - 変えない：`direct_static_update.py` の更新と退避の規則、直接の選択の記録（`work-target`）、`StartLock`、`OperationResult` と出力の封筒、canonical の同期とカタログ、構造のスナップショット、ダッシュボード、`workspace doctor --legacy`、Artifact の命名、`workspace.json` の配布資産。
 
 ## 移行・互換性・rollback

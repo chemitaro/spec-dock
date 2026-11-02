@@ -65,22 +65,23 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
 - `dispatch()` にモードの振り分けがない。宣言を受け付けた後のコマンドは、`REPOSITORY_INDEPENDENT_HANDLERS`、`installation` のコマンド、宣言を読めないときの `workspace doctor --raw` の3つのほかは、すべて `CANONICAL_HANDLERS` の表を通る。
 - パッケージ（`src/spec_dock/`）に、0.5.0 の入口（`spec_dock.cli.main`、`spec_dock.shim_vnext`）から到達できないモジュール、関数、クラス、メソッドがない。到達の判定は `design.md` の方法（import のグラフと、未使用の名前の検出の繰り返し）に従い、判定から外したもの（名前で呼ばれるもの、配布するスクリプト）は `report.md` に理由とともに書く。これには、撤去の前から到達できなかった古いモジュール（`infra/fs_cli.py`、`infra/deps_reader.py`、`domain/deps.py` など）も含む。
 - パッケージのコードで `.meta.json` を読み書きするものがない。`.meta.json` の名前が残るのは、canonical モードがカタログや既定のブランチに残った `.meta.json` を異常として見つける検査（`SCOPE_METADATA_PRESENT`、`canonical check`、`branch` と `work start` の基点の検査）だけである。
-- 宣言の版3を受け付けるコード（版3の定数、`legacy` のモード、`workspace_mode`、`ProjectContext.mode`、`probe_workspace_mode` による振り分け）がない。
+- 宣言の版3を受け付けるコード（版3を受け付ける定数 `LEGACY_WORKSPACE_SCHEMA`、`legacy` のモード、`workspace_mode`、`ProjectContext.mode`、`probe_workspace_mode` による振り分け）がない。版3を表す名前は、見分けて止めるための1つ（`NOT_MIGRATED_WORKSPACE_SCHEMA`）だけである。
 - I-7 から：`infra/commit_tree.py` と `infra/committed_validation.py` の `ls-tree` の解析の重複が1つになる（`committed_validation.py` が到達できなくなって消えるなら、それで満たす）。
 
 ### R-440-04 Scope の雛形と名前の規則は canonical の形だけになる（14章の4）
 
-- 配布資産から、`.md` の雛形 `spec-dock/templates/initiative/`、`templates/epic/`、`templates/issue/`（各4ファイル）がなくなる。dogfood の写し（spec-dock の `spec-dock/templates/`）も、同じ PR の `installation update` でなくなる。`spec-dock/templates/README.md` は `cue/` の雛形と Artifact の雛形だけを説明する。
+- 配布資産から、`.md` の雛形 `spec-dock/templates/initiative/`、`templates/epic/`、`templates/issue/`（各5ファイル：`requirement.md`、`design.md`、`plan.md`、`report.md`、`.workbench/README.md`）がなくなる。dogfood の写し（spec-dock の `spec-dock/templates/`）も、同じ PR の `installation update` でなくなる。`spec-dock/templates/README.md` は `cue/` の雛形と Artifact の雛形だけを説明する。
 - CUE の雛形の `report.md`（`templates/cue/{initiative,epic,issue}/report.md`）の前付けに、`タイトル:` と `親:` の行がない。「詳細:」のリンクは `<区切り>/<ID>/` からの深さ（`../../../docs/…`）である（今の雛形のまま）。
 - `scope create` と `scope import github` が写すとき、前付けの行を除く処理と、「詳細:」の相対リンクを書き換える処理がない。作られるファイルのバイトは、0.4.2 の配布資産を持つリポジトリで 0.4.2 が作るものと同じである（雛形から除いた行は、0.4.2 も写すときに除いていたため）。
 - 配布資産から、従来モードの入れ子の Scope に `epics/rules.md` と `issues/rules.md` を置くための `spec-dock/docs/rules/initiative/epics.md` と `spec-dock/docs/rules/epic/issues.md` がなくなる。canonical モードの作成は、それらを確かめも参照もしない（`artifacts/rules.md` と `discussions/rules.md` は今のまま）。
-- `domain/ids.py` から、slug の規則（`INPUT_SLUG_KEBAB_RE`、`validate_slug`、`validate_input_slug_kebab`、`derive_input_slug_from_title`、`resolve_input_title_and_slug`）と、英数字だけの題名の規則（`INPUT_TITLE_RE`、`validate_input_title`）がなくなる。題名の規則は canonical の `validate_canonical_title` だけになる。Artifact の名前の規則（`artifact create --slug`、Artifact の命名。R-J7）は変えない。
+- `domain/ids.py` から、Scope の slug の規則（`validate_slug`、`derive_input_slug_from_title`、`resolve_input_title_and_slug`）と、英数字だけの題名の規則（`INPUT_TITLE_RE`、`validate_input_title`）がなくなる。題名の規則は canonical の `validate_canonical_title` だけになる。Artifact の名前の規則（`artifact create --slug` と、それを確かめる `INPUT_SLUG_KEBAB_RE`・`validate_input_slug_kebab`。Artifact の命名。R-J7）は残し、変えない。
 
 ### R-440-05 文書に従来モードの記述がない（14章の5）
 
-- README、配布する `spec-dock/docs/`（`guide.md`、`canonical.md`、`migration.md` の 0.5.0 の節を除く本文、`reference_*.md`、`authoring/`、`rules/`、`cli-redesign-guide.html`、`templates/README.md`）、配布するスキル（`.agents/skills/spec-dock/SKILL.md`、`spec-dock-grill-with-docs`）、spec-dock の `AGENTS.md` に、版3のリポジトリでの動き（「3 のリポジトリでは、今までどおり…」、`.meta.json` の作成、入れ子の置き場、slug、`workspace migrate`、`workbench copy`、`--ci` など）の説明がない。
+- README、配布する `spec-dock/docs/`（`guide.md`、`canonical.md`、`migration.md` の版の節でない節（「canonical モードへの移行」「schema3の旧writerから移行」など）、`reference_*.md`、`authoring/`、`rules/`、`cli-redesign-guide.html`、`templates/README.md`、雛形の `.workbench/README.md`）、配布するスキル（`.agents/skills/spec-dock/SKILL.md`、`spec-dock-grill-with-docs`）、spec-dock の `AGENTS.md` に、版3のリポジトリでの動き（「3 のリポジトリでは、今までどおり…」、`.meta.json` の作成、入れ子の置き場、slug、`workspace migrate`、`workbench copy`、`--ci` など）の説明がない。
+- 規則の節（Epic の10章。配布するスキルと spec-dock の `AGENTS.md`）は、Epic の10章の撤去の指示のとおり、最初の段落の「3 のリポジトリでは、今までどおり、仕様もコードと一緒にコミットする。」の文を消し、見出しから「（canonical モード）」を外す。規則の節に版3の動きの文を足さない。
 - 版3の宣言を見たときの動き（`CANONICAL_NOT_MIGRATED` と、0.4.2 を入れ直して移すこと）は、`migration.md` と `canonical.md` と `reference_cli.md` に書く。
-- `migration.md` の過去の版の節（0.4.2 以前）は、その版の記録として残す。
+- `migration.md` の過去の版の節（「## 0.4.0 への更新」〜「## 0.4.2 への更新」）は、その版の記録として、版3の動きの文を含めてそのまま残す。版の節でない節のうち、`workspace migrate` だけを説明する「## schema3の旧writerから移行」は消し、「## canonical モードへの移行」は 0.4.2 と版のタグ `v0.4.2` の手順書を案内する形に直す。
 - `spec-dock/docs/historical/` は、過去の記録として変えない。
 
 ### R-440-06 移行のスクリプトと従来のCIの手順がない（14章の6、I-8 から）
@@ -107,13 +108,14 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
   - 撤去の内容：版3の宣言で、どのコマンドも `CANONICAL_NOT_MIGRATED` で止まること（0.4.2 を入れ直して移すこと）、消えたコマンド（`workspace migrate`、`workbench copy`）と引数（`workspace validate --ci`、`--source local`、`--slug`）、使われなくなったエラーのコード、`.md` の Scope の雛形と `epics.md`・`issues.md` の撤去、CUE の雛形の `report.md` の前付けの2行。
   - #496 と #497 の改善（「背景」の2つ）。すでに使っているリポジトリは、更新の後に `git add spec-dock/templates` で、それまで無視されていた雛形の README を足してコミットすること。
   - 0.5.0 に上げる手順（すべてのリポジトリが版4であることを確かめてから、パッケージを入れ、各リポジトリで `installation update`）。
-- `static-inventory.json` で、外した配布資産（`.md` の雛形の12ファイル、`epics.md`、`issues.md`）は `retired` に入り、その `known_old_sha256` に 0.4.2 のバイトの SHA-256 がある。中身を変えた配布資産は、`files` の `known_old_sha256` に 0.4.2 のバイトの SHA-256 がある。
+  - 版3のまま残ったリポジトリの移し方：SpecDock 0.4.2 を入れ直し、版のタグ `v0.4.2` の `scripts/migrate-to-canonical/README.md` に従う。その手順書が「0.3.0」「`v0.3.0`」と書くところ（配布資産と CI の固定の版、撤去の後の戻し方）は、「0.4.2」「`v0.4.2`」と読み替える（タグの中の手順書は変えられないため）。
+- `static-inventory.json` で、外した配布資産（`.md` の雛形の15ファイル、`epics.md`、`issues.md`）は `retired` に入り、その `known_old_sha256` に 0.4.2 のバイトの SHA-256 がある。退役してよい場所の許可（`infra/static_assets.py` の `package_retired_assets`。今は `spec-dock/spec-dock.version`、`spec-dock/scripts/spec_dock_runtime/*.py`、`.claude/skills/spec-dock*` の枠だけ）に、この17のパスを、名前を挙げて足す（`spec-dock/templates/{initiative,epic,issue}/` の下と、`docs/rules/` の2つのファイル）。ほかのパスは、今と同じく `retired static inventory contains an unsafe target` で止まる。中身を変えた配布資産は、`files` の `known_old_sha256` に 0.4.2 のバイトの SHA-256 がある。
 - 0.4.2 の配布資産を持つ一時のリポジトリ（版4）で、`installation update --backup-dir … --yes` が成功し、変えた資産が 0.5.0 のバイトになり、外した資産が消え（退避される）、`installation show` で既知の古い版も知らない変更も残らない。
 - spec-dock の利用側の配布資産（`spec-dock/` の下と `.agents/skills/`）を、この PR の中で、作った 0.5.0 の候補の `installation update` で上げる。
 
 ### R-440-09 戻し方は 0.4.2 を入れ直す（統括の依頼の8）
 
-- Epic の `design.md`（12章の `CANONICAL_NOT_MIGRATED` の行、14章の戻し方、「移行・互換性・rollback」の組み合わせと戻し方）、Epic の `plan.md`（rollback の I-13）、`migration.md`、`CANONICAL_NOT_MIGRATED` の次の1手が、同じ版を示す。0.4.2 は、両方のモードを持つ最後の版で、CUE の Scope（0.4.0 から）も扱い、版のタグ `v0.4.2` の移行のスクリプトは I-12 で見つかった注意点を含む。0.3.0 は CUE の Scope を扱えないので、0.5.0 から戻す先にしない。
+- Epic の `requirement.md`（R-J6 の「0.3.0 と、版のタグ v0.3.0 に残る手順書」、失敗・境界条件の「撤去の後なら、0.3.0 を入れ直してから戻す」と「撤去の後に、移していないリポジトリかクローンが見つかった」）、Epic の `design.md`（12章の `CANONICAL_NOT_MIGRATED` の行、14章の戻し方、「失敗と境界の扱い」の表の「撤去の後に、版3のリポジトリかクローンが見つかった」の行、「移行・互換性・rollback」の組み合わせと戻し方）、Epic の `plan.md`（rollback の I-13）、`migration.md`、`CANONICAL_NOT_MIGRATED` の次の1手が、同じ版（0.4.2 と `v0.4.2`）を示す。移行の間の記述（0.3.0 が両方のモードを扱った、という過去の事実）は変えない。0.4.2 は、両方のモードを持つ最後の版で、CUE の Scope（0.4.0 から）も扱い、版のタグ `v0.4.2` の移行のスクリプトは I-12 で見つかった注意点を含む。0.3.0 は CUE の Scope を扱えないので、0.5.0 から戻す先にしない。
 
 ## スコープ
 
@@ -140,13 +142,13 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
 - AC-440-01（R-440-01）：版3の宣言の一時のリポジトリで、R-440-01 の50のコマンドのそれぞれが、終了コード3、`CANONICAL_NOT_MIGRATED`、`effects` が空、リポジトリのファイルが変わらないことを、1つのテストで確かめる。`canonical check` は失敗の1件で同じ次の1手を返す。版5の宣言は `PRECONDITION_FAILED` のまま。
 - AC-440-02（R-440-02）：`LEAF_PATHS` が53で、`workspace migrate` と `workbench copy` がない。G7 のテストが、版4の53のコマンドのうち `help` と `completion` と `installation` の4つを除くすべてが `CANONICAL_HANDLERS` か `REPOSITORY_INDEPENDENT_HANDLERS` の canonical の処理で動き、`CANONICAL_NOT_IMPLEMENTED`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`、`BUSINESS_NOT_CONNECTED` を返さないことを確かめる。消した引数が引数の誤りになる。
 - AC-440-03（R-440-03）：`report.md` に、到達の判定の結果（消したモジュールの一覧、残した名前とその理由）と、コードの検索（`.meta.json`、`schema_version` の 3、`LEGACY_WORKSPACE_SCHEMA`、`workspace migrate`、`workbench copy`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`、`--slug` の scope の引数、`--source local`、`--ci`）の結果がある。残った `.meta.json` は canonical の検査だけである。
-- AC-440-04（R-440-04）：雛形と `epics.md`・`issues.md` が配布資産と dogfood の写しにない。CUE の雛形の `report.md` に `タイトル:` と `親:` がない。canonical の `scope create` で作った `report.md` のバイトが、テストの見本（変更の前と同じ）と一致する。`domain/ids.py` に slug と英数字の題名の規則がない。
+- AC-440-04（R-440-04）：雛形の3つのディレクトリ（15ファイル）と `epics.md`・`issues.md` が配布資産と dogfood の写しにない。CUE の雛形の `report.md` に `タイトル:` と `親:` がない。canonical の `scope create` で作った `report.md` のバイトが、テストの見本（変更の前と同じ）と一致する。`domain/ids.py` に Scope の slug と英数字の題名の規則がなく、不正な Artifact の `--slug` が今と同じく止まる（テストを足す）。
 - AC-440-05（R-440-05）：文書の中身のテストが、従来モードの記述がないこと（版3の動きの文、`workspace migrate`、`workbench copy`、`--ci`、`.meta.json` の作成）と、`CANONICAL_NOT_MIGRATED` と 0.4.2 の案内があることを確かめる。
 - AC-440-06（R-440-06）：`scripts/migrate-to-canonical/` と `.github/scripts/specdock-ci-validate.sh` がなく、`run.sh` の `TARGETS` にない。
 - AC-440-07（R-440-07）：`report.md` のテストの分類の一覧で、(b) のすべてに対応する canonical のテストがある。`make lint` と `uv run pytest` が通る。
 - AC-440-08（R-440-08）：版が 0.5.0 にそろう。0.4.2 の配布資産を持つリポジトリが `installation update` で 0.5.0 に上がるテストが通る。`migration.md` の「0.5.0 への更新」の節に、撤去の内容、#496、#497 がある。spec-dock の dogfood の配布資産が 0.5.0 の候補と同じバイトである。
 - AC-440-09（R-440-08）：wheel を作り、一時の venv に入れて、`spec-dock --version` が 0.5.0、`spec-dock help` と `spec-dock canonical --help` が動き、`spec-dock workspace migrate` と `spec-dock workbench copy` がない（引数の誤り）。結果を `report.md` に書く。
-- AC-440-10（R-440-09）：Epic の `design.md` と `plan.md`、`migration.md`、`CANONICAL_NOT_MIGRATED` の次の1手が、0.4.2 と `v0.4.2` を示す。
+- AC-440-10（R-440-09）：Epic の `requirement.md`、`design.md`、`plan.md`、`migration.md`、`CANONICAL_NOT_MIGRATED` の次の1手が、撤去の後の戻し先と移し方として 0.4.2 と `v0.4.2` を示し、0.3.0 を示さない。
 - AC-20 のうち、パッケージについての部分（Epic の I-13 の受け入れ）は、AC-440-01〜AC-440-09 で満たす。各リポジトリの配布資産の PR と、検査のワークフローの 0.5.0 での通過は、マージの後に統括が確かめる。
 
 ## 制約・前提
