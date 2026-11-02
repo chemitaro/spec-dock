@@ -14,7 +14,7 @@ from spec_dock.runtime.cli.legacy import LegacyCommandError
 from spec_dock.runtime.cli.options import explicit_help, parse_vnext
 
 
-def test_vnext_catalog_matches_approved_55_leaf_design() -> None:
+def test_vnext_catalog_matches_approved_53_leaf_design() -> None:
     expected = {
         "scope create initiative",
         "scope create epic",
@@ -52,11 +52,9 @@ def test_vnext_catalog_matches_approved_55_leaf_design() -> None:
         "worktree show",
         "worktree remove",
         "worktree bootstrap",
-        "workbench copy",
         "workspace sync",
         "workspace validate",
         "workspace doctor",
-        "workspace migrate",
         "canonical link",
         "canonical status",
         "installation show",
@@ -72,7 +70,7 @@ def test_vnext_catalog_matches_approved_55_leaf_design() -> None:
         "help",
         "completion",
     }
-    assert len(LEAF_PATHS) == 55
+    assert len(LEAF_PATHS) == 53
     assert set(LEAF_PATHS) == expected
 
 
@@ -120,12 +118,6 @@ def test_help_examples_include_required_runtime_inputs_once() -> None:
     worktree_help = explicit_help(("worktree", "create"))
     worktree_example = worktree_help.split("Examples:\n", 1)[1].splitlines()[0]
     assert worktree_example.count("--base") == 1
-
-    migration_help = explicit_help(("workspace", "migrate"))
-    migration_example = migration_help.split("Examples:\n", 1)[1].splitlines()[0]
-    for option in ("--to-schema", "--to-writer-protocol", "--backup-dir", "--confirm-old-writers-stopped"):
-        assert migration_example.count(option) == 1
-    assert "--mapping-file" not in migration_help
 
 
 def test_repository_operator_guidance_uses_current_cli() -> None:
@@ -223,8 +215,9 @@ def test_removed_legacy_roots_are_tombstones(legacy: list[str], replacement: str
 def test_approved_defaults_are_explicit_in_parsed_request() -> None:
     assert parse_vnext(["scope", "close", "iss-00409"]).reason == "completed"
     assert parse_vnext(["work", "start", "iss-00409"]).source == "github"
-    assert parse_vnext(["dependency", "check", "iss-00409"]).source == "local"
-    assert parse_vnext(["workspace", "sync"]).source == "local"
+    # `--source local` was removed in 0.5.0; `github` is the only choice and has no default.
+    assert parse_vnext(["dependency", "check", "iss-00409"]).source is None
+    assert parse_vnext(["workspace", "sync"]).source is None
 
 
 def test_read_only_leaf_rejects_confirmation_and_accepts_a_preview() -> None:
@@ -252,16 +245,13 @@ def test_common_timeouts_are_typed_finite_and_explicit() -> None:
             parse_vnext(["work", "start", "iss-00409", "--lock-timeout", value])
 
 
-@pytest.mark.parametrize(
-    "path", ["workspace migrate", "installation init", "installation update", "installation uninstall"]
-)
+@pytest.mark.parametrize("path", ["installation init", "installation update", "installation uninstall"])
 @pytest.mark.parametrize("flag", ["--resume", "--rollback"])
 @pytest.mark.parametrize("value", ["0123456789abcdef0123456789abcdef", "bad"])
 def test_old_recovery_routes_are_rejected_before_project_access(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], path: str, flag: str, value: str
 ) -> None:
     arguments = {
-        "workspace migrate": ["--to-schema", "3", "--to-writer-protocol", "specdock.worktree-writer/v1"],
         "installation init": [str(tmp_path / "consumer")],
         "installation update": [],
         "installation uninstall": [],

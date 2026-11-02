@@ -12,11 +12,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
-from spec_dock.runtime.application.canonical_errors import (
-    CANONICAL_NOT_APPLICABLE,
-    CHECK_INSTEAD_RECOVERY,
-    CanonicalCommandError,
-)
+from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
 from spec_dock.runtime.application.canonical_scope_read import resolve_source
 from spec_dock.runtime.application.canonical_scopes import (
     check_canonical_scope_expectations,
@@ -24,7 +20,7 @@ from spec_dock.runtime.application.canonical_scopes import (
     refuse_old_ids,
 )
 from spec_dock.runtime.application.canonical_worktrees import is_catalog
-from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.project_context import resolve_observed_context
 from spec_dock.runtime.application.scope_check import (
     CUE_DOCUMENTS,
     MARKDOWN_DOCUMENTS,
@@ -222,13 +218,6 @@ def _metadata_files(catalog: Path) -> list[str]:
 
 
 def validate_workspace(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    if namespace.ci:
-        raise CanonicalCommandError(
-            CANONICAL_NOT_APPLICABLE,
-            "workspace validate --ci checks committed .meta.json; a canonical workspace keeps no specs on this branch",
-            recovery=(CHECK_INSTEAD_RECOVERY,),
-            details={"next_step": CHECK_INSTEAD_RECOVERY},
-        )
     scopes = load_canonical_scopes(context, timeout=namespace.timeout, link=True, offline=namespace.offline)
     report = inspect_canonical_structure(scopes, timeout=namespace.timeout)
     findings = report.errors
@@ -287,7 +276,7 @@ def _observe_rows(context: ProjectContext, scopes: CanonicalScopes, *, timeout: 
                 raise ValueError("bare repository is not a working tree")
             if is_catalog(entry):
                 continue
-            other = resolve_context(str(entry.path), context.root, timeout=timeout)
+            other = resolve_observed_context(str(entry.path), context.root, timeout=timeout)
             if other.clone_identity != context.clone_identity:
                 raise ValueError("worktree common directory identity mismatch")
             if other.worktree_identity in seen:

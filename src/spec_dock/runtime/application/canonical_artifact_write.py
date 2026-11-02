@@ -1,9 +1,9 @@
 """Canonical-mode `artifact create` and `artifact import file` (iss-00432; Epic design ch. 4 and 6).
 
 A Scope Artifact is published once into `<catalog>/<bucket>/<ID>/artifacts/` under the catalog lock and recorded
-in one changeset; the naming, template and source rules are the legacy ones (`direct_artifact.mutate_artifact`,
-copied here so the legacy module stays unchanged). The structure is read at display freshness: nothing is
-written to GitHub. `@root` Artifacts stay in this checkout's `spec-dock/artifacts/`, as in legacy mode.
+in one changeset; the naming, template and source rules are those of `direct_artifact.mutate_artifact` (which now publishes
+only `@root` Artifacts). The structure is read at display freshness: nothing is
+written to GitHub. `@root` Artifacts stay in this checkout's `spec-dock/artifacts/`.
 """
 
 from __future__ import annotations
@@ -238,7 +238,7 @@ def _source_snapshot(path: Path) -> FileSnapshot:
 def _replacements(
     scopes: CanonicalScopes, target: ScopeView, artifact_id: str, title: str, date: datetime
 ) -> dict[str, str]:
-    """The legacy template placeholders, filled from the GitHub structure instead of `.meta.json`."""
+    """The Artifact template placeholders, filled from the GitHub structure."""
     issue_ref = "#" + target.github_ref.rsplit("#", 1)[1] if target.github_ref is not None else ""
     replacements = {
         "<SCOPE_ID>": target.id,

@@ -2,13 +2,13 @@
 
 SpecDock 0.4.0 から、新しく作る Initiative、Epic、Issue の要件・設計・計画は、CUE で書きます。このガイドは、CUE の Scope を書き、検査し、作業しながら計画を更新するための1本の手引きです。型は SpecDock が配り（型の版 `specdock/v1`）、検査は `spec-dock scope check` が行います。人向けの説明は [Explanation Guide](explanation.md) の `explanation.html` に書きます。
 
-CUE の Scope は、canonical モード（`spec-dock/workspace.json` の `schema_version` が 4）のリポジトリのものです。版3のリポジトリでは、今までどおり Markdown の Scope を作り、`--assurance` と `--assurance-reason` を付けると `CANONICAL_NOT_MIGRATED` で止まります。`scope check` と `scope render` も版4だけです。
+CUE の Scope は、canonical モード（`spec-dock/workspace.json` の `schema_version` が 4）のリポジトリのものです。SpecDock 0.5.0 は版4のリポジトリだけを扱います（版3のリポジトリでは、どのコマンドも `CANONICAL_NOT_MIGRATED` で止まります）。
 
 既存の Markdown の Scope（`requirement.md`、`design.md`、`plan.md`）は、そのまま残り、今までどおり動きます。Markdown の Scope の書き方は [Authoring Kit 概要](overview.md) からたどります。
 
 ## CUE の Scope とは
 
-- `scope create` と `scope import github`（canonical モード）は、Scope の直下に `requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` の5つを雛形から置きます。雛形は `spec-dock/templates/cue/<種類>/` にあります。
+- `scope create` と `scope import github` は、Scope の直下に `requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` の5つを雛形から置きます。雛形は `spec-dock/templates/cue/<種類>/` にあります。
 - SpecDock は、`requirement.cue` があれば CUE の Scope、なければ Markdown の Scope と見分けます。`requirement.md` と `requirement.cue` の両方があると、正本を決められないので `SCOPE_FORMAT_CONFLICT` で止まります。片方を外します。
 - 正本は3つの CUE のファイルです。`report.md` と ADR は Markdown のままです。Lean や PlantUML などのファイルは、任意で `artifacts/` に置きます。
 

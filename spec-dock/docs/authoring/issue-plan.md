@@ -36,7 +36,7 @@ CUE の Scope では、Planning Level が保証レベル（Assurance Level）に
 
 Planning Level は、失敗した場合の影響と回復の難しさに応じて Plan の完成基準を選ぶための文書上の選択です。Priority、Severity、工数、dependency readiness、handoff status、文書量だけでは決めません。未指定なら、執筆を始める目安として `standard` を選べますが、Runtime の default や metadata にはしません。
 
-同じ canonical `plan.md` の `## Planning Level` に、selected level、理由、risk factor、再評価条件を記録します。Runtime の状態、実行可否、`.meta.json`、active manifest、`.assurance.json` には複製しません。level 別の `plan-light.md` などは作りません。
+同じ canonical `plan.md` の `## Planning Level` に、selected level、理由、risk factor、再評価条件を記録します。Runtime の状態、実行可否、GitHub の構造、active manifest、`.assurance.json` には複製しません。level 別の `plan-light.md` などは作りません。
 
 | Example ID | 状態 | 結論 |
 |---|---|---|

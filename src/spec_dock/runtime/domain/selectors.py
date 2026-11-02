@@ -117,25 +117,3 @@ def parse_github_ref(value: str, *, repo_hint: str | None = None) -> GithubScope
     if hint is not None and (parsed.owner, parsed.repo) != hint:
         raise ValueError("GitHub reference and --github-repo disagree")
     return parsed
-
-
-def parse_artifact_selector(value: str) -> ArtifactSelector:
-    if value.strip() == "@root":
-        return ArtifactRootSelector()
-    return parse_scope_selector(value)
-
-
-def parse_worktree_selector(value: str) -> WorktreeSelector:
-    raw = value
-    if raw.startswith("wt:"):
-        worktree_id = raw[3:]
-        if not _WORKTREE_NAME.fullmatch(worktree_id):
-            raise ValueError("invalid stable worktree ID")
-        return WorktreeIdSelector(worktree_id)
-    if raw.startswith("/"):
-        if ".." in raw.split("/") or "\x00" in raw:
-            raise ValueError("worktree path must be absolute without traversal")
-        return WorktreePathSelector(raw)
-    if _WORKTREE_NAME.fullmatch(raw):
-        return WorktreeAliasSelector(raw)
-    raise ValueError("worktree selector requires wt:ID, registered alias, or absolute path")

@@ -10,7 +10,11 @@ package managerでレビュー・通常試験が済んだwheelをworktree外へ�
 
 ## canonical モードへの移行
 
-宣言の版3（従来モード）から版4（canonical モード）への移行は、spec-dock のリポジトリの `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ行います。移行の前に `installation update` で配布資産を 0.3.0 に上げます（従来モードのまま動きます）。移行の後の使い方、ツールの設定の1行、同期が止まったときの扱いは[canonical モードの使い方](canonical.md)にあります。`installation init` は版4の宣言を置くので、新規導入のリポジトリは canonical モードで始まり、`spec-dock canonical link` が要ります。
+SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリ（canonical モード）だけを扱います。版3の宣言のリポジトリでは、`canonical check` のほかのどのコマンドも、何も書かずに `CANONICAL_NOT_MIGRATED`（終了コード3）で止まります（`canonical check` は版3の宣言を問題の1件として返します）。
+
+版3のまま残ったリポジトリは、SpecDock 0.4.2（両方のモードを持つ最後の版）を入れ直し、版のタグ `v0.4.2` の `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ移します。移行のスクリプトは 0.5.0 のリポジトリから外したので、タグから取り出します（`git show v0.4.2:scripts/migrate-to-canonical/README.md`）。その手順書が「0.3.0」「`v0.3.0`」と書くところ（移行の前に上げる配布資産と、CI の SpecDock の固定の版、撤去の後の戻し方）は、「0.4.2」「`v0.4.2`」と読み替えます。移した後に 0.5.0 へ上げます（「0.5.0 への更新」）。
+
+移行の後の使い方、ツールの設定の1行、同期が止まったときの扱いは[canonical モードの使い方](canonical.md)にあります。`installation init` は版4の宣言を置くので、新規導入のリポジトリは canonical モードで始まり、`spec-dock canonical link` が要ります。
 
 ## 0.4.0 への更新
 
@@ -51,6 +55,24 @@ package managerでレビュー・通常試験が済んだwheelをworktree外へ�
   - `spec-dock canonical status` の `changes` に `junk_files` が付きます。前の版が保存してしまった不要ファイルの一覧で、カタログから消すと次の周期が削除を保存します。
   - `spec-dock canonical remove` は、保存しないファイルがカタログに残っていると、何も消さずに `CANONICAL_IGNORED_FILES_PRESENT`（終了コード3）で止まります。示されたファイルを消すか移してから、もう一度実行します。
 
+## 0.5.0 への更新
+
+0.5.0 は、従来モード（宣言の版3、`.meta.json`）を撤去し、canonical モードだけを持つ版です。すべてのリポジトリが版4に移った後に入れます。
+
+- 上げる手順：使っているすべてのリポジトリ（とそのクローン）の `spec-dock/workspace.json` が `"schema_version": 4` であることを確かめてから、パッケージを 0.5.0 に上げ、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。CI の見本は `spec-dock/system/spec-dock-version` の版（0.5.0）の SpecDock を入れて動きます。
+- 撤去したもの：
+  - 版3の宣言を読むと、`canonical check` のほかのどのコマンドも、何も読み書きせずに `CANONICAL_NOT_MIGRATED`（終了コード3）で止まり、`recovery` に「SpecDock 0.4.2 を入れ直し、版のタグ v0.4.2 の scripts/migrate-to-canonical/README.md に従って移す」を示します（「canonical モードへの移行」）。`installation` のコマンドと `workspace doctor --raw` も止まります。版5以上と壊れた宣言は、今までどおり `PRECONDITION_FAILED` です。
+  - コマンド `spec-dock workspace migrate` と `spec-dock workbench copy` がなくなりました（引数の誤り、終了コード2）。公開の葉は 53 になりました。Scope の `.workbench/` はカタログの中にあり、どの worktree からも見えるので、写す必要はありません。
+  - 引数 `workspace validate --ci`（CI では `spec-dock canonical check`）、`workspace sync --source local` と `dependency check --source local`（`--source` は `github` だけ。省くとスナップショットを読みます）、`scope create` と `scope import github` の `--slug` がなくなりました（引数の誤り）。`artifact create --slug` は残ります。
+  - エラーのコード `CANONICAL_NOT_APPLICABLE` と `CANONICAL_WORKBENCH_SHARED` は、もう返りません。
+  - `.md` の Scope の雛形 `spec-dock/templates/{initiative,epic,issue}/`（各 `requirement.md`、`design.md`、`plan.md`、`report.md`、`.workbench/README.md`）と、入れ子の置き場の `epics/rules.md`・`issues/rules.md` の先だった `spec-dock/docs/rules/initiative/epics.md`・`spec-dock/docs/rules/epic/issues.md` を外しました。`installation update` は、変えていなければ退避してから消します。変えていれば手で合わせるよう止まります（`legacy static resource is modified or unknown; merge manually`）。
+  - CUE の雛形の `report.md`（`spec-dock/templates/cue/<種類>/report.md`）の前付けから `タイトル:` と `親:` の行を外し、作るときにその2行を除く処理と「詳細:」のリンクを書き換える処理をやめました。作られる `report.md` は 0.4.2 と同じです。0.4.2 の配布資産のまま 0.5.0 で作ると、その2行が残ります（正本ではありません）。`installation update` の後は残りません。
+  - 移行のスクリプト `scripts/migrate-to-canonical/` を、spec-dock のリポジトリから外しました（版のタグ `v0.4.2` に残ります）。
+- 0.4.2 の後に入った改善：
+  - `installation update`（`--dry-run` と、途中で止まった場合を含む）が `.claude/skills/spec-dock*` の古い写しを外すとき、リンクがない枠ごとに、外枠の `warnings[]` に `CLAUDE_SKILL_LINK_MISSING`（`details`：`slot`、`link_target`、`command`）が出ます。終了コード、`status`、`effects`、`data.result` は変わりません。示された `command` でリンクを置きます（SpecDock はリンクを作りません）。
+  - 配布する `spec-dock/.gitignore` に `!**/.workbench/` を足しました。ルートの `.gitignore` が `.workbench/` を無視していても、`spec-dock/` の下の `.workbench/README.md`（雛形の README を含む）がコミットの対象になります。ほかの中身は無視のままです。すでに使っているリポジトリは、更新の後に `git add spec-dock/templates` で、それまで無視されていた雛形の README を足してコミットします。
+- 戻し方：0.5.0 に問題があれば、パッケージを 0.4.2 に戻します。0.4.2 は canonical モードと CUE の Scope を持つので、配布資産を 0.5.0 に上げる前のリポジトリはそのまま動きます。配布資産を 0.5.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.4.2 のバイトに戻します。版のファイルだけを戻すと、0.4.2 の `canonical check` が 0.5.0 の資産を知らない変更として CI を止め、0.4.2 の `scope create` が外した `docs/rules/initiative/epics.md`・`docs/rules/epic/issues.md` を求めて止まります（0.4.2 の `installation update` も 0.5.0 のバイトを知らないので、戻す手段になりません）。
+
 ## 新規導入
 
 ```sh
@@ -62,18 +84,6 @@ spec-dock --project /absolute/project workspace validate --json
 
 対象は正確なGit worktree root一つです。initは新writerのworkspace宣言と静的資産だけを置き、既存の配布先fileがあれば書込み前に停止します。main/linkedを一括導入せず、runtime、直接作業記録、Git内の独自領域を作りません。
 
-## schema3の旧writerから移行
-
-旧writer・自動起動の停止を確認し、仕様、ignored成果物、旧Git独自領域を含む実体の外部保全と復元確認を先行します。旧writer停止を確認できない状態では適用しません。
-
-```sh
-spec-dock --project /absolute/project workspace doctor --raw --legacy --json
-spec-dock --project /absolute/project workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --dry-run --json
-spec-dock --project /absolute/project workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --backup-dir /absolute/new-migration-backup --confirm-old-writers-stopped --yes --json
-```
-
-自workspaceのschema3宣言のwriter_protocolだけを切り替え、旧control_epochがある場合だけ除きます。Scope ID/path/linkage、文書、未知設定は保持します。旧activeを新予約へ取り込まず、旧Git独自領域に新値を書きません。schema3未満や未知protocolは本版の対象外です。切替後の新Startで直接対象を取得します。
-
 ## static資産の更新・削除
 
 ```sh
@@ -83,7 +93,7 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 spec-dock installation uninstall --target /absolute/project --backup-dir /absolute/new-uninstall-backup --yes --json
 ```
 
-新writer workspaceで既知path/hashのstatic filesだけを変更します。更新は欠けたfileを補い、既知旧bytesを置換し、既知旧runtime filesを個別退役させます。削除も所有権検証を行い、workspace宣言・ignore規則・仕様・Artifact・Workbench・直接記録・directoryを残します。未知改変は人間によるmergeへ戻し、directoryごとの削除はしません。
+版4（新writer）のworkspaceで既知path/hashのstatic filesだけを変更します。更新は欠けたfileを補い、既知旧bytesを置換し、既知旧runtime filesと外した雛形を個別退役させます。削除も所有権検証を行い、workspace宣言・ignore規則・仕様・Artifact・Workbench・直接記録・directoryを残します。未知改変は人間によるmergeへ戻し、directoryごとの削除はしません。
 
 旧static bytes/modeを `backup/static/<relative>` へ保存し、別の一時場所へ実際に復元して比較します。backup先は全clone worktree、Git metadata、installed packageの外で、既存の通常parent下の新しい絶対pathです。既存backupを再利用しません。
 

@@ -25,7 +25,6 @@ if TYPE_CHECKING:
         ("work", "start", "init-00001"),
         ("work", "finish", "init-00001"),
         ("branch", "create", "init-00001"),
-        ("workspace", "migrate", "--to-schema", "3", "--to-writer-protocol", "specdock.worktree-writer/v1"),
         ("installation", "init", "--root", "{root}"),
         ("installation", "update"),
         ("installation", "uninstall"),

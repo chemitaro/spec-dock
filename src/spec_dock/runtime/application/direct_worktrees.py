@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import replace
 import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.project_context import physical_identity, resolve_context
-from spec_dock.runtime.application.scope_query import load_scope_views
-from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
 from spec_dock.runtime.domain.git_ref import parse_commit_oid
 from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.git_process import GitProcessError, run_git
@@ -33,22 +30,9 @@ if TYPE_CHECKING:
     from spec_dock.runtime.infra.work_target_store import StoredSelection
 
 
-def check_current_expectation(
-    namespace: argparse.Namespace, context: ProjectContext, *, stored: StoredSelection | None = None
-) -> None:
-    if namespace.expect_current is None:
-        return
-    views = load_scope_views(context.root / "spec-dock")
-    selected = read_selection(context, views, stored=stored)
-    expected = resolve_scope(context, views, namespace.expect_current, selection=selected).id
-    if selected.status != "selected" or selected.record is None or selected.record.scope_id != expected:
-        raise ValueError("direct target does not match --expect-current")
-
-
 def list_native_worktrees(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     if namespace.expect_backend is not None:
         raise ValueError("--expect-backend requires one existing Scope target")
-    check_current_expectation(namespace, context)
     inventory = worktree_list(context.root, timeout=namespace.timeout)
     if not inventory or any(entry.inventory_error is not None for entry in inventory):
         raise ValueError("native Git worktree inventory is incomplete")
@@ -69,7 +53,6 @@ def list_native_worktrees(namespace: argparse.Namespace, context: ProjectContext
 def show_native_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     if namespace.expect_backend is not None:
         raise ValueError("--expect-backend requires one existing Scope target")
-    check_current_expectation(namespace, context)
     entry = resolve_native_target(namespace.worktree_ref, context, timeout=namespace.timeout)
     result: dict[str, object] = {
         "path": str(entry.path),
@@ -117,54 +100,6 @@ def _removal_observation(context: ProjectContext, path: Path, *, timeout: float)
     present = any(row.path.resolve() == path.resolve() for row in inventory)
     path_present = os.path.lexists(path)
     return {"removed": not present and not path_present, "inventory_present": present, "path_present": path_present}
-
-
-def remove_native_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    context.require_writer()
-    if namespace.expect_backend is not None:
-        raise ValueError("--expect-backend requires one existing Scope target")
-    with WorkTargetStore(context.root) as store:
-        captured_selection = store.read()
-    if captured_selection.status not in ("empty", "selected"):
-        raise ValueError("source direct selection cannot be captured for a Git mutation")
-    if captured_selection.record is not None and (
-        captured_selection.record.clone_identity,
-        captured_selection.record.worktree_identity,
-    ) != (context.clone_identity, context.worktree_identity):
-        raise ValueError("source direct selection physical identity mismatch")
-    check_current_expectation(namespace, context, stored=captured_selection)
-    if not namespace.yes and not namespace.dry_run:
-        raise ValueError("worktree removal requires --yes")
-    entry = resolve_native_target(namespace.worktree_ref, context, timeout=namespace.timeout)
-    result: OperationResult[object] | None = None
-    try:
-        with DirectoryIdentity(entry.path) as held_target:
-            result = _remove_captured_worktree(namespace, context, entry, captured_selection, held_target)
-    except OSError as error:
-        if result is None:
-            raise
-        partial = any(effect.status in ("succeeded", "unknown") for effect in result.effects)
-        diagnostic = (
-            Diagnostic(result.error.code, result.error.message, {**result.error.details, "cleanup_error": str(error)})
-            if result.error is not None
-            else Diagnostic("LOCAL_IO_FAILED", str(error), {})
-        )
-        return replace(
-            result,
-            status="partial" if partial else "failed",
-            exit_code=6 if partial else 5,
-            effects=tuple(
-                replace(effect, status="not_attempted") if effect.status == "planned" else effect
-                for effect in result.effects
-            ),
-            error=diagnostic,
-            recovery=RecoveryInstructions((
-                "Inspect native inventory and the target path before a new explicit operation.",
-            ))
-            if partial
-            else None,
-        )
-    return result
 
 
 def _remove_captured_worktree(
@@ -404,7 +339,6 @@ def create_native_worktree(namespace: argparse.Namespace, context: ProjectContex
         captured_selection.record.worktree_identity,
     ) != (context.clone_identity, context.worktree_identity):
         raise ValueError("source direct selection physical identity mismatch")
-    check_current_expectation(namespace, context, stored=captured_selection)
 
     def verify_source() -> None:
         fresh = resolve_context(str(context.root), context.root, timeout=namespace.timeout)

@@ -2,7 +2,7 @@
 
 set -u
 
-TARGETS=(src/spec_dock tests scripts/migrate-to-canonical)
+TARGETS=(src/spec_dock tests)
 
 run_check() {
   local label="$1"

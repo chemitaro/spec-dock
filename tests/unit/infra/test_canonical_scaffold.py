@@ -18,12 +18,13 @@ if TYPE_CHECKING:
     from pathlib import Path
 
 
-def test_a_template_copy_renders_strips_title_and_parent_lines_and_rebases_doc_links(tmp_path: Path) -> None:
+def test_a_template_copy_renders_placeholders_and_keeps_every_other_byte(tmp_path: Path) -> None:
+    """Since 0.5.0 (iss-00440) the templates carry no title/parent lines and already link at the flat depth."""
     root = tmp_path.resolve()
     template = root / "template"
     template.mkdir()
     (template / "plan.md").write_text(
-        '---\nID: "<ISS_ID>"\nタイトル: "<ISS_TITLE>"\n---\n# <ISS_TITLE>\n詳細: [G](../../../../../../docs/a.md)\n',
+        '---\nID: "<ISS_ID>"\nタイトル: "<ISS_TITLE>"\n---\n# <ISS_TITLE>\n詳細: [G](../../../docs/a.md)\n',
         "utf-8",
     )
     destination = root / "iss-00007"
@@ -38,7 +39,7 @@ def test_a_template_copy_renders_strips_title_and_parent_lines_and_rebases_doc_l
     assert created == [destination / "plan.md"]
     assert (destination / "plan.md").read_text(
         "utf-8"
-    ) == '---\nID: "iss-00007"\n---\n# 葉\n詳細: [G](../../../docs/a.md)\n'
+    ) == '---\nID: "iss-00007"\nタイトル: "葉"\n---\n# 葉\n詳細: [G](../../../docs/a.md)\n'
 
 
 def test_a_missing_bucket_is_created_as_a_real_directory_and_an_existing_one_is_kept(tmp_path: Path) -> None:

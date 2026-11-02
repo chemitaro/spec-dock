@@ -19,9 +19,7 @@ from typing import TYPE_CHECKING
 from spec_dock.runtime.application.canonical_catalog import resolve_layout
 from spec_dock.runtime.application.canonical_errors import (
     CANONICAL_CATALOG_PROTECTED,
-    CANONICAL_WORKBENCH_SHARED,
     CATALOG_PROTECTED_RECOVERY,
-    WORKBENCH_SHARED_RECOVERY,
     CanonicalCommandError,
 )
 from spec_dock.runtime.application.canonical_link import link_after_command
@@ -103,7 +101,7 @@ def show_worktree(namespace: argparse.Namespace, context: ProjectContext) -> Ope
 
 
 def remove_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    """The legacy `remove_native_worktree` with the canonical expectation on the record its inner step verifies."""
+    """Native `worktree remove` (`direct_worktrees._remove_captured_worktree`) after the canonical expectation check."""
     _refuse_catalog(namespace, context)
     context.require_writer()
     if namespace.expect_backend is not None:
@@ -134,7 +132,7 @@ def remove_worktree(namespace: argparse.Namespace, context: ProjectContext) -> O
 
 
 def bootstrap_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    """The legacy `bootstrap_native_worktree` with the canonical expectation on the record its inner step uses."""
+    """Native `worktree bootstrap` (`direct_bootstrap._bootstrap_captured_target`) after the canonical expectation check."""
     _refuse_catalog(namespace, context)
     context.require_writer()
     if namespace.expect_backend is not None:
@@ -241,16 +239,6 @@ def _reading_warnings(context: ProjectContext, namespace: argparse.Namespace) ->
     except (CanonicalCommandError, GithubStructureError, GitProcessError, ValueError, OSError):
         return ()
     return scopes.kind_change_warnings()
-
-
-def refuse_workbench_copy(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    del namespace, context
-    raise CanonicalCommandError(
-        CANONICAL_WORKBENCH_SHARED,
-        "every worktree of this clone reads the same catalog, so each Scope's .workbench is already shared",
-        recovery=(WORKBENCH_SHARED_RECOVERY,),
-        details={"next_step": WORKBENCH_SHARED_RECOVERY},
-    )
 
 
 def install_with_expectation(namespace: argparse.Namespace, target: GitContext) -> OperationResult[object]:

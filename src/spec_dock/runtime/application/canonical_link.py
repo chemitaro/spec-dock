@@ -60,7 +60,7 @@ from spec_dock.runtime.application.canonical_schedule import (
     plan_schedule,
 )
 from spec_dock.runtime.application.canonical_tools_check import tool_findings
-from spec_dock.runtime.application.project_context import probe_workspace_mode
+from spec_dock.runtime.application.project_context import declares_schema_4
 from spec_dock.runtime.domain.canonical_content import FORMAT_FILE, format_writable, read_format
 from spec_dock.runtime.domain.canonical_layout import (
     CANONICAL_BRANCH,
@@ -161,8 +161,9 @@ def link_checkout(
     """Steps 1-8; `schedule=False` (--no-schedule) skips step 6, and a follow-up honours an earlier --no-schedule."""
     require_git(environment)
     layout = resolve_layout(context)
-    # A main checkout on an unmigrated commit keeps working in legacy mode: never put a link there.
-    skip_main = not layout.is_main and probe_workspace_mode(layout.main_checkout) != "canonical"
+    # A main checkout on a commit without a schema-4 declaration (before the switch) gets no link; its own
+    # commands stop with CANONICAL_NOT_MIGRATED and its tree is left as it is.
+    skip_main = not layout.is_main and not declares_schema_4(layout.main_checkout)
     observation = observe_catalog(layout, environment, timeout=timeout)
     _refuse_blocked(observation, skip_main=skip_main)
     plan = _plan_schedule(layout, observation, environment, schedule=schedule, follow_up=follow_up, timeout=timeout)
@@ -834,7 +835,7 @@ def link_after_command(
                 (Effect("canonical.link", "planned", str(link_path)),), (), {"path": str(link_path), "state": "planned"}
             )
         return failed(CANONICAL_NOT_LINKED, f"{checkout} does not exist", LINK_AGAIN_RECOVERY, {"path": str(checkout)})
-    if probe_workspace_mode(checkout) != "canonical":
+    if not declares_schema_4(checkout):
         warning = Diagnostic(
             CANONICAL_CHECKOUT_NOT_MIGRATED,
             f"{checkout} does not declare workspace schema 4, so it was not linked; next: {CHECKOUT_NOT_MIGRATED_NEXT_STEP}",

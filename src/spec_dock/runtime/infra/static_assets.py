@@ -14,6 +14,17 @@ if TYPE_CHECKING:
     from importlib.abc import Traversable
 
 RETIRED_SKILL_SLOTS = (".claude/skills/spec-dock", ".claude/skills/spec-dock-grill-with-docs")
+# Legacy-mode scaffold files that SpecDock 0.5.0 stopped shipping (iss-00440); named one by one, never a prefix,
+# so a retired entry can never reach a user's own file under spec-dock/templates/ or spec-dock/docs/.
+RETIRED_LEGACY_SCAFFOLD_PATHS = frozenset({
+    *(
+        f"spec-dock/templates/{kind}/{name}"
+        for kind in ("initiative", "epic", "issue")
+        for name in ("requirement.md", "design.md", "plan.md", "report.md", ".workbench/README.md")
+    ),
+    "spec-dock/docs/rules/initiative/epics.md",
+    "spec-dock/docs/rules/epic/issues.md",
+})
 StaticClassification = Literal["missing", "current", "known-old", "unknown", "unsafe"]
 
 
@@ -117,6 +128,7 @@ def package_retired_assets() -> tuple[RetiredStaticAsset, ...]:
             path == "spec-dock/spec-dock.version"
             or (path.startswith("spec-dock/scripts/spec_dock_runtime/") and path.endswith(".py"))
             or path.startswith(tuple(f"{slot}/" for slot in RETIRED_SKILL_SLOTS))
+            or path in RETIRED_LEGACY_SCAFFOLD_PATHS
         ):
             raise ValueError("retired static inventory contains an unsafe target")
         hashes = entry["known_old_sha256"]

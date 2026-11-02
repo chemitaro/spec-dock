@@ -161,57 +161,6 @@ def _render_tree_ready_board_puml(
     return "\n".join(lines)
 
 
-def _deps_disabled_error_text(error: str | None) -> str:
-    text = (error or "deps unavailable").strip()
-    return text.replace("\n", " ")
-
-
-def _deps_disabled_puml_note_error_text(error: str | None) -> str:
-    return _deps_disabled_error_text(error).replace("\\", "\\\\").replace('"', '\\"')
-
-
-def _render_deps_disabled_tree_puml(*, todo_only: bool, error: str | None) -> str:
-    mode = "todo" if todo_only else "all"
-    err = _deps_disabled_puml_note_error_text(error)
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append(f"title tree-{mode} - DEPS_DISABLED")
-    lines.append(f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled')
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _render_deps_disabled_deps_issues_puml(*, error: str | None) -> str:
-    err = _deps_disabled_puml_note_error_text(error)
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append("skinparam linetype ortho")
-    lines.append("title deps-issues - DEPS_DISABLED")
-    lines.append(f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled')
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def _render_deps_disabled_deps_raw_puml(*, error: str | None) -> str:
-    err = _deps_disabled_puml_note_error_text(error)
-    lines: list[str] = []
-    lines.append("@startuml")
-    lines.append("left to right direction")
-    lines.append("skinparam shadowing false")
-    lines.append("skinparam linetype ortho")
-    lines.append("title deps-raw - DEPS_DISABLED")
-    lines.append(f'note "deps_preflight_failed\\ndeps.valid=false\\nmode=sync --force\\nerror: {err}" as Disabled')
-    lines.append("@enduml")
-    lines.append("")
-    return "\n".join(lines)
-
-
 def _render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
     nodes = deps_issues_state.get("nodes")
     if not isinstance(nodes, dict):
@@ -453,20 +402,8 @@ def render_tree_ready_board_puml(
     return _render_tree_ready_board_puml(tree_state, active=active, todo_only=todo_only)
 
 
-def render_deps_disabled_tree_puml(*, todo_only: bool, error: str | None) -> str:
-    return _render_deps_disabled_tree_puml(todo_only=todo_only, error=error)
-
-
 def render_deps_issues_puml(deps_issues_state: dict[str, Any]) -> str:
     return _render_deps_issues_puml(deps_issues_state)
-
-
-def render_deps_disabled_deps_issues_puml(*, error: str | None) -> str:
-    return _render_deps_disabled_deps_issues_puml(error=error)
-
-
-def render_deps_disabled_deps_raw_puml(*, error: str | None) -> str:
-    return _render_deps_disabled_deps_raw_puml(error=error)
 
 
 def render_deps_raw_puml(deps_raw_state: dict[str, Any]) -> str:

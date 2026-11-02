@@ -2,7 +2,7 @@
 
 ## Current
 
-通常packageの外部CLIを使い、仕様は各Scopeのcanonical filesから読みます。`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリ（canonical モード）では、Scope の構造は GitHub Issue に、中身は `spec-dock/initiatives/<区切り>/<ID>/`（`spec-dock/canonical` ブランチのカタログへのリンク）にあり、保存と共有は自動です。詳しくは[canonical モードの使い方](canonical.md)を見てください。
+通常packageの外部CLIを使い、仕様は各Scopeのcanonical filesから読みます。SpecDock 0.5.0 は `spec-dock/workspace.json` の `schema_version` が 4 のリポジトリ（canonical モード）だけを扱い、Scope の構造は GitHub Issue に、中身は `spec-dock/initiatives/<区切り>/<ID>/`（`spec-dock/canonical` ブランチのカタログへのリンク）にあり、保存と共有は自動です。詳しくは[canonical モードの使い方](canonical.md)を見てください。
 
 - [導入・移行・保全](migration.md)
 - [CLI参照](reference_cli.md)

@@ -1,4 +1,4 @@
-"""Read stored Artifact identities without opening bodies or inferring authority."""
+"""Read stored `@root` Artifact identities without opening bodies or inferring authority."""
 
 from __future__ import annotations
 
@@ -7,7 +7,6 @@ import os
 import stat
 from typing import TYPE_CHECKING
 
-from spec_dock.runtime.application.scope_query import load_scope_views, show_scope
 from spec_dock.runtime.domain.artifacts import (
     ArtifactFilename,
     GenericImportedArtifactFilename,
@@ -16,14 +15,10 @@ from spec_dock.runtime.domain.artifacts import (
     parse_existing_artifact_filename,
     scan_artifact_slot_ledger,
 )
-from spec_dock.runtime.domain.selectors import ArtifactRootSelector, parse_artifact_selector
 from spec_dock.runtime.infra.json_store import open_guarded_directory
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    from spec_dock.runtime.application.scope_query import ScopeView
-    from spec_dock.runtime.domain.lifecycle import SelectionState
 
 
 @dataclass(frozen=True)
@@ -42,25 +37,13 @@ class ArtifactCatalog:
     items: tuple[ArtifactCatalogEntry, ...]
 
 
-def list_artifacts(
-    *,
-    repo_root: Path,
-    scope: str,
-    selection: SelectionState | None = None,
-    views: tuple[ScopeView, ...] | None = None,
-) -> ArtifactCatalog:
+def list_artifacts(*, repo_root: Path) -> ArtifactCatalog:
     """Return identifiers only; source paths, contents, hashes, and sizes stay private."""
     specdock_dir = repo_root / "spec-dock"
     if specdock_dir.is_symlink() or not specdock_dir.is_dir():
         raise ValueError("SpecDock workspace root is missing or redirected")
-    selector = parse_artifact_selector(scope)
-    if isinstance(selector, ArtifactRootSelector):
-        scope_id = "root"
-        owner = specdock_dir
-    else:
-        target = show_scope(views if views is not None else load_scope_views(specdock_dir), scope, selection=selection)
-        scope_id = target.id
-        owner = target.path
+    scope_id = "root"
+    owner = specdock_dir
     artifacts_dir = owner / "artifacts"
     if not os.path.lexists(artifacts_dir):
         return ArtifactCatalog(scope_id, ())
@@ -122,14 +105,8 @@ def list_artifacts(
     return ArtifactCatalog(scope_id, tuple(entries))
 
 
-def show_artifact(
-    *, repo_root: Path, scope: str, artifact_id: str, selection: SelectionState | None = None
-) -> ArtifactCatalogEntry:
-    matches = [
-        item
-        for item in list_artifacts(repo_root=repo_root, scope=scope, selection=selection).items
-        if item.artifact_id == artifact_id
-    ]
+def show_artifact(*, repo_root: Path, artifact_id: str) -> ArtifactCatalogEntry:
+    matches = [item for item in list_artifacts(repo_root=repo_root).items if item.artifact_id == artifact_id]
     if not matches:
         raise LookupError("Artifact was not found")
     if len(matches) != 1:

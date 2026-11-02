@@ -2,7 +2,7 @@ from collections.abc import Mapping
 import os
 from pathlib import Path
 import re
-from typing import TypedDict, cast
+from typing import TypedDict
 
 import pytest
 
@@ -66,19 +66,11 @@ CURRENT_ARTIFACT_TEMPLATES = (
 )
 
 S07_OWNED_ASSET_CATEGORIES = {
+    # The Markdown Scope templates were removed in 0.5.0 (iss-00440); the CUE set keeps report.md as Markdown.
     "scope-templates": (
-        "templates/initiative/requirement.md",
-        "templates/initiative/design.md",
-        "templates/initiative/plan.md",
-        "templates/initiative/report.md",
-        "templates/epic/requirement.md",
-        "templates/epic/design.md",
-        "templates/epic/plan.md",
-        "templates/epic/report.md",
-        "templates/issue/requirement.md",
-        "templates/issue/design.md",
-        "templates/issue/plan.md",
-        "templates/issue/report.md",
+        "templates/cue/initiative/report.md",
+        "templates/cue/epic/report.md",
+        "templates/cue/issue/report.md",
     ),
     "current-artifact-templates": (
         "templates/artifacts/blank.md",
@@ -234,29 +226,22 @@ SCOPE_TEMPLATE_CONTRACTS: dict[str, ScopeTemplateContract] = {
         "id": "<INIT_ID>",
         "title": "<INIT_TITLE>",
         "parent": None,
-        "guide_prefix": "../../docs/authoring/",
-        "node_parts": ("initiatives", "init-test"),
+        "guide_prefix": "../../../docs/authoring/",
+        "node_parts": ("initiatives", "00000-00999", "init-00001"),
     },
     "epic": {
         "id": "<EPIC_ID>",
         "title": "<EPIC_TITLE>",
         "parent": '["<INIT_ID>"]',
-        "guide_prefix": "../../../../docs/authoring/",
-        "node_parts": ("initiatives", "init-test", "epics", "epic-test"),
+        "guide_prefix": "../../../docs/authoring/",
+        "node_parts": ("initiatives", "00000-00999", "epic-00002"),
     },
     "issue": {
         "id": "<ISS_ID>",
         "title": "<ISS_TITLE>",
         "parent": '["<EPIC_ID>", "<INIT_ID>"]',
-        "guide_prefix": "../../../../../../docs/authoring/",
-        "node_parts": (
-            "initiatives",
-            "init-test",
-            "epics",
-            "epic-test",
-            "issues",
-            "iss-test",
-        ),
+        "guide_prefix": "../../../docs/authoring/",
+        "node_parts": ("initiatives", "00000-00999", "iss-00003"),
     },
 }
 
@@ -420,7 +405,7 @@ def _has_exact_current_first_read_destinations(content: str) -> bool:
 
 
 def _read_template(scope: str, document: str) -> str:
-    return (TEMPLATES_ROOT / scope / f"{document}.md").read_text(encoding="utf-8")
+    return (TEMPLATES_ROOT / "cue" / scope / f"{document}.md").read_text(encoding="utf-8")
 
 
 def _has_exact_scope_template_catalog(filenames: set[str]) -> bool:
@@ -528,8 +513,12 @@ def _relative_link_violations(manifest: tuple[str, ...], scaffold_root: Path) ->
 
         content = asset_path.read_text(encoding="utf-8")
         path_parts = Path(relative_path).parts
-        if len(path_parts) == 3 and path_parts[0] == "templates" and path_parts[1] in SCOPE_TEMPLATE_CONTRACTS:
-            scope = path_parts[1]
+        if (
+            len(path_parts) == 4
+            and path_parts[:2] == ("templates", "cue")
+            and path_parts[2] in SCOPE_TEMPLATE_CONTRACTS
+        ):
+            scope = path_parts[2]
             content = _render_template(content)
             link_base = scaffold_root.joinpath(*SCOPE_TEMPLATE_CONTRACTS[scope]["node_parts"])
         else:
@@ -543,14 +532,14 @@ def _relative_link_violations(manifest: tuple[str, ...], scaffold_root: Path) ->
 
 def test_s07_parity_owned_asset_manifest_is_exact_and_explicit() -> None:
     assert {category: len(paths) for category, paths in S07_OWNED_ASSET_CATEGORIES.items()} == {
-        "scope-templates": 12,
+        "scope-templates": 3,
         "current-artifact-templates": 6,
         "navigation-roots": 4,
         "base-authoring-guides": 2,
         "current-authoring-guides": 6,
         "planning-level-guides": 4,
     }
-    assert len(S07_OWNED_ASSET_MANIFEST) == 34
+    assert len(S07_OWNED_ASSET_MANIFEST) == 25
     assert _owned_manifest_delta(S07_OWNED_ASSET_MANIFEST) == ((), (), ())
     assert S07_PARITY_EXCLUDED_SURFACES == ("tests/unit/infra/test_authoring_kit_assets.py",)
 
@@ -857,43 +846,19 @@ def test_scope_layering_distinguishes_plan_responsibilities_by_scope() -> None:
     assert "親の目的、Issue 分割、依存方向を変更しません" in plan_lines["Issue"]
 
 
-@pytest.mark.parametrize("template_root", (TEMPLATES_ROOT, DOGFOOD_TEMPLATES_ROOT))
-@pytest.mark.parametrize("scope", SCOPES)
-def test_template_scope_markdown_catalog_is_exact(
-    template_root: Path,
-    scope: str,
-) -> None:
-    filenames = {path.name for path in (template_root / scope).glob("*.md") if path.is_file()}
-
-    assert _has_exact_scope_template_catalog(filenames)
-
-
-@pytest.mark.parametrize(
-    "extra_filename",
-    ("plan-light.md", "requirement-copy.md", "design-v2.md"),
-)
-def test_template_scope_catalog_rejects_extra_rdp_like_alias(extra_filename: str) -> None:
-    mutated_catalog = set(SCOPE_TEMPLATE_MARKDOWN_FILES) | {extra_filename}
-
-    assert not _has_exact_scope_template_catalog(mutated_catalog)
-
-
 def test_template_readme_navigation_catalogs_exact_scope_docs_and_current_artifacts() -> None:
     content = (TEMPLATES_ROOT / "README.md").read_text(encoding="utf-8")
     links = set(_markdown_link_destinations(content))
 
     for scope in SCOPES:
-        assert content.count(f"`{scope}/{{requirement,design,plan,report}}.md`") == 1
-        assert f"`{scope}/{{requirement,design,plan}}.md`" not in content
+        assert content.count(f"`cue/{scope}/{{requirement.cue,design.cue,plan.cue,explanation.html,report.md}}`") == 1
+        assert f"`{scope}/{{requirement,design,plan,report}}.md`" not in content  # removed in 0.5.0 (iss-00440)
 
     artifact_catalog = f"`artifacts/{{{','.join(CURRENT_ARTIFACT_TEMPLATES)}}}.md`"
     assert content.count(artifact_catalog) == 1
 
     assert links == {
         "../docs/authoring/overview.md",
-        "../docs/authoring/requirement.md",
-        "../docs/authoring/design.md",
-        "../docs/authoring/issue-plan.md",
         "../docs/authoring/report.md",
         "../docs/authoring/artifacts.md",
         "../docs/authoring/cue.md",  # iss-00477: the CUE Scope templates section
@@ -903,143 +868,13 @@ def test_template_readme_navigation_catalogs_exact_scope_docs_and_current_artifa
         assert (TEMPLATES_ROOT / relative_path).is_file(), f"broken template catalog link: {relative_path}"
 
 
-@pytest.mark.parametrize(
-    ("scope", "document"),
-    ((scope, document) for scope in SCOPES for document in RDP_DOCUMENTS),
-)
-def test_template_rdp_frontmatter_uses_exact_minimal_fields_and_placeholders(
-    scope: str,
-    document: str,
-) -> None:
-    content = _read_template(scope, document)
-    fields = _frontmatter(content)
-    scope_contract = SCOPE_TEMPLATE_CONTRACTS[scope]
-    document_contract = DOCUMENT_TEMPLATE_CONTRACTS[document]
-
-    expected_keys = {"種別", "ID", "タイトル", "関連GitHub", "状態", "最終更新"}
-    if document_contract["dependencies"] is not None:
-        expected_keys.add("依存")
-    if scope_contract["parent"] is not None:
-        expected_keys.add("親")
-    assert set(fields) == expected_keys
-
-    scope_label = scope.capitalize()
-    kind = document_contract["kind"]
-    if document == "plan" and scope == "issue":
-        kind = "実装計画書"
-    assert fields["種別"] == f"{kind}（{scope_label}）"
-    assert fields["ID"] == f'"{scope_contract["id"]}"'
-    assert fields["タイトル"] == f'"{scope_contract["title"]}"'
-    assert fields["関連GitHub"] == '["<GITHUB_ISSUE_NUMBER_OR_URL>"]'
-    assert fields["状態"] == '"draft"'
-    assert fields["最終更新"] == '"YYYY-MM-DD"'
-
-    dependencies = document_contract["dependencies"]
-    if dependencies is not None:
-        assert fields["依存"] == dependencies
-    parent = scope_contract["parent"]
-    if parent is not None:
-        assert fields["親"] == parent
-
-    expected_placeholders = {
-        scope_contract["id"],
-        scope_contract["title"],
-        "<GITHUB_ISSUE_NUMBER_OR_URL>",
-    }
-    if scope == "epic":
-        expected_placeholders.add("<INIT_ID>")
-    if scope == "issue":
-        expected_placeholders.update(("<INIT_ID>", "<EPIC_ID>"))
-    assert set(re.findall(r"<[A-Z_]+>", content)) == expected_placeholders
-
-    rendered = _render_template(content)
-    assert not re.search(r"<[A-Z_]+>", rendered)
-    assert "YYYY-MM-DD" not in rendered
-
-
-@pytest.mark.parametrize(
-    ("scope", "document"),
-    ((scope, document) for scope in SCOPES for document in RDP_DOCUMENTS),
-)
-def test_template_rdp_has_exact_headings_and_one_concise_prompt_per_section(
-    scope: str,
-    document: str,
-) -> None:
-    content = _read_template(scope, document)
-    expected_headings = TEMPLATE_HEADINGS[document]
-    if scope == "issue" and document == "plan":
-        expected_headings = ("Planning Level", *expected_headings)
-
-    assert tuple(re.findall(r"^## ([^\n]+)$", content, flags=re.MULTILINE)) == expected_headings
-    assert not re.search(r"^### ", content, flags=re.MULTILINE)
-    assert "<!--" not in content
-
-    for heading in expected_headings:
-        prompt = _template_section_prompt(content, heading)
-        assert prompt.endswith("。")
-        assert len(prompt) <= 100
-        assert not prompt.startswith(("- ", "* ", "1. ", "```"))
-        assert "..." not in prompt
-
-
-@pytest.mark.parametrize(
-    ("scope", "document"),
-    ((scope, document) for scope in SCOPES for document in RDP_DOCUMENTS),
-)
-def test_template_rdp_guide_link_resolves_from_rendered_node_location(
-    scope: str,
-    document: str,
-) -> None:
-    scope_contract = SCOPE_TEMPLATE_CONTRACTS[scope]
-    document_contract = DOCUMENT_TEMPLATE_CONTRACTS[document]
-    guide = document_contract["guide"]
-    if document == "plan":
-        guide = "issue-plan.md" if scope == "issue" else "scope-layering.md"
-    guide = cast("str", guide)
-    expected_link = f"{scope_contract['guide_prefix']}{guide}"
-
-    for template_root in (TEMPLATES_ROOT, DOGFOOD_TEMPLATES_ROOT):
-        scaffold_root = template_root.parent
-        content = _render_template((template_root / scope / f"{document}.md").read_text(encoding="utf-8"))
-        assert _relative_markdown_links(content) == (expected_link,)
-
-        node_path = scaffold_root.joinpath(*scope_contract["node_parts"], f"{document}.md")
-        resolved_link = _lexical_resolve(node_path.parent / expected_link)
-        expected_target = _lexical_resolve(scaffold_root / "docs" / "authoring" / guide)
-        assert resolved_link == expected_target
-        assert resolved_link.is_file()
-
-
-def test_template_plan_routes_scope_guides_and_limits_planning_level_to_issue() -> None:
-    for scope in SCOPES:
-        content = _read_template(scope, "plan")
-        links = _relative_markdown_links(content)
-        if scope == "issue":
-            assert links == ("../../../../../../docs/authoring/issue-plan.md",)
-            assert tuple(re.findall(r"^## Planning Level$", content, flags=re.MULTILINE)) == ("## Planning Level",)
-        else:
-            assert links == (f"{SCOPE_TEMPLATE_CONTRACTS[scope]['guide_prefix']}scope-layering.md",)
-            assert "Planning Level" not in content
-
-
-@pytest.mark.parametrize(
-    "relative_path",
-    (
-        "README.md",
-        *(f"{scope}/{document}.md" for scope in SCOPES for document in RDP_DOCUMENTS),
-    ),
-)
-def test_template_rdp_assets_match_dogfood_projection(relative_path: str) -> None:
-    assert (TEMPLATES_ROOT / relative_path).read_bytes() == (DOGFOOD_TEMPLATES_ROOT / relative_path).read_bytes()
-
-
 @pytest.mark.parametrize("template_root", (TEMPLATES_ROOT, DOGFOOD_TEMPLATES_ROOT))
 @pytest.mark.parametrize("scope", SCOPES)
 def test_each_scope_has_exactly_one_canonical_report_template(
     template_root: Path,
     scope: str,
 ) -> None:
-    report_files = {path.name for path in (template_root / scope).glob("report*.md") if path.is_file()}
+    report_files = {path.name for path in (template_root / "cue" / scope).glob("report*.md") if path.is_file()}
 
     assert report_files == {"report.md"}
 
@@ -1050,29 +885,17 @@ def test_report_frontmatter_uses_exact_minimal_fields_and_placeholders(scope: st
     fields = _frontmatter(content)
     scope_contract = SCOPE_TEMPLATE_CONTRACTS[scope]
 
-    expected_keys = {"種別", "ID", "タイトル", "関連GitHub", "最終更新", "依存"}
-    if scope_contract["parent"] is not None:
-        expected_keys.add("親")
+    # GitHub is the only authority for title and parent: the CUE report.md carries neither (0.5.0, iss-00440).
+    expected_keys = {"種別", "ID", "関連GitHub", "最終更新", "依存"}
     assert set(fields) == expected_keys
 
     assert fields["種別"] == f"レポート（{scope.capitalize()}）"
     assert fields["ID"] == f'"{scope_contract["id"]}"'
-    assert fields["タイトル"] == f'"{scope_contract["title"]}"'
     assert fields["関連GitHub"] == '["<GITHUB_ISSUE_NUMBER_OR_URL>"]'
     assert fields["最終更新"] == '"YYYY-MM-DD"'
-    assert fields["依存"] == '["requirement.md", "design.md", "plan.md"]'
-    if scope_contract["parent"] is not None:
-        assert fields["親"] == scope_contract["parent"]
+    assert fields["依存"] == '["requirement.cue", "design.cue", "plan.cue"]'
 
-    expected_placeholders = {
-        scope_contract["id"],
-        scope_contract["title"],
-        "<GITHUB_ISSUE_NUMBER_OR_URL>",
-    }
-    if scope == "epic":
-        expected_placeholders.add("<INIT_ID>")
-    if scope == "issue":
-        expected_placeholders.update(("<INIT_ID>", "<EPIC_ID>"))
+    expected_placeholders = {scope_contract["id"], "<GITHUB_ISSUE_NUMBER_OR_URL>"}
     assert set(re.findall(r"<[A-Z_]+>", content)) == expected_placeholders
 
     serialized_frontmatter = "\n".join(f"{key}: {value}" for key, value in fields.items()).casefold()
@@ -1112,7 +935,7 @@ def test_report_guide_link_resolves_from_rendered_node_location(scope: str) -> N
 
     for template_root in (TEMPLATES_ROOT, DOGFOOD_TEMPLATES_ROOT):
         scaffold_root = template_root.parent
-        content = _render_template((template_root / scope / "report.md").read_text(encoding="utf-8"))
+        content = _render_template((template_root / "cue" / scope / "report.md").read_text(encoding="utf-8"))
         assert _relative_markdown_links(content) == (expected_link,)
 
         node_path = scaffold_root.joinpath(*scope_contract["node_parts"], "report.md")
@@ -1124,7 +947,7 @@ def test_report_guide_link_resolves_from_rendered_node_location(scope: str) -> N
 
 @pytest.mark.parametrize("scope", SCOPES)
 def test_report_templates_match_dogfood_projection(scope: str) -> None:
-    relative_path = Path(scope) / "report.md"
+    relative_path = Path("cue") / scope / "report.md"
 
     assert (TEMPLATES_ROOT / relative_path).read_bytes() == (DOGFOOD_TEMPLATES_ROOT / relative_path).read_bytes()
 
@@ -1147,12 +970,12 @@ def test_report_guide_is_non_gating_and_routes_durable_decisions_elsewhere() -> 
 def test_issue_has_one_canonical_plan_and_no_level_specific_plan_aliases(
     template_root: Path,
 ) -> None:
-    issue_templates = template_root / "issue"
-    plan_files = {path.name for path in issue_templates.glob("plan*.md") if path.is_file()}
+    issue_templates = template_root / "cue" / "issue"
+    plan_files = {path.name for path in issue_templates.glob("plan*") if path.is_file()}
 
-    assert plan_files == {"plan.md"}
+    assert plan_files == {"plan.cue"}
     for level in PLANNING_LEVELS:
-        assert not (issue_templates / f"plan-{level}.md").exists()
+        assert not list(issue_templates.glob(f"plan-{level}.*"))
 
 
 def test_issue_plan_base_links_exactly_the_four_completion_guides() -> None:
@@ -1254,13 +1077,10 @@ def test_issue_plan_base_has_exact_selection_heading_and_structural_examples() -
 def test_issue_plan_records_level_decision_in_the_same_canonical_plan() -> None:
     content = _read_authoring_doc("issue-plan.md")
     selection = _section(content, "## Planning Levelの選び方")
-    template_prompt = _template_section_prompt(_read_template("issue", "plan"), "Planning Level")
-
+    # The Markdown plan template is gone (0.5.0); the guide still records the level in the Scope's plan.md.
     assert "同じ canonical `plan.md`" in selection
     for token in ("selected level", "理由", "risk factor", "再評価条件"):
         assert token in selection
-    for token in ("level", "理由", "risk factor", "再評価条件"):
-        assert token in template_prompt
 
 
 def test_planning_level_is_docs_only_and_does_not_own_runtime_metadata() -> None:
@@ -1268,7 +1088,7 @@ def test_planning_level_is_docs_only_and_does_not_own_runtime_metadata() -> None
 
     assert "Runtime の default や metadata にはしません" in selection
     assert "Runtime の状態、実行可否" in selection
-    for token in ("`.meta.json`", "active manifest", "`.assurance.json`"):
+    for token in ("GitHub の構造", "active manifest", "`.assurance.json`"):
         assert token in selection
     assert "には複製しません" in selection
 
@@ -1433,8 +1253,11 @@ def test_s09_ic1_contract_input_is_exact_and_provider_consumer_complete(installe
     assert manifest == S07_OWNED_ASSET_MANIFEST
     assert not _projection_violations(manifest, DOCS_ROOT.parent, installed_static_consumer / "spec-dock")
 
-    for relative_path in S09_SCOPE_PATHS + S09_ISSUE_PLAN_PATHS + S09_LEVEL_GUIDE_PATHS:
+    for relative_path in S09_LEVEL_GUIDE_PATHS:
         assert relative_path in manifest
+    for relative_path in S09_SCOPE_PATHS:  # the Markdown Scope templates were removed in 0.5.0 (iss-00440)
+        if relative_path.startswith("templates/"):
+            assert relative_path not in manifest and not (DOCS_ROOT.parent / relative_path).exists()
 
 
 def test_s09_contract_input_binds_to_canonical_design_section() -> None:
@@ -1466,28 +1289,6 @@ def test_s09_design_binding_rejects_canonical_contract_mutations(token: str, rep
     assert f"missing Design §12 token: {token}" in _s09_design_contract_violations(mutated_section)
 
 
-def test_s09_scope_manifest_covers_requirement_design_plan_report_for_each_scope() -> None:
-    expected = tuple(f"templates/{scope}/{document}" for scope in SCOPES for document in S09_SCOPE_FILE_NAMES)
-    assert S09_IC1_CONTRACT["scope_paths"] == expected
-    assert tuple(path for path in S09_IC1_CONTRACT["owned_asset_manifest"] if path in expected) == expected
-
-
-@pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
-def test_s09_report_contract_is_exact_empty_valid_and_non_gating(scaffold_root: Path) -> None:
-    for scope in SCOPES:
-        report_path = scaffold_root / "templates" / scope / "report.md"
-        content = report_path.read_text(encoding="utf-8")
-        assert tuple(re.findall(r"^## ([^\n]+)$", content, flags=re.MULTILINE)) == REPORT_REQUIRED_HEADINGS
-        for heading in REPORT_REQUIRED_HEADINGS:
-            assert not _template_section_body(content, heading).strip()
-        assert "## Notes" not in content
-
-    guide = (scaffold_root / "docs" / "authoring" / "report.md").read_text(encoding="utf-8")
-    assert "空でも有効" in guide
-    assert "実行可否や完了の機械的な判定には使いません" in guide
-    assert "## Notes" in guide
-
-
 @pytest.mark.parametrize("scaffold_root", (DOCS_ROOT.parent, DOGFOOD_DOCS_ROOT.parent))
 def test_s09_artifact_and_one_plan_catalogs_are_exact(scaffold_root: Path) -> None:
     artifact_dir = scaffold_root / "templates" / "artifacts"
@@ -1497,8 +1298,8 @@ def test_s09_artifact_and_one_plan_catalogs_are_exact(scaffold_root: Path) -> No
     for artifact_type in CURRENT_ARTIFACT_TEMPLATES:
         assert (artifact_dir / f"{artifact_type}.md").is_file()
 
-    issue_dir = scaffold_root / "templates" / "issue"
-    assert tuple(sorted(path.name for path in issue_dir.glob("plan*.md"))) == ("plan.md",)
+    issue_dir = scaffold_root / "templates" / "cue" / "issue"
+    assert tuple(sorted(path.name for path in issue_dir.glob("plan*"))) == ("plan.cue",)
 
     base_guide = scaffold_root / S09_IC1_CONTRACT["base_plan_guide"]
     assert base_guide.is_file()

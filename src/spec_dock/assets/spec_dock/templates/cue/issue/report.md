@@ -1,11 +1,9 @@
 ---
 種別: レポート（Issue）
 ID: "<ISS_ID>"
-タイトル: "<ISS_TITLE>"
 関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
 最終更新: "YYYY-MM-DD"
 依存: ["requirement.cue", "design.cue", "plan.cue"]
-親: ["<EPIC_ID>", "<INIT_ID>"]
 ---
 
 # Result Summary

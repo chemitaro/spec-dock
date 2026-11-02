@@ -104,12 +104,6 @@ def test_validate_warns_about_misplaced_names_conflicts_and_non_scope_dependenci
     )
 
 
-def test_validate_ci_points_at_canonical_check(world: CanonicalWorld) -> None:
-    code, payload = world.run("workspace", "validate", "--ci")
-    assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_APPLICABLE")
-    assert payload["recovery"]["instructions"] == ["Run spec-dock canonical check to check a commit in CI."]
-
-
 def test_sync_observes_worktrees_without_the_catalog(world: CanonicalWorld) -> None:
     linked = world.worktree("feature")
     world.select("iss-00003", 3, checkout=linked)
@@ -123,14 +117,14 @@ def test_sync_observes_worktrees_without_the_catalog(world: CanonicalWorld) -> N
     assert {item["scope_id"] for item in data["scopes"]} == {"init-00001", "epic-00002", "iss-00003"}
 
 
-def test_sync_source_github_refetches_and_explicit_local_is_refused(world: CanonicalWorld) -> None:
+def test_sync_source_github_refetches_and_source_local_no_longer_exists(world: CanonicalWorld) -> None:
     world.run("workspace", "sync")
     before = len(world.fake().graphql_requests())
     code, payload = world.run("workspace", "sync", "--source", "github")
     assert code == 0 and payload["data"]["source"] == "github"
     assert len(world.fake().graphql_requests()) > before
     code, payload = world.run("workspace", "sync", "--source", "local")
-    assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_APPLICABLE")
+    assert (code, payload["error"]["code"]) == (2, "USAGE_ERROR")  # removed in 0.5.0 (iss-00440)
 
 
 def test_doctor_shows_the_canonical_status_items(world: CanonicalWorld) -> None:
@@ -232,3 +226,28 @@ def test_sync_observes_a_schema_three_worktree_and_an_unreadable_one(world: Cano
     assert rows[str(legacy)]["selection"]["status"] == "empty"
     assert [item["code"] for item in rows[str(broken)]["findings"]] == ["WORKTREE_SELECTION_UNAVAILABLE"]
     assert (code, payload["status"]) == (7, "partial")
+
+
+def test_a_schema_three_sibling_keeps_its_selection_observed_and_stops_its_own_commands(world: CanonicalWorld) -> None:
+    """0.5.0 (iss-00440, coordinator decision 2026-11-02): a linked worktree left on schema 3 is observed by its Git
+    identity and direct record only, so Start still sees its selection; commands run in it stop instead."""
+    import json
+
+    from spec_dock.runtime.infra.tree_backup import tree_digest
+    from tests.support.canonical_repo import add_worktree
+
+    legacy = add_worktree(world.main, world.tmp_path / "legacy", "legacy")
+    world.select("iss-00003", 3, checkout=legacy)
+    (legacy / "spec-dock/workspace.json").write_text(
+        json.dumps({"schema_version": 3, "writer_protocol": "specdock.worktree-writer/v1"}), encoding="utf-8"
+    )
+    code, payload = world.run("workspace", "sync")
+    assert code == 0, payload
+    rows = {row["path"]: row for row in payload["data"]["worktrees"]}
+    assert rows[str(legacy)]["selection"]["status"] == "selected"
+    code, payload = world.run("work", "start", "iss-00003", "--base", "HEAD", "--dry-run")
+    assert (code, payload["error"]["code"]) == (3, "SCOPE_ALREADY_SELECTED"), payload
+    before = tree_digest(legacy / "spec-dock")
+    code, payload = world.run("scope", "list", checkout=legacy)
+    assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_MIGRATED"), payload
+    assert payload["effects"] == [] and tree_digest(legacy / "spec-dock") == before

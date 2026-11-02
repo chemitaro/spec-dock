@@ -2,17 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 import re
 import shlex
-import sys
-
-import pytest
-
-from spec_dock.cli import main
-from spec_dock.runtime.infra.tree_backup import tree_digest
-from tests.cli_runtime.test_issue413_scope_publish import publication_fixture
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "src/spec_dock/assets/spec_dock"
@@ -20,10 +12,11 @@ DOCS = ASSETS / "docs"
 
 
 def test_workbench_templates_use_current_destination_flag() -> None:
-    for kind in ("root", "initiative", "epic", "issue"):
-        readme = (ASSETS / "templates" / kind / ".workbench/README.md").read_text(encoding="utf-8")
-        assert "workbench copy --scope <full-id> --to-worktree <linked-worktree>" in readme
-        assert "workbench copy --scope <full-id> --to <linked-worktree>" not in readme
+    # `workbench copy` was removed in 0.5.0, so no shipped .workbench/README.md may point at it.
+    readmes = [ASSETS / "templates/root/.workbench/README.md"]
+    readmes += [ASSETS / "templates/cue" / kind / ".workbench/README.md" for kind in ("initiative", "epic", "issue")]
+    for path in readmes:
+        assert "workbench copy" not in path.read_text(encoding="utf-8"), path
 
 
 def test_command_reference_covers_all_public_leaves() -> None:
@@ -32,7 +25,7 @@ def test_command_reference_covers_all_public_leaves() -> None:
     reference = (DOCS / "reference_cli.md").read_text()
     for leaf in LEAF_PATHS:
         assert f"`{leaf}`" in reference, leaf
-    assert len(LEAF_PATHS) == 55
+    assert len(LEAF_PATHS) == 53
 
 
 def test_current_docs_do_not_instruct_removed_commands() -> None:
@@ -63,102 +56,6 @@ def readme_creation_commands() -> list[list[str]]:
     return commands
 
 
-def sequential_github_stub(executable: Path, log: Path) -> None:
-    """A stateful external gh boundary: only created numbers can be read."""
-    executable.write_text(
-        f"#!{sys.executable}\n"
-        "import json,sys\nfrom pathlib import Path\n"
-        f"log=Path({str(log)!r})\n"
-        "argv=sys.argv[1:]; method=argv[argv.index('--method')+1]; endpoint=argv[argv.index('--method')+2]\n"
-        "assert argv[:5]==['api','--hostname','github.com','--include','--method']\n"
-        "rows=[json.loads(line) for line in log.read_text().splitlines()] if log.exists() else []\n"
-        "created=[row['number'] for row in rows if row['method']=='POST']\n"
-        "if method=='POST':\n"
-        " assert endpoint=='repos/example/repo/issues'\n"
-        " payload=json.load(sys.stdin); number=501+len(created); title=payload['title']; status=201\n"
-        "else:\n"
-        " assert method=='GET'; number=int(endpoint.rsplit('/',1)[-1])\n"
-        " assert endpoint==f'repos/example/repo/issues/{number}' and number in created\n"
-        " title='Created parent'; status=200\n"
-        "with log.open('a') as stream: stream.write(json.dumps(dict(method=method,number=number))+'\\n')\n"
-        "response=dict(number=number,repository_url='https://api.github.com/repos/example/repo',\n"
-        " html_url=f'https://github.com/example/repo/issues/{number}',title=title,state='open',\n"
-        " state_reason=None,updated_at='2026-10-06T00:00:00Z')\n"
-        "print(f'HTTP/2.0 {status} OK\\n\\n'+json.dumps(response))\n"
-    )
-    executable.chmod(0o755)
-
-
-def test_readme_creation_examples_execute_noninteractively_and_keep_confirmation_guard(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root, log = publication_fixture(tmp_path, monkeypatch)
-    sequential_github_stub(tmp_path / "gh-bin/gh", log)
-    monkeypatch.setattr(sys.stdin, "isatty", lambda: False)
-    parent = None
-    for index, command in enumerate(readme_creation_commands()):
-        if parent is not None:
-            command[command.index("--parent") + 1] = parent
-        # No flags are supplied by the test to rescue an incomplete published example.
-        assert "--json" in command and "--yes" in command
-        before = tree_digest(root)
-        requests = log.read_bytes() if log.exists() else b""
-        assert main(["--project", str(root), *(word for word in command if word != "--yes")]) == 3
-        rejected = json.loads(capsys.readouterr().out)
-        assert rejected["error"]["code"] == "CONFIRMATION_REQUIRED" and rejected["effects"] == []
-        assert tree_digest(root) == before
-        assert (log.read_bytes() if log.exists() else b"") == requests
-        assert main(["--project", str(root), *command]) == 0
-        result = json.loads(capsys.readouterr().out)
-        scope = result["data"]["result"]["scope"]
-        assert scope["parent_id"] == parent
-        assert scope["github_ref"] == f"gh:example/repo#{501 + index}"
-        assert scope["id"] == f"{('init', 'epic', 'iss')[index]}-{501 + index:05d}"
-        parent = scope["id"]
-    assert [row["number"] for row in map(json.loads, log.read_text().splitlines()) if row["method"] == "POST"] == [
-        501,
-        502,
-        503,
-    ]
-
-
-@pytest.mark.parametrize(
-    "selector", ["init-00001", "gh:example/repo#1", "@current", "1", "https://github.com/example/repo/issues/1"]
-)
-def test_documented_scope_selector_boundary_is_readonly(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], selector: str
-) -> None:
-    from tests.cli_runtime.test_issue413_active import select_fixture
-
-    root, log = publication_fixture(tmp_path, monkeypatch)
-    select_fixture(root)
-    before = tree_digest(root)
-    valid = selector in {"init-00001", "gh:example/repo#1", "@current"}
-    assert main(["--project", str(root), "scope", "show", selector, "--json"]) == (0 if valid else 3)
-    result = json.loads(capsys.readouterr().out)
-    assert result["effects"] == []
-    if valid:
-        assert result["data"]["result"]["scope"]["id"] == "init-00001"
-    assert tree_digest(root) == before and not log.exists()
-
-
-def test_root_import_example_includes_repository_and_executes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    root, log = publication_fixture(tmp_path, monkeypatch)
-    guide = (ROOT / "docs/github-issue-integration.md").read_text()
-    command = next(shlex.split(line)[1:] for line in guide.splitlines() if line.startswith("spec-dock scope import "))
-    assert "--github-repo" in command
-    command[command.index("--github-repo") + 1] = "example/repo"
-    command[command.index("--parent") + 1] = "init-00001"
-    assert main(["--project", str(root), *command, "--json"]) == 0
-    result = json.loads(capsys.readouterr().out)
-    assert result["data"]["result"]["scope"]["id"] == "epic-00124"
-    assert all(row["method"] == "GET" for row in map(json.loads, log.read_text().splitlines()))
-    assert "固定外部エンジン" not in guide
-    assert "新規`--backend local`作成はできません" in guide
-
-
 def test_current_operating_links_and_sync_examples_follow_observation_contract() -> None:
     from spec_dock.runtime.cli.options import parse_vnext
 
@@ -171,7 +68,7 @@ def test_current_operating_links_and_sync_examples_follow_observation_contract()
         "workspace doctor",
     ]
     assert [parse_vnext(command).source for command in commands if command[:2] == ["workspace", "sync"]] == [
-        "local",
+        None,
         "github",
     ]
     assert "再生成せず" in guide and "unknown／partial" in guide and "自動修復しません" in guide

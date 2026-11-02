@@ -67,11 +67,9 @@ LEAF_PATHS: tuple[str, ...] = (
     "worktree show",
     "worktree remove",
     "worktree bootstrap",
-    "workbench copy",
     "workspace sync",
     "workspace validate",
     "workspace doctor",
-    "workspace migrate",
     "canonical link",
     "canonical status",
     "installation show",
@@ -95,14 +93,14 @@ HELP_EFFECTS: dict[str, str] = {
     "scope import github initiative": "Read a GitHub Issue and create linked Initiative files.",
     "scope import github epic": "Read a GitHub Issue and create linked Epic files.",
     "scope import github issue": "Read a GitHub Issue and create linked Issue files.",
-    "scope list": "Read Scope metadata; no changes.",
+    "scope list": "Read Scopes from the GitHub structure snapshot and the catalog; no changes.",
     "scope show": "Read one Scope and its observed status; no changes.",
     "scope check": "Check one CUE Scope's documents and explanation offline; no changes.",
     "scope render": "Draw one CUE Scope's requirement, design and plan as HTML on standard output; no changes.",
-    "scope edit": "Change the selected Scope title in local metadata.",
-    "scope close": "Complete or cancel one Scope in its backend; active selection stays set.",
-    "scope reopen": "Reopen one Scope in its backend; active selection stays set.",
-    "scope delete": "Delete local Scope-owned files; GitHub and branches remain.",
+    "scope edit": "Change the Scope's GitHub Issue title; catalog files are unchanged.",
+    "scope close": "Complete or cancel one Scope's GitHub Issue; active selection stays set.",
+    "scope reopen": "Reopen one Scope's GitHub Issue; active selection stays set.",
+    "scope delete": "Detach the Scope in GitHub and delete its catalog directory; the Issue and branches remain.",
     "scope move": "Change a Scope parent in GitHub; the flat catalog directory does not move.",
     "active show": "Read this worktree's active selection; no changes.",
     "active set": "Keep the same valid direct selection unchanged and repair only its spec-dock/active navigation links; acquiring another selection requires work start.",
@@ -114,8 +112,8 @@ HELP_EFFECTS: dict[str, str] = {
     "branch switch": "Checkout an existing Git branch under the clone Start lock; the direct selection record stays unchanged.",
     "dependency list": "Read declared or effective dependency edges; no changes.",
     "dependency check": "Read dependency readiness and status evidence; no changes.",
-    "dependency add": "Add a dependency edge to local Scope metadata.",
-    "dependency remove": "Remove a dependency edge from local Scope metadata.",
+    "dependency add": "Add a blocked-by dependency between two Scope Issues in GitHub.",
+    "dependency remove": "Remove a blocked-by dependency between two Scope Issues in GitHub.",
     "artifact create": "Publish one complete Scope-owned or @root Markdown file without overwrite or a shared counter.",
     "artifact import file": "Publish one opaque regular file in the selected Scope or @root without overwrite or a shared counter.",
     "artifact list": "Read Artifact identifiers; no changes.",
@@ -125,11 +123,9 @@ HELP_EFFECTS: dict[str, str] = {
     "worktree show": "Read one absolute path in the native Git worktree inventory; no changes.",
     "worktree remove": "Remove one explicit native Git worktree directory; keep its branch.",
     "worktree bootstrap": "Run make init once in one explicit native worktree; hook output is omitted.",
-    "workbench copy": "Copy one Scope Workbench into a selected worktree.",
     "workspace sync": "Observe current Scope lifecycle and same-clone worktree selections without writing files.",
-    "workspace validate": "Validate working-tree structure; --ci checks a fixed HEAD without installation or execution state. No changes.",
+    "workspace validate": "Validate the GitHub structure snapshot against the catalog directories and documents; no changes.",
     "workspace doctor": "Read current workspace evidence and explicit raw/legacy diagnostics; no repair.",
-    "workspace migrate": "Preserve actual local work and switch only this workspace declaration after restore verification.",
     "canonical link": "Find or create this clone's catalog, link this checkout, and register periodic sync.",
     "canonical status": "Read catalog, link, access, tool settings and sync state; no changes.",
     "installation show": "Read the package version and static resources in one Git worktree; no changes.",
@@ -149,34 +145,30 @@ if set(HELP_EFFECTS) != set(LEAF_PATHS):
     raise RuntimeError("help effects do not match the public CLI leaves")
 
 
-# Optional to the parser so schema-3 calls stay as they are; canonical mode requires both (iss-00474, Q1).
+# Optional to the parser so a missing value stops with ASSURANCE_REQUIRED before any read (iss-00474, Q1).
 _ASSURANCE_ARGUMENTS = (_arg("--assurance", choices=ASSURANCE_LEVELS), _arg("--assurance-reason"))
 
 LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "scope create initiative": (
         _required("--backend", choices=("github",)),
         _required("--title"),
-        _arg("--slug"),
         *_ASSURANCE_ARGUMENTS,
     ),
     "scope create epic": (
         _required("--backend", choices=("github",)),
         _required("--parent"),
         _required("--title"),
-        _arg("--slug"),
         *_ASSURANCE_ARGUMENTS,
     ),
     "scope create issue": (
         _required("--backend", choices=("github",)),
         _required("--parent"),
         _required("--title"),
-        _arg("--slug"),
         *_ASSURANCE_ARGUMENTS,
     ),
     "scope import github initiative": (
         _arg("github_ref"),
         _required("--title"),
-        _arg("--slug"),
         _arg("--github-repo"),
         *_ASSURANCE_ARGUMENTS,
     ),
@@ -184,7 +176,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("github_ref"),
         _required("--parent"),
         _required("--title"),
-        _arg("--slug"),
         _arg("--github-repo"),
         *_ASSURANCE_ARGUMENTS,
     ),
@@ -192,7 +183,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("github_ref"),
         _required("--parent"),
         _required("--title"),
-        _arg("--slug"),
         _arg("--github-repo"),
         *_ASSURANCE_ARGUMENTS,
     ),
@@ -226,7 +216,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "branch create": (_arg("target"), _arg("--name"), _arg("--base")),
     "branch switch": (_arg("target"), _arg("--name")),
     "dependency list": (_arg("target"), _arg("--view", choices=("declared", "effective"))),
-    "dependency check": (_arg("target"), _arg("--source", choices=("local", "github"))),
+    "dependency check": (_arg("target"), _arg("--source", choices=("github",))),
     "dependency add": (_required("--from", dest="from_target"), _required("--to", dest="to_target")),
     "dependency remove": (
         _required("--from", dest="from_target"),
@@ -247,13 +237,8 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "worktree show": (_arg("worktree_ref"),),
     "worktree remove": (_arg("worktree_ref"), _flag("--unlock"), _flag("--discard-ignored")),
     "worktree bootstrap": (_arg("worktree_ref"),),
-    "workbench copy": (
-        _required("--scope"),
-        _required("--to-worktree"),
-        _arg("--on-conflict", choices=("error", "overwrite"), default="error"),
-    ),
-    "workspace sync": (_arg("--source", choices=("local", "github")), _flag("--allow-invalid")),
-    "workspace validate": (_flag("--require-nodes"), _flag("--ci")),
+    "workspace sync": (_arg("--source", choices=("github",)), _flag("--allow-invalid")),
+    "workspace validate": (_flag("--require-nodes"),),
     "workspace doctor": (
         _flag("--raw"),
         _flag("--legacy"),
@@ -261,12 +246,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
         _arg("--github-pr"),
         _arg("--github-head-sha"),
         _flag("--github-extended"),
-    ),
-    "workspace migrate": (
-        _required("--to-schema"),
-        _required("--to-writer-protocol"),
-        _arg("--backup-dir"),
-        _flag("--confirm-old-writers-stopped"),
     ),
     "canonical link": (_flag("--no-schedule"),),
     "canonical status": (_flag("--structure"),),
@@ -286,7 +265,6 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
 
 # Temporary compatibility for the retired internal dispatcher, never public syntax.
 RECOVERY_LEAF_COMMANDS: dict[str, str] = {
-    "workspace migrate": "workspace.migrate",
     "installation init": "installation.init",
     "installation update": "installation.update",
     "installation uninstall": "installation.uninstall",
@@ -316,8 +294,6 @@ MUTATING_LEAF_PATHS = frozenset({
     "worktree create",
     "worktree remove",
     "worktree bootstrap",
-    "workbench copy",
-    "workspace migrate",
     "canonical link",
     "canonical sync",
     "canonical accept",
@@ -343,26 +319,26 @@ class HelpSpec:
 
 
 HELP_PRECONDITIONS: dict[str, str] = {
-    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE. Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
-    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE. Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
-    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository. Schema 4: the flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title; --slug stops with CANONICAL_NOT_APPLICABLE. Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
-    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
-    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
-    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve. Schema 4: adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --slug stops with CANONICAL_NOT_APPLICABLE and --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). Schema 4: --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
-    "scope list": "The selected project must contain a readable Scope tree.",
+    "scope create initiative": "Provide a title and backend; GitHub creation needs a reachable repository. The flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title. --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
+    "scope create epic": "Provide a title and existing Initiative parent; GitHub creation needs a reachable repository. The flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title. --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
+    "scope create issue": "Provide a title and existing Epic parent; GitHub creation needs a reachable repository. The flat catalog directory spec-dock/initiatives/<bucket>/<ID>/ is created (bucket = the thousand range of the number, e.g. 00000-00999); any language title. --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update).",
+    "scope import github initiative": "The GitHub reference must resolve to an Issue not already imported. Adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
+    "scope import github epic": "The GitHub Issue must exist and the Initiative parent must resolve. Adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
+    "scope import github issue": "The GitHub Issue must exist and the Epic parent must resolve. Adds only what is missing (kind label, parent, spec-dock/initiatives/<bucket>/<ID>/); --title is not used (GitHub's title wins; warning CANONICAL_TITLE_IGNORED when they differ). --assurance LEVEL (light|standard|strict|critical) and a non-blank --assurance-reason TEXT are required (otherwise ASSURANCE_REQUIRED, nothing is read or written); the files come from spec-dock/templates/cue/<kind>/ (otherwise SCOPE_TEMPLATES_OUTDATED: run spec-dock installation update). An existing Scope directory is kept as it is (warning ASSURANCE_NOT_WRITTEN).",
+    "scope list": "A schema-4 checkout whose catalog is linked; the structure snapshot is read (GitHub only when it is missing or outdated).",
     "scope show": "The Scope ID or @current selector must resolve in this worktree.",
-    "scope check": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory. A CUE Scope (requirement.cue) needs cue v0.17.1 or later on PATH (CUE_NOT_FOUND, CUE_VERSION_UNSUPPORTED) and a type version this SpecDock ships (CUE_SCHEMA_UNSUPPORTED); a Markdown Scope succeeds with checked=false and needs no cue.",
-    "scope render": "Schema 4 only (schema 3 stops with CANONICAL_NOT_MIGRATED). The Scope must have its catalog directory and be a CUE Scope (a Markdown Scope stops with SCOPE_NOT_CUE). Needs cue v0.17.1 or later on PATH and a type version this SpecDock ships, like scope check. The page loads the checkout's spec-dock/design-system/ through a file: URL (warning DESIGN_SYSTEM_MISSING when it is absent) and diagram parts from the CDN. --design-system inline carries ds.css, ds.js and marked inside the page instead, so it keeps its style on another machine (about 400KB; DESIGN_SYSTEM_MISSING stops with exit 3 when they are absent).",
-    "scope edit": "The target must resolve in the current workspace and its captured metadata must remain unchanged.",
-    "scope close": "The Scope must resolve; its backend and expected state guards must match.",
-    "scope reopen": "The Scope must resolve; its backend and expected state guards must match.",
+    "scope check": "The Scope must have its catalog directory. A CUE Scope (requirement.cue) needs cue v0.17.1 or later on PATH (CUE_NOT_FOUND, CUE_VERSION_UNSUPPORTED) and a type version this SpecDock ships (CUE_SCHEMA_UNSUPPORTED); a Markdown Scope succeeds with checked=false and needs no cue.",
+    "scope render": "The Scope must have its catalog directory and be a CUE Scope (a Markdown Scope stops with SCOPE_NOT_CUE). Needs cue v0.17.1 or later on PATH and a type version this SpecDock ships, like scope check. The page loads the checkout's spec-dock/design-system/ through a file: URL (warning DESIGN_SYSTEM_MISSING when it is absent) and diagram parts from the CDN. --design-system inline carries ds.css, ds.js and marked inside the page instead, so it keeps its style on another machine (about 400KB; DESIGN_SYSTEM_MISSING stops with exit 3 when they are absent).",
+    "scope edit": "The target must resolve in the GitHub structure; a non-blank title of at most 256 characters in any language.",
+    "scope close": "The Scope must resolve; completion requires completed descendants and the expected state guards must match.",
+    "scope reopen": "The Scope must resolve and its expected state guards must match.",
     "scope delete": "Require --backup-dir ABS for a new real backup; descendants require --recursive, incoming edges require --detach-dependencies, and a selected descendant requires --clear-active.",
-    "scope move": "A schema-4 checkout; --parent is required and must be the right kind and open, and not the Scope or one of its descendants.",
+    "scope move": "--parent is required and must be the right kind and open, and not the Scope or one of its descendants.",
     "active show": "The selected worktree must have readable active-selection state.",
     "active set": "Only the same valid direct target is accepted; its selection stays unchanged. Use work start to acquire a selection.",
     "active clear": "--from requires a valid current chain; --all --yes permits discarding observed corrupt regular records. Unknown entries are preserved; ancestors are never promoted.",
-    "work start": "The Scope must be ready, its dependencies satisfied, and branch base resolvable. Schema 4: the default branch name is <ID> (IDs may be given without zero padding, e.g. iss-454); an in-progress mark from another PC only warns SCOPE_IN_PROGRESS (ask the user); SCOPE_KIND_CHANGED and a base commit holding spec-dock/initiatives (CANONICAL_BASE_HAS_SPECS) stop.",
-    "work finish": "The explicit Scope must resolve and its completion guards must pass. A Scope outside the active chain can be completed without changing the current selection. Schema 4: unsaved specs of the Scope and its descendants are saved and pushed first, waiting up to 180 seconds; unconfirmed, the Issue stays open with CANONICAL_SAVE_UNCONFIRMED, and held changes stop with CANONICAL_SAVE_HELD.",
+    "work start": "The Scope must be ready, its dependencies satisfied, and branch base resolvable. The default branch name is <ID> (IDs may be given without zero padding, e.g. iss-454); an in-progress mark from another PC only warns SCOPE_IN_PROGRESS (ask the user); SCOPE_KIND_CHANGED and a base commit holding spec-dock/initiatives (CANONICAL_BASE_HAS_SPECS) stop.",
+    "work finish": "The explicit Scope must resolve and its completion guards must pass. A Scope outside the active chain can be completed without changing the current selection. Unsaved specs of the Scope and its descendants are saved and pushed first, waiting up to 180 seconds; unconfirmed, the Issue stays open with CANONICAL_SAVE_UNCONFIRMED, and held changes stop with CANONICAL_SAVE_HELD.",
     "branch show": "The Scope must resolve; the candidate Git ref may be absent.",
     "branch create": "The Scope must resolve, Git base must exist, and branch ownership must be free.",
     "branch switch": "The existing branch must contain the target and ancestors; the worktree must be clean; the clone Start lock must be free within --lock-timeout, else START_LOCK_BUSY.",
@@ -379,18 +355,16 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "worktree show": "An absolute worktree path must resolve in the same physical Git clone; aliases were retired.",
     "worktree remove": "Use an absolute path in the same clone. Main/current/bare or dirty worktrees cannot be removed. Locked and ignored content require explicit opt-ins and confirmation.",
     "worktree bootstrap": "Use an absolute path in the same clone, a project-owned regular makefile, and --yes. Dry-run never runs make; offline apply is refused.",
-    "workbench copy": "Both worktrees and the Scope Workbench must resolve; conflicts follow --on-conflict.",
     "workspace sync": "Unknown schemas and unsafe paths are refused even with --allow-invalid; incomplete observations return exit 7.",
-    "workspace validate": "Readable schema-3 metadata and regular requirement.md/design.md/plan.md/report.md files are required for each Scope; document bodies are not judged. --ci requires an existing HEAD and cannot use --expect-current or --expect-backend. Invalid or incomplete structure returns exit 7.",
-    "workspace doctor": "Use a Git worktree; --raw permits unknown workspace declarations and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
-    "workspace migrate": "Known schema 3 and valid Scope structure are required. Apply requires a new external --backup-dir under an existing physical parent, --confirm-old-writers-stopped and --yes; --dry-run writes nothing.",
+    "workspace validate": "A schema-4 checkout whose catalog is linked; each Scope needs its spec-dock/initiatives/<bucket>/<ID>/ directory and documents, and document bodies are not judged. In CI, use canonical check instead. Invalid or incomplete structure returns exit 7.",
+    "workspace doctor": "Use a Git worktree; --raw reports an unreadable workspace declaration instead of stopping, and --legacy only inspects retired files. GitHub probes require a fixed repository, PR and head SHA.",
     "canonical link": "A schema-4 workspace in a clone with a main checkout and Git 2.38 or later. Stops before writing when the catalog path, a link path or the spec-dock/canonical checkout is occupied, when the checkout looks mounted from another machine, or when this process cannot write where it must (including the state root and the periodic job). --no-schedule records the baseline but registers no periodic job.",
     "canonical status": "A schema-4 workspace in a clone with a main checkout; it never contacts GitHub or the remote.",
     "installation show": "The selected target must be one exact Git worktree root; no workspace or control record is required.",
     "installation init": "PATH must be a Git worktree root eligible for initial installation.",
-    "installation update": "A schema-3 or schema-4 worktree-writer workspace and known static hashes are required. Changes need a new external --backup-dir under an existing physical parent and --yes; --dry-run writes nothing. Modified or unknown files require manual merge.",
-    "installation uninstall": "Use a schema-3 or schema-4 worktree-writer workspace. Remove only known static hashes after a new external --backup-dir and --yes; --dry-run writes nothing. Modified files stop before changes.",
-    "canonical check": "A Git checkout containing the commit (default HEAD); no catalog, network, GitHub token or particular workspace mode is required. Any problem in the commit tree returns exit 7 with each path and its next step.",
+    "installation update": "A schema-4 worktree-writer workspace and known static hashes are required. Changes need a new external --backup-dir under an existing physical parent and --yes; --dry-run writes nothing. Modified or unknown files require manual merge.",
+    "installation uninstall": "Use a schema-4 worktree-writer workspace. Remove only known static hashes after a new external --backup-dir and --yes; --dry-run writes nothing. Modified files stop before changes.",
+    "canonical check": "A Git checkout containing the commit (default HEAD); no catalog, network or GitHub token is required, and a schema-3 declaration is reported as one problem. Any problem in the commit tree returns exit 7 with each path and its next step.",
     "canonical sync": "Without --registered: a schema-4 checkout whose catalog is linked. --registered needs no project and reads the registry of --state-root (default ${XDG_STATE_HOME:-~/.local/state}/spec-dock). --loop needs --registered and --detach needs --loop.",
     "canonical accept": "A linked schema-4 checkout; name existing catalog files (relative to spec-dock/initiatives) or --deletions for the held deletions.",
     "canonical restore": "A linked schema-4 checkout; every named path must be held (changes.holds) and exist in the catalog HEAD. Without paths, every held deletion is restored.",
@@ -411,31 +385,21 @@ _CONFIRMATION_LEAVES = frozenset({
     "work finish",
     "worktree remove",
     "worktree bootstrap",
-    "workspace migrate",
     "installation init",
     "installation update",
     "installation uninstall",
 })
 
 
-def requires_confirmation(leaf: str, *, backend: str | None = None, on_conflict: str | None = None) -> bool:
-    return (
-        leaf in _CONFIRMATION_LEAVES
-        or (leaf.startswith("scope create ") and backend == "github")
-        or (leaf == "workbench copy" and on_conflict == "overwrite")
-    )
-
-
 _READS_BY_ROOT = {
-    "scope": "Current Scope metadata and hierarchy, direct selection for selectors, and live GitHub only for an explicit remote operation.",
-    "active": "This worktree's active selection and the local Scope hierarchy.",
+    "scope": "The GitHub structure snapshot, the Scope's catalog directory, direct selection for selectors, and live GitHub for writes.",
+    "active": "This worktree's active selection and the Scope hierarchy in the GitHub structure snapshot.",
     "work": "Current Scope hierarchy, direct selection, Git branch and HEAD, dependency evidence, and required live GitHub state.",
-    "branch": "Current Scope metadata, Git refs, and Git worktree branch occupancy.",
-    "dependency": "Declared Scope edges, inherited prerequisites, and status observations.",
+    "branch": "The Scope in the GitHub structure snapshot, Git refs, and Git worktree branch occupancy.",
+    "dependency": "Blocked-by edges and inherited prerequisites in the GitHub structure snapshot, and status observations.",
     "artifact": "The selected Scope's Artifact catalog and safe file metadata.",
-    "worktree": "Native Git worktree inventory, physical clone and path identity, branch and HEAD; Scope metadata only for --expect-current.",
-    "workbench": "Source and destination worktree bindings, Scope identity, and Workbench entry types.",
-    "workspace": "Workspace declaration, current Scope structure, and explicitly requested local or remote observations.",
+    "worktree": "Native Git worktree inventory, physical clone and path identity, branch and HEAD; the GitHub structure only for --expect-current.",
+    "workspace": "Workspace declaration, the GitHub structure snapshot, the catalog, and explicitly requested remote observations.",
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
     "canonical": "This clone's canonical catalog and checkout links, or one commit tree, as each command states.",
 }
@@ -448,7 +412,6 @@ _DOES_NOT_BY_ROOT = {
     "dependency": "Does not close a prerequisite or change GitHub issue state.",
     "artifact": "Does not print Artifact contents, source file hash, or external source path.",
     "worktree": "Does not mutate an independent repository or implicitly run project bootstrap.",
-    "workbench": "Does not copy the root Workbench or start automatic synchronization.",
     "workspace": "Does not silently repair primary Scope data or active selection.",
     "installation": "Does not change other worktrees, Scope data, Artifacts, Workbenches, direct selections or Git metadata.",
     "canonical": "Does not change GitHub Issues or the default branch.",
@@ -462,8 +425,7 @@ _JSON_DATA_BY_ROOT = {
     "dependency": "Declared/effective edges, readiness, blockers, and status provenance.",
     "artifact": "artifact:{id,scope_id,path,type},changed; list returns scope_id,items. Bodies and external source paths remain private.",
     "worktree": "path, branch, head, changed, observed; list returns items with path, branch, head, bare, locked, prunable.",
-    "workbench": "Source/destination worktree IDs, Scope, conflict policy, and mutation state.",
-    "workspace": "Current observations, validity, findings, declaration changes, or verified preservation results.",
+    "workspace": "Current observations, validity and findings.",
     "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
     "canonical": "The command's catalog, link, sync or check observations.",
 }
@@ -498,8 +460,6 @@ def _example(leaf: str) -> str:
         "--type": "blank",
         "--base": "HEAD",
         "--to-worktree": "/absolute/worktree",
-        "--to-schema": "3",
-        "--to-writer-protocol": "specdock.worktree-writer/v1",
     }
     for argument in LEAF_ARGUMENTS[leaf]:
         name = argument.names[0]
@@ -516,8 +476,6 @@ def _example(leaf: str) -> str:
         words.extend(("--base", "HEAD"))
     if leaf == "worktree create":
         words.extend(("--root", "/absolute/worktrees"))
-    if leaf == "workspace migrate":
-        words.extend(("--backup-dir", "/absolute/backup", "--confirm-old-writers-stopped", "--yes"))
     if leaf == "active clear":
         words.append("--all")
     return " ".join(words)
@@ -550,17 +508,13 @@ def _help_spec(leaf: str) -> HelpSpec:
     writes = HELP_EFFECTS[leaf] if leaf in MUTATING_LEAF_PATHS else "None; this command only reads."
     does_not = "Does not read or write project data." if leaf in {"help", "completion"} else _DOES_NOT_BY_ROOT[root]
     if leaf == "scope delete":
-        does_not = (
-            "Does not delete GitHub Issues or Git branches; only the explicitly authorized local subtree is removed."
-        )
-    elif leaf == "workspace migrate":
-        does_not = "Does not rewrite Scope data, import legacy active, alter other worktrees or Git metadata, acquire a Start lock, or replay old records."
+        does_not = "Does not close or delete GitHub Issues or Git branches; only the explicitly authorized catalog directories are removed."
     preconditions = HELP_PRECONDITIONS[leaf]
     json_data = "help text or shell script." if leaf in {"help", "completion"} else _JSON_DATA_BY_ROOT[root]
     json_version = "specdock.cli/v2"
     if leaf == "workspace sync":
         target = "The current Scope tree and main/linked worktrees in this Git clone."
-        reads = "Current metadata, Git worktree inventory, direct records and their ancestors; live GitHub only with --source github."
+        reads = "The GitHub structure snapshot, Git worktree inventory, direct records and their ancestors; --source github refetches the structure first."
         does_not = "Does not save derived state, acquire a Start lock, repair selections, or inspect Codex processes."
         json_version = "specdock.cli/v2"
         json_data = "observed_at, source, complete, worktrees, scopes, counts, findings; process_state=not_observed."
@@ -598,10 +552,11 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf in ("scope list", "scope show"):
-        reads = "Current metadata and this worktree's direct record for dynamic selectors; unobserved GitHub lifecycle is unknown."
-        does_not = (
-            "Does not contact GitHub, read a retired status cache, modify metadata or selection, or change Git refs."
+        reads = (
+            "The GitHub structure snapshot (refreshed only when it is missing or outdated), the catalog directory,"
+            " and this worktree's direct record for dynamic selectors."
         )
+        does_not = "Does not write GitHub, the catalog or selection, or change Git refs."
         json_data = "items, unknown_filtered_count." if leaf == "scope list" else "scope, github_ref, changed=false."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf.startswith("installation "):
@@ -627,13 +582,15 @@ def _help_spec(leaf: str) -> HelpSpec:
         elif leaf == "installation uninstall":
             writes = "Preserve and restore-check known static bytes before removing only those files. Keep workspace declaration, ignore rules, user work, state and directories."
     elif leaf == "workspace validate":
-        target = "The current working-tree structure, or one fixed HEAD with --ci."
-        reads = "Workspace declaration, Scope metadata, dependencies and Artifact entry names/types; live direct selection only for an explicit --expect-current outside --ci."
-        does_not = "Does not fetch Artifact bodies, contact GitHub, require installation control, acquire a Start lock, repair data, or write project state."
+        target = "The GitHub structure snapshot and this clone's catalog."
+        reads = "Workspace declaration, the GitHub structure snapshot, the catalog's Scope directories and documents, and the direct selection only for an explicit --expect-current."
+        does_not = (
+            "Does not fetch Artifact bodies, write GitHub, acquire a Start lock, repair data, or write project state."
+        )
         json_data = "validation: valid, findings, snapshot_source, snapshot_oid and node_count."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "workspace doctor":
-        reads = "Current workspace metadata and this worktree's direct record; safe file information in --raw mode, retired records only with --legacy, and GitHub only with explicit fixed probe arguments."
+        reads = "The workspace declaration, the canonical status items, the GitHub structure snapshot and this worktree's direct record; with --raw and an unreadable declaration only safe file information, retired records only with --legacy, and GitHub probes only with explicit fixed probe arguments."
         does_not = "Does not execute the retired engine, repair control, resume journals, acquire a Start lock, or write any project state."
         json_data = "findings and unverified observations; unsafe, unknown or incomplete evidence returns exit 7."
         confirmation = "No final confirmation is required for this read-only leaf."
@@ -649,11 +606,6 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not write the repository, the catalog, .git or GitHub; --structure may refresh only the structure snapshot in the state root."
         json_data = "catalog, link, exclude, access, tools, sync, changes, format, git, snapshot, dashboard, structure; each has status and next_step."
         confirmation = "No final confirmation is required for this read-only leaf."
-    elif leaf == "workspace migrate":
-        target = "Only this worktree's spec-dock/workspace.json declaration."
-        reads = "Current Scope structure, Git worktree inventory, retired record headers, and actual checkout/common-Git data for the external backup."
-        json_data = "target, before_protocol, after_protocol, changed_paths, backup_path, backup_verified and restore_verified; legacy active is preserved without import."
-        confirmation = "Apply requires --yes and --confirm-old-writers-stopped; the latter is a human operational confirmation, not a monitored guarantee. --dry-run needs neither."
     elif leaf == "canonical sync":
         target = "This clone's catalog, or with --registered every catalog in the registry of the state root."
         reads = "The registry and each catalog's state.json, the catalog work tree and changesets, origin's spec-dock/canonical, and the GitHub structure probe (conditional requests)."
@@ -700,20 +652,20 @@ def _help_spec(leaf: str) -> HelpSpec:
         json_data = "commit, revision, valid, failures (code, message, details.path, details.next_step), entry_count, package_version, version_file; a version difference is a warning."
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "work finish":
-        reads = "Current metadata, required target and descendant lifecycle, and this worktree's captured direct record. GitHub-backed completion is confirmed completed by a live GET before clearing that record."
+        reads = "The GitHub structure snapshot and the target and descendant Issues, the catalog's unsaved changes and sync state, and this worktree's captured direct record. Completion is confirmed by a live GET before clearing that record."
         does_not = "Keeps the current branch; no Start lock, automatic parent selection, child completion, commit, push, merge, or rollback. A Scope outside the active chain leaves the direct record unchanged."
         json_data = "kind=work-finish, scope_id, completed, branch_before, branch_after, selection_token; effects report completion and any captured-record clear separately."
         confirmation = "Apply requires --yes; --dry-run needs no confirmation."
     elif leaf.startswith("scope create"):
-        reads = "Current metadata, templates, origin publication repository, and live GitHub ancestor state."
+        reads = "The GitHub structure snapshot and live parent Issues, spec-dock/templates/cue/<kind>/, the rules sources and the origin repository."
         json_version = "specdock.cli/v2"
         confirmation = "TTY prompts after planning; --yes confirms creation; JSON and non-interactive require --yes."
     elif leaf.startswith("scope import github"):
-        reads = "Current metadata, templates, origin publication repository, the exact GitHub Issue and live ancestor state."
+        reads = "The exact GitHub Issue and its parent, the GitHub structure snapshot, spec-dock/templates/cue/<kind>/, the rules sources and the origin repository."
         json_version = "specdock.cli/v2"
-        confirmation = "No final confirmation is required; import makes no remote mutation."
+        confirmation = "No final confirmation is required; import only adds the missing kind label, parent link and catalog directory."
     elif leaf in ("scope close", "scope reopen"):
-        reads = "Current metadata and the direct record for selectors; live GitHub states for the target and required descendants or ancestors."
+        reads = "The GitHub structure snapshot and the direct record for selectors; live GitHub states for the target and required descendants or ancestors."
         does_not = (
             "Does not change direct selection or Git checkout, automatically close children, or save a lifecycle cache."
         )
@@ -722,10 +674,10 @@ def _help_spec(leaf: str) -> HelpSpec:
             "TTY prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
         )
     elif leaf == "scope edit":
-        reads = "Current local metadata and the direct record for selectors and optional expectation guards."
-        does_not = "Does not modify documents, GitHub state, direct selection or checkout, or acquire a Start lock."
+        reads = "The GitHub structure snapshot and the live Issue, and the direct record for selectors and optional expectation guards."
+        does_not = "Does not modify catalog files, Issue state, direct selection or checkout, or acquire a Start lock."
         json_data = "scope, github_ref, changed; dry-run adds can_apply and blockers."
-        confirmation = "No final confirmation is required for a local title edit."
+        confirmation = "No final confirmation is required for a title edit."
     elif leaf == "scope move":
         reads = (
             "The GitHub structure snapshot checked at decision freshness and the target and new parent Issues"
@@ -744,25 +696,17 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         confirmation = "No final confirmation is required for this leaf."
     elif leaf == "scope delete":
-        reads = "Current Scope subtree, incoming dependency metadata, and this worktree's captured direct selection."
+        reads = "The Scope subtree and incoming dependencies in the GitHub structure snapshot and live Issues, the catalog directories, and this worktree's captured direct selection."
         json_data = "removed_ids, changed_paths, remaining_paths, backup_path; dry-run adds can_apply and blockers."
         confirmation = (
             "TTY prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
         )
     elif leaf.startswith("dependency "):
-        reads = "Current metadata, inherited dependency edges, and the direct record for selectors; live GitHub only with --source github."
+        reads = "Blocked-by and inherited edges in the GitHub structure snapshot, and the direct record for selectors; --source github refetches the structure first."
         does_not = "Does not change direct selection or Git checkout, acquire a Start lock, or persist GitHub state."
         json_version = "specdock.cli/v2"
         json_data = "scope_id, declared, effective, ready, blockers, changed; dry-run adds can_apply."
         confirmation = "No final confirmation is required for this leaf."
-    elif leaf == "workbench copy":
-        target = "One Scope Workbench in this worktree and the same Scope in another worktree of the same Git clone."
-        reads = "Native Git worktree inventory, current Scope metadata, the direct record for dynamic selectors, and source/destination bytes and identities."
-        does_not = "Does not remove destination-only files, acquire a Start lock, change selection, or automatically restore overwritten files."
-        json_data = "scope_id, source_path, destination_path, copied_paths, remaining_paths; copied/remaining paths are relative to the Workbench root."
-        confirmation = (
-            "Overwrite prompts after planning; JSON and non-interactive require --yes; dry-run needs no confirmation."
-        )
     elif leaf in _CONFIRMATION_LEAVES:
         confirmation = (
             "TTY prompts after planning; --yes skips only confirmation; JSON and non-interactive require --yes."

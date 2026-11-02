@@ -15,4 +15,4 @@ createは既存physical rootの直下 `root/NAME` にnative worktreeを置き、
 
 bootstrapはproject-owned makefileを確認して `make init` を一回実行します。対象と任意projectの副作用を確認して許可してください。hook本文は出力せず、失敗・timeout・結果不明ではeffectsと現物を確認します。共通Git内に実行履歴を保存しません。
 
-removeはmain/current/bare、dirty等を拒否し、branchを残します。lockedには--unlock、ignored payloadには--discard-ignoredの明示許可が必要です。直接記録がignored領域にあることも削除前に確認します。`workbench copy --scope TARGET --to-worktree /absolute/worktree` は一回のコピーで、自動同期や正本化ではありません。
+removeはmain/current/bare、dirty等を拒否し、branchを残します。lockedには--unlock、ignored payloadには--discard-ignoredの明示許可が必要です。直接記録がignored領域にあることも削除前に確認します。Scope の `.workbench/` はカタログの中にあり、同じcloneのどのworktreeからも同じものが見えるので、worktree間で写す必要はありません。カタログのworktree（`spec-dock/canonical`）を対象にすると `CANONICAL_CATALOG_PROTECTED` で止まります（取り外しは `canonical remove`）。

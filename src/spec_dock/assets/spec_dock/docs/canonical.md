@@ -1,10 +1,10 @@
 # canonical モードの使い方
 
-SpecDock 0.3.0 から、仕様の置き場を2つの形から選べます。`spec-dock/workspace.json` の `schema_version` が 3 のリポジトリは従来モードで、仕様もコードと一緒にコミットします（今までと同じ）。4 のリポジトリは canonical モードで、仕様の構造（作成、親子、依存、状態、題名、種類）を GitHub Issue に、中身を `spec-dock/canonical` ブランチに置き、コードのブランチには仕様を入れません。版3から4への移行は、spec-dock のリポジトリの `scripts/migrate-to-canonical/README.md` の手順で一度だけ行います。
+canonical モードは、`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリの形で、仕様の構造（作成、親子、依存、状態、題名、種類）を GitHub Issue に、中身を `spec-dock/canonical` ブランチに置き、コードのブランチには仕様を入れません。SpecDock 0.5.0 はこの形だけを扱い、`schema_version` が 3 のリポジトリ（仕様もコードと一緒にコミットする従来の形）では、どのコマンドも `CANONICAL_NOT_MIGRATED` で止まります。版3のリポジトリの移し方は[導入・移行・保全](migration.md)の「canonical モードへの移行」にあります（SpecDock 0.4.2 を入れ直し、版のタグ `v0.4.2` の移行の手順書で一度だけ移します）。
 
 SpecDock 0.4.0 から、canonical モードで新しく作る Scope は CUE の Scope（`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md`）です。書き方と検査は [CUE Authoring Guide](authoring/cue.md) にあります。
 
-エージェントが守る規則は、配布するスキル（`.agents/skills/spec-dock/SKILL.md`）の「仕様の扱い（canonical モード）」の節にあります。この文書は、利用者が用意と困ったときの扱いを知るためのものです。
+エージェントが守る規則は、配布するスキル（`.agents/skills/spec-dock/SKILL.md`）の「仕様の扱い」の節にあります。この文書は、利用者が用意と困ったときの扱いを知るためのものです。
 
 ## モードと置き場
 
@@ -12,8 +12,8 @@ SpecDock 0.4.0 から、canonical モードで新しく作る Scope は CUE の 
 - Scope のディレクトリは、種類と親を問わず `spec-dock/initiatives/<区切り>/<ID>/` に平らに並びます。入れ子にしません。
   - ID は `<種類>-<番号5桁>`（`init-00423`、`epic-00424`、`iss-00454`）。5桁を超えた番号はそのまま（`iss-100454`）。
   - `<区切り>` は番号の千ごとの範囲で、`<下端>-<上端>` を ID の番号と同じ幅で0埋めします（1〜999 は `00000-00999`、1000 は `01000-01999`、100000 は `100000-100999`）。例：`spec-dock/initiatives/00000-00999/iss-00454/`、`spec-dock/initiatives/02000-02999/iss-02114/`。区切りは番号だけで決まり、親や種類を変えても動きません。
-  - 保証レベルの指定が必須です。canonical モードの `scope create` と `scope import github` には `--assurance <light|standard|strict|critical>` と `--assurance-reason <理由>` を付けます。新しい Scope は `spec-dock/templates/cue/<種類>/` から、`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` の一式で作られ、指定は `requirement.cue` の `assurance` だけに書かれます。
-  - slug はありません。canonical モードの `scope create` と `scope import github` に `--slug` を付けると `CANONICAL_NOT_APPLICABLE` で止まります。`scope import github` の `--title` は受け付けますが使わず、GitHub の題名で進めます（違えば警告 `CANONICAL_TITLE_IGNORED`）。
+  - 保証レベルの指定が必須です。`scope create` と `scope import github` には `--assurance <light|standard|strict|critical>` と `--assurance-reason <理由>` を付けます。新しい Scope は `spec-dock/templates/cue/<種類>/` から、`requirement.cue`、`design.cue`、`plan.cue`、`explanation.html`、`report.md` の一式で作られ、指定は `requirement.cue` の `assurance` だけに書かれます。
+  - slug はありません（`scope create` と `scope import github` に `--slug` の引数はありません）。`scope import github` の `--title` は受け付けますが使わず、GitHub の題名で進めます（違えば警告 `CANONICAL_TITLE_IGNORED`）。
   - コマンドの入力は0埋めしなくてよい（`iss-454` は `iss-00454`）。表示と出力は0埋めの形です。
 - 題名は GitHub の題名が正本です。日本語を含むどの言語でもよく、空でなく、制御文字を含まず、256文字以下です。題名を変えても、ID、ディレクトリ名、ブランチ名は変わりません。
 - 親子と依存は GitHub だけにあり、ディレクトリの位置には表れません。場所、親、子、依存は `spec-dock scope show <ID> --json`（`path`、`parent_id` など）で確かめます。
@@ -106,7 +106,7 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - SpecDock は、GitHub の構造（Scope の Issue の番号、種類、題名、状態、ラベル、担当者、親子、依存）を、リポジトリごとに一括で読んで `<状態の置き場>/github/<host>/<owner>/<repo>/snapshot.json` に持ち、表示に使い回します（書けない環境ではメモリーの上だけ）。変わったかの確かめは条件付きの要求（304）なので、GitHub の主のレート制限を消費しません。
 - 新しさ：題名や状態などの変化は、定期の同期の確かめで1〜2分のうちに表示に出ます。親子と依存だけの変更は、Issue の更新の時刻が変わらないことがあるので、最大30分（全体の取り直しの間隔）かかります。SpecDock のコマンドで書いた変更は、次の表示にすぐ出ます。書くコマンドは、書く前に GitHub で確かめ直します。
 - 急ぐとき：`spec-dock workspace sync --source github` か `spec-dock dependency check <ID> --source github` で、確かめを待たずに全体を取り直します。
-- `dependency check` と `workspace sync` の `--source`：canonical モードでは、引数なしはスナップショットで判定し、`--source github` は全体を取り直してから判定し、明示した `--source local` は `CANONICAL_NOT_APPLICABLE` で止まります（従来モードの既定の意味は変わりません）。
+- `dependency check` と `workspace sync` の `--source`：引数なしはスナップショットで判定し、`--source github` は全体を取り直してから判定します（`--source` が受け付けるのは `github` だけです）。
 - `--offline` を付けた読むコマンドは、GitHub に何も送らず、保存したスナップショットを古いもの（警告 `GITHUB_SNAPSHOT_STALE`）として示します。`--source github --offline` は止まります。`canonical sync` と `canonical resume` は `--offline` を受け付けません。
 - GitHub につながらないとき、読むコマンドは古いスナップショットで示し、`GITHUB_SNAPSHOT_STALE` を警告に入れます。書くコマンドは書く前に止まります。
 - ダッシュボード：定期の同期が、mainのチェックアウトの `spec-dock/` に、今までと同じ5つのファイル（`dashboard.md`、`tree.puml`、`tree-all.puml`、`deps-issues.puml`、`deps-raw.puml`）を、構造が変わったときだけ作り直します。題名は GitHub の題名、作業中はラベル `spec-dock:in-progress` で示します。書けなかったときは `canonical status` の `dashboard` に `CANONICAL_DASHBOARD_OCCUPIED`（書く場所にディレクトリかシンボリックリンクがある。退避すれば次の同期が書く）か `CANONICAL_DASHBOARD_FAILED`（`snapshot` と `sync` の項目を確かめる）が出ます。
@@ -118,13 +118,13 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 - 予行演習や試しでは、環境変数 `XDG_STATE_HOME` を必ず一時ディレクトリにします。`--no-schedule` でも基準を状態の置き場に書くためです。`canonical sync` を直接呼ぶときは `--state-root` も一時ディレクトリで渡します。
 - `spec-dock worktree remove` は、SpecDock が置いたリンク `spec-dock/initiatives` だけが無視されたファイルなら、`--discard-ignored` なしで消します（リンクを消すだけで、カタログの中身は消えません）。カタログのworktreeを対象にすると `CANONICAL_CATALOG_PROTECTED` で止まります。
 - リンクを手で消すときは `rm spec-dock/initiatives`（末尾に `/` を付けない）。mainのチェックアウトで `git clean -ff` を使いません（カタログのworktreeを消すため）。
-- `workbench copy` は、どのworktreeからも同じカタログの `.workbench` が見えるので要らず、`CANONICAL_WORKBENCH_SHARED` で止まります。
-- `workspace validate --ci` は `CANONICAL_NOT_APPLICABLE` で止まります。CI では `canonical check` を使います。
+- Scope の `.workbench` は、どのworktreeからも同じカタログのものが見えるので、worktree の間で写す必要はありません（0.5.0 で `workbench copy` を外しました）。
+- CI では `canonical check` を使います（0.5.0 で `workspace validate --ci` を外しました）。
 
 ## 既定のブランチの検査
 
 - `spec-dock canonical check [--commit REV]` は、コードのツリーのコミットに仕様のパス、`.canonical` の下のパス、`.meta.json` がなく、版4の宣言、配布資産、無視の3行、版のファイルがそろうかを確かめます。ネットワークと GitHub のトークンなしで動き、問題はパスと次の1手付きで終了コード7です。
-- ワークフローの見本は `spec-dock/docs/ci/spec-dock-check.yml` です。`spec-dock/system/spec-dock-version` の版のタグ（`v0.3.0` など）の SpecDock を入れて `canonical check` を実行します。版のタグは 0.3.0 から作るので、見本は 0.3.0 以降の配布資産で使います（0.2.4 の版のファイルのままでは入れる段階で失敗します）。
+- ワークフローの見本は `spec-dock/docs/ci/spec-dock-check.yml` です。`spec-dock/system/spec-dock-version` の版のタグ（`v0.5.0` など）の SpecDock を入れて `canonical check` を実行します。版のタグは 0.3.0 から作るので、見本は 0.3.0 以降の配布資産で使います（0.2.4 の版のファイルのままでは入れる段階で失敗します）。
 - 検査は PR をきっかけに動き、結果を PR に表示します。人は通過を確かめてからマージします。
 
 ## CI の費用と、見本の合わせ方
@@ -139,9 +139,8 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 
 | コード | 終了コード | 次の1手 |
 |---|---|---|
-| `CANONICAL_NOT_MIGRATED` | 3 | 宣言が版3のリポジトリです。移行するなら spec-dock の `scripts/migrate-to-canonical/README.md` に従う（`canonical link` では、GitHub に canonical がなく既定のブランチに仕様があるときも） |
+| `CANONICAL_NOT_MIGRATED` | 3 | 宣言が版3のリポジトリです（`canonical link` では、GitHub に canonical がなく既定のブランチに仕様があるときも）。SpecDock 0.4.2 を入れ直し、版のタグ `v0.4.2` の `scripts/migrate-to-canonical/README.md` に従って移す（手順書の 0.3.0 は 0.4.2 と読み替える。[導入・移行・保全](migration.md)） |
 | `CANONICAL_CHECKOUT_NOT_MIGRATED`、`CANONICAL_MAIN_NOT_MIGRATED` | 3／警告 | そのチェックアウト（mainのチェックアウト）で移行後のコミットをチェックアウトしてから `spec-dock canonical link` |
-| `CANONICAL_NOT_APPLICABLE` | 3 | 示した代わりのコマンドを使う（`canonical check`、`--slug` なしの作成、`--source` なしなど） |
 | `CANONICAL_UNSUPPORTED_LAYOUT` | 3 | mainのチェックアウトのある構成（bare でないクローン）で使う |
 | `CANONICAL_GIT_TOO_OLD` | 3 | Git 2.38 以上を入れ、`spec-dock canonical link` をもう一度実行する |
 | `CANONICAL_FOREIGN_CHECKOUT` | 3 | 保存と同期はホストで行う。コンテナでは仕様のファイルを読み書きするだけにするか、コンテナの中でクローンして `spec-dock canonical link` |
@@ -160,7 +159,6 @@ spec-dock canonical status --structure   # 上に加えて、Scope のディレ�
 | `CANONICAL_PAUSED` | 3（`resume`）／警告（`status`） | `spec-dock canonical status` で理由を見て、上の「同期が止まったとき」に従う |
 | `CANONICAL_BASE_HAS_SPECS` | 3 | 移行の後のコミット（仕様のないもの）を基点にする |
 | `CANONICAL_CATALOG_PROTECTED` | 3 | 取り外すなら `spec-dock canonical remove` |
-| `CANONICAL_WORKBENCH_SHARED` | 3 | 何もしなくてよい（どのworktreeからも見える） |
 | `CANONICAL_CHECK_FAILED` | 7 | 失敗ごとに示したパスを、既定のブランチから外す（下の `canonical check` の失敗の種類） |
 | `SPEC_PATH_TRACKED`、`CATALOG_PATH_TRACKED`、`SCOPE_METADATA_TRACKED` | 7（`canonical check` の失敗） | 示したパスを、コードのブランチから外すPRを作る |
 | `WORKSPACE_NOT_MIGRATED`、`WORKSPACE_DECLARATION_INVALID` | 7（同上） | 宣言を版4の正しい形にする（移行の `cut` のブランチを使う） |

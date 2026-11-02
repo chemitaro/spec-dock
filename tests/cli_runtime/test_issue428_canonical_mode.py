@@ -38,29 +38,6 @@ def _run(capsys: pytest.CaptureFixture[str], *argv: str) -> tuple[int, Any]:
     return code, json.loads(capsys.readouterr().out)
 
 
-def test_text_output_shows_the_next_step(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
-) -> None:
-    # iss-00436 removed CANONICAL_NOT_IMPLEMENTED; a canonical refusal still renders its next step as text.
-    root = canonical_workspace(tmp_path / "consumer")
-    assert (
-        main([
-            "--project",
-            str(root),
-            "workspace",
-            "migrate",
-            "--to-schema",
-            "3",
-            "--to-writer-protocol",
-            "specdock.worktree-writer/v1",
-            "--dry-run",
-        ])
-        == 3
-    )
-    stderr = capsys.readouterr().err
-    assert "error [CANONICAL_NOT_APPLICABLE]" in stderr and "recovery: " in stderr
-
-
 @pytest.mark.parametrize(
     "declaration",
     [
@@ -76,34 +53,6 @@ def test_unknown_declarations_still_fail_the_precondition(
     root = canonical_workspace(tmp_path / "consumer", declaration)
     code, result = _run(capsys, "--project", str(root), "scope", "list")
     assert code == 3 and result["error"]["code"] == "PRECONDITION_FAILED"
-
-
-@pytest.mark.parametrize(
-    "flags", [["--dry-run"], ["--backup-dir", "{backup}", "--confirm-old-writers-stopped", "--yes"]]
-)
-def test_workspace_migrate_is_not_applicable_and_keeps_the_declaration(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str], flags: list[str]
-) -> None:
-    root = canonical_workspace(tmp_path / "consumer")
-    declaration = (root / "spec-dock/workspace.json").read_bytes()
-    before = tree_digest(root)
-    argv = [str(tmp_path / "backup") if flag == "{backup}" else flag for flag in flags]
-    code, result = _run(
-        capsys,
-        "--project",
-        str(root),
-        "workspace",
-        "migrate",
-        "--to-schema",
-        "3",
-        "--to-writer-protocol",
-        NEW,
-        *argv,
-    )
-    assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_APPLICABLE"
-    assert result["recovery"]["instructions"]
-    assert (root / "spec-dock/workspace.json").read_bytes() == declaration and tree_digest(root) == before
-    assert not (tmp_path / "backup").exists()
 
 
 def _uninitialized(root: Path) -> Path:
@@ -183,19 +132,3 @@ def test_expect_current_on_a_schema_four_installation_is_checked_before_any_writ
     assert code == 5 and result["status"] == "failed" and result["effects"] == []
     assert result["error"]["code"] == "GIT_FAILED"
     assert tree_digest(target) == before
-
-
-def test_schema_three_installation_show_reports_the_old_declaration_as_known_old(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    target = _uninitialized(tmp_path / "fresh")
-    assert _run(capsys, "installation", "init", str(target), "--yes")[0] == 0
-    (target / "spec-dock/workspace.json").write_text(
-        '{"schema_version":3,"writer_protocol":"specdock.worktree-writer/v1"}\n', encoding="utf-8"
-    )
-    code, shown = _run(capsys, "installation", "show", "--target", str(target))
-    data = shown["data"]["result"]
-    classes = {asset["path"]: asset["classification"] for asset in data["assets"]}
-    assert code == 0 and data["workspace"]["schema_version"] == 3
-    assert classes.pop("spec-dock/workspace.json") == "known-old"
-    assert set(classes.values()) == {"current"}

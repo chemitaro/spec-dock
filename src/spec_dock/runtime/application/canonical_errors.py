@@ -26,7 +26,6 @@ if TYPE_CHECKING:
     from spec_dock.runtime.infra.static_assets import StaticAsset
 
 CANONICAL_NOT_MIGRATED: Final = "CANONICAL_NOT_MIGRATED"
-CANONICAL_NOT_APPLICABLE: Final = "CANONICAL_NOT_APPLICABLE"
 CANONICAL_NOT_LINKED: Final = "CANONICAL_NOT_LINKED"
 CANONICAL_CHECK_FAILED: Final = "CANONICAL_CHECK_FAILED"
 # Catalog and link (iss-00429).
@@ -51,7 +50,6 @@ CANONICAL_CHECKOUT_NOT_MIGRATED: Final = "CANONICAL_CHECKOUT_NOT_MIGRATED"
 CANONICAL_INSIDE_CATALOG: Final = "CANONICAL_INSIDE_CATALOG"
 CANONICAL_BASE_HAS_SPECS: Final = "CANONICAL_BASE_HAS_SPECS"
 CANONICAL_CATALOG_PROTECTED: Final = "CANONICAL_CATALOG_PROTECTED"
-CANONICAL_WORKBENCH_SHARED: Final = "CANONICAL_WORKBENCH_SHARED"
 # Periodic sync (iss-00430). Warnings unless noted.
 CANONICAL_SYNC_NOT_SCHEDULED: Final = "CANONICAL_SYNC_NOT_SCHEDULED"
 CANONICAL_SYNC_NOT_CONFIRMED: Final = "CANONICAL_SYNC_NOT_CONFIRMED"
@@ -82,13 +80,10 @@ CANONICAL_DASHBOARD_OCCUPIED: Final = "CANONICAL_DASHBOARD_OCCUPIED"  # state.js
 CANONICAL_DASHBOARD_FAILED: Final = "CANONICAL_DASHBOARD_FAILED"  # state.json dashboard.error; a status warning
 
 NOT_MIGRATED_RECOVERY: Final = (
-    "This repository is not migrated (workspace schema 3); follow scripts/migrate-to-canonical/README.md "
-    "in SpecDock 0.3.0 to migrate it."
+    "This repository is not migrated (workspace schema 3); reinstall SpecDock 0.4.2 and follow "
+    "scripts/migrate-to-canonical/README.md at the v0.4.2 tag to migrate it."
 )
 CANONICAL_NOT_LINKED_RECOVERY: Final = "spec-dock canonical link"
-MIGRATE_NOT_APPLICABLE_RECOVERY: Final = (
-    "No writer-protocol migration applies to a schema-4 workspace; nothing needs to be done."
-)
 UNSUPPORTED_LAYOUT_RECOVERY: Final = (
     "Use a clone whose main checkout holds the .git directory; bare and separate-git-dir layouts are not supported."
 )
@@ -116,10 +111,6 @@ CHECKOUT_NOT_MIGRATED_NEXT_STEP: Final = (
 )
 BASE_HAS_SPECS_RECOVERY: Final = "Use a commit made after the switch to canonical storage as the base."
 CATALOG_PROTECTED_RECOVERY: Final = "To detach this clone's catalog, run spec-dock canonical remove."
-WORKBENCH_SHARED_RECOVERY: Final = (
-    "Nothing to do: every worktree of this clone sees the same catalog, including each Scope's .workbench."
-)
-CHECK_INSTEAD_RECOVERY: Final = "Run spec-dock canonical check to check a commit in CI."
 START_LOCK_BUSY_RECOVERY: Final = "Wait a moment, then run spec-dock canonical link again."
 LINK_AGAIN_RECOVERY: Final = "Run spec-dock canonical link again; it continues from the current state."
 LINK_NETWORK_RECOVERY: Final = (

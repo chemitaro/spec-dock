@@ -1,10 +1,10 @@
 """Canonical-mode `work start` and `work finish` (iss-00432; Epic design ch. 3, 5 and 6).
 
-Start follows the legacy flow (`work_start.start_work`) with canonical inputs: the Scope comes from the GitHub
+Start follows the flow the schema-3 `work start` had (removed in 0.5.0) with canonical inputs: the Scope comes from the GitHub
 structure checked at decision freshness, the base commit must not track `spec-dock/initiatives`, and readiness
 is I-4's `evaluate_readiness`. After the selection is recorded and the Start lock released, the checkout's
 catalog link and `spec-dock/active` links are aligned and the in-progress mark is added; none of those follow-ups
-changes the result. The legacy module stays unchanged (AC-15); its private helpers are reused, not copied.
+changes the result. The shared steps (`work_start`, `start_plan`, `start_selection`) are reused, not copied.
 """
 
 from __future__ import annotations
@@ -36,7 +36,7 @@ from spec_dock.runtime.application.canonical_writes import (
     diagnostic_for,
     open_write_session,
 )
-from spec_dock.runtime.application.project_context import resolve_context
+from spec_dock.runtime.application.project_context import resolve_observed_context
 from spec_dock.runtime.application.scope_check import check_scope_documents, scope_format
 from spec_dock.runtime.application.start_plan import (
     StartLiveObservations,
@@ -49,7 +49,6 @@ from spec_dock.runtime.application.start_plan import (
     plan_start,
 )
 from spec_dock.runtime.application.start_selection import StartSelectionError
-from spec_dock.runtime.application.start_snapshot import StartSnapshotError
 from spec_dock.runtime.application.work_start import (
     StartData,
     StartGitFailure,
@@ -147,7 +146,7 @@ class ReadinessRefused(StartPrecondition):
 def canonical_worktree_rows(
     context: ProjectContext, views: tuple[ScopeView, ...], *, timeout: float
 ) -> tuple[WorktreeSelection, ...]:
-    """The legacy `observe_worktrees` rows, with every selection read against the canonical Scope views."""
+    """One row per worktree of this clone, each selection read against the canonical Scope views."""
     seen: set[object] = set()
     rows: list[WorktreeSelection] = []
     for entry in worktree_list(context.root, timeout=timeout):
@@ -160,7 +159,7 @@ def canonical_worktree_rows(
                 raise ValueError("bare repository is not a working tree")
             if entry.branch == CANONICAL_BRANCH and (entry.path / FORMAT_FILE).is_file():
                 continue  # the clone's catalog worktree selects nothing
-            other = resolve_context(str(entry.path), context.root, timeout=timeout)
+            other = resolve_observed_context(str(entry.path), context.root, timeout=timeout)
             identity = other.worktree_identity
             if other.clone_identity != context.clone_identity:
                 raise ValueError("worktree common directory identity mismatch")
@@ -532,7 +531,7 @@ def start_work(namespace: argparse.Namespace, context: ProjectContext) -> Operat
             code, details, exit_code = "START_LOCK_BUSY", {}, 3
         elif isinstance(error, ReadinessRefused):
             code, details, exit_code = error.code, error.details, 3
-        elif isinstance(error, (StartPrecondition, StartPlanError, StartSelectionError, StartSnapshotError)):
+        elif isinstance(error, (StartPrecondition, StartPlanError, StartSelectionError)):
             code, details, exit_code = error.code, {}, 3
         elif isinstance(error, LookupError):
             code, details, exit_code = "SCOPE_NOT_FOUND", {}, 4

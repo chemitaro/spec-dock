@@ -6,11 +6,10 @@ import copy
 from dataclasses import asdict
 import os
 import stat
-from typing import TYPE_CHECKING, Final
+from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.active_links import sync_selection_links
 from spec_dock.runtime.application.artifact_query import ArtifactCatalogEntry
-from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_APPLICABLE, CanonicalCommandError
 from spec_dock.runtime.application.canonical_scopes import (
     OFFLINE_MESSAGE,
     check_canonical_scope_expectations,
@@ -46,10 +45,6 @@ if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.application.worktree_observation import SelectionObservation
-
-SOURCE_LOCAL_RECOVERY: Final = (
-    "Omit --source to read the structure snapshot, or use --source github to refetch it from GitHub."
-)
 
 
 def show_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
@@ -106,13 +101,7 @@ def list_scope(namespace: argparse.Namespace, context: ProjectContext) -> Operat
 
 
 def resolve_source(namespace: argparse.Namespace) -> tuple[bool, bool]:
-    """(refresh, offline): `--source github` refetches; an explicit `--source local` does not apply."""
-    if getattr(namespace, "source_explicit", False) and namespace.source == "local":
-        raise CanonicalCommandError(
-            CANONICAL_NOT_APPLICABLE,
-            "--source local reads .meta.json; this workspace keeps structure in GitHub",
-            recovery=(SOURCE_LOCAL_RECOVERY,),
-        )
+    """(refresh, offline): `--source github` refetches; without it the saved snapshot is read."""
     refresh = namespace.source == "github"
     if refresh and namespace.offline:
         raise ValueError(OFFLINE_MESSAGE)

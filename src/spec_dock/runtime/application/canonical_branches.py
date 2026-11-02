@@ -3,8 +3,8 @@
 The default name is the Scope ID itself (`iss-00454`; Epic design ch. 7). Create and switch stop with
 SCOPE_KIND_CHANGED when GitHub moved the target to another kind; show only warns. Create and switch keep today's
 Git steps (existing refs are never reset; switching needs a clean worktree, holds the clone Start lock and keeps
-the selection record). Instead of today's `.meta.json` check of the commit, a commit whose tree still tracks
-`spec-dock/initiatives` is refused: checking it out would replace this checkout's catalog link.
+the selection record). A commit whose tree still tracks `spec-dock/initiatives` (a commit from before the switch to
+canonical storage) is refused: checking it out would replace this checkout's catalog link.
 """
 
 from __future__ import annotations

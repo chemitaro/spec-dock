@@ -16,10 +16,9 @@ from spec_dock.runtime.application.canonical_errors import (
 )
 from spec_dock.runtime.application.project_context import (
     CANONICAL_WORKSPACE_SCHEMA,
-    LEGACY_WORKSPACE_SCHEMA,
     NEW_WRITER_PROTOCOL,
+    NOT_MIGRATED_WORKSPACE_SCHEMA,
     resolve_git_context,
-    workspace_mode,
 )
 from spec_dock.runtime.domain.canonical_layout import GITIGNORE_LINES, GITIGNORE_PATH, ignore_rules_state
 from spec_dock.runtime.infra.commit_tree import list_commit_tree, read_blob, resolve_commit
@@ -69,7 +68,7 @@ _DECLARATION_NEXT_STEP: Final = (
 )
 _NEWER_SCHEMA_NEXT_STEP: Final = (
     f"Install the SpecDock version named by {CI_VERSION_FILE}; "
-    f"this SpecDock knows workspace schema {LEGACY_WORKSPACE_SCHEMA} and {CANONICAL_WORKSPACE_SCHEMA}."
+    f"this SpecDock knows workspace schema {CANONICAL_WORKSPACE_SCHEMA} only."
 )
 _STATIC_ASSET_NEXT_STEP: Final = (
     "Run spec-dock installation update --target <checkout> --backup-dir <new external directory> --yes "
@@ -226,16 +225,14 @@ def _declaration_failure(entry: TreeEntry | None, read: Callable[[TreeEntry], by
     if not isinstance(declaration, dict):
         return _invalid_declaration("invalid-json", "the workspace declaration is not a JSON object")
     version = declaration.get("schema_version")
-    try:
-        mode = workspace_mode(declaration)
-    except ValueError:
+    if type(version) is not int or version not in (NOT_MIGRATED_WORKSPACE_SCHEMA, CANONICAL_WORKSPACE_SCHEMA):
         newer = type(version) is int and version > CANONICAL_WORKSPACE_SCHEMA
         return _invalid_declaration(
             "unknown-schema",
             "the workspace declaration has an unknown schema_version",
             _NEWER_SCHEMA_NEXT_STEP if newer else _DECLARATION_NEXT_STEP,
         )
-    if mode == "legacy":
+    if version == NOT_MIGRATED_WORKSPACE_SCHEMA:
         return _failure(
             WORKSPACE_NOT_MIGRATED,
             WORKSPACE_DECLARATION,

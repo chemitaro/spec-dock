@@ -727,19 +727,23 @@ def test_a_single_branch_clone_of_a_new_repository_creates_the_canonical(
     assert fetch.count("+refs/heads/spec-dock/canonical:refs/remotes/origin/spec-dock/canonical") == 1
 
 
-def _legacy_commands_work(capsys: pytest.CaptureFixture[str], checkout: Path) -> None:
-    code, started = run(capsys, checkout, "work", "start", "init-00001", "--base", "HEAD", "--dry-run")
-    assert code == 0 and started["status"] == "planned", started
-    code, synced = run(capsys, checkout, "workspace", "sync")
-    assert code == 0 and synced["status"] in ("succeeded", "unchanged"), synced
+def _unmigrated_commands_stop(capsys: pytest.CaptureFixture[str], checkout: Path) -> None:
+    """0.5.0 reads only schema 4: a checkout left on a schema-3 commit stops before any effect (iss-00440)."""
+    before = tree_digest(checkout / "spec-dock")
+    for argv in (
+        ("work", "start", "init-00001", "--base", "HEAD", "--dry-run"),
+        ("workspace", "sync"),
+        ("scope", "list"),
+    ):
+        code, result = run(capsys, checkout, *argv)
+        assert (code, result["error"]["code"]) == (3, "CANONICAL_NOT_MIGRATED"), result
+        assert result["effects"] == []
+    assert tree_digest(checkout / "spec-dock") == before
 
 
 def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
-    capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    capsys: pytest.CaptureFixture[str], main_checkout: Path, tmp_path: Path
 ) -> None:
-    from tests.cli_runtime.test_issue413_finish import github_fixture
-
-    github_fixture(tmp_path, monkeypatch, {"1": "open"})
     linked = add_worktree(main_checkout, tmp_path / "linked", "feature")
     git(main_checkout, "checkout", "-q", "-b", "legacy")
     (main_checkout / "spec-dock/workspace.json").write_text(
@@ -747,31 +751,14 @@ def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
     )
     scope = main_checkout / "spec-dock/initiatives/init-00001-fixture"
     scope.mkdir(parents=True)
-    metadata = {
-        "schema_version": 3,
-        "id": "init-00001",
-        "type": "initiative",
-        "title": "Fixture",
-        "slug": "fixture",
-        "parent_id": None,
-        "initiative_id": None,
-        "epic_id": None,
-        "backend": "github",
-        "github": {"issue_number": 1, "repo_owner": "example", "repo_name": "repo"},
-        "lifecycle": None,
-        "revision": 0,
-        "depends_on": [],
-        "created_at": "2026-09-30T00:00:00Z",
-        "updated_at": "2026-09-30T00:00:00Z",
-    }
-    (scope / ".meta.json").write_text(json.dumps(metadata) + "\n", encoding="utf-8")
+    (scope / ".meta.json").write_text(json.dumps({"schema_version": 3, "id": "init-00001"}) + "\n", encoding="utf-8")
     for name in ("requirement.md", "design.md", "plan.md", "report.md"):
         (scope / name).write_text("# Fixture\n", encoding="utf-8")
     git(main_checkout, "add", "-A")
     git(main_checkout, "commit", "-qm", "legacy specs")
     legacy_worktree = add_worktree(main_checkout, tmp_path / "legacy-worktree", "legacy-work")
     legacy_before = tree_digest(main_checkout / "spec-dock/initiatives")
-    _legacy_commands_work(capsys, main_checkout)
+    _unmigrated_commands_stop(capsys, main_checkout)
     code, result = link(capsys, linked)
     assert code == 0, result
     assert [item["code"] for item in result["warnings"]].count("CANONICAL_MAIN_NOT_MIGRATED") == 1
@@ -782,11 +769,9 @@ def test_a_main_checkout_on_a_schema_three_commit_keeps_its_legacy_tree(
         "CANONICAL_MAIN_NOT_MIGRATED"
     ]
     assert git(main_checkout, "status", "--porcelain") == ""
-    code, listed = run(capsys, main_checkout, "scope", "list")
-    assert code == 0 and [item["id"] for item in listed["data"]["result"]["items"]] == ["init-00001"]
-    # The legacy commands that observe every worktree pass over the catalog (coordinator decision D1).
-    _legacy_commands_work(capsys, main_checkout)
-    _legacy_commands_work(capsys, legacy_worktree)
+    # The unmigrated checkouts keep their tree and stop with the 0.4.2 next step instead of reading it.
+    _unmigrated_commands_stop(capsys, main_checkout)
+    _unmigrated_commands_stop(capsys, legacy_worktree)
 
 
 def test_a_failed_observation_after_pushing_is_partial_with_the_applied_effects(

@@ -1,8 +1,8 @@
 """Canonical-mode `scope create` and `scope import github` (iss-00432; Epic design ch. 2, 6 and 7).
 
 GitHub gets the Issue (title and kind label only; SpecDock writes nothing in the body) and its parent first; the
-Scope directory is then published at `<catalog>/<bucket>/<ID>/` from the template, without the front matter
-title and parent lines, under the catalog lock with one changeset. No `.meta.json` is written. A failure after
+Scope directory is then published at `<catalog>/<bucket>/<ID>/` from the template (whose front matter carries no
+title or parent since 0.5.0), under the catalog lock with one changeset. A failure after
 the Issue exists is partial, and `scope import github` completes it: it adds only what is missing, so running it
 again changes nothing.
 
@@ -32,7 +32,6 @@ from spec_dock.runtime.application.canonical_writes import (
     needs_confirmation,
     open_write_session,
     planned,
-    refuse_slug,
 )
 from spec_dock.runtime.application.scope_scaffold import (
     _create_relative_symlink_at,
@@ -96,7 +95,6 @@ CUE_TEMPLATE_FILES: Final = ("requirement.cue", "design.cue", "plan.cue", "expla
 
 def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     context.require_writer()
-    refuse_slug(namespace)
     assurance = _require_assurance(namespace)
     if needs_confirmation(namespace):
         return OperationResult(
@@ -192,7 +190,6 @@ def create_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
 
 def import_scope(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     context.require_writer()
-    refuse_slug(namespace)
     assurance = _require_assurance(namespace)
     kind = cast("ScopeKind", namespace.command_path.rsplit(" ", 1)[-1])
     if namespace.github_repo is not None or not namespace.github_ref.strip().isdigit():
@@ -470,13 +467,11 @@ def _check_scaffold_sources(session: WriteSession, kind: ScopeKind) -> None:
 
 
 def canonical_rules_links(kind: ScopeKind, destination: Path, specdock_dir: Path) -> list[tuple[Path, Path]]:
-    """The Artifact and discussion rules links; the catalog has no child-layer rules (epics/, issues/)."""
-    artifacts = [
-        (link, target)
-        for link, target in _rules_scaffold_specs(kind=kind, dest_dir=destination, specdock_dir=specdock_dir)
-        if link.parent.name == "artifacts"
+    """The Artifact and discussion rules links of a new Scope directory."""
+    return [
+        *_rules_scaffold_specs(kind=kind, dest_dir=destination, specdock_dir=specdock_dir),
+        (destination / "discussions/rules.md", specdock_dir / "docs/rules" / kind / "discussions.md"),
     ]
-    return [*artifacts, (destination / "discussions/rules.md", specdock_dir / "docs/rules" / kind / "discussions.md")]
 
 
 def _main_spec_dock(session: WriteSession) -> Path:

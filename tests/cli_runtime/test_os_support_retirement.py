@@ -88,7 +88,7 @@ raise SystemExit(main(json.loads(sys.argv[2])))
     [
         ["work", "start", "iss-00413", "--base", "HEAD"],
         ["installation", "init", "unused-target", "--yes"],
-        ["workspace", "validate", "--ci"],
+        ["workspace", "validate", "--require-nodes"],
         ["workspace", "doctor", "--raw"],
     ],
 )

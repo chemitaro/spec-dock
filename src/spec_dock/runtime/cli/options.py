@@ -107,9 +107,6 @@ def _add_common_help(parser: argparse.ArgumentParser, leaf: str) -> None:
         group.add_argument(*names, help=text, **options)
 
 
-SOURCE_LEAVES = frozenset({"dependency check", "workspace sync"})
-
-
 class _StrictParser(argparse.ArgumentParser):
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         kwargs.setdefault("allow_abbrev", False)
@@ -120,23 +117,19 @@ class _StrictParser(argparse.ArgumentParser):
 def _recovery_help(leaf: str) -> str:
     if leaf.startswith("installation "):
         return "Inspect installed and remaining static paths before a new operation; no replay, resume or automatic rollback."
-    if leaf == "workbench copy":
-        return "Inspect copied and remaining paths and retained candidate files before a new explicit copy; changes are not automatically undone."
     if leaf.startswith("artifact "):
         return "Inspect the owner catalog and retained candidate files before a new explicit operation; uncertain publications are not automatically repeated."
     if leaf == "scope delete":
         return "Inspect the retained backup and applied or remaining paths before a new explicit operation; changes are not automatically undone."
     if leaf == "scope edit":
-        return (
-            "Inspect the exact Scope metadata before a new explicit edit; do not automatically revert applied changes."
-        )
+        return "Inspect the exact Scope Issue before a new explicit edit; do not automatically revert applied changes."
     if leaf in ("scope close", "scope reopen"):
         return "Inspect the exact Scope and its backend state before a new explicit operation; do not blindly repeat a mutation."
     if leaf.startswith("scope import github "):
-        return "Inspect the exact GitHub Issue and local Scope paths before a new explicit import."
+        return "Inspect the exact GitHub Issue and its catalog directory before a new explicit import."
     if leaf.startswith("scope create "):
         return (
-            "Inspect GitHub and local Scope paths before a new explicit operation. "
+            "Inspect GitHub and the catalog directory before a new explicit operation. "
             "After an uncertain creation, identify the exact Issue and use scope import github."
         )
     if leaf == "work start":
@@ -150,11 +143,9 @@ def _recovery_help(leaf: str) -> str:
     if leaf.startswith("branch "):
         return "Inspect the Git ref, HEAD, and worktree status before a new explicit operation; no journal or rollback."
     if leaf.startswith("dependency "):
-        return "Inspect current metadata and validate the dependency graph before a new explicit operation."
+        return "Inspect the GitHub dependencies and validate the dependency graph before a new explicit operation."
     if leaf.startswith("worktree "):
         return "Inspect the native Git inventory, ref, target path and observed effects before a new explicit operation; no registry, receipt or automatic rollback."
-    if leaf == "workspace migrate":
-        return "Inspect actual declaration bytes and the retained backup before a new explicit migration; no legacy replay, resume or automatic rollback."
     if leaf == "workspace sync":
         return "No mutation to recover; inspect incomplete observations and issue a new Sync."
     if leaf == "canonical link":
@@ -174,9 +165,7 @@ def _reject_retired_start(argv: list[str]) -> None:
     delete = argv[:2] == ["scope", "delete"]
     dependency = len(argv) >= 2 and argv[0] == "dependency"
     artifact = len(argv) >= 2 and argv[0] == "artifact"
-    workbench = argv[:2] == ["workbench", "copy"]
     worktree = len(argv) >= 2 and argv[0] == "worktree"
-    migrate = argv[:2] == ["workspace", "migrate"]
     installation_init = len(argv) >= 2 and argv[0] == "installation"
     branch = len(argv) >= 2 and argv[0] == "branch" and argv[1] in ("show", "create", "switch")
     active = len(argv) >= 2 and argv[0] == "active" and argv[1] in ("set", "clear")
@@ -192,9 +181,7 @@ def _reject_retired_start(argv: list[str]) -> None:
         and not delete
         and not dependency
         and not artifact
-        and not workbench
         and not worktree
-        and not migrate
         and not installation_init
     ):
         return
@@ -208,7 +195,6 @@ def _reject_retired_start(argv: list[str]) -> None:
             name in ("--resume", "--rollback")
             or ((start or dependency) and name == "--allow-stale")
             or (worktree and name == "--recover")
-            or (migrate and name in ("--mapping-file", "--maintenance"))
         ):
             raise RetiredArgumentError(
                 f"{name} was retired; inspect the current state and issue a new explicit operation"
@@ -242,11 +228,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             "--backup-dir",
             "--scope",
             "--type",
-            "--to-worktree",
-            "--on-conflict",
             "--root",
-            "--to-schema",
-            "--to-writer-protocol",
         ):
             if not separator and index + 1 < len(argv):
                 index += 1
@@ -254,7 +236,7 @@ def _reject_retired_start(argv: list[str]) -> None:
             if start and name == "--source" and value == "cache":
                 raise RetiredArgumentError("--source cache was retired; Start uses live GitHub readiness")
             if (sync or dependency) and name == "--source" and value == "cache":
-                raise RetiredArgumentError("--source cache was retired; use local or github observations")
+                raise RetiredArgumentError("--source cache was retired; omit --source or use --source github")
             if create and name == "--backend" and value == "local":
                 raise RetiredArgumentError("--backend local was retired; new Scopes require GitHub-issued numbers")
         index += 1
@@ -504,8 +486,6 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
     _reject_retired_start(remaining)
     parser = build_vnext_parser()
     parsed = parser.parse_args(remaining)
-    if parsed.command_path == "workbench copy" and not Path(parsed.to_worktree).expanduser().is_absolute():
-        parser.error("--to-worktree requires an absolute worktree path; registered aliases were retired")
     if (
         parsed.command_path in ("worktree show", "worktree remove", "worktree bootstrap")
         and not Path(parsed.worktree_ref).expanduser().is_absolute()
@@ -531,10 +511,6 @@ def parse_vnext(argv: Sequence[str]) -> argparse.Namespace:
         parser.error("canonical accept requires paths or --deletions")
     if parsed.command_path == "branch create" and not parsed.base:
         parser.error("branch create requires --base")
-    if parsed.command_path in SOURCE_LEAVES:
-        # Legacy handlers keep receiving `local` by default; canonical mode refuses only an explicit `local`.
-        parsed.source_explicit = parsed.source is not None
-        parsed.source = parsed.source or "local"
     if not accepts_common_option(parsed.command_path, "--yes") and common.get("yes"):
         parser.error("--yes applies only to changing commands")
     for key in (*_COMMON_SWITCHES.values(), *_COMMON_VALUES.values()):

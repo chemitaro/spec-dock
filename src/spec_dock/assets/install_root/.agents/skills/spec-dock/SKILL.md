@@ -19,9 +19,9 @@ Business commands support Linux and macOS with Python 3.10+. Other operating sys
 
 Choose package update, static installation/update, or lifecycle operation according to the layer that actually owns the requested outcome. Do not describe parity between layers as proof that another layer was updated.
 
-## 仕様の扱い（canonical モード）
+## 仕様の扱い
 
-`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。3 のリポジトリでは、今までどおり、仕様もコードと一緒にコミットする。
+`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。
 
 - 仕様は `spec-dock/initiatives/` にある。普通のファイルとして読み書きする。
 - 仕様は Git で扱わない（`git add`、`commit`、`stash`、`reset`、`checkout`、`clean` を仕様に使わない）。保存と共有は、1〜2分のうちに自動で行われる。
@@ -41,14 +41,14 @@ Choose package update, static installation/update, or lifecycle operation accord
 
 ## CUE の Scope と説明資料
 
-canonical モード（`schema_version` が 4）の SpecDock 0.4.0 から、新しい Scope は CUE の Scope である。版3のリポジトリでは今までどおり Markdown の Scope を作り、`--assurance` を付けると `CANONICAL_NOT_MIGRATED` で止まる。
+SpecDock 0.4.0 から、新しい Scope は CUE の Scope である。SpecDock 0.5.0 は `schema_version` が 4 のリポジトリだけを扱い、3 のリポジトリでは、どのコマンドも `CANONICAL_NOT_MIGRATED` で止まる（移し方は `spec-dock/docs/migration.md`）。
 
 - `scope create` と `scope import github` には、`--assurance <light|standard|strict|critical>` と、空白だけでない `--assurance-reason <理由>` を必ず付ける（ないと `ASSURANCE_REQUIRED`）。レベルは失敗したときの影響と回復の難しさで選び、親の計画の切り分けで決めた値を使う。
 - 正本は `requirement.cue`、`design.cue`、`plan.cue`（`requirement.cue` があれば CUE の Scope）。保証レベルは `requirement.cue` の `assurance` だけに書き、途中で書き換えてよい。人向けの説明は `explanation.html` の Markdown に書き、雛形の印の行を消す。
 - 書いたら `spec-dock scope check <ID>` で、誤りと指摘がなくなるまで直す（`cue` v0.17.1 以上が要る）。`spec-dock scope render <ID>` で HTML に描ける。
 - 作業しながら `plan.cue` の手順の `status`（`todo`、`doing`、`done`、`dropped`）を直接書き換え、`scope check` で確かめる。専用のコマンドはない。
 - `work finish` は CUE の Scope を検査し、誤りが残れば何も書かずに `SCOPE_CHECK_FAILED` で止まる。直してから、もう一度 `work finish` を実行する。
-- 詳しくは `spec-dock/docs/authoring/cue.md`（型、番号、規則、保証レベル、コード）と `spec-dock/docs/authoring/explanation.md`（説明資料）を読む。Markdown の Scope は今までどおり `spec-dock/docs/authoring/overview.md` から書く。
+- 詳しくは `spec-dock/docs/authoring/cue.md`（型、番号、規則、保証レベル、コード）と `spec-dock/docs/authoring/explanation.md`（説明資料）を読む。0.4.0 より前に作った Markdown の Scope を直すときは `spec-dock/docs/authoring/overview.md` から書く。
 
 ## Resolve the context and target
 

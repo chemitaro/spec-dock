@@ -14,9 +14,9 @@
 - Use SpecDock commands instead of hand-editing metadata, active pointers, dependency storage, generated projections, or worktree records.
 - Keep the repository's human PR merge gate. That gate does not make `scope create/import`, Artifact creation, `work start/finish`, `scope close/reopen`, `workspace sync`, `installation update`, or other ordinary SpecDock operations human-only.
 
-## 仕様の扱い（canonical モード）
+## 仕様の扱い
 
-`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。3 のリポジトリでは、今までどおり、仕様もコードと一緒にコミットする。
+`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリでは、次に従う。
 
 - 仕様は `spec-dock/initiatives/` にある。普通のファイルとして読み書きする。
 - 仕様は Git で扱わない（`git add`、`commit`、`stash`、`reset`、`checkout`、`clean` を仕様に使わない）。保存と共有は、1〜2分のうちに自動で行われる。

@@ -256,9 +256,9 @@ def test_text_output_lists_each_failure_with_its_path_and_next_step(
 def test_a_legacy_schema_three_repository_reports_its_specs_and_declaration(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    from tests.cli_runtime.test_issue413_work_start import committed_workspace
+    from tests.cli_runtime.test_issue440_schema3_stops import unmigrated_repository
 
-    root = committed_workspace((tmp_path / "legacy").resolve())
+    root = unmigrated_repository((tmp_path / "legacy").resolve())
     code, result = _run(capsys, "--project", str(root), "canonical", "check")
     assert code == 7 and result["error"]["code"] == "CANONICAL_CHECK_FAILED"
     codes = {item["code"] for item in result["data"]["result"]["failures"]}

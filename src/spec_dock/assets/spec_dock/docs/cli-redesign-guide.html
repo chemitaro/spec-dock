@@ -27,7 +27,7 @@
 <a href="#walkthrough"><span>07</span>通常操作の流れ</a>
 <a href="#failure"><span>08</span>途中失敗を正直に扱う</a>
 <a href="#migration"><span>09</span>導入・移行・静的資産更新</a>
-<a href="#catalog"><span>10</span>全55コマンドを確認する</a>
+<a href="#catalog"><span>10</span>全53コマンドを確認する</a>
 <a href="#safety"><span>11</span>この方式が保証する範囲</a>
 <a href="#sources"><span>12</span>詳細へ進む</a></nav>
 <main><details class="mobile-nav"><summary>目次を開く</summary><nav aria-label="モバイル目次"><a href="#overview"><span>01</span>まず理解すること</a>
@@ -39,12 +39,12 @@
 <a href="#walkthrough"><span>07</span>通常操作の流れ</a>
 <a href="#failure"><span>08</span>途中失敗を正直に扱う</a>
 <a href="#migration"><span>09</span>導入・移行・静的資産更新</a>
-<a href="#catalog"><span>10</span>全55コマンドを確認する</a>
+<a href="#catalog"><span>10</span>全53コマンドを確認する</a>
 <a href="#safety"><span>11</span>この方式が保証する範囲</a>
 <a href="#sources"><span>12</span>詳細へ進む</a></nav></details>
 <section id="overview" aria-labelledby="overview-title"><div class="section-label">01</div><h2 id="overview-title">まず理解すること</h2><p class="intro">SpecDockは、GitHub Issueに結び付いた仕様をInitiative・Epic・Issueの三階層で扱うCLIです。実行プログラムは通常のPython packageとしてworktree外に導入し、各作業場には仕様と最小限の作業記録を置きます。</p>
 <p>対応OSはLinuxとmacOS、Pythonは3.10以上です。他のOSでは業務コマンドを開始せず、変更前に<code>UNSUPPORTED_PLATFORM</code>（終了値3）を返します。help・version・completionは、repositoryや業務用のOS機能に依存せず利用できます。</p>
-<div class="cards"><article class="card"><h3>仕様の正本</h3><p>Requirement・Design・PlanはGitで共有する一次仕様です。Reportは実施・検証の記録、Artifactは採用前も含む証拠です。</p></article><article class="card"><h3>Scopeの番号</h3><p>新規Scopeは必ずGitHubを使います。GitHubが発行した番号を既存のIDに使い、UUIDやオフライン用の新しい連番を追加しません。</p></article><article class="card"><h3>現在の作業</h3><p>一つのworktreeの直接対象は同時に一件です。親Epic・Initiativeは文脈や集計であり、別の作業を暗黙に開始しません。</p></article><article class="card"><h3>並行作業の観測</h3><p>Gitが列挙する同じcloneのmainとlinked worktreeを必要時に読みます。別clone、別PC、Codexのプロセスは探索しません。</p></article></div>
+<div class="cards"><article class="card"><h3>仕様の正本</h3><p>Requirement・Design・Planは一次仕様で、clone ごとのカタログ（<code>spec-dock/canonical</code> ブランチ）に置かれ、自動で保存・共有されます。Scopeの題名・種類・親子・依存の正本はGitHubです。Reportは実施・検証の記録、Artifactは採用前も含む証拠です。</p></article><article class="card"><h3>Scopeの番号</h3><p>新規Scopeは必ずGitHubを使います。GitHubが発行した番号を既存のIDに使い、UUIDやオフライン用の新しい連番を追加しません。</p></article><article class="card"><h3>現在の作業</h3><p>一つのworktreeの直接対象は同時に一件です。親Epic・Initiativeは文脈や集計であり、別の作業を暗黙に開始しません。</p></article><article class="card"><h3>並行作業の観測</h3><p>Gitが列挙する同じcloneのmainとlinked worktreeを必要時に読みます。別clone、別PC、Codexのプロセスは探索しません。</p></article></div>
 <p>正確な引数は導入版の<code>spec-dock help COMMAND</code>と各leafの<code>--help</code>で確認できます。本書は外部CLI・直接対象方式の操作を説明します。実装、テスト、レビュー、PR、mergeはそれぞれ独立した完了証拠です。</p>
 </section>
 <section id="engine" aria-labelledby="engine-title"><div class="section-label">02</div><h2 id="engine-title">実行プログラムとGitの役割</h2><p>ここでいう「engine」はCLIを実行するPythonプログラムです。常駐サービスや中央の状態管理サーバーを追加する意味ではありません。package managerでworktree外に導入した一つの実行環境を、どのworktreeからも呼び出します。</p>
@@ -54,7 +54,8 @@
 </section>
 <section id="storage" aria-labelledby="storage-title"><div class="section-label">03</div><h2 id="storage-title">何をどこへ置くか</h2><div class="table-scroll" tabindex="0"><table><thead><tr><th scope="col">情報</th><th scope="col">置き場所・権威</th><th scope="col">扱い</th></tr></thead><tbody>
 <tr><td>CLIのPython実装</td><td>worktree外の通常package</td><td>checkoutやmain worktreeのcontrolに依存しません。</td></tr>
-<tr><td>仕様・metadata・Report</td><td>各checkoutのspec-dock配下</td><td>Gitで共有する一次情報です。既存ID/path/linkageを保持します。</td></tr>
+<tr><td>仕様・Report・Artifact</td><td>カタログ（<code>spec-dock/initiatives/&lt;区切り&gt;/&lt;ID&gt;/</code> の先、<code>spec-dock/canonical</code> ブランチ）</td><td>コードのブランチには入れず、定期の同期が保存・共有します。</td></tr>
+<tr><td>Scopeの題名・種類・親子・依存</td><td>GitHub Issue（種類のラベル、sub-issue、blocked-by）</td><td>SpecDockのコマンドだけで変えます。表示は構造のスナップショットから読みます。</td></tr>
 <tr><td>Scopeの番号・GitHub完了状態</td><td>GitHub</td><td>新規作成はオンラインです。観測できない状態はunknownです。</td></tr>
 <tr><td>直接作業対象</td><td><code>spec-dock/.agent/work-target/</code></td><td>自身のworktreeだけ、ignoredで0または1件。開始時のbranchとScopeを記録します。</td></tr>
 <tr><td>文書・template・skill・shim</td><td>明示したworktreeの静的資産</td><td>packageが持つ既知path/hashに基づいて導入・更新します。</td></tr>
@@ -73,7 +74,7 @@
 <tr><td>Artifact / Workbench</td><td>Artifactは証拠、Workbenchはignoredの一時作業です。作成・import・一回copyだけで正本や採用済み判断にはなりません。</td></tr>
 <tr><td>partial / unknown</td><td>一部効果が成立した、または成否を確定できない状態です。成功・未実施と区別します。</td></tr>
 </tbody></table></div>
-<p>GitHubと結び付いた古いlocal綴りのIDは改名しません。既存true-local metadataの読取・Finish互換性も保持しますが、新規local Scopeやオフライン作成を許すものではありません。</p>
+<p>新規local Scopeやオフライン作成はありません。Scopeの題名、種類、親子、依存の正本はGitHubです。</p>
 </section>
 <section id="selectors" aria-labelledby="selectors-title"><div class="section-label">05</div><h2 id="selectors-title">対象を正確に指定する</h2><p>Scope ID、GitHub番号/ref/URL、現在の直接対象に基づくdynamic selectorを使います。曖昧な番号、未選択、stale、親チェーン不整合から変更対象を推測しません。必要なら<code>scope show TARGET</code>で明示対象を読みます。</p>
 <p><code>--project ABS</code>は正確なGit worktree rootです。worktree show/remove/bootstrapやinstallationの対象も実体の絶対pathで指定します。独自alias台帳を作りません。同じremote URLでも別cloneはこの観測範囲に含めません。</p>
@@ -94,7 +95,7 @@ spec-dock workspace sync --source github --json
 # 実装・検証・レビューと必要な提出を別途完了する
 spec-dock work finish ISSUE_ID --yes --json</code></pre>
 <p>一つのworktreeでIssue AをFinishした後、Issue BをStartする連続利用は可能です。A/Bを同時に直接選択することはできません。同じEpic配下の異なるIssueを別worktreeで開始すれば、Syncが各予約と祖先件数を集計します。</p>
-<p>Syncの既定sourceはlocalです。GitHubを読んでいなければGitHub状態はunknownです。<code>--source github</code>を明示すると現在状態を照会します。出力の<code>data.complete</code>とfindingsを読み、<code>process_state=not_observed</code>を実行中の証拠にしません。</p>
+<p>Syncの既定は構造のスナップショット（GitHubの構造の写し）を読みます。<code>--source github</code>を明示すると、確かめを待たずに取り直してから観測します。出力の<code>data.complete</code>とfindingsを読み、<code>process_state=not_observed</code>を実行中の証拠にしません。</p>
 </section>
 <section id="failure" aria-labelledby="failure-title"><div class="section-label">08</div><h2 id="failure-title">途中失敗を正直に扱う</h2><p>新しい永続journalやresume/rollback操作はありません。実体、Gitの原文エラー、返されたeffects、残った候補とbackupを確認してから、次の明示操作を判断します。自動checkout、branch削除、reset、stash等による巻戻しを行いません。</p>
 <div class="table-scroll" tabindex="0"><table><thead><tr><th scope="col">終了値</th><th scope="col">意味</th><th scope="col">確認すること</th></tr></thead><tbody>
@@ -115,40 +116,37 @@ spec-dock work finish ISSUE_ID --yes --json</code></pre>
 spec-dock installation init /absolute/project --yes --json
 spec-dock installation show --target /absolute/project --json</code></pre>
 <p>initは明示した一つのGit worktreeに文書・template・skill・shimとworkspace宣言を置きます。既存の配布先fileがあれば書込み前に停止します。Python runtime、直接記録、Git内の独自領域は作りません。</p>
-<p>旧schema3 writerの移行では、旧writerと自動起動を停止し、仕様・ignored成果物・旧Git独自領域を含む実体の外部保全と復元確認を先行します。raw doctorで分類し、自workspace宣言だけを新protocolへ切り替えます。旧activeを新しい予約へ取り込みません。</p>
-<pre><code>spec-dock --project /absolute/project workspace doctor --raw --legacy --json
-spec-dock --project /absolute/project workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --dry-run --json
-spec-dock --project /absolute/project workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 --backup-dir /absolute/new-migration-backup --confirm-old-writers-stopped --yes --json
-spec-dock installation update --target /absolute/project --backup-dir /absolute/new-static-backup --yes --json</code></pre>
-<p>static updateは現在/既知旧hashだけを更新し、既知旧runtime filesを一件ずつ退役させます。ユーザー改変はmanual mergeへ戻します。backupには変更する旧bytes/modeだけを保存し、独立した一時場所へ復元して比較します。directory単位の削除はしません。</p>
-<p>uninstallは正確な対象とtool資産削除の明示許可がある場合だけ使います。既知static filesを保全して削除し、workspace、ignore規則、仕様、Artifact、Workbench、直接記録、未知file、directoryを残します。schema3未満、未知protocol、旧writer停止未確認は適用対象にしません。</p>
+<p>版3の宣言のリポジトリは、SpecDock 0.4.2 を入れ直し、版のタグ <code>v0.4.2</code> の <code>scripts/migrate-to-canonical/README.md</code> の手順で移してから、0.5.0 で扱います（<a href="migration.md">導入・移行・保全</a>）。</p>
+<pre><code>spec-dock installation update --target /absolute/project --backup-dir /absolute/new-static-backup --yes --json</code></pre>
+<p>static updateは現在/既知旧hashだけを更新し、既知旧runtime filesと外した雛形を一件ずつ退役させます。ユーザー改変はmanual mergeへ戻します。backupには変更する旧bytes/modeだけを保存し、独立した一時場所へ復元して比較します。directory単位の削除はしません。</p>
+<p>uninstallは正確な対象とtool資産削除の明示許可がある場合だけ使います。既知static filesを保全して削除し、workspace、ignore規則、仕様、Artifact、Workbench、直接記録、未知file、directoryを残します。版4でない宣言と未知protocolは適用対象にしません。</p>
 <p>詳しい条件は<a href="migration.md">導入・移行・保全</a>で確認できます。旧engineの実行、Git controlの更新、journal replay、全worktree一括書換えを移行手順に戻しません。</p>
 </section>
-<section id="catalog" aria-labelledby="catalog-title"><div class="section-label">10</div><h2 id="catalog-title">全55コマンドを確認する</h2><p>C45〜C55（<code>scope move</code>、<code>scope check</code>、<code>scope render</code> を含む）は、宣言の版4（canonical モード。仕様の構造を GitHub Issue に、中身を <code>spec-dock/canonical</code> ブランチに置く形）のためのコマンドです。使い方、ツールの設定の1行、エラーと次の1手は<a href="canonical.md">canonical モードの使い方</a>にあります。</p><p><code>--project ABS</code>は正確なworktree root、<code>--json</code>は<code>specdock.cli/v2</code>のenvelopeです。必要な変更確認は<code>--yes</code>、保全先は新しい<code>--backup-dir ABS</code>で指定します。optional表記でもapplyで必須になる条件があるため、現在helpと結果を読みます。</p>
-<div class="table-scroll wide" tabindex="0" aria-label="全55コマンド。左右にスクロールできます。"><table><thead><tr><th scope="col">ID</th><th scope="col">コマンド</th><th scope="col">引数・固有option</th><th scope="col">対象と効果</th><th scope="col">副作用</th></tr></thead><tbody><tr><td>C01</td><td><code>scope create initiative</code></td><td><code>--backend github --title TITLE [--slug SLUG] [--assurance LEVEL --assurance-reason TEXT]</code>（schema4では必須）</td><td>GitHubで番号を発行してInitiativeを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
-<tr><td>C02</td><td><code>scope create epic</code></td><td><code>--backend github --parent TARGET --title TITLE [--slug SLUG] [--assurance LEVEL --assurance-reason TEXT]</code>（schema4では必須）</td><td>明示したInitiativeの下にEpicを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
-<tr><td>C03</td><td><code>scope create issue</code></td><td><code>--backend github --parent TARGET --title TITLE [--slug SLUG] [--assurance LEVEL --assurance-reason TEXT]</code>（schema4では必須）</td><td>明示したEpicの下にIssueを作ります。</td><td>GitHub作成、ローカルScope</td></tr>
-<tr><td>C04</td><td><code>scope import github initiative</code></td><td><code>GITHUB_REF --title TITLE [--slug SLUG] [--github-repo OWNER/REPO] [--assurance LEVEL --assurance-reason TEXT]</code>（schema4では必須）</td><td>既存Issueを確認してInitiativeへ取り込みます。</td><td>GitHub読取り、ローカルScope</td></tr>
-<tr><td>C05</td><td><code>scope import github epic</code></td><td><code>GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO] [--assurance LEVEL --assurance-reason TEXT]</code>（schema4では必須）</td><td>既存IssueをEpicへ取り込みます。</td><td>GitHub読取り、ローカルScope</td></tr>
-<tr><td>C06</td><td><code>scope import github issue</code></td><td><code>GITHUB_REF --parent TARGET --title TITLE [--slug SLUG] [--github-repo OWNER/REPO] [--assurance LEVEL --assurance-reason TEXT]</code>（schema4では必須）</td><td>既存IssueをIssue Scopeへ取り込みます。</td><td>GitHub読取り、ローカルScope</td></tr>
-<tr><td>C07</td><td><code>scope list</code></td><td><code>[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]</code></td><td>現在treeのScopeを表示します。</td><td>読取りのみ</td></tr>
-<tr><td>C08</td><td><code>scope show</code></td><td><code>TARGET</code></td><td>metadata、親子、未観測を含む状態を表示します。</td><td>読取りのみ</td></tr>
-<tr><td>C09</td><td><code>scope edit</code></td><td><code>TARGET --title TITLE</code></td><td>titleだけを変更し、ID/linkageを保ちます。</td><td>metadata</td></tr>
-<tr><td>C10</td><td><code>scope close</code></td><td><code>TARGET [--reason {completed,not-planned}]</code></td><td>対象backendを閉じます。reason既定はcompletedです。</td><td>GitHub状態、既存local互換状態</td></tr>
-<tr><td>C11</td><td><code>scope reopen</code></td><td><code>TARGET</code></td><td>対象だけをopenへ戻します。</td><td>GitHub状態、既存local互換状態</td></tr>
-<tr><td>C12</td><td><code>scope delete</code></td><td><code>TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]</code></td><td>明示したローカルsubtreeだけを保全・削除します。GitHub/branchは削除しません。</td><td>backup、明示対象</td></tr>
+<section id="catalog" aria-labelledby="catalog-title"><div class="section-label">10</div><h2 id="catalog-title">全53コマンドを確認する</h2><p>SpecDock 0.5.0 は宣言の版4（canonical モード。仕様の構造を GitHub Issue に、中身を <code>spec-dock/canonical</code> ブランチに置く形）だけを扱います。版3の宣言では、<code>canonical check</code> のほかのどのコマンドも <code>CANONICAL_NOT_MIGRATED</code> で止まります。C43〜C50 は canonical のカタログと同期のコマンドです。使い方、ツールの設定の1行、エラーと次の1手は<a href="canonical.md">canonical モードの使い方</a>にあります。</p><p><code>--project ABS</code>は正確なworktree root、<code>--json</code>は<code>specdock.cli/v2</code>のenvelopeです。必要な変更確認は<code>--yes</code>、保全先は新しい<code>--backup-dir ABS</code>で指定します。optional表記でもapplyで必須になる条件があるため、現在helpと結果を読みます。</p>
+<div class="table-scroll wide" tabindex="0" aria-label="全53コマンド。左右にスクロールできます。"><table><thead><tr><th scope="col">ID</th><th scope="col">コマンド</th><th scope="col">引数・固有option</th><th scope="col">対象と効果</th><th scope="col">副作用</th></tr></thead><tbody><tr><td>C01</td><td><code>scope create initiative</code></td><td><code>--backend github --title TITLE --assurance LEVEL --assurance-reason TEXT</code></td><td>GitHubで番号を発行してInitiativeを作り、<code>templates/cue/initiative/</code>からカタログに置きます。</td><td>GitHub作成、カタログのScope</td></tr>
+<tr><td>C02</td><td><code>scope create epic</code></td><td><code>--backend github --parent TARGET --title TITLE --assurance LEVEL --assurance-reason TEXT</code></td><td>明示したInitiativeの下にEpicを作ります。</td><td>GitHub作成、カタログのScope</td></tr>
+<tr><td>C03</td><td><code>scope create issue</code></td><td><code>--backend github --parent TARGET --title TITLE --assurance LEVEL --assurance-reason TEXT</code></td><td>明示したEpicの下にIssueを作ります。</td><td>GitHub作成、カタログのScope</td></tr>
+<tr><td>C04</td><td><code>scope import github initiative</code></td><td><code>GITHUB_REF --title TITLE [--github-repo OWNER/REPO] --assurance LEVEL --assurance-reason TEXT</code>（<code>--title</code>は使わずGitHubの題名で進めます）</td><td>既存Issueを確認してInitiativeへ取り込みます（足りない種類のラベル、親子、カタログのディレクトリだけを足します）。</td><td>GitHubのラベル・親子、カタログのScope</td></tr>
+<tr><td>C05</td><td><code>scope import github epic</code></td><td><code>GITHUB_REF --parent TARGET --title TITLE [--github-repo OWNER/REPO] --assurance LEVEL --assurance-reason TEXT</code>（同上）</td><td>既存IssueをEpicへ取り込みます。</td><td>GitHubのラベル・親子、カタログのScope</td></tr>
+<tr><td>C06</td><td><code>scope import github issue</code></td><td><code>GITHUB_REF --parent TARGET --title TITLE [--github-repo OWNER/REPO] --assurance LEVEL --assurance-reason TEXT</code>（同上）</td><td>既存IssueをIssue Scopeへ取り込みます。</td><td>GitHubのラベル・親子、カタログのScope</td></tr>
+<tr><td>C07</td><td><code>scope list</code></td><td><code>[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]</code></td><td>構造のスナップショットのScopeを、カタログの場所とともに表示します。</td><td>読取りのみ</td></tr>
+<tr><td>C08</td><td><code>scope show</code></td><td><code>TARGET</code></td><td>GitHubの題名、親子、状態、カタログの場所、保証レベルを表示します。</td><td>読取りのみ</td></tr>
+<tr><td>C09</td><td><code>scope edit</code></td><td><code>TARGET --title TITLE</code></td><td>GitHub Issueの題名だけを変更し、ID、ディレクトリ、branchを保ちます。</td><td>GitHubの題名</td></tr>
+<tr><td>C10</td><td><code>scope close</code></td><td><code>TARGET [--reason {completed,not-planned}]</code></td><td>対象のGitHub Issueを閉じます。reason既定はcompletedです。</td><td>GitHub状態</td></tr>
+<tr><td>C11</td><td><code>scope reopen</code></td><td><code>TARGET</code></td><td>対象だけをopenへ戻します。</td><td>GitHub状態</td></tr>
+<tr><td>C12</td><td><code>scope delete</code></td><td><code>TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]</code></td><td>種類のラベルと親子（と、明示すれば依存）を外し、保全してからカタログのディレクトリを削除します。Issueとbranchは消しません。</td><td>GitHubのラベル・親子、backup、カタログ</td></tr>
 <tr><td>C13</td><td><code>active show</code></td><td>共通optionのみ</td><td>一つの直接記録と現在の祖先を表示します。</td><td>読取りのみ</td></tr>
 <tr><td>C14</td><td><code>active set</code></td><td><code>TARGET</code></td><td>現在の妥当な直接対象と同じなら選択はunchangedで、ずれた閲覧用active linkだけを揃えます。空/別対象はWORK_START_REQUIREDで停止します。</td><td>active linkのみ</td></tr>
 <tr><td>C15</td><td><code>active clear</code></td><td><code>--from TARGET</code> または <code>--all</code></td><td>捕捉した直接記録だけを解除し、未選択ならactive linkをfallbackへ揃えます。</td><td>selection、active link</td></tr>
-<tr><td>C16</td><td><code>work start</code></td><td><code>TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]</code></td><td>live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行い、排他の後でactive linkを揃えます。</td><td>Git、worktree局所selection、active link</td></tr>
-<tr><td>C17</td><td><code>work finish</code></td><td><code>TARGET</code></td><td>完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。</td><td>GitHub完了、selection、active link</td></tr>
+<tr><td>C16</td><td><code>work start</code></td><td><code>TARGET [--branch NAME] [--base REF] [--switch-active] [--source github]</code></td><td>live readiness後、短い排他内で重複再確認・branch作成/checkout・直接対象公開を行い、排他の後でactive linkを揃えます。schema4の既定branch名は<code>&lt;ID&gt;</code>で、作業中の印を付け、別のPCの印があれば警告<code>SCOPE_IN_PROGRESS</code>を返します。</td><td>Git、worktree局所selection、active link</td></tr>
+<tr><td>C17</td><td><code>work finish</code></td><td><code>TARGET</code></td><td>完了確認後に捕捉selectionだけ解除し、branchに留まります。解除したらactive linkをfallbackへ揃えます。閉じる前に仕様の保存とpushを最大180秒待ち、確かめられなければ<code>CANONICAL_SAVE_UNCONFIRMED</code>で閉じずに止まります。</td><td>GitHub完了、selection、active link</td></tr>
 <tr><td>C18</td><td><code>branch show</code></td><td><code>TARGET [--name NAME]</code></td><td>現在のref/占有を観測します。対応台帳は保存しません。</td><td>読取りのみ</td></tr>
 <tr><td>C19</td><td><code>branch create</code></td><td><code>TARGET [--name NAME] --base REF</code></td><td>固定baseからbranchを作り、checkoutしません。既存refをresetしません。</td><td>Git ref</td></tr>
 <tr><td>C20</td><td><code>branch switch</code></td><td><code>TARGET [--name NAME]</code></td><td>同cloneのStart lock内でbranchへcheckoutし、selection取得/解除は行いません。lockを--lock-timeout内に取れなければSTART_LOCK_BUSYで止まります。</td><td>Gitのみ</td></tr>
 <tr><td>C21</td><td><code>dependency list</code></td><td><code>TARGET [--view {declared,effective}]</code></td><td>宣言/継承依存を表示します。</td><td>読取りのみ</td></tr>
-<tr><td>C22</td><td><code>dependency check</code></td><td><code>TARGET [--source {local,github}]</code></td><td>readinessと根拠を観測します。既定local、未観測GitHubはunknownです。</td><td>読取りのみ</td></tr>
-<tr><td>C23</td><td><code>dependency add</code></td><td><code>--from TARGET --to TARGET</code></td><td>fromがtoを前提とするedgeを追加します。重複はunchangedです。</td><td>metadata</td></tr>
-<tr><td>C24</td><td><code>dependency remove</code></td><td><code>--from TARGET --to TARGET [--missing-ok]</code></td><td>指定edgeを除きます。</td><td>metadata</td></tr>
+<tr><td>C22</td><td><code>dependency check</code></td><td><code>TARGET [--source github]</code></td><td>readinessと根拠を観測します。既定は構造のスナップショット、<code>--source github</code>は取り直してから判定します。</td><td>読取りのみ</td></tr>
+<tr><td>C23</td><td><code>dependency add</code></td><td><code>--from TARGET --to TARGET</code></td><td>fromがtoを前提とするblocked-byをGitHubに足します。重複はunchangedです。</td><td>GitHubの依存</td></tr>
+<tr><td>C24</td><td><code>dependency remove</code></td><td><code>--from TARGET --to TARGET [--missing-ok]</code></td><td>指定のblocked-byをGitHubから外します。</td><td>GitHubの依存</td></tr>
 <tr><td>C25</td><td><code>artifact create</code></td><td><code>--scope ARTIFACT_SCOPE --type {blank,research,interview,disc,decision-candidate,adr} --title TITLE [--slug SLUG]</code></td><td>templateから一件のMarkdownをno-replace公開します。</td><td>Artifact</td></tr>
 <tr><td>C26</td><td><code>artifact import file</code></td><td><code>PATH --scope ARTIFACT_SCOPE</code></td><td>一件のregular fileをopaque evidenceとして保存します。</td><td>Artifact</td></tr>
 <tr><td>C27</td><td><code>artifact list</code></td><td><code>--scope ARTIFACT_SCOPE</code></td><td>識別情報だけを一覧表示します。</td><td>読取りのみ</td></tr>
@@ -158,29 +156,28 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 <tr><td>C31</td><td><code>worktree show</code></td><td><code>ABS</code></td><td>一つのnative worktreeを表示します。</td><td>読取りのみ</td></tr>
 <tr><td>C32</td><td><code>worktree remove</code></td><td><code>ABS [--unlock] [--discard-ignored]</code></td><td>明示作業場を除去し、branchを残します。</td><td>native Git、対象directory</td></tr>
 <tr><td>C33</td><td><code>worktree bootstrap</code></td><td><code>ABS</code></td><td>project-owned make initを一回実行します。</td><td>任意project処理</td></tr>
-<tr><td>C34</td><td><code>workbench copy</code></td><td><code>--scope TARGET --to-worktree ABS [--on-conflict {error,overwrite}]</code></td><td>同じScopeの一時作業を一回コピーします。</td><td>宛先Workbench</td></tr>
-<tr><td>C35</td><td><code>workspace sync</code></td><td><code>[--source {local,github}] [--allow-invalid]</code></td><td>複数WTの予約・論理active・祖先とlifecycleを都度観測します。</td><td>読取りのみ</td></tr>
-<tr><td>C36</td><td><code>workspace validate</code></td><td><code>[--require-nodes] [--ci]</code></td><td>working treeまたは固定HEADの構造を検証します。</td><td>読取りのみ</td></tr>
-<tr><td>C37</td><td><code>workspace doctor</code></td><td><code>[--raw] [--legacy] [--github-repo OWNER/REPO --github-pr NUMBER --github-head-sha SHA] [--github-extended]</code></td><td>明示した現在/旧状態・capabilityをread-only診断します。</td><td>読取り、明示時GitHub照会</td></tr>
-<tr><td>C38</td><td><code>workspace migrate</code></td><td><code>--to-schema 3 --to-writer-protocol specdock.worktree-writer/v1 [--backup-dir ABS] [--confirm-old-writers-stopped]</code></td><td>一つのschema3 workspace宣言だけを保全・切替します。</td><td>外部backup、workspace宣言</td></tr>
-<tr><td>C39</td><td><code>installation show</code></td><td><code>[--target ABS]</code></td><td>package版と一つのWTのstatic資産分類を表示します。</td><td>読取りのみ</td></tr>
-<tr><td>C40</td><td><code>installation init</code></td><td><code>ABS</code></td><td>未導入WTへ静的資産と新writer宣言を置きます。</td><td>static資産、workspace</td></tr>
-<tr><td>C41</td><td><code>installation update</code></td><td><code>[--target ABS] [--backup-dir ABS]</code></td><td>既知static資産だけを保全して更新・個別退役します。</td><td>外部backup、static資産</td></tr>
-<tr><td>C42</td><td><code>installation uninstall</code></td><td><code>[--target ABS] [--backup-dir ABS]</code></td><td>既知static資産だけを保全・削除し、workspace/ignore/ユーザー成果を残します。</td><td>外部backup、static資産</td></tr>
-<tr><td>C43</td><td><code>help</code></td><td><code>[COMMAND PATH]</code></td><td>現在helpを表示します。repository不要です。</td><td>出力のみ</td></tr>
-<tr><td>C44</td><td><code>completion</code></td><td><code>{bash,zsh,fish}</code></td><td>補完をstdoutへ返し、shell設定を変更しません。</td><td>出力のみ</td></tr>
-<tr><td>C45</td><td><code>canonical check</code></td><td><code>[--commit REV]</code></td><td>指定commit（既定HEAD）のtreeに仕様のpath・<code>.meta.json</code>がなく、版4の宣言・static資産・ignore規則が揃うかをCI向けに検査します。問題はpathと次の1手付きでexit7です。workflow見本は <code>docs/ci/spec-dock-check.yml</code> です。</td><td>読取りのみ</td></tr>
-<tr><td>C46</td><td><code>canonical link</code></td><td><code>[--no-schedule]</code></td><td>schema4で、このcloneのカタログ（mainの<code>spec-dock/.canonical</code>）を探すか作ってlockし、除外の3行を足し、mainとこのチェックアウトの<code>spec-dock/initiatives</code>をカタログへのリンクにし、定期の同期に登録します（登録簿、定期の実行、基準）。<code>--no-schedule</code> は登録せず基準だけを記録します。何度実行しても同じ結果です。</td><td>カタログのworktree、<code>info/exclude</code>、リンク、状態の置き場、定期の実行</td></tr>
-<tr><td>C47</td><td><code>canonical status</code></td><td>共通optionのみ</td><td>schema4で、カタログ、リンク、除外、読み書きの可否、ツールの設定の1行、定期の同期、未保存と保留、形式、git、構造のスナップショットを示し、問題ごとに次の1手を示します。GitHubに問い合わせません。</td><td>読取りのみ</td></tr>
-<tr><td>C48</td><td><code>canonical sync</code></td><td><code>[--registered] [--state-root PATH] [--loop [--detach]]</code></td><td>カタログの保存、取り込み、pushを1回行います（強制pushしません）。<code>--registered</code> は登録簿のすべてのカタログを処理し、<code>--loop</code> はsystemdのない環境の常駐のプロセスとして60秒ごとに動きます。日常は定期の実行が動かします。</td><td>カタログのcommit、push、状態の置き場</td></tr>
-<tr><td>C49</td><td><code>canonical accept</code></td><td><code>[PATH...] [--deletions]</code></td><td>保留した変更（秘密情報らしいもの、大きすぎるファイル、大量の削除）を、次の同期で保存してよいと記録します。中身が変われば効きません。</td><td><code>.runtime/accepted.json</code></td></tr>
-<tr><td>C50</td><td><code>canonical restore</code></td><td><code>[PATH...]</code></td><td>保留中のパス（パスなしは保留中の削除）を、カタログのHEADの内容に戻します。commitしません。</td><td>カタログの作業ツリー</td></tr>
-<tr><td>C51</td><td><code>canonical resume</code></td><td><code>--adopt-remote</code> | <code>--push-local</code></td><td>一時停止したカタログの同期を、利用者が決めた扱いで再開します。</td><td>状態の置き場、<code>--push-local</code> はpush</td></tr>
-<tr><td>C52</td><td><code>canonical remove</code></td><td><code>[--yes]</code></td><td>未保存と未pushがないことを確かめてから、このcloneのリンク、カタログ、除外、定期の同期の登録を外します。ブランチは消しません。</td><td>リンク、カタログ、<code>info/exclude</code>、状態の置き場、定期の実行</td></tr>
-<tr><td>C53</td><td><code>scope move</code></td><td><code>TARGET --parent TARGET</code></td><td>schema4で、ScopeのGitHubの親だけを付け替えます（sub-issueの<code>replace_parent</code>）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば<code>spec-dock/active</code>のリンクを整えます。schema3では<code>CANONICAL_NOT_MIGRATED</code>で止まります。</td><td>GitHubの親子、active link</td></tr>
-<tr><td>C54</td><td><code>scope check</code></td><td><code>TARGET</code></td><td>schema4で、1つのScopeの仕様をインターネットなしで検査します。CUEのScopeは型と一緒に<code>cue</code>（v0.17.1以上）で評価し、形の誤り、つながりの指摘、説明資料の形を、ファイルと直し方つきで示します。誤りがあれば終了コード7。MarkdownのScopeは<code>checked=false</code>で成功します。</td><td>読取りのみ</td></tr>
-<tr><td>C55</td><td><code>scope render</code></td><td><code>TARGET</code></td><td>schema4で、1つのCUEのScopeの要件・設計・計画を、インターネットなしでHTMLに描き、標準出力に出します。検査の結果をページの初めに示し、要件、設計、手順、テストを番号のリンクで結びます。MarkdownのScopeは終了コード7。</td><td>読取りのみ</td></tr></tbody></table></div>
-<p>worktree createはroot/NAMEとworktree/NAME branchを作ります。project-owned <code>make init</code>はbootstrapで別に一回実行します。workbench copyも一回のcopyで、常時同期ではありません。worktree removeはnative Gitのguardを守り、branchを残します。</p>
+<tr><td>C34</td><td><code>workspace sync</code></td><td><code>[--source github] [--allow-invalid]</code></td><td>複数WTの予約・論理active・祖先とlifecycleを都度観測します。</td><td>読取りのみ</td></tr>
+<tr><td>C35</td><td><code>workspace validate</code></td><td><code>[--require-nodes]</code></td><td>構造のスナップショットとカタログのディレクトリ・文書を照らして検証します。CIでは<code>canonical check</code>を使います。</td><td>読取りのみ</td></tr>
+<tr><td>C36</td><td><code>workspace doctor</code></td><td><code>[--raw] [--legacy] [--github-repo OWNER/REPO --github-pr NUMBER --github-head-sha SHA] [--github-extended]</code></td><td>明示した現在/旧状態・capabilityをread-only診断します。</td><td>読取り、明示時GitHub照会</td></tr>
+<tr><td>C37</td><td><code>installation show</code></td><td><code>[--target ABS]</code></td><td>package版と一つのWTのstatic資産分類を表示します。</td><td>読取りのみ</td></tr>
+<tr><td>C38</td><td><code>installation init</code></td><td><code>ABS</code></td><td>未導入WTへ静的資産と新writer宣言を置きます。</td><td>static資産、workspace</td></tr>
+<tr><td>C39</td><td><code>installation update</code></td><td><code>[--target ABS] [--backup-dir ABS]</code></td><td>既知static資産だけを保全して更新・個別退役します。</td><td>外部backup、static資産</td></tr>
+<tr><td>C40</td><td><code>installation uninstall</code></td><td><code>[--target ABS] [--backup-dir ABS]</code></td><td>既知static資産だけを保全・削除し、workspace/ignore/ユーザー成果を残します。</td><td>外部backup、static資産</td></tr>
+<tr><td>C41</td><td><code>help</code></td><td><code>[COMMAND PATH]</code></td><td>現在helpを表示します。repository不要です。</td><td>出力のみ</td></tr>
+<tr><td>C42</td><td><code>completion</code></td><td><code>{bash,zsh,fish}</code></td><td>補完をstdoutへ返し、shell設定を変更しません。</td><td>出力のみ</td></tr>
+<tr><td>C43</td><td><code>canonical check</code></td><td><code>[--commit REV]</code></td><td>指定commit（既定HEAD）のtreeに仕様のpath・<code>.meta.json</code>がなく、版4の宣言・static資産・ignore規則が揃うかをCI向けに検査します。問題はpathと次の1手付きでexit7です。workflow見本は <code>docs/ci/spec-dock-check.yml</code> です。</td><td>読取りのみ</td></tr>
+<tr><td>C44</td><td><code>canonical link</code></td><td><code>[--no-schedule]</code></td><td>このcloneのカタログ（mainの<code>spec-dock/.canonical</code>）を探すか作ってlockし、除外の3行を足し、mainとこのチェックアウトの<code>spec-dock/initiatives</code>をカタログへのリンクにし、定期の同期に登録します（登録簿、定期の実行、基準）。<code>--no-schedule</code> は登録せず基準だけを記録します。何度実行しても同じ結果です。</td><td>カタログのworktree、<code>info/exclude</code>、リンク、状態の置き場、定期の実行</td></tr>
+<tr><td>C45</td><td><code>canonical status</code></td><td>共通optionのみ</td><td>カタログ、リンク、除外、読み書きの可否、ツールの設定の1行、定期の同期、未保存と保留、形式、git、構造のスナップショットを示し、問題ごとに次の1手を示します。GitHubに問い合わせません。</td><td>読取りのみ</td></tr>
+<tr><td>C46</td><td><code>canonical sync</code></td><td><code>[--registered] [--state-root PATH] [--loop [--detach]]</code></td><td>カタログの保存、取り込み、pushを1回行います（強制pushしません）。<code>--registered</code> は登録簿のすべてのカタログを処理し、<code>--loop</code> はsystemdのない環境の常駐のプロセスとして60秒ごとに動きます。日常は定期の実行が動かします。</td><td>カタログのcommit、push、状態の置き場</td></tr>
+<tr><td>C47</td><td><code>canonical accept</code></td><td><code>[PATH...] [--deletions]</code></td><td>保留した変更（秘密情報らしいもの、大きすぎるファイル、大量の削除）を、次の同期で保存してよいと記録します。中身が変われば効きません。</td><td><code>.runtime/accepted.json</code></td></tr>
+<tr><td>C48</td><td><code>canonical restore</code></td><td><code>[PATH...]</code></td><td>保留中のパス（パスなしは保留中の削除）を、カタログのHEADの内容に戻します。commitしません。</td><td>カタログの作業ツリー</td></tr>
+<tr><td>C49</td><td><code>canonical resume</code></td><td><code>--adopt-remote</code> | <code>--push-local</code></td><td>一時停止したカタログの同期を、利用者が決めた扱いで再開します。</td><td>状態の置き場、<code>--push-local</code> はpush</td></tr>
+<tr><td>C50</td><td><code>canonical remove</code></td><td><code>[--yes]</code></td><td>未保存と未pushがないことを確かめてから、このcloneのリンク、カタログ、除外、定期の同期の登録を外します。ブランチは消しません。</td><td>リンク、カタログ、<code>info/exclude</code>、状態の置き場、定期の実行</td></tr>
+<tr><td>C51</td><td><code>scope move</code></td><td><code>TARGET --parent TARGET</code></td><td>ScopeのGitHubの親だけを付け替えます（sub-issueの<code>replace_parent</code>）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば<code>spec-dock/active</code>のリンクを整えます。schema3では<code>CANONICAL_NOT_MIGRATED</code>で止まります。</td><td>GitHubの親子、active link</td></tr>
+<tr><td>C52</td><td><code>scope check</code></td><td><code>TARGET</code></td><td>1つのScopeの仕様をインターネットなしで検査します。CUEのScope（<code>requirement.cue</code>）は、型・リポジトリの型（<code>spec-dock/cue/*.cue</code>）と一緒に<code>cue</code>（v0.17.1以上）で評価し、形の誤り（<code>CUE_INVALID</code>）、つながりの指摘（<code>SPEC_FINDINGS</code>）、保証レベルの置き場、説明資料の形を、ファイルと直し方つきで示します。誤りがあれば終了コード7（<code>SCOPE_CHECK_FAILED</code>）。MarkdownのScopeは<code>checked=false</code>で成功します。<code>work finish</code>も閉じる前に同じ検査をします。schema3では<code>CANONICAL_NOT_MIGRATED</code>で止まります。</td><td>読取りのみ</td></tr>
+<tr><td>C53</td><td><code>scope render</code></td><td><code>TARGET [--design-system MODE]</code></td><td>1つのCUEのScopeの要件・設計・計画を、インターネットなしでHTMLに描き、標準出力に出します（<code>--json</code>では<code>data.result.html</code>）。<code>scope check</code>と同じ評価を使い、検査の結果（つながりの指摘、形の誤り）をページの初めに、続けて要件、失敗・境界条件、設計、計画（手順の状態と数、実行の割り当て）を、番号のリンクで結んで示します。デザインシステムはそのチェックアウトの<code>spec-dock/design-system/</code>を<code>file:</code>のURLで、図の部品はCDNから読みます。<code>--design-system inline</code>（既定は<code>file</code>）では、<code>ds.css</code>、<code>ds.js</code>、<code>marked</code>をHTMLに埋め込み、別のPCでも崩れないページにします（デザインシステムがなければ<code>DESIGN_SYSTEM_MISSING</code>、終了コード3）。評価が通らなければ検査の結果だけのページで成功し<code>SCOPE_RENDER_INCOMPLETE</code>を警告します。MarkdownのScopeは終了コード7（<code>SCOPE_NOT_CUE</code>）。ダッシュボードなどは、Pythonの入口<code>spec_dock.runtime.application.scope_render.render_scope_html(ScopeRenderSource, *, design_system_base, vendor_base)</code>で、読み込み先のURLを渡して描けます（<code>timeout</code>秒、既定30。<code>embed_design_system</code>にデザインシステムのディレクトリを渡すと埋め込みます。返り値はHTMLの<code>str</code>。MarkdownのScopeは<code>CanonicalCommandError</code>の<code>SCOPE_NOT_CUE</code>、<code>cue</code>と型の版の問題は<code>scope check</code>と同じコードで止まります）。schema3では<code>CANONICAL_NOT_MIGRATED</code>で止まります。</td><td>読取りのみ</td></tr>
+</tbody></table></div>
+<p>worktree createはroot/NAMEとworktree/NAME branchを作ります。project-owned <code>make init</code>はbootstrapで別に一回実行します。Scopeの<code>.workbench</code>はカタログの中にあり、どのworktreeからも同じものが見えます。worktree removeはnative Gitのguardを守り、branchを残します。</p>
 </section>
 <section id="safety" aria-labelledby="safety-title"><div class="section-label">11</div><h2 id="safety-title">この方式が保証する範囲</h2><p>協調して新CLIを使う同じphysical cloneのStartを直列化します。旧writer、任意の手編集、別clone、別PC、複数ホストの共有filesystemを完全に封鎖する仕組みではありません。未対応のOS/FS原語は成功と装わず停止します。</p>
 <p>main worktreeは制御拠点ではありません。読み取れない作業場、stale、破損、複数記録は診断に残します。Startの重複確認が完全でなければGit変更前に停止します。別branchへ移った直接記録も予約として捨てません。</p>
