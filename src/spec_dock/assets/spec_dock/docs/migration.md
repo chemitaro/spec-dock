@@ -73,6 +73,24 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
   - 配布する `spec-dock/.gitignore` に `!**/.workbench/` を足しました。ルートの `.gitignore` が `.workbench/` を無視していても、`spec-dock/` の下の `.workbench/README.md`（雛形の README を含む）がコミットの対象になります。ほかの中身は無視のままです。すでに使っているリポジトリは、更新の後に `git add spec-dock/templates` で、それまで無視されていた雛形の README を足してコミットします。
 - 戻し方：0.5.0 に問題があれば、パッケージを 0.4.2 に戻します。0.4.2 は canonical モードと CUE の Scope を持つので、配布資産を 0.5.0 に上げる前のリポジトリはそのまま動きます。配布資産を 0.5.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.4.2 のバイトに戻します。版のファイルだけを戻すと、0.4.2 の `canonical check` が 0.5.0 の資産を知らない変更として CI を止め、0.4.2 の `scope create` が外した `docs/rules/initiative/epics.md`・`docs/rules/epic/issues.md` を求めて止まります（0.4.2 の `installation update` も 0.5.0 のバイトを知らないので、戻す手段になりません）。
 
+## 0.5.1 への更新
+
+0.5.1 は、0.5.0 の後に入れた、確認と実行の間の変化・部分失敗の返し方・宣言の検査の直しを届ける版です。canonical モード（宣言の版4）だけの版で、コマンドと JSON の形は増えません。
+
+- パッケージを 0.5.1 に上げた後、各リポジトリで `spec-dock installation update --target <チェックアウト> --backup-dir <新しい外のディレクトリ> --yes` を実行して配布資産を上げ、通常の PR でコミットします。0.5.0 の配布資産のままでも動きますが、`reference_cli.md`、`cli-redesign-guide.html`、スキル `SKILL.md`、`finalize-artifact.py`、この `migration.md` が新しくなります。CI の見本は `spec-dock/system/spec-dock-version` の版（0.5.1）の SpecDock を入れて動きます。
+- 契約の変更：
+  - `scope close --reason completed` と `work finish` は、子孫がすべて完了（completed）か不採用（not-planned）で閉じていれば親を閉じます。0.5.0 では不採用の子孫があると終了コード3で止まっていました。開いている子孫と状態が分からない子孫があれば、今までどおり `DESCENDANT_NOT_COMPLETED`（終了コード3）で止まります。
+  - `canonical check` は、重複したキーを持つ宣言を `WORKSPACE_DECLARATION_INVALID`（`details.reason=duplicate-member`）の失敗1件にします。ほかのコマンドは、重複したキーを持つ宣言を版4として受け付けず、`PRECONDITION_FAILED`（終了コード3）で止まります。観測の間に消えた版3の worktree は、`workspace sync` と `work start` で unavailable の行になります。
+- 確認と実行の間の変化（何も書かずに止まる）：
+  - `scope close` と `scope reopen` は、端末での確認の後に直接の選択が変わっていれば、何も書かずに `PRECONDITION_FAILED`（終了コード3）で止まります。
+  - `scope create` は、確認の後に `origin` が変わっていれば止まります。何も書いていなければ `PRECONDITION_FAILED`（終了コード3）、種類のラベルを作った後なら `CANONICAL_WRITE_INCOMPLETE`（`partial`、終了コード6）、Issue を作った後なら `SCOPE_PUBLICATION_INCOMPLETE`（`partial`、終了コード6）です。
+  - `worktree remove --unlock` は、unlock の後に無視されたファイルが見つかれば、`--discard-ignored` なしでは何も消さずに止まります（`PRECONDITION_FAILED`、終了コード3。unlock の後なら `WORKTREE_REMOVE_FAILED`、`partial`、終了コード6）。
+- 部分失敗の返し方：
+  - `artifact create` と `artifact import file` は、`artifacts/` を作った後の失敗を `ARTIFACT_PUBLICATION_INCOMPLETE`（`partial`、終了コード6）で返します。`effects` に `artifact.directory` が付き、作ったディレクトリは残ります。
+  - `scope delete` は、途中で失敗したときの `effects` を起きたとおりに返します（例：`selection.clear` が succeeded、`scope.delete` が unknown）。
+- スキル `spec-dock-grill-with-docs` の `finalize-artifact.py` は、`spec-dock/initiatives` のカタログへのリンク越しの Artifact のパスを受け付けます。契約の変更はありません。
+- 戻し方：0.5.1 に問題があれば、パッケージを 0.5.0 に戻します。配布資産を 0.5.1 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.5.0 のバイトに戻します。版のファイルだけを戻すと、0.5.0 の `canonical check` が 0.5.1 の資産を知らない変更として CI を止めます（0.5.0 の `installation update` も 0.5.1 のバイトを知らないので、戻す手段になりません）。
+
 ## 新規導入
 
 ```sh
