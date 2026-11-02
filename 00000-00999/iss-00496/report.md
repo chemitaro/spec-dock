@@ -31,6 +31,8 @@ ID: "iss-00496"
 - コードのレビュー（code-reviewer opus/high、axis both、`9c11174f8..602575f18`）：合格、指摘0。
 - 最終品質ゲート（quality-gate-reviewer opus/high、1人、campaign `iss-00496-g1`、commit `602575f18`）：レビューは合格（P0=0、P1=0、P3=1、範囲は完全）。テストのレーン：`make lint` exit 0、`uv run pytest` exit 0（4100 passed、8 skipped、24分14秒）。記録は作業ツリーの `.workbench/final-quality-gate/iss-00496-g1/closure.md`（Git の外）。
 
+- PR [#503](https://github.com/chemitaro/spec-dock/pull/503)（head `602575f18ba7f6a15a871b59487135fd6cc47c5e`）：Provider CI、SpecDock check、Commit identity がすべて success。マージの状態は READY（2026-11-02T00:50Z に観測。観測は base リポジトリの Actions と Commit Status に限る）。マージと `work finish` は統括が行う。
+
 ## Residual Risks / Follow-ups
 
 - P3（ゲート FQG-001）：作業ツリーの根の道筋に単引用符やバックスラッシュがあると、テキストの標準エラーの文はエスケープされ、写してもそのままでは動かない（`cd` が失敗して `&&` で止まるので、ファイルは壊れない）。JSON の `details.command` は正しい。対応は不要とした。
