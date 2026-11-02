@@ -35,7 +35,7 @@
     {
       "path": ".agents/skills/spec-dock/SKILL.md",
       "source": "install_root/.agents/skills/spec-dock/SKILL.md",
-      "sha256": "8cd5c9799a1815f5c5f0b552097b5be8e0d0364f451a6913942b5cb804eb6f23",
+      "sha256": "15d98858572f976a35e893cc573f9ddd8e8e72400fc32ee5dc86b336bb453635",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -47,7 +47,8 @@
         "4d8befe341350c0f8e7b6055f1086cfd8bfbaf6ea2ef4bf46db6d7aa1a71c500",
         "22d8f04594a5209a8629d09ff6541628f18f4fb2bd979da05db23f8d9c4572a6",
         "66f2cdf90516f628dc5e3da0b0b8ddfc2b7dfd3cb4173833beaf131f5bf605ab",
-        "dc2ef101d896dad3d679b1ba79526459d64724b0b40ca52df81a12b7c6169780"
+        "dc2ef101d896dad3d679b1ba79526459d64724b0b40ca52df81a12b7c6169780",
+        "8cd5c9799a1815f5c5f0b552097b5be8e0d0364f451a6913942b5cb804eb6f23"
       ]
     },
     {
@@ -278,7 +279,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "b51e4679b9b3c53c16d42edbc019294964ef76c75a6241c25e9fe612aabdfc09",
+      "sha256": "d01267b3505de62bfe4757b52eb81a9a1358d815ee1134cd9586a8c674680b14",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -290,7 +291,8 @@
         "75df3f3743a1edabc7ad9c9888f193d8e1d77043f3cd3efbcefc0c158d89efa9",
         "d73995cc82ebefc65e5b9dcc7a1f2c5d3056a9f7ee641871ad49817e44693ade",
         "ac9c3296cd371f25e5ee885f9db2af39961f8fe4edb76205b8fb9dd9e38d6c3f",
-        "0ce735804cd49de202a8be2e731f81a04b1279e1aaa344397e83a15f0a23161d"
+        "0ce735804cd49de202a8be2e731f81a04b1279e1aaa344397e83a15f0a23161d",
+        "b51e4679b9b3c53c16d42edbc019294964ef76c75a6241c25e9fe612aabdfc09"
       ]
     },
     {
@@ -384,7 +386,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "4afe0a6ee880fbf57767be1d678557cb3334205fcdeb88149ba45d14e5667def",
+      "sha256": "bd67d65e1f6904435ae56c6063d94f625a52477aa1ea9acc8f7633769406572d",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -403,7 +405,8 @@
         "132d05d34b6ec06c80819c3e3eff8adc43d1b4d3e5d7ed7f8d47a7a821ccf69a",
         "01c3f1398648c5bf3fefd3353655b283f0d337eb5665e55427adab9f1d4db6c1",
         "1f99ff8e0734455689509cce26d2aec7efade9dd3172aa36034a03938f1b5d41",
-        "279df0ac949a3e969d45d525df8510f676808ebeffb2f8253e2fd660e5bb907d"
+        "279df0ac949a3e969d45d525df8510f676808ebeffb2f8253e2fd660e5bb907d",
+        "4afe0a6ee880fbf57767be1d678557cb3334205fcdeb88149ba45d14e5667def"
       ]
     },
     {

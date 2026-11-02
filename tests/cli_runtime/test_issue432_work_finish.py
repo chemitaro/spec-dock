@@ -171,6 +171,18 @@ def test_a_hold_under_the_scope_stops_before_writing(world: WriteWorld, tmp_path
     assert world.changesets() == [] and world.fake().issue(3).state == "open"
 
 
+def test_a_not_planned_child_does_not_stop_finish(world: WriteWorld) -> None:
+    world.scope("issue", 4, "dropped child", parent=2, state="closed", state_reason="not_planned")
+    world.select("epic-00002", 2)
+    (world.find("epic-00002") / "plan.md").write_text("# plan\n\nepic change\n", encoding="utf-8")
+    world.edit(lambda fake: setattr(fake.issue(3), "state", "closed"))
+    world.edit(lambda fake: setattr(fake.issue(3), "state_reason", "completed"))
+    _run_cycle_on_kick(world)
+    code, payload = world.write("work", "finish", "epic-00002")
+    assert code == 0, payload
+    assert world.fake().issue(2).state == "closed"
+
+
 def test_a_child_reopened_while_waiting_stops_before_closing(world: WriteWorld) -> None:
     world.scope("issue", 4, "done child", parent=2, state="closed", state_reason="completed")
     world.select("epic-00002", 2)

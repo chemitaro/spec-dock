@@ -352,7 +352,7 @@ def _set_state(world: WriteWorld, number: int, state: str, reason: str | None) -
     world.edit(change)
 
 
-@pytest.mark.parametrize("child", [("open", None), ("closed", "not_planned")])
+@pytest.mark.parametrize("child", [("open", None)])
 @pytest.mark.parametrize("parent_completed", [False, True])
 def test_completed_parent_close_still_checks_unfinished_descendants(
     tmp_path: Path,
@@ -368,6 +368,17 @@ def test_completed_parent_close_still_checks_unfinished_descendants(
     code, payload = world.write("scope", "close", "epic-00002")
     assert (code, payload["error"]["message"], payload["effects"]) == (3, "DESCENDANT_NOT_COMPLETED", []), payload
     assert world.writes() == []
+
+
+def test_completed_parent_close_allows_a_not_planned_descendant(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    world = _world(tmp_path, monkeypatch, capsys)
+    _set_state(world, 3, "closed", "not_planned")
+    code, payload = world.write("scope", "close", "epic-00002")
+    assert code == 0, payload
+    assert world.writes()[-1][2] == {"state": "closed", "state_reason": "completed"}
+    assert payload["data"]["result"]["descendants"] == ["iss-00003"]
 
 
 @pytest.mark.parametrize("ancestor", [("completed", 2), ("not_planned", 2), ("not_planned", 1)])

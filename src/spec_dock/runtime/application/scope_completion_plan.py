@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Literal
 from spec_dock.runtime.application.scope_query import show_scope
 
 if TYPE_CHECKING:
-    from collections.abc import Mapping
+    from collections.abc import Iterable, Mapping
 
     from spec_dock.runtime.application.scope_query import ScopeView
     from spec_dock.runtime.domain.lifecycle import ObservedState
@@ -30,6 +30,12 @@ def _state(statuses: Mapping[str, ObservedState], scope_id: str) -> ObservedStat
         return statuses[scope_id]
     except KeyError as error:
         raise ValueError("SCOPE_STATUS_UNOBSERVED") from error
+
+
+def require_descendants_settled(states: Iterable[ObservedState]) -> None:
+    """A parent may complete only when each descendant is completed or closed as not planned."""
+    if any(state not in ("completed", "not-planned") for state in states):
+        raise ValueError("DESCENDANT_NOT_COMPLETED")
 
 
 def _ancestors(views: tuple[ScopeView, ...], target: ScopeView) -> tuple[ScopeView, ...]:
@@ -78,8 +84,8 @@ def plan_close(
     target = show_scope(views, target_id)
     before = _state(statuses, target.id)
     descendants = _descendants(views, target)
-    if reason == "completed" and any(_state(statuses, child.id) != "completed" for child in descendants):
-        raise ValueError("DESCENDANT_NOT_COMPLETED")
+    if reason == "completed":
+        require_descendants_settled(_state(statuses, child.id) for child in descendants)
     if before == "unknown":
         raise ValueError("SCOPE_STATUS_UNKNOWN")
     if before != "open" and before != reason:

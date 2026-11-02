@@ -29,7 +29,7 @@ SpecDock 0.5.0 は宣言の版4（canonical モード）だけを扱います（
 | C07 | `scope list` | `[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]` | 構造のスナップショットのScopeを、カタログの場所とともに表示します。 | 読取りのみ |
 | C08 | `scope show` | `TARGET` | GitHubの題名、親子、状態、カタログの場所、保証レベルを表示します。 | 読取りのみ |
 | C09 | `scope edit` | `TARGET --title TITLE` | GitHub Issueの題名だけを変更し、ID、ディレクトリ、branchを保ちます。 | GitHubの題名 |
-| C10 | `scope close` | `TARGET [--reason {completed,not-planned}]` | 対象のGitHub Issueを閉じます。reason既定はcompletedです。 | GitHub状態 |
+| C10 | `scope close` | `TARGET [--reason {completed,not-planned}]` | 対象のGitHub Issueを閉じます。reason既定はcompletedです。completedで閉じるときは、子孫がすべてcompletedかnot-plannedなら閉じられ、openまたは状態が分からない子孫が1つでもあれば`DESCENDANT_NOT_COMPLETED`で止まります。 | GitHub状態 |
 | C11 | `scope reopen` | `TARGET` | 対象だけをopenへ戻します。 | GitHub状態 |
 | C12 | `scope delete` | `TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]` | 種類のラベルと親子（と、明示すれば依存）を外し、保全してからカタログのディレクトリを削除します。Issueとbranchは消しません。 | GitHubのラベル・親子、backup、カタログ |
 | C13 | `active show` | 共通optionのみ | 一つの直接記録と現在の祖先を表示します。 | 読取りのみ |

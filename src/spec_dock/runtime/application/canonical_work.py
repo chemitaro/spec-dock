@@ -38,6 +38,7 @@ from spec_dock.runtime.application.canonical_writes import (
 )
 from spec_dock.runtime.application.project_context import resolve_observed_context
 from spec_dock.runtime.application.scope_check import check_scope_documents, scope_format
+from spec_dock.runtime.application.scope_completion_plan import require_descendants_settled
 from spec_dock.runtime.application.start_plan import (
     StartLiveObservations,
     StartLocalSnapshot,
@@ -844,9 +845,7 @@ def _finish_rules(session: WriteSession, scope_id: str) -> tuple[str, tuple[str,
         raise ValueError("SCOPE_STATUS_UNKNOWN")
     if observed == "not-planned":
         raise ValueError("TERMINAL_REASON_CONFLICT: reopen is required")
-    for child in descendants:
-        if session.scopes.view(child).status.state != "completed":
-            raise ValueError("DESCENDANT_NOT_COMPLETED")
+    require_descendants_settled(session.scopes.view(child).status.state for child in descendants)
     return observed, descendants
 
 

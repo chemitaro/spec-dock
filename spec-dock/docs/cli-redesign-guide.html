@@ -132,7 +132,7 @@ spec-dock installation show --target /absolute/project --json</code></pre>
 <tr><td>C07</td><td><code>scope list</code></td><td><code>[--kind {initiative,epic,issue}] [--parent TARGET] [--state {open,completed,not-planned,unknown}]</code></td><td>構造のスナップショットのScopeを、カタログの場所とともに表示します。</td><td>読取りのみ</td></tr>
 <tr><td>C08</td><td><code>scope show</code></td><td><code>TARGET</code></td><td>GitHubの題名、親子、状態、カタログの場所、保証レベルを表示します。</td><td>読取りのみ</td></tr>
 <tr><td>C09</td><td><code>scope edit</code></td><td><code>TARGET --title TITLE</code></td><td>GitHub Issueの題名だけを変更し、ID、ディレクトリ、branchを保ちます。</td><td>GitHubの題名</td></tr>
-<tr><td>C10</td><td><code>scope close</code></td><td><code>TARGET [--reason {completed,not-planned}]</code></td><td>対象のGitHub Issueを閉じます。reason既定はcompletedです。</td><td>GitHub状態</td></tr>
+<tr><td>C10</td><td><code>scope close</code></td><td><code>TARGET [--reason {completed,not-planned}]</code></td><td>対象のGitHub Issueを閉じます。reason既定はcompletedです。completedで閉じるときは、子孫がすべてcompletedかnot-plannedなら閉じられ、openまたは状態が分からない子孫が1つでもあれば<code>DESCENDANT_NOT_COMPLETED</code>で止まります。</td><td>GitHub状態</td></tr>
 <tr><td>C11</td><td><code>scope reopen</code></td><td><code>TARGET</code></td><td>対象だけをopenへ戻します。</td><td>GitHub状態</td></tr>
 <tr><td>C12</td><td><code>scope delete</code></td><td><code>TARGET [--recursive] [--clear-active] [--detach-dependencies] [--backup-dir ABS]</code></td><td>種類のラベルと親子（と、明示すれば依存）を外し、保全してからカタログのディレクトリを削除します。Issueとbranchは消しません。</td><td>GitHubのラベル・親子、backup、カタログ</td></tr>
 <tr><td>C13</td><td><code>active show</code></td><td>共通optionのみ</td><td>一つの直接記録と現在の祖先を表示します。</td><td>読取りのみ</td></tr>
