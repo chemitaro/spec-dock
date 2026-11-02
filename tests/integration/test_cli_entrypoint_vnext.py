@@ -16,7 +16,9 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 import pytest
 
 from spec_dock.runtime.infra.tree_backup import tree_digest
-from tests.cli_runtime.test_issue413_work_start import committed_workspace
+from tests.support.canonical_repo import clone, git
+from tests.support.canonical_scopes import REPOSITORY, CanonicalWorld
+from tests.support.legacy_contracts_g1 import chain_world, select_record
 
 
 @pytest.fixture(scope="module")
@@ -54,6 +56,28 @@ def installed_console(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return venv / ("Scripts/spec-dock.exe" if os.name == "nt" else "bin/spec-dock")
 
 
+@pytest.fixture
+def consumer(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> CanonicalWorld:
+    """A linked schema-4 consumer (init-1 / epic-2 / iss-3) with the fake GitHub on PATH and a saved snapshot.
+
+    Only reading commands run through the installed console: a writing command would ensure the periodic sync
+    job, which only the in-process stand-in scheduler may do in tests.
+    """
+    world = chain_world(tmp_path, monkeypatch, capsys)
+    assert world.run("scope", "show", "init-00001")[0] == 0
+    return world
+
+
+def _second_clone(world: CanonicalWorld, name: str) -> Path:
+    """Another linked clone of the same origin; its catalog has none of the first clone's Scope directories."""
+    path = clone(world.tmp_path / "remote.git", world.tmp_path / name)
+    git(path, "remote", "set-url", "origin", str(world.tmp_path / "remote.git"))
+    code, payload = world.run("canonical", "link", checkout=path)
+    assert code == 0, payload
+    git(path, "remote", "set-url", "origin", f"https://github.com/{REPOSITORY}.git")
+    return path
+
+
 def _console(
     executable: Path, arguments: list[str], *, cwd: Path, environment: dict[str, str] | None = None
 ) -> subprocess.CompletedProcess[str]:
@@ -67,51 +91,14 @@ def _console(
 
 
 def test_installed_console_starts_syncs_and_finishes_an_issue_without_control(
-    installed_console: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    installed_console: Path, consumer: CanonicalWorld
 ) -> None:
-    from tests.cli_runtime.test_issue413_contract import add_scope
-    from tests.cli_runtime.test_issue413_finish import github_fixture
-
-    root = committed_workspace((tmp_path / "consumer").resolve())
-    initiative = root / "spec-dock/initiatives/init-00001-fixture"
-    epic = add_scope(root, "epic-00002", "epic", "init-00001", initiative)
-    issue = add_scope(root, "iss-00003", "issue", "epic-00002", epic)
-    subprocess.run(["git", "-C", str(root), "add", "."], check=True, capture_output=True)
-    subprocess.run(
-        [
-            "git",
-            "-C",
-            str(root),
-            "-c",
-            "user.name=Fixture",
-            "-c",
-            "user.email=fixture@example.invalid",
-            "commit",
-            "-qm",
-            "scopes",
-        ],
-        check=True,
-        capture_output=True,
-    )
-    before = {path: path.read_bytes() for path in (root / "spec-dock").rglob("*") if path.is_file()}
-    log = github_fixture(tmp_path, monkeypatch, {"1": "open", "2": "open", "3": "open"})
-    started = _console(
-        installed_console,
-        ["work", "start", "iss-00003", "--branch", "issue-three", "--base", "HEAD", "--json"],
-        cwd=root,
-    )
-    assert started.returncode == 0, started.stdout + started.stderr
-    start = json.loads(started.stdout)
-    assert start["schema_version"] == "specdock.cli/v2" and not started.stderr
-    assert start["data"]["started"] is True and start["data"]["branch_after"] == "issue-three"
-    record = root / "spec-dock/.agent/work-target" / f"target-{start['data']['selection_token']}.json"
-    assert record.is_file()
+    # iss-00440: start and finish ensure the periodic sync job, so they run in process (with the stand-in
+    # scheduler; see tests/cli_runtime/test_issue440_g1_work_finish.py's lifecycle tests). The installed console
+    # observes the started selection without control and without changing it.
+    root = consumer.main
+    record = select_record(consumer, "iss-00003", 3, branch="main")
     captured = record.read_bytes()
-    assert json.loads(captured)["scope_id"] == "iss-00003"
-    assert (
-        subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"], text=True).strip()
-        == "issue-three"
-    )
     synced = _console(installed_console, ["workspace", "sync", "--source", "github", "--json"], cwd=root)
     assert synced.returncode == 0, synced.stdout + synced.stderr
     sync = json.loads(synced.stdout)
@@ -125,22 +112,8 @@ def test_installed_console_starts_syncs_and_finishes_an_issue_without_control(
     assert sync["data"]["worktrees"][0]["selection"]["scope_id"] == "iss-00003"
     assert sync["data"]["worktrees"][0]["process_state"] == "not_observed"
     assert record.read_bytes() == captured
-    finished = _console(installed_console, ["work", "finish", "@current", "--yes", "--json"], cwd=root)
-    assert finished.returncode == 0, finished.stdout + finished.stderr
-    finish = json.loads(finished.stdout)
-    assert not finished.stderr and finish["data"]["completed"] is True
-    assert finish["data"]["branch_after"] == "issue-three" and finish["data"]["selection_token"] is None
-    assert not record.exists()
-    assert (
-        subprocess.check_output(["git", "-C", str(root), "branch", "--show-current"], text=True).strip()
-        == "issue-three"
-    )
     assert not (root / ".git/spec-dock").exists()
-    assert all(path.read_bytes() == exact for path, exact in before.items())
-    assert json.loads((issue / ".meta.json").read_bytes())["github"]["issue_number"] == 3
-    requests = [json.loads(line) for line in log.read_text().splitlines()]
-    assert [(row["method"], row["number"]) for row in requests if row["method"] == "PATCH"] == [("PATCH", 3)]
-    assert json.loads((tmp_path / "remote-states.json").read_bytes()) == {"1": "open", "2": "open", "3": "completed"}
+    assert consumer.fake().writes() == []
 
 
 def test_package_version_ignores_retired_fixed_distribution_version_file(tmp_path: Path) -> None:
@@ -190,13 +163,13 @@ def test_installed_entrypoint_rejects_retired_installer_before_write(installed_c
     assert payload["effects"] == [] and not output.stderr and not tuple(tmp_path.iterdir())
 
 
-@pytest.mark.parametrize("flags", [[], ["--ci"]], ids=["working-tree", "head"])
 def test_installed_validation_needs_no_control_and_writes_nothing(
-    installed_console: Path, tmp_path: Path, flags: list[str]
+    installed_console: Path, consumer: CanonicalWorld
 ) -> None:
-    root = committed_workspace((tmp_path / "consumer").resolve())
+    # iss-00440: the `--ci` (HEAD) variant validated committed .meta.json and was removed with legacy mode.
+    root = consumer.main
     before = tree_digest(root)
-    output = _console(installed_console, ["workspace", "validate", *flags, "--json"], cwd=root)
+    output = _console(installed_console, ["workspace", "validate", "--json"], cwd=root)
     assert output.returncode == 0, output.stdout + output.stderr
     payload = json.loads(output.stdout)
     assert payload["schema_version"] == "specdock.cli/v2" and payload["status"] == "succeeded"
@@ -215,8 +188,10 @@ def test_installed_validation_needs_no_control_and_writes_nothing(
     ],
     ids=["invalid-json", "relative-tampered", "missing-package", "mismatched-digest"],
 )
-def test_retired_locators_are_not_execution_authority(installed_console: Path, tmp_path: Path, locator: bytes) -> None:
-    root = committed_workspace((tmp_path / "consumer").resolve())
+def test_retired_locators_are_not_execution_authority(
+    installed_console: Path, consumer: CanonicalWorld, locator: bytes
+) -> None:
+    root = consumer.main
     control = root / ".git/spec-dock/control"
     control.mkdir(parents=True)
     (control / "engine.json").write_bytes(locator)
@@ -253,9 +228,9 @@ def _installed_shim(console: Path, root: Path) -> Path:
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX env -S shim execution")
 def test_installed_shim_ignores_checkout_python_and_hostile_git_environment(
-    installed_console: Path, tmp_path: Path
+    installed_console: Path, consumer: CanonicalWorld, tmp_path: Path
 ) -> None:
-    root = committed_workspace((tmp_path / "consumer").resolve())
+    root = consumer.main
     shim = _installed_shim(installed_console, root)
     marker = tmp_path / "checkout-imported"
     hostile_code = f"from pathlib import Path\nPath({str(marker)!r}).write_text('unsafe')\n"
@@ -266,9 +241,8 @@ def test_installed_shim_ignores_checkout_python_and_hostile_git_environment(
     local_runtime = root / "spec-dock/scripts/spec_dock_runtime"
     local_runtime.mkdir()
     (local_runtime / "__init__.py").write_text(hostile_code)
-    hostile = committed_workspace((tmp_path / "hostile").resolve())
-    metadata = hostile / "spec-dock/initiatives/init-00001-fixture/.meta.json"
-    metadata.write_text(json.dumps(dict(json.loads(metadata.read_bytes()), title="Hostile")))
+    # The hostile clone's catalog has no Scope directories, so a read through it reports directory_found false.
+    hostile = _second_clone(consumer, "hostile")
     environment = {
         "PATH": str(installed_console.parent) + os.pathsep + os.environ["PATH"],
         "PYTHONPATH": str(root),
@@ -278,14 +252,16 @@ def test_installed_shim_ignores_checkout_python_and_hostile_git_environment(
     output = _console(shim, ["scope", "show", "init-00001", "--json"], cwd=root, environment=environment)
     assert output.returncode == 0, output.stdout + output.stderr
     payload = json.loads(output.stdout)
-    assert payload["data"]["result"]["scope"]["title"] == "Fixture"
+    assert payload["data"]["result"]["scope"]["directory_found"] is True
     assert payload["effects"] == [] and not output.stderr and not marker.exists()
     assert not (root / ".git/spec-dock").exists()
 
 
 @pytest.mark.skipif(os.name != "posix", reason="native POSIX external console symlink")
-def test_path_shim_accepts_a_symlink_to_the_installed_console(installed_console: Path, tmp_path: Path) -> None:
-    root = committed_workspace((tmp_path / "consumer").resolve())
+def test_path_shim_accepts_a_symlink_to_the_installed_console(
+    installed_console: Path, consumer: CanonicalWorld, tmp_path: Path
+) -> None:
+    root = consumer.main
     shim = _installed_shim(installed_console, root)
     aliases = tmp_path / "aliases"
     aliases.mkdir()
@@ -301,27 +277,24 @@ def test_path_shim_accepts_a_symlink_to_the_installed_console(installed_console:
 
 
 def test_two_consumers_use_one_package_and_resolve_the_requested_git_root(
-    installed_console: Path, tmp_path: Path
+    installed_console: Path, consumer: CanonicalWorld
 ) -> None:
-    consumers = [committed_workspace((tmp_path / name).resolve()) for name in ("first", "second")]
-    for root in consumers:
-        metadata = root / "spec-dock/initiatives/init-00001-fixture/.meta.json"
-        metadata.write_text(json.dumps(dict(json.loads(metadata.read_bytes()), title=root.name)))
-    first, second = consumers
+    # Both clones read one fake GitHub; only the first clone's catalog has the Scope directories.
+    first, second = consumer.main, _second_clone(consumer, "second")
     first_shim = _installed_shim(installed_console, first)
     environment = {"PATH": str(installed_console.parent) + os.pathsep + os.environ["PATH"]}
     for cwd, arguments, expected in (
-        (first, ["scope", "show", "init-00001", "--json"], "first"),
-        (second, ["scope", "show", "init-00001", "--json"], "second"),
-        (first, ["--project", str(second), "scope", "show", "init-00001", "--json"], "second"),
+        (first, ["scope", "show", "init-00001", "--json"], True),
+        (second, ["scope", "show", "init-00001", "--json"], False),
+        (first, ["--project", str(second), "scope", "show", "init-00001", "--json"], False),
     ):
         executable = first_shim if os.name == "posix" else installed_console
         output = _console(executable, arguments, cwd=cwd, environment=environment)
         assert output.returncode == 0, output.stdout + output.stderr
         payload = json.loads(output.stdout)
-        assert payload["data"]["result"]["scope"]["title"] == expected
+        assert payload["data"]["result"]["scope"]["directory_found"] is expected
         assert payload["effects"] == [] and not output.stderr
-    for root in consumers:
+    for root in (first, second):
         output = _console(installed_console, ["workspace", "sync", "--json"], cwd=root)
         assert output.returncode == 0, output.stdout + output.stderr
         assert [row["path"] for row in json.loads(output.stdout)["data"]["worktrees"]] == [str(root)]

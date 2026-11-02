@@ -18,7 +18,6 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10
 
 from spec_dock.runtime.infra.tree_backup import tree_digest
 from tests.cli_runtime.test_cli_vnext_contract import LEAF_PATHS
-from tests.cli_runtime.test_issue413_work_start import committed_workspace
 from tests.integration.test_issue413_assets import uninitialized_worktree
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -272,30 +271,12 @@ def test_fresh_wheel_contains_one_normal_runtime_and_context_free_utilities(tmp_
     assert json.loads(invalid.stdout)["schema_version"] == "specdock.cli/v2"
     assert not tuple(outside.iterdir())
 
-    consumer = committed_workspace(tmp_path / "consumer")
+    # iss-00440: the schema-3 `workspace validate` checks (working tree and `--ci`) left with legacy mode; the shim
+    # delegation below only needs a plain repository.
+    consumer = tmp_path / "consumer"
+    subprocess.run(["git", "init", "-q", str(consumer)], check=True, capture_output=True)
+    (consumer / "spec-dock").mkdir()
     validation_environment = dict(environment, PATH=os.environ.get("PATH", ""))
-    for flags in ([], ["--ci"]):
-        if flags:
-            (consumer / "spec-dock/workspace.json").write_bytes(b"private uncommitted declaration")
-            next((consumer / "spec-dock/initiatives").rglob(".meta.json")).write_bytes(b"private uncommitted metadata")
-        before = tree_digest(consumer)
-        validation = subprocess.run(
-            [str(console), "--project", str(consumer), "workspace", "validate", *flags, "--json"],
-            cwd=outside,
-            env=validation_environment,
-            capture_output=True,
-            text=True,
-            check=False,
-            timeout=30,
-        )
-        assert validation.returncode == 0, validation.stdout + validation.stderr
-        payload = json.loads(validation.stdout)
-        assert payload["data"]["kind"] == "validation" and payload["data"]["result"]["valid"] is True
-        assert payload["data"]["result"]["snapshot_source"] == ("HEAD" if flags else "working-tree")
-        assert payload["data"]["result"]["node_count"] == 1 and payload["effects"] == []
-        assert not validation.stderr and "private" not in validation.stdout
-        assert tree_digest(consumer) == before
-        assert not (consumer / "spec-dock/.agent").exists() and not (consumer / ".git/spec-dock").exists()
 
     installed_shim = Path(package_path).with_name("assets") / "spec_dock/scripts/spec-dock"
     consumer_shim = consumer / "spec-dock/scripts/spec-dock"
@@ -422,7 +403,7 @@ def verify_issue415_console(console: Path, tmp_path: Path, environment: dict[str
     import shutil
 
     from tests.cli_runtime.test_help_completion_vnext import _native_completion
-    from tests.integration.test_cli_docs_vnext import readme_creation_commands, sequential_github_stub
+    from tests.integration.test_cli_docs_vnext import readme_creation_commands
 
     target = uninitialized_worktree(tmp_path / "issue415-consumer")
     subprocess.run(
@@ -432,8 +413,10 @@ def verify_issue415_console(console: Path, tmp_path: Path, environment: dict[str
     )
     bin_dir = tmp_path / "issue415-bin"
     bin_dir.mkdir()
-    log = tmp_path / "issue415-gh.jsonl"
-    sequential_github_stub(bin_dir / "gh", log)
+    log = tmp_path / "issue415-gh.log"
+    # Any GitHub call is recorded and fails: the README examples must stop before reaching GitHub here.
+    (bin_dir / "gh").write_text(f'#!/bin/sh\necho "$*" >> {str(log)!r}\nexit 99\n')
+    (bin_dir / "gh").chmod(0o755)
     env = dict(environment, PATH=str(bin_dir) + os.pathsep + environment["PATH"])
 
     def run(arguments: list[str]) -> subprocess.CompletedProcess[str]:
@@ -449,47 +432,17 @@ def verify_issue415_console(console: Path, tmp_path: Path, environment: dict[str
 
     created = run(["installation", "init", str(target), "--yes", "--json"])
     assert created.returncode == 0, created.stdout + created.stderr
-    # installation init declares schema 4; the README examples below exercise legacy mode on schema 3.
-    (target / "spec-dock/workspace.json").write_text(
-        '{"schema_version":3,"writer_protocol":"specdock.worktree-writer/v1"}', encoding="utf-8"
-    )
-    parent = None
+    # iss-00440: the README examples (with --assurance and --assurance-reason) parse in the installed console; on
+    # this unlinked schema-4 target they stop at the confirmation gate, then at the missing catalog link, unwritten.
     for command in readme_creation_commands():
-        if parent is not None:
-            command[command.index("--parent") + 1] = parent
-        assert "--yes" in command and "--json" in command
+        assert "--yes" in command and "--json" in command and "--assurance" in command
         before = tree_digest(target)
-        requests = log.read_bytes() if log.exists() else b""
         denied = run([word for word in command if word != "--yes"])
         assert denied.returncode == 3 and json.loads(denied.stdout)["error"]["code"] == "CONFIRMATION_REQUIRED"
-        assert tree_digest(target) == before and (log.read_bytes() if log.exists() else b"") == requests
-        applied = run(command)
-        assert applied.returncode == 0, applied.stdout + applied.stderr
-        scope = json.loads(applied.stdout)["data"]["result"]["scope"]
-        assert scope["parent_id"] == parent
-        parent = scope["id"]
-    for selector, expected in (
-        ("iss-00503", 0),
-        ("gh:example/repo#503", 0),
-        ("503", 3),
-        ("https://github.com/example/repo/issues/503", 3),
-    ):
-        observed = run(["scope", "show", selector, "--json"])
-        assert observed.returncode == expected, observed.stdout + observed.stderr
-    metadata = next((target / "spec-dock/initiatives").glob("*/.meta.json"))
-    metadata.with_name("meta.json").write_bytes(b"private old metadata")
-    before, requests = tree_digest(target), log.read_bytes()
-    for command in (
-        ["scope", "create", "initiative", "--backend", "github"],
-        ["scope", "import", "github", "initiative", "gh:example/repo#999"],
-    ):
-        denied = run([*command, "--title", "Legacy guard", "--yes", "--json"])
-        result = json.loads(denied.stdout)
-        assert denied.returncode == 5 and result["effects"] == []
-        assert result["error"]["code"] == "LOCAL_IO_FAILED"
-        assert "preserve both files and compare" in result["error"]["message"]
-        assert "manually" in result["error"]["message"]
-        assert tree_digest(target) == before and log.read_bytes() == requests
+        unlinked = run(command)
+        assert unlinked.returncode == 3, unlinked.stdout + unlinked.stderr
+        assert json.loads(unlinked.stdout)["error"]["code"] == "CANONICAL_NOT_LINKED"
+        assert tree_digest(target) == before and not log.exists()
     for shell in ("bash", "zsh", "fish"):
         generated = run(["completion", shell])
         assert generated.returncode == 0, generated.stdout + generated.stderr
