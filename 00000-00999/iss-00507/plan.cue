@@ -1,36 +1,32 @@
 package spec
 
 // 計画（Issue）。型 specdock/v1。
-// 作業しながら、手順の追加、変更、status の更新を、このファイルに直接書く。
 
-// 目標（任意）。
-// goal: "..."
+goal: "canonical の `scope delete` と `artifact create` が、途中の失敗で、起きたとおりの effects と status を返す。"
 
-// 実装の手順。番号（S-01、…）をキーにし、番号の順に並べる。
-// title と realizes（満たす要件・失敗の条件の番号）が必須。
-// status は todo（既定）、doing、done、dropped。after は先に済ませる手順の番号。
-// 1手順を1行に書き、status は title と realizes のすぐ後に置く。status の位置がそろうので一括で書き換えやすく、
-// 同じ手順に status を2つ書く誤りも防げる（同じ値の2つは CUE が黙ってまとめ、違う値なら誤りになる）。
-// すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
-// strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "3つの場面の失敗を注入するテストを書き、今のコードで落ちることを確かめる（Red）", realizes: ["R-01", "R-02"], status: "todo", session: "impl"}
+	"S-02": {title: "`canonical_scope_change.py` の `selection.clear` の記録と `attempted` の判定を直す（Green）", realizes: ["R-01"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-03": {title: "`canonical_artifact_write.py` で `artifacts/` を作った後の失敗を partial にし、既存のテストのコメントを直す（Green）", realizes: ["R-02"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02"], status: "todo", after: ["S-02", "S-03"], session: "impl"}
 }
 
-// テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
-// standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "`--clear-active` の削除で、記録を消した後の記述子の close に OSError を注入すると、終了コード6、`selection.clear succeeded`、`scope.delete not_attempted`、記録はなく Scope のディレクトリは残る（手本 `test_issue413_scope_delete.py::test_confirmed_direct_clear_survives_a_later_descriptor_cleanup_failure`）", verifies: ["R-01"]}
+	"T-02": {title: "Scope のディレクトリの最初の unlink を効かせた後に OSError を注入すると、終了コード6、`scope.delete unknown`、`remaining_paths` にそのディレクトリ、控えは残る", verifies: ["R-01"]}
+	"T-03": {title: "Scope の `artifact create` で `artifacts/` の mkdir を効かせた後に OSError を注入すると、終了コード6、`partial`、`ARTIFACT_PUBLICATION_INCOMPLETE`、effects が `artifact.directory unknown` と `artifact not_attempted`、空の `artifacts/` が残り、変更の記録はない（手本 `test_issue413_artifact.py::test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_without_publication`）", verifies: ["R-02"]}
+	"T-04": {title: "既存の `test_issue440_g2_scope_delete.py`、`test_issue440_g3_artifact.py`、`uv run pytest` の全体が通る", verifies: ["R-01", "R-02"]}
 }
 
-// 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
-// verification: "..."
-// rollback:     "..."
-// exit:         "..."
+verification: "`uv run pytest tests/cli_runtime/test_issue440_g2_scope_delete.py tests/cli_runtime/test_issue440_g3_artifact.py`、`make lint`、`uv run pytest`（全体）。"
+rollback:     "PR を閉じるか、マージ後なら `git revert` する。データの形は変えない。"
+exit:         "T-01〜T-04 が通り、PR がマージできる状態で、CI が通る。"
 
-// 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
-// レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+execution: {
+	sessions: impl: {task: "仕様化と実装", model: "opus", effort: "medium", rationale: "3 policy §4 standard の実装（epic-00512 の plan.cue の session std）"}
+	reviews: {
+		spec: {role: "仕様のレビュー", after: "S-01", model: "opus", effort: "high"}
+		code: {role: "コードのレビュー", after: "S-03", model: "opus", effort: "high"}
+		gate: {role: "最終品質ゲート", after: "S-04", model: "opus", effort: "high"}
+	}
+}

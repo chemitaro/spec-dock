@@ -3,7 +3,7 @@ package spec
 goal: "不採用の子孫があっても親を completed で閉じられるようにする。"
 
 steps: {
-	"S-01": {title: "テストを先に書く（Red）", realizes: ["R-01", "R-02"], status: "todo"}
+	"S-01": {title: "テストを先に書く（Red）。旧判定を固定する既存テスト（test_issue440_g2_scope_change.py の not_planned の子孫の2ケース）は、新しい判定に書き換える", realizes: ["R-01", "R-02"], status: "todo"}
 	"S-02": {title: "判定を1つの関数にまとめ、plan_close と _finish_rules から呼ぶ", realizes: ["R-01"], status: "todo", after: ["S-01"]}
 	"S-03": {title: "reference_cli.md、SKILL.md、写し、static-inventory を直す", realizes: ["R-02"], status: "todo", after: ["S-02"]}
 }

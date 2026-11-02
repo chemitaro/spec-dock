@@ -17,4 +17,4 @@ design: {
 	}
 }
 
-compatibility: "エラーのコード・終了コード・JSON の形は変えない。止まる条件が狭まるだけ（不採用の子孫を許す）。"
+compatibility: "エラーのコード・終了コード・JSON の形は変えない。止まる条件が狭まるだけ（不採用の子孫を許す）。不採用の子孫を持つ親の `scope close`／`work finish` は、終了コード3から0に変わる。この変更は #513 が migration.md の 0.5.1 の節に載せる（Epic の R-09 と decisions で採用済み。worker_done で統括にも伝える）。"
