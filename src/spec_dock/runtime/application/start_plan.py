@@ -12,10 +12,18 @@ from spec_dock.runtime.domain.git_ref import parse_commit_oid
 if TYPE_CHECKING:
     from spec_dock.runtime.application.project_context import ProjectContext
     from spec_dock.runtime.application.scope_query import ScopeView
-    from spec_dock.runtime.application.start_snapshot import LocalInput
     from spec_dock.runtime.application.worktree_observation import SelectionObservation, WorktreeSelection
     from spec_dock.runtime.domain.dependency_vnext import ReadinessResult
     from spec_dock.runtime.infra.work_target_store import SelectionHandle
+
+
+@dataclass(frozen=True)
+class LocalInput:
+    """One local file whose bytes and identity a plan expects to stay unchanged until publication."""
+
+    relative_path: str
+    payload: bytes
+    identity: tuple[int, int]
 
 
 class StartPlanError(ValueError):

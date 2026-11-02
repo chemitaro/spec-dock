@@ -12,7 +12,6 @@ import re
 import stat
 from typing import TYPE_CHECKING
 
-from spec_dock.runtime.domain.canonical_scaffold import rebase_spec_dock_links, strip_structure_front_matter
 from spec_dock.runtime.infra.json_store import open_guarded_directory
 from spec_dock.runtime.infra.template_scaffolder import (
     _open_parent_at,
@@ -43,11 +42,10 @@ def copy_scope_template_at(
     *,
     final_replacements: Mapping[str, str] | None = None,
 ) -> list[Path]:
-    """Copy a Scope template through a held directory descriptor, rendered, without title/parent lines and
-    with its spec-dock/docs links at the flat Scope depth.
+    """Copy a Scope template through a held directory descriptor, rendered.
 
     `final_replacements` fill their markers last, in one pass, so their values (a user's assurance reason) are
-    never rewritten by another replacement, the front matter rule or the link rebasing.
+    never rewritten by another replacement.
     """
     if not src_dir.is_dir():
         raise RuntimeError(f"Missing template directory: {src_dir}")
@@ -63,7 +61,7 @@ def copy_scope_template_at(
         except UnicodeDecodeError:
             payload, mode = source_bytes, source_mode
         else:
-            rendered = rebase_spec_dock_links(strip_structure_front_matter(render_text(text, replacements)))
+            rendered = render_text(text, replacements)
             rendered = _replace_once(rendered, final_replacements or {})
             payload = rendered.encode("utf-8")
             mode = source_mode if payload == source_bytes else 0o666

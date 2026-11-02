@@ -20,23 +20,8 @@ def _scaffold_file_paths(template_dir: Path, dest_dir: Path) -> list[Path]:
     return files
 
 
-def _rules_source_paths(
-    *,
-    kind: Literal["initiative", "epic", "issue"],
-    specdock_dir: Path,
-) -> list[Path]:
-    docs_rules_dir = specdock_dir / "docs" / "rules"
-    if kind == "initiative":
-        return [
-            docs_rules_dir / "initiative" / "epics.md",
-            docs_rules_dir / "initiative" / "artifacts.md",
-        ]
-    if kind == "epic":
-        return [
-            docs_rules_dir / "epic" / "issues.md",
-            docs_rules_dir / "epic" / "artifacts.md",
-        ]
-    return [docs_rules_dir / "issue" / "artifacts.md"]
+def _rules_source_path(*, kind: Literal["initiative", "epic", "issue"], specdock_dir: Path) -> Path:
+    return specdock_dir / "docs" / "rules" / kind / "artifacts.md"
 
 
 def _rules_scaffold_specs(
@@ -45,20 +30,7 @@ def _rules_scaffold_specs(
     dest_dir: Path,
     specdock_dir: Path,
 ) -> list[tuple[Path, Path]]:
-    rules_source_paths = _rules_source_paths(kind=kind, specdock_dir=specdock_dir)
-    if kind == "initiative":
-        return [
-            (dest_dir / "epics" / "rules.md", rules_source_paths[0]),
-            (dest_dir / "artifacts" / "rules.md", rules_source_paths[1]),
-        ]
-    if kind == "epic":
-        return [
-            (dest_dir / "issues" / "rules.md", rules_source_paths[0]),
-            (dest_dir / "artifacts" / "rules.md", rules_source_paths[1]),
-        ]
-    return [
-        (dest_dir / "artifacts" / "rules.md", rules_source_paths[0]),
-    ]
+    return [(dest_dir / "artifacts" / "rules.md", _rules_source_path(kind=kind, specdock_dir=specdock_dir))]
 
 
 def _open_relative_directory_at(root_fd: int, parts: tuple[str, ...]) -> int:
@@ -126,9 +98,9 @@ def _precheck_pre_github_create_rules_sources(
     kind: Literal["initiative", "epic", "issue"],
     specdock_dir: Path,
 ) -> None:
-    for target_path in _rules_source_paths(kind=kind, specdock_dir=specdock_dir):
-        if not target_path.exists() or not target_path.is_file():
-            raise RuntimeError(f"Missing rules source: {target_path}")
+    target_path = _rules_source_path(kind=kind, specdock_dir=specdock_dir)
+    if not target_path.exists() or not target_path.is_file():
+        raise RuntimeError(f"Missing rules source: {target_path}")
 
 
 def _replacements(

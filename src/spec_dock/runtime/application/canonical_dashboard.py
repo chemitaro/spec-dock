@@ -15,7 +15,7 @@ import stat
 from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.canonical_errors import CANONICAL_DASHBOARD_FAILED, CANONICAL_DASHBOARD_OCCUPIED
-from spec_dock.runtime.application.project_context import probe_workspace_mode
+from spec_dock.runtime.application.project_context import declares_schema_4
 from spec_dock.runtime.domain.canonical_dashboard import DASHBOARD_FILES, dashboard_inputs, input_hash
 from spec_dock.runtime.infra.canonical_files import FileOccupied, is_regular_file, replace_text_file
 from spec_dock.runtime.infra.canonical_registry import is_unregistered
@@ -82,7 +82,7 @@ def refresh_dashboard(
             if not (main / ".git").is_dir():  # a linked worktree: one clone has one structure (Epic ch. 13)
                 return DashboardOutcome(skipped="not_main")
             # Only a readable spec-dock/ directory can declare legacy mode; without one, _write records the failure.
-            if _is_directory(dashboard_directory(main)) and probe_workspace_mode(main) != "canonical":
+            if _is_directory(dashboard_directory(main)) and not declares_schema_4(main):
                 return DashboardOutcome(skipped="legacy_mode")
             return _redraw(entry, snapshot, main, snapshot_path=snapshot_path, state_root=state_root, now=now)
     except CycleBusy:

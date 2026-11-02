@@ -1,4 +1,4 @@
-"""Artifact identities and publications from worktree-local owner files."""
+"""`@root` Artifact identities and publications in this checkout's spec-dock/ (Scope Artifacts live in the catalog)."""
 
 from __future__ import annotations
 
@@ -11,10 +11,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock.runtime.application.artifact_query import list_artifacts, show_artifact
 from spec_dock.runtime.application.project_context import resolve_context
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
-from spec_dock.runtime.application.scope_query import load_scope_views
-from spec_dock.runtime.application.start_snapshot import capture_local_inputs, verify_local_inputs
-from spec_dock.runtime.application.worktree_observation import read_selection, resolve_scope
+from spec_dock.runtime.application.start_plan import LocalInput
 from spec_dock.runtime.domain.artifacts import (
     allocate_artifact_filename_for_timestamp,
     allocate_generic_imported_artifact_filename_for_timestamp,
@@ -34,7 +31,6 @@ if TYPE_CHECKING:
 
     from spec_dock.runtime.application.artifact_query import ArtifactCatalogEntry
     from spec_dock.runtime.application.project_context import ProjectContext
-    from spec_dock.runtime.application.start_snapshot import LocalInput
 
 
 def _view(entry: ArtifactCatalogEntry) -> dict[str, object]:
@@ -46,41 +42,34 @@ def _view(entry: ArtifactCatalogEntry) -> dict[str, object]:
     }
 
 
-def _verify_captured(context: ProjectContext, inputs: tuple[LocalInput, ...], *, root_owner: bool) -> None:
-    if not root_owner:
-        verify_local_inputs(context, inputs)
-        return
-    for expected in inputs:
-        observed = read_guarded_json_bytes(context.root / expected.relative_path)
-        if observed is None or observed[1:] != (expected.payload, expected.identity):
-            raise ValueError("Artifact workspace input changed")
+def _capture_declaration(context: ProjectContext) -> LocalInput:
+    """The workspace declaration as admitted; a root Artifact publication stops if it changes meanwhile."""
+    path = context.root / "spec-dock/workspace.json"
+    loaded = read_guarded_json_bytes(path)
+    if loaded is None or not isinstance(loaded[0], dict) or loaded[0] != context.workspace:
+        raise ValueError("workspace changed while capturing Artifact inputs")
+    return LocalInput(path.relative_to(context.root).as_posix(), loaded[1], loaded[2])
+
+
+def _verify_declaration(context: ProjectContext, expected: LocalInput) -> None:
+    observed = read_guarded_json_bytes(context.root / expected.relative_path)
+    if observed is None or observed[1:] != (expected.payload, expected.identity):
+        raise ValueError("Artifact workspace input changed")
 
 
 def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    root_without_current = namespace.scope == "@root" and namespace.expect_current is None
-    views = () if root_without_current else load_scope_views(context.root / "spec-dock")
-    selection = None if root_without_current else read_selection(context, views)
-    target = None if namespace.scope == "@root" else resolve_scope(context, views, namespace.scope, selection=selection)
-    check_scope_expectations(
-        context,
-        views,
-        selection,
-        target=target,
-        expected_current=namespace.expect_current,
-        expected_backend=namespace.expect_backend,
-    )
-    inputs = capture_local_inputs(context, views)
-    scope = target.id if target is not None else "@root"
-    owner = target.path if target is not None else context.root / "spec-dock"
+    """`artifact list|show --scope @root`; the caller has checked any --expect-current against the snapshot."""
+    declaration = _capture_declaration(context)
+    owner = context.root / "spec-dock"
     descriptor = open_guarded_directory(owner)
     try:
         if namespace.command_path == "artifact list":
-            catalog = list_artifacts(repo_root=context.root, scope=scope)
+            catalog = list_artifacts(repo_root=context.root)
             data = FamilyData(
                 "artifact-list", {"scope_id": catalog.scope_id, "items": tuple(map(_view, catalog.items))}
             )
         else:
-            entry = show_artifact(repo_root=context.root, scope=scope, artifact_id=namespace.artifact_id)
+            entry = show_artifact(repo_root=context.root, artifact_id=namespace.artifact_id)
             data = FamilyData("artifact", {"artifact": _view(entry), "changed": False})
         fresh = open_guarded_directory(owner)
         try:
@@ -91,7 +80,7 @@ def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> Op
             os.close(fresh)
     finally:
         os.close(descriptor)
-    _verify_captured(context, inputs, root_owner=scope == "@root")
+    _verify_declaration(context, declaration)
     return OperationResult(namespace.command_path, "succeeded", data, 0)
 
 
@@ -100,28 +89,10 @@ def mutate_artifact(
 ) -> OperationResult[object]:
     context.require_writer()
     imported = namespace.command_path == "artifact import file"
-    views = (
-        ()
-        if namespace.scope == "@root" and namespace.expect_current is None
-        else load_scope_views(context.root / "spec-dock")
-    )
-    selection = (
-        None if namespace.scope == "@root" and namespace.expect_current is None else read_selection(context, views)
-    )
-    target = None if namespace.scope == "@root" else resolve_scope(context, views, namespace.scope, selection=selection)
-    owner = target.path if target is not None else context.root / "spec-dock"
-    scope_id = target.id if target is not None else "root"
-    if namespace.expect_backend is not None and (target is None or namespace.expect_backend != target.backend.kind):
+    if namespace.expect_backend is not None:
         raise ValueError("owner backend does not match --expect-backend")
-    if namespace.expect_current is not None:
-        expected = resolve_scope(context, views, namespace.expect_current, selection=selection).id
-        if (
-            selection is None
-            or selection.status != "selected"
-            or selection.record is None
-            or selection.record.scope_id != expected
-        ):
-            raise ValueError("direct target does not match --expect-current")
+    owner = context.root / "spec-dock"
+    scope_id = "root"
     artifacts = owner / "artifacts"
     date = datetime.fromisoformat(clock.now_iso().replace("Z", "+00:00"))
     date = date.replace(tzinfo=timezone.utc) if date.tzinfo is None else date.astimezone(timezone.utc)
@@ -173,47 +144,26 @@ def mutate_artifact(
             "<YOUR_NAME>": os.environ.get("USER", "<YOUR_NAME>"),
             "YYYY-MM-DD": date.date().isoformat(),
         }
-        issue_ref = (
-            "#" + target.github_ref.rsplit("#", 1)[1] if target is not None and target.github_ref is not None else ""
-        )
-        replacements["<GITHUB_ISSUE_NUMBER_OR_URL>"] = issue_ref
-        if target is not None:
-            prefix = {"initiative": "INIT", "epic": "EPIC", "issue": "ISS"}[target.kind]
-            replacements[f"<{prefix}_ID>"] = target.id
-            replacements[f"<{prefix}_TITLE>"] = target.title
-            if target.kind == "epic":
-                assert target.parent_id is not None
-                replacements["<INIT_ID>"] = target.parent_id
-            elif target.kind == "issue":
-                parent_scope = next(view for view in views if view.id == target.parent_id)
-                assert parent_scope.parent_id is not None
-                replacements.update({
-                    "<EPIC_ID>": parent_scope.id,
-                    "<INIT_ID>": parent_scope.parent_id,
-                    "<FEATURE_ID>": target.id,
-                    "<FEATURE_NAME>": target.title,
-                    "<ISSUE_NUMBER_OR_URL>": issue_ref,
-                })
-        else:
-            for field in (
-                "INIT_ID",
-                "INIT_TITLE",
-                "EPIC_ID",
-                "EPIC_TITLE",
-                "ISS_ID",
-                "ISS_TITLE",
-                "FEATURE_ID",
-                "FEATURE_NAME",
-                "ISSUE_NUMBER_OR_URL",
-            ):
-                replacements[f"<{field}>"] = ""
+        replacements["<GITHUB_ISSUE_NUMBER_OR_URL>"] = ""
+        for field in (
+            "INIT_ID",
+            "INIT_TITLE",
+            "EPIC_ID",
+            "EPIC_TITLE",
+            "ISS_ID",
+            "ISS_TITLE",
+            "FEATURE_ID",
+            "FEATURE_NAME",
+            "ISSUE_NUMBER_OR_URL",
+        ):
+            replacements[f"<{field}>"] = ""
         for prefix in ("ARTIFACT", "ADR", "DISC", "RESEARCH", "INTERVIEW", "DECISION_CANDIDATE", "PR_REPAIR_BATCH"):
             replacements[f"<{prefix}_ID>"] = artifact_id
             replacements[f"<{prefix}_TITLE>"] = title
         for key, value in replacements.items():
             text = text.replace(key, value)
         payload, mode = text.encode("utf-8"), 0o666
-    inputs = capture_local_inputs(context, views)
+    declaration = _capture_declaration(context)
     initial_problem, initial_ledger = scan_artifact_slot_ledger(artifacts)
     if initial_problem is not None:
         raise ValueError(initial_problem)
@@ -230,7 +180,7 @@ def mutate_artifact(
         if fresh.clone_identity != context.clone_identity or fresh.worktree_identity != context.worktree_identity:
             raise ValueError("Git project physical identity changed")
         fresh.require_writer()
-        _verify_captured(fresh, inputs, root_owner=target is None)
+        _verify_declaration(fresh, declaration)
         if imported and source_snapshot() != source:
             raise ValueError("Artifact source changed")
         if not imported and read_regular_file(template_path) != template:
@@ -270,9 +220,7 @@ def mutate_artifact(
         publish_file(path, payload, stage_name=f".publish-{slot[0]}.tmp", verify=verify, mode=mode)
         published = True
         verify_inputs()
-        entry = show_artifact(
-            repo_root=context.root, scope="@root" if target is None else scope_id, artifact_id=artifact_id
-        )
+        entry = show_artifact(repo_root=context.root, artifact_id=artifact_id)
         return OperationResult(
             namespace.command_path,
             "succeeded",

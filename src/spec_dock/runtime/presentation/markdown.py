@@ -1,15 +1,7 @@
 from __future__ import annotations
 
-import json
-from typing import TYPE_CHECKING
-
 from spec_dock.runtime.domain.ids import deps_node_sort_key
-from spec_dock.runtime.presentation.contracts import DashboardArtifact
-from spec_dock.runtime.presentation.json_state import render_index_artifact
-from spec_dock.runtime.presentation.puml import _deps_disabled_error_text, _issue_ready_board_state
-
-if TYPE_CHECKING:
-    from spec_dock.runtime.application.contracts import SyncStateResult
+from spec_dock.runtime.presentation.puml import _issue_ready_board_state
 
 _DASHBOARD_TOP_LIMIT = 10
 _TREE_BOARD_BLOCKERS_LABEL_LIMIT = 3
@@ -111,39 +103,3 @@ def _render_dashboard_md(
 def render_dashboard_nodes_md(index_nodes: dict[str, object], *, top_limit: int = _DASHBOARD_TOP_LIMIT) -> str:
     """dashboard.md from index nodes that carry their own board_state (canonical mode, iss-00438)."""
     return _render_dashboard_md(index_nodes, active=None, top_limit=top_limit)
-
-
-def _render_deps_disabled_dashboard_md(*, error: str | None) -> str:
-    err = _deps_disabled_error_text(error)
-    lines: list[str] = []
-    lines.append("# Dashboard (generated)")
-    lines.append("")
-    lines.append("## DEPS_DISABLED")
-    lines.append("- deps_preflight_failed")
-    lines.append("- deps.valid=false")
-    lines.append("- mode: `sync --force`")
-    lines.append(f"- error: `{err}`")
-    lines.append("- ready/blocked 集計は無効です")
-    lines.append("")
-    lines.append("## Observability")
-    lines.append("- index: `spec-dock/.agent/index.json`")
-    lines.append("- ready board: `spec-dock/tree.puml`")
-    lines.append("- deps graph: `spec-dock/deps-issues.puml`")
-    lines.append("- raw deps graph: `spec-dock/deps-raw.puml`")
-    lines.append("")
-    return "\n".join(lines)
-
-
-def render_dashboard(result: SyncStateResult, *, top_limit: int = 10) -> DashboardArtifact:
-    if result.deps_preflight_error is not None:
-        text = _render_deps_disabled_dashboard_md(error=result.deps_preflight_error)
-        return DashboardArtifact(markdown_text=text if text.endswith("\n") else text + "\n")
-
-    index_artifact = render_index_artifact(result)
-    index_payload = json.loads(index_artifact.all_json_text)
-    nodes = index_payload.get("nodes") if isinstance(index_payload, dict) else {}
-    active = index_payload.get("active") if isinstance(index_payload, dict) else None
-    if not isinstance(nodes, dict):
-        nodes = {}
-    text = _render_dashboard_md(nodes, active=active if isinstance(active, dict) else None, top_limit=top_limit)
-    return DashboardArtifact(markdown_text=text if text.endswith("\n") else text + "\n")

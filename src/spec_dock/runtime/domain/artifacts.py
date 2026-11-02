@@ -234,30 +234,14 @@ def _utf8_prefix(value: str, byte_budget: int) -> str:
     return "".join(result)
 
 
-def is_supported_artifact_type(artifact_type: str) -> bool:
-    return artifact_type in SUPPORTED_ARTIFACT_TYPES
-
-
 def can_create_artifact_type(artifact_type: str) -> bool:
     return artifact_type in CURRENT_CREATABLE_ARTIFACT_TYPES
-
-
-def is_direct_artifact_type(artifact_type: str) -> bool:
-    return can_create_artifact_type(artifact_type)
-
-
-def is_routing_only_artifact_type(artifact_type: str) -> bool:
-    return artifact_type in ROUTING_ONLY_ARTIFACT_TYPES
 
 
 def is_ambiguous_blank_artifact_slug(slug: str) -> bool:
     return any(
         slug == artifact_type or slug.startswith(f"{artifact_type}-") for artifact_type in SUPPORTED_ARTIFACT_TYPES
     )
-
-
-def is_grandfathered_legacy_artifact_filename(name: str) -> bool:
-    return parse_sequential_artifact_filename(name) is not None
 
 
 def parse_sequential_artifact_filename(name: str) -> SequentialArtifactFilename | None:
@@ -348,13 +332,6 @@ def _is_valid_artifact_timestamp(timestamp: str) -> bool:
     return parsed.strftime("%Y%m%dt%H%M%Sz") == timestamp
 
 
-def artifact_id_from_path(path: Path) -> str:
-    parsed = parse_artifact_filename(path.name)
-    if parsed is None:
-        raise RuntimeError(f"Invalid artifact filename: {path.name}")
-    return parsed.artifact_id
-
-
 def is_malformed_artifact_candidate(path: Path) -> bool:
     if path.name == "rules.md":
         return False
@@ -383,11 +360,6 @@ def is_malformed_artifact_candidate(path: Path) -> bool:
                 if "-".join(parts[start:end]) == artifact_type:
                     return True
     return False
-
-
-def scan_artifact_duplicate_state(artifacts_dir: Path) -> tuple[str | None, set[str]]:
-    error, ledger = scan_artifact_slot_ledger(artifacts_dir)
-    return error, set(ledger.artifact_ids)
 
 
 def scan_artifact_slot_ledger(

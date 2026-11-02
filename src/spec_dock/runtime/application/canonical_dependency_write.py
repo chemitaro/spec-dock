@@ -2,7 +2,7 @@
 
 The edge is GitHub's blocked-by between two Scope Issues. Both ends are read again and the source's current
 blocked-by list replaces the snapshot's before deciding; a cycle or a rule violation stops before the write.
-No `.meta.json` and no catalog file is written.
+No catalog file is written.
 """
 
 from __future__ import annotations

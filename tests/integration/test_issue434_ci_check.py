@@ -22,17 +22,25 @@ if TYPE_CHECKING:
 
 PROVIDER = provider_root()
 SCRIPT = PROVIDER / ".github/scripts/specdock-ci-check.sh"
-VALIDATE_SCRIPT = PROVIDER / ".github/scripts/specdock-ci-validate.sh"
 
 
-def test_the_check_script_hardens_the_source_like_the_validate_script() -> None:
-    check = SCRIPT.read_text(encoding="utf-8").splitlines()
-    validate = VALIDATE_SCRIPT.read_text(encoding="utf-8").splitlines()
+def test_the_check_script_hardens_the_source_before_building() -> None:
+    """The hardening the retired specdock-ci-validate.sh shared (removed in 0.5.0, iss-00440) stays in this script."""
+    text = SCRIPT.read_text(encoding="utf-8")
+    check = text.splitlines()
     assert check[-1] == '"$venv_root/bin/spec-dock" --project "$target_root" canonical check --json'
-    assert [line for line in check if "usage:" not in line][:-1] == [line for line in validate if "usage:" not in line][
-        :-1
-    ]
-    assert "usage: specdock-ci-check.sh SOURCE_CHECKOUT TARGET_CHECKOUT EXPECTED_SOURCE_SHA" in SCRIPT.read_text()
+    assert "usage: specdock-ci-check.sh SOURCE_CHECKOUT TARGET_CHECKOUT EXPECTED_SOURCE_SHA" in text
+    for line in (
+        "set -euo pipefail",
+        'if [[ ! "$expected_sha" =~ ^([0-9a-f]{40}|[0-9a-f]{64})$ ]]; then',
+        "actual_sha=\"$(git -C \"$source_root\" rev-parse --verify 'HEAD^{commit}')\"",
+        'if [[ -n "$(git -C "$source_root" status --porcelain --untracked-files=all)" ]]; then',
+        'git -C "$source_root" archive "$actual_sha" src/spec_dock pyproject.toml README.md setup.py | tar -x -C "$build_root"',
+        "unset PYTHONPATH PYTHONHOME PYTHONUSERBASE PYTHONSTARTUP",
+        'python3 -m venv --without-pip "$venv_root"',
+    ):
+        assert line in check, line
+    assert not (PROVIDER / ".github/scripts/specdock-ci-validate.sh").exists()
 
 
 def _check(source: Path, target: Path, sha: str) -> subprocess.CompletedProcess[str]:

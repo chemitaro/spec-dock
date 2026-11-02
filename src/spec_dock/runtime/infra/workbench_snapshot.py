@@ -11,7 +11,6 @@ from spec_dock.runtime.infra.file_publication import FileSnapshot, read_regular_
 from spec_dock.runtime.infra.json_store import open_guarded_directory
 
 if TYPE_CHECKING:
-    from collections.abc import Set
     from pathlib import Path
 
 
@@ -62,58 +61,3 @@ def read_entry(path: Path) -> WorkbenchEntry:
             os.close(descriptor)
     finally:
         os.close(parent)
-
-
-def snapshot_workbench(
-    root: Path, *, missing_ok: bool = False, paths: Set[str] | None = None, ignore_path: str | None = None
-) -> dict[str, WorkbenchEntry]:
-    try:
-        descriptor = open_guarded_directory(root)
-    except FileNotFoundError:
-        parent = open_guarded_directory(root.parent)
-        try:
-            if os.path.lexists(root) or not missing_ok:
-                raise
-        finally:
-            os.close(parent)
-        return {}
-    entries: dict[str, WorkbenchEntry] = {}
-    try:
-        opened = os.fstat(descriptor)
-        entries["."] = WorkbenchEntry("directory", (opened.st_dev, opened.st_ino), stat.S_IMODE(opened.st_mode))
-
-        def walk(path: Path, held: int) -> None:
-            names = sorted(os.listdir(held))
-            for name in names:
-                child = path / name
-                relative = child.relative_to(root).as_posix()
-                if relative == ignore_path or (paths is not None and relative not in paths):
-                    continue
-                observed = os.stat(name, dir_fd=held, follow_symlinks=False)
-                entry = read_entry(child)
-                if entry.identity != (observed.st_dev, observed.st_ino):
-                    raise ValueError("Workbench entry binding changed")
-                entries[relative] = entry
-                if entry.kind == "directory":
-                    nested = open_guarded_directory(child)
-                    try:
-                        opened = os.fstat(nested)
-                        if entry.identity != (opened.st_dev, opened.st_ino):
-                            raise ValueError("Workbench directory identity changed")
-                        walk(child, nested)
-                    finally:
-                        os.close(nested)
-            if paths is None and names != sorted(os.listdir(held)):
-                raise ValueError("Workbench entries changed while reading")
-            fresh = open_guarded_directory(path)
-            try:
-                left, right = os.fstat(held), os.fstat(fresh)
-                if (left.st_dev, left.st_ino) != (right.st_dev, right.st_ino):
-                    raise ValueError("Workbench directory identity changed")
-            finally:
-                os.close(fresh)
-
-        walk(root, descriptor)
-        return entries
-    finally:
-        os.close(descriptor)

@@ -44,7 +44,7 @@ from spec_dock.runtime.application.canonical_link import (
     main_not_migrated_message,
 )
 from spec_dock.runtime.application.canonical_tools_check import tool_findings
-from spec_dock.runtime.application.project_context import probe_workspace_mode
+from spec_dock.runtime.application.project_context import declares_schema_4
 from spec_dock.runtime.domain.canonical_content import CANONICAL_FORMAT, FORMAT_FILE, format_writable, read_format
 from spec_dock.runtime.domain.canonical_layout import GITIGNORE_PATH, MINIMUM_GIT_VERSION
 from spec_dock.runtime.infra import canonical_git, runtime_environment
@@ -127,7 +127,7 @@ def status_of(
             # Report the denied path as the access problem and keep reporting the other items.
             inspect_error = error
     catalog_item = _catalog_item(layout, observation, problem)
-    main_migrated = layout.is_main or probe_workspace_mode(layout.main_checkout) == "canonical"
+    main_migrated = layout.is_main or declares_schema_4(layout.main_checkout)
     link_item = _link_item(observation, problem, main_migrated=main_migrated)
     exclude_item = _exclude_item(layout, observation, problem)
     access_item = _access_item(layout, observation, problem, sandboxed=environment.codex_sandbox and not layout.is_main)

@@ -11,10 +11,7 @@ from typing import TYPE_CHECKING
 
 from spec_dock import __version__
 from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_LINKED, CANONICAL_NOT_LINKED_RECOVERY
-from spec_dock.runtime.application.project_context import resolve_context, resolve_git_context
-from spec_dock.runtime.application.scope_expectations import check_scope_expectations
-from spec_dock.runtime.application.scope_query import load_scope_views
-from spec_dock.runtime.application.worktree_observation import read_selection
+from spec_dock.runtime.application.project_context import resolve_git_context
 from spec_dock.runtime.infra.file_publication import (
     FilePublicationIncomplete,
     FileSnapshot,
@@ -52,17 +49,6 @@ def installation_context(namespace: argparse.Namespace, cwd: Path) -> GitContext
 def install_static_assets(namespace: argparse.Namespace, context: GitContext) -> OperationResult[object]:
     if namespace.expect_backend is not None:
         raise ValueError("--expect-backend requires one existing Scope target")
-    if namespace.expect_current is not None:
-        project = resolve_context(str(context.root), context.root, timeout=namespace.timeout)
-        views = load_scope_views(context.root / "spec-dock")
-        check_scope_expectations(
-            project,
-            views,
-            read_selection(project, views),
-            target=None,
-            expected_current=namespace.expect_current,
-            expected_backend=None,
-        )
     assets = package_static_assets()
     data: dict[str, object] = {
         "target": str(context.root),

@@ -1,8 +1,8 @@
 """Shared reading side of canonical-mode commands: the structure snapshot as legacy-shaped Scope views.
 
 Structure (titles, kinds, states, parents, dependencies) comes from the structure snapshot at display freshness
-(C10); a Scope's directory is always `<catalog>/<bucket>/<ID>` (C3). Views carry `.meta.json`-free values in the legacy
-`ScopeView` shape so the unchanged legacy helpers (selection, expectations, listing, navigation links, Artifact
+(C10); a Scope's directory is always `<catalog>/<bucket>/<ID>` (C3). Views carry the values in the
+`ScopeView` shape so the shared helpers (selection, expectations, listing, navigation links, Artifact
 listing) work on them. A view's path goes through this checkout's `spec-dock/initiatives` link and is never
 resolved, so paths relative to `spec-dock/` stay `initiatives/<bucket>/<ID>`.
 

@@ -19,7 +19,7 @@ from spec_dock.runtime.application.canonical_catalog import (
     require_linked,
     require_writable_format,
 )
-from spec_dock.runtime.application.canonical_errors import CANONICAL_NOT_APPLICABLE, CanonicalCommandError
+from spec_dock.runtime.application.canonical_errors import CanonicalCommandError
 from spec_dock.runtime.application.canonical_scopes import (
     OFFLINE_MESSAGE,
     build_canonical_scopes,
@@ -329,17 +329,6 @@ def check_expectations(
         expected_current=namespace.expect_current,
         expected_backend=namespace.expect_backend,
     )
-
-
-def refuse_slug(namespace: argparse.Namespace) -> None:
-    """Canonical IDs and directory names come from the Issue number; a slug has no place (Epic design ch. 7)."""
-    if getattr(namespace, "slug", None) is not None:
-        raise CanonicalCommandError(
-            CANONICAL_NOT_APPLICABLE,
-            "--slug does not apply in canonical mode: the ID and directory name come from the GitHub Issue number",
-            recovery=("Run the same command without --slug.",),
-            details={"argument": "--slug"},
-        )
 
 
 def needs_confirmation(namespace: argparse.Namespace) -> bool:

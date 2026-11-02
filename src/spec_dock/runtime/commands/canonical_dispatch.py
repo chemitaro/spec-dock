@@ -12,7 +12,6 @@ from spec_dock.runtime.application.canonical_check import check_canonical_commit
 from spec_dock.runtime.application.canonical_dependency_write import mutate_dependency
 from spec_dock.runtime.application.canonical_hold import run_canonical_accept, run_canonical_restore
 from spec_dock.runtime.application.canonical_link import run_canonical_link
-from spec_dock.runtime.application.canonical_refusals import refuse_workspace_migrate
 from spec_dock.runtime.application.canonical_remove import run_canonical_remove
 from spec_dock.runtime.application.canonical_resume import run_canonical_resume
 from spec_dock.runtime.application.canonical_scope_change import delete_scope, edit_scope, lifecycle_scope, move_scope
@@ -40,7 +39,6 @@ from spec_dock.runtime.application.canonical_worktrees import (
     bootstrap_worktree,
     create_worktree_and_link,
     list_worktrees,
-    refuse_workbench_copy,
     remove_worktree,
     show_worktree,
 )
@@ -52,7 +50,6 @@ RepositoryIndependentHandler = Callable[[argparse.Namespace, Path], OperationRes
 
 # Keyed by public leaf path: every leaf that dispatch() does not route before the mode branch (Epic G7, iss-00436).
 CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
-    "workspace migrate": refuse_workspace_migrate,
     "canonical link": run_canonical_link,
     "canonical status": run_canonical_status,
     "worktree create": create_worktree_and_link,
@@ -79,7 +76,6 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "worktree show": show_worktree,
     "worktree remove": remove_worktree,
     "worktree bootstrap": bootstrap_worktree,
-    "workbench copy": refuse_workbench_copy,
     "workspace sync": sync_workspace,
     "workspace validate": validate_workspace,
     "workspace doctor": diagnose_workspace,

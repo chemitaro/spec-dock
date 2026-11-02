@@ -6,12 +6,9 @@ from dataclasses import dataclass
 import stat
 from typing import TYPE_CHECKING, Literal
 
-from spec_dock.runtime.application.project_context import OLD_WRITER_PROTOCOL, resolve_context
+from spec_dock.runtime.application.project_context import OLD_WRITER_PROTOCOL
 from spec_dock.runtime.application.scope_query import show_scope
-from spec_dock.runtime.domain.canonical_content import FORMAT_FILE
-from spec_dock.runtime.domain.canonical_layout import CANONICAL_BRANCH
 from spec_dock.runtime.domain.selectors import ActiveScopeSelector, parse_scope_selector
-from spec_dock.runtime.infra.git_cli import worktree_list
 from spec_dock.runtime.infra.work_target_store import WorkTargetStore
 
 if TYPE_CHECKING:
@@ -134,56 +131,3 @@ class WorktreeSelection:
     worktree_identity: PhysicalIdentity | None
     git: GitWorktreeRecord
     error: OSError | ValueError | RuntimeError | None = None
-
-
-def observe_worktrees(context: ProjectContext, *, timeout: float = 30) -> tuple[WorktreeSelection, ...]:
-    from spec_dock.runtime.application.scope_query import load_scope_views
-
-    seen: set[object] = set()
-    rows: list[WorktreeSelection] = []
-    for entry in worktree_list(context.root, timeout=timeout):
-        direct: StoredSelection | None = None
-        identity: PhysicalIdentity | None = None
-        try:
-            if entry.inventory_error is not None:
-                raise ValueError(entry.inventory_error)
-            if entry.bare:
-                raise ValueError("bare repository is not a working tree")
-            # The one canonical-mode exception (iss-00429, coordinator decision D1): a clone's catalog worktree has
-            # no workspace declaration and selects nothing, so it is not observed.
-            if entry.branch == CANONICAL_BRANCH and (entry.path / FORMAT_FILE).is_file():
-                continue
-            other = resolve_context(str(entry.path), context.root, timeout=timeout)
-            identity = other.worktree_identity
-            if other.clone_identity != context.clone_identity:
-                raise ValueError("worktree common directory identity mismatch")
-            if other.worktree_identity in seen:
-                continue
-            seen.add(other.worktree_identity)
-            with WorkTargetStore(other.root) as store:
-                direct = store.read()
-            views = (
-                load_scope_views(other.root / "spec-dock", target_id=direct.record.scope_id, timeout=timeout)
-                if direct.record is not None
-                else ()
-            )
-            selection = read_selection(other, views)
-            rows.append(WorktreeSelection(str(entry.path), selection, views, identity, entry))
-        except (OSError, ValueError, RuntimeError) as error:
-            rows.append(
-                WorktreeSelection(
-                    str(entry.path),
-                    SelectionObservation(
-                        "unavailable",
-                        direct.record if direct else None,
-                        direct.handle if direct else None,
-                        entry.branch,
-                        reason=str(error),
-                    ),
-                    (),
-                    identity,
-                    entry,
-                    error,
-                )
-            )
-    return tuple(rows)

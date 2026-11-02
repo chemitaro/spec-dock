@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Final, Literal
+from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.domain.writer_admission import require_workspace_write
 from spec_dock.runtime.infra.git_process import run_git
@@ -19,10 +19,13 @@ if TYPE_CHECKING:
 
 NEW_WRITER_PROTOCOL = "specdock.worktree-writer/v1"
 OLD_WRITER_PROTOCOL = "specdock.writer/v1"
-LEGACY_WORKSPACE_SCHEMA: Final = 3
 CANONICAL_WORKSPACE_SCHEMA: Final = 4
-WorkspaceMode = Literal["legacy", "canonical"]
-_MODES: Final[dict[int, WorkspaceMode]] = {LEGACY_WORKSPACE_SCHEMA: "legacy", CANONICAL_WORKSPACE_SCHEMA: "canonical"}
+# The last schema before canonical storage; SpecDock 0.5.0 only names it to stop with CANONICAL_NOT_MIGRATED.
+NOT_MIGRATED_WORKSPACE_SCHEMA: Final = 3
+
+
+class WorkspaceNotMigrated(ValueError):
+    """The declaration is schema 3: this SpecDock no longer reads unmigrated repositories."""
 
 
 @dataclass(frozen=True)
@@ -39,11 +42,6 @@ class GitContext:
 class ProjectContext(GitContext):
     workspace: dict[str, object]
 
-    @property
-    def mode(self) -> WorkspaceMode:
-        """Schema 3 keeps the legacy behavior during migration; schema 4 is canonical mode."""
-        return workspace_mode(self.workspace)
-
     def require_writer(self) -> None:
         if self.workspace.get("writer_protocol") != NEW_WRITER_PROTOCOL:
             raise ValueError("workspace requires explicit migration to specdock.worktree-writer/v1")
@@ -58,6 +56,29 @@ def physical_identity(path: Path) -> PhysicalIdentity:
 def resolve_context(project: str | None, cwd: Path, *, timeout: float = 30) -> ProjectContext:
     root, common = _resolve_git_paths(project, cwd, timeout=timeout)
     workspace = read_workspace_declaration(root / "spec-dock/workspace.json")
+    git = _read_git_context(root, common, timeout=timeout)
+    return ProjectContext(
+        git.root, git.common_dir, git.clone_identity, git.worktree_identity, git.head, git.branch, workspace
+    )
+
+
+def resolve_observed_context(project: str, cwd: Path, *, timeout: float = 30) -> ProjectContext:
+    """Another worktree of this clone, for observing only its Git identity and direct selection record.
+
+    Unlike resolve_context, a schema-3 declaration is admitted here, so a linked worktree left on a pre-migration
+    branch keeps being observed as in 0.4.2 (iss-00440, coordinator decision 2026-11-02). Nothing else of that
+    worktree is read, and every command run in it still stops with CANONICAL_NOT_MIGRATED.
+    """
+    root, common = _resolve_git_paths(project, cwd, timeout=timeout)
+    path = root / "spec-dock/workspace.json"
+    try:
+        workspace = read_workspace_declaration(path)
+    except WorkspaceNotMigrated:
+        loaded = read_guarded_json(path)
+        assert loaded is not None and isinstance(loaded[0], dict)
+        workspace = loaded[0]
+        if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
+            raise ValueError("workspace writer protocol is unknown") from None
     git = _read_git_context(root, common, timeout=timeout)
     return ProjectContext(
         git.root, git.common_dir, git.clone_identity, git.worktree_identity, git.head, git.branch, workspace
@@ -102,25 +123,43 @@ def read_workspace_declaration(path: Path) -> dict[str, object]:
     if loaded is None or not isinstance(loaded[0], dict):
         raise ValueError("workspace declaration is missing or invalid")
     workspace = loaded[0]
-    workspace_mode(workspace)
+    _require_schema_4(workspace)
     if workspace.get("writer_protocol") not in (NEW_WRITER_PROTOCOL, OLD_WRITER_PROTOCOL):
         raise ValueError("workspace writer protocol is unknown")
     return workspace
 
 
-def workspace_mode(workspace: Mapping[str, object]) -> WorkspaceMode:
+def _require_schema_4(workspace: Mapping[str, object]) -> None:
     version = workspace.get("schema_version")
-    if type(version) is not int or version not in _MODES:
-        raise ValueError("workspace requires known schema 3 or 4")
-    return _MODES[version]
+    if type(version) is int and version == NOT_MIGRATED_WORKSPACE_SCHEMA:
+        raise WorkspaceNotMigrated("workspace declares schema 3; it is not migrated to canonical storage")
+    if type(version) is not int or version != CANONICAL_WORKSPACE_SCHEMA:
+        raise ValueError("workspace requires known schema 4")
 
 
-def probe_workspace_mode(root: Path) -> WorkspaceMode | None:
-    """Classify a valid declaration without failing; used only where today's routes skip resolve_context."""
+def require_migrated(root: Path) -> None:
+    """Stop on a strictly readable schema-3 declaration; anything else is left to the caller's own admission.
+
+    The paths that do not admit the declaration (installation, raw doctor) observe it with the diagnostic reader,
+    so an ambiguous file (duplicate keys, not an object, unsafe) keeps being reported as it was in 0.4.2.
+    """
+    from spec_dock.runtime.infra.legacy_reader import inspect_json_file
+
+    observed = inspect_json_file(root / "spec-dock/workspace.json")
+    payload = observed.payload if observed.classification == "observed" else None
+    if isinstance(payload, dict):
+        version = payload.get("schema_version")
+        if type(version) is int and version == NOT_MIGRATED_WORKSPACE_SCHEMA:
+            raise WorkspaceNotMigrated("workspace declares schema 3; it is not migrated to canonical storage")
+
+
+def declares_schema_4(root: Path) -> bool:
+    """True when root holds an admissible schema-4 declaration; never raises."""
     try:
-        return workspace_mode(read_workspace_declaration(root / "spec-dock/workspace.json"))
+        read_workspace_declaration(root / "spec-dock/workspace.json")
     except (OSError, ValueError, RuntimeError, RecursionError):
-        return None
+        return False
+    return True
 
 
 def _git(root: Path, *args: str, allow_missing: bool = False, timeout: float = 30) -> str:
