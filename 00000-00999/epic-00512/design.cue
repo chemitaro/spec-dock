@@ -51,6 +51,11 @@ design: {
 		text:      "統括が、対象の一覧（パス、大きさ、作られた時期と理由、消したときに失うもの）を作って利用者に示す。対象：`worktrees/i12-prep/backups/`、`worktrees/i12-prep/migrate-to-canonical-state/`、`worktrees/spec-dock-042/backups/`、`worktrees/spec-dock-050/backups/`、`/private/tmp/spec-dock-v0.4.*` と `v0.5.0` の作業の置き場、版3の worktree `local-macos-vm-ci` と `schema1-preserving-migration-20261004`。版3の worktree は、#463（止めている）の再開のしかたと合わせて、main を取り込むか消すかを利用者が決める。worktree は `spec-dock worktree remove` で、正確な対象と結果を許可された後だけに消す。"
 		satisfies: ["R-08", "F-03"]
 	}
+	"D-09": {
+		title:     "完了の判定の子孫"
+		text:      "`scope_completion_plan.py` と `canonical_work.py` の子孫の判定で、`completed` と `not-planned` を「閉じた子孫」として扱い、開いている子孫と状態が分からない子孫だけを止める。`DESCENDANT_NOT_COMPLETED` のコードと終了コードは変えない。"
+		satisfies: ["R-09"]
+	}
 }
 
 compatibility: "0.5.1 は、requirement.cue の constraints に挙げた直し（#506、#508、#510 の、誤って進んでいた操作を止めること、#507 の、途中の失敗を `partial`（終了コード6）で返すこと）のほかは、0.5.0 の公開の契約を変えない。変わる点は #513 が `migration.md` の 0.5.1 の節に書く。0.5.0 の配布資産を持つリポジトリは、`installation update` で上がる。"

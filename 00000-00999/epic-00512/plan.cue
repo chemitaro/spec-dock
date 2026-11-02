@@ -32,10 +32,16 @@ slices: {
 		after:   ["iss-00508"]
 		session: "std"
 	}
+	"iss-00520": {
+		covers:  ["R-09"]
+		text:    "第2波。#506 と #507 と並べる。#506 も `scope close` を直すので、ぶつかったら後にマージするほうが main を取り込む。"
+		after:   ["iss-00508"]
+		session: "light"
+	}
 	"iss-00511": {
 		covers:  ["R-06"]
-		text:    "第3波。ほかの直しが変えた文書も含めて整えるので、#506、#507、#509、#510 の後に行う。"
-		after:   ["iss-00506", "iss-00507", "iss-00509", "iss-00510"]
+		text:    "第3波。ほかの直しが変えた文書も含めて整えるので、#506、#507、#509、#510、#520 の後に行う。"
+		after:   ["iss-00506", "iss-00507", "iss-00509", "iss-00510", "iss-00520"]
 		session: "light"
 	}
 	"iss-00513": {
@@ -54,7 +60,7 @@ slices: {
 
 verification: "各 Issue の PR で `make lint` と `uv run pytest`（全体）と CI を通す。standard の Issue は、仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）を通す。light の Issue は、仕様のレビュー opus/medium、コードのレビュー sonnet/high、最終品質ゲート opus/high（1人）。配布の後、5つのリポジトリで `canonical status` と検査のワークフローを確かめる。"
 rollback: "マージの前なら PR を閉じる。マージの後で配る前なら `git revert`。配った後なら、パッケージを 0.5.0 に戻し、各リポジトリの配布の PR を `git revert` する。片付け（#514）は戻せないので、利用者の許可を条件にする。"
-exit: "#506〜#511 と #513 と #514 が閉じ、5つのリポジトリが 0.5.1 で `canonical status` が ok、控えの扱いが #514 の report.md に記録され、この Epic の report.md に結果をまとめた。"
+exit: "#506〜#511、#513、#514、#520 が閉じ、epic-00424 を閉じ、5つのリポジトリが 0.5.1 で `canonical status` が ok、控えの扱いが #514 の report.md に記録され、この Epic の report.md に結果をまとめた。"
 
 execution: {
 	sessions: {
