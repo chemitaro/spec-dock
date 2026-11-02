@@ -25,7 +25,11 @@ SKILL_FILES = (
 AGENTS_FILES = tuple(f".agents/skills/{name}" for name in SKILL_FILES)
 CLAUDE_FILES = tuple(f".claude/skills/{name}" for name in SKILL_FILES)
 DISTRIBUTED = {
-    **{f".claude/skills/{name}": (PROVIDER / name).read_bytes() for name in SKILL_FILES[:3]},
+    **{f".claude/skills/{name}": (PROVIDER / name).read_bytes() for name in SKILL_FILES[1:3]},
+    # The bytes earlier versions copied into .claude; the .agents skills changed since (0.5.0, iss-00440).
+    ".claude/skills/spec-dock-grill-with-docs/SKILL.md": (
+        ROOT / "tests/fixtures/issue421/spec-dock-grill-with-docs-skill-acb7e66.txt"
+    ).read_bytes(),
     ".claude/skills/spec-dock/SKILL.md": (ROOT / "tests/fixtures/issue421/spec-dock-skill-4d25a8b4.txt").read_bytes(),
 }
 USER_FILES = {

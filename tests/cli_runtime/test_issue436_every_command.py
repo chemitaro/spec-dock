@@ -1,6 +1,6 @@
-"""Every public command answers in canonical mode (iss-00436, Epic G7): a canonical handling or a guided refusal.
+"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440).
 
-One linked schema-4 clone with the fake GitHub runs all 55 leaves once. GitHub is the fake on PATH, the catalog
+One linked schema-4 clone with the fake GitHub runs all 53 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
 pushes to the temporary bare remote and the save wait of `work finish` runs on an injected clock.
 """
 
@@ -25,7 +25,7 @@ from tests.support.canonical_writes import WriteWorld
 if TYPE_CHECKING:
     from pathlib import Path
 
-# Routed by dispatch() before the mode branch: they read the declaration themselves or need none.
+# Routed by dispatch() before resolve_context: they read the declaration themselves or need none.
 MODE_INDEPENDENT = {
     "installation show",
     "installation init",
@@ -63,9 +63,57 @@ def test_every_leaf_has_a_route_in_canonical_mode() -> None:
         and path not in REPOSITORY_INDEPENDENT_HANDLERS
         and path not in MODE_INDEPENDENT
     ]
-    assert len(LEAF_PATHS) == 55
+    assert len(LEAF_PATHS) == 53
     assert unrouted == []
-    assert set(CANONICAL_HANDLERS) <= set(LEAF_PATHS)
+    assert set(CANONICAL_HANDLERS) == set(LEAF_PATHS) - MODE_INDEPENDENT - {"canonical check"}
+    assert len(CANONICAL_HANDLERS) == 46
+
+
+# Removed in 0.5.0 (iss-00440, R-440-02): commands and arguments that canonical mode only refused.
+REMOVED_COMMANDS = (
+    ("workspace", "migrate", "--to-schema", "3", "--to-writer-protocol", "specdock.worktree-writer/v1"),
+    ("workbench", "copy", "--scope", "iss-00003", "--to-worktree", "/tmp/x"),
+)
+REMOVED_ARGUMENTS = (
+    ("workspace", "validate", "--ci"),
+    ("workspace", "sync", "--source", "local"),
+    ("dependency", "check", "iss-00003", "--source", "local"),
+    *(
+        ("scope", "create", kind, "--backend", "github", *parent, "--title", "x", "--slug", "x")
+        for kind, parent in (("initiative", ()), ("epic", ("--parent", "init-00001")), ("issue", ("--parent", "e")))
+    ),
+    *(
+        ("scope", "import", "github", kind, "7", *parent, "--title", "x", "--slug", "x")
+        for kind, parent in (("initiative", ()), ("epic", ("--parent", "init-00001")), ("issue", ("--parent", "e")))
+    ),
+)
+
+
+@pytest.mark.parametrize("argv", [*REMOVED_COMMANDS, *REMOVED_ARGUMENTS])
+def test_removed_commands_and_arguments_are_usage_errors(
+    argv: tuple[str, ...], capsys: pytest.CaptureFixture[str]
+) -> None:
+    assert main([*argv, "--json"]) == 2
+    envelope = json.loads(capsys.readouterr().out)
+    assert envelope["error"]["code"] == "USAGE_ERROR" and envelope["effects"] == []
+
+
+def test_removed_commands_are_absent_from_help_and_completion(capsys: pytest.CaptureFixture[str]) -> None:
+    for argv in (["help"], ["completion", "bash"], ["completion", "zsh"], ["completion", "fish"]):
+        assert main(argv) == 0
+        text = capsys.readouterr().out
+        assert "migrate" not in text and "workbench" not in text, argv
+
+
+def test_refusal_only_codes_are_gone_from_the_runtime() -> None:
+    from pathlib import Path
+
+    import spec_dock.runtime
+
+    root = Path(spec_dock.runtime.__file__).parent
+    for code in ("CANONICAL_NOT_APPLICABLE", "CANONICAL_WORKBENCH_SHARED", "BUSINESS_NOT_CONNECTED"):
+        offenders = [str(path) for path in root.rglob("*.py") if code in path.read_text(encoding="utf-8")]
+        assert offenders == [], code
 
 
 def test_no_runtime_source_returns_not_implemented() -> None:
@@ -221,12 +269,10 @@ def _argv(world: WriteWorld, tmp_path: Path) -> list[tuple[str, list[str]]]:
         ("worktree list", []),
         ("worktree show", [str(other)]),
         ("worktree bootstrap", [str(other), "--dry-run"]),
-        ("workbench copy", ["--scope", "iss-3", "--to-worktree", str(other)]),
         ("worktree remove", [str(other), "--dry-run"]),
         ("workspace sync", []),
         ("workspace validate", []),
         ("workspace doctor", []),
-        ("workspace migrate", ["--to-schema", "3", "--to-writer-protocol", "specdock.worktree-writer/v1", "--dry-run"]),
         ("canonical link", []),
         ("canonical status", []),
         ("canonical check", []),
@@ -263,8 +309,12 @@ def test_every_leaf_runs_on_a_linked_schema4_clone(
         error = envelope.get("error") or {}
         if code == 1 or envelope.get("command") != path:
             problems.append(f"{path}: exit {code}, {envelope.get('command')!r}, {error}")
-        elif error.get("code") == "CANONICAL_NOT_IMPLEMENTED":
-            problems.append(f"{path}: not implemented")
+        elif error.get("code") in (
+            "CANONICAL_NOT_IMPLEMENTED",
+            "CANONICAL_NOT_APPLICABLE",
+            "CANONICAL_WORKBENCH_SHARED",
+        ):
+            problems.append(f"{path}: refusal-only {error['code']}")
         elif _canonical_code(error.get("code")) and not envelope.get("recovery"):
             problems.append(f"{path}: {envelope['status']} without recovery: {error}")
     for path, arguments in (("help", ["canonical", "status"]), ("completion", ["bash"])):

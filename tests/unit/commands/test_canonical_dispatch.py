@@ -1,4 +1,4 @@
-"""dispatch() routes by workspace mode at one place, with an entry before resolve_context."""
+"""dispatch() admits only schema 4 and routes through the canonical tables, with an entry before resolve_context."""
 
 from __future__ import annotations
 
@@ -52,6 +52,7 @@ def test_canonical_group_commands_stop_in_a_schema_three_repository(tmp_path: Pa
     code, result = _result(dispatch(_namespace("canonical status", root), root))
     assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_MIGRATED"
     assert "migrate-to-canonical" in " ".join(result["recovery"]["instructions"])
+    assert "SpecDock 0.4.2" in " ".join(result["recovery"]["instructions"])
 
 
 def test_scope_move_stops_in_a_schema_three_repository(tmp_path: Path) -> None:
@@ -87,33 +88,33 @@ def test_entries_before_resolve_context_run_first_and_may_decline(
     assert code == 3 and result["error"]["code"] == "CANONICAL_NOT_MIGRATED"
 
 
-def test_schema_four_runs_registered_canonical_handlers_with_the_mode(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def test_schema_four_runs_registered_canonical_handlers(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from spec_dock.runtime.commands import canonical_dispatch
 
     root = _repository(tmp_path / "canonical", 4)
-    seen: list[str] = []
+    seen: list[object] = []
 
     def handler(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-        seen.append(context.mode)
+        seen.append(context.workspace["schema_version"])
         return OperationResult(namespace.command_path, "succeeded", DiagnosticData(), 0)
 
     monkeypatch.setitem(canonical_dispatch.CANONICAL_HANDLERS, "scope list", handler)
-    assert _result(dispatch(_namespace("scope list", root), root))[0] == 0 and seen == ["canonical"]
+    assert _result(dispatch(_namespace("scope list", root), root))[0] == 0 and seen == [4]
 
 
-def test_schema_three_reaches_the_legacy_handler_unchanged(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_schema_three_never_reaches_a_handler(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from spec_dock.runtime.commands import canonical_dispatch
+
     root = _repository(tmp_path / "legacy", 3)
     reached: list[str] = []
 
-    def legacy(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-        reached.append(context.mode)
+    def handler(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
+        reached.append(namespace.command_path)
         return OperationResult(namespace.command_path, "succeeded", DiagnosticData(), 0)
 
-    monkeypatch.setattr("spec_dock.runtime.application.direct_sync.sync_workspace", legacy)
-    assert _result(dispatch(_namespace("workspace sync", root, source="local", allow_invalid=False), root))[0] == 0
-    assert reached == ["legacy"]
+    monkeypatch.setitem(canonical_dispatch.CANONICAL_HANDLERS, "workspace sync", handler)
+    code, result = _result(dispatch(_namespace("workspace sync", root, source=None, allow_invalid=False), root))
+    assert (code, result["error"]["code"], reached) == (3, "CANONICAL_NOT_MIGRATED", [])
 
 
 def test_canonical_errors_accept_only_failure_exit_codes() -> None:
@@ -133,7 +134,7 @@ def test_handler_types_and_recovery_texts_are_importable_at_runtime() -> None:
 
     assert canonical_dispatch.CanonicalHandler is not None
     assert canonical_dispatch.RepositoryIndependentHandler is not None
-    assert canonical_errors.MIGRATE_NOT_APPLICABLE_RECOVERY.startswith("No writer-protocol migration")
+    assert not hasattr(canonical_errors, "MIGRATE_NOT_APPLICABLE_RECOVERY")  # removed with workspace migrate (0.5.0)
     assert canonical_errors.CANONICAL_NOT_LINKED_RECOVERY == "spec-dock canonical link"
 
 

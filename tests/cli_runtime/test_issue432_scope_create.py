@@ -270,7 +270,7 @@ def test_import_adds_the_kind_label_parent_and_directory_and_never_writes_the_bo
     assert len(world.fake().graphql_requests()) == graphql
 
 
-def test_import_stops_on_a_slug_another_kind_a_different_parent_or_an_old_kind_directory(
+def test_import_stops_on_another_kind_a_different_parent_or_an_old_kind_directory(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     world = _world(tmp_path, monkeypatch, capsys)
@@ -282,7 +282,6 @@ def test_import_stops_on_a_slug_another_kind_a_different_parent_or_an_old_kind_d
     world.edit(lambda fake: fake.add_issue(9, title="Was an Issue"))
     world.directory("issue", 9)
     for argv, code_name, message in (
-        ((5, "--parent", "init-00001", "--title", "Plain", "--slug", "plain"), "CANONICAL_NOT_APPLICABLE", "--slug"),
         ((7, "--parent", "init-00001", "--title", "Labelled"), "PRECONDITION_FAILED", "another spec-dock kind label"),
         ((8, "--parent", "init-00001", "--title", "Parented"), "PRECONDITION_FAILED", "import it with that --parent"),
         ((9, "--parent", "init-00001", "--title", "Was"), "SCOPE_KIND_CHANGED", "epic-00009"),
@@ -305,7 +304,7 @@ def test_import_stops_on_a_slug_another_kind_a_different_parent_or_an_old_kind_d
         "x",
         *ASSURANCE,
     )
-    assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_APPLICABLE")
+    assert (code, payload["error"]["code"]) == (2, "USAGE_ERROR")  # --slug was removed in 0.5.0 (iss-00440)
     assert world.writes() == []
 
 

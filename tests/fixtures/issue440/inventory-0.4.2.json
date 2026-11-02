@@ -1,0 +1,686 @@
+{
+  ".agents/skills/spec-dock-grill-with-docs/SKILL.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "acb7e66a3e6d956918043875d5a87c5c6a3f0a804fe651b2d68a1f839c34b6d9",
+    "source": "install_root/.agents/skills/spec-dock-grill-with-docs/SKILL.md"
+  },
+  ".agents/skills/spec-dock-grill-with-docs/agents/openai.yaml": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "a1499d95abd8447558c535fe5554adcc3c9b988a0a39264a6283d430effe1e94",
+    "source": "install_root/.agents/skills/spec-dock-grill-with-docs/agents/openai.yaml"
+  },
+  ".agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "105f1da76838aeb6d059628495c120b49ab603e8373863e4998ba064c0b2d0dc",
+    "source": "install_root/.agents/skills/spec-dock-grill-with-docs/scripts/finalize-artifact.py"
+  },
+  ".agents/skills/spec-dock/SKILL.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "dc2ef101d896dad3d679b1ba79526459d64724b0b40ca52df81a12b7c6169780",
+    "source": "install_root/.agents/skills/spec-dock/SKILL.md"
+  },
+  "spec-dock/.gitignore": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "b28e6f2406b7d6192a7e4ef14c3e0ff04279bcc97382f52456fdaa64731a84e7",
+    "source": "spec_dock/.gitignore"
+  },
+  "spec-dock/design-system/ds.css": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "b6fb9e3ea931e3593ad93d61b0ace454287e93a4502680cb0755811302ff2d24",
+    "source": "spec_dock/design-system/ds.css"
+  },
+  "spec-dock/design-system/ds.js": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "62fdbae5e67ed6b033c09c5dcb2fc8dea7cadad4c024cb4a0b9f16e93dc3698f",
+    "source": "spec_dock/design-system/ds.js"
+  },
+  "spec-dock/design-system/explanation-skeleton.html": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+    "source": "spec_dock/design-system/explanation-skeleton.html"
+  },
+  "spec-dock/design-system/vendor/marked.LICENSE.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c",
+    "source": "spec_dock/design-system/vendor/marked.LICENSE.md"
+  },
+  "spec-dock/design-system/vendor/marked.umd.js": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "21568877a938d2c4e7d74e27f18e60da96bb73a68809610ca39216e1efebae62",
+    "source": "spec_dock/design-system/vendor/marked.umd.js"
+  },
+  "spec-dock/docs/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "46df3129e70a6b3d13b7d7bcdef984eae95539c395050232bc3e1f8ecc30aa28",
+    "source": "spec_dock/docs/README.md"
+  },
+  "spec-dock/docs/authoring/artifacts.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "f51fdb9afd445978c379bae411be385be0548fec3848680049c0a801d3c8fe0d",
+    "source": "spec_dock/docs/authoring/artifacts.md"
+  },
+  "spec-dock/docs/authoring/cue.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "7260427edba1ece13a97f9d726f841df04b18c8582e8f6319ef164636fc50d91",
+    "source": "spec_dock/docs/authoring/cue.md"
+  },
+  "spec-dock/docs/authoring/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "216332356e46faf7b07f95779ff3be5cae2cac43acdf9abdf3c83e79064a504f",
+    "source": "spec_dock/docs/authoring/design.md"
+  },
+  "spec-dock/docs/authoring/explanation.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "bcf6aaa393a04e2748a11235c0bf6b9c0112728ddbd8702f02c8da69c55d86e2",
+    "source": "spec_dock/docs/authoring/explanation.md"
+  },
+  "spec-dock/docs/authoring/historical.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "2a701a171e8355c762b6062d7464aeddb92ce220fdaaa9e501dc171f56b389e5",
+    "source": "spec_dock/docs/authoring/historical.md"
+  },
+  "spec-dock/docs/authoring/issue-plan-levels/critical.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ec2d8a40bad9913bb6158ace81a369bc3680f03314cf74399ed4b3d967772497",
+    "source": "spec_dock/docs/authoring/issue-plan-levels/critical.md"
+  },
+  "spec-dock/docs/authoring/issue-plan-levels/light.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "3ae80247687e405138f3d238afbded507cad6de995eff123bd56d39611da9934",
+    "source": "spec_dock/docs/authoring/issue-plan-levels/light.md"
+  },
+  "spec-dock/docs/authoring/issue-plan-levels/standard.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "75bb6ba7f9c076ebe0bef7dc4c32480be0e1c31357937028afdc3dd1fc5d899f",
+    "source": "spec_dock/docs/authoring/issue-plan-levels/standard.md"
+  },
+  "spec-dock/docs/authoring/issue-plan-levels/strict.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "0303436c3c3abb6f29c2a2810fc4b0dd1ae5bd3d7cd41c7779c30da5acf91b4a",
+    "source": "spec_dock/docs/authoring/issue-plan-levels/strict.md"
+  },
+  "spec-dock/docs/authoring/issue-plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "cc5ed1eeb3f5abcaf49b825a76d55283bd1aac321e6c7648a706b6107341d2bf",
+    "source": "spec_dock/docs/authoring/issue-plan.md"
+  },
+  "spec-dock/docs/authoring/overview.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "b6e9942fd2c59bed61fa1359602fe2d25f920b0a72462a9298a6123bcb9f8d1d",
+    "source": "spec_dock/docs/authoring/overview.md"
+  },
+  "spec-dock/docs/authoring/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "822fe03a7a8b029b0b60aecc8e9a30b7c698b5c595e90216a71b735067428b91",
+    "source": "spec_dock/docs/authoring/report.md"
+  },
+  "spec-dock/docs/authoring/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "6acd6b1e9da78b66aced244043befdc4d85c9335c93ec2746024edfcef88218b",
+    "source": "spec_dock/docs/authoring/requirement.md"
+  },
+  "spec-dock/docs/authoring/scope-layering.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "536cbe99fecc47240fcb9fe1916f4d41b451ac12f8238815d4bd6f57b7ed70ac",
+    "source": "spec_dock/docs/authoring/scope-layering.md"
+  },
+  "spec-dock/docs/canonical.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "a7d54206fb0da46b74b25ff0e1b75c366270d88ac0cd5d8a92ac7416967d763f",
+    "source": "spec_dock/docs/canonical.md"
+  },
+  "spec-dock/docs/ci/spec-dock-check.yml": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "e3c6d776e53b201eca03ff4bb1046379254e564b1ab599d65dcc80404617beb7",
+    "source": "spec_dock/docs/ci/spec-dock-check.yml"
+  },
+  "spec-dock/docs/cli-redesign-guide.html": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "0ce735804cd49de202a8be2e731f81a04b1279e1aaa344397e83a15f0a23161d",
+    "source": "spec_dock/docs/cli-redesign-guide.html"
+  },
+  "spec-dock/docs/guide.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "af078422a927023873a2cf959ac1d7ce63be75a3b618bc828671cc2a12b5dafc",
+    "source": "spec_dock/docs/guide.md"
+  },
+  "spec-dock/docs/historical/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "af17600e62f9fbe737fc73a2e17fe5b2a3de1e52044d02875b30ee67c060089e",
+    "source": "spec_dock/docs/historical/README.md"
+  },
+  "spec-dock/docs/historical/reference_deps.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "1d9c64cf50243a91489cb9692d6a198cfc1d330d4e1a49f4f57328312d9f6e19",
+    "source": "spec_dock/docs/historical/reference_deps.md"
+  },
+  "spec-dock/docs/historical/reference_github.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "866134b11a8a1da492213ff9d70e69702ab387daf311d99384fdbe508cbf13a7",
+    "source": "spec_dock/docs/historical/reference_github.md"
+  },
+  "spec-dock/docs/historical/reference_naming.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "d74545ae6ccea5077953653f046ae6fea4556f30b621e9b62b1c388043626be6",
+    "source": "spec_dock/docs/historical/reference_naming.md"
+  },
+  "spec-dock/docs/historical/reference_sync.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "233939e7b5a681db33cd563c0271e9dec36e48a9db9d4b61a53dd957fd354bf2",
+    "source": "spec_dock/docs/historical/reference_sync.md"
+  },
+  "spec-dock/docs/historical/reference_worktree.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "eeb56f3aae75913bc865c700e84fcc7a92ab1a6a53357cd2b16442779f8e969b",
+    "source": "spec_dock/docs/historical/reference_worktree.md"
+  },
+  "spec-dock/docs/migration.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "2fa945083021051174f14eb3f3c60f0a9096a3e656718cb8de704a93f1db941d",
+    "source": "spec_dock/docs/migration.md"
+  },
+  "spec-dock/docs/reference_cli.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "279df0ac949a3e969d45d525df8510f676808ebeffb2f8253e2fd660e5bb907d",
+    "source": "spec_dock/docs/reference_cli.md"
+  },
+  "spec-dock/docs/reference_deps.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "d2d1d508d864132e31a566fafa9efa549059d75283451a706a6cd153d61a2de3",
+    "source": "spec_dock/docs/reference_deps.md"
+  },
+  "spec-dock/docs/reference_github.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "3aeb5ab1791b49f1190da45db30428d3ee2ea32a141e169c396342cebab4ae10",
+    "source": "spec_dock/docs/reference_github.md"
+  },
+  "spec-dock/docs/reference_naming.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "fe00f3409d5d28617b6651612abcc91b962f3d72b1b714ec4a4cd217c20ab769",
+    "source": "spec_dock/docs/reference_naming.md"
+  },
+  "spec-dock/docs/reference_sync.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "691c8f7974a5a8e837ee7eaaba25e1753749763ad2aa2f58a972de5abf8b0b01",
+    "source": "spec_dock/docs/reference_sync.md"
+  },
+  "spec-dock/docs/reference_worktree.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "10f68e42bbe8c8d6750941dcd6890f3ec27272cceb379639be96336279e873ed",
+    "source": "spec_dock/docs/reference_worktree.md"
+  },
+  "spec-dock/docs/rules/epic/artifacts.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "515d7adc8ade9c05b318d60e21914624b0b747db0d671a47a3c4663727df3d4f",
+    "source": "spec_dock/docs/rules/epic/artifacts.md"
+  },
+  "spec-dock/docs/rules/epic/discussions.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ab16cf1ff68a19bbb3679de06826a1585483a4f8deea22f1dfa2a9510e133fb0",
+    "source": "spec_dock/docs/rules/epic/discussions.md"
+  },
+  "spec-dock/docs/rules/epic/issues.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "e16e50489d23b7b388cf82c45b3cbde0e406f3260755dc64b527b050ce0fd967",
+    "source": "spec_dock/docs/rules/epic/issues.md"
+  },
+  "spec-dock/docs/rules/initiative/artifacts.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "dea5c7ee36b270c028ccfc5ecb3ecd837c846cb3784262aed90527f2b3a2638d",
+    "source": "spec_dock/docs/rules/initiative/artifacts.md"
+  },
+  "spec-dock/docs/rules/initiative/discussions.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "44a1a85647ff7b788ffba7a3b1deccd9aead01f73abf916c145d8c4841ae6ea5",
+    "source": "spec_dock/docs/rules/initiative/discussions.md"
+  },
+  "spec-dock/docs/rules/initiative/epics.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "52c976233113167f4b54080135170a8250cfe536b480f2ae129d276ca682ccfa",
+    "source": "spec_dock/docs/rules/initiative/epics.md"
+  },
+  "spec-dock/docs/rules/issue/artifacts.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "75943dcafdfb6e2f4f25ea0633a7bd3f1801a3692c800871d17b7e11c2e6742b",
+    "source": "spec_dock/docs/rules/issue/artifacts.md"
+  },
+  "spec-dock/docs/rules/issue/discussions.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "445d06e9b1c4364fa1f532df9aa99a4a17614f48aa834cdb21057cdf9092827b",
+    "source": "spec_dock/docs/rules/issue/discussions.md"
+  },
+  "spec-dock/docs/rules/root/artifacts.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "5c3ba34ddf1ea778269e2a1a4298cbce4ae31353846ed05834364db215dc7d36",
+    "source": "spec_dock/docs/rules/root/artifacts.md"
+  },
+  "spec-dock/scripts/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "7e30d6d4b5bccc55a915fb7a53f70b0e9109c0599fe4649ca140cb6dfbb4d3e5",
+    "source": "spec_dock/scripts/README.md"
+  },
+  "spec-dock/scripts/spec-dock": {
+    "init_only": false,
+    "mode": 493,
+    "sha256": "6363f63b3d71e966f4bf759c63358fa1aa6b6b02c49d3541fcc3ea82f9dbe4ed",
+    "source": "spec_dock/scripts/spec-dock"
+  },
+  "spec-dock/system/.runtime/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "bf164f4ffedb272cff9877ca0ce7d9800a5fbacd01c1ed0f1267a1f7bfa3af57",
+    "source": "spec_dock/system/.runtime/README.md"
+  },
+  "spec-dock/system/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "f84f4bb3313479b2b372192c9adfae4c7feaceeffccc2ae7b479615fbaf0d4a2",
+    "source": "spec_dock/system/README.md"
+  },
+  "spec-dock/system/active-none/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "c73edcc6b729d12a0eec91a9f196812425aec523afecac48aacc02bcf7cff923",
+    "source": "spec_dock/system/active-none/README.md"
+  },
+  "spec-dock/system/active-none/epic/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "9781c7e8d84b4e473dc52044622c9a9c9e36952345537069a8bb7c461be62d12",
+    "source": "spec_dock/system/active-none/epic/README.md"
+  },
+  "spec-dock/system/active-none/epic/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "b17a9b84a7a7463edc179e8e99150b381b4b9e52e4aaa0e1f2318cd8108fe978",
+    "source": "spec_dock/system/active-none/epic/design.md"
+  },
+  "spec-dock/system/active-none/epic/plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "104a64455a1f49ba31928f7073becd8a3534d116c3854065053cbe766fdf4f0f",
+    "source": "spec_dock/system/active-none/epic/plan.md"
+  },
+  "spec-dock/system/active-none/epic/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "985fa30deacf5b580fd5c8760674b92f82e5c74edd4f5876c8560c1183a603d3",
+    "source": "spec_dock/system/active-none/epic/report.md"
+  },
+  "spec-dock/system/active-none/epic/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "d3c1cc0ba23eda6e0324855b5d47d186e5568a80220f746988569cc3da56749c",
+    "source": "spec_dock/system/active-none/epic/requirement.md"
+  },
+  "spec-dock/system/active-none/initiative/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "583c400f25c9a2a7e784c95948de4f7142d4715b2a91ae3db20557e8fd9317d1",
+    "source": "spec_dock/system/active-none/initiative/README.md"
+  },
+  "spec-dock/system/active-none/initiative/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "a22ccea06899d1a249c728f1019c6fd6f4272b21620f794017f8c375ef03a4c3",
+    "source": "spec_dock/system/active-none/initiative/design.md"
+  },
+  "spec-dock/system/active-none/initiative/plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ced586209ef7e9de4c0ae3559dccc153cbece2539c33e2e45adbcb8b0293464b",
+    "source": "spec_dock/system/active-none/initiative/plan.md"
+  },
+  "spec-dock/system/active-none/initiative/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "2cfa7ff502ebda32e9d581b2fe87698b81bf852020ddd7ba2f09d7544ddeccc4",
+    "source": "spec_dock/system/active-none/initiative/report.md"
+  },
+  "spec-dock/system/active-none/initiative/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "af3744e6266ef1e9ec4d075f51ffd852998a8c6c9e17cfcb548612a18e2bd56e",
+    "source": "spec_dock/system/active-none/initiative/requirement.md"
+  },
+  "spec-dock/system/active-none/issue/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "457321ce7c573e59d01b55ea29da99c9d01d53790d06407a9ceddf52821be231",
+    "source": "spec_dock/system/active-none/issue/README.md"
+  },
+  "spec-dock/system/active-none/issue/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "31ff82bcff64a6baf4c99862cae3efa74533a42f769ebb3b8eeab5e0b5fe61d4",
+    "source": "spec_dock/system/active-none/issue/design.md"
+  },
+  "spec-dock/system/active-none/issue/plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "13488b061eb36afc66638a64fe5013fa500ef29febc0e6eae441f0064b840c66",
+    "source": "spec_dock/system/active-none/issue/plan.md"
+  },
+  "spec-dock/system/active-none/issue/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "5ea25694830957e1789b09b38ba64afffd2a9f0fbca092cbd233f6e8f7ec74dc",
+    "source": "spec_dock/system/active-none/issue/report.md"
+  },
+  "spec-dock/system/active-none/issue/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "29647fe4824fcde37c2aa92d6e3fbaa5ff9400b16803434f91cca4cc953a15d6",
+    "source": "spec_dock/system/active-none/issue/requirement.md"
+  },
+  "spec-dock/system/spec-dock-version": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "e2f7bb608ebc9e24092ffcb796ad0aa83f0015afe23635f017df52273150f00d",
+    "source": "spec_dock/system/spec-dock-version"
+  },
+  "spec-dock/templates/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "76656d7ed9bcd54acc57d27c90c44878ee000fe15be6220217af4f5a8712f444",
+    "source": "spec_dock/templates/README.md"
+  },
+  "spec-dock/templates/artifacts/adr.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "7891cbfc90f581aa6789c7511e4e8f939c3a0c9d3be7c3c943dade7e9906e647",
+    "source": "spec_dock/templates/artifacts/adr.md"
+  },
+  "spec-dock/templates/artifacts/blank.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "a150eb7914f815db10b82db347f6717a1b33bc5021f667a786e320b684927488",
+    "source": "spec_dock/templates/artifacts/blank.md"
+  },
+  "spec-dock/templates/artifacts/decision-candidate.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "279c9dde73cd47b7213082b6b7fe6037bbbed90327cd8ddbcb579091b11dc32c",
+    "source": "spec_dock/templates/artifacts/decision-candidate.md"
+  },
+  "spec-dock/templates/artifacts/disc.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "331ac13852dbacd9e9ae4e4b94ec8c61dd13c9f27a5443164d41e0c97cf96536",
+    "source": "spec_dock/templates/artifacts/disc.md"
+  },
+  "spec-dock/templates/artifacts/interview.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "0d526becee3603701cbca776e3c0fdb3488601f885b820450310166defd8ccd6",
+    "source": "spec_dock/templates/artifacts/interview.md"
+  },
+  "spec-dock/templates/artifacts/research.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "5e92d1ba03ce1a5747b0c6444cd04541910c573a33589ed7c001ef31236ef2fd",
+    "source": "spec_dock/templates/artifacts/research.md"
+  },
+  "spec-dock/templates/cue/epic/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/cue/epic/.workbench/README.md"
+  },
+  "spec-dock/templates/cue/epic/design.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "c9a7844aea57387062a47e9cccf2fd06b48a4c8afc7ed3b05dc46097ac730fd4",
+    "source": "spec_dock/templates/cue/epic/design.cue"
+  },
+  "spec-dock/templates/cue/epic/explanation.html": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+    "source": "spec_dock/templates/cue/epic/explanation.html"
+  },
+  "spec-dock/templates/cue/epic/plan.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "9faaa0013e92c012825ee794f2fec44eb496e7f42a5aaf460d0f58070331086e",
+    "source": "spec_dock/templates/cue/epic/plan.cue"
+  },
+  "spec-dock/templates/cue/epic/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "7efe1dd09a4295799f218a86eb78c5ccef4356083af8a93c923cda228526e8c0",
+    "source": "spec_dock/templates/cue/epic/report.md"
+  },
+  "spec-dock/templates/cue/epic/requirement.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "c46151fb4f39d9688663894e1407122d5301bf7c54582fc9e9b2cdf6009ca2b1",
+    "source": "spec_dock/templates/cue/epic/requirement.cue"
+  },
+  "spec-dock/templates/cue/initiative/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/cue/initiative/.workbench/README.md"
+  },
+  "spec-dock/templates/cue/initiative/design.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "831dc197cfb3be713bacf40ebe4a341139e5ae9d0c5d1352ebe7ae2d6a393a63",
+    "source": "spec_dock/templates/cue/initiative/design.cue"
+  },
+  "spec-dock/templates/cue/initiative/explanation.html": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+    "source": "spec_dock/templates/cue/initiative/explanation.html"
+  },
+  "spec-dock/templates/cue/initiative/plan.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "4d2eadbe15fec852af9f10fa508bd8ef53ecdb49b6f6e21031c20d746210f177",
+    "source": "spec_dock/templates/cue/initiative/plan.cue"
+  },
+  "spec-dock/templates/cue/initiative/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "b06fa2aeef9eaa9752cb9e027af3104a533948d3f00479efe50cb0ca0858b60f",
+    "source": "spec_dock/templates/cue/initiative/report.md"
+  },
+  "spec-dock/templates/cue/initiative/requirement.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ed48a6363279d69dccf355296f6ed4dbb88fbe01031e40854ebe473124581e04",
+    "source": "spec_dock/templates/cue/initiative/requirement.cue"
+  },
+  "spec-dock/templates/cue/issue/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/cue/issue/.workbench/README.md"
+  },
+  "spec-dock/templates/cue/issue/design.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "23bdb8f35a2341e9fed027ea4c5f2e763ca7614cda0d5e2a8a2e5897223be53f",
+    "source": "spec_dock/templates/cue/issue/design.cue"
+  },
+  "spec-dock/templates/cue/issue/explanation.html": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "1091d2283b271f85178452ef2d64840076c8d9298a4af250c691fbb2e433aa2d",
+    "source": "spec_dock/templates/cue/issue/explanation.html"
+  },
+  "spec-dock/templates/cue/issue/plan.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "274a58e86c6420363df98d2ff0722867a881c8730ef516dc6958c4cfbb11912a",
+    "source": "spec_dock/templates/cue/issue/plan.cue"
+  },
+  "spec-dock/templates/cue/issue/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "b2c0b4b9ef4ba45c3f53f548baa4052db5b2936771a60bd64f0de79551bd0cad",
+    "source": "spec_dock/templates/cue/issue/report.md"
+  },
+  "spec-dock/templates/cue/issue/requirement.cue": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "6749fe7bcbc1354ed8ce6b7f5be61833edf99805d2ec503f806cb3ea30d47a23",
+    "source": "spec_dock/templates/cue/issue/requirement.cue"
+  },
+  "spec-dock/templates/epic/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/epic/.workbench/README.md"
+  },
+  "spec-dock/templates/epic/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "4ea5d2c52b4a6da12015c9b55625d71a71b445f62f2a3641e74778c840909489",
+    "source": "spec_dock/templates/epic/design.md"
+  },
+  "spec-dock/templates/epic/plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "afe00783b61561a88e89e9971ca6b8c7872841d9cb6fee59923234c6527d7928",
+    "source": "spec_dock/templates/epic/plan.md"
+  },
+  "spec-dock/templates/epic/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "cff9a127eed4a910d50c43262842a082e86df669437e0090f8cfeb2fdacdfa60",
+    "source": "spec_dock/templates/epic/report.md"
+  },
+  "spec-dock/templates/epic/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "640c5177c4fba61126f85ca79370f64cb6dbb11ab4aa54b110a90641e48b40ec",
+    "source": "spec_dock/templates/epic/requirement.md"
+  },
+  "spec-dock/templates/initiative/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/initiative/.workbench/README.md"
+  },
+  "spec-dock/templates/initiative/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "a5681fab80831bb999b149f3e0e721391fc27b3b2964ad151f24fa47352214b0",
+    "source": "spec_dock/templates/initiative/design.md"
+  },
+  "spec-dock/templates/initiative/plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "52f0d714a10531ca5e69b0f3a2e702bf72f3a631ccad03efd652c1801e99885d",
+    "source": "spec_dock/templates/initiative/plan.md"
+  },
+  "spec-dock/templates/initiative/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "e8749e3de129e4b70ddf5d31bc3a26bb60aa8871bca88d1402f37bc1415cba7f",
+    "source": "spec_dock/templates/initiative/report.md"
+  },
+  "spec-dock/templates/initiative/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "6519af868ee7ea35d18d3cb78a0220888ab5052fed0e62058b18b45ffa6bfd60",
+    "source": "spec_dock/templates/initiative/requirement.md"
+  },
+  "spec-dock/templates/issue/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/issue/.workbench/README.md"
+  },
+  "spec-dock/templates/issue/design.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "218bc2c2bf25e862d4a6e9d64501a52331df40a3a19aa96dfdf78eaa1738067c",
+    "source": "spec_dock/templates/issue/design.md"
+  },
+  "spec-dock/templates/issue/plan.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "d36dce3e90394837b37a8cf42acebb2b8a888db6c062b21f4f1287f3358f7906",
+    "source": "spec_dock/templates/issue/plan.md"
+  },
+  "spec-dock/templates/issue/report.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ca7680ce24060b7966ca3e2bef583073bf2f26adf28fcfded50540f0257b679f",
+    "source": "spec_dock/templates/issue/report.md"
+  },
+  "spec-dock/templates/issue/requirement.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "7db442c756f242e2110628d037ad1b3fdcdd6221de2ca94356071b4d5ec48e79",
+    "source": "spec_dock/templates/issue/requirement.md"
+  },
+  "spec-dock/templates/root/.workbench/README.md": {
+    "init_only": false,
+    "mode": 420,
+    "sha256": "ee36ac9a5b5d198e92b4ad229a32cc4bad400ec2e384d712b0c762ec5dbcf9fd",
+    "source": "spec_dock/templates/root/.workbench/README.md"
+  },
+  "spec-dock/workspace.json": {
+    "init_only": true,
+    "mode": 420,
+    "sha256": "a56ce60ecf47cfcbf8133145502872bf99d438bd24eb54d0272496c8666d2632",
+    "source": "spec_dock/workspace.json"
+  }
+}

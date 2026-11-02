@@ -48,12 +48,6 @@ def test_worktree_remove_of_an_ordinary_worktree_still_works(world: CanonicalWor
     assert not linked.exists()
 
 
-def test_workbench_copy_is_refused_as_shared(world: CanonicalWorld) -> None:
-    linked = world.worktree("feature")
-    code, payload = world.run("workbench", "copy", "--scope", "init-00001", "--to-worktree", str(linked), "--yes")
-    assert (code, payload["error"]["code"]) == (3, "CANONICAL_WORKBENCH_SHARED")
-
-
 def test_expect_current_is_checked_against_the_snapshot(world: CanonicalWorld) -> None:
     world.select("init-00001", 1)
     assert world.run("worktree", "list", "--expect-current", "init-00001")[0] == 0

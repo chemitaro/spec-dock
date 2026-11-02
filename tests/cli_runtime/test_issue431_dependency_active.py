@@ -66,9 +66,9 @@ def test_dependency_check_source_github_refetches(world: CanonicalWorld) -> None
     assert roles == ["external"]
 
 
-def test_explicit_source_local_and_offline_github_are_refused(world: CanonicalWorld) -> None:
+def test_offline_github_is_refused_and_source_local_no_longer_exists(world: CanonicalWorld) -> None:
     code, payload = world.run("dependency", "check", "iss-00003", "--source", "local")
-    assert (code, payload["error"]["code"]) == (3, "CANONICAL_NOT_APPLICABLE")
+    assert (code, payload["error"]["code"]) == (2, "USAGE_ERROR")  # removed in 0.5.0 (iss-00440)
     code, payload = world.run("dependency", "check", "iss-00003", "--source", "github", "--offline")
     assert (code, payload["error"]["code"]) == (3, "PRECONDITION_FAILED")
 

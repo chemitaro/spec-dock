@@ -376,17 +376,7 @@ def test_a_failed_write_keeps_the_old_hash_so_the_next_cycle_redraws_all_five(
     assert _dashboard_state(pair, pair.a)["error"] is None  # type: ignore[index]
 
 
-def test_workspace_sync_draws_no_dashboard_in_either_mode(
-    pair: SyncPair, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]
-) -> None:
-    from spec_dock.cli import main
-    from tests.cli_runtime.test_issue413_dependency import dependency_workspace
-
+def test_workspace_sync_draws_no_dashboard(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> None:
     _fake_structure(monkeypatch)
     pair.run(pair.a, "workspace", "sync")  # the bare-path origin stops it early; it never draws either way
     assert _stamps(pair.a) == {}
-    (tmp_path / "legacy").mkdir()
-    legacy, _parent, _child = dependency_workspace(tmp_path / "legacy")
-    capsys.readouterr()
-    assert main(["--project", str(legacy), "workspace", "sync", "--json"]) == 0
-    assert not any((legacy / "spec-dock" / name).exists() for name in DASHBOARD_FILES)
