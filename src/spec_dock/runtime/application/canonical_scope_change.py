@@ -374,18 +374,22 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                 raise
             session.effects.append(Effect("backup", "succeeded", str(backup)))
         if clear and selection.handle is not None:
+            # The outcome is recorded before the store closes its descriptor: a later close failure must not hide
+            # a confirmed removal.
             with WorkTargetStore(context.root) as store:
                 try:
                     outcome = store.remove_observed(selection.handle)
                 except SelectionRemovalUnknown:
                     session.effects.append(Effect("selection.clear", "unknown", selection.handle.token))
                     raise
-            if outcome == "conflict":
-                session.effects.append(Effect("selection.clear", "failed", selection.handle.token))
-                raise ValueError("captured selection changed before clear")
-            session.effects.append(
-                Effect("selection.clear", "succeeded" if outcome == "removed" else "unchanged", selection.handle.token)
-            )
+                if outcome == "conflict":
+                    session.effects.append(Effect("selection.clear", "failed", selection.handle.token))
+                    raise ValueError("captured selection changed before clear")
+                session.effects.append(
+                    Effect(
+                        "selection.clear", "succeeded" if outcome == "removed" else "unchanged", selection.handle.token
+                    )
+                )
         if relatives:
             with session.catalog_changes() as changes:
                 for relative, root in roots.items():
@@ -395,7 +399,7 @@ def delete_scope(namespace: argparse.Namespace, context: ProjectContext) -> Oper
                     try:
                         remove_tree(root, expected_entries=expected_entries[relative])
                     except TreeRemovalIncomplete as error:
-                        if error.applied:
+                        if error.applied or error.attempted:  # an unlink or rmdir may have taken effect
                             changes.delete(relative)
                             session.effects.append(Effect("scope.delete", "unknown", relative.as_posix()))
                         raise error.cause from error

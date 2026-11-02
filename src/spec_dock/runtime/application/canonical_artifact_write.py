@@ -157,17 +157,19 @@ def _publish_scope_artifact(
             effects=(Effect("artifact", "planned", shown_path),),
             warnings=scopes.warnings(),
         )
-    published = attempted = False
+    published = attempted = directory_attempted = created_directory = False
     try:
         with catalog_changes(
             catalog, command=namespace.command_path, origin="command", timeout=CATALOG_LOCK_TIMEOUT
         ) as changes:
             parent = open_guarded_directory(owner)
             try:
+                directory_attempted = True
                 os.mkdir("artifacts", dir_fd=parent)
+                created_directory = True
                 os.fsync(parent)
             except FileExistsError:
-                pass
+                directory_attempted = False
             finally:
                 os.close(parent)
             slot = re.match(r"[0-9]{8}t[0-9]{6}z(?:-[0-9]{2})?", path.name)
@@ -185,16 +187,20 @@ def _publish_scope_artifact(
         if isinstance(error, FilePublicationIncomplete):
             published = error.confirmed
         uncertain = isinstance(error, FilePublicationIncomplete) and not published
-        partial = published or uncertain
+        partial = published or uncertain or directory_attempted
         status: EffectStatus = (
             "succeeded" if published else "unknown" if uncertain else "failed" if attempted else "not_attempted"
         )
+        effects: tuple[Effect, ...] = (Effect("artifact", status, shown_path),) if attempted or partial else ()
+        if directory_attempted and not published and not uncertain:  # the created directory is kept (as `@root`)
+            directory_status: EffectStatus = "succeeded" if created_directory else "unknown"
+            effects = (Effect("artifact.directory", directory_status, f"{shown}/artifacts"), *effects)
         return OperationResult(
             namespace.command_path,
             "partial" if partial else "failed",
             FamilyData("artifact", {"artifact": artifact if published else None, "changed": published}),
             6 if partial else getattr(error, "exit_code", 3 if isinstance(error, ValueError) else 5),
-            effects=(Effect("artifact", status, shown_path),) if attempted else (),
+            effects=effects,
             warnings=scopes.warnings(),
             error=Diagnostic(
                 "ARTIFACT_PUBLICATION_INCOMPLETE" if partial else getattr(error, "code", "LOCAL_IO_FAILED"),
