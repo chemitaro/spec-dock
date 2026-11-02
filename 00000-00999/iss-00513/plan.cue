@@ -14,11 +14,11 @@ package spec
 // すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
 // strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	"S-01": {title: "版を 0.5.1 にする", realizes: ["R-01"], status: "todo", session: "impl"}
-	"S-02": {title: "migration.md に 0.5.1 の節を足す", realizes: ["R-02"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "dogfood の配布資産を installation update で 0.5.1 にする", realizes: ["R-01", "R-02"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-05": {title: "R-04・R-05 はマージの後に統括が行う", realizes: ["R-04", "R-05"], status: "todo", after: ["S-04"]}
+	"S-01": {title: "版を 0.5.1 にする", realizes: ["R-01"], status: "done", session: "impl"}
+	"S-02": {title: "migration.md に 0.5.1 の節を足す", realizes: ["R-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "dogfood の配布資産を installation update で 0.5.1 にする", realizes: ["R-01", "R-02"], status: "done", after: ["S-03"], session: "impl"}
+	"S-05": {title: "R-04・R-05 はマージの後に統括が行う", realizes: ["R-04", "R-05"], status: "done", after: ["S-04"]}
 }
 
 // テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
