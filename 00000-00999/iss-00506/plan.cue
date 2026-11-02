@@ -17,12 +17,14 @@ tests: {
 	"T-03": {title: "create の確認の入力の間に `git remote set-url origin` で別のリポジトリにすると、`PRECONDITION_FAILED`・終了コード3で止まり、GitHub への書き込みがなく、カタログが変わらない", verifies: ["R-02", "F-01"]}
 	"T-04": {title: "`--yes` の create で、POST の間に origin を別のリポジトリにすると、partial・終了コード6・`SCOPE_PUBLICATION_INCOMPLETE`、effects が `github-create succeeded` と `scaffold not_attempted`、`github_ref` が確認したリポジトリの ref、POST は1回、カタログにディレクトリも changeset もなく、recovery の先頭が origin を戻す案内になる", verifies: ["R-02", "F-01"]}
 	"T-05": {title: "親のある create で、POST の後に origin が変わると、`github.sub-issue.add` を試みず `not_attempted` になる", verifies: ["R-02"]}
+	"T-07": {title: "`--yes` の create で、種類のラベルを作った後・POST の前に origin を変えると、`CANONICAL_WRITE_INCOMPLETE`・partial・終了コード6、effects が `github.label.create succeeded` と `github-create`・`scaffold` の `not_attempted` で、Issue の POST がない", verifies: ["R-02", "F-01"]}
+	"T-08": {title: "親のある create で、親への追加の間に origin を変えると、`github.sub-issue.add succeeded`・`scaffold not_attempted`・`SCOPE_PUBLICATION_INCOMPLETE`・終了コード6で、カタログにディレクトリも changeset もない", verifies: ["R-02", "F-01"]}
 	"T-06": {title: "既存の `test_issue440_g2_scope_change.py`、`test_issue440_g2_scope_create.py`、`uv run pytest` の全体が通る", verifies: ["R-01", "R-02"]}
 }
 
 verification: "`uv run pytest tests/cli_runtime/test_issue440_g2_scope_change.py tests/cli_runtime/test_issue440_g2_scope_create.py tests/cli_runtime/test_issue506_reread_after_confirmation.py`、`make lint`、`uv run pytest`（全体）。"
 rollback:     "PR を閉じるか、マージ後なら `git revert` する。データの形は変えない。"
-exit:         "T-01〜T-06 が通り、PR がマージできる状態で、CI が通る。"
+exit:         "T-01〜T-08 が通り、PR がマージできる状態で、CI が通る。"
 
 execution: {
 	sessions: impl: {task: "仕様化と実装", model: "opus", effort: "medium", rationale: "3 policy §4 standard の実装（epic-00512 の plan.cue の session std）"}

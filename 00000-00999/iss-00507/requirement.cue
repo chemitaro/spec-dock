@@ -32,7 +32,7 @@ requirements: {
 	}
 	"R-02": {
 		title: "`artifact create` が、ディレクトリを作った後の失敗を partial で返す"
-		text:  "`artifacts/` を作った後の失敗は、`partial`（`artifact.directory unknown`）で返し、作ったディレクトリを残す。今は `failed`（終了コード5、effects 空）になる。"
+		text:  "`artifacts/` を作った後の失敗は、`partial` で返し（`artifact.directory` は、作ったことが確かめられていれば succeeded、mkdir の結果が分からなければ unknown）、作ったディレクトリを残す。今は `failed`（終了コード5、effects 空）になる。"
 		acceptance: ["失敗を注入したテストで `partial` と `artifact.directory unknown` が観測できる（元のテスト `test_issue413_artifact.py::test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_without_publication`）"]
 	}
 }
