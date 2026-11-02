@@ -26,6 +26,7 @@ from spec_dock.runtime.application.canonical_writes import (
     needs_confirmation,
     open_write_session,
     planned,
+    selection_unchanged,
 )
 from spec_dock.runtime.application.scope_completion_plan import plan_close, plan_reopen
 from spec_dock.runtime.application.worktree_observation import ancestors_for
@@ -132,6 +133,9 @@ def lifecycle_scope(namespace: argparse.Namespace, context: ProjectContext) -> O
         ),
     ):
         return declined(namespace.command_path, data(False))
+    if not namespace.yes and not selection_unchanged(selection, session.selection()):
+        # The terminal answer took time: another Start may have changed what @current meant (iss-00506).
+        raise ValueError("direct selection changed during confirmation")
     if not decision.changed:
         return session.result("unchanged", data(False), effects=(Effect(kind, "unchanged", reference),))
     try:
