@@ -29,7 +29,7 @@ ID: "iss-00496"
 - `scope check iss-00496`：誤り0、警告0。
 - 仕様のレビュー（spec-reviewer opus/high）：round-1 合格（P0=0、P1=0、P2=2、P3=1。P2 と P3 は取り入れた）。
 - コードのレビュー（code-reviewer opus/high、axis both、`9c11174f8..602575f18`）：合格、指摘0。
-- 最終品質ゲート（quality-gate-reviewer opus/high、1人、campaign `iss-00496-g1`、commit `602575f18`）：レビューは合格（P0=0、P1=0、P3=1、範囲は完全）。テストのレーン：`make lint` exit 0、`uv run pytest` は下に記す。
+- 最終品質ゲート（quality-gate-reviewer opus/high、1人、campaign `iss-00496-g1`、commit `602575f18`）：レビューは合格（P0=0、P1=0、P3=1、範囲は完全）。テストのレーン：`make lint` exit 0、`uv run pytest` exit 0（4100 passed、8 skipped、24分14秒）。記録は作業ツリーの `.workbench/final-quality-gate/iss-00496-g1/closure.md`（Git の外）。
 
 ## Residual Risks / Follow-ups
 
