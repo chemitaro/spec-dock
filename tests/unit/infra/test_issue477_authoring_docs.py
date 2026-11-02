@@ -260,7 +260,7 @@ def test_the_release_notes_list_the_contract_changes_for_canonical_mode() -> Non
     ):
         assert token in section, token
     readme = _read(ROOT / "README.md")
-    assert "全55コマンド" in readme and "全53コマンド" not in readme
+    # The count is pinned to the CLI catalog by test_issue511_docs_and_templates.py, not to a number in a sentence.
     assert "src/spec_dock/assets/spec_dock/docs/migration.md" in _section(readme, "## CUE の仕様（0.4.0）")
     cue_section = _section(readme, "## CUE の仕様（0.4.0）")
     assert "`cue`" in cue_section and "canonical モード" in cue_section
