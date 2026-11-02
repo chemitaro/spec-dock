@@ -10,11 +10,11 @@
 
 通常TARGETには完全なScope IDまたは`gh:OWNER/REPO#NUMBER`、各leafで許可された動的selectorを使います。裸番号やIssue URLは通常TARGETとして使えません。importのREFは別の文法で、完全gh ref・完全Issue URL・裸番号と`--github-repo OWNER/REPO`の組合せを受け付けます。矛盾するhintや別repositoryは拒否します。
 
-以下の`OWNER/REPO`と親IDは実在する操作対象へ置き換えます。importはGitHubをGETするだけですが、ローカルscaffoldを作成する変更操作です。
+以下の`OWNER/REPO`と親IDは実在する操作対象へ置き換えます。importは、足りない種類のラベルと親子をGitHubに足し、カタログにScopeのディレクトリを作る変更操作です。
 
 ```sh
-spec-dock scope create initiative --backend github --title "Platform"
-spec-dock scope import github epic 124 --github-repo OWNER/REPO --parent init-00123 --title "Authentication"
+spec-dock scope create initiative --backend github --title "Platform" --assurance standard --assurance-reason "product direction"
+spec-dock scope import github epic 124 --github-repo OWNER/REPO --parent init-00123 --title "Authentication" --assurance standard --assurance-reason "shared login flow"
 spec-dock scope show epic-00124
 spec-dock work start epic-00124 --base main
 spec-dock work finish epic-00124 --yes

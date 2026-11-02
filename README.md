@@ -19,9 +19,9 @@ CLIはagent-firstで運用します。依頼または承認済み計画の範囲
 以下は依頼または承認済み計画に沿った作成例です。`--json`は出力形式、`--yes`はCLI確認の省略であり、操作の認可や安全検査を置き換えません。番号は例なので、実際には各作成結果から返されたIDと、存在するbaseを使います。
 
 ```sh
-spec-dock scope create initiative --backend github --title "Platform" --yes --json
-spec-dock scope create epic --backend github --parent init-00123 --title "Authentication" --yes --json
-spec-dock scope create issue --backend github --parent epic-00124 --title "Refresh tokens" --yes --json
+spec-dock scope create initiative --backend github --title "Platform" --assurance standard --assurance-reason "product direction" --yes --json
+spec-dock scope create epic --backend github --parent init-00123 --title "Authentication" --assurance standard --assurance-reason "shared login flow" --yes --json
+spec-dock scope create issue --backend github --parent epic-00124 --title "Refresh tokens" --assurance strict --assurance-reason "session security" --yes --json
 spec-dock work start iss-00125 --base main --json
 spec-dock active show --json
 spec-dock workspace sync --source github --json
@@ -33,13 +33,13 @@ Startはlive readiness確認、branch作成またはcheckout、worktree自身の
 Finishはbackendのcompletedを確認して、捕捉した直接記録だけを解除します。GitHub Issueは完了理由でclosedとなり、branchには留まります。commit、test、review、push、PR、mergeは別途確認します。`active clear` は選択だけ、`scope close` は完了状態だけを変えます。`active set` は同じ妥当な直接対象へのunchangedだけを許し、空/別対象の取得はStartへ戻します。
 
 
-## 2つのモード（0.3.0）
+## canonical モード（0.5.0）
 
-`spec-dock/workspace.json` の `schema_version` が 3 のリポジトリは従来モードで、仕様もコードと一緒にコミットします。4 のリポジトリは canonical モードで、Scope の構造（作成、親子、依存、状態、題名、種類）を GitHub Issue に、中身を `spec-dock/canonical` ブランチに置きます。仕様はどのチェックアウトからも `spec-dock/initiatives/<区切り>/<ID>/`（例 `spec-dock/initiatives/00000-00999/iss-00454/`）に見え、保存と共有は定期の同期が自動で行います。コードのブランチには仕様を入れません。
+SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 のリポジトリ（canonical モード）だけを扱います。Scope の構造（作成、親子、依存、状態、題名、種類）を GitHub Issue に、中身を `spec-dock/canonical` ブランチに置きます。仕様はどのチェックアウトからも `spec-dock/initiatives/<区切り>/<ID>/`（例 `spec-dock/initiatives/00000-00999/iss-00454/`）に見え、保存と共有は定期の同期が自動で行います。コードのブランチには仕様を入れません。
 
 - 用意はクローンごとに `spec-dock canonical link` の1回です。状態は `spec-dock canonical status` で確かめます。
 - 作業用のworktreeで Claude Code と Codex を使うには、ツールごとに1行の設定を利用者が1回だけ足します（SpecDock は書き換えません）。1行と確かめ方、同期が止まったとき、Linux とコンテナの制約、エラーと次の1手は、配布する `spec-dock/docs/canonical.md`（[この repository の正本](src/spec_dock/assets/spec_dock/docs/canonical.md)）にあります。
-- 版3から4への移行は `scripts/migrate-to-canonical/README.md` の手順で、リポジトリごとに一度だけ行います。
+- `schema_version` が 3 のリポジトリ（仕様もコードと一緒にコミットする従来の形）では、どのコマンドも `CANONICAL_NOT_MIGRATED` で止まります。移すには、SpecDock 0.4.2 を入れ直し、版のタグ `v0.4.2` の `scripts/migrate-to-canonical/README.md` の手順で一度だけ移します（[導入・移行・保全](src/spec_dock/assets/spec_dock/docs/migration.md)の「canonical モードへの移行」）。
 
 ## CUE の仕様（0.4.0）
 
@@ -69,7 +69,7 @@ spec-dock installation update --target /absolute/project --backup-dir /absolute/
 
 対象は明示したGit worktree一つです。initは静的資産とworkspace宣言を置きます。updateは既知path/hashの資産だけを保全・更新・個別退役し、未知改変はmanual mergeへ戻します。runtimeをcheckoutへ配布せず、Git内の独自領域を作りません。
 
-旧schema3 writerの移行は旧writer停止、実体保全と復元確認を先行し、`workspace migrate --to-schema 3 --to-writer-protocol specdock.worktree-writer/v1` で自workspace宣言だけを切り替えます。適用時の外部backupと確認条件、部分失敗のeffectsは[移行ガイド](src/spec_dock/assets/spec_dock/docs/migration.md)で確認してください。自動巻戻し、resume、rollbackによるjournal replayはありません。
+0.5.0 への更新の手順と変わった点、適用時の外部backupと確認条件、部分失敗のeffectsは[移行ガイド](src/spec_dock/assets/spec_dock/docs/migration.md)で確認してください。自動巻戻し、resume、rollbackによるjournal replayはありません。
 
 `SPEC_DOCK_WORKTREE_ROOT` はnative linked worktreeの配置先です。使う場合は絶対pathを指定し、worktree作成時には `--base REF` を明示します。project-owned `make init` は別のbootstrap操作です。
 
