@@ -41,7 +41,7 @@ design: {
 		text: """
 			POST が成功した後、親への追加（`github.sub-issue.add`）の前と、カタログへの公開（`_publish`）の前に `require_same_repository()` を呼ぶ。今の `try` の中なので、`WRITE_FAILURES` に含まれる `ValueError` として捕まり、`session.incomplete(..., code="SCOPE_PUBLICATION_INCOMPLETE")` で返る。
 			結果：status partial、終了コード6、エラーのコード `SCOPE_PUBLICATION_INCOMPLETE`、effects は `github-create succeeded`（対象は確認したリポジトリ）と、残りの手順（`github.sub-issue.add`、`scaffold`）の `not_attempted`、`data.result.github_ref` は確認したリポジトリの ref（例 `gh:example/repo#57`）、カタログにディレクトリを作らず changeset も書かない。従来のテストの観測（終了コード6、effects の最初が succeeded、次が not_attempted、公開しない、POST 1回）と同じ。
-			次の1手（recovery）は、今の「`scope import github ...` を実行する」の前に「`origin` を確認したリポジトリ（`example/repo`）に戻す」を置く。`origin` が違うままでは取り込みが他のリポジトリの Issue として止まるため。この1文は `RepositoryChanged`（`ValueError` の子）が `recovery` として持ち、今の `CanonicalCommandError` の `recovery` と同じく先頭に並べる。
+			次の1手（recovery）は、今の「`scope import github ...` を実行する」の前に「`origin` を確認したリポジトリ（`example/repo`）に戻す」を置く。次の1手の `scope import github` は番号だけを渡し、番号はその時点の `origin` のリポジトリで解釈されるので、`origin` が違うままでは別のリポジトリの同じ番号の Issue を取り込みうるため。この1文は `RepositoryChanged`（`ValueError` の子）が `recovery` として持ち、今の `CanonicalCommandError` の `recovery` と同じく先頭に並べる。
 			"""
 		satisfies: ["R-02", "F-01"]
 	}
@@ -50,8 +50,8 @@ design: {
 compatibility: """
 	公開のコマンド、引数、エラーのコードの種類、終了コードの意味、JSON の形は変わらない。動きの変化は、epic-00512 の constraints の「誤って書き込みや受け付けに進んでいた操作を止める直し」に当たる。#513 が `migration.md` の 0.5.1 の節に載せる点：
 	(1) `scope close`／`scope reopen` を端末で確認したとき、確認の間に直接の選択が変わると、`PRECONDITION_FAILED`（終了コード3、effects 空、GitHub に書かない）で止まる。
-	(2) `scope create` で、確認の後や POST の前に `origin` のリポジトリが変わると、`PRECONDITION_FAILED`（終了コード3）で止まり、Issue を作らない。
-	(3) `scope create` で、POST の後に `origin` のリポジトリが変わると、`SCOPE_PUBLICATION_INCOMPLETE`（partial、終了コード6）で止まり、親への追加とカタログへの公開をしない。effects は `github-create succeeded` と残りの `not_attempted`。
+	(2) `scope create` で、確認の後や POST の前に `origin` のリポジトリが変わると、Issue を作らずに止まる。GitHub にまだ何も書いていなければ `PRECONDITION_FAILED`（failed、終了コード3、effects 空）。種類のラベルを作った後なら `CANONICAL_WRITE_INCOMPLETE`（partial、終了コード6、effects は `github.label.create succeeded` と `github-create`・`scaffold` の `not_attempted`）。
+	(3) `scope create` で、POST の後（親への追加の前、またはカタログへの公開の前）に `origin` のリポジトリが変わると、`SCOPE_PUBLICATION_INCOMPLETE`（partial、終了コード6）で止まり、それより先の親への追加とカタログへの公開をしない。effects は、済んだ手順の `succeeded` と残りの手順の `not_attempted`。`data.result.github_ref` は確認したリポジトリの ref。recovery の先頭は「`origin` を確認したリポジトリに戻す」案内で、その後に今までの `scope import github` の案内が続く。
 	"""
 risks: [
 	"F-01 の、最後の読み直しから GitHub の要求までの短い間は閉じない（Git と GitHub の呼び出しを不可分にする手段がない）",
