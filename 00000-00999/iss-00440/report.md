@@ -54,7 +54,37 @@ ID: "iss-00440"
 
 ## Verification
 
-（全体のテスト、コードのレビュー、最終品質ゲートの結果を、この後に書く）
+### 受け入れ条件
+
+| AC | 確かめたこと | 結果 |
+|---|---|---|
+| AC-440-01 | `tests/cli_runtime/test_issue440_schema3_stops.py`：版3の宣言の一時のリポジトリで50のコマンドが終了コード3・`CANONICAL_NOT_MIGRATED`・`effects`/`warnings` 空・次の1手の文・ファイルが変わらないこと、`--raw`・`--dry-run`・`--expect-current` の変形、`installation` の `--target` と init、`canonical check` の失敗の1件と同じ次の1手、版5・文字列の"4"・null は `PRECONDITION_FAILED`、`help`/`completion` は動く。`test_canonical_dispatch.py`（版3はハンドラーに届かない）。重複キーなど曖昧な宣言の `doctor --raw` は 0.4.2 と同じ観測（G4 の `test_issue440_g4_doctor.py`） | 通過 |
+| AC-440-02 | `test_issue436_every_command.py`：`LEAF_PATHS` が53、`CANONICAL_HANDLERS` が46で表と一致、版4の clone で53のコマンドを1回ずつ流して拒否だけのコード（`CANONICAL_NOT_IMPLEMENTED`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`）が出ないこと、消したコマンドと引数（`workspace migrate`、`workbench copy`、`--ci`、`--source local` 2つ、scope の `--slug` 6つ）が引数の誤り、`help`/`completion` に出ないこと、runtime に拒否だけのコードがないこと | 通過 |
+| AC-440-03 | 上の「到達の判定の結果」と「コードの検索の結果」。`test_no_runtime_code_accepts_schema_three_or_reads_metadata` | 通過 |
+| AC-440-04 | `test_issue440_release_0_5_0.py`（外した17の資産が配布資産と dogfood にない、CUE の `report.md` に `タイトル:`・`親:` がなく「詳細:」が `../../../docs/…`）、`test_issue432_scope_create.py`・`test_issue474_scope_create.py`（作った `report.md` に題名・親の行がなく深さが正しい）、`test_issue440_g3_artifact.py::test_invalid_artifact_slug_stops_without_github_or_catalog_writes`（不正な Artifact の `--slug` は今と同じ `LOCAL_IO_FAILED`、何も書かない。0.5.0 と撤去の前のコードの両方で通る）。`domain/ids.py` に Scope の slug と英数字の題名の規則はない | 通過（バイトの見本との比較は FQG-3） |
+| AC-440-05 | `test_cli_docs_vnext.py`（雛形の `.workbench/README.md` が `workbench copy` を案内しない、文書の例）、`test_issue436_agent_rules.py`（規則の節に「3 のリポジトリでは」がない、見出しが「## 仕様の扱い」）、`test_issue440_release_0_5_0.py`（`migration.md` の 0.5.0 の節の語、「schema3の旧writerから移行」がない、「canonical モードへの移行」が `v0.4.2` と読み替えを示す、`canonical.md` の `CANONICAL_NOT_MIGRATED` の行が 0.4.2）、`test_issue436_docs.py`、`test_authoring_kit_assets.py`、`test_issue477_authoring_docs.py`。手での grep でも、今の配布する文書に従来モードの記述はない（`canonical.md` の「0.5.0 で外しました」と `canonical check` の説明を除く） | 通過（不在の機械的な確かめの広さは FQG-2） |
+| AC-440-06 | `scripts/migrate-to-canonical/` と `.github/scripts/specdock-ci-validate.sh` はない。`run.sh` の `TARGETS` は `(src/spec_dock tests)`。`test_issue434_ci_check.py` が `specdock-ci-validate.sh` のないことを確かめる | 通過 |
+| AC-440-07 | 上の「テストの分類の一覧」。(b) 383件のすべてに、対応する canonical のテスト（書き直し 352件、対応ありで消した 24件）か、canonical 側の不具合として記録した理由（7件）がある。`make lint` と `uv run pytest` は最終品質ゲートで通過 | 通過 |
+| AC-440-08 | `test_issue440_release_0_5_0.py`（版が 0.5.0、`migration.md` の 0.5.0 の節、0.4.2 の配布資産の一覧のすべてが current か既知の古い版か退役、退役の許可の外は止まる、0.4.2 の配布資産を持つリポジトリが `installation update` で上がり `installation show` がすべて current、変えた退役の雛形は手で合わせるよう止まる）。dogfood は作った wheel の `installation update` で上げた（`succeeded`、変えた24・退役17）。コードのレビューの直しで変えた4つの文書は、途中の版のバイトだったので、提供側のバイトを写した。`installation show` で97件すべて current | 通過 |
+| AC-440-09 | 最終の SHA `055d2d2f6` を `git archive` で書き出して作った wheel（sha256 `6e9b21f9e2624b87ffb6ab6d65e42c68234a1c1ecfec5f5b4711ed36dc06dc5e`）を一時の venv に入れ、`spec-dock --version` が `spec-dock 0.5.0`、`spec-dock help` と `spec-dock canonical --help` が終了コード0、`spec-dock workspace migrate` と `spec-dock workbench copy` は引数の誤り（終了コード2、「invalid choice: 'migrate'」「invalid choice: 'workbench'」） | 通過 |
+| AC-440-10 | Epic の `requirement.md`（R-J6、失敗・境界条件の2つ、合意済みの判断の「移行の道具」）、`design.md`（11章、12章の `CANONICAL_NOT_MIGRATED`、14章の消すものの6と戻し方、失敗の表、戻し方）、`plan.md`（I-13 の受け入れと rollback）、`migration.md`、`NOT_MIGRATED_RECOVERY` が 0.4.2 と `v0.4.2` を示す。撤去の後の戻し方は、配布資産の更新の PR を `git revert` する形（コードのレビューの指摘）。移行の間の事実（0.3.0 が両方のモードを扱った）は残した | 通過 |
+
+### 仕様のレビュー（`spec-review`、spec-reviewer opus / xhigh）
+
+- 1回目（requirement `a02a759c…`、design `157d48af…`、plan `f5b25575…`）：P1 2件（退役の許可が `infra/static_assets.py` で3つの枠に限られていること、Epic の要件にも 0.3.0 があること）、P2 7件、P3 3件。すべて根拠ありとして直した（`.workbench/spec-review/iss-00440/review-response.md`）。
+- 2回目（requirement `aede6ea5…`、design `36e13675…`、plan `7a8f654c…`。worktree での実装と切り離すため、`caaeebe45` の独立したクローンを対象にした）：合格（P0・P1 なし、P2 1件、P3 4件）。P2・P3 も文書の食い違いなので直した（合格の後の直し）。
+
+### コードのレビュー（`code-review`、code-reviewer opus / high、`caaeebe45..694073bd5`）
+
+- Standards：合格（P2 1件：0.5.0 から戻すとき配布資産も戻す必要、P3 1件：消した関数を指すコメント）。Spec：合格（P2 1件：`reference_deps.md`、`reference_github.md`、`cli-redesign-guide.html` に従来の記述）。3件とも直した（コミット `055d2d2f6`。`.workbench/code-review/iss-00440/review-response.md`）。
+
+### 最終品質ゲート（`final-quality-gate`、campaign `iss-00440-fqg-1`、ChatGPT のゲートは無効）
+
+- 合格の commit：`055d2d2f6581f7c5f9749021c31215682eec4cba`（1回目で合格）。
+- 主 quality-gate-reviewer（opus / xhigh）：合格、網羅、P0・P1 なし、P2 2件、P3 2件。2人目（sonnet / high）：合格、網羅、P0・P1 なし、P3 2件。
+- テストの道：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3227 passed、7 skipped、1542秒）。
+- 記録：`.workbench/final-quality-gate/iss-00440-fqg-1/closure.md`。P2・P3 は下の「後続の候補」に入れた。
+- 参考：撤去の前（`caaeebe45`）の全体のテストは 4105 passed、8 skipped だった。減った分は、(a) と消したコードだけを確かめるテストの削除と、パラメータの数の違いによる。
 
 ### テストの分類の一覧（R-440-07）
 
@@ -540,4 +570,30 @@ ID: "iss-00440"
 
 ## Residual Risks / Follow-ups
 
-（コードのレビューと最終品質ゲートの後に書く）
+### 後続の候補（統括が Issue にする）
+
+canonical 側の既存の不足（この PR では直していない。統括の判断）：
+
+1. `scope close`／`scope reopen` が、端末での確認の後に直接の選択を読み直さない（`@current` を確認の前に解決する）。再現：`WriteWorld` で `iss-00003` を選び、確認の入力の間に別の `work start` で選択を変えると、古い対象を PATCH する（元のテスト `test_issue413_scope_lifecycle.py::test_scope_lifecycle_refuses_a_changed_direct_selection_after_terminal_confirmation`）。
+2. `scope create` が、端末での確認の後と GitHub の作成の前に `origin` を読み直さない。再現：確認の入力の間に `git remote set-url origin https://github.com/other/repo.git` を行うと、もとのリポジトリに POST する（`test_scope_create_commands_vnext.py::test_github_create_confirmation_rejects_native_origin_change_before_post`）。
+3. `scope create` の作成の間にリポジトリが変わっても、カタログに公開する（作成の後に origin を読み直さない。`test_issue413_scope_publish.py::test_repository_change_during_create_keeps_the_confirmed_old_ref_without_local_publication`）。
+4. canonical の `scope delete` で、`WorkTargetStore.remove_observed()` が "removed" を返した後、`__exit__` の記述子の close が OSError を投げると、記録は消えているのに `selection.clear not_attempted` と報告する（`test_issue413_scope_delete.py::test_confirmed_direct_clear_survives_a_later_descriptor_cleanup_failure`）。あわせて、Scope のディレクトリの最初の unlink が効いた後に例外になると `scope.delete not_attempted` と報告する（`TreeRemovalIncomplete.attempted` を見ていない）。
+5. canonical の `artifact create` で、`artifacts/` を作った後の失敗が `partial`（`artifact.directory unknown`）でなく `failed`（終了コード5、`effects` 空）になる（`test_issue413_artifact.py::test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_without_publication`）。
+6. canonical の `worktree remove --unlock` が、unlock の前に「無視されたものはリンクだけ」と判定して `discard_ignored` を真にするため、unlock の後にできた無視されたファイルを `--discard-ignored` なしで消しうる（撤去の前のコードも同じ。`test_issue413_worktree_remove.py::test_remove_preserves_ignored_content_created_after_unlock`）。
+7. grill の `finalize-artifact.py` が、版4の `spec-dock/initiatives` のリンクを通る Artifact のパスを「unsafe directory component 'initiatives'」で拒む（`test_issue413_artifact_skill.py::test_cli_research_artifact_can_be_finalized_without_recreating_its_identity`。今のテストは実ディレクトリに写した配置で確かめる）。
+8. 版4の宣言で重複キーの最後が 4 のもの（`{"schema_version":99,"schema_version":4}`）は版4として受け付ける（撤去の前と同じ。G4 の書き手の指摘）。
+
+この PR の P2・P3（最終品質ゲートと書き手の指摘。どれも動きの誤りではない）：
+
+9. README.md:9 が「現行CLIの全55コマンド」のままで、`tests/unit/infra/test_issue477_authoring_docs.py` がその文を固定している（FQG-1）。53 に直し、テストも直す。
+10. 文書の中身のテストが、外したコマンドと引数（`spec-dock workspace migrate`、`workbench copy`、`--ci`、`--source local`、`.meta.json` の作成）の不在を、配布する文書の全体で確かめていない（FQG-2）。
+11. 作った CUE の `report.md` のバイトを 0.4.2 の出力と比べるテストがない（FQG-3）。
+12. `resolve_observed_context` が、版3の兄弟の宣言を2回読む間に消えると AssertionError で落ちる（FQG-4。`unavailable` の行にすべき）。
+13. `docs/github-issue-integration.md:7` に local backend とローカル metadata の記述が残る。`pyproject.toml` の package-data に、外した `templates/{initiative,epic,issue}/.workbench/README.md` のパターンが3行残る（どちらも 2人目のゲートの P3）。
+14. wheel から入れたコンソールで、canonical の `work start`／`work finish` を通す e2e のテストはない（本物の定期の実行に触れずに子のプロセスで動かす手段がないため。入れたコンソールでは読むコマンドと `workspace sync` だけを確かめ、Start と Finish はプロセスの中で確かめる）。
+
+### 残るリスク
+
+- vulture と名前の参照で見つからない消し残しがありうる（動きは変えない）。
+- 0.4.2 の雛形のまま 0.5.0 で Scope を作ると、`report.md` に前付けの2行が残る（正本ではない。`installation update` の後は残らない）。
+- マージの後に統括が行うこと：`spec-dock work finish`、0.5.0 を利用者の環境に入れる、`release-tag.yml` の `v0.5.0` の確かめ、ほかの4つのリポジトリの `installation update` と PR、各 PR の検査のワークフローの 0.5.0 での通過（AC-20 の残り）。
