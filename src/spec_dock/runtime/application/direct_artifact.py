@@ -59,6 +59,8 @@ def _verify_declaration(context: ProjectContext, expected: LocalInput) -> None:
 
 def query_artifact(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
     """`artifact list|show --scope @root`; the caller has checked any --expect-current against the snapshot."""
+    if namespace.expect_backend is not None:
+        raise ValueError("--expect-backend requires one existing Scope target")
     declaration = _capture_declaration(context)
     owner = context.root / "spec-dock"
     descriptor = open_guarded_directory(owner)
