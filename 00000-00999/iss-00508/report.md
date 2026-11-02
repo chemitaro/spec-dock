@@ -38,7 +38,7 @@ ID: "iss-00508"
 - テスト先行：新しいテストの2件（T-01、T-02）が直す前に失敗し、直した後に通ることを確かめた。
 - コードのレビュー（code-reviewer opus/high、axis both、範囲 `809a9c67f..726bcf9b5`）：pass、指摘なし。記録：`.workbench/code-review/iss-00508/round-1.json`。
 - `make lint` pass、`uv run pytest`（全体、`726bcf9b5`）3231 passed、7 skipped。
-- 最終品質ゲート：（下に追記）
+- 最終品質ゲート（campaign `iss-00508-fqg-1`、`726bcf9b5`）：合格。レビューの道（quality-gate-reviewer opus/high、1人、観点 functional-correctness・requirements-closure・test-adequacy）は pass、P0〜P3 0、網羅は完全。テストの道は `make lint` 終了コード0、`uv run pytest` 終了コード0（3231 passed、7 skipped）。ChatGPT の補助の道はなし（無効）。記録：`.workbench/final-quality-gate/iss-00508-fqg-1/closure.md`。
 
 ## Residual Risks / Follow-ups
 

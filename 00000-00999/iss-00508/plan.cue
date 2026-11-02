@@ -8,7 +8,7 @@ steps: {
 	"S-01": {title: "unlock の後と、ロックなしの判定の後に無視されたファイルを作るテストを書き、落ちることを確かめる（Red）", realizes: ["R-01", "R-02"], status: "done", session: "impl"}
 	"S-02": {title: "`_remove_captured_worktree` に `ignored_allowed` を足し、canonical の `remove_worktree` から渡す（Green）", realizes: ["R-01", "R-02", "R-03", "F-01"], status: "done", after: ["S-01"], session: "impl"}
 	"S-03": {title: "リンクだけの worktree の削除（ロックあり・なし）のテストを足し、`test_issue432_branch_followups.py` の差し替え関数をキーワード引数を受け取る形に直し、既存のテストを通す", realizes: ["R-03"], status: "done", after: ["S-02"], session: "impl"}
-	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02", "R-03"], status: "todo", after: ["S-03"], session: "impl"}
+	"S-04": {title: "コードのレビュー、最終品質ゲート（`make lint`、`uv run pytest`）、report.md、PR", realizes: ["R-01", "R-02", "R-03"], status: "done", after: ["S-03"], session: "impl"}
 }
 
 tests: {
