@@ -53,7 +53,7 @@ design: {
 	}
 }
 
-compatibility: "0.5.1 は、requirement.cue の constraints に挙げた直し（#506 と #510 の、誤って進んでいた操作を止めること、#507 の、途中の失敗を `partial`（終了コード6）で返すこと）のほかは、0.5.0 の公開の契約を変えない。変わる点は #513 が `migration.md` の 0.5.1 の節に書く。0.5.0 の配布資産を持つリポジトリは、`installation update` で上がる。"
+compatibility: "0.5.1 は、requirement.cue の constraints に挙げた直し（#506、#508、#510 の、誤って進んでいた操作を止めること、#507 の、途中の失敗を `partial`（終了コード6）で返すこと）のほかは、0.5.0 の公開の契約を変えない。変わる点は #513 が `migration.md` の 0.5.1 の節に書く。0.5.0 の配布資産を持つリポジトリは、`installation update` で上がる。"
 risks: [
 	"#506 と #507 は、scope のコマンドの近い所を直すので、ぶつかることがある。後にマージするほうが main を取り込む",
 	"0.5.1 の配布の後、input-devices、company-os、housing-lifecycle で最初の実際の仕様の編集が起きる。同期の記録を見て、問題があれば F-01 の戻し方に従う",

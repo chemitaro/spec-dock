@@ -40,6 +40,8 @@ ID: "iss-00508"
 - `make lint` pass、`uv run pytest`（全体、`726bcf9b5`）3231 passed、7 skipped。
 - 最終品質ゲート（campaign `iss-00508-fqg-1`、`726bcf9b5`）：合格。レビューの道（quality-gate-reviewer opus/high、1人、観点 functional-correctness・requirements-closure・test-adequacy）は pass、P0〜P3 0、網羅は完全。テストの道は `make lint` 終了コード0、`uv run pytest` 終了コード0（3231 passed、7 skipped）。ChatGPT の補助の道はなし（無効）。記録：`.workbench/final-quality-gate/iss-00508-fqg-1/closure.md`。
 
+- PR：https://github.com/chemitaro/spec-dock/pull/519（head `726bcf9b5`）。CI（Provider CI 41436537551、SpecDock check 41436537550、Commit identity 41436537519／41436500459）はすべて success、GitHub は MERGEABLE・CLEAN（2026-11-02T11:40:39Z の観測。外部の CheckRun は観測の対象外）。マージと `spec-dock work finish` は統括が行う。
+
 ## Residual Risks / Follow-ups
 
 - F-01 の残りの時間（最後の確かめと `git worktree remove` の間）は閉じない（D-02）。
