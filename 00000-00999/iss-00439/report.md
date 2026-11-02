@@ -76,3 +76,27 @@ PR をすべて人がマージした：input-devices#18（`773f81e48`）、compa
 - `migrate.py`：仕様のツリーの外から仕様を指すリンクを書き換えない（今回は手で直した）。`cut` が足す `spec-dock-check.yml` は、PR と push で、ホストの runner（`ubuntu-latest`）で動くので、費用の決まりのあるリポジトリでは手で合わせる必要があった。
 - SpecDock：カタログが `.DS_Store` を保存する（利用者の全体の除外が効いていない）。
 - SpecDock：`installation update` は `.claude/skills/spec-dock*` の写しを外すが、`.agents/skills` への相対リンクを作らない。ルートの `.gitignore` の `.workbench/` で、雛形の `templates/cue/*/.workbench/README.md` がコミットから漏れる。
+
+対応の状況（2026-11-02）：`migrate.py` の穴は #495（README に記載）、`spec-dock-check.yml` の費用は #494、`.DS_Store` は #493 で直し、0.4.2 で5つのリポジトリに配った（input-devices#21、company-os#3、housing-lifecycle#241、taikyohiyou_project#2229）。skill のリンクの警告は #496、雛形の README は #497 で、0.5.0（I-13）に入れる。
+
+## 運用の点検（2026-11-02）
+
+切り替えの後の同期の記録と、5つのリポジトリの今の状態を見た。読むだけで、何も変えていない。
+
+- 同期の記録（`~/.local/state/spec-dock/canonical-sync.log` と `.log.1`、2026-10-30T04:23Z〜2026-11-02T00:15Z）：周期の記録 6436件は、すべて `result=ok`、`holds=0`、エラーのコードなし。
+
+  | リポジトリ | 周期 | 保存と push | 最初の周期 |
+  |---|---|---|---|
+  | spec-dock | 3750 | 117 | 2026-10-30T04:23Z |
+  | input-devices | 709 | 0 | 2026-11-01T09:36Z |
+  | company-os | 705 | 0 | 2026-11-01T09:40Z |
+  | housing-lifecycle | 690 | 0 | 2026-11-01T09:57Z |
+  | taikyohiyou | 582 | 2 | 2026-11-01T12:09Z |
+
+  spec-dock では、2026-10-30T04:25Z に1回、遠くの変更の取り込み（`merged=True`）があり、成功した。
+- 各カタログの `state.json`：5つとも `last_error` なし、`holds`・`blocking`・`conflicts` が空、`adopt_remote_pending` は false。
+- `spec-dock canonical status`（0.4.2）：5つとも、リンクが正しく、予定の仕事（launchd、60秒ごと）が入っていて動いている。push の認証は ok。未保存0、未 push 0、`conflict_files` と `junk_files` は空。
+- カタログの `HEAD` は、5つとも GitHub の `spec-dock/canonical` と同じ。
+- 予定の仕事は uv の tool の `spec-dock` を呼ぶので、0.4.2 を入れた後（2026-11-02T00:15Z〜）の周期も 0.4.2 で動き、ok だった。
+
+見えている限界：input-devices、company-os、housing-lifecycle では、切り替えの後に仕様の編集がなく、保存と push の実地の記録はまだない（spec-dock と taikyohiyou で確かめた形と同じ道を通る）。
