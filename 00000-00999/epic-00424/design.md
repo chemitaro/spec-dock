@@ -809,7 +809,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 
 ### 11. 移行のスクリプト（R-G1〜R-G6）
 
-- 置き場は `scripts/migrate-to-canonical/`（spec-dock のリポジトリのルート。パッケージには入れない）。`migrate.py`（標準ライブラリと、`git` と `gh` のコマンドだけを使う1つのファイル）と `README.md`（各リポジトリの移行で使う短い手順書）を置く。撤去（14章）で消す。消した後も、版のタグ `v0.3.0` に残る。
+- 置き場は `scripts/migrate-to-canonical/`（spec-dock のリポジトリのルート。パッケージには入れない）。`migrate.py`（標準ライブラリと、`git` と `gh` のコマンドだけを使う1つのファイル）と `README.md`（各リポジトリの移行で使う短い手順書）を置く。撤去（14章）で消す。消した後も、版のタグ `v0.4.2`（と `v0.3.0`）に残る。
 - 対象は R-J1 のリポジトリである。スクリプトは spec-dock にだけ置き、ほかのリポジトリには写さない。対象は `--project <対象の mainのチェックアウト>` で選ぶ。既定のブランチは、対象の `origin/HEAD` から求める（taikyohiyou_project は `develop`）。`main` を決め打ちしてはならない。
 - 作業の記録は `scripts/migrate-to-canonical/.state/<owner>-<repo>/`（Git では無視）に、リポジトリごとに置く。取り消しの一覧（`undo.jsonl`）と、ID の置き換えの表（`idmap.json`）である。
 - サブコマンド。どれも、既定では予定を表示するだけで、`--apply` を付けたときだけ書く。何度実行しても同じ結果になる。
@@ -864,7 +864,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 
 ### 12. コマンドの一覧と出力の契約
 
-新しく足すコマンド（`cli/catalog.py` の `LEAF_PATHS`、`HELP_EFFECTS`、`--help` の Target/Reads/Writes/Does not の節を、今のコマンドと同じ形で書く）。コマンドの数は、0.3.0 で 44 から 53 になり、撤去（14章）で `workspace migrate` と `workbench copy` を消して 51 になる。
+新しく足すコマンド（`cli/catalog.py` の `LEAF_PATHS`、`HELP_EFFECTS`、`--help` の Target/Reads/Writes/Does not の節を、今のコマンドと同じ形で書く）。コマンドの数は、0.3.0 で 44 から 53 になり、0.4.0（epic-00425）で `scope check` と `scope render` を足して 55 になり、撤去（14章）で `workspace migrate` と `workbench copy` を消して 53 になる。
 
 | コマンド | 書くもの | 効果の要約（`HELP_EFFECTS`） | 担当 |
 |---|---|---|---|
@@ -890,7 +890,7 @@ Linux（常駐のプロセス。systemd のないコンテナ、devcontainer）�
 
 | コード | 終了コード | 次の1手 |
 |---|---|---|
-| `CANONICAL_NOT_MIGRATED` | 3 | 0.3.0 では、移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3のとき。`canonical link` では、GitHub に canonical がなく既定のブランチに仕様があるときも）。撤去の後の 0.5.0 では、どのコマンドも版3の宣言を読むとこれで止まり、「SpecDock 0.3.0 を入れ直し、版のタグ `v0.3.0` の `scripts/migrate-to-canonical/README.md` に従って移す」を示す |
+| `CANONICAL_NOT_MIGRATED` | 3 | 0.3.0 では、移行の手順書（`scripts/migrate-to-canonical/README.md`）を見る（宣言の版が3のとき。`canonical link` では、GitHub に canonical がなく既定のブランチに仕様があるときも）。撤去の後の 0.5.0 では、どのコマンドも版3の宣言を読むとこれで止まり、「SpecDock 0.4.2 を入れ直し、版のタグ `v0.4.2` の `scripts/migrate-to-canonical/README.md` に従って移す（2026-11-02、iss-00440 で 0.3.0 から変えた）」を示す |
 | `CANONICAL_NOT_APPLICABLE` | 3 | 示した代わりのコマンドを使う（`canonical check` など） |
 | `CANONICAL_UNSUPPORTED_LAYOUT` | 3 | mainのチェックアウトのある構成で使う |
 | `CANONICAL_GIT_TOO_OLD` | 3 | Git 2.38 以上を入れ、`spec-dock canonical link` をもう一度実行する（登録簿の git を入れ替えるため） |
@@ -976,16 +976,16 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
   3. canonical モードで拒否するだけのコマンドと引数。コマンドの `workspace migrate` と `workbench copy`、引数の `workspace validate --ci`、`workspace sync --source local`、`dependency check --source local`。`scope create` と `scope import github` の `--slug`。使われなくなるエラーのコード（`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`）も消す。コマンドの数は 53 から 51 になる。
   4. テンプレートの前付けの `タイトル:` と `親:` と、写すときにそれを除く処理（6章）。テンプレートの「詳細:」の相対リンクは `<区切り>/<ID>/` からの深さ（`../../../docs/…`）に直し、写すときに書き換える処理を消す。`epics/rules.md` と `issues/rules.md` を作る配布資産と、従来モードだけが使う名前の規則（`domain/ids.py` の slug の規則と英数字だけの題名の規則）を消す。`.md` の雛形 `templates/{initiative,epic,issue}/` も消す（版4は epic-00425 の `templates/cue/` だけを使う。2026-11-01 に epic-00425 の I-7 から移した）。
   5. 規則の節の版3の文（10章）と、README、配布する `spec-dock/docs/`、spec-dock の `AGENTS.md` の、従来モードの記述。
-  6. 移行のスクリプト `scripts/migrate-to-canonical/`（版のタグ `v0.3.0` に残る）と、spec-dock の `.github/scripts/specdock-ci-validate.sh`（I-10 で `ci.yml` から外した後、使われない）。
+  6. 移行のスクリプト `scripts/migrate-to-canonical/`（版のタグ `v0.4.2` に残る）と、spec-dock の `.github/scripts/specdock-ci-validate.sh`（I-10 で `ci.yml` から外した後、使われない）。
   7. 従来モードだけを確かめるテスト（下の「テストの扱い」）。
 - **残すもの**（R-J7）：直接の選択の記録（`spec-dock/.agent/work-target/`）、`StartLock`、Artifact の命名と作成、`OperationResult` の結果の状態と終了コードの規則、読むだけのコマンドは書かないこと、配布資産の導入と更新（`installation` のコマンド）、worktree とブランチの操作。配布資産の「既知の古い版」の判定は、利用側の配布資産を 0.5.0 に上げるのに使うので残す。
 - **テストの扱い**：
   1. 消す前に、今のテストを、次の3つに分けた一覧を作り、I-13 の報告書に載せる。(a) 版3だけの振る舞いを確かめるもの。(b) 共通の契約を、版3の作り物（`.meta.json` のある一時のリポジトリ）を使って確かめるもの。(c) モードに関係のないもの。2026-10-25 の時点で、`.meta.json` を扱うテストのファイルは100のうち50（テスト717件）ある。
   2. (a) は消す。(b) は、同じ契約を canonical モードの作り物（偽の `gh` と一時のカタログ）で確かめる形に書き直す。すでに canonical のテストが同じことを確かめていれば、その対応を一覧に書いてから消す。(c) は変えない。
-  3. 版3の宣言を読むと、すべてのコマンドが案内付きで止まることを確かめるテストを足す。G7 のテストは、51のコマンドが canonical の処理だけで動くことを確かめる形にする。
+  3. 版3の宣言を読むと、すべてのコマンドが案内付きで止まることを確かめるテストを足す。G7 のテストは、53のコマンド（`help` と `completion` を含む。2026-11-02、iss-00440 で数え直した）が canonical の処理だけで動くことを確かめる形にする。
 - **版**：`pyproject.toml` と版のファイル（`spec-dock/system/spec-dock-version`）を 0.5.0 にする。`release-tag.yml` が、マージの後にタグ `v0.5.0` を作る。
 - **各リポジトリを 0.5.0 にそろえる**（R-J8）：0.5.0 のPRがマージされ、利用者の環境に 0.5.0 を入れた後、統括のエージェントが、R-J1 の各リポジトリで `spec-dock installation update` を行い、通常のPRを作る（5つ）。各リポジトリの検査のワークフローは、版のファイルに従って 0.5.0 を入れて動く。人がマージする。
-- **戻し方**：0.5.0 に問題があれば、利用者の環境に 0.3.0 を入れ直す。0.3.0 は canonical モードを持つので、移したリポジトリはそのまま動く。各リポジトリの配布資産を 0.5.0 に上げた後なら、版のファイルを戻すPRも作る。
+- **戻し方**：0.5.0 に問題があれば、利用者の環境に 0.4.2 を入れ直す（2026-11-02、iss-00440：撤去の後の戻し先は、両方のモードと CUE の Scope を持つ最後の版の 0.4.2 にした。0.3.0 は CUE の Scope を扱えないため）。0.4.2 は canonical モードを持つので、移したリポジトリはそのまま動く。各リポジトリの配布資産を 0.5.0 に上げた後なら、版のファイルを戻すPRも作る。
 
 ## data / failure
 
@@ -1037,7 +1037,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
 | 定期の実行から push の認証ができない | 保存はローカルに積み、`push_auth` に記録する。`canonical status` が示す | `gh auth setup-git`（`https`）。`ssh` なら `https` と `gh` の認証に変える |
 | 移行の間に、一部のリポジトリだけが移った | 0.3.0 は、移したリポジトリを canonical モードで、移していないリポジトリを従来モードで扱う | なし |
 | 切り替えの後、撤去の前に、新しい仕組みに重大な問題が見つかった | そのリポジトリだけを、切り替える前の形に戻せる。ほかのリポジトリには影響しない | 利用者が判断し、「戻し方」に従う |
-| 撤去の後に、版3のリポジトリかクローンが見つかった | すべてのコマンドが `CANONICAL_NOT_MIGRATED` で止まる | 0.3.0 を入れ直し、版のタグ `v0.3.0` の手順書で移す |
+| 撤去の後に、版3のリポジトリかクローンが見つかった | すべてのコマンドが `CANONICAL_NOT_MIGRATED` で止まる | 0.4.2 を入れ直し、版のタグ `v0.4.2` の手順書で移す（手順書の 0.3.0 は 0.4.2 と読み替える） |
 
 ## 変更対象
 
@@ -1143,7 +1143,7 @@ R-J1 のすべてのリポジトリを移した後に、従来モードのコー
 
 - **切り替えのPRのマージ前**：PRを閉じ、`spec-dock/canonical` を消し、`undo --apply` で GitHub への登録を外せば、元に戻る。今の運用はずっと動いている。
 - **マージの後、撤去の前**：そのリポジトリだけを戻す。`export-legacy --apply` で、カタログの内容と、GitHub から作り直した `.meta.json` と、版3の宣言を持つブランチを作り、切り替えのPRで外した今のCIの手順を戻すコミットを足して、PRで戻す。戻すPRをマージする前（各チェックアウトがまだ版4のうち）に、そのリポジトリのすべてのクローン（ほかのPCのものを含む）の各チェックアウトで `spec-dock canonical remove --yes` を行う。版3に戻った後は、canonical のコマンドが `CANONICAL_NOT_MIGRATED` で止まり、取り外せないためである（I-3 の統括の判断）。その後に戻すPRをマージし、必要なら `undo --apply` で登録を外す。0.3.0 のままでよく、ほかのリポジトリには影響しない。
-- **撤去の後**：利用者の環境に 0.3.0 を入れ直してから、上と同じ手順で戻す。移行のスクリプトは、版のタグ `v0.3.0` から取り出す。
+- **撤去の後**：利用者の環境に 0.4.2 を入れ直してから、上と同じ手順で戻す。移行のスクリプトは、版のタグ `v0.4.2` から取り出す（2026-11-02、iss-00440：撤去の後の戻し先は、両方のモードと CUE の Scope を持つ最後の版の 0.4.2 にした。0.3.0 は CUE の Scope を扱えないため）。
 - 戻すかどうかは、利用者が判断する。エージェントは、戻す必要を見つけたら、止まって知らせる。
 
 ## testability
