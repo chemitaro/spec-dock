@@ -71,7 +71,7 @@ SpecDock 0.5.0 は、`spec-dock/workspace.json` の `schema_version` が 4 の�
 - 0.4.2 の後に入った改善：
   - `installation update`（`--dry-run` と、途中で止まった場合を含む）が `.claude/skills/spec-dock*` の古い写しを外すとき、リンクがない枠ごとに、外枠の `warnings[]` に `CLAUDE_SKILL_LINK_MISSING`（`details`：`slot`、`link_target`、`command`）が出ます。終了コード、`status`、`effects`、`data.result` は変わりません。示された `command` でリンクを置きます（SpecDock はリンクを作りません）。
   - 配布する `spec-dock/.gitignore` に `!**/.workbench/` を足しました。ルートの `.gitignore` が `.workbench/` を無視していても、`spec-dock/` の下の `.workbench/README.md`（雛形の README を含む）がコミットの対象になります。ほかの中身は無視のままです。すでに使っているリポジトリは、更新の後に `git add spec-dock/templates` で、それまで無視されていた雛形の README を足してコミットします。
-- 戻し方：0.5.0 に問題があれば、パッケージを 0.4.2 に戻します。0.4.2 は canonical モードと CUE の Scope を持つので、移したリポジトリはそのまま動きます。配布資産を 0.5.0 に上げた後なら、版のファイル（`spec-dock/system/spec-dock-version`）を戻す PR も作ります（CI の見本はその版を入れるため）。
+- 戻し方：0.5.0 に問題があれば、パッケージを 0.4.2 に戻します。0.4.2 は canonical モードと CUE の Scope を持つので、配布資産を 0.5.0 に上げる前のリポジトリはそのまま動きます。配布資産を 0.5.0 に上げた後なら、その更新の PR（版のファイル `spec-dock/system/spec-dock-version` を含む）を `git revert` して、配布資産を 0.4.2 のバイトに戻します。版のファイルだけを戻すと、0.4.2 の `canonical check` が 0.5.0 の資産を知らない変更として CI を止め、0.4.2 の `scope create` が外した `docs/rules/initiative/epics.md`・`docs/rules/epic/issues.md` を求めて止まります（0.4.2 の `installation update` も 0.5.0 のバイトを知らないので、戻す手段になりません）。
 
 ## 新規導入
 

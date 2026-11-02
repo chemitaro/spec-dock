@@ -146,7 +146,7 @@ class ReadinessRefused(StartPrecondition):
 def canonical_worktree_rows(
     context: ProjectContext, views: tuple[ScopeView, ...], *, timeout: float
 ) -> tuple[WorktreeSelection, ...]:
-    """The legacy `observe_worktrees` rows, with every selection read against the canonical Scope views."""
+    """One row per worktree of this clone, each selection read against the canonical Scope views."""
     seen: set[object] = set()
     rows: list[WorktreeSelection] = []
     for entry in worktree_list(context.root, timeout=timeout):

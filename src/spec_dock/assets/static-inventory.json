@@ -276,7 +276,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "d64ae638227b4c1a36da5386a9921472d59d015e94c107f66c7bf37e5c6c5d23",
+      "sha256": "b51e4679b9b3c53c16d42edbc019294964ef76c75a6241c25e9fe612aabdfc09",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -366,7 +366,7 @@
     {
       "path": "spec-dock/docs/migration.md",
       "source": "spec_dock/docs/migration.md",
-      "sha256": "307839d7c7e11c031cb2c9f45b8d82e54c477d312a99aeded1c2ed9f337fb6ee",
+      "sha256": "75c9797650fa35101a4d3f63babcfe4d0fbf77fffdbbf10ded61eb9a3401d694",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -407,21 +407,23 @@
     {
       "path": "spec-dock/docs/reference_deps.md",
       "source": "spec_dock/docs/reference_deps.md",
-      "sha256": "d2d1d508d864132e31a566fafa9efa549059d75283451a706a6cd153d61a2de3",
+      "sha256": "bb962adca3e3dba838d4cfe2fbef7dc8b90dc4aa7e20fe8c08659971f1d635e3",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "162184232a51b8869789f1975bbd15219699353bd57eb1dc96e247dcd91bade2"
+        "162184232a51b8869789f1975bbd15219699353bd57eb1dc96e247dcd91bade2",
+        "d2d1d508d864132e31a566fafa9efa549059d75283451a706a6cd153d61a2de3"
       ]
     },
     {
       "path": "spec-dock/docs/reference_github.md",
       "source": "spec_dock/docs/reference_github.md",
-      "sha256": "3aeb5ab1791b49f1190da45db30428d3ee2ea32a141e169c396342cebab4ae10",
+      "sha256": "b8acce2a6b4c3dedc099cc4d9251aa48f1a26f168ba615069d21fcc88dba86b7",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "53f8bf8a6eca9809da1ff36ab09f1236e9a7b16d3641ddd676e3faf2c04e7b44"
+        "53f8bf8a6eca9809da1ff36ab09f1236e9a7b16d3641ddd676e3faf2c04e7b44",
+        "3aeb5ab1791b49f1190da45db30428d3ee2ea32a141e169c396342cebab4ae10"
       ]
     },
     {

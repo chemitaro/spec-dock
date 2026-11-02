@@ -161,7 +161,8 @@ def link_checkout(
     """Steps 1-8; `schedule=False` (--no-schedule) skips step 6, and a follow-up honours an earlier --no-schedule."""
     require_git(environment)
     layout = resolve_layout(context)
-    # A main checkout on an unmigrated commit keeps working in legacy mode: never put a link there.
+    # A main checkout on a commit without a schema-4 declaration (before the switch) gets no link; its own
+    # commands stop with CANONICAL_NOT_MIGRATED and its tree is left as it is.
     skip_main = not layout.is_main and not declares_schema_4(layout.main_checkout)
     observation = observe_catalog(layout, environment, timeout=timeout)
     _refuse_blocked(observation, skip_main=skip_main)

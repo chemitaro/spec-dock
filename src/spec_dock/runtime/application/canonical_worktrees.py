@@ -101,7 +101,7 @@ def show_worktree(namespace: argparse.Namespace, context: ProjectContext) -> Ope
 
 
 def remove_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    """The legacy `remove_native_worktree` with the canonical expectation on the record its inner step verifies."""
+    """Native `worktree remove` (`direct_worktrees._remove_captured_worktree`) after the canonical expectation check."""
     _refuse_catalog(namespace, context)
     context.require_writer()
     if namespace.expect_backend is not None:
@@ -132,7 +132,7 @@ def remove_worktree(namespace: argparse.Namespace, context: ProjectContext) -> O
 
 
 def bootstrap_worktree(namespace: argparse.Namespace, context: ProjectContext) -> OperationResult[object]:
-    """The legacy `bootstrap_native_worktree` with the canonical expectation on the record its inner step uses."""
+    """Native `worktree bootstrap` (`direct_bootstrap._bootstrap_captured_target`) after the canonical expectation check."""
     _refuse_catalog(namespace, context)
     context.require_writer()
     if namespace.expect_backend is not None:
