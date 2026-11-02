@@ -47,7 +47,7 @@ stop
 @enduml
 ```
 
-- 警告は結果の外枠の `warnings` に出ます。`details` に `slot`、`link_target`、`commands` があります。
+- 警告は結果の外枠の `warnings` に出ます。`details` に `slot`、`link_target`、`command` があります。
 - 結果の成否、`effects`、`data.result` は変わりません。
 - `uninstall` では出ません（`.agents/skills` も外すため）。
 
@@ -56,7 +56,7 @@ stop
 ```sh
 spec-dock installation update --dry-run --json
 # warnings に CLAUDE_SKILL_LINK_MISSING があれば、更新の後に Claude Code で sync-project-skills を使うか、
-# details.commands を作業ツリーの根で順に実行する
+# details.command（1行）を実行する
 ```
 </script>
 <script src="../../../design-system/ds.js"></script>

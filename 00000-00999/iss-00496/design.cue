@@ -17,9 +17,9 @@ design: {
 
 			- 道筋が `RETIRED_SKILL_SLOTS` のどれかの枠の下にあれば、その枠ごとに1件（`RETIRED_SKILL_SLOTS` の並び順）。ほかの古い道筋（`spec-dock/spec-dock.version` など）は数えない。
 			- 置き場は、外枠の `warnings`（`OperationResult.warnings`、`Diagnostic`）。JSON の `warnings[]` と、テキストの標準エラーの `warning [CODE] 文` に、今の決まりのまま出る。`data.result` の形は変えない（`ACTIVE_LINK_NOT_UPDATED` と同じく、結果の成否を変えない派生の知らせとして扱う）。
-			- コードは `CLAUDE_SKILL_LINK_MISSING`。`details` は `slot`（例 `.claude/skills/spec-dock`）、`link_target`（`../../.agents/skills/<name>`）、`commands`（置き方のコマンドの列）。
+			- コードは `CLAUDE_SKILL_LINK_MISSING`。`details` は `slot`（例 `.claude/skills/spec-dock`）、`link_target`（`../../.agents/skills/<name>`）、`command`（置き方の1行のシェルのコマンド）。
 			- 文（`message`）は、テキストの出力だけでも次の1手が分かるように、枠、リンクの行き先、`sync-project-skills`、コマンドを1行に含める。
-			- コマンドは、作業ツリーの根で実行する前提で、`find <slot> -mindepth 1 -depth -type d -empty -delete`、`rmdir <slot>`、`ln -s ../../.agents/skills/<name> <slot>` の3つ。空のディレクトリだけを消し、利用者のファイルが残れば `rmdir` が失敗して止まる（`ln -s` が既存のディレクトリの中にリンクを作る事故を防ぐ）。SpecDock はこれらを実行しない。
+			- コマンドは、どこで実行しても対象の作業ツリーに作用し、途中で失敗すれば後を実行しないように、`&&` でつないだ1行にする：`cd <作業ツリーの根の絶対パス> && find <slot> -mindepth 1 -depth -type d -empty -delete && rmdir <slot> && ln -s ../../.agents/skills/<name> <slot>`。根の道筋はシェルの引用符で囲む。空のディレクトリだけを消し、利用者のファイルが残れば `rmdir` が失敗して止まる（`ln -s` が既存のディレクトリの中にリンクを作る事故を防ぐ）。SpecDock はこれを実行しない。
 			"""
 		satisfies: ["R-01"]
 	}
@@ -28,7 +28,7 @@ design: {
 		text: """
 			- `installation update --dry-run`：`planned` の結果に、外す予定の写しの枠ごとに出す。
 			- `installation update`（適用）：`succeeded` の結果に、実際に外した写しの枠ごとに出す。途中で止まった `partial` の結果でも、実際に外せた写しがあれば出す（その枠はもう見えないため）。
-			- 外す写しがない（`unchanged`、または写しのない枠）なら出さない。前の更新で写しを外した後の空の枠にも、もう一度は出さない（要件の「写しを外さない場合は何も言わない」）。
+			- 外す写しがない（`unchanged`、または写しのない枠）なら出さない。前の更新で写しを外した後の空の枠にも、もう一度は出さない（R-01 の「外す写しの名前ごとに」は、その回に外す写しを数える）。
 			- 枠、`.claude/skills`、`.claude` がリンクなら、今までどおり枠ごと飛ばすので出さない。リンクが壊れている（行き先がない）場合も、リンクは Claude Code の側のもので、SpecDock は写しを外さないので出さない（壊れたリンクの診断は、この Issue の範囲外）。
 			- `installation uninstall` には出さない。`.agents/skills` の skill も外すので、リンクを置く理由がない。
 			"""
