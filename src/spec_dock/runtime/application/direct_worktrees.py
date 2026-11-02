@@ -24,6 +24,7 @@ from spec_dock.runtime.presentation.envelope import (
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Callable
 
     from spec_dock.runtime.application.contracts import GitWorktreeRecord
     from spec_dock.runtime.application.project_context import ProjectContext
@@ -108,7 +109,21 @@ def _remove_captured_worktree(
     entry: GitWorktreeRecord,
     captured_selection: StoredSelection,
     held_target: DirectoryIdentity,
+    *,
+    ignored_allowed: Callable[[bytes], bool] | None = None,
 ) -> OperationResult[object]:
+    """Remove one captured native worktree.
+
+    Without --discard-ignored, ignored content stops the removal unless `ignored_allowed` accepts the current
+    `git ls-files --others --ignored` listing. The listing is judged again at every target check, the last one
+    right before `git worktree remove` (after any unlock), so content created after an earlier judgment stops it.
+    """
+
+    def ignored_blocks(listing: bytes) -> bool:
+        if not listing or namespace.discard_ignored:
+            return False
+        return ignored_allowed is None or not ignored_allowed(listing)
+
     if entry.locked and not namespace.unlock:
         raise ValueError("locked worktree removal requires --unlock")
     git_dir = Path(
@@ -132,7 +147,7 @@ def _remove_captured_worktree(
         "-z",
         timeout=namespace.timeout,
     )
-    if ignored and not namespace.discard_ignored:
+    if ignored_blocks(ignored):
         raise ValueError("ignored worktree content requires --discard-ignored and explicit confirmation")
     captured_observed: dict[str, object] = {"removed": False}
     data: dict[str, object] = {
@@ -186,15 +201,17 @@ def _remove_captured_worktree(
             raise ValueError("native worktree branch, HEAD or flags changed before removal")
         if run_git(entry.path, "status", "--porcelain=v1", "-z", "--untracked-files=all", timeout=namespace.timeout):
             raise ValueError("worktree changed before removal")
-        if not namespace.discard_ignored and run_git(
-            entry.path,
-            "ls-files",
-            "--others",
-            "--ignored",
-            "--exclude-standard",
-            "--directory",
-            "-z",
-            timeout=namespace.timeout,
+        if not namespace.discard_ignored and ignored_blocks(
+            run_git(
+                entry.path,
+                "ls-files",
+                "--others",
+                "--ignored",
+                "--exclude-standard",
+                "--directory",
+                "-z",
+                timeout=namespace.timeout,
+            )
         ):
             raise ValueError("ignored worktree content changed before removal")
         held_target.verify()

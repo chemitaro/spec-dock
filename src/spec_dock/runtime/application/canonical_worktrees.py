@@ -6,7 +6,9 @@ the expectation was checked on; `worktree create` and `installation` read the re
 step, which captures it once more (a narrow window remains there, iss-00432). The clone's catalog worktree is
 shown as such and never removed or bootstrapped here (`canonical remove` detaches it). A worktree whose only
 ignored entry is its correct catalog link is removed without --discard-ignored: the link is SpecDock's own and
-removing it never touches the catalog. `workbench copy` has nothing to copy: every worktree sees the same catalog.
+removing it never touches the catalog. That judgment runs at every target check of the legacy step, the last one
+after any unlock and right before `git worktree remove`, so ignored content created after an earlier check stops
+the removal (iss-00508). `workbench copy` has nothing to copy: every worktree sees the same catalog.
 """
 
 from __future__ import annotations
@@ -112,12 +114,20 @@ def remove_worktree(namespace: argparse.Namespace, context: ProjectContext) -> O
         raise ValueError("worktree removal requires --yes")
     entry = resolve_native_target(namespace.worktree_ref, context, timeout=namespace.timeout)
     legacy = replace_namespace(namespace, expect_current=None)
-    if not namespace.discard_ignored and _only_ignored_is_the_link(context, entry.path, timeout=namespace.timeout):
-        legacy = replace_namespace(legacy, discard_ignored=True)
+    # Listed once before the legacy step only to keep its order: a bare main target still fails here in Git
+    # (GIT_FAILED, exit 5). The link-only judgment itself runs inside the legacy step at every target check.
+    _ignored_listing(entry.path, timeout=namespace.timeout)
     result: OperationResult[object] | None = None
     try:
         with DirectoryIdentity(entry.path) as held_target:
-            result = _remove_captured_worktree(legacy, context, entry, captured, held_target)
+            result = _remove_captured_worktree(
+                legacy,
+                context,
+                entry,
+                captured,
+                held_target,
+                ignored_allowed=lambda listing: _only_ignored_is_the_link(context, entry.path, listing),
+            )
     except OSError as error:
         if result is None:
             raise
@@ -208,12 +218,15 @@ def _cleanup_failure(
     )
 
 
-def _only_ignored_is_the_link(context: ProjectContext, path: Path, *, timeout: float) -> bool:
-    """True when the worktree's ignored content is exactly its correct spec-dock/initiatives link."""
-    ignored = run_git(
+def _ignored_listing(path: Path, *, timeout: float) -> bytes:
+    return run_git(
         path, "ls-files", "--others", "--ignored", "--exclude-standard", "--directory", "-z", timeout=timeout
     )
-    if [item for item in ignored.split(b"\0") if item] != [os.fsencode(LINK_RELATIVE.as_posix())]:
+
+
+def _only_ignored_is_the_link(context: ProjectContext, path: Path, listing: bytes) -> bool:
+    """True when the ignored `listing` of the worktree is exactly its correct spec-dock/initiatives link."""
+    if [item for item in listing.split(b"\0") if item] != [os.fsencode(LINK_RELATIVE.as_posix())]:
         return False
     try:
         layout = resolve_layout(context)
