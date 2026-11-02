@@ -38,7 +38,13 @@ def test_init_places_only_static_assets_and_a_new_declaration_in_the_explicit_wo
     def unexpected(*_args: object, **_kwargs: object) -> None:
         pytest.fail("static init must not contact GitHub or acquire a Start lock")
 
-    monkeypatch.setattr("spec_dock.runtime.infra.github_lifecycle.GithubIssueGateway.get", unexpected)
+    # Every GitHub contact goes through the gh executable (the per-Issue gateway was removed in 0.5.0, iss-00440).
+    tools = tmp_path / "trap-bin"
+    tools.mkdir()
+    contacted = tmp_path / "gh-contacted"
+    (tools / "gh").write_text(f"#!/bin/sh\ntouch '{contacted}'\nexit 91\n", encoding="utf-8")
+    (tools / "gh").chmod(0o755)
+    monkeypatch.setenv("PATH", str(tools) + os.pathsep + os.environ["PATH"])
     monkeypatch.setattr("spec_dock.runtime.infra.start_lock.StartLock.__enter__", unexpected)
     flags = ["--dry-run"] if dry_run else ["--yes"]
     assert main(["installation", "init", str(target), *flags, "--json"]) == 0
@@ -52,6 +58,7 @@ def test_init_places_only_static_assets_and_a_new_declaration_in_the_explicit_wo
 
     assert not (target / "spec-dock/.agent").exists()
     assert (target / "readme.md").read_text() == "existing project work\n" and not tuple(outside.iterdir())
+    assert not contacted.exists()
     if dry_run:
         assert result["status"] == "planned" and data["can_apply"] is True
         assert data["created_paths"] == [] and tree_digest(target) == before
@@ -59,7 +66,7 @@ def test_init_places_only_static_assets_and_a_new_declaration_in_the_explicit_wo
     else:
         declaration = json.loads((target / "spec-dock/workspace.json").read_bytes())
         assert declaration == {"schema_version": 4, "writer_protocol": "specdock.worktree-writer/v1"}
-        assert (target / "spec-dock/templates/issue/requirement.md").is_file()
+        assert (target / "spec-dock/templates/cue/issue/requirement.cue").is_file()  # templates/issue/ retired (0.5.0)
         assert (target / "spec-dock/scripts/spec-dock").is_file()
         assert (target / ".agents/skills/spec-dock/SKILL.md").is_file()
         assert (target / ".agents/skills/spec-dock-grill-with-docs/SKILL.md").is_file()
@@ -624,9 +631,10 @@ def test_uninstall_preserves_workspace_specs_ignored_state_and_unknown_files(
         assert data["can_apply"] is True and tree_digest(target) == before and not backup.exists()
     else:
         assert (
-            result["status"] == "succeeded" and len(data["retired_paths"]) == 112
+            result["status"] == "succeeded" and len(data["retired_paths"]) == 95
         )  # iss-00436 added docs/canonical.md; iss-00475 added design-system (5); iss-00474 added templates/cue (18);
-        # iss-00477 added docs/authoring/{cue,explanation}.md (2)
+        # iss-00477 added docs/authoring/{cue,explanation}.md (2); iss-00440 retired templates/{initiative,epic,issue}
+        # and docs/rules (17)
         skills = [path for path in data["retired_paths"] if path.startswith((".agents/", ".claude/"))]
         assert skills == [
             ".agents/skills/spec-dock-grill-with-docs/SKILL.md",
@@ -970,9 +978,10 @@ def test_static_changes_stop_if_the_observed_asset_is_replaced_with_same_bytes_d
         ]
     else:
         assert (
-            len(result["effects"]) == 113
+            len(result["effects"]) == 96
         )  # iss-00436 docs/canonical.md; iss-00475 design-system (5); iss-00474 templates/cue (18);
-        # iss-00477 docs/authoring/{cue,explanation}.md (2)
+        # iss-00477 docs/authoring/{cue,explanation}.md (2); iss-00440 retired templates/{initiative,epic,issue}
+        # and docs/rules (17)
         assert all(
             effect["kind"] == "installation.retire" and effect["status"] == "not_attempted"
             for effect in result["effects"][1:]
