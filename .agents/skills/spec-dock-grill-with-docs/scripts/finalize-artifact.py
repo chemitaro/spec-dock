@@ -52,6 +52,61 @@ def _artifact_parts(raw: str, repo_root: str) -> tuple[str, ...]:
     return lexical_parts
 
 
+def _main_checkout(repo_root: Path) -> Path | None:
+    """The main checkout of this clone: the root itself, or the owner of a linked worktree's git directory."""
+    marker = repo_root / ".git"
+    try:
+        info = os.lstat(marker)
+        if stat.S_ISDIR(info.st_mode):
+            return repo_root
+        if not stat.S_ISREG(info.st_mode):
+            return None
+        first = marker.read_text(encoding="utf-8").splitlines()[0]
+    except (OSError, UnicodeDecodeError, IndexError):
+        return None
+    if not first.startswith("gitdir:"):
+        return None
+    gitdir = Path(os.path.normpath(repo_root / first[len("gitdir:") :].strip()))
+    if gitdir.parent.name != "worktrees" or gitdir.parent.parent.name != ".git":
+        return None
+    return gitdir.parent.parent.parent
+
+
+def _catalog_link_target(current_fd: int, component: str, parent_path: Path, repo_root: Path) -> Path | None:
+    """Return this clone's catalog when `spec-dock/initiatives` points at exactly that, otherwise None."""
+    main = _main_checkout(repo_root)
+    if main is None:
+        return None
+    catalog = main / "spec-dock" / ".canonical"
+    try:
+        raw = os.readlink(component, dir_fd=current_fd)
+        info = os.lstat(catalog)
+        linked = os.path.realpath(raw if Path(raw).is_absolute() else parent_path / raw)
+        expected = os.path.realpath(catalog)
+    except OSError:
+        return None
+    if stat.S_ISLNK(info.st_mode) or not stat.S_ISDIR(info.st_mode) or linked != expected:
+        return None
+    return Path(expected)
+
+
+def _open_component(
+    current_fd: int, component: str, parent_path: Path, index: int, parts: tuple[str, ...], repo_root: Path
+) -> int:
+    try:
+        return os.open(component, _directory_flags(), dir_fd=current_fd)
+    except OSError as exc:
+        # Version 4 links spec-dock/initiatives to this clone's catalog (main checkout spec-dock/.canonical); no other link is followed.
+        if index == 1 and parts[:2] == ("spec-dock", "initiatives"):
+            target = _catalog_link_target(current_fd, component, parent_path, repo_root)
+            if target is not None:
+                try:
+                    return os.open(target, _directory_flags())
+                except OSError as link_exc:
+                    raise FinalizeError(f"cannot open the catalog link without following links: {link_exc}") from exc
+        raise FinalizeError(f"unsafe directory component '{component}' (symlink or non-directory): {exc}") from exc
+
+
 def _open_parent(repo_root: str, parts: tuple[str, ...]) -> int:
     root_path = Path(repo_root)
     if not root_path.is_absolute():
@@ -69,13 +124,10 @@ def _open_parent(repo_root: str, parts: tuple[str, ...]) -> int:
         raise FinalizeError(f"cannot open repo root without following symlinks: {exc}") from exc
 
     try:
-        for component in parts[:-1]:
-            try:
-                next_fd = os.open(component, _directory_flags(), dir_fd=current_fd)
-            except OSError as exc:
-                raise FinalizeError(
-                    f"unsafe directory component '{component}' (symlink or non-directory): {exc}"
-                ) from exc
+        for index, component in enumerate(parts[:-1]):
+            next_fd = _open_component(
+                current_fd, component, root_path.joinpath(*parts[:index]), index, parts, root_path
+            )
             os.close(current_fd)
             current_fd = next_fd
         return current_fd
