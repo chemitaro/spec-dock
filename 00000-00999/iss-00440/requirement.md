@@ -41,7 +41,7 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
 ### R-440-01 版3の宣言では、すべてのコマンドが書く前に止まる（R-J6、14章の2）
 
 - `spec-dock/workspace.json` の `schema_version` が 3 のリポジトリ（worktree を含む）で、次のどのコマンドも、何も読み書きせずに `CANONICAL_NOT_MIGRATED`（終了コード3、`status` は `failed`、`effects` は空）で止まる。
-  - 公開の51のコマンドから、宣言を読まない `help` と `completion` を除いた49のうち、`canonical check` を除く48のコマンド。`installation show`、`installation init`、`installation update`、`installation uninstall`、`workspace doctor --raw`、`canonical sync`（`--registered` のないもの）を含む。`--dry-run` を付けても同じ。
+  - 公開の53のコマンド（R-440-02）から、宣言を読まない `help` と `completion` を除いた51のうち、`canonical check` を除く50のコマンド。`installation show`、`installation init`、`installation update`、`installation uninstall`、`workspace doctor --raw`、`canonical sync`（`--registered` のないもの）を含む。`--dry-run` を付けても同じ。
   - `recovery` は1つの文で、「SpecDock 0.4.2 を入れ直し、版のタグ `v0.4.2` の `scripts/migrate-to-canonical/README.md` に従って移す」を示す（R-440-09）。
 - `canonical check` は、今と同じく、版3の宣言を失敗の1件（`CANONICAL_CHECK_FAILED`、終了コード7）として返し、その次の1手に同じ文を使う（8章）。
 - `help` と `completion` は、宣言を読まずに今と同じに動く。
@@ -56,7 +56,7 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
   - `workspace validate --ci`。
   - `workspace sync --source local` と `dependency check --source local`（`--source` が受け付けるのは `github` だけになる。引数なしの動きは今と同じ）。
   - `scope create initiative|epic|issue` と `scope import github initiative|epic|issue` の `--slug`。
-- 公開のコマンドの数は 51（`help` と `completion` を含む）になる。`cli/catalog.py` の `LEAF_PATHS`、`HELP_EFFECTS`、`HELP_PRECONDITIONS`、`MUTATING_LEAF_PATHS`、引数の表と、配布する `spec-dock/docs/cli-redesign-guide.html` のコマンドの一覧が、この51とそろう。
+- 公開のコマンドの数は 53（`help` と `completion` を含む）になる。Epic の文書の「51」は、epic-00425 が 0.4.0 で `scope check` と `scope render` を足す前の 53 から数えたもので、今の 55 から2つを消すと 53 である（この Issue で Epic の文書の数を直す）。`cli/catalog.py` の `LEAF_PATHS`、`HELP_EFFECTS`、`HELP_PRECONDITIONS`、`MUTATING_LEAF_PATHS`、引数の表と、配布する `spec-dock/docs/cli-redesign-guide.html` のコマンドの一覧が、この53とそろう。
 - 使われなくなったエラーのコード `CANONICAL_NOT_APPLICABLE` と `CANONICAL_WORKBENCH_SHARED` を、どのコマンドも返さない。コードと文書から定数と説明を消す。
 - `--help` と `help` の各コマンドの説明（効果、前提、読むもの、書くもの、JSON の形）に、版3の説明（`Schema 4:` の区別、`.meta.json`、ローカルの Scope の metadata、`--ci`、入れ子の置き場、slug）がない。canonical モードの今の動きだけを書く。
 
@@ -137,8 +137,8 @@ SpecDock が1つの仕組みだけになる。コード、テスト、文書か�
 
 ## 受け入れ条件
 
-- AC-440-01（R-440-01）：版3の宣言の一時のリポジトリで、R-440-01 の48のコマンドのそれぞれが、終了コード3、`CANONICAL_NOT_MIGRATED`、`effects` が空、リポジトリのファイルが変わらないことを、1つのテストで確かめる。`canonical check` は失敗の1件で同じ次の1手を返す。版5の宣言は `PRECONDITION_FAILED` のまま。
-- AC-440-02（R-440-02）：`LEAF_PATHS` が51で、`workspace migrate` と `workbench copy` がない。G7 のテストが、版4の51のコマンドのうち `help` と `completion` と `installation` を除くすべてが `CANONICAL_HANDLERS` か `REPOSITORY_INDEPENDENT_HANDLERS` の canonical の処理で動き、`CANONICAL_NOT_IMPLEMENTED`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`、`BUSINESS_NOT_CONNECTED` を返さないことを確かめる。消した引数が引数の誤りになる。
+- AC-440-01（R-440-01）：版3の宣言の一時のリポジトリで、R-440-01 の50のコマンドのそれぞれが、終了コード3、`CANONICAL_NOT_MIGRATED`、`effects` が空、リポジトリのファイルが変わらないことを、1つのテストで確かめる。`canonical check` は失敗の1件で同じ次の1手を返す。版5の宣言は `PRECONDITION_FAILED` のまま。
+- AC-440-02（R-440-02）：`LEAF_PATHS` が53で、`workspace migrate` と `workbench copy` がない。G7 のテストが、版4の53のコマンドのうち `help` と `completion` と `installation` の4つを除くすべてが `CANONICAL_HANDLERS` か `REPOSITORY_INDEPENDENT_HANDLERS` の canonical の処理で動き、`CANONICAL_NOT_IMPLEMENTED`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`、`BUSINESS_NOT_CONNECTED` を返さないことを確かめる。消した引数が引数の誤りになる。
 - AC-440-03（R-440-03）：`report.md` に、到達の判定の結果（消したモジュールの一覧、残した名前とその理由）と、コードの検索（`.meta.json`、`schema_version` の 3、`LEGACY_WORKSPACE_SCHEMA`、`workspace migrate`、`workbench copy`、`CANONICAL_NOT_APPLICABLE`、`CANONICAL_WORKBENCH_SHARED`、`--slug` の scope の引数、`--source local`、`--ci`）の結果がある。残った `.meta.json` は canonical の検査だけである。
 - AC-440-04（R-440-04）：雛形と `epics.md`・`issues.md` が配布資産と dogfood の写しにない。CUE の雛形の `report.md` に `タイトル:` と `親:` がない。canonical の `scope create` で作った `report.md` のバイトが、テストの見本（変更の前と同じ）と一致する。`domain/ids.py` に slug と英数字の題名の規則がない。
 - AC-440-05（R-440-05）：文書の中身のテストが、従来モードの記述がないこと（版3の動きの文、`workspace migrate`、`workbench copy`、`--ci`、`.meta.json` の作成）と、`CANONICAL_NOT_MIGRATED` と 0.4.2 の案内があることを確かめる。
