@@ -49,11 +49,12 @@
     {
       "path": "spec-dock/.gitignore",
       "source": "spec_dock/.gitignore",
-      "sha256": "b28e6f2406b7d6192a7e4ef14c3e0ff04279bcc97382f52456fdaa64731a84e7",
+      "sha256": "c9323d364063c4fd8db1b724a2994d0310976208dd5c1a236294f81f9ece9bcb",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
-        "0385b3b649b323ac319d80539925af586af96f6d82f65c83e413f719cd2bf98b"
+        "0385b3b649b323ac319d80539925af586af96f6d82f65c83e413f719cd2bf98b",
+        "b28e6f2406b7d6192a7e4ef14c3e0ff04279bcc97382f52456fdaa64731a84e7"
       ]
     },
     {
