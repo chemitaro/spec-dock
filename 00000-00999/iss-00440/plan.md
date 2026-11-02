@@ -36,7 +36,7 @@ ID: "iss-00440"
 1. **テストの分類**（`design.md` の方法の1）：静的な印でテストのファイルを集め、`report.md` の一覧の下書きを作る。
 2. **受け付けと振り分け**（テスト先行）：
    - Red：版3の宣言で50のコマンドが `CANONICAL_NOT_MIGRATED` で止まるテスト（`tests/cli_runtime/test_issue440_schema3_stops.py`）、版5が `PRECONDITION_FAILED` のままのテスト、`CANONICAL_NOT_MIGRATED` の次の1手が 0.4.2 を示すテスト。
-   - Green：`project_context.py`（`WorkspaceNotMigrated`、`require_migrated`、`declares_schema_4`）、`runtime_dispatch.py` の振り分け、`canonical_errors.py` の `NOT_MIGRATED_RECOVERY`、`canonical_status.py` の main の判定。
+   - Green：`project_context.py`（`WorkspaceNotMigrated`、`require_migrated`、`declares_schema_4`）、`runtime_dispatch.py` の振り分け、`canonical_errors.py` の `NOT_MIGRATED_RECOVERY`、`declares_schema_4` への置き換え（`canonical_status.py`、`canonical_link.py` の2か所、`canonical_dashboard.py`）、`canonical_check.py` の版の比べ方と文。
    - 全体のテストを流し、失敗したテストを動的な印として一覧に足す（方法の2）。一覧を (a)、(b)、(c) に分ける（方法の3〜5）。
 3. **(b) の書き直しと (a) の削除**：(b) ごとに、対応する canonical のテストを一覧に書く。ないものは `CanonicalWorld` で書き直す。(a) と移行のスクリプトのテストを消す。迷うテストは残して統括に `ask` する。
 4. **コマンドと引数**（テスト先行）：
@@ -44,8 +44,8 @@ ID: "iss-00440"
    - Green：`cli/catalog.py`、`cli/options.py`、`canonical_dispatch.py`、`canonical_refusals.py` の削除、`canonical_worktrees.py`・`canonical_scope_read.py`・`canonical_writes.py`・`canonical_workspace.py` の拒否の分岐の削除、`canonical_errors.py` の2つのコードの削除。`--help` の文を canonical の動きだけにする。
 5. **到達できないコードの削除**（`design.md` の到達の判定の方法）：モジュールの削除と vulture の繰り返し。消すたびに関係するテストを流す。`commit_tree.py` と `committed_validation.py` の `ls-tree` の重複を確かめる。
 6. **雛形と名前の規則**（テスト先行）：
-   - Red：配布資産の一覧のテスト（雛形の12ファイルと `epics.md`、`issues.md` がない、CUE の `report.md` に前付けの2行がない）、canonical の作成のファイルの見本のテストが変わらないこと。
-   - Green：配布資産の削除、`templates/cue/*/report.md` の2行の削除、`copy_scope_template_at` と `domain/canonical_scaffold.py` の除去と書き換えの削除、`scope_scaffold.py` と `canonical_scope_create.py` の `epics.md`・`issues.md` の削除、`domain/ids.py` の slug と題名の規則の削除。
+   - Red：配布資産の一覧のテスト（雛形の15ファイルと `epics.md`、`issues.md` がない、退役の許可の外のパスは止まる、CUE の `report.md` に前付けの2行がない）、canonical の作成のファイルの見本のテストが変わらないこと。
+   - Green：配布資産の削除、`templates/cue/*/report.md` の2行の削除、`copy_scope_template_at` と `domain/canonical_scaffold.py` の除去と書き換えの削除、`scope_scaffold.py` と `canonical_scope_create.py` の `epics.md`・`issues.md` の削除、`domain/ids.py` の Scope の slug と英数字の題名の規則の削除（Artifact の `--slug` の検査は残し、不正な値のテストを足す）、`infra/static_assets.py` の退役の許可。
 7. **文書**：README、配布する `spec-dock/docs/`、配布するスキル、`AGENTS.md`、`templates/README.md`、雛形の `.workbench/README.md`、`cli-redesign-guide.html` から従来モードの記述を消す。規則の節は Epic の10章の撤去の指示のとおりにする。`migration.md` に「## 0.5.0 への更新」の節（撤去の内容、#496、#497、上げる手順、版3のリポジトリの移し方と手順書の読み替え）を足し、版の節でない節を直す。文書の中身のテストを直す。Epic の `requirement.md`、`design.md`、`plan.md` の撤去の後の戻し先と、コマンドの数を直す（R-440-09、R-440-02）。
 8. **移行のスクリプトと従来のCIの手順**：`scripts/migrate-to-canonical/` と `.github/scripts/specdock-ci-validate.sh` を消し、`run.sh` の `TARGETS` から外す。`tests/unit/test_static_analysis_script.py` など関係するテストを直す。
 9. **版と配布資産の一覧**（テスト先行）：

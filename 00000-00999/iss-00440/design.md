@@ -52,7 +52,7 @@ def read_workspace_declaration(path: Path) -> dict[str, object]: ...
     # 版4と既知の writer_protocol だけを返す。版3は WorkspaceNotMigrated、ほかは ValueError（今の文のまま）
 
 def declares_schema_4(root: Path) -> bool: ...
-    # 例外を投げずに、root の宣言が受け付けられる版4かを返す（canonical status の main の判定用）
+    # 例外を投げずに、root の宣言が受け付けられる版4かを返す（canonical_status、canonical_link の2か所、canonical_dashboard の判定用）
 
 def require_migrated(root: Path) -> None: ...
     # root の宣言が版3なら WorkspaceNotMigrated。宣言がない、壊れているなら何もしない（installation と doctor --raw 用）
@@ -114,7 +114,7 @@ dispatch(namespace, cwd):
 ### `domain/ids.py`
 
 - 消す：`INPUT_TITLE_RE`、`validate_slug`、`validate_input_title`、`derive_input_slug_from_title`、`resolve_input_title_and_slug`、そのほか到達の判定で使われないもの（`normalize_id_input`、`resolve_id_input`、`validate_lowercase`、`find_existing_id_by_num` など）。
-- 残す：`CANONICAL_ID_RE`、`DEFAULT_ID_WIDTH`、`format_id`、`parse_id`、`slugify`、Artifact の `--slug` を確かめる `INPUT_SLUG_KEBAB_RE` と `validate_input_slug_kebab`（`direct_artifact.py` と `canonical_artifact_write.py` が使う。R-J7）。不正な Artifact の `--slug`（`Add_Token`）が `PRECONDITION_FAILED` 相当で止まり何も書かないことを、canonical の `artifact create` のテストで確かめる（今はない）。
+- 残す：`CANONICAL_ID_RE`、`DEFAULT_ID_WIDTH`、`format_id`、`parse_id`、`slugify`、Artifact の `--slug` を確かめる `INPUT_SLUG_KEBAB_RE` と `validate_input_slug_kebab`（`direct_artifact.py` と `canonical_artifact_write.py` が使う。R-J7）。不正な Artifact の `--slug`（`Add_Token`）が今と同じ結果（`validate_input_slug_kebab` の `RuntimeError` が `dispatch()` に届き `LOCAL_IO_FAILED`、終了コード5）で止まり何も書かないことを、canonical の `artifact create` のテストで確かめる（今はない。失敗の形は R-J7 のため変えない）。
 
 ### 配布資産と `static-inventory.json`
 
@@ -139,7 +139,7 @@ dispatch(namespace, cwd):
    - 関数が呼ばれていても、canonical の呼び出し元が決まった引数だけを渡すために通らない分岐（従来の `.meta.json` の木を読む分岐）は、関数の中を読んで消す。2026-11-02 の試しで見つかったもの：`direct_artifact.query_artifact` と `mutate_artifact`、`artifact_query.list_artifacts` と `show_artifact`（canonical は `@root` だけを渡すので、`@root` だけの形にする）、`direct_worktrees` の `--expect-current` の確かめと `direct_installation.install_static_assets` の `--expect-current` の分岐（canonical はいつも `expect_current=None` で呼ぶ）。これで `scope_query.load_scope_views`、`infra/scope_tree.py`、`application/start_snapshot.py`（`LocalInput` は `start_plan.py` に移す）も届かなくなる。
 5. 2026-11-02 の試し（従来の分岐を消した写しで1を1回）では、次のモジュールが届かなくなる。最終の一覧は `report.md` に書く。
    - 従来の処理：`application/direct_{active,dependencies,finish,migration,scope_delete,scope_edit,scope_lifecycle,scope_publish,sync,validation,workbench}.py`、`application/github_scope_scaffold.py`、`application/scope_ancestors.py`、`infra/{fs_repo,scope_metadata,committed_validation,workbench_publication}.py`。
-   - 撤去の前から届かない古いモジュール：`application/{artifact_preflight,github_issue_targets,ports,repo_context,status_context,validate_tree}.py`、`domain/{active,deps,discussion_docs,status,tree,validation}.py`、`infra/{binary_artifact_publisher,deps_reader,diagram_vendor,fs_cli,git_helper,github_cli}.py`、`presentation/cli_text.py`。これらは、`.meta.json` を読む（`fs_cli`、`deps_reader`、`validation`、`artifact_preflight`）か、それらだけが使うもので、AC-20 のコードの検索に残るので、14章の到達の規則で消す。
+   - 撤去の前から届かない古いモジュール：`application/{artifact_preflight,github_issue_targets,ports,repo_context,status_context,validate_tree}.py`、`domain/{active,deps,discussion_docs,status,tree,validation}.py`、`infra/{binary_artifact_publisher,deps_reader,fs_cli,git_helper,github_cli}.py`、`presentation/cli_text.py`。これらは、`.meta.json` を読む（`fs_cli`、`deps_reader`、`validation`、`artifact_preflight`）か、それらだけが使うもので、AC-20 のコードの検索に残るので、14章の到達の規則で消す。（`infra/diagram_vendor.py` も今は届かないが、4のとおり残す）
    - canonical の処理と同じファイルにある部分（`direct_worktrees.py`、`work_start.py`、`direct_artifact.py`、`direct_diagnostics.py`、`scope_query.py`、`start_snapshot.py`、`worktree_observation.py` など）は、2で従来の経路だけを消す。
 - I-7 から：`committed_validation.py` が1で届かなくなれば、`ls-tree` の解析は `commit_tree.py` の1つだけになる。届くときは、`committed_validation.py` が `commit_tree.py` の解析を使う形にする。
 
@@ -161,8 +161,8 @@ dispatch(namespace, cwd):
 
 ## 変更対象
 
-- 変える：`commands/runtime_dispatch.py`、`commands/canonical_dispatch.py`、`application/project_context.py`、`application/canonical_errors.py`、`application/canonical_status.py`、`application/canonical_scope_create.py`、`application/canonical_scope_read.py`、`application/canonical_writes.py`、`application/canonical_workspace.py`、`application/canonical_worktrees.py`、`application/direct_installation.py`、`application/direct_diagnostics.py`、`application/scope_scaffold.py`、`infra/canonical_scaffold.py`、`domain/canonical_scaffold.py`、`domain/ids.py`、`cli/catalog.py`、`cli/options.py`、到達の判定で従来の経路だけを消すファイル。
-- 消す：到達の判定で届かないモジュール（上の5）、`application/canonical_refusals.py`、配布資産の14ファイル、`scripts/migrate-to-canonical/`、`.github/scripts/specdock-ci-validate.sh`、(a) のテストと移行のスクリプトのテスト、消すコードだけを確かめるテスト。
+- 変える：`infra/static_assets.py`（退役の許可）、`application/canonical_check.py`、`application/canonical_link.py`、`application/canonical_dashboard.py`、`commands/runtime_dispatch.py`、`commands/canonical_dispatch.py`、`application/project_context.py`、`application/canonical_errors.py`、`application/canonical_status.py`、`application/canonical_scope_create.py`、`application/canonical_scope_read.py`、`application/canonical_writes.py`、`application/canonical_workspace.py`、`application/canonical_worktrees.py`、`application/direct_installation.py`、`application/direct_diagnostics.py`、`application/scope_scaffold.py`、`infra/canonical_scaffold.py`、`domain/canonical_scaffold.py`、`domain/ids.py`、`cli/catalog.py`、`cli/options.py`、到達の判定で従来の経路だけを消すファイル。
+- 消す：到達の判定で届かないモジュール（上の5）、`application/canonical_refusals.py`、配布資産の17ファイル（雛形の15と規則の2）、`scripts/migrate-to-canonical/`、`.github/scripts/specdock-ci-validate.sh`、(a) のテストと移行のスクリプトのテスト、消すコードだけを確かめるテスト。
 - 足す：版3で全コマンドが止まるテスト、G7 の53のコマンドのテスト（今の `test_issue436_every_command.py` を直す）、0.5.0 の版と 0.4.2 からの更新のテスト（`test_issue501_release_0_4_2.py` の形）、(b) の書き直し。`test_issue501_release_0_4_2.py` からは、前例（コミット `5a7552b67`。0.4.1 の版の置き場の確かめだけを消した）と同じく `test_the_version_is_0_4_2_in_every_place` だけを消し、0.4.1 のバイトからの更新の経路のテスト（モードに関係のない (c)）は残す。
 - 変えない：`direct_static_update.py` の更新と退避の規則、直接の選択の記録（`work-target`）、`StartLock`、`OperationResult` と出力の封筒、canonical の同期とカタログ、構造のスナップショット、ダッシュボード、`workspace doctor --legacy`、Artifact の命名、`workspace.json` の配布資産。
 
@@ -175,13 +175,13 @@ dispatch(namespace, cwd):
 
 - 0.5.0 は、R-J1 のすべてのリポジトリが版4になった後にだけ入れる（前提は満たした）。
 - 戻し方：マージの前なら PR を閉じる。マージの後なら、PR を `git revert` するか、利用者の環境に 0.4.2 を入れ直す（0.4.2 は canonical モードと CUE の Scope を持つので、移したリポジトリはそのまま動く）。各リポジトリの配布資産を 0.5.0 に上げた後に戻すときは、0.4.2 の `installation update` で配布資産を戻すか、版のファイルを戻す PR を作る（検査のワークフローは版のファイルの版を入れるため）。撤去の後にリポジトリを従来の形に戻すときは、0.4.2 を入れ直し、版のタグ `v0.4.2` の移行のスクリプトで戻す。
-- 0.3.0 を戻す先にしない理由：0.3.0 は CUE の Scope（0.4.0 から）を扱えず、5つのリポジトリには CUE の Scope がある。移行のスクリプトも `v0.4.2` のものが I-12 の注意点を含む最新である。Epic の `design.md` と `plan.md` の「0.3.0 を入れ直す」を、この Issue で「0.4.2」に直す（統括の依頼の8）。
+- 0.3.0 を戻す先にしない理由：0.3.0 は CUE の Scope（0.4.0 から）を扱えず、5つのリポジトリには CUE の Scope がある。移行のスクリプトも `v0.4.2` のものが I-12 の注意点を含む最新である。Epic の `requirement.md`、`design.md`、`plan.md` の撤去の後の「0.3.0 を入れ直す」と「版のタグ `v0.3.0` に残る」を、この Issue で「0.4.2」と「`v0.4.2`」に直す（統括の依頼の8。R-440-09 の一覧）。
 
 ## testability
 
 - AC-440-01：版3の宣言を持つ一時のリポジトリ（Git の初期化と宣言だけ。カタログも `.meta.json` もいらない）で、50のコマンドを、それぞれ最小の正しい引数で `main()` から呼ぶ。終了コード、`error.code`、`effects`、`recovery` の文、`tree_digest` が変わらないことを確かめる。`installation init` は宣言のある宛先を渡す。`canonical check` は版3の宣言のコミットで失敗の1件を確かめる。
 - AC-440-02：`test_issue436_every_command.py` を、53のコマンドの表と `CANONICAL_HANDLERS` の一致、拒否するだけのコードがないこと、消したコマンドと引数が引数の誤りになることを確かめる形に直す。
-- AC-440-03：コードの検索をするテスト（`.meta.json` の名前が canonical の検査のファイルだけにあること、版3の定数がないこと）を足す。到達の判定は手順を `report.md` に書く。
+- AC-440-03：コードの検索をするテスト（`.meta.json` の名前が canonical の検査のファイルだけにあること、版3を受け付ける定数と分岐（`LEGACY_WORKSPACE_SCHEMA`、`workspace_mode`、`probe_workspace_mode`）がなく、版3の名前は止めるための `NOT_MIGRATED_WORKSPACE_SCHEMA` だけであること）を足す。到達の判定は手順を `report.md` に書く。
 - AC-440-04：配布資産のテスト（`static-inventory.json` と雛形の一覧）と、canonical の `scope create` の作るファイルの見本のテスト（`test_issue474_scope_create.py` など今のもの）が、雛形から2行を外しても同じバイトを確かめる。
 - AC-440-05：文書の中身のテスト（`test_issue436_docs.py`、`test_issue436_agent_rules.py`、`test_cli_docs_vnext.py` など）を、従来モードの記述がないことと、0.5.0 の案内があることを確かめる形に直す。
 - AC-440-08：`tests/integration/test_issue440_release_0_5_0.py`（足す）で、版、`migration.md` の節、`static-inventory.json` の既知の古い版、0.4.2 の配布資産からの `installation update` を確かめる。0.4.2 のバイトは `tests/fixtures/issue440/` に置く。
