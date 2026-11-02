@@ -753,8 +753,7 @@ def test_custom_artifact_template_keeps_existing_scope_and_github_replacement_to
 def test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_without_publication(
     world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    # `@root` keeps this contract. A canonical Scope publication reports this case as failed (exit 5) instead of
-    # partial with `artifact.directory` unknown; that gap is recorded for a later fix (iss-00440 mapping).
+    # `@root` keeps this contract; the canonical Scope publication matches it (iss-00507, the next test).
     root = world.main
     owner = root / "spec-dock"
     real_mkdir = os.mkdir
@@ -777,6 +776,57 @@ def test_uncertain_artifact_directory_creation_reports_partial_and_preserves_it_
         "target": (owner / "artifacts").relative_to(root).as_posix(),
     }
     assert result["effects"][1]["status"] == "not_attempted"
+
+
+def test_uncertain_scope_artifact_directory_creation_reports_partial_and_preserves_it_without_publication(
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # iss-00507 R-02: the canonical Scope publication reports a created `artifacts/` like `@root` does
+    root, owner = world.main, world.find(SCOPE)
+    assert not (owner / "artifacts").exists()
+    real_mkdir = os.mkdir
+    attempted: list[bool] = []
+
+    def mkdir(path, mode=0o777, **kwargs):
+        real_mkdir(path, mode, **kwargs)
+        if path == "artifacts" and not attempted:
+            attempted.append(True)
+            raise OSError("fixture: directory creation reply unavailable")
+
+    monkeypatch.setattr(os, "mkdir", mkdir)
+    code, result = _create(capsys, root, "--slug", "proof")
+    assert attempted and (code, result["status"]) == (6, "partial"), result
+    assert result["error"]["code"] == "ARTIFACT_PUBLICATION_INCOMPLETE" and result["recovery"] is not None
+    assert (owner / "artifacts").is_dir() and list((owner / "artifacts").iterdir()) == []
+    assert result["effects"][0] == {"kind": "artifact.directory", "status": "unknown", "target": f"{SHOWN}/artifacts"}
+    assert result["effects"][1]["kind"] == "artifact" and result["effects"][1]["status"] == "not_attempted"
+    assert len(result["effects"]) == 2
+    assert result["data"]["result"] == {"artifact": None, "changed": False}
+    assert world.changesets() == []
+
+
+def test_failure_after_creating_the_scope_artifact_directory_reports_it_succeeded(
+    world: WriteWorld, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # iss-00507 R-02: the directory was confirmed created; the following publication failed before any link
+    root, owner = world.main, world.find(SCOPE)
+    real_open = os.open
+    failed: list[bool] = []
+
+    def open_file(path, flags, mode=0o777, **kwargs):
+        if isinstance(path, str) and path.startswith(".publish-") and flags & os.O_CREAT and not failed:
+            failed.append(True)
+            raise OSError("fixture: stage creation failed")
+        return real_open(path, flags, mode, **kwargs)
+
+    monkeypatch.setattr(os, "open", open_file)
+    code, result = _create(capsys, root, "--slug", "proof")
+    assert failed and (code, result["status"]) == (6, "partial"), result
+    assert result["error"]["code"] == "ARTIFACT_PUBLICATION_INCOMPLETE"
+    assert (owner / "artifacts").is_dir() and list((owner / "artifacts").iterdir()) == []
+    assert result["effects"][0] == {"kind": "artifact.directory", "status": "succeeded", "target": f"{SHOWN}/artifacts"}
+    assert result["effects"][1:] == [{"kind": "artifact", "status": "failed", "target": result["effects"][1]["target"]}]
+    assert result["data"]["result"] == {"artifact": None, "changed": False}
 
 
 def test_artifact_catalog_never_discloses_a_directory_swapped_to_an_external_alias(

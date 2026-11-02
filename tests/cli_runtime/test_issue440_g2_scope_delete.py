@@ -590,3 +590,63 @@ def test_delete_preserves_a_changed_direct_record_and_the_subtree_after_backup(
         {"kind": "scope.delete", "status": "not_attempted", "target": LEAF},
     ]
     assert world.writes() == []
+
+
+def test_confirmed_direct_clear_survives_a_later_descriptor_cleanup_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # iss-00507 R-01: the record removal was confirmed before the store's descriptor close failed
+    world = _world(tmp_path, monkeypatch, capsys)
+    record = _selected(world)
+    held = record.parent.stat()
+    backup = tmp_path / "delete-backup"
+    real_close = os.close
+    injected: list[bool] = []
+
+    def close(descriptor: int) -> None:
+        opened = os.fstat(descriptor)
+        confirmed = not record.exists() and (opened.st_dev, opened.st_ino) == (held.st_dev, held.st_ino)
+        real_close(descriptor)
+        if confirmed and not injected:
+            injected.append(True)
+            raise OSError("fixture: confirmed clear cleanup failed")
+
+    monkeypatch.setattr(os, "close", close)
+    code, payload = _delete(world, "iss-00003", backup, "--clear-active", "--yes")
+    assert injected and (code, payload["status"]) == (6, "partial"), payload
+    assert payload["error"]["code"] == "SCOPE_DELETE_INCOMPLETE"
+    assert not record.exists() and (world.catalog / LEAF).is_dir()
+    assert payload["effects"][:3] == [
+        {"kind": "backup", "status": "succeeded", "target": str(backup)},
+        {"kind": "selection.clear", "status": "succeeded", "target": _token(record)},
+        {"kind": "scope.delete", "status": "not_attempted", "target": LEAF},
+    ]
+    assert payload["data"]["result"]["removed_ids"] == [] and payload["data"]["result"]["remaining_paths"] == [LEAF]
+
+
+def test_first_subtree_unlink_with_unknown_outcome_reports_the_scope_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    # iss-00507 R-01: no entry is confirmed removed, but the first unlink took effect before the error
+    world = _world(tmp_path, monkeypatch, capsys)
+    leaf = world.find("iss-00003")
+    before = _files(leaf)
+    backup = tmp_path / "delete-backup"
+    real_unlink = os.unlink
+    calls: list[str] = []
+
+    def unlink(path: Any, **kwargs: Any) -> None:
+        real_unlink(path, **kwargs)
+        if not calls and kwargs.get("dir_fd") is not None and _same(kwargs["dir_fd"], leaf):
+            calls.append(path)
+            raise OSError("fixture: unlink outcome unavailable")
+
+    monkeypatch.setattr(os, "unlink", unlink)
+    code, payload = _delete(world, "iss-00003", backup, "--yes")
+    assert len(calls) == 1 and (code, payload["status"]) == (6, "partial"), payload
+    assert payload["error"]["code"] == "SCOPE_DELETE_INCOMPLETE"
+    assert leaf.is_dir() and not (leaf / calls[0]).exists() and _files(backup / LEAF) == before
+    assert _effects(payload)[:2] == [("backup", "succeeded"), ("scope.delete", "unknown")]
+    assert payload["effects"][1]["target"] == LEAF
+    assert payload["data"]["result"]["removed_ids"] == [] and payload["data"]["result"]["changed_paths"] == []
+    assert payload["data"]["result"]["remaining_paths"] == [LEAF]
