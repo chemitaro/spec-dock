@@ -1,0 +1,62 @@
+/* 状態のボード（iss-00531 D-06）。試作 d2 の board の部分。 */
+[data-view="board"] {
+  & .sd-board-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; margin-bottom: 12px; }
+  & .sd-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr)); gap: 10px; }
+  & .sd-metric { padding: 10px 14px; border: 1px solid var(--ds-border); border-top: 3px solid var(--st); border-radius: var(--ds-radius-l); background: var(--ds-surface); min-width: 0; }
+  & .sd-metric__label { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 650; color: var(--ds-muted); }
+  & .sd-metric__label .ds-icon { color: var(--ds-accent); }
+  & .sd-metric__value { margin-top: 2px; font-size: 1.7rem; line-height: 1.2; font-weight: 750; font-variant-numeric: tabular-nums; }
+  & .sd-metric__sub { margin-top: 2px; display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; font-weight: 650; color: var(--ds-muted); }
+  & .sd-metric__sub span { display: inline-flex; align-items: center; gap: 3px; }
+  & .sd-metric__sub [data-mg="ok"] .ds-icon { color: var(--ds-ok); }
+  & .sd-metric__sub [data-mg="fix"] .ds-icon { color: var(--ds-danger); }
+  & .sd-ratio { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); }
+  & .sd-ratio p { margin: 0; font-size: 12.5px; color: var(--ds-muted); font-weight: 650; }
+  & .sd-ratio p b { display: block; font-size: 1.2rem; color: var(--ds-text); }
+  & .sd-ring { flex: none; width: 40px; height: 40px; border-radius: 50%; background: conic-gradient(var(--ds-faint) calc(var(--p) * 1%), var(--ds-surface-3) 0); -webkit-mask: radial-gradient(farthest-side, transparent 62%, #000 63%); mask: radial-gradient(farthest-side, transparent 62%, #000 63%); }
+  & .sd-cleanup { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border: 1px solid var(--ds-warn-line); border-left: 4px solid var(--ds-warn); border-radius: var(--ds-radius); background: var(--ds-warn-bg); color: var(--ds-warn-ink); cursor: pointer; font-size: 13px; font-weight: 700; text-align: left; }
+  & .sd-cleanup b { font-size: 1.5rem; line-height: 1; font-variant-numeric: tabular-nums; }
+  & .sd-cleanup > .ds-icon { font-size: 20px; flex: none; }
+  & .sd-cleanup small { display: block; font-weight: 600; color: var(--ds-text-2); font-size: 11.5px; }
+  & .sd-cols { display: grid; grid-template-columns: repeat(var(--ncol, 4), minmax(0, 1fr)); gap: 12px; align-items: start; }
+  & .sd-col { border: 1px solid var(--ds-border); border-top: 3px solid var(--st); border-radius: var(--ds-radius-l); background: var(--ds-bg-2); padding: 0 10px 10px; min-width: 0; }
+  & .sd-col[data-st="merge"] { background: var(--ds-accent-soft); border-color: var(--ds-accent-line); border-top-color: var(--ds-accent); }
+  & .sd-col__head { display: flex; align-items: center; gap: 7px; padding: 10px 2px 2px; font-size: 14px; font-weight: 700; }
+  & .sd-col__head .st-ico, & .sd-col__head > .ds-icon { width: 16px; height: 16px; }
+  & .sd-col__head > .ds-icon { color: var(--ds-accent); }
+  & .sd-col__head b { margin-left: auto; min-width: 24px; padding: 0 7px; border-radius: 999px; background: var(--ds-surface); border: 1px solid var(--ds-border); font-size: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+  & .sd-col__desc { margin: 0 2px 8px; font-size: 11.5px; color: var(--ds-muted); line-height: 1.5; }
+  & .sd-col__list { display: grid; gap: 8px; }
+  & .sd-col__grp { display: flex; gap: 6px; align-items: center; min-width: 0; margin: 6px 2px 0; padding-top: 6px; border-top: 1px dashed var(--ds-border); font-size: 11.5px; font-weight: 700; color: var(--ds-muted); }
+  & .sd-col__grp span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+  & .sd-col__grp .ds-docid { flex: none; }
+  & .sd-col__sub { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 4px 2px 0; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; font-weight: 700; background: var(--ds-surface); border: 1px solid var(--ds-border); }
+  & .sd-col__sub .ds-icon { font-size: 14px; stroke-width: 2.4; }
+  & .sd-col__sub[data-mg="ok"] { color: var(--ds-ok-ink); border-color: var(--ds-ok-line); background: var(--ds-ok-bg); }
+  & .sd-col__sub[data-mg="fix"] { color: var(--ds-danger-ink); border-color: var(--ds-danger-line); background: var(--ds-danger-bg); }
+  & .sd-col__sub small { font-weight: 600; color: var(--ds-muted); font-size: 11px; }
+  & .sd-col__sub b { margin-left: auto; font-variant-numeric: tabular-nums; }
+}
+/* The cleanup dialog sits in the top layer but stays in the board's DOM. */
+[data-view="board"] .sd-dialog { width: min(640px, calc(100vw - 24px)); max-height: 86dvh; padding: 0; border: 1px solid var(--ds-border); border-top: 4px solid var(--ds-warn); border-radius: var(--ds-radius-l); background: var(--ds-surface); color: var(--ds-text); box-shadow: var(--ds-shadow-l); }
+[data-view="board"] .sd-dialog::backdrop { background: rgb(5 10 20 / 45%); }
+[data-view="board"] .sd-dialog__head { display: flex; align-items: center; gap: 8px; padding: 10px 10px 10px 18px; border-bottom: 1px solid var(--ds-border); }
+[data-view="board"] .sd-dialog__head h2 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 15px; }
+[data-view="board"] .sd-dialog__head .sd-iconbtn { margin-left: auto; }
+[data-view="board"] .sd-dialog__body { padding: 14px 18px 18px; display: grid; gap: 10px; }
+[data-view="board"] .sd-dialog__body > p { margin: 0; font-size: 13px; color: var(--ds-text-2); }
+@container app (max-width: 900px) {
+  [data-view="board"] .sd-cols { --ncol: 2 !important; }
+}
+@container app (max-width: 640px) {
+  [data-view="board"] {
+    & .sd-board-top { grid-template-columns: minmax(0, 1fr); }
+    & .sd-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+    & .sd-metric { padding: 8px 9px; }
+    & .sd-metric__label { font-size: 11px; gap: 4px; }
+    & .sd-metric__value { font-size: 1.3rem; }
+    & .sd-ratio { grid-column: 1 / -1; }
+    & .sd-cols { --ncol: 1 !important; }
+  }
+  [data-view="board"] .sd-dialog { width: 100vw; max-width: 100vw; margin: auto 0 0; border-radius: 14px 14px 0 0; }
+}

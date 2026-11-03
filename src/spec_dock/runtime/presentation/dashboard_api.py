@@ -27,7 +27,13 @@ if TYPE_CHECKING:
 
     from spec_dock.runtime.application.dashboard_site import RepositoryView
     from spec_dock.runtime.domain.canonical_structure import PullRequest
-    from spec_dock.runtime.domain.dashboard_model import DashboardModel, DependencyPath, ScopeChange, ScopeModel
+    from spec_dock.runtime.domain.dashboard_model import (
+        ChildStages,
+        DashboardModel,
+        DependencyPath,
+        ScopeChange,
+        ScopeModel,
+    )
     from spec_dock.runtime.infra.dashboard_store import SeenRecord
 
 API_SCHEMA: Final = "specdock.dashboard/v1"
@@ -128,7 +134,15 @@ def _change(change: ScopeChange | None) -> dict[str, object] | None:
     return {"kinds": sorted(change.kinds), "state_before": change.state_before, "pr_before": change.pr_before}
 
 
-def scope_item(model: DashboardModel, scope: ScopeModel, change: ScopeChange | None) -> dict[str, object]:
+def ranks(model: DashboardModel) -> dict[str, int]:
+    """Each Scope's place in the recommended order (Epic R-31); the screens sort by it (iss-00531 D-01)."""
+    return {scope_id: index for index, scope_id in enumerate(model.ordered(model.scopes))}
+
+
+def scope_item(
+    model: DashboardModel, scope: ScopeModel, change: ScopeChange | None, rank: int | None = None
+) -> dict[str, object]:
+    node = model.snapshot.find(scope.id)
     return {
         "id": scope.id,
         "number": scope.number,
@@ -149,6 +163,8 @@ def scope_item(model: DashboardModel, scope: ScopeModel, change: ScopeChange | N
         "path": scope_path(model.repository, scope.id),
         "pr": _pr(scope.pr),
         "change": _change(change),
+        "rank": rank,
+        "in_progress": bool(node.in_progress) if node is not None else False,
     }
 
 
@@ -197,6 +213,7 @@ def structure_document(
         return document
     error = model.pull_requests.error
     scopes = sorted(model.scopes.values(), key=lambda item: item.number)
+    order = ranks(model)
     document.update({
         "pull_requests": {
             "status": model.pull_request_status,
@@ -204,7 +221,7 @@ def structure_document(
             "error": None if error is None else {"code": error.code, "message": error.message, "at": error.at},
         },
         "anomalies": [{"number": a.number, "code": a.code, "message": a.message} for a in model.anomalies],
-        "scopes": [scope_item(model, scope, changes.get(scope.id)) for scope in scopes],
+        "scopes": [scope_item(model, scope, changes.get(scope.id), order[scope.id]) for scope in scopes],
         "cleanup": [{"id": c.scope_id, "code": c.code, "text": c.text} for c in model.cleanup],
         "timeline": {
             "weeks": [asdict(week) for week in weekly_totals(model, now=now)],
@@ -214,28 +231,92 @@ def structure_document(
     return document
 
 
+def _stages(stages: ChildStages) -> dict[str, object]:
+    return {
+        "stages": [list(stage) for stage in stages.stages],
+        "external": [{"child": child, "number": number} for child, number in stages.external],
+        "cyclic": list(stages.cyclic),
+    }
+
+
 def _path(item: DependencyPath) -> dict[str, list[str]]:
     return {"direct": list(item.direct), "indirect": list(item.indirect)}
 
 
-def scope_document(view: RepositoryView, scope_id: str, *, baseline: SeenRecord | None) -> dict[str, object] | None:
+def dependencies(model: DashboardModel, scope_id: str) -> dict[str, object]:
+    """The Scope's recorded waits, its own first and then each ancestor's (nearest first), and the Scopes that
+    record a wait for it; copied from the snapshot without judging anything (iss-00531 D-02)."""
+    snapshot = model.snapshot
+    by_number = {scope.number: scope for scope in model.scopes.values()}
+    chain: list[str] = []
+    current: str | None = scope_id
+    while current is not None and current not in chain:
+        chain.append(current)
+        current = model.scopes[current].parent_id if current in model.scopes else None
+    waits: list[dict[str, object]] = []
+    seen: set[int] = set()
+    for member in chain:
+        node = snapshot.find(member)
+        for number in node.blocked_by if node is not None else ():
+            if number in seen:
+                continue
+            seen.add(number)
+            target = by_number.get(number)
+            if target is not None:
+                item: dict[str, object] = {
+                    "number": number,
+                    "scope_id": target.id,
+                    "title": target.title,
+                    "state": target.state,
+                    "open": target.open,
+                    "external": False,
+                }
+            else:
+                outside = snapshot.external.get(number)
+                is_open = outside is None or outside.state == "open"
+                item = {
+                    "number": number,
+                    "scope_id": None,
+                    "title": outside.title if outside is not None else None,
+                    "state": "open" if is_open else "done",
+                    "open": is_open,
+                    "external": True,
+                }
+            item.update({"declared_by": member, "inherited": member != scope_id})
+            waits.append(item)
+    own = model.scopes[scope_id].number
+    waited_by = [
+        scope.id
+        for scope in sorted(model.scopes.values(), key=lambda item: item.number)
+        if (node := snapshot.find(scope.id)) is not None and own in node.blocked_by
+    ]
+    return {"waits_for": waits, "waited_by": waited_by}
+
+
+def scope_document(
+    view: RepositoryView,
+    scope_id: str,
+    *,
+    baseline: SeenRecord | None,
+    details: Mapping[str, object] | None = None,
+) -> dict[str, object] | None:
     model = view.model
     if model is None or scope_id not in model.scopes:
         return None
     changes = compare_seen(model, baseline.scopes) if baseline is not None else {}
     stages = child_stages(model, scope_id)
+    open_stages = child_stages(model, scope_id, open_only=True)
     waits = root_waits(model, scope_id)
     return {
         "schema": API_SCHEMA,
         "repository": view.repository.key,
         "revision": view.revision,
-        "scope": scope_item(model, model.scopes[scope_id], changes.get(scope_id)),
+        "scope": scope_item(model, model.scopes[scope_id], changes.get(scope_id), ranks(model)[scope_id]),
         "upstream": _path(upstream(model, scope_id)),
         "downstream": _path(downstream_ids(model, scope_id)),
         "root_waits": {"scope_ids": list(waits.scope_ids), "external": list(waits.external)},
-        "child_stages": {
-            "stages": [list(stage) for stage in stages.stages],
-            "external": [{"child": child, "number": number} for child, number in stages.external],
-            "cyclic": list(stages.cyclic),
-        },
+        "child_stages": _stages(stages),
+        "open_child_stages": _stages(open_stages),
+        "dependencies": dependencies(model, scope_id),
+        "details": dict(details) if details is not None else None,
     }
