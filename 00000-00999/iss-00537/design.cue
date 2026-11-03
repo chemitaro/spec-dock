@@ -69,10 +69,11 @@ design: {
 			`runtime/infra/github_snapshot.py`。
 
 			- `PULL_REQUEST_INTERVAL = timedelta(minutes=2)`。
-			- `SnapshotStore.commit_pull_requests(items, fetched_at)`：ロックの中で読み直し、スナップショットがなければ何もしない。今の `pull_requests_fetched_at` が `fetched_at` より新しければ残す（F-04）。ほかは `with_pull_requests` で書く。
-			- `SnapshotStore.record_pull_requests_error(error)`：ロックの中で読み直し、スナップショットがなければ何もしない。今の `pull_requests_fetched_at` が `error.at` より新しければ残す。ほかは `with_pull_requests_error` で書く。
+			- 試みの時刻：成功は `pull_requests_fetched_at`、失敗は `pull_requests_error.at`。どちらも応答を受けた時刻（`clock.now()`）。スナップショットの最後の試みの時刻は、この2つの新しいほう。
+			- `SnapshotStore.commit_pull_requests(items, fetched_at)`：ロックの中で読み直し、スナップショットがなければ何もしない。今の最後の試みの時刻が `fetched_at` より新しければ残す（F-04）。ほかは `with_pull_requests` で書く。
+			- `SnapshotStore.record_pull_requests_error(error)`：ロックの中で読み直し、スナップショットがなければ何もしない。今の最後の試みの時刻が `error.at` より新しければ残す。ほかは `with_pull_requests_error` で書く。
 			- `StructureSnapshotService.ensure_fresh("cycle")`：構造の処理の後、構造の処理が失敗せず（`probe != "failed"`）、スナップショットがあるとき、`refresh_pull_requests()` を呼ぶ。返す `FreshSnapshot` の `snapshot` は PR を書いた後のもの。足した欄 `pull_requests`（`fetched`|`failed`|`skipped`）を持つ。`display`、`decision`、`refresh()` は呼ばない（R-03）。
-			- `refresh_pull_requests()`：最後の試み（`pull_requests_fetched_at` と `pull_requests_error.at` の新しいほう）から `PULL_REQUEST_INTERVAL` 以内なら `skipped`。ほかは問い合わせ、成功なら `commit_pull_requests`、`GithubStructureError` なら `record_pull_requests_error`（`code`、`message`、`at`）で `failed`。例外は外へ出さない（R-04）。
+			- `refresh_pull_requests()`：`pull_requests_fetched_at` から `PULL_REQUEST_INTERVAL` 以内なら `skipped`。`pull_requests_error.code` が `GITHUB_RATE_LIMITED` で、`pull_requests_error.at` から `PULL_REQUEST_INTERVAL` 以内でも `skipped`。ほかは問い合わせ、成功なら `commit_pull_requests`、`GithubStructureError` なら `record_pull_requests_error`（`code`、`message`、`at`）で `failed`。例外は外へ出さない（R-04）。
 			- 同期の側（`canonical_sync.refresh_structures`）は、`ensure_fresh(..., "cycle")` を今までどおり呼ぶだけで、変えない。
 			"""
 		satisfies: ["R-01", "R-03", "R-04"]
@@ -89,7 +90,7 @@ design: {
 			| 版3以上、0、文字列、鍵の組と版が合わない | 今までどおり「ない」 |
 
 			- 既存の読む側（`dependency check`、`scope show`、`canonical status`、今のダッシュボード）は、`StructureSnapshot` の今の欄だけを使う。PR の欄は足すだけなので結果は変わらない。今のダッシュボードの `input_hash` は `issues`、`external`、`anomalies` だけを数えるので、PR の変化でファイルを書き直さない。
-			- 費用：PR の問い合わせはおよそ3点（開いた PR 100件と、その最後のコミット 100件、閉じた PR 50件と、その最後のコミット 50件。合わせて300件÷100）。2分に1回なので、1リポジトリでおよそ90点/時、5リポジトリでおよそ450点/時（1時間の上限5000点の1割に満たない）。1回の同期の時間は、2分に1回、`gh` の呼び出し1回（およそ1秒）だけ増える。
+			- 費用：PR の問い合わせはおよそ3点（開いた PR 100件と、その最後のコミット 100件、閉じた PR 50件と、その最後のコミット 50件。合わせて300件÷100）。成功の後は2分に1回なので、1リポジトリでおよそ90点/時（失敗が続くと、レート制限のほかは60秒の周期ごとに1回試みる）、5リポジトリでおよそ450点/時（1時間の上限5000点の1割に満たない）。1回の同期の時間は、2分に1回、`gh` の呼び出し1回（およそ1秒）だけ増える。
 			"""
 		satisfies: ["R-03", "R-06"]
 	}
@@ -102,5 +103,6 @@ compatibility: """
 risks: [
 	"GitHub が `mergeable` を計算し終えていないと `UNKNOWN` を返す。読む側は、それを「マージできる」に入れる（Epic の D-04）",
 	"利用者のほかの `gh` の使い方と、同じ1時間に5000点を分ける。PR の問い合わせは2分に1回に抑え、レート制限では待たずに諦める",
+	"PR の取得の成功のたびに `snapshot.json` を書き直す（2分に1回）。ファイルの時刻を見る読む側（#529 の自動の更新）は、そのたびに読み直す",
 	"`head_ref_name` が別のフォークの同じ名前のブランチでも対応づく。SpecDock のブランチの規則（Scope の ID）に従う名前なので、受け入れる",
 ]
