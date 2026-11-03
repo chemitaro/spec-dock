@@ -52,14 +52,15 @@ design: {
 	}
 	"D-04": {
 		title: "片付けの候補と、残す印"
-		text: "`model.cleanup` は `CleanupCandidate(scope_id, code, text)` の推奨順の列。`all_descendants_closed`：開いた Epic と Initiative で、子孫が1つ以上あり、すべて閉じている。`closed_with_open_descendants`：閉じた Scope で、開いた子孫がある。後者の Scope の `keep_visible` を真にする。子孫は、スナップショットの親子のうち Scope の番号だけをたどる。"
+		text: "`model.cleanup` は `CleanupCandidate(scope_id, code, text)` の推奨順の列。`all_descendants_closed`：開いた Epic と Initiative で、子孫が1つ以上あり、すべて閉じている。`closed_with_open_descendants`：閉じた Scope で、開いた子孫がある（この Scope の `keep_visible` を真にする）。`open_under_closed_parent`：理由が `parent_closed` の止められている Scope（Epic R-10）。子孫は、スナップショットの親子のうち Scope の番号だけをたどる。"
 		satisfies: ["R-04"]
 	}
 	"D-05": {
 		title: "配下の段と依存の道筋"
 		text: """
 			- `child_stages(model, parent_id, *, open_only)`：`parent_id` が None なら親のない Scope を、ほかはその直下の子を並べる。子 a が子 b を待つのは、a の部分木のどれかの `blocked_by` が b の部分木の番号を指すとき（a ≠ b）。部分木の外を指すものは `external`（子の ID と番号）に入れる。最長の道で段を決め、循環に入る子は段に入れず `cyclic` に入れる。`open_only` では閉じた子と、閉じた先への依存を除く。各段の中は推奨順。返り値は `ChildStages(stages, external, cyclic)`。
-			- `upstream(model, id)`／`downstream_ids(model, id)`：D-03 の待つ関係で、直接（距離1）と間接に分けて返す。上流は、自分と祖先の `blocked_by` の先（Scope だけ）から再帰にたどる。
+			- `downstream_ids(model, id, *, open_only=True)`：D-03 の後に続く数と同じ広げ方（x と x の祖先を待つもの、その子孫、それらの祖先を待つもの）で求めた集合を返す。`open_only` のときの大きさは `downstream` と一致する。直接は、x 自身の番号を `blocked_by` に持つ Scope、ほかは間接。
+			- `upstream(model, id, *, open_only=False)`：直接は自分の `blocked_by` の先（Scope だけ）。間接は、祖先から引き継いだ依存の先と、たどり着いたものの子孫とその依存の先（自分と祖先の分）を、再帰に集めたもの。
 			- `root_waits(model, id)`：止められている Scope の上流のうち、それ自身が止められていない開いた Scope と、開いている Scope でない Issue の番号。
 			"""
 		satisfies: ["R-05"]
@@ -84,7 +85,7 @@ design: {
 			`runtime/domain/dashboard_snapshot.py`：
 
 			- `parse_snapshot_document(payload, *, repository) -> ParsedSnapshot(snapshot, pull_requests)`。`version` が整数でなければ `SnapshotUnreadable`、整数で1と2のどちらでもなければ `SnapshotUnsupported`。版2は PR の3つの鍵（`pull_requests`、`pull_requests_error`、`pull_requests_fetched_at`）を取り除いて解析し、残りを版1の形にして `StructureSnapshot.from_json` に渡す（構造の解析を写さない。#537 が `from_json` を版2に広げたら、後にマージするほうが寄せる）。`SnapshotFormatError` と別のリポジトリのものは `SnapshotUnreadable`。
-			- `PullRequest(number, state, is_draft, head_ref_name, mergeable, checks, created_at, merged_at, closed_at, url)`、`PullRequestsError(code, message, at)`、`PullRequestInfo(status, fetched_at, error, items)`。`status` は版1か `pull_requests_fetched_at` が null で `unknown`、`pull_requests_error` があるか `now - fetched_at` が30分を超えて `stale`、ほかは `fresh`（`now` は `build_model` が渡す）。値の形が違えば `SnapshotUnreadable`。
+			- `PullRequest(number, state, is_draft, head_ref_name, mergeable, checks, created_at, merged_at, closed_at, url)`、`PullRequestsError(code, message, at)`、`PullRequestInfo(status, fetched_at, error, items)`。`status(now)` は、版1か、`pull_requests_fetched_at` が null か、`now - fetched_at` が30分を超えていれば `unknown`、それ以外で `pull_requests_error` があれば `stale`、ほかは `fresh`（Epic D-19。`now` は `build_model` が渡す）。値の形が違えば `SnapshotUnreadable`。
 			- Scope への対応 `pull_request_for(info, scope_id)`：`branch_names_scope(head_ref_name, scope_id)` が真のものから、`state == open` を先、次に `created_at` の新しい順、次に番号の大きい順で1つ。
 			"""
 		satisfies: ["R-08"]
@@ -116,7 +117,7 @@ design: {
 			```
 
 			- `completion_ratio` は終わった数／全体の数（全体が0なら null）。`by_state` はボードの列でなく状態の5つで数える。
-			- `in_progress` は列が `doing` のもの（マージ待ちを除く）、`awaiting_merge` には `merge` を足す。一覧はすべての種類を含み、推奨順。`reason` は理由の `text`。
+			- `in_progress` は列が `doing` のもの（マージ待ちを除く）、`awaiting_merge` には `merge` を足す。一覧はすべての種類を含み、推奨順。`reason` は、`cleanup` では片付けの候補の理由（`CleanupCandidate.text`）で、要素に `cleanup`（候補のコード）を足す。ほかの一覧では Scope の理由（`ScopeReason.text`）。
 			- 項目を足すのは版を変えずにでき、消すか意味を変えるときは版を上げる。配布する `reference_cli.md` に契約として書く。
 			"""
 		satisfies: ["R-10"]
@@ -128,8 +129,8 @@ design: {
 			- 経路：REPOSITORY を指定したときは `REPOSITORY_INDEPENDENT_HANDLERS` で、チェックアウトなしに処理する。省いたときは `CANONICAL_HANDLERS` で、`repository_for_checkout(context.root)` から決める（ネットワークなし）。REPOSITORY が `owner/name`、`github.com/owner/name` でなければ `DASHBOARD_REPOSITORY_INVALID`（終了コード2）。
 			- `runtime/infra/dashboard_files.py`：`read_snapshot_file(state_root, repository)`（`<state_root>/github/<host>/<owner>/<name>/snapshot.json` を自分で読み、`missing`／`unreadable`／`unsupported`／読めた文書を返す）。`read_hidden(state_root, key)`（`<state_root>/dashboard/repositories.json` の `specdock.dashboard-repositories/v1`、`repositories` の鍵 `host/owner/name` があれば真。ない・壊れているは偽）。`read_server_url(state_root)`（`<state_root>/dashboard/server.json` の `specdock.dashboard-server/v1` の `pid` に `os.kill(pid, 0)` で生きているかだけを見て、生きていれば `urls.local`、ほかは null。要求は送らない）。どれも書かない。
 			- 失敗：F-01 `DASHBOARD_SNAPSHOT_MISSING`、F-03 `DASHBOARD_SNAPSHOT_UNSUPPORTED`、F-04 `DASHBOARD_SNAPSHOT_UNREADABLE`（どれも終了コード3、`recovery` に次の1手）。
-			- 出力：`--json` は封筒の `data` に要約（`FamilyData("dashboard", summary)`）。文字の出力は、取得の時刻、古さ、状態ごとの数、各一覧の先頭の数件。
-			- 文書：`reference_cli.md`（提供側と dogfood の写し）にコマンドの行と要約の契約を足し、README と `cli-redesign-guide.html` の数を54にする。
+			- 出力：`--json` は封筒の `data.result` に要約（`FamilyData("dashboard", summary)`。`data.kind` は `dashboard`）。文字の出力は、取得の時刻、古さ、状態ごとの数、各一覧の先頭の数件。
+			- 文書：`reference_cli.md`（提供側と dogfood の写し）にコマンドの行と要約の契約を足し、README と `cli-redesign-guide.html` の数を54にする。`static-inventory.json` は、変えた配布文書の行の sha256 を更新し、前の sha256 を known_old_sha256 に足す（統括の決定。版の番号と `migration.md` は変えない）。
 			"""
 		satisfies: ["R-11"]
 	}
