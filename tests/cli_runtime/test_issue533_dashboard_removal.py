@@ -92,7 +92,9 @@ def _put_old_dashboard_field(pair: SyncPair, checkout: Path, value: object) -> N
     path.write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_a_cycle_writes_none_of_the_five_files_and_reports_zero(pair: SyncPair, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_a_cycle_writes_none_of_the_five_files_and_reports_zero(
+    pair: SyncPair, monkeypatch: pytest.MonkeyPatch
+) -> None:
     """T-01 (R-01)."""
     _fake_structure(monkeypatch)
     for _ in range(2):

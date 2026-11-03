@@ -3,8 +3,8 @@
 It writes nothing in the repository, the catalog, .git, the state root or GitHub and never contacts the
 remote. Only with --structure does it read GitHub's structure at display freshness, which may refresh the
 structure snapshot (iss-00431) and reports how catalog `<bucket>/<ID>/` directories match it (iss-00455, iss-00460).
-The sync, snapshot and state.json parts come from canonical_status_sync (iss-00430), and so does the dashboard
-item (iss-00438); without --structure, `structure` is "not_checked".
+The sync, snapshot and state.json parts come from canonical_status_sync (iss-00430); without --structure,
+`structure` is "not_checked".
 """
 
 from __future__ import annotations
