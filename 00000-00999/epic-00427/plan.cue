@@ -51,10 +51,16 @@ slices: {
 		after:   ["iss-00529"]
 		session: "std"
 	}
+	"iss-00544": {
+		covers:  ["R-11", "R-15", "R-18"]
+		text:    "第3波の後の手直し（2026-11-04 統括が追加）。#531・#532 の報告の残り：骨組みの格子で PC の `<main>` が高さ0になる件を骨組みで直す（#532 の `grid-row: 4` の回避を外す）、構造の API の `assurance`・`branch`（#532 が null で足した項目）を全 Scope 分読む（#531 の `dashboard_scope_details.py` の読み取りを一覧に広げ、時間の上限と失敗の扱いを保つ）、`views/_shared/parts.js` と `views/graph/marks.js` の状態の印の重複を1つに寄せる、スナップショットのないリポジトリでの「見た」の 409 の扱い、手元のデータの既定でない組み合わせで残る線の重なり（4/171 通り）を調べて直せる分を直す。"
+		after:   ["iss-00531", "iss-00532"]
+		session: "std"
+	}
 	"iss-00534": {
 		covers:  ["R-23"]
 		text:    "第4波。0.6.0 を出し、5つのリポジトリに配る。`migration.md` の「0.6.0 への更新」（コマンドが8つ増える、`canonical status` の `dashboard` の項目が消える、残った5つのファイルを消してよい、構造のスナップショットが版2になる）。マージの後の導入と配布は統括が行い、利用者の PC で `dashboard serve` と iPhone からの表示を確かめる。"
-		after:   ["iss-00530", "iss-00531", "iss-00532", "iss-00533"]
+		after:   ["iss-00530", "iss-00531", "iss-00532", "iss-00533", "iss-00544"]
 		session: "light"
 	}
 	"iss-00535": {
