@@ -42,6 +42,12 @@ from spec_dock.runtime.application.canonical_worktrees import (
     remove_worktree,
     show_worktree,
 )
+from spec_dock.runtime.application.dashboard_commands import (
+    list_repositories,
+    mark_checkout,
+    mark_named,
+    serve,
+)
 from spec_dock.runtime.application.dashboard_summary import summarize_checkout, summarize_named
 from spec_dock.runtime.application.project_context import ProjectContext
 from spec_dock.runtime.presentation.envelope import OperationResult
@@ -98,6 +104,8 @@ CANONICAL_HANDLERS: dict[str, CanonicalHandler] = {
     "work start": start_work,
     "work finish": finish_work,
     "dashboard summary": summarize_checkout,
+    "dashboard hide": mark_checkout,
+    "dashboard show": mark_checkout,
 }
 
 # Consulted before resolve_context: commands that work without a repository (canonical sync --registered)
@@ -106,6 +114,10 @@ REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
     "canonical check": check_canonical_commit,
     "canonical sync": run_registered_sync,
     "dashboard summary": summarize_named,
+    "dashboard serve": serve,
+    "dashboard hide": mark_named,
+    "dashboard show": mark_named,
+    "dashboard list": list_repositories,
 }
 
 
