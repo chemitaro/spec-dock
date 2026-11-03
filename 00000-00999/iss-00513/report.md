@@ -32,3 +32,14 @@ ID: "iss-00513"
 
 - 配布の PR（R-04・R-05）と、タグ `v0.5.1`（マージで `release-tag.yml` が作る）は、この Issue の外。
 
+
+## マージの後（統括、R-04・R-05）
+
+2026-11-03 に統括が行った。
+
+- PR #525 のマージ（`24f291f9c`）で、タグ `v0.5.1` ができた。`git archive v0.5.1` から作った wheel を `uv tool install --force` で利用者の環境に入れ、`spec-dock --version` が `spec-dock 0.5.1` を返した。
+- 4つのリポジトリで、一時の worktree（`worktrees/spec-dock-051/<名前>`）を作り、`installation update --backup-dir worktrees/spec-dock-051/backups/<名前> --yes` で配布資産を上げ（変更 6）、`canonical check --json` が終了コード0で通った。PR：input-devices#23、company-os#5、housing-lifecycle#243、taikyohiyou_project#2231。CI は input-devices・company-os・taikyohiyou_project で成功。housing-lifecycle は CI が手で起動するときだけ動く決まりで、push の前の検査（同じ `canonical check`）が通った。利用者が4件をマージした。
+- R-05：input-devices の `README.md`、company-os の `integrations/spec-dock/contract.md` と `README.md`、housing-lifecycle の `README.md` の、SpecDock を 0.2.4（`4d25a8b`）に固定する記述を、`spec-dock/system/spec-dock-version` の版のタグを入れる形に直した（同じ PR）。会議の記録や決定の記録の過去の記述は変えていない。
+- マージの後、5つのリポジトリの `spec-dock/system/spec-dock-version` が 0.5.1 で、`canonical status` のリンク、同期、変更が ok。
+- 一時の worktree とブランチは消した。控え `worktrees/spec-dock-051/backups/` は #514 の片付けの対象として残す。
+- 0.5.1 を入れた後、`spec-dock scope close epic-00424 --reason completed --yes` で epic-00424 を閉じた（epic-00512 の R-09）。
