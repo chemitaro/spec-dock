@@ -8,9 +8,9 @@ steps: {
 	"S-01": {title: "領域のモデルと版2の JSON（読み書き、版1の読み、引き継ぎ）を作る", realizes: ["R-02", "R-06"], status: "done", session: "std"}
 	"S-02": {title: "`pull_requests_by_scope` を作る", realizes: ["R-05"], status: "done", after: ["S-01"], session: "std"}
 	"S-03": {title: "PR の GraphQL の問い合わせと、待たないレート制限を作る", realizes: ["R-01", "R-04"], status: "done", after: ["S-01"], session: "std"}
-	"S-04": {title: "`SnapshotStore` と `ensure_fresh(\"cycle\")` に PR の取得、間隔、失敗の記録をつなぐ", realizes: ["R-01", "R-03", "R-04"], status: "doing", after: ["S-03"], session: "std"}
-	"S-05": {title: "版の移りと既存の読む側の回帰のテストを足す", realizes: ["R-06"], status: "todo", after: ["S-04"], session: "std"}
-	"S-06": {title: "レビュー、最終品質ゲート、report.md、PR", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "todo", after: ["S-05"], session: "std"}
+	"S-04": {title: "`SnapshotStore` と `ensure_fresh(\"cycle\")` に PR の取得、間隔、失敗の記録をつなぐ", realizes: ["R-01", "R-03", "R-04"], status: "done", after: ["S-03"], session: "std"}
+	"S-05": {title: "版の移りと既存の読む側の回帰のテストを足す", realizes: ["R-06"], status: "done", after: ["S-04"], session: "std"}
+	"S-06": {title: "レビュー、最終品質ゲート、report.md、PR", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06"], status: "doing", after: ["S-05"], session: "std"}
 }
 
 tests: {
