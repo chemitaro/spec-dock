@@ -59,7 +59,11 @@ ID: "iss-00529"
 
 ## Final Quality Gate
 
-（ゲートの後に書く）
+- 合格のコミット：`32804ee4262d09e3876c0c7925b8b02d7ba3f0c5`（作業ツリーは clean、試行1回）。記録は `.workbench/final-quality-gate/iss-00529-g1/`（`campaign.json`、`closure.md`、`attempts/01/`）。
+- レビューの側：quality-gate-reviewer（opus/high、1人）。観点は functional-correctness、requirements-closure、test-adequacy。pass（P0 0、P1 0、P2 0、P3 3、網羅は完全）。
+- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3443 passed、7 skipped、25分14秒）。どちらも同じコミット。
+- P3（情報。直さない）：(1) 止める途中に2回目の SIGTERM か Ctrl-C を受けると、片付けの前にシグナルの扱いを既定に戻しているため `server.json` が残ることがある（`pid` が生きていないので古い記録と見なされる）。(2) `--port 80` で起動すると、番号を省いた `Host` と `Origin` を断る。(3) REPOSITORY を渡した `dashboard hide`／`show` は、版3のチェックアウトの中でも止まらずに印を書く（`dashboard summary` と同じ扱い）。
+- 手前の全体のテスト：最初の全体の実行で、全コマンドを1回ずつ動かす2つのテストと版3で止まるテストが落ち、`serve`／`list` が版3のチェックアウトの中で `CANONICAL_NOT_MIGRATED` で止まるように直した（372c1e293 に含む）。
 
 ## Residual Risks / Follow-ups
 

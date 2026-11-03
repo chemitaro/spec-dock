@@ -13,7 +13,7 @@ steps: {
 	"S-05": {title: "`dashboard hide`／`show`／`list` を作り、コマンドの数を縛るテストと文書を直す", realizes: ["R-08"], status: "done", after: ["S-01"], session: "impl"}
 	"S-06": {title: "画面の骨組みと5つの差し込み口を作り、wheel に入ることを確かめる", realizes: ["R-03", "R-10", "R-11", "R-13"], status: "done", after: ["S-03"], session: "impl"}
 	"S-07": {title: "PC のブラウザーで、骨組み、自動の更新、埋め込み、資料の切り離し、hide/show を確かめて report.md に書く", realizes: ["R-03", "R-05", "R-06", "R-10", "R-11", "R-13"], status: "done", after: ["S-04", "S-05", "S-06"], session: "impl"}
-	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-13"], status: "doing", after: ["S-07"], session: "impl"}
+	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-13"], status: "done", after: ["S-07"], session: "impl"}
 }
 
 tests: {
