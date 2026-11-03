@@ -209,7 +209,7 @@ design: {
 		title: "埋め込みの表示と postMessage の約束（`specdock.embed/v1`）"
 		text: """
 			- `?embed=1`：SpecDock の題名とリポジトリの切り替えを消し、画面の切り替えと検索を残す。画面の中のリンクは `embed=1` を引き継ぐ。GitHub などの外へのリンクは `target=_blank` で開く。
-			- 知らせの形：`{source: "specdock", v: 1, type, …}`（親から送るものは `source: "host"`）。始まりは親から：親は枠が読み込まれたら `hello {v}` を送る。SpecDock は、`frame-ancestors` で許した起点（D-09）からの `hello` を受けたら、その起点を覚え、`ready {repository, path, title, capabilities}` を返す。その後、SpecDock から親へ `navigated {path, title, scope}`（画面を移るたび）。親から SpecDock へ `navigate {path}`（枠を作り直さずに移る）、`theme {scheme: "light"|"dark"|"auto"}`。`hello` の前は、SpecDock は何も送らない。
+			- 知らせの形：`{source: "specdock", v: 1, type, …}`（親から送るものは `source: "host"`）。始まりは親から：親は枠の `load` のたびに `hello {v}` を送る（枠の中で全画面の移動が起きると、新しい文書は前の `hello` を知らないため。#527 の試作で確かめた）。SpecDock は、`frame-ancestors` で許した起点（D-09）からの `hello` を受けたら、その起点を覚え、`ready {repository, path, title, capabilities}` を返し、続けて今の画面の `navigated` を1回送る。その後、SpecDock から親へ `navigated {path, title, scope}`（画面を移るたび）。親から SpecDock へ `navigate {path}`（枠を作り直さずに移る）、`theme {scheme: "light"|"dark"|"auto"}`。`hello` の前は、SpecDock は何も送らない。
 			- 起点の確かめ：SpecDock は、覚えた起点からの知らせだけを受け、`event.source` が親の窓であることも確かめる。送るときは、覚えた起点を `targetOrigin` にし、`*` を使わない。
 			- 履歴：画面の移動を履歴に積むのは SpecDock の側（iframe の中の移動は、もとから共通の履歴に入る）。親は `navigated` を受けて自分の URL を `replaceState` で合わせるだけにする。
 			- 高さ：親が枠の高さを決め、SpecDock は中でスクロールする。高さの知らせは作らない。
