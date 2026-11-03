@@ -1,0 +1,25 @@
+/* The top band's search (iss-00531 D-09). Loaded by search.js itself, so it works on every screen. */
+.sd-search { position: relative; display: flex; align-items: center; }
+.sd-search__open { display: none; place-items: center; width: 36px; height: 36px; padding: 0; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--ds-text-2); font-size: 18px; cursor: pointer; }
+.sd-search__field { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 10px; border: 1px solid var(--ds-border); border-radius: 8px; background: var(--ds-surface-2); color: var(--ds-muted); }
+.sd-search__field:focus-within { border-color: var(--ds-focus); box-shadow: 0 0 0 3px var(--ds-accent-soft); }
+.sd-search__field .ds-icon { flex: none; font-size: 15px; }
+.sd-search input { width: 220px; min-width: 0; height: 100%; padding: 0; border: 0; outline: none; background: transparent; color: var(--ds-text); font: inherit; font-size: 13.5px; }
+.sd-search input::placeholder { color: var(--ds-faint); }
+.sd-search__list { position: absolute; z-index: 45; top: calc(100% + 6px); right: 0; width: min(420px, calc(100vw - 24px)); max-height: min(60vh, 420px); overflow: auto; margin: 0; padding: 6px; list-style: none; border: 1px solid var(--ds-border); border-radius: var(--ds-radius-l); background: var(--ds-surface); box-shadow: var(--ds-shadow-l); }
+.sd-search__list[hidden] { display: none; }
+.sd-search__list li { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 7px 10px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+.sd-search__list li[aria-selected="true"], .sd-search__list li[role="option"]:hover { background: var(--ds-accent-soft); }
+.sd-search__t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ds-text); }
+.sd-search__none { color: var(--ds-faint); cursor: default; }
+@container app (max-width: 900px) {
+  .sd-search input { width: 150px; }
+}
+@container app (max-width: 640px) {
+  .sd-search { position: static; }
+  .sd-search__open { display: inline-grid; }
+  .sd-search__field { display: none; }
+  .sd-search.is-open .sd-search__field { display: flex; position: absolute; z-index: 44; left: 0; right: 0; top: var(--ds-topbar-h); height: 50px; padding: 0 12px; border: 0; border-bottom: 1px solid var(--ds-border); border-radius: 0; background: var(--ds-bg); }
+  .sd-search.is-open input { width: 100%; font-size: 16px; }
+  .sd-search__list { top: calc(var(--ds-topbar-h) + 52px); left: 8px; right: 8px; width: auto; }
+}

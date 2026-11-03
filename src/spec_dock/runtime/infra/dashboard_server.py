@@ -99,6 +99,9 @@ class _Handler(BaseHTTPRequestHandler):
 
 class _Listener(ThreadingHTTPServer):
     daemon_threads = True
+    # A screen loads about a dozen modules at once; the standard backlog of 5 makes macOS reset some of them
+    # and the page fails to start (iss-00531).
+    request_queue_size = 128
     allow_reuse_address = True
 
 
