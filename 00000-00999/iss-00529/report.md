@@ -65,6 +65,10 @@ ID: "iss-00529"
 - P3（情報。直さない）：(1) 止める途中に2回目の SIGTERM か Ctrl-C を受けると、片付けの前にシグナルの扱いを既定に戻しているため `server.json` が残ることがある（`pid` が生きていないので古い記録と見なされる）。(2) `--port 80` で起動すると、番号を省いた `Host` と `Origin` を断る。(3) REPOSITORY を渡した `dashboard hide`／`show` は、版3のチェックアウトの中でも止まらずに印を書く（`dashboard summary` と同じ扱い）。
 - 手前の全体のテスト：最初の全体の実行で、全コマンドを1回ずつ動かす2つのテストと版3で止まるテストが落ち、`serve`／`list` が版3のチェックアウトの中で `CANONICAL_NOT_MIGRATED` で止まるように直した（372c1e293 に含む）。
 
+## Pull Request
+
+- PR #540（https://github.com/chemitaro/spec-dock/pull/540）、head `32804ee4262d09e3876c0c7925b8b02d7ba3f0c5`。CI（Provider CI の Actions）は観測できた範囲で PASS、GitHub のマージの可否は READY（2026-11-03T18:58:53Z の観測）。マージと `work finish` は統括が行う。
+
 ## Residual Risks / Follow-ups
 
 - iPhone の Safari での表示と埋め込み（指の操作を含む）は確かめていない。#534 で利用者に頼む。PC の Safari も未実施。
