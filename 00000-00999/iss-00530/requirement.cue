@@ -59,10 +59,11 @@ requirements: {
 	}
 	"R-03": {
 		title: "利用者が `dashboard service uninstall` で、常駐を何も残さずに外せる"
-		text: "常駐を止め（launchd の `bootout`、systemd の `disable --now`）、設定のファイルと常駐の記録（`<state_root>/dashboard/service.log`）を消す。入っていなければ何もせずに成功する（`removed: false`）。同期の常駐には触らない。"
+		text: "常駐を止め（launchd の `bootout`、systemd の `disable --now`）、設定のファイルと常駐の記録（launchd の `<state_root>/dashboard/service.log`。systemd の出力は journal）を消す。入っていなければ何もせずに成功する（`removed: false`）。同期の常駐には触らない。systemd のユーザーの管理が一時的に応えない Linux でも、単位のファイルがあれば `status` に見え、`uninstall` で外す（外せなければ F-02 で止まる）。"
 		acceptance: [
 			"`uninstall` の後、設定のファイルと `service.log` が残らず、`bootout` か `disable --now` が呼ばれる",
 			"2回目の `uninstall` は `removed: false` で成功する",
+			"systemd の単位があり、ユーザーの管理が判定できないとき、`status` は `installed: true`、`uninstall` は単位を消す",
 		]
 	}
 	"R-04": {
@@ -111,6 +112,10 @@ failures: {
 		title: "番号が 1〜65535 でなければ、`install` は何も書かずに `DASHBOARD_PORT_INVALID`（終了コード2）で止まる"
 		text:  "常駐の URL が決まらないので、番号0（空いた番号）は常駐では使わない。"
 	}
+	"F-05": {
+		title: "`install` と `uninstall` に `--dry-run` を付けると、何もせずに使い方の誤り（終了コード2）で止まる"
+		text:  "常駐の入れ外しは、計画だけの形を持たない（`canonical sync` などと同じく、共通の `--dry-run` を受け付けない leaf にする）。`--yes` も受け付けない（`dashboard serve`、`hide`、`show` と同じく、利用者が実行すること自体が明示の操作）。"
+	}
 	"F-04": {
 		title: "常駐の起動で番号が使われていれば、サーバーは終了コード3で終わり、理由を常駐の記録に書く"
 		text:  "管理の側が10秒ごとに起動し直す。`status` は `running: false` を示し、`service.log` に `DASHBOARD_PORT_IN_USE` が残る。"
@@ -129,5 +134,7 @@ decisions: [
 	"2026-11-04（作業者）：常駐の記録（標準出力と標準エラー）は `<state_root>/dashboard/service.log` に書き、`uninstall` で消す（何も残さない）",
 	"2026-11-04（作業者）：常駐の PATH は、同期と同じ形（git の場所、Tailscale の場所、決まった末尾）にする。Tailscale の場所は入れるときに `tailscale` を探して記録する（macOS のアプリの中の実行ファイルは `dashboard_network` が直接探す）",
 	"2026-11-04（作業者）：終了コード75は CLI の結果の封筒（0〜7）の外なので、`serve --service` は封筒を書かずに `SystemExit(75)` で終わる。常駐の管理の側だけが読む",
+	"2026-11-04（作業者）：systemd の単位の出力は journal に任せる（`StandardOutput=append:` の道は引用符を解かないため、空白を含む状態の置き場で壊れる）。`service.log` は launchd だけ",
+	"2026-11-04（仕様のレビューの P2 の扱い）：画面の帯での起動し直しの促し（Epic D-14）は、この Issue が API の `server.installed_version`／`restart_required` を足し、画面は後の Issue（#544 か後続）が読む。担当の割り当ては統括に知らせる。Epic R-28 の受け入れ「ログインし直すとサーバーが動く」は、本物の launchd を使うので、この Issue のテストでは確かめず、#534 の配布の後に利用者の PC で確かめる",
 	"2026-11-04（作業者）：`--service` は利用者向けのヘルプに出さない（`argparse.SUPPRESS`）。`--state-root` は `canonical sync` と同じく見える引数にする",
 ]

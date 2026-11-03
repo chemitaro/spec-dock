@@ -36,7 +36,7 @@ design: {
 			- 定数：`DASHBOARD_LAUNCHD_LABEL = "io.github.chemitaro.spec-dock.dashboard"`、`DASHBOARD_SYSTEMD_SERVICE = "spec-dock-dashboard.service"`、`SERVICE_LOG = "dashboard/service.log"`（状態の置き場から）、`VERSION_CHANGED_EXIT = 75`、`RESTART_SECONDS = 10`、`LOCK_RETRY_SECONDS = 30`、`TAILSCALE_RETRY_SECONDS = 30`、`VERSION_CHECK_SECONDS = 60`。
 			- `DashboardServiceSpec(SchedulerSpec)`：`port: int = 47800`、`tailscale: bool = False`、`tailscale_dir: Path | None = None` を足す。`arguments()` は `(実行ファイル, "dashboard", "serve", "--service", "--port", N, ["--tailscale"], "--state-root", 状態の置き場)`。`log` は `<state_root>/dashboard/service.log`。`search_path(tail)` は git の場所、Tailscale の場所（git と違えば）、末尾。
 			- `dashboard_launchd_plist(spec, label)`：`Label`、`ProgramArguments`、`WorkingDirectory`（ホーム）、`RunAtLoad: true`、`KeepAlive: true`、`ThrottleInterval: 10`、`StandardOutPath`／`StandardErrorPath`（`log`）、`EnvironmentVariables.PATH`。
-			- `dashboard_systemd_unit(spec)`：`[Unit] Description`、`[Service] Type=simple`、`WorkingDirectory=%h`、`Environment=PATH=…`、`ExecStart=…`（同期と同じ `systemd_quote`）、`Restart=always`、`RestartSec=10`、`StandardOutput=append:<log>`、`StandardError=append:<log>`、`[Install] WantedBy=default.target`。
+			- `dashboard_systemd_unit(spec)`：`[Unit] Description`、`[Service] Type=simple`、`WorkingDirectory=%h`、`Environment=PATH=…`、`ExecStart=…`（同期と同じ `systemd_quote`）、`Restart=always`、`RestartSec=10`、`[Install] WantedBy=default.target`。出力は journal（`StandardOutput=append:` は道の引用符を解かないため使わない）。
 			- `service_settings(arguments) -> ServiceSettings(port, tailscale, state_root) | None`：記録した引数の読み戻し（`status` が使う）。`dashboard serve --service` の形でなければ None。
 			"""
 		satisfies: ["R-01", "R-02", "R-07"]
@@ -59,8 +59,9 @@ design: {
 
 			- 管理の種類：`detect_runtime_environment()` の `system` が darwin なら launchd。linux なら `detect_service_manager` で `systemd_present` かつ `systemd_user` が True のとき systemd。どちらでもなければ「入れられない」。
 			- `install`：番号を確かめる（1〜65535、既定 47800。外れれば `DASHBOARD_PORT_INVALID`、終了コード2）。入れられなければ `DASHBOARD_SERVICE_UNSUPPORTED`（終了コード3、次の1手 `spec-dock dashboard serve`）。実行ファイルは、登録簿の同期の常駐（`scheduler_for(registry.scheduler)`）の `recorded_executable` が使えればそれ、なければ `spec_dock_executable()`。git の場所は登録簿の最初の行の git、なければ PATH の git、なければ `/usr/bin`。Tailscale の場所は PATH の `tailscale`。`<state_root>/dashboard/` を作り、`ensure`。結果は `scheduler`、`path`、`outcome`（created／updated／unchanged）、`port`、`tailscale`、`state_root`、`url`（`http://127.0.0.1:<N>/`）、`log`。効果は `dashboard.service`（unchanged なら unchanged）。`SchedulerError` は `DASHBOARD_SERVICE_FAILED`（終了コード3、`details.path`、次の1手は `install` のやり直しか `uninstall`）。
+			- 管理の種類（`status` と `uninstall`）：上の判定で入れられないとされても、Linux で systemd の単位のファイルがあれば systemd として見る（ユーザーの管理が一時的に応えないときにも、入れた常駐を見せて外せるように）。
 			- `status`：書かない。`supported`、`scheduler`、`path`、`installed`、`loaded`、`detail`、記録した `port`／`tailscale`／`state_root`、`server`（記録した状態の置き場（なければ今の置き場）の在りかの記録の `pid` が生きていれば `{pid, urls, version, started_at}`、なければ null）、`running`、`package_version`（`installed_version()`）、`restart_pending`（動いていて版が違う）。入れられない環境では `supported: false` と、ほかは false／null。
-			- `uninstall`：入れられない環境では `removed: false` で成功。`remove` の後、記録した状態の置き場（なければ今の置き場）の `dashboard/service.log` を消す。結果は `removed`、`path`、`log_removed`。効果は `dashboard.service`（removed なら succeeded、でなければ unchanged）。`SchedulerError` は `DASHBOARD_SERVICE_FAILED`。
+			- `uninstall`：入れられない環境（で単位のファイルもない）では `removed: false` で成功。`remove` の後、記録した状態の置き場（なければ今の置き場）の `dashboard/service.log` を消す。結果は `removed`、`path`、`log_removed`。効果は `dashboard.service`（removed なら succeeded、でなければ unchanged）。`SchedulerError` は `DASHBOARD_SERVICE_FAILED`。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "F-01", "F-02", "F-03"]
 	}
@@ -89,7 +90,7 @@ design: {
 	"D-06": {
 		title: "コマンドの一覧、ヘルプ、文書"
 		text: """
-			`LEAF_PATHS` に `dashboard service install`、`dashboard service status`、`dashboard service uninstall`（58 → 61）。引数は `install` が `--port`、`--tailscale`、ほかはなし。`serve` に `--service`（help は SUPPRESS）と `--state-root`。`HELP_EFFECTS`、`HELP_PRECONDITIONS`、`_help_spec` の Target／Reads／Writes／Does not／JSON、`REPOSITORY_INDEPENDENT_HANDLERS`。
+			`LEAF_PATHS` に `dashboard service install`、`dashboard service status`、`dashboard service uninstall`（58 → 61）。引数は `install` が `--port`、`--tailscale`、ほかはなし。`serve` に `--service`（help は SUPPRESS）と `--state-root`。`install` と `uninstall` は `cli/options.py` の `_NO_PLAN_LEAVES` に入れ（`--dry-run` は使い方の誤り）、`MUTATING_LEAF_PATHS` には入れない（`--yes` なし。`serve`／`hide`／`show` と同じ）。`HELP_EFFECTS`、`HELP_PRECONDITIONS`、`_help_spec` の Target／Reads／Writes／Does not／JSON、`REPOSITORY_INDEPENDENT_HANDLERS`。
 
 			コマンドの数を縛るテスト（58 → 61）と、`reference_cli.md`（コマンドの表と「ダッシュボードのサーバーの契約」に常駐の節）、`docs/README.md`、README、`cli-redesign-guide.html`（配布と dogfood の写し）を直し、`static-inventory.json` の変えた行の sha256 を更新して前の値を `known_old_sha256` に足す。
 			"""
