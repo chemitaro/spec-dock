@@ -13,7 +13,7 @@ steps: {
 	"S-05": {title: "「見た」の記録の1件と比べ方、時間の軸、古さを作る", realizes: ["R-06", "R-07", "R-09"], status: "done", after: ["S-02"], session: "impl"}
 	"S-06": {title: "要約の JSON を作る", realizes: ["R-10"], status: "done", after: ["S-03", "S-04", "S-05"], session: "impl"}
 	"S-07": {title: "`dashboard summary` のコマンドとファイルの読みを作り、コマンドの数を縛るテストと文書を直す", realizes: ["R-11"], status: "done", after: ["S-06"], session: "impl"}
-	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-10", "R-11"], status: "doing", after: ["S-07"], session: "impl"}
+	"S-08": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-10", "R-11"], status: "done", after: ["S-07"], session: "impl"}
 }
 
 tests: {
