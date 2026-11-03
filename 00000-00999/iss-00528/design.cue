@@ -82,11 +82,12 @@ design: {
 	"D-08": {
 		title: "スナップショットの文書の読み（版1と版2、PR の欄）"
 		text: """
-			`runtime/domain/dashboard_snapshot.py`：
+			`runtime/domain/dashboard_snapshot.py`（#537 のマージの後、#537 の部品に寄せた）：
 
-			- `parse_snapshot_document(payload, *, repository) -> ParsedSnapshot(snapshot, pull_requests)`。`version` が整数でなければ `SnapshotUnreadable`、整数で1と2のどちらでもなければ `SnapshotUnsupported`。版2は PR の3つの鍵（`pull_requests`、`pull_requests_error`、`pull_requests_fetched_at`）を取り除いて解析し、残りを版1の形にして `StructureSnapshot.from_json` に渡す（構造の解析を写さない。#537 が `from_json` を版2に広げたら、後にマージするほうが寄せる）。`SnapshotFormatError` と別のリポジトリのものは `SnapshotUnreadable`。
-			- `PullRequest(number, state, is_draft, head_ref_name, mergeable, checks, created_at, merged_at, closed_at, url)`、`PullRequestsError(code, message, at)`、`PullRequestInfo(status, fetched_at, error, items)`。`status(now)` は、版1か、`pull_requests_fetched_at` が null か、`now - fetched_at` が30分を超えていれば `unknown`、それ以外で `pull_requests_error` があれば `stale`、ほかは `fresh`（Epic D-19。`now` は `build_model` が渡す）。値の形が違えば `SnapshotUnreadable`。
-			- Scope への対応 `pull_request_for(info, scope_id)`：`branch_names_scope(head_ref_name, scope_id)` が真のものから、`state == open` を先、次に `created_at` の新しい順、次に番号の大きい順で1つ。
+			- `parse_snapshot_document(payload, *, repository) -> ParsedSnapshot(snapshot, pull_requests)`。`version` が整数でなければ `SnapshotUnreadable`、整数で `READABLE_SNAPSHOT_VERSIONS`（1と2）になければ `SnapshotUnsupported`。解析は `StructureSnapshot.from_json`（#537 が版1と版2を読み、PR の欄 `pull_requests`、`pull_requests_fetched_at`、`pull_requests_error` を持つ）に任せ、`SnapshotFormatError` と別のリポジトリのものは `SnapshotUnreadable`。
+			- PR の形は `canonical_structure.PullRequest`、`PullRequestsError`。`PullRequestInfo.of(snapshot)` は `fetched_at`、`error`、`items` と、Scope ごとの PR `by_scope`（`canonical_structure.pull_requests_by_scope`。`branch_names_scope` で対応づけ、open を先、次に `created_at` の新しい順、次に番号の大きい順）を持つ。
+			- `status(now)` は、`pull_requests_fetched_at` が null（版1を含む）か、`now - fetched_at` が30分を超えていれば `unknown`、それ以外で `pull_requests_error` があれば `stale`、ほかは `fresh`（Epic D-19）。
+			- `build_model(snapshot, *, now)` は、PR をスナップショットから取る。
 			"""
 		satisfies: ["R-08"]
 	}
@@ -148,7 +149,6 @@ compatibility: """
 	"""
 
 risks: [
-	"#537 が `StructureSnapshot.from_json` を版2に広げると、この Issue の「版1の形にして渡す」読み方が合わなくなる。後にマージするほうが合わせる（統括の決定）。テストが版1と版2の両方を見るので、合わなければ落ちて分かる",
-	"コマンドの数（53 → 54）を縛るテストと文書が、#530 と #533 でも変わる。後にマージするほうが main を取り込む",
+		"コマンドの数（53 → 54）を縛るテストと文書が、#530 と #533 でも変わる。後にマージするほうが main を取り込む",
 	"後に続く数の計算は、Scope の数 n に対して最悪 n² 程度。250件で十分に速いことをテストで確かめる",
 ]

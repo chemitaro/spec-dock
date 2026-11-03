@@ -175,7 +175,7 @@ constraints: [
 decisions: [
 	"2026-11-04（統括、#537 と合意）：スナップショットの版2の PR の欄は `pull_requests: {\"<番号>\": {number, state: open|closed|merged, is_draft, head_ref_name, mergeable: mergeable|conflicting|unknown, checks: success|failure|pending|none, created_at, merged_at|null, closed_at|null, url}}` と `pull_requests_error: null|{code, message, at}`。鍵は snake_case、値は小文字、時刻は UTC の Z 形式。Scope との対応はスナップショットに持たず、読む側が `branch_names_scope` で求める（open を先、次に created_at の新しい順）",
 	"2026-11-04（統括、#537 から）：版2に `pull_requests_fetched_at: null|\"<UTC Z>\"` がある。null か版1なら PR の状態は分からない。`pull_requests` が {} で取得の時刻が新しければ PR は0件。`pull_requests_error` があっても前回の値を表示に使ってよいが、「分からない／古い」の印を付ける。30分を超えて古いときは「分からない」とする（Epic D-19）",
-	"2026-11-04（統括）：当面、#528 は自分の領域で PR の欄を解析する。後にマージするほうが、もう一方の部品に寄せて重複を消す",
+	"2026-11-04（統括）：当面、#528 は自分の領域で PR の欄を解析する。後にマージするほうが、もう一方の部品に寄せて重複を消す。#537 が先にマージされた（c2dc91826）ので、#528 が main を取り込み、PR の解析を #537 の部品（`StructureSnapshot` の版2の読み、`pull_requests_by_scope`）に寄せた",
 	"2026-11-04（この Issue の判断）：`dashboard summary` は、リポジトリごとのファイル（スナップショット、隠す印、在りかの記録）だけを読み、クローンの選択に関わらないので、同じリポジトリのクローンが2つ登録されていても曖昧にしない（`DASHBOARD_REPOSITORY_AMBIGUOUS` は、クローンを選ぶ必要のある #529 のコマンドに残す）",
 	"2026-11-04（この Issue の判断）：Epic と Initiative を作業中にする子孫の作業中の印は、開いた子孫のものだけを数える（閉じた Scope に残った印で作業中にしない）",
 	"2026-11-04（この Issue の判断）：片付けの候補には、Epic R-20 の「閉じたのに開いた配下がある親」として閉じた親そのものを挙げ、Epic R-10 のとおり、閉じた祖先のために止められている開いた Scope も挙げる（試作は開いた子の側だけを挙げていた）",
