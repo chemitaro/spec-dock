@@ -56,6 +56,18 @@ ID: "iss-00531"
   - 追加の画面の写し（410a06a80）：[ボード](artifacts/20261103t194353z--02-board-pc-410a06a80.png)、[依存](artifacts/20261103t194354z--05-scope-deps-pc-410a06a80.png)、[検索](artifacts/20261103t194354z-01--09-search-pc-410a06a80.png)、[PC・暗い・詳しい画面](artifacts/20261103t194354z-02--10-pc-dark-scope-410a06a80.png)、[390px・暗い・ボード](artifacts/20261103t194354z-03--10-phone-dark-board-410a06a80.png)。
 - 後始末：試しのサーバーと Chrome を止めた。一時の状態の置き場（`/private/tmp/iss531-state.*`）は統括の指示で消さずに残し、統括がまとめて片付ける。
 
+## Final Quality Gate
+
+- 合格のコミット：`410a06a8019ee1154ee07400589f21c4ece6783e`（作業ツリーは clean、試行1回）。記録は `.workbench/final-quality-gate/iss-00531-g1/`（`campaign.json`、`closure.md`、`attempts/01/`）。
+- レビューの側：quality-gate-reviewer（opus/high、1人）。観点は functional-correctness、requirements-closure、test-adequacy。pass（P0 0、P1 0、P2 0、P3 1、網羅は完全）。
+- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3470 passed、7 skipped、27分03秒）。どちらも同じコミット。
+- P3（情報。直さない）：詳しい画面の保証レベルの欄の括弧の中の理由が、状態と食い違うことがある（2つのクローンのときに「カタログにこの Scope がない」、`requirement.*` のないディレクトリで「Markdown の Scope」）。値（分からない／なし）とほかの表示は正しい。
+- 手前の全体のテスト：36e367ca5 で裏で流した全体のテストは、その後にコードを直したので途中で止めた（結果は使っていない）。
+
+## Pull Request
+
+（PR を作った後に書く）
+
 ## Residual Risks / Follow-ups
 
 - iPhone の Safari での表示（390px の実機、ダイアログ、検索の欄）は確かめていない。#534 で利用者に頼む。PC の Safari も未実施。
