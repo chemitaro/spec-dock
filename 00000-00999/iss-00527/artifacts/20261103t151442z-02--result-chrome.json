@@ -1,0 +1,158 @@
+{
+ "allowedEmbed": {
+  "sequence": [
+   "<debug",
+   ">hello",
+   "<debug",
+   "<ready",
+   "<navigated",
+   "<debug"
+  ],
+  "debug": [
+   "loaded /embed?embed=1 top=framed",
+   "visualViewport-resize 1",
+   "hello-accepted http://127.0.0.1:18527"
+  ]
+ },
+ "blockedEmbed": {
+  "iframeLoadEvent": true,
+  "childMessages": 0,
+  "note": "子は何も送らない（debug も来ない）。親から見ると load は発火するが中身は拒否のエラーページ"
+ },
+ "handshake": {
+  "sequence": [
+   "<debug",
+   ">hello",
+   "<debug",
+   "<ready",
+   "<navigated",
+   "<debug",
+   "<debug"
+  ],
+  "rogueDropped": [
+   "drop:not-parent http://127.0.0.1:18527"
+  ],
+  "hellosAccepted": [
+   "hello-accepted http://127.0.0.1:18527"
+  ]
+ },
+ "themeNavigate": {
+  "debug": [
+   "theme dark",
+   "navigate /embed?page=2&embed=1"
+  ],
+  "navigated": [
+   "/embed?embed=1",
+   "/embed?page=2&embed=1"
+  ],
+  "parentUrlAfter": "?p=%2Fembed%3Fpage%3D2%26embed%3D1"
+ },
+ "beforeHello": {
+  "sequence": [
+   "<debug",
+   "<debug"
+  ],
+  "debugBeforeHello": 2
+ },
+ "originCheckNote": "ALLOW の正規表現は 127.0.0.1 / localhost / Tailscale の IP。外の起点は実機（iPhone の手順）では確かめにくいので、正規表現の単体の確かめで代える",
+ "originRegex": {
+  "http://127.0.0.1:1": true,
+  "http://localhost:9": true,
+  "http://100.85.74.8:80": true,
+  "http://evil.example:1": false,
+  "http://127.0.0.1.evil.example:1": false,
+  "https://localhost:1": false
+ },
+ "history": {
+  "entriesBefore": 7,
+  "entriesAfterPushState": 8,
+  "topUrlUnchanged": "http://127.0.0.1:18527/?p=%2Fembed%3Fpage%3D2%26embed%3D1",
+  "afterTopBack": {
+   "popstateSeen": [
+    "popstate ?embed=1"
+   ],
+   "loads": [
+    "loaded /embed?embed=1 top=framed"
+   ]
+  }
+ },
+ "fullNavigation": {
+  "loadsBefore": 1,
+  "loadsAfter": 2,
+  "hellosSent": 2,
+  "sequence": [
+   "<debug",
+   ">hello",
+   "<ready",
+   "<navigated",
+   "<debug",
+   "<debug",
+   ">hello",
+   "<ready",
+   "<navigated",
+   "<debug"
+  ],
+  "historyEntries": 9,
+  "afterBack": {
+   "loads": 3,
+   "hellos": 3,
+   "navigatedPaths": [
+    "/embed?embed=1",
+    "/embed?page=2&embed=1",
+    "/embed?embed=1"
+   ]
+  }
+ },
+ "fullNavigationNoRehello": {
+  "loadsAdded": 1,
+  "navigatedAfterNav": 1
+ },
+ "sandboxFile": {
+  "origin": "null",
+  "parentDom": "BLOCKED SecurityError",
+  "localStorage": "BLOCKED SecurityError",
+  "cssApplied": "'ds-loaded'",
+  "fetchApi": "BLOCKED TypeError",
+  "fetchDsCss": "OK 200",
+  "importApiAsJs": "BLOCKED TypeError",
+  "importDsJs": "OK ds-js"
+ },
+ "sandboxFileTopLevel": {
+  "origin": "null",
+  "note": "トップで開くと CSP の sandbox は文書にも効く（opaque origin = null）"
+ },
+ "svgTopLevel": {
+  "origin": "null"
+ },
+ "touch": {
+  "afterTap1": {
+   "sel": "n0",
+   "taps": 1
+  },
+  "afterTap2": {
+   "navs": 1,
+   "navigatedMsgs": [
+    "/embed?embed=1",
+    "/embed?page=2&sel=n0&embed=1"
+   ]
+  },
+  "drag": {
+   "dx": 80,
+   "dy": 48,
+   "drags": 1
+  },
+  "pinch": {
+   "scaleBefore": 1,
+   "scaleAfter": 2.6,
+   "pinches": 1,
+   "ptrMax": 2,
+   "visualViewportScale": 1
+  },
+  "note": "Chrome の模擬は Pointer Events の touch を出す。Safari の gesturestart は出ないので、iPhone の実機で確かめる（gs カウンター）",
+  "viewport": {
+   "w": 390,
+   "vv": 1,
+   "ua": "Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 "
+  }
+ }
+}
