@@ -6,15 +6,15 @@ package spec
 goal: "状態のボード、Scope の詳しい画面、横断の概況、検索を、骨組みの差し込み口に入れ、PR をマージできる状態で止める。"
 
 steps: {
-	"S-01": {title: "要件、設計、計画、説明資料を書き、仕様のレビューを通す", realizes: ["R-01", "R-07", "R-12"], status: "doing", session: "impl"}
-	"S-02": {title: "構造と Scope の JSON に `rank`、`in_progress`、`dependencies` を足す", realizes: ["R-01", "R-02", "R-07", "R-08", "R-12"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "詳しい画面の読み取り（カタログ、文書、Artifact、保証レベル、worktree）を作り、`dashboard_http.py` の1か所でつなぐ", realizes: ["R-07", "R-08", "R-09"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "共有の部品（`views/_shared/parts.js`、`parts.css`）と検索（`search.js`、`app.js` の1行）を作る", realizes: ["R-04", "R-05", "R-10", "R-11", "R-14", "R-15"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-05": {title: "状態のボード（`views/board.js`）を作る", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-14", "R-15"], status: "todo", after: ["S-02", "S-04"], session: "impl"}
-	"S-06": {title: "Scope の詳しい画面（`views/scope.js`）を作る", realizes: ["R-07", "R-08", "R-09", "R-11", "R-14", "R-15"], status: "todo", after: ["S-03", "S-04"], session: "impl"}
-	"S-07": {title: "横断の概況（`views/overview.js`）を作る", realizes: ["R-12", "R-13", "R-14", "R-15"], status: "todo", after: ["S-02", "S-04"], session: "impl"}
-	"S-08": {title: "PC のヘッドレスの Chrome で、PC の幅と 390px、明るい表示と暗い表示、JavaScript のエラーなしを確かめ、report.md と Artifact に残す", realizes: ["R-01", "R-02", "R-03", "R-05", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15"], status: "todo", after: ["S-05", "S-06", "S-07"], session: "impl"}
-	"S-09": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-15"], status: "todo", after: ["S-08"], session: "impl"}
+	"S-01": {title: "要件、設計、計画、説明資料を書き、仕様のレビューを通す", realizes: ["R-01", "R-07", "R-12"], status: "done", session: "impl"}
+	"S-02": {title: "構造と Scope の JSON に `rank`、`in_progress`、`dependencies` を足す", realizes: ["R-01", "R-02", "R-07", "R-08", "R-12"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "詳しい画面の読み取り（カタログ、文書、Artifact、保証レベル、worktree）を作り、`dashboard_http.py` の1か所でつなぐ", realizes: ["R-07", "R-08", "R-09"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "共有の部品（`views/_shared/parts.js`、`parts.css`）と検索（`search.js`、`app.js` の1行）を作る", realizes: ["R-04", "R-05", "R-10", "R-11", "R-14", "R-15"], status: "done", after: ["S-01"], session: "impl"}
+	"S-05": {title: "状態のボード（`views/board.js`）を作る", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-14", "R-15"], status: "done", after: ["S-02", "S-04"], session: "impl"}
+	"S-06": {title: "Scope の詳しい画面（`views/scope.js`）を作る", realizes: ["R-07", "R-08", "R-09", "R-11", "R-14", "R-15"], status: "done", after: ["S-03", "S-04"], session: "impl"}
+	"S-07": {title: "横断の概況（`views/overview.js`）を作る", realizes: ["R-12", "R-13", "R-14", "R-15"], status: "done", after: ["S-02", "S-04"], session: "impl"}
+	"S-08": {title: "PC のヘッドレスの Chrome で、PC の幅と 390px、明るい表示と暗い表示、JavaScript のエラーなしを確かめ、report.md と Artifact に残す", realizes: ["R-01", "R-02", "R-03", "R-05", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15"], status: "done", after: ["S-05", "S-06", "S-07"], session: "impl"}
+	"S-09": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-15"], status: "doing", after: ["S-08"], session: "impl"}
 }
 
 tests: {
