@@ -161,7 +161,6 @@ def status_of(
         format=format_item,
         git=git_item,
         snapshot=view.snapshot_item(),
-        dashboard=view.dashboard_item(),
         structure=_structure_item(context, timeout=timeout, offline=offline, warnings=warnings)
         if structure
         else _NOT_CHECKED,

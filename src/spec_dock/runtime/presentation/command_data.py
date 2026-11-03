@@ -77,7 +77,6 @@ class CanonicalStatusData:
     format: dict[str, object]
     git: dict[str, object]
     snapshot: dict[str, object]
-    dashboard: dict[str, object]
     structure: dict[str, object]
     kind: str = "canonical-status"
 

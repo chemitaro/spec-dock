@@ -54,12 +54,13 @@
     {
       "path": "spec-dock/.gitignore",
       "source": "spec_dock/.gitignore",
-      "sha256": "c9323d364063c4fd8db1b724a2994d0310976208dd5c1a236294f81f9ece9bcb",
+      "sha256": "a314aedf3ab25fcc1ad486f57511a311b62213e1b185d35583a17e1a4118d1f5",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
         "0385b3b649b323ac319d80539925af586af96f6d82f65c83e413f719cd2bf98b",
-        "b28e6f2406b7d6192a7e4ef14c3e0ff04279bcc97382f52456fdaa64731a84e7"
+        "b28e6f2406b7d6192a7e4ef14c3e0ff04279bcc97382f52456fdaa64731a84e7",
+        "c9323d364063c4fd8db1b724a2994d0310976208dd5c1a236294f81f9ece9bcb"
       ]
     },
     {
@@ -254,7 +255,7 @@
     {
       "path": "spec-dock/docs/canonical.md",
       "source": "spec_dock/docs/canonical.md",
-      "sha256": "5af6ae7a2fd4e9bac3269f2184fcf7013591f5cba616c0ef44302e8c361a0751",
+      "sha256": "a5c88cd4d24774390f276d17fc5f6a9b8bfdabd4a5468004bb45094cfaa7acad",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -265,7 +266,8 @@
         "ac31d512666ef64baa74a06923856b6d4d91e257032dfec8b958c8c11724afdb",
         "4ee1612fa7f5ccdfc51fbd3167f280ce6dd49283cf1e89a31bdb93fbd9689f2e",
         "dc8215fb6a6aeb9617969aee53c91ebc4928e2cd3198535ec16de13f272dacf8",
-        "a7d54206fb0da46b74b25ff0e1b75c366270d88ac0cd5d8a92ac7416967d763f"
+        "a7d54206fb0da46b74b25ff0e1b75c366270d88ac0cd5d8a92ac7416967d763f",
+        "5af6ae7a2fd4e9bac3269f2184fcf7013591f5cba616c0ef44302e8c361a0751"
       ]
     },
     {

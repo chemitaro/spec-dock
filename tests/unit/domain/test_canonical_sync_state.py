@@ -37,7 +37,6 @@ EPIC_STATE = {
     "blocking": [{"path": "b.md", "reason": "local_edit"}],
     "consumed_changesets": ["20261025T115900Z-0123456789abcdef.json"],
     "push_auth": {"result": "ok", "at": "2026-10-25T12:00:00Z", "message": None},
-    "dashboard": {"input_hash": "c" * 64, "written_at": "2026-10-25T12:00:00Z", "error": None},
     "adopt_remote_pending": False,
     "schedule": None,
 }
@@ -48,6 +47,9 @@ def test_the_epic_state_shape_round_trips() -> None:
     assert state.last_cycle is not None and state.last_cycle.finished_at == "2026-10-25T12:00:00Z"
     assert state.holds == (Hold("big.bin", "too_large", "2026-10-25T11:00:00Z"),)
     assert state.to_json() == EPIC_STATE
+    # iss-00533: a `dashboard` field written by an earlier version is read past and not written back.
+    old = {**EPIC_STATE, "dashboard": {"input_hash": "c" * 64, "written_at": "2026-10-25T12:00:00Z", "error": None}}
+    assert CatalogSyncState.from_json(old).to_json() == EPIC_STATE
 
 
 def test_a_new_state_has_unknown_push_auth_and_nothing_else() -> None:

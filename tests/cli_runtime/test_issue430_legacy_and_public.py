@@ -99,10 +99,9 @@ def test_the_state_parts_i5_and_i11_use(tmp_path: Path) -> None:
         )
 
     update_catalog_state(root, catalog, seed)
-    dashboard = {"input_hash": "0" * 64, "written_at": stamp, "error": None}
-    written = update_catalog_state(root, catalog, lambda current: current.evolve(dashboard=dashboard))  # type: ignore[union-attr]
+    written = update_catalog_state(root, catalog, lambda current: current.evolve(unpushed_since=stamp))  # type: ignore[union-attr]
     state = read_catalog_state(root, catalog)
-    assert state == written and state is not None and state.dashboard == dashboard
+    assert state == written and state is not None and state.unpushed_since == stamp
     assert [hold.path for hold in holds_under(state, "init-1/epics/epic-2")] == ["init-1/epics/epic-2/x.md"]
     assert state.remote_contains_head is True and state.last_cycle is None
     entry = RegistryEntry(catalog, "/clone", "github.com/o/r", "/usr/bin/git", stamp)
