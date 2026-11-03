@@ -1,6 +1,6 @@
-"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440; 54 with `dashboard summary`, iss-00528).
+"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440; 54 with `dashboard summary`, iss-00528; 58 with `dashboard serve`, `hide`, `show`, `list`, iss-00529).
 
-One linked schema-4 clone with the fake GitHub runs all 54 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
+One linked schema-4 clone with the fake GitHub runs all 58 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
 pushes to the temporary bare remote and the save wait of `work finish` runs on an injected clock.
 """
 
@@ -63,10 +63,12 @@ def test_every_leaf_has_a_route_in_canonical_mode() -> None:
         and path not in REPOSITORY_INDEPENDENT_HANDLERS
         and path not in MODE_INDEPENDENT
     ]
-    assert len(LEAF_PATHS) == 54
+    assert len(LEAF_PATHS) == 58
     assert unrouted == []
-    assert set(CANONICAL_HANDLERS) == set(LEAF_PATHS) - MODE_INDEPENDENT - {"canonical check"}
-    assert len(CANONICAL_HANDLERS) == 47
+    # `dashboard serve` and `dashboard list` need no checkout: only the repository-independent table routes them.
+    independent_only = {"canonical check", "dashboard serve", "dashboard list"}
+    assert set(CANONICAL_HANDLERS) == set(LEAF_PATHS) - MODE_INDEPENDENT - independent_only
+    assert len(CANONICAL_HANDLERS) == 49
 
 
 # Removed in 0.5.0 (iss-00440, R-440-02): commands and arguments that canonical mode only refused.
@@ -282,6 +284,10 @@ def _argv(world: WriteWorld, tmp_path: Path) -> list[tuple[str, list[str]]]:
         ("canonical resume", []),
         ("canonical remove", []),
         ("dashboard summary", []),
+        ("dashboard serve", ["--port", "70000"]),  # a usage error: the run must not wait for Ctrl-C
+        ("dashboard hide", []),
+        ("dashboard show", []),
+        ("dashboard list", []),
         ("installation show", []),
         ("installation init", [str(tmp_path / "fresh-install"), "--dry-run"]),
         ("installation update", ["--dry-run"]),

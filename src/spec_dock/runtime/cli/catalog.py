@@ -83,6 +83,10 @@ LEAF_PATHS: tuple[str, ...] = (
     "canonical resume",
     "canonical remove",
     "dashboard summary",
+    "dashboard serve",
+    "dashboard hide",
+    "dashboard show",
+    "dashboard list",
     "help",
     "completion",
 )
@@ -140,6 +144,10 @@ HELP_EFFECTS: dict[str, str] = {
     "canonical resume": "Resume a paused catalog after the user decided how to treat the remote.",
     "canonical remove": "Remove this clone's catalog, links and sync registration after confirming nothing is unsaved.",
     "dashboard summary": "Read one repository's dashboard summary (specdock.dashboard-summary/v1) from local files; no changes.",
+    "dashboard serve": "Serve the read-only dashboard of every shown registered repository in the foreground until Ctrl-C or SIGTERM.",
+    "dashboard hide": "Hide one repository from the dashboard; the periodic sync continues.",
+    "dashboard show": "Show a hidden repository on the dashboard again.",
+    "dashboard list": "List the registered repositories, whether each is shown or hidden, and the server URL; no changes.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -262,6 +270,10 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "canonical resume": (_flag("--adopt-remote"), _flag("--push-local")),
     "canonical remove": (),
     "dashboard summary": (_arg("repository", nargs="?"),),
+    "dashboard serve": (_arg("--port", type=int), _flag("--tailscale")),
+    "dashboard hide": (_arg("repository", nargs="?"),),
+    "dashboard show": (_arg("repository", nargs="?"),),
+    "dashboard list": (),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -374,6 +386,10 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "canonical resume": "A linked schema-4 checkout whose catalog is paused; --adopt-remote for remote_rewritten or merge_failed, --push-local for remote_deleted.",
     "canonical remove": "A schema-4 checkout of a clone with a main checkout; stops before writing on unsaved or unpushed changes or on ignored files other than .runtime/ in the catalog. Without --yes it only reports the plan.",
     "dashboard summary": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. The repository's structure snapshot must exist and be readable (DASHBOARD_SNAPSHOT_MISSING, DASHBOARD_SNAPSHOT_UNREADABLE, DASHBOARD_SNAPSHOT_UNSUPPORTED stop with exit 3). Works without a running dashboard server and for hidden repositories; it never contacts GitHub or the server.",
+    "dashboard serve": "No project is required. Listens on 127.0.0.1 only, port 47800 by default (--port N; 0 picks a free port); --tailscale also listens on this PC's Tailscale IPv4 address from `tailscale ip -4` (DASHBOARD_TAILSCALE_UNAVAILABLE exits 3 when there is none). A used port stops with DASHBOARD_PORT_IN_USE (exit 3). When a server already runs, its URL is shown and the command exits 0.",
+    "dashboard hide": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
+    "dashboard show": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
+    "dashboard list": "No project is required; it reads the registry of the state root.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -496,8 +512,10 @@ def _help_spec(leaf: str) -> HelpSpec:
         target = "The selected Git common-directory installation and its registered worktrees."
     elif leaf.startswith("worktree "):
         target = "The explicit absolute path in this clone's native Git inventory; create uses root/NAME."
-    elif leaf == "dashboard summary":
+    elif leaf in ("dashboard summary", "dashboard hide", "dashboard show"):
         target = "REPOSITORY (owner/name or github.com/owner/name), or this checkout's origin repository when omitted."
+    elif leaf in ("dashboard serve", "dashboard list"):
+        target = "Every repository of the registry in the state root that is known and not hidden."
     elif leaf in {"help", "completion"}:
         target = "The CLI catalog; no repository is required."
     elif "target" in arguments:
@@ -654,6 +672,40 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not delete the local or GitHub spec-dock/canonical branch, the structure snapshot or a real directory at a link path."
         json_data = "removed effects; without --yes the planned effects."
         confirmation = "Apply requires --yes; without it (or with --dry-run) only the plan is reported."
+    elif leaf == "dashboard serve":
+        reads = (
+            "The registry, each shown repository's structure snapshot and catalog files, the hidden marks, the"
+            " dashboard seen records, and `tailscale ip -4`/`tailscale status --json` only with --tailscale."
+        )
+        writes = (
+            "<state root>/dashboard/server.lock (held while running), server.json (removed on stop) and"
+            " seen.json when a dashboard page records what was seen."
+        )
+        does_not = (
+            "Does not contact GitHub or the network, write the catalog, the repository or the registry, change"
+            " the Tailscale configuration, or listen on 0.0.0.0."
+        )
+        json_data = (
+            "On stop: already_running=false, stopped, urls {local, tailscale}, repositories. When a server already"
+            " runs: already_running=true, urls, pid. The server's HTTP contracts are in reference_cli.md."
+        )
+        confirmation = "No final confirmation is required; the command runs until Ctrl-C or SIGTERM."
+    elif leaf in ("dashboard hide", "dashboard show"):
+        reads = "The hidden marks and the registry of the state root."
+        writes = "Only <state root>/dashboard/repositories.json (specdock.dashboard-repositories/v1), atomically under a lock."
+        does_not = (
+            "Does not stop the periodic sync, change the registry, the catalog or the repository, or contact GitHub."
+        )
+        json_data = "repository, hidden, changed, registered."
+        confirmation = "No final confirmation is required; show undoes hide."
+    elif leaf == "dashboard list":
+        reads = "The registry, the hidden marks and the server location record (only whether its pid is alive)."
+        does_not = "Does not contact GitHub or the dashboard server, or write any file."
+        json_data = (
+            "repositories[] (repository or null, catalog, main_checkout, hidden, served, problem, path, url),"
+            " server, registry_error."
+        )
+        confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "canonical check":
         target = "One commit of this checkout (--commit, default HEAD); the working tree and index are not read."
         reads = "The commit's tree listing, its workspace declaration, spec-dock/.gitignore, version file and static file blobs, and the installed package inventory."

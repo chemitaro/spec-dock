@@ -104,3 +104,16 @@ def summary_text(summary: dict[str, object], *, limit: int = 5) -> list[str]:
     if summary["server"]:
         lines.append(f"server={summary['server']}")
     return lines
+
+
+def list_text(data: dict[str, object]) -> list[str]:
+    lines = [f"server={data['server'] or 'not running'}"]
+    for row in data["repositories"]:  # type: ignore[attr-defined]
+        name = row["repository"] or "(repository unknown)"
+        state = "hidden" if row["hidden"] else "shown" if row["served"] else "not served"
+        problem = f" problem={row['problem']}" if row["problem"] else ""
+        url = f" {row['url']}" if row["url"] else ""
+        lines.append(f"{name} {state}{problem} catalog={row['catalog']}{url}")
+    if data.get("registry_error"):
+        lines.append(f"registry unreadable: {data['registry_error']}")
+    return lines

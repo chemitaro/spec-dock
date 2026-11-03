@@ -105,10 +105,11 @@
     {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
-      "sha256": "a1522098b7c78d9a3fc9190c12c1a6b3f45ba1fbfc41333f0fecc4363797610d",
+      "sha256": "c0a292774a3a5a533adf75f5e916f48c90995609082201e51e18a854bb8e9f62",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "a1522098b7c78d9a3fc9190c12c1a6b3f45ba1fbfc41333f0fecc4363797610d",
         "aadfdce1f6e61af65e95d3cd39efb3fd87b7cd83a3a3272356ef7cd68b21ba4e",
         "ddbd3e6cb3b216f4217eed6057ed8fdf7221760c18649f7ca997335e8304b353",
         "92f2c560e2d51a76595927f6de26564e451415ae08d645aada399a0e8f10fa5b",
@@ -280,10 +281,11 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "34ccc5993da7b92f7faf7b9f1920ae2c52fa05e8c2eed82b56cba0d45fb8b39a",
+      "sha256": "a490816bab99e1023f4f178a790311896d5ffd4c2b71c60e44be24f18ec3f178",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "34ccc5993da7b92f7faf7b9f1920ae2c52fa05e8c2eed82b56cba0d45fb8b39a",
         "d85e6ca18622bff25cc32ce90e31b5389abf937e5421a2d57a11552f628d0103",
         "e189a764450292ea9bb4020798fb163008c22f407ff24870ffbdfe53fb36ad9e",
         "4e8e0341043e6e7ff15f1d4c3d5fab79d1b273dea10613ad1b6966e67236d6ac",
@@ -389,10 +391,11 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "bbb1bbac291f91643c3e3ec4f7785410c0c669efdfcd40d9cca3380942a01f8e",
+      "sha256": "94f19d8d4bf2aba725c0b4e79a69528fffe76f3d5e888374dcc03a3a2007befd",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
+        "bbb1bbac291f91643c3e3ec4f7785410c0c669efdfcd40d9cca3380942a01f8e",
         "a195de0b32574113896f1ee5d09cc7c65ee7e252a512a945f11d811e641a976f",
         "e7dee1bbf7502528e59ba88d755afe6b23d4b6d0e7da4c6c3419140a031eba32",
         "d7e94faafdff0c1ab9f0b765ad7b7cfb421fcb7920170c67ee9c9ae8e2a7f1c5",
