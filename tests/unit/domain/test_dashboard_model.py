@@ -6,7 +6,7 @@ from datetime import timedelta
 import time
 
 from spec_dock.runtime.domain.canonical_readiness import evaluate_readiness
-from spec_dock.runtime.domain.canonical_structure import ExternalIssue, StructureAnomaly
+from spec_dock.runtime.domain.canonical_structure import ExternalIssue, PullRequestsError, StructureAnomaly
 from spec_dock.runtime.domain.dashboard_model import (
     SeenScope,
     build_model,
@@ -19,7 +19,6 @@ from spec_dock.runtime.domain.dashboard_model import (
     upstream,
     weekly_totals,
 )
-from spec_dock.runtime.domain.dashboard_snapshot import NO_PULL_REQUESTS, PullRequestsError
 from tests.support.dashboard import NOW, closed, node, pr, prs, snapshot
 
 
@@ -154,6 +153,7 @@ def merge_sample():
 
 def merge_prs(**options):
     return prs(
+        merge_sample(),
         pr(103, "iss-00003"),
         pr(104, "chemitaro/iss-00004", checks="failure"),
         pr(105, "iss-00005", draft=True),
@@ -166,7 +166,7 @@ def merge_prs(**options):
 
 
 def test_awaiting_merge_splits_mergeable_and_needs_fix_and_drafts_stay_doing() -> None:
-    model = build_model(merge_sample(), merge_prs(), now=NOW)
+    model = build_model(merge_prs(), now=NOW)
     lanes = {scope.id: (scope.lane, scope.merge) for scope in model.scopes.values() if scope.kind == "issue"}
     assert lanes == {
         "iss-00003": ("awaiting_merge", "mergeable"),
@@ -184,11 +184,10 @@ def test_awaiting_merge_splits_mergeable_and_needs_fix_and_drafts_stay_doing() -
 
 
 def test_unknown_pull_requests_never_make_awaiting_merge_but_stale_ones_do() -> None:
-    unknown = build_model(merge_sample(), NO_PULL_REQUESTS, now=NOW)
+    unknown = build_model(merge_sample(), now=NOW)
     assert unknown.pull_request_status == "unknown" and not unknown.lane("awaiting_merge")
     assert all(scope.pr is None for scope in unknown.scopes.values())
     stale = build_model(
-        merge_sample(),
         merge_prs(error=PullRequestsError("GITHUB_UNAVAILABLE", "down", "2026-11-04T11:55:00Z")),
         now=NOW,
     )
@@ -337,14 +336,14 @@ def test_root_waits_skip_an_in_progress_middle_and_a_parent_with_open_children()
 
 def test_compare_seen_finds_state_new_and_pr_changes_only() -> None:
     before_snapshot = snapshot(node(1, "issue"), node(2, "issue"), node(3, "issue", in_progress=True))
-    before = seen_scopes(build_model(before_snapshot, prs(), now=NOW))
+    before = seen_scopes(build_model(prs(before_snapshot), now=NOW))
     after_snapshot = snapshot(
         node(1, "issue", title="Renamed", in_progress=True),
         node(2, "issue", title="Renamed"),
         node(3, "issue", in_progress=True),
         node(4, "issue"),
     )
-    model = build_model(after_snapshot, prs(pr(30, "iss-00003")), now=NOW)
+    model = build_model(prs(after_snapshot, pr(30, "iss-00003")), now=NOW)
     changes = compare_seen(model, before)
     assert {key: sorted(value.kinds) for key, value in changes.items()} == {
         "iss-00001": ["state"],
@@ -358,9 +357,9 @@ def test_compare_seen_finds_state_new_and_pr_changes_only() -> None:
 def test_compare_seen_needs_a_baseline_and_known_pr_phases() -> None:
     structure = snapshot(node(1, "issue", in_progress=True))
     assert compare_seen(build_model(structure, now=NOW), None) == {}
-    unknown = build_model(structure, NO_PULL_REQUESTS, now=NOW)
+    unknown = build_model(structure, now=NOW)
     assert compare_seen(unknown, {"iss-00001": SeenScope("doing", "none")}) == {}
-    known = build_model(structure, prs(pr(5, "iss-00001", state="merged", merged_at="2026-11-02T00:00:00Z")), now=NOW)
+    known = build_model(prs(structure, pr(5, "iss-00001", state="merged", merged_at="2026-11-02T00:00:00Z")), now=NOW)
     assert seen_scopes(known)["iss-00001"].pr == "merged"
 
 
@@ -386,12 +385,15 @@ def test_weekly_totals_are_cumulative_by_monday_weeks() -> None:
 
 
 def test_recent_events_mix_scope_and_pr_events_newest_first() -> None:
+    structure = snapshot(
+        node(1, "issue", created_at="2026-10-01T00:00:00Z", in_progress=True),
+        closed(2, "issue", created_at="2026-10-02T00:00:00Z", closed_at="2026-10-05T00:00:00Z"),
+    )
     model = build_model(
-        snapshot(
-            node(1, "issue", created_at="2026-10-01T00:00:00Z", in_progress=True),
-            closed(2, "issue", created_at="2026-10-02T00:00:00Z", closed_at="2026-10-05T00:00:00Z"),
+        prs(
+            structure,
+            pr(9, "iss-00001", state="merged", created_at="2026-10-03T00:00:00Z", merged_at="2026-10-04T00:00:00Z"),
         ),
-        prs(pr(9, "iss-00001", state="merged", created_at="2026-10-03T00:00:00Z", merged_at="2026-10-04T00:00:00Z")),
         now=NOW,
     )
     assert [(e.kind, e.number) for e in recent_events(model)] == [
@@ -407,11 +409,12 @@ def test_recent_events_mix_scope_and_pr_events_newest_first() -> None:
 def test_recent_events_include_every_mapped_pull_request_and_none_while_unknown() -> None:
     structure = snapshot(node(5, "issue", created_at="2026-10-01T00:00:00Z", in_progress=True))
     pulls = prs(
+        structure,
         pr(10, "iss-00005", state="merged", created_at="2026-10-02T00:00:00Z", merged_at="2026-10-03T00:00:00Z"),
         pr(12, "iss-00005-fix", created_at="2026-10-04T00:00:00Z"),
         pr(13, "feature/other", created_at="2026-10-05T00:00:00Z"),
     )
-    model = build_model(structure, pulls, now=NOW)
+    model = build_model(pulls, now=NOW)
     chosen = model.scope("iss-00005").pr
     assert chosen is not None and chosen.number == 12
     assert [(e.kind, e.number, e.scope_id) for e in recent_events(model)] == [
@@ -420,7 +423,7 @@ def test_recent_events_include_every_mapped_pull_request_and_none_while_unknown(
         ("pr_opened", 10, "iss-00005"),
         ("created", 5, "iss-00005"),
     ]
-    unknown = build_model(structure, prs(pr(12, "iss-00005"), fetched_at=None), now=NOW)
+    unknown = build_model(prs(structure, pr(12, "iss-00005"), fetched_at=None), now=NOW)
     assert [e.kind for e in recent_events(unknown)] == ["created"]
 
 

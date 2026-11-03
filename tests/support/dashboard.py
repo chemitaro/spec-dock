@@ -5,8 +5,14 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 
-from spec_dock.runtime.domain.canonical_structure import ExternalIssue, ScopeNode, StructureAnomaly, StructureSnapshot
-from spec_dock.runtime.domain.dashboard_snapshot import PullRequest, PullRequestInfo
+from spec_dock.runtime.domain.canonical_structure import (
+    ExternalIssue,
+    PullRequest,
+    PullRequestsError,
+    ScopeNode,
+    StructureAnomaly,
+    StructureSnapshot,
+)
 
 NOW = datetime(2026, 11, 4, 12, 0, tzinfo=timezone.utc)
 FETCHED = "2026-11-04T11:50:00Z"
@@ -93,5 +99,16 @@ def pr(
     )
 
 
-def prs(*items: PullRequest, fetched_at: str | None = FETCHED, error: object = None) -> PullRequestInfo:
-    return PullRequestInfo(2, fetched_at, error, {item.number: item for item in items})  # type: ignore[arg-type]
+def prs(
+    structure: StructureSnapshot,
+    *items: PullRequest,
+    fetched_at: str | None = FETCHED,
+    error: PullRequestsError | None = None,
+) -> StructureSnapshot:
+    """The structure with version-2 pull request fields, as the periodic sync stores them."""
+    return replace(
+        structure,
+        pull_requests={item.number: item for item in items},
+        pull_requests_fetched_at=fetched_at,
+        pull_requests_error=error,
+    )

@@ -28,7 +28,7 @@ def structure():
 
 
 def summary(**options):
-    model = build_model(structure(), prs(pr(30, "iss-00003", checks="failure")), now=NOW)
+    model = build_model(prs(structure(), pr(30, "iss-00003", checks="failure")), now=NOW)
     return model, summary_document(model, hidden=options.get("hidden", False), server=options.get("server"))
 
 

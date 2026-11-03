@@ -14,14 +14,19 @@ from typing import TYPE_CHECKING, Final, Literal
 
 from spec_dock.runtime.domain.canonical_readiness import evaluate_all
 from spec_dock.runtime.domain.canonical_structure import branch_names_scope, parse_timestamp
-from spec_dock.runtime.domain.dashboard_snapshot import NO_PULL_REQUESTS
+from spec_dock.runtime.domain.dashboard_snapshot import PullRequestInfo
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Mapping
 
     from spec_dock.runtime.domain.canonical_readiness import ScopeReadiness
-    from spec_dock.runtime.domain.canonical_structure import ScopeNode, StructureAnomaly, StructureSnapshot
-    from spec_dock.runtime.domain.dashboard_snapshot import PullRequest, PullRequestInfo, PullRequestStatus
+    from spec_dock.runtime.domain.canonical_structure import (
+        PullRequest,
+        ScopeNode,
+        StructureAnomaly,
+        StructureSnapshot,
+    )
+    from spec_dock.runtime.domain.dashboard_snapshot import PullRequestStatus
     from spec_dock.runtime.domain.selectors import ScopeKind
 
 DashboardState = Literal["done", "doing", "blocked", "ready", "unknown"]
@@ -274,11 +279,10 @@ class _Graph:
         return out, direct
 
 
-def build_model(
-    snapshot: StructureSnapshot, pull_requests: PullRequestInfo = NO_PULL_REQUESTS, *, now: datetime
-) -> DashboardModel:
+def build_model(snapshot: StructureSnapshot, *, now: datetime) -> DashboardModel:
     graph = _Graph(snapshot)
     readiness = evaluate_all(snapshot)
+    pull_requests = PullRequestInfo.of(snapshot)
     pr_status = pull_requests.status(now)
     states: dict[str, DashboardState] = {}
     for scope, node in graph.nodes.items():
@@ -289,7 +293,7 @@ def build_model(
     scopes: dict[str, ScopeModel] = {}
     for scope, node in graph.nodes.items():
         state = states[scope]
-        pr = pull_requests.for_scope(scope) if pr_status != "unknown" else None
+        pr = pull_requests.by_scope.get(scope) if pr_status != "unknown" else None
         merge = _merge_group(pr) if state == "doing" and node.kind == "issue" else None
         lane: Lane = "awaiting_merge" if merge is not None else state
         result = readiness[scope]

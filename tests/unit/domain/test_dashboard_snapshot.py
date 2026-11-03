@@ -11,11 +11,16 @@ from spec_dock.runtime.domain.dashboard_snapshot import (
     SnapshotUnsupported,
     parse_snapshot_document,
 )
-from tests.support.dashboard import NOW, node, pr, prs, snapshot
+from tests.support.dashboard import NOW, node, snapshot
 
 
 def v1_document() -> dict[str, object]:
-    return snapshot(node(1, "epic"), node(2, "issue", parent=1, in_progress=True)).to_json()
+    """A version-1 file as SpecDock 0.5 wrote it: no pull request fields."""
+    document = snapshot(node(1, "epic"), node(2, "issue", parent=1, in_progress=True)).to_json()
+    for key in ("pull_requests", "pull_requests_error", "pull_requests_fetched_at"):
+        document.pop(key)
+    document["version"] = 1
+    return document
 
 
 def pr_json(number: int, branch: str, **changes: object) -> dict[str, object]:
@@ -63,17 +68,11 @@ def test_version_2_maps_pull_requests_to_scopes_by_branch_name() -> None:
     )
     info = parsed.pull_requests
     assert info.status(NOW) == "fresh"
-    chosen = info.for_scope("iss-00002")
-    assert chosen is not None and chosen.number == 11
-    assert info.for_scope("epic-00001") is None
+    assert sorted(info.items) == [10, 11, 12]
+    assert {scope: item.number for scope, item in info.by_scope.items()} == {"iss-00002": 11}
 
 
-def test_the_newest_open_pull_request_wins_and_an_empty_fresh_list_means_none() -> None:
-    info = prs(
-        pr(1, "iss-00002", created_at="2026-10-01T00:00:00Z"), pr(2, "x/iss-00002", created_at="2026-10-02T00:00:00Z")
-    )
-    chosen = info.for_scope("iss-00002")
-    assert chosen is not None and chosen.number == 2
+def test_an_empty_fresh_list_means_no_pull_requests() -> None:
     parsed = parse_snapshot_document(v2_document(), repository="github.com/o/r")
     assert parsed.pull_requests.status(NOW) == "fresh" and parsed.pull_requests.items == {}
 

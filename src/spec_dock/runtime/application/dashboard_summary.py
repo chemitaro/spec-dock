@@ -66,7 +66,7 @@ def summarize(
             recovery=("spec-dock canonical status", "wait for the next periodic sync, or run spec-dock canonical sync"),
             details={"repository": repository.key, "path": str(read.path), "reason": read.detail},
         )
-    model = build_model(read.parsed.snapshot, read.parsed.pull_requests, now=now())
+    model = build_model(read.parsed.snapshot, now=now())
     summary = summary_document(model, hidden=read_hidden(root, repository), server=read_server_url(root))
     return OperationResult(command, "succeeded", FamilyData("dashboard", summary), 0)
 
