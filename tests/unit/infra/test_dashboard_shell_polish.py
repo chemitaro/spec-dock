@@ -56,6 +56,8 @@ def test_the_marks_values_live_only_in_core_ui() -> None:
         assert not re.search(r"\{\s*light:\s*1", source), rel
         assert not re.search(r'open:\s*"開いている"', source), rel
         assert not re.search(r'done:\s*"終わった"', source), rel
+        assert not re.search(r'"(止められている|着手できる|作業中|終わった)",', source), rel
+        assert not re.search(r'\["initiative", "Initiative"\]', source), rel
         assert "GRAPH_ICONS" not in source and "MORE_ICONS" not in source, rel
 
 

@@ -4,18 +4,16 @@
 import { KIND_LABEL, PR_STATE_WORDS, STATE_WORDS } from "../../core/ui.js";
 
 export const LANES = [
-  ["blocked", "止められている", "依存の先か上位が終わっていない。待ち先の少ない順"],
-  ["ready", "着手できる", "待っているものがない。後に続く数の多い順"],
-  ["doing", "作業中", "作業中の印か、下書きの PR がある。後に続く数の多い順"],
+  ["blocked", STATE_WORDS.blocked, "依存の先か上位が終わっていない。待ち先の少ない順"],
+  ["ready", STATE_WORDS.ready, "待っているものがない。後に続く数の多い順"],
+  ["doing", STATE_WORDS.doing, "作業中の印か、下書きの PR がある。後に続く数の多い順"],
   ["awaiting_merge", "マージ待ち", "作業中で、下書きでない PR が開いている"],
 ];
-export const DONE_LANE = ["done", "終わった", "閉じた Scope（新しい順）"];
+export const DONE_LANE = ["done", STATE_WORDS.done, "閉じた Scope（新しい順）"];
 export const DONE_LIMIT = 30;
 export const KINDS = [
   ["", "すべて"],
-  ["initiative", "Initiative"],
-  ["epic", "Epic"],
-  ["issue", "Issue"],
+  ...Object.entries(KIND_LABEL),
 ];
 export { KIND_LABEL, PR_STATE_WORDS, STATE_WORDS }; // their home is core/ui.js (iss-00544)
 export const TABS = [

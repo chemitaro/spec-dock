@@ -1,4 +1,4 @@
-// The small marks' HTML for fixed inputs (iss-00544 T-06). Run by tests/unit/infra/test_dashboard_marks_place.py:
+// The small marks' HTML for fixed inputs (iss-00544 T-06). Run by tests/unit/infra/test_dashboard_shell_polish.py:
 //   node dashboard_marks_dump.mjs <assets/dashboard directory>
 // Prints one JSON object; the test compares it with tests/fixtures/issue544/marks-golden.json, written from the
 // code before the marks' values moved to core/ui.js, so the move changes no HTML.
@@ -56,6 +56,9 @@ const out = {
     KIND_LABEL: logic.KIND_LABEL,
     STATE_WORDS: logic.STATE_WORDS,
     PR_STATE_WORDS: logic.PR_STATE_WORDS,
+    LANES: logic.LANES,
+    DONE_LANE: logic.DONE_LANE,
+    KINDS: logic.KINDS,
   },
   marks: {
     ic: MARK_ICONS.map((n) => marks.ic(n, "y")),
