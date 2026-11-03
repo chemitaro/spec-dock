@@ -10,7 +10,7 @@ steps: {
 	"S-03": {title: "canonical status の項目と canonical remove の手順、エラーの定数を消す", realizes: ["R-02", "R-03", "F-02"], status: "done", after: ["S-01"], session: "impl"}
 	"S-04": {title: "配布資産、文書、CLI の説明、inventory、dogfood の写しを直す", realizes: ["R-05"], status: "done", after: ["S-01"], session: "impl"}
 	"S-05": {title: "古いテストと fixture を消し、既存のテストを直す", realizes: ["R-04"], status: "done", after: ["S-02", "S-03"], session: "impl"}
-	"S-06": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "doing", after: ["S-04", "S-05"], session: "impl"}
+	"S-06": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "done", after: ["S-04", "S-05"], session: "impl"}
 }
 
 tests: {
