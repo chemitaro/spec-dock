@@ -1,0 +1,499 @@
+{
+ "heights": [
+  {
+   "tag": "pc",
+   "name": "graph",
+   "view": "graph",
+   "mainTop": 112,
+   "mainH": 788,
+   "inner": 900,
+   "above": 112,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 0,
+     "display": "none"
+    },
+    {
+     "id": "notices",
+     "h": 56,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "pc",
+   "name": "board",
+   "view": "board",
+   "mainTop": 112,
+   "mainH": 788,
+   "inner": 900,
+   "above": 112,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 0,
+     "display": "none"
+    },
+    {
+     "id": "notices",
+     "h": 56,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "pc",
+   "name": "timeline",
+   "view": "timeline",
+   "mainTop": 112,
+   "mainH": 788,
+   "inner": 900,
+   "above": 112,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 0,
+     "display": "none"
+    },
+    {
+     "id": "notices",
+     "h": 56,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "pc",
+   "name": "scope",
+   "view": "scope",
+   "mainTop": 112,
+   "mainH": 788,
+   "inner": 900,
+   "above": 112,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 0,
+     "display": "none"
+    },
+    {
+     "id": "notices",
+     "h": 56,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "pc",
+   "name": "overview",
+   "view": "overview",
+   "mainTop": 56,
+   "mainH": 844,
+   "inner": 900,
+   "above": 56,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 0,
+     "display": "none"
+    },
+    {
+     "id": "notices",
+     "h": 0,
+     "display": "none"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "390",
+   "name": "graph",
+   "view": "graph",
+   "mainTop": 176,
+   "mainH": 668,
+   "inner": 844,
+   "above": 176,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 43,
+     "display": "flex"
+    },
+    {
+     "id": "notices",
+     "h": 77,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "390",
+   "name": "board",
+   "view": "board",
+   "mainTop": 176,
+   "mainH": 668,
+   "inner": 844,
+   "above": 176,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 43,
+     "display": "flex"
+    },
+    {
+     "id": "notices",
+     "h": 77,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "390",
+   "name": "timeline",
+   "view": "timeline",
+   "mainTop": 176,
+   "mainH": 668,
+   "inner": 844,
+   "above": 176,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 43,
+     "display": "flex"
+    },
+    {
+     "id": "notices",
+     "h": 77,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "390",
+   "name": "scope",
+   "view": "scope",
+   "mainTop": 176,
+   "mainH": 668,
+   "inner": 844,
+   "above": 176,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 43,
+     "display": "flex"
+    },
+    {
+     "id": "notices",
+     "h": 77,
+     "display": "grid"
+    }
+   ],
+   "ok": true
+  },
+  {
+   "tag": "390",
+   "name": "overview",
+   "view": "overview",
+   "mainTop": 56,
+   "mainH": 788,
+   "inner": 844,
+   "above": 56,
+   "bands": [
+    {
+     "id": "top",
+     "h": 56,
+     "display": "flex"
+    },
+    {
+     "id": "mtabs",
+     "h": 0,
+     "display": "none"
+    },
+    {
+     "id": "notices",
+     "h": 0,
+     "display": "none"
+    }
+   ],
+   "ok": true
+  }
+ ],
+ "errors": {
+  "390": [],
+  "pc": [],
+  "pc-empty": [],
+  "390-empty": [],
+  "sample": []
+ },
+ "empty": {
+  "pc-graph": {
+   "posts": [],
+   "notices": [
+    "構造のスナップショットがありません。定期の同期が構造を取るまで、画面は空です。 次の1手：spec-dock canon"
+   ],
+   "geo": {
+    "view": "graph",
+    "mainTop": 112,
+    "mainH": 788,
+    "inner": 900,
+    "above": 112,
+    "bands": [
+     {
+      "id": "top",
+      "h": 56,
+      "display": "flex"
+     },
+     {
+      "id": "mtabs",
+      "h": 0,
+      "display": "none"
+     },
+     {
+      "id": "notices",
+      "h": 56,
+      "display": "grid"
+     }
+    ],
+    "ok": true
+   }
+  },
+  "pc-board": {
+   "posts": [],
+   "notices": [
+    "構造のスナップショットがありません。定期の同期が構造を取るまで、画面は空です。 次の1手：spec-dock canon"
+   ],
+   "geo": {
+    "view": "board",
+    "mainTop": 112,
+    "mainH": 788,
+    "inner": 900,
+    "above": 112,
+    "bands": [
+     {
+      "id": "top",
+      "h": 56,
+      "display": "flex"
+     },
+     {
+      "id": "mtabs",
+      "h": 0,
+      "display": "none"
+     },
+     {
+      "id": "notices",
+      "h": 56,
+      "display": "grid"
+     }
+    ],
+    "ok": true
+   }
+  },
+  "pc-timeline": {
+   "posts": [],
+   "notices": [
+    "構造のスナップショットがありません。定期の同期が構造を取るまで、画面は空です。 次の1手：spec-dock canon"
+   ],
+   "geo": {
+    "view": "timeline",
+    "mainTop": 112,
+    "mainH": 788,
+    "inner": 900,
+    "above": 112,
+    "bands": [
+     {
+      "id": "top",
+      "h": 56,
+      "display": "flex"
+     },
+     {
+      "id": "mtabs",
+      "h": 0,
+      "display": "none"
+     },
+     {
+      "id": "notices",
+      "h": 56,
+      "display": "grid"
+     }
+    ],
+    "ok": true
+   }
+  },
+  "390-graph": {
+   "posts": [],
+   "notices": [
+    "構造のスナップショットがありません。定期の同期が構造を取るまで、画面は空です。 次の1手：spec-dock canon"
+   ],
+   "geo": {
+    "view": "graph",
+    "mainTop": 218,
+    "mainH": 626,
+    "inner": 844,
+    "above": 218,
+    "bands": [
+     {
+      "id": "top",
+      "h": 56,
+      "display": "flex"
+     },
+     {
+      "id": "mtabs",
+      "h": 43,
+      "display": "flex"
+     },
+     {
+      "id": "notices",
+      "h": 119,
+      "display": "grid"
+     }
+    ],
+    "ok": true
+   }
+  },
+  "390-board": {
+   "posts": [],
+   "notices": [
+    "構造のスナップショットがありません。定期の同期が構造を取るまで、画面は空です。 次の1手：spec-dock canon"
+   ],
+   "geo": {
+    "view": "board",
+    "mainTop": 218,
+    "mainH": 626,
+    "inner": 844,
+    "above": 218,
+    "bands": [
+     {
+      "id": "top",
+      "h": 56,
+      "display": "flex"
+     },
+     {
+      "id": "mtabs",
+      "h": 43,
+      "display": "flex"
+     },
+     {
+      "id": "notices",
+      "h": 119,
+      "display": "grid"
+     }
+    ],
+    "ok": true
+   }
+  },
+  "390-timeline": {
+   "posts": [],
+   "notices": [
+    "構造のスナップショットがありません。定期の同期が構造を取るまで、画面は空です。 次の1手：spec-dock canon"
+   ],
+   "geo": {
+    "view": "timeline",
+    "mainTop": 218,
+    "mainH": 626,
+    "inner": 844,
+    "above": 218,
+    "bands": [
+     {
+      "id": "top",
+      "h": 56,
+      "display": "flex"
+     },
+     {
+      "id": "mtabs",
+      "h": 43,
+      "display": "flex"
+     },
+     {
+      "id": "notices",
+      "h": 119,
+      "display": "grid"
+     }
+    ],
+    "ok": true
+   }
+  }
+ },
+ "sample": {
+  "posts": [
+   "/api/v1/r/github.com/o/sample/seen"
+  ],
+  "boxes": [
+   {
+    "id": "iss-00002",
+    "st": "doing",
+    "as": "2",
+    "wt": true
+   },
+   {
+    "id": "iss-00004",
+    "st": "ready",
+    "as": null,
+    "wt": false
+   },
+   {
+    "id": "iss-00003",
+    "st": "blocked",
+    "as": "3",
+    "wt": false
+   }
+  ],
+  "detail": [
+   "保証レベル\nstandard\nGitHub\nIssue #2\nPR\n分",
+   "ブランチ\nu/iss-00002\n概要\n依存1\n配下0\n文書\nArt"
+  ]
+ },
+ "ok": true
+}
