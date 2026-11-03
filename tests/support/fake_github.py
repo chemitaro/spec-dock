@@ -79,6 +79,22 @@ class FakeIssue:
 
 
 @dataclass
+class FakePullRequest:
+    """A pull request as GitHub GraphQL reports it (uppercase enums); `checks` is the rollup state or None."""
+
+    number: int
+    head_ref_name: str
+    state: str = "OPEN"
+    is_draft: bool = False
+    mergeable: str = "MERGEABLE"
+    checks: str | None = "SUCCESS"
+    created_at: str = "2026-10-25T00:00:00Z"
+    updated_at: str = "2026-10-25T00:00:00Z"
+    merged_at: str | None = None
+    closed_at: str | None = None
+
+
+@dataclass
 class FakeRequest:
     method: str
     endpoint: str
@@ -124,6 +140,7 @@ class FakeGithub:
         self.labels: dict[str, dict[str, str]] = {}
         self.requests: list[FakeRequest] = []
         self._faults: list[_Fault] = []
+        self.pull_requests: dict[int, FakePullRequest] = {}
         self._tick = 0
         self._next_number = 1
 
@@ -197,6 +214,12 @@ class FakeGithub:
         if parent is not None:
             self.set_parent(issue.number, parent)
         return issue
+
+    def add_pull_request(self, number: int, head_ref_name: str, **fields: Any) -> FakePullRequest:
+        """A pull request of this repository (iss-00537); only the GraphQL pullRequests connection reads it."""
+        item = FakePullRequest(number, head_ref_name, **fields)
+        self.pull_requests[number] = item
+        return item
 
     def add_foreign_issue(
         self, repository: str, number: int, *, title: str = "Foreign", state: str = "open"
@@ -304,6 +327,7 @@ class FakeGithub:
             "labels": self.labels,
             "requests": [asdict(request) for request in self.requests],
             "faults": [asdict(fault) for fault in self._faults],
+            "pull_requests": [asdict(item) for item in self.pull_requests.values()],
             "tick": self._tick,
             "next_number": self._next_number,
         }
@@ -328,6 +352,9 @@ class FakeGithub:
         fake.labels = payload["labels"]
         fake.requests = [FakeRequest(**raw) for raw in payload["requests"]]
         fake._faults = [_Fault(**raw) for raw in payload["faults"]]
+        for raw in payload.get("pull_requests", []):
+            item = FakePullRequest(**raw)
+            fake.pull_requests[item.number] = item
         fake._tick = payload["tick"]
         fake._next_number = payload["next_number"]
         return fake
@@ -409,6 +436,8 @@ class FakeGithub:
         assert isinstance(query, str) and isinstance(variables, dict)
         if f"{variables.get('owner')}/{variables.get('name')}".lower() != self.repository:
             return 200, {"data": {"repository": None}, "errors": [{"type": "NOT_FOUND", "message": "missing"}]}, {}
+        if "pullRequests(" in query:
+            return self._graphql_pull_requests(query)
         aliases = re.findall(r"(\w+):\s*issue\(number:\s*(\d+)\)", query)
         if aliases and "issues(" not in query:
             return self._graphql_numbers(aliases)
@@ -443,6 +472,43 @@ class FakeGithub:
             },
         }
         return 200, {"data": data}, {}
+
+    def _graphql_pull_requests(self, query: str) -> tuple[int, object, dict[str, str]]:
+        """Aliased `pullRequests(first:, states:, orderBy: UPDATED_AT DESC)` connections."""
+        repository: dict[str, object] = {}
+        for alias, arguments in re.findall(r"(\w+):\s*pullRequests\(([^)]*\})\s*\)", query):
+            first = re.search(r"first:\s*(\d+)", arguments)
+            states = re.search(r"states:\s*\[([^\]]*)\]", arguments)
+            assert first is not None and states is not None, "fake GraphQL expects first and states"
+            assert "UPDATED_AT" in arguments and "DESC" in arguments, "fake GraphQL expects newest updates first"
+            wanted = {item.strip() for item in states.group(1).split(",")}
+            chosen = sorted(
+                (item for item in self.pull_requests.values() if item.state in wanted),
+                key=lambda item: (item.updated_at, item.number),
+                reverse=True,
+            )[: int(first.group(1))]
+            repository[alias] = {"nodes": [self._graphql_pull_request(item) for item in chosen]}
+        data = {
+            "rateLimit": {"cost": 3, "remaining": 4990, "resetAt": "2026-10-26T01:00:00Z"},
+            "repository": repository,
+        }
+        return 200, {"data": data}, {}
+
+    @staticmethod
+    def _graphql_pull_request(item: FakePullRequest) -> dict[str, object]:
+        rollup = None if item.checks is None else {"state": item.checks}
+        return {
+            "number": item.number,
+            "state": item.state,
+            "isDraft": item.is_draft,
+            "headRefName": item.head_ref_name,
+            "mergeable": item.mergeable,
+            "createdAt": item.created_at,
+            "mergedAt": item.merged_at,
+            "closedAt": item.closed_at,
+            "url": f"https://github.com/example/repo/pull/{item.number}",
+            "commits": {"nodes": [{"commit": {"statusCheckRollup": rollup}}]},
+        }
 
     def _graphql_numbers(self, aliases: list[tuple[str, str]]) -> tuple[int, object, dict[str, str]]:
         """Aliased `issue(number: N)` fields; a missing number or a pull request answers null with an error."""

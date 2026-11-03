@@ -7,7 +7,7 @@ A state root that cannot be written keeps the snapshot in this process's memory 
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import timedelta
 import errno
 import json
@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Final, Literal, TypeVar, cast
 
 from spec_dock.runtime.domain.canonical_structure import (
     KIND_LABELS,
+    PullRequestsError,
     SnapshotFormatError,
     StructureSnapshot,
     UpsertIssue,
@@ -27,8 +28,11 @@ from spec_dock.runtime.domain.canonical_structure import (
     format_timestamp,
     merge_refresh,
     parse_timestamp,
+    with_pull_requests,
+    with_pull_requests_error,
 )
 from spec_dock.runtime.infra.github_structure import (
+    GITHUB_RATE_LIMITED,
     GITHUB_RESPONSE_INVALID,
     GITHUB_UNAVAILABLE,
     SYSTEM_CLOCK,
@@ -42,13 +46,16 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Mapping, Sequence
     from pathlib import Path
 
-    from spec_dock.runtime.domain.canonical_structure import StructureChange
+    from spec_dock.runtime.domain.canonical_structure import PullRequest, StructureChange
     from spec_dock.runtime.infra.github_structure import GithubClock, GithubRepository
 
 FreshnessLevel = Literal["display", "decision", "cycle"]
 ProbeOutcome = Literal["unchanged", "changed", "skipped", "failed"]
+PullRequestOutcome = Literal["fetched", "failed", "skipped"]
 PROBE_VERSION: Final = 1
 PROBE_INTERVAL: Final = timedelta(seconds=60)
+# iss-00537: the periodic sync reads pull requests at most once per interval (about 3 GraphQL points each).
+PULL_REQUEST_INTERVAL: Final = timedelta(minutes=2)
 MAX_AGE: Final[Mapping[FreshnessLevel, timedelta]] = {
     "display": timedelta(minutes=30),
     "decision": timedelta(minutes=5),
@@ -156,6 +163,32 @@ class SnapshotStore:
         snapshot, _ = self._update(change)
         return cast("StructureSnapshot", snapshot)
 
+    def commit_pull_requests(self, items: Iterable[PullRequest], *, fetched_at: str) -> StructureSnapshot | None:
+        """Replace the pull requests of the current snapshot; keep a newer read and write nothing without one."""
+        read = tuple(items)
+
+        def change(
+            current: StructureSnapshot | None, current_probe: ProbeRecord | None
+        ) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+            if current is None or _after(_last_attempt(current), fetched_at):
+                return current, current_probe
+            return with_pull_requests(current, read, fetched_at=fetched_at), current_probe
+
+        snapshot, _ = self._update(change)
+        return snapshot
+
+    def record_pull_requests_error(self, error: PullRequestsError) -> None:
+        """Record a failed pull request read unless a later read already succeeded; the pull requests stay."""
+
+        def change(
+            current: StructureSnapshot | None, current_probe: ProbeRecord | None
+        ) -> tuple[StructureSnapshot | None, ProbeRecord | None]:
+            if current is None or _after(_last_attempt(current), error.at):
+                return current, current_probe
+            return with_pull_requests_error(current, error), current_probe
+
+        self._update(change)
+
     def save_probe(self, probe: ProbeRecord) -> None:
         """Record a check unless another process already recorded a later one."""
 
@@ -252,6 +285,19 @@ def _choose(
     )
 
 
+def _last_attempt(snapshot: StructureSnapshot) -> str | None:
+    """When the last pull request read answered: its success or its failure, whichever is later."""
+    times = [snapshot.pull_requests_fetched_at]
+    if snapshot.pull_requests_error is not None:
+        times.append(snapshot.pull_requests_error.at)
+    known = [item for item in times if item is not None]
+    return max(known, key=parse_timestamp) if known else None
+
+
+def _after(stored: str | None, candidate: str) -> bool:
+    return stored is not None and parse_timestamp(stored) > parse_timestamp(candidate)
+
+
 def _later(current: ProbeRecord | None, candidate: ProbeRecord) -> bool:
     """True when the stored check is strictly later than the candidate's."""
     if current is None or current.checked_at is None or candidate.checked_at is None:
@@ -344,6 +390,7 @@ class FreshSnapshot:
     refreshed: bool
     warning: SnapshotWarning | None = None
     graphql_cost: int | None = None
+    pull_requests: PullRequestOutcome | None = None  # set by the "cycle" level only (iss-00537)
 
     def require(self) -> StructureSnapshot:
         if self.snapshot is None:
@@ -374,6 +421,35 @@ class StructureSnapshotService:
     def ensure_fresh(self, level: FreshnessLevel) -> FreshSnapshot:
         if level not in MAX_AGE:
             raise ValueError(f"unknown freshness level: {level!r}")
+        fresh = self._ensure_structure(level)
+        if level != "cycle" or fresh.probe == "failed" or fresh.snapshot is None:
+            return fresh
+        snapshot, outcome = self.refresh_pull_requests(fresh.snapshot)
+        return replace(fresh, snapshot=snapshot, pull_requests=outcome)
+
+    def refresh_pull_requests(self, snapshot: StructureSnapshot) -> tuple[StructureSnapshot, PullRequestOutcome]:
+        """Read pull requests once the interval since the last attempt passed; a failure is only recorded.
+
+        Only the periodic sync calls this (through the "cycle" level); commands never ask GitHub for them.
+        """
+        now = self.clock.now()
+        waits = [snapshot.pull_requests_fetched_at]
+        error = snapshot.pull_requests_error
+        if error is not None and error.code == GITHUB_RATE_LIMITED:
+            waits.append(error.at)  # retrying inside a rate limit makes GitHub extend it
+        if any(item is not None and now - parse_timestamp(item) <= PULL_REQUEST_INTERVAL for item in waits):
+            return snapshot, "skipped"
+        try:
+            items = self.client.fetch_pull_requests()
+        except GithubStructureError as error:
+            failure = PullRequestsError(error.code, error.message, format_timestamp(self.clock.now()))
+            self.store.record_pull_requests_error(failure)
+            current, _ = self.store.load()
+            return current or snapshot, "failed"
+        written = self.store.commit_pull_requests(items, fetched_at=format_timestamp(self.clock.now()))
+        return written or snapshot, "fetched"
+
+    def _ensure_structure(self, level: FreshnessLevel) -> FreshSnapshot:
         snapshot, probe = self.store.load()
         now = self.clock.now()
         must_probe = (

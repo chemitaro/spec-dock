@@ -276,14 +276,19 @@ def _sample():
     )
 
 
-def test_json_round_trip_keeps_every_field_and_the_version_one_shape() -> None:
+def test_json_round_trip_keeps_every_field_and_the_version_two_shape() -> None:
     import json
 
     from spec_dock.runtime.domain.canonical_structure import StructureSnapshot
 
     snapshot = _sample()
     payload = json.loads(json.dumps(snapshot.to_json()))
-    assert payload["version"] == 1 and payload["repository"] == REPOSITORY
+    assert payload["version"] == 2 and payload["repository"] == REPOSITORY
+    assert (payload["pull_requests"], payload["pull_requests_fetched_at"], payload["pull_requests_error"]) == (
+        {},
+        None,
+        None,
+    )
     assert (payload["fetched_at"], payload["fetch_started_at"]) == (FETCHED_AT, STARTED_AT)
     assert list(payload["issues"]) == ["1", "2", "3", "9"]
     assert payload["anomalies"] == [
@@ -296,8 +301,12 @@ def test_json_round_trip_keeps_every_field_and_the_version_one_shape() -> None:
 @pytest.mark.parametrize(
     "mutate",
     [
-        lambda payload: payload.update(version=2),
+        lambda payload: payload.update(version=3),
+        lambda payload: payload.update(version=0),
+        lambda payload: payload.update(version="2"),
         lambda payload: payload.update(version=True),
+        lambda payload: payload.update(version=1),
+        lambda payload: payload.pop("pull_requests_error"),
         lambda payload: payload.pop("external"),
         lambda payload: payload["issues"]["3"].pop("blocking"),
         lambda payload: payload["issues"]["3"].update(number="3"),
@@ -537,3 +546,191 @@ def test_branch_matching_needs_a_canonical_id() -> None:
 
     with pytest.raises(ValueError):
         branch_names_scope("iss-454", "iss-454")
+
+
+# iss-00537: pull request state in the version-2 snapshot (Epic D-19).
+
+PR_FETCHED_AT = "2026-10-26T00:12:00Z"
+
+
+def _pull(number: int, branch: str, *, state: str = "open", created: str = "2026-10-25T00:00:00Z", **fields):
+    from spec_dock.runtime.domain.canonical_structure import PullRequest
+
+    values: dict[str, Any] = {
+        "number": number,
+        "state": state,
+        "is_draft": False,
+        "head_ref_name": branch,
+        "mergeable": "mergeable",
+        "checks": "success",
+        "created_at": created,
+        "merged_at": "2026-10-25T02:00:00Z" if state == "merged" else None,
+        "closed_at": None if state == "open" else "2026-10-25T02:00:00Z",
+        "url": f"https://github.com/example/repo/pull/{number}",
+    }
+    values.update(fields)
+    return PullRequest(**values)
+
+
+def _with_pulls():
+    from spec_dock.runtime.domain.canonical_structure import with_pull_requests
+
+    return with_pull_requests(
+        _sample(),
+        [
+            _pull(40, "chemitaro/iss-00003", is_draft=True, checks="pending", mergeable="unknown"),
+            _pull(41, "iss-00003-old", state="merged"),
+        ],
+        fetched_at=PR_FETCHED_AT,
+    )
+
+
+def test_version_two_json_carries_pull_requests_and_their_fetch_record() -> None:
+    import json
+
+    from spec_dock.runtime.domain.canonical_structure import (
+        PullRequestsError,
+        StructureSnapshot,
+        with_pull_requests,
+        with_pull_requests_error,
+    )
+
+    snapshot = _with_pulls()
+    payload = json.loads(json.dumps(snapshot.to_json()))
+    assert payload["version"] == 2
+    assert payload["pull_requests_fetched_at"] == PR_FETCHED_AT and payload["pull_requests_error"] is None
+    assert list(payload["pull_requests"]) == ["40", "41"]
+    assert payload["pull_requests"]["40"] == {
+        "number": 40,
+        "state": "open",
+        "is_draft": True,
+        "head_ref_name": "chemitaro/iss-00003",
+        "mergeable": "unknown",
+        "checks": "pending",
+        "created_at": "2026-10-25T00:00:00Z",
+        "merged_at": None,
+        "closed_at": None,
+        "url": "https://github.com/example/repo/pull/40",
+    }
+    assert payload["pull_requests"]["41"]["state"] == "merged"
+    assert StructureSnapshot.from_json(payload) == snapshot
+
+    failed = with_pull_requests_error(snapshot, PullRequestsError("GITHUB_UNAVAILABLE", "gh timed out", FETCHED_AT))
+    assert failed.pull_requests == snapshot.pull_requests
+    assert failed.pull_requests_fetched_at == PR_FETCHED_AT
+    failed_payload = json.loads(json.dumps(failed.to_json()))
+    assert failed_payload["pull_requests_error"] == {
+        "code": "GITHUB_UNAVAILABLE",
+        "message": "gh timed out",
+        "at": FETCHED_AT,
+    }
+    assert StructureSnapshot.from_json(failed_payload) == failed
+    recovered = with_pull_requests(failed, [], fetched_at="2026-10-26T00:20:00Z")
+    assert (recovered.pull_requests, recovered.pull_requests_error) == ({}, None)
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda payload: payload["pull_requests"]["40"].update(state="draft"),
+        lambda payload: payload["pull_requests"]["40"].update(mergeable="MERGEABLE"),
+        lambda payload: payload["pull_requests"]["40"].update(checks="error"),
+        lambda payload: payload["pull_requests"]["40"].update(is_draft="false"),
+        lambda payload: payload["pull_requests"]["40"].update(created_at="yesterday"),
+        lambda payload: payload["pull_requests"]["40"].pop("url"),
+        lambda payload: payload["pull_requests"]["40"].update(extra=1),
+        lambda payload: payload["pull_requests"].update({"42": payload["pull_requests"].pop("40")}),
+        lambda payload: payload.update(pull_requests=[]),
+        lambda payload: payload.update(pull_requests_fetched_at="soon"),
+        lambda payload: payload.update(pull_requests_error={"code": "X", "message": "m"}),
+    ],
+)
+def test_malformed_pull_request_fields_reject_the_document(mutate: Callable[[dict[str, Any]], object]) -> None:
+    import json
+
+    from spec_dock.runtime.domain.canonical_structure import SnapshotFormatError, StructureSnapshot
+
+    payload = json.loads(json.dumps(_with_pulls().to_json()))
+    mutate(payload)
+    with pytest.raises(SnapshotFormatError):
+        StructureSnapshot.from_json(payload)
+
+
+def _version_one(payload: dict[str, Any]) -> dict[str, Any]:
+    old = {key: value for key, value in payload.items() if not key.startswith("pull_requests")}
+    old["version"] = 1
+    return old
+
+
+def test_a_version_one_document_reads_as_pull_requests_not_yet_fetched() -> None:
+    import json
+
+    from spec_dock.runtime.domain.canonical_structure import SnapshotFormatError, StructureSnapshot
+
+    payload = json.loads(json.dumps(_with_pulls().to_json()))
+    loaded = StructureSnapshot.from_json(_version_one(payload))
+    assert loaded == _sample()
+    assert (loaded.pull_requests, loaded.pull_requests_fetched_at, loaded.pull_requests_error) == ({}, None, None)
+    assert loaded.to_json()["version"] == 2
+    with_extra = _version_one(payload)
+    with_extra["pull_requests"] = {}
+    with pytest.raises(SnapshotFormatError):
+        StructureSnapshot.from_json(with_extra)
+
+
+def test_writes_and_refetches_keep_the_pull_request_fields() -> None:
+    from spec_dock.runtime.domain.canonical_structure import (
+        PullRequestsError,
+        SetParent,
+        apply_changes,
+        apply_changes_lenient,
+        merge_refresh,
+        with_pull_requests_error,
+    )
+
+    current = with_pull_requests_error(_with_pulls(), PullRequestsError("GITHUB_RATE_LIMITED", "later", FETCHED_AT))
+    written = apply_changes(current, [SetParent(9, 1)], at=FETCHED_AT, command="scope move")
+    lenient, _ = apply_changes_lenient(current, [SetParent(99, 1)], at=FETCHED_AT, command="scope move")
+    refreshed = merge_refresh(current, _sample())
+    for snapshot in (written, lenient, refreshed):
+        assert snapshot.pull_requests == current.pull_requests
+        assert snapshot.pull_requests_fetched_at == PR_FETCHED_AT
+        assert snapshot.pull_requests_error == current.pull_requests_error
+    assert merge_refresh(None, _sample()).pull_requests == {}
+
+
+def test_pull_requests_map_to_the_scopes_their_branches_name() -> None:
+    from spec_dock.runtime.domain.canonical_structure import pull_requests_by_scope, with_pull_requests
+
+    snapshot = with_pull_requests(
+        _build(
+            _scope(1, "initiative"),
+            _scope(2, "epic", parent=_ref(1)),
+            _scope(3, "issue", parent=_ref(2)),
+            _scope(5, "issue", parent=_ref(2)),
+            _scope(6, "issue", parent=_ref(2)),
+            _scope(100000, "issue", parent=_ref(2)),
+        ),
+        [
+            _pull(50, "iss-00003", state="merged", created="2026-10-25T05:00:00Z"),
+            _pull(51, "chemitaro/iss-00003-retry", created="2026-10-25T01:00:00Z"),
+            _pull(52, "epic-00002", state="closed"),
+            _pull(53, "team/a/iss-00005", created="2026-10-25T01:00:00Z"),
+            _pull(54, "iss-00005-newer", created="2026-10-25T03:00:00Z"),
+            _pull(55, "iss-00007"),
+            _pull(56, "feature/x-iss-00006"),
+            _pull(57, "iss-00006/followup"),
+            _pull(58, "iss-100000-x"),
+            _pull(59, "init-00001-a", state="closed", created="2026-10-25T01:00:00Z"),
+            _pull(60, "init-00001-b", state="closed", created="2026-10-25T01:00:00Z"),
+        ],
+        fetched_at=PR_FETCHED_AT,
+    )
+    chosen = {scope: item.number for scope, item in pull_requests_by_scope(snapshot).items()}
+    assert chosen == {
+        "iss-00003": 51,
+        "epic-00002": 52,
+        "iss-00005": 54,
+        "iss-100000": 58,
+        "init-00001": 60,
+    }

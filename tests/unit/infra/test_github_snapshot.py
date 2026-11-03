@@ -6,7 +6,7 @@ import fcntl
 import json
 import os
 import stat
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -68,7 +68,7 @@ def test_first_display_read_probes_fetches_and_stores_both_files(tmp_path: Path)
     assert stat.S_IMODE(store.directory.stat().st_mode) == 0o700
     snapshot = json.loads((store.directory / "snapshot.json").read_text(encoding="utf-8"))
     probe = json.loads((store.directory / "probe.json").read_text(encoding="utf-8"))
-    assert snapshot["version"] == 1 and snapshot["issues"]["1"]["title"] == "計画"
+    assert snapshot["version"] == 2 and snapshot["issues"]["1"]["title"] == "計画"
     assert probe["version"] == 1 and probe["checked_at"] == "2026-10-26T00:00:00Z" and probe["last_error"] is None
     assert set(probe["etags"]) == {"spec-dock:initiative", "spec-dock:epic", "spec-dock:issue"}
     assert sorted(path.name for path in store.directory.iterdir()) == ["probe.json", "snapshot.json"]
@@ -108,7 +108,8 @@ def test_age_limits_force_a_full_refetch_after_the_level_window(
     fake.clock.advance(age)
     fresh = service.ensure_fresh(level)  # type: ignore[arg-type]
     assert fresh.refreshed is refetched and fresh.probe == "unchanged"
-    assert len(fake.graphql_requests()) == (2 if refetched else 1)
+    structure = [request for request in fake.graphql_requests() if "pullRequests(" not in str(request.payload)]
+    assert len(structure) == (2 if refetched else 1)
 
 
 def test_decision_and_cycle_always_probe_even_right_after_a_fetch(tmp_path: Path) -> None:
@@ -117,7 +118,8 @@ def test_decision_and_cycle_always_probe_even_right_after_a_fetch(tmp_path: Path
     for level in ("decision", "cycle"):
         start = len(fake.requests)
         assert service.ensure_fresh(level).probe == "unchanged"  # type: ignore[arg-type]
-        assert [status for _, status in _requests_since(fake, start)] == [304, 304, 304]
+        probes = [status for endpoint, status in _requests_since(fake, start) if endpoint != "graphql"]
+        assert probes == [304, 304, 304]
 
 
 def test_a_changed_list_triggers_a_refetch_that_shows_the_new_title(tmp_path: Path) -> None:
@@ -184,7 +186,10 @@ def test_a_version_one_snapshot_that_still_carries_slug_is_refetched(tmp_path: P
     service.ensure_fresh("display")
     path = store.directory / "snapshot.json"
     payload = json.loads(path.read_text(encoding="utf-8"))
-    assert payload["version"] == 1 and all("slug" not in item for item in payload["issues"].values())
+    assert payload["version"] == 2 and all("slug" not in item for item in payload["issues"].values())
+    payload["version"] = 1
+    for name in ("pull_requests", "pull_requests_fetched_at", "pull_requests_error"):
+        del payload[name]
     for item in payload["issues"].values():
         item["slug"] = "old-name"
     path.write_text(json.dumps(payload), encoding="utf-8")
@@ -192,7 +197,7 @@ def test_a_version_one_snapshot_that_still_carries_slug_is_refetched(tmp_path: P
     fresh = service.ensure_fresh("display")
     assert fresh.refreshed and len(fake.graphql_requests()) == 2
     rewritten = json.loads(path.read_text(encoding="utf-8"))
-    assert rewritten["version"] == 1 and all("slug" not in item for item in rewritten["issues"].values())
+    assert rewritten["version"] == 2 and all("slug" not in item for item in rewritten["issues"].values())
 
 
 def test_refetch_merge_keeps_a_write_reflected_while_the_fetch_was_running(tmp_path: Path) -> None:
@@ -352,8 +357,9 @@ def test_reread_of_a_plain_blocker_updates_external_only(tmp_path: Path) -> None
 
 
 def test_a_probe_only_cycle_rewrites_probe_json_but_never_snapshot_json(tmp_path: Path) -> None:
+    """Within the pull request interval a cycle only probes (iss-00537 writes pull requests every 2 minutes)."""
     fake, service, store = _world(tmp_path)
-    service.ensure_fresh("display")
+    service.ensure_fresh("cycle")
     before = (store.directory / "snapshot.json").stat()
     fake.clock.advance(61)
     assert service.ensure_fresh("cycle").probe == "unchanged"
@@ -508,3 +514,200 @@ def test_reread_and_reflection_carry_the_time_fields(tmp_path: Path) -> None:
     reread = service.reread([3], command="scope close")
     assert reread.issues[3].created_at == fake.issue(3).created_at
     assert reread.issues[3].closed_at == "2026-10-26T05:00:00Z"
+
+
+# iss-00537: pull request state of the periodic sync (Epic D-19).
+
+
+def _pull_queries(fake: FakeGithub) -> list[object]:
+    return [request for request in fake.graphql_requests() if "pullRequests(" in str(request.payload)]
+
+
+def _stored(store: SnapshotStore) -> dict[str, Any]:
+    return json.loads((store.directory / "snapshot.json").read_text(encoding="utf-8"))
+
+
+def test_a_cycle_writes_the_pull_requests_of_one_query_into_the_snapshot(tmp_path: Path) -> None:
+    fake, service, store = _world(tmp_path)
+    fake.add_pull_request(30, "chemitaro/iss-00003", checks="FAILURE")
+    service.ensure_fresh("display")
+    assert _stored(store)["pull_requests_fetched_at"] is None and _pull_queries(fake) == []
+    fake.clock.advance(61)
+    fresh = service.ensure_fresh("cycle")
+    assert fresh.pull_requests == "fetched" and len(_pull_queries(fake)) == 1
+    stored = _stored(store)
+    assert stored["version"] == 2
+    assert stored["pull_requests_fetched_at"] == "2026-10-26T00:01:01Z" and stored["pull_requests_error"] is None
+    assert stored["pull_requests"]["30"]["checks"] == "failure"  # type: ignore[index]
+    assert fresh.require().pull_requests[30].head_ref_name == "chemitaro/iss-00003"
+
+
+def test_pull_requests_are_read_only_after_the_two_minute_interval_and_never_by_commands(tmp_path: Path) -> None:
+    fake, service, _ = _world(tmp_path)
+    fake.add_pull_request(30, "iss-00003")
+    service.ensure_fresh("cycle")
+    for seconds in (61, 59):
+        fake.clock.advance(seconds)
+        assert service.ensure_fresh("cycle").pull_requests == "skipped"
+    assert len(_pull_queries(fake)) == 1
+    fake.clock.advance(1)
+    assert service.ensure_fresh("cycle").pull_requests == "fetched" and len(_pull_queries(fake)) == 2
+    fake.clock.advance(600)
+    for fresh in (service.ensure_fresh("display"), service.ensure_fresh("decision"), service.refresh()):
+        assert fresh.pull_requests is None
+    assert len(_pull_queries(fake)) == 2
+
+
+@pytest.mark.parametrize(
+    ("fault", "code"),
+    [
+        ({"timeout": True}, "GITHUB_UNAVAILABLE"),
+        (
+            {"status": 200, "body": {"data": None, "errors": [{"type": "NOT_FOUND", "message": "x"}]}},
+            "GITHUB_ACCESS_DENIED",
+        ),
+        ({"status": 200, "body": {"data": {"repository": {"open": None, "closed": None}}}}, "GITHUB_RESPONSE_INVALID"),
+        (
+            {"status": 200, "body": {"data": None, "errors": [{"type": "RATE_LIMITED", "message": "rate limit"}]}},
+            "GITHUB_RATE_LIMITED",
+        ),
+        (
+            {"status": 403, "headers": {"retry-after": "30"}, "body": {"message": "secondary rate limit"}},
+            "GITHUB_RATE_LIMITED",
+        ),
+    ],
+)
+def test_a_failed_pull_request_read_keeps_the_structure_and_the_previous_pull_requests(
+    tmp_path: Path, fault: dict[str, object], code: str
+) -> None:
+    fake, service, store = _world(tmp_path)
+    fake.add_pull_request(30, "iss-00003")
+    service.ensure_fresh("cycle")
+    fake.issue(3).title = "renamed"
+    fake.touch(3)
+    fake.add_pull_request(31, "iss-00003-next")
+    fake.clock.advance(121)
+    sleeps = len(fake.clock.sleeps)
+
+    real = fake.handle
+
+    def pull_request_fault(argv: list[str], stdin: str | None) -> tuple[str, int]:
+        if stdin is not None and "pullRequests(" in stdin:
+            fake.inject(**fault)  # type: ignore[arg-type]
+        return real(argv, stdin)
+
+    fake.handle = pull_request_fault  # type: ignore[method-assign]
+    fresh = service.ensure_fresh("cycle")
+    assert fresh.probe == "changed" and fresh.refreshed and fresh.pull_requests == "failed"
+    stored = _stored(store)
+    assert stored["fetched_at"] == "2026-10-26T00:02:01Z" and stored["issues"]["3"]["title"] == "renamed"  # type: ignore[index]
+    assert list(stored["pull_requests"]) == ["30"]  # type: ignore[arg-type]
+    assert stored["pull_requests_fetched_at"] == "2026-10-26T00:00:00Z"
+    error = stored["pull_requests_error"]
+    assert isinstance(error, dict) and error["code"] == code and error["at"].startswith("2026-10-26T00:02:")
+    if code == "GITHUB_RATE_LIMITED":
+        assert fake.clock.sleeps[sleeps:] == []
+    fake.handle = real  # type: ignore[method-assign]
+    fake.clock.advance(60)
+    if code == "GITHUB_RATE_LIMITED":  # a rate limit waits two minutes from the failure; others retry next cycle
+        assert service.ensure_fresh("cycle").pull_requests == "skipped"
+        fake.clock.advance(61)
+    assert service.ensure_fresh("cycle").pull_requests == "fetched"
+    stored = _stored(store)
+    assert stored["pull_requests_error"] is None and list(stored["pull_requests"]) == ["30", "31"]  # type: ignore[arg-type]
+
+
+def test_no_pull_request_read_without_a_snapshot_or_after_a_failed_structure_step(tmp_path: Path) -> None:
+    fake, service, _ = _world(tmp_path)
+    fake.inject(timeout=True, times=100)
+    fresh = service.ensure_fresh("cycle")
+    assert (fresh.snapshot, fresh.pull_requests) == (None, None) and _pull_queries(fake) == []
+    fake.clear_faults()
+    service.ensure_fresh("cycle")
+    assert len(_pull_queries(fake)) == 1
+    fake.clock.advance(121)
+    fake.inject(status=503, times=100, method="GET")
+    fresh = service.ensure_fresh("cycle")
+    assert fresh.probe == "failed" and fresh.pull_requests is None and len(_pull_queries(fake)) == 1
+
+
+def test_an_older_pull_request_result_never_replaces_a_newer_one(tmp_path: Path) -> None:
+    from spec_dock.runtime.domain.canonical_structure import PullRequest, PullRequestsError
+
+    fake, service, store = _world(tmp_path)
+    fake.add_pull_request(30, "iss-00003")
+    service.ensure_fresh("cycle")
+    newer = store.load()[0]
+    assert newer is not None and newer.pull_requests_fetched_at == "2026-10-26T00:00:00Z"
+    stale = PullRequest(99, "open", False, "iss-00003", "mergeable", "none", "2026-10-01T00:00:00Z", None, None, "u")
+    assert store.commit_pull_requests([stale], fetched_at="2026-10-25T23:59:00Z") == newer
+    store.record_pull_requests_error(PullRequestsError("GITHUB_UNAVAILABLE", "old", "2026-10-25T23:59:30Z"))
+    assert store.load()[0] == newer
+    failure = PullRequestsError("GITHUB_UNAVAILABLE", "newest", "2026-10-26T00:05:00Z")
+    store.record_pull_requests_error(failure)
+    assert store.commit_pull_requests([stale], fetched_at="2026-10-26T00:04:00Z") is not None
+    kept = store.load()[0]
+    assert kept is not None and kept.pull_requests_error == failure and set(kept.pull_requests) == {30}
+    empty = SnapshotStore(tmp_path / "other", REPOSITORY)
+    assert empty.commit_pull_requests([stale], fetched_at="2026-10-26T00:00:00Z") is None
+    empty.record_pull_requests_error(PullRequestsError("GITHUB_UNAVAILABLE", "x", "2026-10-26T00:00:00Z"))
+    assert empty.load() == (None, None)
+
+
+def test_writes_and_refetches_keep_the_stored_pull_requests(tmp_path: Path) -> None:
+    from spec_dock.runtime.domain.canonical_structure import SetParent
+
+    fake, service, store = _world(tmp_path)
+    fake.add_pull_request(30, "iss-00003")
+    service.ensure_fresh("cycle")
+    service.reflect([SetParent(3, 1)], command="scope move")
+    service.refresh()
+    stored = _stored(store)
+    assert list(stored["pull_requests"]) == ["30"] and stored["pull_requests_fetched_at"] == "2026-10-26T00:00:00Z"  # type: ignore[arg-type]
+
+
+def _old_reader(payload: object) -> bool:
+    """What the version-1-only SpecDock accepts: exactly version 1 with its keys (`_SNAPSHOT_KEYS`)."""
+    keys = {
+        "version",
+        "repository",
+        "fetched_at",
+        "fetch_started_at",
+        "issues",
+        "external",
+        "anomalies",
+        "local_writes",
+    }
+    return (
+        isinstance(payload, dict)
+        and set(payload) == keys
+        and type(payload["version"]) is int
+        and payload["version"] == 1
+    )
+
+
+def test_version_one_files_are_read_and_rewritten_as_version_two_without_a_structure_refetch(tmp_path: Path) -> None:
+    fake, service, store = _world(tmp_path)
+    fake.add_pull_request(30, "iss-00003")
+    service.ensure_fresh("display")
+    path = store.directory / "snapshot.json"
+    current = _stored(store)
+    assert not _old_reader(current)  # the old SpecDock sees no snapshot and refetches
+    old = {key: value for key, value in current.items() if not key.startswith("pull_requests")}
+    old["version"] = 1  # what the old SpecDock writes back after that refetch
+    assert _old_reader(old)
+    path.write_text(json.dumps(old), encoding="utf-8")
+    clear_memory()
+    loaded, _ = store.load()
+    assert loaded is not None and [scope.id for scope in loaded.scopes] == ["init-00001", "epic-00002", "iss-00003"]
+    assert (loaded.pull_requests, loaded.pull_requests_fetched_at, loaded.pull_requests_error) == ({}, None, None)
+    structure_reads = len(fake.graphql_requests())
+    fake.clock.advance(61)
+    fresh = service.ensure_fresh("cycle")
+    assert fresh.probe == "unchanged" and not fresh.refreshed and fresh.pull_requests == "fetched"
+    assert len(fake.graphql_requests()) == structure_reads + 1
+    rewritten = _stored(store)
+    assert rewritten["version"] == 2 and list(rewritten["pull_requests"]) == ["30"]  # type: ignore[arg-type]
+    assert {
+        key: value for key, value in rewritten.items() if not key.startswith("pull_requests") and key != "version"
+    } == {key: value for key, value in old.items() if key != "version"}
