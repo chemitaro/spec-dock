@@ -1,0 +1,32 @@
+/* 横断の概況（iss-00531 D-08）。試作 d2 の overview の部分と、取得が古いときの警告の帯（Epic R-09）。 */
+[data-view="overview"] {
+  & .sd-ov-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr)); gap: 14px; }
+  & .sd-ov { display: flex; flex-direction: column; gap: 12px; min-width: 0; padding: 16px 18px; border: 1px solid var(--ds-border); border-top: 4px solid var(--ds-accent); border-radius: var(--ds-radius-l); background: var(--ds-surface); color: inherit; text-decoration: none; transition: border-color .15s, box-shadow .2s; }
+  & .sd-ov[data-warn="1"] { border-top-color: var(--ds-warn); }
+  & .sd-ov:hover { border-color: var(--ds-accent-line); box-shadow: var(--ds-shadow); }
+  & .sd-ov > * { min-width: 0; }
+  & .sd-ov__warn { display: grid; gap: 6px; margin: -6px -8px 0; }
+  & .sd-ov__warn p { --tone: var(--ds-warn); --tone-bg: var(--ds-warn-bg); --tone-line: var(--ds-warn-line); display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 7px 10px; border: 1px solid var(--tone-line); border-left: 4px solid var(--tone); border-radius: var(--ds-radius); background: var(--tone-bg); font-size: 12.5px; font-weight: 650; color: var(--ds-text); }
+  & .sd-ov__warn p[data-level="error"] { --tone: var(--ds-danger); --tone-bg: var(--ds-danger-bg); --tone-line: var(--ds-danger-line); }
+  & .sd-ov__warn p[data-level="info"] { --tone: var(--ds-note); --tone-bg: var(--ds-note-bg); --tone-line: var(--ds-note-line); }
+  & .sd-ov__warn .ds-icon { flex: none; margin-top: .2em; color: var(--tone); }
+  & .sd-ov__next { display: block; font-weight: 500; color: var(--ds-muted); }
+  & .sd-ov__head { display: flex; align-items: center; gap: 10px; min-width: 0; }
+  & .sd-ov__icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 6px; background: var(--ds-accent-soft); color: var(--ds-accent); font-size: 18px; flex: none; }
+  & .sd-ov__name { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 16px; font-weight: 700; }
+  & .sd-ov__time { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; height: 26px; padding: 0 10px; border: 1px solid var(--ds-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ds-muted); white-space: nowrap; flex: none; }
+  & .sd-ov__time::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ds-ok); }
+  & .sd-ov__time[data-state="stale"]::before { background: var(--ds-warn); }
+  & .sd-ov__next { min-width: 0; }
+  & div.sd-ov__next { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; color: inherit; font-weight: inherit; }
+  & .sd-ov__sec h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 3px; font-size: 12px; font-weight: 700; color: var(--st-ink); }
+  & .sd-ov__sec h3 .ds-icon { color: var(--ds-accent); font-size: 13px; }
+  & .sd-ov__sec ul { list-style: none; margin: 0; padding: 0 0 0 4px; border-left: 3px solid var(--st-line); min-width: 0; }
+  & .sd-ov__sec li { padding: 2px 0 2px 8px; font-size: 13.5px; font-weight: 650; line-height: 1.5; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  & .sd-ov__sec li small { color: var(--ds-faint); font-family: var(--ds-font-mono); font-size: 11px; margin-right: 6px; font-weight: 600; }
+  & .sd-ov__sec .sd-none { color: var(--ds-faint); font-weight: 500; font-size: 12.5px; }
+  & .sd-ov__counts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding-top: 10px; border-top: 1px solid var(--ds-border); }
+  & .sd-ov__frac { margin-left: auto; font-weight: 700; font-variant-numeric: tabular-nums; }
+  & .sd-ov__frac small { color: var(--ds-muted); font-weight: 600; }
+  & .sd-ov__flags { display: flex; flex-wrap: wrap; gap: 6px; }
+}

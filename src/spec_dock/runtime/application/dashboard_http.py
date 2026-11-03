@@ -20,6 +20,7 @@ import stat
 from typing import TYPE_CHECKING, Final
 from urllib.parse import unquote
 
+from spec_dock.runtime.application.dashboard_scope_details import read_scope_details
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.dashboard_model import seen_scopes
 from spec_dock.runtime.infra.dashboard_assets import (
@@ -314,7 +315,9 @@ class DashboardHttp:
             baseline = (find_seen(self.site.state_root, site.repository, wanted) if wanted else None) or find_seen(
                 self.site.state_root, site.repository, None
             )
-            document = scope_document(view, op[1], baseline=baseline)
+            known = view.model is not None and op[1] in view.model.scopes
+            details = read_scope_details(site, op[1]) if known else None  # iss-00531 D-04
+            document = scope_document(view, op[1], baseline=baseline, details=details)
             if document is None:
                 return self._error(404, "DASHBOARD_SCOPE_UNKNOWN", f"{op[1]} is not in this repository's structure")
             return self._json(200, document)

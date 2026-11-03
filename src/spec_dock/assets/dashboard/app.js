@@ -6,6 +6,7 @@ import { createEmbedBridge } from "./core/embed.js";
 import { parseRoute, withEmbed } from "./core/route.js";
 import { renderNotices, renderTop } from "./core/topbar.js";
 import { VIEWS } from "./views/index.js";
+import { mountSearch } from "./views/_shared/search.js";
 
 const REFRESH_MS = 5000;
 const root = document.getElementById("view");
@@ -64,6 +65,7 @@ function render() {
   const module = VIEWS[state.route.view] || VIEWS.graph;
   document.title = title();
   renderTop(top, mobileTabs, state);
+  mountSearch(top.querySelector("#search-slot"), { route: state.route, data: state.data, navigate }); // iss-00531
   renderNotices(noticeArea, state.data, state.error);
   if (state.view !== module) {
     state.view?.dispose?.();
