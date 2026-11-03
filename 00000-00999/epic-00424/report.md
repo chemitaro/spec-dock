@@ -73,3 +73,7 @@ ID: "epic-00424"
   - `installation update` が `.claude/skills/spec-dock*` の古い写しを外し、リンクがないと Claude Code から skill が見えなくなる（#496 で警告にした）。
   - ルートの `.gitignore` の `.workbench/` で、雛形の `.workbench/README.md` がコミットから漏れる（#497 で直した）。
   - GitHub への書き込みは1時間に500件までに抑え、二次のレート制限に当たらなかった。Scope が0件のリポジトリ（company-os）では、`verify` が比べるものがなく止まる。
+
+## 閉じた記録
+
+2026-11-03、SpecDock 0.5.1（`v0.5.1`、`24f291f9c`。不採用の子孫を許す #520 を含む）を利用者の環境に入れた後、`spec-dock scope close epic-00424 --reason completed --yes` で閉じた（成功。`--dry-run` の `blockers` は空）。GitHub の #424 は CLOSED（COMPLETED）。
