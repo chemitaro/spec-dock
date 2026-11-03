@@ -1,0 +1,501 @@
+{
+  "overview": [
+    {
+      "repo": "github.com/o/a",
+      "warn": [
+        "warning:構造の異常が 1件あります。次の1手：spec-dock workspace validate",
+        "info:PR の状態が分かりません。"
+      ],
+      "merge": "ない",
+      "changes": "0",
+      "time": "1分前に取得",
+      "href": "/r/github.com/o/a/"
+    },
+    {
+      "repo": "github.com/o/big",
+      "warn": [
+        "info:PR の状態が分かりません。"
+      ],
+      "merge": "ない",
+      "changes": "0",
+      "time": "1分前に取得",
+      "href": "/r/github.com/o/big/"
+    },
+    {
+      "repo": "github.com/o/m",
+      "warn": [
+        "error:構造のスナップショットがありません。次の1手：spec-dock canonical link、"
+      ],
+      "time": "取得なし",
+      "href": "/r/github.com/o/m/"
+    },
+    {
+      "repo": "github.com/o/r",
+      "warn": [
+        "warning:構造の異常が 1件あります。次の1手：spec-dock workspace validate"
+      ],
+      "merge": "#7Mergeable PR",
+      "changes": "3",
+      "time": "2分前に取得",
+      "href": "/r/github.com/o/r/"
+    },
+    {
+      "repo": "github.com/o/s",
+      "warn": [
+        "warning:3時間前から更新されていません（定期の同期を確かめてください）。次の1手：spec-dock c",
+        "info:PR の状態が分かりません。"
+      ],
+      "merge": "ない",
+      "changes": "0",
+      "time": "3時間前に取得",
+      "href": "/r/github.com/o/s/"
+    }
+  ],
+  "overviewLegend": true,
+  "overviewSearchHidden": true,
+  "overviewSeen": {
+    "before": 1,
+    "after": 1
+  },
+  "board": {
+    "lanes": [
+      "blocked:6",
+      "ready:5",
+      "doing:3",
+      "awaiting_merge:3"
+    ],
+    "ready": [
+      "iss-00003(4)",
+      "epic-00020(1)",
+      "iss-00021(1)",
+      "iss-00006",
+      "epic-00016"
+    ],
+    "doing": [
+      "init-00001",
+      "epic-00002",
+      "iss-00009"
+    ],
+    "mergeable": [
+      "iss-00007",
+      "iss-00008",
+      "iss-00010"
+    ],
+    "subs": [
+      "ok:1",
+      "fix:2"
+    ],
+    "unknown": "不明 1件：記録の食い違いを直すまで、どの列にも入れないiss-00018 Unknown: two kind labe",
+    "kept": "開いた配下を持つ閉じた親 1件（終わったものを隠していても残す）epic-00014 Closed epic with an open ch",
+    "changeBadges": [
+      "iss-00004:新しい",
+      "iss-00006:状態が変わった（止められている → 着手できる）",
+      "iss-00008:PR が変わった（前は開いた PR）"
+    ],
+    "metrics": [
+      "blocked=5",
+      "ready=3",
+      "doing=1",
+      "merge=3",
+      "unknown=1"
+    ],
+    "cleanup": "3",
+    "scriptTitle": false
+  },
+  "cleanupDialog": {
+    "open": true,
+    "rows": [
+      "epic-00016Ev | 配下の 1件がすべて終わったのに、開いたまま",
+      "iss-00015Ope | 閉じた親 epic-00014 の下で開いている",
+      "epic-00014Cl | 閉じたのに、配下の 1件が開いている"
+    ]
+  },
+  "cleanupClosed": true,
+  "kind": {
+    "url": "/r/github.com/o/r/board?kind=epic",
+    "marker": true,
+    "cards": [
+      "epic-00012",
+      "epic-00020",
+      "epic-00016",
+      "epic-00002"
+    ]
+  },
+  "toggles": {
+    "lanes": [
+      "blocked",
+      "ready",
+      "doing",
+      "awaiting_merge",
+      "done"
+    ],
+    "groups": [
+      "epic-00002Board and details <s",
+      "init-00001Dashboard initiative",
+      "epic-00020Epic another waits f"
+    ],
+    "checked": [
+      "true",
+      "true"
+    ],
+    "kept": false
+  },
+  "legend": "着手できる / 作業中 / 止められている / 不明 / 終わった / PR が開いている / 下書きの PR / マージ済み / CI の成功・失敗・実行中 / マージできる・衝突 / N後に続く N件 / 前回見たときから変わった",
+  "bigBoard": {
+    "msFromNavigation": 76,
+    "wallMs": 75,
+    "cards": 210,
+    "scopes": 250
+  },
+  "header": {
+    "kicker": "Issueiss-00007#7",
+    "title": "Mergeable PR",
+    "tags": "作業中PR #40 をマージできるマージ待ち・マージできる",
+    "side": [
+      "親の道筋=init-00001epic-00002iss-00007",
+      "保証レベル=分からない（カタログにこの Scope がない）",
+      "GitHub=Issue #7",
+      "PR=#40",
+      "ブランチ=chemitaro/iss-00007"
+    ],
+    "tabs": [
+      "概要*",
+      "依存0",
+      "配下0",
+      "文書",
+      "Artifact0"
+    ],
+    "legend": true
+  },
+  "summary": [
+    "作られた=2026年10月25日",
+    "このPCの worktree=chemitaro/iss-00007/private/tmp/iss531-state.Q9KN/",
+    "PR=#40 開いているCI 成功マージできる",
+    "前回からの変化=ない"
+  ],
+  "deps": {
+    "rows": [
+      "iss-00003#3大もと | Ready and waited for by two | 着手できる | epic-00012 から引き継いだ",
+      "Scope でない Issue #90大もと | Outside issue | 開いている | epic-00012 から引き継いだ"
+    ],
+    "state": "止められている"
+  },
+  "deepRoots": [
+    "iss-00021 Ready child of the awaited Epic 着手できる"
+  ],
+  "children": {
+    "stages": [
+      "1:iss-00007,iss-00008,iss-00010,iss-00009,iss-00003,iss-00006,iss-00022,iss-00018",
+      "2:iss-00004",
+      "3:iss-00005"
+    ],
+    "done": "終わった 1件を隠している"
+  },
+  "docs": [
+    "要件:true",
+    "設計:true",
+    "計画:false",
+    "説明資料:true(link /r/github.com/o/r/files/iss-00003/explanation.html)",
+    "報告:false"
+  ],
+  "assurance": "standard",
+  "artifacts": [
+    "20261104t000000z--prototype.html -> /r/github.com/o/r/files/iss-00003/artifacts/20261104t000000z--prototype.html target=_blank",
+    "20261104t000001z--notes <b>.md -> /r/github.com/o/r/files/iss-00003/artifacts/20261104t000001z--notes%20%3Cb%3E.md target=_blank"
+  ],
+  "noCatalog": {
+    "callout": "カタログに、この Scope のディレクトリがありません。次の1手：spec-dock canonical status、spec-dock canonical link",
+    "code": "catalog-scope_missing"
+  },
+  "unknownScope": "iss-00099 は、このリポジトリの構造にありません（消されたか、ID の誤り）。",
+  "newTab": {
+    "selected": "配下11",
+    "stages": 3
+  },
+  "tabHistory": {
+    "afterClick": "?tab=deps",
+    "afterBack": "?tab=children 配下11"
+  },
+  "searchOnGraph": true,
+  "searchResults": [
+    "iss-00008PR with failing CI"
+  ],
+  "searchAfterRefresh": {
+    "present": true,
+    "value": "iss-8",
+    "focused": true,
+    "listOpen": true
+  },
+  "searchKeepChoice": {
+    "chosen": "iss-00011Finished issue",
+    "afterRefresh": "iss-00011Finished issue"
+  },
+  "searchOutside": {
+    "closedNow": true,
+    "closedAfterRefresh": true,
+    "value": "issue"
+  },
+  "searchEnter": {
+    "path": "/r/github.com/o/r/scopes/iss-00008",
+    "value": ""
+  },
+  "searchTitle": [
+    "iss-00008PR with failing CI"
+  ],
+  "embedBoard": "/r/github.com/o/r/board?kind=issue target=_blank cardHref=/r/github.com/o/r/scopes/iss-00015?embed=1",
+  "embedScope": "/r/github.com/o/r/scopes/iss-00007",
+  "embedOverview": "/",
+  "noEmbedLink": true,
+  "prUnknownBoard": {
+    "band": "PR の状態が分かりません。マージ待ちの列と PR の印は出",
+    "mergeCol": "PR の状態が分かりません。マージ待ちの列と PR の印は出"
+  },
+  "prUnknownScope": "分からない",
+  "missingBoard": {
+    "empty": "表示できる構造がありません。上の知らせの次の1手を確かめてください。",
+    "notices": [
+      "SNAPSHOT_MISSING"
+    ]
+  },
+  "fits": {
+    "pc-light:overview": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:board": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:board-done": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:scope": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:deps": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:children": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:docs": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-light:artifacts": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:overview": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:board": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:board-done": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:scope": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:deps": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:children": {
+      "doc": 1440,
+      "main": 1425,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:docs": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "pc-dark:artifacts": {
+      "doc": 1440,
+      "main": 1440,
+      "width": 1440,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:overview": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:board": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:board-done": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:scope": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:deps": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:children": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:docs": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-light:artifacts": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:overview": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:board": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:board-done": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:scope": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:deps": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:children": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:docs": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    },
+    "phone-dark:artifacts": {
+      "doc": 390,
+      "main": 390,
+      "width": 390,
+      "ok": true,
+      "over": []
+    }
+  },
+  "search-phone-light": {
+    "fieldVisible": "flex",
+    "results": 1,
+    "fit": true
+  },
+  "search-phone-dark": {
+    "fieldVisible": "flex",
+    "results": 1,
+    "fit": true
+  },
+  "overviewSeenAtEnd": 5,
+  "errors": [
+    "pc-light log: Failed to load resource: the server responded with a status of 404 (Not Found) http://127.0.0.1:18531/api/v1/r/github.com/o/r/scopes/iss-00099",
+    "pc-light log: Failed to load resource: the server responded with a status of 409 (Conflict) http://127.0.0.1:18531/api/v1/r/github.com/o/m/seen"
+  ]
+}
