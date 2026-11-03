@@ -48,7 +48,15 @@ _COMMON_SWITCHES = {
     "--dry-run": "dry_run",
     "--offline": "offline",
 }
-_NO_PLAN_LEAVES = frozenset({"canonical sync", "canonical accept", "canonical restore", "canonical resume"})
+# The dashboard service changes the user's service manager at once; it has no plan-only form (iss-00530).
+_NO_PLAN_LEAVES = frozenset({
+    "canonical sync",
+    "canonical accept",
+    "canonical restore",
+    "canonical resume",
+    "dashboard service install",
+    "dashboard service uninstall",
+})
 _COMMON_VALUES = {
     "--project": "project",
     "--expect-current": "expect_current",

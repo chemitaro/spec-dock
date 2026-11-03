@@ -100,7 +100,7 @@ def test_every_public_leaf_help_describes_the_v2_envelope_without_project_access
     from spec_dock.runtime.cli.catalog import LEAF_PATHS
 
     assert (
-        len(LEAF_PATHS) == 58
+        len(LEAF_PATHS) == 61
     )  # 0.5.0 removed `workspace migrate` and `workbench copy`; iss-00528 added `dashboard summary`; iss-00529 four more
     for leaf in LEAF_PATHS:
         assert main(["--project", str(tmp_path / "missing"), "help", *leaf.split(), "--json"]) == 0

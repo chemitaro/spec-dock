@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 from typing import Any
 
@@ -87,6 +88,9 @@ LEAF_PATHS: tuple[str, ...] = (
     "dashboard hide",
     "dashboard show",
     "dashboard list",
+    "dashboard service install",
+    "dashboard service status",
+    "dashboard service uninstall",
     "help",
     "completion",
 )
@@ -148,6 +152,9 @@ HELP_EFFECTS: dict[str, str] = {
     "dashboard hide": "Hide one repository from the dashboard; the periodic sync continues.",
     "dashboard show": "Show a hidden repository on the dashboard again.",
     "dashboard list": "List the registered repositories, whether each is shown or hidden, and the server URL; no changes.",
+    "dashboard service install": "Install the per-user service that starts the dashboard server at login and keeps it running (launchd or a systemd user service).",
+    "dashboard service status": "Show whether the dashboard service is installed and loaded, whether a server runs, its URL and versions; no changes.",
+    "dashboard service uninstall": "Stop and remove the dashboard service, its job file and its log; the periodic sync is untouched.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -270,10 +277,18 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "canonical resume": (_flag("--adopt-remote"), _flag("--push-local")),
     "canonical remove": (),
     "dashboard summary": (_arg("repository", nargs="?"),),
-    "dashboard serve": (_arg("--port", type=int), _flag("--tailscale")),
+    "dashboard serve": (
+        _arg("--port", type=int),
+        _flag("--tailscale"),
+        _arg("--state-root"),
+        _arg("--service", action="store_true", help=argparse.SUPPRESS),
+    ),
     "dashboard hide": (_arg("repository", nargs="?"),),
     "dashboard show": (_arg("repository", nargs="?"),),
     "dashboard list": (),
+    "dashboard service install": (_arg("--port", type=int), _flag("--tailscale")),
+    "dashboard service status": (),
+    "dashboard service uninstall": (),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -390,6 +405,9 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "dashboard hide": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
     "dashboard show": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. An unreadable marks file stops with DASHBOARD_STATE_UNREADABLE (exit 3) and is not overwritten.",
     "dashboard list": "No project is required; it reads the registry of the state root.",
+    "dashboard service install": "No project is required. macOS (launchd) or Linux with a working systemd user manager; elsewhere DASHBOARD_SERVICE_UNSUPPORTED (exit 3) points to `spec-dock dashboard serve`. --port N is 1-65535 (default 47800). A launchctl/systemctl failure stops with DASHBOARD_SERVICE_FAILED (exit 3). Run it again to change --port or --tailscale.",
+    "dashboard service status": "No project is required; on a PC without a service manager it reports supported=false.",
+    "dashboard service uninstall": "No project is required; nothing installed is a success with removed=false.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -702,6 +720,36 @@ def _help_spec(leaf: str) -> HelpSpec:
         )
         json_data = "repository, hidden, changed, registered."
         confirmation = "No final confirmation is required; show undoes hide."
+    elif leaf == "dashboard service install":
+        target = "This user's dashboard service: ~/Library/LaunchAgents/io.github.chemitaro.spec-dock.dashboard.plist or ${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-dashboard.service."
+        reads = "The platform and systemd user manager, the registry and the periodic sync job (to reuse its executable), and PATH for git and tailscale."
+        writes = (
+            "The job file and its launchctl bootstrap (bootout first when it changed) or systemctl --user daemon-reload,"
+            " enable --now and restart when it changed; <state root>/dashboard/ for the launchd log."
+        )
+        does_not = "Does not change the periodic sync job, the registry, a repository or the network; nothing else installs this service."
+        json_data = (
+            "scheduler, path, outcome (created, updated, unchanged), port, tailscale, state_root, executable, url, log."
+        )
+        confirmation = (
+            "No final confirmation is required; the user runs it to install the service and `uninstall` undoes it."
+        )
+    elif leaf == "dashboard service status":
+        target = "This user's dashboard service and the server location record of its state root."
+        reads = "The job file, launchctl print or systemctl --user is-active, the server location record (only whether its pid is alive) and the installed package version."
+        does_not = "Does not contact the server or GitHub, or write any file."
+        json_data = (
+            "supported, scheduler, path, installed, loaded, detail, port, tailscale, state_root, server"
+            " {pid, urls, version, started_at} or null, running, package_version, restart_pending."
+        )
+        confirmation = "No final confirmation is required for this read-only leaf."
+    elif leaf == "dashboard service uninstall":
+        target = "This user's dashboard service."
+        reads = "The job file and its recorded state root."
+        writes = "launchctl bootout or systemctl --user disable --now and daemon-reload; removes the job file and <state root>/dashboard/service.log."
+        does_not = "Does not change the periodic sync job, the registry, the hidden marks or the seen records."
+        json_data = "scheduler, removed, path, log_removed."
+        confirmation = "No final confirmation is required; `install` puts it back."
     elif leaf == "dashboard list":
         reads = "The registry, the hidden marks and the server location record (only whether its pid is alive)."
         does_not = "Does not contact GitHub or the dashboard server, or write any file."

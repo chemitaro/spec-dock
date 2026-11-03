@@ -227,10 +227,14 @@ def test_every_leaf_completion_matches_yes_and_lock_acceptance(tmp_path: Path, s
         "dashboard serve",
         "dashboard hide",
         "dashboard show",
+        # iss-00530: no --yes; the user runs `service install`/`uninstall` to change their own service
+        "dashboard service install",
+        "dashboard service status",
+        "dashboard service uninstall",
     }
     output = _run(tmp_path, "completion", shell)
     assert output.exit_code == 0
-    assert len(LEAF_PATHS) == 58 and readonly <= set(LEAF_PATHS)
+    assert len(LEAF_PATHS) == 61 and readonly <= set(LEAF_PATHS)
     for leaf in LEAF_PATHS:
         if shell == "fish":
             # Public registration lines belonging to this exact command path.
