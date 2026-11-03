@@ -1,11 +1,9 @@
 ---
 種別: レポート（Epic）
-ID: "epic-00427"
-タイトル: "Build Html Spec Dashboard"
-関連GitHub: ["#427"]
-最終更新: "2026-10-25"
-依存: ["requirement.md", "design.md", "plan.md"]
-親: ["init-00423"]
+ID: "<EPIC_ID>"
+関連GitHub: ["<GITHUB_ISSUE_NUMBER_OR_URL>"]
+最終更新: "YYYY-MM-DD"
+依存: ["requirement.cue", "design.cue", "plan.cue"]
 ---
 
 # Result Summary
