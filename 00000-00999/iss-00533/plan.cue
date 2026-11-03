@@ -5,12 +5,12 @@ package spec
 goal: "Epic の D-10 のとおり、Markdown と PlantUML のダッシュボードの生成と付随の契約を撤去し、standard の検査（レビュー、lint、全体のテスト）を通した PR をマージできる状態で止める。"
 
 steps: {
-	"S-01": {title: "撤去を確かめる失敗するテスト（test_issue533）と wheel の一覧を足す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "todo", session: "impl"}
-	"S-02": {title: "生成のモジュールと同期の手順7、state.json の欄を消す", realizes: ["R-01", "R-04", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "canonical status の項目と canonical remove の手順、エラーの定数を消す", realizes: ["R-02", "R-03", "F-02"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-04": {title: "配布資産、文書、CLI の説明、inventory、dogfood の写しを直す", realizes: ["R-05"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-05": {title: "古いテストと fixture を消し、既存のテストを直す", realizes: ["R-04"], status: "todo", after: ["S-02", "S-03"], session: "impl"}
-	"S-06": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "todo", after: ["S-04", "S-05"], session: "impl"}
+	"S-01": {title: "撤去を確かめる失敗するテスト（test_issue533）と wheel の一覧を足す", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "F-01", "F-02"], status: "done", session: "impl"}
+	"S-02": {title: "生成のモジュールと同期の手順7、state.json の欄を消す", realizes: ["R-01", "R-04", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "canonical status の項目と canonical remove の手順、エラーの定数を消す", realizes: ["R-02", "R-03", "F-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-04": {title: "配布資産、文書、CLI の説明、inventory、dogfood の写しを直す", realizes: ["R-05"], status: "done", after: ["S-01"], session: "impl"}
+	"S-05": {title: "古いテストと fixture を消し、既存のテストを直す", realizes: ["R-04"], status: "done", after: ["S-02", "S-03"], session: "impl"}
+	"S-06": {title: "コードのレビュー、最終品質ゲート、report.md、PR と CI", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05"], status: "doing", after: ["S-04", "S-05"], session: "impl"}
 }
 
 tests: {
