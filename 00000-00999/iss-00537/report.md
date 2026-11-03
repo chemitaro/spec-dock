@@ -24,6 +24,7 @@ ID: "iss-00537"
 - 仕様のレビュー（spec-reviewer opus/high）：round 1 は合格（P2 が1件、P3 が1件）。P2 は間隔の起点を統括の決定に合わせる指摘、P3 は新旧の比べ方の指摘で、仕様を直した。round 2 も合格（P3 が1件）。P3 は互換の注記の書き方で、直した。
 - コードのレビュー（code-reviewer opus/high、Standards と Spec の2人）：どちらも合格。Standards の P3 が1件で、`b8a3812d8` で直した。
 - 最終品質ゲート（quality-gate-reviewer opus/high、1人。campaign `iss-00537-1`）：`b8a3812d8` で合格。レビューは P0〜P3 がすべて0件で、観点も網羅した。`make lint` は exit 0。`uv run pytest` は exit 0（3340 passed、7 skipped）。証拠はリポジトリの `.workbench/final-quality-gate/iss-00537-1/closure.md`。
+- PR #538（https://github.com/chemitaro/spec-dock/pull/538、head `b8a3812d8`）：Provider CI（run 41670005566）、Commit identity（41670005526）、SpecDock check（41670005503）が success。GitHub は MERGEABLE、READY と報告した（2026-11-03T16:18:37Z）。PR はマージできる状態で止め、`work finish` は実行していない。
 - 既存の読む側：版1と版2で、`dependency check` の JSON の結果が一致した。PR が変わっても、今のダッシュボードの `input_hash` は変わらない。どちらもテストで確かめた（`tests/cli_runtime/test_issue537_pull_request_snapshot.py`、`tests/unit/domain/test_canonical_dashboard.py`）。
 
 ## 0.6.0 の移行の注記に要る契約の変更
