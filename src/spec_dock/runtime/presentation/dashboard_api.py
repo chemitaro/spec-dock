@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Final
 
 from spec_dock.runtime.domain.canonical_structure import parse_timestamp
 from spec_dock.runtime.domain.dashboard_model import (
+    KINDS,
     child_stages,
     compare_seen,
     downstream_ids,
@@ -139,10 +140,37 @@ def ranks(model: DashboardModel) -> dict[str, int]:
     return {scope_id: index for index, scope_id in enumerate(model.ordered(model.scopes))}
 
 
+def layout_facts(model: DashboardModel) -> dict[str, dict[str, object]]:
+    """What the structure graph (#532) lays out by, decided by the model: each Scope's declared prerequisites inside
+    the repository and its stage among its siblings (all, and among the open ones)."""
+    by_number = {scope.number: scope.id for scope in model.scopes.values()}
+    nodes = {node.id: node for node in model.snapshot.scopes if node.id is not None}
+    stages: dict[str, dict[str, int | None]] = {scope_id: {"all": None, "open": None} for scope_id in model.scopes}
+    parents: set[str | None] = {None, *(scope.parent_id for scope in model.scopes.values() if scope.parent_id)}
+    for parent in sorted(parents, key=lambda item: "" if item is None else item):
+        for key, open_only in (("all", False), ("open", True)):
+            for level, members in enumerate(child_stages(model, parent, open_only=open_only).stages, start=1):
+                for member in members:
+                    stages[member][key] = level
+    facts: dict[str, dict[str, object]] = {}
+    for scope_id in model.scopes:
+        targets = {by_number[n] for n in nodes[scope_id].blocked_by if n in by_number and by_number[n] != scope_id}
+        facts[scope_id] = {
+            "blocked_by": sorted(targets, key=lambda item: model.scopes[item].number),
+            "stage": stages[scope_id],
+        }
+    return facts
+
+
 def scope_item(
-    model: DashboardModel, scope: ScopeModel, change: ScopeChange | None, rank: int | None = None
+    model: DashboardModel,
+    scope: ScopeModel,
+    change: ScopeChange | None,
+    rank: int | None = None,
+    facts: Mapping[str, Mapping[str, object]] | None = None,
 ) -> dict[str, object]:
     node = model.snapshot.find(scope.id)
+    placed = (facts or {}).get(scope.id, {})
     return {
         "id": scope.id,
         "number": scope.number,
@@ -165,6 +193,12 @@ def scope_item(
         "change": _change(change),
         "rank": rank,
         "in_progress": bool(node.in_progress) if node is not None else False,
+        "blocked_by": list(placed.get("blocked_by", [])),  # type: ignore[call-overload]
+        "stage": dict(placed.get("stage", {"all": None, "open": None})),  # type: ignore[call-overload]
+        # Filled later (Epic R-15; the coordinator adds the readers): the CUE assurance level and this PC's
+        # worktree branch. The screens show them only when they are not null.
+        "assurance": None,
+        "branch": None,
     }
 
 
@@ -208,12 +242,13 @@ def structure_document(
             "anomalies": [],
             "scopes": [],
             "cleanup": [],
-            "timeline": {"weeks": [], "events": []},
+            "timeline": {"weeks": [], "events": [], "weeks_by_kind": {kind: [] for kind in KINDS}},
         })
         return document
     error = model.pull_requests.error
     scopes = sorted(model.scopes.values(), key=lambda item: item.number)
     order = ranks(model)
+    facts = layout_facts(model)
     document.update({
         "pull_requests": {
             "status": model.pull_request_status,
@@ -221,11 +256,14 @@ def structure_document(
             "error": None if error is None else {"code": error.code, "message": error.message, "at": error.at},
         },
         "anomalies": [{"number": a.number, "code": a.code, "message": a.message} for a in model.anomalies],
-        "scopes": [scope_item(model, scope, changes.get(scope.id), order[scope.id]) for scope in scopes],
+        "scopes": [scope_item(model, scope, changes.get(scope.id), order[scope.id], facts) for scope in scopes],
         "cleanup": [{"id": c.scope_id, "code": c.code, "text": c.text} for c in model.cleanup],
         "timeline": {
             "weeks": [asdict(week) for week in weekly_totals(model, now=now)],
             "events": [asdict(event) for event in recent_events(model, limit=EVENT_LIMIT)],
+            "weeks_by_kind": {
+                kind: [asdict(week) for week in weekly_totals(model, now=now, kinds=(kind,))] for kind in KINDS
+            },
         },
     })
     return document
@@ -311,9 +349,13 @@ def scope_document(
         "schema": API_SCHEMA,
         "repository": view.repository.key,
         "revision": view.revision,
-        "scope": scope_item(model, model.scopes[scope_id], changes.get(scope_id), ranks(model)[scope_id]),
+        "scope": scope_item(
+            model, model.scopes[scope_id], changes.get(scope_id), ranks(model)[scope_id], layout_facts(model)
+        ),
         "upstream": _path(upstream(model, scope_id)),
         "downstream": _path(downstream_ids(model, scope_id)),
+        # The graph highlights what waits for a closed Scope too (iss-00532 D-01); `downstream` stays open-only.
+        "downstream_all": _path(downstream_ids(model, scope_id, open_only=False)),
         "root_waits": {"scope_ids": list(waits.scope_ids), "external": list(waits.external)},
         "child_stages": _stages(stages),
         "open_child_stages": _stages(open_stages),
