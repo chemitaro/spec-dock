@@ -34,7 +34,14 @@ epic-00427 の D-10／R-23 のとおり、定期の同期が main のチェッ�
 
 ## Verification
 
-（最終品質ゲートの結果を下に書く）
+- 仕様のレビュー（spec-reviewer opus/high）：round-1 で pass（P0 0、P1 0、P2 2、P3 1）。P2・P3 は仕様に反映した（R-04 の検索の範囲、D-07 のテストの追加、D-02 の関数名）。CUE のファイルは sha256 で固定した。
+- コードのレビュー（code-reviewer opus/high、基準と仕様の2人、06be6b5c）：どちらも pass。仕様の観点は指摘なし。基準の観点の P3 2件（未使用になった `canonical_files` の書き込みの部品、`canonical_status.py` の古い docstring）を af3a2dd6 で直した。
+- 1回目の全体の実行（06be6b5c）で見つかった `test_issue436_docs.py` の節の名前と、新しいテストの整形を af3a2dd6 で直した。
+- 最終品質ゲート（campaign `iss-00533-r1`、quality-gate-reviewer opus/high 1人、af3a2dd6616c7697235d6af6e13dae96f17d4b85）：
+  - レビューのレーン：pass、P0〜P3 なし、網羅完了（functional-correctness、requirements-closure、test-adequacy）。
+  - テストのレーン：`make lint` 終了コード0（ruff check、ruff format check、mypy が pass）。`uv run pytest` 終了コード0（3421 passed、7 skipped、27分01秒）。
+  - 証拠：`.workbench/final-quality-gate/iss-00533-r1/closure.md`（作業ツリーの Git 管理外）。
+- `spec-dock scope check iss-00533`：valid、誤り0、指摘0。
 
 ## Residual Risks / Follow-ups
 
