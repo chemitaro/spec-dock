@@ -46,7 +46,11 @@ ID: "iss-00530"
 
 ## Final Quality Gate
 
-（ゲートの結果をここに書く）
+- 合格のコミット：`9e6c727f28fcdb735a41f2dac89fb4191a866d70`（作業ツリーは clean、試行1回）。記録は `.workbench/final-quality-gate/iss-00530-g1/`（`campaign.json`、`closure.md`、`attempts/01/`）。
+- レビューの側：quality-gate-reviewer（opus/high、1人）。観点は functional-correctness、requirements-closure、test-adequacy。pass（P0 0、P1 0、P2 0、P3 3、網羅は完全）。
+- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3491 passed、7 skipped、27分14秒）。どちらも同じコミット。
+- P3（情報。直さない）：(1) systemd の常駐が自動の起動し直しを待つ間（activating）は、同じ設定の `install` が `unchanged` でなく `updated` を返し `enable --now` を実行する（害はない）。(2) `reference_cli.md` の `dashboard service status` の JSON の項目の一覧が一部だけ（ヘルプの JSON の節には全部ある）。(3) `install` が同期の常駐の記録した実行ファイルを使い回すことを確かめるテストがない。
+- 手前の全体の実行（77b10aeb1）は、レビューの直しの途中で外から止められた（終了コード144、26%まで。失敗はなかった）。ゲートの実行が正本。
 
 ## Pull Request
 
