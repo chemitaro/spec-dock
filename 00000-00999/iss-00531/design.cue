@@ -30,7 +30,9 @@ design: {
 			- `waits_for`：その Scope と祖先のスナップショットの `blocked_by` を、自分の分を先に、祖先は近い順に集める。各項目は `{number, scope_id, title, state, declared_by, inherited, external, open}`。`scope_id` は Scope なら ID、Scope でない Issue なら null（`external: true`、`state` は `open` か `done`、題名はスナップショットの `external` から）。`state` は Scope ならモデルの状態。同じ番号は最初の1回だけ。
 			- `waited_by`：スナップショットの `blocked_by` にこの Scope の番号を持つ Scope の ID（直接に待つもの）。間接のものは既存の `downstream`（直接と間接）を使う。
 
-			判定は足さず、スナップショットの依存の記録を写すだけにする。止められている理由と大もとの待ち先は、既存の `scope.reason` と `root_waits` を使う。
+			あわせて `open_child_stages`（モデルの `child_stages(model, ID, open_only=True)`。開いた配下と開いた依存だけで決めた段。形は `child_stages` と同じ）を足す。既存の `child_stages`（閉じたものも含む）は残す。
+
+			判定は足さず、スナップショットの依存の記録とモデルの関数の結果を写すだけにする。止められている理由と大もとの待ち先は、既存の `scope.reason` と `root_waits` を使う。
 			"""
 		satisfies: ["R-07", "R-08"]
 	}
@@ -75,12 +77,14 @@ design: {
 		text: """
 			`render(root, ctx)` は `ctx.data.scopes` から作る。
 
-			- 表示の切り替えは問い合わせの文字列：`kind`（`initiative`、`epic`、`issue`。なしはすべて）、`group=1`（親ごと）、`done=1`（終わったものを含める）。押すと `ctx.navigate` で URL を置き換え、骨組みが `render` を呼び直す。
+			- 表示の切り替えは問い合わせの文字列：`kind`（`initiative`、`epic`、`issue`。なしはすべて）、`group=1`（親ごと）、`done=1`（終わったものを含める）。切り替えは同じリポジトリの中の普通のリンク（`data-nav`）で、骨組みの `navigate` が履歴に積み（戻るで戻れる）、`render` を呼び直す。
+			- 終わったものを隠しているときは、`keep_visible`（開いた子孫を持つ閉じた親）を、列の上の帯「開いた配下を持つ閉じた親 N件」に、詳しい画面へのリンクつきで残す（Epic R-12）。
 			- 列：`blocked`、`ready`、`doing`、`awaiting_merge`、（`done`）。各 Scope の `lane` で振り分け、`rank` の昇順に並べる。`unknown` は列に入れず、上の注意の帯に一覧にする。`awaiting_merge` の列は `merge` で `mergeable`（先）と `needs_fix` の段に分ける。終わった列は新しい順の30件までにし、残りの数を書く。
 			- 親ごとのまとめでは、列の中を親で分け、見出しに親の状態の印と ID と題名を出す（閉じた親も見出しには出る。開いた配下を見失わない。Epic R-12）。親の並びは、その親の中で一番 `rank` の小さい札の順。
 			- 上の数の帯：止められている、着手できる、作業中、マージ待ち（直す・できるの内訳）、不明（あれば）の数（Issue だけを数える）と、終わった割合（全 Scope の終わった数／全体）。右に「片付けの候補 N」のボタン。押すと `<dialog>` で一覧（Scope、理由、GitHub へのリンク、詳しい画面へのリンク）を開く。
 			- PR の状態：`pull_requests.status` が `unknown` なら、上に「PR の状態が分からない」の帯を出し、マージ待ちの列の中に理由を書く。`stale` なら帯に「前回の値」と書く。
 			- 凡例と、列の並びの説明（推奨順）を置く。埋め込みのときは `newTabLink`。
+			- 速さ：列の振り分けと並びは、Scope の数に比例する1回の走査と並べ替えだけにする。250件の構造で2秒以内に出ることを、ヘッドレスの Chrome で測る（Epic R-13、D-07）。
 			- 構造がない（`ctx.data` が null か `snapshot.status` が `missing`／`unsupported` で Scope が0件）ときは、空の案内だけを出す（通知の帯は骨組みが出す）。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-14", "R-15"]
@@ -92,10 +96,12 @@ design: {
 
 			- `ctx.scope` が null で、構造にその ID がなければ「構造にない」とボードへのリンク（F-02）。構造にはあるのに Scope の JSON が読めないときは「読めない」。
 			- 見出し：種類、ID、番号、題名、状態の札（`chip`）、理由、マージ待ちの段、変化の印、右の欄に親の道筋（構造の `parent_id` を辿る。各段は詳しい画面へのリンク）、保証レベル（`details.assurance`）、GitHub の Issue、PR（印とリンク）、このPCのブランチ。
-			- タブ（問い合わせ `tab`＝`summary`、`deps`、`children`、`docs`、`artifacts`。既定 `summary`）。押すと `ctx.navigate` で URL を置き換える。配下のない Issue でも配下のタブは出し、「配下はない」と書く。
+			- タブ（問い合わせ `tab`＝`summary`、`deps`、`children`、`docs`、`artifacts`。既定 `summary`）。タブは普通のリンク（`data-nav`）で、骨組みの `navigate` が履歴に積み、Scope の JSON を読み直して `render` を呼ぶ。配下のない Issue でも配下のタブは出し、「配下はない」と書く。
 			- 概要：状態の説明の帯、配下の進み具合（子孫でなく直下の配下の状態ごとの数）、記録（作成と完了の日、このPCの worktree とブランチ、PR、変化）。worktree が読めないときは「分からない」、ないときは「このPCにはない（ほかのPCは分からない）」。
 			- 依存：待っているもの（`dependencies.waits_for` を、自分の分と引き継いだ分（宣言した祖先の ID つき）に分け、Scope でない Issue は GitHub のリンク）と、大もとの待ち先の印（`root_waits`）、待たれているもの（`waited_by` を直接、`downstream.indirect` の数を間接）。
-			- 配下：`child_stages.stages` を段1 → 段2 → … に並べ、各段の中は `rank` の順。終わったものを隠す（問い合わせ `done=1` で含める）ときは、終わった配下を数だけにする（`keep_visible` は残す）。`external`（外への依存）と `cyclic`（循環）を別に示す。
+			- 配下：サーバーが Scope の JSON に足す `open_child_stages`（モデルの `child_stages(…, open_only=True)`。開いた配下と開いた依存だけで決めた段）を段1 → 段2 → … に並べ、各段の中は `rank` の順。終わった配下は段の後ろの「終わった」にまとめ、既定は数だけを示す（問い合わせ `done=1` で札も示す）。`keep_visible` の閉じた配下は、隠しているときも札を示す。`external`（外への依存）と `cyclic`（循環）を別に示す。
+			- PR の状態が分からない（`pull_requests.status` が `unknown`）ときは、見出しの PR の欄と概要のタブの PR を「分からない」にする（R-06）。
+			- 凡例を、タブの上に置く（R-04）。
 			- 文書と Artifact：`details.catalog` が `ok` でなければ、そのことと次の1手。文書は5つの札（あるかないか、説明資料は新しいタブで開くリンク）。Artifact は表（名前、形式、大きさ、日時、新しいタブで開くリンク。HTML はサーバーが切り離して配る）。
 			"""
 		satisfies: ["R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "R-11", "R-14", "R-15"]
@@ -107,16 +113,19 @@ design: {
 
 			- 札：名前、取得の時刻（「N分前」）、マージ待ち・作業中・着手できる Issue の題名を `rank` の順に3件ずつ（残りの数）、状態ごとの数とマージ待ちの数、終わった数／全体、止められている数、片付けの候補の数、変化の数。札全体がそのリポジトリのホームへのリンク（`ctx.href(item.path)`。別のリポジトリなので骨組みはページを読み直す）。
 			- 警告の帯：構造の JSON の `snapshot.status`（`missing`、`unreadable`、`unsupported`）と `notices` の `SNAPSHOT_STALE`、`STRUCTURE_ANOMALIES`、`PULL_REQUESTS_UNKNOWN`、`REPOSITORY_AMBIGUOUS` から、理由と経過（「3時間前から更新されていない」）と次の1手を札の上に出す。API が失敗したら（404、500、通信の失敗）、その札にだけ「読めない」の帯を出す。
-			- 埋め込みのときは `newTabLink`。
+			- 埋め込みのときは `newTabLink`。凡例を札の上に置く（R-04）。
 			"""
 		satisfies: ["R-04", "R-05", "R-12", "R-13", "R-14", "R-15"]
 	}
 	"D-09": {
 		title: "検索 `views/_shared/search.js` と、骨組みの1行"
 		text: """
-			`mountSearch(slot, {route, data, navigate, href})` を骨組みの `render()` の `renderTop` の直後に1回呼ぶ（`app.js` に import と1行）。
+			`mountSearch(slot, {route, data, navigate})` を骨組みの `render()` の `renderTop` の直後で呼ぶ（`app.js` に import の行と、呼び出しの1行）。
 
-			- 部品（入力欄と候補の一覧、スマートフォンの虫めがねのボタン）はモジュールの中で1回だけ作り、呼ばれるたびに新しい `#search-slot` へ移す。入力中に骨組みが上の帯を描き直しても、入力の値、カーソル、開いた候補を保つ（移す前にフォーカスを覚え、移した後に戻す）。
+			- 部品（入力欄と候補の一覧、スマートフォンの虫めがねのボタン）はモジュールの中で1回だけ作り、呼ばれるたびに新しい `#search-slot` へ移す。
+			- 骨組みは、データが変わらないときも5秒ごとに上の帯だけを描き直し（`refresh` の `renderTop`）、そのときは `render()` も `mountSearch` も呼ばない。そこで `search.js` は、最初の `mountSearch` で上の帯（`#search-slot` の親の `header`）を `MutationObserver` で見張り、部品が外れて新しい `#search-slot` ができたら、最後に受けた状態で付け直す。
+			- フォーカスは、部品が外れる前に失われる（`renderTop` が先に外す）。そこで、入力欄の `focus` で印を立て、`blur` の後に部品がまだ文書の中にあるときだけ印を消す（外されたことによる `blur` では印を残す）。選択の位置は入力のたびに覚える。付け直したときに印があれば、フォーカスと選択の位置を戻す。入力の値と開いた候補は、部品を作り直さないので残る。
+			- 検索の CSS（`views/_shared/search.css`）は、`search.js` が最初に部品を作るときに `<link>` で読み込む（#532 の画面がホームのときも効くように）。
 			- リポジトリがない（概況）か、構造がないときは何も出さない。
 			- 一致：ID（大文字小文字を区別しない。`iss-531` のような0埋めなしも、数字を5桁にそろえて比べる）、番号（`531`、`#531`）、題名の部分一致。完全に一致する ID と番号を先に、ほかは `rank` の順で8件まで。終わったものも出す（状態の印で分かる）。
 			- 上下の矢印で選び、Enter か押すと `navigate(scope.path)` で詳しい画面へ移り、欄を空にする。Escape で閉じる。`role="combobox"` と `listbox` を持つ。

@@ -19,13 +19,13 @@ steps: {
 
 tests: {
 	"T-01": {title: "構造の JSON の `rank` がモデルの推奨順と一致する（マージできる → 直す必要あり → 作業中 → 着手できる（後に続く数の多い順）→ 止められている（待ち先の少ない順））", verifies: ["R-01", "R-02", "R-12"]}
-	"T-02": {title: "Scope の JSON の `dependencies`：自分の依存、祖先から引き継いだ依存（宣言した祖先）、Scope でない Issue、待たれているもの", verifies: ["R-07", "R-08"]}
+	"T-02": {title: "Scope の JSON の `dependencies`：自分の依存、祖先から引き継いだ依存（宣言した祖先）、Scope でない Issue、待たれているもの。`open_child_stages` が閉じた配下を除いて段を決める", verifies: ["R-07", "R-08"]}
 	"T-03": {title: "詳しい画面の読み取り：カタログ ok／ない／2つのクローン／Scope のディレクトリがない、文書のありなし（`.cue` と昔の `.md`、リンクは数えない）、Artifact の一覧（隠しファイルとリンクを除く、名前の逃がし、打ち切り）", verifies: ["R-08", "R-09"]}
 	"T-04": {title: "詳しい画面の読み取り：保証レベル（読めた、読めない、`cue` の時間切れ）と worktree（Scope を名指すブランチだけ、git の失敗）が、その欄だけ「読めない」になる", verifies: ["R-07", "F-03"]}
 	"T-05": {title: "API：`scopes/<ID>` が `dependencies` と `details` を返し、知らない ID は読み取りを走らせずに 404。カタログもリポジトリも書かれない", verifies: ["R-07", "R-09", "F-02"]}
-	"T-06": {title: "画面の資源：3つの画面が差し込み口の形（`id`、`title`、`icon`、`styles`、`render`）を持ち、`views/_shared/` の部品を読み、外の URL を読まず、`innerHTML` に入れる利用者の文字を `esc` で逃がす。`app.js` の追加が `mountSearch` の1行だけ", verifies: ["R-15", "F-04"]}
+	"T-06": {title: "画面の資源：3つの画面が差し込み口の形（`id`、`title`、`icon`、`styles`、`render`）を持ち、`views/_shared/` の部品を読み、外の URL を読まず、`innerHTML` に入れる利用者の文字を `esc` で逃がす。`app.js` の追加が import の行と `mountSearch` の呼び出しの1行だけ", verifies: ["R-15", "F-04"]}
 	"T-07": {title: "JavaScript の単体（`node` があるとき）：ボードの列の振り分けと並び、問い合わせの文字列の切り替え、検索の一致（ID、0埋めなし、番号、`#番号`、題名）、変化と PR の印の言葉、概況の警告の帯の理由", verifies: ["R-01", "R-02", "R-05", "R-06", "R-10", "R-13"]}
-	"T-08": {title: "ヘッドレスの Chrome：ボードの列と順、片付けの候補の一覧、種類と親と終わったものの切り替えと URL、詳しい画面の見出しと5つのタブと段、カタログのない Scope、検索から詳しい画面へ、概況の札と古いときの警告の帯、埋め込みの逃げ道、PC と 390px と暗い表示ではみ出さずエラーなし、概況で `seen` が増えない（report.md）", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15", "F-01"]}
+	"T-08": {title: "ヘッドレスの Chrome：ボードの列と順、片付けの候補の一覧、種類と親と終わったものの切り替えと URL、開いた子孫を持つ閉じた親の帯、250件の構造でボードが2秒以内、3つの画面の凡例、詳しい画面の見出しと5つのタブと段、PR が分からないときの表示、カタログのない Scope、検索から詳しい画面へ、上の帯の5秒ごとの描き直しの後も検索の欄と入力が残る、概況の札と古いときの警告の帯、埋め込みの逃げ道、PC と 390px と暗い表示ではみ出さずエラーなし、概況で `seen` が増えない（report.md）", verifies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-07", "R-08", "R-09", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15", "F-01"]}
 }
 
 verification: "`make lint` と `uv run pytest`（全体）。仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）。PC のヘッドレスの Chrome での確かめ（一時のディレクトリの状態の置き場で立てたサーバー）。PR の CI。iPhone の Safari の確かめは #534 で利用者に頼む。"
