@@ -71,9 +71,13 @@ class LaunchdScheduler:
             return True
         return False if completed.returncode == NOT_FOUND else None
 
+    def _payload(self, spec: SchedulerSpec) -> bytes:
+        """The plist this job writes; the dashboard service writes its own form under its own label."""
+        return launchd_plist(spec, label=self.label)
+
     def needs_change(self, spec: SchedulerSpec) -> bool:
         try:
-            if self.plist.read_bytes() != launchd_plist(spec, label=self.label):
+            if self.plist.read_bytes() != self._payload(spec):
                 return True
         except FileNotFoundError:
             return True
@@ -113,7 +117,7 @@ class LaunchdScheduler:
 
     def ensure(self, spec: SchedulerSpec) -> EnsureOutcome:
         existed = self.plist.exists()
-        changed = write_atomic(self.plist, launchd_plist(spec, label=self.label))
+        changed = write_atomic(self.plist, self._payload(spec))
         loaded = self._loaded()
         if not changed and loaded is not False:
             return "unchanged"

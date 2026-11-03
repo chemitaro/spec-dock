@@ -1,6 +1,6 @@
 # CLI参照（Current）
 
-通常packageの外部 `spec-dock` が公開58 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
+通常packageの外部 `spec-dock` が公開61 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
 
 | 用途 | 入力 | 境界 |
 |---|---|---|
@@ -74,10 +74,13 @@ SpecDock 0.5.0 は宣言の版4（canonical モード）だけを扱います（
 | C52 | `scope check` | `TARGET` | 1つのScopeの仕様をインターネットなしで検査します。CUEのScope（`requirement.cue`）は、型・リポジトリの型（`spec-dock/cue/*.cue`）と一緒に`cue`（v0.17.1以上）で評価し、形の誤り（`CUE_INVALID`）、つながりの指摘（`SPEC_FINDINGS`）、保証レベルの置き場、説明資料の形を、ファイルと直し方つきで示します。誤りがあれば終了コード7（`SCOPE_CHECK_FAILED`）。MarkdownのScopeは`checked=false`で成功します。`work finish`も閉じる前に同じ検査をします。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | 読取りのみ |
 | C53 | `scope render` | `TARGET [--design-system MODE]` | 1つのCUEのScopeの要件・設計・計画を、インターネットなしでHTMLに描き、標準出力に出します（`--json`では`data.result.html`）。`scope check`と同じ評価を使い、検査の結果（つながりの指摘、形の誤り）をページの初めに、続けて要件、失敗・境界条件、設計、計画（手順の状態と数、実行の割り当て）を、番号のリンクで結んで示します。デザインシステムはそのチェックアウトの`spec-dock/design-system/`を`file:`のURLで、図の部品はCDNから読みます。`--design-system inline`（既定は`file`）では、`ds.css`、`ds.js`、`marked`をHTMLに埋め込み、別のPCでも崩れないページにします（デザインシステムがなければ`DESIGN_SYSTEM_MISSING`、終了コード3）。評価が通らなければ検査の結果だけのページで成功し`SCOPE_RENDER_INCOMPLETE`を警告します。MarkdownのScopeは終了コード7（`SCOPE_NOT_CUE`）。ダッシュボードなどは、Pythonの入口`spec_dock.runtime.application.scope_render.render_scope_html(ScopeRenderSource, *, design_system_base, vendor_base)`で、読み込み先のURLを渡して描けます（`timeout`秒、既定30。`embed_design_system`にデザインシステムのディレクトリを渡すと埋め込みます。返り値はHTMLの`str`。MarkdownのScopeは`CanonicalCommandError`の`SCOPE_NOT_CUE`、`cue`と型の版の問題は`scope check`と同じコードで止まります）。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | 読取りのみ |
 | C54 | `dashboard summary` | `[REPOSITORY]` | 1つのリポジトリのダッシュボードの要約（契約 `specdock.dashboard-summary/v1`）を返します。チェックアウトの中ではREPOSITORYを省けます（`origin`から決めます）。外では`owner/name`か`github.com/owner/name`で指します。利用者ごとの状態の置き場の構造のスナップショット（版1と版2）を自分で読み、GitHubにもダッシュボードのサーバーにも要求を送りません（在りかの記録の`pid`が生きているかだけを見ます）。サーバーが動いていなくても、隠したリポジトリでも動きます。`--json`では`data.result`が要約です。スナップショットがなければ`DASHBOARD_SNAPSHOT_MISSING`、壊れていれば`DASHBOARD_SNAPSHOT_UNREADABLE`、知らない版なら`DASHBOARD_SNAPSHOT_UNSUPPORTED`（どれも終了コード3）、REPOSITORYの形が違えば`DASHBOARD_REPOSITORY_INVALID`（終了コード2）。 | 読取りのみ |
-| C55 | `dashboard serve` | `[--port N] [--tailscale]` | 利用者ごとに1つのダッシュボードのサーバーを前面で動かし、Ctrl-CかSIGTERMで止まります。登録簿の、`repository`が分かり隠していない全リポジトリを`/r/<host>/<owner>/<name>/`で、見るだけで配ります（登録の追加と隠す印の変更は、起動し直さずに現れます）。既定は`127.0.0.1`の番号47800だけに待ち受け（`--port`で変え、0は空いた番号）、`--tailscale`では`tailscale ip -4`の住所にも待ち受けます（`0.0.0.0`には待ち受けず、Tailscaleの設定を変えません）。起動のときに、標準エラーにURLと見せるリポジトリの一覧を書きます。すでに動いていれば、そのURLを示して終了コード0で終わります（`already_running`）。番号が使われていれば`DASHBOARD_PORT_IN_USE`、Tailscaleの住所がなければ`DASHBOARD_TAILSCALE_UNAVAILABLE`（どちらも終了コード3）。GitHubにもほかのネットワークにも要求を送りません。 | 状態の置き場の`dashboard/server.json`・`server.lock`・`seen.json` |
+| C55 | `dashboard serve` | `[--port N] [--tailscale] [--state-root ROOT]` | 利用者ごとに1つのダッシュボードのサーバーを前面で動かし、Ctrl-CかSIGTERMで止まります。登録簿の、`repository`が分かり隠していない全リポジトリを`/r/<host>/<owner>/<name>/`で、見るだけで配ります（登録の追加と隠す印の変更は、起動し直さずに現れます）。既定は`127.0.0.1`の番号47800だけに待ち受け（`--port`で変え、0は空いた番号）、`--tailscale`では`tailscale ip -4`の住所にも待ち受けます（`0.0.0.0`には待ち受けず、Tailscaleの設定を変えません）。起動のときに、標準エラーにURLと見せるリポジトリの一覧を書きます。すでに動いていれば、そのURLを示して終了コード0で終わります（`already_running`）。番号が使われていれば`DASHBOARD_PORT_IN_USE`、Tailscaleの住所がなければ`DASHBOARD_TAILSCALE_UNAVAILABLE`（どちらも終了コード3）。`--state-root ROOT`は状態の置き場を絶対の道で指します（相対の道は`DASHBOARD_STATE_ROOT_INVALID`、終了コード2）。GitHubにもほかのネットワークにも要求を送りません。 | 状態の置き場の`dashboard/server.json`・`server.lock`・`seen.json` |
 | C56 | `dashboard hide` | `[REPOSITORY]` | そのリポジトリをダッシュボードの表示から外します（一覧、横断の概況、Tailscaleで見せる範囲）。直接のURLには、戻すコマンドの案内だけを返します。定期の同期は止まりません（同期も止めるのは`canonical remove`）。チェックアウトの中ではREPOSITORYを省けます。印の置き場が読めなければ`DASHBOARD_STATE_UNREADABLE`（終了コード3）で止まり、上書きしません。 | 状態の置き場の`dashboard/repositories.json` |
 | C57 | `dashboard show` | `[REPOSITORY]` | `dashboard hide`で外したリポジトリを表示に戻します。 | 状態の置き場の`dashboard/repositories.json` |
 | C58 | `dashboard list` | | 登録簿の各行の、リポジトリ（分からなければ`null`）、表示中か隠しているか、配れるか、サーバーのURL（動いていれば）を示します。 | 読取りのみ |
+| C59 | `dashboard service install` | `[--port N] [--tailscale]` | ログインのときにダッシュボードのサーバーを起動し、落ちても起動し直す常駐を入れます（macOSはlaunchdの`~/Library/LaunchAgents/io.github.chemitaro.spec-dock.dashboard.plist`、Linuxはsystemdのユーザーの単位`spec-dock-dashboard.service`）。定期の同期の常駐とは別のもので、同期の常駐には触りません。`canonical link`や`installation update`はこの常駐を入れません。実行ファイルは同期の常駐が記録したもの（なければ今の`spec-dock`）。同じ設定ならなにもせず（`unchanged`）、`--port`か`--tailscale`を変えて実行し直すと書き直して起動し直します（`updated`）。番号は1〜65535（既定47800。外れれば`DASHBOARD_PORT_INVALID`、終了コード2）。launchdもsystemdのユーザーの管理もなければ何も書かずに`DASHBOARD_SERVICE_UNSUPPORTED`（終了コード3、`dashboard serve`を案内）、`launchctl`か`systemctl`が失敗すれば`DASHBOARD_SERVICE_FAILED`（終了コード3）。`--dry-run`はありません。 | 常駐の設定のファイルと登録、状態の置き場の`dashboard/` |
+| C60 | `dashboard service status` | | 常駐が入っているか（`installed`）、管理の側に読み込まれているか（`loaded`）、サーバーが動いているか（`running`、在りかの記録の`pid`）、URL、設定の番号とTailscaleと状態の置き場、動いているサーバーの版と入っているパッケージの版（違えば`restart_pending`）を示します。常駐を入れられないPCでは`supported: false`です。 | 読取りのみ |
+| C61 | `dashboard service uninstall` | | 常駐を止め（`launchctl bootout`か`systemctl --user disable --now`）、設定のファイルと`dashboard/service.log`を消します。入っていなければ`removed: false`で成功します。同期の常駐、隠す印、「見た」の記録には触りません。`--dry-run`はありません。 | 常駐の設定のファイルと登録、`dashboard/service.log` |
 
 ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象ではありません。通常操作はworkspaceの版4の新writer宣言を検証します。help/version/completion、raw doctor、installation、canonical checkは各leafの限定的なcontextを使います。
 
@@ -120,6 +123,17 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 - **隠す印（`specdock.dashboard-repositories/v1`）**：`<state_root>/dashboard/repositories.json`の`repositories: {<host/owner/name>: {hidden_at}}`。書くのは`dashboard hide`と`show`だけです。
 - **「見た」の記録（`specdock.dashboard-seen/v1`）**：`<state_root>/dashboard/seen.json`に、リポジトリごとに直近の5件（`seen_id`、`seen_at`、各Scopeの`{state, pr}`）。`POST /api/v1/r/<host>/<owner>/<name>/seen`は、`Origin`がサーバー自身の起点と完全に一致し、`X-SpecDock-Dashboard: 1`と`Content-Type: application/json`がある要求だけを受けます（ほかは403）。中身は読まず、サーバーがそのときのモデルから記録します。`structure?baseline=<seen_id>`はその記録と比べた変化を返します。
 - **埋め込みの約束（`specdock.embed/v1`）**：知らせは`{source: "specdock"|"host", v: 1, type, …}`。親は枠の`load`のたびに`hello`を送ります。SpecDockは、`event.source`が親の窓で、起点が埋め込みの許可に合う`hello`を受けたら、その起点を覚えて`ready {repository, path, title, capabilities}`を返し、続けて今の画面の`navigated {path, title, scope}`を1回送ります。その後は画面を移るたびに`navigated`です。親は`navigate {path}`と`theme {scheme: "light"|"dark"|"auto"}`を送れます。SpecDockは`hello`の前は何も送らず、覚えた起点だけを`targetOrigin`にします。高さは親が決めます。
+
+## ダッシュボードの常駐の契約
+
+`dashboard service install`が入れる常駐の約束です（言い直した約束3：常駐は利用者が明示して入れたときだけ入り、`status`で見え、`uninstall`で何も残さず消えます）。
+
+- **動かすもの**：`<spec-dock> dashboard serve --service --port <N> [--tailscale] --state-root <状態の置き場>`。`--service`は常駐のための内部の引数で、ヘルプには出しません。`--state-root`は前面の`serve`でも使えます（絶対の道）。
+- **launchd**：ラベル`io.github.chemitaro.spec-dock.dashboard`、`RunAtLoad`、`KeepAlive`、`ThrottleInterval` 10、標準出力と標準エラーは`<状態の置き場>/dashboard/service.log`、`PATH`はgitとtailscaleの場所と`/usr/bin:/bin:/usr/sbin:/sbin`。
+- **systemd**：`${XDG_CONFIG_HOME:-~/.config}/systemd/user/spec-dock-dashboard.service`、`Type=simple`、`Restart=always`、`RestartSec=10`、`WantedBy=default.target`。出力はjournal（`journalctl --user -u spec-dock-dashboard`）。systemdのユーザーの管理が一時的に応えないときも、単位があれば`status`に見え、`uninstall`で外せます。
+- **前面の`serve`との共存**：`--service`のサーバーは、ほかのサーバーが`dashboard/server.lock`を持っていれば終わらずに30秒ごとに取り直して待ち、そのサーバーが止まれば引き継ぎます。待っている間のSIGTERMでは終了コード0です。前面の`serve`は、常駐が動いていればそのURLを示して終わります。
+- **Tailscale**：`--service --tailscale`で住所が得られなければ`127.0.0.1`だけで起動し、30秒ごとに住所を取り直して、得られたら待ち受けと`Host`の検査と埋め込みの許可と在りかの記録の`urls.tailscale`に足します。
+- **版の更新**：サーバーは60秒ごとに入っているパッケージの版を読み直します。`--service`のサーバーは、版が変わっていれば在りかの記録を消して終了コード75で終わり（CLIのJSONは書きません）、launchdとsystemdが新しい版で起動し直します。前面の`serve`は終わらず、標準エラーに1回知らせ、`/api/v1/repositories`の`server`に`installed_version`と`restart_required: true`を出します。
 
 ## JSONと途中失敗
 

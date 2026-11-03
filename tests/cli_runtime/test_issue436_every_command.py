@@ -1,6 +1,6 @@
-"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440; 54 with `dashboard summary`, iss-00528; 58 with `dashboard serve`, `hide`, `show`, `list`, iss-00529).
+"""Every public command runs canonical handling only (iss-00436, Epic G7; 53 leaves since 0.5.0, iss-00440; 54 with `dashboard summary`, iss-00528; 58 with `dashboard serve`, `hide`, `show`, `list`, iss-00529; 61 with `dashboard service install`, `status`, `uninstall`, iss-00530).
 
-One linked schema-4 clone with the fake GitHub runs all 58 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
+One linked schema-4 clone with the fake GitHub runs all 61 leaves once; no leaf answers with a refusal-only code. GitHub is the fake on PATH, the catalog
 pushes to the temporary bare remote and the save wait of `work finish` runs on an injected clock.
 """
 
@@ -63,10 +63,17 @@ def test_every_leaf_has_a_route_in_canonical_mode() -> None:
         and path not in REPOSITORY_INDEPENDENT_HANDLERS
         and path not in MODE_INDEPENDENT
     ]
-    assert len(LEAF_PATHS) == 58
+    assert len(LEAF_PATHS) == 61
     assert unrouted == []
-    # `dashboard serve` and `dashboard list` need no checkout: only the repository-independent table routes them.
-    independent_only = {"canonical check", "dashboard serve", "dashboard list"}
+    # `dashboard serve`, `list` and `service` need no checkout: only the repository-independent table routes them.
+    independent_only = {
+        "canonical check",
+        "dashboard serve",
+        "dashboard list",
+        "dashboard service install",
+        "dashboard service status",
+        "dashboard service uninstall",
+    }
     assert set(CANONICAL_HANDLERS) == set(LEAF_PATHS) - MODE_INDEPENDENT - independent_only
     assert len(CANONICAL_HANDLERS) == 49
 
@@ -288,6 +295,9 @@ def _argv(world: WriteWorld, tmp_path: Path) -> list[tuple[str, list[str]]]:
         ("dashboard hide", []),
         ("dashboard show", []),
         ("dashboard list", []),
+        ("dashboard service install", []),  # the suite's fake platform has no service manager: it stops, writes nothing
+        ("dashboard service status", []),
+        ("dashboard service uninstall", []),
         ("installation show", []),
         ("installation init", [str(tmp_path / "fresh-install"), "--dry-run"]),
         ("installation update", ["--dry-run"]),

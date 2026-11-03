@@ -111,6 +111,9 @@ def _arguments(root: Path, tmp_path: Path) -> dict[str, list[str]]:
         "dashboard hide": [],
         "dashboard show": [],
         "dashboard list": [],
+        "dashboard service install": [],
+        "dashboard service status": [],
+        "dashboard service uninstall": [],
     }
 
 
@@ -136,7 +139,7 @@ def test_every_business_command_but_canonical_check_stops_on_a_schema_three_decl
     root = unmigrated_repository(tmp_path / "consumer")
     arguments = _arguments(root, tmp_path)
     assert set(arguments) == set(LEAF_PATHS) - UTILITIES - {"canonical check"}
-    assert len(arguments) == 55
+    assert len(arguments) == 58
     before = tree_digest(root)
     for leaf, extra in arguments.items():
         code, result = _run(capsys, root, leaf, extra)

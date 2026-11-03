@@ -48,6 +48,11 @@ from spec_dock.runtime.application.dashboard_commands import (
     mark_named,
     serve,
 )
+from spec_dock.runtime.application.dashboard_service import (
+    install as install_service,
+    status as service_status,
+    uninstall as uninstall_service,
+)
 from spec_dock.runtime.application.dashboard_summary import summarize_checkout, summarize_named
 from spec_dock.runtime.application.project_context import ProjectContext
 from spec_dock.runtime.presentation.envelope import OperationResult
@@ -118,6 +123,9 @@ REPOSITORY_INDEPENDENT_HANDLERS: dict[str, RepositoryIndependentHandler] = {
     "dashboard hide": mark_named,
     "dashboard show": mark_named,
     "dashboard list": list_repositories,
+    "dashboard service install": install_service,
+    "dashboard service status": service_status,
+    "dashboard service uninstall": uninstall_service,
 }
 
 

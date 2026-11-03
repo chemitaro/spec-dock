@@ -115,6 +115,21 @@ def _utc(value: datetime) -> str:
     return value.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def _listen(host: str, port: int) -> _Listener:
+    try:
+        return _Listener((host, port), _Handler)
+    except OSError as error:
+        if error.errno == errno.EADDRINUSE:
+            raise DashboardServerError(
+                "DASHBOARD_PORT_IN_USE",
+                f"port {port} on {host} is already in use",
+                recovery=("spec-dock dashboard serve --port <another number>",),
+            ) from error
+        raise DashboardServerError(
+            "DASHBOARD_LISTEN_FAILED", f"cannot listen on {host}:{port}: {error.strerror or error}"
+        ) from error
+
+
 class DashboardServer:
     def __init__(
         self,
@@ -124,12 +139,17 @@ class DashboardServer:
         tailscale: bool = False,
         probe: TailscaleProbe | None = None,
         version: str = __version__,
+        defer_tailscale: bool = False,
     ) -> None:
         self.state_root = state_root
         self.requested_port = port
         self.tailscale = tailscale
         self.probe = probe if probe is not None else LocalTailscale()
         self.version = version
+        self.defer_tailscale = defer_tailscale
+        self.tailscale_pending = False
+        self.started_at = ""
+        self._handler: type[_Handler] = _Handler
         self.site = DashboardSite(state_root)
         self._stack = ExitStack()
         self._listeners: list[_Listener] = []
@@ -155,27 +175,19 @@ class DashboardServer:
         dns: str | None = None
         if self.tailscale:
             address = self.probe.ipv4()
-            if address is None:
+            if address is None and self.defer_tailscale:
+                self.tailscale_pending = True  # the service starts locally and adds the address later (R-06)
+            elif address is None:
                 raise DashboardServerError(
                     "DASHBOARD_TAILSCALE_UNAVAILABLE",
                     "the Tailscale IPv4 address could not be read (`tailscale ip -4`)",
                     recovery=("tailscale status", "spec-dock dashboard serve  (without --tailscale)"),
                 )
-            dns = self.probe.dns_name()
+            else:
+                dns = self.probe.dns_name()
         port = self.requested_port
         for host in (LOCAL_HOST, *([address] if address else [])):
-            try:
-                listener = _Listener((host, port), _Handler)
-            except OSError as error:
-                if error.errno == errno.EADDRINUSE:
-                    raise DashboardServerError(
-                        "DASHBOARD_PORT_IN_USE",
-                        f"port {port} on {host} is already in use",
-                        recovery=("spec-dock dashboard serve --port <another number>",),
-                    ) from error
-                raise DashboardServerError(
-                    "DASHBOARD_LISTEN_FAILED", f"cannot listen on {host}:{port}: {error.strerror or error}"
-                ) from error
+            listener = _listen(host, port)
             self._listeners.append(listener)
             port = listener.server_address[1]
         self.port = port
@@ -184,6 +196,7 @@ class DashboardServer:
         hosts = (LOCAL_HOST, "localhost", *([address] if address else []), *([dns] if dns else []))
         embed_hosts = (LOCAL_HOST, "localhost", *([address] if address else []))
         started = _utc(datetime.now(timezone.utc))
+        self.started_at = started
         self.app = DashboardHttp(
             self.site,
             hosts=hosts,
@@ -193,17 +206,53 @@ class DashboardServer:
             version=self.version,
             started_at=started,
         )
-        handler = type("DashboardHandler", (_Handler,), {"app": self.app})
+        self._handler = type("DashboardHandler", (_Handler,), {"app": self.app})
         for listener in self._listeners:
-            listener.RequestHandlerClass = handler
-            thread = threading.Thread(target=listener.serve_forever, name="spec-dock-dashboard", daemon=True)
-            thread.start()
-            self._threads.append(thread)
+            self._run(listener)
         write_server_record(
             self.state_root, local=local, tailscale=remote, pid=os.getpid(), version=self.version, started_at=started
         )
         self.urls = ServerUrls(local, remote)
         return self.urls
+
+    def _run(self, listener: _Listener) -> None:
+        listener.RequestHandlerClass = self._handler
+        thread = threading.Thread(target=listener.serve_forever, name="spec-dock-dashboard", daemon=True)
+        thread.start()
+        self._threads.append(thread)
+
+    def add_tailscale(self) -> bool:
+        """Listen on the Tailscale address found late (the service started locally, R-06); False to retry later.
+
+        Call it from the thread that also calls `stop`. The address joins the accepted hosts, the embedding
+        hosts and the location record.
+        """
+        if not self.tailscale_pending or self.app is None or self.urls is None:
+            return False
+        address = self.probe.ipv4()
+        if address is None:
+            return False
+        try:
+            listener = _listen(address, self.port)
+        except DashboardServerError:
+            return False
+        self._listeners.append(listener)
+        self._run(listener)
+        dns = self.probe.dns_name()
+        self.app.hosts = (*self.app.hosts, address, *([dns] if dns else []))
+        self.app.embed_hosts = (*self.app.embed_hosts, address)
+        remote = f"http://{address}:{self.port}/"
+        write_server_record(
+            self.state_root,
+            local=self.urls.local,
+            tailscale=remote,
+            pid=os.getpid(),
+            version=self.version,
+            started_at=self.started_at,
+        )
+        self.urls = ServerUrls(self.urls.local, remote)
+        self.tailscale_pending = False
+        return True
 
     def wait(self, timeout: float | None = None) -> bool:
         return self._stopped.wait(timeout)
