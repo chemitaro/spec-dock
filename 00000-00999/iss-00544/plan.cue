@@ -5,12 +5,12 @@ package spec
 goal: "第3波の手直し5件を、テスト駆動で入れ、PC のヘッドレスの Chrome で確かめ、マージできる PR にする。"
 
 steps: {
-	"S-01": {title: "骨組みの格子の行を明示し、graph と timeline の回避を消す", realizes: ["R-01"], status: "todo", session: "impl"}
-	"S-02": {title: "`read_structure_facts` と覚える仕組みを足し、構造の API と詳しい画面に渡す", realizes: ["R-02", "R-03", "F-01", "F-02"], status: "todo", session: "impl"}
-	"S-03": {title: "印の値を `core/ui.js` に寄せ、worktree の印を作業中の箱に限る", realizes: ["R-04"], status: "todo", session: "impl"}
-	"S-04": {title: "骨組みが「見た」をモデルがあるときだけ送る", realizes: ["R-05"], status: "todo", session: "impl"}
-	"S-05": {title: "経路の引き直しを問題の最も少ない回を返す形にし、代表のデータを足す", realizes: ["R-06"], status: "todo", session: "impl"}
-	"S-06": {title: "PC のヘッドレスの Chrome で5画面を確かめ、手元の私的な構造で線の検査をやり直し、report.md に書く", realizes: ["R-01", "R-05", "R-06"], status: "todo", after: ["S-01", "S-02", "S-03", "S-04", "S-05"], session: "impl"}
+	"S-01": {title: "骨組みの格子の行を明示し、graph と timeline の回避を消す", realizes: ["R-01"], status: "done", session: "impl"}
+	"S-02": {title: "`read_structure_facts` と覚える仕組みを足し、構造の API と詳しい画面に渡す", realizes: ["R-02", "R-03", "F-01", "F-02"], status: "done", session: "impl"}
+	"S-03": {title: "印の値を `core/ui.js` に寄せ、worktree の印を作業中の箱に限る", realizes: ["R-04"], status: "done", session: "impl"}
+	"S-04": {title: "骨組みが「見た」をモデルがあるときだけ送る", realizes: ["R-05"], status: "done", session: "impl"}
+	"S-05": {title: "経路の引き直しを問題の最も少ない回を返す形にし、代表のデータを足す", realizes: ["R-06"], status: "done", session: "impl"}
+	"S-06": {title: "PC のヘッドレスの Chrome で5画面を確かめ、手元の私的な構造で線の検査をやり直し、report.md に書く", realizes: ["R-01", "R-05", "R-06"], status: "done", after: ["S-01", "S-02", "S-03", "S-04", "S-05"], session: "impl"}
 }
 
 tests: {
