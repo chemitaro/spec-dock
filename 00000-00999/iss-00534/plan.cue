@@ -14,13 +14,18 @@ package spec
 // すべての要件に、それを満たす手順が要る（dropped の手順は数えない）。
 // strict 以上では、dropped でない手順のすべてが、いずれかの番号に結び付く。
 steps: {
-	// "S-01": {title: "〜を作る", realizes: ["R-01"], status: "todo", after: ["..."], session: "impl"}
+	"S-01": {title: "版を 0.6.0 にする", realizes: ["R-01"], status: "todo", session: "impl"}
+	"S-02": {title: "migration.md に 0.6.0 の節を足す", realizes: ["R-02"], status: "todo", after: ["S-01"], session: "impl"}
+	"S-03": {title: "static-inventory.json と fixture とテストを足す", realizes: ["R-03"], status: "todo", after: ["S-02"], session: "impl"}
+	"S-04": {title: "R-04 はマージの後に統括が行う", realizes: ["R-04"], status: "todo", after: ["S-03"]}
 }
 
 // テスト。番号（T-01、…）をキーにする。title と verifies（確かめる要件・失敗の条件の番号）が必須。
 // standard 以上では、すべての要件に、strict 以上では、すべての失敗の条件に、確かめるテストが要る。
 tests: {
-	// "T-01": {title: "〜を確かめる", verifies: ["R-01"]}
+	"T-01": {title: "版が 0.6.0 の全部の場所でそろう", verifies: ["R-01"]}
+	"T-02": {title: "migration.md に 0.6.0 の節があり、dogfood の写しと一致する", verifies: ["R-02"]}
+	"T-03": {title: "inventory が 0.5.1 のバイトを知り、0.5.1 の consumer が installation update で上がる", verifies: ["R-03"]}
 }
 
 // 検証のしかた、戻し方、終わりの条件（任意）。critical では、手順があれば rollback が要る。
@@ -30,7 +35,6 @@ tests: {
 
 // 実行の割り当て（任意）。手順の session は、ここのセッションの名前を指す。
 // レビューの after は、どの手順の後かを指す。モデルと推論の名前は、どんな文字列でもよい。
-// execution: {
-// 	sessions: impl: {task: "仕様化と実装", model: "...", effort: "...", rationale: "..."}
-// 	reviews: code: {role: "コードのレビュー", after: "S-01", model: "...", effort: "..."}
-// }
+execution: {
+	sessions: impl: {task: "仕様化と実装", model: "sonnet", effort: "medium", rationale: "light。版の番号と文書だけの変更で、0.5.1 を入れ直せば戻る。"}
+}
