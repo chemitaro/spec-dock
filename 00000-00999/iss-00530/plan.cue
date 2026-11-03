@@ -11,7 +11,7 @@ steps: {
 	"S-03": {title: "`install`、`status`、`uninstall` の処理とコマンドの一覧（58 → 61）を作る", realizes: ["R-01", "R-02", "R-03", "R-07"], status: "done", after: ["S-02"], session: "impl"}
 	"S-04": {title: "`serve --service`：ロックの待ち、Tailscale の取り直し、版の確かめと終了コード75、前面の知らせと API の項目", realizes: ["R-04", "R-05", "R-06"], status: "done", after: ["S-01"], session: "impl"}
 	"S-05": {title: "文書（`reference_cli.md`、README、`cli-redesign-guide.html`）と `static-inventory.json` を直す", realizes: ["R-07"], status: "done", after: ["S-03", "S-04"], session: "impl"}
-	"S-06": {title: "コードのレビュー、最終品質ゲート、report.md、PR、CI", realizes: ["R-01", "R-07"], status: "doing", after: ["S-05"], session: "impl"}
+	"S-06": {title: "コードのレビュー、最終品質ゲート、report.md、PR、CI", realizes: ["R-01", "R-07"], status: "done", after: ["S-05"], session: "impl"}
 }
 
 tests: {
