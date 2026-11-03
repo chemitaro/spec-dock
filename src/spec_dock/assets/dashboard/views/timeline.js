@@ -2,6 +2,7 @@
 // and the recent Scope and pull request events. The model counts (#528 weekly_totals, recent_events); this screen
 // adds the chosen kinds up (timeline/series.js) and draws.
 import { esc, ic, stateIcon } from "../core/ui.js";
+import { emptyText } from "./graph.js";
 import { GRAPH_ICONS } from "./graph/marks.js";
 import { groupEvents, mergeWeeks } from "./timeline/series.js";
 
@@ -171,7 +172,7 @@ function render(root, ctx) {
   T.ctx = ctx;
   const data = ctx.data;
   if (!data || !Array.isArray(data.scopes) || !data.scopes.length) {
-    root.innerHTML = `<div class="tl"><p class="gx-empty-text">${!data ? "このリポジトリの構造を読めませんでした。" : "このリポジトリには、まだ Scope がありません。"}</p></div>`;
+    root.innerHTML = `<div class="tl"><p class="gx-empty-text">${esc(emptyText(data))}</p></div>`;
     return;
   }
   const chosen = KINDS.map(([k]) => k).filter((k) => T.kinds.has(k));

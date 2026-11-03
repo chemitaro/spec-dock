@@ -14,7 +14,12 @@ import * as M from "./graph/marks.js";
 const { esc, ic, stateIcon, STATES } = M;
 const PREFS = "specdock.graph.v1";
 const PHONE = 640;
-const LOAD_ERROR = "このリポジトリの構造を読めませんでした。";
+// Why there is no graph (F-01). The reason and the next step are in the shell's notices above.
+export function emptyText(data) {
+  if (!data) return "このリポジトリの構造を読めませんでした。";
+  if (data.snapshot?.status !== "ok") return "構造のスナップショットがないか読めないため、図を描けません。上の知らせを見てください。";
+  return "このリポジトリには、まだ Scope がありません。";
+}
 
 // The board's lane order (Epic R-13): blocked, ready, doing, awaiting merge (needs fix, mergeable), unknown.
 const HL = [
@@ -60,7 +65,8 @@ function loadPrefs() {
 }
 function savePrefs() {
   try {
-    localStorage.setItem(PREFS, JSON.stringify({ ...V.opts, legend: V.legend }));
+    const { mode, showDone, deps, fold } = V.opts; // the focus lives in the URL, not in the preferences
+    localStorage.setItem(PREFS, JSON.stringify({ mode, showDone, deps, fold, legend: V.legend }));
   } catch {
     // ignore
   }
@@ -107,6 +113,7 @@ function dispose() {
   for (const type of ["gesturestart", "gesturechange", "gestureend"]) document.removeEventListener(type, stopGesture, { passive: false });
   window.removeEventListener("resize", onResize);
   if (window.specdockEdgeAudit === edgeAudit) delete window.specdockEdgeAudit;
+  V.token++; // an answer of the scope API that arrives after leaving the screen is dropped
   V.root = null;
   V.el = null;
   V.sig = null;
@@ -129,7 +136,7 @@ function render(root, ctx) {
   const data = ctx.data;
   const focus = ctx.route.params.get("focus") || null;
   if (!data || !Array.isArray(data.scopes) || !data.scopes.length) {
-    showEmpty(!data ? LOAD_ERROR : "このリポジトリには、まだ Scope がありません。");
+    showEmpty(emptyText(data));
     return;
   }
   V.el.empty.hidden = true;
