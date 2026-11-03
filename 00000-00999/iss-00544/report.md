@@ -61,14 +61,15 @@ ID: "iss-00544"
 
 ## Final Quality Gate
 
-- 合格のコミット：`25d9d420f329407ba380840ff5e5110cae7434c8`（作業ツリーは clean）。記録は `.workbench/final-quality-gate/iss-00544-g1/`（`campaign.json`、`closure.md`、`attempts/01/`）。試行1回で合格。
+- 合格のコミット：`0d453b26f1e010916c6ef699eed63152eae294cf`（作業ツリーは clean。`25d9d420f` に、#530（PR #545）の入った `origin/main` を取り込んだマージ）。記録は `.workbench/final-quality-gate/iss-00544-g1/`（`campaign.json`、`closure.md`、`review-response.md`、`attempts/01〜02/`）。
+- 試行：01（`25d9d420f`）は両方の道が合格。その後 #530 がマージされ、`origin/main` を取り込んだ（競合なし。両方が触れたのは `dashboard_http.py` だけで、#530 の `installed_version`・`restart_required` と、この Issue の覚える仕組みは別の箇所）。02（`0d453b26f`）で両方の道をやり直して合格。
 - レビューの側：quality-gate-reviewer（opus/high、1人）。観点は functional-correctness、requirements-closure、test-adequacy。pass（P0 0、P1 0、P2 0、P3 1、網羅は完全）。
-- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3484 passed、7 skipped、26分26秒）。どちらも同じコミット。
+- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3511 passed、7 skipped、26分02秒）。どちらも同じコミット。
 - P3（情報。直していない）：構造の API を2回読んだとき2回目に `cue` を走らせないこと（R-03）を、HTTP を通して確かめるテストはない（`read_structure_facts` の単位では確かめている）。
 
 ## Pull Request
 
-（記入中）
+- PR #546（https://github.com/chemitaro/spec-dock/pull/546）、head `0d453b26f1e010916c6ef699eed63152eae294cf`（`Refs #544`、`Refs #427`）。CI は観測できた範囲（Actions と Commit Status）で PASS：Provider CI、SpecDock check、Commit identity。GitHub のマージの可否は READY（2026-11-03T23:07:47Z の観測）。マージと `work finish` は統括が行う。
 
 ## Residual Risks / Follow-ups
 
