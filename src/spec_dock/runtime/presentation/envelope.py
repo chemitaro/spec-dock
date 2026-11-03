@@ -218,6 +218,10 @@ def render_text(
             for label, items in (("failure", failures), ("warning", result.warnings))
             for item in items
         )
+    elif result.command == "dashboard summary" and isinstance(result.data, FamilyData):
+        from spec_dock.runtime.presentation.dashboard_summary import summary_text
+
+        stdout_lines.extend(_text_escape(line) for line in summary_text(result.data.result))
     elif result.command == "scope check" and isinstance(result.data, FamilyData):
         stdout_lines.extend(_scope_check_text(result.data.result))
     elif isinstance(result.data, (ActiveData, FamilyData, CanonicalStatusData)) or (

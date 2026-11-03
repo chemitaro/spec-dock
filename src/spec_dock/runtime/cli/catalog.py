@@ -82,6 +82,7 @@ LEAF_PATHS: tuple[str, ...] = (
     "canonical restore",
     "canonical resume",
     "canonical remove",
+    "dashboard summary",
     "help",
     "completion",
 )
@@ -138,6 +139,7 @@ HELP_EFFECTS: dict[str, str] = {
     "canonical restore": "Restore held deletions or paths from the catalog HEAD; no commit.",
     "canonical resume": "Resume a paused catalog after the user decided how to treat the remote.",
     "canonical remove": "Remove this clone's catalog, links and sync registration after confirming nothing is unsaved.",
+    "dashboard summary": "Read one repository's dashboard summary (specdock.dashboard-summary/v1) from local files; no changes.",
     "help": "Print command help; no changes.",
     "completion": "Print shell completion without changing shell configuration.",
 }
@@ -259,6 +261,7 @@ LEAF_ARGUMENTS: dict[str, tuple[ArgumentSpec, ...]] = {
     "canonical restore": (_arg("paths", nargs="*"),),
     "canonical resume": (_flag("--adopt-remote"), _flag("--push-local")),
     "canonical remove": (),
+    "dashboard summary": (_arg("repository", nargs="?"),),
     "help": (_arg("help_path", nargs="*"),),
     "completion": (_arg("shell", choices=("bash", "zsh", "fish")),),
 }
@@ -370,6 +373,7 @@ HELP_PRECONDITIONS: dict[str, str] = {
     "canonical restore": "A linked schema-4 checkout; every named path must be held (changes.holds) and exist in the catalog HEAD. Without paths, every held deletion is restored.",
     "canonical resume": "A linked schema-4 checkout whose catalog is paused; --adopt-remote for remote_rewritten or merge_failed, --push-local for remote_deleted.",
     "canonical remove": "A schema-4 checkout of a clone with a main checkout; stops before writing on unsaved or unpushed changes or on ignored files other than .runtime/ in the catalog. Without --yes it only reports the plan.",
+    "dashboard summary": "Inside a schema-4 checkout REPOSITORY may be omitted (it comes from the origin remote); elsewhere pass owner/name or github.com/owner/name. The repository's structure snapshot must exist and be readable (DASHBOARD_SNAPSHOT_MISSING, DASHBOARD_SNAPSHOT_UNREADABLE, DASHBOARD_SNAPSHOT_UNSUPPORTED stop with exit 3). Works without a running dashboard server and for hidden repositories; it never contacts GitHub or the server.",
     "help": "No project is required.",
     "completion": "No project is required; choose bash, zsh, or fish.",
 }
@@ -402,6 +406,7 @@ _READS_BY_ROOT = {
     "workspace": "Workspace declaration, the GitHub structure snapshot, the catalog, and explicitly requested remote observations.",
     "installation": "Installed package inventory and the selected worktree's declaration and static file snapshots.",
     "canonical": "This clone's canonical catalog and checkout links, or one commit tree, as each command states.",
+    "dashboard": "The repository's structure snapshot, the dashboard hidden marks and the server location record (only whether its pid is alive).",
 }
 
 _DOES_NOT_BY_ROOT = {
@@ -415,6 +420,7 @@ _DOES_NOT_BY_ROOT = {
     "workspace": "Does not silently repair primary Scope data or active selection.",
     "installation": "Does not change other worktrees, Scope data, Artifacts, Workbenches, direct selections or Git metadata.",
     "canonical": "Does not change GitHub Issues or the default branch.",
+    "dashboard": "Does not contact GitHub or the dashboard server, refresh the snapshot, or write any file.",
 }
 
 _JSON_DATA_BY_ROOT = {
@@ -428,6 +434,7 @@ _JSON_DATA_BY_ROOT = {
     "workspace": "Current observations, validity and findings.",
     "installation": "target, package_version, created_paths, changed_paths, retired_paths, backup_path and preservation checks.",
     "canonical": "The command's catalog, link, sync or check observations.",
+    "dashboard": "result is the specdock.dashboard-summary/v1 document: schema, repository, fetched_at, stale, counts, completion_ratio, awaiting_merge, in_progress, ready, blocked, cleanup, anomaly_count, pull_requests, paths, hidden, server.",
 }
 
 
@@ -489,6 +496,8 @@ def _help_spec(leaf: str) -> HelpSpec:
         target = "The selected Git common-directory installation and its registered worktrees."
     elif leaf.startswith("worktree "):
         target = "The explicit absolute path in this clone's native Git inventory; create uses root/NAME."
+    elif leaf == "dashboard summary":
+        target = "REPOSITORY (owner/name or github.com/owner/name), or this checkout's origin repository when omitted."
     elif leaf in {"help", "completion"}:
         target = "The CLI catalog; no repository is required."
     elif "target" in arguments:

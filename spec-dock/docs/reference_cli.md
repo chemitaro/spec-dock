@@ -1,6 +1,6 @@
 # CLI参照（Current）
 
-通常packageの外部 `spec-dock` が公開53 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
+通常packageの外部 `spec-dock` が公開54 leafの入口です。正確な文法は `spec-dock help COMMAND` または `spec-dock COMMAND --help` で確認します。通常Scope TARGETとGitHub取込用REFは別の文法です。曖昧な対象は副作用前に拒否します。
 
 | 用途 | 入力 | 境界 |
 |---|---|---|
@@ -73,6 +73,7 @@ SpecDock 0.5.0 は宣言の版4（canonical モード）だけを扱います（
 | C51 | `scope move` | `TARGET --parent TARGET` | ScopeのGitHubの親だけを付け替えます（sub-issueの`replace_parent`）。カタログの平らなディレクトリは動きません。このチェックアウトが対象かその子孫を選んでいれば`spec-dock/active`のリンクを整えます。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | GitHubの親子、active link |
 | C52 | `scope check` | `TARGET` | 1つのScopeの仕様をインターネットなしで検査します。CUEのScope（`requirement.cue`）は、型・リポジトリの型（`spec-dock/cue/*.cue`）と一緒に`cue`（v0.17.1以上）で評価し、形の誤り（`CUE_INVALID`）、つながりの指摘（`SPEC_FINDINGS`）、保証レベルの置き場、説明資料の形を、ファイルと直し方つきで示します。誤りがあれば終了コード7（`SCOPE_CHECK_FAILED`）。MarkdownのScopeは`checked=false`で成功します。`work finish`も閉じる前に同じ検査をします。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | 読取りのみ |
 | C53 | `scope render` | `TARGET [--design-system MODE]` | 1つのCUEのScopeの要件・設計・計画を、インターネットなしでHTMLに描き、標準出力に出します（`--json`では`data.result.html`）。`scope check`と同じ評価を使い、検査の結果（つながりの指摘、形の誤り）をページの初めに、続けて要件、失敗・境界条件、設計、計画（手順の状態と数、実行の割り当て）を、番号のリンクで結んで示します。デザインシステムはそのチェックアウトの`spec-dock/design-system/`を`file:`のURLで、図の部品はCDNから読みます。`--design-system inline`（既定は`file`）では、`ds.css`、`ds.js`、`marked`をHTMLに埋め込み、別のPCでも崩れないページにします（デザインシステムがなければ`DESIGN_SYSTEM_MISSING`、終了コード3）。評価が通らなければ検査の結果だけのページで成功し`SCOPE_RENDER_INCOMPLETE`を警告します。MarkdownのScopeは終了コード7（`SCOPE_NOT_CUE`）。ダッシュボードなどは、Pythonの入口`spec_dock.runtime.application.scope_render.render_scope_html(ScopeRenderSource, *, design_system_base, vendor_base)`で、読み込み先のURLを渡して描けます（`timeout`秒、既定30。`embed_design_system`にデザインシステムのディレクトリを渡すと埋め込みます。返り値はHTMLの`str`。MarkdownのScopeは`CanonicalCommandError`の`SCOPE_NOT_CUE`、`cue`と型の版の問題は`scope check`と同じコードで止まります）。schema3では`CANONICAL_NOT_MIGRATED`で止まります。 | 読取りのみ |
+| C54 | `dashboard summary` | `[REPOSITORY]` | 1つのリポジトリのダッシュボードの要約（契約 `specdock.dashboard-summary/v1`）を返します。チェックアウトの中ではREPOSITORYを省けます（`origin`から決めます）。外では`owner/name`か`github.com/owner/name`で指します。利用者ごとの状態の置き場の構造のスナップショット（版1と版2）を自分で読み、GitHubにもダッシュボードのサーバーにも要求を送りません（在りかの記録の`pid`が生きているかだけを見ます）。サーバーが動いていなくても、隠したリポジトリでも動きます。`--json`では`data.result`が要約です。スナップショットがなければ`DASHBOARD_SNAPSHOT_MISSING`、壊れていれば`DASHBOARD_SNAPSHOT_UNREADABLE`、知らない版なら`DASHBOARD_SNAPSHOT_UNSUPPORTED`（どれも終了コード3）、REPOSITORYの形が違えば`DASHBOARD_REPOSITORY_INVALID`（終了コード2）。 | 読取りのみ |
 
 ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象ではありません。通常操作はworkspaceの版4の新writer宣言を検証します。help/version/completion、raw doctor、installation、canonical checkは各leafの限定的なcontextを使います。
 
@@ -81,6 +82,26 @@ ARTIFACT_SCOPEの@rootはArtifact所有者だけで、Scope作成/Startの対象
 新規branchのStartには--base REF、既存branchの再利用には明示--branch NAMEとbase省略が必要です。GitHub照会は短いStart排他の外です。排他内で同cloneの予約を再観測し、checkoutから直接記録公開まで保持します。`branch switch`もcheckoutから確認までStart lockを保持し、active linkの書込みと排他します（--lock-timeout、既定5秒）。同じbranchの重複checkoutはGitが、同じIssue・ノードの重複選択はStart排他内の再観測（SCOPE_ALREADY_SELECTED、branch名ではなくScope IDとGitHub番号で比較）が防ぎます。Start lockはGit共通dirへのOS flockだけで、Gitへファイルや設定を書きません。SpecDockを経由しないGit操作と別cloneは排他の対象外です。通常編集、Artifact、Sync、Finish、migration、installationは共通Start lockを取りません。
 
 同一direct target/branchのStartはunchangedです。別branchへ移った予約、破損/複数記録も重複検査から捨てません。active setは同じ妥当な直接対象の確認と閲覧用active linkの修復だけで、新規取得や親への切替は行いません。active linkは選択の正本ではなく、失敗してもwarningだけで選択の結果を変えません。clearはselectionだけ、FinishはGitHub完了を確認してから解除します。後から始まった別対象は消さず、元branchへ戻りません。
+
+## ダッシュボードの要約の契約（`specdock.dashboard-summary/v1`）
+
+`dashboard summary`（と、今後のダッシュボードのサーバー）が返す要約の形です。項目を足すのは版を変えずに行い、消すか意味を変えるときは版を上げます。
+
+| 項目 | 意味 |
+|---|---|
+| `schema` | `specdock.dashboard-summary/v1` |
+| `repository` | `github.com/<owner>/<name>` |
+| `fetched_at`、`stale` | 構造を取得した時刻（UTC）と、30分を超えて古いか |
+| `counts` | `total`、状態ごとの数 `by_state`（`done`、`doing`、`blocked`、`ready`、`unknown`）、種類ごとの数 `by_kind`（`initiative`、`epic`、`issue` の各 `total` と状態ごとの数） |
+| `completion_ratio` | 終わった数／全体の数（Scopeがなければ`null`） |
+| `awaiting_merge`、`in_progress`、`ready`、`blocked` | ボードの列の一覧（推奨順）。各要素は`id`、`number`、`kind`、`title`、`state`、`reason`。`awaiting_merge`は`merge`（`mergeable`か`needs_fix`）を足します。`in_progress`はマージ待ちを除きます |
+| `cleanup` | 片付けの候補（推奨順）。`reason`は候補の理由、`cleanup`は種類（`all_descendants_closed`、`closed_with_open_descendants`、`open_under_closed_parent`） |
+| `anomaly_count` | スナップショットに記録された構造の異常の数 |
+| `pull_requests` | PRの状態の確かさ：`status`（`fresh`、`stale`は直近の取得の失敗で前回の値、`unknown`は版1・未取得・30分超で使わない）、`fetched_at`、`error` |
+| `paths` | 各Scopeの詳しい画面の道 `/r/<host>/<owner>/<name>/scopes/<ID>` |
+| `hidden`、`server` | 表示から隠しているか、動いているサーバーの手元のURL（なければ`null`） |
+
+状態は`dependency check`と同じ着手の判定から決め、EpicとInitiativeだけ、開いた子孫に作業中の印があれば作業中にします。
 
 ## JSONと途中失敗
 

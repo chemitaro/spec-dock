@@ -14,7 +14,7 @@ from spec_dock.runtime.cli.legacy import LegacyCommandError
 from spec_dock.runtime.cli.options import explicit_help, parse_vnext
 
 
-def test_vnext_catalog_matches_approved_53_leaf_design() -> None:
+def test_vnext_catalog_matches_approved_54_leaf_design() -> None:
     expected = {
         "scope create initiative",
         "scope create epic",
@@ -67,10 +67,11 @@ def test_vnext_catalog_matches_approved_53_leaf_design() -> None:
         "canonical restore",
         "canonical resume",
         "canonical remove",
+        "dashboard summary",
         "help",
         "completion",
     }
-    assert len(LEAF_PATHS) == 53
+    assert len(LEAF_PATHS) == 54  # iss-00528 added `dashboard summary`
     assert set(LEAF_PATHS) == expected
 
 
