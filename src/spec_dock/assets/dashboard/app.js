@@ -172,7 +172,11 @@ async function boot() {
     if (state.data) {
       // Compare with the record that was latest when this page opened, then record this visit once.
       state.baseline = state.data.seen?.latest_id ?? null;
-      await api.markSeen(state.route.repository).catch(() => null);
+      // Only a structure with a model has anything to record (Epic D-18); the server refuses the rest with 409,
+      // which the browser would log as an error (iss-00544).
+      if (state.data?.snapshot?.fetched_at) {
+        await api.markSeen(state.route.repository);
+      }
     }
   }
   render();

@@ -79,14 +79,17 @@ def representative(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Any]:
     documents = {
         "spec-dock": document_of(json.loads(SNAPSHOT.read_text(encoding="utf-8"))),
         "generated": document(generated()),
+        # With 8 rounds that return the last round, both keep lanes too close in some ways of showing (iss-00544).
+        "generated-15": document(generated(seed=15)),
+        "generated-18": document(generated(seed=18)),
     }
     return _run(tmp_path_factory.mktemp("graph"), {"documents": documents, "checks": ["audit"]})
 
 
 def test_every_way_of_showing_the_representative_structures_draws_clean_lines(representative: dict[str, Any]) -> None:
     runs = representative["audit"]
-    assert {run["name"] for run in runs} == {"spec-dock", "generated"}
-    assert len(runs) >= 2 * 16  # 16 combinations each, and every open Epic or Initiative as the focus
+    assert {run["name"] for run in runs} == {"spec-dock", "generated", "generated-15", "generated-18"}
+    assert len(runs) >= 4 * 16  # 16 combinations each, and every open Epic or Initiative as the focus
     assert sum(run["edges"] for run in runs if run["name"] == "spec-dock" and run["opts"]["deps"] == "all") > 100
     dirty = [
         {

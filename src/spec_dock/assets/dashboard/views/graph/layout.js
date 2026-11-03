@@ -5,7 +5,7 @@
 //
 // The model decides everything about the Scopes (state, stage, recommended order, cleanup candidates); this module
 // only arranges them: stages left to right, the recommended order (`rank`) top to bottom inside a stage.
-import { portSpan, route } from "./router.js";
+import { audit, portSpan, route } from "./router.js";
 
 export const SIZE = {
   boxW: 178,
@@ -421,27 +421,46 @@ function portRoom(G) {
   return add;
 }
 
+// The routing check's count of problems in one round (router.js audit: box hits, lanes too close, diagonals, ...).
+function problems(G, res) {
+  const a = audit(
+    res.routes.map((rt) => ({ pts: rt.pts, failed: rt.failed, ka: G.obs[G.edges[rt.ei].a].key, kz: G.obs[G.edges[rt.ei].z].key })),
+    G.obs,
+  );
+  return a.boxHits + a.ownHits + a.overlaps + a.diagonal + a.portShare + a.trunkOverlaps + a.failed;
+}
+
+// The prototype stopped after 8 rounds. Widening one channel can crowd another, so the rounds do not always settle:
+// a large structure (284 lines) needed 9, and another round can also undo a clean one (iss-00544).
+export const ROUNDS = 10;
+
 /**
- * Lay out and route, widening the gaps where a channel lacks lanes (at most 8 rounds; the prototype's loop).
- * Returns {layout, G, routes, widen, iters, unmapped, gaps}.
+ * Lay out and route, widening the gaps where a channel lacks lanes (at most ROUNDS rounds; the prototype's loop).
+ * When the rounds do not settle, the round with the fewest problems in the routing check is kept (the earliest of
+ * equals), not the last one. Returns {layout, G, routes, widen, iters, unmapped, gaps, problems}.
  */
 export function routeLayout(scopes, cleanup, options = {}, start = {}) {
   const gaps = { ...start };
-  let L, G, res, iters = 0, unmapped = 0;
+  let iters = 0;
+  let best = null;
   let before = new Set();
-  for (; iters < 8; iters++) {
-    L = layout(scopes, cleanup, options, gaps);
-    G = graphInput(L);
-    res = route(G);
+  for (; iters < ROUNDS; iters++) {
+    const L = layout(scopes, cleanup, options, gaps);
+    const G = graphInput(L);
+    const res = route(G);
     const add = portRoom(G);
-    if (!res.widen.length && !Object.keys(add).length) break;
-    unmapped = 0;
+    const settled = !res.widen.length && !Object.keys(add).length;
+    const round = { layout: L, G, routes: res.routes, widen: res.widen, unmapped: 0, gaps: { ...gaps }, problems: settled ? 0 : problems(G, res) };
+    if (settled) {
+      best = round;
+      break;
+    }
     const now = new Set();
     for (const w of res.widen) {
       const sig = `${w.axis}|${G.obs[w.oa]?.key ?? w.oa}|${G.obs[w.ob]?.key ?? w.ob}`;
       now.add(sig);
       let keys = gapFor(G, w.axis, w.oa, w.ob, L.opts.mode === "tree");
-      if (!keys.length) unmapped++;
+      if (!keys.length) round.unmapped++;
       // a channel that no gap reaches, or that widening did not relieve: every gap of the axis grows a little
       if (!keys.length || before.has(sig)) keys = [...keys, `all.${w.axis}`];
       for (const key of keys) {
@@ -449,9 +468,10 @@ export function routeLayout(scopes, cleanup, options = {}, start = {}) {
         add[key] = Math.max(add[key] || 0, amount);
       }
     }
+    if (!best || round.problems < best.problems) best = round;
     before = now;
     if (!Object.keys(add).length) break;
     for (const [key, value] of Object.entries(add)) gaps[key] = (gaps[key] || 0) + value;
   }
-  return { layout: L, G, routes: res.routes, widen: res.widen, iters, unmapped, gaps };
+  return { ...best, iters };
 }

@@ -3,7 +3,6 @@
 // adds the chosen kinds up (timeline/series.js) and draws.
 import { esc, ic, stateIcon } from "../core/ui.js";
 import { emptyText } from "./graph.js";
-import { GRAPH_ICONS } from "./graph/marks.js";
 import { groupEvents, mergeWeeks } from "./timeline/series.js";
 
 const KINDS = [
@@ -21,8 +20,7 @@ const EVENT = {
 
 const T = { kinds: new Set(KINDS.map(([k]) => k)), root: null, ctx: null, weeks: [], resize: null, change: null };
 
-const icon = (name) =>
-  GRAPH_ICONS[name] ? `<svg class="ds-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${GRAPH_ICONS[name]}</svg>` : ic(name);
+const icon = (name) => ic(name);
 
 function loadPrefs() {
   try {

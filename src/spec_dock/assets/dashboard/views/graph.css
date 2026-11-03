@@ -1,9 +1,7 @@
 /* The structure graph (iss-00532; Epic D-08). The adopted design d2's marks, graph, legend and panel, scoped under
    .gx so the other screens' styles stay apart. Boxes, frames and folded groups are placed absolutely at the
    coordinates layout.js computes; the lines are one SVG on top. */
-/* The shell's grid puts <main> in the 4th (1fr) row only when the mobile tabs and the notices take rows 2 and 3;
-   on a PC both are display:none and <main> would fall into an auto row of height 0. Pin it to the 1fr row. */
-.main[data-view="graph"] { grid-row: 4; position: relative; overflow: hidden; }
+.main[data-view="graph"] { position: relative; overflow: hidden; }
 .gx { position: absolute; inset: 0; --edge-p2: color-mix(in srgb, var(--ds-accent) 58%, var(--ds-bg)); }
 @keyframes ds-pulse { 50% { opacity: .35; } }
 

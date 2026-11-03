@@ -8,22 +8,29 @@ broken `cue`, a failing `git worktree list`) becomes that part's "unreadable" an
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import os
 from pathlib import Path
 import stat
+import threading
+import time
 from typing import TYPE_CHECKING, Final, Protocol
 from urllib.parse import quote
 
 from spec_dock.runtime.application.scope_check import read_assurance
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.canonical_structure import branch_names_scope
+from spec_dock.runtime.infra.cue_tool import CueToolError, locate_cue
 from spec_dock.runtime.infra.git_cli import worktree_list
 
 if TYPE_CHECKING:
+    from collections.abc import Callable, Sequence
+
     from spec_dock.runtime.application.contracts import GitWorktreeRecord
     from spec_dock.runtime.application.dashboard_site import SiteRepository
     from spec_dock.runtime.application.scope_check import AssuranceReading
+    from spec_dock.runtime.infra.cue_tool import CueTool
 
 TIMEOUT: Final = 3.0
 ARTIFACT_LIMIT: Final = 300
@@ -138,10 +145,12 @@ def read_scope_details(
     *,
     timeout: float = TIMEOUT,
     artifact_limit: int = ARTIFACT_LIMIT,
-    assurance_reader: AssuranceReader = read_assurance,
-    worktree_lister: WorktreeLister = worktree_list,
+    assurance_reader: AssuranceReader | None = None,
+    worktree_lister: WorktreeLister | None = None,
 ) -> dict[str, object]:
     """The `details` of the Scope JSON; never raises for missing or unreadable files."""
+    assurance_reader = assurance_reader or read_assurance
+    worktree_lister = worktree_lister or worktree_list
     catalog = site.catalog
     worktrees = _worktrees(catalog, scope_id, worktree_lister, timeout)
     empty: dict[str, object] = {
@@ -179,3 +188,131 @@ def read_scope_details(
         "assurance": _assurance(directory, assurance_reader, timeout),
         "worktrees": worktrees,
     }
+
+
+def scope_facts(details: dict[str, object]) -> dict[str, str | None]:
+    """The structure fields `assurance` and `branch` of one Scope, from its details (iss-00544 D-02)."""
+    assurance = details.get("assurance")
+    worktrees = details.get("worktrees")
+    level = assurance.get("level") if isinstance(assurance, dict) else None
+    items = worktrees.get("items") if isinstance(worktrees, dict) else None
+    branch = items[0].get("branch") if isinstance(items, list) and items and isinstance(items[0], dict) else None
+    return {
+        "assurance": level if isinstance(level, str) else None,
+        "branch": branch if isinstance(branch, str) else None,
+    }
+
+
+# --- The structure list: every Scope's assurance level and this PC's branch (iss-00544 D-02) -------------------
+
+
+class StructureAssuranceReader(Protocol):
+    def __call__(self, directory: Path | None, *, timeout: float, tool: CueTool | None = None) -> AssuranceReading: ...
+
+
+class CueLocator(Protocol):
+    def __call__(self, *, timeout: float) -> CueTool: ...
+
+
+@dataclass(frozen=True)
+class _Remembered:
+    mtime_ns: int
+    size: int
+    level: str | None
+
+
+@dataclass
+class StructureFactsCache:
+    """The assurance levels read so far, per catalog, keyed by `requirement.cue`'s time and size.
+
+    It lives as long as the server process and is never written anywhere. Requests are served in parallel, so the
+    table of a catalog is read and replaced under the lock; the external processes run outside it.
+    """
+
+    catalogs: dict[str, dict[str, _Remembered]] = field(default_factory=dict)
+    lock: threading.Lock = field(default_factory=threading.Lock, repr=False, compare=False)
+
+
+def _branches(catalog: Path, scope_ids: Sequence[str], lister: WorktreeLister, timeout: float) -> dict[str, str]:
+    try:
+        records = lister(catalog, timeout=timeout)
+    except Exception:  # git missing, slow or failing: every branch is unknown (F-01)
+        return {}
+    found: dict[str, str] = {}
+    for scope_id in scope_ids:
+        for record in records:
+            if record.branch is not None and branch_names_scope(record.branch, scope_id):
+                found[scope_id] = record.branch  # the first in the listing's order
+                break
+    return found
+
+
+def read_structure_facts(
+    site: SiteRepository,
+    scope_ids: Sequence[str],
+    cache: StructureFactsCache,
+    *,
+    timeout: float = TIMEOUT,
+    clock: Callable[[], float] = time.monotonic,
+    assurance_reader: StructureAssuranceReader | None = None,
+    worktree_lister: WorktreeLister | None = None,
+    cue_locator: CueLocator | None = None,
+) -> dict[str, dict[str, str | None]]:
+    """`{ID: {"assurance", "branch"}}` for the structure API; never raises, and an unknown value is None.
+
+    `git worktree list` runs once. A level is read with `cue` only when `requirement.cue`'s time or size changed;
+    the external processes of one request share `timeout`. Past it, levels stay None and unremembered, so a later
+    request reads them (F-02).
+    """
+    reader = assurance_reader or read_assurance
+    lister = worktree_lister or worktree_list
+    locate = cue_locator or locate_cue
+    facts: dict[str, dict[str, str | None]] = {item: {"assurance": None, "branch": None} for item in scope_ids}
+    catalog = site.catalog
+    if catalog is None or not _is_directory(catalog):
+        return facts
+    deadline = clock() + timeout
+    for scope_id, branch in _branches(catalog, scope_ids, lister, timeout).items():
+        facts[scope_id]["branch"] = branch
+    key = str(catalog)
+    with cache.lock:
+        old = dict(cache.catalogs.get(key, {}))
+    kept: dict[str, _Remembered] = {}
+    tool: CueTool | None = None
+    no_tool = False
+    for scope_id in scope_ids:
+        try:
+            directory = catalog / Path(*scope_relative(scope_id).parts)
+        except ValueError:
+            continue
+        info = _regular(directory / "requirement.cue")
+        if info is None:
+            continue  # a Markdown Scope, or none in the catalog: no level
+        remembered = old.get(scope_id)
+        if remembered is not None and (remembered.mtime_ns, remembered.size) == (info.st_mtime_ns, info.st_size):
+            kept[scope_id] = remembered
+            facts[scope_id]["assurance"] = remembered.level
+            continue
+        left = deadline - clock()
+        if no_tool or left <= 0:
+            continue  # no cue, or past the limit: None now, read on a later request (F-02)
+        try:
+            if tool is None:
+                tool = locate(timeout=left)
+                left = deadline - clock()
+                if left <= 0:
+                    continue
+            reading = reader(directory, timeout=left, tool=tool)
+        except CueToolError:
+            no_tool = True
+            continue
+        except Exception:  # a broken read never takes the structure down (F-01)
+            continue
+        level = reading.level if reading.source == "cue" else None
+        if level is None and clock() >= deadline:
+            continue  # most likely stopped by the time limit: read again later
+        kept[scope_id] = _Remembered(info.st_mtime_ns, info.st_size, level)
+        facts[scope_id]["assurance"] = level
+    with cache.lock:
+        cache.catalogs[key] = kept
+    return facts

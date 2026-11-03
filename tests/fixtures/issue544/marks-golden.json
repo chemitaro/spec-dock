@@ -1,0 +1,281 @@
+{
+ "ui": {
+  "stateIcon": [
+   [
+    "<svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" role=\"img\" aria-label=\"着手できる\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg>",
+    "<svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg>"
+   ],
+   [
+    "<svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" role=\"img\" aria-label=\"作業中\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg>",
+    "<svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg>"
+   ],
+   [
+    "<svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" role=\"img\" aria-label=\"止められている\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg>",
+    "<svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg>"
+   ],
+   [
+    "<svg class=\"st-ico\" data-st=\"unknown\" viewBox=\"0 0 24 24\" role=\"img\" aria-label=\"不明\"><path d=\"M12 1.8 22.2 12 12 22.2 1.8 12z\" fill=\"currentColor\"/><path class=\"on\" style=\"stroke-width:2.2\" d=\"M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1\"/></svg>",
+    "<svg class=\"st-ico\" data-st=\"unknown\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1.8 22.2 12 12 22.2 1.8 12z\" fill=\"currentColor\"/><path class=\"on\" style=\"stroke-width:2.2\" d=\"M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1\"/></svg>"
+   ],
+   [
+    "<svg class=\"st-ico\" data-st=\"done\" viewBox=\"0 0 24 24\" role=\"img\" aria-label=\"終わった\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><path class=\"on\" d=\"m7.6 12.3 3 3 5.8-6.2\"/></svg>",
+    "<svg class=\"st-ico\" data-st=\"done\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><path class=\"on\" d=\"m7.6 12.3 3 3 5.8-6.2\"/></svg>"
+   ]
+  ],
+  "chip": [
+   "<span class=\"chip\" data-st=\"ready\"><svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg>着手できる</span>",
+   "<span class=\"chip\" data-st=\"doing\"><svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg>作業中</span>",
+   "<span class=\"chip\" data-st=\"blocked\"><svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg>止められている</span>",
+   "<span class=\"chip\" data-st=\"unknown\"><svg class=\"st-ico\" data-st=\"unknown\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1.8 22.2 12 12 22.2 1.8 12z\" fill=\"currentColor\"/><path class=\"on\" style=\"stroke-width:2.2\" d=\"M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1\"/></svg>不明</span>",
+   "<span class=\"chip\" data-st=\"done\"><svg class=\"st-ico\" data-st=\"done\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><path class=\"on\" d=\"m7.6 12.3 3 3 5.8-6.2\"/></svg>終わった</span>"
+  ],
+  "ic": [
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m6 9 6 6 6-6\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m12 3 9 5-9 5-9-5z\"/><path d=\"m3 13 9 5 9-5\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M3 15h18M9 4v16\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5M12 7v5l3 2\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v5M12 8h.01\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg>",
+   "<svg class=\"ds-icon x\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg>"
+  ]
+ },
+ "parts": {
+  "icon": [
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m6 9 6 6 6-6\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m12 3 9 5-9 5-9-5z\"/><path d=\"m3 13 9 5 9-5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M3 15h18M9 4v16\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5M12 7v5l3 2\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v5M12 8h.01\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><path d=\"M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3\"/><circle cx=\"17.5\" cy=\"18\" r=\"2\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m9 6 6 6-6 6\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m15 6-6 6 6 6\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 6l12 12M18 6 6 18\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m12 3 8 4.5v9L12 21l-8-4.5v-9z\"/><path d=\"m4 7.5 8 4.5 8-4.5M12 12v9\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"2.5\" y=\"7.5\" width=\"8\" height=\"9\" rx=\"1.5\"/><path d=\"M10.5 12h10M16.5 8l4 4-4 4\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 5v14M6 13l6 6 6-6\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M14 3H6a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8z\"/><path d=\"M14 3v5h5\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 4.5A1.5 1.5 0 0 1 5.5 3H20v16H5.5A1.5 1.5 0 0 0 4 20.5zM4 20.5A1.5 1.5 0 0 0 5.5 22H20\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"3\" y=\"5\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M8 3v4M16 3v4\"/></svg>",
+   "<svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.3M12 16.6v.1\"/></svg>"
+  ],
+  "kindLabel": [
+   "Initiative",
+   "Epic",
+   "Issue",
+   "x",
+   ""
+  ],
+  "assuranceMark": [
+   "<span class=\"sd-as\" data-lv=\"1\" role=\"img\" aria-label=\"保証レベル light\" title=\"保証レベル light\"><i class=\"f\"></i><i class=\"\"></i><i class=\"\"></i><i class=\"\"></i></span>",
+   "<span class=\"sd-as\" data-lv=\"2\" role=\"img\" aria-label=\"保証レベル standard\" title=\"保証レベル standard\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"\"></i><i class=\"\"></i></span>",
+   "<span class=\"sd-as\" data-lv=\"3\" role=\"img\" aria-label=\"保証レベル strict\" title=\"保証レベル strict\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i><i class=\"\"></i></span>",
+   "<span class=\"sd-as\" data-lv=\"4\" role=\"img\" aria-label=\"保証レベル critical\" title=\"保証レベル critical\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i></span>",
+   "",
+   ""
+  ],
+  "prMark": [
+   [
+    "<span class=\"sd-pr\" data-pr=\"open\" role=\"img\" aria-label=\"PR #3 開いている・CI 成功・マージできる\" title=\"PR #3 開いている・CI 成功・マージできる\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"sd-ci\" data-ci=\"success\"></span><span class=\"sd-mg\" data-mg=\"mergeable\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg></span></span>",
+    "<span class=\"sd-pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#3 開いている</span><span class=\"sd-prw\"><span class=\"sd-ci\" data-ci=\"success\"></span>CI 成功</span><span class=\"sd-prw\"><span class=\"sd-mg\" data-mg=\"mergeable\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg></span>マージできる</span>"
+   ],
+   [
+    "<span class=\"sd-pr\" data-pr=\"draft\" role=\"img\" aria-label=\"PR #4 下書き・CI 実行中\" title=\"PR #4 下書き・CI 実行中\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"sd-ci\" data-ci=\"pending\"></span></span>",
+    "<span class=\"sd-pr\" data-pr=\"draft\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#4 下書き</span><span class=\"sd-prw\"><span class=\"sd-ci\" data-ci=\"pending\"></span>CI 実行中</span>"
+   ],
+   [
+    "<span class=\"sd-pr\" data-pr=\"open\" role=\"img\" aria-label=\"PR #5 開いている・CI 失敗・衝突がある\" title=\"PR #5 開いている・CI 失敗・衝突がある\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"sd-ci\" data-ci=\"failure\"></span><span class=\"sd-mg\" data-mg=\"conflicting\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg></span></span>",
+    "<span class=\"sd-pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#5 開いている</span><span class=\"sd-prw\"><span class=\"sd-ci\" data-ci=\"failure\"></span>CI 失敗</span><span class=\"sd-prw\"><span class=\"sd-mg\" data-mg=\"conflicting\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg></span>衝突がある</span>"
+   ],
+   [
+    "<span class=\"sd-pr\" data-pr=\"open\" role=\"img\" aria-label=\"PR #6 開いている・CI なし・マージの可否は不明\" title=\"PR #6 開いている・CI なし・マージの可否は不明\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"sd-mg\" data-mg=\"unknown\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.3M12 16.6v.1\"/></svg></span></span>",
+    "<span class=\"sd-pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#6 開いている</span><span class=\"sd-prw\">CI なし</span><span class=\"sd-prw\"><span class=\"sd-mg\" data-mg=\"unknown\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M9.6 9.4a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.3M12 16.6v.1\"/></svg></span>マージの可否は不明</span>"
+   ],
+   [
+    "<span class=\"sd-pr\" data-pr=\"merged\" role=\"img\" aria-label=\"PR #7 マージ済み\" title=\"PR #7 マージ済み\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg></span>",
+    "<span class=\"sd-pr\" data-pr=\"merged\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg>#7 マージ済み</span>"
+   ],
+   [
+    "<span class=\"sd-pr\" data-pr=\"closed\" role=\"img\" aria-label=\"PR #8 閉じた\" title=\"PR #8 閉じた\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><path d=\"M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3\"/><circle cx=\"17.5\" cy=\"18\" r=\"2\"/></svg></span>",
+    "<span class=\"sd-pr\" data-pr=\"closed\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><path d=\"M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3\"/><circle cx=\"17.5\" cy=\"18\" r=\"2\"/></svg>#8 閉じた</span>"
+   ]
+  ],
+  "downMark": [
+   "",
+   "<span class=\"sd-dn\" title=\"後に続く 1件（これを直接・間接に待っている開いた Scope）\" role=\"img\" aria-label=\"後に続く 1件\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"2.5\" y=\"7.5\" width=\"8\" height=\"9\" rx=\"1.5\"/><path d=\"M10.5 12h10M16.5 8l4 4-4 4\"/></svg>1</span>",
+   "<span class=\"sd-dn\" title=\"後に続く 5件（これを直接・間接に待っている開いた Scope）\" role=\"img\" aria-label=\"後に続く 5件\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"2.5\" y=\"7.5\" width=\"8\" height=\"9\" rx=\"1.5\"/><path d=\"M10.5 12h10M16.5 8l4 4-4 4\"/></svg>5</span>"
+  ],
+  "progressBar": [
+   "<span class=\"sd-bar\" style=\"width:100%\" role=\"img\" aria-label=\"終わった 3／7\"><i data-st=\"done\" style=\"width:42.86%\"></i><i data-st=\"doing\" style=\"width:14.29%\"></i><i data-st=\"ready\" style=\"width:28.57%\"></i><i data-st=\"blocked\" style=\"width:14.29%\"></i></span>",
+   "<span class=\"sd-bar\" style=\"width:40px\" role=\"img\" aria-label=\"終わった 0／0\"></span>"
+  ],
+  "stateCountList": [
+   "<span class=\"sd-cnts\"><span class=\"sd-cnt\" data-st=\"blocked\" title=\"止められている 1\"><svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg><span class=\"vh\">止められている</span>1</span><span class=\"sd-cnt\" data-st=\"ready\" title=\"着手できる 2\"><svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg><span class=\"vh\">着手できる</span>2</span><span class=\"sd-cnt\" data-st=\"doing\" title=\"作業中 1\"><svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg><span class=\"vh\">作業中</span>1</span><span class=\"sd-cnt\" data-st=\"unknown\" title=\"不明 0\"><svg class=\"st-ico\" data-st=\"unknown\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1.8 22.2 12 12 22.2 1.8 12z\" fill=\"currentColor\"/><path class=\"on\" style=\"stroke-width:2.2\" d=\"M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1\"/></svg><span class=\"vh\">不明</span>0</span><span class=\"sd-cnt\" data-st=\"done\" title=\"終わった 3\"><svg class=\"st-ico\" data-st=\"done\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><path class=\"on\" d=\"m7.6 12.3 3 3 5.8-6.2\"/></svg><span class=\"vh\">終わった</span>3</span></span>",
+   "<span class=\"sd-cnts\"><span class=\"sd-cnt\" data-st=\"blocked\" title=\"止められている 1\"><svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg><span class=\"vh\">止められている</span>1</span><span class=\"sd-cnt\" data-st=\"ready\" title=\"着手できる 2\"><svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg><span class=\"vh\">着手できる</span>2</span><span class=\"sd-cnt\" data-st=\"doing\" title=\"作業中 1\"><svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg><span class=\"vh\">作業中</span>1</span><span class=\"sd-cnt\" data-st=\"unknown\" title=\"不明 0\"><svg class=\"st-ico\" data-st=\"unknown\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1.8 22.2 12 12 22.2 1.8 12z\" fill=\"currentColor\"/><path class=\"on\" style=\"stroke-width:2.2\" d=\"M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1\"/></svg><span class=\"vh\">不明</span>0</span></span>"
+  ],
+  "legend": "<details class=\"sd-legend\"><summary><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v5M12 8h.01\"/></svg>凡例</summary><ul><li><svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg><span>着手できる</span></li><li><svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg><span>作業中</span></li><li><svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg><span>止められている</span></li><li><svg class=\"st-ico\" data-st=\"unknown\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M12 1.8 22.2 12 12 22.2 1.8 12z\" fill=\"currentColor\"/><path class=\"on\" style=\"stroke-width:2.2\" d=\"M9.9 9.7a2.2 2.2 0 1 1 3.1 2c-.6.3-1 .8-1 1.4v.3M12 16.4v.1\"/></svg><span>不明</span></li><li><svg class=\"st-ico\" data-st=\"done\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"10\" fill=\"currentColor\"/><path class=\"on\" d=\"m7.6 12.3 3 3 5.8-6.2\"/></svg><span>終わった</span></li></ul><ul><li><span class=\"sd-pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg></span><span>PR が開いている</span></li><li><span class=\"sd-pr\" data-pr=\"draft\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg></span><span>下書きの PR</span></li><li><span class=\"sd-pr\" data-pr=\"merged\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg></span><span>マージ済み</span></li><li><span class=\"sd-ci\" data-ci=\"success\"></span><span class=\"sd-ci\" data-ci=\"failure\"></span><span class=\"sd-ci\" data-ci=\"pending\"></span><span>CI の成功・失敗・実行中</span></li><li><span class=\"sd-mg\" data-mg=\"mergeable\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg></span><span class=\"sd-mg\" data-mg=\"conflicting\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg></span><span>マージできる・衝突</span></li><li><span class=\"sd-dn\" title=\"後に続く 1件（これを直接・間接に待っている開いた Scope）\" role=\"img\" aria-label=\"後に続く 1件\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"2.5\" y=\"7.5\" width=\"8\" height=\"9\" rx=\"1.5\"/><path d=\"M10.5 12h10M16.5 8l4 4-4 4\"/></svg>N</span><span>後に続く N件</span></li><li><span class=\"sd-legend__chg\"></span><span>前回見たときから変わった</span></li></ul></details>",
+  "changeBadge": [
+   "<span class=\"sd-badge sd-chg\" data-tone=\"accent\" title=\"前回見たときからの変化\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>新しい</span>",
+   "<span class=\"sd-badge sd-chg\" data-tone=\"accent\" title=\"前回見たときからの変化\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>状態が変わった（着手できる → 止められている）</span>",
+   "<span class=\"sd-badge sd-chg\" data-tone=\"accent\" title=\"前回見たときからの変化\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>状態が変わった（作業中 → 止められている）・PR が変わった（前は下書きの PR）</span>",
+   "<span class=\"sd-badge sd-chg\" data-tone=\"accent\" title=\"前回見たときからの変化\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>PR が変わった（前はPR なし）</span>"
+  ]
+ },
+ "logic": {
+  "changeWords": [
+   "新しい",
+   "状態が変わった（着手できる → 止められている）",
+   "状態が変わった（作業中 → 止められている）・PR が変わった（前は下書きの PR）",
+   "PR が変わった（前はPR なし）"
+  ],
+  "prWords": [
+   "PR #3 開いている・CI 成功・マージできる",
+   "PR #4 下書き・CI 実行中",
+   "PR #5 開いている・CI 失敗・衝突がある",
+   "PR #6 開いている・CI なし・マージの可否は不明",
+   "PR #7 マージ済み",
+   "PR #8 閉じた"
+  ],
+  "KIND_LABEL": {
+   "initiative": "Initiative",
+   "epic": "Epic",
+   "issue": "Issue"
+  },
+  "STATE_WORDS": {
+   "done": "終わった",
+   "doing": "作業中",
+   "ready": "着手できる",
+   "blocked": "止められている",
+   "unknown": "不明"
+  },
+  "PR_STATE_WORDS": {
+   "open": "開いている",
+   "draft": "下書き",
+   "merged": "マージ済み",
+   "closed": "閉じた"
+  }
+ },
+ "marks": {
+  "ic": [
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m6 9 6 6 6-6\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m12 3 9 5-9 5-9-5z\"/><path d=\"m3 13 9 5 9-5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M3 15h18M9 4v16\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 12a9 9 0 1 0 3-6.7L3 8\"/><path d=\"M3 3v5h5M12 7v5l3 2\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 8a6 6 0 0 1 12 0c0 7 3 8 3 8H3s3-1 3-8M10 20a2 2 0 0 0 4 0\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M12 11v5M12 8h.01\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m9 6 6 6-6 6\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M6 6l12 12M18 6 6 18\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 5v14M5 12h14\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12h14\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M4 9V5a1 1 0 0 1 1-1h4M15 4h4a1 1 0 0 1 1 1v4M20 15v4a1 1 0 0 1-1 1h-4M9 20H5a1 1 0 0 1-1-1v-4\"/><rect x=\"8\" y=\"8\" width=\"8\" height=\"8\" rx=\"1\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><path d=\"M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3\"/><circle cx=\"17.5\" cy=\"18\" r=\"2\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"m8.5 12.5 2.5 2.5 5-5.5\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m12 3 8 4.5v9L12 21l-8-4.5v-9z\"/><path d=\"m4 7.5 8 4.5 8-4.5M12 12v9\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 12h14M13 6l6 6-6 6\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"5\"/><circle cx=\"12\" cy=\"12\" r=\"1\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"2.5\" y=\"7.5\" width=\"8\" height=\"9\" rx=\"1.5\"/><path d=\"M10.5 12h10M16.5 8l4 4-4 4\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M5 4v14a2 2 0 0 0 2 2h3M5 9h5M14 7h6M14 18h6\"/><rect x=\"10\" y=\"5\" width=\"4\" height=\"4\" rx=\"1\"/><rect x=\"10\" y=\"16\" width=\"4\" height=\"4\" rx=\"1\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><rect x=\"6\" y=\"9\" width=\"5\" height=\"4\" rx=\"1\"/><rect x=\"13\" y=\"9\" width=\"5\" height=\"4\" rx=\"1\"/></svg>",
+   "<svg class=\"ds-icon y\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1\"/></svg>"
+  ],
+  "KIND": {
+   "initiative": "Initiative",
+   "epic": "Epic",
+   "issue": "Issue"
+  },
+  "asMark": [
+   "<span class=\"as\" data-lv=\"1\" role=\"img\" aria-label=\"保証 light\" title=\"保証レベル light\"><i class=\"f\"></i><i class=\"\"></i><i class=\"\"></i><i class=\"\"></i></span>",
+   "<span class=\"as\" data-lv=\"2\" role=\"img\" aria-label=\"保証 standard\" title=\"保証レベル standard\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"\"></i><i class=\"\"></i></span>",
+   "<span class=\"as\" data-lv=\"3\" role=\"img\" aria-label=\"保証 strict\" title=\"保証レベル strict\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i><i class=\"\"></i></span>",
+   "<span class=\"as\" data-lv=\"4\" role=\"img\" aria-label=\"保証 critical\" title=\"保証レベル critical\"><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i><i class=\"f\"></i></span>",
+   "",
+   ""
+  ],
+  "AS_LEVELS": [
+   "light",
+   "standard",
+   "strict",
+   "critical"
+  ],
+  "prMark": [
+   [
+    "<span class=\"pr\" data-pr=\"open\" role=\"img\" aria-label=\"PR #3 開いている・CI 成功・マージできる\" title=\"PR #3 開いている・CI 成功・マージできる\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"ci\" data-ci=\"success\"></span><span class=\"mg\" data-mg=\"ok\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg></span></span>",
+    "<span class=\"pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#3 開いている</span><span><span class=\"ci\" data-ci=\"success\"></span> CI 成功</span><span><span class=\"mg\" data-mg=\"ok\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"m5 12.5 4.5 4.5L19 7.5\"/></svg></span>マージできる</span>"
+   ],
+   [
+    "<span class=\"pr\" data-pr=\"draft\" role=\"img\" aria-label=\"PR #4 下書き・CI 実行中\" title=\"PR #4 下書き・CI 実行中\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"ci\" data-ci=\"running\"></span></span>",
+    "<span class=\"pr\" data-pr=\"draft\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#4 下書き</span><span><span class=\"ci\" data-ci=\"running\"></span> CI 実行中</span>"
+   ],
+   [
+    "<span class=\"pr\" data-pr=\"open\" role=\"img\" aria-label=\"PR #5 開いている・CI 失敗・衝突\" title=\"PR #5 開いている・CI 失敗・衝突\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg><span class=\"ci\" data-ci=\"failure\"></span><span class=\"mg\" data-mg=\"conflict\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg></span></span>",
+    "<span class=\"pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#5 開いている</span><span><span class=\"ci\" data-ci=\"failure\"></span> CI 失敗</span><span><span class=\"mg\" data-mg=\"conflict\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M13 2 4 14h7l-1 8 9-12h-7z\"/></svg></span>衝突している</span>"
+   ],
+   [
+    "<span class=\"pr\" data-pr=\"open\" role=\"img\" aria-label=\"PR #6 開いている\" title=\"PR #6 開いている\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg></span>",
+    "<span class=\"pr\" data-pr=\"open\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><circle cx=\"18\" cy=\"8\" r=\"2\"/><path d=\"M6 8v8M18 10c0 4-6 3-11.5 6.5\"/></svg>#6 開いている</span>"
+   ],
+   [
+    "<span class=\"pr\" data-pr=\"merged\" role=\"img\" aria-label=\"PR #7 マージ済み\" title=\"PR #7 マージ済み\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg></span>",
+    "<span class=\"pr\" data-pr=\"merged\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"5.5\" r=\"2\"/><circle cx=\"6\" cy=\"18.5\" r=\"2\"/><circle cx=\"18\" cy=\"12\" r=\"2\"/><path d=\"M6 7.5v9M6 7.5c0 3.5 4 4.5 10 4.5\"/></svg>#7 マージ済み</span>"
+   ],
+   [
+    "<span class=\"pr\" data-pr=\"closed\" role=\"img\" aria-label=\"PR #8 閉じた\" title=\"PR #8 閉じた\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><path d=\"M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3\"/><circle cx=\"17.5\" cy=\"18\" r=\"2\"/></svg></span>",
+    "<span class=\"pr\" data-pr=\"closed\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><circle cx=\"6\" cy=\"6\" r=\"2\"/><circle cx=\"6\" cy=\"18\" r=\"2\"/><path d=\"M6 8v8M15 5l5 5M20 5l-5 5M17.5 13v3\"/><circle cx=\"17.5\" cy=\"18\" r=\"2\"/></svg>#8 閉じた</span>"
+   ]
+  ],
+  "sbar": [
+   "<span class=\"sbar\" style=\"width:64px\" role=\"img\" aria-label=\"終わった 3／7\"><i data-st=\"done\" style=\"width:42.86%\"></i><i data-st=\"doing\" style=\"width:14.29%\"></i><i data-st=\"ready\" style=\"width:28.57%\"></i><i data-st=\"blocked\" style=\"width:14.29%\"></i></span>",
+   "<span class=\"sbar\" style=\"width:64px\"></span>"
+  ],
+  "counts": "<span class=\"cnts\"><span class=\"cnt\" data-st=\"blocked\" title=\"止められている 1\"><svg class=\"st-ico\" data-st=\"blocked\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M8.1 2.6h7.8l5.5 5.5v7.8l-5.5 5.5H8.1l-5.5-5.5V8.1z\" fill=\"currentColor\"/><path class=\"on\" d=\"M7.6 12h8.8\"/></svg>1</span><span class=\"cnt\" data-st=\"ready\" title=\"着手できる 2\"><svg class=\"st-ico\" data-st=\"ready\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M7 4.2 20.2 12 7 19.8z\" fill=\"currentColor\" stroke=\"currentColor\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/></svg>2</span><span class=\"cnt\" data-st=\"doing\" title=\"作業中 1\"><svg class=\"st-ico\" data-st=\"doing\" viewBox=\"0 0 24 24\" aria-hidden=\"true\"><circle cx=\"12\" cy=\"12\" r=\"8.6\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.6\"/><path d=\"M12 6.2a5.8 5.8 0 0 1 0 11.6z\" fill=\"currentColor\"/></svg>1</span></span>",
+  "frac": "<span class=\"frac\">3<small>／7</small></span>",
+  "dnMark": [
+   "",
+   "<span class=\"dn\" title=\"後に続く 3件（これを直接・間接に待っている開いた Scope）\" role=\"img\" aria-label=\"後に続く 3件\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><rect x=\"2.5\" y=\"7.5\" width=\"8\" height=\"9\" rx=\"1.5\"/><path d=\"M10.5 12h10M16.5 8l4 4-4 4\"/></svg>3</span>"
+  ],
+  "stageMark": [
+   "",
+   "<span class=\"stg\" title=\"段2（同じ親の中で 3段のうち 2段目に進める）\">2</span>"
+  ],
+  "wtMark": [
+   "",
+   "<span class=\"wt\" title=\"worktree：u/iss-00002\" role=\"img\" aria-label=\"worktree u/iss-00002\"><svg class=\"ds-icon\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z\"/></svg></span>"
+  ],
+  "changeText": [
+   "新しく作られた",
+   "状態が変わった（前は着手できる）",
+   "状態が変わった（前は作業中）・PR が変わった",
+   "PR が変わった"
+  ],
+  "chgMark": [
+   "<span class=\"chg\" title=\"前回から変化：新しく作られた\"></span>",
+   "<span class=\"chg\" title=\"前回から変化：状態が変わった（前は着手できる）\"></span>",
+   "<span class=\"chg\" title=\"前回から変化：状態が変わった（前は作業中）・PR が変わった\"></span>",
+   "<span class=\"chg\" title=\"前回から変化：PR が変わった\"></span>"
+  ]
+ }
+}

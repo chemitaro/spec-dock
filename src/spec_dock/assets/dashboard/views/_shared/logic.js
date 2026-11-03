@@ -1,6 +1,7 @@
 // Pure helpers for the board, the detail screen, the overview and the search (iss-00531). No DOM here, so
 // node can test them (tests/unit/infra/test_dashboard_screens_js.py). Nothing here judges a state: lanes,
 // merge groups, ranks and changes come from the server's model (#528), which the screens only copy.
+import { KIND_LABEL, PR_STATE_WORDS, STATE_WORDS } from "../../core/ui.js";
 
 export const LANES = [
   ["blocked", "止められている", "依存の先か上位が終わっていない。待ち先の少ない順"],
@@ -16,7 +17,7 @@ export const KINDS = [
   ["epic", "Epic"],
   ["issue", "Issue"],
 ];
-export const KIND_LABEL = { initiative: "Initiative", epic: "Epic", issue: "Issue" };
+export { KIND_LABEL, PR_STATE_WORDS, STATE_WORDS }; // their home is core/ui.js (iss-00544)
 export const TABS = [
   ["summary", "概要"],
   ["deps", "依存"],
@@ -130,7 +131,6 @@ export function searchScopes(scopes, query, limit = 8) {
   return [...exact.sort(byRank), ...partial.sort(byRank)].slice(0, limit);
 }
 
-export const STATE_WORDS = { done: "終わった", doing: "作業中", ready: "着手できる", blocked: "止められている", unknown: "不明" };
 const PR_PHASE_WORDS = {
   none: "PR なし",
   draft: "下書きの PR",
@@ -153,7 +153,6 @@ export function changeWords(change, scope) {
   return parts.join("・") || "変わった";
 }
 
-export const PR_STATE_WORDS = { open: "開いている", draft: "下書き", merged: "マージ済み", closed: "閉じた" };
 export const CHECK_WORDS = { success: "CI 成功", failure: "CI 失敗", pending: "CI 実行中", none: "CI なし" };
 export const MERGEABLE_WORDS = { mergeable: "マージできる", conflicting: "衝突がある", unknown: "マージの可否は不明" };
 

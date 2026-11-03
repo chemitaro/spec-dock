@@ -28,6 +28,7 @@ export function scope(repository, scopeId, baseline) {
 
 // Epic D-18: the server records the current model; the body is ignored. The fixed header and the JSON type
 // make another origin need a preflight, which the server never grants.
+// A refusal or a failed request never stops the page: the answer is then null.
 export async function markSeen(repository) {
   const response = await fetch(api(repository, "seen"), {
     method: "POST",
@@ -35,6 +36,6 @@ export async function markSeen(repository) {
     body: "{}",
     cache: "no-store",
     credentials: "omit",
-  });
-  return response.ok ? response.json() : null;
+  }).catch(() => null);
+  return response?.ok ? response.json().catch(() => null) : null;
 }
