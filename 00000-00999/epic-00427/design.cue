@@ -38,14 +38,14 @@ design: {
 
 			| コマンド | 働き |
 			|---|---|
-			| `dashboard serve [--port N] [--tailscale] [--json]` | 前面で動き、Ctrl-C か SIGTERM で止まる。起動のときに URL と見せるリポジトリの一覧を書く。すでに動いていれば、その URL を示して終わる（終了コード0） |
+			| `dashboard serve [--port N] [--tailscale] [--json]` | 前面で動き、Ctrl-C か SIGTERM で止まる。起動のときに URL と見せるリポジトリの一覧を書く。すでに動いていれば、その URL を示して終わる（終了コード0）。常駐から起動されたときは D-14 の決まりに従う |
 			| `dashboard service install [--port N] [--tailscale]` | 常駐を入れる（D-14） |
 			| `dashboard service status` | 常駐が入っているか、動いているか、URL |
 			| `dashboard service uninstall` | 常駐を外す |
 			| `dashboard hide [REPOSITORY]` | 表示から外す（D-13）。チェックアウトの中では省ける |
 			| `dashboard show [REPOSITORY]` | 表示に戻す |
 			| `dashboard list [--json]` | 登録したリポジトリと、表示中か隠しているか、サーバーの URL |
-			| `dashboard summary [REPOSITORY] [--json]` | R-21 の要約。サーバーが動いていなくても、隠したリポジトリでも動き、ネットワークに触れない。スナップショットがないときは `DASHBOARD_SNAPSHOT_MISSING`（終了コード3） |
+			| `dashboard summary [REPOSITORY] [--json]` | R-21 の要約。サーバーが動いていなくても、隠したリポジトリでも動き、GitHub にもサーバーにも要求を送らない（在りかの記録の `pid` が生きているかだけを見る）。スナップショットがないときは `DASHBOARD_SNAPSHOT_MISSING`（終了コード3） |
 
 			`REPOSITORY` は `owner/name` か `host/owner/name`。同じリポジトリのクローンが2つ登録されているときは、main のチェックアウトの道で選ばせる（`DASHBOARD_REPOSITORY_AMBIGUOUS`、終了コード3）。`repository` が分からない登録の行は、一覧に「リポジトリが分からない」と出し、配らない。
 			"""
@@ -59,7 +59,7 @@ design: {
 			- 待ち受け：既定は `127.0.0.1` だけ。`--tailscale` のときは `tailscale ip -4` の住所にも待ち受ける。`0.0.0.0` には待ち受けない。前面の `serve --tailscale` で住所が得られなければ、起動せずに `DASHBOARD_TAILSCALE_UNAVAILABLE`（終了コード3）で止まる（F-08）。常駐では手元で先に始め、30秒ごとに住所を取り直して足す（R-28）。
 			- 番号：既定は 47800 の1つ（`--port` で変える）。使われていれば、起動せずに `DASHBOARD_PORT_IN_USE`（終了コード3）で止まる（F-07）。
 			- 二重起動：`<state_root>/dashboard/server.lock` の排他のロックで防ぐ。2つ目の `serve` は、動いているサーバーの URL を示して終わる。
-			- 受け付けるのは `GET` と `HEAD` だけ。書き込みの口はない（R-04）。`Host` の見出しが、待ち受けの住所と番号（`127.0.0.1`、`localhost`、Tailscale の IP、このPCの MagicDNS の名前）でなければ 421 で断る。
+			- 受け付けるのは `GET` と `HEAD` と、「見た」の口（D-18）の `POST` だけ（R-04）。`Host` の見出しが、待ち受けの住所と番号（`127.0.0.1`、`localhost`、Tailscale の IP、このPCの MagicDNS の名前）でなければ 421 で断る。
 			- リポジトリの切り離し：リポジトリごとのモデルの組み立てを例外で閉じ込め、失敗はそのリポジトリの画面と API にだけ返す（R-03、F-12）。
 			- 新しい登録：登録簿の時刻が変わったら読み直す（R-01）。
 			"""
@@ -70,33 +70,34 @@ design: {
 		text: """
 			画面は、サーバーの JSON の API だけを読む。どれも、スナップショット、カタログ、このPCの worktree をその場で読み、GitHub に問い合わせない（R-04、R-07）。
 
-			- 画面の道筋：`/`（横断の概況、D-16）、`/r/<host>/<owner>/<name>/`（ホーム＝構造の図）、`…/graph`、`…/board`、`…/list`、`…/timeline`、`…/scopes/<ID>`。表示の切り替えは問い合わせの文字列に持つ（固めない）。`/r/…/scopes/<ID>` の形と `?embed=1` は、変えない契約にする（R-17、R-22）。画面の中のリンクは相対の道で作り、前置きが変わっても動くようにする。
+			- 画面の道筋：`/`（横断の概況、D-16）、`/r/<host>/<owner>/<name>/`（ホーム＝構造の図）、`…/graph`、`…/board`、`…/timeline`、`…/scopes/<ID>`。表示の切り替えは問い合わせの文字列に持つ（固めない）。`/r/…/scopes/<ID>` の形と `?embed=1` は、変えない契約にする（R-17、R-22）。画面の中のリンクは相対の道で作り、前置きが変わっても動くようにする。
 			- 共有の部品：`/assets/…`（画面）、`/ds/…`（デザインシステム）、`/vendor/…`（図の部品）。全リポジトリで共有する。
-			- API：`GET /api/v1/repositories`（表示中のリポジトリと、各要約への道）。リポジトリごとに `GET /api/v1/r/<host>/<owner>/<name>/{summary|structure|scopes/<ID>|revision}`。
-			- 自動の更新：画面は5秒ごとにそのリポジトリの `revision`（スナップショットの `fetched_at` とファイルの時刻、カタログの `state.json` の時刻から作る短い印）を読み、変わったときだけ全体を読み直す（R-08）。
+			- API：`GET /api/v1/repositories`（表示中のリポジトリと、各要約への道）。リポジトリごとに `GET /api/v1/r/<host>/<owner>/<name>/{summary|structure|scopes/<ID>|revision}` と、`POST /api/v1/r/<host>/<owner>/<name>/seen`（D-18）。
+			- 自動の更新：画面は5秒ごとにそのリポジトリの `revision`（スナップショットの `fetched_at` とファイルの時刻、カタログの `state.json` の時刻、「見た」の記録の時刻から作る短い印）を読み、変わったときだけ全体を読み直す（R-08）。
 			- 応答の JSON は `schema: "specdock.dashboard/v1"` を持つ。`structure` の形は画面のためのもので、公開の契約にしない。
 			"""
 		satisfies: ["R-04", "R-07", "R-08", "R-17"]
 	}
 	"D-04": {
-		title: "状態のモデル：`evaluate_all` からの5つの状態"
+		title: "状態のモデル：`evaluate_readiness` からの5つの状態と、ボードの分け方"
 		text: """
 			新しい領域の部品 `runtime/domain/dashboard_model.py` に、スナップショットから画面のモデルを作る純粋な関数を置く。
 
-			- Issue：`evaluate_all` の DONE、DOING、BLOCKED、READY、UNKNOWN を、終わった、作業中、止められている、着手できる、不明にそのまま写す。判定を別に書かないので、`dependency check` と一致する（R-10）。
-			- Epic と Initiative：閉じていれば終わった。自分か子孫に `in_progress` があれば作業中。自分の `evaluate_readiness` が BLOCKED なら止められている。異常があれば不明。それ以外は着手できる。配下の進み具合（終わった数と全体の数）を別に持つ。
+			- 状態（R-10）：どの種類も `evaluate_all` の結果を写す。DONE → 終わった、UNKNOWN → 不明、DOING → 作業中、BLOCKED → 止められている、READY → 着手できる。Epic と Initiative は、DONE と UNKNOWN でなく、子孫のどれかに `in_progress` があれば作業中にする（この1つだけを足す）。止められている理由は `blockers` の `role`（`ancestor` の閉じた親、`prerequisite`、`external`）から作る。判定を別に書かないので、`dependency check` と一致する。
+			- ボードの分け方（R-13）：作業中で、下書きでない開いた PR（D-19）を持つ Issue をマージ待ちの列に、ほかの作業中を作業中の列に置く。状態そのものは変えない。
 			- 終わったものを隠すときに残す印：開いた子孫を持つ閉じた Scope（R-12）。
 			- 配下の実行の順番：直下の子を、子孫どうしの依存も子の間の依存に数えて、トポロジカルな段（1、2、…）に分ける。外への依存は別に持つ（R-18）。循環は異常として不明に回す。
-			- 片付けの候補：配下がすべて閉じたのに開いている Epic と Initiative、閉じたのに開いた配下がある親（R-20）。
-			- 時間の軸：`created_at` と `closed_at` から、週ごとの作成と完了の累計と、最近の動きを作る（R-16）。
+			- 片付けの候補：配下がすべて閉じたのに開いている Epic と Initiative、閉じたのに開いた配下がある親（R-14、R-20）。
+			- 前回からの変化（R-29）：「見た」の記録（D-18）の各 Scope の状態と PR の状態と、今のモデルを比べ、状態が変わった、新しい、PR が変わった（開いた、マージ待ちになった、CI が失敗に変わった、マージされた、閉じた）を印にする。題名、親子、依存だけの変化は数えない。
+			- 時間の軸：`created_at` と `closed_at` から、週ごとの作成と完了の累計を作り、最近の動きに Scope の作成と完了、PR の開いた時刻とマージの時刻を並べる（R-16）。
 			- 取得の時刻と古さ：`fetched_at` から30分を超えたかを決める。異常は `anomalies` をそのまま渡す（R-09）。
 			"""
-		satisfies: ["R-09", "R-10", "R-12", "R-16", "R-18", "R-20"]
+		satisfies: ["R-09", "R-10", "R-12", "R-13", "R-14", "R-16", "R-18", "R-20", "R-29"]
 	}
 	"D-05": {
 		title: "要約の JSON の契約（`specdock.dashboard-summary/v1`）"
 		text: """
-			D-04 のモデルから作る。項目：`schema`、`repository`、`fetched_at`、`stale`、`counts`（種類ごと・状態ごとの数）、`completion_ratio`、`in_progress`・`ready`・`blocked`・`cleanup` の一覧（各要素は `id`、`number`、`title`、`state`、`reason`）、`anomaly_count`、`paths`（各 Scope の詳しい画面の道。`/r/<host>/<owner>/<name>/scopes/<ID>`）、`hidden`（隠しているか）、`server`（在りかの記録があり、そのサーバーが応えるときだけ、その基点の URL。なければ null）。
+			D-04 のモデルから作る。項目：`schema`、`repository`、`fetched_at`、`stale`、`counts`（種類ごと・状態ごとの数）、`completion_ratio`、`awaiting_merge`・`in_progress`・`ready`・`blocked`・`cleanup` の一覧（各要素は `id`、`number`、`title`、`state`、`reason`）、`anomaly_count`、`paths`（各 Scope の詳しい画面の道。`/r/<host>/<owner>/<name>/scopes/<ID>`）、`hidden`（隠しているか）、`server`（在りかの記録があり、その `pid` が生きているときだけ、その基点の URL。なければ null。応えるかは確かめない）。
 
 			項目を足すのは版を変えずにできる。消すか意味を変えるときは版を上げる。配布する `reference_cli.md` に契約として書く。
 			"""
@@ -116,7 +117,7 @@ design: {
 		text: """
 			画面は、組み立ての道具を使わない素の HTML、CSS、JavaScript のモジュールで書き、`src/spec_dock/assets/dashboard/` に置いて wheel に同梱する（`assets/**/*` で入る）。配布資産（`static-inventory.json`）には入れない。図の部品とデザインシステムもサーバーが配り、CDN に頼らない（R-24）。
 
-			- ホームは構造の図（R-15）。上の帯に、リポジトリの切り替え（R-03）、4つの画面の切り替え、検索（R-17）を置く。
+			- ホームは構造の図（R-15）。上の帯に、リポジトリの切り替え（R-03）、3つの画面の切り替え、今のリポジトリの検索、取得の時刻（R-17）を置く。PC では本体を幅いっぱいにし、選んだものの要点を右の欄に、スマートフォンでは下から出す。見た目の決まり（色、文字、余白）は、2026-11-03 に利用者が選ぶデザイン案に従う。
 			- 明るい表示と暗い表示は `prefers-color-scheme` に従う。幅 390px で横にはみ出さない。高さは `100vh` でなく `100dvh` か親の高さで決める（iframe の中でも崩れないため）（R-06）。
 			- 状態の札は、色、記号、言葉の3つで示し、凡例を置く（R-11）。
 			- 画面の状態は URL だけに持つ（埋め込まれたときに、ブラウザーの保存の領域が分けられても困らないため）。
@@ -125,15 +126,15 @@ design: {
 		satisfies: ["R-03", "R-06", "R-11", "R-13", "R-24"]
 	}
 	"D-08": {
-		title: "4つの画面と詳しい画面"
+		title: "3つの画面と詳しい画面"
 		text: """
-			モック（`artifacts/20261025t220347z--dashboard-mock.html`）の画面と操作を基にし、データは D-03 の API から読む。
+			データは D-03 の API から読む。見た目は、利用者が選んだデザイン案に従う。
 
-			- 構造の図（R-15、ホーム）：入れ子と木の2つの表し方、範囲の絞り込み、依存の線の3つの切り替え、段の表示、折り返し、拡大・縮小・移動、前後の強調と要点、ダブルクリックでの移動。配置の計算は画面の側で行う。指の操作は、図の領域に `touch-action: none` を付け、Pointer Events で2本指の拡大縮小とドラッグを自分で処理し、Safari の `gesturestart` を止めてページ全体の拡大と競合させない。拡大・縮小と「全体を収める」のボタンも置く。
-			- 状態のボード（R-13）、一覧と概況（R-14）、検索（R-17）。
-			- 時間の軸（R-16）：週ごとの累計の図と、最近の動き。
-			- 詳しい画面（R-18）：見出し、状態の理由、依存、配下、配下の実行の順番、作業中の場所、Artifact、写せるコマンド（D-17）。
-			- 文書の欄（段階1）：文書があるかないかと、HTML の Artifact へのリンクだけ。カタログがなければ、そのことと `spec-dock canonical link` を示す（F-05）。
+			- 構造の図（R-15、ホーム）：入れ子と木の2つの表し方、範囲の絞り込み、依存の線の3つの切り替え、段の表示、折り返し、拡大・縮小・移動、前後の強調と要点、PC のダブルクリックとスマートフォンの2回目のタップでの移動。箱には、状態、ID と番号、題名、保証レベル、PR の印、作業中のブランチ、変化の印。Epic の枠には、進み具合の帯、状態ごとの数、保証レベル。配置の計算は画面の側で行う。指の操作は、図の領域に `touch-action: none` を付け、Pointer Events で2本指の拡大縮小とドラッグを自分で処理し、Safari の `gesturestart` を止めてページ全体の拡大と競合させない。拡大・縮小と「全体を収める」のボタンも置く。
+			- 状態のボード（R-13、R-14）：マージ待ち、作業中、着手できる、止められている（終わった）の列、種類の絞り込み、親ごとのまとめ、上の数の帯と片付けの候補の印。一覧の画面は作らない。
+			- 時間の軸（R-16）：週ごとの累計の図と、Scope と PR の最近の動き。
+			- 詳しい画面（R-18）：見出しと、概要、依存、配下、文書、Artifact のタブ。GitHub の Issue と PR へのリンク。写せるコマンドは置かない。
+			- 文書のタブ（段階1）：文書があるかないかだけ。カタログがなければ、そのことと `spec-dock canonical link` を示す（F-05）。
 			- 終わったものの切り替え（R-12）。
 			"""
 		satisfies: ["R-12", "R-13", "R-14", "R-15", "R-16", "R-17", "R-18"]
@@ -141,7 +142,7 @@ design: {
 	"D-09": {
 		title: "HTML の資料の切り離しと、枠の決まり"
 		text: """
-			- 資料：カタログの HTML の資料（Artifact、`explanation.html`）は `/r/<host>/<owner>/<name>/files/<ID>/…` から配り、`Content-Security-Policy: sandbox allow-scripts allow-popups`（`allow-same-origin` なし）を付ける。資料は固有でない起点で動き、ダッシュボードの画面の DOM と、どのリポジトリの API の JSON にも触れられない（API には CORS の見出しを付けない）。1つの起点に全リポジトリが載るので、この切り離しは欠かせない（R-05、F-09）。配るのは、その Scope のディレクトリの中の通常のファイルだけで、リンクと `..` を断る。
+			- 資料：カタログの資料（Artifact、`explanation.html` など）は `/r/<host>/<owner>/<name>/files/<ID>/…` から配り、この道から返すすべての応答に、形式によらず `Content-Security-Policy: sandbox allow-scripts allow-popups`（`allow-same-origin` なし）と `X-Content-Type-Options: nosniff` を付ける（SVG のようにスクリプトを含められるほかの形式も切り離すため）。資料は固有でない起点で動き、ダッシュボードの画面の DOM と、どのリポジトリの API の JSON にも触れられない（API には CORS の見出しを付けない）。1つの起点に全リポジトリが載るので、この切り離しは欠かせない（R-05、F-09）。配るのは、その Scope のディレクトリの中の通常のファイルだけで、リンクと `..` を断る。
 			- 共有の部品：固有でない起点の資料がデザインシステムと図の部品を読めるよう、`/ds/` と `/vendor/` の静的なファイルにだけ `Access-Control-Allow-Origin: *` を付ける（データを含まないため）。資料が読む `../../../design-system/` などの相対の道は、サーバーが `/ds/` に写す。
 			- 枠の決まり：通常の画面は `Content-Security-Policy: frame-ancestors 'self'`。`?embed=1` の画面と、そこから開く資料は、段階1では `frame-ancestors 'self' http://127.0.0.1:* http://localhost:* http://<Tailscale の IP>:*` にする（見るだけなので、設定なしで company-os に埋め込めるようにする）。`X-Frame-Options` は付けない。書き込みを足す段階で、正確な起点の設定に絞る。
 			"""
@@ -191,11 +192,13 @@ design: {
 	"D-14": {
 		title: "常駐（`dashboard service`）"
 		text: """
-			`runtime/infra/canonical_scheduling.py` の `Scheduler` の部品を使い、同期とは別のラベル（launchd の `…spec-dock.dashboard`、systemd のユーザーの単位 `spec-dock-dashboard.service`）で、常に動くサービス（launchd の `KeepAlive`、systemd の `Restart=on-failure`）として入れる。`canonical link` や `installation update` からは入れない（言い直した約束3）。
+			`runtime/infra/canonical_scheduling.py` の `Scheduler` の部品を使い、同期とは別のラベル（launchd の `…spec-dock.dashboard`、systemd のユーザーの単位 `spec-dock-dashboard.service`）で、常に動くサービス（launchd の `KeepAlive`、systemd の `Restart=always` と `RestartSec=10`）として入れる。`canonical link` や `installation update` からは入れない（言い直した約束3）。
 
+			- 起動の引数：常駐は `dashboard serve --service` で動く（利用者向けの印でない内部の引数）。
 			- 実行ファイル：同期と同じ Python とコンソールを記録する（macOS のフルディスクアクセスの許可を同期と共有するため）。
 			- 設定：`--port` と `--tailscale` は、常駐の起動の引数に書く。変えるときは `install` をやり直す。
-			- 版の更新：サーバーは60秒ごとに `importlib.metadata.version("spec-dock")` を見て、起動のときと違えば終了する。常駐は新しい版で起動し直す。前面の `serve` は、画面の帯で起動し直しを促す。
+			- 前面の `serve` との共存：`--service` で起動したとき、前面の `serve` がロックを持っていれば、終わらずに30秒ごとにロックを取り直して待つ（launchd と systemd が起動と終了を繰り返さないように）。前面の `serve` が止まれば、常駐がそのまま引き継ぐ。
+			- 版の更新：サーバーは60秒ごとに `importlib.metadata.version("spec-dock")` を見て、起動のときと違えば終了コード75で終了する。launchd の `KeepAlive` と systemd の `Restart=always` が、新しい版で起動し直す。前面の `serve` は、画面の帯で起動し直しを促す（終了しない）。
 			- `status`：設定のファイルがあるか、動いているか、URL、記録した版。`uninstall`：常駐を止めて設定のファイルを消し、何も残さない。
 			- systemd のない Linux では、常駐を入れずに `serve` を案内する（同期の loop の代わりは作らない）。
 			"""
@@ -204,10 +207,10 @@ design: {
 	"D-15": {
 		title: "埋め込みの表示と postMessage の約束（`specdock.embed/v1`）"
 		text: """
-			- `?embed=1`：SpecDock の題名とリポジトリの切り替えを消し、画面のタブと検索を残す。画面の中のリンクは `embed=1` を引き継ぐ。GitHub などの外へのリンクは `target=_blank` で開く。
-			- 知らせの形：`{source: "specdock", v: 1, type, …}`。SpecDock から親へ：`ready {repository, path, title, capabilities}`、`navigated {path, title, scope}`（画面を移るたび）。親から SpecDock へ：`navigate {path}`（枠を作り直さずに移る）、`theme {scheme: "light"|"dark"|"auto"}`。
-			- 起点の確かめ：SpecDock は、`frame-ancestors` で許した起点（D-09）からの知らせだけを受け、`event.source` が親の窓であることも確かめる。送るときは、`ready` の前に受けた親の起点を `targetOrigin` にし、`*` を使わない。
-			- 履歴：画面の移動を履歴に積むのは SpecDock の側（iframe の中の移動は、もとから共通の履歴に入る）。親は `navigated` を受けて自分の URL を `replaceState` で合わせるだけにする（戻るが二重に効かないようにする）。
+			- `?embed=1`：SpecDock の題名とリポジトリの切り替えを消し、画面の切り替えと検索を残す。画面の中のリンクは `embed=1` を引き継ぐ。GitHub などの外へのリンクは `target=_blank` で開く。
+			- 知らせの形：`{source: "specdock", v: 1, type, …}`（親から送るものは `source: "host"`）。始まりは親から：親は枠が読み込まれたら `hello {v}` を送る。SpecDock は、`frame-ancestors` で許した起点（D-09）からの `hello` を受けたら、その起点を覚え、`ready {repository, path, title, capabilities}` を返す。その後、SpecDock から親へ `navigated {path, title, scope}`（画面を移るたび）。親から SpecDock へ `navigate {path}`（枠を作り直さずに移る）、`theme {scheme: "light"|"dark"|"auto"}`。`hello` の前は、SpecDock は何も送らない。
+			- 起点の確かめ：SpecDock は、覚えた起点からの知らせだけを受け、`event.source` が親の窓であることも確かめる。送るときは、覚えた起点を `targetOrigin` にし、`*` を使わない。
+			- 履歴：画面の移動を履歴に積むのは SpecDock の側（iframe の中の移動は、もとから共通の履歴に入る）。親は `navigated` を受けて自分の URL を `replaceState` で合わせるだけにする。
 			- 高さ：親が枠の高さを決め、SpecDock は中でスクロールする。高さの知らせは作らない。
 			- 足すのは版を変えずにでき、消すか意味を変えるときは版を上げる。配布する `reference_cli.md` に契約として書く。
 			"""
@@ -215,20 +218,43 @@ design: {
 	}
 	"D-16": {
 		title: "横断の概況（`/`）"
-		text: "表示中の全リポジトリについて、状態ごとの数、終わった割合、作業中のもの、止められているもの（理由つき）、片付けの候補の数、取得の時刻と古さ、読めないときの印を、リポジトリごとの札で並べる。札を押すと、そのリポジトリのホームへ移る。`?embed=1` で埋め込める。統合ダッシュボードは、JSON から画面を作らずにこれを埋め込める（R-22）。"
+		text: "表示中の全リポジトリについて、リポジトリごとの札を並べる。札には、一番大きく、マージ待ち、作業中、着手できる Issue の題名を数件ずつ出し、その下に状態ごとの数、止められている数、片付けの候補の数、前回からの変化の数、取得の時刻と古さ、読めないときの印を出す。札を押すと、そのリポジトリのホームへ移る。横断の概況を開いても「見た」にしない（D-18）。`?embed=1` で埋め込める。統合ダッシュボードは、JSON から画面を作らずにこれを埋め込める（R-22）。"
 		satisfies: ["R-22"]
 	}
 	"D-17": {
-		title: "写せるコマンドと、安全でない文脈での写し方"
-		text: "詳しい画面の写せるコマンドは、状態に合わせて画面が組み立てる（例：着手できる Issue に `spec-dock work start <ID>`）。写すボタンは、`navigator.clipboard` が使えるとき（`127.0.0.1` など安全な文脈）はそれを使い、使えないとき（`http://<Tailscale の IP>`）は、隠した文字の欄を選んで `document.execCommand('copy')` を試し、それも効かなければ、コマンドの文字を選んだ状態で示して手で写せるようにする（R-29）。埋め込まれたときのために、親の iframe に `allow=\"clipboard-write\"` を付けることを、D-15 の契約の文書に書く。"
-		satisfies: ["R-18", "R-29"]
+		title: "（2026-11-03 に取り下げ）写せるコマンド"
+		text: "利用者の決定で、画面からコマンドを写す機能を置かないことにした。詳しい画面には GitHub の Issue と PR へのリンクだけを置く（R-18）。Tailscale の住所でクリップボードが使えない問題は、起きなくなった。番号は、経緯を残すために残す。"
+		satisfies: ["R-18"]
+	}
+	"D-18": {
+		title: "「見た」の記録（`specdock.dashboard-seen/v1`）"
+		text: """
+			- 置き場：`<state_root>/dashboard/seen.json`。リポジトリ（`host/owner/name`）ごとに、`seen_at` と、そのときの各 Scope の状態と PR の状態（`{ID: {state, pr}}`）を持つ。ロックつきで原子的に書く。端末に関わらず共通（R-29）。
+			- 口：`POST /api/v1/r/<host>/<owner>/<name>/seen`。そのリポジトリの画面（構造の図、ボード、時間の軸、詳しい画面）を開き、データを読み終えたときに、画面が1回送る。中身は空で、サーバーがそのときのモデルから記録を作る（画面から状態を受け取らない）。横断の概況からは送らない。
+			- 守り：`Origin` の見出しがサーバー自身の起点（待ち受けの住所と番号）と完全に一致し、`X-SpecDock-Dashboard: 1` の見出しがあり、`Content-Type` が `application/json` の要求だけを受け、ほかは 403 で断る（ほかの起点からは事前の確かめ（preflight）が要る形にし、CORS の見出しは返さない）。Cookie は使わない。偽の要求でできるのは変化の印を消すことだけで、GitHub、カタログ、リポジトリには触れない。
+			- 前回の記録がないリポジトリは、変化の印を出さず、最初に開いたときに記録を作る。
+			"""
+		satisfies: ["R-04", "R-29"]
+	}
+	"D-19": {
+		title: "PR の状態の取得（構造のスナップショットの版2）"
+		text: """
+			定期の同期が構造を取るときに、同じ周期で PR を取る（`runtime/infra/github_structure.py`）。
+
+			- 取るもの：そのリポジトリの開いている PR（最大100件）と、最近更新された閉じた PR（最大50件）を、GraphQL の1回の問い合わせ（ページを足すときだけ増える）で、`number`、`state`、`isDraft`、`headRefName`、`mergeable`（MERGEABLE、CONFLICTING、UNKNOWN）、`statusCheckRollup.state`（SUCCESS、FAILURE、PENDING、ERROR、なし）、`createdAt`、`mergedAt`、`closedAt`、`url` を取る。
+			- 持ち方：構造のスナップショット（C10）の版を2に上げ、`pull_requests: {番号: {...}}` を足す。版1を読む前の版の SpecDock は版2を知らない版として扱い、取り直す（`SnapshotStore._read` はもともと知らない版を「ない」と扱う）。
+			- Scope との対応：PR の `headRefName` を、`canonical_structure.branch_names_scope` で Scope に対応づける（`iss-00528`、`chemitaro/iss-00528` など）。同じ Scope に複数の PR があれば、開いているものを先に、新しいものを先に選ぶ。
+			- 失敗：PR の問い合わせだけが失敗したときは、構造の取得を続け、`pull_requests` を前回の値のまま残し、`pull_requests_error` に理由と時刻を書く。ダッシュボードは「PR の状態が分からない」を示す（R-30）。
+			- 費用：問い合わせはリポジトリごとに1回増える。GitHub の制限（1時間に5000点）の中で、今の構造の取得と同じ間隔に収める。
+			"""
+		satisfies: ["R-07", "R-30"]
 	}
 }
 
 compatibility: """
-	- 段階1の版（0.6.0）：公開のコマンドが8つ増える（61）。`canonical status` の JSON から `dashboard` の項目が消え、`canonical remove` は5つのファイルを消さない（D-10）。ほかのコマンドの契約は変えない。`migration.md` に「0.6.0 への更新」を書く。
+	- 段階1の版（0.6.0）：公開のコマンドが8つ増える（61）。`canonical status` の JSON から `dashboard` の項目が消え、`canonical remove` は5つのファイルを消さない（D-10）。構造のスナップショットが版2になる（D-19。ユーザーごとの状態の置き場の中の、SpecDock だけが読むファイル）。ほかのコマンドの契約は変えない。`migration.md` に「0.6.0 への更新」を書く。
 	- 段階2の版（0.7.0）：API と画面を足すだけで、ほかの契約は変えない。
-	- 公開の契約にするもの：要約の JSON（`specdock.dashboard-summary/v1`）、在りかの記録（`specdock.dashboard-server/v1`）、画面の道 `/r/<host>/<owner>/<name>/scopes/<ID>` と `?embed=1`、postMessage の約束（`specdock.embed/v1`）、`frame-ancestors` の決まり。画面の中の JSON（`structure`）と、表示の切り替えの問い合わせは契約にしない。
+	- 公開の契約にするもの：要約の JSON（`specdock.dashboard-summary/v1`）、「見た」の記録の置き場（`specdock.dashboard-seen/v1`。読むのは SpecDock だけだが形を固める）、在りかの記録（`specdock.dashboard-server/v1`）、画面の道 `/r/<host>/<owner>/<name>/scopes/<ID>` と `?embed=1`、postMessage の約束（`specdock.embed/v1`）、`frame-ancestors` の決まり。画面の中の JSON（`structure`）と、表示の切り替えの問い合わせは契約にしない。
 	- 戻すときは、パッケージを前の版に戻し、常駐を入れていれば `dashboard service uninstall` を先に行う。5つのファイルの生成も前の版で戻る。
 	"""
 
