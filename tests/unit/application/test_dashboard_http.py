@@ -116,6 +116,27 @@ def test_unreadable_hidden_marks_keep_the_last_readable_marks(env: Env) -> None:
     assert [site.key for site in env.site.repositories()] == ["github.com/o/r"]
 
 
+def test_hidden_marks_unreadable_from_the_start_hide_everything(env: Env) -> None:
+    (env.state / "dashboard").mkdir(parents=True, exist_ok=True)
+    (env.state / "dashboard" / "repositories.json").write_text("{broken")
+    site = DashboardSite(env.state, now=lambda: NOW)
+    assert site.repositories() == () and site.marks_unreadable()
+    assert all(row.hidden and not row.served for row in site.rows())
+    status, body = env.json("/api/v1/repositories")
+    assert status == 200 and body["repositories"] == [] and body["marks_unreadable"] is True
+
+
+def test_revision_steps_while_stale(env: Env) -> None:
+    write_snapshot(env.state, sample(fetched_at="2026-11-04T10:00:00Z"))
+    clock = [NOW]
+    site = DashboardSite(env.state, now=lambda: clock[0])
+    first = site.view(site.repositories()[0]).revision
+    clock[0] = NOW.replace(minute=5)
+    assert site.view(site.repositories()[0]).revision == first  # same 10-minute step
+    clock[0] = NOW.replace(minute=15)
+    assert site.view(site.repositories()[0]).revision != first
+
+
 def test_an_unreadable_registry_keeps_the_last_listing(env: Env) -> None:
     assert len(env.site.repositories()) == 2
     (env.state / "canonical-registry.json").write_text("{broken")

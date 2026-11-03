@@ -27,7 +27,8 @@ export function renderTop(target, mobileTabs, state) {
     .join("");
   const name = repo ? repo.split("/").slice(1).join("/") : "すべてのリポジトリ";
   const snapshot = data?.snapshot;
-  const stale = snapshot && (snapshot.stale || snapshot.status !== "ok");
+  const age = snapshot?.age_seconds == null ? null : snapshot.age_seconds + Math.max(0, (performance.now() - (state.loadedAt || 0)) / 1000);
+  const stale = snapshot && (snapshot.stale || snapshot.status !== "ok" || (age != null && age > 30 * 60));
   const changes = data?.changes_count || 0;
   target.innerHTML =
     `<span class="brand embed-hide"><a href="/" class="brand__link" aria-label="横断の概況"><span class="brand__mark">S</span><span class="brand__name">SpecDock</span></a></span>` +
@@ -42,7 +43,7 @@ export function renderTop(target, mobileTabs, state) {
       ? `<span class="iconbtn changes" title="前回見たときからの変化" aria-label="前回から変化 ${changes}件">${ic("bell")}${changes ? `<span class="num">${changes}</span>` : ""}</span>`
       : "") +
     (repo
-      ? `<span class="status"${stale ? ' data-state="stale"' : ""} title="GitHub から構造を取得した時刻${snapshot?.fetched_at ? `：${esc(snapshot.fetched_at)}` : ""}"><span>${snapshot?.fetched_at ? esc(ago(snapshot.age_seconds)) : "取得なし"}<span class="status__w">に取得</span></span></span>`
+      ? `<span class="status"${stale ? ' data-state="stale"' : ""} title="GitHub から構造を取得した時刻${snapshot?.fetched_at ? `：${esc(snapshot.fetched_at)}` : ""}"><span>${snapshot?.fetched_at ? esc(ago(age)) : "取得なし"}<span class="status__w">に取得</span></span></span>`
       : "") +
     `</div>`;
   mobileTabs.innerHTML = tabs;

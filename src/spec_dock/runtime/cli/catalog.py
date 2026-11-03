@@ -514,8 +514,12 @@ def _help_spec(leaf: str) -> HelpSpec:
         target = "The explicit absolute path in this clone's native Git inventory; create uses root/NAME."
     elif leaf in ("dashboard summary", "dashboard hide", "dashboard show"):
         target = "REPOSITORY (owner/name or github.com/owner/name), or this checkout's origin repository when omitted."
-    elif leaf in ("dashboard serve", "dashboard list"):
+    elif leaf == "dashboard serve":
         target = "Every repository of the registry in the state root that is known and not hidden."
+    elif leaf == "dashboard list":
+        target = (
+            "Every row of the registry in the state root, hidden ones and rows whose repository is unknown included."
+        )
     elif leaf in {"help", "completion"}:
         target = "The CLI catalog; no repository is required."
     elif "target" in arguments:
@@ -703,7 +707,7 @@ def _help_spec(leaf: str) -> HelpSpec:
         does_not = "Does not contact GitHub or the dashboard server, or write any file."
         json_data = (
             "repositories[] (repository or null, catalog, main_checkout, hidden, served, problem, path, url),"
-            " server, registry_error."
+            " server, registry_error, marks_unreadable (true: every repository is kept hidden)."
         )
         confirmation = "No final confirmation is required for this read-only leaf."
     elif leaf == "canonical check":

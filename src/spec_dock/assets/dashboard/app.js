@@ -17,6 +17,7 @@ const state = {
   route: parseRoute(location.href),
   repositories: [],
   data: null, // structure JSON of the current repository
+  loadedAt: 0, // performance.now() when data arrived; the band counts the age on from it
   scope: null, // scope JSON on the detail screen
   baseline: null, // the seen_id that change marks compare with, fixed for this page (Epic D-18)
   revision: null,
@@ -88,6 +89,7 @@ async function loadRepository() {
   if (!repo) return;
   try {
     state.data = await api.structure(repo, state.baseline);
+    state.loadedAt = performance.now();
     state.revision = state.data.revision;
     state.scope = state.route.scope ? await api.scope(repo, state.route.scope, state.baseline).catch(() => null) : null;
     state.error = null;
@@ -101,7 +103,10 @@ async function refresh() {
   if (!repo || document.hidden) return;
   try {
     const { revision } = await api.revision(repo);
-    if (revision === state.revision) return;
+    if (revision === state.revision) {
+      renderTop(top, mobileTabs, state); // the fetch age keeps counting while nothing changes
+      return;
+    }
     await loadRepository();
     render();
   } catch {
@@ -148,6 +153,7 @@ function interceptLinks(event) {
 }
 
 async function boot() {
+  document.title = title(); // a `hello` answered before the first render still reports the screen's title
   if (state.route.embed) document.documentElement.dataset.embed = "1";
   document.addEventListener("click", interceptLinks);
   window.addEventListener("popstate", () => navigate(location.pathname + location.search, { push: false }));

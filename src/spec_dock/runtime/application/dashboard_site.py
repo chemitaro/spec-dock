@@ -105,6 +105,8 @@ class _Listing:
     entries: tuple[RegistryEntry, ...] = ()
     hidden: frozenset[str] = frozenset()
     registry_error: str | None = None
+    marks_unreadable: bool = False
+    marks_read: bool = False
     served: dict[str, SiteRepository] = field(default_factory=dict)
 
 
@@ -131,7 +133,6 @@ class DashboardSite:
         except RegistryUnreadable as failure:
             error = failure.reason  # keep the last readable registry (F-07)
         read = hidden_repositories(self.state_root)
-        hidden = listing.hidden if read is None else read  # unreadable marks never unhide (fail closed)
         groups: dict[str, list[RegistryEntry]] = {}
         for entry in entries:
             repository = _parse(entry.repository)
@@ -144,7 +145,15 @@ class DashboardSite:
                 served[key] = SiteRepository(repository, Path(items[0].catalog), (items[0].catalog,))
             else:
                 served[key] = SiteRepository(repository, None, tuple(item.catalog for item in items), "ambiguous")
-        self._listing = _Listing(signature, entries, hidden, error, served)
+        # Unreadable marks never unhide (fail closed): keep the last readable marks, and before any readable
+        # read hide every repository until `dashboard hide`/`show` can be used again.
+        if read is not None:
+            hidden, marks_read = read, True
+        elif listing.marks_read:
+            hidden, marks_read = listing.hidden, True
+        else:
+            hidden, marks_read = frozenset(served), False
+        self._listing = _Listing(signature, entries, hidden, error, read is None, marks_read, served)
         return self._listing
 
     def repositories(self) -> tuple[SiteRepository, ...]:
@@ -156,6 +165,10 @@ class DashboardSite:
     def unknown_count(self) -> int:
         with self._lock:
             return sum(1 for entry in self._refresh_listing().entries if _parse(entry.repository) is None)
+
+    def marks_unreadable(self) -> bool:
+        with self._lock:
+            return self._refresh_listing().marks_unreadable
 
     def registry_error(self) -> str | None:
         with self._lock:
@@ -221,12 +234,16 @@ class DashboardSite:
         catalog_state = (
             _signature(catalog_state_dir(self.state_root, str(site.catalog)) / STATE_FILE) if site.catalog else None
         )
-        stale = model is not None and now - parse_timestamp(model.fetched_at) > STALE_AFTER
+        age = now - parse_timestamp(model.fetched_at) if model is not None else None
+        stale = age is not None and age > STALE_AFTER
+        # While stale, a 10-minute step makes the screens reload the notice text ("N時間前から…").
+        step = int(age.total_seconds() // 600) if stale and age is not None else None
         parts = (
             signature,
             catalog_state,
             status,
             stale,
+            step,
             model.pull_request_status if model is not None else None,
             site.problem,
         )

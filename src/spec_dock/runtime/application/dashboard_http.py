@@ -294,6 +294,7 @@ class DashboardHttp:
             "schema": API_SCHEMA,
             "repositories": items,
             "unknown_count": self.site.unknown_count(),
+            "marks_unreadable": self.site.marks_unreadable(),
             "server": {"version": self.version, "started_at": self.started_at, "embed_hosts": list(self.embed_hosts)},
         }
 

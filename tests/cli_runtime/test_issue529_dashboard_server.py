@@ -313,6 +313,9 @@ def test_hide_inside_a_checkout_and_an_unreadable_marks_file(
     code, result = _run(capsys, "dashboard", "show", "o/r")
     assert (code, result["error"]["code"]) == (3, "DASHBOARD_STATE_UNREADABLE")
     assert (state / "dashboard" / "repositories.json").read_text() == "{broken"
+    code, result = _run(capsys, "dashboard", "list")
+    assert code == 0 and result["data"]["result"]["marks_unreadable"] is True
+    assert all(row["hidden"] for row in result["data"]["result"]["repositories"])
 
 
 def test_a_hidden_repository_leaves_a_running_server(

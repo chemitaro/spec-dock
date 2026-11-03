@@ -190,5 +190,10 @@ def list_repositories(
             "path": path,
             "url": f"{server.rstrip('/')}{path}" if server and path and row.served else None,
         })
-    data: dict[str, object] = {"repositories": rows, "server": server, "registry_error": site.registry_error()}
+    data: dict[str, object] = {
+        "repositories": rows,
+        "server": server,
+        "registry_error": site.registry_error(),
+        "marks_unreadable": site.marks_unreadable(),
+    }
     return _result(namespace.command_path, data)

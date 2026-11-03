@@ -114,6 +114,8 @@ def list_text(data: dict[str, object]) -> list[str]:
         problem = f" problem={row['problem']}" if row["problem"] else ""
         url = f" {row['url']}" if row["url"] else ""
         lines.append(f"{name} {state}{problem} catalog={row['catalog']}{url}")
+    if data.get("marks_unreadable"):
+        lines.append("hidden marks unreadable: repositories stay hidden until dashboard/repositories.json is fixed")
     if data.get("registry_error"):
         lines.append(f"registry unreadable: {data['registry_error']}")
     return lines
