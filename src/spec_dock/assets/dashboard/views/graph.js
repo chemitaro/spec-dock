@@ -225,7 +225,7 @@ function boxHtml(s, n) {
     const { cnt, total } = tally(s.id);
     marks = `<div class="gx-marks">${M.sbar(cnt, total, 64)}${M.frac(cnt, total)}${M.counts(cnt)}${M.asMark(s.assurance)}${M.dnMark(s.downstream)}</div>`;
   } else {
-    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.branch)}${M.dnMark(s.downstream)}</div>`;
+    marks = `<div class="gx-marks">${M.asMark(s.assurance)}${M.prMark(s.pr)}${M.wtMark(s.state === "doing" ? s.branch : null)}${M.dnMark(s.downstream)}</div>`;
   }
   return (
     `<div class="gx-box${frame ? " is-frame" : ""}" data-id="${esc(s.id)}" data-st="${s.state}" role="button" tabindex="0" aria-label="${esc(label)}" style="${pos(n)}">` +

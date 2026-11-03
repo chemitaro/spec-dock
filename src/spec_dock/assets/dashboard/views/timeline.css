@@ -1,6 +1,4 @@
 /* The time axis (iss-00532; Epic D-08), as in the adopted design d2. Scoped under .tl. */
-/* <main> scrolls in the shell's 1fr row (see graph.css: without this it sits in an auto row and cannot scroll). */
-.main[data-view="timeline"] { grid-row: 4; }
 .tl { max-width: var(--ds-wide-max); margin: 0 auto; padding: 20px 24px 64px; }
 .tl .page-head { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 8px 16px; margin-bottom: 14px; }
 .tl .page-head h1 { margin: 0; font-size: 1.35rem; line-height: 1.4; font-weight: 700; }

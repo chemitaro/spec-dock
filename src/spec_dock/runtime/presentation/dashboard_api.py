@@ -168,8 +168,10 @@ def scope_item(
     change: ScopeChange | None,
     rank: int | None = None,
     facts: Mapping[str, Mapping[str, object]] | None = None,
+    readings: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> dict[str, object]:
     node = model.snapshot.find(scope.id)
+    read = (readings or {}).get(scope.id, {})
     placed = (facts or {}).get(scope.id, {})
     return {
         "id": scope.id,
@@ -195,10 +197,9 @@ def scope_item(
         "in_progress": bool(node.in_progress) if node is not None else False,
         "blocked_by": list(placed.get("blocked_by", [])),  # type: ignore[call-overload]
         "stage": dict(placed.get("stage", {"all": None, "open": None})),  # type: ignore[call-overload]
-        # Filled later (Epic R-15; the coordinator adds the readers): the CUE assurance level and this PC's
-        # worktree branch. The screens show them only when they are not null.
-        "assurance": None,
-        "branch": None,
+        # The CUE assurance level and this PC's worktree branch (iss-00544 D-02); null when unknown.
+        "assurance": read.get("assurance"),
+        "branch": read.get("branch"),
     }
 
 
@@ -219,6 +220,7 @@ def structure_document(
     now: datetime,
     baseline: SeenRecord | None,
     latest: SeenRecord | None,
+    readings: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> dict[str, object]:
     model = view.model
     changes: Mapping[str, ScopeChange] = (
@@ -256,7 +258,9 @@ def structure_document(
             "error": None if error is None else {"code": error.code, "message": error.message, "at": error.at},
         },
         "anomalies": [{"number": a.number, "code": a.code, "message": a.message} for a in model.anomalies],
-        "scopes": [scope_item(model, scope, changes.get(scope.id), order[scope.id], facts) for scope in scopes],
+        "scopes": [
+            scope_item(model, scope, changes.get(scope.id), order[scope.id], facts, readings) for scope in scopes
+        ],
         "cleanup": [{"id": c.scope_id, "code": c.code, "text": c.text} for c in model.cleanup],
         "timeline": {
             "weeks": [asdict(week) for week in weekly_totals(model, now=now)],
@@ -337,6 +341,7 @@ def scope_document(
     *,
     baseline: SeenRecord | None,
     details: Mapping[str, object] | None = None,
+    readings: Mapping[str, Mapping[str, str | None]] | None = None,
 ) -> dict[str, object] | None:
     model = view.model
     if model is None or scope_id not in model.scopes:
@@ -350,7 +355,12 @@ def scope_document(
         "repository": view.repository.key,
         "revision": view.revision,
         "scope": scope_item(
-            model, model.scopes[scope_id], changes.get(scope_id), ranks(model)[scope_id], layout_facts(model)
+            model,
+            model.scopes[scope_id],
+            changes.get(scope_id),
+            ranks(model)[scope_id],
+            layout_facts(model),
+            readings,
         ),
         "upstream": _path(upstream(model, scope_id)),
         "downstream": _path(downstream_ids(model, scope_id)),

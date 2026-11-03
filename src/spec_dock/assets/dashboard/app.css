@@ -144,11 +144,13 @@ svg.ds-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentCo
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; } }
 
 .app { position: relative; width: 100%; height: 100%; display: grid; grid-template-rows: var(--ds-topbar-h) auto auto minmax(0, 1fr); overflow: hidden; container: app / inline-size; }
-.main { min-height: 0; min-width: 0; overflow: auto; outline: none; }
+/* Every band has its own row (iss-00544): a band that is not shown (the phone tabs on a PC, no notices) keeps
+   its row at height 0, and the screen always fills the last row. */
+.main { grid-row: 4; min-height: 0; min-width: 0; overflow: auto; outline: none; }
 
 /* ---------- Top band (DS .ds-topbar) ---------- */
 .top {
-  position: relative; z-index: 30; display: flex; align-items: center; gap: 12px; height: var(--ds-topbar-h); min-width: 0;
+  grid-row: 1; position: relative; z-index: 30; display: flex; align-items: center; gap: 12px; height: var(--ds-topbar-h); min-width: 0;
   padding: 0 16px; border-bottom: 1px solid var(--ds-border);
   background: color-mix(in srgb, var(--ds-bg) 92%, transparent);
   -webkit-backdrop-filter: saturate(1.6) blur(14px); backdrop-filter: saturate(1.6) blur(14px);
@@ -178,14 +180,14 @@ svg.ds-icon { width: 1em; height: 1em; flex: none; fill: none; stroke: currentCo
 .status { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--ds-border); border-radius: 999px; font-size: 12px; font-weight: 600; color: var(--ds-muted); white-space: nowrap; }
 .status::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--ds-ok); }
 .status[data-state="stale"]::before { background: var(--ds-warn); }
-.mtabs { display: none; }
+.mtabs { grid-row: 2; display: none; }
 .mtabs[hidden] { display: none !important; }
 
 /* Embedded (?embed=1, Epic D-15): no SpecDock title and no repository switcher. */
 :root[data-embed="1"] .embed-hide { display: none; }
 
 /* ---------- Notices (Epic R-09) ---------- */
-.notices { display: grid; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--ds-border); background: var(--ds-bg-2); }
+.notices { grid-row: 3; display: grid; gap: 6px; padding: 8px 16px; border-bottom: 1px solid var(--ds-border); background: var(--ds-bg-2); }
 .notices[hidden] { display: none; }
 .notice { --tone: var(--ds-warn); --tone-bg: var(--ds-warn-bg); --tone-line: var(--ds-warn-line); --tone-ink: var(--ds-warn-ink); display: flex; gap: 10px; align-items: flex-start; padding: 8px 12px; border: 1px solid var(--tone-line); border-left: 4px solid var(--tone); border-radius: var(--ds-radius); background: var(--tone-bg); font-size: 13px; }
 .notice[data-level="error"] { --tone: var(--ds-danger); --tone-bg: var(--ds-danger-bg); --tone-line: var(--ds-danger-line); --tone-ink: var(--ds-danger-ink); }

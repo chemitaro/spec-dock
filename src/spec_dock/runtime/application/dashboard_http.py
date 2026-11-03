@@ -20,7 +20,12 @@ import stat
 from typing import TYPE_CHECKING, Final
 from urllib.parse import unquote
 
-from spec_dock.runtime.application.dashboard_scope_details import read_scope_details
+from spec_dock.runtime.application.dashboard_scope_details import (
+    StructureFactsCache,
+    read_scope_details,
+    read_structure_facts,
+    scope_facts,
+)
 from spec_dock.runtime.domain.canonical_layout import scope_relative
 from spec_dock.runtime.domain.dashboard_model import seen_scopes
 from spec_dock.runtime.infra.dashboard_assets import (
@@ -105,6 +110,7 @@ class DashboardHttp:
         self.installed_version = version  # the server's loop sets the upgraded version (iss-00530 R-05)
         self.started_at = started_at
         self.now = now
+        self.facts = StructureFactsCache()  # iss-00544 D-02: assurance levels remembered across requests
 
     # --- Headers -----------------------------------------------------------------------------------------------
 
@@ -314,7 +320,10 @@ class DashboardHttp:
             latest = find_seen(self.site.state_root, site.repository, None)
             wanted = request.param("baseline")
             baseline = (find_seen(self.site.state_root, site.repository, wanted) if wanted else None) or latest
-            return self._json(200, structure_document(view, now=self.now(), baseline=baseline, latest=latest))
+            ids = sorted(view.model.scopes) if view.model is not None else []
+            readings = read_structure_facts(site, ids, self.facts)  # iss-00544 D-02
+            document = structure_document(view, now=self.now(), baseline=baseline, latest=latest, readings=readings)
+            return self._json(200, document)
         if op == ["summary"]:
             return self._summary(view)
         if len(op) == 2 and op[0] == "scopes":
@@ -324,10 +333,11 @@ class DashboardHttp:
             )
             known = view.model is not None and op[1] in view.model.scopes
             details = read_scope_details(site, op[1]) if known else None  # iss-00531 D-04
-            document = scope_document(view, op[1], baseline=baseline, details=details)
-            if document is None:
+            one = {op[1]: scope_facts(details)} if details is not None else None
+            scope_json = scope_document(view, op[1], baseline=baseline, details=details, readings=one)
+            if scope_json is None:
                 return self._error(404, "DASHBOARD_SCOPE_UNKNOWN", f"{op[1]} is not in this repository's structure")
-            return self._json(200, document)
+            return self._json(200, scope_json)
         return self._error(404, "DASHBOARD_NOT_FOUND", "no such API")
 
     def _summary(self, view: RepositoryView) -> Response:

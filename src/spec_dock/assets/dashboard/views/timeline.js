@@ -1,16 +1,11 @@
 // The time axis (iss-00532; Epic R-16, D-08): cumulative created and closed Scopes per week for the chosen kinds,
 // and the recent Scope and pull request events. The model counts (#528 weekly_totals, recent_events); this screen
 // adds the chosen kinds up (timeline/series.js) and draws.
-import { esc, ic, stateIcon } from "../core/ui.js";
+import { esc, ic, KIND_LABEL, stateIcon } from "../core/ui.js";
 import { emptyText } from "./graph.js";
-import { GRAPH_ICONS } from "./graph/marks.js";
 import { groupEvents, mergeWeeks } from "./timeline/series.js";
 
-const KINDS = [
-  ["initiative", "Initiative"],
-  ["epic", "Epic"],
-  ["issue", "Issue"],
-];
+const KINDS = Object.entries(KIND_LABEL);
 const PREFS = "specdock.timeline.v1";
 const EVENT = {
   created: ["sparkle", "が作られた"],
@@ -21,8 +16,7 @@ const EVENT = {
 
 const T = { kinds: new Set(KINDS.map(([k]) => k)), root: null, ctx: null, weeks: [], resize: null, change: null };
 
-const icon = (name) =>
-  GRAPH_ICONS[name] ? `<svg class="ds-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${GRAPH_ICONS[name]}</svg>` : ic(name);
+const icon = (name) => ic(name);
 
 function loadPrefs() {
   try {
