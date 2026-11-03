@@ -65,7 +65,7 @@ slices: {
 	}
 	"iss-00535": {
 		covers:  ["R-19", "R-25", "R-26", "F-10"]
-		text:    "第5波（段階2）。D-11 の文書の描画と計画の進み具合。"
+		text:    "第5波（段階2）。D-11 の文書の描画と計画の進み具合。あわせて、#530 の残り：API の `server.restart_required` が true のとき、画面の上の帯で前面の `serve` の起動し直しを促す。"
 		after:   ["iss-00534"]
 		session: "std"
 	}
