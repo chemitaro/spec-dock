@@ -6,14 +6,14 @@ package spec
 goal: "構造の図と時間の軸を、試作 d2 の見た目と振る舞いで作り、線の検査を0件にして、マージできる PR にする。"
 
 steps: {
-	"S-01": {title: "構造の API に blocked_by、stage、rank、assurance、branch、weeks_by_kind を足す（テスト先行）", realizes: ["R-01", "R-05", "R-11"], status: "todo", session: "impl"}
-	"S-02": {title: "ROUTER を views/graph/router.js に移し、lane の障害物と trunkOverlaps を足す", realizes: ["R-02", "F-02"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-03": {title: "配置の計算 views/graph/layout.js と、隙間を広げる引き直し", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-13", "F-02"], status: "todo", after: ["S-02"], session: "impl"}
-	"S-04": {title: "node の検査の仕組み（tests/js と pytest）と見本の構造で、検査を0件にする", realizes: ["R-02", "R-05"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-05": {title: "図の画面 views/graph.js、graph.css、graph/marks.js（描画、印、選択、要点、絞り込み、凡例）", realizes: ["R-01", "R-03", "R-04", "R-06", "R-07", "R-09", "R-10", "R-12", "F-01"], status: "todo", after: ["S-03"], session: "impl"}
-	"S-06": {title: "拡大・縮小・移動と2本指のつまみ、gesturestart の抑止、帯の下の余白", realizes: ["R-08"], status: "todo", after: ["S-05"], session: "impl"}
-	"S-07": {title: "時間の軸 views/timeline.js、timeline.css、timeline/series.js", realizes: ["R-11", "R-12", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
-	"S-08": {title: "PC のヘッドレスの Chrome での確かめ（PC と 390px、明暗、JS のエラー、edgeAudit、速さ、指の操作）と Artifact", realizes: ["R-07", "R-08", "R-12", "R-13"], status: "todo", after: ["S-06", "S-07"], session: "impl"}
+	"S-01": {title: "構造の API に blocked_by、stage、rank、assurance、branch、weeks_by_kind を足す（テスト先行）", realizes: ["R-01", "R-05", "R-11"], status: "done", session: "impl"}
+	"S-02": {title: "ROUTER を views/graph/router.js に移し、lane の障害物と trunkOverlaps を足す", realizes: ["R-02", "F-02"], status: "done", after: ["S-01"], session: "impl"}
+	"S-03": {title: "配置の計算 views/graph/layout.js と、隙間を広げる引き直し", realizes: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-13", "F-02"], status: "done", after: ["S-02"], session: "impl"}
+	"S-04": {title: "node の検査の仕組み（tests/js と pytest）と見本の構造で、検査を0件にする", realizes: ["R-02", "R-05"], status: "done", after: ["S-03"], session: "impl"}
+	"S-05": {title: "図の画面 views/graph.js、graph.css、graph/marks.js（描画、印、選択、要点、絞り込み、凡例）", realizes: ["R-01", "R-03", "R-04", "R-06", "R-07", "R-09", "R-10", "R-12", "F-01"], status: "done", after: ["S-03"], session: "impl"}
+	"S-06": {title: "拡大・縮小・移動と2本指のつまみ、gesturestart の抑止、帯の下の余白", realizes: ["R-08"], status: "done", after: ["S-05"], session: "impl"}
+	"S-07": {title: "時間の軸 views/timeline.js、timeline.css、timeline/series.js", realizes: ["R-11", "R-12", "F-01"], status: "done", after: ["S-01"], session: "impl"}
+	"S-08": {title: "PC のヘッドレスの Chrome での確かめ（PC と 390px、明暗、JS のエラー、edgeAudit、速さ、指の操作）と Artifact", realizes: ["R-07", "R-08", "R-12", "R-13"], status: "doing", after: ["S-06", "S-07"], session: "impl"}
 	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "todo", after: ["S-04", "S-08"], session: "impl"}
 }
 
