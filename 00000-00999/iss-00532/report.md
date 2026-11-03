@@ -80,7 +80,12 @@ ID: "iss-00532"
 
 ## Final Quality Gate
 
-（ゲートの結果を書く）
+- 合格のコミット：`e23291cf4844af72eae6d8b1f7b8768d4ffc3dda`（作業ツリーは clean）。記録は `.workbench/final-quality-gate/iss-00532-g1/`（`campaign.json`、`closure.md`、`attempts/01〜03/`）。
+- 試行：01（`9953a7040`）レビュー pass。#531 のマージで全体のテストを止めて取り込み直した。02（`6aa34f2ec`、#531 の取り込み。`dashboard_api.py` の `rank` の競合を両方の意図を残して解いた）レビュー pass。#533 のマージでテストを止めて取り込み直した。03（`e23291cf4`、#533 の取り込み。競合なし）で両方の道が合格。
+- レビューの側：quality-gate-reviewer（opus/high、1人）。観点は functional-correctness、requirements-closure、test-adequacy。pass（P0 0、P1 0、P2 0、P3 2、網羅は完全）。
+- テストの側：`make lint` 終了コード0（ruff check、ruff format check、mypy すべて pass）、`uv run pytest` 終了コード0（3464 passed、7 skipped、25分11秒。node の線の検査10件を含む）。どちらも同じコミット。
+- P3（情報。直していない）：(1) 入れ子で畳む既定のまま、片付けの候補（配下がすべて終わった Epic）に絞ると、その Epic 自体がまとまりに畳まれ、枠も配下も出ない。(2) node の線の検査の絞り込みの組み合わせは、閉じていない Epic と Initiative だけ（D-07 の「各 Epic」より狭い）。
+- マージの後のブラウザーの確かめ：`6aa34f2ec`（#531 の取り込み後）で全項目をやり直して同じ結果（[結果](artifacts/20261103t203009z--result-after-merge.json)）。#533 の取り込みは画面と構造の API に触れていない（差分は撤去したファイルだけ）ので、ブラウザーの確かめはやり直していない。
 
 ## Pull Request
 
@@ -93,3 +98,5 @@ ID: "iss-00532"
 - 保証レベルとブランチの印は、統括が API に値を入れるまで出ない。
 - 骨組みの格子で `<main>` が高さ0になる件と、スナップショットのないリポジトリでの「見た」の 409（上の「骨組みについての観察」）は、骨組みの担当で扱う。
 - 試作の残った課題のうち「親をまたぐ依存で左右の並びが崩れるときは、矢印の向きでしか分からない」はそのまま。
+- 最終品質ゲートの P3 の2件（上の節）。(1) は、絞った Scope を畳みから外す小さな直しで済む見込み。
+- 状態の印や PR の印などの部品は、#531 の `views/_shared/parts.js` と一部が重なる（状態の記号は両方とも `core/ui.js` の `STATES`／`stateIcon`）。重なりの整理は統括の判断で後に行う。

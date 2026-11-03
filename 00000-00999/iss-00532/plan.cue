@@ -13,8 +13,8 @@ steps: {
 	"S-05": {title: "図の画面 views/graph.js、graph.css、graph/marks.js（描画、印、選択、要点、絞り込み、凡例）", realizes: ["R-01", "R-03", "R-04", "R-06", "R-07", "R-09", "R-10", "R-12", "F-01"], status: "done", after: ["S-03"], session: "impl"}
 	"S-06": {title: "拡大・縮小・移動と2本指のつまみ、gesturestart の抑止、帯の下の余白", realizes: ["R-08"], status: "done", after: ["S-05"], session: "impl"}
 	"S-07": {title: "時間の軸 views/timeline.js、timeline.css、timeline/series.js", realizes: ["R-11", "R-12", "F-01"], status: "done", after: ["S-01"], session: "impl"}
-	"S-08": {title: "PC のヘッドレスの Chrome での確かめ（PC と 390px、明暗、JS のエラー、edgeAudit、速さ、指の操作）と Artifact", realizes: ["R-07", "R-08", "R-12", "R-13"], status: "doing", after: ["S-06", "S-07"], session: "impl"}
-	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "todo", after: ["S-04", "S-08"], session: "impl"}
+	"S-08": {title: "PC のヘッドレスの Chrome での確かめ（PC と 390px、明暗、JS のエラー、edgeAudit、速さ、指の操作）と Artifact", realizes: ["R-07", "R-08", "R-12", "R-13"], status: "done", after: ["S-06", "S-07"], session: "impl"}
+	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "doing", after: ["S-04", "S-08"], session: "impl"}
 }
 
 tests: {
