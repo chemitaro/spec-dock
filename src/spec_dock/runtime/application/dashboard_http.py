@@ -107,6 +107,7 @@ class DashboardHttp:
         self.embed_hosts = tuple(embed_hosts)
         self.local_url = local_url
         self.version = version
+        self.installed_version = version  # the server's loop sets the upgraded version (iss-00530 R-05)
         self.started_at = started_at
         self.now = now
         self.facts = StructureFactsCache()  # iss-00544 D-02: assurance levels remembered across requests
@@ -302,7 +303,13 @@ class DashboardHttp:
             "repositories": items,
             "unknown_count": self.site.unknown_count(),
             "marks_unreadable": self.site.marks_unreadable(),
-            "server": {"version": self.version, "started_at": self.started_at, "embed_hosts": list(self.embed_hosts)},
+            "server": {
+                "version": self.version,
+                "started_at": self.started_at,
+                "embed_hosts": list(self.embed_hosts),
+                "installed_version": self.installed_version,
+                "restart_required": self.installed_version != self.version,
+            },
         }
 
     def _repository_api(self, request: Request, site: SiteRepository, op: list[str]) -> Response:

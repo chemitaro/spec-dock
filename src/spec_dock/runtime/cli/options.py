@@ -48,7 +48,15 @@ _COMMON_SWITCHES = {
     "--dry-run": "dry_run",
     "--offline": "offline",
 }
-_NO_PLAN_LEAVES = frozenset({"canonical sync", "canonical accept", "canonical restore", "canonical resume"})
+# The dashboard service changes the user's service manager at once; it has no plan-only form (iss-00530).
+_NO_PLAN_LEAVES = frozenset({
+    "canonical sync",
+    "canonical accept",
+    "canonical restore",
+    "canonical resume",
+    "dashboard service install",
+    "dashboard service uninstall",
+})
 _COMMON_VALUES = {
     "--project": "project",
     "--expect-current": "expect_current",
@@ -301,7 +309,11 @@ def completion_script(shell: str) -> str:
         for index, word in enumerate(parts):
             children.setdefault(" ".join(parts[:index]), set()).add(word)
         children.setdefault(leaf, set()).update(
-            name for argument in LEAF_ARGUMENTS[leaf] for name in argument.names if name.startswith("-")
+            name
+            for argument in LEAF_ARGUMENTS[leaf]
+            if argument.options.get("help") is not argparse.SUPPRESS  # internal (`dashboard serve --service`)
+            for name in argument.names
+            if name.startswith("-")
         )
         children[leaf].update(
             name

@@ -19,9 +19,10 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from spec_dock.runtime.application import canonical_schedule
-from spec_dock.runtime.infra import canonical_scheduling, runtime_environment
+from spec_dock.runtime.application import canonical_schedule, dashboard_service as dashboard_service_app
+from spec_dock.runtime.infra import canonical_scheduling, dashboard_service, runtime_environment
 from tests.support.canonical_sync import FakeScheduler
+from tests.support.dashboard_service import FakeServices
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -73,20 +74,29 @@ def _session_guard() -> Iterator[None]:
         canonical_scheduling.spec_dock_executable,
         runtime_environment.detect_service_manager,
         canonical_schedule.FIRST_RUN_WAIT,
+        dashboard_service.dashboard_service_for,
+        dashboard_service_app.detect_environment,
     )
-    canonical_scheduling.scheduler_for = _fresh_fake  # type: ignore[assignment]
-    canonical_scheduling.spec_dock_executable = lambda: _FAKE_EXECUTABLE
-    runtime_environment.detect_service_manager = _no_service_manager  # type: ignore[assignment]
-    canonical_schedule.FIRST_RUN_WAIT = 0.0
-    try:
-        yield
-    finally:
-        (
-            canonical_scheduling.scheduler_for,
-            canonical_scheduling.spec_dock_executable,
-            runtime_environment.detect_service_manager,
-            canonical_schedule.FIRST_RUN_WAIT,
-        ) = saved
+    with tempfile.TemporaryDirectory(prefix="spec-dock-dashboard-service-") as directory:
+        # The dashboard service (iss-00530): job files in a temporary directory, a fake launchctl/systemctl.
+        fallback = FakeServices(Path(directory))
+        canonical_scheduling.scheduler_for = _fresh_fake  # type: ignore[assignment]
+        canonical_scheduling.spec_dock_executable = lambda: _FAKE_EXECUTABLE
+        runtime_environment.detect_service_manager = _no_service_manager  # type: ignore[assignment]
+        canonical_schedule.FIRST_RUN_WAIT = 0.0
+        dashboard_service.dashboard_service_for = fallback.service_for  # type: ignore[assignment]
+        dashboard_service_app.detect_environment = fallback.environment
+        try:
+            yield
+        finally:
+            (
+                canonical_scheduling.scheduler_for,
+                canonical_scheduling.spec_dock_executable,
+                runtime_environment.detect_service_manager,
+                canonical_schedule.FIRST_RUN_WAIT,
+                dashboard_service.dashboard_service_for,
+                dashboard_service_app.detect_environment,
+            ) = saved
 
 
 @pytest.fixture(autouse=True)  # noqa: RUF076 -- every test gets its own recording fakes
@@ -99,3 +109,12 @@ def periodic_jobs(monkeypatch: pytest.MonkeyPatch) -> dict[str, FakeScheduler]:
 
     monkeypatch.setattr(canonical_scheduling, "scheduler_for", scheduler_for)
     return schedulers
+
+
+@pytest.fixture(autouse=True)  # noqa: RUF076 -- every test gets its own fake dashboard service manager
+def dashboard_services(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> FakeServices:
+    """This test's platform (Linux without systemd unless changed) and fake launchctl/systemctl (iss-00530)."""
+    fakes = FakeServices(tmp_path / "dashboard-service")
+    monkeypatch.setattr(dashboard_service, "dashboard_service_for", fakes.service_for)
+    monkeypatch.setattr(dashboard_service_app, "detect_environment", fakes.environment)
+    return fakes

@@ -106,7 +106,7 @@
     {
       "path": "spec-dock/docs/README.md",
       "source": "spec_dock/docs/README.md",
-      "sha256": "c0a292774a3a5a533adf75f5e916f48c90995609082201e51e18a854bb8e9f62",
+      "sha256": "ea4fd81759933f90d8123505a1556cd7333e525c1554062f25e4d5973413182e",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -118,7 +118,8 @@
         "b26c1072fcf0305586fab8a6b4741aa3197b006fbcd71f173c83d25c7d5db459",
         "8d4bb7d515758d23ba05ce3a50a72f34394577887d6455ba5a16e571af186083",
         "46df3129e70a6b3d13b7d7bcdef984eae95539c395050232bc3e1f8ecc30aa28",
-        "3682d3ad38cc2a6225ebaaa782cd9c86f6112bd20514d02a109194c54dd821e5"
+        "3682d3ad38cc2a6225ebaaa782cd9c86f6112bd20514d02a109194c54dd821e5",
+        "c0a292774a3a5a533adf75f5e916f48c90995609082201e51e18a854bb8e9f62"
       ]
     },
     {
@@ -283,7 +284,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "a490816bab99e1023f4f178a790311896d5ffd4c2b71c60e44be24f18ec3f178",
+      "sha256": "d5f47759687eb35bf36e4b81ef2cee30f10d0da662751caf170bc6a5e4e239d9",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -298,7 +299,8 @@
         "ac9c3296cd371f25e5ee885f9db2af39961f8fe4edb76205b8fb9dd9e38d6c3f",
         "0ce735804cd49de202a8be2e731f81a04b1279e1aaa344397e83a15f0a23161d",
         "b51e4679b9b3c53c16d42edbc019294964ef76c75a6241c25e9fe612aabdfc09",
-        "d01267b3505de62bfe4757b52eb81a9a1358d815ee1134cd9586a8c674680b14"
+        "d01267b3505de62bfe4757b52eb81a9a1358d815ee1134cd9586a8c674680b14",
+        "a490816bab99e1023f4f178a790311896d5ffd4c2b71c60e44be24f18ec3f178"
       ]
     },
     {
@@ -393,7 +395,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "94f19d8d4bf2aba725c0b4e79a69528fffe76f3d5e888374dcc03a3a2007befd",
+      "sha256": "2941d065a250c54b628f6472adab49d363dea2d79645e4ebc8ad3c914e408aa8",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -415,7 +417,8 @@
         "1f99ff8e0734455689509cce26d2aec7efade9dd3172aa36034a03938f1b5d41",
         "279df0ac949a3e969d45d525df8510f676808ebeffb2f8253e2fd660e5bb907d",
         "4afe0a6ee880fbf57767be1d678557cb3334205fcdeb88149ba45d14e5667def",
-        "bd67d65e1f6904435ae56c6063d94f625a52477aa1ea9acc8f7633769406572d"
+        "bd67d65e1f6904435ae56c6063d94f625a52477aa1ea9acc8f7633769406572d",
+        "94f19d8d4bf2aba725c0b4e79a69528fffe76f3d5e888374dcc03a3a2007befd"
       ]
     },
     {
