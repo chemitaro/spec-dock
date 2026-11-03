@@ -14,13 +14,13 @@ steps: {
 	"S-06": {title: "拡大・縮小・移動と2本指のつまみ、gesturestart の抑止、帯の下の余白", realizes: ["R-08"], status: "todo", after: ["S-05"], session: "impl"}
 	"S-07": {title: "時間の軸 views/timeline.js、timeline.css、timeline/series.js", realizes: ["R-11", "R-12", "F-01"], status: "todo", after: ["S-01"], session: "impl"}
 	"S-08": {title: "PC のヘッドレスの Chrome での確かめ（PC と 390px、明暗、JS のエラー、edgeAudit、速さ、指の操作）と Artifact", realizes: ["R-07", "R-08", "R-12", "R-13"], status: "todo", after: ["S-06", "S-07"], session: "impl"}
-	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "todo", after: ["S-08"], session: "impl"}
+	"S-09": {title: "コードのレビュー、最終品質ゲート、report.md、PR", realizes: ["R-02"], status: "todo", after: ["S-04", "S-08"], session: "impl"}
 }
 
 tests: {
-	"T-01": {title: "構造の API の新しい項目（blocked_by、stage の all/open と循環、rank、assurance・branch が null、weeks_by_kind）", verifies: ["R-01", "R-05", "R-11"]}
+	"T-01": {title: "構造の API の新しい項目（blocked_by、stage の all/open と循環、rank、assurance・branch が null、weeks_by_kind、scopes/<ID> の downstream_all）", verifies: ["R-01", "R-05", "R-07", "R-11"]}
 	"T-02": {title: "node：代表のデータのすべての組み合わせで audit の数と trunkOverlaps が0、経路の失敗が0", verifies: ["R-02", "F-02"]}
-	"T-03": {title: "node：配置で、待ち先が左の列、同じ列は rank の順、段が7つで折り返し、終わったものを隠し閉じた親を残す、片付けの候補を畳む、focus で配下だけ", verifies: ["R-04", "R-05", "R-06", "R-01"]}
+	"T-03": {title: "node：配置で、待ち先が左の列、同じ列は rank の順、段が7つで折り返し、終わったものを隠し閉じた親を残す、片付けの候補を畳み keep_visible の親は畳まない、木では畳まない、focus で配下だけ", verifies: ["R-04", "R-05", "R-06", "R-01"]}
 	"T-04": {title: "node：依存の線の3つの切り替えで、組の数が変わり、終わった依存に done が付く", verifies: ["R-03"]}
 	"T-05": {title: "node：mergeWeeks が選んだ種類の累計を正しく足し、groupEvents が新しい順に日ごとに分ける", verifies: ["R-11"]}
 	"T-06": {title: "node：250件の見本で、配置と経路の計算（引き直しを含む）が1秒以内", verifies: ["R-13"]}

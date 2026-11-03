@@ -21,6 +21,8 @@ design: {
 			- `rank`：モデルの推奨順（`recommended_key`）で全 Scope を並べたときの位置（0始まり）。画面は同じ段の中をこの順に並べる。
 			- `assurance`、`branch`：今は常に `null`（統括が後で値を入れる。形は文字列。`assurance` は `light`／`standard`／`strict`／`critical`、`branch` はこのPCの worktree のブランチの名前）。
 
+			`scopes/<ID>` に `downstream_all`（`{direct, indirect}`。モデルの `downstream_ids(model, ID, open_only=False)`）を足す。既存の `downstream`（開いたものだけ）は変えない。閉じた Scope を選んだとき、画面はこちらを使う。
+
 			`structure` の `timeline` に `weeks_by_kind: {"initiative": [...], "epic": [...], "issue": [...]}` を足す（各要素は `weeks` と同じ `{week_start, created, closed}`。モデルの `weekly_totals(model, now=now, kinds=(種類,))`）。既存の項目は変えない。
 			"""
 		satisfies: ["R-01", "R-05", "R-11"]
@@ -32,7 +34,8 @@ design: {
 
 			- 入力 `G = {obs: [{x1, y1, x2, y2, p1, p2, key, lane?}], frames: [{x1, y1, x2, y2, cls}], edges: [{a, z}], bounds}`。`edges` は `obs` の番号で、`a` の右の辺から `z` の左の辺へ。
 			- 手順：出入りの位置の割り振り（間隔10px）、障害物を4px ふくらませた疎な直交の格子、向きを状態に持つ A*（長さ、曲がり40、枠の出入り30、共有と交差の罰則）、同じ向きの線分を8px の車線に分ける寄せ（3回）、角の半径7px と交差の切れ目の描画。足りない車線の幅は `widen: [{axis, oa, ob, amount}]` で返す。
-			- 試作から足すもの：`obs` の `lane: "v"` は、縦の線分だけを塞ぐ障害物（木の親子の線）。横に横切れる。`audit` は、それに沿う縦の線分を `trunkOverlaps` に数える。
+			- 試作から足すもの：`obs` の `lane: "v"` は縦の線分だけ、`lane: "h"` は横の線分だけを塞ぐ障害物（木の親子の線の縦の幹と、子へ入る横の枝）。もう一方の向きには横切れる。`audit` は、それに沿う同じ向きの線分を `trunkOverlaps` に数える。
+			- 通り道の片側が図の端のときも、足りない幅を `widen` で返す（障害物の番号の代わりに -1）。
 			- `audit` は試作と同じく `boxHits`、`ownHits`、`overlaps`、`diagonal`、`portShare`、`failed` を数える（`lane` の障害物は箱の当たりに数えない）。
 			"""
 		satisfies: ["R-02", "F-02"]
@@ -44,11 +47,11 @@ design: {
 
 			- 見せる Scope：`showDone` か、終わっていないか、見せる子を持つもの。`focus` があれば、その Scope と子孫だけ。
 			- 入れ子：子を持つ Scope を枠、子のない Issue を箱にする。枠の中は、子の段（`showDone` なら `stage.all`、でなければ `stage.open`。`null` は1段目）の列に分け、同じ段の中は `rank` の順に上から並べる。段が1つなら折り返す行（幅 1240px まで）にする。段が6つを超えたら、6列ごとに次の行に折り返す。最上位は、枠を推奨順に縦に重ね、親のない Issue をその後の行に並べる。
-			- 木：見せる Scope を、親の後に子を推奨順に並べた字下げの一覧にする（1段32px）。すべて同じ大きさの箱。親子の線は、親の箱の左下から子の左の辺へ。
-			- 片付けの候補（`fold` のとき）：同じ入れ物の同じ列の候補を、1つのまとまりにする。まとまりの中の Scope への依存は、まとまりにつなぐ。
+			- 木：見せる Scope を、親の後に子を段と推奨順に並べた字下げの一覧にする（1段40px）。Issue は 178×88、子を持つものは 236×88 の箱。親子の線は、親の箱の左下から下へ伸びる幹（`lane: "v"`）と、子の上端から14px の高さで子の左の辺へ入る枝（`lane: "h"`）。依存の線が子へ入る位置は、枝より下（上端から28px より下）にする。行の間の隙間は行ごとに広げられる。
+			- 片付けの候補（入れ子で `fold` のとき）：同じ入れ物の同じ列の候補を、1つのまとまりにする。開いた配下を持つ閉じた親（`keep_visible`）は畳まない。まとまりの中の Scope と、その子孫への依存は、まとまりにつなぐ。木では畳まない。
 			- 依存の組：各 Scope の `blocked_by` の先と自分を、見えている箱、枠、まとまりに写す。同じ組は1本にまとめる。親子の間（片方がもう片方を含む）と、同じまとまりの中は線にしない。`deps` が `wait` なら、待ち先が開いている依存だけ。
 			- 寸法：箱 178×88、枠の見出し22、要点の行18、枠の中の余白、列の間44、行の間12、最上位の間28、上の余白は操作の帯の高さ（D-05）。隙間は `gaps[キー]` だけ広げられる。
-			- `widen` を隙間のキーに写す `gapFor(axis, a, b)`：2つの障害物の共通の入れ物が、その向きに並べる入れ物なら、その隙間のキーを返す。
+			- `widen` を隙間のキーに写す `gapFor(axis, a, b)`：2つの障害物の共通の入れ物から上へたどり、その向きに並べる入れ物の隙間のキーを返す。図の端なら外の余白、木なら字下げか、その行の後の隙間。
 			- `G` を作る `graphInput(layout)` と、隙間を広げて最大8回引き直す `routeLayout(scopes, cleanup, opts)` も、このモジュールに置く（DOM なし）。
 			"""
 		satisfies: ["R-01", "R-02", "R-03", "R-04", "R-05", "R-06", "R-13", "F-02"]
@@ -59,7 +62,7 @@ design: {
 			- `render(root, ctx)`：最初に骨組みの DOM（図の領域、世界、線の SVG、操作の帯、凡例、要点の欄）を作る。データ（`revision`）、表し方、`focus` が変わったときだけ、D-03 で配置して描き直し、見る位置と倍率と選択を保つ。`dispose()` で文書への登録（`gesturestart` など、`keydown`）を外す。
 			- 箱と枠と印は `marks.js` の部品で描く。状態の記号は `core/ui.js` の `stateIcon`。PR の印は `pr.state`、`pr.is_draft`、`pr.checks`、`pr.mergeable` から。
 			- 状態の印（`hl`）：Issue の箱の `lane`／`merge` で数え、押すとその箱に `is-hl`、ほかに `is-dim`。選択と状態の印は、後の操作が前の操作を消す。
-			- 選択：`api.scope(repository, ID, baseline なし)` を読み、`upstream`、`downstream`、`root_waits` から箱と線の見え方を決める。線は、組 `[待ち先, 待つもの]` のどれかが、選んだ Scope と直接の上流・下流を結べば強く、両端が関係する Scope（選んだもの、その祖先、上流、下流）なら弱く、ほかは淡く。読んでいる間に別の操作があったら結果を捨てる。読めなければ選んだ箱だけを際立たせる。
+			- 選択：`api.scope(repository, ID, baseline なし)` を読み、`upstream`、`downstream`（選んだ Scope が終わっていれば `downstream_all`）、`root_waits` から箱と線の見え方を決める。線は、組 `[待ち先, 待つもの]` のどれかが、選んだ Scope と直接の上流・下流を結べば強く、両端が関係する Scope（選んだもの、その祖先、上流、下流）なら弱く、ほかは淡く。読んでいる間に別の操作があったら結果を捨てる。読めなければ選んだ箱だけを際立たせる。
 			- 要点の欄：状態の札（言葉つき）、マージ待ちの札、ID と番号と種類、題名、理由の文、親の道筋（押すとその親を選ぶ）、種類・保証・PR・ブランチ・段・変化の表、枠なら配下の進み具合、「詳しく」（`ctx.navigate`）、GitHub のリンク、枠なら「この範囲に絞る」。片付けの候補のまとまりを押したときは、候補の一覧と理由。
 			- 範囲の絞り込みは `ctx.navigate(?focus=ID)`。絞っているときは、帯に道筋と「全体へ戻る」。
 			- 操作：D-05。PC のダブルクリックで `ctx.navigate(scope の path)`。幅 640px 以下では、同じ箱の2回目のタップで移る。
@@ -92,7 +95,7 @@ design: {
 			- `tests/unit/presentation/test_dashboard_graph_js.py` が、見本の構造から `structure_document` の JSON を作り、node で `tests/js/dashboard_graph_check.mjs` を走らせ、結果の JSON を確かめる。
 			- 見本：`tests/fixtures/issue532/spec-dock-snapshot.json`（spec-dock の構造のスナップショット、2026-11-04）と、生成した250件の構造（Initiative 2、Epic 18、Issue 230、依存あり）。
 			- 組み合わせ：表し方（入れ子、木）× 終わったもの（隠す、出す）× 線（すべて、待っているもの）× 片付けの候補（畳む、開く）と、各 Epic への絞り込み。すべてで `audit` の6つの数と `trunkOverlaps` が0。
-			- node がないとき：環境変数 `CI` があれば失敗、なければ理由つきで skip。
+			- node がないとき：環境変数 `CI` があれば失敗、なければ理由つきで skip。GitHub の ubuntu-latest のランナーには node が入っている。ワークフロー（`provider-ci.yml`）は変えない。自己ホストのランナーに node がなく落ちたときは、統括が手当てする（2026-11-04 の統括の判断）。
 			"""
 		satisfies: ["R-02", "R-05", "R-11"]
 	}
