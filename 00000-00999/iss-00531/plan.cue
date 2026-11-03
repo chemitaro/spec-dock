@@ -14,7 +14,7 @@ steps: {
 	"S-06": {title: "Scope の詳しい画面（`views/scope.js`）を作る", realizes: ["R-07", "R-08", "R-09", "R-11", "R-14", "R-15"], status: "done", after: ["S-03", "S-04"], session: "impl"}
 	"S-07": {title: "横断の概況（`views/overview.js`）を作る", realizes: ["R-12", "R-13", "R-14", "R-15"], status: "done", after: ["S-02", "S-04"], session: "impl"}
 	"S-08": {title: "PC のヘッドレスの Chrome で、PC の幅と 390px、明るい表示と暗い表示、JavaScript のエラーなしを確かめ、report.md と Artifact に残す", realizes: ["R-01", "R-02", "R-03", "R-05", "R-10", "R-11", "R-12", "R-13", "R-14", "R-15"], status: "done", after: ["S-05", "S-06", "S-07"], session: "impl"}
-	"S-09": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-15"], status: "doing", after: ["S-08"], session: "impl"}
+	"S-09": {title: "コードのレビュー、最終品質ゲート、PR、CI", realizes: ["R-01", "R-15"], status: "done", after: ["S-08"], session: "impl"}
 }
 
 tests: {
