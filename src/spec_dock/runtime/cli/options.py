@@ -309,7 +309,11 @@ def completion_script(shell: str) -> str:
         for index, word in enumerate(parts):
             children.setdefault(" ".join(parts[:index]), set()).add(word)
         children.setdefault(leaf, set()).update(
-            name for argument in LEAF_ARGUMENTS[leaf] for name in argument.names if name.startswith("-")
+            name
+            for argument in LEAF_ARGUMENTS[leaf]
+            if argument.options.get("help") is not argparse.SUPPRESS  # internal (`dashboard serve --service`)
+            for name in argument.names
+            if name.startswith("-")
         )
         children[leaf].update(
             name

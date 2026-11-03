@@ -146,10 +146,13 @@ def serve(
     server: DashboardServer | None = None
     upgraded = False
     try:
-        started_version = version_reader()
+        started_version = version_reader()  # the baseline, also recorded as the server's version
         waited = False
         while server is None:
-            candidate = server_factory(root, port=port, tailscale=bool(namespace.tailscale), defer_tailscale=service)
+            options: dict[str, object] = {"version": started_version} if started_version else {}
+            candidate = server_factory(
+                root, port=port, tailscale=bool(namespace.tailscale), defer_tailscale=service, **options
+            )
             try:
                 urls = candidate.start()
             except DashboardAlreadyRunning as running:
@@ -183,13 +186,16 @@ def serve(
                 continue
             next_version = now + timing.version_check
             current = version_reader()
-            if current is None or started_version is None or current == started_version:
+            if current is None or started_version is None:
+                continue
+            if server.app is not None:
+                server.app.installed_version = current  # the latest read (also back to the started version)
+            if current == started_version:
                 continue
             if service:
                 upgraded = True
                 break
-            if not announced and server.app is not None:
-                server.app.installed_version = current
+            if not announced:
                 sys.stderr.write(
                     f"dashboard: spec-dock {current} is installed; restart `spec-dock dashboard serve` to use it\n"
                 )

@@ -284,7 +284,7 @@
     {
       "path": "spec-dock/docs/cli-redesign-guide.html",
       "source": "spec_dock/docs/cli-redesign-guide.html",
-      "sha256": "48827624681a568b0711631d41ce520965de870c7101ced6d5fbf86f69eb2db7",
+      "sha256": "d5f47759687eb35bf36e4b81ef2cee30f10d0da662751caf170bc6a5e4e239d9",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [
@@ -395,7 +395,7 @@
     {
       "path": "spec-dock/docs/reference_cli.md",
       "source": "spec_dock/docs/reference_cli.md",
-      "sha256": "aceb95aec8120aa6600fb5db3690c2a9791daa295b943e68007af5869063e56d",
+      "sha256": "2941d065a250c54b628f6472adab49d363dea2d79645e4ebc8ad3c914e408aa8",
       "mode": 420,
       "init_only": false,
       "known_old_sha256": [

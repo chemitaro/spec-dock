@@ -199,3 +199,13 @@ def test_install_and_uninstall_have_no_plan_only_form(
     code = main(["dashboard", "service", leaf, "--dry-run", "--json"])
     assert code == 2
     assert dashboard_services.commands.calls == [] and not dashboard_services.root.exists()
+
+
+def test_the_internal_service_flag_stays_out_of_help_and_completion(capsys: pytest.CaptureFixture[str]) -> None:
+    for shell in ("bash", "zsh", "fish"):
+        assert main(["completion", shell]) == 0
+        script = capsys.readouterr().out
+        assert "--state-root" in script and "--service" not in script, shell
+    assert main(["help", "dashboard", "serve"]) == 0
+    text = capsys.readouterr().out
+    assert "--state-root" in text and "--service" not in text

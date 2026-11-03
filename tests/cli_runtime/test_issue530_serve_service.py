@@ -158,18 +158,45 @@ def test_the_foreground_server_keeps_running_and_reports_the_upgrade(
         def upgraded() -> bool:
             with urllib.request.urlopen(url, timeout=5) as response:
                 seen["server"] = json.loads(response.read())["server"]
-            return bool(seen["server"]["restart_required"])
+            return seen["server"]["installed_version"] == "0.6.1"  # each read refreshes it
 
         seen["upgraded"] = _until(upgraded)
         stop.set()
 
     _later(drive)
     result = serve(
-        _namespace(service=False), tmp_path, timing=FAST, version_reader=_versions("0.5.0", "0.6.0"), stop=stop
+        _namespace(service=False), tmp_path, timing=FAST, version_reader=_versions("0.5.0", "0.6.0", "0.6.1"), stop=stop
     )
-    assert seen["upgraded"] is True and seen["server"]["installed_version"] == "0.6.0"
+    assert seen["upgraded"] is True and seen["server"]["restart_required"] is True
     assert result.exit_code == 0 and result.data.result["stopped"] is True  # type: ignore[attr-defined]
-    assert capsys.readouterr().err.count("spec-dock 0.6.0 is installed") == 1
+    assert capsys.readouterr().err.count("is installed; restart") == 1
+
+
+def test_the_foreground_server_clears_the_notice_when_the_started_version_returns(state: Path, tmp_path: Path) -> None:
+    stop = threading.Event()
+    seen: list[dict[str, Any]] = []
+    installed = {"version": "0.5.0"}
+
+    def drive() -> None:
+        _until(lambda: _local(state) is not None)
+        url = f"{_local(state)}api/v1/repositories"
+
+        def read() -> dict[str, Any]:
+            with urllib.request.urlopen(url, timeout=5) as response:
+                server: dict[str, Any] = json.loads(response.read())["server"]
+            seen.append(server)
+            return server
+
+        installed["version"] = "0.6.0"
+        _until(lambda: read()["restart_required"] is True)
+        installed["version"] = "0.5.0"
+        _until(lambda: read()["restart_required"] is False)
+        stop.set()
+
+    _later(drive)
+    serve(_namespace(service=False), tmp_path, timing=FAST, version_reader=lambda: installed["version"], stop=stop)
+    assert any(item["restart_required"] for item in seen)
+    assert seen[-1]["restart_required"] is False and seen[-1]["installed_version"] == "0.5.0"
 
 
 # --- T-09 ----------------------------------------------------------------------------------------------------
