@@ -8,47 +8,52 @@ goal: "利用者ごとに1つのサーバーで、全リポジトリの仕様の
 slices: {
 	"iss-00527": {
 		covers:  ["F-13"]
-		text:    "第1波。試作：起点の違う iframe の中で、iPhone の Safari と PC のブラウザーが、構造の図の指の操作（つまむ、移動、ダブルタップ）、`frame-ancestors` の決まり、`sandbox` の資料の切り離しと `/ds/` の読み込み、戻るの履歴（D-15）、写す機能の代わり（D-17）をどう扱うかを確かめる。製品のコードは出さず、結果を report.md に書き、設計（D-08、D-09、D-15、D-17）を直す材料にする。iPhone の実機の確かめは利用者に頼む。"
+		text:    "第1波。試作：起点の違う iframe の中で、iPhone の Safari と PC のブラウザーが、構造の図の指の操作（つまむ、移動、タップ）、`frame-ancestors` の決まり、`sandbox` の資料の切り離しと `/ds/` の読み込み、postMessage の始まりの挨拶と戻るの履歴（D-15）をどう扱うかを確かめる。製品のコードは出さず、結果を report.md に書き、設計（D-08、D-09、D-15）を直す材料にする。逃げ道（普通のリンク）の実装は #531。iPhone の実機の確かめは利用者に頼む。"
 		session: "light"
 	}
 	"iss-00528": {
-		covers:  ["R-07", "R-09", "R-10", "R-20", "R-21", "F-01", "F-02", "F-03", "F-04", "F-06"]
-		text:    "第1波。D-04 の状態のモデル、D-05 の要約、D-12 の読めないときの扱いと、`dashboard summary`（D-01 の一部）。HTTP は作らない。#527 と並べる。"
+		covers:  ["R-07", "R-09", "R-10", "R-20", "R-21", "R-29", "F-01", "F-02", "F-03", "F-04", "F-06"]
+		text:    "第1波。D-04 の状態のモデル（ボードの分け方、変化の比べ方を含む。PR の欄は #537 の形を先に決めて受ける）、D-05 の要約、D-12 の読めないときの扱いと、`dashboard summary`（D-01 の一部）。HTTP は作らない。R-21 の受け入れのうち CLI の側と、R-29 の比べ方を確かめる。#527・#537 と並べる。"
+		session: "std"
+	}
+	"iss-00537": {
+		covers:  ["R-07", "R-30"]
+		text:    "第1波。D-19 の PR の状態の取得（定期の同期の GraphQL、構造のスナップショットの版2、Scope との対応、失敗の扱い）。スナップショットの形は #528 と最初に合わせる。#527・#528 と並べる。"
 		session: "std"
 	}
 	"iss-00529": {
-		covers:  ["R-01", "R-02", "R-03", "R-04", "R-05", "R-08", "R-22", "R-27", "F-07", "F-08", "F-09", "F-12"]
-		text:    "第2波。D-02 のサーバー、D-03 の道筋と API、D-06 の在りかの記録、D-09 の切り離しと枠の決まり、D-13 の `hide`／`show`／`list`、D-15 の埋め込みの表示と postMessage の約束（サーバーの側と、確かめ用の空の画面）。画面そのものは #531・#532。"
+		covers:  ["R-01", "R-02", "R-03", "R-04", "R-05", "R-08", "R-21", "R-22", "R-27", "R-29", "F-07", "F-08", "F-09", "F-12"]
+		text:    "第2波。D-02 のサーバー、D-03 の道筋と API、D-06 の在りかの記録、D-09 の切り離しと枠の決まり、D-13 の `hide`／`show`／`list`、D-18 の「見た」の口、D-15 の埋め込みの約束。あわせて、画面の骨組み（上の帯、リポジトリの切り替え、画面の切り替えの枠、`?embed=1`、postMessage の受け渡し、5秒ごとの自動の更新、「見た」の送信）を作り、R-03・R-08・R-22 をこの Issue で確かめる。中の3つの画面は #531・#532 が作る。見た目は利用者が選んだデザイン案に従う。"
 		after:   ["iss-00528"]
 		session: "std"
 	}
 	"iss-00530": {
 		covers:  ["R-28"]
-		text:    "第3波。D-14 の常駐（`dashboard service install`／`status`／`uninstall`）と、版の更新の後の起動し直し。#531・#532・#533 と並べる。"
+		text:    "第3波。D-14 の常駐（`dashboard service install`／`status`／`uninstall`、前面の `serve` との共存、版の更新の後の起動し直し）。#531・#532・#533 と並べる。コマンドの数を縛る文書（`reference_cli.md` など）は #533 と重なるので、後にマージするほうが main を取り込む。"
 		after:   ["iss-00529"]
 		session: "std"
 	}
 	"iss-00531": {
-		covers:  ["R-06", "R-11", "R-12", "R-13", "R-14", "R-17", "R-18", "R-24", "R-29", "F-05"]
-		text:    "第3波。D-07 の画面の作り、D-08 のボード・一覧・詳しい画面・検索、D-16 の横断の概況、D-17 の写せるコマンド。#527 の試作の結果を取り込む。#532 と並べる（画面のモジュールを分けてぶつからないようにする）。"
-		after:   ["iss-00529", "iss-00527"]
+		covers:  ["R-06", "R-11", "R-12", "R-13", "R-14", "R-17", "R-18", "R-24", "R-29", "F-05", "F-13"]
+		text:    "第3波。D-07 の画面の作り、D-08 の状態のボード（マージ待ちの列、片付けの候補の印）・詳しい画面（タブ）・検索、D-16 の横断の概況、変化の印、どの画面も普通のリンクで開ける逃げ道。#527 の試作の結果と、利用者が選んだデザイン案を取り込む。#532 と並べる（画面のモジュールを分けてぶつからないようにする）。"
+		after:   ["iss-00529", "iss-00527", "iss-00537"]
 		session: "std"
 	}
 	"iss-00532": {
-		covers:  ["R-15", "R-16", "F-11"]
-		text:    "第3波。D-08 の構造の図（ホーム）と時間の軸。#527 の試作の指の操作の結果を取り込む。#531 と並べる。"
-		after:   ["iss-00529", "iss-00527"]
+		covers:  ["R-06", "R-11", "R-15", "R-16", "R-29", "F-11"]
+		text:    "第3波。D-08 の構造の図（ホーム。状態をアイコンと図形で示す）と時間の軸（PR の出来事を含む）、図の変化の印。#527 の試作の指の操作の結果と、利用者が選んだデザイン案を取り込む。#531 と並べる。"
+		after:   ["iss-00529", "iss-00527", "iss-00537"]
 		session: "std"
 	}
 	"iss-00533": {
 		covers:  ["R-23"]
-		text:    "第3波。D-10 の撤去。#530〜#532 と並べる（直す場所が重ならない）。"
+		text:    "第3波。D-10 の撤去。#530〜#532 と並べる。`reference_cli.md` と `cli-redesign-guide.html` は #530 と重なるので、後にマージするほうが main を取り込む。"
 		after:   ["iss-00529"]
 		session: "std"
 	}
 	"iss-00534": {
 		covers:  ["R-23"]
-		text:    "第4波。0.6.0 を出し、5つのリポジトリに配る。`migration.md` の「0.6.0 への更新」（コマンドが8つ増える、`canonical status` の `dashboard` の項目が消える、残った5つのファイルを消してよい）。マージの後の導入と配布は統括が行い、利用者の PC で `dashboard serve` と iPhone からの表示を確かめる。"
+		text:    "第4波。0.6.0 を出し、5つのリポジトリに配る。`migration.md` の「0.6.0 への更新」（コマンドが8つ増える、`canonical status` の `dashboard` の項目が消える、残った5つのファイルを消してよい、構造のスナップショットが版2になる）。マージの後の導入と配布は統括が行い、利用者の PC で `dashboard serve` と iPhone からの表示を確かめる。"
 		after:   ["iss-00530", "iss-00531", "iss-00532", "iss-00533"]
 		session: "light"
 	}
@@ -66,9 +71,9 @@ slices: {
 	}
 }
 
-verification: "各 Issue の PR で `make lint` と `uv run pytest`（全体）と CI を通す。standard の Issue は、仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）を通す。light の Issue は、仕様のレビュー opus/medium、コードのレビュー sonnet/high、最終品質ゲート opus/high（1人）。画面の Issue（#531、#532）は、PC のブラウザーでの確かめを報告に残し、iPhone の Safari の確かめは利用者に頼む。0.6.0 と 0.7.0 の配布の後、5つのリポジトリで `canonical status` と、`dashboard serve` での各リポジトリの表示を確かめる。"
+verification: "画面の見た目は、利用者が3つのデザイン案から選んだもの（2026-11-03 に用意）を、#529 の前に epic-00427 の決定として記録し、それに従う。各 Issue の PR で `make lint` と `uv run pytest`（全体）と CI を通す。standard の Issue は、仕様のレビュー（spec-reviewer opus/high）、コードのレビュー（code-reviewer opus/high）、最終品質ゲート（quality-gate-reviewer opus/high、1人）を通す。light の Issue は、仕様のレビュー opus/medium、コードのレビュー sonnet/high、最終品質ゲート opus/high（1人）。画面の Issue（#531、#532）は、PC のブラウザーでの確かめを報告に残し、iPhone の Safari の確かめは利用者に頼む。0.6.0 と 0.7.0 の配布の後、5つのリポジトリで `canonical status` と、`dashboard serve` での各リポジトリの表示を確かめる。"
 rollback: "マージの前なら PR を閉じる。マージの後で配る前なら `git revert`。配った後なら、常駐を入れていれば `dashboard service uninstall` を先に行い、パッケージを前の版に戻し、各リポジトリの配布の PR を `git revert` する。"
-exit: "#527〜#536 が閉じ、5つのリポジトリが 0.7.0 で、利用者の PC と iPhone から全リポジトリのダッシュボードが開け、company-os の試しの親の画面に埋め込めることを確かめ、この Epic の report.md に結果をまとめた。"
+exit: "#527〜#537 が閉じ、5つのリポジトリが 0.7.0 で、利用者の PC と iPhone から全リポジトリのダッシュボードが開け、company-os の試しの親の画面に埋め込めることを確かめ、この Epic の report.md に結果をまとめた。"
 
 execution: {
 	sessions: {
